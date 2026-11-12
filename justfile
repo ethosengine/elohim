@@ -696,16 +696,19 @@ _gate-epr-ts:
 # elohim/eprfs is its own native workspace with no per-project justfile; the
 # recipe lives here so the manifest's typed contract has a real target.
 # Check published version collisions before building, without Cargo registry credentials.
+# Ingest is a write: it delivers a candidate only after every check passed. The source state
+# and HEAD it records are read before the checks, so an edit made while they run reads dirty.
 _gate-eprfs:
-    @set -- --workspace; \
+    @before="$("$CARGO_TARGET_DIR/debug/epr" bin --tool epr source-state 2>/dev/null || "${EPR_BIN:-epr}" bin --tool epr source-state 2>/dev/null || echo none)"; \
+      tested_head="$(git rev-parse HEAD)"; \
+      set -- --workspace; \
       if [ -n "${GATE_CARGO_PACKAGES:-}" ]; then set --; for package in $GATE_CARGO_PACKAGES; do set -- "$@" -p "$package"; done; fi; \
-      cd elohim/eprfs && bash "{{justfile_directory()}}/genesis/orchestrator/gate-steps.sh" \
+      (cd elohim/eprfs && bash "{{justfile_directory()}}/genesis/orchestrator/gate-steps.sh" \
         fmt -- cargo fmt --check \
         ::: precheck -- python3 "{{justfile_directory()}}/scripts/ci/publish_eprfs.py" --precheck \
         ::: lint -- node "{{justfile_directory()}}/genesis/orchestrator/cargo-lint.mjs" "$@" --all-targets -- -D warnings \
-        ::: test -- cargo test "$@"
-    # Ingest is a write: only deliver a candidate after every check passed.
-    @just _eprfs-ingest-around build
+        ::: test -- cargo test "$@") || exit $?; \
+      EPRFS_SOURCE_BEFORE="$before" EPRFS_TESTED_HEAD="$tested_head" just _eprfs-ingest-around build
 
 # Native seam guidance's non-Rust contracts: the declaration and method schemas hold every
 # declaration the opt-in binding names, and the hook adapter stays private and fails visibly.
@@ -729,8 +732,8 @@ _eprfs-deliver:
 # tree: hooks keep `.claude/data` ledgers dirty in the main checkout. Before the slot's first
 # build there is no debug/epr to judge with, so the device's own epr reads the "before" state.
 _eprfs-ingest-around mode:
-    @before="$("$CARGO_TARGET_DIR/debug/epr" bin --tool epr source-state 2>/dev/null || "${EPR_BIN:-epr}" bin --tool epr source-state 2>/dev/null || echo none)"; \
-      tested_head="$(git rev-parse HEAD)"; \
+    @before="${EPRFS_SOURCE_BEFORE:-$("$CARGO_TARGET_DIR/debug/epr" bin --tool epr source-state 2>/dev/null || "${EPR_BIN:-epr}" bin --tool epr source-state 2>/dev/null || echo none)}"; \
+      tested_head="${EPRFS_TESTED_HEAD:-$(git rev-parse HEAD)}"; \
       if [[ "{{mode}}" == test ]]; then \
         set -- --workspace; \
         if [ -n "${GATE_CARGO_PACKAGES:-}" ]; then set --; for package in $GATE_CARGO_PACKAGES; do set -- "$@" -p "$package"; done; fi; \
