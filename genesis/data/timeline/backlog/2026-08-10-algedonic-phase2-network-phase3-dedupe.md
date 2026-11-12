@@ -11,11 +11,11 @@ status: "backlog"
 priority: "medium"
 tags: [algedonic, feedback-signal, epr-rea, ci-cd, network, dedupe, research-derived]
 cites:
-  - algedonic-feedback-signal | Algedonic Feedback Signal | sha256:d0b1b524dc7240fc | path: genesis/docs/superpowers/specs/2026-08-10-algedonic-feedback-signal-design.md
-  - algedonic-phase1-epr-local-first | Algedonic Phase 1 | sha256:a70d7eab56d40189 | path: genesis/docs/superpowers/plans/2026-08-10-algedonic-phase1-epr-local-first-plan.md
-  - algedonic-slice1-delivery-flow | Algedonic Slice 1 | sha256:66054e651d33f3a4 | path: genesis/docs/superpowers/plans/2026-08-10-algedonic-slice1-delivery-flow-plan.md
-  - vision-gap-limit-governor-stub | Vision-Gap STUB | sha256:14ea8f3e81cd87c8 | path: genesis/docs/superpowers/plans/2026-06-14-vision-gap-limit-governor-stub.md
-  - .claude/memory/project_ghost_declaration_deadlock_batch3.md
+  - "algedonic-feedback-signal | Algedonic Feedback Signal | sha256:d0b1b524dc7240fc | path: genesis/docs/superpowers/specs/2026-08-10-algedonic-feedback-signal-design.md"
+  - "algedonic-phase1-epr-local-first | Algedonic Phase 1 | sha256:a70d7eab56d40189 | path: genesis/docs/superpowers/plans/2026-08-10-algedonic-phase1-epr-local-first-plan.md"
+  - "algedonic-slice1-delivery-flow | Algedonic Slice 1 | sha256:66054e651d33f3a4 | path: genesis/docs/superpowers/plans/2026-08-10-algedonic-slice1-delivery-flow-plan.md"
+  - "vision-gap-limit-governor-stub | Vision-Gap STUB | sha256:14ea8f3e81cd87c8 | path: genesis/docs/superpowers/plans/2026-06-14-vision-gap-limit-governor-stub.md"
+  - "project-ghost-declaration-deadlock-batch3 | Batch-3 = ghost-declaration deadlock, not missing anchors | sha256:7fe93f5aae2072bc | path: .claude/memory/project_ghost_declaration_deadlock_batch3.md"
   - elohim/epr-rea/src/epistemic.rs
   - genesis/research/meadows-systems-dynamics-cross-pollination-2026-08-11.md
 ---
@@ -42,6 +42,124 @@ pattern to the network (CI/CD-produced signals), phase 3 burns down what the pat
 | 7 | **Absence is a floor breach declared by the expectant holon; `Sense` and `ClearPolicy` enter the type** | A period that closed with no observation is a floor breach whose stock is observations received and whose limit is the kind's `diversity_threshold.min_count`, carried with `Confidence{claim: Witnessed, unknown_reason: NoObservations}`, declared by the holon whose period closed empty, never by the silent producer — the typed inverse of `heartbeat.rs:368` (free storage defaults to 100% on probe failure). The reset is `should_clear(open, now, ClearPolicy{clear_pct, hold_secs})` emitting `algedonic-clear`; the alert rules' `for:` durations (30 m / 6 h in `alpha-doorway-alerts.yaml`) become `hold_secs`. Canon: [Observability epic](genesis/docs/content/elohim-protocol/observability/epic.md) §7 step 4. | Blocked on the first production emitter (the operator's post-observation compare, epic §4); the PrometheusRule file stays as a SHADOW until every alert it would fire was preceded by a signal that reached the holon first. | elohim/epr/src/algedonic.rs + the operator emitter in elohim-storage; small |
 | 8 | **`reliance-account-closed@1` emitter with emit and clear hysteresis per holon** (extends row 7) | Minted from [commons composition at scale](epr:commons-composition-at-scale-2026-10-15) §15 MN-10. `should_emit` (`elohim/epr/src/algedonic.rs:381`) has no production caller and no clearing predicate (guidestar spec:342-343). Read the measure per holon at its own reach: a dead cite fires one notice to the holon's person, and repairing it clears that notice without re-firing. Uses row 7's `ClearPolicy`. | Row 7 (`ClearPolicy` in the type); the reliance `CoverageDomain` (dependency-graph entry) | elohim/epr/src/algedonic.rs; small |
 | 9 | **`epr feedback` — a person's words about a surface, born discoverable and gathered when asked** (operator, 2026-10-10, during the manual two-workspace device join) | The operator typed `epr device feedback "…"` and `epr device status` on shem and neither existed (`status` and did-you-mean hints landed the same day: dev `2dc2a08e1`, `d2b3ccb01`). Operator's statements: (a) feedback is authored at the CLI, local-first, with an explicit `--reach` intent at authorship; (b) it may be born at a reach that is available for network discovery — a PULL signal, not a push: the network asks "how is everyone feeling about `epr(<hash>:<cli-view-slug>)`" and that question is an event asking peers to aggregate their feedback on that EPR toward a developer peer; (c) a higher reach can carry urgency and become a PUSH signal; (d) the agentic reach gate must apply to this command, so an agent authoring feedback at a widened reach is gated like any other reach-crossing act; (e) EPRs carry every native network signal local-first, and the same feedback is visible when the EPR is viewed in a peer-based app. Agent's interpretation, not yet ruled: the target is the EPR of the command surface (typing it under `epr device` supplies the subject); the carrier is the existing `/elohim/feedback-signal/<target>` topic and `create_feedback_signal`, so this is a door onto the algedonic signal rather than a new record type; aggregation is a projection a steward reads, and pickup as a bug or enhancement is the governance act. Operator's rulings, 2026-10-10: (f) an answer carries BOTH layers — the anonymous measure always (who is experiencing it and why: device, locality, version numbers, tags or categories; and what it is), and the person's words when they pushed them; for words the person did not push, the asker makes a polite ask of that person rather than taking them; (g) the asker is a steward of the code or collective, governed and in good standing, and WHO may collect depends on the stakes the reach gate returns — a sensitive issue is collected with discretion, a zero-day is high stakes and is collected only by a higher-trusted steward ("go get your high-trusted superior to collect"). Agent's interpretation: the stakes class is a property of the feedback set by its author or by the gate, and it selects the standing an asker needs; still to design: what the anonymous measure may contain before it identifies a person on a small network (device plus locality plus version can be one person), and how the polite ask is carried and declined. | p2p-design-gate before any route or entry type; rides row 6 of the phase-3 table (zome `SIGNAL_KINDS` + kind-gates) for the DHT leg; the reach gate leg needs the feedback verb named in the PreToolUse policy table; scenario owed under `genesis/a2o/features/` before implementation | epr-cli verb + storage signal projection; one design pass first |
+
+### Row 9 extension — EPR owns experience and feedback (operator, 2026-11-08)
+
+Exceptions and feedback are first-class protocol experiences. A Brit fallback and a failure
+loading the Elohim landing page must both be capturable locally, understandable by an agent
+acting through that surface, and traceable through repair to a verified change in the original
+experience. The operator places the common contract in **EPR**; **Brit inherits and implements
+that interface**. This extends row 9 beyond a feedback command. It remains backlog scope, not
+a claim that the interface or end-to-end path is implemented.
+
+**Scope clarification (operator, same session).** Compute exceptions are one common channel
+of this primitive, not its defining case. The common contract must also admit human-authored
+feedback, unmet needs, experienced friction, observations about commitments and their effects,
+and evidence of improvement or recovery. These are illustrative channels, not a closed taxonomy
+or newly minted signal kinds. Preserve each channel's meaning: feedback is not necessarily an
+error, disagreement is not necessarily a breach, and an observation is not automatically a
+witness or attestation. The shared loop is experience → local record → interpretation →
+consented response and sharing → verified effect; the failure-to-recovery chain below is its
+first proving slice. Design the EPR contract from that broader purpose, with compute adapters
+implementing it rather than defining it through stack traces, exit codes or mandatory bounds.
+
+**Ownership.** EPR owns the shared feedback contract, lifecycle and consent/reach semantics,
+composing the existing observation, algedonic, REA commitment and attestation primitives.
+Its device-side implementation must record and read without a repository, HEAD, conductor or
+network connection. Brit supplies operation/version context, typed failure or declared bridge,
+fallback outcome and replay evidence. LVI supplies composition/lifecycle context; Rakia supplies
+build/input and verification evidence; browser and agent-view adapters supply the failed
+interaction and its capture. These are consumers/producers of the same contract, not separate
+feedback authorities. This follows Brit's existing ownership table in
+`elohim/brit/docs/plans/2026-09-27-native-developer-through-line.md`: `epr flow` owns intent,
+commitment, attribution, review and acceptance; Brit owns orchestration, not another governance
+ledger. Native typed exceptions remain useful; the shared interface records their experienced
+effect without replacing each tool's error model.
+
+**Concrete missing joins, inspected 2026-11-08.** The package-authored Brit guard
+(`.epr-meta/elohim/packages/hooks/brit-first.json`) returns “fallback recorded in this tool
+call” without persisting a record. A guard refusal, a declared Git bridge, a missing capability
+and a failed Brit operation must remain distinguishable; the quoted path-history fallback is
+a reported capability claim until tested against the named binary. Codex shell-adapter coverage
+in this session is explicitly unsupported, not zero fallbacks. The app's
+`app/elohim-app/src/app/elohim/services/issue-report.service.ts` posts issue-report content
+over HTTP; its logger retains only an in-memory buffer. `genesis/a2o/scripts/look.ts` already
+persists browser captures. `epr flow note` already appends CID-addressed records through
+`SidecarFlowStore`, but its repository/HEAD requirement prevents it from being the general
+offline client interface. Adapt these producers and stores behind EPR; do not start a Brit-only
+JSONL ledger or a telemetry service as the authority.
+
+**Local-first reading.**
+
+- **Alone, key on device:** capture a bounded private occurrence, retain the affected surface
+  version and evidence, prepare a feedback draft, and sign a fixed submission locally. Transport
+  and acknowledgement wait for a recipient; recording and investigation do not.
+- **Alone, key held by doorway:** keep the local occurrence and draft across restart; fixing and
+  addressing the submission works locally, signing waits. Show “only on this device; not saved
+  to your account.” A hosting doorway can read what is sent to it and sign for its participant.
+- **Alone, no key:** capture and inspect during the visit; disclose that nothing survives the
+  visit. Durable account attribution is not invented for an anonymous visitor.
+- **Working version:** author-only feedback draft, separate from the fixed occurrence and from
+  published feedback. An agent proposes a draft under its granted scope; widening its audience
+  requires the participant's consent or an applicable existing grant.
+- **Each kind of state:** selection is device-only; live activity is passing; the feedback text
+  is a working version; shared evidence and accepted repair claims are fixed publications.
+- **Arrivals:** another authorized personal device adds continuity and learns only the permitted
+  records; a peer or collective steward adds corroboration/triage and learns the consented
+  submission; an always-on copy adds availability and learns content or ciphertext plus timing
+  according to its grant; a doorway adds hosting; a public pool may process approved public
+  evidence only, never private diagnostics. Loss of each leaves local capture, drafts and held
+  evidence usable. The person's own node can perform the local and signing steps without a host.
+- **Shown to the person:** local-only versus shared, unsigned versus signed versus witnessed,
+  each copy caught up/behind/unknown, submission pending/elected/not current, and exactly what
+  is waiting. A repaired release and recovery on this device are separate facts.
+- **Refusals:** no automatic raw command/URL/log upload, no silent reach increase, no publishing
+  failure that erases the original local experience, and no recursive error storm if capture
+  itself fails. Declare retention and bounded occurrence aggregation; retain visible capture
+  gaps. Local collection and sharing are separately governed.
+- **Stands as is:** reuse the existing producers, flow records, observations and repair
+  commitments. The missing home is an EPR-owned local intake/read contract with adapters.
+
+**P2P design boundary before implementation.** Rebuildable self-sense and priority views are
+Ephemeral (C); a retained occurrence or authored draft cannot be called rebuildable merely
+because it is local. Its Private (B) holding/source-chain binding needs to be designed with
+the browser and native adapters together. A signature alone is not an independent witness.
+Consented attestations of outcomes use the existing observation-to-fruit discipline; private
+capture adds zero DHT heads, and raw occurrences must not become one public head each.
+Budget one-year network cost by admitted incidents/transitions and retention before selecting
+the publication carrier. Consent permits sharing; evidence and collective governance determine
+earned reach and acceptance. Neither substitutes for the other.
+
+The current `create_feedback_signal` accepts a target ActionHash and returns an ActionHash;
+its integrity whitelist does not admit algedonic kinds. Extending that whitelist moves the DNA
+hash. The documented interim `CommitmentByState` link returns a link ActionHash and links a
+commitment EntryHash to a proof event ActionHash; it supplies discoverability, not proof of
+acceptance. Preserve these distinctions when finishing the p2p-design-gate; row 9's earlier
+carrier suggestion is not an approved mapping. No new entry type, route or wire schema is
+chosen by this note. **SDO/RWA boundary:** a collector may learn only what the participant's
+crossing act admits; no cross-holon join of raw activity, no identifying “anonymous” diagnostic
+bundle, and no compelled private words. Shared counter-evidence retains its constitutional floor.
+
+**Acceptance chain to make runnable before implementation:** experience → durable private
+capture → addressed concern/promise → consented feedback → governed development commitment →
+repair and independent verification → delivered version → safe replay of the original
+experience → evidence-backed recovery. This is the VSM sense/respond loop through the native
+developer experience, not closure by a status-field edit. Brit/LVI/Rakia contribute their
+evidence to EPR collectives; qualified stewards can prioritize and accept without owning the
+participant's private log. A measured bound crossing may produce algedonic escalation; an
+ordinary exception with no declared bound remains feedback, not an invented breach.
+
+The first two stories must exercise the same contract: (1) a Brit fallback with its observed
+reason and outcome; (2) a landing-page failure captured with no server reachable, surviving a
+signed-in participant's browser restart, then deliberately shared. Both must show repair evidence
+and recovery on the affected version. Add restart/offline, duplicate-report, declined-sharing,
+missing-adapter and recurrence cases; an unsafe mutation is never automatically replayed.
+Backlog priority is a declared read over impact, observed recurrence, workaround cost, unresolved
+age, coverage and corroboration. Preserve sampling/attempt denominators; absent capture is
+unknown, report volume is not independent attestation, and a workaround is not recovery.
+
+This is a design requirement capture. No runnable scenario, production adapter, new measure,
+attestation or green habit is claimed by this update.
 
 ## Phase 3 — dedupe / burn-down (slice-2 spec items this arc subsumes)
 
