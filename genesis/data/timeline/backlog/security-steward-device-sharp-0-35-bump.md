@@ -9,7 +9,7 @@ written: "2026-10-03"
 author: "deprecation-triage"
 status: "backlog"
 priority: "medium"
-deprecation_status: blocked
+deprecation_status: in-progress
 severity: high
 fingerprints: []
 relatedNodeIds:
@@ -64,3 +64,11 @@ then either remove the dependency or move the specifier to `^0.35.4` and run `ju
 
 None yet. Closure requires the steward/device gate green and alerts #732, #739, #860, #861 no
 longer open.
+
+## Status 2026-11-12
+
+Fixed on branch `deps/npm-security-20261112` (not yet landed): `steward/device/package.json` now
+declares `sharp ^0.35.5` (first patched for GHSA-wq5f-xc86-pv6w, alerts #948/#950, as well as
+#732/#739/#860/#861); the lock resolves `sharp@0.35.5` and the prebuilt binary loads in this
+workspace (`require('sharp').versions` prints libvips 8.x). No source consumer exists, as noted.
+Closure waits on landing and the alerts closing.

@@ -9,7 +9,7 @@ written: "2026-10-03"
 author: "deprecation-triage"
 status: "backlog"
 priority: "medium"
-deprecation_status: blocked
+deprecation_status: in-progress
 severity: medium
 fingerprints: []
 relatedNodeIds:
@@ -62,3 +62,10 @@ apply the three specifier changes, `pnpm install`, then `just gate` for
 
 None yet. Closure requires the three packages' test suites green on vitest 4.1.11 and alerts
 #834, #835, #836, #841, #842 no longer open.
+
+## Status 2026-11-12
+
+Done on branch `deps/npm-security-20261112` (not yet landed): all four vitest-3 declarations
+(the three above plus `elohim/eprfs/eprfs-ts`) moved to `^4.1.11`. `pnpm test` is green in each
+(epr-ts 65, storage-client-ts 135, agent-sdk 38, eprfs-ts 34 tests). The move also removes
+`tinypool@1.1.1` from the lock, which closes the critical tinypool alerts #936/#937.
