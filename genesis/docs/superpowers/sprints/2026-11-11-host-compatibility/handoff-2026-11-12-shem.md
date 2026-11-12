@@ -14,6 +14,16 @@ Codex's Brit feedback sprint (session 01a1cbeb) is published and finished.
 
 ## K9 two-device receipt: where it stands
 
+**Complete in both directions (about 16:20Z), after landing 17 (dev `6060f8347`).** Each side
+exits 1 with the same 11 pairs, mirrored, paired on both devices' records at `8b273f826`:
+`Scrt1.o`, `crt1.o`, the dynamic loader, `libc.so.6`, `libc_nonshared.a` (two lines), `libgcc.a`,
+`libgcc_s.so.1`, `libm.so.6`, `libmvec.so.1` and the `gcc` link driver, all at identical paths
+with different bytes. There is no macro-dump line, so the compiler macros agree. The packages
+differ three ways: vendor (shem AlmaLinux 10.2, ethosengine RHEL 10.0), glibc release (2.39-128
+against 2.39-145) and ISA build (shem's `x86_64_v2` variant). gcc is 14.3.1-4.4 on both, but the
+binaries differ. Shem's output: `evidence/k9-inputs-diff-shem.txt`. Ethosengine writes the plan's
+K9 line and its own evidence. The bullets below record how it got here.
+
 - Shem's half is recorded at commit `8b273f826`: output `bafkr4iegrxripmxuvkkrwl4q76jjenva4vtxcf65wkgufcgzg7glw5g5su`,
   key `bafyreifeinwqu6ra7iqj3j7dxlutl5xrocsmjhxch3wrtnpxfadl7vnrlm`. A second build two hours
   later reproduced the same output and key.
@@ -49,8 +59,9 @@ Codex's Brit feedback sprint (session 01a1cbeb) is published and finished.
 
 | What | State now | What it should become |
 |---|---|---|
-| Peer daemon | Runs the candidate `genesis/local-dev/hostcompat-wave1/k9/epr-8b273f826`, started with `EPR_BIN` set to that same path, `EPR_PEER_RELAY_URL=https://relay.alpha.elohim.host`, `--root /projects/elohim --handle matthew --listen 0.0.0.0:7777 --policy /projects/elohim/.worktrees/k9-8b273f826/genesis/agentic/pool-policy.json`. Log: `genesis/local-dev/peer/serve-shem-20261112.log`. | An installed release at or past `8b273f826`, with a policy file that is current with dev. |
-| Worktree `.worktrees/k9-8b273f826` | Detached at `8b273f826`. The daemon read its policy from here at start. | Removable once the daemon is restarted on another policy path and K9 is closed. |
+| Peer daemon | Since about 16:15Z runs the candidate `genesis/local-dev/hostcompat-wave1/k9/epr-6060f8347` (dev after landing 17, CID `bafkr4idiqjyy37fmfv4vcolbgkhkp6fihywpd23iephq4cjmahm4bx5spa`), started with `EPR_BIN` set to that same path, `EPR_PEER_RELAY_URL=https://relay.alpha.elohim.host`, `--root /projects/elohim --handle matthew --listen 0.0.0.0:7777 --policy /projects/elohim/.worktrees/k9-6060f8347/genesis/agentic/pool-policy.json`. Log: `genesis/local-dev/peer/serve-shem-20261112b.log`. | An installed release at or past `6060f8347`, with a policy file that is current with dev. |
+| Worktree `.worktrees/k9-6060f8347` | Detached at `6060f8347`. The daemon read its policy from here at start; the `epr` was built from here into pool family `k9`. | Removable once the daemon is restarted on another policy path. |
+| Worktree `.worktrees/k9-8b273f826` | Detached at `8b273f826`. The `--repo` for the K9 diff, since shem's record is at that commit. | Removable once K9 is closed. |
 | Main checkout `/projects/elohim` | Local `dev` at `6d994a931`, 117 dirty entries from several sessions. Untouched today. | Synced to dev. See the next section. |
 | Worktree `.worktrees/hc-k6v2` | Branch `hostcompat/k6-v2-sysroot`, used for every docs landing today. Two hook ledgers under `.claude/data/` are modified and deliberately left unstaged. | Keep for further docs landings, or cut a fresh one. |
 

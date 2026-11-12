@@ -1,0 +1,40 @@
+# K9 two-device receipt, shem direction (2026-11-12, about 16:17Z)
+# epr: genesis/local-dev/hostcompat-wave1/k9/epr-6060f8347 (dev 6060f8347, CID bafkr4idiqjyy37fmfv4vcolbgkhkp6fihywpd23iephq4cjmahm4bx5spa, sha256 e599349f67de2ee65f5d9a612816293fa91352344affa77c5ad0e828ce893387)
+# command: epr artifact inputs diff <method-doorway.json> --device did:key:z6MkpZRhMwWJpv7HeZyArTUkbnG6DUyukQp18MxUs2fHVMZB --repo <worktree at 8b273f826>
+# '-' lines are this device's inputs (shem), '+' lines the sibling's (ethosengine); see line_diff in elohim/eprfs/epr-cli/src/artifact/inputs.rs
+## exit
+EXIT=1
+## stderr
+inputs diff method=bafyreigncqdi6dazdut5t2svn5dir3smnjl3rwuuftb6crtn2dnqruwb2e
+this device: device=did:key:z6Mkm5deEA87WrC3PDDGjkZwnWhUGhwHS43UinXhy5N6bowj key=bafyreifeinwqu6ra7iqj3j7dxlutl5xrocsmjhxch3wrtnpxfadl7vnrlm input=bafkr4ia6eoasc3ghidccfpyq45p72iwt5lcgpjnqq4xsa72ba6bbyqca74 commit=8b273f826f3382a6114d3b87e6d8f283c05ba4a9 manifest=bafyreifsium2yd3u2y7544vdxskwk6zov4lgcjxckl5a42fgb4aekkr2wi
+sibling: device=did:key:z6MkpZRhMwWJpv7HeZyArTUkbnG6DUyukQp18MxUs2fHVMZB key=bafyreihe2pgpl5c2kpsbduud6ykm347zbnx66hiibe6qyq3knzjttt5lhi input=bafkr4idc7yezxlwekw6d2zkv2dlqqdwqbhi6mkz6xudmq47ei7zhbjab7u commit=8b273f826f3382a6114d3b87e6d8f283c05ba4a9 manifest=bafyreicillwaz7zd7zpj7vvghdnml3d4xvpvphcypvz6dlog3ltybmn4sm
+## stdout
++link:Scrt1.o	/usr/lib64/Scrt1.o	bafkr4iexmkehtuhn6yhoyufncyvsujf7hcnl2idjbdueboez33lvzof6na
+-link:Scrt1.o	/usr/lib64/Scrt1.o	bafkr4if7jxd4edatuuzwnq24afcytntncjzylqet4r4twxxwmsot7nb7fy
+-link:crt1.o	/usr/lib64/crt1.o	bafkr4ibmd4ynpe5pn7cadsf2hnfat7t27zj4xeicfveo2smjdzmclkc7wi
++link:crt1.o	/usr/lib64/crt1.o	bafkr4ici7rnkklkc4ql6nkdb533r7eag22rnuexvz4g7dddwudvxxpqvcy
++link:libc.so>/lib64/ld-linux-x86-64.so.2	/usr/lib64/ld-linux-x86-64.so.2	bafkr4ibqu57hsjmj627rywevrmm3kbr7qmox5y2cysw4xivdoidb7ev2ei
+-link:libc.so>/lib64/ld-linux-x86-64.so.2	/usr/lib64/ld-linux-x86-64.so.2	bafkr4if3qtg2kyys7oedzwj73cbr3qamveml4tr3icxpqbuyqafnqdaxjy
++link:libc.so>/lib64/libc.so.6	/usr/lib64/libc.so.6	bafkr4ic5vajkwmwxbvqu4vreomjkdmjkcxsx4mbbgnc6mgynoi5wfkmw54
+-link:libc.so>/lib64/libc.so.6	/usr/lib64/libc.so.6	bafkr4iejj6shndtliewiggqnds7qtdz34woahxtz3rlxgywnbs5l6xr3fm
++link:libc.so>/usr/lib64/libc_nonshared.a	/usr/lib64/libc_nonshared.a	bafkr4iaouwlsa6dbxw33gnol4zykbeemogs6v2tol6opwpdro7f5htl45i
+-link:libc.so>/usr/lib64/libc_nonshared.a	/usr/lib64/libc_nonshared.a	bafkr4igk2aqv2ybnnrm5unw4chdx7s7k4r4b4lslxbjje47xjoscj54kwq
++link:libc_nonshared.a	/usr/lib64/libc_nonshared.a	bafkr4iaouwlsa6dbxw33gnol4zykbeemogs6v2tol6opwpdro7f5htl45i
+-link:libc_nonshared.a	/usr/lib64/libc_nonshared.a	bafkr4igk2aqv2ybnnrm5unw4chdx7s7k4r4b4lslxbjje47xjoscj54kwq
+-link:libgcc.a	/usr/lib/gcc/x86_64-redhat-linux/14/libgcc.a	bafkr4ib6iah44hawzamjxhipwljselacr3wqtwyzdsf5ptqgv4qsyvjj6a
++link:libgcc.a	/usr/lib/gcc/x86_64-redhat-linux/14/libgcc.a	bafkr4ieiynwun6u2ugy4x37rpasvixh6mgpb6zcgcw3cbhepkgtgthmbtu
++link:libgcc_s.so>/lib64/libgcc_s.so.1	/usr/lib64/libgcc_s-14-20251022.so.1	bafkr4ibz4otvcdyqjyp6zemvflf6jqgferveiaops3psabph5b5nh6f4kq
+-link:libgcc_s.so>/lib64/libgcc_s.so.1	/usr/lib64/libgcc_s-14-20251022.so.1	bafkr4ihkwb7cgviqcaloyz5goqv5o2bwnwdeys4ak4pq5pjbldtebvdvsu
++link:libm.so>/lib64/libm.so.6	/usr/lib64/libm.so.6	bafkr4ifjbqi5dsdazlbgl3dbp2jwv6jzsdu6npxxkwwhigx6xcsb3pmm2q
+-link:libm.so>/lib64/libm.so.6	/usr/lib64/libm.so.6	bafkr4igahqtucdo2rric3tg65x5nukduoscvf5pbd3sd4ewx3ygt7sfkcy
+-link:libm.so>/lib64/libmvec.so.1	/usr/lib64/libmvec.so.1	bafkr4icd5ilr6u4gj2phue3k6hgclsqti2mestpmpupd4aknkh2xiobsh4
++link:libm.so>/lib64/libmvec.so.1	/usr/lib64/libmvec.so.1	bafkr4ig6ey6q4xykmzt5huulztvtah3354an6vnb3wfrs6tfusrin76gpi
++tool:link-driver:target	/usr/bin/gcc	bafkr4ibbxbhqlugpavccs7ncgdr3sv2lnowt7tdig426xlztmbpgmuciz4
+-tool:link-driver:target	/usr/bin/gcc	bafkr4iecgjqi6cz35jfpdnuh73axg5al4rslcws2kogcwcq2ytgitcqjbm
+## shem packages (rpm -q, /etc/os-release)
+glibc-2.39-128.el10_2.alma.1.x86_64_v2
+glibc-devel-2.39-128.el10_2.alma.1.x86_64_v2
+gcc-14.3.1-4.4.el10.alma.2.x86_64_v2
+libgcc-14.3.1-4.4.el10.alma.2.x86_64_v2
+NAME="AlmaLinux"
+VERSION_ID="10.2"
