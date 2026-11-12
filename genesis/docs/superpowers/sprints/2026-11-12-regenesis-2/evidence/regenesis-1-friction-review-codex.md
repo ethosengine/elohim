@@ -1,3 +1,10 @@
+---
+id: regenesis-2-friction-review-of-regenesis-1
+title: Regenesis-1 friction review (Codex gpt-6-astra, read-only)
+date: 2026-11-12
+author: Codex gpt-6-astra read leg, dispatched by shem session 3dd97e3d; five cited lines spot-checked by Claude Opus 5.5
+---
+
 **CONFIRMED:** reviewed `origin/dev` at `0088755ec` against regenesis-1’s records. No files changed; no tests, builds, deployments, or live probes ran. “CLOSED” below means the source contains the cure, not that I independently reproduced its runtime result.
 
 Evidence shorthand: **S** = [STATE.md](/projects/elohim/.worktrees/hc-k6v2/genesis/docs/superpowers/sprints/2026-11-05-regenesis-1/STATE.md); **R** = [regression-classes.md](/projects/elohim/.worktrees/hc-k6v2/genesis/docs/superpowers/sprints/2026-11-05-regenesis-1/regression-classes.md), numbered sections; **H** = [cycle-time handoff](/projects/elohim/.worktrees/hc-k6v2/genesis/docs/superpowers/sprints/2026-11-05-regenesis-1/briefs/cycle-time-harvest-handoff.md). Dev paths below abbreviate `elohim/elohim-storage/src/` as **ST**, `genesis/orchestrator/` as **O**, `genesis/seeder/src/` as **SE**, and `doorway/doorway-service/src/` as **DW**.
