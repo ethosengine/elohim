@@ -101,14 +101,7 @@ fn put(options: &Options) -> ArtifactResult<ExitCode> {
         key: derivation,
         input_lines: None,
     };
-    record_artifact(
-        options,
-        &descriptor,
-        &key,
-        bytes,
-        key.basis,
-        Some(&manifest),
-    )
+    record_artifact(options, &descriptor, &key, bytes, Some(&manifest), &[])
 }
 
 #[cfg(test)]
@@ -158,8 +151,8 @@ mod tests {
                 &descriptor,
                 &key,
                 Bytes::from(bytes.clone()),
-                "test",
                 validated,
+                &[],
             )
             .unwrap_err();
             assert!(

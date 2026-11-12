@@ -45,9 +45,15 @@ use eprfs_peer::{
 };
 use serde::Serialize;
 
+mod attestation;
+mod cargo_project;
+mod compiler_inputs;
 mod custody;
+mod describe;
+mod destinations;
 mod extract;
 mod inputs;
+mod preflight;
 mod requires;
 #[cfg(test)]
 use requires::read_requires;
@@ -98,20 +104,20 @@ type ArtifactResult<T> = Result<T, ArtifactError>;
 
 pub fn usage() -> String {
     "usage: epr artifact <\n  \
-     describe --project P --bin B [--features F] --rustflags R --sources MANIFEST#STEP \
-     --crate DIR [--env K=V]... [--target-isa LEVEL] [--target-<name> VALUE]... [--repo ROOT] [--out FILE] \
+     describe --project P --bin B [--features F] --rustflags R [--sources MANIFEST#STEP] \
+     [--crate DIR] [--env K=V]... [--target-isa LEVEL] [--target-<name> VALUE]... [--repo ROOT] [--out FILE] \
      (the mesh-build method descriptor; target names: arch, isa, os, libc, cflags, sysroot)\n  \
      | key --method FILE [--repo ROOT] [--print input|key] [--json] \
      (the derivation key at HEAD; exits 3 when the view has uncommitted changes)\n  \
      | put --method FILE --input CID --bytes PATH --project P [--commit SHA] [--duration-ms N] \
-     [--requires FILE.json] [--cross] [--repo ROOT] [--payload-store DIR] [--json] \
+     [--requires FILE.json] [--repository NAME] [--cross] [--repo ROOT] [--payload-store DIR] [--json] \
      (record a built artifact: descriptor, brit build attestation, one custody Produce that \
      crosses with --cross; extracts ELF Requires and evidence; --requires may only tighten; \
      Requires and evidence are stored locally, not yet served to siblings (K3 part 2: \
      explicit default-deny disclosure permission with admit, following K6 slice 1); \
      exits 3 `unrecorded: <reason>`)\n  \
      | sysroot pack --from DIR --triple T --out FILE [--json]\n  \
-     | sysroot put --archive FILE [--project P] [--requires FILE.json] [--cross] [--repo ROOT] [--payload-store DIR] [--json]\n  \
+     | sysroot put --archive FILE [--project P] [--requires FILE.json] [--repository NAME] [--cross] [--repo ROOT] [--payload-store DIR] [--json]\n  \
      | fetch (--method FILE | --output CID) --dest PATH [--repo ROOT] [--handle H] [--transport tier|iroh-blobs] \
      [--stall S] [--total S] [--expect-output CID] [--json] \
      (draw the artifact for the key from admitted siblings through this device's epr peer \
@@ -130,6 +136,12 @@ pub fn usage() -> String {
 /// Entry point for `epr artifact …`.
 pub fn run(args: &[String]) -> ArtifactResult<ExitCode> {
     let verb = args.first().map(String::as_str);
+    if matches!(verb, Some("describe" | "put"))
+        || (verb == Some("sysroot") && args.get(1).map(String::as_str) == Some("put"))
+    {
+        eprintln!("{}", preflight::REACH);
+    }
+
     if matches!(verb, Some("--help" | "-h" | "help")) {
         println!("{}", usage());
         return Ok(ExitCode::SUCCESS);
@@ -146,7 +158,7 @@ pub fn run(args: &[String]) -> ArtifactResult<ExitCode> {
     )?;
     let outcome = match verb {
         Some("sysroot") => sysroot_cli::run(sysroot_verb, &options),
-        Some("describe") => describe(&options),
+        Some("describe") => describe::describe(&options),
         Some("key") => key(&options),
         Some("put") => put(&options),
         Some("fetch") => fetch(&options),
@@ -189,6 +201,7 @@ struct Options {
     triple: Option<String>,
     archive: Option<PathBuf>,
     project: Option<String>,
+    repository: Option<String>,
     bin: Option<String>,
     features: Option<String>,
     rustflags: Option<String>,
@@ -255,6 +268,7 @@ impl Options {
                 "--archive" => options.archive = Some(PathBuf::from(value)),
                 "--repo" => options.repo = PathBuf::from(value),
                 "--project" => options.project = Some(value),
+                "--repository" => options.repository = Some(value),
                 "--bin" => options.bin = Some(value),
                 "--features" => options.features = Some(value),
                 "--rustflags" => options.rustflags = Some(value),
@@ -1005,197 +1019,6 @@ fn tool_line(program: &str, args: &[&str], cwd: &Path) -> ArtifactResult<String>
     Ok(out.stdout)
 }
 
-fn describe(options: &Options) -> ArtifactResult<ExitCode> {
-    let project = Options::required(&options.project, "--project")?;
-    let bin = Options::required(&options.bin, "--bin")?;
-    let rustflags = Options::required(&options.rustflags, "--rustflags")?;
-    let sources = Options::required(&options.sources, "--sources")?;
-    let crate_dir = Options::required(&options.crate_dir, "--crate")?;
-    let repo = &options.repo;
-    let crate_path = repo.join(crate_dir);
-
-    let mut non_path_inputs = BTreeMap::new();
-    non_path_inputs.insert("RUSTFLAGS".to_string(), rustflags.to_string());
-    // The crate, so the closure reads every Cargo configuration cargo reads for it.
-    non_path_inputs.insert(CRATE_INPUT.to_string(), crate_dir.to_string());
-    // Every native toolchain variable set here reaches cargo in the mesh build: recorded.
-    for name in NATIVE_BUILD_ENV {
-        if let Ok(value) = std::env::var(name) {
-            non_path_inputs.insert(name.to_string(), value);
-        }
-    }
-    for pair in &options.env {
-        let (key, value) = pair.split_once('=').ok_or_else(|| {
-            ArtifactError::InvalidArguments(format!("--env {pair}: expected K=V"))
-        })?;
-        if RESOURCE_CAPS.contains(&key) {
-            continue;
-        }
-        if non_path_inputs
-            .insert(key.to_string(), value.to_string())
-            .is_some()
-            && build_input_class(key) == BuildInputClass::Target
-        {
-            return Err(ArtifactError::Gap(format!("{key} is declared twice")));
-        }
-    }
-    for (name, value) in &options.target {
-        if non_path_inputs
-            .insert(name.clone(), value.clone())
-            .is_some()
-        {
-            return Err(ArtifactError::Gap(format!("{name} is declared twice")));
-        }
-    }
-    validate_target_inputs(&non_path_inputs)?;
-
-    let rustc = tool_line("rustc", &["-vV"], &crate_path)?;
-    let field = |name: &str| {
-        rustc
-            .lines()
-            .find_map(|line| line.strip_prefix(&format!("{name}: ")))
-            .map(str::trim)
-            .unwrap_or_default()
-            .to_string()
-    };
-    let host = field("host");
-    if host.is_empty() {
-        return Err(ArtifactError::Gap("rustc -vV names no host triple".into()));
-    }
-    let cargo = tool_line("cargo", &["-V"], &crate_path)?;
-    let mut tools = BTreeMap::new();
-    tools.insert("rustc".to_string(), rustc.clone());
-    tools.insert(
-        "cargo".to_string(),
-        cargo.lines().next().unwrap_or_default().to_string(),
-    );
-    tools.insert(
-        "toolchain".to_string(),
-        std::env::var("RUSTUP_TOOLCHAIN").unwrap_or_else(|_| "unpinned".into()),
-    );
-
-    let features = options.features.as_deref().filter(|f| !f.trim().is_empty());
-    let mut flags = vec![format!("--bin={bin}")];
-    if let Some(features) = features {
-        flags.push(format!("--features={features}"));
-    }
-    flags.push("--profile=dev".into());
-    flags.push(format!("--target={host}"));
-
-    // The view: the build step's declared sources, the lock and cargo config beside the crate, any
-    // toolchain file, and every path package cargo resolves for this build.
-    let (manifest, step) = sources
-        .split_once('#')
-        .ok_or_else(|| ArtifactError::InvalidArguments("--sources is MANIFEST#STEP".into()))?;
-    let manifest_json: serde_json::Value = serde_json::from_str(
-        &std::fs::read_to_string(repo.join(manifest))
-            .map_err(|e| ArtifactError::Gap(format!("{manifest} does not read: {e}")))?,
-    )?;
-    let globs = manifest_json["steps"][step]["inputs"]["sources"]
-        .as_array()
-        .ok_or_else(|| {
-            ArtifactError::Gap(format!(
-                "{manifest} declares no steps.{step}.inputs.sources"
-            ))
-        })?;
-    let mut view: Vec<String> = Vec::new();
-    for glob in globs {
-        let glob = glob.as_str().ok_or_else(|| {
-            ArtifactError::Gap(format!("{manifest} {step}: a source is not a string"))
-        })?;
-        let prefix = glob_prefix(glob).ok_or_else(|| {
-            ArtifactError::Gap(format!(
-                "{manifest} {step}: the source `{glob}` covers the whole tree; no closure is keyed"
-            ))
-        })?;
-        view.push(prefix);
-    }
-    for extra in [
-        "Cargo.lock",
-        ".cargo/config.toml",
-        "rust-toolchain",
-        "rust-toolchain.toml",
-    ] {
-        if crate_path.join(extra).is_file() {
-            view.push(format!("{crate_dir}/{extra}"));
-        }
-    }
-    view.push(format!("{crate_dir}/Cargo.toml"));
-    let mut metadata_args = vec![
-        "metadata".to_string(),
-        "--format-version".into(),
-        "1".into(),
-        "--offline".into(),
-        "--filter-platform".into(),
-        host.clone(),
-        "--manifest-path".into(),
-        crate_path.join("Cargo.toml").to_string_lossy().into_owned(),
-    ];
-    if let Some(features) = features {
-        metadata_args.push("--features".into());
-        metadata_args.push(features.into());
-    }
-    let metadata_args: Vec<&str> = metadata_args.iter().map(String::as_str).collect();
-    let metadata: serde_json::Value =
-        serde_json::from_str(&tool_line("cargo", &metadata_args, &crate_path)?)?;
-    let root = repo.canonicalize().unwrap_or_else(|_| repo.clone());
-    for package in metadata["packages"].as_array().into_iter().flatten() {
-        if !package["source"].is_null() {
-            continue;
-        }
-        let Some(dir) = package["manifest_path"]
-            .as_str()
-            .and_then(|p| Path::new(p).parent())
-        else {
-            continue;
-        };
-        let dir = dir.canonicalize().unwrap_or_else(|_| dir.to_path_buf());
-        let relative = dir.strip_prefix(&root).map_err(|_| {
-            ArtifactError::Gap(format!(
-                "the path package {} is outside the checkout, so no closure is keyed",
-                dir.display()
-            ))
-        })?;
-        view.push(relative.to_string_lossy().into_owned());
-    }
-    let view = View::from_tree_paths(
-        view.iter()
-            .map(|path| TreePath::from_slash_bytes(path.as_bytes()).map_err(|e| e.to_string()))
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(|e| ArtifactError::Gap(format!("a view path is invalid: {e}")))?,
-    );
-
-    let descriptor = MethodDescriptor {
-        name: MESH_BUILD.into(),
-        tools,
-        flags,
-        params: None,
-        exec: None,
-        step: Some(format!("{MESH_BUILD}:{project}")),
-        embedder: None,
-        view: view.paths().cloned().collect(),
-        non_path_inputs,
-        deterministic: false,
-    };
-    let (_, config) = cargo_config_lines(&options.repo, &descriptor)?;
-    let (effective, _) = effective_selection(&descriptor, &config)?;
-    let text = serde_json::to_string_pretty(&descriptor)?;
-    match &options.out {
-        Some(out) => {
-            if let Some(parent) = out.parent().filter(|p| !p.as_os_str().is_empty()) {
-                std::fs::create_dir_all(parent)?;
-            }
-            std::fs::write(out, format!("{text}\n"))?;
-            let method = effective
-                .cid()
-                .map_err(|e| ArtifactError::Gap(e.to_string()))?;
-            println!("{method}");
-        }
-        None => println!("{text}"),
-    }
-    Ok(ExitCode::SUCCESS)
-}
-
 // ---------------------------------------------------------------------------
 // put
 // ---------------------------------------------------------------------------
@@ -1310,59 +1133,18 @@ fn served_store_matches(payload_dir: &Path) -> ArtifactResult<()> {
 }
 
 fn put(options: &Options) -> ArtifactResult<ExitCode> {
-    let project = Options::required(&options.project, "--project")?;
-    let input = Options::required(&options.input, "--input")?;
-    let bytes_path = options.bytes.as_ref().ok_or_else(|| {
-        ArtifactError::InvalidArguments(format!("--bytes needs a value\n{}", usage()))
-    })?;
-    let repo = &options.repo;
+    Options::required(&options.project, "--project")?;
+    Options::required(&options.input, "--input")?;
     let descriptor = read_descriptor(options).map_err(unrecorded)?;
-    check_payload_method(&descriptor.name, false)?;
-    let step = format!("{}:{project}", descriptor.name);
-    if descriptor.step.as_deref() != Some(step.as_str()) {
-        return Err(unrecorded(format!(
-            "the descriptor's step is {:?}, not {step}",
-            descriptor.step
-        )));
-    }
-    // A declared target is recorded and keyed, but nothing yet applies it to the compiler: the
-    // bytes would be the host default's build under a variant's key. Until the declared target is
-    // realized by the build itself (plan K6: pinned sysroot and the flags it implies), refuse.
-    if let Some(name) = descriptor
-        .non_path_inputs
-        .keys()
-        .find(|name| name.starts_with("target."))
-    {
-        return Err(unrecorded(format!(
-            "the method declares {name}, and no build applies a declared target yet (K6); \
-             these bytes would be recorded under a variant key they were not built for"
-        )));
-    }
-    // The environment recording runs in must be the one the method records (the mesh build runs
-    // cargo in exactly it), and the closure must be the one the build started from.
-    check_build_env(&descriptor).map_err(unrecorded)?;
-    let (key, selections, effective) = clean_selection(repo, &descriptor).map_err(unrecorded)?;
-    if key.input.to_string() != input {
-        return Err(unrecorded(format!(
-            "the closure moved during the build: it was {input}, it is {} now",
-            key.input
-        )));
-    }
-    if let Some(commit) = &options.commit {
-        if *commit != key.head {
-            return Err(unrecorded(format!(
-                "HEAD moved during the build: it was {commit}, it is {} now",
-                key.head
-            )));
-        }
-    }
-    let bytes = Bytes::from(
-        std::fs::read(bytes_path)
-            .map_err(|e| unrecorded(format!("{} does not read: {e}", bytes_path.display())))?,
-    );
-    check_linker(&descriptor, &selections, &bytes)
-        .map_err(|e| unrecorded(format!("{}: {e}", bytes_path.display())))?;
-    record_artifact(options, &effective, &key, bytes, BASIS_KEY_SLOT, None)
+    let prepared = preflight::check(options, &descriptor)?;
+    record_artifact(
+        options,
+        &prepared.descriptor,
+        &prepared.key,
+        prepared.bytes,
+        None,
+        &prepared.gaps,
+    )
 }
 
 /// Archive method names are reserved for their validators, not selected by an executable's
@@ -1381,9 +1163,10 @@ fn record_artifact(
     descriptor: &MethodDescriptor,
     key: &ClosureKey,
     bytes: Bytes,
-    basis: &str,
     sysroot_manifest: Option<&sysroot::Manifest>,
+    gaps: &[String],
 ) -> ArtifactResult<ExitCode> {
+    let basis = key.basis;
     check_payload_method(&descriptor.name, sysroot_manifest.is_some())?;
     if let Some(lines) = &key.input_lines {
         if BlobCid::compute_bytes(lines.as_bytes()) != key.input {
@@ -1429,35 +1212,22 @@ fn record_artifact(
         .map_err(|e| unrecorded(format!("this workspace has no device key: {e}")))?
         .did_key();
 
-    let duration = options.duration_ms.to_string();
-    brit(
-        repo,
-        &[
-            "build",
-            "put",
-            "--step",
-            &step,
-            "--manifest",
-            &key.method.to_string(),
-            "--output",
-            &output.to_string(),
-            "--inputs-hash",
-            &key.key_cid.to_string(),
-            "--commit",
-            &key.head,
-            "--success",
-            "true",
-            "--duration-ms",
-            &duration,
-        ],
-    )?;
-
     let peer_options = peer::Options {
         root: repo.clone(),
         payload_store: options.payload_store.clone(),
         ..peer::Options::default()
     };
     let payload_dir = peer::payload_store_dir(&peer_options)?;
+    let flow_root = peer::served_root(repo).map_err(unrecorded)?;
+    let scope = preflight::repository_scope(options)?;
+    destinations::payload(&payload_dir)?;
+    destinations::flow(&flow_root)?;
+    destinations::brit(repo)?;
+    // Open and lock the flow log before content writes, then validate again under that lock.
+    use elohim_epr_rea::FlowStore;
+    let flow = SidecarFlowStore::open(&flow_root).map_err(unrecorded)?;
+    let mut transaction = flow.transaction().map_err(unrecorded)?;
+    let previous = transaction.records().map_err(unrecorded)?;
     // The runtime the put runs on: a blob-store payload backend is opened inside it (shared: the
     // serving daemon, when up, is the store's owner).
     let runtime = tokio::runtime::Builder::new_current_thread()
@@ -1471,9 +1241,6 @@ fn record_artifact(
         .map_err(|e| unrecorded(format!("the payload store does not open: {e}")))?
         .store;
     served_store_matches(&payload_dir)?;
-    let flow_root = peer::served_root(repo).map_err(unrecorded)?;
-    let scope = crate::flow::repository::repository_scope(repo)
-        .map_err(|e| unrecorded(format!("this checkout has no repository scope: {e}")))?;
     let record = DerivationRecord {
         key: key.key.clone(),
         output: output.clone(),
@@ -1511,12 +1278,19 @@ fn record_artifact(
         format!("env:commit={}", key.head),
         format!("env:agentId={agent_id}"),
     ];
+    // Reach is pending for every recorder, including sysroot archives (K12, pending H12).
+    let mut gaps = gaps.to_vec();
+    gaps.push("reach".into());
+    gaps.sort();
+    gaps.dedup();
+    extra.push(format!("env:gaps={}", gaps.join(",")));
     if let Some((cid, _)) = &requires {
         extra.push(format!("env:requires={cid}"));
     }
     if let Some((cid, _)) = &requires_evidence {
         extra.push(format!("env:requires-evidence={cid}"));
     }
+    let mut pending = elohim_epr_rea::MemoryFlowStore::new();
     let put = runtime.block_on(async {
         if let Some(manifest) = sysroot_manifest {
             store
@@ -1544,12 +1318,67 @@ fn record_artifact(
                 .await
                 .map_err(|e| unrecorded(format!("the Requires evidence is not stored: {e}")))?;
         }
-        let mut flow = SidecarFlowStore::open(&flow_root)
-            .map_err(|e| unrecorded(format!("the flow store does not open: {e}")))?;
-        put_local_blob_with(store.as_ref(), &mut flow, record, bytes, &context, extra)
+        put_local_blob_with(store.as_ref(), &mut pending, record, bytes, &context, extra)
             .await
             .map_err(unrecorded)
+    }).map_err(|e| unrecorded(format!("{e}; orphan content-addressed blobs may remain in {} (input {}, method {}, output {})", payload_dir.display(), key.input, key.method, output)))?;
+    let event = pending
+        .records()
+        .map_err(unrecorded)?
+        .into_iter()
+        .next()
+        .ok_or_else(|| unrecorded("custody produced no event"))?
+        .1;
+    let duration = options.duration_ms.to_string();
+    attestation::publish(
+        repo,
+        &[
+            "build",
+            "put",
+            "--step",
+            &step,
+            "--manifest",
+            &key.method.to_string(),
+            "--output",
+            &output.to_string(),
+            "--inputs-hash",
+            &key.key_cid.to_string(),
+            "--commit",
+            &key.head,
+            "--success",
+            "true",
+            "--duration-ms",
+            &duration,
+        ],
+        key,
+        &step,
+        &output,
+        &agent_id,
+    )
+    .map_err(|e| {
+        unrecorded(format!(
+            "{e}; orphan content-addressed blobs remain in {} (manifest {})",
+            payload_dir.display(),
+            put.manifest_cid
+        ))
     })?;
+    // A retry after an uncertain append/sync must not duplicate a complete Produce. Compare
+    // the entire event except its observation time under the same exclusive flow lock.
+    let already_produced = previous.iter().any(|(_, prior)| match (prior, &event) {
+        (elohim_epr_rea::FlowRecord::Event(prior), elohim_epr_rea::FlowRecord::Event(next)) => {
+            let mut prior = prior.clone();
+            prior.occurred_at.clone_from(&next.occurred_at);
+            prior == *next
+        }
+        _ => false,
+    });
+    if !already_produced {
+        transaction.append(event).map_err(|e| {
+            unrecorded(format!(
+                "attested, not produced: re-run put with the same arguments to complete; {e}"
+            ))
+        })?;
+    }
     let recorded = Recorded {
         project: project.to_string(),
         method: key.method.to_string(),

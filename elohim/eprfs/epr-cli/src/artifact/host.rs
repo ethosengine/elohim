@@ -331,6 +331,26 @@ pub(super) fn check_linker(
     Ok(())
 }
 
+/// Root of the installed compiler selected by the same recorded selector as native-lib probing.
+pub(super) fn compiler_root(descriptor: &MethodDescriptor) -> ArtifactResult<std::path::PathBuf> {
+    let path = descriptor
+        .non_path_inputs
+        .get(PATH_INPUT)
+        .ok_or_else(|| ArtifactError::Gap("no compiler PATH".into()))?;
+    let name = descriptor
+        .non_path_inputs
+        .get("RUSTC")
+        .map_or("rustc", String::as_str);
+    let executable = super::resolve_tool_path(name, path)
+        .ok_or_else(|| ArtifactError::Gap("compiler unresolved".into()))?;
+    let compiler = native_libraries::compiler(&executable, descriptor)?;
+    compiler
+        .parent()
+        .and_then(Path::parent)
+        .map(Path::to_path_buf)
+        .ok_or_else(|| ArtifactError::Gap("compiler has no toolchain root".into()))
+}
+
 #[cfg(test)]
 #[path = "../../tests/support/artifact_elf.rs"]
 mod fixture;

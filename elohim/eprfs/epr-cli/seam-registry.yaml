@@ -2434,3 +2434,32 @@ decisionPoints:
     - { path: elohim/eprfs/epr-cli/src/artifact/extract_ranges_tests.rs, testName: artifact_unknown_function_boundaries_names_section, kind: unit }
     - { path: elohim/eprfs/epr-cli/src/artifact/extract_tests.rs, testName: artifact_endbr_is_evidence_not_a_requirement, kind: unit }
     - { path: elohim/eprfs/epr-cli/src/artifact/extract_tests.rs, testName: artifact_xgetbv_is_extra_only_below_osxsave_level, kind: unit }
+
+- name: artifact_recording_preflight
+  kind: verdict-fn
+  sourceLocation:
+    file: src/artifact/preflight.rs
+    modulePath: elohim_epr_cli::artifact::preflight::check
+  summary: "K11 slice 1 aggregates the self-description checklist before any recording effect. Foreign Cargo projects require a committed lock, source commit, complete host inputs and attribution; existing manifest-backed mesh recipes retain their prior dependency envelope. Reach is explicitly pending H12."
+  concernIds:
+    - { id: C0, status: answered, justification: "Ephemeral local admission over existing method/input CIDs and Produce records; no new DHT entity, recurring head or route." }
+    - { id: C1, status: n-a, justification: "No release or holder election; a successful preflight authorizes only the existing local recording tail." }
+    - { id: C2, status: answered, justification: "Current source commit and clean closure must match the supplied input; no snapshot CID substitutes for a commit and Requires declarations cannot weaken extraction." }
+    - { id: C3, status: partial, justification: "Unsupported recipes return all missing items with exit 3; local tool subprocesses retain the existing process runner and have no new timeout." }
+    - { id: C4, status: answered, justification: "Missing lock, commit, input closure, link lines, executable evidence and each attribution prerequisite are named. Reach is never claimed present." }
+    - { id: C5, status: answered, justification: "A source commit and Brit/device attribution are evidence, not a grant of publication authority; Provides is never serialized." }
+    - { id: C6a, status: partial, justification: "One standalone package is accepted; dependency closures and scripts refuse. Existing ELF allocation and subprocess bounds are unchanged." }
+    - { id: C6b, status: answered, justification: "Rejected puts do not open the payload store or write Brit attestations or flow events; tests reopen stores to prove absence." }
+    - { id: C7, status: answered, justification: "Both describe and put print pending reach; no new serving capability is advertised." }
+    - { id: C8, status: partial, justification: "One aggregated diagnostic names every observed unmet checklist item and preserves lower-level evidence; no per-outcome metric is added to this local CLI." }
+    - { id: C9, status: answered, justification: "Uses the existing repository scope parser, device key and Brit signer namespaces without inferring identity from a remote or path." }
+    - { id: C10, status: answered, justification: "Cargo retains mesh-build descriptor shape; non-Cargo recipes cannot borrow a thinner recording path. Existing mesh dependency compatibility is explicit and bounded to its two manifest-backed recipes." }
+    - { id: C11, status: n-a, justification: "No network request, queue or external capacity allocation is introduced." }
+    - { id: C12, status: partial, justification: "Existing custody and disclosure boundaries remain; full reach enforcement is K12 pending H12, per the plan K11 order note." }
+    - { id: C13, status: n-a, justification: "No authority tier is introduced; the pending reach successor is explicitly named at the check." }
+    - { id: C14, status: answered, justification: "Unsupported metadata, formats, targets and tool failures survive as named diagnostics; nothing is silently treated as a complete artifact." }
+  contractTests:
+    - { path: elohim/eprfs/epr-cli/tests/artifact_foreign.rs, testName: artifact_foreign_describe_put_records_complete_local_artifact, kind: integration }
+    - { path: elohim/eprfs/epr-cli/tests/artifact_foreign.rs, testName: artifact_foreign_all_independent_failures_are_reported_together, kind: integration }
+    - { path: elohim/eprfs/epr-cli/tests/artifact_foreign.rs, testName: artifact_foreign_noncargo_lists_all_unmet_items_and_records_nothing, kind: integration }
+    - { path: elohim/eprfs/epr-cli/tests/support/artifact_preflight.rs, testName: artifact_existing_mesh_dependency_recipe_passes_preflight, kind: integration }
