@@ -196,3 +196,7 @@ with either epr build, and under each of the hook's variables tried (`GIT_CONFIG
 `GATE_EVIDENCE`, `CARGO_TARGET_DIR`, `GATE_RUN_KIND`), while Codex 01a1cbeb's gates ran
 alongside. Re-gating was blocked by the one-build guard during that session's elohim-storage
 gate. Cause not found; the dev landing runs the full gate. The bypass covers only that branch.
+
+## Shem handoff (2026-11-12)
+
+State, open decisions and the traps found on 2026-11-12 are in `handoff-2026-11-12-shem.md` beside this journal. The K9 receipt is one serve-side manifest defect from done.
