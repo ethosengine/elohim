@@ -137,6 +137,63 @@ fn show(subject: &str, options: &Options) -> ArtifactResult<ExitCode> {
     Ok(ExitCode::SUCCESS)
 }
 
+fn candidate(row: &peer::SiblingArtifact) -> String {
+    format!(
+        "input={} commit={} time={}",
+        row.input.as_deref().unwrap_or("unrecorded"),
+        row.commit,
+        row.at
+    )
+}
+
+/// Produce carries occurred_at (exposed as at), not a production-ordered fold position.
+fn same_source<'a>(
+    rows: &'a [peer::SiblingArtifact],
+    device: &str,
+    local: &peer::SiblingArtifact,
+) -> ArtifactResult<&'a peer::SiblingArtifact> {
+    let mut candidates: Vec<_> = rows
+        .iter()
+        .filter(|row| row.device == device && row.method == local.method)
+        .collect();
+    candidates.sort_by_key(|row| (&row.input, &row.commit, &row.at));
+    let mut matching = Vec::new();
+    for row in &candidates {
+        if row.commit == local.commit {
+            let at = chrono::DateTime::parse_from_rfc3339(&row.at).map_err(|error| {
+                ArtifactError::Gap(format!(
+                    "invalid Produce occurred_at: {}: {error}",
+                    candidate(row)
+                ))
+            })?;
+            matching.push((at, *row));
+        }
+    }
+    let newest = matching.iter().map(|(at, _)| at).max().ok_or_else(|| {
+        ArtifactError::Gap(format!(
+            "no same-source sibling record for commit {}; pass a literal key; candidates (up to 5):\n{}",
+            local.commit,
+            candidates.iter().take(5).map(|row| candidate(row)).collect::<Vec<_>>().join("\n")
+        ))
+    })?;
+    let tied: Vec<_> = matching
+        .iter()
+        .filter(|(at, _)| at == newest)
+        .map(|(_, row)| *row)
+        .collect();
+    let selected = tied[0];
+    if tied.iter().any(|row| row.input != selected.input) {
+        return Err(ArtifactError::Gap(format!(
+            "ambiguous newest same-source Produce records; pass a literal key:\n{}",
+            tied.iter()
+                .map(|row| candidate(row))
+                .collect::<Vec<_>>()
+                .join("\n")
+        )));
+    }
+    Ok(selected)
+}
+
 fn diff(subject: &str, device: &str, options: &Options) -> ArtifactResult<ExitCode> {
     let key = local_key(subject, options)?;
     let local = read_document(options, key.input.cid())?;
@@ -147,23 +204,27 @@ fn diff(subject: &str, device: &str, options: &Options) -> ArtifactResult<ExitCo
             "--device must name an admitted sibling".into(),
         ));
     }
-    // The custody reader already filters by roster admission. Use the latest folded record
-    // for the same method; a literal key is an exact pin. Each document has its OWN input CID:
-    // two documents verified against one input CID could never produce a nonempty diff.
-    let row = found
+    let local_cid = key_cid(&key)
+        .map_err(|e| ArtifactError::Gap(e.to_string()))?
+        .to_string();
+    let local_row = found
         .rows
         .iter()
         .rev()
-        .find(|row| {
-            row.device == device
-                && match &exact {
-                    Some(cid) => row.key == cid.to_string(),
-                    None => row.method.as_deref() == Some(key.method.to_string().as_str()),
-                }
-        })
-        .ok_or_else(|| {
-            ArtifactError::Gap("no admitted sibling record for this key or method".into())
-        })?;
+        .find(|row| row.device == found.device && row.key == local_cid)
+        .ok_or_else(|| ArtifactError::Gap(format!("no local record for key {local_cid}")))?;
+    recorded_key(local_row)?;
+    // The custody reader filters by roster admission. Descriptor comparisons hold source
+    // constant; a literal key retains its exact match, regardless of the recorded commit.
+    let row = match exact {
+        Some(cid) => found
+            .rows
+            .iter()
+            .rev()
+            .find(|row| row.device == device && row.key == cid.to_string())
+            .ok_or_else(|| ArtifactError::Gap("no admitted sibling record for this key".into()))?,
+        None => same_source(&found.rows, device, local_row)?,
+    };
     let remote = recorded_key(row)?;
     let peer_dir = peer::peer_dir()?;
     if ServeLock::held(&peer_dir) != Some(true) {
@@ -222,6 +283,16 @@ fn diff(subject: &str, device: &str, options: &Options) -> ArtifactResult<ExitCo
     }
     let sibling = read_document(options, remote.input.cid())?;
     let lines = line_diff(&local, &sibling);
+    eprintln!("inputs diff method={}", key.method);
+    for (side, record) in [("this device", local_row), ("sibling", row)] {
+        eprintln!(
+            "{side}: device={} key={} input={} commit={}",
+            record.device,
+            record.key,
+            record.input.as_deref().unwrap_or("unrecorded"),
+            record.commit
+        );
+    }
     print!("{lines}");
     Ok(ExitCode::from(u8::from(!lines.is_empty())))
 }

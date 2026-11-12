@@ -3,22 +3,55 @@ use eprfs_core::{DerivationKey, KeyInput};
 use eprfs_peer::{FetchDone, FetchFor, FetchRequest};
 use std::time::{Duration, Instant};
 
-fn append_input_record(device: &Device, key: &DerivationKey, owner: &str, local: bool) {
+fn input_record(key: &DerivationKey, owner: &str, at: &str, commit: &str) -> FlowEvent {
     let mut event = produce_record(
         &eprfs_peer::key_cid(key).unwrap().to_string(),
         &BlobCid::compute_bytes(b"artifact"),
         &BlobCid::compute(b"manifest").to_string(),
-        (!local).then_some(owner),
+        None,
     );
     event.receiver = AgentRef(owner.into());
     event.classified_as.extend([
         format!("env:method={}", key.method),
         format!("env:input={}", key.input.cid()),
     ]);
+    event.occurred_at = at.into();
+    event
+        .classified_as
+        .retain(|slot| !slot.starts_with("env:commit="));
+    event.classified_as.push(format!("env:commit={commit}"));
+    event
+}
+
+fn append_local(device: &Device, key: &DerivationKey) {
     SidecarFlowStore::open(device.root())
         .unwrap()
-        .append(FlowRecord::Event(event))
+        .append(FlowRecord::Event(input_record(
+            key,
+            &device.key.did_key(),
+            "2026-11-08T10:00:00Z",
+            "source",
+        )))
         .unwrap();
+}
+
+fn fold_inputs(device: &Device, owner: &str, events: Vec<FlowEvent>) {
+    let mut channel: Vec<_> = events
+        .into_iter()
+        .map(|event| eprfs_peer::ChannelEvent {
+            cid: atom_cid(&event).unwrap(),
+            event,
+        })
+        .collect();
+    channel.sort_by_key(|row| row.cid.to_string());
+    let outcome = eprfs_peer::fold_events(
+        &SidecarFlowStore::open(device.root()).unwrap(),
+        owner,
+        &channel,
+        &CrossingAllowList::new([("artifact-produce@1", ["produce"])]),
+    )
+    .unwrap();
+    assert_eq!(outcome.appended as usize, channel.len());
 }
 
 fn store_lines(path: &Path, input: &BlobCid, lines: &str) {
@@ -36,14 +69,14 @@ fn store_lines(path: &Path, input: &BlobCid, lines: &str) {
 }
 
 #[test]
-fn inputs_show_and_diff_use_verified_documents_and_only_print_differing_lines() {
+fn inputs_diff_selects_newest_same_commit_in_cid_fold_order_and_prints_provenance() {
     let (_keys, a, b) = household();
     let scratch = TempDir::new().unwrap();
     let (method, descriptor) = method_file(scratch.path(), &["crate"]);
     let computed = elohim_epr_cli::artifact::closure_key(b.root(), &descriptor).unwrap();
     let local = computed.input_lines.unwrap();
     store_lines(&b.payload(), &computed.input, &local);
-    append_input_record(&b, &computed.key, &b.key.did_key(), true);
+    append_local(&b, &computed.key);
     for subject in [method.to_str().unwrap(), &computed.key_cid.to_string()] {
         let shown = b.epr(&[
             "artifact",
@@ -72,19 +105,80 @@ fn inputs_show_and_diff_use_verified_documents_and_only_print_differing_lines() 
     // One removed and one added line: exactly two lines of output, with no context.
     let removed = local.lines().next().unwrap();
     let changed = local.replacen(removed, "zz-sibling:changed", 1);
-    for (lines, exit, expected) in [
+    for (index, (lines, exit, expected)) in [
         (
             changed.as_str(),
             1,
             format!("-{removed}\n+zz-sibling:changed\n"),
         ),
         (local.as_str(), 0, String::new()),
-    ] {
+        (local.as_str(), 0, String::new()),
+    ]
+    .into_iter()
+    .enumerate()
+    {
         let remote = DerivationKey {
             method: computed.method.clone(),
             input: KeyInput::Raw(BlobCid::compute_bytes(lines.as_bytes())),
         };
-        append_input_record(&b, &remote, &a.key.did_key(), false);
+        let at = format!("2026-11-08T12:00:0{index}Z");
+        let commit = if index == 2 {
+            "literal-other-source"
+        } else {
+            "source"
+        };
+        let mut newest = input_record(&remote, &a.key.did_key(), &at, commit);
+        // Find an older event sorting AFTER the newest one, as an initial channel sync
+        // does. The older timestamp even sorts lexically later, because of its offset.
+        let mut older = None;
+        for nonce in 0..1000 {
+            newest
+                .classified_as
+                .retain(|slot| !slot.starts_with("env:fixtureNonce="));
+            newest
+                .classified_as
+                .push(format!("env:fixtureNonce={nonce}"));
+            let newest_cid = atom_cid(&newest).unwrap().to_string();
+            let other = DerivationKey {
+                method: computed.method.clone(),
+                input: KeyInput::Raw(BlobCid::compute_bytes(
+                    format!("older {index} {nonce}").as_bytes(),
+                )),
+            };
+            let event = input_record(
+                &other,
+                &a.key.did_key(),
+                "2026-11-08T13:00:00+02:00",
+                "source",
+            );
+            if atom_cid(&event).unwrap().to_string() > newest_cid {
+                older = Some(event);
+                break;
+            }
+        }
+        let other_source = input_record(
+            &computed.key,
+            &a.key.did_key(),
+            "2026-11-09T00:00:00Z",
+            &format!("other-source-{index}"),
+        );
+        fold_inputs(
+            &b,
+            &a.key.did_key(),
+            vec![newest, older.expect("CID order inversion"), other_source],
+        );
+        if index == 2 {
+            fold_inputs(
+                &b,
+                &a.key.did_key(),
+                vec![input_record(
+                    &remote,
+                    &a.key.did_key(),
+                    "2026-11-10T00:00:00Z",
+                    commit,
+                )],
+            );
+        }
         let (queue, payload, remote_lines, did, remote_key) = (
             queue.clone(),
             b.payload(),
@@ -130,11 +224,17 @@ fn inputs_show_and_diff_use_verified_documents_and_only_print_differing_lines() 
             )
             .unwrap();
         });
+        let literal = computed.key_cid.to_string();
+        let subject = if index == 2 {
+            &literal
+        } else {
+            method.to_str().unwrap()
+        };
         let diff = b.epr(&[
             "artifact",
             "inputs",
             "diff",
-            method.to_str().unwrap(),
+            subject,
             "--device",
             &a.key.did_key(),
             "--repo",
@@ -142,7 +242,25 @@ fn inputs_show_and_diff_use_verified_documents_and_only_print_differing_lines() 
         ]);
         worker.join().unwrap();
         assert_eq!(diff.status.code(), Some(exit), "{}", text(&diff));
-        assert_eq!(String::from_utf8(diff.stdout).unwrap(), expected);
+        assert_eq!(String::from_utf8_lossy(&diff.stdout), expected);
+        let stderr = String::from_utf8_lossy(&diff.stderr);
+        for line in [
+            format!("inputs diff method={}", computed.method),
+            format!(
+                "this device: device={} key={} input={} commit=source",
+                b.key.did_key(),
+                computed.key_cid,
+                computed.input
+            ),
+            format!(
+                "sibling: device={} key={} input={} commit={commit}",
+                a.key.did_key(),
+                eprfs_peer::key_cid(&remote).unwrap(),
+                remote.input.cid()
+            ),
+        ] {
+            assert!(stderr.lines().any(|actual| actual == line), "{stderr}");
+        }
     }
     let refused = b.epr(&[
         "artifact",
@@ -155,4 +273,129 @@ fn inputs_show_and_diff_use_verified_documents_and_only_print_differing_lines() 
         b.root().to_str().unwrap(),
     ]);
     assert_eq!(refused.status.code(), Some(3));
+}
+
+#[test]
+fn inputs_diff_without_same_commit_refuses_with_five_candidates_and_literal_key_hint() {
+    let (_keys, a, b) = household();
+    let scratch = TempDir::new().unwrap();
+    let (method, descriptor) = method_file(scratch.path(), &["crate"]);
+    let computed = elohim_epr_cli::artifact::closure_key(b.root(), &descriptor).unwrap();
+    store_lines(
+        &b.payload(),
+        &computed.input,
+        computed.input_lines.as_ref().unwrap(),
+    );
+    append_local(&b, &computed.key);
+    let mut events = Vec::new();
+    let mut expected = Vec::new();
+    for i in 0..7 {
+        let remote = DerivationKey {
+            method: computed.method.clone(),
+            input: KeyInput::Raw(BlobCid::compute_bytes(format!("other {i}").as_bytes())),
+        };
+        let commit = format!("other-commit-{i}");
+        let at = format!("2026-11-09T00:00:0{i}Z");
+        expected.push(format!(
+            "input={} commit={commit} time={at}",
+            remote.input.cid()
+        ));
+        events.push(input_record(&remote, &a.key.did_key(), &at, &commit));
+    }
+    fold_inputs(&b, &a.key.did_key(), events);
+    let diff = b.epr(&[
+        "artifact",
+        "inputs",
+        "diff",
+        method.to_str().unwrap(),
+        "--device",
+        &a.key.did_key(),
+        "--repo",
+        b.root().to_str().unwrap(),
+    ]);
+    assert_eq!(diff.status.code(), Some(3), "{}", text(&diff));
+    assert!(diff.stdout.is_empty());
+    let stderr = String::from_utf8_lossy(&diff.stderr);
+    assert!(
+        stderr.contains("no same-source sibling record for commit source"),
+        "{stderr}"
+    );
+    assert!(stderr.contains("pass a literal key"), "{stderr}");
+    expected.sort();
+    assert_eq!(
+        stderr
+            .lines()
+            .filter(|line| line.starts_with("input="))
+            .collect::<Vec<_>>(),
+        expected
+            .iter()
+            .take(5)
+            .map(String::as_str)
+            .collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn inputs_diff_equal_produce_times_with_different_inputs_refuses_both_candidates() {
+    let (_keys, a, b) = household();
+    let scratch = TempDir::new().unwrap();
+    let (method, descriptor) = method_file(scratch.path(), &["crate"]);
+    let computed = elohim_epr_cli::artifact::closure_key(b.root(), &descriptor).unwrap();
+    store_lines(
+        &b.payload(),
+        &computed.input,
+        computed.input_lines.as_ref().unwrap(),
+    );
+    append_local(&b, &computed.key);
+    let remote = DerivationKey {
+        method: computed.method.clone(),
+        input: KeyInput::Raw(BlobCid::compute_bytes(b"different input")),
+    };
+    fold_inputs(
+        &b,
+        &a.key.did_key(),
+        vec![
+            input_record(
+                &computed.key,
+                &a.key.did_key(),
+                "2026-11-08T12:00:00Z",
+                "source",
+            ),
+            input_record(
+                &remote,
+                &a.key.did_key(),
+                "2026-11-08T14:00:00+02:00",
+                "source",
+            ),
+        ],
+    );
+    let diff = b.epr(&[
+        "artifact",
+        "inputs",
+        "diff",
+        method.to_str().unwrap(),
+        "--device",
+        &a.key.did_key(),
+        "--repo",
+        b.root().to_str().unwrap(),
+    ]);
+    assert_eq!(diff.status.code(), Some(3), "{}", text(&diff));
+    assert!(diff.stdout.is_empty());
+    let stderr = String::from_utf8_lossy(&diff.stderr);
+    assert!(
+        stderr.contains("ambiguous newest same-source Produce records"),
+        "{stderr}"
+    );
+    for (key, at) in [
+        (&computed.key, "2026-11-08T12:00:00Z"),
+        (&remote, "2026-11-08T14:00:00+02:00"),
+    ] {
+        assert!(
+            stderr.contains(&format!(
+                "input={} commit=source time={at}",
+                key.input.cid()
+            )),
+            "{stderr}"
+        );
+    }
 }

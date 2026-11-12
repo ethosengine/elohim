@@ -119,8 +119,9 @@ pub fn usage() -> String {
      | inputs show <key-or-descriptor> [--repo ROOT] [--payload-store DIR]\n  \
      | inputs diff <key-or-descriptor> --device <did:key> [--repo ROOT] [--handle H] \
      [--payload-store DIR] [--stall S] [--total S] \
-     (verified input lines at reach self; descriptor FILE compares the latest sibling record of \
-     the same method, key CID pins that exact key; diff: - this device, + sibling, sorted without context; \
+     (verified input lines at reach self; descriptor FILE compares the newest Produce occurred_at of \
+     the same method and source commit, refusing different-input time ties; key CID pins that exact key; \
+     provenance on stderr; diff: - this device, + sibling, sorted without context; \
      exits 0 identical, 1 different, 3 refused/unavailable)\n  \
      | holders (--key CID | --output CID | --family CID) [--min N] [--json] [--repo ROOT] [--handle H]>"
         .to_string()
