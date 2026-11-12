@@ -105,11 +105,18 @@ files in the main checkout take dev's versions.
    needed later under `genesis/local-dev/`.
 5. **`inputs diff` with a literal key demands an exact key match.** The two devices' keys differ,
    so use the descriptor form, which pairs by commit.
-6. **Brit gaps hit again:** no `ls-remote`; `brit commit` cannot commit a merge; `brit branch` only
-   lists; `brit fetch` may leave `origin/dev` stale. Each direct Git command needs a first-line
+6. **Brit gaps hit again:** `brit commit` cannot commit a merge; `brit branch` only lists. Two
+   that are not gaps (Codex session 01a1d073): `brit remote -n origin refs` reads the remote heads
+   (the `ls-remote` equivalent, verified), and `brit fetch -r origin +refs/heads/dev:refs/remotes/origin/dev`
+   updates the tracking ref explicitly. Each direct Git command needs a first-line
    `# Brit fallback: <reason>` comment or a hook blocks it.
 7. **The commit attribution hook prints `UNMEASURED: epr session: unknown session command
-   commit-trailers`** on every commit. Trailers were written by hand today. Not investigated.
+   commit-trailers`** on every commit. Cause found by Codex 01a1d073: the shell snapshot exports
+   an old `EPR_BIN` (`bafyreibrqqhx…`), which lacks the command. With `env -u EPR_BIN` the command
+   runs but refuses one layer down ("session model is unmeasured"), because this session's
+   envelope was opened with no model. `berth moor --model` updates the mooring, not the envelope.
+   Handed to Codex; trailers were written by hand meanwhile. Unset `EPR_BIN` for ordinary
+   commands, but keep it set where a candidate `epr` is meant (the daemon, the K9 diff).
 8. **The auto-mode classifier refuses a full-access `codex exec` leg**, so landings went to Sonnet
    agents. The landing brief is `genesis/local-dev/stewardship-20261112/codex-landing/prompt.md`.
 9. **A berth note watcher ends after one reply.** Ethosengine's "please run yours now" sat unread
