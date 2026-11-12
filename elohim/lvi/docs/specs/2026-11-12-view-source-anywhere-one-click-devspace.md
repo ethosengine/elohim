@@ -93,8 +93,12 @@ change outward:
 1. **A variant for herself.** She keeps it. Nobody else is asked.
 2. **A signal.** Her variant, and her reason, are evidence that the original did not fit her. So
    is the same change made by others. Someone close to her may also raise what she would not ask
-   for herself: a grandson who sees her squinting can surface the concern on her behalf, acting
-   for her under a stewardship grant and not in her name without one.
+   for herself. A grandson who sees her squinting can do it either way: as a peer of equal
+   standing, raising in his own name what he sees of her experience, or as the steward of her
+   device, under a stewardship grant, if she would sooner not deal with it at all. The network
+   rewards and encourages that care in both forms. Because elohim are present and can read the
+   context, the response can fit the real needs, wishes and ambitions of the people involved,
+   not a general case.
 3. **A collective.** When signals gather around one need, the people who share it, with their
    elohim, can form a collective for that space: large print, here. It has members, a purpose and
    rules like any other collective in the network, and it has a lifecycle. It forms, it works, and
@@ -108,7 +112,9 @@ change outward:
 
 So the grandmothers are not only users whose feedback is collected. They are collaborators in the
 network's evolution, at the depth they choose, with the elohim doing the work of finding, drafting,
-aggregating and repairing.
+aggregating and repairing. This is what human flourishing means inside the development lifecycle:
+the way software is made answers to the particular people it is for, and caring for one of them is
+itself a contribution.
 
 ## What it is built from
 
