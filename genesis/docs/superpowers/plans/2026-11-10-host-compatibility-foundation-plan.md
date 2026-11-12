@@ -176,11 +176,13 @@ Code is decoded within function boundaries: symbol-table function sizes and `.eh
 
 Verify: recording the epr built on ethosengine yields the x86-64-v3 level with `source: extracted` and its sqlite3 evidence (`walIndexTryHdr` avx2, `sqlite3LogEst` lzcnt), plus `abi.libc ≥ glibc 2.39`. Measured 2026-11-11 (K8 evidence, `k8-extraction-ethosengine.json`): the clause also carries seven extras reached only from runtime-dispatched code (ring's `adx`, `aes`, `pclmulqdq`, `vpclmulqdq`, `vaes`, `sha_ni`; compiler_builtins' `fma4`), counted until K10 proves the dispatch. The same record admitted against a synthetic v2 `Provides` refuses naming the missing features; an unreadable artifact refuses.
 
-- [ ] **K9 — the key's input lines are stored as a document by the input CID, readable by the person's own devices (reach `self`) like the method record, so another of their devices can diff its own lines against the record's** (serves sprint-lands-each-closure-once)
+- [x] **K9 — the key's input lines are stored as a document by the input CID, readable by the person's own devices (reach `self`) like the method record, so another of their devices can diff its own lines against the record's** (serves sprint-lands-each-closure-once)
 
 Reach: `self`, not wider. The lines include the compiler's predefined-macro dump and the link-input paths, which reveal the building host's default ISA and sysroot layout: a host fact, which spec §4 keeps local. Between one person's devices that disclosure is within the roster's trust (H12). Beyond them, a declared-target build (K6) keys the floor by its CID in place of host lines, so what crosses at wider reach is the floor's identity, not the host's.
 
 Verify: on two devices of one person, the same descriptor's input documents are fetched and diffed, and the diff names exactly the differing lines (on ethosengine and shem: `link:Scrt1.o`, `link:crt1.o` and the macro dump); the stored document's CID equals the key's input CID; a requester that is not one of the person's devices is refused the document.
+
+Receipt 2026-11-12 (`k9-two-device-receipt.md`): both directions paired the 8b273f826 records and printed the same 11 differing lines. The macro dump agrees; the whole glibc and gcc link floor differs at identical paths (RHEL 10.0 glibc -145 against AlmaLinux 10.2 glibc -128 x86_64_v2, same gcc version), which is the floor K6 keys by CID. Reaching it took dev's crossing policy on both daemons and record-exact serving and pairing (6060f8347).
 
 - [ ] **K10 — dispatch evidence (spec §3.2): the ISA extraction counts only code reached without a runtime feature check, on evidence bound to the bytes (compiler multi-versioning metadata or a build-time attestation naming guarded functions by content), not a symbol-name pattern; unproven dispatch counts as a requirement** (serves sprint-lands-each-closure-once)
 
