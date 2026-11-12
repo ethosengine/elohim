@@ -40,7 +40,7 @@ Codex's Brit feedback sprint (session 01a1cbeb) is published and finished.
 | Peer daemon | Runs the candidate `genesis/local-dev/hostcompat-wave1/k9/epr-8b273f826`, started with `EPR_BIN` set to that same path, `EPR_PEER_RELAY_URL=https://relay.alpha.elohim.host`, `--root /projects/elohim --handle matthew --listen 0.0.0.0:7777 --policy /projects/elohim/.worktrees/k9-8b273f826/genesis/agentic/pool-policy.json`. Log: `genesis/local-dev/peer/serve-shem-20261112.log`. | An installed release at or past `8b273f826`, with a policy file that is current with dev. |
 | Worktree `.worktrees/k9-8b273f826` | Detached at `8b273f826`. The daemon read its policy from here at start. | Removable once the daemon is restarted on another policy path and K9 is closed. |
 | Main checkout `/projects/elohim` | Local `dev` at `6d994a931`, 117 dirty entries from several sessions. Untouched today. | Synced to dev. See the next section. |
-| Worktree `.worktrees/hc-k6v2` | Branch `hostcompat/k6-v2-sysroot`, used for every docs landing today. Two hook ledgers under `.claude/data/` are modified and deliberately never staged. | Keep for further docs landings, or cut a fresh one. |
+| Worktree `.worktrees/hc-k6v2` | Branch `hostcompat/k6-v2-sysroot`, used for every docs landing today. Two hook ledgers under `.claude/data/` are modified and deliberately left unstaged. | Keep for further docs landings, or cut a fresh one. |
 
 ## The main-checkout sync (owed, not urgent)
 
@@ -54,7 +54,7 @@ K9 does not need it. Read these first:
 
 Rules that came out of both: keep Codex's six undelivered `brit-first` hook additions as they are;
 do not replace the nine shared integration files wholesale; union the hook ledgers, re-hashing at
-sync time because they keep growing; never move the `brit` or `rakia` gitlinks; the nested `brit`
+sync time because they keep growing; do not move the `brit` or `rakia` gitlinks; the nested `brit`
 checkout is itself dirty at a different commit. The retired execution-compatibility prototype's
 files in the main checkout take dev's versions.
 
