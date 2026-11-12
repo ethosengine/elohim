@@ -18,7 +18,9 @@ PostToolUse hook: fingerprint dedupe → ledger; NEW → background
 This sweep is the **deliberate drain**: it walks both stores to stasis the way
 `/memory-stasis-loop` walks the memory disciplines.
 
-**Stasis** := the ledger is EMPTY, or contains only `blocked` entries with a
+**Stasis** additionally requires no actionable Dependabot package cluster;
+unpatchable or blocked clusters retain their documented blockers and stay open
+until the harvester observes closure. For the warning ledger, stasis := it is EMPTY, or contains only `blocked` entries with a
 still-valid, documented blocker in their canonical backlog entry. Fixed items
 DECOMPOSE at close (ledger line + backlog entry deleted; the verifying commit
 is the record; rare chronicle graduation) — everything in the backlog has a
@@ -30,6 +32,21 @@ store are themselves an incoherence to repair.
 Each round:
 
 ### 1. Measure (scoreboard)
+
+Read `python3 .claude/scripts/dependabot-harvest.py --clusters` FIRST. Its live
+ledger is `.claude/data/dependabot-findings.jsonl`, separate from the warning
+ledger below. Rank package clusters by critical alert count first, then total
+alert count. Dispatch ONE remediation per ecosystem/package cluster across
+ALL affected lockfiles, not one task per advisory or manifest. For Cargo use
+`cargo update -p <package> --precise <patched-version>` in each affected
+workspace; for pnpm mirror root `package.json` `pnpm.overrides` into
+`pnpm-workspace.yaml` and regenerate the affected lockfiles. Test each owning
+workspace. Unpatchable clusters need a documented mitigation/blocker.
+
+Dependabot closure is measured by disappearance in the NEXT successful harvest,
+never by a fix commit or a local lockfile check. Do not delete findings or mark
+them closed yourself. The following warning-ledger coherence rules do not own
+Dependabot's live-set reconciliation or append-only closure history.
 
 ```bash
 python3 - <<'EOF'
@@ -59,17 +76,19 @@ breaks the deterministic citation).
 ### 2. Pick highest-leverage work
 
 Priority order:
-1. **Ledger↔backlog incoherence** (deterministic layer is lying) — repair
+1. **Dependabot package clusters** — critical count first, then alert count;
+   one remediation spans all of the cluster’s lockfiles.
+2. **Ledger↔backlog incoherence** (deterministic layer is lying) — repair
    directly.
-2. **`open` entries** (captured, never triaged — a dispatch was lost or
+3. **`open` entries** (captured, never triaged — a dispatch was lost or
    declined) — dispatch `deprecation-triage` with those fingerprints.
-3. **`blocked` entries whose blocker may have cleared** — read the backlog
+4. **`blocked` entries whose blocker may have cleared** — read the backlog
    entry's "Current decision"; check the blocker empirically (package
    version now available? substrate capability flipped in
    genesis/manifests/cluster-state.yaml? upstream issue closed — WebFetch
    it). Cleared → dispatch `deprecation-triage` to re-attempt; still
    blocked → refresh the decision line with today's evidence and move on.
-4. **`triaged` entries older than a week** (fix in flight that never
+5. **`triaged` entries older than a week** (fix in flight that never
    landed) — dispatch to finish or demote to `blocked` with the reason.
 
 Dispatch one `deprecation-triage` (Opus) at a time for focused concerns, or
@@ -87,7 +106,8 @@ different projects).
 
 ### 3. Re-measure and decide
 
-Re-run the scoreboard. Loop while the non-stasis count is shrinking. Stop at
+Re-run the Dependabot harvest and the warning scoreboard. A fix still present
+in the next harvest remains open; only the harvester records its closure. Loop while the non-stasis count is shrinking. Stop at
 stasis, or when a round makes no progress (then report exactly what is stuck
 and why — a stuck item usually means the concern needs an operator-initiated
 sprint, which is a `vision-readiness` roadmap conversation, not more agent

@@ -1,0 +1,12 @@
+lockfileVersion: '9.0'
+importers:
+  .:
+    dependencies:
+      '@scope/fixture':
+        specifier: ^0.2.5
+        version: 0.2.5
+packages:
+  '@scope/fixture@0.2.5': {}
+  fixture@1.0.0: {}
+snapshots:
+  '@scope/fixture@0.2.5(peer@1.0.0)': {}

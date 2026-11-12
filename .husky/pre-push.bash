@@ -852,6 +852,11 @@ for PUSH_LINE in "${PUSH_LINES[@]}"; do
   else
     STYLE_BASE="origin/dev"
   fi
+  # Cheap, offline security paydown runs before Rust compilation/expensive gates.
+  # Warn by default; SECURITY_PAYDOWN=strict makes a refusal bind this push.
+  if ! python3 "$(git rev-parse --show-toplevel)/.claude/scripts/dependabot-paydown.py" --base "$STYLE_BASE" --head "$LOCAL_SHA"; then
+    leg_red security-paydown "the security paydown ratchet refused $REMOTE_REF (above)"
+  fi
   if ! bash "$(git rev-parse --show-toplevel)/genesis/orchestrator/rust-style.sh" --base "$STYLE_BASE" --head "$LOCAL_SHA"; then
     echo "Rust style reach gate refused this ref; fix findings or restore measurable inputs."
     leg_red rust-style "the style reach gate refused $REMOTE_REF (above)"
