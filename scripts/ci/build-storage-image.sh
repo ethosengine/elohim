@@ -82,7 +82,7 @@ fi
 
 # CACHE_BUST is the closure key; unrelated commit ids never bust the cargo layer.
 # Pull the pinned base image (matches the Dockerfile FROM; keep in sync).
-nerdctl -n k8s.io pull rust:1.94.0-slim-bookworm || true
+nerdctl -n k8s.io pull rust:1.100.0-slim-bookworm || true
 
 BUILDKIT_HOST=unix:///run/buildkit/buildkitd.sock \
     nerdctl -n k8s.io build \

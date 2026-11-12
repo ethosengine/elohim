@@ -46,7 +46,7 @@ FROM ${CONDUCTOR_SOURCE_IMAGE} AS conductor-source
 # change never recompiles third-party crates in either path, and the quality
 # gate never pays for the release dependency graph it does not use (edge #1555:
 # 1466 s of the storage gate's 2691 s was that release compile).
-FROM rust:1.94.0-slim-bookworm AS dep-sources
+FROM rust:1.100.0-slim-bookworm AS dep-sources
 
 WORKDIR /app
 
@@ -546,7 +546,7 @@ RUN CARGO_INCREMENTAL=0 RUSTFLAGS='--cfg getrandom_backend="custom"' cargo test 
 # is the SAME file the local pre-push gate runs (single source of matrix
 # truth); inside this stage cargo is on PATH so the script takes its direct
 # path.
-FROM rust:1.94.0-slim-bookworm AS sdk-check
+FROM rust:1.100.0-slim-bookworm AS sdk-check
 # libsqlite3-dev: the SDK's `native` feature links SYSTEM sqlite via
 # rusqlite→libsqlite3-sys (no `bundled` feature) — present in the dev
 # container, absent from slim-bookworm.
