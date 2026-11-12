@@ -3,11 +3,15 @@ use eprfs_core::{DerivationKey, KeyInput};
 use eprfs_peer::{FetchDone, FetchFor, FetchRequest};
 use std::time::{Duration, Instant};
 
+fn record_manifest(owner: &str, at: &str, commit: &str) -> BlobCid {
+    BlobCid::compute(format!("{owner}:{at}:{commit}").as_bytes())
+}
+
 fn input_record(key: &DerivationKey, owner: &str, at: &str, commit: &str) -> FlowEvent {
     let mut event = produce_record(
         &eprfs_peer::key_cid(key).unwrap().to_string(),
         &BlobCid::compute_bytes(b"artifact"),
-        &BlobCid::compute(b"manifest").to_string(),
+        &record_manifest(owner, at, commit).to_string(),
         None,
     );
     event.receiver = AgentRef(owner.into());
@@ -77,6 +81,37 @@ fn inputs_diff_selects_newest_same_commit_in_cid_fold_order_and_prints_provenanc
     let local = computed.input_lines.unwrap();
     store_lines(&b.payload(), &computed.input, &local);
     append_local(&b, &computed.key);
+    // Append order is deliberately opposite occurred_at order.
+    SidecarFlowStore::open(b.root())
+        .unwrap()
+        .append(FlowRecord::Event(input_record(
+            &computed.key,
+            &b.key.did_key(),
+            "2026-11-08T11:00:00Z",
+            "newer-source",
+        )))
+        .unwrap();
+    SidecarFlowStore::open(b.root())
+        .unwrap()
+        .append(FlowRecord::Event(input_record(
+            &computed.key,
+            &b.key.did_key(),
+            "2026-11-08T09:00:00Z",
+            "oldest-source",
+        )))
+        .unwrap();
+
+    // Equal occurred_at instants use ascending commit/manifest/output, not append order.
+    SidecarFlowStore::open(b.root())
+        .unwrap()
+        .append(FlowRecord::Event(input_record(
+            &computed.key,
+            &b.key.did_key(),
+            "2026-11-08T13:00:00+02:00",
+            "z-source",
+        )))
+        .unwrap();
+
     for subject in [method.to_str().unwrap(), &computed.key_cid.to_string()] {
         let shown = b.epr(&[
             "artifact",
@@ -124,6 +159,8 @@ fn inputs_diff_selects_newest_same_commit_in_cid_fold_order_and_prints_provenanc
         let at = format!("2026-11-08T12:00:0{index}Z");
         let commit = if index == 2 {
             "literal-other-source"
+        } else if index == 1 {
+            "newer-source"
         } else {
             "source"
         };
@@ -179,6 +216,16 @@ fn inputs_diff_selects_newest_same_commit_in_cid_fold_order_and_prints_provenanc
                 )],
             );
         }
+        let expected_manifest = record_manifest(
+            &a.key.did_key(),
+            if index == 2 {
+                "2026-11-10T00:00:00Z"
+            } else {
+                &at
+            },
+            commit,
+        );
+        let requested_manifest = expected_manifest.clone();
         let (queue, payload, remote_lines, did, remote_key) = (
             queue.clone(),
             b.payload(),
@@ -212,6 +259,7 @@ fn inputs_diff_selects_newest_same_commit_in_cid_fold_order_and_prints_provenanc
             assert_eq!(request.authority.key(), Some(&remote_key));
             assert_eq!(request.holders.len(), 1);
             assert_eq!(request.holders[0].device, did);
+            assert_eq!(request.holders[0].manifest, requested_manifest);
             assert!(request.dest.as_os_str().is_empty());
             std::fs::remove_file(path).unwrap();
             store_lines(&payload, remote_key.input.cid(), &remote_lines);
@@ -247,16 +295,27 @@ fn inputs_diff_selects_newest_same_commit_in_cid_fold_order_and_prints_provenanc
         for line in [
             format!("inputs diff method={}", computed.method),
             format!(
-                "this device: device={} key={} input={} commit=source",
+                "this device: device={} key={} input={} commit={} manifest={}",
                 b.key.did_key(),
                 computed.key_cid,
-                computed.input
+                computed.input,
+                if index == 0 { "source" } else { "newer-source" },
+                record_manifest(
+                    &b.key.did_key(),
+                    if index == 0 {
+                        "2026-11-08T10:00:00Z"
+                    } else {
+                        "2026-11-08T11:00:00Z"
+                    },
+                    if index == 0 { "source" } else { "newer-source" }
+                )
             ),
             format!(
-                "sibling: device={} key={} input={} commit={commit}",
+                "sibling: device={} key={} input={} commit={commit} manifest={}",
                 a.key.did_key(),
                 eprfs_peer::key_cid(&remote).unwrap(),
-                remote.input.cid()
+                remote.input.cid(),
+                expected_manifest
             ),
         ] {
             assert!(stderr.lines().any(|actual| actual == line), "{stderr}");
@@ -287,6 +346,16 @@ fn inputs_diff_without_same_commit_refuses_with_five_candidates_and_literal_key_
         computed.input_lines.as_ref().unwrap(),
     );
     append_local(&b, &computed.key);
+    SidecarFlowStore::open(b.root())
+        .unwrap()
+        .append(FlowRecord::Event(input_record(
+            &computed.key,
+            &b.key.did_key(),
+            "2026-11-08T11:00:00Z",
+            "newer-source",
+        )))
+        .unwrap();
+
     let mut events = Vec::new();
     let mut expected = Vec::new();
     for i in 0..7 {
@@ -317,7 +386,7 @@ fn inputs_diff_without_same_commit_refuses_with_five_candidates_and_literal_key_
     assert!(diff.stdout.is_empty());
     let stderr = String::from_utf8_lossy(&diff.stderr);
     assert!(
-        stderr.contains("no same-source sibling record for commit source"),
+        stderr.contains("no same-source sibling record for commit newer-source"),
         "{stderr}"
     );
     assert!(stderr.contains("pass a literal key"), "{stderr}");

@@ -1630,9 +1630,10 @@ async fn a_late_indexable_older_derivation_never_evicts_a_newer_one() {
     let newer_put = holder.put(GRANTED, bytes, true).await;
     let artifact = output(&newer_put);
     assert_eq!(output(&older_put), artifact);
-    assert!(
-        holder.reindex_at(t0).await.is_empty(),
-        "only the newer is designated"
+    assert_eq!(
+        holder.reindex_at(t0).await.len(),
+        1,
+        "older record awaits its method"
     );
     assert_eq!(
         holder.mount.held(&artifact).map(|held| held.manifest),
@@ -1937,7 +1938,7 @@ impl HeadTableView {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn superseded_history_is_bounded() {
+async fn custody_index_tracks_distinct_manifests_including_history() {
     let h = household();
     let mut holder = holder(&h).await;
     let bytes = artifact_bytes(141, 300 * 1024);
@@ -1954,8 +1955,8 @@ async fn superseded_history_is_bounded() {
         )
         .await;
         assert!(holder.reindex().await.is_empty());
-        // One output, eight derivations: the index tracks one manifest, never the history.
-        assert_eq!(holder.mount.tracked_manifests(), 1);
+        // Each distinct custody manifest remains addressable by an exact request.
+        assert_eq!(holder.mount.tracked_manifests(), n + 1);
         last = Some(put);
     }
     let last = last.expect("a put");
@@ -1963,7 +1964,7 @@ async fn superseded_history_is_bounded() {
         holder.mount.held(&output(&last)).map(|held| held.manifest),
         Some(last.manifest_cid.clone())
     );
-    // A designated manifest that fails is the one record kept for its output.
+    // A failed latest manifest remains tracked beside the eight older records.
     let failing = granted_variant("unrecorded");
     put_with(
         holder.payload.as_ref(),
@@ -1975,7 +1976,7 @@ async fn superseded_history_is_bounded() {
     )
     .await;
     assert_eq!(holder.reindex().await.len(), 1);
-    assert_eq!(holder.mount.tracked_manifests(), 1);
+    assert_eq!(holder.mount.tracked_manifests(), 9);
     assert!(holder.mount.held(&output(&last)).is_none());
     holder.router.shutdown().await.expect("shutdown");
 }

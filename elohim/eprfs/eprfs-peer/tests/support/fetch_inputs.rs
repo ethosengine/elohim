@@ -158,12 +158,17 @@ async fn input_document_fetch_verifies_requested_cid_before_use() {
         assert_eq!(
             running.tier.asked.lock().unwrap().as_slice(),
             &[
-                TierRequest::Manifest {
-                    artifact: held.manifest.record.output.clone()
-                },
-                TierRequest::Blob {
+                TierRequest::Record {
                     artifact: held.manifest.record.output.clone(),
-                    cid: key.input.cid().clone()
+                    manifest: held.manifest_cid.clone(),
+                    key: Some(eprfs_peer::key_cid(&key).unwrap()),
+                    cid: None,
+                },
+                TierRequest::Record {
+                    artifact: held.manifest.record.output.clone(),
+                    manifest: held.manifest_cid.clone(),
+                    key: Some(eprfs_peer::key_cid(&key).unwrap()),
+                    cid: Some(key.input.cid().clone()),
                 },
             ],
             "no artifact chunks or unrelated objects are fetched"

@@ -2,7 +2,7 @@
 //! (artifact-store design §1.1, §1.5).
 //!
 //! The channel store stays the only tree store the tier endpoint reads. This mount answers
-//! [`TierRequest::Manifest`] and [`TierRequest::Blob`] from the device's payload store, for the
+//! [`TierRequest::Record`] (and legacy output-only requests) from the payload store, for the
 //! derivation artifacts this device holds custody of, and only to a device the artifact grant
 //! admits ([`crate::ArtifactServeList`]). It keeps:
 //!
@@ -14,10 +14,9 @@
 //!   (`via:`), is never local custody. A manifest whose method record is not held here is
 //!   [`Unindexed::MethodUnknown`], one whose chunks do not reconstruct its output here is
 //!   [`Unindexed::OutputUnverified`] or [`Unindexed::ManifestInvalid`], and neither is served. For
-//!   each output, only the manifest of the latest custody event in log order is served; an
-//!   indexed manifest that no longer reads is dropped at the next rebuild. A failed manifest is
+//!   an explicit request, the named custody manifest is served; an indexed manifest that no longer reads is dropped at the next rebuild. A failed manifest is
 //!   retried with a backoff, an invalid one only after a new custody event;
-//! - one `serve-blob` session per (requester, artifact), closed on the last distinct chunk, when
+//! - one `serve-blob` session per (requester, manifest), closed on the last distinct chunk, when
 //!   the connection closes, or after [`SERVE_IDLE`]; each closed session (and each refusal of an
 //!   admitted device) becomes one [`ServedDraw`], which the daemon records as one `Use` event.
 //!   That event carries no `measure:` slot, so it never crosses. Recording is bounded: at most
@@ -103,6 +102,8 @@ pub struct Held {
     pub output: BlobCid,
     /// The method CID the derivation record keys.
     pub method: BlobCid,
+    /// The derivation key CID, checked for record-bound requests.
+    pub key: BlobCid,
     /// The input document named by the derivation key (self reach, like its method).
     pub input: BlobCid,
     /// The method descriptor's name: what the grant is judged on.
@@ -121,11 +122,13 @@ impl Held {
     }
 }
 
-/// What the mount may serve, by output and by object.
+/// What the mount may serve, by custody manifest and by object.
 #[derive(Debug, Default)]
 pub struct ArtifactIndex {
-    by_output: BTreeMap<BlobCid, Held>,
-    /// Manifest and chunk CIDs → the outputs naming them.
+    by_manifest: BTreeMap<BlobCid, Held>,
+    /// Latest custody manifest per output, for legacy output-only requests.
+    latest: BTreeMap<BlobCid, BlobCid>,
+    /// Object CIDs → the manifests naming them.
     by_object: BTreeMap<BlobCid, BTreeSet<BlobCid>>,
     /// Designated manifests held and not served, with why.
     unindexed: BTreeMap<BlobCid, Unindexed>,
@@ -134,12 +137,11 @@ pub struct ArtifactIndex {
 }
 
 impl ArtifactIndex {
-    /// Index `held` as its output's entry, replacing (and removing every membership of) any
-    /// other entry of that output.
+    /// Index one custody record without replacing other records of the same output.
     fn insert(&mut self, held: Held) {
         self.unindexed.remove(&held.manifest);
         self.retry.remove(&held.manifest);
-        self.remove_output(&held.output);
+        self.remove_manifest(&held.manifest);
         for object in std::iter::once(&held.manifest)
             .chain(std::iter::once(&held.method))
             .chain(std::iter::once(&held.input))
@@ -148,21 +150,21 @@ impl ArtifactIndex {
             self.by_object
                 .entry(object.clone())
                 .or_default()
-                .insert(held.output.clone());
+                .insert(held.manifest.clone());
         }
-        self.by_output.insert(held.output.clone(), held);
+        self.by_manifest.insert(held.manifest.clone(), held);
     }
 
-    /// Drop the entry for `output` and every membership it gave its objects.
-    fn remove_output(&mut self, output: &BlobCid) -> Option<Held> {
-        let old = self.by_output.remove(output)?;
+    /// Drop one manifest and every membership it gave its objects.
+    fn remove_manifest(&mut self, manifest: &BlobCid) -> Option<Held> {
+        let old = self.by_manifest.remove(manifest)?;
         for object in std::iter::once(&old.manifest)
             .chain(std::iter::once(&old.method))
             .chain(std::iter::once(&old.input))
             .chain(&old.chunks)
         {
             let emptied = self.by_object.get_mut(object).is_some_and(|outputs| {
-                outputs.remove(output);
+                outputs.remove(manifest);
                 outputs.is_empty()
             });
             if emptied {
@@ -172,39 +174,37 @@ impl ArtifactIndex {
         Some(old)
     }
 
-    /// Keep only what `designated` names: entries of other manifests or outputs, and failure
-    /// records of manifests no longer designated, leave the index. The index's size follows the
-    /// distinct outputs of this device's custody events, never its history.
+    /// Retain the distinct manifests named by local custody, including older records.
     fn retain_designated(&mut self, designated: &BTreeMap<BlobCid, Designated>) {
-        let stale: Vec<BlobCid> = self
-            .by_output
-            .iter()
-            .filter(|(output, held)| {
-                designated
-                    .get(*output)
-                    .is_none_or(|designation| designation.manifest != held.manifest)
-            })
-            .map(|(output, _)| output.clone())
+        let stale: Vec<_> = self
+            .by_manifest
+            .keys()
+            .filter(|manifest| !designated.contains_key(*manifest))
+            .cloned()
             .collect();
-        for output in stale {
-            self.remove_output(&output);
+        for manifest in stale {
+            self.remove_manifest(&manifest);
         }
-        let live: BTreeSet<&BlobCid> = designated.values().map(|d| &d.manifest).collect();
-        self.unindexed.retain(|manifest, _| live.contains(manifest));
-        self.retry.retain(|manifest, _| live.contains(manifest));
+        self.unindexed
+            .retain(|manifest, _| designated.contains_key(manifest));
+        self.retry
+            .retain(|manifest, _| designated.contains_key(manifest));
     }
 
     /// How many manifests the index tracks, served or not.
     fn tracked(&self) -> usize {
-        let mut manifests: BTreeSet<&BlobCid> =
-            self.by_output.values().map(|held| &held.manifest).collect();
+        let mut manifests: BTreeSet<&BlobCid> = self
+            .by_manifest
+            .values()
+            .map(|held| &held.manifest)
+            .collect();
         manifests.extend(self.unindexed.keys());
         manifests.extend(self.retry.keys());
         manifests.len()
     }
 }
 
-/// The custody event that designates an output's manifest: the latest one in flow-log order.
+/// The latest local custody event for one manifest.
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct Designated {
     manifest: BlobCid,
@@ -518,6 +518,7 @@ impl BlobMount {
         Ok(Held {
             manifest: manifest_cid.clone(),
             output: manifest.record.output.clone(),
+            key: crate::key_cid(&manifest.record.key).map_err(|e| invalid(e.to_string()))?,
             method,
             input: manifest.record.key.input.cid().clone(),
             method_name: descriptor.name,
@@ -538,10 +539,8 @@ impl BlobMount {
 
     /// Rebuild the index from `events` as of `now`.
     ///
-    /// - **Designation follows event order.** For each output, the latest custody Produce of this
-    ///   device's own in the log designates its manifest; only that manifest is ever served for
-    ///   it. An older derivation never displaces a newer one, however late it becomes indexable,
-    ///   and the same log designates the same manifests after a restart.
+    /// - Every distinct local custody manifest is indexed. Event order selects only the
+    ///   legacy output-only default; late indexing never changes that default.
     /// - Everything else leaves the index: entries of undesignated manifests and their
     ///   memberships, and failure records of manifests no longer designated.
     /// - A designated manifest already indexed is re-read, and dropped when it no longer reads.
@@ -556,6 +555,7 @@ impl BlobMount {
         now: Instant,
     ) -> Vec<PeerError> {
         let mut designated: BTreeMap<BlobCid, Designated> = BTreeMap::new();
+        let mut latest = BTreeMap::new();
         for (event_cid, event) in events {
             let Some(manifest) = custody_manifest(event, &self.custodian) else {
                 continue;
@@ -563,8 +563,9 @@ impl BlobMount {
             let Ok(output) = BlobCid::parse(&event.resource.to_string()) else {
                 continue;
             };
+            latest.insert(output, manifest.clone());
             designated.insert(
-                output,
+                manifest.clone(),
                 Designated {
                     manifest,
                     event: *event_cid,
@@ -575,14 +576,15 @@ impl BlobMount {
         }
         if let Ok(mut index) = self.index.write() {
             index.retain_designated(&designated);
+            index.latest = latest;
         }
         let mut unindexed = Vec::new();
-        for (output, designation) in &designated {
+        for (manifest, designation) in &designated {
             let (current, previous) = self.index.read().map_or((false, None), |index| {
                 (
                     index
-                        .by_output
-                        .get(output)
+                        .by_manifest
+                        .get(manifest)
                         .is_some_and(|held| held.manifest == designation.manifest),
                     index.retry.get(&designation.manifest).cloned(),
                 )
@@ -596,7 +598,7 @@ impl BlobMount {
                         reason: why.to_string(),
                     };
                     if let Ok(mut index) = self.index.write() {
-                        index.remove_output(output);
+                        index.remove_manifest(manifest);
                         index
                             .unindexed
                             .insert(designation.manifest.clone(), reason.clone());
@@ -635,14 +637,20 @@ impl BlobMount {
     }
 
     /// How many manifests the index tracks, served, unindexed or waiting to retry: bounded by
-    /// the distinct outputs of this device's custody events.
+    /// the distinct manifests of this device's custody events.
     pub fn tracked_manifests(&self) -> usize {
         self.index.read().map_or(0, |index| index.tracked())
     }
 
-    /// The artifact `output` names, when indexed.
+    /// A specific custody record, never substituted by another record of its output.
+    fn held_record(&self, manifest: &BlobCid) -> Option<Held> {
+        self.index.read().ok()?.by_manifest.get(manifest).cloned()
+    }
+
+    /// The latest custody record of `output`, when indexed (legacy output-only lookup).
     pub fn held(&self, output: &BlobCid) -> Option<Held> {
-        self.index.read().ok()?.by_output.get(output).cloned()
+        let index = self.index.read().ok()?;
+        index.by_manifest.get(index.latest.get(output)?).cloned()
     }
 
     /// Why the manifest `manifest` is held and not served, when it is.
@@ -651,20 +659,19 @@ impl BlobMount {
     }
 
     fn method_of(&self, output: &BlobCid) -> Option<String> {
-        self.index
-            .read()
-            .ok()?
-            .by_output
-            .get(output)
-            .map(|held| held.method_name.clone())
+        self.held(output).map(|held| held.method_name)
     }
 
     fn object_of(&self, artifact: &BlobCid, cid: &BlobCid) -> bool {
         self.index.read().is_ok_and(|index| {
-            index
-                .by_object
-                .get(cid)
-                .is_some_and(|outputs| outputs.contains(artifact))
+            index.by_object.get(cid).is_some_and(|manifests| {
+                manifests.iter().any(|manifest| {
+                    index
+                        .by_manifest
+                        .get(manifest)
+                        .is_some_and(|held| held.output == *artifact)
+                })
+            })
         })
     }
 
@@ -677,7 +684,7 @@ impl BlobMount {
             .get(cid)
             .into_iter()
             .flatten()
-            .filter_map(|output| index.by_output.get(output))
+            .filter_map(|manifest| index.by_manifest.get(manifest))
             .filter(|held| {
                 (held.method != *cid && held.input != *cid)
                     || serves.discloses_method(&held.method_name)
@@ -727,7 +734,7 @@ impl BlobMount {
         let Ok(mut sessions) = self.sessions.lock() else {
             return;
         };
-        let key = (device.to_string(), held.output.clone());
+        let key = (device.to_string(), held.manifest.clone());
         let session = sessions.entry(key.clone()).or_insert_with(|| Session {
             held: held.clone(),
             connection,
@@ -843,7 +850,7 @@ pub(crate) fn uniform_refusal(self_id: &TierId, artifact: &BlobCid) -> TierAnswe
     )
 }
 
-/// Answer one [`TierRequest::Manifest`] or [`TierRequest::Blob`]: `admit_root`, then
+/// Answer an artifact request: admit the selected record's method (or legacy root), then
 /// `admit_object`, then membership, before any byte is read (the tree endpoint never calls
 /// `admit_object`, so this path does). A requester the gate does not admit gets the uniform
 /// refusal whatever failed; an admitted device gets the typed one, and is recorded.
@@ -858,6 +865,7 @@ pub(crate) async fn answer(
     let (artifact, asked) = match request {
         TierRequest::Manifest { artifact } => (artifact, None),
         TierRequest::Blob { artifact, cid } => (artifact, Some(cid)),
+        TierRequest::Record { artifact, cid, .. } => (artifact, cid.as_ref()),
         _ => {
             return (
                 TierAnswer::Failed {
@@ -878,11 +886,32 @@ pub(crate) async fn answer(
             None => (uniform_refusal(self_id, artifact), Answered::Refused),
         }
     };
-    if let Err(refusal) = gate.admit_root(who, artifact) {
-        return refuse(refusal);
-    }
-    let Some((mount, held)) = mount.and_then(|mount| Some((mount, mount.held(artifact)?))) else {
-        return refuse(ReachRefusal::new(ReachReason::OutsideStanding, None));
+    let (mount, held) = if let TierRequest::Record { manifest, key, .. } = request {
+        // Admission precedes record lookup so strangers cannot inventory custody.
+        if gate.admitted(who).is_none() {
+            return refuse(ReachRefusal::new(ReachReason::OutsideStanding, None));
+        }
+        let selected = mount.and_then(|mount| Some((mount, mount.held_record(manifest)?)));
+        let Some((mount, held)) = selected.filter(|(_, held)| {
+            held.output == *artifact && key.as_ref().is_none_or(|key| *key == held.key)
+        }) else {
+            return refuse(ReachRefusal::new(
+                ReachReason::NoRecord,
+                Some(format!("manifest:{manifest}")),
+            ));
+        };
+        if let Err(refusal) = gate.admit_artifact(who, &held.method_name) {
+            return refuse(refusal);
+        }
+        (mount, held)
+    } else {
+        if let Err(refusal) = gate.admit_root(who, artifact) {
+            return refuse(refusal);
+        }
+        let Some(selected) = mount.and_then(|mount| Some((mount, mount.held(artifact)?))) else {
+            return refuse(ReachRefusal::new(ReachReason::OutsideStanding, None));
+        };
+        selected
     };
     let object = asked.unwrap_or(&held.manifest);
     if *object == held.method || *object == held.input {

@@ -857,3 +857,28 @@ decisionPoints:
     contractTests:
       - { path: elohim/eprfs/eprfs-peer/tests/serve_blob.rs, testName: descriptor_disclosure_requires_explicit_permission_and_revokes_on_reload, kind: integration }
       - { path: elohim/eprfs/eprfs-peer/tests/rules.rs, testName: descriptor_permission_is_default_deny_digest_covered_and_not_an_audience_grant, kind: unit }
+
+  - name: record_bound_artifact_answer
+    kind: verdict-fn
+    sourceLocation: { file: src/blob_mount.rs, modulePath: eprfs_peer::blob_mount::answer }
+    summary: "TierRequest::Record binds manifest, output and optional key. The custody index retains distinct local manifests; answer uses admit_artifact on that record's method before disclosure and membership checks. Legacy output-only requests retain their latest-log default."
+    concernIds:
+      - { id: C0, status: answered, justification: "Custody projection of existing local Produce events; no head or reach promotion." }
+      - { id: C1, status: answered, justification: "Requested CIDs confer no custody or grant; own non-via Produce and roster admission remain required." }
+      - { id: C2, status: n-a, justification: "Exact immutable record selection does not elect a head. Legacy output-only order is unchanged." }
+      - { id: C3, status: answered, justification: "Existing frame and fetch deadlines bound transfer; index retry backoff is retained." }
+      - { id: C4, status: answered, justification: "Missing exact record returns NoRecord naming the requested manifest, never a substitute." }
+      - { id: C5, status: answered, justification: "Index validates manifest/output reconstruction; request checks output/key, and the client retains ManifestRejected." }
+      - { id: C6a, status: partial, justification: "Frame, concurrency and byte budgets persist. Index size now follows distinct custody manifests, not outputs; no new history-retention cap is claimed." }
+      - { id: C6b, status: answered, justification: "Rebuild deduplicates manifests; repeat requests do not create Produce records. Serve sessions bind requester and manifest." }
+      - { id: C7, status: answered, justification: "A crossed holder manifest stays selectable even when another record has the same output/key." }
+      - { id: C8, status: partial, justification: "Existing typed refusal and bounded ServedDraw recording remain; no new per-record metric claimed." }
+      - { id: C9, status: answered, justification: "Authenticated roster device admission is reused without a new identity store." }
+      - { id: C10, status: answered, justification: "A distinct Record wire variant makes older servers reject, rather than silently ignore an optional record binding." }
+      - { id: C11, status: answered, justification: "The same tier frame limits and admitted/unadmitted semaphore pools govern Record." }
+      - { id: C12, status: answered, justification: "admit_artifact checks the selected record's method grant; method/input disclosure remains steward-only and default-deny." }
+      - { id: C13, status: partial, justification: "Existing self-only disclosure scaffold remains; H12 is still the successor, not implemented here." }
+      - { id: C14, status: partial, justification: "Existing bounded refusal draws are retained; no cross-device witness is claimed." }
+    contractTests:
+      - { path: elohim/eprfs/eprfs-peer/tests/support/serve_inputs.rs, testName: exact_older_record_serves_manifest_inputs_and_bytes_and_refuses_unknown_manifest, kind: integration }
+      - { path: elohim/eprfs/eprfs-peer/tests/serve_blob.rs, testName: custody_index_tracks_distinct_manifests_including_history, kind: integration }

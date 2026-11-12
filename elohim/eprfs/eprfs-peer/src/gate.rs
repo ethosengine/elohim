@@ -155,6 +155,19 @@ impl StewardDevicesGate {
         })
     }
 
+    /// Judge the method of the selected custody record, not the output's latest record.
+    pub(crate) fn admit_artifact(&self, who: &Requester, method: &str) -> Result<(), ReachRefusal> {
+        let device = self.admit(who)?;
+        if self.scope.grants(device, method) {
+            Ok(())
+        } else {
+            Err(ReachRefusal::new(
+                ReachReason::OutsideStanding,
+                Some(serve_blob_standing(method)),
+            ))
+        }
+    }
+
     /// Method and input documents share both gates: steward audience and explicit disclosure.
     /// H12 (host-compatibility spec §7.8, reach on the object) would replace both gates.
     /// Until then these host facts remain self-only; carrier audiences grant nothing.

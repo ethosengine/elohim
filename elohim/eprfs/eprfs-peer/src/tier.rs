@@ -132,6 +132,14 @@ pub enum TierRequest {
     /// The manifest of the artifact whose complete output is `artifact`. The answer names the
     /// manifest's own CID; decoding it and checking it names `artifact` is the fetcher's.
     Manifest { artifact: BlobCid },
+    /// One exact custody record. `cid: None` asks for its manifest, otherwise for a member.
+    /// A distinct wire variant makes older servers fail closed rather than ignore the binding.
+    Record {
+        artifact: BlobCid,
+        manifest: BlobCid,
+        key: Option<BlobCid>,
+        cid: Option<BlobCid>,
+    },
     /// The object `cid` (a chunk, or the manifest) of the artifact `artifact`. Asked under the
     /// artifact, never alone: an object is served only as part of an artifact granted here.
     Blob { artifact: BlobCid, cid: BlobCid },
@@ -490,7 +498,9 @@ impl Inner {
                 endpoint.serve_diff(who, &old, &new, &view, &opts).await,
                 TierAnswer::Diff,
             ),
-            TierRequest::Manifest { .. } | TierRequest::Blob { .. } => {
+            TierRequest::Manifest { .. }
+            | TierRequest::Blob { .. }
+            | TierRequest::Record { .. } => {
                 let (answer, answered) = blob_mount::answer(
                     self.mount.as_deref(),
                     &self.gate,
@@ -621,12 +631,17 @@ fn check_answer(
             &listing.cid,
             listing.path == *path && listing_cid(listing, tree).as_ref() == Some(&listing.cid),
         ),
-        (TierRequest::Manifest { .. }, TierAnswer::Blob { cid, bytes }) => {
-            (cid, cid.verifies(bytes))
-        }
-        (TierRequest::Blob { cid: asked, .. }, TierAnswer::Blob { cid, bytes }) => {
-            (cid, cid == asked && cid.verifies(bytes))
-        }
+        (
+            TierRequest::Manifest { .. } | TierRequest::Record { cid: None, .. },
+            TierAnswer::Blob { cid, bytes },
+        ) => (cid, cid.verifies(bytes)),
+        (
+            TierRequest::Blob { cid: asked, .. }
+            | TierRequest::Record {
+                cid: Some(asked), ..
+            },
+            TierAnswer::Blob { cid, bytes },
+        ) => (cid, cid == asked && cid.verifies(bytes)),
         (TierRequest::Diff { .. }, TierAnswer::Diff(_))
         | (_, TierAnswer::Unanswered { .. } | TierAnswer::Failed { .. }) => return Ok(()),
         _ => return Err(frame_error("the answer is not of the kind asked")),

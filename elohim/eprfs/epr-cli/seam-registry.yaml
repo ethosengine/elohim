@@ -2463,3 +2463,29 @@ decisionPoints:
     - { path: elohim/eprfs/epr-cli/tests/artifact_foreign.rs, testName: artifact_foreign_all_independent_failures_are_reported_together, kind: integration }
     - { path: elohim/eprfs/epr-cli/tests/artifact_foreign.rs, testName: artifact_foreign_noncargo_lists_all_unmet_items_and_records_nothing, kind: integration }
     - { path: elohim/eprfs/epr-cli/tests/support/artifact_preflight.rs, testName: artifact_existing_mesh_dependency_recipe_passes_preflight, kind: integration }
+
+- name: newest_record
+  kind: pure-decision-predicate
+  sourceLocation: { file: src/artifact/inputs.rs, modulePath: elohim_epr_cli::artifact::inputs::newest_record }
+  summary: "Input diff descriptors choose the newest local occurred_at with a same-method sibling commit; literal keys choose the newest exact-key occurrence. Equal instants use ascending commit/manifest/output; sibling ties with different inputs still refuse."
+  concernIds:
+  - { id: C0, status: answered, justification: "Diagnostic pairing over custody evidence, not version/head authority." }
+  - { id: C1, status: n-a, justification: "No election or standing grant." }
+  - { id: C2, status: answered, justification: "Parsed Produce occurred_at orders candidates, independent of append/fold order; commit/manifest/output break equal-time local ties." }
+  - { id: C3, status: answered, justification: "Finite local candidate traversal; subsequent fetch retains deadlines." }
+  - { id: C4, status: answered, justification: "No common commit preserves the refusal, five candidates and literal-key hint; invalid timestamps refuse." }
+  - { id: C5, status: answered, justification: "Pairing does not authenticate bytes: recorded_key, manifest checks and verified input CID still do." }
+  - { id: C6a, status: partial, justification: "Finite custody snapshot and five printed candidates; common-commit search is quadratic in local and sibling rows." }
+  - { id: C6b, status: answered, justification: "Selection is pure and input fetch creates no Produce or executable installation." }
+  - { id: C7, status: n-a, justification: "No advertisement is added." }
+  - { id: C8, status: partial, justification: "stderr prints both chosen commits and manifests; no per-selection counter is added." }
+  - { id: C9, status: answered, justification: "Existing custody reader uses roster-admitted devices." }
+  - { id: C10, status: answered, justification: "Literal keys keep exact-key semantics; existing ambiguity and absence tests remain." }
+  - { id: C11, status: n-a, justification: "Local diagnostic selection; existing fetch transport bounds remote load." }
+  - { id: C12, status: answered, justification: "Selection never replaces serving-side grant or disclosure enforcement." }
+  - { id: C13, status: n-a, justification: "No authority tier is introduced." }
+  - { id: C14, status: partial, justification: "Existing CLI gap output only, without a new witnessed decision capsule." }
+  contractTests:
+  - { path: elohim/eprfs/epr-cli/tests/support/artifact_inputs.rs, testName: inputs_diff_selects_newest_same_commit_in_cid_fold_order_and_prints_provenance, kind: integration }
+  - { path: elohim/eprfs/epr-cli/tests/support/artifact_inputs.rs, testName: inputs_diff_without_same_commit_refuses_with_five_candidates_and_literal_key_hint, kind: integration }
+  - { path: elohim/eprfs/epr-cli/tests/support/artifact_inputs.rs, testName: inputs_diff_equal_produce_times_with_different_inputs_refuses_both_candidates, kind: integration }
