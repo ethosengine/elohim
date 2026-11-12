@@ -21,8 +21,20 @@ Codex's Brit feedback sprint (session 01a1cbeb) is published and finished.
 - Shem's `epr artifact inputs diff` (descriptor form) pairs with ethosengine's `8b273f826` record
   and then exits 3: ethosengine's daemon served the manifest of its newer `164eca807` record for
   the same output, and the fetch rejects a manifest other than the one the paired record names.
-  Sent to ethosengine at about 15:25Z; the cure is theirs to choose. A workaround (re-record on
-  shem at `164eca807`) would hide the defect, so it waits for their word.
+  Ethosengine agreed (note at about 15:15Z) that this is the serve-side twin of its own pairing
+  defect (B): both assume one record per key and output, which commit-independent keys break. It
+  ruled out the workaround and is fixing the design on branch `hostcompat/k9-pair-by-record`
+  (from dev `03201672a`, Codex astra leg): (1) the daemon serves exactly the record named in
+  `holders[].manifest` and refuses with a typed gap rather than substituting; shem's client-side
+  `ManifestRejected` guard stays; (2) `inputs diff` pairs on the newest commit both devices
+  recorded; (3) artifact fetch is checked for the same assumption. It will send a landing
+  notice and then run its daemon on the fixed candidate.
+- **Shem needs the fixed `epr` too**, so that shem's daemon can serve ethosengine's direction.
+  After the landing: build `epr` from that dev commit, keep a copy under
+  `genesis/local-dev/hostcompat-wave1/k9/`, restart shem's daemon on it (same flags as in the
+  table below, `EPR_BIN` set to the new path), then re-run the diff with the new binary. Shem's
+  own record at `8b273f826` should not need re-recording; if the new pairing rule selects a
+  different commit, say so to ethosengine before re-recording.
 - Expected content of a successful diff, per ethosengine: `link:Scrt1.o`, `link:crt1.o` and the
   compiler macro dump. Anything else is a finding.
 - To re-run:
