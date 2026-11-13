@@ -689,8 +689,9 @@ fn ark_bin() -> Outcome<PathBuf> {
         .find(|p| executable(p))
         .ok_or_else(|| {
             format!(
-                "REFUSED: no ark binary — build it with `(cd elohim && RUSTUP_TOOLCHAIN=1.96.1 \
-                 CARGO_TARGET_DIR={} RUSTFLAGS= cargo build -p elohim-ark)` or set ARK_BIN",
+                "REFUSED: no ark binary — use the toolchain pinned in genesis/agentic/pool-policy.json \
+                 to run `(cd elohim && CARGO_TARGET_DIR={} RUSTFLAGS= cargo build -p elohim-ark)`, \
+                 or set ARK_BIN",
                 ARK_POOL_SLOT.trim_end_matches("/debug/ark")
             )
         })
