@@ -317,12 +317,18 @@ function sortedObject(value) {
   return value;
 }
 
+// Shared compiler runners are execution inputs, never CI dispatch sources.
+export const COMPILER_GATE_INPUTS = [
+  'genesis/orchestrator/cargo-lint.mjs',
+  'genesis/orchestrator/gate-steps.sh',
+];
+
 /**
  * The closure material: the canonical JSON (sorted keys, no whitespace) of everything the
  * verdict is a function of. A gate run as an ark Task names these exact bytes as its input
  * (`ark task spec --material`), where they become an eprfs tree; CID math stays in Rust.
  */
-export function closureMaterial({ project, fingerprints, manifestBlob: blob, cargoEnv, nativeKey, recipeFile = null, runner = null, dirTree = null, cargoConfig = null, rustc = null, gitlinks = null, packages = [], reads = null }) {
+export function closureMaterial({ project, fingerprints, manifestBlob: blob, cargoEnv, nativeKey, compilerTools = null, recipeFile = null, runner = null, dirTree = null, cargoConfig = null, rustc = null, gitlinks = null, packages = [], reads = null }) {
   return JSON.stringify(sortedObject({
     v: 3,
     ...(nativeKey ? { native: nativeKey } : {}),
@@ -332,6 +338,7 @@ export function closureMaterial({ project, fingerprints, manifestBlob: blob, car
     steps: fingerprints,
     env: cargoEnv || {},
     recipeFile,
+    compilerTools,
     runner,
     dirTree,
     cargoConfig,
@@ -370,7 +377,7 @@ export function dirtyPaths(project, { root, spawn = spawnSync, commit = 'HEAD', 
   if (!sources) return null;
   // A basename read (`**\/.epr-meta`) is a glob pathspec, so a NEW untracked match anywhere is dirt too.
   const pathspec = path => (isReadPattern(path) ? `:(glob)${path}` : path);
-  const paths = [project.dir, project.manifestPath, ...sources.map(source => source.endsWith('/**') ? source.slice(0, -2) : source), recipePath,
+  const paths = [...COMPILER_GATE_INPUTS, 'genesis/orchestrator/run-local-gate.sh', project.dir, project.manifestPath, ...sources.map(source => source.endsWith('/**') ? source.slice(0, -2) : source), recipePath,
     ...(reads.scope === 'paths' ? reads.oids.map(row => pathspec(row.path)) : ['.'])];
   const out = gitRead(root, ['status', '--porcelain', '--untracked-files=normal', '--', ...new Set(paths),
     ...GATE_EXHAUST.map(path => `:(top,glob,exclude)${path}`)], spawn);
@@ -433,6 +440,7 @@ export function ageOf(iso, now = Date.now()) {
 // D5: "the space never rides what it upgrades". A sibling verdict cannot judge candidate
 // bytes that change the gate, its crossing substrate, admission, or measure vocabulary.
 export const SIBLING_REUSE_GOVERNANCE_PATHS = Object.freeze([
+  ...COMPILER_GATE_INPUTS,
   'genesis/orchestrator/gate-evidence.mjs',
   'genesis/orchestrator/gate-runner.mjs',
   'genesis/orchestrator/gate-*.mjs',
@@ -568,6 +576,7 @@ export function gateEvidence(project, { env = process.env, root, commit, cargoEn
   if (!blob) return { line: `unavailable (manifest ${project.manifestPath} absent at ${String(commit).slice(0, 9)})` };
   const recipe = recipeAt(project, root, commit, spawn);
   const runner = manifestBlob(root, commit, 'genesis/orchestrator/run-local-gate.sh', spawn);
+  const compilerTools = COMPILER_GATE_INPUTS.map(path => ({ path, oid: manifestBlob(root, commit, path, spawn) }));
   const dirTree = project.dir === '.'
     ? gitRead(root, ['rev-parse', `${commit}^{tree}`], spawn)?.trim() || null
     : projectTree(root, commit, project.dir, spawn);
@@ -593,7 +602,7 @@ export function gateEvidence(project, { env = process.env, root, commit, cargoEn
     : `tree (${read ? 'unresolved' : 'unknown'} reads)`;
   const material = closureMaterial({
     project, fingerprints: fp.fingerprints, manifestBlob: blob, cargoEnv, nativeKey,
-    recipeFile: recipe.blob, runner, dirTree,
+    recipeFile: recipe.blob, compilerTools, runner, dirTree,
     cargoConfig: manifestBlob(root, commit, '.cargo/config.toml', spawn),
     rustc: rustcHash(project, root, env, cargoEnv, spawn),
     gitlinks: gitlinksAt(root, commit, sources, spawn),

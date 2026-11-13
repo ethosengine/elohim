@@ -84,7 +84,7 @@ const closureReplies = [
   [isShow, { status: 0, stdout: JSON.stringify({ steps: { 'cargo-build-storage': { inputs: { sources } } } }), stderr: '' }],
   [isTree, { status: 0, stdout: '', stderr: '' }],
 ];
-const closureMaterial = { recipeFile: 'blob1', runner: 'blob1', dirTree: 'blob1', cargoConfig: 'blob1', gitlinks: [], reads: { scope: 'tree', oid: 'blob1' } };
+const closureMaterial = { compilerTools: ['genesis/orchestrator/cargo-lint.mjs', 'genesis/orchestrator/gate-steps.sh'].map(path => ({ path, oid: 'blob1' })), recipeFile: 'blob1', runner: 'blob1', dirTree: 'blob1', cargoConfig: 'blob1', gitlinks: [], reads: { scope: 'tree', oid: 'blob1' } };
 
 test('the attestation step is the gate project, not a manifest step', () => {
   assert.equal(attestationStep(project), 'gate:elohim-storage');
@@ -157,7 +157,7 @@ test('gateEvidence resolves the closure, asks brit-build-ref once with the key, 
     assert.equal(result.line, 'hit green (signer did:key:zSIG, 30m ago, commit ffffffff1); closure scope tree (unknown reads)');
     assert.equal(result.dirty, false);
     const status = calls.find(c => isStatus(c.bin, c.args));
-    assert.deepEqual(status.args, ['status', '--porcelain', '--untracked-files=normal', '--', 'elohim/elohim-storage', 'elohim/holochain/build-manifest.json', 'elohim/elohim-storage/src/', '.claude/data/', 'elohim/brit', 'elohim/elohim-storage/justfile', '.',
+    assert.deepEqual(status.args, ['status', '--porcelain', '--untracked-files=normal', '--', ...['genesis/orchestrator/cargo-lint.mjs', 'genesis/orchestrator/gate-steps.sh', 'genesis/orchestrator/run-local-gate.sh'], 'elohim/elohim-storage', 'elohim/holochain/build-manifest.json', 'elohim/elohim-storage/src/', '.claude/data/', 'elohim/brit', 'elohim/elohim-storage/justfile', '.',
       ...GATE_EXHAUST.map(path => `:(top,glob,exclude)${path}`)]);
     const find = calls.filter(c => isFind(c.bin, c.args));
     assert.equal(find.length, 1, 'one lookup per project');
@@ -1036,7 +1036,7 @@ test('dirtyPaths passes declared sources and recipe with exhaust exclusions', ()
   ]);
   assert.deepEqual(dirtyPaths(project, { root: '/repo', spawn }), ['.claude/data/failure-taxonomy.json']);
   assert.deepEqual(calls.find(c => isStatus(c.bin, c.args)).args, [
-    'status', '--porcelain', '--untracked-files=normal', '--', project.dir, project.manifestPath,
+    'status', '--porcelain', '--untracked-files=normal', '--', ...['genesis/orchestrator/cargo-lint.mjs', 'genesis/orchestrator/gate-steps.sh', 'genesis/orchestrator/run-local-gate.sh'], project.dir, project.manifestPath,
     'elohim/elohim-storage/src/', '.claude/data/', 'elohim/brit', 'elohim/elohim-storage/justfile', '.',
     ...GATE_EXHAUST.map(path => `:(top,glob,exclude)${path}`),
   ]);
@@ -1451,4 +1451,18 @@ test('a project with no habit atom keys on its plain tree OID; an unreadable lis
   assert.equal(projectTree('/r', 'c1', 'elohim/elohim-storage', unreadable), 'tree-1');
   const absent = fakeSpawn([[isRevParse, { status: 128, stdout: '', stderr: '' }]]).spawn;
   assert.equal(projectTree('/r', 'c1', 'elohim/elohim-storage', absent), null);
+});
+
+test('compiler helpers move the closure key and are dirt even outside a narrow project', t => {
+  const inspect = readEvidenceFixture(t);
+  const { result } = inspect();
+  const material = JSON.parse(result.material);
+  for (const path of ['genesis/orchestrator/cargo-lint.mjs', 'genesis/orchestrator/gate-steps.sh']) {
+    assert.ok(material.compilerTools.some(row => row.path === path && row.oid));
+    const base = { project, ...closureMaterial };
+    assert.notEqual(closureKey(base), closureKey({ ...base, compilerTools: base.compilerTools.map(row => row.path === path ? { ...row, oid: 'changed' } : row) }));
+    const { spawn, calls } = fakeSpawn([[isStatus, { status: 0, stdout: ` M ${path}\n` }]]);
+    assert.deepEqual(dirtyPaths(project, { root: '/repo', spawn, sources: [], recipePath: 'justfile', reads: { scope: 'paths', oids: [] } }), [path]);
+    assert.ok(calls[0].args.includes(path));
+  }
 });

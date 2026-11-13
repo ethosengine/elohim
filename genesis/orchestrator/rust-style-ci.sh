@@ -60,10 +60,15 @@ if [[ "${1:-}" == --print-base ]]; then
   exit 0
 fi
 export CARGO_TARGET_DIR="$style_root/.rust-style-target" RUSTFLAGS="" CARGO_BUILD_JOBS=1
+# The official Rust image has no Node; the shared lint driver needs it in CI.
+if ! command -v node >/dev/null 2>&1; then
+  apt-get update
+  apt-get install -y --no-install-recommends nodejs
+fi
 # The official Rust image uses the minimal profile.
 rustup component add rustfmt clippy
-cargo build --locked --manifest-path genesis/orchestrator/rust-style/Cargo.toml
-cargo fmt --manifest-path genesis/orchestrator/rust-style/Cargo.toml --check
-cargo clippy --locked --manifest-path genesis/orchestrator/rust-style/Cargo.toml --all-targets -- -D warnings
-cargo test --locked --manifest-path genesis/orchestrator/rust-style/Cargo.toml
-"$CARGO_TARGET_DIR/debug/epr-rust-style" --root "$style_root" --base "$style_base" --head HEAD
+bash "$style_root/genesis/orchestrator/gate-steps.sh" \
+  fmt -- cargo fmt --manifest-path genesis/orchestrator/rust-style/Cargo.toml --check \
+  ::: lint -- node genesis/orchestrator/cargo-lint.mjs --locked --manifest-path genesis/orchestrator/rust-style/Cargo.toml --all-targets -- -D warnings \
+  ::: test -- cargo test --locked --manifest-path genesis/orchestrator/rust-style/Cargo.toml \
+  ::: check -- bash -c 'cargo build --locked --manifest-path genesis/orchestrator/rust-style/Cargo.toml && "$CARGO_TARGET_DIR/debug/epr-rust-style" --root "$1" --base "$2" --head HEAD' _ "$style_root" "$style_base"

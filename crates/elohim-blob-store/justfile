@@ -4,10 +4,8 @@
 # multi-process tests run here, with default features (the store alone) and all features
 # (the eprfs tier).
 gate:
-    #!/usr/bin/env bash
-    set -uo pipefail
-    run() { "$@"; result=$?; echo EXIT=$result; [ "$result" -eq 0 ] || exit "$result"; }
-    run cargo fmt --check
-    run cargo clippy --locked --all-features --all-targets -- -D warnings
-    run cargo test --locked
-    run cargo test --locked --all-features
+    bash ../../genesis/orchestrator/gate-steps.sh \
+      fmt -- cargo fmt --check \
+      ::: lint -- node ../../genesis/orchestrator/cargo-lint.mjs --locked --all-features --all-targets -- -D warnings \
+      ::: test -- cargo test --locked \
+      ::: test-all -- cargo test --locked --all-features

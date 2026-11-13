@@ -32,7 +32,7 @@ check:
 
 # Lint with clippy
 clippy:
-    cargo clippy -- -D warnings
+    node ../../genesis/orchestrator/cargo-lint.mjs -- -D warnings
 
 # Format code
 fmt:
@@ -47,4 +47,7 @@ clean:
     cargo clean
 
 # Quality gate: fmt-check + clippy + test
-gate: fmt-check clippy test
+gate:
+    bash ../../genesis/orchestrator/gate-steps.sh fmt -- just fmt-check \
+      ::: lint -- just clippy \
+      ::: test -- just test

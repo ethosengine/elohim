@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { SIBLING_REUSE_GOVERNANCE_PATHS } from './gate-evidence.mjs';
+import { COMPILER_GATE_INPUTS, SIBLING_REUSE_GOVERNANCE_PATHS } from './gate-evidence.mjs';
 
 export const CHANGE_CLASSES = Object.freeze(['0', 'low', 'channel', 'governance', 'high']);
 export const CLASS_EFFECTS = Object.freeze({
@@ -36,6 +36,7 @@ export const CLASS_EFFECTS = Object.freeze({
 });
 
 export const GOVERNANCE_PATHS = Object.freeze([
+  ...COMPILER_GATE_INPUTS,
   '.husky/**',
   '.ci-ignore',
   '.epr-meta/manifest.md',

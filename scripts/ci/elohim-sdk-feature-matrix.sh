@@ -33,24 +33,14 @@ export RUSTFLAGS=""
 export RUSTC_WRAPPER=""
 export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-${TMPDIR:-/tmp}/elohim-sdk-feature-matrix-target}"
 
-run_sdk_test() {
-  local label="$1"
-  shift
-
-  echo "[elohim-sdk] cargo test: ${label}"
-  cargo test --locked --manifest-path "${SDK_MANIFEST}" "$@"
-}
-
-cargo fmt --manifest-path "${SDK_MANIFEST}" --check
-
-run_sdk_test "no default features" --no-default-features
-run_sdk_test "default features"
-run_sdk_test "client" --no-default-features --features client
-run_sdk_test "native" --no-default-features --features native
-run_sdk_test "wasm feature on native target" --no-default-features --features wasm
-run_sdk_test "sync" --no-default-features --features sync
-run_sdk_test "full" --no-default-features --features full
-run_sdk_test "all features" --all-features
-
-echo "[elohim-sdk] cargo clippy: all features and targets"
-cargo clippy --locked --manifest-path "${SDK_MANIFEST}" --all-features --all-targets -- -D warnings
+bash "${SDK_MATRIX_ROOT}/genesis/orchestrator/gate-steps.sh" \
+  fmt -- cargo fmt --manifest-path "${SDK_MANIFEST}" --check \
+  ::: lint -- node "${SDK_MATRIX_ROOT}/genesis/orchestrator/cargo-lint.mjs" --locked --manifest-path "${SDK_MANIFEST}" --all-features --all-targets -- -D warnings \
+  ::: test-no-default -- cargo test --locked --manifest-path "${SDK_MANIFEST}" --no-default-features \
+  ::: test-default -- cargo test --locked --manifest-path "${SDK_MANIFEST}" \
+  ::: test-client -- cargo test --locked --manifest-path "${SDK_MANIFEST}" --no-default-features --features client \
+  ::: test-native -- cargo test --locked --manifest-path "${SDK_MANIFEST}" --no-default-features --features native \
+  ::: test-wasm -- cargo test --locked --manifest-path "${SDK_MANIFEST}" --no-default-features --features wasm \
+  ::: test-sync -- cargo test --locked --manifest-path "${SDK_MANIFEST}" --no-default-features --features sync \
+  ::: test-full -- cargo test --locked --manifest-path "${SDK_MANIFEST}" --no-default-features --features full \
+  ::: test-all -- cargo test --locked --manifest-path "${SDK_MANIFEST}" --all-features

@@ -20,8 +20,8 @@ build-dev:
 
 # Run tests
 test:
-    cargo test --lib --bins
-    cargo test --test schema_contract
+    bash ../../genesis/orchestrator/gate-steps.sh test -- cargo test --lib --bins \
+      ::: schema -- cargo test --test schema_contract
 
 # Type-check without building
 check:
@@ -29,7 +29,7 @@ check:
 
 # Lint with clippy
 clippy:
-    cargo clippy --all-targets -- -D warnings
+    node ../../genesis/orchestrator/cargo-lint.mjs --all-targets -- -D warnings
 
 # Format code
 fmt:
@@ -44,4 +44,7 @@ clean:
     cargo clean
 
 # Quality gate: fmt-check + clippy + test
-gate: fmt-check clippy test
+gate:
+    bash ../../genesis/orchestrator/gate-steps.sh fmt -- just fmt-check \
+      ::: lint -- just clippy \
+      ::: test -- just test

@@ -1,17 +1,8 @@
-# Invoked through the manifest gate runner (`just gate elohim-placement`), which resolves the
-# elohim workspace's cargo-pool slot and clears RUSTFLAGS. Each step echoes its own EXIT line.
+# Invoked through the manifest gate runner, which supplies the native pool slot.
 gate:
-    #!/usr/bin/env bash
-    set -uo pipefail
-    step() {
-        "$@"
-        result=$?
-        echo "EXIT=$result  ($*)"
-        [ "$result" -eq 0 ] || exit "$result"
-    }
-    step cargo fmt --check -p elohim-placement-core
-    step cargo clippy -p elohim-placement-core --all-targets --all-features -- -D warnings
-    step cargo test -p elohim-placement-core --all-features
-    # The `runtime` split this crate relies on: elohim-compute's actuation contract alone.
-    step cargo test -p elohim-compute --no-default-features
-    step cargo clippy -p elohim-compute --no-default-features --all-targets -- -D warnings
+    bash ../../genesis/orchestrator/gate-steps.sh \
+      fmt -- cargo fmt --check -p elohim-placement-core \
+      ::: lint -- node ../../genesis/orchestrator/cargo-lint.mjs -p elohim-placement-core --all-targets --all-features -- -D warnings \
+      ::: test -- cargo test -p elohim-placement-core --all-features \
+      ::: test-runtime -- cargo test -p elohim-compute --no-default-features \
+      ::: lint-runtime -- node ../../genesis/orchestrator/cargo-lint.mjs -p elohim-compute --no-default-features --all-targets -- -D warnings

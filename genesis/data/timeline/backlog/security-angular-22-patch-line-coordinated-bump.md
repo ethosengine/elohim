@@ -78,3 +78,12 @@ Next step: bump every `@angular/*` specifier to the 22.2.x line across the consu
 
 None yet. Closure requires the Angular project gates green and alerts #862, #863, #864, #871,
 #872, #909 no longer open.
+
+## Status 2026-11-12 (partial)
+
+On branch `deps/npm-security-20261112` (not yet landed) the runtime family
+(`common`, `compiler`, `core`, `forms`, `platform-browser`, `platform-server`, `router`) is
+held together at 22.1.8 by `package.json` `pnpm.overrides`, which clears #872 (22.1.6) and
+#862/#863/#871/#864 without touching `@angular/build@22.1.0` or its patch. Still open: #909
+(`router`, 22.2.0) and GHSA-w739-gvwx-grc3 (#954/#955/#956, `platform-server`, 22.2.1) need the
+22.2.x family move with the patch re-cut described above.
