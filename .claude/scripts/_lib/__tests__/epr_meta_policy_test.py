@@ -423,4 +423,42 @@ check("M2 closed: the homoglyph spans index the original bytes",
       _evidence.get("spans") == [{"start": _raw.index(b"self"), "end": _raw.index(b" identity")},
                                  {"start": _s, "end": _raw.index(b".\n")}])
 
+# ── native parameter policies (feedback-local-retention@1 shape) ──
+_NATIVE = REGISTRY + """\
+  - id: native-budget
+    version: 1
+    class: measure
+    scope: { path: .eprfs/status/feedback }
+    measure: { totalBytes: 100, activeBytes: 50 }
+    permitted-local-parameters: [totalBytes, activeBytes]
+    why: native consumer reads the defaults.
+  - id: dodged-ceiling
+    version: 1
+    class: measure
+    scope: { write: "*.rs" }
+    measure: { loc-hard: 1 }
+    permitted-local-parameters: [loc-hard]
+    why: a LoC ceiling cannot dodge kind validation by listing parameters.
+  - id: bad-parameters
+    version: 1
+    class: measure
+    scope: { path: x }
+    measure: { totalBytes: 100 }
+    permitted-local-parameters: [{}]
+    why: malformed list is refused, not a crash.
+"""
+with tempfile.TemporaryDirectory() as td:
+    tmp = _repo(Path(td), _NATIVE)
+    pols, errs = epr_meta.load_policies(tmp)
+    check("native parameter policy: an integer map over permitted parameters loads",
+          "native-budget@1" in pols and pols["native-budget@1"].get("__native_parameters__"))
+    check("native parameter policy: a loc-* block still needs measure.kind",
+          "dodged-ceiling@1" not in pols and any("dodged-ceiling@1" in e and "kind" in e for e in errs))
+    check("native parameter policy: a non-string parameter list is refused, not raised",
+          "bad-parameters@1" not in pols and any("bad-parameters@1" in e for e in errs))
+    merged = _merged([{"id": "r-native", "policy": "native-budget@1"}])
+    xerrs = epr_meta.expand_policies(merged, pols)
+    check("native parameter policy: a resolver binding is refused LOUD and not enforced",
+          "r-native" not in merged["rules"] and any("native parameter policy" in e for e in xerrs))
+
 print(f"  {_passed} assertions passed ✅")

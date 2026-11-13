@@ -36,7 +36,10 @@ omits the validation receipts: push them separately with
 `git push origin 'refs/notes/brit/build/*:refs/notes/brit/build/*'`. The pre-push hook skips
 `refs/notes/*` since 2bba47154 (verified 2026-11-08, artifact-store push-notes-build.log).
 `core.hooksPath` names the main checkout's `.husky/_`, so a worktree push runs the main
-checkout's hook; when that checkout predates 2bba47154, add `-c core.hooksPath=<worktree>/.husky/_`.
+checkout's hook; when that checkout predates 2bba47154, add `-c core.hooksPath=<worktree>/.husky/_`. Git treats a missing
+hooks directory as no hook and pushes ungated without a word (landing 21, 2026-11-13): refuse the
+push unless `test -x <worktree>/.husky/_/pre-push` (`pnpm install` creates it), and confirm the
+push log carries `[pre-push]` lines afterwards.
 Covenant notes (`refs/notes/brit/covenant/*`) stay local until the steward rules on publishing
 them. Keep Brit for other operations; recheck the exception when the push fix lands. Coordinate the landing lane before pushing; an occupied lane is not permission to race
 its head.

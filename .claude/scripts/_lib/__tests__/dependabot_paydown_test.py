@@ -240,6 +240,16 @@ class VersionTests(unittest.TestCase):
             content = "lockfileVersion: '9.0'\npackages:\n" + "".join(f"  '{key}': {{}}\n" for key in keys)
             self.assertEqual(dp.parse_lock("pnpm-lock.yaml", content), {"fixture": {"1.2.3"}, "@scope/fixture": {"1.2.3"}})
 
+    def test_pnpm_local_sources_are_not_registry_resolutions(self):
+        keys = ("fixture@1.2.3", "local-core@file:elohim/local-core/pkg", "@scope/linked@link:../linked")
+        content = "lockfileVersion: '9.0'\npackages:\n" + "".join(f"  '{key}': {{}}\n" for key in keys)
+        self.assertEqual(dp.parse_lock("pnpm-lock.yaml", content), {"fixture": {"1.2.3"}})
+        # A VCS or tarball source could stand in for a vulnerable registry package: unmeasured.
+        for key in ("forked@git+https://example.invalid/forked.git#abc", "fixture@https://example.invalid/t.tgz",
+                    "odd@notaversion"):
+            with self.assertRaises(ValueError):
+                dp.parse_lock("pnpm-lock.yaml", f"lockfileVersion: '9.0'\npackages:\n  '{key}': {{}}\n")
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

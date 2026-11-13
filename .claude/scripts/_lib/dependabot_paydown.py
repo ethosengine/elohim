@@ -52,6 +52,11 @@ def parse_lock(path, content):
             # v9 name@version, v6 /name@version, v5 /name/version;
             # scoped names and peer/patch suffixes are preserved until split.
             key = key.lstrip("/")
+            # A local workspace source (name@file:…, link:, workspace:, portal:) is first-party code,
+            # not a registry resolution. VCS and tarball URLs stay unmeasured below: one could
+            # repoint a vulnerable registry package and must not read as paydown.
+            if re.fullmatch(r"(@[^/]+/[^@/]+|[^@/]+)@(file|link|portal|workspace):.*", key):
+                continue
             match = re.fullmatch(r"(@[^/]+/[^@/]+|[^@/]+)(?:@|/)(\d[^(/_]*)(?:[(/_].*)?", key)
             if not match:
                 raise ValueError(f"unmeasured pnpm package key: {key}")
