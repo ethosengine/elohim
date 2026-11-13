@@ -154,7 +154,7 @@ crate-specific `RUSTFLAGS`. A per-project cargo resource cap (`CARGO_BUILD_JOBS`
 `build-manifest.json` (the rakia-validated schema accepts it since rakia 2b2cedb,
 2026-09-23); `genesis/agentic/pool-policy.json`'s `cargo_env_overrides` only fills a
 cap a manifest has not declared, manifest winning on conflict; its `"*"` entry pins the local gate's
-`RUSTUP_TOOLCHAIN` (1.96.1) for every cargo project, and the gate refuses if it is not installed. `elohim/epr/rust-toolchain.toml` declares the same version for the flake the epr and eprfs pipelines take their Rust from, and `genesis/orchestrator/rust-toolchain-pin.test.mjs` refuses a mismatch. `elohim-storage`
+`RUSTUP_TOOLCHAIN` (1.100.0) for every cargo project, and the gate refuses if it is not installed. `elohim/epr/rust-toolchain.toml` declares the same version for the flake the epr and eprfs pipelines take their Rust from, and `genesis/orchestrator/rust-toolchain-pin.test.mjs` refuses a mismatch. `elohim-storage`
 declares `CARGO_BUILD_JOBS: "1"`, measured: the gate's build phase peaks at 15.4 GB at
 cargo's default parallelism and is shed by the workspace RAM guard; at one job it
 peaks at 5.4 GB for ~12% wall-clock. DNA/WASM workspaces remain plain Cargo because
