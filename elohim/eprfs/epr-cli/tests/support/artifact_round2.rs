@@ -57,7 +57,7 @@ fn gaps(f: &Foreign) -> String {
 #[test]
 fn artifact_foreign_dependencies_record_sorted_declared_gaps_through_real_proxies() {
     let _cargo = CARGO.lock().unwrap_or_else(|e| e.into_inner());
-    let f = Foreign::new();
+    let Some(f) = Foreign::try_new() else { return };
     add_dependencies(&f);
     f.build();
     let out = success(f.describe());
@@ -70,9 +70,9 @@ fn artifact_foreign_dependencies_record_sorted_declared_gaps_through_real_proxie
         assert!(text(&out).contains(&format!("{gap}: pending, not enforced")));
     }
     let d = f.descriptor();
-    assert_eq!(d.tools["toolchain"], "1.96.1");
+    assert_eq!(d.tools["toolchain"], f.pin);
     assert!(!d.non_path_inputs.contains_key("RUSTUP_TOOLCHAIN"));
-    if std::path::Path::new("/opt/rust/cargo/bin/rustup").exists() {
+    if f.via_rustup && std::path::Path::new("/opt/rust/cargo/bin/rustup").exists() {
         assert!(d.non_path_inputs["PATH"].starts_with("/opt/rust/cargo/bin:"));
     }
     let input = f.input();
@@ -87,7 +87,7 @@ fn artifact_foreign_dependencies_record_sorted_declared_gaps_through_real_proxie
 #[test]
 fn artifact_mesh_named_foreign_dependencies_use_the_same_rule() {
     let _cargo = CARGO.lock().unwrap_or_else(|e| e.into_inner());
-    let f = Foreign::new();
+    let Some(f) = Foreign::try_new() else { return };
     add_dependencies(&f);
     // Reproduce every old recognition fact without being the Elohim repository.
     let crate_dir = "elohim/elohim-storage";
@@ -156,7 +156,7 @@ fn artifact_mesh_named_foreign_dependencies_use_the_same_rule() {
 #[test]
 fn artifact_untracked_entrypoint_refuses_describe_and_put() {
     let _cargo = CARGO.lock().unwrap_or_else(|e| e.into_inner());
-    let f = Foreign::new();
+    let Some(f) = Foreign::try_new() else { return };
     success(f.describe());
     let d = f.descriptor();
     let input = f.input();
@@ -177,7 +177,7 @@ fn artifact_untracked_entrypoint_refuses_describe_and_put() {
 #[test]
 fn artifact_ignored_include_is_found_in_cargo_dep_info() {
     let _cargo = CARGO.lock().unwrap_or_else(|e| e.into_inner());
-    let f = Foreign::new();
+    let Some(f) = Foreign::try_new() else { return };
     std::fs::write(f.root.join("secret.txt"), "not in captured view").unwrap();
     std::fs::write(f.root.join(".gitignore"), "/secret.txt\n").unwrap();
     std::fs::write(
@@ -199,7 +199,7 @@ fn artifact_ignored_include_is_found_in_cargo_dep_info() {
 #[test]
 fn artifact_missing_dep_info_refuses() {
     let _cargo = CARGO.lock().unwrap_or_else(|e| e.into_inner());
-    let f = Foreign::new();
+    let Some(f) = Foreign::try_new() else { return };
     f.build();
     success(f.describe());
     let input = f.input();
@@ -214,7 +214,9 @@ fn artifact_missing_dep_info_refuses() {
 fn artifact_required_library_placeholder_refuses() {
     use std::os::unix::fs::PermissionsExt;
     let _cargo = CARGO.lock().unwrap_or_else(|e| e.into_inner());
-    let mut f = Foreign::new();
+    let Some(mut f) = Foreign::try_new() else {
+        return;
+    };
     f.build();
     let tools = f.dir.path().join("tools");
     std::fs::create_dir(&tools).unwrap();
@@ -239,7 +241,7 @@ fn artifact_required_library_placeholder_refuses() {
 fn artifact_destination_failures_leave_no_attestation_or_produce() {
     let _cargo = CARGO.lock().unwrap_or_else(|e| e.into_inner());
     for failure in ["payload-file", "payload-format", "flow"] {
-        let f = Foreign::new();
+        let Some(f) = Foreign::try_new() else { return };
         f.build();
         success(f.describe());
         let input = f.input();
@@ -291,7 +293,7 @@ fn artifact_destination_failures_leave_no_attestation_or_produce() {
 #[test]
 fn artifact_pending_banner_precedes_option_errors() {
     let _cargo = CARGO.lock().unwrap_or_else(|e| e.into_inner());
-    let f = Foreign::new();
+    let Some(f) = Foreign::try_new() else { return };
     for verb in ["describe", "put"] {
         let out = f.epr().args([verb, "--unknown", "value"]).output().unwrap();
         let stderr = String::from_utf8_lossy(&out.stderr);
@@ -322,7 +324,7 @@ fn artifact_unpinned_dependencies_are_aggregated_before_resolution() {
 #[test]
 fn artifact_compiler_input_outside_repository_refuses() {
     let _cargo = CARGO.lock().unwrap_or_else(|e| e.into_inner());
-    let f = Foreign::new();
+    let Some(f) = Foreign::try_new() else { return };
     let external = f.dir.path().join("external.txt");
     std::fs::write(&external, "outside").unwrap();
     std::fs::write(

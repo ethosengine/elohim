@@ -27,6 +27,8 @@ use fixture::{artifact_elf, wait_for_stub};
 
 #[path = "support/artifact_native_libraries.rs"]
 mod native_libraries;
+#[path = "support/toolchain_pin.rs"]
+mod toolchain_pin;
 
 const HANDLE: &str = "matthew";
 const AGENT_ID: &str = "4f5e3d2c1b0a99887766554433221100ffeeddccbbaa00998877665544332211";

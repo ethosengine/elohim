@@ -313,14 +313,15 @@ export function checkCargoLocks({ root, projects, spawn = spawnSync, env = proce
     if (ws && !ws.startsWith('elohim/holochain/dna')) workspaces.add(ws);
   }
   if (!workspaces.size) return null;
-  let toolchain = '1.96.1';
-  try { toolchain = JSON.parse(readFileSync(join(root, 'genesis/agentic/pool-policy.json'), 'utf8')).cargo_env_overrides?.['*']?.RUSTUP_TOOLCHAIN || toolchain; }
-  catch { /* The pin is a default; an unreadable policy keeps it. */ }
+  // The pin lives only in pool-policy; with no readable pin, cargo resolves its own default.
+  let toolchain;
+  try { toolchain = JSON.parse(readFileSync(join(root, 'genesis/agentic/pool-policy.json'), 'utf8')).cargo_env_overrides?.['*']?.RUSTUP_TOOLCHAIN; }
+  catch { /* an unreadable policy pins nothing */ }
   const rows = [];
   for (const ws of [...workspaces].sort()) {
     const manifest = join(root, ws, 'Cargo.toml');
     const r = spawn('cargo', ['metadata', '--locked', '--offline', '--format-version', '1', '--manifest-path', manifest],
-      { cwd: root, encoding: 'utf8', stdio: ['ignore', 'ignore', 'pipe'], env: { ...env, RUSTFLAGS: '', RUSTUP_TOOLCHAIN: toolchain } });
+      { cwd: root, encoding: 'utf8', stdio: ['ignore', 'ignore', 'pipe'], env: { ...env, RUSTFLAGS: '', ...(toolchain ? { RUSTUP_TOOLCHAIN: toolchain } : {}) } });
     const name = `cargo-lock:${ws}`;
     if (r.status === 0) { rows.push(row(name, 'ok')); continue; }
     const err = String(r.stderr || r.error?.message || '').trim();

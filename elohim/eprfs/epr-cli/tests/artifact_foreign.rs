@@ -9,6 +9,8 @@ use tempfile::TempDir;
 
 #[path = "support/artifact_elf.rs"]
 mod fixture;
+#[path = "support/toolchain_pin.rs"]
+mod toolchain_pin;
 static CARGO: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 const REACH: &str = "reach: pending, not enforced";
@@ -55,9 +57,13 @@ struct Foreign {
     binary: PathBuf,
     path: String,
     brit: PathBuf,
+    pin: String,
+    via_rustup: bool,
 }
 impl Foreign {
-    fn new() -> Self {
+    /// `None` (after a `SKIP:` line) when no real compiler at the pin is available.
+    fn try_new() -> Option<Self> {
+        let toolchain = toolchain_pin::real_toolchain_or_skip()?;
         let dir = tempfile::tempdir().unwrap();
         let root = dir.path().join("project");
         std::fs::create_dir_all(root.join("src")).unwrap();
@@ -71,18 +77,14 @@ impl Foreign {
             "fn main() { println!(\"hello\"); }\n",
         )
         .unwrap();
-        let toolchain = success(
-            Command::new("rustup")
-                .args(["which", "--toolchain", "1.96.1", "cargo"])
-                .output()
-                .unwrap(),
-        );
-        let cargo = PathBuf::from(String::from_utf8(toolchain.stdout).unwrap().trim());
-        // Exercise real rustup proxies offline; installed toolchains live outside our isolated HOME.
+        let cargo = toolchain.cargo;
+        // Exercise real rustup proxies offline where rustup exists (a device); installed
+        // toolchains live outside our isolated HOME. Without rustup (CI's nix shell) the PATH
+        // toolchain is the pin itself, so its directory is the whole PATH.
         let proxy = PathBuf::from("/opt/rust/cargo/bin");
         let path = format!(
             "{}:/usr/bin:/bin",
-            if proxy.join("rustup").is_file() {
+            if toolchain.via_rustup && proxy.join("rustup").is_file() {
                 proxy
             } else {
                 cargo.parent().unwrap().to_path_buf()
@@ -104,6 +106,8 @@ impl Foreign {
             .map(real_brit)
             .unwrap_or_else(|| PathBuf::from("brit-build-ref"));
         let fixture = Self {
+            pin: toolchain.pin,
+            via_rustup: toolchain.via_rustup,
             method: dir.path().join("method.json"),
             binary: dir.path().join("target/debug/hello"),
             root,
@@ -125,15 +129,14 @@ impl Foreign {
         std::fs::create_dir_all(&signer).unwrap();
         std::fs::write(signer.join("agent-key"), [42u8; 32]).unwrap();
         DeviceKey::load_or_generate(&fixture.dir.path().join("device.seed")).unwrap();
-        fixture
+        Some(fixture)
     }
     fn command(&self, program: impl AsRef<std::ffi::OsStr>) -> Command {
         let mut c = Command::new(program);
         c.env_clear()
             .current_dir(&self.root)
             .env("PATH", &self.path)
-            .env("RUSTUP_TOOLCHAIN", "1.96.1")
-            .env("RUSTUP_HOME", "/opt/rust/rustup")
+            .env("RUSTUP_TOOLCHAIN", &self.pin)
             .env("RUSTUP_AUTO_INSTALL", "0")
             .env("RUSTFLAGS", "")
             .env("HOME", self.dir.path().join("home"))
@@ -145,6 +148,9 @@ impl Foreign {
             .env("EPR_STORE", self.dir.path().join("store"))
             .env("BRIT_BUILD_REF_BIN", &self.brit)
             .env(DEVICE_KEY_ENV, self.dir.path().join("device.seed"));
+        if self.via_rustup {
+            c.env("RUSTUP_HOME", "/opt/rust/rustup");
+        }
         if let Some(tmp) = std::env::var_os("TMPDIR") {
             c.env("TMPDIR", tmp);
         }
@@ -283,7 +289,7 @@ impl Foreign {
 #[test]
 fn artifact_foreign_describe_put_records_complete_local_artifact() {
     let _cargo = CARGO.lock().unwrap_or_else(|e| e.into_inner());
-    let f = Foreign::new();
+    let Some(f) = Foreign::try_new() else { return };
     f.build();
     let out = success(f.describe());
     assert!(text(&out).contains(REACH));
@@ -354,7 +360,7 @@ fn refusal(
     repository: bool,
 ) {
     let _cargo = CARGO.lock().unwrap_or_else(|e| e.into_inner());
-    let f = Foreign::new();
+    let Some(f) = Foreign::try_new() else { return };
     // Refusal checks need a real readable ELF, but don't compile the same binary seven times.
     std::fs::create_dir_all(f.binary.parent().unwrap()).unwrap();
     let llvm = fixture::RUSTC_IDENTITY
@@ -485,7 +491,7 @@ fn artifact_foreign_missing_signer_and_device_are_aggregated() {
 #[test]
 fn artifact_foreign_missing_brit_records_nothing() {
     let _cargo = CARGO.lock().unwrap_or_else(|e| e.into_inner());
-    let f = Foreign::new();
+    let Some(f) = Foreign::try_new() else { return };
     success(f.describe());
     let d = f.descriptor();
     let input = f.input();
@@ -505,7 +511,7 @@ fn artifact_foreign_missing_brit_records_nothing() {
 fn artifact_foreign_unusable_signer_records_nothing() {
     use std::os::unix::fs::PermissionsExt;
     let _cargo = CARGO.lock().unwrap_or_else(|e| e.into_inner());
-    let f = Foreign::new();
+    let Some(f) = Foreign::try_new() else { return };
     success(f.describe());
     let d = f.descriptor();
     let input = f.input();

@@ -127,8 +127,11 @@ test('cargo-locks: a lock its manifests agree with is ok, checked --locked --off
   assert.deepEqual(rows.map(r => [r.check, r.level]), [['cargo-lock:ws', 'ok']]);
   assert.deepEqual(calls[0].args.slice(0, 4), ['metadata', '--locked', '--offline', '--format-version']);
   assert.equal(calls[0].opts.env.RUSTFLAGS, '');
-  assert.equal(calls[0].opts.env.RUSTUP_TOOLCHAIN, '1.96.1');
+  assert.equal('RUSTUP_TOOLCHAIN' in calls[0].opts.env, false, 'no policy pins nothing');
   assert.deepEqual(readFileSync(join(root, 'ws/Cargo.lock')), before, 'the check must not modify the lockfile');
+  put(root, 'genesis/agentic/pool-policy.json', JSON.stringify({ cargo_env_overrides: { '*': { RUSTUP_TOOLCHAIN: '9.9.9' } } }));
+  checkCargoLocks({ root, projects: [pa], spawn, env: {} });
+  assert.equal(calls[1].opts.env.RUSTUP_TOOLCHAIN, '9.9.9', 'the policy pin is the only toolchain source');
 });
 
 test('cargo-locks: a stale lock is REFUSED naming the lockfile with the cure', (t) => {

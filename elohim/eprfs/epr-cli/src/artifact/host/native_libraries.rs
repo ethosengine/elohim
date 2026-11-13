@@ -191,7 +191,20 @@ pub(super) fn compiler(
     if !is_rustup_proxy(executable, &resolved) {
         return Ok(resolved);
     }
-    let proxy = resolved;
+    let home = std::env::var_os("RUSTUP_HOME")
+        .map(PathBuf::from)
+        .or_else(|| std::env::var_os("HOME").map(|home| PathBuf::from(home).join(".rustup")));
+    proxy_compiler(resolved, descriptor, home)
+}
+
+/// Resolves a rustup proxy to the installed toolchain's real `rustc` under `home` (the process's
+/// `RUSTUP_HOME`, or `HOME/.rustup`, chosen by [`compiler`]); taking it as a parameter lets tests
+/// exercise the refusals without mutating the shared process environment.
+fn proxy_compiler(
+    proxy: PathBuf,
+    descriptor: &MethodDescriptor,
+    home: Option<PathBuf>,
+) -> ArtifactResult<PathBuf> {
     let toolchain = descriptor
         .tools
         .get("toolchain")
@@ -199,12 +212,9 @@ pub(super) fn compiler(
         .ok_or_else(|| {
             ArtifactError::Gap("rustc proxy needs recorded RUSTUP_TOOLCHAIN; describe again".into())
         })?;
-    let home = std::env::var_os("RUSTUP_HOME")
-        .map(PathBuf::from)
-        .or_else(|| std::env::var_os("HOME").map(|home| PathBuf::from(home).join(".rustup")))
-        .ok_or_else(|| {
-            ArtifactError::Gap("rustc proxy needs process RUSTUP_HOME or HOME".into())
-        })?;
+    let home = home.ok_or_else(|| {
+        ArtifactError::Gap("rustc proxy needs process RUSTUP_HOME or HOME".into())
+    })?;
     if !home.is_dir() {
         return Err(ArtifactError::Gap(format!(
             "RUSTUP_HOME {} must be an existing directory; it will not be created",

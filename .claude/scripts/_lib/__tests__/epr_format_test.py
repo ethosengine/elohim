@@ -28,6 +28,9 @@ for _ in range(8):
 if REPO is None:  # pragma: no cover
     print("FAIL: could not locate repo root", file=sys.stderr)
     sys.exit(1)
+# The gate's pinned toolchain: the formatter must run the toolchain this device actually has.
+PIN = json.loads((REPO / "genesis/agentic/pool-policy.json").read_text())[
+    "cargo_env_overrides"]["*"]["RUSTUP_TOOLCHAIN"]
 
 from _lib import epr_format, epr_meta, epr_meta_git  # noqa: E402
 
@@ -152,7 +155,7 @@ def build_template():
         shutil.copy(REPO / ".husky" / h, t / ".husky" / h)
         os.chmod(t / ".husky" / h, 0o755)
     write(t, "genesis/agentic/pool-policy.json",
-          json.dumps({"cargo_env_overrides": {"*": {"RUSTUP_TOOLCHAIN": "1.96.1"}}}))
+          json.dumps({"cargo_env_overrides": {"*": {"RUSTUP_TOOLCHAIN": PIN}}}))
     write(t, ".gitignore", ".claude/data/\n")
     # Rust: a virtual workspace whose member inherits its edition (elohim/eprfs's shape).
     write(t, "rs/Cargo.toml", '[workspace]\nmembers = ["clean"]\n[workspace.package]\nedition = "2021"\n')
@@ -378,9 +381,9 @@ if HAVE_RUSTFMT:
     git(d, "update-index", "--add", "--cacheinfo", f"160000,{head(sub)},rs/clean/vendored")
     r = commit(d)
     check("a gitlink is not a formatting subject", r.returncode == 0, r.stderr)
-    proc = subprocess.run([shutil.which("rustup"), "run", "1.96.1", "rustfmt", "--check"],
+    proc = subprocess.run([shutil.which("rustup"), "run", PIN, "rustfmt", "--check"],
                           input=b"fn main(){let a=1;}\n", capture_output=True)
-    m = epr_format.Rustfmt("1.96.1").measure(
+    m = epr_format.Rustfmt(PIN).measure(
         epr_format.DiskTree(d), "rs/clean/src/lib.rs", b"fn main(){let a=1;}\n",
         epr_format.RustContract("2021", None, "x"))
     check(f"byte comparison catches what `rustfmt --check` on stdin reports as exit "
@@ -413,7 +416,7 @@ if HAVE_RUSTFMT:
     nopath = env_with(PATH=path_without(RUSTUP_DIR))
     r = commit(d2, "m", nopath)
     check("missing rustfmt REFUSES with the install cure",
-          r.returncode != 0 and "rustup component add rustfmt --toolchain 1.96.1" in r.stderr,
+          r.returncode != 0 and f"rustup component add rustfmt --toolchain {PIN}" in r.stderr,
           r.stderr)
     r = commit(d2, "m", env_with(PATH=path_without(RUSTUP_DIR), EPR_META_ACK="1"))
     check("…and EPR_META_ACK=1 acknowledges a missing tool (ask-class, witnessed)",

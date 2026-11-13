@@ -10,6 +10,9 @@ import unittest
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[3]
+# The gate's pinned toolchain; fixtures pin the same one so the real compiler they run exists.
+PIN = json.loads((ROOT / "genesis/agentic/pool-policy.json").read_text())[
+    "cargo_env_overrides"]["*"]["RUSTUP_TOOLCHAIN"]
 SPEC = importlib.util.spec_from_file_location("rust_style_hook", ROOT / ".claude/hooks/rust-style.py")
 HOOK = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(HOOK)
@@ -183,7 +186,7 @@ class WrapperCargoConfig(unittest.TestCase):
             'slot_path() { echo "$STYLE_TEST_SLOT"; }\n'
         )
         (pool.parent.parent / "pool-policy.json").write_text(json.dumps({
-            "cargo_env_overrides": {"*": {"RUSTUP_TOOLCHAIN": "1.96.1"}}
+            "cargo_env_overrides": {"*": {"RUSTUP_TOOLCHAIN": PIN}}
         }))
         subprocess.run(["git", "init", "-q", str(root)], check=True)
         env = {**os.environ, "STYLE_TEST_SLOT": str(root / "pool")}
@@ -204,7 +207,7 @@ class WrapperCargoConfig(unittest.TestCase):
             host = next(
                 line.removeprefix("host: ")
                 for line in subprocess.check_output(
-                    ["rustc", "-vV"], env={**env, "RUSTUP_TOOLCHAIN": "1.96.1"}, text=True
+                    ["rustc", "-vV"], env={**env, "RUSTUP_TOOLCHAIN": PIN}, text=True
                 ).splitlines()
                 if line.startswith("host: ")
             )
@@ -316,7 +319,7 @@ class GateGit(unittest.TestCase):
             pool.parent.mkdir(parents=True)
             pool.write_text('detect_family() { echo fixture; }\nslot_path() { echo "$STYLE_TEST_SLOT"; }\n')
             (pool.parent.parent / "pool-policy.json").write_text(json.dumps({
-                "cargo_env_overrides": {"*": {"RUSTUP_TOOLCHAIN": "1.96.1"}}
+                "cargo_env_overrides": {"*": {"RUSTUP_TOOLCHAIN": PIN}}
             }))
             binary = root / "pool/debug/epr-rust-style"
             binary.parent.mkdir(parents=True)
@@ -351,7 +354,7 @@ class GateGit(unittest.TestCase):
             pool.parent.mkdir(parents=True)
             pool.write_text('detect_family() { echo fixture; }\nslot_path() { echo "$STYLE_TEST_SLOT"; }\n')
             (pool.parent.parent / "pool-policy.json").write_text(json.dumps({
-                "cargo_env_overrides": {"*": {"RUSTUP_TOOLCHAIN": "1.96.1"}}
+                "cargo_env_overrides": {"*": {"RUSTUP_TOOLCHAIN": PIN}}
             }))
             binary = root / "pool/debug/epr-rust-style"
             binary.parent.mkdir(parents=True)

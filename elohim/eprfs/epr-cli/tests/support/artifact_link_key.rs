@@ -618,17 +618,9 @@ fn artifact_real_gcc_accepts_rustc_bundled_lld() {
         eprintln!("SKIP: real cc on PATH is not gcc");
         return;
     }
-    let Ok(rustc) = Command::new("rustup")
-        .args(["run", "1.96.1", "rustc", "-vV"])
-        .output()
-    else {
-        eprintln!("SKIP: rustup / rustc 1.96.1 is unavailable");
+    let Some(real) = toolchain_pin::real_toolchain_or_skip() else {
         return;
     };
-    if !rustc.status.success() {
-        eprintln!("SKIP: rustc 1.96.1 is not installed");
-        return;
-    }
     let repo = checkout();
     let scratch = TempDir::new().unwrap();
     let (_, mut descriptor) = method_file_with(
@@ -637,18 +629,29 @@ fn artifact_real_gcc_accepts_rustc_bundled_lld() {
         &[
             ("PATH", &std::env::var("PATH").unwrap()),
             ("RUSTFLAGS", "-C link-arg=-fuse-ld=lld"),
-            ("RUSTUP_TOOLCHAIN", "1.96.1"),
+            ("RUSTUP_TOOLCHAIN", &real.pin),
         ],
     );
     descriptor
         .tools
-        .insert("rustc".into(), String::from_utf8(rustc.stdout).unwrap());
+        .insert("toolchain".into(), real.pin.clone());
+    descriptor.tools.insert("rustc".into(), real.identity);
     elohim_epr_cli::artifact::closure_key(repo.path(), &descriptor).unwrap();
-    eprintln!("real gcc + rustc 1.96.1 bundled-lld key: PASS");
+    eprintln!("real gcc + rustc {} bundled-lld key: PASS", real.pin);
 }
 
 #[test]
 fn artifact_real_describe_keys_with_process_homes_and_home_location_is_not_an_input() {
+    let Some(real) = toolchain_pin::real_toolchain_or_skip() else {
+        return;
+    };
+    // A rustup device must name its home explicitly: the test varies HOME, which would otherwise
+    // relocate `HOME/.rustup`. Without rustup (CI's nix shell) the PATH compiler needs no home.
+    let rustup_home = std::env::var_os("RUSTUP_HOME");
+    if real.via_rustup && rustup_home.is_none() {
+        eprintln!("SKIP: rustup device without RUSTUP_HOME");
+        return;
+    }
     let repo = checkout();
     let scratch = TempDir::new().unwrap();
     let tools = scratch.path().join("bin");
@@ -686,7 +689,7 @@ fn artifact_real_describe_keys_with_process_homes_and_home_location_is_not_an_in
     describe
         .env_clear()
         .env("PATH", format!("{}:{build_path}", tools.display()))
-        .env("RUSTUP_TOOLCHAIN", "1.96.1")
+        .env("RUSTUP_TOOLCHAIN", &real.pin)
         .env("RUSTUP_AUTO_INSTALL", "0")
         .env("XDG_CONFIG_HOME", scratch.path().join("config"));
     for name in ["RUSTUP_HOME", "CARGO_HOME", "HOME", "TMPDIR"] {
@@ -713,9 +716,9 @@ fn artifact_real_describe_keys_with_process_homes_and_home_location_is_not_an_in
             "--env",
             "CC=cc",
             "--env",
-            "RUSTUP_TOOLCHAIN=1.96.1",
-            "--env",
         ])
+        .arg(format!("RUSTUP_TOOLCHAIN={}", real.pin))
+        .arg("--env")
         .arg(format!("PATH={build_path}"))
         .arg("--repo")
         .arg(repo.path());
@@ -727,14 +730,13 @@ fn artifact_real_describe_keys_with_process_homes_and_home_location_is_not_an_in
     }
     assert_eq!(descriptor.non_path_inputs["PATH"], build_path);
     assert_eq!(descriptor.non_path_inputs["CC"], "cc");
-    assert!(descriptor.tools["rustc"].contains("release: 1.96.1"));
+    assert!(descriptor.tools["rustc"].contains(&format!("release: {}", real.pin)));
     let method = scratch.path().join("method.json");
     std::fs::write(&method, &out.stdout).unwrap();
     let baseline = elohim_epr_cli::artifact::closure_key(repo.path(), &descriptor).unwrap();
 
     // Isolated children vary HOME without mutating the parallel test process's environment.
     // RUSTUP_HOME continues to locate the same installed compiler in both cases.
-    let rustup_home = std::env::var_os("RUSTUP_HOME").expect("device has RUSTUP_HOME");
     for home in ["home-a", "home-b"] {
         let home = scratch.path().join(home);
         std::fs::create_dir(&home).unwrap();
@@ -744,10 +746,12 @@ fn artifact_real_describe_keys_with_process_homes_and_home_location_is_not_an_in
             .env("PATH", &build_path)
             .env("CC", "cc")
             .env("RUSTFLAGS", "")
-            .env("RUSTUP_TOOLCHAIN", "1.96.1")
+            .env("RUSTUP_TOOLCHAIN", &real.pin)
             .env("HOME", &home)
-            .env("RUSTUP_HOME", &rustup_home)
             .env("XDG_CONFIG_HOME", scratch.path().join("config"));
+        if let Some(rustup_home) = &rustup_home {
+            key_command.env("RUSTUP_HOME", rustup_home);
+        }
         for name in ["CARGO_HOME", "TMPDIR"] {
             if let Some(value) = std::env::var_os(name) {
                 key_command.env(name, value);

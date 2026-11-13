@@ -4,6 +4,9 @@ use super::*;
 use crate::artifact::{closure_key, host, PATH_INPUT};
 use eprfs_core::TreePath;
 
+#[path = "../../../../tests/support/toolchain_pin.rs"]
+mod toolchain_pin;
+
 fn stub(dir: &Path, name: &str, body: &str) {
     let identity = if name == "rustc" {
         format!(
@@ -221,15 +224,18 @@ echo 'note: native-static-libs: -lfoo -lc' >&2
 
 #[test]
 fn artifact_real_toolchain_native_link_lines() {
+    let Some(real) = toolchain_pin::real_toolchain_or_skip() else {
+        return;
+    };
     let mut descriptor = descriptor(&std::env::var("PATH").unwrap());
-    let rustc = Command::new("rustc")
-        .args(["+1.96.1", "-vV"])
-        .output()
-        .unwrap();
-    assert!(rustc.status.success());
+    // The recorded pin selects the compiler when PATH's rustc is a rustup proxy.
     descriptor
         .tools
-        .insert("rustc".into(), String::from_utf8(rustc.stdout).unwrap());
+        .insert("toolchain".into(), real.pin.clone());
+    descriptor
+        .non_path_inputs
+        .insert("RUSTUP_TOOLCHAIN".into(), real.pin);
+    descriptor.tools.insert("rustc".into(), real.identity);
     let linked = lines(&descriptor).unwrap();
     for name in ["m", "pthread", "dl", "rt", "util", "c", "gcc_s"] {
         assert!(
@@ -297,20 +303,37 @@ fn artifact_native_library_requires_full_matching_identity_before_probing() {
 
 #[test]
 fn artifact_native_library_missing_toolchain_refuses_without_installing() {
-    let path = std::env::var("PATH").unwrap();
-    let mut descriptor = descriptor(&path);
+    // The subject is the rustup-proxy path, so it is built hermetically: a `rustc` that is a
+    // link to a `rustup` stub (what `is_rustup_proxy` recognises, whatever compiler this machine
+    // has) and a rustup home that exists but holds no toolchain at all. Nothing is installed.
+    let tools = tempfile::tempdir().unwrap();
+    stub(tools.path(), "rustup", "exit 99");
+    let rustc = tools.path().join("rustc");
+    std::os::unix::fs::symlink(tools.path().join("rustup"), &rustc).unwrap();
+    let home = tempfile::tempdir().unwrap();
+    std::fs::create_dir(home.path().join("toolchains")).unwrap();
+    let mut descriptor = descriptor(tools.path().to_str().unwrap());
     descriptor
         .tools
         .insert("toolchain".into(), "9.99.99".into());
     descriptor
         .non_path_inputs
         .insert("RUSTUP_TOOLCHAIN".into(), "9.99.99".into());
-    let Err(ArtifactError::Gap(message)) = probe(&descriptor, &path) else {
+    let Err(ArtifactError::Gap(message)) = proxy_compiler(
+        std::fs::canonicalize(&rustc).unwrap(),
+        &descriptor,
+        Some(home.path().to_path_buf()),
+    ) else {
         panic!("uninstalled toolchain must refuse");
     };
     assert!(message.contains("not installed"), "{message}");
     assert!(!message.contains("syncing channel"), "{message}");
     assert!(!message.contains("downloading"), "{message}");
+    assert_eq!(
+        home.path().join("toolchains").read_dir().unwrap().count(),
+        0,
+        "refusal must not install"
+    );
 }
 
 #[test]
