@@ -76,6 +76,7 @@ impl Fixture {
                 self.config.path().join("missing-device-key"),
             )
             .env_remove("EPR_PEER_RELAY_URL")
+            .env_remove("EPR_PEER_RELAYS")
             .env_remove("CLAUDE_CODE_SESSION_ID")
             .env_remove("CLAUDE_SESSION_ID")
             .env_remove("ELOHIM_SESSION_ID");

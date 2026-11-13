@@ -542,7 +542,7 @@ fn peer_daemon_check() -> Check {
                 "no epr peer serve holds this device's serve lock; admitted siblings read it as silent{}",
                 evidence.map(|e| format!(" ({e})")).unwrap_or_default()
             ),
-            Some("start the devfile peer-serve command (it carries EPR_PEER_RELAY_URL)".into()),
+            Some("start the devfile peer-serve command (it carries EPR_PEER_RELAYS)".into()),
         ),
         Ok((true, evidence)) => peer_daemon_version_check(evidence),
         Err(error) => Check::new(

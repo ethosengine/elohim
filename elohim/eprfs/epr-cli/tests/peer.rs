@@ -115,6 +115,7 @@ fn command_for(key_file: &Path, config: &Path, store: &Path) -> Command {
         .env("EPR_PAYLOAD_STORE", config.join("payload"))
         .env("EPR_BIN", env!("CARGO_BIN_EXE_epr"))
         .env_remove("EPR_PEER_RELAY_URL")
+        .env_remove("EPR_PEER_RELAYS")
         .env_remove("CLAUDE_CODE_SESSION_ID")
         .env_remove("CLAUDE_SESSION_ID")
         .env_remove("ELOHIM_SESSION_ID");

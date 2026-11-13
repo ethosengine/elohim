@@ -819,6 +819,7 @@ When('that pinned session starts the peer daemon', { timeout: 30000 }, async fun
     XDG_CONFIG_HOME: join(state.base, 'config'),
     GIT_CEILING_DIRECTORIES: '/tmp',
     EPR_PEER_RELAY_URL: '',
+    EPR_PEER_RELAYS: '',
     EPR_PIN_CID: state.cidA,
     EPR_FIXTURE_OWNER_PID: String(process.pid),
   };

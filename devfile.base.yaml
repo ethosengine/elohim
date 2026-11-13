@@ -441,7 +441,8 @@ commands:
       component: tools
       workingDir: /projects/elohim
       commandLine: |
-        export EPR_PEER_RELAY_URL="${EPR_PEER_RELAY_URL:-https://relay.alpha.elohim.host}"
+        export EPR_PEER_RELAYS="${EPR_PEER_RELAYS:-${EPR_PEER_RELAY_URL:-https://relay.alpha.elohim.host}}"
+        unset EPR_PEER_RELAY_URL
         set -- peer serve --root /projects/elohim --handle matthew --listen "0.0.0.0:${EPR_PEER_PORT:-7777}"
         if [ -n "${EPR_PEER_ADDRESS:-}" ]; then
           set -- "$@" --peer "$EPR_PEER_ADDRESS"

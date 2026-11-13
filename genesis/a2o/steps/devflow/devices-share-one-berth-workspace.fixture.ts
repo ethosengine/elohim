@@ -289,7 +289,7 @@ export class WorkspaceHalf {
     assert.equal(leases.device, this.receipt.device.did);
     assert.ok(
       leases.serving,
-      'start this device’s epr peer serve with EPR_PEER_RELAY_URL=https://relay.alpha.elohim.host first'
+      'start this device’s epr peer serve with EPR_PEER_RELAYS=https://relay.alpha.elohim.host first'
     );
     assert.ok(
       leases.others[this.peerDid],

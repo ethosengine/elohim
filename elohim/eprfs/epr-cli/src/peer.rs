@@ -142,7 +142,8 @@ pub fn usage() -> String {
      only; runs until stopped. The payload store is --payload-store, else EPR_PAYLOAD_STORE, \
      else $XDG_DATA_HOME/epr/payload. A fetch `epr artifact fetch` queues installs only under an \
      --install-root, EPR_INSTALL_ROOTS, or a mesh-bin directory under the cargo pool. --check validates its read-only start floor; \
-     EPR_PEER_RELAY_URL homes it to a relay; --peer names a device's direct address when there \
+     EPR_PEER_RELAYS accepts comma-separated relay URLs (or n0); off disables relaying. \
+     --peer names a device's direct address when there \
      is none)\n  \
      | status [--root DIR] [--handle H] [--json] \
      (one line per admitted device: its last folded head, its age and the events folded)\n  \
@@ -2295,7 +2296,7 @@ pub fn fold(options: &Options, from: &str, root: &str) -> PeerResult<eprfs_peer:
         (None, Some(relay)) => NodeAddr::new(node).with_relay_url(relay.clone().into()),
         (None, None) => {
             return Err(PeerCliError::InvalidArguments(format!(
-                "no address for {from}: set EPR_PEER_RELAY_URL or pass --peer <node_id>@<ip:port>"
+                "no address for {from}: set EPR_PEER_RELAYS or pass --peer <node_id>@<ip:port>"
             )))
         }
     };

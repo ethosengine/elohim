@@ -70,22 +70,29 @@ test('peer-serve is on demand and forwards defaults and optional overrides as li
   const cwd = scratch(t);
   const stub = join(cwd, 'epr stub');
   writeFileSync(stub, `#!/bin/sh
-printf '%s\\n' "$EPR_PEER_RELAY_URL" "$@"
+test "\${EPR_PEER_RELAY_URL+x}" != x || exit 1
+printf '%s\\n' "$EPR_PEER_RELAYS" "$@"
 `, { mode: 0o755 });
   writeFileSync(join(cwd, 'epr'), readFileSync(stub), { mode: 0o755 });
   assert.ok(!JSON.stringify(base.events).includes('peer-serve'));
   assert.ok(!base.commands.some(item => item.composite?.commands?.includes('peer-serve')));
   for (const overrides of [
     {},
-    { EPR_BIN: stub, EPR_PEER_PORT: '8888', EPR_PEER_RELAY_URL: 'https://relay.example.test', EPR_PEER_ADDRESS: 'peer with spaces; literal' },
-    { EPR_BIN: '', EPR_PEER_PORT: '', EPR_PEER_RELAY_URL: '', EPR_PEER_ADDRESS: '' },
+    { EPR_BIN: stub, EPR_PEER_PORT: '8888', EPR_PEER_RELAYS: 'https://relay.example.test,https://relay.backup.test', EPR_PEER_ADDRESS: 'peer with spaces; literal' },
+    { EPR_BIN: '', EPR_PEER_PORT: '', EPR_PEER_RELAYS: '', EPR_PEER_ADDRESS: '' },
+    { EPR_PEER_RELAY_URL: 'https://relay.legacy.test' },
+    { EPR_PEER_RELAYS: '', EPR_PEER_RELAY_URL: 'https://relay.legacy.test' },
+    { EPR_PEER_RELAYS: 'https://relay.example.test', EPR_PEER_RELAY_URL: 'https://relay.legacy.test' },
+    { EPR_PEER_RELAYS: 'off', EPR_PEER_RELAY_URL: 'https://relay.legacy.test' },
+    { EPR_PEER_RELAYS: 'n0' },
+    { EPR_PEER_RELAY_URL: '' },
   ]) {
     const r = spawnSync('/bin/sh', ['-c', command('peer-serve')], {
       cwd, env: { PATH: `${cwd}:${process.env.PATH}`, ...overrides }, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
     });
     assert.equal(r.status, 0, r.stderr);
     assert.deepEqual(r.stdout.trim().split('\n'), [
-      overrides.EPR_PEER_RELAY_URL || 'https://relay.alpha.elohim.host',
+      overrides.EPR_PEER_RELAYS || overrides.EPR_PEER_RELAY_URL || 'https://relay.alpha.elohim.host',
       'peer', 'serve', '--root', '/projects/elohim', '--handle', 'matthew',
       '--listen', `0.0.0.0:${overrides.EPR_PEER_PORT || '7777'}`,
       ...(overrides.EPR_PEER_ADDRESS ? ['--peer', overrides.EPR_PEER_ADDRESS] : []),
