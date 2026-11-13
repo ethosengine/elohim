@@ -850,13 +850,18 @@ else: b.touch(session,pid=4101)
             f=Fixture(base); f.setup()
             app=f.base/'app'; snapshot=f.base/'stage-lease.json'
             write(app/'scripts/hc-mesh.sh', f'cp "$BERTH_DIR/leases.json" {snapshot}\nexit 42\n')
+            # The lane refuses before its berth claim without the a2o workspace prerequisites.
+            a2o=f.base/'a2o'
+            write(a2o/'node_modules/.bin/cucumber-js', '#!/bin/sh\nexit 0\n')
+            (a2o/'node_modules/.bin/cucumber-js').chmod(0o755)
+            write(a2o/'node_modules/@elohim/storage-client/dist/index.js', '')
             template=(REPO/'genesis/agentic/compute/stage/stage-runner.template.sh').read_text()
             exports='\n'.join(line for line in template.splitlines()
                               if line.startswith(('export ELOHIM_SESSION_', 'export BERTH_CLASS=')))
             shutil.copy2(REPO/'justfile', f.root/'justfile')
             script=f.base/'stage.sh'
             write(script, 'STAGE_NAME=probe\n'+exports+'\n'+
-                  f'just --justfile {f.root}/justfile app_dir={app} test mesh fixture.feature\n')
+                  f'just --justfile {f.root}/justfile app_dir={app} a2o_dir={a2o} test mesh fixture.feature\n')
             write(f.base/'no-runtimes.json', '{"runtimes":[]}')
             out=f.run(['bash',script], native=False, expected=42, extra_env={
                 'EPR_BIN':str(BINARY), 'EPR_PROC_ROOT':'/proc',
