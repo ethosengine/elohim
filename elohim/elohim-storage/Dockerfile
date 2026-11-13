@@ -354,6 +354,7 @@ RUN sed -i \
     sed -i \
     -e 's|serde = { workspace = true, features = \["derive"\] }|serde = { version = "1.0", features = ["derive"] }|' \
     -e 's|serde_json.workspace = true|serde_json = "1.0"|' \
+    -e 's|chrono.workspace = true|chrono = { version = "0.4", features = ["serde"] }|' \
     -e 's|thiserror.workspace = true|thiserror = "2.0"|' \
     epr-rea/Cargo.toml
 
