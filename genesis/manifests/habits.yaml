@@ -2447,9 +2447,9 @@ habits:
       - "node --test genesis/orchestrator/cargo-affected.test.mjs genesis/orchestrator/serving-receipt.test.mjs (change detection never passes an unreadable range; mandatory receipt refusal still refuses)"
       - "node genesis/orchestrator/gate-live.mjs harvest --last 20 (live read of this device's run logs; green needs the slices it names to shrink across pushes)"
     evidence: >
-      DELTA 2026-11-13b (still RED): mesh and mesh-browser refuse missing cucumber or storage-client dist before claiming the berth, with exact install/build cures; scoped zero-scenario runs now fail before report or feedback writes, and the serving-receipt reader's existing empty-report refusal is regression-tested. Proof: JustWrapperTest 7/7 and report-builder + serving-receipt 45/45, EXIT=0 (Node subprocess tests required sandbox escalation after EPERM); prep's existing a2o-selected dist cure is unchanged. Brit's store launcher refused read-only state, so repository operations used its installed current binary directly; shell adapter coverage remains unmeasured.
-    evidence-fingerprint: sha256:87ae9c2ac729a278
-    evidence-bytes: 4597
+      DELTA 2026-11-13b (still RED): mesh and mesh-browser refuse missing cucumber or storage-client dist before claiming the berth, with exact install/build cures; scoped zero-scenario runs now fail before report or feedback writes, and the serving-receipt reader's existing empty-report refusal is regression-tested. Proof: JustWrapperTest 7/7 and report-builder + serving-receipt 45/45, EXIT=0 (Node subprocess tests required sandbox escalation after EPERM); prep's existing a2o-selected dist cure is unchanged. Brit's store launcher refused read-only state, so repository operations used its installed current binary directly; Brit commit then refused the checkout as untrusted even with the existing hook path explicitly configured, requiring Git fallback with normal hooks; shell adapter coverage remains unmeasured.
+    evidence-fingerprint: sha256:bdab32e61efcf2a6
+    evidence-bytes: 4746
     evidence-entries: 5
     guard: >-
       Never let a recorded red reach `exit 0`: every early pass goes through pass_or_refuse. Never move a
