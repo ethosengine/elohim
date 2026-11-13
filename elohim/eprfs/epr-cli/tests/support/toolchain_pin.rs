@@ -26,6 +26,7 @@ pub struct RealToolchain {
 
 /// The pinned release declared by the repository containing this crate.
 pub fn pin() -> Option<String> {
+    // gate-reads: genesis/agentic/pool-policy.json
     let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let policy = manifest
         .ancestors()
