@@ -2706,10 +2706,10 @@ habits:
       - "node --test genesis/orchestrator/gate-landing-base.test.mjs (device-DID tiebreak, cap of 4: unobservable in the one-DID fixture)"
       - "over >= 10 pushes, from the device's flow store dev-landing@1 rows and berth's hold fold: hold p50/p90 vs 233/3,321 s; Σ regated_s on landed_as=moved vs Σ gate seconds saved on landed_as=ff; chain_len p90; duplicate gated closures = 0, duplicate claims = 0, >= 2 intents per Jenkins wave (unwired until S6)"
     evidence: >
-      DELTA 2026-11-12i (RED preserved, inactive; K9 receipt): two devices diffed doorway input lines both ways at 8b273f826 records (epr and daemons at 6060f8347): 11 differing lines, mirrored, the whole glibc/gcc link floor at identical paths (RHEL 10.0 glibc -145 vs AlmaLinux 10.2 -128 x86_64_v2); macro dump agrees. Needed dev crossing policy on both daemons (main-checkout policy lacked artifact-produce@1, denying crossing silently) and record-exact serving/pairing. Evidence: sprints/2026-11-07-artifact-store/evidence/k9-two-device-receipt.md. Open: stale daemon policy unannounced; relay-only manifest errors read as transport-cannot-deliver; device current epr predates K9.
-    evidence-fingerprint: sha256:df389a5ca0a5d21b
-    evidence-bytes: 53869
-    evidence-entries: 38
+      DELTA 2026-11-13 (RED preserved, inactive; mesh key refusal visibility): `just mesh build` reports the last nonblank stderr line, then stdout, then the key command's exit code, caps the excerpt at 240 characters and names the full `.key-why` diagnostic; either key call's refusal prevents fetch/put and clears the input. Proof: `TMPDIR=/var/tmp/rg2-rust bash app/elohim-app/scripts/__tests__/hc-mesh-closure-staleness.test.sh` EXIT=0 (37 assertions, including both calls, both streams, trailing blanks, silent exit 3 and bounded path excerpts). Story harvest: between key refusal and an unrecorded install, the operator must see the cause without accepting diagnostic output as a key; preserved by the shell regressions. The ignored-file Gap dispatcher writes stdout (JSON with `--json`), while a dirty key writes stderr after stdout; both exit 3. Brit/epr launchers refused read-only bookkeeping, so current binaries were used directly; Brit path-filtered log is unsupported. Shell adapter coverage remains unmeasured.
+    evidence-fingerprint: sha256:1b348e9225850d83
+    evidence-bytes: 54890
+    evidence-entries: 39
     refs:
       - "spec: genesis/docs/superpowers/specs/2026-10-27-steward-space-landing-plane-design.md (§2 Arm A slices A0-A13; §3 this habit and the WIP fence)"
       - "upstream of: genesis/orchestrator/.epr-meta/push-delivers-within-budget.habit.md (active red; A9/A10 move its measured ratio)"

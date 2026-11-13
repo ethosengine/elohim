@@ -7,7 +7,7 @@ here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 fail=0
 t() { if eval "$2"; then echo "ok   $1"; else echo "FAIL $1"; fail=1; fi; }
 
-export TMPDIR=/var/tmp/b3-codex
+export TMPDIR="${TMPDIR:-/var/tmp/b3-codex}"
 mkdir -p "$TMPDIR"
 tmp="$(mktemp -d "$TMPDIR/hc-mesh-closure-staleness.XXXXXX")"
 trap 'rm -rf "$tmp"' EXIT
@@ -22,6 +22,7 @@ if [ "${1:-}" != artifact ]; then
 fi
 verb="${2:-}"
 shift 2
+printf '%s\n' "$verb" >> "$EPR_STUB_CALLS"
 case "$verb" in
   describe)
     out=""
@@ -32,6 +33,30 @@ case "$verb" in
     printf '{"fixture":true}\n' > "$out"
     ;;
   key)
+    # Exercise both key calls: --print succeeds before a JSON-only refusal.
+    mode="${EPR_STUB_MODE:-equal}"
+    if [[ "$mode" == json-* && " $* " == *' --print input '* ]]; then
+      echo input-a
+      exit 0
+    fi
+    case "${mode#json-}" in
+      stderr)
+        echo input-that-must-not-be-used
+        printf 'earlier diagnostic\nepr artifact: uncommitted changes in source.rs\n\n \t\n' >&2
+        exit 3
+        ;;
+      stdout)
+        printf 'earlier diagnostic\nignored files inside the view: dist/index.js\n\n'
+        exit 3
+        ;;
+      silent) exit 3 ;;
+      long)
+        printf 'ignored files inside the view: '
+        printf 'dist/path-%s.js; ' {1..100}
+        printf '\n'
+        exit 3
+        ;;
+    esac
     case "${EPR_STUB_MODE:-equal}" in
       noartifact)
         echo 'usage: epr flow <command>' >&2
@@ -83,6 +108,7 @@ STUB
 chmod 0755 "$stub"
 
 export EPR_BIN="$stub"
+export EPR_STUB_CALLS="$tmp/epr-calls"
 export MESH_DIR="$tmp/mesh"
 export MESH_PEERS=unit
 export MESH_TRANSPORT_BACKEND=libp2p
@@ -167,6 +193,34 @@ printf '{"key":"stale","method":"stale","input":"stale"}\n' > "$record"
 EPR_STUB_MODE=nokey mesh_build storage >/dev/null 2>&1; build_rc=$?
 t "successful unkeyed install removes a stale derivation projection" \
   '[ "$build_rc" -eq 0 ] && [ -x "$STORAGE_BIN" ] && [ ! -e "$record" ]'
+
+# Refusals on either stream, including a failed second key call, must remain diagnostic text.
+for stage in '' json-; do
+  for mode in stderr stdout silent long; do
+    write_record
+    : > "$EPR_STUB_CALLS"
+    out="$(EPR_STUB_MODE="$stage$mode" mesh_build storage 2>&1)"; build_rc=$?
+    reason=$(sed -n 's/^\[mesh build\] unrecorded: no key: //p' <<< "$out")
+    excerpt="${reason% (details: *)}"
+    case "$mode" in
+      stderr) expected='epr artifact: uncommitted changes in source.rs' ;;
+      stdout) expected='ignored files inside the view: dist/index.js' ;;
+      silent) expected='epr artifact key exited 3' ;;
+      long) expected='ignored files inside the view: dist/path-1.js;' ;;
+    esac
+    t "$stage$mode refusal names the reason and diagnostic file" \
+      '[[ "$reason" == "$expected"* ]] && [[ "$reason" == *"(details: $method.key-why)" ]] && [ "${#excerpt}" -le 240 ]'
+    t "$stage$mode refusal builds without fetch, put or derivation record" \
+      '[ "$build_rc" -eq 0 ] && [ -x "$STORAGE_BIN" ] && [ ! -e "$record" ] && ! grep -Eq "^(fetch|put)$" "$EPR_STUB_CALLS"'
+    if [ "$mode" != silent ]; then
+      t "$stage$mode full refusal retained" 'grep -Fq "$expected" "$method.key-why"'
+    fi
+    if [ "$mode" = long ]; then
+      t "$stage$mode truncation retains final path in file only" \
+        '[[ "$excerpt" == *"..." ]] && [[ "$reason" != *"dist/path-100.js"* ]] && grep -Fq "dist/path-100.js" "$method.key-why"'
+    fi
+  done
+done
 
 # Review M1: an explicit STORAGE_BIN naming the canonical mesh-slot path keeps the mtime rule, and is
 # not refused for a changed closure while its mtime check passes.

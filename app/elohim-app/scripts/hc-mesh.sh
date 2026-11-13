@@ -2118,6 +2118,21 @@ PY
 # The epr the mesh build records and fetches artifacts through (artifact-store design §3).
 _mesh_epr() { printf '%s\n' "${EPR_BIN:-epr}"; }
 
+# Keep both diagnostic streams, but only a bounded last nonblank line in the build log.
+# Gap refusals can be stdout (including --json); dirty keys report on stderr after stdout.
+mesh_key_failure() { # <stderr-file> <captured-stdout> <exit-code>
+  local why="$1" output="$2" status="$3" reason
+  reason=$(awk 'NF { line=$0 } END { print line }' "$why")
+  if [ -z "$reason" ]; then
+    reason=$(printf '%s\n' "$output" | awk 'NF { line=$0 } END { print line }')
+  fi
+  [ -z "$output" ] || printf '\n%s\n' "$output" >> "$why"
+  reason="${reason:-epr artifact key exited $status}"
+  reason=$(printf '%s' "$reason" | tr '\r\t' '  ')
+  [ "${#reason}" -le 240 ] || reason="${reason:0:237}..."
+  printf 'no key: %s (details: %s)\n' "$reason" "$why"
+}
+
 # mesh_fetch <method.json> <dest> — draw the artifact the method's key names at this checkout's
 # HEAD from one of the person's other devices, through this device's running `epr peer serve`
 # (artifact-store design §3.b.4). 0 only when the whole-blob-verified artifact is installed at
@@ -2144,7 +2159,7 @@ mesh_build() { # [storage|doorway|beacon] (default all three)
   _mesh_build_one() { # <project> <crate-dir> <slot> <bin> <rustflags> <features> <dest> [sources]
     local project="$1" crate="$2" slot="$3" bin="$4" rustflags="$5" features="$6" dest="$7"
     local sources="${8:-}" method="" input="" key_json="" commit="" unrecorded="" started=0 out=""
-    local envs=() rec=() line
+    local envs=() rec=() line key_rc
     # Declared values win over the caller's environment, exactly as run-local-gate.sh exports
     # them: the workspace shell carries CARGO_BUILD_JOBS=4, and storage's measured cap is 1.
     mesh_build_record_env "$project" "$rustflags"
@@ -2188,13 +2203,21 @@ mesh_build() { # [storage|doorway|beacon] (default all three)
           "$crate" "$features" 2>&1); then
         unrecorded="the method is not described: ${out:-epr artifact describe failed}"
         method=""
-      elif ! input=$("${rec[@]}" "$(_mesh_epr)" artifact key --method "$method" --repo "$REPO_ROOT" \
+      elif out=$("${rec[@]}" "$(_mesh_epr)" artifact key --method "$method" --repo "$REPO_ROOT" \
           --print input 2>"$method.key-why"); then
-        unrecorded="no key: $(tail -n 1 "$method.key-why" 2>/dev/null || true)"
+        input="$out"
+        if out=$("${rec[@]}" "$(_mesh_epr)" artifact key --method "$method" --repo "$REPO_ROOT" \
+            --json 2>"$method.key-why"); then
+          key_json="$out"
+        else
+          key_rc=$?
+          unrecorded=$(mesh_key_failure "$method.key-why" "$out" "$key_rc")
+          input=""
+        fi
+      else
+        key_rc=$?
+        unrecorded=$(mesh_key_failure "$method.key-why" "$out" "$key_rc")
         input=""
-      elif ! key_json=$("${rec[@]}" "$(_mesh_epr)" artifact key --method "$method" --repo "$REPO_ROOT" \
-          --json 2>>"$method.key-why"); then
-        key_json=""
       fi
       commit=$(git -C "$REPO_ROOT" rev-parse HEAD 2>/dev/null || true)
       if [ -n "$input" ] && [ "${MESH_BUILD_FETCH:-1}" != "0" ] && mesh_fetch "$method" "$dest"; then
