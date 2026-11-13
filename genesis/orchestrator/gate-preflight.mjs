@@ -65,6 +65,12 @@ export function onRedPolicy({ env = process.env, root = ROOT } = {}) {
 
 const row = (check, level, why = '', cure = '') => ({ check, level, why, cure });
 
+// Prep executes argv, never shell-parses a human cure. Both views have one source.
+export const WORKSPACE_INSTALL = ['pnpm', 'install', '--frozen-lockfile', '--prefer-offline'];
+const commandRow = (check, level, why, commands) => ({
+  ...row(check, level, why, commands.map(command => command.join(' ')).join(' && ')), commands,
+});
+
 function usesNode(project) {
   return !project.run?.cargo && project.run?.kind !== 'attested';
 }
@@ -78,8 +84,8 @@ export function checkSubmodules({ root, spawn = spawnSync }) {
   if (r.status !== 0) return row('submodules', 'WARN', 'git submodule status failed', 'git submodule status');
   const missing = String(r.stdout).split('\n').filter(line => line.startsWith('-')).map(line => line.trim().split(/\s+/)[1]);
   if (missing.length) {
-    return row('submodules', 'REFUSED', `not checked out: ${missing.join(' ')} — their attested gate projects vanish and the orchestrator registry tests fail`,
-      `git submodule update --init ${missing.join(' ')}`);
+    return { ...row('submodules', 'REFUSED', `not checked out: ${missing.join(' ')} — their attested gate projects vanish and the orchestrator registry tests fail`,
+      `git submodule update --init ${missing.join(' ')}`), missing };
   }
   const moved = String(r.stdout).split('\n').filter(line => line.startsWith('+')).map(line => line.trim().split(/\s+/)[1]);
   if (moved.length) {
@@ -111,8 +117,8 @@ export function checkNodeModules({ root, projects }) {
   const needing = projects.filter(usesNode);
   if (!needing.length) return null;
   if (existsSync(join(root, 'node_modules/.modules.yaml'))) return row('node_modules', 'ok');
-  return row('node_modules', 'REFUSED', `no installed workspace for ${needing.map(p => p.name).join(' ')}`,
-    'pnpm install --frozen-lockfile --prefer-offline');
+  return commandRow('node_modules', 'REFUSED', `no installed workspace for ${needing.map(p => p.name).join(' ')}`,
+    [WORKSPACE_INSTALL]);
 }
 
 function readJson(path) {
@@ -151,8 +157,8 @@ export function checkElementDists({ root, projects }) {
     }
   }
   if (!missing.length) return row('element-dists', 'ok');
-  return row('element-dists', 'REFUSED', `unbuilt element package(s) a selected gate imports: ${missing.join(' ')}`,
-    `pnpm ${missing.map(name => `--filter ${name}`).join(' ')} run build`);
+  return commandRow('element-dists', 'REFUSED', `unbuilt element package(s) a selected gate imports: ${missing.join(' ')}`,
+    [['pnpm', ...missing.flatMap(name => ['--filter', name]), 'run', 'build']]);
 }
 
 export function checkStorageClientDist({ root, projects }) {
@@ -161,8 +167,8 @@ export function checkStorageClientDist({ root, projects }) {
   if (existsSync(join(root, STORAGE_CLIENT_DIST))) return row('storage-client-dist', 'ok');
   // genesis-a2o builds nothing first (10-19: type-aware lint read error types; 11-01: a lane of 0
   // scenarios); app prebuilds build it, though lint can run before that.
-  return row('storage-client-dist', a2o ? 'REFUSED' : 'WARN', `${STORAGE_CLIENT_DIST} absent — type-aware lint and the a2o lane read it`,
-    'pnpm --filter @elohim/storage-client... run build');
+  return commandRow('storage-client-dist', a2o ? 'REFUSED' : 'WARN', `${STORAGE_CLIENT_DIST} absent — type-aware lint and the a2o lane read it`,
+    [['pnpm', '--filter', '@elohim/storage-client...', 'run', 'build']]);
 }
 
 /** The elohim dev pool slot the agentic-shift harness falls back to (`just gate elohim-ark` builds it). */
@@ -206,17 +212,20 @@ export function checkWorkspaceDists({ root, projects }) {
   const needed = WORKSPACE_DISTS.some(lib => projects.some(project => dependsOn(root, project, lib.name)));
   if (!needed) return null;
   if (!missing.length) return row('workspace-dists', 'ok');
-  return row('workspace-dists', 'REFUSED', `unbuilt workspace librar${missing.length > 1 ? 'ies' : 'y'} a selected gate imports: ${missing.map(lib => lib.name).join(' ')}`,
-    `pnpm ${missing.map(lib => `--filter ${lib.name}`).join(' ')} run build`);
+  return commandRow('workspace-dists', 'REFUSED', `unbuilt workspace librar${missing.length > 1 ? 'ies' : 'y'} a selected gate imports: ${missing.map(lib => lib.name).join(' ')}`,
+    [['pnpm', ...missing.flatMap(lib => ['--filter', lib.name]), 'run', 'build']]);
 }
 
 export function checkSophiaUmd({ root, projects }) {
   if (!projects.some(p => p.name === 'elohim-app')) return null;
   if (SOPHIA_UMD.some(path => existsSync(join(root, path)))) return row('sophia-umd', 'ok');
   // check-sophia.sh can still fetch it from Nexus or a GitHub release, so this predicts, never refuses.
-  return row('sophia-umd', 'WARN', 'no sophia-element UMD in the app assets or the sophia submodule — elohim-app prebuild must fetch one from the network or fail',
-    'pnpm -C sophia install && pnpm -C sophia build && pnpm -C sophia --filter @ethosengine/sophia-element build:umd');
+  return commandRow('sophia-umd', 'WARN', 'no sophia-element UMD in the app assets or the sophia submodule — elohim-app prebuild must fetch one from the network or fail',
+    [['pnpm', '-C', 'sophia', 'install'], ['pnpm', '-C', 'sophia', 'build'],
+      ['pnpm', '-C', 'sophia', '--filter', '@ethosengine/sophia-element', 'build:umd']]);
 }
+
+export const DIST_CHECKS = [checkElementDists, checkStorageClientDist, checkWorkspaceDists, checkSophiaUmd];
 
 function sourcesOf(root, project) {
   const manifest = JSON.parse(readFileSync(join(root, project.manifestPath), 'utf8'));
@@ -373,10 +382,7 @@ export function runPreflight({ root = ROOT, projects, env = process.env, spawn =
     ...timed(() => checkSubmodules({ root, spawn })),
     ...timed(() => checkTmpdir({ projects, env })),
     ...timed(() => checkNodeModules({ root, projects })),
-    ...timed(() => checkElementDists({ root, projects })),
-    ...timed(() => checkStorageClientDist({ root, projects })),
-    ...timed(() => checkWorkspaceDists({ root, projects })),
-    ...timed(() => checkSophiaUmd({ root, projects })),
+    ...DIST_CHECKS.flatMap(check => timed(() => check({ root, projects }))),
     ...timed(() => checkArk({ projects, env })),
     ...timed(() => checkCargoDeny({ root, projects, spawn })),
     ...timed(() => checkCargoLocks({ root, projects, spawn, env })),

@@ -166,6 +166,7 @@ its own pnpm workspace. The root developer interface is intentionally small:
 
 ```bash
 just --list
+just dev prep                 # initialize local submodules, install dependencies/hooks, build missing selected dists, then preflight
 just gate                     # changed projects, including worktree edits
 just gate elohim-storage      # explicit manifest project or owning path
 just test app                 # focused test family

@@ -319,11 +319,12 @@ test target="changed" scope="":
       *) echo "test target must be changed|app|a2o|mesh|seeder|storage|doorway|node|sophia" >&2; exit 2 ;;
     esac
 
-# Manage the single-peer local stack. Safe default: status.
+# Prepare the workspace or manage the single-peer local stack. Safe default: status.
 dev action="status" profile="isolated" seed="false" build="false" *extra="":
     #!/usr/bin/env bash
     set -euo pipefail
     case "{{ action }}" in
+      prep) exec node "{{ root }}/genesis/orchestrator/worktree-prep.mjs" ;;
       shift)
         shift_args=("{{ profile }}")
         [[ "{{ profile }}" == "isolated" ]] && shift_args=(status)
@@ -375,7 +376,7 @@ dev action="status" profile="isolated" seed="false" build="false" *extra="":
         exec "{{ app_dir }}/scripts/hc-start.sh" --stop
         ;;
       status) just --justfile "{{ root }}/justfile" status runtime ;;
-      *) echo "dev action must be start|conductor|app|package|shift|stop|status" >&2; exit 2 ;;
+      *) echo "dev action must be prep|start|conductor|app|package|shift|stop|status" >&2; exit 2 ;;
     esac
 
 # Manage or measure the local multi-peer mesh. Safe default: status.
