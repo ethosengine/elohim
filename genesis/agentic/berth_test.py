@@ -2351,6 +2351,14 @@ class JustWrapperTest(unittest.TestCase):
         root = Path(self.directory.name)
         self.berth_dir = root / "berth"
         self.app = root / "app"
+        self.a2o = root / "a2o"
+        self.cucumber = self.a2o / "node_modules/.bin/cucumber-js"
+        self.storage_dist = self.a2o / "node_modules/@elohim/storage-client/dist/index.js"
+        self.cucumber.parent.mkdir(parents=True)
+        self.cucumber.write_text("#!/bin/sh\nexit 99\n")
+        self.cucumber.chmod(0o755)
+        self.storage_dist.parent.mkdir(parents=True)
+        self.storage_dist.write_text("export {};\n")
         (self.app / "scripts").mkdir(parents=True)
         self.reached = root / "reached"
         self.lane_pid = root / "lane.pid"
@@ -2380,7 +2388,8 @@ fi
 
     def just(self, *args, **env):
         e = dict(self.env, **env)
-        return subprocess.run(["just", "--justfile", str(REPO / "justfile"), f"app_dir={self.app}", *args],
+        return subprocess.run(["just", "--justfile", str(REPO / "justfile"), f"app_dir={self.app}",
+                               f"a2o_dir={self.a2o}", *args],
                               env=e, capture_output=True, text=True, timeout=120)
 
     def berth(self, *args, **env):
@@ -2394,6 +2403,34 @@ fi
             r = self.just("test", "mesh", "x.feature", ELOHIM_SESSION_ID="me", **env)
             self.assertEqual(r.returncode, want, (env, r.stderr[-400:]))
         self.assertFalse(self.reached.exists())
+
+    def test_missing_dependencies_refuse_before_claiming_the_berth(self):
+        for target in ("mesh", "mesh-browser"):
+            for dependency, cure in (
+                (self.cucumber, "pnpm install --frozen-lockfile"),
+                (self.storage_dist, "pnpm --filter @elohim/storage-client... run build"),
+            ):
+                saved = dependency.read_text()
+                dependency.unlink()
+                try:
+                    r = self.just("test", target, "@concern:missing", ELOHIM_SESSION_ID="me")
+                    self.assertEqual(r.returncode, 2, r.stderr)
+                    refusals = [line for line in r.stderr.splitlines() if line.startswith("REFUSED:")]
+                    self.assertEqual(len(refusals), 1, r.stderr)
+                    self.assertIn(cure, refusals[0])
+                    self.assertFalse(self.berth_dir.exists(), "dependency check claimed the berth")
+                    self.assertFalse(self.reached.exists(), "dependency check started the mesh lane")
+                    self.assertFalse((self.a2o / "reports").exists())
+                finally:
+                    dependency.write_text(saved)
+                    dependency.chmod(0o755)
+
+    def test_nonexecutable_cucumber_refuses_before_the_berth(self):
+        self.cucumber.chmod(0o644)
+        r = self.just("test", "mesh", "x.feature", ELOHIM_SESSION_ID="me")
+        self.assertEqual(r.returncode, 2, r.stderr)
+        self.assertIn("pnpm install --frozen-lockfile", r.stderr)
+        self.assertFalse(self.berth_dir.exists())
 
     def test_no_session_is_exit_4_and_the_lane_proceeds_unleased(self):
         self.assertEqual(self.berth("claim", "mesh", "--ttl", "60").returncode, 4)
@@ -2421,7 +2458,7 @@ fi
 
     def test_an_overlong_verify_lane_is_killed_at_its_ttl_then_the_berth_is_free(self):
         proc = subprocess.Popen(["just", "--justfile", str(REPO / "justfile"), f"app_dir={self.app}",
-                                 "test", "mesh", "x.feature"],
+                                 f"a2o_dir={self.a2o}", "test", "mesh", "x.feature"],
                                 env=dict(self.env, ELOHIM_SESSION_ID="me", BERTH_TTL="3", STUB_MODE="overlong"),
                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         deadline = time.time() + 10

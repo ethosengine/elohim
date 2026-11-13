@@ -101,6 +101,14 @@ function main() {
     ? readFileSync(args.cucumberPath, 'utf8')
     : '[]';
   const scenarios = loadCucumber(cucumberJson);
+  // Reject before feedback, files or attestations: no scenarios is no run evidence.
+  if (args.scope && scenarios.length === 0) {
+    console.error(
+      `EMPTY SELECTION: scope '${args.scope}' measured 0 scenarios — no sprint report written. ` +
+        `Check step loading and the scope relative to genesis/a2o, including profile tag filters.`
+    );
+    process.exit(3);
+  }
   const consoleArtifacts = loadConsoleArtifacts(args.consoleDir);
   const gaps = loadCoverageGap(args.coverageGapPath);
 
@@ -157,21 +165,6 @@ function main() {
       (env.unknown.length > 0 ? ` · unknown: ${env.unknown.join(', ')}` : '')
   );
   printDeclaredHeadline(report);
-
-  // Empty-selection receipt: a scoped run that measured ZERO scenarios did
-  // not exercise anything — most often the scope resolved to nothing
-  // (silently, at exit 0, from cucumber's own end). A clean report with 0
-  // scenarios and a scope on record is exactly that false-green shape, so
-  // this is the one case where the BUILDER itself fails the run rather than
-  // deferring entirely to cucumber's own exit code.
-  if (args.scope && report.summary.scenarios.total === 0) {
-    console.error(
-      `EMPTY SELECTION: scope '${args.scope}' measured 0 scenarios — this is an ` +
-        `empty-selection receipt, not a passing run. Check the scope resolves to ` +
-        `something relative to genesis/a2o (a bad path silently selects nothing).`
-    );
-    process.exit(3);
-  }
 
   // The report is the evidence; these are its projections, and neither changes the verdict.
   // A household run fulfils its valueflow commitments (`epr flow fulfill`, formerly by hand)

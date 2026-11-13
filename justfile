@@ -43,6 +43,16 @@ test target="changed" scope="":
       app) cd "{{ app_dir }}"; exec pnpm test ;;
       a2o) cd "{{ a2o_dir }}"; exec pnpm run test:unit ;;
       mesh|mesh-browser)
+        # Workspace prerequisites precede the berth: a lane that cannot load its steps
+        # must neither reserve the household nor manufacture an empty run report.
+        if [[ ! -x "{{ a2o_dir }}/node_modules/.bin/cucumber-js" ]]; then
+          echo "REFUSED: cucumber-js is missing or not executable — run: pnpm install --frozen-lockfile" >&2
+          exit 2
+        fi
+        if [[ ! -f "{{ a2o_dir }}/node_modules/@elohim/storage-client/dist/index.js" ]]; then
+          echo "REFUSED: @elohim/storage-client dist is missing — run: pnpm --filter @elohim/storage-client... run build" >&2
+          exit 2
+        fi
         # Act I lane — the a2o `mesh` cucumber profile against the household mesh THIS host owns.
         # `mesh-browser` is the same act, same mesh, through a real browser: it selects the
         # `mesh-browser` profile (@browser/@browser-only, which `mesh` excludes) and points the
@@ -274,7 +284,7 @@ test target="changed" scope="":
               "{{ a2o_dir }}/node_modules/.bin/cucumber-js" --config "$cfg_rel" --profile "$a2o_profile" "{{ scope }}" || rc=$? ;;
           esac
         fi
-        # Built REGARDLESS of the verdict: a red run that leaves no evidence is the exact
+        # Built for nonempty runs REGARDLESS of the verdict: a red run that leaves no evidence is the exact
         # defect this slice exists to fix. Run-identified under the stable glob
         # reports/sprint-report-household-*.json, so no run overwrites another. A scoped run
         # still reports every unexercised DECLARED concern as NOT MEASURED (Law I) — a

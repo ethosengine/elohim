@@ -70,6 +70,16 @@ function receipt() {
 }
 test("accepts every measured station on the current household source", () =>
   assert.equal(validateReceipt(receipt(), expected, names), true));
+test("refuses zero-scenario reports even on current source and with no station names", () => {
+  const report = receipt();
+  report.summary.scenarios = { total: 0 };
+  report.summary.byConcern["doorway-failover"].scenarios = [];
+  for (const stations of [names, []]) {
+    assert.equal(validateReceipt(report, expected, stations), false);
+    report.summary.byConcern = {};
+    assert.equal(validateReceipt(report, expected, stations), false);
+  }
+});
 for (const status of ["pending", "skipped", "failed", "undefined"]) {
   test(`refuses a ${status} SSR or browser station`, () => {
     const report = receipt();
