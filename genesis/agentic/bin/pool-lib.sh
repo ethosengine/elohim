@@ -1252,6 +1252,10 @@ slot_age_epoch() {
 list_stale_artifact_hashes() {
   local root="${1:-$POOL_ROOT/family}" keep="${2:-1}" min_mb="${3:-64}" min_age_h="${4:-6}"
   [ -d "$root" ] || return 0
+  # Cargo 1.100 stores complete units under build/<package>/<hash>/.
+  # Keep the legacy deps walk below unchanged for older toolchain slots.
+  python3 "$(dirname "${BASH_SOURCE[0]}")/pool-artifact-hashes.py" \
+    "$root" "$keep" "$min_mb" "$min_age_h" || return
   local min_age_min=$((min_age_h * 60))
   find "$root" -type d -name deps 2>/dev/null \
     | while IFS= read -r deps; do
@@ -1303,7 +1307,12 @@ prune_stale_artifact_hashes() {
   list_stale_artifact_hashes "$root" "$keep" "$min_mb" "$min_age_h" \
     | while IFS="$(printf '\t')" read -r bytes path; do
       if [ "$yes" = "1" ]; then
-        rm -f "$path" 2>/dev/null && \
+        # Only the new-layout reader emits directories (one complete unit).
+        if [ -d "$path" ] && [ ! -L "$path" ]; then
+          rm -rf -- "$path" 2>/dev/null
+        else
+          rm -f -- "$path" 2>/dev/null
+        fi && \
           printf 'removed\t%s\t%s\n' "$(human_bytes "$bytes")" "$path"
       else
         printf 'would-remove\t%s\t%s\n' "$(human_bytes "$bytes")" "$path"
