@@ -344,7 +344,12 @@ seams:
     # floor: which grant scope a method spends and which carrier may be admitted for it. The same
     # what-may-be-asked side of admission. Routed 2026-10-27; its registry was born unrouted with
     # feat/gate-live (c832238fe).
-    registry_crates: [mishpat, qahal-types, elohim-placement-core]
+    # `elohim-host-contract` (crates/elohim-host-contract) — the pure host compatibility predicate:
+    # whether an artifact's Requires may be admitted on a device's observed Provides. The same
+    # what-may-be-asked side of admission. Routed 2026-11-13 (ethosengine's routing, folded into
+    # the regenesis-2 harness-floor landing); its registry was born unrouted with hostcompat A1
+    # (21607ecd1).
+    registry_crates: [mishpat, qahal-types, elohim-placement-core, elohim-host-contract]
     habits: [doorway-failover, operator-runtime-surface]
     n_a_concerns: []
 

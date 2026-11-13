@@ -551,6 +551,7 @@ FROM rust:1.94.0-slim-bookworm AS sdk-check
 # rusqlite→libsqlite3-sys (no `bundled` feature) — present in the dev
 # container, absent from slim-bookworm.
 RUN apt-get update && apt-get install -y \
+    nodejs \
     pkg-config \
     libssl-dev \
     build-essential \
@@ -560,6 +561,7 @@ RUN rustup component add rustfmt clippy
 WORKDIR /sdk-gate
 COPY crates ./crates
 COPY scripts/ci/elohim-sdk-feature-matrix.sh ./scripts/ci/elohim-sdk-feature-matrix.sh
+COPY genesis/orchestrator/cargo-lint.mjs genesis/orchestrator/gate-steps.sh ./genesis/orchestrator/
 RUN bash scripts/ci/elohim-sdk-feature-matrix.sh
 
 # ═══════════════════════════════════════════════════════════════════════════

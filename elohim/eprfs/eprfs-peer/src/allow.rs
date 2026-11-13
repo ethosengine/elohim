@@ -12,6 +12,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
 use elohim_epr_rea::FlowEvent;
+use serde::Serialize;
 use serde_json::Value;
 
 use crate::error::PeerError;
@@ -130,10 +131,57 @@ impl CrossingAllowList {
             .is_some_and(|kinds| kinds.contains(kind))
     }
 
+    /// The records this device authored under a measure in `intended` that this list does not
+    /// admit, counted per measure and kind. `intended` names measures a record carries only
+    /// because its writer asked for it to cross, so each row is a crossing the loaded policy
+    /// silently withholds (a policy file behind the code that writes the record reads this way).
+    /// Events folded from another device, and events with no single measure and kind, are not
+    /// counted: they were never this device's to cross.
+    pub fn withheld<'e>(
+        &self,
+        events: impl IntoIterator<Item = &'e FlowEvent>,
+        intended: &[&str],
+    ) -> Vec<WithheldCrossing> {
+        let mut counts: BTreeMap<(&str, &str), u64> = BTreeMap::new();
+        for event in events {
+            if via_device(event).is_some() || self.admits(event) {
+                continue;
+            }
+            let (Some(measure), Some(kind)) = (
+                single_slot(event, MEASURE_SLOT),
+                single_slot(event, KIND_SLOT),
+            ) else {
+                continue;
+            };
+            if intended.contains(&measure) {
+                *counts.entry((measure, kind)).or_default() += 1;
+            }
+        }
+        counts
+            .into_iter()
+            .map(|((measure, kind), events)| WithheldCrossing {
+                measure: measure.to_owned(),
+                kind: kind.to_owned(),
+                events,
+            })
+            .collect()
+    }
+
     /// The ordered crossing map used to encode the rules digest.
     pub(crate) fn crosses(&self) -> &BTreeMap<String, BTreeSet<String>> {
         &self.crosses
     }
+}
+
+/// Records of one measure and kind that this device wrote to cross and its loaded allow-list
+/// withholds.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WithheldCrossing {
+    pub measure: String,
+    pub kind: String,
+    /// How many of this device's own records are withheld.
+    pub events: u64,
 }
 
 /// The device an event was folded from, when it carries a [`VIA_SLOT`].

@@ -486,7 +486,8 @@ def spot_check(repo_root: Path, n: int = 8, *, seed: str = "") -> dict:
         seam_id = by_point.get(f"{crate}::{name}") or by_crate.get(crate)
         disk_concerns = sorted({cb.get("id") for cb in pt.get("concernIds") or []
                                 if isinstance(cb, dict)})
-        # Independent containment test: line scan for a `fn <name>` token, no regex reuse.
+        # Independent containment test: line scan for a `fn <name>` token (Rust) or a
+        # `function <name>` token (.mjs, the other suffix the census admits), no regex reuse.
         disk_verified = False
         for ct in pt.get("contractTests") or []:
             if not isinstance(ct, dict):
@@ -498,7 +499,8 @@ def spot_check(repo_root: Path, n: int = 8, *, seed: str = "") -> dict:
             try:
                 for line in f.read_text(errors="replace").splitlines():
                     toks = re.split(r"[^A-Za-z0-9_]+", line)
-                    if "fn" in toks and tn in toks and toks.index("fn") < toks.index(tn):
+                    kw = "function" if f.suffix == ".mjs" else "fn"
+                    if kw in toks and tn in toks and toks.index(kw) < toks.index(tn):
                         disk_verified = True
                         break
             except OSError:

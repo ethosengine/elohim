@@ -45,11 +45,14 @@ function pathDepClosure(crateDir, seen = new Set()) {
   return seen;
 }
 
-/** Build-context sources the storage Dockerfile copies (stage copies excluded). */
-function dockerCopySources() {
+/** Build-context sources for the runtime image; sdk-check is an independent CI target. */
+function dockerCopySources({ includeSdkCheck = false } = {}) {
   const text = readFileSync(join(root, STORAGE, 'Dockerfile'), 'utf8');
   const sources = new Set();
+  let sdkCheck = false;
   for (const line of text.split('\n')) {
+    if (/^FROM\s/i.test(line)) sdkCheck = /\sAS\s+sdk-check\s*$/i.test(line);
+    if (sdkCheck && !includeSdkCheck) continue;
     const m = line.match(/^COPY\s+(?!--from)(.+)$/);
     if (!m) continue;
     const parts = m[1].trim().split(/\s+/).filter(p => !p.startsWith('--'));
@@ -82,7 +85,7 @@ test('every path-dep crate in the storage closure reaches the Docker build conte
   assert.deepEqual(missing, [], `path-dep crates the storage Dockerfile never COPYs: ${missing.join(', ')}`);
 });
 
-test('every source the storage Dockerfile copies re-triggers the edge build', () => {
+test('every runtime source the storage Dockerfile copies re-triggers the edge build', () => {
   const globs = manifestSources();
   const unwatched = [...dockerCopySources()].filter(src => !covered(src, globs));
   assert.deepEqual(
@@ -90,6 +93,19 @@ test('every source the storage Dockerfile copies re-triggers the edge build', ()
     [],
     `copied into the storage image but absent from cargo-build-storage sources — a change there ships a stale binary: ${unwatched.join(', ')}`,
   );
+});
+
+test('SDK validation helpers stay in the isolated check stage, outside runtime dispatch inputs', () => {
+  const docker = readFileSync(join(root, STORAGE, 'Dockerfile'), 'utf8');
+  // If the runtime ever consumes this stage, its inputs must join the runtime closure.
+  assert.doesNotMatch(docker, /^FROM\s+sdk-check\b|^COPY\s+--from=sdk-check\b/gmi);
+  const runtime = dockerCopySources();
+  const all = dockerCopySources({ includeSdkCheck: true });
+  for (const path of ['genesis/orchestrator/cargo-lint.mjs', 'genesis/orchestrator/gate-steps.sh']) {
+    assert.ok(all.has(path), `${path} must be available to the SDK gate`);
+    assert.ok(!runtime.has(path), `${path} is a validation input, not a runtime input`);
+    assert.ok(!covered(path, manifestSources()), `${path} must not widen runtime dispatch`);
+  }
 });
 
 // The Dockerfile builds storage from /app with every sibling crate COPY'd flat beside it, so each

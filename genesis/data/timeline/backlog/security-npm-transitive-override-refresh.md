@@ -166,3 +166,12 @@ releases a version that requires the patched range.
 ## Verification
 
 None yet. Closure requires a green gate run plus the alerts API showing the count drop.
+
+## Status 2026-11-12
+
+Branch `deps/npm-security-20261112` (not yet landed) adds the effective overrides to root
+`package.json` `pnpm.overrides` (pnpm 10.30.3 records that field in the lock, not the
+`pnpm-workspace.yaml` set): `axios ^1.20.0`, `form-data ^4.0.6`, `handlebars ^4.7.10`,
+`immutable ^5.1.8`, `proxy-addr ^2.0.8`, `shell-quote ^1.12.0`, `piscina@<5 ^4.9.4`,
+`piscina@>=5 ^5.3.2`, plus `storybook ^10.6.2` (direct, with the `@storybook/*` addons) and the
+Angular 22.1.8 runtime set. The workspace yaml carries the same entries.

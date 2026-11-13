@@ -12,6 +12,7 @@ invariant: >-
 status: red
 active: false
 checks:
+  - "node --test genesis/orchestrator/worktree-prep.test.mjs (local submodule references, frozen install, selected preflight cures, idempotence, failed cures, and executable pre-push hook)"
   - "node --test genesis/orchestrator/gate-preflight.test.mjs (each preflight check refuses its miss with a cure and stays silent for unaffected gates; REFUSED reaches the live run; on-red policy order; cheapest-first ordering; harvest slices)"
   - "node --test genesis/orchestrator/prepush-gate-live.test.mjs (run opens before the first check; a pre-gate red is live at once and the push continues; an early pass still refuses; GATE_ON_RED=stop ends at the first red; a stop request is seen; the close follows the hook's exit status and prints the harvest)"
   - "node --test genesis/orchestrator/cargo-affected.test.mjs genesis/orchestrator/serving-receipt.test.mjs (change detection never passes an unreadable range; mandatory receipt refusal still refuses)"
@@ -30,6 +31,8 @@ refs:
   - genesis/orchestrator/.epr-meta/gate-failures-arrive-live.habit.md
 retire-when: "the edit-time and commit-time hooks catch every class the preflight refuses, and the harvest names no recurring or late cheap red across 20 consecutive pushes"
 ---
+
+DELTA 2026-11-13 (still RED): `just dev prep` executes the preflight's structured setup cures: it clones missing submodules from the main checkout without network fetches, installs dependencies and hooks, builds only the refused dists of the selected projects, re-runs preflight and last asserts an executable `.husky/_/pre-push` (landing 21 pushed ungated from a worktree without it; friction E4). Proof: worktree-prep 14/14 and gate-preflight 24/24, exit 0; package projections 2372 checks, exit 0; a real run in .worktrees/regen2-e4 exited 0 (preflight clear, hook executable; genesis/local-dev/regenesis-2/dev-prep-e4.log). Implemented by Codex, run and verified by shem.
 
 DELTA 2026-11-01c (still RED; first real stop, and two gaps it exposed): the feature-branch push of 56c3ec891 got an orchestrator red at 24 min; the agent stopped it with `gate-live.mjs stop`, and the hook ended after the running gate (`stopped: stop requested on the live run; not run: agentic-shift memory-ceremony`, refused at 345 s instead of ~80 min more). Gap 1: the red arrived mid-gate and no outlook came with it (outlooks fired only after a gate's verdict), so the cost of continuing was worked out by hand; the tap now emits the outlook on its first red from GATE_REMAINING. Gap 2: the red was not a flake as first read: the push used `git -c core.hooksPath=…`, which reaches every child git through GIT_CONFIG_PARAMETERS, so build-compute-worker's fixture `git push` ran the pre-push hook and failed (reproduced: leaked 0/1, clean 1/1). gateChildEnv now strips push-scoped git config alongside GIT_DIR/GIT_WORK_TREE.
 

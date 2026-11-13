@@ -2006,7 +2006,25 @@ def load_policies(repo_root: Path) -> tuple[dict, list[str]]:
             errs.append(f"policy `{key}` carries multiple actionable predicates {actionable} — "
                         f"only the first is evaluated; NOT loaded")
             continue
-        if cls == "measure":
+        native_parameters = False
+        m = pol.get("measure")
+        if (cls == "measure" and "permitted-local-parameters" in pol and isinstance(m, dict)
+                and not {"kind", "loc-soft", "loc-hard"} & set(m)):
+            # A native parameter policy (e.g. feedback-local-retention@1): its `measure:` block is
+            # the default parameter set a native consumer (epr) reads, not an edit-time ceiling.
+            # A block naming a resolver key (kind, loc-*) is an ordinary measure and takes the
+            # checks below. Validate the defaults as an integer map over the declared local
+            # parameters; expand_policies refuses any resolver binding to such a policy.
+            permitted = pol.get("permitted-local-parameters")
+            if (not m or not isinstance(permitted, list)
+                    or not all(isinstance(k, str) for k in permitted)
+                    or any(not isinstance(v, int) or isinstance(v, bool) for v in m.values())
+                    or set(m) - set(permitted)):
+                errs.append(f"policy `{key}` class `measure` declares permitted-local-parameters "
+                            f"but its `measure:` block is not an integer map over them; NOT loaded")
+                continue
+            native_parameters = True
+        elif cls == "measure":
             m = pol.get("measure")
             bad = [k for k in ("loc-soft", "loc-hard")
                    if isinstance(m, dict) and k in m and not isinstance(m[k], int)]
@@ -2051,7 +2069,7 @@ def load_policies(repo_root: Path) -> tuple[dict, list[str]]:
                             f"(policy-pin-mismatch), not enforced as authored")
                 out[key] = {"__pin_mismatch__": True}
                 continue
-        out[key] = pol
+        out[key] = {**pol, "__native_parameters__": True} if native_parameters else pol
     return out, errs
 
 
@@ -2081,6 +2099,11 @@ def expand_policies(merged: dict, policies: dict) -> list[str]:
         if pol is None:
             errs.append(f"rule `{rid}` binds unknown policy `{ref}` — rule NOT enforced "
                         f"(registry: {POLICY_REGISTRY_REL})")
+            del merged["rules"][rid]
+            continue
+        if pol.get("__native_parameters__"):
+            errs.append(f"rule `{rid}` binds `{ref}`, a native parameter policy read by its native "
+                        f"consumer, not an edit-time resolver rule — rule NOT enforced")
             del merged["rules"][rid]
             continue
         if pol.get("__pin_mismatch__"):

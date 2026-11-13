@@ -328,3 +328,23 @@ describe('normalize and fingerprint', () => {
     assert.notEqual(fp, fingerprint('p', 'test', 'b'));
   });
 });
+
+test('gate-steps reports each red step without inventing a second diagnostic', () => {
+  const { events } = run([
+    'gate-steps: running fmt',
+    'gate-steps: fmt failed with exit code 1',
+    'gate-steps: running lint',
+    'gate-steps: lint failed with exit code 101',
+    'gate-steps: running test',
+    'test result: ok. 3 passed; 0 failed',
+    'error: Recipe `gate` failed on line 7 with exit code 1',
+  ]);
+  assert.deepEqual(events.map(e => [e.kind, e.step, e.exit]), [
+    ['step-failed', 'fmt', 1], ['step-failed', 'lint', 101], ['step-failed', 'gate', 1],
+  ]);
+});
+
+test('lowercase just recipe summaries remain step events', () => {
+  const { events } = run(['error: recipe `gate` failed on line 11 with exit code 1']);
+  assert.deepEqual(events.map(e => [e.kind, e.step, e.exit]), [['step-failed', 'gate', 1]]);
+});

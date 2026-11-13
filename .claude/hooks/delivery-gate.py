@@ -15,6 +15,11 @@ import re
 import subprocess
 import sys
 import time
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+from _lib.dependabot_harvest import pressure as dependabot_pressure
+from _lib.findings_ledger import read_rows
 
 PROJECT = os.environ.get("CLAUDE_PROJECT_DIR") or os.path.dirname(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -139,6 +144,7 @@ def main():
 
     ci_open = jsonl_count(".claude/data/ci-findings.jsonl", lambda e: e.get("status") == "open")
     dep_open = jsonl_count(".claude/data/deprecations.jsonl", lambda e: e.get("status") != "fixed")
+    dependabot = dependabot_pressure(read_rows(Path(PROJECT) / ".claude/data/dependabot-findings.jsonl"))
 
     # FAILURE-CLASS-AWARE floor (mirrors delivery-scoreboard.py's verdict ladder):
     # floor pressure = a degraded window WITH open (live code) findings attributed.
@@ -170,7 +176,11 @@ def main():
     if ci_open:
         pressures.append((ci_open, f"{ci_open} open CI findings (→ ci-failure-triage / shift rails)"))
     if dep_open:
-        pressures.append((dep_open, f"{dep_open} live dep/sec findings (→ /deprecation-stasis)"))
+        pressures.append((dep_open, f"{dep_open} live deprecation/warning findings (→ /deprecation-stasis)"))
+    if dependabot["open"]:
+        pressures.append((dependabot["weighted"],
+                          f'{dependabot["open"]} live Dependabot alerts '
+                          f'({dependabot["critical"]} critical) (→ /deprecation-stasis)'))
     if code_red:
         pressures.append((10, f"code-red CI floor: {', '.join(code_red)} (degraded window + open findings;"
                               f" env-gated red excluded)"))
@@ -180,7 +190,7 @@ def main():
 
     pressures.sort(reverse=True)
     top = pressures[0][1]
-    summary = " · ".join(p[1].split(" (")[0] for p in pressures[:4])
+    summary = " · ".join(p[1].split(" (→")[0] for p in pressures[:4])
 
     context = (
         f"DELIVERY GATE (advisory, planning-feed only): {summary}. "

@@ -2440,15 +2440,16 @@ habits:
     status: red
     active: false
     checks:
+      - "node --test genesis/orchestrator/worktree-prep.test.mjs (local submodule references, frozen install, selected preflight cures, idempotence, failed cures, and executable pre-push hook)"
       - "node --test genesis/orchestrator/gate-preflight.test.mjs (each preflight check refuses its miss with a cure and stays silent for unaffected gates; REFUSED reaches the live run; on-red policy order; cheapest-first ordering; harvest slices)"
       - "node --test genesis/orchestrator/prepush-gate-live.test.mjs (run opens before the first check; a pre-gate red is live at once and the push continues; an early pass still refuses; GATE_ON_RED=stop ends at the first red; a stop request is seen; the close follows the hook's exit status and prints the harvest)"
       - "node --test genesis/orchestrator/cargo-affected.test.mjs genesis/orchestrator/serving-receipt.test.mjs (change detection never passes an unreadable range; mandatory receipt refusal still refuses)"
       - "node genesis/orchestrator/gate-live.mjs harvest --last 20 (live read of this device's run logs; green needs the slices it names to shrink across pushes)"
     evidence: >
-      DELTA 2026-11-01c (still RED; first real stop, and two gaps it exposed): the feature-branch push of 56c3ec891 got an orchestrator red at 24 min; the agent stopped it with `gate-live.mjs stop`, and the hook ended after the running gate (`stopped: stop requested on the live run; not run: agentic-shift memory-ceremony`, refused at 345 s instead of ~80 min more). Gap 1: the red arrived mid-gate and no outlook came with it (outlooks fired only after a gate's verdict), so the cost of continuing was worked out by hand; the tap now emits the outlook on its first red from GATE_REMAINING. Gap 2: the red was not a flake as first read: the push used `git -c core.hooksPath=…`, which reaches every child git through GIT_CONFIG_PARAMETERS, so build-compute-worker's fixture `git push` ran the pre-push hook and failed (reproduced: leaked 0/1, clean 1/1). gateChildEnv now strips push-scoped git config alongside GIT_DIR/GIT_WORK_TREE.
-    evidence-fingerprint: sha256:c0c59c2cb8cf5f77
-    evidence-bytes: 3251
-    evidence-entries: 3
+      DELTA 2026-11-13 (still RED): `just dev prep` executes the preflight's structured setup cures: it clones missing submodules from the main checkout without network fetches, installs dependencies and hooks, builds only the refused dists of the selected projects, re-runs preflight and last asserts an executable `.husky/_/pre-push` (landing 21 pushed ungated from a worktree without it; friction E4). Proof: worktree-prep 14/14 and gate-preflight 24/24, exit 0; package projections 2372 checks, exit 0; a real run in .worktrees/regen2-e4 exited 0 (preflight clear, hook executable; genesis/local-dev/regenesis-2/dev-prep-e4.log). Implemented by Codex, run and verified by shem.
+    evidence-fingerprint: sha256:93b07a545421e4e3
+    evidence-bytes: 3928
+    evidence-entries: 4
     guard: >-
       Never let a recorded red reach `exit 0`: every early pass goes through pass_or_refuse. Never move a
       check into the preflight that is not seconds-cheap on a warm tree, and never make a WARN refuse.
@@ -2480,10 +2481,10 @@ habits:
       - "python3 .claude/hooks/tests/test_gate_live_inject.py (every agent hears a red at its next tool call, one cursor per agent; a background push gets the Monitor command)"
       - "@concern:gate-failures-arrive-live"
     evidence: >
-      DELTA 2026-10-27 (still RED; delivery no longer opt-in): push 9 (de1d22eab) proved the tap and the gap. The tap logged elohim-storage's red (`request_metrics_guard_observes_a_dropped_unfinished_request`, metrics.rs:7900) at 19:40:00Z, 7 min before the gate's verdict, but no agent heard it: delivery needed the pushing agent to arm `follow`, and it had not. Now the native `gate-live-inject` PostToolUse hook (every tool, package-mastered) adds each new red from the session's run to the next tool call with a cursor per agent, and a background push or gate gets the Monitor command for an idle wait. `gate-live.mjs unseen` formats and moves the cursor; the hook spawns node only when the run file grew (77 ms silent path, replayed push 9's storage red verbatim against the live log). Checks: gate-live 44/44, hook 6/6. Green still needs a real push whose first red reaches the agent mid-run.
-    evidence-fingerprint: sha256:70a21fc8ee6e5cf1
-    evidence-bytes: 2280
-    evidence-entries: 3
+      DELTA 2026-11-12 (still RED; no push requested): native Rust gates now collect workspace warnings through cargo-lint and continue fmt/lint/test through gate-steps, with compiler helpers keyed in the closure and gate-tap remaining the sole live emitter; eprfs candidate ingestion stays behind all-green checks. Evidence: focused node:test 199/199 (including real Cargo verdict equivalence, step continuation under bash -e, and closure regression checks); the two-member dependency fixture reports first + second + integration lints (old EXIT=101, new EXIT=1), while clean and outside-dependency-only warnings pass both and compile errors retain 101; Rust 1.100 blob-store reports 1 old / 2 new rendered instances of the same fetch_update finding (EXIT=101/1). Deliberate-red run 20261112T210245Z-0088755ecd2c-059ea1 recorded a lint at 21:02:48.248Z while cargo-clippy, cargo and clippy-driver were alive, before lint step EXIT=1 at 21:02:48.799Z; both test variants passed, the temporary edit was restored byte-for-byte, and the restored gate passed. Raw logs and process observations: genesis/a2o/reports/recovery/lint-fail-at-end/.
+    evidence-fingerprint: sha256:f9e7ee8042ad3766
+    evidence-bytes: 3414
+    evidence-entries: 4
     guard: >-
       Preserve output bytes, exit status, and termination signals. Keep excerpts
       device-only. Require real-push evidence of first_red_s, continued later
@@ -2657,6 +2658,37 @@ habits:
       when all first-party crates have zero active-rule debt and the ordinary compiler/governance
       gates enforce these same properties without a separate Git debt ratchet
 
+  - id: security-alerts-close-in-flight
+    declared: genesis/orchestrator/.epr-meta/security-alerts-close-in-flight.habit.md
+    invariant: >
+      Dependency edits expose open security package clusters to agents. Pushed
+      dependency scopes introduce no new patchable vulnerable resolutions and pay
+      down at least one existing patchable alert; the next harvest measures closure.
+    status: red
+    active: false
+    checks:
+      - "python3 .claude/scripts/dependabot-paydown.py --base origin/dev --head HEAD (SECURITY_PAYDOWN=warn by default; strict enforces the ratchet)"
+      - "python3 .claude/scripts/dependabot-harvest.py --clusters (next harvest measures closure)"
+      - "python3 .claude/scripts/_lib/__tests__/dependabot_paydown_test.py"
+      - "python3 .claude/scripts/_lib/__tests__/dependabot_inflight_test.py"
+    evidence: >
+      Steward ruling, 2026-11-12: "we need to have an aggressive loop on closing
+      security issues in-flight so every agent fights forward on that universal
+      responsibility."
+
+      Baseline measured 2026-11-12 from the GitHub API by the orchestrator:
+      478 open (16 critical, 190 high, 213 medium, 59 low; 10 unpatchable).
+      Fixed by month: July 510 / Aug 16 / Sep 15 / Oct 0 / Nov 0.
+    evidence-fingerprint: sha256:7bdf160d88ea8fd6
+    evidence-bytes: 366
+    evidence-entries: 0
+    guard: >
+      Unpatchable alerts never block paydown. Missing evidence is unmeasured, not
+      clean. A fix commit or passing fixture does not establish live closure.
+    retire-when: >
+      Open patchable Dependabot alerts on dev stay at 0 critical and 0 high for
+      30 consecutive days.
+
   - id: sprint-lands-each-closure-once
     declared: genesis/orchestrator/.epr-meta/sprint-lands-each-closure-once.habit.md
     invariant: >
@@ -2673,10 +2705,10 @@ habits:
       - "node --test genesis/orchestrator/gate-landing-base.test.mjs (device-DID tiebreak, cap of 4: unobservable in the one-DID fixture)"
       - "over >= 10 pushes, from the device's flow store dev-landing@1 rows and berth's hold fold: hold p50/p90 vs 233/3,321 s; Σ regated_s on landed_as=moved vs Σ gate seconds saved on landed_as=ff; chain_len p90; duplicate gated closures = 0, duplicate claims = 0, >= 2 intents per Jenkins wave (unwired until S6)"
     evidence: >
-      DELTA 2026-11-12h (RED preserved, inactive; K9 bounded serve index): supersedes 12g's history-sized index tradeoff. Full Held entries, object memberships, failures/retries and rebuild manifest reads now follow distinct outputs, one latest-log designation each; other local custody is retained as manifest CIDs only. Historical exact records reuse read_held on demand, with a mount-wide FIFO cache capped at 4 and cleared on rebuild; request authorization uses that record's method/disclosure/membership and current local custody, never the latest record's grant. Serve-use bookkeeping uses the output's current designated custody scope; immutable manifest/key/producer provenance and CLI pairing remain exact. Proof: peer 175 (including eight same-output records tracking 1, oldest-record service, cache eviction/revalidation, custody withdrawal, missing method/chunk and corrupt history refusal), CLI artifact_ 143, inputs_ 7, both packages all-target Clippy -D warnings, fmt --check and just gate rust-style each EXIT=0; suppression debt 0 -> 0. Receipts: genesis/a2o/reports/recovery/hc-k9-bounded-index/. Initial unpinned build was interrupted, and the first pinned run exposed the obsolete older-record-at-rebuild failure expectation, restored to designated-only behavior before the full green rerun. Story harvest: chain K9 local custody -> exact record serving, missing station repeated builds of one output keep full index state/revalidation per output and cache <=4; green by custody_index_tracks_outputs_and_serves_oldest_record_on_demand and on_demand_record_cache_is_bounded_and_evicted_records_are_revalidated. No new a2o story needed beyond these runnable regressions. Direct source/commit reads were outside governed recall. Launcher sandbox bookkeeping refused read-only filesystem; host launchers and native model/session attribution work, while Bash adapter coverage remains unmeasured. Scoped Brit staging and the requested Git commit fallback keep hooks enabled; local second commit only, no push.
-    evidence-fingerprint: sha256:09b1f77c4325c8d7
-    evidence-bytes: 51759
-    evidence-entries: 36
+      DELTA 2026-11-12i (RED preserved, inactive; K9 receipt): two devices diffed doorway input lines both ways at 8b273f826 records (epr and daemons at 6060f8347): 11 differing lines, mirrored, the whole glibc/gcc link floor at identical paths (RHEL 10.0 glibc -145 vs AlmaLinux 10.2 -128 x86_64_v2); macro dump agrees. Needed dev crossing policy on both daemons (main-checkout policy lacked artifact-produce@1, denying crossing silently) and record-exact serving/pairing. Evidence: sprints/2026-11-07-artifact-store/evidence/k9-two-device-receipt.md. Open: stale daemon policy unannounced; relay-only manifest errors read as transport-cannot-deliver; device current epr predates K9.
+    evidence-fingerprint: sha256:df389a5ca0a5d21b
+    evidence-bytes: 53869
+    evidence-entries: 38
     refs:
       - "spec: genesis/docs/superpowers/specs/2026-10-27-steward-space-landing-plane-design.md (§2 Arm A slices A0-A13; §3 this habit and the WIP fence)"
       - "upstream of: genesis/orchestrator/.epr-meta/push-delivers-within-budget.habit.md (active red; A9/A10 move its measured ratio)"

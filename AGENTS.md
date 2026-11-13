@@ -123,7 +123,10 @@ omits the validation receipts: push them separately with
 `git push origin 'refs/notes/brit/build/*:refs/notes/brit/build/*'`. The pre-push hook skips
 `refs/notes/*` since 2bba47154 (verified 2026-11-08, artifact-store push-notes-build.log).
 `core.hooksPath` names the main checkout's `.husky/_`, so a worktree push runs the main
-checkout's hook; when that checkout predates 2bba47154, add `-c core.hooksPath=<worktree>/.husky/_`.
+checkout's hook; when that checkout predates 2bba47154, add `-c core.hooksPath=<worktree>/.husky/_`. Git treats a missing
+hooks directory as no hook and pushes ungated without a word (landing 21, 2026-11-13): refuse the
+push unless `test -x <worktree>/.husky/_/pre-push` (`pnpm install` creates it), and confirm the
+push log carries `[pre-push]` lines afterwards.
 Covenant notes (`refs/notes/brit/covenant/*`) stay local until the steward rules on publishing
 them. Keep Brit for other operations; recheck the exception when the push fix lands. Coordinate the landing lane before pushing; an occupied lane is not permission to race
 its head.
@@ -163,6 +166,7 @@ its own pnpm workspace. The root developer interface is intentionally small:
 
 ```bash
 just --list
+just dev prep                 # initialize local submodules, install dependencies/hooks, build missing selected dists, then preflight
 just gate                     # changed projects, including worktree edits
 just gate elohim-storage      # explicit manifest project or owning path
 just test app                 # focused test family
@@ -249,7 +253,7 @@ Holochain packing requires their in-tree `./target`.
 - `GATE_DEFER=off`: a gate whose p90 is at least 600 s and that has not failed locally in 10+ runs may defer to CI on a CI-built feature branch, never on dev or main. This switch disables that.
 - `HARNESS_JOBS`: agentic-library harness parallelism, default 4.
 - `GATE_TASK=on|off`: the `orchestrator` gate (the only default-on one) runs as a placement Task in the device's own envelope through `ark task run`. Its input root is a CID of the closure material, and an admissible derivation (with `GATE_EVIDENCE=reuse`) runs nothing. An interrupt answers why, when to come back and what to use meanwhile, and records no evidence. Dirty inputs still run through ark but reuse and record nothing. An unavailable closure, no fresh ark or exit 75 prints `gate-task: … — ran direct` and runs the old path.
-- Live failures: every gate runs through `gate-tap.mjs`, which appends each failure-level line to a run log on this device as it prints (`GATE_TAP=off` runs untapped). Every agent hears a red without subscribing: the `gate-live-inject` PostToolUse hook adds each new red from its own session's run to its next tool call (one cursor per agent, so a subagent never consumes its parent's), and a background push or gate also gets the Monitor command (`node genesis/orchestrator/gate-live.mjs follow`) that wakes an idle agent on the first red. Investigate read-only until the hook exits, because HEAD moves during pre-push. No decision is read from these events; the exit status is the verdict. Habit `gate-failures-arrive-live`.
+- Live failures: every gate runs through `gate-tap.mjs`, which appends each failure-level line to a run log on this device as it prints (`GATE_TAP=off` runs untapped). Every agent hears a red without subscribing: the `gate-live-inject` PostToolUse hook adds each new red from its own session's run to its next tool call (one cursor per agent, so a subagent never consumes its parent's), and a background push or gate also gets the Monitor command (`node genesis/orchestrator/gate-live.mjs follow`) that wakes an idle agent on the first red. Native Rust gates fail at the end, so one run reports every red: `cargo-lint.mjs` stands in for `cargo clippy … -- -D warnings` (it runs `--keep-going`, prints each workspace-member warning as a denied error, and exits non-zero exactly when the old form would), and `gate-steps.sh` runs fmt, lint and test even after one fails, printing a `step-failed` line for each red step and exiting with the first failure's code. Investigate read-only until the hook exits, because HEAD moves during pre-push. No decision is read from these events; the exit status is the verdict. Habit `gate-failures-arrive-live`.
 
 Habit `push-gate-pays-once` in `genesis/orchestrator/.epr-meta/`.
 

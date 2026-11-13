@@ -1119,7 +1119,8 @@ async fn pure_iroh_mode_reports_a_typed_transport_gap() {
     assert_eq!(
         gap,
         FetchGap::TransportCannotDeliver {
-            mode: "iroh-blobs".into()
+            mode: "iroh-blobs".into(),
+            cause: None
         }
     );
     assert_eq!(gap.kind(), "transport-cannot-deliver");
