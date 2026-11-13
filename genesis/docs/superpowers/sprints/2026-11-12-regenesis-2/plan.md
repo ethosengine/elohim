@@ -2,7 +2,7 @@
 id: regenesis-2-plan
 title: Re-genesis 2 — the toolchain crossing (Holochain 0.7.1, Rust 1.100, security, discipline)
 date: 2026-11-12
-status: DRAFT v0 — scope and pre-clear wave proposed; steward decisions in §5 open; orchestrator not yet agreed with ethosengine
+status: DRAFT v0 — scope and pre-clear wave proposed; orchestration ruled (split by lane, §5.6); decisions 1-5 open
 author: shem session 3dd97e3d (Claude Opus 5.5); friction review by Codex gpt-6-astra (read-only)
 habits: [dataplane-convergence, push-gate-pays-once, pin-attestation, addresses-are-declared-profiles]
 ---
@@ -74,6 +74,18 @@ boot; F15 delayed-readiness binding mint; F16 doorway readiness across a conduct
 seeder deferred-write retry; F21 upload-contract self-test; F23 HEAD/GET parity. Procedure: F22 —
 one integration base, gitlinks recorded, before any worktree is cut.
 
+From ethosengine's side (notes 2026-11-12, its lanes unless marked shem):
+
+| # | Item | Pre-clear | Owner |
+|---|---|---|---|
+| E1 | Peer daemons read `pool-policy.json` from a main checkout behind dev and denied every Produce crossing (K9) | sync both main checkouts to dev before the crossing; landing 20 warns at serve/status start | both |
+| E2 | Device epr release lags (`bin-store refused epr candidate compare-and-swap`) | move both devices to a released epr before the crossing | ethosengine |
+| E4 | Fresh worktrees fail late in elohim-app (unbuilt element packages; 3402 s push, red at 64 s in) | worktree prep step or a fail-fast gate check | shem |
+| E5 | Dev moved during a notice window and aborted landing 18 | hold the lane for a declared window during the crossing | both |
+| E6 | Three artifact-class defects passed unit tests and two reviews; only a household build found them | schedule the household serving receipt on the final tree before the last push | shem |
+| E7 | CLAUDE.md landing exception looks stale (notes refspec passed on landings 17–20) | re-check on brit 0.1.14 and retire it in the discipline work | shem |
+| E8 | `pgrep -f`/`kill` matched its own shell and killed the daemon | `ps -eo args` with a bracketed grep pattern | note |
+
 Landing shape: pre-clears are cut in separate worktrees from one recorded base and landed as ONE
 branch, so the pre-push hook is paid once (`push-gate-pays-once`).
 
@@ -98,7 +110,26 @@ Tracks, each prepared on its own branch, merged into one crossing branch:
    (`imagodei_integrity/src/agent_peer_binding.rs`; `arch-dataplane-borrows-backlog` row 25).
 4. **T — toolchain.** Rust 1.100.0 at every pin home together; build-dir-layout fallout in pool and
    mesh tooling; never-type and lint fallout. Both devices switch compilers in the same window.
-5. **S — security.** `zip` lockfiles; Angular 22.2 patch line if it fits; the dep/sec ledger drained
+   Brit moves to 1.100.0 in its own repository (the Brit session, steward request 2026-11-12) and
+   arrives here through its next pin; the monorepo branch leaves `elohim/brit` alone.
+   Prepared on `deps/rust-1.100-20261112` (12 commits; every Rust gate run green under 1.100.0:
+   storage 5921, doorway 2033, eprfs 2391 tests). Still owed in the crossing:
+   - **DNA builds have no toolchain pin.** Locally they use the rustup default `stable`; CI uses
+     the holonix flake. 1.100.0 moves the lamad integrity wasm and DNA hash (measured: 1.99.0
+     `uhC0kIIVeo6…` → 1.100.0 `uhC0knnvLw1…`). Pin the DNA workspaces to the same rustc CI uses,
+     so a local household build and CI's bundle agree. The devspace image (che-devworkspaces
+     `33f5ca7`) now defaults to 1.100.0, so a restarted workspace rebuilding DNAs before the
+     crossing would make household bundles skew from their recorded cells.
+   - `pool-lib.sh list_stale_artifact_hashes` walks `deps/`, which Cargo 1.100's build-dir layout
+     removes: it reclaims nothing on 1.100 slots. Old-layout slots double until pruned.
+   - Service images pinned below the workspace: storage `rust:1.94.0` (Dockerfile and
+     `scripts/ci/build-storage-image.sh`; its Dockerfile copies `deps/`, `build/`, `.fingerprint`,
+     which 1.100's layout breaks), doorway `rust:1.93`, steward/node `rust:1.94.0`, edgenode
+     zombie-fix `rust:1.91`.
+   - `epr-cli/src/device/supervise.rs:692` prints a stale `RUSTUP_TOOLCHAIN=1.96.1` cure.
+   - Cargo's new unused-dependency warning names `eae`, `gate-client`, `gate-client-zome`,
+     `tower-http` in `elohim/Cargo.toml` (K track).
+5. **S — security.** `zip` lockfiles (six of seven fixed on `deps/zip-security-20261112`, zip 9.x; the seventh, sweettest #1044, is held by `holochain_metrics` 0.7.x requiring `zip ^8.6`, so the fork port bumps it to 9.x and the sweettest pin follows); Angular 22.2 patch line if it fits; the dep/sec ledger drained
    by `/deprecation-stasis` where a fix is bounded.
 6. **K — consistency and discipline.** Measured, not aspirational: cargo `unused_dependencies` to
    zero in touched crates; rust-style paydown in crates the crossing touches (the no-new rule already
@@ -131,7 +162,10 @@ cleared, re-seeded, targeted account rebinding (F05's procedure) → validation.
 4. Angular 22.2 patch line: in this crossing or its own landing?
 5. Cargo `min-publish-age` cooldown: adopt after the crossing (it would hold back fresh security
    fixes during it)?
-6. Orchestration: ethosengine (as in regenesis-1) or shem, and the split of tracks between devices.
+6. ~~Orchestration~~ **Ruled 2026-11-12 (steward, via ethosengine): split by lane.** shem orchestrates
+   the whole and owns H (fork 0.7.1) and D (the five DNAs); ethosengine owns T (Rust 1.100), epr/eprfs
+   and the artifact-store re-record on both devices, moving compilers in one window (H13 posture B).
+   One landing lane, coordinated as today. shem's prepared `deps/rust-1.100-20261112` is input to T.
 
 ## 6. Risks and stop conditions
 
@@ -149,9 +183,10 @@ cleared, re-seeded, targeted account rebinding (F05's procedure) → validation.
 
 | Branch | Where | State |
 |---|---|---|
-| `deps/npm-security-20261112` | `.worktrees/deps-npm-20261112` | landing |
+| `deps/npm-security-20261112` | `.worktrees/deps-npm-20261112` | landed (`ab4ed3b9d`) |
 | `deps/zip-security-20261112` | `.worktrees/deps-zip-20261112` | in preparation |
-| `deps/rust-1.100-20261112` | `.worktrees/deps-rust-1100` | in preparation |
+| `deps/rust-1.100-20261112` | `.worktrees/deps-rust-1100`, origin branch | handed to ethosengine for track T |
+| `deps/dependabot-harvest` | `.worktrees/dependabot-harvest` | landing with this plan and the brit 0.1.14 pin |
 | `elohim-0.7.1-sync` (fork) | `.worktrees/hc-fork-071` | 13/34 + iroh re-vendor; local |
 | `deps/holochain-0.7.1` | `.worktrees/deps-hc-071` | no commits; evidence only |
 | `regenesis-2/plan` | `.worktrees/regen2-plan` | this plan |
