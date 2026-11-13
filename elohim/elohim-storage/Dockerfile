@@ -437,10 +437,13 @@ FROM dep-sources AS deps
 # p2p_iroh module — the feature only activates the optional dep entries here.
 RUN RUSTFLAGS='--cfg getrandom_backend="custom"' cargo build --release --features p2p-iroh
 
-# Remove placeholder source, binaries, and proc-macro outputs to force rebuild.
-# CRITICAL: build/ and .fingerprint/ contain embed_migrations! output from the
-# placeholder build (empty migrations dir). Without removing these, Cargo reuses
-# the cached proc-macro result and the real migrations are never embedded.
+# Remove placeholder src/benches and uplifted binaries/libraries at the profile root.
+# Cargo 1.100: build/{diesel*,elohim*} removes whole package trees, including each
+# unit's fingerprint/ and out/ artifacts. This forces embed_migrations! to run
+# again with real migrations instead of reusing the empty placeholder result.
+# Older Cargo: build/ removes build-script output, deps/ removes compiled elohim
+# artifacts, and .fingerprint/ invalidates diesel/elohim units. Keep these legacy
+# operands even though 1.100 has no profile-root deps/ or .fingerprint/.
 RUN rm -rf src benches target/release/elohim-storage target/release/libelohim* \
     target/release/deps/elohim* target/release/deps/libelohim* \
     target/release/build/diesel* target/release/.fingerprint/diesel* \
@@ -469,9 +472,10 @@ RUN mkdir -p .cargo && printf '[profile.dev]\ndebug = "line-tables-only"\n[profi
 # Warm the dev+test dependency graph against placeholder src: without this,
 # every quality-gate run cold-compiles the full graph.
 RUN RUSTFLAGS='--cfg getrandom_backend="custom"' cargo test --no-run
-# Same placeholder-poisoning rm as the release path, dev-profile dirs — the
-# check stage's test build must never reuse a placeholder-built
-# embed_migrations! output (empty migrations → false green).
+# Same cleanup as release: src/benches and profile-root uplifted artifacts;
+# 1.100 build/{diesel*,elohim*} package trees (fingerprint/ + out/); older Cargo
+# build-script output plus deps/ artifacts and .fingerprint/ invalidation.
+# The check stage must re-run embed_migrations! with the real migrations.
 RUN rm -rf src benches target/debug/elohim-storage target/debug/libelohim* \
     target/debug/deps/elohim* target/debug/deps/libelohim* \
     target/debug/build/diesel* target/debug/.fingerprint/diesel* \
