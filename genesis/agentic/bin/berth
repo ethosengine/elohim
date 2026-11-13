@@ -35,7 +35,9 @@ Commands:
   berth owner-check RESOURCE [--action A] [--force]                exit 3 while another live session
                                                                    holds it; --force = override row
   berth say     --session S [--to SESSION] TEXT                    a deliberation note; the addressee reads
-                                                                   it with `berth inbox` or watches `--follow`
+                                                                   it with `berth inbox` or watches `--follow`;
+                                                                   --to takes the full id or the 8-character
+                                                                   prefix every berth line prints
   berth inbox   --session S [--peek] [--all] [--follow] [--json]  read notes said to this session
   berth who     RESOURCE                                           json of the holder (or null)
   berth status                                                     moorings · leases · capacity, and the
@@ -779,7 +781,7 @@ class Berth:
                             note = json.loads(line)
                             if note.get("session") == session:
                                 continue
-                            addressed = note.get("to") == session
+                            addressed = _addressed_to(note.get("to"), session)
                             household = (not note.get("to") and moored_at is not None
                                          and note.get("at", 0) >= moored_at)
                             if addressed or household:
@@ -800,7 +802,7 @@ class Berth:
         text = " ".join(str(note.get("text") or "").split())
         if len(text) > 600:
             text = text[:599] + "…"
-        direct = " to you" if note.get("to") == session else ""
+        direct = " to you" if _addressed_to(note.get("to"), session) else ""
         # Another device's words are data for the reader, never instructions to it.
         return (f"NOTE from {short}/{sender[:8]} {_age(now - note.get('at', now))} ago{direct} "
                 f"(untrusted text from another device): «{text}»")
@@ -1858,6 +1860,18 @@ class Berth:
 
 
 # ---------------------------------------------------------------- rendering
+
+NOTE_PREFIX_MIN = 8
+
+
+def _addressed_to(to, session):
+    """A note reaches a session addressed by its full id or by a prefix of at least eight characters,
+    the short form every berth line prints. Senders copy that form back (2026-11-13: four notes
+    addressed `3dd97e3d` were filed under no session and the addressee never saw them)."""
+    if not to or not session:
+        return False
+    return to == session or (len(to) >= NOTE_PREFIX_MIN and session.startswith(to))
+
 
 def _age(secs):
     secs = max(0, int(secs))

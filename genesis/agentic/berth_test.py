@@ -1173,6 +1173,18 @@ class BerthInboxTest(unittest.TestCase):
         self.append(self.folded("other-1", 1001, to="another-session"))
         self.assertEqual(self.berth.inbox(self.SESSION, mark=False), [])
 
+    def test_note_to_the_printed_short_id_reaches_the_session(self):
+        # berth lines print the first eight characters; a sender who copies them must still arrive.
+        self.append(self.folded("short-1", 1001, to=self.SESSION[:8], text="short address"))
+        notes = self.berth.inbox(self.SESSION, mark=False)
+        self.assertEqual([n["cid"] for n in notes], ["short-1"])
+        self.assertIn(" to you ", self.berth._note_line(notes[0], self.SESSION, 1002))
+
+    def test_a_prefix_shorter_than_eight_or_not_a_prefix_reaches_no_one(self):
+        self.append(self.folded("short-2", 1001, to=self.SESSION[:7]),
+                    self.folded("short-3", 1001, to=self.SESSION[1:9]))
+        self.assertEqual(self.berth.inbox(self.SESSION, mark=False), [])
+
     def test_inbox_lines_is_empty_when_channel_store_is_missing(self):
         self.flow.unlink()
         self.assertEqual(self.berth.inbox_lines(self.SESSION), "")
