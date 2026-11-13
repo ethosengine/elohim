@@ -75,7 +75,11 @@ fn default_expires_at() -> DateTime<Utc> {
 
 impl OAuthSessionDoc {
     /// Create a new OAuth session with 5-minute expiry.
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "one authorization request mints the session; these are its required fields, \
+                  persisted together, and a builder would add no check"
+    )]
     pub fn new(
         code: String,
         client_id: String,

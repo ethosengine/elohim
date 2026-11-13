@@ -34,7 +34,11 @@ use super::{get_conn, parse_body};
 /// Request to create a stewardship grant (acknowledged-only, data lives in Holochain zome)
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-#[allow(dead_code)]
+#[allow(
+    dead_code,
+    reason = "acknowledged-only: the body is deserialized to validate its shape; the grant itself \
+              is recorded by the imagodei zome, so these fields are never read here"
+)]
 struct CreateGrantRequest {
     pub subject_id: String,
     pub authority_basis: String,
