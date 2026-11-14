@@ -1231,7 +1231,9 @@ test('runProject reuses a sibling green, labels it sibling, and records sibling 
   assert.equal(runProject({ ...project, run: { kind: 'just', recipe: 'gate' } }, false, false, {
     root, env: { ...env, GATE_EVIDENCE: 'reuse' }, spawn, write: line => lines.push(line),
   }), 0);
-  assert.match(lines.join(''), /reused: green .* \(signer sibling did:key:z6Mksibling0001, independence: sibling\)/);
+  assert.match(lines.join(''), /reused: green in 12 s on the sibling at siblings1 \(signer sibling did:key:z6Mksibling0001, independence: sibling\)/);
+  // The row's `at` is a checkout's HEAD author time, not a clock reading: no age is printed from it.
+  assert.doesNotMatch(lines.join(''), /reused: green \d+[smhd] ago at siblings1/);
   assert.equal(calls.filter(c => c.bin === 'bash' || isPut(c.bin, c.args)).length, 0);
   const cycle = calls.find(c => c.bin === 'epr' && c.args.includes('run-kind=sibling-reused'));
   assert.ok(cycle, 'sibling reuse has its own gate-cycle run kind');

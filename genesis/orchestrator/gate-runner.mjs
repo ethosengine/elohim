@@ -496,7 +496,13 @@ export function runProject(project, printOnly, namesOnly, {
     const signer = sibling
       ? `signer sibling ${shortDid(row.device)}, independence: sibling`
       : 'signer this workspace';
-    write(`[gate] ${project.name} reused: green ${ageOf(sibling ? row.at : row.attestation.builtAt)} at ${String(row.commit).slice(0, 9)} (${signer})\n`);
+    // A sibling row's `at` is the author time of the HEAD of the checkout `epr flow note` wrote
+    // from (the device's main checkout), not a clock reading, so no age is derived from it; the
+    // sibling's own run time is what is known.
+    const when = sibling
+      ? `in ${Math.round(Number(row.seconds) || 0)} s on the sibling`
+      : ageOf(row.attestation.builtAt);
+    write(`[gate] ${project.name} reused: green ${when} at ${String(row.commit).slice(0, 9)} (${signer})\n`);
     const seconds = Number(process.hrtime.bigint() - started) / 1e9;
     recordCycle(project, seconds, 0, {
       ...cycleEnv, GATE_RUN_KIND: sibling ? 'sibling-reused' : 'reused',
