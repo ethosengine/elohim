@@ -493,6 +493,21 @@ its `why` line is kept: it names the next floor check.
 
 Verify: the push log line and the `run-kind=sibling-reused` cycle row, linked from the habit `push-gate-pays-once` as a DELTA; the seconds the landing lane was held, beside the previous landing's.
 
+Receipt (2026-11-14, landing 39 = lane A, dev cfad29078..ea193cbfa): ethosengine gated the clean
+commit with a hooked branch push (ALL CLEAR 3,132 s; 11 `gate-verdict@1` rows crossed after
+landing 38's device-root fix). shem pushed the same commit with `GATE_EVIDENCE=reuse`, and its log
+prints `[gate] eprfs reused: green … at ea193cbfa (signer sibling did:key:z6MkpZRh…VMZB,
+independence: sibling)`: eprfs passed in 31 s there, against 1,177 s gated here (shem
+`genesis/local-dev/regenesis-2/push-39.log`). Lane held 7,621 s, against 2,433 s for landing 37,
+whose reuse missed by construction (worktree store). Not reused, each with its `why`:
+- elohim-ark, steward-node, elohim-storage, genesis and the bridges: unverifiable epoch-2 brit
+  build notes, which the pinned brit-build-ref cannot decode, vetoed reuse. This is an acceptance
+  item for the brit pin move.
+- orchestrator: its `GATE_TASK` path checks only its own attestations.
+- host-contract, epr-storage, rust-style and cargo-coverage: not enabled for reuse.
+Open: the `push-gate-pays-once` DELTA and the cycle row (the orchestrator's atom, the integrator's
+to write); tick this item with it.
+
 - [ ] **G2 — the gate verdict names what the closure key does not see: a `gate-verdict@1` row carries the recording device's coarse host class (proven bundle names only, H7), and the reuse line prints it beside the reusing device's own** (serves sprint-lands-each-closure-once)
 
 The key holds the source closure and `rustc -vV`. It does not hold the C compiler, the link
