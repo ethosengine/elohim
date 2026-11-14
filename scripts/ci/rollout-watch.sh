@@ -181,9 +181,17 @@ stuck_verdict() {
 }
 
 # Read the update revision's pods once; set `verdict` when one crashloops.
+#
+# Each read is bounded by coreutils `timeout`, never by kubectl's own
+# --request-timeout: in the edge pod kubectl reaches the API only through the
+# service-account (in-cluster) fallback, which client-go takes ONLY when the
+# loaded client config equals the bare default, and any override such as a
+# request timeout makes it non-default. kubectl then dials its default
+# http://localhost:8080 and every read fails ("connection refused"), so with
+# that flag this watcher never read a pod in CI (edge #1878, #1880).
 probe() {
   local sts_line generation observed revision sel_line pods_raw record
-  sts_line="$(kubectl get "statefulset/${NAME}" -n "${NAMESPACE}" --request-timeout=10s -o "go-template=${STS_TEMPLATE}" 2>"${state_file}.err")" \
+  sts_line="$(timeout --signal=KILL 15 kubectl get "statefulset/${NAME}" -n "${NAMESPACE}" -o "go-template=${STS_TEMPLATE}" 2>"${state_file}.err")" \
     || { warn_read "statefulset get"; return 0; }
   IFS="${US}" read -r generation observed revision sel_line <<< "${sts_line}"
   # The controller has not yet observed the applied spec (kubectl's own
@@ -200,7 +208,7 @@ probe() {
     warn_read "update revision or selector unresolved"
     return 0
   fi
-  pods_raw="$(kubectl get pods -n "${NAMESPACE}" --request-timeout=10s -l "${selector}" -o "go-template=${PODS_TEMPLATE}" 2>"${state_file}.err")" \
+  pods_raw="$(timeout --signal=KILL 15 kubectl get pods -n "${NAMESPACE}" -l "${selector}" -o "go-template=${PODS_TEMPLATE}" 2>"${state_file}.err")" \
     || { warn_read "pods get"; return 0; }
 
   verdict_table=""

@@ -219,6 +219,13 @@ test("the watcher is read-only, and its go-templates never read a field under an
   assert.ok(templates.includes("PODS_TEMPLATE="), "templates not found");
   assert.doesNotMatch(templates, /\.lastState\.terminated|\.state\.waiting|index \.metadata\.labels|\.spec\.selector\.matchLabels|\.status\.updateRevision|\.status\.observedGeneration/);
   assert.doesNotMatch(body, /kubectl (apply|delete|patch|replace|scale|annotate|label|exec|rollout (restart|undo|pause|resume))/);
+  // In-cluster, any client-config override (kubectl's own --request-timeout,
+  // --server, --token…) turns off the service-account fallback and kubectl dials
+  // localhost:8080; reads are bounded by coreutils timeout instead.
+  const code = body.split("\n").filter((l) => !/^\s*#/.test(l)).join("\n");
+  assert.doesNotMatch(code, /--request-timeout|--server|--token|--kubeconfig/);
+  assert.match(code, /timeout --signal=KILL \d+ kubectl get "statefulset\//);
+  assert.match(code, /timeout --signal=KILL \d+ kubectl get pods /);
 });
 
 test("edge Jenkinsfile waits through the watcher and records the fast-fail", () => {
