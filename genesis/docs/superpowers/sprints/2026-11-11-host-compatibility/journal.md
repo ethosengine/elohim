@@ -200,3 +200,43 @@ gate. Cause not found; the dev landing runs the full gate. The bypass covers onl
 ## Shem handoff (2026-11-12)
 
 State, open decisions and the traps found on 2026-11-12 are in `handoff-2026-11-12-shem.md` beside this journal. The K9 receipt is one serve-side manifest defect from done.
+
+## Lane A on ethosengine: A2, A3, A4 part 1 (2026-11-14)
+
+Steward direction (2026-11-14, ~04:40Z): while shem shakes out the pipeline, carry the sprint
+forward outside eprfs; lane A chosen. Covenant recorded this session: steward of record, and
+purpose "Lane A, ark write-set" (`epr covenant` clauses bafyreihdpelj… and bafyreidbdfux…, the
+second superseding a wrong preflight-script glob). Overnight the steward made this an in-session
+shift with shem as integrator. The shift launcher (`just dev shift start`) was not used: it needs
+native flow commitments for these items, and this sprint's items were never claimed (see the
+worktree-envelope note above).
+
+- **Spec first.** c7560b026 states the own-build rule in spec §3.2 (ruling condition 6) before any
+  code relies on it.
+- **A2 and A3** (81605d283, 179ef207b, implemented by Codex astra, reviewed by a Claude reviewer):
+  ark observes `Provides` at supervisor start (uname, CPU features from std detection and CPUID
+  with OS state checks, the running glibc, loader paths for x86, aarch64 and riscv64) and keeps
+  it in memory. `ark host provides` prints it locally. Candidate admission replaces the
+  platform-string comparison with `admit` over a caller-resolved `Requires`. A missing
+  requirement, or one without `arch` and `os`, refuses. The own-build rule waives only unmet,
+  observed, extracted `isa.x86` clauses, only with an `OwnProduce` naming this device's Produce
+  CID for that exact executable, and never for a withdrawn artifact. Recordable verdicts carry
+  required clauses only (golden test). 33 extractor-emittable features ark cannot observe soundly
+  (virtualisation, SGX, AMX, CET, MSR-gated) refuse as `unobserved`; a test reads the
+  extractor's table (`// gate-reads:`) so a new name cannot slip past. `just gate elohim-ark`
+  EXIT 0 (227 tests plus 3 doctests), `just gate rust-style` EXIT 0, ark debt 0 to 0. The review's
+  low findings were fixed except one, kept by design: an admitted verdict lists the satisfied
+  clauses (spec §3.3). For the contract crate's owner: `Provides` derives `Debug`, so a `{:?}`
+  would print the inventory.
+- **A4 part 1** (238528a6a): `ark host admit --requires <file>` prints one admitted or REFUSED
+  line naming the axis and the required value, never the host's; a declared `avx512f`
+  requirement is refused here. The first A4 attempt wired preflight by re-implementing the flow
+  log and payload-store layout in Python inside `hc-mesh.sh`; refused and removed, since it
+  duplicates eprfs's format outside its owner. **Part 2 is blocked** on an epr verb returning a
+  recorded output's requirement; asked of shem as eprfs owner.
+- **Gaps met.** `brit worktree add` panics "Entry too large to fit in memory" (it creates the
+  branch first; `git worktree add` attached it). `brit fetch origin dev` finds no configured
+  remote in a worktree. `brit commit` still refuses the worktree hooksPath. `just dev prep`
+  clones submodules only from the main checkout, whose brit, rakia and sophia lag dev's pins;
+  the pins were fetched from the rg2-rust worktree instead (an E4 follow-up for prep). Codex
+  astra hit its usage limit (until 2026-11-18) during the A4 rework; a Claude agent finished it.

@@ -124,13 +124,25 @@ Verify: the crate's vector tests pass (v2 on v3 admitted, v3 on v2 refused, glib
 
 Verify: both devices print their observed `Provides`; they differ in the ISA bundle; a test asserts it is not part of any serialized record.
 
-- [ ] **A3 — `authenticate_candidate` (`elohim/ark/core/src/candidate.rs`) admits against the observed host instead of comparing to the installed runtime's triple; `WrongPlatform` carries the unmet axis** (serves workspace-device-arrival)
+State (2026-11-14, ethosengine): built on `hostcompat/lane-a-admission` (81605d283, 179ef207b).
+`ark host provides` prints on ethosengine (v3 set plus `sha_ni`, `adx`, glibc 2.39); the
+privacy tests pass in `just gate elohim-ark`. Open: shem's print, for the two-device check.
+
+- [x] **A3 — `authenticate_candidate` (`elohim/ark/core/src/candidate.rs`) admits against the observed host instead of comparing to the installed runtime's triple; `WrongPlatform` carries the unmet axis** (serves workspace-device-arrival)
 
 Verify: the candidate contract tests cover an admitted and a refused candidate on synthetic `Provides`. The admission returns a verdict a caller can record (variant CID, permit or the unmet clause) without exposing `Provides`, so P2 can put it in a fulfilment's evidence (ruling "In-kind work is still accounted").
 
 - [ ] **A4 — `just mesh preflight` prints one admitted-or-refused line per mesh binary** (serves dataplane-convergence)
 
 Verify: preflight output on both devices; a deliberately foreign binary is refused with its axis.
+
+State (2026-11-14): part 1 done (238528a6a): `ark host admit --requires <file>` prints one
+admitted or REFUSED line naming the axis and required value; a declared `avx512f` requirement is
+refused on ethosengine. Part 2, the preflight lines, is blocked: no epr verb returns a recorded
+output's requirement document, and reading the flow log and payload layout from the mesh script
+would duplicate the store's format outside eprfs. Missing node: `chain A4 / between mesh-bin
+derivation record → ark host admit / missing node: epr artifact requires --output <cid>
+(env:requires CID, document bytes, self) / not built`.
 
 ## Lane K — key honesty and family (spec §6.3, §7; rungs H2–H3; reviews F1–F6, G1, B1–B2)
 
