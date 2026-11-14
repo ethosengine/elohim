@@ -884,3 +884,35 @@ decisionPoints:
       - { path: elohim/eprfs/eprfs-peer/tests/serve_blob.rs, testName: custody_index_tracks_outputs_and_serves_oldest_record_on_demand, kind: integration }
       - { path: elohim/eprfs/eprfs-peer/tests/serve_blob.rs, testName: on_demand_record_cache_is_bounded_and_evicted_records_are_revalidated, kind: integration }
       - { path: elohim/eprfs/eprfs-peer/tests/support/serve_inputs.rs, testName: historical_record_is_validated_only_on_demand_and_cannot_borrow_membership, kind: integration }
+  - name: serve_decision
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/serve_decision.rs
+      modulePath: eprfs_peer::serve_decision
+    summary: "Whether one artifact object is served to one requester, from the selected record's reach claim (the env:reach slot on this device's own custody Produce events for its manifest, folded by reach_claims: slotless events ignored once any own event carries a slot, the narrowest slot decides, an unreadable slot counts below private) and the berth.artifacts serves policy. A slotless record keeps the method-row rule; a record declaring exactly self is served to an admitted device of the person unless its method's row leaves the steward out; private, unreadable and every level above self refuse. An unloaded policy refuses everything, never reads as an empty list. Plan item K12 packet 1: pure, and not yet called by the gate."
+    concernIds:
+      - { id: C0, status: answered, justification: "Serving plane only; the decision reads custody facts and promotes nothing." }
+      - { id: C1, status: answered, justification: "The requester's relationship and the claim both come from this device's own records; nothing the peer sends names either." }
+      - { id: C2, status: n-a, justification: "No head order is read or decided." }
+      - { id: C3, status: answered, justification: "Pure and synchronous; a policy that is not loaded is PolicyUnavailable and refuses." }
+      - { id: C4, status: answered, justification: "Private and unreadable claims are one Deny::Private, which packet 2 answers with the uniform refusal, so a sibling cannot tell a private record from a missing one." }
+      - { id: C5, status: answered, justification: "A slot is evidence only from this device's own custody events; a folded (via:) or foreign-custodian Produce contributes no claim." }
+      - { id: C6a, status: answered, justification: "One map read and one serves-row read per decision; the fold is one pass over events per rebuild." }
+      - { id: C6b, status: answered, justification: "Read-only; reach_claims returns a fresh map each call." }
+      - { id: C7, status: partial, justification: "A holder may still be listed for a record it then refuses; suppressing private records from crossing (packet 3) closes the main case." }
+      - { id: C8, status: partial, justification: "Every outcome is a typed Basis or Deny; recording the basis on the serve event lands with the gate in packet 2." }
+      - { id: C9, status: answered, justification: "The caller passes admission as read at the request; a device the roster drops is Relationship::None at its next request." }
+      - { id: C10, status: answered, justification: "Slotless records keep the pre-K12 method-row rule unchanged, so no answer changes until a writer records a slot." }
+      - { id: C11, status: n-a, justification: "No fan-out added." }
+      - { id: C12, status: answered, justification: "Default deny: every combination outside the two serve cases refuses, checked over the full product of the enums." }
+      - { id: C13, status: partial, justification: "One relationship (own device); every level above self refuses as LadderUnbuilt until the ladder is built." }
+      - { id: C14, status: partial, justification: "Refusals are typed for local recording, not witnessed across devices." }
+    contractTests:
+      - { path: elohim/eprfs/eprfs-peer/tests/serve_decision.rs, testName: the_truth_table_holds_row_by_row, kind: integration }
+      - { path: elohim/eprfs/eprfs-peer/tests/serve_decision.rs, testName: every_unlisted_combination_denies, kind: integration }
+      - { path: elohim/eprfs/eprfs-peer/tests/serve_decision.rs, testName: an_unreadable_reach_slot_is_private, kind: integration }
+      - { path: elohim/eprfs/eprfs-peer/tests/serve_decision.rs, testName: the_narrowest_slot_of_a_manifest_decides, kind: integration }
+      - { path: elohim/eprfs/eprfs-peer/tests/serve_decision.rs, testName: a_slotless_reput_cannot_undo_a_slot, kind: integration }
+      - { path: elohim/eprfs/eprfs-peer/tests/serve_decision.rs, testName: a_sibling_or_foreign_custodian_event_contributes_no_claim, kind: integration }
+      - { path: elohim/eprfs/eprfs-peer/tests/serve_decision.rs, testName: the_gates_reach_names_and_openness_match_elohim_epr, kind: integration }
+    notes: "K12 design (host-compatibility plan, rulings 2026-11-12 conditions 1-5; Q1 = refuse above self). Packet 2 wires it into admit_root/admit_object and the uniform refusal; packet 3 adds the writer."

@@ -65,6 +65,7 @@ mod lease_view;
 mod local_blob;
 mod proof;
 mod rules;
+mod serve_decision;
 mod serves;
 mod steward_scope;
 mod tier;
@@ -133,6 +134,10 @@ pub use local_blob::{
     stream_local_blob_with, LocalBlobContext,
 };
 pub use rules::{Rules, RulesDigest, RulesState};
+pub use serve_decision::{
+    event_reach, parse_reach, reach_claims, serve_decision, Basis, DeclaredReach, Deny, ObjectKind,
+    ReachClaim, Relationship, ServePolicy, REACH_LEVELS, REACH_SLOT,
+};
 pub use serves::{ArtifactServeList, CARRIER_AUDIENCE_PREFIX, STEWARD_AUDIENCE};
 pub use steward_scope::{
     Settlement, StewardScope, DEFAULT_CONFIRM_WAIT_S, DEFAULT_FENCE_MARGIN_S, DEFAULT_MAX_SKEW_S,

@@ -122,10 +122,22 @@ impl ArtifactServeList {
     /// Whether `device` may be served artifacts of the method named `method_name`, judged against
     /// `admission` now. Only the steward audience grants today; a carrier entry is reserved.
     pub fn grants(&self, device: &str, method_name: &str, admission: &Admission) -> bool {
+        self.row_grants_steward(method_name) && admission.admits_device(device)
+    }
+
+    /// Whether the row for `method_name` names the steward audience, judged without a requester.
+    pub fn row_grants_steward(&self, method_name: &str) -> bool {
         self.by_method
             .get(method_name)
             .is_some_and(|audiences| audiences.contains(STEWARD_AUDIENCE))
-            && admission.admits_device(device)
+    }
+
+    /// Whether a row for `method_name` exists and leaves the steward audience out (an empty
+    /// list, or carrier entries only). Such a row narrows reach: the steward closed the method.
+    pub fn narrows(&self, method_name: &str) -> bool {
+        self.by_method
+            .get(method_name)
+            .is_some_and(|audiences| !audiences.contains(STEWARD_AUDIENCE))
     }
 
     /// Additional permission for descriptor bytes; callers must still enforce the audience grant.

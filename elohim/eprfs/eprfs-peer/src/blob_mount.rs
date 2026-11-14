@@ -891,7 +891,7 @@ impl BlobMount {
 /// `copy:self`, `manifest:<cid>`, received into custody by `custodian` (this device), and not
 /// folded from another device (no `via:` slot). A sibling's Produce, crossed or folded, is that
 /// sibling's custody, never this device's: it names no authority to serve from here.
-fn custody_manifest(event: &FlowEvent, custodian: &str) -> Option<BlobCid> {
+pub(crate) fn custody_manifest(event: &FlowEvent, custodian: &str) -> Option<BlobCid> {
     if event.action != ReaVerb::Produce
         || event.receiver.0 != custodian
         || via_device(event).is_some()
