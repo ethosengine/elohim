@@ -239,6 +239,8 @@ Verify: a fresh workspace records a small cargo binary end to end; a non-cargo r
 
 - [ ] **K12 — `env:reach` on every `Produce`, derived as the narrowest input reach (`epr::Reach`), and the peer gate serving when the requester's relationship meets it, with `berth.artifacts.serves` as a narrowing list (spec §7.8). H12 ruled 2026-11-12 (option B, `sprints/2026-11-11-host-compatibility/rulings-2026-11-12.md`); K12 may start** (serves dataplane-convergence)
 
+Seat (2026-11-14): the highest-capability seat the runtime offers designs and reviews this item (on the Claude runtime today, a subagent started with model `fable`); implementation may be handed down as packets. It is the one item in this plan where a mistake widens who can draw bytes.
+
 Verify: with an unchanged `pool-policy.json`, an admitted device of the person draws a `self` floor (an unattributed floor is `self`) and a `self` mesh build without a new grant row; a `private` artifact, or one with an input the derivation cannot classify, refuses; a record with no `env:reach` slot is served only by a `serves` row naming its method, as today; a `serves` row whose audience excludes the requester denies even when reach allows; nothing above `self` is served under H12.
 
 ## Lane V — variant sets and conformance (spec §7, §7.1; rungs H4, H9; reviews G2, G3, B5)
@@ -435,4 +437,17 @@ reuse (a per-project `sibling: false` in `gate_reuse`) only after a measured dis
 never in advance.
 
 Verify: a reuse line showing both classes; a test that a row with no class still reuses and prints `class unmeasured`.
+
+- [ ] **I1 — the record shapes lanes V and P read, as interfaces only: the `VariantSet` document (V1), the recordable admission verdict (A3, A5), and the commitment and fulfilment as `elohim/epr-rea` flow events on the plane `RecordPlane` chooses (P2); types, seam-registry rows and vector tests, no behaviour** (serves sprint-lands-each-closure-once)
+
+Seat: the highest-capability seat the runtime offers (on the Claude runtime today, a subagent
+started with model `fable`), as one seat holding all three shapes. V1 to V4, P1, P2, F3, R1 and
+C1 read them across ark-core, the eprfs fetch path, placement-core and epr-rea, so a shape
+chosen inside one lane is paid for by the others. The coordinating session (any model) starts
+this seat when A5 and K13 have landed and K3's fetch by family is on dev, gives it this plan,
+the spec and the rulings file, and afterwards hands V and P out as packets against the landed
+types. Each shape passes the `p2p-design-gate` skill before it is proposed. ark-core and
+placement-core do not gain the contract crate (240693e34).
+
+Verify: the three types land with vector tests and seam-registry rows; V1, P1 and P2's briefs cite them by path; no behaviour change in `just gate elohim-ark`, `eprfs` or `elohim-compute`.
 
