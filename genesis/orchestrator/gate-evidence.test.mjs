@@ -22,6 +22,7 @@ import {
   attestationStep,
   closureKey,
   describeEvidence,
+  deviceRoot,
   dirtyPaths,
   GATE_EXHAUST,
   emitGateVerdict,
@@ -35,6 +36,7 @@ import {
   resolveBin,
   selfAgentId,
   siblingGovernanceChange,
+  siblingVerdicts,
   signerIdentity,
   stepFingerprints,
 } from './gate-evidence.mjs';
@@ -452,7 +454,7 @@ test('a completed brit record emits one device-gated crossing verdict and failur
     success: true, seconds: 1, commit: 'abc', put: {}, root: '/repo', env: {}, spawn: skipped.spawn,
     warn: line => warnings.push(line),
   }), true);
-  assert.equal(skipped.calls.length, 1);
+  assert.equal(skipped.calls.filter(call => call.bin === 'epr').length, 1);
   assert.deepEqual(warnings, []);
 
   // `HEAD` crosses as the sha it named here; a commit that does not resolve is not emitted.
@@ -478,6 +480,43 @@ test('a completed brit record emits one device-gated crossing verdict and failur
   }), false);
   assert.equal(warnings.length, 1);
   assert.match(warnings[0], /not emitted \(refused\)/);
+});
+
+test('a linked worktree emits and reads verdicts at the main checkout the daemon crosses', () => {
+  // G1 (landing 37): a push from .worktrees/<name> wrote its verdict into that worktree's own
+  // flow store, which the peer daemon (`epr peer serve --root <main checkout>`) never crosses.
+  const isCommonDir = (bin, args) => bin === 'git' && args.includes('--git-common-dir');
+  const isCommit = (bin, args) => bin === 'git' && args.includes('--verify');
+  const isEpr = bin => bin === 'epr';
+  const sha = 'abc0000000000000000000000000000000000000';
+  const worktree = '/main/.worktrees/push';
+  const linked = fakeSpawn([
+    [isCommonDir, { status: 0, stdout: '/main/.git\n' }],
+    [isCommit, { status: 0, stdout: `${sha}\n` }],
+    [(bin, args) => isEpr(bin) && args[1] === 'leases', { status: 0, stdout: '{"standing":"device"}' }],
+    [(bin, args) => isEpr(bin) && args[1] === 'note', { status: 0, stdout: '' }],
+    [(bin, args) => isEpr(bin) && args[1] === 'verdicts', { status: 0, stdout: '[]' }],
+  ]);
+  assert.equal(deviceRoot(worktree, linked.spawn), '/main');
+  assert.equal(emitGateVerdict(project, 'closure', {
+    success: true, seconds: 1, commit: 'HEAD', put: {}, root: worktree, env: {}, spawn: linked.spawn,
+  }), true);
+  assert.deepEqual(siblingVerdicts(project, 'closure', { root: worktree, env: {}, spawn: linked.spawn }), { candidates: [] });
+  const epr = linked.calls.filter(call => isEpr(call.bin));
+  assert.deepEqual(epr.map(call => call.args[1]), ['leases', 'note', 'verdicts']);
+  for (const call of epr) {
+    assert.equal(call.args[call.args.indexOf('--root') + 1], '/main', call.args.join(' '));
+    assert.equal(call.opts.cwd, '/main');
+  }
+  // The commit that crosses is still resolved in the pushing worktree, where HEAD is.
+  assert.equal(linked.calls.find(call => isCommit(call.bin, call.args)).opts.cwd, worktree);
+  assert.ok(epr[1].args.includes(`commit=${sha}`));
+
+  // A submodule, a bare repository or no answer keeps the root it was given.
+  for (const [stdout, status] of [['/main/.git/modules/brit\n', 0], ['/srv/repo.git\n', 0], ['', 128], ['.git\n', 0]]) {
+    const other = fakeSpawn([[isCommonDir, { status, stdout }]]);
+    assert.equal(deviceRoot(worktree, other.spawn), worktree, stdout);
+  }
 });
 
 const seed = '9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60';

@@ -25,7 +25,7 @@ import { nativeGateKey, nativeGateState, usesNativeClosure } from './gate-source
 import { spawnSync } from 'child_process';
 import { createHash, createPrivateKey, createPublicKey } from 'crypto';
 import { accessSync, constants, readFileSync } from 'fs';
-import { delimiter, isAbsolute, join, relative, resolve } from 'path';
+import { basename, delimiter, dirname, isAbsolute, join, relative, resolve } from 'path';
 import { globCovers, isReadPattern, readSet } from './gate-input-audit.mjs';
 import { buildNotesRef, expectedRefusal, heldNotes, noteEpoch, readBuildNote, unverifiableNotes } from './scripts/brit-attest.mjs';
 
@@ -474,12 +474,26 @@ export function siblingGovernanceChange({ root, spawn = spawnSync }) {
     : { changed: false, paths: [] };
 }
 
+/**
+ * The checkout whose flow store this device's peer daemon crosses: the main worktree of the git
+ * common dir. A gate runs in whichever linked worktree pushed, but that worktree's own
+ * `.eprfs/status/flows.jsonl` is never served or folded into, so a verdict written there never
+ * reaches a sibling and a sibling's verdict is never read there (G1, landing 37). A submodule
+ * (common dir under `.git/modules/`), a bare repository or an unreadable answer keeps `root`.
+ */
+export function deviceRoot(root, spawn = spawnSync) {
+  const common = gitRead(root, ['rev-parse', '--path-format=absolute', '--git-common-dir'], spawn)?.trim();
+  if (!common || !isAbsolute(common) || basename(common) !== '.git') return root;
+  return dirname(common);
+}
+
 /** Admitted sibling verdict rows from the native device-channel read. Any failure is a miss. */
 export function siblingVerdicts(project, key, { root, env = process.env, spawn = spawnSync }) {
+  const device = deviceRoot(root, spawn);
   try {
     const r = spawn(env.EPR_BIN || 'epr', [
-      'peer', 'verdicts', '--project', project.name, '--closure', key, '--json', '--root', root,
-    ], { cwd: root, encoding: 'utf8', timeout: 5_000 });
+      'peer', 'verdicts', '--project', project.name, '--closure', key, '--json', '--root', device,
+    ], { cwd: device, encoding: 'utf8', timeout: 5_000 });
     if (r.status !== 0) return { candidates: [], error: 'epr peer verdicts failed' };
     const rows = JSON.parse(r.stdout);
     if (!Array.isArray(rows)) return { candidates: [], error: 'epr peer verdicts: not an array' };
@@ -721,10 +735,12 @@ export function emitGateVerdict(project, key, {
     warn(`[gate] ${project.name} verdict crossing: not emitted (${reason})\n`);
     return false;
   };
+  // The verdict is written where the daemon crosses from, never to the pushing worktree's store.
+  const device = deviceRoot(root, spawn);
   let standing;
   try {
-    const leases = spawn(epr, ['peer', 'leases', '--json', '--root', root], {
-      cwd: root, encoding: 'utf8', timeout: 5_000,
+    const leases = spawn(epr, ['peer', 'leases', '--json', '--root', device], {
+      cwd: device, encoding: 'utf8', timeout: 5_000,
     });
     if (leases.status !== 0) return failed('device standing unavailable');
     standing = JSON.parse(leases.stdout);
@@ -749,9 +765,9 @@ export function emitGateVerdict(project, key, {
     '--value', '1', '--reason', 'verdict',
   ];
   for (const [name, value] of Object.entries(fields)) args.push('--env', `${name}=${value}`);
-  args.push('--root', root);
+  args.push('--root', device);
   try {
-    const emitted = spawn(epr, args, { cwd: root, encoding: 'utf8', timeout: 5_000 });
+    const emitted = spawn(epr, args, { cwd: device, encoding: 'utf8', timeout: 5_000 });
     return emitted.status === 0 || failed((emitted.stderr || '').trim().split('\n').pop() || `exit ${emitted.status}`);
   } catch (error) {
     return failed(String(error?.message || error).split('\n')[0]);
