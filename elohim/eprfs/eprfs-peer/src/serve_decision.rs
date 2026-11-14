@@ -24,6 +24,10 @@ use crate::serves::ArtifactServeList;
 /// The classification slot prefix carrying a record's reach.
 pub const REACH_SLOT: &str = "env:reach=";
 
+/// Any slot whose key starts with this, in any case, is a reach slot; one not spelled exactly
+/// [`REACH_SLOT`] is unreadable rather than absent, so a mistyped `private` is never slotless.
+const REACH_KEY: &str = "env:reach";
+
 /// The reach vocabulary the gate reads, with its openness (1 = most restrictive). The gate keeps
 /// its own closed list so the daemon does not depend on `elohim-epr`; a test pins it to
 /// `elohim_epr::Reach`.
@@ -92,10 +96,20 @@ impl DeclaredReach {
 /// The loaded `berth.artifacts` policy, or the fact that none is loaded. A policy that failed to
 /// parse is `Unavailable`, never an empty list: an empty list narrows nothing, so it would serve
 /// every `self` record.
+///
+/// Callers hold the shared policy as `Option<ArtifactServeList>` (`None` for an unreadable file,
+/// a daemon with no policy and a poisoned lock) and build this with [`ServePolicy::from`], never
+/// by wrapping a defaulted [`ArtifactServeList`] in `Loaded`.
 #[derive(Debug, Clone, Copy)]
 pub enum ServePolicy<'a> {
     Unavailable,
     Loaded(&'a ArtifactServeList),
+}
+
+impl<'a> From<Option<&'a ArtifactServeList>> for ServePolicy<'a> {
+    fn from(policy: Option<&'a ArtifactServeList>) -> Self {
+        policy.map_or(ServePolicy::Unavailable, ServePolicy::Loaded)
+    }
 }
 
 /// Which object of a record is asked for.
@@ -125,7 +139,8 @@ pub enum Deny {
     NoMethodRow,
     /// Slotless method or input object whose method is not in `discloseMethod`.
     MethodNotDisclosed,
-    /// Declared `private`, or a slot the gate cannot read.
+    /// Declared `private`, or a slot the gate cannot read. The two answer alike; a caller that
+    /// records the local refusal reason reads it from the claim, not from this value.
     Private,
     /// Declared above `self`; refused until the ladder above `self` is built.
     LadderUnbuilt,
@@ -145,11 +160,14 @@ pub fn parse_reach(value: &str) -> DeclaredReach {
 
 /// The reach one event declares: `None` without a slot, unreadable with more than one.
 pub fn event_reach(event: &FlowEvent) -> Option<DeclaredReach> {
-    let mut values = slots(event).filter_map(|slot| slot.strip_prefix(REACH_SLOT));
-    let first = values.next()?;
-    Some(match values.next() {
-        None => parse_reach(first),
-        Some(_) => DeclaredReach::Unreadable,
+    let mut reach = slots(event).filter(|slot| {
+        slot.get(..REACH_KEY.len())
+            .is_some_and(|key| key.eq_ignore_ascii_case(REACH_KEY))
+    });
+    let first = reach.next()?;
+    Some(match (reach.next(), first.strip_prefix(REACH_SLOT)) {
+        (None, Some(value)) => parse_reach(value),
+        _ => DeclaredReach::Unreadable,
     })
 }
 
@@ -159,7 +177,8 @@ pub fn event_reach(event: &FlowEvent) -> Option<DeclaredReach> {
 /// `Produce` names no authority here). Once any own event of a manifest carries a slot, the
 /// slotless ones are ignored, and the narrowest slot decides, so the order in which binaries of
 /// different ages ran cannot widen a claim. A manifest absent from the map has no own custody
-/// record and is refused before any decision.
+/// record and is refused before any decision: a caller must never default a missing entry to
+/// [`ReachClaim::Slotless`], which would send a sibling-only manifest down the method-row path.
 pub fn reach_claims<'e>(
     events: impl IntoIterator<Item = &'e FlowEvent>,
     custodian: &str,

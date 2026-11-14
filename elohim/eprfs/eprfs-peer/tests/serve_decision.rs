@@ -21,6 +21,26 @@ enum Row {
     Steward,
     /// A row for the method that leaves the steward out: an empty list.
     Excludes,
+    /// A row for the method naming only a reserved carrier audience: it also leaves the steward out.
+    CarrierOnly,
+    /// The steward and a carrier: still names the steward.
+    StewardAndCarrier,
+    /// A steward row for a different method only: the method itself has no row.
+    OtherMethod,
+}
+
+const CARRIER: &str = "carrier:did:key:z6MkCarrierDevice";
+
+impl Row {
+    /// The rows that name the steward audience for the method.
+    fn grants(self) -> bool {
+        matches!(self, Row::Steward | Row::StewardAndCarrier)
+    }
+
+    /// The rows that exist for the method and leave the steward out.
+    fn narrows(self) -> bool {
+        matches!(self, Row::Excludes | Row::CarrierOnly)
+    }
 }
 
 fn serves(row: Row, disclose: bool) -> ArtifactServeList {
@@ -32,6 +52,15 @@ fn serves(row: Row, disclose: bool) -> ArtifactServeList {
         }
         Row::Excludes => {
             artifacts.insert("serves".into(), json!({ METHOD: [] }));
+        }
+        Row::CarrierOnly => {
+            artifacts.insert("serves".into(), json!({ METHOD: [CARRIER] }));
+        }
+        Row::StewardAndCarrier => {
+            artifacts.insert("serves".into(), json!({ METHOD: ["steward", CARRIER] }));
+        }
+        Row::OtherMethod => {
+            artifacts.insert("serves".into(), json!({ "sysroot-pack": ["steward"] }));
         }
     }
     if disclose {
@@ -346,7 +375,14 @@ fn the_truth_table_holds_row_by_row() {
 
 #[test]
 fn every_unlisted_combination_denies() {
-    let rows = [Row::Absent, Row::Steward, Row::Excludes];
+    let rows = [
+        Row::Absent,
+        Row::Steward,
+        Row::Excludes,
+        Row::CarrierOnly,
+        Row::StewardAndCarrier,
+        Row::OtherMethod,
+    ];
     let mut policies: Vec<Option<(Row, bool)>> = vec![None];
     for row in rows {
         policies.push(Some((row, false)));
@@ -362,12 +398,11 @@ fn every_unlisted_combination_denies() {
                     // The serve rows of the truth table, stated independently of the function.
                     let expected = match (policy, who, claim) {
                         (Some((row, disclose)), Relationship::OwnDevice, ReachClaim::Slotless) => {
-                            (*row == Row::Steward
-                                && (object == ObjectKind::ManifestOrChunk || *disclose))
+                            (row.grants() && (object == ObjectKind::ManifestOrChunk || *disclose))
                                 .then_some(Basis::MethodRow)
                         }
                         (Some((row, _)), Relationship::OwnDevice, claim) if *claim == OWN => {
-                            (*row != Row::Excludes).then_some(Basis::Reach)
+                            (!row.narrows()).then_some(Basis::Reach)
                         }
                         _ => None,
                     };
@@ -382,9 +417,10 @@ fn every_unlisted_combination_denies() {
             }
         }
     }
-    // Slotless: the steward row serves bytes under either disclose value and a method object
-    // only when disclosed; self: absent and steward rows, both disclose values, both objects.
-    assert_eq!(permitted, 2 + 1 + 8);
+    // Slotless: the two rows naming the steward serve bytes under either disclose value and a
+    // method object only when disclosed (2 x 3); self: the four rows that do not narrow, both
+    // disclose values, both objects (4 x 2 x 2).
+    assert_eq!(permitted, 2 * 3 + 4 * 2 * 2);
 }
 
 #[test]
@@ -418,6 +454,61 @@ fn an_unreadable_reach_slot_is_private() {
         assert_eq!(outcome, Err(Deny::Private));
     }
     assert_eq!(event_reach(&custody(&output, &manifest, ME, &[])), None);
+
+    // A near-miss key is a reach slot the gate cannot read, never an absent one: a mistyped
+    // `private` must not fall back to the method-row path.
+    for slot in [
+        "env:reach",
+        "env:reach:private",
+        "env:Reach=private",
+        "ENV:REACH=self",
+        "env:reach =self",
+        "env:reachable=self",
+    ] {
+        let event = custody(&output, &manifest, ME, &[slot]);
+        assert_eq!(
+            event_reach(&event),
+            Some(DeclaredReach::Unreadable),
+            "{slot}"
+        );
+        let claim = claim_of(std::slice::from_ref(&event), &manifest).expect("own custody");
+        assert_eq!(claim, UNREADABLE, "{slot}");
+    }
+    // A well-formed slot beside a malformed one is still two reach slots in one event.
+    let mixed = custody(
+        &output,
+        &manifest,
+        ME,
+        &["env:reach=self", "env:Reach=self"],
+    );
+    assert_eq!(event_reach(&mixed), Some(DeclaredReach::Unreadable));
+    // Other env slots are not reach slots.
+    let other = custody(&output, &manifest, ME, &["env:requires=bafkreiexample"]);
+    assert_eq!(event_reach(&other), None);
+}
+
+#[test]
+fn an_unavailable_policy_is_never_an_empty_list() {
+    let empty = ArtifactServeList::default();
+    let decide_under = |policy: ServePolicy<'_>| {
+        serve_decision(
+            Relationship::OwnDevice,
+            &OWN,
+            METHOD,
+            ObjectKind::ManifestOrChunk,
+            &policy,
+        )
+    };
+    assert_eq!(
+        decide_under(ServePolicy::from(None)),
+        Err(Deny::PolicyUnavailable)
+    );
+    // The hazard T5 names: a defaulted list narrows nothing, so it would serve a `self` record.
+    // Only a policy that parsed may be passed as loaded.
+    assert_eq!(
+        decide_under(ServePolicy::from(Some(&empty))),
+        Ok(Basis::Reach)
+    );
 }
 
 #[test]

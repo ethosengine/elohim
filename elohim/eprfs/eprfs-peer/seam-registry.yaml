@@ -915,4 +915,5 @@ decisionPoints:
       - { path: elohim/eprfs/eprfs-peer/tests/serve_decision.rs, testName: a_slotless_reput_cannot_undo_a_slot, kind: integration }
       - { path: elohim/eprfs/eprfs-peer/tests/serve_decision.rs, testName: a_sibling_or_foreign_custodian_event_contributes_no_claim, kind: integration }
       - { path: elohim/eprfs/eprfs-peer/tests/serve_decision.rs, testName: the_gates_reach_names_and_openness_match_elohim_epr, kind: integration }
+      - { path: elohim/eprfs/eprfs-peer/tests/serve_decision.rs, testName: an_unavailable_policy_is_never_an_empty_list, kind: integration }
     notes: "K12 design (host-compatibility plan, rulings 2026-11-12 conditions 1-5; Q1 = refuse above self). Packet 2 wires it into admit_root/admit_object and the uniform refusal; packet 3 adds the writer."
