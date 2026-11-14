@@ -19,6 +19,7 @@ elohim-epr-rea = { path = "../../epr-rea" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 serde_ipld_dagcbor = { workspace = true }
+cid = { workspace = true }
 chrono = { workspace = true }
 thiserror = { workspace = true }
 sha2 = { workspace = true }

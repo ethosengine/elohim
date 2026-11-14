@@ -1174,7 +1174,6 @@ dependencies = [
  "elohim-compute",
  "elohim-epr",
  "elohim-epr-rea",
- "elohim-host-contract",
  "elohim-placement-core",
  "elohim-seam-contracts",
  "eprfs-core",
@@ -1192,6 +1191,7 @@ name = "elohim-ark-supervisor"
 version = "0.1.0"
 dependencies = [
  "chrono",
+ "cid",
  "elohim-ark-core",
  "elohim-device-runtime",
  "elohim-epr",

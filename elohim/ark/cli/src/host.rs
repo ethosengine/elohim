@@ -1,7 +1,7 @@
 //! Local admission prints only requirements; Provides remains in memory.
 use std::{fs, path::Path};
 
-use ark_core::compatibility::admit_recorded_requirements;
+use ark_supervisor::admission::admit_recorded_requirements;
 use elohim_epr::verdict::{CheckOutcome, Decision};
 use eprfs_core::BlobCid;
 use host_contract::{Predicate, Requires};

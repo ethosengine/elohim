@@ -10,10 +10,9 @@ use std::collections::BTreeSet;
 use chrono::{DateTime, Utc};
 use cid::Cid;
 use elohim_epr::{Epr, EprKind};
-use host_contract::{Provides, Requires};
 use serde::{Deserialize, Serialize};
 
-use crate::compatibility::{admit_artifact, HostAdmission, HostAxesDebug, OwnProduce};
+use crate::compatibility::CompatibilityEffect;
 
 /// Domain discriminator; unknown versions cannot silently gain this meaning.
 pub const CANDIDATE_SCHEMA_KEY: &str = "ark-candidate-v1";
@@ -83,7 +82,7 @@ pub struct CandidateContent {
 }
 
 /// Independently observed local state. Missing observations must not be invented.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct CandidateObservation {
     /// Expected elected channel.
     pub channel: String,
@@ -109,25 +108,14 @@ pub struct CandidateObservation {
     pub observed_executable: Cid,
     /// Candidate runtime manifest independently resolved from the elected release.
     pub candidate_manifest: Cid,
-    /// Requirement resolved from this executable's Produce env:requires, not signed content.
-    /// Native candidates must supply both arch and os, even with no ISA floor.
-    pub requires: Option<Requires>,
-    /// Private, in-memory observation of the device that would execute these bytes.
-    pub provides: Provides,
-    /// Evidence from this device's local Produce lookup for the executable.
-    pub own_produce: Option<OwnProduce>,
-    /// Device-local illegal-instruction counter-evidence; populated by the future F3 caller.
-    pub withdrawn_artifacts: BTreeSet<Cid>,
+    /// Host admission's effect for the executable these bytes hash to, produced by
+    /// `ark_supervisor::admission::admit_artifact` from the requirement on the
+    /// executable's Produce (env:requires, not signed content), this device's
+    /// in-memory Provides and its own-build evidence. `None` refuses: unknown
+    /// compatibility is never admitted.
+    pub compatibility: Option<CompatibilityEffect>,
     /// Explicit observation time; this pure module reads no clock.
     pub now: DateTime<Utc>,
-}
-
-impl std::fmt::Debug for CandidateObservation {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("CandidateObservation")
-            .field("provides_axes", &HostAxesDebug(&self.provides))
-            .finish_non_exhaustive()
-    }
 }
 
 /// Authenticated candidate CONTENT only. No conversion to activation authority exists.
@@ -135,7 +123,7 @@ impl std::fmt::Debug for CandidateObservation {
 pub struct AuthenticatedCandidateContent {
     cid: Cid,
     content: CandidateContent,
-    admission: HostAdmission,
+    admission: CompatibilityEffect,
 }
 
 impl AuthenticatedCandidateContent {
@@ -144,7 +132,7 @@ impl AuthenticatedCandidateContent {
         self.cid
     }
     /// Recordable compatibility effect, with no observed host values.
-    pub fn admission(&self) -> &HostAdmission {
+    pub fn admission(&self) -> &CompatibilityEffect {
         &self.admission
     }
     /// Read-only content, not an authorization to mutate processes.
@@ -171,8 +159,9 @@ pub enum CandidateRefusal<Compatibility = ()> {
     WrongTarget,
     /// Installed predecessor differs.
     StalePredecessor,
-    /// Host admission refused. The authentication result carries a HostAdmission;
-    /// the unit instantiation retains the Copy ReasonLabel vocabulary contract.
+    /// Host admission refused, or no admission effect for these bytes was supplied.
+    /// The authentication result carries a [`PlatformRefusal`]; the unit
+    /// instantiation retains the Copy ReasonLabel vocabulary contract.
     WrongPlatform(Compatibility),
     /// Observed bytes differ from signed candidate identity.
     ArtifactMismatch,
@@ -220,13 +209,29 @@ impl<T> CandidateRefusal<T> {
     }
 }
 
+/// Why a candidate is refused as `WrongPlatform`. Carries required clauses and
+/// effect identities only, never host values.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", tag = "kind", content = "detail")]
+pub enum PlatformRefusal {
+    /// Admission refused; the effect's verdict names each unmet clause.
+    Refused(Box<CompatibilityEffect>),
+    /// The supplied effect was computed for another executable.
+    EffectForOtherExecutable {
+        /// The executable the supplied effect names.
+        effect_executable: Cid,
+    },
+    /// No admission effect was supplied; unknown compatibility refuses.
+    NoEffect,
+}
+
 /// Authenticate signed content against independently supplied expectations.
 /// Success deliberately confers NO process permission or notarization claim.
 pub fn authenticate_candidate(
     epr: &Epr,
     pin: &CandidatePin,
     observed: &CandidateObservation,
-) -> Result<AuthenticatedCandidateContent, CandidateRefusal<Box<HostAdmission>>> {
+) -> Result<AuthenticatedCandidateContent, CandidateRefusal<PlatformRefusal>> {
     use CandidateRefusal::*;
     // Bound payload and each variable-size envelope field before crypto.
     if epr.payload.len() > MAX_CANDIDATE_BYTES
@@ -316,16 +321,21 @@ pub fn authenticate_candidate(
     if content.candidate.executable != observed.observed_executable {
         return Err(ArtifactMismatch);
     }
-    let admission = admit_artifact(
-        observed.observed_executable,
-        observed.requires.as_ref(),
-        &observed.provides,
-        observed.own_produce.as_ref(),
-        &observed.withdrawn_artifacts,
-    );
-    if admission.verdict.decision != elohim_epr::verdict::Decision::Permit {
-        return Err(WrongPlatform(Box::new(admission)));
-    }
+    // Fail closed: no effect, an effect for other bytes, or a refusal effect.
+    let admission = match &observed.compatibility {
+        None => return Err(WrongPlatform(PlatformRefusal::NoEffect)),
+        Some(effect) if effect.executable() != observed.observed_executable => {
+            return Err(WrongPlatform(PlatformRefusal::EffectForOtherExecutable {
+                effect_executable: effect.executable(),
+            }))
+        }
+        Some(effect) if !effect.permits() => {
+            return Err(WrongPlatform(PlatformRefusal::Refused(Box::new(
+                effect.clone(),
+            ))))
+        }
+        Some(effect) => effect.clone(),
+    };
     if !content
         .required_capabilities
         .is_subset(&content.candidate.capabilities)

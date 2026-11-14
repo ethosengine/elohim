@@ -38,7 +38,7 @@ std_probes!(
 
 // (extractor name, leaf, subleaf, register, bit). Only register-only extensions
 // or features with an additional usability gate below belong here. Privileged
-// modes and AMX are explicitly UNPROBED_X86 in core, never CPUID-only promises.
+// modes and AMX are explicitly UNPROBED_X86 in admission, never CPUID-only promises.
 const CPUID_PROBES: &[(&str, u32, u32, char, u32)] = &[
     ("fpu", 1, 0, 'd', 0),
     ("cx8", 1, 0, 'd', 8),
@@ -162,7 +162,7 @@ pub(super) fn observe() -> BTreeSet<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ark_core::compatibility::UNPROBED_X86;
+    use crate::admission::UNPROBED_X86;
 
     #[test]
     fn extractor_names_are_probed_or_explicitly_unprobed() {

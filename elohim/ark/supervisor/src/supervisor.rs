@@ -208,7 +208,7 @@ impl std::fmt::Debug for Supervisor {
         f.debug_struct("Supervisor")
             .field(
                 "provides_axes",
-                &ark_core::compatibility::HostAxesDebug(&self.provides),
+                &crate::admission::HostAxesDebug(&self.provides),
             )
             .finish_non_exhaustive()
     }

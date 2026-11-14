@@ -134,3 +134,109 @@ decisionPoints:
       - {path: elohim/ark/supervisor/src/x86.rs, testName: extractor_names_are_probed_or_explicitly_unprobed, kind: unit}
       - {path: elohim/ark/supervisor/src/x86.rs, testName: synthetic_avx_requires_osxsave_and_vector_state, kind: unit}
       - {path: elohim/ark/supervisor/src/x86.rs, testName: pku_and_fsgsbase_require_os_enablement, kind: unit}
+
+  - name: admit_artifact
+    kind: verdict-fn
+    sourceLocation:
+      file: src/admission.rs
+      modulePath: ark_supervisor::admission::admit_artifact
+    summary: >
+      Reuses host-contract admission locally, recording only requirement-side effects.
+      Missing requirements fail closed. Only unmet extracted isa.x86 clauses on this
+      device's own, non-withdrawn artifact can receive a named own-build permit.
+    concernIds:
+    - id: C0
+      status: answered
+      justification: Supervisor-side admission beside the observer; it returns ark-core's host-contract-free effect and the host inventory stays in supervisor memory.
+    - id: C1
+      status: n-a
+      justification: No release election or head mutation; executable CID is independently supplied.
+    - id: C2
+      status: n-a
+      justification: No competing version selection, clock or authority tier is introduced.
+    - id: C3
+      status: n-a
+      justification: Synchronous evaluation of finite requirements; no lifecycle or retry state.
+    - id: C4
+      status: answered
+      justification: Missing requirement, unknown axis, unobserved axis and unmet predicate refuse distinctly.
+    - id: C5
+      status: partial
+      justification: >
+        Local Provides is checked with the contract predicate; requirements and same-device
+        Produce provenance must be independently resolved by the caller. No grant is inferred.
+    - id: C6a
+      status: partial
+      justification: >
+        One comparison per original clause; no network or retries. Caller-side artifact
+        requirement acquisition and size limits remain upstream of this local function.
+    - id: C6b
+      status: answered
+      justification: Deterministic, side-effect-free evaluation; no records are minted by the predicate.
+    - id: C7
+      status: partial
+      justification: >
+        Only an admission effect is returned. Activation and fetch are later consumers;
+        this implementation does not advertise compatibility or launch from a verdict.
+    - id: C8
+      status: partial
+      justification: >
+        Every original clause has a check witness. Own-build permits name every waiver and its Produce CID,
+        refusals carry required axes and values without host values. Live meters await consumers.
+    - id: C9
+      status: n-a
+      justification: Artifact identity uses the existing executable CID; no agent identity is minted.
+    - id: C10
+      status: answered
+      justification: Contract predicates retain open axes; unknown and unobserved axes refuse.
+    - id: C11
+      status: n-a
+      justification: No external queue, concurrency or capacity scheduler.
+    - id: C12
+      status: n-a
+      justification: Compatibility confers no execution authority or wider reach.
+    - id: C13
+      status: n-a
+      justification: No social authority tier is introduced by host compatibility.
+    - id: C14
+      status: partial
+      justification: >
+        Caller-supplied artifact withdrawal disables the own-build rule; F3 death classification
+        and withdrawal propagation are deliberately not implemented in A3.
+    contractTests:
+    - path: elohim/ark/supervisor/tests/admission_contract.rs
+      testName: observed_requirements_admit_for_the_named_executable
+      kind: integration
+    - path: elohim/ark/supervisor/tests/admission_contract.rs
+      testName: unmet_isa_names_required_axis_without_host_values
+      kind: integration
+    - path: elohim/ark/supervisor/tests/admission_contract.rs
+      testName: unknown_and_unobserved_refuse_even_own_builds
+      kind: integration
+    - path: elohim/ark/supervisor/tests/admission_contract.rs
+      testName: absent_and_empty_native_requirements_refuse
+      kind: integration
+    - path: elohim/ark/supervisor/tests/admission_contract.rs
+      testName: recorded_requirements_never_use_the_own_build_rule
+      kind: integration
+    - path: elohim/ark/supervisor/tests/admission_contract.rs
+      testName: own_build_permit_names_every_waived_clause
+      kind: integration
+    - path: elohim/ark/supervisor/tests/admission_contract.rs
+      testName: declared_proven_non_isa_sibling_and_withdrawn_refuse
+      kind: integration
+    - path: elohim/ark/supervisor/tests/admission_contract.rs
+      testName: native_candidates_require_both_arch_and_os
+      kind: integration
+    - path: elohim/ark/supervisor/tests/admission_contract.rs
+      testName: unprobed_features_refuse_without_an_own_build_waiver
+      kind: integration
+    - path: elohim/ark/supervisor/tests/admission_contract.rs
+      testName: mixed_axis_waives_only_the_failed_extracted_evidence
+      kind: integration
+    - path: elohim/ark/supervisor/tests/admission_contract.rs
+      testName: produce_for_another_executable_cannot_waive
+      kind: integration
+    - path: elohim/ark/supervisor/tests/admission_contract.rs
+      testName: admission_wire_goldens_disclose_effect_and_produce_only
+      kind: integration

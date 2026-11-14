@@ -4,6 +4,7 @@
 //! I/O lives here and nothing else does: the pure decisions are `ark_core`'s, and
 //! there is no network in this crate (no swarm, no HTTP, no DHT).
 
+pub mod admission;
 pub mod driver;
 pub mod host;
 pub mod native;
