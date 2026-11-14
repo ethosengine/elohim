@@ -65,6 +65,9 @@ pub fn admit(path: Option<&Path>, name: &str, binary: Option<(&Path, &str)>) -> 
                         "conflicting recorded requirements (MergeError) — rebuild with just mesh build {build}"
                     ));
                 }
+                Err(ResolveGap::Malformed(reason)) => {
+                    return Err(format!("malformed requirement record: {reason}"))
+                }
                 Err(gap) => return Ok(format!("unmeasured ({gap})")),
             };
             let record = admit_artifact(&recorded, &provides, &Default::default());
@@ -74,10 +77,10 @@ pub fn admit(path: Option<&Path>, name: &str, binary: Option<(&Path, &str)>) -> 
                     .iter()
                     .map(|clause| {
                         let predicate: Predicate = serde_json::from_value(clause.predicate.clone())
-                            .expect("admission preserves the requirement predicate");
-                        format!("{} {}", clause.axis, value(&predicate))
+                            .map_err(|_| "invalid predicate in admission waiver")?;
+                        Ok::<_, String>(format!("{} {}", clause.axis, value(&predicate)))
                     })
-                    .collect::<Vec<_>>()
+                    .collect::<Result<Vec<_>, _>>()?
                     .join("; ");
                 return Ok(format!(
                     "admitted under the own-build rule (waived: {waived})"
@@ -101,7 +104,7 @@ pub fn admit(path: Option<&Path>, name: &str, binary: Option<(&Path, &str)>) -> 
                 .checks
                 .iter()
                 .find(|c| c.outcome == CheckOutcome::Failed)
-                .expect("refusal has a failed check");
+                .ok_or("admission declined without a failed check")?;
             let axis = failed
                 .check_id
                 .strip_prefix("host-compatibility:")

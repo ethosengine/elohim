@@ -139,7 +139,7 @@ fn reader_gaps_and_output_mismatch_never_admit() {
             1,
             json!({}),
             "reader failed",
-            ResolveGap::Malformed("artifact reader failed".into()),
+            ResolveGap::ReaderGap("artifact reader failed".into()),
         ),
     ] {
         let mut reply = base.clone();
@@ -193,6 +193,10 @@ fn reader_gaps_and_output_mismatch_never_admit() {
         .unwrap_err(),
         ResolveGap::Malformed("output mismatch".into())
     );
+    reply["requires"] = json!(elohim_epr::cid::compute_bytes_cid(
+        &serde_json::to_vec(&case.requires).unwrap()
+    )
+    .to_string());
     reply["output"] = json!(case.executable.to_string());
     reply["produce"] = json!("not a CID");
     assert!(matches!(
@@ -677,4 +681,52 @@ fn admission_wire_goldens_disclose_effect_and_produce_only() {
     ] {
         assert!(!debug.contains(private), "leaked {private}: {debug}");
     }
+}
+
+#[test]
+fn written_requirement_is_bounded_and_matches_its_cid_including_merged_documents() {
+    use ark_supervisor::admission::ResolveGap;
+    use elohim_epr::cid::compute_bytes_cid;
+    use serde_json::json;
+    let output = compute_cid(b"output");
+    let mut document = b"[]".to_vec();
+    let mut reply = json!({"output":output.to_string(), "known":true, "self":false,
+        "produce":null, "requires":compute_bytes_cid(&document).to_string(), "path":"WRITE_PATH",
+        "sources":[compute_bytes_cid(b"source one").to_string(), compute_bytes_cid(b"source two").to_string()]});
+    assert!(support::stub_bytes(output, Some(&document), reply.clone(), 0, "", "").is_ok());
+    // Even harmless whitespace changes must match the exact written document's CID.
+    document.push(b' ');
+    assert_eq!(
+        support::stub_bytes(output, Some(&document), reply.clone(), 0, "", "").unwrap_err(),
+        ResolveGap::Malformed("requirement CID does not match written bytes".into())
+    );
+    document.resize(1024 * 1024, b' ');
+    reply["requires"] = json!(compute_bytes_cid(&document).to_string());
+    assert!(support::stub_bytes(output, Some(&document), reply.clone(), 0, "", "").is_ok());
+    document.push(b' ');
+    reply["requires"] = json!(compute_bytes_cid(&document).to_string());
+    assert_eq!(
+        support::stub_bytes(output, Some(&document), reply, 0, "", "").unwrap_err(),
+        ResolveGap::Malformed("document exceeds 1 MiB".into())
+    );
+}
+
+#[test]
+fn sleeping_reader_is_killed_and_reaped_at_the_deadline() {
+    use ark_supervisor::admission::ResolveGap;
+    use serde_json::json;
+    let tmp = tempfile::tempdir().unwrap();
+    let pid_path = tmp.path().join("pid");
+    let before = format!("echo $$ > '{}'; exec sleep 60", pid_path.display());
+    let started = std::time::Instant::now();
+    assert_eq!(
+        support::stub_bytes(compute_cid(b"output"), None, json!(null), 0, "", &before).unwrap_err(),
+        ResolveGap::ReaderGap("artifact reader timed out after 30 s".into())
+    );
+    assert!(started.elapsed() < std::time::Duration::from_secs(45));
+    let pid = std::fs::read_to_string(pid_path).unwrap();
+    assert!(
+        !std::path::Path::new(&format!("/proc/{}", pid.trim())).exists(),
+        "reader was not reaped"
+    );
 }

@@ -126,12 +126,7 @@ fn final_k13_answers_are_distinct_and_single_line() {
             0,
             "unmeasured (epr has no requirement reader yet)",
         ),
-        (
-            "error",
-            json!({}),
-            0,
-            "unmeasured (malformed requirement record: artifact reader failed)",
-        ),
+        ("error", json!({}), 0, "unmeasured (artifact reader failed)"),
         (
             "unknown",
             json!({"known":false}),
@@ -163,8 +158,8 @@ fn final_k13_answers_are_distinct_and_single_line() {
     reader.record(&floor(), true);
     fs::write(reader.dir.path().join("reply"), "{}").unwrap();
     let (exit, line) = reader.run("ok");
-    assert_eq!(exit, 0);
-    assert!(line.contains("unmeasured (malformed"));
+    assert_eq!(exit, 1);
+    assert!(line.starts_with("REFUSED compatibility fixture: malformed"));
 }
 
 #[test]
@@ -183,8 +178,8 @@ fn null_or_invalid_local_produce_never_waives() {
         (
             true,
             json!("invalid"),
-            0,
-            "unmeasured (malformed requirement record: invalid local Produce CID)",
+            1,
+            "REFUSED compatibility fixture: malformed requirement record: invalid local Produce CID",
         ),
         (
             false,
@@ -294,4 +289,32 @@ fn unknown_missing_and_non_isa_requirements_refuse() {
         assert!(line.contains(&format!("{axis} requires foreign")));
     }
     assert!(!run(&[]).0);
+}
+
+#[test]
+fn malformed_reader_answers_and_written_bytes_refuse_in_one_line() {
+    let reader = Reader::new();
+    for (field, wrong, detail) in [
+        (
+            "output",
+            json!(BlobCid::compute_bytes(b"other").to_string()),
+            "output mismatch",
+        ),
+        ("known", json!(false), "inconsistent reader response"),
+        (
+            "requires",
+            json!(BlobCid::compute_bytes(b"other").to_string()),
+            "requirement CID does not match written bytes",
+        ),
+    ] {
+        reader.record(&floor(), false);
+        let path = reader.dir.path().join("reply");
+        let mut reply: Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+        reply[field] = wrong;
+        fs::write(path, reply.to_string()).unwrap();
+        let (exit, line) = reader.run("ok");
+        assert_eq!(exit, 1);
+        assert!(line.starts_with("REFUSED compatibility fixture:"));
+        assert!(line.contains(detail), "{line}");
+    }
 }
