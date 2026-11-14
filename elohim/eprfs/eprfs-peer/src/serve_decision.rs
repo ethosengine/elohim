@@ -2,7 +2,9 @@
 //! claim and the device's `serves` policy (host-compatibility plan item K12, packet 1).
 //!
 //! Pure: no lock, clock, store or network. The gate establishes who is asking and which record
-//! was selected; this module only decides. Nothing calls it yet, so no answer changes.
+//! was selected; this module only decides, and says how a refusal is answered on the wire
+//! ([`wire_refusal`]) and recorded locally ([`deny_reason`]). The gate calls it on every artifact
+//! answer (packet 2): `blob_mount::answer`, `DeviceScope` and `StewardDevicesGate`.
 //!
 //! A record's claim is the `env:reach=<level>` slot on this device's own custody `Produce`
 //! events for its manifest ([`reach_claims`]). A record no own event gives a slot is
@@ -126,6 +128,89 @@ pub enum Basis {
     MethodRow,
     /// A record declaring `self`, served to an admitted device of the person.
     Reach,
+}
+
+/// The slot a serve's `Use` event carries when it was served by reach.
+pub const GATE_REACH_SLOT: &str = "gate:reach";
+
+/// The slot a serve's `Use` event carries when it was served by its method's `serves` row.
+pub const GATE_ROW_SLOT: &str = "gate:row";
+
+impl Basis {
+    /// The `gate:` slot a serve's `Use` event names this basis with.
+    pub fn slot(self) -> &'static str {
+        match self {
+            Basis::MethodRow => GATE_ROW_SLOT,
+            Basis::Reach => GATE_REACH_SLOT,
+        }
+    }
+}
+
+/// The standing an admitted device is told it lacks for a record declared above `self`.
+pub const LADDER_UNBUILT: &str = "serve-reach:ladder-unbuilt";
+
+/// How a refusal is answered on the wire.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum WireRefusal {
+    /// Exactly what this device answers the same request for an object it does not hold: the
+    /// requester cannot tell a refused record from a missing one.
+    AsAbsent,
+    /// A typed refusal naming a standing of the person's own policy the requester lacks.
+    Standing(String),
+}
+
+/// What the requester is told for `deny`, as a function of who it is, the record's claim and its
+/// method only.
+///
+/// - A requester that is not an admitted device of the person learns nothing, whatever the claim
+///   or the reason (including an unavailable policy).
+/// - A record declared `private`, or with a slot the gate cannot read, answers as absent even to
+///   the person's own device, whatever the reason (including an unavailable policy): a sibling is
+///   outside a `private` record's reach, and must not learn that it exists.
+/// - Otherwise the standing labels of the method-row gate are kept: `serve-blob:<method>` for an
+///   unavailable policy, a missing or non-steward row, or a row that narrows a `self` record;
+///   `disclose-method:<method>` for an undisclosed slotless method; and
+///   [`LADDER_UNBUILT`] for a record declared above `self`.
+pub fn wire_refusal(
+    deny: Deny,
+    who: Relationship,
+    claim: &ReachClaim,
+    method_name: &str,
+) -> WireRefusal {
+    let private = matches!(
+        claim,
+        ReachClaim::Declared(DeclaredReach::Private | DeclaredReach::Unreadable)
+    );
+    if who == Relationship::None || private {
+        return WireRefusal::AsAbsent;
+    }
+    match deny {
+        Deny::NotAdmitted | Deny::Private => WireRefusal::AsAbsent,
+        Deny::PolicyUnavailable | Deny::NoMethodRow | Deny::Narrowed => {
+            WireRefusal::Standing(crate::gate::serve_blob_standing(method_name))
+        }
+        Deny::MethodNotDisclosed => WireRefusal::Standing(format!("disclose-method:{method_name}")),
+        Deny::LadderUnbuilt => WireRefusal::Standing(LADDER_UNBUILT.to_string()),
+    }
+}
+
+/// The true reason a refusal of an admitted device is recorded with on this device (the
+/// `reason:` slot of its `draw:refused` event), which may say more than the wire does. A
+/// `private` claim and an unreadable one share [`Deny::Private`]; which it was is read from the
+/// claim.
+pub fn deny_reason(deny: Deny, claim: &ReachClaim, method_name: &str) -> String {
+    match deny {
+        Deny::PolicyUnavailable => "serve-policy:unavailable".to_string(),
+        Deny::NotAdmitted => "outside-standing".to_string(),
+        Deny::NoMethodRow | Deny::Narrowed => crate::gate::serve_blob_standing(method_name),
+        Deny::MethodNotDisclosed => format!("disclose-method:{method_name}"),
+        Deny::Private => match claim {
+            ReachClaim::Declared(DeclaredReach::Unreadable) => "serve-reach:unreadable",
+            _ => "serve-reach:private",
+        }
+        .to_string(),
+        Deny::LadderUnbuilt => LADDER_UNBUILT.to_string(),
+    }
 }
 
 /// Why an object is refused.

@@ -210,7 +210,7 @@ async fn real_holder(t: &Three, me: &Device, key: &PeerKey) -> RealHolder {
     let scope = DeviceScope::new(
         channel.clone(),
         Some(mount.clone()),
-        Arc::new(RwLock::new(serves)),
+        Arc::new(RwLock::new(Some(serves))),
         admission.clone(),
     );
     let protocol = TierProtocol::with_scope(

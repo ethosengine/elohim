@@ -43,7 +43,7 @@ async fn exact_older_record_serves_manifest_inputs_and_bytes_and_refuses_unknown
     );
     let mut policy = serve_policy();
     policy["berth"]["artifacts"]["discloseMethod"] = serde_json::json!([GRANTED]);
-    *a.serves.write().unwrap() = ArtifactServeList::from_policy(&policy).unwrap();
+    *a.serves.write().unwrap() = Some(ArtifactServeList::from_policy(&policy).unwrap());
     let b = client(&h.key_b).await;
     let requested = TierRequest::Record {
         artifact: output(old),
@@ -137,7 +137,7 @@ async fn exact_older_record_serves_manifest_inputs_and_bytes_and_refuses_unknown
         );
     }
     // Disclosure revocation still blocks this older record's input document.
-    *a.serves.write().unwrap() = ArtifactServeList::from_policy(&serve_policy()).unwrap();
+    *a.serves.write().unwrap() = Some(ArtifactServeList::from_policy(&serve_policy()).unwrap());
     assert!(
         eprfs_peer::fetch_input_document(&b, key, &output(old), &holders, &budget)
             .await
@@ -210,7 +210,7 @@ async fn input_document_shares_method_disclosure_and_steward_only_admission() {
     assert!(eprfs_peer::ServeScope::methods_of(&scope, &input).is_empty());
     let mut policy = serve_policy();
     policy["berth"]["artifacts"]["discloseMethod"] = serde_json::json!([GRANTED]);
-    *a.serves.write().unwrap() = ArtifactServeList::from_policy(&policy).unwrap();
+    *a.serves.write().unwrap() = Some(ArtifactServeList::from_policy(&policy).unwrap());
     assert_eq!(
         served_bytes(call(&b, &a.addr, request.clone()).await, &input),
         GRANTED.as_bytes()
@@ -228,7 +228,7 @@ async fn input_document_shares_method_disclosure_and_steward_only_admission() {
     );
     policy["berth"]["artifacts"]["serves"][GRANTED] =
         serde_json::json!([format!("carrier:{}", h.b.did)]);
-    *a.serves.write().unwrap() = ArtifactServeList::from_policy(&policy).unwrap();
+    *a.serves.write().unwrap() = Some(ArtifactServeList::from_policy(&policy).unwrap());
     assert_eq!(
         call(&b, &a.addr, request.clone()).await,
         typed(
@@ -237,7 +237,7 @@ async fn input_document_shares_method_disclosure_and_steward_only_admission() {
             Some("serve-blob:mesh-build")
         )
     );
-    *a.serves.write().unwrap() = ArtifactServeList::from_policy(&serve_policy()).unwrap();
+    *a.serves.write().unwrap() = Some(ArtifactServeList::from_policy(&serve_policy()).unwrap());
     assert_eq!(call(&b, &a.addr, request).await, denied);
     assert!(eprfs_peer::ServeScope::methods_of(&scope, &input).is_empty());
     stranger.close().await;

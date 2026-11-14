@@ -7,6 +7,9 @@ use eprfs_core::{BlobCid, KeyCustody, ReachGate, ReachReason, ReachRefusal, Requ
 use iroh::NodeId;
 
 use crate::admission::Admission;
+use crate::serve_decision::{
+    deny_reason, wire_refusal, Basis, Deny, ObjectKind, ReachClaim, Relationship, WireRefusal,
+};
 
 /// Admission shared between the tier gate and whoever reloads it. A [`Admission::reload`] through
 /// the lock takes effect at the next request, on every open connection, with no restart.
@@ -17,28 +20,46 @@ pub type SharedAdmission = Arc<RwLock<Admission>>;
 pub enum Served {
     /// A root of the channel tree this device projects and serves.
     Channel,
-    /// The output CID of a derivation artifact this device holds custody of, indexed under the
-    /// method named `method`. Served only to a device the artifact grant admits for that name.
-    Artifact { method: String },
+    /// The output CID of a derivation artifact this device holds custody of: its latest custody
+    /// record is indexed under the method named `method`, and its own custody events give that
+    /// record the reach claim `claim`. Served only as [`crate::serve_decision`] decides.
+    Artifact { method: String, claim: ReachClaim },
     /// Anything else, whether held here or not. Never served.
     Unknown,
 }
 
 /// What this device's tier serves: its channel roots, the artifacts its mount indexes, and the
-/// grant that says to whom (artifact-store design §1.3). Address resolution is not authorization:
-/// [`Self::classify`] and [`Self::object_of`] only say what a CID is here; [`Self::grants`] alone
-/// says who may have it.
+/// decision that says to whom (artifact-store design §1.3, K12). Address resolution is not
+/// authorization: [`Self::classify`] and [`Self::object_of`] only say what a CID is here;
+/// [`Self::decide`] alone says who may have an object of a record.
 pub trait ServeScope: Send + Sync {
     /// What `root` is on this device.
     fn classify(&self, root: &BlobCid) -> Served;
     /// Whether `cid` is the manifest of `artifact`, or one of the chunks it names.
     fn object_of(&self, artifact: &BlobCid, cid: &BlobCid) -> bool;
-    /// The method names of every indexed artifact `cid` is the manifest or a chunk of.
+    /// The method names of the indexed records `cid` is an object of whose own decision serves
+    /// that object to an admitted device of the person under the policy now (admission itself is
+    /// not judged here).
     fn methods_of(&self, cid: &BlobCid) -> Vec<String>;
-    /// Whether `device` (a did:key) may be served artifacts of the method named `method_name`.
-    fn grants(&self, device: &str, method_name: &str) -> bool;
-    /// Additional method-record permission; existing scopes default to deny.
-    fn discloses_method(&self, _method: &str) -> bool {
+    /// Whether the `object` of a record with `claim` and method `method_name` may be served to
+    /// `device` (a did:key, judged against admission now; `None` for a requester that is not a
+    /// device). Existing scopes default to deny: no policy is loaded.
+    ///
+    /// # Errors
+    ///
+    /// The [`Deny`] that refuses it.
+    fn decide(
+        &self,
+        _device: Option<&str>,
+        _claim: &ReachClaim,
+        _method_name: &str,
+        _object: ObjectKind,
+    ) -> Result<Basis, Deny> {
+        Err(Deny::PolicyUnavailable)
+    }
+    /// Whether some indexed record `cid` is an object of is one whose own decision serves that
+    /// object to `device` now. Existing scopes default to deny.
+    fn admits_object(&self, _device: &str, _cid: &BlobCid) -> bool {
         false
     }
 }
@@ -61,10 +82,14 @@ impl ServeScope for WholeStoreScope {
     fn methods_of(&self, _cid: &BlobCid) -> Vec<String> {
         Vec::new()
     }
+}
 
-    fn grants(&self, _device: &str, _method_name: &str) -> bool {
-        false
-    }
+/// A refusal of one object of a selected record: what the requester is told, and the true reason
+/// this device records.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct RecordRefusal {
+    pub(crate) wire: WireRefusal,
+    pub(crate) local: String,
 }
 
 /// The standing label an admitted device lacks for an artifact of the method named `method`.
@@ -85,19 +110,25 @@ pub fn serve_blob_standing(method: &str) -> String {
 /// The rules, in order, every request (artifact-store design §1.3):
 ///
 /// - [`ReachGate::admit_root`]: the requester must be admitted; then a channel root is admitted,
-///   an artifact is admitted when [`ServeScope::grants`] its method to the device, else refused
-///   `OutsideStanding` naming the standing `serve-blob:<method>`; anything else is refused
-///   `OutsideStanding` with no label.
-/// - [`ReachGate::admit_object`]: the requester must be admitted; then an object indexed under
-///   some artifact whose method is granted to the device is admitted, anything else is refused
-///   `NotUnderRoot`.
+///   and an artifact is admitted when [`ServeScope::decide`] serves its latest record's manifest
+///   to the device. A refusal names the standing the device lacks (`serve-blob:<method>`,
+///   `serve-reach:ladder-unbuilt`), except that a `private` or unreadable record is refused
+///   exactly as an unknown root is: `OutsideStanding` with no label.
+/// - [`ReachGate::admit_object`]: the requester must be admitted; then an object is admitted when
+///   some indexed record naming it serves it to the device ([`ServeScope::admits_object`]),
+///   anything else is refused `NotUnderRoot`. Membership in the requested artifact is the
+///   caller's to check after.
+/// - [`StewardDevicesGate::admit_record`]: one object of one selected record, decided on that
+///   record's own claim; the artifact answer path uses it for every request shape.
 ///
 /// **Labels narrow `reach.rs`'s normalization rule, deliberately.** eprfs-core says a serving
 /// endpoint normalizes every refusal to `OutsideStanding` with no label before replying. The tree
 /// endpoint still does. The artifact mount replies with these typed refusals, label included, to
 /// the person's own admitted devices only: they are the same person, and the label names a method
 /// of their own policy, not a group they are outside of. To anyone else every refusal is the
-/// uniform form, byte-identical to the tree endpoint's.
+/// uniform form, byte-identical to the tree endpoint's. A record declared `private` (or with a
+/// reach slot the gate cannot read) is the exception: it is answered as absent even to the
+/// person's own devices, which are outside its reach ([`crate::wire_refusal`]).
 ///
 /// Fail closed: a poisoned admission lock admits nobody.
 #[derive(Clone)]
@@ -155,32 +186,27 @@ impl StewardDevicesGate {
         })
     }
 
-    /// Judge the method of the selected custody record, not the output's latest record.
-    pub(crate) fn admit_artifact(&self, who: &Requester, method: &str) -> Result<(), ReachRefusal> {
-        let device = self.admit(who)?;
-        if self.scope.grants(device, method) {
-            Ok(())
+    /// Decide `object` of the selected custody record (claim `claim`, method `method_name`) for
+    /// `who`: the record's own claim and method, never the output's latest record's.
+    pub(crate) fn admit_record(
+        &self,
+        who: &Requester,
+        claim: &ReachClaim,
+        method_name: &str,
+        object: ObjectKind,
+    ) -> Result<Basis, RecordRefusal> {
+        let device = self.admitted(who);
+        let relationship = if device.is_some() {
+            Relationship::OwnDevice
         } else {
-            Err(ReachRefusal::new(
-                ReachReason::OutsideStanding,
-                Some(serve_blob_standing(method)),
-            ))
-        }
-    }
-
-    /// Method and input documents share both gates: steward audience and explicit disclosure.
-    /// H12 (host-compatibility spec §7.8, reach on the object) would replace both gates.
-    /// Until then these host facts remain self-only; carrier audiences grant nothing.
-    pub(crate) fn admit_method(&self, who: &Requester, method: &str) -> Result<(), ReachRefusal> {
-        let device = self.admit(who)?;
-        if self.scope.grants(device, method) && self.scope.discloses_method(method) {
-            Ok(())
-        } else {
-            Err(ReachRefusal::new(
-                ReachReason::OutsideStanding,
-                Some(format!("disclose-method:{method}")),
-            ))
-        }
+            Relationship::None
+        };
+        self.scope
+            .decide(device, claim, method_name, object)
+            .map_err(|deny| RecordRefusal {
+                wire: wire_refusal(deny, relationship, claim, method_name),
+                local: deny_reason(deny, claim, method_name),
+            })
     }
 
     fn admit<'w>(&self, who: &'w Requester) -> Result<&'w str, ReachRefusal> {
@@ -195,23 +221,27 @@ impl ReachGate for StewardDevicesGate {
         let device = self.admit(who)?;
         match self.scope.classify(root) {
             Served::Channel => Ok(()),
-            Served::Artifact { method } if self.scope.grants(device, &method) => Ok(()),
-            Served::Artifact { method } => Err(ReachRefusal::new(
-                ReachReason::OutsideStanding,
-                Some(serve_blob_standing(&method)),
-            )),
+            Served::Artifact { method, claim } => self
+                .scope
+                .decide(Some(device), &claim, &method, ObjectKind::ManifestOrChunk)
+                .map(|_| ())
+                .map_err(|deny| {
+                    match wire_refusal(deny, Relationship::OwnDevice, &claim, &method) {
+                        WireRefusal::AsAbsent => {
+                            ReachRefusal::new(ReachReason::OutsideStanding, None)
+                        }
+                        WireRefusal::Standing(standing) => {
+                            ReachRefusal::new(ReachReason::OutsideStanding, Some(standing))
+                        }
+                    }
+                }),
             Served::Unknown => Err(ReachRefusal::new(ReachReason::OutsideStanding, None)),
         }
     }
 
     fn admit_object(&self, who: &Requester, cid: &BlobCid) -> Result<(), ReachRefusal> {
         let device = self.admit(who)?;
-        let granted = self
-            .scope
-            .methods_of(cid)
-            .iter()
-            .any(|method| self.scope.grants(device, method));
-        if granted {
+        if self.scope.admits_object(device, cid) {
             Ok(())
         } else {
             Err(ReachRefusal::new(ReachReason::NotUnderRoot, None))

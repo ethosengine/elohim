@@ -23,8 +23,8 @@ use eprfs_peer::{
     bind, channel_tier_id, open_payload_store, put_local_blob, tier_call, tier_request,
     ArtifactServeList, BlobMount, ChannelStore, CrossingAllowList, DeviceScope, DrawOutcome,
     LocalBlobContext, PeerConfig, PeerDaemon, PeerError, PeerKey, Rules, ServedDraw,
-    SharedAdmission, TierAnswer, TierLimits, TierProtocol, TierRequest, Unindexed,
-    INDEX_RETRY_FIRST, INDEX_RETRY_MAX, REFUSALS_PER_WINDOW, TIER_ALPN,
+    SharedAdmission, SharedServePolicy, TierAnswer, TierLimits, TierProtocol, TierRequest,
+    Unindexed, INDEX_RETRY_FIRST, INDEX_RETRY_MAX, REFUSALS_PER_WINDOW, TIER_ALPN,
 };
 use eprfs_storage::{TierBlobManifest, TierBlobPut};
 use iroh::endpoint::Connection;
@@ -188,7 +188,7 @@ struct Holder {
     mount: Arc<BlobMount>,
     served: mpsc::Receiver<ServedDraw>,
     admission: SharedAdmission,
-    serves: Arc<RwLock<ArtifactServeList>>,
+    serves: SharedServePolicy,
     protocol: TierProtocol,
     router: Router,
     addr: NodeAddr,
@@ -206,7 +206,7 @@ async fn holder(h: &Household) -> Holder {
         .expect("rules")
         .serves()
         .clone();
-    let serves = Arc::new(RwLock::new(serves));
+    let serves: SharedServePolicy = Arc::new(RwLock::new(Some(serves)));
     let scope = DeviceScope::new(
         channel.clone(),
         Some(mount.clone()),
@@ -552,6 +552,8 @@ async fn an_admitted_sibling_draws_a_granted_artifact_and_the_holder_records_one
             format!("copy:{}", p.b.did),
             format!("manifest:{}", put.manifest_cid),
             "draw:completed".to_string(),
+            // K12: a serve names its basis; this record is slotless, served by its method's row.
+            "gate:row".to_string(),
         ]
     );
     assert!(
@@ -2157,7 +2159,7 @@ async fn descriptor_disclosure_requires_explicit_permission_and_revokes_on_reloa
     );
     let mut policy = serve_policy();
     policy["berth"]["artifacts"]["discloseMethod"] = serde_json::json!(["mesh-build"]);
-    *a.serves.write().unwrap() = ArtifactServeList::from_policy(&policy).unwrap();
+    *a.serves.write().unwrap() = Some(ArtifactServeList::from_policy(&policy).unwrap());
     assert_eq!(
         eprfs_peer::ServeScope::methods_of(&scope, &method),
         [GRANTED]
@@ -2166,13 +2168,13 @@ async fn descriptor_disclosure_requires_explicit_permission_and_revokes_on_reloa
         call(&b, &a.addr, request.clone()).await,
         TierAnswer::Blob { .. }
     ));
-    *a.serves.write().unwrap() = ArtifactServeList::from_policy(&serve_policy()).unwrap();
+    *a.serves.write().unwrap() = Some(ArtifactServeList::from_policy(&serve_policy()).unwrap());
     assert_eq!(call(&b, &a.addr, request).await, denied);
     assert!(eprfs_peer::ServeScope::methods_of(&scope, &method).is_empty());
     // Sysroot serving/disclosure is authorized only in this test-local fixture.
     policy["berth"]["artifacts"]["serves"]["sysroot-pack"] = serde_json::json!(["steward"]);
     policy["berth"]["artifacts"]["discloseMethod"] = serde_json::json!(["sysroot-pack"]);
-    *a.serves.write().unwrap() = ArtifactServeList::from_policy(&policy).unwrap();
+    *a.serves.write().unwrap() = Some(ArtifactServeList::from_policy(&policy).unwrap());
     assert!(matches!(
         call(
             &b,
@@ -2191,3 +2193,6 @@ async fn descriptor_disclosure_requires_explicit_permission_and_revokes_on_reloa
 
 #[path = "support/serve_inputs.rs"]
 mod inputs;
+
+#[path = "support/serve_reach.rs"]
+mod reach;

@@ -61,4 +61,13 @@ export interface PeerCliStatus {
     kind: string;
     events: number;
   }[];
+  /**
+   * The artifact gate's exit counts over the daemon's recorded flow store for the last 14 days (K12 design section 4): serves by reach, serves by method row, and outputs whose latest own custody record in the window has no reach slot. Null when no daemon has recorded its store, or the store cannot be read.
+   */
+  artifactGate: null | {
+    since: string;
+    reachDraws: number;
+    rowDraws: number;
+    slotlessDesignated: number;
+  };
 }

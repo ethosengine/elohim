@@ -937,6 +937,11 @@ struct StatusOutcome {
     /// This device's own crossing-intent records that the policy file the daemon loaded does
     /// not cross; empty when every one crosses or no daemon has recorded its store and rules.
     withheld_crossings: Vec<WithheldCrossing>,
+    /// The artifact gate's exit counts over the daemon's recorded flow store, for the last
+    /// `ARTIFACT_GATE_WINDOW` (K12 design §4): serves by reach, serves by method row, and outputs
+    /// whose latest own custody record in the window has no reach slot. `None` when no daemon has
+    /// recorded its store, or the store cannot be read.
+    artifact_gate: Option<eprfs_peer::ArtifactGateCounts>,
 }
 
 /// One node id's refused connections, as `status` reports them.
@@ -1055,7 +1060,21 @@ fn status(options: &Options) -> PeerResult<ExitCode> {
         }
         _ => Vec::new(),
     };
+    let artifact_gate = table
+        .store
+        .as_ref()
+        .filter(|place| place.log.is_file())
+        .and_then(|place| elohim_epr_rea::SidecarFlowStore::open(&place.root).ok())
+        .and_then(|store| store.events().ok())
+        .map(|events| {
+            eprfs_peer::artifact_gate_counts(
+                events.iter().map(|(_, event)| event),
+                &did,
+                SystemTime::now(),
+            )
+        });
     let outcome = StatusOutcome {
+        artifact_gate,
         withheld_crossings: withheld,
         cli_cid,
         daemon_cids,
@@ -1120,6 +1139,12 @@ fn render(outcome: &StatusOutcome) {
         for line in withheld_lines(&outcome.withheld_crossings, &rules.policy) {
             println!("{line}");
         }
+    }
+    if let Some(gate) = &outcome.artifact_gate {
+        println!(
+            "artifact gate since {}  served by reach {}  by method row {}  slotless records {}",
+            gate.since, gate.reach_draws, gate.row_draws, gate.slotless_designated
+        );
     }
     if outcome.devices.is_empty() {
         println!("no other device is admitted on this roster");
@@ -2394,6 +2419,12 @@ mod status_contract {
                 kind: "produce".into(),
                 events: 2,
             }],
+            artifact_gate: Some(eprfs_peer::ArtifactGateCounts {
+                since: "2026-11-01T00:00:00Z".into(),
+                reach_draws: 1,
+                row_draws: 0,
+                slotless_designated: 2,
+            }),
         })
         .expect("serialize status");
         let schema: serde_json::Value = serde_json::from_str(include_str!(

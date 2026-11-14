@@ -20,7 +20,8 @@
     "channel",
     "refusedConnections",
     "refusedStrangers",
-    "withheldCrossings"
+    "withheldCrossings",
+    "artifactGate"
   ],
   "properties": {
     "cliCid": {
@@ -270,6 +271,23 @@
           }
         }
       }
+    },
+    "artifactGate": {
+      "description": "The artifact gate's exit counts over the daemon's recorded flow store for the last 14 days (K12 design section 4): serves by reach, serves by method row, and outputs whose latest own custody record in the window has no reach slot. Null when no daemon has recorded its store, or the store cannot be read.",
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["since", "reachDraws", "rowDraws", "slotlessDesignated"],
+          "properties": {
+            "since": { "type": "string" },
+            "reachDraws": { "type": "integer", "minimum": 0 },
+            "rowDraws": { "type": "integer", "minimum": 0 },
+            "slotlessDesignated": { "type": "integer", "minimum": 0 }
+          }
+        }
+      ]
     }
   }
 }

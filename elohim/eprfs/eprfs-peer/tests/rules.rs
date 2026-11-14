@@ -1,7 +1,8 @@
 //! The advisory rules digest includes only the crossing kinds and steward resource names.
 
-use eprfs_peer::Rules;
+use eprfs_peer::{Rules, GATE_SEMANTICS};
 use serde_json::json;
+use sha2::{Digest, Sha256};
 
 #[test]
 fn a_comment_only_edit_keeps_the_digest() {
@@ -189,4 +190,33 @@ fn descriptor_permission_is_default_deny_digest_covered_and_not_an_audience_gran
         explicit["berth"]["artifacts"]["discloseMethod"] = malformed;
         assert!(Rules::from_policy(&explicit).is_err());
     }
+}
+
+/// Two devices whose gates decide differently never show the same digest (K12 threat T17): the
+/// canonical form names the gate's semantics version, so a K12 daemon's digest differs from a
+/// pre-K12 daemon's for the same policy.
+#[test]
+fn the_rules_digest_names_the_gate_semantics() {
+    let hex = |bytes: &[u8]| format!("{:x}", Sha256::digest(bytes));
+    let digest = Rules::from_policy(&json!({})).unwrap().digest();
+    assert_eq!(GATE_SEMANTICS, 2);
+    assert_eq!(
+        digest.as_str(),
+        hex(br#"{"crosses":{},"steward":{"names":[],"prefixes":[]},"gate_semantics":2}"#)
+    );
+    // The pre-K12 canonical form of the same policy had no such field.
+    assert_ne!(
+        digest.as_str(),
+        hex(br#"{"crosses":{},"steward":{"names":[],"prefixes":[]}}"#)
+    );
+    // The field is present whether or not anything is served.
+    let serving = Rules::from_policy(&json!({
+        "berth": { "artifacts": { "serves": { "mesh-build": ["steward"] } } }
+    }))
+    .unwrap()
+    .digest();
+    assert_eq!(
+        serving.as_str(),
+        hex(br#"{"crosses":{},"steward":{"names":[],"prefixes":[]},"serves":{"mesh-build":["steward"]},"gate_semantics":2}"#)
+    );
 }

@@ -803,104 +803,122 @@ decisionPoints:
     kind: verdict-fn
     sourceLocation:
       file: src/gate.rs
-      modulePath: eprfs_peer::StewardDevicesGate::admit_method
-    summary: "Method descriptors require an existing audience grant AND digest-covered berth.artifacts.discloseMethod membership, default deny. Reload takes effect per request. Both tier answers and direct object admission filter descriptor bytes; holding a descriptor does not authorize disclosure."
+      modulePath: eprfs_peer::StewardDevicesGate::admit_record
+    summary: "Method records and keyed input documents are decided, like every artifact object, on the selected record's own reach claim through serve_decision (K12 packet 2; the method-only admit_artifact/admit_method pair is gone). A slotless record keeps the old rule: an audience row naming the steward AND digest-covered berth.artifacts.discloseMethod membership, default deny. A record declaring exactly self discloses its method and input to an admitted device of the person with no discloseMethod row, unless its method's row leaves the steward out (ruled 2026-11-12, T12). Private, unreadable and above-self records refuse. Reload takes effect per request; holding a descriptor does not authorize disclosure."
     concernIds:
       - id: C0
         status: answered
-        justification: "A stranger receives the same refusal, carrying no standing label, for a held root and an unknown one; its request never reaches the store."
+        justification: "A stranger receives the same refusal, carrying no standing label, for a held root and an unknown one, under every claim and with no policy loaded; its request never reaches the store."
       - id: C1
         status: answered
-        justification: "The requester's identity is the node id iroh authenticated in the handshake, mapped through the device's own roster; nothing the peer sends names it."
+        justification: "The requester's identity is the node id iroh authenticated in the handshake, mapped through the device's own roster; the claim is read from this device's own custody events. Nothing the peer sends names either."
       - id: C2
         status: n-a
         justification: "No head order."
       - id: C3
         status: answered
-        justification: "Synchronous read of the shared admission; a poisoned lock refuses rather than waits."
+        justification: "Synchronous reads of the shared admission and serve policy; a poisoned lock refuses (Relationship::None or ServePolicy::Unavailable) rather than waits."
       - id: C4
         status: answered
-        justification: "Not admitted is one refusal (OutsideStanding, no label) whatever the reason: unknown, contested, rotated away or anonymous."
+        justification: "Not admitted is one refusal (OutsideStanding, no label) whatever the reason. A private or unreadable record's method is answered exactly as an unknown object, even to an own device."
       - id: C5
         status: answered
-        justification: "Admission re-verifies every roster row on reload; the gate only reads its verdict."
+        justification: "Admission re-verifies every roster row on reload; the claim is folded only from this device's own non-via custody Produce events."
       - id: C6a
         status: answered
-        justification: "Two map reads per request."
+        justification: "Two lock reads and one claim-map read per request."
       - id: C6b
         status: answered
-        justification: "Read-only; reload replaces admission under the write lock."
+        justification: "Read-only; reloads replace admission and the policy under their write locks."
       - id: C7
         status: n-a
         justification: "Nothing is advertised."
       - id: C8
         status: answered
-        justification: "Admitted refusals carry disclose-method:<name>; strangers receive uniform refusals. The existing served/refused ledger records each answer."
+        justification: "Admitted refusals carry disclose-method:<name> or serve-blob:<name> (serve-reach:ladder-unbuilt above self), and are recorded locally with the true reason; strangers receive uniform refusals."
       - id: C9
         status: answered
         justification: "Admission is read on every request, so a reload that contests or rotates a device takes effect at its next request on an already-open connection."
       - id: C10
         status: answered
-        justification: "Old serves-only policies continue serving manifests/chunks, but do not disclose methods; adding disclosure changes the rules digest."
+        justification: "Slotless records keep the pre-K12 rule (old serves-only policies serve manifests and chunks but disclose no method); the rules digest names the gate semantics version."
       - id: C11
         status: n-a
         justification: "No fan-out."
       - id: C12
         status: answered
-        justification: "Default deny; no admit-on-error path, and a poisoned lock admits nobody."
+        justification: "Default deny; no admit-on-error path; an unloaded policy is Unavailable and never an empty list."
       - id: C13
-        status: n-a
-        justification: "The same at every stage."
+        status: partial
+        justification: "H12 (reach on the object) is implemented for one relationship, the person's own devices: a self record discloses at its reach. Every level above self refuses until the ladder is built, and private material is detected only by what the K12 writer (packet 3, not yet landed) classifies."
       - id: C14
         status: partial
-        justification: "Refusals are counted, not witnessed."
+        justification: "Refusals are counted and recorded locally, not witnessed."
     contractTests:
       - { path: elohim/eprfs/eprfs-peer/tests/serve_blob.rs, testName: descriptor_disclosure_requires_explicit_permission_and_revokes_on_reload, kind: integration }
       - { path: elohim/eprfs/eprfs-peer/tests/rules.rs, testName: descriptor_permission_is_default_deny_digest_covered_and_not_an_audience_grant, kind: unit }
+      - { path: elohim/eprfs/eprfs-peer/tests/support/serve_reach.rs, testName: a_self_record_discloses_its_method_and_input_at_its_reach, kind: integration }
+      - { path: elohim/eprfs/eprfs-peer/tests/support/serve_reach.rs, testName: a_slotless_record_still_needs_disclose_method, kind: integration }
+      - { path: elohim/eprfs/eprfs-peer/tests/support/serve_reach.rs, testName: a_row_that_excludes_steward_denies_a_self_record, kind: integration }
+      - { path: elohim/eprfs/eprfs-peer/tests/support/serve_reach.rs, testName: a_stranger_gets_the_uniform_refusal_for_every_claim, kind: integration }
 
   - name: record_bound_artifact_answer
     kind: verdict-fn
     sourceLocation: { file: src/blob_mount.rs, modulePath: eprfs_peer::blob_mount::answer }
-    summary: "TierRequest::Record binds manifest, output and optional key. The custody index keeps one full latest-log record per output and CID-only history; older local records are validated on demand into a four-entry FIFO cache; answer uses admit_artifact on that record's method before disclosure and membership checks. Legacy output-only requests retain their latest-log default."
+    summary: "TierRequest::Record binds manifest, output and optional key; legacy output-only requests select the output's latest record. Exactly one record is selected per answer and every object is decided on that record's own reach claim (the claim map the index folds from this device's own custody events at each rebuild, replaced whole) through StewardDevicesGate::admit_record and serve_decision; a record no own custody event claims is refused as absent, never decided as slotless. The legacy object any-match counts only records that serve the object to this requester, and membership in the selected record still binds it. The custody index keeps one full latest-log record per output and CID-only history; older local records are validated on demand into a four-entry FIFO cache. Each serve's Use event names its basis (gate:reach or gate:row)."
     concernIds:
-      - { id: C0, status: answered, justification: "Custody projection of existing local Produce events; no head or reach promotion." }
-      - { id: C1, status: answered, justification: "Requested CIDs confer no custody or grant; own non-via Produce and roster admission remain required." }
-      - { id: C2, status: n-a, justification: "Exact immutable record selection does not elect a head. Legacy output-only order is unchanged." }
+      - { id: C0, status: answered, justification: "Custody projection of existing local Produce events; no head or reach promotion. The claim is read, never written, by the gate." }
+      - { id: C1, status: answered, justification: "Requested CIDs confer no custody, claim or grant; own non-via Produce (receiver = this device) and roster admission remain required. A sibling's folded slot is no claim here (T1, T2)." }
+      - { id: C2, status: n-a, justification: "Exact immutable record selection does not elect a head. Among one manifest's own slotted events the narrowest decides, independent of append order (T7)." }
       - { id: C3, status: answered, justification: "Existing frame and fetch deadlines bound transfer; index retry backoff is retained." }
-      - { id: C4, status: answered, justification: "Missing exact record returns NoRecord naming the requested manifest, never a substitute." }
+      - { id: C4, status: answered, justification: "A missing exact record returns NoRecord naming the requested manifest, never a substitute. A private or unreadable record is answered byte-for-byte as absent for its request shape (NoRecord for record-bound, the uniform refusal for legacy), even to an own device; the true reason is recorded locally only (T13)." }
       - { id: C5, status: answered, justification: "Index and on-demand validation check manifest/output reconstruction; request checks output/key, and the client retains ManifestRejected." }
-      - { id: C6a, status: partial, justification: "Frame, concurrency and byte budgets persist. Full index entries and rebuild validation follow distinct outputs; historical CIDs follow distinct local manifests, while the on-demand cache is capped at four full records and cleared on rebuild." }
-      - { id: C6b, status: answered, justification: "Rebuild deduplicates manifests; repeat requests do not create Produce records. Serve sessions bind requester and manifest." }
-      - { id: C7, status: answered, justification: "A crossed holder manifest stays selectable even when another record has the same output/key." }
-      - { id: C8, status: partial, justification: "Existing typed refusal and bounded ServedDraw recording remain; no new per-record metric claimed." }
-      - { id: C9, status: answered, justification: "Authenticated roster device admission is reused without a new identity store." }
-      - { id: C10, status: answered, justification: "A distinct Record wire variant makes older servers reject, rather than silently ignore an optional record binding." }
+      - { id: C6a, status: partial, justification: "Frame, concurrency and byte budgets persist. Full index entries and rebuild validation follow distinct outputs; the claim map holds one entry per distinct own manifest, folded in one pass per rebuild; the on-demand cache is capped at four full records and cleared on rebuild." }
+      - { id: C6b, status: answered, justification: "Rebuild deduplicates manifests and replaces the claim map whole; repeat requests do not create Produce records. Serve sessions bind requester and manifest." }
+      - { id: C7, status: partial, justification: "A crossed holder manifest stays selectable even when another record has the same output/key. A holder may be listed for a record it then refuses; suppressing private records from crossing is packet 3's." }
+      - { id: C8, status: answered, justification: "Each completed or partial serve records gate:reach or gate:row; each admitted refusal records its true reason (serve-reach:private, serve-reach:unreadable, serve-policy:unavailable, serve-blob:<method>, ...). epr peer status reports reachDraws, rowDraws and slotlessDesignated over 14 days as artifactGate." }
+      - { id: C9, status: answered, justification: "Authenticated roster device admission is reused without a new identity store, and re-read before any byte is read." }
+      - { id: C10, status: answered, justification: "A distinct Record wire variant makes older servers reject, rather than silently ignore an optional record binding. Slotless records keep the method-row rule, so no answer changes until a writer records a slot; the rules digest names the gate semantics version (T17). A pre-K12 daemon still ignores slots (T16, residual)." }
       - { id: C11, status: answered, justification: "The same tier frame limits and admitted/unadmitted semaphore pools govern Record." }
-      - { id: C12, status: answered, justification: "admit_artifact checks the selected record's method grant; method/input disclosure remains steward-only and default-deny." }
-      - { id: C13, status: partial, justification: "Existing self-only disclosure scaffold remains; H12 is still the successor, not implemented here." }
+      - { id: C12, status: answered, justification: "Default deny: an unloaded policy (unreadable file, no policy configured, poisoned lock) serves nothing by row or by reach (T5); unknown, empty and repeated slots read as unreadable and refuse." }
+      - { id: C13, status: partial, justification: "H12 reach on the object is implemented for the person's own devices: a self record is served and discloses its method and input at its reach without a row. Every level above self refuses (serve-reach:ladder-unbuilt, Q1); the ladder is not built." }
       - { id: C14, status: partial, justification: "Existing bounded refusal draws are retained; no cross-device witness is claimed." }
     contractTests:
       - { path: elohim/eprfs/eprfs-peer/tests/support/serve_inputs.rs, testName: exact_older_record_serves_manifest_inputs_and_bytes_and_refuses_unknown_manifest, kind: integration }
       - { path: elohim/eprfs/eprfs-peer/tests/serve_blob.rs, testName: custody_index_tracks_outputs_and_serves_oldest_record_on_demand, kind: integration }
       - { path: elohim/eprfs/eprfs-peer/tests/serve_blob.rs, testName: on_demand_record_cache_is_bounded_and_evicted_records_are_revalidated, kind: integration }
       - { path: elohim/eprfs/eprfs-peer/tests/support/serve_inputs.rs, testName: historical_record_is_validated_only_on_demand_and_cannot_borrow_membership, kind: integration }
+      - { path: elohim/eprfs/eprfs-peer/tests/support/serve_reach.rs, testName: an_admitted_sibling_draws_a_self_floor_with_no_row_for_its_method, kind: integration }
+      - { path: elohim/eprfs/eprfs-peer/tests/support/serve_reach.rs, testName: an_admitted_sibling_draws_a_self_mesh_build_with_the_shipped_policy, kind: integration }
+      - { path: elohim/eprfs/eprfs-peer/tests/support/serve_reach.rs, testName: a_private_record_is_indistinguishable_from_an_unknown_root_to_a_sibling, kind: integration }
+      - { path: elohim/eprfs/eprfs-peer/tests/support/serve_reach.rs, testName: a_slotless_record_is_served_only_by_its_method_row, kind: integration }
+      - { path: elohim/eprfs/eprfs-peer/tests/support/serve_reach.rs, testName: a_slotless_sysroot_floor_is_refused_with_the_shipped_policy, kind: integration }
+      - { path: elohim/eprfs/eprfs-peer/tests/support/serve_reach.rs, testName: a_record_declared_above_self_is_refused, kind: integration }
+      - { path: elohim/eprfs/eprfs-peer/tests/support/serve_reach.rs, testName: a_folded_sibling_produce_with_a_reach_slot_grants_nothing_here, kind: integration }
+      - { path: elohim/eprfs/eprfs-peer/tests/support/serve_reach.rs, testName: a_reach_slot_on_another_custodians_produce_is_not_a_claim, kind: integration }
+      - { path: elohim/eprfs/eprfs-peer/tests/support/serve_reach.rs, testName: a_malformed_policy_reload_revokes_reach_serving_too, kind: integration }
+      - { path: elohim/eprfs/eprfs-peer/tests/support/serve_reach.rs, testName: a_daemon_without_a_policy_serves_no_artifact_by_reach, kind: integration }
+      - { path: elohim/eprfs/eprfs-peer/tests/support/serve_reach.rs, testName: a_later_narrower_slot_takes_effect_at_the_next_rebuild, kind: integration }
+      - { path: elohim/eprfs/eprfs-peer/tests/support/serve_reach.rs, testName: an_object_shared_with_a_private_record_is_served_only_under_the_permitted_one, kind: integration }
+      - { path: elohim/eprfs/eprfs-peer/tests/support/serve_reach.rs, testName: a_serve_use_event_names_its_basis, kind: integration }
+      - { path: elohim/eprfs/eprfs-peer/tests/rules.rs, testName: the_rules_digest_names_the_gate_semantics, kind: unit }
   - name: serve_decision
     kind: pure-decision-predicate
     sourceLocation:
       file: src/serve_decision.rs
       modulePath: eprfs_peer::serve_decision
-    summary: "Whether one artifact object is served to one requester, from the selected record's reach claim (the env:reach slot on this device's own custody Produce events for its manifest, folded by reach_claims: slotless events ignored once any own event carries a slot, the narrowest slot decides, an unreadable slot counts below private) and the berth.artifacts serves policy. A slotless record keeps the method-row rule; a record declaring exactly self is served to an admitted device of the person unless its method's row leaves the steward out; private, unreadable and every level above self refuse. An unloaded policy refuses everything, never reads as an empty list. Plan item K12 packet 1: pure, and not yet called by the gate."
+    summary: "Whether one artifact object is served to one requester, from the selected record's reach claim (the env:reach slot on this device's own custody Produce events for its manifest, folded by reach_claims: slotless events ignored once any own event carries a slot, the narrowest slot decides, an unreadable slot counts below private) and the berth.artifacts serves policy. A slotless record keeps the method-row rule; a record declaring exactly self is served to an admitted device of the person unless its method's row leaves the steward out; private, unreadable and every level above self refuse. An unloaded policy refuses everything, never reads as an empty list. Pure; the gate calls it for every artifact object (K12 packet 2), and wire_refusal/deny_reason derive the answer and the locally recorded reason from (Deny, requester, claim, method)."
     concernIds:
       - { id: C0, status: answered, justification: "Serving plane only; the decision reads custody facts and promotes nothing." }
       - { id: C1, status: answered, justification: "The requester's relationship and the claim both come from this device's own records; nothing the peer sends names either." }
       - { id: C2, status: n-a, justification: "No head order is read or decided." }
       - { id: C3, status: answered, justification: "Pure and synchronous; a policy that is not loaded is PolicyUnavailable and refuses." }
-      - { id: C4, status: answered, justification: "Private and unreadable claims are one Deny::Private, which packet 2 answers with the uniform refusal, so a sibling cannot tell a private record from a missing one." }
+      - { id: C4, status: answered, justification: "Private and unreadable claims are one Deny::Private; wire_refusal answers a private or unreadable claim as absent under every Deny (an unavailable policy included) and every Deny to a stranger, so a sibling cannot tell a private record from a missing one." }
       - { id: C5, status: answered, justification: "A slot is evidence only from this device's own custody events; a folded (via:) or foreign-custodian Produce contributes no claim." }
       - { id: C6a, status: answered, justification: "One map read and one serves-row read per decision; the fold is one pass over events per rebuild." }
       - { id: C6b, status: answered, justification: "Read-only; reach_claims returns a fresh map each call." }
       - { id: C7, status: partial, justification: "A holder may still be listed for a record it then refuses; suppressing private records from crossing (packet 3) closes the main case." }
-      - { id: C8, status: partial, justification: "Every outcome is a typed Basis or Deny; recording the basis on the serve event lands with the gate in packet 2." }
+      - { id: C8, status: answered, justification: "Every outcome is a typed Basis or Deny; Basis::slot names the serve event's gate:reach or gate:row, and deny_reason the refusal's true local reason (private and unreadable told apart from the claim)." }
       - { id: C9, status: answered, justification: "The caller passes admission as read at the request; a device the roster drops is Relationship::None at its next request." }
       - { id: C10, status: answered, justification: "Slotless records keep the pre-K12 method-row rule unchanged, so no answer changes until a writer records a slot." }
       - { id: C11, status: n-a, justification: "No fan-out added." }
@@ -916,4 +934,5 @@ decisionPoints:
       - { path: elohim/eprfs/eprfs-peer/tests/serve_decision.rs, testName: a_sibling_or_foreign_custodian_event_contributes_no_claim, kind: integration }
       - { path: elohim/eprfs/eprfs-peer/tests/serve_decision.rs, testName: the_gates_reach_names_and_openness_match_elohim_epr, kind: integration }
       - { path: elohim/eprfs/eprfs-peer/tests/serve_decision.rs, testName: an_unavailable_policy_is_never_an_empty_list, kind: integration }
-    notes: "K12 design (host-compatibility plan, rulings 2026-11-12 conditions 1-5; Q1 = refuse above self). Packet 2 wires it into admit_root/admit_object and the uniform refusal; packet 3 adds the writer."
+      - { path: elohim/eprfs/eprfs-peer/tests/serve_decision.rs, testName: a_refusal_is_answered_from_the_deny_the_requester_and_the_claim, kind: integration }
+    notes: "K12 design (host-compatibility plan, rulings 2026-11-12 conditions 1-5; Q1 = refuse above self). Packet 2 wires it into admit_root, admit_object and blob_mount::answer; packet 3 adds the writer."

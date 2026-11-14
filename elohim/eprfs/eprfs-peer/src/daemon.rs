@@ -45,7 +45,9 @@ use url::Url;
 
 use crate::admission::{roster_rows_from_file, Admission};
 use crate::announce::{topic_for, Channel, HeadVerdict, REANNOUNCE_EVERY};
-use crate::blob_mount::{rfc3339_utc, BlobMount, DeviceScope, ServedDraw, INDEX_RETRY_FIRST};
+use crate::blob_mount::{
+    rfc3339_utc, BlobMount, DeviceScope, ServedDraw, SharedServePolicy, INDEX_RETRY_FIRST,
+};
 use crate::channel::{channel_tier_id, project_channel_with_nacks, ChannelStore};
 use crate::connections::ConnectionBook;
 use crate::endpoint::bind_on;
@@ -63,7 +65,6 @@ use crate::head_table::{HeadTable, StorePlace};
 use crate::key::PeerKey;
 use crate::local_blob::LocalBlobContext;
 use crate::rules::{Rules, RulesState};
-use crate::serves::ArtifactServeList;
 use crate::tier::{TierLimits, TierProtocol, TIER_ALPN};
 
 /// How often the daemon looks at its roster and flow store and asks whether a head is due.
@@ -335,7 +336,8 @@ impl PeerDaemon {
         let limits = TierLimits::default();
         let book = ConnectionBook::default();
         book.name(roster_named_nodes(&rows, &config.chain_root));
-        let serves = Arc::new(RwLock::new(config.rules.serves().clone()));
+        // No serve policy in the rules is `None`, never an empty list (K12 threat T5).
+        let serves: SharedServePolicy = Arc::new(RwLock::new(config.rules.serve_policy().cloned()));
         let (mount, served_rx) = match &config.payload_store {
             Some(payload) => {
                 let (mount, served_rx) = BlobMount::new(payload.clone(), config.device.clone());
@@ -689,8 +691,9 @@ struct Run {
     /// When a rebuild next falls due with no change to the log, so a manifest whose backoff has
     /// run out is tried again.
     index_retry_at: Option<Instant>,
-    /// The artifact grant the tier's scope reads; replaced when the rules reload.
-    serves: Arc<RwLock<ArtifactServeList>>,
+    /// The serve policy the tier's scope reads; replaced when the rules reload, `None` while the
+    /// policy file does not read.
+    serves: SharedServePolicy,
     /// The one queued sibling fetch in flight, off the loop (artifact-store design §3.b.2): its
     /// task, its queue stem and who its answer is for.
     fetch_task: Option<(JoinHandle<()>, String, FetchFor)>,
@@ -1095,8 +1098,9 @@ impl Run {
 
     /// Re-read the enforced rule sets when their policy file changed. A bad replacement keeps
     /// the loaded crossing and steward rules and is recorded for status readers, but revokes
-    /// serving: the artifact grant is empty (deny) until a policy that reads loads again. A grant
-    /// is never carried past a policy that no longer says it.
+    /// serving: no serve policy is loaded, so no artifact is served by its row or by its reach,
+    /// until a policy that reads loads again. A grant is never carried past a policy that no
+    /// longer says it, and an unreadable policy is never an empty list (K12 threat T5).
     fn reload_rules(&mut self) -> Result<(), PeerError> {
         let Some(policy) = self.config.policy.clone() else {
             return Ok(());
@@ -1110,7 +1114,7 @@ impl Run {
             Ok(rules) => {
                 // Restored on every policy that reads, a revocation's included.
                 if let Ok(mut serves) = self.serves.write() {
-                    *serves = rules.serves().clone();
+                    *serves = rules.serve_policy().cloned();
                 }
                 let old = self.config.rules.digest();
                 let new = rules.digest();
@@ -1143,7 +1147,7 @@ impl Run {
             Err(error) => {
                 // Fail closed for serving, every time the file fails to read.
                 if let Ok(mut serves) = self.serves.write() {
-                    *serves = ArtifactServeList::default();
+                    *serves = None;
                 }
                 let reason = error.to_string();
                 let digest = self.config.rules.digest();

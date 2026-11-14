@@ -78,9 +78,10 @@ pub use announce::{
     topic_for, Channel, HeadVerdict, ANNOUNCE_DEBOUNCE, REANNOUNCE_EVERY, TOPIC_PREFIX,
 };
 pub use blob_mount::{
-    open_payload_store, ArtifactIndex, BlobMount, DeviceScope, DrawOutcome, Held, ServedDraw,
-    Unindexed, INDEX_RETRY_FIRST, INDEX_RETRY_MAX, RECORD_CACHE_CAPACITY, REFUSALS_PER_WINDOW,
-    SERVED_QUEUE, SERVE_BLOB, SERVE_IDLE,
+    artifact_gate_counts, open_payload_store, ArtifactGateCounts, ArtifactIndex, BlobMount,
+    DeviceScope, DrawOutcome, Held, ServedDraw, SharedServePolicy, Unindexed, ARTIFACT_GATE_WINDOW,
+    INDEX_RETRY_FIRST, INDEX_RETRY_MAX, RECORD_CACHE_CAPACITY, REFUSALS_PER_WINDOW, SERVED_QUEUE,
+    SERVE_BLOB, SERVE_IDLE,
 };
 /// The byte buffer artifacts are put with, so a consumer needs no bytes dependency of its own.
 pub use bytes::Bytes;
@@ -133,10 +134,11 @@ pub use local_blob::{
     put_local_blob, put_local_blob_with, read_local_blob, stream_local_blob,
     stream_local_blob_with, LocalBlobContext,
 };
-pub use rules::{Rules, RulesDigest, RulesState};
+pub use rules::{Rules, RulesDigest, RulesState, GATE_SEMANTICS};
 pub use serve_decision::{
-    event_reach, parse_reach, reach_claims, serve_decision, Basis, DeclaredReach, Deny, ObjectKind,
-    ReachClaim, Relationship, ServePolicy, REACH_LEVELS, REACH_SLOT,
+    deny_reason, event_reach, parse_reach, reach_claims, serve_decision, wire_refusal, Basis,
+    DeclaredReach, Deny, ObjectKind, ReachClaim, Relationship, ServePolicy, WireRefusal,
+    GATE_REACH_SLOT, GATE_ROW_SLOT, LADDER_UNBUILT, REACH_LEVELS, REACH_SLOT,
 };
 pub use serves::{ArtifactServeList, CARRIER_AUDIENCE_PREFIX, STEWARD_AUDIENCE};
 pub use steward_scope::{

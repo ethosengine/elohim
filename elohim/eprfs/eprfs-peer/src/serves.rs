@@ -42,6 +42,14 @@ pub struct ArtifactServeList {
     disclose_method: BTreeSet<String>,
 }
 
+/// The list a set of rules with no serve policy reports through [`crate::Rules::serves`], for
+/// the digest and readers. The gate never serves by it: it reads such rules as
+/// [`crate::ServePolicy::Unavailable`].
+pub(crate) static NO_SERVE_LIST: ArtifactServeList = ArtifactServeList {
+    by_method: BTreeMap::new(),
+    disclose_method: BTreeSet::new(),
+};
+
 impl ArtifactServeList {
     /// The grant a parsed `pool-policy.json` declares; empty when it declares none.
     ///

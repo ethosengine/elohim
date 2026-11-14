@@ -318,6 +318,11 @@ async fn flow_fold_folds_a_devices_channel_root_once_and_status_reads_it() {
     // Connections A refused: three of B's (say after a Contest), and strangers' in one total.
     table.channel.refused_connections.insert(b.node_id(), 3);
     table.channel.refused_strangers = 2;
+    // The store the daemon served from: status reads the artifact gate's counts from it.
+    table.store = Some(StorePlace {
+        root: a.checkout.path().to_path_buf(),
+        log: a.checkout.path().join(".eprfs/status/flows.jsonl"),
+    });
     table.save(&a.peer_dir()).unwrap();
     let status = a.epr(&["peer", "status", "--root", a.root(), "--json"]);
     assert!(
@@ -338,8 +343,15 @@ async fn flow_fold_folds_a_devices_channel_root_once_and_status_reads_it() {
         "{json}"
     );
     assert_eq!(json["refusedStrangers"], 2, "{json}");
+    // No artifact was served or put in custody here (K12 design §4 exit counts).
+    let gate = &json["artifactGate"];
+    assert_eq!(gate["reachDraws"], 0, "{json}");
+    assert_eq!(gate["rowDraws"], 0, "{json}");
+    assert_eq!(gate["slotlessDesignated"], 0, "{json}");
+    assert!(gate["since"].is_string(), "{json}");
     let text = a.epr(&["peer", "status", "--root", a.root()]);
     let text = String::from_utf8_lossy(&text.stdout).to_string();
+    assert!(text.contains("artifact gate since"), "{text}");
     assert!(text.contains("head seq 4"), "{text}");
     assert!(text.contains("refused connections"), "{text}");
     assert!(text.contains(": 3"), "{text}");

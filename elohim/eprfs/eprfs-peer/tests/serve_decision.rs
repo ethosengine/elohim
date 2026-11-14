@@ -6,8 +6,9 @@
 use elohim_epr_rea::{AgentRef, FlowEvent, Magnitude, ReaVerb};
 use eprfs_core::BlobCid;
 use eprfs_peer::{
-    event_reach, parse_reach, reach_claims, serve_decision, ArtifactServeList, Basis,
-    DeclaredReach, Deny, ObjectKind, ReachClaim, Relationship, ServePolicy, REACH_LEVELS,
+    deny_reason, event_reach, parse_reach, reach_claims, serve_decision, wire_refusal,
+    ArtifactServeList, Basis, DeclaredReach, Deny, ObjectKind, ReachClaim, Relationship,
+    ServePolicy, WireRefusal, GATE_REACH_SLOT, GATE_ROW_SLOT, LADDER_UNBUILT, REACH_LEVELS,
 };
 use serde_json::json;
 
@@ -629,4 +630,80 @@ fn the_gates_reach_names_and_openness_match_elohim_epr() {
         };
         assert_eq!(parse_reach(name), expected, "{name}");
     }
+}
+
+/// Packet 2's wire helper: a stranger learns nothing under any refusal; a private or unreadable
+/// claim answers as absent under every refusal, even to an own device and even with no policy
+/// loaded; every other refusal keeps the method-row labels, and above `self` is named. The local
+/// reason tells private from unreadable by the claim.
+#[test]
+fn a_refusal_is_answered_from_the_deny_the_requester_and_the_claim() {
+    let denies = [
+        Deny::PolicyUnavailable,
+        Deny::NotAdmitted,
+        Deny::NoMethodRow,
+        Deny::MethodNotDisclosed,
+        Deny::Private,
+        Deny::LadderUnbuilt,
+        Deny::Narrowed,
+    ];
+    let claims = [
+        ReachClaim::Slotless,
+        ReachClaim::Declared(DeclaredReach::Private),
+        ReachClaim::Declared(DeclaredReach::Unreadable),
+        ReachClaim::Declared(DeclaredReach::OwnDevices),
+        ReachClaim::Declared(DeclaredReach::Wider(7)),
+    ];
+    let standing = |label: &str| WireRefusal::Standing(label.to_string());
+    for deny in denies {
+        for claim in &claims {
+            assert_eq!(
+                wire_refusal(deny, Relationship::None, claim, METHOD),
+                WireRefusal::AsAbsent,
+                "{deny:?} {claim:?} to a stranger"
+            );
+            let private = matches!(
+                claim,
+                ReachClaim::Declared(DeclaredReach::Private | DeclaredReach::Unreadable)
+            );
+            let expected = match deny {
+                _ if private => WireRefusal::AsAbsent,
+                Deny::NotAdmitted | Deny::Private => WireRefusal::AsAbsent,
+                Deny::PolicyUnavailable | Deny::NoMethodRow | Deny::Narrowed => {
+                    standing("serve-blob:mesh-build")
+                }
+                Deny::MethodNotDisclosed => standing("disclose-method:mesh-build"),
+                Deny::LadderUnbuilt => standing(LADDER_UNBUILT),
+            };
+            assert_eq!(
+                wire_refusal(deny, Relationship::OwnDevice, claim, METHOD),
+                expected,
+                "{deny:?} {claim:?} to an own device"
+            );
+        }
+    }
+    let private = ReachClaim::Declared(DeclaredReach::Private);
+    let unreadable = ReachClaim::Declared(DeclaredReach::Unreadable);
+    assert_eq!(
+        deny_reason(Deny::Private, &private, METHOD),
+        "serve-reach:private"
+    );
+    assert_eq!(
+        deny_reason(Deny::Private, &unreadable, METHOD),
+        "serve-reach:unreadable"
+    );
+    assert_eq!(
+        deny_reason(Deny::PolicyUnavailable, &private, METHOD),
+        "serve-policy:unavailable"
+    );
+    assert_eq!(
+        deny_reason(
+            Deny::Narrowed,
+            &ReachClaim::Declared(DeclaredReach::OwnDevices),
+            METHOD
+        ),
+        "serve-blob:mesh-build"
+    );
+    assert_eq!(Basis::Reach.slot(), GATE_REACH_SLOT);
+    assert_eq!(Basis::MethodRow.slot(), GATE_ROW_SLOT);
 }

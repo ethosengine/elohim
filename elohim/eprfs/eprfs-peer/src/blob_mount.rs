@@ -3,10 +3,12 @@
 //!
 //! The channel store stays the only tree store the tier endpoint reads. This mount answers
 //! [`TierRequest::Record`] (and legacy output-only requests) from the payload store, for the
-//! derivation artifacts this device holds custody of, and only to a device the artifact grant
-//! admits ([`crate::ArtifactServeList`]). It keeps:
+//! derivation artifacts this device holds custody of, and only as [`crate::serve_decision`]
+//! decides for the selected record: by its own reach claim when its custody events declare one,
+//! else by its method's row in [`crate::ArtifactServeList`]. It keeps:
 //!
-//! - an [`ArtifactIndex`] of what it may serve: each artifact's manifest, method name and chunks.
+//! - an [`ArtifactIndex`] of what it may serve: each artifact's manifest, method name and chunks,
+//!   and the reach claim of every manifest this device's own custody events name.
 //!   The index's source of truth is this device's own flow store — the `custody-blob` Produce
 //!   events with `manifest:<cid>` and `copy:self` that [`crate::put_local_blob`] writes, daemon or
 //!   no daemon — rebuilt when the store moves. Only this device's own custody counts: a Produce
@@ -55,7 +57,17 @@ use crate::channel::ChannelStore;
 use crate::error::PeerError;
 use crate::gate::{ServeScope, Served, SharedAdmission, StewardDevicesGate};
 use crate::local_blob::{custody_use_event, LocalBlobContext};
+use crate::serve_decision::{
+    reach_claims, serve_decision, Basis, Deny, ObjectKind, ReachClaim, Relationship, ServePolicy,
+    WireRefusal,
+};
 use crate::serves::ArtifactServeList;
+
+/// The serve policy the gate reads, shared with whoever reloads it. `None` when no policy is
+/// loaded: an unreadable policy file, a daemon started with none, or (read through a poisoned
+/// lock) a policy that cannot be read. `None` serves no artifact by row or by reach; it is never
+/// replaced by an empty list, which would narrow nothing (K12 threat T5).
+pub type SharedServePolicy = Arc<RwLock<Option<ArtifactServeList>>>;
 use crate::tier::{TierAnswer, TierRequest};
 
 /// How long a `serve-blob` session waits for its next chunk before it is closed as partial.
@@ -144,6 +156,11 @@ pub struct ArtifactIndex {
     by_object: BTreeMap<BlobCid, BTreeSet<BlobCid>>,
     /// Designated manifests held and not served, with why.
     unindexed: BTreeMap<BlobCid, Unindexed>,
+    /// The reach claim of every manifest this device's own custody events name, folded from the
+    /// whole log at each rebuild and replaced whole, never patched: a narrower slot appended
+    /// after a manifest was indexed takes effect at the next rebuild (K12 threat T6). A manifest
+    /// absent here has no own custody record and is never served.
+    claims: BTreeMap<BlobCid, ReachClaim>,
     /// When each designated manifest that failed may be tried again.
     retry: BTreeMap<BlobCid, Retry>,
 }
@@ -281,6 +298,8 @@ pub struct ServedDraw {
     pub outcome: DrawOutcome,
     /// The output's designated custody scope, when the artifact is locally held.
     pub in_scope_of: Option<cid::Cid>,
+    /// Why the session's objects were served (`gate:reach` or `gate:row`); `None` for a refusal.
+    pub basis: Option<Basis>,
 }
 
 impl ServedDraw {
@@ -302,6 +321,9 @@ impl ServedDraw {
         if let DrawOutcome::Refused { reason } = &self.outcome {
             slots.push(format!("reason:{reason}"));
         }
+        if let Some(basis) = self.basis {
+            slots.push(basis.slot().to_string());
+        }
         let mut event = custody_use_event(
             &context,
             &self.artifact.to_string(),
@@ -318,6 +340,8 @@ impl ServedDraw {
 #[derive(Debug)]
 struct Session {
     held: Held,
+    /// The basis of the session's latest served object.
+    basis: Basis,
     connection: usize,
     served: BTreeSet<BlobCid>,
     bytes: u64,
@@ -335,6 +359,7 @@ impl Session {
             of: self.held.distinct_chunks(),
             outcome,
             in_scope_of: Some(self.held.in_scope_of),
+            basis: Some(self.basis),
         }
     }
 }
@@ -598,10 +623,12 @@ impl BlobMount {
             .values()
             .map(|d| (d.manifest.clone(), d.clone()))
             .collect();
+        let claims = reach_claims(events.iter().map(|(_, event)| event), &self.custodian);
         if let Ok(mut index) = self.index.write() {
             index.retain_designated(&designated);
             index.latest = latest;
             index.other_local = other_local;
+            index.claims = claims;
             index.records.clear();
         }
         let mut unindexed = Vec::new();
@@ -748,8 +775,19 @@ impl BlobMount {
         self.index.read().ok()?.unindexed.get(manifest).cloned()
     }
 
-    fn method_of(&self, output: &BlobCid) -> Option<String> {
-        self.held(output).map(|held| held.method_name)
+    /// The reach claim this device's own custody events give `manifest`, as of the last rebuild;
+    /// `None` when no own custody event names it (then it is never served).
+    pub fn claim(&self, manifest: &BlobCid) -> Option<ReachClaim> {
+        self.index.read().ok()?.claims.get(manifest).copied()
+    }
+
+    /// The method name and reach claim of `output`'s latest custody record, when indexed and
+    /// claimed by this device's own custody.
+    fn artifact_of(&self, output: &BlobCid) -> Option<(String, ReachClaim)> {
+        let index = self.index.read().ok()?;
+        let held = index.by_manifest.get(&index.latest.get(output)?.manifest)?;
+        let claim = index.claims.get(&held.manifest)?;
+        Some((held.method_name.clone(), *claim))
     }
 
     fn object_of(&self, artifact: &BlobCid, cid: &BlobCid) -> bool {
@@ -765,7 +803,14 @@ impl BlobMount {
         })
     }
 
-    fn methods_of(&self, cid: &BlobCid, serves: &ArtifactServeList) -> Vec<String> {
+    /// The method names of the designated records `cid` is an object of that `permits` serves
+    /// `cid` under, each judged on its own claim and on what `cid` is to it. A record with no own
+    /// claim is never counted.
+    fn permitted_methods(
+        &self,
+        cid: &BlobCid,
+        permits: impl Fn(&ReachClaim, &str, ObjectKind) -> bool,
+    ) -> Vec<String> {
         let Ok(index) = self.index.read() else {
             return Vec::new();
         };
@@ -774,12 +819,14 @@ impl BlobMount {
             .get(cid)
             .into_iter()
             .flatten()
-            .filter_map(|manifest| index.by_manifest.get(manifest))
-            .filter(|held| {
-                (held.method != *cid && held.input != *cid)
-                    || serves.discloses_method(&held.method_name)
+            .filter_map(|manifest| {
+                Some((
+                    index.by_manifest.get(manifest)?,
+                    index.claims.get(manifest)?,
+                ))
             })
-            .map(|held| held.method_name.clone())
+            .filter(|(held, claim)| permits(claim, &held.method_name, object_kind(held, cid)))
+            .map(|(held, _)| held.method_name.clone())
             .collect()
     }
 
@@ -817,21 +864,23 @@ impl BlobMount {
         &self,
         device: &str,
         held: &Held,
-        object: &BlobCid,
-        len: usize,
+        served: (&BlobCid, usize, Basis),
         connection: usize,
     ) {
+        let (object, len, basis) = served;
         let Ok(mut sessions) = self.sessions.lock() else {
             return;
         };
         let key = (device.to_string(), held.manifest.clone());
         let session = sessions.entry(key.clone()).or_insert_with(|| Session {
             held: held.clone(),
+            basis,
             connection,
             served: BTreeSet::new(),
             bytes: 0,
             last: Instant::now(),
         });
+        session.basis = basis;
         session.connection = connection;
         session.last = Instant::now();
         if held.chunks.contains(object) {
@@ -883,6 +932,7 @@ impl BlobMount {
             of: held.as_ref().map_or(0, Held::distinct_chunks),
             outcome: DrawOutcome::Refused { reason },
             in_scope_of: held.map(|held| held.in_scope_of),
+            basis: None,
         });
     }
 }
@@ -905,6 +955,16 @@ pub(crate) fn custody_manifest(event: &FlowEvent, custodian: &str) -> Option<Blo
         .iter()
         .find_map(|slot| slot.strip_prefix("manifest:"))
         .and_then(|text| BlobCid::parse(text).ok())
+}
+
+/// What `cid` is to the record `held`: its method record or input document, or one of its
+/// manifest and chunks.
+fn object_kind(held: &Held, cid: &BlobCid) -> ObjectKind {
+    if *cid == held.method || *cid == held.input {
+        ObjectKind::MethodOrInput
+    } else {
+        ObjectKind::ManifestOrChunk
+    }
 }
 
 /// The refusal reason a `draw:refused` event carries: the standing lacked, else the reason.
@@ -940,10 +1000,17 @@ pub(crate) fn uniform_refusal(self_id: &TierId, artifact: &BlobCid) -> TierAnswe
     )
 }
 
-/// Answer an artifact request: admit the selected record's method (or legacy root), then
-/// `admit_object`, then membership, before any byte is read (the tree endpoint never calls
-/// `admit_object`, so this path does). A requester the gate does not admit gets the uniform
-/// refusal whatever failed; an admitted device gets the typed one, and is recorded.
+/// Answer an artifact request. Exactly one record is selected (the named one for a record-bound
+/// request, never a substitute; the output's latest for a legacy one), and the requested object
+/// is decided on that record's own reach claim ([`StewardDevicesGate::admit_record`]); a legacy
+/// request then needs `admit_object`, and every request membership in the selected record,
+/// before any byte is read (the tree endpoint never calls `admit_object`, so this path does).
+///
+/// A requester the gate does not admit gets the uniform refusal whatever failed. An admitted
+/// device gets the typed refusal, and is recorded with the true reason, except that a record it
+/// may not learn of (declared `private`, or with an unreadable slot) is answered exactly as this
+/// request shape is for a record not held: `NoRecord` naming the asked manifest for a
+/// record-bound request, the uniform refusal for a legacy one.
 pub(crate) async fn answer(
     mount: Option<&BlobMount>,
     gate: &StewardDevicesGate,
@@ -965,65 +1032,74 @@ pub(crate) async fn answer(
             )
         }
     };
-    let refuse = |refusal: ReachRefusal| -> (TierAnswer, Answered) {
+    let refuse_as = |refusal: ReachRefusal, local: String| -> (TierAnswer, Answered) {
         match gate.admitted(who) {
             Some(device) => {
                 if let Some(mount) = mount {
-                    mount.record_refused(device, artifact, refusal_reason(&refusal));
+                    mount.record_refused(device, artifact, local);
                 }
                 (refused(self_id, artifact, refusal), Answered::Refused)
             }
             None => (uniform_refusal(self_id, artifact), Answered::Refused),
         }
     };
-    let (mount, held) = if let TierRequest::Record { manifest, key, .. } = request {
-        // Admission precedes record lookup so strangers cannot inventory custody.
-        if gate.admitted(who).is_none() {
-            return refuse(ReachRefusal::new(ReachReason::OutsideStanding, None));
-        }
-        let selected = match mount {
-            Some(mount) => mount
-                .held_record(artifact, manifest)
-                .await
-                .map(|held| (mount, held)),
-            None => None,
-        };
-        let Some((mount, held)) = selected.filter(|(_, held)| {
-            held.output == *artifact && key.as_ref().is_none_or(|key| *key == held.key)
-        }) else {
-            return refuse(ReachRefusal::new(
-                ReachReason::NoRecord,
-                Some(format!("manifest:{manifest}")),
-            ));
-        };
-        if let Err(refusal) = gate.admit_artifact(who, &held.method_name) {
-            return refuse(refusal);
-        }
-        (mount, held)
-    } else {
-        if let Err(refusal) = gate.admit_root(who, artifact) {
-            return refuse(refusal);
-        }
-        let Some(selected) = mount.and_then(|mount| Some((mount, mount.held(artifact)?))) else {
-            return refuse(ReachRefusal::new(ReachReason::OutsideStanding, None));
-        };
-        selected
+    let refuse = |refusal: ReachRefusal| -> (TierAnswer, Answered) {
+        let local = refusal_reason(&refusal);
+        refuse_as(refusal, local)
     };
-    let object = asked.unwrap_or(&held.manifest);
-    if *object == held.method || *object == held.input {
-        if let Err(refusal) = gate.admit_method(who, &held.method_name) {
-            return refuse(refusal);
-        }
+    // Admission precedes record lookup so strangers cannot inventory custody.
+    if gate.admitted(who).is_none() {
+        return refuse(ReachRefusal::new(ReachReason::OutsideStanding, None));
     }
     let record_bound = matches!(request, TierRequest::Record { .. });
+    // What this request shape is answered for a record this device does not hold.
+    let absent = match request {
+        TierRequest::Record { manifest, .. } => {
+            ReachRefusal::new(ReachReason::NoRecord, Some(format!("manifest:{manifest}")))
+        }
+        _ => ReachRefusal::new(ReachReason::OutsideStanding, None),
+    };
+    let selected = match (mount, request) {
+        (Some(mount), TierRequest::Record { manifest, key, .. }) => mount
+            .held_record(artifact, manifest)
+            .await
+            .filter(|held| {
+                held.output == *artifact && key.as_ref().is_none_or(|key| *key == held.key)
+            })
+            .map(|held| (mount, held)),
+        (Some(mount), _) => mount.held(artifact).map(|held| (mount, held)),
+        (None, _) => None,
+    };
+    // A record no own custody event claims is not this device's: refused as absent, never
+    // decided as slotless.
+    let Some((mount, held, claim)) = selected.and_then(|(mount, held)| {
+        let claim = mount.claim(&held.manifest)?;
+        Some((mount, held, claim))
+    }) else {
+        return refuse(absent);
+    };
+    let object = asked.unwrap_or(&held.manifest);
+    let basis = match gate.admit_record(who, &claim, &held.method_name, object_kind(&held, object))
+    {
+        Ok(basis) => basis,
+        Err(refusal) => {
+            let wire = match refusal.wire {
+                WireRefusal::AsAbsent => absent,
+                WireRefusal::Standing(standing) => {
+                    ReachRefusal::new(ReachReason::OutsideStanding, Some(standing))
+                }
+            };
+            return refuse_as(wire, refusal.local);
+        }
+    };
     if !record_bound {
         if let Err(refusal) = gate.admit_object(who, object) {
             return refuse(refusal);
         }
     }
     // Record requests use the validated entry's membership and current local custody.
-    // Their method grant and disclosure were judged above; the legacy object index contains
-    // only designated records and must not substitute its method for the selected record's.
+    // The selected record's own claim was judged above; the legacy object index contains only
+    // designated records and must not substitute its claim or method for the selected record's.
     let in_held = *object == held.manifest
         || *object == held.method
         || *object == held.input
@@ -1047,7 +1123,12 @@ pub(crate) async fn answer(
             } else {
                 Answered::Chunk
             };
-            mount.record_served(device, &held, object, handle.bytes.len(), connection);
+            mount.record_served(
+                device,
+                &held,
+                (object, handle.bytes.len(), basis),
+                connection,
+            );
             (
                 TierAnswer::Blob {
                     cid: object.clone(),
@@ -1080,11 +1161,12 @@ pub(crate) async fn answer(
 }
 
 /// The scope a device daemon serves: its channel roots, the artifacts its mount indexes, and the
-/// artifact grant, judged against admission now.
+/// serve decision over each record's own claim and the loaded policy, judged against admission
+/// now.
 pub struct DeviceScope {
     channel: Arc<ChannelStore>,
     mount: Option<Arc<BlobMount>>,
-    serves: Arc<RwLock<ArtifactServeList>>,
+    serves: SharedServePolicy,
     admission: SharedAdmission,
 }
 
@@ -1092,7 +1174,7 @@ impl DeviceScope {
     pub fn new(
         channel: Arc<ChannelStore>,
         mount: Option<Arc<BlobMount>>,
-        serves: Arc<RwLock<ArtifactServeList>>,
+        serves: SharedServePolicy,
         admission: SharedAdmission,
     ) -> DeviceScope {
         DeviceScope {
@@ -1102,6 +1184,42 @@ impl DeviceScope {
             admission,
         }
     }
+
+    /// Who `device` is, judged against admission now. A poisoned lock admits nobody.
+    fn relationship(&self, device: Option<&str>) -> Relationship {
+        match device {
+            Some(device)
+                if self
+                    .admission
+                    .read()
+                    .is_ok_and(|admission| admission.admits_device(device)) =>
+            {
+                Relationship::OwnDevice
+            }
+            _ => Relationship::None,
+        }
+    }
+
+    /// Run `decide` under the loaded policy: `Unavailable` when none is loaded or the lock is
+    /// poisoned, never a defaulted list.
+    fn under_policy<T>(&self, decide: impl FnOnce(&ServePolicy<'_>) -> T) -> T {
+        match self.serves.read() {
+            Ok(serves) => decide(&ServePolicy::from(serves.as_ref())),
+            Err(_) => decide(&ServePolicy::Unavailable),
+        }
+    }
+
+    /// The method names of the records `cid` is an object of that serve it to `who` now.
+    fn permitted_methods(&self, who: Relationship, cid: &BlobCid) -> Vec<String> {
+        let Some(mount) = self.mount.as_ref() else {
+            return Vec::new();
+        };
+        self.under_policy(|policy| {
+            mount.permitted_methods(cid, |claim, method, object| {
+                serve_decision(who, claim, method, object, policy).is_ok()
+            })
+        })
+    }
 }
 
 impl ServeScope for DeviceScope {
@@ -1109,8 +1227,12 @@ impl ServeScope for DeviceScope {
         if self.channel.roots().contains(root) {
             return Served::Channel;
         }
-        match self.mount.as_ref().and_then(|mount| mount.method_of(root)) {
-            Some(method) => Served::Artifact { method },
+        match self
+            .mount
+            .as_ref()
+            .and_then(|mount| mount.artifact_of(root))
+        {
+            Some((method, claim)) => Served::Artifact { method, claim },
             None => Served::Unknown,
         }
     }
@@ -1122,31 +1244,108 @@ impl ServeScope for DeviceScope {
     }
 
     fn methods_of(&self, cid: &BlobCid) -> Vec<String> {
-        self.serves
-            .read()
-            .map(|serves| {
-                self.mount
-                    .as_ref()
-                    .map(|mount| mount.methods_of(cid, &serves))
-                    .unwrap_or_default()
-            })
-            .unwrap_or_default()
+        self.permitted_methods(Relationship::OwnDevice, cid)
     }
 
-    fn discloses_method(&self, method: &str) -> bool {
-        self.serves
-            .read()
-            .is_ok_and(|serves| serves.discloses_method(method))
+    fn decide(
+        &self,
+        device: Option<&str>,
+        claim: &ReachClaim,
+        method_name: &str,
+        object: ObjectKind,
+    ) -> Result<Basis, Deny> {
+        let who = self.relationship(device);
+        self.under_policy(|policy| serve_decision(who, claim, method_name, object, policy))
     }
 
-    fn grants(&self, device: &str, method_name: &str) -> bool {
-        // Fail closed: a poisoned lock grants nothing.
-        self.serves.read().is_ok_and(|serves| {
-            self.admission
-                .read()
-                .is_ok_and(|admission| serves.grants(device, method_name, &admission))
+    fn admits_object(&self, device: &str, cid: &BlobCid) -> bool {
+        let who = self.relationship(Some(device));
+        who == Relationship::OwnDevice && !self.permitted_methods(who, cid).is_empty()
+    }
+}
+
+/// The window `epr peer status` reads the artifact gate's exit counts over (K12 design §4).
+pub const ARTIFACT_GATE_WINDOW: Duration = Duration::from_secs(14 * 86_400);
+
+/// The three numbers the method-row path's exit criterion reads from one device's own flow log
+/// over [`ARTIFACT_GATE_WINDOW`] (K12 design §4): served draws by basis, and the outputs whose
+/// latest own custody record in the window carries no reach slot.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ArtifactGateCounts {
+    /// The window's start, RFC 3339 UTC.
+    pub since: String,
+    /// Completed or partial serves this device recorded with `gate:reach`.
+    pub reach_draws: u64,
+    /// Completed or partial serves recorded with `gate:row`, or with no `gate:` slot at all (a
+    /// pre-K12 daemon served only by row).
+    pub row_draws: u64,
+    /// Outputs whose latest own custody event falls in the window and whose manifest is
+    /// slotless.
+    pub slotless_designated: u64,
+}
+
+/// Count [`ArtifactGateCounts`] over `events` (this device's flow log, in append order) for the
+/// device `custodian`, as of `now`. An event whose time cannot be read is counted as inside the
+/// window, so an unreadable time can only make the exit harder to reach.
+pub fn artifact_gate_counts<'e>(
+    events: impl IntoIterator<Item = &'e FlowEvent>,
+    custodian: &str,
+    now: SystemTime,
+) -> ArtifactGateCounts {
+    let since = rfc3339_utc(now.checked_sub(ARTIFACT_GATE_WINDOW).unwrap_or(UNIX_EPOCH));
+    let in_window = |at: &str| match (at.get(..19), since.get(..19)) {
+        (Some(at), Some(start)) if readable_utc_second(at) => at >= start,
+        _ => true,
+    };
+    let events: Vec<&FlowEvent> = events.into_iter().collect();
+    let mut counts = ArtifactGateCounts {
+        since: since.clone(),
+        reach_draws: 0,
+        row_draws: 0,
+        slotless_designated: 0,
+    };
+    let mut latest: BTreeMap<String, (BlobCid, &str)> = BTreeMap::new();
+    for event in &events {
+        if let Some(manifest) = custody_manifest(event, custodian) {
+            latest.insert(
+                event.resource.to_string(),
+                (manifest, event.occurred_at.as_str()),
+            );
+            continue;
+        }
+        let has = |slot: &str| event.classified_as.iter().any(|s| s == slot);
+        let served = event.action == ReaVerb::Use
+            && event.provider.0 == custodian
+            && has(SERVE_BLOB)
+            && (has("draw:completed") || has("draw:partial"));
+        if !served || !in_window(&event.occurred_at) {
+            continue;
+        }
+        if has(crate::serve_decision::GATE_REACH_SLOT) {
+            counts.reach_draws += 1;
+        } else {
+            counts.row_draws += 1;
+        }
+    }
+    let claims = reach_claims(events.iter().copied(), custodian);
+    counts.slotless_designated = latest
+        .values()
+        .filter(|(manifest, at)| {
+            in_window(at) && claims.get(manifest) == Some(&ReachClaim::Slotless)
         })
-    }
+        .count() as u64;
+    counts
+}
+
+/// Whether `at` is `YYYY-MM-DDTHH:MM:SS`, the fixed-width prefix that compares as a time.
+fn readable_utc_second(at: &str) -> bool {
+    at.bytes().enumerate().all(|(i, b)| match i {
+        4 | 7 => b == b'-',
+        10 => b == b'T',
+        13 | 16 => b == b':',
+        _ => b.is_ascii_digit(),
+    }) && at.len() == 19
 }
 
 /// Open (creating it, and any missing parent, if absent) the directory payload store at `path`,
