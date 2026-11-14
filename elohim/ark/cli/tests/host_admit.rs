@@ -80,9 +80,10 @@ fn recorded_output_requires_verified_bytes_before_reader_lookup() {
 fn reader_alone_supplies_own_build_eligibility() {
     let reader = Reader::new();
     let mut clauses = floor();
-    clauses.push(json!({"axis":"isa.x86", "predicate":{"kind":"subset", "value":["hostcompat_impossible_feature"]}, "source":"extracted"}));
+    // SSE2 is provided by every x86_64 host; the synthetic features are never provided.
+    clauses.push(json!({"axis":"isa.x86", "predicate":{"kind":"subset", "value":["sse2", "hostcompat_impossible_feature", "hostcompat_other_missing_feature"]}, "source":"extracted"}));
     reader.record(&clauses, true);
-    assert_eq!(reader.run("ok"), (0, "ok compatibility fixture: admitted under the own-build rule (waived: isa.x86 hostcompat_impossible_feature)\n".into()));
+    assert_eq!(reader.run("ok"), (0, "ok compatibility fixture: admitted under the own-build rule (isa.x86 missing here: hostcompat_impossible_feature, hostcompat_other_missing_feature; extracted)\n".into()));
     reader.record(&clauses, false);
     assert_eq!(reader.run("ok").0, 1);
     for source in ["declared", "proven"] {

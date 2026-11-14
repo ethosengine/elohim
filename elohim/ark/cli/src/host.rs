@@ -7,7 +7,7 @@ use ark_supervisor::admission::{
 use cid::Cid;
 use elohim_epr::verdict::{CheckOutcome, Decision};
 use eprfs_core::BlobCid;
-use host_contract::{names::axis, Clause, ClauseSource, Predicate, Requires};
+use host_contract::{names::axis, AxisId, AxisValue, Clause, ClauseSource, Predicate, Requires};
 
 fn value(predicate: &Predicate) -> String {
     match predicate {
@@ -78,13 +78,25 @@ pub fn admit(path: Option<&Path>, name: &str, binary: Option<(&Path, &str)>) -> 
                     .map(|clause| {
                         let predicate: Predicate = serde_json::from_value(clause.predicate.clone())
                             .map_err(|_| "invalid predicate in admission waiver")?;
-                        Ok::<_, String>(format!("{} {}", clause.axis, value(&predicate)))
+                        let (Predicate::Subset(required), Some(AxisValue::Names(provided))) =
+                            (&predicate, provides.observed(&AxisId(clause.axis.clone())))
+                        else {
+                            return Err("invalid feature set in admission waiver".to_string());
+                        };
+                        // Only unmet requirements leave this process, never the host inventory.
+                        let missing = required
+                            .difference(provided)
+                            .cloned()
+                            .collect::<Vec<_>>()
+                            .join(", ");
+                        Ok(format!(
+                            "{} missing here: {missing}; {}",
+                            clause.axis, clause.source
+                        ))
                     })
                     .collect::<Result<Vec<_>, _>>()?
                     .join("; ");
-                return Ok(format!(
-                    "admitted under the own-build rule (waived: {waived})"
-                ));
+                return Ok(format!("admitted under the own-build rule ({waived})"));
             }
             record.verdict().clone()
         } else {
