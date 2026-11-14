@@ -370,19 +370,10 @@ decisionPoints:
       testName: unknown_domain_schema_fields_and_unbounded_inputs_are_refused
       kind: integration
     - path: elohim/ark/core/tests/candidate_contract.rs
-      testName: permit_effect_authenticates_even_when_platform_labels_differ
+      testName: authentication_does_not_claim_host_compatibility
       kind: integration
     - path: elohim/ark/core/tests/candidate_contract.rs
-      testName: refusal_effect_refuses_wrong_platform_with_its_unmet_clauses
-      kind: integration
-    - path: elohim/ark/core/tests/candidate_contract.rs
-      testName: effect_for_another_executable_refuses_wrong_platform
-      kind: integration
-    - path: elohim/ark/core/tests/candidate_contract.rs
-      testName: missing_effect_refuses_wrong_platform
-      kind: integration
-    - path: elohim/ark/core/tests/candidate_contract.rs
-      testName: compatibility_refuses_after_artifact_mismatch_and_before_capabilities
+      testName: artifact_mismatch_precedes_missing_capability
       kind: integration
     - path: elohim/ark/core/tests/candidate_contract.rs
       testName: refusal_labels_are_stable_and_distinct
@@ -479,6 +470,12 @@ decisionPoints:
       testName: unknown_domain_schema_fields_and_unbounded_inputs_are_refused
       kind: integration
     - path: elohim/ark/core/tests/candidate_contract.rs
+      testName: authentication_does_not_claim_host_compatibility
+      kind: integration
+    - path: elohim/ark/core/tests/candidate_contract.rs
+      testName: artifact_mismatch_precedes_missing_capability
+      kind: integration
+    - path: elohim/ark/core/tests/candidate_contract.rs
       testName: refusal_labels_are_stable_and_distinct
       kind: integration
 
@@ -571,6 +568,12 @@ decisionPoints:
       kind: integration
     - path: elohim/ark/core/tests/candidate_contract.rs
       testName: unknown_domain_schema_fields_and_unbounded_inputs_are_refused
+      kind: integration
+    - path: elohim/ark/core/tests/candidate_contract.rs
+      testName: authentication_does_not_claim_host_compatibility
+      kind: integration
+    - path: elohim/ark/core/tests/candidate_contract.rs
+      testName: artifact_mismatch_precedes_missing_capability
       kind: integration
     - path: elohim/ark/core/tests/candidate_contract.rs
       testName: refusal_labels_are_stable_and_distinct

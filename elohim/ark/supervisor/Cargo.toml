@@ -27,5 +27,4 @@ hex = { workspace = true }
 nix = { workspace = true, features = ["user", "feature"] }
 libc = { workspace = true }
 
-[dev-dependencies]
 tempfile = { workspace = true }

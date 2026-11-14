@@ -1,7 +1,9 @@
 //! Local admission prints only requirements; Provides remains in memory.
 use std::{fs, path::Path};
 
-use ark_supervisor::admission::{admit_artifact, admit_recorded_requirements, OwnProduce};
+use ark_supervisor::admission::{
+    admit_artifact, admit_recorded_requirements, resolve_recorded, ResolveGap,
+};
 use cid::Cid;
 use elohim_epr::verdict::{CheckOutcome, Decision};
 use eprfs_core::BlobCid;
@@ -38,42 +40,26 @@ fn verified_bytes(path: &Path, cid: Option<&str>) -> Result<Vec<u8>, String> {
 }
 
 /// Each invocation prints exactly one line, including malformed/unavailable input.
-pub fn admit(
-    path: &Path,
-    name: &str,
-    requires_cid: Option<&str>,
-    binary: Option<(&Path, &str)>,
-    own_produce: Option<&str>,
-) -> u8 {
+pub fn admit(path: Option<&Path>, name: &str, binary: Option<(&Path, &str)>) -> u8 {
     let result = (|| {
-        if let Some((path, cid)) = binary {
+        let provides = ark_supervisor::host::observe_host();
+        let verdict = if let Some((path, cid)) = binary {
             verified_bytes(path, Some(cid)).map_err(|e| {
                 format!("output requires {cid} — {e}; rebuild or restore the recorded binary")
             })?;
-        }
-        let bytes = verified_bytes(path, requires_cid)
-            .map_err(|e| format!("env:requires requires a verified local document — {e}; restore the recorded requirement"))?;
-        let requires: Requires = serde_json::from_slice(&bytes).map_err(|_| {
-            "env:requires requires a valid clause array — restore the recorded requirement"
-                .to_string()
-        })?;
-        let provides = ark_supervisor::host::observe_host();
-        let verdict = if let Some(produce) = own_produce {
-            let (_, output) = binary.ok_or("own Produce requires a verified binary/output")?;
-            let output = output.parse::<Cid>().map_err(|_| "invalid output CID")?;
-            let produce = produce
-                .parse::<Cid>()
-                .map_err(|_| "invalid own Produce CID")?;
-            let claim = OwnProduce::from_local_lookup(produce, output);
-            let effect = admit_artifact(
-                output,
-                Some(&requires),
-                &provides,
-                Some(&claim),
-                &Default::default(),
-            );
-            if effect.permits() && !effect.own_build_rule().is_empty() {
-                let waived = effect
+            let output = cid.parse::<Cid>().map_err(|_| "invalid output CID")?;
+            let recorded = match resolve_recorded(output) {
+                Ok(recorded) => recorded,
+                Err(ResolveGap::UnknownOutput(cid)) => {
+                    return Err(format!(
+                        "epr does not know output {cid} — rebuild or restore the recorded binary"
+                    ));
+                }
+                Err(gap) => return Ok(format!("unmeasured ({gap})")),
+            };
+            let record = admit_artifact(&recorded, &provides, &Default::default());
+            if record.permits() && !record.own_build_rule().is_empty() {
+                let waived = record
                     .own_build_rule()
                     .iter()
                     .map(|clause| {
@@ -87,12 +73,18 @@ pub fn admit(
                     "admitted under the own-build rule (waived: {waived})"
                 ));
             }
-            effect.verdict().clone()
+            record.verdict().clone()
         } else {
+            let path = path.ok_or("env:requires requires a requirement file")?;
+            let bytes = verified_bytes(path, None)
+                .map_err(|e| format!("env:requires requires a local document — {e}"))?;
+            let requires: Requires = serde_json::from_slice(&bytes).map_err(|_| {
+                "env:requires requires a valid clause array — restore the requirement"
+            })?;
             admit_recorded_requirements(Some(&requires), &provides)
         };
         if verdict.decision == Decision::Permit {
-            Ok(format!("admitted ({} clauses)", requires.clauses().len()))
+            Ok("admitted".into())
         } else {
             let failed = verdict
                 .witness
@@ -120,20 +112,27 @@ pub fn admit(
             .flat_map(char::escape_debug)
             .collect::<String>()
     };
+    let diagnostic = if path.is_some() {
+        " (diagnostic: requirement from file, not from the record)"
+    } else {
+        ""
+    };
     match result {
         Ok(detail) => {
             println!(
-                "ok compatibility {}: {}",
+                "ok compatibility {}: {}{}",
                 single_line(name),
-                single_line(&detail)
+                single_line(&detail),
+                diagnostic
             );
             0
         }
         Err(detail) => {
             println!(
-                "REFUSED compatibility {}: {}",
+                "REFUSED compatibility {}: {}{}",
                 single_line(name),
-                single_line(&detail)
+                single_line(&detail),
+                diagnostic
             );
             1
         }

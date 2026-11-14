@@ -1,19 +1,21 @@
-//! Host admission: judge an artifact's recorded requirements against this device's
-//! observed `Provides`, and return only the recordable effect
-//! ([`ark_core::compatibility::CompatibilityEffect`]). The contract's diagnostic
-//! verdict includes host values and must never be copied into an ark record.
-//!
-//! This lives in the supervisor, beside the observer, so the pure core never names
-//! the host contract and no workspace that depends on `ark-core` pulls it in.
+//! Host admission owns the grant; serializable records are evidence only.
 
 use std::collections::BTreeSet;
 
-use ark_core::compatibility::{CompatibilityEffect, WaivedClause};
+use ark_core::candidate::{AuthenticatedCandidateContent, CandidateRefusal};
+use serde::{Deserialize, Serialize};
+
+#[path = "admission_record.rs"]
+mod record;
+#[path = "recorded_requirement.rs"]
+mod recorded;
 use cid::Cid;
 use elohim_epr::verdict::{CheckOutcome, CheckWitness, Decision, Verdict, Witness};
 use host_contract::{
     admit, names::axis, AxisId, Clause, ClauseSource, Predicate, Provides, Requires,
 };
+pub use record::{AdmissionRecord, WaivedClause};
+pub use recorded::{resolve_recorded, ResolveGap};
 
 /// Features emitted by epr-cli's extract_cpuid::cpu_name whose usable state ark
 /// cannot establish. Privileged/MSR modes, device setup, obsolete modes and CET
@@ -56,23 +58,105 @@ pub const UNPROBED_X86: &[&str] = &[
     "rng_en",
 ];
 
-/// Local evidence claim, not a transferable authority or a record deserializer.
+/// Local evidence minted only by the artifact reader, never caller assertions.
+/// ```compile_fail
+/// use ark_supervisor::admission::OwnProduce;
+/// let forged = OwnProduce { produce: todo!(), executable: todo!() };
+/// ```
+/// ```compile_fail
+/// let forged: ark_supervisor::admission::OwnProduce = serde_json::from_str("{}").unwrap();
+/// ```
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct OwnProduce {
     produce: Cid,
     executable: Cid,
 }
 
-impl OwnProduce {
-    /// Only the caller that looked up this executable's local Produce and verified
-    /// that THIS device recorded it may construct this claim. A sibling's Produce
-    /// or a publisher assertion does not qualify. Admission performs no record lookup.
-    pub fn from_local_lookup(produce: Cid, executable: Cid) -> Self {
-        Self {
-            produce,
-            executable,
-        }
+/// Requirement bound to an output by the local artifact reader. No public constructor.
+/// ```compile_fail
+/// use ark_supervisor::admission::RecordedRequirement;
+/// let forged = RecordedRequirement { output: todo!(), requires: todo!(), own_produce: None };
+/// ```
+/// ```compile_fail
+/// let forged: ark_supervisor::admission::RecordedRequirement = serde_json::from_str("{}").unwrap();
+/// ```
+#[derive(Debug)]
+pub struct RecordedRequirement {
+    output: Cid,
+    requires: Requires,
+    own_produce: Option<OwnProduce>,
+}
+
+/// Host admission of authenticated content. A future launch path must require
+/// `&AdmittedCandidate`, alongside its other authority checks; no launch is wired
+/// here. This proves compatibility at observation time, not delegation or freshness.
+/// ```compile_fail
+/// use ark_supervisor::admission::AdmittedCandidate;
+/// let forged = AdmittedCandidate { authenticated: todo!(), record: todo!() };
+/// ```
+/// ```compile_fail
+/// let forged: ark_supervisor::admission::AdmittedCandidate = serde_json::from_str("{}").unwrap();
+/// ```
+#[derive(Debug)]
+pub struct AdmittedCandidate {
+    authenticated: AuthenticatedCandidateContent,
+    record: AdmissionRecord,
+}
+
+impl AdmittedCandidate {
+    pub fn authenticated(&self) -> &AuthenticatedCandidateContent {
+        &self.authenticated
     }
+    pub fn executable(&self) -> Cid {
+        self.record.executable()
+    }
+    pub fn verdict(&self) -> &Verdict {
+        self.record.verdict()
+    }
+    pub fn own_build_rule(&self) -> &[WaivedClause] {
+        self.record.own_build_rule()
+    }
+    pub fn own_produce(&self) -> Option<Cid> {
+        self.record.own_produce()
+    }
+    pub fn record(&self) -> AdmissionRecord {
+        self.record.clone()
+    }
+}
+
+/// Recordable refusal details, containing requirements but no host inventory.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", tag = "kind", content = "detail")]
+pub enum PlatformRefusal {
+    Refused(Box<AdmissionRecord>),
+    RequirementForOtherExecutable { recorded_executable: Cid },
+}
+
+/// Combine authenticated content and locally resolved requirements. Missing
+/// documents fail in `resolve_recorded`; missing required axes refuse here.
+pub fn admit_candidate(
+    authenticated: AuthenticatedCandidateContent,
+    recorded: RecordedRequirement,
+    host: &Provides,
+    withdrawn: &BTreeSet<Cid>,
+) -> Result<AdmittedCandidate, CandidateRefusal<PlatformRefusal>> {
+    if recorded.output != authenticated.content().candidate.executable {
+        return Err(CandidateRefusal::WrongPlatform(
+            PlatformRefusal::RequirementForOtherExecutable {
+                recorded_executable: recorded.output,
+            },
+        ));
+    }
+    let record = admit_artifact(&recorded, host, withdrawn);
+    if !record.permits() {
+        return Err(CandidateRefusal::WrongPlatform(PlatformRefusal::Refused(
+            Box::new(record),
+        )));
+    }
+    Ok(AdmittedCandidate {
+        authenticated,
+        record,
+    })
 }
 
 /// Debug view of ark's known axes only; never formats the underlying inventory.
@@ -109,8 +193,7 @@ fn unprobed(clause: &Clause) -> bool {
         }
 }
 
-/// The waived clause in the core's host-contract-free form, spelled exactly as the
-/// contract's own wire form spells it.
+/// Required clause in the recordable evidence form; never a host value.
 fn waived_clause(clause: &Clause) -> WaivedClause {
     let source = match serde_json::json!(clause.source) {
         serde_json::Value::String(source) => source,
@@ -124,16 +207,15 @@ fn waived_clause(clause: &Clause) -> WaivedClause {
     }
 }
 
-/// Admit independently resolved artifact requirements. No process authority is
-/// conferred. Only failed, observed, extracted x86 ISA clauses can be waived;
-/// unknown and unobserved remain refusals even for this device's own builds.
+/// Inspect recorded artifact requirements. Returns evidence only, never a grant.
 pub fn admit_artifact(
-    executable: Cid,
-    requires: Option<&Requires>,
+    recorded: &RecordedRequirement,
     provides: &Provides,
-    own_produce: Option<&OwnProduce>,
     withdrawn_artifacts: &BTreeSet<Cid>,
-) -> CompatibilityEffect {
+) -> AdmissionRecord {
+    let executable = recorded.output;
+    let requires = Some(&recorded.requires);
+    let own_produce = recorded.own_produce.as_ref();
     let own_build = own_produce.is_some_and(|claim| claim.executable == executable)
         && !withdrawn_artifacts.contains(&executable);
     let (mut verdict, own_build_rule) = judge_requirements(requires, provides, own_build);
@@ -150,12 +232,12 @@ pub fn admit_artifact(
             }
         }
     }
-    CompatibilityEffect::from_admission(
+    AdmissionRecord {
         executable,
         verdict,
-        own_build_rule.iter().map(waived_clause).collect(),
+        own_build_rule: own_build_rule.iter().map(waived_clause).collect(),
         own_produce,
-    )
+    }
 }
 
 /// Judge a requirement as recorded, against the observed host. The own-build

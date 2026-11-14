@@ -135,11 +135,11 @@ decisionPoints:
       - {path: elohim/ark/supervisor/src/x86.rs, testName: synthetic_avx_requires_osxsave_and_vector_state, kind: unit}
       - {path: elohim/ark/supervisor/src/x86.rs, testName: pku_and_fsgsbase_require_os_enablement, kind: unit}
 
-  - name: admit_artifact
+  - name: admit_candidate
     kind: verdict-fn
     sourceLocation:
       file: src/admission.rs
-      modulePath: ark_supervisor::admission::admit_artifact
+      modulePath: ark_supervisor::admission::admit_candidate
     summary: >
       Reuses host-contract admission locally, recording only requirement-side effects.
       Missing requirements fail closed. Only unmet extracted isa.x86 clauses on this
@@ -147,7 +147,7 @@ decisionPoints:
     concernIds:
     - id: C0
       status: answered
-      justification: Supervisor-side admission beside the observer; it returns ark-core's host-contract-free effect and the host inventory stays in supervisor memory.
+      justification: Supervisor owns the opaque grant and its separate record; core authenticates content only. Host inventory stays in memory.
     - id: C1
       status: n-a
       justification: No release election or head mutation; executable CID is independently supplied.
@@ -163,8 +163,9 @@ decisionPoints:
     - id: C5
       status: partial
       justification: >
-        Local Provides is checked with the contract predicate; requirements and same-device
-        Produce provenance must be independently resolved by the caller. No grant is inferred.
+        Local Provides is checked with the contract predicate; only the configured artifact reader
+        resolves requirements and same-device Produce provenance. Records cannot construct a grant.
+        EPR_BIN and PATH remain trusted local configuration.
     - id: C6a
       status: partial
       justification: >
@@ -176,7 +177,7 @@ decisionPoints:
     - id: C7
       status: partial
       justification: >
-        Only an admission effect is returned. Activation and fetch are later consumers;
+        An opaque grant is returned only from authenticated content and reader-resolved requirements. Activation and fetch are later consumers;
         this implementation does not advertise compatibility or launch from a verdict.
     - id: C8
       status: partial
@@ -204,6 +205,12 @@ decisionPoints:
         Caller-supplied artifact withdrawal disables the own-build rule; F3 death classification
         and withdrawal propagation are deliberately not implemented in A3.
     contractTests:
+    - path: elohim/ark/supervisor/tests/admission_contract.rs
+      testName: authenticated_content_needs_a_matching_admitted_record
+      kind: integration
+    - path: elohim/ark/supervisor/tests/admission_contract.rs
+      testName: reader_gaps_and_output_mismatch_never_admit
+      kind: integration
     - path: elohim/ark/supervisor/tests/admission_contract.rs
       testName: observed_requirements_admit_for_the_named_executable
       kind: integration

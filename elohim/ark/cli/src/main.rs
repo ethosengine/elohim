@@ -107,24 +107,19 @@ enum Command {
 enum HostCommand {
     /// Print freshly observed host compatibility axes (local diagnostic only).
     Provides,
-    /// Admit a locally stored Requires JSON array, without printing host values.
+    /// Admit verified output bytes through the local artifact record.
+    /// Unmeasured gaps exit 0: nothing was admitted and nothing was refused.
     Admit {
-        #[arg(long)]
-        requires: PathBuf,
+        /// Diagnostic only: no own-build rule, no record provenance.
+        #[arg(long, conflicts_with_all = ["binary", "output"], required_unless_present = "output")]
+        requires: Option<PathBuf>,
         #[arg(long, default_value = "binary")]
         name: String,
-        /// Verify the requirement document against its recorded byte CID.
-        #[arg(long)]
-        requires_cid: Option<String>,
-        /// Verify the binary against the Produce output before using its requirements.
+        /// Verify the binary against the output CID before resolving the record.
         #[arg(long, requires = "output")]
         binary: Option<PathBuf>,
         #[arg(long, requires = "binary")]
         output: Option<String>,
-        /// Produce CID from this device's own record lookup (epr artifact requires --json),
-        /// never from a publisher. Requires verified binary/output bytes.
-        #[arg(long, requires_all = ["binary", "output"])]
-        own_produce: Option<String>,
     },
 }
 
@@ -268,17 +263,13 @@ fn execute(command: Command) -> Result<u8, Failure> {
                 HostCommand::Admit {
                     requires,
                     name,
-                    requires_cid,
                     binary,
                     output,
-                    own_produce,
                 },
         } => Ok(host::admit(
-            &requires,
+            requires.as_deref(),
             &name,
-            requires_cid.as_deref(),
             binary.as_deref().zip(output.as_deref()),
-            own_produce.as_deref(),
         )),
         Command::Run {
             manifest,

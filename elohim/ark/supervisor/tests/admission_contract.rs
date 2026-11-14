@@ -1,17 +1,174 @@
 //! Host admission against a synthetic observed host: requirement-side effects only,
 //! the own-build rule's conditions, and the no-host-values wire goldens. Candidate
-//! authentication's use of the effect is covered in ark-core's candidate contract.
+//! grants are tested separately from core authentication.
 
 use std::collections::BTreeSet;
 
-use ark_core::compatibility::CompatibilityEffect;
+mod support;
+use ark_supervisor::admission::AdmissionRecord;
 use ark_supervisor::admission::{
-    admit_artifact, admit_recorded_requirements, HostAxesDebug, OwnProduce, UNPROBED_X86,
+    admit_artifact, admit_recorded_requirements, HostAxesDebug, UNPROBED_X86,
 };
 use cid::Cid;
 use elohim_epr::cid::compute_cid;
 use elohim_epr::verdict::Decision;
 use host_contract::{AxisId, AxisValue, Clause, ClauseSource, Predicate, Provides, Requires};
+
+#[path = "support/candidate.rs"]
+mod candidate;
+
+#[test]
+fn authenticated_content_needs_a_matching_admitted_record() {
+    use ark_core::candidate::CandidateRefusal;
+    use ark_supervisor::admission::{admit_candidate, PlatformRefusal};
+    let authenticated = candidate::authenticated();
+    let output = authenticated.content().candidate.executable;
+    let requires = native_requires(vec![isa_clause(ClauseSource::Extracted, &["avx2"])]).unwrap();
+    let recorded = support::resolve(output, Some(&requires), true).unwrap();
+    let admitted = admit_candidate(
+        authenticated.clone(),
+        recorded,
+        &synthetic_host(),
+        &BTreeSet::new(),
+    )
+    .unwrap();
+    assert_eq!(admitted.authenticated(), &authenticated);
+    assert_eq!(admitted.executable(), output);
+    assert_eq!(admitted.verdict().decision, Decision::Permit);
+    assert_eq!(admitted.own_build_rule().len(), 1);
+    assert_eq!(
+        admitted.own_produce(),
+        Some(compute_cid(b"this device's Produce"))
+    );
+    let record = admitted.record();
+    let wire = serde_json::to_string(&record).unwrap();
+    assert_eq!(
+        serde_json::from_str::<AdmissionRecord>(&wire).unwrap(),
+        record
+    );
+    for (other_output, own, withdrawn) in [
+        (compute_cid(b"other"), true, BTreeSet::new()),
+        (output, false, BTreeSet::new()),
+        (output, true, BTreeSet::from([output])),
+    ] {
+        let recorded = support::resolve(other_output, Some(&requires), own).unwrap();
+        let refusal = admit_candidate(
+            authenticated.clone(),
+            recorded,
+            &synthetic_host(),
+            &withdrawn,
+        )
+        .unwrap_err();
+        assert_eq!(refusal.label(), "candidate_wrong_platform");
+        if other_output != output {
+            assert!(matches!(
+                refusal,
+                CandidateRefusal::WrongPlatform(
+                    PlatformRefusal::RequirementForOtherExecutable { .. }
+                )
+            ));
+        } else {
+            assert!(matches!(
+                refusal,
+                CandidateRefusal::WrongPlatform(PlatformRefusal::Refused(_))
+            ));
+        }
+    }
+    let missing = support::resolve(output, Some(&Requires::default()), false).unwrap();
+    assert!(matches!(
+        admit_candidate(
+            authenticated.clone(),
+            missing,
+            &synthetic_host(),
+            &BTreeSet::new()
+        ),
+        Err(CandidateRefusal::WrongPlatform(_))
+    ));
+    let plain = support::resolve(output, Some(&native_requires(vec![]).unwrap()), false).unwrap();
+    assert!(
+        admit_candidate(authenticated, plain, &synthetic_host(), &BTreeSet::new())
+            .unwrap()
+            .own_build_rule()
+            .is_empty()
+    );
+}
+
+#[test]
+fn reader_gaps_and_output_mismatch_never_admit() {
+    use ark_supervisor::admission::ResolveGap;
+    use serde_json::json;
+    let case = fixture();
+    for (status, diagnostic, expected) in [
+        (3, "not recorded", ResolveGap::NotRecorded),
+        (
+            2,
+            "unknown output",
+            ResolveGap::UnknownOutput(case.executable),
+        ),
+        (
+            2,
+            "error: unrecognized subcommand 'requires'",
+            ResolveGap::NoReader,
+        ),
+        (
+            1,
+            "reader failed",
+            ResolveGap::Malformed("artifact reader failed".into()),
+        ),
+    ] {
+        assert_eq!(
+            support::stub(
+                case.executable,
+                case.requires.as_ref(),
+                json!(null),
+                status,
+                diagnostic
+            )
+            .unwrap_err(),
+            expected
+        );
+    }
+    let mut reply = json!({"output":compute_cid(b"different output").to_string(), "requires":compute_cid(b"requires").to_string(), "self":true, "produce":compute_cid(b"produce").to_string(), "path":"WRITE_PATH"});
+    assert_eq!(
+        support::stub(
+            case.executable,
+            case.requires.as_ref(),
+            reply.clone(),
+            0,
+            ""
+        )
+        .unwrap_err(),
+        ResolveGap::Malformed("output mismatch".into())
+    );
+    reply["output"] = json!(case.executable.to_string());
+    reply["produce"] = json!("not a CID");
+    assert!(matches!(
+        support::stub(
+            case.executable,
+            case.requires.as_ref(),
+            reply.clone(),
+            0,
+            ""
+        ),
+        Err(ResolveGap::Malformed(_))
+    ));
+    reply["self"] = json!(false);
+    assert!(support::stub(
+        case.executable,
+        case.requires.as_ref(),
+        reply.clone(),
+        0,
+        ""
+    )
+    .is_ok());
+    reply["self"] = json!(true);
+    reply["produce"] = json!(null);
+    let recorded = support::stub(case.executable, case.requires.as_ref(), reply, 0, "").unwrap();
+    assert_eq!(
+        admit_artifact(&recorded, &case.provides, &BTreeSet::new()).own_produce(),
+        None
+    );
+}
 
 fn set(values: &[&str]) -> BTreeSet<String> {
     values.iter().map(|s| (*s).to_owned()).collect()
@@ -23,7 +180,7 @@ struct Case {
     executable: Cid,
     requires: Option<Requires>,
     provides: Provides,
-    own_produce: Option<OwnProduce>,
+    own_produce: Option<Cid>,
     withdrawn_artifacts: BTreeSet<Cid>,
 }
 
@@ -43,14 +200,14 @@ fn fixture() -> Case {
     }
 }
 
-fn admit(case: &Case) -> CompatibilityEffect {
-    admit_artifact(
+fn admit(case: &Case) -> AdmissionRecord {
+    let recorded = support::resolve(
         case.executable,
         case.requires.as_ref(),
-        &case.provides,
-        case.own_produce.as_ref(),
-        &case.withdrawn_artifacts,
+        case.own_produce == Some(case.executable),
     )
+    .unwrap();
+    admit_artifact(&recorded, &case.provides, &case.withdrawn_artifacts)
 }
 
 fn isa_clause(source: ClauseSource, features: &[&str]) -> Clause {
@@ -91,11 +248,11 @@ fn native_requires(mut clauses: Vec<Clause>) -> Result<Requires, host_contract::
     Requires::try_from(clauses)
 }
 
-fn own_produce(executable: Cid) -> OwnProduce {
-    OwnProduce::from_local_lookup(compute_cid(b"this device's Produce"), executable)
+fn local_output(executable: Cid) -> Cid {
+    executable
 }
 
-fn summary_of<'a>(effect: &'a CompatibilityEffect, suffix: &str) -> &'a str {
+fn summary_of<'a>(effect: &'a AdmissionRecord, suffix: &str) -> &'a str {
     &effect
         .verdict()
         .witness
@@ -149,7 +306,7 @@ fn unmet_isa_names_required_axis_without_host_values() {
 #[test]
 fn unknown_and_unobserved_refuse_even_own_builds() {
     let mut case = fixture();
-    case.own_produce = Some(own_produce(case.executable));
+    case.own_produce = Some(local_output(case.executable));
     case.requires =
         Some(native_requires(vec![isa_clause(ClauseSource::Extracted, &["avx2"])]).unwrap());
     case.provides = Provides::default();
@@ -175,13 +332,9 @@ fn unknown_and_unobserved_refuse_even_own_builds() {
 #[test]
 fn absent_and_empty_native_requirements_refuse() {
     let mut case = fixture();
-    case.requires = None;
-    case.own_produce = Some(own_produce(case.executable));
-    let result = admit(&case);
-    assert_eq!(result.verdict().decision, Decision::Refuse);
     assert_eq!(
-        result.verdict().witness.checks[0].summary,
-        "missing-requirement"
+        support::resolve(case.executable, None, true).unwrap_err(),
+        ark_supervisor::admission::ResolveGap::NotRecorded
     );
     case.requires = Some(Requires::default());
     assert_eq!(admit(&case).verdict().decision, Decision::Refuse);
@@ -213,7 +366,7 @@ fn recorded_requirements_never_use_the_own_build_rule() {
 #[test]
 fn own_build_permit_names_every_waived_clause() {
     let mut case = fixture();
-    case.own_produce = Some(own_produce(case.executable));
+    case.own_produce = Some(local_output(case.executable));
     let waived = vec![
         isa_clause(ClauseSource::Extracted, &["avx2"]),
         isa_clause(ClauseSource::Extracted, &["bmi2"]),
@@ -248,7 +401,7 @@ fn declared_proven_non_isa_sibling_and_withdrawn_refuse() {
     let base = fixture();
     for source in [ClauseSource::Declared, ClauseSource::Proven] {
         let mut case = base.clone();
-        case.own_produce = Some(own_produce(case.executable));
+        case.own_produce = Some(local_output(case.executable));
         case.requires = Some(
             native_requires(vec![
                 isa_clause(ClauseSource::Extracted, &["bmi2"]),
@@ -261,7 +414,7 @@ fn declared_proven_non_isa_sibling_and_withdrawn_refuse() {
         assert!(result.own_build_rule().is_empty());
     }
     let mut case = base;
-    case.own_produce = Some(own_produce(case.executable));
+    case.own_produce = Some(local_output(case.executable));
     case.requires = Some(
         native_requires(vec![Clause {
             axis: AxisId("arch".into()),
@@ -276,7 +429,7 @@ fn declared_proven_non_isa_sibling_and_withdrawn_refuse() {
         Some(native_requires(vec![isa_clause(ClauseSource::Extracted, &["avx2"])]).unwrap());
     case.own_produce = None;
     assert_eq!(admit(&case).verdict().decision, Decision::Refuse);
-    case.own_produce = Some(own_produce(case.executable));
+    case.own_produce = Some(local_output(case.executable));
     case.withdrawn_artifacts.insert(case.executable);
     assert_eq!(admit(&case).verdict().decision, Decision::Refuse);
     case.withdrawn_artifacts.clear();
@@ -294,7 +447,7 @@ fn native_candidates_require_both_arch_and_os() {
     ] {
         let mut case = fixture();
         case.requires = Some(Requires::try_from(clauses.clone()).unwrap());
-        case.own_produce = Some(own_produce(case.executable));
+        case.own_produce = Some(local_output(case.executable));
         let result = admit(&case);
         assert_eq!(result.verdict().decision, Decision::Refuse);
         for axis in ["arch", "os"] {
@@ -315,7 +468,7 @@ fn native_candidates_require_both_arch_and_os() {
 fn unprobed_features_refuse_without_an_own_build_waiver() {
     for feature in UNPROBED_X86 {
         let mut case = fixture();
-        case.own_produce = Some(own_produce(case.executable));
+        case.own_produce = Some(local_output(case.executable));
         case.requires =
             Some(native_requires(vec![isa_clause(ClauseSource::Extracted, &[feature])]).unwrap());
         // Even a supplied inventory cannot promote a feature ark cannot probe.
@@ -343,7 +496,7 @@ fn mixed_axis_waives_only_the_failed_extracted_evidence() {
         ("sse3", "avx2", Decision::Refuse),
     ] {
         let mut case = fixture();
-        case.own_produce = Some(own_produce(case.executable));
+        case.own_produce = Some(local_output(case.executable));
         case.requires = Some(
             native_requires(vec![
                 isa_clause(ClauseSource::Extracted, &[extracted]),
@@ -366,7 +519,7 @@ fn produce_for_another_executable_cannot_waive() {
     let mut case = fixture();
     case.requires =
         Some(native_requires(vec![isa_clause(ClauseSource::Extracted, &["avx2"])]).unwrap());
-    case.own_produce = Some(own_produce(compute_cid(b"other executable")));
+    case.own_produce = Some(local_output(compute_cid(b"other executable")));
     let result = admit(&case);
     assert_eq!(result.verdict().decision, Decision::Refuse);
     assert_eq!(result.own_produce(), None);
@@ -411,7 +564,7 @@ fn admission_wire_goldens_disclose_effect_and_produce_only() {
     let required = json!({"axis":"isa.x86","predicate":{"kind":"subset","value":["avx2"]},
         "source":"extracted"});
     for own in [false, true] {
-        case.own_produce = own.then(|| own_produce(case.executable));
+        case.own_produce = own.then(|| local_output(case.executable));
         let result = admit(&case);
         let evidence = if own {
             json!({"required":required,"ownProduce":produce})
@@ -433,7 +586,7 @@ fn admission_wire_goldens_disclose_effect_and_produce_only() {
         assert_eq!(wire, golden);
         // The recorded effect round-trips through its own wire form.
         assert_eq!(
-            serde_json::from_value::<CompatibilityEffect>(wire.clone()).unwrap(),
+            serde_json::from_value::<AdmissionRecord>(wire.clone()).unwrap(),
             result
         );
         let wire = wire.to_string();

@@ -1,12 +1,9 @@
 use std::collections::BTreeSet;
 
 use ark_core::candidate::*;
-use ark_core::compatibility::{CompatibilityEffect, WaivedClause};
 use chrono::{TimeZone, Utc};
 use cid::Cid;
-use elohim_epr::verdict::{CheckOutcome, CheckWitness, Decision, Verdict, Witness};
 use elohim_epr::{cid::compute_cid, AgentKeypair, Epr, EprKind, Reach};
-use serde_json::json;
 
 fn set(values: &[&str]) -> BTreeSet<String> {
     values.iter().map(|s| (*s).to_owned()).collect()
@@ -65,7 +62,6 @@ fn fixture() -> (CandidateContent, CandidatePin, CandidateObservation) {
         observed_executable: raw,
         candidate_manifest: content.candidate.manifest,
         now,
-        compatibility: Some(permit_effect(raw)),
     };
     (content, pin, observed)
 }
@@ -198,7 +194,7 @@ fn independent_target_and_installed_changes_refuse_stale_content() {
 #[test]
 fn signed_incompatible_candidates_do_not_gain_compatibility_from_signature() {
     let (content, pin, observed) = fixture();
-    let cases: Vec<(CandidateContent, CandidateRefusal<PlatformRefusal>)> = vec![
+    let cases: Vec<(CandidateContent, CandidateRefusal)> = vec![
         (
             CandidateContent {
                 candidate: CandidateRuntime {
@@ -313,153 +309,23 @@ fn refusal_labels_are_stable_and_distinct() {
     ]);
 }
 
-// Effects are built directly here: admission itself (requirements against an observed
-// host, the own-build rule) is the supervisor's, and its tests live there
-// (elohim/ark/supervisor/tests/admission_contract.rs).
-
-fn verdict(executable: Cid, decision: Decision, checks: Vec<CheckWitness>) -> Verdict {
-    Verdict {
-        axis: "host-compatibility".into(),
-        subject: Some(executable.to_string()),
-        decision,
-        witness: Witness { checks },
-        policy_ref: None,
-    }
-}
-
-fn permit_effect(executable: Cid) -> CompatibilityEffect {
-    CompatibilityEffect::from_admission(
-        executable,
-        verdict(executable, Decision::Permit, Vec::new()),
-        Vec::new(),
-        None,
-    )
-}
-
-fn required_avx2() -> serde_json::Value {
-    json!({"axis":"isa.x86","predicate":{"kind":"subset","value":["avx2"]},"source":"extracted"})
-}
-
-fn refusal_effect(executable: Cid) -> CompatibilityEffect {
-    CompatibilityEffect::from_admission(
-        executable,
-        verdict(
-            executable,
-            Decision::Refuse,
-            vec![CheckWitness {
-                check_id: "host-compatibility:isa.x86".into(),
-                outcome: CheckOutcome::Failed,
-                summary: "unmet".into(),
-                observed: Some(json!({ "required": required_avx2() })),
-            }],
-        ),
-        Vec::new(),
-        None,
-    )
-}
-
-fn own_build_effect(executable: Cid) -> CompatibilityEffect {
-    let produce = compute_cid(b"this device's Produce");
-    CompatibilityEffect::from_admission(
-        executable,
-        verdict(
-            executable,
-            Decision::Permit,
-            vec![CheckWitness {
-                check_id: "host-compatibility:isa.x86".into(),
-                outcome: CheckOutcome::Passed,
-                summary: "permit-under-own-build-rule".into(),
-                observed: Some(json!({ "required": required_avx2(), "ownProduce": produce })),
-            }],
-        ),
-        vec![WaivedClause {
-            axis: "isa.x86".into(),
-            predicate: json!({"kind":"subset","value":["avx2"]}),
-            source: "extracted".into(),
-            narrowing: None,
-        }],
-        Some(produce),
-    )
-}
-
 #[test]
-fn permit_effect_authenticates_even_when_platform_labels_differ() {
+fn authentication_does_not_claim_host_compatibility() {
     let (mut content, pin, observed) = fixture();
     content.candidate.platform = "different-informational-target-label".into();
     let result = authenticate_candidate(&signed(&content, &pin), &pin, &observed).unwrap();
-    assert!(result.admission().permits());
-    assert!(result.admission().own_build_rule().is_empty());
-    assert_eq!(
-        result.admission().executable(),
-        observed.observed_executable
-    );
-    let mut own = observed.clone();
-    own.compatibility = Some(own_build_effect(observed.observed_executable));
-    let result = authenticate_candidate(&signed(&content, &pin), &pin, &own).unwrap();
-    assert_eq!(result.admission().own_build_rule().len(), 1);
-    assert_eq!(
-        result.admission().own_produce(),
-        Some(compute_cid(b"this device's Produce"))
-    );
+    assert_eq!(result.content(), &content);
 }
 
 #[test]
-fn refusal_effect_refuses_wrong_platform_with_its_unmet_clauses() {
+fn artifact_mismatch_precedes_missing_capability() {
     let (content, pin, mut observed) = fixture();
-    let effect = refusal_effect(observed.observed_executable);
-    observed.compatibility = Some(effect.clone());
-    let refusal = authenticate_candidate(&signed(&content, &pin), &pin, &observed).unwrap_err();
-    assert_eq!(refusal.label(), "candidate_wrong_platform");
-    let CandidateRefusal::WrongPlatform(PlatformRefusal::Refused(carried)) = refusal else {
-        panic!("expected a refused effect, got {refusal:?}");
-    };
-    assert_eq!(*carried, effect);
-    let wire = serde_json::to_value(&*carried).unwrap();
-    assert_eq!(
-        wire["verdict"]["witness"]["checks"][0]["observed"]["required"],
-        required_avx2()
-    );
-    assert_eq!(wire["verdict"]["witness"]["checks"][0]["summary"], "unmet");
-}
-
-#[test]
-fn effect_for_another_executable_refuses_wrong_platform() {
-    let (content, pin, mut observed) = fixture();
-    let other = compute_cid(b"other executable");
-    // Neither a plain nor an own-build permit carries to different bytes.
-    for effect in [permit_effect(other), own_build_effect(other)] {
-        observed.compatibility = Some(effect);
-        assert_eq!(
-            authenticate_candidate(&signed(&content, &pin), &pin, &observed),
-            Err(CandidateRefusal::WrongPlatform(
-                PlatformRefusal::EffectForOtherExecutable {
-                    effect_executable: other
-                }
-            ))
-        );
-    }
-}
-
-#[test]
-fn missing_effect_refuses_wrong_platform() {
-    let (content, pin, mut observed) = fixture();
-    observed.compatibility = None;
-    assert_eq!(
-        authenticate_candidate(&signed(&content, &pin), &pin, &observed),
-        Err(CandidateRefusal::WrongPlatform(PlatformRefusal::NoEffect))
-    );
-}
-
-#[test]
-fn compatibility_refuses_after_artifact_mismatch_and_before_capabilities() {
-    let (content, pin, mut observed) = fixture();
-    observed.compatibility = None;
     observed.required_capabilities.insert("not-provided".into());
     assert_eq!(
         authenticate_candidate(&signed(&content, &pin), &pin, &observed),
-        Err(CandidateRefusal::WrongPlatform(PlatformRefusal::NoEffect))
+        Err(CandidateRefusal::MissingCapability)
     );
-    observed.observed_executable = compute_cid(b"wrong independently observed bytes");
+    observed.observed_executable = compute_cid(b"wrong bytes");
     assert_eq!(
         authenticate_candidate(&signed(&content, &pin), &pin, &observed),
         Err(CandidateRefusal::ArtifactMismatch)

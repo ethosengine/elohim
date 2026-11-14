@@ -1,6 +1,134 @@
 use eprfs_core::BlobCid;
 use serde_json::{json, Value};
-use std::{fs, process::Command};
+use std::{fs, os::unix::fs::PermissionsExt, process::Command};
+
+struct Reader {
+    dir: tempfile::TempDir,
+    output: String,
+}
+
+impl Reader {
+    fn new() -> Self {
+        let dir = tempfile::tempdir().unwrap();
+        fs::write(dir.path().join("binary"), b"binary").unwrap();
+        fs::write(
+            dir.path().join("epr"),
+            r##"#!/bin/sh
+set -eu
+[ "$1 $2 $3 $5 $7" = 'artifact requires --output --write --json' ]
+base="$(dirname "$0")"
+case "${MODE:-ok}" in
+  gap) exit 3 ;;
+  unknown) exit 2 ;;
+  missing) echo "error: unrecognized subcommand 'requires'" >&2; exit 2 ;;
+esac
+cp "$base/requires" "$6"
+sed "s|WRITE_PATH|$6|g" "$base/reply"
+"##,
+        )
+        .unwrap();
+        fs::set_permissions(dir.path().join("epr"), fs::Permissions::from_mode(0o700)).unwrap();
+        Self {
+            dir,
+            output: BlobCid::compute_bytes(b"binary").to_string(),
+        }
+    }
+    fn record(&self, clauses: &[Value], own: bool) {
+        fs::write(
+            self.dir.path().join("requires"),
+            serde_json::to_vec(clauses).unwrap(),
+        )
+        .unwrap();
+        fs::write(self.dir.path().join("reply"), json!({"output":self.output, "requires":BlobCid::compute_bytes(&serde_json::to_vec(clauses).unwrap()).to_string(), "self":own, "produce":BlobCid::compute_bytes(b"Produce").to_string(), "path":"WRITE_PATH"}).to_string()).unwrap();
+    }
+    fn run(&self, mode: &str) -> (i32, String) {
+        let output = Command::new(env!("CARGO_BIN_EXE_ark"))
+            .env("EPR_BIN", self.dir.path().join("epr"))
+            .env("MODE", mode)
+            .args(["host", "admit", "--output", &self.output, "--binary"])
+            .arg(self.dir.path().join("binary"))
+            .args(["--name", "fixture"])
+            .output()
+            .unwrap();
+        assert!(output.stderr.is_empty());
+        let line = String::from_utf8(output.stdout).unwrap();
+        assert_eq!(line.lines().count(), 1);
+        (output.status.code().unwrap(), line)
+    }
+}
+
+#[test]
+fn recorded_output_requires_verified_bytes_before_reader_lookup() {
+    let reader = Reader::new();
+    reader.record(&floor(), false);
+    assert_eq!(
+        reader.run("ok"),
+        (0, "ok compatibility fixture: admitted\n".into())
+    );
+    fs::write(reader.dir.path().join("binary"), b"wrong bytes").unwrap();
+    let (exit, line) = reader.run("gap");
+    assert_eq!(exit, 1);
+    assert!(line.contains("recorded CID does not match bytes"));
+}
+
+#[test]
+#[cfg(target_arch = "x86_64")]
+fn reader_alone_supplies_own_build_eligibility() {
+    let reader = Reader::new();
+    let mut clauses = floor();
+    clauses.push(json!({"axis":"isa.x86", "predicate":{"kind":"subset", "value":["hostcompat_impossible_feature"]}, "source":"extracted"}));
+    reader.record(&clauses, true);
+    assert_eq!(reader.run("ok"), (0, "ok compatibility fixture: admitted under the own-build rule (waived: isa.x86 hostcompat_impossible_feature)\n".into()));
+    reader.record(&clauses, false);
+    assert_eq!(reader.run("ok").0, 1);
+    for source in ["declared", "proven"] {
+        clauses[2]["source"] = json!(source);
+        reader.record(&clauses, true);
+        assert_eq!(reader.run("ok").0, 1);
+    }
+}
+
+#[test]
+fn gaps_are_unmeasured_but_unknown_output_is_refused() {
+    let reader = Reader::new();
+    reader.record(&floor(), true);
+    for mode in ["gap", "missing"] {
+        let (exit, line) = reader.run(mode);
+        assert_eq!(exit, 0);
+        assert!(line.contains("unmeasured ("));
+    }
+    let (exit, line) = reader.run("unknown");
+    assert_eq!(exit, 1);
+    assert!(line.starts_with("REFUSED compatibility fixture: epr does not know output"));
+    fs::write(reader.dir.path().join("reply"), "{}").unwrap();
+    let (exit, line) = reader.run("ok");
+    assert_eq!(exit, 0);
+    assert!(line.contains("unmeasured (malformed"));
+}
+
+#[test]
+fn cli_separates_record_and_diagnostic_forms() {
+    for args in [
+        vec!["--own-produce", "cid", "--requires", "file"],
+        vec!["--output", "cid"],
+        vec!["--binary", "file"],
+        vec!["--requires", "file", "--output", "cid", "--binary", "file"],
+    ] {
+        let result = Command::new(env!("CARGO_BIN_EXE_ark"))
+            .args(["host", "admit"])
+            .args(args)
+            .output()
+            .unwrap();
+        assert_eq!(result.status.code(), Some(64));
+    }
+    let help = Command::new(env!("CARGO_BIN_EXE_ark"))
+        .args(["host", "admit", "--help"])
+        .output()
+        .unwrap();
+    assert!(String::from_utf8(help.stdout)
+        .unwrap()
+        .contains("nothing was admitted and nothing was refused"));
+}
 
 fn floor() -> Vec<Value> {
     vec![
@@ -31,7 +159,7 @@ fn admits_the_stored_clause_array() {
         run(&floor()),
         (
             true,
-            "ok compatibility fixture: admitted (2 clauses)\n".into()
+            "ok compatibility fixture: admitted (diagnostic: requirement from file, not from the record)\n".into()
         )
     );
 }
@@ -67,106 +195,4 @@ fn unknown_missing_and_non_isa_requirements_refuse() {
         assert!(line.contains(&format!("{axis} requires foreign")));
     }
     assert!(!run(&[]).0);
-}
-
-#[test]
-fn recorded_cids_are_checked_before_admission() {
-    let dir = tempfile::tempdir().unwrap();
-    let req = dir.path().join("requires.json");
-    let bin = dir.path().join("binary");
-    let bytes = serde_json::to_vec(&floor()).unwrap();
-    fs::write(&req, &bytes).unwrap();
-    fs::write(&bin, b"binary").unwrap();
-    let req_cid = BlobCid::compute_bytes(&bytes).to_string();
-    let output_cid = BlobCid::compute_bytes(b"binary").to_string();
-    let call = || {
-        Command::new(env!("CARGO_BIN_EXE_ark"))
-            .args(["host", "admit", "--requires"])
-            .arg(&req)
-            .args([
-                "--requires-cid",
-                &req_cid,
-                "--output",
-                &output_cid,
-                "--binary",
-            ])
-            .arg(&bin)
-            .output()
-            .unwrap()
-    };
-    assert!(call().status.success());
-    fs::write(&bin, b"foreign binary").unwrap();
-    let output = call();
-    assert!(!output.status.success());
-    assert!(String::from_utf8(output.stdout)
-        .unwrap()
-        .contains("output requires"));
-    fs::write(&bin, b"binary").unwrap();
-    fs::write(&req, b"[]").unwrap();
-    assert!(!call().status.success());
-}
-
-#[test]
-#[cfg(target_arch = "x86_64")]
-fn own_produce_waives_only_extracted_isa_after_byte_verification() {
-    let dir = tempfile::tempdir().unwrap();
-    let req = dir.path().join("requires.json");
-    let bin = dir.path().join("binary");
-    fs::write(&bin, b"binary").unwrap();
-    let output = BlobCid::compute_bytes(b"binary").to_string();
-    let produce = BlobCid::compute_bytes(b"local Produce record").to_string();
-    let call = || {
-        Command::new(env!("CARGO_BIN_EXE_ark"))
-            .args(["host", "admit", "--requires"])
-            .arg(&req)
-            .args(["--name", "fixture", "--binary"])
-            .arg(&bin)
-            .args(["--output", &output, "--own-produce", &produce])
-            .output()
-            .unwrap()
-    };
-    let mut clauses = floor();
-    clauses.push(json!({"axis":"isa.x86", "predicate":{"kind":"subset", "value":["hostcompat_impossible_feature"]}, "source":"extracted"}));
-    fs::write(&req, serde_json::to_vec(&clauses).unwrap()).unwrap();
-    let admitted = call();
-    assert!(admitted.status.success());
-    assert_eq!(String::from_utf8(admitted.stdout).unwrap(), "ok compatibility fixture: admitted under the own-build rule (waived: isa.x86 hostcompat_impossible_feature)\n");
-    fs::write(&bin, b"foreign bytes").unwrap();
-    let refused = call();
-    assert!(!refused.status.success());
-    assert!(String::from_utf8(refused.stdout)
-        .unwrap()
-        .contains("recorded CID does not match bytes"));
-    fs::write(&bin, b"binary").unwrap();
-    for source in ["declared", "proven"] {
-        clauses[2]["source"] = json!(source);
-        fs::write(&req, serde_json::to_vec(&clauses).unwrap()).unwrap();
-        let refused = call();
-        assert!(!refused.status.success());
-        let line = String::from_utf8(refused.stdout).unwrap();
-        assert!(line.starts_with("REFUSED compatibility fixture: isa.x86 requires"));
-        assert!(!line.contains("waived"));
-    }
-}
-
-#[test]
-fn own_produce_requires_binary_and_output() {
-    for extra in [vec![], vec!["--binary", "binary"], vec!["--output", "cid"]] {
-        let output = Command::new(env!("CARGO_BIN_EXE_ark"))
-            .args([
-                "host",
-                "admit",
-                "--requires",
-                "requires.json",
-                "--own-produce",
-                "cid",
-            ])
-            .args(extra)
-            .output()
-            .unwrap();
-        assert_eq!(output.status.code(), Some(64));
-        assert!(String::from_utf8(output.stderr)
-            .unwrap()
-            .contains("required arguments"));
-    }
 }
