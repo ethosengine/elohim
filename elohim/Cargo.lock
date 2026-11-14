@@ -1439,7 +1439,7 @@ dependencies = [
 
 [[package]]
 name = "eprfs-local"
-version = "0.3.5"
+version = "0.3.6"
 dependencies = [
  "bytes",
  "eprfs-core",
@@ -1454,7 +1454,7 @@ dependencies = [
 
 [[package]]
 name = "eprfs-storage"
-version = "0.3.7"
+version = "0.3.8"
 dependencies = [
  "async-trait",
  "blake3",

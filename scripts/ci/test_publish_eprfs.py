@@ -348,6 +348,29 @@ class PrecheckTests(unittest.TestCase):
         self.assertIn("packaged source differs", stderr)
         self.assertIn("(src/new file.rs)", stderr)
 
+    def test_sibling_version_moved_since_publication_refuses(self):
+        self.files["Cargo.lock"] = (
+            b'[[package]]\nname = "eprfs-core"\nversion = "0.1.0"\n\n'
+            b'[[package]]\nname = "eprfs-host"\nversion = "0.2.0"\nsource = "registry+https://example.invalid"\n'
+        )
+        (self.workspace / "Cargo.lock").write_text(
+            '[[package]]\nname = "eprfs-core"\nversion = "0.1.0"\n\n'
+            '[[package]]\nname = "eprfs-host"\nversion = "0.2.1"\n'
+        )
+        status, _, stderr = self.run_precheck()
+        self.assertEqual(status, 1)
+        self.assertIn(
+            f"{NAME} {VERSION}: the published Cargo.lock pins eprfs-host 0.2.0 but the workspace now builds 0.2.1",
+            stderr,
+        )
+
+    def test_sibling_versions_unchanged_since_publication_pass(self):
+        self.files["Cargo.lock"] = b'[[package]]\nname = "eprfs-host"\nversion = "0.2.1"\nsource = "registry+x"\n'
+        (self.workspace / "Cargo.lock").write_text('[[package]]\nname = "eprfs-host"\nversion = "0.2.1"\n')
+        status, stdout, stderr = self.run_precheck()
+        self.assertEqual(status, 0, stderr)
+        self.assertIn(f"verified existing: {NAME} {VERSION}", stdout)
+
     def test_absent_version_passes(self):
         responses = self.responses()
         responses[1] = HTTPError(BASE, 404, "missing", {}, None)

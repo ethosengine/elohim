@@ -350,6 +350,53 @@ def package_version(crate: Path, workspace_version: str | None = None) -> str:
     return version
 
 
+def workspace_members(lock: Path) -> dict[str, str]:
+    """Path packages (no `source`) a workspace lockfile builds, by name."""
+    if not lock.is_file():
+        return {}
+    try:
+        packages = tomllib.loads(lock.read_text()).get("package", [])
+    except (UnicodeDecodeError, tomllib.TOMLDecodeError):
+        raise PublishError(f"{lock}: unreadable workspace lockfile") from None
+    return {p["name"]: p["version"] for p in packages if "source" not in p and "name" in p and "version" in p}
+
+
+def archive_member(data: bytes, name: str, version: str, path: str) -> bytes | None:
+    """One file from an archive `archive_contents` has already validated."""
+    with gzip.GzipFile(fileobj=io.BytesIO(data)) as compressed:
+        tar_bytes = compressed.read(MAX_UNPACKED + 1)
+    with tarfile.open(fileobj=io.BytesIO(tar_bytes), mode="r:") as archive:
+        try:
+            member = archive.getmember(f"{name}-{version}/{path}")
+        except KeyError:
+            return None
+        handle = archive.extractfile(member)
+        return handle.read() if handle else None
+
+
+def locked_member_moves(remote: bytes, name: str, version: str, members: dict[str, str]) -> list[tuple[str, str, str]]:
+    """Workspace members the published package locked at a version the workspace no longer builds.
+
+    Cargo packs the workspace lockfile, filtered to the crate's graph, into every package, so a
+    sibling's version bump changes this crate's package even when none of its own files move —
+    the publish stage then refuses the unchanged version as an immutable collision.
+    """
+    if not members:
+        return []
+    lock = archive_member(remote, name, version, "Cargo.lock")
+    if lock is None:
+        return []
+    try:
+        packages = tomllib.loads(lock.decode()).get("package", [])
+    except (UnicodeDecodeError, tomllib.TOMLDecodeError):
+        raise PublishError(f"{name} {version}: published Cargo.lock is unreadable") from None
+    return sorted(
+        (p["name"], p["version"], members[p["name"]])
+        for p in packages
+        if p.get("name") != name and p.get("name") in members and p.get("version") != members[p["name"]]
+    )
+
+
 def precheck(repo: Path) -> None:
     eprfs_workspace = repo / "elohim/eprfs"
     manifest = tomllib.loads((eprfs_workspace / "Cargo.toml").read_text())
@@ -398,6 +445,14 @@ def precheck(repo: Path) -> None:
                 raise PublishError(
                     f"{name} {version}: packaged source differs from the published {version} "
                     f"({sorted(differences)[0]}); bump the version"
+                )
+            lockfile = (crate if name == "elohim-seam-contracts" else eprfs_workspace) / "Cargo.lock"
+            moved = locked_member_moves(remote, name, version, workspace_members(lockfile))
+            if moved:
+                dependency, published, current = moved[0]
+                raise PublishError(
+                    f"{name} {version}: the published Cargo.lock pins {dependency} {published} but the "
+                    f"workspace now builds {current}, so the package differs; bump the version"
                 )
             print(f"verified existing: {name} {version}", flush=True)
     except RegistryUnavailable as error:
