@@ -43,6 +43,11 @@ reordered or removed.
 - **Direction ruled**: variety is the protocol's strength; damage stays cheap and repair happens at
   the edge (spec §7.4). H11 (the six rules and the seed as written) is **open**. H10 (rakia) is
   **open** and gated below.
+- **H12, H13 and the scope of K10 are ruled** (2026-11-12, under the steward's delegation;
+  `sprints/2026-11-11-host-compatibility/rulings-2026-11-12.md`): reach on the object decides who
+  may draw it, with `serves` kept as a narrowing list; builds from different native compilers
+  share a family and not a key (H13); K10 is built as the own-build rule first. Nothing in lanes A, K,
+  V or P waits on a steward ruling as of 2026-11-14. Only P3 does (H10).
 - **Inherit, do not mint** (spec §9): every record is expressed through `elohim/epr` and
   `elohim/epr-rea` primitives unless the item says why not.
 - **In-kind work is still accounted** (steward, 2026-11-12): work the steward's own devices supply
@@ -67,11 +72,19 @@ reordered or removed.
   governance, integrity and witness. The contract, the extraction and the recorded inputs exist
   so that a job and the peer under it can know before a run whether it will fit, refuse early,
   and send that refusal back as feedback. Each time an elohim is called for something a program
-  could have checked, that is a finding, and its repair is a new floor check. This widens
-  `GATE_EVIDENCE=reuse`, which accepts only this workspace's own attestation
-  today (habit `push-gate-pays-once`, `genesis/orchestrator/.epr-meta/`). The mechanism is not
-  designed here; it is owed as an item in that habit's lane, and an accepted sibling verdict is
-  accounted like any other supplied work (ruling above).
+  could have checked, that is a finding, and its repair is a new floor check. An accepted sibling
+  verdict is accounted like any other supplied work (ruling above).
+  Corrected 2026-11-14: an earlier wording here said `GATE_EVIDENCE=reuse` accepts only this
+  workspace's own attestation and that the mechanism was still to be designed. The floor has been
+  in the gate runner since 2026-10-27 (habit `push-gate-pays-once`, its DELTA of that date;
+  `genesis/orchestrator/gate-evidence.mjs` `reusableHit`, `gate-runner.mjs` at the
+  `siblingVerdicts` call). After a local miss the runner asks `epr peer verdicts` for
+  `gate-verdict@1` rows from roster-admitted devices and reuses a green one for the exact
+  closure, behind the project allow-list, clean inputs, the selector check, a red from any device
+  as a veto, and a refusal when the push changes the gate's own governance paths. What is still
+  owed is in lane G at the end of this plan: no push on either device has yet printed
+  `independence: sibling`, and the closure key does not see the C compiler or the host's
+  instruction set.
 - **Rails, not one pipe**: feedback is judged against five rails (spec §9); several channels may
   remain.
 - **No habit is set active.** The two-slot fence is held by `dataplane-convergence` and
@@ -131,6 +144,16 @@ privacy tests pass in `just gate elohim-ark`. Open: shem's print, for the two-de
 - [x] **A3 — `authenticate_candidate` (`elohim/ark/core/src/candidate.rs`) admits against the observed host instead of comparing to the installed runtime's triple; `WrongPlatform` carries the unmet axis** (serves workspace-device-arrival)
 
 Verify: the candidate contract tests cover an admitted and a refused candidate on synthetic `Provides`. The admission returns a verdict a caller can record (variant CID, permit or the unmet clause) without exposing `Provides`, so P2 can put it in a fulfilment's evidence (ruling "In-kind work is still accounted").
+
+State (2026-11-14, review of d12a28be..240693e3): the verify above is met by contract tests. No
+running path enforces admission yet: outside tests nothing calls `admit_artifact`, builds a
+`CandidateObservation` or calls `authenticate_candidate`. Two bindings the spec states are
+conventions in the code and not checks, and item A5 (end of this plan) closes them before the
+first caller (P1, P2, V4 or R1) is wired. (1) `CompatibilityEffect` derives `Deserialize` and has
+a public constructor in ark-core, and `authenticate_candidate` checks only that the effect names
+the same executable and that its decision is a permit, so a hand-built effect with no checks
+authenticates. (2) `OwnProduce::from_local_lookup` takes two bare CIDs and looks nothing up, so
+"this device recorded the Produce" (ruling condition 2) is the caller's word.
 
 - [ ] **A4 — `just mesh preflight` prints one admitted-or-refused line per mesh binary** (serves dataplane-convergence)
 
@@ -362,3 +385,54 @@ Verify: the S5 scenario's second device adopts the repair after its health windo
 - [ ] **C4 — channel discovery inside the steward's devices (channel id, family, suite; not followers), and the commons-reach listing named as a missing node with the commons rung of spec §7.2** (serves dataplane-convergence)
 
 Verify: an elohim on one device lists the channels carrying a family from the steward space; the missing node for commons reach is recorded in the spec or the backlog.
+
+## Lane G and late items (appended 2026-11-14)
+
+Appended after lane C so earlier gap ids stay stable. Lane G is the gate-verdict half of the
+ruling "A sibling's gate verdict may stand in for a local run": the floor is built, and these
+items prove it and name what it does not see. A5 and K13 belong to lanes A and K and sit here
+only because items are appended, not inserted. Order: K13, then A4 part 2 and A5 together; G1
+needs no code and can run on the next landing.
+
+- [ ] **K13 — `epr artifact requires --output <cid>`: a read-only verb that returns a recorded output's requirement (the `env:requires` CID and the document bytes) and whether this device recorded the `Produce`, checked against this device's key and not taken from a flag; it is the missing node A4 part 2 names** (serves dataplane-convergence)
+
+Rules (steering verdict, 2026-11-14): it reads this device's own store and never the network.
+Several `Produce` events for one output are merged through `Requires::try_from`, so a conflict
+is a `MergeError` and never a silent choice; a `Produce` with no `env:requires` slot is ignored
+when another carries one (shem's v2 floor has one of each, journal "The floor"). An output with
+no slot at all answers `unmeasured` with exit 0 and a distinct line, so the preflight can print
+it without treating it as a refusal. The `self` answer is the only source A5 accepts for an
+own-build claim.
+
+Verify: on both devices the verb returns the mesh storage binary's requirement and `self: true`; for a sibling's fetched output it returns `self: false`; an output with no slot prints `unmeasured`.
+
+- [ ] **A5 — the admission effect and the own-build claim are bound by construction before any running path consumes them: `authenticate_candidate` re-checks that the verdict's subject is the executable, that its checks cover `arch` and `os`, and that an own-build waiver is present exactly when an own Produce is named; `CompatibilityEffect` is no longer deserializable (a record carries its recordable projection, and the effect is rebuilt by admission); `OwnProduce` is constructed only from K13's verified answer; `Provides` loses its derived `Debug`** (serves workspace-device-arrival)
+
+ark-core stays free of the contract crate (240693e34): the re-checks read only ark-core's own
+verdict type. The observed host is the supervisor's own process environment (its libc, its
+mount namespace, the core the probe ran on); a child launched under another root is outside
+what A2 observes, and that limit is stated in spec §4 with this item, not solved by it.
+
+Verify: tests refuse a hand-built effect with empty checks, an effect whose subject differs from its executable, and a waiver with no own Produce; a sibling's Produce cannot produce an own-build permit; `{:?}` of a `Provides` does not compile or prints no observed value; `just gate elohim-ark` and `just gate host-contract` green.
+
+- [ ] **G1 — a live two-device receipt of sibling gate reuse (the artifact-store sprint's owed F1r, K7): one device gates a clean commit, the other pushes the same commit with `GATE_EVIDENCE=reuse` and its log prints `reused … independence: sibling` for at least one cargo project** (serves sprint-lands-each-closure-once)
+
+No code is owed. Both peer daemons must run an epr and a `pool-policy.json` that cross
+`gate-verdict@1`, and the commit must not touch the governance paths
+(`SIBLING_REUSE_GOVERNANCE_PATHS`), which always run locally. A miss is as useful as a hit when
+its `why` line is kept: it names the next floor check.
+
+Verify: the push log line and the `run-kind=sibling-reused` cycle row, linked from the habit `push-gate-pays-once` as a DELTA; the seconds the landing lane was held, beside the previous landing's.
+
+- [ ] **G2 — the gate verdict names what the closure key does not see: a `gate-verdict@1` row carries the recording device's coarse host class (proven bundle names only, H7), and the reuse line prints it beside the reusing device's own** (serves sprint-lands-each-closure-once)
+
+The key holds the source closure and `rustc -vV`. It does not hold the C compiler, the link
+floor or the instruction set, and the two devices differ in all three (K9 receipt). Verdict
+(2026-11-14): this does not gate G1 or daily use between the steward's own devices. A green
+that a host difference would have turned red is caught by CI on dev, and the device that
+accepted it repairs. G2 makes the difference visible on the line; a project is taken off sibling
+reuse (a per-project `sibling: false` in `gate_reuse`) only after a measured disagreement,
+never in advance.
+
+Verify: a reuse line showing both classes; a test that a row with no class still reuses and prints `class unmeasured`.
+

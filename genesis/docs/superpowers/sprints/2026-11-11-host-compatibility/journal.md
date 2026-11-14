@@ -103,12 +103,12 @@ working posture, so none is left open. A steward ruling overrides any posture.
 |---|---|---|---|---|
 | 1 | Parked local rebase (stasis :17) | shem | No standing ruling asked; shem integrates by merge only, never a local rebase | adopted |
 | 2 | A1 README loop close | shem | Round 5 fresh read: 0 correctness, 3 interpretability; its glosses applied (psABI, DAG-CBOR, `compile_fail`, toolchain), with no fresh read of them; closed under the 2026-10-20 no-fixed-point ruling. Rounds: 0/4/0, 0/3/2, 0/3/2, 0/2/3, 0/3/0 | closed |
-| 3 | Who may draw a floor (was: sysroot serves grant) | steward rules; ethosengine designs | Changed at the steward's direction: no grant row. Spec §7.8 (6e8c1e2a1) puts reach on the object: every Produce carries `env:reach`, the peer gate serves when the requester's relationship meets it, and `berth.artifacts.serves` becomes a narrowing list. The sysroot-pack grant proposal is withdrawn. New rulings **H12** (reach on the object) and **H13** (compiler posture B). Implementation is lane K, held until H12 is ruled | awaiting steward: H12, H13 |
-| 4 | Compiler closure, A or B | ethosengine (lane K designer) | **B**: per-compiler variants share a family, never a key. A (a CID-pinned gcc closure as a seed member, X1) is a later optimisation | decided; steward ratifies |
+| 3 | Who may draw a floor (was: sysroot serves grant) | steward rules; ethosengine designs | Changed at the steward's direction: no grant row. Spec §7.8 (6e8c1e2a1) puts reach on the object: every Produce carries `env:reach`, the peer gate serves when the requester's relationship meets it, and `berth.artifacts.serves` becomes a narrowing list. The sysroot-pack grant proposal is withdrawn. New rulings **H12** (reach on the object) and **H13** (compiler posture B). Implementation is lane K, held until H12 is ruled | ruled 2026-11-12 (H12 option B, H13 posture B; `rulings-2026-11-12.md`); K12 may start, not yet built |
+| 4 | Compiler closure, A or B | ethosengine (lane K designer) | **B**: per-compiler variants share a family, never a key. A (a CID-pinned gcc closure as a seed member, X1) is a later optimisation | ratified 2026-11-12 (H13) |
 | 5 | Lane K review findings | ethosengine | (1) HIGH, fixed by deriving keyed libs from rustc's native-static-libs; (2) host tool lines stay in the key input until K6 slice 2; (3) the family carries rustc/cargo identity plus target.* only; (4) a tie refuses rather than guess, open to the steward; (6) the daemon serves its own CLI, which derived the key | dispositions in the K DELTA |
 | 6 | ethosengine's extracted vectors | shem | Raw extraction kept under `tests/vectors/extracted/`; two derived vectors: epr on a synthetic v3 host (permit) and on a synthetic v2 host (refuse; missing avx avx2 bmi1 bmi2 f16c fma lzcnt movbe osxsave). A mutation check confirmed both are evaluated | landed with this commit |
 | 7 | cc -march second F2r split (per-build CFLAGS) | ethosengine | K6 slice 2 runs the `-dM` probe with the realised per-build CFLAGS | planned |
-| 8 | A2-A4 (ark) | unassigned | Neither covenant covers `elohim/ark`. Whoever first holds a covenant with that write-set takes it and notes the other | awaiting a covenant |
+| 8 | A2-A4 (ark) | unassigned | Neither covenant covers `elohim/ark`. Whoever first holds a covenant with that write-set takes it and notes the other | taken by ethosengine 2026-11-14 (covenant "Lane A, ark write-set"); A2, A3 and A4 part 1 on dev at landing 35 |
 | 9 | K3 part 2, K6, K7 | ethosengine | Lane K continues | in flight |
 | 10 | Preflight checks: worktree hook path, setgid TMPDIR | next covenant covering `genesis/orchestrator` | Backlog row below; neither device's write-set covers it tonight | row ready |
 | 11 | `epr flow claim` refused from a worktree | next covenant covering the backlog | Backlog row below | row ready |
@@ -247,3 +247,72 @@ worktree-envelope note above).
   `elohim/ark` depends on. `authenticate_candidate` takes the supervisor's `CompatibilityEffect`
   and refuses it fail-closed (no effect, an effect for other bytes, a refusal). No other
   workspace's lockfile, manifest or image changed.
+
+## Steering review (2026-11-14, coordinating session a5b5548c)
+
+Asked by the steward: where the two devices stand against the plan, a brief review of lane A,
+verdicts on the open questions, and steering. Read at dev b1c788353. The plan carries the
+resulting edits (the corrected sibling-verdict ruling, A3's state, and items K13, A5, G1, G2).
+
+**Where the plan stands.** S1 to S3, A1, A3 and K9 are closed. A2 waits on shem's
+`ark host provides` print. A4 part 2 waits on K13. K1 to K8, K10 to K12 are unticked in the plan
+although the plan's own note says K1, K2, K3 part 1, K4, K5 and K6 slice 1 are on dev: their
+owner ticks each one against its verify line, or restates the line. K1's verify still says the
+two devices' keys are equal, which H13 ruled they are not. Lanes V, P, F, R and C are unstarted.
+
+**Open questions, answered.**
+
+| Question | Answer | Evidence |
+|---|---|---|
+| Does gate reuse accept a sibling's green yet? | Yes in code since 2026-10-27, behind five fences. It has never fired on a real push | `gate-runner.mjs` `siblingVerdicts` call; habit `push-gate-pays-once` DELTA 2026-10-27; no `independence: sibling` line in any push log on shem |
+| Are H12 and H13 open? | No. Both ruled 2026-11-12. K12 may start and is not built: `env:reach` appears only as a declared gap | `rulings-2026-11-12.md`; spec §12 |
+| Do the declared gaps block daily use? | No. `reach` closes with K12; build-scripts and dependency-sources close with K6's pinned closure; compiler-inputs closes with a build receipt (K11). Each prints as pending | plan K11 |
+| Is one landing lane the bottleneck? | The lane is right; the hold is too long. The author gates the exact commit before claiming the lane, and the lane then pays only what reuse cannot cover. G1 measures the hold | plan G1 |
+| Which gates run as placed tasks? | Only the orchestrator gate and `just measure`. No more are moved until P2 puts admission inside `ark task run`; then one cargo gate at a time, `elohim-ark` first | plan P2 |
+| Rust 1.96.1 | The gate pin on dev is already 1.100.0 (`pool-policy.json`). What remains is the holochain fork's own toolchain file and brit's pin. It retires with those pins and blocks nothing here | `pool-policy.json` `cargo_env_overrides` |
+| Reviews while Codex is out (until 2026-11-18) | Claude seats, with the reviewer given the code and not the author's conclusion. Blind-reader rounds are unaffected | memory note, shem |
+
+**Review of lane A (d12a28be, 4277de3e, f468a0ba, 240693e3).** Read by a separate reviewer and
+then checked in the source. Sound: the CPU probes (OS state gating for AVX and AVX-512, the
+leaf limit, the unprobed list held to the extractor's table by a test), the waiver logic (only
+an unmet, observed, extracted `isa.x86` clause waives, and any other failed check clears every
+waiver), and the shape of `admit_artifact` (a pure function over CIDs, a requirement and the
+observed host, with no checkout, mesh or CI assumption, so placement and a devspace launcher
+can call it). Not sound yet, and latent because nothing calls it outside tests: the effect and
+the own-build claim are forgeable by a caller (plan A3 state, item A5). Keeping ark-core free of
+the contract crate was the right call for the closures, and its cost is that the trust boundary
+now rests on those two types, so they must be closed by construction. `ark host admit` prints
+`ok` for any requirement file handed to it; with K13 it takes the requirement from the record
+by output CID, and the file form stays a diagnostic.
+
+**Steering.**
+
+1. shem: K13 first (its `self` answer is what A5 needs), then the A2 print. ethosengine: A5
+   beside A4 part 2. Neither waits on the other after K13's interface is agreed.
+2. G1 on the next landing, at no cost: whichever device lands next has the other gate the same
+   commit first. Record the hold time either way.
+3. No running path consumes an admission before A5 lands. P1, P2, V4 and R1 each name A5 as a
+   precondition in their brief.
+4. P1 takes the verdict by injection: placement-core declares the compatibility stage and an
+   admitter trait, and ark's supervisor supplies it. Placement never holds `Provides`, and
+   placement-core does not gain the contract crate, for the same closure reason as ark-core.
+5. Under H13 the only reuse of native builds between the two devices is lane V. With K3's fetch
+   by family landed, V1 is the next item on the critical path, ahead of more lane K polish.
+6. Owners tick or restate the lane K items this week, so `epr flow project` mints a true plate.
+
+**Work for a Fable seat.** Two items are design-heavy, cross several owners' seams, and are read
+by most of what follows. Each is better designed once by one seat holding the whole picture,
+then handed out as packets.
+- *The record seam of lanes V and P, as interfaces only*: the `VariantSet` document (V1), the
+  recordable admission verdict (A3, A5), and the commitment and fulfilment written as epr-rea
+  flow events on the plane `RecordPlane` chooses (P2 notes the placement drafts reach no store
+  today). V1 to V4, P1, P2, F3, R1 and C1 all read these three shapes, across ark-core,
+  eprfs fetch, placement-core and epr-rea. Deliverable: types, seam-registry rows and vector
+  tests, no behaviour. It unblocks both devices to build V and P in parallel.
+- *K12*: the serving gate gains a second path (reach on the object beside the method rows),
+  with a derivation of the narrowest input reach and an exit criterion for the old path. It is
+  the one item here where a mistake widens who can draw bytes, and it unblocks the K6 floor
+  draw, K7 and K11's `reach` gap.
+K10 step 3 (the dispatch certificate) is the hardest item in the plan and is correctly not
+started: its trigger has not been measured.
+
