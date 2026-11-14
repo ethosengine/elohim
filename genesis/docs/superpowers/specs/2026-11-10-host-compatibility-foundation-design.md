@@ -185,6 +185,26 @@ compares; which sources are good enough at which reach is decided by the existin
 - A device may run its own build on `declared` and `extracted` clauses.
 - Wider reach requires `proven` clauses for the host classes it is offered to.
 
+**The own-build rule** (ruled 2026-11-12, step 1 of the K10 sequence). Until dispatch evidence
+exists, an extracted ISA clause can overstate what a build needs, which would refuse a device its
+own tools. A device may therefore run a build whose recorded requirement it does not meet only
+when all of these hold:
+
+1. Every unmet clause is on the `isa.x86` axis and has source `extracted`. A `declared` or
+   `proven` clause, or a clause on any other axis, refuses as before.
+2. The artifact's `Produce` was recorded by this same device.
+3. The verdict is recorded as a permit under the own-build rule, naming each unmet clause, and
+   is distinct from a plain permit.
+4. The rule applies only on the device that recorded the build: a sibling is offered the build
+   only when `admit` permits it on the clause as recorded.
+5. An illegal-instruction death of that artifact on that device (ark's death witness, §9 gaps)
+   withdraws the rule for that artifact on that device.
+
+Ark's candidate admission (plan A3) is where these conditions are checked. The rule is removed
+for an artifact once dispatch evidence (K10 option A) narrows that artifact's clause, and removed
+altogether once that evidence covers every tool in the seed. Its recorded uses are one of the
+measures that start that work.
+
 Evidence can also be withdrawn:
 
 - A crash that contradicts a requirement (an illegal-instruction death, a loader failure) is
