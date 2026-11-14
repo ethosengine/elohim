@@ -27,7 +27,7 @@ pub fn observe_host() -> Provides {
     #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
     provides.observe(
         AxisId(axis::ISA_X86.into()),
-        AxisValue::Names(x86_features()),
+        AxisValue::Names(super::x86::observe()),
     );
     #[cfg(all(target_os = "linux", target_env = "gnu"))]
     {
@@ -109,6 +109,24 @@ fn observe_linux(provides: &mut Provides) {
         "/lib64/ld-linux-x86-64.so.2",
         "/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2",
         "/lib/ld-linux.so.2",
+        "/lib32/ld-linux.so.2",
+        "/lib/i386-linux-gnu/ld-linux.so.2",
+        "/libx32/ld-linux-x32.so.2",
+        "/lib/x86_64-linux-gnux32/ld-linux-x32.so.2",
+        "/lib/ld-linux-aarch64.so.1",
+        "/lib/aarch64-linux-gnu/ld-linux-aarch64.so.1",
+        "/lib/ld-linux-aarch64_be.so.1",
+        "/lib/ld-linux-riscv64-lp64.so.1",
+        "/lib/ld-linux-riscv64-lp64f.so.1",
+        "/lib/ld-linux-riscv64-lp64d.so.1",
+        "/lib/riscv64-linux-gnu/ld-linux-riscv64-lp64d.so.1",
+        "/lib/ld-musl-i386.so.1",
+        "/lib/ld-musl-x32.so.1",
+        "/lib/ld-musl-aarch64.so.1",
+        "/lib/ld-musl-aarch64_be.so.1",
+        "/lib/ld-musl-riscv64.so.1",
+        "/lib/ld-musl-riscv64-sf.so.1",
+        "/lib/ld-musl-riscv64-sp.so.1",
         "/lib/ld-musl-x86_64.so.1",
     ] {
         match std::fs::metadata(path) {
@@ -121,42 +139,6 @@ fn observe_linux(provides: &mut Provides) {
         }
     }
     provides.observe(AxisId(axis::ABI_LOADER.into()), AxisValue::Names(loaders));
-}
-
-#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
-fn x86_features() -> std::collections::BTreeSet<String> {
-    let mut features = std::collections::BTreeSet::new();
-    macro_rules! detect {
-        ($($rust:tt => $contract:literal),* $(,)?) => { $(
-            if std::is_x86_feature_detected!($rust) { features.insert($contract.into()); }
-        )* };
-    }
-    // std's AVX-family detection also checks OSXSAVE/XCR0: CPU flags alone
-    // would incorrectly admit hosts whose kernel cannot preserve vector state.
-    detect!("cmpxchg16b" => "cx16", "popcnt" => "popcnt",
-        "sse3" => "sse3", "sse4.1" => "sse4_1", "sse4.2" => "sse4_2", "ssse3" => "ssse3",
-        "avx" => "avx", "avx2" => "avx2", "bmi1" => "bmi1", "bmi2" => "bmi2",
-        "f16c" => "f16c", "fma" => "fma", "lzcnt" => "lzcnt", "movbe" => "movbe",
-        "aes" => "aes", "pclmulqdq" => "pclmulqdq", "adx" => "adx", "sha" => "sha_ni",
-        "vaes" => "vaes", "vpclmulqdq" => "vpclmulqdq",
-        "avx512f" => "avx512f", "avx512bw" => "avx512bw", "avx512cd" => "avx512cd",
-        "avx512dq" => "avx512dq", "avx512vl" => "avx512vl");
-    let avx_usable = std::is_x86_feature_detected!("avx");
-    if avx_usable {
-        features.insert("osxsave".into());
-    }
-    // CPUID is available on x86_64; test the extended leaf limit first.
-    // Rust's feature macro has no LAHF/SAHF or FMA4 spelling.
-    if std::arch::x86_64::__cpuid(0x8000_0000).eax >= 0x8000_0001 {
-        let extended = std::arch::x86_64::__cpuid(0x8000_0001).ecx;
-        if extended & 1 != 0 {
-            features.insert("lahf_lm".into());
-        }
-        if avx_usable && extended & (1 << 16) != 0 {
-            features.insert("fma4".into());
-        }
-    }
-    features
 }
 
 #[cfg(test)]

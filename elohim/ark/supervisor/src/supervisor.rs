@@ -203,6 +203,17 @@ pub struct Supervisor {
     observer: Option<Arc<dyn StateObserver>>,
 }
 
+impl std::fmt::Debug for Supervisor {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Supervisor")
+            .field(
+                "provides_axes",
+                &ark_core::compatibility::HostAxesDebug(&self.provides),
+            )
+            .finish_non_exhaustive()
+    }
+}
+
 impl Supervisor {
     /// Validates a manifest/berth pairing and builds the one scope every record is
     /// accountable to.

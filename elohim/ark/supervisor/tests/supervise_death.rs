@@ -239,6 +239,12 @@ fn host_inventory_is_cached_refreshable_and_absent_from_every_written_record() {
             let generation = self.0.fetch_add(1, Ordering::SeqCst);
             let mut host = Provides::default();
             host.observe(
+                AxisId("isa.x86".into()),
+                AxisValue::Names(std::collections::BTreeSet::from([
+                    "HOST-ONLY-FEATURE".into()
+                ])),
+            );
+            host.observe(
                 AxisId("private-observer-axis".into()),
                 AxisValue::Scalar(format!("PRIVATE-HOST-INVENTORY-{generation}")),
             );
@@ -268,6 +274,10 @@ fn host_inventory_is_cached_refreshable_and_absent_from_every_written_record() {
     let mut supervisor =
         supervisor_with_driver(&manifest, &berth, Box::new(ObservingDriver(calls.clone())));
     assert_eq!(calls.load(Ordering::SeqCst), 1);
+    assert_eq!(
+        format!("{supervisor:?}"),
+        "Supervisor { provides_axes: {\"isa.x86\"}, .. }"
+    );
     let first = supervisor.provides().clone();
     assert_eq!(supervisor.provides(), &first);
     assert_eq!(calls.load(Ordering::SeqCst), 1);

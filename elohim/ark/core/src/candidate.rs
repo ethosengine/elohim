@@ -13,7 +13,7 @@ use elohim_epr::{Epr, EprKind};
 use host_contract::{Provides, Requires};
 use serde::{Deserialize, Serialize};
 
-use crate::compatibility::{admit_artifact, HostAdmission};
+use crate::compatibility::{admit_artifact, HostAdmission, HostAxesDebug, OwnProduce};
 
 /// Domain discriminator; unknown versions cannot silently gain this meaning.
 pub const CANDIDATE_SCHEMA_KEY: &str = "ark-candidate-v1";
@@ -83,7 +83,7 @@ pub struct CandidateContent {
 }
 
 /// Independently observed local state. Missing observations must not be invented.
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct CandidateObservation {
     /// Expected elected channel.
     pub channel: String,
@@ -110,16 +110,24 @@ pub struct CandidateObservation {
     /// Candidate runtime manifest independently resolved from the elected release.
     pub candidate_manifest: Cid,
     /// Requirement resolved from this executable's Produce env:requires, not signed content.
-    /// None is missing evidence; Some(empty) explicitly requires no host features.
+    /// Native candidates must supply both arch and os, even with no ISA floor.
     pub requires: Option<Requires>,
     /// Private, in-memory observation of the device that would execute these bytes.
     pub provides: Provides,
-    /// True only when this device recorded this executable's Produce.
-    pub own_build: bool,
+    /// Evidence from this device's local Produce lookup for the executable.
+    pub own_produce: Option<OwnProduce>,
     /// Device-local illegal-instruction counter-evidence; populated by the future F3 caller.
     pub withdrawn_artifacts: BTreeSet<Cid>,
     /// Explicit observation time; this pure module reads no clock.
     pub now: DateTime<Utc>,
+}
+
+impl std::fmt::Debug for CandidateObservation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("CandidateObservation")
+            .field("provides_axes", &HostAxesDebug(&self.provides))
+            .finish_non_exhaustive()
+    }
 }
 
 /// Authenticated candidate CONTENT only. No conversion to activation authority exists.
@@ -312,7 +320,7 @@ pub fn authenticate_candidate(
         observed.observed_executable,
         observed.requires.as_ref(),
         &observed.provides,
-        observed.own_build,
+        observed.own_produce.as_ref(),
         &observed.withdrawn_artifacts,
     );
     if admission.verdict.decision != elohim_epr::verdict::Decision::Permit {

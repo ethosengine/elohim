@@ -681,7 +681,7 @@ decisionPoints:
     - id: C8
       status: partial
       justification: >
-        Every original clause has a check witness. Own-build permits name every waiver,
+        Every original clause has a check witness. Own-build permits name every waiver and its Produce CID,
         refusals carry required axes and values without host values. Live meters await consumers.
     - id: C9
       status: n-a
@@ -714,11 +714,26 @@ decisionPoints:
       testName: unknown_and_unobserved_refuse_even_own_builds
       kind: integration
     - path: elohim/ark/core/tests/candidate_contract.rs
-      testName: absent_requirement_refuses_but_explicit_empty_requires_nothing
+      testName: absent_and_empty_native_requirements_refuse
       kind: integration
     - path: elohim/ark/core/tests/candidate_contract.rs
       testName: own_build_permit_names_every_waived_clause
       kind: integration
     - path: elohim/ark/core/tests/candidate_contract.rs
       testName: declared_proven_non_isa_sibling_and_withdrawn_refuse
+      kind: integration
+    - path: elohim/ark/core/tests/candidate_contract.rs
+      testName: native_candidates_require_both_arch_and_os
+      kind: integration
+    - path: elohim/ark/core/tests/candidate_contract.rs
+      testName: unprobed_features_refuse_without_an_own_build_waiver
+      kind: integration
+    - path: elohim/ark/core/tests/candidate_contract.rs
+      testName: mixed_axis_waives_only_the_failed_extracted_evidence
+      kind: integration
+    - path: elohim/ark/core/tests/candidate_contract.rs
+      testName: produce_for_another_executable_cannot_waive
+      kind: integration
+    - path: elohim/ark/core/tests/candidate_contract.rs
+      testName: admission_wire_goldens_disclose_effect_and_produce_only
       kind: integration

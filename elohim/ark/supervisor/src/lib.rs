@@ -11,6 +11,8 @@ pub mod pipes;
 pub mod reaper;
 pub mod spool;
 pub mod supervisor;
+#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+mod x86;
 
 // Re-exports are uncommented by the task that fills each module.
 pub use driver::{Driver, DriverError, Fingerprint, Started};

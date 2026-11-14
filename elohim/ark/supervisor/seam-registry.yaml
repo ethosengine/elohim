@@ -131,3 +131,6 @@ decisionPoints:
       - {path: elohim/ark/supervisor/src/host.rs, testName: versions_are_numeric_and_fail_closed, kind: unit}
       - {path: elohim/ark/supervisor/tests/supervise_death.rs, testName: host_inventory_is_cached_refreshable_and_absent_from_every_written_record, kind: integration}
       - {path: elohim/ark/cli/tests/cli_smoke.rs, testName: host_provides_is_a_local_diagnostic_without_records, kind: integration}
+      - {path: elohim/ark/supervisor/src/x86.rs, testName: extractor_names_are_probed_or_explicitly_unprobed, kind: unit}
+      - {path: elohim/ark/supervisor/src/x86.rs, testName: synthetic_avx_requires_osxsave_and_vector_state, kind: unit}
+      - {path: elohim/ark/supervisor/src/x86.rs, testName: pku_and_fsgsbase_require_os_enablement, kind: unit}
