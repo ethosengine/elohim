@@ -24,6 +24,8 @@ case "$verb" in
     [ "$*" = '--key key-a --json' ]
     if [ "$MODE" = no-own ]; then
       echo '{"holders":[{"device":"sibling","output":"foreign","self":false}]}'
+    elif [[ "$MODE" == multi* || "$MODE" = no-match ]]; then
+      echo '{"holders":[{"output":"stale-output","self":true},{"output":"output-a","self":true}]}'
     else
       echo '{"holders":[{"device":"sibling","output":"foreign","self":false},{"device":"local","output":"output-a","self":true}]}'
     fi ;;
@@ -54,13 +56,23 @@ STUB
 cat > "$tmp/bin/ark" <<'STUB'
 #!/usr/bin/env bash
 set -eu
-[ "$1 $2 $3 $4 $5" = 'host admit --output output-a --binary' ]
+[ "$1 $2 $3 $5" = 'host admit --output --binary' ]
+if [ "$MODE" = empty ]; then
+  printf 'first failure\nsecond failure\n' >&2
+  exit 7
+fi
+if [ "$4" = stale-output ] || [ "$MODE" = no-match ]; then
+  echo "REFUSED compatibility $8: output requires $4 — recorded CID does not match bytes; rebuild or restore the recorded binary"
+  exit 1
+fi
+[ "$4" = output-a ]
+[ "${EPR_BIN:-}" = "$EXPECTED_EPR" ]
 [ -f "$6" ] && [ "$7" = --name ] && [ "$#" = 8 ]
 name="$8"
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 rc=0
-reply="$(epr artifact requires --output "$4" --write "$work/requires" --json 2>"$work/why")" || rc=$?
+reply="$("$EPR_BIN" artifact requires --output "$4" --write "$work/requires" --json 2>"$work/why")" || rc=$?
 case "$MODE" in
   unmeasured) [ "$rc" = 0 ] && [ "$(jq -r '.unmeasured' <<<"$reply")" = 'no recorded requirement' ] && [ ! -e "$work/requires" ]; echo "ok compatibility $name: unmeasured (no recorded requirement)"; exit 0 ;;
   unavailable) [ "$rc" = 3 ] && [ "$(jq -r '.unavailable[0]' <<<"$reply")" = requires-a ]; echo "ok compatibility $name: unmeasured (requirement not held locally)"; exit 0 ;;
@@ -68,7 +80,7 @@ case "$MODE" in
   conflict) [ "$rc" = 4 ] && [ "$(jq -r '.conflict' <<<"$reply")" = 'incompatible clauses' ]; echo "REFUSED compatibility $name: conflicting recorded requirements (MergeError) — rebuild with just mesh build storage"; exit 1 ;;
   unknown) [ "$rc" = 2 ]; echo "REFUSED compatibility $name: epr does not know output output-a — rebuild with just mesh build storage"; exit 1 ;;
   missing) [ "$rc" = 2 ]; echo "ok compatibility $name: unmeasured (epr has no requirement reader yet)"; exit 0 ;;
-  error) [ "$rc" = 1 ]; echo "ok compatibility $name: unmeasured (malformed requirement record: artifact reader failed)"; exit 0 ;;
+  error) [ "$rc" = 1 ]; echo "ok compatibility $name: unmeasured (artifact reader failed)"; exit 0 ;;
 esac
 [ "$rc" = 0 ] && [ "$(cat "$work/requires")" = 'exact requirement bytes' ]
 if [ "$MODE" = own ]; then
@@ -76,7 +88,8 @@ if [ "$MODE" = own ]; then
   [ "$(jq -r '.produce' <<<"$reply")" = produce-a ]
   echo "ok compatibility $name: admitted under the own-build rule (waived: isa.x86 avx512f)"
 else
-  if [ "$MODE" = refused ]; then
+  if [[ "$MODE" = refused || "$MODE" = multi-refused || "$MODE" = refusal-text ]]; then
+    if [ "$MODE" = refusal-text ]; then echo "REFUSED compatibility $name: reader refuses"; exit 1; fi
     echo "REFUSED compatibility $name: isa.x86 requires avx512f"
     exit 1
   fi
@@ -85,7 +98,8 @@ fi
 STUB
 chmod +x "$tmp/bin/epr" "$tmp/bin/ark"
 export PATH="$tmp/bin:$PATH"
-export EPR_BIN=epr ARK_BIN="$tmp/bin/ark"
+export ARK_BIN="$tmp/bin/ark" EXPECTED_EPR="$tmp/bin/epr"
+EPR_BIN="$EXPECTED_EPR" # Deliberately not exported: mesh must pass its chosen reader.
 export MESH_DIR="$tmp/mesh" MESH_PEERS=unit MESH_TRANSPORT_BACKEND=libp2p MESH_DOORWAYS=0
 source "$here/../hc-mesh.sh" >/dev/null
 STORAGE_BIN="$tmp/elohim-storage"
@@ -113,8 +127,23 @@ run
 t 'refusal fails preflight' '[ "$rc" = 1 ] && [[ "$out" == "REFUSED compatibility elohim-storage:"* ]]'
 MESH_ALLOW_INCOMPATIBLE_BINARY=1
 run
-t 'override preserves refusal and announces its use' '[ "$rc" = 0 ] && [[ "$out" == "REFUSED compatibility elohim-storage:"* ]] && [[ "$out" == *"MESH_ALLOW_INCOMPATIBLE_BINARY=1 used" ]]'
+t 'override replaces refusal and announces its use' '[ "$rc" = 0 ] && [[ "$out" == "ok compatibility override elohim-storage:"* ]] && [[ "${out,,}" != *refus* ]] && [[ "$out" == *"(MESH_ALLOW_INCOMPATIBLE_BINARY=1)" ]]'
+MODE=refusal-text
+run
+t 'override rewords nested refusal text' '[ "$rc" = 0 ] && [[ "${out,,}" != *refus* ]]'
 unset MESH_ALLOW_INCOMPATIBLE_BINARY
+MODE=multi
+run
+t 'second self output matches staged bytes' '[ "$rc" = 0 ] && [ "$out" = "ok compatibility elohim-storage: admitted" ]'
+MODE=multi-refused
+run
+t 'matching output still undergoes host admission' '[ "$rc" = 1 ] && [ "$out" = "REFUSED compatibility elohim-storage: isa.x86 requires avx512f" ]'
+MODE=no-match
+run
+t 'no self output matches staged bytes' '[ "$rc" = 1 ] && [ "$out" = "REFUSED compatibility elohim-storage: no recorded output matches the staged bytes" ]'
+MODE=empty
+run
+t 'empty ark failure prints exit and first stderr line' '[ "$rc" = 1 ] && [ "$out" = "REFUSED compatibility elohim-storage: ark exited 7 (first failure)" ]'
 MODE=unmeasured
 run
 t 'exit 0 with null requirement admits nothing' '[ "$rc" = 0 ] && [ "$out" = "ok compatibility elohim-storage: unmeasured (no recorded requirement)" ]'
@@ -135,7 +164,7 @@ run
 t 'missing reader is unmeasured' '[ "$rc" = 0 ] && [ "$out" = "ok compatibility elohim-storage: unmeasured (epr has no requirement reader yet)" ]'
 MODE=error
 run
-t 'failed reader is unmeasured' '[ "$rc" = 0 ] && [ "$out" = "ok compatibility elohim-storage: unmeasured (malformed requirement record: artifact reader failed)" ]'
+t 'failed reader is unmeasured' '[ "$rc" = 0 ] && [ "$out" = "ok compatibility elohim-storage: unmeasured (artifact reader failed)" ]'
 MODE=no-own
 run
 t 'sibling holder is not local Produce' '[ "$rc" = 0 ] && [[ "$out" == *"unmeasured (no Produce on this device)" ]]'
@@ -178,6 +207,6 @@ out="$(preflight 2>&1)"; rc=$?
 t 'compatibility alone makes preflight refuse' '[ "$rc" = 1 ] && [[ "$out" == *"REFUSED compatibility elohim-storage:"* ]]'
 MESH_ALLOW_INCOMPATIBLE_BINARY=1
 out="$(preflight 2>&1)"; rc=$?
-t 'declared override restores preflight success' '[ "$rc" = 0 ] && [[ "$out" == *"MESH_ALLOW_INCOMPATIBLE_BINARY=1 used"* ]]'
+t 'declared override restores preflight success' '[ "$rc" = 0 ] && [[ "$out" == *"(MESH_ALLOW_INCOMPATIBLE_BINARY=1)"* ]] && [[ "${out,,}" != *refus* ]]'
 echo "$count assertions"
 exit "$fail"

@@ -2480,8 +2480,9 @@ preflight_binary_freshness() {
 
 # Requirements and local Produce evidence belong to epr; ark owns byte/CID verification
 # and host admission. Never inspect the store layout or infer compatibility from freshness.
-mesh_binary_compatibility() ( # <binary> <bin-name> <build-project>
-  local binary="$1" bin="$2" record key output result
+mesh_binary_compatibility() ( # <binary> <bin-name>
+  local binary="$1" bin="$2" record key outputs output result line rc stderr
+  export EPR_BIN="$(_mesh_epr)"
   record="$(dirname "$binary")/.derivation-$bin.json"
   if [ ! -f "$record" ]; then
     echo "ok compatibility $bin: unmeasured (no derivation record)"
@@ -2495,8 +2496,8 @@ mesh_binary_compatibility() ( # <binary> <bin-name> <build-project>
     echo "ok compatibility $bin: unmeasured (epr holder lookup unavailable)"
     return 0
   fi
-  output="$(jq -er '[.holders[] | select(.self == true) | .output | select(type == "string" and length > 0)][0] // empty' <<<"$result" 2>/dev/null)" || output=""
-  if [ -z "$output" ]; then
+  outputs="$(jq -er '.holders[] | select(.self == true) | .output | select(type == "string" and length > 0)' <<<"$result" 2>/dev/null)" || outputs=""
+  if [ -z "$outputs" ]; then
     echo "ok compatibility $bin: unmeasured (no Produce on this device)"
     return 0
   fi
@@ -2506,30 +2507,50 @@ mesh_binary_compatibility() ( # <binary> <bin-name> <build-project>
   fi
   # ark interprets K13: missing/unavailable requirements remain unmeasured;
   # unknown outputs and conflicting requirements refuse. Preserve its line/status.
-  "$ARK_BIN" host admit --output "$output" --binary "$binary" --name "$bin"
+  stderr="$(mktemp)"
+  trap 'rm -f "$stderr"' EXIT
+  while IFS= read -r output; do
+    rc=0
+    line="$("$ARK_BIN" host admit --output "$output" --binary "$binary" --name "$bin" 2>"$stderr")" || rc=$?
+    if [ "$rc" -ne 0 ] && [[ "$line" == "REFUSED compatibility $bin: output requires $output — recorded CID does not match bytes;"* ]]; then
+      continue
+    fi
+    if [ "$rc" -ne 0 ] && [ -z "$line" ]; then
+      line="REFUSED compatibility $bin: ark exited $rc ($(head -n 1 "$stderr"))"
+    fi
+    printf '%s\n' "$line"
+    return "$rc"
+  done <<<"$outputs"
+  echo "REFUSED compatibility $bin: no recorded output matches the staged bytes"
+  return 1
 )
 
 preflight_binary_compatibility() {
-  local failed=0 binary bin project line rc
-  local entries=("$STORAGE_BIN|elohim-storage|storage")
+  local failed=0 binary bin line rc detail
+  local entries=("$STORAGE_BIN|elohim-storage")
   if [ "$MESH_DOORWAYS_EFFECTIVE" = "1" ]; then
-    entries+=("$DOORWAY_BIN|doorway|doorway")
+    entries+=("$DOORWAY_BIN|doorway")
     if [ "$MESH_MEMBERSHIP" = "1" ]; then
-      entries+=("$BEACON_BIN|relay-addr-beacon|beacon")
+      entries+=("$BEACON_BIN|relay-addr-beacon")
     fi
   fi
   for line in "${entries[@]}"; do
-    IFS='|' read -r binary bin project <<<"$line"
+    IFS='|' read -r binary bin <<<"$line"
     rc=0
-    line="$(mesh_binary_compatibility "$binary" "$bin" "$project")" || rc=$?
-    printf '%s\n' "$line"
+    line="$(mesh_binary_compatibility "$binary" "$bin")" || rc=$?
     if [ "$rc" -ne 0 ] || [[ "$line" == REFUSED* ]]; then
       if [ "${MESH_ALLOW_INCOMPATIBLE_BINARY:-0}" = "1" ]; then
-        echo "ok compatibility override $bin: MESH_ALLOW_INCOMPATIBLE_BINARY=1 used"
+        detail="${line#REFUSED }"
+        # mesh wait treats even a diagnostic containing "refus" as a failed start.
+        if [[ "${detail,,}" == *refus* ]]; then
+          detail="compatibility check did not pass"
+        fi
+        line="ok compatibility override $bin: $detail (MESH_ALLOW_INCOMPATIBLE_BINARY=1)"
       else
         failed=1
       fi
     fi
+    printf '%s\n' "$line"
   done
   return "$failed"
 }
