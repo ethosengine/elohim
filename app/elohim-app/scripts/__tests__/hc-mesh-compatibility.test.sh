@@ -49,21 +49,30 @@ STUB
 cat > "$tmp/bin/ark" <<'STUB'
 #!/usr/bin/env bash
 set -eu
-[ "$1 $2 $3" = 'host admit --requires' ]
-[ "$(cat "$4")" = 'exact requirement bytes' ]
-[ "$5" = --binary ] && [ -f "$6" ]
-[ "$7 $8 $9" = '--output output-a --name' ]
-name="${10}"
+[ "$1 $2 $3 $4 $5" = 'host admit --output output-a --binary' ]
+[ -f "$6" ] && [ "$7" = --name ] && [ "$#" = 8 ]
+name="$8"
+work="$(mktemp -d)"
+trap 'rm -rf "$work"' EXIT
+rc=0
+reply="$(epr artifact requires --output "$4" --write "$work/requires" --json 2>"$work/why")" || rc=$?
+case "$MODE" in
+  unavailable) [ "$rc" = 3 ]; echo "ok compatibility $name: unmeasured (no recorded requirement or document unavailable locally)"; exit 0 ;;
+  unknown) [ "$rc" = 2 ]; echo "REFUSED compatibility $name: epr does not know output output-a — rebuild or restore the recorded binary"; exit 1 ;;
+  missing) [ "$rc" = 2 ]; echo "ok compatibility $name: unmeasured (epr has no requirement reader yet)"; exit 0 ;;
+  error) [ "$rc" = 1 ]; echo "ok compatibility $name: unmeasured (malformed requirement record: artifact reader failed)"; exit 0 ;;
+esac
+[ "$rc" = 0 ] && [ "$(cat "$work/requires")" = 'exact requirement bytes' ]
 if [ "$MODE" = own ]; then
-  [ "$#" = 12 ] && [ "${11} ${12}" = '--own-produce produce-a' ]
+  [ "$(jq -r '.self' <<<"$reply")" = true ]
+  [ "$(jq -r '.produce' <<<"$reply")" = produce-a ]
   echo "ok compatibility $name: admitted under the own-build rule (waived: isa.x86 avx512f)"
 else
-  [ "$#" = 10 ]
   if [ "$MODE" = refused ]; then
     echo "REFUSED compatibility $name: isa.x86 requires avx512f"
     exit 1
   fi
-  echo "ok compatibility $name: admitted (2 clauses)"
+  echo "ok compatibility $name: admitted"
 fi
 STUB
 chmod +x "$tmp/bin/epr" "$tmp/bin/ark"
@@ -83,13 +92,13 @@ done
 export MODE=admitted
 run() { out="$(preflight_binary_compatibility 2>&1)"; rc=$?; }
 run
-t 'admitted from own holder, absent produce key accepted' '[ "$rc" = 0 ] && [ "$out" = "ok compatibility elohim-storage: admitted (2 clauses)" ]'
+t 'admitted from own holder, absent produce key accepted' '[ "$rc" = 0 ] && [ "$out" = "ok compatibility elohim-storage: admitted" ]'
 MODE=own
 run
-t 'own-build claim forwarded and waived clause printed' '[ "$rc" = 0 ] && [[ "$out" == *"admitted under the own-build rule (waived: isa.x86 avx512f)" ]]'
+t 'ark resolves own-build eligibility and prints waived clause' '[ "$rc" = 0 ] && [[ "$out" == *"admitted under the own-build rule (waived: isa.x86 avx512f)" ]]'
 for MODE in null sibling; do
   run
-  t "$MODE Produce never forwarded as an own-build claim" '[ "$rc" = 0 ] && [[ "$out" == *"admitted (2 clauses)" ]]'
+  t "$MODE record does not supply own-build eligibility" '[ "$rc" = 0 ] && [[ "$out" == *"admitted" ]]'
 done
 MODE=refused
 run
@@ -100,14 +109,16 @@ t 'override preserves refusal and announces its use' '[ "$rc" = 0 ] && [[ "$out"
 unset MESH_ALLOW_INCOMPATIBLE_BINARY
 MODE=unavailable
 run
-t 'exit 3 is unmeasured with a single-line reason' '[ "$rc" = 0 ] && [ "$out" = "ok compatibility elohim-storage: unmeasured (no recorded requirement document unavailable locally)" ]'
+t 'exit 3 is unmeasured with a single-line reason' '[ "$rc" = 0 ] && [ "$out" = "ok compatibility elohim-storage: unmeasured (no recorded requirement or document unavailable locally)" ]'
 MODE=unknown
 run
-t 'exit 2 is a provenance refusal with a runnable rebuild command' '[ "$rc" = 1 ] && [ "$out" = "REFUSED compatibility elohim-storage: epr does not know output output-a — rebuild with just mesh build storage" ]'
-for MODE in missing error; do
-  run
-  t "$MODE reader is unmeasured" '[ "$rc" = 0 ] && [ "$out" = "ok compatibility elohim-storage: unmeasured (epr has no requirement reader yet)" ]'
-done
+t 'exit 2 is a provenance refusal printed unchanged' '[ "$rc" = 1 ] && [ "$out" = "REFUSED compatibility elohim-storage: epr does not know output output-a — rebuild or restore the recorded binary" ]'
+MODE=missing
+run
+t 'missing reader is unmeasured' '[ "$rc" = 0 ] && [ "$out" = "ok compatibility elohim-storage: unmeasured (epr has no requirement reader yet)" ]'
+MODE=error
+run
+t 'failed reader is unmeasured' '[ "$rc" = 0 ] && [ "$out" = "ok compatibility elohim-storage: unmeasured (malformed requirement record: artifact reader failed)" ]'
 MODE=no-own
 run
 t 'sibling holder is not local Produce' '[ "$rc" = 0 ] && [[ "$out" == *"unmeasured (no Produce on this device)" ]]'
