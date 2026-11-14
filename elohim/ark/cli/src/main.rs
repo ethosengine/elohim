@@ -1,6 +1,7 @@
 //! `ark` — run a RuntimeManifest in a Berth and inspect its local evidence.
 
 mod brit_index;
+mod host;
 mod material;
 mod task;
 mod task_files;
@@ -106,6 +107,21 @@ enum Command {
 enum HostCommand {
     /// Print freshly observed host compatibility axes (local diagnostic only).
     Provides,
+    /// Admit a locally stored Requires JSON array, without printing host values.
+    Admit {
+        #[arg(long)]
+        requires: PathBuf,
+        #[arg(long, default_value = "binary")]
+        name: String,
+        /// Verify the requirement document against its recorded byte CID.
+        #[arg(long)]
+        requires_cid: Option<String>,
+        /// Verify the binary against the Produce output before using its requirements.
+        #[arg(long, requires = "output")]
+        binary: Option<PathBuf>,
+        #[arg(long, requires = "binary")]
+        output: Option<String>,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -243,6 +259,21 @@ fn execute(command: Command) -> Result<u8, Failure> {
             );
             Ok(EXIT_OK)
         }
+        Command::Host {
+            command:
+                HostCommand::Admit {
+                    requires,
+                    name,
+                    requires_cid,
+                    binary,
+                    output,
+                },
+        } => Ok(host::admit(
+            &requires,
+            &name,
+            requires_cid.as_deref(),
+            binary.as_deref().zip(output.as_deref()),
+        )),
         Command::Run {
             manifest,
             berth,

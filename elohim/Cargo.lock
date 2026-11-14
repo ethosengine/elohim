@@ -1149,6 +1149,7 @@ dependencies = [
  "elohim-device-runtime",
  "elohim-epr",
  "elohim-epr-rea",
+ "elohim-host-contract",
  "elohim-placement-core",
  "elohim-seam-contracts",
  "eprfs-core",

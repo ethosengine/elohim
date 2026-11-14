@@ -130,6 +130,46 @@ pub fn admit_artifact(
     own_produce: Option<&OwnProduce>,
     withdrawn_artifacts: &BTreeSet<Cid>,
 ) -> HostAdmission {
+    let own_build = own_produce.is_some_and(|claim| claim.executable == executable)
+        && !withdrawn_artifacts.contains(&executable);
+    let (mut verdict, own_build_rule) = judge_requirements(requires, provides, own_build);
+    verdict.subject = Some(executable.to_string());
+    let own_produce = own_produce
+        .filter(|_| !own_build_rule.is_empty())
+        .map(|p| p.produce);
+    if let Some(produce) = own_produce {
+        for check in &mut verdict.witness.checks {
+            if check.summary == "permit-under-own-build-rule" {
+                if let Some(serde_json::Value::Object(evidence)) = &mut check.observed {
+                    evidence.insert("ownProduce".into(), serde_json::json!(produce));
+                }
+            }
+        }
+    }
+    HostAdmission {
+        executable,
+        verdict,
+        own_build_rule,
+        own_produce,
+    }
+}
+
+/// Judge a requirement as recorded, against the observed host. The own-build
+/// rule never applies here: it needs a verified local Produce (`OwnProduce`),
+/// which a bare requirement document cannot supply. No artifact identity or
+/// host inventory is fabricated.
+#[must_use]
+pub fn admit_recorded_requirements(requires: Option<&Requires>, provides: &Provides) -> Verdict {
+    judge_requirements(requires, provides, false).0
+}
+
+/// Shared judgement; `own_build` is derived only from a verified `OwnProduce`
+/// in `admit_artifact`, so it is never an externally assertable flag.
+fn judge_requirements(
+    requires: Option<&Requires>,
+    provides: &Provides,
+    own_build: bool,
+) -> (Verdict, Vec<Clause>) {
     let mut checks = Vec::new();
     let mut waived = Vec::new();
     if let Some(requires) = requires {
@@ -152,8 +192,7 @@ pub fn admit_artifact(
             };
             let waiver = !passed
                 && reason == "unmet"
-                && own_produce.is_some_and(|claim| claim.executable == executable)
-                && !withdrawn_artifacts.contains(&executable)
+                && own_build
                 && clause.axis.0 == axis::ISA_X86
                 && clause.source == ClauseSource::Extracted;
             if waiver {
@@ -175,12 +214,7 @@ pub fn admit_artifact(
                 },
                 // Allow-list artifact evidence; never transform or serialize the
                 // contract verdict, whose observed field includes private values.
-                observed: Some(if waiver {
-                    serde_json::json!({ "required": clause,
-                        "ownProduce": own_produce.map(|p| p.produce) })
-                } else {
-                    serde_json::json!({ "required": clause })
-                }),
+                observed: Some(serde_json::json!({ "required": clause })),
             });
         }
         for required_axis in [axis::ARCH, axis::OS] {
@@ -220,11 +254,10 @@ pub fn admit_artifact(
             }
         }
     }
-    HostAdmission {
-        executable,
-        verdict: Verdict {
+    (
+        Verdict {
             axis: "host-compatibility".into(),
-            subject: Some(executable.to_string()),
+            subject: None,
             decision: if permitted {
                 Decision::Permit
             } else {
@@ -233,11 +266,6 @@ pub fn admit_artifact(
             witness: Witness { checks },
             policy_ref: None,
         },
-        own_produce: if waived.is_empty() {
-            None
-        } else {
-            own_produce.map(|p| p.produce)
-        },
-        own_build_rule: waived,
-    }
+        waived,
+    )
 }

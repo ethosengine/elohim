@@ -11,6 +11,7 @@ name = "ark"
 path = "src/main.rs"
 
 [dependencies]
+elohim-host-contract = { path = "../../../crates/elohim-host-contract" }
 elohim-ark-core = { path = "../core" }
 elohim-ark-supervisor = { path = "../supervisor" }
 elohim-epr = { path = "../../epr" }
