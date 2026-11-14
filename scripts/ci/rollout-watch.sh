@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # rollout-watch.sh — wait for one workload rollout, and give up on a
-# crashlooping StatefulSet pod FAST instead of waiting out the whole timeout.
+# crashlooping StatefulSet pod FAST instead of waiting out the whole timeout,
+# and on a pod stuck Terminating that the StatefulSet can never replace.
 #
 # WHY: an edge deploy waited the full `kubectl rollout status --timeout=600s`
 # for every storage peer whose pod was in CrashLoopBackOff ("Disk quota
@@ -34,6 +35,14 @@
 #     into the same directory capture-rollout-evidence.sh fills, so the
 #     archived rollout-evidence/** bundle carries the reason next to the pod
 #     state, events and logs.
+#   * A pod of ANY revision whose deletionTimestamp is older than its grace
+#     period plus ROLLOUT_FASTFAIL_STUCK_SECS is judged stuck Terminating, with
+#     the same exit 4 and artifacts. A StatefulSet never starts a replacement
+#     while the old pod object exists, so the wait cannot succeed: edge #1878
+#     spent its whole 600 s on james-alpha's conductor, evicted by the taint
+#     manager when node thinkc-p0t went unreachable and still Terminating 27 h
+#     later. The reason names the node and the pod's DisruptionTarget message;
+#     recovering the node or force-deleting the pod is the operator's.
 #   * Any other kind, ROLLOUT_FASTFAIL=0, or a malformed knob runs the plain
 #     wait unchanged (exec). A pod read that fails skips that poll; it never
 #     fails the rollout.
@@ -43,10 +52,13 @@
 #   ROLLOUT_FASTFAIL_POLL_SECS      seconds between pod reads (default 15)
 #   ROLLOUT_FASTFAIL_MIN_RESTARTS   CrashLoopBackOff restart floor (default 3)
 #   ROLLOUT_FASTFAIL_RISE_POLLS     consecutive rising polls (default 3)
+#   ROLLOUT_FASTFAIL_STUCK_SECS     seconds past the grace period a terminating
+#                                   pod may linger (default 300)
 #
 # Exit codes:
 #   0          rollout complete
-#   4          fast-failed: a pod of the update revision is crashlooping
+#   4          fast-failed: a pod of the update revision is crashlooping, or a
+#              pod is stuck Terminating
 #   otherwise  kubectl rollout status's own exit (timeout, error, usage=2)
 
 set -u
@@ -71,6 +83,7 @@ ENABLED="${ROLLOUT_FASTFAIL:-1}"
 POLL_SECS="${ROLLOUT_FASTFAIL_POLL_SECS:-15}"
 MIN_RESTARTS="${ROLLOUT_FASTFAIL_MIN_RESTARTS:-3}"
 RISE_POLLS="${ROLLOUT_FASTFAIL_RISE_POLLS:-3}"
+STUCK_SECS="${ROLLOUT_FASTFAIL_STUCK_SECS:-300}"
 
 plain_wait() {
   exec kubectl rollout status "${KIND}/${NAME}" -n "${NAMESPACE}" "--timeout=${TIMEOUT}"
@@ -90,7 +103,8 @@ fi
 
 for knob in "ROLLOUT_FASTFAIL_POLL_SECS=${POLL_SECS}" \
             "ROLLOUT_FASTFAIL_MIN_RESTARTS=${MIN_RESTARTS}" \
-            "ROLLOUT_FASTFAIL_RISE_POLLS=${RISE_POLLS}"; do
+            "ROLLOUT_FASTFAIL_RISE_POLLS=${RISE_POLLS}" \
+            "ROLLOUT_FASTFAIL_STUCK_SECS=${STUCK_SECS}"; do
   if ! [[ "${knob#*=}" =~ ^[1-9][0-9]*$ ]]; then
     echo "rollout-watch: ${knob%%=*} must be a positive integer, got '${knob#*=}' — crashloop watch OFF, plain rollout wait" >&2
     plain_wait
@@ -108,8 +122,8 @@ RS=$'\x1e'
 # here would only skip the poll — the guard keeps the poll measuring.
 STS_TEMPLATE='{{.metadata.generation}}{{"\x1f"}}{{with .status}}{{.observedGeneration}}{{end}}{{"\x1f"}}{{with .status}}{{.updateRevision}}{{end}}{{"\x1f"}}{{with .spec}}{{with .selector}}{{range $key, $value := .matchLabels}}{{printf "%s=%s," $key $value}}{{end}}{{end}}{{end}}'
 LAST_TERMINATED_NONE='{{"\x1f"}}{{"\x1f"}}'
-CONTAINER_FIELDS='{{$p}}{{"\x1f"}}{{$r}}{{"\x1f"}}{{$d}}{{"\x1f"}}{{.name}}{{"\x1f"}}{{.restartCount}}{{"\x1f"}}{{with .state}}{{with .waiting}}{{.reason}}{{end}}{{end}}{{"\x1f"}}{{with .lastState}}{{with .terminated}}{{.reason}}{{"\x1f"}}{{.exitCode}}{{"\x1f"}}{{.message}}{{else}}'"${LAST_TERMINATED_NONE}"'{{end}}{{else}}'"${LAST_TERMINATED_NONE}"'{{end}}{{"\x1e"}}'
-PODS_TEMPLATE='{{range .items}}{{$p := .metadata.name}}{{$r := ""}}{{with .metadata.labels}}{{$r = index . "controller-revision-hash"}}{{end}}{{$d := .metadata.deletionTimestamp}}{{with .status}}{{range .initContainerStatuses}}'"${CONTAINER_FIELDS}"'{{end}}{{range .containerStatuses}}'"${CONTAINER_FIELDS}"'{{end}}{{end}}{{end}}'
+CONTAINER_FIELDS='{{$p}}{{"\x1f"}}{{$r}}{{"\x1f"}}{{$d}}{{"\x1f"}}{{$g}}{{"\x1f"}}{{$n}}{{"\x1f"}}{{$why}}{{"\x1f"}}{{.name}}{{"\x1f"}}{{.restartCount}}{{"\x1f"}}{{with .state}}{{with .waiting}}{{.reason}}{{end}}{{end}}{{"\x1f"}}{{with .lastState}}{{with .terminated}}{{.reason}}{{"\x1f"}}{{.exitCode}}{{"\x1f"}}{{.message}}{{else}}'"${LAST_TERMINATED_NONE}"'{{end}}{{else}}'"${LAST_TERMINATED_NONE}"'{{end}}{{"\x1e"}}'
+PODS_TEMPLATE='{{range .items}}{{$p := .metadata.name}}{{$r := ""}}{{with .metadata.labels}}{{$r = index . "controller-revision-hash"}}{{end}}{{$d := .metadata.deletionTimestamp}}{{$g := .metadata.deletionGracePeriodSeconds}}{{$n := ""}}{{with .spec}}{{$n = .nodeName}}{{end}}{{$why := ""}}{{with .status}}{{range .conditions}}{{if eq .type "DisruptionTarget"}}{{$why = .message}}{{end}}{{end}}{{range .initContainerStatuses}}'"${CONTAINER_FIELDS}"'{{end}}{{range .containerStatuses}}'"${CONTAINER_FIELDS}"'{{end}}{{end}}{{end}}'
 
 # go-template prints "<no value>" for an absent field.
 present() {
@@ -146,6 +160,26 @@ warn_read() {
   fi
 }
 
+# Set `verdict` when a terminating pod has outlived its grace period by STUCK_SECS.
+# An unparseable timestamp judges nothing.
+stuck_verdict() {
+  local pod="$1" deleted="$2" grace="$3" node="$4" disruption="$5" since age
+  # "2026-11-12T22:44:31Z" -> "2026-11-12 22:44:31" (UTC by -u): the one form both
+  # GNU and busybox `date -d` read.
+  local stamp="${deleted%Z}"
+  stamp="${stamp/T/ }"
+  since="$(date -u -d "${stamp}" +%s 2>/dev/null)" || return 0
+  [[ "${since}" =~ ^[0-9]+$ ]] || return 0
+  [[ "${grace}" =~ ^[0-9]+$ ]] || grace=30
+  present "${node}" || node="unknown"
+  present "${disruption}" || disruption=""
+  age=$(( $(date -u +%s) - since ))
+  [ "${age}" -ge $(( grace + STUCK_SECS )) ] || return 0
+  verdict="pod ${pod} stuck Terminating for $(( age / 3600 ))h$(( age % 3600 / 60 ))m (deleted ${deleted}, grace ${grace}s) on node ${node}"
+  verdict+="${disruption:+ ($(one_line "${disruption}"))}"
+  verdict+=" — not a crashloop: the node has not removed it, so the statefulset cannot start a replacement; operator: recover node ${node} or force-delete the pod"
+}
+
 # Read the update revision's pods once; set `verdict` when one crashloops.
 probe() {
   local sts_line generation observed revision sel_line pods_raw record
@@ -172,8 +206,8 @@ probe() {
   verdict_table=""
   while IFS= read -r -d "${RS}" record; do
     [ -n "${record}" ] || continue
-    local pod rev deleted container restarts waiting last_reason last_exit last_message
-    IFS="${US}" read -r -d '' pod rev deleted container restarts waiting last_reason last_exit last_message <<< "${record}"
+    local pod rev deleted grace node disruption container restarts waiting last_reason last_exit last_message
+    IFS="${US}" read -r -d '' pod rev deleted grace node disruption container restarts waiting last_reason last_exit last_message <<< "${record}"
     present "${last_message:-}" || last_message=""
     last_message="$(one_line "${last_message}")"
     [ -n "${pod}" ] && [ -n "${container}" ] || continue
@@ -182,6 +216,11 @@ probe() {
     present "${last_reason}" || last_reason=""
     present "${last_exit}" || last_exit=""
     verdict_table+="${pod} ${container} revision=${rev} restarts=${restarts} waiting=${waiting:--} lastTerminated=${last_reason:--}/${last_exit:--} ${last_message}"$'\n'
+
+    # A pod of any revision stuck on its way out blocks the StatefulSet.
+    if [ -z "${verdict}" ] && present "${deleted}"; then
+      stuck_verdict "${pod}" "${deleted}" "${grace}" "${node}" "${disruption}"
+    fi
 
     # Only the revision being rolled, and never a pod on its way out.
     [ "${rev}" = "${revision}" ] || continue
@@ -212,7 +251,7 @@ probe() {
   done <<< "${pods_raw}"
 }
 
-echo "rollout-watch: waiting for statefulset/${NAME} in ${NAMESPACE} (timeout ${TIMEOUT}); fast-fail on a crashlooping update-revision pod (CrashLoopBackOff with >=${MIN_RESTARTS} restarts, or restarts rising on ${RISE_POLLS} consecutive ${POLL_SECS}s polls)"
+echo "rollout-watch: waiting for statefulset/${NAME} in ${NAMESPACE} (timeout ${TIMEOUT}); fast-fail on a crashlooping update-revision pod (CrashLoopBackOff with >=${MIN_RESTARTS} restarts, or restarts rising on ${RISE_POLLS} consecutive ${POLL_SECS}s polls) or a pod Terminating ${STUCK_SECS}s past its grace period"
 
 kubectl rollout status "statefulset/${NAME}" -n "${NAMESPACE}" "--timeout=${TIMEOUT}" &
 rollout_pid=$!

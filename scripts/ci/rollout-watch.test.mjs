@@ -54,10 +54,15 @@ function existsSync(p) { return fs.existsSync(p); }
 `;
 
 // One container-status record exactly as the script's go-template emits it.
-function rec({ pod = "peer-0", rev = "rev-new", deleted = "<no value>", container = "elohim-node",
-  restarts = 0, waiting = "", lastReason = "", lastExit = "", lastMessage = "" } = {}) {
-  return [pod, rev, deleted, container, String(restarts), waiting, lastReason, lastExit, lastMessage].join(US) + RS;
+function rec({ pod = "peer-0", rev = "rev-new", deleted = "<no value>", grace = "<no value>", node = "node-a",
+  disruption = "", container = "elohim-node", restarts = 0, waiting = "", lastReason = "", lastExit = "",
+  lastMessage = "" } = {}) {
+  return [pod, rev, deleted, grace, node, disruption, container, String(restarts), waiting, lastReason, lastExit,
+    lastMessage].join(US) + RS;
 }
+
+// An RFC 3339 timestamp `secs` seconds ago, as the API server writes deletionTimestamp.
+const ago = (secs) => new Date(Date.now() - secs * 1000).toISOString().replace(/\.\d+Z$/, "Z");
 
 async function run(t, scenario, { kind = "statefulset", env = {} } = {}) {
   const dir = await mkdtemp(join(tmpdir(), "rollout-watch-"));
@@ -154,7 +159,7 @@ test("a crashlooping pod of an OLDER revision or a terminating pod is never judg
   const crash = { restarts: 9, waiting: "CrashLoopBackOff", lastReason: "Error", lastExit: "1" };
   const r = await run(t, {
     rollout: { code: 0, afterMs: 2500 },
-    polls: [rec({ ...crash, rev: "rev-old" }) + rec({ ...crash, pod: "peer-1", deleted: "2026-10-29T10:00:00Z" })],
+    polls: [rec({ ...crash, rev: "rev-old" }) + rec({ ...crash, pod: "peer-1", deleted: ago(5), grace: "30" })],
   });
   assert.equal(r.code, 0, r.stdout + r.stderr);
   assert.equal(r.reason, null);
@@ -268,4 +273,32 @@ test("once the generation is observed the crashloop is judged as before", async 
   const r = await run(t, { generation: 2, observed: 2, rollout: { hang: true },
     polls: [rec({ restarts: 3, waiting: "CrashLoopBackOff" })] });
   assert.equal(r.code, 4, r.stdout + r.stderr);
+});
+
+test("a pod stuck Terminating past its grace period fast-fails naming the node and the eviction", async (t) => {
+  const r = await run(t, {
+    rollout: { hang: true },
+    polls: [rec({ rev: "rev-old", deleted: ago(27 * 3600), grace: "30", node: "thinkc-p0t",
+      disruption: "Taint manager: deleting due to NoExecute taint" })],
+  });
+  assert.equal(r.code, 4, r.stdout + r.stderr);
+  assert.ok(r.elapsed < 10000, `fast-fail took ${r.elapsed}ms`);
+  assert.match(r.reason, /^pod peer-0 stuck Terminating for 2[67]h\d+m \(deleted \S+Z, grace 30s\) on node thinkc-p0t \(Taint manager: deleting due to NoExecute taint\) — not a crashloop: .*operator: recover node thinkc-p0t or force-delete the pod\n$/);
+  assert.ok(r.rolloutPid && !alive(r.rolloutPid), "the rollout wait was left running");
+});
+
+test("a terminating pod inside its grace period plus slack, or with an unreadable timestamp, is not judged", async (t) => {
+  for (const deleted of [ago(60), "not-a-time"]) {
+    const r = await run(t, { rollout: { code: 0, afterMs: 2500 },
+      polls: [rec({ rev: "rev-old", deleted, grace: "30" })] });
+    assert.equal(r.code, 0, `${deleted}: ${r.stdout}${r.stderr}`);
+    assert.equal(r.reason, null, deleted);
+  }
+});
+
+test("the stuck-terminating slack is a knob", async (t) => {
+  const r = await run(t, { rollout: { hang: true }, polls: [rec({ deleted: ago(120), grace: "30" })] },
+    { env: { ROLLOUT_FASTFAIL_STUCK_SECS: "60" } });
+  assert.equal(r.code, 4, r.stdout + r.stderr);
+  assert.match(r.reason, /stuck Terminating for 0h2m .* on node node-a — not a crashloop/);
 });
