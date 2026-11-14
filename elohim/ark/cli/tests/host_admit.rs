@@ -105,3 +105,68 @@ fn recorded_cids_are_checked_before_admission() {
     fs::write(&req, b"[]").unwrap();
     assert!(!call().status.success());
 }
+
+#[test]
+#[cfg(target_arch = "x86_64")]
+fn own_produce_waives_only_extracted_isa_after_byte_verification() {
+    let dir = tempfile::tempdir().unwrap();
+    let req = dir.path().join("requires.json");
+    let bin = dir.path().join("binary");
+    fs::write(&bin, b"binary").unwrap();
+    let output = BlobCid::compute_bytes(b"binary").to_string();
+    let produce = BlobCid::compute_bytes(b"local Produce record").to_string();
+    let call = || {
+        Command::new(env!("CARGO_BIN_EXE_ark"))
+            .args(["host", "admit", "--requires"])
+            .arg(&req)
+            .args(["--name", "fixture", "--binary"])
+            .arg(&bin)
+            .args(["--output", &output, "--own-produce", &produce])
+            .output()
+            .unwrap()
+    };
+    let mut clauses = floor();
+    clauses.push(json!({"axis":"isa.x86", "predicate":{"kind":"subset", "value":["hostcompat_impossible_feature"]}, "source":"extracted"}));
+    fs::write(&req, serde_json::to_vec(&clauses).unwrap()).unwrap();
+    let admitted = call();
+    assert!(admitted.status.success());
+    assert_eq!(String::from_utf8(admitted.stdout).unwrap(), "ok compatibility fixture: admitted under the own-build rule (waived: isa.x86 hostcompat_impossible_feature)\n");
+    fs::write(&bin, b"foreign bytes").unwrap();
+    let refused = call();
+    assert!(!refused.status.success());
+    assert!(String::from_utf8(refused.stdout)
+        .unwrap()
+        .contains("recorded CID does not match bytes"));
+    fs::write(&bin, b"binary").unwrap();
+    for source in ["declared", "proven"] {
+        clauses[2]["source"] = json!(source);
+        fs::write(&req, serde_json::to_vec(&clauses).unwrap()).unwrap();
+        let refused = call();
+        assert!(!refused.status.success());
+        let line = String::from_utf8(refused.stdout).unwrap();
+        assert!(line.starts_with("REFUSED compatibility fixture: isa.x86 requires"));
+        assert!(!line.contains("waived"));
+    }
+}
+
+#[test]
+fn own_produce_requires_binary_and_output() {
+    for extra in [vec![], vec!["--binary", "binary"], vec!["--output", "cid"]] {
+        let output = Command::new(env!("CARGO_BIN_EXE_ark"))
+            .args([
+                "host",
+                "admit",
+                "--requires",
+                "requires.json",
+                "--own-produce",
+                "cid",
+            ])
+            .args(extra)
+            .output()
+            .unwrap();
+        assert_eq!(output.status.code(), Some(64));
+        assert!(String::from_utf8(output.stderr)
+            .unwrap()
+            .contains("required arguments"));
+    }
+}

@@ -121,6 +121,10 @@ enum HostCommand {
         binary: Option<PathBuf>,
         #[arg(long, requires = "binary")]
         output: Option<String>,
+        /// Produce CID from this device's own record lookup (epr artifact requires --json),
+        /// never from a publisher. Requires verified binary/output bytes.
+        #[arg(long, requires_all = ["binary", "output"])]
+        own_produce: Option<String>,
     },
 }
 
@@ -267,12 +271,14 @@ fn execute(command: Command) -> Result<u8, Failure> {
                     requires_cid,
                     binary,
                     output,
+                    own_produce,
                 },
         } => Ok(host::admit(
             &requires,
             &name,
             requires_cid.as_deref(),
             binary.as_deref().zip(output.as_deref()),
+            own_produce.as_deref(),
         )),
         Command::Run {
             manifest,

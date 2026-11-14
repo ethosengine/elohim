@@ -1,7 +1,8 @@
 //! Local admission prints only requirements; Provides remains in memory.
 use std::{fs, path::Path};
 
-use ark_supervisor::admission::admit_recorded_requirements;
+use ark_supervisor::admission::{admit_artifact, admit_recorded_requirements, OwnProduce};
+use cid::Cid;
 use elohim_epr::verdict::{CheckOutcome, Decision};
 use eprfs_core::BlobCid;
 use host_contract::{Predicate, Requires};
@@ -42,6 +43,7 @@ pub fn admit(
     name: &str,
     requires_cid: Option<&str>,
     binary: Option<(&Path, &str)>,
+    own_produce: Option<&str>,
 ) -> u8 {
     let result = (|| {
         if let Some((path, cid)) = binary {
@@ -55,8 +57,40 @@ pub fn admit(
             "env:requires requires a valid clause array — restore the recorded requirement"
                 .to_string()
         })?;
-        let verdict =
-            admit_recorded_requirements(Some(&requires), &ark_supervisor::host::observe_host());
+        let provides = ark_supervisor::host::observe_host();
+        let verdict = if let Some(produce) = own_produce {
+            let (_, output) = binary.ok_or("own Produce requires a verified binary/output")?;
+            let output = output.parse::<Cid>().map_err(|_| "invalid output CID")?;
+            let produce = produce
+                .parse::<Cid>()
+                .map_err(|_| "invalid own Produce CID")?;
+            let claim = OwnProduce::from_local_lookup(produce, output);
+            let effect = admit_artifact(
+                output,
+                Some(&requires),
+                &provides,
+                Some(&claim),
+                &Default::default(),
+            );
+            if effect.permits() && !effect.own_build_rule().is_empty() {
+                let waived = effect
+                    .own_build_rule()
+                    .iter()
+                    .map(|clause| {
+                        let predicate: Predicate = serde_json::from_value(clause.predicate.clone())
+                            .expect("admission preserves the requirement predicate");
+                        format!("{} {}", clause.axis, value(&predicate))
+                    })
+                    .collect::<Vec<_>>()
+                    .join("; ");
+                return Ok(format!(
+                    "admitted under the own-build rule (waived: {waived})"
+                ));
+            }
+            effect.verdict().clone()
+        } else {
+            admit_recorded_requirements(Some(&requires), &provides)
+        };
         if verdict.decision == Decision::Permit {
             Ok(format!("admitted ({} clauses)", requires.clauses().len()))
         } else {
