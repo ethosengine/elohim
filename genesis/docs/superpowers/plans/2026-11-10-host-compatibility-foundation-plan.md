@@ -171,9 +171,27 @@ derivation record → ark host admit / missing node: epr artifact requires --out
 
 Chain: S2 → spec §6.3 and §7 → `derive.rs`, `artifact.rs`, `fetch.rs` → the F2r receipt.
 
+State (2026-11-14, read from the habit `sprint-lands-each-closure-once` DELTAs of 2026-11-11 and
+2026-11-12; not a tick). Code for most of this lane is on dev, and its boxes are open because
+each verify line asks for a receipt that the DELTAs do not show. The lane's owner ticks an item
+when that receipt exists, or restates the line.
+
+| Item | On dev | What its verify line still asks |
+|---|---|---|
+| K1 | yes (DELTAs 11-11d, i, j: link driver and native-static-libs keyed) | the key comparison on both devices, as restated below |
+| K2 | yes (DELTA 11-11b: six reserved `target.*` inputs) | a v2 and a v3 descriptor of one recipe sharing a family CID |
+| K3 | part 1 (DELTAs 11-11e, f: `env:family`, `env:requires`, the family fold); part 2 in flight | the v2 device selecting and fetching the v2 variant from a family holding both |
+| K4, K5 | yes (DELTA 11-11c, round 2) | the divergence observation; the lookup by output CID matching the key lookup |
+| K6 | slice 1 (DELTAs 11-11e to h) and shem's v2 floor (DELTA 11-12a) | the F2r receipt in both directions, which waits on K12 serving the floor |
+| K7 | no | both receipts; G1 at the end of this plan is its F1r half |
+| K8 | extraction recorded on both devices (plan K8, K10 receipts) | the refusal against a synthetic v2 `Provides` and of an unreadable artifact |
+| K10 | step 1 landed as A3's own-build rule | steps 2 and 3, on their triggers |
+| K11 | slices landed (DELTAs 11-12b, d, e, f: the uniform preflight, declared gaps, recording order) | a fresh workspace recording a small cargo binary end to end; a non-cargo recipe refusing with its missing items |
+| K12 | not started as far as dev shows; `env:reach` appears only as a declared gap | all of it |
+
 - [ ] **K1 — the derivation input holds source and cargo configuration only; host tool identity moves into the method, derived from the build (effective linker from `rustc -vV`, link inputs the link read), retiring the fixed keyed-tool list in `artifact.rs`** (serves sprint-lands-each-closure-once)
 
-Verify: the two devices' keys for the same source and declared target are equal; a changed link input changes the key; a changed unused system tool does not.
+Verify (restated 2026-11-14 under H13): the two devices' keys for the same source and declared target are equal only when their compilers and link floors are also equal; where those differ, as on shem and ethosengine (K9 receipt), the keys differ and share one family CID. A changed link input changes the key; a changed unused system tool does not.
 
 - [ ] **K2 — the declared target under the reserved `target.` prefix of the method's non-path inputs; target-cpu lifted out of `RUSTFLAGS`; each recorded build-environment variable classified as target or method; `family_cid` as a named rule in `eprfs-core/src/derive.rs`** (serves sprint-lands-each-closure-once)
 
