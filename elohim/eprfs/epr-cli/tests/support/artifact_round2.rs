@@ -1,6 +1,18 @@
 //! Uniform admission, actual compiler inputs, recording order and the proxy path.
 use super::*;
 
+const REGISTRY: &str = "/opt/rust/cargo/registry";
+const REGISTRY_CRATE: &str = "cache/index.crates.io-1949cf8c6b5b557f/cfg-if-1.0.4.crate";
+
+/// These tests copy one installed crate from the device's Cargo registry; without it they `SKIP:`.
+fn registry_or_skip() -> bool {
+    let found = PathBuf::from(REGISTRY).join(REGISTRY_CRATE).is_file();
+    if !found {
+        eprintln!("SKIP: {REGISTRY}/{REGISTRY_CRATE} is not installed");
+    }
+    found
+}
+
 fn copy_registry(f: &Foreign) {
     // Copy just one already-installed registry package and its sparse-index record. No shared
     // Cargo-home writes, network, seed identities or dependency on the Elohim manifest.
@@ -12,7 +24,7 @@ fn copy_registry(f: &Foreign) {
     ] {
         let dest = f.dir.path().join("cargo-home/registry").join(&rel);
         std::fs::create_dir_all(dest.parent().unwrap()).unwrap();
-        std::fs::copy(PathBuf::from("/opt/rust/cargo/registry").join(rel), dest).unwrap();
+        std::fs::copy(PathBuf::from(REGISTRY).join(rel), dest).unwrap();
     }
 }
 
@@ -57,6 +69,9 @@ fn gaps(f: &Foreign) -> String {
 #[test]
 fn artifact_foreign_dependencies_record_sorted_declared_gaps_through_real_proxies() {
     let _cargo = CARGO.lock().unwrap_or_else(|e| e.into_inner());
+    if !brit_or_skip() || !registry_or_skip() {
+        return;
+    }
     let Some(f) = Foreign::try_new() else { return };
     add_dependencies(&f);
     f.build();
@@ -87,6 +102,9 @@ fn artifact_foreign_dependencies_record_sorted_declared_gaps_through_real_proxie
 #[test]
 fn artifact_mesh_named_foreign_dependencies_use_the_same_rule() {
     let _cargo = CARGO.lock().unwrap_or_else(|e| e.into_inner());
+    if !brit_or_skip() || !registry_or_skip() {
+        return;
+    }
     let Some(f) = Foreign::try_new() else { return };
     add_dependencies(&f);
     // Reproduce every old recognition fact without being the Elohim repository.

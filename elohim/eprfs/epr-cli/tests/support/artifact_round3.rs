@@ -22,6 +22,9 @@ fn notes(f: &Foreign) -> Vec<u8> {
 #[test]
 fn artifact_failed_attestation_preserves_history_and_reports_orphans() {
     let _cargo = CARGO.lock().unwrap_or_else(|e| e.into_inner());
+    if !brit_or_skip() {
+        return;
+    }
     for publish_first in [false, true] {
         let Some(f) = Foreign::try_new() else { return };
         f.build();
@@ -81,6 +84,9 @@ fn artifact_failed_attestation_preserves_history_and_reports_orphans() {
 #[test]
 fn artifact_attested_not_produced_retry_is_idempotent_and_never_removes_flow_records() {
     let _cargo = CARGO.lock().unwrap_or_else(|e| e.into_inner());
+    if !brit_or_skip() {
+        return;
+    }
     let Some(f) = Foreign::try_new() else { return };
     f.build();
     success(f.describe());

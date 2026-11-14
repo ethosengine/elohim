@@ -38,6 +38,31 @@ fn real_brit(found: PathBuf) -> PathBuf {
         .find(|candidate| candidate.is_file())
         .unwrap_or(found)
 }
+/// The command environment is cleared and its PATH holds only the toolchain, so a bare name
+/// would not resolve there: find brit-build-ref on the caller's PATH up front.
+fn brit_build_ref() -> Option<PathBuf> {
+    std::env::var_os("BRIT_BUILD_REF_BIN")
+        .map(PathBuf::from)
+        .filter(|path| path.is_absolute())
+        .or_else(|| {
+            std::env::var_os("PATH").and_then(|paths| {
+                std::env::split_paths(&paths)
+                    .map(|dir| dir.join("brit-build-ref"))
+                    .find(|candidate| candidate.is_file())
+            })
+        })
+        .map(real_brit)
+}
+/// A test that records through Brit or reads its signer needs a real `brit-build-ref`. A device
+/// has one; CI's nix shell does not, so such a test prints `SKIP:` there. Refusal tests that
+/// stop before Brit runs do not call this and still run everywhere.
+fn brit_or_skip() -> bool {
+    let found = brit_build_ref().is_some_and(|path| path.is_file());
+    if !found {
+        eprintln!("SKIP: no brit-build-ref file on BRIT_BUILD_REF_BIN or PATH");
+    }
+    found
+}
 fn text(out: &Output) -> String {
     format!(
         "{}{}",
@@ -91,20 +116,7 @@ impl Foreign {
             }
             .display()
         );
-        // The command environment is cleared and its PATH holds only the toolchain, so a bare
-        // name would not resolve there: find brit-build-ref on the caller's PATH up front.
-        let brit = std::env::var_os("BRIT_BUILD_REF_BIN")
-            .map(PathBuf::from)
-            .filter(|path| path.is_absolute())
-            .or_else(|| {
-                std::env::var_os("PATH").and_then(|paths| {
-                    std::env::split_paths(&paths)
-                        .map(|dir| dir.join("brit-build-ref"))
-                        .find(|candidate| candidate.is_file())
-                })
-            })
-            .map(real_brit)
-            .unwrap_or_else(|| PathBuf::from("brit-build-ref"));
+        let brit = brit_build_ref().unwrap_or_else(|| PathBuf::from("brit-build-ref"));
         let fixture = Self {
             pin: toolchain.pin,
             via_rustup: toolchain.via_rustup,
@@ -289,6 +301,9 @@ impl Foreign {
 #[test]
 fn artifact_foreign_describe_put_records_complete_local_artifact() {
     let _cargo = CARGO.lock().unwrap_or_else(|e| e.into_inner());
+    if !brit_or_skip() {
+        return;
+    }
     let Some(f) = Foreign::try_new() else { return };
     f.build();
     let out = success(f.describe());
@@ -475,6 +490,9 @@ fn artifact_foreign_noncargo_lists_all_unmet_items_and_records_nothing() {
 }
 #[test]
 fn artifact_foreign_missing_signer_and_device_are_aggregated() {
+    if !brit_or_skip() {
+        return;
+    }
     refusal(
         |f, _| {
             std::fs::remove_file(f.root.join(".git/brit/agent-key")).unwrap();
