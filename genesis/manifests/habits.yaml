@@ -1057,10 +1057,10 @@ habits:
       - "a2o @concern:workspace-device-arrival (genesis/a2o/features/devflow/workspace-device-arrival.feature — a keyless workspace is refused by name and nothing else blocks; a second device joins through the first with no key crossing; a missing model names its provisioner; @act:host @requires:epr-cli; all five scenarios are wired, including local candidates with degraded enhancements)"
       - "epr flow report --headline — the `index:` slot reads within the fold-lag ceiling on this device (index-fold-lag-ceiling@1; lag reached its limit once on 2026-10-16), and `participant:` names a standing human by the tracked roster"
     evidence: >
-      DELTA 2026-11-11 (RED preserved): S3 adds the @wip `devflow/unseen-device-builds-its-variant.feature` (spec §7.5): a device of an unseen class participates through the seed's portable tier, builds and proves its own variant, and a later device of its class resolves it. Its correctness finding (an unobservable audience) is fixed. Measured on shem: it is a v2-only host (no avx2/bmi2/movbe/lzcnt/fma), so an arriving shem must refuse a v3 epr before adoption; A2/A3 and V5 carry that.
-    evidence-fingerprint: sha256:c7a99e2d5454b035
-    evidence-bytes: 11410
-    evidence-entries: 14
+      DELTA 2026-11-14 (RED preserved, the v3-on-v2 half now judged): a device judges a binary against its own observed host before running it (host-compat A2–A5, A4 part 2, on `hostcompat/lane-a-preflight`). `ark host provides` prints v3 here and v2 on shem. ark's admission refuses a requirement the host does not meet, naming the axis and never the host's value. The own-build rule admits this device's own mesh doorway and storage builds with the waived `isa.x86` clause named; a sibling's build gets no waiver. Evidence: `just gate elohim-ark` 252 tests plus 3 doctests, and a live `ark host admit` through K13 on ethosengine. Arrival itself is not yet gated on admission (no running path consumes it before P1/V4/R1), so the habit stays red on its own measure.
+    evidence-fingerprint: sha256:2aec4924dfee468a
+    evidence-bytes: 12174
+    evidence-entries: 15
     refs:
       - "spec: elohim/lvi/docs/specs/2026-10-10-workspace-arrival-as-declared-device.md (the mapping of every init surface onto DevspaceSeed / Berth / device key / model pin; the three enrollment layers; the record-without-witness seam §6.3)"
       - "the devfile's arrival commands: devfile.base.yaml `setup-embed-model` + `setup-device-memory` (postStart); the provisioners genesis/agentic/bin/{embed-model-provision,device-memory-sync}"
