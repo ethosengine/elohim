@@ -189,39 +189,55 @@ when that receipt exists, or restates the line.
 | K11 | slices landed (DELTAs 11-12b, d, e, f: the uniform preflight, declared gaps, recording order) | a fresh workspace recording a small cargo binary end to end; a non-cargo recipe refusing with its missing items |
 | K12 | not started as far as dev shows; `env:reach` appears only as a declared gap | all of it |
 
-- [ ] **K1 — the derivation input holds source and cargo configuration only; host tool identity moves into the method, derived from the build (effective linker from `rustc -vV`, link inputs the link read), retiring the fixed keyed-tool list in `artifact.rs`** (serves sprint-lands-each-closure-once)
+- [x] **K1 — the derivation input holds source and cargo configuration only; host tool identity moves into the method, derived from the build (effective linker from `rustc -vV`, link inputs the link read), retiring the fixed keyed-tool list in `artifact.rs`** (serves sprint-lands-each-closure-once)
 
 Verify (restated 2026-11-14 under H13): the two devices' keys for the same source and declared target are equal only when their compilers and link floors are also equal; where those differ, as on shem and ethosengine (K9 receipt), the keys differ and share one family CID. A changed link input changes the key; a changed unused system tool does not.
 
-- [ ] **K2 — the declared target under the reserved `target.` prefix of the method's non-path inputs; target-cpu lifted out of `RUSTFLAGS`; each recorded build-environment variable classified as target or method; `family_cid` as a named rule in `eprfs-core/src/derive.rs`** (serves sprint-lands-each-closure-once)
+State (2026-11-14, lane K tick): met. In code, by the habit DELTAs 11-11, 11-11d, 11-11i and 11-11j (50e78683a, f37624b2b). Across devices the keys differ, as H13 says, and the measured cause is the glibc and gcc link floor (K9 receipt, 11 differing lines). The one-family half is carried by K6.
+
+- [x] **K2 — the declared target under the reserved `target.` prefix of the method's non-path inputs; target-cpu lifted out of `RUSTFLAGS`; each recorded build-environment variable classified as target or method; `family_cid` as a named rule in `eprfs-core/src/derive.rs`** (serves sprint-lands-each-closure-once)
 
 Verify: existing method CIDs do not move for descriptors without `target.*`; v2 and v3 descriptors of one recipe share a family CID; unit tests in `derive.rs`.
+
+State (2026-11-14, lane K tick): met (DELTA 11-11b; 0078bd40e). The doorway method CID did not move; `artifact_describe_variants_share_only_family` shows v2 and v3 descriptors sharing one family CID; eprfs-core 151 of 151 tests.
 
 - [ ] **K3 — `Produce` events gain additive `env:family` and `env:requires` slots; on an own-key miss, fetch reads by family, groups by key, admits each variant, chooses, re-derives the chosen variant's key itself and resolves holders for that key only** (serves sprint-lands-each-closure-once)
 
 Verify: a fetch on the v2 device of a family that holds a v2 and a v3 variant selects v2 and fetches it; the daemon's key re-check passes on the re-derived key.
 
-- [ ] **K4 — a second output under one key narrows the holders (to the set's named CID, or by trust policy) and is recorded as divergence evidence, instead of refusing the fetch** (serves dataplane-convergence)
+State (2026-11-14, lane K tick): part 1 met (DELTAs 11-11e, 11-11f): `Produce` carries `env:family` and `env:requires`, and `holders --family` lists each variant with its holders. Part 2, the fetch by family with admission and key re-derivation, is not on dev (`family.rs` still defers it), so this item stays open on the verify above. The overnight 1.100 cross-fetches were by output CID, not by family.
+
+- [x] **K4 — a second output under one key narrows the holders (to the set's named CID, or by trust policy) and is recorded as divergence evidence, instead of refusing the fetch** (serves dataplane-convergence)
 
 Verify: a test with two differing outputs under one key fetches from the agreeing holder and records one divergence observation.
 
-- [ ] **K5 — holder lookup by output CID over the same `Produce` fold, and a fewer-than-N-holders warning read from it** (serves dataplane-convergence)
+State (2026-11-14, lane K tick): met (329883371, DELTA 11-11c): eprfs-peer 160 and CLI 1,385 tests. A tied holder count refuses; that choice is open to the steward, not a defect against this verify.
+
+- [x] **K5 — holder lookup by output CID over the same `Produce` fold, and a fewer-than-N-holders warning read from it** (serves dataplane-convergence)
 
 Verify: a lookup by `env:output` returns the same holders as the key lookup for a single-variant family.
+
+State (2026-11-14, lane K tick): met (329883371, DELTA 11-11c): `holders --output` matches the key lookup for a single-variant family in its regressions.
 
 - [ ] **K6 — a declared target with a pinned sysroot (itself a recorded derivation with a key and a requirement); F2r closes with one family in both directions (each device records its own key under it; H13), including the v3-on-v2 refusal under emulation** (serves sprint-lands-each-closure-once)
 
 Verify: the F2r receipt names the sysroot CID; each device records its own key under one family; each fetches the other's variant by family and admits or refuses it; the emulated v2 run refuses the v3 variant before launch. Keys are equal only when the compilers are too (H13, ruled 2026-11-12, `sprints/2026-11-11-host-compatibility/rulings-2026-11-12.md`).
 
+State (2026-11-14, lane K tick): slices 1 and 2 met. The sysroot derivation is recorded with its key and requirement (e4e303506), and shem's v2 floor is recorded (1,655 members, output `bafkr4ic3gyme…`, `evidence/k6-v2-floor.json`). Still open: serving the floor (waits on K12); each device fetching the other's variant by family (waits on K3 part 2); and the emulated v2 run, of which no record exists. Refusal of a v3 requirement on a v2 host is shown so far only by vectors and `ark host admit`.
+
 - [ ] **K7 — re-run the artifact-store sprint's owed receipts (F1r sibling reuse, the F2r fetch half) on the new key, reuse by family between devices with different compilers (H13)** (serves sprint-lands-each-closure-once)
 
 Verify: both receipts in `sprints/2026-11-07-artifact-store/evidence/`, linked from its `RESULT.md`.
+
+State (2026-11-14, lane K tick): not met. The F2r fetch half has figures on the new key, but they are filed only in the steward's overnight notes. ethosengine to shem: doorway 227 MB in 5.3 s, 0 wasted. shem to ethosengine: doorway 227 MB in 2.9 s and storage 542 MB in 7.3 s, 0 wasted. Keys differ per host (H13). That is reuse by output CID, not by family, and it is not yet in the artifact-store evidence. The F1r half is G1, which has no receipt yet.
 
 Items K8–K12 were added 2026-11-11 from spec §7.9 (an artifact is born self-describing) and §7.8
 (reach on the object). Each one is a precondition for a second device to close a gap from the
 record alone. State at addition: K1, K2, K3 part 1, K4, K5 and K6 slice 1 are on dev (6e8c1e2a1).
 
-- [ ] **K8 — `put` extracts `Requires` from the bytes itself (arch, OS, loader, needed libraries, libc symbol floor, kernel ABI note, ISA level) with `host_contract::Requires` and writes `env:requires`; a caller-supplied `--requires` may only make a clause stricter; an artifact whose requirements cannot be extracted refuses** (serves sprint-lands-each-closure-once)
+- [x] **K8 — `put` extracts `Requires` from the bytes itself (arch, OS, loader, needed libraries, libc symbol floor, kernel ABI note, ISA level) with `host_contract::Requires` and writes `env:requires`; a caller-supplied `--requires` may only make a clause stricter; an artifact whose requirements cannot be extracted refuses** (serves sprint-lands-each-closure-once)
+
+State (2026-11-14, lane K tick): met. The installed epr extracts v3 plus glibc 2.39 with the seven extras counted (`bafkr4ic76hvp5ozpc2izyuhug6fqiwrdxcpndalzemmiygdzakucicfccy`, `k8-extraction-ethosengine.json`). It refuses against the synthetic v2 vector (`ethosengine-epr-on-synthetic-v2.json`) and on an unreadable artifact (`artifact_unreadable_requirements_refuse_with_output_name`). shem's native build yields the same CID (`k8-extraction-shem-built.json`).
 
 Axis ids and version lines come from the `host_contract` constants the A1 owner is adding (arch, os, isa.x86, kernel.linux, abi.libc, abi.loader, lib; lines glibc, musl, linux), never from literal strings, so two spellings cannot silently fail to compare. K8 starts after those constants land. Constraints from the A1 owner (shem, 2026-11-11): `put` builds `Requires` through `Requires::try_from(Vec<Clause>)` or `insert`, so a conflict between a declared and an extracted clause surfaces as `MergeError` and never silently weakens; extracted clauses carry `source: extracted`; the building host's `Provides` is never recorded (it is not serializable by design).
 
@@ -245,6 +261,8 @@ Scope (ruled 2026-11-12, `sprints/2026-11-11-host-compatibility/rulings-2026-11-
 
 Verify: ark's blake3 `*_avx2` paths do not raise its extracted ISA clause when their guard is evidenced; with the evidence withheld, the same bytes extract v3; epr's sqlite3 v3 code stays a requirement. For epr, exactly v3 is an outcome of complete coverage, not a preset target: narrowing removes a feature only when every occurrence of it is certified, and the remaining instructions then decide the level. Withheld evidence keeps all seven K8 extras and refuses against the synthetic v3 `Provides`.
 
+State (2026-11-14, lane K tick): step 1 met as A3 (spec §3.2 3bae37313; ark d12a28be2, 4277de3ea; A5 binds the own-build claim to K13's `self`). The withdrawal on an illegal-instruction death (condition 5) has its input, a withdrawn-artifact set; F3 does not exist yet. Steps 2 and 3 are open on their triggers. The blake3 sentence of the verify above stays as step 3's target. It is not provable by a branch-dominance check, since blake3's platform enum is public (the rulings), so step 3's certificate slice must cover it by name.
+
 Design input (read-only pass, 2026-11-11, `sprints/2026-11-07-artifact-store/evidence/k10-dispatch-evidence-design.md`): a function hash proves identity, not guarded reachability. The evidence is a certificate produced after the final link, bound to the whole artifact's CID, naming each guarded region, its detector, every incoming edge and the pointer or object invariants. `put` checks it and rescans every occurrence, and another device re-checks it without running the code. The scope is wider than ring and compiler_builtins: `sha_ni` also comes from two `sha2` versions. The three real mechanisms (ring's capability tokens and key variants, compiler_builtins' cached function pointer, blake3's public platform enum) each defeat a branch-dominance check, so the first slice covers one ELF and link configuration and these named contracts only. Unsupported or unresolved paths keep the requirement.
 
 Second-device receipt (shem, 2026-11-12, `k8-extraction-shem-built.json`): an epr built natively on shem extracts the identical Requires CID, but for other causes. Its sqlite is v2 C, and the v3 level comes only from dispatched code (chacha20's avx2 backend, ring, sha2, compiler_builtins). shem's own Sandy Bridge CPU (no avx2, bmi, fma, adx or sha_ni) runs this epr, yet the recorded clause refuses it: the motivating case for K10. A second narrowing class comes from the same receipt. 1,277 of 1,281 `bmi1` sites are `tzcnt`, which LLVM emits in baseline code as `rep bsf`, and which runs as BSF without BMI1. Unlike ENDBR it is not a pure NOP: the two differ on a zero input, and code compiled with bmi1 may rely on the zero result. So K8 keeps counting it. K10 removes it only on evidence that the containing code was compiled at baseline (a build attestation naming the code's target features); without that, a v2-targeted build would be refused on v2 hosts for bmi1.
@@ -254,6 +272,8 @@ Second-device receipt (shem, 2026-11-12, `k8-extraction-shem-built.json`): an ep
 The steward's uniform rule (2026-11-12) classifies every §7.9 item as present, a declared gap, or a missing fact that refuses every recipe together before any write; no mesh recognition or identity exemption exists. Four declared gaps are allowed when applicable: `reach` (K12, pending H12), `build-inputs.build-scripts` (build-script/proc-macro inputs remain unenumerated), `build-inputs.dependency-sources` (registry checksums pin dependencies but source trees remain outside the captured view), and `build-inputs.compiler-inputs-unattested` (every Cargo recipe: edited dep-info cannot be detected without a build receipt). K6's pinned build closure must close build-scripts and dependency-sources; compiler-inputs-unattested closes only when put runs the build or an ark task records a build receipt binding compiler inputs, closure key and output bytes. Dep-info naming another target or older than the binary remains a missing fact that refuses, naming both paths. Describe/put prints each applicable gap as pending, not enforced while Produce records one sorted `env:gaps` slot. Committed locks and source commits, dependency pins, captured path/compiler inputs, resolved link inputs, attribution, supported artifact/target/narrowing, and writable destinations remain required for ours and foreign projects alike; recording orders destination preflight, content-addressed documents (reported harmless orphans on failure), Brit attestation, then Produce LAST. Neither the flow log nor Brit notes are ever rolled back. A failed Produce append reports `attested, not produced: re-run put with the same arguments to complete`; retries reuse a verified matching attestation from this signer and append Produce once. The shared recorder adds `reach` for every recipe, including sysroot put, whose banner also names it.
 
 Verify: a fresh workspace records a small cargo binary end to end; a non-cargo recipe refuses naming each missing §7.9 item.
+
+State (2026-11-14, lane K tick): met at test level. A real offline foreign cargo binary records end to end, and missing facts refuse every recipe together, each named (DELTAs 11-12b, d, e, f; 5f3688195). Open: the same from a fresh lvi workspace holding only the installed `epr`. The four declared gaps close as K12, K6 and a build receipt land.
 
 - [ ] **K12 — `env:reach` on every `Produce`, derived as the narrowest input reach (`epr::Reach`), and the peer gate serving when the requester's relationship meets it, with `berth.artifacts.serves` as a narrowing list (spec §7.8). H12 ruled 2026-11-12 (option B, `sprints/2026-11-11-host-compatibility/rulings-2026-11-12.md`); K12 may start** (serves dataplane-convergence)
 
