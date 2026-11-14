@@ -149,6 +149,7 @@
 #                   Declarations (manifest.json + berth.json) are rewritten per
 #                   peer on every launch; the same data root is never run twice.
 #
+#   MESH_ALLOW_INCOMPATIBLE_BINARY  Set to 1 to override compatibility refusals; announced.
 #   ARK_BIN         The `ark` binary. Default: the cargo-pool dev slot
 #                   /projects/.cargo-target-pool/family/dev/elohim/dev/debug/ark,
 #                   then whatever `ark` is on PATH. MESH_CONDUCTOR_LAUNCH=ark
@@ -2474,6 +2475,84 @@ preflight_binary_freshness() {
     fi
   fi
   rm -f "$tmp"
+  return "$failed"
+}
+
+# Requirements and local Produce evidence belong to epr; ark owns byte/CID verification
+# and host admission. Never inspect the store layout or infer compatibility from freshness.
+mesh_binary_compatibility() ( # <binary> <bin-name> <build-project>
+  local binary="$1" bin="$2" project="$3" record key output result rc=0 reason produce
+  local tmp own_args=()
+  record="$(dirname "$binary")/.derivation-$bin.json"
+  if [ ! -f "$record" ]; then
+    echo "ok compatibility $bin: unmeasured (no derivation record)"
+    return 0
+  fi
+  if ! key="$(jq -er '.key | select(type == "string" and length > 0)' "$record" 2>/dev/null)"; then
+    echo "ok compatibility $bin: unmeasured (invalid derivation record)"
+    return 0
+  fi
+  if ! result="$("$(_mesh_epr)" artifact holders --key "$key" --json 2>/dev/null)"; then
+    echo "ok compatibility $bin: unmeasured (epr holder lookup unavailable)"
+    return 0
+  fi
+  output="$(jq -er '[.holders[] | select(.self == true) | .output | select(type == "string" and length > 0)][0] // empty' <<<"$result" 2>/dev/null)" || output=""
+  if [ -z "$output" ]; then
+    echo "ok compatibility $bin: unmeasured (no Produce on this device)"
+    return 0
+  fi
+  tmp="$(mktemp -d)" || return 1
+  trap 'rm -rf "$tmp"' EXIT
+  result="$("$(_mesh_epr)" artifact requires --output "$output" --write "$tmp/requires.json" --json 2>"$tmp/why")" || rc=$?
+  if [ "$rc" -ne 0 ]; then
+    # Missing verbs commonly exit 2 too; distinguish a CLI usage error from unknown output.
+    if grep -qiE '(unrecognized|unrecognised|unknown|unexpected|invalid).*(subcommand|command|requires)|usage:.*artifact' "$tmp/why" <(printf '%s\n' "$result"); then
+      echo "ok compatibility $bin: unmeasured (epr has no requirement reader yet)"
+    elif [ "$rc" -eq 3 ]; then
+      reason="$(cat "$tmp/why")"
+      [ -n "$reason" ] || reason="$result"
+      reason="$(printf '%s' "$reason" | tr '\n\r\t' '   ' | tr -d '[:cntrl:]')"
+      echo "ok compatibility $bin: unmeasured (${reason:-no recorded requirement or document unavailable locally})"
+    elif [ "$rc" -eq 2 ]; then
+      echo "REFUSED compatibility $bin: epr does not know output $output — rebuild with just mesh build $project"
+      return 1
+    else
+      echo "ok compatibility $bin: unmeasured (epr has no requirement reader yet)"
+    fi
+    return 0
+  fi
+  if [ -z "${ARK_BIN:-}" ] || [ ! -x "$ARK_BIN" ]; then
+    echo "ok compatibility $bin: unmeasured (no ark binary)"
+    return 0
+  fi
+  produce="$(jq -er 'select(.self == true) | .produce | select(type == "string" and length > 0)' <<<"$result" 2>/dev/null)" || produce=""
+  [ -z "$produce" ] || own_args=(--own-produce "$produce")
+  "$ARK_BIN" host admit --requires "$tmp/requires.json" --binary "$binary" \
+    --output "$output" --name "$bin" "${own_args[@]}"
+)
+
+preflight_binary_compatibility() {
+  local failed=0 binary bin project line rc
+  local entries=("$STORAGE_BIN|elohim-storage|storage")
+  if [ "$MESH_DOORWAYS_EFFECTIVE" = "1" ]; then
+    entries+=("$DOORWAY_BIN|doorway|doorway")
+    if [ "$MESH_MEMBERSHIP" = "1" ]; then
+      entries+=("$BEACON_BIN|relay-addr-beacon|beacon")
+    fi
+  fi
+  for line in "${entries[@]}"; do
+    IFS='|' read -r binary bin project <<<"$line"
+    rc=0
+    line="$(mesh_binary_compatibility "$binary" "$bin" "$project")" || rc=$?
+    printf '%s\n' "$line"
+    if [ "$rc" -ne 0 ] || [[ "$line" == REFUSED* ]]; then
+      if [ "${MESH_ALLOW_INCOMPATIBLE_BINARY:-0}" = "1" ]; then
+        echo "ok compatibility override $bin: MESH_ALLOW_INCOMPATIBLE_BINARY=1 used"
+      else
+        failed=1
+      fi
+    fi
+  done
   return "$failed"
 }
 
@@ -5477,6 +5556,7 @@ preflight() {
   #     falls back to the tracked-src mtime rule and says so; explicit paths retain that rule.
   #     A stale artifact is measured as if it were the fix (see assert_binary_matches_closure).
   preflight_binary_freshness || fail=1
+  preflight_binary_compatibility || fail=1
 
   # 5c. hApp coordinator bundle freshness — same class of check as 5b, one
   #     layer down (the packed Holochain bundle rather than a --bin
