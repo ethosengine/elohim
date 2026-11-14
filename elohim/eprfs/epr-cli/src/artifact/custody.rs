@@ -39,18 +39,15 @@ pub(super) fn records(found: &SiblingArtifacts) -> Vec<SiblingRecord> {
         .collect()
 }
 
-/// Availability is local possession only; this query never fetches from siblings.
-fn requires_availability(
+/// Each document's bytes when this device holds them and they hash to their CID. Local
+/// possession only; this query never fetches from siblings.
+fn local_documents(
     options: &Options,
     cids: &BTreeSet<BlobCid>,
-) -> ArtifactResult<BTreeMap<BlobCid, &'static str>> {
-    let mut availability: BTreeMap<_, _> = cids
-        .iter()
-        .cloned()
-        .map(|cid| (cid, "unavailable"))
-        .collect();
+) -> ArtifactResult<BTreeMap<BlobCid, Option<Vec<u8>>>> {
+    let mut documents: BTreeMap<_, _> = cids.iter().cloned().map(|cid| (cid, None)).collect();
     if cids.is_empty() {
-        return Ok(availability);
+        return Ok(documents);
     }
     let payload_dir = peer::payload_store_dir(&peer::Options {
         root: options.repo.clone(),
@@ -58,7 +55,7 @@ fn requires_availability(
         ..peer::Options::default()
     })?;
     if !payload_dir.exists() {
-        return Ok(availability);
+        return Ok(documents);
     }
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
@@ -69,17 +66,176 @@ fn requires_availability(
                 .await
                 .map_err(|e| ArtifactError::Gap(format!("local Requires store: {e}")))?
                 .store;
-        for (cid, status) in &mut availability {
-            if store
+        for (cid, slot) in &mut documents {
+            if let Ok(blob) = store
                 .fetch_blob(cid, eprfs_core::FetchPolicy::LocalOnly)
                 .await
-                .is_ok_and(|blob| BlobCid::compute_bytes(&blob.bytes) == *cid)
             {
-                *status = "local";
+                if BlobCid::compute_bytes(&blob.bytes) == *cid {
+                    *slot = Some(blob.bytes.to_vec());
+                }
             }
         }
-        Ok(availability)
+        Ok(documents)
     })
+}
+
+fn requires_availability(
+    options: &Options,
+    cids: &BTreeSet<BlobCid>,
+) -> ArtifactResult<BTreeMap<BlobCid, &'static str>> {
+    Ok(local_documents(options, cids)?
+        .into_iter()
+        .map(|(cid, bytes)| {
+            (
+                cid,
+                if bytes.is_some() {
+                    "local"
+                } else {
+                    "unavailable"
+                },
+            )
+        })
+        .collect())
+}
+
+/// `requires` exit for an output this device's store has no custody Produce of.
+const EXIT_UNKNOWN_OUTPUT: u8 = 2;
+/// `requires` exit when a recorded requirement document is not held locally.
+const EXIT_UNAVAILABLE: u8 = super::EXIT_GAP;
+/// `requires` exit when the output's recorded requirement documents do not merge.
+const EXIT_CONFLICT: u8 = 4;
+
+/// `epr artifact requires --output <cid>`: the recorded requirement of one output, read from
+/// this device's own flow store and payload store, never the network (plan item K13).
+///
+/// `self` is true only when this device's own key recorded a custody Produce of the output (a
+/// local `epr artifact put`); a sibling's crossed Produce and a fetch never make it true, and no
+/// flag can. `produce` names that record, the one an own-build claim may cite. Several Produce
+/// events for one output merge through `Requires::try_from`; a Produce with no `env:requires`
+/// slot adds nothing, and an output whose Produce events carry none at all is `unmeasured`.
+pub(super) fn requires(options: &Options) -> ArtifactResult<ExitCode> {
+    let output = options
+        .output
+        .as_ref()
+        .ok_or_else(|| ArtifactError::InvalidArguments("requires needs --output CID".into()))?;
+    let found = peer::custody_artifacts(&options.repo, options.handle.as_deref())?;
+    let rows: Vec<_> = found
+        .rows
+        .iter()
+        .filter(|row| BlobCid::parse(&row.output).is_ok_and(|cid| &cid == output))
+        .collect();
+    let mut own: Vec<_> = rows
+        .iter()
+        .filter(|row| row.device == found.device)
+        .collect();
+    own.sort_by(|a, b| (&a.at, &a.record).cmp(&(&b.at, &b.record)));
+    let produce = own.first().map(|row| row.record.clone());
+    let is_self = produce.is_some();
+    let who = if is_self { "self" } else { "other" };
+    let report = |line: String, fields: serde_json::Value| {
+        if options.json {
+            let mut value = serde_json::json!({
+                "output": output, "self": is_self, "produce": produce,
+            });
+            value
+                .as_object_mut()
+                .expect("object literal")
+                .extend(fields.as_object().expect("object literal").clone());
+            println!("{value}");
+        } else {
+            println!("{line}");
+        }
+    };
+    if rows.is_empty() {
+        report(
+            format!("unknown {output}: no custody Produce of it on this device's store"),
+            serde_json::json!({"known": false, "requires": null, "path": null}),
+        );
+        return Ok(ExitCode::from(EXIT_UNKNOWN_OUTPUT));
+    }
+    let mut cids = BTreeSet::new();
+    for slot in rows.iter().filter_map(|row| row.requires.as_deref()) {
+        cids.insert(BlobCid::parse(slot).map_err(|e| {
+            ArtifactError::Gap(format!(
+                "requires gap: {output} carries an unreadable env:requires {slot}: {e}"
+            ))
+        })?);
+    }
+    if cids.is_empty() {
+        report(
+            format!("unmeasured {output}: no recorded requirement {who}"),
+            serde_json::json!({
+                "known": true, "requires": null, "path": null,
+                "unmeasured": "no recorded requirement",
+            }),
+        );
+        return Ok(ExitCode::SUCCESS);
+    }
+    let documents = local_documents(options, &cids)?;
+    let missing: Vec<_> = documents
+        .iter()
+        .filter(|(_, bytes)| bytes.is_none())
+        .map(|(cid, _)| cid.to_string())
+        .collect();
+    if !missing.is_empty() {
+        report(
+            format!(
+                "unavailable {output}: requirement {} not held locally {who}",
+                missing.join(", ")
+            ),
+            serde_json::json!({
+                "known": true, "requires": null, "path": null, "unavailable": missing,
+            }),
+        );
+        return Ok(ExitCode::from(EXIT_UNAVAILABLE));
+    }
+    let sources: Vec<_> = documents.keys().map(ToString::to_string).collect();
+    let mut clauses: Vec<host_contract::Clause> = Vec::new();
+    for (cid, bytes) in &documents {
+        // Decoding is the checked merge, so a stored document that would not construct is
+        // refused here rather than handed on as bytes.
+        let document: host_contract::Requires = serde_json::from_slice(
+            bytes.as_deref().expect("missing refused above"),
+        )
+        .map_err(|e| {
+            ArtifactError::Gap(format!(
+                "requires gap: {cid} is not a requirement document: {e}"
+            ))
+        })?;
+        clauses.extend(Vec::<host_contract::Clause>::from(document));
+    }
+    let (requires, bytes) = match host_contract::Requires::try_from(clauses) {
+        Err(error) => {
+            report(
+                format!("conflict {output}: MergeError: {error} {who}"),
+                serde_json::json!({
+                    "known": true, "requires": null, "path": null, "sources": sources,
+                    "conflict": error.to_string(),
+                }),
+            );
+            return Ok(ExitCode::from(EXIT_CONFLICT));
+        }
+        // One recorded document is handed on byte for byte; several are merged canonically.
+        Ok(_) if documents.len() == 1 => {
+            let (cid, bytes) = documents.into_iter().next().expect("one document");
+            (cid, bytes.expect("missing refused above"))
+        }
+        Ok(merged) => {
+            let (cid, bytes) = super::requires::canonical(&merged)?;
+            (cid, bytes.to_vec())
+        }
+    };
+    if let Some(path) = &options.write {
+        std::fs::write(path, &bytes)?;
+    }
+    report(
+        format!("requires {requires} {who}"),
+        serde_json::json!({
+            "known": true, "requires": requires, "path": options.write, "sources": sources,
+        }),
+    );
+    Ok(ExitCode::SUCCESS)
 }
 
 fn requires_text(requires: &Requires, availability: &BTreeMap<BlobCid, &'static str>) -> String {

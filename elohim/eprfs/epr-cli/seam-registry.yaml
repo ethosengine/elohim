@@ -2489,3 +2489,28 @@ decisionPoints:
   - { path: elohim/eprfs/epr-cli/tests/support/artifact_inputs.rs, testName: inputs_diff_selects_newest_same_commit_in_cid_fold_order_and_prints_provenance, kind: integration }
   - { path: elohim/eprfs/epr-cli/tests/support/artifact_inputs.rs, testName: inputs_diff_without_same_commit_refuses_with_five_candidates_and_literal_key_hint, kind: integration }
   - { path: elohim/eprfs/epr-cli/tests/support/artifact_inputs.rs, testName: inputs_diff_equal_produce_times_with_different_inputs_refuses_both_candidates, kind: integration }
+- name: artifact_requires
+  kind: reason-outcome-enum
+  sourceLocation: { file: src/artifact/custody.rs, modulePath: elohim_epr_cli::artifact::custody::requires }
+  summary: "Plan item K13: one output's recorded requirement from this device's own flow and payload stores. Outcomes: found (0, the one document byte for byte or the canonical merge of several), unmeasured (0, no Produce carries env:requires), unknown output (2), document not held locally (3), MergeError (4). `self` and `produce` are this device's key-checked custody Produce, the only source an own-build claim (A5) accepts."
+  concernIds:
+  - { id: C0, status: answered, justification: "Reads existing custody Produce events and locally held requirement documents; adds no record, head or store." }
+  - { id: C1, status: answered, justification: "`self` is decided by the device key that custody_artifacts resolves from standing; no flag sets it, and a sibling's crossed Produce or a fetch never makes it true." }
+  - { id: C2, status: answered, justification: "Several Produce events for one output merge through Requires::try_from; disagreement is a MergeError, never a choice. The cited Produce is the earliest own record by occurred_at, then record CID." }
+  - { id: C3, status: answered, justification: "Local reads only (FetchPolicy::LocalOnly); one pass over the custody rows of one output." }
+  - { id: C4, status: answered, justification: "Each refusal has its own exit and JSON field; an unreadable env:requires slot or a document that does not decode refuses as a gap, never as an empty requirement." }
+  - { id: C5, status: answered, justification: "A held document is used only when its bytes hash to its CID, and decoding is the checked merge, so stored bytes cannot forge a weaker requirement." }
+  - { id: C6a, status: answered, justification: "Bounded by the output's custody rows and their distinct documents." }
+  - { id: C6b, status: answered, justification: "Read-only; --write writes only the answered document, and a conflict writes nothing." }
+  - { id: C7, status: n-a, justification: "No network route; never fetches from siblings." }
+  - { id: C8, status: answered, justification: "Plain and JSON forms name the outcome, the source documents and self/other." }
+  - { id: C9, status: answered, justification: "Documents are addressed by their raw-byte CIDs; a merged answer is canonical JSON with its own CID and lists its sources." }
+  - { id: C10, status: answered, justification: "Exit codes and JSON keys are the contract the mesh preflight (A4 part 2) reads." }
+  - { id: C11, status: n-a, justification: "A local query, run once per staged binary by preflight." }
+  - { id: C12, status: answered, justification: "Reveals only this device's own stores to its own caller." }
+  - { id: C13, status: n-a, justification: "No authority tier; admission stays in ark." }
+  - { id: C14, status: partial, justification: "The answer is not witnessed; A5 binds it inside ark's admission." }
+  contractTests:
+  - { path: elohim/eprfs/epr-cli/tests/support/artifact_requires.rs, testName: requires_answers_unknown_unmeasured_and_self_from_the_device_key, kind: integration }
+  - { path: elohim/eprfs/epr-cli/tests/support/artifact_requires.rs, testName: requires_hands_on_one_document_byte_for_byte_and_merges_several, kind: integration }
+  - { path: elohim/eprfs/epr-cli/tests/support/artifact_requires.rs, testName: requires_refuses_conflicting_documents_as_a_merge_error, kind: integration }

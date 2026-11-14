@@ -129,7 +129,11 @@ pub fn usage() -> String {
      the same method and source commit, refusing different-input time ties; key CID pins that exact key; \
      provenance on stderr; diff: - this device, + sibling, sorted without context; \
      exits 0 identical, 1 different, 3 refused/unavailable)\n  \
-     | holders (--key CID | --output CID | --family CID) [--min N] [--json] [--repo ROOT] [--handle H]>"
+     | holders (--key CID | --output CID | --family CID) [--min N] [--json] [--repo ROOT] [--handle H]\n  \
+     | requires --output CID [--write FILE] [--json] [--repo ROOT] [--handle H] [--payload-store DIR] \
+     (the output's recorded requirement from this device's own store, never the network; `self` \
+     only when this device's key recorded the Produce; exits 0 found or `unmeasured`, 2 unknown \
+     output, 3 document not held locally, 4 MergeError)>"
         .to_string()
 }
 
@@ -163,13 +167,14 @@ pub fn run(args: &[String]) -> ArtifactResult<ExitCode> {
         Some("put") => put(&options),
         Some("fetch") => fetch(&options),
         Some("holders") => custody::holders(&options),
+        Some("requires") => custody::requires(&options),
         Some(other) => {
             return Err(ArtifactError::InvalidArguments(format!(
                 "unknown artifact verb `{other}`{}\n{}",
                 crate::hint::did_you_mean(
                     other,
                     "epr artifact",
-                    &["describe", "key", "put", "fetch", "holders"]
+                    &["describe", "key", "put", "fetch", "holders", "requires"]
                 ),
                 usage()
             )))
@@ -210,6 +215,7 @@ struct Options {
     env: Vec<String>,
     target: Vec<(String, String)>,
     out: Option<PathBuf>,
+    write: Option<PathBuf>,
     method: Option<PathBuf>,
     requires: Option<PathBuf>,
     print: Option<String>,
@@ -280,6 +286,7 @@ impl Options {
                     options.target.push((name, value));
                 }
                 "--out" => options.out = Some(PathBuf::from(value)),
+                "--write" => options.write = Some(PathBuf::from(value)),
                 "--method" => options.method = Some(PathBuf::from(value)),
                 "--requires" => options.requires = Some(PathBuf::from(value)),
                 "--print" => options.print = Some(value),

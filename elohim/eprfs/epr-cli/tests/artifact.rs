@@ -1126,6 +1126,9 @@ mod link_key;
 #[path = "support/artifact_holders.rs"]
 mod holders;
 
+#[path = "support/artifact_requires.rs"]
+mod requires;
+
 #[path = "support/artifact_sysroot_put.rs"]
 mod sysroot_put;
 

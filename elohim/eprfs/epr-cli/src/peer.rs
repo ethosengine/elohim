@@ -1485,6 +1485,9 @@ fn verdicts(options: &Options) -> PeerResult<ExitCode> {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SiblingArtifact {
+    /// CID of the custody Produce record this row was read from.
+    #[serde(skip_serializing)]
+    pub record: String,
     #[serde(skip_serializing)]
     pub key: String,
     #[serde(skip_serializing)]
@@ -1511,6 +1514,7 @@ pub struct SiblingArtifact {
 /// itself: its resource, subject
 /// and `env:output` name one output, and it names exactly one manifest.
 fn artifact_from_event(
+    record: &impl std::fmt::Display,
     event: &FlowEvent,
     me: &str,
     admission: &Admission,
@@ -1544,6 +1548,7 @@ fn artifact_from_event(
     }
     let manifest = one_slot(event, "manifest:")?;
     Some(SiblingArtifact {
+        record: record.to_string(),
         key: key.to_string(),
         method: one_slot(event, "env:method=").map(str::to_string),
         input: one_slot(event, "env:input=").map(str::to_string),
@@ -1638,7 +1643,9 @@ pub fn custody_artifacts(root: &Path, handle: Option<&str>) -> PeerResult<Siblin
         .events()
         .map_err(|e| PeerCliError::Peer(PeerError::FlowStore(e)))?
         .into_iter()
-        .filter_map(|(_, event)| artifact_from_event(&event, &did, &admission, &table))
+        .filter_map(|(record, event)| {
+            artifact_from_event(&record, &event, &did, &admission, &table)
+        })
         .collect();
     Ok(SiblingArtifacts {
         rows,
