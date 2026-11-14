@@ -10,7 +10,10 @@ use std::collections::BTreeSet;
 use chrono::{DateTime, Utc};
 use cid::Cid;
 use elohim_epr::{Epr, EprKind};
+use host_contract::{Provides, Requires};
 use serde::{Deserialize, Serialize};
+
+use crate::compatibility::{admit_artifact, HostAdmission};
 
 /// Domain discriminator; unknown versions cannot silently gain this meaning.
 pub const CANDIDATE_SCHEMA_KEY: &str = "ark-candidate-v1";
@@ -106,21 +109,35 @@ pub struct CandidateObservation {
     pub observed_executable: Cid,
     /// Candidate runtime manifest independently resolved from the elected release.
     pub candidate_manifest: Cid,
+    /// Requirement resolved from this executable's Produce env:requires, not signed content.
+    /// None is missing evidence; Some(empty) explicitly requires no host features.
+    pub requires: Option<Requires>,
+    /// Private, in-memory observation of the device that would execute these bytes.
+    pub provides: Provides,
+    /// True only when this device recorded this executable's Produce.
+    pub own_build: bool,
+    /// Device-local illegal-instruction counter-evidence; populated by the future F3 caller.
+    pub withdrawn_artifacts: BTreeSet<Cid>,
     /// Explicit observation time; this pure module reads no clock.
     pub now: DateTime<Utc>,
 }
 
 /// Authenticated candidate CONTENT only. No conversion to activation authority exists.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct AuthenticatedCandidateContent {
     cid: Cid,
     content: CandidateContent,
+    admission: HostAdmission,
 }
 
 impl AuthenticatedCandidateContent {
     /// Identity of the signed content.
     pub fn cid(&self) -> Cid {
         self.cid
+    }
+    /// Recordable compatibility effect, with no observed host values.
+    pub fn admission(&self) -> &HostAdmission {
+        &self.admission
     }
     /// Read-only content, not an authorization to mutate processes.
     pub fn content(&self) -> &CandidateContent {
@@ -129,8 +146,9 @@ impl AuthenticatedCandidateContent {
 }
 
 /// Stable refusal vocabulary. Consumers must count refusals beside success.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum CandidateRefusal {
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum CandidateRefusal<Compatibility = ()> {
     /// Input exceeds the bounded work contract.
     TooLarge,
     /// Wrong domain, schema or malformed data/identity.
@@ -145,8 +163,9 @@ pub enum CandidateRefusal {
     WrongTarget,
     /// Installed predecessor differs.
     StalePredecessor,
-    /// Different execution platform.
-    WrongPlatform,
+    /// Host admission refused. The authentication result carries a HostAdmission;
+    /// the unit instantiation retains the Copy ReasonLabel vocabulary contract.
+    WrongPlatform(Compatibility),
     /// Observed bytes differ from signed candidate identity.
     ArtifactMismatch,
     /// Candidate cannot provide a required capability.
@@ -164,12 +183,19 @@ impl seam_contracts::ReasonLabel for CandidateRefusal {
         Self::InvalidTime,
         Self::WrongTarget,
         Self::StalePredecessor,
-        Self::WrongPlatform,
+        Self::WrongPlatform(()),
         Self::ArtifactMismatch,
         Self::MissingCapability,
         Self::DatabaseIncompatible,
     ];
     fn label(&self) -> &'static str {
+        self.label()
+    }
+}
+
+impl<T> CandidateRefusal<T> {
+    /// Stable refusal label, independent of the attached compatibility effect.
+    pub fn label(&self) -> &'static str {
         match self {
             Self::TooLarge => "candidate_too_large",
             Self::InvalidContent => "candidate_invalid_content",
@@ -178,7 +204,7 @@ impl seam_contracts::ReasonLabel for CandidateRefusal {
             Self::InvalidTime => "candidate_invalid_time",
             Self::WrongTarget => "candidate_wrong_target",
             Self::StalePredecessor => "candidate_stale_predecessor",
-            Self::WrongPlatform => "candidate_wrong_platform",
+            Self::WrongPlatform(_) => "candidate_wrong_platform",
             Self::ArtifactMismatch => "candidate_artifact_mismatch",
             Self::MissingCapability => "candidate_missing_capability",
             Self::DatabaseIncompatible => "candidate_database_incompatible",
@@ -192,7 +218,7 @@ pub fn authenticate_candidate(
     epr: &Epr,
     pin: &CandidatePin,
     observed: &CandidateObservation,
-) -> Result<AuthenticatedCandidateContent, CandidateRefusal> {
+) -> Result<AuthenticatedCandidateContent, CandidateRefusal<Box<HostAdmission>>> {
     use CandidateRefusal::*;
     // Bound payload and each variable-size envelope field before crypto.
     if epr.payload.len() > MAX_CANDIDATE_BYTES
@@ -279,11 +305,18 @@ pub fn authenticate_candidate(
     if expected_predecessor != observed.installed {
         return Err(StalePredecessor);
     }
-    if content.candidate.platform != observed.installed.platform {
-        return Err(WrongPlatform);
-    }
     if content.candidate.executable != observed.observed_executable {
         return Err(ArtifactMismatch);
+    }
+    let admission = admit_artifact(
+        observed.observed_executable,
+        observed.requires.as_ref(),
+        &observed.provides,
+        observed.own_build,
+        &observed.withdrawn_artifacts,
+    );
+    if admission.verdict.decision != elohim_epr::verdict::Decision::Permit {
+        return Err(WrongPlatform(Box::new(admission)));
     }
     if !content
         .required_capabilities
@@ -305,5 +338,6 @@ pub fn authenticate_candidate(
     Ok(AuthenticatedCandidateContent {
         cid: epr.envelope.cid,
         content,
+        admission,
     })
 }

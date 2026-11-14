@@ -326,8 +326,9 @@ decisionPoints:
         remains unwired.
     - id: C8
       status: partial
-      justification: Typed refusal enum and stable independent golden labels exist. Runtime outcome
-        counters require an eventual consumer.
+      justification: Typed refusal enum retains its Copy unit ReasonLabel vocabulary and stable golden labels.
+        The payload instantiation carries only the executable CID, required clauses and effects.
+        Runtime outcome counters require an eventual consumer.
     - id: C9
       status: partial
       justification: Exact berth/incarnation/child/predecessor matching prevents silent retargeting;
@@ -419,8 +420,9 @@ decisionPoints:
         remains unwired.
     - id: C8
       status: partial
-      justification: Typed refusal enum and stable independent golden labels exist. Runtime outcome
-        counters require an eventual consumer.
+      justification: Typed refusal enum retains its Copy unit ReasonLabel vocabulary and stable golden labels.
+        The payload instantiation carries only the executable CID, required clauses and effects.
+        Runtime outcome counters require an eventual consumer.
     - id: C9
       status: partial
       justification: Exact berth/incarnation/child/predecessor matching prevents silent retargeting;
@@ -512,8 +514,9 @@ decisionPoints:
         remains unwired.
     - id: C8
       status: partial
-      justification: Typed refusal enum and stable independent golden labels exist. Runtime outcome
-        counters require an eventual consumer.
+      justification: Typed refusal enum retains its Copy unit ReasonLabel vocabulary and stable golden labels.
+        The payload instantiation carries only the executable CID, required clauses and effects.
+        Runtime outcome counters require an eventual consumer.
     - id: C9
       status: partial
       justification: Exact berth/incarnation/child/predecessor matching prevents silent retargeting;
@@ -630,3 +633,92 @@ decisionPoints:
       testName: declaration_grammar_and_supersession_preserve_neighbours
       kind: unit
       mirrorRisk: false
+
+  - name: admit_artifact
+    kind: verdict-fn
+    sourceLocation:
+      file: src/compatibility.rs
+      modulePath: ark_core::compatibility::admit_artifact
+      line: 28
+    summary: >
+      Reuses host-contract admission locally, recording only requirement-side effects.
+      Missing requirements fail closed. Only unmet extracted isa.x86 clauses on this
+      device's own, non-withdrawn artifact can receive a named own-build permit.
+    concernIds:
+    - id: C0
+      status: answered
+      justification: Pure compatibility effect; host inventory remains in supervisor memory.
+    - id: C1
+      status: n-a
+      justification: No release election or head mutation; executable CID is independently supplied.
+    - id: C2
+      status: n-a
+      justification: No competing version selection, clock or authority tier is introduced.
+    - id: C3
+      status: n-a
+      justification: Synchronous evaluation of finite requirements; no lifecycle or retry state.
+    - id: C4
+      status: answered
+      justification: Missing requirement, unknown axis, unobserved axis and unmet predicate refuse distinctly.
+    - id: C5
+      status: partial
+      justification: >
+        Local Provides is checked with the contract predicate; requirements and same-device
+        Produce provenance must be independently resolved by the caller. No grant is inferred.
+    - id: C6a
+      status: partial
+      justification: >
+        One comparison per original clause; no network or retries. Caller-side artifact
+        requirement acquisition and size limits remain upstream of this local function.
+    - id: C6b
+      status: answered
+      justification: Deterministic, side-effect-free evaluation; no records are minted by the predicate.
+    - id: C7
+      status: partial
+      justification: >
+        Only an admission effect is returned. Activation and fetch are later consumers;
+        this implementation does not advertise compatibility or launch from a verdict.
+    - id: C8
+      status: partial
+      justification: >
+        Every original clause has a check witness. Own-build permits name every waiver,
+        refusals carry required axes and values without host values. Live meters await consumers.
+    - id: C9
+      status: n-a
+      justification: Artifact identity uses the existing executable CID; no agent identity is minted.
+    - id: C10
+      status: answered
+      justification: Contract predicates retain open axes; unknown and unobserved axes refuse.
+    - id: C11
+      status: n-a
+      justification: No external queue, concurrency or capacity scheduler.
+    - id: C12
+      status: n-a
+      justification: Compatibility confers no execution authority or wider reach.
+    - id: C13
+      status: n-a
+      justification: No social authority tier is introduced by host compatibility.
+    - id: C14
+      status: partial
+      justification: >
+        Caller-supplied artifact withdrawal disables the own-build rule; F3 death classification
+        and withdrawal propagation are deliberately not implemented in A3.
+    contractTests:
+    - path: elohim/ark/core/tests/candidate_contract.rs
+      testName: observed_requirements_admit_even_when_platform_labels_differ
+      kind: integration
+    - path: elohim/ark/core/tests/candidate_contract.rs
+      testName: unmet_isa_names_required_axis_without_host_values
+      kind: integration
+    - path: elohim/ark/core/tests/candidate_contract.rs
+      testName: unknown_and_unobserved_refuse_even_own_builds
+      kind: integration
+    - path: elohim/ark/core/tests/candidate_contract.rs
+      testName: absent_requirement_refuses_but_explicit_empty_requires_nothing
+      kind: integration
+    - path: elohim/ark/core/tests/candidate_contract.rs
+      testName: own_build_permit_names_every_waived_clause
+      kind: integration
+    - path: elohim/ark/core/tests/candidate_contract.rs
+      testName: declared_proven_non_isa_sibling_and_withdrawn_refuse
+      kind: integration

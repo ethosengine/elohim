@@ -11,6 +11,7 @@ name = "ark_supervisor"
 path = "src/lib.rs"
 
 [dependencies]
+elohim-host-contract = { path = "../../../crates/elohim-host-contract" }
 elohim-device-runtime = { path = "../../eprfs/device-runtime" }
 elohim-ark-core = { path = "../core" }
 elohim-epr = { path = "../../epr" }
@@ -22,7 +23,7 @@ chrono = { workspace = true }
 thiserror = { workspace = true }
 sha2 = { workspace = true }
 hex = { workspace = true }
-nix = { workspace = true, features = ["user"] }
+nix = { workspace = true, features = ["user", "feature"] }
 libc = { workspace = true }
 
 [dev-dependencies]

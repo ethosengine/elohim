@@ -14,6 +14,7 @@ path = "src/lib.rs"
 testing = []
 
 [dependencies]
+elohim-host-contract = { path = "../../../crates/elohim-host-contract" }
 # Pure only. Adding tokio/nix/libc/diesel here fails `boundary::no_runtime_or_io_deps`.
 elohim-epr = { path = "../../epr" }
 # The REA/ValueFlows vocabulary the runtime's records project INTO. `default-features = false`

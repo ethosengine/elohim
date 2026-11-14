@@ -1,9 +1,12 @@
 use std::collections::BTreeSet;
 
 use ark_core::candidate::*;
+use ark_core::compatibility::HostAdmission;
 use chrono::{TimeZone, Utc};
 use cid::Cid;
+use elohim_epr::verdict::Decision;
 use elohim_epr::{cid::compute_cid, AgentKeypair, Epr, EprKind, Reach};
+use host_contract::{AxisId, AxisValue, Clause, ClauseSource, Predicate, Provides, Requires};
 
 fn set(values: &[&str]) -> BTreeSet<String> {
     values.iter().map(|s| (*s).to_owned()).collect()
@@ -62,6 +65,12 @@ fn fixture() -> (CandidateContent, CandidatePin, CandidateObservation) {
         observed_executable: raw,
         candidate_manifest: content.candidate.manifest,
         now,
+        requires: Some(
+            Requires::try_from(vec![isa_clause(ClauseSource::Declared, &["sse3"])]).unwrap(),
+        ),
+        provides: synthetic_host(),
+        own_build: false,
+        withdrawn_artifacts: BTreeSet::new(),
     };
     (content, pin, observed)
 }
@@ -194,17 +203,7 @@ fn independent_target_and_installed_changes_refuse_stale_content() {
 #[test]
 fn signed_incompatible_candidates_do_not_gain_compatibility_from_signature() {
     let (content, pin, observed) = fixture();
-    let cases: Vec<(CandidateContent, CandidateRefusal)> = vec![
-        (
-            CandidateContent {
-                candidate: CandidateRuntime {
-                    platform: "aarch64-unknown-linux-gnu".into(),
-                    ..content.candidate.clone()
-                },
-                ..content.clone()
-            },
-            CandidateRefusal::WrongPlatform,
-        ),
+    let cases: Vec<(CandidateContent, CandidateRefusal<Box<HostAdmission>>)> = vec![
         (
             CandidateContent {
                 candidate: CandidateRuntime {
@@ -317,4 +316,199 @@ fn refusal_labels_are_stable_and_distinct() {
         "candidate_missing_capability",
         "candidate_database_incompatible",
     ]);
+}
+
+fn isa_clause(source: ClauseSource, features: &[&str]) -> Clause {
+    Clause {
+        axis: AxisId("isa.x86".into()),
+        predicate: Predicate::Subset(set(features)),
+        source,
+        narrowing: None,
+    }
+}
+
+fn synthetic_host() -> Provides {
+    let mut host = Provides::default();
+    host.observe(
+        AxisId("isa.x86".into()),
+        AxisValue::Names(set(&["sse3", "private-host-marker"])),
+    );
+    host.observe(
+        AxisId("arch".into()),
+        AxisValue::Scalar("private-architecture-marker".into()),
+    );
+    host
+}
+
+fn compatibility_result(observed: &CandidateObservation) -> HostAdmission {
+    let (content, pin, _) = fixture();
+    match authenticate_candidate(&signed(&content, &pin), &pin, observed) {
+        Ok(content) => content.admission().clone(),
+        Err(CandidateRefusal::WrongPlatform(admission)) => *admission,
+        Err(other) => panic!("unexpected refusal {other:?}"),
+    }
+}
+
+#[test]
+fn observed_requirements_admit_even_when_platform_labels_differ() {
+    let (mut content, pin, observed) = fixture();
+    content.candidate.platform = "different-informational-target-label".into();
+    let result = authenticate_candidate(&signed(&content, &pin), &pin, &observed).unwrap();
+    assert_eq!(result.admission().verdict.decision, Decision::Permit);
+    assert!(result.admission().own_build_rule.is_empty());
+    assert_eq!(result.admission().executable, observed.observed_executable);
+}
+
+#[test]
+fn unmet_isa_names_required_axis_without_host_values() {
+    let (_, _, mut observed) = fixture();
+    observed.requires =
+        Some(Requires::try_from(vec![isa_clause(ClauseSource::Extracted, &["avx2"])]).unwrap());
+    let result = compatibility_result(&observed);
+    assert_eq!(result.verdict.decision, Decision::Refuse);
+    let wire = serde_json::to_value(&result).unwrap();
+    let check = &wire["verdict"]["witness"]["checks"][0];
+    assert_eq!(check["summary"], "unmet");
+    assert_eq!(check["observed"]["required"]["axis"], "isa.x86");
+    assert_eq!(
+        check["observed"]["required"]["predicate"]["value"],
+        serde_json::json!(["avx2"])
+    );
+    assert!(!wire.to_string().contains("private-host-marker"));
+    assert!(!wire.to_string().contains("private-architecture-marker"));
+    assert!(!wire.to_string().contains("\"host\""));
+    assert!(!wire.to_string().contains("provides"));
+}
+
+#[test]
+fn unknown_and_unobserved_refuse_even_own_builds() {
+    let (_, _, mut observed) = fixture();
+    observed.own_build = true;
+    observed.requires =
+        Some(Requires::try_from(vec![isa_clause(ClauseSource::Extracted, &["avx2"])]).unwrap());
+    observed.provides = Provides::default();
+    for reason in ["unknown-axis", "unobserved"] {
+        if reason == "unobserved" {
+            observed.provides.mark_unobserved(AxisId("isa.x86".into()));
+        }
+        let result = compatibility_result(&observed);
+        assert_eq!(result.verdict.decision, Decision::Refuse);
+        assert_eq!(result.verdict.witness.checks[0].summary, reason);
+        assert!(result.own_build_rule.is_empty());
+    }
+    let clause = Clause {
+        axis: AxisId("future.axis".into()),
+        predicate: Predicate::Equal("required".into()),
+        source: ClauseSource::Declared,
+        narrowing: None,
+    };
+    observed.requires = Some(Requires::try_from(vec![clause]).unwrap());
+    assert_eq!(
+        compatibility_result(&observed).verdict.witness.checks[0].summary,
+        "unknown-axis"
+    );
+}
+
+#[test]
+fn absent_requirement_refuses_but_explicit_empty_requires_nothing() {
+    let (_, _, mut observed) = fixture();
+    observed.requires = None;
+    observed.own_build = true;
+    let result = compatibility_result(&observed);
+    assert_eq!(result.verdict.decision, Decision::Refuse);
+    assert_eq!(
+        result.verdict.witness.checks[0].summary,
+        "missing-requirement"
+    );
+    observed.requires = Some(Requires::default());
+    assert_eq!(
+        compatibility_result(&observed).verdict.decision,
+        Decision::Permit
+    );
+}
+
+#[test]
+fn own_build_permit_names_every_waived_clause() {
+    let (_, _, mut observed) = fixture();
+    observed.own_build = true;
+    let waived = vec![
+        isa_clause(ClauseSource::Extracted, &["avx2"]),
+        isa_clause(ClauseSource::Extracted, &["bmi2"]),
+    ];
+    let mut clauses = waived.clone();
+    clauses.push(isa_clause(ClauseSource::Declared, &["sse3"]));
+    observed.requires = Some(Requires::try_from(clauses).unwrap());
+    let result = compatibility_result(&observed);
+    assert_eq!(result.verdict.decision, Decision::Permit);
+    assert_eq!(result.own_build_rule, waived);
+    assert_eq!(
+        result
+            .verdict
+            .witness
+            .checks
+            .iter()
+            .filter(|c| c.summary == "permit-under-own-build-rule")
+            .count(),
+        2
+    );
+    assert!(!serde_json::to_string(&result)
+        .unwrap()
+        .contains("private-host-marker"));
+}
+
+#[test]
+fn declared_proven_non_isa_sibling_and_withdrawn_refuse() {
+    let (_, _, base) = fixture();
+    for source in [ClauseSource::Declared, ClauseSource::Proven] {
+        let mut observed = base.clone();
+        observed.own_build = true;
+        observed.requires = Some(
+            Requires::try_from(vec![
+                isa_clause(ClauseSource::Extracted, &["bmi2"]),
+                isa_clause(source, &["avx2"]),
+            ])
+            .unwrap(),
+        );
+        let result = compatibility_result(&observed);
+        assert_eq!(result.verdict.decision, Decision::Refuse);
+        assert!(result.own_build_rule.is_empty());
+    }
+    let mut observed = base;
+    observed.own_build = true;
+    observed.requires = Some(
+        Requires::try_from(vec![Clause {
+            axis: AxisId("arch".into()),
+            predicate: Predicate::Equal("x86_64".into()),
+            source: ClauseSource::Extracted,
+            narrowing: None,
+        }])
+        .unwrap(),
+    );
+    assert_eq!(
+        compatibility_result(&observed).verdict.decision,
+        Decision::Refuse
+    );
+    observed.requires =
+        Some(Requires::try_from(vec![isa_clause(ClauseSource::Extracted, &["avx2"])]).unwrap());
+    observed.own_build = false;
+    assert_eq!(
+        compatibility_result(&observed).verdict.decision,
+        Decision::Refuse
+    );
+    observed.own_build = true;
+    observed
+        .withdrawn_artifacts
+        .insert(observed.observed_executable);
+    assert_eq!(
+        compatibility_result(&observed).verdict.decision,
+        Decision::Refuse
+    );
+    observed.withdrawn_artifacts.clear();
+    observed
+        .withdrawn_artifacts
+        .insert(compute_cid(b"another artifact"));
+    assert_eq!(
+        compatibility_result(&observed).verdict.decision,
+        Decision::Permit
+    );
 }

@@ -18,6 +18,31 @@ use sha2::{Digest, Sha256};
 const ARK: &str = env!("CARGO_BIN_EXE_ark");
 const SHELL: &str = "/bin/sh";
 
+#[test]
+fn host_provides_is_a_local_diagnostic_without_records() {
+    let root = tempfile::tempdir().unwrap();
+    let output = Command::new(ARK)
+        .args(["host", "provides"])
+        .current_dir(root.path())
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    let printed = String::from_utf8(output.stdout).unwrap();
+    for axis in [
+        "arch",
+        "os",
+        "isa.x86",
+        "abi.libc",
+        "abi.loader",
+        "kernel.linux",
+    ] {
+        assert!(printed
+            .lines()
+            .any(|line| line.starts_with(&format!("{axis}: "))));
+    }
+    assert_eq!(fs::read_dir(root.path()).unwrap().count(), 0);
+}
+
 fn shell_sha256() -> String {
     let bytes = fs::read(SHELL).expect("read /bin/sh");
     format!("{:x}", Sha256::digest(bytes))

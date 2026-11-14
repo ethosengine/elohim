@@ -196,6 +196,7 @@ pub struct Supervisor {
     berth: Berth,
     scope: RuntimeScope,
     driver: Arc<dyn Driver>,
+    provides: host_contract::Provides,
     sink: SharedSink,
     clock: SharedClock,
     shutdown: Arc<AtomicBool>,
@@ -259,12 +260,23 @@ impl Supervisor {
             manifest,
             berth,
             scope,
+            provides: driver.provides(),
             driver: Arc::from(driver),
             sink: Arc::new(Mutex::new(sink)),
             clock: Arc::from(clock),
             shutdown: Arc::new(AtomicBool::new(false)),
             observer: None,
         })
+    }
+
+    /// Startup observation retained in memory, never included in a record.
+    pub fn provides(&self) -> &host_contract::Provides {
+        &self.provides
+    }
+
+    /// Refresh after a kernel, driver or hardware change; replaces stale values.
+    pub fn reobserve_host(&mut self) {
+        self.provides = self.driver.provides();
     }
 
     /// Adds an observer for state-bearing passport rewrites.

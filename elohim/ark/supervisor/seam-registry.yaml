@@ -99,3 +99,35 @@ decisionPoints:
       - { id: C14, status: answered, justification: "Existing supervisor teardown owns child lifetime and evidence." }
     contractTests:
       - { path: elohim/ark/cli/tests/cli_smoke.rs, testName: bin_channel_runs_verified_device_current_and_passport_observes_it, kind: integration }
+
+  - name: observe_host
+    kind: boundary-answer-type
+    sourceLocation:
+      file: src/host.rs
+      modulePath: ark_supervisor::host::observe_host
+    summary: >
+      Observe private Provides from CPUID and usable vector state, uname, loaded glibc
+      and resolving loader paths. Supervisor retains one snapshot, refreshes explicitly,
+      and never writes the inventory to a record. CLI printing is local diagnostics only.
+    concernIds:
+      - {id: C0, status: answered, justification: 'Host compatibility observation lives in supervisor I/O beside the unchanged enforcement Fingerprint.'}
+      - {id: C1, status: n-a, justification: 'No release election or head selection.'}
+      - {id: C2, status: n-a, justification: 'No authority ordering or version election.'}
+      - {id: C3, status: n-a, justification: 'Finite synchronous probes, no retry lifecycle.'}
+      - {id: C4, status: answered, justification: 'Known axes begin unobserved; only successful probes replace that state.'}
+      - {id: C5, status: answered, justification: 'No manifest, catalogue or device label supplies an observation.'}
+      - {id: C6a, status: partial, justification: 'Fixed axes and loader path list; filesystem metadata I/O is not cancellable.'}
+      - {id: C6b, status: answered, justification: 'Read-only probes; refresh replaces the in-memory snapshot and emits no records.'}
+      - {id: C7, status: answered, justification: 'No host inventory advertisement; local printing does not create records.'}
+      - {id: C8, status: partial, justification: 'Operator can print axes locally; no per-probe live metric is introduced.'}
+      - {id: C9, status: n-a, justification: 'No agent identities or keys.'}
+      - {id: C10, status: answered, justification: 'Canonical contract axis and feature spellings; unsupported probes remain unobserved.'}
+      - {id: C11, status: n-a, justification: 'One snapshot per envelope, no external queue.'}
+      - {id: C12, status: n-a, justification: 'Observation confers no authority to execute.'}
+      - {id: C13, status: n-a, justification: 'No social authority tier.'}
+      - {id: C14, status: partial, justification: 'Probe failures remain unobserved; F3 illegal-instruction witnessing is a later slice.'}
+    contractTests:
+      - {path: elohim/ark/supervisor/src/host.rs, testName: every_supported_axis_is_observed_or_explicitly_unobserved, kind: unit}
+      - {path: elohim/ark/supervisor/src/host.rs, testName: versions_are_numeric_and_fail_closed, kind: unit}
+      - {path: elohim/ark/supervisor/tests/supervise_death.rs, testName: host_inventory_is_cached_refreshable_and_absent_from_every_written_record, kind: integration}
+      - {path: elohim/ark/cli/tests/cli_smoke.rs, testName: host_provides_is_a_local_diagnostic_without_records, kind: integration}

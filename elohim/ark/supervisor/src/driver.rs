@@ -72,6 +72,12 @@ pub trait Driver: Send + Sync {
     /// Reports what this host is and what it will enforce.
     fn fingerprint(&self) -> Fingerprint;
 
+    /// Observe compatibility for this driver's execution host. Unknown drivers
+    /// report no known axes; native observation is provided by NativeDriver.
+    fn provides(&self) -> host_contract::Provides {
+        host_contract::Provides::default()
+    }
+
     /// Verifies the artifact and starts the child, or refuses without spawning anything.
     fn start(&self, spec: &ChildSpec, berth: &Berth) -> Result<Started, DriverError>;
 

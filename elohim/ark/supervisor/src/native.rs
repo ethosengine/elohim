@@ -73,6 +73,10 @@ pub fn sha256_file(path: &Path) -> std::io::Result<String> {
 }
 
 impl Driver for NativeDriver {
+    fn provides(&self) -> host_contract::Provides {
+        crate::host::observe_host()
+    }
+
     fn fingerprint(&self) -> Fingerprint {
         Fingerprint {
             hostname: proc_line("/proc/sys/kernel/hostname"),

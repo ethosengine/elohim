@@ -1173,6 +1173,7 @@ dependencies = [
  "elohim-compute",
  "elohim-epr",
  "elohim-epr-rea",
+ "elohim-host-contract",
  "elohim-placement-core",
  "elohim-seam-contracts",
  "eprfs-core",
@@ -1194,6 +1195,7 @@ dependencies = [
  "elohim-device-runtime",
  "elohim-epr",
  "elohim-epr-rea",
+ "elohim-host-contract",
  "hex",
  "libc",
  "nix",
@@ -1305,6 +1307,15 @@ dependencies = [
  "serde_json",
  "tempfile",
  "thiserror 2.0.17",
+]
+
+[[package]]
+name = "elohim-host-contract"
+version = "0.1.0"
+dependencies = [
+ "elohim-epr",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

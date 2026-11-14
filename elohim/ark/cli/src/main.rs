@@ -57,6 +57,11 @@ struct Cli {
 
 #[derive(Subcommand, Debug)]
 enum Command {
+    /// Inspect this device locally; observations are never written to ark records.
+    Host {
+        #[command(subcommand)]
+        command: HostCommand,
+    },
     /// Supervise the manifest's processes in the given berth until they stop.
     Run {
         /// Path to the RuntimeManifest JSON.
@@ -95,6 +100,12 @@ enum Command {
         #[command(subcommand)]
         command: Box<TaskCommand>,
     },
+}
+
+#[derive(Subcommand, Debug)]
+enum HostCommand {
+    /// Print freshly observed host compatibility axes (local diagnostic only).
+    Provides,
 }
 
 #[derive(Subcommand, Debug)]
@@ -223,6 +234,15 @@ fn main() -> ExitCode {
 
 fn execute(command: Command) -> Result<u8, Failure> {
     match command {
+        Command::Host {
+            command: HostCommand::Provides,
+        } => {
+            print!(
+                "{}",
+                ark_supervisor::host::print_provides(&ark_supervisor::host::observe_host())
+            );
+            Ok(EXIT_OK)
+        }
         Command::Run {
             manifest,
             berth,

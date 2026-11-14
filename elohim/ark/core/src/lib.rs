@@ -6,6 +6,7 @@
 
 pub mod berth;
 pub mod candidate;
+pub mod compatibility;
 pub mod declaration;
 pub mod exit;
 pub mod intent;
@@ -57,6 +58,7 @@ mod boundary {
     const SOURCES: &[(&str, &str)] = &[
         ("berth.rs", include_str!("berth.rs")),
         ("candidate.rs", include_str!("candidate.rs")),
+        ("compatibility.rs", include_str!("compatibility.rs")),
         ("declaration.rs", include_str!("declaration.rs")),
         ("exit.rs", include_str!("exit.rs")),
         ("intent.rs", include_str!("intent.rs")),

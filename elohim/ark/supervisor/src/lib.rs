@@ -5,6 +5,7 @@
 //! there is no network in this crate (no swarm, no HTTP, no DHT).
 
 pub mod driver;
+pub mod host;
 pub mod native;
 pub mod pipes;
 pub mod reaper;

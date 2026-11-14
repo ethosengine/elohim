@@ -26,7 +26,8 @@
           "crates/elohim-address/**",
           "elohim/epr-rea/**",
           "elohim/elohim-compute/**",
-          "crates/seam-contracts/**"
+          "crates/seam-contracts/**",
+          "crates/elohim-host-contract/**"
         ],
         "buildProcess": []
       },

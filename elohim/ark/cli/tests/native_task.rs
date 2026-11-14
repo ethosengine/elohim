@@ -111,7 +111,29 @@ fn result(output: Output) -> Value {
         "{}",
         String::from_utf8_lossy(&output.stderr)
     );
-    serde_json::from_slice(&output.stdout).expect("one existing TaskOutcome JSON")
+    let record: Value =
+        serde_json::from_slice(&output.stdout).expect("one existing TaskOutcome JSON");
+    assert_task_record_has_no_provides(&record);
+    record
+}
+
+// All successful native-task scenarios exercise the record boundary as well as
+// the outcome. Provides belongs to the envelope, never a task's transferable effect.
+fn assert_task_record_has_no_provides(value: &Value) {
+    match value {
+        Value::Object(fields) => {
+            assert!(!fields.contains_key("provides"));
+            for nested in fields.values() {
+                assert_task_record_has_no_provides(nested);
+            }
+        }
+        Value::Array(values) => {
+            for nested in values {
+                assert_task_record_has_no_provides(nested);
+            }
+        }
+        _ => {}
+    }
 }
 
 struct Running(Option<Child>);

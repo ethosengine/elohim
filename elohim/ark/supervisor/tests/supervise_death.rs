@@ -228,6 +228,89 @@ fn sigkill(pid: u32) {
 }
 
 #[test]
+fn host_inventory_is_cached_refreshable_and_absent_from_every_written_record() {
+    use host_contract::{AxisId, AxisValue, Provides};
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::Arc;
+
+    struct ObservingDriver(Arc<AtomicUsize>);
+    impl Driver for ObservingDriver {
+        fn provides(&self) -> Provides {
+            let generation = self.0.fetch_add(1, Ordering::SeqCst);
+            let mut host = Provides::default();
+            host.observe(
+                AxisId("private-observer-axis".into()),
+                AxisValue::Scalar(format!("PRIVATE-HOST-INVENTORY-{generation}")),
+            );
+            host
+        }
+        fn fingerprint(&self) -> Fingerprint {
+            NativeDriver.fingerprint()
+        }
+        fn start(&self, spec: &ChildSpec, berth: &Berth) -> Result<Started, DriverError> {
+            NativeDriver.start(spec, berth)
+        }
+        fn signal(&self, pid: u32, signal: i32) -> Result<(), DriverError> {
+            NativeDriver.signal(pid, signal)
+        }
+        fn stats(&self, pid: u32) -> Option<ProcessSample> {
+            NativeDriver.stats(pid)
+        }
+    }
+
+    let root = tempfile::tempdir().unwrap();
+    let manifest = RuntimeManifest {
+        processes: vec![child("child", "exit 0", Vec::new(), policy(0, 100))],
+        ..RuntimeManifest::default()
+    };
+    let berth = berth_for(&manifest, root.path().into(), &["child"]);
+    let calls = Arc::new(AtomicUsize::new(0));
+    let mut supervisor =
+        supervisor_with_driver(&manifest, &berth, Box::new(ObservingDriver(calls.clone())));
+    assert_eq!(calls.load(Ordering::SeqCst), 1);
+    let first = supervisor.provides().clone();
+    assert_eq!(supervisor.provides(), &first);
+    assert_eq!(calls.load(Ordering::SeqCst), 1);
+    supervisor.reobserve_host();
+    assert_eq!(calls.load(Ordering::SeqCst), 2);
+    assert_ne!(supervisor.provides(), &first);
+    supervisor.run().unwrap();
+    assert_eq!(calls.load(Ordering::SeqCst), 2);
+    // Include declarations as well as every record emitted by an actual run:
+    // passport, intent journal, witness JSON/CBOR, tally and REA flow records.
+    std::fs::write(
+        root.path().join("berth.json"),
+        serde_json::to_vec(&berth).unwrap(),
+    )
+    .unwrap();
+    fn inspect(path: &std::path::Path, count: &mut usize) {
+        for entry in std::fs::read_dir(path).unwrap() {
+            let path = entry.unwrap().path();
+            if path.is_dir() {
+                inspect(&path, count);
+            } else {
+                let bytes = std::fs::read(path).unwrap();
+                let text = String::from_utf8_lossy(&bytes);
+                for private in [
+                    "PRIVATE-HOST-INVENTORY",
+                    "private-observer-axis",
+                    "\"provides\"",
+                ] {
+                    assert!(!text.contains(private), "host inventory reached a record");
+                }
+                *count += 1;
+            }
+        }
+    }
+    let mut count = 0;
+    inspect(root.path(), &mut count);
+    assert!(
+        count >= 5,
+        "exercise real record writers, not an empty directory"
+    );
+}
+
+#[test]
 fn a_sigkilled_child_leaves_a_witness_then_restarts_then_gives_up_on_same_cause() {
     let data_root = tempfile::tempdir().unwrap();
     let manifest = RuntimeManifest {
