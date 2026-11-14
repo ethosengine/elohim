@@ -133,9 +133,15 @@ read_warned=0
 verdict=""
 verdict_table=""
 
+# kubectl's own stderr names why a read failed (RBAC, template, timeout): keep its first line
+# in the warning, or every failed read looks the same in the deploy log.
 warn_read() {
   if [ "${read_warned}" -eq 0 ]; then
-    echo "rollout-watch: pod read for statefulset/${NAME} failed ($1) — skipping polls until it reads; the rollout wait itself is unaffected" >&2
+    local detail=""
+    if [ -s "${state_file}.err" ]; then
+      detail=": $(one_line "$(head -c 300 "${state_file}.err")")"
+    fi
+    echo "rollout-watch: pod read for statefulset/${NAME} failed ($1)${detail} — skipping polls until it reads; the rollout wait itself is unaffected" >&2
     read_warned=1
   fi
 }
@@ -143,7 +149,7 @@ warn_read() {
 # Read the update revision's pods once; set `verdict` when one crashloops.
 probe() {
   local sts_line generation observed revision sel_line pods_raw record
-  sts_line="$(kubectl get "statefulset/${NAME}" -n "${NAMESPACE}" --request-timeout=10s -o "go-template=${STS_TEMPLATE}" 2>/dev/null)" \
+  sts_line="$(kubectl get "statefulset/${NAME}" -n "${NAMESPACE}" --request-timeout=10s -o "go-template=${STS_TEMPLATE}" 2>"${state_file}.err")" \
     || { warn_read "statefulset get"; return 0; }
   IFS="${US}" read -r generation observed revision sel_line <<< "${sts_line}"
   # The controller has not yet observed the applied spec (kubectl's own
@@ -160,7 +166,7 @@ probe() {
     warn_read "update revision or selector unresolved"
     return 0
   fi
-  pods_raw="$(kubectl get pods -n "${NAMESPACE}" --request-timeout=10s -l "${selector}" -o "go-template=${PODS_TEMPLATE}" 2>/dev/null)" \
+  pods_raw="$(kubectl get pods -n "${NAMESPACE}" --request-timeout=10s -l "${selector}" -o "go-template=${PODS_TEMPLATE}" 2>"${state_file}.err")" \
     || { warn_read "pods get"; return 0; }
 
   verdict_table=""
@@ -221,7 +227,7 @@ cleanup() {
     pkill -P "${probe_pid}" 2>/dev/null
     kill "${probe_pid}" 2>/dev/null
   fi
-  rm -f "${state_file}"
+  rm -f "${state_file}" "${state_file}.new" "${state_file}.err"
 }
 trap cleanup EXIT
 

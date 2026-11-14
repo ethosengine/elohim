@@ -30,7 +30,7 @@ if (args[0] === 'rollout' && args[1] === 'status') {
   return;
 }
 if (args[0] === 'get' && args[1].startsWith('statefulset/')) {
-  if (scenario.stsFails) process.exit(1);
+  if (scenario.stsFails) { console.error('Error from server (Forbidden): statefulsets.apps "peer" is forbidden'); process.exit(1); }
   const out = () => {
     process.stdout.write((scenario.generation ?? 1) + '\\x1f' + (scenario.observed ?? 1) + '\\x1f' + scenario.revision + '\\x1f' + 'app=peer,');
     process.exit(0);
@@ -172,7 +172,14 @@ test("an init container crashloop fast-fails too", async (t) => {
 test("an unreadable pod list never fails the rollout", async (t) => {
   const r = await run(t, { rollout: { code: 0, afterMs: 2500 }, podsFail: true });
   assert.equal(r.code, 0);
-  assert.match(r.stderr, /pod read for statefulset\/peer failed \(pods get\)/);
+  assert.match(r.stderr, /pod read for statefulset\/peer failed \(pods get\): Forbidden — /);
+  assert.equal(r.stderr.match(/pod read for/g).length, 1, "read failure warned more than once");
+});
+
+test("an unreadable statefulset names kubectl's reason and never fails the rollout", async (t) => {
+  const r = await run(t, { rollout: { code: 0, afterMs: 2500 }, stsFails: true });
+  assert.equal(r.code, 0);
+  assert.match(r.stderr, /failed \(statefulset get\): Error from server \(Forbidden\): statefulsets\.apps "peer" is forbidden — /);
   assert.equal(r.stderr.match(/pod read for/g).length, 1, "read failure warned more than once");
 });
 
