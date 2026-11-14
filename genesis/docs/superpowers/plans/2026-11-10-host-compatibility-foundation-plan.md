@@ -484,7 +484,7 @@ prints its axes, never their values. `just gate elohim-ark` and `just gate host-
 green. The integrator (shem) proposed the plan text; the stricter form was offered to them on
 2026-11-14 in its place.
 
-- [ ] **G1 — a live two-device receipt of sibling gate reuse (the artifact-store sprint's owed F1r, K7): one device gates a clean commit, the other pushes the same commit with `GATE_EVIDENCE=reuse` and its log prints `reused … independence: sibling` for at least one cargo project** (serves sprint-lands-each-closure-once)
+- [x] **G1 — a live two-device receipt of sibling gate reuse (the artifact-store sprint's owed F1r, K7): one device gates a clean commit, the other pushes the same commit with `GATE_EVIDENCE=reuse` and its log prints `reused … independence: sibling` for at least one cargo project** (serves sprint-lands-each-closure-once)
 
 No code is owed. Both peer daemons must run an epr and a `pool-policy.json` that cross
 `gate-verdict@1`, and the commit must not touch the governance paths
@@ -505,8 +505,7 @@ whose reuse missed by construction (worktree store). Not reused, each with its `
   item for the brit pin move.
 - orchestrator: its `GATE_TASK` path checks only its own attestations.
 - host-contract, epr-storage, rust-style and cargo-coverage: not enabled for reuse.
-Open: the `push-gate-pays-once` DELTA and the cycle row (the orchestrator's atom, the integrator's
-to write); tick this item with it.
+The `push-gate-pays-once` DELTA landed in landing 43 (6bd505a05, shem); G1 is ticked on it.
 
 - [ ] **G2 — the gate verdict names what the closure key does not see: a `gate-verdict@1` row carries the recording device's coarse host class (proven bundle names only, H7), and the reuse line prints it beside the reusing device's own** (serves sprint-lands-each-closure-once)
 
