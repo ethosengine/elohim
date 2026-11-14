@@ -240,3 +240,10 @@ worktree-envelope note above).
   clones submodules only from the main checkout, whose brit, rakia and sophia lag dev's pins;
   the pins were fetched from the rg2-rust worktree instead (an E4 follow-up for prep). Codex
   astra hit its usage limit (until 2026-11-18) during the A4 rework; a Claude agent finished it.
+- **ark-core stays contract-free** (240693e34). The first branch push refused at the orchestrator's
+  closure tests: ark-core depending on `elohim-host-contract` pulled the contract crate into the
+  closures of every workspace that reaches ark-core (storage and its Docker context, the k8s bridge,
+  eprfs, steward/node). Host admission moved into `ark-supervisor`, which nothing outside
+  `elohim/ark` depends on. `authenticate_candidate` takes the supervisor's `CompatibilityEffect`
+  and refuses it fail-closed (no effect, an effect for other bytes, a refusal). No other
+  workspace's lockfile, manifest or image changed.
