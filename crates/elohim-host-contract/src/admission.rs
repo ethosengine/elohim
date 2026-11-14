@@ -23,10 +23,21 @@ use crate::{AxisId, AxisValue, Predicate, Requires};
 /// fn must_deserialize<T: serde::de::DeserializeOwned>() {}
 /// must_deserialize::<Provides>();
 /// ```
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Clone, Default, PartialEq, Eq)]
 pub struct Provides {
     observed: BTreeMap<AxisId, AxisValue>,
     unobserved: BTreeSet<AxisId>,
+}
+
+// Debug may be embedded in a caller's records. Reveal observation coverage only,
+// including extension axes, never the device's private inventory.
+impl std::fmt::Debug for Provides {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Provides")
+            .field("observed", &self.observed.keys().collect::<Vec<_>>())
+            .field("unobserved", &self.unobserved)
+            .finish()
+    }
 }
 
 impl Provides {

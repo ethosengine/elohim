@@ -194,3 +194,63 @@ fn narrowing_is_provenance_that_admit_ignores_and_the_wire_omits_when_absent() {
         admit(&plain, &host).decision
     );
 }
+
+#[test]
+fn provides_debug_reports_coverage_without_observed_values() {
+    let mut provides = Provides::default();
+    let observations = [
+        ("arch", AxisValue::Scalar("private-architecture".into())),
+        ("os", AxisValue::Scalar("private-operating-system".into())),
+        (
+            "isa.x86",
+            AxisValue::Names(BTreeSet::from(["private-feature".into()])),
+        ),
+        (
+            "abi.loader",
+            AxisValue::Names(BTreeSet::from(["/private/loader".into()])),
+        ),
+        (
+            "abi.libc",
+            AxisValue::Version(host_contract::Version {
+                line: "private-libc".into(),
+                components: vec![987, 654],
+            }),
+        ),
+        (
+            "extension.axis",
+            AxisValue::Scalar("private-extension".into()),
+        ),
+    ];
+    for (axis, value) in observations {
+        provides.observe(AxisId(axis.into()), value);
+    }
+    provides.mark_unobserved(AxisId("kernel.linux".into()));
+    for debug in [format!("{provides:?}"), format!("{provides:#?}")] {
+        let (observed, unobserved) = debug.split_once("unobserved:").unwrap();
+        assert!(observed.contains("observed:"));
+        for axis in [
+            "arch",
+            "os",
+            "isa.x86",
+            "abi.loader",
+            "abi.libc",
+            "extension.axis",
+        ] {
+            assert!(observed.contains(axis), "missing {axis}: {debug}");
+        }
+        assert!(unobserved.contains("kernel.linux"));
+        assert!(!observed.contains("kernel.linux"));
+        for value in [
+            "private-architecture",
+            "private-operating-system",
+            "private-feature",
+            "/private/loader",
+            "private-libc",
+            "987",
+            "654",
+            "private-extension",
+        ] {
+            assert!(!debug.contains(value), "leaked {value}: {debug}");
+        }
+    }
+}
