@@ -133,13 +133,21 @@ Chain: S2 → spec §3.3 refusals → the contract crate → vector tests.
 
 Verify: the crate's vector tests pass (v2 on v3 admitted, v3 on v2 refused, glibc floor both ways, unknown axis refused); `just gate rust-style` clean for the crate; the report states whether an unknown axis is a `Refuse` or a `Refer` and why.
 
-- [ ] **A2 — ark observes `Provides` at start beside its `Fingerprint` (`elohim/ark/supervisor/src/driver.rs`, `native.rs`), not serialized off the device** (serves workspace-device-arrival)
+- [x] **A2 — ark observes `Provides` at start beside its `Fingerprint` (`elohim/ark/supervisor/src/driver.rs`, `native.rs`), not serialized off the device** (serves workspace-device-arrival)
 
 Verify: both devices print their observed `Provides`; they differ in the ISA bundle; a test asserts it is not part of any serialized record.
 
 State (2026-11-14, ethosengine): built on `hostcompat/lane-a-admission` (81605d283, 179ef207b).
 `ark host provides` prints on ethosengine (v3 set plus `sha_ni`, `adx`, glibc 2.39); the
 privacy tests pass in `just gate elohim-ark`. Open: shem's print, for the two-device check.
+
+State (2026-11-14, later): met. shem's `ark host provides` (d0e6f14fd) prints a v2-level set
+(no avx2, bmi or fma) against ethosengine's v3 set plus sha_ni and adx, so the ISA bundles
+differ. The second device also caught a false `avx_vnni_int16`: std queries CPUID leaf 7
+subleaf 1 without checking the maximum subleaf. Leaf-7 subleaf-1 features are now read through a
+bounded probe and closed over their prerequisites. The live A4 run found two more gaps: the `lib`
+axis was never observed, and the VIA PadLock bits were listed unprobed. ark now observes `lib` from
+the loader's search directories and probes the PadLock bits only behind a Centaur vendor check.
 
 - [x] **A3 — `authenticate_candidate` (`elohim/ark/core/src/candidate.rs`) admits against the observed host instead of comparing to the installed runtime's triple; `WrongPlatform` carries the unmet axis** (serves workspace-device-arrival)
 
@@ -166,6 +174,14 @@ output's requirement document, and reading the flow log and payload layout from 
 would duplicate the store's format outside eprfs. Missing node: `chain A4 / between mesh-bin
 derivation record → ark host admit / missing node: epr artifact requires --output <cid>
 (env:requires CID, document bytes, self) / not built`.
+
+State (2026-11-14, later): part 2 done on `hostcompat/lane-a-preflight`; the missing node is K13
+(35b5c996c). `ark host admit --output <cid> --binary <path>` takes the requirement from the
+record through K13 and verifies the document's bytes against its CID. The mesh preflight prints
+one line per staged binary: admitted, admitted under the own-build rule, REFUSED, or unmeasured.
+An override line never reads as a refusal. Live on ethosengine with K13, the mesh doorway and
+storage binaries are admitted under the own-build rule, naming the waived `isa.x86` clause; a
+declared `avx512f` requirement is refused. Open for the verify: the same preflight lines on shem.
 
 ## Lane K — key honesty and family (spec §6.3, §7; rungs H2–H3; reviews F1–F6, G1, B1–B2)
 
@@ -446,7 +462,7 @@ own-build claim.
 
 Verify: on both devices the verb returns the mesh storage binary's requirement and `self: true`; for a sibling's fetched output it returns `self: false`; an output with no slot prints `unmeasured`.
 
-- [ ] **A5 — the admission effect and the own-build claim are bound by construction before any running path consumes them: `authenticate_candidate` re-checks that the verdict's subject is the executable, that its checks cover `arch` and `os`, and that an own-build waiver is present exactly when an own Produce is named; `CompatibilityEffect` is no longer deserializable (a record carries its recordable projection, and the effect is rebuilt by admission); `OwnProduce` is constructed only from K13's verified answer; `Provides` loses its derived `Debug`** (serves workspace-device-arrival)
+- [x] **A5 — the admission effect and the own-build claim are bound by construction before any running path consumes them: `authenticate_candidate` re-checks that the verdict's subject is the executable, that its checks cover `arch` and `os`, and that an own-build waiver is present exactly when an own Produce is named; `CompatibilityEffect` is no longer deserializable (a record carries its recordable projection, and the effect is rebuilt by admission); `OwnProduce` is constructed only from K13's verified answer; `Provides` loses its derived `Debug`** (serves workspace-device-arrival)
 
 ark-core stays free of the contract crate (240693e34): the re-checks read only ark-core's own
 verdict type. The observed host is the supervisor's own process environment (its libc, its
@@ -454,6 +470,19 @@ mount namespace, the core the probe ran on); a child launched under another root
 what A2 observes, and that limit is stated in spec §4 with this item, not solved by it.
 
 Verify: tests refuse a hand-built effect with empty checks, an effect whose subject differs from its executable, and a waiver with no own Produce; a sibling's Produce cannot produce an own-build permit; `{:?}` of a `Provides` does not compile or prints no observed value; `just gate elohim-ark` and `just gate host-contract` green.
+
+State (2026-11-14): met in a stricter form, on `hostcompat/lane-a-preflight`. A grant lives in
+the crate that produces it. ark-core's `authenticate_candidate` authenticates only and confers no
+run permission. ark-supervisor's `admit_candidate` returns an `AdmittedCandidate` with private
+fields, no `Deserialize` and no public constructor. `OwnProduce` has no public constructor: it is
+built only inside `resolve_recorded`, from K13's `self` and `produce` for that output, with the
+written document's bytes checked against the requirement CID. `AdmissionRecord` is the
+recordable projection, and no API accepts it as input. So a hand-built effect cannot be
+constructed at all; compile-fail doctests stand where this verify asks for refusal tests. A
+sibling's Produce (`self: false`) yields no waiver, which is tested with a stub reader. `Provides`
+prints its axes, never their values. `just gate elohim-ark` and `just gate host-contract` are
+green. The integrator (shem) proposed the plan text; the stricter form was offered to them on
+2026-11-14 in its place.
 
 - [ ] **G1 — a live two-device receipt of sibling gate reuse (the artifact-store sprint's owed F1r, K7): one device gates a clean commit, the other pushes the same commit with `GATE_EVIDENCE=reuse` and its log prints `reused … independence: sibling` for at least one cargo project** (serves sprint-lands-each-closure-once)
 

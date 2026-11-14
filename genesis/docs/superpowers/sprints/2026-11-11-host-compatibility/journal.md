@@ -316,3 +316,28 @@ then handed out as packets.
 K10 step 3 (the dispatch certificate) is the hardest item in the plan and is correctly not
 started: its trigger has not been measured.
 
+
+## Lane A, second slice: A5, A4 part 2, and what the live run found (2026-11-14)
+
+- **Covenant widened** by the steward ("you can widen the covenant and include what you need to
+  finish your lanes, well, correctly and in good faith"): clause bafyreiawslkd… adds the contract
+  crate, the mesh preflight script and its tests, and the device-arrival habit atom.
+- **K13 and G1.** shem built `epr artifact requires --output` (K13). ethosengine landed it as
+  landing 37 (35b5c996c) for G1, the sibling gate reuse check. Reuse missed by construction: both
+  the gate-verdict write and the sibling read used the pushing worktree's own store, not the main
+  checkout's, which the peer daemon serves. eprfs was therefore gated in full locally (1,618 s;
+  lane held 2,433 s). shem fixed the root in landing 38 (cfad29078); lane A's landing is the
+  clean retry.
+- **A5** lands in a stricter form than the plan text: grants only from the producing crate,
+  `OwnProduce` only from K13's answer, compile-fail tests (plan A5 State). The review found the
+  requirement document's bytes unchecked against its CID, and an override that still printed
+  REFUSED; both are fixed.
+- **A2's second device** caught a false `avx_vnni_int16` (std's unbounded CPUID 7.1 query).
+- **The live A4 run** on ethosengine used K13 against the real mesh records. It found that the
+  household's own doorway and storage binaries would be REFUSED: `lib` was never observed, and the
+  PadLock bits were listed unprobed. Both are fixed. Both binaries are now admitted under the
+  own-build rule. A sibling would still be refused, as the ruling says. Follow-up: the waived list
+  prints the whole clause, including features this host has; listing only the missing ones would
+  read better.
+- **Codex astra** was restored by the steward mid-shift and implemented every round. A Claude
+  reviewer reviewed each round.
