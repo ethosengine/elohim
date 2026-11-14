@@ -84,11 +84,38 @@ const CPUID_PROBES: &[(&str, u32, u32, char, u32)] = &[
     ("ptwrite", 0x14, 0, 'b', 4),
 ];
 
+// Linux v6.12 arch/x86/include/asm/cpufeatures.h word 5, CPUID.C0000001.EDX:
+// https://github.com/torvalds/linux/blob/v6.12/arch/x86/include/asm/cpufeatures.h#L137-L147
+// XSTORE_EN=3, XCRYPT_EN=7, ACE2_EN=9, PHE_EN=11, PMM_EN=13.
+const PADLOCK_PROBES: &[(&str, u32)] = &[
+    ("rng_en", 3),
+    ("ace_en", 7),
+    ("ace2_en", 9),
+    ("phe_en", 11),
+    ("pmm_en", 13),
+];
+
+fn padlock_edx(mut read: impl FnMut(u32, u32) -> [u32; 4]) -> u32 {
+    let vendor = read(0, 0);
+    let mut name = [0u8; 12];
+    name[..4].copy_from_slice(&vendor[1].to_le_bytes());
+    name[4..8].copy_from_slice(&vendor[3].to_le_bytes());
+    name[8..].copy_from_slice(&vendor[2].to_le_bytes());
+    // Intel can alias an unsupported leaf; never query the Centaur range there.
+    if !matches!(&name, b"CentaurHauls" | b"  Shanghai  ") || read(0xc000_0000, 0)[0] < 0xc000_0001
+    {
+        return 0;
+    }
+    read(0xc000_0001, 0)[3]
+}
+
+fn read_cpuid(leaf: u32, sub: u32) -> [u32; 4] {
+    let r = __cpuid_count(leaf, sub);
+    [r.eax, r.ebx, r.ecx, r.edx]
+}
+
 fn cpuid(leaf: u32, sub: u32) -> [u32; 4] {
-    cpuid_with(leaf, sub, |leaf, sub| {
-        let r = __cpuid_count(leaf, sub);
-        [r.eax, r.ebx, r.ecx, r.edx]
-    })
+    cpuid_with(leaf, sub, read_cpuid)
 }
 
 fn cpuid_with(leaf: u32, sub: u32, mut read: impl FnMut(u32, u32) -> [u32; 4]) -> [u32; 4] {
@@ -240,13 +267,71 @@ pub(super) fn observe() -> BTreeSet<String> {
         };
         (name, cpuid(leaf, sub)[index] & (1 << bit) != 0)
     });
-    collect(standard.chain(direct).chain([("cpuid", true)]), &state)
+    let padlock = padlock_edx(read_cpuid);
+    let centaur = PADLOCK_PROBES
+        .iter()
+        .map(|&(name, bit)| (name, padlock & (1 << bit) != 0));
+    collect(
+        standard
+            .chain(direct)
+            .chain(centaur)
+            .chain([("cpuid", true)]),
+        &state,
+    )
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::admission::UNPROBED_X86;
+
+    #[test]
+    fn padlock_queries_only_supported_centaur_leaves_and_decodes_enabled_bits() {
+        for vendor in [
+            b"CentaurHauls",
+            b"  Shanghai  ",
+            b"GenuineIntel",
+            b"AuthenticAMD",
+        ] {
+            for maximum in [0xc000_0000, 0xc000_0001] {
+                for bit in 0..32 {
+                    let mut calls = Vec::new();
+                    let edx = padlock_edx(|leaf, sub| {
+                        calls.push(leaf);
+                        assert_eq!(sub, 0);
+                        match leaf {
+                            0 => [
+                                0,
+                                u32::from_le_bytes(vendor[..4].try_into().unwrap()),
+                                u32::from_le_bytes(vendor[8..].try_into().unwrap()),
+                                u32::from_le_bytes(vendor[4..8].try_into().unwrap()),
+                            ],
+                            0xc000_0000 => [maximum, 0, 0, 0],
+                            0xc000_0001 => [0, 0, 0, 1 << bit],
+                            _ => panic!("unexpected CPUID leaf"),
+                        }
+                    });
+                    let centaur = matches!(vendor, b"CentaurHauls" | b"  Shanghai  ");
+                    let supported = centaur && maximum >= 0xc000_0001;
+                    let expected_calls = if supported {
+                        vec![0, 0xc000_0000, 0xc000_0001]
+                    } else if centaur {
+                        vec![0, 0xc000_0000]
+                    } else {
+                        vec![0]
+                    };
+                    assert_eq!(calls, expected_calls);
+                    for &(name, enabled_bit) in PADLOCK_PROBES {
+                        assert_eq!(
+                            edx & (1 << enabled_bit) != 0,
+                            supported && bit == enabled_bit,
+                            "{name}"
+                        );
+                    }
+                }
+            }
+        }
+    }
 
     #[test]
     fn subleaf_zero_limit_never_queries_subleaf_one() {
@@ -293,6 +378,7 @@ mod tests {
             .iter()
             .map(|p| (p.0, true))
             .chain(CPUID_PROBES.iter().map(|p| (p.0, true)))
+            .chain(PADLOCK_PROBES.iter().map(|p| (p.0, true)))
     }
 
     #[test]
@@ -397,6 +483,7 @@ mod tests {
             .iter()
             .map(|p| p.0)
             .chain(CPUID_PROBES.iter().map(|p| p.0))
+            .chain(PADLOCK_PROBES.iter().map(|p| p.0))
             .chain(["cpuid", "osxsave"])
             .collect();
         let names: BTreeSet<_> = source

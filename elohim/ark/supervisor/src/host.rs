@@ -6,6 +6,10 @@ use host_contract::{
     AxisId, AxisValue, Provides, Version,
 };
 
+#[cfg(target_os = "linux")]
+#[path = "host_libraries.rs"]
+mod libraries;
+
 const AXES: &[&str] = &[
     axis::ARCH,
     axis::OS,
@@ -13,6 +17,7 @@ const AXES: &[&str] = &[
     axis::ABI_LIBC,
     axis::ABI_LOADER,
     axis::KERNEL_LINUX,
+    axis::LIB,
 ];
 
 /// Observe the current process's host without reading any declaration or label.
@@ -23,7 +28,19 @@ pub fn observe_host() -> Provides {
         provides.mark_unobserved(AxisId((*name).into()));
     }
     #[cfg(target_os = "linux")]
-    observe_linux(&mut provides);
+    {
+        observe_linux(&mut provides);
+        let arch = match provides.observed(&AxisId(axis::ARCH.into())) {
+            Some(AxisValue::Scalar(arch)) => arch.as_str(),
+            _ => "",
+        };
+        if let Some(names) = libraries::observe(
+            libraries::default_dirs(arch),
+            std::path::Path::new("/etc/ld.so.conf"),
+        ) {
+            provides.observe(AxisId(axis::LIB.into()), AxisValue::Names(names));
+        }
+    }
     #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
     provides.observe(
         AxisId(axis::ISA_X86.into()),

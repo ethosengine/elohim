@@ -50,10 +50,6 @@ pub const UNPROBED_X86: &[&str] = &[
     "lkgs",
     "wrmsrns",
     "sgx1",
-    "ace_en",
-    "phe_en",
-    "pmm_en",
-    "rng_en",
 ];
 
 /// Local evidence minted only by the artifact reader, never caller assertions.

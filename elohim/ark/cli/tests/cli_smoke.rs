@@ -35,6 +35,7 @@ fn host_provides_is_a_local_diagnostic_without_records() {
         "abi.libc",
         "abi.loader",
         "kernel.linux",
+        "lib",
     ] {
         assert!(printed
             .lines()
