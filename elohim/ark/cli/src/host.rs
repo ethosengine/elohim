@@ -7,7 +7,7 @@ use ark_supervisor::admission::{
 use cid::Cid;
 use elohim_epr::verdict::{CheckOutcome, Decision};
 use eprfs_core::BlobCid;
-use host_contract::{Predicate, Requires};
+use host_contract::{names::axis, Clause, ClauseSource, Predicate, Requires};
 
 fn value(predicate: &Predicate) -> String {
     match predicate {
@@ -103,7 +103,21 @@ pub fn admit(path: Option<&Path>, name: &str, binary: Option<(&Path, &str)>) -> 
                 .witness
                 .checks
                 .iter()
-                .find(|c| c.outcome == CheckOutcome::Failed)
+                .filter(|c| c.outcome == CheckOutcome::Failed)
+                // A blocked own-build waiver is restored to "unmet" by admission.
+                // Prefer the non-waivable blocker, including declared/proven evidence
+                // on the same axis. Unknown/unobserved ISA is never waivable.
+                .min_by_key(|c| {
+                    c.summary == "unmet"
+                        && c.observed
+                            .as_ref()
+                            .and_then(|v| v.get("required"))
+                            .and_then(|v| serde_json::from_value::<Clause>(v.clone()).ok())
+                            .is_some_and(|clause| {
+                                clause.axis.0 == axis::ISA_X86
+                                    && clause.source == ClauseSource::Extracted
+                            })
+                })
                 .ok_or("admission declined without a failed check")?;
             let axis = failed
                 .check_id

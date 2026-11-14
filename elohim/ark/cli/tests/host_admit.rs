@@ -318,3 +318,38 @@ fn malformed_reader_answers_and_written_bytes_refuse_in_one_line() {
         assert!(line.contains(detail), "{line}");
     }
 }
+
+#[test]
+#[cfg(target_arch = "x86_64")]
+fn refusal_names_non_waivable_blocker_with_or_without_own_produce() {
+    let reader = Reader::new();
+    for own in [false, true] {
+        for (axis, required, source, reason) in [
+            ("lib", "libhostcompat_missing.so.1", "extracted", "unmet"),
+            ("zzz.unknown", "missing", "extracted", "unknown-axis"),
+            ("isa.x86", "amx_tile", "extracted", "unobserved"),
+            (
+                "isa.x86",
+                "hostcompat_declared_feature",
+                "declared",
+                "unmet",
+            ),
+            ("isa.x86", "hostcompat_proven_feature", "proven", "unmet"),
+        ] {
+            let mut clauses = floor();
+            clauses.push(json!({"axis":"isa.x86", "predicate":{"kind":"subset", "value":["hostcompat_impossible_feature"]}, "source":"extracted"}));
+            clauses.push(json!({"axis":axis, "predicate":{"kind":if axis == "isa.x86" {"subset"} else {"present"}, "value":[required]}, "source":source}));
+            reader.record(&clauses, own);
+            let (exit, line) = reader.run("ok");
+            assert_eq!(exit, 1);
+            assert!(
+                line.starts_with(&format!(
+                    "REFUSED compatibility fixture: {axis} requires {required} —"
+                )),
+                "{line}"
+            );
+            assert!(line.contains(&format!("({reason})")), "{line}");
+            assert!(!line.contains("waived"));
+        }
+    }
+}
