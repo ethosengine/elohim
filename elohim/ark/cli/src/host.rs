@@ -41,6 +41,11 @@ fn verified_bytes(path: &Path, cid: Option<&str>) -> Result<Vec<u8>, String> {
 
 /// Each invocation prints exactly one line, including malformed/unavailable input.
 pub fn admit(path: Option<&Path>, name: &str, binary: Option<(&Path, &str)>) -> u8 {
+    let build = match name {
+        "elohim-storage" => "storage",
+        "relay-addr-beacon" => "beacon",
+        other => other,
+    };
     let result = (|| {
         let provides = ark_supervisor::host::observe_host();
         let verdict = if let Some((path, cid)) = binary {
@@ -52,7 +57,12 @@ pub fn admit(path: Option<&Path>, name: &str, binary: Option<(&Path, &str)>) -> 
                 Ok(recorded) => recorded,
                 Err(ResolveGap::UnknownOutput(cid)) => {
                     return Err(format!(
-                        "epr does not know output {cid} — rebuild or restore the recorded binary"
+                        "epr does not know output {cid} — rebuild with just mesh build {build}"
+                    ));
+                }
+                Err(ResolveGap::Conflict) => {
+                    return Err(format!(
+                        "conflicting recorded requirements (MergeError) — rebuild with just mesh build {build}"
                     ));
                 }
                 Err(gap) => return Ok(format!("unmeasured ({gap})")),

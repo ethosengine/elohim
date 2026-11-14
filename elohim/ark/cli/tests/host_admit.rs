@@ -18,12 +18,16 @@ set -eu
 [ "$1 $2 $3 $5 $7" = 'artifact requires --output --write --json' ]
 base="$(dirname "$0")"
 case "${MODE:-ok}" in
-  gap) exit 3 ;;
-  unknown) exit 2 ;;
   missing) echo "error: unrecognized subcommand 'requires'" >&2; exit 2 ;;
+  error) echo 'reader failed' >&2; exit 1 ;;
+  ok) cp "$base/requires" "$6" ;;
 esac
-cp "$base/requires" "$6"
 sed "s|WRITE_PATH|$6|g" "$base/reply"
+case "${MODE:-ok}" in
+  unknown) exit 2 ;;
+  unavailable|gap) exit 3 ;;
+  conflict) exit 4 ;;
+esac
 "##,
         )
         .unwrap();
@@ -39,7 +43,7 @@ sed "s|WRITE_PATH|$6|g" "$base/reply"
             serde_json::to_vec(clauses).unwrap(),
         )
         .unwrap();
-        fs::write(self.dir.path().join("reply"), json!({"output":self.output, "requires":BlobCid::compute_bytes(&serde_json::to_vec(clauses).unwrap()).to_string(), "self":own, "produce":BlobCid::compute_bytes(b"Produce").to_string(), "path":"WRITE_PATH"}).to_string()).unwrap();
+        fs::write(self.dir.path().join("reply"), json!({"known":true, "sources":[], "output":self.output, "requires":BlobCid::compute_bytes(&serde_json::to_vec(clauses).unwrap()).to_string(), "self":own, "produce":BlobCid::compute_bytes(b"Produce").to_string(), "path":"WRITE_PATH"}).to_string()).unwrap();
     }
     fn run(&self, mode: &str) -> (i32, String) {
         let output = Command::new(env!("CARGO_BIN_EXE_ark"))
@@ -89,21 +93,116 @@ fn reader_alone_supplies_own_build_eligibility() {
 }
 
 #[test]
-fn gaps_are_unmeasured_but_unknown_output_is_refused() {
+fn final_k13_answers_are_distinct_and_single_line() {
     let reader = Reader::new();
-    reader.record(&floor(), true);
-    for mode in ["gap", "missing"] {
-        let (exit, line) = reader.run(mode);
-        assert_eq!(exit, 0);
-        assert!(line.contains("unmeasured ("));
+    for (mode, extra, exit, detail) in [
+        (
+            "unmeasured",
+            json!({"unmeasured":"no recorded requirement"}),
+            0,
+            "unmeasured (no recorded requirement)",
+        ),
+        (
+            "unavailable",
+            json!({"unavailable":[BlobCid::compute_bytes(b"absent").to_string()]}),
+            0,
+            "unmeasured (requirement not held locally)",
+        ),
+        (
+            "gap",
+            json!({"gap":"document does not decode"}),
+            0,
+            "unmeasured (document does not decode)",
+        ),
+        (
+            "gap",
+            json!({"gap":"unreadable slot\nnext line"}),
+            0,
+            "unmeasured (unreadable slot\\nnext line)",
+        ),
+        (
+            "missing",
+            json!({}),
+            0,
+            "unmeasured (epr has no requirement reader yet)",
+        ),
+        (
+            "error",
+            json!({}),
+            0,
+            "unmeasured (malformed requirement record: artifact reader failed)",
+        ),
+        (
+            "unknown",
+            json!({"known":false}),
+            1,
+            "epr does not know output",
+        ),
+        (
+            "conflict",
+            json!({"conflict":"incompatible clauses"}),
+            1,
+            "conflicting recorded requirements (MergeError) — rebuild with just mesh build fixture",
+        ),
+    ] {
+        let mut reply = json!({"output":reader.output, "self":true, "produce":null,
+            "known":true, "requires":null, "path":null});
+        reply
+            .as_object_mut()
+            .unwrap()
+            .extend(extra.as_object().unwrap().clone());
+        fs::write(reader.dir.path().join("reply"), reply.to_string()).unwrap();
+        let (actual, line) = reader.run(mode);
+        assert_eq!(actual, exit, "{mode}: {line}");
+        assert!(line.contains(detail), "{mode}: {line}");
+        assert!(!line.contains("admitted"));
+        if mode == "unknown" {
+            assert!(line.contains("— rebuild with just mesh build fixture"));
+        }
     }
-    let (exit, line) = reader.run("unknown");
-    assert_eq!(exit, 1);
-    assert!(line.starts_with("REFUSED compatibility fixture: epr does not know output"));
+    reader.record(&floor(), true);
     fs::write(reader.dir.path().join("reply"), "{}").unwrap();
     let (exit, line) = reader.run("ok");
     assert_eq!(exit, 0);
     assert!(line.contains("unmeasured (malformed"));
+}
+
+#[test]
+#[cfg(target_arch = "x86_64")]
+fn null_or_invalid_local_produce_never_waives() {
+    let reader = Reader::new();
+    let mut clauses = floor();
+    clauses.push(json!({"axis":"isa.x86", "predicate":{"kind":"subset", "value":["hostcompat_impossible_feature"]}, "source":"extracted"}));
+    for (local, produce, exit, detail) in [
+        (
+            true,
+            json!(null),
+            1,
+            "isa.x86 requires hostcompat_impossible_feature",
+        ),
+        (
+            true,
+            json!("invalid"),
+            0,
+            "unmeasured (malformed requirement record: invalid local Produce CID)",
+        ),
+        (
+            false,
+            json!("invalid"),
+            1,
+            "isa.x86 requires hostcompat_impossible_feature",
+        ),
+    ] {
+        reader.record(&clauses, local);
+        let path = reader.dir.path().join("reply");
+        let mut reply: Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+        reply["produce"] = produce;
+        fs::write(path, reply.to_string()).unwrap();
+        let (actual, line) = reader.run("ok");
+        assert_eq!(actual, exit);
+        assert!(line.contains(detail), "{line}");
+        assert!(!line.contains("admitted"));
+    }
 }
 
 #[test]

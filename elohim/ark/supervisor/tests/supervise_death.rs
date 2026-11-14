@@ -274,10 +274,13 @@ fn host_inventory_is_cached_refreshable_and_absent_from_every_written_record() {
     let mut supervisor =
         supervisor_with_driver(&manifest, &berth, Box::new(ObservingDriver(calls.clone())));
     assert_eq!(calls.load(Ordering::SeqCst), 1);
-    assert_eq!(
-        format!("{supervisor:?}"),
-        "Supervisor { provides_axes: {\"isa.x86\"}, .. }"
-    );
+    let debug = format!("{supervisor:?}");
+    for axis in ["isa.x86", "private-observer-axis"] {
+        assert!(debug.contains(axis));
+    }
+    for private in ["HOST-ONLY-FEATURE", "PRIVATE-HOST-INVENTORY"] {
+        assert!(!debug.contains(private));
+    }
     let first = supervisor.provides().clone();
     assert_eq!(supervisor.provides(), &first);
     assert_eq!(calls.load(Ordering::SeqCst), 1);

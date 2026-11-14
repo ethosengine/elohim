@@ -30,18 +30,23 @@ case "$verb" in
   requires)
     [ "$1" = --output ] && [ "$2" = output-a ]
     [ "$3" = --write ] && [ "$5" = --json ]
+    reply="$(jq -nc --arg path "$4" '{output:"output-a", self:false, produce:null, known:true, requires:null, path:null}')"
     case "$MODE" in
-      unavailable) printf 'no recorded requirement\ndocument unavailable locally\n' >&2; exit 3 ;;
-      unknown) echo 'unknown output output-a' >&2; exit 2 ;;
+      unmeasured) jq '. + {unmeasured:"no recorded requirement"}' <<<"$reply"; exit 0 ;;
+      unavailable) jq '. + {unavailable:["requires-a"]}' <<<"$reply"; exit 3 ;;
+      gap) jq '. + {gap:"document does not decode"}' <<<"$reply"; exit 3 ;;
+      unknown) jq '. + {known:false}' <<<"$reply"; exit 2 ;;
+      conflict) jq '. + {conflict:"incompatible clauses"}' <<<"$reply"; exit 4 ;;
       missing) echo "error: unrecognized subcommand 'requires'" >&2; exit 2 ;;
       error) echo 'reader failed' >&2; exit 1 ;;
     esac
     printf 'exact requirement bytes\n' > "$4"
+    reply="$(jq --arg path "$4" '. + {requires:"requires-a",path:$path,sources:["requires-a"]}' <<<"$reply")"
     case "$MODE" in
-      own) echo '{"output":"output-a","requires":"requires-a","self":true,"produce":"produce-a"}' ;;
-      null) echo '{"self":true,"produce":null}' ;;
-      sibling) echo '{"self":false,"produce":"publisher-claim"}' ;;
-      *) echo '{"output":"output-a","requires":"requires-a","self":true}' ;;
+      own) jq '. + {self:true,produce:"produce-a"}' <<<"$reply" ;;
+      null) jq '. + {self:true}' <<<"$reply" ;;
+      sibling) jq '. + {produce:"publisher-claim"}' <<<"$reply" ;;
+      *) echo "$reply" ;;
     esac ;;
   *) exit 99 ;;
 esac
@@ -57,8 +62,11 @@ trap 'rm -rf "$work"' EXIT
 rc=0
 reply="$(epr artifact requires --output "$4" --write "$work/requires" --json 2>"$work/why")" || rc=$?
 case "$MODE" in
-  unavailable) [ "$rc" = 3 ]; echo "ok compatibility $name: unmeasured (no recorded requirement or document unavailable locally)"; exit 0 ;;
-  unknown) [ "$rc" = 2 ]; echo "REFUSED compatibility $name: epr does not know output output-a — rebuild or restore the recorded binary"; exit 1 ;;
+  unmeasured) [ "$rc" = 0 ] && [ "$(jq -r '.unmeasured' <<<"$reply")" = 'no recorded requirement' ] && [ ! -e "$work/requires" ]; echo "ok compatibility $name: unmeasured (no recorded requirement)"; exit 0 ;;
+  unavailable) [ "$rc" = 3 ] && [ "$(jq -r '.unavailable[0]' <<<"$reply")" = requires-a ]; echo "ok compatibility $name: unmeasured (requirement not held locally)"; exit 0 ;;
+  gap) [ "$rc" = 3 ]; echo "ok compatibility $name: unmeasured ($(jq -r '.gap' <<<"$reply"))"; exit 0 ;;
+  conflict) [ "$rc" = 4 ] && [ "$(jq -r '.conflict' <<<"$reply")" = 'incompatible clauses' ]; echo "REFUSED compatibility $name: conflicting recorded requirements (MergeError) — rebuild with just mesh build storage"; exit 1 ;;
+  unknown) [ "$rc" = 2 ]; echo "REFUSED compatibility $name: epr does not know output output-a — rebuild with just mesh build storage"; exit 1 ;;
   missing) [ "$rc" = 2 ]; echo "ok compatibility $name: unmeasured (epr has no requirement reader yet)"; exit 0 ;;
   error) [ "$rc" = 1 ]; echo "ok compatibility $name: unmeasured (malformed requirement record: artifact reader failed)"; exit 0 ;;
 esac
@@ -92,7 +100,7 @@ done
 export MODE=admitted
 run() { out="$(preflight_binary_compatibility 2>&1)"; rc=$?; }
 run
-t 'admitted from own holder, absent produce key accepted' '[ "$rc" = 0 ] && [ "$out" = "ok compatibility elohim-storage: admitted" ]'
+t 'admitted from own holder, null produce accepted' '[ "$rc" = 0 ] && [ "$out" = "ok compatibility elohim-storage: admitted" ]'
 MODE=own
 run
 t 'ark resolves own-build eligibility and prints waived clause' '[ "$rc" = 0 ] && [[ "$out" == *"admitted under the own-build rule (waived: isa.x86 avx512f)" ]]'
@@ -107,12 +115,21 @@ MESH_ALLOW_INCOMPATIBLE_BINARY=1
 run
 t 'override preserves refusal and announces its use' '[ "$rc" = 0 ] && [[ "$out" == "REFUSED compatibility elohim-storage:"* ]] && [[ "$out" == *"MESH_ALLOW_INCOMPATIBLE_BINARY=1 used" ]]'
 unset MESH_ALLOW_INCOMPATIBLE_BINARY
+MODE=unmeasured
+run
+t 'exit 0 with null requirement admits nothing' '[ "$rc" = 0 ] && [ "$out" = "ok compatibility elohim-storage: unmeasured (no recorded requirement)" ]'
+MODE=gap
+run
+t 'exit 3 gap remains unmeasured' '[ "$rc" = 0 ] && [ "$out" = "ok compatibility elohim-storage: unmeasured (document does not decode)" ]'
+MODE=conflict
+run
+t 'exit 4 conflict refuses with rebuild command' '[ "$rc" = 1 ] && [ "$out" = "REFUSED compatibility elohim-storage: conflicting recorded requirements (MergeError) — rebuild with just mesh build storage" ]'
 MODE=unavailable
 run
-t 'exit 3 is unmeasured with a single-line reason' '[ "$rc" = 0 ] && [ "$out" = "ok compatibility elohim-storage: unmeasured (no recorded requirement or document unavailable locally)" ]'
+t 'exit 3 is unmeasured with a single-line reason' '[ "$rc" = 0 ] && [ "$out" = "ok compatibility elohim-storage: unmeasured (requirement not held locally)" ]'
 MODE=unknown
 run
-t 'exit 2 is a provenance refusal printed unchanged' '[ "$rc" = 1 ] && [ "$out" = "REFUSED compatibility elohim-storage: epr does not know output output-a — rebuild or restore the recorded binary" ]'
+t 'exit 2 is a provenance refusal printed unchanged' '[ "$rc" = 1 ] && [ "$out" = "REFUSED compatibility elohim-storage: epr does not know output output-a — rebuild with just mesh build storage" ]'
 MODE=missing
 run
 t 'missing reader is unmeasured' '[ "$rc" = 0 ] && [ "$out" = "ok compatibility elohim-storage: unmeasured (epr has no requirement reader yet)" ]'

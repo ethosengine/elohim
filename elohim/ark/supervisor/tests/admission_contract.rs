@@ -6,9 +6,7 @@ use std::collections::BTreeSet;
 
 mod support;
 use ark_supervisor::admission::AdmissionRecord;
-use ark_supervisor::admission::{
-    admit_artifact, admit_recorded_requirements, HostAxesDebug, UNPROBED_X86,
-};
+use ark_supervisor::admission::{admit_artifact, admit_recorded_requirements, UNPROBED_X86};
 use cid::Cid;
 use elohim_epr::cid::compute_cid;
 use elohim_epr::verdict::Decision;
@@ -98,37 +96,92 @@ fn reader_gaps_and_output_mismatch_never_admit() {
     use ark_supervisor::admission::ResolveGap;
     use serde_json::json;
     let case = fixture();
-    for (status, diagnostic, expected) in [
-        (3, "not recorded", ResolveGap::NotRecorded),
+    let base = json!({"output":case.executable.to_string(), "self":false,
+        "produce":null, "known":true, "requires":null, "path":null});
+    for (status, extra, diagnostic, expected) in [
         (
-            2,
-            "unknown output",
-            ResolveGap::UnknownOutput(case.executable),
+            0,
+            json!({"unmeasured":"no recorded requirement"}),
+            "",
+            ResolveGap::NotRecorded,
         ),
         (
             2,
+            json!({"known":false}),
+            "",
+            ResolveGap::UnknownOutput(case.executable),
+        ),
+        (
+            3,
+            json!({"unavailable":[compute_cid(b"absent requirement").to_string()]}),
+            "",
+            ResolveGap::Unavailable,
+        ),
+        (
+            3,
+            json!({"gap":"unreadable env:requires slot"}),
+            "",
+            ResolveGap::ReaderGap("unreadable env:requires slot".into()),
+        ),
+        (
+            4,
+            json!({"conflict":"incompatible clauses"}),
+            "",
+            ResolveGap::Conflict,
+        ),
+        (
+            2,
+            json!({}),
             "error: unrecognized subcommand 'requires'",
             ResolveGap::NoReader,
         ),
         (
             1,
+            json!({}),
             "reader failed",
             ResolveGap::Malformed("artifact reader failed".into()),
         ),
     ] {
+        let mut reply = base.clone();
+        reply
+            .as_object_mut()
+            .unwrap()
+            .extend(extra.as_object().unwrap().clone());
+        if !diagnostic.is_empty() {
+            // A missing verb or process failure has no K13 JSON answer.
+            reply = json!(null);
+        }
         assert_eq!(
-            support::stub(
-                case.executable,
-                case.requires.as_ref(),
-                json!(null),
-                status,
-                diagnostic
-            )
-            .unwrap_err(),
+            support::stub(case.executable, None, reply.clone(), status, diagnostic).unwrap_err(),
             expected
         );
+        if diagnostic.is_empty() {
+            reply["output"] = json!(compute_cid(b"other output").to_string());
+            assert_eq!(
+                support::stub(case.executable, None, reply, status, "").unwrap_err(),
+                ResolveGap::Malformed("output mismatch".into())
+            );
+        }
     }
-    let mut reply = json!({"output":compute_cid(b"different output").to_string(), "requires":compute_cid(b"requires").to_string(), "self":true, "produce":compute_cid(b"produce").to_string(), "path":"WRITE_PATH"});
+    for (status, extra) in [
+        (0, json!({})),
+        (0, json!({"known":false})),
+        (2, json!({})),
+        (3, json!({})),
+        (3, json!({"unavailable":[]})),
+        (4, json!({})),
+    ] {
+        let mut reply = base.clone();
+        reply
+            .as_object_mut()
+            .unwrap()
+            .extend(extra.as_object().unwrap().clone());
+        assert!(matches!(
+            support::stub(case.executable, None, reply, status, ""),
+            Err(ResolveGap::Malformed(_))
+        ));
+    }
+    let mut reply = json!({"known":true, "sources":[], "output":compute_cid(b"different output").to_string(), "requires":compute_cid(b"requires").to_string(), "self":true, "produce":compute_cid(b"produce").to_string(), "path":"WRITE_PATH"});
     assert_eq!(
         support::stub(
             case.executable,
@@ -603,9 +656,25 @@ fn admission_wire_goldens_disclose_effect_and_produce_only() {
             assert!(!wire.contains(private), "leaked {private}: {wire}");
         }
     }
-    let debug = format!("{:?}", HostAxesDebug(&case.provides));
-    assert_eq!(
-        debug,
-        "{\"arch\", \"os\", \"isa.x86\", \"abi.libc\", \"abi.loader\", \"kernel.linux\"}"
-    );
+    let debug = format!("{:?}", case.provides);
+    for axis in [
+        "arch",
+        "os",
+        "isa.x86",
+        "abi.libc",
+        "abi.loader",
+        "kernel.linux",
+    ] {
+        assert!(debug.contains(axis));
+    }
+    for private in [
+        "private-host-marker",
+        "sse3",
+        "glibc",
+        "987",
+        "654",
+        "/private/host",
+    ] {
+        assert!(!debug.contains(private), "leaked {private}: {debug}");
+    }
 }

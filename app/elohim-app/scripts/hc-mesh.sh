@@ -2504,6 +2504,8 @@ mesh_binary_compatibility() ( # <binary> <bin-name> <build-project>
     echo "ok compatibility $bin: unmeasured (no ark binary)"
     return 0
   fi
+  # ark interprets K13: missing/unavailable requirements remain unmeasured;
+  # unknown outputs and conflicting requirements refuse. Preserve its line/status.
   "$ARK_BIN" host admit --output "$output" --binary "$binary" --name "$bin"
 )
 

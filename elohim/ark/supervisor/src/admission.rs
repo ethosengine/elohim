@@ -11,9 +11,7 @@ mod record;
 mod recorded;
 use cid::Cid;
 use elohim_epr::verdict::{CheckOutcome, CheckWitness, Decision, Verdict, Witness};
-use host_contract::{
-    admit, names::axis, AxisId, Clause, ClauseSource, Predicate, Provides, Requires,
-};
+use host_contract::{admit, names::axis, Clause, ClauseSource, Predicate, Provides, Requires};
 pub use record::{AdmissionRecord, WaivedClause};
 pub use recorded::{resolve_recorded, ResolveGap};
 
@@ -157,29 +155,6 @@ pub fn admit_candidate(
         authenticated,
         record,
     })
-}
-
-/// Debug view of ark's known axes only; never formats the underlying inventory.
-/// The contract currently has no axis iterator, so unknown extension axes are omitted.
-pub struct HostAxesDebug<'a>(pub &'a Provides);
-
-impl std::fmt::Debug for HostAxesDebug<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let axes = [
-            axis::ARCH,
-            axis::OS,
-            axis::ISA_X86,
-            axis::ABI_LIBC,
-            axis::ABI_LOADER,
-            axis::KERNEL_LINUX,
-        ];
-        f.debug_set()
-            .entries(axes.into_iter().filter(|name| {
-                let id = AxisId((*name).into());
-                self.0.observed(&id).is_some() || self.0.is_unobserved(&id)
-            }))
-            .finish()
-    }
 }
 
 fn unprobed(clause: &Clause) -> bool {

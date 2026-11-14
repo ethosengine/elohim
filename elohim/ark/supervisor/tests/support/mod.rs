@@ -13,15 +13,14 @@ pub fn resolve(
     requires: Option<&Requires>,
     own: bool,
 ) -> Result<RecordedRequirement, ResolveGap> {
-    let reply = json!({"output":output.to_string(), "requires":compute_cid(b"requirements").to_string(),
-        "self":own, "produce":compute_cid(b"this device's Produce").to_string(), "path":"WRITE_PATH"});
-    stub(
-        output,
-        requires,
-        reply,
-        if requires.is_some() { 0 } else { 3 },
-        "",
-    )
+    let mut reply = json!({"output":output.to_string(), "requires":compute_cid(b"requirements").to_string(),
+        "known":true, "self":own, "produce":compute_cid(b"this device's Produce").to_string(), "path":"WRITE_PATH"});
+    if requires.is_none() {
+        reply["requires"] = json!(null);
+        reply["path"] = json!(null);
+        reply["unmeasured"] = json!("no recorded requirement");
+    }
+    stub(output, requires, reply, 0, "")
 }
 
 pub fn stub(
@@ -51,10 +50,11 @@ set -eu
 [ "$4" = '{output}' ]
 base="$(dirname "$0")"
 cat "$base/stderr" >&2
-if [ {status} != 0 ]; then exit {status}; fi
-cp "$base/document" "$6"
+if [ {status} = 0 ] && [ {has_requirement} = true ]; then cp "$base/document" "$6"; fi
 sed "s|WRITE_PATH|$6|g" "$base/reply"
-"##
+exit {status}
+"##,
+            has_requirement = requires.is_some()
         ),
     )
     .unwrap();

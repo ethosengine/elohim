@@ -206,10 +206,7 @@ pub struct Supervisor {
 impl std::fmt::Debug for Supervisor {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Supervisor")
-            .field(
-                "provides_axes",
-                &crate::admission::HostAxesDebug(&self.provides),
-            )
+            .field("provides_axes", &self.provides)
             .finish_non_exhaustive()
     }
 }

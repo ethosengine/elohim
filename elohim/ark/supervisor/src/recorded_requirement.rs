@@ -9,8 +9,14 @@ use super::{OwnProduce, RecordedRequirement};
 /// Resolution gaps never become compatibility permits.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum ResolveGap {
-    #[error("no recorded requirement or document unavailable locally")]
+    #[error("no recorded requirement")]
     NotRecorded,
+    #[error("requirement not held locally")]
+    Unavailable,
+    #[error("{0}")]
+    ReaderGap(String),
+    #[error("conflicting recorded requirements (MergeError)")]
+    Conflict,
     #[error("epr does not know output {0}")]
     UnknownOutput(Cid),
     #[error("epr has no requirement reader yet")]
@@ -22,11 +28,16 @@ pub enum ResolveGap {
 #[derive(Deserialize)]
 struct ReaderReply {
     output: String,
-    requires: String,
+    known: bool,
+    requires: Option<String>,
     #[serde(rename = "self")]
     local: bool,
     produce: Option<String>,
-    path: PathBuf,
+    path: Option<PathBuf>,
+    unmeasured: Option<String>,
+    unavailable: Option<Vec<String>>,
+    gap: Option<String>,
+    conflict: Option<String>,
 }
 
 /// Resolve only through `epr artifact requires`. EPR_BIN overrides PATH; this is
@@ -48,6 +59,7 @@ pub fn resolve_recorded(output: Cid) -> Result<RecordedRequirement, ResolveGap> 
         .arg("--json")
         .output()
         .map_err(|_| ResolveGap::NoReader)?;
+    let reply = serde_json::from_slice::<ReaderReply>(&result.stdout);
     if !result.status.success() {
         let diagnostic = format!(
             "{} {}",
@@ -66,27 +78,56 @@ pub fn resolve_recorded(output: Cid) -> Result<RecordedRequirement, ResolveGap> 
         ]
         .iter()
         .any(|marker| diagnostic.contains(marker));
-        return Err(if missing_verb {
-            ResolveGap::NoReader
-        } else {
-            match result.status.code() {
-                Some(3) => ResolveGap::NotRecorded,
-                Some(2) => ResolveGap::UnknownOutput(output),
-                _ => ResolveGap::Malformed("artifact reader failed".into()),
-            }
-        });
+        if missing_verb && reply.is_err() {
+            return Err(ResolveGap::NoReader);
+        }
+        if !matches!(result.status.code(), Some(2..=4)) {
+            return Err(ResolveGap::Malformed("artifact reader failed".into()));
+        }
     }
-    let reply: ReaderReply = serde_json::from_slice(&result.stdout)
-        .map_err(|_| ResolveGap::Malformed("invalid reader response".into()))?;
+    let reply = reply.map_err(|_| ResolveGap::Malformed("invalid reader response".into()))?;
     if reply.output.parse::<Cid>().ok() != Some(output) {
         return Err(ResolveGap::Malformed("output mismatch".into()));
     }
-    if reply.requires.parse::<Cid>().is_err() || reply.path != path {
+    // Exit status alone is not provenance. Validate the K13 answer before
+    // classifying it, including the output identity on non-success answers.
+    match result.status.code() {
+        Some(2) if !reply.known => return Err(ResolveGap::UnknownOutput(output)),
+        Some(3) => {
+            if let Some(gap) = reply.gap {
+                return Err(ResolveGap::ReaderGap(gap));
+            }
+            if reply.unavailable.is_some_and(|cids| {
+                !cids.is_empty() && cids.iter().all(|cid| cid.parse::<Cid>().is_ok())
+            }) {
+                return Err(ResolveGap::Unavailable);
+            }
+        }
+        Some(4) if reply.conflict.is_some() => return Err(ResolveGap::Conflict),
+        Some(0) if reply.known => {
+            if reply.requires.is_none()
+                && reply.unmeasured.as_deref() == Some("no recorded requirement")
+            {
+                return Err(ResolveGap::NotRecorded);
+            }
+        }
+        _ => return Err(ResolveGap::Malformed("inconsistent reader response".into())),
+    }
+    if !result.status.success() {
+        return Err(ResolveGap::Malformed("inconsistent reader response".into()));
+    }
+    if reply
+        .requires
+        .as_deref()
+        .and_then(|cid| cid.parse::<Cid>().ok())
+        .is_none()
+        || reply.path.as_ref() != Some(&path)
+    {
         return Err(ResolveGap::Malformed(
             "invalid requirement identity or path".into(),
         ));
     }
-    let bytes = fs::read(&path).map_err(|_| ResolveGap::NotRecorded)?;
+    let bytes = fs::read(&path).map_err(|_| ResolveGap::Unavailable)?;
     let requires = serde_json::from_slice(&bytes)
         .map_err(|_| ResolveGap::Malformed("invalid requirement document".into()))?;
     let own_produce = if reply.local {
