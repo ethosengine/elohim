@@ -439,3 +439,78 @@ fn run_declares_a_named_process_with_its_environment_offline() {
         assert!(!fx.epr(refused).status.success(), "{refused:?}");
     }
 }
+
+/// `--env` splits at the first `=` only, keeps an empty value, and refuses at declaration what
+/// spawn would refuse later: an unresolvable `{…}` placeholder, loader keys, a duplicate
+/// `--name`, and a name already held by another tool's process.
+#[test]
+fn run_env_entries_keep_their_text_and_refuse_what_spawn_cannot_honour_offline() {
+    let fx = fixture_with(PathBuf::from("/nonexistent/ark"));
+    fx.ok(&[
+        "device",
+        "run",
+        "epr",
+        "--name",
+        "peer",
+        "--env",
+        "A=b=c",
+        "--env",
+        "E=",
+        "--env",
+        "ROOT={data_root}/peer",
+    ]);
+    let manifest: Value =
+        serde_json::from_str(&fx.ok(&["device", "show", "--render", "manifest"])).unwrap();
+    assert_eq!(
+        manifest["processes"][0]["env"],
+        json!({"A": "b=c", "E": "", "ROOT": "{data_root}/peer"})
+    );
+    fx.ok(&["device", "run", "epr"]);
+    for refused in [
+        &["device", "run", "epr", "--name", "peer", "--env", "X={foo}"][..],
+        &["device", "run", "epr", "--name", "peer", "--env", "X=a{b"],
+        &[
+            "device",
+            "run",
+            "epr",
+            "--name",
+            "peer",
+            "--env",
+            "LD_PRELOAD=/x.so",
+        ],
+        &[
+            "device",
+            "run",
+            "epr",
+            "--name",
+            "peer",
+            "--env",
+            "DYLD_INSERT_LIBRARIES=/x",
+        ],
+        &[
+            "device",
+            "run",
+            "epr",
+            "--name",
+            "peer",
+            "--env",
+            "GCONV_PATH=/x",
+        ],
+        &["device", "run", "epr", "--name", "peer", "--name", "other"],
+        &["device", "run", "brit", "--name", "epr"],
+        &["device", "run", "brit", "--name", "epr", "--stop"],
+    ] {
+        let output = fx.epr(refused);
+        assert!(!output.status.success(), "{refused:?}");
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert!(
+            !stderr.contains("{foo}") && !stderr.contains("x.so"),
+            "{stderr}"
+        );
+    }
+    // Every refusal left the declaration as it was.
+    let manifest: Value =
+        serde_json::from_str(&fx.ok(&["device", "show", "--render", "manifest"])).unwrap();
+    assert_eq!(manifest["processes"].as_array().unwrap().len(), 2);
+    assert_eq!(manifest["processes"][0]["env"]["A"], "b=c");
+}

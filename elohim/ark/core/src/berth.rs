@@ -136,22 +136,14 @@ impl Berth {
         template: &str,
     ) -> Result<String, BerthError> {
         let mut resolved = String::with_capacity(template.len());
-        let mut remainder = template;
-
-        while let Some(open) = remainder.find('{') {
-            resolved.push_str(&remainder[..open]);
-            let after_open = &remainder[open + 1..];
-            let Some(close) = after_open.find('}') else {
-                return Err(BerthError::Malformed(format!(
-                    "unterminated template near '{{{after_open}'"
-                )));
-            };
-            let key = &after_open[..close];
-            resolved.push_str(&self.template_value(process, artifact_path, key)?);
-            remainder = &after_open[close + 1..];
+        for piece in template_pieces(template)? {
+            match piece {
+                TemplatePiece::Literal(text) => resolved.push_str(text),
+                TemplatePiece::Key(key) => {
+                    resolved.push_str(&self.template_value(process, artifact_path, key)?)
+                }
+            }
         }
-
-        resolved.push_str(remainder);
         Ok(resolved)
     }
 
@@ -181,6 +173,50 @@ impl Berth {
             }
         }
     }
+}
+
+/// One piece of a manifest template: literal text or a `{key}` placeholder.
+enum TemplatePiece<'a> {
+    Literal(&'a str),
+    Key(&'a str),
+}
+
+/// Splits a template into literal text and placeholder keys; an unclosed `{` is malformed.
+fn template_pieces(template: &str) -> Result<Vec<TemplatePiece<'_>>, BerthError> {
+    let mut pieces = Vec::new();
+    let mut remainder = template;
+    while let Some(open) = remainder.find('{') {
+        pieces.push(TemplatePiece::Literal(&remainder[..open]));
+        let after_open = &remainder[open + 1..];
+        let Some(close) = after_open.find('}') else {
+            return Err(BerthError::Malformed(format!(
+                "unterminated template near '{{{after_open}'"
+            )));
+        };
+        pieces.push(TemplatePiece::Key(&after_open[..close]));
+        remainder = &after_open[close + 1..];
+    }
+    pieces.push(TemplatePiece::Literal(remainder));
+    Ok(pieces)
+}
+
+/// Checks a template before any berth exists: every placeholder must be well formed and name
+/// a key some berth can resolve (`data_root`, `name`, `artifact`, `log_level`, `port.<k>` or
+/// `env.<k>`). Whether a given berth declares that port or env entry is known only at spawn.
+pub fn check_template(template: &str) -> Result<(), BerthError> {
+    for piece in template_pieces(template)? {
+        if let TemplatePiece::Key(key) = piece {
+            let resolvable = matches!(key, "data_root" | "name" | "artifact" | "log_level")
+                || key
+                    .strip_prefix("port.")
+                    .or_else(|| key.strip_prefix("env."))
+                    .is_some_and(|rest| !rest.is_empty());
+            if !resolvable {
+                return Err(BerthError::UnknownTemplate(key.to_string()));
+            }
+        }
+    }
+    Ok(())
 }
 
 #[cfg(test)]

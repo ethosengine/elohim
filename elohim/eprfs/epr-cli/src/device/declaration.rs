@@ -113,6 +113,9 @@ pub(super) fn run(args: &[String]) -> Result<ExitCode, String> {
                     "--render" => render = Some(value.as_str()),
                     "--ready-line" => launch.ready_line = Some(value.clone()),
                     "--restart" => launch.restart = Some(declaration::parse_restart(value)?),
+                    "--name" if launch.name.is_some() => {
+                        return Err("--name is declared twice".into())
+                    }
                     "--name" => launch.name = Some(value.clone()),
                     "--env" => {
                         let (key, val) = value.split_once('=').ok_or("--env needs KEY=VALUE")?;

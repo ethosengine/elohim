@@ -313,10 +313,14 @@ fn an_unnamed_run_act_with_no_environment_keeps_the_historical_manifest_cid() {
 
 #[test]
 fn named_processes_of_one_tool_coexist_and_are_replaced_and_stopped_by_name() {
+    let epr_env = std::collections::BTreeMap::from([("EPR_MODE".to_owned(), "lsp".to_owned())]);
     let both = run(
         &run(&base(), false, named("peer")).unwrap(),
         false,
-        RunLaunch::default(),
+        RunLaunch {
+            env: epr_env.clone(),
+            ..RunLaunch::default()
+        },
     )
     .unwrap();
     assert_eq!(names(&both), ["peer", "epr"]);
@@ -337,6 +341,10 @@ fn named_processes_of_one_tool_coexist_and_are_replaced_and_stopped_by_name() {
         .find(|p| p.name == "epr")
         .unwrap();
     assert_eq!(epr.argv, ["{artifact}"]);
+    assert_eq!(
+        epr.env, epr_env,
+        "re-declaring peer leaves epr's environment untouched"
+    );
     let peer = redeclared
         .processes
         .iter()
@@ -389,6 +397,87 @@ fn run_launch_refuses_secret_or_malformed_environment_and_names() {
         assert!(run(&base(), false, named(name)).is_err(), "run {name:?}");
         assert!(run(&base(), true, named(name)).is_err(), "stop {name:?}");
     }
+    for key in ["GITHUB_APIKEY", "ssh_privatekey", "DB_PASSWD"] {
+        let refused = run(&base(), false, with_env(key, "literal")).unwrap_err();
+        assert!(
+            refused.contains("secrets are referenced by name only"),
+            "{key}: {refused}"
+        );
+    }
+    for key in [
+        "LD_PRELOAD",
+        "ld_library_path",
+        "DYLD_INSERT_LIBRARIES",
+        "gconv_path",
+    ] {
+        let refused = run(&base(), false, with_env(key, "/x")).unwrap_err();
+        assert!(refused.contains("loader keys"), "{key}: {refused}");
+    }
+    for (key, value) in [("PATH", "/usr/bin"), ("HOME", "/home/x")] {
+        assert!(run(&base(), false, with_env(key, value)).is_ok(), "{key}");
+    }
     assert!(secret_env_key("my_secret_dir"));
     assert!(!secret_env_key("XDG_CONFIG_HOME"));
+    assert!(!loader_env_key("OLD_PATH"));
+}
+
+#[test]
+fn environment_values_are_template_checked_at_declaration() {
+    let with_value = |value: &str| RunLaunch {
+        env: std::collections::BTreeMap::from([("X".to_owned(), value.to_owned())]),
+        ..named("peer")
+    };
+    for value in [
+        "{data_root}/peer",
+        "{name}-{log_level}",
+        "{artifact}",
+        "127.0.0.1:{port.peer}",
+        "{env.EPR_CHECKOUT}",
+        "plain=b=c",
+        "",
+    ] {
+        let declared = run(&base(), false, with_value(value)).unwrap();
+        assert_eq!(declared.processes[0].env["X"], value);
+    }
+    for value in ["{foo}", "a{b", "{port.}", "{env.}", "{}", "x{data_root"] {
+        let refused = run(&base(), false, with_value(value)).unwrap_err();
+        assert!(
+            refused.contains("environment entry 'X'"),
+            "{value}: {refused}"
+        );
+        assert!(
+            !refused.contains(value),
+            "the value is never echoed: {refused}"
+        );
+    }
+}
+
+#[test]
+fn a_process_name_never_captures_another_tools_process() {
+    let other = |stop: bool| {
+        move |head: &RuntimeManifest| {
+            supersede(
+                head,
+                ManifestAct::Run {
+                    tool: "brit".into(),
+                    stop,
+                    launch: named("epr"),
+                },
+            )
+            .map_err(|e| e.to_string())
+        }
+    };
+    let with_epr = run(&base(), false, RunLaunch::default()).unwrap();
+    for stop in [false, true] {
+        let refused = other(stop)(&with_epr).unwrap_err();
+        assert!(
+            refused.contains("process epr runs bin:epr, not bin:brit"),
+            "stop={stop}: {refused}"
+        );
+    }
+    // The other way round: `epr` acts cannot take a name held by brit.
+    let with_brit = other(false)(&base()).unwrap();
+    assert!(run(&with_brit, false, named("epr")).is_err());
+    assert!(run(&with_brit, true, named("epr")).is_err());
+    assert!(run(&with_brit, true, RunLaunch::default()).is_err());
 }

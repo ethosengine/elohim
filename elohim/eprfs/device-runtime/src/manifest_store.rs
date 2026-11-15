@@ -368,6 +368,11 @@ fn validate_secrets(manifest: &RuntimeManifest) -> Result<()> {
     for process in &manifest.processes {
         for key in process.env.keys() {
             validate_env_key(key)?;
+            if declaration::loader_env_key(key) {
+                return Err(invalid(format!(
+                    "{key}: loader keys would run code the passport never hashed"
+                )));
+            }
         }
     }
     Ok(())

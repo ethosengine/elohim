@@ -288,6 +288,18 @@ impl RunLaunch {
                     "{name}: {key}: secrets are referenced by name only"
                 )));
             }
+            if loader_env_key(key) {
+                return Err(ManifestError::Invalid(format!(
+                    "{name}: {key}: loader keys would run code the passport never hashed"
+                )));
+            }
+            // Values are berth templates resolved at spawn; refuse now what spawn would refuse
+            // later. The value itself is never echoed.
+            if crate::berth::check_template(value).is_err() {
+                return Err(ManifestError::Invalid(format!(
+                    "{name}: environment entry '{key}' has an unknown or malformed {{…}} placeholder"
+                )));
+            }
         }
         let readiness = match self.ready_line {
             Some(line) if line.is_empty() => {
@@ -328,19 +340,30 @@ impl RunLaunch {
 
 /// Words that mark an environment key as a secret. A [`ChildSpec`] env entry is a literal
 /// value stored in the chain with no by-name reference form, so such keys are refused.
-pub const SECRET_ENV_WORDS: [&str; 7] = [
+pub const SECRET_ENV_WORDS: [&str; 10] = [
     "TOKEN",
     "SECRET",
     "PASSWORD",
+    "PASSWD",
     "PASSPHRASE",
     "CREDENTIAL",
     "PRIVATE_KEY",
+    "PRIVATEKEY",
     "API_KEY",
+    "APIKEY",
 ];
 /// Whether an environment key names a secret, case-insensitively.
 pub fn secret_env_key(key: &str) -> bool {
     let upper = key.to_ascii_uppercase();
     SECRET_ENV_WORDS.iter().any(|word| upper.contains(word))
+}
+
+/// Whether an environment key makes the dynamic loader inject code: any `LD_*` or `DYLD_*`
+/// key, or `GCONV_PATH`, case-insensitively. A process whose passport claims its bytes must
+/// not load bytes nobody hashed.
+pub fn loader_env_key(key: &str) -> bool {
+    let upper = key.to_ascii_uppercase();
+    upper.starts_with("LD_") || upper.starts_with("DYLD_") || upper == "GCONV_PATH"
 }
 
 /// Parse a restart policy as a person types it. Unknown words are refused, never defaulted.
@@ -412,6 +435,20 @@ pub fn supersede(
             }
             if !stop && spec.bins.is_empty() {
                 return Err(ManifestError::Invalid("tool has no executable".into()));
+            }
+            // A name never captures another tool's process, by declaration or by stop.
+            let channel = format!("bin:{tool}");
+            if let Some(existing) = next.processes.iter().find(|p| p.name == name) {
+                let held = match &existing.artifact {
+                    ArtifactRef::Channel { channel_id } if *channel_id == channel => None,
+                    ArtifactRef::Channel { channel_id } => Some(channel_id.clone()),
+                    ArtifactRef::Pinned { .. } => Some("a pinned artifact".to_owned()),
+                };
+                if let Some(held) = held {
+                    return Err(ManifestError::Invalid(format!(
+                        "process {name} runs {held}, not {channel}; {tool} cannot replace or stop it"
+                    )));
+                }
             }
             next.processes.retain(|p| p.name != name);
             if !stop {
