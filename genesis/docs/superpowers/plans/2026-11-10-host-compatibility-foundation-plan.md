@@ -163,7 +163,7 @@ the same executable and that its decision is a permit, so a hand-built effect wi
 authenticates. (2) `OwnProduce::from_local_lookup` takes two bare CIDs and looks nothing up, so
 "this device recorded the Produce" (ruling condition 2) is the caller's word.
 
-- [ ] **A4 — `just mesh preflight` prints one admitted-or-refused line per mesh binary** (serves dataplane-convergence)
+- [x] **A4 — `just mesh preflight` prints one admitted-or-refused line per mesh binary** (serves dataplane-convergence)
 
 Verify: preflight output on both devices; a deliberately foreign binary is refused with its axis.
 
@@ -181,7 +181,13 @@ record through K13 and verifies the document's bytes against its CID. The mesh p
 one line per staged binary: admitted, admitted under the own-build rule, REFUSED, or unmeasured.
 An override line never reads as a refusal. Live on ethosengine with K13, the mesh doorway and
 storage binaries are admitted under the own-build rule, naming the waived `isa.x86` clause; a
-declared `avx512f` requirement is refused. Open for the verify: the same preflight lines on shem.
+declared `avx512f` requirement is refused. On shem (2026-11-14, bc8770b7f, K13 epr): `just mesh
+preflight` EXIT 0, elohim-storage and doorway built there by `just mesh build` are admitted under
+the own-build rule, and relay-addr-beacon reads `unmeasured (no derivation record)` because its
+mesh build records no artifact (shem `genesis/local-dev/regenesis-2/a4-preflight-2.log`). Met on
+both devices. Found by the run, for the mesh-build owner: a checkout holding gitignored TS `dist/`
+trees or generated bindings inside the method's view leaves every mesh build unrecorded (`no key:
+ignored files exist inside the method's view`), so a normal dev checkout never records one.
 
 ## Lane K — key honesty and family (spec §6.3, §7; rungs H2–H3; reviews F1–F6, G1, B1–B2)
 
