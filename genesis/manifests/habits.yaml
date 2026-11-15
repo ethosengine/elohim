@@ -1821,44 +1821,10 @@ habits:
         ARK_BIN must name a built ark: without it this test returns successfully
         without asserting the live story)
     evidence: >
-      DELTA 2026-10-26 (born RED, inactive): commit `06dd6c51c` records that the live
-      story `ark_keeps_the_declared_resident_and_reloads_a_moved_head` passed with
-      `ARK_BIN` set against a fixture device, NOT this workspace's own chain. The
-      commit also records `just gate elohim-ark`, `eprfs` and `rust-style` with exit 0.
-      These are the commit's reported results, not new runs during this authoring pass.
-      Blind-reader loop (fresh `blind-reader` agent, a2o-story profile, path only):
-      round 1 READY, 0 correctness · 5 interpretability · 1 preference (EffectiveTier
-      jargon, chain/CID model, fixture vs product readiness, berth lease vs data-root
-      exclusivity, degraded vs REFUSED); all five repaired, the preference (split the
-      stop proof) declined. Round 1 also exposed a defect: a resident declared without
-      a ready line is never marked ready, so the arrival line would have stayed
-      degraded; `check()` now counts such a child as waiting only while it has no live
-      process. Round 2 (new reader) READY, 0 correctness · 5 interpretability · 2
-      preference; repaired restart-policy gloss, incarnation's purpose, the by-hand
-      `ark run` behind the singleton scenario, and the lease's role; declined chain
-      history (out of this story's scope) and a concrete path. Closed by judgment at two
-      READY rounds with zero correctness findings. Loop cost: 2 reader rounds, about
-      105k reader tokens.
-
-      The live story declares a resident, observes readiness, repeats supervise at the
-      same head, kills the resident with signal 9, reads its death witness, supersedes
-      the head, observes reload under the new CID with a greater incarnation, and stops
-      ark and its child. Its resident is a copy of bash registered as the fixture's
-      `epr` tool, not `epr lsp serve --device`. With `ARK_BIN` unset the live test returns
-      before those assertions; an ordinary green eprfs gate alone does not prove them.
-      The fixture also disables the berth lease. The duplicate-ark refusal is grounded
-      in `supervise.rs`; this live test does not exercise that refusal. The Gherkin
-      story remains `@wip` until its steps are wired.
-
-      Green requires evidence from this workspace's real device chain: declare the
-      resident `epr lsp serve --device`, supervise it and observe it ready at the head,
-      kill that resident and observe its replacement ready with a death witness naming
-      the killed process and cause, and record `berth status` showing `device-ark`.
-      Keep the manifest CID, process IDs, witness and lease observation with that delta.
-      Until that adoption is observed, the fixture pass leaves this habit red.
-    evidence-fingerprint: sha256:f191288cbd2c2b1a
-    evidence-bytes: 2539
-    evidence-entries: 1
+      DELTA 2026-11-15 (RED preserved; follow outcomes recorded): every `epr bin follow` attempt now leaves a private `follow.json` per tool store (pending, then landed, refused with its kind, unchanged or observed) and `epr peer status` prints the last outcome per tool. Local evidence: 37 device-runtime follow tests and 7 epr-cli peer tests passed, clippy -D warnings clean; one independent review round, eight findings fixed. Not observed on a live device, and no resident is declared yet: the peer daemon is still hand-launched, so this habit stays red.
+    evidence-fingerprint: sha256:37d94fe22d954741
+    evidence-bytes: 3093
+    evidence-entries: 2
     guard: >-
       Fixture evidence is not evidence of adoption on this workspace's real chain.
       The fixture disables berth leasing with EPR_BERTH_BIN empty, so it cannot prove

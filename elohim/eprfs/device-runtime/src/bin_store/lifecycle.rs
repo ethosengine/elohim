@@ -1,5 +1,6 @@
 use super::{
     files,
+    follow_record::{FollowOutcome, Noted},
     landing::{Expect, Transition},
     source::{self, CommandSpec},
     IngestOptions, Pin, Refusal, Release, Result, Status, Store,
@@ -7,6 +8,7 @@ use super::{
 use crate::session::{self, SessionIdentity};
 use serde_json::{json, Value};
 use std::{
+    cell::RefCell,
     collections::BTreeSet,
     fs,
     path::Path,
@@ -17,10 +19,12 @@ struct PrepareOptions<'a> {
     mode: ark_core::declaration::FollowMode,
     pin: Option<&'a str>,
     expect: Expect,
+    /// A follow attempt's slot for the release it stages, filled before landing is tried.
+    candidate: Option<&'a RefCell<Option<String>>>,
 }
 
 impl Store {
-    fn committed_current(&self) -> Option<String> {
+    pub(super) fn committed_current(&self) -> Option<String> {
         self.root
             .join("current.json")
             .is_file()
@@ -197,7 +201,14 @@ impl Store {
         let commit = state["head"]
             .as_str()
             .ok_or_else(|| Refusal::new("source-mismatch", "missing HEAD"))?;
-        self.adopt(repo, commit, closure, "bootstrap", Expect::Prior(expected))
+        self.adopt(
+            repo,
+            commit,
+            closure,
+            "bootstrap",
+            Expect::Prior(expected),
+            None,
+        )
     }
     fn adopt(
         &self,
@@ -206,6 +217,7 @@ impl Store {
         closure: Option<&Path>,
         gate: &str,
         expect: Expect,
+        candidate: Option<&RefCell<Option<String>>>,
     ) -> Result<Release> {
         self.prepare_declared(
             repo,
@@ -216,6 +228,7 @@ impl Store {
                 mode: ark_core::declaration::FollowMode::Apply,
                 pin: None,
                 expect,
+                candidate,
             },
         )
     }
@@ -227,7 +240,7 @@ impl Store {
         gate: &str,
         options: PrepareOptions<'_>,
     ) -> Result<Release> {
-        let PrepareOptions { mode, pin, expect } = options;
+        let pin = options.pin;
         let mut records = self.records();
         if let Some(pin) = pin {
             records.sort_by_key(|record| record.cid != pin);
@@ -244,7 +257,7 @@ impl Store {
                 && (complete || pin == Some(record.cid.as_str()))
                 && self.verified(&record.cid)
             {
-                return self.finish_declared(record, commit, repo, mode, pin, expect.clone());
+                return self.finish_declared(record, commit, repo, &options);
             }
         }
         let mut attempts=vec!["verified current unavailable (epr bin status --tool <tool> --json)".to_owned(),"no verified stored candidate for wanted commit (epr bin status --tool <tool> --commit <sha> --json)".into()];
@@ -259,9 +272,7 @@ impl Store {
                     closure: true,
                 },
             ) {
-                Ok(record) => {
-                    return self.finish_declared(record, commit, repo, mode, pin, expect.clone())
-                }
+                Ok(record) => return self.finish_declared(record, commit, repo, &options),
                 Err(e) => attempts.push(format!(
                     "local closure: {}; epr bin ingest --tool {} --closure {}",
                     e.kind,
@@ -275,7 +286,7 @@ impl Store {
             );
         }
         match self.build_release(repo, commit, gate, &mut attempts, &files::env) {
-            Ok(record) => self.finish_declared(record, commit, repo, mode, pin, expect),
+            Ok(record) => self.finish_declared(record, commit, repo, &options),
             Err(e) => {
                 attempts.push(format!("{}: {}", e.kind, e.detail));
                 Err(Refusal::new("bootstrap-unavailable", attempts.join("; ")))
@@ -287,24 +298,25 @@ impl Store {
         mut record: Release,
         commit: &str,
         repo: &Path,
-        mode: ark_core::declaration::FollowMode,
-        pin: Option<&str>,
-        expect: Expect,
+        options: &PrepareOptions<'_>,
     ) -> Result<Release> {
-        if pin.is_some_and(|pin| pin != record.cid) {
+        if let Some(slot) = options.candidate {
+            *slot.borrow_mut() = Some(record.cid.clone());
+        }
+        if options.pin.is_some_and(|pin| pin != record.cid) {
             return Err(Refusal::new(
                 "release-pin-mismatch",
                 "candidate differs from the device manifest pin",
             ));
         }
-        if mode.applies() {
+        if options.mode.applies() {
             return self.land_mode(
                 &record.cid,
                 commit,
                 repo,
                 Transition::Forward,
                 false,
-                expect,
+                options.expect.clone(),
             );
         }
         self.require_published(repo, commit)?;
@@ -314,35 +326,41 @@ impl Store {
     }
     /// Stage and verify an observed head without moving current; canary/apply retain the
     /// existing attestation and health floor before landing. A pin constrains the release.
+    ///
+    /// Every attempt leaves its outcome in the store's `follow.json` (see `last_follow`).
     pub fn follow_declared(
         &self,
         repo: &Path,
         closure: Option<&Path>,
         follow: &ark_core::declaration::Follow,
     ) -> Result<Value> {
-        if follow.mode.applies() && follow.pin.is_none() {
-            return self.follow(repo, closure);
-        }
-        let expected = self.committed_current();
-        let state = self.source_state(repo)?;
-        let commit = state["head"]
-            .as_str()
-            .ok_or_else(|| Refusal::new("source-mismatch", "no source HEAD"))?;
-        if state["clean"] != true {
-            return Err(Refusal::new("checkout-dirty", repo.display().to_string()));
-        }
-        let record = self.prepare_declared(
-            repo,
-            commit,
-            closure,
-            "follow",
-            PrepareOptions {
-                mode: follow.mode,
-                pin: follow.pin.as_deref(),
-                expect: Expect::Prior(expected),
-            },
-        )?;
-        Ok(json!({"followed":follow.mode.applies(), "observed":record.cid, "mode":follow.mode}))
+        self.recorded_follow(repo, follow.mode.label(), |noted| {
+            if follow.mode.applies() && follow.pin.is_none() {
+                return self.follow_unrecorded(repo, closure, noted);
+            }
+            let expected = self.committed_current();
+            let state = self.source_state(repo)?;
+            let commit = state["head"]
+                .as_str()
+                .ok_or_else(|| Refusal::new("source-mismatch", "no source HEAD"))?;
+            noted.commit = Some(commit.to_owned());
+            if state["clean"] != true {
+                return Err(Refusal::new("checkout-dirty", repo.display().to_string()));
+            }
+            let record = self.prepare_declared(
+                repo,
+                commit,
+                closure,
+                "follow",
+                PrepareOptions {
+                    mode: follow.mode,
+                    pin: follow.pin.as_deref(),
+                    expect: Expect::Prior(expected),
+                    candidate: Some(&noted.candidate),
+                },
+            )?;
+            Ok(json!({"followed":follow.mode.applies(), "observed":record.cid, "mode":follow.mode}))
+        })
     }
     pub(super) fn build_release(
         &self,
@@ -563,20 +581,35 @@ impl Store {
         let _ = fs::remove_dir_all(download);
         result
     }
-    /// Follow an already published clean descendant held by this checkout.
+    /// Follow an already published clean descendant held by this checkout. Every attempt
+    /// leaves its outcome in the store's `follow.json` (see `last_follow`).
     pub fn follow(&self, repo: &Path, closure: Option<&Path>) -> Result<Value> {
+        self.recorded_follow(repo, "apply", |noted| {
+            self.follow_unrecorded(repo, closure, noted)
+        })
+    }
+    fn follow_unrecorded(
+        &self,
+        repo: &Path,
+        closure: Option<&Path>,
+        noted: &mut Noted,
+    ) -> Result<Value> {
+        use FollowOutcome::{Refused, Unchanged};
         let landed: Value =
             files::read_json(&self.root.join("current.json")).unwrap_or(Value::Null);
         let expected = self.committed_current();
         let Some(old) = landed["commit"].as_str().filter(|_| expected.is_some()) else {
-            return Ok(
-                json!({"followed":false,"why":"no landed head; bootstrap seeds the first one"}),
-            );
+            return Ok(noted.settle(
+                Refused,
+                "no-landed-head",
+                "no landed head; bootstrap seeds the first one",
+            ));
         };
         let state = self.source_state(repo)?;
         let commit = state["head"]
             .as_str()
             .ok_or_else(|| Refusal::new("source-mismatch", "no source HEAD"))?;
+        noted.commit = Some(commit.to_owned());
         let inventory_complete = self
             .head("current")
             .and_then(|cid| self.record(&cid))
@@ -587,14 +620,18 @@ impl Store {
                     .all(|bin| record.bins.contains_key(bin))
             });
         if commit == old && inventory_complete {
-            return Ok(json!({"followed":false,"why":"the landed head is this checkout's HEAD"}));
+            return Ok(noted.settle(
+                Unchanged,
+                "head-is-checkout",
+                "the landed head is this checkout's HEAD",
+            ));
         }
         let head = self.git(repo, &["rev-parse", "HEAD"])?;
         if self.require_published(repo, &head).is_err() {
             if self.tool == "brit" {
                 return Err(Refusal::new("unpublished", "HEAD is not published on dev"));
             }
-            return Ok(json!({"followed":false,"why":"HEAD is not published on dev"}));
+            return Ok(noted.settle(Refused, "unpublished", "HEAD is not published on dev"));
         }
         if !self.descends(repo, old, commit)? {
             if self.tool == "brit" {
@@ -603,24 +640,39 @@ impl Store {
                     "brit pin does not descend from landed head",
                 ));
             }
-            return Ok(
-                json!({"followed":false,"why":"HEAD does not descend from the landed head"}),
-            );
+            return Ok(noted.settle(
+                Refused,
+                "non-descendant",
+                "HEAD does not descend from the landed head",
+            ));
         }
         if self.tool == "epr" && inventory_complete {
             let paths = self.source_paths(repo);
             let mut args = vec!["diff", "--quiet", old, commit, "--"];
             args.extend(paths.iter().map(String::as_str));
             if self.git_ok(repo, &args) {
-                return Ok(
-                    json!({"followed":false,"why":"no epr source change since the landed head"}),
-                );
+                return Ok(noted.settle(
+                    Unchanged,
+                    "no-source-change",
+                    "no epr source change since the landed head",
+                ));
             }
         }
         if state["clean"] != true {
-            return Ok(json!({"followed":false,"why":"epr sources are dirty in this checkout"}));
+            return Ok(noted.settle(
+                Refused,
+                "checkout-dirty",
+                "epr sources are dirty in this checkout",
+            ));
         }
-        let record = self.adopt(repo, commit, closure, "follow", Expect::Prior(expected))?;
+        let record = self.adopt(
+            repo,
+            commit,
+            closure,
+            "follow",
+            Expect::Prior(expected),
+            Some(&noted.candidate),
+        )?;
         let mut value = serde_json::to_value(record)?;
         value["followed"] = json!(true);
         Ok(value)

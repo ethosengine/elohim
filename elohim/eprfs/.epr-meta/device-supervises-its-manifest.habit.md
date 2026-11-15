@@ -76,3 +76,5 @@ kill that resident and observe its replacement ready with a death witness naming
 the killed process and cause, and record `berth status` showing `device-ark`.
 Keep the manifest CID, process IDs, witness and lease observation with that delta.
 Until that adoption is observed, the fixture pass leaves this habit red.
+
+DELTA 2026-11-15 (RED preserved; follow outcomes recorded): every `epr bin follow` attempt now leaves a private `follow.json` per tool store (pending, then landed, refused with its kind, unchanged or observed) and `epr peer status` prints the last outcome per tool. Local evidence: 37 device-runtime follow tests and 7 epr-cli peer tests passed, clippy -D warnings clean; one independent review round, eight findings fixed. Not observed on a live device, and no resident is declared yet: the peer daemon is still hand-launched, so this habit stays red.

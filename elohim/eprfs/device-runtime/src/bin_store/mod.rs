@@ -2,6 +2,7 @@
 //! Status is a projection, never an authority. CLI parsing lives in the consuming binary.
 mod feedback_health;
 pub(crate) mod files;
+mod follow_record;
 mod ingest;
 mod install;
 mod landing;
@@ -12,6 +13,7 @@ mod source;
 
 use eprfs_core::BlobCid;
 pub use files::{file_cid, sums_manifest};
+pub use follow_record::{FollowOutcome, FollowRecord, LastFollow};
 pub use landing::Transition;
 pub use launch::{launch, launch_os, Resolution};
 use serde::{Deserialize, Serialize};

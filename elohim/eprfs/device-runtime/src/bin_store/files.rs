@@ -152,17 +152,21 @@ pub(super) fn atomic_link(path: &Path, target: &Path) -> Result<()> {
 pub(crate) struct Lock(File);
 impl Lock {
     pub(crate) fn acquire(root: &Path, timeout: Duration) -> Result<Self> {
-        Self::acquire_mode(root, timeout, libc::LOCK_EX)
+        Self::acquire_mode(root, ".lock", timeout, libc::LOCK_EX)
     }
     pub(crate) fn shared(root: &Path, timeout: Duration) -> Result<Self> {
-        Self::acquire_mode(root, timeout, libc::LOCK_SH)
+        Self::acquire_mode(root, ".lock", timeout, libc::LOCK_SH)
     }
-    fn acquire_mode(root: &Path, timeout: Duration, mode: libc::c_int) -> Result<Self> {
+    /// An exclusive lock on a separate file, for state that must not wait on store mutation.
+    pub(crate) fn acquire_named(root: &Path, name: &str, timeout: Duration) -> Result<Self> {
+        Self::acquire_mode(root, name, timeout, libc::LOCK_EX)
+    }
+    fn acquire_mode(root: &Path, name: &str, timeout: Duration, mode: libc::c_int) -> Result<Self> {
         fs::create_dir_all(root)?;
         let file = OpenOptions::new()
             .create(true)
             .append(true)
-            .open(root.join(".lock"))?;
+            .open(root.join(name))?;
         let start = Instant::now();
         loop {
             // SAFETY: the fd is open and owned for the lifetime of Lock; flock doesn't retain pointers.

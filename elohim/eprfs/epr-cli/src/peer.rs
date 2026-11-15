@@ -74,6 +74,8 @@ fn withheld_crossings(root: &Path, allow: &CrossingAllowList) -> PeerResult<Vec<
 }
 
 /// One line per withheld measure and kind, naming the policy file that omits it and the cure.
+mod follow_status;
+
 fn withheld_lines(withheld: &[WithheldCrossing], policy: &Path) -> Vec<String> {
     withheld
         .iter()
@@ -942,6 +944,9 @@ struct StatusOutcome {
     /// whose latest own custody record in the window has no reach slot. `None` when no daemon has
     /// recorded its store, or the store cannot be read.
     artifact_gate: Option<eprfs_peer::ArtifactGateCounts>,
+    /// The last `epr bin follow` attempt per registered tool, from each store's private
+    /// `follow.json`; `state` names never-attempted, interrupted and corrupt records apart.
+    follow_outcomes: Vec<follow_status::ToolFollow>,
 }
 
 /// One node id's refused connections, as `status` reports them.
@@ -1073,7 +1078,9 @@ fn status(options: &Options) -> PeerResult<ExitCode> {
                 SystemTime::now(),
             )
         });
+    let follow_outcomes = follow_status::follow_outcomes(&crate::bin::daemon_proc_root());
     let outcome = StatusOutcome {
+        follow_outcomes,
         artifact_gate,
         withheld_crossings: withheld,
         cli_cid,
@@ -1145,6 +1152,9 @@ fn render(outcome: &StatusOutcome) {
             "artifact gate since {}  served by reach {}  by method row {}  slotless records {}",
             gate.since, gate.reach_draws, gate.row_draws, gate.slotless_designated
         );
+    }
+    for line in follow_status::follow_lines(&outcome.follow_outcomes) {
+        println!("{line}");
     }
     if outcome.devices.is_empty() {
         println!("no other device is admitted on this roster");
@@ -2425,6 +2435,7 @@ mod status_contract {
                 row_draws: 0,
                 slotless_designated: 2,
             }),
+            follow_outcomes: follow_outcome_fixtures(),
         })
         .expect("serialize status");
         let schema: serde_json::Value = serde_json::from_str(include_str!(
@@ -2440,9 +2451,101 @@ mod status_contract {
             bad.as_object_mut().expect("object").remove(field);
             assert!(!validator.is_valid(&bad), "missing {field}");
         }
-        let mut bad = value;
+        let mut bad = value.clone();
         bad["daemonCids"] = serde_json::json!(["sha256:legacy"]);
         assert!(!validator.is_valid(&bad));
+        // Each follow state is distinct on the wire: no record is a bare null.
+        let states: Vec<_> = value["followOutcomes"]
+            .as_array()
+            .expect("follow outcomes")
+            .iter()
+            .map(|row| row["state"].as_str().expect("state").to_owned())
+            .collect();
+        assert_eq!(
+            states,
+            [
+                "never",
+                "recorded",
+                "in-progress",
+                "unknown",
+                "interrupted",
+                "corrupt",
+                "unavailable"
+            ]
+        );
+        let mut bad = value.clone();
+        bad["followOutcomes"][0]["record"] = serde_json::Value::Null;
+        assert!(!validator.is_valid(&bad), "never carries no record");
+        let mut bad = value.clone();
+        bad["followOutcomes"][1]["record"]["outcome"] = serde_json::json!("crashed");
+        assert!(!validator.is_valid(&bad), "outcome is a closed vocabulary");
+        for (row, why) in [(3, "unknown"), (4, "interrupted"), (5, "corrupt")] {
+            let mut bad = value.clone();
+            bad["followOutcomes"][row]
+                .as_object_mut()
+                .expect("row")
+                .remove("detail");
+            assert!(!validator.is_valid(&bad), "{why} names its detail");
+        }
+        // Output from a CLI that predates follow outcomes still validates.
+        let mut older = value;
+        older
+            .as_object_mut()
+            .expect("status")
+            .remove("followOutcomes");
+        assert!(validator.is_valid(&older), "followOutcomes is optional");
+    }
+
+    fn follow_outcome_fixtures() -> Vec<super::follow_status::ToolFollow> {
+        use super::follow_status::ToolFollow;
+        use elohim_device_runtime::bin_store::{FollowOutcome, FollowRecord};
+        let cid = eprfs_core::BlobCid::compute_raw(b"head").to_string();
+        let record = |outcome| FollowRecord {
+            version: 1,
+            attempt: "1-2-3".into(),
+            started_at: "2026-11-15T10:00:00Z".into(),
+            ended_at: (outcome != FollowOutcome::Pending).then(|| "2026-11-15T10:00:01Z".into()),
+            owner_pid: 1,
+            owner_start_time: Some("42".into()),
+            source: "/projects/elohim".into(),
+            commit: Some("a".repeat(40)),
+            mode: "apply".into(),
+            prior_cid: Some(cid.clone()),
+            candidate_cid: None,
+            result_cid: Some(cid.clone()),
+            outcome,
+            kind: Some("non-descendant".into()),
+            reason: Some("HEAD does not descend from the landed head".into()),
+        };
+        vec![
+            ToolFollow::Never { tool: "epr".into() },
+            ToolFollow::Recorded {
+                tool: "brit".into(),
+                record: record(FollowOutcome::Refused),
+            },
+            ToolFollow::InProgress {
+                tool: "epr".into(),
+                record: record(FollowOutcome::Pending),
+            },
+            ToolFollow::Unknown {
+                tool: "epr".into(),
+                record: record(FollowOutcome::Pending),
+                detail: "process table /proc is unavailable".into(),
+            },
+            ToolFollow::Interrupted {
+                tool: "epr".into(),
+                record: record(FollowOutcome::Pending),
+                detail: "owner process 1 has exited".into(),
+            },
+            ToolFollow::Corrupt {
+                tool: "epr".into(),
+                detail: "expected value at line 1".into(),
+            },
+            ToolFollow::Unavailable {
+                tool: "*".into(),
+                detail: "tool registry: missing".into(),
+            },
+        ]
     }
 
     #[test]

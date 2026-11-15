@@ -3249,3 +3249,6 @@ fn repeated_landings_preserve_the_head_and_notice_only_transitions() {
 
 #[path = "tests_retained.rs"]
 mod retained;
+
+#[path = "tests_follow_record.rs"]
+mod follow_outcome;

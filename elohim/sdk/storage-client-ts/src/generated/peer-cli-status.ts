@@ -2,7 +2,7 @@
 /* Generated from protocol schema: views/peer-cli-status.schema.json -- DO NOT EDIT */
 
 /**
- * Device-local CLI output; reconstructed from private custody and runtime observations. No network authority.
+ * Source of truth: device-private bin stores, head table and process table (Private, Category B). Device-local CLI output; reconstructed from private custody and runtime observations per invocation. No network authority.
  */
 export interface PeerCliStatus {
   cliCid: string | null;
@@ -70,4 +70,79 @@ export interface PeerCliStatus {
     rowDraws: number;
     slotlessDesignated: number;
   };
+  /**
+   * The last `epr bin follow` attempt per registered tool, one row each, read from that tool store's private follow.json. Optional: absent in output from a CLI that predates follow outcomes; every current CLI emits it. `state` makes every absence explicit (views CONVENTIONS rule 11): `never` = the store holds no follow record; `recorded` = a terminal record; `in-progress` = a pending record whose owner process was observed running (not a zombie); `unknown` = a pending record whose owner could not be observed, with `detail` saying why; `interrupted` = a pending record that will never finish (owner exited, is a zombie, its PID was reused, or the outcome could not be written), with `detail` saying which; `corrupt` = the record exists but cannot be read or fails validation; `unavailable` = the tool's store could not be opened, or, with tool `*`, the tool registry itself.
+   */
+  followOutcomes?: (
+    | {
+        state: 'never';
+        tool: string;
+      }
+    | {
+        state: 'recorded' | 'in-progress';
+        tool: string;
+        record: FollowRecord;
+      }
+    | {
+        state: 'unknown' | 'interrupted';
+        tool: string;
+        record: FollowRecord;
+        detail: string;
+      }
+    | {
+        state: 'corrupt' | 'unavailable';
+        tool: string;
+        detail: string;
+      }
+  )[];
+}
+/**
+ * One `epr bin follow` attempt as the tool store's private follow.json holds it. Device operational state: never notarized or synced, and it never names the installed head (current.json does).
+ */
+export interface FollowRecord {
+  version: number;
+  attempt: string;
+  startedAt: string;
+  /**
+   * Null only while the attempt is pending (one provenance).
+   */
+  endedAt: string | null;
+  ownerPid: number;
+  /**
+   * Owner start time in clock ticks as decimal text (bigint-as-string); null when the process table could not be read at start.
+   */
+  ownerStartTime: string | null;
+  /**
+   * The source checkout followed, as the caller named it; URL userinfo, query and fragment are removed.
+   */
+  source: string;
+  /**
+   * The checkout HEAD the attempt observed; null when it stopped before reading one.
+   */
+  commit: string | null;
+  mode: 'apply' | 'canary' | 'observe';
+  /**
+   * Device head when the attempt began; null when the device had none.
+   */
+  priorCid: string | null;
+  /**
+   * Release the attempt staged or tried to land; null when it stopped before choosing one.
+   */
+  candidateCid: string | null;
+  /**
+   * Device head when the attempt ended; null when the device had none.
+   */
+  resultCid: string | null;
+  /**
+   * pending is written before any work; the other four are terminal.
+   */
+  outcome: 'pending' | 'landed' | 'refused' | 'unchanged' | 'observed';
+  /**
+   * Stable reason category (a refusal kind, or why nothing was done). Null for a clean landing or an observation; a landing whose head committed before a later step failed carries that step's kind.
+   */
+  kind: string | null;
+  /**
+   * Bounded (240 characters), single-line, sanitised reason: URL credentials and secret-named assignments are removed. Null exactly when there is no reason to give.
+   */
+  reason: string | null;
 }

@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "epr:schema:view:peer-cli-status",
   "title": "PeerCliStatus",
-  "description": "Device-local CLI output; reconstructed from private custody and runtime observations. No network authority.",
+  "description": "Source of truth: device-private bin stores, head table and process table (Private, Category B). Device-local CLI output; reconstructed from private custody and runtime observations per invocation. No network authority.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -23,6 +23,82 @@
     "withheldCrossings",
     "artifactGate"
   ],
+  "$defs": {
+    "followRecord": {
+      "description": "One `epr bin follow` attempt as the tool store's private follow.json holds it. Device operational state: never notarized or synced, and it never names the installed head (current.json does).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "attempt",
+        "startedAt",
+        "endedAt",
+        "ownerPid",
+        "ownerStartTime",
+        "source",
+        "commit",
+        "mode",
+        "priorCid",
+        "candidateCid",
+        "resultCid",
+        "outcome",
+        "kind",
+        "reason"
+      ],
+      "properties": {
+        "version": { "type": "integer", "minimum": 1 },
+        "attempt": { "type": "string" },
+        "startedAt": { "type": "string" },
+        "endedAt": {
+          "description": "Null only while the attempt is pending (one provenance).",
+          "type": ["string", "null"]
+        },
+        "ownerPid": { "type": "integer", "minimum": 0 },
+        "ownerStartTime": {
+          "description": "Owner start time in clock ticks as decimal text (bigint-as-string); null when the process table could not be read at start.",
+          "type": ["string", "null"],
+          "pattern": "^[0-9]+$"
+        },
+        "source": {
+          "description": "The source checkout followed, as the caller named it; URL userinfo, query and fragment are removed.",
+          "type": "string"
+        },
+        "commit": {
+          "description": "The checkout HEAD the attempt observed; null when it stopped before reading one.",
+          "type": ["string", "null"]
+        },
+        "mode": { "enum": ["apply", "canary", "observe"] },
+        "priorCid": {
+          "description": "Device head when the attempt began; null when the device had none.",
+          "type": ["string", "null"],
+          "pattern": "^baf[k-y]r(ei|4i)[a-z2-7]+$"
+        },
+        "candidateCid": {
+          "description": "Release the attempt staged or tried to land; null when it stopped before choosing one.",
+          "type": ["string", "null"],
+          "pattern": "^baf[k-y]r(ei|4i)[a-z2-7]+$"
+        },
+        "resultCid": {
+          "description": "Device head when the attempt ended; null when the device had none.",
+          "type": ["string", "null"],
+          "pattern": "^baf[k-y]r(ei|4i)[a-z2-7]+$"
+        },
+        "outcome": {
+          "description": "pending is written before any work; the other four are terminal.",
+          "enum": ["pending", "landed", "refused", "unchanged", "observed"]
+        },
+        "kind": {
+          "description": "Stable reason category (a refusal kind, or why nothing was done). Null for a clean landing or an observation; a landing whose head committed before a later step failed carries that step's kind.",
+          "type": ["string", "null"]
+        },
+        "reason": {
+          "description": "Bounded (240 characters), single-line, sanitised reason: URL credentials and secret-named assignments are removed. Null exactly when there is no reason to give.",
+          "type": ["string", "null"],
+          "maxLength": 240
+        }
+      }
+    }
+  },
   "properties": {
     "cliCid": {
       "type": [
@@ -288,6 +364,54 @@
           }
         }
       ]
+    },
+    "followOutcomes": {
+      "description": "The last `epr bin follow` attempt per registered tool, one row each, read from that tool store's private follow.json. Optional: absent in output from a CLI that predates follow outcomes; every current CLI emits it. `state` makes every absence explicit (views CONVENTIONS rule 11): `never` = the store holds no follow record; `recorded` = a terminal record; `in-progress` = a pending record whose owner process was observed running (not a zombie); `unknown` = a pending record whose owner could not be observed, with `detail` saying why; `interrupted` = a pending record that will never finish (owner exited, is a zombie, its PID was reused, or the outcome could not be written), with `detail` saying which; `corrupt` = the record exists but cannot be read or fails validation; `unavailable` = the tool's store could not be opened, or, with tool `*`, the tool registry itself.",
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["state", "tool"],
+            "properties": {
+              "state": { "const": "never" },
+              "tool": { "type": "string" }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["state", "tool", "record"],
+            "properties": {
+              "state": { "enum": ["recorded", "in-progress"] },
+              "tool": { "type": "string" },
+              "record": { "$ref": "#/$defs/followRecord" }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["state", "tool", "record", "detail"],
+            "properties": {
+              "state": { "enum": ["unknown", "interrupted"] },
+              "tool": { "type": "string" },
+              "record": { "$ref": "#/$defs/followRecord" },
+              "detail": { "type": "string" }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["state", "tool", "detail"],
+            "properties": {
+              "state": { "enum": ["corrupt", "unavailable"] },
+              "tool": { "type": "string" },
+              "detail": { "type": "string" }
+            }
+          }
+        ]
+      }
     }
   }
 }
