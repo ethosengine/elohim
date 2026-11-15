@@ -470,16 +470,23 @@ export function runProject(project, printOnly, namesOnly, {
     selfId: env.GATE_EVIDENCE === 'reuse' ? selfAgentId(root, spawn, signerOptions) : null,
     selectorCheck: reuseSelector(project, gateCommit, { root, env: childEnv, spawn }),
   };
-  let decision = task ? { reuse: false, why: 'decided by the Task' }
-    : reusableHit(evidence, reuseContext);
+  // Under a Task, ark judges this workspace's own green (it reads no rakia oracle, so it reuses
+  // no more than reusableHit would); this check only asks whether one exists, so it spends no
+  // selector call on it, and a local miss here is a miss in ark too.
+  const local = reusableHit(evidence, task
+    ? { ...reuseContext, selectorCheck: () => ({ ok: true }) } : reuseContext);
+  let decision = task ? { reuse: false, why: 'decided by the Task' } : local;
   // Preserve the local brit path exactly. Only a local miss asks the device channel, and the
-  // native read has already removed self, revoked and unadmitted devices.
-  if (!task && !decision.reuse && env.GATE_EVIDENCE === 'reuse'
+  // native read has already removed self, revoked and unadmitted devices. A sibling verdict is
+  // keyed by the closure key both paths record and emit (`evidence.key`, the sha256 of the
+  // Task's input material), so the channel is asked before a Task runs: a sibling green stands
+  // in for the Task, and anything else leaves the decision to ark.
+  if (!local.reuse && env.GATE_EVIDENCE === 'reuse'
       && reuseContext.enabled && reuseContext.selfId && evidence.key) {
     const sibling = siblingVerdicts(project, evidence.key, { root, env, spawn });
     if (sibling.candidates.length > 0) {
       const governance = siblingGovernanceChange({ root, spawn });
-      decision = governance.changed
+      const asked = governance.changed
         ? { reuse: false, why: governance.why }
         : reusableHit(evidence, {
           ...reuseContext,
@@ -488,6 +495,8 @@ export function runProject(project, printOnly, namesOnly, {
           // seam explicit and lets alternate candidate sources fail closed.
           admitCandidate: candidate => candidate.source === 'sibling',
         });
+      if (!task || asked.reuse) decision = asked;
+      else write(`[gate] ${project.name} not reused from a sibling: ${asked.why}\n`);
     }
   }
   if (decision.reuse) {

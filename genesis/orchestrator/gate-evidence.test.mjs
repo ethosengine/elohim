@@ -1271,6 +1271,90 @@ test('a governance-class change refuses a sibling verdict and runs the gate', as
   assert.equal(calls.filter(c => c.bin === 'bash').length, 1);
 });
 
+// GATE_TASK on: the proving gate runs as an ark Task, whose own look-up reads only this
+// workspace's attestations. A local miss asks the sibling channel before the Task runs.
+function taskSiblingFixture(t, { sibling = siblingGreen, diff = '', rows = [] } = {}) {
+  const { root, env } = evidenceFixture(t);
+  mkdirSync(join(root, 'genesis/agentic'), { recursive: true });
+  writeFileSync(join(root, 'genesis/agentic/pool-policy.json'), JSON.stringify({ gate_reuse: { projects: [project.name] } }));
+  mkdirSync(join(root, '.git/brit'), { recursive: true });
+  writeFileSync(join(root, '.git/brit/agent-key'), Buffer.from(seed, 'hex'));
+  mkdirSync(join(root, 'genesis/orchestrator'), { recursive: true });
+  writeFileSync(join(root, 'genesis/orchestrator/run-local-gate.sh'), '#!/bin/sh\nexit 0\n');
+  const ark = join(root, 'ark');
+  writeFileSync(ark, '#!/bin/sh\nexit 0\n');
+  chmodSync(ark, 0o755);
+  const isArk = verb => (bin, args) => bin === ark && args[0] === 'task' && args[1] === verb;
+  const { spawn, calls } = fakeSpawn([
+    [isFingerprint, fingerprintReply('bafy-a')],
+    [(bin, args) => isRevParse(bin, args) && args[1] === '--git-common-dir', { status: 0, stdout: '.git\n' }],
+    ...closureReplies,
+    [isStatus, { status: 0, stdout: '' }],
+    [isFind, { status: 0, stdout: JSON.stringify(rows) }],
+    signerReply,
+    [isGet, getMiss],
+    [isArk('spec'), { status: 0, stdout: JSON.stringify({ spec: {}, derivation: { method: 'bafymethod', input: 'bafyinput' } }) }],
+    // ark's own look-up misses (no attestation here) and runs the gate: an answered non-hit.
+    [isArk('run'), (_bin, args) => {
+      writeFileSync(args[args.indexOf('--status') + 1], `${JSON.stringify({ status: 'answered', value: { hit: false } })}\n`);
+      return { status: 0, stdout: '', stderr: '' };
+    }],
+    [isPeerVerdicts, (_bin, args) => ({ status: 0, stdout: JSON.stringify([{
+      ...sibling, closure: args[args.indexOf('--closure') + 1],
+    }]) })],
+    [isMergeBase, { status: 0, stdout: 'base\n' }],
+    [(bin, args) => bin === 'git' && args[0] === 'diff', { status: 0, stdout: diff }],
+    [isPut, { status: 0, stdout: 'bafyrecorded\n', stderr: '' }],
+    [(bin) => bin === 'epr', { status: 0, stdout: '' }],
+  ]);
+  const lines = [];
+  const status = runProject => runProject({ ...project, run: { kind: 'just', recipe: 'gate' } }, false, false, {
+    root, env: { ...env, GATE_EVIDENCE: 'reuse', GATE_TASK: 'on', ARK_BIN: ark }, spawn,
+    write: line => lines.push(line), warn: () => {},
+  });
+  const taskRuns = () => calls.filter(isArkCall => isArk('run')(isArkCall.bin, isArkCall.args)).length;
+  return { status, calls, lines, taskRuns };
+}
+
+test('a Task gate on a local miss stands on an admitted sibling green and does not run', async t => {
+  const { runProject } = await import('./gate-runner.mjs');
+  const f = taskSiblingFixture(t);
+  assert.equal(f.status(runProject), 0);
+  assert.match(f.lines.join(''), /\[gate\] elohim-storage reused: green in 12 s on the sibling at siblings1 \(signer sibling did:key:z6Mksibling0001, independence: sibling\)/);
+  assert.equal(f.taskRuns(), 0, 'the Task does not run');
+  assert.equal(f.calls.filter(c => c.bin === 'bash' || isPut(c.bin, c.args)).length, 0);
+  // The sibling is asked by the closure key siblings emit, not ark's input CID.
+  const asked = f.calls.find(c => isPeerVerdicts(c.bin, c.args));
+  assert.match(asked.args[asked.args.indexOf('--closure') + 1], /^[0-9a-f]{64}$/);
+  assert.ok(f.calls.find(c => c.bin === 'epr' && c.args.includes('run-kind=sibling-reused')));
+});
+
+test('a Task gate runs its Task when the sibling verdict is red', async t => {
+  const { runProject } = await import('./gate-runner.mjs');
+  const f = taskSiblingFixture(t, { sibling: { ...siblingGreen, success: false } });
+  assert.equal(f.status(runProject), 0);
+  assert.match(f.lines.join(''), /not reused from a sibling: sibling verdict is red/);
+  assert.doesNotMatch(f.lines.join(''), /reused: green/);
+  assert.equal(f.taskRuns(), 1);
+});
+
+test('a Task gate runs its Task when the change touches sibling-reuse governance', async t => {
+  const { runProject } = await import('./gate-runner.mjs');
+  const f = taskSiblingFixture(t, { diff: 'genesis/orchestrator/gate-task.mjs\n' });
+  assert.equal(f.status(runProject), 0);
+  assert.match(f.lines.join(''), /not reused from a sibling: governance-class change: genesis\/orchestrator\/gate-task\.mjs/);
+  assert.equal(f.taskRuns(), 1);
+});
+
+test('a Task gate with its own green leaves the decision to ark and asks no sibling', async t => {
+  const { runProject } = await import('./gate-runner.mjs');
+  const f = taskSiblingFixture(t, { rows: [greenRow] });
+  assert.equal(f.status(runProject), 0);
+  assert.equal(f.calls.filter(c => isPeerVerdicts(c.bin, c.args)).length, 0);
+  assert.equal(f.calls.filter(c => c.bin === 'git' && c.args[0] === 'diff').length, 0, 'no selector call is spent');
+  assert.equal(f.taskRuns(), 1);
+});
+
 test('epr peer verdicts failure is a miss and the gate runs', async t => {
   const { runProject } = await import('./gate-runner.mjs');
   const { root, env } = evidenceFixture(t);
