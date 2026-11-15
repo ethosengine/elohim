@@ -13,7 +13,10 @@ mod fixture;
 mod toolchain_pin;
 static CARGO: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
-const REACH: &str = "reach: pending, not enforced";
+/// The pre-K12 banner, which no verb prints any longer.
+const PENDING: &str = "reach: pending, not enforced";
+/// The level `put` names once it records a mesh build (K12).
+const REACH_SELF: &str = "reach: self\n";
 /// A bin-store alias (`<store>/bin/<name>` linking to `bin-launch`) resolves its pin from the
 /// caller's session and config, which this fixture deliberately isolates, so the launcher refuses
 /// under the fixture's environment. Use the store's current real binary
@@ -307,7 +310,7 @@ fn artifact_foreign_describe_put_records_complete_local_artifact() {
     let Some(f) = Foreign::try_new() else { return };
     f.build();
     let out = success(f.describe());
-    assert!(text(&out).contains(REACH));
+    assert!(!text(&out).contains(PENDING));
     let d = f.descriptor();
     assert_eq!(d.name, "mesh-build");
     assert_eq!(d.non_path_inputs["PATH"], f.path);
@@ -320,7 +323,7 @@ fn artifact_foreign_describe_put_records_complete_local_artifact() {
     assert!(!paths.iter().any(String::is_empty));
     let input = f.input();
     let out = success(f.put(&input, true));
-    assert!(text(&out).contains(REACH));
+    assert!(text(&out).contains(REACH_SELF), "{}", text(&out));
     let events = SidecarFlowStore::open(&f.root).unwrap().events().unwrap();
     let produces: Vec<_> = events
         .iter()
@@ -335,10 +338,15 @@ fn artifact_foreign_describe_put_records_complete_local_artifact() {
         .find_map(|s| s.strip_prefix("env:requires="))
         .unwrap();
     assert!(p.classified_as.iter().any(|s| s.starts_with("env:family=")));
-    assert!(!p.classified_as.iter().any(|s| s.starts_with("env:reach=")));
+    let reach: Vec<_> = p
+        .classified_as
+        .iter()
+        .filter(|s| s.starts_with("env:reach="))
+        .collect();
+    assert_eq!(reach, ["env:reach=self"]);
     assert!(p
         .classified_as
-        .contains(&"env:gaps=build-inputs.compiler-inputs-unattested,reach".to_string()));
+        .contains(&"env:gaps=build-inputs.compiler-inputs-unattested".to_string()));
     let rt = tokio::runtime::Runtime::new().unwrap();
     rt.block_on(async {
         let store = elohim_epr_cli::payload::open_payload_store(
@@ -397,7 +405,8 @@ fn refusal(
     for item in expected {
         assert!(text(&out).contains(item), "{item}: {}", text(&out));
     }
-    assert!(text(&out).contains(REACH));
+    // An unrecorded put derives no reach and prints no banner.
+    assert!(!text(&out).contains(PENDING) && !text(&out).contains("reach: "));
     f.absent(&d, &input);
 }
 #[test]

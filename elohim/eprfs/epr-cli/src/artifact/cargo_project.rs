@@ -59,7 +59,7 @@ pub(super) fn metadata(
 }
 
 // K6's pinned build closure must enumerate script/proc-macro inputs and capture registry
-// source trees to close these two gaps. K12, blocked on H12, closes reach.
+// source trees to close these two gaps. Each caps the record's derived reach at `self` (K12).
 pub(super) const SCRIPTS_GAP: &str = "build-inputs.build-scripts";
 pub(super) const SOURCES_GAP: &str = "build-inputs.dependency-sources";
 // Close only when put runs the build, or an ark build receipt binds compiler inputs to the
@@ -102,7 +102,7 @@ pub(super) fn checklist(
     descriptor: &MethodDescriptor,
     missing: &mut Vec<String>,
 ) -> Vec<String> {
-    let mut gaps = vec!["reach".to_string(), COMPILER_GAP.to_string()];
+    let mut gaps = vec![COMPILER_GAP.to_string()];
     let crate_path = repo.join(
         descriptor
             .non_path_inputs

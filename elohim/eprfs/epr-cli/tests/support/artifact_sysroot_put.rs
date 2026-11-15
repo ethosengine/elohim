@@ -62,7 +62,11 @@ fn sysroot_put_then_output_fetch(with_requires: bool) {
     }
     let put = command.output().unwrap();
     assert!(put.status.success(), "{}", text(&put));
-    assert!(String::from_utf8_lossy(&put.stderr).starts_with("reach: pending, not enforced\n"));
+    assert!(
+        String::from_utf8_lossy(&put.stderr).contains("reach: self\n"),
+        "{}",
+        text(&put)
+    );
     let recorded: serde_json::Value = serde_json::from_slice(&put.stdout).unwrap();
     assert_eq!(recorded["output"], output.to_string());
     let verified = elohim_epr_cli::artifact::sysroot::verify(&bytes).unwrap();
@@ -109,7 +113,8 @@ fn sysroot_put_then_output_fetch(with_requires: bool) {
         .filter(|s| s.starts_with("env:gaps="))
         .map(String::as_str)
         .collect();
-    assert_eq!(gaps, ["env:gaps=reach"]);
+    // A floor has no open gap, so its Produce carries no env:gaps slot (K12 dropped `reach`).
+    assert!(gaps.is_empty(), "{gaps:?}");
 
     assert!(produces[0]
         .classified_as

@@ -40,7 +40,7 @@ use eprfs_peer::{
     ensure_queue_dir, fetch_cancel_path, fetch_done_path, fetch_queue_dir, fetch_request_path,
     key_cid, put_local_blob_with, put_method_record, read_queue_file, resolve_holders,
     resolve_output_holders, write_queue_file, Bytes, FetchAuthority, FetchDone, FetchFor, FetchGap,
-    FetchRequest, FetchTransport, LocalBlobContext, ARTIFACT_PRODUCE_KIND,
+    FetchRequest, FetchTransport, HeadTable, LocalBlobContext, Rules, ARTIFACT_PRODUCE_KIND,
     ARTIFACT_PRODUCE_MEASURE, FETCH_STALL, FETCH_TOTAL,
 };
 use serde::Serialize;
@@ -55,6 +55,7 @@ mod extract;
 mod generated;
 mod inputs;
 mod preflight;
+mod reach;
 mod requires;
 #[cfg(test)]
 use requires::read_requires;
@@ -112,8 +113,9 @@ pub fn usage() -> String {
      (the derivation key at HEAD; exits 3 when the view has uncommitted changes)\n  \
      | put --method FILE --input CID --bytes PATH --project P [--commit SHA] [--duration-ms N] \
      [--requires FILE.json] [--repository NAME] [--cross] [--repo ROOT] [--payload-store DIR] [--json] \
-     (record a built artifact: descriptor, brit build attestation, one custody Produce that \
-     crosses with --cross; extracts ELF Requires and evidence; --requires may only tighten; \
+     (record a built artifact: descriptor, brit build attestation, one custody Produce carrying \
+     the reach derived from its inputs (self or private, never an argument) that crosses with \
+     --cross unless private; extracts ELF Requires and evidence; --requires may only tighten; \
      Requires and evidence are stored locally, not yet served to siblings (K3 part 2: \
      explicit default-deny disclosure permission with admit, following K6 slice 1); \
      exits 3 `unrecorded: <reason>`)\n  \
@@ -141,12 +143,6 @@ pub fn usage() -> String {
 /// Entry point for `epr artifact …`.
 pub fn run(args: &[String]) -> ArtifactResult<ExitCode> {
     let verb = args.first().map(String::as_str);
-    if matches!(verb, Some("describe" | "put"))
-        || (verb == Some("sysroot") && args.get(1).map(String::as_str) == Some("put"))
-    {
-        eprintln!("{}", preflight::REACH);
-    }
-
     if matches!(verb, Some("--help" | "-h" | "help")) {
         println!("{}", usage());
         return Ok(ExitCode::SUCCESS);
@@ -1073,6 +1069,8 @@ struct Recorded {
     bytes: u64,
     commit: String,
     agent_id: String,
+    /// The derived reach (`self` or `private`), as the Produce's `env:reach` slot names it.
+    reach: &'static str,
     crosses: bool,
 }
 
@@ -1166,6 +1164,37 @@ fn served_store_matches(payload_dir: &Path) -> ArtifactResult<()> {
             ours.display(),
             recorded.display()
         )))
+    }
+}
+
+/// Why this device's running `epr peer serve` cannot be confirmed to enforce the reach gate, or
+/// `None` when it can (or when no daemon serves, or the running one loaded no policy and so serves
+/// no artifact). The daemon exposes no gate version of its own; its head table records the digest
+/// of the rules it loaded, and that digest covers the gate semantics version (T17). A digest equal
+/// to this binary's digest of the same policy file confirms the semantics; anything else is
+/// unconfirmed (an older daemon, a newer one, or a policy edit not yet reloaded). A warning only:
+/// a pre-K12 daemon serving a `private` record is the design's residual T16, not closed here.
+fn reach_gate_unconfirmed() -> Option<String> {
+    let peer_dir = peer::peer_dir().ok()?;
+    if ServeLock::held(&peer_dir) != Some(true) {
+        return None;
+    }
+    let loaded = match HeadTable::load(&peer_dir) {
+        Ok(table) => table.rules?,
+        Err(e) => return Some(format!("its head table does not read: {e}")),
+    };
+    match Rules::from_policy_file(&loaded.policy) {
+        Ok(rules) if rules.digest().as_str() == loaded.digest.as_str() => None,
+        Ok(rules) => Some(format!(
+            "its loaded rules digest {} is not this epr's digest {} of the same policy {}",
+            loaded.digest.short(),
+            rules.digest().short(),
+            loaded.policy.display()
+        )),
+        Err(e) => Some(format!(
+            "its policy {} does not read here: {e}",
+            loaded.policy.display()
+        )),
     }
 }
 
@@ -1265,6 +1294,30 @@ fn record_artifact(
     let flow = SidecarFlowStore::open(&flow_root).map_err(unrecorded)?;
     let mut transaction = flow.transaction().map_err(unrecorded)?;
     let previous = transaction.records().map_err(unrecorded)?;
+    // Reach is derived from what was hashed into the key and the method, never from an argument
+    // or the environment (K12 §2, T8). A recorded artifact the method names is read from this
+    // device's own flow log, under the same lock.
+    let hashed = match (sysroot_manifest, key.input_lines.as_deref()) {
+        (Some(manifest), None) => reach::Hashed::Floor(manifest),
+        (None, Some(document)) => reach::Hashed::Document(document),
+        _ => {
+            return Err(unrecorded(
+                "the key has no single input to classify for reach",
+            ))
+        }
+    };
+    let held: Vec<&elohim_epr_rea::FlowEvent> = previous
+        .iter()
+        .filter_map(|(_, record)| match record {
+            elohim_epr_rea::FlowRecord::Event(event) => Some(event),
+            _ => None,
+        })
+        .collect();
+    let derived = reach::derive_reach(hashed, &key.input, descriptor, project, gaps, &held);
+    // A private record's Produce does not cross, even with --cross (ruling Q2): a crossed event
+    // tells the person's other devices its output, key and commit.
+    let private = derived.reach == elohim_epr::Reach::Private;
+    let crosses = options.cross && !private;
     // The runtime the put runs on: a blob-store payload backend is opened inside it (shared: the
     // serving daemon, when up, is the store's owner).
     let runtime = tokio::runtime::Builder::new_current_thread()
@@ -1292,7 +1345,7 @@ fn record_artifact(
         custodian: AgentRef(device),
         in_scope_of: scope,
         occurred_at: chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true),
-        crossing: options.cross.then(|| {
+        crossing: crosses.then(|| {
             (
                 ARTIFACT_PRODUCE_MEASURE.to_string(),
                 ARTIFACT_PRODUCE_KIND.to_string(),
@@ -1314,9 +1367,10 @@ fn record_artifact(
         format!("env:bytes={byte_len}"),
         format!("env:commit={}", key.head),
         format!("env:agentId={agent_id}"),
+        // Exactly one reach slot per custody Produce, for every recorder (K12).
+        derived.slot(),
     ];
-    // Reach is pending for every recorder, including sysroot archives (K12, pending H12).
-    extra.push(preflight::gap_annotation(gaps));
+    extra.extend(preflight::gap_annotation(gaps));
     if let Some((cid, _)) = &requires {
         extra.push(format!("env:requires={cid}"));
     }
@@ -1422,8 +1476,28 @@ fn record_artifact(
         bytes: byte_len,
         commit: key.head.clone(),
         agent_id,
-        crosses: options.cross,
+        reach: reach::level_name(derived.reach),
+        crosses,
     };
+    eprintln!("reach: {}", recorded.reach);
+    for why in &derived.narrowed_by {
+        eprintln!("reach: private because of {why}");
+    }
+    if private && options.cross {
+        eprintln!(
+            "reach: private records do not cross: --cross was given, and this Produce stays on \
+             this device"
+        );
+    }
+    if private {
+        if let Some(why) = reach_gate_unconfirmed() {
+            eprintln!(
+                "reach: warning: this device's epr peer serve may predate the reach gate ({why}); \
+                 a daemon that does serves this private record through its method's serves row; \
+                 restart epr peer serve with this epr"
+            );
+        }
+    }
     if options.json {
         println!("{}", serde_json::to_string_pretty(&recorded)?);
     } else {

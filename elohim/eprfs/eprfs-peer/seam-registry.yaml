@@ -850,7 +850,7 @@ decisionPoints:
         justification: "Default deny; no admit-on-error path; an unloaded policy is Unavailable and never an empty list."
       - id: C13
         status: partial
-        justification: "H12 (reach on the object) is implemented for one relationship, the person's own devices: a self record discloses at its reach. Every level above self refuses until the ladder is built, and private material is detected only by what the K12 writer (packet 3, not yet landed) classifies."
+        justification: "H12 (reach on the object) is implemented for one relationship, the person's own devices: a self record discloses at its reach. Every level above self refuses until the ladder is built, and private material is detected only by what the K12 writer (epr-cli derive_reach) classifies."
       - id: C14
         status: partial
         justification: "Refusals are counted and recorded locally, not witnessed."
@@ -875,7 +875,7 @@ decisionPoints:
       - { id: C5, status: answered, justification: "Index and on-demand validation check manifest/output reconstruction; request checks output/key, and the client retains ManifestRejected." }
       - { id: C6a, status: partial, justification: "Frame, concurrency and byte budgets persist. Full index entries and rebuild validation follow distinct outputs; the claim map holds one entry per distinct own manifest, folded in one pass per rebuild; the on-demand cache is capped at four full records and cleared on rebuild." }
       - { id: C6b, status: answered, justification: "Rebuild deduplicates manifests and replaces the claim map whole; repeat requests do not create Produce records. Serve sessions bind requester and manifest." }
-      - { id: C7, status: partial, justification: "A crossed holder manifest stays selectable even when another record has the same output/key. A holder may be listed for a record it then refuses; suppressing private records from crossing is packet 3's." }
+      - { id: C7, status: partial, justification: "A crossed holder manifest stays selectable even when another record has the same output/key. A holder may be listed for a record it then refuses; the K12 writer does not cross a private record's Produce (epr-cli derive_reach), which closes the main case." }
       - { id: C8, status: answered, justification: "Each completed or partial serve records gate:reach or gate:row; each admitted refusal records its true reason (serve-reach:private, serve-reach:unreadable, serve-policy:unavailable, serve-blob:<method>, ...). epr peer status reports reachDraws, rowDraws and slotlessDesignated over 14 days as artifactGate." }
       - { id: C9, status: answered, justification: "Authenticated roster device admission is reused without a new identity store, and re-read before any byte is read." }
       - { id: C10, status: answered, justification: "A distinct Record wire variant makes older servers reject, rather than silently ignore an optional record binding. Slotless records keep the method-row rule, so no answer changes until a writer records a slot; the rules digest names the gate semantics version (T17). A pre-K12 daemon still ignores slots (T16, residual)." }
@@ -917,7 +917,7 @@ decisionPoints:
       - { id: C5, status: answered, justification: "A slot is evidence only from this device's own custody events; a folded (via:) or foreign-custodian Produce contributes no claim." }
       - { id: C6a, status: answered, justification: "One map read and one serves-row read per decision; the fold is one pass over events per rebuild." }
       - { id: C6b, status: answered, justification: "Read-only; reach_claims returns a fresh map each call." }
-      - { id: C7, status: partial, justification: "A holder may still be listed for a record it then refuses; suppressing private records from crossing (packet 3) closes the main case." }
+      - { id: C7, status: partial, justification: "A holder may still be listed for a record it then refuses; the K12 writer suppressing private records from crossing (epr-cli derive_reach) closes the main case." }
       - { id: C8, status: answered, justification: "Every outcome is a typed Basis or Deny; Basis::slot names the serve event's gate:reach or gate:row, and deny_reason the refusal's true local reason (private and unreadable told apart from the claim)." }
       - { id: C9, status: answered, justification: "The caller passes admission as read at the request; a device the roster drops is Relationship::None at its next request." }
       - { id: C10, status: answered, justification: "Slotless records keep the pre-K12 method-row rule unchanged, so no answer changes until a writer records a slot." }

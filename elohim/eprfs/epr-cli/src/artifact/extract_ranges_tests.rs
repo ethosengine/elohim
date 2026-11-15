@@ -84,24 +84,19 @@ fn artifact_partial_decode_preflight_gap_reaches_produce_annotation() {
     let code = [0xff, 0xe0, 0xc5, 0xfd, 0xef, 0xc0, 0xc3, 6];
     let bytes = sized(&code, code.len() as u64);
     let mut gaps = vec![
-        "reach".into(),
         "build-inputs.build-scripts".into(),
-        "reach".into(),
+        "build-inputs.build-scripts".into(),
     ];
     for _ in 0..2 {
         preflight::requires_gaps(&bytes, Path::new("partial.elf"), None, &mut gaps).unwrap();
     }
     assert_eq!(
         gaps,
-        [
-            "build-inputs.build-scripts",
-            preflight::PARTIAL_DECODE_GAP,
-            "reach"
-        ]
+        ["build-inputs.build-scripts", preflight::PARTIAL_DECODE_GAP]
     );
     assert_eq!(
-        preflight::gap_annotation(&gaps),
-        "env:gaps=build-inputs.build-scripts,isa.x86.partial-decode,reach"
+        preflight::gap_annotation(&gaps).as_deref(),
+        Some("env:gaps=build-inputs.build-scripts,isa.x86.partial-decode")
     );
     let result = extract(Path::new("partial.elf"), &bytes).unwrap();
     assert_eq!(
@@ -123,10 +118,11 @@ fn artifact_partial_decode_preflight_gap_reaches_produce_annotation() {
 fn artifact_complete_decode_preflight_has_no_partial_gap() {
     use crate::artifact::preflight;
     let bytes = sized(&[0xc3], 1);
-    let mut gaps = vec!["reach".into()];
+    let mut gaps = Vec::new();
     preflight::requires_gaps(&bytes, Path::new("complete.elf"), None, &mut gaps).unwrap();
-    assert_eq!(gaps, ["reach"]);
-    assert_eq!(preflight::gap_annotation(&gaps), "env:gaps=reach");
+    assert!(gaps.is_empty(), "{gaps:?}");
+    // No open gap is no `env:gaps` slot; reach is no longer a gap (K12).
+    assert_eq!(preflight::gap_annotation(&gaps), None);
 }
 
 #[test]

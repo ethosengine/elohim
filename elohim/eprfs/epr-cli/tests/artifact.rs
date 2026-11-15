@@ -1413,6 +1413,9 @@ mod requires;
 #[path = "support/artifact_sysroot_put.rs"]
 mod sysroot_put;
 
+#[path = "support/artifact_reach.rs"]
+mod reach;
+
 #[path = "support/artifact_inputs.rs"]
 mod inputs;
 

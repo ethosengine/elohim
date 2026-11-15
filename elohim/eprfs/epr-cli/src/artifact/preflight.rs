@@ -3,9 +3,8 @@
 use super::*;
 use object::Object;
 
-// The unconditional declared gap: K12 is blocked on H12. Dependency gaps are detected
-// separately by cargo_project. Never claim env:reach from this observation.
-pub(super) const REACH: &str = "reach: pending, not enforced";
+// Reach is no gap: `record_artifact` derives it from the record's inputs (K12, `reach.rs`).
+// Dependency gaps are detected separately by cargo_project.
 // Admission owns this gap: partial extraction is evidence, never a refusal or ISA clause.
 pub(super) const PARTIAL_DECODE_GAP: &str = "isa.x86.partial-decode";
 const COMPILER: &str = "missing build-inputs: compiler/linker inputs incomplete";
@@ -53,7 +52,7 @@ pub(super) fn repository_scope(options: &Options) -> ArtifactResult<cid::Cid> {
 /// Independent checks continue after a failure; dependent checks report the absent prerequisite.
 pub(super) fn check(options: &Options, descriptor: &MethodDescriptor) -> ArtifactResult<Prepared> {
     let mut missing = Vec::new();
-    let mut gaps = vec!["reach".to_string()];
+    let mut gaps = Vec::new();
     if descriptor.name != MESH_BUILD {
         // No adapter proves even conditional applicability for an unknown recipe. An ELF alone
         // cannot establish its recipe, family, target realization or dispatch provenance.
@@ -232,17 +231,17 @@ pub(super) fn requires_gaps(
     Ok(())
 }
 
-/// The Produce annotation shared by executable and archive recording.
-pub(super) fn gap_annotation(gaps: &[String]) -> String {
+/// The Produce annotation shared by executable and archive recording; `None` when no gap is open,
+/// so a record with none carries no `env:gaps` slot.
+pub(super) fn gap_annotation(gaps: &[String]) -> Option<String> {
     let mut gaps = gaps.to_vec();
-    gaps.push("reach".into());
     gaps.sort();
     gaps.dedup();
-    format!("env:gaps={}", gaps.join(","))
+    (!gaps.is_empty()).then(|| format!("env:gaps={}", gaps.join(",")))
 }
 
 pub(super) fn print_gaps(gaps: &[String]) {
-    for gap in gaps.iter().filter(|g| *g != "reach") {
+    for gap in gaps {
         eprintln!("{gap}: pending, not enforced");
     }
 }

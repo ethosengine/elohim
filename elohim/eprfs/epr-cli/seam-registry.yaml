@@ -2521,6 +2521,43 @@ decisionPoints:
   - { path: elohim/eprfs/epr-cli/tests/support/artifact_inputs.rs, testName: inputs_diff_selects_newest_same_commit_in_cid_fold_order_and_prints_provenance, kind: integration }
   - { path: elohim/eprfs/epr-cli/tests/support/artifact_inputs.rs, testName: inputs_diff_without_same_commit_refuses_with_five_candidates_and_literal_key_hint, kind: integration }
   - { path: elohim/eprfs/epr-cli/tests/support/artifact_inputs.rs, testName: inputs_diff_equal_produce_times_with_different_inputs_refuses_both_candidates, kind: integration }
+- name: derive_reach
+  kind: pure-decision-predicate
+  sourceLocation: { file: src/artifact/reach.rs, modulePath: elohim_epr_cli::artifact::reach::derive_reach }
+  summary: "K12 packet 3, the writer: the narrowest reach among everything hashed into a record's derivation key (the input document line by line, or the verified floor manifest) and its method descriptor, written once as env:reach=<level> on the custody Produce that epr artifact put and sysroot put record. Each line grammar the mesh-build writer emits (view lines for the descriptor's own view paths, cargo-config, cargo-home, tool, link) and the descriptor's tools, flags and build environment are self; floor members of a verified manifest are self; a named recorded artifact (target.sysroot) takes the narrowest claim this device holds for it. Anything with no class (an unknown line, a view-shaped line outside the view, an unknown recipe kind, params/exec/embedder, a stray floor key) and an empty input set make the record private. An open build-inputs.* gap caps it at self and never makes it private (Q4); nothing above self is derived (Q1). A private record's Produce drops the crossing slots even with --cross (Q2), and put says so on its own line. reach is no longer a declared gap; a record with no open gap carries no env:gaps slot."
+  concernIds:
+  - { id: C0, status: answered, justification: "Classifies bytes the put already hashed; adds one slot to an existing custody Produce and no record, head or store." }
+  - { id: C1, status: answered, justification: "No flag, environment variable or descriptor value names a level (T8): the inputs are the key's own bytes and the descriptor's field structure. Unknown arguments are refused; a build-environment value named reach is an input of class self." }
+  - { id: C2, status: n-a, justification: "No head order. The gate folds several slots of one manifest to the narrowest." }
+  - { id: C3, status: answered, justification: "Pure and synchronous over bytes in memory; the recorded-artifact lookup reads the flow records already read under the put's flow lock." }
+  - { id: C4, status: answered, justification: "Private is recorded, not refused; put names the level and each input that made it private, and says on its own line that a private record does not cross." }
+  - { id: C5, status: answered, justification: "The input document is checked to hash to the key's input CID and the floor manifest to reproduce from the payload before classification; a floor whose key or method names another manifest is private." }
+  - { id: C6a, status: answered, justification: "One pass over the input lines, the descriptor and, only for a named artifact, the flow records in memory." }
+  - { id: C6b, status: answered, justification: "A re-put of the same derivation is the same event and is not appended, so a manifest gains no second slot from it." }
+  - { id: C7, status: answered, justification: "A private record's Produce carries no measure or reason slot, so the crossing allow-list never admits it and siblings learn neither its output, key nor commit (T14)." }
+  - { id: C8, status: answered, justification: "The printed level and reasons, the JSON reach field and the slot itself are the explanation; no stored reach-evidence document is added." }
+  - { id: C9, status: n-a, justification: "No identity is read or compared." }
+  - { id: C10, status: answered, justification: "The slot value is elohim_epr::Reach's serde name, tested against the gate's REACH_LEVELS. A pre-K12 daemon ignores the slot (T16, residual): put warns for a private record when the running daemon's loaded rules digest is not this binary's digest of the same policy, the only gate-semantics evidence the daemon exposes." }
+  - { id: C11, status: n-a, justification: "No fan-out." }
+  - { id: C12, status: answered, justification: "Default private: the classifier has no catch-all that returns a reach, the descriptor is destructured whole, and an empty input set is private; comparison is on openness, never on declaration order (T9, T10)." }
+  - { id: C13, status: partial, justification: "Derives self or private only; the ladder above self and attributed public floors wait on the package-attribution node. Committed source is uniformly self: no path-level private declaration exists yet (missing node, design 2.6)." }
+  - { id: C14, status: partial, justification: "The derived level is recorded locally on the Produce, not witnessed." }
+  contractTests:
+  - { path: elohim/eprfs/epr-cli/tests/support/artifact_reach.rs, testName: a_mesh_build_put_records_reach_self, kind: integration }
+  - { path: elohim/eprfs/epr-cli/tests/support/artifact_reach.rs, testName: a_sysroot_put_records_reach_self, kind: integration }
+  - { path: elohim/eprfs/epr-cli/src/artifact/reach_tests.rs, testName: an_unknown_input_line_makes_the_record_private, kind: unit }
+  - { path: elohim/eprfs/epr-cli/src/artifact/reach_tests.rs, testName: a_view_shaped_line_outside_the_view_is_private, kind: unit }
+  - { path: elohim/eprfs/epr-cli/src/artifact/reach_tests.rs, testName: an_unknown_recipe_kind_is_private, kind: unit }
+  - { path: elohim/eprfs/epr-cli/src/artifact/reach_tests.rs, testName: a_descriptor_field_with_no_class_is_private, kind: unit }
+  - { path: elohim/eprfs/epr-cli/src/artifact/reach_tests.rs, testName: no_inputs_is_private, kind: unit }
+  - { path: elohim/eprfs/epr-cli/src/artifact/reach_tests.rs, testName: derive_reach_never_exceeds_self, kind: unit }
+  - { path: elohim/eprfs/epr-cli/src/artifact/reach_tests.rs, testName: an_open_build_input_gap_caps_reach_at_self, kind: unit }
+  - { path: elohim/eprfs/epr-cli/tests/support/artifact_reach.rs, testName: put_takes_no_reach_from_arguments_or_environment, kind: integration }
+  - { path: elohim/eprfs/epr-cli/tests/support/artifact_reach.rs, testName: a_descriptor_env_named_reach_does_not_change_the_slot, kind: integration }
+  - { path: elohim/eprfs/epr-cli/tests/support/artifact_reach.rs, testName: put_writes_exactly_one_reach_slot, kind: integration }
+  - { path: elohim/eprfs/epr-cli/tests/support/artifact_reach.rs, testName: a_private_put_does_not_cross_even_with_cross, kind: integration }
+  - { path: elohim/eprfs/epr-cli/tests/support/artifact_reach.rs, testName: put_no_longer_declares_the_reach_gap, kind: integration }
+  - { path: elohim/eprfs/epr-cli/tests/support/artifact_reach.rs, testName: a_private_put_warns_unless_the_serving_daemon_is_confirmed_to_gate_reach, kind: integration }
 - name: artifact_requires
   kind: reason-outcome-enum
   sourceLocation: { file: src/artifact/custody.rs, modulePath: elohim_epr_cli::artifact::custody::requires }

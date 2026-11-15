@@ -80,7 +80,6 @@ fn artifact_foreign_dependencies_record_sorted_declared_gaps_through_real_proxie
         "build-inputs.build-scripts",
         "build-inputs.dependency-sources",
         "build-inputs.compiler-inputs-unattested",
-        "reach",
     ] {
         assert!(text(&out).contains(&format!("{gap}: pending, not enforced")));
     }
@@ -95,7 +94,7 @@ fn artifact_foreign_dependencies_record_sorted_declared_gaps_through_real_proxie
     assert!(text(&out).contains("build-inputs.build-scripts: pending, not enforced"));
     assert_eq!(
         gaps(&f),
-        "env:gaps=build-inputs.build-scripts,build-inputs.compiler-inputs-unattested,build-inputs.dependency-sources,reach"
+        "env:gaps=build-inputs.build-scripts,build-inputs.compiler-inputs-unattested,build-inputs.dependency-sources"
     );
 }
 
@@ -167,7 +166,7 @@ fn artifact_mesh_named_foreign_dependencies_use_the_same_rule() {
     );
     assert_eq!(
         gaps(&f),
-        "env:gaps=build-inputs.build-scripts,build-inputs.compiler-inputs-unattested,build-inputs.dependency-sources,reach"
+        "env:gaps=build-inputs.build-scripts,build-inputs.compiler-inputs-unattested,build-inputs.dependency-sources"
     );
 }
 
@@ -309,16 +308,15 @@ fn artifact_destination_failures_leave_no_attestation_or_produce() {
 }
 
 #[test]
-fn artifact_pending_banner_precedes_option_errors() {
+fn artifact_option_errors_print_no_reach_banner() {
+    // Reach is derived at put time (K12); no verb announces a pending reach any longer.
     let _cargo = CARGO.lock().unwrap_or_else(|e| e.into_inner());
     let Some(f) = Foreign::try_new() else { return };
     for verb in ["describe", "put"] {
         let out = f.epr().args([verb, "--unknown", "value"]).output().unwrap();
         let stderr = String::from_utf8_lossy(&out.stderr);
-        assert!(
-            stderr.starts_with("reach: pending, not enforced\n"),
-            "{stderr}"
-        );
+        assert!(!stderr.contains("reach:"), "{stderr}");
+        assert!(stderr.contains("unknown artifact argument"), "{stderr}");
         assert!(!out.status.success());
     }
 }
