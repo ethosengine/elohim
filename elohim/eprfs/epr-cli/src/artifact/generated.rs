@@ -32,9 +32,16 @@
 //! the view); when that listing cannot be read, nothing is left out.
 //!
 //! The excluded bytes never enter the key, so a clean checkout and one with the generated outputs
-//! present key identically. Named residuals: a build script or proc macro in a dependency outside
-//! the view, a compile-time reader that assembles the path without its leaf literal inside a
-//! non-build-script source, a submodule nested inside a submodule (not listed), and an
+//! present key identically. A tracked symlink inside the view that targets, holds or sits inside
+//! an excluded root refuses (`refuse_escaping_symlinks` refuses only targets leaving the view). A
+//! file that does not read (other than absent or not UTF-8) refuses; a manifest that does not
+//! read or parse makes its whole crate build-time code; `package.build` names the build script.
+//!
+//! Named residuals: a build script or proc macro in a dependency outside the view; a compile-time
+//! reader that assembles the path without its leaf literal inside a non-build-script source
+//! (including a module a build script pulls in from another file); a submodule nested inside a
+//! submodule (not listed); non-Rust configuration a build tool reads is not lexed (a
+//! `tauri.conf.json` `frontendDist: "../dist"` beside a tracked package.json would pass); and an
 //! existence-only probe (`Path::exists`) of an empty directory.
 //!
 //! Why not the alternatives: the view format (`eprfs_core::View`) is an antichain of included
@@ -149,7 +156,7 @@ pub(super) fn left_out(
             && match shape {
                 Shape::PackageDist => true,
                 Shape::TsRsBindings => std::fs::read_to_string(repo.join(manifest))
-                    .is_ok_and(|text| text.contains("ts-rs")),
+                    .is_ok_and(|text| depends_on_ts_rs(&text)),
             }
     };
     let mut excluded = BTreeSet::new();
@@ -164,12 +171,115 @@ pub(super) fn left_out(
     }
     let excluded: Vec<String> = excluded.into_iter().collect();
     if !excluded.is_empty() {
-        let Some(files) = view_files(repo, view, gitlinks)? else {
+        let Some(listed) = view_files(repo, view, gitlinks)? else {
             return Ok((Vec::new(), all));
         };
-        refuse_readers(repo, view, &files, &excluded)?;
+        refuse_aliasing_symlinks(repo, &listed.symlinks, &excluded)?;
+        refuse_readers(repo, view, &listed.files, &excluded)?;
     }
     Ok((excluded, refusing))
+}
+
+/// The tracked entries inside the view, checkout-relative.
+struct ViewFiles {
+    /// Regular tracked files.
+    files: Vec<String>,
+    /// Tracked symlinks (mode 120000).
+    symlinks: Vec<String>,
+}
+
+/// Split one `git ls-files -s -z` listing into regular files, symlinks and gitlinks, each
+/// prefixed with `prefix`.
+fn split_staged(listed: &str, prefix: &str, out: &mut ViewFiles, links: &mut BTreeSet<String>) {
+    for entry in listed.split('\0').filter(|p| !p.is_empty()) {
+        // `<mode> <oid> <stage>\t<path>`
+        let Some((meta, path)) = entry.split_once('\t') else {
+            continue;
+        };
+        let path = join(prefix, path);
+        if meta.starts_with("160000 ") {
+            links.insert(path);
+        } else if meta.starts_with("120000 ") {
+            out.symlinks.push(path);
+        } else {
+            out.files.push(path);
+        }
+    }
+}
+
+/// Refuse a tracked symlink inside the view whose target is, holds or sits inside an excluded
+/// root: reading through it reads the ignored bytes under a name the lexical check never sees.
+/// (`refuse_escaping_symlinks` refuses only targets leaving the view; an excluded root is inside
+/// it.) An unreadable link refuses too.
+fn refuse_aliasing_symlinks(
+    repo: &Path,
+    symlinks: &[String],
+    excluded: &[String],
+) -> ArtifactResult<()> {
+    for link in symlinks {
+        let target = std::fs::read_link(repo.join(link)).map_err(|e| {
+            ArtifactError::Gap(format!(
+                "the tracked symlink {link} inside the method's view does not read ({e}), so it \
+                 cannot be shown not to alias an ignored generated output"
+            ))
+        })?;
+        let target = target.to_string_lossy();
+        let dir = link.rsplit_once('/').map_or("", |(dir, _)| dir);
+        let resolved = if target.starts_with('/') {
+            None
+        } else {
+            lexical(&format!("{dir}/{target}"))
+        };
+        let aliased = match &resolved {
+            Some(resolved) => excluded
+                .iter()
+                .find(|root| within(resolved, root) || within(root, resolved)),
+            // An absolute target: left to `refuse_escaping_symlinks`, which refuses it.
+            None => None,
+        };
+        if let Some(root) = aliased {
+            return Err(ArtifactError::Gap(format!(
+                "the tracked symlink {link} inside the method's view points at {target}, which \
+                 reaches the ignored generated output {root}; a build could read it and no \
+                 closure line names it"
+            )));
+        }
+    }
+    Ok(())
+}
+
+/// `[dependencies]`, `[dev-dependencies]`, `[build-dependencies]` or any
+/// `[target.*.…dependencies]` table of a Cargo manifest names `ts-rs` (as its key, or renamed
+/// through `package = "ts-rs"`); a comment or a string elsewhere does not. An unparsable manifest
+/// does not qualify.
+fn depends_on_ts_rs(text: &str) -> bool {
+    let Ok(table) = text.parse::<toml::Table>() else {
+        return false;
+    };
+    const KINDS: [&str; 3] = ["dependencies", "dev-dependencies", "build-dependencies"];
+    let names = |deps: Option<&toml::Value>| {
+        deps.and_then(toml::Value::as_table).is_some_and(|deps| {
+            deps.iter().any(|(key, value)| {
+                key == "ts-rs"
+                    || value
+                        .as_table()
+                        .and_then(|v| v.get("package"))
+                        .and_then(toml::Value::as_str)
+                        == Some("ts-rs")
+            })
+        })
+    };
+    KINDS.iter().any(|kind| names(table.get(*kind)))
+        || table
+            .get("target")
+            .and_then(toml::Value::as_table)
+            .is_some_and(|targets| {
+                targets.values().any(|target| {
+                    target
+                        .as_table()
+                        .is_some_and(|t| KINDS.iter().any(|kind| names(t.get(*kind))))
+                })
+            })
 }
 
 /// Every tracked file inside the view, checkout-relative: the superproject's index and, for each
@@ -180,22 +290,16 @@ fn view_files(
     repo: &Path,
     view: &[String],
     gitlinks: &[String],
-) -> ArtifactResult<Option<Vec<String>>> {
+) -> ArtifactResult<Option<ViewFiles>> {
     let mut args = vec!["ls-files", "-z", "-s", "--full-name", "--"];
     args.extend(view.iter().map(String::as_str));
-    let mut files = Vec::new();
+    let mut out = ViewFiles {
+        files: Vec::new(),
+        symlinks: Vec::new(),
+    };
     let mut links: BTreeSet<String> = gitlinks.iter().cloned().collect();
-    for entry in git_ok(repo, &args)?.split('\0').filter(|p| !p.is_empty()) {
-        // `<mode> <oid> <stage>\t<path>`
-        let Some((meta, path)) = entry.split_once('\t') else {
-            continue;
-        };
-        if meta.starts_with("160000 ") {
-            links.insert(path.to_string());
-        } else {
-            files.push(path.to_string());
-        }
-    }
+    split_staged(&git_ok(repo, &args)?, "", &mut out, &mut links);
+    let mut nested = BTreeSet::new();
     for link in &links {
         let dir = repo.join(link);
         if !dir.join(".git").exists() {
@@ -211,19 +315,14 @@ fn view_files(
                 }
             })
             .collect();
-        let mut args = vec!["ls-files", "-z", "--"];
+        let mut args = vec!["ls-files", "-z", "-s", "--"];
         args.extend(inner.iter().map(String::as_str));
         let Ok(listed) = git_ok(&dir, &args) else {
             return Ok(None);
         };
-        files.extend(
-            listed
-                .split('\0')
-                .filter(|p| !p.is_empty())
-                .map(|p| format!("{link}/{p}")),
-        );
+        split_staged(&listed, link, &mut out, &mut nested);
     }
-    Ok(Some(files))
+    Ok(Some(out))
 }
 
 /// The tracked files among `paths` (`git ls-files`), exactly as named.
@@ -252,10 +351,7 @@ fn refuse_readers(
     files: &[String],
     excluded: &[String],
 ) -> ArtifactResult<()> {
-    let leaves: BTreeSet<&str> = excluded
-        .iter()
-        .map(|root| root.rsplit('/').next().unwrap_or(root))
-        .collect();
+    let mut crates: std::collections::BTreeMap<String, CrateInfo> = Default::default();
     let repo_abs = std::fs::canonicalize(repo)
         .ok()
         .and_then(|p| p.to_str().map(str::to_string));
@@ -268,19 +364,38 @@ fn refuse_readers(
         if !(manifest || name.ends_with(".rs")) {
             continue;
         }
-        let Ok(text) = std::fs::read_to_string(repo.join(file)) else {
-            // Absent (a deletion `git status` reports as dirty) or not UTF-8 (no literal of an
-            // excluded path can be in it as text).
-            continue;
+        // Every file is lexed: a directory-walking macro can name an ancestor of an excluded
+        // root without its leaf name appearing anywhere in the file.
+        let text = match std::fs::read_to_string(repo.join(file)) {
+            Ok(text) => text,
+            // Absent: a deletion `git status` reports as dirty. Not UTF-8: no literal of an
+            // excluded path can be in it as text.
+            Err(e)
+                if matches!(
+                    e.kind(),
+                    std::io::ErrorKind::NotFound | std::io::ErrorKind::InvalidData
+                ) =>
+            {
+                continue
+            }
+            Err(e) => {
+                return Err(ArtifactError::Gap(format!(
+                    "the tracked {file} inside the method's view does not read ({e}), so it \
+                     cannot be shown not to read an ignored generated output"
+                )))
+            }
         };
-        if !leaves.iter().any(|leaf| text.contains(leaf)) {
-            continue;
-        }
         let file_dir = file.rsplit_once('/').map_or("", |(dir, _)| dir);
         let crate_dir = crate_root(repo, file_dir);
+        let info = crates
+            .entry(crate_dir.clone())
+            .or_insert_with(|| crate_info(repo, &crate_dir));
         let reader = if manifest {
             Reader::Manifest
-        } else if name == "build.rs" || is_proc_macro(repo, &crate_dir) {
+        } else if name == "build.rs"
+            || info.runs_at_build
+            || info.build_script.as_deref() == Some(file)
+        {
             Reader::BuildCode
         } else {
             Reader::Source
@@ -326,21 +441,62 @@ fn crate_root(repo: &Path, dir: &str) -> String {
     }
 }
 
-/// The crate at `crate_dir` is a proc-macro crate (its code runs inside the compiler).
-fn is_proc_macro(repo: &Path, crate_dir: &str) -> bool {
-    let Ok(text) = std::fs::read_to_string(repo.join(crate_dir).join("Cargo.toml")) else {
-        return false;
+/// What a crate's manifest says about code that runs at build time.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct CrateInfo {
+    /// Every source of the crate runs at build time: a proc-macro crate, or a manifest that does
+    /// not read or parse (fail closed).
+    runs_at_build: bool,
+    /// The build script's checkout-relative path: `package.build` when it is a path, else
+    /// `build.rs` at the crate root; `None` when `build = false`.
+    build_script: Option<String>,
+}
+
+fn crate_info(repo: &Path, crate_dir: &str) -> CrateInfo {
+    let default_script = Some(join(crate_dir, "build.rs"));
+    let text = match std::fs::read_to_string(repo.join(crate_dir).join("Cargo.toml")) {
+        Ok(text) => text,
+        // No manifest at all: the checkout root outside any crate.
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            return CrateInfo {
+                runs_at_build: false,
+                build_script: default_script,
+            }
+        }
+        Err(_) => {
+            return CrateInfo {
+                runs_at_build: true,
+                build_script: default_script,
+            }
+        }
     };
-    text.parse::<toml::Table>().is_ok_and(|table| {
-        table
-            .get("lib")
-            .and_then(toml::Value::as_table)
-            .is_some_and(|lib| {
-                ["proc-macro", "proc_macro"]
-                    .iter()
-                    .any(|key| lib.get(*key).and_then(toml::Value::as_bool) == Some(true))
-            })
-    })
+    let Ok(table) = text.parse::<toml::Table>() else {
+        return CrateInfo {
+            runs_at_build: true,
+            build_script: default_script,
+        };
+    };
+    let proc_macro = table
+        .get("lib")
+        .and_then(toml::Value::as_table)
+        .is_some_and(|lib| {
+            ["proc-macro", "proc_macro"]
+                .iter()
+                .any(|key| lib.get(*key).and_then(toml::Value::as_bool) == Some(true))
+        });
+    let build_script = match table
+        .get("package")
+        .and_then(toml::Value::as_table)
+        .and_then(|package| package.get("build"))
+    {
+        Some(toml::Value::String(path)) => lexical(&format!("{crate_dir}/{path}")),
+        Some(toml::Value::Boolean(false)) => None,
+        _ => default_script,
+    };
+    CrateInfo {
+        runs_at_build: proc_macro,
+        build_script,
+    }
 }
 
 /// How a tracked file can read paths when cargo builds the view.
@@ -365,6 +521,11 @@ struct Literal {
     /// Inside a macro invocation or an attribute (`name!(…)`, `#[…]`), where a compile-time
     /// reader takes its path; a runtime `Path::join("..")` is not.
     in_macro: bool,
+    /// The first argument of a macro invocation (`include_dir!("web")`) or an attribute value
+    /// (`#[folder = "."]`): where a directory-walking macro takes the directory it embeds, so a
+    /// bare name (no `/`) resolved against the crate root can walk onto an excluded root's
+    /// ancestor.
+    walk_arg: bool,
 }
 
 /// The excluded root `literal` reaches, if any (see the module docs for the resolution rules).
@@ -377,6 +538,7 @@ fn named_root(
     reader: Reader,
 ) -> Option<String> {
     let in_macro = literal.in_macro || reader == Reader::BuildCode;
+    let walk_arg = literal.walk_arg;
     let literal = literal.text.as_str();
     if literal.is_empty() || literal.len() > 4096 || literal.contains('\n') {
         return None;
@@ -394,7 +556,7 @@ fn named_root(
     // crate root, which `include_dir!` and rust-embed's `#[folder]` resolve against, and an
     // absolute path), where a path-shaped literal onto an ancestor of an excluded root reads it
     // too. Every other resolution refuses only a literal into one.
-    let path_shaped = literal.contains('/') && reader != Reader::Manifest && in_macro;
+    let path_shaped = (literal.contains('/') || walk_arg) && reader != Reader::Manifest && in_macro;
     let mut resolved = Vec::new();
     if let Some(rest) = literal.strip_prefix("$CARGO_MANIFEST_DIR") {
         resolved.push((
@@ -437,6 +599,7 @@ fn toml_strings(text: &str) -> Vec<Literal> {
             toml::Value::String(s) => out.push(Literal {
                 text: s.clone(),
                 in_macro: false,
+                walk_arg: false,
             }),
             toml::Value::Array(items) => items.iter().for_each(|item| walk(item, out)),
             toml::Value::Table(table) => table.values().for_each(|item| walk(item, out)),
@@ -453,6 +616,17 @@ fn toml_strings(text: &str) -> Vec<Literal> {
     }
 }
 
+/// One open delimiter of a Rust source.
+#[derive(Debug, Clone, Copy, Default)]
+struct Frame {
+    /// At or inside a macro invocation or attribute.
+    in_macro: bool,
+    /// At or inside an attribute (`#[…]`, `#![…]`).
+    in_attr: bool,
+    /// This delimiter opened a macro invocation (`name!(`).
+    opened_by_macro: bool,
+}
+
 /// The string literals of a Rust source (`"…"`, `b"…"`, `r#"…"#`), comments skipped. Escapes are
 /// kept as written except `\"` and `\\`; a path literal needs neither.
 fn rust_string_literals(text: &str) -> Vec<Literal> {
@@ -460,14 +634,20 @@ fn rust_string_literals(text: &str) -> Vec<Literal> {
     let mut out = Vec::new();
     let mut i = 0;
     let ident = |c: char| c.is_alphanumeric() || c == '_';
-    // One frame per open delimiter: whether it is (inside) a macro invocation or attribute.
-    let mut frames: Vec<bool> = Vec::new();
-    // The last significant character outside literals and comments.
+    // One frame per open delimiter.
+    let mut frames: Vec<Frame> = Vec::new();
+    // The last two significant characters outside literals and comments.
     let mut last = ' ';
+    let mut before_last = ' ';
     while i < chars.len() {
         let c = chars[i];
         let next = chars.get(i + 1).copied();
-        let in_macro = frames.last().copied().unwrap_or(false);
+        let frame = frames.last().copied().unwrap_or_default();
+        let in_macro = frame.in_macro;
+        // The first token inside a delimiter a macro opened, or the value after `=` in an
+        // attribute.
+        let walk_arg = (frame.opened_by_macro && matches!(last, '(' | '[' | '{'))
+            || (frame.in_attr && last == '=');
         match c {
             '/' if next == Some('/') => {
                 while i < chars.len() && chars[i] != '\n' {
@@ -521,8 +701,10 @@ fn rust_string_literals(text: &str) -> Vec<Literal> {
                 out.push(Literal {
                     text: chars[start..end].iter().collect(),
                     in_macro,
+                    walk_arg,
                 });
                 i = end + 1 + hashes;
+                before_last = last;
                 last = '"';
             }
             '"' => {
@@ -547,8 +729,10 @@ fn rust_string_literals(text: &str) -> Vec<Literal> {
                 out.push(Literal {
                     text: literal,
                     in_macro,
+                    walk_arg,
                 });
                 i += 1;
+                before_last = last;
                 last = '"';
             }
             '\'' => {
@@ -567,17 +751,26 @@ fn rust_string_literals(text: &str) -> Vec<Literal> {
                 }
             }
             '(' | '[' | '{' => {
-                frames.push(in_macro || last == '!' || (c == '[' && last == '#'));
+                let attr = c == '[' && (last == '#' || (last == '!' && before_last == '#'));
+                let by_macro = last == '!' && !attr;
+                frames.push(Frame {
+                    in_macro: in_macro || by_macro || attr,
+                    in_attr: frame.in_attr || attr,
+                    opened_by_macro: by_macro,
+                });
+                before_last = last;
                 last = c;
                 i += 1;
             }
             ')' | ']' | '}' => {
                 frames.pop();
+                before_last = last;
                 last = c;
                 i += 1;
             }
             _ => {
                 if !c.is_whitespace() {
+                    before_last = last;
                     last = c;
                 }
                 i += 1;
@@ -617,6 +810,22 @@ mod tests {
         assert_eq!(
             literals.iter().map(|l| l.in_macro).collect::<Vec<_>>(),
             vec![true, false, false, false]
+        );
+        let args = rust_string_literals(
+            "#![doc = \"d\"] #[folder = \".\"] struct A; include_dir!(\"web\"); \
+             assert_eq!(x, \"..\"); #[cfg(feature = \"f\")] fn g() {}",
+        );
+        assert_eq!(
+            args.iter()
+                .map(|l| (l.text.as_str(), l.walk_arg))
+                .collect::<Vec<_>>(),
+            vec![
+                ("d", true),
+                (".", true),
+                ("web", true),
+                ("..", false),
+                ("f", true)
+            ]
         );
         let nested = rust_string_literals(
             "#[folder = \"../app\"] struct A; let p = root.join(\"../..\"); \
@@ -669,6 +878,7 @@ mod tests {
             let literal = Literal {
                 text: literal.to_string(),
                 in_macro,
+                walk_arg: false,
             };
             named_root(
                 &literal,
@@ -702,6 +912,26 @@ mod tests {
         assert!(hit("dist", src, krate, false).is_none());
         assert!(hit("../../epr-ts/src/generated/", src, krate, false).is_none());
         assert!(hit(".", src, krate, false).is_none());
+        // As a walking macro's argument or an attribute value a bare name resolves against the
+        // crate root: `#[folder = "."]` embeds the crate, its bindings/ included.
+        let bindings = vec!["elohim/epr/bindings".to_string()];
+        let walk = |literal: &str, walk_arg: bool| {
+            named_root(
+                &Literal {
+                    text: literal.to_string(),
+                    in_macro: true,
+                    walk_arg,
+                },
+                "elohim/epr/src",
+                "elohim/epr",
+                Some("/repo"),
+                &bindings,
+                Reader::Source,
+            )
+        };
+        assert!(walk(".", true).is_some());
+        assert!(walk(".", false).is_none());
+        assert!(walk("src", true).is_none());
         // A build script's bare leaf name does: it can join the path from pieces.
         assert!(hit("dist", krate, krate, true).is_some());
         // A manifest's path dependency on the package's directory does not; a path into it does.
@@ -710,6 +940,7 @@ mod tests {
                 &Literal {
                     text: literal.to_string(),
                     in_macro: false,
+                    walk_arg: false,
                 },
                 krate,
                 krate,

@@ -2476,7 +2476,7 @@ decisionPoints:
     - { id: C2, status: answered, justification: "Excluded bytes never enter the key lines, so a clean checkout and one holding the generated outputs key identically; the refusal stays the default for every other ignored path." }
     - { id: C3, status: answered, justification: "Bounded git ls-files calls (two, plus one per submodule the view reaches); only tracked .rs/Cargo.toml files in the view that contain an excluded leaf name are lexed; literals over 4096 bytes are skipped." }
     - { id: C4, status: answered, justification: "A naming source refuses with the output, the source file and the literal; a non-shape ignored path refuses with the existing message." }
-    - { id: C5, status: partial, justification: "The no-reader proof is lexical: a non-build-script compile-time reader assembling the path without its leaf literal, a reader in a dependency outside the view, and a submodule nested in a submodule and an existence-only probe of an empty directory are named residuals in the module docs." }
+    - { id: C5, status: partial, justification: "The no-reader proof is lexical over Rust sources and Cargo manifests: a non-build-script compile-time reader assembling the path without its leaf literal, a reader in a dependency outside the view, a submodule nested in a submodule, non-Rust configuration readers (e.g. a tauri.conf.json frontendDist naming ../dist beside a tracked package.json) and an existence-only probe of an empty directory are named residuals in the module docs. A tracked in-view symlink aliasing an excluded root refuses (refuse_escaping_symlinks only covers targets leaving the view); unreadable files, links and manifests fail closed." }
     - { id: C6a, status: answered, justification: "Work is linear in tracked files of the view; no allocation proportional to excluded bytes." }
     - { id: C6b, status: answered, justification: "Pure apart from reads; no write on any path." }
     - { id: C7, status: n-a, justification: "No serving surface." }
@@ -2492,6 +2492,8 @@ decisionPoints:
     - { path: elohim/eprfs/epr-cli/tests/artifact.rs, testName: an_ignored_file_outside_the_generated_shapes_still_refuses, kind: integration }
     - { path: elohim/eprfs/epr-cli/tests/artifact.rs, testName: a_tracked_source_naming_a_generated_output_refuses, kind: integration }
     - { path: elohim/eprfs/epr-cli/tests/artifact.rs, testName: a_submodule_in_the_view_is_read_for_names_of_a_generated_output, kind: integration }
+    - { path: elohim/eprfs/epr-cli/tests/artifact.rs, testName: a_directory_walking_embed_of_a_generated_outputs_package_refuses, kind: integration }
+    - { path: elohim/eprfs/epr-cli/tests/artifact.rs, testName: a_tracked_symlink_aliasing_a_generated_output_refuses, kind: integration }
     - { path: elohim/eprfs/epr-cli/src/artifact/generated.rs, testName: literals_resolve_into_or_onto_an_excluded_root, kind: unit }
 
 - name: newest_record

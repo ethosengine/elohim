@@ -974,12 +974,23 @@ fn an_ignored_file_outside_the_generated_shapes_still_refuses() {
     generated_outputs_checkout(&a);
     let (method, _) = method_file(scratch.path(), &["crate", "pkg"]);
     write_ignored(&a, "pkg/dist/index.js");
+    // A manifest that mentions ts-rs only in a comment is no ts-rs crate.
+    std::fs::write(
+        a.root().join("pkg/Cargo.toml"),
+        "# no ts-rs here\n[package]\nname = \"pkg\"\nversion = \"0.1.0\"\n",
+    )
+    .unwrap();
+    git(a.root(), &["add", "pkg/Cargo.toml"]);
+    git(
+        a.root(),
+        &["commit", "-q", "-m", "a manifest naming ts-rs in a comment"],
+    );
     for stray in [
         // A generated file beside sources.
         "crate/src/schema.generated",
         // A `dist` with no package.json beside it.
         "crate/src/dist/bundle.js",
-        // A `bindings` directory of a package that is no ts-rs crate.
+        // A `bindings` directory of a crate that depends on no ts-rs.
         "pkg/bindings/x.ts",
     ] {
         write_ignored(&a, stray);
@@ -1033,6 +1044,89 @@ fn a_tracked_source_naming_a_generated_output_refuses() {
     let out = key_with(&a, &method, &[]);
     assert_eq!(out.status.code(), Some(3), "{}", text(&out));
     assert!(text(&out).contains("crate/build.rs"), "{}", text(&out));
+    // A build script named by `package.build` is build-time code too, whatever its file name.
+    git(a.root(), &["rm", "-q", "crate/build.rs"]);
+    std::fs::create_dir_all(a.root().join("crate/tools")).unwrap();
+    std::fs::write(
+        a.root().join("crate/tools/gen.rs"),
+        "fn main() { let _ = [\"..\", \"pkg\", \"dist\"].join(\"/\"); }\n",
+    )
+    .unwrap();
+    std::fs::write(
+        a.root().join("crate/Cargo.toml"),
+        "[package]\nname = \"fixture\"\nversion = \"0.1.0\"\nbuild = \"tools/gen.rs\"\n\n\
+         [dependencies]\nts-rs = \"10\"\n",
+    )
+    .unwrap();
+    git(a.root(), &["add", "crate/tools/gen.rs", "crate/Cargo.toml"]);
+    git(
+        a.root(),
+        &["commit", "-q", "-m", "a build script by another name"],
+    );
+    let out = key_with(&a, &method, &[]);
+    assert_eq!(out.status.code(), Some(3), "{}", text(&out));
+    assert!(text(&out).contains("crate/tools/gen.rs"), "{}", text(&out));
+}
+
+#[test]
+fn a_directory_walking_embed_of_a_generated_outputs_package_refuses() {
+    for (file, source, names) in [
+        // include_dir! of the whole package: no `dist` literal anywhere in the file.
+        (
+            "crate/src/web.rs",
+            "pub static WEB: include_dir::Dir = \
+             include_dir::include_dir!(\"$CARGO_MANIFEST_DIR/../pkg\");\n",
+            "pkg/dist",
+        ),
+        // rust-embed's folder attribute resolves a bare `.` against the crate root, whose
+        // ignored bindings/ it would embed.
+        (
+            "crate/src/assets.rs",
+            "#[derive(rust_embed::RustEmbed)]\n#[folder = \".\"]\npub struct Assets;\n",
+            "crate/bindings",
+        ),
+    ] {
+        let keys = TempDir::new().unwrap();
+        let a = Device::new(&keys, "a");
+        let scratch = TempDir::new().unwrap();
+        generated_outputs_checkout(&a);
+        let (method, _) = method_file(scratch.path(), &["crate", "pkg"]);
+        write_ignored(&a, "pkg/dist/index.js");
+        write_ignored(&a, "crate/bindings/Thing.ts");
+        key_of(&a, &method, &[]);
+        std::fs::write(a.root().join(file), source).unwrap();
+        git(a.root(), &["add", file]);
+        git(a.root(), &["commit", "-q", "-m", "embed a directory"]);
+        let out = key_with(&a, &method, &[]);
+        assert_eq!(out.status.code(), Some(3), "{file}: {}", text(&out));
+        assert!(
+            text(&out).contains(names) && text(&out).contains(file),
+            "{file}: {}",
+            text(&out)
+        );
+    }
+}
+
+#[test]
+fn a_tracked_symlink_aliasing_a_generated_output_refuses() {
+    let keys = TempDir::new().unwrap();
+    let a = Device::new(&keys, "a");
+    let scratch = TempDir::new().unwrap();
+    generated_outputs_checkout(&a);
+    let (method, _) = method_file(scratch.path(), &["crate", "pkg"]);
+    write_ignored(&a, "pkg/dist/index.js");
+    key_of(&a, &method, &[]);
+    // Inside the view, so refuse_escaping_symlinks passes it; it reads the ignored bundle.
+    std::os::unix::fs::symlink("../../pkg/dist", a.root().join("crate/src/app")).unwrap();
+    git(a.root(), &["add", "crate/src/app"]);
+    git(a.root(), &["commit", "-q", "-m", "an aliasing link"]);
+    let out = key_with(&a, &method, &[]);
+    assert_eq!(out.status.code(), Some(3), "{}", text(&out));
+    assert!(
+        text(&out).contains("symlink crate/src/app") && text(&out).contains("pkg/dist"),
+        "{}",
+        text(&out)
+    );
 }
 
 #[test]
