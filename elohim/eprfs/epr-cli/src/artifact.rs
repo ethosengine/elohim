@@ -52,6 +52,7 @@ mod custody;
 mod describe;
 mod destinations;
 mod extract;
+mod generated;
 mod inputs;
 mod preflight;
 mod requires;
@@ -352,6 +353,11 @@ pub struct ClosureKey {
     /// Paths inside the view with uncommitted changes (`git status --porcelain`); a dirty closure
     /// has no usable key.
     pub dirty: Vec<String>,
+    /// Ignored generated-output directories inside the view left out of the key because no
+    /// tracked source names them ([`generated`]); never part of the key, so a clean checkout keys
+    /// alike.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub excluded: Vec<String>,
     #[serde(skip)]
     pub key: DerivationKey,
     /// Exact bytes hashed for a mesh-build input; absent for the sysroot manifest basis.
@@ -797,9 +803,22 @@ use host::{check_linker, tool_lines};
 
 /// Untracked files `git status --ignored` lists inside the view are inputs no closure line names;
 /// `node_modules` directories are excluded by declaration (cargo never reads them; a residual the
-/// report names).
+/// report names). Generated outputs beside their manifests are left out only by proof
+/// ([`generated::left_out`]).
 fn is_excluded_ignored(path: &str) -> bool {
     path.split('/').any(|part| part == "node_modules")
+}
+
+/// An ignored `git status --porcelain` path (`!! <path>`) that overlaps the view component-wise:
+/// at or under a view path, or an ancestor of one. git matches a directory pathspec by string
+/// prefix when it lists ignored directories (`elohim/epr` lists `elohim/eprfs/eprfs-ts/dist/`),
+/// so its ignored answer is filtered here; a quoted path is kept. Changed and untracked entries
+/// are never filtered: a dirty line outside the view only refuses more.
+fn status_in_view(path: &str, view: &[String]) -> bool {
+    let path = path.trim_end_matches('/');
+    path.starts_with('"')
+        || under_view(path, view)
+        || view.iter().any(|v| v.starts_with(&format!("{path}/")))
 }
 
 /// The derivation key of `descriptor` at `repo`'s HEAD (the interim `KeyInput::Raw` form; see the
@@ -880,13 +899,17 @@ fn closure_selection(
     let status = git_ok(repo, &status_args)?;
     let mut dirty = Vec::new();
     let mut ignored = Vec::new();
+    let mut status_view = paths.clone();
+    status_view.extend(gitlinks.iter().cloned());
     for line in status.lines().map(str::trim_end).filter(|l| !l.is_empty()) {
         match line.strip_prefix("!! ") {
+            Some(path) if !status_in_view(path, &status_view) => {}
             Some(path) if !is_excluded_ignored(path) => ignored.push(path.to_string()),
             Some(_) => {}
             None => dirty.push(line.trim().to_string()),
         }
     }
+    let (excluded, ignored) = generated::left_out(repo, &paths, &gitlinks, ignored)?;
     if !ignored.is_empty() {
         return Err(ArtifactError::Gap(format!(
             "ignored files exist inside the method's view ({}); a build could read them and no \
@@ -913,6 +936,7 @@ fn closure_selection(
             basis: BASIS_KEY_SLOT,
             head,
             dirty,
+            excluded,
             key,
             input_lines: Some(lines),
         },
@@ -970,6 +994,12 @@ fn key(options: &Options) -> ArtifactResult<ExitCode> {
     let descriptor = read_descriptor(options)?;
     check_build_env(&descriptor)?;
     let key = closure_key(&options.repo, &descriptor)?;
+    if !key.excluded.is_empty() {
+        eprintln!(
+            "epr artifact: left out ignored generated outputs no tracked source names: {}",
+            key.excluded.join("; ")
+        );
+    }
     if options.json {
         println!("{}", serde_json::to_string_pretty(&key)?);
     } else {

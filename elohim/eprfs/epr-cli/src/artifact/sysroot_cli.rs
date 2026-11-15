@@ -98,6 +98,7 @@ fn put(options: &Options) -> ArtifactResult<ExitCode> {
         basis: "basis-key:sysroot-manifest",
         head,
         dirty: Vec::new(),
+        excluded: Vec::new(),
         key: derivation,
         input_lines: None,
     };
@@ -138,6 +139,7 @@ mod tests {
                 basis: "test",
                 head: "test".into(),
                 dirty: vec![],
+                excluded: vec![],
                 key: derivation,
                 input_lines: None,
             };

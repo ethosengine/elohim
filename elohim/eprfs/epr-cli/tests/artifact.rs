@@ -890,6 +890,193 @@ fn an_index_flag_refuses() {
     assert!(text(&out).contains("ignored files"), "{}", text(&out));
 }
 
+/// A checkout with a JavaScript package (`pkg/package.json`) and a ts-rs crate
+/// (`crate/Cargo.toml`), both inside the view `crate` + `pkg`, ignoring `dist/` and `bindings/`
+/// the way the workspace's root `.gitignore` does.
+fn generated_outputs_checkout(a: &Device) {
+    std::fs::write(
+        a.root().join(".gitignore"),
+        "dist/\nbindings/\nout/\n*.generated\n",
+    )
+    .unwrap();
+    std::fs::write(
+        a.root().join("crate/Cargo.toml"),
+        "[package]\nname = \"fixture\"\nversion = \"0.1.0\"\n\n[dependencies]\nts-rs = \"10\"\n",
+    )
+    .unwrap();
+    std::fs::create_dir_all(a.root().join("pkg/src")).unwrap();
+    std::fs::write(a.root().join("pkg/package.json"), "{\"name\":\"pkg\"}\n").unwrap();
+    std::fs::write(a.root().join("pkg/src/index.ts"), "export {};\n").unwrap();
+    git(
+        a.root(),
+        &[
+            "add",
+            ".gitignore",
+            "crate/Cargo.toml",
+            "pkg/package.json",
+            "pkg/src/index.ts",
+        ],
+    );
+    git(
+        a.root(),
+        &["commit", "-q", "-m", "a package and a ts-rs crate"],
+    );
+}
+
+fn write_ignored(a: &Device, path: &str) {
+    let path = a.root().join(path);
+    std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+    std::fs::write(path, "generated\n").unwrap();
+}
+
+#[test]
+fn generated_outputs_beside_their_manifests_key_as_a_clean_checkout() {
+    let keys = TempDir::new().unwrap();
+    let a = Device::new(&keys, "a");
+    let scratch = TempDir::new().unwrap();
+    generated_outputs_checkout(&a);
+    let (method, _) = method_file(scratch.path(), &["crate", "pkg"]);
+    let clean = key_of(&a, &method, &[]);
+    // A package's dist beside its package.json and a ts-rs crate's bindings export directory.
+    write_ignored(&a, "pkg/dist/index.js");
+    write_ignored(&a, "crate/bindings/Thing.ts");
+    // An ignored directory outside the view whose path merely shares a string prefix with a view
+    // path: git lists `crate-extra/out/` for the pathspec `crate`, and it is no input here.
+    std::fs::create_dir_all(a.root().join("crate-extra")).unwrap();
+    std::fs::write(a.root().join("crate-extra/tracked.txt"), "t\n").unwrap();
+    git(a.root(), &["add", "crate-extra/tracked.txt"]);
+    git(
+        a.root(),
+        &["commit", "-q", "-m", "a tracked sibling directory"],
+    );
+    write_ignored(&a, "crate-extra/out/y.generated");
+    let after = key_with(&a, &method, &[]);
+    assert!(after.status.success(), "{}", text(&after));
+    assert!(
+        text(&after).contains("left out ignored generated outputs")
+            && text(&after).contains("pkg/dist"),
+        "{}",
+        text(&after)
+    );
+    // The sibling commit moved HEAD but nothing inside the view: the key is the clean one.
+    assert_eq!(
+        String::from_utf8(after.stdout).unwrap().trim(),
+        clean,
+        "excluded generated outputs never enter the key"
+    );
+}
+
+#[test]
+fn an_ignored_file_outside_the_generated_shapes_still_refuses() {
+    let keys = TempDir::new().unwrap();
+    let a = Device::new(&keys, "a");
+    let scratch = TempDir::new().unwrap();
+    generated_outputs_checkout(&a);
+    let (method, _) = method_file(scratch.path(), &["crate", "pkg"]);
+    write_ignored(&a, "pkg/dist/index.js");
+    for stray in [
+        // A generated file beside sources.
+        "crate/src/schema.generated",
+        // A `dist` with no package.json beside it.
+        "crate/src/dist/bundle.js",
+        // A `bindings` directory of a package that is no ts-rs crate.
+        "pkg/bindings/x.ts",
+    ] {
+        write_ignored(&a, stray);
+        let out = key_with(&a, &method, &[]);
+        assert_eq!(out.status.code(), Some(3), "{stray}: {}", text(&out));
+        assert!(
+            text(&out).contains("ignored files"),
+            "{stray}: {}",
+            text(&out)
+        );
+        std::fs::remove_file(a.root().join(stray)).unwrap();
+    }
+}
+
+#[test]
+fn a_tracked_source_naming_a_generated_output_refuses() {
+    let keys = TempDir::new().unwrap();
+    let a = Device::new(&keys, "a");
+    let scratch = TempDir::new().unwrap();
+    generated_outputs_checkout(&a);
+    let (method, _) = method_file(scratch.path(), &["crate", "pkg"]);
+    write_ignored(&a, "pkg/dist/index.js");
+    key_of(&a, &method, &[]);
+    // A crate embedding the package's bundle: the build reads the ignored bytes.
+    std::fs::write(
+        a.root().join("crate/src/embed.rs"),
+        "pub const APP: &[u8] = include_bytes!(\"../../pkg/dist/index.js\");\n",
+    )
+    .unwrap();
+    git(a.root(), &["add", "crate/src/embed.rs"]);
+    git(a.root(), &["commit", "-q", "-m", "embed the bundle"]);
+    let out = key_with(&a, &method, &[]);
+    assert_eq!(out.status.code(), Some(3), "{}", text(&out));
+    assert!(
+        text(&out).contains("pkg/dist") && text(&out).contains("crate/src/embed.rs"),
+        "{}",
+        text(&out)
+    );
+    // A build script that only names the leaf joins the path at build time; it refuses too.
+    git(a.root(), &["rm", "-q", "crate/src/embed.rs"]);
+    std::fs::write(
+        a.root().join("crate/build.rs"),
+        "fn main() { let _ = std::path::Path::new(\"..\").join(\"pkg\").join(\"dist\"); }\n",
+    )
+    .unwrap();
+    git(a.root(), &["add", "crate/build.rs"]);
+    git(
+        a.root(),
+        &["commit", "-q", "-m", "a build script reading the bundle"],
+    );
+    let out = key_with(&a, &method, &[]);
+    assert_eq!(out.status.code(), Some(3), "{}", text(&out));
+    assert!(text(&out).contains("crate/build.rs"), "{}", text(&out));
+}
+
+#[test]
+fn a_submodule_in_the_view_is_read_for_names_of_a_generated_output() {
+    let keys = TempDir::new().unwrap();
+    let a = Device::new(&keys, "a");
+    let scratch = TempDir::new().unwrap();
+    generated_outputs_checkout(&a);
+    // An upstream repository whose source embeds the superproject package's bundle.
+    let upstream = TempDir::new().unwrap();
+    std::fs::create_dir_all(upstream.path().join("src")).unwrap();
+    std::fs::write(upstream.path().join("src/lib.rs"), "pub fn f() {}\n").unwrap();
+    git(upstream.path(), &["init", "-q"]);
+    git(upstream.path(), &["add", "src/lib.rs"]);
+    git(upstream.path(), &["commit", "-q", "-m", "upstream"]);
+    git(
+        a.root(),
+        &[
+            "-c",
+            "protocol.file.allow=always",
+            "submodule",
+            "add",
+            "-q",
+            upstream.path().to_str().unwrap(),
+            "sub",
+        ],
+    );
+    git(a.root(), &["commit", "-q", "-m", "a submodule"]);
+    // The view reaches into the submodule, as a mesh view reaches `elohim/rakia/schemas`.
+    let (method, _) = method_file(scratch.path(), &["crate", "pkg", "sub/src"]);
+    write_ignored(&a, "pkg/dist/index.js");
+    key_of(&a, &method, &[]);
+    std::fs::write(
+        a.root().join("sub/src/lib.rs"),
+        "pub const APP: &str = include_str!(\"../../pkg/dist/index.js\");\n",
+    )
+    .unwrap();
+    git(&a.root().join("sub"), &["commit", "-q", "-am", "embed"]);
+    git(a.root(), &["commit", "-q", "-am", "move the submodule"]);
+    let out = key_with(&a, &method, &[]);
+    assert_eq!(out.status.code(), Some(3), "{}", text(&out));
+    assert!(text(&out).contains("sub/src/lib.rs"), "{}", text(&out));
+}
+
 #[test]
 fn a_completion_for_another_request_is_never_accepted() {
     use eprfs_peer::{FetchDone, FetchFor, FetchGap};
