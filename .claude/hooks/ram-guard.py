@@ -36,6 +36,7 @@ import re
 import shlex
 import subprocess
 import sys
+import threading
 import time
 
 PROJECT_DIR = os.environ.get("CLAUDE_PROJECT_DIR", "/projects/elohim")
@@ -331,15 +332,28 @@ def _berth():
     return _BERTH_MOD
 
 
-def berth_touch(session):
+def berth_touch(session, wait_s=2.0):
     """Heartbeat through Berth's native owner/lifecycle guard and atomic berth writer.
     A replacement owner cannot refresh a reused session's mooring or its leases.
     Refusal is best-effort for the hook, but never bypasses the mutation guard.
+
+    The touch takes Berth's store lock (a blocking flock), which another writer — a claim, a
+    pre-push landing phase, an inbox poll — may hold; waiting on it delayed the prompt past this
+    hook's 5 s budget (UserPromptSubmit timed out at 5017 ms during a landing, 2026-11-15). It
+    stays in-process, because a detached child loses the session's process ancestry and Berth
+    then refuses it, and waits at most `wait_s`: on a held lock this one heartbeat is skipped and
+    the next prompt's touch refreshes the mooring. Berth publishes moorings atomically, so an
+    abandoned attempt never leaves a half-written mooring.
     """
-    try:
-        _berth().Berth().touch(session or "default", pid=owner_pid())
-    except Exception:
-        pass
+    def touch():
+        try:
+            _berth().Berth().touch(session or "default", pid=owner_pid())
+        except Exception:
+            pass
+
+    worker = threading.Thread(target=touch, name="berth-touch", daemon=True)
+    worker.start()
+    worker.join(wait_s)
 
 
 def berth_overrun_check():
