@@ -1282,6 +1282,13 @@ pub struct ArtifactGateCounts {
     pub row_draws: u64,
     /// Outputs whose latest own custody event falls in the window and whose manifest is
     /// slotless.
+    ///
+    /// A proxy, not the K12 design's exit criterion 2 (which counts, with no window, outputs
+    /// whose latest record was produced after the writer landed on this device): no
+    /// writer-landed time is recorded yet, and a slotless record re-put by a stale binary drops
+    /// out of this count after the window while criterion 2 would still see it. Whether the
+    /// proxy is accepted for the exit is the steward's question Q3; until then this number is
+    /// evidence, not the exit.
     pub slotless_designated: u64,
 }
 

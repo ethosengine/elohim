@@ -36,12 +36,19 @@ impl Rules {
     /// # Errors
     ///
     /// [`PeerError::Policy`] when any rule set is malformed.
+    ///
+    /// A policy with no `berth.artifacts` section loads no serve policy at all (`None`), so the
+    /// gate refuses every artifact; it is never read as an empty list, which narrows nothing and
+    /// would serve every `self` record (K12 threat T5 through a lost or misspelled section).
     pub fn from_policy(policy: &Value) -> Result<Rules, PeerError> {
-        Ok(Rules::new(
+        let rules = Rules::new(
             CrossingAllowList::from_policy(policy)?,
             StewardScope::from_policy(policy)?,
-        )
-        .with_serves(ArtifactServeList::from_policy(policy)?))
+        );
+        if policy.pointer("/berth/artifacts").is_none() {
+            return Ok(rules);
+        }
+        Ok(rules.with_serves(ArtifactServeList::from_policy(policy)?))
     }
 
     /// Load both enforced rule sets from one `pool-policy.json` file.
@@ -125,6 +132,10 @@ impl Rules {
             serves: &'a BTreeMap<String, BTreeSet<String>>,
             #[serde(skip_serializing_if = "BTreeSet::is_empty")]
             disclose_method: &'a BTreeSet<String>,
+            // No serve policy loaded refuses everything, while a loaded empty one serves `self`
+            // records: the two decide differently, so they never share a digest.
+            #[serde(skip_serializing_if = "std::ops::Not::not")]
+            no_serve_policy: bool,
             gate_semantics: u32,
         }
 
@@ -136,6 +147,7 @@ impl Rules {
             },
             serves: self.serves().by_method(),
             disclose_method: self.serves().disclosed_methods(),
+            no_serve_policy: self.serves.is_none(),
             gate_semantics: GATE_SEMANTICS,
         };
         let bytes = serde_json::to_vec(&canonical)

@@ -148,8 +148,13 @@ fn serves_enters_the_rules_digest_and_relays_still_do_not() {
     assert_ne!(digest(&serving), digest(&other_method));
     // Relays and prose stay outside the digest, grant or no grant.
     assert_eq!(digest(&serving), digest(&serving_with_relays));
-    // A policy that serves nothing keeps the digest it had before the grant existed.
-    assert_eq!(digest(&base), digest(&serving_nothing));
+    // A policy with no `berth.artifacts` section loads no serve policy and refuses every
+    // artifact; a loaded empty grant serves `self` records by reach. They decide differently, so
+    // they never share a digest (K12 review: T5 through a lost section, and T17).
+    assert_ne!(digest(&base), digest(&serving_nothing));
+    let mut empty_section = base.clone();
+    empty_section["berth"]["artifacts"] = json!({});
+    assert_eq!(digest(&empty_section), digest(&serving_nothing));
     // The serve grant is loaded with the rest.
     assert!(!Rules::from_policy(&serving)
         .expect("serving")
@@ -198,7 +203,9 @@ fn descriptor_permission_is_default_deny_digest_covered_and_not_an_audience_gran
 #[test]
 fn the_rules_digest_names_the_gate_semantics() {
     let hex = |bytes: &[u8]| format!("{:x}", Sha256::digest(bytes));
-    let digest = Rules::from_policy(&json!({})).unwrap().digest();
+    let digest = Rules::from_policy(&json!({ "berth": { "artifacts": {} } }))
+        .unwrap()
+        .digest();
     assert_eq!(GATE_SEMANTICS, 2);
     assert_eq!(
         digest.as_str(),
@@ -209,6 +216,15 @@ fn the_rules_digest_names_the_gate_semantics() {
         digest.as_str(),
         hex(br#"{"crosses":{},"steward":{"names":[],"prefixes":[]}}"#)
     );
+    // A policy with no `berth.artifacts` section loads no serve policy: the gate refuses every
+    // artifact, unlike a loaded empty list, which serves `self` records. They differ in the digest.
+    let absent = Rules::from_policy(&json!({})).unwrap();
+    assert!(absent.serve_policy().is_none());
+    assert_eq!(
+        absent.digest().as_str(),
+        hex(br#"{"crosses":{},"steward":{"names":[],"prefixes":[]},"no_serve_policy":true,"gate_semantics":2}"#)
+    );
+    assert_ne!(absent.digest(), digest);
     // The field is present whether or not anything is served.
     let serving = Rules::from_policy(&json!({
         "berth": { "artifacts": { "serves": { "mesh-build": ["steward"] } } }

@@ -278,11 +278,46 @@ async fn a_private_record_is_indistinguishable_from_an_unknown_root_to_a_sibling
             assert_eq!(answer, uniform(&artifact), "as an unknown root is");
             assert_eq!(frame_without_echo(&answer), unknown_legacy);
         }
-        for cid in [None, Some(&chunks(put)[0])] {
+        for cid in [None, Some(&chunks(put)[0]), Some(&method_cid(put))] {
             assert_eq!(
                 call(&b, &a.addr, record_of(put, cid)).await,
                 no_record(put),
                 "as a manifest not held is"
+            );
+        }
+    }
+    // With no serve policy loaded, the person's own device still cannot tell a private record
+    // from one this device never held: the private answer precedes the unavailable-policy one,
+    // so no `serve-blob:<method>` label leaks for a private record.
+    *a.serves.write().unwrap() = None;
+    assert_eq!(
+        frame_without_echo(&call(&b, &a.addr, manifest_of(&never)).await),
+        unknown_legacy
+    );
+    assert_eq!(
+        call(&b, &a.addr, record_of(&never, None)).await,
+        no_record(&never)
+    );
+    for put in [&private, &unreadable] {
+        let artifact = output(put);
+        for request in [
+            manifest_of(put),
+            blob_of(put, &chunks(put)[0]),
+            blob_of(put, &method_cid(put)),
+        ] {
+            let answer = call(&b, &a.addr, request).await;
+            assert_eq!(
+                answer,
+                uniform(&artifact),
+                "no policy: as an unknown root is"
+            );
+            assert_eq!(frame_without_echo(&answer), unknown_legacy);
+        }
+        for cid in [None, Some(&chunks(put)[0]), Some(&method_cid(put))] {
+            assert_eq!(
+                call(&b, &a.addr, record_of(put, cid)).await,
+                no_record(put),
+                "no policy: as a manifest not held is"
             );
         }
     }
