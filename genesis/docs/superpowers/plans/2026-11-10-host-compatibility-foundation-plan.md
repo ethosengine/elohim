@@ -187,7 +187,7 @@ the own-build rule, and relay-addr-beacon reads `unmeasured (no derivation recor
 mesh build records no artifact (shem `genesis/local-dev/regenesis-2/a4-preflight-2.log`). Met on
 both devices. Found by the run, for the mesh-build owner: a checkout holding gitignored TS `dist/`
 trees or generated bindings inside the method's view leaves every mesh build unrecorded (`no key:
-ignored files exist inside the method's view`), so a normal dev checkout never records one.
+ignored files exist inside the method's view`), so a normal dev checkout never records one. Fixed for the mesh-build owner by landing 49 (053f39078): the artifact key now leaves out ignored generated outputs that no tracked reader names. Re-observed on shem on 2026-11-15 in retire-1961 at 053f39078 with every `dist/` and `bindings/` in place: `just mesh build storage` and `just mesh build doorway` both keyed and recorded (no `unrecorded` line); log genesis/local-dev/regenesis-2/reobserve-mesh-build.log.
 
 ## Lane K — key honesty and family (spec §6.3, §7; rungs H2–H3; reviews F1–F6, G1, B1–B2)
 
