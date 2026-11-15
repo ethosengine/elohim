@@ -153,3 +153,137 @@ fn an_open_headless_default_keeps_a_later_explicit_cli_base() {
         base
     );
 }
+
+fn snapshot(dir: &Path) -> std::collections::BTreeMap<std::path::PathBuf, Vec<u8>> {
+    let mut files = std::collections::BTreeMap::new();
+    let mut stack = vec![dir.to_path_buf()];
+    while let Some(next) = stack.pop() {
+        for entry in fs::read_dir(&next).unwrap() {
+            let path = entry.unwrap().path();
+            if path.is_dir() {
+                stack.push(path.clone());
+                files.insert(path, Vec::new());
+            } else {
+                files.insert(path.clone(), fs::read(&path).unwrap());
+            }
+        }
+    }
+    files
+}
+
+/// Story (slice 2 S2c): the peer daemon is declared on the device's private chain; adopting
+/// a committed base (whose processes are empty) previews without writing, keeps `peer`, and
+/// refuses rather than silently replacing a `peer` the base declares differently.
+#[test]
+fn apply_previews_a_base_and_keeps_the_declared_peer() {
+    let root = tempfile::tempdir().unwrap();
+    let device = root.path().join("device");
+    value(epr(root.path(), &["apply"]));
+    value(epr(
+        root.path(),
+        &[
+            "run",
+            "epr",
+            "--name",
+            "peer",
+            "--env",
+            "EPR_PEER_FIXTURE=1",
+        ],
+    ));
+    let mut base = elohim_device_runtime::manifest_store::workspace_base().unwrap();
+    base.follows[0].mode = ark_core::declaration::FollowMode::Canary;
+    assert!(
+        base.processes.is_empty(),
+        "the committed base declares no process"
+    );
+    let committed = root.path().join("committed-base.json");
+    fs::write(&committed, serde_json::to_vec(&base).unwrap()).unwrap();
+    let committed = committed.to_str().unwrap();
+
+    let before = snapshot(&device);
+    let replacing = value(epr(
+        root.path(),
+        &[
+            "apply",
+            "--preview",
+            "--base",
+            committed,
+            "--replace-processes",
+            "--json",
+        ],
+    ));
+    assert_eq!(
+        replacing["processes"]["removed"],
+        serde_json::json!(["peer"])
+    );
+    assert_eq!(replacing["follows"]["changed"][0]["name"], "bin:epr");
+    assert_ne!(replacing["currentCid"], replacing["nextCid"]);
+    let text = epr(
+        root.path(),
+        &[
+            "apply",
+            "--preview",
+            "--base",
+            committed,
+            "--replace-processes",
+        ],
+    );
+    assert!(text.status.success());
+    let text = String::from_utf8(text.stdout).unwrap();
+    assert!(text.contains("nothing written"), "{text}");
+    assert!(text.contains("processes:\n  - peer"), "{text}");
+    let carrying = value(epr(
+        root.path(),
+        &["apply", "--preview", "--base", committed, "--json"],
+    ));
+    assert_eq!(carrying["processes"]["removed"], serde_json::json!([]));
+    assert_eq!(snapshot(&device), before, "a preview writes nothing");
+
+    let applied = value(epr(root.path(), &["apply", "--base", committed]));
+    assert_eq!(applied["manifestCid"], carrying["nextCid"]);
+    assert_eq!(applied["processes"][0]["name"], "peer");
+
+    // A base that names `peer` differently would drop this device's declaration: refused.
+    let full: serde_json::Value =
+        serde_json::from_slice(&epr(root.path(), &["show", "--render", "manifest"]).stdout)
+            .unwrap();
+    let mut theirs = full["processes"][0].clone();
+    theirs["argv"] = serde_json::json!(["{artifact}", "peer", "serve"]);
+    let mut conflicting = serde_json::to_value(&base).unwrap();
+    conflicting["follows"][1]["mode"] = serde_json::json!("canary");
+    conflicting["processes"] = serde_json::json!([theirs]);
+    let conflicting_path = root.path().join("conflicting-base.json");
+    fs::write(&conflicting_path, serde_json::to_vec(&conflicting).unwrap()).unwrap();
+    let conflicting_path = conflicting_path.to_str().unwrap();
+    let before = snapshot(&device);
+    let refused = epr(root.path(), &["apply", "--base", conflicting_path]);
+    assert!(!refused.status.success());
+    let stderr = String::from_utf8_lossy(&refused.stderr);
+    assert!(stderr.contains("manifest-process-conflict"), "{stderr}");
+    assert!(stderr.contains("peer"), "{stderr}");
+    assert!(stderr.contains("--replace-processes"), "{stderr}");
+    assert_eq!(snapshot(&device), before, "a refusal writes nothing");
+
+    let replaced = value(epr(
+        root.path(),
+        &["apply", "--base", conflicting_path, "--replace-processes"],
+    ));
+    assert_eq!(
+        replaced["processes"][0]["argv"],
+        serde_json::json!(["{artifact}", "peer", "serve"])
+    );
+}
+
+#[test]
+fn preview_and_replace_processes_belong_to_their_verbs() {
+    let root = tempfile::tempdir().unwrap();
+    for args in [
+        &["show", "--preview"][..],
+        &["follow", "bin:epr", "--preview"],
+        &["apply", "--preview", "--render", "manifest"],
+        &["show", "--replace-processes"],
+    ] {
+        assert!(!epr(root.path(), args).status.success(), "{args:?}");
+    }
+    assert!(!root.path().join("device/manifest/head").exists());
+}

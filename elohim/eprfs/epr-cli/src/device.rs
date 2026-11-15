@@ -91,6 +91,10 @@ pub fn usage() -> &'static str {
      epr device run <tool> [--name <process>] [--env KEY=VALUE]... [--ready-line <text>] \
      [--restart permanent|transient|temporary] [-- <args>...] \
      | epr device run <tool> [--name <process>] --stop\n  \
+     epr device apply [--base <manifest.json>] [--replace-processes] [--preview [--json]]\n    \
+     (adopting a base keeps the processes this device declared; a base that declares one \
+     differently refuses until --replace-processes; --preview diffs follows, tools and \
+     processes and writes nothing)\n  \
      epr device supervise [--status [--json] | --stop]\n    \
      (ark runs this device's declared manifest; a moved head reloads it by restart)\n  epr device trust <path>\n  epr device approvals [--node <this node URL>]\n    \
      (whom this machine's node speaks for, what is waiting, and what to run next)\n\

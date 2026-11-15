@@ -617,3 +617,198 @@ fn a_headless_default_refreshes_before_apply_and_its_first_act() {
         assert_eq!(record["base"], base.cid().unwrap());
     }
 }
+
+// Slice 2 S2c: adopting an explicit base keeps the processes this device declared.
+fn peer(args: &[&str]) -> ManifestAct {
+    ManifestAct::Run {
+        tool: "epr".into(),
+        stop: false,
+        launch: ark_core::declaration::RunLaunch {
+            name: Some("peer".into()),
+            args: args.iter().map(|a| a.to_string()).collect(),
+            ..Default::default()
+        },
+    }
+}
+fn deployed(dir: &std::path::Path, base: ark_core::RuntimeManifest) -> ManifestStore {
+    ManifestStore::new(
+        dir,
+        base,
+        Projections {
+            runtime_config: Some(dir.join("runtime-config.toml")),
+            bin_tools: Some(dir.join("bin/bin-tools.json")),
+        },
+    )
+    .unwrap()
+}
+fn canary_base() -> ark_core::RuntimeManifest {
+    let mut base = manifest_store::workspace_base().unwrap();
+    base.follows[0].mode = FollowMode::Canary;
+    base
+}
+fn snapshot(dir: &std::path::Path) -> std::collections::BTreeMap<std::path::PathBuf, Vec<u8>> {
+    let mut files = std::collections::BTreeMap::new();
+    let mut stack = vec![dir.to_path_buf()];
+    while let Some(next) = stack.pop() {
+        for entry in fs::read_dir(&next).unwrap() {
+            let path = entry.unwrap().path();
+            if path.is_dir() {
+                stack.push(path.clone());
+                files.insert(path, Vec::new());
+            } else {
+                files.insert(path.clone(), fs::read(&path).unwrap());
+            }
+        }
+    }
+    files
+}
+
+#[test]
+fn adopting_a_base_carries_the_processes_this_device_declared() {
+    let (dir, store) = fixture();
+    store.apply().unwrap();
+    let head = store.act(peer(&["peer", "serve"])).unwrap();
+    let base = canary_base();
+    let next = deployed(dir.path(), base.clone()).apply().unwrap();
+    let mut expected = base;
+    expected.supersedes = Some(head.cid().unwrap());
+    expected.processes = head.processes.clone();
+    assert_eq!(next, expected, "base processes, then the device's own");
+    assert_eq!(next.processes[0].name, "peer");
+    assert_eq!(
+        store.read().unwrap(),
+        next,
+        "the chain head is the carried CID"
+    );
+}
+
+#[test]
+fn a_base_naming_a_device_process_differently_refuses_and_writes_nothing() {
+    let (dir, store) = fixture();
+    store.apply().unwrap();
+    let head = store.act(peer(&["peer", "serve"])).unwrap();
+    let mut base = canary_base();
+    let mut theirs = head.processes[0].clone();
+    theirs.argv.push("--other".into());
+    base.processes.push(theirs);
+    let before = snapshot(dir.path());
+    let adopting = deployed(dir.path(), base);
+    for refused in [
+        adopting.apply().unwrap_err(),
+        adopting.preview().unwrap_err(),
+    ] {
+        assert_eq!(refused.kind, "manifest-process-conflict");
+        assert!(refused.detail.contains("peer"), "{refused}");
+        assert!(refused.detail.contains("--replace-processes"), "{refused}");
+        assert!(refused.detail.contains("epr device run"), "{refused}");
+    }
+    assert!(
+        adopting.act(follow("bin:other")).is_err(),
+        "every act adopts"
+    );
+    assert_eq!(snapshot(dir.path()), before);
+    assert_eq!(store.read().unwrap(), head);
+}
+
+#[test]
+fn replace_processes_adopts_the_base_processes_exactly() {
+    let (dir, store) = fixture();
+    store.apply().unwrap();
+    let head = store.act(peer(&["peer", "serve"])).unwrap();
+    let base = canary_base();
+    let next = deployed(dir.path(), base.clone())
+        .replace_processes(true)
+        .apply()
+        .unwrap();
+    let mut expected = base;
+    expected.supersedes = Some(head.cid().unwrap());
+    assert_eq!(next, expected);
+    assert!(next.processes.is_empty(), "peer is gone");
+}
+
+#[test]
+fn a_base_dropping_no_device_process_adopts_exactly_as_before() {
+    // No device process: the adopted manifest is today's `base + supersedes`, byte for byte.
+    let (dir, store) = fixture();
+    store.apply().unwrap();
+    let head = store.act(follow("bin:local")).unwrap();
+    let base = canary_base();
+    let next = deployed(dir.path(), base.clone()).apply().unwrap();
+    let mut today = base.clone();
+    today.supersedes = Some(head.cid().unwrap());
+    assert_eq!(next.cid().unwrap(), today.cid().unwrap());
+
+    // A process the head's own base declared is the base's: a deployment still removes it.
+    let (fleet, scratch) = fixture();
+    let declared = scratch.act(peer(&["peer", "serve"])).unwrap().processes;
+    let mut with_proxy = manifest_store::workspace_base().unwrap();
+    with_proxy.processes = declared;
+    let before = deployed(fleet.path(), with_proxy)
+        .act(follow("bin:fleet"))
+        .unwrap();
+    assert_eq!(before.processes.len(), 1);
+    let node = deployed(fleet.path(), manifest_store::workspace_base().unwrap());
+    let removed = node.act(follow("bin:local")).unwrap();
+    assert!(
+        removed.processes.is_empty(),
+        "the base removed its own process"
+    );
+
+    // A device process the new base declares identically has converged; nothing refuses.
+    let (dir, store) = fixture();
+    store.apply().unwrap();
+    let head = store.act(peer(&["peer", "serve"])).unwrap();
+    let mut adopting = canary_base();
+    adopting.processes = head.processes.clone();
+    let next = deployed(dir.path(), adopting.clone()).apply().unwrap();
+    let mut today = adopting;
+    today.supersedes = Some(head.cid().unwrap());
+    assert_eq!(next, today);
+}
+
+#[test]
+fn preview_names_process_changes_and_writes_nothing() {
+    let (dir, store) = fixture();
+    store.apply().unwrap();
+    let head = store.act(peer(&["peer", "serve"])).unwrap();
+    let before = snapshot(dir.path());
+    let replacing = deployed(dir.path(), canary_base()).replace_processes(true);
+    let preview = replacing.preview().unwrap();
+    assert_eq!(preview.current_cid, head.cid().unwrap());
+    assert!(preview.changed);
+    assert_eq!(preview.processes.removed, vec!["peer".to_string()]);
+    assert!(preview.processes.added.is_empty());
+    assert_eq!(preview.follows.changed.len(), 1);
+    assert_eq!(preview.follows.changed[0].name, "bin:epr");
+    assert_eq!(preview.follows.changed[0].fields, vec!["mode".to_string()]);
+    let carrying = deployed(dir.path(), canary_base()).preview().unwrap();
+    assert_eq!(carrying.processes, Default::default(), "peer is carried");
+    // Nothing moved: no head, version, projection, owner marker or lock contents.
+    assert_eq!(snapshot(dir.path()), before);
+    let applied = deployed(dir.path(), canary_base()).apply().unwrap();
+    assert_eq!(carrying.next_cid, applied.cid().unwrap());
+    // With nothing to adopt, the preview is the head on both sides.
+    let settled = deployed(dir.path(), canary_base()).preview().unwrap();
+    assert!(!settled.changed);
+    assert_eq!(settled.next_cid, applied.cid().unwrap());
+}
+
+#[test]
+fn preview_diffs_changed_process_fields_by_wire_name() {
+    let mut current = manifest_store::workspace_base().unwrap();
+    let (_dir, scratch) = fixture();
+    current.processes = scratch.act(peer(&["peer", "serve"])).unwrap().processes;
+    let mut next = current.clone();
+    next.processes[0].argv.push("--verbose".into());
+    next.processes[0]
+        .env
+        .insert("RUST_LOG".into(), "debug".into());
+    next.tools.get_mut("epr").unwrap().bins.push("extra".into());
+    let preview = manifest_store::ManifestPreview::between(&current, &next).unwrap();
+    assert_eq!(preview.processes.changed[0].name, "peer");
+    assert_eq!(
+        preview.processes.changed[0].fields,
+        vec!["argv".to_string(), "env".to_string()]
+    );
+    assert_eq!(preview.tools.changed[0].fields, vec!["bins".to_string()]);
+}

@@ -86,6 +86,9 @@ pub(super) fn run(args: &[String]) -> Result<ExitCode, String> {
     let mut unfollow = false;
     let mut render = None;
     let mut launch = RunLaunch::default();
+    let mut json = false;
+    let mut preview = false;
+    let mut replace_processes = false;
     let mut i = 1;
     while i < args.len() {
         match args[i].as_str() {
@@ -97,7 +100,9 @@ pub(super) fn run(args: &[String]) -> Result<ExitCode, String> {
             "--stop" => stop = true,
             "--unfollow" => unfollow = true,
             "--observed" => observed = true,
-            "--json" => {}
+            "--json" => json = true,
+            "--preview" => preview = true,
+            "--replace-processes" => replace_processes = true,
             "--channels" | "--root" | "--runtime-config" | "--base" | "--mode" | "--pin"
             | "--render" | "--ready-line" | "--restart" | "--name" | "--env" => {
                 let flag = &args[i];
@@ -134,11 +139,29 @@ pub(super) fn run(args: &[String]) -> Result<ExitCode, String> {
     if verb != "run" && launch != RunLaunch::default() {
         return Err("--name, --env, --ready-line, --restart and `-- <args>` belong to run".into());
     }
+    if preview && (verb != "apply" || observed || render.is_some()) {
+        return Err("--preview belongs to apply, without --observed or --render".into());
+    }
+    if replace_processes && !matches!(verb.as_str(), "follow" | "run" | "apply") {
+        return Err("--replace-processes belongs to follow, run and apply".into());
+    }
     if render.is_some_and(|r| !matches!(r, "runtime-config" | "bin-tools" | "manifest")) {
         return Err("render must be runtime-config, bin-tools or manifest".into());
     }
     let observed_bins = root.clone();
-    let store = store(root, runtime, base)?;
+    let store = store(root, runtime, base)?.replace_processes(replace_processes);
+    if preview {
+        let preview = store.preview().map_err(|e| e.to_string())?;
+        if json {
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&preview).map_err(|e| e.to_string())?
+            );
+        } else {
+            print!("{}", render_preview(&preview));
+        }
+        return Ok(ExitCode::SUCCESS);
+    }
     let manifest = match verb.as_str() {
         "follow" if channels.is_some() => {
             store.follow_list(channels.as_deref().unwrap_or_default())
@@ -182,4 +205,38 @@ pub(super) fn run(args: &[String]) -> Result<ExitCode, String> {
     };
     println!("{output}");
     Ok(ExitCode::SUCCESS)
+}
+
+/// Human reading of an apply preview; `--json` prints the structured preview instead.
+fn render_preview(preview: &manifest_store::ManifestPreview) -> String {
+    let unchanged = if preview.changed { "" } else { " (unchanged)" };
+    let mut lines = vec![
+        "epr device apply --preview (nothing written)".to_owned(),
+        format!("  current  {}", preview.current_cid),
+        format!("  next     {}{unchanged}", preview.next_cid),
+    ];
+    for (label, diff) in [
+        ("follows", &preview.follows),
+        ("tools", &preview.tools),
+        ("processes", &preview.processes),
+    ] {
+        let items: Vec<String> = diff
+            .added
+            .iter()
+            .map(|name| format!("  + {name}"))
+            .chain(diff.removed.iter().map(|name| format!("  - {name}")))
+            .chain(
+                diff.changed
+                    .iter()
+                    .map(|c| format!("  ~ {} ({})", c.name, c.fields.join(", "))),
+            )
+            .collect();
+        if items.is_empty() {
+            lines.push(format!("{label}: unchanged"));
+        } else {
+            lines.push(format!("{label}:"));
+            lines.extend(items);
+        }
+    }
+    lines.join("\n") + "\n"
 }

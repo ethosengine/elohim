@@ -3,7 +3,7 @@
 use crate::bin_store::{files, Refusal, Registry, Result};
 use ark_core::{
     declaration::{self, ManifestAct},
-    RuntimeManifest,
+    ChildSpec, RuntimeManifest,
 };
 use std::{
     fs,
@@ -44,6 +44,7 @@ pub struct ManifestStore {
     root: PathBuf,
     base: RuntimeManifest,
     explicit_base: bool,
+    replace_processes: bool,
     projections: Projections,
 }
 impl ManifestStore {
@@ -59,8 +60,15 @@ impl ManifestStore {
             root: root.into(),
             base,
             explicit_base: true,
+            replace_processes: false,
             projections,
         })
+    }
+    /// Adopt an explicit base's process list exactly, dropping the processes this device
+    /// declared itself. Without it, adoption carries them forward (see `carry_processes`).
+    pub fn replace_processes(mut self, replace: bool) -> Self {
+        self.replace_processes = replace;
+        self
     }
     /// Construct a workspace declaration store without network or live-store access.
     pub fn workspace(root: impl Into<PathBuf>, projections: Projections) -> Result<Self> {
@@ -91,16 +99,20 @@ impl ManifestStore {
             if let Some(head) = self.head()? {
                 return self.version(&head.base);
             }
-            let base = match fs::read_to_string(self.root.join("runtime-manifest.json")) {
-                Ok(text) => RuntimeManifest::from_json(&text).map_err(invalid)?,
-                Err(e) if e.kind() == std::io::ErrorKind::NotFound => workspace_base()?,
-                Err(e) => return Err(e.into()),
-            };
-            base.validate().map_err(invalid)?;
-            validate_secrets(&base)?;
-            return Ok(base);
+            return self.saved_base();
         }
         Ok(self.base.clone())
+    }
+    // The headless default: the saved projection, else the carried workspace base.
+    fn saved_base(&self) -> Result<RuntimeManifest> {
+        let base = match fs::read_to_string(self.root.join("runtime-manifest.json")) {
+            Ok(text) => RuntimeManifest::from_json(&text).map_err(invalid)?,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => workspace_base()?,
+            Err(e) => return Err(e.into()),
+        };
+        base.validate().map_err(invalid)?;
+        validate_secrets(&base)?;
+        Ok(base)
     }
     fn chain(&self) -> PathBuf {
         self.root.join("manifest")
@@ -194,18 +206,45 @@ impl ManifestStore {
     }
     fn reconcile_base(&self) -> Result<RuntimeManifest> {
         self.claim_projections()?;
-        let mut manifest = self.read()?;
-        // An explicitly supplied deployment base is a new declaration, not an edit of
-        // the projection. Retain the private head in its supersedes chain on upgrade.
-        if let Some(head) = self.head()? {
-            if self.explicit_base && head.base != self.base.cid().map_err(invalid)? {
-                manifest = self.base.clone();
-                manifest.supersedes = Some(head.cid);
-                self.carry_config(&manifest, None)?;
-                self.commit(&manifest)?;
-            }
+        let manifest = self.read()?;
+        let Some(adopted) = self.adoption(&manifest)? else {
+            return Ok(manifest);
+        };
+        self.carry_config(&adopted, None)?;
+        self.commit(&adopted)?;
+        Ok(adopted)
+    }
+    // An explicitly supplied deployment base is a new declaration, not an edit of the
+    // projection. Retain the private head in its supersedes chain on upgrade. Pure: reads
+    // the chain, writes nothing, so preview and apply share one answer.
+    fn adoption(&self, current: &RuntimeManifest) -> Result<Option<RuntimeManifest>> {
+        let Some(head) = self.head()? else {
+            return Ok(None);
+        };
+        if !self.explicit_base || head.base == self.base.cid().map_err(invalid)? {
+            return Ok(None);
         }
-        Ok(manifest)
+        let mut adopted = self.base.clone();
+        adopted.supersedes = Some(head.cid);
+        if !self.replace_processes {
+            adopted.processes = carry_processes(&self.version(&head.base)?, current, &self.base)?;
+            adopted.validate().map_err(invalid)?;
+            validate_secrets(&adopted)?;
+        }
+        Ok(Some(adopted))
+    }
+    /// What `apply` would commit, computed without the chain lock and without writing a
+    /// head, a version, a projection or an owner marker. `current` is the head (or, for a
+    /// headless chain, the saved default); `next` equals `current` when apply changes nothing.
+    pub fn preview(&self) -> Result<ManifestPreview> {
+        let (current, next) = if self.head()?.is_some() {
+            let current = self.read()?;
+            let next = self.adoption(&current)?.unwrap_or_else(|| current.clone());
+            (current, next)
+        } else {
+            (self.saved_base()?, self.base()?)
+        };
+        ManifestPreview::between(&current, &next)
     }
     /// Seed missing settings and reconcile explicitly changed deployment settings.
     /// An unchanged seed preserves private config releases; follows always come from head.
@@ -361,6 +400,164 @@ impl ManifestStore {
             write_registry(path, &registry(manifest)?)?;
         }
         Ok(())
+    }
+}
+/// Processes an adopted base carries.
+///
+/// Decision (slice 2 S2c): adoption CARRIES the device's own declarations forward rather than
+/// refusing by default. A refusal's second cure, re-declaring after `--replace-processes`,
+/// commits a head without the process first, and a supervisor that reconciles in between
+/// stops the resident (the peer daemon) only to start it again; carrying never opens that
+/// window. Adoption stays deterministic: the result is a pure function of three
+/// content-addressed versions already in the chain (the new base, the head, and the base the
+/// head was built on), so the adopted manifest's CID is well defined, exactly as `supersedes`
+/// already makes it head-dependent.
+///
+/// A head process the head's own base declares identically is the base's: it follows the new
+/// base, so a deployment can still remove or change it (a fleet base removing `ws-proxy` is
+/// adopted as before). Every other head process is the device's own. The result is the new
+/// base's processes, in order, then the device's own processes the new base does not name, in
+/// head order. A device declaration the new base names identically has converged; one the new
+/// base names differently is a conflict, refused naming each process, because neither side
+/// can be dropped silently.
+fn carry_processes(
+    prior_base: &RuntimeManifest,
+    head: &RuntimeManifest,
+    base: &RuntimeManifest,
+) -> Result<Vec<ChildSpec>> {
+    let mut processes = base.processes.clone();
+    let mut conflicts = Vec::new();
+    for process in &head.processes {
+        if prior_base.processes.contains(process) {
+            continue;
+        }
+        match base.processes.iter().find(|p| p.name == process.name) {
+            None => processes.push(process.clone()),
+            Some(declared) if declared == process => {}
+            Some(_) => conflicts.push(process.name.as_str()),
+        }
+    }
+    if conflicts.is_empty() {
+        return Ok(processes);
+    }
+    Err(Refusal::new(
+        "manifest-process-conflict",
+        format!(
+            "the base declares {} differently than this device does, so adopting it would \
+             drop the device's declaration. Rerun with --replace-processes to accept the \
+             base's processes, or re-declare them after apply with `epr device run`",
+            conflicts.join(", ")
+        ),
+    ))
+}
+
+/// Read-only diff between the current declaration and what `apply` would commit.
+///
+/// Its own plain JSON shape, deliberately not a change to the `runtime-declaration` view:
+/// `{currentCid, nextCid, changed, follows, tools, processes}`, where each of the last three
+/// is `{added: [...], removed: [...], changed: [{name, fields: [...]}]}`. Follows are keyed by
+/// channel, tools by name, processes by name. `fields` names each differing field in that
+/// item's own wire spelling (`mode`, `pin`; `bins`, `aliases`, `candidateEnv`,
+/// `longRunning`, `source`; `argv`, `env`, `readiness`, `policy`, ...).
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ManifestPreview {
+    /// CID of the current declaration.
+    pub current_cid: String,
+    /// CID apply would leave as the declaration; equal to `current_cid` when nothing moves.
+    pub next_cid: String,
+    /// Whether apply would commit a different declaration.
+    pub changed: bool,
+    /// Channel follows by channel.
+    pub follows: SetDiff,
+    /// Tool registry entries by tool name.
+    pub tools: SetDiff,
+    /// Declared processes by process name.
+    pub processes: SetDiff,
+}
+/// Added, removed and changed members of one keyed collection.
+#[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize)]
+pub struct SetDiff {
+    /// Keys only the next declaration has.
+    pub added: Vec<String>,
+    /// Keys only the current declaration has.
+    pub removed: Vec<String>,
+    /// Keys both have, with the fields that differ.
+    pub changed: Vec<FieldChange>,
+}
+/// One member present on both sides whose fields differ.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+pub struct FieldChange {
+    /// The member's key.
+    pub name: String,
+    /// Differing field names, in the member's wire spelling.
+    pub fields: Vec<String>,
+}
+impl ManifestPreview {
+    /// Diff two declarations without I/O.
+    pub fn between(current: &RuntimeManifest, next: &RuntimeManifest) -> Result<Self> {
+        let current_cid = current.cid().map_err(invalid)?;
+        let next_cid = next.cid().map_err(invalid)?;
+        Ok(Self {
+            changed: current_cid != next_cid,
+            current_cid,
+            next_cid,
+            follows: SetDiff::keyed(
+                current.follows.iter().map(|f| (f.channel.clone(), f)),
+                next.follows.iter().map(|f| (f.channel.clone(), f)),
+            )?,
+            tools: SetDiff::keyed(
+                current.tools.iter().map(|(k, v)| (k.clone(), v)),
+                next.tools.iter().map(|(k, v)| (k.clone(), v)),
+            )?,
+            processes: SetDiff::keyed(
+                current.processes.iter().map(|p| (p.name.clone(), p)),
+                next.processes.iter().map(|p| (p.name.clone(), p)),
+            )?,
+        })
+    }
+}
+impl SetDiff {
+    fn keyed<'a, T: serde::Serialize + 'a>(
+        current: impl Iterator<Item = (String, &'a T)>,
+        next: impl Iterator<Item = (String, &'a T)>,
+    ) -> Result<Self> {
+        let fields = |item: &T| match serde_json::to_value(item) {
+            Ok(serde_json::Value::Object(map)) => Ok(map),
+            Ok(other) => Err(invalid(format!("expected an object, found {other}"))),
+            Err(e) => Err(invalid(e)),
+        };
+        let current: Vec<_> = current.collect();
+        let next: Vec<_> = next.collect();
+        let mut diff = Self::default();
+        for (key, item) in &next {
+            match current.iter().find(|(k, _)| k == key) {
+                None => diff.added.push(key.clone()),
+                Some((_, old)) => {
+                    let (old, new) = (fields(old)?, fields(item)?);
+                    let mut names: Vec<String> = old
+                        .keys()
+                        .chain(new.keys())
+                        .filter(|name| old.get(*name) != new.get(*name))
+                        .cloned()
+                        .collect();
+                    names.sort();
+                    names.dedup();
+                    if !names.is_empty() {
+                        diff.changed.push(FieldChange {
+                            name: key.clone(),
+                            fields: names,
+                        });
+                    }
+                }
+            }
+        }
+        diff.removed = current
+            .iter()
+            .filter(|(key, _)| !next.iter().any(|(k, _)| k == key))
+            .map(|(key, _)| key.clone())
+            .collect();
+        Ok(diff)
     }
 }
 // ChildSpec.env has no by-name reference form. Do not persist literal secrets in a chain.
