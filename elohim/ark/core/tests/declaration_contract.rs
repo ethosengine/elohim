@@ -161,6 +161,7 @@ fn run_launch_appends_args_and_declares_the_readiness_ladder_and_restart() {
                 args: vec!["lsp".into(), "serve".into(), "--device".into()],
                 ready_line: Some("lsp ready".into()),
                 restart: Some(Restart::Transient),
+                ..RunLaunch::default()
             },
         },
     )
@@ -236,4 +237,158 @@ fn run_launch_refuses_what_it_cannot_honour() {
         Ok(ark_core::manifest::Restart::Transient)
     );
     assert!(parse_restart("sometimes").is_err());
+}
+
+fn run(head: &RuntimeManifest, stop: bool, launch: RunLaunch) -> Result<RuntimeManifest, String> {
+    supersede(
+        head,
+        ManifestAct::Run {
+            tool: "epr".into(),
+            stop,
+            launch,
+        },
+    )
+    .map_err(|e| e.to_string())
+}
+fn named(name: &str) -> RunLaunch {
+    RunLaunch {
+        name: Some(name.into()),
+        ..RunLaunch::default()
+    }
+}
+fn names(manifest: &RuntimeManifest) -> Vec<&str> {
+    manifest.processes.iter().map(|p| p.name.as_str()).collect()
+}
+
+#[test]
+fn run_launch_names_the_process_and_declares_its_environment() {
+    let env = std::collections::BTreeMap::from([
+        ("EPR_PEER_RELAYS".to_owned(), "x".to_owned()),
+        ("XDG_CONFIG_HOME".to_owned(), "y".to_owned()),
+    ]);
+    let next = run(
+        &base(),
+        false,
+        RunLaunch {
+            args: vec!["peer".into(), "serve".into()],
+            env: env.clone(),
+            ..named("peer")
+        },
+    )
+    .unwrap();
+    let child = &next.processes[0];
+    assert_eq!(child.name, "peer");
+    assert_eq!(
+        child.artifact,
+        ark_core::manifest::ArtifactRef::Channel {
+            channel_id: "bin:epr".into()
+        }
+    );
+    assert_eq!(child.argv, ["{artifact}", "peer", "serve"]);
+    assert_eq!(child.env, env);
+}
+
+#[test]
+fn an_unnamed_run_act_with_no_environment_keeps_the_historical_manifest_cid() {
+    // The same pin as `a_run_act_without_launch_detail_keeps_its_historical_manifest_cid`,
+    // reached with both new fields spelled out: an absent name and an empty environment
+    // add nothing to the child, and naming the tool itself is the same declaration.
+    const HISTORICAL: &str = "bafyreib6r42fyl4pbsbfkedlwow4mq6vmypniasd5lstjx6ldqmi27z5bm";
+    let base = RuntimeManifest::from_json(include_str!("workspace-device-run-launch.json"))
+        .expect("historical device manifest decodes");
+    let explicit = RunLaunch {
+        args: Vec::new(),
+        ready_line: None,
+        restart: None,
+        name: None,
+        env: std::collections::BTreeMap::new(),
+    };
+    let next = run(&base, false, explicit).unwrap();
+    assert_eq!(next.cid().unwrap(), HISTORICAL);
+    assert_eq!(
+        run(&base, false, named("epr")).unwrap().cid().unwrap(),
+        HISTORICAL
+    );
+}
+
+#[test]
+fn named_processes_of_one_tool_coexist_and_are_replaced_and_stopped_by_name() {
+    let both = run(
+        &run(&base(), false, named("peer")).unwrap(),
+        false,
+        RunLaunch::default(),
+    )
+    .unwrap();
+    assert_eq!(names(&both), ["peer", "epr"]);
+    // Re-declaring `peer` replaces only `peer`.
+    let redeclared = run(
+        &both,
+        false,
+        RunLaunch {
+            args: vec!["peer".into(), "serve".into()],
+            ..named("peer")
+        },
+    )
+    .unwrap();
+    assert_eq!(names(&redeclared), ["epr", "peer"]);
+    let epr = redeclared
+        .processes
+        .iter()
+        .find(|p| p.name == "epr")
+        .unwrap();
+    assert_eq!(epr.argv, ["{artifact}"]);
+    let peer = redeclared
+        .processes
+        .iter()
+        .find(|p| p.name == "peer")
+        .unwrap();
+    assert_eq!(peer.argv, ["{artifact}", "peer", "serve"]);
+    // A stop by name removes only that process; the default stop removes only `epr`.
+    let stopped = run(&redeclared, true, named("peer")).unwrap();
+    assert_eq!(names(&stopped), ["epr"]);
+    let stopped = run(&redeclared, true, RunLaunch::default()).unwrap();
+    assert_eq!(names(&stopped), ["peer"]);
+    // A stop still refuses launch detail other than the name.
+    let env = std::collections::BTreeMap::from([("A".to_owned(), "1".to_owned())]);
+    assert!(run(
+        &redeclared,
+        true,
+        RunLaunch {
+            env,
+            ..named("peer")
+        }
+    )
+    .is_err());
+}
+
+#[test]
+fn run_launch_refuses_secret_or_malformed_environment_and_names() {
+    let with_env = |key: &str, value: &str| RunLaunch {
+        env: std::collections::BTreeMap::from([(key.to_owned(), value.to_owned())]),
+        ..named("peer")
+    };
+    for key in [
+        "EPR_PEER_TOKEN",
+        "db_password",
+        "Signing_Private_Key",
+        "API_KEY",
+    ] {
+        let refused = run(&base(), false, with_env(key, "literal")).unwrap_err();
+        assert!(
+            refused.contains("secrets are referenced by name only"),
+            "{key}: {refused}"
+        );
+    }
+    for (key, value) in [("", "x"), ("A=B", "x"), ("A\0", "x"), ("A", "x\0y")] {
+        assert!(
+            run(&base(), false, with_env(key, value)).is_err(),
+            "{key:?}={value:?}"
+        );
+    }
+    for name in ["", "a/b", "my peer", "peer\t", ".."] {
+        assert!(run(&base(), false, named(name)).is_err(), "run {name:?}");
+        assert!(run(&base(), true, named(name)).is_err(), "stop {name:?}");
+    }
+    assert!(secret_env_key("my_secret_dir"));
+    assert!(!secret_env_key("XDG_CONFIG_HOME"));
 }

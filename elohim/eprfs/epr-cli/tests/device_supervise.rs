@@ -359,3 +359,83 @@ fn run_declares_args_readiness_and_restart_offline() {
         json!([])
     );
 }
+
+/// A named run act declares a second resident of one tool: `peer` runs `bin:epr` beside any
+/// default `epr`, with its declared environment kept in the stored manifest. The printed
+/// view follows the runtime-declaration schema, which carries no environment.
+#[test]
+fn run_declares_a_named_process_with_its_environment_offline() {
+    let fx = fixture_with(PathBuf::from("/nonexistent/ark"));
+    let view: Value = serde_json::from_str(&fx.ok(&[
+        "device",
+        "run",
+        "epr",
+        "--name",
+        "peer",
+        "--env",
+        "A=1",
+        "--env",
+        "B=2",
+        "--ready-line",
+        "epr peer: serving",
+        "--",
+        "peer",
+        "serve",
+        "--root",
+        "/x",
+    ]))
+    .unwrap();
+    let process = &view["processes"][0];
+    assert_eq!(process["name"], "peer");
+    assert_eq!(process["channelId"], "bin:epr");
+    assert_eq!(
+        process["argv"],
+        json!(["{artifact}", "peer", "serve", "--root", "/x"])
+    );
+    let manifest: Value =
+        serde_json::from_str(&fx.ok(&["device", "show", "--render", "manifest"])).unwrap();
+    let child = &manifest["processes"][0];
+    assert_eq!(child["env"], json!({"A": "1", "B": "2"}));
+    assert_eq!(
+        child["readiness"][0]["stdout_line"]["contains"],
+        "epr peer: serving"
+    );
+    // The default `epr` coexists; stopping by name removes only `peer`.
+    fx.ok(&["device", "run", "epr"]);
+    let names = |view: &Value| -> Vec<String> {
+        view["processes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|p| p["name"].as_str().unwrap().to_owned())
+            .collect()
+    };
+    let shown: Value = serde_json::from_str(&fx.ok(&["device", "show"])).unwrap();
+    assert_eq!(names(&shown), ["peer", "epr"]);
+    let stopped: Value =
+        serde_json::from_str(&fx.ok(&["device", "run", "epr", "--name", "peer", "--stop"]))
+            .unwrap();
+    assert_eq!(names(&stopped), ["epr"]);
+    // Refusals: a secret-named key, a malformed entry, a bad name, launch flags off `run`.
+    for refused in [
+        &[
+            "device",
+            "run",
+            "epr",
+            "--name",
+            "peer",
+            "--env",
+            "EPR_TOKEN=x",
+        ][..],
+        &["device", "run", "epr", "--env", "NOEQUALS"],
+        &["device", "run", "epr", "--env", "A=1", "--env", "A=2"],
+        &["device", "run", "epr", "--name", "a/b"],
+        &[
+            "device", "run", "epr", "--name", "peer", "--env", "A=1", "--stop",
+        ],
+        &["device", "follow", "bin:epr", "--name", "peer"],
+        &["device", "follow", "bin:epr", "--env", "A=1"],
+    ] {
+        assert!(!fx.epr(refused).status.success(), "{refused:?}");
+    }
+}

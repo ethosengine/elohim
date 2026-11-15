@@ -379,19 +379,7 @@ fn validate_config_secrets(payload: &str) -> Result<()> {
     Ok(())
 }
 fn validate_env_key(key: &str) -> Result<()> {
-    let upper = key.to_ascii_uppercase();
-    if [
-        "TOKEN",
-        "SECRET",
-        "PASSWORD",
-        "PASSPHRASE",
-        "CREDENTIAL",
-        "PRIVATE_KEY",
-        "API_KEY",
-    ]
-    .iter()
-    .any(|name| upper.contains(name))
-    {
+    if declaration::secret_env_key(key) {
         return Err(invalid(format!(
             "{key}: secrets are referenced by name only"
         )));

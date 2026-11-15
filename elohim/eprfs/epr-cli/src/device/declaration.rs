@@ -99,7 +99,7 @@ pub(super) fn run(args: &[String]) -> Result<ExitCode, String> {
             "--observed" => observed = true,
             "--json" => {}
             "--channels" | "--root" | "--runtime-config" | "--base" | "--mode" | "--pin"
-            | "--render" | "--ready-line" | "--restart" => {
+            | "--render" | "--ready-line" | "--restart" | "--name" | "--env" => {
                 let flag = &args[i];
                 i += 1;
                 let value = args.get(i).ok_or_else(|| format!("{flag} needs a value"))?;
@@ -113,6 +113,13 @@ pub(super) fn run(args: &[String]) -> Result<ExitCode, String> {
                     "--render" => render = Some(value.as_str()),
                     "--ready-line" => launch.ready_line = Some(value.clone()),
                     "--restart" => launch.restart = Some(declaration::parse_restart(value)?),
+                    "--name" => launch.name = Some(value.clone()),
+                    "--env" => {
+                        let (key, val) = value.split_once('=').ok_or("--env needs KEY=VALUE")?;
+                        if launch.env.insert(key.to_owned(), val.to_owned()).is_some() {
+                            return Err(format!("--env {key} is declared twice"));
+                        }
+                    }
                     _ => unreachable!(),
                 }
             }
@@ -122,7 +129,7 @@ pub(super) fn run(args: &[String]) -> Result<ExitCode, String> {
         i += 1;
     }
     if verb != "run" && launch != RunLaunch::default() {
-        return Err("--ready-line, --restart and `-- <args>` belong to run".into());
+        return Err("--name, --env, --ready-line, --restart and `-- <args>` belong to run".into());
     }
     if render.is_some_and(|r| !matches!(r, "runtime-config" | "bin-tools" | "manifest")) {
         return Err("render must be runtime-config, bin-tools or manifest".into());

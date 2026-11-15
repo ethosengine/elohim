@@ -252,13 +252,42 @@ pub struct RunLaunch {
     pub ready_line: Option<String>,
     /// Restart eligibility; `None` keeps the policy default (permanent).
     pub restart: Option<Restart>,
+    /// The process name this act declares or stops; `None` is the tool's own name. Acts
+    /// replace and stop by this name, so two residents of one tool coexist under two names.
+    pub name: Option<String>,
+    /// Environment entries for the child, applied after the policy's scrub. Literal values
+    /// land in the chain, so secret-named keys are refused (see [`secret_env_key`]).
+    pub env: BTreeMap<String, String>,
 }
 impl RunLaunch {
+    /// The process name this act targets, validated as a path-safe identifier.
+    fn process_name(&self, tool: &str) -> Result<String, ManifestError> {
+        match &self.name {
+            None => Ok(tool.to_owned()),
+            Some(name) if valid_name(name) => Ok(name.clone()),
+            Some(name) => Err(ManifestError::Invalid(format!(
+                "invalid process name '{name}'; expected letters, digits, '_', '.' or '-'"
+            ))),
+        }
+    }
     fn child(self, tool: &str) -> Result<ChildSpec, ManifestError> {
+        let name = self.process_name(tool)?;
         if self.args.iter().any(|arg| arg.contains('\0')) {
             return Err(ManifestError::Invalid(format!(
-                "{tool}: an argument carries a NUL byte, which exec cannot pass"
+                "{name}: an argument carries a NUL byte, which exec cannot pass"
             )));
+        }
+        for (key, value) in &self.env {
+            if key.is_empty() || key.contains(['=', '\0']) || value.contains('\0') {
+                return Err(ManifestError::Invalid(format!(
+                    "{name}: environment entry '{key}' cannot be passed to exec"
+                )));
+            }
+            if secret_env_key(key) {
+                return Err(ManifestError::Invalid(format!(
+                    "{name}: {key}: secrets are referenced by name only"
+                )));
+            }
         }
         let readiness = match self.ready_line {
             Some(line) if line.is_empty() => {
@@ -284,16 +313,34 @@ impl RunLaunch {
         let mut argv = vec!["{artifact}".to_owned()];
         argv.extend(self.args);
         Ok(ChildSpec {
-            name: tool.to_owned(),
+            name,
             artifact: ArtifactRef::Channel {
                 channel_id: format!("bin:{tool}"),
             },
             argv,
+            env: self.env,
             readiness,
             policy,
             ..ChildSpec::default()
         })
     }
+}
+
+/// Words that mark an environment key as a secret. A [`ChildSpec`] env entry is a literal
+/// value stored in the chain with no by-name reference form, so such keys are refused.
+pub const SECRET_ENV_WORDS: [&str; 7] = [
+    "TOKEN",
+    "SECRET",
+    "PASSWORD",
+    "PASSPHRASE",
+    "CREDENTIAL",
+    "PRIVATE_KEY",
+    "API_KEY",
+];
+/// Whether an environment key names a secret, case-insensitively.
+pub fn secret_env_key(key: &str) -> bool {
+    let upper = key.to_ascii_uppercase();
+    SECRET_ENV_WORDS.iter().any(|word| upper.contains(word))
 }
 
 /// Parse a restart policy as a person types it. Unknown words are refused, never defaulted.
@@ -317,8 +364,9 @@ pub enum ManifestAct {
         mode: Option<FollowMode>,
         pin: Option<String>,
     },
-    /// Run or stop a registered tool using its local current artifact. A stop carries the
-    /// default launch; any launch detail on a stop is refused rather than ignored.
+    /// Run or stop a registered tool using its local current artifact, as the process the
+    /// launch names (the tool's name by default). A stop carries at most that name; any other
+    /// launch detail on a stop is refused rather than ignored.
     Run {
         tool: String,
         stop: bool,
@@ -352,15 +400,20 @@ pub fn supersede(
                 .tools
                 .get(&tool)
                 .ok_or_else(|| ManifestError::Invalid(format!("unknown tool {tool}")))?;
-            if stop && launch != RunLaunch::default() {
+            let name = launch.process_name(&tool)?;
+            let detail = RunLaunch {
+                name: None,
+                ..launch.clone()
+            };
+            if stop && detail != RunLaunch::default() {
                 return Err(ManifestError::Invalid(format!(
-                    "a stop of {tool} carries no arguments, ready line or restart policy"
+                    "a stop of {name} carries no arguments, environment, ready line or restart policy"
                 )));
             }
             if !stop && spec.bins.is_empty() {
                 return Err(ManifestError::Invalid("tool has no executable".into()));
             }
-            next.processes.retain(|p| p.name != tool);
+            next.processes.retain(|p| p.name != name);
             if !stop {
                 next.processes.push(launch.child(&tool)?);
             }

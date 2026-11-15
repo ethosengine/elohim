@@ -88,8 +88,9 @@ pub fn usage() -> &'static str {
      epr device approve '<link | number | key fingerprint>' [--only <act>]... [--yes] [--node <this node URL>]\n  \
      epr device approve <number | key fingerprint> --decline\n  \
      epr device status [--json] [--root <path>]\n  epr device arrive [--strict]\n  \
-     epr device run <tool> [--ready-line <text>] [--restart permanent|transient|temporary] \
-     [-- <args>...] | epr device run <tool> --stop\n  \
+     epr device run <tool> [--name <process>] [--env KEY=VALUE]... [--ready-line <text>] \
+     [--restart permanent|transient|temporary] [-- <args>...] \
+     | epr device run <tool> [--name <process>] --stop\n  \
      epr device supervise [--status [--json] | --stop]\n    \
      (ark runs this device's declared manifest; a moved head reloads it by restart)\n  epr device trust <path>\n  epr device approvals [--node <this node URL>]\n    \
      (whom this machine's node speaks for, what is waiting, and what to run next)\n\
