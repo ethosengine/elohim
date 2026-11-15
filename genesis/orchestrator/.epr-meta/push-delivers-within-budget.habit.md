@@ -14,6 +14,7 @@ checks:
   - "measurement liveness: `bash scripts/ci/fleet-quiesce-gate.test.sh` checks that an oversized /metrics body is still measured, and that a broken evaluator ends as GATE-DEFECT instead of polling blind."
   - "no-op rolls: `node --test genesis/orchestrator/validate-only-pipeline.test.mjs` checks that an edge selection with only dataplane-validation stale dispatches validate-only."
   - "ledger: `.claude/scripts/ci-harvest.py` files a BUDGET_EXHAUSTED finding for any build its own timeout killed (`python3 .claude/scripts/_lib/__tests__/ci_harvest_budget_exhausted_test.py`)."
+  - "ledger liveness (algedonic sensor, observation only): fold ci-harvest-cursor-lag@1 per job per its procedure in .claude/epr-meta/measures.yaml (Jenkins lastCompletedBuild minus .claude/data/ci-cursor.json); lens ci-harvest-cursor-lag-ceiling@1 reads red at 11 or more builds, where one harvest drops builds for good (`epr flow report --bound ci-harvest-cursor-lag-ceiling`)."
   - "a2o @concern:push-delivers-within-budget (genesis/a2o/features/dataplane/app-delivery-refuses-fast.feature — @act:i, four household stations: the not-ready window is answered in seconds; `just test mesh features/dataplane/app-delivery-refuses-fast.feature`)"
 refs:
   - "genesis/data/timeline/backlog/edge-quiesce-gate-timeout-aborts.md (the budget arithmetic, one layer down then up)"

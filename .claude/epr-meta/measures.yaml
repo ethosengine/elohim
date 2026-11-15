@@ -1801,6 +1801,45 @@ measures:
       concern, concern_routes.route() returns None for them, no measure reads elohim-edge
       results, and the habit that owns the clause still described the fleet check as unmeasured.
 
+  # ── algedonic-designer firing 2026-11-15 (seed 3967488658; interruption, apology-and-rant,
+  # numbness / 12d). The CI harvester went numb: its tracked ledger's newest row is 2026-10-22
+  # while commits inside the window cite elohim-edge #1878/#1880 reds the ledger never saw.
+  - id: ci-harvest-cursor-lag
+    version: 1
+    family: algedonic-sensing
+    unit: builds
+    procedure: >
+      For each job in .claude/scripts/ci-harvest.py `JOBS`, read Jenkins
+      `/job/<job>/job/dev/api/json?tree=lastCompletedBuild[number]` (anonymous) and subtract
+      `.claude/data/ci-cursor.json` `jobs[<job>]` (absent cursor = skip the job, never 0). Fold
+      the difference per job: `epr flow note --kind observation --measure ci-harvest-cursor-lag@1
+      --subject . --value <lastCompletedBuild - cursor> --env job=<job>`. When Jenkins cannot be
+      read, fold nothing for that job: the reading is UNMEASURED, never a lag of 0. A negative
+      difference (cursor ahead of a renumbered job) folds 0.
+    env-sensitivity: [job]
+    provenance: >
+      .claude/data/ci-cursor.json at 2026-11-15 (tree): jobs elohim-edge 1704, elohim-orchestrator
+      2130, elohim 1770; .claude/data/ci-findings.jsonl newest `ts` 2026-10-22 across all jobs.
+      In-window evidence of later completed builds: commits 836b09f02 / 29794833b / c12445f02
+      (2026-11-14) cite elohim-edge #1878 and #1880 reds; sprint journal
+      genesis/docs/superpowers/sprints/2026-11-05-regenesis-1/STATE.md cites orchestrator #2235
+      and edge #1821 (2026-11-06), #1830 and #1832 (2026-11-07/08). Lag read from the tree:
+      elohim-edge >= 176 (1880 - 1704), elohim-orchestrator >= 105 (2235 - 2130), 24 days with
+      no ledger row. Harvester mechanics: ci-harvest.py lists the newest MAX_BUILDS_PER_JOB + 5
+      = 15 builds, keeps the newest MAX_BUILDS_PER_JOB = 10 above the cursor, then advances the
+      cursor to the max seen; in --hook mode every error exits 0 silently.
+    default-authority: observation
+    status: active
+    established_by: algedonic-designer-2026-11-15
+    why: >
+      The harvester is the channel every CI-ledger sensor listens through (unrouted-finding-
+      recurrence@1, edge-apex-root-unserved@1, push-delivers-within-budget's ledger check), and
+      it fails silent by design: a Jenkins outage, a proxy refusal or a session that never runs
+      the SessionStart hook all look like "no new findings". Its silence is only health when the
+      jobs it watches are also quiet; here elohim-edge advanced at least 176 builds while the
+      ledger stayed still. Past 10 builds of lag one harvest drops the oldest builds for good,
+      because the cursor jumps to the newest one seen.
+
 lenses:
   - id: dialogue-blocked-ceiling
     version: 1
@@ -2838,3 +2877,33 @@ lenses:
       (16b82ec09dc5, to 2026-10-22); that cumulative count is provenance, not a newest-ten
       reading. Read with `epr flow report --bound edge-apex-root-unserved-ceiling`; the bound
       declares no headline slot.
+
+  # ── harvester numbness bound (algedonic-designer, 2026-11-15; seed 3967488658) ──
+  - id: ci-harvest-cursor-lag-ceiling
+    version: 1
+    binding: binding-local
+    class: measure
+    consumes: [ci-harvest-cursor-lag@1]
+    subject: .
+    context: ci-findings-ledger
+    compare: at-or-above
+    soft: 5
+    hard: 11
+    concern: push-delivers-within-budget
+    retire-when: >
+      when CI findings reach the fold from Jenkins by construction (ledgers-fold-once's exit), so
+      no cursor exists whose lag could hide a build
+    status: active
+    established_by: algedonic-designer-2026-11-15
+    why: >
+      Hard 11 is the harvester's own arithmetic: one run keeps at most MAX_BUILDS_PER_JOB = 10
+      builds above the cursor and then advances the cursor to the newest seen, so an eleventh
+      unharvested build is skipped permanently (.claude/scripts/ci-harvest.py harvest_job and the
+      cursor update after it). Soft 5 is half a run's capacity, about 17 hours of elohim-edge
+      cadence at the window's observed rate (at least 176 builds over 24 days, about 7.3 a day;
+      5 / 7.3 = 0.68 d). At mint the in-tree reading is elohim-edge 176 and
+      elohim-orchestrator 105, both at or above 11, so the bound reads red. The concern is
+      push-delivers-within-budget: its atom's `ledger:` check names ci-harvest.py as the leg that
+      files a BUDGET_EXHAUSTED finding, and the native-delivery plan's D2 rules that ci-harvest
+      findings serve that habit. Read with `epr flow report --bound ci-harvest-cursor-lag-ceiling`
+      and on the habit row (the atom's checks: line).
