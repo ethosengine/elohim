@@ -303,21 +303,33 @@ fn cargo_project_gap() -> String {
     super::super::cargo_project::COMPILER_GAP.to_string()
 }
 
+/// Every class, with a recorded artifact at each of the eight levels. Each class names its
+/// successor in an exhaustive match, so a new variant does not compile until it joins the chain.
 fn every_class() -> Vec<Class> {
-    let mut classes = vec![
-        Class::Source,
-        Class::CargoConfig,
-        Class::CargoHome,
-        Class::HostTool,
-        Class::LinkInput,
-        Class::BuildEnvironment,
-        Class::FloorMember,
-        Class::Unclassified("x".into()),
-    ];
-    classes.extend((1..=8).map(|openness| Class::Recorded {
+    let recorded = |openness| Class::Recorded {
         cid: cid("floor"),
         reach: at_openness(openness),
-    }));
+    };
+    let mut classes = Vec::new();
+    let mut next = Some(Class::Source);
+    while let Some(class) = next {
+        next = match &class {
+            Class::Source => Some(Class::CargoConfig),
+            Class::CargoConfig => Some(Class::CargoHome),
+            Class::CargoHome => Some(Class::HostTool),
+            Class::HostTool => Some(Class::LinkInput),
+            Class::LinkInput => Some(Class::BuildEnvironment),
+            Class::BuildEnvironment => Some(Class::FloorMember),
+            Class::FloorMember => Some(recorded(1)),
+            Class::Recorded { reach, .. } if reach.openness() < 8 => {
+                Some(recorded(reach.openness() + 1))
+            }
+            Class::Recorded { .. } => Some(Class::Unclassified("x".into())),
+            Class::Unclassified(_) => None,
+        };
+        classes.push(class);
+    }
+    assert_eq!(classes.len(), 7 + 8 + 1);
     classes
 }
 
@@ -439,7 +451,12 @@ fn a_named_floor_takes_the_narrowest_claim_this_device_holds() {
         (vec![&own_self], Reach::SelfScope),
         (vec![&own_self, &unrelated], Reach::SelfScope),
         (vec![&own_self, &sibling_private], Reach::Private),
-        (vec![&own_self, &slotless], Reach::Private),
+        // Once a slotted record exists, slotless ones are ignored, as in the gate's fold.
+        (vec![&own_self, &slotless], Reach::SelfScope),
+        (vec![&slotless, &own_self, &slotless], Reach::SelfScope),
+        (vec![&slotless], Reach::Private),
+        (vec![&slotless, &slotless], Reach::Private),
+        (vec![&slotless, &sibling_private], Reach::Private),
         (vec![&own_self, &unreadable], Reach::Private),
     ] {
         assert_eq!(

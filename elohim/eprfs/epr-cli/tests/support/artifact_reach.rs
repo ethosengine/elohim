@@ -347,7 +347,7 @@ fn put_no_longer_declares_the_reach_gap() {
 fn a_private_put_warns_unless_the_serving_daemon_is_confirmed_to_gate_reach() {
     // T16 residual: a pre-K12 daemon ignores the slot. The daemon exposes no gate version, but its
     // head table records the digest of the rules it loaded, which covers the gate semantics.
-    const WARNING: &str = "reach: warning: this device's epr peer serve may predate the reach gate";
+    const WARNING: &str = "reach: warning: cannot confirm the serving daemon reads reach slots";
     let f = MeshPut::new(|descriptor| descriptor.embedder = Some("fixture-embedder".into()));
     let peer_dir = f.a.config.path().join("epr").join("peer");
     let _serving = elohim_epr_cli::peer::ServeLock::acquire(&peer_dir).unwrap();
@@ -360,6 +360,24 @@ fn a_private_put_warns_unless_the_serving_daemon_is_confirmed_to_gate_reach() {
         format!("{}\n", ours.display()),
     )
     .unwrap();
+    // A serving daemon whose head table records no loaded rules (one that predates recording
+    // them) is no evidence of a gate: warn.
+    eprfs_peer::HeadTable::load(&peer_dir)
+        .unwrap()
+        .save(&peer_dir)
+        .unwrap();
+    assert!(eprfs_peer::HeadTable::load(&peer_dir)
+        .unwrap()
+        .rules
+        .is_none());
+    let out = f.put_with(&[], &[]);
+    assert_eq!(recorded(&out)["reach"], "private");
+    assert!(text(&out).contains(WARNING), "{}", text(&out));
+    assert!(
+        text(&out).contains("its head table records no loaded rules"),
+        "{}",
+        text(&out)
+    );
     let policy = f.a.root().join("pool-policy.json");
     std::fs::write(
         &policy,

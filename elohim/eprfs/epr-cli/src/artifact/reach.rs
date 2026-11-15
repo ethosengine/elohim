@@ -395,14 +395,18 @@ fn method_classes(
 }
 
 /// A recorded artifact named by CID: the narrowest `env:reach` among the custody records this
-/// device holds for that output (its own and those folded from a sibling). No record, a record
-/// without the slot, or an unreadable slot is `private`. A sibling's claim enters only this
-/// minimum: it can narrow a record, never widen one, and it never decides what this device serves.
+/// device holds for that output (its own and those folded from a sibling). As in the gate's fold
+/// (design §3.3 rule 2), once any of those records carries a slot the slotless ones are ignored;
+/// no record, or only slotless ones, is `private`, and an unreadable slot counts as `private`. A
+/// sibling's claim enters only this minimum: it can narrow a record, never widen one, and it never
+/// decides what this device serves.
 fn recorded(value: &str, held: &[&FlowEvent]) -> Class {
     let Ok(cid) = BlobCid::parse(value) else {
         return Class::Unclassified(format!("the named artifact `{}`", shown(value)));
     };
     let cid = cid.to_string();
+    // Slotless records contribute nothing: with no slotted record the minimum is over nothing,
+    // which is `private`.
     let levels: Vec<Reach> = held
         .iter()
         .filter(|event| {
@@ -410,10 +414,11 @@ fn recorded(value: &str, held: &[&FlowEvent]) -> Class {
                 && event.classified_as.first().map(String::as_str) == Some("custody-blob")
                 && event.classified_as.get(1) == Some(&cid)
         })
-        .map(|event| match event_reach(event) {
-            Some(DeclaredReach::OwnDevices) => Reach::SelfScope,
-            Some(DeclaredReach::Wider(openness)) => at_openness(openness),
-            Some(DeclaredReach::Private | DeclaredReach::Unreadable) | None => Reach::Private,
+        .filter_map(|event| event_reach(event))
+        .map(|declared| match declared {
+            DeclaredReach::OwnDevices => Reach::SelfScope,
+            DeclaredReach::Wider(openness) => at_openness(openness),
+            DeclaredReach::Private | DeclaredReach::Unreadable => Reach::Private,
         })
         .collect();
     Class::Recorded {

@@ -1168,8 +1168,8 @@ fn served_store_matches(payload_dir: &Path) -> ArtifactResult<()> {
 }
 
 /// Why this device's running `epr peer serve` cannot be confirmed to enforce the reach gate, or
-/// `None` when it can (or when no daemon serves, or the running one loaded no policy and so serves
-/// no artifact). The daemon exposes no gate version of its own; its head table records the digest
+/// `None` when it can or when no daemon serves. A head table with no loaded rules is unconfirmed
+/// (a false warning on a no-policy daemon is accepted). The daemon exposes no gate version of its own; its head table records the digest
 /// of the rules it loaded, and that digest covers the gate semantics version (T17). A digest equal
 /// to this binary's digest of the same policy file confirms the semantics; anything else is
 /// unconfirmed (an older daemon, a newer one, or a policy edit not yet reloaded). A warning only:
@@ -1180,7 +1180,12 @@ fn reach_gate_unconfirmed() -> Option<String> {
         return None;
     }
     let loaded = match HeadTable::load(&peer_dir) {
-        Ok(table) => table.rules?,
+        Ok(table) => match table.rules {
+            Some(loaded) => loaded,
+            // A daemon that predates recording its rules (or one with no policy, which serves
+            // nothing): no evidence either way, so warn rather than read the silence as a gate.
+            None => return Some("its head table records no loaded rules".into()),
+        },
         Err(e) => return Some(format!("its head table does not read: {e}")),
     };
     match Rules::from_policy_file(&loaded.policy) {
@@ -1492,9 +1497,10 @@ fn record_artifact(
     if private {
         if let Some(why) = reach_gate_unconfirmed() {
             eprintln!(
-                "reach: warning: this device's epr peer serve may predate the reach gate ({why}); \
-                 a daemon that does serves this private record through its method's serves row; \
-                 restart epr peer serve with this epr"
+                "reach: warning: cannot confirm the serving daemon reads reach slots ({why}); a \
+                 daemon that predates the reach gate ignores env:reach and serves this private \
+                 record to the person's other devices through its method's serves row; restart \
+                 epr peer serve with this epr"
             );
         }
     }
