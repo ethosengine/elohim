@@ -1,0 +1,66 @@
+{
+ "what": "K12 packet 4: two-device receipt of serving by reach (host-compatibility plan, K12 verify clause 1)",
+ "date": "2026-11-15",
+ "serving_device": {
+  "device": "shem did:key:z6Mkm5deEA87WrC3PDDGjkZwnWhUGhwHS43UinXhy5N6bowj",
+  "epr": "explicit candidate built at dev 555183948 (K12 packets 1-3), CID bafkr4id3qk3gnap3p76ciwfy2jvrdfbl4wpwziosd2xgpl62mx2qqqrjmm, sha256 b29455356d6e02319ccf36caee1b2a49f53b6b11889c22ff2d900ea2cf240f18; not landed in the bin-store",
+  "daemon": "epr peer serve --root /projects/elohim --handle matthew --listen 0.0.0.0:7777 --policy <pool-policy.json, berth.artifacts unchanged: serves {mesh-build:[steward]}, discloseMethod [mesh-build]>",
+  "rules": "4c917dfa",
+  "records": {
+   "floor": {
+    "output": "bafkr4ic3gyme6ajwr7ctshk4jbarcby7vss75fhviiugl477rv4weqbhxq",
+    "manifest": "bafyreifzcnd3qk7frl437w3kucnqpswkfqzbmmibsckoqupe3snsph7bra",
+    "method": "sysroot-pack (no serves row)",
+    "reach": "self (re-put 2026-11-15T08:55Z; same key and commit as 2026-11-12, so the manifest keeps two slotless and gains one self event; the gate's fold reads self)"
+   },
+   "doorway": {
+    "output": "bafkr4ifqcby53wqtbcps53o4yl367vxggxh4ag2ul64xwmtp5s7swa247a",
+    "manifest": "bafyreiepgnxi4igggxzzaqpkz6i632ebsogp3hepknd4ti4srkbpvqygim",
+    "method": "mesh-build",
+    "reach": "self (an open build-inputs.build-scripts gap capped it at self; ruling Q4)"
+   }
+  },
+  "artifactGate_before": {
+   "reachDraws": 0,
+   "rowDraws": 3
+  },
+  "artifactGate_after": {
+   "reachDraws": 2,
+   "rowDraws": 3,
+   "slotlessDesignated": 5
+  }
+ },
+ "drawing_device": {
+  "device": "ethosengine did:key:z6MkpZRhMwWJpv7HeZyArTUkbnG6DUyukQp18MxUs2fHVMZB",
+  "epr": "its current release, unchanged (bin-store bafyreieswsek..., sha256 95d14b72...)",
+  "rules": "53d88f76 (expected skew: its daemon predates gate_semantics 2)",
+  "pool_policy": "unchanged (one-image/daemon/pool-policy.json sha256 b7c9c53b...)",
+  "draws": {
+   "floor": {
+    "exit": 0,
+    "rule": "output",
+    "fetchedFrom": "shem",
+    "chunks": 14,
+    "seconds": 0.52,
+    "bytes": 25468580,
+    "sha256": "149125b38af36b4e7d7c0a72460e65c9bac2e5b29074696842bbda80ba74b5a5"
+   },
+   "doorway": {
+    "exit": 0,
+    "rule": "output",
+    "fetchedFrom": "shem",
+    "chunks": "132 fetched + 13 resumed",
+    "seconds": 2.94,
+    "bytes": 227188856,
+    "sha256": "199ca6da6144abbc371f84ab0aceaef598f412d00b6de2d7e25822e99033b07b"
+   }
+  },
+  "note": "a first floor fetch with --dest under genesis/local-dev was refused by the DRAWING device's own install-root check (EXIT 3), not by shem's gate; raw files stay on ethosengine under genesis/local-dev/one-image/k12-p4/ because that device cannot fetch dev today",
+  "drawn_at": "2026-11-15T08:59Z"
+ },
+ "verify": {
+  "clause1_live": "an admitted device of the person drew a self floor (method with NO serves row: refused before K12) and a self mesh build, pool-policy unchanged, no new grant row: shem reachDraws 0 -> 2",
+  "clauses2to5": "covered by tests, not exercised live: private/unclassified refuses (eprfs-peer serve_reach a_private_record_is_indistinguishable_from_an_unknown_root_to_a_sibling; epr-cli reach_tests an_unknown_input_line_makes_the_record_private), slotless served only by its method row (a_slotless_record_is_served_only_by_its_method_row; shem rowDraws 3 live), a row excluding the requester denies (a_row_that_excludes_steward_denies_a_self_record), nothing above self (a_record_declared_above_self_is_refused)",
+  "not_shown": "the design's 'old slotless floor refused by exact record' leg is moot: the floor kept its manifest (same key and commit)"
+ }
+}
