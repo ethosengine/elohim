@@ -228,6 +228,24 @@ fn land(fx: &Fixture, dir: &str, tail: &[u8]) -> String {
     release.cid
 }
 
+/// A declared env as the run wrote it, less the device dirs the test host's own shell carries
+/// (`device run` carries HOME and the XDG homes it finds; the fixture sets HOME and
+/// XDG_CONFIG_HOME, the host may set the rest).
+fn declared_env(env: &Value, fx: &Fixture) -> Value {
+    let mut env = env.clone();
+    let map = env.as_object_mut().expect("env is an object");
+    for key in ["XDG_DATA_HOME", "XDG_CACHE_HOME", "XDG_STATE_HOME"] {
+        map.remove(key);
+    }
+    assert_eq!(map.remove("HOME"), Some(json!(fx.base)), "HOME is carried");
+    assert_eq!(
+        map.remove("XDG_CONFIG_HOME"),
+        Some(json!(fx.base.join("config"))),
+        "XDG_CONFIG_HOME is carried"
+    );
+    env
+}
+
 fn wait_for(what: &str, mut probe: impl FnMut() -> Option<Value>) -> Value {
     let deadline = Instant::now() + Duration::from_secs(60);
     loop {
@@ -445,7 +463,10 @@ fn run_declares_a_named_process_with_its_environment_offline() {
     let manifest: Value =
         serde_json::from_str(&fx.ok(&["device", "show", "--render", "manifest"])).unwrap();
     let child = &manifest["processes"][0];
-    assert_eq!(child["env"], json!({"A": "1", "B": "2"}));
+    assert_eq!(
+        declared_env(&child["env"], &fx),
+        json!({"A": "1", "B": "2"})
+    );
     assert_eq!(
         child["readiness"][0]["stdout_line"]["contains"],
         "epr peer: serving"
@@ -512,7 +533,7 @@ fn run_env_entries_keep_their_text_and_refuse_what_spawn_cannot_honour_offline()
     let manifest: Value =
         serde_json::from_str(&fx.ok(&["device", "show", "--render", "manifest"])).unwrap();
     assert_eq!(
-        manifest["processes"][0]["env"],
+        declared_env(&manifest["processes"][0]["env"], &fx),
         json!({"A": "b=c", "E": "", "ROOT": "{data_root}/peer"})
     );
     fx.ok(&["device", "run", "epr"]);

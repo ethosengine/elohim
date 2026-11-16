@@ -193,6 +193,23 @@ pub(super) fn run(args: &[String]) -> Result<ExitCode, String> {
                 let registry = manifest_store::registry(&head).map_err(|e| e.to_string())?;
                 let process = launch.name.as_deref().unwrap_or(&tool);
                 refuse_launcher_env(process, &tool, launch.env.keys(), &registry, false)?;
+                let carry = carry_device_dirs(&mut launch.env, |key| std::env::var(key).ok());
+                if !carry.carried.is_empty() {
+                    eprintln!(
+                        "carried from this shell into process {process}'s declared env: {} \
+                         (ark clears every other variable; declare --env KEY=VALUE to choose \
+                         another value)",
+                        carry.carried.join(", ")
+                    );
+                }
+                if !carry.braced.is_empty() {
+                    eprintln!(
+                        "not carried into process {process}: {} — the shell's value holds a \
+                         brace, which a declared env value reads as a placeholder; declare it \
+                         with --env KEY=VALUE",
+                        carry.braced.join(", ")
+                    );
+                }
             }
             store.act(ManifestAct::Run { tool, stop, launch })
         }
@@ -233,6 +250,53 @@ pub(super) fn run(args: &[String]) -> Result<ExitCode, String> {
     };
     println!("{output}");
     Ok(ExitCode::SUCCESS)
+}
+
+/// The directories a `bin:<tool>` process finds this device by: its key and roster live under
+/// `XDG_CONFIG_HOME`, its stores under the data, cache and state homes. Ark starts a child with
+/// a cleared environment, so a peer serve declared without them dies "this device has no device
+/// key" and restarts in a loop.
+const DEVICE_DIR_KEYS: [&str; 5] = [
+    "HOME",
+    "XDG_CONFIG_HOME",
+    "XDG_DATA_HOME",
+    "XDG_CACHE_HOME",
+    "XDG_STATE_HOME",
+];
+
+/// What [`carry_device_dirs`] did with each key the run left undeclared.
+struct Carry {
+    /// Declared from the shell, in [`DEVICE_DIR_KEYS`] order.
+    carried: Vec<&'static str>,
+    /// Left undeclared because the shell's value holds `{` or `}`, which ark reads as a
+    /// placeholder; carrying it would refuse a run the steward never typed that value into.
+    braced: Vec<&'static str>,
+}
+
+/// Declare each [`DEVICE_DIR_KEYS`] entry the run did not declare itself, from `lookup` (the
+/// invoking shell). An explicit `--env` always wins; an unset or empty key stays undeclared.
+fn carry_device_dirs(
+    env: &mut std::collections::BTreeMap<String, String>,
+    lookup: impl Fn(&str) -> Option<String>,
+) -> Carry {
+    let mut carry = Carry {
+        carried: Vec::new(),
+        braced: Vec::new(),
+    };
+    for key in DEVICE_DIR_KEYS {
+        if env.contains_key(key) {
+            continue;
+        }
+        match lookup(key).filter(|v| !v.is_empty()) {
+            Some(value) if value.contains(['{', '}']) => carry.braced.push(key),
+            Some(value) => {
+                env.insert(key.to_owned(), value);
+                carry.carried.push(key);
+            }
+            None => {}
+        }
+    }
+    carry
 }
 
 /// The keys that steer the bin launcher to a raw candidate instead of the verified current:
@@ -343,4 +407,37 @@ fn render_preview(preview: &manifest_store::ManifestPreview) -> String {
         );
     }
     lines.join("\n") + "\n"
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::BTreeMap;
+
+    #[test]
+    fn a_run_carries_the_device_dirs_it_did_not_declare_and_never_overrides_one() {
+        let mut env = BTreeMap::from([("XDG_CONFIG_HOME".to_owned(), "/chosen".to_owned())]);
+        let shell = |key: &str| match key {
+            "HOME" => Some("/home/user".to_owned()),
+            "XDG_CONFIG_HOME" => Some("/shell-config".to_owned()),
+            "XDG_DATA_HOME" => Some("/nix/xdg/data".to_owned()),
+            "XDG_CACHE_HOME" => Some(String::new()),
+            "XDG_STATE_HOME" => Some("/odd/{dir}".to_owned()),
+            _ => None,
+        };
+        let carry = carry_device_dirs(&mut env, shell);
+        assert_eq!(carry.carried, ["HOME", "XDG_DATA_HOME"]);
+        assert_eq!(
+            carry.braced,
+            ["XDG_STATE_HOME"],
+            "a braced value is named, not carried"
+        );
+        assert_eq!(env["XDG_CONFIG_HOME"], "/chosen", "an explicit --env wins");
+        assert_eq!(env["HOME"], "/home/user");
+        assert!(
+            !env.contains_key("XDG_CACHE_HOME"),
+            "an empty value is not carried"
+        );
+        assert!(!env.contains_key("XDG_STATE_HOME"));
+    }
 }

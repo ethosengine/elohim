@@ -271,7 +271,7 @@ fn supervise(
         return Ok(ExitCode::SUCCESS);
     }
     preflight(head)?;
-    let ark = ark_bin()?;
+    let (ark, ark_source) = ark_bin(data_root)?;
     let leased = claim_lease(berth, &head_cid)?;
     let result = (|| {
         // The holder goes first: a handover that times out leaves this device's own ark as
@@ -306,9 +306,10 @@ fn supervise(
     match result {
         Ok(started) => {
             println!(
-                "device ark: started pid {} at manifest {head_cid} (log {})",
+                "device ark: started pid {} at manifest {head_cid} (log {}; ark {}, {ark_source})",
                 started.pid,
-                data_root.join("ark.log").display()
+                data_root.join("ark.log").display(),
+                ark.display()
             );
             Ok(ExitCode::SUCCESS)
         }
@@ -882,7 +883,8 @@ fn stop_ark(data_root: &Path, started: &Started) -> Outcome<()> {
         }
         thread::sleep(Duration::from_millis(100));
     }
-    let _ = fs::remove_file(data_root.join("supervise.json"));
+    // The record stays: `running` reads it as stopped (the pid no longer matches its start
+    // tick), and `recorded_ark` still finds the ark this device chose after a clean stop.
     Ok(())
 }
 
@@ -1167,16 +1169,27 @@ fn epoch_ms() -> u64 {
         .map_or(0, |d| u64::try_from(d.as_millis()).unwrap_or(u64::MAX))
 }
 
-/// `ARK_BIN`, else the pool slot `hc-mesh.sh` prefers, else `ark` on PATH.
-fn ark_bin() -> Outcome<PathBuf> {
-    let executable = |p: &Path| {
-        use std::os::unix::fs::PermissionsExt;
-        fs::metadata(p).is_ok_and(|m| m.is_file() && m.permissions().mode() & 0o111 != 0)
-    };
+fn executable(path: &Path) -> bool {
+    use std::os::unix::fs::PermissionsExt;
+    fs::metadata(path).is_ok_and(|m| m.is_file() && m.permissions().mode() & 0o111 != 0)
+}
+
+/// The ark this data root last started, while that file is still executable. It is read
+/// whether or not that ark still runs: a follow driven by a hook carries no `ARK_BIN`, and the
+/// ark a steward chose once must not silently fall back to an older pool build.
+fn recorded_ark(data_root: &Path) -> Option<PathBuf> {
+    let bytes = fs::read(data_root.join("supervise.json")).ok()?;
+    let started: Started = serde_json::from_slice(&bytes).ok()?;
+    executable(&started.ark).then_some(started.ark)
+}
+
+/// `ARK_BIN`, else the ark this data root last started (see [`recorded_ark`]), else the pool
+/// slot `hc-mesh.sh` prefers, else `ark` on PATH — with the name of the rule that chose it.
+fn ark_bin(data_root: &Path) -> Outcome<(PathBuf, &'static str)> {
     if let Some(explicit) = std::env::var_os("ARK_BIN").filter(|v| !v.is_empty()) {
         let path = PathBuf::from(explicit);
         return if executable(&path) {
-            Ok(path)
+            Ok((path, "ARK_BIN"))
         } else {
             Err(format!(
                 "REFUSED: ARK_BIN={} is not an executable file",
@@ -1184,15 +1197,19 @@ fn ark_bin() -> Outcome<PathBuf> {
             ))
         };
     }
+    if let Some(recorded) = recorded_ark(data_root) {
+        return Ok((recorded, "recorded in supervise.json"));
+    }
     let pool = PathBuf::from(ARK_POOL_SLOT);
     if executable(&pool) {
-        return Ok(pool);
+        return Ok((pool, "cargo pool slot"));
     }
     std::env::var_os("PATH")
         .into_iter()
         .flat_map(|path| std::env::split_paths(&path).collect::<Vec<_>>())
         .map(|dir| dir.join("ark"))
         .find(|p| executable(p))
+        .map(|path| (path, "PATH"))
         .ok_or_else(|| {
             format!(
                 "REFUSED: no ark binary — use the toolchain pinned in genesis/agentic/pool-policy.json \
@@ -1336,6 +1353,37 @@ mod tests {
         assert!(carried_incarnation(dir.path())
             .unwrap_err()
             .contains("incarnation"));
+    }
+
+    #[test]
+    fn the_recorded_ark_is_reused_only_while_it_is_executable() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = tempfile::tempdir().unwrap();
+        assert!(recorded_ark(dir.path()).is_none(), "no record");
+        let ark = dir.path().join("ark-bin");
+        fs::write(&ark, "#!/bin/sh\n").unwrap();
+        let record = Started {
+            pid: 1,
+            start_ticks: 0,
+            manifest_cid: "bafy".into(),
+            ark: ark.clone(),
+            started_at_epoch_ms: 0,
+        };
+        write_atomic(
+            &dir.path().join("supervise.json"),
+            &serde_json::to_vec(&record).unwrap(),
+        )
+        .unwrap();
+        fs::set_permissions(&ark, fs::Permissions::from_mode(0o644)).unwrap();
+        assert!(recorded_ark(dir.path()).is_none(), "not executable");
+        fs::set_permissions(&ark, fs::Permissions::from_mode(0o755)).unwrap();
+        assert_eq!(
+            recorded_ark(dir.path()),
+            Some(ark.clone()),
+            "read although that ark no longer runs"
+        );
+        fs::remove_file(&ark).unwrap();
+        assert!(recorded_ark(dir.path()).is_none(), "gone");
     }
 
     #[test]
