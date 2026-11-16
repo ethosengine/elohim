@@ -98,6 +98,7 @@ fn each_tool(root: &Path, long: bool) -> Result<()> {
     }
     after_moves(
         &moved,
+        super::supervise::child_behind(root),
         &manifest,
         &mut || super::supervise::after_landing(root),
         &mut |line| eprintln!("device arrival: {line}"),
@@ -107,9 +108,12 @@ fn each_tool(root: &Path, long: bool) -> Result<()> {
 
 /// A follow that moved the current of a tool a declared process runs asks the supervisor
 /// once: ark resolves `bin:` only at spawn, so a running child stays on the old bytes until
-/// supervise restarts it. Nothing moved, or nothing declared on what moved, asks nothing.
+/// supervise restarts it. `behind` is a supervised child already on older bytes than current,
+/// which is what a current moved outside arrival leaves: it asks once too. Nothing moved and
+/// nothing behind, or nothing declared on what moved, asks nothing.
 fn after_moves(
     moved: &[String],
+    behind: bool,
     head: &ark_core::RuntimeManifest,
     supervise: &mut impl FnMut() -> std::result::Result<(), String>,
     say: &mut impl FnMut(String),
@@ -121,13 +125,18 @@ fn after_moves(
         })
     };
     let landed: Vec<_> = moved.iter().filter(|tool| runs(tool)).cloned().collect();
-    if landed.is_empty() {
+    if landed.is_empty() && !behind {
         return false;
     }
-    say(format!(
-        "{} moved; asking the device ark to run it",
-        landed.join(", ")
-    ));
+    say(if landed.is_empty() {
+        "a supervised child runs older bytes than current; asking the device ark to restart it"
+            .to_owned()
+    } else {
+        format!(
+            "{} moved; asking the device ark to run it",
+            landed.join(", ")
+        )
+    });
     if let Err(error) = supervise() {
         say(format!("supervise (continuing): {error}"));
     }
@@ -268,11 +277,20 @@ mod tests {
         head
     }
     fn asks(moved: &[&str], head: &ark_core::RuntimeManifest, fails: bool) -> (u32, Vec<String>) {
+        asks_behind(moved, false, head, fails)
+    }
+    fn asks_behind(
+        moved: &[&str],
+        behind: bool,
+        head: &ark_core::RuntimeManifest,
+        fails: bool,
+    ) -> (u32, Vec<String>) {
         let moved: Vec<String> = moved.iter().map(|t| (*t).to_owned()).collect();
         let mut calls = 0;
         let mut lines = Vec::new();
         let asked = after_moves(
             &moved,
+            behind,
             head,
             &mut || {
                 calls += 1;
@@ -301,5 +319,14 @@ mod tests {
         assert_eq!(asks(&["epr"], &head_running(&[]), false).0, 0);
         assert_eq!(asks(&[], &declared, false).0, 0);
         assert_eq!(asks(&["brit"], &declared, false).0, 0);
+    }
+    #[test]
+    fn a_child_left_behind_by_a_move_outside_arrival_asks_the_supervisor_once() {
+        let declared = head_running(&["epr"]);
+        let (calls, lines) = asks_behind(&[], true, &declared, false);
+        assert_eq!(calls, 1);
+        assert!(lines[0].contains("older bytes than current"), "{lines:?}");
+        // An undeclared tool moving does not hide the child that is behind.
+        assert_eq!(asks_behind(&["brit"], true, &declared, false).0, 1);
     }
 }

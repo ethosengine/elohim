@@ -747,6 +747,29 @@ pub(crate) fn after_landing(checkout: &Path) -> Outcome<()> {
     supervise(&data_root, &head, lease_tool(checkout).as_deref(), false).map(|_| ())
 }
 
+/// Whether this device's running ark, at the head manifest, holds a child on other bytes than
+/// its channel's current. Arrival asks it so a current that some other verb moved (`epr bin
+/// follow`, a landing's own ingest) still reaches the running child: found on shem at dev
+/// 34b2fdabe, where a followed epr left the supervised peer on the old bytes and the next
+/// arrival, having moved nothing itself, asked nothing. Anything unreadable answers `false`;
+/// arrival never disturbs supervision on a guess.
+pub(crate) fn child_behind(checkout: &Path) -> bool {
+    let data_root = default_data_root(checkout);
+    let Ok(head) = super::declaration::store(None, None, None)
+        .and_then(|store| store.read().map_err(|e| e.to_string()))
+    else {
+        return false;
+    };
+    let (Ok(head_cid), Ok(Some(started))) = (head.cid(), running(&data_root)) else {
+        return false;
+    };
+    started.manifest_cid == head_cid
+        && matches!(
+            child_identity(&data_root, &head, &started),
+            Ok(Identity::Stale { .. })
+        )
+}
+
 fn start_ark(
     data_root: &Path,
     head: &RuntimeManifest,
