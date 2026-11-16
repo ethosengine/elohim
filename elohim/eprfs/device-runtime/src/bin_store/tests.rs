@@ -1338,6 +1338,56 @@ fn not_a_device_check_refuses_while_a_peer_process_is_declared() {
     );
 }
 #[test]
+fn a_revert_lands_with_a_note_while_a_forward_refuses_under_a_declared_peer() {
+    let mut f = Fixture::new("epr");
+    f.store = f.store.clone().with_peer_serving(PeerServing::Required);
+    let good = f.release("pre-check-good");
+    let bad = f.release("bad-current");
+    let forward = f.release("forward-candidate");
+    f.land(&good).unwrap();
+    f.land(&bad).unwrap();
+    for kind in ["peer-check-unsupported", "peer-check-not-a-device"] {
+        {
+            let mut state = f.state.lock().unwrap();
+            state.peer_check_unsupported = kind == "peer-check-unsupported";
+            state.peer_check_not_device = kind == "peer-check-not-a-device";
+        }
+
+        let error = f.land_expected(&forward, Some(&bad.cid)).unwrap_err();
+        assert_eq!(error.kind, kind);
+        assert_eq!(f.store.head("current"), Some(bad.cid.clone()));
+
+        let landed = f
+            .store
+            .land_expected(
+                &good.cid,
+                &f.commit(),
+                f.tmp.path(),
+                Transition::Revert,
+                Some(&bad.cid),
+            )
+            .unwrap();
+        assert_eq!(landed.ring, "reverted");
+        assert_eq!(f.store.head("current"), Some(good.cid.clone()));
+        let record = f.store.record(&good.cid).unwrap();
+        assert!(record.extra["notes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|row| row["kind"] == kind
+                && row["detail"]
+                    .as_str()
+                    .is_some_and(|d| d.contains("supervised `epr peer serve` is declared"))));
+        // Put the bad release back as current for the next kind.
+        {
+            let mut state = f.state.lock().unwrap();
+            state.peer_check_unsupported = false;
+            state.peer_check_not_device = false;
+        }
+        f.land_expected(&bad, Some(&good.cid)).unwrap();
+    }
+}
+#[test]
 fn a_passing_check_lands_while_a_peer_process_is_declared() {
     let mut f = Fixture::new("epr");
     f.store = f.store.clone().with_peer_serving(PeerServing::Required);

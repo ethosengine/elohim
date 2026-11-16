@@ -412,6 +412,57 @@ mod tests {
     }
 
     #[test]
+    fn only_a_peer_serve_on_the_tools_own_channel_requires_peer_serving() {
+        let tmp = tempfile::tempdir().unwrap();
+        let base = device_manifest(tmp.path()).read().unwrap();
+        let channel = |tool: &str| ark_core::ArtifactRef::Channel {
+            channel_id: format!("bin:{tool}"),
+        };
+        let child = |artifact: ark_core::ArtifactRef, argv: &[&str]| ark_core::ChildSpec {
+            name: "peer".into(),
+            artifact,
+            argv: argv.iter().map(|arg| (*arg).to_owned()).collect(),
+            ..Default::default()
+        };
+        let declares = |spec: ark_core::ChildSpec| {
+            let mut manifest = base.clone();
+            manifest.processes = vec![spec];
+            declares_peer_serve(&manifest, "epr")
+        };
+
+        assert!(declares(child(
+            channel("epr"),
+            &["{artifact}", "peer", "serve", "--root", "/r"]
+        )));
+        assert!(
+            !declares(child(channel("brit"), &["{artifact}", "peer", "serve"])),
+            "another tool's channel"
+        );
+        assert!(
+            !declares(child(
+                ark_core::ArtifactRef::Pinned {
+                    cid: None,
+                    sha256: "0".repeat(64),
+                    bytes: None,
+                },
+                &["{artifact}", "peer", "serve"],
+            )),
+            "a pinned artifact does not follow the landed release"
+        );
+        assert!(
+            !declares(child(
+                channel("epr"),
+                &["{artifact}", "peer", "serve", "--check"]
+            )),
+            "a check is not a daemon"
+        );
+        assert!(
+            !declares(child(channel("epr"), &["peer", "serve"])),
+            "`peer` at argv[0] is the program, not its first argument"
+        );
+    }
+
+    #[test]
     fn an_unreadable_manifest_keeps_the_landing_tolerance() {
         let tmp = tempfile::tempdir().unwrap();
         let store = device_manifest(tmp.path());

@@ -134,8 +134,7 @@ pub enum PeerCliError {
     /// [`EXIT_SERVE_LOCK_HELD`] with one stable line, so a supervisor coalesces repeated losses
     /// into one cause instead of restart-looping against a hand-started holder.
     #[error(
-        "epr peer serve refused: this device's serve lock `{}` is held by {}; one endpoint per \
-         node id — stop the holder first, or leave it serving (exit {EXIT_SERVE_LOCK_HELD})",
+        "{SERVE_LOCK_HELD_LINE}\n  the serve lock `{}` is held by {}",
         .path.display(),
         holder_name(.holder)
     )]
@@ -158,6 +157,11 @@ impl PeerCliError {
 /// ark supervisor's same-cause key (`exited:<code>|<first stderr line>|fast:<bool>`) is
 /// identical across repeated losses and its `same_cause_limit` stops the restart loop.
 pub const EXIT_SERVE_LOCK_HELD: u8 = 5;
+
+/// The refusal's first line, identical whoever holds the lock: a supervisor's same-cause key
+/// reads it, so the holder (which varies) is named on the line after it.
+pub const SERVE_LOCK_HELD_LINE: &str = "epr peer serve refused: another serve holds this device's \
+     serve lock; one endpoint per node id — stop it first, or leave it serving (exit 5)";
 
 /// The serve lock's holder as the refusal names it.
 fn holder_name(holder: &Option<u32>) -> String {
@@ -394,21 +398,24 @@ impl ServeLock {
         Ok(())
     }
 
-    /// The live process a `serve` recorded as this lock's holder, if any. A recorded pid whose
-    /// start time no longer matches is a dead holder (or a reused pid) and names nobody.
+    /// The live process a `serve` recorded as this lock's holder, if any. Only a full
+    /// `<pid> <start time>` record whose start time still matches names a holder: a dead holder,
+    /// a reused pid, a pid-only or unreadable record names nobody.
     #[must_use]
     pub fn holder(peer_dir: &Path) -> Option<u32> {
+        Self::holder_in(peer_dir, &elohim_device_runtime::session::proc_root())
+    }
+
+    fn holder_in(peer_dir: &Path, proc_root: &Path) -> Option<u32> {
         let text = std::fs::read_to_string(peer_dir.join(Self::FILE_NAME)).ok()?;
         let mut fields = text.split_whitespace();
         let pid: u32 = fields.next()?.parse().ok()?;
-        let now = elohim_device_runtime::session::process_start_time(
-            &elohim_device_runtime::session::proc_root(),
-            pid,
-        )?;
-        match fields.next() {
-            Some(start) if start != now.to_string() => None,
-            _ => Some(pid),
+        let recorded = fields.next()?;
+        if fields.next().is_some() {
+            return None;
         }
+        let now = elohim_device_runtime::session::process_start_time(proc_root, pid)?;
+        (recorded == now.to_string()).then_some(pid)
     }
 
     /// Whether a daemon holds this device's serve lock now: `Some(true)` when it is held,
@@ -2775,5 +2782,74 @@ mod status_contract {
         assert!(allow
             .withheld([&record], &CROSSING_INTENT_MEASURES)
             .is_empty());
+    }
+}
+
+#[cfg(test)]
+mod serve_lock_tests {
+    use super::{ServeLock, EXIT_SERVE_LOCK_HELD, SERVE_LOCK_HELD_LINE};
+    use std::path::Path;
+
+    fn record(dir: &Path, text: &str) {
+        std::fs::write(dir.join(ServeLock::FILE_NAME), text).unwrap();
+    }
+
+    fn own_start() -> u64 {
+        elohim_device_runtime::session::process_start_time(
+            &elohim_device_runtime::session::proc_root(),
+            std::process::id(),
+        )
+        .expect("this test process has a start time")
+    }
+
+    #[test]
+    fn a_recorded_holder_reads_back_as_this_process() {
+        let dir = tempfile::tempdir().unwrap();
+        let lock = ServeLock::acquire(dir.path()).unwrap();
+        lock.record_holder().unwrap();
+        assert_eq!(ServeLock::holder(dir.path()), Some(std::process::id()));
+        // A second record replaces the first rather than appending to it.
+        lock.record_holder().unwrap();
+        let text = std::fs::read_to_string(dir.path().join(ServeLock::FILE_NAME)).unwrap();
+        assert_eq!(text, format!("{} {}\n", std::process::id(), own_start()));
+    }
+
+    #[test]
+    fn a_reused_pid_names_nobody() {
+        let dir = tempfile::tempdir().unwrap();
+        record(
+            dir.path(),
+            &format!("{} {}\n", std::process::id(), own_start() + 1),
+        );
+        assert_eq!(ServeLock::holder(dir.path()), None);
+    }
+
+    #[test]
+    fn a_pid_only_record_names_nobody() {
+        let dir = tempfile::tempdir().unwrap();
+        record(dir.path(), &format!("{}\n", std::process::id()));
+        assert_eq!(ServeLock::holder(dir.path()), None);
+    }
+
+    #[test]
+    fn an_empty_absent_or_garbage_record_names_nobody() {
+        let dir = tempfile::tempdir().unwrap();
+        assert_eq!(ServeLock::holder(dir.path()), None, "absent");
+        for text in [
+            "",
+            "\n",
+            "not-a-pid 12\n",
+            "-1 12\n",
+            &format!("{} {} extra\n", std::process::id(), own_start()),
+        ] {
+            record(dir.path(), text);
+            assert_eq!(ServeLock::holder(dir.path()), None, "{text:?}");
+        }
+    }
+
+    #[test]
+    fn the_stable_refusal_line_names_the_exit_code() {
+        assert!(SERVE_LOCK_HELD_LINE.contains(&format!("(exit {EXIT_SERVE_LOCK_HELD})")));
+        assert!(!SERVE_LOCK_HELD_LINE.contains('\n'));
     }
 }

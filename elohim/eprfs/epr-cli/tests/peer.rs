@@ -834,19 +834,6 @@ fn the_serving_line_is_on_stdout_and_sigterm_sigint_stop_cleanly() {
     }
 }
 
-fn serve_once(device: &Device, policy: &Path) -> Output {
-    device.epr(&[
-        "peer",
-        "serve",
-        "--root",
-        device.root(),
-        "--policy",
-        policy.to_str().unwrap(),
-        "--listen",
-        "127.0.0.1:0",
-    ])
-}
-
 /// Every daemon lease in a device's epr store, with its bytes, in name order.
 fn daemon_leases(device: &Device) -> Vec<(PathBuf, Vec<u8>)> {
     let dir = device.config.path().join("epr-store/sessions");
@@ -869,6 +856,42 @@ fn daemon_leases(device: &Device) -> Vec<(PathBuf, Vec<u8>)> {
     leases
 }
 
+/// The refusal's stable first line exactly as `epr` prints it.
+fn refusal_line() -> String {
+    format!("epr peer: {}", elohim_epr_cli::peer::SERVE_LOCK_HELD_LINE)
+}
+
+/// One losing serve: exits the lock-held code, announces nothing, and returns its stderr.
+fn lose(command: &mut Command) -> String {
+    let out = command.output().expect("epr runs");
+    let stderr = String::from_utf8_lossy(&out.stderr).into_owned();
+    assert_eq!(
+        out.status.code(),
+        Some(i32::from(elohim_epr_cli::peer::EXIT_SERVE_LOCK_HELD)),
+        "{stderr}"
+    );
+    assert!(
+        out.stdout.is_empty(),
+        "a refused serve never announces itself"
+    );
+    stderr
+}
+
+fn serve_command(device: &Device, policy: &Path) -> Command {
+    let mut command = device.command();
+    command.args([
+        "peer",
+        "serve",
+        "--root",
+        device.root(),
+        "--policy",
+        policy.to_str().unwrap(),
+        "--listen",
+        "127.0.0.1:0",
+    ]);
+    command
+}
+
 #[test]
 fn a_second_serve_exits_lock_held_naming_the_holder_and_leaves_its_lease_intact() {
     let (keys, a, _b) = household();
@@ -882,31 +905,33 @@ fn a_second_serve_exits_lock_held_naming_the_holder_and_leaves_its_lease_intact(
         holder_lease.starts_with(&format!("daemon-{}-", first.id())),
         "{holder_lease}"
     );
+    let lock_file = a
+        .peer_dir()
+        .join(elohim_epr_cli::peer::ServeLock::FILE_NAME);
+    let holder_record = std::fs::read(&lock_file).unwrap();
+    assert!(
+        String::from_utf8_lossy(&holder_record).starts_with(&format!("{} ", first.id())),
+        "the holder records itself: {:?}",
+        String::from_utf8_lossy(&holder_record)
+    );
 
-    let mut first_lines = Vec::new();
     for _ in 0..2 {
-        let out = serve_once(&a, &policy);
-        let stderr = String::from_utf8_lossy(&out.stderr).into_owned();
-        assert_eq!(
-            out.status.code(),
-            Some(i32::from(elohim_epr_cli::peer::EXIT_SERVE_LOCK_HELD)),
+        let stderr = lose(&mut serve_command(&a, &policy));
+        let mut lines = stderr.lines();
+        // Line 1 never varies with the holder: it is what a supervisor's same-cause key reads.
+        assert_eq!(lines.next(), Some(refusal_line().as_str()), "{stderr}");
+        let holder = lines.next().unwrap_or_default();
+        assert!(
+            holder.contains(&format!("held by pid {}", first.id())),
             "{stderr}"
         );
-        let line = stderr.lines().next().unwrap_or_default().to_owned();
-        assert!(
-            line.contains(&format!("held by pid {}", first.id())),
-            "{line}"
-        );
-        assert!(line.contains("stop the holder first"), "{line}");
-        assert!(
-            out.stdout.is_empty(),
-            "a refused serve never announces itself"
-        );
         assert_eq!(daemon_leases(&a), before, "the loser writes no lease");
-        first_lines.push(line);
+        assert_eq!(
+            std::fs::read(&lock_file).unwrap(),
+            holder_record,
+            "the loser never rewrites the holder's record"
+        );
     }
-    // One stable first line: a supervisor's same-cause key sees one cause, not two.
-    assert_eq!(first_lines[0], first_lines[1]);
 
     signal_and_wait(&mut first, libc::SIGTERM);
 }
@@ -917,19 +942,49 @@ fn a_serve_against_a_lock_held_without_a_recorded_holder_writes_no_lease() {
     let policy = policy(keys.path());
     let _held = elohim_epr_cli::peer::ServeLock::acquire(&a.peer_dir()).expect("lock");
 
-    let out = serve_once(&a, &policy);
+    let stderr = lose(&mut serve_command(&a, &policy));
 
-    let stderr = String::from_utf8_lossy(&out.stderr);
+    let mut lines = stderr.lines();
     assert_eq!(
-        out.status.code(),
-        Some(i32::from(elohim_epr_cli::peer::EXIT_SERVE_LOCK_HELD)),
+        lines.next(),
+        Some(refusal_line().as_str()),
+        "the same first line as a loss to a recorded holder: {stderr}"
+    );
+    assert!(
+        lines.next().unwrap_or_default().contains("recorded no pid"),
         "{stderr}"
     );
-    assert!(stderr.contains("recorded no pid"), "{stderr}");
     assert!(
         !a.config.path().join("epr-store/sessions").exists(),
         "a lost lock records no daemon lease"
     );
+}
+
+#[test]
+fn relay_notices_never_precede_the_lock_refusal() {
+    let (keys, a, _b) = household();
+    let policy = policy(keys.path());
+    let _held = elohim_epr_cli::peer::ServeLock::acquire(&a.peer_dir()).expect("lock");
+
+    // Each relay source prints its own notice when serve reaches it: the THIRD-PARTY n0 line,
+    // the legacy-variable deprecation, and (with neither set) the absent-Rulebook default.
+    for (key, value) in [
+        ("EPR_PEER_RELAYS", Some("n0")),
+        ("EPR_PEER_RELAY_URL", Some("https://relay.example.test")),
+        ("EPR_PEER_RELAYS", None),
+    ] {
+        let mut command = serve_command(&a, &policy);
+        if let Some(value) = value {
+            command.env(key, value);
+        }
+        let stderr = lose(&mut command);
+        assert_eq!(
+            stderr.lines().next(),
+            Some(refusal_line().as_str()),
+            "{key}={value:?}: {stderr}"
+        );
+        assert!(!stderr.contains("relay"), "{key}={value:?}: {stderr}");
+    }
 }
 
 /// A berth record as T1 folds it, `via` another device when folded from it.

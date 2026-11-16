@@ -296,7 +296,7 @@ impl Store {
                 state
             };
             self.require_attestation(&mut record, commit, repo, false)?;
-            let health_note = self.health(cid, commit, repo)?;
+            let health_note = self.health(cid, commit, repo, &transition)?;
             let feedback = self.feedback_health(cid, repo)?;
             let _locks = match &feedback {
                 Some(qualified) => qualified.locks(self)?,
@@ -465,6 +465,7 @@ impl Store {
         cid: &str,
         commit: &str,
         repo: &Path,
+        transition: &Transition,
     ) -> Result<Option<(&'static str, &'static str)>> {
         let dir = self.artifact(cid)?;
         self.identity(&dir, cid, commit)
@@ -507,8 +508,11 @@ impl Store {
             if !checked.success {
                 if checked.stderr.contains("unknown peer argument `--check`") {
                     return self.peer_check_outcome(
+                        transition,
                         "peer-check-unsupported",
                         "candidate does not advertise peer serve --check",
+                        "candidate does not advertise peer serve --check; a supervised `epr peer \
+                         serve` is declared and the check could not prove this revert serves",
                     );
                 }
                 let refusal_kind = serde_json::from_str::<Value>(&checked.stdout)
@@ -516,8 +520,12 @@ impl Store {
                     .and_then(|value| value["kind"].as_str().map(str::to_owned));
                 if refusal_kind.as_deref() == Some("not-a-device") {
                     return self.peer_check_outcome(
+                        transition,
                         "peer-check-not-a-device",
                         "candidate check found no device standing in this checkout",
+                        "candidate check found no device standing in this checkout; a supervised \
+                         `epr peer serve` is declared and the check could not prove this revert \
+                         serves",
                     );
                 }
                 return Err(Refusal::new(
@@ -529,15 +537,20 @@ impl Store {
         Ok(None)
     }
     /// A peer check that proves nothing: a note while no peer process is declared, a refusal
-    /// once the device supervises `peer serve` from the landed release.
+    /// once the device supervises `peer serve` from the landed release. A revert still lands
+    /// with a note naming the declared peer: it is the escape hatch from a bad current, and the
+    /// previous good release may predate `peer serve --check`.
     fn peer_check_outcome(
         &self,
+        transition: &Transition,
         kind: &'static str,
         detail: &'static str,
+        revert_detail: &'static str,
     ) -> Result<Option<(&'static str, &'static str)>> {
-        match self.peer_serving {
-            PeerServing::Tolerated => Ok(Some((kind, detail))),
-            PeerServing::Required => Err(Refusal::new(
+        match (self.peer_serving, transition) {
+            (PeerServing::Tolerated, _) => Ok(Some((kind, detail))),
+            (PeerServing::Required, Transition::Revert) => Ok(Some((kind, revert_detail))),
+            (PeerServing::Required, _) => Err(Refusal::new(
                 kind,
                 format!(
                     "{detail}; this device's manifest declares a supervised `epr peer serve`, \
