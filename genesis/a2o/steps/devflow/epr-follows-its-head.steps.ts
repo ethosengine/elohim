@@ -28,6 +28,8 @@ import { setTimeout as delay } from 'node:timers/promises';
 
 import { After, Given, Then, When } from '@cucumber/cucumber';
 
+import * as AjvNs from 'ajv/dist/2020.js';
+
 import { assertByteCid, mintByteCid } from '../../src/framework/byte-address.js';
 import { loadRegistry } from '../../src/framework/session.js';
 
@@ -56,7 +58,7 @@ interface FollowFixture {
   launchedCid?: string;
   last?: Invocation;
   daemon?: ChildProcess;
-  daemonEnv?: NodeJS.ProcessEnv;
+  deviceEnv?: NodeJS.ProcessEnv;
   bootstrapEnv?: NodeJS.ProcessEnv;
 }
 
@@ -73,6 +75,29 @@ const candidateSource = process.env.EPR_BIN ?? documentedGateBuild;
 const storeCli = candidateSource;
 const launcherSource = process.env.BIN_LAUNCH_BIN ?? join(dirname(candidateSource), 'bin-launch');
 const scratchBase = process.env.A2O_TMPDIR ?? tmpdir();
+const peerStatusSchemaPath = join(
+  repository,
+  'elohim/sdk/schemas/v1/views/peer-cli-status.schema.json'
+);
+
+type Validate = AjvNs.ValidateFunction;
+const AjvCtor: new (opts: { strict: boolean; allErrors: boolean }) => AjvNs.default =
+  (AjvNs as unknown as { default: new (opts: object) => AjvNs.default }).default ??
+  (AjvNs as unknown as new (opts: object) => AjvNs.default);
+let compiledPeerStatus: Validate | undefined;
+
+function peerStatusSchema(): Validate {
+  compiledPeerStatus ??= new AjvCtor({ strict: false, allErrors: true }).compile(
+    JSON.parse(readFileSync(peerStatusSchemaPath, 'utf8'))
+  );
+  return compiledPeerStatus;
+}
+
+function ajvErrors(valid: Validate): string {
+  return (valid.errors ?? [])
+    .map(error => `${error.instancePath || '/'} ${error.message ?? ''}`)
+    .join('; ');
+}
 
 function fixture(world: object): FollowFixture {
   const found = fixtures.get(world);
@@ -279,6 +304,13 @@ function ingest(
   return cid;
 }
 
+/** The head a landing expects to replace: `epr bin land --expect` refuses any other prior. */
+function priorHead(state: FollowFixture): string {
+  const path = join(state.store, 'current.json');
+  if (!existsSync(path)) return 'none';
+  return String(object(JSON.parse(readFileSync(path, 'utf8'))).cid);
+}
+
 function land(state: FollowFixture, cid: string, sourceCommit: string, revert = false): Invocation {
   return store(state, [
     'land',
@@ -287,6 +319,8 @@ function land(state: FollowFixture, cid: string, sourceCommit: string, revert = 
     sourceCommit,
     '--repo',
     state.repo,
+    '--expect',
+    priorHead(state),
     ...(revert ? ['--revert'] : []),
   ]);
 }
@@ -732,7 +766,16 @@ Given(
         )
       ).cid
     );
-    call(['land', state.cidA, '--commit', state.commitA, '--repo', state.repo]);
+    call([
+      'land',
+      state.cidA,
+      '--commit',
+      state.commitA,
+      '--repo',
+      state.repo,
+      '--expect',
+      priorHead(state),
+    ]);
     // Model an installed launcher link, rather than the standalone launcher copy
     // used by scenarios that never exercise installation's plain-binary adoption.
     const managedLauncher = join(dirname(state.store), 'bin/bin-launch');
@@ -806,12 +849,19 @@ Then('the device lands the paired release and installs its launcher', function (
   );
 });
 
-When('that pinned session starts the peer daemon', { timeout: 30000 }, async function () {
-  const state = fixture(this);
-  assert.ok(state.sessionEnv);
+/**
+ * Make the fixture checkout one of Matthew's devices: a witnessed human, a device key and a
+ * registered peer endpoint, which `epr peer status` needs to report anything. Starts no daemon.
+ * `overrides` apply last, so a caller can pin the build its own commands run.
+ */
+function setUpPeerDevice(
+  state: FollowFixture,
+  base: NodeJS.ProcessEnv,
+  overrides: NodeJS.ProcessEnv = {}
+): NodeJS.ProcessEnv {
   appendFileSync(join(state.repo, '.git/info/exclude'), '\n.eprfs/\n');
-  state.daemonEnv = {
-    ...state.sessionEnv,
+  const deviceEnv: NodeJS.ProcessEnv = {
+    ...base,
     EPR_UNDER_TEST: '1',
     EPR_PROC_ROOT: state.procRoot,
     EPR_BIN_TOOLS: registrySource,
@@ -820,11 +870,12 @@ When('that pinned session starts the peer daemon', { timeout: 30000 }, async fun
     GIT_CEILING_DIRECTORIES: '/tmp',
     EPR_PEER_RELAY_URL: '',
     EPR_PEER_RELAYS: '',
-    EPR_PIN_CID: state.cidA,
     EPR_FIXTURE_OWNER_PID: String(process.pid),
+    ...overrides,
   };
+  state.deviceEnv = deviceEnv;
   const native = (args: string[]) =>
-    ok(state, [storeCli, ...args, '--root', state.repo], state.daemonEnv);
+    ok(state, [storeCli, ...args, '--root', state.repo], deviceEnv);
   native([
     'actor',
     'witness',
@@ -837,8 +888,34 @@ When('that pinned session starts the peer daemon', { timeout: 30000 }, async fun
     '--basis',
     'fixture operator present',
   ]);
-  const id = ok(state, [storeCli, 'peer', 'id'], state.daemonEnv).stdout.trim();
+  const id = ok(state, [storeCli, 'peer', 'id'], deviceEnv).stdout.trim();
   native(['actor', 'device', 'endpoint', '--node-id', id]);
+  return deviceEnv;
+}
+
+/** `epr peer status --json` through the launcher, checked against its view schema. */
+function peerStatus(state: FollowFixture, env: NodeJS.ProcessEnv): JsonObject {
+  const status: unknown = JSON.parse(
+    ok(state, [state.launcher, 'peer', 'status', '--root', state.repo, '--json'], env).stdout
+  );
+  const valid = peerStatusSchema();
+  assert.ok(valid(status), `peer status --json fails its view schema: ${ajvErrors(valid)}`);
+  return object(status);
+}
+
+Given(
+  "Matthew's workspace has its own device identity and peer endpoint, with no peer daemon running",
+  function () {
+    const state = fixture(this);
+    setUpPeerDevice(state, launcherEnv(state, { ELOHIM_SESSION_ID: 'peer-status-session' }));
+    assert.equal(state.daemon, undefined, 'no peer daemon was started');
+  }
+);
+
+When('that pinned session starts the peer daemon', { timeout: 30000 }, async function () {
+  const state = fixture(this);
+  assert.ok(state.sessionEnv);
+  setUpPeerDevice(state, state.sessionEnv, { EPR_PIN_CID: state.cidA });
   const peerPolicy = join(state.base, 'peer-policy.json');
   writeFileSync(peerPolicy, JSON.stringify({ berth: { channel: { crosses: {} } } }));
   state.daemon = spawn(
@@ -856,7 +933,7 @@ When('that pinned session starts the peer daemon', { timeout: 30000 }, async fun
     ],
     {
       cwd: state.repo,
-      env: state.daemonEnv,
+      env: state.deviceEnv,
       stdio: ['ignore', 'ignore', 'pipe'],
     }
   );
@@ -894,7 +971,7 @@ Then("the peer daemon's lease and status name build B as its running build", fun
   const status = object(
     JSON.parse(
       ok(state, [state.launcher, 'peer', 'status', '--root', state.repo, '--json'], {
-        ...state.daemonEnv,
+        ...state.deviceEnv,
         EPR_PIN_CID: '',
       }).stdout
     )
@@ -964,4 +1041,62 @@ When('Matthew tries to revert to stored build B', function () {
   const state = fixture(this);
   assert.ok(state.cidB && state.commitB);
   state.last = land(state, state.cidB, state.commitB, true);
+});
+
+When('the device follows that checkout with epr bin follow', function () {
+  const state = fixture(this);
+  state.last = store(state, ['follow', '--repo', state.repo]);
+});
+
+Then('the follow lands nothing and build B remains the landed epr head', function () {
+  const state = fixture(this);
+  const result = state.last;
+  assert.ok(result, 'a follow attempt must have run');
+  // A refused follow is an answer, not a failure: it exits 0 and says it did not follow.
+  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+  assert.equal(object(JSON.parse(result.stdout)).followed, false, result.stdout);
+  assert.equal(landedCid(state), state.cidB);
+});
+
+Then("peer status reports epr's last follow as refused for {string}", function (kind: string) {
+  const state = fixture(this);
+  assert.ok(state.deviceEnv && state.cidB);
+  const outcomes = peerStatus(state, state.deviceEnv).followOutcomes;
+  assert.ok(Array.isArray(outcomes), 'peer status carries followOutcomes');
+  const row = object(outcomes.find(entry => object(entry).tool === 'epr'));
+  assert.equal(row.state, 'recorded', JSON.stringify(row));
+  const record = object(row.record);
+  assert.equal(record.outcome, 'refused');
+  assert.equal(record.kind, kind);
+  assert.equal(record.commit, state.commitA, 'the record names the checkout it refused');
+  // The head the device kept: build B before the attempt and after it.
+  assert.equal(record.priorCid, state.cidB);
+  assert.equal(record.resultCid, state.cidB);
+  assert.equal(landedCid(state), state.cidB);
+});
+
+/** The CLI's own shortening of a CID for a status line: 16 leading and 4 trailing characters. */
+function shortCid(cid: string): string {
+  const chars = [...cid];
+  return chars.length <= 21 ? cid : `${chars.slice(0, 16).join('')}…${chars.slice(-4).join('')}`;
+}
+
+Then("peer status's epr line says the follow was refused and names the head it kept", function () {
+  const state = fixture(this);
+  assert.ok(state.deviceEnv && state.cidB);
+  const text = ok(
+    state,
+    [state.launcher, 'peer', 'status', '--root', state.repo],
+    state.deviceEnv
+  ).stdout;
+  const line = text.split('\n').find(entry => entry.startsWith('follow epr: '));
+  assert.ok(line, `peer status prints no epr follow line:\n${text}`);
+  const kept = shortCid(state.cidB).replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
+  assert.match(
+    line,
+    new RegExp(
+      String.raw`^follow epr: refused at \S+ \(commit ${state.commitA.slice(0, 12)}, apply, ` +
+        String.raw`head stays ${kept}\) — non-descendant: HEAD does not descend from the landed head$`
+    )
+  );
 });

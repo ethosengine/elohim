@@ -11,10 +11,13 @@ Feature: Matthew's workspace follows its landed epr head
   history; and it passes its health check (the evaluator names its own executable CID and answers a read-only flow
   command). "Lands" below means both steps; a build ingested but not landed stays in the store,
   available to pin or to revert to. A revert moves the head backward deliberately, and only to a
-  published build. The store's verbs (ingest, land, resolve, status, gc) are `epr bin`; `epr` on
-  PATH is a launcher that asks the same store which build to run. The first launcher resolution
-  in a session pins that head, so a gate may land a newer build without changing the evaluator
-  underneath work already in progress. A build ingested from an unfinished, dirty tree remains
+  published build. The store's verbs (ingest, land, pin, resolve, status, gc) are `epr bin`; `epr` on
+  PATH is a launcher, a small executable named bin-launch, that asks the same store which build to
+  run. The first launcher resolution in a session pins that head, so a gate (the local checks that
+  build and store a build before a push) may land a newer build without changing the evaluator
+  underneath work already in progress. A session that falls behind the head this way gets one notice
+  naming the newly landed release, and `epr bin pin` moves that session's own pin when Matthew
+  chooses to. A build ingested from an unfinished, dirty tree remains
   available for deliberate testing, but it cannot silently become the device's head.
 
   "Reports build B's CID" below means the reported executable CID matches the epr entry in
@@ -38,11 +41,22 @@ Feature: Matthew's workspace follows its landed epr head
   the head, the previous head, builds ingested within the last 14 days, and every build a live
   session pin or daemon lease names.
 
+  A device also keeps up by itself: `epr bin follow` looks at the device's checkout and lands the
+  epr build for that commit only under the landing rules above, so a checkout whose commit does
+  not descend from the head is refused. Every follow leaves a follow record, a private note in the
+  store saying how that attempt ended (landed; refused; unchanged; or observed, when a follow in
+  observe mode only reports what it would land) and, for a refusal,
+  its kind; `epr peer status` reports each tool's last follow record, even with no peer daemon
+  running, so a device whose following is stuck no longer looks the same as one that is current.
+
   Older devices may still use a Python launcher and addresses beginning with sha256:. Their
   installed epr has no bin command for managing the native store. Their start hook queues a
   background build, then the new native commands migrate the store and install its launcher.
-  Historical single-executable releases remain valid; the new release carries both epr and its
-  launcher. Matthew can then run the landed evaluator.
+  Historical single-file releases (epr alone) remain valid; the new paired release carries both epr
+  and its launcher. Matthew can then run the landed evaluator. The device's manifest declares which
+  tools it keeps, its inventory; applying that manifest and following brings the declared release in,
+  and so does each arrival, the start-of-session routine that follows the device's declared tools.
+  A paired release from the same source commit replaces a single-file one already landed.
 
   Background:
     Given Matthew's workspace has an isolated device directory and source history
@@ -127,6 +141,16 @@ Feature: Matthew's workspace follows its landed epr head
     When the head is reverted to build A and build B loses previous-head and 14-day history protection
     And garbage collection runs while the peer daemon lives
     Then build B remains in the store, held by the daemon's lease
+
+  Scenario: A refused follow is visible in peer status
+    Given clean build A is the landed epr head
+    And clean build B lands from the next source commit
+    And Matthew's workspace has its own device identity and peer endpoint, with no peer daemon running
+    And Matthew checks out build A's older source commit
+    When the device follows that checkout with epr bin follow
+    Then the follow lands nothing and build B remains the landed epr head
+    And peer status reports epr's last follow as refused for "non-descendant"
+    And peer status's epr line says the follow was refused and names the head it kept
 
   @regression
   Scenario: An unpublished feature build cannot become the head even with a revert
