@@ -36,6 +36,11 @@ The steward approved a renewal. Two sessions acted on it in parallel; the one on
 ethosengine's `4b1cf33b0` (window to **2026-11-16T16:00Z**), and shem's duplicate was dropped.
 The same refusal therefore recurs on **2026-11-16T16:00Z** unless the steward rules first.
 
+It recurred. On 2026-11-16 the window closed at 16:00Z with no ruling and no sense, and the
+next dev push (shem, 17:27Z, a fix for a red eprfs pipeline) met the refusal 153 s into its gate.
+The steward ruled "Renew 7 days" when asked; the window is now 2026-11-16T16:00Z to
+**2026-11-23T16:00Z**, same parties and bounds. Second occurrence in two weeks: this item is the cure.
+
 When the shift offered a cloud-routine reminder, the operator declined it: "this needs to be
 part of the native elohim harness".
 
@@ -53,4 +58,4 @@ part of the native elohim harness".
 
 ## Next expiry to beat
 
-adam G2 runner grant: **2026-11-16T16:00:00Z**.
+adam G2 runner grant: **2026-11-23T16:00:00Z**.
