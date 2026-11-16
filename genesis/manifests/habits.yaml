@@ -1821,10 +1821,10 @@ habits:
         ARK_BIN must name a built ark: without it this test returns successfully
         without asserting the live story)
     evidence: >
-      DELTA 2026-11-15 (RED preserved; follow outcomes recorded): every `epr bin follow` attempt now leaves a private `follow.json` per tool store (pending, then landed, refused with its kind, unchanged or observed) and `epr peer status` prints the last outcome per tool. Local evidence: 37 device-runtime follow tests and 7 epr-cli peer tests passed, clippy -D warnings clean; one independent review round, eight findings fixed. Not observed on a live device, and no resident is declared yet: the peer daemon is still hand-launched, so this habit stays red.
-    evidence-fingerprint: sha256:37d94fe22d954741
-    evidence-bytes: 3093
-    evidence-entries: 2
+      DELTA 2026-11-16 (RED preserved; adopted live on shem): with dev 51bbf5976 (S2a, S2c, S2d, S2b) and epr head bafyreibrouhrtlkkijns6d4zrh4xci5xk2u344ntrp4nqwqrtaj2vd2p34, shem declared `peer` (`bin:epr`, `peer serve`, restart permanent) at manifest bafyreidzvu6k5uwk4l4vuoqkpguxli77so3hyndrwom6n3pu3jbd6rl3s4 and ran `epr device supervise --handover`. Observed: a plain supervise first refused `peer-serve-unowned` naming the hand-launched pid 1561321; the handover interrupted it and ark pid 3853767 started the declared child; `epr peer status` read daemon CID equal to CLI CID; `just status device` read `ok peer daemon` and `ok device supervisor … 1 ready`; `berth status` showed `device-ark` held for that manifest. A SIGKILL of child pid 3853886 left death witness bafyreigwrc6wkamqw6nstfjbnmu4j4mawkjbsy6lnvgdhgfvex76nopxa4 (`signaled`, signal 9, restart after 1 s) and replacement pid 3854906 read ready within a minute. Two defects met, backlog row 16: ark scrubs the child's environment, so the first declaration (manifest bafyreidqe2d3lskznclcz7kqcw52xv235pkwt3dzn6xmlat6bbh2347p7q) died twice on "this device has no device key" until HOME and the XDG directories were declared; and supervise took ark from a build slot through `ARK_BIN`, because the fixed pool path held a binary from 2026-11-08. Still owed before green: a restart onto a newly landed epr with no human acting, observed on a live device; ethosengine's adoption; ark resolved without `ARK_BIN`.
+    evidence-fingerprint: sha256:c731a23097037279
+    evidence-bytes: 4568
+    evidence-entries: 3
     guard: >-
       Fixture evidence is not evidence of adoption on this workspace's real chain.
       The fixture disables berth leasing with EPR_BERTH_BIN empty, so it cannot prove
