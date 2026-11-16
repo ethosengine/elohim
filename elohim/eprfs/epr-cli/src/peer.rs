@@ -129,6 +129,42 @@ pub enum PeerCliError {
         .0.display()
     )]
     Serving(PathBuf),
+
+    /// A second `epr peer serve` lost this device's serve lock to a live holder. It exits
+    /// [`EXIT_SERVE_LOCK_HELD`] with one stable line, so a supervisor coalesces repeated losses
+    /// into one cause instead of restart-looping against a hand-started holder.
+    #[error(
+        "epr peer serve refused: this device's serve lock `{}` is held by {}; one endpoint per \
+         node id — stop the holder first, or leave it serving (exit {EXIT_SERVE_LOCK_HELD})",
+        .path.display(),
+        holder_name(.holder)
+    )]
+    ServeLockHeld { path: PathBuf, holder: Option<u32> },
+}
+
+impl PeerCliError {
+    /// The process exit code `epr peer` reports for this error: 2, except a lost serve lock.
+    #[must_use]
+    pub fn exit_code(&self) -> u8 {
+        match self {
+            PeerCliError::ServeLockHeld { .. } => EXIT_SERVE_LOCK_HELD,
+            _ => 2,
+        }
+    }
+}
+
+/// `epr peer serve` exits with this code when another process holds the device's serve lock.
+/// Distinct from every other epr exit (1-4), and the refusal is one stable stderr line, so an
+/// ark supervisor's same-cause key (`exited:<code>|<first stderr line>|fast:<bool>`) is
+/// identical across repeated losses and its `same_cause_limit` stops the restart loop.
+pub const EXIT_SERVE_LOCK_HELD: u8 = 5;
+
+/// The serve lock's holder as the refusal names it.
+fn holder_name(holder: &Option<u32>) -> String {
+    holder.map_or_else(
+        || "a process that recorded no pid (an `epr flow fold`, or an older epr)".to_owned(),
+        |pid| format!("pid {pid}"),
+    )
 }
 
 pub type PeerResult<T> = Result<T, PeerCliError>;
@@ -146,7 +182,7 @@ pub fn usage() -> String {
      --install-root, EPR_INSTALL_ROOTS, or a mesh-bin directory under the cargo pool. --check validates its read-only start floor; \
      EPR_PEER_RELAYS accepts comma-separated relay URLs (or n0); off disables relaying. \
      --peer names a device's direct address when there \
-     is none)\n  \
+     is none. Exits 5 when another process holds this device's serve lock)\n  \
      | status [--root DIR] [--handle H] [--json] \
      (one line per admitted device: its last folded head, its age and the events folded)\n  \
      | leases [--root DIR] [--handle H] [--policy PATH] [--json] \
@@ -294,7 +330,7 @@ pub fn peer_dir() -> PeerResult<PathBuf> {
 /// ends, however it ends).
 #[derive(Debug)]
 pub struct ServeLock {
-    _file: std::fs::File,
+    file: std::fs::File,
 }
 
 impl ServeLock {
@@ -320,7 +356,7 @@ impl ServeLock {
         let mut attempts = Self::CONTENDED_RETRIES;
         loop {
             match rustix::fs::flock(&file, rustix::fs::FlockOperation::NonBlockingLockExclusive) {
-                Ok(()) => return Ok(ServeLock { _file: file }),
+                Ok(()) => return Ok(ServeLock { file }),
                 Err(errno) if errno == rustix::io::Errno::WOULDBLOCK && attempts > 0 => {
                     attempts -= 1;
                     std::thread::sleep(std::time::Duration::from_millis(20));
@@ -335,6 +371,45 @@ impl ServeLock {
 
     /// Retries of a contended exclusive take before reporting `Serving` (20 ms apart).
     const CONTENDED_RETRIES: u32 = 5;
+
+    /// Record this process as the lock's holder (`<pid> <start time>`), so a second `serve`
+    /// can name it. Written into the held file itself, which only the holder may rewrite.
+    ///
+    /// # Errors
+    ///
+    /// [`PeerCliError::Io`] when the lock file cannot be rewritten.
+    pub fn record_holder(&self) -> PeerResult<()> {
+        use std::io::Write;
+        let pid = std::process::id();
+        let start = elohim_device_runtime::session::process_start_time(
+            &elohim_device_runtime::session::proc_root(),
+            pid,
+        );
+        self.file.set_len(0)?;
+        let mut file = &self.file;
+        match start {
+            Some(start) => writeln!(file, "{pid} {start}")?,
+            None => writeln!(file, "{pid}")?,
+        }
+        Ok(())
+    }
+
+    /// The live process a `serve` recorded as this lock's holder, if any. A recorded pid whose
+    /// start time no longer matches is a dead holder (or a reused pid) and names nobody.
+    #[must_use]
+    pub fn holder(peer_dir: &Path) -> Option<u32> {
+        let text = std::fs::read_to_string(peer_dir.join(Self::FILE_NAME)).ok()?;
+        let mut fields = text.split_whitespace();
+        let pid: u32 = fields.next()?.parse().ok()?;
+        let now = elohim_device_runtime::session::process_start_time(
+            &elohim_device_runtime::session::proc_root(),
+            pid,
+        )?;
+        match fields.next() {
+            Some(start) if start != now.to_string() => None,
+            _ => Some(pid),
+        }
+    }
 
     /// Whether a daemon holds this device's serve lock now: `Some(true)` when it is held,
     /// `Some(false)` when it is free, `None` when the lock could not be probed. The probe takes
@@ -791,6 +866,20 @@ fn serve(options: Options) -> PeerResult<ExitCode> {
     }
     let device = Device::open(&options.root, options.handle.as_deref())?;
     let key = peer_key(&device)?;
+    // The lock comes before anything that prints or records: a serve that loses it leaves no
+    // daemon lease behind, and its refusal is its first stderr line (the line a supervisor's
+    // same-cause key reads). The key guard above still refuses a stranger device first.
+    let serving = match ServeLock::acquire(&device.peer_dir) {
+        Ok(serving) => serving,
+        Err(PeerCliError::Serving(path)) => {
+            return Err(PeerCliError::ServeLockHeld {
+                path,
+                holder: ServeLock::holder(&device.peer_dir),
+            })
+        }
+        Err(error) => return Err(error),
+    };
+    serving.record_holder()?;
     let policy = options
         .policy
         .clone()
@@ -810,7 +899,7 @@ fn serve(options: Options) -> PeerResult<ExitCode> {
             .as_deref()
             .map(std::path::Path::new),
     )?;
-    let _serving = ServeLock::acquire(&device.peer_dir)?;
+    // `serving` holds the lock until this function returns.
     // The payload store this daemon serves, recorded where `epr artifact put` checks it writes the
     // same one (artifact-store review M9).
     let payload_dir = payload_store_dir(&options)?;

@@ -1294,6 +1294,59 @@ fn a_not_a_device_check_still_lands() {
         .iter()
         .any(|row| row["kind"] == "peer-check-not-a-device"));
 }
+/// A device that supervises `peer serve` refuses a candidate whose check proves nothing, and
+/// keeps its committed head byte-identical.
+fn refused_while_peer_serving_is_required(prepare: impl Fn(&mut State), kind: &str) {
+    let mut f = Fixture::new("epr");
+    f.store = f.store.clone().with_peer_serving(PeerServing::Required);
+    let current = f.release("current");
+    let candidate = f.release("candidate");
+    f.land(&current).unwrap();
+    let before = fs::read(f.store.root.join("current.json")).unwrap();
+    prepare(&mut f.state.lock().unwrap());
+
+    let error = f.land_expected(&candidate, Some(&current.cid)).unwrap_err();
+
+    assert_eq!(error.kind, kind);
+    assert!(
+        error.detail.contains("supervised `epr peer serve`"),
+        "{}",
+        error.detail
+    );
+    assert!(error.detail.contains("--stop"), "{}", error.detail);
+    assert_eq!(f.store.head("current"), Some(current.cid.clone()));
+    assert_eq!(fs::read(f.store.root.join("current.json")).unwrap(), before);
+    let record = f.store.record(&candidate.cid).unwrap();
+    assert!(record.extra["refusals"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|row| row["kind"] == kind));
+}
+#[test]
+fn unsupported_check_refuses_while_a_peer_process_is_declared() {
+    refused_while_peer_serving_is_required(
+        |state| state.peer_check_unsupported = true,
+        "peer-check-unsupported",
+    );
+}
+#[test]
+fn not_a_device_check_refuses_while_a_peer_process_is_declared() {
+    refused_while_peer_serving_is_required(
+        |state| state.peer_check_not_device = true,
+        "peer-check-not-a-device",
+    );
+}
+#[test]
+fn a_passing_check_lands_while_a_peer_process_is_declared() {
+    let mut f = Fixture::new("epr");
+    f.store = f.store.clone().with_peer_serving(PeerServing::Required);
+    let candidate = f.release("serving");
+
+    f.land_expected(&candidate, None).unwrap();
+
+    assert_eq!(f.store.head("current"), Some(candidate.cid.clone()));
+}
 #[test]
 fn revert_to_pre_s1_release_lands() {
     let f = Fixture::new("epr");

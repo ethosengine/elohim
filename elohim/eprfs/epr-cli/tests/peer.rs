@@ -834,6 +834,104 @@ fn the_serving_line_is_on_stdout_and_sigterm_sigint_stop_cleanly() {
     }
 }
 
+fn serve_once(device: &Device, policy: &Path) -> Output {
+    device.epr(&[
+        "peer",
+        "serve",
+        "--root",
+        device.root(),
+        "--policy",
+        policy.to_str().unwrap(),
+        "--listen",
+        "127.0.0.1:0",
+    ])
+}
+
+/// Every daemon lease in a device's epr store, with its bytes, in name order.
+fn daemon_leases(device: &Device) -> Vec<(PathBuf, Vec<u8>)> {
+    let dir = device.config.path().join("epr-store/sessions");
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return Vec::new();
+    };
+    let mut leases: Vec<_> = entries
+        .map(|entry| entry.unwrap().path())
+        .filter(|path| {
+            path.file_name()
+                .and_then(|name| name.to_str())
+                .is_some_and(|name| name.starts_with("daemon-"))
+        })
+        .map(|path| {
+            let bytes = std::fs::read(&path).unwrap();
+            (path, bytes)
+        })
+        .collect();
+    leases.sort();
+    leases
+}
+
+#[test]
+fn a_second_serve_exits_lock_held_naming_the_holder_and_leaves_its_lease_intact() {
+    let (keys, a, _b) = household();
+    let policy = policy(keys.path());
+    let mut first = spawn_serve(&a, &policy);
+    wait_for_serving(&mut first);
+    let before = daemon_leases(&a);
+    assert_eq!(before.len(), 1, "the holder records one lease: {before:?}");
+    let holder_lease = before[0].0.file_name().unwrap().to_string_lossy();
+    assert!(
+        holder_lease.starts_with(&format!("daemon-{}-", first.id())),
+        "{holder_lease}"
+    );
+
+    let mut first_lines = Vec::new();
+    for _ in 0..2 {
+        let out = serve_once(&a, &policy);
+        let stderr = String::from_utf8_lossy(&out.stderr).into_owned();
+        assert_eq!(
+            out.status.code(),
+            Some(i32::from(elohim_epr_cli::peer::EXIT_SERVE_LOCK_HELD)),
+            "{stderr}"
+        );
+        let line = stderr.lines().next().unwrap_or_default().to_owned();
+        assert!(
+            line.contains(&format!("held by pid {}", first.id())),
+            "{line}"
+        );
+        assert!(line.contains("stop the holder first"), "{line}");
+        assert!(
+            out.stdout.is_empty(),
+            "a refused serve never announces itself"
+        );
+        assert_eq!(daemon_leases(&a), before, "the loser writes no lease");
+        first_lines.push(line);
+    }
+    // One stable first line: a supervisor's same-cause key sees one cause, not two.
+    assert_eq!(first_lines[0], first_lines[1]);
+
+    signal_and_wait(&mut first, libc::SIGTERM);
+}
+
+#[test]
+fn a_serve_against_a_lock_held_without_a_recorded_holder_writes_no_lease() {
+    let (keys, a, _b) = household();
+    let policy = policy(keys.path());
+    let _held = elohim_epr_cli::peer::ServeLock::acquire(&a.peer_dir()).expect("lock");
+
+    let out = serve_once(&a, &policy);
+
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert_eq!(
+        out.status.code(),
+        Some(i32::from(elohim_epr_cli::peer::EXIT_SERVE_LOCK_HELD)),
+        "{stderr}"
+    );
+    assert!(stderr.contains("recorded no pid"), "{stderr}");
+    assert!(
+        !a.config.path().join("epr-store/sessions").exists(),
+        "a lost lock records no daemon lease"
+    );
+}
+
 /// A berth record as T1 folds it, `via` another device when folded from it.
 fn berth_record(
     kind: &str,

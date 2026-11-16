@@ -123,7 +123,7 @@ fn main() -> ExitCode {
             Ok(code) => code,
             Err(error) => {
                 eprintln!("epr peer: {error}");
-                ExitCode::from(2)
+                ExitCode::from(error.exit_code())
             }
         };
     }

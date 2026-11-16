@@ -14,7 +14,7 @@ mod source;
 use eprfs_core::BlobCid;
 pub use files::{file_cid, sums_manifest};
 pub use follow_record::{FollowOutcome, FollowRecord, LastFollow};
-pub use landing::Transition;
+pub use landing::{PeerServing, Transition};
 pub use launch::{launch, launch_os, Resolution};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
@@ -324,6 +324,7 @@ pub struct Store {
     config: Tool,
     registry: Registry,
     runner: Arc<dyn Runner>,
+    peer_serving: PeerServing,
 }
 impl Store {
     /// Open a store description without mutating it.
@@ -334,6 +335,7 @@ impl Store {
             config: registry.tool(tool)?,
             registry: registry.clone(),
             runner: Arc::new(SystemRunner),
+            peer_serving: PeerServing::default(),
         })
     }
     /// Select TOOL_STORE, BIN_STORE/tool, or the persistent device default.
@@ -352,6 +354,12 @@ impl Store {
     /// Supply an external-command boundary for isolated build and attestation tests.
     pub fn with_runner(mut self, runner: Arc<dyn Runner>) -> Self {
         self.runner = runner;
+        self
+    }
+    /// Set how landing judges a candidate whose peer check is unsupported or finds no device.
+    /// The caller derives it from the device's manifest; the store never reads that format.
+    pub fn with_peer_serving(mut self, peer_serving: PeerServing) -> Self {
+        self.peer_serving = peer_serving;
         self
     }
     /// Name a running stored executable by its verified release; standalone candidates

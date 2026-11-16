@@ -2,6 +2,19 @@ use super::{files, source::CommandSpec, Refusal, Release, Result, Store};
 use serde_json::{json, Value};
 use std::{path::Path, time::Duration};
 
+/// Whether this device supervises an `epr peer serve` from the landed release. The caller
+/// derives it from the device's manifest; landing only reads the answer.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum PeerServing {
+    /// No supervised peer process: a candidate whose `peer serve --check` is unsupported, or
+    /// finds no device in the checkout, lands with a note.
+    #[default]
+    Tolerated,
+    /// The manifest declares a supervised `peer serve`: those two outcomes refuse landing,
+    /// since the supervisor would restart the daemon into a release that cannot serve.
+    Required,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 /// Explicit intent for a committed-head transition.
 pub enum Transition {
@@ -493,19 +506,19 @@ impl Store {
                 .map_err(|error| Refusal::new("health-peer-check-failed", error.detail))?;
             if !checked.success {
                 if checked.stderr.contains("unknown peer argument `--check`") {
-                    return Ok(Some((
+                    return self.peer_check_outcome(
                         "peer-check-unsupported",
                         "candidate does not advertise peer serve --check",
-                    )));
+                    );
                 }
                 let refusal_kind = serde_json::from_str::<Value>(&checked.stdout)
                     .ok()
                     .and_then(|value| value["kind"].as_str().map(str::to_owned));
                 if refusal_kind.as_deref() == Some("not-a-device") {
-                    return Ok(Some((
+                    return self.peer_check_outcome(
                         "peer-check-not-a-device",
                         "candidate check found no device standing in this checkout",
-                    )));
+                    );
                 }
                 return Err(Refusal::new(
                     "health-peer-check-failed",
@@ -514,6 +527,26 @@ impl Store {
             }
         }
         Ok(None)
+    }
+    /// A peer check that proves nothing: a note while no peer process is declared, a refusal
+    /// once the device supervises `peer serve` from the landed release.
+    fn peer_check_outcome(
+        &self,
+        kind: &'static str,
+        detail: &'static str,
+    ) -> Result<Option<(&'static str, &'static str)>> {
+        match self.peer_serving {
+            PeerServing::Tolerated => Ok(Some((kind, detail))),
+            PeerServing::Required => Err(Refusal::new(
+                kind,
+                format!(
+                    "{detail}; this device's manifest declares a supervised `epr peer serve`, \
+                     which this release would break. Land a release whose `epr peer serve \
+                     --check` passes in this checkout, or stop the peer process first \
+                     (`epr device run epr --name <process> --stop`)"
+                ),
+            )),
+        }
     }
     pub(super) fn require_attestation(
         &self,

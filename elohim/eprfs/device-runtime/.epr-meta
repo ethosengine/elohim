@@ -12,6 +12,9 @@ The release record and session pins are private device records (B); the status v
 reconstructed (C). No new DHT entries, coordinator calls, signals or recurring network heads.
 Binary identity uses eprfs-core raw CIDs; release manifests use its canonical DAG-CBOR codec.
 Ingest verifies bytes; land alone advances current after provenance, ancestry and health.
+Health notes a candidate whose `peer serve --check` is unsupported or finds no device, but
+refuses both once the caller passes `PeerServing::Required` (epr-cli does when the device
+manifest head declares a supervised `peer serve`; an unreadable head keeps the note, warned).
 The launcher trusts ingested immutable files, as the preceding Python exec path did.
 Private local custody has no public reach claim. Cross-device custody belongs to slice B.
 

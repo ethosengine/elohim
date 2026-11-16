@@ -1,6 +1,6 @@
 //! Fail-open arrival orchestration. Long custody work runs in a detached, device-locked worker.
 use elohim_device_runtime::{
-    bin_store::{Refusal, Registry, Store},
+    bin_store::{PeerServing, Refusal, Registry, Store},
     session,
 };
 use std::{
@@ -42,7 +42,13 @@ fn each_tool(root: &Path, long: bool) -> Result<()> {
             continue;
         };
         let result = (|| {
-            let store = Store::from_environment(tool, &registry)?;
+            let store = Store::from_environment(tool, &registry)?.with_peer_serving(
+                if crate::bin::declares_peer_serve(&manifest, tool) {
+                    PeerServing::Required
+                } else {
+                    PeerServing::Tolerated
+                },
+            );
             if follow.mode == ark_core::declaration::FollowMode::Observe {
                 if long {
                     store.follow_declared(root, None, follow)?;

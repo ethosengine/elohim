@@ -1,6 +1,7 @@
 //! Thin command adapter for the device-runtime library.
 use elohim_device_runtime::{
-    bin_store::{self, IngestOptions, Refusal, Registry, Store, Transition},
+    bin_store::{self, IngestOptions, PeerServing, Refusal, Registry, Store, Transition},
+    manifest_store::ManifestStore,
     session,
 };
 use serde_json::{json, Value};
@@ -108,6 +109,15 @@ pub(crate) fn execute(args: &[String]) -> Result<String, Refusal> {
         Store::from_environment(tool, &registry)?
     };
     let store = store.with_runner(std::sync::Arc::new(crate::git::DeviceRunner));
+    // Only the verbs that land read the device manifest for the landing policy.
+    let store = if matches!(verb, "land" | "follow" | "bootstrap") {
+        store.with_peer_serving(peer_serving_policy(
+            crate::device::declaration::store(None, None, None),
+            tool,
+        ))
+    } else {
+        store
+    };
     let repo = || store.repo_root(options.get("--repo").map(Path::new));
     let identity = session::resolve();
     let closure = options.get("--closure").map(Path::new);
@@ -251,6 +261,33 @@ pub(crate) fn execute(args: &[String]) -> Result<String, Refusal> {
     serde_json::to_string(&value).map_err(|e| argument(e.to_string()))
 }
 
+/// Whether `manifest` declares a supervised `peer serve` running `tool`'s landed release: a
+/// process on the tool's channel whose arguments begin `peer serve` (not `--check`).
+pub(crate) fn declares_peer_serve(manifest: &ark_core::RuntimeManifest, tool: &str) -> bool {
+    let channel = format!("bin:{tool}");
+    manifest.processes.iter().any(|process| {
+        matches!(&process.artifact, ark_core::ArtifactRef::Channel { channel_id } if *channel_id == channel)
+            && process.argv.get(1..3) == Some(&["peer".to_owned(), "serve".to_owned()][..])
+            && !process.argv.iter().any(|arg| arg == "--check")
+    })
+}
+
+/// The landing policy the device's current manifest head sets for `tool`. An unreadable head
+/// keeps the tolerance and says so: landing never fails on the manifest it cannot read.
+pub(crate) fn peer_serving_policy(store: Result<ManifestStore, String>, tool: &str) -> PeerServing {
+    match store.and_then(|store| store.read().map_err(|error| error.to_string())) {
+        Ok(head) if declares_peer_serve(&head, tool) => PeerServing::Required,
+        Ok(_) => PeerServing::Tolerated,
+        Err(detail) => {
+            eprintln!(
+                "{tool} landing: device manifest unreadable ({detail}); a candidate whose peer \
+                 check is unsupported or finds no device still lands with a note"
+            );
+            PeerServing::Tolerated
+        }
+    }
+}
+
 /// Open the epr custody store shared by daemon and device status.
 pub(crate) fn daemon_store(
 ) -> Result<elohim_device_runtime::bin_store::Store, elohim_device_runtime::bin_store::Refusal> {
@@ -324,6 +361,73 @@ mod tests {
             Transition::RebaseLineage {
                 reason: "history was rewritten".into()
             }
+        );
+    }
+
+    fn device_manifest(root: &Path) -> ManifestStore {
+        crate::device::declaration::store(Some(root.to_path_buf()), None, None).unwrap()
+    }
+
+    fn run_epr(store: &ManifestStore, name: &str, args: &[&str]) {
+        store
+            .act(ark_core::declaration::ManifestAct::Run {
+                tool: "epr".into(),
+                stop: false,
+                launch: ark_core::declaration::RunLaunch {
+                    name: Some(name.into()),
+                    args: args.iter().map(|arg| (*arg).to_owned()).collect(),
+                    ..Default::default()
+                },
+            })
+            .unwrap();
+    }
+
+    #[test]
+    fn landing_requires_peer_serving_only_when_the_head_declares_a_peer_process() {
+        let tmp = tempfile::tempdir().unwrap();
+        let store = device_manifest(tmp.path());
+        assert_eq!(
+            peer_serving_policy(Ok(device_manifest(tmp.path())), "epr"),
+            PeerServing::Tolerated,
+            "a head with no processes keeps the tolerance"
+        );
+
+        run_epr(&store, "flow-report", &["flow", "report", "scope"]);
+        assert_eq!(
+            peer_serving_policy(Ok(device_manifest(tmp.path())), "epr"),
+            PeerServing::Tolerated,
+            "an epr process that does not serve keeps the tolerance"
+        );
+
+        run_epr(&store, "peer", &["peer", "serve", "--listen", "0.0.0.0:0"]);
+        assert_eq!(
+            peer_serving_policy(Ok(device_manifest(tmp.path())), "epr"),
+            PeerServing::Required
+        );
+        // The policy is per tool: brit's landing does not judge epr's peer process.
+        assert_eq!(
+            peer_serving_policy(Ok(device_manifest(tmp.path())), "brit"),
+            PeerServing::Tolerated
+        );
+    }
+
+    #[test]
+    fn an_unreadable_manifest_keeps_the_landing_tolerance() {
+        let tmp = tempfile::tempdir().unwrap();
+        let store = device_manifest(tmp.path());
+        run_epr(&store, "peer", &["peer", "serve"]);
+        std::fs::write(tmp.path().join("manifest/head"), b"not a head").unwrap();
+
+        assert_eq!(
+            peer_serving_policy(
+                crate::device::declaration::store(Some(tmp.path().to_path_buf()), None, None),
+                "epr"
+            ),
+            PeerServing::Tolerated
+        );
+        assert_eq!(
+            peer_serving_policy(Err("no device key".into()), "epr"),
+            PeerServing::Tolerated
         );
     }
 }
