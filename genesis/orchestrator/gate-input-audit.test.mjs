@@ -448,3 +448,21 @@ for (const name of NAMED_READ_SET_PROJECTS) {
     }
   });
 }
+
+// A habit delta re-projects genesis/manifests/habits.yaml. While eprfs keyed on the whole
+// directory, every delta in the repository re-ran the eprfs workspace gate (1323 s on 9be1cb048).
+test('eprfs keys on each cluster-state manifest and never on the habits projection', () => {
+  const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
+  const { paths, unresolved } = readSet({ root: ROOT, sources: ['elohim/eprfs/**'] });
+  assert.deepEqual(unresolved, []);
+  const covered = file => paths.some(read => readCovers(read, file));
+  assert.equal(covered('genesis/manifests/habits.yaml'), false,
+    'a read covers genesis/manifests/habits.yaml: name the files read, not the directory');
+  const manifests = readdirSync(resolve(ROOT, 'genesis/manifests'))
+    .filter(name => /^cluster-state.*\.yaml$/.test(name));
+  assert.ok(manifests.length >= 2, 'the cluster-state manifests are absent: the listing is broken');
+  for (const name of manifests) {
+    assert.ok(covered(`genesis/manifests/${name}`),
+      `genesis/manifests/${name} is unnamed: add its gate-reads line in epr-cli/tests/flow_scope.rs`);
+  }
+});

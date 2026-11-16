@@ -82,7 +82,13 @@ fn repo_root() -> Option<PathBuf> {
     // gate-reads: genesis/docs/held
     // gate-reads: genesis/a2o/features
     // gate-reads: genesis/a2o/held
-    // gate-reads: genesis/manifests
+    // The cluster-state files are named one by one: the directory also holds `habits.yaml`, the
+    // generated projection every habit delta rewrites, which no scope leg reads. Keying on the
+    // directory re-ran this workspace's whole gate for each delta (1323 s on 9be1cb048). A new
+    // `cluster-state*.yaml` must be named here; gate-input-audit.test.mjs refuses one that is not.
+    // gate-reads: genesis/manifests/cluster-state.yaml
+    // gate-reads: genesis/manifests/cluster-state.act1-household.yaml
+    // gate-reads: genesis/manifests/cluster-state.act2-neighbourhood.yaml
     // gate-reads: genesis/orchestrator/data/deployments.json
     // gate-reads: .claude/scripts/memory-kit
     Path::new(env!("CARGO_MANIFEST_DIR"))
