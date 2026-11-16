@@ -1046,7 +1046,7 @@ habits:
       home, the human's roster knows the device (bound through the human's other device, no key
       crossing), the pinned embedding model resolves from a device-owned place, the semantic fold
       is attested within its freshness limit, and the workspace is moored on the machine's berth.
-      One native read (`epr device status`, also `just status device`) prints eight conditions;
+      One native read (`epr device status`, also `just status device`) prints one line per condition;
       model, fold and berth enhancements may be degraded. Every REFUSED line names the
       command that cures it. Nothing about arrival depends on a visitor's cache or on another
       workspace's keystore.
@@ -1057,10 +1057,10 @@ habits:
       - "a2o @concern:workspace-device-arrival (genesis/a2o/features/devflow/workspace-device-arrival.feature — a keyless workspace is refused by name and nothing else blocks; a second device joins through the first with no key crossing; a missing model names its provisioner; @act:host @requires:epr-cli; all five scenarios are wired, including local candidates with degraded enhancements)"
       - "epr flow report --headline — the `index:` slot reads within the fold-lag ceiling on this device (index-fold-lag-ceiling@1; lag reached its limit once on 2026-10-16), and `participant:` names a standing human by the tracked roster"
     evidence: >
-      DELTA 2026-11-16 (RED preserved, lane E of steward-device-arrival: one device layout): `elohim_device_runtime::layout` is now the one resolver for config dir, bin-store, cargo pool and checkout. Each is resolved env > saved `<config_dir>/layout.json` > host default, except the checkout: env > the checkout the caller stands in > saved. `/projects` is a default only when it exists. A differing env override is reported as `layout-override-differs`, not refused. The bin-store, the eprfs gate's build-output test, the declaration's bins, the ark slot, the LSP slot and `peer serve` all read it; `epr device layout show --json|save` exposes it. `peer serve --check` prints the layout and install scope and refuses an uncreatable destination before launch. Queued fetches always have `<bin_store>/incoming`, and an empty scope refuses `install-destination-missing`. E5: an owner re-open names a null envelope model once and refuses a different one. Evidence: eprfs fmt + lint + 2,521 tests pass, rust-style PASS (debt 0→0); this workspace resolves to its existing paths; the device-arrival profile's 2 new layout stations pass. Open: the laptop is not yet measured, the "eight conditions" scenario is stale against 14 status lines, and E4 found that `bin follow` cannot draw from a sibling (put → fetch → ingest by hand).
-    evidence-fingerprint: sha256:a028e736dd74e8fa
-    evidence-bytes: 13501
-    evidence-entries: 16
+      DELTA 2026-11-16 (RED preserved; a durable-home device can now open a native session, proven on fixtures only): Matthew's laptop (think-p52s, outside Kubernetes, no /projects) was bound locally but refused `envelope-persistent-config-required` because every key under $HOME was read as ephemeral. `persistent_home()` now resolves a named basis: `explicit-mount` (unchanged), or `declared-durable-home` when the host announces no Che/DevWorkspace marker and a `persistence.json` signed by the device key names the key's own resolved directory; `epr actor device persistence --declare durable-home` is the steward's act, never mints a key and refuses on Che. A copied, moved or edited declaration refuses `envelope-persistence-declaration-invalid`; Che refuses `envelope-home-ephemeral-platform` even with one (ff18be07, steps 8439f630; device-arrival profile 8 scenarios green against the branch's epr). The story no longer counts conditions: the preflight prints fourteen lines where the step asserted eight, red on dev before this change. Owed for green: the laptop itself declares, opens a session, publishes roster commit c6a5f57fc through the gate and exchanges a verified head with a sibling; `device_key`, `epr device status` and `berth` do not yet read ethosengine's layout resolver (landed 7c8cbb94e); `epr bin follow` cannot yet draw epr from a sibling (ethosengine's reading of bin_store/lifecycle.rs).
+    evidence-fingerprint: sha256:88dbcf532ad8e3ee
+    evidence-bytes: 14915
+    evidence-entries: 17
     refs:
       - "spec: elohim/lvi/docs/specs/2026-10-10-workspace-arrival-as-declared-device.md (the mapping of every init surface onto DevspaceSeed / Berth / device key / model pin; the three enrollment layers; the record-without-witness seam §6.3)"
       - "the devfile's arrival commands: devfile.base.yaml `setup-embed-model` + `setup-device-memory` (postStart); the provisioners genesis/agentic/bin/{embed-model-provision,device-memory-sync}"
@@ -2576,10 +2576,10 @@ habits:
       - "node --test genesis/orchestrator/gate-cost.test.mjs (expected-cost fold over gate-cycle-seconds@1 and the defer decision's refusals)"
       - "a2o genesis/a2o/features/devflow/native-gate-evidence.feature reuse rule (this workspace's own green stands in; a red or an unadmitted signer never does)"
     evidence: >
-      DELTA 2026-11-14 (status unchanged; the sibling half is now measured — G1): landing 39 (dev cfad29078..ea193cbfa, shem, GATE_EVIDENCE=reuse) printed `[gate] eprfs reused: … at ea193cbfa (signer sibling did:key:z6MkpZRh…VMZB, independence: sibling)` and ran eprfs in 31 s against 1177 s on ethosengine, which gated the same sha by a hooked branch push (log: shem genesis/local-dev/regenesis-2/push-39.log). The first attempt (landing 37, 35b5c996c) missed by construction: verdicts were emitted to and read from the pushing worktree's flow store, which the peer daemon never crosses; cfad29078 routes both through the main checkout (deviceRoot, worktree test). dcc20f307 stops printing an age from a sibling row (flow note stamps occurredAt with the checkout HEAD's author time). Still not reused, each with its why line: epoch-2 brit build notes the pinned brit-build-ref cannot decode veto elohim-ark, steward-node, elohim-storage, doorway, genesis and the bridges (waits on the brit pin; notes kept); the orchestrator's GATE_TASK ark path reads only this device's attestations; host-contract, epr-storage, rust-style and cargo-coverage are not enrolled in gate_reuse.
-    evidence-fingerprint: sha256:2577db98fbcdfe5f
-    evidence-bytes: 17699
-    evidence-entries: 21
+      DELTA 2026-11-16 (status unchanged; a habit delta no longer re-keys eprfs — the key fix is unit-proven, the saving is not yet measured on a push): the 9be1cb048 habit delta ran eprfs for 1323 s. Habit atoms were already outside the key (`projectTree`); the moving read was `genesis/manifests`, declared whole by `epr-cli/tests/flow_scope.rs`, which also holds the generated `habits.yaml` every delta rewrites. The scope legs read only the cluster-state files, now named one by one (e1790d7c); `gate-input-audit.test.mjs` refuses a read that covers `habits.yaml` or a `cluster-state*.yaml` left unnamed. Still open: the same test reads `genesis/docs/superpowers/specs`, `plans` and `genesis/a2o/features` whole, so any spec or story edit re-keys eprfs.
+    evidence-fingerprint: sha256:e7405b3deff45f6c
+    evidence-bytes: 18454
+    evidence-entries: 22
     guard: >
       Regression risks: (1) reusing on a key that omits something the recipe reads — the recipe
       body, the project tree, a submodule pin, a repo file a test include_str!s; the input audit
