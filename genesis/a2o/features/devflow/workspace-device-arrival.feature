@@ -25,8 +25,9 @@ Feature: A workspace arrives as one of its person's devices, and a refusal names
   #     by hand; only public material is in them, and the joining scenario ("A second device
   #     joins…") proves it.
   #   - "Arrival" is the state in which a workspace has everything it needs to act as a device.
-  #     The "arrival preflight" (`just status device`) reads eight conditions and prints one line
-  #     per condition — `ok <condition>: …` or `degraded|REFUSED|unknown <condition>: <why> — <cure>`:
+  #     The "arrival preflight" (`just status device`) reads a growing list of conditions and prints one line
+  #     per condition — `ok <condition>: …` or `degraded|REFUSED|unknown <condition>: <why> — <cure>`. The
+  #     conditions these scenarios name:
   #        epr binary    the native tool `epr` is reachable
   #        brit binary   followed tool or explicit local candidate
   #        repository trusted  git accepts this checkout natively or by device declaration
@@ -47,7 +48,8 @@ Feature: A workspace arrives as one of its person's devices, and a refusal names
   # here. A pending request identifies authorization as the next step; running
   # the ceremony is a person's act. A missing key or binding is refused by name below.
   # Optional model, fold and berth gaps are degraded: core work can still proceed.
-  # The last scenario checks all eight lines on a bound fixture with local tool candidates.
+  # "A locally usable workspace…" checks that no printed line refuses, whatever the list has
+  # grown to, on a bound fixture with local tool candidates.
   #
   # Where a device keeps its things (the "device layout", `epr device layout show`): the
   # config home (key, roster pins, sessions), the bin-store (the executables `epr` lands and
@@ -130,8 +132,6 @@ Feature: A workspace arrives as one of its person's devices, and a refusal names
   # longer matches its signature and is refused. A container platform that announces itself
   # (an Eclipse Che workspace sets DEVWORKSPACE_ID) is refused a home key even when such a note
   # is present; its key belongs in the persistent directory its platform mounts outside $HOME.
-  # These scenarios are @wip until their step definitions land in
-  # steps/devflow/workspace-device-arrival.steps.ts.
 
   Scenario: A device whose home survives restarts declares it once and opens a native session
     Given a device whose key lives under a home that survives restarts
