@@ -579,10 +579,21 @@ fn python3() -> Option<PathBuf> {
             .map(|dir| dir.join("python3"))
             .find(|p| p.is_file())
     });
-    if found.is_none() {
+    let Some(found) = found else {
         eprintln!("device_supervise: no python3 on PATH; the serve-lock story is not exercised");
-    }
-    found
+        return None;
+    };
+    // A nix `python3` is a wrapper that re-executes the interpreter under the interpreter's own
+    // name, so a symlink to it never shows `epr` in /proc/<pid>/cmdline (eprfs dev #160). The
+    // holder links to the interpreter the wrapper ends in; it imports the standard library only.
+    let real = Command::new(&found)
+        .args(["-c", "import os; print(os.readlink('/proc/self/exe'))"])
+        .output()
+        .ok()
+        .filter(|out| out.status.success())
+        .map(|out| PathBuf::from(String::from_utf8_lossy(&out.stdout).trim()))
+        .filter(|path| path.is_file());
+    Some(real.unwrap_or(found))
 }
 
 impl Holder {
