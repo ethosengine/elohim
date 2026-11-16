@@ -185,11 +185,17 @@ pub(super) fn run(args: &[String]) -> Result<ExitCode, String> {
             mode: if unfollow { None } else { Some(mode) },
             pin,
         }),
-        "run" => store.act(ManifestAct::Run {
-            tool: name.ok_or("run needs a tool")?,
-            stop,
-            launch,
-        }),
+        "run" => {
+            let tool = name.ok_or("run needs a tool")?;
+            if !stop {
+                // A run act always declares a `bin:<tool>` channel; refuse before it is written.
+                let head = store.read().map_err(|e| e.to_string())?;
+                let registry = manifest_store::registry(&head).map_err(|e| e.to_string())?;
+                let process = launch.name.as_deref().unwrap_or(&tool);
+                refuse_launcher_env(process, &tool, launch.env.keys(), &registry, false)?;
+            }
+            store.act(ManifestAct::Run { tool, stop, launch })
+        }
         "show" => store.read(),
         "apply" => store.apply_carrying().map(|applied| {
             if !applied.carried.is_empty() {
@@ -227,6 +233,65 @@ pub(super) fn run(args: &[String]) -> Result<ExitCode, String> {
     };
     println!("{output}");
     Ok(ExitCode::SUCCESS)
+}
+
+/// The keys that steer the bin launcher to a raw candidate instead of the verified current:
+/// `EPR_BIN` always, and every `candidateEnv` key the device registry declares for any tool.
+fn launcher_env_keys(registry: &elohim_device_runtime::bin_store::Registry) -> Vec<String> {
+    let mut keys = vec!["EPR_BIN".to_owned()];
+    for tool in registry.tools.values() {
+        let declared = tool["candidateEnv"]
+            .as_object()
+            .into_iter()
+            .flat_map(|map| {
+                map.values()
+                    .filter_map(|v| v.as_array())
+                    .flatten()
+                    .filter_map(|v| v.as_str())
+            });
+        for key in declared {
+            if !keys.iter().any(|k| k == key) {
+                keys.push(key.to_owned());
+            }
+        }
+    }
+    keys
+}
+
+/// Refuse a launcher candidate key in the declared environment of a process whose artifact is
+/// a `bin:<tool>` channel. A child started with one executes that raw candidate and reports its
+/// file CID, not the release CID, so the device reads it as behind current. The key is named,
+/// the value never. `at_supervise` words the refusal for a manifest that already carries it.
+pub(super) fn refuse_launcher_env<'a>(
+    process: &str,
+    tool: &str,
+    env_keys: impl IntoIterator<Item = &'a String>,
+    registry: &elohim_device_runtime::bin_store::Registry,
+    at_supervise: bool,
+) -> Result<(), String> {
+    let keys = launcher_env_keys(registry);
+    let Some(key) = env_keys
+        .into_iter()
+        .find(|key| keys.iter().any(|k| k == *key))
+    else {
+        return Ok(());
+    };
+    Err(format!(
+        "REFUSED launcher-env-declared: process {process} runs bin:{tool} and declares {key}, \
+         a launcher candidate key; the child would execute that raw candidate and report its \
+         file CID instead of the release CID, so the device reads it as behind current. \
+         Launcher candidate keys ({}) are refused for every process whose artifact is a \
+         bin:<tool> channel{}",
+        keys.join(", "),
+        if at_supervise {
+            format!(
+                "; this manifest already declares it, so nothing starts — redeclare it with \
+                 `epr device run {tool} --name {process}` without --env {key}"
+            )
+        } else {
+            String::new()
+        }
+    ))
 }
 
 /// Human reading of an apply preview; `--json` prints the structured preview instead.

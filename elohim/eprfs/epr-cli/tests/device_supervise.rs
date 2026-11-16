@@ -573,19 +573,29 @@ struct Holder {
     child: Child,
 }
 
+fn python3() -> Option<PathBuf> {
+    let found = std::env::var_os("PATH").and_then(|path| {
+        std::env::split_paths(&path)
+            .map(|dir| dir.join("python3"))
+            .find(|p| p.is_file())
+    });
+    if found.is_none() {
+        eprintln!("device_supervise: no python3 on PATH; the serve-lock story is not exercised");
+    }
+    found
+}
+
 impl Holder {
+    /// `epr peer serve --root <root>`, run from its own directory.
     fn start(fx: &Fixture, root: &Path) -> Option<Holder> {
-        let Some(python) = std::env::var_os("PATH").and_then(|path| {
-            std::env::split_paths(&path)
-                .map(|dir| dir.join("python3"))
-                .find(|p| p.is_file())
-        }) else {
-            eprintln!(
-                "device_supervise: no python3 on PATH; the serve-lock story is not exercised"
-            );
-            return None;
-        };
-        let dir = fx.base.join("holder");
+        let tail = ["--root".to_owned(), root.display().to_string()];
+        Holder::start_in(fx, &fx.base.join("holder"), &tail)
+    }
+
+    /// `epr peer serve <tail…>` with working directory `dir`.
+    fn start_in(fx: &Fixture, dir: &Path, tail: &[String]) -> Option<Holder> {
+        let python = python3()?;
+        let dir = dir.to_owned();
         fs::create_dir_all(&dir).unwrap();
         let link = dir.join("epr");
         let _ = fs::remove_file(&link);
@@ -604,8 +614,8 @@ impl Holder {
         )
         .unwrap();
         let mut child = Command::new(&link)
-            .args(["peer", "serve", "--root"])
-            .arg(root)
+            .args(["peer", "serve"])
+            .args(tail)
             .current_dir(&dir)
             .env_clear()
             .env("XDG_CONFIG_HOME", fx.base.join("config"))
@@ -653,19 +663,17 @@ impl Drop for Holder {
 
 fn declare_peer(fx: &Fixture, env: &[&str]) {
     let root = fx.repo.to_str().unwrap().to_owned();
+    declare_peer_with(fx, env, &["--root", &root]);
+}
+
+/// Declare `peer` as `peer serve <root_args…>`.
+fn declare_peer_with(fx: &Fixture, env: &[&str], root_args: &[&str]) {
     let mut args = vec!["device", "run", "epr", "--name", "peer"];
     for entry in env {
         args.extend(["--env", entry]);
     }
-    args.extend([
-        "--ready-line",
-        "epr peer: serving",
-        "--",
-        "peer",
-        "serve",
-        "--root",
-        &root,
-    ]);
+    args.extend(["--ready-line", "epr peer: serving", "--", "peer", "serve"]);
+    args.extend(root_args);
     fx.ok(&args);
 }
 
@@ -749,6 +757,62 @@ fn handover_refuses_a_daemon_serving_another_root_offline() {
     );
     assert!(holder.running(), "a refused handover signals nothing");
     assert_eq!(fx.status()["running"], false);
+}
+
+/// The root check reads `--root <path>` and `--root=<path>` alike, and a daemon that names no
+/// root is never matched by its working directory: here every holder runs from the data root,
+/// the directory a declared `--root={data_root}` resolves against.
+#[test]
+fn handover_compares_both_root_forms_and_never_a_working_directory_offline() {
+    let fx = fixture_with(PathBuf::from("/nonexistent/ark"));
+    let proc = [(REAL_PROC.0, OsStr::new(REAL_PROC.1))];
+    let data_root = fx.data_root();
+    let repo = fx.repo.display().to_string();
+    let attempt = |declared: &[&str], tail: &[String]| -> Option<String> {
+        declare_peer_with(&fx, &[], declared);
+        let mut holder = Holder::start_in(&fx, &data_root, tail)?;
+        fx.lease(holder.pid());
+        let refused = fx.epr_with(&["device", "supervise", "--handover"], &proc);
+        assert!(!refused.status.success());
+        assert!(holder.running(), "a refused handover signals nothing");
+        Some(stderr(&refused))
+    };
+    // A daemon in the data root naming no root, against a declared `--root={data_root}`.
+    let Some(text) = attempt(&["--root={data_root}"], &[]) else {
+        return;
+    };
+    assert!(
+        text.contains("peer-serve-handover-refused") && text.contains("names no --root"),
+        "{text}"
+    );
+    // Declared `--root={data_root}/peer`, a daemon in the data root serving another root.
+    let text = attempt(
+        &["--root={data_root}/peer"],
+        &["--root".into(), fx.base.display().to_string()],
+    )
+    .unwrap();
+    assert!(text.contains("same --root"), "{text}");
+    // A declared child naming no root has nothing to compare: refused, not matched by cwd.
+    let text = attempt(&[], &["--root".into(), repo.clone()]).unwrap();
+    assert!(text.contains("names no --root to compare"), "{text}");
+    // Both spellings of the same root pass the root check; the lease check (passed here) and
+    // only the start-tick reconfirmation stand after it, so the handover proceeds to ark.
+    for (declared, tail) in [
+        (
+            format!("--root={repo}"),
+            vec!["--root".to_owned(), repo.clone()],
+        ),
+        ("--root".to_owned(), vec![format!("--root={repo}")]),
+    ] {
+        let declared: Vec<&str> = if declared == "--root" {
+            vec!["--root", &repo]
+        } else {
+            vec![declared.as_str()]
+        };
+        let text = attempt(&declared, &tail).unwrap();
+        assert!(!text.contains("handover-refused"), "{text}");
+        assert!(text.contains("ARK_BIN"), "only ark is missing: {text}");
+    }
 }
 
 /// The handover: SIGINT to the one confirmed daemon, its lock freed, then ark starts the
@@ -889,4 +953,149 @@ fn a_child_on_old_bytes_restarts_onto_the_landed_current_and_a_current_one_stays
     assert!(fx
         .ok(&["device", "supervise"])
         .contains("at current manifest"));
+}
+
+/// A launcher candidate key (`EPR_BIN`, or any `candidateEnv` key the registry names) in a
+/// `bin:` process's environment would make the child execute a raw candidate and report its file
+/// CID instead of the release CID. Declaring one refuses and writes nothing; a manifest that
+/// already carries one (here adopted from a base) refuses at supervise and starts nothing; the
+/// value is never echoed. Ordinary keys are unaffected.
+#[test]
+fn a_launcher_candidate_key_is_refused_at_declaration_and_at_supervise_offline() {
+    let fx = fixture_with(PathBuf::from("/nonexistent/ark"));
+    let secret = "/somewhere/secret-candidate";
+    for (tool, key) in [("epr", "EPR_BIN"), ("epr", "BRIT_BIN"), ("brit", "EPR_BIN")] {
+        let entry = format!("{key}={secret}");
+        let refused = fx.epr(&[
+            "device", "run", tool, "--name", "peer", "--env", &entry, "--", "peer", "serve",
+        ]);
+        assert!(!refused.status.success(), "{tool} {key}");
+        let text = stderr(&refused);
+        assert!(
+            text.contains("REFUSED launcher-env-declared")
+                && text.contains(key)
+                && text.contains(&format!("bin:{tool}"))
+                && text.contains("file CID")
+                && text.contains("bin:<tool> channel"),
+            "{text}"
+        );
+        assert!(!text.contains(secret), "the value is never echoed: {text}");
+    }
+    let shown: Value = serde_json::from_str(&fx.ok(&["device", "show"])).unwrap();
+    assert_eq!(shown["processes"], json!([]), "a refusal writes nothing");
+
+    // An ordinary key is unaffected, at declaration and at supervise (which goes on to look
+    // for ark).
+    fx.ok(&[
+        "device", "run", "epr", "--name", "peer", "--env", "A=1", "--", "peer", "serve",
+    ]);
+    let unaffected = fx.epr(&["device", "supervise"]);
+    assert!(
+        stderr(&unaffected).contains("ARK_BIN"),
+        "{}",
+        stderr(&unaffected)
+    );
+
+    // A manifest that already carries the key: a base declaring it, adopted by apply.
+    let mut base: Value =
+        serde_json::from_str(&fx.ok(&["device", "show", "--render", "manifest"])).unwrap();
+    base["processes"][0]["env"]["EPR_BIN"] = json!(secret);
+    base.as_object_mut().unwrap().remove("supersedes");
+    let base_path = fx.base.join("base-with-epr-bin.json");
+    fs::write(&base_path, base.to_string()).unwrap();
+    fx.ok(&["device", "run", "epr", "--name", "peer", "--stop"]);
+    fx.ok(&["device", "apply", "--base", base_path.to_str().unwrap()]);
+    let carried: Value =
+        serde_json::from_str(&fx.ok(&["device", "show", "--render", "manifest"])).unwrap();
+    assert_eq!(carried["processes"][0]["env"]["EPR_BIN"], secret);
+
+    let refused = fx.epr(&["device", "supervise"]);
+    assert!(!refused.status.success());
+    let text = stderr(&refused);
+    assert!(
+        text.contains("REFUSED launcher-env-declared")
+            && text.contains("EPR_BIN")
+            && text.contains("nothing starts"),
+        "{text}"
+    );
+    assert!(!text.contains(secret), "the value is never echoed: {text}");
+    assert!(
+        !text.contains("ARK_BIN"),
+        "refused before ark is looked for: {text}"
+    );
+    assert_eq!(fx.status()["running"], false, "nothing started");
+}
+
+/// The likeliest live state: ark already runs the current head, and a hand-started daemon holds
+/// the serve lock, so the declared peer can only wait behind it. A current head is no reason to
+/// stand aside: supervise refuses, and `--handover` interrupts the daemon and restarts ark, after
+/// which the declared peer takes the lock and serves.
+#[test]
+fn a_current_ark_does_not_hide_an_unowned_daemon_from_supervise() {
+    let Some(fx) = fixture() else { return };
+    let Some(python) = python3() else { return };
+    let config = fx.base.join("config");
+    declare_peer(&fx, &[&format!("XDG_CONFIG_HOME={}", config.display())]);
+    // The declared child (bash, the fixture's `epr` bytes) runs a python waiter that takes the
+    // serve lock only once `go` exists, retrying while another process holds it.
+    let data_root = fx.data_root();
+    fs::create_dir_all(&data_root).unwrap();
+    fs::write(
+        data_root.join("peer"),
+        format!(
+            "trap 'kill \"$py\" 2>/dev/null; exit 0' INT TERM\n\
+             {} \"$PWD/peer.py\" &\npy=$!\nwait \"$py\"\n",
+            python.display()
+        ),
+    )
+    .unwrap();
+    fs::write(
+        data_root.join("peer.py"),
+        "import fcntl, os, signal, sys, time\n\
+         signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))\n\
+         while not os.path.exists('go'):\n    time.sleep(0.05)\n\
+         path = os.path.join(os.environ['XDG_CONFIG_HOME'], 'epr', 'peer', 'serve.lock')\n\
+         os.makedirs(os.path.dirname(path), exist_ok=True)\n\
+         lock = open(path, 'a')\n\
+         while True:\n    try:\n        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)\n        break\n    except BlockingIOError:\n        time.sleep(0.1)\n\
+         print('epr peer: serving', flush=True)\n\
+         while True:\n    time.sleep(0.2)\n",
+    )
+    .unwrap();
+    let proc = [(REAL_PROC.0, OsStr::new(REAL_PROC.1))];
+    let started = fx.epr_with(&["device", "supervise"], &proc);
+    assert!(started.status.success(), "{}", stderr(&started));
+    let ark1 = wait_for("ark at the head", || {
+        let status = fx.status();
+        status["processes"][0]["pid"].as_u64().map(|_| status)
+    })["pid"]
+        .as_u64()
+        .unwrap();
+
+    // The hand-started daemon takes the lock first; only then may the declared peer try.
+    let Some(mut holder) = Holder::start(&fx, &fx.repo) else {
+        return;
+    };
+    fs::write(data_root.join("go"), "").unwrap();
+    thread::sleep(Duration::from_millis(500));
+    assert_ne!(fx.status()["processes"][0]["ready"], true, "the peer waits");
+
+    let refused = fx.epr_with(&["device", "supervise"], &proc);
+    assert!(!refused.status.success(), "a current head hid the holder");
+    let text = stderr(&refused);
+    assert!(text.contains("REFUSED peer-serve-unowned"), "{text}");
+    assert!(holder.running());
+    assert_eq!(fx.status()["pid"].as_u64().unwrap(), ark1, "ark untouched");
+
+    fx.lease(holder.pid());
+    let output = fx.epr_with(&["device", "supervise", "--handover"], &proc);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(output.status.success(), "{stdout}\n{}", stderr(&output));
+    assert!(stdout.contains("handing over, then restarting"), "{stdout}");
+    assert_eq!(holder.exit().code(), Some(0), "SIGINT only");
+    let ready = wait_for("the declared peer to serve", || {
+        let status = fx.status();
+        (status["processes"][0]["ready"] == true).then_some(status)
+    });
+    assert_ne!(ready["pid"].as_u64().unwrap(), ark1, "ark was restarted");
 }

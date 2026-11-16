@@ -208,11 +208,22 @@ fn supervise(
             berth_path.display()
         ));
     }
+    refuse_declared_launcher_env(head)?;
+    // Before anything is judged, claimed, stopped or signalled: a serve lock held outside this
+    // ark refuses here unless the person asked for the handover. A current ark is no answer to
+    // it, since its declared peer child only waits in backoff behind the foreign holder.
+    let holder = peer_serve_preflight(head, data_root, started.as_ref(), handover)?;
     // At the head, the manifest alone cannot say a child is current: ark resolves `bin:` at
     // each spawn, so a child started before a landing still runs the bytes it was started on.
     let mut stale_binary = false;
     if let Some(started) = &started {
-        if started.manifest_cid == head_cid {
+        if started.manifest_cid == head_cid && holder.is_some() {
+            println!(
+                "device ark: running pid {} at current manifest {head_cid}, but an epr peer \
+                 serve it did not start holds the serve lock; handing over, then restarting",
+                started.pid
+            );
+        } else if started.manifest_cid == head_cid {
             match child_identity(data_root, head, started)? {
                 Identity::Current => {
                     println!(
@@ -260,9 +271,6 @@ fn supervise(
         return Ok(ExitCode::SUCCESS);
     }
     preflight(head)?;
-    // Before anything is claimed, stopped or signalled: a serve lock held outside this ark
-    // refuses here unless the person asked for the handover.
-    let holder = peer_serve_preflight(head, data_root, started.as_ref(), handover)?;
     let ark = ark_bin()?;
     let leased = claim_lease(berth, &head_cid)?;
     let result = (|| {
@@ -271,6 +279,14 @@ fn supervise(
         if let Some(holder) = &holder {
             hand_over(holder)?;
         }
+        let interrupted = |error: String| match &holder {
+            Some(holder) => format!(
+                "{error} — the unowned epr peer serve (pid {}) was already interrupted, so \
+                 nothing serves this device now; rerun `epr device supervise`",
+                holder.pid
+            ),
+            None => error,
+        };
         if let Some(started) = &started {
             if stale_binary {
                 println!(
@@ -283,9 +299,9 @@ fn supervise(
                     started.pid, started.manifest_cid
                 );
             }
-            stop_ark(data_root, started)?;
+            stop_ark(data_root, started).map_err(interrupted)?;
         }
-        start_ark(data_root, head, &head_cid, &ark)
+        start_ark(data_root, head, &head_cid, &ark).map_err(interrupted)
     })();
     match result {
         Ok(started) => {
@@ -303,6 +319,33 @@ fn supervise(
             Err(error)
         }
     }
+}
+
+/// A manifest that already carries a launcher candidate key on a `bin:` process is refused
+/// before anything is judged, stopped or started — even when an ark already runs it.
+fn refuse_declared_launcher_env(head: &RuntimeManifest) -> Outcome<()> {
+    let mut registry = None;
+    for process in &head.processes {
+        let Some(tool) = channel_tool(&process.artifact) else {
+            continue;
+        };
+        if process.env.is_empty() {
+            continue;
+        }
+        if registry.is_none() {
+            registry = Some(manifest_store::registry(head).map_err(|e| e.to_string())?);
+        }
+        if let Some(registry) = &registry {
+            super::declaration::refuse_launcher_env(
+                &process.name,
+                tool,
+                process.env.keys(),
+                registry,
+                true,
+            )?;
+        }
+    }
+    Ok(())
 }
 
 /// Refuse before anything is stopped or started: every child must be a `bin:` channel the
@@ -400,11 +443,17 @@ pub(crate) fn declared_peer_serve(head: &RuntimeManifest) -> Option<&ark_core::C
         .find(|p| p.argv.get(1..3).is_some_and(|a| a == ["peer", "serve"]))
 }
 
-/// The `--root` an `epr peer serve` argv tail names (`.` when it names none, as serve does).
-fn serve_root(tail: &[String]) -> &str {
-    tail.windows(2)
-        .find(|w| w[0] == "--root")
-        .map_or(".", |w| w[1].as_str())
+/// The `--root` an `epr peer serve` argv tail names, as `--root <path>` or `--root=<path>`.
+/// `None` when it names none: serve's own default (its working directory) is never assumed,
+/// so a daemon matched by working directory alone is never taken for the declared one.
+fn serve_root(tail: &[String]) -> Option<&str> {
+    tail.iter().enumerate().find_map(|(i, arg)| {
+        if arg == "--root" {
+            tail.get(i + 1).map(String::as_str)
+        } else {
+            arg.strip_prefix("--root=")
+        }
+    })
 }
 
 /// An `epr peer serve` holding the serve lock that this ark did not start, confirmed to be
@@ -413,6 +462,11 @@ struct Holder {
     pid: u32,
     start_ticks: u64,
     lock: PathBuf,
+    /// How long the interrupted daemon may take to release the lock: the declared peer
+    /// process's shutdown grace plus a margin, as `stop_ark` allows its own children.
+    wait: Duration,
+    /// The running ark, whose own peer child may take the lock the moment it is released.
+    ark: Option<u32>,
 }
 
 /// The serve-lock handover preflight. Nothing here signals: it returns the holder only when
@@ -433,10 +487,7 @@ fn peer_serve_preflight(
     }
     let holders = lock_holders(&lock);
     if let Some(started) = started.filter(|s| is_same_process(s.pid, s.start_ticks)) {
-        if holders
-            .iter()
-            .any(|pid| proc_ppid(*pid) == Some(started.pid))
-        {
+        if holders.iter().any(|pid| descends_from(*pid, started.pid)) {
             // This ark's own child: stopping the ark releases it.
             return Ok(None);
         }
@@ -446,6 +497,7 @@ fn peer_serve_preflight(
         .copied()
         .find(|pid| peer_serve_tail(*pid).is_some())
         .or_else(|| holders.first().copied());
+    let start_ticks = holder.and_then(|pid| proc_stat(pid).map(|(_, ticks)| ticks));
     let Some(pid) = holder else {
         let detail = format!(
             "a process this user cannot see holds {}; ark would start a second daemon beside \
@@ -487,25 +539,31 @@ fn peer_serve_preflight(
     if proc_uid(pid).is_none() || proc_uid(pid) != proc_uid(std::process::id()) {
         return Err(refused("same-user"));
     }
+    let start_ticks = start_ticks.ok_or_else(|| refused("still-running"))?;
     let Some((cwd, tail)) = peer_serve_tail(pid) else {
         return Err(refused("`epr peer serve` command line"));
+    };
+    let Some(declared_root) = serve_root(&declared.argv[3..]) else {
+        return Err(refused(&format!(
+            "same --root (the declared {} names no --root to compare)",
+            declared.name
+        )));
+    };
+    let Some(holder_root) = serve_root(&tail) else {
+        return Err(refused("same --root (it names no --root)"));
     };
     let template = Berth {
         data_root: data_root.to_owned(),
         ..Berth::default()
     };
     let declared_root = template
-        .resolve_template(
-            &declared.name,
-            Path::new(""),
-            serve_root(&declared.argv[3..]),
-        )
+        .resolve_template(&declared.name, Path::new(""), declared_root)
         .map_err(|e| e.to_string())?;
     let canonical = |base: &Path, root: &str| {
         let path = base.join(root);
         fs::canonicalize(&path).unwrap_or(path)
     };
-    if canonical(&cwd, serve_root(&tail)) != canonical(data_root, &declared_root) {
+    if canonical(&cwd, holder_root) != canonical(data_root, &declared_root) {
         return Err(refused("same --root"));
     }
     if !lock_holders(&lock).contains(&pid) {
@@ -514,18 +572,28 @@ fn peer_serve_preflight(
     if !leased {
         return Err(refused("daemon-lease"));
     }
-    let start_ticks = proc_stat(pid)
-        .map(|(_, ticks)| ticks)
-        .ok_or_else(|| refused("still-running"))?;
+    // The checks above read /proc over time; the pid they judged must still be that process.
+    if !is_same_process(pid, start_ticks) {
+        return Err(refused("still-running"));
+    }
+    let grace = declared.policy.shutdown.grace_ms;
     Ok(Some(Holder {
         pid,
         start_ticks,
         lock,
+        ark: started
+            .filter(|s| is_same_process(s.pid, s.start_ticks))
+            .map(|s| s.pid),
+        wait: if grace == 0 {
+            HANDOVER_WAIT
+        } else {
+            Duration::from_millis(grace) + STOP_MARGIN
+        },
     }))
 }
 
 /// SIGINT to the one confirmed holder, then wait for the kernel to release its lock. Never
-/// escalates: a daemon that keeps the lock is reported and left running.
+/// escalates: a daemon that keeps the lock past its wait is reported, still draining.
 fn hand_over(holder: &Holder) -> Outcome<()> {
     if is_same_process(holder.pid, holder.start_ticks) {
         let pid = libc::pid_t::try_from(holder.pid).map_err(|e| e.to_string())?;
@@ -542,19 +610,32 @@ fn hand_over(holder: &Holder) -> Outcome<()> {
             }
         }
     }
-    let deadline = Instant::now() + HANDOVER_WAIT;
+    let deadline = Instant::now() + holder.wait;
     loop {
         match super::arrival::serve_lock_probe() {
             Ok((_, false)) => return Ok(()),
+            // Released, and already taken by the declared peer this ark was holding back.
+            Ok((_, true))
+                if !is_same_process(holder.pid, holder.start_ticks)
+                    && holder.ark.is_some_and(|ark| {
+                        let holders = lock_holders(&holder.lock);
+                        !holders.is_empty() && holders.iter().all(|pid| descends_from(*pid, ark))
+                    }) =>
+            {
+                return Ok(())
+            }
             Ok((_, true)) => {}
             Err(error) => return Err(format!("REFUSED peer-serve-unprobed: {error}")),
         }
         if Instant::now() >= deadline {
             return Err(format!(
                 "REFUSED peer-serve-handover-timeout: {} is still held {}s after SIGINT to pid \
-                 {}; it is left running and ark is not started beside it",
+                 {}; it was interrupted and is probably still draining, and ark is not started \
+                 beside it — wait for pid {} to exit (never kill it), then rerun \
+                 `epr device supervise`",
                 holder.lock.display(),
-                HANDOVER_WAIT.as_secs(),
+                holder.wait.as_secs(),
+                holder.pid,
                 holder.pid
             ));
         }
@@ -601,8 +682,17 @@ fn peer_serve_tail(pid: u32) -> Option<(PathBuf, Vec<String>)> {
         .filter(|a| !a.is_empty())
         .map(|a| String::from_utf8_lossy(a).into_owned())
         .collect();
-    let is_epr = Path::new(args.first()?).file_name()? == "epr";
-    (is_epr && args.get(1..3)? == ["peer", "serve"]).then_some(())?;
+    let named = Path::new(args.first()?)
+        .file_name()
+        .is_some_and(|name| name == "epr" || name == "bin-launch");
+    let stored = || {
+        let exe = fs::canonicalize(format!("/proc/{pid}/exe")).ok()?;
+        let store = crate::bin::daemon_store().ok()?;
+        let root = fs::canonicalize(store.root()).ok()?;
+        exe.starts_with(root).then_some(())
+    };
+    (named || stored().is_some()).then_some(())?;
+    (args.get(1..3)? == ["peer", "serve"]).then_some(())?;
     let cwd = fs::read_link(format!("/proc/{pid}/cwd")).ok()?;
     Some((cwd, args[3..].to_vec()))
 }
@@ -710,6 +800,9 @@ fn start_ark(
         // The registry ark resolves `bin:` channels against is the declaration it runs, never
         // a committed base found by walking up from its working directory.
         .env("EPR_BIN_TOOLS", &manifest_path)
+        // Ark (and the bin: children it resolves) choose epr from the verified current, never
+        // from a candidate whoever ran supervise happened to carry.
+        .env_remove("EPR_BIN")
         .stdin(Stdio::null())
         .stdout(log.try_clone().map_err(|e| e.to_string())?)
         .stderr(log);
@@ -1034,6 +1127,20 @@ fn proc_ppid(pid: u32) -> Option<u32> {
     let state = fields.next()?;
     (state != "Z").then_some(())?;
     fields.next()?.parse().ok()
+}
+
+/// Whether `pid` is `ancestor`'s child or a descendant of one (a child may hand its lock to a
+/// worker it forked), walking at most a few parents.
+fn descends_from(pid: u32, ancestor: u32) -> bool {
+    let mut current = pid;
+    for _ in 0..8 {
+        match proc_ppid(current) {
+            Some(parent) if parent == ancestor => return true,
+            Some(parent) if parent > 1 => current = parent,
+            _ => return false,
+        }
+    }
+    false
 }
 
 fn is_same_process(pid: u32, start_ticks: u64) -> bool {
