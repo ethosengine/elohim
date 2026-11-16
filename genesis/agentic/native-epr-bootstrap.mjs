@@ -83,7 +83,9 @@ if (!process.argv.includes('--worker')) {
     if (!JSON.parse(call(['source-state'])).clean) throw new Error('source closure dirty; landing refused');
     call(['migrate']);
     const record = JSON.parse(call(['ingest', binary, '--source-commit', commit]));
-    call(['land', record.cid, '--commit', commit]);
+    // Landing names the head it replaces; a store with no head yet expects `none`.
+    const prior = JSON.parse(call(['status', '--json'])).head ?? 'none';
+    call(['land', record.cid, '--commit', commit, '--expect', prior]);
     call(['install-launcher', '--launcher', join(env.CARGO_TARGET_DIR, 'debug/bin-launch')]);
     process.stdout.write(`native evaluator ready: ${record.cid}\n`);
   } catch (error) {

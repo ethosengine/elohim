@@ -219,5 +219,7 @@ fs.chmodSync(path.join(dir, 'epr'), 0o755);
   assert.match(calls, /build/);
   assert.match(calls, /migrate/);
   assert.match(calls, /land/);
+  // `epr bin land` refuses without the head it replaces; a store with no head expects `none`.
+  assert.match(calls, /"--expect","none"/);
   assert.match(calls, /install-launcher/);
 });
