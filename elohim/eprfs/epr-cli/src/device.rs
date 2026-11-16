@@ -30,6 +30,7 @@
 mod arrival;
 mod arrival_work;
 pub(crate) mod declaration;
+mod layout;
 mod supervise;
 pub use arrival::{status, Check, State};
 
@@ -99,7 +100,10 @@ pub fn usage() -> &'static str {
      diffs follows, tools and processes, lists carried and conflicting ones, writes \
      nothing, and exits 1 on a conflict)\n  \
      epr device supervise [--status [--json] | --stop]\n    \
-     (ark runs this device's declared manifest; a moved head reloads it by restart)\n  epr device trust <path>\n  epr device approvals [--node <this node URL>]\n    \
+     (ark runs this device's declared manifest; a moved head reloads it by restart)\n  \
+     epr device layout show [--json] | save [--field binStore|cargoPool|projectRoot]...\n    \
+     (where this device keeps its config, executables, cargo pool and checkout, and why)\n  \
+     epr device trust <path>\n  epr device approvals [--node <this node URL>]\n    \
      (whom this machine's node speaks for, what is waiting, and what to run next)\n\
      This machine's node is --node, else ELOHIM_NODE_URL, else the one node of this machine \
      that answers on 8090/8095/8091/8092/8093.\n\
@@ -119,7 +123,7 @@ const FLAGS: [&str; 7] = [
 ];
 
 /// The device commands, as a person types them.
-const COMMANDS: [&str; 10] = [
+const COMMANDS: [&str; 11] = [
     "join",
     "ask",
     "redeem",
@@ -130,6 +134,7 @@ const COMMANDS: [&str; 10] = [
     "trust",
     "approvals",
     "supervise",
+    "layout",
 ];
 
 /// The command a mistyped or guessed word most likely meant: a word people
@@ -158,6 +163,7 @@ pub fn run(args: &[String]) -> Outcome<ExitCode> {
     match args.first().map(String::as_str) {
         Some("follow" | "run" | "show" | "apply") => declaration::run(args),
         Some("supervise") => supervise::run(&args[1..]),
+        Some("layout") => layout::run(&args[1..]),
         Some("join") => join(&args[1..]),
         Some("ask") => ask(&args[1..]),
         Some("approve") => crate::approver::approve(&args[1..]),

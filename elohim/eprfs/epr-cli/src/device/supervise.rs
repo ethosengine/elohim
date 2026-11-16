@@ -34,8 +34,16 @@ use std::{
 const LEASE: &str = "device-ark";
 /// Where the device ark keeps its data, under the main checkout.
 const DATA_REL: &str = ".eprfs/status/ark/device";
-/// The pool slot `hc-mesh.sh` prefers for `ark`.
-const ARK_POOL_SLOT: &str = "/projects/.cargo-target-pool/family/dev/elohim/dev/debug/ark";
+/// The slot under the cargo pool that `hc-mesh.sh` prefers for `ark`.
+const ARK_POOL_REL: &str = "family/dev/elohim/dev/debug/ark";
+
+/// `ark`'s pool slot on this device, when the device layout names a cargo pool.
+fn ark_pool_slot() -> Option<PathBuf> {
+    elohim_device_runtime::layout::resolve()
+        .ok()?
+        .cargo_pool()
+        .map(|pool| pool.join(ARK_POOL_REL))
+}
 /// Margin past the longest declared shutdown grace before a stop is called failed: ark
 /// signals each child, waits its grace, then reaps and writes its passport.
 const STOP_MARGIN: Duration = Duration::from_secs(10);
@@ -1223,9 +1231,9 @@ fn ark_bin(data_root: &Path) -> Outcome<(PathBuf, &'static str)> {
     if let Some(recorded) = recorded_ark(data_root) {
         return Ok((recorded, "recorded in supervise.json"));
     }
-    let pool = PathBuf::from(ARK_POOL_SLOT);
-    if executable(&pool) {
-        return Ok((pool, "cargo pool slot"));
+    let pool = ark_pool_slot();
+    if let Some(pool) = pool.as_ref().filter(|pool| executable(pool)) {
+        return Ok((pool.clone(), "cargo pool slot"));
     }
     std::env::var_os("PATH")
         .into_iter()
@@ -1234,11 +1242,14 @@ fn ark_bin(data_root: &Path) -> Outcome<(PathBuf, &'static str)> {
         .find(|p| executable(p))
         .map(|path| (path, "PATH"))
         .ok_or_else(|| {
+            let target = pool.as_ref().map_or_else(
+                || "<target dir>".to_owned(),
+                |slot| slot.display().to_string().trim_end_matches("/debug/ark").to_owned(),
+            );
             format!(
                 "REFUSED: no ark binary — use the toolchain pinned in genesis/agentic/pool-policy.json \
-                 to run `(cd elohim && CARGO_TARGET_DIR={} RUSTFLAGS= cargo build -p elohim-ark)`, \
-                 or set ARK_BIN",
-                ARK_POOL_SLOT.trim_end_matches("/debug/ark")
+                 to run `(cd elohim && CARGO_TARGET_DIR={target} RUSTFLAGS= cargo build -p elohim-ark)`, \
+                 or set ARK_BIN"
             )
         })
 }

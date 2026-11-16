@@ -57,8 +57,37 @@ fn setup(tool: &str, binary: &Path) -> (tempfile::TempDir, Store, std::path::Pat
         serde_json::to_vec(&registry).unwrap(),
     )
     .unwrap();
+    settle_exec(
+        &bin.join("bin-launch"),
+        store.root().parent().unwrap(),
+        tool,
+    );
     (tmp, store, bin, release.cid)
 }
+/// Wait out ETXTBSY on a freshly copied launcher: a sibling test thread that forks while the
+/// copy's write descriptor is open holds it until that child execs, and an exec in the window
+/// fails with "Text file busy". The probe is the read-only `resolve --current` inspection
+/// against this fixture's own store; its output is discarded.
+fn settle_exec(launcher: &Path, store_root: &Path, tool: &str) {
+    for _ in 0..200 {
+        let probe = Command::new(launcher)
+            .args(["resolve", "--tool", tool, "--current", "--json"])
+            .env_clear()
+            .env("BIN_STORE", store_root)
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status();
+        match probe {
+            Err(error) if error.raw_os_error() == Some(ETXTBSY) => {
+                std::thread::sleep(std::time::Duration::from_millis(5));
+            }
+            _ => return,
+        }
+    }
+    panic!("{} stayed busy for a second", launcher.display());
+}
+/// Linux `ETXTBSY` ("Text file busy").
+const ETXTBSY: i32 = 26;
 #[test]
 fn inspect_current_ignores_overrides_and_does_not_publish_a_pin_or_usage_lease() {
     let (tmp, store, bin, cid) = setup("epr", Path::new("/bin/bash"));

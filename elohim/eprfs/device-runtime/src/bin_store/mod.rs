@@ -338,17 +338,13 @@ impl Store {
             peer_serving: PeerServing::default(),
         })
     }
-    /// Select TOOL_STORE, BIN_STORE/tool, or the persistent device default.
+    /// Select TOOL_STORE, else `<bin_store>/tool` from the device layout
+    /// ([`crate::layout`]: BIN_STORE, the saved layout, or this host's default).
     pub fn from_environment(tool: &str, registry: &Registry) -> Result<Self> {
-        let path = files::env(&format!("{}_STORE", tool.to_uppercase()))
-            .map(PathBuf::from)
-            .unwrap_or_else(|| {
-                PathBuf::from(
-                    files::env("BIN_STORE")
-                        .unwrap_or_else(|| "/projects/.claude-config/tools/bin-store".into()),
-                )
-                .join(tool)
-            });
+        let path = match files::env(&format!("{}_STORE", tool.to_uppercase())) {
+            Some(path) => PathBuf::from(path),
+            None => crate::layout::resolve()?.bin_store()?.join(tool),
+        };
         Self::new(path, tool, registry)
     }
     /// Supply an external-command boundary for isolated build and attestation tests.

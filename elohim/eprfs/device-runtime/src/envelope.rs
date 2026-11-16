@@ -620,11 +620,32 @@ impl Store {
     ) -> Result<Envelope> {
         proposed.validate_proposed(proc_root)?;
         if let Some(mut old) = self.existing(&proposed, proc_root)? {
+            // The owner's re-open is how a runtime that cannot name its model at start
+            // (SessionStart) names it later: the first model sticks, a different one refuses.
+            let mut changed = match (&old.model, proposed.model) {
+                (None, Some(model)) => {
+                    old.model = Some(model);
+                    true
+                }
+                (Some(recorded), Some(model)) if *recorded != model => {
+                    return Err(Refusal::new(
+                        "envelope-model-conflict",
+                        format!(
+                            "{}: recorded model {recorded}, re-open names {model}",
+                            old.id()
+                        ),
+                    ));
+                }
+                _ => false,
+            };
             if !old.holder_held() {
                 if let Some(holder) = arm(self, &old) {
                     old.owner_holder = Some(holder);
-                    self.save(&old)?;
+                    changed = true;
                 }
+            }
+            if changed {
+                self.save(&old)?;
             }
             return Ok(old);
         }

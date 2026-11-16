@@ -32,6 +32,8 @@ interface Fixture {
   request?: ObjectValue;
   authorization?: ObjectValue;
   preflight?: { lines: string[]; status: number };
+  bins?: string; // the executables' place this workspace names (BIN_STORE)
+  layout?: { value: ObjectValue; status: number };
   keyStatBefore?: { a: number; b: number };
 }
 const fixtures = new WeakMap<object, Fixture>();
@@ -377,4 +379,82 @@ Then('the {string} line is degraded and names {string}', function (name: string,
   const value = line(state(this), name);
   assert.ok(value.startsWith('degraded'), value);
   assert.ok(value.includes(cure), value);
+});
+
+// ── Where the device keeps its things (the device layout) ───────────────────────────────────
+/** `epr device layout <verb>` for this workspace, with its named executables' place if any. */
+function layoutRun(f: Fixture, args: string[], bins: string | undefined, expected: number | null) {
+  const env = deviceEnv(f, f.keyB, bins ? { BIN_STORE: bins } : {});
+  return run(f, [env.EPR_BIN ?? binary, 'device', 'layout', ...args], env, expected);
+}
+function location(f: Fixture, field: string): { path?: string; origin: ObjectValue } {
+  assert.ok(f.layout, 'the layout has not been shown');
+  const found = object(f.layout.value[field]);
+  return { path: found.path as string | undefined, origin: object(found.origin) };
+}
+
+Given('this workspace names its own place for executables', function () {
+  const f = state(this);
+  f.bins = join(f.base, 'named-bins');
+});
+
+Given('this device remembered a place for its executables', function () {
+  const f = state(this);
+  const remembered = join(f.base, 'remembered-bins');
+  const saved = layoutRun(f, ['save', '--field', 'binStore'], remembered, 0);
+  assert.ok(saved.stdout.includes(remembered), saved.stdout);
+});
+
+Given('this workspace names a different place for executables', function () {
+  const f = state(this);
+  f.bins = join(f.base, 'named-bins');
+});
+
+When("this device's layout is shown", function () {
+  const f = state(this);
+  const r = layoutRun(f, ['show', '--json'], f.bins, null);
+  assert.notEqual(r.status, null, `layout show did not run\n${r.stderr}`);
+  f.layout = { value: object(JSON.parse(r.stdout)), status: r.status as number };
+});
+
+Then(
+  'the executables are kept in the place this workspace named, chosen by {string}',
+  function (variable: string) {
+    const f = state(this);
+    const bins = location(f, 'binStore');
+    assert.equal(bins.path, f.bins);
+    assert.deepEqual(bins.origin, { kind: 'env', name: variable });
+  }
+);
+
+Then(
+  'the checkout named is the repository this workspace stands in, found where it stands',
+  function () {
+    const f = state(this);
+    const root = location(f, 'projectRoot');
+    assert.equal(root.path, f.root);
+    assert.deepEqual(root.origin, { kind: 'discovered' });
+  }
+);
+
+Then("the config place is under this workspace's own config home", function () {
+  const f = state(this);
+  const config = location(f, 'configDir');
+  // The fixture names its key file explicitly, so the config place is that key's directory.
+  assert.equal(config.path, dirname(f.keyB));
+  assert.deepEqual(config.origin, { kind: 'env', name: 'ELOHIM_DEVICE_KEY_FILE' });
+});
+
+Then('the remembered place is reported beside it as a difference', function () {
+  const f = state(this);
+  assert.ok(f.layout);
+  const differs = f.layout.value.differs as ObjectValue[];
+  assert.deepEqual(differs, [
+    { field: 'binStore', env: f.bins, saved: join(f.base, 'remembered-bins') },
+  ]);
+});
+
+Then('showing the layout succeeds', function () {
+  const f = state(this);
+  assert.equal(f.layout?.status, 0);
 });

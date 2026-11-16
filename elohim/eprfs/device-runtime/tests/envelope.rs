@@ -85,6 +85,61 @@ fn binding_is_idempotent_private_and_cannot_be_reused_or_traverse() {
     );
     assert!(!dir.path().join("key").exists());
 }
+/// A fake `/proc` naming pid 7 started at tick 42, the owner every `binding` claims.
+fn live_owner_proc(root: &Path) {
+    std::fs::create_dir_all(root.join("self/ns")).unwrap();
+    std::fs::write(root.join("self/ns/pid"), "namespace").unwrap();
+    std::fs::create_dir_all(root.join("sys/kernel/random")).unwrap();
+    std::fs::write(root.join("sys/kernel/random/boot_id"), "boot").unwrap();
+    std::fs::create_dir_all(root.join("7")).unwrap();
+    let mut fields = vec!["0"; 20];
+    fields[0] = "S";
+    fields[19] = "42";
+    std::fs::write(
+        root.join("7/stat"),
+        format!("7 (codex) {}", fields.join(" ")),
+    )
+    .unwrap();
+}
+#[test]
+fn owner_reopen_names_a_missing_model_once_and_refuses_a_different_one() {
+    if !in_succession_fixture("owner_reopen_names_a_missing_model_once_and_refuses_a_different_one")
+    {
+        return;
+    }
+    let dir = tempfile::tempdir().unwrap();
+    live_owner_proc(dir.path());
+    let store = Store::lock(&dir.path().join("key")).unwrap();
+    // SessionStart opens before the runtime can name its model.
+    let started = store
+        .open(binding(dir.path(), "codex-7-42"), dir.path())
+        .unwrap();
+    assert_eq!(started.model, None);
+    let mut named = binding(dir.path(), "codex-7-42");
+    named.model = Some("claude-opus-5-5".into());
+    let reopened = store.open(named.clone(), dir.path()).unwrap();
+    assert_eq!(reopened.model.as_deref(), Some("claude-opus-5-5"));
+    assert_eq!(reopened.opened_at, started.opened_at, "same generation");
+    assert_eq!(reopened.generation, started.generation);
+    // Saved, not only returned: a model-less re-open reads it back.
+    let again = store
+        .open(binding(dir.path(), "codex-7-42"), dir.path())
+        .unwrap();
+    assert_eq!(again.model.as_deref(), Some("claude-opus-5-5"));
+    assert_eq!(store.open(named, dir.path()).unwrap().model, again.model);
+    let mut other = binding(dir.path(), "codex-7-42");
+    other.model = Some("claude-sonnet-5-5".into());
+    let refused = store.open(other, dir.path()).unwrap_err();
+    assert_eq!(refused.kind, "envelope-model-conflict");
+    let kept = store
+        .open(binding(dir.path(), "codex-7-42"), dir.path())
+        .unwrap();
+    assert_eq!(
+        kept.model.as_deref(),
+        Some("claude-opus-5-5"),
+        "refusal changes nothing"
+    );
+}
 #[test]
 fn liveness_uses_both_pid_and_start_and_unknown_is_not_dead() {
     let dir = tempfile::tempdir().unwrap();

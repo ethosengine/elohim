@@ -28,6 +28,7 @@ use std::process::ExitCode;
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use elohim_device_runtime::layout::DeviceLayout;
 use elohim_epr_rea::{FlowEvent, FlowRecord, FlowStore, ParticipantRow};
 use eprfs_peer::{
     lease_events, other_devices, peer_from_arg, relay_from_env, roster_rows_from_file, slots,
@@ -531,6 +532,10 @@ struct ServeCheckOutcome {
     rules_digest: String,
     rules: &'static str,
     loaded_rules_digest: Option<String>,
+    /// `layout <field> = <path> (<origin>)` lines, then any `layout-override-differs` line.
+    layout: Vec<String>,
+    /// Where a queued fetch may install.
+    install: String,
 }
 
 #[derive(Serialize)]
@@ -748,8 +753,31 @@ fn serve_check(options: &Options) -> PeerResult<ExitCode> {
         Some(_) => "match",
         None => "unrecorded",
     };
+    // The destinations launch writes, named and checked before launch (nothing is created).
+    let layout = match elohim_device_runtime::layout::resolve() {
+        Ok(layout) => layout,
+        Err(error) => return check_refusal(options, 1, &error.kind, error.detail),
+    };
+    let store = match crate::bin::daemon_store() {
+        Ok(store) => store,
+        Err(error) => return check_refusal(options, 1, &error.kind, error.detail),
+    };
+    if let Err(error) = elohim_device_runtime::layout::check_creatable("binStore", store.root()) {
+        return check_refusal(options, 1, &error.kind, error.detail);
+    }
+    let install = install_scope(options, &layout);
+    if install_is_empty(&install) {
+        return check_refusal(options, 1, INSTALL_MISSING, install_missing());
+    }
+    for root in &install.roots {
+        if let Err(error) = elohim_device_runtime::layout::check_creatable("installRoot", root) {
+            return check_refusal(options, 1, &error.kind, error.detail);
+        }
+    }
     let outcome = ServeCheckOutcome {
         ok: true,
+        layout: layout.lines(),
+        install: describe_install(&install),
         executable_cid,
         device: device.key.did_key(),
         node_id: key.node_id().to_string(),
@@ -775,6 +803,10 @@ fn serve_check(options: &Options) -> PeerResult<ExitCode> {
             ),
             _ => println!("rules: {} ({})", outcome.rules, outcome.rules_digest),
         }
+        for line in &outcome.layout {
+            println!("{line}");
+        }
+        println!("install: {}", outcome.install);
     }
     Ok(ExitCode::SUCCESS)
 }
@@ -809,24 +841,31 @@ pub const PAYLOAD_STORE_RECORD: &str = "payload-store";
 pub const INSTALL_ROOTS_ENV: &str = "EPR_INSTALL_ROOTS";
 
 /// Where this daemon's queued fetches may install: every `--install-root`, every root in
-/// [`INSTALL_ROOTS_ENV`], and a `mesh-bin` directory under the cargo pool
-/// (`CARGO_TARGET_POOL_ROOT`, else `/projects/.cargo-target-pool` when it exists).
-fn install_scope(options: &Options) -> eprfs_peer::InstallScope {
+/// [`INSTALL_ROOTS_ENV`], the device's `<bin_store>/incoming`, and a `mesh-bin` directory
+/// under the cargo pool, all from the device layout ([`elohim_device_runtime::layout`]).
+fn install_scope(options: &Options, layout: &DeviceLayout) -> eprfs_peer::InstallScope {
     let mut roots = options.install_roots.clone();
     if let Some(extra) = std::env::var_os(INSTALL_ROOTS_ENV) {
         roots.extend(std::env::split_paths(&extra).filter(|p| p.is_absolute()));
     }
-    let mesh_bin_pool = std::env::var_os("CARGO_TARGET_POOL_ROOT")
-        .filter(|v| !v.is_empty())
-        .map(PathBuf::from)
-        .or_else(|| {
-            let default = PathBuf::from("/projects/.cargo-target-pool");
-            default.is_dir().then_some(default)
-        });
+    roots.extend(layout.incoming().ok());
     eprfs_peer::InstallScope {
         roots,
-        mesh_bin_pool,
+        mesh_bin_pool: layout.cargo_pool().map(Path::to_owned),
     }
+}
+
+/// The destination refusal both `serve --check` and `serve` report for an empty scope.
+const INSTALL_MISSING: &str = "install-destination-missing";
+
+fn install_missing() -> String {
+    "a queued fetch could install nowhere: no --install-root, no EPR_INSTALL_ROOTS, no bin-store \
+     (set BIN_STORE, XDG_DATA_HOME or HOME) and no cargo pool"
+        .into()
+}
+
+fn install_is_empty(scope: &eprfs_peer::InstallScope) -> bool {
+    scope.roots.is_empty() && scope.mesh_bin_pool.is_none()
 }
 
 fn describe_install(scope: &eprfs_peer::InstallScope) -> String {
@@ -928,7 +967,21 @@ fn serve(options: Options) -> PeerResult<ExitCode> {
         device.peer_dir.join(PAYLOAD_STORE_RECORD),
         format!("{}\n", payload_dir.display()),
     )?;
-    let install = install_scope(&options);
+    let layout = elohim_device_runtime::layout::resolve()?;
+    for line in &layout.differs {
+        eprintln!("epr peer: {}", line.line());
+    }
+    let install = install_scope(&options, &layout);
+    if install_is_empty(&install) {
+        return Err(PeerCliError::InvalidArguments(format!(
+            "{INSTALL_MISSING}: {}",
+            install_missing()
+        )));
+    }
+    // An install root must exist to admit anything; the incoming directory is the daemon's own.
+    if let Ok(incoming) = layout.incoming() {
+        std::fs::create_dir_all(&incoming)?;
+    }
     eprintln!(
         "epr peer: a queued fetch installs only under {}",
         describe_install(&install)

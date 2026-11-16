@@ -28,11 +28,13 @@ pub(crate) fn store_with_bins(
     let bins = if explicit_root {
         root.join("bin/bin-tools.json")
     } else {
-        let bin_root = std::env::var_os("BIN_STORE")
-            .filter(|value| !value.is_empty())
-            .map(PathBuf::from)
-            .unwrap_or_else(|| PathBuf::from("/projects/.claude-config/tools/bin-store"));
-        bin_root.join("bin/bin-tools.json")
+        elohim_device_runtime::layout::resolve()
+            .and_then(|layout| {
+                layout
+                    .bin_store()
+                    .map(|root| root.join("bin/bin-tools.json"))
+            })
+            .map_err(|e| e.to_string())?
     };
     let runtime_config = runtime
         .or_else(|| {

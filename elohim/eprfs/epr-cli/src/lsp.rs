@@ -494,17 +494,19 @@ fn serve(options: &Options) -> LspResult<ExitCode> {
 /// top, the default root), and a pure function is testable. A root that is itself the checkout
 /// top has an empty workspace path, so its slot is `$POOL/family/<family>/<slot>`.
 fn lsp_slot(root: &Path, slot: &str) -> PathBuf {
-    let pool = std::env::var_os("CARGO_TARGET_POOL_ROOT")
-        .filter(|v| !v.is_empty())
-        .map_or_else(
-            || PathBuf::from("/projects/.cargo-target-pool"),
-            PathBuf::from,
-        );
     let worktree = root
         .ancestors()
         .find(|dir| dir.join(".git").exists())
         .unwrap_or(root)
         .to_path_buf();
+    // The layout's pool (CARGO_TARGET_POOL_ROOT, saved, or the Che pool). A device with no
+    // pool builds where cargo would by default: the root's own `target/<slot>`.
+    let pool = elohim_device_runtime::layout::resolve()
+        .ok()
+        .and_then(|layout| layout.cargo_pool().map(Path::to_owned));
+    let Some(pool) = pool else {
+        return root.join("target").join(slot);
+    };
     let family = std::env::var("CARGO_TARGET_POOL_FAMILY")
         .ok()
         .filter(|v| !v.is_empty())

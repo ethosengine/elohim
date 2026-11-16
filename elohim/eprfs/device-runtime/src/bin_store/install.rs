@@ -360,7 +360,13 @@ impl Store {
 }
 
 fn build_output(path: &Path) -> bool {
-    path.starts_with("/projects/.cargo-target-pool")
+    // The Che pool stays named even when the layout points elsewhere: refusing to adopt from
+    // a build output is conservative, and no other host has that path.
+    let pool = crate::layout::resolve()
+        .ok()
+        .and_then(|layout| layout.cargo_pool().map(Path::to_owned));
+    path.starts_with(crate::layout::CHE_CARGO_POOL)
+        || pool.is_some_and(|pool| path.starts_with(pool))
         || path.starts_with("/tmp/eprfs-gate-target")
         || path.components().any(|part| part.as_os_str() == "target")
 }

@@ -48,6 +48,14 @@ Feature: A workspace arrives as one of its person's devices, and a refusal names
   # the ceremony is a person's act. A missing key or binding is refused by name below.
   # Optional model, fold and berth gaps are degraded: core work can still proceed.
   # The last scenario checks all eight lines on a bound fixture with local tool candidates.
+  #
+  # Where a device keeps its things (the "device layout", `epr device layout show`): the
+  # config home (key, roster pins, sessions), the bin-store (the executables `epr` lands and
+  # runs), the cargo pool (shared build output, when the device has one) and the checkout. A
+  # workspace container keeps them under its `/projects` tree; a laptop has no such tree and
+  # keeps them under its own home. Each place is chosen in one order: a variable the person
+  # set, else a place the device remembered (`epr device layout save`), else the host's default.
+  # The checkout the person stands in always beats a remembered one.
 
   Background:
     Given a committed repository whose roster for "matthew" was begun on another device
@@ -89,3 +97,18 @@ Feature: A workspace arrives as one of its person's devices, and a refusal names
   Scenario: A locally usable workspace permits degraded enhancements and exits zero
     Given the core arrival conditions are met on this workspace
     Then every line reads ok or degraded and the preflight exits zero
+
+  Scenario: Every place this device keeps its things is named with the reason it was chosen
+    Given this workspace names its own place for executables
+    When this device's layout is shown
+    Then the executables are kept in the place this workspace named, chosen by "BIN_STORE"
+    And the checkout named is the repository this workspace stands in, found where it stands
+    And the config place is under this workspace's own config home
+
+  Scenario: A remembered place gives way to one the person names, and the difference is said, not refused
+    Given this device remembered a place for its executables
+    And this workspace names a different place for executables
+    When this device's layout is shown
+    Then the executables are kept in the place this workspace named, chosen by "BIN_STORE"
+    And the remembered place is reported beside it as a difference
+    And showing the layout succeeds
