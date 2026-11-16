@@ -114,6 +114,13 @@ Feature: A workspace arrives as one of its person's devices, and a refusal names
     And showing the layout succeeds
 
   # A device's home is durable or ephemeral, and the native tool is told which, never guesses.
+  # A "native session" (`epr session open`) is the device's record of one agent run: who is
+  # acting, for which person, from which checkout. Its records (the "envelope") live beside the
+  # device key and must outlive a restart, so opening one is where persistence is decided; the
+  # arrival preflight above reads whether a key exists, not whether its home will survive.
+  # The session names the "basis" it was accepted on: "explicit-mount" (the key lives in a
+  # persistent directory outside $HOME) or "declared-durable-home" (below). Its refusals carry
+  # stable codes beginning `envelope-`.
   # A workspace container's home ($HOME) is wiped when the workspace restarts, so by default a
   # key kept under $HOME cannot hold a native session: the session would vanish with it. A
   # laptop's home survives restarts. Its person says so once with
@@ -139,6 +146,7 @@ Feature: A workspace arrives as one of its person's devices, and a refusal names
   @wip
   Scenario: A container workspace whose home is wiped on restart is refused even with a declaration
     Given a workspace whose key lives under $HOME and whose platform sets DEVWORKSPACE_ID
+    And the workspace stands for "matthew" on the roster
     And a persistence declaration signed by that key sits beside the key
     When a native session is opened there
     Then it is refused with "envelope-home-ephemeral-platform"
@@ -149,6 +157,7 @@ Feature: A workspace arrives as one of its person's devices, and a refusal names
   @wip
   Scenario: A declaration copied from another device or another directory is refused
     Given a device whose key lives under a home that survives restarts
+    And the device stands for "matthew" on the roster
     And the persistence declaration beside its key was copied from another device
     When a native session is opened there
     Then it is refused with "envelope-persistence-declaration-invalid" naming the device mismatch
