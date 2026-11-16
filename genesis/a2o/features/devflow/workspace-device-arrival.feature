@@ -133,7 +133,6 @@ Feature: A workspace arrives as one of its person's devices, and a refusal names
   # These scenarios are @wip until their step definitions land in
   # steps/devflow/workspace-device-arrival.steps.ts.
 
-  @wip
   Scenario: A device whose home survives restarts declares it once and opens a native session
     Given a device whose key lives under a home that survives restarts
     And the device stands for "matthew" on the roster
@@ -143,7 +142,6 @@ Feature: A workspace arrives as one of its person's devices, and a refusal names
     And declaring a second time reports the existing declaration and rewrites nothing
     And a native session opens on the device with the basis "declared-durable-home"
 
-  @wip
   Scenario: A container workspace whose home is wiped on restart is refused even with a declaration
     Given a workspace whose key lives under $HOME and whose platform sets DEVWORKSPACE_ID
     And the workspace stands for "matthew" on the roster
@@ -154,7 +152,6 @@ Feature: A workspace arrives as one of its person's devices, and a refusal names
     And no session record was written
     And declaring the home durable there is refused the same way
 
-  @wip
   Scenario: A declaration copied from another device or another directory is refused
     Given a device whose key lives under a home that survives restarts
     And the device stands for "matthew" on the roster
