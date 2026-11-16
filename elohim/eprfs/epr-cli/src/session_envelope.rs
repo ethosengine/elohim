@@ -31,31 +31,180 @@ fn home() -> Result<PathBuf> {
     device_key::resolve_path().map_err(err)
 }
 fn persistent_home() -> Result<PathBuf> {
-    let absolute_override = ["XDG_CONFIG_HOME", "ELOHIM_DEVICE_KEY_FILE"]
-        .iter()
-        .any(|k| std::env::var_os(k).is_some_and(|v| Path::new(&v).is_absolute()));
-    if !absolute_override {
-        return Err("envelope-persistent-config-required: set XDG_CONFIG_HOME to an absolute persistent config directory outside $HOME".into());
+    resolve_persistence_with(&|name: &str| std::env::var_os(name)).map(|p| p.key)
+}
+
+/// Environment markers of a platform whose `$HOME` is wiped on restart (Eclipse Che and
+/// DevWorkspace pods). Any one set and non-empty makes a home key ephemeral, declared or not.
+pub(crate) const EPHEMERAL_HOME_MARKERS: [&str; 3] = [
+    "DEVWORKSPACE_ID",
+    "CHE_WORKSPACE_ID",
+    "DEVWORKSPACE_NAMESPACE",
+];
+
+const PERSISTENT_CONFIG_REQUIRED: &str = "envelope-persistent-config-required: set XDG_CONFIG_HOME to an absolute persistent config directory outside $HOME";
+
+/// The named basis on which this device's envelope store is accepted as persistent.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum PersistenceBasis {
+    /// An absolute `XDG_CONFIG_HOME` or `ELOHIM_DEVICE_KEY_FILE` places the key outside `$HOME`.
+    ExplicitMount,
+    /// The key lives under `$HOME` on a host with no ephemeral-home marker, and its directory
+    /// holds a `persistence.json` the key itself signed for that directory.
+    DeclaredDurableHome { declared_at: String },
+}
+
+impl PersistenceBasis {
+    /// The basis's stable wire name.
+    pub(crate) fn name(&self) -> &'static str {
+        match self {
+            Self::ExplicitMount => "explicit-mount",
+            Self::DeclaredDurableHome { .. } => "declared-durable-home",
+        }
     }
-    let key = match std::env::var_os("ELOHIM_DEVICE_KEY_FILE").filter(|v| !v.is_empty()) {
-        Some(value) => PathBuf::from(value),
-        None => home()?,
-    };
+}
+
+/// A key path accepted as persistent, with the basis that accepted it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct Persistence {
+    key: PathBuf,
+    basis: PersistenceBasis,
+}
+
+impl Persistence {
+    /// The key path as the device-key module resolves it (unresolved symlinks kept, so every
+    /// store opened from it names the same path `home()` does).
+    pub(crate) fn key(&self) -> &Path {
+        &self.key
+    }
+    /// Why the key's directory counts as persistent.
+    pub(crate) fn basis(&self) -> &PersistenceBasis {
+        &self.basis
+    }
+}
+
+/// Where the device key resolves, and the facts the persistence decision reads about it.
+#[derive(Debug, Clone)]
+pub(crate) struct KeyPlacement {
+    /// The key path as `device_key::resolve_path_with` names it.
+    pub(crate) key: PathBuf,
+    /// The key's directory with every existing ancestor symlink-resolved.
+    pub(crate) dir: PathBuf,
+    /// Whether that resolved directory lies under the resolved `$HOME`.
+    pub(crate) under_home: bool,
+    /// Whether an absolute `XDG_CONFIG_HOME` or `ELOHIM_DEVICE_KEY_FILE` is set.
+    pub(crate) absolute_override: bool,
+    /// The first ephemeral-home platform marker set, if any.
+    pub(crate) ephemeral_marker: Option<&'static str>,
+}
+
+/// Resolve the key and decide whether it is home storage, from an environment lookup.
+pub(crate) fn key_placement_with<F>(lookup: &F) -> Result<KeyPlacement>
+where
+    F: Fn(&str) -> Option<std::ffi::OsString>,
+{
+    let non_empty = |name: &str| lookup(name).filter(|v| !v.is_empty());
+    let absolute_override = ["XDG_CONFIG_HOME", device_key::DEVICE_KEY_ENV]
+        .iter()
+        .any(|k| non_empty(k).is_some_and(|v| Path::new(&v).is_absolute()));
+    let ephemeral_marker = EPHEMERAL_HOME_MARKERS
+        .into_iter()
+        .find(|k| non_empty(k).is_some());
+    // A relative or in-repository key override is refused here, never resolved against the cwd.
+    let key = device_key::resolve_path_with(|name| lookup(name)).map_err(err)?;
     // Resolve symlinks as well as lexical .. before deciding whether this is home storage.
     let resolved = resolved_prefix(&key)?;
-    let under_home = std::env::var_os("HOME")
+    let dir = resolved
+        .parent()
+        .map(Path::to_path_buf)
+        .ok_or_else(|| format!("device key path {} has no directory", key.display()))?;
+    let under_home = non_empty("HOME")
         .map(PathBuf::from)
         .map(|p| resolved_prefix(&p))
         .transpose()?
         .is_some_and(|p| resolved.starts_with(p));
-    if under_home {
-        return Err("envelope-persistent-config-required: set XDG_CONFIG_HOME to an absolute persistent config directory outside $HOME".into());
-    }
-    home()
+    Ok(KeyPlacement {
+        key,
+        dir,
+        under_home,
+        absolute_override,
+        ephemeral_marker,
+    })
 }
+
+/// The refusal for a key with no accepted basis; the remedy it names depends on the host.
+fn persistent_config_required(placement: &KeyPlacement) -> String {
+    match (placement.under_home, placement.ephemeral_marker) {
+        (true, Some(marker)) => format!(
+            "{PERSISTENT_CONFIG_REQUIRED} ({marker} is set: this host's $HOME is wiped on restart)"
+        ),
+        (true, None) => format!(
+            "{PERSISTENT_CONFIG_REQUIRED}; or, when this device's $HOME survives restarts (a \
+             laptop, not a container workspace), declare it once with `epr actor device \
+             persistence --declare durable-home`"
+        ),
+        (false, _) => PERSISTENT_CONFIG_REQUIRED.to_string(),
+    }
+}
+
+/// The one persistence resolver: accept the key on a named basis or refuse with the reason.
+///
+/// 1. `ExplicitMount` — an absolute override is set and the resolved key is outside `$HOME`.
+/// 2. `DeclaredDurableHome` — the resolved key is under `$HOME`, no ephemeral-home marker is
+///    set, and the key's directory holds a declaration that verifies against the loaded key and
+///    that directory.
+/// 3. Anything else refuses, before any envelope state can be created.
+pub(crate) fn resolve_persistence_with<F>(lookup: &F) -> Result<Persistence>
+where
+    F: Fn(&str) -> Option<std::ffi::OsString>,
+{
+    let placement = key_placement_with(lookup)?;
+    if !placement.under_home {
+        if placement.absolute_override {
+            return Ok(Persistence {
+                key: placement.key,
+                basis: PersistenceBasis::ExplicitMount,
+            });
+        }
+        return Err(persistent_config_required(&placement));
+    }
+    let declaration = device_key::persistence_path(&placement.dir);
+    if !declaration.try_exists().map_err(err)? {
+        return Err(persistent_config_required(&placement));
+    }
+    if let Some(marker) = placement.ephemeral_marker {
+        return Err(format!(
+            "envelope-home-ephemeral-platform: {marker} is set, so this host's $HOME is wiped on \
+             restart and {} cannot make it durable; set XDG_CONFIG_HOME to an absolute \
+             persistent config directory outside $HOME",
+            declaration.display()
+        ));
+    }
+    let key = device_key::DeviceKey::load(&placement.key).map_err(|e| {
+        format!(
+            "envelope-persistence-declaration-invalid: the device key at {} cannot be loaded: {e}",
+            placement.key.display()
+        )
+    })?;
+    match device_key::read_persistence_declaration(&placement.dir, &key.did_key()) {
+        Ok(Some(Ok(verified))) => Ok(Persistence {
+            key: placement.key,
+            basis: PersistenceBasis::DeclaredDurableHome {
+                declared_at: verified.declared_at,
+            },
+        }),
+        Ok(Some(Err(why))) => Err(format!("envelope-persistence-declaration-invalid: {why}")),
+        Ok(None) => Err(persistent_config_required(&placement)),
+        Err(e) => Err(format!(
+            "envelope-persistence-declaration-invalid: {}: {e}",
+            declaration.display()
+        )),
+    }
+}
+
 // Canonicalize existing ancestors too: an absent key under a home symlink must still
 // produce the persistent-directory remedy before any state can be created.
-fn resolved_prefix(path: &Path) -> Result<PathBuf> {
+pub(crate) fn resolved_prefix(path: &Path) -> Result<PathBuf> {
     match path.canonicalize() {
         Ok(path) => Ok(path),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
@@ -889,4 +1038,240 @@ pub fn run(args: &[String]) -> Result<ExitCode> {
     };
     println!("{}", serde_json::to_string_pretty(&value).map_err(err)?);
     Ok(ExitCode::SUCCESS)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashMap;
+    use std::ffi::OsString;
+
+    fn env(pairs: &[(&str, &Path)]) -> impl Fn(&str) -> Option<OsString> {
+        let map: HashMap<String, OsString> = pairs
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.as_os_str().to_owned()))
+            .collect();
+        move |name| map.get(name).cloned()
+    }
+
+    /// A laptop-shaped home: `<base>/home/.config/elohim/device/ed25519.seed`, key minted.
+    fn laptop() -> (tempfile::TempDir, PathBuf, device_key::DeviceKey) {
+        let base = tempfile::tempdir().unwrap();
+        let home = base.path().join("home");
+        let key_path = home.join(".config/elohim/device/ed25519.seed");
+        let key = device_key::DeviceKey::load_or_generate(&key_path).unwrap();
+        (base, home, key)
+    }
+
+    fn canonical_dir(key: &device_key::DeviceKey) -> PathBuf {
+        key.path().parent().unwrap().canonicalize().unwrap()
+    }
+
+    fn declare(key: &device_key::DeviceKey, dir: &Path, into: &Path) {
+        let declaration =
+            device_key::PersistenceDeclaration::sign(key, dir, "2026-11-16T00:00:00Z").unwrap();
+        device_key::write_persistence_declaration(into, &declaration).unwrap();
+    }
+
+    #[test]
+    fn a_durable_home_with_its_own_declaration_is_accepted() {
+        let (_base, home, key) = laptop();
+        let dir = canonical_dir(&key);
+        declare(&key, &dir, &dir);
+        let persistence = resolve_persistence_with(&env(&[("HOME", &home)])).unwrap();
+        assert_eq!(
+            persistence.basis(),
+            &PersistenceBasis::DeclaredDurableHome {
+                declared_at: "2026-11-16T00:00:00Z".into()
+            }
+        );
+        assert_eq!(persistence.basis().name(), "declared-durable-home");
+        assert_eq!(persistence.key(), key.path());
+    }
+
+    #[test]
+    fn a_home_key_without_a_declaration_names_the_declare_act() {
+        let (_base, home, _key) = laptop();
+        let refusal = resolve_persistence_with(&env(&[("HOME", &home)])).unwrap_err();
+        assert!(
+            refusal.starts_with("envelope-persistent-config-required: set XDG_CONFIG_HOME"),
+            "{refusal}"
+        );
+        assert!(
+            refusal.contains("epr actor device persistence --declare durable-home"),
+            "{refusal}"
+        );
+    }
+
+    #[test]
+    fn an_ephemeral_home_platform_refuses_even_a_valid_declaration() {
+        let (_base, home, key) = laptop();
+        let id = Path::new("workspace-1234");
+        for marker in EPHEMERAL_HOME_MARKERS {
+            // Without a declaration: the long-standing remedy, and no declare suggestion.
+            let refusal =
+                resolve_persistence_with(&env(&[("HOME", &home), (marker, id)])).unwrap_err();
+            assert!(
+                refusal.starts_with("envelope-persistent-config-required:"),
+                "{refusal}"
+            );
+            assert!(refusal.contains(marker), "{refusal}");
+            assert!(!refusal.contains("--declare"), "{refusal}");
+        }
+        let dir = canonical_dir(&key);
+        declare(&key, &dir, &dir);
+        for marker in EPHEMERAL_HOME_MARKERS {
+            let refusal =
+                resolve_persistence_with(&env(&[("HOME", &home), (marker, id)])).unwrap_err();
+            assert!(
+                refusal.starts_with("envelope-home-ephemeral-platform:"),
+                "{refusal}"
+            );
+        }
+        // An empty marker is not a marker.
+        let empty = Path::new("");
+        assert!(
+            resolve_persistence_with(&env(&[("HOME", &home), ("DEVWORKSPACE_ID", empty)])).is_ok()
+        );
+    }
+
+    #[test]
+    fn a_declaration_from_another_device_is_refused() {
+        let (_base, home, key) = laptop();
+        let (_other_base, _other_home, other) = laptop();
+        let dir = canonical_dir(&key);
+        // Signed by another device, even naming this directory.
+        declare(&other, &dir, &dir);
+        let refusal = resolve_persistence_with(&env(&[("HOME", &home)])).unwrap_err();
+        assert!(
+            refusal.starts_with("envelope-persistence-declaration-invalid:"),
+            "{refusal}"
+        );
+        assert!(refusal.contains("device mismatch"), "{refusal}");
+    }
+
+    #[test]
+    fn a_declaration_copied_to_another_directory_is_refused() {
+        let (base, _home, key) = laptop();
+        let original = canonical_dir(&key);
+        declare(&key, &original, &original);
+        // The same key and its declaration copied into a second home.
+        let second = base.path().join("second");
+        let copy = second.join(".config/elohim/device");
+        std::fs::create_dir_all(&copy).unwrap();
+        for name in ["ed25519.seed", device_key::PERSISTENCE_FILE] {
+            std::fs::copy(original.join(name), copy.join(name)).unwrap();
+        }
+        let refusal = resolve_persistence_with(&env(&[("HOME", &second)])).unwrap_err();
+        assert!(
+            refusal.starts_with("envelope-persistence-declaration-invalid:"),
+            "{refusal}"
+        );
+        assert!(refusal.contains("directory mismatch"), "{refusal}");
+    }
+
+    #[test]
+    fn a_tampered_declaration_is_refused() {
+        let (_base, home, key) = laptop();
+        let dir = canonical_dir(&key);
+        declare(&key, &dir, &dir);
+        let path = device_key::persistence_path(&dir);
+        let text = std::fs::read_to_string(&path).unwrap();
+        std::fs::write(
+            &path,
+            text.replace("2026-11-16T00:00:00Z", "2020-01-01T00:00:00Z"),
+        )
+        .unwrap();
+        let refusal = resolve_persistence_with(&env(&[("HOME", &home)])).unwrap_err();
+        assert!(
+            refusal.starts_with("envelope-persistence-declaration-invalid:")
+                && refusal.contains("signature does not verify"),
+            "{refusal}"
+        );
+        // An added field is tampering too, and so is a file that does not parse.
+        std::fs::write(&path, text.replacen('{', "{\"extra\":1,", 1)).unwrap();
+        let refusal = resolve_persistence_with(&env(&[("HOME", &home)])).unwrap_err();
+        assert!(refusal.contains("does not parse"), "{refusal}");
+    }
+
+    #[test]
+    fn an_explicit_mount_outside_home_keeps_its_basis() {
+        let (base, home, _key) = laptop();
+        let xdg = base.path().join("persistent-config");
+        let persistence =
+            resolve_persistence_with(&env(&[("HOME", &home), ("XDG_CONFIG_HOME", &xdg)])).unwrap();
+        assert_eq!(persistence.basis(), &PersistenceBasis::ExplicitMount);
+        assert_eq!(persistence.basis().name(), "explicit-mount");
+        assert_eq!(
+            persistence.key(),
+            xdg.join("elohim/device/ed25519.seed").as_path()
+        );
+        let seed = base.path().join("mounted/ed25519.seed");
+        let persistence = resolve_persistence_with(&env(&[
+            ("HOME", &home),
+            (device_key::DEVICE_KEY_ENV, &seed),
+        ]))
+        .unwrap();
+        assert_eq!(persistence.basis(), &PersistenceBasis::ExplicitMount);
+        assert_eq!(persistence.key(), seed.as_path());
+        // A relative XDG_CONFIG_HOME is ignored: the key falls back under $HOME and refuses.
+        let refusal = resolve_persistence_with(&env(&[
+            ("HOME", &home),
+            ("XDG_CONFIG_HOME", Path::new("relative/config")),
+        ]))
+        .unwrap_err();
+        assert!(refusal.starts_with("envelope-persistent-config-required:"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn symlinked_homes_and_keys_resolve_before_the_home_decision() {
+        let (base, home, _key) = laptop();
+        // An absolute override that is a symlink INTO $HOME is still home storage.
+        let alias = base.path().join("alias");
+        std::os::unix::fs::symlink(home.join(".config"), &alias).unwrap();
+        let refusal =
+            resolve_persistence_with(&env(&[("HOME", &home), ("XDG_CONFIG_HOME", &alias)]))
+                .unwrap_err();
+        assert!(
+            refusal.starts_with("envelope-persistent-config-required:"),
+            "{refusal}"
+        );
+        // A $HOME that is itself a symlink resolves too.
+        let home_link = base.path().join("home-link");
+        std::os::unix::fs::symlink(&home, &home_link).unwrap();
+        let refusal = resolve_persistence_with(&env(&[
+            ("HOME", &home_link),
+            ("XDG_CONFIG_HOME", &home.join(".config")),
+        ]))
+        .unwrap_err();
+        assert!(
+            refusal.starts_with("envelope-persistent-config-required:"),
+            "{refusal}"
+        );
+        // An absent key under a home symlink refuses before any state is created.
+        let missing = home_link.join("missing/ed25519.seed");
+        let refusal = resolve_persistence_with(&env(&[
+            ("HOME", &home),
+            (device_key::DEVICE_KEY_ENV, &missing),
+        ]))
+        .unwrap_err();
+        assert!(
+            refusal.starts_with("envelope-persistent-config-required:"),
+            "{refusal}"
+        );
+        assert!(!home.join("missing").exists());
+        // A declaration is read from the RESOLVED directory, so one reached through the alias
+        // verifies against the canonical directory it was signed for.
+        let key = device_key::DeviceKey::load(&alias.join("elohim/device/ed25519.seed")).unwrap();
+        let dir = home.join(".config/elohim/device").canonicalize().unwrap();
+        declare(&key, &dir, &dir);
+        let persistence =
+            resolve_persistence_with(&env(&[("HOME", &home), ("XDG_CONFIG_HOME", &alias)]))
+                .unwrap();
+        assert!(matches!(
+            persistence.basis(),
+            PersistenceBasis::DeclaredDurableHome { .. }
+        ));
+    }
 }

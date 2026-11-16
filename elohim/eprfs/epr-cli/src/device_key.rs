@@ -42,6 +42,12 @@
 //! is recorded at `<key dir>/rosters/<handle>.root` — for the default key path that is
 //! `<config home>/elohim/device/rosters/<handle>.root` (ruling R-P15) — so a device's pins travel
 //! with its key and a temp test key gets temp pins.
+//!
+//! **A durable home is declared, never inferred.** A key under `$HOME` is refused as envelope
+//! storage by default, because an Eclipse Che workspace wipes `$HOME` on restart. A laptop's home
+//! is durable, and says so with `<key dir>/persistence.json` ([`PersistenceDeclaration`]): the
+//! device key's signature over its own did:key and its own canonical directory, so a declaration
+//! copied from another device, moved to another directory, or edited no longer verifies.
 
 use std::ffi::OsString;
 use std::fs::{self, File, OpenOptions};
@@ -50,6 +56,7 @@ use std::path::{Path, PathBuf};
 
 use elohim_epr::proof::{self, AgentKeypair};
 use rand_core::{OsRng, RngCore};
+use serde::{Deserialize, Serialize};
 
 /// Test-and-tooling override for the key's path. Its only intended uses are tests and the
 /// two-device enrolment rehearsal; an ordinary session resolves the config-home path.
@@ -575,6 +582,189 @@ pub fn write_root_pin(key_file: &Path, handle: &str, root: &str) -> io::Result<S
             format!("the roster pin {} vanished after writing", path.display()),
         )
     })
+}
+
+// ---------------------------------------------------------------------------
+// durable-home persistence declaration
+// ---------------------------------------------------------------------------
+
+/// The declaration's file name, beside the seed in the key's own (canonical) directory.
+pub const PERSISTENCE_FILE: &str = "persistence.json";
+
+/// The one basis a declaration may carry: this device's `$HOME` survives restarts.
+pub const DURABLE_HOME_BASIS: &str = "durable-home";
+
+/// The only declaration format version.
+const PERSISTENCE_VERSION: u32 = 1;
+
+/// The domain tag a declaration signature covers, ahead of the CID of the unsigned body — the
+/// same shape as a roster row's (`elohim:participant-roster-row:v1:` + body CID), so a
+/// declaration signature can never be replayed as a signature over anything else.
+const PERSISTENCE_SIGNING_DOMAIN: &str = "elohim:device-persistence-declaration:v1:";
+
+/// A device's signed statement that its key directory is durable home storage.
+///
+/// Wire form: `{ "v":1, "basis":"durable-home", "device":"did:key:…", "dir":"<canonical key
+/// directory>", "declaredAt":"<RFC3339>", "sig":"<lowercase hex ed25519>" }`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct PersistenceDeclaration {
+    pub v: u32,
+    pub basis: String,
+    pub device: String,
+    pub dir: String,
+    pub declared_at: String,
+    pub sig: String,
+}
+
+/// Every field but `sig`: the body whose dag-cbor CID the signature covers.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PersistenceBody<'a> {
+    v: u32,
+    basis: &'a str,
+    device: &'a str,
+    dir: &'a str,
+    declared_at: &'a str,
+}
+
+impl PersistenceDeclaration {
+    /// Sign a durable-home declaration for `dir` (the CANONICAL directory the key loads from).
+    pub fn sign(key: &DeviceKey, dir: &Path, declared_at: &str) -> io::Result<Self> {
+        let dir = dir.to_str().ok_or_else(|| {
+            io::Error::new(
+                io::ErrorKind::InvalidInput,
+                format!(
+                    "the key directory `{}` is not UTF-8 and cannot be declared",
+                    dir.display()
+                ),
+            )
+        })?;
+        let mut declaration = Self {
+            v: PERSISTENCE_VERSION,
+            basis: DURABLE_HOME_BASIS.to_string(),
+            device: key.did_key(),
+            dir: dir.to_string(),
+            declared_at: declared_at.to_string(),
+            sig: String::new(),
+        };
+        declaration.sig = eprfs_meta::hex_lower(&key.sign(&declaration.signing_message()?));
+        Ok(declaration)
+    }
+
+    /// The exact bytes the signature covers: the domain tag and the unsigned body's atom CID
+    /// (canonical dag-cbor, the roster rows' `elohim_epr_rea::atom_cid`).
+    pub fn signing_message(&self) -> io::Result<Vec<u8>> {
+        let body = PersistenceBody {
+            v: self.v,
+            basis: &self.basis,
+            device: &self.device,
+            dir: &self.dir,
+            declared_at: &self.declared_at,
+        };
+        let cid = elohim_epr_rea::atom_cid(&body)
+            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e.to_string()))?;
+        Ok(format!("{PERSISTENCE_SIGNING_DOMAIN}{cid}").into_bytes())
+    }
+
+    /// Check this declaration against the key actually loaded (`device`) and the canonical
+    /// directory it is actually loaded from (`dir`). The error names the check that failed.
+    pub fn verify(&self, device: &str, dir: &Path) -> Result<(), String> {
+        if self.v != PERSISTENCE_VERSION {
+            return Err(format!(
+                "unsupported declaration version {} (expected {PERSISTENCE_VERSION})",
+                self.v
+            ));
+        }
+        if self.basis != DURABLE_HOME_BASIS {
+            return Err(format!(
+                "unsupported basis `{}` (expected `{DURABLE_HOME_BASIS}`)",
+                self.basis
+            ));
+        }
+        if self.device != device {
+            return Err(format!(
+                "device mismatch: the declaration names {}, the key here is {device}",
+                self.device
+            ));
+        }
+        if Path::new(&self.dir) != dir {
+            return Err(format!(
+                "directory mismatch: the declaration names `{}`, the key loads from `{}`",
+                self.dir,
+                dir.display()
+            ));
+        }
+        let message = self.signing_message().map_err(|e| e.to_string())?;
+        let signature = hex_decode_lower(&self.sig)
+            .ok_or_else(|| "signature is not lowercase hex".to_string())?;
+        if !verify(device, &message, &signature) {
+            return Err("signature does not verify against the device key".into());
+        }
+        Ok(())
+    }
+}
+
+/// Where a key directory's declaration lives.
+pub fn persistence_path(key_dir: &Path) -> PathBuf {
+    key_dir.join(PERSISTENCE_FILE)
+}
+
+/// Read and check the declaration in `key_dir` against `device`. `Ok(None)` when no file is
+/// present; `Ok(Some(Err(why)))` when one is present but fails a check (including parsing).
+pub fn read_persistence_declaration(
+    key_dir: &Path,
+    device: &str,
+) -> io::Result<Option<Result<PersistenceDeclaration, String>>> {
+    let path = persistence_path(key_dir);
+    let bytes = match fs::read(&path) {
+        Ok(bytes) => bytes,
+        Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(None),
+        Err(e) => return Err(e),
+    };
+    let parsed = serde_json::from_slice::<PersistenceDeclaration>(&bytes)
+        .map_err(|e| format!("{} does not parse: {e}", path.display()))
+        .and_then(|declaration| {
+            declaration
+                .verify(device, key_dir)
+                .map(|()| declaration)
+                .map_err(|why| format!("{}: {why}", path.display()))
+        });
+    Ok(Some(parsed))
+}
+
+/// Write `declaration` into `key_dir` atomically: an `O_EXCL` 0600 temp sibling, fsynced, then
+/// renamed over the declaration path, then the directory fsynced. A reader sees the old file or
+/// the new one, never a torn write.
+pub fn write_persistence_declaration(
+    key_dir: &Path,
+    declaration: &PersistenceDeclaration,
+) -> io::Result<()> {
+    let path = persistence_path(key_dir);
+    let mut bytes = serde_json::to_vec_pretty(declaration)
+        .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e.to_string()))?;
+    bytes.push(b'\n');
+    let tmp = create_temp_seed_file(&path, &bytes)?;
+    if let Err(e) = fs::rename(&tmp, &path) {
+        let _ = fs::remove_file(&tmp);
+        return Err(e);
+    }
+    fsync_parent_dir(&path)
+}
+
+/// Lowercase hex only; anything else (odd length, upper case, non-hex) is `None`.
+fn hex_decode_lower(text: &str) -> Option<Vec<u8>> {
+    if !text.len().is_multiple_of(2)
+        || !text
+            .bytes()
+            .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+    {
+        return None;
+    }
+    (0..text.len())
+        .step_by(2)
+        .map(|i| u8::from_str_radix(&text[i..i + 2], 16).ok())
+        .collect()
 }
 
 #[cfg(test)]

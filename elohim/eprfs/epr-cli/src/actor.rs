@@ -91,6 +91,10 @@ pub enum ActorError {
     /// A multi-store act failed part-way and left a named row behind; the message names it.
     #[error("orphan: {0}")]
     Orphan(String),
+
+    /// A refusal that carries its own stable reason code (`envelope-…: <why>`).
+    #[error("{0}")]
+    Refused(String),
 }
 
 pub type ActorResult<T> = std::result::Result<T, ActorError>;
@@ -240,8 +244,10 @@ pub fn run(args: &[String]) -> ActorResult<ExitCode> {
     }
 }
 
-/// `epr actor device enroll | authorize | bind` — the three-command ceremony (ruling R-P8) — and
-/// `endpoint`, which names this device's iroh node id on the roster (spec §3.1).
+/// `epr actor device enroll | authorize | bind` — the three-command ceremony (ruling R-P8) —
+/// `endpoint`, which names this device's iroh node id on the roster (spec §3.1), and
+/// `persistence`, which reads (or, with `--declare durable-home`, records) the basis on which this
+/// device's key directory counts as persistent envelope storage.
 ///
 /// Every verb prints JSON on stdout (the request and the authorization are the messages carried
 /// between the two devices), so `--json` is accepted and implied.
@@ -343,15 +349,35 @@ fn run_device(args: &[String]) -> ActorResult<ExitCode> {
             );
             Ok(ExitCode::SUCCESS)
         }
-        other => Err(ActorError::InvalidArguments(format!(
-            "unknown device verb `{other}`{} — enroll | authorize | bind | endpoint | contest\n{}",
+        "persistence" => {
+            let (_opts, rest) = parse_global(&args[1..])?;
+            let declare = match take_opt(&rest, "--declare")?.as_deref() {
+                None => false,
+                Some(device_key::DURABLE_HOME_BASIS) => true,
+                Some(other) => {
+                    return Err(ActorError::InvalidArguments(format!(
+                        "device persistence --declare takes `{}`, not `{other}`",
+                        device_key::DURABLE_HOME_BASIS
+                    )))
+                }
+            };
+            let outcome = device_persistence_with(&|name: &str| std::env::var_os(name), declare)?;
+            println!("{}", serde_json::to_string_pretty(&outcome)?);
+            eprintln!("{}", outcome.summary());
+            Ok(ExitCode::SUCCESS)
+        }
+        other => {
+            Err(ActorError::InvalidArguments(format!(
+            "unknown device verb `{other}`{} — enroll | authorize | bind | endpoint | contest | \
+             persistence\n{}",
             crate::hint::did_you_mean(
                 other,
                 "epr actor device",
-                &["enroll", "authorize", "bind", "endpoint", "contest"]
+                &["enroll", "authorize", "bind", "endpoint", "contest", "persistence"]
             ),
             usage()
-        ))),
+        )))
+        }
     }
 }
 
@@ -2451,7 +2477,7 @@ fn parse_global(args: &[String]) -> ActorResult<(GlobalOpts, Vec<String>)> {
                 i += 1;
             }
             "--as" | "--session" | "--subject" | "--basis" | "--handle" | "--answers"
-            | "--under" | "--node-id" => {
+            | "--under" | "--node-id" | "--declare" => {
                 let value = args.get(i + 1).ok_or_else(|| {
                     ActorError::InvalidArguments(format!("{} needs a value", args[i]))
                 })?;
@@ -2468,6 +2494,143 @@ fn parse_global(args: &[String]) -> ActorResult<(GlobalOpts, Vec<String>)> {
     }
     let root = std::fs::canonicalize(&root).unwrap_or(root);
     Ok((GlobalOpts { root, json }, rest))
+}
+
+// ---------------------------------------------------------------------------
+// device persistence
+// ---------------------------------------------------------------------------
+
+/// What `epr actor device persistence` resolved or recorded.
+#[derive(Debug, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct PersistenceOutcome {
+    /// `explicit-mount` or `declared-durable-home`.
+    pub basis: String,
+    /// The key path the basis accepts.
+    pub key: PathBuf,
+    /// The declaration's own timestamp, for a declared durable home.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub declared_at: Option<String>,
+    /// `read` (no flag), `declared` (written now), `already-declared` (a valid one stood and was
+    /// left untouched) or `replaced` (an invalid one was overwritten; `replaced` names why).
+    pub act: &'static str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub replaced: Option<String>,
+}
+
+impl PersistenceOutcome {
+    /// The one-line human summary printed on stderr.
+    pub fn summary(&self) -> String {
+        let when = self
+            .declared_at
+            .as_deref()
+            .map(|at| format!(", declared {at}"))
+            .unwrap_or_default();
+        match self.act {
+            "declared" => format!(
+                "persistence  declared {}: this device's $HOME holds {} durably{when}",
+                device_key::DURABLE_HOME_BASIS,
+                self.key.display()
+            ),
+            "replaced" => format!(
+                "persistence  re-declared {} over an invalid declaration ({}){when}",
+                device_key::DURABLE_HOME_BASIS,
+                self.replaced.as_deref().unwrap_or("invalid")
+            ),
+            "already-declared" => format!(
+                "persistence  already declared {} — nothing rewritten{when}",
+                device_key::DURABLE_HOME_BASIS
+            ),
+            _ => format!(
+                "persistence  basis {} for {}{when}",
+                self.basis,
+                self.key.display()
+            ),
+        }
+    }
+}
+
+/// Read the persistence basis (`declare == false`) or declare a durable home for the existing
+/// device key (`declare == true`), from an environment lookup so it is testable without mutating
+/// the process environment.
+///
+/// Declaring never mints a key, refuses on a host with an ephemeral-home marker, refuses a key
+/// outside `$HOME` (an explicit mount is its basis; there is nothing to declare), leaves a valid
+/// declaration untouched, and writes atomically at mode 0600.
+pub fn device_persistence_with<F>(lookup: &F, declare: bool) -> ActorResult<PersistenceOutcome>
+where
+    F: Fn(&str) -> Option<std::ffi::OsString>,
+{
+    use crate::session_envelope::{self as envelope, PersistenceBasis};
+    if !declare {
+        let persistence =
+            envelope::resolve_persistence_with(lookup).map_err(ActorError::Refused)?;
+        let declared_at = match persistence.basis() {
+            PersistenceBasis::DeclaredDurableHome { declared_at } => Some(declared_at.clone()),
+            PersistenceBasis::ExplicitMount => None,
+        };
+        return Ok(PersistenceOutcome {
+            basis: persistence.basis().name().to_string(),
+            key: persistence.key().to_path_buf(),
+            declared_at,
+            act: "read",
+            replaced: None,
+        });
+    }
+    let placement = envelope::key_placement_with(lookup).map_err(ActorError::Refused)?;
+    if let Some(marker) = placement.ephemeral_marker {
+        return Err(ActorError::Refused(format!(
+            "envelope-home-ephemeral-platform: {marker} is set, so this host's $HOME is wiped on \
+             restart and cannot be declared durable; set XDG_CONFIG_HOME to an absolute \
+             persistent config directory outside $HOME"
+        )));
+    }
+    if !placement.under_home {
+        return Err(ActorError::Refused(format!(
+            "nothing to declare: the device key at {} lies outside $HOME, where an explicit \
+             mount (an absolute XDG_CONFIG_HOME or {}) is the basis",
+            placement.key.display(),
+            device_key::DEVICE_KEY_ENV
+        )));
+    }
+    let key = match DeviceKey::load(&placement.key) {
+        Ok(key) => key,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            return Err(ActorError::Refused(format!(
+                "no device key at {}: a declaration is signed by an existing key and never mints \
+                 one; run `epr actor device enroll --handle <handle>` first",
+                placement.key.display()
+            )))
+        }
+        Err(e) => return Err(e.into()),
+    };
+    let replaced = match device_key::read_persistence_declaration(&placement.dir, &key.did_key())? {
+        Some(Ok(existing)) => {
+            return Ok(PersistenceOutcome {
+                basis: "declared-durable-home".into(),
+                key: placement.key,
+                declared_at: Some(existing.declared_at),
+                act: "already-declared",
+                replaced: None,
+            })
+        }
+        Some(Err(why)) => Some(why),
+        None => None,
+    };
+    let declared_at = chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
+    let declaration = device_key::PersistenceDeclaration::sign(&key, &placement.dir, &declared_at)?;
+    device_key::write_persistence_declaration(&placement.dir, &declaration)?;
+    Ok(PersistenceOutcome {
+        basis: "declared-durable-home".into(),
+        key: placement.key,
+        declared_at: Some(declared_at),
+        act: if replaced.is_some() {
+            "replaced"
+        } else {
+            "declared"
+        },
+        replaced,
+    })
 }
 
 fn short_cid_str(cid: &str) -> String {
@@ -2490,7 +2653,8 @@ pub fn usage() -> String {
      | device authorize <request-json-or-path> [--root DIR]\n  \
      | device bind <authorization-json-or-path> [--root DIR]\n  \
      | device endpoint --node-id <iroh-node-id> [--handle <handle>] [--root DIR]\n  \
-     | device contest --device <did:key> --basis \"<line>\" [--handle <handle>] [--root DIR]\n\
+     | device contest --device <did:key> --basis \"<line>\" [--handle <handle>] [--root DIR]\n  \
+     | device persistence [--declare durable-home]\n\
      >\n\
      `actor device` puts this machine's key on this repository's roster for a participant. \
      To join a node to a person's identity on the network instead, see `epr device`."
@@ -2565,6 +2729,131 @@ mod tests {
             err.to_string().contains("enroll | authorize | bind"),
             "got: {err}"
         );
+    }
+
+    mod persistence {
+        use super::super::*;
+        use std::collections::HashMap;
+        use std::ffi::OsString;
+
+        fn env(pairs: &[(&str, &Path)]) -> impl Fn(&str) -> Option<OsString> {
+            let map: HashMap<String, OsString> = pairs
+                .iter()
+                .map(|(k, v)| (k.to_string(), v.as_os_str().to_owned()))
+                .collect();
+            move |name| map.get(name).cloned()
+        }
+
+        fn key_dir(home: &Path) -> PathBuf {
+            home.join(".config/elohim/device")
+        }
+
+        #[test]
+        fn declaring_is_idempotent_private_and_read_back() {
+            let base = tempfile::tempdir().unwrap();
+            let home = base.path().join("home");
+            DeviceKey::load_or_generate(&key_dir(&home).join("ed25519.seed")).unwrap();
+            let lookup = env(&[("HOME", &home)]);
+
+            let first = device_persistence_with(&lookup, true).unwrap();
+            assert_eq!(first.act, "declared");
+            assert_eq!(first.basis, "declared-durable-home");
+            let path = device_key::persistence_path(&key_dir(&home));
+            let written = std::fs::read(&path).unwrap();
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                let mode = std::fs::metadata(&path).unwrap().permissions().mode() & 0o777;
+                assert_eq!(mode, 0o600);
+            }
+
+            let second = device_persistence_with(&lookup, true).unwrap();
+            assert_eq!(second.act, "already-declared");
+            assert_eq!(second.declared_at, first.declared_at);
+            assert_eq!(std::fs::read(&path).unwrap(), written, "never rewritten");
+
+            let read = device_persistence_with(&lookup, false).unwrap();
+            assert_eq!(read.act, "read");
+            assert_eq!(read.basis, "declared-durable-home");
+            assert_eq!(read.declared_at, first.declared_at);
+            let leftovers: Vec<_> = std::fs::read_dir(key_dir(&home))
+                .unwrap()
+                .map(|e| e.unwrap().file_name())
+                .collect();
+            assert_eq!(
+                leftovers.len(),
+                2,
+                "seed and declaration only: {leftovers:?}"
+            );
+        }
+
+        #[test]
+        fn an_invalid_declaration_is_replaced_and_says_why() {
+            let base = tempfile::tempdir().unwrap();
+            let home = base.path().join("home");
+            DeviceKey::load_or_generate(&key_dir(&home).join("ed25519.seed")).unwrap();
+            let other =
+                DeviceKey::load_or_generate(&base.path().join("other/ed25519.seed")).unwrap();
+            let dir = key_dir(&home).canonicalize().unwrap();
+            let foreign =
+                device_key::PersistenceDeclaration::sign(&other, &dir, "2026-01-01T00:00:00Z")
+                    .unwrap();
+            device_key::write_persistence_declaration(&dir, &foreign).unwrap();
+            let outcome = device_persistence_with(&env(&[("HOME", &home)]), true).unwrap();
+            assert_eq!(outcome.act, "replaced");
+            assert!(outcome.replaced.unwrap().contains("device mismatch"));
+            assert!(device_persistence_with(&env(&[("HOME", &home)]), false).is_ok());
+        }
+
+        #[test]
+        fn declaring_refuses_without_a_key_and_creates_nothing() {
+            let base = tempfile::tempdir().unwrap();
+            let home = base.path().join("home");
+            std::fs::create_dir_all(&home).unwrap();
+            let err = device_persistence_with(&env(&[("HOME", &home)]), true).unwrap_err();
+            assert!(err.to_string().contains("never mints"), "{err}");
+            assert!(!home.join(".config").exists(), "no key, no directory");
+            // The read-only form refuses with the remedy and creates nothing either.
+            let err = device_persistence_with(&env(&[("HOME", &home)]), false).unwrap_err();
+            assert!(
+                err.to_string()
+                    .starts_with("envelope-persistent-config-required:"),
+                "{err}"
+            );
+            assert!(!home.join(".config").exists());
+        }
+
+        #[test]
+        fn declaring_refuses_on_an_ephemeral_home_platform() {
+            let base = tempfile::tempdir().unwrap();
+            let home = base.path().join("home");
+            DeviceKey::load_or_generate(&key_dir(&home).join("ed25519.seed")).unwrap();
+            let err = device_persistence_with(
+                &env(&[("HOME", &home), ("DEVWORKSPACE_ID", Path::new("ws-1"))]),
+                true,
+            )
+            .unwrap_err();
+            assert!(
+                err.to_string()
+                    .starts_with("envelope-home-ephemeral-platform: DEVWORKSPACE_ID"),
+                "{err}"
+            );
+            assert!(!device_key::persistence_path(&key_dir(&home)).exists());
+        }
+
+        #[test]
+        fn declaring_refuses_a_key_outside_home() {
+            let base = tempfile::tempdir().unwrap();
+            let home = base.path().join("home");
+            let xdg = base.path().join("mounted");
+            DeviceKey::load_or_generate(&xdg.join("elohim/device/ed25519.seed")).unwrap();
+            let lookup = env(&[("HOME", &home), ("XDG_CONFIG_HOME", &xdg)]);
+            let err = device_persistence_with(&lookup, true).unwrap_err();
+            assert!(err.to_string().starts_with("nothing to declare"), "{err}");
+            let read = device_persistence_with(&lookup, false).unwrap();
+            assert_eq!(read.basis, "explicit-mount");
+            assert_eq!(read.declared_at, None);
+        }
     }
 
     #[test]

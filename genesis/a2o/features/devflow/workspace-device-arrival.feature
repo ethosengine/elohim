@@ -112,3 +112,47 @@ Feature: A workspace arrives as one of its person's devices, and a refusal names
     Then the executables are kept in the place this workspace named, chosen by "BIN_STORE"
     And the remembered place is reported beside it as a difference
     And showing the layout succeeds
+
+  # A device's home is durable or ephemeral, and the native tool is told which, never guesses.
+  # A workspace container's home ($HOME) is wiped when the workspace restarts, so by default a
+  # key kept under $HOME cannot hold a native session: the session would vanish with it. A
+  # laptop's home survives restarts. Its person says so once with
+  # `epr actor device persistence --declare durable-home`, which writes `persistence.json`
+  # beside the key: a note the key itself signs, naming that key and the directory the key
+  # lives in. A note that names another key or another directory, or that has been edited, no
+  # longer matches its signature and is refused. A container platform that announces itself
+  # (an Eclipse Che workspace sets DEVWORKSPACE_ID) is refused a home key even when such a note
+  # is present; its key belongs in the persistent directory its platform mounts outside $HOME.
+  # These scenarios are @wip until their step definitions land in
+  # steps/devflow/workspace-device-arrival.steps.ts.
+
+  @wip
+  Scenario: A device whose home survives restarts declares it once and opens a native session
+    Given a device whose key lives under a home that survives restarts
+    And the device stands for "matthew" on the roster
+    And no container platform marker is set
+    When the person declares the home durable on that device
+    Then a persistence declaration signed by the device key sits beside the key
+    And declaring a second time reports the existing declaration and rewrites nothing
+    And a native session opens on the device with the basis "declared-durable-home"
+
+  @wip
+  Scenario: A container workspace whose home is wiped on restart is refused even with a declaration
+    Given a workspace whose key lives under $HOME and whose platform sets DEVWORKSPACE_ID
+    And a persistence declaration signed by that key sits beside the key
+    When a native session is opened there
+    Then it is refused with "envelope-home-ephemeral-platform"
+    And the refusal names setting XDG_CONFIG_HOME to a persistent directory outside $HOME
+    And no session record was written
+    And declaring the home durable there is refused the same way
+
+  @wip
+  Scenario: A declaration copied from another device or another directory is refused
+    Given a device whose key lives under a home that survives restarts
+    And the persistence declaration beside its key was copied from another device
+    When a native session is opened there
+    Then it is refused with "envelope-persistence-declaration-invalid" naming the device mismatch
+    When the key and its declaration are instead moved together into another directory
+    And a native session is opened from that directory
+    Then it is refused with "envelope-persistence-declaration-invalid" naming the directory mismatch
+    And no session record was written in either place
