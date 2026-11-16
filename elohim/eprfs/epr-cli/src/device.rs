@@ -88,13 +88,16 @@ pub fn usage() -> &'static str {
      epr device approve '<link | number | key fingerprint>' [--only <act>]... [--yes] [--node <this node URL>]\n  \
      epr device approve <number | key fingerprint> --decline\n  \
      epr device status [--json] [--root <path>]\n  epr device arrive [--strict]\n  \
+     epr device follow <channel> [--mode observe|canary|apply] [--pin <cid>] | --unfollow \
+     [--base <manifest.json> [--replace-processes]]\n  \
      epr device run <tool> [--name <process>] [--env KEY=VALUE]... [--ready-line <text>] \
-     [--restart permanent|transient|temporary] [-- <args>...] \
-     | epr device run <tool> [--name <process>] --stop\n  \
+     [--restart permanent|transient|temporary] [--base <manifest.json> [--replace-processes]] \
+     [-- <args>...] | epr device run <tool> [--name <process>] --stop\n  \
      epr device apply [--base <manifest.json>] [--replace-processes] [--preview [--json]]\n    \
-     (adopting a base keeps the processes this device declared; a base that declares one \
-     differently refuses until --replace-processes; --preview diffs follows, tools and \
-     processes and writes nothing)\n  \
+     (adopting a base carries the processes this device declared and names them; a base \
+     that declares one differently refuses until --replace-processes; --preview [--json] \
+     diffs follows, tools and processes, lists carried and conflicting ones, writes \
+     nothing, and exits 1 on a conflict)\n  \
      epr device supervise [--status [--json] | --stop]\n    \
      (ark runs this device's declared manifest; a moved head reloads it by restart)\n  epr device trust <path>\n  epr device approvals [--node <this node URL>]\n    \
      (whom this machine's node speaks for, what is waiting, and what to run next)\n\

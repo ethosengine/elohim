@@ -237,9 +237,17 @@ fn apply_previews_a_base_and_keeps_the_declared_peer() {
         &["apply", "--preview", "--base", committed, "--json"],
     ));
     assert_eq!(carrying["processes"]["removed"], serde_json::json!([]));
+    assert_eq!(carrying["carried"], serde_json::json!(["peer"]));
+    assert_eq!(carrying["conflicts"], serde_json::json!([]));
     assert_eq!(snapshot(&device), before, "a preview writes nothing");
 
-    let applied = value(epr(root.path(), &["apply", "--base", committed]));
+    let output = epr(root.path(), &["apply", "--base", committed]);
+    let stderr = String::from_utf8_lossy(&output.stderr).into_owned();
+    assert!(
+        stderr.contains("carried (device-owned, not in base): peer"),
+        "{stderr}"
+    );
+    let applied = value(output);
     assert_eq!(applied["manifestCid"], carrying["nextCid"]);
     assert_eq!(applied["processes"][0]["name"], "peer");
 
@@ -256,6 +264,19 @@ fn apply_previews_a_base_and_keeps_the_declared_peer() {
     fs::write(&conflicting_path, serde_json::to_vec(&conflicting).unwrap()).unwrap();
     let conflicting_path = conflicting_path.to_str().unwrap();
     let before = snapshot(&device);
+    let dry = epr(
+        root.path(),
+        &["apply", "--preview", "--base", conflicting_path, "--json"],
+    );
+    assert_eq!(dry.status.code(), Some(1), "a conflicting dry run fails");
+    let dry: serde_json::Value = serde_json::from_slice(&dry.stdout).unwrap();
+    assert_eq!(dry["conflicts"], serde_json::json!(["peer"]));
+    let text = epr(
+        root.path(),
+        &["apply", "--preview", "--base", conflicting_path],
+    );
+    assert_eq!(text.status.code(), Some(1));
+    assert!(String::from_utf8_lossy(&text.stdout).contains("conflicts ("));
     let refused = epr(root.path(), &["apply", "--base", conflicting_path]);
     assert!(!refused.status.success());
     let stderr = String::from_utf8_lossy(&refused.stderr);
@@ -281,6 +302,11 @@ fn preview_and_replace_processes_belong_to_their_verbs() {
         &["show", "--preview"][..],
         &["follow", "bin:epr", "--preview"],
         &["apply", "--preview", "--render", "manifest"],
+        &["apply", "--preview", "--mode", "canary"],
+        &["apply", "--preview", "--pin", "bafy"],
+        &["apply", "--preview", "--stop"],
+        &["apply", "--preview", "--unfollow"],
+        &["apply", "--preview", "--channels", "bin:epr=observe"],
         &["show", "--replace-processes"],
     ] {
         assert!(!epr(root.path(), args).status.success(), "{args:?}");

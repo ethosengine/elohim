@@ -693,15 +693,17 @@ fn a_base_naming_a_device_process_differently_refuses_and_writes_nothing() {
     base.processes.push(theirs);
     let before = snapshot(dir.path());
     let adopting = deployed(dir.path(), base);
-    for refused in [
-        adopting.apply().unwrap_err(),
-        adopting.preview().unwrap_err(),
-    ] {
-        assert_eq!(refused.kind, "manifest-process-conflict");
-        assert!(refused.detail.contains("peer"), "{refused}");
-        assert!(refused.detail.contains("--replace-processes"), "{refused}");
-        assert!(refused.detail.contains("epr device run"), "{refused}");
-    }
+    let refused = adopting.apply().unwrap_err();
+    assert_eq!(refused.kind, "manifest-process-conflict");
+    assert!(refused.detail.contains("peer"), "{refused}");
+    assert!(refused.detail.contains("--replace-processes"), "{refused}");
+    assert!(refused.detail.contains("epr device run"), "{refused}");
+    let preview = adopting.preview().unwrap();
+    assert_eq!(preview.conflicts, vec!["peer".to_string()]);
+    assert_eq!(
+        preview.next_cid, preview.current_cid,
+        "apply would commit nothing"
+    );
     assert!(
         adopting.act(follow("bin:other")).is_err(),
         "every act adopts"
@@ -811,4 +813,177 @@ fn preview_diffs_changed_process_fields_by_wire_name() {
         vec!["argv".to_string(), "env".to_string()]
     );
     assert_eq!(preview.tools.changed[0].fields, vec!["bins".to_string()]);
+}
+
+fn named(name: &str, args: &[&str]) -> ManifestAct {
+    ManifestAct::Run {
+        tool: "epr".into(),
+        stop: false,
+        launch: ark_core::declaration::RunLaunch {
+            name: Some(name.into()),
+            args: args.iter().map(|a| a.to_string()).collect(),
+            ..Default::default()
+        },
+    }
+}
+// A base declaring `name` with `args`, built from the real run act so it validates.
+fn base_with(name: &str, args: &[&str]) -> ark_core::RuntimeManifest {
+    let (_dir, scratch) = fixture();
+    let mut base = manifest_store::workspace_base().unwrap();
+    base.processes = scratch.act(named(name, args)).unwrap().processes;
+    base
+}
+
+#[test]
+fn apply_and_preview_name_the_carried_processes() {
+    let (dir, store) = fixture();
+    store.apply().unwrap();
+    store.act(peer(&["peer", "serve"])).unwrap();
+    let preview = deployed(dir.path(), canary_base()).preview().unwrap();
+    assert_eq!(preview.carried, vec!["peer".to_string()]);
+    assert!(preview.conflicts.is_empty());
+    let applied = deployed(dir.path(), canary_base())
+        .apply_carrying()
+        .unwrap();
+    assert_eq!(applied.carried, vec!["peer".to_string()]);
+    assert_eq!(applied.manifest.cid().unwrap(), preview.next_cid);
+}
+
+#[test]
+fn a_device_override_of_a_base_process_is_the_devices_own() {
+    // The prior base declares `conductor`; the device re-runs it with its own arguments.
+    let prior = base_with("conductor", &["--base-args"]);
+    let (dir, _store) = fixture();
+    deployed(dir.path(), prior.clone())
+        .act(follow("bin:x"))
+        .unwrap();
+    let head = deployed(dir.path(), prior)
+        .act(named("conductor", &["--device-args"]))
+        .unwrap();
+    // A new base dropping it carries the override.
+    let mut dropping = canary_base();
+    dropping.processes.clear();
+    let carried = deployed(dir.path(), dropping.clone()).preview().unwrap();
+    assert_eq!(carried.carried, vec!["conductor".to_string()]);
+    // A new base naming it differently (from both the old base and the device) conflicts.
+    let mut renamed = base_with("conductor", &["--new-base-args"]);
+    renamed.follows[0].mode = FollowMode::Canary;
+    let refused = deployed(dir.path(), renamed).apply().unwrap_err();
+    assert_eq!(refused.kind, "manifest-process-conflict");
+    assert!(refused.detail.contains("conductor"), "{refused}");
+    let next = deployed(dir.path(), dropping).apply().unwrap();
+    assert_eq!(next.processes, head.processes);
+}
+
+#[test]
+fn a_carried_process_survives_a_second_adoption_in_order() {
+    let (dir, store) = fixture();
+    store.apply().unwrap();
+    store.act(peer(&["peer", "serve"])).unwrap();
+    store.act(named("peer2", &["second"])).unwrap();
+    let first = base_with("conductor", &["--base"]);
+    let once = deployed(dir.path(), first).apply().unwrap();
+    let names = |m: &ark_core::RuntimeManifest| {
+        m.processes
+            .iter()
+            .map(|p| p.name.clone())
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(names(&once), ["conductor", "peer", "peer2"]);
+    let mut second = base_with("conductor", &["--base"]);
+    second.follows[0].mode = FollowMode::Canary;
+    let twice = deployed(dir.path(), second).apply().unwrap();
+    assert_eq!(names(&twice), ["conductor", "peer", "peer2"]);
+    assert_eq!(twice.processes[1..], once.processes[1..]);
+    assert_eq!(twice.supersedes, Some(once.cid().unwrap()));
+}
+
+#[test]
+fn an_unreadable_prior_base_is_a_typed_refusal_with_an_escape() {
+    let (dir, store) = fixture();
+    store.apply().unwrap();
+    let head = store.act(peer(&["peer", "serve"])).unwrap();
+    let record: serde_json::Value =
+        serde_json::from_slice(&fs::read(dir.path().join("manifest/head")).unwrap()).unwrap();
+    let prior = dir.path().join(format!(
+        "manifest/{}.cbor",
+        record["base"].as_str().unwrap()
+    ));
+    fs::remove_file(prior).unwrap();
+    for refused in [
+        deployed(dir.path(), canary_base()).apply().unwrap_err(),
+        deployed(dir.path(), canary_base()).preview().unwrap_err(),
+    ] {
+        assert_eq!(refused.kind, "manifest-base-unreadable", "{refused}");
+        assert!(refused.detail.contains("--replace-processes"), "{refused}");
+    }
+    let replaced = deployed(dir.path(), canary_base())
+        .replace_processes(true)
+        .apply()
+        .unwrap();
+    assert_eq!(replaced.supersedes, Some(head.cid().unwrap()));
+    assert!(replaced.processes.is_empty());
+}
+
+#[test]
+fn boot_defers_a_conflicting_adoption_and_keeps_the_previous_head() {
+    let (dir, store) = fixture();
+    store.apply().unwrap();
+    store.act(peer(&["peer", "serve"])).unwrap();
+    let head = fs::read(dir.path().join("manifest/head")).unwrap();
+    let mut conflicting = base_with("peer", &["other"]);
+    conflicting.follows[0].mode = FollowMode::Canary;
+    let base = dir.path().join("deployed-base.json");
+    fs::write(&base, serde_json::to_vec(&conflicting).unwrap()).unwrap();
+    let config = dir.path().join("runtime-config.toml");
+    fs::remove_file(&config).unwrap();
+    let deferred = manifest_store::boot_runtime_config_reporting(Some(&config), Some(&base), None)
+        .unwrap()
+        .expect("boot names what it deferred");
+    assert_eq!(deferred.kind, "manifest-adoption-deferred");
+    assert!(
+        deferred.detail.contains("manifest-process-conflict"),
+        "{deferred}"
+    );
+    assert!(deferred.detail.contains("peer"), "{deferred}");
+    assert!(
+        deferred.detail.contains(&format!(
+            "epr device apply --base {} --replace-processes",
+            base.display()
+        )),
+        "{deferred}"
+    );
+    assert_eq!(fs::read(dir.path().join("manifest/head")).unwrap(), head);
+    assert!(
+        config.is_file(),
+        "the previous head's projection is repaired"
+    );
+    // The printing form used by storage boot also succeeds.
+    manifest_store::boot_runtime_config(Some(&config), Some(&base), None).unwrap();
+    assert_eq!(fs::read(dir.path().join("manifest/head")).unwrap(), head);
+}
+
+#[test]
+fn preview_refuses_another_chains_projection_without_claiming_anything() {
+    let owner = tempfile::tempdir().unwrap();
+    let shared = owner.path().join("shared/runtime-config.toml");
+    let projections = Projections {
+        runtime_config: Some(shared.clone()),
+        bin_tools: None,
+    };
+    ManifestStore::workspace(owner.path().join("a"), projections.clone())
+        .unwrap()
+        .apply()
+        .unwrap();
+    let other = owner.path().join("b");
+    fs::create_dir_all(&other).unwrap();
+    let b = ManifestStore::workspace(&other, projections).unwrap();
+    let refused = b.preview().unwrap_err();
+    assert_eq!(refused.kind, "projection-owner-conflict");
+    assert_eq!(
+        fs::read_dir(&other).unwrap().count(),
+        0,
+        "preview created nothing"
+    );
+    assert_eq!(b.apply().unwrap_err().kind, refused.kind);
 }

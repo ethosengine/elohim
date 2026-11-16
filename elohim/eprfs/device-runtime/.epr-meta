@@ -14,3 +14,12 @@ Binary identity uses eprfs-core raw CIDs; release manifests use its canonical DA
 Ingest verifies bytes; land alone advances current after provenance, ancestry and health.
 The launcher trusts ingested immutable files, as the preceding Python exec path did.
 Private local custody has no public reach claim. Cross-device custody belongs to slice B.
+
+Adopting a deployment base carries the device's own process declarations forward: every
+head process the head's own base did not declare identically. So a fleet base cannot
+force-remove or replace a process the device declared or edited; a base naming one
+differently refuses until `--replace-processes`, and storage boot keeps the previous head
+with a warning instead of failing. Refusing by default would wedge every act once the base
+moved, and its cure (replace, then re-declare) commits a head without the resident in
+between, which the supervisor would stop and restart. Base-owned processes still follow
+the base, so a deployment removes those as before.

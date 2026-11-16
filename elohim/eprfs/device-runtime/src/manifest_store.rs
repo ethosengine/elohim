@@ -199,52 +199,93 @@ impl ManifestStore {
     }
     /// Repair projections after a crash or boot; an explicitly changed base is an act.
     pub fn apply(&self) -> Result<RuntimeManifest> {
+        self.apply_carrying().map(|applied| applied.manifest)
+    }
+    /// `apply`, also naming the device-owned processes an adoption carried onto the base.
+    pub fn apply_carrying(&self) -> Result<Applied> {
         let _lock = files::Lock::acquire(&self.chain(), Duration::from_secs(30))?;
-        let manifest = self.reconcile_base()?;
+        let (manifest, carried) = self.reconcile()?;
         self.project(&manifest)?;
-        Ok(manifest)
+        Ok(Applied { manifest, carried })
     }
     fn reconcile_base(&self) -> Result<RuntimeManifest> {
+        self.reconcile().map(|(manifest, _)| manifest)
+    }
+    fn reconcile(&self) -> Result<(RuntimeManifest, Vec<String>)> {
         self.claim_projections()?;
         let manifest = self.read()?;
-        let Some(adopted) = self.adoption(&manifest)? else {
-            return Ok(manifest);
+        let Some(adoption) = self.adoption(&manifest)? else {
+            return Ok((manifest, Vec::new()));
         };
-        self.carry_config(&adopted, None)?;
-        self.commit(&adopted)?;
-        Ok(adopted)
+        if !adoption.conflicts.is_empty() {
+            return Err(conflict_refusal(&adoption.conflicts));
+        }
+        self.carry_config(&adoption.manifest, None)?;
+        self.commit(&adoption.manifest)?;
+        Ok((adoption.manifest, adoption.carried))
     }
     // An explicitly supplied deployment base is a new declaration, not an edit of the
     // projection. Retain the private head in its supersedes chain on upgrade. Pure: reads
-    // the chain, writes nothing, so preview and apply share one answer.
-    fn adoption(&self, current: &RuntimeManifest) -> Result<Option<RuntimeManifest>> {
+    // the chain, writes nothing, so preview and apply share one answer. A non-empty
+    // `conflicts` is a refusal for every writer; preview reports it instead.
+    fn adoption(&self, current: &RuntimeManifest) -> Result<Option<Adoption>> {
         let Some(head) = self.head()? else {
             return Ok(None);
         };
         if !self.explicit_base || head.base == self.base.cid().map_err(invalid)? {
             return Ok(None);
         }
-        let mut adopted = self.base.clone();
-        adopted.supersedes = Some(head.cid);
+        let mut manifest = self.base.clone();
+        manifest.supersedes = Some(head.cid);
+        let mut adoption = Adoption {
+            manifest,
+            carried: Vec::new(),
+            conflicts: Vec::new(),
+        };
         if !self.replace_processes {
-            adopted.processes = carry_processes(&self.version(&head.base)?, current, &self.base)?;
-            adopted.validate().map_err(invalid)?;
-            validate_secrets(&adopted)?;
+            let prior = self
+                .version(&head.base)
+                .map_err(|e| base_unreadable(&head.base, &e))?;
+            let carry = carry_processes(&prior, current, &self.base);
+            adoption.manifest.processes = carry.processes;
+            adoption.carried = carry.carried;
+            adoption.conflicts = carry.conflicts;
+            if adoption.conflicts.is_empty() {
+                adoption.manifest.validate().map_err(invalid)?;
+                validate_secrets(&adoption.manifest)?;
+            }
         }
-        Ok(Some(adopted))
+        Ok(Some(adoption))
     }
     /// What `apply` would commit, computed without the chain lock and without writing a
     /// head, a version, a projection or an owner marker. `current` is the head (or, for a
-    /// headless chain, the saved default); `next` equals `current` when apply changes nothing.
+    /// headless chain, the saved default); `next` equals `current` when apply changes nothing
+    /// and when apply would refuse a conflict, which `conflicts` then names.
+    ///
+    /// Ownership is checked read-only where apply's claim would refuse (another chain's
+    /// owner marker on a projection). The one gap: a projection parent that cannot be
+    /// created fails apply but passes preview, because checking it would mean creating it.
     pub fn preview(&self) -> Result<ManifestPreview> {
-        let (current, next) = if self.head()?.is_some() {
-            let current = self.read()?;
-            let next = self.adoption(&current)?.unwrap_or_else(|| current.clone());
-            (current, next)
-        } else {
-            (self.saved_base()?, self.base()?)
+        self.check_projections()?;
+        if self.head()?.is_none() {
+            return ManifestPreview::between(&self.saved_base()?, &self.base()?);
+        }
+        let current = self.read()?;
+        let Some(adoption) = self.adoption(&current)? else {
+            return ManifestPreview::between(&current, &current);
         };
-        ManifestPreview::between(&current, &next)
+        if !adoption.conflicts.is_empty() {
+            let mut preview = ManifestPreview::between(&current, &current)?;
+            preview.conflicts = adoption.conflicts;
+            return Ok(preview);
+        }
+        let mut preview = ManifestPreview::between(&current, &adoption.manifest)?;
+        preview.carried = adoption.carried;
+        Ok(preview)
+    }
+    // The same store without its explicit base: the chain's own recorded base.
+    fn without_base(&self) -> Result<Self> {
+        Self::from_source(self.root.clone(), None, self.projections.clone())
     }
     /// Seed missing settings and reconcile explicitly changed deployment settings.
     /// An unchanged seed preserves private config releases; follows always come from head.
@@ -352,17 +393,44 @@ impl ManifestStore {
     fn claim_projections(&self) -> Result<()> {
         fs::create_dir_all(self.chain())?;
         let owner = fs::canonicalize(self.chain())?;
-        for path in [
+        for path in self.projection_paths() {
+            claim_projection(&path, &owner)?;
+        }
+        Ok(())
+    }
+    // Read-only twin of claim_projections: refuses exactly where an existing owner marker
+    // names another chain, and creates no directory, lock or marker.
+    fn check_projections(&self) -> Result<()> {
+        let owner = match fs::canonicalize(self.chain()) {
+            Ok(owner) => owner,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                match fs::canonicalize(&self.root) {
+                    Ok(root) => root.join("manifest"),
+                    // Nothing exists yet, so no marker can name another chain.
+                    Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+                    Err(e) => return Err(e.into()),
+                }
+            }
+            Err(e) => return Err(e.into()),
+        };
+        for path in self.projection_paths() {
+            match fs::read_to_string(owner_marker(&path)) {
+                Ok(existing) if Path::new(&existing) == owner => {}
+                Ok(existing) => return Err(owner_conflict(&path, &existing, &owner)),
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+                Err(e) => return Err(e.into()),
+            }
+        }
+        Ok(())
+    }
+    fn projection_paths(&self) -> impl Iterator<Item = PathBuf> {
+        [
             Some(self.root.join("runtime-manifest.json")),
             self.projections.runtime_config.clone(),
             self.projections.bin_tools.clone(),
         ]
         .into_iter()
         .flatten()
-        {
-            claim_projection(&path, &owner)?;
-        }
-        Ok(())
     }
     fn project(&self, manifest: &RuntimeManifest) -> Result<()> {
         self.claim_projections()?;
@@ -424,23 +492,49 @@ fn carry_processes(
     prior_base: &RuntimeManifest,
     head: &RuntimeManifest,
     base: &RuntimeManifest,
-) -> Result<Vec<ChildSpec>> {
-    let mut processes = base.processes.clone();
-    let mut conflicts = Vec::new();
+) -> Carry {
+    let mut carry = Carry {
+        processes: base.processes.clone(),
+        carried: Vec::new(),
+        conflicts: Vec::new(),
+    };
     for process in &head.processes {
         if prior_base.processes.contains(process) {
             continue;
         }
         match base.processes.iter().find(|p| p.name == process.name) {
-            None => processes.push(process.clone()),
+            None => {
+                carry.processes.push(process.clone());
+                carry.carried.push(process.name.clone());
+            }
             Some(declared) if declared == process => {}
-            Some(_) => conflicts.push(process.name.as_str()),
+            Some(_) => carry.conflicts.push(process.name.clone()),
         }
     }
-    if conflicts.is_empty() {
-        return Ok(processes);
-    }
-    Err(Refusal::new(
+    carry
+}
+struct Carry {
+    processes: Vec<ChildSpec>,
+    carried: Vec<String>,
+    conflicts: Vec<String>,
+}
+// One adoption: the manifest it would commit, the device processes it carries, and the
+// device processes the new base names differently (any one refuses the adoption).
+struct Adoption {
+    manifest: RuntimeManifest,
+    carried: Vec<String>,
+    conflicts: Vec<String>,
+}
+/// What `apply` committed or repaired.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Applied {
+    /// The resulting declaration.
+    pub manifest: RuntimeManifest,
+    /// Device-owned processes an adoption carried onto the new base, in head order.
+    pub carried: Vec<String>,
+}
+fn conflict_refusal(conflicts: &[String]) -> Refusal {
+    Refusal::new(
         "manifest-process-conflict",
         format!(
             "the base declares {} differently than this device does, so adopting it would \
@@ -448,14 +542,29 @@ fn carry_processes(
              base's processes, or re-declare them after apply with `epr device run`",
             conflicts.join(", ")
         ),
-    ))
+    )
+}
+fn base_unreadable(cid: &str, error: &Refusal) -> Refusal {
+    Refusal::new(
+        "manifest-base-unreadable",
+        format!(
+            "the base {cid} this head was built on cannot be read ({error}), so the \
+             processes this device declared cannot be told from the base's. Rerun with \
+             --replace-processes to adopt the new base's processes exactly, then re-declare \
+             the device's own with `epr device run`"
+        ),
+    )
 }
 
 /// Read-only diff between the current declaration and what `apply` would commit.
 ///
 /// Its own plain JSON shape, deliberately not a change to the `runtime-declaration` view:
-/// `{currentCid, nextCid, changed, follows, tools, processes}`, where each of the last three
-/// is `{added: [...], removed: [...], changed: [{name, fields: [...]}]}`. Follows are keyed by
+/// `{currentCid, nextCid, changed, follows, tools, processes, carried, conflicts}`, where
+/// follows, tools and processes are each
+/// `{added: [...], removed: [...], changed: [{name, fields: [...]}]}`. `carried` names the
+/// device-owned processes adoption keeps although the base does not declare them;
+/// `conflicts` names device processes the base declares differently, in which case apply
+/// refuses and `nextCid` equals `currentCid`. Follows are keyed by
 /// channel, tools by name, processes by name. `fields` names each differing field in that
 /// item's own wire spelling (`mode`, `pin`; `bins`, `aliases`, `candidateEnv`,
 /// `longRunning`, `source`; `argv`, `env`, `readiness`, `policy`, ...).
@@ -474,6 +583,10 @@ pub struct ManifestPreview {
     pub tools: SetDiff,
     /// Declared processes by process name.
     pub processes: SetDiff,
+    /// Device-owned processes carried onto the base (not in it), in head order.
+    pub carried: Vec<String>,
+    /// Device processes the base declares differently; non-empty means apply refuses.
+    pub conflicts: Vec<String>,
 }
 /// Added, removed and changed members of one keyed collection.
 #[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize)]
@@ -514,6 +627,8 @@ impl ManifestPreview {
                 current.processes.iter().map(|p| (p.name.clone(), p)),
                 next.processes.iter().map(|p| (p.name.clone(), p)),
             )?,
+            carried: Vec::new(),
+            conflicts: Vec::new(),
         })
     }
 }
@@ -593,6 +708,17 @@ fn owner_marker(path: &Path) -> PathBuf {
     marker.push(".owner");
     marker.into()
 }
+fn owner_conflict(path: &Path, existing: &str, owner: &Path) -> Refusal {
+    Refusal::new(
+        "projection-owner-conflict",
+        format!(
+            "{} is owned by chain {}; writer {} refused",
+            path.display(),
+            existing,
+            owner.display()
+        ),
+    )
+}
 fn claim_projection(path: &Path, owner: &Path) -> Result<()> {
     let parent = path
         .parent()
@@ -602,15 +728,7 @@ fn claim_projection(path: &Path, owner: &Path) -> Result<()> {
     let marker = owner_marker(path);
     match fs::read_to_string(&marker) {
         Ok(existing) if Path::new(&existing) == owner => Ok(()),
-        Ok(existing) => Err(Refusal::new(
-            "projection-owner-conflict",
-            format!(
-                "{} is owned by chain {}; writer {} refused",
-                path.display(),
-                existing,
-                owner.display()
-            ),
-        )),
+        Ok(existing) => Err(owner_conflict(path, &existing, owner)),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
             files::atomic_bytes(&marker, owner.as_os_str().as_encoded_bytes(), 0o600)
         }
@@ -619,29 +737,82 @@ fn claim_projection(path: &Path, owner: &Path) -> Result<()> {
 }
 /// Storage boot decision, shared with boot regression tests. A declaration needs a watcher;
 /// a watcher with private chain ownership repairs even when its head has been deleted.
+/// A deferred adoption is warned on stderr, never a boot failure (see
+/// `repair_runtime_config_reporting`).
 pub fn boot_runtime_config(
     path: Option<&Path>,
     base: Option<&Path>,
     seed: Option<&str>,
 ) -> Result<()> {
+    warn_deferred(boot_runtime_config_reporting(path, base, seed)?);
+    Ok(())
+}
+/// `boot_runtime_config`, returning the adoption it deferred instead of printing it.
+pub fn boot_runtime_config_reporting(
+    path: Option<&Path>,
+    base: Option<&Path>,
+    seed: Option<&str>,
+) -> Result<Option<Refusal>> {
     match path {
-        Some(path) => repair_runtime_config(path, base, seed),
+        Some(path) => repair_runtime_config_reporting(path, base, seed),
         None if base.is_some() => Err(invalid(
             "declared runtime requires ELOHIM_RUNTIME_CONFIG_PATH",
         )),
-        None => Ok(()),
+        None => Ok(None),
     }
 }
 /// Repair a watched projection if a chain or an explicit deployment declaration exists.
 pub fn repair_runtime_config(path: &Path, base: Option<&Path>, seed: Option<&str>) -> Result<()> {
-    let Some(store) = discover_runtime_config(path, base)? else {
-        return Ok(());
-    };
-    if let Some(seed) = seed {
-        store.seed_settings(seed)?;
-    }
-    store.apply()?;
+    warn_deferred(repair_runtime_config_reporting(path, base, seed)?);
     Ok(())
+}
+/// Boot repair that never fails on adoption. Interactive apply, follow and run refuse a
+/// process conflict or an unreadable prior base, because the person can pass
+/// `--replace-processes`; a booting node cannot. Here the node keeps its previous head,
+/// repairs its projections from it, and returns the deferred adoption naming the cure.
+pub fn repair_runtime_config_reporting(
+    path: &Path,
+    base: Option<&Path>,
+    seed: Option<&str>,
+) -> Result<Option<Refusal>> {
+    let Some(store) = discover_runtime_config(path, base)? else {
+        return Ok(None);
+    };
+    let repair = |store: &ManifestStore| -> Result<()> {
+        if let Some(seed) = seed {
+            store.seed_settings(seed)?;
+        }
+        store.apply().map(|_| ())
+    };
+    match repair(&store) {
+        Ok(()) => Ok(None),
+        Err(refused)
+            if store.explicit_base
+                && matches!(
+                    refused.kind.as_str(),
+                    "manifest-process-conflict" | "manifest-base-unreadable"
+                ) =>
+        {
+            let previous = store.without_base()?;
+            repair(&previous)?;
+            let head = previous.read()?.cid().map_err(invalid)?;
+            let base = base.map_or_else(|| "<base>".into(), |b| b.display().to_string());
+            Ok(Some(Refusal::new(
+                "manifest-adoption-deferred",
+                format!(
+                    "{refused}. Boot kept the previous head {head} and continued. Operator \
+                     cure: `epr device apply --base {base} --replace-processes`, or \
+                     re-declare the processes after apply with `epr device run`"
+                ),
+            )))
+        }
+        Err(e) => Err(e),
+    }
+}
+fn warn_deferred(deferred: Option<Refusal>) {
+    if let Some(deferred) = deferred {
+        eprintln!("WARNING {deferred}");
+    }
 }
 /// Discover the declaration boot and adoption share, including an external projection's owner.
 /// Absence is a legacy unowned config; a declared but unreadable owner must refuse.

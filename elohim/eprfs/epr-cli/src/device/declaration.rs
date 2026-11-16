@@ -81,6 +81,7 @@ pub(super) fn run(args: &[String]) -> Result<ExitCode, String> {
     let mut observed = false;
     let mut channels = None;
     let mut mode = FollowMode::Observe;
+    let mut mode_given = false;
     let mut pin = None;
     let mut stop = false;
     let mut unfollow = false;
@@ -113,7 +114,10 @@ pub(super) fn run(args: &[String]) -> Result<ExitCode, String> {
                     "--root" => root = Some(PathBuf::from(value)),
                     "--runtime-config" => runtime = Some(PathBuf::from(value)),
                     "--base" => base = Some(PathBuf::from(value)),
-                    "--mode" => mode = FollowMode::parse(value)?,
+                    "--mode" => {
+                        mode = FollowMode::parse(value)?;
+                        mode_given = true;
+                    }
                     "--pin" => pin = Some(value.clone()),
                     "--render" => render = Some(value.as_str()),
                     "--ready-line" => launch.ready_line = Some(value.clone()),
@@ -139,8 +143,13 @@ pub(super) fn run(args: &[String]) -> Result<ExitCode, String> {
     if verb != "run" && launch != RunLaunch::default() {
         return Err("--name, --env, --ready-line, --restart and `-- <args>` belong to run".into());
     }
-    if preview && (verb != "apply" || observed || render.is_some()) {
-        return Err("--preview belongs to apply, without --observed or --render".into());
+    let act_flags = stop || unfollow || channels.is_some() || mode_given || pin.is_some();
+    if preview && (verb != "apply" || observed || render.is_some() || act_flags) {
+        return Err(
+            "--preview belongs to apply, without --observed, --render, --stop, \
+                    --unfollow, --channels, --mode or --pin"
+                .into(),
+        );
     }
     if replace_processes && !matches!(verb.as_str(), "follow" | "run" | "apply") {
         return Err("--replace-processes belongs to follow, run and apply".into());
@@ -160,7 +169,12 @@ pub(super) fn run(args: &[String]) -> Result<ExitCode, String> {
         } else {
             print!("{}", render_preview(&preview));
         }
-        return Ok(ExitCode::SUCCESS);
+        // A dry run that apply would refuse still shows what refuses, then fails.
+        return Ok(if preview.conflicts.is_empty() {
+            ExitCode::SUCCESS
+        } else {
+            ExitCode::FAILURE
+        });
     }
     let manifest = match verb.as_str() {
         "follow" if channels.is_some() => {
@@ -177,7 +191,15 @@ pub(super) fn run(args: &[String]) -> Result<ExitCode, String> {
             launch,
         }),
         "show" => store.read(),
-        "apply" => store.apply(),
+        "apply" => store.apply_carrying().map(|applied| {
+            if !applied.carried.is_empty() {
+                eprintln!(
+                    "carried (device-owned, not in base): {}",
+                    applied.carried.join(", ")
+                );
+            }
+            applied.manifest
+        }),
         _ => return Err("expected follow, run, show or apply".into()),
     }
     .map_err(|e| e.to_string())?;
@@ -237,6 +259,23 @@ fn render_preview(preview: &manifest_store::ManifestPreview) -> String {
             lines.push(format!("{label}:"));
             lines.extend(items);
         }
+    }
+    if !preview.carried.is_empty() {
+        lines.push(format!(
+            "carried (device-owned, not in base): {}",
+            preview.carried.join(", ")
+        ));
+    }
+    if !preview.conflicts.is_empty() {
+        lines.push(format!(
+            "conflicts (the base declares these differently; apply refuses): {}",
+            preview.conflicts.join(", ")
+        ));
+        lines.push(
+            "  cure: rerun with --replace-processes to accept the base's processes, or \
+             re-declare them after apply with `epr device run`"
+                .to_owned(),
+        );
     }
     lines.join("\n") + "\n"
 }
