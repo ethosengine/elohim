@@ -5,21 +5,31 @@
 //! head reloads ark under the new CID with the incarnation carried, and `--stop` leaves
 //! nothing running.
 //!
-//! This needs a built `ark`, which lives in the `elohim` cargo workspace, not this one. It
-//! runs only when `ARK_BIN` names one (for example the pool slot
-//! `/projects/.cargo-target-pool/family/dev/elohim/dev/debug/ark` after `just gate ark`);
-//! otherwise it says so and passes without asserting anything. The eprfs gate does not set
-//! `ARK_BIN`, so this story is exercised by hand until a gate builds both workspaces.
+//! A binary landed under an unchanged manifest reaches a running child the same way: supervise
+//! sees the child's executing bytes differ from its channel's current and restarts ark. And an
+//! `epr peer serve` the person started by hand keeps its serve lock until they hand it over:
+//! supervise refuses beside it, and `--handover` interrupts it (SIGINT only) before ark starts
+//! the declared one.
+//!
+//! The ark stories need a built `ark`, which lives in the `elohim` cargo workspace, not this
+//! one. They run only when `ARK_BIN` names one (for example the pool slot
+//! `/projects/.cargo-target-pool/family/dev/elohim/dev/debug/ark` after `just gate elohim-ark`);
+//! otherwise they say so and pass without asserting anything. The eprfs gate does not set
+//! `ARK_BIN`, so run it as `ARK_BIN=<ark> just gate eprfs`. The refusals before ark is reached
+//! run everywhere a `python3` is on PATH (it stands in for a hand-started daemon holding the
+//! serve lock).
 use elohim_device_runtime::{
     bin_store::{CommandOutput, CommandSpec, IngestOptions, Refusal, Runner, Store},
     manifest_store,
 };
 use serde_json::{json, Value};
 use std::{
+    ffi::OsStr,
     fs,
+    io::{BufRead, BufReader},
     os::unix::fs::{symlink, PermissionsExt},
     path::{Path, PathBuf},
-    process::{Command, Output},
+    process::{Child, Command, ExitStatus, Output, Stdio},
     thread,
     time::{Duration, Instant},
 };
@@ -35,7 +45,12 @@ struct Fixture {
 
 impl Fixture {
     fn epr(&self, args: &[&str]) -> Output {
-        Command::new(env!("CARGO_BIN_EXE_epr"))
+        self.epr_with(args, &[])
+    }
+
+    fn epr_with(&self, args: &[&str], extra: &[(&str, &OsStr)]) -> Output {
+        let mut command = Command::new(env!("CARGO_BIN_EXE_epr"));
+        command
             .args(args)
             .current_dir(&self.repo)
             .env("HOME", &self.base)
@@ -57,9 +72,11 @@ impl Fixture {
             .env_remove("ELOHIM_RUNTIME_CONFIG_PATH")
             .env_remove("ELOHIM_RUNTIME_MANIFEST_PATH")
             .env_remove("GIT_DIR")
-            .env_remove("GIT_WORK_TREE")
-            .output()
-            .expect("run epr")
+            .env_remove("GIT_WORK_TREE");
+        for (key, value) in extra {
+            command.env(key, value);
+        }
+        command.output().expect("run epr")
     }
 
     fn ok(&self, args: &[&str]) -> String {
@@ -92,6 +109,29 @@ impl Fixture {
 
     fn data_root(&self) -> PathBuf {
         self.repo.join(".eprfs/status/ark/device")
+    }
+
+    fn store(&self) -> Store {
+        let registry =
+            manifest_store::registry(&manifest_store::workspace_base().unwrap()).unwrap();
+        Store::new(self.base.join("bins/epr"), "epr", &registry)
+            .unwrap()
+            .with_runner(std::sync::Arc::new(IdentityRunner))
+    }
+
+    /// The current `bin:epr` release and the file ark executes for it.
+    fn current(&self) -> (String, PathBuf) {
+        self.store().current_artifact().unwrap()
+    }
+
+    /// A daemon lease naming `pid`, as `epr peer serve` records its own.
+    fn lease(&self, pid: u32) {
+        let cid = self.current().0;
+        assert!(self
+            .store()
+            .daemon_lease(&cid, pid, Path::new("/proc"))
+            .unwrap()
+            .is_some());
     }
 }
 
@@ -143,16 +183,28 @@ fn fixture_with(ark: PathBuf) -> Fixture {
     // `#!` script would run as its interpreter and the rung would rightly refuse it. The
     // resident is declared as the workspace base's own `epr` tool, because the bin store
     // ingests only the tools it knows how to identify; its bytes here are a copy of bash.
-    let source = base.join("source");
+    let fx = Fixture {
+        _temp: temp,
+        base,
+        repo,
+        ark,
+    };
+    land(&fx, "source", b"");
+    fx
+}
+
+/// Ingest a copy of bash (with `tail` appended, so each landing is new bytes that still run)
+/// and make it the verified current, as `epr bin land` would.
+fn land(fx: &Fixture, dir: &str, tail: &[u8]) -> String {
+    let source = fx.base.join(dir);
     fs::create_dir_all(&source).unwrap();
     for bin in ["epr", "bin-launch"] {
-        fs::copy("/bin/bash", source.join(bin)).unwrap();
+        let mut bytes = fs::read("/bin/bash").unwrap();
+        bytes.extend_from_slice(tail);
+        fs::write(source.join(bin), bytes).unwrap();
         fs::set_permissions(source.join(bin), fs::Permissions::from_mode(0o755)).unwrap();
     }
-    let registry = manifest_store::registry(&manifest_store::workspace_base().unwrap()).unwrap();
-    let store = Store::new(base.join("bins/epr"), "epr", &registry)
-        .unwrap()
-        .with_runner(std::sync::Arc::new(IdentityRunner));
+    let store = fx.store();
     let release = store
         .ingest(
             &source.join("epr"),
@@ -164,18 +216,16 @@ fn fixture_with(ark: PathBuf) -> Fixture {
             },
         )
         .unwrap();
-    symlink(&release.cid, store.root().join("current")).unwrap();
-    fs::write(
-        store.root().join("current.json"),
-        json!({ "cid": release.cid }).to_string(),
-    )
-    .unwrap();
-    Fixture {
-        _temp: temp,
-        base,
-        repo,
-        ark,
+    let link = store.root().join("current");
+    let previous = fs::read_link(&link).ok();
+    let _ = fs::remove_file(&link);
+    symlink(&release.cid, &link).unwrap();
+    let mut record = json!({ "cid": release.cid });
+    if let Some(previous) = previous {
+        record["previous"] = json!(previous.to_string_lossy());
     }
+    fs::write(store.root().join("current.json"), record.to_string()).unwrap();
+    release.cid
 }
 
 fn wait_for(what: &str, mut probe: impl FnMut() -> Option<Value>) -> Value {
@@ -513,4 +563,330 @@ fn run_env_entries_keep_their_text_and_refuse_what_spawn_cannot_honour_offline()
         serde_json::from_str(&fx.ok(&["device", "show", "--render", "manifest"])).unwrap();
     assert_eq!(manifest["processes"].as_array().unwrap().len(), 2);
     assert_eq!(manifest["processes"][0]["env"]["A"], "b=c");
+}
+
+/// A hand-started `epr peer serve` stand-in: `python3` invoked through a link named `epr` as
+/// `epr peer serve --root <root>`, so its command line reads as the daemon's. It takes the
+/// serve lock under the fixture's `XDG_CONFIG_HOME` and exits 0 on SIGINT (1 on SIGTERM, so a
+/// handover that terminated it would show).
+struct Holder {
+    child: Child,
+}
+
+impl Holder {
+    fn start(fx: &Fixture, root: &Path) -> Option<Holder> {
+        let Some(python) = std::env::var_os("PATH").and_then(|path| {
+            std::env::split_paths(&path)
+                .map(|dir| dir.join("python3"))
+                .find(|p| p.is_file())
+        }) else {
+            eprintln!(
+                "device_supervise: no python3 on PATH; the serve-lock story is not exercised"
+            );
+            return None;
+        };
+        let dir = fx.base.join("holder");
+        fs::create_dir_all(&dir).unwrap();
+        let link = dir.join("epr");
+        let _ = fs::remove_file(&link);
+        symlink(python, &link).unwrap();
+        fs::write(
+            dir.join("peer"),
+            "import fcntl, os, signal, sys, time\n\
+             path = os.path.join(os.environ['XDG_CONFIG_HOME'], 'epr', 'peer', 'serve.lock')\n\
+             os.makedirs(os.path.dirname(path), exist_ok=True)\n\
+             lock = open(path, 'a')\n\
+             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)\n\
+             signal.signal(signal.SIGINT, lambda *_: sys.exit(0))\n\
+             signal.signal(signal.SIGTERM, lambda *_: sys.exit(1))\n\
+             print('held', flush=True)\n\
+             while True:\n    time.sleep(0.1)\n",
+        )
+        .unwrap();
+        let mut child = Command::new(&link)
+            .args(["peer", "serve", "--root"])
+            .arg(root)
+            .current_dir(&dir)
+            .env_clear()
+            .env("XDG_CONFIG_HOME", fx.base.join("config"))
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::inherit())
+            .spawn()
+            .unwrap();
+        let mut line = String::new();
+        BufReader::new(child.stdout.take().unwrap())
+            .read_line(&mut line)
+            .unwrap();
+        assert_eq!(line.trim(), "held", "the holder took the serve lock");
+        Some(Holder { child })
+    }
+
+    fn pid(&self) -> u32 {
+        self.child.id()
+    }
+
+    fn running(&mut self) -> bool {
+        self.child.try_wait().unwrap().is_none()
+    }
+
+    fn exit(&mut self) -> ExitStatus {
+        let deadline = Instant::now() + Duration::from_secs(30);
+        loop {
+            if let Some(status) = self.child.try_wait().unwrap() {
+                return status;
+            }
+            assert!(Instant::now() < deadline, "the holder never exited");
+            thread::sleep(Duration::from_millis(50));
+        }
+    }
+}
+
+impl Drop for Holder {
+    fn drop(&mut self) {
+        if self.running() {
+            let _ = self.child.kill();
+        }
+        let _ = self.child.wait();
+    }
+}
+
+fn declare_peer(fx: &Fixture, env: &[&str]) {
+    let root = fx.repo.to_str().unwrap().to_owned();
+    let mut args = vec!["device", "run", "epr", "--name", "peer"];
+    for entry in env {
+        args.extend(["--env", entry]);
+    }
+    args.extend([
+        "--ready-line",
+        "epr peer: serving",
+        "--",
+        "peer",
+        "serve",
+        "--root",
+        &root,
+    ]);
+    fx.ok(&args);
+}
+
+fn stderr(output: &Output) -> String {
+    String::from_utf8_lossy(&output.stderr).into_owned()
+}
+
+const REAL_PROC: (&str, &str) = ("EPR_PROC_ROOT", "/proc");
+
+/// With no ark anywhere: a hand-started daemon holding the serve lock refuses supervise before
+/// ark is even looked for, and nothing is signalled. `--handover` refuses too while any check
+/// fails, naming the check, and the daemon keeps running.
+#[test]
+fn a_serve_lock_held_outside_ark_refuses_and_signals_nothing_offline() {
+    let fx = fixture_with(PathBuf::from("/nonexistent/ark"));
+    let daemon_cure = || {
+        let rows: Vec<Value> =
+            serde_json::from_slice(&fx.epr(&["device", "status", "--json"]).stdout).unwrap();
+        let row = rows
+            .into_iter()
+            .find(|r| r["name"] == "peer daemon")
+            .unwrap();
+        row["cure"].as_str().unwrap_or_default().to_owned()
+    };
+    // A silent daemon's cure is the devfile command until the head declares one, then the
+    // supervisor.
+    assert!(daemon_cure().contains("devfile"), "{}", daemon_cure());
+    declare_peer(&fx, &[]);
+    assert!(
+        daemon_cure().starts_with("epr device supervise"),
+        "{}",
+        daemon_cure()
+    );
+    let Some(mut holder) = Holder::start(&fx, &fx.repo) else {
+        return;
+    };
+    let proc = [(REAL_PROC.0, OsStr::new(REAL_PROC.1))];
+
+    let refused = fx.epr_with(&["device", "supervise"], &proc);
+    assert!(!refused.status.success());
+    let text = stderr(&refused);
+    assert!(text.contains("REFUSED peer-serve-unowned"), "{text}");
+    assert!(text.contains(&format!("pid {}", holder.pid())), "{text}");
+    assert!(text.contains("--handover"), "{text}");
+    assert!(holder.running(), "an unowned refusal signals nothing");
+    assert_eq!(fx.status()["running"], false, "ark was not started");
+
+    // Every check but the lease holds: refused, naming the lease, and nothing is signalled.
+    let refused = fx.epr_with(&["device", "supervise", "--handover"], &proc);
+    assert!(!refused.status.success());
+    let text = stderr(&refused);
+    assert!(
+        text.contains("REFUSED peer-serve-handover-refused") && text.contains("daemon-lease"),
+        "{text}"
+    );
+    assert!(holder.running());
+    assert_eq!(fx.status()["running"], false);
+}
+
+/// A daemon serving another root is not the one the head declares: `--handover` refuses it by
+/// the root check, though its lease names it, and leaves it running.
+#[test]
+fn handover_refuses_a_daemon_serving_another_root_offline() {
+    let fx = fixture_with(PathBuf::from("/nonexistent/ark"));
+    declare_peer(&fx, &[]);
+    let elsewhere = fx.base.join("elsewhere");
+    fs::create_dir_all(&elsewhere).unwrap();
+    let Some(mut holder) = Holder::start(&fx, &elsewhere) else {
+        return;
+    };
+    fx.lease(holder.pid());
+    let refused = fx.epr_with(
+        &["device", "supervise", "--handover"],
+        &[(REAL_PROC.0, OsStr::new(REAL_PROC.1))],
+    );
+    assert!(!refused.status.success());
+    let text = stderr(&refused);
+    assert!(
+        text.contains("REFUSED peer-serve-handover-refused") && text.contains("same --root"),
+        "{text}"
+    );
+    assert!(holder.running(), "a refused handover signals nothing");
+    assert_eq!(fx.status()["running"], false);
+}
+
+/// The handover: SIGINT to the one confirmed daemon, its lock freed, then ark starts the
+/// declared `peer` with its declared environment — `XDG_CONFIG_HOME` (where the child writes
+/// what it saw) and `EPR_BIN_TOOLS` as a `{data_root}` template, with no working-directory
+/// field: ark's working directory is the data root.
+#[test]
+fn handover_interrupts_the_unowned_daemon_and_ark_starts_the_declared_one() {
+    let Some(fx) = fixture() else { return };
+    let config = fx.base.join("config");
+    let xdg = format!("XDG_CONFIG_HOME={}", config.display());
+    declare_peer(
+        &fx,
+        &[
+            &xdg,
+            "EPR_BIN_TOOLS={data_root}/manifest.json",
+            "FIXTURE_MARK=declared",
+        ],
+    );
+    // The declared child is bash (the fixture's `epr` bytes) running `peer serve --root …`,
+    // which reads the script `peer` from its working directory, the data root.
+    fs::create_dir_all(fx.data_root()).unwrap();
+    fs::write(
+        fx.data_root().join("peer"),
+        "trap 'exit 0' INT TERM\nenv > \"$XDG_CONFIG_HOME/child.env\"\n\
+         echo \"epr peer: serving $*\"\nwhile :; do sleep 1; done\n",
+    )
+    .unwrap();
+    let Some(mut holder) = Holder::start(&fx, &fx.repo) else {
+        return;
+    };
+    fx.lease(holder.pid());
+
+    let output = fx.epr_with(
+        &["device", "supervise", "--handover"],
+        &[(REAL_PROC.0, OsStr::new(REAL_PROC.1))],
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(output.status.success(), "{stdout}\n{}", stderr(&output));
+    assert!(
+        stdout.contains(&format!("SIGINT to epr peer serve pid {}", holder.pid())),
+        "{stdout}"
+    );
+    assert!(stdout.contains("started pid"), "{stdout}");
+    let status = holder.exit();
+    assert_eq!(
+        status.code(),
+        Some(0),
+        "the daemon left on SIGINT, never SIGTERM or SIGKILL: {status}"
+    );
+    let ready = wait_for("the declared peer to serve", || {
+        let status = fx.status();
+        (status["processes"][0]["ready"] == true).then_some(status)
+    });
+    assert_eq!(ready["processes"][0]["name"], "peer");
+
+    let seen = fs::read_to_string(config.join("child.env")).unwrap();
+    let has = |line: String| seen.lines().any(|l| l == line);
+    assert!(has(xdg.clone()), "{seen}");
+    assert!(
+        has(format!(
+            "EPR_BIN_TOOLS={}",
+            fx.data_root().join("manifest.json").display()
+        )),
+        "{seen}"
+    );
+    assert!(has("FIXTURE_MARK=declared".into()), "{seen}");
+    assert!(
+        !seen.lines().any(|l| l.starts_with("BIN_STORE=")),
+        "ark's scrub keeps undeclared keys out: {seen}"
+    );
+}
+
+fn start_ticks(pid: u64) -> String {
+    let stat = fs::read_to_string(format!("/proc/{pid}/stat")).unwrap();
+    let rest = &stat[stat.rfind(')').unwrap() + 2..];
+    rest.split_whitespace().nth(19).unwrap().to_owned()
+}
+
+/// Same manifest, same bytes: supervise leaves ark alone. Same manifest, a landed current:
+/// supervise names the stale child and restarts ark, and the new child executes the current.
+#[test]
+fn a_child_on_old_bytes_restarts_onto_the_landed_current_and_a_current_one_stays() {
+    let Some(fx) = fixture() else { return };
+    let resident = script("bytes");
+    fx.ok(&[
+        "device",
+        "run",
+        "epr",
+        "--ready-line",
+        READY,
+        "--",
+        "-c",
+        &resident,
+    ]);
+    let head = fx.head();
+    assert!(fx.ok(&["device", "supervise"]).contains("started pid"));
+    let first = wait_for("the resident to become ready", || {
+        let status = fx.status();
+        (status["processes"][0]["ready"] == true).then_some(status)
+    });
+    let ark1 = first["pid"].as_u64().unwrap();
+    let ticks1 = start_ticks(ark1);
+    let child1 = first["processes"][0]["pid"].as_u64().unwrap();
+
+    let again = fx.ok(&["device", "supervise"]);
+    assert!(again.contains("at current manifest"), "{again}");
+    assert_eq!(fx.status()["pid"].as_u64().unwrap(), ark1);
+    assert_eq!(start_ticks(ark1), ticks1, "the same ark, never restarted");
+    assert!(alive(child1));
+
+    let old = fx.current().0;
+    let new = land(&fx, "source-v2", b"\n# landed v2\n");
+    assert_ne!(old, new);
+    assert_eq!(fx.head(), head, "a landing leaves the manifest as it was");
+    let restarted = fx.ok(&["device", "supervise"]);
+    assert!(
+        restarted.contains(&format!("epr runs {old}, current is {new}; restarting")),
+        "{restarted}"
+    );
+    let second = wait_for("the resident on the landed bytes", || {
+        let status = fx.status();
+        let pid = status["processes"][0]["pid"].as_u64()?;
+        (status["processes"][0]["ready"] == true && pid != child1).then_some(status)
+    });
+    assert_eq!(second["manifestCid"], head);
+    assert_ne!(second["pid"].as_u64().unwrap(), ark1);
+    assert!(!alive(ark1));
+    let child2 = second["processes"][0]["pid"].as_u64().unwrap();
+    let running =
+        elohim_device_runtime::bin_store::file_cid(Path::new(&format!("/proc/{child2}/exe")))
+            .unwrap();
+    let current = elohim_device_runtime::bin_store::file_cid(&fx.current().1).unwrap();
+    assert_eq!(
+        running, current,
+        "the new child executes the landed current"
+    );
+    assert!(fx
+        .ok(&["device", "supervise"])
+        .contains("at current manifest"));
 }

@@ -15,7 +15,10 @@
 //! means restart and witnessed deaths, never a bound. The workspace RAM guard and the
 //! berth lease remain the only enforcers.
 use ark_core::{declaration, ArtifactRef, Berth, Passport, RuntimeManifest};
-use elohim_device_runtime::{bin_store::Store, manifest_store};
+use elohim_device_runtime::{
+    bin_store::{file_cid, Store},
+    manifest_store,
+};
 use serde::{Deserialize, Serialize};
 use std::{
     fs,
@@ -41,6 +44,8 @@ const START_WATCH: Duration = Duration::from_millis(1500);
 /// Two clocks (the kernel's boot-relative start tick and ark's epoch stamp) disagree by
 /// rounding; a pid whose start is further than this from the passport's is someone else.
 const START_TOLERANCE_MS: u64 = 2_000;
+/// How long `--handover` waits for an interrupted `epr peer serve` to release its serve lock.
+const HANDOVER_WAIT: Duration = Duration::from_secs(20);
 
 type Outcome<T> = Result<T, String>;
 
@@ -91,6 +96,7 @@ struct Options {
     json: bool,
     root: Option<PathBuf>,
     data_root: Option<PathBuf>,
+    handover: bool,
 }
 
 pub(super) fn run(args: &[String]) -> Outcome<ExitCode> {
@@ -100,6 +106,7 @@ pub(super) fn run(args: &[String]) -> Outcome<ExitCode> {
         json: false,
         root: None,
         data_root: None,
+        handover: false,
     };
     let mut iter = args.iter();
     while let Some(arg) = iter.next() {
@@ -107,6 +114,7 @@ pub(super) fn run(args: &[String]) -> Outcome<ExitCode> {
             "--status" => opts.status = true,
             "--stop" => opts.stop = true,
             "--json" => opts.json = true,
+            "--handover" => opts.handover = true,
             "--root" | "--data-root" => {
                 let value = iter
                     .next()
@@ -127,6 +135,11 @@ pub(super) fn run(args: &[String]) -> Outcome<ExitCode> {
     }
     if opts.status && opts.stop {
         return Err("--status reads and --stop acts; ask for one".into());
+    }
+    if opts.handover && (opts.status || opts.stop) {
+        return Err(
+            "--handover belongs to a supervise that starts ark, not --status or --stop".into(),
+        );
     }
     let checkout = here_checkout();
     let data_root = opts
@@ -163,17 +176,24 @@ pub(super) fn run(args: &[String]) -> Outcome<ExitCode> {
         release_lease(berth.as_deref());
         return Ok(ExitCode::SUCCESS);
     }
-    supervise(&data_root, &head, berth.as_deref())
+    supervise(&data_root, &head, berth.as_deref(), opts.handover)
 }
 
 pub(super) fn usage() -> &'static str {
-    "usage: epr device supervise [--status [--json] | --stop] [--root <device root>] \
-     [--data-root <path>]\n  \
+    "usage: epr device supervise [--handover] [--status [--json] | --stop] \
+     [--root <device root>] [--data-root <path>]\n  \
      (ark runs this device's declared manifest from <main checkout>/.eprfs/status/ark/device; \
-     a moved head reloads it by restart)"
+     a moved head or a child running other bytes than its channel's current reloads it by \
+     restart; --handover interrupts an `epr peer serve` this ark did not start so the \
+     declared one can take its serve lock)"
 }
 
-fn supervise(data_root: &Path, head: &RuntimeManifest, berth: Option<&Path>) -> Outcome<ExitCode> {
+fn supervise(
+    data_root: &Path,
+    head: &RuntimeManifest,
+    berth: Option<&Path>,
+    handover: bool,
+) -> Outcome<ExitCode> {
     let head_cid = head.cid().map_err(|e| e.to_string())?;
     let started = running(data_root)?;
     let berth_path = data_root.join("berth.json");
@@ -188,13 +208,39 @@ fn supervise(data_root: &Path, head: &RuntimeManifest, berth: Option<&Path>) -> 
             berth_path.display()
         ));
     }
+    // At the head, the manifest alone cannot say a child is current: ark resolves `bin:` at
+    // each spawn, so a child started before a landing still runs the bytes it was started on.
+    let mut stale_binary = false;
     if let Some(started) = &started {
         if started.manifest_cid == head_cid {
-            println!(
-                "device ark: running pid {} at current manifest {head_cid}",
-                started.pid
-            );
-            return Ok(ExitCode::SUCCESS);
+            match child_identity(data_root, head, started)? {
+                Identity::Current => {
+                    println!(
+                        "device ark: running pid {} at current manifest {head_cid}",
+                        started.pid
+                    );
+                    return Ok(ExitCode::SUCCESS);
+                }
+                Identity::NoLiveChild => {
+                    println!(
+                        "device ark: running pid {} at current manifest {head_cid}; no child is \
+                         live yet (starting or in restart backoff), so none is judged stale and \
+                         nothing restarts",
+                        started.pid
+                    );
+                    return Ok(ExitCode::SUCCESS);
+                }
+                Identity::Stale {
+                    child,
+                    running,
+                    current,
+                } => {
+                    println!(
+                        "device ark: {child} runs {running}, current is {current}; restarting"
+                    );
+                    stale_binary = true;
+                }
+            }
         }
     }
     if head.processes.is_empty() {
@@ -214,14 +260,29 @@ fn supervise(data_root: &Path, head: &RuntimeManifest, berth: Option<&Path>) -> 
         return Ok(ExitCode::SUCCESS);
     }
     preflight(head)?;
+    // Before anything is claimed, stopped or signalled: a serve lock held outside this ark
+    // refuses here unless the person asked for the handover.
+    let holder = peer_serve_preflight(head, data_root, started.as_ref(), handover)?;
     let ark = ark_bin()?;
     let leased = claim_lease(berth, &head_cid)?;
     let result = (|| {
+        // The holder goes first: a handover that times out leaves this device's own ark as
+        // it was, never stopped for a daemon that would not stop.
+        if let Some(holder) = &holder {
+            hand_over(holder)?;
+        }
         if let Some(started) = &started {
-            println!(
-                "device ark: reloading — stopping pid {} (manifest {}) for head {head_cid}",
-                started.pid, started.manifest_cid
-            );
+            if stale_binary {
+                println!(
+                    "device ark: stopping pid {} (manifest {head_cid}) to start current bytes",
+                    started.pid
+                );
+            } else {
+                println!(
+                    "device ark: reloading — stopping pid {} (manifest {}) for head {head_cid}",
+                    started.pid, started.manifest_cid
+                );
+            }
             stop_ark(data_root, started)?;
         }
         start_ark(data_root, head, &head_cid, &ark)
@@ -249,11 +310,7 @@ fn supervise(data_root: &Path, head: &RuntimeManifest, berth: Option<&Path>) -> 
 fn preflight(head: &RuntimeManifest) -> Outcome<()> {
     let registry = manifest_store::registry(head).map_err(|e| e.to_string())?;
     for process in &head.processes {
-        let tool = match &process.artifact {
-            ArtifactRef::Channel { channel_id } => channel_id.strip_prefix("bin:"),
-            ArtifactRef::Pinned { .. } => None,
-        }
-        .ok_or_else(|| {
+        let tool = channel_tool(&process.artifact).ok_or_else(|| {
             format!(
                 "REFUSED: process {} is not a bin: channel; the device berth places only \
                  tools from the device bin store",
@@ -265,6 +322,338 @@ fn preflight(head: &RuntimeManifest) -> Outcome<()> {
             .map_err(|e| format!("{e} — epr bin bootstrap --tool {tool}"))?;
     }
     Ok(())
+}
+
+/// Whether the children a running ark holds run their channels' current bytes.
+enum Identity {
+    Current,
+    /// The ark is up but no declared child has a live process (starting or backing off).
+    NoLiveChild,
+    Stale {
+        child: String,
+        running: String,
+        current: String,
+    },
+}
+
+/// Each live child of `started` (by the passport's pid, confirmed as this ark's child in
+/// `/proc`) is judged by the bytes the kernel executes, `/proc/<pid>/exe`, against the
+/// verified current of its declared `bin:` channel: the same byte CID the store files by.
+fn child_identity(
+    data_root: &Path,
+    head: &RuntimeManifest,
+    started: &Started,
+) -> Outcome<Identity> {
+    let Some(passport) = load_passport(data_root) else {
+        return Ok(Identity::NoLiveChild);
+    };
+    let registry = manifest_store::registry(head).map_err(|e| e.to_string())?;
+    let mut live = false;
+    for child in &passport.processes {
+        let Some(pid) = child.pid else { continue };
+        if proc_ppid(pid) != Some(started.pid) {
+            continue;
+        }
+        let Some(tool) = head
+            .processes
+            .iter()
+            .find(|spec| spec.name == child.name)
+            .and_then(|spec| channel_tool(&spec.artifact))
+        else {
+            continue;
+        };
+        let exe = PathBuf::from(format!("/proc/{pid}/exe"));
+        // A child that died between the passport and this read is not live, not stale.
+        let Ok(running_bytes) = file_cid(&exe) else {
+            continue;
+        };
+        live = true;
+        let store = Store::from_environment(tool, &registry).map_err(|e| e.to_string())?;
+        let (current, path) = store.current_artifact().map_err(|e| e.to_string())?;
+        if running_bytes != file_cid(&path).map_err(|e| e.to_string())? {
+            let running = store.executable_cid(&exe).unwrap_or(running_bytes);
+            return Ok(Identity::Stale {
+                child: child.name.clone(),
+                running,
+                current,
+            });
+        }
+    }
+    Ok(if live {
+        Identity::Current
+    } else {
+        Identity::NoLiveChild
+    })
+}
+
+fn channel_tool(artifact: &ArtifactRef) -> Option<&str> {
+    match artifact {
+        ArtifactRef::Channel { channel_id } => channel_id.strip_prefix("bin:"),
+        ArtifactRef::Pinned { .. } => None,
+    }
+}
+
+/// The declared process whose argv after `{artifact}` begins `peer serve`, if any.
+pub(crate) fn declared_peer_serve(head: &RuntimeManifest) -> Option<&ark_core::ChildSpec> {
+    head.processes
+        .iter()
+        .find(|p| p.argv.get(1..3).is_some_and(|a| a == ["peer", "serve"]))
+}
+
+/// The `--root` an `epr peer serve` argv tail names (`.` when it names none, as serve does).
+fn serve_root(tail: &[String]) -> &str {
+    tail.windows(2)
+        .find(|w| w[0] == "--root")
+        .map_or(".", |w| w[1].as_str())
+}
+
+/// An `epr peer serve` holding the serve lock that this ark did not start, confirmed to be
+/// the one process `--handover` may interrupt.
+struct Holder {
+    pid: u32,
+    start_ticks: u64,
+    lock: PathBuf,
+}
+
+/// The serve-lock handover preflight. Nothing here signals: it returns the holder only when
+/// `--handover` was asked and every check passed.
+fn peer_serve_preflight(
+    head: &RuntimeManifest,
+    data_root: &Path,
+    started: Option<&Started>,
+    handover: bool,
+) -> Outcome<Option<Holder>> {
+    let Some(declared) = declared_peer_serve(head) else {
+        return Ok(None);
+    };
+    let (lock, held) = super::arrival::serve_lock_probe()
+        .map_err(|e| format!("REFUSED peer-serve-unprobed: {e}"))?;
+    if !held {
+        return Ok(None);
+    }
+    let holders = lock_holders(&lock);
+    if let Some(started) = started.filter(|s| is_same_process(s.pid, s.start_ticks)) {
+        if holders
+            .iter()
+            .any(|pid| proc_ppid(*pid) == Some(started.pid))
+        {
+            // This ark's own child: stopping the ark releases it.
+            return Ok(None);
+        }
+    }
+    let holder = holders
+        .iter()
+        .copied()
+        .find(|pid| peer_serve_tail(*pid).is_some())
+        .or_else(|| holders.first().copied());
+    let Some(pid) = holder else {
+        let detail = format!(
+            "a process this user cannot see holds {}; ark would start a second daemon beside \
+             it, so nothing starts and nothing is signalled — stop the daemon holding it with \
+             SIGINT, then rerun `epr device supervise`",
+            lock.display()
+        );
+        return Err(if handover {
+            format!("REFUSED peer-serve-handover-refused: holds serve.lock: {detail}")
+        } else {
+            format!("REFUSED peer-serve-unowned: {detail}")
+        });
+    };
+    let leased = daemon_lease_names(pid);
+    let exe = holder_exe_cid(pid);
+    if !handover {
+        return Err(format!(
+            "REFUSED peer-serve-unowned: pid {pid} (exe {exe}; daemon lease {}) holds {} and \
+             this device ark did not start it; ark would start {} beside it, so nothing \
+             starts and nothing is signalled — stop it with SIGINT (kill -INT {pid}), then \
+             rerun `epr device supervise`, or rerun with --handover",
+            if leased {
+                "names it"
+            } else {
+                "names no such pid"
+            },
+            lock.display(),
+            declared.name
+        ));
+    }
+    let refused = |check: &str| {
+        format!(
+            "REFUSED peer-serve-handover-refused: pid {pid} (exe {exe}) holds {} but fails the \
+             {check} check; it is left running — stop it yourself with SIGINT, then rerun \
+             `epr device supervise`",
+            lock.display()
+        )
+    };
+    if proc_uid(pid).is_none() || proc_uid(pid) != proc_uid(std::process::id()) {
+        return Err(refused("same-user"));
+    }
+    let Some((cwd, tail)) = peer_serve_tail(pid) else {
+        return Err(refused("`epr peer serve` command line"));
+    };
+    let template = Berth {
+        data_root: data_root.to_owned(),
+        ..Berth::default()
+    };
+    let declared_root = template
+        .resolve_template(
+            &declared.name,
+            Path::new(""),
+            serve_root(&declared.argv[3..]),
+        )
+        .map_err(|e| e.to_string())?;
+    let canonical = |base: &Path, root: &str| {
+        let path = base.join(root);
+        fs::canonicalize(&path).unwrap_or(path)
+    };
+    if canonical(&cwd, serve_root(&tail)) != canonical(data_root, &declared_root) {
+        return Err(refused("same --root"));
+    }
+    if !lock_holders(&lock).contains(&pid) {
+        return Err(refused("holds-serve.lock"));
+    }
+    if !leased {
+        return Err(refused("daemon-lease"));
+    }
+    let start_ticks = proc_stat(pid)
+        .map(|(_, ticks)| ticks)
+        .ok_or_else(|| refused("still-running"))?;
+    Ok(Some(Holder {
+        pid,
+        start_ticks,
+        lock,
+    }))
+}
+
+/// SIGINT to the one confirmed holder, then wait for the kernel to release its lock. Never
+/// escalates: a daemon that keeps the lock is reported and left running.
+fn hand_over(holder: &Holder) -> Outcome<()> {
+    if is_same_process(holder.pid, holder.start_ticks) {
+        let pid = libc::pid_t::try_from(holder.pid).map_err(|e| e.to_string())?;
+        println!(
+            "device ark: handing over — SIGINT to epr peer serve pid {}",
+            holder.pid
+        );
+        // SAFETY: `kill` takes plain integers; the pid was confirmed against its start tick
+        // just above, so the signal cannot reach a recycled pid.
+        if unsafe { libc::kill(pid, libc::SIGINT) } != 0 {
+            let error = std::io::Error::last_os_error();
+            if error.raw_os_error() != Some(libc::ESRCH) {
+                return Err(format!("signalling pid {}: {error}", holder.pid));
+            }
+        }
+    }
+    let deadline = Instant::now() + HANDOVER_WAIT;
+    loop {
+        match super::arrival::serve_lock_probe() {
+            Ok((_, false)) => return Ok(()),
+            Ok((_, true)) => {}
+            Err(error) => return Err(format!("REFUSED peer-serve-unprobed: {error}")),
+        }
+        if Instant::now() >= deadline {
+            return Err(format!(
+                "REFUSED peer-serve-handover-timeout: {} is still held {}s after SIGINT to pid \
+                 {}; it is left running and ark is not started beside it",
+                holder.lock.display(),
+                HANDOVER_WAIT.as_secs(),
+                holder.pid
+            ));
+        }
+        thread::sleep(Duration::from_millis(100));
+    }
+}
+
+/// Every process of this user whose open file description holds a flock on `lock`, read from
+/// `/proc/<pid>/fdinfo` (the kernel lists a lock there only for the description that holds it).
+fn lock_holders(lock: &Path) -> Vec<u32> {
+    let lock = fs::canonicalize(lock).unwrap_or_else(|_| lock.to_owned());
+    let me = std::process::id();
+    let Ok(entries) = fs::read_dir("/proc") else {
+        return Vec::new();
+    };
+    entries
+        .filter_map(Result::ok)
+        .filter_map(|e| e.file_name().to_str()?.parse::<u32>().ok())
+        .filter(|pid| *pid != me)
+        .filter(|pid| {
+            let Ok(fds) = fs::read_dir(format!("/proc/{pid}/fd")) else {
+                return false;
+            };
+            fds.filter_map(Result::ok).any(|fd| {
+                fs::read_link(fd.path()).is_ok_and(|target| target == lock)
+                    && fs::read_to_string(format!(
+                        "/proc/{pid}/fdinfo/{}",
+                        fd.file_name().to_string_lossy()
+                    ))
+                    .is_ok_and(|info| {
+                        info.lines()
+                            .any(|l| l.starts_with("lock:") && l.contains("FLOCK"))
+                    })
+            })
+        })
+        .collect()
+}
+
+/// `(cwd, argv after "serve")` when `/proc/<pid>/cmdline` is `epr peer serve …`.
+fn peer_serve_tail(pid: u32) -> Option<(PathBuf, Vec<String>)> {
+    let cmdline = fs::read(format!("/proc/{pid}/cmdline")).ok()?;
+    let args: Vec<String> = cmdline
+        .split(|b| *b == 0)
+        .filter(|a| !a.is_empty())
+        .map(|a| String::from_utf8_lossy(a).into_owned())
+        .collect();
+    let is_epr = Path::new(args.first()?).file_name()? == "epr";
+    (is_epr && args.get(1..3)? == ["peer", "serve"]).then_some(())?;
+    let cwd = fs::read_link(format!("/proc/{pid}/cwd")).ok()?;
+    Some((cwd, args[3..].to_vec()))
+}
+
+/// Whether a live daemon lease in the device `epr` store names `pid` as its owner.
+fn daemon_lease_names(pid: u32) -> bool {
+    crate::bin::daemon_store()
+        .and_then(|store| store.live_daemons(&crate::bin::daemon_proc_root()))
+        .is_ok_and(|leases| leases.iter().any(|lease| lease.owner_pid == Some(pid)))
+}
+
+/// The release (or raw byte) CID of the bytes `pid` executes, when they can be read.
+fn holder_exe_cid(pid: u32) -> String {
+    let exe = PathBuf::from(format!("/proc/{pid}/exe"));
+    crate::bin::daemon_store()
+        .ok()
+        .and_then(|store| store.executable_cid(&exe).ok())
+        .or_else(|| file_cid(&exe).ok())
+        .unwrap_or_else(|| "unreadable".into())
+}
+
+/// The real uid `/proc/<pid>/status` reports.
+fn proc_uid(pid: u32) -> Option<u32> {
+    fs::read_to_string(format!("/proc/{pid}/status"))
+        .ok()?
+        .lines()
+        .find_map(|line| {
+            line.strip_prefix("Uid:")?
+                .split_whitespace()
+                .next()?
+                .parse()
+                .ok()
+        })
+}
+
+/// After arrival moved a tool's current: when this device's ark runs and the head declares a
+/// process, supervise once so a child still on the old bytes restarts onto the new ones. An
+/// ark nobody started stays unstarted; arrival never begins supervision on its own.
+pub(crate) fn after_landing(checkout: &Path) -> Outcome<()> {
+    let data_root = default_data_root(checkout);
+    let head = super::declaration::store(None, None, None)?
+        .read()
+        .map_err(|e| e.to_string())?;
+    if head.processes.is_empty() {
+        return Ok(());
+    }
+    if running(&data_root)?.is_none() {
+        println!("device ark: not running; the landed binary waits for `epr device supervise`");
+        return Ok(());
+    }
+    supervise(&data_root, &head, lease_tool(checkout).as_deref(), false).map(|_| ())
 }
 
 fn start_ark(
@@ -635,6 +1024,16 @@ fn proc_stat(pid: u32) -> Option<(char, u64)> {
         fields.first()?.chars().next()?,
         fields.get(19)?.parse().ok()?,
     ))
+}
+
+/// The parent pid from `/proc/<pid>/stat`, for a process that is not a zombie.
+fn proc_ppid(pid: u32) -> Option<u32> {
+    let stat = fs::read_to_string(format!("/proc/{pid}/stat")).ok()?;
+    let rest = stat.get(stat.rfind(')')? + 2..)?;
+    let mut fields = rest.split_whitespace();
+    let state = fields.next()?;
+    (state != "Z").then_some(())?;
+    fields.next()?.parse().ok()
 }
 
 fn is_same_process(pid: u32, start_ticks: u64) -> bool {

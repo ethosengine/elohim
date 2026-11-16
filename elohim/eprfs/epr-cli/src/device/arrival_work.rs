@@ -29,6 +29,7 @@ fn each_tool(root: &Path, long: bool) -> Result<()> {
             detail,
         })?;
     let skipped = std::env::var("BIN_STORE_SKIP_TOOLS").unwrap_or_default();
+    let mut moved = Vec::new();
     for tool in registry
         .tools
         .keys()
@@ -41,6 +42,13 @@ fn each_tool(root: &Path, long: bool) -> Result<()> {
         else {
             continue;
         };
+        let current = || {
+            Store::from_environment(tool, &registry)
+                .and_then(|store| store.current_artifact())
+                .ok()
+                .map(|(cid, _)| cid)
+        };
+        let before = current();
         let result = (|| {
             let store = Store::from_environment(tool, &registry)?.with_peer_serving(
                 if crate::bin::declares_peer_serve(&manifest, tool) {
@@ -83,8 +91,47 @@ fn each_tool(root: &Path, long: bool) -> Result<()> {
         if let Err(error) = result {
             eprintln!("{tool} arrival (continuing): {error}");
         }
+        let after = current();
+        if after.is_some() && after != before {
+            moved.push(tool.clone());
+        }
     }
+    after_moves(
+        &moved,
+        &manifest,
+        &mut || super::supervise::after_landing(root),
+        &mut |line| eprintln!("device arrival: {line}"),
+    );
     Ok(())
+}
+
+/// A follow that moved the current of a tool a declared process runs asks the supervisor
+/// once: ark resolves `bin:` only at spawn, so a running child stays on the old bytes until
+/// supervise restarts it. Nothing moved, or nothing declared on what moved, asks nothing.
+fn after_moves(
+    moved: &[String],
+    head: &ark_core::RuntimeManifest,
+    supervise: &mut impl FnMut() -> std::result::Result<(), String>,
+    say: &mut impl FnMut(String),
+) -> bool {
+    let runs = |tool: &String| {
+        head.processes.iter().any(|p| {
+            matches!(&p.artifact, ark_core::ArtifactRef::Channel { channel_id }
+                if channel_id.strip_prefix("bin:") == Some(tool.as_str()))
+        })
+    };
+    let landed: Vec<_> = moved.iter().filter(|tool| runs(tool)).cloned().collect();
+    if landed.is_empty() {
+        return false;
+    }
+    say(format!(
+        "{} moved; asking the device ark to run it",
+        landed.join(", ")
+    ));
+    if let Err(error) = supervise() {
+        say(format!("supervise (continuing): {error}"));
+    }
+    true
 }
 /// Heal already available heads before returning; queue builds without holding the hook's pipes.
 pub(super) fn start(root: &Path) -> Result<()> {
@@ -203,5 +250,56 @@ mod tests {
     #[test]
     fn installation_failure_is_reported_without_claiming_success() {
         assert!(!exercise("install-launcher").1);
+    }
+    fn head_running(tools: &[&str]) -> ark_core::RuntimeManifest {
+        let mut head = elohim_device_runtime::manifest_store::workspace_base().unwrap();
+        head.processes.clear();
+        for tool in tools {
+            head = ark_core::declaration::supersede(
+                &head,
+                ark_core::declaration::ManifestAct::Run {
+                    tool: (*tool).into(),
+                    stop: false,
+                    launch: ark_core::declaration::RunLaunch::default(),
+                },
+            )
+            .unwrap();
+        }
+        head
+    }
+    fn asks(moved: &[&str], head: &ark_core::RuntimeManifest, fails: bool) -> (u32, Vec<String>) {
+        let moved: Vec<String> = moved.iter().map(|t| (*t).to_owned()).collect();
+        let mut calls = 0;
+        let mut lines = Vec::new();
+        let asked = after_moves(
+            &moved,
+            head,
+            &mut || {
+                calls += 1;
+                if fails {
+                    Err("REFUSED peer-serve-unowned: fixture".into())
+                } else {
+                    Ok(())
+                }
+            },
+            &mut |line| lines.push(line),
+        );
+        assert_eq!(asked, calls == 1);
+        (calls, lines)
+    }
+    #[test]
+    fn a_moved_epr_asks_the_supervisor_once_only_when_a_process_runs_it() {
+        let declared = head_running(&["epr"]);
+        let (calls, lines) = asks(&["brit", "epr"], &declared, false);
+        assert_eq!(calls, 1);
+        assert!(lines[0].starts_with("epr moved"), "{lines:?}");
+        // A refusal is reported and arrival goes on.
+        let (calls, lines) = asks(&["epr"], &declared, true);
+        assert_eq!(calls, 1);
+        assert!(lines[1].contains("peer-serve-unowned"), "{lines:?}");
+        // Nothing declared, nothing moved, or only an undeclared tool moved: no ask.
+        assert_eq!(asks(&["epr"], &head_running(&[]), false).0, 0);
+        assert_eq!(asks(&[], &declared, false).0, 0);
+        assert_eq!(asks(&["brit"], &declared, false).0, 0);
     }
 }

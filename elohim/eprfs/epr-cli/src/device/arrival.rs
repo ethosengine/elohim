@@ -496,22 +496,11 @@ fn supervisor_check(root: &Path) -> Check {
 /// included, so unlike a recorded pid it cannot read a previous container's daemon as live.
 #[cfg(feature = "peer")]
 fn serve_liveness() -> std::result::Result<(bool, Option<String>), String> {
-    use rustix::fs::{flock, FlockOperation};
-    let dir = crate::peer::peer_dir().map_err(|e| e.to_string())?;
-    let path = dir.join(crate::peer::ServeLock::FILE_NAME);
-    let file = match fs::File::open(&path) {
-        Ok(file) => file,
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok((false, None)),
-        Err(e) => return Err(format!("{}: {e}", path.display())),
-    };
-    let held = match flock(&file, FlockOperation::NonBlockingLockShared) {
-        // Shared and dropped at once; `ServeLock::acquire` retries a contended exclusive take,
-        // so this momentary probe does not read as a live daemon to a starting `serve`.
-        Ok(()) => false,
-        Err(errno) if errno == rustix::io::Errno::WOULDBLOCK => true,
-        Err(errno) => return Err(format!("{}: {errno}", path.display())),
-    };
-    drop(file);
+    let (path, held) = serve_lock_probe()?;
+    let dir = path.parent().unwrap_or(&path).to_owned();
+    if !held && !path.exists() {
+        return Ok((false, None));
+    }
     // Evidence, not state: a head is refolded only when its sibling's root moves, so an idle
     // sibling ages here while every daemon is healthy.
     let now = std::time::SystemTime::now()
@@ -533,6 +522,47 @@ fn serve_liveness() -> std::result::Result<(bool, Option<String>), String> {
     Err("this epr was built without the peer feature".into())
 }
 
+/// `<peer dir>/serve.lock` and whether a process holds it now, by a momentary shared flock
+/// that never creates the file (absent reads as free). `epr device supervise` asks the same
+/// question before it starts a declared `epr peer serve`.
+#[cfg(feature = "peer")]
+pub(super) fn serve_lock_probe() -> std::result::Result<(std::path::PathBuf, bool), String> {
+    use rustix::fs::{flock, FlockOperation};
+    let dir = crate::peer::peer_dir().map_err(|e| e.to_string())?;
+    let path = dir.join(crate::peer::ServeLock::FILE_NAME);
+    let file = match fs::File::open(&path) {
+        Ok(file) => file,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok((path, false)),
+        Err(e) => return Err(format!("{}: {e}", path.display())),
+    };
+    let held = match flock(&file, FlockOperation::NonBlockingLockShared) {
+        // Shared and dropped at once; `ServeLock::acquire` retries a contended exclusive take,
+        // so this momentary probe does not read as a live daemon to a starting `serve`.
+        Ok(()) => false,
+        Err(errno) if errno == rustix::io::Errno::WOULDBLOCK => true,
+        Err(errno) => return Err(format!("{}: {errno}", path.display())),
+    };
+    drop(file);
+    Ok((path, held))
+}
+#[cfg(not(feature = "peer"))]
+pub(super) fn serve_lock_probe() -> std::result::Result<(std::path::PathBuf, bool), String> {
+    Err("this epr was built without the peer feature, so it cannot find the serve lock".into())
+}
+
+/// The cure for a silent peer daemon: the supervisor when the head declares `epr peer
+/// serve`, else the devfile command that starts one by hand.
+fn peer_daemon_cure() -> String {
+    let declared = super::declaration::store(None, None, None)
+        .and_then(|s| s.read().map_err(|e| e.to_string()))
+        .ok()
+        .and_then(|head| super::supervise::declared_peer_serve(&head).map(|p| p.name.clone()));
+    match declared {
+        Some(name) => format!("epr device supervise (the device head declares `{name}`)"),
+        None => "start the devfile peer-serve command (it carries EPR_PEER_RELAYS)".into(),
+    }
+}
+
 fn peer_daemon_check() -> Check {
     match serve_liveness() {
         Ok((false, evidence)) => Check::new(
@@ -542,7 +572,7 @@ fn peer_daemon_check() -> Check {
                 "no epr peer serve holds this device's serve lock; admitted siblings read it as silent{}",
                 evidence.map(|e| format!(" ({e})")).unwrap_or_default()
             ),
-            Some("start the devfile peer-serve command (it carries EPR_PEER_RELAYS)".into()),
+            Some(peer_daemon_cure()),
         ),
         Ok((true, evidence)) => peer_daemon_version_check(evidence),
         Err(error) => Check::new(
