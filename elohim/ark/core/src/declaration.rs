@@ -277,6 +277,19 @@ impl RunLaunch {
                 "{name}: an argument carries a NUL byte, which exec cannot pass"
             )));
         }
+        // Arguments are berth templates resolved at spawn, like environment values: refuse
+        // now what spawn would refuse later, by position (1 is the first after `{artifact}`),
+        // never echoing the argument itself.
+        if let Some(position) = self
+            .args
+            .iter()
+            .position(|arg| crate::berth::check_template(arg).is_err())
+        {
+            return Err(ManifestError::Invalid(format!(
+                "{name}: argument {} has an unknown or malformed {{…}} placeholder",
+                position + 1
+            )));
+        }
         for (key, value) in &self.env {
             if key.is_empty() || key.contains(['=', '\0']) || value.contains('\0') {
                 return Err(ManifestError::Invalid(format!(

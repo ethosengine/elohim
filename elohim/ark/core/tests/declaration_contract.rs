@@ -453,6 +453,43 @@ fn environment_values_are_template_checked_at_declaration() {
 }
 
 #[test]
+fn arguments_are_template_checked_at_declaration_by_position() {
+    let with_args = |args: &[&str]| RunLaunch {
+        args: args.iter().map(|a| (*a).to_owned()).collect(),
+        ..named("peer")
+    };
+    let accepted = [
+        "serve",
+        "--root={data_root}/peer",
+        "{name}",
+        "127.0.0.1:{port.peer}",
+        "{env.EPR_CHECKOUT}",
+        "",
+    ];
+    let declared = run(&base(), false, with_args(&accepted)).unwrap();
+    assert_eq!(declared.processes[0].argv[1..], accepted);
+    for (args, position) in [
+        (&["{foo}"][..], 1),
+        (&["serve", "a{b"], 2),
+        (&["serve", "--root", "{port.}"], 3),
+        (&["{env.}"], 1),
+        (&["ok", "{}"], 2),
+        (&["x{data_root"], 1),
+    ] {
+        let refused = run(&base(), false, with_args(args)).unwrap_err();
+        assert!(
+            refused.contains(&format!("argument {position} ")),
+            "{args:?}: {refused}"
+        );
+        let bad = args[position - 1];
+        assert!(
+            !refused.contains(bad),
+            "the argument is never echoed: {refused}"
+        );
+    }
+}
+
+#[test]
 fn a_process_name_never_captures_another_tools_process() {
     let other = |stop: bool| {
         move |head: &RuntimeManifest| {
