@@ -195,3 +195,88 @@ Owed before the habit can turn: on the laptop, an `epr` at `521649ed0` or later;
 `epr actor device persistence --declare durable-home`; `epr session open`; the roster commit
 `c6a5f57fc` published through the normal gate; a verified head exchanged with a sibling; a
 start, stop and restart that keep the same device key.
+
+## Row 9 — a branch that only carries work to the integrator pays the full local gate
+
+Measured twice on ethosengine: `feat/steward-arrival-e` spent 75 minutes in local gates on
+2026-11-16, and `feat/steward-arrival-t2b` spent over 60 on 2026-11-17 (eprfs 1,425 s, then
+elohim-storage) while Jenkins ran nothing for either. The landing push on shem gates the same
+commits again.
+
+Two causes. The defer-to-CI rule only fires for a CI-built branch, and
+`CI_BRANCH_PATTERN` in `genesis/orchestrator/gate-cost.mjs:9` accepts `feat-…` and `claude/…` and
+not `feat/…`, the spelling both devices used. And the orchestrator asked for a fully gated
+feature push where a transport was wanted (shem's instruction, corrected 2026-11-17).
+
+Until changed: name a hand-over branch `claude/<name>` or `feat-<name>`. Probe before widening
+the pattern: confirm in `genesis/orchestrator/Jenkinsfile` that a `feat/…` branch is discovered
+and built; a pattern that defers to a build Jenkins never runs leaves the long gates unrun.
+Steward's suggestion (2026-11-17): let forge branch namespaces model the governance boundaries
+now, and graduate each to a native peer channel. He named `stewarded/`, `compat/` and `dev2/` as
+examples and asked shem for a design aligned with the native-dev-plane spec. Shem's proposal,
+not ruled:
+
+**One rule.** A branch name states the reach of the work and which rung is asked to carry it
+(spec §4). It never selects a weaker gate. A verdict is a derivation record keyed by closure: it
+is paid once, by whichever admitted device runs it, and it is demanded only where a head others
+adopt moves, which today is `dev`. A push that moves no adopted head demands nothing.
+
+| Namespace | Rung and reach | What the push does today | Native form it retires into |
+|---|---|---|---|
+| `dev` | the space head's mirror | full closure of verdicts, from this device or an admitted sibling | F3: a compare-and-swap on the signed space head; the forge only fast-forwards |
+| `self/<name>` (the steward's `stewarded/`) | R1, one steward's devices, reach `self` | preflight and seconds checks; records a hand-over intent naming the head; gates already run on the sender cross as sibling verdicts, so the integrator pays only what nobody ran | A7b: a sibling's git objects over the peer channel, the intent on `epr peer intents`; the branch becomes an optional mirror |
+| `carry/<name>` (the steward's `dev2/`) | R2, an enrolled carrier (Jenkins, a think-p node), reach `self`, zero independence | the existing defer-to-CI rule, under a name that says what it is; `feat-…` and `claude/…` are this lane today | F4: one `TaskSpec` offered over the peer channel, the result a record with basis `UnderGrant`, `NotCarried` when no carrier answers |
+| none for `compat/` | a build for another architecture is a different method CID, not a lane | `carry/` with the method named (`epr artifact describe --target-isa …`) | the same F4 offer; placement matches the method to a device that can run it |
+| `trusted/` and wider | R3 and up | not offered: no second principal with standing exists (spec §5, F6) | the graduation verb |
+
+Graduation steps, each with its receipt:
+
+1. Names only. The hook reads the prefix. Receipt: a `self/` hand-over in seconds, and the
+   integrator's landing printing `independence: sibling` for every gate the sender ran.
+2. The hand-over is a record, not prose over berth: head, closure keys and verdict CIDs as a
+   landing intent both devices read. Receipt: the integrator lands from `epr peer intents` alone.
+3. Carriers fold records back. Jenkins writes a derivation record for what it built, so a
+   deferred gate ends as a reuse hit on the device and not as a promise. Receipt: a local hit
+   whose signer is the carrier.
+4. Objects cross natively (A7b) and offers replace branches (F4). Receipt: the spec's section 0
+   test, a hand-over and a carried build with the forge unreachable.
+
+What this would have changed on 2026-11-17: ethosengine's push carries no gate and takes
+seconds; its eprfs pass (1,425 s) is a sibling verdict shem reuses at landing; elohim-storage
+runs once, on a carrier or at landing, not twice. Unverified and owed before step 1 is trusted:
+that a sibling verdict recorded in a linked worktree crosses (G1 on 2026-11-14 crossed from the
+main checkout), and what state A7b is in.
+
+## Row 10 — a red in the first minutes does not stop the long gates (second occurrence of row 4)
+
+2026-11-17, ethosengine: the orchestrator gate went red about 5 minutes into the t2b push and
+elohim-storage was still running 50 minutes later toward a push that could not land. Row 4 said
+to raise this with the steward if it recurred. It recurred. Proposal for his ruling: under
+`gate_on_red: continue`, a red whose gate is cheap (p90 under 600 s) and after which the push
+cannot land stops gates that have not started; gates already running finish and record. Smaller
+step that needs no ruling: order the run so cheap gates finish before a long one starts.
+
+Steward's direction (2026-11-17): a red is a subscribable event wherever the gate runs, and the
+verdict still comes at the end so one run reports every red. Locally this exists (`gate-tap.mjs`,
+the `gate-live-inject` hook, `gate-live.mjs follow`; habit `gate-failures-arrive-live`). The run
+log stays on the device that ran the gate, so shem learned of this red 52 minutes late, in
+prose. Owed, in order: (a) a sibling's reds reach the other device's agents over the peer
+channel, the same event shape, so an orchestrator hears a delegate's red as it prints; (b) a
+Jenkins run exposes the same events as a WebSocket subscription; (c) rakia's executor emits
+them natively, so local, sibling and carrier runs are one stream with one reader.
+
+The stream is shaped for a subscriber's attention (steward, same day): two events are owed to
+every subscriber and the rest are opt-in. The floor is the first red of a run, sent the moment
+it prints, with the gate, the line and the cost of continuing. The ceiling is one thin final
+report at exit: the verdict, each red once, what was reused and what ran. Reds between the two
+are available to a subscriber who asks for them and are never pushed by default, so a watcher
+is interrupted at most twice per run.
+
+## Row 11 — `just dev prep` exits 0 with an empty submodule checkout
+
+2026-11-17, ethosengine worktree `steward-arrival-t2`: prep could not read rakia's pinned tree
+(`f9787c9e`), left `elohim/rakia` with every file staged as deleted and `sophia` without its
+`build-manifest.json`, and exited 0. The orchestrator gate then failed with
+`registry.get(name).run` undefined, an hour into a push. Reported by ethosengine, not reproduced
+on shem. Probe: after prep, `test -f <submodule>/build-manifest.json` for each attested
+submodule; prep and `gate-preflight.mjs` should refuse naming the submodule and the fetch cure.
