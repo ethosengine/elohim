@@ -42,6 +42,14 @@ pub(crate) const EPHEMERAL_HOME_MARKERS: [&str; 3] = [
     "DEVWORKSPACE_NAMESPACE",
 ];
 
+/// Whether this process runs on a platform that announces a home wiped on restart (a workspace
+/// container). Read from the process environment; the same markers the persistence basis uses.
+pub(crate) fn on_ephemeral_home_platform() -> bool {
+    EPHEMERAL_HOME_MARKERS
+        .iter()
+        .any(|name| std::env::var_os(name).is_some_and(|value| !value.is_empty()))
+}
+
 const PERSISTENT_CONFIG_REQUIRED: &str = "envelope-persistent-config-required: set XDG_CONFIG_HOME to an absolute persistent config directory outside $HOME";
 
 /// The named basis on which this device's envelope store is accepted as persistent.

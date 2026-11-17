@@ -61,6 +61,9 @@ impl Fixture {
             .env("EPR_BERTH_BIN", "")
             .env("EPR_PROC_ROOT", self.base.join("proc"))
             .env("ELOHIM_SESSION_ID", "supervise-fixture")
+            // These fixtures stand for a workspace container, whose peer starts from its devfile;
+            // named here so the cure text does not depend on the host that runs the test.
+            .env("DEVWORKSPACE_ID", "supervise-fixture")
             .env("CLAUDE_CONFIG_DIR", self.base.join("berth-config"))
             .env("PATH", "/usr/bin:/bin")
             .env("GIT_CONFIG_GLOBAL", "/dev/null")

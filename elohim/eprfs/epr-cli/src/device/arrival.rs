@@ -1041,7 +1041,12 @@ fn peer_daemon_cure() -> String {
         .and_then(|head| super::supervise::declared_peer_serve(&head).map(|p| p.name.clone()));
     match declared {
         Some(name) => format!("epr device supervise (the device head declares `{name}`)"),
-        None => "start the devfile peer-serve command (it carries EPR_PEER_RELAYS)".into(),
+        // A workspace container starts its peer from the devfile, which carries the relay
+        // settings. A person's own machine has no devfile: it starts the peer when it wants one.
+        None if crate::session_envelope::on_ephemeral_home_platform() => {
+            "start the devfile peer-serve command (it carries EPR_PEER_RELAYS)".into()
+        }
+        None => "start the peer on demand: epr peer serve".into(),
     }
 }
 

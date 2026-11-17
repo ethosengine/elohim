@@ -217,7 +217,7 @@ just seed apply mesh content  # seed the household mesh THIS host owns (env from
 just seed apply mesh content '' '<logical-id>'  # target canonical content; skips deployment bindings and projections
 just look page <url>          # eyes-first render
 just status habits
-just status device            # has this workspace ARRIVED as its human's device: six ok/REFUSED lines (epr binary · device key · roster bound · embed model · fold attested · berth moored), each REFUSED naming its cure; exit 1 on any
+just status device            # has this workspace ARRIVED as its human's device: one ok/degraded/unknown/REFUSED line per condition (epr binary · device key and its persistence basis · roster bound and whether it is published · embed model · fold attested · berth moored · peer daemon · sibling exchange · device layout, among others), each non-ok line naming its cure and a last `next step` line naming the one thing owed; exit 1 on any REFUSED
 just codegen all verify
 ```
 
@@ -407,7 +407,7 @@ invent a private scorecard, a second identity store, or an authority penalty fro
 
 Che workspace restarts erase `/tmp`. Keep work in progress, helper scripts, checkpoints, and resumable campaign state under `genesis/local-dev/<campaign>/`, never `/tmp`. Keep Git worktrees under `/projects/elohim/.worktrees/`. Store required durable proof receipts under `genesis/a2o/reports/recovery/` and operator runbooks under `genesis/docs/superpowers/sprints/`. `/tmp` is only for disposable scratch that can be regenerated; never make it the only copy of uncommitted work or evidence. After a restart, resume existing conductor databases and keystores in place; do not reset or recast identities.
 
-A workspace is one of its human's **devices**, and arriving as one is six conditions `just status device` reads in one place (epr binary · device key · roster bound · embed model · fold attested · berth moored), each `REFUSED` line naming its cure. A fresh workspace binds to its human through `epr actor device enroll | authorize | bind` (no key ever crosses; the roster row travels by git) and puts the pinned embedding model on the PVC with `genesis/agentic/bin/embed-model-provision` (the devfile's `setup-embed-model` runs it on start); `$HOME` is wiped, `/nix/xdg/{config,cache}` persist. What the devfile should declare and what lvi's `DevspaceSeed` will: `elohim/lvi/docs/specs/2026-10-10-workspace-arrival-as-declared-device.md`.
+A workspace is one of its human's **devices**, and arriving as one is a list of conditions `just status device` reads in one place (among them epr binary · device key · roster bound · embed model · fold attested · berth moored · peer daemon · sibling exchange), each non-ok line naming its cure and the last line naming the next step. A fresh workspace binds to its human through `epr actor device enroll | authorize | bind` (no key ever crosses; the roster row travels by git) and puts the pinned embedding model on the PVC with `genesis/agentic/bin/embed-model-provision` (the devfile's `setup-embed-model` runs it on start); `$HOME` is wiped, `/nix/xdg/{config,cache}` persist. What the devfile should declare and what lvi's `DevspaceSeed` will: `elohim/lvi/docs/specs/2026-10-10-workspace-arrival-as-declared-device.md`.
 
 
 ### Story-First Default
