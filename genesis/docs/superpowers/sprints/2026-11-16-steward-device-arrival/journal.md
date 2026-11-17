@@ -2,7 +2,7 @@
 id: steward-device-arrival-journal
 title: Steward-device arrival — sprint journal and the laptop runbook
 date: 2026-11-17
-status: OPEN — seven landings on dev; the laptop receipt and the sibling draw of epr are owed
+status: OPEN — eight landings on dev; the laptop receipt and the sibling draw of epr are owed
 author: shem session 76dc84be (Claude Fable 5.2), orchestrating; ethosengine session e57d1a58 (Claude Opus 5.5) on lane E and train 2
 habits: [workspace-device-arrival, push-gate-pays-once]
 ---
@@ -29,6 +29,7 @@ complete, and the artifact store delivering `epr` itself between a person's devi
 | `627627896` | shem | `roster bound` says whether the binding is published; a `sibling exchange` line; a last `next step` line; off a container the peer cure is `epr peer serve` |
 | `367881e33` | shem | Backlog: a build-input view keys `epr` with no change to the generated-output scan |
 | `ba165f566` | shem | `elohim/eprfs/bin-build-view.json` and a test that fails when a build of `epr` reads a tracked file outside it |
+| (this landing) | shem | The cargo-pool library reads the saved device layout where no container pool exists, so gate scripts need no `CARGO_TARGET_POOL_ROOT` on a person's own machine |
 
 Gate cost on shem, for the record: eprfs ran in full six times (1741, 1562, 1537, 1313 s and two
 runs that did not land); two docs-only landings took 45 s and 43 s.
@@ -102,11 +103,10 @@ commit `c6a5f57fc`. Do not re-enroll.
 6. **Open the session:** `epr session open --model <the model in use>`. This is the step that
    refused on 2026-11-16.
 7. **Publish the roster rows through the normal gate.** The pre-push hook builds the rust-style
-   checker, which still takes its pool from the environment: export
-   `CARGO_TARGET_POOL_ROOT="$HOME/.cache/elohim-cargo-pool"` for the push (the gate scripts do not
-   read the device layout yet). `berth` now finds its store through the layout and needs no
-   `BERTH_DIR`. After the push and a fetch, status reads `ok roster bound … published on
-   origin/dev`.
+   checker into the cargo pool. Name the pool once, and the gate scripts find it from then on:
+   `CARGO_TARGET_POOL_ROOT="$HOME/.cache/elohim-cargo-pool" epr device layout save --field
+   cargoPool`. `berth` finds its store through the layout and needs no `BERTH_DIR`. After the
+   push and a fetch, status reads `ok roster bound … published on origin/dev`.
 8. **Start the peer when wanted:** `epr peer serve --check`, then `epr peer serve`. The check
    prints the layout and refuses before launch if the install destination cannot be created.
 9. **On a sibling, pull dev,** so it admits the laptop. Then on the laptop `epr device status`
@@ -114,10 +114,11 @@ commit `c6a5f57fc`. Do not re-enroll.
    head`, and the last line to `nothing owed`.
 10. **Stop and start once more.** Same device key, same endpoint, no new authorization.
 
-Still needing a hand-set variable on the laptop after this sprint: `CARGO_TARGET_POOL_ROOT` for
-any push that selects a cargo gate. Everything else in the 2026-11-16 override list
-(`EPR_BIN`, `BIN_STORE`, `CLAUDE_PROJECT_DIR`, `CLAUDE_CONFIG_DIR`, `BERTH_DIR`) should be
-unnecessary; report any that is not.
+After this sprint the 2026-11-16 override list (`EPR_BIN`, `BIN_STORE`, `CLAUDE_PROJECT_DIR`,
+`CLAUDE_CONFIG_DIR`, `BERTH_DIR`, `CARGO_TARGET_POOL_ROOT`) should be unnecessary in an ordinary
+shell once the bin-store and the pool are saved in the layout; report any that is not. The
+toolchain variables for the one bootstrap build (`RUSTUP_TOOLCHAIN`, `RUSTFLAGS`,
+`CARGO_BUILD_JOBS`) remain until the sibling draw replaces that build.
 
 ## What the sprint measured, and what it did not
 

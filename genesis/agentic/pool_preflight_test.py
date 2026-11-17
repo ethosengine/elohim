@@ -137,5 +137,56 @@ worktrees_newer_than_marker() { return 0; }
         self.assertEqual(self.log.read_text().splitlines(), ['steward:1', 'size'])
 
 
+
+class PoolRootResolutionTest(unittest.TestCase):
+    """The pool root: the variable, else the container pool where it exists, else the saved layout."""
+
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.root = Path(tmp.name)
+        self.asked = self.root / 'asked'
+        self.epr = self.root / 'epr'
+
+    def fake_epr(self, body):
+        self.epr.write_text(f'#!/bin/sh\necho asked >>"{self.asked}"\n{body}\n')
+        self.epr.chmod(0o755)
+
+    def pool_root(self, **env):
+        base = {'PATH': os.environ['PATH'], 'HOME': str(self.root), 'EPR_BIN': str(self.epr)}
+        out = subprocess.run(['bash', '-c', f'. "{BIN / "pool-lib.sh"}" && pool_root'],
+                             env={**base, **env}, capture_output=True, text=True, timeout=20)
+        self.assertEqual(out.returncode, 0, out.stderr)
+        return out.stdout.strip()
+
+    def test_the_variable_wins_and_epr_is_not_asked(self):
+        self.fake_epr('exit 0')
+        self.assertEqual(self.pool_root(CARGO_TARGET_POOL_ROOT='/named/pool',
+                                        POOL_HOST_DEFAULT=str(self.root / 'absent')), '/named/pool')
+        self.assertFalse(self.asked.exists())
+
+    def test_the_container_pool_is_used_where_it_exists_without_asking(self):
+        self.fake_epr('exit 0')
+        container = self.root / 'container-pool'
+        container.mkdir()
+        self.assertEqual(self.pool_root(POOL_HOST_DEFAULT=str(container)), str(container))
+        self.assertFalse(self.asked.exists())
+
+    def test_a_device_with_no_container_pool_uses_the_place_it_saved(self):
+        saved = json.dumps({'cargoPool': {'path': '/home/person/.cache/pool', 'origin': {'kind': 'saved'}}})
+        self.fake_epr(f"echo '{saved}'")
+        self.assertEqual(self.pool_root(POOL_HOST_DEFAULT=str(self.root / 'absent')),
+                         '/home/person/.cache/pool')
+        self.assertTrue(self.asked.exists())
+
+    def test_no_saved_place_or_no_epr_keeps_the_old_default(self):
+        absent = str(self.root / 'absent')
+        self.fake_epr("echo '{\"cargoPool\": null}'")
+        self.assertEqual(self.pool_root(POOL_HOST_DEFAULT=absent), absent)
+        self.fake_epr('exit 2')
+        self.assertEqual(self.pool_root(POOL_HOST_DEFAULT=absent), absent)
+        self.assertEqual(self.pool_root(POOL_HOST_DEFAULT=absent, EPR_BIN=str(self.root / 'no-epr')), absent)
+
+
 if __name__ == '__main__':
     unittest.main()

@@ -9,7 +9,25 @@
 # within a slot. The hooks handle worktree stewardship + emit the slot
 # path to the agent so they know which CARGO_TARGET_DIR to set.
 
-POOL_ROOT="${CARGO_TARGET_POOL_ROOT:-/projects/.cargo-target-pool}"
+# Where the pool lives: the variable; else the workspace container's `/projects` pool when that
+# tree exists (unchanged, and no process is started); else the place this device saved in its
+# layout (`CARGO_TARGET_POOL_ROOT=<dir> epr device layout save --field cargoPool`), so a person's
+# own machine needs no variable in every shell. A device with neither keeps the old default and
+# fails as before, naming the path. POOL_HOST_DEFAULT exists for tests.
+POOL_HOST_DEFAULT="${POOL_HOST_DEFAULT:-/projects/.cargo-target-pool}"
+pool_root_from_layout() {
+  command -v python3 >/dev/null 2>&1 || return 1
+  timeout 3 "${EPR_BIN:-epr}" device layout show --json 2>/dev/null |
+    python3 -c 'import json,sys; print((json.load(sys.stdin).get("cargoPool") or {}).get("path") or "")' 2>/dev/null
+}
+if [ -n "${CARGO_TARGET_POOL_ROOT:-}" ]; then
+  POOL_ROOT="$CARGO_TARGET_POOL_ROOT"
+elif [ -d "$POOL_HOST_DEFAULT" ]; then
+  POOL_ROOT="$POOL_HOST_DEFAULT"
+else
+  POOL_ROOT="$(pool_root_from_layout || true)"
+  [ -n "$POOL_ROOT" ] || POOL_ROOT="$POOL_HOST_DEFAULT"
+fi
 POOL_PARENT_REPO="${POOL_PARENT_REPO:-${CLAUDE_PROJECT_DIR:-/projects/elohim}}"
 POOL_WORKTREES_DIR="${POOL_WORKTREES_DIR:-$POOL_PARENT_REPO/.claude/worktrees}"
 
