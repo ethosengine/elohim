@@ -55,6 +55,7 @@ const MODEL_MANIFEST = '.epr-meta/elohim/algorithms/embedding-models/all-minilm-
 const INDEX_MEASURE = '.epr-meta/elohim/algorithms/recall-semantic-index.json';
 const RECALL_CONTRACT = '.epr-meta/elohim/algorithms/recall-contract.json'; // `session open` initializes recall
 const HANDLE = 'matthew';
+const DECLARATION = 'persistence.json'; // the durable-home note beside the device key
 
 function state(world: object): Fixture {
   const f = fixtures.get(world);
@@ -580,7 +581,7 @@ When('the person declares the home durable on that device', function () {
 
 Then('a persistence declaration signed by the device key sits beside the key', function () {
   const d = currentHome(state(this));
-  const path = join(dirname(d.key), 'persistence.json');
+  const path = join(dirname(d.key), DECLARATION);
   assert.ok(existsSync(path), `no declaration at ${path}`);
   assert.equal(statSync(path).mode & 0o777, 0o600);
   const body = object(JSON.parse(readFileSync(path, 'utf8')));
@@ -594,7 +595,7 @@ Then('a persistence declaration signed by the device key sits beside the key', f
 Then('declaring a second time reports the existing declaration and rewrites nothing', function () {
   const f = state(this);
   const d = currentHome(f);
-  const path = join(dirname(d.key), 'persistence.json');
+  const path = join(dirname(d.key), DECLARATION);
   const before = readFileSync(path, 'hex');
   const mtime = statSync(path).mtimeMs;
   const again = declare(f, d);
@@ -645,7 +646,7 @@ Given('a persistence declaration signed by that key sits beside the key', functi
   // platform that announces itself, which is the scenario's last assertion.
   const honest: HomeDevice = { home: d.home, key: d.key };
   declare(f, honest);
-  assert.ok(existsSync(join(dirname(d.key), 'persistence.json')));
+  assert.ok(existsSync(join(dirname(d.key), DECLARATION)));
 });
 
 When('a native session is opened there', function () {
@@ -691,7 +692,7 @@ Then('declaring the home durable there is refused the same way', function () {
 Given('the persistence declaration beside its key was copied from another device', function () {
   const f = state(this);
   const d = currentHome(f);
-  const path = join(dirname(d.key), 'persistence.json');
+  const path = join(dirname(d.key), DECLARATION);
   // This device's own declaration, kept so the story's later "moved together" step moves the
   // declaration that really belongs to this key.
   declare(f, d);
@@ -700,7 +701,7 @@ Given('the persistence declaration beside its key was copied from another device
   const other = homeDevice(f, 'other-laptop');
   epr(f, homeEnv(f, other), ['actor', 'device', 'enroll', '--handle', HANDLE, '--json']);
   declare(f, other);
-  writeFileSync(path, readFileSync(join(dirname(other.key), 'persistence.json')), { mode: 0o600 });
+  writeFileSync(path, readFileSync(join(dirname(other.key), DECLARATION)), { mode: 0o600 });
 });
 
 Then('it is refused with {string} naming the device mismatch', function (code: string) {
@@ -719,7 +720,7 @@ When('the key and its declaration are instead moved together into another direct
   mkdirSync(dir, { recursive: true });
   const key = join(dir, 'ed25519.seed');
   copyFileSync(d.key, key);
-  writeFileSync(join(dir, 'persistence.json'), d.ownDeclaration, { mode: 0o600 });
+  writeFileSync(join(dir, DECLARATION), d.ownDeclaration, { mode: 0o600 });
   d.moved = { key, dir };
 });
 
