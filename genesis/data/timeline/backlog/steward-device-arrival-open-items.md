@@ -142,6 +142,17 @@ should stop the run even under `continue`.
 looks for `ark` in the pushing worktree's own pool family and falls back to the direct path when a
 new family has none.
 
+The cargo-pool library now reads the saved layout where no container pool exists (`e6f4523b8`:
+the variable, else `/projects/.cargo-target-pool` where that tree exists, else
+`epr device layout save --field cargoPool`, else the old default).
+
+**No gate runs the pool library's tests.** That push selected only `address-profile-lint`
+(18 s). `_gate-agentic-shift` runs `shift*_test.py` and `berth_test`; `pool_preflight_test.py`,
+`pool_artifact_hashes_test.py`, `lsp_attach_test.py` and `lsp_flycheck_test.py` (36 tests that
+source `pool-lib.sh`, a library every session hook sources) run in no gate and passed locally
+only. Adding them means editing the `justfile`, which is in every root gate's key. Probe: a
+push that changes `genesis/agentic/bin/pool-lib.sh` selects a gate that runs those four files.
+
 ## Row 7 — eprfs still keys on whole documentation directories
 
 `epr-cli/tests/flow_scope.rs` declares reads of `genesis/docs/superpowers/specs`, `plans`,
