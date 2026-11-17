@@ -475,6 +475,7 @@ Then('the remembered place is reported beside it as a difference', function () {
 Then('showing the layout succeeds', function () {
   const f = state(this);
   assert.equal(f.layout?.status, 0);
+});
 
 // ---------------------------------------------------------------------------
 // A device's home is durable or ephemeral, and the native tool is told which.
