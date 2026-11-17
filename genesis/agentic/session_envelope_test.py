@@ -632,6 +632,29 @@ class EnvelopeTest(unittest.TestCase):
                     changed = f.run(['git', 'show', '-s', '--format=%(trailers)'], native=False)
                     assert 'fixture-next-model (Codex)' in changed and 'fixture-model (Codex)' not in changed, changed
 
+    def test_a_live_owner_declares_its_model_once_and_commits_become_measured(self):
+        # SessionStart opens the envelope before the runtime can name its model. The same live
+        # owner then declares it; the CLI must record it, not answer with the old record.
+        with tempfile.TemporaryDirectory(prefix='commit-late-model-') as base:
+            f = Fixture(base); f.setup()
+            first = f.epr('session', 'open', '--json')
+            assert first['model'] is None, first
+            late = f.epr('session', 'open', '--model', 'fixture-late-model', '--json')
+            assert late['model'] == 'fixture-late-model', late
+            assert late['generation'] == first['generation'], (first, late)
+            assert f.epr('session', 'show', '--json')['envelope']['model'] == 'fixture-late-model'
+            result = f.epr('session', 'commit-trailers', '--json')
+            assert result['status'] == 'measured', result
+            assert ['Co-Authored-By', 'fixture-late-model <noreply@anthropic.com>'] in result['trailers'], result
+            # Declaring the same model again is a read; a different one is refused, never swapped.
+            assert f.epr('session', 'open', '--model', 'fixture-late-model', '--json')['model'] == 'fixture-late-model'
+            argv = [sys.executable, str(f.base / 'exec.py'), str(f.base / 'launch/epr'),
+                    'session', 'open', '--model', 'another-model', '--json']
+            refused = subprocess.run(argv, cwd=f.root, env=f.env('claude'), text=True, capture_output=True, timeout=45)
+            assert refused.returncode != 0, refused
+            assert 'envelope-model-conflict' in refused.stdout + refused.stderr, refused
+            assert f.epr('session', 'show', '--json')['envelope']['model'] == 'fixture-late-model'
+
     def test_commit_decoration_missing_model_is_unmeasured_not_invented(self):
         with tempfile.TemporaryDirectory(prefix='commit-unmeasured-') as base:
             f = Fixture(base); f.setup()

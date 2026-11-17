@@ -121,7 +121,8 @@ fn status_keeps_dependency_order_and_does_not_mint_a_key() {
             "rust toolchain",
             "git hooks",
             "brit trust",
-            "object packs"
+            "object packs",
+            "device layout"
         ]
     );
     // No serve lock is held: siblings read this device as silent.

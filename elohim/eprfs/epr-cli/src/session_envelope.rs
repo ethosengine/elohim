@@ -282,6 +282,12 @@ pub fn open(model: Option<&str>) -> Result<Envelope> {
         }
     };
     let identity = session::resolve();
+    // A model the caller names on this call (`--model`), as opposed to one a runtime export
+    // supplies on every lazy open.
+    let declared = model
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(str::to_owned);
     let model = envelope::model(model, &identity, &session::registry(), &|k| {
         std::env::var(k).ok()
     });
@@ -310,15 +316,22 @@ pub fn open(model: Option<&str>) -> Result<Envelope> {
     // Reentrant facet subprocesses (berth fold emission) may already hold a shared
     // lifecycle guard. A fully initialized lazy open is a read, never a lock upgrade; only an
     // unarmed holder asks for the exclusive guard, without waiting, and otherwise stays a read.
+    //
+    // A model the owner declares now and the record does not carry is a write, not a read: it
+    // goes to `open_armed` under the exclusive guard, which sets it once or refuses a different
+    // one. Returning the record here dropped the declaration and left every later commit
+    // unmeasured (2026-11-16, both devices).
     let mut unarmed = None;
     {
         let store = Store::shared(&key_path).map_err(err)?;
         if let Some(record) = store.existing(&proposed, &proc_root).map_err(err)? {
+            let declares_model = declared.is_some() && declared != record.model;
             if root
                 .join(recall::RECALL_DIR_REL)
                 .join(record.id())
                 .join("continuation.json")
                 .is_file()
+                && !declares_model
             {
                 if record.holder_held() {
                     return Ok(record);
