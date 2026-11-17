@@ -108,6 +108,23 @@ class LocationResolutionTest(unittest.TestCase):
         half = self.resolve({"EPR_BIN": "/bin/epr", "CLAUDE_CONFIG_DIR": "/env/config"}, run, lambda _: True)
         self.assertEqual(half, ("/env/config", "/layout/repo", None))
 
+    def test_a_discovered_worktree_answers_with_its_main_checkout(self):
+        # One machine, one policy: the layout discovers the worktree a session stands in; berth
+        # reads pool-policy.json from that worktree's main checkout.
+        with tempfile.TemporaryDirectory() as base:
+            main = os.path.join(base, "main")
+            wt = os.path.join(base, "wt")
+            meta = os.path.join(main, ".git", "worktrees", "wt")
+            os.makedirs(meta)
+            os.makedirs(wt)
+            Path(meta, "commondir").write_text("../..\n")
+            Path(wt, ".git").write_text(f"gitdir: {meta}\n")
+            layout = {"stateDir": self.LAYOUT["stateDir"],
+                      "projectRoot": {"path": wt, "origin": {"kind": "discovered"}}}
+            run, _ = self.epr(json.dumps(layout))
+            found = self.resolve({"EPR_BIN": "/bin/epr"}, run, lambda _: True)
+            self.assertEqual(found[1], os.path.realpath(main))
+
     def test_projects_is_the_fallback_only_where_it_exists(self):
         che = {"/projects/.claude-config", "/projects/elohim"}
         for run, _ in (self.epr(returncode=2), self.epr("not json"),

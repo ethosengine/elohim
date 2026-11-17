@@ -136,6 +136,24 @@ def _layout_from_epr(env, run):
     return {"stateDir": path("stateDir"), "projectRoot": path("projectRoot")}
 
 
+def main_checkout(root):
+    """A linked worktree's main checkout, without relying on the hook's exported Git context.
+    A separate git dir or submodule is not a main checkout; keep the supplied root there."""
+    try:
+        with open(os.path.join(root, ".git")) as f:
+            marker = f.read().strip()
+        if not marker.startswith("gitdir: "):
+            return root
+        git_dir = os.path.realpath(os.path.join(root, marker[8:]))
+        with open(os.path.join(git_dir, "commondir")) as f:
+            common = os.path.realpath(os.path.join(git_dir, f.read().strip()))
+        if os.path.basename(common) == ".git" and os.path.isdir(common):
+            return os.path.dirname(common)
+    except OSError:
+        pass
+    return root
+
+
 def resolve_locations(env=None, run=subprocess.run, isdir=os.path.isdir):
     """(config_dir, project_dir, error). Each in order: CLAUDE_CONFIG_DIR / CLAUDE_PROJECT_DIR; the
     device layout's stateDir / projectRoot (asked only when a variable is missing); the Che `/projects`
@@ -146,7 +164,10 @@ def resolve_locations(env=None, run=subprocess.run, isdir=os.path.isdir):
     if config is None or project is None:
         layout = _layout_from_epr(env, run)
         config = config or layout.get("stateDir")
-        project = project or layout.get("projectRoot")
+        # One machine, one policy: a linked worktree answers with its main checkout, so every
+        # session reads the same pool-policy.json whichever worktree it stands in.
+        discovered = layout.get("projectRoot")
+        project = project or (main_checkout(discovered) if discovered else None)
     if config is None and isdir(CHE_CONFIG_DIR):
         config = CHE_CONFIG_DIR
     if project is None and isdir(CHE_PROJECT_DIR):
@@ -332,24 +353,6 @@ def store_dir():
     if CONFIG_DIR is None:
         raise BerthStateError(LOCATION_ERROR)
     return os.path.join(CONFIG_DIR, "berth")
-
-
-def main_checkout(root):
-    """A linked worktree's main checkout, without relying on the hook's exported Git context.
-    A separate git dir or submodule is not a main checkout; keep the supplied root there."""
-    try:
-        with open(os.path.join(root, ".git")) as f:
-            marker = f.read().strip()
-        if not marker.startswith("gitdir: "):
-            return root
-        git_dir = os.path.realpath(os.path.join(root, marker[8:]))
-        with open(os.path.join(git_dir, "commondir")) as f:
-            common = os.path.realpath(os.path.join(git_dir, f.read().strip()))
-        if os.path.basename(common) == ".git" and os.path.isdir(common):
-            return os.path.dirname(common)
-    except OSError:
-        pass
-    return root
 
 
 def load_policy(path=POLICY_FILE):
