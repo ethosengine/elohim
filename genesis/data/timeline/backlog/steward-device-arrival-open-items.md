@@ -138,8 +138,17 @@ new family has none.
 `epr-cli/tests/flow_scope.rs` declares reads of `genesis/docs/superpowers/specs`, `plans`,
 `held`, `genesis/docs/plans`, `genesis/docs/held` and `genesis/a2o/features`, so any spec or story
 edit re-runs the eprfs workspace gate (26 to 60 minutes). The `genesis/manifests` case was closed
-in `ef0b1db12`. Also seen: the narrowing line printed "0 of 13 members" for a push that changed
-three `epr-cli` sources.
+in `ef0b1db12`. Unexplained, and a trap if `GATE_NARROW=on` is ever enabled: the first two pushes of the sprint
+(ranges `9be1cb048..5ada8a1b4` and `7c8cbb94e..ef0b1db12`, both changing
+`epr-cli/src/{actor,device_key,session_envelope}.rs`) printed `eprfs narrow (shadow):  (0 of 13
+members)`, which under `on` would have tested no package. Re-running `affectedPackages` offline
+on the second range with the same manifest returns `["elohim-epr-cli"]`, and two later pushes
+from the same worktree printed correct sets (3 of 13, 1 of 13). The hook's changed-file list for
+those two runs was not kept, so the cause is not established; `pkg.dir` would come out as
+`.worktrees/<name>/…` and match nothing if the runner's root were the main checkout while cargo
+resolved manifests in the worktree. Probe: keep `GATE_CHANGED_FILES` beside the run log, and add a
+test that a non-empty changed list under a selected workspace never yields an empty package set
+without a stated reason.
 
 ## Row 8 — the laptop itself
 
