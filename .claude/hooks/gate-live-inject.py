@@ -15,6 +15,7 @@ import re
 import shlex
 import subprocess
 import sys
+import time
 
 CODE = Path(__file__).resolve().parents[2]
 ROOT = Path(os.environ.get("CLAUDE_PROJECT_DIR") or CODE)
@@ -66,6 +67,81 @@ def unseen(session, reader):
         env={k: v for k, v in os.environ.items() if not k.startswith("GIT_")},
     )
     return [line for line in result.stdout.splitlines() if line.strip()]
+
+
+SIBLING_KINDS = ("gate-red@1", "gate-final@1")
+SIBLING_POLL_S = 20
+SIBLING_FRESH_S = 600
+
+
+def berth_bin():
+    return os.environ.get("GATE_LIVE_BERTH_BIN") or str(CODE / "genesis" / "agentic" / "bin" / "berth")
+
+
+def addressed_to(to, session):
+    """berth's own rule: the full id, or a prefix of at least eight characters."""
+    return bool(to and session and (to == session or (len(to) >= 8 and session.startswith(to))))
+
+
+def sibling_line(body, note):
+    """One line per sibling note; the text is another device's data, clipped and never executed."""
+    def clip(value, n=200):
+        return " ".join(str(value if value is not None else "").split())[:n]
+    where = clip(str(body.get("device") or note.get("from_device") or "device").split(":")[-1][:10]
+                 + (" " + str(body["ref"]) if body.get("ref") else ""))
+    if body.get("kind") == "gate-red@1":
+        cont = body.get("continuing") or {}
+        more = ""
+        if cont:
+            more = f"; {len(cont.get('remaining') or [])} gate(s) still to run, ~{max(1, round((cont.get('total_s') or 0) / 60))} min"
+        stop = f" (to stop it, on that device: {clip(body['stop'])})" if body.get("stop") else ""
+        return f"[gate-live] SIBLING RED {where} {clip(body.get('gate'))} +{body.get('atS', '?')}s — {clip(body.get('line'))}{more}{stop}"
+    reds = body.get("reds") or []
+    detail = ": " + " | ".join(f"{clip(r.get('gate'))}: {clip(r.get('line'))}" for r in reds[:3]) if reds else ""
+    return (f"[gate-live] SIBLING FINAL {where} {clip(body.get('verdict'))} in {body.get('wallS', '?')}s — "
+            f"{len(reds)} red(s){detail}; ran {len(body.get('ran') or [])}, reused {len(body.get('reused') or [])}")
+
+
+def sibling_unseen(live, session, reader, now=None):
+    """Sibling gate-red@1 / gate-final@1 notes addressed to this session that this reader has not
+    been shown, read with `berth inbox --peek` (nothing consumed) and tracked by note cid in this
+    reader's own cursor. Polled at most every SIBLING_POLL_S; any error is silence."""
+    now = time.time() if now is None else now
+    path = live / "cursors" / f"{filename(session)}--{filename(reader)}--sibling.json"
+    try:
+        state = json.loads(path.read_text())
+    except (OSError, ValueError):
+        state = None
+    poll = float(os.environ.get("GATE_LIVE_SIBLING_POLL_S", SIBLING_POLL_S))
+    if state and now - state.get("checked_at", 0) < poll:
+        return []
+    result = subprocess.run(
+        [berth_bin(), "inbox", "--session", session, "--peek", "--all", "--json"],
+        capture_output=True, text=True, timeout=3,
+    )
+    if result.returncode != 0:
+        return []
+    notes = json.loads(result.stdout)
+    seen = set(state.get("cids", [])) if state else set()
+    lines = []
+    for note in notes:
+        cid = note.get("cid")
+        if not cid or cid in seen or not addressed_to(note.get("to"), session):
+            continue
+        try:
+            body = json.loads(note.get("text") or "")
+        except ValueError:
+            continue
+        if not isinstance(body, dict) or body.get("kind") not in SIBLING_KINDS:
+            continue
+        seen.add(cid)
+        # First contact: a red older than ten minutes is history, not news.
+        if state is None and now - float(note.get("at") or 0) > SIBLING_FRESH_S:
+            continue
+        lines.append(sibling_line(body, note))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps({"checked_at": now, "cids": sorted(seen)[-500:]}))
+    return lines
 
 
 def command_segments(command):
@@ -147,6 +223,11 @@ def main():
     live = live_root()
     if has_news(live, session, reader):
         lines.extend(unseen(session, str(reader)))
+
+    try:
+        lines.extend(sibling_unseen(live, session, str(reader)))
+    except Exception:  # noqa: BLE001 — berth missing, slow or broken: surface nothing
+        pass
 
     if lines:
         print(json.dumps({"hookSpecificOutput": {

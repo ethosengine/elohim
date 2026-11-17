@@ -43,6 +43,7 @@ function tap(t, script, { run = true } = {}) {
   // events differently inside a push (2 !== 1) than when run alone.
   const env = { ...process.env };
   delete env.GATE_REMAINING;
+  env.GATE_LIVE_SIBLING = 'off';
   const result = spawnSync(process.execPath, [TAP, '--project', 'fixture', ...(run ? ['--run', runPath] : []), '--', 'bash', '-c', script],
     { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe', 'pipe'], timeout: 15000, env });
   const events = run ? readFileSync(runPath, 'utf8').split('\n').filter(Boolean).map(line => JSON.parse(line)) : [];
@@ -239,4 +240,84 @@ test('fd 3 carries all five cost axes beside the failure signals', t => {
     assert.ok(Object.hasOwn(summary, key), key);
     assert.ok(summary[key] === null || Number.isFinite(summary[key]), key);
   }
+});
+
+describe('gate-tap sibling notes', () => {
+  const GATE_LIVE = resolve(dirname(TAP), 'gate-live.mjs');
+  const HERE = 'did:key:z6MkHEREdeviceAAAA';
+  const SUB = { cid: 'sub1', at: 1, from_device: 'did:key:z6MkOTHER', session: 'shem', to: null,
+    text: JSON.stringify({ kind: 'gate-subscription@1', subscriber: 'shem', device: HERE, ref: '*',
+      intent: 'default', until: '2999-01-01T00:00:00.000Z' }) };
+  const THREE_RED = 'echo "test a ... FAILED"; echo "test b ... FAILED"; echo "test c ... FAILED"; exit 101';
+
+  function setup(t, { sleepS = 0, exit = 0, notes = [SUB], withBerth = true } = {}) {
+    const dir = mkdtempSync(resolve(tmpdir(), 'gate-tap-sib-'));
+    t.after(() => rmSync(dir, { recursive: true, force: true }));
+    writeFileSync(resolve(dir, 'notes.json'), JSON.stringify(notes));
+    const bin = resolve(dir, 'berth-stub');
+    writeFileSync(bin, `#!/bin/bash\n${sleepS ? `sleep ${sleepS}\n` : ''}if [ "$1" = say ]; then printf '%s\\n' "$*" >> "${dir}/says.log"; else cat "${dir}/notes.json"; fi\nexit ${exit}\n`, { mode: 0o755 });
+    const runPath = resolve(dir, 'run.jsonl');
+    writeFileSync(runPath, `${JSON.stringify({ v: 1, run: 'run', seq: 0, at: new Date().toISOString(), kind: 'run-open', candidate: { sha: 'x', target: 't' }, session: 'gate-session', ref: 'refs/heads/dev' })}\n`);
+    const env = { ...process.env, GATE_LIVE_BERTH_BIN: withBerth ? bin : resolve(dir, 'no-berth'),
+      GATE_LIVE_DEVICE: HERE, EPR_BIN: resolve(dir, 'missing-epr'), GATE_REMAINING: 'app other' };
+    delete env.GATE_LIVE_SIBLING;
+    return { dir, runPath, env };
+  }
+
+  const says = dir => { try { return readFileSync(resolve(dir, 'says.log'), 'utf8').split('\n').filter(Boolean); } catch { return []; } };
+  const wait = async (dir, n) => {
+    for (let i = 0; i < 80 && says(dir).length < n; i++) await new Promise(r => setTimeout(r, 50));
+    await new Promise(r => setTimeout(r, 250));
+  };
+  const runTap = (env, runPath, script) => {
+    const started = Date.now();
+    const result = spawnSync(process.execPath, [TAP, '--project', 'fixture', '--run', runPath, '--', 'bash', '-c', script],
+      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe', 'pipe'], timeout: 20000, env });
+    return { result, ms: Date.now() - started };
+  };
+
+  test('three reds then close send exactly the first red and the final, the stop command as text', async t => {
+    const { dir, runPath, env } = setup(t);
+    const { result } = runTap(env, runPath, THREE_RED);
+    assert.equal(result.status, 101);
+    const close = spawnSync(process.execPath, [GATE_LIVE, 'close', '--run', runPath, '--outcome', 'failed'], { encoding: 'utf8', env, timeout: 10000 });
+    assert.equal(close.status, 0, close.stderr);
+    await wait(dir, 2);
+    const sent = says(dir);
+    assert.equal(sent.length, 2, sent.join('\n'));
+    const bodies = sent.map(line => JSON.parse(line.slice(line.indexOf('{'))));
+    const red = bodies.find(b => b.kind === 'gate-red@1');
+    const final = bodies.find(b => b.kind === 'gate-final@1');
+    assert.equal(red.line, 'test a ... FAILED');
+    assert.equal(red.gate, 'fixture');
+    assert.equal(red.ref, 'refs/heads/dev');
+    assert.equal(red.stop, `node genesis/orchestrator/gate-live.mjs stop --run ${runPath}`);
+    assert.deepEqual(red.continuing.remaining.map(g => g.project), ['fixture', 'app', 'other']);
+    assert.equal(final.verdict, 'failed');
+    assert.equal(final.reds.length, 3);
+    for (const line of sent) assert.match(line, /^say --session gate-session --to shem \{/);
+  });
+
+  test('a berth that fails or is missing never changes the gate status or its output', t => {
+    for (const options of [{ exit: 1 }, { withBerth: false }]) {
+      const { runPath, env } = setup(t, options);
+      const { result } = runTap(env, runPath, THREE_RED);
+      assert.equal(result.status, 101);
+      assert.equal(result.stdout, 'test a ... FAILED\ntest b ... FAILED\ntest c ... FAILED\n');
+    }
+  });
+
+  test('a slow berth (10 s) leaves the exit status alone and adds under 2 s of wall time', t => {
+    const baseline = setup(t, { notes: [] });
+    const off = { ...baseline.env, GATE_LIVE_SIBLING: 'off' };
+    const base = runTap(off, baseline.runPath, THREE_RED);
+    const slow = setup(t, { sleepS: 10 });
+    const measured = runTap(slow.env, slow.runPath, THREE_RED);
+    assert.equal(base.result.status, 101);
+    assert.equal(measured.result.status, 101);
+    const added = measured.ms - base.ms;
+    console.log(`slow-berth overhead: ${added} ms (baseline ${base.ms} ms, with a 10 s berth ${measured.ms} ms)`);
+    assert.ok(added < 2000, `added ${added} ms`);
+    assert.ok(measured.ms < 8000, 'the tap never waited out the 10 s berth');
+  });
 });

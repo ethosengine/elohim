@@ -2,7 +2,7 @@
 // No decision is ever read from this log; the verdict is the exit status / brit attestation.
 // See genesis/docs/superpowers/specs/2026-10-26-gate-live-failure-channel-design.md.
 
-import { execFileSync, spawnSync } from 'node:child_process';
+import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import {
   appendFileSync,
@@ -145,6 +145,7 @@ export function openRun({
   sha = null,
   target = null,
   session = null,
+  ref = process.env.GATE_LIVE_REF || null,
   now = () => new Date(),
   keep = 20,
 } = {}) {
@@ -171,6 +172,7 @@ export function openRun({
     kind: 'run-open',
     candidate: { sha, target },
     session,
+    ...(ref ? { ref } : {}),
   };
 
   appendFileSync(path, `${JSON.stringify(event)}\n`, { encoding: 'utf8', flag: 'ax' });
@@ -290,12 +292,14 @@ export function closeRun(path, outcome, {
     // and carries that Task's three-part answer.
     const interrupted = events.find((event) => event.kind === 'gate-verdict'
       && event.status === 'Unanswered' && event.verdict?.deferred !== true && event.unanswered);
-    return appendEvent(path, {
+    const closed = appendEvent(path, {
       kind: 'run-close',
       outcome: interrupted ? 'interrupted' : outcome,
       ...(deferred === undefined ? {} : { deferred }),
       ...(interrupted ? { unanswered: interrupted.unanswered } : {}),
     }, { now });
+    if (closed) emitFinalDetached(path);
+    return closed;
   } catch {
     return null;
   }
@@ -649,8 +653,304 @@ export function formatHarvest({ runs, slices }) {
     ...slices.slice(0, 6).map((slice) => `[harvest]   ${slice.kind}: ${slice.line}`)];
 }
 
+
+// ── Sibling reds over berth notes ─────────────────────────────────────────────────────────────
+// A subscription is one broadcast berth note; the device that runs a matching gate answers with
+// directed berth notes. Everything below is fire-and-forget: a note never blocks the gate, never
+// changes its exit status, and nothing reads a verdict from one. Berth is the carrier, so there is
+// no channel or daemon of this layer's own.
+const SUBSCRIPTION_KIND = 'gate-subscription@1';
+const RED_KIND = 'gate-red@1';
+const FINAL_KIND = 'gate-final@1';
+const DEFAULT_SUBSCRIPTION_MS = 12 * 60 * 60 * 1000;
+const READ_TIMEOUT_MS = 1200;
+const NOTE_LINE_MAX = 300;
+const HERE = dirname(fileURLToPath(import.meta.url));
+
+function berthBin(env = process.env) {
+  return env.GATE_LIVE_BERTH_BIN || resolve(HERE, '..', 'agentic', 'bin', 'berth');
+}
+
+function siblingOff(env = process.env) {
+  return env.GATE_LIVE_SIBLING === 'off';
+}
+
+/** The subscription note body (the recorded subscription). */
+export function subscriptionBody({ session, device = 'any', ref = '*', every = false, nth, until, now = () => new Date() }) {
+  const intent = nth ? `nth:${nth}` : every ? 'every' : 'default';
+  return {
+    kind: SUBSCRIPTION_KIND,
+    subscriber: session,
+    device,
+    ref,
+    intent,
+    until: until ?? new Date(new Date(now()).getTime() + DEFAULT_SUBSCRIPTION_MS).toISOString(),
+  };
+}
+
+function globRegExp(glob) {
+  const source = String(glob).replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*').replace(/\?/g, '.');
+  return new RegExp(`^${source}$`);
+}
+
+/**
+ * The subscriptions among berth notes that name this device and this run's ref. A subscription
+ * with an unreadable body, an expired `until`, or another device is ignored; a run with no ref is
+ * matched only by `*` (or an absent ref). The latest note per (subscriber, device, ref) wins.
+ */
+export function matchSubscriptions(notes, { did, ref = null, now = () => new Date() }) {
+  const atMs = new Date(now()).getTime();
+  const latest = new Map();
+  for (const note of Array.isArray(notes) ? notes : []) {
+    let body;
+    try { body = JSON.parse(String(note?.text ?? '')); } catch { continue; }
+    if (!body || body.kind !== SUBSCRIPTION_KIND || typeof body.subscriber !== 'string' || !body.subscriber) continue;
+    const until = Date.parse(body.until ?? '');
+    if (!Number.isFinite(until) || until <= atMs) continue;
+    if (body.device !== 'any' && body.device !== did) continue;
+    const want = body.ref ?? '*';
+    if (ref ? !globRegExp(want).test(ref) : want !== '*') continue;
+    const key = `${body.subscriber}\u0000${body.device}\u0000${want}`;
+    if (!latest.has(key) || (note.at ?? 0) >= (latest.get(key).at ?? 0)) latest.set(key, { at: note.at ?? 0, body });
+  }
+  return [...latest.values()].map(({ body }) => {
+    const nth = /^nth:(\d+)$/.exec(String(body.intent ?? ''));
+    return { subscriber: body.subscriber, intent: nth && Number(nth[1]) > 0 ? { nth: Number(nth[1]) } : body.intent === 'every' ? 'every' : 'default' };
+  });
+}
+
+/** Does a subscriber hear the red with this 1-based ordinal in its run? */
+export function hearsRed(intent, ordinal) {
+  if (intent === 'every') return true;
+  if (typeof intent === 'object') return ordinal % intent.nth === 0;
+  return ordinal === 1;
+}
+
+// Runs a command and settles by `timeoutMs` whatever its descendants hold open: an orphaned child
+// keeping a pipe open must not hold the gate's exit.
+function runBounded(command, args, { timeoutMs = READ_TIMEOUT_MS, env = process.env } = {}) {
+  return new Promise((done) => {
+    let out = '';
+    let settled = false;
+    let child;
+    const finish = (value) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      try { child?.stdout?.destroy(); child?.kill('SIGKILL'); } catch { /* already gone */ }
+      done(value);
+    };
+    const timer = setTimeout(() => finish(null), timeoutMs);
+    try {
+      child = spawn(command, args, { env, stdio: ['ignore', 'pipe', 'ignore'] });
+    } catch { finish(null); return; }
+    child.on('error', () => finish(null));
+    child.stdout.on('data', (chunk) => { out += chunk; });
+    child.on('close', (code) => finish(code === 0 ? out : null));
+  });
+}
+
+/** This device's did: GATE_LIVE_DEVICE, else the one `epr peer leases --json` names. */
+async function deviceDid({ env = process.env } = {}) {
+  if (env.GATE_LIVE_DEVICE) return env.GATE_LIVE_DEVICE;
+  const out = await runBounded(env.EPR_BIN || 'epr', ['peer', 'leases', '--json'], { env });
+  try {
+    const did = JSON.parse(out).device;
+    return typeof did === 'string' && did ? did : null;
+  } catch { return null; }
+}
+
+/** Berth notes visible to `session`, without moving any cursor (--peek). null when unreadable. */
+async function peekNotes(session, { env = process.env, timeoutMs = READ_TIMEOUT_MS } = {}) {
+  const out = await runBounded(berthBin(env), ['inbox', '--session', session, '--peek', '--all', '--json'], { env, timeoutMs });
+  try {
+    const notes = JSON.parse(out);
+    return Array.isArray(notes) ? notes : null;
+  } catch { return null; }
+}
+
+/** One directed note, fire-and-forget: detached, never awaited, every failure swallowed. */
+function sendNote(session, to, body, { env = process.env } = {}) {
+  try {
+    const args = ['say', '--session', session];
+    if (to) args.push('--to', to);
+    args.push(JSON.stringify(body));
+    const child = spawn(berthBin(env), args, { detached: true, stdio: 'ignore', env });
+    child.on('error', () => {});
+    child.unref();
+  } catch { /* a note that cannot be sent is not a gate failure */ }
+}
+
+function runFacts(path) {
+  const events = parseEvents(readFileSync(path, 'utf8'));
+  const open = events.find((event) => event.kind === 'run-open') ?? {};
+  return { events, open };
+}
+
+function failureLine(event) {
+  const failure = event.failure && typeof event.failure === 'object' ? event.failure : event;
+  return String(excerptLines(failure.excerpt).find((line) => line.trim()) ?? failure.class ?? 'failure').trim().slice(0, NOTE_LINE_MAX);
+}
+
+async function subscribersFor(path, env) {
+  const { open } = runFacts(path);
+  const session = open.session || env.ELOHIM_SESSION_ID || null;
+  if (!session) return null;
+  const [did, notes] = await Promise.all([deviceDid({ env }), peekNotes(session, { env })]);
+  if (!did || !notes) return null;
+  const ref = open.ref || env.GATE_LIVE_REF || null;
+  return { session, did, ref, subscribers: matchSubscriptions(notes, { did, ref }) };
+}
+
+const subscriberMemo = new Map();
+
+/**
+ * Called once per failure the tap appended: sends gate-red@1 to each subscriber whose intent hears
+ * it. `continuing` is the outlook() of the first red (a promise or a value); a later red reuses the
+ * run's recorded outlook. Resolves to the number of notes sent; never rejects.
+ */
+export async function emitRed(path, event, { continuing, env = process.env } = {}) {
+  try {
+    if (siblingOff(env) || !event || event.kind !== 'failure') return 0;
+    if (!subscriberMemo.has(path)) subscriberMemo.set(path, subscribersFor(path, env));
+    const found = await subscriberMemo.get(path);
+    if (!found || !found.subscribers.length) return 0;
+    const { events, open } = runFacts(path);
+    const ordinal = events.filter((e) => e.kind === 'failure' && e.seq <= event.seq).length;
+    const hearers = found.subscribers.filter((sub) => hearsRed(sub.intent, ordinal));
+    if (!hearers.length) return 0;
+    let outlooked = await Promise.race([Promise.resolve(continuing), delay(1000, null)]).catch(() => null);
+    outlooked ??= events.find((e) => e.kind === 'outlook') ?? null;
+    const wallMs = new Date(event.at ?? Date.now()).getTime() - new Date(open.at ?? Date.now()).getTime();
+    const body = {
+      kind: RED_KIND,
+      run: basename(path, '.jsonl'),
+      device: found.did,
+      ref: found.ref,
+      gate: event.project ?? null,
+      line: failureLine(event),
+      atS: Math.max(0, Math.round(wallMs / 1000)),
+      continuing: outlooked ? { remaining: outlooked.remaining ?? [], total_s: outlooked.total_s ?? null } : null,
+      // Text for the reader's eyes; the receiver never executes it.
+      stop: `node genesis/orchestrator/gate-live.mjs stop --run ${path}`,
+    };
+    for (const sub of hearers) sendNote(found.session, sub.subscriber, body, { env });
+    return hearers.length;
+  } catch { return 0; }
+}
+
+/** The gate-final@1 body for a closed run, from what its log already holds. */
+function finalBody(path, { did, ref }) {
+  const { events, open } = runFacts(path);
+  const close = events.findLast((e) => e.kind === 'run-close');
+  const verdicts = events.filter((e) => e.kind === 'gate-verdict' && e.verdict && typeof e.verdict === 'object');
+  const reds = [];
+  const seen = new Set();
+  for (const event of events.filter((e) => e.kind === 'failure')) {
+    const red = { gate: event.project ?? null, line: failureLine(event) };
+    const key = `${red.gate}\u0000${red.line}`;
+    if (!seen.has(key)) { seen.add(key); reds.push(red); }
+  }
+  return {
+    kind: FINAL_KIND,
+    run: basename(path, '.jsonl'),
+    device: did,
+    ref,
+    verdict: close?.outcome ?? 'unknown',
+    reds,
+    reused: verdicts.filter((e) => e.verdict.reused).map((e) => e.project),
+    ran: verdicts.filter((e) => !e.verdict.reused && !e.verdict.deferred).map((e) => e.project),
+    wallS: close ? Math.max(0, Math.round((new Date(close.at) - new Date(open.at)) / 1000)) : null,
+  };
+}
+
+/** Sends gate-final@1 to every matching subscriber. Never rejects. */
+export async function emitFinal(path, { env = process.env } = {}) {
+  try {
+    if (siblingOff(env)) return 0;
+    const found = await subscribersFor(path, env);
+    if (!found || !found.subscribers.length) return 0;
+    const body = finalBody(path, found);
+    for (const sub of found.subscribers) sendNote(found.session, sub.subscriber, body, { env });
+    return found.subscribers.length;
+  } catch { return 0; }
+}
+
+// closeRun's own call: a detached helper does the berth reads and sends, so a gate-runner that
+// closes its run never waits on berth.
+function emitFinalDetached(path) {
+  if (siblingOff()) return;
+  try {
+    const child = spawn(process.execPath, [fileURLToPath(import.meta.url), 'emit-final', '--run', path],
+      { detached: true, stdio: 'ignore', env: process.env });
+    child.on('error', () => {});
+    child.unref();
+  } catch { /* fire-and-forget */ }
+}
+
+export function formatSiblingNote(note) {
+  let body;
+  try { body = JSON.parse(String(note?.text ?? '')); } catch { return null; }
+  if (!body || (body.kind !== RED_KIND && body.kind !== FINAL_KIND)) return null;
+  const where = `${String(body.device ?? note.from_device ?? 'device').split(':').pop().slice(0, 10)}${body.ref ? ` ${body.ref}` : ''}`;
+  const clip = (value) => String(value ?? '').replace(/\s+/g, ' ').slice(0, 200);
+  if (body.kind === RED_KIND) {
+    const more = body.continuing ? `; ${(body.continuing.remaining ?? []).length} gate(s) still to run, ~${Math.max(1, Math.round((body.continuing.total_s ?? 0) / 60))} min` : '';
+    return `[gate-live] SIBLING RED ${where} ${clip(body.gate)} +${body.atS ?? '?'}s — ${clip(body.line)}${more}${body.stop ? ` (to stop it, on that device: ${clip(body.stop)})` : ''}`;
+  }
+  const reds = Array.isArray(body.reds) ? body.reds : [];
+  return `[gate-live] SIBLING FINAL ${where} ${clip(body.verdict)} in ${body.wallS ?? '?'}s — ${reds.length} red(s)${reds.length ? `: ${reds.slice(0, 3).map((r) => `${clip(r.gate)}: ${clip(r.line)}`).join(' | ')}` : ''}; ran ${(body.ran ?? []).length}, reused ${(body.reused ?? []).length}`;
+}
+
+/** Tails this session's berth inbox (peek, never consuming) and prints each sibling gate note once. */
+export async function followSibling({
+  session,
+  write = (line) => process.stdout.write(`${line}\n`),
+  env = process.env,
+  pollMs = 2000,
+  timeoutMs,
+  sleep = delay,
+} = {}) {
+  const deadline = timeoutMs === undefined ? Infinity : Date.now() + timeoutMs;
+  const seen = new Set();
+  const startedMs = Date.now();
+  let first = true;
+  while (Date.now() < deadline) {
+    const notes = await peekNotes(session, { env, timeoutMs: 5000 });
+    for (const note of notes ?? []) {
+      if (!note?.cid || seen.has(note.cid)) continue;
+      seen.add(note.cid);
+      // Backlog from before this follow started is history, not news.
+      if (first && (note.at ?? 0) * 1000 < startedMs - 10 * 60 * 1000) continue;
+      const line = formatSiblingNote(note);
+      if (line) write(line);
+    }
+    first = false;
+    await sleep(Math.min(pollMs, Math.max(0, deadline - Date.now())));
+  }
+  return 'unknown';
+}
+
+/** The `subscribe` verb: one broadcast note, the recorded subscription. Returns berth's exit status. */
+export function subscribe(options, { env = process.env, now = () => new Date() } = {}) {
+  const body = subscriptionBody({
+    session: options.session, device: options.device, ref: options.ref,
+    every: Boolean(options.every), nth: options.nth, until: options.until, now,
+  });
+  const result = spawnSync(berthBin(env), ['say', '--session', options.session, JSON.stringify(body)],
+    { encoding: 'utf8', env, timeout: 15000 });
+  if (result.stdout) process.stdout.write(result.stdout);
+  if (result.stderr) process.stderr.write(result.stderr);
+  if (result.error) {
+    process.stderr.write(`[gate-live] subscribe: berth: ${result.error.message}\n`);
+    return 1;
+  }
+  if (result.status === 0) process.stdout.write(`${JSON.stringify(body)}\n`);
+  return result.status ?? 1;
+}
+
 const USAGE = `Usage:
-  node gate-live.mjs open --sha S --target T [--session S]
+  node gate-live.mjs open --sha S --target T [--session S] [--ref R]
   node gate-live.mjs event --run PATH --json '<event json>'
   node gate-live.mjs close --run PATH --outcome passed|gates-passed|failed|interrupted [--deferred N | --deferred-from-log]
   node gate-live.mjs follow [--session S | --run R | --latest] [--timeout-ms N]
@@ -661,15 +961,18 @@ const USAGE = `Usage:
   node gate-live.mjs stopped --run PATH                         (exit 0 when a stop was requested)
   node gate-live.mjs outlook --run PATH --remaining "a b c"     (once per run: what continuing costs)
   node gate-live.mjs harvest [--last N]
+  node gate-live.mjs subscribe --session S --device DID|any [--ref GLOB] [--every | --nth N] [--until RFC3339]
+  node gate-live.mjs follow --sibling --session S               (a sibling device's reds, from berth notes)
+  node gate-live.mjs emit-final --run PATH                      (internal: closeRun's detached gate-final@1 sender)
 `;
 
 function parseArguments(argv) {
   const [verb, ...args] = argv;
   const allowed = {
-    open: ['sha', 'target', 'session'],
+    open: ['sha', 'target', 'session', 'ref'],
     event: ['run', 'json'],
     close: ['run', 'outcome', 'deferred', 'deferred-from-log'],
-    follow: ['session', 'run', 'latest', 'timeout-ms'],
+    follow: ['session', 'run', 'latest', 'timeout-ms', 'sibling'],
     show: ['session', 'run', 'latest', 'seq'],
     unseen: ['session', 'reader'],
     red: ['run', 'project', 'message'],
@@ -677,6 +980,8 @@ function parseArguments(argv) {
     stopped: ['run'],
     harvest: ['last'],
     outlook: ['run', 'remaining'],
+    subscribe: ['session', 'device', 'ref', 'every', 'nth', 'until'],
+    'emit-final': ['run'],
   };
   if (!Object.hasOwn(allowed, verb)) throw new Error('unknown verb');
 
@@ -687,7 +992,7 @@ function parseArguments(argv) {
     if (!allowed[verb].includes(name) || Object.hasOwn(options, name)) {
       throw new Error('unknown or repeated option');
     }
-    if (name === 'latest' || name === 'deferred-from-log') {
+    if (name === 'latest' || name === 'deferred-from-log' || name === 'sibling' || name === 'every') {
       options[name] = true;
     } else {
       const value = args[++index];
@@ -708,6 +1013,8 @@ function parseArguments(argv) {
     stopped: ['run'],
     harvest: [],
     outlook: ['run'],
+    subscribe: ['session', 'device'],
+    'emit-final': ['run'],
   };
   if (required[verb].some((name) => !Object.hasOwn(options, name))) {
     throw new Error('missing required option');
@@ -722,6 +1029,13 @@ function parseArguments(argv) {
     throw new Error('choose one run selector');
   }
 
+  if (verb === 'follow' && options.sibling && !options.session) throw new Error('--sibling needs --session');
+  if (verb === 'subscribe') {
+    if (options.every && options.nth !== undefined) throw new Error('choose one intent');
+    if (options.until !== undefined && !Number.isFinite(Date.parse(options.until))) throw new Error('until must be RFC3339');
+    if (options.nth !== undefined && !/^[1-9]\d*$/.test(options.nth)) throw new Error('nth must be a positive integer');
+    options.ref ??= '*';
+  }
   for (const name of ['seq', 'timeout-ms', 'deferred', 'last']) {
     if (Object.hasOwn(options, name)) {
       if (!/^\d+$/.test(options[name]) || !Number.isSafeInteger(Number(options[name]))) {
@@ -771,6 +1085,7 @@ async function main(argv) {
           sha: options.sha,
           target: options.target,
           session: options.session ?? resolveSession(),
+          ...(options.ref ? { ref: options.ref } : {}),
         });
         process.stdout.write(`${result.path}\n`);
         return 0;
@@ -788,7 +1103,13 @@ async function main(argv) {
           throw new Error(`could not close ${options.run}`);
         }
         return 0;
+      case 'subscribe':
+        return subscribe(options);
+      case 'emit-final':
+        await emitFinal(resolve(root, options.run));
+        return 0;
       case 'follow': {
+        if (options.sibling) return await followSibling({ session: options.session, timeoutMs: options['timeout-ms'] });
         let session = options.session;
         let latest = options.latest ?? false;
         if (!options.run && session === undefined && !latest) {
@@ -815,14 +1136,16 @@ async function main(argv) {
         }
         return 0;
       }
-      case 'red':
-        if (appendEvent(resolve(root, options.run), {
+      case 'red': {
+        const written = appendEvent(resolve(root, options.run), {
           kind: 'failure', project: options.project,
           failure: { class: 'pre-gate', excerpt: [options.message] },
-        }) === null) {
-          throw new Error(`could not append red to ${options.run}`);
-        }
+        });
+        if (written === null) throw new Error(`could not append red to ${options.run}`);
+        // Bounded: the sibling note is sent detached, and the CLI waits no longer than this.
+        await Promise.race([emitRed(resolve(root, options.run), written), delay(1500)]);
         return 0;
+      }
       case 'stop': {
         let session = options.session;
         let latest = options.latest ?? false;
@@ -859,7 +1182,7 @@ async function main(argv) {
   } catch (error) {
     const message = String(error?.message ?? error).replace(/[\r\n]+/g, ' ');
     process.stderr.write(`[gate-live] ${message}\n`);
-    if (['open', 'event', 'close', 'unseen', 'red', 'harvest', 'outlook'].includes(verb)) return 0;
+    if (['open', 'event', 'close', 'unseen', 'red', 'harvest', 'outlook', 'emit-final'].includes(verb)) return 0;
     return verb === 'follow' ? 3 : 1;
   }
 }

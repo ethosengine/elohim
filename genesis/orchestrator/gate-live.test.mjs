@@ -31,6 +31,9 @@ const {
   follow,
 } = live;
 
+// Existing tests are not a sibling-notes run; the sibling tests below pass their own env.
+process.env.GATE_LIVE_SIBLING = 'off';
+
 const SHA = '0123456789abcdef0123456789abcdef01234567';
 const AT = '2026-10-26T12:00:00.000Z';
 const now = () => new Date(AT);
@@ -65,18 +68,26 @@ test('exports only the public run-log functions', () => {
   assert.deepEqual(Object.keys(live).sort(), [
     'appendEvent',
     'closeRun',
+    'emitFinal',
+    'emitRed',
     'findRun',
     'follow',
+    'followSibling',
     'formatEvent',
     'formatHarvest',
+    'formatSiblingNote',
     'harvest',
+    'hearsRed',
     'liveRoot',
+    'matchSubscriptions',
     'openRun',
     'outlook',
     'readRun',
     'requestStop',
     'resolveSession',
     'stopRequested',
+    'subscribe',
+    'subscriptionBody',
     'unseen',
   ]);
 });
@@ -948,4 +959,189 @@ test('CLI follow maps outcomes to exit codes', (t) => {
   assert.equal(unknown.status, 3);
   assert.equal(unknown.stdout, '');
   assert.equal(unknown.stderr, '');
+});
+
+// ── sibling reds over berth notes ────────────────────────────────────────────────────────────
+const HERE_DID = 'did:key:z6MkHEREdeviceAAAA';
+const OTHER_DID = 'did:key:z6MkOTHERdeviceBBB';
+
+function stubBerth(root, { notes = [], sleepS = 0, exit = 0 } = {}) {
+  writeFileSync(join(root, 'notes.json'), JSON.stringify(notes));
+  const bin = join(root, 'berth-stub');
+  writeFileSync(bin, `#!/bin/bash
+${sleepS ? `sleep ${sleepS}\n` : ''}if [ "$1" = say ]; then printf '%s\n' "$*" >> "${root}/says.log"; else cat "${root}/notes.json"; fi
+exit ${exit}
+`, { mode: 0o755 });
+  return bin;
+}
+
+function siblingEnv(root, bin) {
+  const env = { ...process.env, GATE_LIVE_BERTH_BIN: bin, GATE_LIVE_DEVICE: HERE_DID, EPR_BIN: join(root, 'missing-epr') };
+  delete env.GATE_LIVE_SIBLING;
+  return env;
+}
+
+function subNote(body, { cid = 'c1', at = 1 } = {}) {
+  return { cid, at, from_device: OTHER_DID, session: 'shem-orchestrator', to: null, text: JSON.stringify({ kind: 'gate-subscription@1', subscriber: 'shem-orchestrator', device: HERE_DID, ref: '*', intent: 'default', until: '2999-01-01T00:00:00.000Z', ...body }) };
+}
+
+function says(root) {
+  try { return readFileSync(join(root, 'says.log'), 'utf8').split('\n').filter(Boolean); } catch { return []; }
+}
+
+async function settle(root, count, ms = 4000) {
+  const end = Date.now() + ms;
+  while (Date.now() < end && says(root).length < count) await new Promise((r) => setTimeout(r, 50));
+  await new Promise((r) => setTimeout(r, 200));
+  return says(root);
+}
+
+const sayBody = (line) => JSON.parse(line.slice(line.indexOf('{')));
+
+test('subscribe sends one broadcast berth note that records the subscription', (t) => {
+  const root = fixture(t);
+  const bin = stubBerth(root);
+  const env = siblingEnv(root, bin);
+  const result = spawnSync(process.execPath, [SCRIPT, 'subscribe', '--session', 'shem-orchestrator', '--device', 'any', '--ref', 'refs/heads/dev', '--nth', '2', '--until', '2999-01-01T00:00:00Z'],
+    { cwd: root, encoding: 'utf8', timeout: 8000, env });
+  assert.equal(result.status, 0, result.stderr);
+  const sent = says(root);
+  assert.equal(sent.length, 1);
+  assert.ok(sent[0].startsWith('say --session shem-orchestrator {'), 'a broadcast carries no --to');
+  assert.deepEqual(sayBody(sent[0]), {
+    kind: 'gate-subscription@1', subscriber: 'shem-orchestrator', device: 'any', ref: 'refs/heads/dev',
+    intent: 'nth:2', until: '2999-01-01T00:00:00Z',
+  });
+});
+
+test('subscribe defaults to the default intent, any ref, and twelve hours', (t) => {
+  const root = fixture(t);
+  const bin = stubBerth(root);
+  const before = Date.now();
+  const result = spawnSync(process.execPath, [SCRIPT, 'subscribe', '--session', 's', '--device', HERE_DID],
+    { cwd: root, encoding: 'utf8', timeout: 8000, env: siblingEnv(root, bin) });
+  assert.equal(result.status, 0, result.stderr);
+  const body = sayBody(says(root)[0]);
+  assert.equal(body.intent, 'default');
+  assert.equal(body.ref, '*');
+  const hours = (Date.parse(body.until) - before) / 3600000;
+  assert.ok(hours > 11.9 && hours < 12.1, String(hours));
+});
+
+test('subscribe returns berth\'s failure and refuses a nonsense intent', (t) => {
+  const root = fixture(t);
+  assert.notEqual(spawnSync(process.execPath, [SCRIPT, 'subscribe', '--session', 's', '--device', 'any'],
+    { cwd: root, encoding: 'utf8', env: siblingEnv(root, join(root, 'no-berth')) }).status, 0);
+  assert.notEqual(spawnSync(process.execPath, [SCRIPT, 'subscribe', '--session', 's', '--device', 'any', '--every', '--nth', '2'],
+    { cwd: root, encoding: 'utf8', env: siblingEnv(root, stubBerth(root)) }).status, 0);
+  const failing = stubBerth(root, { exit: 1 });
+  assert.equal(spawnSync(process.execPath, [SCRIPT, 'subscribe', '--session', 's', '--device', 'any'],
+    { cwd: root, encoding: 'utf8', env: siblingEnv(root, failing) }).status, 1);
+});
+
+test('matchSubscriptions: device did or any, ref glob, expired until, no-ref runs', () => {
+  const at = () => new Date('2026-11-17T00:00:00Z');
+  const mk = (body, cid) => subNote(body, { cid });
+  const notes = [
+    mk({ subscriber: 'a' }, 'a'),
+    mk({ subscriber: 'b', device: 'any' }, 'b'),
+    mk({ subscriber: 'c', device: OTHER_DID }, 'c'),
+    mk({ subscriber: 'd', until: '2026-11-16T00:00:00Z' }, 'd'),
+    mk({ subscriber: 'e', ref: 'refs/heads/*' }, 'e'),
+    mk({ subscriber: 'f', ref: 'refs/tags/*' }, 'f'),
+    { cid: 'g', at: 1, text: 'free prose, not a subscription' },
+    { cid: 'h', at: 1, text: JSON.stringify({ kind: 'gate-red@1' }) },
+  ];
+  const names = (ref) => live.matchSubscriptions(notes, { did: HERE_DID, ref, now: at }).map((s) => s.subscriber).sort();
+  assert.deepEqual(names('refs/heads/dev'), ['a', 'b', 'e']);
+  assert.deepEqual(names(null), ['a', 'b'], 'a run with no ref matches only `*`');
+  assert.deepEqual(names('refs/tags/v1'), ['a', 'b', 'f']);
+});
+
+test('matchSubscriptions: the latest note per subscriber wins and intents parse', () => {
+  const notes = [
+    subNote({ intent: 'every' }, { cid: '1', at: 1 }),
+    subNote({ intent: 'nth:3' }, { cid: '2', at: 2 }),
+  ];
+  assert.deepEqual(live.matchSubscriptions(notes, { did: HERE_DID }), [{ subscriber: 'shem-orchestrator', intent: { nth: 3 } }]);
+  assert.equal(live.hearsRed('default', 1), true);
+  assert.equal(live.hearsRed('default', 2), false);
+  assert.equal(live.hearsRed('every', 7), true);
+  assert.equal(live.hearsRed({ nth: 2 }, 2), true);
+  assert.equal(live.hearsRed({ nth: 2 }, 3), false);
+});
+
+function threeRedRun(root) {
+  const { path } = openRun({ root, sha: SHA, target: 'dev', session: 'gate-session', ref: 'refs/heads/dev' });
+  const reds = ['one', 'two', 'three'].map((name) => appendEvent(path, { ...RED, project: 'storage', test: name, excerpt: `test ${name} ... FAILED` }));
+  return { path, reds };
+}
+
+test('default intent: three reds yield first-red and final, exactly two notes, with the stop command as text', async (t) => {
+  const root = fixture(t);
+  const bin = stubBerth(root, { notes: [subNote({})] });
+  const env = siblingEnv(root, bin);
+  const { path, reds } = threeRedRun(root);
+  appendEvent(path, { kind: 'outlook', remaining: [{ project: 'app', p90_s: 300 }], total_s: 300 });
+  for (const red of reds) await live.emitRed(path, red, { env });
+  assert.equal(await live.emitFinal(path, { env }), 1, 'final reaches the one subscriber');
+  const sent = await settle(root, 2);
+  assert.equal(sent.length, 2);
+  for (const line of sent) assert.match(line, /^say --session gate-session --to shem-orchestrator \{/);
+  const [first, final] = sent.map(sayBody);
+  assert.equal(first.kind, 'gate-red@1');
+  assert.equal(first.gate, 'storage');
+  assert.equal(first.line, 'test one ... FAILED');
+  assert.equal(first.device, HERE_DID);
+  assert.equal(first.ref, 'refs/heads/dev');
+  assert.equal(typeof first.atS, 'number');
+  assert.deepEqual(first.continuing, { remaining: [{ project: 'app', p90_s: 300 }], total_s: 300 });
+  assert.equal(first.stop, `node genesis/orchestrator/gate-live.mjs stop --run ${path}`);
+  assert.equal(final.kind, 'gate-final@1');
+  assert.equal(final.run, first.run);
+  assert.deepEqual(final.reds.map((r) => r.line), ['test one ... FAILED', 'test two ... FAILED', 'test three ... FAILED']);
+});
+
+test('every sends all three reds; nth:2 sends the second', async (t) => {
+  const root = fixture(t);
+  const env = siblingEnv(root, stubBerth(root, { notes: [subNote({ intent: 'every' })] }));
+  const { path, reds } = threeRedRun(root);
+  for (const red of reds) await live.emitRed(path, red, { env });
+  assert.equal((await settle(root, 3)).length, 3);
+
+  const second = fixture(t);
+  const env2 = siblingEnv(second, stubBerth(second, { notes: [subNote({ intent: 'nth:2' })] }));
+  const run2 = threeRedRun(second);
+  for (const red of run2.reds) await live.emitRed(run2.path, red, { env: env2 });
+  const sent = await settle(second, 1);
+  assert.equal(sent.length, 1);
+  assert.equal(sayBody(sent[0]).line, 'test two ... FAILED');
+});
+
+test('no matching subscription, an expired one, or a missing berth sends nothing', async (t) => {
+  const root = fixture(t);
+  const { path, reds } = threeRedRun(root);
+  const expired = siblingEnv(root, stubBerth(root, { notes: [subNote({ until: '2001-01-01T00:00:00Z' }), subNote({ device: OTHER_DID }, { cid: 'c2' })] }));
+  assert.equal(await live.emitRed(path, reds[0], { env: expired }), 0);
+  const missing = siblingEnv(root, join(root, 'no-berth'));
+  assert.equal(await live.emitFinal(path, { env: missing }), 0);
+  assert.deepEqual(says(root), []);
+});
+
+test('formatSiblingNote reads a red and a final as one human line', () => {
+  const red = live.formatSiblingNote({ text: JSON.stringify({ kind: 'gate-red@1', device: HERE_DID, ref: 'refs/heads/dev', gate: 'storage', line: 'test x ... FAILED', atS: 300, continuing: { remaining: [{}, {}], total_s: 600 }, stop: 'node x stop' }) });
+  assert.match(red, /SIBLING RED .*storage \+300s — test x \.\.\. FAILED; 2 gate\(s\) still to run, ~10 min/);
+  const final = live.formatSiblingNote({ text: JSON.stringify({ kind: 'gate-final@1', device: HERE_DID, verdict: 'failed', reds: [{ gate: 'g', line: 'l' }], ran: ['g'], reused: [], wallS: 9 }) });
+  assert.match(final, /SIBLING FINAL .*failed in 9s — 1 red\(s\): g: l/);
+  assert.equal(live.formatSiblingNote({ text: 'prose' }), null);
+});
+
+test('follow --sibling prints each sibling note once from a peek and consumes nothing', async (t) => {
+  const root = fixture(t);
+  const note = { cid: 'n1', at: Date.now() / 1000, session: 'x', to: 's', text: JSON.stringify({ kind: 'gate-red@1', device: HERE_DID, gate: 'g', line: 'boom', atS: 1 }) };
+  const bin = stubBerth(root, { notes: [note, { ...note, cid: 'n2', text: 'prose' }] });
+  const lines = [];
+  await live.followSibling({ session: 's', env: siblingEnv(root, bin), write: (l) => lines.push(l), pollMs: 20, timeoutMs: 600, sleep: (ms) => new Promise((r) => setTimeout(r, ms)) });
+  assert.equal(lines.length, 1);
+  assert.match(lines[0], /SIBLING RED .* g \+1s — boom/);
 });

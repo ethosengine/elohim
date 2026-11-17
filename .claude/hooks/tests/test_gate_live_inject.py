@@ -15,14 +15,16 @@ GATE_LIVE = REPO / 'genesis/orchestrator/gate-live.mjs'
 MODULE = runpy.run_path(str(HOOK))
 
 
-class GateLiveInjectTest(unittest.TestCase):
+class Harness(unittest.TestCase):
     def setUp(self):
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
         self.root = Path(tmp.name)
         clean = {k: v for k, v in os.environ.items() if not k.startswith('GIT_')}
         self.env = {**clean, 'CLAUDE_PROJECT_DIR': str(self.root), 'ELOHIM_SESSION_ID': '',
-                    'EPR_BIN': str(self.root / 'missing-epr')}
+                    'EPR_BIN': str(self.root / 'missing-epr'),
+                    'GATE_LIVE_BERTH_BIN': str(self.root / 'missing-berth'),
+                    'GATE_LIVE_SIBLING_POLL_S': '0'}
 
     def live(self, *args):
         result = subprocess.run(['node', str(GATE_LIVE), *args], cwd=self.root, env=self.env,
@@ -48,6 +50,8 @@ class GateLiveInjectTest(unittest.TestCase):
         self.assertEqual(out['hookEventName'], 'PostToolUse')
         return out['additionalContext']
 
+
+class GateLiveInjectTest(Harness):
     def test_silent_without_a_run(self):
         self.assertIsNone(self.hook({'session_id': 's-main', 'tool_name': 'Read', 'tool_input': {}}))
 
@@ -172,6 +176,78 @@ class GateLiveInjectTest(unittest.TestCase):
                 result = subprocess.run([sys.executable, str(HOOK)], cwd=self.root, env=self.env,
                                         input=raw, text=True, capture_output=True, timeout=10)
                 self.assertEqual((result.returncode, result.stdout, result.stderr), (0, '', ''))
+
+
+class SiblingNotesTest(Harness):
+    """A sibling device's gate-red@1 / gate-final@1 notes, read from berth with --peek."""
+
+    SESSION = 'abcdef12-0000-4000-8000-000000000001'
+
+    def stub_berth(self, notes, exit_code=0):
+        (self.root / 'notes.json').write_text(json.dumps(notes))
+        stub = self.root / 'berth'
+        stub.write_text('#!/bin/bash\n'
+                        'echo "$@" >> "$(dirname "$0")/berth-calls"\n'
+                        f'cat "$(dirname "$0")/notes.json"\nexit {exit_code}\n')
+        stub.chmod(0o755)
+        self.env['GATE_LIVE_BERTH_BIN'] = str(stub)
+
+    def note(self, cid, body, to=None, at=None):
+        import time
+        return {'cid': cid, 'at': at if at is not None else time.time(), 'from_device': 'did:key:z6MkSIBLINGDEVICE',
+                'session': 'orchestrator', 'to': to or self.SESSION, 'text': json.dumps(body)}
+
+    def call(self):
+        return self.hook({'session_id': self.SESSION, 'tool_name': 'Read', 'tool_input': {}})
+
+    RED = {'kind': 'gate-red@1', 'run': 'r1', 'device': 'did:key:z6MkSIBLINGDEVICE', 'ref': 'refs/heads/dev',
+           'gate': 'elohim-storage', 'line': 'test folds_twice ... FAILED', 'atS': 312,
+           'continuing': {'remaining': [{'project': 'app', 'p90_s': 600}], 'total_s': 600},
+           'stop': 'node genesis/orchestrator/gate-live.mjs stop --run /x/r1.jsonl'}
+
+    def test_a_sibling_red_is_surfaced_once(self):
+        self.stub_berth([self.note('cid-1', self.RED)])
+        context = self.call()
+        self.assertIn('SIBLING RED', context)
+        self.assertIn('elohim-storage', context)
+        self.assertIn('test folds_twice ... FAILED', context)
+        self.assertIn('gate-live.mjs stop --run /x/r1.jsonl', context)
+        calls = (self.root / 'berth-calls').read_text()
+        self.assertIn('--peek', calls)
+        self.assertIsNone(self.call())
+
+    def test_a_new_note_after_the_first_is_surfaced_and_other_notes_are_ignored(self):
+        final = {'kind': 'gate-final@1', 'run': 'r1', 'device': 'did:key:z6MkSIBLINGDEVICE', 'ref': None,
+                 'verdict': 'failed', 'reds': [{'gate': 'app', 'line': 'boom'}], 'reused': ['a'], 'ran': ['b', 'c'],
+                 'wallS': 900}
+        self.stub_berth([self.note('cid-1', self.RED)])
+        self.assertIn('SIBLING RED', self.call())
+        self.stub_berth([self.note('cid-1', self.RED), self.note('cid-2', final),
+                         self.note('cid-3', {'kind': 'gate-subscription@1'}),
+                         self.note('cid-4', self.RED, to='someone-else-entirely'),
+                         {**self.note('cid-5', self.RED), 'text': 'not json'}])
+        context = self.call()
+        self.assertIn('SIBLING FINAL', context)
+        self.assertIn('failed in 900s', context)
+        self.assertNotIn('SIBLING RED', context)
+        self.assertIsNone(self.call())
+
+    def test_history_older_than_ten_minutes_is_not_news_on_first_contact(self):
+        import time
+        self.stub_berth([self.note('cid-old', self.RED, at=time.time() - 3600)])
+        self.assertIsNone(self.call())
+
+    def test_a_broken_berth_surfaces_nothing_and_does_not_raise(self):
+        for stub_exit in (None, 1):
+            if stub_exit is None:
+                self.env['GATE_LIVE_BERTH_BIN'] = str(self.root / 'no-such-berth')
+            else:
+                self.stub_berth([self.note('cid-1', self.RED)], exit_code=stub_exit)
+            self.assertIsNone(self.call())
+        (self.root / 'berth').write_text('#!/bin/bash\necho "{not json"\n')
+        (self.root / 'berth').chmod(0o755)
+        self.env['GATE_LIVE_BERTH_BIN'] = str(self.root / 'berth')
+        self.assertIsNone(self.call())
 
 
 if __name__ == '__main__':

@@ -16,7 +16,8 @@ import { existsSync, readFileSync, readdirSync, writeSync } from 'fs';
 import { dirname, isAbsolute, join, resolve } from 'path';
 import { createRecognizer } from './gate-failure-lines.mjs';
 import { GATE_ATTRIBUTION_WINDOW_MS, attribute, readEdits } from './gate-attribution.mjs';
-import { appendEvent, liveRoot, outlook } from './gate-live.mjs';
+import { setTimeout as delay } from 'timers/promises';
+import { appendEvent, emitRed, liveRoot, outlook } from './gate-live.mjs';
 
 function parseArgs(argv) {
   const split = argv.indexOf('--');
@@ -177,15 +178,23 @@ function main() {
   // every gate after it (GATE_REMAINING, set by the hook and gate-runner) with their recorded cost.
   // outlook() is once per run, so a run whose first red came earlier adds nothing here.
   let outlooked = false;
+  let firstOutlook;
+  // Sibling notes are fire-and-forget; the tap only waits (bounded, below) for the reads that
+  // decide whether to send, so an exit never drops a note that was about to be handed to berth.
+  const pending = new Set();
+  const track = promise => { pending.add(promise); promise.finally(() => pending.delete(promise)); };
   const recognizer = createRecognizer({
     project,
     emit: event => {
       if (!run) return;
-      appendEvent(run, label(event));
+      const written = appendEvent(run, label(event));
       if (!outlooked && event.kind === 'failure' && process.env.GATE_REMAINING !== undefined) {
         outlooked = true;
         const remaining = [project, ...process.env.GATE_REMAINING.split(/\s+/).filter(Boolean)];
-        outlook(run, remaining, { root: process.cwd() }).catch(() => { /* fail-open */ });
+        firstOutlook = outlook(run, remaining, { root: process.cwd() }).catch(() => null);
+      }
+      if (written && event.kind === 'failure') {
+        track(emitRed(run, written, { continuing: firstOutlook }));
       }
     },
   });
@@ -220,6 +229,10 @@ function main() {
     } catch { /* no fd 3: run by hand */ }
     // Exit only after forwarded bytes drain, then carry the child's status or signal.
     const finish = () => {
+      // The wait for sibling-note reads is capped well under 2 s; berth itself is never awaited.
+      Promise.race([Promise.allSettled([...pending]), delay(1500)]).then(exit, exit);
+    };
+    const exit = () => {
       if (signal) {
         for (const s of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.removeAllListeners(s);
         process.kill(process.pid, signal);
