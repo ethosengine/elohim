@@ -75,6 +75,72 @@ def guest_uid_unavailable_reason():
     return None
 
 
+class LocationResolutionTest(unittest.TestCase):
+    """berth finds its store and policy through the device layout, never by a guess of its own."""
+
+    resolve = staticmethod(_NS["resolve_locations"])
+    LAYOUT = {"stateDir": {"path": "/layout/state", "origin": {"kind": "hostDefault"}},
+              "projectRoot": {"path": "/layout/repo", "origin": {"kind": "discovered"}}}
+
+    def epr(self, stdout="", returncode=0, raises=None):
+        calls = []
+
+        def run(argv, **kwargs):
+            calls.append((argv, kwargs))
+            if raises:
+                raise raises
+            return subprocess.CompletedProcess(argv, returncode, stdout, "")
+        return run, calls
+
+    def test_the_variables_win_and_epr_is_not_asked(self):
+        run, calls = self.epr(json.dumps(self.LAYOUT))
+        found = self.resolve({"CLAUDE_CONFIG_DIR": "/env/config", "CLAUDE_PROJECT_DIR": "/env/repo",
+                              "EPR_BIN": "/bin/epr"}, run, lambda _: True)
+        self.assertEqual(found, ("/env/config", "/env/repo", None))
+        self.assertEqual(calls, [])
+
+    def test_the_layout_answers_what_the_variables_leave_open(self):
+        run, calls = self.epr(json.dumps(self.LAYOUT))
+        found = self.resolve({"EPR_BIN": "/bin/epr"}, run, lambda _: True)
+        self.assertEqual(found, ("/layout/state", "/layout/repo", None), "the layout beats /projects")
+        self.assertEqual(calls[0][0], ["/bin/epr", "device", "layout", "show", "--json"])
+        self.assertEqual(calls[0][1]["timeout"], _NS["LAYOUT_TIMEOUT_S"])
+        half = self.resolve({"EPR_BIN": "/bin/epr", "CLAUDE_CONFIG_DIR": "/env/config"}, run, lambda _: True)
+        self.assertEqual(half, ("/env/config", "/layout/repo", None))
+
+    def test_projects_is_the_fallback_only_where_it_exists(self):
+        che = {"/projects/.claude-config", "/projects/elohim"}
+        for run, _ in (self.epr(returncode=2), self.epr("not json"),
+                       self.epr(raises=subprocess.TimeoutExpired("epr", 3)), self.epr(raises=OSError("gone"))):
+            self.assertEqual(self.resolve({"EPR_BIN": "/bin/epr"}, run, che.__contains__),
+                             ("/projects/.claude-config", "/projects/elohim", None))
+        no_epr, calls = self.epr()
+        self.assertEqual(self.resolve({"PATH": "/nonexistent"}, no_epr, che.__contains__)[:2],
+                         ("/projects/.claude-config", "/projects/elohim"))
+        self.assertEqual(calls, [], "no epr on PATH is never spawned")
+        relative = json.dumps({"stateDir": {"path": "state"}, "projectRoot": {"path": None}})
+        run, _ = self.epr(relative)
+        self.assertEqual(self.resolve({"EPR_BIN": "/bin/epr"}, run, che.__contains__)[:2],
+                         ("/projects/.claude-config", "/projects/elohim"), "a relative path is no answer")
+
+    def test_neither_names_what_to_set_and_main_refuses_with_it(self):
+        run, _ = self.epr(returncode=2)
+        config, project, error = self.resolve({"EPR_BIN": "/bin/epr"}, run, lambda _: False)
+        self.assertEqual((config, project), (None, None))
+        self.assertIn("CLAUDE_CONFIG_DIR", error)
+        self.assertIn("CLAUDE_PROJECT_DIR", error)
+        self.assertIn("epr device layout show", error)
+        main = _NS["main"]
+        err = io.StringIO()
+        with mock.patch.dict(main.__globals__, {"CONFIG_DIR": None, "PROJECT_DIR": None,
+                                                "LOCATION_ERROR": error}), \
+                mock.patch.dict(os.environ, {}, clear=False), contextlib.redirect_stderr(err):
+            os.environ.pop("BERTH_DIR", None)
+            code = main(["berth", "status"])
+        self.assertEqual(code, _NS["EXIT_NO_SESSION"])
+        self.assertIn("epr device layout show", err.getvalue())
+
+
 class HoldFoldAndReapTest(unittest.TestCase):
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()

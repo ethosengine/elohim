@@ -5,7 +5,8 @@ use crate::{
     git,
 };
 use elohim_device_runtime::{
-    bin_store::{Registry, Store},
+    bin_store::{Refusal, Registry, Store},
+    layout::{self, DeviceLayout, Field},
     session,
 };
 use serde::{Deserialize, Serialize};
@@ -99,8 +100,13 @@ pub(crate) fn status_at(root: &Path) -> Vec<Check> {
     };
     let key = device_key::resolve_path();
     let handle = sole_handle(root).unwrap_or_else(|| "<handle>".into());
+    // The same resolvers every other device command reads: status names, never re-derives.
+    let device_layout = resolve_layout(root);
+    let persistence =
+        crate::session_envelope::resolve_persistence_with(&|name: &str| std::env::var_os(name))
+            .map(|persistence| describe_basis(persistence.basis()));
     let key_check = match &key {
-        Ok(path) => key_check(path, &handle),
+        Ok(path) => key_check(path, &handle, &persistence),
         Err(error) => Check::new(
             "device key",
             State::Refused,
@@ -118,7 +124,18 @@ pub(crate) fn status_at(root: &Path) -> Vec<Check> {
             index::status(root, index::EmbedderChoice::Pinned),
             lag_limit(root),
         ),
-        berth_check(&berth_dir(), identity.session.as_deref()),
+        match berth_dir(&env, device_layout.as_ref().ok()) {
+            Ok(dir) => berth_check(&dir, identity.session.as_deref()),
+            Err(why) => Check::new(
+                "berth moored",
+                State::Degraded,
+                why,
+                Some(format!(
+                    "set {} to this device's state directory",
+                    Field::StateDir.env()
+                )),
+            ),
+        },
         repository_check(root),
         peer_daemon_check(),
         supervisor_check(root),
@@ -128,7 +145,109 @@ pub(crate) fn status_at(root: &Path) -> Vec<Check> {
         hooks_check(root),
         brit_trust_check(root),
         packs_check(root),
+        layout_check(device_layout),
     ]
+}
+
+/// The device layout as a command run from `root` resolves it (the real environment and
+/// filesystem; the checkout discovered from `root`). A read: nothing is created.
+fn resolve_layout(root: &Path) -> Result<DeviceLayout, Refusal> {
+    let env = |name: &str| std::env::var_os(name);
+    let exists = |path: &Path| path.exists();
+    layout::resolve_with(&layout::Host {
+        env: &env,
+        exists: &exists,
+        cwd: Some(root.to_owned()),
+    })
+}
+
+/// How a report names the basis a native session would open on.
+fn describe_basis(basis: &crate::session_envelope::PersistenceBasis) -> String {
+    match basis {
+        crate::session_envelope::PersistenceBasis::ExplicitMount => basis.name().to_owned(),
+        crate::session_envelope::PersistenceBasis::DeclaredDurableHome { declared_at } => {
+            format!("{}, declared {declared_at}", basis.name())
+        }
+    }
+}
+
+const LAYOUT_CHECK: &str = "device layout";
+/// The report label of each field, in the order the layout line names them.
+const LAYOUT_LABELS: [(Field, &str); 5] = [
+    (Field::ConfigDir, "config"),
+    (Field::BinStore, "bin-store"),
+    (Field::StateDir, "state"),
+    (Field::CargoPool, "pool"),
+    (Field::ProjectRoot, "checkout"),
+];
+
+/// Where this device keeps its things, each with the reason it was chosen. An override that
+/// disagrees with the saved layout degrades (gates set them on purpose); a startup-critical
+/// destination this user cannot create refuses, because every launch would then fail.
+fn layout_check(resolved: Result<DeviceLayout, Refusal>) -> Check {
+    let device_layout =
+        match resolved {
+            Ok(device_layout) => device_layout,
+            Err(error) => return Check::new(
+                LAYOUT_CHECK,
+                State::Refused,
+                format!("{}: {}", error.kind, error.detail),
+                Some(
+                    "correct the named variable or the saved layout.json, then epr device layout \
+                     show"
+                        .into(),
+                ),
+            ),
+        };
+    let places = LAYOUT_LABELS
+        .iter()
+        .map(|(field, label)| format!("{label} {}", device_layout.get(*field).describe()))
+        .collect::<Vec<_>>()
+        .join(" · ");
+    let blocked: Vec<(Field, String)> = [
+        (Field::BinStore, device_layout.bin_store()),
+        (Field::StateDir, device_layout.state_dir()),
+    ]
+    .into_iter()
+    .filter_map(|(field, path)| {
+        path.and_then(|path| layout::check_creatable(field.name(), path))
+            .err()
+            .map(|error| (field, format!("{}: {}", error.kind, error.detail)))
+    })
+    .collect();
+    if !blocked.is_empty() {
+        let variables: Vec<&str> = blocked.iter().map(|(field, _)| field.env()).collect();
+        let fields: Vec<String> = blocked
+            .iter()
+            .map(|(field, _)| format!("--field {}", field.name()))
+            .collect();
+        let why: Vec<&str> = blocked.iter().map(|(_, why)| why.as_str()).collect();
+        return Check::new(
+            LAYOUT_CHECK,
+            State::Refused,
+            format!("{places}; {}", why.join("; ")),
+            Some(format!(
+                "set {} to a directory this user can create and write, then epr device layout \
+                 save {}",
+                variables.join(" and "),
+                fields.join(" ")
+            )),
+        );
+    }
+    if device_layout.differs.is_empty() {
+        return Check::new(LAYOUT_CHECK, State::Ok, places, None);
+    }
+    let differs: Vec<String> = device_layout.differs.iter().map(|d| d.line()).collect();
+    Check::new(
+        LAYOUT_CHECK,
+        State::Degraded,
+        format!("{places}; {}", differs.join("; ")),
+        Some(
+            "epr device layout save to remember the variable's place, or unset the variable to \
+             use the saved one"
+                .into(),
+        ),
+    )
 }
 
 /// The Rust toolchain the local gate pins (`pool-policy.json` `cargo_env_overrides["*"]`),
@@ -706,9 +825,36 @@ fn absent_state(tool: &str) -> State {
         State::Degraded
     }
 }
-fn key_check(path: &Path, handle: &str) -> Check {
+/// The key, and the basis a native session would open on beside it (`persistence`: the basis
+/// named, or the persistence refusal as `<code>: <cure>`). A bound key whose home is not known
+/// to survive a restart degrades: the device can act, but cannot keep a session.
+fn key_check(path: &Path, handle: &str, persistence: &Result<String, String>) -> Check {
     match device_key::DeviceKey::load(path) {
-        Ok(_) => Check::new("device key", State::Ok, path.display().to_string(), None),
+        Ok(_) => match persistence {
+            Ok(basis) => Check::new(
+                "device key",
+                State::Ok,
+                format!("{} (persistence {basis})", path.display()),
+                None,
+            ),
+            Err(refusal) => {
+                let (code, cure) = refusal.split_once(": ").unwrap_or(("", refusal.as_str()));
+                Check::new(
+                    "device key",
+                    State::Degraded,
+                    format!(
+                        "{}; native sessions cannot open here ({})",
+                        path.display(),
+                        if code.is_empty() {
+                            "persistence refused"
+                        } else {
+                            code
+                        }
+                    ),
+                    Some(cure.to_owned()),
+                )
+            }
+        },
         Err(error) => Check::new(
             "device key",
             State::Refused,
@@ -848,11 +994,26 @@ fn fold_check(value: crate::flow::FlowResult<Value>, limit: u64) -> Check {
         ),
     }
 }
-fn berth_dir() -> PathBuf {
-    PathBuf::from(
-        std::env::var("CLAUDE_CONFIG_DIR").unwrap_or_else(|_| "/projects/.claude-config".into()),
-    )
-    .join("berth/moorings")
+/// The berth's moorings, found as `genesis/agentic/bin/berth` finds its store: `BERTH_DIR`,
+/// else `$CLAUDE_CONFIG_DIR/berth`, else `<the layout's state directory>/berth`.
+fn berth_dir(
+    env: &dyn Fn(&str) -> Option<String>,
+    device_layout: Option<&DeviceLayout>,
+) -> Result<PathBuf, String> {
+    let set = |name: &str| env(name).filter(|value| !value.is_empty());
+    let store = match (set("BERTH_DIR"), set("CLAUDE_CONFIG_DIR")) {
+        (Some(store), _) => PathBuf::from(store),
+        (None, Some(config)) => PathBuf::from(config).join("berth"),
+        (None, None) => device_layout
+            .ok_or("the device layout did not resolve")
+            .and_then(|l| {
+                l.state_dir()
+                    .map_err(|_| "this device names no state directory")
+            })
+            .map_err(|why| format!("no berth store: {why}"))?
+            .join("berth"),
+    };
+    Ok(store.join("moorings"))
 }
 fn berth_check(dir: &Path, session: Option<&str>) -> Check {
     let records: Vec<Value> = fs::read_dir(dir)
@@ -993,18 +1154,178 @@ mod tests {
     fn missing_and_invalid_keys_refuse_without_minting() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("key/seed");
-        let check = key_check(&path, "matthew");
+        let mount = Ok("explicit-mount".to_owned());
+        let check = key_check(&path, "matthew", &mount);
         assert_eq!(check.state, State::Refused);
         assert!(check.cure.unwrap().contains("enroll --handle matthew"));
         assert!(!path.exists());
         fs::create_dir(path.parent().unwrap()).unwrap();
         fs::write(&path, b"bad").unwrap();
-        assert_eq!(key_check(&path, "matthew").state, State::Refused);
-        device_key::DeviceKey::load_or_generate(&dir.path().join("valid/seed")).unwrap();
-        assert_eq!(
-            key_check(&dir.path().join("valid/seed"), "matthew").state,
-            State::Ok
+        assert_eq!(key_check(&path, "matthew", &mount).state, State::Refused);
+        let valid = dir.path().join("valid/seed");
+        device_key::DeviceKey::load_or_generate(&valid).unwrap();
+        let ok = key_check(&valid, "matthew", &mount);
+        assert_eq!(ok.state, State::Ok);
+        assert!(ok.detail.ends_with("(persistence explicit-mount)"), "{ok}");
+    }
+    #[test]
+    fn a_bound_key_whose_home_is_not_durable_degrades_naming_the_persistence_cure() {
+        let dir = tempfile::tempdir().unwrap();
+        let key = dir.path().join("device/ed25519.seed");
+        device_key::DeviceKey::load_or_generate(&key).unwrap();
+        let refused = Err(
+            "envelope-persistent-config-required: set XDG_CONFIG_HOME to an \
+                           absolute persistent config directory; or declare it once with `epr \
+                           actor device persistence --declare durable-home`"
+                .to_owned(),
         );
+        let check = key_check(&key, "matthew", &refused);
+        assert_eq!(check.state, State::Degraded);
+        assert!(check
+            .detail
+            .contains("cannot open here (envelope-persistent-config-required)"));
+        let cure = check.cure.unwrap();
+        assert!(cure.starts_with("set XDG_CONFIG_HOME"), "{cure}");
+        assert!(cure.contains("--declare durable-home"), "{cure}");
+        let declared = Ok("declared-durable-home, declared 2026-11-16T00:00:00Z".to_owned());
+        let ok = key_check(&key, "matthew", &declared);
+        assert_eq!(ok.state, State::Ok);
+        assert!(
+            ok.detail.contains("persistence declared-durable-home"),
+            "{ok}"
+        );
+    }
+    #[test]
+    fn the_layout_line_names_every_place_and_refuses_an_unwritable_destination() {
+        let dir = tempfile::tempdir().unwrap();
+        let resolve = |pairs: &[(&str, String)]| {
+            let env = |name: &str| {
+                pairs
+                    .iter()
+                    .find(|(k, _)| *k == name)
+                    .map(|(_, v)| std::ffi::OsString::from(v))
+            };
+            let exists = |path: &Path| path.exists() && !path.starts_with("/projects");
+            layout::resolve_with(&layout::Host {
+                env: &env,
+                exists: &exists,
+                cwd: None,
+            })
+        };
+        let home = dir.path().join("home").display().to_string();
+        let ok = layout_check(resolve(&[("HOME", home.clone())]));
+        assert_eq!(ok.state, State::Ok, "{ok}");
+        for label in [
+            "config ",
+            " · bin-store ",
+            " · state ",
+            " · pool ",
+            " · checkout ",
+        ] {
+            assert!(ok.detail.contains(label), "{label} in {ok}");
+        }
+        assert!(ok
+            .detail
+            .contains(&format!("state {home}/.local/state/elohim (host default)")));
+        let plain = dir.path().join("plain");
+        fs::write(&plain, "").unwrap();
+        let blocked = layout_check(resolve(&[
+            ("HOME", home.clone()),
+            (
+                "ELOHIM_STATE_DIR",
+                plain.join("state").display().to_string(),
+            ),
+        ]));
+        assert_eq!(blocked.state, State::Refused, "{blocked}");
+        assert!(blocked.detail.contains("layout-destination-unwritable"));
+        let cure = blocked.cure.unwrap();
+        assert!(cure.contains("set ELOHIM_STATE_DIR"), "{cure}");
+        assert!(cure.contains("--field stateDir"), "{cure}");
+        let none = layout_check(resolve(&[]));
+        assert_eq!(
+            none.state,
+            State::Refused,
+            "no home names no bin-store or state"
+        );
+        assert!(none
+            .cure
+            .unwrap()
+            .contains("BIN_STORE and ELOHIM_STATE_DIR"));
+    }
+    #[test]
+    fn a_layout_override_that_disagrees_with_the_saved_place_degrades() {
+        let dir = tempfile::tempdir().unwrap();
+        let config = dir.path().join("xdg/elohim/device");
+        fs::create_dir_all(&config).unwrap();
+        let saved = dir.path().join("saved-bins").display().to_string();
+        fs::write(
+            config.join(layout::SAVED_FILE),
+            format!(r#"{{"version":1,"binStore":"{saved}"}}"#),
+        )
+        .unwrap();
+        let xdg = dir.path().join("xdg").display().to_string();
+        let named = dir.path().join("named-bins").display().to_string();
+        let home = dir.path().join("home").display().to_string();
+        let pairs = [
+            ("XDG_CONFIG_HOME", xdg),
+            ("HOME", home),
+            ("BIN_STORE", named.clone()),
+        ];
+        let env = |name: &str| {
+            pairs
+                .iter()
+                .find(|(k, _)| *k == name)
+                .map(|(_, v)| std::ffi::OsString::from(v))
+        };
+        let exists = |path: &Path| path.exists() && !path.starts_with("/projects");
+        let check = layout_check(layout::resolve_with(&layout::Host {
+            env: &env,
+            exists: &exists,
+            cwd: None,
+        }));
+        assert_eq!(check.state, State::Degraded, "{check}");
+        assert!(check.detail.contains(&format!(
+            "layout-override-differs binStore env {named} saved {saved}"
+        )));
+        assert!(check.cure.unwrap().contains("epr device layout save"));
+    }
+    #[test]
+    fn berth_moorings_are_found_where_berth_keeps_its_store() {
+        let env = |pairs: &'static [(&'static str, &'static str)]| {
+            move |name: &str| {
+                pairs
+                    .iter()
+                    .find(|(k, _)| *k == name)
+                    .map(|(_, v)| (*v).to_owned())
+            }
+        };
+        assert_eq!(
+            berth_dir(
+                &env(&[("BERTH_DIR", "/b"), ("CLAUDE_CONFIG_DIR", "/c")]),
+                None
+            )
+            .unwrap(),
+            PathBuf::from("/b/moorings")
+        );
+        assert_eq!(
+            berth_dir(&env(&[("CLAUDE_CONFIG_DIR", "/c")]), None).unwrap(),
+            PathBuf::from("/c/berth/moorings")
+        );
+        let state_env = |name: &str| -> Option<std::ffi::OsString> {
+            (name == "ELOHIM_STATE_DIR").then(|| "/state".into())
+        };
+        let exists = |_: &Path| false;
+        let device_layout = layout::resolve_with(&layout::Host {
+            env: &state_env,
+            exists: &exists,
+            cwd: None,
+        })
+        .unwrap();
+        assert_eq!(
+            berth_dir(&env(&[]), Some(&device_layout)).unwrap(),
+            PathBuf::from("/state/berth/moorings")
+        );
+        assert!(berth_dir(&env(&[]), None).is_err());
     }
     #[test]
     fn roster_cures_distinguish_first_unbound_and_pending_devices() {

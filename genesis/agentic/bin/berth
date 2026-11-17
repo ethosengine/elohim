@@ -19,8 +19,8 @@ projection is a rename, never a redesign:
 
 Classification (p2p-design-gate, 2026-09-03): every record is Ephemeral (C) — delete the store and
 it is rebuilt from the live processes and the next moor/claim. Source of truth: the running
-workspace. Store: $CLAUDE_CONFIG_DIR/berth (survives container restarts; never inside /tmp; never
-in git). Design note: genesis/docs/superpowers/specs/2026-09-03-workspace-berth-carrying-capacity-design.md
+workspace. Store: $BERTH_DIR, else $CLAUDE_CONFIG_DIR/berth, else <the device layout's stateDir>/berth
+(`epr device layout show`; survives container restarts; never inside /tmp; never in git). Design note: genesis/docs/superpowers/specs/2026-09-03-workspace-berth-carrying-capacity-design.md
 
 Commands:
   berth moor    --session S [--model M] [--lab L] [--runtime R] [--principal P] [--task T]
@@ -106,9 +106,64 @@ import subprocess
 import sys
 import time
 
-CONFIG_DIR = os.environ.get("CLAUDE_CONFIG_DIR", "/projects/.claude-config")
-PROJECT_DIR = os.environ.get("CLAUDE_PROJECT_DIR", "/projects/elohim")
-POLICY_FILE = os.path.join(PROJECT_DIR, "genesis", "agentic", "pool-policy.json")
+# Where this device keeps the berth store and which checkout's policy it reads. The device layout
+# (`epr device layout show`) is the one resolver; berth asks it rather than guessing, and keeps the
+# Che workspace's `/projects` paths only as the fallback for an `epr` that cannot answer yet.
+CHE_CONFIG_DIR = "/projects/.claude-config"
+CHE_PROJECT_DIR = "/projects/elohim"
+LAYOUT_TIMEOUT_S = 3
+
+
+def _layout_from_epr(env, run):
+    """stateDir and projectRoot from `epr device layout show --json`; {} when epr is absent, fails,
+    is too old to know the verb, or does not answer within LAYOUT_TIMEOUT_S."""
+    epr = env.get("EPR_BIN") or shutil.which("epr", path=env.get("PATH"))
+    if not epr:
+        return {}
+    try:
+        result = run([epr, "device", "layout", "show", "--json"], capture_output=True, text=True,
+                     stdin=subprocess.DEVNULL, timeout=LAYOUT_TIMEOUT_S)
+        value = json.loads(result.stdout) if result.returncode == 0 else None
+    except (OSError, ValueError, subprocess.SubprocessError):
+        return {}
+    if not isinstance(value, dict):
+        return {}
+
+    def path(field):
+        location = value.get(field)
+        found = location.get("path") if isinstance(location, dict) else None
+        return found if isinstance(found, str) and os.path.isabs(found) else None
+    return {"stateDir": path("stateDir"), "projectRoot": path("projectRoot")}
+
+
+def resolve_locations(env=None, run=subprocess.run, isdir=os.path.isdir):
+    """(config_dir, project_dir, error). Each in order: CLAUDE_CONFIG_DIR / CLAUDE_PROJECT_DIR; the
+    device layout's stateDir / projectRoot (asked only when a variable is missing); the Che `/projects`
+    path, only when it exists. Anything still unknown is named in `error`; nothing is guessed."""
+    env = os.environ if env is None else env
+    config = env.get("CLAUDE_CONFIG_DIR") or None
+    project = env.get("CLAUDE_PROJECT_DIR") or None
+    if config is None or project is None:
+        layout = _layout_from_epr(env, run)
+        config = config or layout.get("stateDir")
+        project = project or layout.get("projectRoot")
+    if config is None and isdir(CHE_CONFIG_DIR):
+        config = CHE_CONFIG_DIR
+    if project is None and isdir(CHE_PROJECT_DIR):
+        project = CHE_PROJECT_DIR
+    missing = [what for what, found in (("the berth store's state directory (CLAUDE_CONFIG_DIR)", config),
+                                        ("the checkout (CLAUDE_PROJECT_DIR)", project)) if found is None]
+    error = None
+    if missing:
+        error = (f"cannot locate {' or '.join(missing)}: set the variable, or put an epr that answers "
+                 "`epr device layout show --json` on PATH (or EPR_BIN); this host has no /projects layout")
+    return config, project, error
+
+
+# Resolved once per process: every command below reads the same answer.
+CONFIG_DIR, PROJECT_DIR, LOCATION_ERROR = resolve_locations()
+# An unknown checkout names no policy file; berth's main refuses before any policy is read.
+POLICY_FILE = os.path.join(PROJECT_DIR, "genesis", "agentic", "pool-policy.json") if PROJECT_DIR else ""
 DEFAULT_TTL_S = 3 * 3600
 DEFAULT_RESOURCES = {"mesh": 1, "cargo": 1, "disk-heavy": 1}
 DEFAULT_CLASS = "verify"
@@ -272,7 +327,11 @@ def write_json_atomic(path, obj):
 
 
 def store_dir():
-    return os.environ.get("BERTH_DIR") or os.path.join(CONFIG_DIR, "berth")
+    if os.environ.get("BERTH_DIR"):
+        return os.environ["BERTH_DIR"]
+    if CONFIG_DIR is None:
+        raise BerthStateError(LOCATION_ERROR)
+    return os.path.join(CONFIG_DIR, "berth")
 
 
 def main_checkout(root):
@@ -2129,6 +2188,11 @@ def main(argv):
         sys.stdout.write(result['stdout'])
         sys.stderr.write(result['stderr'])
         return result['exit']
+    if LOCATION_ERROR and not (PROJECT_DIR and os.environ.get("BERTH_DIR")):
+        # The store or the policy cannot be found: a wrapper may proceed unleased (exit 4), and the
+        # line says what to set.
+        print(f"berth: {LOCATION_ERROR}", file=sys.stderr)
+        return EXIT_NO_SESSION
     store = store_dir()
     try:
         return _main(argv)

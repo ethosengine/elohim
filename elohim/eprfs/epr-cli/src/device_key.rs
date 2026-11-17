@@ -106,6 +106,10 @@ pub fn resolve_path() -> io::Result<PathBuf> {
 ///    ABSOLUTE path (the XDG base-directory spec says a relative value is invalid and ignored).
 /// 3. `$HOME/.config/elohim/device/ed25519.seed`.
 ///
+/// Steps 2 and 3 are the device layout's config-directory rule
+/// ([`elohim_device_runtime::layout::default_config_dir_with`]); only the key-FILE override,
+/// which names a file and is admitted by [`check_override_path`], stays here.
+///
 /// No home at all is an error, never a fallback into the working directory: a key written into a
 /// checkout is exactly the per-clone identity this module exists to avoid.
 ///
@@ -122,27 +126,21 @@ where
         check_override_path(&explicit)?;
         return Ok(explicit);
     }
-    let config_home = match non_empty("XDG_CONFIG_HOME").map(PathBuf::from) {
-        Some(xdg) if xdg.is_absolute() => xdg,
-        _ => match non_empty("HOME") {
-            Some(home) => PathBuf::from(home).join(".config"),
-            None => {
-                return Err(io::Error::new(
-                    io::ErrorKind::NotFound,
-                    format!(
-                        "no device key path: {DEVICE_KEY_ENV}, XDG_CONFIG_HOME and HOME are all \
-                         unset — the device key lives in the OS user's config home, never in a \
-                         checkout"
-                    ),
-                ))
-            }
-        },
-    };
-    Ok(config_home
-        .join("elohim")
-        .join("device")
-        .join("ed25519.seed"))
+    // The directory rule is the device layout's, so the key and every store beside it agree.
+    let dir = elohim_device_runtime::layout::default_config_dir_with(&lookup).ok_or_else(|| {
+        io::Error::new(
+            io::ErrorKind::NotFound,
+            format!(
+                "no device key path: {DEVICE_KEY_ENV}, XDG_CONFIG_HOME and HOME are all unset — \
+                 the device key lives in the OS user's config home, never in a checkout"
+            ),
+        )
+    })?;
+    Ok(dir.join(KEY_FILE_NAME))
 }
+
+/// The seed's file name inside the device config directory.
+pub const KEY_FILE_NAME: &str = "ed25519.seed";
 
 /// Refuse an `ELOHIM_DEVICE_KEY_FILE` that is relative, or that lies inside a git repository.
 ///
