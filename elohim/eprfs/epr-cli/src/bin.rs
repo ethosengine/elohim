@@ -520,7 +520,7 @@ pub(crate) mod sibling {
     }
 
     #[cfg(feature = "peer")]
-    enum Draw {
+    pub(crate) enum Draw {
         /// Nothing was drawn and nothing was ingested; the follow may still build.
         Gap(String),
         /// The sibling's bytes are not what it promised, or the store refused them.
@@ -529,7 +529,6 @@ pub(crate) mod sibling {
 
     #[cfg(feature = "peer")]
     fn draw(store: &Store, repo: &Path, commit: &str, incoming: &Path) -> Result<Value, Draw> {
-        use std::os::unix::fs::PermissionsExt;
         let found = crate::peer::custody_artifacts(repo, None)
             .map_err(|e| Draw::Gap(format!("no-record: {e}")))?;
         let offer = select(&found.rows, &found.device, commit).ok_or_else(|| {
@@ -538,6 +537,23 @@ pub(crate) mod sibling {
                  stamped with a release for {commit}"
             ))
         })?;
+        take(store, repo, commit, incoming, &offer, &|output, dest| {
+            crate::artifact::fetch_output(repo, output, dest).map_err(|e| e.to_string())
+        })
+    }
+
+    /// Draw `offer`'s bins with `fetch` (exact output CID to destination), refuse bytes that do
+    /// not make the release it named, and ingest them as the sibling's.
+    #[cfg(feature = "peer")]
+    pub(crate) fn take(
+        store: &Store,
+        repo: &Path,
+        commit: &str,
+        incoming: &Path,
+        offer: &Offer,
+        fetch: &dyn Fn(&str, &Path) -> Result<(), String>,
+    ) -> Result<Value, Draw> {
+        use std::os::unix::fs::PermissionsExt;
         let dir = incoming.join(format!("sibling-{}", offer.release));
         // A previous partial draw is replaced, never trusted.
         let _ = std::fs::remove_dir_all(&dir);
@@ -547,8 +563,7 @@ pub(crate) mod sibling {
         let result = (|| {
             for (bin, output) in &offer.outputs {
                 let dest = dir.join(bin);
-                crate::artifact::fetch_output(repo, output, &dest)
-                    .map_err(|e| Draw::Gap(e.to_string()))?;
+                fetch(output, &dest).map_err(Draw::Gap)?;
                 std::fs::set_permissions(&dest, std::fs::Permissions::from_mode(0o755))
                     .map_err(|e| Draw::Gap(format!("local-store: {}: {e}", dest.display())))?;
             }
@@ -580,10 +595,10 @@ pub(crate) mod sibling {
             if release.cid != offer.release {
                 return Err(mismatch(&release.cid));
             }
-            Ok(())
+            Ok(release.provenance.gate_run)
         })();
         let _ = std::fs::remove_dir_all(&dir);
-        result?;
+        let gate_run = result?;
         let seconds = started.elapsed().as_secs_f64();
         eprintln!(
             "follow: drew epr release {} from {} in {seconds:.1} s",
@@ -593,6 +608,7 @@ pub(crate) mod sibling {
             "device": offer.device,
             "release": offer.release,
             "outputs": offer.outputs,
+            "gateRun": gate_run,
             "seconds": seconds,
         }))
     }
@@ -822,6 +838,145 @@ mod tests {
             at: at.into(),
             head_seq: None,
         }
+    }
+
+    /// The store's own identity probe answers like an epr release (as the launcher tests do).
+    #[cfg(feature = "peer")]
+    struct Identity;
+    #[cfg(feature = "peer")]
+    impl bin_store::Runner for Identity {
+        fn run(&self, spec: &bin_store::CommandSpec) -> Result<bin_store::CommandOutput, Refusal> {
+            Ok(bin_store::CommandOutput {
+                success: true,
+                stdout: json!({
+                    "cid": bin_store::file_cid(Path::new(&spec.program))?,
+                    "version": "fixture"
+                })
+                .to_string(),
+                stderr: String::new(),
+            })
+        }
+    }
+
+    #[cfg(feature = "peer")]
+    fn two_bin_store(root: &Path) -> Store {
+        let registry: Registry = serde_json::from_value(json!({"version":1,"tools":{"epr":{
+            "bins":["epr","bin-launch"],"aliases":{},"longRunning":[],
+            "candidateEnv":{"epr":["EPR_BIN"]}}}}))
+        .unwrap();
+        Store::new(root.join("store/epr"), "epr", &registry)
+            .unwrap()
+            .with_runner(std::sync::Arc::new(Identity))
+    }
+
+    #[cfg(feature = "peer")]
+    fn sibling_bins(dir: &Path, launcher: &str) {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::create_dir_all(dir).unwrap();
+        for (bin, body) in [
+            ("epr", "#!/bin/sh\n# sibling epr\n"),
+            ("bin-launch", launcher),
+        ] {
+            std::fs::write(dir.join(bin), body).unwrap();
+            std::fs::set_permissions(dir.join(bin), std::fs::Permissions::from_mode(0o755))
+                .unwrap();
+        }
+    }
+
+    #[cfg(feature = "peer")]
+    fn offer_for(release: &str) -> sibling::Offer {
+        sibling::Offer {
+            device: "did:key:z6MkSibling".into(),
+            release: release.into(),
+            outputs: [("bin-launch", "out-launch"), ("epr", "out-epr")]
+                .into_iter()
+                .map(|(b, o)| (b.to_string(), o.to_string()))
+                .collect(),
+            at: "2026-11-17T07:00:00Z".into(),
+        }
+    }
+
+    /// Serves `dir`'s bins by output CID, as a sibling's daemon would.
+    #[cfg(feature = "peer")]
+    fn serving(dir: &Path) -> impl Fn(&str, &Path) -> Result<(), String> + '_ {
+        move |output: &str, dest: &Path| {
+            let bin = if output == "out-epr" {
+                "epr"
+            } else {
+                "bin-launch"
+            };
+            std::fs::copy(dir.join(bin), dest)
+                .map(|_| ())
+                .map_err(|e| e.to_string())
+        }
+    }
+
+    #[cfg(feature = "peer")]
+    #[test]
+    fn a_drawn_release_that_makes_its_promised_cid_is_ingested_as_the_siblings() {
+        let tmp = tempfile::tempdir().unwrap();
+        let store = two_bin_store(tmp.path());
+        let landed = tmp.path().join("sibling");
+        sibling_bins(&landed, "#!/bin/sh\n# sibling launcher\n");
+        let release = store.release_cid_of(&landed).unwrap();
+        let commit = "c".repeat(40);
+        let incoming = tmp.path().join("incoming");
+        assert!(!store.holds_verified_for(&commit));
+        let serve = serving(&landed);
+        let drawn = match sibling::take(
+            &store,
+            tmp.path(),
+            &commit,
+            &incoming,
+            &offer_for(&release),
+            &serve,
+        ) {
+            Ok(value) => value,
+            Err(sibling::Draw::Gap(gap)) => panic!("gap: {gap}"),
+            Err(sibling::Draw::Refused(r)) => panic!("refused {}: {}", r.kind, r.detail),
+        };
+        assert_eq!(drawn["release"], release);
+        assert_eq!(drawn["gateRun"], "sibling:did:key:z6MkSibling");
+        // The predicate `follow` and `bootstrap` land by without building.
+        assert!(store.holds_verified_for(&commit));
+        assert!(
+            !incoming.join(format!("sibling-{release}")).exists(),
+            "the draw leaves nothing in incoming"
+        );
+    }
+
+    #[cfg(feature = "peer")]
+    #[test]
+    fn a_drawn_release_whose_bytes_make_another_cid_is_refused_and_nothing_is_ingested() {
+        let tmp = tempfile::tempdir().unwrap();
+        let store = two_bin_store(tmp.path());
+        let landed = tmp.path().join("sibling");
+        sibling_bins(&landed, "#!/bin/sh\n# sibling launcher\n");
+        let promised = store.release_cid_of(&landed).unwrap();
+        let tampered = tmp.path().join("tampered");
+        sibling_bins(&tampered, "#!/bin/sh\n# not the launcher it landed\n");
+        let commit = "d".repeat(40);
+        let incoming = tmp.path().join("incoming");
+        let serve = serving(&tampered);
+        match sibling::take(
+            &store,
+            tmp.path(),
+            &commit,
+            &incoming,
+            &offer_for(&promised),
+            &serve,
+        ) {
+            Err(sibling::Draw::Refused(refusal)) => {
+                assert_eq!(refusal.kind, "sibling-release-mismatch");
+                assert!(refusal.detail.contains(&promised), "{}", refusal.detail);
+            }
+            Err(sibling::Draw::Gap(gap)) => panic!("a mismatch is a refusal, not a gap: {gap}"),
+            Ok(value) => panic!("tampered bytes were taken: {value}"),
+        }
+        assert!(!store.holds_verified_for(&commit), "nothing is ingested");
+        let made = store.release_cid_of(&tampered).unwrap();
+        assert!(!store.verified(&made) && !store.verified(&promised));
+        assert!(!incoming.join(format!("sibling-{promised}")).exists());
     }
 
     #[cfg(feature = "peer")]
