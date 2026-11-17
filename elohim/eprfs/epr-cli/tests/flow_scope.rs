@@ -72,25 +72,41 @@ fn base() -> TempDir {
     tmp
 }
 
+/// The live tree is read only by `live_corpus_*` tests. The eprfs workspace gate skips them
+/// (`--skip live_corpus_`) and keys on the workspace alone; gate project `eprfs-live-corpus` runs
+/// them and keys on the documents they read (the scoped `gate-reads` lines in `repo_root`). A
+/// test under any other name that reached the live tree would read documents neither key names.
+fn assert_live_corpus_test() {
+    let thread = std::thread::current();
+    let name = thread.name().unwrap_or("");
+    let leaf = name.rsplit("::").next().unwrap_or(name);
+    assert!(
+        leaf.starts_with("live_corpus_"),
+        "test `{name}` reads the live tree: name it `live_corpus_…` so the eprfs-live-corpus gate \
+         runs it and keys on its reads"
+    );
+}
+
 fn repo_root() -> Option<PathBuf> {
+    assert_live_corpus_test();
     // The live legs read the scope zones (live and held), the cluster-state manifests and their act
     // lane contracts, deployments.json, and the kit oracle's presence.
-    // gate-reads: genesis/docs/superpowers/specs
-    // gate-reads: genesis/docs/superpowers/plans
-    // gate-reads: genesis/docs/superpowers/held
-    // gate-reads: genesis/docs/plans
-    // gate-reads: genesis/docs/held
-    // gate-reads: genesis/a2o/features
-    // gate-reads: genesis/a2o/held
+    // gate-reads(eprfs-live-corpus): genesis/docs/superpowers/specs
+    // gate-reads(eprfs-live-corpus): genesis/docs/superpowers/plans
+    // gate-reads(eprfs-live-corpus): genesis/docs/superpowers/held
+    // gate-reads(eprfs-live-corpus): genesis/docs/plans
+    // gate-reads(eprfs-live-corpus): genesis/docs/held
+    // gate-reads(eprfs-live-corpus): genesis/a2o/features
+    // gate-reads(eprfs-live-corpus): genesis/a2o/held
     // The cluster-state files are named one by one: the directory also holds `habits.yaml`, the
     // generated projection every habit delta rewrites, which no scope leg reads. Keying on the
     // directory re-ran this workspace's whole gate for each delta (1323 s on 9be1cb048). A new
     // `cluster-state*.yaml` must be named here; gate-input-audit.test.mjs refuses one that is not.
-    // gate-reads: genesis/manifests/cluster-state.yaml
-    // gate-reads: genesis/manifests/cluster-state.act1-household.yaml
-    // gate-reads: genesis/manifests/cluster-state.act2-neighbourhood.yaml
-    // gate-reads: genesis/orchestrator/data/deployments.json
-    // gate-reads: .claude/scripts/memory-kit
+    // gate-reads(eprfs-live-corpus): genesis/manifests/cluster-state.yaml
+    // gate-reads(eprfs-live-corpus): genesis/manifests/cluster-state.act1-household.yaml
+    // gate-reads(eprfs-live-corpus): genesis/manifests/cluster-state.act2-neighbourhood.yaml
+    // gate-reads(eprfs-live-corpus): genesis/orchestrator/data/deployments.json
+    // gate-reads(eprfs-live-corpus): .claude/scripts/memory-kit
     Path::new(env!("CARGO_MANIFEST_DIR"))
         .ancestors()
         .nth(3)
@@ -312,7 +328,7 @@ fn the_focus_baseline_says_full_focus_when_nothing_is_narrowed() {
 
 /// The oracle leg over the LIVE cluster-state. Read-only.
 #[test]
-fn the_kit_agrees_with_the_native_scope_reading() {
+fn live_corpus_the_kit_agrees_with_the_native_scope_reading() {
     let Some(repo) = repo_root() else {
         eprintln!("SKIP: could not resolve the repository root from CARGO_MANIFEST_DIR");
         return;
@@ -376,7 +392,7 @@ fn the_kit_agrees_with_the_native_scope_reading() {
 
 /// The pinned witness, asserted exactly when the oracle cannot be asked.
 #[test]
-fn the_recorded_scope_line_is_the_witness_once_the_kit_is_gone() {
+fn live_corpus_recorded_scope_line_is_the_witness_once_the_kit_is_gone() {
     let Some(repo) = repo_root() else {
         eprintln!("SKIP: could not resolve the repository root");
         return;

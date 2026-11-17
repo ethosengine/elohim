@@ -69,6 +69,30 @@
           "cargo": { "workspace": "elohim/eprfs", "profile": "dev", "rustflags": "" }
         }
       },
+      "eprfs-live-corpus": {
+        "dir": "elohim/eprfs",
+        "steps": ["rust-build-test"],
+        "inputs": {
+          "sources": [
+            "genesis/docs/**",
+            "genesis/research/**",
+            "elohim/sdk/domains/lamad/manifest.json",
+            ".gitmodules",
+            "genesis/a2o/features/**",
+            "genesis/a2o/held/**",
+            "genesis/manifests/cluster-state*.yaml",
+            "genesis/orchestrator/data/deployments.json",
+            ".epr-meta",
+            "**/.epr-meta"
+          ],
+          "buildProcess": ["justfile"]
+        },
+        "run": {
+          "kind": "root-just",
+          "recipe": "_gate-eprfs-live-corpus",
+          "cargo": { "workspace": "elohim/eprfs", "profile": "dev", "rustflags": "" }
+        }
+      },
       "seam-guidance-contracts": {
         "dir": "elohim/sdk/domains/elohim-agent",
         "inputs": {

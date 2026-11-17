@@ -66,10 +66,12 @@ fn frontmatter_body(text: &str) -> Option<&str> {
 }
 
 #[test]
-fn live_manifests_are_integrity_clean() {
+fn live_corpus_manifests_are_integrity_clean() {
     // The walk reads every tracked `.epr-meta` manifest and nothing else (SKIP_DIRS / SKIP_REL
     // prune only untracked or ignored trees), so its closure is that file kind, not the repository.
-    // gate-reads: **/.epr-meta
+    // The read is this leg's alone: the eprfs workspace gate skips `live_corpus_*` tests, and gate
+    // project `eprfs-live-corpus` runs this one and keys on the file kind.
+    // gate-reads(eprfs-live-corpus): **/.epr-meta
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../..")
         .canonicalize()

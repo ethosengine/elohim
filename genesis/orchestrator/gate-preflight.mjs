@@ -42,7 +42,9 @@ export const NAMED_READ_SET_PROJECTS = ['elohim-storage', 'doorway', 'steward-no
 // asserts the runtime services' shared-crate reads). Without it here, one new test-file read
 // (epr-cli/tests/session_envelope.rs, 2026-11-10) put eprfs back on whole-tree keying unseen, and a
 // dirty ledger then cost a 47-minute re-run.
-export const PREFLIGHT_READ_SET_PROJECTS = [...NAMED_READ_SET_PROJECTS, 'eprfs'];
+// eprfs-live-corpus scans the same sources and keys on the reads its `gate-reads(eprfs-live-corpus)`
+// lines name, so one unnamed read there would widen it the same way.
+export const PREFLIGHT_READ_SET_PROJECTS = [...NAMED_READ_SET_PROJECTS, 'eprfs', 'eprfs-live-corpus'];
 
 const ELEMENTS_DIR = 'app/elohim-elements';
 const STORAGE_CLIENT_DIST = 'elohim/sdk/storage-client-ts/dist/index.js';

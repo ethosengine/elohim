@@ -701,6 +701,87 @@ test('equal trees under different commits share a closure key', async function e
   }
 });
 
+// Backlog steward-device-arrival-open-items row 7, through the real closure functions on a real
+// repository: two gate projects share one cargo step; the live-corpus test file's reads carry a
+// `gate-reads(fixture-live)` scope. A documentation commit keeps the workspace key (evidence hit)
+// and moves the live-corpus key; a Rust source commit moves the workspace key.
+test('a scoped live-corpus read re-keys only its own project; a Rust change still re-keys the workspace', t => {
+  const root = mkdtempSync(join(tmpdir(), 'gate-evidence-live-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const cleanEnv = { ...process.env };
+  for (const key of ['GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_PREFIX', 'GIT_COMMON_DIR', 'GATE_COMMIT']) delete cleanEnv[key];
+  Object.assign(cleanEnv, {
+    GIT_CEILING_DIRECTORIES: dirname(root),
+    GIT_CONFIG_NOSYSTEM: '1',
+    GIT_CONFIG_GLOBAL: '/dev/null',
+    HOME: root,
+    GIT_AUTHOR_NAME: 'Test Author',
+    GIT_AUTHOR_EMAIL: 'author@example.test',
+    GIT_COMMITTER_NAME: 'Test Committer',
+    GIT_COMMITTER_EMAIL: 'committer@example.test',
+    GIT_AUTHOR_DATE: '2026-11-17T12:00:00Z',
+    GIT_COMMITTER_DATE: '2026-11-17T12:00:00Z',
+  });
+  const git = (...args) => spawnSync('git', args, { cwd: root, env: cleanEnv, encoding: 'utf8' });
+  const commit = message => {
+    git('add', '.');
+    assert.equal(git('commit', '-m', message).status, 0);
+    return git('rev-parse', 'HEAD').stdout.trim();
+  };
+  assert.equal(git('init').status, 0);
+  for (const dir of ['ws/tests', 'ws/src', 'genesis/orchestrator', 'docs']) mkdirSync(join(root, dir), { recursive: true });
+  writeFileSync(join(root, 'ws', 'build-manifest.json'), JSON.stringify({
+    steps: { s: { inputs: { sources: ['ws/**'] } } },
+  }));
+  writeFileSync(join(root, 'justfile'), 'gate:\n  true\nlive:\n  true\n');
+  writeFileSync(join(root, 'genesis', 'orchestrator', 'run-local-gate.sh'), '#!/bin/sh\n');
+  writeFileSync(join(root, 'ws', 'Cargo.toml'), '[package]\nname="ws"\nversion="0.1.0"\n');
+  writeFileSync(join(root, 'ws', 'src', 'lib.rs'), 'pub fn one() -> u8 { 1 }\n');
+  writeFileSync(join(root, 'ws', 'tests', 'fixture.rs'),
+    'const X: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/../data.json"));\n');
+  writeFileSync(join(root, 'ws', 'tests', 'live.rs'), `fn repo_root() -> PathBuf {
+    // gate-reads(fixture-live): docs
+    let mut p = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    p.pop();
+    p
+}
+`);
+  writeFileSync(join(root, 'data.json'), '{"v":1}\n');
+  writeFileSync(join(root, 'docs', 'a.md'), '# a\n');
+  const base = commit('base');
+  writeFileSync(join(root, 'docs', 'scratch.md'), '# a documentation edit\n');
+  const docs = commit('docs');
+  writeFileSync(join(root, 'ws', 'src', 'lib.rs'), 'pub fn one() -> u8 { 2 }\n');
+  const rust = commit('rust');
+
+  const brit = join(root, 'brit');
+  const buildRef = join(root, 'brit-build-ref');
+  // The step fingerprint follows the step's own sources (ws/**), as brit's does.
+  writeFileSync(brit,
+    `#!/bin/sh\nprintf '{"fingerprints":[{"step":"%s","fingerprint":"%s"}]}' "$5" "$(git -C '${root}' rev-parse "$7:ws")"\n`);
+  writeFileSync(buildRef, '#!/bin/sh\nprintf "[]"\n');
+  chmodSync(brit, 0o755);
+  chmodSync(buildRef, 0o755);
+  const env = { ...cleanEnv, BRIT_BIN: brit, BRIT_BUILD_REF_BIN: buildRef, PATH: cleanEnv.PATH || '' };
+  const isoSpawn = (cmd, args, opts) => spawnSync(cmd, args, { ...opts, env: { ...cleanEnv, ...(opts?.env || {}) } });
+  const gateProject = (name, recipe) => ({
+    name, dir: 'ws', manifestPath: 'ws/build-manifest.json', steps: ['s'],
+    run: { kind: 'root-just', recipe, cargo: { workspace: 'ws' } },
+  });
+  const workspace = gateProject('fixture-ws', 'gate');
+  const live = gateProject('fixture-live', 'live');
+  const at = (gp, rev) => gateEvidence(gp, { root, commit: rev, env, spawn: isoSpawn });
+
+  const ws = [base, docs, rust].map(rev => at(workspace, rev));
+  const lv = [base, docs, rust].map(rev => at(live, rev));
+  assert.match(ws[0].line, /closure scope paths \(1 reads\)/, 'the workspace keys on data.json alone');
+  assert.match(lv[0].line, /closure scope paths \(2 reads\)/, 'the live project keys on data.json and docs');
+  assert.equal(ws[1].key, ws[0].key, 'a documentation commit keeps the workspace closure: its evidence still hits');
+  assert.notEqual(lv[1].key, lv[0].key, 'a documentation commit re-keys the live-corpus project');
+  assert.notEqual(ws[2].key, ws[1].key, 'a Rust source change still re-keys the workspace');
+  assert.notEqual(lv[2].key, lv[1].key, 'a Rust source change re-keys the live-corpus project too');
+});
+
 test('non-Rust projects and Cargo steps without covered Rust files get unknown tree scope', t => {
   for (const options of [
     { gateProject: { ...project, run: { kind: 'root-just', recipe: 'gate' } } },

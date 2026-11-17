@@ -1564,7 +1564,7 @@ decisionPoints:
     testName: an_unknown_cap_is_drift_on_a_doc_and_a_fixture_tag_on_a_feature
     kind: integration
   - path: elohim/eprfs/epr-cli/tests/flow_scope.rs
-    testName: the_kit_agrees_with_the_native_scope_reading
+    testName: live_corpus_the_kit_agrees_with_the_native_scope_reading
     kind: integration
   - path: elohim/eprfs/epr-cli/tests/flow_scope.rs
     testName: apply_moves_the_tree_writes_the_stop_and_refreshes_the_baseline

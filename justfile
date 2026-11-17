@@ -697,6 +697,8 @@ _gate-agentic-shift:
     node --test genesis/agentic/objective-schema.test.mjs genesis/agentic/readiness.test.mjs genesis/agentic/seed-target.test.mjs
     python3 -m unittest discover -s genesis/agentic -p 'shift*_test.py'
     python3 -m unittest genesis.agentic.berth_test
+    # The cargo-pool library every session hook sources (backlog row 6), with family_busy (row 13).
+    python3 -m unittest genesis.agentic.pool_preflight_test genesis.agentic.pool_artifact_hashes_test genesis.agentic.lsp_attach_test genesis.agentic.lsp_flycheck_test
 
 # `pnpm build` first: @elohim/epr ships no dist/ in the tree, so a consumer's
 # import fails at module resolution rather than at type-check. Testing a package
@@ -718,8 +720,33 @@ _gate-eprfs:
         fmt -- cargo fmt --check \
         ::: precheck -- python3 "{{justfile_directory()}}/scripts/ci/publish_eprfs.py" --precheck \
         ::: lint -- node "{{justfile_directory()}}/genesis/orchestrator/cargo-lint.mjs" "$@" --all-targets -- -D warnings \
-        ::: test -- cargo test "$@") || exit $?; \
+        ::: test -- cargo test "$@" -- --skip live_corpus_) || exit $?; \
       EPRFS_SOURCE_BEFORE="$before" EPRFS_TESTED_HEAD="$tested_head" just _eprfs-ingest-around build
+
+# The eprfs live-corpus legs (backlog steward-device-arrival-open-items row 7): the `live_corpus_*`
+# tests read the documentation tree, the memory directory, every CLAUDE.md and every `.epr-meta`
+# manifest. `_gate-eprfs` skips them (`--skip live_corpus_`), so a documentation commit leaves the
+# workspace key alone; this project keys on those reads (their `gate-reads(eprfs-live-corpus)`
+# lines) and runs in the eprfs slot with the same `--workspace` feature set, so a warm slot
+# compiles only these three test binaries. Each binary must pass at least one live leg: a rename or
+# a filter drift fails here instead of passing on zero tests.
+_gate-eprfs-live-corpus:
+    #!/usr/bin/env bash
+    set -uo pipefail
+    cd elohim/eprfs
+    log="$(mktemp)"
+    trap 'rm -f "$log"' EXIT
+    for target in flow_cites flow_scope live_manifest_integrity; do
+      cargo test --workspace --test "$target" -- live_corpus_ 2>&1 | tee "$log"
+      status=${PIPESTATUS[0]}
+      [ "$status" -eq 0 ] || exit "$status"
+      ran=$(grep -cE '^test live_corpus_[A-Za-z0-9_]+ \.\.\. ok$' "$log" || true)
+      if [ "${ran:-0}" -lt 1 ]; then
+        echo "[gate] eprfs-live-corpus: --test $target passed no live_corpus_ test; a rename or a filter drift would skip the live legs" >&2
+        exit 1
+      fi
+      echo "[gate] eprfs-live-corpus: --test $target passed $ran live leg(s)"
+    done
 
 # Native seam guidance's non-Rust contracts: the declaration and method schemas hold every
 # declaration the opt-in binding names, and the hook adapter stays private and fails visibly.
@@ -734,8 +761,10 @@ _gate-seam-guidance-contracts:
 _eprfs-deliver:
     @just _eprfs-ingest-around build
 
-# Run `cargo test --workspace` (test) or build the device binaries (build), then ingest debug/epr
-# at HEAD into the device store as a dev-context candidate.
+# Run `cargo test --workspace` (test, then the build) or build the device binaries (build), then
+# ingest debug/epr at HEAD into the device store as a dev-context candidate, and offer that release
+# to this person's other devices (genesis/orchestrator/eprfs-produce.sh: describe, key and a
+# crossed `artifact put` of these same bytes; a refusal prints one line and the gate stays green).
 # gate-runner gives each linked worktree a -wt-<basename> target suffix, so another
 # worktree cannot replace this tested artifact before the staging copy below.
 # Accepted residual: a concurrent rebuild in this same worktree can still replace debug/epr.
@@ -749,18 +778,18 @@ _eprfs-ingest-around mode:
         set -- --workspace; \
         if [ -n "${GATE_CARGO_PACKAGES:-}" ]; then set --; for package in $GATE_CARGO_PACKAGES; do set -- "$@" -p "$package"; done; fi; \
         (cd elohim/eprfs && cargo test "$@") || exit $?; \
-        if [ -n "${GATE_CARGO_PACKAGES:-}" ]; then (cd elohim/eprfs && cargo build -p elohim-epr-cli --bin epr) || exit $?; fi; \
-      else \
-        (cd elohim/eprfs && cargo build -p elohim-epr-cli --bin epr -p elohim-device-runtime --bin bin-launch) || exit $?; \
       fi; \
+      (cd elohim/eprfs && cargo build -p elohim-epr-cli --bin epr -p elohim-device-runtime --bin bin-launch) || exit $?; \
       after="$("$CARGO_TARGET_DIR/debug/epr" bin --tool epr source-state 2>/dev/null || echo none)"; \
       tree_clean=false; \
       if [[ "$before" == "$after" && "$before" == *'"clean":true'* ]]; then tree_clean=true; fi; \
       if [[ -x "$CARGO_TARGET_DIR/debug/epr" ]]; then \
-        "$CARGO_TARGET_DIR/debug/epr" bin --tool epr ingest "$CARGO_TARGET_DIR/debug/epr" \
+        if ingested="$("$CARGO_TARGET_DIR/debug/epr" bin --tool epr ingest "$CARGO_TARGET_DIR/debug/epr" \
           --source-commit "$tested_head" --tree-clean "$tree_clean" \
-          --gate-run "${GATE_RUN_KIND:-local-gate}" \
-          >/dev/null || echo "[gate] epr dev-context ingest skipped (store refused; gate remains green)"; \
+          --gate-run "${GATE_RUN_KIND:-local-gate}")"; then \
+          bash "{{justfile_directory()}}/genesis/orchestrator/eprfs-produce.sh" "$tested_head" "$tree_clean" "$ingested" \
+            || echo "[gate] epr producer put skipped (the producer exited $?; gate remains green)"; \
+        else echo "[gate] epr dev-context ingest skipped (store refused; gate remains green)"; fi; \
       else \
         echo "[gate] epr dev-context ingest skipped ($CARGO_TARGET_DIR/debug/epr was not built)"; \
       fi

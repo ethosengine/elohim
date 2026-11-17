@@ -233,15 +233,34 @@ const SEAL_LEGACY: &[Row] = &[
 // Harness
 // ---------------------------------------------------------------------------
 
+/// The live tree is read only by `live_corpus_*` tests. The eprfs workspace gate skips them
+/// (`--skip live_corpus_`) and keys on the workspace alone; gate project `eprfs-live-corpus` runs
+/// them and keys on the documents they read (the scoped `gate-reads` lines in `repo_root`). A
+/// test under any other name that reached the live tree would read documents neither key names.
+fn assert_live_corpus_test() {
+    let thread = std::thread::current();
+    let name = thread.name().unwrap_or("");
+    let leaf = name.rsplit("::").next().unwrap_or(name);
+    assert!(
+        leaf.starts_with("live_corpus_"),
+        "test `{name}` reads the live tree: name it `live_corpus_…` so the eprfs-live-corpus gate \
+         runs it and keys on its reads"
+    );
+}
+
 fn repo_root() -> PathBuf {
+    assert_live_corpus_test();
     // tests/ -> epr-cli -> eprfs -> elohim -> <repo>
-    // The live legs read the doc roots, every gospel CLAUDE.md, and the two in-repo legacy path
-    // cites the LIVE_VERIFY documents carry today; a new legacy cite there must be declared here.
-    // gate-reads: genesis/docs
-    // gate-reads: .claude/memory
-    // gate-reads: **/CLAUDE.md
-    // gate-reads: elohim/sdk/domains/lamad/manifest.json
-    // gate-reads: .claude/skills/memory-ceremony/SKILL.md
+    // The live legs read the doc roots, every gospel CLAUDE.md, the research corpus with the
+    // `.gitmodules` its submodule cites are judged against, and the two in-repo legacy path cites
+    // the LIVE_VERIFY documents carry today; a new legacy cite there must be declared here.
+    // gate-reads(eprfs-live-corpus): genesis/docs
+    // gate-reads(eprfs-live-corpus): .claude/memory
+    // gate-reads(eprfs-live-corpus): **/CLAUDE.md
+    // gate-reads(eprfs-live-corpus): elohim/sdk/domains/lamad/manifest.json
+    // gate-reads(eprfs-live-corpus): .claude/skills/memory-ceremony/SKILL.md
+    // gate-reads(eprfs-live-corpus): genesis/research
+    // gate-reads(eprfs-live-corpus): .gitmodules
     let mut p = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     for _ in 0..3 {
         p = p
@@ -560,7 +579,7 @@ fn live_verify_legacy_read_paths(root: &Path) -> Vec<String> {
 }
 
 #[test]
-fn verify_agrees_with_the_oracle_on_twenty_live_documents() {
+fn live_corpus_verify_agrees_with_the_oracle_on_twenty_documents() {
     let root = repo_root();
     let read_paths = live_verify_legacy_read_paths(&root);
     common::assert_declared_reads(
@@ -1024,10 +1043,9 @@ fn cite_fingerprint_stays_the_citation_profile_after_the_address_crossing() {
 }
 
 #[test]
-fn research_corpus_has_no_dead_cite_after_the_address_crossing() {
-    // gate-reads: genesis/research
-    // `verify` reads `.gitmodules` to judge a cite into a submodule at its pin.
-    // gate-reads: .gitmodules
+fn live_corpus_research_has_no_dead_cite_after_the_address_crossing() {
+    // Reads genesis/research, and `.gitmodules` (`verify` judges a cite into a submodule at its
+    // pin); both are declared on `repo_root`, the construction every live read derives from.
     let root = repo_root();
     let research = root.join("genesis/research");
     if !research.is_dir() {
@@ -1212,13 +1230,12 @@ fn a_missing_path_outside_every_submodule_is_dead_exactly_as_before() {
 }
 
 #[test]
-fn research_corpus_has_no_dead_cite_with_no_submodule_checked_out() {
+fn live_corpus_research_has_no_dead_cite_with_no_submodule_checked_out() {
     // The eprfs CI pod checks out the superproject but no submodule. Rebuild that shape from the
     // live checkout without touching it: the real `.gitmodules`, the real gitlink pins, the
     // research documents, and an empty placeholder at every non-submodule target that exists
     // live (`verify` asks only whether such a target exists) — and no submodule at all.
-    // gate-reads: genesis/research
-    // gate-reads: .gitmodules
+    // Its reads (genesis/research, .gitmodules) are declared on `repo_root`.
     let live = repo_root();
     let research = live.join("genesis/research");
     let Ok(gitmodules) = std::fs::read_to_string(live.join(".gitmodules")) else {

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync, readdirSync } from 'fs';
 import { dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
-import { auditProject, exhaustInputs, globCovers, isReadPattern, readCovers, readSet } from './gate-input-audit.mjs';
+import { auditProject, declarationScopes, exhaustInputs, globCovers, isReadPattern, readCovers, readSet } from './gate-input-audit.mjs';
 import { GATE_EXHAUST } from './gate-evidence.mjs';
 import { NAMED_READ_SET_PROJECTS } from './gate-preflight.mjs';
 import { loadGateRegistry } from './pipeline-registry.mjs';
@@ -233,6 +233,50 @@ test('a **/<basename> declaration names one file kind across the repository, and
   }
 });
 
+// Backlog steward-device-arrival-open-items row 7: the eprfs live-corpus legs keyed the workspace
+// gate on the whole documentation tree. A scoped declaration gives a read to one gate project.
+test('a gate-reads(<project>) declaration names its read for that project alone', () => {
+  const text = `fn repo_root() -> PathBuf {
+    // gate-reads(live-corpus): genesis/docs
+    // gate-reads(live-corpus): **/CLAUDE.md
+    let mut p = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    p.pop();
+    p
+  }`;
+  const as = name => readSet({ ...fixture(text), project: { ...project, name } });
+  assert.deepEqual(as('live-corpus'), { paths: ['**/CLAUDE.md', 'genesis/docs'], unresolved: [] });
+  assert.deepEqual(as('workspace'), { paths: [], unresolved: [] },
+    'another project neither keys on the read nor reports the claimed walk unresolved');
+  assert.deepEqual(readSet(fixture(text)), { paths: ['**/CLAUDE.md', 'genesis/docs'], unresolved: [] },
+    'a scan that names no project (reverse-dependency narrowing) sees every declared read');
+  assert.deepEqual(auditProject({ ...fixture(text), project: { ...project, name: 'workspace' } }).undeclared, []);
+});
+
+test('an unscoped declaration beside a scoped one still keys every project, and a scope covers only its statement', () => {
+  const mixed = `fn walk() {
+    // gate-reads(live-corpus): genesis/docs
+    // gate-reads: shared/fixtures
+    Path::new(env!("CARGO_MANIFEST_DIR")).ancestors().find_map(find_root);
+  }`;
+  const as = (text, name) => readSet({ ...fixture(text), project: { ...project, name } });
+  assert.deepEqual(as(mixed, 'workspace'), { paths: ['shared/fixtures'], unresolved: [] });
+  assert.deepEqual(as(mixed, 'live-corpus').paths, ['genesis/docs', 'shared/fixtures']);
+  const beside = `fn walk() {
+    // gate-reads(live-corpus): genesis/docs
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).ancestors().find_map(find_root);
+    let other = Path::new(env!("CARGO_MANIFEST_DIR")).ancestors().find_map(find_other);
+  }`;
+  const result = as(beside, 'workspace');
+  assert.deepEqual(result.paths, []);
+  assert.equal(result.unresolved.length, 1, 'the next statement is not claimed by the scoped line above its neighbour');
+  for (const malformed of ['gate-reads(): genesis/docs', 'gate-reads(a b): genesis/docs', 'gate-reads (x): genesis/docs']) {
+    const r = as(`fn walk() {\n    // ${malformed}\n    Path::new(env!("CARGO_MANIFEST_DIR")).ancestors().find_map(find_root);\n  }`, 'workspace');
+    assert.deepEqual(r.paths, [], malformed);
+    assert.equal(r.unresolved.length, 1, `${malformed} is not a declaration`);
+  }
+  assert.deepEqual(declarationScopes(mixed), [{ project: 'live-corpus', path: 'genesis/docs', line: 2 }]);
+});
+
 test('readCovers matches a basename read at the root and any depth only; source globs stay literal', () => {
   assert.ok(readCovers('**/.epr-meta', '.epr-meta'));
   assert.ok(readCovers('**/.epr-meta', 'a/b/.epr-meta'));
@@ -388,8 +432,12 @@ test('REAL eprfs names its governance walk as the .epr-meta file kind, not the w
   const result = realReadSet('eprfs');
   assert.deepEqual(result.unresolved, []);
   assert.ok(result.paths.includes('genesis/agentic/agent-runtimes.json'));
-  assert.ok(result.paths.includes('**/.epr-meta'), 'the governance walk must remain visible as its file kind');
-  assert.ok(!result.paths.includes('.'), 'no eprfs read may name the whole repository');
+  // The walk is a live-corpus leg: eprfs-live-corpus keys on it, the workspace gate skips it.
+  const live = realReadSet('eprfs-live-corpus');
+  assert.deepEqual(live.unresolved, []);
+  assert.ok(live.paths.includes('**/.epr-meta'), 'the governance walk must remain visible as its file kind');
+  assert.ok(!result.paths.includes('**/.epr-meta'), 'the workspace gate skips the live walk and must not key on it');
+  for (const r of [result, live]) assert.ok(!r.paths.includes('.'), 'no eprfs read may name the whole repository');
   assert.ok(!result.unresolved.some(row => row.file.endsWith('/live_manifest_integrity.rs')));
   assert.ok(!result.unresolved.some(row => row.file.includes('/flow/memory/recall/')));
   for (const name of ['recall-contract', 'recall-semantic-index', 'recall-lexical-index']) {
@@ -451,10 +499,12 @@ for (const name of NAMED_READ_SET_PROJECTS) {
 
 // A habit delta re-projects genesis/manifests/habits.yaml. While eprfs keyed on the whole
 // directory, every delta in the repository re-ran the eprfs workspace gate (1323 s on 9be1cb048).
-test('eprfs keys on each cluster-state manifest and never on the habits projection', () => {
+test('eprfs-live-corpus keys on each cluster-state manifest and never on the habits projection', () => {
   const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
-  const { paths, unresolved } = readSet({ root: ROOT, sources: ['elohim/eprfs/**'] });
+  const { paths, unresolved } = realReadSet('eprfs-live-corpus');
   assert.deepEqual(unresolved, []);
+  assert.equal(readSet({ root: ROOT, sources: ['elohim/eprfs/**'] }).paths.some(read => readCovers(read, 'genesis/manifests/habits.yaml')),
+    false, 'no eprfs scan, scoped or not, may cover the habits projection');
   const covered = file => paths.some(read => readCovers(read, file));
   assert.equal(covered('genesis/manifests/habits.yaml'), false,
     'a read covers genesis/manifests/habits.yaml: name the files read, not the directory');
@@ -465,4 +515,52 @@ test('eprfs keys on each cluster-state manifest and never on the habits projecti
     assert.ok(covered(`genesis/manifests/${name}`),
       `genesis/manifests/${name} is unnamed: add its gate-reads line in epr-cli/tests/flow_scope.rs`);
   }
+});
+
+// Row 7's receipt on the real tree: a documentation edit falls outside every eprfs workspace read
+// and inside the live-corpus project's, so only eprfs-live-corpus re-keys for it.
+test('REAL a documentation edit re-keys eprfs-live-corpus and never the eprfs workspace gate', () => {
+  const workspace = realReadSet('eprfs');
+  const live = realReadSet('eprfs-live-corpus');
+  const covers = (reads, file) => reads.paths.some(read => readCovers(read, file));
+  for (const file of [
+    'genesis/docs/superpowers/sprints/2026-11-17-scratch-sprint-journal.md',
+    'genesis/docs/content/elohim-protocol/scratch.md',
+    '.claude/memory/scratch-note.md',
+    'elohim/sdk/CLAUDE.md',
+    'genesis/a2o/features/devflow/scratch.feature',
+    'genesis/research/scratch.md',
+    'elohim/eprfs/.epr-meta',
+  ]) {
+    assert.ok(!covers(workspace, file), `the eprfs workspace key reads ${file}`);
+    assert.ok(covers(live, file), `eprfs-live-corpus does not key on ${file}`);
+  }
+});
+
+test('REAL every gate-reads(<project>) scope names a registered gate project whose sources scan the file', () => {
+  const repo = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
+  const registry = loadGateRegistry(repo);
+  const scanned = name => {
+    const project = registry.get(name);
+    const manifest = JSON.parse(readFileSync(resolve(repo, project.manifestPath), 'utf8'));
+    return [...new Set(project.steps.flatMap(step => manifest.steps[step].inputs?.sources || []))];
+  };
+  const failures = [];
+  let scopes = 0;
+  const walk = dir => {
+    for (const entry of readdirSync(resolve(repo, dir), { withFileTypes: true })) {
+      const rel = `${dir}/${entry.name}`;
+      if (entry.isDirectory()) { if (!['target', 'node_modules', 'fixtures'].includes(entry.name)) walk(rel); continue; }
+      if (!entry.name.endsWith('.rs')) continue;
+      for (const { project, line } of declarationScopes(readFileSync(resolve(repo, rel), 'utf8'))) {
+        scopes += 1;
+        // A misspelt scope would drop the read from every key: refuse it.
+        if (!registry.has(project)) failures.push(`${rel}:${line} names unknown gate project ${project}`);
+        else if (!scanned(project).some(glob => globCovers(glob, rel))) failures.push(`${rel}:${line}: ${project} does not scan this file`);
+      }
+    }
+  };
+  walk('elohim/eprfs');
+  assert.ok(scopes >= 20, `only ${scopes} scoped declarations found: the live-corpus legs lost their scope`);
+  assert.deepEqual(failures, []);
 });

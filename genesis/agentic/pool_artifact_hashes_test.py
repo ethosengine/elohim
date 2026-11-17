@@ -139,5 +139,51 @@ class PoolArtifactHashesTest(unittest.TestCase):
         self.assertTrue(legacy_new.exists())
 
 
+class FamilyBusyTest(unittest.TestCase):
+    """`family_busy` guards the hash sweep: `cargo test` holds no build lock while tests run
+    (backlog row 13, 2026-11-17: a cozo unit was removed under a running storage gate)."""
+
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory(prefix='pool busy ')
+        self.addCleanup(tmp.cleanup)
+        self.pool = Path(tmp.name) / 'pool'
+        self.elsewhere = Path(tmp.name) / 'elsewhere'
+        self.elsewhere.mkdir()
+        for family in ('fam', 'fam-b'):
+            (self.pool / 'family' / family / 'elohim__eprfs' / 'dev' / 'debug').mkdir(parents=True)
+
+    def slot(self, family):
+        return self.pool / 'family' / family / 'elohim__eprfs' / 'dev'
+
+    def live(self, **env):
+        """A process outside the pool (cwd elsewhere) that runs until the test ends."""
+        process = subprocess.Popen(['sleep', '60'], cwd=self.elsewhere,
+                                   env={**os.environ, **env})
+        self.addCleanup(process.wait)
+        self.addCleanup(process.kill)
+        return process
+
+    def busy(self, family='fam'):
+        env = {**os.environ, 'CARGO_TARGET_POOL_ROOT': str(self.pool)}
+        env.pop('CARGO_TARGET_DIR', None)
+        result = subprocess.run(
+            ['bash', '-c', 'source "$1"; family_busy "$2"; echo "exit=$?"', '_', str(LIB), family],
+            cwd=self.elsewhere, capture_output=True, text=True, env=env, check=True)
+        return result.stdout.strip().splitlines()[-1] == 'exit=0'
+
+    def test_idle_family_is_not_busy(self):
+        self.assertFalse(self.busy())
+
+    def test_live_process_targeting_the_family_is_busy(self):
+        self.live(CARGO_TARGET_DIR=str(self.slot('fam')))
+        self.assertTrue(self.busy())
+
+    def test_process_in_another_family_leaves_this_one_idle(self):
+        # `fam-b` shares the `fam` prefix: the match is on the family directory, not a prefix.
+        self.live(CARGO_TARGET_DIR=str(self.slot('fam-b')))
+        self.assertFalse(self.busy('fam'))
+        self.assertTrue(self.busy('fam-b'))
+
+
 if __name__ == '__main__':
     unittest.main()

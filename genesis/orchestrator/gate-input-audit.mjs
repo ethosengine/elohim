@@ -64,6 +64,21 @@ function repositoryFiles(root) {
   return [...new Set(result.stdout.split('\0').filter(Boolean))];
 }
 
+/**
+ * `// gate-reads: <path>` names a read for every gate whose sources cover the file.
+ * `// gate-reads(<project>): <path>` names it for that gate project alone: the statement it sits
+ * above runs only in that project's recipe (eprfs's live-corpus legs run in `eprfs-live-corpus`,
+ * which the workspace recipe skips by name), so another project scanning the same file neither
+ * keys on the read nor reports it unresolved. A scan that names no project counts every
+ * declaration, scoped or not (reverse-dependency narrowing must see every read).
+ */
+const DECLARATION = /^\/\/\s*gate-reads(?:\(([A-Za-z0-9_.-]+)\))?:\s*(\S.*?)\s*$/;
+
+/** Every `gate-reads(<project>)` scope a Rust source names, in order of appearance. */
+export function declarationScopes(text) {
+  return tokens(text).declarations.filter(d => d.project).map(({ project, path, line }) => ({ project, path, line }));
+}
+
 // Keep strings atomic and discard comments, preserving locations. In particular,
 // neither examples in doc comments nor Rust source inside fixture strings are reads.
 function tokens(text) {
@@ -88,9 +103,9 @@ function tokens(text) {
       pattern.lastIndex = offset;
       raw = pattern.exec(text)[0];
     }
-    const declaration = raw.match(/^\/\/\s*gate-reads:\s*(\S.*?)\s*$/);
+    const declaration = raw.match(DECLARATION);
     if (declaration && /^\s*$/.test(text.slice(text.lastIndexOf('\n', offset - 1) + 1, offset))) {
-      declarations.push({ path: declaration[1], offset, line });
+      declarations.push({ path: declaration[2], project: declaration[1] || null, offset, line });
     }
     if (!/^\s|^\/\//.test(raw) && !raw.startsWith('/*')) {
       const token = { text: raw, offset, line };
@@ -239,7 +254,7 @@ function nearestCrate(root, file, readFile) {
   }
 }
 
-function auditFile(root, file, text, crate) {
+function auditFile(root, file, text, crate, projectName = null) {
   const { ts, declarations } = tokens(text);
   const functions = functionsIn(ts);
   const constants = new Map();
@@ -358,7 +373,11 @@ function auditFile(root, file, text, crate) {
       const rel = relative(root, resolve(root, path));
       return !path.startsWith('/') && !path.includes('\\') && !path.includes('*') && rel !== '..' && !rel.startsWith('../');
     });
-    return declared.length ? declared.map(({ path }) => ({ ...row, path, how: 'gate-reads' })) : [row];
+    const mine = declared.filter(({ project }) => !project || !projectName || project === projectName);
+    if (mine.length) return mine.map(({ path }) => ({ ...row, path, how: 'gate-reads' }));
+    // Every declaration on this statement names another gate project: that project's recipe runs
+    // the read and keys on it; this project's recipe never executes the statement.
+    return declared.length ? [] : [row];
   });
 }
 
@@ -370,12 +389,12 @@ function auditFile(root, file, text, crate) {
  * Mutation/ancestor searches and other data-derived paths require declarations or review of the printed
  * unresolved roots; this audit is not a proof of an arbitrary Rust read closure.
  */
-function scan({ root, sources, readFile = readFileSync, listFiles = repositoryFiles }) {
+function scan({ root, sources, project = null, readFile = readFileSync, listFiles = repositoryFiles }) {
   root = resolve(root);
   const found = new Map();
   for (const file of [...new Set(listFiles(root))].sort()) {
     if (!file.endsWith('.rs') || !sources.some(glob => globCovers(glob, file))) continue;
-    const rows = auditFile(root, file, readFile(resolve(root, file), 'utf8'), nearestCrate(root, file, readFile));
+    const rows = auditFile(root, file, readFile(resolve(root, file), 'utf8'), nearestCrate(root, file, readFile), project?.name ?? null);
     for (const row of rows) found.set(JSON.stringify(row), row);
   }
   return [...found.values()];
