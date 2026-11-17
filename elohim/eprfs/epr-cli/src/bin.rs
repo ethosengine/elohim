@@ -417,6 +417,13 @@ pub(crate) mod sibling {
         pub at: String,
     }
 
+    /// Whether `release` is one CID-shaped token: non-empty ASCII letters and digits only, so it
+    /// can name a directory without leaving the one it is joined to.
+    #[cfg(feature = "peer")]
+    pub(crate) fn names_one_release(release: &str) -> bool {
+        !release.is_empty() && release.bytes().all(|b| b.is_ascii_alphanumeric())
+    }
+
     /// The release to draw for `commit`: among admitted siblings' crossed Produces stamped with
     /// `env:release` and `env:release-bin`, the newest (device, release) that holds every bin.
     /// `me`'s own records are never offers.
@@ -432,6 +439,11 @@ pub(crate) mod sibling {
                 continue;
             };
             if row.device == me || row.commit != commit || !BINS.contains(&bin.as_str()) {
+                continue;
+            }
+            // The release names a directory under `incoming`. It comes from a sibling's record,
+            // so anything that is not one CID-shaped token is no offer.
+            if !names_one_release(release) {
                 continue;
             }
             let offer = offers
@@ -465,6 +477,12 @@ pub(crate) mod sibling {
         let Some((first, why)) = path(tool, can_build, knob.as_deref()) else {
             return Ok(Drawn::default());
         };
+        // A host that builds and did not ask for a draw takes the path it always took: nothing
+        // is read here that could refuse before the follow's own checks.
+        if !first {
+            eprintln!("{why}");
+            return Ok(Drawn::default());
+        }
         let commit = store.source_state(repo)?["head"]
             .as_str()
             .map(str::to_owned)
@@ -474,9 +492,6 @@ pub(crate) mod sibling {
             return Ok(Drawn::default());
         }
         eprintln!("{why}");
-        if !first {
-            return Ok(Drawn::default());
-        }
         let incoming = layout
             .ok()
             .and_then(|l| l.incoming().ok())
@@ -554,6 +569,12 @@ pub(crate) mod sibling {
         fetch: &dyn Fn(&str, &Path) -> Result<(), String>,
     ) -> Result<Value, Draw> {
         use std::os::unix::fs::PermissionsExt;
+        if !names_one_release(&offer.release) {
+            return Err(Draw::Gap(format!(
+                "no-offer: {} named a release that is not one CID token",
+                offer.device
+            )));
+        }
         let dir = incoming.join(format!("sibling-{}", offer.release));
         // A previous partial draw is replaced, never trusted.
         let _ = std::fs::remove_dir_all(&dir);
@@ -591,7 +612,15 @@ pub(crate) mod sibling {
                         closure: false,
                     },
                 )
-                .map_err(Draw::Refused)?;
+                // The bytes made the release the sibling named and this device's store still
+                // would not take them (a sibling of another architecture cannot be probed here).
+                // Nothing was ingested, so the follow may build.
+                .map_err(|refusal| {
+                    Draw::Gap(format!(
+                        "store-refused: {}: {}",
+                        refusal.kind, refusal.detail
+                    ))
+                })?;
             if release.cid != offer.release {
                 return Err(mismatch(&release.cid));
             }
@@ -1035,5 +1064,16 @@ mod tests {
             None,
             "an incomplete release is no offer"
         );
+
+        // A release is a directory name under `incoming`: one that could leave it is no offer.
+        for escaping in ["a/../../x", "..", "R1/x", "R 1", "R1\u{0}"] {
+            let rows = vec![
+                row(A, HEAD, escaping, "epr", t1),
+                row(A, HEAD, escaping, "bin-launch", t1),
+            ];
+            assert_eq!(select(&rows, ME, HEAD), None, "{escaping:?} is no offer");
+            assert!(!sibling::names_one_release(escaping));
+        }
+        assert!(sibling::names_one_release("bafyreiabc234"));
     }
 }
