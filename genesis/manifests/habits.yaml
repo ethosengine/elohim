@@ -2576,10 +2576,10 @@ habits:
       - "node --test genesis/orchestrator/gate-cost.test.mjs (expected-cost fold over gate-cycle-seconds@1 and the defer decision's refusals)"
       - "a2o genesis/a2o/features/devflow/native-gate-evidence.feature reuse rule (this workspace's own green stands in; a red or an unadmitted signer never does)"
     evidence: >
-      DELTA 2026-11-16 (status unchanged; a habit delta no longer re-keys eprfs — the key fix is unit-proven, the saving is not yet measured on a push): the 9be1cb048 habit delta ran eprfs for 1323 s. Habit atoms were already outside the key (`projectTree`); the moving read was `genesis/manifests`, declared whole by `epr-cli/tests/flow_scope.rs`, which also holds the generated `habits.yaml` every delta rewrites. The scope legs read only the cluster-state files, now named one by one (e1790d7c); `gate-input-audit.test.mjs` refuses a read that covers `habits.yaml` or a `cluster-state*.yaml` left unnamed. Still open: the same test reads `genesis/docs/superpowers/specs`, `plans` and `genesis/a2o/features` whole, so any spec or story edit re-keys eprfs.
-    evidence-fingerprint: sha256:e7405b3deff45f6c
-    evidence-bytes: 18454
-    evidence-entries: 22
+      DELTA 2026-11-17 (status unchanged; the `habits.yaml` fix is on dev and the eprfs key is still not stable across documentation commits — measured): eprfs was green on shem at ba165f566 (1313 s). Three commits later (a sprint journal under genesis/docs/superpowers/sprints, genesis/agentic/bin/pool-lib.sh, a backlog edit), `GATE_EVIDENCE=reuse just gate eprfs` printed `eprfs evidence: miss; closure scope paths (246 reads)` and `not reused: no attestation for this closure yet`, then began a full run (log: shem .worktrees/steward-arrival/genesis/local-dev/steward-arrival/reuse-probe.log). Cause read from the declared reads: `epr-cli/tests/flow_cites.rs` reads `genesis/docs`, `.claude/memory` and every CLAUDE.md; `flow_scope.rs` reads the spec, plan, held and a2o feature directories. Docs-only pushes cost 43–45 s because they select no gate; the next eprfs-selecting push pays in full whether or not Rust changed. Also measured this sprint: an orchestrator-only reuse (elohim-ark 12 s against 195 s, steward-node 39 s against 1091 s) on a re-push whose inputs to those gates had not changed. Open: split the live-corpus legs out of the eprfs workspace gate (backlog steward-device-arrival-open-items row 7); no gate runs the cargo-pool library's tests (same backlog, row 6).
+    evidence-fingerprint: sha256:ce9a9105a929564b
+    evidence-bytes: 19741
+    evidence-entries: 23
     guard: >
       Regression risks: (1) reusing on a key that omits something the recipe reads — the recipe
       body, the project tree, a submodule pin, a repo file a test include_str!s; the input audit

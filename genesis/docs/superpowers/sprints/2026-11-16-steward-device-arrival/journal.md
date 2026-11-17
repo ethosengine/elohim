@@ -2,7 +2,7 @@
 id: steward-device-arrival-journal
 title: Steward-device arrival — sprint journal and the laptop runbook
 date: 2026-11-17
-status: OPEN — eight landings on dev; the laptop receipt and the sibling draw of epr are owed
+status: OPEN — nine landings on dev; the laptop receipt and the sibling draw of epr are owed
 author: shem session 76dc84be (Claude Fable 5.2), orchestrating; ethosengine session e57d1a58 (Claude Opus 5.5) on lane E and train 2
 habits: [workspace-device-arrival, push-gate-pays-once]
 ---
@@ -29,7 +29,7 @@ complete, and the artifact store delivering `epr` itself between a person's devi
 | `627627896` | shem | `roster bound` says whether the binding is published; a `sibling exchange` line; a last `next step` line; off a container the peer cure is `epr peer serve` |
 | `367881e33` | shem | Backlog: a build-input view keys `epr` with no change to the generated-output scan |
 | `ba165f566` | shem | `elohim/eprfs/bin-build-view.json` and a test that fails when a build of `epr` reads a tracked file outside it |
-| (this landing) | shem | The cargo-pool library reads the saved device layout where no container pool exists, so gate scripts need no `CARGO_TARGET_POOL_ROOT` on a person's own machine |
+| `e6f4523b8` | shem | The cargo-pool library reads the saved device layout where no container pool exists, so gate scripts need no `CARGO_TARGET_POOL_ROOT` on a person's own machine |
 
 Gate cost on shem, for the record: eprfs ran in full six times (1741, 1562, 1537, 1313 s and two
 runs that did not land); two docs-only landings took 45 s and 43 s.
@@ -122,9 +122,14 @@ toolchain variables for the one bootstrap build (`RUSTUP_TOOLCHAIN`, `RUSTFLAGS`
 
 ## What the sprint measured, and what it did not
 
-- A habit delta in the root `.epr-meta` plus a backlog edit lands in 45 s. The case that cost
-  1323 s on `9be1cb048` was a habit atom inside `elohim/eprfs`, which selects the eprfs gate; the
-  key fix is unit-proven and that reuse path is still unmeasured on a real push.
+- A habit delta in the root `.epr-meta` plus a backlog edit lands in 45 s, because it selects no
+  gate. That is not the case the fix was for. The case that cost 1323 s on `9be1cb048` was a
+  habit atom inside `elohim/eprfs`, which selects the eprfs gate and then depends on its key.
+- The key is not stable across ordinary work: eprfs was green at `ba165f566`, and three commits
+  later (this journal, the cargo-pool library, a backlog edit) `GATE_EVIDENCE=reuse just gate
+  eprfs` missed and began a full run. `epr-cli/tests/flow_cites.rs` reads all of `genesis/docs`
+  and `.claude/memory`. The `habits.yaml` fix removes one cause; any document commit is another
+  (backlog row 7, with a proposed split of the live-corpus legs into their own gate).
 - Commit attribution: `measured` on shem session 76dc84be with the landed code, run with the
   gate-built binary.
 - The device-arrival story: 15 scenarios, 115 steps, green against the landed build.
