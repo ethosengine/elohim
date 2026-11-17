@@ -20,6 +20,7 @@
           ".husky/hooks-path.mjs",
           ".husky/hooks-path.test.mjs",
           "elohim/ark/core/**",
+          "elohim/ark/supervisor/**",
           "elohim/placement/core/**",
           "elohim/elohim-compute/**",
           "elohim/elohim-settings/**",

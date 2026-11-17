@@ -18,6 +18,7 @@
           "elohim/eprfs/**",
           "elohim/sdk/domains/elohim-agent/adapter/**",
           "elohim/ark/core/**",
+          "elohim/ark/supervisor/**",
           "elohim/placement/core/**",
           "elohim/elohim-compute/**",
           "elohim/elohim-settings/**",
