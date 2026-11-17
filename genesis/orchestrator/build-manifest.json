@@ -48,6 +48,26 @@
         "stage": "Lint Jenkinsfiles",
         "function": null
       }
+    },
+    "rust-style-checker": {
+      "description": "The Rust style checker's own sources: the closure its fmt, lint, self-tests and distribution test read. Every source sits under genesis/orchestrator/**, which lint-jenkinsfiles already watches, so this step adds no CI dispatch; it gives the local rust-style-checker gate project a fingerprint.",
+      "inputs": {
+        "sources": [
+          "genesis/orchestrator/rust-style/**",
+          "genesis/orchestrator/rust-style.sh",
+          "genesis/orchestrator/rust-style-build-env.sh"
+        ],
+        "buildProcess": []
+      },
+      "outputs": {
+        "artifacts": [],
+        "verify": null
+      },
+      "depends": [],
+      "executor": {
+        "stage": "Rust Style Gate",
+        "function": null
+      }
     }
   },
   "gate": {
@@ -211,6 +231,7 @@
           "buildProcess": [
             "genesis/orchestrator/rust-style/**",
             "genesis/orchestrator/rust-style.sh",
+            "genesis/orchestrator/rust-style-build-env.sh",
             ".claude/epr-meta/policies.yaml",
             "genesis/orchestrator/rust-style-ci.sh"
           ]
@@ -218,6 +239,31 @@
         "run": {
           "kind": "root-just",
           "recipe": "_gate-rust-style",
+          "cargo": {
+            "workspace": "genesis__orchestrator__rust-style",
+            "profile": "dev",
+            "rustflags": "",
+            "env": {
+              "CARGO_BUILD_JOBS": "1"
+            }
+          }
+        }
+      },
+      "rust-style-checker": {
+        "dir": "genesis/orchestrator/rust-style",
+        "steps": ["rust-style-checker"],
+        "inputs": {
+          "sources": [
+            "genesis/orchestrator/rust-style/**",
+            "genesis/orchestrator/rust-style.sh",
+            "genesis/orchestrator/rust-style-build-env.sh",
+            ".cargo/config.toml"
+          ],
+          "buildProcess": ["justfile"]
+        },
+        "run": {
+          "kind": "root-just",
+          "recipe": "_gate-rust-style-checker",
           "cargo": {
             "workspace": "genesis__orchestrator__rust-style",
             "profile": "dev",

@@ -963,6 +963,13 @@ measure *args:
     set -euo pipefail
     exec bash "{{ justfile_directory() }}/genesis/agentic/compute/measure.sh" {{ args }}
 
-# One repository-wide syntax/ratchet gate; Cargo resolves the checker freshness.
+# One repository-wide syntax/ratchet gate; Cargo resolves the checker freshness. It runs on
+# every push that selects it (the baseline moves with origin/dev) and carries only the scan and
+# the adapter test, whose reads (.claude/.codex hook registrations) lie outside the checker.
 _gate-rust-style:
-    bash genesis/orchestrator/rust-style.sh --verify
+    bash genesis/orchestrator/rust-style.sh --verify-scan
+
+# The checker's own fmt, lint, self-tests and distribution test. They read only the checker's
+# sources, the root .cargo/config.toml and the toolchain, so the verdict is keyed and reused.
+_gate-rust-style-checker:
+    bash genesis/orchestrator/rust-style.sh --verify-checker

@@ -36,7 +36,7 @@ if [[ "${1:-}" == "--hook" ]]; then
   exec "$style_binary" --root "$style_root" "$@"
 fi
 # Cargo's fingerprint checks are the freshness authority. Never use an arbitrary PATH binary.
-if [[ "${1:-}" != "--verify" ]]; then
+if [[ "${1:-}" != --verify* ]]; then
   cargo build --quiet --locked --manifest-path "$style_root/genesis/orchestrator/rust-style/Cargo.toml"
 fi
 if [[ "${1:-}" == "--acceptance" ]]; then
@@ -44,15 +44,43 @@ if [[ "${1:-}" == "--acceptance" ]]; then
   [[ $# == 1 ]] || { echo '--acceptance requires one fixture name' >&2; exit 2; }
   exec cargo test --quiet --locked --manifest-path "$style_root/genesis/orchestrator/rust-style/Cargo.toml" --test reach "$1" -- --exact
 fi
-if [[ "${1:-}" == "--verify" ]]; then
-  shift
-  bash "$style_root/genesis/orchestrator/gate-steps.sh" \
-    fmt -- cargo fmt --manifest-path "$style_root/genesis/orchestrator/rust-style/Cargo.toml" --check \
-    ::: lint -- node "$style_root/genesis/orchestrator/cargo-lint.mjs" --quiet --locked --manifest-path "$style_root/genesis/orchestrator/rust-style/Cargo.toml" --all-targets -- -D warnings \
-    ::: test -- cargo test --quiet --locked --manifest-path "$style_root/genesis/orchestrator/rust-style/Cargo.toml" \
-    ::: hooks -- python3 "$style_root/genesis/orchestrator/rust-style/hook_test.py" \
-    ::: distribution -- python3 -m unittest discover -s "$style_root/genesis/orchestrator/rust-style" -p test_source_distribution.py \
-    ::: check -- bash -c 'cargo build --quiet --locked --manifest-path "$1/genesis/orchestrator/rust-style/Cargo.toml" && "$CARGO_TARGET_DIR/debug/epr-rust-style" --root "$1" "${@:2}"' _ "$style_root" "$@"
-  exit $?
-fi
+# --verify-checker: the checker's own legs, a function of its sources, the root
+# .cargo/config.toml and the toolchain alone (gate project rust-style-checker, reused by key).
+# --verify-scan: the repository scan against the moving baseline plus the adapter test, whose
+# reads lie outside the checker (gate project rust-style, run on every push that selects it).
+# --verify: both, in the original order, for a direct full run.
+style_manifest="$style_root/genesis/orchestrator/rust-style/Cargo.toml"
+style_checker_legs=(
+  fmt -- cargo fmt --manifest-path "$style_manifest" --check
+  ::: lint -- node "$style_root/genesis/orchestrator/cargo-lint.mjs" --quiet --locked --manifest-path "$style_manifest" --all-targets -- -D warnings
+  ::: test -- cargo test --quiet --locked --manifest-path "$style_manifest"
+)
+style_distribution_leg=(
+  distribution -- python3 -m unittest discover -s "$style_root/genesis/orchestrator/rust-style" -p test_source_distribution.py
+)
+style_hooks_leg=(
+  hooks -- python3 "$style_root/genesis/orchestrator/rust-style/hook_test.py"
+)
+style_check_leg=(
+  check -- bash -c 'cargo build --quiet --locked --manifest-path "$1/genesis/orchestrator/rust-style/Cargo.toml" && "$CARGO_TARGET_DIR/debug/epr-rust-style" --root "$1" "${@:2}"' _ "$style_root"
+)
+case "${1:-}" in
+  --verify-checker)
+    shift
+    [[ $# == 0 ]] || { echo '--verify-checker takes no arguments' >&2; exit 2; }
+    bash "$style_root/genesis/orchestrator/gate-steps.sh" "${style_checker_legs[@]}" ::: "${style_distribution_leg[@]}"
+    exit $?
+    ;;
+  --verify-scan)
+    shift
+    bash "$style_root/genesis/orchestrator/gate-steps.sh" "${style_hooks_leg[@]}" ::: "${style_check_leg[@]}" "$@"
+    exit $?
+    ;;
+  --verify)
+    shift
+    bash "$style_root/genesis/orchestrator/gate-steps.sh" "${style_checker_legs[@]}" ::: "${style_hooks_leg[@]}" \
+      ::: "${style_distribution_leg[@]}" ::: "${style_check_leg[@]}" "$@"
+    exit $?
+    ;;
+esac
 exec "$style_target/debug/epr-rust-style" --root "$style_root" "$@"

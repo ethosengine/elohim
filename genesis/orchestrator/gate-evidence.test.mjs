@@ -1672,3 +1672,120 @@ test('compiler helpers move the closure key and are dirt even outside a narrow p
     assert.ok(calls[0].args.includes(path));
   }
 });
+
+// S6 (native throughput): the rust-style gate split. The checker's own legs (fmt, lint,
+// self-tests, distribution test) are the rust-style-checker project, keyed on the checker's
+// closure; the repository scan stays in rust-style, which has no step and so no key, and runs on
+// every push that selects it. Real project and step declarations, real checker sources (the
+// audit reads discipline.rs's include of the root .cargo/config.toml), a real repository.
+test('rust-style-checker keys on the checker closure alone; the scan project never keys', async t => {
+  const { loadGateRegistry } = await import('./pipeline-registry.mjs');
+  const { readdirSync } = await import('node:fs');
+  const repo = join(dirname(new URL(import.meta.url).pathname), '../..');
+  const registry = loadGateRegistry(repo);
+  const real = registry.get('rust-style-checker');
+  const scanProject = registry.get('rust-style');
+  assert.ok(real, 'rust-style-checker is a registered gate project');
+  assert.deepEqual(scanProject.steps, [], 'the scan project declares no step: it is never keyed');
+  const manifestRel = 'genesis/orchestrator/build-manifest.json';
+
+  const root = mkdtempSync(join(tmpdir(), 'gate-evidence-style-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const cleanEnv = { ...process.env };
+  for (const key of ['GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_PREFIX', 'GIT_COMMON_DIR', 'GATE_COMMIT']) delete cleanEnv[key];
+  Object.assign(cleanEnv, {
+    GIT_CEILING_DIRECTORIES: dirname(root), GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: '/dev/null', HOME: root,
+    GIT_AUTHOR_NAME: 'Test Author', GIT_AUTHOR_EMAIL: 'author@example.test',
+    GIT_COMMITTER_NAME: 'Test Committer', GIT_COMMITTER_EMAIL: 'committer@example.test',
+    GIT_AUTHOR_DATE: '2026-11-17T12:00:00Z', GIT_COMMITTER_DATE: '2026-11-17T12:00:00Z',
+  });
+  const git = (...args) => spawnSync('git', args, { cwd: root, env: cleanEnv, encoding: 'utf8' });
+  const put = (rel, text) => { mkdirSync(dirname(join(root, rel)), { recursive: true }); writeFileSync(join(root, rel), text); };
+  const append = (rel, text) => put(rel, readFileSync(join(root, rel), 'utf8') + text);
+  const commit = message => {
+    git('add', '.');
+    assert.equal(git('commit', '-q', '-m', message).status, 0, message);
+    return git('rev-parse', 'HEAD').stdout.trim();
+  };
+  assert.equal(git('init', '-q').status, 0);
+  const copy = rel => put(rel, readFileSync(join(repo, rel), 'utf8'));
+  for (const rel of [manifestRel, 'justfile', 'genesis/orchestrator/run-local-gate.sh', 'genesis/orchestrator/rust-style.sh',
+    'genesis/orchestrator/rust-style-build-env.sh', 'genesis/orchestrator/rust-style-ci.sh', '.cargo/config.toml',
+    'genesis/orchestrator/cargo-lint.mjs', 'genesis/orchestrator/gate-steps.sh']) copy(rel);
+  const checker = 'genesis/orchestrator/rust-style';
+  for (const rel of ['Cargo.toml', 'Cargo.lock', 'scan/Cargo.toml', 'scan/src/lib.rs', 'hook_test.py', 'test_source_distribution.py', 'source-distribution.py']) copy(`${checker}/${rel}`);
+  for (const sub of ['src', 'tests']) {
+    for (const name of readdirSync(join(repo, checker, sub)).filter(n => n.endsWith('.rs'))) copy(`${checker}/${sub}/${name}`);
+  }
+  put('elohim/eprfs/x/Cargo.toml', '[package]\nname="x"\nversion="0.1.0"\n');
+  put('elohim/eprfs/x/src/lib.rs', 'pub fn x() -> u8 { 1 }\n');
+  put('.claude/hooks/rust-style.py', '# adapter\n');
+  put('.claude/settings.json', '{"hooks":"rust-style.py"}\n');
+  put('genesis/docs/a.md', '# a\n');
+  const revs = { base: commit('base') };
+  const edits = [
+    // [name, path, should the checker key move?]
+    ['eprfs', 'elohim/eprfs/x/src/lib.rs', false],
+    ['docs', 'genesis/docs/a.md', false],
+    // Adapter registrations are read only by the hooks leg, which stays in the always-run scan.
+    ['adapter', '.claude/settings.json', false],
+    ['checker-src', `${checker}/src/lib.rs`, true],
+    ['checker-test', `${checker}/tests/ratchet.rs`, true],
+    ['distribution', `${checker}/source-distribution.py`, true],
+    ['wrapper', 'genesis/orchestrator/rust-style.sh', true],
+    ['build-env', 'genesis/orchestrator/rust-style-build-env.sh', true],
+    ['cargo-config', '.cargo/config.toml', true],
+    ['recipe', 'justfile', true],
+  ];
+  for (const [name, path] of edits) {
+    append(path, path.endsWith('.json') ? '\n' : path.endsWith('.rs') ? '\n// edit\n' : '\n# edit\n');
+    revs[name] = commit(name);
+  }
+
+  // brit's fingerprint is a function of the step's declared sources at the commit; this double
+  // hashes the object ids those sources name, read from the manifest at that commit.
+  const brit = join(root, 'brit');
+  const buildRef = join(root, 'brit-build-ref');
+  writeFileSync(brit, `#!/usr/bin/env node
+const { execFileSync } = require('child_process');
+const [, , , , manifest, , step, , rev] = process.argv;
+const g = (...a) => execFileSync('git', ['-C', ${JSON.stringify(root)}, ...a], { encoding: 'utf8' });
+const rel = require('path').relative(${JSON.stringify(root)}, manifest);
+const sources = JSON.parse(g('show', rev + ':' + rel)).steps[step].inputs.sources;
+const ids = sources.map(s => { try { return g('rev-parse', rev + ':' + s.replace(/\\/\\*\\*$/, '')).trim(); } catch { return 'absent'; } });
+const fp = require('crypto').createHash('sha256').update(ids.join('\\n')).digest('hex');
+process.stdout.write(JSON.stringify({ fingerprints: [{ step, fingerprint: fp }] }));
+`);
+  writeFileSync(buildRef, '#!/bin/sh\nprintf "[]"\n');
+  chmodSync(brit, 0o755);
+  chmodSync(buildRef, 0o755);
+  const env = { ...cleanEnv, BRIT_BIN: brit, BRIT_BUILD_REF_BIN: buildRef, PATH: cleanEnv.PATH || '' };
+  const isoSpawn = (cmd, args, opts) => spawnSync(cmd, args, { ...opts, env: { ...cleanEnv, ...(opts?.env || {}) } });
+  const project = { ...real, manifestPath: manifestRel };
+  const cargoEnv = { RUSTUP_TOOLCHAIN: '1.100.0', CARGO_BUILD_JOBS: '1' };
+  const at = (rev, gp = project, ce = cargoEnv) => gateEvidence(gp, { root, commit: rev, env, cargoEnv: ce, spawn: isoSpawn });
+
+  const base = at(revs.base);
+  assert.ok(base.key, base.line);
+  assert.match(base.line, /closure scope paths \(\d+ reads\)/, 'the audit names every checker read');
+  const reads = JSON.parse(base.material).reads;
+  assert.ok(reads.oids.some(row => row.path === '.cargo/config.toml'), 'the root cargo config is a named read');
+  assert.ok(reads.oids.every(row => row.path === '.cargo/config.toml' || row.path.startsWith(`${checker}/`)),
+    `every named read is the checker's own or the root cargo config: ${reads.oids.map(r => r.path)}`);
+  let previous = base.key;
+  for (const [name, path, moves] of edits) {
+    const key = at(revs[name]).key;
+    if (moves) assert.notEqual(key, previous, `${path} must re-key rust-style-checker`);
+    else assert.equal(key, previous, `${path} must leave the rust-style-checker key equal (evidence still hits)`);
+    previous = key;
+  }
+  // The pinned toolchain is keyed through the cargo environment and rustc -vV.
+  assert.notEqual(at(revs.base, project, { ...cargoEnv, RUSTUP_TOOLCHAIN: '1.99.0' }).key, base.key,
+    'a different pinned toolchain re-keys rust-style-checker');
+  // Negative control: the scan project never has a key, at any commit.
+  for (const rev of [revs.base, revs.eprfs, revs['checker-src']]) {
+    const scan = at(rev, { ...scanProject, manifestPath: manifestRel });
+    assert.equal(scan.key, undefined);
+    assert.match(scan.line, /gate-only inputs, no step fingerprint/);
+  }
+});

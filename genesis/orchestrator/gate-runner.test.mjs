@@ -226,6 +226,46 @@ test('Rust style selects new crates and inherited lint configuration', () => {
   }
 });
 
+// S6: the checker's own legs are a separate project. A checker change selects both; a Rust change
+// elsewhere selects only the always-run scan, whose baseline moves with origin/dev.
+test('a checker change selects rust-style-checker; a Rust change elsewhere selects only the scan', () => {
+  const select = (changed, oracle) => projectsForChanges(ROOT, [changed], { oracle, rakia: () => new Map() }).map(p => p.name);
+  for (const oracle of ['path', 'rakia']) {
+    for (const changed of [
+      'genesis/orchestrator/rust-style/src/lib.rs', 'genesis/orchestrator/rust-style/tests/ratchet.rs',
+      'genesis/orchestrator/rust-style/source-distribution.py', 'genesis/orchestrator/rust-style.sh',
+      'genesis/orchestrator/rust-style-build-env.sh', '.cargo/config.toml',
+    ]) {
+      const selected = select(changed, oracle);
+      assert.ok(selected.includes('rust-style-checker'), `${changed} must select rust-style-checker (${oracle})`);
+      assert.ok(selected.includes('rust-style'), `${changed} must still select the scan (${oracle})`);
+    }
+    for (const changed of ['elohim/eprfs/epr-cli/src/main.rs', 'some/crate/src/lib.rs', 'genesis/docs/rust-style-guide.md']) {
+      const selected = select(changed, oracle);
+      assert.ok(selected.includes('rust-style'), `${changed} must select the scan (${oracle})`);
+      assert.ok(!selected.includes('rust-style-checker'), `${changed} must not select rust-style-checker (${oracle})`);
+    }
+  }
+});
+
+test('the rust-style-checker step adds no CI dispatch: lint-jenkinsfiles already watches every source', () => {
+  const manifest = JSON.parse(readFileSync(resolve(ROOT, 'genesis/orchestrator/build-manifest.json'), 'utf8'));
+  const step = manifest.steps['rust-style-checker'];
+  const lint = manifest.steps['lint-jenkinsfiles'];
+  assert.ok(lint.inputs.sources.includes('genesis/orchestrator/**'));
+  for (const source of [...step.inputs.sources, ...step.inputs.buildProcess]) {
+    assert.ok(source.startsWith('genesis/orchestrator/'), `${source} would widen elohim-orchestrator's dispatch`);
+  }
+  // Same run class as the step it shadows, and nothing downstream depends on it.
+  assert.equal(step.class, lint.class);
+  for (const { content } of loadManifests(ROOT)) {
+    for (const [name, other] of Object.entries(content.steps || {})) {
+      assert.ok(!(other.depends || []).some(d => d === 'rust-style-checker' || d.endsWith(':rust-style-checker')),
+        `${content.pipeline}:${name} depends on the local-only checker step`);
+    }
+  }
+});
+
 describe('manifest-driven local gate registry', () => {
   const registry = loadGateRegistry(ROOT);
 
