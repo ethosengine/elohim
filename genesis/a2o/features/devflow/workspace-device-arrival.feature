@@ -31,7 +31,8 @@ Feature: A workspace arrives as one of its person's devices, and a refusal names
   #        epr binary    the native tool `epr` is reachable
   #        brit binary   followed tool or explicit local candidate
   #        repository trusted  git accepts this checkout natively or by device declaration
-  #        device key    this device's signing key exists on its persistent home
+  #        device key    this device's signing key exists, and whether a native session
+  #                      (below) could be kept beside it, on which basis
   #        roster bound  the person's roster lists this device
   #        embed model   the model that turns text into searchable vectors is in one of its
   #                      declared places (the paths its manifest lists, checked in order) — a
@@ -118,8 +119,9 @@ Feature: A workspace arrives as one of its person's devices, and a refusal names
   # A device's home is durable or ephemeral, and the native tool is told which, never guesses.
   # A "native session" (`epr session open`) is the device's record of one agent run: who is
   # acting, for which person, from which checkout. Its records (the "envelope") live beside the
-  # device key and must outlive a restart, so opening one is where persistence is decided; the
-  # arrival preflight above reads whether a key exists, not whether its home will survive.
+  # device key and must outlive a restart, so opening one is where persistence is decided. The
+  # arrival preflight asks the same question without opening anything: its "device key" line
+  # names the basis a session would open on, or says that none can open and how to cure it.
   # The session names the "basis" it was accepted on: "explicit-mount" (the key lives in a
   # persistent directory outside $HOME) or "declared-durable-home" (below). Its refusals carry
   # stable codes beginning `envelope-`.
@@ -132,6 +134,19 @@ Feature: A workspace arrives as one of its person's devices, and a refusal names
   # longer matches its signature and is refused. A container platform that announces itself
   # (an Eclipse Che workspace sets DEVWORKSPACE_ID) is refused a home key even when such a note
   # is present; its key belongs in the persistent directory its platform mounts outside $HOME.
+
+  # A device can stand for its person and still be unable to keep a session: nothing has yet
+  # said its home survives a restart. It can act, so the preflight degrades rather than refuses.
+  Scenario: A bound device whose home is not yet declared durable is told how, and declaring it clears the line
+    Given a device whose key lives under a home that survives restarts
+    And the device stands for "matthew" on the roster
+    And no container platform marker is set
+    When the arrival preflight runs on that device
+    Then the "device key" line is degraded and names "epr actor device persistence --declare durable-home"
+    And the "roster bound" line reads ok
+    When the person declares the home durable on that device
+    And the arrival preflight runs on that device again
+    Then the "device key" line reads ok and names the persistence basis "declared-durable-home"
 
   Scenario: A device whose home survives restarts declares it once and opens a native session
     Given a device whose key lives under a home that survives restarts

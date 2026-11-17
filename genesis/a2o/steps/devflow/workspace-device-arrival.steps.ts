@@ -623,6 +623,21 @@ Then('a native session opens on the device with the basis {string}', function (b
   assert.ok(sessionRecords(d.key).length > 0, 'the session left a record beside the key');
 });
 
+When('the arrival preflight runs on that device( again)', function () {
+  const f = state(this);
+  // homeEnv removes every container-platform marker: this test host is itself a Che workspace.
+  f.preflight = preflight(f, homeEnv(f, currentHome(f)));
+});
+
+Then(
+  'the {string} line reads ok and names the persistence basis {string}',
+  function (name: string, basis: string) {
+    const l = line(state(this), name);
+    assert.ok(l.startsWith('ok'), l);
+    assert.ok(l.includes(`persistence ${basis}`), `${l}\n  does not name the basis ${basis}`);
+  }
+);
+
 Given(
   'a workspace whose key lives under $HOME and whose platform sets DEVWORKSPACE_ID',
   function () {
