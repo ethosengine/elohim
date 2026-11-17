@@ -7,7 +7,7 @@ use elohim_device_runtime::{
 use std::process::ExitCode;
 
 const USAGE: &str = "usage: epr device layout show [--json] | epr device layout save [--field \
-                     binStore|cargoPool|projectRoot]...";
+                     binStore|stateDir|cargoPool|projectRoot]...";
 
 pub(super) fn run(args: &[String]) -> Result<ExitCode, String> {
     match args.first().map(String::as_str) {

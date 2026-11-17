@@ -1,4 +1,4 @@
-//! Where this device keeps its config, executables, build pool and checkout: one resolver.
+//! Where this device keeps its config, executables, state, build pool and checkout: one resolver.
 //!
 //! Every path a device-side command needs that is not inside the checkout it runs from comes
 //! from [`resolve`]. A Che workspace keeps its durable state under `/projects`; a physical
@@ -26,6 +26,9 @@ pub const SAVED_FILE: &str = "layout.json";
 pub const CHE_CONFIG: &str = "/projects/.claude-config";
 /// The Che workspace's bin-store, under [`CHE_CONFIG`].
 pub const CHE_BIN_STORE: &str = "/projects/.claude-config/tools/bin-store";
+/// The Che workspace's state directory (berth store, session state): [`CHE_CONFIG`] itself,
+/// where those stores have always lived there.
+pub const CHE_STATE_DIR: &str = CHE_CONFIG;
 /// The Che workspace's cargo target pool.
 pub const CHE_CARGO_POOL: &str = "/projects/.cargo-target-pool";
 /// The Che workspace's main checkout.
@@ -41,6 +44,8 @@ pub enum Field {
     ConfigDir,
     /// The content-addressed executable store (`<bin_store>/<tool>`).
     BinStore,
+    /// The device's mutable coordination state: the berth store and its session state.
+    StateDir,
     /// The cargo target pool, when this device has one.
     CargoPool,
     /// The checkout device commands act on, when one is known.
@@ -49,9 +54,10 @@ pub enum Field {
 
 impl Field {
     /// Every field, in report order.
-    pub const ALL: [Field; 4] = [
+    pub const ALL: [Field; 5] = [
         Field::ConfigDir,
         Field::BinStore,
+        Field::StateDir,
         Field::CargoPool,
         Field::ProjectRoot,
     ];
@@ -60,6 +66,7 @@ impl Field {
         match self {
             Field::ConfigDir => "configDir",
             Field::BinStore => "binStore",
+            Field::StateDir => "stateDir",
             Field::CargoPool => "cargoPool",
             Field::ProjectRoot => "projectRoot",
         }
@@ -69,6 +76,7 @@ impl Field {
         match self {
             Field::ConfigDir => "ELOHIM_DEVICE_KEY_FILE",
             Field::BinStore => "BIN_STORE",
+            Field::StateDir => "ELOHIM_STATE_DIR",
             Field::CargoPool => "CARGO_TARGET_POOL_ROOT",
             Field::ProjectRoot => "EPR_PROJECT_ROOT",
         }
@@ -99,6 +107,24 @@ pub struct Location {
     pub path: Option<PathBuf>,
     /// Where it came from.
     pub origin: Origin,
+}
+
+impl Location {
+    /// `<path> (<origin>)`, or `absent (nothing names it)`: how every report names a location.
+    pub fn describe(&self) -> String {
+        let path = self
+            .path
+            .as_ref()
+            .map_or_else(|| "absent".into(), |p| p.display().to_string());
+        let origin = match &self.origin {
+            Origin::Env(name) => format!("env {name}"),
+            Origin::Saved => "saved".into(),
+            Origin::Discovered => "discovered".into(),
+            Origin::HostDefault => "host default".into(),
+            Origin::Absent => "nothing names it".into(),
+        };
+        format!("{path} ({origin})")
+    }
 }
 
 /// An environment variable and the saved layout naming different paths; the variable won.
@@ -133,6 +159,8 @@ pub struct DeviceLayout {
     pub config_dir: Location,
     /// The bin-store root; absent only on a host with no `/projects`, `XDG_DATA_HOME` or `HOME`.
     pub bin_store: Location,
+    /// The state directory; absent only on a host with no `/projects`, `XDG_STATE_HOME` or `HOME`.
+    pub state_dir: Location,
     /// The cargo target pool.
     pub cargo_pool: Location,
     /// The checkout.
@@ -147,6 +175,7 @@ impl DeviceLayout {
         match field {
             Field::ConfigDir => &self.config_dir,
             Field::BinStore => &self.bin_store,
+            Field::StateDir => &self.state_dir,
             Field::CargoPool => &self.cargo_pool,
             Field::ProjectRoot => &self.project_root,
         }
@@ -171,6 +200,16 @@ impl DeviceLayout {
             )
         })
     }
+    /// The state directory, or the refusal a command that needs one reports.
+    pub fn state_dir(&self) -> Result<&Path> {
+        self.state_dir.path.as_deref().ok_or_else(|| {
+            Refusal::new(
+                "layout-no-state-home",
+                "no state directory: set ELOHIM_STATE_DIR, XDG_STATE_HOME or HOME (this host has \
+                 no /projects layout)",
+            )
+        })
+    }
     /// The cargo target pool, when this device has one.
     pub fn cargo_pool(&self) -> Option<&Path> {
         self.cargo_pool.path.as_deref()
@@ -187,21 +226,7 @@ impl DeviceLayout {
     pub fn lines(&self) -> Vec<String> {
         let mut lines: Vec<String> = Field::ALL
             .iter()
-            .map(|&field| {
-                let location = self.get(field);
-                let path = location
-                    .path
-                    .as_ref()
-                    .map_or_else(|| "absent".into(), |p| p.display().to_string());
-                let origin = match &location.origin {
-                    Origin::Env(name) => format!("env {name}"),
-                    Origin::Saved => "saved".into(),
-                    Origin::Discovered => "discovered".into(),
-                    Origin::HostDefault => "host default".into(),
-                    Origin::Absent => "nothing names it".into(),
-                };
-                format!("layout {} = {path} ({origin})", field.name())
-            })
+            .map(|&field| format!("layout {} = {}", field.name(), self.get(field).describe()))
             .collect();
         lines.extend(self.differs.iter().map(Differs::line));
         lines
@@ -217,6 +242,9 @@ pub struct Saved {
     /// The saved bin-store root.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub bin_store: Option<PathBuf>,
+    /// The saved state directory.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub state_dir: Option<PathBuf>,
     /// The saved cargo pool.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cargo_pool: Option<PathBuf>,
@@ -230,6 +258,7 @@ impl Saved {
         match field {
             Field::ConfigDir => None,
             Field::BinStore => self.bin_store.as_ref(),
+            Field::StateDir => self.state_dir.as_ref(),
             Field::CargoPool => self.cargo_pool.as_ref(),
             Field::ProjectRoot => self.project_root.as_ref(),
         }
@@ -238,6 +267,7 @@ impl Saved {
         match field {
             Field::ConfigDir => {}
             Field::BinStore => self.bin_store = Some(path),
+            Field::StateDir => self.state_dir = Some(path),
             Field::CargoPool => self.cargo_pool = Some(path),
             Field::ProjectRoot => self.project_root = Some(path),
         }
@@ -339,6 +369,18 @@ pub fn resolve_with(host: &Host<'_>) -> Result<DeviceLayout> {
                 }),
         },
     };
+    // A Che workspace's berth store and session state already live in its config tree; they
+    // never move, so its presence keeps them there.
+    let state_dir = match explicit(Field::StateDir)? {
+        Some(location) => location,
+        None => match from_saved(Field::StateDir) {
+            Some(location) => location,
+            None if che => default(CHE_STATE_DIR.into()),
+            None => xdg("XDG_STATE_HOME")
+                .or_else(|| home.as_ref().map(|h| h.join(".local/state")))
+                .map_or_else(absent, |state| default(state.join("elohim"))),
+        },
+    };
     let cargo_pool = match explicit(Field::CargoPool)? {
         Some(location) => location,
         None => from_saved(Field::CargoPool).unwrap_or_else(|| {
@@ -380,6 +422,7 @@ pub fn resolve_with(host: &Host<'_>) -> Result<DeviceLayout> {
             None => absent(),
         },
         bin_store,
+        state_dir,
         cargo_pool,
         project_root,
         differs,
@@ -405,14 +448,19 @@ fn config_dir(host: &Host<'_>) -> Result<Option<PathBuf>> {
             )),
         };
     }
+    Ok(default_config_dir_with(host.env))
+}
+
+/// The device config directory when no key file names it: `$XDG_CONFIG_HOME/elohim/device`
+/// (absolute only, per the base-directory spec), else `$HOME/.config/elohim/device`, else none.
+/// The device key derives its default seed path from this, so the two never disagree.
+pub fn default_config_dir_with(env: &dyn Fn(&str) -> Option<OsString>) -> Option<PathBuf> {
+    let set = |name: &str| env(name).filter(|value| !value.is_empty());
     let config_home = match set("XDG_CONFIG_HOME").map(PathBuf::from) {
         Some(xdg) if xdg.is_absolute() => xdg,
-        _ => match set("HOME") {
-            Some(home) => PathBuf::from(home).join(".config"),
-            None => return Ok(None),
-        },
+        _ => PathBuf::from(set("HOME")?).join(".config"),
     };
-    Ok(Some(config_home.join("elohim").join("device")))
+    Some(config_home.join("elohim").join("device"))
 }
 
 fn config_origin(host: &Host<'_>) -> Origin {
@@ -471,7 +519,12 @@ pub fn read_saved(config_dir: &Path) -> Result<Saved> {
 /// layout, keeping fields not named. Absent fields are not saved. Returns the saved layout.
 pub fn save(layout: &DeviceLayout, fields: &[Field]) -> Result<Saved> {
     let fields: Vec<Field> = if fields.is_empty() {
-        vec![Field::BinStore, Field::CargoPool, Field::ProjectRoot]
+        vec![
+            Field::BinStore,
+            Field::StateDir,
+            Field::CargoPool,
+            Field::ProjectRoot,
+        ]
     } else {
         fields.to_vec()
     };
@@ -561,9 +614,11 @@ mod tests {
 
     #[test]
     fn che_workspace_resolves_byte_identical_to_the_paths_it_used_before() {
-        // This workspace: XDG_CONFIG_HOME on the persistent /nix/xdg volume, /projects present.
+        // This workspace: XDG_CONFIG_HOME and XDG_STATE_HOME on the persistent /nix/xdg volume,
+        // /projects present. The berth store and session state stay in the config tree.
         let layout = Fixture::new(&[
             ("XDG_CONFIG_HOME", "/nix/xdg/config"),
+            ("XDG_STATE_HOME", "/nix/xdg/state"),
             ("HOME", "/home/user"),
         ])
         .with(CHE_CONFIG)
@@ -583,8 +638,10 @@ mod tests {
             path(&layout.cargo_pool),
             Some("/projects/.cargo-target-pool")
         );
+        assert_eq!(path(&layout.state_dir), Some("/projects/.claude-config"));
         assert_eq!(path(&layout.project_root), Some("/projects/elohim"));
         assert_eq!(layout.bin_store.origin, Origin::HostDefault);
+        assert_eq!(layout.state_dir.origin, Origin::HostDefault);
         assert!(layout.differs.is_empty());
     }
 
@@ -599,6 +656,7 @@ mod tests {
             path(&layout.bin_store),
             Some("/home/m/.local/share/elohim/bin-store")
         );
+        assert_eq!(path(&layout.state_dir), Some("/home/m/.local/state/elohim"));
         assert_eq!(layout.cargo_pool.origin, Origin::Absent);
         assert_eq!(layout.project_root.origin, Origin::Absent);
         assert_eq!(
@@ -609,6 +667,22 @@ mod tests {
             .resolve()
             .unwrap();
         assert_eq!(path(&data.bin_store), Some("/data/elohim/bin-store"));
+        let state = Fixture::new(&[("HOME", "/home/m"), ("XDG_STATE_HOME", "/state")])
+            .resolve()
+            .unwrap();
+        assert_eq!(path(&state.state_dir), Some("/state/elohim"));
+        let relative_state = Fixture::new(&[("HOME", "/home/m"), ("XDG_STATE_HOME", "rel")])
+            .resolve()
+            .unwrap();
+        assert_eq!(
+            path(&relative_state.state_dir),
+            Some("/home/m/.local/state/elohim")
+        );
+        let none = Fixture::new(&[("BIN_STORE", "/gate/bins")])
+            .resolve()
+            .unwrap();
+        assert_eq!(none.state_dir.origin, Origin::Absent);
+        assert_eq!(none.state_dir().unwrap_err().kind, "layout-no-state-home");
         let relative_xdg = Fixture::new(&[("HOME", "/home/m"), ("XDG_DATA_HOME", "rel")])
             .resolve()
             .unwrap();
@@ -665,7 +739,7 @@ mod tests {
         fs::create_dir_all(&config).unwrap();
         fs::write(
             config.join(SAVED_FILE),
-            r#"{"version":1,"binStore":"/saved/bins","cargoPool":"/saved/pool","projectRoot":"/saved/repo"}"#,
+            r#"{"version":1,"binStore":"/saved/bins","stateDir":"/saved/state","cargoPool":"/saved/pool","projectRoot":"/saved/repo"}"#,
         )
         .unwrap();
         let xdg = dir.path().to_str().unwrap();
@@ -679,10 +753,16 @@ mod tests {
             "saved beats the host default"
         );
         assert_eq!(saved.bin_store.origin, Origin::Saved);
+        assert_eq!(
+            path(&saved.state_dir),
+            Some("/saved/state"),
+            "a saved state directory beats the Che default too"
+        );
         assert_eq!(path(&saved.project_root), Some("/saved/repo"));
         let overridden = Fixture::new(&[
             ("XDG_CONFIG_HOME", xdg),
             ("BIN_STORE", "/gate/bins"),
+            ("ELOHIM_STATE_DIR", "/gate/state"),
             ("CARGO_TARGET_POOL_ROOT", "/saved/pool"),
         ])
         .resolve()
@@ -691,11 +771,18 @@ mod tests {
         assert_eq!(overridden.bin_store.origin, Origin::Env("BIN_STORE".into()));
         assert_eq!(
             overridden.differs,
-            vec![Differs {
-                field: Field::BinStore,
-                env: "/gate/bins".into(),
-                saved: "/saved/bins".into()
-            }],
+            vec![
+                Differs {
+                    field: Field::BinStore,
+                    env: "/gate/bins".into(),
+                    saved: "/saved/bins".into()
+                },
+                Differs {
+                    field: Field::StateDir,
+                    env: "/gate/state".into(),
+                    saved: "/saved/state".into()
+                }
+            ],
             "an equal override is not a difference"
         );
         assert_eq!(
@@ -750,6 +837,10 @@ mod tests {
         assert_eq!(
             saved.bin_store.as_deref(),
             Some(Path::new("/home/m/.local/share/elohim/bin-store"))
+        );
+        assert_eq!(
+            saved.state_dir.as_deref(),
+            Some(Path::new("/home/m/.local/state/elohim"))
         );
         assert_eq!(saved.cargo_pool, None, "an absent field is not saved");
         let again = fixture.resolve().unwrap();
