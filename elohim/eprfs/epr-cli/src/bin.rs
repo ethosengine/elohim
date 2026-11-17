@@ -643,16 +643,18 @@ pub(crate) mod sibling {
         })
     }
 
+    /// Judges one bin's verified requirement document on this host: `(bin, document)` to
+    /// `Ok`, or the unmet requirement.
+    #[cfg(feature = "peer")]
+    pub(crate) type Admit = dyn Fn(&str, &[u8]) -> Result<(), String>;
+
     /// Row 12: whether this device can run every bin of `offer`, judged from what each bin's
     /// Produce stated, before a byte is fetched. `admit` judges one verified document on this
     /// host. A bin that stated nothing, whose statement did not cross, or whose statement does
     /// not make the CID its Produce named is not drawn: an honest draw never pays for bytes on
     /// an unread statement. Every answer here is a gap, so the follow may still build.
     #[cfg(feature = "peer")]
-    pub(crate) fn admissible(
-        offer: &Offer,
-        admit: &dyn Fn(&str, &[u8]) -> Result<(), String>,
-    ) -> Result<(), String> {
+    pub(crate) fn admissible(offer: &Offer, admit: &Admit) -> Result<(), String> {
         for bin in BINS {
             let stated = offer.requires.get(bin).cloned().unwrap_or_default();
             let Some(cid) = stated.cid else {
@@ -695,7 +697,7 @@ pub(crate) mod sibling {
         commit: &str,
         incoming: &Path,
         offer: &Offer,
-        admit: &dyn Fn(&str, &[u8]) -> Result<(), String>,
+        admit: &Admit,
         fetch: &dyn Fn(&str, &Path) -> Result<(), String>,
     ) -> Result<Value, Draw> {
         admissible(offer, admit).map_err(Draw::Gap)?;
