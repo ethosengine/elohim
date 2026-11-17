@@ -114,11 +114,18 @@ pub(crate) fn status_at(root: &Path) -> Vec<Check> {
             Some("set XDG_CONFIG_HOME to this device's persistent config directory".into()),
         ),
     };
-    vec![
+    let current = key
+        .as_deref()
+        .ok()
+        .map_or(actor::DeviceState::Unwitnessed, |key| {
+            actor::device_state_read_only(root, key)
+        });
+    let published = published_refs(registry.as_ref().ok());
+    let mut checks = vec![
         binary("epr"),
         binary("brit"),
         key_check,
-        roster_check(root, key.as_deref().ok(), &handle),
+        roster_check(root, &current, &handle, &published),
         model_check(root),
         fold_check(
             index::status(root, index::EmbedderChoice::Pinned),
@@ -138,15 +145,371 @@ pub(crate) fn status_at(root: &Path) -> Vec<Check> {
         },
         repository_check(root),
         peer_daemon_check(),
+        sibling_check(root, &current),
         supervisor_check(root),
-        // Restart-arrival facts (backlog container-restart-strands-session-envelope): appended
-        // so earlier positions stay stable for readers that index them.
+        // Restart-arrival facts (backlog container-restart-strands-session-envelope).
         toolchain_check(root, &env),
         hooks_check(root),
         brit_trust_check(root),
         packs_check(root),
         layout_check(device_layout),
-    ]
+    ];
+    // Always last: what the person does next, read from the lines above.
+    let next = next_step(&checks);
+    checks.push(next);
+    checks
+}
+
+/// The conditions of the joining ceremony, in the order a person resolves them: the tool, the
+/// key (and the persistence its line names), the roster (enroll · authorize · bind, then
+/// publish), the peer, then the exchange with a sibling.
+const CEREMONY: [&str; 5] = [
+    "epr binary",
+    "device key",
+    ROSTER_CHECK,
+    "peer daemon",
+    SIBLING_CHECK,
+];
+const NEXT_CHECK: &str = "next step";
+
+/// The first unresolved ceremony condition's cure, repeated verbatim, or that nothing is owed.
+/// Never refuses: it restates a line above, and the exit status is that line's to set.
+fn next_step(checks: &[Check]) -> Check {
+    let ceremony: Vec<&Check> = CEREMONY
+        .iter()
+        .filter_map(|name| checks.iter().find(|c| c.name == *name))
+        .collect();
+    if let Some(owed) = ceremony
+        .iter()
+        .find(|c| c.state != State::Ok && c.cure.is_some())
+    {
+        let state = if owed.state == State::Unknown {
+            State::Unknown
+        } else {
+            State::Degraded
+        };
+        return Check::new(NEXT_CHECK, state, owed.name.clone(), owed.cure.clone());
+    }
+    // Unresolved with no cure is a fact, not a debt: a person with one device owes no sibling.
+    let detail = match ceremony.iter().find(|c| c.state != State::Ok) {
+        Some(open) => format!("nothing owed; this device is arrived ({})", open.detail),
+        None => "nothing owed; this device is arrived and exchanging".to_owned(),
+    };
+    Check::new(NEXT_CHECK, State::Ok, detail, None)
+}
+
+/// The remote-tracking refs the device declares as published: the epr tool's
+/// `source.publishedRef` (the refs `epr bin land` accepts as landed), narrowed to the ones a
+/// fetch writes. A local branch is never publication; only what the shared branch carried at the
+/// last fetch is.
+fn published_refs(registry: Option<&Registry>) -> Vec<String> {
+    registry
+        .and_then(|registry| registry.tool("epr").ok())
+        .and_then(|tool| tool.source["publishedRef"].as_array().cloned())
+        .unwrap_or_default()
+        .iter()
+        .filter_map(Value::as_str)
+        .filter(|reference| reference.starts_with("refs/remotes/"))
+        .map(str::to_owned)
+        .collect()
+}
+
+/// Where this device's roster row stands against the published refs, as of the last fetch.
+#[derive(Debug, PartialEq, Eq)]
+enum Publication {
+    /// The row is on this published ref.
+    Published(String),
+    /// The row is committed here (`true`) or only in the working tree (`false`), not on the ref.
+    Local { reference: String, committed: bool },
+    /// None of these refs has been fetched here.
+    NeverFetched(Vec<String>),
+    /// The device declares no published ref.
+    Undeclared,
+    /// git could not read the repository.
+    Unreadable(String),
+}
+
+/// Whether `reference` names a commit here: `Ok(false)` when it is absent, `Err` when git
+/// refused to read the repository. A read: no fetch, no write.
+fn ref_exists(root: &Path, reference: &str) -> Result<bool, String> {
+    let output = git::command(root)
+        .args(["rev-parse", "--verify", "--quiet"])
+        .arg(format!("{reference}^{{commit}}"))
+        .output()
+        .map_err(|e| format!("git: {e}"))?;
+    match output.status.code() {
+        Some(0) => Ok(true),
+        Some(1) => Ok(false),
+        _ => Err(String::from_utf8_lossy(&output.stderr).trim().to_owned()),
+    }
+}
+
+/// The roster file's bytes at `revision`, or `None` when that revision does not carry it.
+fn roster_at(root: &Path, revision: &str, rel: &str) -> Option<String> {
+    let output = git::command(root)
+        .arg("show")
+        .arg(format!("{revision}:{rel}"))
+        .output()
+        .ok()?;
+    output
+        .status
+        .success()
+        .then(|| String::from_utf8_lossy(&output.stdout).into_owned())
+}
+
+fn publication(root: &Path, handle: &str, did: &str, refs: &[String]) -> Publication {
+    if refs.is_empty() {
+        return Publication::Undeclared;
+    }
+    let rel = actor::roster_rel(handle);
+    let lists = |revision: &str| {
+        roster_at(root, revision, &rel)
+            .is_some_and(|text| actor::roster_text_lists(handle, &text, did))
+    };
+    let mut fetched = None;
+    for reference in refs {
+        match ref_exists(root, reference) {
+            Ok(true) if lists(reference) => return Publication::Published(reference.clone()),
+            Ok(true) => {
+                fetched.get_or_insert_with(|| reference.clone());
+            }
+            Ok(false) => {}
+            Err(why) => return Publication::Unreadable(why),
+        }
+    }
+    match fetched {
+        Some(reference) => Publication::Local {
+            reference,
+            committed: lists("HEAD"),
+        },
+        None => Publication::NeverFetched(refs.to_vec()),
+    }
+}
+
+/// `refs/remotes/origin/dev` → `origin/dev`.
+fn short_ref(reference: &str) -> &str {
+    reference.strip_prefix("refs/remotes/").unwrap_or(reference)
+}
+
+/// The roster line once this device stands: published, local only, or not knowable offline.
+fn publication_check(standing: &actor::Standing, publication: Publication) -> Check {
+    let described = standing.describe();
+    let handle = &standing.handle;
+    let rel = actor::roster_rel(handle);
+    match publication {
+        Publication::Published(reference) => Check::new(
+            ROSTER_CHECK,
+            State::Ok,
+            format!(
+                "{described}; published on {} (as of the last fetch)",
+                short_ref(&reference)
+            ),
+            None,
+        ),
+        Publication::Local {
+            reference,
+            committed,
+        } => Check::new(
+            ROSTER_CHECK,
+            State::Degraded,
+            format!(
+                "{described}; {handle}'s roster row for this device is local only ({}), not on \
+                 {} (as of the last fetch), so no other device of {handle}'s can recognise it yet",
+                if committed {
+                    "in a local commit"
+                } else {
+                    "in the working tree"
+                },
+                short_ref(&reference)
+            ),
+            Some(if committed {
+                format!("publish the roster rows through the normal gate ({rel} is committed here)")
+            } else {
+                format!("commit {rel}, then publish the roster rows through the normal gate")
+            }),
+        ),
+        Publication::NeverFetched(refs) => {
+            Check::new(
+                ROSTER_CHECK,
+                State::Unknown,
+                format!(
+                "{described}; {} has never been fetched here, so whether {handle}'s roster row \
+                 for this device is published is unknown",
+                refs.iter().map(|r| short_ref(r)).collect::<Vec<_>>().join(", ")
+            ),
+                Some("fetch the integration branch".into()),
+            )
+        }
+        Publication::Undeclared => Check::new(
+            ROSTER_CHECK,
+            State::Unknown,
+            format!(
+                "{described}; the device manifest declares no published remote-tracking ref \
+                 (the epr tool's source.publishedRef), so publication is unknown"
+            ),
+            Some(
+                "declare the integration branch's remote-tracking ref in the epr tool's \
+                  source.publishedRef"
+                    .into(),
+            ),
+        ),
+        Publication::Unreadable(why) => Check::new(
+            ROSTER_CHECK,
+            State::Unknown,
+            format!("{described}; git could not read the published branch: {why}"),
+            Some("cure the repository trusted line first".into()),
+        ),
+    }
+}
+
+const ROSTER_CHECK: &str = "roster bound";
+const SIBLING_CHECK: &str = "sibling exchange";
+
+/// Whether a sibling device of the same person has exchanged heads with this one, read from the
+/// head table the peer daemon saved — never a dial, never a daemon start. A roster that names a
+/// sibling's endpoint is not evidence of exchange; only a folded head and its acknowledgement are.
+fn sibling_check(root: &Path, current: &actor::DeviceState) -> Check {
+    let actor::DeviceState::Standing(standing) = current else {
+        return Check::new(
+            SIBLING_CHECK,
+            State::Degraded,
+            "this device stands on no roster yet, so it has no sibling to exchange with",
+            None,
+        );
+    };
+    let siblings = actor::roster_siblings(root, &standing.handle, &standing.device);
+    exchange_check(&siblings, &standing.device, saved_heads())
+}
+
+/// The peer daemon's saved head table: `Ok(None)` when none has been saved.
+#[cfg(feature = "peer")]
+fn saved_heads() -> Result<Option<eprfs_peer::HeadTable>, String> {
+    let dir = crate::peer::peer_dir().map_err(|e| e.to_string())?;
+    if !dir.join(eprfs_peer::HeadTable::FILE_NAME).is_file() {
+        return Ok(None);
+    }
+    eprfs_peer::HeadTable::load(&dir)
+        .map(Some)
+        .map_err(|e| e.to_string())
+}
+#[cfg(not(feature = "peer"))]
+fn saved_heads() -> Result<Option<()>, String> {
+    Err("this epr was built without the peer feature, so it cannot read the peer's status".into())
+}
+
+#[cfg(not(feature = "peer"))]
+fn exchange_check(siblings: &[String], _did: &str, heads: Result<Option<()>, String>) -> Check {
+    if siblings.is_empty() {
+        return no_sibling();
+    }
+    Check::new(
+        SIBLING_CHECK,
+        State::Unknown,
+        heads.err().unwrap_or_default(),
+        None,
+    )
+}
+
+fn no_sibling() -> Check {
+    Check::new(
+        SIBLING_CHECK,
+        State::Degraded,
+        "this device has no sibling in the roster",
+        None,
+    )
+}
+
+/// The exchange as `heads` records it, for this device `did` and its roster `siblings`.
+#[cfg(feature = "peer")]
+fn exchange_check(
+    siblings: &[String],
+    did: &str,
+    heads: Result<Option<eprfs_peer::HeadTable>, String>,
+) -> Check {
+    if siblings.is_empty() {
+        return no_sibling();
+    }
+    let table = match heads {
+        Ok(Some(table)) => table,
+        Ok(None) => {
+            return Check::new(
+                SIBLING_CHECK,
+                State::Unknown,
+                "no peer status has been saved on this device, so nothing its siblings sent \
+                 has been read",
+                Some("start the peer on demand: epr peer serve".into()),
+            )
+        }
+        Err(why) => {
+            return Check::new(
+                SIBLING_CHECK,
+                State::Unknown,
+                why,
+                Some("restore access to the epr peer directory".into()),
+            )
+        }
+    };
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| u64::try_from(d.as_millis()).unwrap_or(u64::MAX));
+    let ago = |at: u64| now.saturating_sub(at) / 1000;
+    let heads: Vec<(&String, &eprfs_peer::DeviceHead)> = siblings
+        .iter()
+        .filter_map(|sibling| table.devices.get(sibling).map(|head| (sibling, head)))
+        .collect();
+    let acking = heads
+        .iter()
+        .filter_map(|(sibling, head)| head.folded.get(did).map(|seq| (sibling, head, seq)))
+        .max_by_key(|(_, head, _)| head.folded_at);
+    if let Some((sibling, head, seq)) = acking {
+        return Check::new(
+            SIBLING_CHECK,
+            State::Ok,
+            format!(
+                "{} acknowledges this device's head to seq {seq}; its own head (seq {}) was \
+                 folded here {}s ago",
+                actor::short_did(sibling),
+                head.seq,
+                ago(head.folded_at)
+            ),
+            None,
+        );
+    }
+    let named = siblings
+        .iter()
+        .map(|s| actor::short_did(s))
+        .collect::<Vec<_>>()
+        .join(", ");
+    match heads.iter().max_by_key(|(_, head)| head.folded_at) {
+        None => Check::new(
+            SIBLING_CHECK,
+            State::Degraded,
+            format!(
+                "the roster lists {named}, but no verified head from a sibling has been folded \
+                 here: nothing has been exchanged"
+            ),
+            Some(format!(
+                "keep epr peer serve running here and on {named}; epr peer status shows each \
+                 head as it folds"
+            )),
+        ),
+        Some((sibling, head)) => Check::new(
+            SIBLING_CHECK,
+            State::Degraded,
+            format!(
+                "{} has a verified head here (seq {}, folded {}s ago), but no sibling \
+                 acknowledges this device's head",
+                actor::short_did(sibling),
+                head.seq,
+                ago(head.folded_at)
+            ),
+            Some(format!(
+                "keep epr peer serve running here until {} folds this device's head; epr peer \
+                 status shows its acknowledgement",
+                actor::short_did(sibling)
+            )),
+        ),
+    }
 }
 
 /// The device layout as a command run from `root` resolves it (the real environment and
@@ -877,12 +1240,22 @@ fn sole_handle(root: &Path) -> Option<String> {
         .collect();
     (handles.len() == 1).then(|| handles.remove(0))
 }
-fn roster_check(root: &Path, key: Option<&Path>, handle: &str) -> Check {
-    let current = key.map_or(actor::DeviceState::Unwitnessed, |key| {
-        actor::device_state_read_only(root, key)
-    });
-    if let actor::DeviceState::Standing(standing) = &current {
-        return Check::new("roster bound", State::Ok, standing.describe(), None);
+/// Whether the person's roster lists this device, and once it does, whether the shared branch
+/// carried that row at the last fetch: a binding only this device has seen is not yet one any
+/// sibling can recognise. Reads the already-fetched refs; never fetches.
+fn roster_check(
+    root: &Path,
+    current: &actor::DeviceState,
+    handle: &str,
+    published: &[String],
+) -> Check {
+    if let actor::DeviceState::Standing(standing) = current {
+        if !actor::device_enrolled(root, &standing.handle, &standing.device) {
+            // Standing read from this checkout's records with no row of its own: nothing to publish.
+            return Check::new(ROSTER_CHECK, State::Ok, standing.describe(), None);
+        }
+        let found = publication(root, &standing.handle, &standing.device, published);
+        return publication_check(standing, found);
     }
     let pending = root
         .join(actor::PARTICIPANTS_REL)
@@ -899,7 +1272,7 @@ fn roster_check(root: &Path, key: Option<&Path>, handle: &str) -> Check {
         format!("epr actor device enroll --handle {handle} here; on a device already in {handle}'s roster run epr actor device authorize '<request>'; then here epr actor device bind '<authorization>' and commit {}/{handle}.jsonl", actor::PARTICIPANTS_REL)
     };
     Check::new(
-        "roster bound",
+        ROSTER_CHECK,
         State::Refused,
         if matches!(current, actor::DeviceState::RootContested(_)) {
             "roster root contested; review the pinned root before enrollment"
@@ -1330,19 +1703,21 @@ mod tests {
     #[test]
     fn roster_cures_distinguish_first_unbound_and_pending_devices() {
         let dir = tempfile::tempdir().unwrap();
-        let first = roster_check(dir.path(), None, "matthew");
+        let first = roster_check(dir.path(), &actor::DeviceState::Unwitnessed, "matthew", &[]);
         assert!(first.cure.unwrap().contains("actor witness"));
         let roster = dir.path().join(actor::PARTICIPANTS_REL);
         fs::create_dir_all(&roster).unwrap();
         fs::write(roster.join("matthew.jsonl"), "").unwrap();
-        let unbound = roster_check(dir.path(), None, "matthew");
+        let unbound = roster_check(dir.path(), &actor::DeviceState::Unwitnessed, "matthew", &[]);
         for verb in ["enroll", "authorize", "bind"] {
             assert!(unbound.cure.as_ref().unwrap().contains(verb));
         }
         fs::write(roster.join(".enroll-matthew.json"), "{}").unwrap();
-        assert!(roster_check(dir.path(), None, "matthew")
-            .detail
-            .contains("pending"));
+        assert!(
+            roster_check(dir.path(), &actor::DeviceState::Unwitnessed, "matthew", &[])
+                .detail
+                .contains("pending")
+        );
     }
     #[test]
     fn absent_model_degrades_without_refusing_local_work() {
@@ -1571,5 +1946,187 @@ mod tests {
             assert!(value["cure"].is_null() || value["cure"].is_string());
             assert!(check.to_string().contains("condition: evidence"));
         }
+    }
+    #[test]
+    fn next_step_repeats_the_first_owed_ceremony_cure_and_never_refuses() {
+        let line = |name: &str, state: State, cure: Option<&str>| {
+            Check::new(
+                name,
+                state,
+                format!("{name} evidence"),
+                cure.map(str::to_owned),
+            )
+        };
+        let mut checks = vec![
+            line("epr binary", State::Ok, None),
+            line("embed model", State::Degraded, Some("provision the model")),
+            line("device key", State::Ok, None),
+            line(
+                ROSTER_CHECK,
+                State::Refused,
+                Some("enroll, authorize, bind"),
+            ),
+            line("peer daemon", State::Degraded, Some("start the peer")),
+            line(
+                SIBLING_CHECK,
+                State::Degraded,
+                Some("keep the peer running"),
+            ),
+        ];
+        // The embed model is not part of the ceremony; the refused roster comes first.
+        let next = next_step(&checks);
+        assert_eq!(next.state, State::Degraded, "the next step never refuses");
+        assert_eq!(next.detail, ROSTER_CHECK);
+        assert_eq!(next.cure.as_deref(), Some("enroll, authorize, bind"));
+        checks[3] = line(
+            ROSTER_CHECK,
+            State::Unknown,
+            Some("fetch the integration branch"),
+        );
+        let next = next_step(&checks);
+        assert_eq!(next.state, State::Unknown);
+        assert_eq!(next.cure.as_deref(), Some("fetch the integration branch"));
+        checks[3] = line(ROSTER_CHECK, State::Ok, None);
+        checks[4] = line("peer daemon", State::Ok, None);
+        assert_eq!(
+            next_step(&checks).cure.as_deref(),
+            Some("keep the peer running")
+        );
+        checks[5] = line(SIBLING_CHECK, State::Ok, None);
+        let done = next_step(&checks);
+        assert_eq!(done.state, State::Ok);
+        assert_eq!(
+            done.to_string(),
+            "ok next step: nothing owed; this device is arrived and exchanging"
+        );
+        // One device: no sibling is a fact without a cure, so nothing is owed, and the line says why.
+        checks[5] = Check::new(
+            SIBLING_CHECK,
+            State::Degraded,
+            "this device has no sibling in the roster",
+            None,
+        );
+        let alone = next_step(&checks);
+        assert_eq!(alone.state, State::Ok);
+        assert!(alone.detail.contains("no sibling in the roster"), "{alone}");
+    }
+    #[test]
+    fn published_refs_are_the_declared_remote_tracking_refs_only() {
+        let registry: Registry = serde_json::from_value(json!({"version":1,"tools":{
+            "epr":{"bins":["epr"],"source":{"publishedRef":["refs/heads/dev","refs/remotes/origin/dev"]}}
+        }}))
+        .unwrap();
+        assert_eq!(published_refs(Some(&registry)), ["refs/remotes/origin/dev"]);
+        assert!(published_refs(None).is_empty());
+        let standing = actor::Standing {
+            subject: "human:matthew".into(),
+            handle: "matthew".into(),
+            record_cid: "row".into(),
+            witnessed_by: None,
+            claimed_at: String::new(),
+            device: "did:key:z6MkFixtureDevice0000000000000000".into(),
+            roster: None,
+        };
+        let check = |p| publication_check(&standing, p);
+        let local = check(Publication::Local {
+            reference: "refs/remotes/origin/dev".into(),
+            committed: true,
+        });
+        assert_eq!(local.state, State::Degraded);
+        assert!(local.detail.contains("matthew's roster row for this device is local only (in a local commit), not on origin/dev (as of the last fetch)"), "{local}");
+        assert!(local
+            .cure
+            .unwrap()
+            .starts_with("publish the roster rows through the normal gate"));
+        let uncommitted = check(Publication::Local {
+            reference: "refs/remotes/origin/dev".into(),
+            committed: false,
+        });
+        assert!(uncommitted.detail.contains("in the working tree"));
+        assert!(uncommitted
+            .cure
+            .unwrap()
+            .starts_with("commit .eprfs/status/participants/matthew.jsonl"));
+        let published = check(Publication::Published("refs/remotes/origin/dev".into()));
+        assert_eq!(published.state, State::Ok);
+        assert!(published
+            .detail
+            .ends_with("published on origin/dev (as of the last fetch)"));
+        for absent in [
+            Publication::NeverFetched(vec!["refs/remotes/origin/dev".into()]),
+            Publication::Undeclared,
+            Publication::Unreadable("dubious ownership".into()),
+        ] {
+            let unknown = check(absent);
+            assert_eq!(unknown.state, State::Unknown, "{unknown}");
+        }
+        assert_eq!(
+            check(Publication::NeverFetched(vec![
+                "refs/remotes/origin/dev".into()
+            ]))
+            .cure
+            .as_deref(),
+            Some("fetch the integration branch")
+        );
+    }
+    #[cfg(feature = "peer")]
+    #[test]
+    fn sibling_exchange_needs_a_folded_head_that_acknowledges_ours() {
+        let ours = "did:key:z6MkThisDevice000000000000000000000";
+        let sibling = "did:key:z6MkSiblingDevice0000000000000000000".to_owned();
+        let siblings = vec![sibling.clone()];
+        assert_eq!(
+            exchange_check(&[], ours, Ok(None)).detail,
+            "this device has no sibling in the roster"
+        );
+        let unsaved = exchange_check(&siblings, ours, Ok(None));
+        assert_eq!(unsaved.state, State::Unknown);
+        assert_eq!(
+            unsaved.cure.as_deref(),
+            Some("start the peer on demand: epr peer serve")
+        );
+        // Known endpoints and an empty table: nothing exchanged, never ok.
+        let mut table = eprfs_peer::HeadTable::default();
+        let silent = exchange_check(&siblings, ours, Ok(Some(table.clone())));
+        assert_eq!(silent.state, State::Degraded);
+        assert!(silent.detail.contains("no verified head"), "{silent}");
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis();
+        let now = u64::try_from(now).unwrap();
+        let mut head = eprfs_peer::DeviceHead {
+            seq: 4,
+            root: eprfs_core::BlobCid::compute_bytes(b"sibling root"),
+            at: now,
+            folded: std::collections::BTreeMap::new(),
+            folded_at: now.saturating_sub(90_000),
+            events_folded: 0,
+            nack: Default::default(),
+        };
+        table.devices.insert(sibling.clone(), head.clone());
+        let unacked = exchange_check(&siblings, ours, Ok(Some(table.clone())));
+        assert_eq!(unacked.state, State::Degraded);
+        assert!(
+            unacked.detail.contains("no sibling acknowledges"),
+            "{unacked}"
+        );
+        head.folded.insert(ours.to_owned(), 2);
+        table.devices.insert(sibling.clone(), head);
+        let exchanging = exchange_check(&siblings, ours, Ok(Some(table)));
+        assert_eq!(exchanging.state, State::Ok, "{exchanging}");
+        assert!(exchanging.detail.contains(&actor::short_did(&sibling)));
+        assert!(exchanging.detail.contains("to seq 2"));
+        assert!(exchanging.detail.contains("90s ago"), "{exchanging}");
+        // A head from a device that is not this person's sibling is no exchange.
+        assert_eq!(
+            exchange_check(
+                &["did:key:z6MkSomeoneElse000000000000000000000".into()],
+                ours,
+                Ok(Some(eprfs_peer::HeadTable::default()))
+            )
+            .state,
+            State::Degraded
+        );
     }
 }

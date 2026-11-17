@@ -1188,6 +1188,27 @@ pub fn device_enrolled(root: &Path, handle: &str, did: &str) -> bool {
     read_roster(root, handle).is_ok_and(|roster| roster.members(&verifier()).contains(did))
 }
 
+/// The other devices `handle`'s tracked roster here lists beside `did`, sorted. Honest absence (no
+/// roster, an unreadable one) is empty. Read-only: never creates a roster or a pin.
+pub(crate) fn roster_siblings(root: &Path, handle: &str, did: &str) -> Vec<String> {
+    read_roster(root, handle).map_or_else(
+        |_| Vec::new(),
+        |roster| {
+            roster
+                .members(&verifier())
+                .into_iter()
+                .filter(|member| member != did)
+                .collect()
+        },
+    )
+}
+
+/// Whether `did` is a member of `handle`'s roster as `text` reads — the roster file's bytes at
+/// another revision. Parsed in memory; a text that does not parse lists nobody.
+pub(crate) fn roster_text_lists(handle: &str, text: &str, did: &str) -> bool {
+    Roster::from_jsonl(handle, text).is_ok_and(|roster| roster.members(&verifier()).contains(did))
+}
+
 /// Read one handle's roster; an absent file is an empty roster (without creating it).
 fn read_roster(root: &Path, handle: &str) -> ActorResult<Roster> {
     if !roster_file(root, handle).is_file() {
@@ -1200,7 +1221,7 @@ fn roster_file(root: &Path, handle: &str) -> PathBuf {
     root.join(PARTICIPANTS_REL).join(format!("{handle}.jsonl"))
 }
 
-fn roster_rel(handle: &str) -> String {
+pub(crate) fn roster_rel(handle: &str) -> String {
     format!("{PARTICIPANTS_REL}/{handle}.jsonl")
 }
 

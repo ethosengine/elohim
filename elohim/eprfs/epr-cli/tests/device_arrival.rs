@@ -48,7 +48,8 @@ fn fixture() -> tempfile::TempDir {
         .unwrap()
         .success());
     let registry = json!({"version":1,"tools":{
-        "epr":{"bins":["epr"],"candidateEnv":{"epr":["EPR_BIN"]}},
+        "epr":{"bins":["epr"],"candidateEnv":{"epr":["EPR_BIN"]},
+            "source":{"publishedRef":["refs/heads/dev","refs/remotes/origin/dev"]}},
         "brit":{"bins":["brit"],"candidateEnv":{"brit":["BRIT_BIN"]}}
     }});
     fs::write(temp.path().join("registry.json"), registry.to_string()).unwrap();
@@ -117,27 +118,51 @@ fn status_keeps_dependency_order_and_does_not_mint_a_key() {
             "berth moored",
             "repository trusted",
             "peer daemon",
+            "sibling exchange",
             "device supervisor",
             "rust toolchain",
             "git hooks",
             "brit trust",
             "object packs",
-            "device layout"
+            "device layout",
+            "next step"
         ]
     );
     // No serve lock is held: siblings read this device as silent.
     assert_eq!(checks[8]["state"], "degraded");
     assert!(checks[8]["detail"].as_str().unwrap().contains("silent"));
+    // No device stands here, so there is no sibling to exchange with; never a refusal.
+    assert_eq!(checks[9]["state"], "degraded");
+    assert!(checks[9]["detail"]
+        .as_str()
+        .unwrap()
+        .contains("stands on no roster"));
     // The fixture pins no toolchain and declares no governed hooks.
-    assert_eq!(checks[10]["state"], "ok");
     assert_eq!(checks[11]["state"], "ok");
+    assert_eq!(checks[12]["state"], "ok");
     assert_eq!(checks[2]["state"], "refused");
     assert_eq!(checks[4]["state"], "degraded");
     assert_eq!(checks[5]["state"], "degraded");
     assert_eq!(checks[6]["state"], "degraded");
     // The committed base declares no process: nothing to supervise is not a lack.
-    assert_eq!(checks[9]["state"], "ok");
-    assert!(checks[9]["cure"].is_null());
+    assert_eq!(checks[10]["state"], "ok");
+    assert!(checks[10]["cure"].is_null());
+    // The last line repeats the first owed ceremony cure, and never refuses.
+    let next = checks.last().unwrap();
+    assert_ne!(next["state"], "refused");
+    let owed = [
+        "epr binary",
+        "device key",
+        "roster bound",
+        "peer daemon",
+        "sibling exchange",
+    ]
+    .iter()
+    .filter_map(|name| checks.iter().find(|c| c["name"] == *name))
+    .find(|c| c["state"] != "ok" && !c["cure"].is_null())
+    .unwrap();
+    assert_eq!(next["detail"], owed["name"]);
+    assert_eq!(next["cure"], owed["cure"]);
     assert!(!temp.path().join("device/seed").exists());
 }
 #[test]
@@ -216,4 +241,162 @@ fn peer_daemon_status_compares_live_lease_with_current() {
     assert_eq!(peer_state(base), "ok");
     write(&older, start + 1);
     assert_eq!(peer_state(base), "ok");
+}
+
+/// Plain git in the fixture repository, as its owner (no assumed foreign ownership).
+fn fixture_git(base: &Path, args: &[&str]) {
+    let output = Command::new("git")
+        .args([
+            "-c",
+            "user.name=Fixture",
+            "-c",
+            "user.email=fixture@example.invalid",
+        ])
+        .args(args)
+        .current_dir(base.join("repo"))
+        .env_remove("GIT_DIR")
+        .env_remove("GIT_WORK_TREE")
+        .env("GIT_CONFIG_GLOBAL", "/dev/null")
+        .env("GIT_CONFIG_NOSYSTEM", "1")
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "git {args:?}: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+/// The fixture's device becomes its person's first device: the chain root of a roster here.
+fn first_device(base: &Path) {
+    assert!(epr(base, &["device", "trust", "."]).status.success());
+    fs::write(base.join("repo/README.md"), "# fixture\n").unwrap();
+    fixture_git(base, &["add", "README.md"]);
+    fixture_git(base, &["commit", "-q", "-m", "before the roster"]);
+    let witnessed = epr(
+        base,
+        &[
+            "actor",
+            "witness",
+            "--subject",
+            "human:matthew",
+            "--as",
+            "agent:reader@fixture",
+            "--session",
+            "arrival-test",
+            "--basis",
+            "the person is present at the fixture",
+            "--json",
+        ],
+    );
+    assert!(
+        witnessed.status.success(),
+        "{}",
+        String::from_utf8_lossy(&witnessed.stderr)
+    );
+}
+fn line(base: &Path, name: &str) -> Value {
+    checks(base)
+        .1
+        .into_iter()
+        .find(|c| c["name"] == name)
+        .unwrap()
+}
+
+/// The laptop's case: bound in a local commit and never published reads as local only, never
+/// as arrived; publication is read from the last fetch of the declared remote-tracking ref.
+#[test]
+fn roster_bound_names_whether_the_shared_branch_carries_the_row() {
+    let temp = fixture();
+    let base = temp.path();
+    first_device(base);
+    let never = line(base, "roster bound");
+    assert_eq!(never["state"], "unknown", "{never}");
+    assert!(never["detail"]
+        .as_str()
+        .unwrap()
+        .contains("origin/dev has never been fetched"));
+    assert_eq!(never["cure"], "fetch the integration branch");
+    // The shared branch as last fetched: the commit before the roster existed.
+    fixture_git(base, &["update-ref", "refs/remotes/origin/dev", "HEAD"]);
+    let uncommitted = line(base, "roster bound");
+    assert_eq!(uncommitted["state"], "degraded", "{uncommitted}");
+    assert!(uncommitted["detail"]
+        .as_str()
+        .unwrap()
+        .contains("matthew's roster row for this device is local only (in the working tree)"));
+    fixture_git(base, &["add", ".eprfs/status/participants/matthew.jsonl"]);
+    fixture_git(base, &["commit", "-q", "-m", "matthew's roster"]);
+    let committed = line(base, "roster bound");
+    assert_eq!(committed["state"], "degraded");
+    let detail = committed["detail"].as_str().unwrap();
+    assert!(detail.contains("(in a local commit), not on origin/dev (as of the last fetch)"));
+    assert!(committed["cure"]
+        .as_str()
+        .unwrap()
+        .starts_with("publish the roster rows through the normal gate"));
+    let (output, rows) = checks(base);
+    assert_eq!(rows.last().unwrap()["name"], "next step");
+    // Local only is degraded, so the exit stays the refusals' to set.
+    assert!(rows.iter().all(|r| r["state"] != "refused") == output.status.success());
+    fixture_git(base, &["update-ref", "refs/remotes/origin/dev", "HEAD"]);
+    let published = line(base, "roster bound");
+    assert_eq!(published["state"], "ok", "{published}");
+    assert!(published["detail"]
+        .as_str()
+        .unwrap()
+        .ends_with("published on origin/dev (as of the last fetch)"));
+    // One device: no sibling, said plainly, and no exchange is claimed.
+    let sibling = line(base, "sibling exchange");
+    assert_eq!(sibling["state"], "degraded");
+    assert_eq!(
+        sibling["detail"],
+        "this device has no sibling in the roster"
+    );
+}
+
+/// Every file under the fixture, with its bytes: a status run must leave it identical.
+fn tree(dir: &Path) -> Vec<(String, Vec<u8>)> {
+    let mut files = Vec::new();
+    let mut stack = vec![dir.to_path_buf()];
+    while let Some(next) = stack.pop() {
+        for entry in fs::read_dir(&next).unwrap() {
+            let path = entry.unwrap().path();
+            let meta = fs::symlink_metadata(&path).unwrap();
+            let name = path.strip_prefix(dir).unwrap().display().to_string();
+            if meta.is_dir() {
+                files.push((format!("{name}/"), Vec::new()));
+                stack.push(path);
+            } else {
+                files.push((name, fs::read(&path).unwrap_or_default()));
+            }
+        }
+    }
+    files.sort();
+    files
+}
+
+#[test]
+fn status_is_a_read_that_leaves_the_fixture_byte_identical() {
+    let temp = fixture();
+    let base = temp.path();
+    first_device(base);
+    fixture_git(base, &["update-ref", "refs/remotes/origin/dev", "HEAD"]);
+    let before = tree(base);
+    let (_, rows) = checks(base);
+    assert_eq!(rows.last().unwrap()["name"], "next step");
+    let text = epr(base, &["device", "status"]);
+    assert!(!text.stdout.is_empty());
+    let after = tree(base);
+    let changed: Vec<_> = before
+        .iter()
+        .zip(after.iter())
+        .filter(|(b, a)| b != a)
+        .map(|(b, _)| b.0.clone())
+        .collect();
+    assert_eq!(
+        before.len(),
+        after.len(),
+        "a status run created or removed a file"
+    );
+    assert!(changed.is_empty(), "a status run changed {changed:?}");
 }
