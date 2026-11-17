@@ -112,7 +112,8 @@ pub fn usage() -> String {
      | key --method FILE [--repo ROOT] [--print input|key] [--json] \
      (the derivation key at HEAD; exits 3 when the view has uncommitted changes)\n  \
      | put --method FILE --input CID --bytes PATH --project P [--commit SHA] [--duration-ms N] \
-     [--requires FILE.json] [--repository NAME] [--cross] [--repo ROOT] [--payload-store DIR] [--json] \
+     [--requires FILE.json] [--repository NAME] [--cross] [--release CID --release-bin NAME] \
+     [--repo ROOT] [--payload-store DIR] [--json] \
      (record a built artifact: descriptor, brit build attestation, one custody Produce carrying \
      the reach derived from its inputs (self or private, never an argument) that crosses with \
      --cross unless private; extracts ELF Requires and evidence; --requires may only tighten; \
@@ -219,6 +220,10 @@ struct Options {
     input: Option<String>,
     bytes: Option<PathBuf>,
     commit: Option<String>,
+    /// The bin-store release these bytes are one bin of, stamped on the Produce as
+    /// `env:release` with `env:release-bin`, so a sibling following that release finds it.
+    release: Option<String>,
+    release_bin: Option<String>,
     duration_ms: u64,
     cross: bool,
     payload_store: Option<PathBuf>,
@@ -233,6 +238,9 @@ struct Options {
     output: Option<BlobCid>,
     min: Option<u64>,
     json: bool,
+    /// Set only by in-process callers ([`fetch_output`]): stdout belongs to them, so the verb
+    /// prints nothing of its own.
+    quiet: bool,
 }
 
 impl Options {
@@ -290,6 +298,8 @@ impl Options {
                 "--input" => options.input = Some(value),
                 "--bytes" => options.bytes = Some(PathBuf::from(value)),
                 "--commit" => options.commit = Some(value),
+                "--release" => options.release = Some(value),
+                "--release-bin" => options.release_bin = Some(value),
                 "--duration-ms" => options.duration_ms = seconds(&value)?,
                 "--payload-store" => options.payload_store = Some(PathBuf::from(value)),
                 "--dest" => options.dest = Some(PathBuf::from(value)),
@@ -1203,8 +1213,56 @@ fn reach_gate_unconfirmed() -> Option<String> {
     }
 }
 
+/// The `env:release` / `env:release-bin` slots for `--release CID --release-bin NAME`: both or
+/// neither, each one token, since a slot is `key=value` with no further structure.
+fn release_slots(options: &Options) -> ArtifactResult<Vec<String>> {
+    let token = |flag: &str, value: &str| {
+        if value.is_empty() || value.contains(|c: char| c.is_whitespace() || c == '=') {
+            Err(ArtifactError::InvalidArguments(format!(
+                "{flag} {value:?}: expected one token with no whitespace or '='"
+            )))
+        } else {
+            Ok(())
+        }
+    };
+    match (&options.release, &options.release_bin) {
+        (None, None) => Ok(Vec::new()),
+        (Some(release), Some(bin)) => {
+            token("--release", release)?;
+            token("--release-bin", bin)?;
+            Ok(vec![
+                format!("env:release={release}"),
+                format!("env:release-bin={bin}"),
+            ])
+        }
+        _ => Err(ArtifactError::InvalidArguments(
+            "--release and --release-bin go together".into(),
+        )),
+    }
+}
+
+/// Draw the exact output `output` from admitted siblings into `dest` through this device's
+/// `epr peer serve`, as `epr artifact fetch --output CID --dest PATH` does. `epr bin follow`
+/// uses it to take a sibling's landed release instead of compiling.
+///
+/// # Errors
+///
+/// [`ArtifactError::Gap`] (`fetch gap: <kind>: <reason>`) for every reason the draw did not
+/// install, including a daemon that is not serving.
+pub(crate) fn fetch_output(repo: &Path, output: &str, dest: &Path) -> ArtifactResult<()> {
+    let options = Options {
+        repo: std::fs::canonicalize(repo).unwrap_or_else(|_| repo.to_path_buf()),
+        output: Some(custody::parse_cid(output)?),
+        dest: Some(dest.to_path_buf()),
+        quiet: true,
+        ..Options::default()
+    };
+    fetch(&options).map(|_| ())
+}
+
 fn put(options: &Options) -> ArtifactResult<ExitCode> {
     Options::required(&options.project, "--project")?;
+    release_slots(options)?;
     Options::required(&options.input, "--input")?;
     let descriptor = read_descriptor(options).map_err(unrecorded)?;
     let prepared = preflight::check(options, &descriptor)?;
@@ -1379,6 +1437,7 @@ fn record_artifact(
     if let Some((cid, _)) = &requires {
         extra.push(format!("env:requires={cid}"));
     }
+    extra.extend(release_slots(options)?);
     if let Some((cid, _)) = &requires_evidence {
         extra.push(format!("env:requires-evidence={cid}"));
     }
@@ -1656,6 +1715,9 @@ fn fetch(options: &Options) -> ArtifactResult<ExitCode> {
         } => {
             if let FetchAuthority::Derivation { key_cid, .. } = &authority {
                 custody::record_divergence(&found.served_root, &found.device, key_cid, &selection)?;
+            }
+            if options.quiet {
+                return Ok(ExitCode::SUCCESS);
             }
             if !options.json && selection.outputs.len() > 1 {
                 println!(

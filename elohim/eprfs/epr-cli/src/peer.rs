@@ -1687,6 +1687,12 @@ pub struct SiblingArtifact {
     pub manifest: String,
     pub bytes: u64,
     pub commit: String,
+    /// `env:release`: the bin-store release this output is one bin of, when the recorder said.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub release: Option<String>,
+    /// `env:release-bin`: which bin of [`Self::release`] this output is.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub release_bin: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub agent_id: Option<String>,
     pub at: String,
@@ -1743,6 +1749,8 @@ fn artifact_from_event(
         manifest: manifest.to_string(),
         bytes: env.get("bytes")?.parse().ok()?,
         commit: (*env.get("commit")?).to_string(),
+        release: one_slot(event, "env:release=").map(str::to_string),
+        release_bin: one_slot(event, "env:release-bin=").map(str::to_string),
         agent_id: env.get("agentId").map(|value| (*value).to_string()),
         at: event.occurred_at.clone(),
         head_seq: heads.devices.get(device).map(|head| head.seq),

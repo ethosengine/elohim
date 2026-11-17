@@ -702,6 +702,147 @@ fn peer_artifacts_lists_only_admitted_siblings_records_for_the_key() {
 }
 
 #[test]
+fn a_produce_stamped_with_a_release_names_it_to_siblings() {
+    let (_keys, a, b) = household();
+    let a_did = a.key.did_key();
+    let key = "bafyreigq2n5xqgbtzbb6ce2ebobfqvqtjqdmmqkn3mmdyx5n6k4hgemrzu";
+    let output = BlobCid::compute_bytes(b"the epr binary");
+    let manifest = BlobCid::compute(b"\xa0").to_string();
+    let release = "bafyreiaww7ivxkoouk2ojpwpqtm4pm7hxlvlzl3u7bqhrgnxcdhbg7mwmu";
+    let mut stamped = produce_record(key, &output, &manifest, Some(&a_did));
+    stamped.classified_as.extend([
+        format!("env:release={release}"),
+        "env:release-bin=epr".into(),
+    ]);
+    let mut store = SidecarFlowStore::open(b.root()).unwrap();
+    store.append(FlowRecord::Event(stamped)).unwrap();
+    let out = b.epr(&[
+        "peer",
+        "artifacts",
+        "--key",
+        key,
+        "--json",
+        "--root",
+        b.root().to_str().unwrap(),
+    ]);
+    assert!(out.status.success(), "{}", text(&out));
+    let rows: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(rows[0]["release"], release, "{rows}");
+    assert_eq!(rows[0]["releaseBin"], "epr", "{rows}");
+}
+
+/// Device B follows epr where its sibling A recorded a landed release for B's HEAD: the offer is
+/// found through B's standing and folded custody, and the draw reaches B's own `epr peer serve`.
+/// With no daemon up the draw is a typed gap and the follow goes on to its own path.
+#[test]
+fn a_follow_under_the_knob_draws_a_siblings_release_for_head_before_building() {
+    let (_keys, a, b) = household();
+    let head = String::from_utf8(
+        elohim_epr_cli::process::build_command("git", &["rev-parse", "HEAD"], b.root(), &[])
+            .output()
+            .unwrap()
+            .stdout,
+    )
+    .unwrap()
+    .trim()
+    .to_string();
+    let release = "bafyreiaww7ivxkoouk2ojpwpqtm4pm7hxlvlzl3u7bqhrgnxcdhbg7mwmu";
+    let manifest = BlobCid::compute(b"\xa0").to_string();
+    let key = "bafyreigq2n5xqgbtzbb6ce2ebobfqvqtjqdmmqkn3mmdyx5n6k4hgemrzu";
+    let stamped = |bin: &str, commit: &str| {
+        let output = BlobCid::compute_bytes(format!("{commit} {bin}").as_bytes());
+        let mut event = produce_record(key, &output, &manifest, Some(&a.key.did_key()));
+        event
+            .classified_as
+            .retain(|slot| !slot.starts_with("env:commit="));
+        event.classified_as.extend([
+            format!("env:commit={commit}"),
+            format!("env:release={release}"),
+            format!("env:release-bin={bin}"),
+        ]);
+        event
+    };
+    let follow = |b: &Device| {
+        let bins = b.config.path().join("bins");
+        let run = |args: &[&str]| {
+            b.command()
+                .args(args)
+                .env("BIN_STORE", &bins)
+                .env("EPR_FOLLOW_SIBLING", "1")
+                .output()
+                .unwrap()
+        };
+        let declared = run(&["device", "follow", "bin:epr", "--mode", "apply"]);
+        assert!(declared.status.success(), "{}", text(&declared));
+        run(&[
+            "bin",
+            "--tool",
+            "epr",
+            "follow",
+            "--repo",
+            b.root().to_str().unwrap(),
+        ])
+    };
+    let mut store = SidecarFlowStore::open(b.root()).unwrap();
+
+    // Only another commit's release is on record: no offer, said once, then the follow's own path.
+    for bin in ["epr", "bin-launch"] {
+        store
+            .append(FlowRecord::Event(stamped(bin, "0123456789abcdef")))
+            .unwrap();
+    }
+    let out = follow(&b);
+    let said = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        said.contains("follow: drawing epr from a sibling first: "),
+        "{said}"
+    );
+    assert!(said.contains("no-offer"), "{said}");
+
+    // A's release for B's HEAD is the offer; the draw goes to B's daemon, which is not serving.
+    for bin in ["epr", "bin-launch"] {
+        store
+            .append(FlowRecord::Event(stamped(bin, &head)))
+            .unwrap();
+    }
+    let out = follow(&b);
+    let said = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        said.contains("follow: drawing epr from a sibling first: "),
+        "{said}"
+    );
+    eprintln!("{said}");
+    assert!(!said.contains("no-offer"), "{said}");
+    assert!(said.contains("fetch gap: daemon-down"), "{said}");
+    assert!(
+        !b.config
+            .path()
+            .join("bins/incoming")
+            .read_dir()
+            .is_ok_and(|mut d| d.next().is_some()),
+        "a draw that installed nothing leaves nothing in incoming"
+    );
+}
+
+#[test]
+fn put_takes_a_release_only_with_the_bin_it_names() {
+    let keys = TempDir::new().unwrap();
+    let a = Device::new(&keys, "a");
+    for args in [
+        &["--release", "bafyrei-release"][..],
+        &["--release-bin", "epr"][..],
+        &["--release", "has space", "--release-bin", "epr"][..],
+        &["--release", "bafyrei-release", "--release-bin", "a=b"][..],
+    ] {
+        let mut argv = vec!["artifact", "put", "--project", "eprfs", "--input", "x"];
+        argv.extend_from_slice(args);
+        let out = a.epr(&argv);
+        assert!(!out.status.success(), "{args:?}: {}", text(&out));
+        assert!(text(&out).contains("--release"), "{args:?}: {}", text(&out));
+    }
+}
+
+#[test]
 fn fetch_without_a_daemon_is_daemon_down_with_a_cure() {
     let keys = TempDir::new().unwrap();
     let a = Device::new(&keys, "a");

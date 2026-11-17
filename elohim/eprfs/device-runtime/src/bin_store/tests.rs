@@ -3350,6 +3350,82 @@ fn repeated_landings_preserve_the_head_and_notice_only_transitions() {
     assert_eq!(notice(), 0);
 }
 
+#[test]
+fn release_cid_of_names_what_ingest_records_without_writing_anything() {
+    let f = Fixture::new("epr");
+    // The shipped two-bin epr release, sharing the fixture's fake runner.
+    let mut registry = f.registry.clone();
+    registry.tools.get_mut("epr").unwrap()["bins"] = json!(["epr", "bin-launch"]);
+    let runner = Arc::new(Fake {
+        root: f.tmp.path().into(),
+        state: f.state.clone(),
+        tool: "epr".into(),
+    });
+    let store = Store::new(f.path("two"), "epr", &registry)
+        .unwrap()
+        .with_runner(runner);
+    let drawn = f.path("drawn");
+    fs::create_dir_all(&drawn).unwrap();
+    for name in ["epr", "bin-launch"] {
+        atomic_bytes(
+            &drawn.join(name),
+            format!("#!/bin/sh\n# drawn {name}\nexit 0\n").as_bytes(),
+            0o755,
+        )
+        .unwrap();
+    }
+    let listing = |dir: &Path| -> Vec<PathBuf> {
+        let mut paths: Vec<_> = fs::read_dir(dir)
+            .map(|d| d.map(|e| e.unwrap().path()).collect())
+            .unwrap_or_default();
+        paths.sort();
+        paths
+    };
+    let before = listing(store.root());
+    let promised = store.release_cid_of(&drawn).unwrap();
+    assert_eq!(
+        listing(store.root()),
+        before,
+        "computing the CID writes nothing"
+    );
+
+    let commit = f.commit();
+    assert!(!store.holds_verified_for(&commit));
+    let release = store
+        .ingest(
+            &drawn.join("epr"),
+            &IngestOptions {
+                source_commit: Some(commit.clone()),
+                tree_clean: Some(true),
+                gate_run: Some("sibling:did:key:z6Mksibling".into()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+    assert_eq!(
+        release.cid, promised,
+        "ingest records the CID promised before it"
+    );
+    assert!(store.holds_verified_for(&commit));
+    assert!(
+        !store.holds_verified_for(&"b".repeat(40)),
+        "another commit is not held"
+    );
+
+    atomic_bytes(&drawn.join("bin-launch"), b"#!/bin/sh\n# other\n", 0o755).unwrap();
+    assert_ne!(
+        store.release_cid_of(&drawn).unwrap(),
+        promised,
+        "other bytes, other release"
+    );
+    fs::remove_file(drawn.join("bin-launch")).unwrap();
+    assert_eq!(
+        store.release_cid_of(&drawn).unwrap_err().kind,
+        "binary-unusable",
+        "a missing bin is refused, never hashed as absent"
+    );
+}
+
 #[path = "tests_retained.rs"]
 mod retained;
 

@@ -295,6 +295,58 @@ impl Store {
             Err(Refusal::new("tool-unknown", &self.tool))
         }
     }
+    /// The release CID [`Store::ingest`] would record for the bins in `dir`, computed without
+    /// writing, executing or locking anything. A caller holding bytes from elsewhere (a sibling's
+    /// crossed Produce) compares this with the CID it was promised before any byte is ingested,
+    /// because ingest runs the binary to read its identity.
+    ///
+    /// # Errors
+    ///
+    /// `binary-unusable` when a registered bin is not an executable file in `dir`; `checksums-*`
+    /// when an alias present in `dir` differs from its target.
+    pub fn release_cid_of(&self, dir: &Path) -> Result<String> {
+        let mut sums = BTreeMap::new();
+        for name in &self.config.bins {
+            let file = dir.join(name);
+            if !files::executable(&file) {
+                return Err(Refusal::new(
+                    "binary-unusable",
+                    format!("no executable {name}: {}", file.display()),
+                ));
+            }
+            sums.insert(name.clone(), files::file_cid(&file)?);
+        }
+        for (alias, target) in &self.config.aliases {
+            let target_cid = sums.get(target).cloned().ok_or_else(|| {
+                Refusal::new(
+                    "checksums-mismatch",
+                    format!("alias {alias} has no target {target}"),
+                )
+            })?;
+            if dir.join(alias).is_file() && files::file_cid(&dir.join(alias))? != target_cid {
+                return Err(Refusal::new(
+                    "checksums-mismatch",
+                    format!("alias {alias} differs from {target}"),
+                ));
+            }
+            sums.insert(alias.clone(), target_cid);
+        }
+        self.release_cid(&sums)
+    }
+    /// Whether `follow` would land a stored release for `commit` without building: a verified
+    /// record, built from a clean tree at that commit, carrying every declared bin (the same
+    /// test `prepare_declared` applies before it reaches for a closure or a compiler).
+    pub fn holds_verified_for(&self, commit: &str) -> bool {
+        self.records().into_iter().any(|record| {
+            record.source(commit).is_some_and(|s| s.tree_clean)
+                && self
+                    .config
+                    .bins
+                    .iter()
+                    .all(|bin| record.bins.contains_key(bin))
+                && self.verified(&record.cid)
+        })
+    }
     /// Verify all release bytes and the release identity, never just a metadata claim.
     pub fn verified(&self, cid: &str) -> bool {
         let Some(record) = self.record(cid) else {

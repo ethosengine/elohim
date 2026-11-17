@@ -214,7 +214,25 @@ pub(crate) fn execute(args: &[String]) -> Result<String, Refusal> {
         "gc" => store.gc(&session::proc_root(), None)?,
         "shadows" => json!(store.shadows(&std::env::var("PATH").unwrap_or_default())),
         "source-state" => store.source_state(&repo()?)?,
-        "bootstrap" => json!(store.bootstrap(&repo()?, closure)?),
+        "bootstrap" => {
+            let repo = repo()?;
+            // The first arrival of a device that cannot build is the case the draw is for.
+            let drawn = if closure.is_none() {
+                sibling::before_landing(&store, tool, &repo)?
+            } else {
+                sibling::Drawn::default()
+            };
+            match store.bootstrap(&repo, closure) {
+                Ok(release) => {
+                    let mut value = json!(release);
+                    if let (Some(record), Some(map)) = (drawn.record, value.as_object_mut()) {
+                        map.insert("sibling".into(), record);
+                    }
+                    value
+                }
+                Err(refusal) => return Err(drawn.explain(refusal)),
+            }
+        }
         "follow" => {
             let head = crate::device::declaration::store(None, None, None)
                 .map_err(argument)?
@@ -224,7 +242,25 @@ pub(crate) fn execute(args: &[String]) -> Result<String, Refusal> {
                 .iter()
                 .find(|f| f.channel == format!("bin:{tool}"))
             {
-                Some(follow) => store.follow_declared(&repo()?, closure, follow)?,
+                Some(follow) => {
+                    let repo = repo()?;
+                    // A closure the caller supplied is the bytes to follow; nothing is drawn.
+                    let drawn = if follow.mode.applies() && closure.is_none() {
+                        sibling::before_landing(&store, tool, &repo)?
+                    } else {
+                        sibling::Drawn::default()
+                    };
+                    match store.follow_declared(&repo, closure, follow) {
+                        Ok(mut value) => {
+                            if let (Some(record), Some(map)) = (drawn.record, value.as_object_mut())
+                            {
+                                map.insert("sibling".into(), record);
+                            }
+                            value
+                        }
+                        Err(refusal) => return Err(drawn.explain(refusal)),
+                    }
+                }
                 None => {
                     serde_json::json!({"followed":false,"why":"device does not follow this tool"})
                 }
@@ -300,6 +336,266 @@ pub(crate) fn daemon_store(
 /// Process table used to observe daemon owner lifetimes.
 pub(crate) fn daemon_proc_root() -> PathBuf {
     session::proc_root()
+}
+
+/// Follow-from-sibling: before `bin follow` compiles epr, take the release an admitted sibling
+/// landed for the same commit, drawn by exact output CID through this device's `epr peer serve`.
+/// The sibling's word is never the authority: the drawn bytes must make the release CID its
+/// Produce named before anything is ingested, and ingest then verifies them like any other bytes.
+pub(crate) mod sibling {
+    use super::{Refusal, Store};
+    use serde_json::Value;
+    use std::path::Path;
+
+    /// The knob that makes a host that can build draw from a sibling first.
+    #[cfg(feature = "peer")]
+    pub(crate) const FOLLOW_SIBLING_ENV: &str = "EPR_FOLLOW_SIBLING";
+    /// The bins one sibling must hold for one release before it is taken.
+    #[cfg(feature = "peer")]
+    pub(crate) const BINS: [&str; 2] = ["epr", "bin-launch"];
+
+    /// What the draw left for the follow that runs after it.
+    #[derive(Debug, Default)]
+    pub(crate) struct Drawn {
+        /// The draw, reported on the follow's result as `sibling`.
+        pub record: Option<Value>,
+        /// Why nothing was drawn, appended to a follow that then could not build.
+        pub gap: Option<String>,
+    }
+
+    impl Drawn {
+        /// `refusal`, with why nothing was drawn when that is part of why it could not land.
+        pub(crate) fn explain(self, mut refusal: Refusal) -> Refusal {
+            if let Some(gap) = self.gap {
+                refusal.detail = format!("{}; sibling: {gap}", refusal.detail);
+            }
+            refusal
+        }
+    }
+
+    #[cfg(feature = "peer")]
+    pub(crate) fn refused(kind: &str, detail: impl Into<String>) -> Refusal {
+        Refusal {
+            kind: kind.into(),
+            detail: detail.into(),
+        }
+    }
+
+    /// Whether `bin follow --tool <tool>` draws from a sibling before building, with the one line
+    /// that says which path and why; `None` for a tool with no sibling path.
+    #[cfg(feature = "peer")]
+    pub(crate) fn path(tool: &str, can_build: bool, knob: Option<&str>) -> Option<(bool, String)> {
+        if tool != "epr" {
+            return None;
+        }
+        Some(match (can_build, knob == Some("1")) {
+            (false, _) => (
+                true,
+                "follow: drawing epr from a sibling first: this host resolves no cargo pool".into(),
+            ),
+            (true, true) => (
+                true,
+                format!("follow: drawing epr from a sibling first: {FOLLOW_SIBLING_ENV}=1"),
+            ),
+            (true, false) => (
+                false,
+                format!(
+                    "follow: building epr locally: this host resolves a cargo pool \
+                     ({FOLLOW_SIBLING_ENV}=1 draws from a sibling first)"
+                ),
+            ),
+        })
+    }
+
+    /// One sibling's landed release for a commit: every bin of [`BINS`] by output CID.
+    #[cfg(feature = "peer")]
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub(crate) struct Offer {
+        pub device: String,
+        pub release: String,
+        pub outputs: std::collections::BTreeMap<String, String>,
+        pub at: String,
+    }
+
+    /// The release to draw for `commit`: among admitted siblings' crossed Produces stamped with
+    /// `env:release` and `env:release-bin`, the newest (device, release) that holds every bin.
+    /// `me`'s own records are never offers.
+    #[cfg(feature = "peer")]
+    pub(crate) fn select(
+        rows: &[crate::peer::SiblingArtifact],
+        me: &str,
+        commit: &str,
+    ) -> Option<Offer> {
+        let mut offers = std::collections::BTreeMap::<(String, String), Offer>::new();
+        for row in rows {
+            let (Some(release), Some(bin)) = (&row.release, &row.release_bin) else {
+                continue;
+            };
+            if row.device == me || row.commit != commit || !BINS.contains(&bin.as_str()) {
+                continue;
+            }
+            let offer = offers
+                .entry((row.device.clone(), release.clone()))
+                .or_insert_with(|| Offer {
+                    device: row.device.clone(),
+                    release: release.clone(),
+                    outputs: std::collections::BTreeMap::new(),
+                    at: String::new(),
+                });
+            // Rows arrive in flow order, so a later record of the same bin stands.
+            offer.outputs.insert(bin.clone(), row.output.clone());
+            if row.at > offer.at {
+                offer.at.clone_from(&row.at);
+            }
+        }
+        offers
+            .into_values()
+            .filter(|offer| BINS.iter().all(|bin| offer.outputs.contains_key(*bin)))
+            .max_by(|a, b| a.at.cmp(&b.at).then_with(|| b.release.cmp(&a.release)))
+    }
+
+    /// Before `follow` or `bootstrap` lands: decide the path, say it, and draw when the path is
+    /// sibling-first and no stored release already serves the checkout's HEAD. A gap falls back to the follow's own build; a sibling
+    /// whose bytes do not make the release it named refuses the whole follow.
+    #[cfg(feature = "peer")]
+    pub(crate) fn before_landing(store: &Store, tool: &str, repo: &Path) -> Result<Drawn, Refusal> {
+        let layout = elohim_device_runtime::layout::resolve();
+        let can_build = layout.as_ref().is_ok_and(|l| l.cargo_pool().is_some());
+        let knob = std::env::var(FOLLOW_SIBLING_ENV).ok();
+        let Some((first, why)) = path(tool, can_build, knob.as_deref()) else {
+            return Ok(Drawn::default());
+        };
+        let commit = store.source_state(repo)?["head"]
+            .as_str()
+            .map(str::to_owned)
+            .ok_or_else(|| refused("source-mismatch", "no source HEAD"))?;
+        if store.holds_verified_for(&commit) {
+            eprintln!("follow: epr for {commit} is already held; nothing to draw or build");
+            return Ok(Drawn::default());
+        }
+        eprintln!("{why}");
+        if !first {
+            return Ok(Drawn::default());
+        }
+        let incoming = layout
+            .ok()
+            .and_then(|l| l.incoming().ok())
+            .or_else(|| {
+                store
+                    .root()
+                    .parent()
+                    .map(|p| p.join(elohim_device_runtime::layout::INCOMING_DIR))
+            })
+            .ok_or_else(|| refused("layout-no-data-home", "no incoming directory to draw into"))?;
+        match draw(store, repo, &commit, &incoming) {
+            Ok(record) => Ok(Drawn {
+                record: Some(record),
+                gap: None,
+            }),
+            Err(Draw::Gap(gap)) => {
+                eprintln!(
+                    "follow: nothing drawn from a sibling ({gap}); {}",
+                    if can_build {
+                        "building locally"
+                    } else {
+                        "trying a local build"
+                    }
+                );
+                Ok(Drawn {
+                    record: None,
+                    gap: Some(gap),
+                })
+            }
+            Err(Draw::Refused(refusal)) => Err(refusal),
+        }
+    }
+
+    #[cfg(not(feature = "peer"))]
+    pub(crate) fn before_landing(
+        _store: &Store,
+        _tool: &str,
+        _repo: &Path,
+    ) -> Result<Drawn, Refusal> {
+        Ok(Drawn::default())
+    }
+
+    #[cfg(feature = "peer")]
+    enum Draw {
+        /// Nothing was drawn and nothing was ingested; the follow may still build.
+        Gap(String),
+        /// The sibling's bytes are not what it promised, or the store refused them.
+        Refused(Refusal),
+    }
+
+    #[cfg(feature = "peer")]
+    fn draw(store: &Store, repo: &Path, commit: &str, incoming: &Path) -> Result<Value, Draw> {
+        use std::os::unix::fs::PermissionsExt;
+        let found = crate::peer::custody_artifacts(repo, None)
+            .map_err(|e| Draw::Gap(format!("no-record: {e}")))?;
+        let offer = select(&found.rows, &found.device, commit).ok_or_else(|| {
+            Draw::Gap(format!(
+                "no-offer: no admitted sibling recorded a crossed Produce of epr and bin-launch \
+                 stamped with a release for {commit}"
+            ))
+        })?;
+        let dir = incoming.join(format!("sibling-{}", offer.release));
+        // A previous partial draw is replaced, never trusted.
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir)
+            .map_err(|e| Draw::Gap(format!("local-store: {}: {e}", dir.display())))?;
+        let started = std::time::Instant::now();
+        let result = (|| {
+            for (bin, output) in &offer.outputs {
+                let dest = dir.join(bin);
+                crate::artifact::fetch_output(repo, output, &dest)
+                    .map_err(|e| Draw::Gap(e.to_string()))?;
+                std::fs::set_permissions(&dest, std::fs::Permissions::from_mode(0o755))
+                    .map_err(|e| Draw::Gap(format!("local-store: {}: {e}", dest.display())))?;
+            }
+            let fetched = store.release_cid_of(&dir).map_err(Draw::Refused)?;
+            let mismatch = |made: &str| {
+                Draw::Refused(refused(
+                    "sibling-release-mismatch",
+                    format!(
+                        "{} offered release {} for {commit}; the drawn bytes make {made}",
+                        offer.device, offer.release
+                    ),
+                ))
+            };
+            if fetched != offer.release {
+                return Err(mismatch(&fetched));
+            }
+            let release = store
+                .ingest(
+                    &dir.join(BINS[0]),
+                    &super::IngestOptions {
+                        repo: Some(repo.into()),
+                        source_commit: Some(commit.into()),
+                        gate_run: Some(format!("sibling:{}", offer.device)),
+                        tree_clean: Some(true),
+                        closure: false,
+                    },
+                )
+                .map_err(Draw::Refused)?;
+            if release.cid != offer.release {
+                return Err(mismatch(&release.cid));
+            }
+            Ok(())
+        })();
+        let _ = std::fs::remove_dir_all(&dir);
+        result?;
+        let seconds = started.elapsed().as_secs_f64();
+        eprintln!(
+            "follow: drew epr release {} from {} in {seconds:.1} s",
+            offer.release, offer.device
+        );
+        Ok(serde_json::json!({
+            "device": offer.device,
+            "release": offer.release,
+            "outputs": offer.outputs,
+            "seconds": seconds,
+        }))
+    }
 }
 
 #[cfg(test)]
@@ -479,6 +775,110 @@ mod tests {
         assert_eq!(
             peer_serving_policy(Err("no device key".into()), "epr"),
             PeerServing::Tolerated
+        );
+    }
+
+    #[cfg(feature = "peer")]
+    #[test]
+    fn a_host_draws_from_a_sibling_first_only_without_a_pool_or_with_the_knob() {
+        use sibling::path;
+        let (first, why) = path("epr", false, None).unwrap();
+        assert!(first);
+        assert!(why.contains("resolves no cargo pool"), "{why}");
+        let (first, why) = path("epr", true, Some("1")).unwrap();
+        assert!(first);
+        assert!(why.contains("EPR_FOLLOW_SIBLING=1"), "{why}");
+        for knob in [None, Some("0"), Some("yes"), Some("")] {
+            let (first, why) = path("epr", true, knob).unwrap();
+            assert!(!first, "knob {knob:?} must not draw on a host that builds");
+            assert!(why.starts_with("follow: building epr locally"), "{why}");
+        }
+        assert_eq!(path("brit", false, Some("1")), None, "only epr has a path");
+    }
+
+    #[cfg(feature = "peer")]
+    fn row(
+        device: &str,
+        commit: &str,
+        release: &str,
+        bin: &str,
+        at: &str,
+    ) -> crate::peer::SiblingArtifact {
+        crate::peer::SiblingArtifact {
+            record: format!("record-{device}-{release}-{bin}-{at}"),
+            key: "key".into(),
+            method: None,
+            input: None,
+            family: None,
+            requires: None,
+            device: device.into(),
+            output: format!("output-{release}-{bin}"),
+            manifest: "manifest".into(),
+            bytes: 1,
+            commit: commit.into(),
+            release: (!release.is_empty()).then(|| release.into()),
+            release_bin: (!bin.is_empty()).then(|| bin.into()),
+            agent_id: None,
+            at: at.into(),
+            head_seq: None,
+        }
+    }
+
+    #[cfg(feature = "peer")]
+    #[test]
+    fn the_offer_is_the_newest_complete_release_a_sibling_stamped_for_the_commit() {
+        use sibling::select;
+        const ME: &str = "did:key:me";
+        const A: &str = "did:key:a";
+        const B: &str = "did:key:b";
+        const HEAD: &str = "c0ffee";
+        let t1 = "2026-11-17T01:00:00Z";
+        let t2 = "2026-11-17T02:00:00Z";
+        let t3 = "2026-11-17T03:00:00Z";
+        let rows = vec![
+            // A's complete release R1 at HEAD.
+            row(A, HEAD, "R1", "epr", t1),
+            row(A, HEAD, "R1", "bin-launch", t1),
+            // B's newer release R2 lacks its launcher: not an offer.
+            row(B, HEAD, "R2", "epr", t3),
+            // My own newest release is never an offer.
+            row(ME, HEAD, "R3", "epr", t3),
+            row(ME, HEAD, "R3", "bin-launch", t3),
+            // Another commit, and an unstamped Produce, are not offers for HEAD.
+            row(A, "other", "R4", "epr", t3),
+            row(A, "other", "R4", "bin-launch", t3),
+            row(A, HEAD, "", "", t3),
+        ];
+        let offer = select(&rows, ME, HEAD).expect("R1 is complete");
+        assert_eq!((offer.device.as_str(), offer.release.as_str()), (A, "R1"));
+        assert_eq!(offer.outputs["epr"], "output-R1-epr");
+        assert_eq!(offer.outputs["bin-launch"], "output-R1-bin-launch");
+
+        // Once B completes R2 later, the newest complete release wins.
+        let mut more = rows.clone();
+        more.push(row(B, HEAD, "R2", "bin-launch", t2));
+        let offer = select(&more, ME, HEAD).unwrap();
+        assert_eq!((offer.device.as_str(), offer.release.as_str()), (B, "R2"));
+
+        // A later record of the same bin stands (flow order).
+        let mut relabelled = rows.clone();
+        let mut later = row(A, HEAD, "R1", "epr", t2);
+        later.output = "output-R1-epr-again".into();
+        relabelled.push(later);
+        assert_eq!(
+            select(&relabelled, ME, HEAD).unwrap().outputs["epr"],
+            "output-R1-epr-again"
+        );
+
+        assert_eq!(
+            select(&rows, ME, "unknown"),
+            None,
+            "nothing for another commit"
+        );
+        assert_eq!(
+            select(&rows[2..3], ME, HEAD),
+            None,
+            "an incomplete release is no offer"
         );
     }
 }
