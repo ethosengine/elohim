@@ -46,14 +46,34 @@ pub fn assert_declared_reads<'a>(
                 .is_some_and(|suffix| suffix.starts_with('/'))
     }
 
+    // The grammar of gate-input-audit.mjs's DECLARATION: `// gate-reads: <path>`, or
+    // `// gate-reads(<project>): <path>` scoping the read to one gate project (either form
+    // declares it here). tests/fixtures/gate-reads-grammar.tsv pins it for both parsers.
+    fn declaration(line: &str) -> Option<&str> {
+        let rest = line
+            .trim()
+            .strip_prefix("//")?
+            .trim_start()
+            .strip_prefix("gate-reads")?;
+        let rest = match rest.strip_prefix('(') {
+            Some(scoped) => {
+                let (scope, after) = scoped.split_once(')')?;
+                let valid = |c: char| c.is_ascii_alphanumeric() || "_.-".contains(c);
+                if scope.is_empty() || !scope.chars().all(valid) {
+                    return None;
+                }
+                after
+            }
+            None => rest,
+        };
+        let path = rest.strip_prefix(':')?.trim();
+        (!path.is_empty()).then_some(path)
+    }
+
     let declared = source
         .lines()
-        .filter_map(|line| {
-            line.trim()
-                .strip_prefix("// gate-reads:")
-                .map(str::trim)
-                .map(normalize)
-        })
+        .filter_map(declaration)
+        .map(normalize)
         .collect::<Vec<_>>();
     assert!(
         !declared.contains(&"."),

@@ -1,0 +1,18 @@
+# The `gate-reads` declaration grammar, read by both parsers that must agree on it:
+# genesis/orchestrator/gate-input-audit.mjs (DECLARATION; gate-input-audit.test.mjs) and
+# elohim/eprfs/epr-cli/tests/common/mod.rs (assert_declared_reads; flow_cites.rs).
+# <verdict>\t<path>\t<line>: `declares` means the line declares <path>; `none` means it declares
+# nothing, and in particular not <path>.
+declares	genesis/docs	// gate-reads: genesis/docs
+declares	genesis/docs	    // gate-reads: genesis/docs   
+declares	genesis/docs	//gate-reads: genesis/docs
+declares	genesis/docs	// gate-reads(eprfs-live-corpus): genesis/docs
+declares	**/.epr-meta	    // gate-reads(eprfs-live-corpus): **/.epr-meta
+declares	a/b.json	// gate-reads(p_1.x-y): a/b.json
+none	genesis/docs	// gate-reads(): genesis/docs
+none	genesis/docs	// gate-reads(a b): genesis/docs
+none	genesis/docs	// gate-reads (x): genesis/docs
+none	genesis/docs	// gate-reads(x) : genesis/docs
+none	genesis/docs	// gate-read: genesis/docs
+none	genesis/docs	/// gate-reads: genesis/docs
+none	genesis/docs	let x = 1; // gate-reads: genesis/docs

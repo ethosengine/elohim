@@ -271,6 +271,41 @@ fn repo_root() -> PathBuf {
     p
 }
 
+/// One fixture, two readers: gate-input-audit.mjs's DECLARATION (gate-input-audit.test.mjs reads
+/// the same rows) and `common::assert_declared_reads`. The scoped `gate-reads(<project>):` form once
+/// reached the audit and not this reader, which then refused every live-corpus read it declares.
+#[test]
+fn gate_reads_grammar_matches_the_gate_input_audit() {
+    let rows = include_str!("fixtures/gate-reads-grammar.tsv");
+    let mut checked = 0;
+    for row in rows
+        .lines()
+        .filter(|row| !row.is_empty() && !row.starts_with('#'))
+    {
+        let mut columns = row.splitn(3, '\t');
+        let (Some(verdict), Some(path), Some(line)) =
+            (columns.next(), columns.next(), columns.next())
+        else {
+            panic!("grammar row is not <verdict>\\t<path>\\t<line>: {row:?}");
+        };
+        match verdict {
+            "declares" => common::assert_declared_reads(line, [path], "gate-reads grammar"),
+            "none" => {
+                let declared = std::panic::catch_unwind(|| {
+                    common::assert_declared_reads(line, [path], "gate-reads grammar");
+                });
+                assert!(declared.is_err(), "`{line}` must declare nothing");
+            }
+            other => panic!("unknown grammar verdict {other:?} in {row:?}"),
+        }
+        checked += 1;
+    }
+    assert!(
+        checked >= 10,
+        "the grammar fixture lost its rows ({checked})"
+    );
+}
+
 fn fixtures() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/.cite-writer")
 }

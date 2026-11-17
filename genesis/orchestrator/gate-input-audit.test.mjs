@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync, readdirSync } from 'fs';
 import { dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
-import { auditProject, declarationScopes, exhaustInputs, globCovers, isReadPattern, readCovers, readSet } from './gate-input-audit.mjs';
+import { auditProject, declarationScopes, declarationsIn, exhaustInputs, globCovers, isReadPattern, readCovers, readSet } from './gate-input-audit.mjs';
 import { GATE_EXHAUST } from './gate-evidence.mjs';
 import { NAMED_READ_SET_PROJECTS } from './gate-preflight.mjs';
 import { loadGateRegistry } from './pipeline-registry.mjs';
@@ -563,4 +563,24 @@ test('REAL every gate-reads(<project>) scope names a registered gate project who
   walk('elohim/eprfs');
   assert.ok(scopes >= 20, `only ${scopes} scoped declarations found: the live-corpus legs lost their scope`);
   assert.deepEqual(failures, []);
+});
+
+// The Rust side keeps its own reader of these lines (epr-cli tests/common/mod.rs
+// assert_declared_reads); the scoped form once reached the audit and not it (S2 red, 2026-11-17).
+// One fixture pins the grammar both must accept; flow_cites.rs reads the same rows.
+test('the gate-reads grammar fixture shared with the Rust reader parses as declared', () => {
+  const repo = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
+  const rows = readFileSync(resolve(repo, 'elohim/eprfs/epr-cli/tests/fixtures/gate-reads-grammar.tsv'), 'utf8')
+    .split('\n').filter(row => row && !row.startsWith('#'));
+  assert.ok(rows.length >= 10, 'the grammar fixture lost its rows');
+  for (const row of rows) {
+    const [verdict, path, ...rest] = row.split('\t');
+    const line = rest.join('\t');
+    const parsed = declarationsIn(`${line}\n`).map(d => d.path);
+    if (verdict === 'declares') assert.deepEqual(parsed, [path], line);
+    else {
+      assert.equal(verdict, 'none', row);
+      assert.deepEqual(parsed, [], line);
+    }
+  }
 });

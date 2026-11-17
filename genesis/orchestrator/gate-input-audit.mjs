@@ -74,9 +74,18 @@ function repositoryFiles(root) {
  */
 const DECLARATION = /^\/\/\s*gate-reads(?:\(([A-Za-z0-9_.-]+)\))?:\s*(\S.*?)\s*$/;
 
+/**
+ * Every `gate-reads` declaration a Rust source carries, scoped or not, as the audit reads it.
+ * The grammar is pinned for this parser and for epr-cli's `assert_declared_reads` by one fixture,
+ * elohim/eprfs/epr-cli/tests/fixtures/gate-reads-grammar.tsv.
+ */
+export function declarationsIn(text) {
+  return tokens(text).declarations.map(({ project, path, line }) => ({ project, path, line }));
+}
+
 /** Every `gate-reads(<project>)` scope a Rust source names, in order of appearance. */
 export function declarationScopes(text) {
-  return tokens(text).declarations.filter(d => d.project).map(({ project, path, line }) => ({ project, path, line }));
+  return declarationsIn(text).filter(d => d.project);
 }
 
 // Keep strings atomic and discard comments, preserving locations. In particular,
