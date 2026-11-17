@@ -87,6 +87,15 @@ byte-order mark, fail-closed flags, tracked symlinks), and drop the three skips 
 unnecessary. The 69-entry list is derivable from `cargo metadata` plus the dep-info; a hand list
 will drift, so the step's sources should be checked against a build's dep-info in the gate.
 
+Landed since: the view as its own file, `elohim/eprfs/bin-build-view.json` (step `bin-build`),
+outside any build manifest so it selects no gate and dispatches no pipeline, and
+`epr-cli/tests/bin_build_view.rs`, which reads the dep-info cargo writes beside the `epr` binary
+and fails naming any tracked file the build read that the view leaves out (negative control:
+removing the embedded device manifest from the view fails the test with that path). So the
+producer can pass `--sources elohim/eprfs/bin-build-view.json#bin-build` with no manifest
+decision. Still the steward's: whether the three scan skips are dropped. Not covered by the test:
+`bin-launch`'s dep-info (the test sees only its own package's binary).
+
 ### What this means for the native-dev-plane joins
 
 Join F2 (a sibling fetches a binary from a peer's tier instead of rebuilding) is, for `epr`
