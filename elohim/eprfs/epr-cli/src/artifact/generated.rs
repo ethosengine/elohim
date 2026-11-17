@@ -16,7 +16,8 @@
 //!    left out; every other ignored path still refuses. A name alone (`dist`, `bindings`) never
 //!    qualifies.
 //! 2. **No tracked reader names it.** Every tracked Rust source and Cargo manifest inside the view
-//!    is lexed for string literals. A literal that resolves (against the source's directory, its
+//!    is lexed for string literals (after blanking a leading byte-order mark and shebang line, as
+//!    rustc drops them; raw byte and raw C strings escape nothing). A literal that resolves (against the source's directory, its
 //!    crate root, the checkout root, or after `$CARGO_MANIFEST_DIR`/a `concat!` tail) into an
 //!    excluded directory refuses, and so does a path-shaped macro or attribute argument onto one
 //!    of its ancestors when resolved against the crate root, after `$CARGO_MANIFEST_DIR` or as
@@ -627,10 +628,63 @@ struct Frame {
     opened_by_macro: bool,
 }
 
+/// Blank what rustc drops before lexing, keeping every index: a leading byte-order mark, and a
+/// first-line shebang. As rustc does, `#!` opens a shebang unless the next token after
+/// whitespace and comments is `[` (an inner attribute); an unclosed comment there leaves no `[`,
+/// so the line is a shebang. Without this a shebang line such as `#!x /*` reads as a comment
+/// opening and hides every literal after it.
+fn blank_preamble(chars: &mut [char]) {
+    let start = usize::from(chars.first() == Some(&'\u{feff}'));
+    if start == 1 {
+        chars[0] = ' ';
+    }
+    if chars.get(start) != Some(&'#') || chars.get(start + 1) != Some(&'!') {
+        return;
+    }
+    let mut j = start + 2;
+    loop {
+        match (chars.get(j), chars.get(j + 1)) {
+            (Some(c), _) if c.is_whitespace() => j += 1,
+            (Some('/'), Some('/')) => {
+                while j < chars.len() && chars[j] != '\n' {
+                    j += 1;
+                }
+            }
+            (Some('/'), Some('*')) => {
+                let mut depth = 0usize;
+                loop {
+                    match (chars.get(j), chars.get(j + 1)) {
+                        // Unclosed: no `[` follows, so rustc reads a shebang.
+                        (None, _) => break,
+                        (Some('/'), Some('*')) => {
+                            depth += 1;
+                            j += 2;
+                        }
+                        (Some('*'), Some('/')) => {
+                            depth -= 1;
+                            j += 2;
+                            if depth == 0 {
+                                break;
+                            }
+                        }
+                        _ => j += 1,
+                    }
+                }
+            }
+            (Some('['), _) => return,
+            _ => break,
+        }
+    }
+    for c in chars[start..].iter_mut().take_while(|c| **c != '\n') {
+        *c = ' ';
+    }
+}
+
 /// The string literals of a Rust source (`"…"`, `b"…"`, `r#"…"#`), comments skipped. Escapes are
 /// kept as written except `\"` and `\\`; a path literal needs neither.
 fn rust_string_literals(text: &str) -> Vec<Literal> {
-    let chars: Vec<char> = text.chars().collect();
+    let mut chars: Vec<char> = text.chars().collect();
+    blank_preamble(&mut chars);
     let mut out = Vec::new();
     let mut i = 0;
     let ident = |c: char| c.is_alphanumeric() || c == '_';
@@ -673,7 +727,7 @@ fn rust_string_literals(text: &str) -> Vec<Literal> {
             }
             'r' if (i == 0
                 || !ident(chars[i - 1])
-                || (chars[i - 1] == 'b' && (i < 2 || !ident(chars[i - 2]))))
+                || (matches!(chars[i - 1], 'b' | 'c') && (i < 2 || !ident(chars[i - 2]))))
                 && matches!(next, Some('"' | '#')) =>
             {
                 let mut j = i + 1;
@@ -783,6 +837,50 @@ fn rust_string_literals(text: &str) -> Vec<Literal> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn raw_c_strings_shebangs_and_byte_order_marks_lex_as_rustc_lexes_them() {
+        // A raw C string's backslash escapes nothing: the literal after it is still seen.
+        let src = r##"const A: &CStr = cr"\"; fn f() { let _ = include_bytes!("../dist/x"); }"##;
+        assert!(rust_string_literals(src)
+            .iter()
+            .any(|l| l.text == "../dist/x"));
+        assert!(
+            rust_string_literals(r##"const A: &CStr = cr#"\"#; const B: &str = "b";"##)
+                .iter()
+                .any(|l| l.text == "b")
+        );
+        // rustc drops a first-line shebang: it opens no comment, even an unclosed one.
+        for src in [
+            "#!x /*\nfn f() { let _ = include_bytes!(\"../dist/y\"); }\n// */\n",
+            "#! /*\nconst A: &[u8] = include_bytes!(\"../dist/y\");\n",
+        ] {
+            assert!(
+                rust_string_literals(src)
+                    .iter()
+                    .any(|l| l.text == "../dist/y"),
+                "{src}"
+            );
+        }
+        // `#!` then `[`, after whitespace and comments, is an inner attribute and is read.
+        for src in [
+            "#![doc = \"attr\"]\n",
+            "#! /* c */ [doc = \"attr\"]\n",
+            "#!\n// c\n[doc = \"attr\"]\n",
+        ] {
+            assert!(
+                rust_string_literals(src).iter().any(|l| l.text == "attr"),
+                "{src}"
+            );
+        }
+        // A byte-order mark before a shebang is dropped the same way.
+        let src = "\u{feff}#!shebang \"x\"\nconst A: &str = \"out\";";
+        let texts: Vec<_> = rust_string_literals(src)
+            .into_iter()
+            .map(|l| l.text)
+            .collect();
+        assert_eq!(texts, vec!["out".to_string()]);
+    }
 
     #[test]
     fn literals_skip_comments_chars_and_read_raw_strings() {
