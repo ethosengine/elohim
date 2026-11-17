@@ -32,13 +32,23 @@ output CID into `<bin_store>/incoming`, ingest with `gate_run sibling:<did>` and
 the release CID equals the producer's. The producer half records the Produce where the bytes
 are built, in the eprfs gate's ingest step.
 
-Blocked on the steward: ethosengine's permission layer refused a relayed grant, so the branch
-does not land until the steward states the write-set there (`epr-cli/src/bin.rs`,
-`epr-cli/src/artifact.rs`, `epr-cli/src/artifact/**`, `justfile`).
+Landed 2026-11-17 in `a51dacfc8` (consumer, `--release`/`--release-bin` on put, review fixes).
+First live draw the same day: shem put `epr` and `bin-launch` at `a51dacfc8` with `--cross`
+(release `bafyreic4kqcvcmg5ivr7lrhuxv7xp4cgopcwf7t3qjq6otlh7ttds5kzoa`), and ethosengine, through
+its running `epr peer serve`, ran `EPR_FOLLOW_SIBLING=1 epr bin follow --tool epr`: both bins
+(167 MB) drawn in 5.8 s, the same release CID ingested with `gateRun sibling:<shem>`, the ring
+landed, no local build of the release. Logs on ethosengine:
+`genesis/local-dev/steward-arrival-e/draw-follow*.log`.
 
-Probe: on a device with no cargo pool, `epr bin bootstrap --tool epr` lands the sibling's
-release CID with no compile; on shem, `EPR_FOLLOW_SIBLING=1 epr bin follow --tool epr` does the
-same and the wall-clock is recorded against a local build.
+Still open:
+
+- The producer ran by hand (describe, key, the gate's own bytes, `put --release --release-bin
+  --cross`, with `--sources elohim/eprfs/bin-build-view.json#bin-build` and the gate's recorded
+  env). It is not in `_eprfs-ingest-around`, so the next landing offers nothing until someone
+  repeats it. The justfile is in every root gate's key; the leg should land with its own test.
+- No draw has run on a host with no cargo pool (the laptop), and none without the variable.
+- No cold release build was timed against the draw. The only local figure is a warm
+  incremental debug build of the consumer, 21.6 s on ethosengine, which is not comparable.
 
 ## Row 2 — no eprfs-view build could be keyed on any device
 
@@ -321,3 +331,19 @@ cannot read is unseen; the superseded-unit grouping (target, path, features, pro
 two live variants of one crate that differ only in their dependency graph as old and new
 (inferred from the code, not reproduced); and
 the red verdict for `a51dacfc8` stays in the gate history. No test covers `family_busy`.
+
+## Row 14 — the draw runs before the published check
+
+2026-11-17, ethosengine, first live draw: with `refs/remotes/origin/dev` stale, `follow` drew
+167 MB and then refused `HEAD is not published on dev`. `brit fetch origin dev` had not moved
+the remote-tracking ref; `brit fetch -r origin` did. Owed: check published before drawing, or
+name the stale ref and its cure in the refusal. Probe: with a stale `origin/dev`,
+`EPR_FOLLOW_SIBLING=1 epr bin follow --tool epr` fetches nothing and names the ref. The fetch
+behaviour is a Brit gap for row 5.
+
+## Row 15 — the first `epr` on a device still has to come from somewhere
+
+The draw lives inside `epr`. A device whose installed `epr` predates `a51dacfc8`, or that has
+none, cannot draw; ethosengine built the consumer locally before its draw, and the laptop's
+runbook still starts with one local build. Owed: a first-epr path that needs no `epr` (a small
+fetcher, or `bin-launch` carrying the draw), decided against spec §5 before it is built.
