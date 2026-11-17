@@ -24,7 +24,6 @@ fn repo_root() -> PathBuf {
 }
 
 fn view_sources(root: &Path) -> Vec<String> {
-    // gate-reads: elohim/eprfs/bin-build-view.json
     let text = std::fs::read_to_string(root.join(VIEW_REL)).expect("the view file reads");
     let doc: serde_json::Value = serde_json::from_str(&text).expect("the view file is JSON");
     doc["steps"]["bin-build"]["inputs"]["sources"]
@@ -79,6 +78,7 @@ fn dep_info_inputs(text: &str) -> Vec<PathBuf> {
 
 #[test]
 fn the_view_names_no_test_bench_or_example_directory() {
+    // gate-reads: elohim/eprfs/bin-build-view.json
     let sources = view_sources(&repo_root());
     assert!(!sources.is_empty(), "the view lists nothing");
     for source in &sources {
@@ -94,6 +94,9 @@ fn the_view_names_no_test_bench_or_example_directory() {
 
 #[test]
 fn every_tracked_file_a_build_of_epr_reads_is_inside_the_view() {
+    // The view file is the one repository file read here. The dep-info lies in the target
+    // directory; the paths it names are compared as strings and never opened.
+    // gate-reads: elohim/eprfs/bin-build-view.json
     let root = repo_root();
     let sources = view_sources(&root);
     let dep_info = PathBuf::from(format!("{}.d", env!("CARGO_BIN_EXE_epr")));
