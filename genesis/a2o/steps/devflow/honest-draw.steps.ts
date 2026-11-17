@@ -489,26 +489,28 @@ function said(h: Household): string {
 }
 
 /**
- * The follow's own path after a sibling gap: when the draw was attempted (a requirement gap) the
- * follow says it builds locally; when the draw was refused before it began (unpublished) it says
- * nothing more and finishes on its normal path, so the observation is a clean exit with the
- * follow's own result on stdout and no sibling-draw announcement.
+ * The follow's own path after a requirement gap: the draw was attempted and declined, and the
+ * follow says it builds locally, without refusing.
  */
 function ownPathFollows(h: Household): void {
   const text = said(h);
   const at = text.indexOf('follow: nothing drawn from a sibling');
   assert.ok(at >= 0, `expected a gap line in:\n${text}`);
   assert.equal(h.status, 0, `the follow does not refuse:\n${text}`);
-  if (text.includes('drawing epr from a sibling first')) {
-    assert.match(
-      text.slice(at),
-      /building locally|trying a local build/,
-      `the follow goes on to its own build after the gap:\n${text}`
-    );
-  } else {
-    assert.match(h.stdout ?? '', /"followed"\s*:/, `the follow's own result:\n${h.stdout}`);
-  }
+  assert.match(
+    text.slice(at),
+    /building locally|trying a local build/,
+    `the follow goes on to its own build after the gap:\n${text}`
+  );
 }
+
+Then('device B lands nothing', function () {
+  const h = household(this);
+  const text = said(h);
+  assert.ok(!text.includes('drawing epr from a sibling first'), `no draw was begun:\n${text}`);
+  const result = JSON.parse((h.stdout ?? '').trim().split('\n').pop() ?? '{}');
+  assert.equal(result.followed, false, `nothing is landed:\n${h.stdout}`);
+});
 
 Then("device B fetches device A's release", function () {
   const text = said(household(this));

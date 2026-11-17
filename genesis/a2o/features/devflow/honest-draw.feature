@@ -22,7 +22,8 @@ Feature: A device judges a sibling's epr from what it says it needs, before fetc
 
   If any check fails, the device fetches nothing. It says which check failed and how to fix it.
   Then it goes on as if no sibling had offered anything: a device that can build compiles epr
-  itself. Drawing is a shortcut, so a failed check here falls back to the device's own path
+  itself, and when the commit is not published here its own follow stops there too, since it
+  lands only a published commit. Drawing is a shortcut, so a failed check here falls back to the device's own path
   rather than refusing the follow. (Bytes that arrive and do not make the release they were
   offered as are a different case, outside these scenarios: that refuses the follow.)
 
@@ -74,4 +75,4 @@ Feature: A device judges a sibling's epr from what it says it needs, before fetc
     Then device B fetches nothing
     And device B names each branch it checked, with the commit each one points to here
     And device B says to fetch the remote branch with "brit fetch -r origin"
-    And device B goes on to its own build
+    And device B lands nothing
