@@ -103,12 +103,21 @@ ethosengine pushed 32 refs for `7c8cbb94e`, shem's push for `ef0b1db12` was reje
 refs; shem's verdicts for `ef0b1db12` and `521649ed0` are local only. No one should guess a merge
 strategy over signed attestations. Needs a ruling: how per-device verdict notes combine.
 
-## Row 4 — a fresh worktree fails a push minutes in, for a reason preflight already printed
+## Row 4 — a fresh worktree's preflight refusal does not stop the push (by declared policy)
 
-Both devices lost a push cycle on 2026-11-16: preflight printed the missing
-`elohim/sdk/storage-client-ts/dist/index.js` (and, earlier, the uninitialised submodules), the
-push carried on, and `genesis-a2o` failed typecheck minutes later. `just dev prep` cures both in
-under a minute. The missing dist should refuse at preflight when a selected gate reads it.
+Both devices pushed from a fresh worktree on 2026-11-16 and met a preflight `REFUSED` (first the
+uninitialised submodules, then the missing `elohim/sdk/storage-client-ts/dist/index.js`). The
+refusal was printed, with its cure, in the first seconds. The push carried on because
+`gate_on_red` in `genesis/agentic/pool-policy.json` is `continue`: one run reports every red and
+records every green, and the live outlook line names the cost of continuing and the stop command.
+On ethosengine that run took 4,490 s and ended refused; its twelve green verdicts were then
+reused and the re-push took 295 s, so the time was not lost. Shem had run `just dev prep` first.
+
+Corrected reading (the first version of this row called it a gate defect; it is not): the check
+exists and is live. What is missing is habit: `just dev prep` before the first push from a new
+worktree, and an agent that acts on the outlook line. Open question for the steward only if this
+recurs: whether a preflight refusal, whose cure is seconds and after which the push cannot land,
+should stop the run even under `continue`.
 
 ## Row 5 — Brit gaps met while rebasing
 
