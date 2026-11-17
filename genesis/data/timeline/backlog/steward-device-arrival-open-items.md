@@ -272,6 +272,16 @@ report at exit: the verdict, each red once, what was reused and what ran. Reds b
 are available to a subscriber who asks for them and are never pushed by default, so a watcher
 is interrupted at most twice per run.
 
+A subscriber states its intent when it subscribes (steward, same day): "for this run, every
+red", or every nth event, in place of the default two. Asking up front is how the stream
+respects the watcher's attention without guessing it. One event is owed by every
+subscription with no opt-out: the subscription itself, recorded as an EPR, naming who asked
+for what on which run. That record is the floor governance reads to judge whether the
+watcher was suitably cared for and whether the watching was abuse. It is near-frictionless
+among one person's own devices; its friction is meant to rise with reach (a collective, a
+repository, a deployment). Not designed here: the record's shape, where it resolves, or what
+the friction is at each reach.
+
 ## Row 11 — `just dev prep` exits 0 with an empty submodule checkout
 
 2026-11-17, ethosengine worktree `steward-arrival-t2`: prep could not read rakia's pinned tree
@@ -280,3 +290,34 @@ is interrupted at most twice per run.
 `registry.get(name).run` undefined, an hour into a push. Reported by ethosengine, not reproduced
 on shem. Probe: after prep, `test -f <submodule>/build-manifest.json` for each attested
 submodule; prep and `gate-preflight.mjs` should refuse naming the submodule and the fetch cure.
+
+## Row 12 — the sibling draw fetches before it reads what the binary requires
+
+2026-11-17, landed in `a51dacfc8`: `sibling::select` picks an offer by commit and release only.
+A device learns that a sibling's `epr` is not for it by fetching 153 MB and failing the ingest
+probe; since `3af74caed` that falls back to a local build (`store-refused`) and no longer
+refuses the follow. The record to decide earlier exists: `epr artifact put` extracts the ELF
+requirements and `epr artifact requires --output CID` reads them, but only from the device's
+own store, since requirements are not yet served to siblings (K3 part 2). Shem's `epr` at
+`a51dacfc8` needs glibc 2.39 or newer and the baseline x86-64 instruction set (`readelf`,
+`objdump -T`, 2026-11-17). Owed: requirements cross with the Produce, and `select` skips an
+offer this device cannot run, printing which requirement failed. Probe: on a device with an
+older glibc, `EPR_FOLLOW_SIBLING=1 epr bin follow --tool epr` prints a requirement gap and
+fetches nothing. The steward's framing (same day): an artifact must be honest about what it
+needs, so a device can refuse it from its own statement before running an instruction.
+
+## Row 13 — the pool sweep deleted a build unit under a running gate
+
+2026-11-17 17:02Z, shem: the session-start hook (`.claude/scripts/clean-caches.sh`) ran
+`cargo-pool enforce --yes` while the landing push's `elohim-storage` gate was in its test
+phase. Hash-gc removed `build/cozo/235c866c800aacef` (older than the six-hour floor), and the
+doctest step failed 29 minutes in with `extern location for cozo does not exist`. The gate
+recorded a red for a commit whose code was sound; the re-push passed (1385 s). Cause:
+`family_busy` saw only cargo's build lock and a working directory inside the family, and
+`cargo test` holds neither while tests run. Fixed here: a live process with
+`CARGO_TARGET_DIR` inside the family makes it busy (`genesis/agentic/bin/pool-lib.sh`; probed
+against a scratch pool: idle 1, live 0, other family 1). Not fixed: a process this user
+cannot read is unseen; the superseded-unit grouping (target, path, features, profile) may treat
+two live variants of one crate that differ only in their dependency graph as old and new
+(inferred from the code, not reproduced); and
+the red verdict for `a51dacfc8` stays in the gate history. No test covers `family_busy`.

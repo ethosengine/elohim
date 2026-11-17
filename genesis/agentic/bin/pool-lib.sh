@@ -1131,8 +1131,13 @@ slot_pinned() { [ -n "${1:-}" ] && [ -e "$1/.pin" ]; }
 # In use = cargo holds the build lock OR a live process executes from it.
 slot_in_use() { slot_locked "$1" || slot_exec_busy "$1"; }
 
-# A family is busy when any of its slots is locked, or any live process has
-# its CWD inside the family tree.
+# A family is busy when any of its slots is locked, any live process has its
+# CWD inside the family tree, or any live process runs with CARGO_TARGET_DIR
+# inside it. The last covers a cargo run past its build phase: `cargo test`
+# drops the build lock before tests execute and then compiles doctests against
+# build units no lock protects. On 2026-11-17 hash-gc removed a six-hour-old
+# cozo unit under a running elohim-storage gate and its doctest step failed
+# with "extern location for cozo does not exist" 29 minutes in.
 family_busy() {
   local fam="${1:-}" fd
   [ -n "$fam" ] || return 1
@@ -1148,6 +1153,11 @@ family_busy() {
     cwd="$(readlink "$pid_dir/cwd" 2>/dev/null)" || continue
     case "$cwd" in "$fd"|"$fd"/*) return 0 ;; esac
   done
+  # One grep over every readable environ; an unreadable one (another uid, a
+  # process that exited) is skipped, which leaves that process unseen.
+  if grep -qzsF "CARGO_TARGET_DIR=$fd/" /proc/[0-9]*/environ 2>/dev/null; then
+    return 0
+  fi
   return 1
 }
 
