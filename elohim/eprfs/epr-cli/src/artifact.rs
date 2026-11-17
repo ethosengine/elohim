@@ -57,6 +57,7 @@ mod inputs;
 mod preflight;
 mod reach;
 mod requires;
+pub(crate) use requires::inline_doc as requires_inline_doc;
 #[cfg(test)]
 use requires::read_requires;
 pub mod sysroot;
@@ -1434,8 +1435,19 @@ fn record_artifact(
         derived.slot(),
     ];
     extra.extend(preflight::gap_annotation(gaps));
-    if let Some((cid, _)) = &requires {
+    if let Some((cid, bytes)) = &requires {
         extra.push(format!("env:requires={cid}"));
+        // Row 12: the statement crosses with the Produce, so a device can refuse the output
+        // from it before fetching a byte.
+        match requires::inline_slot(bytes) {
+            Some(slot) => extra.push(slot),
+            None => eprintln!(
+                "requires: {cid} is {} bytes, over the {}-byte inline cap; a sibling sees only \
+                 its CID and treats the requirement as unmeasured",
+                bytes.len(),
+                requires::INLINE_MAX
+            ),
+        }
     }
     extra.extend(release_slots(options)?);
     if let Some((cid, _)) = &requires_evidence {

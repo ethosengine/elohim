@@ -1050,4 +1050,47 @@ mod tests {
         assert!(manifest("../epr-ts").is_none());
         assert!(manifest("../epr-ts/dist/crate").is_some());
     }
+
+    /// Ruling R3 (native-throughput, 2026-11-17): the generated-output scan has no skips. A
+    /// literal inside a top-level `#[cfg(test)]` module and one in a file under `tests/` are
+    /// lexed like any other; the build-input view (`bin-build-view.json`), not the scanner,
+    /// keeps test code out of a bin method's view.
+    #[test]
+    fn test_code_is_lexed_like_any_other_code() {
+        let src = "fn main() {}\n#[cfg(test)]\nmod tests {\n    #[test]\n    fn t() { \
+                   let _ = include_bytes!(\"../dist/x\"); }\n}\n";
+        let literals = rust_string_literals(src);
+        assert!(
+            literals.iter().any(|l| l.text == "../dist/x" && l.in_macro),
+            "a cfg(test) module's literal is read: {:?}",
+            literals.iter().map(|l| &l.text).collect::<Vec<_>>()
+        );
+
+        let repo = tempfile::tempdir().unwrap();
+        let krate = repo.path().join("krate");
+        std::fs::create_dir_all(krate.join("tests")).unwrap();
+        std::fs::create_dir_all(krate.join("src")).unwrap();
+        std::fs::write(
+            krate.join("Cargo.toml"),
+            "[package]\nname = \"krate\"\nversion = \"0.0.0\"\n",
+        )
+        .unwrap();
+        std::fs::write(krate.join("src/lib.rs"), "").unwrap();
+        std::fs::write(
+            krate.join("tests/t.rs"),
+            "#[test] fn t() { let _ = include_bytes!(\"../dist/x\"); }\n",
+        )
+        .unwrap();
+        let refused = refuse_readers(
+            repo.path(),
+            &["krate".to_string()],
+            &["krate/tests/t.rs".to_string()],
+            &["krate/dist".to_string()],
+        )
+        .unwrap_err();
+        assert!(
+            refused.to_string().contains("krate/tests/t.rs"),
+            "a file under tests/ is lexed: {refused}"
+        );
+    }
 }

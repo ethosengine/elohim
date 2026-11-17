@@ -627,11 +627,12 @@ impl Store {
             ));
         }
         let head = self.git(repo, &["rev-parse", "HEAD"])?;
-        if self.require_published(repo, &head).is_err() {
+        if let Err(unpublished) = self.require_published(repo, &head) {
+            let why = format!("HEAD is not published on dev: {}", unpublished.detail);
             if self.tool == "brit" {
-                return Err(Refusal::new("unpublished", "HEAD is not published on dev"));
+                return Err(Refusal::new("unpublished", why));
             }
-            return Ok(noted.settle(Refused, "unpublished", "HEAD is not published on dev"));
+            return Ok(noted.settle(Refused, "unpublished", &why));
         }
         if !self.descends(repo, old, commit)? {
             if self.tool == "brit" {

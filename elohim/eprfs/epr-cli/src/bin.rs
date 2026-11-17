@@ -353,6 +353,9 @@ pub(crate) mod sibling {
     /// The bins one sibling must hold for one release before it is taken.
     #[cfg(feature = "peer")]
     pub(crate) const BINS: [&str; 2] = ["epr", "bin-launch"];
+    /// The cure for an offer whose statement cannot be read here.
+    #[cfg(feature = "peer")]
+    const RE_PUT: &str = "the sibling re-puts the release with an epr that writes env:requires-doc";
 
     /// What the draw left for the follow that runs after it.
     #[derive(Debug, Default)]
@@ -414,7 +417,18 @@ pub(crate) mod sibling {
         pub device: String,
         pub release: String,
         pub outputs: std::collections::BTreeMap<String, String>,
+        /// What each bin's Produce stated it needs, read before anything is fetched.
+        pub requires: std::collections::BTreeMap<String, Stated>,
         pub at: String,
+    }
+
+    /// One bin's statement of what it needs: the `env:requires` CID and the document itself
+    /// as it crossed inline (`env:requires-doc`). Both are the sibling's word until checked.
+    #[cfg(feature = "peer")]
+    #[derive(Debug, Clone, Default, PartialEq, Eq)]
+    pub(crate) struct Stated {
+        pub cid: Option<String>,
+        pub doc: Option<String>,
     }
 
     /// Whether `release` is one CID-shaped token: non-empty ASCII letters and digits only, so it
@@ -452,10 +466,19 @@ pub(crate) mod sibling {
                     device: row.device.clone(),
                     release: release.clone(),
                     outputs: std::collections::BTreeMap::new(),
+                    requires: std::collections::BTreeMap::new(),
                     at: String::new(),
                 });
-            // Rows arrive in flow order, so a later record of the same bin stands.
+            // Rows arrive in flow order, so a later record of the same bin stands, and its
+            // statement with it.
             offer.outputs.insert(bin.clone(), row.output.clone());
+            offer.requires.insert(
+                bin.clone(),
+                Stated {
+                    cid: row.requires.clone(),
+                    doc: row.requires_doc.clone(),
+                },
+            );
             if row.at > offer.at {
                 offer.at.clone_from(&row.at);
             }
@@ -490,6 +513,16 @@ pub(crate) mod sibling {
         if store.holds_verified_for(&commit) {
             eprintln!("follow: epr for {commit} is already held; nothing to draw or build");
             return Ok(Drawn::default());
+        }
+        // Row 14: the follow lands only a published HEAD, so a draw for one that is not (or for
+        // one a stale remote-tracking ref hides) is bytes paid for a refusal. Nothing is fetched.
+        if let Some(detail) = store.unpublished(repo, &commit) {
+            let gap = format!("unpublished: {detail}");
+            eprintln!("follow: nothing drawn from a sibling ({gap})");
+            return Ok(Drawn {
+                record: None,
+                gap: Some(gap),
+            });
         }
         eprintln!("{why}");
         let incoming = layout
@@ -552,9 +585,121 @@ pub(crate) mod sibling {
                  stamped with a release for {commit}"
             ))
         })?;
-        take(store, repo, commit, incoming, &offer, &|output, dest| {
-            crate::artifact::fetch_output(repo, output, dest).map_err(|e| e.to_string())
+        let host = ark_supervisor::host::observe_host();
+        draw_offer(
+            store,
+            repo,
+            commit,
+            incoming,
+            &offer,
+            &|_bin, document| admit_on(&host, document),
+            &|output, dest| {
+                crate::artifact::fetch_output(repo, output, dest).map_err(|e| e.to_string())
+            },
+        )
+    }
+
+    /// Judge one verified requirement document against this host's observation, with the
+    /// envelope's own admission (what `ark host admit --requires` runs). Only the failed
+    /// requirement leaves: the host's inventory is never printed or recorded.
+    #[cfg(feature = "peer")]
+    pub(crate) fn admit_on(host: &host_contract::Provides, document: &[u8]) -> Result<(), String> {
+        use elohim_epr::verdict::{CheckOutcome, Decision};
+        let requires: host_contract::Requires = serde_json::from_slice(document)
+            .map_err(|e| format!("the requirement is not a clause array: {e}"))?;
+        let verdict = ark_supervisor::admission::admit_recorded_requirements(Some(&requires), host);
+        if verdict.decision == Decision::Permit {
+            return Ok(());
+        }
+        let failed: Vec<String> = verdict
+            .witness
+            .checks
+            .iter()
+            .filter(|check| check.outcome == CheckOutcome::Failed)
+            .map(|check| {
+                let axis = check
+                    .check_id
+                    .strip_prefix("host-compatibility:")
+                    .unwrap_or(&check.check_id);
+                match check
+                    .observed
+                    .as_ref()
+                    .and_then(|o| o.get("required"))
+                    .map(|r| r.get("predicate").unwrap_or(r))
+                {
+                    Some(required) => format!("{axis} {} (requires {required})", check.summary),
+                    // Admission demands some axes of every statement (arch, os).
+                    None => format!(
+                        "{axis} {}: the statement records no {axis} clause",
+                        check.summary
+                    ),
+                }
+            })
+            .collect();
+        Err(if failed.is_empty() {
+            "admission declined without a failed check".into()
+        } else {
+            failed.join("; ")
         })
+    }
+
+    /// Row 12: whether this device can run every bin of `offer`, judged from what each bin's
+    /// Produce stated, before a byte is fetched. `admit` judges one verified document on this
+    /// host. A bin that stated nothing, whose statement did not cross, or whose statement does
+    /// not make the CID its Produce named is not drawn: an honest draw never pays for bytes on
+    /// an unread statement. Every answer here is a gap, so the follow may still build.
+    #[cfg(feature = "peer")]
+    pub(crate) fn admissible(
+        offer: &Offer,
+        admit: &dyn Fn(&str, &[u8]) -> Result<(), String>,
+    ) -> Result<(), String> {
+        for bin in BINS {
+            let stated = offer.requires.get(bin).cloned().unwrap_or_default();
+            let Some(cid) = stated.cid else {
+                return Err(format!(
+                    "unmeasured-requirement: {bin} of release {} from {} records no \
+                     env:requires; cure: {RE_PUT}",
+                    offer.release, offer.device
+                ));
+            };
+            let Some(doc) = stated.doc else {
+                return Err(format!(
+                    "unmeasured-requirement: {bin} requirement {cid} did not cross with its \
+                     Produce (offer predates requires-doc, or the document is over the inline \
+                     cap); cure: {RE_PUT}"
+                ));
+            };
+            let document = crate::artifact::requires_inline_doc(&cid, &doc).map_err(|why| {
+                format!(
+                    "unverifiable-requirement: {bin} of release {} from {}: {why}; cure: {RE_PUT}",
+                    offer.release, offer.device
+                )
+            })?;
+            admit(bin, &document).map_err(|unmet| {
+                format!(
+                    "requirement-unmet: {bin} of release {} from {} cannot run here: {unmet}; \
+                     cure: build for this device, or draw an offer built for it",
+                    offer.release, offer.device
+                )
+            })?;
+        }
+        Ok(())
+    }
+
+    /// [`admissible`], then [`take`]: the offer's statement is read and judged on this host
+    /// before `fetch` is called once.
+    #[cfg(feature = "peer")]
+    pub(crate) fn draw_offer(
+        store: &Store,
+        repo: &Path,
+        commit: &str,
+        incoming: &Path,
+        offer: &Offer,
+        admit: &dyn Fn(&str, &[u8]) -> Result<(), String>,
+        fetch: &dyn Fn(&str, &Path) -> Result<(), String>,
+    ) -> Result<Value, Draw> {
+        admissible(offer, admit).map_err(Draw::Gap)?;
+        take(store, repo, commit, incoming, offer, fetch)
     }
 
     /// Draw `offer`'s bins with `fetch` (exact output CID to destination), refuse bytes that do
@@ -856,6 +1001,7 @@ mod tests {
             input: None,
             family: None,
             requires: None,
+            requires_doc: None,
             device: device.into(),
             output: format!("output-{release}-{bin}"),
             manifest: "manifest".into(),
@@ -921,8 +1067,254 @@ mod tests {
                 .into_iter()
                 .map(|(b, o)| (b.to_string(), o.to_string()))
                 .collect(),
+            requires: std::collections::BTreeMap::new(),
             at: "2026-11-17T07:00:00Z".into(),
         }
+    }
+
+    /// A requirement document asking for glibc at least `min`, as `put` would record it: the
+    /// `env:requires` CID and the inline `env:requires-doc` slot value.
+    #[cfg(feature = "peer")]
+    fn glibc_at_least(min: &[u32]) -> sibling::Stated {
+        use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
+        use host_contract::{names::axis, AxisId, Clause, ClauseSource, Predicate, Requires};
+        // As `put` records it: arch and os always (admission demands both), then the floor.
+        let mut requires = Requires::default();
+        for (name, predicate) in [
+            (axis::ARCH, Predicate::Equal("x86_64".into())),
+            (axis::OS, Predicate::Equal("linux".into())),
+            (
+                axis::ABI_LIBC,
+                Predicate::AtLeast(host_contract::Version {
+                    line: "glibc".into(),
+                    components: min.to_vec(),
+                }),
+            ),
+        ] {
+            requires
+                .insert(Clause {
+                    axis: AxisId(name.into()),
+                    predicate,
+                    source: ClauseSource::Extracted,
+                    narrowing: None,
+                })
+                .unwrap();
+        }
+        let bytes = serde_json::to_vec(&requires).unwrap();
+        sibling::Stated {
+            cid: Some(eprfs_core::BlobCid::compute_bytes(&bytes).to_string()),
+            doc: Some(URL_SAFE_NO_PAD.encode(&bytes)),
+        }
+    }
+
+    /// An x86_64 Linux host that observed nothing else.
+    #[cfg(feature = "peer")]
+    fn linux_host() -> host_contract::Provides {
+        use host_contract::{names::axis, AxisId, AxisValue, Provides};
+        let mut host = Provides::default();
+        host.observe(
+            AxisId(axis::ARCH.into()),
+            AxisValue::Scalar("x86_64".into()),
+        );
+        host.observe(AxisId(axis::OS.into()), AxisValue::Scalar("linux".into()));
+        host
+    }
+
+    /// An x86_64 Linux host that observed glibc `version`.
+    #[cfg(feature = "peer")]
+    fn host_with_glibc(version: &[u32]) -> host_contract::Provides {
+        use host_contract::{names::axis, AxisId, AxisValue, Version};
+        let mut host = linux_host();
+        host.observe(
+            AxisId(axis::ABI_LIBC.into()),
+            AxisValue::Version(Version {
+                line: "glibc".into(),
+                components: version.to_vec(),
+            }),
+        );
+        host
+    }
+
+    /// `offer` with every bin stating `stated`.
+    #[cfg(feature = "peer")]
+    fn stating(mut offer: sibling::Offer, stated: &sibling::Stated) -> sibling::Offer {
+        offer.requires = sibling::BINS
+            .iter()
+            .map(|bin| ((*bin).to_owned(), stated.clone()))
+            .collect();
+        offer
+    }
+
+    #[cfg(feature = "peer")]
+    #[test]
+    fn an_offer_whose_statement_this_host_cannot_meet_is_refused_before_any_fetch() {
+        // Row 12 probe: shem's epr needs glibc 2.39; a host on 2.31 fetches nothing.
+        let tmp = tempfile::tempdir().unwrap();
+        let store = two_bin_store(tmp.path());
+        let landed = tmp.path().join("sibling");
+        sibling_bins(&landed, "#!/bin/sh\n# sibling launcher\n");
+        let release = store.release_cid_of(&landed).unwrap();
+        let commit = "e".repeat(40);
+        let incoming = tmp.path().join("incoming");
+        let offer = stating(offer_for(&release), &glibc_at_least(&[2, 39]));
+        let fetched = std::cell::Cell::new(0);
+        let old = host_with_glibc(&[2, 31]);
+        let result = sibling::draw_offer(
+            &store,
+            tmp.path(),
+            &commit,
+            &incoming,
+            &offer,
+            &|_, document| sibling::admit_on(&old, document),
+            &|_, _| {
+                fetched.set(fetched.get() + 1);
+                Err("must not fetch".into())
+            },
+        );
+        match result {
+            Err(sibling::Draw::Gap(gap)) => {
+                assert!(gap.starts_with("requirement-unmet: "), "{gap}");
+                assert!(
+                    gap.contains("abi.libc"),
+                    "names the failed requirement: {gap}"
+                );
+                assert!(gap.contains(&release), "{gap}");
+            }
+            Err(sibling::Draw::Refused(r)) => panic!("a gap, not a refusal: {}", r.detail),
+            Ok(value) => panic!("an offer this host cannot run was taken: {value}"),
+        }
+        assert_eq!(fetched.get(), 0, "nothing is fetched");
+        assert!(!store.holds_verified_for(&commit));
+        assert!(!incoming.exists(), "nothing is staged");
+
+        // The same statement on a host that meets it is drawn and ingested.
+        let new = host_with_glibc(&[2, 40]);
+        let serve = serving(&landed);
+        let drawn = match sibling::draw_offer(
+            &store,
+            tmp.path(),
+            &commit,
+            &incoming,
+            &offer,
+            &|_, document| sibling::admit_on(&new, document),
+            &|output, dest| {
+                fetched.set(fetched.get() + 1);
+                serve(output, dest)
+            },
+        ) {
+            Ok(value) => value,
+            Err(sibling::Draw::Gap(gap)) => panic!("gap: {gap}"),
+            Err(sibling::Draw::Refused(r)) => panic!("refused {}: {}", r.kind, r.detail),
+        };
+        assert_eq!(drawn["release"], release);
+        assert_eq!(fetched.get(), 2, "both bins are fetched once admitted");
+        assert!(store.holds_verified_for(&commit));
+    }
+
+    #[cfg(feature = "peer")]
+    #[test]
+    fn an_offer_whose_statement_did_not_cross_or_does_not_verify_is_not_fetched() {
+        let tmp = tempfile::tempdir().unwrap();
+        let store = two_bin_store(tmp.path());
+        let incoming = tmp.path().join("incoming");
+        let host = host_with_glibc(&[2, 99]);
+        let good = glibc_at_least(&[2, 17]);
+        let other = glibc_at_least(&[2, 18]);
+        let cases = [
+            (
+                sibling::Stated::default(),
+                "unmeasured-requirement: ",
+                "records no env:requires",
+            ),
+            (
+                sibling::Stated {
+                    cid: good.cid.clone(),
+                    doc: None,
+                },
+                "unmeasured-requirement: ",
+                "offer predates requires-doc",
+            ),
+            (
+                // A document that makes another CID than the one its Produce named.
+                sibling::Stated {
+                    cid: good.cid.clone(),
+                    doc: other.doc.clone(),
+                },
+                "unverifiable-requirement: ",
+                "not the env:requires",
+            ),
+            (
+                sibling::Stated {
+                    cid: good.cid.clone(),
+                    doc: Some("not base64!".into()),
+                },
+                "unverifiable-requirement: ",
+                "base64url",
+            ),
+        ];
+        for (stated, kind, why) in cases {
+            let offer = stating(offer_for("R1"), &stated);
+            let fetched = std::cell::Cell::new(0);
+            match sibling::draw_offer(
+                &store,
+                tmp.path(),
+                &"f".repeat(40),
+                &incoming,
+                &offer,
+                &|_, document| sibling::admit_on(&host, document),
+                &|_, _| {
+                    fetched.set(fetched.get() + 1);
+                    Err("must not fetch".into())
+                },
+            ) {
+                Err(sibling::Draw::Gap(gap)) => {
+                    assert!(
+                        gap.starts_with(kind) && gap.contains(why),
+                        "{stated:?}: {gap}"
+                    );
+                }
+                Err(sibling::Draw::Refused(r)) => panic!("{stated:?}: refused {}", r.detail),
+                Ok(value) => panic!("{stated:?}: taken {value}"),
+            }
+            assert_eq!(fetched.get(), 0, "{stated:?}: nothing is fetched");
+        }
+        // One bin stating its need is not enough: every bin must.
+        let mut half = stating(offer_for("R1"), &good);
+        half.requires.remove("bin-launch");
+        let gap = sibling::admissible(&half, &|_, d| sibling::admit_on(&host, d)).unwrap_err();
+        assert!(
+            gap.contains("bin-launch") && gap.contains("records no env:requires"),
+            "{gap}"
+        );
+        assert_eq!(
+            sibling::admissible(&stating(offer_for("R1"), &good), &|_, d| {
+                sibling::admit_on(&host, d)
+            }),
+            Ok(())
+        );
+    }
+
+    #[cfg(feature = "peer")]
+    #[test]
+    fn an_unobserved_axis_is_refused_not_assumed() {
+        // A host that did not observe glibc cannot claim to meet a glibc floor.
+        let document = {
+            use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
+            URL_SAFE_NO_PAD
+                .decode(glibc_at_least(&[2, 17]).doc.unwrap())
+                .unwrap()
+        };
+        let unmet = sibling::admit_on(&linux_host(), &document).unwrap_err();
+        assert!(unmet.contains("abi.libc"), "{unmet}");
+        assert!(
+            !unmet.contains("arch") && !unmet.contains("os "),
+            "only glibc fails: {unmet}"
+        );
+        // A statement missing an axis admission demands names it.
+        let bare = br#"[]"#;
+        let missing = sibling::admit_on(&host_with_glibc(&[2, 40]), bare).unwrap_err();
+        assert!(missing.contains("arch missing-requirement"), "{missing}");
+        assert!(sibling::admit_on(&host_with_glibc(&[2, 17]), &document).is_ok());
     }
 
     /// Serves `dir`'s bins by output CID, as a sibling's daemon would.
@@ -1048,11 +1440,20 @@ mod tests {
         let mut relabelled = rows.clone();
         let mut later = row(A, HEAD, "R1", "epr", t2);
         later.output = "output-R1-epr-again".into();
+        later.requires = Some("req-cid".into());
+        later.requires_doc = Some("req-doc".into());
         relabelled.push(later);
+        let offer = select(&relabelled, ME, HEAD).unwrap();
+        assert_eq!(offer.outputs["epr"], "output-R1-epr-again");
+        // The statement travels with the output it was recorded beside.
         assert_eq!(
-            select(&relabelled, ME, HEAD).unwrap().outputs["epr"],
-            "output-R1-epr-again"
+            offer.requires["epr"],
+            sibling::Stated {
+                cid: Some("req-cid".into()),
+                doc: Some("req-doc".into()),
+            }
         );
+        assert_eq!(offer.requires["bin-launch"], sibling::Stated::default());
 
         assert_eq!(
             select(&rows, ME, "unknown"),

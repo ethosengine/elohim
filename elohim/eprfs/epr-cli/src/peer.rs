@@ -1682,6 +1682,11 @@ pub struct SiblingArtifact {
     pub family: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub requires: Option<String>,
+    /// `env:requires-doc`: the requirement document [`Self::requires`] names, inline (base64url,
+    /// no padding), so a device can judge the output before fetching it. The recorder's word
+    /// only: a reader checks its CID against [`Self::requires`] before trusting it.
+    #[serde(skip_serializing)]
+    pub requires_doc: Option<String>,
     pub device: String,
     pub output: String,
     pub manifest: String,
@@ -1744,6 +1749,7 @@ fn artifact_from_event(
         input: one_slot(event, "env:input=").map(str::to_string),
         family: one_slot(event, "env:family=").map(str::to_string),
         requires: one_slot(event, "env:requires=").map(str::to_string),
+        requires_doc: one_slot(event, "env:requires-doc=").map(str::to_string),
         device: device.to_string(),
         output: output.to_string(),
         manifest: manifest.to_string(),

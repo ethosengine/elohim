@@ -1290,6 +1290,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "elohim-ark-supervisor"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "cid",
+ "elohim-ark-core",
+ "elohim-device-runtime",
+ "elohim-epr",
+ "elohim-epr-rea",
+ "elohim-host-contract",
+ "hex",
+ "libc",
+ "nix",
+ "serde",
+ "serde_ipld_dagcbor",
+ "serde_json",
+ "sha2 0.10.9",
+ "tempfile",
+ "thiserror 2.0.18",
+]
+
+[[package]]
 name = "elohim-blob-store"
 version = "0.1.0"
 dependencies = [
@@ -1390,6 +1412,7 @@ dependencies = [
  "cid",
  "did-bridge",
  "elohim-ark-core",
+ "elohim-ark-supervisor",
  "elohim-blob-store",
  "elohim-consent-grant",
  "elohim-device-runtime",
@@ -3428,6 +3451,18 @@ dependencies = [
  "windows 0.61.3",
  "windows-result 0.3.4",
  "wmi",
+]
+
+[[package]]
+name = "nix"
+version = "0.31.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2bc81ce8148d3b4f3274da811f11cdd824ae661ee4ef732cdb229825cf5be7f7"
+dependencies = [
+ "bitflags",
+ "cfg-if",
+ "cfg_aliases",
+ "libc",
 ]
 
 [[package]]

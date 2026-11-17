@@ -285,18 +285,49 @@ impl Store {
             "closure":closure,"closureCid":BlobCid::compute_bytes(lines.as_bytes()).to_string()}))
     }
     pub(super) fn require_published(&self, repo: &Path, commit: &str) -> Result<()> {
-        let published = self.config.source["publishedRef"]
-            .as_array()
-            .is_some_and(|refs| {
-                refs.iter().filter_map(Value::as_str).any(|reference| {
-                    self.git_ok(repo, &["merge-base", "--is-ancestor", commit, reference])
-                })
-            });
-        if published {
-            Ok(())
-        } else {
-            Err(Refusal::new("unpublished", "commit is not contained in any publishedRef; land on dev or fetch origin/dev before epr bin land"))
+        match self.unpublished(repo, commit) {
+            None => Ok(()),
+            Some(detail) => Err(Refusal::new("unpublished", detail)),
         }
+    }
+
+    /// Why `commit` is not published on this device, or `None` when one of the tool's
+    /// `source.publishedRef`s contains it. The answer names every declared ref with the commit
+    /// it resolves to here (or that it is absent) and the cure, so a stale remote-tracking ref
+    /// reads as stale rather than as a commit nobody landed.
+    pub fn unpublished(&self, repo: &Path, commit: &str) -> Option<String> {
+        let refs: Vec<&str> = self.config.source["publishedRef"]
+            .as_array()
+            .map(|refs| refs.iter().filter_map(Value::as_str).collect())
+            .unwrap_or_default();
+        if refs
+            .iter()
+            .any(|reference| self.git_ok(repo, &["merge-base", "--is-ancestor", commit, reference]))
+        {
+            return None;
+        }
+        if refs.is_empty() {
+            return Some(format!(
+                "{commit} is not contained in any publishedRef: the {} tool declares none",
+                self.tool
+            ));
+        }
+        let seen = refs
+            .iter()
+            .map(|reference| {
+                let peeled = format!("{reference}^{{commit}}");
+                match self.git(repo, &["rev-parse", "--verify", "--quiet", &peeled]) {
+                    Ok(sha) => format!("{reference} at {}", sha.get(..12).unwrap_or(&sha)),
+                    Err(_) => format!("{reference} absent"),
+                }
+            })
+            .collect::<Vec<_>>()
+            .join(", ");
+        Some(format!(
+            "{commit} is not contained in any publishedRef ({seen}); if it is on dev, the \
+             remote-tracking ref is stale: brit fetch -r origin moves it (brit fetch origin dev \
+             does not), else land the commit on dev"
+        ))
     }
     pub(super) fn descends(&self, repo: &Path, ancestor: &str, descendant: &str) -> Result<bool> {
         if self.tool != "brit" {

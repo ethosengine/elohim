@@ -1940,6 +1940,50 @@ fn test_follow_leaves_the_head_for_an_unpublished_or_unchanged_checkout() {
     assert_eq!(f.store.head("current"), Some(a.cid));
 }
 #[test]
+fn test_unpublished_names_each_declared_ref_where_it_stands_and_the_fetch_cure() {
+    // Row 14: a stale remote-tracking ref must read as stale, naming the ref and its cure.
+    let f = Fixture::new("epr");
+    let refs: Vec<String> = f.registry.tool("epr").unwrap().source["publishedRef"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|r| r.as_str().unwrap().to_owned())
+        .collect();
+    assert!(
+        !refs.is_empty(),
+        "the workspace registry declares published refs"
+    );
+    let head = "b".repeat(40);
+    {
+        let mut s = f.state.lock().unwrap();
+        s.head = head.clone();
+        s.published = false;
+    }
+    let detail = f
+        .store
+        .unpublished(f.tmp.path(), &head)
+        .expect("a commit on no published ref is unpublished");
+    for reference in &refs {
+        // The fake resolves every ref to its head, so each reads `<ref> at <12 hex>`.
+        assert!(
+            detail.contains(&format!("{reference} at {}", &head[..12])),
+            "{detail}"
+        );
+    }
+    assert!(
+        detail.contains("not contained in any publishedRef"),
+        "{detail}"
+    );
+    assert!(detail.contains("brit fetch -r origin"), "{detail}");
+    let refusal = f.store.require_published(f.tmp.path(), &head).unwrap_err();
+    assert_eq!(
+        (refusal.kind.as_str(), refusal.detail.as_str()),
+        ("unpublished", detail.as_str())
+    );
+    f.state.lock().unwrap().published = true;
+    assert_eq!(f.store.unpublished(f.tmp.path(), &head), None);
+}
+#[test]
 fn test_follow_does_nothing_when_epr_sources_did_not_change() {
     let f = Fixture::new("epr");
     let a = f.release("a");

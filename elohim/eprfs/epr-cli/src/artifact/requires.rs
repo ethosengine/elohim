@@ -1,14 +1,52 @@
 //! Canonical local documents and caller declarations merged through host_contract.
 use std::path::Path;
 
+use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
 use eprfs_core::BlobCid;
 use eprfs_peer::Bytes;
 
 use super::{ArtifactError, ArtifactResult};
 
+/// The largest requirement document a custody Produce carries inline as `env:requires-doc`.
+/// A crossed event over the fold's per-event cap (64 KiB) stops a sibling's fold, so a larger
+/// document keeps only its CID, and a reader treats that requirement as unmeasured.
+pub(crate) const INLINE_MAX: usize = 16 * 1024;
+
+/// The `env:requires-doc` slot for a requirement document, or `None` past [`INLINE_MAX`].
+/// The document is the artifact's own statement of what it needs, derived from its bytes; it
+/// carries nothing observed about this host, so it may cross wherever its Produce crosses.
+pub(super) fn inline_slot(bytes: &[u8]) -> Option<String> {
+    (bytes.len() <= INLINE_MAX)
+        .then(|| format!("env:requires-doc={}", URL_SAFE_NO_PAD.encode(bytes)))
+}
+
+/// The requirement document a Produce carried inline in `slot`, once it decodes and makes the
+/// `env:requires` CID the same Produce named; why it cannot be trusted otherwise.
+pub(crate) fn inline_doc(cid: &str, slot: &str) -> Result<Vec<u8>, String> {
+    let expected =
+        BlobCid::parse(cid).map_err(|e| format!("env:requires {cid} is not a CID: {e}"))?;
+    let bytes = URL_SAFE_NO_PAD
+        .decode(slot)
+        .map_err(|e| format!("env:requires-doc is not base64url: {e}"))?;
+    if bytes.len() > INLINE_MAX {
+        return Err(format!(
+            "env:requires-doc is {} bytes, over the {INLINE_MAX}-byte inline cap",
+            bytes.len()
+        ));
+    }
+    let made = BlobCid::compute_bytes(&bytes);
+    if made != expected {
+        return Err(format!(
+            "env:requires-doc makes {made}, not the env:requires {cid} it stands for"
+        ));
+    }
+    Ok(bytes)
+}
+
 /// Sorted object keys, compact UTF-8, unchanged arrays and only plain-decimal u64 numbers.
 /// Used for caller input and the unchanged optional sysroot document; executable put always
-/// adds extracted clauses. Both documents remain local.
+/// adds extracted clauses. The requirement document crosses inline with its Produce
+/// ([`inline_slot`]); the evidence document stays local.
 pub(super) fn read_requires(path: &Path) -> ArtifactResult<(BlobCid, Bytes)> {
     let input = std::fs::read(path)?;
     check_numbers(&input)?;
@@ -201,6 +239,33 @@ fn check_numbers(input: &[u8]) -> ArtifactResult<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_requirement_document_crosses_inline_and_is_trusted_only_for_its_own_cid() {
+        let bytes = br#"[{"axis":"abi.libc"}]"#;
+        let slot = inline_slot(bytes).unwrap();
+        let value = slot.strip_prefix("env:requires-doc=").unwrap();
+        let cid = BlobCid::compute_bytes(bytes).to_string();
+        assert_eq!(inline_doc(&cid, value).unwrap(), bytes);
+        let other = BlobCid::compute_bytes(b"[]").to_string();
+        assert!(inline_doc(&other, value)
+            .unwrap_err()
+            .contains("not the env:requires"));
+        assert!(inline_doc("not-a-cid", value)
+            .unwrap_err()
+            .contains("is not a CID"));
+        // At the cap it crosses; past it only the CID does, and a reader refuses an oversized
+        // inline document even when its CID matches.
+        assert!(inline_slot(&vec![b' '; INLINE_MAX]).is_some());
+        let big = vec![b' '; INLINE_MAX + 1];
+        assert_eq!(inline_slot(&big), None);
+        let encoded = URL_SAFE_NO_PAD.encode(&big);
+        assert!(
+            inline_doc(&BlobCid::compute_bytes(&big).to_string(), &encoded)
+                .unwrap_err()
+                .contains("inline cap")
+        );
+    }
 
     #[test]
     fn artifact_requires_plain_decimal_u64_vectors_with_typed_paths() {

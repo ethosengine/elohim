@@ -23,7 +23,7 @@ default = ["peer", "lsp"]
 # The payload opener (`src/payload.rs`) reads and claims the format marker through
 # elohim-blob-store's `marker` module, the one implementation of it, so `peer` links the crate
 # (its eprfs tier stays behind `blob-store`).
-peer = ["dep:eprfs-peer", "dep:tokio", "dep:elohim-blob-store"]
+peer = ["dep:eprfs-peer", "dep:tokio", "dep:elohim-blob-store", "dep:ark-supervisor"]
 # `epr lsp`: one shared, session-attributed language server per toolchain per checkout root.
 lsp = ["dep:elohim-epr-lsp", "dep:tokio"]
 # The `blob-store-v1` payload format (artifact-store E4): `src/payload.rs` creates new payload
@@ -36,6 +36,10 @@ blob-store = ["peer", "elohim-blob-store/tier"]
 # Declared-view wire types (`epr view`): TS derivations of the captured projection shapes.
 ts-rs = { version = "10.1", features = ["serde-json-impl"] }
 ark-core = { package = "elohim-ark-core", path = "../../ark/core" }
+# The sibling draw (`peer`) judges an offer's stated requirements on this host before fetching
+# it, with the envelope's own observer and admission (`ark host admit --requires` in-process),
+# so a device without an ark binary can still draw honestly.
+ark-supervisor = { package = "elohim-ark-supervisor", path = "../../ark/supervisor", optional = true }
 elohim-device-runtime = { path = "../device-runtime" }
 # `epr lsp`: the multiplexer, its attribution and its daemon.
 elohim-epr-lsp = { path = "../epr-lsp", optional = true }

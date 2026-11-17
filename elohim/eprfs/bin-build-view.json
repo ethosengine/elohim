@@ -34,6 +34,8 @@
           "elohim/eprfs/eprfs-ts/src/**",
           "elohim/ark/core/Cargo.toml",
           "elohim/ark/core/src/**",
+          "elohim/ark/supervisor/Cargo.toml",
+          "elohim/ark/supervisor/src/**",
           "elohim/placement/core/Cargo.toml",
           "elohim/placement/core/src/**",
           "elohim/elohim-compute/Cargo.toml",

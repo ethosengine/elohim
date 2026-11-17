@@ -485,6 +485,19 @@ async fn put_and_mount(overridden: bool, with_requires: bool) {
             .find_map(|s| s.strip_prefix("env:requires=")),
         Some(requires_cid.to_string()).as_deref()
     );
+    // Row 12: the statement crosses with the Produce, byte for byte, so a sibling can judge
+    // the output before fetching it.
+    {
+        use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
+        let inline = produce
+            .classified_as
+            .iter()
+            .find_map(|s| s.strip_prefix("env:requires-doc="))
+            .expect("the requirement document crosses inline");
+        let decoded = URL_SAFE_NO_PAD.decode(inline).unwrap();
+        assert_eq!(decoded.as_slice(), canonical_requires);
+        assert_eq!(BlobCid::compute_bytes(&decoded), requires_cid);
+    }
 
     // It crosses under the repository's own allow-list …
     let policy =
@@ -784,35 +797,127 @@ fn a_follow_under_the_knob_draws_a_siblings_release_for_head_before_building() {
         ])
     };
     let mut store = SidecarFlowStore::open(b.root()).unwrap();
+    let nothing_staged = |b: &Device| {
+        !b.config
+            .path()
+            .join("bins/incoming")
+            .read_dir()
+            .is_ok_and(|mut d| d.next().is_some())
+    };
 
-    // Only another commit's release is on record: no offer, said once, then the follow's own path.
+    let stderr_of = |b: &Device| String::from_utf8_lossy(&follow(b).stderr).into_owned();
+
+    // Row 14: B's HEAD is on no published ref here (as with a stale origin/dev). Nothing is
+    // read or drawn, the line names each ref where it stands and the fetch cure, and the follow
+    // goes on to its own path.
     for bin in ["epr", "bin-launch"] {
         store
             .append(FlowRecord::Event(stamped(bin, "0123456789abcdef")))
             .unwrap();
     }
-    let out = follow(&b);
-    let said = String::from_utf8_lossy(&out.stderr);
+    let line = stderr_of(&b);
     assert!(
-        said.contains("follow: drawing epr from a sibling first: "),
-        "{said}"
+        line.contains("follow: nothing drawn from a sibling (unpublished: "),
+        "{line}"
     );
-    assert!(said.contains("no-offer"), "{said}");
+    assert!(line.contains("refs/remotes/origin/dev absent"), "{line}");
+    assert!(line.contains("brit fetch -r origin"), "{line}");
+    assert!(!line.contains("drawing epr from a sibling first"), "{line}");
+    assert!(!line.contains("fetch gap"), "nothing is fetched: {line}");
+    assert!(nothing_staged(&b));
+    let published = elohim_epr_cli::process::build_command(
+        "git",
+        &["update-ref", "refs/remotes/origin/dev", &head],
+        b.root(),
+        &[],
+    )
+    .output()
+    .unwrap();
+    assert!(published.status.success(), "{}", text(&published));
 
-    // A's release for B's HEAD is the offer; the draw goes to B's daemon, which is not serving.
+    // Published, and only another commit's release is on record: no offer, said once, then the
+    // follow's own path.
+    let line = stderr_of(&b);
+    assert!(
+        line.contains("follow: drawing epr from a sibling first: "),
+        "{line}"
+    );
+    assert!(line.contains("no-offer"), "{line}");
+
+    // A's release for B's HEAD, recorded before env:requires-doc existed (as a51dacfc8's puts
+    // were: the CID, not the document): row 12 reads it as unmeasured, fetches nothing, and the
+    // follow goes on.
     for bin in ["epr", "bin-launch"] {
-        store
-            .append(FlowRecord::Event(stamped(bin, &head)))
-            .unwrap();
+        let mut event = stamped(bin, &head);
+        event
+            .classified_as
+            .push(format!("env:requires={}", BlobCid::compute_bytes(b"[]")));
+        store.append(FlowRecord::Event(event)).unwrap();
     }
-    let out = follow(&b);
-    let said = String::from_utf8_lossy(&out.stderr);
+    let said = stderr_of(&b);
     assert!(
         said.contains("follow: drawing epr from a sibling first: "),
         "{said}"
     );
+    assert!(said.contains("offer predates requires-doc"), "{said}");
+    assert!(!said.contains("fetch gap"), "nothing is fetched: {said}");
+    assert!(nothing_staged(&b));
+
+    // The same release, re-recorded with a statement this host cannot meet.
+    let statement = |glibc: u32| {
+        use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
+        use host_contract::{names::axis, AxisId, Clause, ClauseSource, Predicate, Requires};
+        let mut requires = Requires::default();
+        for (name, predicate) in [
+            (axis::ARCH, Predicate::Equal(std::env::consts::ARCH.into())),
+            (axis::OS, Predicate::Equal("linux".into())),
+            (
+                axis::ABI_LIBC,
+                Predicate::AtLeast(host_contract::Version {
+                    line: "glibc".into(),
+                    components: vec![2, glibc],
+                }),
+            ),
+        ] {
+            requires
+                .insert(Clause {
+                    axis: AxisId(name.into()),
+                    predicate,
+                    source: ClauseSource::Extracted,
+                    narrowing: None,
+                })
+                .unwrap();
+        }
+        let bytes = serde_json::to_vec(&requires).unwrap();
+        [
+            format!("env:requires={}", BlobCid::compute_bytes(&bytes)),
+            format!("env:requires-doc={}", URL_SAFE_NO_PAD.encode(&bytes)),
+        ]
+    };
+    let stating = |store: &mut SidecarFlowStore, glibc: u32| {
+        for bin in ["epr", "bin-launch"] {
+            let mut event = stamped(bin, &head);
+            event.classified_as.extend(statement(glibc));
+            store.append(FlowRecord::Event(event)).unwrap();
+        }
+    };
+    stating(&mut store, 9999);
+    let said = stderr_of(&b);
+    assert!(said.contains("requirement-unmet: "), "{said}");
+    assert!(
+        said.contains("abi.libc"),
+        "names the failed requirement: {said}"
+    );
+    assert!(!said.contains("fetch gap"), "nothing is fetched: {said}");
+    assert!(nothing_staged(&b));
+
+    // A statement this host meets (any glibc this test runs on is past 2.0): the draw goes to
+    // B's daemon, which is not serving.
+    stating(&mut store, 0);
+    let said = stderr_of(&b);
     eprintln!("{said}");
     assert!(!said.contains("no-offer"), "{said}");
+    assert!(!said.contains("requirement"), "{said}");
     assert!(said.contains("fetch gap: daemon-down"), "{said}");
     assert!(
         !b.config
