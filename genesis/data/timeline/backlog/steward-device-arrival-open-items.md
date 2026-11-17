@@ -153,12 +153,31 @@ source `pool-lib.sh`, a library every session hook sources) run in no gate and p
 only. Adding them means editing the `justfile`, which is in every root gate's key. Probe: a
 push that changes `genesis/agentic/bin/pool-lib.sh` selects a gate that runs those four files.
 
-## Row 7 — eprfs still keys on whole documentation directories
+## Row 7 — eprfs keys on the whole documentation tree and on the memory directory
 
-`epr-cli/tests/flow_scope.rs` declares reads of `genesis/docs/superpowers/specs`, `plans`,
-`held`, `genesis/docs/plans`, `genesis/docs/held` and `genesis/a2o/features`, so any spec or story
-edit re-runs the eprfs workspace gate (26 to 60 minutes). The `genesis/manifests` case was closed
-in `ef0b1db12`. Unexplained, and a trap if `GATE_NARROW=on` is ever enabled: the first two pushes of the sprint
+Three live-corpus legs inside the eprfs cargo gate declare reads far wider than the workspace:
+`epr-cli/tests/flow_cites.rs` reads `genesis/docs`, `.claude/memory` and every `CLAUDE.md` (it
+verifies the live documents' cites); `flow_scope.rs` reads `genesis/docs/superpowers/specs`,
+`plans`, `held`, `genesis/docs/plans`, `genesis/docs/held` and `genesis/a2o/features`;
+`live_manifest_integrity.rs` reads every `.epr-meta` manifest. The reads are honest: those tests
+do open those files. The cost is that any documentation commit moves the eprfs key.
+
+Measured 2026-11-17 on shem: eprfs was green at `ba165f566`; three commits later (a sprint
+journal under `genesis/docs/superpowers/sprints/`, the cargo-pool library, a backlog edit),
+`GATE_EVIDENCE=reuse just gate eprfs` printed `evidence: miss … not reused: no attestation for
+this closure yet` and began a full run. The docs-only pushes themselves took 43 to 45 s because
+they do not select eprfs; the next push that does select it pays 26 minutes whether or not any
+Rust changed. So the `genesis/manifests` fix in `ef0b1db12` removes one cause (a habit delta
+rewriting `habits.yaml`), and the saving holds only while no document changed since the last
+green. On a normal working day that is rare.
+
+Proposed shape (not built; it changes a build manifest and the `justfile`): the live-corpus legs
+become their own gate project, a seconds-scale `cargo test --test flow_cites --test flow_scope
+--test live_manifest_integrity` (or the `epr` commands they wrap) keyed on those document reads,
+and the workspace gate keeps the fixture tests and keys on the workspace. Then a documentation
+commit costs seconds and a Rust commit is not re-run for prose.
+
+Unexplained, and a trap if `GATE_NARROW=on` is ever enabled: the first two pushes of the sprint
 (ranges `9be1cb048..5ada8a1b4` and `7c8cbb94e..ef0b1db12`, both changing
 `epr-cli/src/{actor,device_key,session_envelope}.rs`) printed `eprfs narrow (shadow):  (0 of 13
 members)`, which under `on` would have tested no package. Re-running `affectedPackages` offline
