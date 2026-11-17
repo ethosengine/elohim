@@ -55,6 +55,46 @@ Residual named there: identifiers are matched as alphanumeric, not by XID.
 This loosens an integrity check. It was ruled by the session model in the steward's absence and
 lands only with the steward's confirmation.
 
+**Finding 2026-11-17 (shem, read-only, `dev` 627627896, unmodified code): no skip is needed.** The
+method's view was the whole eprfs workspace (`elohim/eprfs/build-manifest.json#rust-build-test`),
+tests included, and the ignored generated directories (`elohim/epr/bindings`,
+`elohim/eprfs/eprfs-ts/dist`) sit inside it. With a view limited to what a binary build reads, they
+are not in the view and the scan has nothing to refuse:
+
+- A scratch manifest outside the repository, one step, 69 entries: the workspace `Cargo.toml` and
+  `Cargo.lock`, `.cargo/config.toml`, each member's and path dependency's `Cargo.toml` and
+  `src/**`, `genesis/orchestrator/rust-style` and its `scan` crate, and
+  `genesis/orchestrator/manifests/runtime/workspace-device.manifest.json` (the binary embeds it).
+  No `tests/`, `benches/` or `examples/`.
+- Under the mesh build's scrubbed environment (every `CARGO_*`/`RUST*` unset except `CARGO_HOME`
+  and `RUSTUP_HOME`; `RUSTUP_TOOLCHAIN=1.100.0` and `PATH` recorded with `--env`):
+  `epr artifact describe --project eprfs --bin epr --rustflags "" --crate elohim/eprfs/epr-cli
+  --sources <scratch>#epr-bin-build` exits 0, and `epr artifact key` exits 0 with
+  `key bafyreidul2t5c5…askm head 627627896`.
+- A real `cargo build --locked -p elohim-epr-cli --bin epr` under that environment (29m48s cold,
+  one job) wrote a dep-info naming 394 files inside the repository; all 394 lie inside the view.
+  The first 66-entry view missed two (the embedded device manifest and the rust-style `scan`
+  crate), which is what the dep-info check is for.
+
+Not run: `epr artifact put` on that build (it writes a custody record and a build attestation),
+and the same for `bin-launch`.
+
+Recommendation for the steward: declare a build step for the `epr` and `bin-launch` binaries whose
+sources are the build-input view (a manifest decision; step sources also drive CI dispatch), keep
+the scanner hardening from the reviews as standalone integrity fixes (raw C strings, shebang and
+byte-order mark, fail-closed flags, tracked symlinks), and drop the three skips (top-level
+`#[cfg(test)]` modules, `tests/`/`benches/`/`examples/`, and the narrowed literal rule) as
+unnecessary. The 69-entry list is derivable from `cargo metadata` plus the dep-info; a hand list
+will drift, so the step's sources should be checked against a build's dep-info in the gate.
+
+### What this means for the native-dev-plane joins
+
+Join F2 (a sibling fetches a binary from a peer's tier instead of rebuilding) is, for `epr`
+itself: consumer built and tested on ethosengine with an injected fetch (positive draw and
+tampered-release refusal); producer unblocked in principle by the build-input view above; the live
+draw through `epr peer serve` and the fetch-versus-build wall-clock unmeasured. The build
+baselines to beat: 25m34s on the laptop, 29m48s on shem (cold, one job).
+
 ## Row 3 — two devices' build notes diverge on origin
 
 `git push origin 'refs/notes/brit/build/*:refs/notes/brit/build/*'` fast-forwards only for the
