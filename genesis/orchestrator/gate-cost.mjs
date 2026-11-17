@@ -8,6 +8,16 @@ import { GATE_CYCLE_MEASURE, minutes } from './gate-cycle.mjs';
 // genesis/orchestrator/Jenkinsfile:1894 — Groovy ==~ matches the whole branch name.
 export const CI_BRANCH_PATTERN = /^(?:dev|dev-.+|feat-.+|claude\/.+)$/;
 
+// A hand-over lane (row 9, ruling R1): a branch that carries work between one steward's devices.
+// It moves no head others adopt, and no Jenkins build is shown for it, so it never earns a
+// defer-to-CI promise — whatever pattern a caller supplies. The pre-push hook classifies a push as a
+// hand-over only when every destination is `refs/heads/` followed by such a name. A literal prefix
+// and a non-empty suffix, never a regex (`.` misses U+2028 and other characters git permits), so
+// the hook, the recorder and this decision classify every name alike.
+export const HANDOVER_PREFIX = 'self/';
+export const isHandoverBranch = branch =>
+  typeof branch === 'string' && branch.startsWith(HANDOVER_PREFIX) && branch.length > HANDOVER_PREFIX.length;
+
 /** Read the flows sidecar; unrelated records are ignored, malformed lines counted. */
 export function readCycleRows(flowsPath, readFile = readFileSync, seen = new Set()) {
   const rows = [];
@@ -109,6 +119,8 @@ export function deferDecision({ cost, targets, branches, ciBranchPattern, env, s
   if (env.FORCE_HEAVY_GATES === '1') return { defer: false, why: 'FORCE_HEAVY_GATES=1' };
   const protectedTarget = targets.find(target => ['refs/heads/dev', 'refs/heads/main'].includes(target));
   if (protectedTarget) return { defer: false, why: `${protectedTarget} requires local gates` };
+  const handOver = branches.find(isHandoverBranch);
+  if (handOver !== undefined) return { defer: false, why: `${handOver} is a hand-over lane; no CI build is shown for it` };
   // Clone for each match so global/sticky expressions cannot mutate caller state.
   const nonCiBranch = branches.find(branch => !new RegExp(ciBranchPattern).test(branch));
   if (!branches.length || nonCiBranch !== undefined) {

@@ -124,6 +124,51 @@ while read -r PUSH_LINE; do
   PUSH_LINES+=("$PUSH_LINE")
 done
 
+# ── Hand-over lane: classified once, from the raw push ────────────
+# A push whose EVERY destination is refs/heads/self/<name> hands work from one of the steward's
+# devices to another and moves no head anyone adopts (backlog row 9, ruling R1, step 1). It runs
+# every seconds check below and no project gate, then records the hand-over (handover-record.mjs).
+# Read before notes and deletions are filtered out: one notes ref, tag, protected deletion, `dev`
+# destination or malformed line anywhere in the batch, in either order, is the ordinary push. Only
+# field three (the destination) counts: a local branch named self/… pushed to dev is ordinary.
+# The record is advisory: a dev landing of the same head demands every gate, and reads no record.
+# The match is a literal prefix plus a non-empty suffix (no regex), the rule gate-cost.mjs
+# isHandoverBranch and handover-record.mjs apply, so every character git permits classifies alike.
+# Residual this client hook cannot see: on the receiver, a refs/heads/self/x that is a symbolic ref
+# to dev would move dev; that is closed by the forge not accepting symbolic branch refs over push.
+PUSH_IS_HANDOVER=""
+push_is_handover() {
+  local line local_ref local_sha remote_ref remote_sha extra oid='^([0-9a-f]{40}|[0-9a-f]{64})$'
+  [ "${#PUSH_LINES[@]}" -gt 0 ] || return 1
+  for line in "${PUSH_LINES[@]}"; do
+    read -r local_ref local_sha remote_ref remote_sha extra <<<"$line"
+    [ -n "$local_ref" ] && [ -z "$extra" ] || return 1
+    [[ "$local_sha" =~ $oid && "$remote_sha" =~ $oid ]] || return 1
+    [[ "$remote_ref" == "refs/heads/self/"?* ]] || return 1
+  done
+  return 0
+}
+push_is_handover && PUSH_IS_HANDOVER=1
+# ── Hand-over lane: classified ────────────────────────────────────
+
+# core.hooksPath is absolute, so a linked worktree's push runs the main checkout's copy of this file
+# (see the Berth block). Say so when the two differ: a stale main checkout runs a stale hook, which
+# for a self/ push means the full gates (the lane above does not exist there). Advisory only.
+HOOK_RUNNING_COPY=$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || echo "${BASH_SOURCE[0]}")
+if [ -f "$HOOK_WORK_TREE/.husky/pre-push.bash" ] &&
+   [ "$HOOK_RUNNING_COPY" != "$(readlink -f "$HOOK_WORK_TREE/.husky/pre-push.bash" 2>/dev/null)" ] &&
+   ! cmp -s "$HOOK_RUNNING_COPY" "$HOOK_WORK_TREE/.husky/pre-push.bash"; then
+  # The override is offered only when its launcher exists: git treats a missing hooks directory as no
+  # hook at all, so following the advice without it would push a dev landing ungated.
+  if [ -x "$HOOK_WORK_TREE/.husky/_/pre-push" ]; then
+    printf "[pre-push] note: running %s, which differs from this checkout's .husky/pre-push.bash; to run this checkout's hook: git -c core.hooksPath='%s' push …\n" \
+      "$HOOK_RUNNING_COPY" "$HOOK_WORK_TREE/.husky/_" >&2
+  else
+    printf "[pre-push] note: running %s, which differs from this checkout's .husky/pre-push.bash; this checkout has no executable .husky/_/pre-push — run pnpm install in it first (a hooks path without that launcher runs no hook at all)\n" \
+      "$HOOK_RUNNING_COPY" >&2
+  fi
+fi
+
 # ── Berth: integration claims ─────────────────────────────────────
 #
 # A push to dev or main lands on the branch every device of this person integrates on. It holds the
@@ -685,7 +730,74 @@ phase_l_handoff() {
   echo "[pre-push] Phase L: landing ${PHASE_L_LAND_SHA:0:12} on ${PHASE_L_BASE:0:12} as a fast-forward; the landing agent releases dev-integration after the transfer (log: $PHASE_L_LOG)"
 }
 
+# Defined here, before every success exit, so a hand-over can reach it too (BRIT_ADVISORY=always).
+# ── Brit advisory (Stage 1a) ─────────────────────────────────────
+# Runs brit verify + brit plan as advisory checks. Warn-only — never fails push.
+# Stage 2: becomes load-bearing (failure blocks push). Stage 1a: gather signal.
+#
+# IMPORTANT: REPO_ROOT is NOT set by git when invoking pre-push hooks in
+# production. We derive the helper path via git rev-parse — git hooks run with
+# CWD set to the repo root, but using rev-parse is more robust to future CWD
+# changes. The helper itself defaults its own ${REPO_ROOT:-/projects/elohim}
+# fallback when invoked without it being exported.
+brit_advisory() {
+  REPO_TOPLEVEL="$(git rev-parse --show-toplevel 2>/dev/null)"
+  if [ -z "$REPO_TOPLEVEL" ]; then
+    return 0  # not in a git repo (shouldn't happen for pre-push); silent skip
+  fi
+  HELPER="$REPO_TOPLEVEL/genesis/orchestrator/scripts/brit-helper.sh"
+  if [ ! -x "$HELPER" ]; then
+    return 0  # helper not present (e.g., older branch); silently skip
+  fi
+  # Run only when the pushed range touches what brit reads (BRIT_ADVISORY=always forces it):
+  # the brit gitlink, brit's own tree, the brit scripts, any build-manifest.json, this hook.
+  # KNOWN GAP, accepted for a warn-only stage: `brit verify` checks the integrity of the WHOLE
+  # repository, so an ordinary commit that rewrites history or corrupts the object store gets no
+  # Stage 1a signal until a brit-relevant path changes. Stage 2 (the stage that makes this leg
+  # blocking) must drop the path gate or run verify on every push within its bound — do not
+  # inherit this gate unknowingly. (steward-space-reliability-plan, 2026-10-29)
+  if [ "${BRIT_ADVISORY:-}" != "always" ] && git rev-parse --verify origin/dev >/dev/null 2>&1; then
+    BRIT_BASE="$(git merge-base origin/dev HEAD 2>/dev/null || echo origin/dev)"
+    if ! git diff --name-only "$BRIT_BASE" HEAD -- elohim/brit .brit genesis/orchestrator/scripts/brit-helper.sh genesis/orchestrator/scripts/brit-attest.mjs '**/build-manifest.json' .husky 2>/dev/null | grep -q .; then
+      echo ""
+      echo "── brit advisory (Stage 1a — warn-only): skipped — no brit-relevant path in the pushed range (BRIT_ADVISORY=always to force)"
+      return 0
+    fi
+  fi
+  echo ""
+  echo "── brit advisory (Stage 1a — warn-only; each call bounded by BRIT_ADVISORY_TIMEOUT_S, default 60s) ─────────────────────"
+  REPO_ROOT="$REPO_TOPLEVEL" "$HELPER" verify
+  # plan against origin/dev (the merge target); if origin/dev is unreachable, skip.
+  if git rev-parse --verify origin/dev >/dev/null 2>&1; then
+    REPO_ROOT="$REPO_TOPLEVEL" "$HELPER" plan --since origin/dev || true
+  fi
+}
+
+# A hand-over's only success: its cheap reds refuse, then the record is written or the push refuses.
+# BERTH_TARGETS is empty for a hand-over by construction (no dev/main destination), so no Phase L.
+handover_finish() {
+  if [ -n "$PREGATE_FAILED" ]; then
+    echo "[pre-push] REFUSED: red before the hand-over:$PREGATE_FAILED (above)." >&2
+    exit 1
+  fi
+  # A live stop request ends a hand-over as it ends the ordinary gate loop: refused, nothing recorded.
+  if gate_stop_requested; then
+    echo "[pre-push] stopped: stop requested on the live run; the hand-over is not recorded." >&2
+    exit 1
+  fi
+  # The warn-only Brit integrity advisory, when forced: it never refuses.
+  [ "${BRIT_ADVISORY:-}" != "always" ] || brit_advisory
+  if ! printf '%s\n' "${PUSH_LINES[@]}" |
+     node "$HOOK_WORK_TREE/genesis/orchestrator/handover-record.mjs" --root "$HOOK_WORK_TREE"; then
+    echo "[pre-push] REFUSED: the hand-over record was not written (above); a hand-over is never pushed without it." >&2
+    exit 1
+  fi
+  echo "[pre-push] hand-over: seconds checks green, no project gate ran here; landing this head on dev demands every gate."
+  exit 0
+}
+
 hook_pass() {
+  [ -z "$PUSH_IS_HANDOVER" ] || handover_finish
   [ -n "$BERTH_TARGETS" ] || exit 0
   local line local_sha remote_ref remote_sha target rc
   PHASE_L_STARTED=1
@@ -1319,7 +1431,12 @@ fi
 # Runtime-manifest pin/render conformance. 2026-09-05: every active human is
 # pinned, so Unpinned is now REFUSE (exit 65), alongside CID/resource drift.
 # Use the same pool resolver as native gate.projects; no prebuilt binary needed.
-if echo "$CHANGED" | grep -qE "bridges/k8s/|elohim/ark/core/|genesis/orchestrator/data/deployments\.json|genesis/orchestrator/manifests/runtime/|genesis/data/devices/archetype-resource-budgets\.json|scripts/ci/conductor-split-budget\.sh"; then
+RUNTIME_PINS_PATHS="bridges/k8s/|elohim/ark/core/|genesis/orchestrator/data/deployments\.json|genesis/orchestrator/manifests/runtime/|genesis/data/devices/archetype-resource-budgets\.json|scripts/ci/conductor-split-budget\.sh"
+# A cargo build, not a seconds check: a hand-over leaves it to the dev landing, which runs it.
+if [ -n "$PUSH_IS_HANDOVER" ] && echo "$CHANGED" | grep -qE "$RUNTIME_PINS_PATHS"; then
+  echo "[pre-push] hand-over: runtime manifest pin/render conformance not run (cargo run k8s-bridge); the dev landing runs it."
+fi
+if [ -z "$PUSH_IS_HANDOVER" ] && echo "$CHANGED" | grep -qE "$RUNTIME_PINS_PATHS"; then
   echo "[pre-push] Verifying runtime manifest pins and rendered resources..."
   if (
     k8s_repo_root="$(git rev-parse --show-toplevel)"
@@ -1403,6 +1520,16 @@ else
 fi
 rm -f "$T2_LIST"
 [ "$T2_STATUS" -eq 0 ] || leg_red t2-receipt "household serving receipt refused (exit $T2_STATUS, above)"
+
+# ── Hand-over lane: every seconds check above has run ────────────
+# What follows is long: PVC reclamation, the project gate recipes, the household epr landing (dev
+# only) and the warn-only brit advisory. A hand-over runs none of them; its reds above still refuse,
+# and its success is the record (handover_finish, through pass_or_refuse and hook_pass).
+if [ -n "$PUSH_IS_HANDOVER" ]; then
+  [ -z "$PROJECTS" ] ||
+    echo "[pre-push] hand-over: project gates not run here: $(echo $PROJECTS) (preflight ran above); a dev landing of this head runs or reuses each."
+  pass_or_refuse
+fi
 
 # ── Project filter ────────────────────────────────────────────────
 # Projects are stable manifest keys; the shared runner resolves directories.
@@ -1554,47 +1681,6 @@ resume_rust_analyzer() {
   fi
 }
 
-# ── Brit advisory (Stage 1a) ─────────────────────────────────────
-# Runs brit verify + brit plan as advisory checks. Warn-only — never fails push.
-# Stage 2: becomes load-bearing (failure blocks push). Stage 1a: gather signal.
-#
-# IMPORTANT: REPO_ROOT is NOT set by git when invoking pre-push hooks in
-# production. We derive the helper path via git rev-parse — git hooks run with
-# CWD set to the repo root, but using rev-parse is more robust to future CWD
-# changes. The helper itself defaults its own ${REPO_ROOT:-/projects/elohim}
-# fallback when invoked without it being exported.
-brit_advisory() {
-  REPO_TOPLEVEL="$(git rev-parse --show-toplevel 2>/dev/null)"
-  if [ -z "$REPO_TOPLEVEL" ]; then
-    return 0  # not in a git repo (shouldn't happen for pre-push); silent skip
-  fi
-  HELPER="$REPO_TOPLEVEL/genesis/orchestrator/scripts/brit-helper.sh"
-  if [ ! -x "$HELPER" ]; then
-    return 0  # helper not present (e.g., older branch); silently skip
-  fi
-  # Run only when the pushed range touches what brit reads (BRIT_ADVISORY=always forces it):
-  # the brit gitlink, brit's own tree, the brit scripts, any build-manifest.json, this hook.
-  # KNOWN GAP, accepted for a warn-only stage: `brit verify` checks the integrity of the WHOLE
-  # repository, so an ordinary commit that rewrites history or corrupts the object store gets no
-  # Stage 1a signal until a brit-relevant path changes. Stage 2 (the stage that makes this leg
-  # blocking) must drop the path gate or run verify on every push within its bound — do not
-  # inherit this gate unknowingly. (steward-space-reliability-plan, 2026-10-29)
-  if [ "${BRIT_ADVISORY:-}" != "always" ] && git rev-parse --verify origin/dev >/dev/null 2>&1; then
-    BRIT_BASE="$(git merge-base origin/dev HEAD 2>/dev/null || echo origin/dev)"
-    if ! git diff --name-only "$BRIT_BASE" HEAD -- elohim/brit .brit genesis/orchestrator/scripts/brit-helper.sh genesis/orchestrator/scripts/brit-attest.mjs '**/build-manifest.json' .husky 2>/dev/null | grep -q .; then
-      echo ""
-      echo "── brit advisory (Stage 1a — warn-only): skipped — no brit-relevant path in the pushed range (BRIT_ADVISORY=always to force)"
-      return 0
-    fi
-  fi
-  echo ""
-  echo "── brit advisory (Stage 1a — warn-only; each call bounded by BRIT_ADVISORY_TIMEOUT_S, default 60s) ─────────────────────"
-  REPO_ROOT="$REPO_TOPLEVEL" "$HELPER" verify
-  # plan against origin/dev (the merge target); if origin/dev is unreachable, skip.
-  if git rev-parse --verify origin/dev >/dev/null 2>&1; then
-    REPO_ROOT="$REPO_TOPLEVEL" "$HELPER" plan --since origin/dev || true
-  fi
-}
 
 if [ -n "$RA_PIDS" ]; then
   RA_COUNT=$(echo "$RA_PIDS" | wc -l | tr -d ' ')

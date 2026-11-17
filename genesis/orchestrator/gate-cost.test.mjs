@@ -11,6 +11,7 @@ import { join, dirname } from 'node:path';
 import assert from 'node:assert/strict';
 import {
   CI_BRANCH_PATTERN,
+  isHandoverBranch,
   readCycleRows,
   readCycleUnion,
   costOf,
@@ -243,6 +244,29 @@ test('branch matching is pure even for a caller-supplied global expression', () 
   assert.equal(deferDecision(input).defer, true);
   assert.equal(deferDecision(input).defer, true);
   assert.equal(ciBranchPattern.lastIndex, 7);
+});
+
+test('a self/ hand-over branch is never a CI-built branch', () => {
+  assert.equal(CI_BRANCH_PATTERN.test('self/x'), false);
+  for (const branch of ['self/x', 'self/a\u2028b', 'self/\u2028', 'self/a/b']) {
+    assert.equal(isHandoverBranch(branch), true, JSON.stringify(branch));
+  }
+  for (const branch of ['self/', 'self', 'claude/self/x', 'feat-self/x', 'Self/x', undefined]) {
+    assert.equal(isHandoverBranch(branch), false, JSON.stringify(branch));
+  }
+  assert.equal(deferDecision({ ...eligible, branches: ['self/a\u2028b'], ciBranchPattern: /^.+$/su }).defer, false);
+  const alone = deferDecision({ ...eligible, targets: ['refs/heads/self/x'], branches: ['self/x'] });
+  assert.equal(alone.defer, false);
+  assert.match(alone.why, /self\/x/);
+  // Even a caller pattern that would accept it, and even beside an eligible CI branch.
+  for (const input of [
+    { targets: ['refs/heads/self/x'], branches: ['self/x'], ciBranchPattern: /^.+$/ },
+    { targets: ['refs/heads/feat-cost', 'refs/heads/self/x'], branches: ['feat-cost', 'self/x'] },
+  ]) {
+    const decision = deferDecision({ ...eligible, ...input });
+    assert.equal(decision.defer, false, JSON.stringify(input.branches));
+    assert.match(decision.why, /self\/x is a hand-over lane/);
+  }
 });
 
 test('no branch names is insufficient evidence of CI coverage', () => {
