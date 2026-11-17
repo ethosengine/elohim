@@ -855,12 +855,14 @@ HOOK_ON_EXIT="phase_l_on_exit $HOOK_ON_EXIT"
 LIVE_SHA=""
 LIVE_DEV_SHA=""
 LIVE_TARGETS=""
+LIVE_REF="" # the destination ref the run is judged by, so a sibling's subscription can match it
 for PUSH_LINE in "${PUSH_LINES[@]}"; do
   read -r _ L_SHA L_REF _ <<<"$PUSH_LINE"
   is_notes_ref "$L_REF" && continue # reported once, by the change-detection loop below
   [ "$L_SHA" = "$ZERO_SHA" ] && continue
   LIVE_TARGETS="${LIVE_TARGETS:+$LIVE_TARGETS }$L_REF"
   LIVE_SHA="$L_SHA"
+  [ -n "$LIVE_DEV_SHA" ] || LIVE_REF="$L_REF"
   [ "$L_REF" = refs/heads/dev ] && LIVE_DEV_SHA="$L_SHA"
 done
 LIVE_SHA="${LIVE_DEV_SHA:-$LIVE_SHA}"
@@ -888,7 +890,7 @@ gate_live_close_on_exit() {
   return 0
 }
 HOOK_ON_EXIT="$HOOK_ON_EXIT gate_live_close_on_exit"
-GATE_LIVE_RUN=$(node genesis/orchestrator/gate-live.mjs open --sha "$LIVE_SHA" --target "$LIVE_TARGETS" 2>/dev/null) || GATE_LIVE_RUN=""
+GATE_LIVE_RUN=$(node genesis/orchestrator/gate-live.mjs open --sha "$LIVE_SHA" --target "$LIVE_TARGETS" ${LIVE_REF:+--ref "$LIVE_REF"} 2>/dev/null) || GATE_LIVE_RUN=""
 if [ -n "$GATE_LIVE_RUN" ]; then
   export GATE_LIVE_RUN
   echo "  Live failures: node genesis/orchestrator/gate-live.mjs follow --run $GATE_LIVE_RUN"

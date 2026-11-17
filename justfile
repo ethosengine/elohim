@@ -18,6 +18,8 @@ default:
 gate target="changed" base="origin/dev":
     #!/usr/bin/env bash
     set -euo pipefail
+    # The ref a live run is announced under, so a sibling's gate subscription can match it.
+    export GATE_LIVE_REF="${GATE_LIVE_REF:-refs/heads/$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo HEAD)}"
     if [[ "{{ target }}" != "changed" ]]; then
       exec node "{{ root }}/genesis/orchestrator/gate-runner.mjs" --target "{{ target }}"
     fi

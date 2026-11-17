@@ -347,3 +347,51 @@ The draw lives inside `epr`. A device whose installed `epr` predates `a51dacfc8`
 none, cannot draw; ethosengine built the consumer locally before its draw, and the laptop's
 runbook still starts with one local build. Owed: a first-epr path that needs no `epr` (a small
 fetcher, or `bin-launch` carrying the draw), decided against spec §5 before it is built.
+
+## What the native-throughput sprint changed (2026-11-17, `bea497110`)
+
+Journal: `genesis/docs/superpowers/sprints/2026-11-17-native-throughput/journal.md`.
+
+- **Row 1.** The producer is in `_eprfs-ingest-around` (`genesis/orchestrator/eprfs-produce.sh`,
+  test `eprfs-produce.test.mjs`). It ran in the gate of the `bea497110` landing and put both
+  bins with `--cross`. Still open: a draw on a host with no cargo pool, and a draw without the
+  variable.
+- **Row 3.** Ruled (R4): each device publishes its build notes to
+  `refs/notes/brit/devices/<device-id>/build/*`; no forge-side reader of the shared refs was
+  found. Not built.
+- **Row 6.** The four pool and LSP test files run in `_gate-agentic-shift`, and a change to
+  `pool-lib.sh` selects that gate.
+- **Row 7.** The live-corpus legs are the `eprfs-live-corpus` gate project, keyed on their own
+  reads through `// gate-reads(<project>): <path>`. Warm wall time 58 to 60 s. Still open: the
+  empty narrow set under `GATE_NARROW`.
+- **Row 9.** Step 1 is built: a push whose every destination is `refs/heads/self/*` keeps the
+  seconds checks, skips the project gate recipes and records the hand-over. Still open: the
+  first timed hand-over, whether Jenkins builds `self/*` (the repository does not show the
+  controller's branch filter), and steps 2 to 4.
+- **Row 13.** `family_busy` has a test (idle, live, a family named with the same prefix).
+- **Row 15.** Ruled (R5): a forge release asset carrying the exact pair, verified against a
+  steward-authenticated pin before first run. Not built.
+
+## Row 16 — a warn-only leg prints `REFUSED`
+
+The security-paydown leg prints `REFUSED <manifest>: N patchable alert(s), no paydown` for each
+manifest and returns success unless `SECURITY_PAYDOWN=strict`. An orchestrator read six such
+lines as a push that could not land and stopped the run. Probe: a warn-only leg's lines say
+`WARN`, or say on the line that the push is not bound by them.
+
+## Row 17 — a stale exported `EPR_BIN` shadows the device's head
+
+A terminal that exports `EPR_BIN` to an old store path makes every `epr` in that session the old
+binary; `epr bin status` says only `candidate`. On 2026-11-17 this left commit attribution
+`UNMEASURED` and the CLI different from the peer daemon until commands ran with it unset. Related:
+`epr bin land` needs a clean checkout whose HEAD is the commit, so a release already on
+`origin/dev` cannot be landed from a main checkout that is behind or dirty. Probe: `epr device
+status` names an `EPR_BIN` that resolves to something other than the head.
+
+## Row 18 — the pool family follows the branch prefix
+
+A branch named `claude/<name>` builds in pool family `claude`, cold, while the worktree's
+previous branch `feat/steward-arrival` had a warm `steward` family. The first
+`eprfs-live-corpus` run compiled for 9 min 18 s for that reason alone. Probe: a worktree keeps
+its family across a branch rename, or the gate prints that it is starting a cold family and
+names the warm one.

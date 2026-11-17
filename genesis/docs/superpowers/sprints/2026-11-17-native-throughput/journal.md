@@ -126,3 +126,25 @@ Findings on the way:
   gate on a warm slot, not a seconds one.
 - The terminal that launched the session exported a stale `EPR_BIN`, which shadowed the device's
   head `epr`; commits and pushes here run with it unset.
+
+### Landing 1 (shem, 2026-11-17 22:33Z): `b97893259..bea497110`
+
+The producer ran inside the eprfs gate with no manual step:
+
+```
+[gate] epr producer put: release bafyreic4kq…5kzoa at bea497110028, epr bafkr4iedokx…, bin-launch bafkr4ig6pyq… (crosses)
+```
+
+The release CID equals the one put by hand at `a51dacfc8`: `epr`'s source closure did not change
+between the two heads, so the bytes are the same and only the offer's head is new.
+
+Gate cost of this landing (78 min, the justfile being in every root gate's key): eprfs 1596 s,
+memory-ceremony 1152 s, orchestrator 573 s, agentic-shift 280 s (now with the cargo-pool
+library's tests), rust-style 253 s, cargo-bridge 238 s, jenkins-bridge 237 s,
+eprfs-live-corpus 60 s. The first attempt was stopped by the orchestrator on a misreading: the
+security-paydown leg prints `REFUSED` lines while being warn-only by default.
+
+Ethosengine's E1 found a real consequence on the way: `epr` now depends on
+`elohim/ark/supervisor` for in-process host admission, so that a device with no `ark` binary can
+still be admitted for a draw. Four build manifests gain a watch line for that crate. Ruled: keep
+the dependency. It adds two packages to the eprfs lock (the supervisor and `nix`).
