@@ -2,7 +2,7 @@
 id: steward-device-arrival-journal
 title: Steward-device arrival — sprint journal and the laptop runbook
 date: 2026-11-17
-status: OPEN — train 2 landed and one device drew epr from a sibling; the laptop receipt is owed
+status: CLOSED 2026-11-17 by the steward — train 2 landed and one device drew epr from a sibling; the laptop receipt (runbook step 11) is owed and carries over
 author: shem session 76dc84be (Claude Fable 5.2), orchestrating; ethosengine session e57d1a58 (Claude Opus 5.5) on lane E and train 2
 habits: [workspace-device-arrival, push-gate-pays-once]
 ---
@@ -54,6 +54,15 @@ on dev` because its `origin/dev` was stale; after a fetch the second run landed 
 
 The producer ran by hand (`genesis/local-dev/steward-arrival/produce.sh` on shem, not tracked).
 It is not yet a justfile leg, so a later landing offers nothing until it is repeated.
+
+## Closing (2026-11-17)
+
+The steward closed the sprint away from the laptop. Dev is at `348ca7722`. The hand-over
+branches `claude/steward-arrival-t2b` and `feat/steward-arrival-e` were deleted from origin
+after confirming both are contained in dev. Carried into the next leg of the integration epic
+(artifact store, build queues, rakia): backlog rows 1, 12, 14, 15 and the lane proposal in row
+9. Shem's worktree `.worktrees/steward-arrival` is kept: it holds the untracked producer
+script and the push logs.
 
 ## Decisions for the steward
 
