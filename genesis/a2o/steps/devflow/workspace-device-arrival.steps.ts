@@ -128,10 +128,14 @@ function rosterRows(f: Fixture): ObjectValue[] {
     .map(l => object(JSON.parse(l)));
 }
 function git(f: Fixture, args: string[]) {
-  run(f, ['git', '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', ...args], {
-    PATH: process.env.PATH,
-    HOME: f.base,
-  });
+  return run(
+    f,
+    ['git', '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', ...args],
+    { PATH: process.env.PATH, HOME: f.base }
+  );
+}
+function gitOut(f: Fixture, args: string[]): string {
+  return git(f, args).stdout;
 }
 
 Given(
@@ -179,6 +183,9 @@ Given(
     ]);
     assert.ok(existsSync(f.keyA), 'the other device minted its key');
     assert.equal(rosterRows(f).length, 1, 'one genesis row');
+    // The roster as the other device began it is on the integration branch, fetched here.
+    commitRoster(f, "matthew's roster, begun on the other device");
+    fetchedAt(f, 'HEAD');
   }
 );
 
@@ -330,12 +337,27 @@ Then("neither the request nor the authorization carries either device's secret k
   }
 });
 
-Then('the {string} line of the arrival preflight reads ok here', function (name: string) {
-  const f = state(this);
-  f.preflight = preflight(f, deviceEnv(f, f.keyB));
-  const l = line(f, name);
-  assert.ok(l.startsWith('ok'), l);
-});
+/** The roster line names the standing; whether it is published is the publication scenarios'. */
+function assertStands(l: string, handle: string) {
+  assert.ok(!l.startsWith('REFUSED'), l);
+  assert.ok(l.includes(`standing human:${handle} `), `${l}\n  does not stand for ${handle}`);
+}
+
+Then(
+  'the arrival preflight here says this workspace stands for {string}',
+  function (handle: string) {
+    const f = state(this);
+    f.preflight = preflight(f, deviceEnv(f, f.keyB));
+    assertStands(line(f, 'roster bound'), handle);
+  }
+);
+
+Then(
+  'the {string} line says the device stands for {string}',
+  function (name: string, handle: string) {
+    assertStands(line(state(this), name), handle);
+  }
+);
 
 Given('no declared place holds the embedding model', function () {
   const f = state(this);
@@ -347,9 +369,9 @@ Given('no declared place holds the embedding model', function () {
   );
 });
 
-Given('the core arrival conditions are met on this workspace', function () {
-  const f = state(this);
-  const request = epr(f, deviceEnv(f, f.keyB), [
+/** The whole ceremony for this workspace: enroll here, authorize on the other device, bind here. */
+function joinHere(f: Fixture) {
+  f.request = epr(f, deviceEnv(f, f.keyB), [
     'actor',
     'device',
     'enroll',
@@ -357,20 +379,25 @@ Given('the core arrival conditions are met on this workspace', function () {
     HANDLE,
     '--json',
   ]);
-  const authorization = epr(f, deviceEnv(f, f.keyA), [
+  f.authorization = epr(f, deviceEnv(f, f.keyA), [
     'actor',
     'device',
     'authorize',
-    JSON.stringify(request),
+    JSON.stringify(f.request),
     '--json',
   ]);
   epr(f, deviceEnv(f, f.keyB), [
     'actor',
     'device',
     'bind',
-    JSON.stringify(authorization),
+    JSON.stringify(f.authorization),
     '--json',
   ]);
+}
+
+Given('the core arrival conditions are met on this workspace', function () {
+  const f = state(this);
+  joinHere(f);
   // Candidate execution makes a fixture local-first; no downloaded brit release or model needed.
   f.preflight = preflight(
     f,
@@ -382,14 +409,15 @@ Given('the core arrival conditions are met on this workspace', function () {
   );
 });
 
-Then('every line reads ok or degraded and the preflight exits zero', function () {
+Then('every line reads ok, degraded or unknown and the preflight exits zero', function () {
   const f = state(this);
   assert.equal(f.preflight?.status, 0, f.preflight?.lines.join('\n'));
   // The condition list grows with the device (hooks, trust, packs, daemon, supervisor, toolchain);
   // the claim is that none of them refuses, so no count is asserted. Named lines have their own steps.
+  // Unknown is a fact this device cannot read alone (a branch never fetched, no saved peer status).
   const lines = f.preflight?.lines ?? [];
   assert.ok(lines.length > 0, 'the preflight printed no condition');
-  const refused = lines.filter(line => !/^(ok|degraded) /.test(line));
+  const refused = lines.filter(line => !/^(ok|degraded|unknown) /.test(line));
   assert.deepEqual(refused, [], lines.join('\n'));
 });
 
@@ -761,3 +789,201 @@ Then('no session record was written in either place', function () {
   assert.deepEqual(sessionRecords(d.key), []);
   assert.deepEqual(sessionRecords(d.moved.key), []);
 });
+
+// ── Publication, sibling exchange and the next step ─────────────────────────────────────────
+const ROSTER_REL = `.eprfs/status/participants/${HANDLE}.jsonl`;
+const PUBLISHED_REF = 'refs/remotes/origin/dev'; // the declared remote-tracking ref (publishedRef)
+const AS_OF_LAST_FETCH = 'as of the last fetch';
+const SIBLING_EXCHANGE = 'sibling exchange';
+const NEXT_STEP = 'next step';
+/** The ceremony's order, as the feature's glossary states it. */
+const CEREMONY = ['epr binary', 'device key', 'roster bound', 'peer daemon', SIBLING_EXCHANGE];
+
+function commitRoster(f: Fixture, message: string) {
+  git(f, ['-C', f.root, 'add', ROSTER_REL]);
+  git(f, ['-C', f.root, 'commit', '-q', '-m', message]);
+}
+/** Stands in for a push through the gate followed by a fetch: the remote-tracking ref moves. */
+function fetchedAt(f: Fixture, revision: string) {
+  git(f, ['-C', f.root, 'update-ref', PUBLISHED_REF, revision]);
+}
+function didOf(note: ObjectValue | undefined, field: string): string {
+  const did = String(note?.[field] ?? '');
+  assert.ok(did.startsWith('did:key:'), `no ${field} did in ${JSON.stringify(note)}`);
+  return did;
+}
+/** A syntactically whole channel root CID (CIDv1, raw, BLAKE3-256 multihash) over fixed bytes. */
+function fixtureRoot(seed: string): string {
+  const bytes = Buffer.concat([Buffer.from([0x01, 0x55, 0x1e, 0x20]), Buffer.alloc(32, seed)]);
+  const alphabet = 'abcdefghijklmnopqrstuvwxyz234567';
+  let bits = 0;
+  let value = 0;
+  let out = 'b';
+  for (const byte of bytes) {
+    value = (value << 8) | byte;
+    bits += 8;
+    while (bits >= 5) {
+      out += alphabet[(value >>> (bits - 5)) & 31];
+      bits -= 5;
+    }
+  }
+  if (bits > 0) out += alphabet[(value << (5 - bits)) & 31];
+  return out;
+}
+/**
+ * The head table this workspace's peer process saves (eprfs-peer `HeadTable`, `heads.json` in
+ * `<XDG_CONFIG_HOME>/epr/peer`), holding the other device's head when one has arrived.
+ */
+function savePeerStatus(f: Fixture, otherHead?: { seq: number; acks?: number }) {
+  const env = deviceEnv(f, f.keyB);
+  const dir = join(String(env.XDG_CONFIG_HOME), 'epr/peer');
+  mkdirSync(dir, { recursive: true });
+  const now = Date.now();
+  const devices: Record<string, unknown> = {};
+  if (otherHead) {
+    const ours = didOf(f.request, 'controller');
+    devices[didOf(f.authorization, 'authorizedBy')] = {
+      seq: otherHead.seq,
+      root: fixtureRoot(`other-${otherHead.seq}`),
+      at: now,
+      folded: otherHead.acks === undefined ? {} : { [ours]: otherHead.acks },
+      folded_at: now,
+      events_folded: otherHead.seq,
+    };
+  }
+  const table = {
+    version: 1,
+    own: null,
+    devices,
+    dropped: { unadmitted: 0, forged: 0, rollback: 0, replayed: 0, malformed: 0 },
+  };
+  writeFileSync(join(dir, 'heads.json'), `${JSON.stringify(table, null, 2)}\n`);
+}
+
+Given(
+  "the integration branch, as last fetched here, carries matthew's roster with only the other device on it",
+  function () {
+    const f = state(this);
+    const published = gitOut(f, ['-C', f.root, 'show', `${PUBLISHED_REF}:${ROSTER_REL}`]);
+    assert.equal(published.split('\n').filter(l => l.trim()).length, 1, published);
+  }
+);
+
+Given('this workspace has never fetched the integration branch', function () {
+  const f = state(this);
+  git(f, ['-C', f.root, 'update-ref', '-d', PUBLISHED_REF]);
+});
+
+Given('this workspace has joined {string} through the other device', function (handle: string) {
+  const f = state(this);
+  assert.equal(handle, HANDLE);
+  joinHere(f);
+  assert.equal(rosterRows(f).length, 2, 'the binding is on the roster here');
+});
+
+Given("this workspace's binding is committed here but not yet published", function () {
+  commitRoster(state(this), 'bind this workspace');
+});
+
+When('the binding reaches the integration branch and is fetched here', function () {
+  fetchedAt(state(this), 'HEAD');
+});
+
+Then(
+  'the {string} line is degraded and says the binding is local only, as of the last fetch',
+  function (name: string) {
+    const l = line(state(this), name);
+    assert.ok(l.startsWith('degraded'), l);
+    assert.ok(l.includes('local only') && l.includes(AS_OF_LAST_FETCH), l);
+    assert.ok(l.includes(HANDLE), `${l}\n  does not name the person`);
+  }
+);
+
+Then(
+  'the {string} line reads ok and says the binding is published, as of the last fetch',
+  function (name: string) {
+    const l = line(state(this), name);
+    assert.ok(l.startsWith('ok'), l);
+    assert.ok(l.includes(`published on origin/dev (${AS_OF_LAST_FETCH})`), l);
+  }
+);
+
+Then('the {string} line is unknown and names {string}', function (name: string, cure: string) {
+  const l = line(state(this), name);
+  assert.ok(l.startsWith('unknown'), l);
+  assert.ok(l.includes(cure), `${l}\n  does not name ${cure}`);
+});
+
+Given(
+  "this workspace's peer has saved its status, and nothing has arrived from the other device",
+  function () {
+    savePeerStatus(state(this));
+  }
+);
+
+When(
+  "the other device's head arrives here without acknowledging this workspace's head",
+  function () {
+    savePeerStatus(state(this), { seq: 3 });
+  }
+);
+
+When("the other device's next head acknowledges this workspace's head", function () {
+  savePeerStatus(state(this), { seq: 4, acks: 1 });
+});
+
+Then(
+  'the {string} line is degraded and says no head from a sibling has arrived',
+  function (name: string) {
+    const l = line(state(this), name);
+    assert.ok(l.startsWith('degraded'), l);
+    assert.ok(l.includes('no verified head') && l.includes('nothing has been exchanged'), l);
+  }
+);
+
+Then(
+  "the {string} line is degraded and says no sibling acknowledges this workspace's head",
+  function (name: string) {
+    const l = line(state(this), name);
+    assert.ok(l.startsWith('degraded'), l);
+    assert.ok(l.includes("no sibling acknowledges this device's head"), l);
+  }
+);
+
+Then('the {string} line reads ok and names the other device', function (name: string) {
+  const f = state(this);
+  const l = line(f, name);
+  assert.ok(l.startsWith('ok'), l);
+  const other = didOf(f.authorization, 'authorizedBy');
+  // The line names the sibling by its short form: the did's first sixteen and last four characters.
+  assert.ok(l.includes(other.slice(0, 16)) && l.includes(other.slice(-4)), `${l}\n  ${other}`);
+  assert.ok(l.includes('ago'), `${l}\n  does not say how long ago`);
+});
+
+Then(
+  "the last line is the next step, repeating the cure of the first unmet condition in the ceremony's order",
+  function () {
+    const f = state(this);
+    assert.ok(f.preflight, 'the preflight has not run');
+    const lines = f.preflight.lines;
+    const last = lines.at(-1) ?? '';
+    assert.equal(
+      lines.filter(l => l.includes(` ${NEXT_STEP}: `)).length,
+      1,
+      'exactly one next-step line'
+    );
+    assert.ok(!last.startsWith('REFUSED'), `the next step refused: ${last}`);
+    const owed = CEREMONY.map(name => line(f, name)).find(
+      l => !l.startsWith('ok ') && l.includes(' — ')
+    );
+    if (!owed) {
+      assert.match(last, /^ok next step: nothing owed/, last);
+      return;
+    }
+    const name = CEREMONY.find(n => owed.includes(` ${n}: `));
+    const prefix = ` ${NEXT_STEP}: ${name} — `;
+    assert.ok(last.includes(prefix), `${last}\n  does not name ${name}`);
+    const cure = last.slice(last.indexOf(prefix) + prefix.length);
+    assert.ok(owed.endsWith(` — ${cure}`), `${last}\n  does not repeat the cure of ${owed}`);
+  }
+);

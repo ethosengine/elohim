@@ -33,7 +33,8 @@ Feature: A workspace arrives as one of its person's devices, and a refusal names
   #        repository trusted  git accepts this checkout natively or by device declaration
   #        device key    this device's signing key exists, and whether a native session
   #                      (below) could be kept beside it, on which basis
-  #        roster bound  the person's roster lists this device
+  #        roster bound  the person's roster lists this device; once it does, whether the
+  #                      roster's rows are "published" (below), or only on this device
   #        embed model   the model that turns text into searchable vectors is in one of its
   #                      declared places (the paths its manifest lists, checked in order) — a
   #                      missing semantic search is degraded; lexical recall still works
@@ -43,6 +44,14 @@ Feature: A workspace arrives as one of its person's devices, and a refusal names
   #        berth moored  the workspace has registered itself with the machine's berth — the
   #                      scheduler that shares heavy work (builds, the mesh) between the
   #                      sessions on one machine — so it can claim capacity instead of competing
+  #        peer daemon   the device's peer process is running: the process that exchanges
+  #                      with the person's other devices (its "siblings")
+  #        sibling exchange  a sibling has sent this device its latest "head" and acknowledged
+  #                      this device's own head, as the peer process last saved it (below)
+  #        next step     always the last line: the one thing to do next, repeated word for word
+  #                      from the first unmet condition in the ceremony's order (epr binary,
+  #                      device key, roster bound, peer daemon, sibling exchange), or "nothing
+  #                      owed" when none is unmet. It is never REFUSED itself.
   # Contract: status never fixes anything; it exits 1 only for REFUSED. Degraded means a missing
   # enhancement; unknown means an unreachable cross-device fact. Session arrival fails open. The
   # cure it names IS the complete ceremony: enroll here, authorize on the other device, bind
@@ -50,7 +59,8 @@ Feature: A workspace arrives as one of its person's devices, and a refusal names
   # the ceremony is a person's act. A missing key or binding is refused by name below.
   # Optional model, fold and berth gaps are degraded: core work can still proceed.
   # "A locally usable workspace…" checks that no printed line refuses, whatever the list has
-  # grown to, on a bound fixture with local tool candidates.
+  # grown to, on a bound fixture with local tool candidates. A fact that cannot be read on this
+  # device alone (a branch never fetched, a peer status never saved) reads unknown there.
   #
   # Where a device keeps its things (the "device layout", `epr device layout show`): the
   # config home (key, roster pins, sessions), the bin-store (the executables `epr` lands and
@@ -60,6 +70,8 @@ Feature: A workspace arrives as one of its person's devices, and a refusal names
   # set, else a place the device remembered (`epr device layout save`), else the host's default.
   # The checkout the person stands in always beats a remembered one.
 
+  # The fixture repository was fetched from the integration branch (below), and that branch
+  # already carries matthew's roster as the other device began it.
   Background:
     Given a committed repository whose roster for "matthew" was begun on another device
 
@@ -90,7 +102,7 @@ Feature: A workspace arrives as one of its person's devices, and a refusal names
     Then matthew's roster carries one binding for this workspace approved by the other device
     And the two devices hold different keys and neither key file moved
     And neither the request nor the authorization carries either device's secret key
-    And the "roster bound" line of the arrival preflight reads ok here
+    And the arrival preflight here says this workspace stands for "matthew"
 
   Scenario: A model missing from its declared places degrades recall and names its provisioner
     Given no declared place holds the embedding model
@@ -99,7 +111,7 @@ Feature: A workspace arrives as one of its person's devices, and a refusal names
 
   Scenario: A locally usable workspace permits degraded enhancements and exits zero
     Given the core arrival conditions are met on this workspace
-    Then every line reads ok or degraded and the preflight exits zero
+    Then every line reads ok, degraded or unknown and the preflight exits zero
 
   Scenario: Every place this device keeps its things is named with the reason it was chosen
     Given this workspace names its own place for executables
@@ -143,7 +155,7 @@ Feature: A workspace arrives as one of its person's devices, and a refusal names
     And no container platform marker is set
     When the arrival preflight runs on that device
     Then the "device key" line is degraded and names "epr actor device persistence --declare durable-home"
-    And the "roster bound" line reads ok
+    And the "roster bound" line says the device stands for "matthew"
     When the person declares the home durable on that device
     And the arrival preflight runs on that device again
     Then the "device key" line reads ok and names the persistence basis "declared-durable-home"
@@ -177,3 +189,49 @@ Feature: A workspace arrives as one of its person's devices, and a refusal names
     And a native session is opened from that directory
     Then it is refused with "envelope-persistence-declaration-invalid" naming the directory mismatch
     And no session record was written in either place
+
+  # The roster travels by git, so a binding written here is known only here until its rows reach
+  # the "integration branch": the shared branch every device of the person pulls from. Rows that
+  # are there are "published". Publishing goes through the repository's normal gate (the checks a
+  # push must pass before the integration branch accepts it), like any other change. The preflight reads the integration branch as this device last fetched it and
+  # never fetches by itself, so what it says about publication is "as of the last fetch".
+  Scenario: A device bound here whose roster rows are not yet published is told so and how to publish them
+    Given the integration branch, as last fetched here, carries matthew's roster with only the other device on it
+    And this workspace has joined "matthew" through the other device
+    And this workspace's binding is committed here but not yet published
+    When the arrival preflight runs here
+    Then the "roster bound" line is degraded and says the binding is local only, as of the last fetch
+    And the "roster bound" line also names "publish the roster rows through the normal gate"
+    When the binding reaches the integration branch and is fetched here
+    And the arrival preflight runs here
+    Then the "roster bound" line reads ok and says the binding is published, as of the last fetch
+
+  Scenario: A device that has never fetched the integration branch is not told its binding is published
+    Given this workspace has never fetched the integration branch
+    And this workspace has joined "matthew" through the other device
+    When the arrival preflight runs here
+    Then the "roster bound" line is unknown and names "fetch the integration branch"
+
+  # Devices of one person exchange through their peer processes: each sends its latest "head" (a
+  # signed summary of the records it holds) and acknowledges the heads it has received. The peer
+  # process saves what it has received on the device; the preflight reads that saved status and
+  # dials no one. A roster naming a sibling says the sibling exists, never that the two have met.
+  Scenario: A device whose siblings are known but who has exchanged nothing with them is not called connected
+    Given this workspace has joined "matthew" through the other device
+    And this workspace's peer has saved its status, and nothing has arrived from the other device
+    When the arrival preflight runs here
+    Then the "sibling exchange" line is degraded and says no head from a sibling has arrived
+    When the other device's head arrives here without acknowledging this workspace's head
+    And the arrival preflight runs here
+    Then the "sibling exchange" line is degraded and says no sibling acknowledges this workspace's head
+    When the other device's next head acknowledges this workspace's head
+    And the arrival preflight runs here
+    Then the "sibling exchange" line reads ok and names the other device
+
+  Scenario: The last line names the one next step, repeated from the first condition still owed
+    Given this workspace holds no device key
+    When the arrival preflight runs here
+    Then the last line is the next step, repeating the cure of the first unmet condition in the ceremony's order
+    When this workspace has joined "matthew" through the other device
+    And the arrival preflight runs here
+    Then the last line is the next step, repeating the cure of the first unmet condition in the ceremony's order
