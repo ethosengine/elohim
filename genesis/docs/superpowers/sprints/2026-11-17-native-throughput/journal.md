@@ -148,3 +148,29 @@ Ethosengine's E1 found a real consequence on the way: `epr` now depends on
 `elohim/ark/supervisor` for in-process host admission, so that a device with no `ark` binary can
 still be admitted for a draw. Four build manifests gain a watch line for that crate. Ruled: keep
 the dependency. It adds two packages to the eprfs lock (the supervisor and `nix`).
+
+### What the 78 minutes were, and the first cut (2026-11-17)
+
+The landing's gate times sum to the hook's 4607 s. Reading the log against the keying code:
+
+- memory-ceremony (1152 s), agentic-shift (280 s), rust-style (253 s), dialogue-stasis (110 s)
+  and epr-app-package (70 s) declare no steps, so they have no evidence key and run on every
+  push that selects them.
+- memory-ceremony shares the eprfs slot but built with `-p elohim-epr-cli`, which resolves
+  features differently from the eprfs gate's `--workspace`. It recompiled the workspace and its
+  test binaries straight after the eprfs gate built them. With the same package set as the
+  ingest and `--workspace` on its two test lines, the same gate ran in **365 s** (compiles 0.55
+  to 0.62 s; the same 14 test targets, 210 hook tests and 11 scenarios pass). Saving about
+  787 s on every landing that runs both gates, with no change to any key.
+- rust-style's cost is one self-test (176 s) that builds the checker in a fresh temporary
+  directory. Not changed yet: splitting the checker's own fmt, lint and tests into a keyed cargo
+  project would save about 180 to 230 s on landings that do not touch the checker.
+- A sound key for agentic-shift is the whole tree, so it would help a retry or a sibling and
+  not a first landing. Not changed.
+
+Held, not landed: keying a root gate on the closure of recipes it runs in place of the whole
+justfile (lane S5). A Codex review confirmed six ways to change what a gate runs without moving
+its key (a recipe reached through `xargs` or a split command word; a `just` call inside a
+script a recipe runs; an imported justfile; the `just` binary not pinned between dump and run).
+Measured on this landing it would have kept six small gates' keys. The patch is kept at
+`genesis/local-dev/native-throughput/s5-recipe-closure.patch`.

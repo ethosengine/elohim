@@ -804,18 +804,21 @@ _gate-memory-ceremony:
     # elohim/eprfs/epr-cli/src/flow/memory/footprint.rs (METHOD_VERSION bounded-memory-balance-v1),
     # gated below by --test flow_memory_footprint, whose pinned normalized digest is asserted
     # unconditionally and does not need the Python oracle to be present.
-    cargo build --manifest-path elohim/eprfs/Cargo.toml -p elohim-epr-cli
-    # The hooks suite's session-envelope fixture copies bin-launch from beside debug/epr. Only
-    # the eprfs gate built it, so a fresh worktree slot whose eprfs verdict was reused refused here.
-    cargo build --manifest-path elohim/eprfs/Cargo.toml -p elohim-device-runtime --bin bin-launch
+    # One build command, the same package set as the eprfs gate's ingest (`_eprfs-ingest-around`),
+    # and `--workspace` on the tests below, the same feature set as `_gate-eprfs`: this gate shares
+    # the eprfs slot, and a `-p elohim-epr-cli` build resolves features differently, so it
+    # recompiled the workspace and its test binaries after the eprfs gate had just built them
+    # (measured 2026-11-17: about 790 s of this gate's 1152 s).
+    # The hooks suite's session-envelope fixture copies bin-launch from beside debug/epr.
+    cargo build --manifest-path elohim/eprfs/Cargo.toml -p elohim-epr-cli --bin epr -p elohim-device-runtime --bin bin-launch
     # Station five (2026-09-10): the recall executor and the identity-closed corrections view are
     # native. These two binaries carry the 60 Python recall cases (54 counterparts + 6 retired as
     # out-of-process artefacts); the Python suite and its scripts are gone.
-    cargo test --manifest-path elohim/eprfs/Cargo.toml -p elohim-epr-cli --test flow_memory_recall --test flow_concerns_corrections --test flow_memory_footprint --test flow_memory_recall_golden --test flow_memory_recall_lens --test flow_memory_recall_sample --test flow_report --test flow_report_fold_lag
+    cargo test --manifest-path elohim/eprfs/Cargo.toml --workspace --test flow_memory_recall --test flow_concerns_corrections --test flow_memory_footprint --test flow_memory_recall_golden --test flow_memory_recall_lens --test flow_memory_recall_sample --test flow_report --test flow_report_fold_lag
     # Governed-discovery station 4 (final review, ruling I3): the native semantic provider's own
     # suites — the fold, the semantic and lexical routes, first-screen fusion, the pinned embedder
     # and the index declarations — run in the gate that covers the station.
-    cargo test --manifest-path elohim/eprfs/Cargo.toml -p elohim-epr-cli --test flow_memory_recall_fold --test flow_memory_recall_semantic --test flow_memory_recall_fusion --test flow_memory_recall_lexical --test flow_memory_recall_embedder --test flow_memory_recall_index
+    cargo test --manifest-path elohim/eprfs/Cargo.toml --workspace --test flow_memory_recall_fold --test flow_memory_recall_semantic --test flow_memory_recall_fusion --test flow_memory_recall_lexical --test flow_memory_recall_embedder --test flow_memory_recall_index
     # Station four (2026-09-10): the memory-index projection router and the relocated memory
     # lenses. Station six round (b) (2026-09-11) removed the kit leg from every hook, so these
     # now pin the INVERTED contract: a drift signal is a fold and only a fold, and the index
