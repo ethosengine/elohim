@@ -228,7 +228,7 @@ test('row 11 (a): with no local holder the refusal names every checkout tried an
   assert.ok(!f.calls.some(([cmd]) => cmd === 'pnpm'), 'nothing installs after a refused submodule');
 });
 
-function movedFixture(t, { dirty = false, aborted = false, held = true, sibling = true } = {}) {
+function movedFixture(t, { dirty = false, aborted = false, indexEntries = '', held = true, sibling = true } = {}) {
   const status = ATTESTED_SUBMODULES.map(m => `${m === 'elohim/brit' ? '+' : ' '}abc ${m}`).join('\n');
   const f = fixture(t, {
     git: (args, initialized) => {
@@ -238,6 +238,7 @@ function movedFixture(t, { dirty = false, aborted = false, held = true, sibling 
       }
       if (args.includes('status')) return ok(status);
       if (args.includes('ls-tree')) return ls(args.at(-1));
+      if (args[0] === '-C' && args.includes('ls-files') && !args.includes('--others')) return ok(indexEntries);
       if (args.includes('worktree')) return ok('worktree /main checkout\n\nworktree /wt/nt-e2\n');
       if (args.includes('cat-file')) {
         if (args[1].endsWith(`${f.root}/elohim/brit`) || args[1] === join(f.root, 'elohim/brit')) return held ? ok() : { status: 1 };
@@ -290,5 +291,16 @@ test('row 11: a checkout aborted mid-way (every file staged as deleted) is resto
   const update = f.calls.find(call => call[0] === 'git' && call.includes('--no-fetch') && call.at(-1) === 'elohim/brit' && !call.includes('--init'));
   assert.ok(update.includes('--force'), update.join(' '));
   assert.ok(f.calls.some(call => call.includes('fetch') && call.includes('/wt/nt-e2/elohim/brit')), 'the pin was fetched first');
+});
+
+test('E6 #1: one intentionally staged deletion in a moved submodule is work, never forced away', t => {
+  // `git status` lists only changed paths, so a single staged deletion beside untouched files also
+  // has every status line starting "D ". The index still holds the untouched files: not aborted.
+  const f = movedFixture(t, { aborted: true, indexEntries: 'README.md\nsrc/main.rs\n' });
+  assert.equal(prep(f.options), 0, f.logs.join('\n'));
+  assert.match(f.logs.join('\n'), /WARN elohim\/brit: differs from its pin and has local changes/);
+  assert.ok(!f.calls.some(call => call.includes('--force')), 'no forced update over staged work');
+  assert.ok(!f.calls.some(call => call.includes('--no-fetch') && call.at(-1) === 'elohim/brit' && !call.includes('--init')),
+    'no update at all');
 });
 

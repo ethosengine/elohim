@@ -153,9 +153,13 @@ export function prep({ root = ROOT, spawn = spawnSync, exists = existsSync,
       const dir = join(root, module);
       const status = spawn('git', ['-C', dir, 'status', '--porcelain'], { encoding: 'utf8' });
       const lines = String(status.stdout ?? '').split('\n').filter(Boolean);
-      // Row 11's signature: an aborted checkout leaves every tracked file staged as deleted and no
-      // file in the tree. That is no one's work, so it is cured like a clean checkout.
-      const aborted = lines.length > 0 && lines.every((line) => line.startsWith('D  '));
+      // Row 11's signature: an aborted checkout leaves every tracked file staged as deleted, so its
+      // index holds NO entry. "Every status line is a staged deletion" alone is not proof (E6 #1):
+      // status lists only changed paths, so one intentional staged deletion beside untouched files
+      // looks the same. Only an empty index is no one's work, cured like a clean checkout.
+      const allDeleted = lines.length > 0 && lines.every((line) => line.startsWith('D  '));
+      const index = allDeleted ? spawn('git', ['-C', dir, 'ls-files'], { encoding: 'utf8' }) : null;
+      const aborted = allDeleted && index?.status === 0 && !String(index.stdout ?? '').trim();
       if (status.status !== 0 || (lines.length && !aborted)) {
         log(`[prep] WARN ${module}: differs from its pin and has local changes (or cannot be read); left as is`);
         continue;
