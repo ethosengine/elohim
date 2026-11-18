@@ -137,18 +137,30 @@ export function prep({ root = ROOT, spawn = spawnSync, exists = existsSync,
       const source = pinSource(module, pin, { candidates, spawn, exists });
       if (!source) throw noSource(module, pin, [main, ...candidates].filter(Boolean));
       log(`[prep] ${module}: the main checkout lacks pin ${pin.slice(0, 12)}; using ${source}`);
+      // The failed first attempt leaves a submodule repository behind, and a second `update --init`
+      // reuses it rather than cloning from the new source: fetch the pin into it first.
+      if (exists(join(root, module, '.git'))) {
+        execute(['git', '-C', join(root, module), ...LOCAL_ONLY, 'fetch', '--no-tags', join(source, module), pin]);
+      }
       execute(submoduleCommand(module, { main: source, exists }));
     }
     // Row 11 (b): an initialized submodule left at another commit (a rebase moved the gitlink)
     // makes the gate test bytes the push does not carry. A clean one is moved to its pin;
     // a dirty one is someone's work and keeps the warning.
-    for (const module of modules.why?.includes('differs from the pin') ? movedSubmodules(root, spawn) : []) {
+    // Read the moved set directly: the preflight row stops at the first missing submodule and
+    // then never names a moved one (live, 2026-11-18: sophia missing hid rakia at another commit).
+    for (const module of movedSubmodules(root, spawn)) {
       const dir = join(root, module);
       const status = spawn('git', ['-C', dir, 'status', '--porcelain'], { encoding: 'utf8' });
-      if (status.status !== 0 || String(status.stdout).trim()) {
+      const lines = String(status.stdout ?? '').split('\n').filter(Boolean);
+      // Row 11's signature: an aborted checkout leaves every tracked file staged as deleted and no
+      // file in the tree. That is no one's work, so it is cured like a clean checkout.
+      const aborted = lines.length > 0 && lines.every((line) => line.startsWith('D  '));
+      if (status.status !== 0 || (lines.length && !aborted)) {
         log(`[prep] WARN ${module}: differs from its pin and has local changes (or cannot be read); left as is`);
         continue;
       }
+      if (aborted) log(`[prep] ${module}: every tracked file is staged as deleted (an aborted checkout); restoring it`);
       const pin = pinOf(root, module, spawn);
       if (!pin) throw new Error(`the pin of ${module} could not be read`);
       if (!pinSource(module, pin, { candidates: [root], spawn, exists })) {
@@ -159,7 +171,7 @@ export function prep({ root = ROOT, spawn = spawnSync, exists = existsSync,
         execute(['git', '-C', dir, ...LOCAL_ONLY, 'fetch', '--no-tags', join(source, module), pin]);
       }
       log(`[prep] ${module}: moving the clean checkout to its pin ${pin.slice(0, 12)}`);
-      execute(['git', ...LOCAL_ONLY, 'submodule', 'update', '--no-fetch', '--', module]);
+      execute(['git', ...LOCAL_ONLY, 'submodule', 'update', '--no-fetch', ...(aborted ? ['--force'] : []), '--', module]);
     }
     execute(WORKSPACE_INSTALL);
 

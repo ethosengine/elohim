@@ -204,6 +204,11 @@ test('row 11 (a): a pin the main checkout lacks is taken from the sibling worktr
   assert.ok(clones[1].includes('--reference') && clones[1].includes('/wt/nt-e1/elohim/rakia'), clones[1].join(' '));
   assert.ok(clones[1].includes('protocol.allow=never'), 'still local-only');
   assert.ok(!f.calls.some(call => call.includes('cat-file') && call.includes(`${f.root}/elohim/rakia`)), 'never its own checkout');
+  // The first attempt's leftover repository is given the pin before the retry (live, 2026-11-18).
+  const fetch = f.calls.find(call => call.includes('fetch') && call.includes('/wt/nt-e1/elohim/rakia'));
+  assert.deepEqual(fetch, ['git', '-C', join(f.root, 'elohim/rakia'), '-c', 'protocol.allow=never',
+    '-c', 'protocol.file.allow=always', 'fetch', '--no-tags', '/wt/nt-e1/elohim/rakia', PIN]);
+  assert.ok(f.calls.indexOf(fetch) < f.calls.indexOf(clones[1]), 'fetched before the retry');
 });
 
 test('row 11 (a): with no local holder the refusal names every checkout tried and the remote cure', t => {
@@ -223,12 +228,14 @@ test('row 11 (a): with no local holder the refusal names every checkout tried an
   assert.ok(!f.calls.some(([cmd]) => cmd === 'pnpm'), 'nothing installs after a refused submodule');
 });
 
-function movedFixture(t, { dirty = false, held = true, sibling = true } = {}) {
+function movedFixture(t, { dirty = false, aborted = false, held = true, sibling = true } = {}) {
   const status = ATTESTED_SUBMODULES.map(m => `${m === 'elohim/brit' ? '+' : ' '}abc ${m}`).join('\n');
   const f = fixture(t, {
     git: (args, initialized) => {
       ATTESTED_SUBMODULES.forEach(m => initialized.add(m));
-      if (args.includes('--porcelain') && args.includes('status')) return ok(dirty ? ' M src/lib.rs\n' : '');
+      if (args.includes('--porcelain') && args.includes('status')) {
+        return ok(aborted ? 'D  Cargo.toml\nD  src/lib.rs\n' : dirty ? ' M src/lib.rs\n' : '');
+      }
       if (args.includes('status')) return ok(status);
       if (args.includes('ls-tree')) return ls(args.at(-1));
       if (args.includes('worktree')) return ok('worktree /main checkout\n\nworktree /wt/nt-e2\n');
@@ -275,3 +282,13 @@ test('row 11 (b): a moved submodule whose pin no checkout holds refuses with the
   assert.equal(prep(f.options), 1);
   assert.match(f.logs.find(line => line.startsWith('[prep] REFUSED:')), /no local checkout holds the pinned commit/);
 });
+
+test('row 11: a checkout aborted mid-way (every file staged as deleted) is restored to its pin', t => {
+  const f = movedFixture(t, { aborted: true, held: false });
+  assert.equal(prep(f.options), 0, f.logs.join('\n'));
+  assert.match(f.logs.join('\n'), /elohim\/brit: every tracked file is staged as deleted \(an aborted checkout\); restoring it/);
+  const update = f.calls.find(call => call[0] === 'git' && call.includes('--no-fetch') && call.at(-1) === 'elohim/brit' && !call.includes('--init'));
+  assert.ok(update.includes('--force'), update.join(' '));
+  assert.ok(f.calls.some(call => call.includes('fetch') && call.includes('/wt/nt-e2/elohim/brit')), 'the pin was fetched first');
+});
+

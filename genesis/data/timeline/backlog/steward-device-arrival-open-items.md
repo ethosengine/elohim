@@ -316,6 +316,16 @@ its pin (fetching the pin from a sibling first when its own copy lacks it); a di
 the warning and is left untouched. Network fetch stays out of prep by design. Tests:
 `worktree-prep.test.mjs`, six `row 11` cases.
 
+Live receipt, 2026-11-18, worktree `nt-dod2`, the exact shape this row opened with: the main
+checkout's rakia lacked `f9787c9e`, prep named the sibling holding it, and the retry failed again
+because the first attempt's half-made submodule repository was reused and every file was left staged
+as deleted. Three more cures, each tested: the retry first fetches the pin into that leftover
+repository; the moved set is read from `git submodule status` itself (the preflight row stops at
+the first missing submodule, sophia, and never named rakia); and a checkout whose every status line
+is a staged deletion is an aborted checkout, not work, so it is restored to its pin with
+`submodule update --force`. The fourth prep exited 0 with rakia at its pin and gate selection back
+to the two projects the branch touches.
+
 ## Row 12 — the sibling draw fetches before it reads what the binary requires
 
 2026-11-17, landed in `a51dacfc8`: `sibling::select` picks an offer by commit and release only.
