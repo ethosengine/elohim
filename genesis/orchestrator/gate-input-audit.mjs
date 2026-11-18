@@ -264,79 +264,122 @@ function nearestCrate(root, file, readFile) {
 }
 
 const AUXILIARY_TARGET_DIRS = new Set(['tests', 'benches', 'examples']);
+const posixPath = path => path.split('\\').join('/');
 
-/** The quoted strings of a TOML array value starting at `text[start]` ('['), or null. */
-function tomlStrings(text, start) {
-  const end = text.indexOf(']', start);
-  if (text[start] !== '[' || end < 0) return null;
-  const body = text.slice(start + 1, end).replace(/#[^\n]*/g, '');
-  const items = body.split(',').map(item => item.trim()).filter(Boolean);
-  const values = items.map(item => /^"([^"\\]*)"$/.exec(item)?.[1] ?? /^'([^']*)'$/.exec(item)?.[1]);
-  return values.includes(undefined) ? null : values;
+/**
+ * The workspace members of a cargo project as cargo itself names them (`cargo metadata --no-deps
+ * --offline --locked`: in-workspace path dependencies count, exclusions apply), each with its
+ * manifest directory and every target's source file, absolute. null when cargo cannot answer, and
+ * every caller then fails closed.
+ */
+export function cargoMembers(root, workspace, { spawn = spawnSync, env = process.env } = {}) {
+  const result = spawn('cargo', ['metadata', '--no-deps', '--offline', '--locked', '--format-version', '1',
+    '--manifest-path', resolve(root, workspace, 'Cargo.toml')], { encoding: 'utf8', env, timeout: 60_000, maxBuffer: 64 * 1024 * 1024 });
+  if (result.error || result.status !== 0) return null;
+  try {
+    const metadata = JSON.parse(result.stdout);
+    const ids = new Set(metadata.workspace_members);
+    const members = metadata.packages.filter(pkg => ids.has(pkg.id)).map(pkg => ({
+      dir: dirname(resolve(pkg.manifest_path)),
+      targets: pkg.targets.map(target => resolve(target.src_path)),
+    }));
+    return members.length ? members : null;
+  } catch {
+    return null;
+  }
 }
 
-/** The TOML table a line-oriented reader is in at each line: `[workspace]`, `[[test]]`, ... */
-function tomlSections(text) {
+/** `<dir>`'s first path component for `file` when `file` lies inside it, else null. */
+function topIn(dir, abs) {
+  const inside = posixPath(relative(dir, abs)).split('/');
+  return inside.length >= 2 && inside[0] !== '..' && inside[0] !== '' ? inside[0] : null;
+}
+
+/** Does a crate manifest point a compiled target (lib, bin, build script) into an auxiliary dir? */
+function manifestPins(text) {
   let section = '';
-  return text.split('\n').map(line => {
+  for (const line of text.split('\n')) {
     const header = /^\s*(\[\[?[^\]]+\]\]?)\s*(#.*)?$/.exec(line);
-    if (header) section = header[1].replace(/\s+/g, '');
-    return { section, line };
+    if (header) { section = header[1].replace(/\s+/g, ''); continue; }
+    const key = /^\s*(path|build)\s*=\s*(.*?)\s*(#.*)?$/.exec(line);
+    if (!key || !((key[1] === 'path' && ['[lib]', '[[bin]]'].includes(section)) || (key[1] === 'build' && section === '[package]'))) continue;
+    if (key[1] === 'build' && /^(true|false)$/.test(key[2])) continue;
+    const value = /^"([^"\\]*)"$|^'([^']*)'$/.exec(key[2]);
+    if (!value) return true;
+    const top = posixPath((value[1] ?? value[2]).replace(/\\/g, '/')).split('/').filter(part => part && part !== '.')[0];
+    if (AUXILIARY_TARGET_DIRS.has(top)) return true;
+  }
+  return false;
+}
+
+const CODE_INCLUDES = new Set(['include!', 'include_str!', 'include_bytes!', 'std::include!', 'std::include_str!',
+  'std::include_bytes!', 'core::include!', 'core::include_str!', 'core::include_bytes!']);
+
+/**
+ * What a file's `include!`-family calls and `#[path = ...]` attributes reach, read from the token
+ * stream (so a string or comment that merely mentions one is not code): `{ path, dir }` per
+ * reference, absolute, `dir` true when only a directory prefix is known; `'*'` when a reference
+ * cannot be read at all (a macro argument, a constant), which the caller treats as "anything".
+ */
+function codeReferences(root, file, text, crate) {
+  const { ts } = tokens(text);
+  const reached = [];
+  const here = dirname(resolve(root, file));
+  for (let i = 0; i < ts.length; i++) {
+    const call = callAt(ts, i);
+    if (call && CODE_INCLUDES.has(call.name)) {
+      const [first] = argumentsOf(ts, call);
+      const value = first ? stringValue(ts, first[0], first[1], crate, new Map()) : null;
+      reached.push(value ? { path: resolve(value.manifest ? '/' : here, value.value), dir: Boolean(value.prefix) } : '*');
+      i = call.end - 1;
+    } else if (ts[i].text === '#' && ts[i + 1]?.text === '[' && ts[i + 2]?.text === 'path' && ts[i + 3]?.text === '=') {
+      const value = ts[i + 4]?.value;
+      reached.push(typeof value === 'string' ? { path: resolve(here, value), dir: false } : '*');
+    }
+  }
+  return reached;
+}
+
+/** Can a reference reach into `crate`'s tests/, benches/ or examples/? */
+function reachesAuxiliary(crate, reference) {
+  if (reference === '*') return true;
+  return [...AUXILIARY_TARGET_DIRS].some(name => {
+    const aux = resolve(crate, name);
+    return reference.path === aux || reference.path.startsWith(`${aux}/`) || (reference.dir && `${aux}/`.startsWith(`${reference.path.replace(/\/$/, '')}/`));
   });
 }
 
 /**
- * Workspace members of a cargo workspace directory, repository-relative, or null when they cannot
- * be named exactly: an unreadable or unparsable manifest, or a member glob (fail closed).
+ * Review of E7 (A, reworked after review): `cargo test` in a project's workspace compiles only the
+ * lib, bin and build-script targets of a crate that is NOT a member, so that crate's AUTO-DISCOVERED
+ * tests/, benches/ and examples/ files are not the gate's reads. The skip fails closed: no members
+ * from cargo metadata, a crate whose lib/bin/build target points into one of those dirs (after
+ * normalisation), or any compiled scanned file whose include!/#[path] reaches into one (or cannot be
+ * read) keeps every file of that crate (or, unreadable, of every crate). Returns the skipped files.
  */
-function workspaceMembers(root, workspace, readFile) {
-  let text;
-  try { text = readFile(resolve(root, workspace, 'Cargo.toml'), 'utf8'); } catch { return null; }
-  const rows = tomlSections(text);
-  const members = new Set();
-  if (rows.some(row => row.section === '[package]')) members.add(workspace);
-  const memberLine = rows.findIndex(row => row.section === '[workspace]' && /^\s*members\s*=/.test(row.line));
-  if (memberLine < 0) return rows.some(row => row.section === '[workspace]') ? null : (members.size ? [...members] : null);
-  const offset = rows.slice(0, memberLine).reduce((sum, row) => sum + row.line.length + 1, 0);
-  const listed = tomlStrings(text, text.indexOf('[', offset + rows[memberLine].line.indexOf('=')));
-  if (!listed || listed.some(member => /[*?[\]{}]/.test(member))) return null;
-  for (const member of listed) members.add(relative(root, resolve(root, workspace, member)).split('\\').join('/'));
-  return [...members];
-}
-
-/** Does a crate's manifest point a compiled lib/bin target into tests/, benches/ or examples/? */
-function compiledTargetInAuxiliaryDir(text) {
-  return tomlSections(text).some(({ section, line }) => (section === '[lib]' || section === '[[bin]]')
-    && /^\s*path\s*=\s*["'](\.\/)?(tests|benches|examples)\//.test(line));
-}
-
-/**
- * Review of E7 (2026-11-18): `cargo test --workspace` in a project's workspace compiles only the
- * lib/bin targets of a crate that is NOT a member, so that crate's tests/, benches/ and examples/
- * are never compiled by the recipe and their reads are not the gate's (a dependency's
- * schema_contract.rs read all of elohim/sdk/schemas/v1 for eprfs). Returns the predicate that
- * skips exactly those files; skips nothing when the members cannot be named (fail closed), for a
- * member, for the workspace root itself, and for a crate whose lib/bin target lives in one of those
- * directories. src/**, build.rs and any [[test]] path outside the three directories stay audited.
- */
-function uncompiledTarget(root, project, readFile) {
-  const workspace = project?.run?.cargo?.workspace;
-  const members = workspace ? workspaceMembers(root, workspace, readFile) : null;
-  if (!members) return () => false;
-  const memberDirs = new Set(members.map(member => resolve(root, member)));
+function uncompiledFiles(root, workspace, members, scanned, crates, readFile) {
+  const memberDirs = new Set(members.map(member => member.dir));
   const workspaceDir = resolve(root, workspace);
-  const compiledAux = new Map();
-  return (file, crate) => {
-    if (!crate || memberDirs.has(crate) || crate === workspaceDir) return false;
-    const inside = relative(crate, resolve(root, file)).split('\\').join('/').split('/');
-    if (inside.length < 2 || !AUXILIARY_TARGET_DIRS.has(inside[0])) return false;
-    if (!compiledAux.has(crate)) {
-      let manifest = null;
-      try { manifest = readFile(resolve(crate, 'Cargo.toml'), 'utf8'); } catch { /* unreadable: keep */ }
-      compiledAux.set(crate, manifest === null || compiledTargetInAuxiliaryDir(manifest));
-    }
-    return !compiledAux.get(crate);
+  const candidate = file => {
+    const crate = crates.get(file);
+    return crate && !memberDirs.has(crate) && crate !== workspaceDir
+      && AUXILIARY_TARGET_DIRS.has(topIn(crate, resolve(root, file))) ? crate : null;
   };
+  const candidates = new Map(scanned.map(file => [file, candidate(file)]).filter(([, crate]) => crate));
+  const pinned = new Set();
+  for (const crate of new Set(candidates.values())) {
+    let manifest = null;
+    try { manifest = readFile(resolve(crate, 'Cargo.toml'), 'utf8'); } catch { /* unreadable: pin */ }
+    if (manifest === null || manifestPins(manifest)) pinned.add(crate);
+  }
+  const candidateCrates = new Set(candidates.values());
+  for (const file of scanned) {
+    if (candidates.has(file)) continue;
+    for (const reference of codeReferences(root, file, readFile(resolve(root, file), 'utf8'), crates.get(file))) {
+      for (const crate of candidateCrates) if (reachesAuxiliary(crate, reference)) pinned.add(crate);
+    }
+  }
+  return new Set([...candidates].filter(([, crate]) => !pinned.has(crate)).map(([file]) => file));
 }
 
 function auditFile(root, file, text, crate, projectName = null) {
@@ -474,15 +517,28 @@ function auditFile(root, file, text, crate, projectName = null) {
  * Mutation/ancestor searches and other data-derived paths require declarations or review of the printed
  * unresolved roots; this audit is not a proof of an arbitrary Rust read closure.
  */
-function scan({ root, sources, project = null, readFile = readFileSync, listFiles = repositoryFiles }) {
+function scan({ root, sources, project = null, readFile = readFileSync, listFiles = repositoryFiles, members }) {
   root = resolve(root);
   const found = new Map();
-  const skip = uncompiledTarget(root, project, readFile);
-  for (const file of [...new Set(listFiles(root))].sort()) {
-    if (!file.endsWith('.rs') || !sources.some(glob => globCovers(glob, file))) continue;
-    const crate = nearestCrate(root, file, readFile);
-    if (skip(file, crate)) continue;
-    const rows = auditFile(root, file, readFile(resolve(root, file), 'utf8'), crate, project?.name ?? null);
+  const workspace = project?.run?.cargo?.workspace ?? null;
+  if (workspace && members === undefined) members = cargoMembers(root, workspace);
+  // Review of E7 (1): the gated crates' own test, bench and example targets and build scripts are
+  // compiled by the recipe whatever the step sources list, so they are always scanned (every member
+  // and each target's source file when cargo names them, else the project's own directory).
+  const ownDirs = workspace ? (members ? members.map(member => member.dir) : [resolve(root, project.dir)]) : [];
+  const ownTargets = new Set(members ? members.flatMap(member => member.targets) : []);
+  const own = file => {
+    const abs = resolve(root, file);
+    return ownTargets.has(abs) || ownDirs.some(dir => posixPath(relative(dir, abs)) === 'build.rs'
+      || AUXILIARY_TARGET_DIRS.has(topIn(dir, abs)));
+  };
+  const scanned = [...new Set(listFiles(root))].sort()
+    .filter(file => file.endsWith('.rs') && (sources.some(glob => globCovers(glob, file)) || own(file)));
+  const crates = new Map(scanned.map(file => [file, nearestCrate(root, file, readFile)]));
+  const skipped = workspace && members ? uncompiledFiles(root, workspace, members, scanned, crates, readFile) : new Set();
+  for (const file of scanned) {
+    if (skipped.has(file)) continue;
+    const rows = auditFile(root, file, readFile(resolve(root, file), 'utf8'), crates.get(file), project?.name ?? null);
     for (const row of rows) found.set(JSON.stringify(row), row);
   }
   return [...found.values()];
