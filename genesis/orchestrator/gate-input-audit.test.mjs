@@ -487,12 +487,15 @@ for (const name of NAMED_READ_SET_PROJECTS) {
     if (!['elohim-epr', 'eprfs'].includes(name)) {
       assert.ok(result.paths.includes('.claude/epr-meta/policies.yaml'));
       assert.ok(result.paths.includes('.claude/epr-meta/concerns.yaml'));
-      assert.ok(result.paths.includes('elohim/elohim-render/fixtures'));
     }
-    if (name === 'elohim-storage') {
-      for (const path of ['elohim/sdk/schemas/v1', 'elohim/sdk/domains',
-        'genesis/orchestrator/manifests/runtime', 'genesis/orchestrator/data/deployments.json',
-        'scripts/ci/conductor-split-budget.sh']) assert.ok(result.paths.includes(path), path);
+    if (name === 'elohim-storage') assert.ok(result.paths.includes('elohim/sdk/domains'));
+    // Review of E7: these were read only by tests of crates the service's `cargo test` never
+    // compiles (elohim-render's, bridges/k8s's and elohim-epr's integration tests are dependency
+    // targets), so they are not the gate's inputs and must not key it.
+    if (name !== 'elohim-epr') {
+      for (const path of ['elohim/elohim-render/fixtures', 'scripts/ci/conductor-split-budget.sh', 'elohim/sdk/schemas/v1']) {
+        assert.ok(!result.paths.includes(path), `${name} keys on ${path}`);
+      }
     }
   });
 }
@@ -583,4 +586,66 @@ test('the gate-reads grammar fixture shared with the Rust reader parses as decla
       assert.deepEqual(parsed, [], line);
     }
   }
+});
+
+// ── Review of E7: a non-member crate's tests/, benches/ and examples/ are never compiled ──────
+function workspaceFixture(workspaceManifest, extra = {}) {
+  const files = {
+    'ws/Cargo.toml': workspaceManifest,
+    'ws/member/Cargo.toml': '[package]\nname = "member"\n',
+    'ws/member/tests/a.rs': 'include_str!("../../../shared/member-test.json");',
+    'ext/adapter/Cargo.toml': '[package]\nname = "adapter"\n',
+    'ext/adapter/tests/c.rs': 'include_str!("../../../shared/relative-member-test.json");',
+    'dep/Cargo.toml': '[package]\nname = "dep"\n',
+    'dep/tests/b.rs': 'include_str!("../../shared/dep-test.json");',
+    'dep/benches/x.rs': 'include_str!("../../shared/dep-bench.json");',
+    'dep/examples/y.rs': 'include_str!("../../shared/dep-example.json");',
+    'dep/src/lib.rs': 'include_str!("../../shared/dep-src.json");',
+    'dep/build.rs': 'include_str!("../shared/dep-build.json");',
+    'dep/integration/z.rs': 'include_str!("../../shared/dep-custom-test.json");',
+    ...extra,
+  };
+  return {
+    root,
+    project: { name: 'p', dir: 'ws', run: { cargo: { workspace: 'ws' } } },
+    sources: ['ws/**', 'dep/**', 'ext/**'],
+    listFiles: () => Object.keys(files),
+    readFile: path => {
+      const rel = path.slice(root.length + 1);
+      if (Object.hasOwn(files, rel)) return files[rel];
+      throw Object.assign(new Error(`missing ${path}`), { code: 'ENOENT' });
+    },
+  };
+}
+const MEMBERS = '[workspace]\nresolver = "2"\nmembers = [\n    "member",   # a comment\n    "../ext/adapter",\n]\n';
+const EVERY_READ = ['shared/dep-bench.json', 'shared/dep-build.json', 'shared/dep-custom-test.json', 'shared/dep-example.json',
+  'shared/dep-src.json', 'shared/dep-test.json', 'shared/member-test.json', 'shared/relative-member-test.json'];
+
+test('E7 A: a non-member crate\'s tests, benches and examples are not the gate\'s reads; its src, build.rs and members stay', () => {
+  assert.deepEqual(readSet(workspaceFixture(MEMBERS)).paths, [
+    'shared/dep-build.json', 'shared/dep-custom-test.json', 'shared/dep-src.json', 'shared/member-test.json', 'shared/relative-member-test.json',
+  ]);
+});
+
+test('E7 A: a member\'s tests/ read stays, a relative member included', () => {
+  const paths = readSet(workspaceFixture(MEMBERS)).paths;
+  assert.ok(paths.includes('shared/member-test.json'));
+  assert.ok(paths.includes('shared/relative-member-test.json'));
+});
+
+test('E7 A: fail closed: an unreadable or unparsable workspace manifest, or a member glob, skips nothing', () => {
+  for (const manifest of ['[workspace]\nmembers = [ "member", unquoted ]\n', '[workspace]\nmembers = ["crates/*"]\n', '[workspace]\nresolver = "2"\n']) {
+    assert.deepEqual(readSet(workspaceFixture(manifest)).paths, EVERY_READ, manifest);
+  }
+  const missing = workspaceFixture(MEMBERS);
+  const read = missing.readFile;
+  missing.readFile = path => { if (path.endsWith('/ws/Cargo.toml')) throw Object.assign(new Error('gone'), { code: 'ENOENT' }); return read(path); };
+  assert.deepEqual(readSet(missing).paths, EVERY_READ);
+  assert.deepEqual(readSet({ ...workspaceFixture(MEMBERS), project: { name: 'js', dir: 'ws', run: {} } }).paths, EVERY_READ,
+    'a project with no cargo workspace skips nothing');
+});
+
+test('E7 A: a non-member whose lib or bin target lives in tests/, benches/ or examples/ keeps those reads', () => {
+  const fixture = workspaceFixture(MEMBERS, { 'dep/Cargo.toml': '[package]\nname = "dep"\n\n[lib]\npath = "tests/b.rs"\n' });
+  assert.ok(readSet(fixture).paths.includes('shared/dep-test.json'));
 });
