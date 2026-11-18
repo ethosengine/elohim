@@ -63,61 +63,122 @@ struct Document {
     from: String,
 }
 
+/// The largest method or input document this comparison reads. Real ones are a few kilobytes;
+/// a record naming a larger object (an artifact's bytes, say) is refused before it is compared.
+pub(super) const MAX_DOCUMENT_BYTES: u64 = 8 * 1024 * 1024;
+
+fn too_large(what: &str, len: u64) -> ArtifactError {
+    ArtifactError::Gap(format!(
+        "the document {what} is {len} bytes, over the {MAX_DOCUMENT_BYTES}-byte document cap"
+    ))
+}
+
+/// This device's payload store, when one exists.
+struct LocalStore {
+    store: std::sync::Arc<dyn EprfsStorage>,
+    root: PathBuf,
+    format: crate::payload::PayloadFormat,
+}
+
+/// A carried document `dir/<cid>`: opened without following a symlink and without blocking on a
+/// FIFO, accepted only as a regular file, and read no further than the cap.
+fn carried(dir: &Path, cid: &BlobCid) -> ArtifactResult<Option<Document>> {
+    use std::io::Read;
+    use std::os::unix::fs::OpenOptionsExt;
+    let path = dir.join(cid.to_string());
+    let shown = path.display().to_string();
+    let file = match std::fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK)
+        .open(&path)
+    {
+        Ok(file) => file,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(error) if error.raw_os_error() == Some(libc::ELOOP) => {
+            return Err(ArtifactError::Gap(format!(
+                "the document {shown} is a symbolic link; a carried document must be a regular \
+                 file in the --documents directory"
+            )))
+        }
+        Err(error) => {
+            return Err(ArtifactError::Gap(format!(
+                "the document {shown} does not open: {error}"
+            )))
+        }
+    };
+    let metadata = file
+        .metadata()
+        .map_err(|e| ArtifactError::Gap(format!("the document {shown} does not stat: {e}")))?;
+    if !metadata.is_file() {
+        return Err(ArtifactError::Gap(format!(
+            "the document {shown} is not a regular file"
+        )));
+    }
+    if metadata.len() > MAX_DOCUMENT_BYTES {
+        return Err(too_large(&shown, metadata.len()));
+    }
+    let mut bytes = Vec::new();
+    file.take(MAX_DOCUMENT_BYTES + 1)
+        .read_to_end(&mut bytes)
+        .map_err(|e| ArtifactError::Gap(format!("the document {shown} does not read: {e}")))?;
+    if bytes.len() as u64 > MAX_DOCUMENT_BYTES {
+        return Err(too_large(&shown, bytes.len() as u64));
+    }
+    if !cid.verifies(&bytes) {
+        return Err(ArtifactError::Gap(format!(
+            "the document {shown} fails its CID {cid}"
+        )));
+    }
+    Ok(Some(Document { bytes, from: shown }))
+}
+
 /// The document named by `cid`, verified: this device's payload store first, then each
 /// `--documents` directory. `Ok(None)` only when no place holds it; a held copy that does not
-/// hash to `cid` refuses.
+/// hash to `cid`, or exceeds the cap, refuses.
 fn held(
-    store: Option<&dyn EprfsStorage>,
-    store_dir: &Path,
+    local: Option<&LocalStore>,
     documents: &[PathBuf],
     cid: &BlobCid,
     runtime: &tokio::runtime::Runtime,
 ) -> ArtifactResult<Option<Document>> {
-    if let Some(store) = store {
-        match runtime.block_on(store.fetch_blob(cid, FetchPolicy::LocalOnly)) {
+    if let Some(local) = local {
+        let shown = format!("{cid} in {}", local.root.display());
+        // The directory format's object is `<root>/<cid>`; its size is checked before the read.
+        // The storage trait exposes no size for the blob-store format, whose read is capped
+        // after it returns, before any comparison.
+        if local.format == crate::payload::PayloadFormat::DirectoryV1 {
+            if let Ok(metadata) = std::fs::symlink_metadata(local.root.join(cid.to_string())) {
+                if metadata.len() > MAX_DOCUMENT_BYTES {
+                    return Err(too_large(&shown, metadata.len()));
+                }
+            }
+        }
+        match runtime.block_on(local.store.fetch_blob(cid, FetchPolicy::LocalOnly)) {
+            Ok(blob) if blob.bytes.len() as u64 > MAX_DOCUMENT_BYTES => {
+                return Err(too_large(&shown, blob.bytes.len() as u64));
+            }
             Ok(blob) if blob.cid == *cid && cid.verifies(&blob.bytes) => {
                 return Ok(Some(Document {
                     bytes: blob.bytes.to_vec(),
-                    from: store_dir.display().to_string(),
+                    from: local.root.display().to_string(),
                 }));
             }
             Ok(_) => {
                 return Err(ArtifactError::Gap(format!(
-                    "the document {cid} in {} fails its CID",
-                    store_dir.display()
+                    "the document {shown} fails its CID"
                 )))
             }
             Err(EprfsError::BlobNotFound(_)) => {}
             Err(error) => {
                 return Err(ArtifactError::Gap(format!(
-                    "the document {cid} in {} does not read: {error}",
-                    store_dir.display()
+                    "the document {shown} does not read: {error}"
                 )))
             }
         }
     }
     for dir in documents {
-        let path = dir.join(cid.to_string());
-        match std::fs::read(&path) {
-            Ok(bytes) if cid.verifies(&bytes) => {
-                return Ok(Some(Document {
-                    bytes,
-                    from: path.display().to_string(),
-                }))
-            }
-            Ok(_) => {
-                return Err(ArtifactError::Gap(format!(
-                    "the document {} fails its CID {cid}",
-                    path.display()
-                )))
-            }
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
-            Err(error) => {
-                return Err(ArtifactError::Gap(format!(
-                    "the document {} does not read: {error}",
-                    path.display()
-                )))
-            }
+        if let Some(document) = carried(dir, cid)? {
+            return Ok(Some(document));
         }
     }
     Ok(None)
@@ -227,6 +288,16 @@ fn provenance(side: &Side<'_>, method: Option<&Document>, input: Option<&Documen
     }
 }
 
+/// One input line for a terminal: a carriage return shown as `\r`, a missing final newline said.
+fn shown(line: &classify::Located) -> String {
+    let text = line.line.replace('\r', "\\r");
+    if line.terminated {
+        text
+    } else {
+        format!("{text} (no final newline)")
+    }
+}
+
 fn print_text(report: &Report) {
     for delta in report.method.iter().flatten() {
         println!(
@@ -252,10 +323,10 @@ fn print_text(report: &Report) {
             delta.reason
         );
         if let Some(a) = &delta.a {
-            println!("  - [{}] {}", a.position, a.line);
+            println!("  - [{}] {}", a.position, shown(a));
         }
         if let Some(b) = &delta.b {
-            println!("  + [{}] {}", b.position, b.line);
+            println!("  + [{}] {}", b.position, shown(b));
         }
     }
     let count = |classes: &mut dyn Iterator<Item = Class>| {
@@ -285,6 +356,12 @@ fn print_text(report: &Report) {
     println!("summary: method {method}; inputs {inputs}{shape}");
 }
 
+fn runtime() -> ArtifactResult<tokio::runtime::Runtime> {
+    Ok(tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()?)
+}
+
 pub(super) fn diff_keys(
     first: &str,
     second: &str,
@@ -299,34 +376,31 @@ pub(super) fn diff_keys(
         payload_store: options.payload_store.clone(),
         ..peer::Options::default()
     })?;
+    // A failed draw is kept with its side: with --partial the rest is still compared.
+    let mut fetch_failed: Vec<(&'static str, String)> = Vec::new();
     if flags.fetch {
         for side in [&a, &b] {
             if side.own {
                 continue;
             }
-            let runtime = tokio::runtime::Builder::new_current_thread()
-                .enable_all()
-                .build()?;
-            let store = open_store(&store_dir, &runtime)?;
+            let runtime = runtime()?;
+            let local = open_store(&store_dir, &runtime)?;
             let input = side.derivation.input.cid();
-            if held(
-                store.as_deref(),
-                &store_dir,
-                &flags.documents,
-                input,
-                &runtime,
-            )?
-            .is_none()
-            {
-                drop(store);
-                draw_input_document(options, &side.row.device, side.row, &side.derivation)?;
+            if held(local.as_ref(), &flags.documents, input, &runtime)?.is_none() {
+                drop(local);
+                if let Err(error) =
+                    draw_input_document(options, &side.row.device, side.row, &side.derivation)
+                {
+                    if !flags.partial {
+                        return Err(error);
+                    }
+                    fetch_failed.push((side.name, error.to_string()));
+                }
             }
         }
     }
-    let runtime = tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()?;
-    let store = open_store(&store_dir, &runtime)?;
+    let runtime = runtime()?;
+    let local = open_store(&store_dir, &runtime)?;
     let mut gaps = Vec::new();
     let mut documents = Vec::new();
     for side in [&a, &b] {
@@ -335,21 +409,22 @@ pub(super) fn diff_keys(
             ("method", &side.derivation.method),
             ("input", side.derivation.input.cid()),
         ] {
-            let document = held(
-                store.as_deref(),
-                &store_dir,
-                &flags.documents,
-                cid,
-                &runtime,
-            )?;
+            let document = held(local.as_ref(), &flags.documents, cid, &runtime)?;
             if document.is_none() {
-                gaps.push(missing(side, kind, cid, &store_dir));
+                let mut gap = missing(side, kind, cid, &store_dir);
+                if let Some((_, why)) = fetch_failed
+                    .iter()
+                    .find(|(name, _)| kind == "input" && *name == side.name)
+                {
+                    gap.push_str(&format!("; --fetch did not draw it: {why}"));
+                }
+                gaps.push(gap);
             }
             pair.push(document);
         }
         documents.push(pair);
     }
-    drop(store);
+    drop(local);
     if !gaps.is_empty() && !flags.partial {
         return Err(ArtifactError::Gap(format!(
             "{}\n(--partial compares whatever is held and still exits 3)",
@@ -357,18 +432,34 @@ pub(super) fn diff_keys(
         )));
     }
     let [a_docs, b_docs] = [&documents[0], &documents[1]];
+    let (a_method, b_method) = (
+        a.derivation.method.to_string(),
+        b.derivation.method.to_string(),
+    );
+    let (a_input, b_input) = (
+        a.derivation.input.cid().to_string(),
+        b.derivation.input.cid().to_string(),
+    );
     let method = match (&a_docs[0], &b_docs[0]) {
-        (Some(left), Some(right)) => Some(classify::method_deltas(
-            &decode_method(&a.derivation.method, &left.bytes)?,
-            &decode_method(&b.derivation.method, &right.bytes)?,
-        )),
+        (Some(left), Some(right)) => {
+            let mut deltas = classify::method_deltas(
+                &decode_method(&a.derivation.method, &left.bytes)?,
+                &decode_method(&b.derivation.method, &right.bytes)?,
+            );
+            classify::unexplained_method(&mut deltas, &a_method, &b_method);
+            Some(deltas)
+        }
         _ => None,
     };
     let inputs = match (&a_docs[1], &b_docs[1]) {
-        (Some(left), Some(right)) => Some(classify::input_deltas(
-            &decode_input(a.derivation.input.cid(), left.bytes.clone())?,
-            &decode_input(b.derivation.input.cid(), right.bytes.clone())?,
-        )),
+        (Some(left), Some(right)) => {
+            let mut deltas = classify::input_deltas(
+                &decode_input(a.derivation.input.cid(), left.bytes.clone())?,
+                &decode_input(b.derivation.input.cid(), right.bytes.clone())?,
+            );
+            classify::unexplained_input(&mut deltas, &a_input, &b_input);
+            Some(deltas)
+        }
         _ => None,
     };
     let changes: Vec<classify::Change> = method
@@ -377,11 +468,14 @@ pub(super) fn diff_keys(
         .map(|d| d.change)
         .chain(inputs.iter().flatten().map(|d| d.change))
         .collect();
+    // Identity is the verified CIDs', never the absence of a reported difference.
+    let identical = a_method == b_method && a_input == b_input;
     let report = Report {
         a: provenance(&a, a_docs[0].as_ref(), a_docs[1].as_ref()),
         b: provenance(&b, b_docs[0].as_ref(), b_docs[1].as_ref()),
-        identical: changes.is_empty() && gaps.is_empty(),
-        order_only: !changes.is_empty()
+        identical,
+        order_only: !identical
+            && !changes.is_empty()
             && changes.iter().all(|c| *c == classify::Change::OrderOnly),
         method,
         inputs,
@@ -415,19 +509,24 @@ pub(super) fn diff_keys(
     }))
 }
 
-/// This device's payload store, opened shared; `None` when no store exists at `dir` yet, so
-/// every document then reads as not held (or from a `--documents` directory).
-fn open_store(
-    dir: &Path,
-    runtime: &tokio::runtime::Runtime,
-) -> ArtifactResult<Option<std::sync::Arc<dyn EprfsStorage>>> {
-    if !dir.exists() {
-        return Ok(None);
+/// This device's payload store, opened shared, only when one already exists: an absent or empty
+/// directory is no store (opening it would select a format and write a marker), so every document
+/// then reads as not held here.
+fn open_store(dir: &Path, runtime: &tokio::runtime::Runtime) -> ArtifactResult<Option<LocalStore>> {
+    match crate::payload::detect(dir).map_err(|e| ArtifactError::Gap(e.to_string()))? {
+        crate::payload::Detected::New => return Ok(None),
+        crate::payload::Detected::Marked(_) | crate::payload::Detected::UnmarkedDirectory => {}
     }
     runtime.block_on(async {
         crate::payload::open_payload_store(dir, crate::payload::Access::Shared)
             .await
-            .map(|opened| Some(opened.store))
+            .map(|opened| {
+                Some(LocalStore {
+                    store: opened.store,
+                    root: opened.root,
+                    format: opened.format,
+                })
+            })
             .map_err(|e| ArtifactError::Gap(e.to_string()))
     })
 }

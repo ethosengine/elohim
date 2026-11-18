@@ -88,9 +88,27 @@ fn store_method(path: &Path, descriptor: &MethodDescriptor) -> Vec<u8> {
     })
 }
 
+fn fixture_cid(seed: &str) -> String {
+    BlobCid::compute_bytes(seed.as_bytes()).to_string()
+}
+
+fn libm() -> String {
+    format!(
+        "link:libm.so\t/usr/lib64/libm.so\t{}\n",
+        fixture_cid("libm")
+    )
+}
+
+fn libc() -> String {
+    format!(
+        "link:libc.so\t/usr/lib64/libc.so\t{}\n",
+        fixture_cid("libc")
+    )
+}
+
 /// Two synthetic recordings of one crate: the sibling's PATH lists the same directories in
 /// another order, its rustc reports another LLVM version, its crt1.o resolves elsewhere with equal
-/// content, and its libm/libc probe lines swap places.
+/// content (unresolved: a path can reach DT_NEEDED), and its libm/libc probe lines swap places.
 fn two_recordings() -> (MethodDescriptor, String, MethodDescriptor, String) {
     let scratch = TempDir::new().unwrap();
     let (_, mut this) = method_file_with(
@@ -107,18 +125,23 @@ fn two_recordings() -> (MethodDescriptor, String, MethodDescriptor, String) {
         "rustc".into(),
         fixture::RUSTC_IDENTITY.replace("LLVM version: 22.1.2", "LLVM version: 22.1.3"),
     );
-    let this_lines = "crate\t040000 tree 1111111111111111111111111111111111111111\n\
-                      tool:link-driver\t/usr/bin/gcc\tbafkr4ifixtureversion\n\
-                      link:crt1.o\t/usr/lib64/crt1.o\tbafkr4ifixturecrt1\n\
-                      link:libm.so\t/usr/lib64/libm.so\tbafkr4ifixturelibm\n\
-                      link:libc.so\t/usr/lib64/libc.so\tbafkr4ifixturelibc\n"
-        .to_owned();
-    let sibling_lines = "crate\t040000 tree 1111111111111111111111111111111111111111\n\
-                         tool:link-driver\t/usr/bin/gcc\tbafkr4ifixtureversion\n\
-                         link:crt1.o\t/lib/x86_64-linux-gnu/crt1.o\tbafkr4ifixturecrt1\n\
-                         link:libc.so\t/usr/lib64/libc.so\tbafkr4ifixturelibc\n\
-                         link:libm.so\t/usr/lib64/libm.so\tbafkr4ifixturelibm\n"
-        .to_owned();
+    let source = "crate\t040000 tree 1111111111111111111111111111111111111111\n";
+    let tool = format!(
+        "tool:link-driver\t/usr/bin/gcc\t{}\n",
+        fixture_cid("version")
+    );
+    let this_lines = format!(
+        "{source}{tool}link:crt1.o\t/usr/lib64/crt1.o\t{}\n{}{}",
+        fixture_cid("crt1"),
+        libm(),
+        libc()
+    );
+    let sibling_lines = format!(
+        "{source}{tool}link:crt1.o\t/lib/x86_64-linux-gnu/crt1.o\t{}\n{}{}",
+        fixture_cid("crt1"),
+        libc(),
+        libm()
+    );
     (this, this_lines, sibling, sibling_lines)
 }
 
@@ -191,10 +214,13 @@ fn inputs_diff_two_keys_classifies_each_method_field_and_ordered_input_line() {
     let inputs = report["inputs"].as_array().unwrap();
     let crt1 = inputs.iter().find(|d| d["label"] == "link:crt1.o").unwrap();
     assert_eq!(crt1["change"], "changed");
-    assert_eq!(crt1["class"], "key-only");
+    assert_eq!(crt1["class"], "unresolved");
     assert_eq!(
         crt1["b"]["line"],
-        "link:crt1.o\t/lib/x86_64-linux-gnu/crt1.o\tbafkr4ifixturecrt1"
+        format!(
+            "link:crt1.o\t/lib/x86_64-linux-gnu/crt1.o\t{}",
+            fixture_cid("crt1")
+        )
     );
     let moved: Vec<_> = inputs
         .iter()
@@ -209,17 +235,21 @@ fn inputs_diff_two_keys_classifies_each_method_field_and_ordered_input_line() {
     assert_eq!(plain.status.code(), Some(1), "{}", text(&plain));
     let stdout = String::from_utf8_lossy(&plain.stdout);
     for line in [
-        "method tools.rustc[LLVM version] changed byte-affecting: ",
-        "  - 22.1.2",
-        "  + 22.1.3",
-        "method nonPathInputs.PATH order order-only unresolved: ",
-        "input link:crt1.o changed key-only: ",
-        "  + [3] link:crt1.o\t/lib/x86_64-linux-gnu/crt1.o\tbafkr4ifixturecrt1",
+        "method tools.rustc[LLVM version] changed byte-affecting: ".to_owned(),
+        "  - 22.1.2".to_owned(),
+        "  + 22.1.3".to_owned(),
+        "method nonPathInputs.PATH order order-only unresolved: ".to_owned(),
+        "input link:crt1.o changed unresolved: ".to_owned(),
+        format!(
+            "  + [3] link:crt1.o\t/lib/x86_64-linux-gnu/crt1.o\t{}",
+            fixture_cid("crt1")
+        ),
         "summary: method 2 (byte-affecting 1, key-only 0, unresolved 1); inputs 2 \
-         (byte-affecting 0, key-only 1, unresolved 1)",
+         (byte-affecting 0, key-only 0, unresolved 2)"
+            .to_owned(),
     ] {
         assert!(
-            stdout.lines().any(|l| l.starts_with(line)),
+            stdout.lines().any(|l| l.starts_with(&line)),
             "{line}\n{stdout}"
         );
     }
@@ -231,8 +261,8 @@ fn inputs_diff_two_keys_classifies_each_method_field_and_ordered_input_line() {
 
     // An order-only document pair is reported as such.
     let only_order = this_lines.replace(
-        "link:libm.so\t/usr/lib64/libm.so\tbafkr4ifixturelibm\nlink:libc.so\t/usr/lib64/libc.so\tbafkr4ifixturelibc\n",
-        "link:libc.so\t/usr/lib64/libc.so\tbafkr4ifixturelibc\nlink:libm.so\t/usr/lib64/libm.so\tbafkr4ifixturelibm\n",
+        &format!("{}{}", libm(), libc()),
+        &format!("{}{}", libc(), libm()),
     );
     let reordered = key_of(&this, &only_order);
     store_lines(&b.payload(), reordered.input.cid(), &only_order);
@@ -325,6 +355,76 @@ fn inputs_diff_two_keys_classifies_each_method_field_and_ordered_input_line() {
         .unwrap()
         .iter()
         .any(|d| d["field"] == "flags[--features]" && d["class"] == "byte-affecting"));
+
+    // A carried document is read only as a regular file, never through a symlink or a FIFO,
+    // and never past the document cap.
+    let refused_carry = |prepare: &dyn Fn(&Path)| {
+        let dir = TempDir::new().unwrap();
+        prepare(&dir.path().join(unheld_key.method.to_string()));
+        let out = diff(
+            &["--documents", dir.path().to_str().unwrap()],
+            &this_cid,
+            &unheld_cid,
+        );
+        assert_eq!(out.status.code(), Some(3), "{}", text(&out));
+        text(&out)
+    };
+    let symlinked = refused_carry(&|path| std::os::unix::fs::symlink(&carried, path).unwrap());
+    assert!(symlinked.contains("is a symbolic link"), "{symlinked}");
+    let fifo = refused_carry(&|path| {
+        let made = std::process::Command::new("mkfifo")
+            .arg(path)
+            .status()
+            .unwrap();
+        assert!(made.success());
+    });
+    assert!(fifo.contains("is not a regular file"), "{fifo}");
+    let oversized = refused_carry(&|path| {
+        std::fs::File::create(path)
+            .unwrap()
+            .set_len(8 * 1024 * 1024 + 1)
+            .unwrap();
+    });
+    assert!(oversized.contains("document cap"), "{oversized}");
+
+    // A draw that fails under --partial is kept as the input gap; the held methods still compare.
+    let unfetched_lines = format!("{sibling_lines}extra\t-\n");
+    let unfetched = key_of(&sibling, &unfetched_lines);
+    fold_inputs(
+        &b,
+        &a.key.did_key(),
+        vec![input_record(
+            &unfetched,
+            &a.key.did_key(),
+            "2026-11-08T14:00:00Z",
+            "source",
+        )],
+    );
+    let unfetched_cid = eprfs_peer::key_cid(&unfetched).unwrap().to_string();
+    let fetched = diff(
+        &["--fetch", "--partial", "--json"],
+        &this_cid,
+        &unfetched_cid,
+    );
+    assert_eq!(fetched.status.code(), Some(3), "{}", text(&fetched));
+    let report: serde_json::Value = serde_json::from_slice(&fetched.stdout).unwrap();
+    assert_eq!(report["method"].as_array().unwrap().len(), 2, "{report:#}");
+    assert!(report["inputs"].is_null());
+    let gap = report["missing"][0].as_str().unwrap();
+    assert!(gap.contains("--fetch did not draw it"), "{gap}");
+    let strict = diff(&["--fetch"], &this_cid, &unfetched_cid);
+    assert_eq!(strict.status.code(), Some(3), "{}", text(&strict));
+    assert!(strict.stdout.is_empty());
+
+    // An empty payload directory is no store: the diagnostic leaves it empty.
+    let empty = TempDir::new().unwrap();
+    let blank = diff(
+        &["--payload-store", empty.path().to_str().unwrap()],
+        &this_cid,
+        &sibling_cid,
+    );
+    assert_eq!(blank.status.code(), Some(3), "{}", text(&blank));
+    assert_eq!(std::fs::read_dir(empty.path()).unwrap().count(), 0);
 
     // A key with no record is refused, and --device is not part of the two-key form.
     let absent = BlobCid::compute(b"absent").to_string();
