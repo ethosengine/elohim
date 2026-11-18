@@ -48,15 +48,23 @@ fn probe_until(
     };
     let output = match deadline {
         None => command.output().map_err(ran)?,
-        Some(deadline) => bounded_output(&mut command, deadline)
-            .map_err(ran)?
-            .ok_or_else(|| {
-                ArtifactError::Gap(format!(
+        Some(deadline) => match bounded_output(&mut command, deadline).map_err(ran)? {
+            Bounded::Done(output) => output,
+            Bounded::Expired => {
+                return Err(ArtifactError::Gap(format!(
                     "{} {} exceeded the probe deadline",
                     tool.display(),
                     args.join(" ")
-                ))
-            })?,
+                )))
+            }
+            Bounded::TooLarge => {
+                return Err(ArtifactError::Gap(format!(
+                    "{} {} wrote more than {PROBE_OUTPUT_LIMIT} bytes",
+                    tool.display(),
+                    args.join(" ")
+                )))
+            }
+        },
     };
     if !output.status.success() {
         return Err(ArtifactError::Gap(format!(
@@ -69,58 +77,182 @@ fn probe_until(
     Ok(output)
 }
 
-/// Run `command` to completion or until `deadline`; `None` when the deadline passed. The child
-/// leads its own process group, and the whole group is killed, so a driver's own children (cc1)
-/// cannot keep it alive. Pipe readers are left behind on expiry rather than joined: a descendant
-/// that left the group may still hold a pipe, and this caller must not wait for it.
-fn bounded_output(command: &mut Command, deadline: Instant) -> std::io::Result<Option<Output>> {
+/// Bytes a deadline-bounded probe may write to each of stdout and stderr; gcc's predefined-macro
+/// dump, the largest answer the sysroot probe asks for, is a few tens of KiB.
+const PROBE_OUTPUT_LIMIT: u64 = 4 * 1024 * 1024;
+
+enum Bounded {
+    Done(Output),
+    Expired,
+    TooLarge,
+}
+
+/// Kill the child's whole process group and reap the child without a blocking wait: a few
+/// non-blocking tries, then the process is left to be reaped at exit rather than waited for.
+fn kill_group(child: &mut std::process::Child) {
+    let group = i32::try_from(child.id()).unwrap_or(i32::MAX);
+    // SAFETY: kill(2) takes plain integers and has no memory effects; the group is this child's
+    // own (process_group(0) at spawn). An error (ESRCH: the group is already empty) is benign.
+    unsafe { libc::kill(-group, libc::SIGKILL) };
+    for _ in 0..50 {
+        if !matches!(child.try_wait(), Ok(None)) {
+            return;
+        }
+        std::thread::sleep(Duration::from_millis(2));
+    }
+}
+
+/// Run `command` under one `deadline` covering the child's life AND the drain of its pipes: a
+/// descendant that keeps a pipe open after the child exits cannot hold the caller, because the
+/// readers are never joined, only received from until the deadline. Each pipe's capture is capped
+/// at [`PROBE_OUTPUT_LIMIT`]. The child leads its own process group, and on every exit path the
+/// group is killed, so neither a stuck nor a lingering descendant outlives the probe.
+fn bounded_output(command: &mut Command, deadline: Instant) -> std::io::Result<Bounded> {
     use std::os::unix::process::CommandExt;
+    use std::sync::mpsc;
     let mut child = command
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .process_group(0)
         .spawn()?;
-    let reader = |pipe: Option<Box<dyn Read + Send>>| {
+    let (sender, received) = mpsc::channel::<(bool, Vec<u8>, bool)>();
+    let pipes: [(bool, Option<Box<dyn Read + Send>>); 2] = [
+        (true, child.stdout.take().map(|p| Box::new(p) as _)),
+        (false, child.stderr.take().map(|p| Box::new(p) as _)),
+    ];
+    for (is_stdout, pipe) in pipes {
+        let sender = sender.clone();
         std::thread::spawn(move || {
             let mut bytes = Vec::new();
-            if let Some(mut pipe) = pipe {
+            if let Some(pipe) = pipe {
                 // A read error ends the capture; the exit status still decides the probe.
-                let _ = pipe.read_to_end(&mut bytes);
+                let _ = pipe.take(PROBE_OUTPUT_LIMIT + 1).read_to_end(&mut bytes);
             }
-            bytes
-        })
-    };
-    let stdout = reader(
-        child
-            .stdout
-            .take()
-            .map(|p| Box::new(p) as Box<dyn Read + Send>),
-    );
-    let stderr = reader(
-        child
-            .stderr
-            .take()
-            .map(|p| Box::new(p) as Box<dyn Read + Send>),
-    );
+            let over = bytes.len() as u64 > PROBE_OUTPUT_LIMIT;
+            // The receiver may have given up at its deadline; nothing waits for this send.
+            let _ = sender.send((is_stdout, bytes, over));
+        });
+    }
+    drop(sender);
     let status = loop {
         if let Some(status) = child.try_wait()? {
             break status;
         }
         if Instant::now() >= deadline {
-            let group = i32::try_from(child.id()).unwrap_or(i32::MAX);
-            // SAFETY: kill(2) takes plain integers; the group is this child's own, created by
-            // process_group(0) above, so no unrelated process is signalled.
-            unsafe { libc::kill(-group, libc::SIGKILL) };
-            let _ = child.wait();
-            return Ok(None);
+            kill_group(&mut child);
+            return Ok(Bounded::Expired);
         }
         std::thread::sleep(Duration::from_millis(2));
     };
-    Ok(Some(Output {
+    let (mut stdout, mut stderr) = (None, None);
+    while stdout.is_none() || stderr.is_none() {
+        let left = deadline.saturating_duration_since(Instant::now());
+        match received.recv_timeout(left) {
+            Ok((_, _, true)) => {
+                kill_group(&mut child);
+                return Ok(Bounded::TooLarge);
+            }
+            Ok((true, bytes, false)) => stdout = Some(bytes),
+            Ok((false, bytes, false)) => stderr = Some(bytes),
+            Err(mpsc::RecvTimeoutError::Timeout) => {
+                kill_group(&mut child);
+                return Ok(Bounded::Expired);
+            }
+            Err(mpsc::RecvTimeoutError::Disconnected) => break,
+        }
+    }
+    // The child is reaped; kill whatever of its group lingers, holding no pipe.
+    kill_group(&mut child);
+    Ok(Bounded::Done(Output {
         status,
-        stdout: stdout.join().unwrap_or_default(),
-        stderr: stderr.join().unwrap_or_default(),
+        stdout: stdout.unwrap_or_default(),
+        stderr: stderr.unwrap_or_default(),
     }))
+}
+
+/// Limits on the files the sysroot probe and its re-check read: one wall-clock deadline (shared
+/// with the probe's children), a per-file size and a total over all files.
+pub(crate) struct ReadBudget {
+    pub deadline: Instant,
+    pub per_file: u64,
+    pub remaining: u64,
+}
+
+/// libc.so.6 is a few MiB and libgcc.a under ten; nothing the sysroot names approaches this.
+pub(crate) const SYSROOT_FILE_LIMIT: u64 = 64 * 1024 * 1024;
+/// Over every file one observation reads: a few times the real sum (about 20 MiB here).
+pub(crate) const SYSROOT_TOTAL_LIMIT: u64 = 256 * 1024 * 1024;
+
+/// Why a bounded read did not return bytes: the file is gone (a change, for the re-check), or
+/// it is outside the bounds (the observation cannot be made).
+enum ReadRefused {
+    Missing,
+    Outside(String),
+}
+
+/// Read `file` within `budget`: the last component is never followed, the open never blocks on a
+/// FIFO or device, only a regular file within the per-file and remaining bytes is read, and the
+/// deadline is checked before the open and between chunks.
+fn bounded_read(file: &Path, budget: &mut ReadBudget) -> Result<Vec<u8>, ReadRefused> {
+    use std::os::unix::fs::OpenOptionsExt;
+    let expired = || {
+        ReadRefused::Outside(format!(
+            "reading {} exceeded the probe deadline",
+            file.display()
+        ))
+    };
+    if Instant::now() >= budget.deadline {
+        return Err(expired());
+    }
+    let handle = match std::fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK)
+        .open(file)
+    {
+        Ok(handle) => handle,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Err(ReadRefused::Missing),
+        Err(e) => return Err(ReadRefused::Outside(format!("{}: {e}", file.display()))),
+    };
+    let meta = handle
+        .metadata()
+        .map_err(|e| ReadRefused::Outside(format!("{}: {e}", file.display())))?;
+    if !meta.is_file() {
+        return Err(ReadRefused::Outside(format!(
+            "{} is not a regular file",
+            file.display()
+        )));
+    }
+    let limit = budget.per_file.min(budget.remaining);
+    if meta.len() > limit {
+        return Err(ReadRefused::Outside(format!(
+            "{} is {} bytes, over the {limit}-byte read bound",
+            file.display(),
+            meta.len()
+        )));
+    }
+    let mut bytes = Vec::new();
+    let mut handle = handle.take(limit + 1);
+    let mut chunk = vec![0u8; 1024 * 1024];
+    loop {
+        if Instant::now() >= budget.deadline {
+            return Err(expired());
+        }
+        let read = handle
+            .read(&mut chunk)
+            .map_err(|e| ReadRefused::Outside(format!("{}: {e}", file.display())))?;
+        if read == 0 {
+            break;
+        }
+        bytes.extend_from_slice(&chunk[..read]);
+    }
+    if bytes.len() as u64 > limit {
+        return Err(ReadRefused::Outside(format!(
+            "{} grew past the {limit}-byte read bound",
+            file.display()
+        )));
+    }
+    budget.remaining -= bytes.len() as u64;
+    Ok(bytes)
 }
 
 fn output_bytes(output: Output) -> Vec<u8> {
@@ -165,7 +297,16 @@ fn driver_defaults(
     Ok(())
 }
 
-fn link_input(lines: &mut String, label: &str, file: &Path, depth: usize) -> ArtifactResult<()> {
+/// Content-address one link input, and the referents of a GNU ld script. With a `budget` (the
+/// sysroot probe) every read is bounded by it ([`bounded_read`]); without one (the artifact key)
+/// files are read as before.
+fn link_input(
+    lines: &mut String,
+    label: &str,
+    file: &Path,
+    depth: usize,
+    mut budget: Option<&mut ReadBudget>,
+) -> ArtifactResult<()> {
     if depth > 4 {
         return Err(ArtifactError::Gap(format!(
             "link input {label}: linker script recursion exceeds depth 4"
@@ -177,12 +318,21 @@ fn link_input(lines: &mut String, label: &str, file: &Path, depth: usize) -> Art
             file.display()
         ))
     })?;
-    let bytes = std::fs::read(&resolved).map_err(|e| {
-        ArtifactError::Gap(format!(
-            "link input {label} at {} does not read: {e}",
-            resolved.display()
-        ))
-    })?;
+    let bytes = match budget.as_deref_mut() {
+        Some(budget) => bounded_read(&resolved, budget).map_err(|refused| match refused {
+            ReadRefused::Missing => ArtifactError::Gap(format!(
+                "link input {label} at {} does not read: missing",
+                resolved.display()
+            )),
+            ReadRefused::Outside(why) => ArtifactError::Gap(why),
+        })?,
+        None => std::fs::read(&resolved).map_err(|e| {
+            ArtifactError::Gap(format!(
+                "link input {label} at {} does not read: {e}",
+                resolved.display()
+            ))
+        })?,
+    };
     lines.push_str(&format!(
         "link:{label}\t{}\t{}\n",
         resolved.display(),
@@ -212,6 +362,7 @@ fn link_input(lines: &mut String, label: &str, file: &Path, depth: usize) -> Art
                     &format!("{label}>{referent}"),
                     Path::new(referent),
                     depth + 1,
+                    budget.as_deref_mut(),
                 )?;
             }
         }
@@ -247,7 +398,7 @@ pub(super) fn tool_lines(
         driver_defaults(&mut lines, "link-driver", driver, path, None)?;
         for input in DRIVER_INPUTS {
             if let Some(file) = native_libraries::driver_file(driver, input, path, None)? {
-                link_input(&mut lines, input, Path::new(&file), 0)?;
+                link_input(&mut lines, input, Path::new(&file), 0, None)?;
             } else {
                 lines.push_str(&format!("link:{input}\t-\n"));
             }
@@ -255,11 +406,11 @@ pub(super) fn tool_lines(
         for name in native_libraries::probe(descriptor, path)? {
             let shared = format!("lib{name}.so");
             if let Some(file) = native_libraries::driver_file(driver, &shared, path, None)? {
-                link_input(&mut lines, &shared, Path::new(&file), 0)?;
+                link_input(&mut lines, &shared, Path::new(&file), 0, None)?;
             } else {
                 let archive = format!("lib{name}.a");
                 if let Some(file) = native_libraries::driver_file(driver, &archive, path, None)? {
-                    link_input(&mut lines, &archive, Path::new(&file), 0)?;
+                    link_input(&mut lines, &archive, Path::new(&file), 0, None)?;
                 } else {
                     lines.push_str(&format!("link:lib{name}\t-\n"));
                 }
@@ -306,49 +457,161 @@ const SYSROOT_LIBRARIES: [&str; 3] = ["libc.so", "libm.so", "libgcc_s.so"];
 /// driver `cc` under `path` (canonical path, `--version` digest, predefined-macro digest), then
 /// each of [`DRIVER_INPUTS`] and [`SYSROOT_LIBRARIES`] as `cc -print-file-name` resolves it,
 /// content-addressed through any linker script. Sorted; absolute canonical paths as the key's
-/// input document spells them. Every child is killed at `deadline`.
+/// input document spells them. One `deadline` covers every child, its pipes and every file read;
+/// files are bounded by [`SYSROOT_FILE_LIMIT`] and [`SYSROOT_TOTAL_LIMIT`].
 ///
 /// What it does NOT see: a same-path gcc rebuild whose `--version` output, predefined macros and
 /// selected inputs are unchanged (cc1, collect2, as and ld are not hashed, nor is the gcc binary
-/// itself); libraries outside these lists, including any a Rust build adds; header files.
+/// itself); libraries outside these lists, including any a Rust build adds; header files; linker
+/// script operands that are not absolute paths.
 pub(crate) fn sysroot_lines(path: &str, deadline: Instant) -> ArtifactResult<Vec<String>> {
+    sysroot_lines_within(
+        path,
+        &mut ReadBudget {
+            deadline,
+            per_file: SYSROOT_FILE_LIMIT,
+            remaining: SYSROOT_TOTAL_LIMIT,
+        },
+    )
+}
+
+fn sysroot_lines_within(path: &str, budget: &mut ReadBudget) -> ArtifactResult<Vec<String>> {
+    let deadline = Some(budget.deadline);
     let driver = resolve_tool("cc", path)
         .ok_or_else(|| ArtifactError::Gap("no C link driver cc under PATH".into()))?;
     let mut lines = String::new();
-    tool_version(&mut lines, "link-driver", &driver, path, Some(deadline))?;
-    driver_defaults(&mut lines, "link-driver", &driver, path, Some(deadline))?;
+    tool_version(&mut lines, "link-driver", &driver, path, deadline)?;
+    driver_defaults(&mut lines, "link-driver", &driver, path, deadline)?;
     for input in DRIVER_INPUTS.iter().chain(SYSROOT_LIBRARIES.iter()) {
-        match native_libraries::driver_file(&driver, input, path, Some(deadline))? {
-            Some(file) => link_input(&mut lines, input, Path::new(&file), 0)?,
+        match native_libraries::driver_file(&driver, input, path, deadline)? {
+            Some(file) => link_input(&mut lines, input, Path::new(&file), 0, Some(&mut *budget))?,
             None => lines.push_str(&format!("link:{input}\t-\n")),
         }
     }
     let mut lines: Vec<String> = lines.lines().map(str::to_owned).collect();
     lines.sort_unstable();
+    check_sysroot_lines(&lines).map_err(ArtifactError::Gap)?;
     Ok(lines)
 }
 
-/// Re-check recorded [`sysroot_lines`] without running any program: every `link:` file is read
-/// and content-addressed again, and every `tool:` path must still be a file. Returns the labels
-/// that differ. A cheap, partial check: a driver whose output changed at the same path, or an
-/// input recorded as absent that has since appeared, is only seen by a full observation.
-pub(crate) fn sysroot_drift(lines: &[String]) -> Vec<String> {
+/// More lines than a sysroot observation can emit (two driver lines, eleven inputs, a few
+/// linker-script referents each).
+const SYSROOT_LINES_LIMIT: usize = 64;
+
+/// An absolute path with no `.`/`..` components.
+fn clean_absolute(path: &str) -> bool {
+    path.starts_with('/')
+        && Path::new(path).components().all(|c| {
+            matches!(
+                c,
+                std::path::Component::RootDir | std::path::Component::Normal(_)
+            )
+        })
+}
+
+/// `link:<input>` with `<input>` one the probe asks for, followed by zero or more
+/// `><absolute path>` linker-script referents.
+fn sysroot_link_label(label: &str) -> bool {
+    let Some(rest) = label.strip_prefix("link:") else {
+        return false;
+    };
+    let mut parts = rest.split('>');
+    let input = parts.next().unwrap_or_default();
+    DRIVER_INPUTS
+        .iter()
+        .chain(SYSROOT_LIBRARIES.iter())
+        .any(|known| *known == input)
+        && parts.all(clean_absolute)
+}
+
+/// The grammar of [`sysroot_lines`]: sorted and unique; each line either `link:<input>\t-` (not
+/// found) or `<label>\t<absolute path>\t<CID>` with a label the probe emits; at least the driver
+/// line and one link input with a path. A record read from disk is checked against it before
+/// any path in it is used.
+pub(crate) fn check_sysroot_lines(lines: &[String]) -> Result<(), String> {
+    if lines.len() > SYSROOT_LINES_LIMIT {
+        return Err(format!(
+            "{} lines, more than a sysroot observation emits",
+            lines.len()
+        ));
+    }
+    let (mut driver, mut linked) = (false, false);
+    for (index, line) in lines.iter().enumerate() {
+        let fields: Vec<&str> = line.split('\t').collect();
+        let valid = match fields[..] {
+            [label, "-"] => sysroot_link_label(label) && !label.contains('>'),
+            [label, path, cid] if clean_absolute(path) && BlobCid::parse(cid).is_ok() => {
+                if label == "tool:link-driver" {
+                    driver = true;
+                    true
+                } else if label == "tool:link-driver:target" {
+                    true
+                } else {
+                    let ok = sysroot_link_label(label);
+                    linked |= ok;
+                    ok
+                }
+            }
+            _ => false,
+        };
+        if !valid {
+            return Err(format!("line {} is not a sysroot identity line", index + 1));
+        }
+    }
+    if !lines.windows(2).all(|pair| pair[0] < pair[1]) {
+        return Err("lines are not sorted and unique".into());
+    }
+    if !driver || !linked {
+        return Err("no driver line or no link input with a path".into());
+    }
+    Ok(())
+}
+
+/// Re-check recorded [`sysroot_lines`] without running any program, within one `deadline` and
+/// the same per-file and total read bounds: the lines are checked against the grammar first,
+/// then every `link:` file is read and content-addressed again and every `tool:` path must still
+/// be a regular file at its canonical path. Returns the labels that changed (a file now missing
+/// or no longer at its canonical path is a change); `Err` when the check cannot be made (bad
+/// grammar, a file outside the bounds, the deadline). A cheap, partial check: a driver whose
+/// output changed at the same path, or an input recorded as absent that has since appeared, is
+/// only seen by a full observation.
+pub(crate) fn sysroot_drift(lines: &[String], deadline: Instant) -> Result<Vec<String>, String> {
+    sysroot_drift_within(
+        lines,
+        &mut ReadBudget {
+            deadline,
+            per_file: SYSROOT_FILE_LIMIT,
+            remaining: SYSROOT_TOTAL_LIMIT,
+        },
+    )
+}
+
+fn sysroot_drift_within(lines: &[String], budget: &mut ReadBudget) -> Result<Vec<String>, String> {
+    check_sysroot_lines(lines)?;
     let mut drifted = Vec::new();
     for line in lines {
         let fields: Vec<&str> = line.split('\t').collect();
         let [label, file, cid] = fields[..] else {
             continue;
         };
-        let same = if label.starts_with("tool:") {
-            Path::new(file).is_file()
+        let path = Path::new(file);
+        // A recorded path is canonical; one that no longer resolves to itself has moved.
+        let same = if std::fs::canonicalize(path).ok().as_deref() != Some(path) {
+            false
+        } else if label.starts_with("tool:") {
+            std::fs::symlink_metadata(path).is_ok_and(|meta| meta.is_file())
         } else {
-            std::fs::read(file).is_ok_and(|bytes| BlobCid::compute_bytes(&bytes).to_string() == cid)
+            match bounded_read(path, budget) {
+                Ok(bytes) => BlobCid::compute_bytes(&bytes).to_string() == cid,
+                Err(ReadRefused::Missing) => false,
+                Err(ReadRefused::Outside(why)) => return Err(why),
+            }
         };
         if !same {
             drifted.push(label.to_owned());
         }
     }
-    drifted
+    Ok(drifted)
 }
 
 fn linker_identity(text: &str) -> Option<(&str, &str)> {
@@ -723,8 +986,9 @@ mod tests {
                 format!(
                     "#!/bin/sh\ncase \"$1\" in\n  -print-file-name=*) n=\"${{1#-print-file-name=}}\"; \
                      if [ -e '{lib}'/\"$n\" ]; then echo '{lib}'/\"$n\"; else echo \"$n\"; fi ;;\n  \
-                     --version) echo '{body}' ;;\n  *) {body_macros} ;;\nesac\n",
+                     --version) echo '{version}' ;;\n  *) {body_macros} ;;\nesac\n",
                     lib = self.lib().display(),
+                    version = if body.starts_with("sleep_ ") { "cc 14 (stalling)" } else { body },
                     // `sleep_ <command>` makes every probe but `--version` run <command>.
                     body_macros = body
                         .strip_prefix("sleep_ ")
@@ -749,6 +1013,17 @@ mod tests {
         fn lines(&self, path: &str) -> Vec<String> {
             sysroot_lines(path, Instant::now() + Duration::from_secs(20)).unwrap()
         }
+    }
+
+    fn drift(lines: &[String]) -> Vec<String> {
+        sysroot_drift(lines, Instant::now() + Duration::from_secs(20)).unwrap()
+    }
+
+    fn sleep_bin() -> &'static str {
+        ["/usr/bin/sleep", "/bin/sleep"]
+            .into_iter()
+            .find(|p| Path::new(p).exists())
+            .unwrap()
     }
 
     /// The identity names the driver and its inputs by canonical path and content: PATH order,
@@ -783,24 +1058,21 @@ mod tests {
             .any(|l| l.starts_with(&format!("link:libc.so>{lib}/libc.so.6\t{real}/libc.so.6\t"))));
         assert!(first.contains(&"link:libgcc_s.so\t-".to_owned()));
         assert!(first.iter().all(|l| !l.contains("rustc")));
-        assert!(sysroot_drift(&first).is_empty());
+        assert!(drift(&first).is_empty());
 
         fake.put("libc.so.6", b"\x7fELF libc 2.40");
         let libc = fake.lines(&a);
         assert_ne!(libc, first);
-        assert_eq!(
-            sysroot_drift(&first),
-            vec![format!("link:libc.so>{lib}/libc.so.6")]
-        );
+        assert_eq!(drift(&first), vec![format!("link:libc.so>{lib}/libc.so.6")]);
         fake.put("crt1.o", b"another crt1");
         assert_ne!(fake.lines(&a), libc);
-        assert!(sysroot_drift(&libc).contains(&"link:crt1.o".to_owned()));
+        assert!(drift(&libc).contains(&"link:crt1.o".to_owned()));
         // A driver whose output changes at the same path moves the identity, but only a full
         // observation sees it: the cheap re-check runs no program.
         let before = fake.lines(&a);
         fake.driver("cc 14.3.2");
         assert_ne!(fake.lines(&a), before);
-        assert!(sysroot_drift(&before).is_empty());
+        assert!(drift(&before).is_empty());
         let empty = fake.root.path().join("empty").display().to_string();
         assert!(
             sysroot_lines(&empty, Instant::now() + Duration::from_secs(5))
@@ -810,27 +1082,141 @@ mod tests {
         );
     }
 
-    /// A driver that never answers is killed at the deadline instead of holding the caller.
+    /// One deadline covers the child and its pipes: a driver that EXITS while a descendant keeps
+    /// the pipe open, and a driver that never exits, are both cut off at the deadline, and the
+    /// descendant is killed with the group rather than left running.
     #[test]
-    fn sysroot_probe_kills_a_driver_that_overruns_its_deadline() {
+    fn sysroot_probe_deadline_covers_a_descendant_holding_the_pipe() {
         let fake = FakeSysroot::new();
         let a = fake.bin("a");
-        // The probe clears PATH to the fake's; the sleeper is a grandchild holding the pipes.
-        let sleep = ["/usr/bin/sleep", "/bin/sleep"]
+        let marker = fake.root.path().join("descendant.pid");
+        for body in [
+            // The driver exits at once; its background child holds stdout and stderr open.
+            format!(
+                "sleep_ /bin/sh -c 'echo $$ > {}; exec {} 30' & exit 0",
+                marker.display(),
+                sleep_bin()
+            ),
+            // The driver itself waits on the sleeper.
+            format!("sleep_ {} 30; true", sleep_bin()),
+        ] {
+            fake.driver(&body);
+            let started = Instant::now();
+            let error = sysroot_lines(&a, Instant::now() + Duration::from_millis(300)).unwrap_err();
+            let elapsed = started.elapsed();
+            assert!(
+                error.to_string().contains("exceeded the probe deadline"),
+                "{body}: {error}"
+            );
+            assert!(elapsed < Duration::from_secs(3), "{body}: {elapsed:?}");
+        }
+        // The exiting driver's descendant was killed with its process group.
+        let pid: i32 = std::fs::read_to_string(&marker)
+            .unwrap()
+            .trim()
+            .parse()
+            .unwrap();
+        let gone = (0..100).any(|_| {
+            std::thread::sleep(Duration::from_millis(10));
+            !Path::new(&format!("/proc/{pid}")).exists()
+                || std::fs::read_to_string(format!("/proc/{pid}/stat"))
+                    .is_ok_and(|stat| stat.contains(") Z "))
+        });
+        assert!(gone, "descendant {pid} outlived the probe");
+    }
+
+    /// A probe's captured output is capped; a driver that floods its pipe is refused.
+    #[test]
+    fn sysroot_probe_output_is_capped() {
+        let fake = FakeSysroot::new();
+        let a = fake.bin("a");
+        let head = ["/usr/bin/head", "/bin/head"]
             .into_iter()
             .find(|p| Path::new(p).exists())
             .unwrap();
-        fake.driver(&format!("sleep_ {sleep} 30; true"));
-        let started = Instant::now();
-        let error = sysroot_lines(&a, Instant::now() + Duration::from_millis(300)).unwrap_err();
-        assert!(
-            error.to_string().contains("exceeded the probe deadline"),
-            "{error}"
+        fake.driver(&format!(
+            "sleep_ {head} -c {} /dev/zero",
+            PROBE_OUTPUT_LIMIT + 1
+        ));
+        let error = sysroot_lines(&a, Instant::now() + Duration::from_secs(20)).unwrap_err();
+        assert!(error.to_string().contains("wrote more than"), "{error}");
+    }
+
+    /// Files are read within the per-file and total bounds, never through a link or from a
+    /// non-regular file, for the probe and for the re-check alike.
+    #[test]
+    fn sysroot_reads_are_bounded_per_file_and_in_total() {
+        let fake = FakeSysroot::new();
+        let a = fake.bin("a");
+        let lines = fake.lines(&a);
+        let budget = |per_file, remaining| ReadBudget {
+            deadline: Instant::now() + Duration::from_secs(20),
+            per_file,
+            remaining,
+        };
+        let large = sysroot_lines_within(&a, &mut budget(8, SYSROOT_TOTAL_LIMIT)).unwrap_err();
+        assert!(large.to_string().contains("read bound"), "{large}");
+        let total = sysroot_lines_within(&a, &mut budget(SYSROOT_FILE_LIMIT, 40)).unwrap_err();
+        assert!(total.to_string().contains("read bound"), "{total}");
+        let recheck = sysroot_drift_within(&lines, &mut budget(8, SYSROOT_TOTAL_LIMIT));
+        assert!(recheck.unwrap_err().contains("read bound"));
+        let expired = sysroot_drift_within(
+            &lines,
+            &mut ReadBudget {
+                deadline: Instant::now(),
+                per_file: SYSROOT_FILE_LIMIT,
+                remaining: SYSROOT_TOTAL_LIMIT,
+            },
         );
+        assert!(expired.unwrap_err().contains("exceeded the probe deadline"));
+        // A FIFO in place of a recorded file is outside the bounds: not read, never waited on.
+        let crt = fake.lib().join("crt1.o");
+        std::fs::remove_file(&crt).unwrap();
+        assert!(std::process::Command::new("mkfifo")
+            .arg(&crt)
+            .status()
+            .unwrap()
+            .success());
+        let fifo = sysroot_drift(&lines, Instant::now() + Duration::from_secs(20));
+        assert!(fifo.unwrap_err().contains("not a regular file"));
+        // A file that is gone is a change, not an error.
+        std::fs::remove_file(&crt).unwrap();
+        assert_eq!(drift(&lines), vec!["link:crt1.o".to_owned()]);
+    }
+
+    /// The re-check refuses a recorded line outside the probe's grammar before using any path.
+    #[test]
+    fn sysroot_recorded_lines_must_match_the_probe_grammar() {
+        let fake = FakeSysroot::new();
+        let lines = fake.lines(&fake.bin("a"));
+        assert!(check_sysroot_lines(&lines).is_ok());
+        let cid = BlobCid::compute_bytes(b"x").to_string();
+        let driver = format!("tool:link-driver\t/usr/bin/gcc\t{cid}");
+        let with = |extra: &str| {
+            let mut lines = vec![driver.clone(), extra.to_owned()];
+            lines.sort();
+            lines
+        };
         assert!(
-            started.elapsed() < Duration::from_secs(10),
-            "{:?}",
-            started.elapsed()
+            check_sysroot_lines(&with(&format!("link:crt1.o\t/usr/lib/crt1.o\t{cid}"))).is_ok()
         );
+        for bad in [
+            format!("link:crt1.o\tusr/lib/crt1.o\t{cid}"),
+            format!("link:crt1.o\t/usr/lib/../../etc/shadow\t{cid}"),
+            format!("link:secret\t/etc/shadow\t{cid}"),
+            format!("link:libc.so>etc/x\t/usr/lib/x\t{cid}"),
+            "link:crt1.o\t/usr/lib/crt1.o\tnot-a-cid".to_owned(),
+            "link:crt1.o\t/usr/lib/crt1.o".to_owned(),
+            "link:libc.so>/x\t-".to_owned(),
+            format!("link:crt1.o\t/usr/lib/crt1.o\t{cid}\textra"),
+        ] {
+            assert!(check_sysroot_lines(&with(&bad)).is_err(), "{bad}");
+        }
+        // No driver line, no link line with a path, nothing at all, or unsorted: refused.
+        let link = format!("link:crt1.o\t/usr/lib/crt1.o\t{cid}");
+        assert!(check_sysroot_lines(std::slice::from_ref(&link)).is_err());
+        assert!(check_sysroot_lines(&with("link:crt1.o\t-")).is_err());
+        assert!(check_sysroot_lines(&[]).is_err());
+        assert!(check_sysroot_lines(&[driver, link]).is_err());
     }
 }
