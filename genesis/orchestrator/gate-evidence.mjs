@@ -26,7 +26,7 @@ import { spawnSync } from 'child_process';
 import { createHash, createPrivateKey, createPublicKey } from 'crypto';
 import { accessSync, constants, readFileSync } from 'fs';
 import { basename, delimiter, dirname, isAbsolute, join, relative, resolve } from 'path';
-import { globCovers, isReadPattern, readSet } from './gate-input-audit.mjs';
+import { UNAUDITED_RECIPE_PROJECTS, globCovers, isReadPattern, readSet } from './gate-input-audit.mjs';
 import { buildNotesRef, expectedRefusal, heldNotes, noteEpoch, readBuildNote, unverifiableNotes } from './scripts/brit-attest.mjs';
 
 /** The attestation step name a gate PROJECT writes under: one closure per project, not per manifest step. */
@@ -194,7 +194,7 @@ function stepSources(project, root, commit, spawn) {
 const readSets = new Map();
 
 function readSetAt(project, root, commit, sources, tree, spawn) {
-  if (!project.run.cargo || !sources) return null;
+  if (!project.run.cargo || !sources || UNAUDITED_RECIPE_PROJECTS.includes(project.name)) return null;
   const key = JSON.stringify([resolve(root), project.name, commit, tree]);
   if (readSets.has(key)) return readSets.get(key);
   try {

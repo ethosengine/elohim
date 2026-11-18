@@ -19,7 +19,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadGateRegistry } from './pipeline-registry.mjs';
-import { globCovers, readSet } from './gate-input-audit.mjs';
+import { UNAUDITED_RECIPE_PROJECTS, globCovers, readSet } from './gate-input-audit.mjs';
 import { dirtyPaths } from './gate-evidence.mjs';
 import { appendEvent } from './gate-live.mjs';
 
@@ -357,8 +357,10 @@ export function checkEvidenceRecordable({ root, projects, env = process.env, reu
     let paths;
     try {
       // Mirror the closure key (gate-evidence.mjs readSetAt): every cargo project is keyed on its
-      // named reads when it has no unresolved one; only a non-cargo gate keys on the whole tree.
-      const result = NAMED_READ_SET_PROJECTS.includes(project.name) || project.run?.cargo
+      // named reads when it has no unresolved one; a non-cargo gate, and a project whose recipe
+      // runs tests the audit cannot read (UNAUDITED_RECIPE_PROJECTS), keys on the whole tree.
+      const result = (NAMED_READ_SET_PROJECTS.includes(project.name) || project.run?.cargo)
+        && !UNAUDITED_RECIPE_PROJECTS.includes(project.name)
         ? read({ root, project, sources: sourcesOf(root, project) }) : null;
       const reads = result && result.unresolved.length === 0 && !result.paths.includes('.')
         ? { scope: 'paths', oids: result.paths.map(path => ({ path })) }

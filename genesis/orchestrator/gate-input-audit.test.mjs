@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync, readdirSync } from 'fs';
 import { dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
-import { auditProject, declarationScopes, declarationsIn, exhaustInputs, globCovers, isReadPattern, readCovers, readSet } from './gate-input-audit.mjs';
+import { UNAUDITED_RECIPE_PROJECTS, auditProject, declarationScopes, declarationsIn, exhaustInputs, globCovers, isReadPattern, readCovers, readSet } from './gate-input-audit.mjs';
 import { GATE_EXHAUST } from './gate-evidence.mjs';
 import { NAMED_READ_SET_PROJECTS } from './gate-preflight.mjs';
 import { loadGateRegistry } from './pipeline-registry.mjs';
@@ -438,6 +438,13 @@ test('Rust files outside the declared sources are not scanned', () => {
   }), []);
 });
 
+function realSources(name) {
+  const repo = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
+  const project = loadGateRegistry(repo).get(name);
+  const manifest = JSON.parse(readFileSync(resolve(repo, project.manifestPath), 'utf8'));
+  return [...new Set(project.steps.flatMap(step => manifest.steps[step].inputs.sources))];
+}
+
 function realReadSet(name) {
   const repo = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
   const project = loadGateRegistry(repo).get(name);
@@ -623,3 +630,17 @@ for (const [name, own, files] of [
     for (const file of files) assert.ok(result.paths.some(read => readCovers(read, file)), `${name}: ${file}`);
   });
 }
+
+test('E9 REAL: orchestrator keys on the whole tree because its suite reads what neither its sources nor its Rust reads cover', () => {
+  // gate-evidence readSetAt and the preflight's evidence row both return tree scope for it.
+  assert.ok(UNAUDITED_RECIPE_PROJECTS.includes('orchestrator'));
+  const repo = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
+  const schema = 'elohim/sdk/schemas/v1/gate-live-event.schema.json';
+  const suite = JSON.parse(readFileSync(resolve(repo, 'genesis/orchestrator/package.json'), 'utf8')).scripts.test;
+  assert.match(suite, /gate-live-schema\.test\.mjs/);
+  assert.match(readFileSync(resolve(repo, 'genesis/orchestrator/gate-live-schema.test.mjs'), 'utf8'), /gate-live-event\.schema\.json/);
+  const sources = realSources('orchestrator');
+  assert.ok(!sources.some(glob => globCovers(glob, schema)), 'not a step source');
+  const own = readSet({ root: repo, project: loadGateRegistry(repo).get('orchestrator'), sources: ['genesis/orchestrator/**'] });
+  assert.ok(!own.paths.some(read => readCovers(read, schema)), 'not a Rust read of its own: only the whole tree keys it');
+});

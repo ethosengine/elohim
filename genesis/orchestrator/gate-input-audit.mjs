@@ -14,6 +14,17 @@ import { loadGateRegistry } from './pipeline-registry.mjs';
  * is exactly `<name>` (for example every `.epr-meta` manifest). It is the only wildcard a
  * gate-reads declaration may carry; it lets a walk over one file kind leave tree scope.
  */
+/**
+ * Gate projects whose recipe runs tests this audit cannot read (it scans Rust only): their closure
+ * keys on the whole commit tree, whatever Rust read set their cargo workspace has. E9 (review of
+ * E7): orchestrator declares the eprfs workspace only to build its EPR_BIN, while its recipe runs a
+ * node, python and shell suite whose reads span the repository (every build-manifest.json through the
+ * registry tests, every .rs through the REAL read-set tests, .husky, scripts/ci, genesis/scripts/ci,
+ * app/elohim-app/scripts/__tests__, ...); keyed on eprfs's Rust reads, a change to one of them could
+ * reuse a green the suite never judged.
+ */
+export const UNAUDITED_RECIPE_PROJECTS = Object.freeze(['orchestrator']);
+
 export function isReadPattern(path) {
   return /^\*\*\/[^/*\\]+$/.test(path);
 }
