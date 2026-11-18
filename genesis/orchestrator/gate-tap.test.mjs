@@ -336,4 +336,21 @@ describe('gate-tap sibling notes', () => {
     assert.equal(left.stdout.trim(), '', 'no berth process outlives its deadline');
     assert.deepEqual(says(hung.dir), [], 'the hung say never wrote');
   });
+
+  test('a gate that exits red with no recognized failure line still sends one red (DoD-4 receipt)', async t => {
+    const { dir, runPath, env } = setup(t);
+    // A Gherkin parse error prints nothing the recognizer knows; just names the failed recipe.
+    const script = "echo '(6:1): expected: #EOF, got Feature: a second feature'; echo 'error: Recipe `_gate-x` failed on line 3 with exit code 1' >&2; exit 1";
+    const { result } = runTap(env, runPath, script);
+    assert.equal(result.status, 1);
+    const events = readFileSync(runPath, 'utf8').split('\n').filter(Boolean).map(l => JSON.parse(l));
+    assert.equal(events.filter(e => e.kind === 'step-failed').length, 1);
+    const failures = events.filter(e => e.kind === 'failure');
+    assert.equal(failures.length, 1, 'one stand-in failure for the unrecognized red');
+    assert.equal(failures[0].failure.class, 'step');
+    await wait(dir, 1);
+    const red = says(dir).map(line => JSON.parse(line.slice(line.indexOf('{')))).find(b => b.kind === 'gate-red@1');
+    assert.ok(red, says(dir).join('\n'));
+    assert.equal(red.class, 'step');
+  });
 });

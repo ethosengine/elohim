@@ -895,7 +895,14 @@ async function subscribersFor(path, env) {
   const session = open.session || env.ELOHIM_SESSION_ID || null;
   if (!session) return null;
   const [did, notes] = await Promise.all([deviceDid({ env }), peekNotes(session, { env })]);
-  if (!did || !notes) return null;
+  // A discovery that cannot run is named in the run log; no subscriber at all is the quiet norm.
+  if (!did || !notes) {
+    appendEvent(path, {
+      kind: 'sibling-delivery', ok: false,
+      why: !did ? 'no device id (GATE_LIVE_DEVICE unset and epr peer leases unanswered)' : 'berth inbox unreadable',
+    });
+    return null;
+  }
   const ref = open.ref || env.GATE_LIVE_REF || null;
   return { session, did, ref, subscribers: matchSubscriptions(notes, { did, ref }) };
 }
