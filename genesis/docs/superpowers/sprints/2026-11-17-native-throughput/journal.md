@@ -416,7 +416,21 @@ libc with no numeric need still refuses. The reviewer checked the binaries the d
 exchange: each keeps its floor. The sysroot status line is in a third round (arrival could
 hang on a pipe held by a descendant; status trusted paths in its own record).
 
-### Definition of done, as of 2026-11-18 17:00Z
+**E9 and the sysroot line (18:30Z).** Ethosengine landed E9 at `1bb6d1c90` (799 s push): the
+embedding model manifest, 26 cite targets (an undeclared one fails the leg) and doorway's
+schema path are keyed where the code lives, and the orchestrator is keyed on the whole tree
+because its Node, Python and shell suite was never audited and reads 171 paths outside its
+sources. The cost showed in that push: the orchestrator ran 182 s where earlier landings
+reused it, and memory-ceremony, not enrolled, ran 456 s. `epr device status` now carries a
+`sysroot` line: `unknown sysroot: not yet observed` until an arrival records the identity,
+`ok` while the recorded link inputs still hash the same, `degraded sysroot: changed since …`
+for seven days after they change. Three independent reviews; the last round (bounded
+`os-release` read, a refused reader thread, a retargeted library symlink) landed without a
+fourth. Run read-only on shem before landing: exit 0 in 1.2 s. Not verified: a real arrival
+writing the record, and ethosengine. Receipts `codex-sysroot-review{,2,3}` and
+`codex-sysroot-rereview` under `genesis/local-dev/native-throughput/`.
+
+### Definition of done, as of 2026-11-18 18:40Z
 
 | Line | State |
 |---|---|
