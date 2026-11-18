@@ -226,3 +226,36 @@ Open, for the steward: every head in this sprint touched a fenced path, because 
 subject is the gate and the peer channel. Whether the fence should be per project (a `peer.rs`
 change does not alter what `elohim-storage`'s tests judge) is a trust decision, recorded in the
 backlog and not taken.
+
+### Ethosengine lands its own heads (2026-11-18)
+
+| Landing | Head | Gate on ethosengine | Push to `dev` | Reused in the push |
+|---|---|---|---|---|
+| 2b (E3) | `faa225e05` | 48 min, before hand-over | 321 s | genesis, jenkins-bridge, elohim-ark, eprfs-live-corpus, orchestrator, steward-node, eprfs, elohim-storage |
+| 3 (requirements fix + shem's five commits) | `78cd0c0e5` | 33 min (eprfs 941 s, memory-ceremony 463 s) | 631 s | rust-style-checker, jenkins-bridge, eprfs-live-corpus, orchestrator, eprfs |
+
+Ruling R6 has its receipt: the same kind of head cost shem 162 minutes and cost the device
+that had gated it 5 to 11 minutes. About 10 minutes of landing 3's push were eleven gates that
+are not enrolled for reuse and ran twice (agentic-shift and memory-ceremony are most of it).
+
+**The draw check on `dev` refused every cross-device draw between landing 2 and landing 3.**
+At `6616ce547` ethosengine's draw of shem's `epr` printed `requirement-unmet … isa.x86 unmet
+(requires subset [… fma4 … vaes vpclmulqdq])` and fetched nothing in 1.2 s. The refusal was
+false: the extractor counted CPUID-guarded code paths in dependencies as requirements, and
+ethosengine's own build of the same commit lists the same set and runs. Fix `7f48672f8`:
+admission judges the level the build declared (target ISA and `-C target-cpu` or
+`target-feature` in the recorded flags, baseline x86-64 when none); what the bytes merely
+contain is kept as evidence. A build declared above the host, or `target-cpu=native`, still
+refuses. Residual: a C dependency compiled with its own machine flags is outside the
+declaration.
+
+**Line 1 of the definition of done.** At `78cd0c0e5` shem ran `EPR_FOLLOW_SIBLING=1 epr bin
+follow --tool epr` and printed `drew epr release bafyreiebwmixsfw… from did:key:z6MkpZRh… in
+11.6 s`, 21.9 s wall, no local build. Landing 1 (`bea497110`) was drawn by ethosengine in
+3.7 s, with the caveat that its store already held that release. Landings 1, 2 and 3 each put
+a release from the gate with no manual step; the draw at landing 2 was the false refusal above.
+
+A Codex review of E2 (`76cacc2a6`) returned FIX FIRST with eight findings, so E2 did not ride
+landing 3. Required before it lands: raw failure text and the absolute run path cross devices;
+sibling text enters an agent's context with no untrusted frame; a send has no timeout; the
+recipient is read from the note body. Lane E4, ethosengine.

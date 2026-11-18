@@ -432,6 +432,21 @@ that gated a fenced head lands it (ruling R6 in that sprint's journal). Decision
 steward: keep the fence whole, or scope it per project by the gate's own input closure. Probe
 if scoped: a `peer.rs` change reuses a sibling's `elohim-storage` verdict and still runs `eprfs`.
 
+A read-only Codex review (gpt-6.2-astra, 2026-11-18, receipt
+`genesis/local-dev/native-throughput/codex-fence-design.receipt.md`) recommends a split, and
+only after one thing is proven. Paths that change how a verdict is produced, keyed, enrolled or
+named (`gate-*.mjs`, the compiler gate inputs, `pool-policy.json`, `measures.yaml`) stay fenced
+for the whole push. A change confined to `peer.rs` or `eprfs-peer/**` would be scoped to the
+projects whose closure reads it, with `eprfs` and `orchestrator` always run locally. The
+condition: a crossed verdict names no executable today, so the fence reads source history and
+cannot say which `epr` and which daemon emitted, folded and read the row. A candidate `peer.rs`
+selected through `EPR_BIN` could read a stored red as green. The receipt owed before narrowing
+is a two-device run that names the builds at emission, crossing, fold and read, and refuses a
+candidate override and an unknown build. On landing 2 the scoped rule would have saved 75
+minutes (elohim-storage and steward-node) and still run eprfs. The review also notes that two
+specs carry a decision D5: the 2026-10-27 landing-plane design is the one that requires local
+judgment here.
+
 ## Row 20 — five gates write no verdict, so no device can reuse or list them
 
 `epr-storage`, `rust-style`, `rakia-validate`, `pipeline-list-fresh` and `cargo-coverage` print
@@ -445,3 +460,24 @@ entry, or a written reason it cannot.
 `handover-record.mjs` reads a build note at the pushed head only. A verdict that stood in from
 an older commit with the same closure is not listed, so the record under-reports what the
 sender holds. Probe: the record lists a verdict by closure, with the commit it was minted at.
+
+## Row 22 — two devices never compute the same artifact key for one commit
+
+At `6616ce547` both devices put `epr` from their own gate build, and the two Produces differ in
+method and in input (shem method `bafyreibxw36w55…`, ethosengine `bafyreiadpm2vjn…`), so a key
+hit across devices did not happen: the draw works by release at a head, never by key. The cause
+is not established. The producer (`genesis/orchestrator/eprfs-produce.sh:62-71`) already skips
+`CARGO_TARGET_DIR`, `CARGO_HOME` and `RUSTUP_HOME`; the method still carries the literal ordered
+`PATH`, the full `rustc -vV`, and any set `CC`, `AR`, `PKG_CONFIG_PATH` and similar, and the
+input carries resolved compiler, linker and startup-object paths with their content CIDs
+(`epr-cli/src/artifact.rs:408,553,714`, `artifact/host.rs:56`). Whether the two builds are
+byte-reproducible is not shown, because the declared inputs differ. `epr artifact inputs diff`
+cannot compare the two today: it requires the same method and commit, or the same key
+(`artifact/inputs.rs:178,259`). A read-only Codex review (gpt-6.2-astra, 2026-11-18) is at
+`genesis/local-dev/native-throughput/codex-key-design.receipt.md`.
+
+Probe: `epr artifact inputs diff` accepts two Produce keys, verifies each document against its
+CID and prints every differing field or line with whether it can change the bytes. Then, once
+two devices agree on both CIDs, two cold builds per device give four equal output CIDs or a
+named section that differs. Not to be done: dropping a variable from the record without
+evidence scoped to this recipe, or reading equal keys as proof of a deterministic build.
