@@ -5,7 +5,7 @@ import { existsSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { projectsForChanges } from './gate-runner.mjs';
-import { checkSubmodules, DIST_CHECKS, formatRow, runPreflight, WORKSPACE_INSTALL } from './gate-preflight.mjs';
+import { ATTESTED_SUBMODULES, checkSubmodules, DIST_CHECKS, formatRow, runPreflight, WORKSPACE_INSTALL } from './gate-preflight.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
@@ -61,6 +61,17 @@ export function pinOf(root, module, spawn = spawnSync) {
   const r = spawn('git', ['-C', root, 'ls-tree', 'HEAD', '--', module], { encoding: 'utf8' });
   const match = r.status === 0 && /^160000 commit ([0-9a-f]{40,64})\t/.exec(String(r.stdout));
   return match ? match[1] : null;
+}
+
+/**
+ * The attested submodules checked out at another commit than their pin (`+` in `git submodule
+ * status`). Read here rather than taken from the preflight row, so prep stays outside the
+ * gate-*.mjs files that fence sibling reuse.
+ */
+export function movedSubmodules(root, spawn = spawnSync) {
+  const r = spawn('git', ['-C', root, 'submodule', 'status', '--', ...ATTESTED_SUBMODULES], { encoding: 'utf8' });
+  if (r.status !== 0) return [];
+  return String(r.stdout).split('\n').filter(line => line.startsWith('+')).map(line => line.trim().split(/\s+/)[1]);
 }
 
 /** Every other checkout of this repository (the main one and each linked worktree), never `root`. */
@@ -131,7 +142,7 @@ export function prep({ root = ROOT, spawn = spawnSync, exists = existsSync,
     // Row 11 (b): an initialized submodule left at another commit (a rebase moved the gitlink)
     // makes the gate test bytes the push does not carry. A clean one is moved to its pin;
     // a dirty one is someone's work and keeps the warning.
-    for (const module of modules.moved || []) {
+    for (const module of modules.why?.includes('differs from the pin') ? movedSubmodules(root, spawn) : []) {
       const dir = join(root, module);
       const status = spawn('git', ['-C', dir, 'status', '--porcelain'], { encoding: 'utf8' });
       if (status.status !== 0 || String(status.stdout).trim()) {

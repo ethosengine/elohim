@@ -91,8 +91,8 @@ export function checkSubmodules({ root, spawn = spawnSync }) {
   }
   const moved = String(r.stdout).split('\n').filter(line => line.startsWith('+')).map(line => line.trim().split(/\s+/)[1]);
   if (moved.length) {
-    return { ...row('submodules', 'WARN', `checked-out commit differs from the pin: ${moved.join(' ')} — gates test bytes the push does not carry`,
-      `git submodule update ${moved.join(' ')}   (or commit the pin you mean)`), moved };
+    return row('submodules', 'WARN', `checked-out commit differs from the pin: ${moved.join(' ')} — gates test bytes the push does not carry`,
+      `git submodule update ${moved.join(' ')}   (or commit the pin you mean)`);
   }
   return row('submodules', 'ok');
 }
