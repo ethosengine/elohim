@@ -17,7 +17,7 @@ import { dirname, isAbsolute, join, resolve } from 'path';
 import { createRecognizer } from './gate-failure-lines.mjs';
 import { GATE_ATTRIBUTION_WINDOW_MS, attribute, readEdits } from './gate-attribution.mjs';
 import { setTimeout as delay } from 'timers/promises';
-import { appendEvent, emitRed, liveRoot, outlook } from './gate-live.mjs';
+import { appendEvent, emitRedDetached, liveRoot, outlook } from './gate-live.mjs';
 
 function parseArgs(argv) {
   const split = argv.indexOf('--');
@@ -179,8 +179,8 @@ function main() {
   // outlook() is once per run, so a run whose first red came earlier adds nothing here.
   let outlooked = false;
   let firstOutlook;
-  // Sibling notes are fire-and-forget; the tap only waits (bounded, below) for the reads that
-  // decide whether to send, so an exit never drops a note that was about to be handed to berth.
+  // The first red's outlook is written to the run log before its sibling note is sent, so the
+  // detached sender reads it there; the tap waits for that write only (bounded, below).
   const pending = new Set();
   const track = promise => { pending.add(promise); promise.finally(() => pending.delete(promise)); };
   const recognizer = createRecognizer({
@@ -192,10 +192,11 @@ function main() {
         outlooked = true;
         const remaining = [project, ...process.env.GATE_REMAINING.split(/\s+/).filter(Boolean)];
         firstOutlook = outlook(run, remaining, { root: process.cwd() }).catch(() => null);
+        track(firstOutlook);
       }
-      if (written && event.kind === 'failure') {
-        track(emitRed(run, written, { continuing: firstOutlook }));
-      }
+      // E4 finding 3: a detached, deadline-bound worker sends the note; the tap never waits on
+      // berth, and an unsendable note is a sibling-delivery line in the run log.
+      if (written && event.kind === 'failure') emitRedDetached(run, written);
     },
   });
   const child = spawn(command, args, {
@@ -229,7 +230,7 @@ function main() {
     } catch { /* no fd 3: run by hand */ }
     // Exit only after forwarded bytes drain, then carry the child's status or signal.
     const finish = () => {
-      // The wait for sibling-note reads is capped well under 2 s; berth itself is never awaited.
+      // Only the outlook write is awaited, capped; berth is never awaited here.
       Promise.race([Promise.allSettled([...pending]), delay(1500)]).then(exit, exit);
     };
     const exit = () => {

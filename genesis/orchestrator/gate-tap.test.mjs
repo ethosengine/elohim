@@ -245,17 +245,19 @@ test('fd 3 carries all five cost axes beside the failure signals', t => {
 describe('gate-tap sibling notes', () => {
   const GATE_LIVE = resolve(dirname(TAP), 'gate-live.mjs');
   const HERE = 'did:key:z6MkHEREdeviceAAAA';
-  const SUB = { cid: 'sub1', at: 1, from_device: 'did:key:z6MkOTHER', session: 'shem', to: null,
+  const SUB = { cid: 'sub1', at: Date.now() / 1000, from_device: 'did:key:z6MkOTHER', session: 'shem', to: null,
     text: JSON.stringify({ kind: 'gate-subscription@1', subscriber: 'shem', device: HERE, ref: '*',
       intent: 'default', until: '2999-01-01T00:00:00.000Z' }) };
   const THREE_RED = 'echo "test a ... FAILED"; echo "test b ... FAILED"; echo "test c ... FAILED"; exit 101';
 
-  function setup(t, { sleepS = 0, exit = 0, notes = [SUB], withBerth = true } = {}) {
+  // sleepS stalls every berth call (inbox and say); saySleepS stalls only `say` (E4 finding 8:
+  // a stall in inbox discovery means say is never reached, so it tests nothing about say).
+  function setup(t, { sleepS = 0, saySleepS = 0, exit = 0, notes = [SUB], withBerth = true } = {}) {
     const dir = mkdtempSync(resolve(tmpdir(), 'gate-tap-sib-'));
     t.after(() => rmSync(dir, { recursive: true, force: true }));
     writeFileSync(resolve(dir, 'notes.json'), JSON.stringify(notes));
     const bin = resolve(dir, 'berth-stub');
-    writeFileSync(bin, `#!/bin/bash\n${sleepS ? `sleep ${sleepS}\n` : ''}if [ "$1" = say ]; then printf '%s\\n' "$*" >> "${dir}/says.log"; else cat "${dir}/notes.json"; fi\nexit ${exit}\n`, { mode: 0o755 });
+    writeFileSync(bin, `#!/bin/bash\n${sleepS ? `sleep ${sleepS}\n` : ''}if [ "$1" = say ]; then ${saySleepS ? `sleep ${saySleepS}; ` : ''}printf '%s\\n' "$*" >> "${dir}/says.log"; else cat "${dir}/notes.json"; fi\nexit ${exit}\n`, { mode: 0o755 });
     const runPath = resolve(dir, 'run.jsonl');
     writeFileSync(runPath, `${JSON.stringify({ v: 1, run: 'run', seq: 0, at: new Date().toISOString(), kind: 'run-open', candidate: { sha: 'x', target: 't' }, session: 'gate-session', ref: 'refs/heads/dev' })}\n`);
     const env = { ...process.env, GATE_LIVE_BERTH_BIN: withBerth ? bin : resolve(dir, 'no-berth'),
@@ -276,7 +278,7 @@ describe('gate-tap sibling notes', () => {
     return { result, ms: Date.now() - started };
   };
 
-  test('three reds then close send exactly the first red and the final, the stop command as text', async t => {
+  test('three reds then close send exactly the first red and the final, facts only', async t => {
     const { dir, runPath, env } = setup(t);
     const { result } = runTap(env, runPath, THREE_RED);
     assert.equal(result.status, 101);
@@ -288,13 +290,13 @@ describe('gate-tap sibling notes', () => {
     const bodies = sent.map(line => JSON.parse(line.slice(line.indexOf('{'))));
     const red = bodies.find(b => b.kind === 'gate-red@1');
     const final = bodies.find(b => b.kind === 'gate-final@1');
-    assert.equal(red.line, 'test a ... FAILED');
     assert.equal(red.gate, 'fixture');
+    assert.equal(red.class, 'test');
+    assert.equal(red.ordinal, 1);
     assert.equal(red.ref, 'refs/heads/dev');
-    assert.equal(red.stop, `node genesis/orchestrator/gate-live.mjs stop --run ${runPath}`);
-    assert.deepEqual(red.continuing.remaining.map(g => g.project), ['fixture', 'app', 'other']);
+    for (const line of sent) assert.ok(!line.includes('FAILED') && !line.includes(dir) && !line.includes('stop'), line);
     assert.equal(final.verdict, 'failed');
-    assert.equal(final.reds.length, 3);
+    assert.equal(final.failures, 3);
     for (const line of sent) assert.match(line, /^say --session gate-session --to shem \{/);
   });
 
@@ -307,17 +309,31 @@ describe('gate-tap sibling notes', () => {
     }
   });
 
-  test('a slow berth (10 s) leaves the exit status alone and adds under 2 s of wall time', t => {
+  test('a hung berth say leaves the gate fast and its status intact, and the sender is reaped and named', async t => {
     const baseline = setup(t, { notes: [] });
     const off = { ...baseline.env, GATE_LIVE_SIBLING: 'off' };
     const base = runTap(off, baseline.runPath, THREE_RED);
-    const slow = setup(t, { sleepS: 10 });
-    const measured = runTap(slow.env, slow.runPath, THREE_RED);
+    const hung = setup(t, { saySleepS: 30 });
+    hung.env.GATE_LIVE_DELIVER_MS = '700';
+    const measured = runTap(hung.env, hung.runPath, THREE_RED);
     assert.equal(base.result.status, 101);
-    assert.equal(measured.result.status, 101);
+    assert.equal(measured.result.status, 101, 'the gate status is the child\'s');
+    assert.equal(measured.result.stdout, base.result.stdout);
     const added = measured.ms - base.ms;
-    console.log(`slow-berth overhead: ${added} ms (baseline ${base.ms} ms, with a 10 s berth ${measured.ms} ms)`);
+    console.log(`hung-say overhead: ${added} ms (baseline ${base.ms} ms, with a hung say ${measured.ms} ms)`);
     assert.ok(added < 2000, `added ${added} ms`);
-    assert.ok(measured.ms < 8000, 'the tap never waited out the 10 s berth');
+    // The detached sender hits its deadline, kills berth's process group and records why.
+    let deliveries = [];
+    for (let i = 0; i < 80 && !deliveries.length; i++) {
+      await new Promise(r => setTimeout(r, 100));
+      deliveries = readFileSync(hung.runPath, 'utf8').split('\n').filter(Boolean).map(l => JSON.parse(l))
+        .filter(e => e.kind === 'sibling-delivery');
+    }
+    assert.equal(deliveries.length, 1, 'one red reaches one subscriber');
+    assert.equal(deliveries[0].ok, false);
+    assert.match(deliveries[0].why, /exceeded 700 ms/);
+    const left = spawnSync('pgrep', ['-f', resolve(hung.dir, 'berth-stub')], { encoding: 'utf8' });
+    assert.equal(left.stdout.trim(), '', 'no berth process outlives its deadline');
+    assert.deepEqual(says(hung.dir), [], 'the hung say never wrote');
   });
 });
