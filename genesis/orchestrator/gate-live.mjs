@@ -932,19 +932,33 @@ function failureFacts(event) {
   };
 }
 
-// Trim list fields until the body fits one argv entry; say how many were left out.
+// Room deliver() needs to add `forDevice` (a did:key of at most 128 characters) to each copy.
+const FOR_DEVICE_RESERVE = Buffer.byteLength(',"forDevice":""') + 128;
+
+/**
+ * Trim list fields until the body, with `forDevice` still to be added, fits one argv entry of
+ * BODY_MAX bytes; say how many were left out. E6 #6: long ids in fields that are not lists could
+ * keep it over even with every list empty, so the ref goes next, and a body still over is cut to
+ * its counts (`truncated: true`), which always fit.
+ */
 function bounded(body, lists) {
+  const fits = () => Buffer.byteLength(JSON.stringify(body)) + FOR_DEVICE_RESERVE <= BODY_MAX;
   for (const key of lists) {
     if (Array.isArray(body[key]) && body[key].length > LIST_MAX) {
       body[`${key}Omitted`] = body[key].length - LIST_MAX;
       body[key] = body[key].slice(0, LIST_MAX);
     }
   }
-  while (Buffer.byteLength(JSON.stringify(body)) > BODY_MAX) {
+  while (!fits()) {
     const key = lists.find((name) => Array.isArray(body[name]) && body[name].length);
     if (!key) break;
     body[key].pop();
     body[`${key}Omitted`] = (body[`${key}Omitted`] ?? 0) + 1;
+  }
+  if (!fits() && body.ref !== null) body.ref = null;
+  if (!fits()) {
+    const counts = Object.fromEntries(Object.entries(body).filter(([, value]) => Number.isSafeInteger(value) || value === null));
+    return { ...counts, kind: body.kind, run: body.run, device: body.device, verdict: body.verdict, truncated: true };
   }
   return body;
 }
@@ -1017,7 +1031,7 @@ export async function emitRed(path, event, { continuing, env = process.env } = {
         total_s: Number.isFinite(outlooked.total_s) ? Math.round(outlooked.total_s) : null,
       } : null,
     };
-    return await deliver(path, found.session, hearers, body, env);
+    return await deliver(path, found.session, hearers, bounded(body, []), env);
   } catch { return 0; }
 }
 

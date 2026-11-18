@@ -1456,3 +1456,30 @@ test('E6 #5: a run with no session, and a final whose discovery fails after a de
   assert.ok(readDeliveries(path).some((d) => d.ok === false && d.why === 'berth inbox unreadable'), 'the promised final names its miss');
   void reds;
 });
+
+// ── E6 #6: what crosses fits its byte cap ────────────────────────────────────────────────────
+test('E6 #6: every final as sent, forDevice included, fits BODY_MAX whatever the id lengths', async (t) => {
+  const root = fixture(t);
+  const env = siblingEnv(root, stubBerth(root, { notes: [subNote({})] }));
+  let largest = 0;
+  for (let n = 100; n <= 199; n += 3) {
+    const { path } = openRun({ root, sha: SHA, target: 'dev', session: 'gate-session', ref: `refs/heads/${'r'.repeat(180)}` });
+    appendEvent(path, { ...RED, project: `g${'x'.repeat(198)}`, fingerprint: 'f'.repeat(199), step: 's'.repeat(199) });
+    for (let i = 0; i < 25; i += 1) appendEvent(path, { kind: 'gate-verdict', project: `${String(i).padStart(2, '0')}${'p'.repeat(n - 2)}`, verdict: { exit: 0, seconds: 1 } });
+    closeRun(path, 'failed');
+    await live.emitFinal(path, { env });
+  }
+  for (const line of says(root)) {
+    const body = line.slice(line.indexOf('{'));
+    const parsed = JSON.parse(body);
+    assert.equal(parsed.forDevice, OTHER_DID);
+    largest = Math.max(largest, Buffer.byteLength(body));
+  }
+  assert.ok(says(root).length > 30, 'every final was sent');
+  assert.ok(largest <= 3500, `largest final ${largest} bytes`);
+});
+
+test('E6 #6: a red with every id at its longest still fits, and the formatter reads a cut final', () => {
+  const cut = { kind: 'gate-final@1', run: '0123456789abcdef', device: OTHER_DID, verdict: 'failed', failures: 3, wallS: 9, truncated: true };
+  assert.match(live.formatSiblingNote({ text: JSON.stringify(cut), from_device: OTHER_DID }), /SIBLING FINAL .* failed in 9s — 3 red\(s\); ran 0, reused 0/);
+});
