@@ -506,3 +506,15 @@ CID and prints every differing field or line with whether it can change the byte
 two devices agree on both CIDs, two cold builds per device give four equal output CIDs or a
 named section that differs. Not to be done: dropping a variable from the record without
 evidence scoped to this recipe, or reading equal keys as proof of a deterministic build.
+
+Measured 2026-11-18 with `epr artifact inputs diff <key-a> <key-b>` (branch
+`claude/nt-inputs-diff`, not landed; receipt
+`genesis/local-dev/native-throughput/inputs-diff-shem-ethosengine-6616ce547.txt`). Source
+paths, cargo config and the gcc `--version` digest are equal on both devices. Eleven input lines
+differ and each can change the bytes: the gcc predefined-macro digest at the same `/usr/bin/gcc`,
+and ten link inputs with different content at identical paths (`crt1.o`, `Scrt1.o`, `libgcc.a`,
+`libc_nonshared.a`, `ld-linux-x86-64.so.2`, `libc.so.6`, `libgcc_s`, `libm.so.6`, `libmvec.so.1`).
+The two workspaces carry different glibc and gcc runtime builds, so the keys rightly differ.
+Five method fields differ only in `PATH` (extra and reordered entries on shem); whether those
+reach the build is unresolved. A key hit across devices needs the same sysroot on both, which is
+what the recorded `sysroot-pack` artifact is for; it does not need a change to the key.
