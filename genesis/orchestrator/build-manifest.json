@@ -110,6 +110,8 @@
             "genesis/agentic/bin/lsp-null.py",
             "genesis/agentic/pool-policy.json",
             "genesis/agentic/pool_preflight_test.py",
+            "genesis/agentic/pool_family_test.py",
+            ".claude/hooks/cargo-disk-guard.py",
             "genesis/agentic/pool_artifact_hashes_test.py",
             "genesis/agentic/lsp_attach_test.py",
             "genesis/agentic/lsp_flycheck_test.py",

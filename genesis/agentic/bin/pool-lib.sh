@@ -56,7 +56,19 @@ find_worktree_root() {
   return 1
 }
 
-# Family heuristic: env override → .family file → branch prefix → fallback.
+# Family heuristic: env override → .family file → the family this worktree
+# recorded → branch prefix (recorded on first use) → fallback.
+#
+# The record (backlog row 18): the first family derived from a real branch is
+# written to <git-dir>/cargo-pool-family, which is per worktree, untracked and
+# removed with the worktree. Later reads return it, so a branch rename, a hand-
+# over under another prefix (claude/<name>, self/<name>) or a detached head in
+# the same worktree keeps building in the warm family instead of a cold one.
+# A worktree with no record derives exactly as before, so every existing family
+# keeps resolving for the branch that made it. A detached head never writes a
+# record (a rebase must not move a worktree into its basename family). To let a
+# worktree follow its branch again: rm "$(git rev-parse --git-dir)/cargo-pool-family".
+FAMILY_RECORD_NAME="cargo-pool-family"
 detect_family() {
   local wt="$1"
   if [ -n "${CARGO_TARGET_POOL_FAMILY:-}" ]; then
@@ -65,6 +77,15 @@ detect_family() {
   if [ -f "$wt/.family" ]; then
     local v; v="$(tr -d '[:space:]' < "$wt/.family")"
     [ -n "$v" ] && { echo "$v"; return; }
+  fi
+  local gitdir record=""
+  gitdir="$(git -C "$wt" rev-parse --absolute-git-dir 2>/dev/null || true)"
+  if [ -n "$gitdir" ] && [ -d "$gitdir" ]; then
+    record="$gitdir/$FAMILY_RECORD_NAME"
+    if [ -f "$record" ]; then
+      local r; r="$(tr -d '[:space:]' < "$record" 2>/dev/null || true)"
+      [ -n "$r" ] && { echo "$r"; return; }
+    fi
   fi
   local branch
   branch="$(git -C "$wt" rev-parse --abbrev-ref HEAD 2>/dev/null || echo)"
@@ -76,7 +97,12 @@ detect_family() {
     feat/*|feature/*|fix/*|chore/*) branch="${branch#*/}" ;;
     worktree-*) branch="${branch#worktree-}" ;;
   esac
-  echo "${branch%%[-/]*}" | tr '[:upper:]' '[:lower:]'
+  local fam; fam="$(echo "${branch%%[-/]*}" | tr '[:upper:]' '[:lower:]')"
+  # Best effort: an unwritable git dir (read-only worker) derives every time.
+  if [ -n "$record" ] && [ -n "$fam" ]; then
+    { printf '%s\n' "$fam" > "$record"; } 2>/dev/null || true
+  fi
+  echo "$fam"
 }
 
 # Convert workspace-relative path "elohim/elohim-storage" → "elohim__elohim-storage"

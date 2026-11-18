@@ -710,7 +710,7 @@ _gate-agentic-shift:
     python3 -m unittest discover -s genesis/agentic -p 'shift*_test.py'
     python3 -m unittest genesis.agentic.berth_test
     # The cargo-pool library every session hook sources (backlog row 6), with family_busy (row 13).
-    python3 -m unittest genesis.agentic.pool_preflight_test genesis.agentic.pool_artifact_hashes_test genesis.agentic.lsp_attach_test genesis.agentic.lsp_flycheck_test
+    python3 -m unittest genesis.agentic.pool_preflight_test genesis.agentic.pool_family_test genesis.agentic.pool_artifact_hashes_test genesis.agentic.lsp_attach_test genesis.agentic.lsp_flycheck_test
 
 # `pnpm build` first: @elohim/epr ships no dist/ in the tree, so a consumer's
 # import fails at module resolution rather than at type-check. Testing a package

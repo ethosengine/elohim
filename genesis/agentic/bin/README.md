@@ -61,18 +61,28 @@ worktrees whose branches have already merged to dev.
 
 ## Family detection
 
-The hook derives the family for a worktree as:
+The hook derives the family for a worktree from the first of these that
+answers:
 
 1. `CARGO_TARGET_POOL_FAMILY` env var (override).
 2. `<worktree-root>/.family` file (per-worktree pin).
-3. Branch name prefix split on `-` or `/`, with `feat/`, `feature/`,
-   `fix/`, `chore/`, `worktree-` prefixes stripped first.
+3. A remembered step-4 result: `<git-dir>/cargo-pool-family`. The first
+   time step 4 answers for a worktree, its result is written there
+   (untracked, per worktree, removed with the worktree), and from then on
+   this step answers first. So a branch rename, a hand-over under another
+   prefix (`claude/<name>`, `self/<name>`), or a detached head in the same
+   worktree keeps building in the warm family. To let the worktree follow
+   its branch again: `rm "$(git rev-parse --git-dir)/cargo-pool-family"`.
+4. The branch name: strip the first matching prefix of `feat/`, `feature/`,
+   `fix/`, `chore/`, `worktree-`; the family is the remainder up to its
+   first `-` or `/`, lowercased.
    - `iroh-pkarr` → `iroh`
    - `feat/iroh-phase12-manifest` → `iroh`
    - `worktree-iroh-parallel-stack` → `iroh`
    - `epr-phase-2b-batch-c` → `epr`
    - `dev` → `dev`
-4. Sanitized worktree directory name (last-resort fallback).
+5. Sanitized worktree directory name (last-resort fallback; a detached head
+   with no record lands here and writes no record).
 
 ## Operator commands
 

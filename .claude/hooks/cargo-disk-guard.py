@@ -403,8 +403,9 @@ def worktree_root(cwd: str):
 
 def family_for(cwd: str):
     """Mirror pool-lib.sh detect_family exactly (review C8): env override →
-    .family file → branch with feat/fix/chore/worktree- prefix strip →
-    first [-/] token, lowercased."""
+    .family file → the worktree's recorded family (<git-dir>/cargo-pool-family,
+    written on first derivation from a real branch; backlog row 18) → branch
+    with feat/fix/chore/worktree- prefix strip → first [-/] token, lowercased."""
     env = os.environ.get("CARGO_TARGET_POOL_FAMILY")
     if env:
         return env
@@ -412,9 +413,25 @@ def family_for(cwd: str):
     fam_file = os.path.join(wt, ".family")
     try:
         if os.path.isfile(fam_file):
-            v = open(fam_file).read().strip()
+            with open(fam_file) as fh:
+                v = "".join(fh.read().split())
             if v:
                 return v
+    except Exception:
+        pass
+    record = None
+    try:
+        gitdir = subprocess.run(
+            ["git", "-C", wt, "rev-parse", "--absolute-git-dir"],
+            capture_output=True, text=True, timeout=2,
+        ).stdout.strip()
+        if gitdir and os.path.isdir(gitdir):
+            record = os.path.join(gitdir, "cargo-pool-family")
+            if os.path.isfile(record):
+                with open(record) as fh:
+                    v = "".join(fh.read().split())
+                if v:
+                    return v
     except Exception:
         pass
     try:
@@ -431,9 +448,16 @@ def family_for(cwd: str):
         else:
             if branch.startswith("worktree-"):
                 branch = branch[len("worktree-"):]
-        return re.split(r"[-/]", branch, 1)[0].lower()
+        fam = re.split(r"[-/]", branch, 1)[0].lower()
     except Exception:
         return None
+    if record and fam:
+        try:
+            with open(record, "w") as fh:
+                fh.write(fam + "\n")
+        except Exception:
+            pass
+    return fam
 
 
 def slot_for(ws: str, cwd: str, release: bool):
