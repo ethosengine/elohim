@@ -334,6 +334,18 @@ The one-line verdict: **a sibling in discipline and a stranger in substrate.** T
 
 ---
 
+## The Machine-Witness Problem — Unified Attestation and remote attestation
+
+[Unified Attestation](https://uattest.net/) is Volla's open-source alternative to Google Play Integrity (March 2026): a privileged Android service obtains a hardware key-attestation chain bound to a request hash, one backend checks it against OEM-enrolled builds and signs a 60-second verdict token, and an app server verifies the token offline. Two critiques frame the reading. [lumi](https://lumi.codeberg.page/blog/remote-attestation.html) rejects the category ("the same thing, just with a different authority"); GrapheneOS rejects the shape, since the same hardware API already supports plural certifiers publishing signed data that relying parties verify themselves. Volla matters to us for a second reason: it is also the vendor that shipped Holochain apps on the Quintus.
+
+The survey's answer to *is our attestation the same thing?* is **no**, and it proposes the vocabulary to keep it so. Platform attestation is hardware testimony about a machine's software state, delivered to a party who can then refuse the machine's owner. Elohim attestation is a principal's signed claim about a content-addressed subject, at a reach, weighed by each reader's own policy and counted in principals with standing. **We attest artifacts and acts; they attest machines.** Read in source, Unified Attestation's backend generates and stores the OEM endorsement keys it later judges, its "federation" is an admin-curated key list, and its policy is whatever an OEM enrols; it has also drifted toward its critic with a public registry and a client-side verifier.
+
+What we take is discipline, not mechanism: a **direction test** for any evidence about a device (who verifies, who chose the policy, what the relying party can do to the device's human), *signed data verified locally from plural sources, never a verdict API*, and the word **platform evidence** for machine state, admissible in compute placement and never in standing or reach. For peer-executed code the note finds our design is the inverse of DRM (the device owner constrains the visiting code) and that re-execution by a second principal is stronger than a hardware quote for integrity; confidentiality from the provider is the one case a TEE addresses, and our first answer there is reach. The finding that matters most is about us: the comparison flatters our design and not our enforcement (issuer authorization still accepts all).
+
+[Cross-pollination survey →](epr:unified-attestation-remote-attestation-cross-pollination-2026-11-18) · minted to [commons-holonic-stewardship-backlog](epr:commons-holonic-stewardship-backlog) row 54 · manifest clones: `uattest-backend`, `uattest-android-service`, `uattest-android-sdk`, `uattest-vbmeta-build-submit`, `uattest-website`.
+
+---
+
 ## The Stewardship Problem
 
 "Take it with you" means a desktop app that runs a Holochain conductor, stores your data locally, and works offline. Tauri gives us the native shell; the hard problems are conductor embedding lifecycle, identity handoff between web and native contexts, deep link routing across cold and warm starts, and making offline-first feel seamless rather than degraded. This is where stewardship stops being a principle and becomes a UX.
