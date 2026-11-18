@@ -730,15 +730,17 @@ function union(a, b) {
  * The subscriptions among berth notes that name this device and this run's ref, one per recipient.
  * A subscription binds to the session that SENT its note (berth's `session` on the note): a body
  * naming another subscriber nominates nobody. Its lease is at most DEFAULT_SUBSCRIPTION_MS from
- * the note's own time, whatever `until` says. The latest note per (sender, device, ref) stands
- * before expiry is judged, so a later note with a past `until` unsubscribes. A run with no ref is
- * matched only by `*` (or an absent ref). A recipient matched by several subscriptions (`any` and
- * this device, or two globs) is one entry with the broader intent.
+ * the note's own time, whatever `until` says. The latest note per (sender, sending device, device,
+ * ref) stands before expiry is judged, so a later note with a past `until` unsubscribes; a note
+ * stamped more than CLOCK_SKEW_MS ahead is dropped BEFORE that choice, so it can neither extend a
+ * lease nor hide a valid note (E6 #3). Two devices claiming one session id are two recipients, each
+ * with its own consent and revocation. A run with no ref is matched only by `*` (or an absent ref).
+ * A recipient matched by several subscriptions (`any` and this device, or two globs) is one entry
+ * with the broader intent.
  */
 export function matchSubscriptions(notes, { did, ref = null, now = () => new Date() }) {
   const atMs = new Date(now()).getTime();
   const latest = new Map();
-  const latestDevice = new Map();
   for (const note of Array.isArray(notes) ? notes : []) {
     let body;
     try { body = JSON.parse(String(note?.text ?? '')); } catch { continue; }
@@ -746,31 +748,36 @@ export function matchSubscriptions(notes, { did, ref = null, now = () => new Dat
     if (typeof note.session !== 'string' || note.session !== body.subscriber) continue;
     if (body.device !== 'any' && body.device !== did) continue;
     const want = body.ref ?? '*';
-    const key = `${note.session}\u0000${body.device}\u0000${want}`;
     const at = Number(note.at ?? 0);
-    if (!latest.has(key) || at >= latest.get(key).at) {
-      latest.set(key, { at, body, want });
-      latestDevice.set(key, typeof note.from_device === 'string' ? note.from_device : null);
-    }
+    // E5 #5 / E6 #3: a note stamped more than CLOCK_SKEW_MS ahead of this device's clock is no
+    // subscription, so a sender cannot extend its 12 h lease by dating the note in the future, and
+    // (judged before the latest is chosen) such a note cannot shadow a valid one.
+    if (Number.isFinite(at) && at * 1000 > atMs + CLOCK_SKEW_MS) continue;
+    const from = isDeviceId(note.from_device) ? note.from_device : null;
+    const key = `${note.session}\u0000${from ?? ''}\u0000${body.device}\u0000${want}`;
+    if (!latest.has(key) || at >= latest.get(key).at) latest.set(key, { at, body, want, from });
   }
   const byRecipient = new Map();
-  for (const [key, { at, body, want }] of latest) {
-    // E5 #5: a note stamped more than CLOCK_SKEW_MS ahead of this device's clock is no
-    // subscription, so a sender cannot extend its 12 h lease by dating the note in the future.
-    if (Number.isFinite(at) && at * 1000 > atMs + CLOCK_SKEW_MS) continue;
+  for (const { at, body, want, from } of latest.values()) {
     const sentMs = Number.isFinite(at) && at > 0 ? at * 1000 : atMs;
     const until = Math.min(Date.parse(body.until ?? ''), sentMs + DEFAULT_SUBSCRIPTION_MS);
     if (!Number.isFinite(until) || until <= atMs) continue;
     if (ref ? !globRegExp(want).test(ref) : want !== '*') continue;
     const intent = intentOf(body);
-    const device = key.split('\u0000')[0] === body.subscriber ? latestDevice.get(key) : null;
-    const held = byRecipient.get(body.subscriber);
-    byRecipient.set(body.subscriber, {
-      intent: held ? union(held.intent, intent) : intent,
-      device: held?.device ?? device ?? null,
-    });
+    const recipient = `${body.subscriber}\u0000${from ?? ''}`;
+    const held = byRecipient.get(recipient);
+    byRecipient.set(recipient, { subscriber: body.subscriber, device: from, intent: held ? union(held.intent, intent) : intent });
   }
-  return [...byRecipient].map(([subscriber, { intent, device }]) => ({ subscriber, intent, device }));
+  return [...byRecipient.values()].map(({ subscriber, intent, device }) => ({ subscriber, intent, device }));
+}
+
+/**
+ * Receipt check (E6 #3): a sibling note naming `forDevice` is for that device's copy of the
+ * session. When this device's did is known and differs, the note is someone else's; when it is
+ * unknown the note is kept, since berth already routed it to this session.
+ */
+export function meantForDevice(body, did) {
+  return !isDeviceId(body?.forDevice) || !isDeviceId(did) || body.forDevice === did;
 }
 
 /** Does a subscriber hear the red with this 1-based ordinal in its run? */
@@ -1135,6 +1142,7 @@ export async function followSibling({
   const startedMs = Date.now();
   let first = true;
   let framed = false;
+  const did = await deviceDid({ env });
   // A process exit status: 0 when the follow ended (deadline or, with untilFinal, a final).
   while (Date.now() < deadline) {
     const notes = await peekNotes(session, { env, timeoutMs: 5000 });
@@ -1143,6 +1151,9 @@ export async function followSibling({
       seen.add(note.cid);
       // Backlog from before this follow started is history, not news.
       if (first && (note.at ?? 0) * 1000 < startedMs - 10 * 60 * 1000) continue;
+      let body = null;
+      try { body = JSON.parse(String(note.text ?? '')); } catch { /* formatSiblingNote refuses it */ }
+      if (!meantForDevice(body, did)) continue;
       const line = formatSiblingNote(note);
       if (!line) continue;
       // E5 #7: the same frame the inject hook gives these lines — another device's data.

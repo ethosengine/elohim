@@ -143,6 +143,47 @@ def sibling_line(body, note):
             f"reused {count(body.get('reused'), body.get('reusedOmitted'))}")
 
 
+DEVICE_DID = re.compile(r"did:key:z[0-9A-Za-z]{8,120}")
+DEVICE_CACHE_S = 3600
+
+
+def own_device(live, now=None):
+    """This device's did:key: GATE_LIVE_DEVICE, else `epr peer leases --json` (bounded), cached
+    for DEVICE_CACHE_S under the live root. None when unknown."""
+    env = os.environ.get("GATE_LIVE_DEVICE")
+    if env is not None:
+        return env if DEVICE_DID.fullmatch(env) else None
+    now = time.time() if now is None else now
+    cache = live / "device.json"
+    try:
+        held = json.loads(cache.read_text())
+        if now - float(held["at"]) < DEVICE_CACHE_S and DEVICE_DID.fullmatch(held["did"]):
+            return held["did"]
+    except (OSError, ValueError, KeyError, TypeError):
+        pass
+    try:
+        result = subprocess.run([os.environ.get("EPR_BIN") or "epr", "peer", "leases", "--json"],
+                                capture_output=True, text=True, timeout=2)
+        did = json.loads(result.stdout).get("device") if result.returncode == 0 else None
+    except (OSError, ValueError, subprocess.SubprocessError, AttributeError):
+        did = None
+    if not (isinstance(did, str) and DEVICE_DID.fullmatch(did)):
+        return None
+    try:
+        cache.parent.mkdir(parents=True, exist_ok=True)
+        cache.write_text(json.dumps({"did": did, "at": now}))
+    except OSError:
+        pass
+    return did
+
+
+def meant_for_device(body, did):
+    """E6 #3, as gate-live.mjs meantForDevice: a note naming another device's forDevice is not
+    shown; an unknown own did keeps it."""
+    target = body.get("forDevice")
+    return not (isinstance(target, str) and DEVICE_DID.fullmatch(target)) or did is None or target == did
+
+
 def note_at(note):
     """A note's `at` as a finite float, or None."""
     value = note.get("at")
@@ -197,6 +238,7 @@ def sibling_unseen(live, session, reader, now=None):
                 and note_at({"at": entry[0]}) is not None):
             recent[entry[1]] = float(entry[0])
     floor = note_at({"at": state.get("floor")}) if state else None
+    did = own_device(live, now)
     candidates = []
     for note in notes:
         if not isinstance(note, dict):
@@ -216,6 +258,8 @@ def sibling_unseen(live, session, reader, now=None):
         except (TypeError, ValueError):
             continue
         if not isinstance(body, dict) or body.get("kind") not in SIBLING_KINDS:
+            continue
+        if not meant_for_device(body, did):
             continue
         candidates.append((at, cid, body, note))
     lines = []

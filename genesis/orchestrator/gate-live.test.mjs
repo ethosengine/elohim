@@ -86,6 +86,7 @@ test('exports only the public run-log functions', () => {
     'isDeviceId',
     'liveRoot',
     'matchSubscriptions',
+    'meantForDevice',
     'noteUnsentReds',
     'opaqueRun',
     'openRun',
@@ -1310,3 +1311,40 @@ test('E5 #7: follow --sibling survives --timeout-ms 0, ends after a final on req
   assert.match(lines[1], /~\? min/);
 });
 
+
+test('E6 #3: two devices claiming one session are two recipients, each with its own revocation', () => {
+  const A = 'did:key:z6MkDEVICEaaaaAAAA';
+  const B = 'did:key:z6MkDEVICEbbbbBBBB';
+  const now = Date.now() / 1000;
+  const fromA = { ...subNote({}, { cid: 'a1', at: now - 60 }), from_device: A };
+  const fromB = { ...subNote({ intent: 'every' }, { cid: 'b1', at: now - 50 }), from_device: B };
+  const revokeA = { ...subNote({ until: '2000-01-01T00:00:00.000Z' }, { cid: 'a2', at: now - 10 }), from_device: A };
+  const sort = (list) => list.sort((x, y) => String(x.device).localeCompare(String(y.device)));
+  assert.deepEqual(sort(live.matchSubscriptions([fromA, fromB], { did: HERE_DID })), [
+    { subscriber: 'shem-orchestrator', intent: 'default', device: A },
+    { subscriber: 'shem-orchestrator', intent: 'every', device: B },
+  ]);
+  // A's revocation ends A's subscription only; B's later consent is not overwritten either.
+  assert.deepEqual(live.matchSubscriptions([fromA, fromB, revokeA], { did: HERE_DID }),
+    [{ subscriber: 'shem-orchestrator', intent: 'every', device: B }]);
+});
+
+test('E6 #3: a rejected future-dated note never suppresses the valid one before it', () => {
+  const now = Date.now() / 1000;
+  const valid = subNote({ intent: 'every' }, { cid: 'v', at: now - 60 });
+  const future = subNote({ until: '2000-01-01T00:00:00.000Z' }, { cid: 'f', at: now + 3600 });
+  assert.deepEqual(live.matchSubscriptions([valid, future], { did: HERE_DID }),
+    [{ subscriber: 'shem-orchestrator', intent: 'every', device: OTHER_DID }]);
+});
+
+test('E6 #3: the follower drops a note whose forDevice names another device', async (t) => {
+  const root = mkdtempSync(join(tmpdir(), 'gate-live-fordevice-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const red = (cid, forDevice) => ({ cid, at: Date.now() / 1000, from_device: OTHER_DID, session: 'orch', to: 's',
+    text: JSON.stringify({ kind: 'gate-red@1', run: '0123456789abcdef', device: OTHER_DID, gate: 'g', class: 'test', ordinal: 1, atS: 1, ...(forDevice ? { forDevice } : {}) }) });
+  const notes = [red('mine', HERE_DID), red('theirs', 'did:key:z6MkELSEWHEREcccc'), red('unnamed')];
+  const lines = [];
+  await live.followSibling({ session: 's', env: siblingEnv(root, stubBerth(root, { notes })), write: (l) => lines.push(l), pollMs: 20, timeoutMs: 300 });
+  assert.equal(lines.filter((l) => l.startsWith('[gate-live] SIBLING RED')).length, 2, lines.join('\n'));
+  assert.equal(live.meantForDevice({ forDevice: 'did:key:z6MkELSEWHEREcccc' }, null), true, 'unknown own did keeps the note');
+});
