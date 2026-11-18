@@ -74,6 +74,7 @@ SIBLING_POLL_S = 20
 SIBLING_FRESH_S = 600
 SIBLING_LINES_MAX = 20
 LATE_WINDOW_S = 600
+CLOCK_SKEW_S = 300  # gate-live.mjs CLOCK_SKEW_MS
 RECENT_MAX = 1000
 
 
@@ -246,9 +247,14 @@ def sibling_unseen(live, session, reader, now=None):
         cid, at = note.get("cid"), note_at(note)
         if not isinstance(cid, str) or not cid or at is None:
             continue
+        # E6 #4: a note stamped more than CLOCK_SKEW_S ahead is not news yet and never moves the
+        # watermark (it would push every real note below the late window); it is judged at its time.
+        if at > now + CLOCK_SKEW_S:
+            continue
         if cursor_at is not None and at <= cursor_at:
-            # Late or tied: news only within the window, above the floor, and never passed.
-            if (at < cursor_at - LATE_WINDOW_S or (floor is not None and at <= floor)
+            # Late or tied: news only within the window, above the floor, and never passed. A tie
+            # with the cursor is decided by cids_at alone, so the floor never hides one (E6 #4).
+            if (at < cursor_at - LATE_WINDOW_S or (floor is not None and at <= floor and at < cursor_at)
                     or cid in cursor_cids or cid in recent):
                 continue
         if not addressed_to(note.get("to"), session):
@@ -282,13 +288,18 @@ def sibling_unseen(live, session, reader, now=None):
     if more:
         lines.append(f"[gate-live] {more} more sibling note(s) wait; they follow on the next tool calls.")
     if cursor_at is not None:
-        kept = sorted(((a, c) for c, a in recent.items() if a >= cursor_at - LATE_WINDOW_S),
-                      key=lambda e: (e[0], e[1]))
+        # Overflow trims only notes BELOW the cursor: a note at the cursor instant is never forgotten
+        # (and the floor stays below the cursor), so 1050 notes at one instant are all shown in turn
+        # and none replays when the cursor later moves past them (E6 #4).
+        window = sorted(((a, c) for c, a in recent.items() if a >= cursor_at - LATE_WINDOW_S),
+                        key=lambda e: (e[0], e[1]))
+        ties = [e for e in window if e[0] >= cursor_at]
+        kept = [e for e in window if e[0] < cursor_at]
         if len(kept) > RECENT_MAX:
             # Overflow forgets the oldest; the floor keeps a forgotten note from replaying.
             dropped, kept = kept[:-RECENT_MAX], kept[-RECENT_MAX:]
             floor = dropped[-1][0] if floor is None else max(floor, dropped[-1][0])
-        recent_out = [[a, c] for a, c in kept]
+        recent_out = [[a, c] for a, c in kept + ties]
     else:
         recent_out = []
     if floor is not None and cursor_at is not None and floor < cursor_at - LATE_WINDOW_S:

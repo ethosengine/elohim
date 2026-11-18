@@ -364,6 +364,29 @@ class SiblingNotesTest(Harness):
         self.assertEqual(state['at'], base)
         self.assertIn([base - 100, 'cid-late'], state['recent'])
 
+    def test_e6_4_many_notes_at_one_instant_are_all_shown_none_lost(self):
+        import time
+        base = time.time() - 30
+        notes = [self.note(f'cid-{i:04d}', {**self.RED, 'ordinal': i + 1}, at=base) for i in range(1050)]
+        self.stub_berth(notes)
+        shown = []
+        for _ in range(80):
+            context = self.call()
+            if context is None:
+                break
+            shown += self.ordinals(context)
+        self.assertEqual(sorted(shown), list(range(1, 1051)))
+
+    def test_e6_4_a_far_future_note_never_moves_the_watermark(self):
+        import time
+        now = time.time()
+        future = self.note('cid-future', {**self.RED, 'ordinal': 9}, at=now + 3600)
+        first = self.note('cid-a', {**self.RED, 'ordinal': 1}, at=now - 5)
+        self.stub_berth([future, first])
+        self.assertEqual(self.ordinals(self.call()), [1])
+        self.stub_berth([future, first, self.note('cid-b', {**self.RED, 'ordinal': 2}, at=now + 1)])
+        self.assertEqual(self.ordinals(self.call()), [2])
+
     def test_recent_stays_bounded_and_a_forgotten_note_does_not_replay(self):
         import time
         base = time.time() - 60
@@ -375,7 +398,8 @@ class SiblingNotesTest(Harness):
         self.stub_berth([*replay, self.note('cid-new', {**self.RED, 'ordinal': 8}, at=base + 1)])
         self.assertEqual(self.ordinals(self.call()), [8])
         state = json.loads(path.read_text())
-        self.assertLessEqual(len(state['recent']), MODULE['RECENT_MAX'])
+        # The bound is on notes below the cursor; notes at the cursor instant are never trimmed (E6 #4).
+        self.assertLessEqual(len([a for a, _ in state['recent'] if a < state['at']]), MODULE['RECENT_MAX'])
         self.assertTrue(all(a >= state['at'] - MODULE['LATE_WINDOW_S'] for a, _ in state['recent']))
         self.assertIn('floor', state)
         self.assertIsNone(self.call())
