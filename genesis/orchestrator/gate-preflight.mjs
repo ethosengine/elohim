@@ -67,6 +67,11 @@ export function onRedPolicy({ env = process.env, root = ROOT } = {}) {
 
 const row = (check, level, why = '', cure = '') => ({ check, level, why, cure });
 
+// A fresh worktree (a harness-made `.claude/worktrees/agent-<id>` among them, backlog row 25) has
+// neither submodules nor node_modules; one command cures both, then the dists and this preflight.
+export const PREP_COMMAND = 'just dev prep';
+const viaPrep = (root, byHand) => `${PREP_COMMAND}, run in ${root} (or by hand: ${byHand})`;
+
 // Prep executes argv, never shell-parses a human cure. Both views have one source.
 export const WORKSPACE_INSTALL = ['pnpm', 'install', '--frozen-lockfile', '--prefer-offline'];
 const commandRow = (check, level, why, commands) => ({
@@ -87,7 +92,7 @@ export function checkSubmodules({ root, spawn = spawnSync }) {
   const missing = String(r.stdout).split('\n').filter(line => line.startsWith('-')).map(line => line.trim().split(/\s+/)[1]);
   if (missing.length) {
     return { ...row('submodules', 'REFUSED', `not checked out: ${missing.join(' ')} — their attested gate projects vanish and the orchestrator registry tests fail`,
-      `git submodule update --init ${missing.join(' ')}`), missing };
+      viaPrep(root, `git submodule update --init ${missing.join(' ')}`)), missing };
   }
   const moved = String(r.stdout).split('\n').filter(line => line.startsWith('+')).map(line => line.trim().split(/\s+/)[1]);
   if (moved.length) {
@@ -119,8 +124,9 @@ export function checkNodeModules({ root, projects }) {
   const needing = projects.filter(usesNode);
   if (!needing.length) return null;
   if (existsSync(join(root, 'node_modules/.modules.yaml'))) return row('node_modules', 'ok');
-  return commandRow('node_modules', 'REFUSED', `no installed workspace for ${needing.map(p => p.name).join(' ')}`,
+  const red = commandRow('node_modules', 'REFUSED', `no installed workspace for ${needing.map(p => p.name).join(' ')}`,
     [WORKSPACE_INSTALL]);
+  return { ...red, cure: viaPrep(root, red.cure) };
 }
 
 function readJson(path) {

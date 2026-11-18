@@ -31,6 +31,8 @@ test('submodules: an uninitialised attested submodule refuses with the init comm
   const r = checkSubmodules({ root: '/x', spawn });
   assert.equal(r.level, 'REFUSED');
   assert.match(r.cure, /git submodule update --init elohim\/brit/);
+  // Row 25: a fresh worktree is told the one command that readies it, and where to run it.
+  assert.match(r.cure, /^just dev prep, run in \/x \(or by hand: /);
 });
 
 test('tmpdir: a temp root inside a git repository refuses in the first second, naming both', () => {
@@ -59,7 +61,10 @@ test('submodules: a checked-out commit off the pin warns, never refuses', () => 
 test('node_modules: required only by a non-cargo gate', (t) => {
   const root = scratch(t);
   assert.equal(checkNodeModules({ root, projects: [storage] }), null);
-  assert.equal(checkNodeModules({ root, projects: [app] }).level, 'REFUSED');
+  const red = checkNodeModules({ root, projects: [app] });
+  assert.equal(red.level, 'REFUSED');
+  assert.equal(red.cure, `just dev prep, run in ${root} (or by hand: pnpm install --frozen-lockfile --prefer-offline)`);
+  assert.deepEqual(red.commands, [['pnpm', 'install', '--frozen-lockfile', '--prefer-offline']], 'executable argv is unchanged');
   put(root, 'node_modules/.modules.yaml');
   assert.equal(checkNodeModules({ root, projects: [app] }).level, 'ok');
 });
