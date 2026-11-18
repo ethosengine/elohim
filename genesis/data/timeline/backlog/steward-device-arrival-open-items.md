@@ -604,3 +604,28 @@ unsound until the real reads are keyed. In flight: lane E9 declares these reads.
 for the steward: the gate's own envelope observes what the recipe opens and which variables
 it reads, and the verdict is keyed on the observation; the scan becomes a cross-check. Rows
 20 and 21 (enrolment) wait on the same answer.
+
+Delta 2026-11-18 (lane E9, widening only, landed with this note): the four reads are keyed at their
+home. eprfs: `common::live_model_manifest()` declares the model manifest where its path is built (the
+audit follows neither a cross-module `common::repo_root()` nor a helper's argument; the test file
+produced no audit row at all). eprfs-live-corpus: both live cite legs share `legacy_read_paths()`
+(cited directories count) and assert their targets are declared; 26 research cite targets are now
+declared `gate-reads(eprfs-live-corpus)`, so a new cite target is declared or the leg is red.
+doorway: the audit resolves a zero-argument helper of exactly `let NAME = <manifest chain>;` and a
+tail on NAME. orchestrator: the audit reads Rust only, and the orchestrator suite reads 171 paths
+outside its step sources (whole-repository registry and read-set walks, `.husky`, `scripts/ci`,
+`genesis/scripts/ci`, `app/elohim-app/scripts/__tests__`, `genesis/a2o`, the event schema, and some of
+its own test files), so `UNAUDITED_RECIPE_PROJECTS` keys it on the whole tree. Measured cost: a landing
+whose tree differs from the attested one runs the gate, 188 s (run 20261118T174617Z), where such
+landings reused it at 50 s and 51 s of push wall (6a8a19767, 5449615ce). Follow-up that buys it back:
+the suite's outside reads declared in a list the suite itself enforces, hashed into its key.
+
+Covered only by another crate's test read and NOT verified to be read by the gate's own tests
+(survey: repo paths named by string literals in compiled files): for elohim-storage,
+`.claude/epr-meta/recipes.yaml` (`bridges/jenkins/src/observe.rs:26`), `.epr-meta/collective.json`
+(`bridges/cargo/src/translate.rs:113`), `genesis/agentic/agent-runtimes.json`
+(`elohim/eprfs/device-runtime/src/bin_store/install.rs:148`) and `genesis/orchestrator/manifests/runtime/`
+(`bridges/k8s/src/lib.rs:364`); for doorway and steward-node, `elohim/sdk/storage-client-ts/src/generated`
+(`crates/elohim-views/src/acquisition.rs:13`). Doorway, elohim-storage and steward-node each hold an
+include reference the audit cannot read, so the narrowing held on `self/nt-audit` would skip nothing
+for them today.
