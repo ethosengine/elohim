@@ -932,8 +932,10 @@ function failureFacts(event) {
   };
 }
 
-// Room deliver() needs to add `forDevice` (a did:key of at most 128 characters) to each copy.
-const FOR_DEVICE_RESERVE = Buffer.byteLength(',"forDevice":""') + 128;
+// Room deliver() needs to add `forDevice` to each copy: the longest did:key DID admits (E8 #3: the
+// reserve once said 128 characters while DID admits 129).
+const DID_MAX = 'did:key:z'.length + 120;
+const FOR_DEVICE_RESERVE = Buffer.byteLength(',"forDevice":""') + DID_MAX;
 
 /**
  * Trim list fields until the body, with `forDevice` still to be added, fits one argv entry of

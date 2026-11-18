@@ -1499,3 +1499,27 @@ test('E8 #1: a note after the final that ended the follow is still printed after
   await live.followSibling({ session: 's', env, write: (l) => second.push(l), pollMs: 10, timeoutMs: 150, cursor });
   assert.deepEqual(second.filter((l) => l.startsWith('[gate-live] SIBLING')).map((l) => /red #(\d+)/.exec(l)?.[1]), ['4'], second.join('\n'));
 });
+
+test('E8 #3: a final for the longest DID the validator admits fits BODY_MAX', async (t) => {
+  const root = fixture(t);
+  const longest = `did:key:z${'M'.repeat(120)}`;
+  assert.ok(live.isDeviceId(longest) && !live.isDeviceId(`${longest}M`), 'the longest admitted DID');
+  const env = siblingEnv(root, stubBerth(root, { notes: [{ ...subNote({}), from_device: longest }] }));
+  let largest = 0;
+  // The ref grows one byte per run while a ran entry trims in 195-byte steps, so the trimmed size
+  // passes every value of that window, the cap's edge included (the old reserve sent 3501 bytes
+  // at a 49-character ref).
+  for (let n = 6; n <= 200; n += 1) {
+    const { path } = openRun({ root, sha: SHA, target: 'dev', session: 'gate-session', ref: `refs/heads/${'r'.repeat(n - 5)}` });
+    for (let i = 0; i < 25; i += 1) appendEvent(path, { kind: 'gate-verdict', project: `${String(i).padStart(2, '0')}${'p'.repeat(190)}`, verdict: { exit: 0, seconds: 1 } });
+    closeRun(path, 'failed');
+    await live.emitFinal(path, { env });
+  }
+  for (const line of says(root)) {
+    const body = line.slice(line.indexOf('{'));
+    assert.equal(JSON.parse(body).forDevice, longest);
+    largest = Math.max(largest, Buffer.byteLength(body));
+  }
+  assert.ok(says(root).length >= 195, 'every final was sent');
+  assert.ok(largest <= 3500, `largest final ${largest} bytes`);
+});
