@@ -23,6 +23,7 @@ pub mod frames;
 pub mod git;
 pub mod govern;
 pub mod hint;
+pub(crate) mod host_link;
 pub mod integrate;
 #[cfg(feature = "lsp")]
 pub mod lsp;

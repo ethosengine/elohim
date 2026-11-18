@@ -36,7 +36,7 @@ const SYSROOT_BLIND: &str = "the identity covers cc's version and predefined mac
 /// A full observation: the identity lines of the artifact key's probe and the human context.
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct SysrootObserved {
-    /// [`crate::artifact::sysroot_lines`]: sorted `tool:link-driver*` and `link:` lines.
+    /// [`crate::host_link::sysroot_lines`]: sorted `tool:link-driver*` and `link:` lines.
     lines: Vec<String>,
     /// `/etc/os-release` `ID VERSION_ID`, when readable.
     os: Option<String>,
@@ -92,7 +92,7 @@ fn observe_sysroot(
     let path = env("PATH")
         .filter(|value| !value.is_empty())
         .ok_or("PATH is not set")?;
-    let lines = crate::artifact::sysroot_lines(&path, deadline).map_err(|e| {
+    let lines = crate::host_link::sysroot_lines(&path, deadline).map_err(|e| {
         let why = e.to_string();
         if why.contains("exceeded the probe deadline") {
             probe_exceeded()
@@ -118,7 +118,7 @@ fn observe_sysroot(
 fn os_context(files: &[&Path], deadline: std::time::Instant) -> Option<String> {
     files
         .iter()
-        .find_map(|file| crate::artifact::read_context(file, OS_RELEASE_LIMIT, deadline))
+        .find_map(|file| crate::host_link::read_context(file, OS_RELEASE_LIMIT, deadline))
         .and_then(|bytes| String::from_utf8(bytes).ok())
         .and_then(|text| os_release(&text))
 }
@@ -298,7 +298,7 @@ fn sysroot_judge(
 }
 
 /// A status read's judgement: the record, plus a cheap re-check of the files its current lines
-/// name ([`crate::artifact::sysroot_drift`]). Runs no program and writes nothing.
+/// name ([`crate::host_link::sysroot_drift`]). Runs no program and writes nothing.
 fn sysroot_status(remembered: Option<SysrootRecord>, now: chrono::DateTime<chrono::Utc>) -> Check {
     let Some(record) = remembered else {
         return Check::new(
@@ -309,7 +309,7 @@ fn sysroot_status(remembered: Option<SysrootRecord>, now: chrono::DateTime<chron
         );
     };
     let deadline = std::time::Instant::now() + SYSROOT_RECHECK;
-    let drifted = match crate::artifact::sysroot_drift(&record.current.lines, deadline) {
+    let drifted = match crate::host_link::sysroot_drift(&record.current.lines, deadline) {
         Ok(drifted) => drifted,
         Err(why) => return unobserved(format!("re-check: {why}"), None),
     };
@@ -388,7 +388,7 @@ fn read_sysroot_record(file: &Path) -> Result<Option<SysrootRecord>, String> {
 /// A record is data from disk: the current lines must match the probe's grammar and hash to the
 /// recorded identity, earlier identities carry no lines, and every time and CID must parse.
 fn check_sysroot_record(record: &SysrootRecord) -> Result<(), String> {
-    crate::artifact::check_sysroot_lines(&record.current.lines)?;
+    crate::host_link::check_sysroot_lines(&record.current.lines)?;
     let recomputed = SysrootObserved {
         lines: record.current.lines.clone(),
         os: None,
@@ -1048,7 +1048,7 @@ mod tests {
         let full = started.elapsed();
         let started = std::time::Instant::now();
         let drifted =
-            crate::artifact::sysroot_drift(&observed.lines, started + SYSROOT_RECHECK).unwrap();
+            crate::host_link::sysroot_drift(&observed.lines, started + SYSROOT_RECHECK).unwrap();
         let cheap = started.elapsed();
         eprintln!(
             "sysroot probe on this host: full {full:?} ({} lines, cid {}), bounded re-check \

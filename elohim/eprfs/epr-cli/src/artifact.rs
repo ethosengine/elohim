@@ -791,32 +791,16 @@ fn cargo_config_lines(
 /// The `non_path_inputs` entry naming the fixed `PATH` a recorded mesh build runs cargo under.
 pub const PATH_INPUT: &str = "PATH";
 
-/// `name` resolved the way a process with `PATH=path` resolves it: as given when it names a
-/// path, else the first executable regular file of that name on `path`; canonicalized.
-fn resolve_tool(name: &str, path: &str) -> Option<PathBuf> {
-    std::fs::canonicalize(resolve_tool_path(name, path)?).ok()
-}
-
-/// Preserve the executable name for argv[0]-dispatched proxies such as rustup's rustc.
-fn resolve_tool_path(name: &str, path: &str) -> Option<PathBuf> {
-    use std::os::unix::fs::PermissionsExt;
-    let runnable = |candidate: &Path| {
-        std::fs::metadata(candidate)
-            .is_ok_and(|meta| meta.is_file() && meta.permissions().mode() & 0o111 != 0)
-    };
-    let found = if name.contains('/') {
-        Some(PathBuf::from(name)).filter(|candidate| runnable(candidate))
-    } else {
-        std::env::split_paths(path)
-            .map(|dir| dir.join(name))
-            .find(|candidate| runnable(candidate))
-    }?;
-    std::path::absolute(found).ok()
-}
-
 mod host;
+use crate::host_link::{resolve_tool, resolve_tool_path};
 use host::{check_linker, tool_lines};
-pub(crate) use host::{check_sysroot_lines, read_context, sysroot_drift, sysroot_lines};
+
+/// The link-input probe's refusals are the artifact key's typed gaps.
+impl From<crate::host_link::Gap> for ArtifactError {
+    fn from(gap: crate::host_link::Gap) -> Self {
+        ArtifactError::Gap(gap.0)
+    }
+}
 
 /// Untracked files `git status --ignored` lists inside the view are inputs no closure line names;
 /// `node_modules` directories are excluded by declaration (cargo never reads them; a residual the

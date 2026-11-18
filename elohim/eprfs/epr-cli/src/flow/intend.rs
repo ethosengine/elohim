@@ -28,6 +28,7 @@ use super::{
 
 pub(crate) const LANDING_MEASURE: &str = "dev-landing@1";
 pub(crate) const INTENT_TAG: &str = "dev-landing:intent";
+#[cfg(feature = "peer")] // read only by `epr peer` (src/peer.rs)
 pub(crate) const KINDS: [&str; 4] = ["intent", "landed", "withdraw", "dismiss"];
 pub(crate) const LANDING_UNIT: &str = "dev-landing";
 pub(crate) const CLASSES_LITERAL: [&str; 5] = ["0", "low", "channel", "governance", "high"];
@@ -1124,6 +1125,7 @@ fn unix_seconds_millis() -> String {
     format!("{}.{:03}", millis / 1000, millis % 1000)
 }
 
+#[cfg(feature = "peer")] // read only by `epr peer` (src/peer.rs)
 pub(crate) fn unix_slot_ms(raw: &str) -> Option<u64> {
     let (seconds, fraction) = raw.split_once('.').unwrap_or((raw, "0"));
     let seconds = seconds.parse::<u64>().ok()?;

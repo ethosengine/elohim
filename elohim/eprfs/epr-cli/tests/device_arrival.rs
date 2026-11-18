@@ -197,6 +197,7 @@ fn detached_arrival_closes_parent_pipes_and_returns_summary() {
 }
 
 #[test]
+#[cfg(feature = "peer")] // the live daemon holds `peer::ServeLock`
 fn peer_daemon_status_compares_live_lease_with_current() {
     use std::os::unix::{fs::symlink, fs::PermissionsExt};
     let temp = fixture();
