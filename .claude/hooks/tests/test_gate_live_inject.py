@@ -277,20 +277,97 @@ class SiblingNotesTest(Harness):
         first = self.note('cid-zzz-first', self.RED, at=base)
         self.stub_berth([first])
         self.assertIn('SIBLING RED', self.call())
-        # 600 newer notes, whose cids sort before the first one's; one batch is shown once.
+        # 600 newer notes, whose cids sort before the first one's; each is shown exactly once,
+        # at most SIBLING_LINES_MAX per call.
         newer = [self.note(f'cid-{i:04d}', {**self.RED, 'ordinal': i + 2}, at=base + 1 + i * 0.01)
                  for i in range(600)]
         self.stub_berth([first, *newer])
-        context = self.call()
-        self.assertEqual(context.count('SIBLING RED'), 600)
-        self.assertNotIn('red #1 ', context)
+        shown = []
+        for _ in range(40):
+            context = self.call()
+            if context is None:
+                break
+            reds = [line for line in context.splitlines() if 'SIBLING RED' in line]
+            self.assertLessEqual(len(reds), MODULE['SIBLING_LINES_MAX'])
+            shown.extend(reds)
         self.assertIsNone(self.call())
+        self.assertEqual(len(shown), 600)
+        self.assertEqual(shown, [f for f in shown if 'red #1 ' not in f])
+        self.assertEqual(shown, sorted(set(shown), key=shown.index))
         # A note at exactly the cursor's instant with a new cid is still news; the old ones are not.
         tie = self.note('cid-tie', {**self.RED, 'ordinal': 9999}, at=newer[-1]['at'])
         self.stub_berth([first, *newer, tie])
         context = self.call()
         self.assertEqual(context.count('SIBLING RED'), 1)
         self.assertIn('red #9999 ', context)
+        self.assertIsNone(self.call())
+
+    def ordinals(self, context):
+        lines = context.splitlines()
+        self.assertEqual(lines[0], self.FRAME)
+        self.assertEqual(context.count(self.FRAME), 1)
+        return [int(line.split('red #', 1)[1].split(' ', 1)[0]) for line in lines if 'SIBLING RED' in line]
+
+    def cursor_path(self):
+        return (self.root / '.eprfs' / 'status' / 'gate-live' / 'cursors'
+                / f'{self.SESSION}--main--sibling.json')
+
+    def test_a_flood_is_shown_twenty_at_a_time_oldest_first(self):
+        import time
+        base = time.time() - 120
+        notes = [self.note(f'cid-{i:02d}', {**self.RED, 'ordinal': i}, at=base + i) for i in range(45)]
+        self.stub_berth(list(reversed(notes)))
+        more = '[gate-live] {} more sibling note(s) wait; they follow on the next tool calls.'
+        context = self.call()
+        self.assertEqual(self.ordinals(context), list(range(0, 20)))
+        self.assertEqual(context.splitlines()[-1], more.format(25))
+        context = self.call()
+        self.assertEqual(self.ordinals(context), list(range(20, 40)))
+        self.assertEqual(context.splitlines()[-1], more.format(5))
+        context = self.call()
+        self.assertEqual(self.ordinals(context), list(range(40, 45)))
+        self.assertNotIn('more sibling', context)
+        self.assertIsNone(self.call())
+
+    def test_a_waiting_backlog_is_not_held_by_the_poll_throttle(self):
+        import time
+        base = time.time() - 120
+        self.stub_berth([self.note(f'cid-{i:02d}', {**self.RED, 'ordinal': i}, at=base + i)
+                         for i in range(25)])
+        self.env['GATE_LIVE_SIBLING_POLL_S'] = '3600'
+        self.assertEqual(self.ordinals(self.call()), list(range(0, 20)))
+        self.assertEqual(self.ordinals(self.call()), list(range(20, 25)))
+        self.assertIsNone(self.call())
+
+    def test_a_late_note_inside_the_window_is_shown_once_and_one_below_it_is_lost(self):
+        import time
+        base = time.time() - 60
+        head = self.note('cid-head', {**self.RED, 'ordinal': 1}, at=base)
+        self.stub_berth([head])
+        self.assertEqual(self.ordinals(self.call()), [1])
+        late = self.note('cid-late', {**self.RED, 'ordinal': 2}, at=base - 100)
+        lost = self.note('cid-lost', {**self.RED, 'ordinal': 3}, at=base - 2000)
+        self.stub_berth([head, late, lost])
+        self.assertEqual(self.ordinals(self.call()), [2])
+        self.assertIsNone(self.call())
+        state = json.loads(self.cursor_path().read_text())
+        self.assertEqual(state['at'], base)
+        self.assertIn([base - 100, 'cid-late'], state['recent'])
+
+    def test_recent_stays_bounded_and_a_forgotten_note_does_not_replay(self):
+        import time
+        base = time.time() - 60
+        path = self.cursor_path()
+        path.parent.mkdir(parents=True)
+        recent = [[base - 500 + i * 0.25, f'cid-r{i:04d}'] for i in range(1500)]
+        path.write_text(json.dumps({'checked_at': 0, 'at': base, 'cids_at': [], 'recent': recent}))
+        replay = [self.note(c, {**self.RED, 'ordinal': 7}, at=a) for a, c in recent[:3]]
+        self.stub_berth([*replay, self.note('cid-new', {**self.RED, 'ordinal': 8}, at=base + 1)])
+        self.assertEqual(self.ordinals(self.call()), [8])
+        state = json.loads(path.read_text())
+        self.assertLessEqual(len(state['recent']), MODULE['RECENT_MAX'])
+        self.assertTrue(all(a >= state['at'] - MODULE['LATE_WINDOW_S'] for a, _ in state['recent']))
+        self.assertIn('floor', state)
         self.assertIsNone(self.call())
 
     def test_an_old_format_cursor_is_read_as_first_contact(self):

@@ -1220,8 +1220,9 @@ test('follow --sibling prints each sibling note once from a peek and consumes no
   const bin = stubBerth(root, { notes: [note, { ...note, cid: 'n2', text: 'prose' }] });
   const lines = [];
   await live.followSibling({ session: 's', env: siblingEnv(root, bin), write: (l) => lines.push(l), pollMs: 20, timeoutMs: 600, sleep: (ms) => new Promise((r) => setTimeout(r, ms)) });
-  assert.equal(lines.length, 1);
-  assert.match(lines[0], /SIBLING RED .* run r1 g test red #1 \+1s/);
+  assert.equal(lines.length, 2, 'the frame, then the red');
+  assert.match(lines[0], /untrusted data from another device/);
+  assert.match(lines[1], /SIBLING RED .* run r1 g test red #1 \+1s/);
 });
 
 test('E4 finding 6: a self/* subscription matches a hand-over run, and a run killed before close gets an unknown final', async (t) => {
@@ -1285,5 +1286,24 @@ test('E5 #1: a device id, project or step that is not an id never reaches the wi
   assert.equal(body.step, null);
   assert.equal(body.ref, 'refs/heads/dev');
   assert.ok(!JSON.stringify(body).includes('/private'), JSON.stringify(body));
+});
+
+test('E5 #7: follow --sibling survives --timeout-ms 0, ends after a final on request, and never prints Infinity', async (t) => {
+  const root = fixture(t);
+  const zero = spawnSync(process.execPath, [SCRIPT, 'follow', '--sibling', '--session', 's', '--timeout-ms', '0'],
+    { cwd: root, encoding: 'utf8', timeout: 8000, env: siblingEnv(root, stubBerth(root)) });
+  assert.equal(zero.status, 0, zero.stderr);
+  assert.ok(!/ERR_INVALID_ARG_TYPE/.test(zero.stderr), zero.stderr);
+  const now = Date.now() / 1000;
+  const red = { cid: 'r', at: now, session: 'x', to: 's', text: JSON.stringify({ kind: 'gate-red@1', run: 'r1', device: HERE_DID, gate: 'g', class: 'test', ordinal: 1, atS: 1, continuing: { remaining: 2, total_s: '1e400' } }) };
+  const final = { cid: 'f', at: now, session: 'x', to: 's', text: JSON.stringify({ kind: 'gate-final@1', run: 'r1', device: HERE_DID, verdict: 'failed', failures: 1, reds: [], ran: [], reused: [], wallS: 3 }) };
+  const lines = [];
+  const started = Date.now();
+  const code = await live.followSibling({ session: 's', env: siblingEnv(root, stubBerth(root, { notes: [red, final] })), write: (l) => lines.push(l), pollMs: 20, timeoutMs: 5000, untilFinal: true });
+  assert.equal(code, 0);
+  assert.ok(Date.now() - started < 3000, 'it ended at the final, not the deadline');
+  assert.match(lines.at(-1), /SIBLING FINAL/);
+  assert.ok(lines.every((l) => !/Infinity/.test(l)), lines.join('\n'));
+  assert.match(lines[1], /~\? min/);
 });
 

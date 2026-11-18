@@ -72,6 +72,9 @@ def unseen(session, reader):
 SIBLING_KINDS = ("gate-red@1", "gate-final@1")
 SIBLING_POLL_S = 20
 SIBLING_FRESH_S = 600
+SIBLING_LINES_MAX = 20
+LATE_WINDOW_S = 600
+RECENT_MAX = 1000
 
 
 def berth_bin():
@@ -153,7 +156,12 @@ def sibling_unseen(live, session, reader, now=None):
     """Sibling gate-red@1 / gate-final@1 notes addressed to this session that this reader has not
     been shown, read with `berth inbox --peek` (nothing consumed). This reader's cursor is
     monotonic: the highest note `at` already passed plus the cids seen at exactly that instant,
-    so no retention window can ever replay an old note. Polled at most every SIBLING_POLL_S;
+    and `recent`, the [at, cid] pairs passed within LATE_WINDOW_S below it, so a note that syncs
+    in late with an older `at` is still shown once. A note stamped more than LATE_WINDOW_S below
+    the cursor (or at or below `floor`, raised when `recent` overflows RECENT_MAX) is lost by
+    design: no retention window can ever replay an old note. At most SIBLING_LINES_MAX notes are
+    shown per call, oldest first, and the cursor moves only past what was shown, so the rest
+    follow on the next calls (unthrottled while some wait). Polled at most every SIBLING_POLL_S;
     any error is silence. Lines are preceded by one frame naming them untrusted data."""
     now = time.time() if now is None else now
     path = live / "cursors" / f"{filename(session)}--{filename(reader)}--sibling.json"
@@ -165,7 +173,11 @@ def sibling_unseen(live, session, reader, now=None):
     if not isinstance(state, dict) or note_at(state) is None:
         state = None
     poll = float(os.environ.get("GATE_LIVE_SIBLING_POLL_S", SIBLING_POLL_S))
-    if state and now - float(state.get("checked_at") or 0) < poll:
+    try:
+        checked_at = float(state.get("checked_at") or 0) if state else 0.0
+    except (TypeError, ValueError):
+        checked_at = 0.0
+    if state and not state.get("more") and now - checked_at < poll:
         return []
     result = subprocess.run(
         [berth_bin(), "inbox", "--session", session, "--peek", "--all", "--json"],
@@ -177,7 +189,14 @@ def sibling_unseen(live, session, reader, now=None):
     if not isinstance(notes, list):
         return []
     cursor_at = note_at(state) if state else None
-    cursor_cids = set(c for c in (state.get("cids_at") or []) if isinstance(c, str)) if state else set()
+    cids_at = state.get("cids_at") if state else None
+    cursor_cids = set(c for c in cids_at if isinstance(c, str)) if isinstance(cids_at, list) else set()
+    recent = {}  # cid -> at, for notes passed below (or at) the cursor within the late window
+    for entry in (state.get("recent") if state and isinstance(state.get("recent"), list) else []):
+        if (isinstance(entry, list) and len(entry) == 2 and isinstance(entry[1], str)
+                and note_at({"at": entry[0]}) is not None):
+            recent[entry[1]] = float(entry[0])
+    floor = note_at({"at": state.get("floor")}) if state else None
     candidates = []
     for note in notes:
         if not isinstance(note, dict):
@@ -185,8 +204,11 @@ def sibling_unseen(live, session, reader, now=None):
         cid, at = note.get("cid"), note_at(note)
         if not isinstance(cid, str) or not cid or at is None:
             continue
-        if cursor_at is not None and (at < cursor_at or (at == cursor_at and cid in cursor_cids)):
-            continue
+        if cursor_at is not None and at <= cursor_at:
+            # Late or tied: news only within the window, above the floor, and never passed.
+            if (at < cursor_at - LATE_WINDOW_S or (floor is not None and at <= floor)
+                    or cid in cursor_cids or cid in recent):
+                continue
         if not addressed_to(note.get("to"), session):
             continue
         try:
@@ -197,18 +219,43 @@ def sibling_unseen(live, session, reader, now=None):
             continue
         candidates.append((at, cid, body, note))
     lines = []
-    for at, cid, body, note in sorted(candidates, key=lambda c: (c[0], c[1])):
+    ordered = sorted(candidates, key=lambda c: (c[0], c[1]))
+    more = 0
+    for index, (at, cid, body, note) in enumerate(ordered):
+        # First contact: a red older than ten minutes is history, not news (but it is passed).
+        stale = state is None and now - at > SIBLING_FRESH_S
+        if not stale and len(lines) >= SIBLING_LINES_MAX:
+            # Time order: everything from here on waits, and the cursor stays below it.
+            more = len(ordered) - index
+            break
+        recent[cid] = at
         if cursor_at is None or at > cursor_at:
             cursor_at, cursor_cids = at, {cid}
-        else:
+        elif at == cursor_at:
             cursor_cids.add(cid)
-        # First contact: a red older than ten minutes is history, not news (but it is passed).
-        if state is None and now - at > SIBLING_FRESH_S:
-            continue
-        lines.append(sibling_line(body, note))
+        if not stale:
+            lines.append(sibling_line(body, note))
+    if more:
+        lines.append(f"[gate-live] {more} more sibling note(s) wait; they follow on the next tool calls.")
+    if cursor_at is not None:
+        kept = sorted(((a, c) for c, a in recent.items() if a >= cursor_at - LATE_WINDOW_S),
+                      key=lambda e: (e[0], e[1]))
+        if len(kept) > RECENT_MAX:
+            # Overflow forgets the oldest; the floor keeps a forgotten note from replaying.
+            dropped, kept = kept[:-RECENT_MAX], kept[-RECENT_MAX:]
+            floor = dropped[-1][0] if floor is None else max(floor, dropped[-1][0])
+        recent_out = [[a, c] for a, c in kept]
+    else:
+        recent_out = []
+    if floor is not None and cursor_at is not None and floor < cursor_at - LATE_WINDOW_S:
+        floor = None  # below the window it no longer decides anything
     path.parent.mkdir(parents=True, exist_ok=True)
     cursor = {"checked_at": now, "at": cursor_at if cursor_at is not None else 0.0,
-              "cids_at": sorted(cursor_cids)}
+              "cids_at": sorted(cursor_cids), "recent": recent_out}
+    if floor is not None:
+        cursor["floor"] = floor
+    if more:
+        cursor["more"] = more
     path.write_text(json.dumps(cursor))
     return [SIBLING_FRAME, *lines] if lines else []
 
