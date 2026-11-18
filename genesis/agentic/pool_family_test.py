@@ -7,7 +7,9 @@ under another prefix or a detached head in the same worktree stays warm.
 
 Run: python3 -m unittest genesis.agentic.pool_family_test
 """
+import contextlib
 import importlib.util
+import io
 import os
 from pathlib import Path
 import subprocess
@@ -19,6 +21,18 @@ HERE = Path(__file__).resolve().parent
 POOL_LIB = HERE / 'bin' / 'pool-lib.sh'
 HOOK = HERE.parents[1] / '.claude' / 'hooks' / 'cargo-disk-guard.py'
 RECORD = 'cargo-pool-family'
+# Every family and second-level workspace name under /projects/.cargo-target-pool on 2026-11-18.
+EXISTING = [
+    'berth', 'brit', 'brit-memory', 'brit-noise-20261112', 'claude', 'deps', 'deps-zip', 'dev',
+    'epr-1100-f664a1bfb', 'epr-a0bec2549', 'feedback', 'follow', 'follow-outcome', 'gate',
+    'hc-fork-071', 'hc-k6v2', 'hostcompat', 'k12', 'k13', 'k9', 'land', 'qualification', 'regen2',
+    'restart', 'retire', 'retire-1961', 'rust1100', 'steward', 'steward-arrival',
+    'elohim__elohim-storage', 'genesis__orchestrator__rust-style', 'k9-8b273f826__elohim__eprfs',
+    'projects__elohim__.worktrees__brit-memory-advisories-20261114', 'xfetch', 'dev', 'release',
+]
+# Values that must never become a pool path component.
+HOSTILE = ['..', '.', '../escape', 'a/b', '/abs', 'a b', 'a\tb', 'a\nb', '-rf', 'x' * 201,
+           'ok$(id)', 'a;b', 'café', '  ', '.hidden']
 
 
 def load_guard():
@@ -59,7 +73,9 @@ class PoolFamilyTest(unittest.TestCase):
         return out.stdout.strip()
 
     def py_family(self, wt, **extra):
-        with mock.patch.dict(os.environ, {**self.env, **extra}, clear=True):
+        self.py_stderr = io.StringIO()
+        with mock.patch.dict(os.environ, {**self.env, **extra}, clear=True), \
+                contextlib.redirect_stderr(self.py_stderr):
             return self.guard.family_for(str(wt))
 
     def record(self, wt):
@@ -109,6 +125,93 @@ class PoolFamilyTest(unittest.TestCase):
         self.git(self.wt, 'branch', '-m', 'claude/x')
         self.record(self.wt).unlink()
         self.assertEqual(self.bash_family(self.wt), 'claude')
+
+    def bash_run(self, script, *args, **extra):
+        return subprocess.run(['bash', '-c', f'source "$1" && shift && {script}', '_', str(POOL_LIB), *args],
+                              env={**self.env, **extra}, capture_output=True, text=True, timeout=20)
+
+    def test_validators_agree_and_keep_every_existing_family(self):
+        values = EXISTING + HOSTILE + ['sprint', 'as-integrate', 'v1.2', '_x', 'A-Z']
+        out = self.bash_run('for v in "$@"; do pool_component_ok "$v" && echo 1 || echo 0; done', *values)
+        self.assertEqual(out.returncode, 0, out.stderr)
+        bash = [line == '1' for line in out.stdout.splitlines()]
+        python = [self.guard.pool_component_ok(v) for v in values]
+        self.assertEqual(bash, python)
+        self.assertTrue(all(python[:len(EXISTING)]), 'every family in the live pool still resolves')
+        self.assertFalse(any(python[len(EXISTING):len(EXISTING) + len(HOSTILE)]))
+
+    def test_hostile_values_from_every_source_are_ignored_identically(self):
+        for value in HOSTILE:
+            for source in ('env', '.family', 'record'):
+                with self.subTest(source=source, value=value):
+                    extra = {}
+                    record = self.record(self.wt)
+                    record.unlink(missing_ok=True)
+                    (self.wt / '.family').unlink(missing_ok=True)
+                    if source == 'env':
+                        extra['CARGO_TARGET_POOL_FAMILY'] = value
+                    elif source == '.family':
+                        (self.wt / '.family').write_text(value)
+                    else:
+                        record.write_text(value)
+                    out = subprocess.run(
+                        ['bash', '-c', 'source "$1" && detect_family "$2"', '_', str(POOL_LIB), str(self.wt)],
+                        env={**self.env, **extra}, capture_output=True, text=True, timeout=20)
+                    bash = out.stdout.strip()
+                    python = self.py_family(self.wt, **extra)
+                    self.assertEqual(bash, 'steward', 'falls through to the branch family')
+                    self.assertEqual(python, bash)
+                    if value.strip() or source == 'env':
+                        self.assertIn('cargo-pool: ignoring family', out.stderr)
+                        self.assertIn('cargo-pool: ignoring family', self.py_stderr.getvalue())
+                    if source == 'record':
+                        self.assertEqual(record.read_text(), value, 'an invalid record is never replaced')
+        (self.wt / '.family').unlink(missing_ok=True)
+
+    def test_whitespace_around_a_valid_value_is_trimmed_by_both(self):
+        (self.wt / '.family').write_text('  sprint \n')
+        self.assertEqual(self.bash_family(self.wt), 'sprint')
+        self.assertEqual(self.py_family(self.wt), 'sprint')
+        self.assertEqual(self.bash_family(self.wt, CARGO_TARGET_POOL_FAMILY=' as-x '), 'as-x')
+        self.assertEqual(self.py_family(self.wt, CARGO_TARGET_POOL_FAMILY=' as-x '), 'as-x')
+
+    def test_a_symlinked_or_fifo_record_is_neither_read_nor_written(self):
+        record = self.record(self.wt)
+        target = self.root / 'outside'
+        target.write_text('evil\n')
+        record.symlink_to(target)
+        for family in (self.bash_family, self.py_family):
+            self.assertEqual(family(self.wt), 'steward')
+        self.assertEqual(target.read_text(), 'evil\n', 'the link target is never truncated')
+        self.assertTrue(record.is_symlink())
+        record.unlink()
+        record.symlink_to(self.root / 'dangling')
+        for family in (self.bash_family, self.py_family):
+            self.assertEqual(family(self.wt), 'steward')
+        self.assertFalse((self.root / 'dangling').exists(), 'a dangling link is never followed to create')
+        record.unlink()
+        os.mkfifo(record)
+        for family in (self.bash_family, self.py_family):
+            self.assertEqual(family(self.wt), 'steward')  # a write or read here would hang to the timeout
+        self.assertFalse(record.is_file())
+
+    def test_slot_construction_refuses_anything_but_one_component_per_level(self):
+        ok = self.bash_run('slot_path "$@"', 'steward', 'elohim/elohim-storage', 'dev')
+        self.assertEqual(ok.returncode, 0)
+        self.assertEqual(ok.stdout.strip(), f"{self.root / 'pool'}/family/steward/elohim__elohim-storage/dev")
+        for args in (('..', 'elohim', 'dev'), ('a/b', 'elohim', 'dev'), ('steward', '..', 'dev'),
+                     ('steward', 'elohim', '../x'), ('', 'elohim', 'dev'), ('a b', 'elohim', 'dev')):
+            with self.subTest(args=args):
+                out = self.bash_run('slot_path "$@"', *args)
+                self.assertEqual(out.returncode, 1)
+                self.assertEqual(out.stdout, '')
+                self.assertIn('refusing slot outside the pool', out.stderr)
+        with mock.patch.object(self.guard, 'family_for', return_value='..'):
+            self.assertIsNone(self.guard.slot_for('elohim', str(self.wt), False))
+        with mock.patch.object(self.guard, 'family_for', return_value='steward'):
+            self.assertIsNone(self.guard.slot_for('..', str(self.wt), False))
+            slot = self.guard.slot_for('elohim/elohim-storage', str(self.wt), False)
+            self.assertTrue(slot.endswith('/family/steward/elohim__elohim-storage/dev'), slot)
 
     def test_unwritable_record_still_derives(self):
         # A directory in the record's place can be neither read nor written as a

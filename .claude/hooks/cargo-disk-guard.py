@@ -70,6 +70,7 @@ import os
 import re
 import shlex
 import signal
+import stat as stat_mod
 import subprocess
 import sys
 import time
@@ -401,22 +402,53 @@ def worktree_root(cwd: str):
     return PROJECT_DIR
 
 
+# Mirror of pool-lib.sh pool_component_ok: one path component under the pool.
+# fullmatch, so a trailing newline fails as it does under bash `[[ =~ ]]`.
+_POOL_COMPONENT = re.compile(r"[A-Za-z0-9_][A-Za-z0-9._-]{0,199}")
+_FAMILY_REJECTED = set()
+
+
+def pool_component_ok(value) -> bool:
+    return isinstance(value, str) and _POOL_COMPONENT.fullmatch(value) is not None
+
+
+def _family_reject(value: str, source: str) -> None:
+    """A source offered a family it may not have: said once on stderr, never used."""
+    if (value, source) in _FAMILY_REJECTED:
+        return
+    _FAMILY_REJECTED.add((value, source))
+    print(f"cargo-pool: ignoring family {value!r} from {source} "
+          f"(expected one path component of [A-Za-z0-9._-])", file=sys.stderr)
+
+
+def _read_trimmed(path: str) -> str:
+    with open(path) as fh:
+        return fh.read().strip()
+
+
 def family_for(cwd: str):
     """Mirror pool-lib.sh detect_family exactly (review C8): env override →
     .family file → the worktree's recorded family (<git-dir>/cargo-pool-family,
     written on first derivation from a real branch; backlog row 18) → branch
-    with feat/fix/chore/worktree- prefix strip → first [-/] token, lowercased."""
+    with feat/fix/chore/worktree- prefix strip → first [-/] token, lowercased.
+    Every source must be one valid path component; an invalid one is reported
+    and skipped. Where bash falls back to the directory basename (detached head,
+    or a branch yielding no valid family) this returns None."""
     env = os.environ.get("CARGO_TARGET_POOL_FAMILY")
     if env:
-        return env
+        v = env.strip()
+        if pool_component_ok(v):
+            return v
+        _family_reject(env, "CARGO_TARGET_POOL_FAMILY")
     wt = worktree_root(cwd)
     fam_file = os.path.join(wt, ".family")
     try:
         if os.path.isfile(fam_file):
-            with open(fam_file) as fh:
-                v = "".join(fh.read().split())
-            if v:
+            v = _read_trimmed(fam_file)
+            if pool_component_ok(v):
                 return v
+            if v:
+                _family_reject(v, fam_file)
     except Exception:
         pass
     record = None
@@ -427,11 +459,17 @@ def family_for(cwd: str):
         ).stdout.strip()
         if gitdir and os.path.isdir(gitdir):
             record = os.path.join(gitdir, "cargo-pool-family")
-            if os.path.isfile(record):
-                with open(record) as fh:
-                    v = "".join(fh.read().split())
-                if v:
+            # Only a regular file that is not a symlink is read.
+            try:
+                st = os.lstat(record)
+            except FileNotFoundError:
+                st = None
+            if st is not None and stat_mod.S_ISREG(st.st_mode):
+                v = _read_trimmed(record)
+                if pool_component_ok(v):
                     return v
+                if v:
+                    _family_reject(v, record)
     except Exception:
         pass
     try:
@@ -451,9 +489,16 @@ def family_for(cwd: str):
         fam = re.split(r"[-/]", branch, 1)[0].lower()
     except Exception:
         return None
-    if record and fam:
+    if not pool_component_ok(fam):
+        if fam:
+            _family_reject(fam, f"branch {branch}")
+        return None
+    if record:
+        # Create exclusively: O_EXCL never follows or replaces an existing
+        # entry (an invalid record, a symlink, a fifo, a directory).
         try:
-            with open(record, "w") as fh:
+            fd = os.open(record, os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0), 0o644)
+            with os.fdopen(fd, "w") as fh:
                 fh.write(fam + "\n")
         except Exception:
             pass
@@ -467,7 +512,14 @@ def slot_for(ws: str, cwd: str, release: bool):
     # exact mirror of pool-lib flatten_path: '/'->'_' then runs of '_'->'__'
     flat = re.sub(r"_+", "__", ws.replace("/", "_"))
     profile = "release" if release else "dev"
-    return f"{POOL_ROOT}/family/{fam}/{flat}/{profile}"
+    # Containment: three valid components, so exactly three levels under family/.
+    if not all(pool_component_ok(part) for part in (fam, flat, profile)):
+        return None
+    family_root = os.path.join(POOL_ROOT, "family")
+    slot = f"{family_root}/{fam}/{flat}/{profile}"
+    if os.path.dirname(os.path.dirname(os.path.dirname(os.path.normpath(slot)))) != os.path.normpath(family_root):
+        return None
+    return slot
 
 
 def deny(reason: str):

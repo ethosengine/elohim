@@ -69,40 +69,77 @@ find_worktree_root() {
 # record (a rebase must not move a worktree into its basename family). To let a
 # worktree follow its branch again: rm "$(git rev-parse --git-dir)/cargo-pool-family".
 FAMILY_RECORD_NAME="cargo-pool-family"
+
+# One path component under the pool: a conservative charset, no `/`, no
+# whitespace, never `.`/`..`, never a leading `-`. Every existing family
+# (brit-noise-20261112, epr-1100-f664a1bfb, as-integrate, …) and flattened
+# workspace name (projects__elohim__.worktrees__…) matches. Bash ERE `$` is end
+# of string, so an embedded newline fails. Mirrored by cargo-disk-guard.py.
+pool_component_ok() {
+  [[ "${1:-}" =~ ^[A-Za-z0-9_][A-Za-z0-9._-]{0,199}$ ]]
+}
+
+# Trim leading and trailing whitespace only; inner whitespace stays (and fails).
+pool_trim() {
+  local s="$1"
+  s="${s#"${s%%[![:space:]]*}"}"
+  s="${s%"${s##*[![:space:]]}"}"
+  printf '%s' "$s"
+}
+
+# A source that offered a family it may not have: said on stderr, never used.
+pool_family_reject() {
+  printf 'cargo-pool: ignoring family %q from %s (expected one path component of [A-Za-z0-9._-])\n' "$1" "$2" >&2
+}
+
 detect_family() {
-  local wt="$1"
+  local wt="$1" v
   if [ -n "${CARGO_TARGET_POOL_FAMILY:-}" ]; then
-    echo "$CARGO_TARGET_POOL_FAMILY"; return
+    v="$(pool_trim "$CARGO_TARGET_POOL_FAMILY")"
+    if pool_component_ok "$v"; then echo "$v"; return; fi
+    pool_family_reject "$CARGO_TARGET_POOL_FAMILY" CARGO_TARGET_POOL_FAMILY
   fi
   if [ -f "$wt/.family" ]; then
-    local v; v="$(tr -d '[:space:]' < "$wt/.family")"
-    [ -n "$v" ] && { echo "$v"; return; }
+    v="$(pool_trim "$(cat "$wt/.family" 2>/dev/null || true)")"
+    if pool_component_ok "$v"; then echo "$v"; return; fi
+    [ -n "$v" ] && pool_family_reject "$v" "$wt/.family"
   fi
   local gitdir record=""
   gitdir="$(git -C "$wt" rev-parse --absolute-git-dir 2>/dev/null || true)"
   if [ -n "$gitdir" ] && [ -d "$gitdir" ]; then
     record="$gitdir/$FAMILY_RECORD_NAME"
-    if [ -f "$record" ]; then
-      local r; r="$(tr -d '[:space:]' < "$record" 2>/dev/null || true)"
-      [ -n "$r" ] && { echo "$r"; return; }
+    # Only a regular file that is not a symlink is read; anything else is
+    # neither read nor written (see below).
+    if [ -f "$record" ] && [ ! -L "$record" ]; then
+      v="$(pool_trim "$(cat "$record" 2>/dev/null || true)")"
+      if pool_component_ok "$v"; then echo "$v"; return; fi
+      [ -n "$v" ] && pool_family_reject "$v" "$record"
     fi
   fi
-  local branch
+  local branch fam=""
   branch="$(git -C "$wt" rev-parse --abbrev-ref HEAD 2>/dev/null || echo)"
-  if [ -z "$branch" ] || [ "$branch" = "HEAD" ]; then
-    basename "$wt" | tr '[:upper:]' '[:lower:]' | tr -c 'a-z0-9-' '-' | sed 's/-*$//' || echo unknown
-    return
+  if [ -n "$branch" ] && [ "$branch" != "HEAD" ]; then
+    case "$branch" in
+      feat/*|feature/*|fix/*|chore/*) branch="${branch#*/}" ;;
+      worktree-*) branch="${branch#worktree-}" ;;
+    esac
+    fam="$(echo "${branch%%[-/]*}" | tr '[:upper:]' '[:lower:]')"
+    if pool_component_ok "$fam"; then
+      # Best effort, and never through an existing entry: an existing record
+      # (an invalid one, a symlink, a fifo, a directory) is left alone, and
+      # noclobber creates the file with O_EXCL. An unwritable git dir derives
+      # every time.
+      if [ -n "$record" ] && [ ! -e "$record" ] && [ ! -L "$record" ]; then
+        { ( set -C; printf '%s\n' "$fam" > "$record" ); } 2>/dev/null || true
+      fi
+      echo "$fam"; return
+    fi
+    [ -n "$fam" ] && pool_family_reject "$fam" "branch $branch"
   fi
-  case "$branch" in
-    feat/*|feature/*|fix/*|chore/*) branch="${branch#*/}" ;;
-    worktree-*) branch="${branch#worktree-}" ;;
-  esac
-  local fam; fam="$(echo "${branch%%[-/]*}" | tr '[:upper:]' '[:lower:]')"
-  # Best effort: an unwritable git dir (read-only worker) derives every time.
-  if [ -n "$record" ] && [ -n "$fam" ]; then
-    { printf '%s\n' "$fam" > "$record"; } 2>/dev/null || true
-  fi
-  echo "$fam"
+  # Detached head, or a branch that yields no valid family: the worktree's
+  # sanitized directory name, which writes no record.
+  v="$(basename "$wt" | tr '[:upper:]' '[:lower:]' | tr -c 'a-z0-9-' '-' | sed 's/-*$//')"
+  if pool_component_ok "$v"; then echo "$v"; else echo unknown; fi
 }
 
 # Convert workspace-relative path "elohim/elohim-storage" → "elohim__elohim-storage"
@@ -111,9 +148,20 @@ flatten_path() {
 }
 
 # Slot path: $POOL_ROOT/family/<family>/<flat-ws-rel>/<profile>/
+# Containment: each of the three is one valid path component, so the result is
+# always exactly three levels under $POOL_ROOT/family. Otherwise nothing is
+# printed and the call fails (a `set -e` caller stops rather than building
+# outside the pool).
 slot_path() {
   local family="$1" ws_rel="$2" profile="${3:-dev}"
   local flat; flat="$(flatten_path "$ws_rel")"
+  local part
+  for part in "$family" "$flat" "$profile"; do
+    if ! pool_component_ok "$part"; then
+      printf 'cargo-pool: refusing slot outside the pool: %q is not one path component\n' "$part" >&2
+      return 1
+    fi
+  done
   echo "$POOL_ROOT/family/$family/$flat/$profile"
 }
 
