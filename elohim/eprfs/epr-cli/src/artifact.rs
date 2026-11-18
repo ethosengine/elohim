@@ -134,6 +134,15 @@ pub fn usage() -> String {
      the same method and source commit, refusing different-input time ties; key CID pins that exact key; \
      provenance on stderr; diff: - this device, + sibling, sorted without context; \
      exits 0 identical, 1 different, 3 refused/unavailable)\n  \
+     | inputs diff <key-a> <key-b> [--documents DIR]... [--fetch] [--partial] [--json] [--repo ROOT] \
+     [--handle H] [--payload-store DIR] [--stall S] [--total S] \
+     (two explicit Produce keys, this device's or an admitted sibling's: each method and input \
+     document is read from the payload store or a --documents DIR (files named by CID) and \
+     verified against its own CID; every differing method field and ordered input line, - a, + b, \
+     classed byte-affecting | key-only | unresolved with its reason, order-only moves shown as \
+     such; --fetch draws a sibling's missing input document through epr peer serve; a document \
+     not held refuses naming its cure, --partial compares what is held; \
+     exits 0 identical, 1 different, 3 refused/unavailable)\n  \
      | holders (--key CID | --output CID | --family CID) [--min N] [--json] [--repo ROOT] [--handle H]\n  \
      | requires --output CID [--write FILE] [--json] [--repo ROOT] [--handle H] [--payload-store DIR] \
      (the output's recorded requirement from this device's own store, never the network; `self` \

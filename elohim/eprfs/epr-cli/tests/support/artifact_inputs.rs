@@ -72,6 +72,274 @@ fn store_lines(path: &Path, input: &BlobCid, lines: &str) {
     });
 }
 
+fn store_method(path: &Path, descriptor: &MethodDescriptor) -> Vec<u8> {
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    runtime.block_on(async {
+        let store = eprfs_peer::open_payload_store(path).unwrap();
+        let cid = eprfs_peer::put_method_record(store.as_ref(), descriptor)
+            .await
+            .unwrap();
+        store
+            .fetch_blob(&cid, eprfs_core::FetchPolicy::LocalOnly)
+            .await
+            .unwrap()
+            .bytes
+            .to_vec()
+    })
+}
+
+/// Two synthetic recordings of one crate: the sibling's PATH lists the same directories in
+/// another order, its rustc reports another LLVM version, its crt1.o resolves elsewhere with equal
+/// content, and its libm/libc probe lines swap places.
+fn two_recordings() -> (MethodDescriptor, String, MethodDescriptor, String) {
+    let scratch = TempDir::new().unwrap();
+    let (_, mut this) = method_file_with(
+        scratch.path(),
+        &["crate"],
+        &[("PATH", "/opt/rust/bin:/usr/bin:/bin")],
+    );
+    this.tools.insert("cargo".into(), "cargo 1.96.1".into());
+    let mut sibling = this.clone();
+    sibling
+        .non_path_inputs
+        .insert("PATH".into(), "/usr/bin:/opt/rust/bin:/bin".into());
+    sibling.tools.insert(
+        "rustc".into(),
+        fixture::RUSTC_IDENTITY.replace("LLVM version: 22.1.2", "LLVM version: 22.1.3"),
+    );
+    let this_lines = "crate\t040000 tree 1111111111111111111111111111111111111111\n\
+                      tool:link-driver\t/usr/bin/gcc\tbafkr4ifixtureversion\n\
+                      link:crt1.o\t/usr/lib64/crt1.o\tbafkr4ifixturecrt1\n\
+                      link:libm.so\t/usr/lib64/libm.so\tbafkr4ifixturelibm\n\
+                      link:libc.so\t/usr/lib64/libc.so\tbafkr4ifixturelibc\n"
+        .to_owned();
+    let sibling_lines = "crate\t040000 tree 1111111111111111111111111111111111111111\n\
+                         tool:link-driver\t/usr/bin/gcc\tbafkr4ifixtureversion\n\
+                         link:crt1.o\t/lib/x86_64-linux-gnu/crt1.o\tbafkr4ifixturecrt1\n\
+                         link:libc.so\t/usr/lib64/libc.so\tbafkr4ifixturelibc\n\
+                         link:libm.so\t/usr/lib64/libm.so\tbafkr4ifixturelibm\n"
+        .to_owned();
+    (this, this_lines, sibling, sibling_lines)
+}
+
+fn key_of(descriptor: &MethodDescriptor, lines: &str) -> DerivationKey {
+    DerivationKey {
+        method: descriptor.cid().unwrap(),
+        input: KeyInput::Raw(BlobCid::compute_bytes(lines.as_bytes())),
+    }
+}
+
+#[test]
+fn inputs_diff_two_keys_classifies_each_method_field_and_ordered_input_line() {
+    let (_keys, a, b) = household();
+    let (this, this_lines, sibling, sibling_lines) = two_recordings();
+    let (this_key, sibling_key) = (key_of(&this, &this_lines), key_of(&sibling, &sibling_lines));
+    for (descriptor, lines, key) in [
+        (&this, &this_lines, &this_key),
+        (&sibling, &sibling_lines, &sibling_key),
+    ] {
+        store_method(&b.payload(), descriptor);
+        store_lines(&b.payload(), key.input.cid(), lines);
+    }
+    append_local(&b, &this_key);
+    fold_inputs(
+        &b,
+        &a.key.did_key(),
+        vec![input_record(
+            &sibling_key,
+            &a.key.did_key(),
+            "2026-11-08T12:00:00Z",
+            "source",
+        )],
+    );
+    let (this_cid, sibling_cid) = (
+        eprfs_peer::key_cid(&this_key).unwrap().to_string(),
+        eprfs_peer::key_cid(&sibling_key).unwrap().to_string(),
+    );
+    let root = b.root().to_str().unwrap();
+    let diff = |extra: &[&str], left: &str, right: &str| {
+        let mut args = vec!["artifact", "inputs", "diff", left, right, "--repo", root];
+        args.extend_from_slice(extra);
+        b.epr(&args)
+    };
+
+    let json = diff(&["--json"], &this_cid, &sibling_cid);
+    assert_eq!(json.status.code(), Some(1), "{}", text(&json));
+    let report: serde_json::Value = serde_json::from_slice(&json.stdout).unwrap();
+    assert_eq!(report["a"]["own"], true);
+    assert_eq!(report["b"]["own"], false);
+    assert_eq!(report["b"]["device"], a.key.did_key());
+    assert_eq!(report["identical"], false);
+    assert_eq!(report["orderOnly"], false);
+    let method = report["method"].as_array().unwrap();
+    let field = |name: &str| {
+        method
+            .iter()
+            .find(|delta| delta["field"] == name)
+            .unwrap_or_else(|| panic!("no {name} in {method:#?}"))
+    };
+    let path = field("nonPathInputs.PATH order");
+    assert_eq!(path["change"], "order-only");
+    assert_eq!(path["class"], "unresolved");
+    assert_eq!(path["a"], "/opt/rust/bin:/usr/bin:/bin");
+    assert_eq!(path["b"], "/usr/bin:/opt/rust/bin:/bin");
+    let llvm = field("tools.rustc[LLVM version]");
+    assert_eq!(llvm["class"], "byte-affecting");
+    assert_eq!(llvm["a"], "22.1.2");
+    assert_eq!(llvm["b"], "22.1.3");
+    assert_eq!(method.len(), 2, "{method:#?}");
+    let inputs = report["inputs"].as_array().unwrap();
+    let crt1 = inputs.iter().find(|d| d["label"] == "link:crt1.o").unwrap();
+    assert_eq!(crt1["change"], "changed");
+    assert_eq!(crt1["class"], "key-only");
+    assert_eq!(
+        crt1["b"]["line"],
+        "link:crt1.o\t/lib/x86_64-linux-gnu/crt1.o\tbafkr4ifixturecrt1"
+    );
+    let moved: Vec<_> = inputs
+        .iter()
+        .filter(|d| d["change"] == "order-only")
+        .collect();
+    assert_eq!(moved.len(), 1, "{inputs:#?}");
+    assert_eq!(moved[0]["class"], "unresolved");
+    assert_ne!(moved[0]["a"]["position"], moved[0]["b"]["position"]);
+    assert_eq!(inputs.len(), 2, "{inputs:#?}");
+
+    let plain = diff(&[], &this_cid, &sibling_cid);
+    assert_eq!(plain.status.code(), Some(1), "{}", text(&plain));
+    let stdout = String::from_utf8_lossy(&plain.stdout);
+    for line in [
+        "method tools.rustc[LLVM version] changed byte-affecting: ",
+        "  - 22.1.2",
+        "  + 22.1.3",
+        "method nonPathInputs.PATH order order-only unresolved: ",
+        "input link:crt1.o changed key-only: ",
+        "  + [3] link:crt1.o\t/lib/x86_64-linux-gnu/crt1.o\tbafkr4ifixturecrt1",
+        "summary: method 2 (byte-affecting 1, key-only 0, unresolved 1); inputs 2 \
+         (byte-affecting 0, key-only 1, unresolved 1)",
+    ] {
+        assert!(
+            stdout.lines().any(|l| l.starts_with(line)),
+            "{line}\n{stdout}"
+        );
+    }
+    let stderr = String::from_utf8_lossy(&plain.stderr);
+    assert!(
+        stderr.contains(&format!("b: device={} key={sibling_cid}", a.key.did_key())),
+        "{stderr}"
+    );
+
+    // An order-only document pair is reported as such.
+    let only_order = this_lines.replace(
+        "link:libm.so\t/usr/lib64/libm.so\tbafkr4ifixturelibm\nlink:libc.so\t/usr/lib64/libc.so\tbafkr4ifixturelibc\n",
+        "link:libc.so\t/usr/lib64/libc.so\tbafkr4ifixturelibc\nlink:libm.so\t/usr/lib64/libm.so\tbafkr4ifixturelibm\n",
+    );
+    let reordered = key_of(&this, &only_order);
+    store_lines(&b.payload(), reordered.input.cid(), &only_order);
+    fold_inputs(
+        &b,
+        &a.key.did_key(),
+        vec![input_record(
+            &reordered,
+            &a.key.did_key(),
+            "2026-11-08T12:30:00Z",
+            "source",
+        )],
+    );
+    let reordered_cid = eprfs_peer::key_cid(&reordered).unwrap().to_string();
+    let order = diff(&["--json"], &this_cid, &reordered_cid);
+    assert_eq!(order.status.code(), Some(1), "{}", text(&order));
+    let report: serde_json::Value = serde_json::from_slice(&order.stdout).unwrap();
+    assert_eq!(report["orderOnly"], true);
+    assert_eq!(report["method"].as_array().unwrap().len(), 0);
+
+    let same = diff(&[], &this_cid, &this_cid);
+    assert_eq!(same.status.code(), Some(0), "{}", text(&same));
+
+    // A sibling whose method document is not held refuses, naming it and the cure.
+    let mut unheld = sibling.clone();
+    unheld.flags.push("--features=unheld".into());
+    let unheld_key = key_of(&unheld, &sibling_lines);
+    fold_inputs(
+        &b,
+        &a.key.did_key(),
+        vec![input_record(
+            &unheld_key,
+            &a.key.did_key(),
+            "2026-11-08T13:00:00Z",
+            "source",
+        )],
+    );
+    let unheld_cid = eprfs_peer::key_cid(&unheld_key).unwrap().to_string();
+    let refused = diff(&[], &this_cid, &unheld_cid);
+    assert_eq!(refused.status.code(), Some(3), "{}", text(&refused));
+    assert!(refused.stdout.is_empty());
+    let stderr = String::from_utf8_lossy(&refused.stderr);
+    assert!(
+        stderr.contains(&format!("b's method document {}", unheld_key.method)),
+        "{stderr}"
+    );
+    assert!(
+        stderr.contains("no read path draws a method document"),
+        "{stderr}"
+    );
+    assert!(stderr.contains("--documents DIR"), "{stderr}");
+
+    // --partial still compares what is held, and still exits 3.
+    let partial = diff(&["--partial", "--json"], &this_cid, &unheld_cid);
+    assert_eq!(partial.status.code(), Some(3), "{}", text(&partial));
+    let report: serde_json::Value = serde_json::from_slice(&partial.stdout).unwrap();
+    assert!(report["method"].is_null());
+    assert_eq!(report["inputs"].as_array().unwrap().len(), 2);
+    assert_eq!(report["missing"].as_array().unwrap().len(), 1);
+
+    // A carried copy that fails its CID refuses; the true bytes are accepted.
+    let documents = TempDir::new().unwrap();
+    let carried = documents.path().join(unheld_key.method.to_string());
+    std::fs::write(&carried, b"not the method document").unwrap();
+    let docs = documents.path().to_str().unwrap();
+    let tampered = diff(&["--documents", docs], &this_cid, &unheld_cid);
+    assert_eq!(tampered.status.code(), Some(3), "{}", text(&tampered));
+    assert!(
+        String::from_utf8_lossy(&tampered.stderr).contains("fails its CID"),
+        "{}",
+        text(&tampered)
+    );
+    let elsewhere = TempDir::new().unwrap();
+    std::fs::write(
+        &carried,
+        store_method(&elsewhere.path().join("payload"), &unheld),
+    )
+    .unwrap();
+    let carried_diff = diff(&["--documents", docs, "--json"], &this_cid, &unheld_cid);
+    assert_eq!(
+        carried_diff.status.code(),
+        Some(1),
+        "{}",
+        text(&carried_diff)
+    );
+    let report: serde_json::Value = serde_json::from_slice(&carried_diff.stdout).unwrap();
+    assert_eq!(report["b"]["methodDocument"], carried.display().to_string());
+    assert!(report["method"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|d| d["field"] == "flags[--features]" && d["class"] == "byte-affecting"));
+
+    // A key with no record is refused, and --device is not part of the two-key form.
+    let absent = BlobCid::compute(b"absent").to_string();
+    let none = diff(&[], &this_cid, &absent);
+    assert_eq!(none.status.code(), Some(3), "{}", text(&none));
+    assert!(String::from_utf8_lossy(&none.stderr).contains("no Produce record for key"));
+    let device = diff(&["--device", &a.key.did_key()], &this_cid, &sibling_cid);
+    assert_ne!(device.status.code(), Some(0));
+    assert!(
+        text(&device).contains("takes no --device"),
+        "{}",
+        text(&device)
+    );
+}
+
 #[test]
 fn inputs_diff_selects_newest_same_commit_in_cid_fold_order_and_prints_provenance() {
     let (_keys, a, b) = household();

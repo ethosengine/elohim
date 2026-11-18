@@ -7,6 +7,48 @@ use eprfs_peer::RequestedHolder;
 
 use super::*;
 
+mod classify;
+mod pair;
+
+/// `inputs diff <key> <key> [...]`: the second positional is the second key; its flags are read
+/// here and the rest go to the shared artifact options.
+fn run_pair(subject: &str, second: &str, args: &[String]) -> ArtifactResult<ExitCode> {
+    let mut flags = pair::PairFlags::default();
+    let mut rest = Vec::new();
+    let mut iter = args.iter();
+    while let Some(flag) = iter.next() {
+        match flag.as_str() {
+            "--documents" => flags
+                .documents
+                .push(PathBuf::from(iter.next().ok_or_else(|| {
+                    ArtifactError::InvalidArguments("--documents needs a directory".into())
+                })?)),
+            "--fetch" => flags.fetch = true,
+            "--partial" => flags.partial = true,
+            "--device" => {
+                return Err(ArtifactError::InvalidArguments(
+                    "inputs diff with two keys takes no --device: each key's record names its \
+                     own device"
+                        .into(),
+                ))
+            }
+            _ => rest.push(flag.clone()),
+        }
+    }
+    let options = Options::parse(&rest)?;
+    match pair::diff_keys(subject, second, &flags, &options) {
+        Ok(exit) => Ok(exit),
+        Err(ArtifactError::InvalidArguments(why)) => Err(ArtifactError::InvalidArguments(why)),
+        Err(error) => {
+            if options.json {
+                println!("{}", serde_json::json!({ "gap": error.to_string() }));
+            }
+            eprintln!("inputs unavailable: {error}");
+            Ok(ExitCode::from(EXIT_GAP))
+        }
+    }
+}
+
 pub(super) fn run(args: &[String]) -> ArtifactResult<ExitCode> {
     if matches!(
         args.first().map(String::as_str),
@@ -19,6 +61,11 @@ pub(super) fn run(args: &[String]) -> ArtifactResult<ExitCode> {
     let subject = args
         .get(1)
         .ok_or_else(|| ArtifactError::InvalidArguments(usage()))?;
+    if verb == Some("diff") {
+        if let Some(second) = args.get(2).filter(|arg| !arg.starts_with("--")) {
+            return run_pair(subject, second, &args[3..]);
+        }
+    }
     let mut device = None;
     let mut rest = Vec::new();
     let mut flags = args[2..].iter();
@@ -267,6 +314,33 @@ fn diff(subject: &str, device: &str, options: &Options) -> ArtifactResult<ExitCo
         None => same_source(&found.rows, device, local_row)?,
     };
     let remote = recorded_key(row)?;
+    draw_input_document(options, device, row, &remote)?;
+    let sibling = read_document(options, remote.input.cid())?;
+    let lines = line_diff(&local, &sibling);
+    eprintln!("inputs diff method={}", key.method);
+    for (side, record) in [("this device", local_row), ("sibling", row)] {
+        eprintln!(
+            "{side}: device={} key={} input={} commit={} manifest={}",
+            record.device,
+            record.key,
+            record.input.as_deref().unwrap_or("unrecorded"),
+            record.commit,
+            record.manifest
+        );
+    }
+    print!("{lines}");
+    Ok(ExitCode::from(u8::from(!lines.is_empty())))
+}
+
+/// Ask this device's `epr peer serve` to draw `row`'s input document from `device` into the
+/// payload store. An input-only request installs no file and records no Use; the daemon stores
+/// the document only when it hashes to the key's input CID.
+fn draw_input_document(
+    options: &Options,
+    device: &str,
+    row: &peer::SiblingArtifact,
+    remote: &DerivationKey,
+) -> ArtifactResult<()> {
     let peer_dir = peer::peer_dir()?;
     if ServeLock::held(&peer_dir) != Some(true) {
         return Err(gap(&FetchGap::DaemonDown));
@@ -275,7 +349,7 @@ fn diff(subject: &str, device: &str, options: &Options) -> ArtifactResult<ExitCo
         inputs_only: true,
         nonce: FetchRequest::fresh_nonce(),
         authority: FetchAuthority::Derivation {
-            key_cid: key_cid(&remote).map_err(|e| ArtifactError::Gap(e.to_string()))?,
+            key_cid: key_cid(remote).map_err(|e| ArtifactError::Gap(e.to_string()))?,
             key: remote.clone(),
         },
         output: custody::parse_cid(&row.output)?,
@@ -322,21 +396,7 @@ fn diff(subject: &str, device: &str, options: &Options) -> ArtifactResult<ExitCo
             ));
         }
     }
-    let sibling = read_document(options, remote.input.cid())?;
-    let lines = line_diff(&local, &sibling);
-    eprintln!("inputs diff method={}", key.method);
-    for (side, record) in [("this device", local_row), ("sibling", row)] {
-        eprintln!(
-            "{side}: device={} key={} input={} commit={} manifest={}",
-            record.device,
-            record.key,
-            record.input.as_deref().unwrap_or("unrecorded"),
-            record.commit,
-            record.manifest
-        );
-    }
-    print!("{lines}");
-    Ok(ExitCode::from(u8::from(!lines.is_empty())))
+    Ok(())
 }
 
 /// Sorted multiset difference: repeated lines remain meaningful and no context is printed.
