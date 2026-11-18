@@ -815,6 +815,7 @@ fn resolve_tool_path(name: &str, path: &str) -> Option<PathBuf> {
 }
 
 mod host;
+pub(crate) use host::sysroot_lines;
 use host::{check_linker, tool_lines};
 
 /// Untracked files `git status --ignored` lists inside the view are inputs no closure line names;

@@ -69,13 +69,16 @@ impl fmt::Display for Check {
     }
 }
 
-/// Read this device's arrival conditions; never enroll, install, or build during a status read.
+/// Read this device's arrival conditions; never enroll, install, build or write during a status
+/// read.
 pub fn status() -> Vec<Check> {
     let here = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-    status_at(&git::checkout(&here).unwrap_or(here))
+    status_at(&git::checkout(&here).unwrap_or(here), false)
 }
 
-pub(crate) fn status_at(root: &Path) -> Vec<Check> {
+/// The arrival conditions at `root`. `remember` (only `epr device arrive`) also records this
+/// host's sysroot observation, so a later read can say when it changed.
+pub(crate) fn status_at(root: &Path, remember: bool) -> Vec<Check> {
     let identity = session::resolve();
     let registry = Registry::discover();
     let env = |key: &str| std::env::var(key).ok();
@@ -149,6 +152,16 @@ pub(crate) fn status_at(root: &Path) -> Vec<Check> {
         supervisor_check(root),
         // Restart-arrival facts (backlog container-restart-strands-session-envelope).
         toolchain_check(root, &env),
+        sysroot_check(
+            observe_sysroot(root, &env),
+            device_layout
+                .as_ref()
+                .map_err(|refusal| refusal.to_string())
+                .and_then(|l| l.state_dir().map_err(|refusal| refusal.to_string()))
+                .map(|dir| dir.join(SYSROOT_RECORD)),
+            remember,
+            chrono::Utc::now(),
+        ),
         hooks_check(root),
         brit_trust_check(root),
         packs_check(root),
@@ -613,19 +626,23 @@ fn layout_check(resolved: Result<DeviceLayout, Refusal>) -> Check {
     )
 }
 
-/// The Rust toolchain the local gate pins (`pool-policy.json` `cargo_env_overrides["*"]`),
-/// looked up in rustup's home. `$HOME` is wiped on a workspace restart, and a rustup home under
-/// it loses the pin; the gate then refuses every cargo project. A read: never installs.
-fn toolchain_check(root: &Path, env: &dyn Fn(&str) -> Option<String>) -> Check {
-    let pin = fs::read(root.join("genesis/agentic/pool-policy.json"))
+/// The toolchain `pool-policy.json` pins for every cargo gate (`cargo_env_overrides["*"]`).
+fn gate_toolchain(root: &Path) -> Option<String> {
+    fs::read(root.join("genesis/agentic/pool-policy.json"))
         .ok()
         .and_then(|bytes| serde_json::from_slice::<Value>(&bytes).ok())
         .and_then(|policy| {
             policy["cargo_env_overrides"]["*"]["RUSTUP_TOOLCHAIN"]
                 .as_str()
                 .map(str::to_owned)
-        });
-    let Some(pin) = pin else {
+        })
+}
+
+/// The Rust toolchain the local gate pins (`pool-policy.json` `cargo_env_overrides["*"]`),
+/// looked up in rustup's home. `$HOME` is wiped on a workspace restart, and a rustup home under
+/// it loses the pin; the gate then refuses every cargo project. A read: never installs.
+fn toolchain_check(root: &Path, env: &dyn Fn(&str) -> Option<String>) -> Check {
+    let Some(pin) = gate_toolchain(root) else {
         return Check::new(
             "rust toolchain",
             State::Ok,
@@ -688,6 +705,252 @@ fn toolchain_missing(pin: &str, toolchains: &Path) -> Check {
             "rustup toolchain install {pin} --profile minimal --component clippy,rustfmt"
         )),
     )
+}
+
+const SYSROOT_CHECK: &str = "sysroot";
+/// The remembered sysroot, under the layout's state directory (persistent across a workspace
+/// restart; `$HOME` is not).
+const SYSROOT_RECORD: &str = "sysroot/observed.json";
+/// How long a changed sysroot stays a degraded line after the change is first seen: long enough
+/// for every session of a working week to read it, short enough not to become wallpaper. A
+/// judgement, not a measured bound; the change itself stays in the record's `previous`.
+const SYSROOT_NOTICE_DAYS: i64 = 7;
+
+/// The system link inputs this host would key a build with, and the human context beside them.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct SysrootObserved {
+    /// CID over the sorted `tool:link-driver` and `link:` lines of the artifact key's probe.
+    cid: String,
+    /// `/etc/os-release` `ID VERSION_ID`, when readable.
+    os: Option<String>,
+    /// The loaded glibc's `gnu_get_libc_version`, on a glibc host.
+    glibc: Option<String>,
+}
+
+/// One remembered observation and when this device first saw it (RFC 3339, UTC).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct SysrootSeen {
+    cid: String,
+    os: Option<String>,
+    glibc: Option<String>,
+    first_seen: String,
+}
+
+/// The last observed sysroot and the one before it, when it changed.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SysrootRecord {
+    current: SysrootSeen,
+    previous: Option<SysrootSeen>,
+}
+
+/// Observe this host's sysroot with the artifact key's own link-input probe, under this
+/// process's PATH and the session's toolchain (else the gate pin). Never fails the caller.
+fn observe_sysroot(
+    root: &Path,
+    env: &dyn Fn(&str) -> Option<String>,
+) -> Result<SysrootObserved, String> {
+    let set = |name: &str| env(name).filter(|value| !value.is_empty());
+    let path = set("PATH").ok_or("PATH is not set")?;
+    let toolchain = set("RUSTUP_TOOLCHAIN")
+        .or_else(|| gate_toolchain(root))
+        .unwrap_or_else(|| "unpinned".into());
+    let lines = crate::artifact::sysroot_lines(&path, &toolchain).map_err(|e| e.to_string())?;
+    let document: String = lines.iter().map(|line| format!("{line}\n")).collect();
+    let os = ["/etc/os-release", "/usr/lib/os-release"]
+        .iter()
+        .find_map(|file| fs::read_to_string(file).ok())
+        .and_then(|text| os_release(&text));
+    Ok(SysrootObserved {
+        cid: eprfs_core::BlobCid::compute_bytes(document.as_bytes()).to_string(),
+        os,
+        glibc: glibc_version(),
+    })
+}
+
+/// `ID VERSION_ID` from an os-release document (either may be quoted); `ID` alone without a
+/// version.
+fn os_release(text: &str) -> Option<String> {
+    let field = |key: &str| {
+        text.lines()
+            .find_map(|line| line.strip_prefix(key)?.strip_prefix('='))
+            .map(|value| value.trim().trim_matches(['"', '\'']).to_owned())
+            .filter(|value| !value.is_empty())
+    };
+    let id = field("ID")?;
+    Some(match field("VERSION_ID") {
+        Some(version) => format!("{id} {version}"),
+        None => id,
+    })
+}
+
+#[cfg(all(target_os = "linux", target_env = "gnu"))]
+fn glibc_version() -> Option<String> {
+    // SAFETY: glibc returns a static, NUL-terminated string for the loaded libc.
+    let version = unsafe { std::ffi::CStr::from_ptr(libc::gnu_get_libc_version()) };
+    version.to_str().ok().map(str::to_owned)
+}
+#[cfg(not(all(target_os = "linux", target_env = "gnu")))]
+fn glibc_version() -> Option<String> {
+    None
+}
+
+/// `<short cid> (<os>, glibc <v>)`, leaving out what was not observed.
+fn describe_sysroot(cid: &str, os: Option<&str>, glibc: Option<&str>) -> String {
+    let context: Vec<String> = os
+        .map(str::to_owned)
+        .into_iter()
+        .chain(glibc.map(|v| format!("glibc {v}")))
+        .collect();
+    let short = crate::frames::short_cid(cid);
+    if context.is_empty() {
+        short
+    } else {
+        format!("{short} ({})", context.join(", "))
+    }
+}
+
+/// Judge an observation against the remembered record. Returns the line and, when the record
+/// should change, the record to write; the caller decides whether this read writes. A changed
+/// sysroot is a fact, never a refusal: builds stay correct, only keys and caches go cold.
+fn sysroot_judge(
+    observed: Result<SysrootObserved, String>,
+    remembered: Result<Option<SysrootRecord>, String>,
+    now: chrono::DateTime<chrono::Utc>,
+) -> (Check, Option<SysrootRecord>) {
+    let observed = match observed {
+        Ok(observed) => observed,
+        Err(why) => {
+            return (
+                Check::new(
+                    SYSROOT_CHECK,
+                    State::Degraded,
+                    format!("unobserved ({why})"),
+                    None,
+                ),
+                None,
+            )
+        }
+    };
+    let stamp = now.to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
+    let seen = SysrootSeen {
+        cid: observed.cid.clone(),
+        os: observed.os.clone(),
+        glibc: observed.glibc.clone(),
+        first_seen: stamp,
+    };
+    let describe =
+        |seen: &SysrootSeen| describe_sysroot(&seen.cid, seen.os.as_deref(), seen.glibc.as_deref());
+    let ok = |note: Option<String>| {
+        let detail = describe(&seen);
+        Check::new(
+            SYSROOT_CHECK,
+            State::Ok,
+            note.map_or_else(|| detail.clone(), |note| format!("{detail}; {note}")),
+            None,
+        )
+    };
+    let changed = |was: &SysrootSeen, now: &SysrootSeen| {
+        Check::new(
+            SYSROOT_CHECK,
+            State::Degraded,
+            format!(
+                "changed since {} — was {}, now {}; artifact keys and pool build caches made \
+                 before are for the previous system libraries",
+                now.first_seen,
+                describe(was),
+                describe(now)
+            ),
+            Some(
+                "none needed for correctness; expect cold builds and key misses; record the new \
+                 image in the journal"
+                    .into(),
+            ),
+        )
+    };
+    match remembered {
+        Ok(Some(record)) if record.current.cid == observed.cid => {
+            let recent = chrono::DateTime::parse_from_rfc3339(&record.current.first_seen)
+                .is_ok_and(|first| {
+                    now.signed_duration_since(first) < chrono::TimeDelta::days(SYSROOT_NOTICE_DAYS)
+                });
+            let check = match &record.previous {
+                Some(previous) if recent => changed(previous, &record.current),
+                _ => ok(None),
+            };
+            (check, None)
+        }
+        Ok(Some(record)) => {
+            let check = changed(&record.current, &seen);
+            let next = SysrootRecord {
+                current: seen,
+                previous: Some(record.current),
+            };
+            (check, Some(next))
+        }
+        Ok(None) => (
+            ok(None),
+            Some(SysrootRecord {
+                current: seen.clone(),
+                previous: None,
+            }),
+        ),
+        Err(why) => (
+            ok(Some(format!("previous record unreadable ({why})"))),
+            Some(SysrootRecord {
+                current: seen.clone(),
+                previous: None,
+            }),
+        ),
+    }
+}
+
+fn read_sysroot_record(file: &Path) -> Result<Option<SysrootRecord>, String> {
+    match fs::read(file) {
+        Ok(bytes) => serde_json::from_slice(&bytes)
+            .map(Some)
+            .map_err(|e| format!("{}: {e}", file.display())),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(e) => Err(format!("{}: {e}", file.display())),
+    }
+}
+
+/// Replace the record whole: write beside it, then rename over it.
+fn write_sysroot_record(file: &Path, record: &SysrootRecord) -> Result<(), String> {
+    let parent = file.parent().ok_or("record has no directory")?;
+    fs::create_dir_all(parent).map_err(|e| format!("{}: {e}", parent.display()))?;
+    let bytes = serde_json::to_vec_pretty(record).map_err(|e| e.to_string())?;
+    let staged = file.with_extension("json.new");
+    fs::write(&staged, bytes).map_err(|e| format!("{}: {e}", staged.display()))?;
+    fs::rename(&staged, file).map_err(|e| format!("{}: {e}", file.display()))
+}
+
+/// The sysroot line. `record` is set only by `epr device arrive`: a status read never writes,
+/// so a change it sees stays a change until an arrival remembers it.
+fn sysroot_check(
+    observed: Result<SysrootObserved, String>,
+    record_file: Result<PathBuf, String>,
+    record: bool,
+    now: chrono::DateTime<chrono::Utc>,
+) -> Check {
+    let file = match record_file {
+        Ok(file) => file,
+        Err(why) => {
+            let (mut check, _) = sysroot_judge(observed, Ok(None), now);
+            if check.state == State::Ok {
+                check.detail = format!("{}; change not tracked: {why}", check.detail);
+            }
+            return check;
+        }
+    };
+    let (mut check, next) = sysroot_judge(observed, read_sysroot_record(&file), now);
+    if let (true, Some(next)) = (record, next) {
+        if let Err(why) = write_sysroot_record(&file, &next) {
+            check.detail = format!("{}; not remembered: {why}", check.detail);
+        }
+    }
+    check
 }
 
 /// Hooks `.husky/hooks-path.mjs` requires in `core.hooksPath` (its `GOVERNED_HOOKS` plus the
@@ -1497,7 +1760,7 @@ pub(super) fn run(args: &[String], arrive: bool) -> Result<ExitCode, crate::erro
             return Ok(ExitCode::SUCCESS);
         }
     }
-    let checks = status_at(&root);
+    let checks = status_at(&root, arrive);
     if json {
         println!("{}", serde_json::to_string(&checks)?);
     } else {
@@ -1769,6 +2032,178 @@ mod tests {
             State::Degraded
         );
         assert_eq!(berth_check(dir.path(), None).state, State::Ok);
+    }
+    fn sysroot(cid: &str, os: &str) -> Result<SysrootObserved, String> {
+        Ok(SysrootObserved {
+            cid: cid.into(),
+            os: Some(os.into()),
+            glibc: Some("2.39".into()),
+        })
+    }
+    fn at(stamp: &str) -> chrono::DateTime<chrono::Utc> {
+        chrono::DateTime::parse_from_rfc3339(stamp)
+            .unwrap()
+            .with_timezone(&chrono::Utc)
+    }
+    const CID_A: &str = "bafkreiaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    const CID_B: &str = "bafkreibbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+    #[test]
+    fn sysroot_first_seen_is_ok_and_remembered_only_by_an_arrival() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join(SYSROOT_RECORD);
+        let now = at("2026-11-18T10:00:00Z");
+        let read = sysroot_check(
+            sysroot(CID_A, "almalinux 10.2"),
+            Ok(file.clone()),
+            false,
+            now,
+        );
+        assert_eq!(read.state, State::Ok);
+        assert_eq!(
+            read.to_string(),
+            "ok sysroot: bafkreia…aaaa (almalinux 10.2, glibc 2.39)"
+        );
+        assert!(!file.exists(), "a status read must not write");
+        let arrival = sysroot_check(
+            sysroot(CID_A, "almalinux 10.2"),
+            Ok(file.clone()),
+            true,
+            now,
+        );
+        assert_eq!(arrival.to_string(), read.to_string());
+        let record = read_sysroot_record(&file).unwrap().unwrap();
+        assert_eq!(record.current.cid, CID_A);
+        assert_eq!(record.current.first_seen, "2026-11-18T10:00:00Z");
+        assert!(record.previous.is_none());
+    }
+    #[test]
+    fn sysroot_unchanged_stays_ok_and_leaves_the_record() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join(SYSROOT_RECORD);
+        sysroot_check(
+            sysroot(CID_A, "almalinux 10.2"),
+            Ok(file.clone()),
+            true,
+            at("2026-11-01T00:00:00Z"),
+        );
+        let before = fs::read(&file).unwrap();
+        let later = sysroot_check(
+            sysroot(CID_A, "almalinux 10.2"),
+            Ok(file.clone()),
+            true,
+            at("2026-11-18T10:00:00Z"),
+        );
+        assert_eq!(later.state, State::Ok);
+        assert_eq!(fs::read(&file).unwrap(), before);
+    }
+    #[test]
+    fn sysroot_change_degrades_with_both_identities_then_settles() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join(SYSROOT_RECORD);
+        sysroot_check(
+            sysroot(CID_A, "almalinux 10.1"),
+            Ok(file.clone()),
+            true,
+            at("2026-11-01T00:00:00Z"),
+        );
+        let new = || sysroot(CID_B, "almalinux 10.2");
+        // A status read sees the change, names it, and writes nothing.
+        let read = sysroot_check(new(), Ok(file.clone()), false, at("2026-11-18T10:00:00Z"));
+        assert_eq!(read.state, State::Degraded);
+        assert_eq!(
+            read_sysroot_record(&file).unwrap().unwrap().current.cid,
+            CID_A
+        );
+        let arrival = sysroot_check(new(), Ok(file.clone()), true, at("2026-11-18T10:00:00Z"));
+        assert_eq!(
+            arrival.to_string(),
+            "degraded sysroot: changed since 2026-11-18T10:00:00Z — was bafkreia…aaaa \
+             (almalinux 10.1, glibc 2.39), now bafkreib…bbbb (almalinux 10.2, glibc 2.39); \
+             artifact keys and pool build caches made before are for the previous system \
+             libraries — none needed for correctness; expect cold builds and key misses; \
+             record the new image in the journal"
+        );
+        assert_eq!(arrival.to_string(), read.to_string());
+        let record = read_sysroot_record(&file).unwrap().unwrap();
+        assert_eq!(record.current.cid, CID_B);
+        assert_eq!(record.previous.unwrap().cid, CID_A);
+        // The change stays visible on later reads within the notice, then is a plain fact.
+        let soon = sysroot_check(new(), Ok(file.clone()), true, at("2026-11-20T00:00:00Z"));
+        assert_eq!(soon.state, State::Degraded);
+        assert!(soon
+            .detail
+            .starts_with("changed since 2026-11-18T10:00:00Z"));
+        let settled = sysroot_check(new(), Ok(file.clone()), true, at("2026-11-26T00:00:00Z"));
+        assert_eq!(settled.state, State::Ok);
+        assert_eq!(
+            read_sysroot_record(&file)
+                .unwrap()
+                .unwrap()
+                .previous
+                .unwrap()
+                .cid,
+            CID_A
+        );
+    }
+    #[test]
+    fn sysroot_unobservable_degrades_and_never_writes() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join(SYSROOT_RECORD);
+        let check = sysroot_check(
+            Err("no C link driver cc under PATH".into()),
+            Ok(file.clone()),
+            true,
+            at("2026-11-18T10:00:00Z"),
+        );
+        assert_eq!(
+            check.to_string(),
+            "degraded sysroot: unobserved (no C link driver cc under PATH)"
+        );
+        assert!(!file.exists());
+        // A corrupt record is replaced, said once, never a refusal.
+        fs::create_dir_all(file.parent().unwrap()).unwrap();
+        fs::write(&file, b"not json").unwrap();
+        let check = sysroot_check(
+            sysroot(CID_A, "rhel 10.0"),
+            Ok(file.clone()),
+            true,
+            at("2026-11-18T10:00:00Z"),
+        );
+        assert_eq!(check.state, State::Ok);
+        assert!(
+            check.detail.contains("previous record unreadable"),
+            "{}",
+            check.detail
+        );
+        assert_eq!(
+            read_sysroot_record(&file).unwrap().unwrap().current.cid,
+            CID_A
+        );
+        // No state directory: the identity is still shown, the change is not tracked.
+        let check = sysroot_check(
+            sysroot(CID_A, "rhel 10.0"),
+            Err("no state directory".into()),
+            true,
+            at("2026-11-18T10:00:00Z"),
+        );
+        assert_eq!(check.state, State::Ok);
+        assert!(check
+            .detail
+            .ends_with("change not tracked: no state directory"));
+    }
+    #[test]
+    fn sysroot_context_reads_os_release_quoting() {
+        assert_eq!(
+            os_release("NAME=\"AlmaLinux\"\nID=\"almalinux\"\nID_LIKE=\"rhel centos fedora\"\nVERSION_ID=\"10.2\"\n"),
+            Some("almalinux 10.2".into())
+        );
+        assert_eq!(
+            os_release("ID=rhel\nVERSION_ID='10.0'\n"),
+            Some("rhel 10.0".into())
+        );
+        assert_eq!(os_release("ID=arch\n"), Some("arch".into()));
+        assert_eq!(os_release("NAME=x\n"), None);
+        assert_eq!(describe_sysroot(CID_A, None, None), "bafkreia…aaaa");
     }
     #[test]
     fn toolchain_pin_is_read_from_pool_policy_and_found_under_rustup_home() {

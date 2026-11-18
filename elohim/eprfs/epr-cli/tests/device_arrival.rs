@@ -24,6 +24,8 @@ fn epr(base: &Path, args: &[&str]) -> Output {
         .env("EPR_BIN", env!("CARGO_BIN_EXE_epr"))
         .env("BRIT_BIN", env!("CARGO_BIN_EXE_epr"))
         .env("CLAUDE_CONFIG_DIR", base.join("berth-config"))
+        // An arrival remembers its sysroot here, never in this host's real state directory.
+        .env("ELOHIM_STATE_DIR", base.join("state"))
         .env("BIN_STORE_SKIP_TOOLS", "epr,brit")
         .env("ELOHIM_SESSION_ID", "arrival-test")
         .env("PATH", "/usr/bin:/bin")
@@ -121,6 +123,7 @@ fn status_keeps_dependency_order_and_does_not_mint_a_key() {
             "sibling exchange",
             "device supervisor",
             "rust toolchain",
+            "sysroot",
             "git hooks",
             "brit trust",
             "object packs",
@@ -128,6 +131,8 @@ fn status_keeps_dependency_order_and_does_not_mint_a_key() {
             "next step"
         ]
     );
+    // The sysroot is a fact, whatever this host's PATH lets the probe see: never a refusal.
+    assert_ne!(checks[12]["state"], "refused");
     // No serve lock is held: siblings read this device as silent.
     assert_eq!(checks[8]["state"], "degraded");
     assert!(checks[8]["detail"].as_str().unwrap().contains("silent"));
@@ -139,7 +144,7 @@ fn status_keeps_dependency_order_and_does_not_mint_a_key() {
         .contains("stands on no roster"));
     // The fixture pins no toolchain and declares no governed hooks.
     assert_eq!(checks[11]["state"], "ok");
-    assert_eq!(checks[12]["state"], "ok");
+    assert_eq!(checks[13]["state"], "ok");
     assert_eq!(checks[2]["state"], "refused");
     assert_eq!(checks[4]["state"], "degraded");
     assert_eq!(checks[5]["state"], "degraded");

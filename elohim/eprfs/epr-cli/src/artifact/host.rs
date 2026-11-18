@@ -205,6 +205,67 @@ pub(super) fn tool_lines(
     Ok(lines)
 }
 
+/// This host's system link inputs, read by the same probe the artifact key's input uses: the
+/// `tool:link-driver` and `link:` lines [`tool_lines`] writes for a build of rustc's host triple
+/// under `path` with no flags and no cargo configuration (so the default `cc` driver and std's
+/// native libraries), sorted. Paths stay absolute, as the key's input document spells them.
+/// `toolchain` selects the compiler whose std names those libraries. A host with no `cc` has no
+/// observable sysroot and refuses.
+pub(crate) fn sysroot_lines(path: &str, toolchain: &str) -> ArtifactResult<Vec<String>> {
+    let rustc = super::resolve_tool_path("rustc", path)
+        .ok_or_else(|| ArtifactError::Gap("rustc does not resolve under PATH".into()))?;
+    // The identity `describe` records: `rustc -vV` in this process's environment, here with the
+    // toolchain pinned and rustup forbidden to install one.
+    let output = Command::new(&rustc)
+        .arg("-vV")
+        .stdin(Stdio::null())
+        .env("PATH", path)
+        .env("RUSTUP_TOOLCHAIN", toolchain)
+        .env("RUSTUP_AUTO_INSTALL", "0")
+        .output()
+        .map_err(|e| ArtifactError::Gap(format!("{} -vV does not run: {e}", rustc.display())))?;
+    if !output.status.success() {
+        return Err(ArtifactError::Gap(format!(
+            "{} -vV failed: {}",
+            rustc.display(),
+            String::from_utf8_lossy(&output.stderr).trim()
+        )));
+    }
+    let identity = String::from_utf8(output.stdout)
+        .map_err(|e| ArtifactError::Gap(format!("rustc -vV is not UTF-8: {e}")))?;
+    let descriptor = MethodDescriptor {
+        name: "sysroot".into(),
+        tools: [
+            ("rustc".to_owned(), identity.trim().to_owned()),
+            ("toolchain".to_owned(), toolchain.to_owned()),
+        ]
+        .into(),
+        flags: vec![],
+        params: None,
+        exec: None,
+        step: None,
+        embedder: None,
+        view: vec![],
+        non_path_inputs: [(PATH_INPUT.to_owned(), path.to_owned())].into(),
+        deterministic: false,
+    };
+    let selections = resolve(
+        &mut descriptor.non_path_inputs.clone(),
+        &toml::Value::Table(Default::default()),
+        target(&descriptor),
+    )?;
+    let mut lines: Vec<String> = tool_lines(&descriptor, &selections)?
+        .lines()
+        .filter(|line| line.starts_with("link:") || line.starts_with("tool:link-driver"))
+        .map(str::to_owned)
+        .collect();
+    if lines.iter().any(|line| line == "tool:link-driver\t-") {
+        return Err(ArtifactError::Gap("no C link driver cc under PATH".into()));
+    }
+    lines.sort_unstable();
+    Ok(lines)
+}
+
 fn linker_identity(text: &str) -> Option<(&str, &str)> {
     for (marker, kind) in [
         ("LLD ", "LLD"),
