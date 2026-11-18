@@ -149,8 +149,7 @@
       "additionalProperties": false,
       "required": ["class", "fingerprint", "locus", "excerpt"],
       "properties": {
-        "class": {
-          "enum": ["test", "compile", "lint", "format", "env"],
+        "class": { "enum": ["test", "compile", "lint", "format", "env", "step"],
           "description": "Source of truth: the v1 live recognizer's diagnostic classes. These differ from the verdict's code/environment/unknown classification."
         },
         "fingerprint": { "type": "string", "pattern": "^[0-9a-f]{12}$" },

@@ -177,3 +177,14 @@ test('a run-open record may carry the ref it is judged by, and only a refs/ ref'
   assert.equal(validate({ ...open, ref: 'refs/heads/claude/nt-prep' }), true, JSON.stringify(validate.errors));
   assert.equal(validate({ ...open, ref: '/home/m/x' }), false);
 });
+
+test('E6 #2: a stand-in failure from the recognizer validates against the schema', () => {
+  const events = [];
+  const rec = createRecognizer({ project: 'gherkin-prepush-lint', emit: e => events.push(e) });
+  rec.push('error: Recipe `_gate-gherkin-prepush-lint` failed on line 3 with exit code 1');
+  rec.end(1);
+  const stand = events.find(e => e.kind === 'failure');
+  assert.ok(stand);
+  const record = { v: 1, run: 'r', seq: 3, at: '2026-11-18T14:00:00.000Z', ...stand };
+  assert.equal(validate(record), true, JSON.stringify(validate.errors, null, 2));
+});

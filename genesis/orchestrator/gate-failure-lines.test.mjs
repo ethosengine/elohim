@@ -348,3 +348,45 @@ test('lowercase just recipe summaries remain step events', () => {
   const { events } = run(['error: recipe `gate` failed on line 11 with exit code 1']);
   assert.deepEqual(events.map(e => [e.kind, e.step, e.exit]), [['step-failed', 'gate', 1]]);
 });
+
+describe('E6 #2: an unrecognized red step stands in only once the child is known to have failed', () => {
+  const RECIPE = name => `error: Recipe \`${name}\` failed on line 3 with exit code 1`;
+  const end = (lines, exitCode) => {
+    const events = [];
+    const rec = createRecognizer({ project: 'proj', emit: e => events.push(e) });
+    for (const line of lines) rec.push(line);
+    rec.end(exitCode);
+    return { events, rec };
+  };
+
+  test('a child that exits 0 never sends a red, whatever it printed', () => {
+    const { events, rec } = end(['(6:1): expected: #EOF', RECIPE('_gate-x')], 0);
+    assert.deepEqual(failures(events), []);
+    assert.equal(rec.summary().failures, 0);
+  });
+
+  test('a printed exit code 0 marker is no failed step', () => {
+    const { events } = end(['error: Recipe `_gate-x` failed on line 3 with exit code 0'], 1);
+    assert.deepEqual(events.filter(e => e.kind === 'step-failed'), []);
+    assert.deepEqual(failures(events), []);
+  });
+
+  test('each distinct opaque failed step stands in once, counted in the summary', () => {
+    const { events, rec } = end([RECIPE('_gate-a'), RECIPE('_gate-b'), RECIPE('_gate-a')], 1);
+    const stand = failures(events);
+    assert.deepEqual(stand.map(e => [e.step, e.failure.class, e.failure.nth]), [['_gate-a', 'step', 1], ['_gate-b', 'step', 2]]);
+    assert.match(stand[0].failure.fingerprint, /^[0-9a-f]{12}$/);
+    assert.deepEqual(stand[0].failure.locus, {});
+    assert.equal(typeof stand[0].failure.excerpt, 'string');
+    assert.equal(rec.summary().failures, 2, 'the fd-3 summary and the final agree');
+  });
+
+  test('a recognized failure anywhere in the run means no stand-in, before or after the marker', () => {
+    const real = 'error[E0425]: cannot find value `x` in this scope';
+    for (const lines of [[RECIPE('_gate-a'), real, '  --> src/lib.rs:1:1', ''], [real, '  --> src/lib.rs:1:1', '', RECIPE('_gate-a')]]) {
+      const { events } = end(lines, 1);
+      assert.ok(failures(events).every(e => e.failure.class !== 'step'), JSON.stringify(failures(events)));
+      assert.ok(failures(events).length >= 1);
+    }
+  });
+});

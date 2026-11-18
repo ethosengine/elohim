@@ -179,7 +179,6 @@ function main() {
   // outlook() is once per run, so a run whose first red came earlier adds nothing here.
   let outlooked = false;
   let firstOutlook;
-  let recognized = false; // whether this gate has recorded a failure event yet
   // The first red's outlook is written to the run log before its sibling note is sent, so the
   // detached sender reads it there; the tap waits for that write only (bounded, below).
   const pending = new Set();
@@ -197,21 +196,7 @@ function main() {
       }
       // E4 finding 3: a detached, deadline-bound worker sends the note; the tap never waits on
       // berth, and an unsendable note is a sibling-delivery line in the run log.
-      if (written && event.kind === 'failure') {
-        recognized = true;
-        emitRedDetached(run, written);
-      }
-      // DoD-4 receipt (2026-11-18): a step can exit red with no line the recognizer knows (a
-      // Gherkin parse error), and a red that is never a failure event never reaches a sibling.
-      // The first such step stands in as one failure, class `step`, so every red gate is heard.
-      if (written && event.kind === 'step-failed' && !recognized) {
-        recognized = true;
-        const stand = appendEvent(run, label({
-          kind: 'failure', project, step: event.step,
-          failure: { class: 'step', excerpt: [`${event.step} exited ${event.exit}`] },
-        }));
-        if (stand) emitRedDetached(run, stand);
-      }
+      if (written && event.kind === 'failure') emitRedDetached(run, written);
     },
   });
   const child = spawn(command, args, {
@@ -239,7 +224,8 @@ function main() {
     const cost = sampler.sample();
     out.end();
     err.end();
-    recognizer.end();
+    // The child's status decides whether an unrecognized red step stands in as a failure (E6 #2).
+    recognizer.end(signal ? 1 : code);
     try {
       writeSync(3, `${JSON.stringify({ signals: recognizer.signals(), ...recognizer.summary(), ...cost })}\n`);
     } catch { /* no fd 3: run by hand */ }

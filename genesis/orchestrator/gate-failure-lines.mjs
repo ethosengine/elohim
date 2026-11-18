@@ -93,6 +93,7 @@ export function createRecognizer({ project, emit, now = () => Date.now() }) {
   let overflow = 0;
   let lastPath = null;
   let block = null; // { kind: 'cargo-test' | 'rust', lines, event }
+  const failedSteps = new Map(); // step name -> first non-zero exit printed for it
 
   function raise(cls, locus, text, extra = {}) {
     if (cls === 'test') signals.assertionFailed = true;
@@ -160,7 +161,11 @@ export function createRecognizer({ project, emit, now = () => Date.now() }) {
     const step = STEP_FAILED.exec(line) || GATE_STEP_FAILED.exec(line);
     if (step) {
       signals.recipeStarted = true;
-      emit({ kind: 'step-failed', project, step: step[1], exit: Number(step[2]) });
+      const exit = Number(step[2]);
+      // A printed "exit code 0" is no failed step (E6 #2; the schema refuses one).
+      if (exit === 0) return;
+      if (!failedSteps.has(step[1])) failedSteps.set(step[1], exit);
+      emit({ kind: 'step-failed', project, step: step[1], exit });
       return;
     }
 
@@ -177,7 +182,19 @@ export function createRecognizer({ project, emit, now = () => Date.now() }) {
 
   return {
     push,
-    end() { closeBlock(); },
+    /**
+     * `exitCode`: the child's status, once known. A child that exited non-zero with no failure this
+     * recognizer could name (a Gherkin parse error) gets one `step` failure per distinct failed step,
+     * raised like any other (fingerprint, nth, summary count), so every red gate is heard; a child
+     * that exited 0 never does, whatever it printed (E6 #2, DoD-4 receipt 2026-11-18).
+     */
+    end(exitCode) {
+      closeBlock();
+      if (exitCode === undefined || exitCode === 0 || failures > 0) return;
+      for (const [name, exit] of failedSteps) {
+        raise('step', {}, `${name} exited ${exit} with no failure line this recognizer knows`, { step: name });
+      }
+    },
     signals: () => ({ ...signals }),
     summary: () => ({ failures, overflow, firstRedSeconds: firstRedMs === null ? null : firstRedMs / 1000 }),
   };
