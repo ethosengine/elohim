@@ -806,11 +806,30 @@ fn artifact_glibc_loader_is_matched_by_exact_soname() {
         result.evidence[axis::ABI_LIBC]["library"],
         "ld-linux-x86-64.so.2"
     );
-    let aarch64 = glibc_needs(&[
-        ("libc.so.6", &["GLIBC_2.17"]),
-        ("ld-linux-aarch64.so.1", &["GLIBC_2.17"]),
-    ]);
-    assert!(extract(Path::new("aarch64-loader.elf"), &aarch64).is_ok());
+    // An AArch64 binary whose highest need is on its loader: the floor is the loader's, so the
+    // assertion fails if the classifier ignored `ld-linux-aarch64.so.1`.
+    let aarch64 = with_needs(
+        fixture(
+            elf::EM_AARCH64,
+            elf::ELFOSABI_LINUX,
+            &[0xc0, 0x03, 0x5f, 0xd6],
+            Some("/lib/ld-linux-aarch64.so.1"),
+            None,
+        ),
+        &[
+            ("libc.so.6", &["GLIBC_2.17"]),
+            ("ld-linux-aarch64.so.1", &["GLIBC_2.17", "GLIBC_2.35"]),
+        ],
+    );
+    let result = extract(Path::new("aarch64-loader.elf"), &aarch64).unwrap();
+    assert_eq!(
+        predicate(&result.requires, axis::ABI_LIBC),
+        &floor(line::GLIBC, vec![2, 35])
+    );
+    assert_eq!(
+        result.evidence[axis::ABI_LIBC]["library"],
+        "ld-linux-aarch64.so.1"
+    );
 }
 
 /// A needed libc.so.6 with no readable numeric need of its own refuses, even when another
