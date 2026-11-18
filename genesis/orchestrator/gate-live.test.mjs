@@ -1073,7 +1073,7 @@ test('matchSubscriptions: the latest note per subscriber wins and intents parse'
     subNote({ intent: 'every' }, { cid: '1', at: Date.now() / 1000 - 2 }),
     subNote({ intent: 'nth:3' }, { cid: '2', at: Date.now() / 1000 - 1 }),
   ];
-  assert.deepEqual(live.matchSubscriptions(notes, { did: HERE_DID }), [{ subscriber: 'shem-orchestrator', intent: { nth: 3 } }]);
+  assert.deepEqual(live.matchSubscriptions(notes, { did: HERE_DID }), [{ subscriber: 'shem-orchestrator', intent: { nth: 3 }, device: OTHER_DID }]);
   assert.equal(live.hearsRed('default', 1), true);
   assert.equal(live.hearsRed('default', 2), false);
   assert.equal(live.hearsRed('every', 7), true);
@@ -1114,6 +1114,7 @@ test('default intent: three reds yield first-red and final, exactly two notes, f
     assert.equal(body.line, undefined);
   }
   assert.equal(first.run, live.opaqueRun(path, HERE_DID));
+  assert.equal(first.forDevice, OTHER_DID, 'each copy names the device whose subscription it answers');
   assert.match(first.run, /^[0-9a-f]{16}$/);
   assert.equal(final.kind, 'gate-final@1');
   assert.equal(final.run, first.run);
@@ -1175,8 +1176,16 @@ test('E4 finding 5: a subscription binds to its sender, its lease is capped, a l
   assert.deepEqual(match(unsubscribed), []);
   // `any` and this device, or two globs, are one recipient with the broader intent.
   const both = [subNote({ device: 'any', intent: 'nth:3' }, { cid: 'x' }), subNote({ ref: 'refs/heads/*', intent: 'nth:2' }, { cid: 'y' })];
-  assert.deepEqual(match(both), [{ subscriber: 'shem-orchestrator', intent: { nth: 2 } }]);
-  assert.deepEqual(match([...both, subNote({ intent: 'every' }, { cid: 'z' })]), [{ subscriber: 'shem-orchestrator', intent: 'every' }]);
+  // E5 #5: nth:3 and nth:2 for one recipient hear the union (red 3 is not dropped).
+  const [merged] = match(both);
+  assert.deepEqual(merged.intent, { any: [{ nth: 3 }, { nth: 2 }] });
+  assert.deepEqual([1, 2, 3, 4, 5, 6].filter((n) => live.hearsRed(merged.intent, n)), [2, 3, 4, 6]);
+  assert.equal(merged.device, OTHER_DID, 'the subscribing device travels with the recipient');
+  assert.deepEqual(match([...both, subNote({ intent: 'every' }, { cid: 'z' })]).map((s) => s.intent), ['every']);
+  // E5 #5: a note stamped in the future cannot extend the 12 h lease: beyond five minutes of
+  // clock skew it is no subscription at all; within it, it counts from its stamp.
+  assert.deepEqual(match([subNote({}, { at: nowS + 10 * 3600 })]), []);
+  assert.equal(match([subNote({}, { at: nowS + 60 })]).length, 1);
 });
 
 test('E4 finding 3: a stuck or missing berth is bounded and named, never silent', async (t) => {

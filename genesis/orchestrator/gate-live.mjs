@@ -669,6 +669,7 @@ const SUBSCRIPTION_KIND = 'gate-subscription@1';
 const RED_KIND = 'gate-red@1';
 const FINAL_KIND = 'gate-final@1';
 const DEFAULT_SUBSCRIPTION_MS = 12 * 60 * 60 * 1000;
+const CLOCK_SKEW_MS = 5 * 60 * 1000;
 const READ_TIMEOUT_MS = 1200;
 // E4 (review of row 10a): a sibling note carries facts, never text. Raw failure lines, paths and
 // commands stay on the device that printed them; a line like `TOKEN=… FAILED` must not cross.
@@ -711,11 +712,13 @@ function intentOf(body) {
   return nth && Number(nth[1]) > 0 ? { nth: Number(nth[1]) } : body.intent === 'every' ? 'every' : 'default';
 }
 
-// The broader of two intents for one recipient: every, then the smaller nth, then default.
-function broader(a, b) {
+// Two intents for one recipient hear the union of what each hears (E5 #5: nth:2 with nth:3 must
+// still hear red 3): `every` absorbs everything, otherwise the distinct intents are kept.
+function union(a, b) {
   if (a === 'every' || b === 'every') return 'every';
-  if (typeof a === 'object' && typeof b === 'object') return { nth: Math.min(a.nth, b.nth) };
-  return typeof a === 'object' ? a : b;
+  const list = [...(a?.any ?? [a]), ...(b?.any ?? [b])];
+  const distinct = [...new Map(list.map((i) => [JSON.stringify(i), i])).values()];
+  return distinct.length === 1 ? distinct[0] : { any: distinct };
 }
 
 /**
@@ -730,6 +733,7 @@ function broader(a, b) {
 export function matchSubscriptions(notes, { did, ref = null, now = () => new Date() }) {
   const atMs = new Date(now()).getTime();
   const latest = new Map();
+  const latestDevice = new Map();
   for (const note of Array.isArray(notes) ? notes : []) {
     let body;
     try { body = JSON.parse(String(note?.text ?? '')); } catch { continue; }
@@ -739,24 +743,35 @@ export function matchSubscriptions(notes, { did, ref = null, now = () => new Dat
     const want = body.ref ?? '*';
     const key = `${note.session}\u0000${body.device}\u0000${want}`;
     const at = Number(note.at ?? 0);
-    if (!latest.has(key) || at >= latest.get(key).at) latest.set(key, { at, body, want });
+    if (!latest.has(key) || at >= latest.get(key).at) {
+      latest.set(key, { at, body, want });
+      latestDevice.set(key, typeof note.from_device === 'string' ? note.from_device : null);
+    }
   }
   const byRecipient = new Map();
-  for (const { at, body, want } of latest.values()) {
+  for (const [key, { at, body, want }] of latest) {
+    // E5 #5: a note stamped more than CLOCK_SKEW_MS ahead of this device's clock is no
+    // subscription, so a sender cannot extend its 12 h lease by dating the note in the future.
+    if (Number.isFinite(at) && at * 1000 > atMs + CLOCK_SKEW_MS) continue;
     const sentMs = Number.isFinite(at) && at > 0 ? at * 1000 : atMs;
     const until = Math.min(Date.parse(body.until ?? ''), sentMs + DEFAULT_SUBSCRIPTION_MS);
     if (!Number.isFinite(until) || until <= atMs) continue;
     if (ref ? !globRegExp(want).test(ref) : want !== '*') continue;
     const intent = intentOf(body);
+    const device = key.split('\u0000')[0] === body.subscriber ? latestDevice.get(key) : null;
     const held = byRecipient.get(body.subscriber);
-    byRecipient.set(body.subscriber, held ? broader(held, intent) : intent);
+    byRecipient.set(body.subscriber, {
+      intent: held ? union(held.intent, intent) : intent,
+      device: held?.device ?? device ?? null,
+    });
   }
-  return [...byRecipient].map(([subscriber, intent]) => ({ subscriber, intent }));
+  return [...byRecipient].map(([subscriber, { intent, device }]) => ({ subscriber, intent, device }));
 }
 
 /** Does a subscriber hear the red with this 1-based ordinal in its run? */
 export function hearsRed(intent, ordinal) {
   if (intent === 'every') return true;
+  if (Array.isArray(intent?.any)) return intent.any.some((one) => hearsRed(one, ordinal));
   if (typeof intent === 'object') return ordinal % intent.nth === 0;
   return ordinal === 1;
 }
@@ -840,10 +855,13 @@ export function sendNote(session, to, body, { env = process.env, deadlineMs = Nu
 }
 
 // Deliver `body` to every recipient and write one sibling-delivery line per attempt.
+// Each recipient's copy names the device that subscribed (`forDevice`, from berth's from_device on
+// the subscription note), so a receiver can drop a note meant for the same session id elsewhere.
 async function deliver(path, session, recipients, body, env = process.env) {
-  const results = await Promise.all(recipients.map((to) => sendNote(session, to, body, { env })));
+  const results = await Promise.all(recipients.map((sub) => sendNote(session, sub.subscriber,
+    idOr(sub.device) ? { ...body, forDevice: sub.device } : body, { env })));
   results.forEach((result, index) => {
-    appendEvent(path, { kind: 'sibling-delivery', note: body.kind, to: recipients[index], ...result });
+    appendEvent(path, { kind: 'sibling-delivery', note: body.kind, to: recipients[index].subscriber, ...result });
   });
   return results.filter((result) => result.ok).length;
 }
@@ -908,6 +926,9 @@ async function subscribersFor(path, env, { recordMiss = false } = {}) {
   return { session, did, ref, subscribers: matchSubscriptions(notes, { did, ref }) };
 }
 
+// Recipients are re-read after SUBSCRIBERS_TTL_MS, so a long-lived caller (the pre-gate red verb, a
+// test process) does not hold an old subscription set forever (E5 #5).
+const SUBSCRIBERS_TTL_MS = 60_000;
 const subscriberMemo = new Map();
 
 /**
@@ -918,8 +939,11 @@ const subscriberMemo = new Map();
 export async function emitRed(path, event, { continuing, env = process.env } = {}) {
   try {
     if (siblingOff(env) || !event || event.kind !== 'failure') return 0;
-    if (!subscriberMemo.has(path)) subscriberMemo.set(path, subscribersFor(path, env, { recordMiss: true }));
-    const found = await subscriberMemo.get(path);
+    const memo = subscriberMemo.get(path);
+    if (!memo || Date.now() - memo.at > SUBSCRIBERS_TTL_MS) {
+      subscriberMemo.set(path, { at: Date.now(), found: subscribersFor(path, env, { recordMiss: true }) });
+    }
+    const found = await subscriberMemo.get(path).found;
     if (!found || !found.subscribers.length) return 0;
     const { events, open } = runFacts(path);
     const ordinal = events.filter((e) => e.kind === 'failure' && e.seq <= event.seq).length;
@@ -942,7 +966,7 @@ export async function emitRed(path, event, { continuing, env = process.env } = {
         total_s: Number.isFinite(outlooked.total_s) ? Math.round(outlooked.total_s) : null,
       } : null,
     };
-    return await deliver(path, found.session, hearers.map((sub) => sub.subscriber), body, env);
+    return await deliver(path, found.session, hearers, body, env);
   } catch { return 0; }
 }
 
@@ -981,7 +1005,7 @@ export async function emitFinal(path, { env = process.env } = {}) {
     const found = await subscribersFor(path, env);
     if (!found || !found.subscribers.length) return 0;
     const body = finalBody(path, found);
-    return await deliver(path, found.session, found.subscribers.map((sub) => sub.subscriber), body, env);
+    return await deliver(path, found.session, found.subscribers, body, env);
   } catch { return 0; }
 }
 
