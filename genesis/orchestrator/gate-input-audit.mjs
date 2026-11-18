@@ -279,8 +279,17 @@ function auditFile(root, file, text, crate, projectName = null) {
   for (const fn of functions) {
     if (functions.filter(other => other.name === fn.name).length !== 1 ||
         ts[fn.start + 2]?.text !== '(' || ts[fn.start + 2].close !== fn.start + 3) continue;
-    const path = pathExpression(ts, fn.body + 1, crate, constants, new Map());
+    const path = pathExpression(ts, fn.body + 1, crate, constants, new Map()) ?? boundTail(fn);
     if (path && path.end === fn.end && !path.dynamic && !path.prefix) helpers.set(fn.name, path);
+  }
+  // Review of E7 (doorway's schema_dir): one `let NAME = <manifest chain>;` then a tail chain on
+  // NAME is the same literal path as the chain written in one expression. Nothing else is.
+  function boundTail(fn) {
+    const name = ts[fn.body + 2]?.text;
+    if (ts[fn.body + 1]?.text !== 'let' || !/^[a-z_]\w*$/.test(name || '') || name === 'mut' || ts[fn.body + 3]?.text !== '=') return null;
+    const bound = pathExpression(ts, fn.body + 4, crate, constants, new Map());
+    if (!bound || bound.dynamic || bound.prefix || ts[bound.end]?.text !== ';') return null;
+    return pathExpression(ts, bound.end + 1, crate, constants, new Map([[name, { path: bound.path, dynamic: false, origin: bound.origin }]]));
   }
   const usedHelpers = new Set();
   const candidates = [];

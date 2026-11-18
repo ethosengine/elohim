@@ -134,6 +134,26 @@ test('a one-level local helper resolves its callers without keeping its root con
   }`)), { paths: ['shared/data.json', 'shared/fixtures'], unresolved: [] });
 });
 
+test('E9: a helper that binds its manifest chain once and joins the binding resolves like the chain', () => {
+  // doorway/doorway-service/tests/schema_contract.rs: schema_dir() wrote its root this way, and the
+  // audit saw only the crate directory, so its real schema read was keyed by another crate's test.
+  assert.deepEqual(readSet(fixture(`fn schema_dir() -> PathBuf {
+    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    manifest_dir.join("../../shared/schemas")
+  }
+  fn load() {
+    std::fs::read_dir(schema_dir().join("views"));
+  }`)), { paths: ['shared/schemas/views'], unresolved: [] });
+  for (const body of [
+    'let mut dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")); dir.join("../../shared/schemas")',
+    'let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")); touch(); dir.join("../../shared/schemas")',
+    'let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")); other.join("../../shared/schemas")',
+  ]) {
+    const result = readSet(fixture(`fn schema_dir() -> PathBuf { ${body} }\nstd::fs::read_dir(schema_dir().join("views"));`));
+    assert.ok(!result.paths.includes('shared/schemas/views'), body);
+  }
+});
+
 test('helpers with statements, arguments or ambiguous names are not inferred', () => {
   for (const definition of [
     'fn repo() -> PathBuf { touch(); PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..") }',
@@ -584,3 +604,22 @@ test('the gate-reads grammar fixture shared with the Rust reader parses as decla
     }
   }
 });
+
+// ── E9: real reads that only another crate's test read kept in the key, now named at their home ─
+// Each is checked with the project's OWN files as the only sources, so no dependency's test can
+// be what covers it.
+for (const [name, own, files] of [
+  ['eprfs', ['elohim/eprfs/**'], ['.epr-meta/elohim/algorithms/embedding-models/all-minilm-l6-v2.json']],
+  ['eprfs-live-corpus', ['elohim/eprfs/**'], [
+    '.epr-meta/elohim/algorithms/embedding-models/all-minilm-l6-v2.json', 'genesis/manifests/cluster-state.yaml',
+    'elohim/holochain/dna/mishpat/zomes/mishpat/src/commitments.rs', 'genesis/agentic/pool-policy.json',
+  ]],
+  ['doorway', ['doorway/doorway-service/**'], ['elohim/sdk/schemas/v1/views/auth-response.schema.json']],
+]) {
+  test(`E9 REAL: ${name} covers its own reads (${files.length}) without another crate's test`, () => {
+    const repo = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
+    const result = readSet({ root: repo, project: loadGateRegistry(repo).get(name), sources: own });
+    assert.deepEqual(result.unresolved, []);
+    for (const file of files) assert.ok(result.paths.some(read => readCovers(read, file)), `${name}: ${file}`);
+  });
+}
