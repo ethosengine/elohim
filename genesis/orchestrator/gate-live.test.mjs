@@ -83,6 +83,7 @@ test('exports only the public run-log functions', () => {
     'formatSiblingNote',
     'harvest',
     'hearsRed',
+    'isDeviceId',
     'liveRoot',
     'matchSubscriptions',
     'opaqueRun',
@@ -1261,3 +1262,28 @@ test('a red whose discovery cannot run names the miss; a final in the same state
     .filter((e) => e.kind === 'sibling-delivery');
   assert.deepEqual(deliveries.map((d) => [d.ok, d.why]), [[false, 'berth inbox unreadable']]);
 });
+
+test('E5 #1: a device id, project or step that is not an id never reaches the wire', async (t) => {
+  const root = fixture(t);
+  const sub = [subNote({})];
+  // A hostname or path in GATE_LIVE_DEVICE is no device: nothing is sent, and the miss is named.
+  const badDevice = { ...siblingEnv(root, stubBerth(root, { notes: sub })), GATE_LIVE_DEVICE: '/home/m/build-box' };
+  const { path, reds } = threeRedRun(root);
+  assert.equal(await live.emitRed(path, reds[0], { env: badDevice }), 0);
+  assert.deepEqual(says(root), []);
+  assert.equal(live.isDeviceId(HERE_DID), true);
+  for (const bad of ['host.local', '/home/m', `did:key:z${'a'.repeat(400)}`, 'did:key:zbad/../x', 'did:key:zshort']) assert.equal(live.isDeviceId(bad), false, bad);
+  // A path-shaped project or step is dropped from the body; refs keep their own form.
+  const second = fixture(t);
+  const env = siblingEnv(second, stubBerth(second, { notes: sub }));
+  // The run's first red, so a default subscription hears it.
+  const { path: runPath } = openRun({ root: second, sha: SHA, target: 'dev', session: 'gate-session', ref: 'refs/heads/dev' });
+  const red = appendEvent(runPath, { kind: 'failure', project: '/private/build', step: '../../etc', class: 'test' });
+  assert.equal(await live.emitRed(runPath, red, { env }), 1);
+  const [body] = (await settle(second, 1)).map(sayBody);
+  assert.equal(body.gate, null);
+  assert.equal(body.step, null);
+  assert.equal(body.ref, 'refs/heads/dev');
+  assert.ok(!JSON.stringify(body).includes('/private'), JSON.stringify(body));
+});
+

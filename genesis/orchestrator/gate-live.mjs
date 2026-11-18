@@ -678,7 +678,12 @@ const WORKER_MS = 20_000;          // an emit worker's whole life
 const EMIT_WORKERS_MAX = 8;        // per run, from one tap process; later reds ride the final
 const LIST_MAX = 20;               // reds, ran and reused entries in a final
 const BODY_MAX = 3_500;            // bytes of JSON handed to berth as one argv entry
-const ID = /^[A-Za-z0-9._:@/+-]{1,200}$/;
+// E5 #1: an id starts with a letter, digit or `_` (just recipes) and holds no `/` and no `..`, so a path such as
+// `/private/build` is never a project or step on the wire; a ref is `refs/...`; a device is a
+// did:key, so a hostname or path in GATE_LIVE_DEVICE never crosses either.
+const ID = /^(?!.*\.\.)[A-Za-z0-9_][A-Za-z0-9._:@+-]{0,199}$/;
+const REF = /^(?!.*\.\.)refs\/[A-Za-z0-9._\/+-]{1,200}$/;
+const DID = /^did:key:z[0-9A-Za-z]{8,120}$/;
 const HERE = dirname(fileURLToPath(import.meta.url));
 
 function berthBin(env = process.env) {
@@ -800,13 +805,14 @@ function runBounded(command, args, { timeoutMs = READ_TIMEOUT_MS, env = process.
   });
 }
 
-/** This device's did: GATE_LIVE_DEVICE, else the one `epr peer leases --json` names. */
+/** This device's did: GATE_LIVE_DEVICE, else the one `epr peer leases --json` names; either way
+ * only a did:key (E5 #1), so the value cannot carry a hostname or a path to another device. */
 async function deviceDid({ env = process.env } = {}) {
-  if (env.GATE_LIVE_DEVICE) return env.GATE_LIVE_DEVICE;
+  if (env.GATE_LIVE_DEVICE) return isDeviceId(env.GATE_LIVE_DEVICE) ? env.GATE_LIVE_DEVICE : null;
   const out = await runBounded(env.EPR_BIN || 'epr', ['peer', 'leases', '--json'], { env });
   try {
     const did = JSON.parse(out).device;
-    return typeof did === 'string' && did ? did : null;
+    return isDeviceId(did) ? did : null;
   } catch { return null; }
 }
 
@@ -859,7 +865,7 @@ export function sendNote(session, to, body, { env = process.env, deadlineMs = Nu
 // the subscription note), so a receiver can drop a note meant for the same session id elsewhere.
 async function deliver(path, session, recipients, body, env = process.env) {
   const results = await Promise.all(recipients.map((sub) => sendNote(session, sub.subscriber,
-    idOr(sub.device) ? { ...body, forDevice: sub.device } : body, { env })));
+    isDeviceId(sub.device) ? { ...body, forDevice: sub.device } : body, { env })));
   results.forEach((result, index) => {
     appendEvent(path, { kind: 'sibling-delivery', note: body.kind, to: recipients[index].subscriber, ...result });
   });
@@ -873,6 +879,15 @@ export function opaqueRun(path, did) {
 
 function idOr(value, fallback = null) {
   return typeof value === 'string' && ID.test(value) ? value : fallback;
+}
+
+function refOr(value) {
+  return typeof value === 'string' && REF.test(value) ? value : null;
+}
+
+/** Whether `value` is a did:key this layer will put on the wire. */
+export function isDeviceId(value) {
+  return typeof value === 'string' && DID.test(value);
 }
 
 // The failure facts that may cross: class, fingerprint, step. Excerpt and locus stay local.
@@ -956,7 +971,7 @@ export async function emitRed(path, event, { continuing, env = process.env } = {
       kind: RED_KIND,
       run: opaqueRun(path, found.did),
       device: found.did,
-      ref: idOr(found.ref),
+      ref: refOr(found.ref),
       gate: idOr(event.project),
       ...failureFacts(event),
       ordinal,
@@ -988,7 +1003,7 @@ function finalBody(path, { did, ref }) {
     kind: FINAL_KIND,
     run: opaqueRun(path, did),
     device: did,
-    ref: idOr(ref),
+    ref: refOr(ref),
     verdict: idOr(close?.outcome, 'unknown'),
     failures: failures.length,
     reds,
@@ -1060,7 +1075,8 @@ export function formatSiblingNote(note) {
   // Another device's data: every field is checked to be an id or a number before it is printed.
   const id = (value) => idOr(value, '?');
   const n = (value) => (Number.isSafeInteger(value) && value >= 0 ? value : '?');
-  const where = `${id(body.device ?? note.from_device).split(':').pop().slice(0, 10)}${idOr(body.ref) ? ` ${body.ref}` : ''} run ${id(body.run)}`;
+  const device = isDeviceId(body.device) ? body.device : isDeviceId(note.from_device) ? note.from_device : '?';
+  const where = `${device.split(':').pop().slice(0, 10)}${refOr(body.ref) ? ` ${body.ref}` : ''} run ${id(body.run)}`;
   const red = (r) => `${id(r?.gate)} ${id(r?.class)}${idOr(r?.step) ? ` ${r.step}` : ''}${idOr(r?.fingerprint) ? ` ${r.fingerprint}` : ''}`;
   if (body.kind === RED_KIND) {
     const more = body.continuing ? `; ${n(body.continuing.remaining)} gate(s) still to run, ~${Math.max(1, Math.round((Number(body.continuing.total_s) || 0) / 60))} min` : '';
