@@ -13,6 +13,8 @@ use serde_json::{json, Value};
 
 use super::{unrecorded, ArtifactResult};
 
+#[path = "extract_declared.rs"]
+mod declared;
 #[path = "extract_frames.rs"]
 mod frames;
 #[path = "extract_isa.rs"]
@@ -26,6 +28,28 @@ mod tests;
 mod versions;
 
 type Elf<'a> = ElfFile64<'a, Endianness>;
+
+pub(crate) use declared::{declared, Declared};
+
+/// [`extract`], then the isa.x86 requirement governed by the build's declaration (see
+/// `extract_declared.rs`); `None` keeps the bytes' extraction, as for an archive or a caller
+/// with no method at hand.
+pub(super) fn extract_declared(
+    path: &Path,
+    bytes: &[u8],
+    declaration: Option<(&Declared, &str)>,
+) -> ArtifactResult<Extraction> {
+    let mut extraction = extract(path, bytes)?;
+    if let Some((declared, method)) = declaration {
+        declared::govern(
+            &mut extraction.requires,
+            &mut extraction.evidence,
+            declared,
+            method,
+        )?;
+    }
+    Ok(extraction)
+}
 
 pub(super) struct Extraction {
     pub requires: Requires,

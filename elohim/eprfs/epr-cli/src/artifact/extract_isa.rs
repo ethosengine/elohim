@@ -18,7 +18,7 @@ use cpuid::cpu_name;
 #[path = "extract_speculative.rs"]
 pub(super) mod speculative;
 
-const V4: &[&str] = &["avx512f", "avx512bw", "avx512cd", "avx512dq", "avx512vl"];
+pub(super) const V4: &[&str] = &["avx512f", "avx512bw", "avx512cd", "avx512dq", "avx512vl"];
 const BASELINE: &[&str] = &[
     "fpu", "cx8", "cmov", "mmx", "fxsr", "sse", "sse2", "syscall", "clflush", "tsc", "msr", "cpuid",
 ];

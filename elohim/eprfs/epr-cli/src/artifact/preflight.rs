@@ -7,6 +7,10 @@ use object::Object;
 // Dependency gaps are detected separately by cargo_project.
 // Admission owns this gap: partial extraction is evidence, never a refusal or ISA clause.
 pub(super) const PARTIAL_DECODE_GAP: &str = "isa.x86.partial-decode";
+/// The partial-decode gap when the build's declaration governs isa.x86 (`extract_declared.rs`):
+/// the decode covered only what the bytes were observed to use, not the declared requirement,
+/// so it leaves the admitted clause measured.
+pub(super) const OBSERVED_PARTIAL_DECODE_GAP: &str = "isa.x86.observed.partial-decode";
 const COMPILER: &str = "missing build-inputs: compiler/linker inputs incomplete";
 const REQUIRES: &str = "missing Requires: unsupported artifact format or architecture";
 
@@ -143,8 +147,14 @@ pub(super) fn check(options: &Options, descriptor: &MethodDescriptor) -> Artifac
                     missing.push(format!("{COMPILER}: {e}"));
                 }
             }
-            if let Err(e) = requires_gaps(bytes, bytes_path, options.requires.as_deref(), &mut gaps)
-            {
+            let declared = extract::declared(&descriptor.non_path_inputs);
+            if let Err(e) = requires_gaps_declared(
+                bytes,
+                bytes_path,
+                options.requires.as_deref(),
+                &mut gaps,
+                Some(&declared),
+            ) {
                 let label = if e.to_string().contains("dispatch narrowing") {
                     "missing dispatch-evidence: requested narrowing is unproved"
                 } else {
@@ -210,16 +220,33 @@ pub(super) fn check(options: &Options, descriptor: &MethodDescriptor) -> Artifac
 }
 
 /// Use the same extraction/merge validation as recording, including its evidence document.
+#[cfg(test)]
 pub(super) fn requires_gaps(
     bytes: &[u8],
     output: &Path,
     caller: Option<&Path>,
     gaps: &mut Vec<String>,
 ) -> ArtifactResult<()> {
-    let (_, evidence) = requires::documents(bytes, output, caller, false)?;
+    requires_gaps_declared(bytes, output, caller, gaps, None)
+}
+
+/// [`requires_gaps`] for a build whose declaration is known: a partial decode is then a gap in
+/// the observation only ([`OBSERVED_PARTIAL_DECODE_GAP`]), unless the declaration is one this
+/// reader cannot name and the bytes' extraction governs.
+pub(super) fn requires_gaps_declared(
+    bytes: &[u8],
+    output: &Path,
+    caller: Option<&Path>,
+    gaps: &mut Vec<String>,
+    declared: Option<&extract::Declared>,
+) -> ArtifactResult<()> {
+    let (_, evidence) = requires::documents(bytes, output, caller, false, None)?;
     if let Some((_, evidence)) = evidence {
         if partial_decode(&evidence)? {
-            gaps.push(PARTIAL_DECODE_GAP.into());
+            gaps.push(match declared {
+                Some(extract::Declared::Features(_)) => OBSERVED_PARTIAL_DECODE_GAP.into(),
+                _ => PARTIAL_DECODE_GAP.into(),
+            });
         }
     }
     gaps.sort();

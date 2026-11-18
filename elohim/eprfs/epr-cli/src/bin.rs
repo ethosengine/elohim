@@ -455,8 +455,11 @@ pub(crate) mod sibling {
         ]
         .into_iter()
         .find(|name| {
-            gap.strip_prefix(name)
-                .is_some_and(|rest| rest.is_empty() || rest.starts_with('.'))
+            gap.strip_prefix(name).is_some_and(|rest| {
+                // `<axis>.observed.*` is a gap in what the bytes were seen to use, beside a
+                // declared requirement that stays measured (extract_declared.rs).
+                (rest.is_empty() || rest.starts_with('.')) && !rest.starts_with(".observed")
+            })
         })
     }
 
@@ -670,16 +673,17 @@ pub(crate) mod sibling {
     /// The residual's cheap half: the statement that admitted an offer is the producing
     /// sibling's own word, so before either drawn binary is executed (ingest runs
     /// `epr --version`), this device re-extracts what the staged bytes require and judges that
-    /// on this host. A partial decode of the staged bytes is unmeasured, as at put time.
+    /// on this host: libc, loader, kernel, libraries and architecture, which the bytes alone
+    /// establish. isa.x86 is left out: what a host must have there is what the build declared
+    /// (extract_declared.rs), already judged from the stated document, and the bytes'
+    /// instruction union includes code behind runtime CPUID checks.
     #[cfg(feature = "peer")]
     fn staged_admit(host: &host_contract::Provides, bin: &str, bytes: &[u8]) -> Result<(), String> {
-        let (document, partial) = crate::artifact::staged_requires(Path::new(bin), bytes)?;
-        if partial {
-            return Err(format!(
-                "re-extraction decoded {bin}'s x86 code only partially, so its isa.x86 \
-                 requirement is unmeasured"
-            ));
-        }
+        let (document, _partial) = crate::artifact::staged_requires(Path::new(bin), bytes)?;
+        let mut clauses: Vec<serde_json::Value> = serde_json::from_slice(&document)
+            .map_err(|e| format!("re-extracted requirement is not a clause array: {e}"))?;
+        clauses.retain(|clause| clause["axis"] != host_contract::names::axis::ISA_X86);
+        let document = serde_json::to_vec(&clauses).map_err(|e| e.to_string())?;
         admit_on(host, &document)
     }
 
@@ -1867,6 +1871,8 @@ mod tests {
             ("library", None),
             ("build-inputs.build-scripts", None),
             ("isa.x86x", None),
+            // A gap in the observation beside a declared requirement leaves it measured.
+            ("isa.x86.observed.partial-decode", None),
         ] {
             assert_eq!(sibling::unmeasured_axis_for_test(gap), axis, "{gap}");
         }

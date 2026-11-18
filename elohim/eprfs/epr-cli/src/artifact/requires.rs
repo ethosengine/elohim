@@ -87,11 +87,12 @@ pub(super) fn documents(
     output: &Path,
     caller: Option<&Path>,
     archive: bool,
+    declaration: Option<(&super::extract::Declared, &str)>,
 ) -> ArtifactResult<(Option<Document>, Option<Document>)> {
     if archive {
         return Ok((caller.map(read_requires).transpose()?, None));
     }
-    let mut extraction = super::extract::extract(output, bytes)?;
+    let mut extraction = super::extract::extract_declared(output, bytes, declaration)?;
     if let Some(path) = caller {
         merge_declared(&mut extraction.requires, path)?;
     }

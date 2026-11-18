@@ -1223,7 +1223,7 @@ fn reach_gate_unconfirmed() -> Option<String> {
 /// When the bytes are not an executable extraction reads.
 pub(crate) fn staged_requires(path: &Path, bytes: &[u8]) -> Result<(Vec<u8>, bool), String> {
     let (requires, evidence) =
-        requires::documents(bytes, path, None, false).map_err(|e| e.to_string())?;
+        requires::documents(bytes, path, None, false, None).map_err(|e| e.to_string())?;
     let (_, document) = requires.ok_or_else(|| format!("{}: no requirement", path.display()))?;
     let partial = match evidence {
         Some((_, evidence)) => preflight::partial_decode(&evidence).map_err(|e| e.to_string())?,
@@ -1356,6 +1356,10 @@ fn record_artifact(
             .unwrap_or_else(|| Path::new("sysroot archive")),
         options.requires.as_deref(),
         sysroot_manifest.is_some(),
+        Some((
+            &extract::declared(&descriptor.non_path_inputs),
+            &key.method.to_string(),
+        )),
     )?;
 
     if let Some(manifest) = sysroot_manifest {

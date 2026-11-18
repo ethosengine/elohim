@@ -126,7 +126,7 @@ fn artifact_elf_extracts_and_round_trips_against_v2() {
     assert!(
         matches!(predicate(&extraction.requires, axis::ABI_LOADER), Predicate::Present(loaders) if loaders.iter().any(|p| p.contains("ld-linux")))
     );
-    let (document, evidence) = documents(&bytes, &path, None, false).unwrap();
+    let (document, evidence) = documents(&bytes, &path, None, false, None).unwrap();
     let (cid, bytes) = document.unwrap();
     assert_eq!(cid, eprfs_core::BlobCid::compute_bytes(&bytes));
     let decoded: Requires = serde_json::from_slice(&bytes).unwrap();
@@ -370,7 +370,7 @@ fn artifact_caller_only_tightens_and_never_forges_provenance() {
             serde_json::to_vec(&clause(axis::KERNEL_LINUX, predicate.clone())).unwrap(),
         )
         .unwrap();
-        let result = documents(&bytes, Path::new("output.elf"), Some(&caller), false);
+        let result = documents(&bytes, Path::new("output.elf"), Some(&caller), false, None);
         if okay {
             let requires: Requires = serde_json::from_slice(&result.unwrap().0.unwrap().1).unwrap();
             assert!(Vec::<Clause>::from(requires)
@@ -386,14 +386,14 @@ fn artifact_caller_only_tightens_and_never_forges_provenance() {
     )
     .unwrap();
     assert!(
-        documents(&bytes, Path::new("output.elf"), Some(&caller), false)
+        documents(&bytes, Path::new("output.elf"), Some(&caller), false, None)
             .unwrap_err()
             .to_string()
             .contains("MergeError")
     );
     std::fs::write(&caller, format!(r#"[{{"axis":"{}","predicate":{{"kind":"at-least","value":{{"line":"{}","components":[1e0]}}}}}}]"#, axis::KERNEL_LINUX, line::LINUX)).unwrap();
     assert!(matches!(
-        documents(&bytes, Path::new("output.elf"), Some(&caller), false),
+        documents(&bytes, Path::new("output.elf"), Some(&caller), false, None),
         Err(super::super::ArtifactError::RequiresNumber { .. })
     ));
 }
@@ -407,7 +407,7 @@ fn artifact_unreadable_requirements_refuse_with_output_name() {
         fixture(elf::EM_X86_64, 0, &[0xc3], None, None),
         fixture(elf::EM_X86_64, elf::ELFOSABI_LINUX, &[0x0f], None, None),
     ] {
-        let error = documents(&bytes, path, None, false)
+        let error = documents(&bytes, path, None, false, None)
             .unwrap_err()
             .to_string();
         assert!(
@@ -423,10 +423,12 @@ fn artifact_unreadable_requirements_refuse_with_output_name() {
             .contains("e_machine 243")
     );
     // sysroot put preserves its non-ELF archive path and optional opaque caller document.
-    assert!(documents(b"archive validated by sysroot", path, None, true)
-        .unwrap()
-        .0
-        .is_none());
+    assert!(
+        documents(b"archive validated by sysroot", path, None, true, None)
+            .unwrap()
+            .0
+            .is_none()
+    );
 }
 
 #[test]
