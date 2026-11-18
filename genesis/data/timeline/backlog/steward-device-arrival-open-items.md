@@ -548,3 +548,30 @@ steward's lane (brit releases are incremental).
 minutes per agent. `just dev prep` does it; nothing runs it when the harness makes the
 worktree. Owed: the worktree-create hook runs `just dev prep`, or the preflight's refusal names
 that one command.
+
+## Row 26 — nothing on a device knows which system libraries it builds against
+
+Reviewed 2026-11-18 at the steward's request (journal, "The sysroot review"). The two devices
+run different images on purpose, and every image tag floats. Open, in order of consequence:
+
+1. A gate verdict's key holds nothing of gcc, glibc or the image, so a green stands in across
+   two systems and across an image update, and the reused line does not say so. Proposal:
+   record the sysroot identity on the verdict as evidence, outside the key. Steward decision.
+2. An image update changes the link inputs silently. Built, awaiting review
+   (`claude/nt-sysroot-visible`): `epr device status` prints the identity and a `degraded
+   sysroot: changed since …` line.
+3. The workspace images are not pinned by digest and their build records no package list
+   (`che-devworkspaces`: `buildDevspaceImage.groovy`, the Dockerfiles' `FROM … :latest`).
+   Steward's repository; a change is not prepared.
+4. No workspace build can run on the fleet: floor glibc 2.39 against bookworm's 2.36. The
+   cure is a declared target floor that a build links against (`--sysroot` and `-B`, or static
+   musl); `sysroot pack|put` exists and nothing consumes it. Next sprint's subject.
+5. The glibc floor counted libc's symbol versions only. Built with item 2.
+
+## Row 18, addition (2026-11-18)
+
+Every worktree on a `claude/<name>` branch resolves to the one family `claude`. Two gates in
+two such worktrees at once removed each other's build tree (journal). The per-worktree record
+keeps a family across a rename; it does not give a new worktree its own. Owed: a delegated
+worktree gets a family of its own at creation, or the gate refuses a slot another live gate
+owns and does not clean it.

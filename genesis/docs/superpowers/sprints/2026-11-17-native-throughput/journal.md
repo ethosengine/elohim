@@ -302,24 +302,83 @@ rebase leaves `AUTO_MERGE`, and `epr bin follow --tool brit` refuses from an unp
 so commits on this branch went through the Git fallback. The follow is retried from the
 published head once the batch lands.
 
-### Definition of done, as of 2026-11-18 10:50Z
+### The day's landings (2026-11-18, after 10:50Z)
+
+| Time (Z) | Head on `dev` | Lander | Gate before | Push | Reused in the push |
+|---|---|---|---|---|---|
+| 11:00 | `542e5304c` stand-in red for a failed step with no recognised line | ethosengine | 158 s | 54 s | orchestrator |
+| 13:12 | `618597e5f` two tests clear `GATE_LIVE_REF` | ethosengine | 157 s | 53 s | orchestrator |
+| 13:24 | `d082572b8` worktree prep (handed over on `self/nt-prep` in 22.9 s) | shem | 224 s on ethosengine | 274 s | orchestrator, from the sibling |
+| 14:01 | `7f2710614` E5 (six review items, schema `ref`, gospel sync) | ethosengine | 21 min | 425 s | elohim-storage |
+| 14:13 | `6a8a19767` E6 item 1, prep never forces over a staged deletion | ethosengine | 3 min | 50 s | orchestrator |
+| 15:31 | `59cbe20cd` shem's batch, 14 commits | shem | 83 min, green at 14:27 | 3360 s | nothing |
+
+**Line 3 of the definition of done, the receipt.** Shem landed ethosengine's hand-over from a
+fresh worktree after `just dev prep` (16 s install, preflight clear):
+`[gate] orchestrator reused: green in 210 s on the sibling at d082572b8 (signer sibling
+did:key:z6MkpZRh…VMZB, independence: sibling)`. `address-profile-lint` is not enrolled and ran
+again. Logs `push-nt-prep.log`, `land-nt-prep.log`.
+
+**Shem's batch paid for its gates three times.** (1) A first gate was stopped at 17 minutes to
+take review fixes. (2) The second failed in eprfs and memory-ceremony with `failed to write
+…/family/claude/elohim__eprfs/dev/debug/build/…/invoked.timestamp: No such file or directory`:
+a delegated builder's worktree, also on a `claude/` branch, ran `just gate orchestrator` in the
+same pool family and the two runs removed each other's build tree (`.gate-owner` named the
+other worktree). Thirty minutes lost; shem's worktree now has its own family record. (3) The
+third ran green in 83 minutes, cold. Then the rebase onto four small landings from ethosengine
+moved the orchestrator, eprfs and eprfs-live-corpus closures, and the push ran all of them
+again: 56 minutes with nothing reused, five minutes after the same commits were green. Which
+read those landings touched is not yet established. Every `claude/*` worktree shares one pool
+family by prefix; that is a new part of backlog row 18.
+
+The red ethosengine met while gating its hand-over came from shem's own earlier commit
+`994f10630`: `just gate` exports `GATE_LIVE_REF`, and two orchestrator tests inherited it. It
+bites only when the orchestrator gate runs direct, since a Task runs in a constructed
+environment. The run-open event's schema also refused `ref`, which production records carry.
+
+**Independent reviews, and what they stopped.**
+
+| Work | Verdicts | Outcome |
+|---|---|---|
+| Peer-note injection and pool family record | FIX FIRST | fixed, landed in `59cbe20cd` |
+| First-`epr` verifier (R5) | FIX FIRST, FIX FIRST | second round fixed at `22e0c2931`; the hand-off command the note documented did not run, and now ingests a real staged release into a scratch store; third review not run; not landed |
+| Gate enrolment (rows 20, 21) | FIX FIRST, FIX FIRST | **held by ruling**, branch `claude/nt-gate-verdicts` `fbbbe6234` |
+| E5 | FOLLOW-UP REQUIRED | lane E6; item 1 landed, items 2 to 6 built on ethosengine |
+
+The enrolment ruling: widening the key to hold the ambient environment does not converge. The
+second review found a variable read by a dependency (`ESLINT_USE_FLAT_CONFIG`) that changes
+the outcome and not the key, a clean checkout at one commit certifying another, a Task child
+whose constructed environment omits a keyed variable, and environment values written in
+plaintext to a task file. A gate should be reusable when it ran in the declared envelope, so
+the envelope is the input. Receipts: `codex-enrol-review.receipt.md`,
+`codex-enrol-rereview.receipt.md`.
+
+**The sysroot review (steward's request, 15:00Z).** The two devices run different images by an
+earlier ruling: shem AlmaLinux 10.2 x86-64-v2 from `:v2-latest`, ethosengine the UBI 10
+x86-64-v3 chain from `:latest`. Every tag in both chains floats, `dnf install` is unpinned,
+the registry keeps three dated builds, no package list is recorded, and nothing compares a
+running workspace with a declared image. A gate verdict's key holds `rustc -vV` and repository
+inputs and nothing of gcc, glibc or the image, so a verdict stands in across the two systems
+and across an image update. `epr`, `brit`, `elohim-storage` and `doorway` need only libc, libm,
+libgcc_s and the loader, at a glibc floor of 2.39; the fleet's images are Debian bookworm
+(2.36), so no workspace-built binary can be deployed, and admission says so. The floor counted
+only libc's symbol versions. `sysroot pack|put` exists and a peer can serve a floor; nothing
+links against one. Built, not yet reviewed (`claude/nt-sysroot-visible`): `epr device status`
+names the sysroot and says when it changed, and the floor counts every glibc library. Backlog
+row 26.
+
+Not done: `just dev notes publish` (the dry run lists 47 refs including seven `ci:*` notes,
+and whether device mirrors carry those is the steward's open decision); `epr bin follow --tool
+brit` from the published head ran 300 s with no output and was stopped, so shem's brit is
+still 0.2.0.
+
+### Definition of done, as of 2026-11-18 15:40Z
 
 | Line | State |
 |---|---|
-| 1 release from the gate, drawn by the sibling | met (11.6 s draw at `78cd0c0e5`); landing 2's draw was the false ISA refusal, since fixed |
-| 2 requirements judged at admission | landed (`6616ce547`, `faa225e05`, `7f48672f8`); not re-run by the orchestrator |
-| 3 hand-over in seconds, landed by the sibling | hand-overs 38 to 77 s; no `independence: sibling` landing receipt yet (waits on `self/nt-prep`) |
-| 4 a sibling's red arrives live | met on a scratch ref at 10:50Z (4.9 s); the fix that made it fire is not on `dev` yet |
-| 5 | met earlier in the sprint |
-| 6 backlog and habit deltas | backlog current to row 22; habit deltas for landings 2, 3 and E4 owed |
-
-**Line 4, the receipt.** With the fix on a scratch head (`5804e04b3`), ethosengine failed
-`gherkin-prepush-lint` at 10:50:03.608Z. Its run log records the stand-in failure 19 ms later
-and the note handed to berth in 1.2 s. Shem's follower printed
-`SIBLING RED z6MkpZRhMw refs/heads/scratch/dod4b run 4a45f28895574a8d gherkin-prepush-lint step
-_gate-gherkin-prepush-lint red #1 +7s; 5 gate(s) still to run, ~9 min` at 10:50:08.474Z:
-4.9 s from the failed step to the other device, and it was in the orchestrator's context 21 s
-after that. The thin final has its own receipt from the earlier run: recorded on ethosengine at
-10:49:43.361Z, printed on shem at 10:49:48.926Z (`SIBLING FINAL … failed in 397s — 0 red(s);
-ran 4, reused 0`). Log: `genesis/local-dev/native-throughput/dod4-follow-2.log`. The first
-attempt would have passed a test that only checked the final; the red itself was silent.
+| 1 release from the gate, drawn by the sibling | met (11.6 s draw at `78cd0c0e5`) |
+| 2 requirements judged at admission | landed; not re-run by the orchestrator |
+| 3 hand-over in seconds, landed by the sibling | met: 22.9 s hand-over, `independence: sibling` on the landing |
+| 4 a sibling's red arrives live | met: 4.9 s on a scratch ref; the fix is on `dev`; E6 items 2 to 6 open |
+| 5 deployment path read, first step ruled | met earlier in the sprint; the sysroot review adds that the fleet cannot run a workspace build |
+| 6 backlog and habit deltas | current to row 26 |
