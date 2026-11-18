@@ -518,3 +518,33 @@ The two workspaces carry different glibc and gcc runtime builds, so the keys rig
 Five method fields differ only in `PATH` (extra and reordered entries on shem); whether those
 reach the build is unresolved. A key hit across devices needs the same sysroot on both, which is
 what the recorded `sysroot-pack` artifact is for; it does not need a change to the key.
+
+## Row 23 — a peer note waits for the receiver to look
+
+2026-11-18: shem sent ethosengine a note at 05:09Z; ethosengine read it at 10:47Z. Its session
+was alive and waiting for a differently worded note. Two followers on shem expired in between
+and the sprint's live-red test waited five and a half hours. A berth note enters a session only
+when that session next reads its inbox; nothing wakes an idle agent. Owed: an addressed note
+wakes its session the way a gate red does (the `gate-live-inject` hook already injects reds on
+the next tool call; an idle session needs the Monitor form), and a note that has gone unread
+past a bound is visible to its sender (`berth say` prints nothing either way).
+
+## Row 24 — brit gaps met while orchestrating (installed 0.2.0 on shem, pin 0.2.6)
+
+Observed 2026-11-17/18, each on brit 0.2.0, so each needs re-checking on 0.2.6 before it is
+called a gap: `brit commit` exits with a backtrace when a Git rebase or cherry-pick has left
+`AUTO_MERGE`; no rebase onto a moved upstream when a gitlink moved; no cherry-pick. Built in the
+brit submodule on branch `nt-gaps` (`f35d1b753`, not pushed, pin not moved): `brit log <ref>`
+and ranges, `brit diff tree --name-only`. `epr bin follow --tool brit` refuses from a head that
+is not published on `dev`, so a device whose sprint branch carries local commits cannot bring
+its brit to the pin without a second checkout. Getting `nt-gaps` upstream and released is the
+steward's lane (brit releases are incremental).
+
+## Row 25 — a delegated agent's fresh worktree is refused by the gate preflight
+
+2026-11-18: three builders in harness-made worktrees (`.claude/worktrees/agent-<id>`) each met
+`gate-preflight` REFUSED: no submodules, no `node_modules`, no `.husky/_`. The cure is known
+(`git submodule update --init elohim/brit elohim/rakia sophia`, `pnpm install`) and costs
+minutes per agent. `just dev prep` does it; nothing runs it when the harness makes the
+worktree. Owed: the worktree-create hook runs `just dev prep`, or the preflight's refusal names
+that one command.

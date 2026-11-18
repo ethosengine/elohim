@@ -1057,10 +1057,10 @@ habits:
       - "a2o @concern:workspace-device-arrival (genesis/a2o/features/devflow/workspace-device-arrival.feature — a keyless workspace is refused by name and nothing else blocks; a second device joins through the first with no key crossing; a missing model names its provisioner; @act:host @requires:epr-cli; all five scenarios are wired, including local candidates with degraded enhancements)"
       - "epr flow report --headline — the `index:` slot reads within the fold-lag ceiling on this device (index-fold-lag-ceiling@1; lag reached its limit once on 2026-10-16), and `participant:` names a standing human by the tracked roster"
     evidence: >
-      DELTA 2026-11-17c (still RED; the producer is a gate leg and one offer followed a landing with no manual step): landing b97893259..bea497110 printed `[gate] epr producer put: release bafyreic4kq…5kzoa at bea497110028 … (crosses)` from `genesis/orchestrator/eprfs-produce.sh` inside `_eprfs-ingest-around`. Ethosengine, from a detached worktree at that head, ran `EPR_FOLLOW_SIBLING=1 epr bin follow --tool epr`: drew the release from shem in 3.7 s, ring landed, gateRun sibling, no local build. The release CID was already in its store from the 17:50Z draw, so this run does not prove bytes moved; the next landing changes epr's source and supplies that. The 2026-11-17 manual producer recorded an environment its bytes were not built under (its rebuild was a 0.58 s no-op); the gate leg records the environment the gate builds in. Green still waits on the laptop (runbook step 11).
-    evidence-fingerprint: sha256:1f4b726f70c2ba67
-    evidence-bytes: 19682
-    evidence-entries: 21
+      DELTA 2026-11-18 (still RED; a clean cross-device draw after a false refusal was removed): at `6616ce547` ethosengine's draw of shem's `epr` refused with `isa.x86 unmet` in 1.2 s; the refusal was false, because the extractor counted CPUID-guarded code in dependencies as a requirement. `7f48672f8` makes admission judge the level the build declared. At `78cd0c0e5` shem ran `EPR_FOLLOW_SIBLING=1 epr bin follow --tool epr` and drew release bafyreiebwmixsfw… from ethosengine in 11.6 s (21.9 s wall), no local build (genesis/local-dev/native-throughput/dod1-follow-l3.log). Two devices still never share an artifact key: `epr artifact inputs diff` measured different glibc and gcc runtime builds (backlog row 22). Shem's installed brit is 0.2.0 against a 0.2.6 pin; `epr bin follow --tool brit` refuses from an unpublished head.
+    evidence-fingerprint: sha256:6bab7c70030f53ca
+    evidence-bytes: 20513
+    evidence-entries: 22
     refs:
       - "spec: elohim/lvi/docs/specs/2026-10-10-workspace-arrival-as-declared-device.md (the mapping of every init surface onto DevspaceSeed / Berth / device key / model pin; the three enrollment layers; the record-without-witness seam §6.3)"
       - "the devfile's arrival commands: devfile.base.yaml `setup-embed-model` + `setup-device-memory` (postStart); the provisioners genesis/agentic/bin/{embed-model-provision,device-memory-sync}"
@@ -2448,10 +2448,10 @@ habits:
       - "python3 .claude/hooks/tests/test_gate_live_inject.py (every agent hears a red at its next tool call, one cursor per agent; a background push gets the Monitor command)"
       - "@concern:gate-failures-arrive-live"
     evidence: >
-      DELTA 2026-11-12 (still RED; no push requested): native Rust gates now collect workspace warnings through cargo-lint and continue fmt/lint/test through gate-steps, with compiler helpers keyed in the closure and gate-tap remaining the sole live emitter; eprfs candidate ingestion stays behind all-green checks. Evidence: focused node:test 199/199 (including real Cargo verdict equivalence, step continuation under bash -e, and closure regression checks); the two-member dependency fixture reports first + second + integration lints (old EXIT=101, new EXIT=1), while clean and outside-dependency-only warnings pass both and compile errors retain 101; Rust 1.100 blob-store reports 1 old / 2 new rendered instances of the same fetch_update finding (EXIT=101/1). Deliberate-red run 20261112T210245Z-0088755ecd2c-059ea1 recorded a lint at 21:02:48.248Z while cargo-clippy, cargo and clippy-driver were alive, before lint step EXIT=1 at 21:02:48.799Z; both test variants passed, the temporary edit was restored byte-for-byte, and the restored gate passed. Raw logs and process observations: genesis/a2o/reports/recovery/lint-fail-at-end/.
-    evidence-fingerprint: sha256:f9e7ee8042ad3766
-    evidence-bytes: 3414
-    evidence-entries: 4
+      DELTA 2026-11-18b (status unchanged until the fix is on dev; a sibling's red crossed devices in 4.9 s): with the stand-in failure fix on scratch head `5804e04b3`, ethosengine's `gherkin-prepush-lint` step failed at 10:50:03.608Z and shem's `gate-live.mjs follow --sibling` printed `SIBLING RED … red #1 +7s; 5 gate(s) still to run` at 10:50:08.474Z. A `SIBLING FINAL` for the earlier run arrived 5.6 s after it was recorded. Log genesis/local-dev/native-throughput/dod4-follow-2.log.
+    evidence-fingerprint: sha256:d7407c61541c2212
+    evidence-bytes: 4614
+    evidence-entries: 6
     guard: >-
       Preserve output bytes, exit status, and termination signals. Keep excerpts
       device-only. Require real-push evidence of first_red_s, continued later
@@ -2576,10 +2576,10 @@ habits:
       - "node --test genesis/orchestrator/gate-cost.test.mjs (expected-cost fold over gate-cycle-seconds@1 and the defer decision's refusals)"
       - "a2o genesis/a2o/features/devflow/native-gate-evidence.feature reuse rule (this workspace's own green stands in; a red or an unadmitted signer never does)"
     evidence: >
-      DELTA 2026-11-17b (status unchanged; three costs that were not the closure's are removed, two measured and one unit-proven): landing b97893259..bea497110 (shem, 4607 s of gates, log genesis/local-dev/native-throughput/push-dev-2.log). (1) The live-corpus legs are their own project `eprfs-live-corpus`, keyed through `// gate-reads(<project>):`; it ran in 60 s on that push and a documentation edit no longer moves the eprfs workspace key (gate-evidence.test.mjs, real tree: workspace reads 246 → 228). Not yet measured: an eprfs evidence hit across a documentation commit on a real push. (2) memory-ceremony shared the eprfs slot but resolved features with `-p`, recompiling what eprfs had just built: 1152 s on that push, 365 s after building with the ingest's package set and `--workspace` (genesis/local-dev/native-throughput/gate-memory-ceremony-1.log, EXIT=0, same tests). (3) The rust-style checker's own fmt, lint, test and distribution legs are the keyed project `rust-style-checker` (19 s warm; the scan stays always-run, 31 s); its evidence hit after a commit is the receipt still owed. Still unkeyed and running on every selecting push: agentic-shift (280 s), dialogue-stasis (110 s), epr-app-package (70 s). Held: keying a root gate on the recipes it runs (six confirmed ways to under-key; patch kept in genesis/local-dev/native-throughput).
-    evidence-fingerprint: sha256:a21f5fceabaaf9c8
-    evidence-bytes: 21117
-    evidence-entries: 24
+      DELTA 2026-11-18 (status unchanged; the governance fence priced, and a landing rule that avoids it): landing 2 (shem landing ethosengine's head, log genesis/local-dev/native-throughput/push-dev-3.log) took 162 min and reused no sibling verdict: one diff over the push touched `elohim/eprfs/epr-cli/src/peer.rs`, a path in `SIBLING_REUSE_GOVERNANCE_PATHS`, and the fence then refuses the sibling's verdict for every project. A device's own verdict is not fenced, so the orchestrator ruled that the device which gated a fenced head lands it; ethosengine then landed `faa225e05` in 321 s, `78cd0c0e5` in 631 s and `94e768892` in 70 s. About 10 min of the 631 s were eleven gates not enrolled for reuse. Whether the fence should refuse per project is the steward's decision (genesis/data/timeline/backlog/steward-device-arrival-open-items.md row 19); enrolment is rows 20 and 21, in progress.
+    evidence-fingerprint: sha256:24022c918bdefd69
+    evidence-bytes: 22007
+    evidence-entries: 25
     guard: >
       Regression risks: (1) reusing on a key that omits something the recipe reads — the recipe
       body, the project tree, a submodule pin, a repo file a test include_str!s; the input audit

@@ -259,3 +259,67 @@ A Codex review of E2 (`76cacc2a6`) returned FIX FIRST with eight findings, so E2
 landing 3. Required before it lands: raw failure text and the absolute run path cross devices;
 sibling text enters an agent's context with no untrusted frame; a send has no timeout; the
 recipient is read from the note body. Lane E4, ethosengine.
+
+### E4 lands; the live-red test finds a silent red (2026-11-18)
+
+E4 (`94e768892`, the eight E2 findings) landed from ethosengine: 21 min gate, 70 s push. It
+landed before the independent review the orchestrator had asked for. The review, run after the
+fact, returned FOLLOW-UP REQUIRED: findings 2 and 8 fixed, six partial (consent is not bound to
+the sending device; `GATE_LIVE_DEVICE` crosses verbatim; some sends are unbounded; the follower
+drops or replays notes around its cursor and crashes on `--timeout-ms 0`; a tap's ninth red is
+dropped; a two-branch push tracks one destination). Receipt:
+`genesis/local-dev/native-throughput/codex-e4-review.receipt.md`. Lane E5, ethosengine.
+
+**Line 4 of the definition of done is not met, and the first live attempt says why.** Shem
+subscribed (`every`, `refs/heads/scratch/*`) at 05:09Z and followed. Ethosengine did not read
+that note for five and a half hours; two followers expired with nothing. At 10:43:04Z it fired
+the red anyway: `gherkin-prepush-lint` failed in 2 s with exit 1, and no `gate-red@1` was sent.
+The tap recognises no failure line in a Gherkin parse error, and the emitter fires only on a
+recognised line, so a gate can go red and a sibling hears nothing until the final. The fix is
+the first E5 item: a failed step with no recognised line records one synthetic failure event,
+and a delivery that finds no device, note or subscriber prints that instead of returning zero.
+Shem's follower is re-armed (10:48Z, three hours); the rerun follows the fix's landing.
+
+The five-hour silence is its own finding: a peer note reaches a session only when that session
+next reads its inbox. Nothing wakes an agent that is waiting on the wrong signal.
+
+### Shem's batch, built by delegated agents (2026-11-18)
+
+| Work | Where | State |
+|---|---|---|
+| R4 device note mirrors (`just dev notes [publish]`) | `5317022ca`, `2768f142c` | on the sprint branch, not landed; first real publish not run |
+| `epr artifact inputs diff <key-a> <key-b>` | `ce337cf02`, `398224121` | Codex review FIX FIRST (7), all fixed; not landed |
+| R5 first-`epr` verifier and packager | `claude/nt-r5-first-epr` | Codex review FIX FIRST (6); fixes in progress |
+| Gate verdict enrolment (backlog rows 20, 21) | `claude/nt-gate-verdicts` | in progress |
+| `brit log <ref>`, `brit diff tree --name-only` | brit `nt-gaps` `f35d1b753` | local to the submodule; needs a brit release lane |
+
+The inputs diff answered backlog row 22 by measurement: shem and ethosengine never share an
+artifact key because their glibc and gcc runtime builds differ (the gcc predefined-macro digest
+and ten link inputs). A shared key needs a shared sysroot, not a change to the key.
+
+The installed `brit` on shem is 0.2.0, not the pinned 0.2.6. `brit commit` refuses after a
+rebase leaves `AUTO_MERGE`, and `epr bin follow --tool brit` refuses from an unpublished head,
+so commits on this branch went through the Git fallback. The follow is retried from the
+published head once the batch lands.
+
+### Definition of done, as of 2026-11-18 10:50Z
+
+| Line | State |
+|---|---|
+| 1 release from the gate, drawn by the sibling | met (11.6 s draw at `78cd0c0e5`); landing 2's draw was the false ISA refusal, since fixed |
+| 2 requirements judged at admission | landed (`6616ce547`, `faa225e05`, `7f48672f8`); not re-run by the orchestrator |
+| 3 hand-over in seconds, landed by the sibling | hand-overs 38 to 77 s; no `independence: sibling` landing receipt yet (waits on `self/nt-prep`) |
+| 4 a sibling's red arrives live | met on a scratch ref at 10:50Z (4.9 s); the fix that made it fire is not on `dev` yet |
+| 5 | met earlier in the sprint |
+| 6 backlog and habit deltas | backlog current to row 22; habit deltas for landings 2, 3 and E4 owed |
+
+**Line 4, the receipt.** With the fix on a scratch head (`5804e04b3`), ethosengine failed
+`gherkin-prepush-lint` at 10:50:03.608Z. Its run log records the stand-in failure 19 ms later
+and the note handed to berth in 1.2 s. Shem's follower printed
+`SIBLING RED z6MkpZRhMw refs/heads/scratch/dod4b run 4a45f28895574a8d gherkin-prepush-lint step
+_gate-gherkin-prepush-lint red #1 +7s; 5 gate(s) still to run, ~9 min` at 10:50:08.474Z:
+4.9 s from the failed step to the other device, and it was in the orchestrator's context 21 s
+after that. The thin final has its own receipt from the earlier run: recorded on ethosengine at
+10:49:43.361Z, printed on shem at 10:49:48.926Z (`SIBLING FINAL … failed in 397s — 0 red(s);
+ran 4, reused 0`). Log: `genesis/local-dev/native-throughput/dod4-follow-2.log`. The first
+attempt would have passed a test that only checked the final; the red itself was silent.
