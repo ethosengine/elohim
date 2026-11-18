@@ -647,13 +647,34 @@
         "binding": "constitutional",
         "scope_json": "{\"scope\":{\"new\":true,\"write\":\"*.md\"}}",
         "citations": null,
-        "status": "active",
+        "status": "superseded",
         "established_by": "operator-ratification-pending-2026-07-02",
+        "established_at": null,
+        "superseded_by": "memory-frontmatter-at-birth@2",
+        "created_at": null,
+        "updated_at": null,
+        "metadata_json": "{\"enforcementClass\":\"deny\",\"registry\":\"policies.yaml\",\"resolutionMode\":\"pinned\",\"version\":1}"
+      }
+    },
+    {
+      "citesContentCid": "bafyreigeiycokazc7kphzrfduefxojt6ec67cohim7r3h5ncpuvf53qlli",
+      "citesContentSha256": "sha256:c44604e50322fa9e7cc4a3a10b77267e20bdf138e867e3b3f5a27d2a5eee0b5a",
+      "registry": "policies.yaml",
+      "precedent": {
+        "id": "memory-frontmatter-at-birth@2",
+        "title": "Memory topic files must be born projectable and saying whom they apply to",
+        "summary": "Memory topic files must be born projectable and saying whom they apply to",
+        "full_reasoning": "@2 keeps @1's three keys and adds `applies-to:`, a top-level key with one of three values. `device`: true of this machine only (paths, installed tools, local state) and of no use on another. `steward`: one named person's direction, correction or description of themselves; it is theirs, on record, and another person's session must not read it as its own user's. `repository`: context crafted from the work, true for anyone working here. The moment of writing is when the author knows the audience best and when stating it costs least, so the choice is made then and never inferred later. Also still needed: name (slug), title (<= 60 chars), description (ONE line, <= 160 chars: what the fact is + when it bites), metadata.type (user|feedback|project|reference). Entries born before @2 take their audience from their type (user and feedback: steward; project and reference: repository).",
+        "binding": "constitutional",
+        "scope_json": "{\"scope\":{\"new\":true,\"write\":\"*.md\"}}",
+        "citations": null,
+        "status": "active",
+        "established_by": "operator-approved-2026-11-18-memory-first-rung-plan-step-2c",
         "established_at": null,
         "superseded_by": null,
         "created_at": null,
         "updated_at": null,
-        "metadata_json": "{\"enforcementClass\":\"deny\",\"registry\":\"policies.yaml\",\"resolutionMode\":\"pinned\",\"version\":1}"
+        "metadata_json": "{\"enforcementClass\":\"deny\",\"registry\":\"policies.yaml\",\"resolutionMode\":\"pinned\",\"version\":2}"
       }
     },
     {

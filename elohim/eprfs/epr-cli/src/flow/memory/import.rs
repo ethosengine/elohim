@@ -62,7 +62,7 @@ use std::collections::BTreeSet;
 use std::path::{Component, Path, PathBuf};
 
 use elohim_epr_rea::{ActorStore, SidecarActorStore};
-use eprfs_agent::memory::{Contribution, FileRef, Imported, Locality, Source};
+use eprfs_agent::memory::{AppliesTo, Contribution, FileRef, Imported, Locality, Source};
 use eprfs_core::BlobCid;
 use serde_json::{json, Value};
 
@@ -555,6 +555,27 @@ fn one(
             indexed: Some(fm.indexed()),
         });
     }
+    let applies_to = match fm.applies_to() {
+        Ok(declared) => declared,
+        Err(written) => {
+            return Ok(Outcome::Refused {
+                reason: format!(
+                    "unreadable memory frontmatter {written} — an entry applies to `device`, \
+                     `steward` or `repository` (top-level or under `metadata:`, and the same in \
+                     both if both), or declares nothing and takes its kind's default; whose an \
+                     entry is cannot be guessed from a spelling the collective never declared"
+                ),
+                indexed: Some(fm.indexed()),
+            });
+        }
+    };
+    // A device entry is one workspace's own: it never travels past the workspace, whatever the
+    // directory's policy would allow. Narrowed by the same `min` as the policy pair, so this can
+    // only ever tighten reach. `steward` and `repository` leave it where the policies put it.
+    let reach = match applies_to {
+        Some(AppliesTo::Device) => reach.min(Locality::Workspace),
+        _ => reach,
+    };
 
     let row = entries::row_from_frontmatter(file, &fm);
     let name = entries::clean_line(fm.get("name"));
@@ -608,6 +629,9 @@ fn one(
             git_name: git_name(root, rel),
             entry_type,
             indexed: fm.indexed(),
+            // Only what the entry DECLARED: the default is re-derived on read, so a contribution
+            // whose entry never named it keeps the exact bytes it was first recorded with.
+            applies_to,
         }),
     };
 

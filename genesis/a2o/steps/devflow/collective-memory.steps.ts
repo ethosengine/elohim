@@ -1,6 +1,15 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 
@@ -16,6 +25,8 @@ interface MemoryFixture {
   baseline?: ObjectValue;
   claimBytes: string;
   recall?: ObjectValue;
+  gate?: ObjectValue;
+  indexText?: string;
 }
 const fixtures = new WeakMap<object, MemoryFixture>();
 const repository = resolve('../..');
@@ -124,7 +135,7 @@ function project(f: MemoryFixture, includeAlternative = true): void {
   write(f, projectionPath, f.view);
   f.projection = { path: projectionPath, resource: pin(f, projectionPath) };
 }
-function setup(world: object): MemoryFixture {
+function setup(world: object, seeded = true): MemoryFixture {
   const root = mkdtempSync(join(tmpdir(), 'collective-memory-story-'));
   const env = { ...process.env };
   for (const key of ['GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_COMMON_DIR'])
@@ -191,6 +202,7 @@ function setup(world: object): MemoryFixture {
     ]);
   }
   f.collective = pin(f, '.epr-meta/collective.json');
+  if (!seeded) return f;
   contribute(f, findingPath, 'The trial reader opened the cited passage');
   contribute(f, 'genesis/alternative.json', 'The whole workflow has independent acceptance');
   f.claimBytes = readFileSync(join(root, findingPath), 'utf8');
@@ -374,4 +386,243 @@ Then('the report leaves the contested judgment unresolved', function () {
   recall(f, 'resume');
   f.view = native(f, 'project', ['--input', 'genesis/request.json']);
   assert.ok(JSON.stringify(object(f.view.receipt)).includes(qualification));
+});
+
+// ── applies-to: whose each inherited memory is ──────────────────────────────────────────────────
+// Mirrors elohim/eprfs/epr-cli/tests/flow_memory_import.rs (`the_index_groups_...`): an agent
+// imports the collective's shared entry, a standing human stands for entries no agent authored,
+// and the index is projected from the contributions those acts leave.
+const memoryDir = '.claude/memory';
+const indexPath = `${memoryDir}/MEMORY.md`;
+const firstSteward = 'human:matthew';
+const secondSteward = 'human:ruth';
+const stewardedEntries = ['feedback_ruling', 'user_matthew'];
+const gateProbe = resolve(dirname(new URL(import.meta.url).pathname), 'memory-gate-probe.py');
+
+function entry(stem: string, kind: string, extra = '', origin = false): string {
+  const meta = origin
+    ? '  originSessionId: never-claimed-session\n  modified: 2026-09-25T09:00:00Z\n'
+    : '';
+  return `---\nname: ${stem}\ndescription: The claim of ${stem}.\n${extra}metadata:\n  type: ${kind}\n${meta}---\n\nbody\n`;
+}
+function commitAll(f: MemoryFixture): void {
+  for (const args of [
+    ['add', '-A'],
+    ['commit', '-qm', 'entries'],
+  ]) {
+    const result = spawnSync('/usr/bin/git', args, { cwd: f.root, env: f.env, encoding: 'utf8' });
+    assert.equal(result.status, 0, result.stderr);
+  }
+}
+function projectIndex(f: MemoryFixture): string {
+  native(f, 'project', ['--index', '--out', indexPath]);
+  f.indexText = readFileSync(join(f.root, indexPath), 'utf8');
+  return f.indexText;
+}
+/** The heading a row sits under: the nearest `## ` line above it. */
+function sectionOf(index: string, file: string): string | undefined {
+  let heading: string | undefined;
+  for (const line of index.split('\n')) {
+    if (line.startsWith('## ')) heading = line;
+    else if (line.includes(`](${file})`)) return heading;
+  }
+  return undefined;
+}
+const collectiveHeading = '## Held by the collective';
+const directionFrom = (who: string): string => `## Direction from ${who} (theirs, on record)`;
+function contributionOf(f: MemoryFixture, stem: string): ObjectValue {
+  return object(
+    JSON.parse(
+      readFileSync(join(f.root, `.eprfs/status/memory/contributions/${stem}.json`), 'utf8')
+    )
+  );
+}
+/** The gate: the edit-time resolver's own entry point, on a simulated new-file write. */
+function gate(f: MemoryFixture, content: string): ObjectValue {
+  const probe = join(f.root, 'gate-content.md');
+  writeFileSync(probe, content);
+  const result = spawnSync('python3', [gateProbe, repository, probe], {
+    encoding: 'utf8',
+    timeout: 30_000,
+  });
+  assert.equal(result.status, 0, result.stderr);
+  return object(JSON.parse(result.stdout));
+}
+const correction = (extra: string): string =>
+  `---\nname: feedback_newcomer_correction\ntitle: Newcomer correction\ndescription: The newcomer's first correction of a practice.\n${extra}metadata:\n  type: feedback\n---\n\nbody\n`;
+/** The CID `epr` gives a file's raw bytes: CIDv1, raw codec, sha2-256, base32 lower. */
+function rawCid(bytes: Buffer): string {
+  const digest = createHash('sha256').update(bytes).digest();
+  const raw = Buffer.concat([Buffer.from([0x01, 0x55, 0x12, 0x20]), digest]);
+  const alphabet = 'abcdefghijklmnopqrstuvwxyz234567';
+  let bits = 0;
+  let acc = 0;
+  let out = '';
+  for (const byte of raw) {
+    acc = (acc << 8) | byte;
+    bits += 8;
+    while (bits >= 5) {
+      out += alphabet[(acc >>> (bits - 5)) & 31];
+      bits -= 5;
+    }
+    acc &= (1 << bits) - 1;
+  }
+  if (bits > 0) out += alphabet[(acc << (5 - bits)) & 31];
+  return 'b' + out;
+}
+
+Given(
+  "a collective whose memory holds a shared finding, the first steward's direction and a note describing the first steward",
+  function () {
+    const f = setup(this, false);
+    write(f, `${memoryDir}/project_shared.md`, entry('project_shared', 'project'));
+    commitAll(f);
+    native(f, 'import', [memoryDir, '--session', 'author']);
+    // The first steward's direction and the note about them: written by no witnessable agent,
+    // so the standing human stands for them.
+    for (const [stem, kind] of [
+      ['feedback_ruling', 'feedback'],
+      ['user_matthew', 'user'],
+    ])
+      write(f, `${memoryDir}/${stem}.md`, entry(stem, kind, '', true));
+    invoke(f, [
+      binary,
+      'actor',
+      'claim',
+      '--as',
+      firstSteward,
+      '--session',
+      'human-session',
+      '--root',
+      f.root,
+      '--json',
+    ]);
+    native(f, 'import', [
+      ...stewardedEntries.map(stem => `${memoryDir}/${stem}.md`),
+      '--session',
+      'human-session',
+      '--steward-of-record',
+    ]);
+  }
+);
+When("a second developer's session reads the projected memory index", function () {
+  projectIndex(state(this));
+});
+Then('the shared finding is listed as held by the collective', function () {
+  assert.equal(sectionOf(state(this).indexText ?? '', 'project_shared.md'), collectiveHeading);
+});
+Then("the first steward's direction is listed under the first steward's name", function () {
+  assert.equal(
+    sectionOf(state(this).indexText ?? '', 'feedback_ruling.md'),
+    directionFrom(firstSteward)
+  );
+});
+Then("the note describing the first steward is listed under the first steward's name", function () {
+  assert.equal(
+    sectionOf(state(this).indexText ?? '', 'user_matthew.md'),
+    directionFrom(firstSteward)
+  );
+});
+Then("no row under the first steward's name is listed as held by the collective", function () {
+  const index = state(this).indexText ?? '';
+  for (const stem of stewardedEntries)
+    assert.notEqual(sectionOf(index, `${stem}.md`), collectiveHeading, stem);
+  const held = index.split(directionFrom(firstSteward))[0];
+  for (const stem of stewardedEntries) assert.ok(!held.includes(`](${stem}.md)`), stem);
+});
+
+When(
+  "the second developer's session writes a correction that does not say whom it applies to",
+  function () {
+    const f = state(this);
+    f.gate = gate(f, correction(''));
+  }
+);
+Then('the memory gate refuses the entry and names the three audiences', function () {
+  const verdict = object(state(this).gate);
+  assert.equal(verdict.decision, 'refuse', JSON.stringify(verdict));
+  const reason = String(verdict.reason);
+  assert.ok(reason.includes('applies-to'), reason);
+  for (const audience of ['device', 'steward', 'repository'])
+    assert.ok(reason.includes(`\`${audience}\``), `${audience}: ${reason}`);
+});
+When('the session writes the same correction as applying to its steward', function () {
+  const f = state(this);
+  const text = correction('applies-to: steward\n');
+  f.gate = gate(f, text);
+  write(f, `${memoryDir}/feedback_newcomer_correction.md`, text);
+});
+Then('the entry is accepted', function () {
+  const verdict = object(state(this).gate);
+  assert.equal(verdict.decision, 'permit', JSON.stringify(verdict));
+});
+Then("after import the correction is listed under the second developer's name", function () {
+  const f = state(this);
+  const stem = 'feedback_newcomer_correction';
+  const rel = `${memoryDir}/${stem}.md`;
+  // `import` fills the steward slot with the collective's own party; a slot naming a participant
+  // is written directly with its attributed act (as `plant_stewarded` does in the Rust test).
+  const template = contributionOf(f, 'project_shared');
+  const imported = object(template.imported);
+  const bytes = readFileSync(join(f.root, rel));
+  const contribution = {
+    ...template,
+    steward: secondSteward,
+    concern: stem,
+    claim: `The claim of ${stem}.`,
+    uncertainty: [],
+    sources: [{ resource: { path: rel, cid: rawCid(bytes) }, reach: 'repository' }],
+    imported: {
+      ...imported,
+      display: stem,
+      file: `${stem}.md`,
+      scopePath: rel,
+      entryType: 'feedback',
+      appliesTo: 'steward',
+    },
+  };
+  const request = `.eprfs/status/memory/contributions/${stem}.json`;
+  const text = JSON.stringify(contribution, null, 2) + '\n';
+  write(f, request, text);
+  const note = spawnSync(
+    binary,
+    [
+      'flow',
+      'note',
+      '--on',
+      request,
+      '--kind',
+      'observation',
+      '--session',
+      'author',
+      '--reason',
+      `Collective contribution ${rawCid(Buffer.from(text))} under ${object(f.collective).cid}; unreviewed, no acceptance`,
+      '--root',
+      f.root,
+    ],
+    { cwd: f.root, env: f.env, encoding: 'utf8', timeout: 30_000 }
+  );
+  assert.equal(note.status, 0, `${note.stdout}\n${note.stderr}`);
+  assert.equal(sectionOf(projectIndex(f), `${stem}.md`), directionFrom(secondSteward));
+});
+
+When('an entry declared as applying to the device is imported', function () {
+  const f = state(this);
+  // Named with the writing session and time, so the entry-form import can attribute it to its agent.
+  write(
+    f,
+    `${memoryDir}/project_here.md`,
+    entry('project_here', 'project', 'applies-to: device\n').replace(
+      'type: project\n',
+      `type: project\n  originSessionId: author\n  modified: ${new Date().toISOString()}\n`
+    )
+  );
+  native(f, 'import', [`${memoryDir}/project_here.md`, '--session', 'author']);
+});
+Then('its contribution reaches no further than the device it was written on', function () {
+  const f = state(this);
+  assert.equal(contributionOf(f, 'project_here').reach, 'workspace');
+  // A device entry is not the collective's memory: it never appears in the shared index.
+  assert.ok(existsSync(join(f.root, memoryDir, 'project_here.md')));
+  assert.equal(sectionOf(projectIndex(f), 'project_here.md'), undefined);
 });

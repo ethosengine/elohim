@@ -532,7 +532,7 @@
       "id": "memory-frontmatter-at-birth",
       "version": 1,
       "registry": "policies.yaml",
-      "status": "active",
+      "status": "superseded",
       "resolutionMode": "pinned",
       "resolutionModeSource": "registry-default",
       "sha256Pin": "sha256:a622e4d20e5aa57ab9152e48a082ff437499ad5b498516408f0cc864cce003ee",
@@ -541,6 +541,37 @@
       "cid": "bafyreifgelsneds2uv5lsfjojcqif72dosm22w2jqulebdymzbsmzyad5y",
       "bodyBytes": 664,
       "supersedes": [],
+      "supersededBy": {
+        "declared": "memory-frontmatter-at-birth@2",
+        "id": "memory-frontmatter-at-birth",
+        "version": 2,
+        "registry": "policies.yaml",
+        "cid": "bafyreigeiycokazc7kphzrfduefxojt6ec67cohim7r3h5ncpuvf53qlli",
+        "resolved": true
+      }
+    },
+    {
+      "id": "memory-frontmatter-at-birth",
+      "version": 2,
+      "registry": "policies.yaml",
+      "status": "active",
+      "resolutionMode": "pinned",
+      "resolutionModeSource": "registry-default",
+      "sha256Pin": "sha256:c44604e50322fa9e7cc4a3a10b77267e20bdf138e867e3b3f5a27d2a5eee0b5a",
+      "sha256Computed": "sha256:c44604e50322fa9e7cc4a3a10b77267e20bdf138e867e3b3f5a27d2a5eee0b5a",
+      "pinState": "verified",
+      "cid": "bafyreigeiycokazc7kphzrfduefxojt6ec67cohim7r3h5ncpuvf53qlli",
+      "bodyBytes": 1252,
+      "supersedes": [
+        {
+          "declared": "policies.yaml#memory-frontmatter-at-birth@1",
+          "id": "memory-frontmatter-at-birth",
+          "version": 1,
+          "registry": "policies.yaml",
+          "cid": "bafyreifgelsneds2uv5lsfjojcqif72dosm22w2jqulebdymzbsmzyad5y",
+          "resolved": true
+        }
+      ],
       "supersededBy": null
     },
     {

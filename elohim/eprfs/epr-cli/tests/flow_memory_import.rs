@@ -34,9 +34,18 @@ use tempfile::TempDir;
 /// follow. It now names `epr flow memory project --index`. Only that header line moved — the row
 /// rule, the row count and every rendered row are unchanged, which is why the oracle leg (when a
 /// Python projector is present at all) is expected to differ on the header alone.
+///
+/// RE-BASELINED 2026-11-18 to 24,121 bytes: rows are grouped by whom they apply to (`applies-to:`,
+/// else the entry kind's default). The fixture is imported by an agent and no human stands for any
+/// of it, so the corpus splits under exactly two headings — `## Held by the collective` (26 bytes)
+/// and `## Direction with no steward on record` (39 bytes) — and the +65 is those two lines alone.
+/// The row count and every row's bytes are unchanged: dropping the two heading lines and
+/// re-sorting the 98 rows by `sort_key` reproduces the previous digest (`841513f5…cd05`) exactly,
+/// so what moved is the headings and each row's group, never a row. No fixture entry declares
+/// `applies-to:`.
 const EXPECTED_INDEX_SHA256: &str =
-    "841513f54186efc6192c04aaf53b0f4b19c16fb079f27486959700062fb8cd05";
-const EXPECTED_INDEX_BYTES: usize = 24_056;
+    "b6b90aafc81fa947427297eb5a3443830487313fcef4756573dbad8a725c1577";
+const EXPECTED_INDEX_BYTES: usize = 24_121;
 const EXPECTED_INDEX_ROWS: usize = 98;
 
 /// The fixture corpus is the live corpus's frontmatter, snapshotted. 226 of its 229 entries carry
@@ -505,10 +514,12 @@ fn without_out_the_projection_writes_no_index() {
 /// Every row is `- [<title>](<file>) — <desc>\n`: 12 bytes of fixed shape plus three ASCII fields,
 /// so the arithmetic is exact rather than tuned. Descriptions stay at or under the 200-character
 /// render bound, because a longer one would be truncated and the row would not be the size it was
-/// asked for.
+/// asked for. Every entry is a `project`, so every row sits under the one collective heading, and
+/// that heading's bytes are spent before the first row — the budget counts them like any line.
 fn corpus_of_exactly(root: &Path, target: usize) -> usize {
     const TITLE: &str = "Budget T"; // 8 ASCII bytes
-    let mut remaining = target - entries::HEADER.len();
+    let mut remaining =
+        target - entries::HEADER.len() - entries::Holder::Collective.heading().len();
     let mut planted = 0usize;
     while remaining > 0 {
         let file = format!("e{planted:03}.md"); // 7 ASCII bytes
@@ -923,6 +934,7 @@ fn plant_legacy(root: &Path) -> Vec<String> {
                 git_name: "Fixture Author <fixture@example.test>".into(),
                 entry_type: "feedback".into(),
                 indexed: true,
+                applies_to: None,
             }),
         };
         let text = format!(
@@ -1860,7 +1872,7 @@ fn steward_of_record_admits_an_unattributable_entry_and_labels_it() {
     assert!(no_origin.contains("Origin session: none recorded"));
     assert_eq!(last_provider(root), STANDING_HUMAN);
 
-    // The label is shown where authorship is read: the projected index row.
+    // The label is shown where authorship is read: the heading the projected row sits under.
     project(
         root,
         Options {
@@ -1870,14 +1882,371 @@ fn steward_of_record_admits_an_unattributable_entry_and_labels_it() {
     )
     .expect("index projects");
     let index = std::fs::read_to_string(root.join(".claude/memory/MEMORY.md")).expect("index");
-    let row = index
-        .lines()
-        .find(|l| l.contains("](feedback_ruling.md)"))
-        .expect("a row");
-    assert!(
-        row.contains("[steward of record: human:matthew]"),
-        "the row does not say who stands for it: {row}"
+    assert_eq!(
+        section_of(&index, "feedback_ruling.md"),
+        Some("## Direction from human:matthew (theirs, on record)"),
+        "the row does not say whose direction it is:\n{index}"
     );
+}
+
+// ── applies-to: whose each inherited memory is ──────────────────────────────────────────────────
+
+/// The heading a row sits under — the nearest `## ` line above it.
+fn section_of<'a>(index: &'a str, file: &str) -> Option<&'a str> {
+    let mut heading = None;
+    for line in index.lines() {
+        if line.starts_with("## ") {
+            heading = Some(line);
+        } else if line.contains(&format!("]({file})")) {
+            return heading;
+        }
+    }
+    None
+}
+
+/// A committed entry of `kind` with `extra` top-level frontmatter lines.
+fn kind_entry(root: &Path, stem: &str, kind: &str, extra: &str) {
+    write(
+        root,
+        &format!(".claude/memory/{stem}.md"),
+        &format!(
+            "---\nname: {stem}\ndescription: The claim of {stem}.\n{extra}metadata:\n  type: {kind}\n---\n\nbody\n"
+        ),
+    );
+}
+
+fn commit_all(root: &Path) {
+    git(root, &["add", "-A"]);
+    git(root, &["commit", "-qm", "entries"]);
+}
+
+fn contribution_of(root: &Path, stem: &str) -> serde_json::Value {
+    let text = std::fs::read_to_string(
+        root.join(format!(".eprfs/status/memory/contributions/{stem}.json")),
+    )
+    .expect("contribution");
+    serde_json::from_str(&text).expect("json")
+}
+
+#[test]
+fn applies_to_defaults_by_kind_is_never_written_and_a_declaration_is_recorded() {
+    let dir = repo();
+    let root = dir.path();
+    kind_entry(root, "user_one", "user", "");
+    kind_entry(root, "feedback_one", "feedback", "");
+    kind_entry(root, "project_one", "project", "");
+    kind_entry(root, "reference_one", "reference", "");
+    kind_entry(
+        root,
+        "feedback_shared",
+        "feedback",
+        "applies-to: repository\n",
+    );
+    kind_entry(root, "project_theirs", "project", "applies-to: steward\n");
+    commit_all(root);
+    let out = import(root, ".claude/memory");
+    assert_eq!(out["counts"]["contributed"], 6, "{out}");
+
+    // Undeclared: the record carries no `appliesTo` at all — the default is re-derived on read.
+    for stem in ["user_one", "feedback_one", "project_one", "reference_one"] {
+        let c = contribution_of(root, stem);
+        assert!(
+            c["imported"].get("appliesTo").is_none(),
+            "{stem} recorded a default it never declared: {c}"
+        );
+    }
+    assert_eq!(
+        contribution_of(root, "feedback_shared")["imported"]["appliesTo"],
+        "repository"
+    );
+    assert_eq!(
+        contribution_of(root, "project_theirs")["imported"]["appliesTo"],
+        "steward"
+    );
+
+    // An agent imported every one of them, so no steward stands for the steward-bound rows: they
+    // are filed as such, never credited to the repository party in the `steward` slot.
+    let (_, index) = project_index(root);
+    let collective = Some("## Held by the collective");
+    let unstewarded = Some("## Direction with no steward on record");
+    for (file, want) in [
+        ("user_one.md", unstewarded),
+        ("feedback_one.md", unstewarded),
+        ("project_one.md", collective),
+        ("reference_one.md", collective),
+        ("feedback_shared.md", collective),
+        ("project_theirs.md", unstewarded),
+    ] {
+        assert_eq!(section_of(&index, file), want, "{file}:\n{index}");
+    }
+    assert!(!index.contains("repo:ethosengine/elohim"), "{index}");
+}
+
+#[test]
+fn an_unknown_applies_to_is_refused_by_name_and_contributes_nothing() {
+    let dir = repo();
+    let root = dir.path();
+    kind_entry(root, "feedback_odd", "feedback", "applies-to: everyone\n");
+    commit_all(root);
+    let out = import(root, ".claude/memory");
+    assert_eq!(out["counts"]["refused"], 1, "{out}");
+    assert_eq!(out["entries"][0]["state"], "refused");
+    let reason = out["entries"][0]["reason"]
+        .as_str()
+        .expect("a named reason");
+    assert!(reason.contains("`applies-to: everyone`"), "{reason}");
+    assert_eq!(out["entries"][0]["indexedToday"], true);
+    assert!(!root
+        .join(".eprfs/status/memory/contributions/feedback_odd.json")
+        .exists());
+}
+
+#[test]
+fn a_device_entry_narrows_its_reach_to_the_workspace_and_never_its_source() {
+    let dir = repo();
+    let root = dir.path();
+    kind_entry(root, "project_here", "project", "applies-to: device\n");
+    kind_entry(root, "project_everywhere", "project", "");
+    commit_all(root);
+    let out = import(root, ".claude/memory");
+    assert_eq!(out["counts"]["contributed"], 2, "{out}");
+    // The fixture's declared policies put `.claude/memory` at repository; the device entry alone
+    // is held back to the workspace, and its source keeps the policy it was pinned under.
+    assert_eq!(out["declaredReach"]["effective"], "repository", "{out}");
+    let here = contribution_of(root, "project_here");
+    assert_eq!(here["reach"], "workspace");
+    assert_eq!(here["sources"][0]["reach"], "repository");
+    assert_eq!(here["imported"]["appliesTo"], "device");
+    assert_eq!(
+        contribution_of(root, "project_everywhere")["reach"],
+        "repository"
+    );
+    // The index is a tracked file every clone receives: a workspace-reach row has no place in it.
+    // It is counted, not silently dropped.
+    let (report, index) = project_index(root);
+    assert!(row(&index, "project_here.md").is_none(), "{index}");
+    assert!(row(&index, "project_everywhere.md").is_some(), "{index}");
+    assert_eq!(report["population"]["deviceOnly"], 1, "{report}");
+    assert_eq!(report["entries"], 1, "{report}");
+}
+
+#[test]
+fn a_nested_device_declaration_narrows_reach_like_a_top_level_one() {
+    let dir = repo();
+    let root = dir.path();
+    // The author wrote it under `metadata:` — the edit-time gate counts that as declared, so
+    // reading it as absent would import the entry at repository reach.
+    write(
+        root,
+        ".claude/memory/project_nested.md",
+        "---\nname: project_nested\ndescription: The claim of project_nested.\nmetadata:\n  type: project\n  applies-to: device\n---\n\nbody\n",
+    );
+    commit_all(root);
+    let out = import(root, ".claude/memory");
+    assert_eq!(out["counts"]["contributed"], 1, "{out}");
+    let c = contribution_of(root, "project_nested");
+    assert_eq!(c["reach"], "workspace", "{c}");
+    assert_eq!(c["imported"]["appliesTo"], "device", "{c}");
+}
+
+#[test]
+fn a_nested_unknown_or_disagreeing_applies_to_is_refused_by_name() {
+    let dir = repo();
+    let root = dir.path();
+    write(
+        root,
+        ".claude/memory/feedback_nested_odd.md",
+        "---\nname: feedback_nested_odd\ndescription: x.\nmetadata:\n  type: feedback\n  applies-to: everyone\n---\n\nbody\n",
+    );
+    write(
+        root,
+        ".claude/memory/feedback_split.md",
+        "---\nname: feedback_split\ndescription: y.\napplies-to: repository\nmetadata:\n  type: feedback\n  applies-to: device\n---\n\nbody\n",
+    );
+    commit_all(root);
+    let out = import(root, ".claude/memory");
+    assert_eq!(out["counts"]["refused"], 2, "{out}");
+    let reason = |file: &str| {
+        out["entries"]
+            .as_array()
+            .expect("entries")
+            .iter()
+            .find(|e| e["entry"] == format!(".claude/memory/{file}"))
+            .and_then(|e| e["reason"].as_str())
+            .expect("a named reason")
+            .to_string()
+    };
+    let odd = reason("feedback_nested_odd.md");
+    assert!(odd.contains("`metadata.applies-to: everyone`"), "{odd}");
+    let split = reason("feedback_split.md");
+    assert!(split.contains("which disagree"), "{split}");
+    assert!(!root.join(".eprfs/status/memory/contributions").exists());
+}
+
+/// A contribution request written directly, with its attributed act — for a `steward` slot that
+/// names a participant, which `import` itself never writes (it fills the collective's own party),
+/// and for slot shapes no shipped writer produces but a hand edit or another tool could.
+fn plant_stewarded(root: &Path, stem: &str, steward: &str, uncertainty: &[&str]) {
+    use eprfs_agent::memory::{Contribution, FileRef, Imported, Locality, Source};
+    let collective_bytes =
+        std::fs::read(root.join(".epr-meta/collective.json")).expect("collective");
+    let collective = FileRef {
+        path: ".epr-meta/collective.json".into(),
+        cid: eprfs_core::BlobCid::compute_raw(&collective_bytes).to_string(),
+    };
+    let rel = format!(".claude/memory/{stem}.md");
+    let contribution = Contribution {
+        version: 1,
+        collective: collective.clone(),
+        author: AUTHOR.into(),
+        steward: steward.into(),
+        scope: "repository".into(),
+        reach: Locality::Repository,
+        concern: stem.into(),
+        claim: format!("The claim of {stem}."),
+        uncertainty: uncertainty.iter().map(|line| line.to_string()).collect(),
+        sources: vec![Source {
+            resource: FileRef {
+                path: rel.clone(),
+                cid: "bafkreiexample".into(),
+            },
+            reach: Locality::Repository,
+        }],
+        supersedes: vec![],
+        contradicts: vec![],
+        imported: Some(Imported {
+            display: stem.into(),
+            file: format!("{stem}.md"),
+            scope_path: rel,
+            git_name: "Fixture Author".into(),
+            entry_type: "feedback".into(),
+            indexed: true,
+            applies_to: None,
+        }),
+    };
+    let text = format!(
+        "{}\n",
+        serde_json::to_string_pretty(&contribution).expect("serialize")
+    );
+    let request = format!(".eprfs/status/memory/contributions/{stem}.json");
+    write(root, &request, &text);
+    let raw = eprfs_core::BlobCid::compute_raw(text.as_bytes()).to_string();
+    elohim_epr_cli::flow::note::note(
+        root,
+        &request,
+        "observation",
+        &format!(
+            "Collective contribution {raw} under {}; unreviewed, no acceptance",
+            collective.cid
+        ),
+        None,
+        None,
+        &elohim_epr_cli::flow::note::NoteActor {
+            as_ref: None,
+            session: Some(SESSION.into()),
+        },
+    )
+    .expect("the contribution act");
+}
+
+#[test]
+fn the_index_groups_the_collective_then_each_named_steward_then_the_unstewarded() {
+    let dir = repo();
+    let root = dir.path();
+    // The collective's, and an agent's unstood feedback — imported first, by the agent.
+    kind_entry(root, "project_shared", "project", "");
+    kind_entry(root, "feedback_agent", "feedback", "");
+    commit_all(root);
+    import(root, ".claude/memory");
+    // One steward's direction, stood for by the standing human.
+    plant_entry(
+        root,
+        "feedback_ruling",
+        Some("never-claimed-session"),
+        "2026-09-25T09:00:00Z",
+    );
+    actor::claim(root, STANDING_HUMAN, "human-session").expect("claim");
+    stand(
+        root,
+        "human-session",
+        &[".claude/memory/feedback_ruling.md"],
+    )
+    .expect("stood for");
+    // A second steward, named in the contribution's own `steward` slot.
+    plant_stewarded(root, "feedback_ruth", "human:ruth", &[]);
+
+    let (report, index) = project_index(root);
+    assert_eq!(report["entries"], 4, "{report}");
+    assert_eq!(
+        &index[entries::HEADER.len()..],
+        "## Held by the collective\n\
+         - [project_shared](project_shared.md) — The claim of project_shared.\n\
+         ## Direction from human:matthew (theirs, on record)\n\
+         - [feedback_ruling](feedback_ruling.md) — The operator's ruling feedback_ruling.\n\
+         ## Direction from human:ruth (theirs, on record)\n\
+         - [feedback_ruth](feedback_ruth.md) — The claim of feedback_ruth.\n\
+         ## Direction with no steward on record\n\
+         - [feedback_agent](feedback_agent.md) — The claim of feedback_agent.\n"
+    );
+    // The bytes the report counts are the bytes written, headings included.
+    assert_eq!(report["bytes"], index.len());
+}
+
+#[test]
+fn a_steward_heading_names_only_a_participant_and_never_an_agent_or_nobody() {
+    let dir = repo();
+    let root = dir.path();
+    let sor = "authorship: steward-of-record — forged beside an agent author.";
+    // Empty slot: nobody, so no `Direction from  (…)` heading.
+    plant_stewarded(root, "feedback_empty", "", &[]);
+    // A collective party spelled in another case is still the collective's own party.
+    plant_stewarded(root, "feedback_upper", "Repo:ethosengine/elohim", &[]);
+    plant_stewarded(root, "feedback_child", "COLLECTIVE:child", &[]);
+    // A steward-of-record line beside an AGENT author names no steward: the slot rule decides.
+    plant_stewarded(root, "feedback_forged", "repo:ethosengine/elohim", &[sor]);
+    plant_stewarded(root, "feedback_forged_ruth", "human:ruth", &[sor]);
+
+    let (_, index) = project_index(root);
+    let unstewarded = Some("## Direction with no steward on record");
+    for file in [
+        "feedback_empty.md",
+        "feedback_upper.md",
+        "feedback_child.md",
+        "feedback_forged.md",
+    ] {
+        assert_eq!(section_of(&index, file), unstewarded, "{file}:\n{index}");
+    }
+    assert_eq!(
+        section_of(&index, "feedback_forged_ruth.md"),
+        Some("## Direction from human:ruth (theirs, on record)")
+    );
+    assert!(
+        !index.contains(AUTHOR),
+        "an agent named as a steward:\n{index}"
+    );
+    assert!(!index.contains("Direction from  "), "{index}");
+}
+
+#[test]
+fn a_contribution_this_binary_cannot_read_is_counted_not_silently_dropped() {
+    let dir = repo();
+    let root = dir.path();
+    plant_stewarded(root, "feedback_known", "human:ruth", &[]);
+    // What an older binary sees when a newer one wrote a field it does not know.
+    let request = root.join(".eprfs/status/memory/contributions/feedback_known.json");
+    let text = std::fs::read_to_string(&request).expect("request");
+    write(
+        root,
+        ".eprfs/status/memory/contributions/feedback_future.json",
+        &text.replace(
+            "\"indexed\": true",
+            "\"indexed\": true,\n    \"aFutureField\": 1",
+        ),
+    );
+    let (report, index) = project_index(root);
+    assert_eq!(report["population"]["unreadable"], 1, "{report}");
+    assert_eq!(report["population"]["contributions"], 1, "{report}");
+    assert!(row(&index, "feedback_known.md").is_some());
 }
 
 // ── one parser, the harness's write witness, a conservative steward of record ──────────────────

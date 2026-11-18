@@ -606,9 +606,9 @@
       "resolutionModeSource": "registry-default",
       "head": {
         "registry": "policies.yaml",
-        "version": 1,
-        "cid": "bafyreifgelsneds2uv5lsfjojcqif72dosm22w2jqulebdymzbsmzyad5y",
-        "sha256Pin": "sha256:a622e4d20e5aa57ab9152e48a082ff437499ad5b498516408f0cc864cce003ee"
+        "version": 2,
+        "cid": "bafyreigeiycokazc7kphzrfduefxojt6ec67cohim7r3h5ncpuvf53qlli",
+        "sha256Pin": "sha256:c44604e50322fa9e7cc4a3a10b77267e20bdf138e867e3b3f5a27d2a5eee0b5a"
       },
       "tipBasis": "sole-active",
       "competing": false,
@@ -616,8 +616,15 @@
         {
           "registry": "policies.yaml",
           "version": 1,
-          "status": "active",
+          "status": "superseded",
           "cid": "bafyreifgelsneds2uv5lsfjojcqif72dosm22w2jqulebdymzbsmzyad5y",
+          "supersededBy": "memory-frontmatter-at-birth@2"
+        },
+        {
+          "registry": "policies.yaml",
+          "version": 2,
+          "status": "active",
+          "cid": "bafyreigeiycokazc7kphzrfduefxojt6ec67cohim7r3h5ncpuvf53qlli",
           "supersededBy": null
         }
       ]

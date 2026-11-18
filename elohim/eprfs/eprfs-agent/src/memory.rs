@@ -25,6 +25,49 @@ pub enum Locality {
     Repository,
 }
 
+/// Whom an imported memory entry is FOR: its frontmatter `applies-to:`.
+///
+/// A second axis beside [`Locality`], and deliberately not folded into it. Locality says how far
+/// the bytes may travel; `applies-to` says whose they are to act on — the one device that wrote
+/// them, one named steward's direction, or the repository's shared memory. A session inheriting
+/// the index reads the second to tell the collective's knowledge from a steward's preference.
+/// Only `Device` touches locality, and only to narrow it (see `import.rs`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum AppliesTo {
+    Device,
+    Steward,
+    Repository,
+}
+
+impl AppliesTo {
+    /// The frontmatter spelling, exactly; anything else is `None` and the caller refuses it.
+    ///
+    /// Exact, not case-folded: the value is written into a tracked record, and a lenient reader
+    /// would let `Steward` and `steward` both stand for one thing in some files and not others.
+    pub fn parse(value: &str) -> Option<Self> {
+        match value {
+            "device" => Some(Self::Device),
+            "steward" => Some(Self::Steward),
+            "repository" => Some(Self::Repository),
+            _ => None,
+        }
+    }
+
+    /// What an entry that declares nothing applies to, read from its declared kind.
+    ///
+    /// `user` and `feedback` entries are what a steward said about themselves or asked of the
+    /// agents, so they are that steward's; `project` and `reference` entries are what the
+    /// repository knows. A kind outside those four (the import admits any non-empty one) reads
+    /// as repository: the default that claims no one's direction for them.
+    pub fn default_for_type(entry_type: &str) -> Self {
+        match entry_type {
+            "user" | "feedback" => Self::Steward,
+            _ => Self::Repository,
+        }
+    }
+}
+
 /// A local collective declaration: `<dir>/.epr-meta/collective.json`.
 ///
 /// It names NO steward. Stewardship is plural and lives in [`Affiliation`] records (the local
@@ -285,6 +328,26 @@ pub struct Imported {
     /// False when the entry declared `index: false` — it stays a contribution and stays out of
     /// the projected index, exactly as its author asked.
     pub indexed: bool,
+    /// The entry's `applies-to:`, recorded ONLY when the entry declared it.
+    ///
+    /// An absent field means "the default for `entry_type`" and is never filled in: every
+    /// contribution written before this field existed must still serialize to its own bytes, or
+    /// its CID would move and the authorship freeze would read an unchanged entry as a rewrite.
+    ///
+    /// Rollout order: this struct is `deny_unknown_fields`, so a binary that predates the field
+    /// cannot read a contribution carrying it — every device must run a binary that knows
+    /// `appliesTo` before it folds contributions from entries that declare it (the index counts
+    /// such files as `unreadable` rather than dropping them unseen).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub applies_to: Option<AppliesTo>,
+}
+
+impl Imported {
+    /// Whom the entry applies to: what it declared, else its kind's default.
+    pub fn effective_applies_to(&self) -> AppliesTo {
+        self.applies_to
+            .unwrap_or_else(|| AppliesTo::default_for_type(&self.entry_type))
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -349,6 +412,100 @@ mod tests {
             since: "2026-09-25T00:00:00Z".into(),
             withdrawn: None,
         }
+    }
+
+    /// A contribution as `import` wrote every one of them before `applies-to` existed — the exact
+    /// pretty-printed bytes, trailing newline included.
+    const LEGACY: &str = r#"{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreiexample"
+  },
+  "author": "agent:orchestrator@fixture",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "feedback_example",
+  "claim": "The one-line claim.",
+  "uncertainty": [],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/feedback_example.md",
+        "cid": "bafkreisource"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Example",
+    "file": "feedback_example.md",
+    "scopePath": ".claude/memory/feedback_example.md",
+    "gitName": "Fixture Author",
+    "entryType": "feedback",
+    "indexed": true
+  }
+}
+"#;
+
+    fn reserialized(c: &Contribution) -> String {
+        format!("{}\n", serde_json::to_string_pretty(c).unwrap())
+    }
+
+    #[test]
+    fn a_contribution_without_applies_to_round_trips_to_its_own_bytes() {
+        let c: Contribution = serde_json::from_str(LEGACY).unwrap();
+        let imported = c.imported.as_ref().unwrap();
+        assert_eq!(imported.applies_to, None);
+        assert_eq!(imported.effective_applies_to(), AppliesTo::Steward);
+        // Byte-identical, so its CID — and every record that pins it — is unmoved.
+        assert_eq!(reserialized(&c), LEGACY);
+    }
+
+    #[test]
+    fn a_declared_applies_to_round_trips_and_an_unknown_one_is_refused() {
+        let declared = LEGACY.replace(
+            "\"indexed\": true\n",
+            "\"indexed\": true,\n    \"appliesTo\": \"device\"\n",
+        );
+        let c: Contribution = serde_json::from_str(&declared).unwrap();
+        let imported = c.imported.as_ref().unwrap();
+        assert_eq!(imported.applies_to, Some(AppliesTo::Device));
+        assert_eq!(imported.effective_applies_to(), AppliesTo::Device);
+        assert_eq!(reserialized(&c), declared);
+        let unknown = LEGACY.replace(
+            "\"indexed\": true\n",
+            "\"indexed\": true,\n    \"appliesTo\": \"everyone\"\n",
+        );
+        assert!(serde_json::from_str::<Contribution>(&unknown).is_err());
+    }
+
+    #[test]
+    fn applies_to_defaults_by_kind_and_parses_only_its_exact_spellings() {
+        assert_eq!(AppliesTo::default_for_type("user"), AppliesTo::Steward);
+        assert_eq!(AppliesTo::default_for_type("feedback"), AppliesTo::Steward);
+        assert_eq!(
+            AppliesTo::default_for_type("project"),
+            AppliesTo::Repository
+        );
+        assert_eq!(
+            AppliesTo::default_for_type("reference"),
+            AppliesTo::Repository
+        );
+        assert_eq!(AppliesTo::default_for_type("other"), AppliesTo::Repository);
+        for (spelling, want) in [
+            ("device", AppliesTo::Device),
+            ("steward", AppliesTo::Steward),
+            ("repository", AppliesTo::Repository),
+        ] {
+            assert_eq!(AppliesTo::parse(spelling), Some(want));
+            assert_eq!(serde_json::to_value(want).unwrap(), spelling);
+        }
+        assert_eq!(AppliesTo::parse("Device"), None);
+        assert_eq!(AppliesTo::parse(""), None);
     }
 
     #[test]

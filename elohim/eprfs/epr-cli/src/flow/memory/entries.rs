@@ -17,8 +17,15 @@
 //! * **`metadata:` sub-keys are read here and NOWHERE in the projector.** They gate import
 //!   (`metadata.type` is required frontmatter) and never reach a rendered row, so admitting them
 //!   carries no parity risk. The block ends at the first line that is not indented.
+//! * **The ROW is still the projector's; the LAYOUT no longer is.** Rows are grouped under one
+//!   heading per [`Holder`] (`applies-to:`, read here and nowhere in the Python), where the
+//!   projector emitted one flat list. The kit projector is deleted, so no second leg renders the
+//!   layout; what parity remains is per row — title, link, description, truncation — and the
+//!   pinned digest in `flow_memory_import.rs`, which moved deliberately when the headings arrived.
 
 use std::collections::BTreeMap;
+
+use eprfs_agent::memory::AppliesTo;
 
 /// The generated-file header. It is part of the projected bytes, so the byte budget and the
 /// unloaded-row offset both start after it.
@@ -91,7 +98,53 @@ impl Frontmatter {
     pub fn indexed(&self) -> bool {
         !self.get("index").eq_ignore_ascii_case("false")
     }
+
+    /// The entry's declared `applies-to:` — `Ok(None)` when it declares none, `Err` naming the
+    /// frontmatter that cannot be read as a declaration.
+    ///
+    /// Both dialects are read, top-level and nested under `metadata:`, because the edit-time gate
+    /// counts either as present: reading only one would let an author who wrote
+    /// `metadata:\n  applies-to: device` pass the gate believing they declared `device`, and then
+    /// be imported at repository reach — a widening exactly where they asked for a narrowing.
+    ///
+    /// There is no precedence between them. When both carry a value and they DISAGREE the entry is
+    /// refused: either winner would silently overrule a declaration someone wrote, and one of the
+    /// two losers is always the narrower one. An unknown value in either place is refused the same
+    /// way. Absence is not an error — it is the common case, and [`Self::effective_applies_to`]
+    /// supplies the kind's default. The `Err` text is the frontmatter as written, in backticks, so
+    /// the refusal can quote it.
+    pub fn applies_to(&self) -> Result<Option<AppliesTo>, String> {
+        let read = |value: &str, spelled: &str| -> Result<Option<AppliesTo>, String> {
+            if value.is_empty() {
+                return Ok(None);
+            }
+            AppliesTo::parse(value)
+                .map(Some)
+                .ok_or_else(|| format!("`{spelled}: {value}`"))
+        };
+        let top_value = self.get(APPLIES_TO_KEY).trim();
+        let nested_value = self.meta(APPLIES_TO_KEY).trim();
+        let top = read(top_value, APPLIES_TO_KEY)?;
+        let nested = read(nested_value, &format!("metadata.{APPLIES_TO_KEY}"))?;
+        match (top, nested) {
+            (Some(a), Some(b)) if a != b => Err(format!(
+                "`{APPLIES_TO_KEY}: {top_value}` and `metadata.{APPLIES_TO_KEY}: {nested_value}`, \
+                 which disagree"
+            )),
+            (top, nested) => Ok(top.or(nested)),
+        }
+    }
+
+    /// Whom the entry applies to: its declaration, else the default for its declared kind.
+    pub fn effective_applies_to(&self) -> Result<AppliesTo, String> {
+        Ok(self
+            .applies_to()?
+            .unwrap_or_else(|| AppliesTo::default_for_type(self.entry_type())))
+    }
 }
+
+/// The frontmatter key, spelled once for the reader and the refusal that names it.
+pub const APPLIES_TO_KEY: &str = "applies-to";
 
 /// Whether a line is a top-level `key: value` pair — the Python `_KV_RE` shape.
 ///
@@ -260,11 +313,70 @@ pub fn sort_key(file: &str) -> String {
     file.to_lowercase()
 }
 
-/// The projected index bytes: header, then one line per row in the caller's order.
-pub fn render(rows: &[IndexRow]) -> String {
+/// Whose memory a group of index rows is: what the collective holds, or one steward's direction.
+///
+/// This replaces a per-row `[steward of record: X]` prefix. The prefix said who STOOD for a row;
+/// it could not say whether the row was shared knowledge or that person's own preference, and a
+/// second developer's first session needs exactly that distinction. One heading per holder says
+/// it once instead of on every line, which also returns the prefix's bytes to the budget.
+///
+/// The variant order IS the render order: the collective's shared memory first, then each named
+/// steward by name, then direction no steward stands for.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub enum Holder {
+    /// `applies-to` repository. Device entries never get a row in the tracked index at all: their
+    /// reach stops at the workspace, so `index.rs` counts them and leaves them out.
+    Collective,
+    /// Steward-bound rows one named participant stands for.
+    Steward(String),
+    /// Steward-bound rows whose record names no steward — an agent wrote them and nobody stood
+    /// for them. Named as such rather than credited to the repository, which directs nothing.
+    Unstewarded,
+}
+
+impl Holder {
+    /// The heading line, newline included: its bytes count against the budget like a row's.
+    pub fn heading(&self) -> String {
+        match self {
+            Holder::Collective => "## Held by the collective\n".to_string(),
+            Holder::Steward(name) => format!("## Direction from {name} (theirs, on record)\n"),
+            Holder::Unstewarded => "## Direction with no steward on record\n".to_string(),
+        }
+    }
+}
+
+/// One holder's rows, under its heading, in [`sort_key`] order.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IndexGroup {
+    pub holder: Holder,
+    pub rows: Vec<IndexRow>,
+}
+
+/// Gather rows under their holders: holders in [`Holder`] order, rows within each by [`sort_key`].
+///
+/// A holder with no rows has no heading — an empty section would spend budget saying nothing.
+pub fn group(rows: Vec<(Holder, IndexRow)>) -> Vec<IndexGroup> {
+    let mut by_holder: BTreeMap<Holder, Vec<IndexRow>> = BTreeMap::new();
+    for (holder, row) in rows {
+        by_holder.entry(holder).or_default().push(row);
+    }
+    by_holder
+        .into_iter()
+        .map(|(holder, mut rows)| {
+            rows.sort_by_key(|row| sort_key(&row.file));
+            IndexGroup { holder, rows }
+        })
+        .collect()
+}
+
+/// The projected index bytes: header, then each group's heading and its rows, in order.
+pub fn render(groups: &[IndexGroup]) -> String {
     let mut out = String::from(HEADER);
-    for row in rows {
-        out.push_str(&row.line());
+    for group in groups {
+        out.push_str(&group.holder.heading());
+        for row in &group.rows {
+            out.push_str(&row.line());
+        }
     }
     out
 }
@@ -274,16 +386,27 @@ pub fn render(rows: &[IndexRow]) -> String {
 /// Transcribed from `count_unloaded`, with the ONE change station one requires: the cap is a
 /// parameter resolved from the declared measure registry, never a module constant. That is the
 /// difference between a threshold and a bound.
-pub fn unloaded(rows: &[IndexRow], hard: usize) -> Vec<String> {
+///
+/// Headings advance the offset exactly as [`render`] emits them, so a row's position here is its
+/// position in the file; a heading is never itself reported, since it is not a row anyone lost.
+pub fn unloaded(groups: &[IndexGroup], hard: usize) -> Vec<String> {
     let mut offset = HEADER.len();
     let mut past = Vec::new();
-    for row in rows {
-        offset += row.line().len();
-        if offset > hard {
-            past.push(row.file.clone());
+    for group in groups {
+        offset += group.holder.heading().len();
+        for row in &group.rows {
+            offset += row.line().len();
+            if offset > hard {
+                past.push(row.file.clone());
+            }
         }
     }
     past
+}
+
+/// How many rows the groups carry — the index's `entries` count, headings excluded.
+pub fn row_count(groups: &[IndexGroup]) -> usize {
+    groups.iter().map(|g| g.rows.len()).sum()
 }
 
 /// Build an index row straight from an entry's frontmatter, the way the projector does.
@@ -352,5 +475,137 @@ mod tests {
     fn index_false_is_case_insensitive_and_absence_means_indexed() {
         assert!(!parse("---\nindex: False\n---\n").indexed());
         assert!(parse("---\nname: x\n---\n").indexed());
+    }
+
+    #[test]
+    fn applies_to_defaults_by_kind_and_a_declaration_overrides_it() {
+        let of = |kind: &str, extra: &str| {
+            parse(&format!(
+                "---\nname: x\n{extra}metadata:\n  type: {kind}\n---\n"
+            ))
+        };
+        for (kind, want) in [
+            ("user", AppliesTo::Steward),
+            ("feedback", AppliesTo::Steward),
+            ("project", AppliesTo::Repository),
+            ("reference", AppliesTo::Repository),
+        ] {
+            let fm = of(kind, "");
+            assert_eq!(fm.applies_to(), Ok(None), "{kind}: nothing declared");
+            assert_eq!(
+                fm.effective_applies_to(),
+                Ok(want),
+                "{kind}: the kind's default"
+            );
+        }
+        // The flat `type:` dialect defaults the same way.
+        assert_eq!(
+            parse("---\ntype: feedback\n---\n").effective_applies_to(),
+            Ok(AppliesTo::Steward)
+        );
+        let declared = of("feedback", "applies-to: repository\n");
+        assert_eq!(declared.applies_to(), Ok(Some(AppliesTo::Repository)));
+        assert_eq!(declared.effective_applies_to(), Ok(AppliesTo::Repository));
+        assert_eq!(
+            of("project", "applies-to: \"device\"\n").effective_applies_to(),
+            Ok(AppliesTo::Device)
+        );
+    }
+
+    #[test]
+    fn an_unknown_or_miscased_applies_to_is_an_error_never_a_default() {
+        for value in ["everyone", "Steward", "repo"] {
+            let fm = parse(&format!(
+                "---\napplies-to: {value}\nmetadata:\n  type: feedback\n---\n"
+            ));
+            assert_eq!(fm.applies_to(), Err(format!("`applies-to: {value}`")));
+            assert!(fm.effective_applies_to().is_err());
+            let nested = parse(&format!(
+                "---\nmetadata:\n  type: feedback\n  applies-to: {value}\n---\n"
+            ));
+            assert_eq!(
+                nested.applies_to(),
+                Err(format!("`metadata.applies-to: {value}`"))
+            );
+        }
+    }
+
+    #[test]
+    fn a_nested_applies_to_is_a_declaration_and_two_that_disagree_are_refused() {
+        // The edit-time gate counts the nested key as present, so the reader must too.
+        let nested = parse("---\nmetadata:\n  type: project\n  applies-to: device\n---\n");
+        assert_eq!(nested.applies_to(), Ok(Some(AppliesTo::Device)));
+        // The same value in both places is one declaration.
+        let both = parse(
+            "---\napplies-to: device\nmetadata:\n  type: project\n  applies-to: device\n---\n",
+        );
+        assert_eq!(both.applies_to(), Ok(Some(AppliesTo::Device)));
+        // Different values have no winner: either would overrule what someone wrote.
+        let split = parse(
+            "---\napplies-to: repository\nmetadata:\n  type: project\n  applies-to: device\n---\n",
+        );
+        assert_eq!(
+            split.applies_to(),
+            Err(
+                "`applies-to: repository` and `metadata.applies-to: device`, which disagree"
+                    .to_string()
+            )
+        );
+    }
+
+    fn row(file: &str) -> IndexRow {
+        IndexRow {
+            file: file.into(),
+            title: format!("T {file}"),
+            desc: "d".into(),
+        }
+    }
+
+    #[test]
+    fn rows_group_collective_first_then_stewards_by_name_then_the_unstewarded() {
+        let groups = group(vec![
+            (Holder::Unstewarded, row("u.md")),
+            (Holder::Steward("human:ruth".into()), row("r.md")),
+            (Holder::Collective, row("b.md")),
+            (Holder::Steward("human:matthew".into()), row("m2.md")),
+            (Holder::Collective, row("A.md")),
+            (Holder::Steward("human:matthew".into()), row("m1.md")),
+        ]);
+        let text = render(&groups);
+        let body: Vec<&str> = text[HEADER.len()..].lines().collect();
+        assert_eq!(
+            body,
+            [
+                "## Held by the collective",
+                "- [T A.md](A.md) — d",
+                "- [T b.md](b.md) — d",
+                "## Direction from human:matthew (theirs, on record)",
+                "- [T m1.md](m1.md) — d",
+                "- [T m2.md](m2.md) — d",
+                "## Direction from human:ruth (theirs, on record)",
+                "- [T r.md](r.md) — d",
+                "## Direction with no steward on record",
+                "- [T u.md](u.md) — d",
+            ]
+        );
+        assert_eq!(row_count(&groups), 6);
+        assert!(group(Vec::new()).is_empty(), "no rows, no headings");
+    }
+
+    #[test]
+    fn unloaded_counts_heading_bytes_where_render_puts_them() {
+        let groups = group(vec![
+            (Holder::Collective, row("a.md")),
+            (Holder::Steward("human:matthew".into()), row("m.md")),
+        ]);
+        let text = render(&groups);
+        // A cap at exactly the whole file loads every row; one byte short loses the last one.
+        assert!(unloaded(&groups, text.len()).is_empty());
+        assert_eq!(unloaded(&groups, text.len() - 1), ["m.md"]);
+        // A cap that ends inside the SECOND heading loses the row after it, even though the
+        // first group's bytes alone fit: the heading is what pushed it past.
+        let first = HEADER.len() + Holder::Collective.heading().len() + row("a.md").line().len();
+        assert_eq!(unloaded(&groups, first), ["m.md"]);
+        assert_eq!(unloaded(&groups, first - 1), ["a.md", "m.md"]);
     }
 }

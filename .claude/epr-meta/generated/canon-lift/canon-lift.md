@@ -2,7 +2,7 @@
 
 # Concern canon — brit lift
 
-**43 rows across both registry homes -> 43 CIDv1(dag-cbor, sha2-256) atoms** (43 pin-verified, 32 declared heads).
+**44 rows across both registry homes -> 44 CIDv1(dag-cbor, sha2-256) atoms** (44 pin-verified, 32 declared heads).
 
 The content plane (`canon-atoms.json`) and the standing plane (`precedent-standing.json`) are what the v1 YAML row deliberately conflates; `declared-heads.json` carries the brit declared-head-over-DAG primitive at resolution mode `pinned`. Every CID is a codec wrap of the exact bytes the registry's own `sha256` pin already covers — the digests below are the same 32 bytes, rendered twice.
 
@@ -38,7 +38,7 @@ The `sha256` column is the registry's own live pin; the `CID` is that same diges
 | `feedback-local-retention` | `policies.yaml@1` | `sha256:cf7b1a105d2e4bfb1e8908bf58aa6e48b769e60de8bca5a2b9652e422effd0d7` | `bafyreigppmnbaxjojp5r5ciix5mku3siw5u6mdpixss2folffzbc576q24` |
 | `governance-escalation-ladder` | `policies.yaml@1` | `sha256:97008339f53de85e02ff63222f3e521889f538a458e56d05f656cc48ecf75954` | `bafyreiexacbtt5j55bpaf73deixt4uqyrh2trjcy4vwql5swzreoz52zkq` |
 | `habit-declaration-at-birth` | `policies.yaml@1` | `sha256:528917b7b386fe63209d385c1d194b6f366c617b65e4125201db39589cb789c2` | `bafyreicsrel3pm4g7zrsbhjylqorss3pgzwgc63f4qjfeao3hfmjzn4jyi` |
-| `memory-frontmatter-at-birth` | `policies.yaml@1` | `sha256:a622e4d20e5aa57ab9152e48a082ff437499ad5b498516408f0cc864cce003ee` | `bafyreifgelsneds2uv5lsfjojcqif72dosm22w2jqulebdymzbsmzyad5y` |
+| `memory-frontmatter-at-birth` | `policies.yaml@2` | `sha256:c44604e50322fa9e7cc4a3a10b77267e20bdf138e867e3b3f5a27d2a5eee0b5a` | `bafyreigeiycokazc7kphzrfduefxojt6ec67cohim7r3h5ncpuvf53qlli` |
 | `ownership-ontology-guard` | `policies.yaml@5` | `sha256:a19c92b89c3009f7bd521fc6f448c6c2ef573862afbb4adf03f93bb7eebadc2b` | `bafyreifbtsjlrhbqbh332uq7y32errwc55ltqyvpxnfn6a7zho365ow4fm` |
 | `rust-style-strict` | `policies.yaml@1` | `sha256:6de3a7df5d7b876c25de1339feb5fa67601df342f5910a20217d9c02ba26c235` | `bafyreidn4ot56xl3q5wclxqthh7ll6thmao7gqxvsefcail5tqblujwcgu` |
 | `source-file-loc-ceiling` | `policies.yaml@1` | `sha256:ba3d0c7ce8e5bdda3aa4241603a8d40706fcdc5f90072e38f38d30ef5070702d` | `bafyreif2hughz2hfxxndvjbecyb2rvaha36nyx4qa4xdr44ngdxva4dqfu` |
@@ -55,6 +55,8 @@ The `sha256` column is the registry's own live pin; the `CID` is that same diges
 | `policies.yaml#c6a-bounded-work@2` | active | `concerns.yaml#c6a-bounded-work@1` | — |
 | `policies.yaml#eprfs-meta-domain-neutrality@1` | superseded | — | `eprfs-meta-domain-neutrality@2` |
 | `policies.yaml#eprfs-meta-domain-neutrality@2` | active | `policies.yaml#eprfs-meta-domain-neutrality@1` | — |
+| `policies.yaml#memory-frontmatter-at-birth@1` | superseded | — | `memory-frontmatter-at-birth@2` |
+| `policies.yaml#memory-frontmatter-at-birth@2` | active | `policies.yaml#memory-frontmatter-at-birth@1` | — |
 | `policies.yaml#ownership-ontology-guard@1` | superseded | — | `ownership-ontology-guard@2` |
 | `policies.yaml#ownership-ontology-guard@2` | superseded | `policies.yaml#ownership-ontology-guard@1` | `ownership-ontology-guard@3` |
 | `policies.yaml#ownership-ontology-guard@3` | superseded | `policies.yaml#ownership-ontology-guard@2` | `ownership-ontology-guard@4` |

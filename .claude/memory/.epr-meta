@@ -12,7 +12,7 @@ purpose: >
   managed home (subject-routing.yaml); native memory stays light.
 rules:
   - id: memory-frontmatter-at-birth
-    policy: memory-frontmatter-at-birth@1
+    policy: memory-frontmatter-at-birth@2
   - id: memory-index-is-generated
     class: dispatch
     when: { write: "MEMORY.md" }

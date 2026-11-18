@@ -1,4 +1,5 @@
 {
+  "autoDreamEnabled": true,
   "hooks": {
     "SessionStart": [
       {

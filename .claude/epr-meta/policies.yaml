@@ -126,6 +126,33 @@ policies:
       teach and inventory; never block authoring.
 
   - id: memory-frontmatter-at-birth
+    version: 2
+    contentHash: sha256:c44604e50322fa9e7cc4a3a10b77267e20bdf138e867e3b3f5a27d2a5eee0b5a
+    title: Memory topic files must be born projectable and saying whom they apply to
+    binding: constitutional
+    class: deny
+    scope: { write: "*.md", new: true }
+    require-frontmatter: [name, title, description, applies-to]
+    status: active
+    retire-when: >
+      never for the three format keys, on @1's ground: a memory without name/title/description
+      cannot enter the generated MEMORY.md index. The applies-to requirement retires when an
+      entry's audience is taken from where it is composed (a collection mounted at a declared
+      ring) so that asking the author to restate it would add nothing
+    established_by: operator-approved-2026-11-18-memory-first-rung-plan-step-2c
+    why: >
+      @2 keeps @1's three keys and adds `applies-to:`, a top-level key with one of three values.
+      `device`: true of this machine only (paths, installed tools, local state) and of no use on
+      another. `steward`: one named person's direction, correction or description of themselves;
+      it is theirs, on record, and another person's session must not read it as its own user's.
+      `repository`: context crafted from the work, true for anyone working here. The moment of
+      writing is when the author knows the audience best and when stating it costs least, so the
+      choice is made then and never inferred later. Also still needed: name (slug), title
+      (<= 60 chars), description (ONE line, <= 160 chars: what the fact is + when it bites),
+      metadata.type (user|feedback|project|reference). Entries born before @2 take their
+      audience from their type (user and feedback: steward; project and reference: repository).
+
+  - id: memory-frontmatter-at-birth
     version: 1
     contentHash: sha256:a622e4d20e5aa57ab9152e48a082ff437499ad5b498516408f0cc864cce003ee
     title: Memory topic files must be born with projectable frontmatter
@@ -133,7 +160,8 @@ policies:
     class: deny
     scope: { write: "*.md", new: true }
     require-frontmatter: [name, title, description]
-    status: active
+    status: superseded
+    superseded_by: memory-frontmatter-at-birth@2
     retire-when: >
       never: this is a format precondition, not a habit that can be internalized — a memory
       without name/title/description cannot enter the generated MEMORY.md index at all. It retires

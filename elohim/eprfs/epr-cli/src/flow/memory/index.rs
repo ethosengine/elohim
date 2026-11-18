@@ -22,6 +22,10 @@
 //!   rows out only when the fold is EFFECTIVE (see `supersession.rs`): at once for the curator's
 //!   own work, else after a distinct Steward's approving verdict. Until then both stay indexed and
 //!   the umbrella's row says the fold is pending; the report names the approval command.
+//! * **Rows are grouped by whom they apply to.** Each entry's `applies-to:` (declared, else its
+//!   kind's default) files it under what the collective holds or under the one steward whose
+//!   direction it is (see `holder` below), so an inheriting session can tell shared memory from one
+//!   person's preference without reading a per-row label.
 //! * **Writing is opt-in.** With no `--out` the command reports and writes no index. A projection
 //!   that silently overwrote its target every time it was asked a question would be the same defect
 //!   in a new place.
@@ -29,7 +33,7 @@
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
-use eprfs_agent::memory::Contribution;
+use eprfs_agent::memory::{AppliesTo, Contribution, Imported};
 use serde_json::{json, Value};
 
 use super::supersession;
@@ -59,8 +63,8 @@ pub fn run(root: &Path, opts: &Options) -> FlowResult<Value> {
     )
     .to_path_buf();
 
-    let (rows, population, folds) = collect(&mut lead, &contributions_rel)?;
-    let text = entries::render(&rows);
+    let (groups, population, folds) = collect(&mut lead, &contributions_rel)?;
+    let text = entries::render(&groups);
     let bytes = text.len();
 
     // Resolve the cap first: both the unloaded count and the refusal are denominated in it.
@@ -71,7 +75,7 @@ pub fn run(root: &Path, opts: &Options) -> FlowResult<Value> {
     };
     let hard = bound.as_ref().and_then(|b| b.hard);
 
-    let unloaded = hard.map(|cap| entries::unloaded(&rows, cap as usize));
+    let unloaded = hard.map(|cap| entries::unloaded(&groups, cap as usize));
 
     // The fold is appended BEFORE any refusal. A breached budget is exactly when the drift matters,
     // and a report that refuses without recording what it saw teaches nothing twice.
@@ -139,7 +143,7 @@ pub fn run(root: &Path, opts: &Options) -> FlowResult<Value> {
         "mode": "index",
         "collective": collective_ref,
         "contributionsDirectory": contributions_rel.to_string_lossy(),
-        "entries": rows.len(),
+        "entries": entries::row_count(&groups),
         "population": population,
         "bytes": bytes,
         "budget": bound.as_ref().map(|b| json!({
@@ -173,16 +177,18 @@ pub fn run(root: &Path, opts: &Options) -> FlowResult<Value> {
 fn collect(
     reader: &mut Reader,
     dir: &Path,
-) -> FlowResult<(Vec<entries::IndexRow>, Value, Vec<supersession::Fold>)> {
+) -> FlowResult<(Vec<entries::IndexGroup>, Value, Vec<supersession::Fold>)> {
     let root = reader.root.clone();
     let absolute = root.join(dir);
     let mut rows = Vec::new();
     let (mut total, mut unattributed, mut opted_out, mut superseded) =
         (0usize, 0usize, 0usize, 0usize);
+    let (mut device_only, mut unreadable) = (0usize, 0usize);
     if !absolute.is_dir() {
         return Ok((
-            rows,
-            json!({"contributions": 0, "unattributed": 0, "optedOut": 0, "superseded": 0}),
+            Vec::new(),
+            json!({"contributions": 0, "unattributed": 0, "optedOut": 0, "superseded": 0,
+                   "deviceOnly": 0, "unreadable": 0}),
             Vec::new(),
         ));
     }
@@ -206,7 +212,11 @@ fn collect(
     files.sort();
     for path in files {
         let text = std::fs::read_to_string(&path)?;
+        // Counted, not just skipped: a contribution written by a NEWER binary (a field this one
+        // does not know, refused by `deny_unknown_fields`) lands here too, and a silent skip would
+        // make a sibling device's row vanish from this device's index with nothing said.
         let Ok(contribution) = serde_json::from_str::<Contribution>(&text) else {
+            unreadable += 1;
             continue;
         };
         let Some(provenance) = contribution.imported.clone() else {
@@ -221,6 +231,13 @@ fn collect(
             opted_out += 1;
             continue;
         }
+        // A device entry's contribution reaches the workspace at most, and this index is a
+        // tracked file every clone receives: rendering its row would carry it past its reach.
+        // It stays a contribution (recall on this workspace still sees it) and is counted.
+        if provenance.effective_applies_to() == AppliesTo::Device {
+            device_only += 1;
+            continue;
+        }
         // Folded out by an EFFECTIVE supersession: the contribution and its file are untouched,
         // recall and attribution still see it; only the index row is the umbrella's now.
         let request = dir
@@ -232,39 +249,77 @@ fn collect(
             superseded += 1;
             continue;
         }
-        // Authorship is shown where the row is: a steward-of-record contribution says so on its
-        // own line, so no session reads the human as having written what they only stand for.
-        let steward_of_record = contribution
-            .uncertainty
-            .iter()
-            .any(|line| line.starts_with(super::import::STEWARD_OF_RECORD));
-        let desc = if steward_of_record {
-            format!(
-                "[steward of record: {}] {}",
-                contribution.author, contribution.claim
-            )
+        let holder = holder(&contribution, &provenance);
+        // A fold awaiting a Steward's verdict says so on the umbrella's own row.
+        let desc = if pending.contains(&request) {
+            format!("{} {}", supersession::PENDING_LABEL, contribution.claim)
         } else {
             contribution.claim
         };
-        // A fold awaiting a Steward's verdict says so on the umbrella's own row.
-        let desc = if pending.contains(&request) {
-            format!("{} {desc}", supersession::PENDING_LABEL)
-        } else {
-            desc
-        };
-        rows.push(entries::IndexRow {
-            file: provenance.file,
-            title: contribution.imported.map(|i| i.display).unwrap_or_default(),
-            desc,
-        });
+        rows.push((
+            holder,
+            entries::IndexRow {
+                file: provenance.file,
+                title: provenance.display,
+                desc,
+            },
+        ));
     }
-    rows.sort_by_key(|row| entries::sort_key(&row.file));
     Ok((
-        rows,
+        entries::group(rows),
         json!({"contributions": total, "unattributed": unattributed, "optedOut": opted_out,
-               "superseded": superseded}),
+               "superseded": superseded, "deviceOnly": device_only, "unreadable": unreadable}),
         folds,
     ))
+}
+
+/// Whose row this is: the heading the index files it under.
+///
+/// Repository entries are the collective's. A steward-bound entry is the direction of
+/// the participant who STANDS for it: first the human a steward-of-record line names (that act
+/// writes the human into `author`, and the line is what says they stand rather than wrote), else
+/// the contribution's `steward` slot — but only when that slot names a participant. Import fills
+/// the slot with the collective's own party (`repo:<owner>/<name>` at the root, the child's
+/// `collective:<id>` below it), and crediting a preference to the repository would tell a second
+/// developer that nobody's direction is somebody's. Such rows are filed as unstewarded instead.
+///
+/// A steward-of-record line only names a steward when its `author` is a `human:` ref — only a
+/// human stands as steward of record, so a line beside an agent author is a malformed or forged
+/// slot, and filing the row under the agent would credit it with direction it cannot give. That
+/// row falls through to the `steward` slot rule. Device rows never reach here (see `collect`).
+fn holder(contribution: &Contribution, provenance: &Imported) -> entries::Holder {
+    match provenance.effective_applies_to() {
+        AppliesTo::Repository | AppliesTo::Device => entries::Holder::Collective,
+        AppliesTo::Steward => {
+            let steward_of_record = contribution
+                .uncertainty
+                .iter()
+                .any(|line| line.starts_with(super::import::STEWARD_OF_RECORD));
+            if steward_of_record && has_prefix(&contribution.author, "human:") {
+                entries::Holder::Steward(contribution.author.trim().to_string())
+            } else if names_a_participant(&contribution.steward) {
+                entries::Holder::Steward(contribution.steward.trim().to_string())
+            } else {
+                entries::Holder::Unstewarded
+            }
+        }
+    }
+}
+
+/// Whether a steward slot names a participant rather than nobody or a collective's own party.
+///
+/// An empty slot names no one; a heading built from it would read `Direction from  (theirs…)`.
+fn names_a_participant(slot: &str) -> bool {
+    let slot = slot.trim();
+    !(slot.is_empty() || has_prefix(slot, "repo:") || has_prefix(slot, "collective:"))
+}
+
+/// An ASCII-case-insensitive prefix test, so `Repo:` cannot pass for a participant.
+fn has_prefix(value: &str, prefix: &str) -> bool {
+    value
+        .trim()
+        .get(..prefix.len())
+        .is_some_and(|head| head.eq_ignore_ascii_case(prefix))
 }
 
 /// The entry files an EFFECTIVE fold hides — the rows the harness's install guard excuses.
