@@ -336,6 +336,13 @@
       "path": "genesis/research/repos/radicle-ci-broker",
       "relevance": "Radicle CI broker: node events → adapter subprocesses → one job COB per commit signed by the node key. No artifact field, best-effort COB updates, at-most-once events. Compare with brit build attestations (output_cid) and gate attestation.",
       "pillar": "elohim"
+    },
+    {
+      "name": "memorilla",
+      "url": "https://github.com/snap-stanford/memorilla.git",
+      "path": "genesis/research/repos/memorilla",
+      "relevance": "Stanford SNAP latent memory module for frozen LLMs (arXiv:2610.21375): documents encoded once, a fixed budget of query-dependent memory tokens per question. Read for what a learned, opaque memory does to legibility, provenance and reach-scoping compared with our file-and-cite memory; and for its agent-memory evaluation.",
+      "pillar": "elohim"
     }
   ]
 }

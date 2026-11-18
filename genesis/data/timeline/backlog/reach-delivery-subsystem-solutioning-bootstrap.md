@@ -771,6 +771,19 @@ that holding content does not mean being able to read it.
       through failover, with evidence distinguishing intentional selection from stale propagation?
     - What network update contract will the later Lamad authoring sprint consume for atomic
       lesson/module/path edits? Keep that sprint's composition UX outside this subsystem's scope.
+15. **Join as a named axis, and the record of a join (added 2026-11-18).** The [Memorilla and dreaming survey](epr:memorilla-claude-dreaming-cross-pollination-2026-11-18), after
+    the operator's correction of its first draft, reads three separate questions where memory work
+    had been using one: reach (how far may this be seen), custody (who holds the bytes and can they
+    read them; the resilience epic's encrypted, social and commons custody) and join (who may tie
+    these bytes to a person and to each other, from where, and for what). It is a candidate answer
+    to tension 1 and restates tension 5's "holder ≠ reader". The operator's direction on the third
+    axis: which elohim acts, at which tier, and where it joins *from* are part of the reach-shape
+    that bounds privacy (a doctor's visit and a family table are the same person and two joins).
+    Questions it brings to this session: does a derived artifact take the narrowest ring among its
+    sources or its builder's ring; what must be dropped when data is aggregated upward and who
+    witnesses that; is the record of a join private to the person or contestable; and does the
+    verdict's reserved `viewer?` carry the invoking tier and purpose. The survey's §4.2 lists the
+    fields; two have no home yet (what was correlated; which other elohim were consulted).
 
 ## 11. Definition of done for the solutioning session
 

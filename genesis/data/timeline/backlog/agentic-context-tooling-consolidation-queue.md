@@ -490,6 +490,109 @@ before investing.
     check. Convergence is by adoption: `eprfs-core`'s `ProjectionManifest` (path → BlobCid) is the
     candidate, and the package projection is the smallest first adopter.
 
+28. **A dream that only proposes, and each proposal a consolidation event** ([Memorilla and dreaming survey](epr:memorilla-claude-dreaming-cross-pollination-2026-11-18) T1–T3,
+    minted 2026-11-18). The memory ceremony is hard to prioritise because it runs consolidation as
+    cleanup, which the living-memory epic names as the mistake: a consolidation is a judgment that
+    "carries flow", and "none of it is silent". The ceremony today records no discovery, no noticer
+    and no freed capacity, so it has nothing to show. Build the thin `/dream` the 2026-05-10
+    lifecycle design specified and nobody built: scheduled, one small-model reader per transcript
+    and one organizer (Anthropic's cookbook cost shape, about $8 for fifty long transcripts),
+    transcripts treated as untrusted data, output as a branch and a diff, no in-place edit. Each
+    proposal is recorded on the valueflow with the truth found, the entries and their stewards,
+    what is freed and any change of reach. Recall journeys run before and after and print with the
+    diff. The four-lens ceremony stays for the judgments a proposal cannot make. A dream never
+    widens an entry: widening is a compose through the reach gate.
+29. **The native dream runs, watched, until our own can replace it** (same survey, T5; the
+    steward's ruling 2026-11-18, reversing the survey's recommendation to switch it off). Claude
+    Code 2.1.327 contains a background dream that edits the memory directory in place behind a
+    server flag (gate: 24 hours and 5 sessions), found in the binary and absent from the
+    documentation. `.claude/settings.json` sets `autoDreamEnabled: true`, which takes effect only
+    where the account has the feature. The steward's reason: use it and learn from it until there
+    is much more confidence in subsuming it. What to watch, because the directory is git-tracked
+    and its `MEMORY.md` is a generated projection: every dream shows up as a working-tree diff
+    before it is committed, so read that diff; a dream may hand-edit the generated index, delete
+    an entry that records a ruling, or merge entries with no `supersedes:` edge and no Steward's
+    verdict. Whether the edit-time gate and the index projection hook see a dream's writes is
+    untested. Each observed dream is evidence for item 28's design.
+    **Design pass owed (steward, 2026-11-18; backlog only for now).** Leaving it on is a holding
+    posture, not a settled one. A later design pass has to state the concept and how the native
+    dream stands in relation to the Elohim native memory system: what each is allowed to write,
+    which is the authority when they disagree (the generated index, `supersedes:` folds and a
+    Steward's verdict on one side; an in-place editor on the other), what a dream's output counts
+    as (a proposal to be judged, or an edit already made), and the condition under which ours
+    subsumes it. Inputs: the observed dream diffs, item 28, and the survey's sections 2.3 and 3.
+    **The same pass should find the edge between memory and constitution (steward, 2026-11-18).**
+    A harness gives an agent two things at the start of every session, its standing instructions
+    and its memories, and both shape what it does. Here the first is the gospel `CLAUDE.md`
+    files and the `.epr-meta` policies (which already carry a binding ladder: observation,
+    persuasive, binding-local, constitutional), and the second is the memory index. Questions for
+    the pass: what makes an entry stop being one steward's direction and become a rule that binds
+    whoever works here, and who ratifies that; whether the living-memory epic's permanent core
+    ("truths that have earned permanence through repetition") is where the constitution begins;
+    how a memory proposes an amendment without acting as one; and which side wins when they
+    disagree. Claude Code's dream settles the last by rule (the checked-in instructions win unless
+    a memory is dated later and corrects them). The risk on our side is a shadow constitution:
+    unratified direction that binds in practice because every session loads it.
+30. **Every memory entry says what it applies to and how far it may be seen** (same survey, S3
+    and §4.5). Two additive frontmatter fields: `applies-to` (device, steward or repository) and a
+    reach. Today the collective sets one ceiling by path, so all 320 entries share a ring, the
+    `user`-type entries go to the forge in the clear, and an entry has no governance leg and is
+    not a whole EPR. With the fields, the path rule becomes a ceiling, device-bound entries stop
+    travelling, steward-bound entries can cross the steward channel, and the index projection can
+    filter at session start. A third field, the memory class (contextual, attestation and the
+    rest), is what lets a dream supersede a ruling instead of deleting it. Classifying the existing
+    entries is mostly mechanical from `type`; the device-bound ones need a read.
+    **Classification pass, proposed and not applied (2026-11-18).** A read of all 317 entries
+    against the default (user and feedback: steward; project and reference: repository) found
+    these exceptions. None was edited: import refuses an entry whose bytes were written by one
+    participant when another contributed it ("a contribution is never re-authored by another
+    participant"), and 291 of the 302 contributions stand under `human:matthew` as steward of
+    record. Re-audiencing a steward's entries is that steward's act, or a supersession a Steward
+    judges; it is not a mechanical sweep.
+    - *feedback that is a technical lesson, so the repository's* (21 high confidence): the
+      `feedback_` entries `async_in_computed_silently_dies`, `cucumber_profile_paths_merge_trap`,
+      `diesel_migration_timestamp_collision`, `zone_native_await_unhandled_rejection`,
+      `onpush_implicit_default_harness_blindness`, `lint_autofix_string_scan_poison`,
+      `codegen_prettier_oscillation`, `sccache_spawn_enoent_rca`,
+      `sccache_cache_corruption_recovery`, `sccache_failure_classes`,
+      `pnpm_symlinked_node_modules_write_through`, `no_backticks_in_double_quoted_shell_strings`,
+      `partition_compile_and_stale_dist`, `swarm_composition_fresh_tree_build`,
+      `workflow_structuredoutput_hang`, `agents_commit_ledger_files`,
+      `verifier_needs_counterpart_minted_vector`, `plan_checkbox_is_commitment_grain`,
+      `package_first_projection_drift_direction`, `shared_tree_commit_and_gate_mechanics`,
+      `worktree_push_bypasses_husky_gate`; a further 12 at medium confidence.
+    - *true of one machine, so the device's* (12 high confidence):
+      `project_container_cargo_environment_quirks`, `project_container_restart_recovery_drill`,
+      `project_devspace_recovery`, `project_workspace_berth_io_guard`,
+      `reference_io_guard_berth_rails`, `project_ram_guard_oom_group_kill`,
+      `reference_node_hardware_ethosengine_shem`, `feedback_pvc_threshold_and_recovery`,
+      `project_devspace_disk_cleanup_procedure`, `project_cargo_disk_guard_override`,
+      `project_cargo_pvc_disk_discipline`, `project_shem_workspace_runs_long_sprints`; a further 8
+      at medium confidence. Several are true of this *kind* of workspace and useful on a sibling
+      of the same kind, which the three values do not express.
+    - *project entries that are a person's, so the steward's* (11): the outreach threads
+      (`project_*_outreach*`, `project_outreach_threads`, `project_canteen_outreach_thread`).
+    - *Broken frontmatter in 22 entries*: an `id:` line at column 0 inside the `metadata:` block,
+      which closes the block before `type:` is read. The same shape in 22 files suggests a tool
+      wrote it, probably the cite id assigner; unconfirmed. Their recorded contributions carry
+      the right type, so nothing is lost today, and a re-import of any of them would be refused
+      for a missing type.
+    **Gap found while wiring the onboarding story (2026-11-18).** Import names a steward only
+    for a steward-of-record entry, where a human stands as its author. An entry an agent writes
+    in a person's session records the agent as author and the collective as steward, so its row
+    falls under "Direction with no steward on record" (11 of the 302 contributions today, 6 of
+    them feedback). The scenario "after import the correction is listed under the second
+    developer's name" passes on a contribution built by hand for that reason. The cure is for an
+    agent-written entry to carry the steward of record of the session that wrote it, which the
+    session covenant already records.
+31. **Usefulness parity, and entries that carry their outcome** (same survey, T6 and S4). Two
+    measures the recall work lacks. First, journeys whose answer needs two memories, neither of
+    which states it (the shape of Memorilla's PersonalizationV4), added to the standing reader's
+    set, as the bar our recall should meet by means that keep the join with the person. Second, an
+    entry records whether acting on it later helped; Memorilla's agent memory learns what to
+    surface from reward-annotated documents, and ours records what was learned and never what it
+    bought.
+
 ## Exit criteria
 
 Each item lands as its own bounded change (or an explicit won't-fix note here), with the
