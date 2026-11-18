@@ -890,14 +890,15 @@ function runFacts(path) {
   return { events, open };
 }
 
-async function subscribersFor(path, env) {
+async function subscribersFor(path, env, { recordMiss = false } = {}) {
   const { open } = runFacts(path);
   const session = open.session || env.ELOHIM_SESSION_ID || null;
   if (!session) return null;
   const [did, notes] = await Promise.all([deviceDid({ env }), peekNotes(session, { env })]);
-  // A discovery that cannot run is named in the run log; no subscriber at all is the quiet norm.
+  // A discovery that cannot run while a red is waiting is named in the run log (the actionable
+  // case); the final, written after run-close, stays quiet, and no subscriber at all is the norm.
   if (!did || !notes) {
-    appendEvent(path, {
+    if (recordMiss) appendEvent(path, {
       kind: 'sibling-delivery', ok: false,
       why: !did ? 'no device id (GATE_LIVE_DEVICE unset and epr peer leases unanswered)' : 'berth inbox unreadable',
     });
@@ -917,7 +918,7 @@ const subscriberMemo = new Map();
 export async function emitRed(path, event, { continuing, env = process.env } = {}) {
   try {
     if (siblingOff(env) || !event || event.kind !== 'failure') return 0;
-    if (!subscriberMemo.has(path)) subscriberMemo.set(path, subscribersFor(path, env));
+    if (!subscriberMemo.has(path)) subscriberMemo.set(path, subscribersFor(path, env, { recordMiss: true }));
     const found = await subscriberMemo.get(path);
     if (!found || !found.subscribers.length) return 0;
     const { events, open } = runFacts(path);

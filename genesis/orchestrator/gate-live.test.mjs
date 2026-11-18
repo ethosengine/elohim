@@ -1237,3 +1237,14 @@ test('E4 finding 6: a self/* subscription matches a hand-over run, and a run kil
   assert.equal(final.failures, 3);
 });
 
+
+test('a red whose discovery cannot run names the miss; a final in the same state stays quiet', async (t) => {
+  const root = fixture(t);
+  const { path, reds } = threeRedRun(root);
+  const missing = siblingEnv(root, join(root, 'no-berth'));
+  assert.equal(await live.emitRed(path, reds[0], { env: missing }), 0);
+  assert.equal(await live.emitFinal(path, { env: missing }), 0);
+  const deliveries = readFileSync(path, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l))
+    .filter((e) => e.kind === 'sibling-delivery');
+  assert.deepEqual(deliveries.map((d) => [d.ok, d.why]), [[false, 'berth inbox unreadable']]);
+});
