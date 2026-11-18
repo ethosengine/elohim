@@ -301,6 +301,21 @@ the friction is at each reach.
 on shem. Probe: after prep, `test -f <submodule>/build-manifest.json` for each attested
 submodule; prep and `gate-preflight.mjs` should refuse naming the submodule and the fetch cure.
 
+2026-11-18, ethosengine, two more occurrences in the native-throughput sprint. (a) A fresh
+worktree `nt-e2`: the main checkout's `elohim/rakia` did not hold the pin `f9787c9e`, so the
+local-reference clone failed `unable to read tree`; prep by then refused (exit 1), and the cure
+was a hand fetch of the pin from the `nt-e1` worktree's rakia. (b) After a rebase moved the
+`elohim/brit` gitlink (0.2.0 to 0.2.6), `nt-e1` kept its initialized brit at the old commit;
+prep only warned `checked-out commit differs from the pin` and exited 0, and the stale gitlink
+widened gate selection and kept the genesis evidence dirty. Cured in
+`genesis/orchestrator/worktree-prep.mjs` (branch `claude/nt-prep`): when the main checkout
+cannot serve a missing submodule, prep tries every sibling worktree's copy that holds the pin,
+over local file transport only, and names the one it used; with none, it refuses naming each
+checkout tried and the remote cure. A clean initialized submodule at another commit is moved to
+its pin (fetching the pin from a sibling first when its own copy lacks it); a dirty one keeps
+the warning and is left untouched. Network fetch stays out of prep by design. Tests:
+`worktree-prep.test.mjs`, six `row 11` cases.
+
 ## Row 12 — the sibling draw fetches before it reads what the binary requires
 
 2026-11-17, landed in `a51dacfc8`: `sibling::select` picks an offer by commit and release only.

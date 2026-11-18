@@ -42,7 +42,7 @@ export function mainCheckout({ root, spawn = spawnSync }) {
 export function submoduleCommand(module, { main, exists = existsSync }) {
   // --reference alone still clones the remote URL. Use the local checkout as the clone
   // source too, forbid network protocols and refuse an unavailable pin instead of fetching.
-  const args = ['git', '-c', 'protocol.allow=never', '-c', 'protocol.file.allow=always'];
+  const args = ['git', ...LOCAL_ONLY];
   let reference;
   if (main) {
     reference = join(main, module);
@@ -54,13 +54,56 @@ export function submoduleCommand(module, { main, exists = existsSync }) {
   return [...args, '--', module];
 }
 
+const LOCAL_ONLY = ['-c', 'protocol.allow=never', '-c', 'protocol.file.allow=always'];
+
+/** The commit `module` is pinned to at HEAD (its gitlink), or null when it cannot be read. */
+export function pinOf(root, module, spawn = spawnSync) {
+  const r = spawn('git', ['-C', root, 'ls-tree', 'HEAD', '--', module], { encoding: 'utf8' });
+  const match = r.status === 0 && /^160000 commit ([0-9a-f]{40,64})\t/.exec(String(r.stdout));
+  return match ? match[1] : null;
+}
+
+/** Every other checkout of this repository (the main one and each linked worktree), never `root`. */
+export function siblingCheckouts(root, spawn = spawnSync) {
+  const r = spawn('git', ['-C', root, 'worktree', 'list', '--porcelain'], { encoding: 'utf8' });
+  if (r.status !== 0) return [];
+  return String(r.stdout).split('\n')
+    .filter(line => line.startsWith('worktree '))
+    .map(line => resolve(line.slice('worktree '.length)))
+    .filter(path => path !== resolve(root));
+}
+
+/**
+ * Row 11 (a): the first checkout in `candidates` whose copy of `module` holds commit `pin`, or
+ * null. Read with `cat-file -e` in that checkout's submodule; nothing is fetched or written.
+ */
+export function pinSource(module, pin, { candidates, spawn = spawnSync, exists = existsSync }) {
+  for (const candidate of candidates) {
+    const dir = join(candidate, module);
+    if (!exists(join(dir, '.git'))) continue;
+    const held = spawn('git', ['-C', dir, 'cat-file', '-e', `${pin}^{commit}`], { encoding: 'utf8' });
+    if (held.status === 0) return candidate;
+  }
+  return null;
+}
+
+function noSource(module, pin, candidates) {
+  return new Error(`${module}: no local checkout holds the pinned commit ${pin.slice(0, 12)} ` +
+    `(tried ${candidates.length ? candidates.join(', ') : 'none'}); fetch it from the remote with ` +
+    `git submodule update --init -- ${module}, or bring a checkout that holds it`);
+}
+
 export function prep({ root = ROOT, spawn = spawnSync, exists = existsSync,
   select = projectsForChanges, preflight = runPreflight,
   distChecks = DIST_CHECKS, log = console.log } = {}) {
-  const execute = ([command, ...args]) => {
+  const attempt = ([command, ...args]) => {
     log(`[prep] ${[command, ...args].join(' ')}`);
     const result = spawn(command, args, { cwd: root, stdio: 'inherit' });
-    if (result.status !== 0) throw new Error(`${command} failed (${result.status ?? result.signal ?? result.error?.message ?? 'could not start'})`);
+    return result.status === 0 ? null : `${command} failed (${result.status ?? result.signal ?? result.error?.message ?? 'could not start'})`;
+  };
+  const execute = command => {
+    const failure = attempt(command);
+    if (failure) throw new Error(failure);
   };
   let failed = false;
   try {
@@ -70,7 +113,43 @@ export function prep({ root = ROOT, spawn = spawnSync, exists = existsSync,
     if (modules.level === 'WARN' && !modules.why.includes('differs from the pin')) {
       throw new Error('cannot inspect submodules; refusing an incomplete gate registry');
     }
-    for (const module of modules.missing || []) execute(submoduleCommand(module, { main, exists }));
+    // Where a pinned commit can come from, after the main checkout: every sibling worktree.
+    const others = () => siblingCheckouts(root, spawn).filter(path => path !== main);
+    for (const module of modules.missing || []) {
+      const first = attempt(submoduleCommand(module, { main, exists }));
+      if (!first) continue;
+      // Row 11 (a): the main checkout's copy lacks the pin ("unable to read tree"). Try each
+      // sibling worktree's copy as the local source, and say which one served it.
+      const pin = pinOf(root, module, spawn);
+      if (!pin) throw new Error(`${first}; and the pin of ${module} could not be read`);
+      const candidates = others();
+      const source = pinSource(module, pin, { candidates, spawn, exists });
+      if (!source) throw noSource(module, pin, [main, ...candidates].filter(Boolean));
+      log(`[prep] ${module}: the main checkout lacks pin ${pin.slice(0, 12)}; using ${source}`);
+      execute(submoduleCommand(module, { main: source, exists }));
+    }
+    // Row 11 (b): an initialized submodule left at another commit (a rebase moved the gitlink)
+    // makes the gate test bytes the push does not carry. A clean one is moved to its pin;
+    // a dirty one is someone's work and keeps the warning.
+    for (const module of modules.moved || []) {
+      const dir = join(root, module);
+      const status = spawn('git', ['-C', dir, 'status', '--porcelain'], { encoding: 'utf8' });
+      if (status.status !== 0 || String(status.stdout).trim()) {
+        log(`[prep] WARN ${module}: differs from its pin and has local changes (or cannot be read); left as is`);
+        continue;
+      }
+      const pin = pinOf(root, module, spawn);
+      if (!pin) throw new Error(`the pin of ${module} could not be read`);
+      if (!pinSource(module, pin, { candidates: [root], spawn, exists })) {
+        const candidates = [main, ...others()].filter(Boolean);
+        const source = pinSource(module, pin, { candidates, spawn, exists });
+        if (!source) throw noSource(module, pin, candidates);
+        log(`[prep] ${module}: pin ${pin.slice(0, 12)} fetched from ${source}`);
+        execute(['git', '-C', dir, ...LOCAL_ONLY, 'fetch', '--no-tags', join(source, module), pin]);
+      }
+      log(`[prep] ${module}: moving the clean checkout to its pin ${pin.slice(0, 12)}`);
+      execute(['git', ...LOCAL_ONLY, 'submodule', 'update', '--no-fetch', '--', module]);
+    }
     execute(WORKSPACE_INSTALL);
 
     // Load the registry only after the submodules exist: they own attested manifests.

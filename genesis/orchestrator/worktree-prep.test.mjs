@@ -13,7 +13,7 @@ const put = (root, file, value = '') => {
   writeFileSync(join(root, file), value);
 };
 
-function fixture(t, { hook = true, fail, projects, ineffectiveBuild = false } = {}) {
+function fixture(t, { hook = true, fail, projects, ineffectiveBuild = false, git } = {}) {
   const root = mkdtempSync(join(tmpdir(), 'worktree-prep-'));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const calls = [], logs = [];
@@ -32,6 +32,8 @@ function fixture(t, { hook = true, fail, projects, ineffectiveBuild = false } = 
     if (command === 'test') return spawnSync(command, args, options);
     if (command === 'bash') return { status: 1 }; // cargo-deny unavailable; never invoke cargo.
     if (command === 'git') {
+      const answer = git?.(args, initialized);
+      if (answer) return answer;
       if (args[0] === '-c') { initialized.add(args.at(-1)); return ok(); }
       if (args.includes('status')) return ok(ATTESTED_SUBMODULES.map(m => `${initialized.has(m) ? ' ' : '-'}abc ${m}`).join('\n'));
       if (args.includes('--git-common-dir')) return ok('/main checkout/.git\n');
@@ -172,4 +174,104 @@ test('missing local base uses HEAD changes; unreadable range fails closed', () =
 test('root dev prep dispatches the prep entrypoint', () => {
   const justfile = readFileSync(new URL('../../justfile', import.meta.url), 'utf8');
   assert.match(justfile, /prep\) exec node "\{\{ root \}\}\/genesis\/orchestrator\/worktree-prep\.mjs" ;;/);
+});
+
+const PIN = 'f9787c9e'.padEnd(40, '0');
+const ls = module => ok(`160000 commit ${PIN}\t${module}\n`);
+
+test('row 11 (a): a pin the main checkout lacks is taken from the sibling worktree that holds it, and named', t => {
+  const f = fixture(t, {
+    git: (args, initialized) => {
+      // The main checkout's rakia lacks the pin: its clone fails ("unable to read tree").
+      if (args[0] === '-c' && args.includes('submodule.elohim/rakia.url=/main checkout/elohim/rakia')) {
+        return { status: 128, stderr: 'fatal: unable to read tree f9787c9e' };
+      }
+      if (args[0] === '-c' && args.includes('submodule.elohim/rakia.url=/wt/nt-e1/elohim/rakia')) {
+        initialized.add('elohim/rakia'); return ok();
+      }
+      if (args.includes('ls-tree')) return ls(args.at(-1));
+      if (args.includes('worktree')) return ok(`worktree /main checkout\nHEAD x\n\nworktree /wt/stale\n\nworktree /wt/nt-e1\n\nworktree ${f.root}\n`);
+      if (args.includes('cat-file')) return args[1] === '/wt/nt-e1/elohim/rakia' ? ok() : { status: 1 };
+      return undefined;
+    },
+  });
+  f.options.exists = path => !path.startsWith('/wt/stale');
+  assert.equal(prep(f.options), 0, f.logs.join('\n'));
+  const log = f.logs.join('\n');
+  assert.match(log, /elohim\/rakia: the main checkout lacks pin f9787c9e0000; using \/wt\/nt-e1/);
+  const clones = f.calls.filter(([cmd, arg, ...rest]) => cmd === 'git' && arg === '-c' && rest.at(-1) === 'elohim/rakia');
+  assert.equal(clones.length, 2, 'the main checkout first, then the sibling');
+  assert.ok(clones[1].includes('--reference') && clones[1].includes('/wt/nt-e1/elohim/rakia'), clones[1].join(' '));
+  assert.ok(clones[1].includes('protocol.allow=never'), 'still local-only');
+  assert.ok(!f.calls.some(call => call.includes('cat-file') && call.includes(`${f.root}/elohim/rakia`)), 'never its own checkout');
+});
+
+test('row 11 (a): with no local holder the refusal names every checkout tried and the remote cure', t => {
+  const f = fixture(t, {
+    git: args => {
+      if (args[0] === '-c' && args.at(-1) === 'elohim/rakia') return { status: 128, stderr: 'fatal: unable to read tree' };
+      if (args.includes('ls-tree')) return ls(args.at(-1));
+      if (args.includes('worktree')) return ok(`worktree /main checkout\n\nworktree /wt/a\n`);
+      if (args.includes('cat-file')) return { status: 1 };
+      return undefined;
+    },
+  });
+  assert.equal(prep(f.options), 1);
+  const refused = f.logs.find(line => line.startsWith('[prep] REFUSED:'));
+  assert.match(refused, /no local checkout holds the pinned commit f9787c9e0000 \(tried \/main checkout, \/wt\/a\)/);
+  assert.match(refused, /git submodule update --init -- elohim\/rakia/);
+  assert.ok(!f.calls.some(([cmd]) => cmd === 'pnpm'), 'nothing installs after a refused submodule');
+});
+
+function movedFixture(t, { dirty = false, held = true, sibling = true } = {}) {
+  const status = ATTESTED_SUBMODULES.map(m => `${m === 'elohim/brit' ? '+' : ' '}abc ${m}`).join('\n');
+  const f = fixture(t, {
+    git: (args, initialized) => {
+      ATTESTED_SUBMODULES.forEach(m => initialized.add(m));
+      if (args.includes('--porcelain') && args.includes('status')) return ok(dirty ? ' M src/lib.rs\n' : '');
+      if (args.includes('status')) return ok(status);
+      if (args.includes('ls-tree')) return ls(args.at(-1));
+      if (args.includes('worktree')) return ok('worktree /main checkout\n\nworktree /wt/nt-e2\n');
+      if (args.includes('cat-file')) {
+        if (args[1].endsWith(`${f.root}/elohim/brit`) || args[1] === join(f.root, 'elohim/brit')) return held ? ok() : { status: 1 };
+        return sibling && args[1] === '/wt/nt-e2/elohim/brit' ? ok() : { status: 1 };
+      }
+      if (args.includes('fetch') || (args[0] === '-c' && args.includes('--no-fetch') && !args.includes('--init'))) return ok();
+      return undefined;
+    },
+  });
+  return f;
+}
+
+test('row 11 (b): a clean submodule at another commit is moved to its pin, not warned', t => {
+  const f = movedFixture(t);
+  assert.equal(prep(f.options), 0, f.logs.join('\n'));
+  assert.match(f.logs.join('\n'), /elohim\/brit: moving the clean checkout to its pin f9787c9e0000/);
+  const update = f.calls.find(call => call[0] === 'git' && call.includes('--no-fetch') && call.at(-1) === 'elohim/brit');
+  assert.deepEqual(update, ['git', '-c', 'protocol.allow=never', '-c', 'protocol.file.allow=always',
+    'submodule', 'update', '--no-fetch', '--', 'elohim/brit']);
+  assert.ok(!f.calls.some(call => call.includes('fetch') && !call.includes('--no-fetch')), 'its own checkout holds the pin');
+});
+
+test('row 11 (b): a pin the moved submodule lacks is fetched from a sibling first, locally', t => {
+  const f = movedFixture(t, { held: false });
+  assert.equal(prep(f.options), 0, f.logs.join('\n'));
+  assert.match(f.logs.join('\n'), /elohim\/brit: pin f9787c9e0000 fetched from \/wt\/nt-e2/);
+  const fetch = f.calls.find(call => call.includes('fetch') && !call.includes('--no-fetch'));
+  assert.deepEqual(fetch, ['git', '-C', join(f.root, 'elohim/brit'), '-c', 'protocol.allow=never',
+    '-c', 'protocol.file.allow=always', 'fetch', '--no-tags', '/wt/nt-e2/elohim/brit', PIN]);
+});
+
+test('row 11 (b): a dirty moved submodule is left alone with the warning', t => {
+  const f = movedFixture(t, { dirty: true });
+  assert.equal(prep(f.options), 0, f.logs.join('\n'));
+  assert.match(f.logs.join('\n'), /WARN elohim\/brit: differs from its pin and has local changes/);
+  assert.ok(!f.calls.some(call => call.includes('--no-fetch') && call.at(-1) === 'elohim/brit' && !call.includes('--init')),
+    'no update over local work');
+});
+
+test('row 11 (b): a moved submodule whose pin no checkout holds refuses with the cure', t => {
+  const f = movedFixture(t, { held: false, sibling: false });
+  assert.equal(prep(f.options), 1);
+  assert.match(f.logs.find(line => line.startsWith('[prep] REFUSED:')), /no local checkout holds the pinned commit/);
 });

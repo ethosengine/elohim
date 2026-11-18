@@ -26,7 +26,9 @@ import { closeSync, fstatSync, fsyncSync, ftruncateSync, mkdirSync, openSync, re
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { isHandoverBranch } from './gate-cost.mjs';
-import { deviceRoot, resolveBin } from './gate-evidence.mjs';
+import { deviceRoot, gateEvidence, resolveBin, selfAgentId } from './gate-evidence.mjs';
+import { gateChildEnv } from './gate-runner.mjs';
+import { loadGateRegistry } from './pipeline-registry.mjs';
 import { readBuildNote } from './scripts/brit-attest.mjs';
 
 export const HANDOVER_SCHEMA = 'handover-record@1';
@@ -90,11 +92,46 @@ export function cidString(bytes) {
 }
 
 /**
- * The gate verdicts this device holds for exactly `head`: every `gate:*` step brit lists, read at
- * that commit with the gate's own verified reader. `{ verdicts, unreadable, inventory }`; a listing
- * that fails makes the inventory unavailable and says why.
+ * This device's newest verdict for `project`'s closure at `head`, attested at any commit: the key
+ * gate-evidence computes for `head` (what a dev landing's reuse would look up), matched against
+ * every note under the project's step. `{ closure, row }`, `{ closure, row: null }` when nothing is
+ * held for that closure, or `{ error }` when the key cannot be computed here.
  */
-export function inventory(head, { root, buildRefBin, spawn = spawnSync }) {
+export function closureVerdict(project, head, { root, env = process.env, spawn = spawnSync, selfId, evidenceOf = gateEvidence }) {
+  const childEnv = gateChildEnv(project, env, root);
+  let cargoEnv = {};
+  try { cargoEnv = JSON.parse(childEnv.GATE_CARGO_ENV || '{}'); } catch { /* none declared */ }
+  const evidence = evidenceOf(project, { env: childEnv, root, commit: head, cargoEnv, spawn, warn: () => {} });
+  if (!evidence.key) return { error: evidence.line || 'no closure key' };
+  const own = (evidence.rows || [])
+    .filter(row => row?.attestation?.agentId && row.attestation.agentId === selfId)
+    .sort((a, b) => Date.parse(b.attestation?.builtAt || 0) - Date.parse(a.attestation?.builtAt || 0));
+  return { closure: evidence.key, row: own[0] || null };
+}
+
+/** The default closure lookup: the gate registry's project, then {@link closureVerdict}. */
+export function registryLookup({ root, env = process.env, spawn = spawnSync }) {
+  let registry = null;
+  let selfId;
+  return (name, head) => {
+    registry ??= loadGateRegistry(root);
+    const project = registry.get(name);
+    if (!project) return { error: 'not in the gate registry' };
+    if (selfId === undefined) selfId = selfAgentId(root, spawn) ?? null;
+    if (!selfId) return { error: 'no workspace signer' };
+    return closureVerdict(project, head, { root, env, spawn, selfId });
+  };
+}
+
+/**
+ * The gate verdicts this device holds for `head`: every `gate:*` step brit lists, read at that
+ * commit with the gate's own verified reader; and, for a step with no note at `head`, this
+ * device's verdict for the same closure attested at another commit (a reuse hit records nothing
+ * at the head it served), found with `lookup` and named with the commit that attested it.
+ * `{ verdicts, unreadable, inventory }`; a listing that fails makes the inventory unavailable and
+ * says why.
+ */
+export function inventory(head, { root, buildRefBin, spawn = spawnSync, lookup = null }) {
   if (!buildRefBin) return { verdicts: [], unreadable: [], inventory: 'unavailable: brit-build-ref not on BRIT_BUILD_REF_BIN or PATH' };
   let listed;
   try {
@@ -112,7 +149,23 @@ export function inventory(head, { root, buildRefBin, spawn = spawnSync }) {
   for (const step of steps) {
     const project = step.slice('gate:'.length);
     const note = readBuildNote(step, head, { buildRefBin, root, spawn, timeout: 30_000 });
-    if (note.state === 'absent') continue;
+    if (note.state === 'absent') {
+      // Advisory, like the record: a lookup that cannot run lists nothing, never refuses.
+      let found = null;
+      try { found = lookup ? lookup(project, head) : null; } catch { found = null; }
+      if (found?.row) {
+        const { attestation } = found.row;
+        verdicts.push({
+          project,
+          closure: found.closure,
+          verdict: cidString(attestation.outputCid),
+          signer: attestation.agentId,
+          verdictOf: attestation.success === true ? 'green' : 'red',
+          attestedAt: String(found.row.commit || ''),
+        });
+      }
+      continue;
+    }
     if (note.state !== 'verified') {
       unreadable.push({ project, state: note.state, reason: note.reason || '' });
       continue;
@@ -131,7 +184,7 @@ export function inventory(head, { root, buildRefBin, spawn = spawnSync }) {
 
 export function summaryLine(record, log) {
   const held = record.verdicts.length
-    ? record.verdicts.map(v => `${v.project} ${v.verdictOf}`).join(', ')
+    ? record.verdicts.map(v => `${v.project} ${v.verdictOf}${v.attestedAt ? ` (same closure, attested ${v.attestedAt.slice(0, 12)})` : ''}`).join(', ')
     : 'none';
   const parts = [
     `[pre-push] hand-over ${record.head.slice(0, 12)} → ${record.destinations.join(' ')}:`,
@@ -195,7 +248,9 @@ export function main(argv, {
     destinations,
     at: time,
     worktree: root,
-    ...inventory(head, { root, buildRefBin, spawn }),
+    // Opt-in: the closure lookup recomputes each unnoted step's key (measured 75 s against 0.46 s
+    // for the head-only read, 2026-11-18, on 6616ce547), which would double a hand-over push.
+    ...inventory(head, { root, buildRefBin, spawn, lookup: env.HANDOVER_CLOSURE_LOOKUP === '1' ? registryLookup({ root, env, spawn }) : null }),
   }));
   try {
     appendBatch(log, records.map(r => `${JSON.stringify(r)}\n`).join(''));
