@@ -336,6 +336,41 @@
       "path": "genesis/research/repos/radicle-ci-broker",
       "relevance": "Radicle CI broker: node events → adapter subprocesses → one job COB per commit signed by the node key. No artifact field, best-effort COB updates, at-most-once events. Compare with brit build attestations (output_cid) and gate attestation.",
       "pillar": "elohim"
+    },
+    {
+      "name": "uattest-backend",
+      "url": "https://github.com/unifiedAttestation/Backend.git",
+      "path": "genesis/research/repos/uattest-backend",
+      "relevance": "Volla Unified Attestation backend + portal: KeyMint chain verification, policy, token signing, OEM trust anchors, federation. Read for who decides a device is acceptable, what the token asserts, and what 'federation' concretely means.",
+      "pillar": "imagodei"
+    },
+    {
+      "name": "uattest-android-service",
+      "url": "https://github.com/unifiedAttestation/Android-Service.git",
+      "path": "genesis/research/repos/uattest-android-service",
+      "relevance": "Unified Attestation privileged Android system service: performs KeyMint attestation with challenge = requestHash and posts the chain to a backend. Read for what leaves the device and under whose control.",
+      "pillar": "imagodei"
+    },
+    {
+      "name": "uattest-android-sdk",
+      "url": "https://github.com/unifiedAttestation/Android-SDK.git",
+      "path": "genesis/research/repos/uattest-android-sdk",
+      "relevance": "Unified Attestation thin client SDK over AIDL, mirroring the Play Integrity API shape (getProviderSet, requestIntegrityToken).",
+      "pillar": "imagodei"
+    },
+    {
+      "name": "uattest-vbmeta-build-submit",
+      "url": "https://github.com/unifiedAttestation/vbmeta-build-submit.git",
+      "path": "genesis/research/repos/uattest-vbmeta-build-submit",
+      "relevance": "Unified Attestation OEM tooling that submits verified-boot (vbmeta) build identities to a backend: the enrolment path by which an OS build becomes 'approved'.",
+      "pillar": "imagodei"
+    },
+    {
+      "name": "uattest-website",
+      "url": "https://github.com/unifiedAttestation/Website.git",
+      "path": "genesis/research/repos/uattest-website",
+      "relevance": "Unified Attestation project site (uattest.net) source; the wiki is the closest thing to a spec.",
+      "pillar": "imagodei"
     }
   ]
 }
