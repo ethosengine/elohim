@@ -215,6 +215,15 @@ fn extract_elf(bytes: &[u8]) -> ArtifactResult<Extraction> {
                 "reason": "musl loader identifies the line, not a version",
             }),
         )?;
+    } else if needed.contains("libc.so.6")
+        && !glibc
+            .values()
+            .any(|need| !need.marker && need.libraries.contains("libc.so.6"))
+    {
+        // Another glibc library's number cannot stand in for libc's own unknown need.
+        return Err(unrecorded(
+            "libc.so.6 has no readable GLIBC_x.y version needs; abi.libc floor unknown",
+        ));
     } else if let Some((_, highest)) = glibc
         .iter()
         .max_by(|a, b| a.1.components.cmp(&b.1.components))
@@ -227,6 +236,15 @@ fn extract_elf(bytes: &[u8]) -> ArtifactResult<Extraction> {
                 libraries.entry(library).or_default().push(name);
             }
         }
+        // Known `GLIBC_ABI_*` markers by name, with the release each one implies.
+        let markers: BTreeMap<&str, String> = glibc
+            .iter()
+            .filter(|(_, need)| need.marker)
+            .map(|(name, need)| {
+                let version: Vec<String> = need.components.iter().map(u32::to_string).collect();
+                (name.as_str(), version.join("."))
+            })
+            .collect();
         result.insert(
             axis::ABI_LIBC,
             floor(line::GLIBC, highest.components.clone()),
@@ -234,12 +252,9 @@ fn extract_elf(bytes: &[u8]) -> ArtifactResult<Extraction> {
                 "library": highest.libraries.first(),
                 "libraries": libraries,
                 "GLIBC_versions": glibc.keys().collect::<Vec<_>>(),
+                "GLIBC_ABI_markers": markers,
             }),
         )?;
-    } else if needed.contains("libc.so.6") {
-        return Err(unrecorded(
-            "libc.so.6 has no readable GLIBC_x.y version needs; abi.libc floor unknown",
-        ));
     }
     if machine == elf::EM_X86_64 {
         let scan = isa::scan(&file)?;

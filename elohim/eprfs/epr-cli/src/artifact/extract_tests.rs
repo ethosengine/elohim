@@ -522,11 +522,17 @@ fn with_needs(mut bytes: Vec<u8>, libraries: &[(&str, &[&str])]) -> Vec<u8> {
             (library, versions.iter().map(|v| offset(v)).collect())
         })
         .collect();
-    let count = entries.len();
+    let needed = entries.len();
+    // A library given no versions is DT_NEEDED with no version-need record.
+    let (versioned, bare): (Vec<_>, Vec<_>) = entries
+        .into_iter()
+        .partition(|(_, versions)| !versions.is_empty());
+    let entries: Vec<(u32, Vec<u32>)> = versioned.into_iter().chain(bare).collect();
+    let count = entries.iter().filter(|(_, v)| !v.is_empty()).count();
     let strings_start = (bytes.len() + 7) & !7;
     let dynamic_start = (strings_start + strings.len() + 7) & !7;
     // NEEDED per library, STRTAB, STRSZ, VERNEED, VERNEEDNUM, NULL.
-    let dynamic_size = (count + 5) * 16;
+    let dynamic_size = (needed + 5) * 16;
     let needs_start = dynamic_start + dynamic_size;
     let mut dynamic = Vec::new();
     for (library, _) in &entries {
@@ -544,7 +550,7 @@ fn with_needs(mut bytes: Vec<u8>, libraries: &[(&str, &[&str])]) -> Vec<u8> {
     }
     dynamic.extend([0u8; 16]);
     let mut needs = Vec::new();
-    for (index, (library, versions)) in entries.iter().enumerate() {
+    for (index, (library, versions)) in entries.iter().take(count).enumerate() {
         let next = if index + 1 == count {
             0u32
         } else {
@@ -714,6 +720,148 @@ fn artifact_glibc_floor_counts_every_glibc_library() {
     assert!(
         error.contains("unsupported libm.so.6 version need GLIBC_PRIVATE"),
         "{error}"
+    );
+}
+
+fn glibc_needs(libraries: &[(&str, &[&str])]) -> Vec<u8> {
+    with_needs(
+        fixture(
+            elf::EM_X86_64,
+            elf::ELFOSABI_LINUX,
+            &[0xc3],
+            Some("/lib64/ld-linux-x86-64.so.2"),
+            None,
+        ),
+        libraries,
+    )
+}
+
+fn refusal_text(name: &str, bytes: &[u8]) -> String {
+    extract(Path::new(name), bytes).err().unwrap().to_string()
+}
+
+/// `/usr/bin/getconf` on AlmaLinux 10 (glibc 2.39-128) needs exactly these four nodes on
+/// libc.so.6 and runs there: the RELR marker is a loader capability from glibc 2.36, not a refusal.
+#[test]
+fn artifact_glibc_abi_dt_relr_is_a_2_36_floor_recorded_by_name() {
+    let getconf = glibc_needs(&[(
+        "libc.so.6",
+        &[
+            "GLIBC_ABI_DT_RELR",
+            "GLIBC_2.3.4",
+            "GLIBC_2.34",
+            "GLIBC_2.2.5",
+        ],
+    )]);
+    let result = extract(Path::new("getconf.elf"), &getconf).unwrap();
+    assert_eq!(
+        predicate(&result.requires, axis::ABI_LIBC),
+        &floor(line::GLIBC, vec![2, 36])
+    );
+    let evidence = &result.evidence[axis::ABI_LIBC];
+    assert_eq!(
+        evidence["GLIBC_ABI_markers"],
+        json!({"GLIBC_ABI_DT_RELR": "2.36"})
+    );
+    assert_eq!(evidence["library"], "libc.so.6");
+    // A numeric need above the marker still sets the floor.
+    let newer = glibc_needs(&[("libc.so.6", &["GLIBC_ABI_DT_RELR", "GLIBC_2.38"])]);
+    assert_eq!(
+        predicate(
+            &extract(Path::new("newer.elf"), &newer).unwrap().requires,
+            axis::ABI_LIBC
+        ),
+        &floor(line::GLIBC, vec![2, 38])
+    );
+    // Markers whose upstream release is above hosts that export them by backport, and unknown
+    // markers, still refuse by name.
+    for marker in [
+        "GLIBC_ABI_GNU2_TLS",
+        "GLIBC_ABI_DT_X86_64_PLT",
+        "GLIBC_ABI_NEW",
+    ] {
+        let bytes = glibc_needs(&[("libc.so.6", &[marker, "GLIBC_2.34"])]);
+        let error = refusal_text("marker.elf", &bytes);
+        assert!(
+            error.contains(&format!("unsupported libc.so.6 version need {marker}")),
+            "{error}"
+        );
+    }
+}
+
+/// Only glibc's own loaders for the admitted machines count; another `ld-linux*` name does not.
+#[test]
+fn artifact_glibc_loader_is_matched_by_exact_soname() {
+    let bytes = glibc_needs(&[
+        ("libc.so.6", &["GLIBC_2.34"]),
+        ("ld-linux-x86-64.so.2", &["GLIBC_2.35"]),
+        ("ld-linux-fake.so.9", &["GLIBC_9.99"]),
+    ]);
+    let result = extract(Path::new("loader.elf"), &bytes).unwrap();
+    assert_eq!(
+        predicate(&result.requires, axis::ABI_LIBC),
+        &floor(line::GLIBC, vec![2, 35])
+    );
+    assert_eq!(
+        result.evidence[axis::ABI_LIBC]["library"],
+        "ld-linux-x86-64.so.2"
+    );
+    let aarch64 = glibc_needs(&[
+        ("libc.so.6", &["GLIBC_2.17"]),
+        ("ld-linux-aarch64.so.1", &["GLIBC_2.17"]),
+    ]);
+    assert!(extract(Path::new("aarch64-loader.elf"), &aarch64).is_ok());
+}
+
+/// A needed libc.so.6 with no readable numeric need of its own refuses, even when another
+/// glibc library (or only a marker on libc) supplies a number.
+#[test]
+fn artifact_needed_libc_without_its_own_version_need_still_refuses() {
+    for libraries in [
+        &[("libc.so.6", &[][..]), ("libm.so.6", &["GLIBC_2.38"][..])][..],
+        &[
+            ("libc.so.6", &["GLIBC_ABI_DT_RELR"][..]),
+            ("libm.so.6", &["GLIBC_2.38"][..]),
+        ][..],
+    ] {
+        let error = refusal_text("unknown-libc.elf", &glibc_needs(libraries));
+        assert!(
+            error.contains("libc.so.6 has no readable GLIBC_x.y version needs"),
+            "{error}"
+        );
+    }
+}
+
+/// glibc's NSS modules are glibc: a private need on one refuses. Modules other projects ship
+/// are not matched by a prefix, so their nodes are not read.
+#[test]
+fn artifact_glibc_nss_modules_are_named_not_prefixed() {
+    let files = glibc_needs(&[
+        ("libc.so.6", &["GLIBC_2.34"]),
+        ("libnss_files.so.2", &["GLIBC_PRIVATE"]),
+    ]);
+    let error = refusal_text("nss-files.elf", &files);
+    assert!(
+        error.contains("unsupported libnss_files.so.2 version need GLIBC_PRIVATE"),
+        "{error}"
+    );
+    let compat = glibc_needs(&[
+        ("libc.so.6", &["GLIBC_2.34"]),
+        ("libnss_compat.so.2", &["GLIBC_PRIVATE"]),
+    ]);
+    assert!(refusal_text("nss-compat.elf", &compat).contains("libnss_compat.so.2"));
+    let systemd = glibc_needs(&[
+        ("libc.so.6", &["GLIBC_2.34"]),
+        ("libnss_systemd.so.2", &["GLIBC_PRIVATE"]),
+    ]);
+    assert_eq!(
+        predicate(
+            &extract(Path::new("nss-systemd.elf"), &systemd)
+                .unwrap()
+                .requires,
+            axis::ABI_LIBC
+        ),
+        &floor(line::GLIBC, vec![2, 34])
     );
 }
 

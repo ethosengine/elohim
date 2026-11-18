@@ -14,7 +14,13 @@ use super::{layout::Budget, text, unrecorded, ArtifactResult, Elf};
 /// `libcrypt.so.1` is left out on purpose: distributions ship it from libxcrypt, which exports
 /// `GLIBC_2.2.5`-style compatibility nodes that say nothing about the installed glibc.
 /// Non-glibc nodes (`GLIBCXX_`, `GCC_`, `OPENSSL_`, ...) are not read here at all.
-const GLIBC_SONAMES: [&str; 13] = [
+///
+/// glibc's NSS modules are named one by one (`files`, `compat`, `dns`, `db`, `hesiod`, and the
+/// historical `nis`/`nisplus` before 2.32) together with `libcidn.so.1` (removed in 2.34): a
+/// direct need on one of them is a need on that glibc, and their `GLIBC_PRIVATE` nodes must refuse
+/// like libc's. Modules other projects ship (`libnss_systemd`, `libnss_myhostname`, `libnss_sss`)
+/// are not glibc and are not matched by any prefix.
+const GLIBC_SONAMES: [&str; 21] = [
     "libc.so.6",
     "libm.so.6",
     "libmvec.so.1",
@@ -28,27 +34,48 @@ const GLIBC_SONAMES: [&str; 13] = [
     "libBrokenLocale.so.1",
     "libthread_db.so.1",
     "libc_malloc_debug.so.0",
+    "libcidn.so.1",
+    "libnss_files.so.2",
+    "libnss_compat.so.2",
+    "libnss_dns.so.2",
+    "libnss_db.so.2",
+    "libnss_hesiod.so.2",
+    "libnss_nis.so.2",
+    "libnss_nisplus.so.2",
 ];
 
-/// glibc's dynamic loaders, by the names its ports give them: `ld-linux*.so.N` (x86-64, i386,
-/// x32, aarch64, arm, riscv, loongarch, ...), `ld64.so.N` (powerpc64, s390x) and `ld.so.1`
-/// (powerpc, mips, s390). The loader carries needs such as `GLIBC_2.3` for `__tls_get_addr`.
+/// glibc's dynamic loader for each machine the extractor admits (`extract.rs` refuses every
+/// other `e_machine`): x86-64 and little-endian aarch64. The loader carries needs such as
+/// `GLIBC_2.3` for `__tls_get_addr`. Any other `ld-*` soname is not glibc's and is not read.
+const GLIBC_LOADERS: [&str; 2] = ["ld-linux-x86-64.so.2", "ld-linux-aarch64.so.1"];
+
 fn glibc_library(soname: &str) -> bool {
-    GLIBC_SONAMES.contains(&soname)
-        || (soname.starts_with("ld-linux") && soname.contains(".so."))
-        || matches!(soname, "ld64.so.1" | "ld64.so.2" | "ld.so.1")
+    GLIBC_SONAMES.contains(&soname) || GLIBC_LOADERS.contains(&soname)
 }
 
-/// One `GLIBC_x.y` need: its numeric version and every glibc library that carries it.
+/// Non-numeric `GLIBC_ABI_*` markers that stand for a loader capability, with the upstream glibc
+/// release that introduced the marker. A binary needing one needs at least that release.
+/// `GLIBC_ABI_DT_RELR` is in glibc 2.36's `elf/Versions` (libc). `GLIBC_ABI_GNU2_TLS` and
+/// `GLIBC_ABI_DT_X86_64_PLT` are deliberately absent: they appear upstream only after 2.42, yet
+/// distribution glibc builds export them by backport (AlmaLinux 10's 2.39 exports both), so their
+/// upstream release would refuse a host that runs the binary; they still refuse until a
+/// capability axis can say which hosts provide them. A backport of DT_RELR to an older release
+/// (2.34) is likewise refused by this floor: conservative, never admitting a host that lacks it.
+const GLIBC_ABI_MARKERS: [(&str, [u32; 2]); 1] = [("GLIBC_ABI_DT_RELR", [2, 36])];
+
+/// One `GLIBC_*` need: the version it implies and every glibc library that carries it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct GlibcNeed {
     pub components: Vec<u32>,
     pub libraries: BTreeSet<String>,
+    /// A `GLIBC_ABI_*` capability marker, whose version is its introducing release.
+    pub marker: bool,
 }
 
-/// Every `GLIBC_x.y` version need on a glibc library ([`glibc_library`]), keyed by node name.
-/// A non-numeric `GLIBC_*` node on such a library (`GLIBC_PRIVATE`, `GLIBC_ABI_DT_RELR`) is not a
-/// version and no floor expresses it, so it refuses rather than being skipped.
+/// Every `GLIBC_x.y` version need and every known `GLIBC_ABI_*` marker ([`GLIBC_ABI_MARKERS`])
+/// on a glibc library ([`glibc_library`]), keyed by node name. Any other non-numeric `GLIBC_*`
+/// node on such a library (`GLIBC_PRIVATE`, an unknown marker) is not a version and no floor
+/// expresses it, so it refuses rather than being skipped.
 pub(super) fn glibc_versions(
     file: &Elf<'_>,
     bytes: &[u8],
@@ -99,17 +126,24 @@ pub(super) fn glibc_versions(
                 )?;
                 if glibc {
                     if let Some(number) = name.strip_prefix("GLIBC_") {
-                        let components = number
-                            .split('.')
-                            .map(str::parse::<u32>)
-                            .collect::<Result<Vec<_>, _>>()
-                            .map_err(|_| {
-                                unrecorded(format!(
-                                    "unsupported {} version need {}",
-                                    super::layout::name(&soname),
-                                    super::layout::name(&name)
-                                ))
-                            })?;
+                        let marker = GLIBC_ABI_MARKERS
+                            .iter()
+                            .find(|(marker, _)| *marker == name)
+                            .map(|(_, version)| version.to_vec());
+                        let components = match &marker {
+                            Some(version) => version.clone(),
+                            None => number
+                                .split('.')
+                                .map(str::parse::<u32>)
+                                .collect::<Result<Vec<_>, _>>()
+                                .map_err(|_| {
+                                    unrecorded(format!(
+                                        "unsupported {} version need {}",
+                                        super::layout::name(&soname),
+                                        super::layout::name(&name)
+                                    ))
+                                })?,
+                        };
                         if components.len() < 2 {
                             return Err(unrecorded("invalid GLIBC version"));
                         }
@@ -118,6 +152,7 @@ pub(super) fn glibc_versions(
                             .or_insert_with(|| GlibcNeed {
                                 components,
                                 libraries: BTreeSet::new(),
+                                marker: marker.is_some(),
                             })
                             .libraries
                             .insert(soname.clone());
