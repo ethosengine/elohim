@@ -203,7 +203,7 @@ fn extract_elf(bytes: &[u8]) -> ArtifactResult<Extraction> {
     if musl {
         if !glibc.is_empty() {
             return Err(unrecorded(
-                "musl PT_INTERP conflicts with GLIBC version needs on libc.so.6",
+                "musl PT_INTERP conflicts with GLIBC version needs on a glibc library",
             ));
         }
         // Empty components mean the musl line with no provable version floor, not a host version.
@@ -215,12 +215,25 @@ fn extract_elf(bytes: &[u8]) -> ArtifactResult<Extraction> {
                 "reason": "musl loader identifies the line, not a version",
             }),
         )?;
-    } else if let Some(version) = glibc.iter().max_by(|a, b| a.1.cmp(b.1)) {
+    } else if let Some((_, highest)) = glibc
+        .iter()
+        .max_by(|a, b| a.1.components.cmp(&b.1.components))
+    {
+        // `library` names who carried the floor (the first by name when several carry it);
+        // `libraries` keeps every glibc library's needs so the floor can be re-derived.
+        let mut libraries: BTreeMap<&str, Vec<&str>> = BTreeMap::new();
+        for (name, need) in &glibc {
+            for library in &need.libraries {
+                libraries.entry(library).or_default().push(name);
+            }
+        }
         result.insert(
             axis::ABI_LIBC,
-            floor(line::GLIBC, version.1.clone()),
+            floor(line::GLIBC, highest.components.clone()),
             json!({
-                "library": "libc.so.6", "GLIBC_versions": glibc.keys().collect::<Vec<_>>(),
+                "library": highest.libraries.first(),
+                "libraries": libraries,
+                "GLIBC_versions": glibc.keys().collect::<Vec<_>>(),
             }),
         )?;
     } else if needed.contains("libc.so.6") {

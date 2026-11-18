@@ -6,10 +6,53 @@ use object::read::elf::SectionHeader;
 
 use super::{layout::Budget, text, unrecorded, ArtifactResult, Elf};
 
+/// Sonames glibc itself installs and versions with `GLIBC_x.y` (glibc's `shlib-versions` files,
+/// 2.17 through 2.41, every Linux port). One glibc build supplies all of them together, so a
+/// `GLIBC_x.y` need on any of them needs that glibc, whichever library carries it: after the
+/// 2.34 merge `libpthread`, `libdl`, `librt` and `libutil` are stubs whose old version nodes
+/// remain, and `libm`/`libmvec` gain new nodes on their own (libm's `GLIBC_2.38`, `GLIBC_2.39`).
+/// `libcrypt.so.1` is left out on purpose: distributions ship it from libxcrypt, which exports
+/// `GLIBC_2.2.5`-style compatibility nodes that say nothing about the installed glibc.
+/// Non-glibc nodes (`GLIBCXX_`, `GCC_`, `OPENSSL_`, ...) are not read here at all.
+const GLIBC_SONAMES: [&str; 13] = [
+    "libc.so.6",
+    "libm.so.6",
+    "libmvec.so.1",
+    "libpthread.so.0",
+    "libdl.so.2",
+    "librt.so.1",
+    "libresolv.so.2",
+    "libutil.so.1",
+    "libanl.so.1",
+    "libnsl.so.1",
+    "libBrokenLocale.so.1",
+    "libthread_db.so.1",
+    "libc_malloc_debug.so.0",
+];
+
+/// glibc's dynamic loaders, by the names its ports give them: `ld-linux*.so.N` (x86-64, i386,
+/// x32, aarch64, arm, riscv, loongarch, ...), `ld64.so.N` (powerpc64, s390x) and `ld.so.1`
+/// (powerpc, mips, s390). The loader carries needs such as `GLIBC_2.3` for `__tls_get_addr`.
+fn glibc_library(soname: &str) -> bool {
+    GLIBC_SONAMES.contains(&soname)
+        || (soname.starts_with("ld-linux") && soname.contains(".so."))
+        || matches!(soname, "ld64.so.1" | "ld64.so.2" | "ld.so.1")
+}
+
+/// One `GLIBC_x.y` need: its numeric version and every glibc library that carries it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) struct GlibcNeed {
+    pub components: Vec<u32>,
+    pub libraries: BTreeSet<String>,
+}
+
+/// Every `GLIBC_x.y` version need on a glibc library ([`glibc_library`]), keyed by node name.
+/// A non-numeric `GLIBC_*` node on such a library (`GLIBC_PRIVATE`, `GLIBC_ABI_DT_RELR`) is not a
+/// version and no floor expresses it, so it refuses rather than being skipped.
 pub(super) fn glibc_versions(
     file: &Elf<'_>,
     bytes: &[u8],
-) -> ArtifactResult<BTreeMap<String, Vec<u32>>> {
+) -> ArtifactResult<BTreeMap<String, GlibcNeed>> {
     let e = file.endian();
     let table = file.elf_section_table();
     let mut versions = BTreeMap::new();
@@ -38,10 +81,12 @@ pub(super) fn glibc_versions(
             if aux_count == 0 {
                 return Err(unrecorded("version needs: empty auxiliary chain"));
             }
-            let libc = strings
+            let library = strings
                 .get(word(need, 4))
-                .map_err(|_| unrecorded("version needs: invalid library string"))?
-                == b"libc.so.6";
+                .map_err(|_| unrecorded("version needs: invalid library string"))?;
+            // A soname that is not UTF-8 names no glibc library; its needs are not read.
+            let soname = std::str::from_utf8(library).unwrap_or_default().to_owned();
+            let glibc = glibc_library(&soname);
             let mut aux = advance(cursor, word(need, 8), data.len())?;
             let next = word(need, 12);
             for aux_index in 0..aux_count {
@@ -52,7 +97,7 @@ pub(super) fn glibc_versions(
                         .get(word(entry, 8))
                         .map_err(|_| unrecorded("version needs: invalid version string"))?,
                 )?;
-                if libc {
+                if glibc {
                     if let Some(number) = name.strip_prefix("GLIBC_") {
                         let components = number
                             .split('.')
@@ -60,14 +105,22 @@ pub(super) fn glibc_versions(
                             .collect::<Result<Vec<_>, _>>()
                             .map_err(|_| {
                                 unrecorded(format!(
-                                    "unsupported libc.so.6 version need {}",
+                                    "unsupported {} version need {}",
+                                    super::layout::name(&soname),
                                     super::layout::name(&name)
                                 ))
                             })?;
                         if components.len() < 2 {
                             return Err(unrecorded("invalid GLIBC version"));
                         }
-                        versions.insert(name, components);
+                        versions
+                            .entry(name)
+                            .or_insert_with(|| GlibcNeed {
+                                components,
+                                libraries: BTreeSet::new(),
+                            })
+                            .libraries
+                            .insert(soname.clone());
                     }
                 }
                 let next_aux = word(entry, 12);

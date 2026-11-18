@@ -489,9 +489,21 @@ fn artifact_measure_requested_elf() {
     result.unwrap(); // A refusal is still a failing measurement, even though its evidence is saved.
 }
 
-/// Add independently encoded dynamic and GNU version-needs sections. The higher GLIBC need
-/// belongs to libm, so an unscoped version scan would incorrectly require 9.99 instead of 2.39.
-fn with_dynamic(mut bytes: Vec<u8>) -> Vec<u8> {
+/// Add independently encoded dynamic and GNU version-needs sections. The higher GLIBC-named
+/// need belongs to libxcrypt's libcrypt, which is not glibc, so a scan that read every library
+/// would incorrectly require 9.99 instead of 2.39.
+fn with_dynamic(bytes: Vec<u8>) -> Vec<u8> {
+    with_needs(
+        bytes,
+        &[
+            ("libc.so.6", &["GLIBC_2.9", "GLIBC_2.39"]),
+            ("libcrypt.so.1", &["GLIBC_9.99"]),
+        ],
+    )
+}
+
+/// [`with_dynamic`] with the given DT_NEEDED libraries and each one's version needs, in order.
+fn with_needs(mut bytes: Vec<u8>, libraries: &[(&str, &[&str])]) -> Vec<u8> {
     let old_offset = u64::from_le_bytes(bytes[40..48].try_into().unwrap()) as usize;
     let mut headers = bytes[old_offset..].to_vec();
     // Read-only dynamic metadata occupies a different virtual page from code.
@@ -503,32 +515,41 @@ fn with_dynamic(mut bytes: Vec<u8>) -> Vec<u8> {
         strings.push(0);
         offset
     };
-    let libc = offset("libc.so.6");
-    let libm = offset("libm.so.6");
-    let low = offset("GLIBC_2.9");
-    let high = offset("GLIBC_2.39");
-    let unrelated = offset("GLIBC_9.99");
+    let entries: Vec<(u32, Vec<u32>)> = libraries
+        .iter()
+        .map(|(library, versions)| {
+            let library = offset(library);
+            (library, versions.iter().map(|v| offset(v)).collect())
+        })
+        .collect();
+    let count = entries.len();
     let strings_start = (bytes.len() + 7) & !7;
     let dynamic_start = (strings_start + strings.len() + 7) & !7;
-    // 2 NEEDED, STRTAB, STRSZ, VERNEED, VERNEEDNUM, NULL.
-    let needs_start = dynamic_start + 7 * 16;
+    // NEEDED per library, STRTAB, STRSZ, VERNEED, VERNEEDNUM, NULL.
+    let dynamic_size = (count + 5) * 16;
+    let needs_start = dynamic_start + dynamic_size;
     let mut dynamic = Vec::new();
-    for library in [libc, libm] {
+    for (library, _) in &entries {
         dynamic.extend(u64::from(elf::DT_NEEDED).to_le_bytes());
-        dynamic.extend(u64::from(library).to_le_bytes());
+        dynamic.extend(u64::from(*library).to_le_bytes());
     }
     for (tag, value) in [
         (elf::DT_STRTAB, 0x400000 + strings_start as u64),
         (elf::DT_STRSZ, strings.len() as u64),
         (elf::DT_VERNEED, 0x400000 + needs_start as u64),
-        (elf::DT_VERNEEDNUM, 2),
+        (elf::DT_VERNEEDNUM, count as u64),
     ] {
         dynamic.extend(u64::from(tag).to_le_bytes());
         dynamic.extend(value.to_le_bytes());
     }
     dynamic.extend([0u8; 16]);
     let mut needs = Vec::new();
-    for (library, versions, next) in [(libc, vec![low, high], 48u32), (libm, vec![unrelated], 0)] {
+    for (index, (library, versions)) in entries.iter().enumerate() {
+        let next = if index + 1 == count {
+            0u32
+        } else {
+            16 * (1 + versions.len() as u32)
+        };
         needs.extend(1u16.to_le_bytes());
         needs.extend((versions.len() as u16).to_le_bytes());
         needs.extend(library.to_le_bytes());
@@ -561,7 +582,7 @@ fn with_dynamic(mut bytes: Vec<u8>) -> Vec<u8> {
         header[4..8].copy_from_slice(&kind.to_le_bytes());
         header[16..24].copy_from_slice(&(0x400000 + start as u64).to_le_bytes());
         if kind == elf::SHT_GNU_VERNEED {
-            header[44..48].copy_from_slice(&2u32.to_le_bytes());
+            header[44..48].copy_from_slice(&(count as u32).to_le_bytes());
         }
         header[24..32].copy_from_slice(&(start as u64).to_le_bytes());
         header[32..40].copy_from_slice(&(data.len() as u64).to_le_bytes());
@@ -587,7 +608,7 @@ fn with_dynamic(mut bytes: Vec<u8>) -> Vec<u8> {
         elf::PT_DYNAMIC,
         elf::PF_R,
         dynamic_start as u64,
-        7 * 16,
+        dynamic_size as u64,
         0x400000 + dynamic_start as u64,
     ));
     let phoff = bytes.len() as u64;
@@ -602,7 +623,7 @@ fn with_dynamic(mut bytes: Vec<u8>) -> Vec<u8> {
 }
 
 #[test]
-fn artifact_glibc_floor_is_numeric_and_scoped_to_libc() {
+fn artifact_glibc_floor_is_numeric_and_scoped_to_glibc_libraries() {
     let bytes = with_dynamic(fixture(
         elf::EM_X86_64,
         elf::ELFOSABI_LINUX,
@@ -617,12 +638,13 @@ fn artifact_glibc_floor_is_numeric_and_scoped_to_libc() {
     );
     assert_eq!(
         predicate(&result.requires, axis::LIB),
-        &Predicate::Present(names(&["libc.so.6", "libm.so.6"]))
+        &Predicate::Present(names(&["libc.so.6", "libcrypt.so.1"]))
     );
     assert_eq!(
         result.evidence[axis::ABI_LIBC]["GLIBC_versions"],
         json!(["GLIBC_2.39", "GLIBC_2.9"])
     );
+    assert_eq!(result.evidence[axis::ABI_LIBC]["library"], "libc.so.6");
     let mut malformed = bytes.clone();
     let position = malformed
         .windows(10)
@@ -634,6 +656,65 @@ fn artifact_glibc_floor_is_numeric_and_scoped_to_libc() {
         .unwrap()
         .to_string()
         .contains("unsupported libc.so.6 version"));
+}
+
+/// A binary whose highest glibc need is on libm (glibc 2.38's libm nodes, absent from 2.34) is
+/// not admitted by libc's lower need alone; the loader's and libpthread's needs count too, and
+/// `GLIBC_PRIVATE` on a glibc library refuses rather than being read as a version.
+#[test]
+fn artifact_glibc_floor_counts_every_glibc_library() {
+    let build = |libm: &'static str| {
+        with_needs(
+            fixture(
+                elf::EM_X86_64,
+                elf::ELFOSABI_LINUX,
+                &[0xc3],
+                Some("/lib64/ld-linux-x86-64.so.2"),
+                None,
+            ),
+            &[
+                ("libc.so.6", &["GLIBC_2.2.5", "GLIBC_2.34"]),
+                ("libm.so.6", &[libm]),
+                ("libpthread.so.0", &["GLIBC_2.3.2"]),
+                ("ld-linux-x86-64.so.2", &["GLIBC_2.3"]),
+                ("libcrypt.so.1", &["GLIBC_9.99"]),
+            ],
+        )
+    };
+    let result = extract(Path::new("libm-floor.elf"), &build("GLIBC_2.38")).unwrap();
+    assert_eq!(
+        predicate(&result.requires, axis::ABI_LIBC),
+        &floor(line::GLIBC, vec![2, 38])
+    );
+    let evidence = &result.evidence[axis::ABI_LIBC];
+    assert_eq!(evidence["library"], "libm.so.6");
+    assert_eq!(
+        evidence["GLIBC_versions"],
+        json!([
+            "GLIBC_2.2.5",
+            "GLIBC_2.3",
+            "GLIBC_2.3.2",
+            "GLIBC_2.34",
+            "GLIBC_2.38"
+        ])
+    );
+    assert_eq!(
+        evidence["libraries"],
+        json!({
+            "ld-linux-x86-64.so.2": ["GLIBC_2.3"],
+            "libc.so.6": ["GLIBC_2.2.5", "GLIBC_2.34"],
+            "libm.so.6": ["GLIBC_2.38"],
+            "libpthread.so.0": ["GLIBC_2.3.2"],
+        })
+    );
+    let error = extract(Path::new("private.elf"), &build("GLIBC_PRIVATE"))
+        .err()
+        .unwrap()
+        .to_string();
+    assert!(
+        error.contains("unsupported libm.so.6 version need GLIBC_PRIVATE"),
+        "{error}"
+    );
 }
 
 #[test]
