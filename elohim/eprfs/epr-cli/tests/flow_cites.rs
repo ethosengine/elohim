@@ -261,6 +261,35 @@ fn repo_root() -> PathBuf {
     // gate-reads(eprfs-live-corpus): .claude/skills/memory-ceremony/SKILL.md
     // gate-reads(eprfs-live-corpus): genesis/research
     // gate-reads(eprfs-live-corpus): .gitmodules
+    // The cited targets of genesis/research and the LIVE_VERIFY documents outside the roots
+    // above: `verify` reads each (a missing one is a DEAD-CITE), and every leg asserts this list
+    // covers what its documents cite, so a new cite target is declared here or the leg is red.
+    // gate-reads(eprfs-live-corpus): .epr-meta/elohim/algorithms/embedding-models/all-minilm-l6-v2.json
+    // gate-reads(eprfs-live-corpus): .epr-meta/elohim/algorithms/recall-contract.json
+    // gate-reads(eprfs-live-corpus): bridges/valueflows/valueflows-types/src/lib.rs
+    // gate-reads(eprfs-live-corpus): elohim/brit/docs/specs/2026-06-29-epr-meta-composition-snapshot-canonical-cites-design.md
+    // gate-reads(eprfs-live-corpus): elohim/elohim-storage/research/economic-systems-research.md
+    // gate-reads(eprfs-live-corpus): elohim/elohim-storage/src/graduation/summary_event.rs
+    // gate-reads(eprfs-live-corpus): elohim/elohim-storage/src/p2p/view_federation.rs
+    // gate-reads(eprfs-live-corpus): elohim/elohim-storage/src/recursion.rs
+    // gate-reads(eprfs-live-corpus): elohim/elohim-storage/src/services/aggregator.rs
+    // gate-reads(eprfs-live-corpus): elohim/elohim-storage/src/services/constitutional_ratio_registry.rs
+    // gate-reads(eprfs-live-corpus): elohim/elohim-storage/src/services/resource_nature.rs
+    // gate-reads(eprfs-live-corpus): elohim/epr-rea/src/external.rs
+    // gate-reads(eprfs-live-corpus): elohim/epr-rea/src/model.rs
+    // gate-reads(eprfs-live-corpus): elohim/epr/src/witness.rs
+    // gate-reads(eprfs-live-corpus): elohim/holochain/dna/.epr-meta/one-human-one-vote.habit.md
+    // gate-reads(eprfs-live-corpus): elohim/holochain/dna/imagodei/zomes/imagodei/src/qahal_coordinator.rs
+    // gate-reads(eprfs-live-corpus): elohim/holochain/dna/imagodei/zomes/imagodei_integrity/src/lib.rs
+    // gate-reads(eprfs-live-corpus): elohim/holochain/dna/imagodei/zomes/imagodei_integrity/src/qahal.rs
+    // gate-reads(eprfs-live-corpus): elohim/holochain/dna/mishpat/zomes/mishpat/src/commitments.rs
+    // gate-reads(eprfs-live-corpus): genesis/agentic/pool-policy.json
+    // gate-reads(eprfs-live-corpus): genesis/data/timeline/CONVENTIONS.md
+    // gate-reads(eprfs-live-corpus): genesis/data/timeline/backlog/citation-apparatus-claim-grain-typed-edges-reach-gate.md
+    // gate-reads(eprfs-live-corpus): genesis/data/timeline/backlog/commons-pool-as-economic-authority-wallets-in-bridge-layer.md
+    // gate-reads(eprfs-live-corpus): genesis/data/timeline/backlog/measure-family-borrows-backlog.md
+    // gate-reads(eprfs-live-corpus): genesis/manifests/cluster-state.yaml
+    // gate-reads(eprfs-live-corpus): genesis/orchestrator/.epr-meta/push-delivers-within-budget.habit.md
     let mut p = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     for _ in 0..3 {
         p = p
@@ -573,9 +602,17 @@ fn looks_like_repo_path(reference: &str) -> bool {
 }
 
 fn live_verify_legacy_read_paths(root: &Path) -> Vec<String> {
+    legacy_read_paths(root, LIVE_VERIFY.iter().map(|(doc, _, _)| *doc))
+}
+
+/// The repository paths `verify` reads to judge the legacy path cites of `docs`: each cited file or
+/// directory that exists (a missing one is the DEAD-CITE the legs refuse). They are data-derived
+/// reads, so every leg asserts they are declared on `repo_root` (review of E7: the research leg's
+/// targets were in eprfs-live-corpus's key only through another crate's test reads).
+fn legacy_read_paths<'a>(root: &Path, docs: impl IntoIterator<Item = &'a str>) -> Vec<String> {
     let canonical_root = root.canonicalize().expect("repository root resolves");
     let mut paths = Vec::new();
-    for (doc, _, _) in LIVE_VERIFY {
+    for doc in docs {
         let Ok(text) = std::fs::read_to_string(root.join(doc)) else {
             continue;
         };
@@ -597,7 +634,7 @@ fn live_verify_legacy_read_paths(root: &Path) -> Vec<String> {
             let Ok(target) = candidate.canonicalize() else {
                 continue;
             };
-            if target.is_file() && target.starts_with(&canonical_root) {
+            if target.exists() && target.starts_with(&canonical_root) {
                 paths.push(
                     target
                         .strip_prefix(&canonical_root)
@@ -1095,6 +1132,23 @@ fn live_corpus_research_has_no_dead_cite_after_the_address_crossing() {
         .collect();
     docs.sort();
     assert!(!docs.is_empty(), "genesis/research holds no documents");
+    let relative: Vec<String> = docs
+        .iter()
+        .map(|doc| {
+            Path::new(doc)
+                .strip_prefix(&root)
+                .expect("a research document is beneath the repository root")
+                .to_string_lossy()
+                .replace('\\', "/")
+        })
+        .collect();
+    common::assert_declared_reads(
+        include_str!("flow_cites.rs"),
+        legacy_read_paths(&root, relative.iter().map(String::as_str))
+            .iter()
+            .map(String::as_str),
+        "live research cite targets",
+    );
     // `verify` is the DEAD-CITE reader (a cite whose repo-path target is missing). `stamp`'s
     // `dead` verdict is a different, older measure of unresolved slugs and is not this check.
     for doc in &docs {
