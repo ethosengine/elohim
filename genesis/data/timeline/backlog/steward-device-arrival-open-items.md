@@ -629,3 +629,17 @@ Covered only by another crate's test read and NOT verified to be read by the gat
 (`crates/elohim-views/src/acquisition.rs:13`). Doorway, elohim-storage and steward-node each hold an
 include reference the audit cannot read, so the narrowing held on `self/nt-audit` would skip nothing
 for them today.
+
+## Row 29 — admission lets a v3 device's C code onto a v2 device
+
+Found 2026-11-18 20:28Z (journal). Shem (x86-64-v2) drew `epr` from ethosengine at
+`78cd0c0e5`; admission passed; the peer daemon started from that binary dies with SIGILL in
+bundled SQLite. Admission (`epr-cli/src/artifact/extract_declared.rs`, since `7f48672f8`)
+takes the build's level from the Rust target and flags, baseline when none. The C driver has
+its own default: `gcc -Q --help=target` prints `-march=x86-64-v2` on shem and, expected, v3 on
+RHEL 10. Owed, in order: (1) the declared level is the maximum of the Rust level and the C
+driver's, read from the driver's predefined macros the key already probes, so a v2 host
+refuses before fetch; (2) the gate builds C at a declared baseline so one device's release is
+another's; (3) a check that runs a drawn binary's daemon path before it becomes current, since
+`--version` succeeding proved nothing here. Related: row 26 item 4 (the deploy floor) is the
+same question for glibc. Until (1) lands, shem follows only its own `epr` builds.

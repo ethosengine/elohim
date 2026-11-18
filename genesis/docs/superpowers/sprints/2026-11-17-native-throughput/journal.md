@@ -430,11 +430,34 @@ fourth. Run read-only on shem before landing: exit 0 in 1.2 s. Not verified: a r
 writing the record, and ethosengine. Receipts `codex-sysroot-review{,2,3}` and
 `codex-sysroot-rereview` under `genesis/local-dev/native-throughput/`.
 
-### Definition of done, as of 2026-11-18 18:40Z
+**The sysroot line lands on the second push (20:27Z, `1a0879d0a`).** The first push was
+refused by the gate: `elohim-epr-cli` did not compile with `default-features = false`, which
+is how `bridges/cargo` and `bridges/jenkins` take it, because the new code called into the
+`peer`-gated `artifact` module. Three reviews and every local check had used default
+features. The probe moved to an ungated module; both feature sets and both bridges were proven
+before the second push (2718 s).
+
+**A drawn binary crashed on shem, and line 1's receipt is corrected.** Verifying the landing,
+the orchestrator ran `epr device arrive` on shem. The arrival restarted the device supervisor,
+which started the peer daemon from the installed `epr`: the release shem drew from ethosengine
+at landing 3 (`bafyreiebwmixsfw…`). It died at once with SIGILL (exit 132; kernel `trap invalid
+opcode … in epr`), in `selectExpander`, bundled SQLite. Shem's CPU is x86-64-v2. Shem's gcc
+defaults to `-march=x86-64-v2` (AlmaLinux's v2 flavour); ethosengine runs RHEL 10, whose gcc
+defaults to v3 (to be confirmed there), so C code its gate compiles carries v3 instructions
+with no CPU check. The admission fix `7f48672f8` judges the level the Rust build declared and
+named a C dependency's flags as a residual; the residual is every C dependency. The refusal it
+removed was true for the C part. Shem's daemon had kept running its own older build since
+before the draw, which is why nothing failed for sixteen hours. Recovered at 20:29Z: shem
+followed its own release `bafyreih54myd2…` at `1a0879d0a`, the supervisor restarted, the peer
+serves and ethosengine's head is seconds old. Until admission counts the C driver's level,
+shem does not draw `epr` from ethosengine; the other direction is sound. Lane E10
+(ethosengine), reviewed before it lands. Backlog row 29.
+
+### Definition of done, as of 2026-11-18 20:40Z
 
 | Line | State |
 |---|---|
-| 1 release from the gate, drawn by the sibling | met (11.6 s draw at `78cd0c0e5`) |
+| 1 release from the gate, drawn by the sibling | drawn in 11.6 s at `78cd0c0e5`, but the drawn binary cannot run its peer daemon on shem (SIGILL); **not met** until admission counts the C compiler level (row 29) |
 | 2 requirements judged at admission | landed; not re-run by the orchestrator |
 | 3 hand-over in seconds, landed by the sibling | met: 22.9 s hand-over, `independence: sibling` on the landing |
 | 4 a sibling's red arrives live | met: 4.9 s on a scratch ref; the fix is on `dev`; E6 items 2 to 6 open |
