@@ -862,11 +862,11 @@ fn sysroot_judge(
                 describe(was),
                 describe(now)
             ),
-            Some(
+            Some(format!(
                 "none needed for correctness; expect cold builds and key misses; record the new \
-                 image in the journal"
-                    .into(),
-            ),
+                 image in the journal; this line settles {SYSROOT_NOTICE_DAYS} days after the \
+                 change"
+            )),
         )
     };
     match remembered {
@@ -2121,7 +2121,7 @@ mod tests {
              (almalinux 10.1, glibc 2.39), now bafkreib…bbbb (almalinux 10.2, glibc 2.39); \
              artifact keys and pool build caches made before are for the previous system \
              libraries — none needed for correctness; expect cold builds and key misses; \
-             record the new image in the journal"
+             record the new image in the journal; this line settles 7 days after the change"
         );
         assert_eq!(arrival.to_string(), read.to_string());
         let record = read_sysroot_record(&file).unwrap().unwrap();

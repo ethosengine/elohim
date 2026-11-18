@@ -592,4 +592,82 @@ mod tests {
             .to_string()
             .contains("describe again"));
     }
+
+    /// PATH order and unrelated PATH entries do not move the sysroot identity: two spellings of
+    /// one `cc` resolve (canonically) to one driver, so the lines are equal; a `cc` with other
+    /// content is another sysroot.
+    #[test]
+    fn sysroot_lines_do_not_depend_on_path_order_or_unrelated_entries() {
+        use std::os::unix::fs::PermissionsExt;
+        let process_path = std::env::var("PATH").unwrap();
+        let rustc = super::super::resolve_tool_path("rustc", &process_path).unwrap();
+        let rustc_dir = rustc.parent().unwrap().display().to_string();
+        let toolchain = std::env::var("RUSTUP_TOOLCHAIN").unwrap_or_else(|_| {
+            let output = Command::new(&rustc).arg("-V").output().unwrap();
+            String::from_utf8(output.stdout)
+                .unwrap()
+                .split_whitespace()
+                .nth(1)
+                .unwrap()
+                .to_owned()
+        });
+        let root = tempfile::tempdir().unwrap();
+        let stub = |name: &str, version: &str| {
+            let file = root.path().join(name);
+            std::fs::write(
+                &file,
+                format!(
+                    "#!/bin/sh\ncase \"$1\" in\n  -print-file-name=*) echo \"${{1#-print-file-name=}}\" ;;\n  \
+                     --version) echo '{version}' ;;\n  *) echo '#define __STUB__ 1' ;;\nesac\n"
+                ),
+            )
+            .unwrap();
+            std::fs::set_permissions(&file, std::fs::Permissions::from_mode(0o755)).unwrap();
+            fixture::wait_for_stub(&file);
+            file
+        };
+        let gcc = stub("gcc", "stub-cc 14.3.1");
+        let other = stub("other-gcc", "stub-cc 14.3.2");
+        let dirs: Vec<_> = ["a", "b", "unrelated", "c"]
+            .iter()
+            .map(|name| {
+                let dir = root.path().join(name);
+                std::fs::create_dir(&dir).unwrap();
+                dir
+            })
+            .collect();
+        std::os::unix::fs::symlink(&gcc, dirs[0].join("cc")).unwrap();
+        std::os::unix::fs::symlink(&gcc, dirs[1].join("cc")).unwrap();
+        std::os::unix::fs::symlink(&other, dirs[3].join("cc")).unwrap();
+        let spell = |order: &[usize]| {
+            let mut entries: Vec<String> = order
+                .iter()
+                .map(|i| dirs[*i].display().to_string())
+                .collect();
+            entries.push(rustc_dir.clone());
+            entries.join(":")
+        };
+        let first = sysroot_lines(&spell(&[0]), &toolchain).unwrap();
+        assert!(
+            first
+                .iter()
+                .any(|line| line.starts_with("tool:link-driver\t")),
+            "{first:?}"
+        );
+        assert!(first
+            .iter()
+            .all(|line| !line.contains(&format!("{}/", dirs[0].display()))));
+        for order in [&[1, 0][..], &[2, 1], &[2, 0, 1]] {
+            assert_eq!(
+                sysroot_lines(&spell(order), &toolchain).unwrap(),
+                first,
+                "{order:?}"
+            );
+        }
+        assert_ne!(sysroot_lines(&spell(&[3]), &toolchain).unwrap(), first);
+        assert!(sysroot_lines(&spell(&[2]), &toolchain)
+            .unwrap_err()
+            .to_string()
+            .contains("no C link driver cc"));
+    }
 }
