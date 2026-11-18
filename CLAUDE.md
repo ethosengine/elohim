@@ -92,6 +92,7 @@ just dev start                # isolated conductor + storage + doorway
 just dev shift start <contract.json> --runtime codex  # bounded Claude/Codex task; resume|status|stop <id>, recover; genesis/agentic/SHIFT.md
 just dev package app/elohim-app # build, check and package an Angular EPR app locally; no upload
 # EPR_APP_ADAPTER=./my-adapter.mjs just dev package ./my-client selects a local adapter
+just dev notes [publish]       # this device's build notes -> refs/notes/brit/devices/<did>/build/* on origin, fast-forward only; bare = dry run, no forge contact
 just dev conductor alpha      # T3 hybrid rung: a workspace conductor joined to alpha (fork iroh pair, CONDUCTOR_ARC_FACTOR / CONDUCTOR_APP_PORT=4485; stock 0.7 lacks the fork cross-relay preflight fix); auto-offsets to STORAGE_PORT=8095/DOORWAY_PORT=8898 and a sandbox named t3-<profile> beside an already-running household mesh
 CONDUCTOR_ADMIN_PORT=39097 just dev conductor alpha  # join-alpha enrollment/resume pins an explicit admin port (1..65535); ordinary resumes retain the recorded .hc_ports port so existing storage/doorway pairing survives; export sourced private env assignments before launching
 STORAGE_HAPP_PATH=/absolute/path/to/app.happ just dev conductor alpha  # storage --happ-path in ordinary/release-channel launches; readable file required, unset keeps the storage default; HAPP_BUNDLE_PATH selects doorway provisioning only
