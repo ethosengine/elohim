@@ -32,8 +32,12 @@ Temporary landing exception (cycle-time harvest, 2026-11-06): the re-genesis lan
 logs record brit 0.1.12 closing send-pack after a green hook. Until a corrected Brit
 push is verified, use Git for that landing with `GATE_EVIDENCE=reuse git push origin HEAD:dev`,
 keeping the hook enabled and recording the fallback in the sprint journal. `HEAD:dev` alone
-omits the validation receipts: push them separately with
-`git push origin 'refs/notes/brit/build/*:refs/notes/brit/build/*'`. The pre-push hook skips
+omits the validation receipts. Each device publishes them to its OWN forge destination,
+`refs/notes/brit/devices/<did>/build/*`, fast-forward only, with `just dev notes publish`
+(`just dev notes` is the dry run; `genesis/orchestrator/device-notes-publish.mjs`, ruling R4 of
+the native-throughput sprint). Never push the shared `refs/notes/brit/build/*` refs on origin:
+they are frozen, the devices' signed copies diverged there (backlog
+`steward-device-arrival-open-items` row 3), and nothing merges over signed records. The pre-push hook skips
 `refs/notes/*` since 2bba47154 (verified 2026-11-08, artifact-store push-notes-build.log).
 `core.hooksPath` names the main checkout's `.husky/_`, so a worktree push runs the main
 checkout's hook; when that checkout predates 2bba47154, add `-c core.hooksPath=<worktree>/.husky/_`. Git treats a missing
@@ -88,6 +92,7 @@ just dev start                # isolated conductor + storage + doorway
 just dev shift start <contract.json> --runtime codex  # bounded Claude/Codex task; resume|status|stop <id>, recover; genesis/agentic/SHIFT.md
 just dev package app/elohim-app # build, check and package an Angular EPR app locally; no upload
 # EPR_APP_ADAPTER=./my-adapter.mjs just dev package ./my-client selects a local adapter
+just dev notes [publish]       # this device's build notes -> refs/notes/brit/devices/<did>/build/* on origin, fast-forward only; bare = dry run, no forge contact
 just dev conductor alpha      # T3 hybrid rung: a workspace conductor joined to alpha (fork iroh pair, CONDUCTOR_ARC_FACTOR / CONDUCTOR_APP_PORT=4485; stock 0.7 lacks the fork cross-relay preflight fix); auto-offsets to STORAGE_PORT=8095/DOORWAY_PORT=8898 and a sandbox named t3-<profile> beside an already-running household mesh
 CONDUCTOR_ADMIN_PORT=39097 just dev conductor alpha  # join-alpha enrollment/resume pins an explicit admin port (1..65535); ordinary resumes retain the recorded .hc_ports port so existing storage/doorway pairing survives; export sourced private env assignments before launching
 STORAGE_HAPP_PATH=/absolute/path/to/app.happ just dev conductor alpha  # storage --happ-path in ordinary/release-channel launches; readable file required, unset keeps the storage default; HAPP_BUNDLE_PATH selects doorway provisioning only

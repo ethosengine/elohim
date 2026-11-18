@@ -37,8 +37,19 @@ Commands:
   berth say     --session S [--to SESSION] TEXT                    a deliberation note; the addressee reads
                                                                    it with `berth inbox` or watches `--follow`;
                                                                    --to takes the full id or the 8-character
-                                                                   prefix every berth line prints
+                                                                   prefix every berth line prints; prints
+                                                                   `berth say: note #<dseq> at <time> to <who>`
   berth inbox   --session S [--peek] [--all] [--follow] [--json]  read notes said to this session
+  berth inbox   --session S --reader R [--limit N] [--peek] [--json] [--follow]
+                                                                   one reader's unread notes ADDRESSED to S
+                                                                   (no household broadcasts, no gate-red@1/
+                                                                   gate-final@1); its own cursor, never the
+                                                                   session's seen offset. The hook reader of
+                                                                   the main agent is `main`; an idle agent's
+                                                                   Monitor: `berth inbox --session S --reader
+                                                                   main --follow` (each line printed before
+                                                                   the cursor passes it; pipe it through no
+                                                                   head/cut)
   berth who     RESOURCE                                           json of the holder (or null)
   berth status                                                     moorings · leases · capacity, and the
                                                                    other devices' moorings and steward
@@ -105,6 +116,7 @@ import shutil
 import subprocess
 import sys
 import time
+import unicodedata
 
 # Where this device keeps the berth store and which checkout's policy it reads. The device layout
 # (`epr device layout show`) is the one resolver; berth asks it rather than guessing, and keeps the
@@ -758,9 +770,13 @@ class Berth:
                 via = tag[4:]
         if not row.get("cid") or not fields.get("session") or "text" not in fields:
             return None
-        return {"cid": row["cid"], "at": float(fields["at"]), "from_device": via,
+        note = {"cid": row["cid"], "at": float(fields["at"]), "from_device": via,
                 "session": fields["session"], "to": fields.get("to") or None,
                 "text": fields["text"]}
+        # The sender's device record number: `berth say` prints it, so both ends can name one note.
+        if str(fields.get("dseq", "")).isdigit():
+            note["dseq"] = int(fields["dseq"])
+        return note
 
     @staticmethod
     def _read_json(path, default):
@@ -856,12 +872,66 @@ class Berth:
         except Exception:
             return []
 
+    # A reader is one agent of a session (the main agent, a subagent, a Monitor watching for it).
+    # Its cursor is its own offset into the normalized stream and never moves the session's seen
+    # offset, so a note one reader was shown still reaches `berth inbox`. Reader delivery is the
+    # wake path: notes ADDRESSED to the session only (a household broadcast wakes no one), and
+    # never the gate-live machine notes, which gate-live-inject and `gate-live.mjs follow` own.
+    def _inbox_reader_path(self, session, reader):
+        return os.path.join(self._inbox_dir(), "readers", f"{_safe(session)}--{_safe(reader)}.json")
+
+    def reader_entries(self, session, reader, limit=None):
+        """([(note, offset_after)], scan_end): unread addressed notes for this reader, oldest first,
+        at most `limit`. Reading starts past both this reader's cursor and the session's seen
+        offset, so a note the session already read with `berth inbox` is not news. Moves nothing."""
+        with self._locked("inbox"):
+            os.makedirs(os.path.join(self._inbox_dir(), "readers"), exist_ok=True)
+            self._scan_inbox()
+            start = max(self._read_json(self._inbox_reader_path(session, reader), {}).get("offset", 0),
+                        self._read_json(self._inbox_seen_path(session), {}).get("offset", 0))
+            entries, end = [], start
+            try:
+                with open(self._inbox_notes_path(), encoding="utf-8") as f:
+                    f.seek(start)
+                    while limit is None or len(entries) < limit:
+                        line = f.readline()
+                        if not line:
+                            break
+                        end = f.tell()
+                        note = json.loads(line)
+                        if (note.get("session") != session and _addressed_to(note.get("to"), session)
+                                and not _gate_live_note(note.get("text"))):
+                            entries.append((note, end))
+            except FileNotFoundError:
+                pass
+            return entries, end
+
+    def advance_reader(self, session, reader, offset):
+        """Move this reader's cursor forward to `offset`; never back."""
+        with self._locked("inbox"):
+            os.makedirs(os.path.join(self._inbox_dir(), "readers"), exist_ok=True)
+            path = self._inbox_reader_path(session, reader)
+            if offset > self._read_json(path, {}).get("offset", 0):
+                write_json_atomic(path, {"offset": offset})
+
+    def reader_inbox(self, session, reader, limit=None, mark=True):
+        """The notes `reader_entries` names; with `mark`, this reader has now been shown them. When
+        `limit` cut the read short, the cursor stops at the last note returned, so the rest come
+        next time. Fail-open, like `inbox`."""
+        try:
+            entries, end = self.reader_entries(session, reader, limit=limit)
+            if mark:
+                self.advance_reader(session, reader, end)
+            return [note for note, _ in entries]
+        except Exception:
+            return []
+
     @staticmethod
     def _note_line(note, session, now):
         device = note.get("from_device")
         short = (device.split(":")[-1][:10] + "…") if device else "this device"
         sender = str(note.get("session") or "?")
-        text = " ".join(str(note.get("text") or "").split())
+        text = _one_line(note.get("text"))
         if len(text) > 600:
             text = text[:599] + "…"
         direct = " to you" if _addressed_to(note.get("to"), session) else ""
@@ -1935,6 +2005,28 @@ def _addressed_to(to, session):
     return to == session or (len(to) >= NOTE_PREFIX_MIN and session.startswith(to))
 
 
+GATE_LIVE_NOTE_KINDS = ("gate-red@1", "gate-final@1")
+
+
+def _gate_live_note(text):
+    """True for a gate-live machine note (a JSON body of kind gate-red@1 or gate-final@1)."""
+    if not isinstance(text, str) or not text.lstrip().startswith("{"):
+        return False
+    try:
+        body = json.loads(text)
+    except ValueError:
+        return False
+    return isinstance(body, dict) and body.get("kind") in GATE_LIVE_NOTE_KINDS
+
+
+def _one_line(text):
+    """Another session's text as one printable line: whitespace (newlines, U+2028 and kin)
+    collapsed, control and format characters (escapes, bidi overrides) dropped, and the
+    guillemets that quote it replaced so the text cannot close its own quotation."""
+    text = "".join(c for c in str(text or "") if c.isspace() or unicodedata.category(c) not in ("Cc", "Cf"))
+    return " ".join(text.split()).replace("«", "‹").replace("»", "›")
+
+
 def _age(secs):
     secs = max(0, int(secs))
     return f"{secs}s" if secs < 90 else (f"{secs // 60}m" if secs < 5400 else f"{secs // 3600}h{(secs % 3600) // 60:02d}")
@@ -2340,6 +2432,38 @@ def _main(argv):
         include_seen = "--all" in argv
         follow = "--follow" in argv
         as_json = "--json" in argv
+        reader = _opt(argv, "--reader")
+        limit = _opt(argv, "--limit")
+        try:
+            limit = int(limit) if limit is not None else None
+        except ValueError:
+            limit = 0
+        if reader is not None and (not reader.strip() or reader.startswith("--") or include_seen
+                                   or (limit is not None and limit < 1)):
+            print("usage: berth inbox --session S --reader R [--limit N] [--peek] [--json] [--follow] "
+                  "(--all reads the session's notes; a reader reads only its unread addressed notes)",
+                  file=sys.stderr)
+            return 2
+        if reader is not None and follow:
+            # The Monitor form: one line per note, printed and flushed BEFORE this reader's cursor
+            # passes it, so a closed pipe costs no note it did not print. Nothing else is moved.
+            while True:
+                entries, end = b.reader_entries(session, reader)
+                for note, offset in entries:
+                    try:
+                        print(b._note_line(note, session, b.now()), flush=True)
+                    except (BrokenPipeError, OSError):
+                        return 0
+                    b.advance_reader(session, reader, offset)
+                b.advance_reader(session, reader, end)
+                b.sleep(2)
+        if reader is not None:
+            notes = b.reader_inbox(session, reader, limit=limit, mark=not peek)
+            if as_json:
+                print(json.dumps(notes, sort_keys=True))
+            elif notes:
+                print("\n".join(b._note_line(note, session, b.now()) for note in notes))
+            return 0
         if follow:
             while True:
                 for note in b.inbox(session, mark=True, include_seen=include_seen):
@@ -2445,11 +2569,16 @@ def _main(argv):
         if not text:
             print("usage: berth say --session S [--to SESSION] TEXT", file=sys.stderr)
             return 2
-        b.say(session, text, to=to)
+        row = b.say(session, text, to=to)
         failed = b.take_fold_failures(None)
         if failed:
             print(f"berth say: said here, but {failed[0]} — no other device will read it", file=sys.stderr)
             return 1
+        # The sender sees what left: the recipient, and the note's id (this device's record number,
+        # which the recipient's `inbox --json` carries as `dseq`). Delivery is not read receipt: the
+        # note reaches an agent at its next tool call, its Monitor, or its next `berth inbox`.
+        print(f"berth say: note #{row.get('dseq')} at {_rfc3339(row['at'] * 1000)} to "
+              f"{to if to else 'the household (every session moored before it; no --to)'}")
         return 0
     print(__doc__.split("Commands:")[1].split("Resources")[0])
     return 2
