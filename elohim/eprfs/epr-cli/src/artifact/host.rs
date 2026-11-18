@@ -122,7 +122,7 @@ fn bounded_output(command: &mut Command, deadline: Instant) -> std::io::Result<B
     ];
     for (is_stdout, pipe) in pipes {
         let sender = sender.clone();
-        std::thread::spawn(move || {
+        let spawned = spawn_reader(move || {
             let mut bytes = Vec::new();
             if let Some(pipe) = pipe {
                 // A read error ends the capture; the exit status still decides the probe.
@@ -132,11 +132,21 @@ fn bounded_output(command: &mut Command, deadline: Instant) -> std::io::Result<B
             // The receiver may have given up at its deadline; nothing waits for this send.
             let _ = sender.send((is_stdout, bytes, over));
         });
+        if let Err(refused) = spawned {
+            // No reader, no bounded drain: end the probe as a failure, not a panic.
+            kill_group(&mut child);
+            return Err(refused);
+        }
     }
     drop(sender);
     let status = loop {
-        if let Some(status) = child.try_wait()? {
-            break status;
+        match child.try_wait() {
+            Ok(Some(status)) => break status,
+            Ok(None) => {}
+            Err(error) => {
+                kill_group(&mut child);
+                return Err(error);
+            }
         }
         if Instant::now() >= deadline {
             kill_group(&mut child);
@@ -170,6 +180,24 @@ fn bounded_output(command: &mut Command, deadline: Instant) -> std::io::Result<B
     }))
 }
 
+#[cfg(test)]
+thread_local! {
+    /// Tests set this to make [`spawn_reader`] refuse, as the OS does at its thread limit.
+    static REFUSE_READER_THREADS: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// Start a pipe reader; a refusal (the OS's thread or memory limit) is an error, never a panic.
+fn spawn_reader(reader: impl FnOnce() + Send + 'static) -> std::io::Result<()> {
+    #[cfg(test)]
+    if REFUSE_READER_THREADS.with(std::cell::Cell::get) {
+        return Err(std::io::Error::other("reader thread refused"));
+    }
+    std::thread::Builder::new()
+        .name("probe-reader".into())
+        .spawn(reader)
+        .map(drop)
+}
+
 /// Limits on the files the sysroot probe and its re-check read: one wall-clock deadline (shared
 /// with the probe's children), a per-file size and a total over all files.
 pub(crate) struct ReadBudget {
@@ -183,6 +211,20 @@ pub(crate) const SYSROOT_FILE_LIMIT: u64 = 64 * 1024 * 1024;
 /// Over every file one observation reads: a few times the real sum (about 20 MiB here).
 pub(crate) const SYSROOT_TOTAL_LIMIT: u64 = 256 * 1024 * 1024;
 
+/// A small context file (os-release) read within `deadline` and `cap` bytes through
+/// [`bounded_read`]; anything else (missing, a link, a FIFO, too large, late) is `None`.
+pub(crate) fn read_context(file: &Path, cap: u64, deadline: Instant) -> Option<Vec<u8>> {
+    bounded_read(
+        file,
+        &mut ReadBudget {
+            deadline,
+            per_file: cap,
+            remaining: cap,
+        },
+    )
+    .ok()
+}
+
 /// Why a bounded read did not return bytes: the file is gone (a change, for the re-check), or
 /// it is outside the bounds (the observation cannot be made).
 enum ReadRefused {
@@ -192,7 +234,9 @@ enum ReadRefused {
 
 /// Read `file` within `budget`: the last component is never followed, the open never blocks on a
 /// FIFO or device, only a regular file within the per-file and remaining bytes is read, and the
-/// deadline is checked before the open and between chunks.
+/// deadline is checked before the open and between chunks. A stated limit: a stalled filesystem
+/// can hold one synchronous open or read past the deadline, as it can every other check of
+/// `epr device status`; the deadline is noticed when that call returns.
 fn bounded_read(file: &Path, budget: &mut ReadBudget) -> Result<Vec<u8>, ReadRefused> {
     use std::os::unix::fs::OpenOptionsExt;
     let expired = || {
@@ -561,8 +605,21 @@ pub(crate) fn check_sysroot_lines(lines: &[String]) -> Result<(), String> {
     if !lines.windows(2).all(|pair| pair[0] < pair[1]) {
         return Err("lines are not sorted and unique".into());
     }
-    if !driver || !linked {
-        return Err("no driver line or no link input with a path".into());
+    let named = |want: &dyn Fn(&str) -> bool| {
+        lines.iter().any(|line| {
+            let fields: Vec<&str> = line.split('\t').collect();
+            fields.len() == 3 && want(fields[0])
+        })
+    };
+    // What the probe always emits on a glibc host: the startup object and libc behind its script.
+    let crt1 = named(&|label| label == "link:crt1.o");
+    let libc = named(&|label| {
+        label.starts_with("link:libc.so>") && label.rsplit('/').next() == Some("libc.so.6")
+    });
+    if !driver || !linked || !crt1 || !libc {
+        return Err(
+            "the driver line, link:crt1.o or libc.so's libc.so.6 referent is missing".into(),
+        );
     }
     Ok(())
 }
@@ -595,8 +652,13 @@ fn sysroot_drift_within(lines: &[String], budget: &mut ReadBudget) -> Result<Vec
             continue;
         };
         let path = Path::new(file);
-        // A recorded path is canonical; one that no longer resolves to itself has moved.
-        let same = if std::fs::canonicalize(path).ok().as_deref() != Some(path) {
+        // A linker-script referent's label keeps the script's own operand: re-resolve that, so a
+        // symlink retargeted to another installed file is a change even while the old target is
+        // intact. Other paths are canonical and must still resolve to themselves.
+        let operand = label
+            .rsplit_once('>')
+            .map_or(path, |(_, operand)| Path::new(operand));
+        let same = if std::fs::canonicalize(operand).ok().as_deref() != Some(path) {
             false
         } else if label.starts_with("tool:") {
             std::fs::symlink_metadata(path).is_ok_and(|meta| meta.is_file())
@@ -1192,14 +1254,30 @@ mod tests {
         assert!(check_sysroot_lines(&lines).is_ok());
         let cid = BlobCid::compute_bytes(b"x").to_string();
         let driver = format!("tool:link-driver\t/usr/bin/gcc\t{cid}");
-        let with = |extra: &str| {
-            let mut lines = vec![driver.clone(), extra.to_owned()];
+        let crt1 = format!("link:crt1.o\t/usr/lib/crt1.o\t{cid}");
+        let libc = format!("link:libc.so>/lib64/libc.so.6\t/usr/lib64/libc.so.6\t{cid}");
+        let set = |lines: &[&String], extra: &str| {
+            let mut lines: Vec<String> = lines.iter().map(|l| (*l).clone()).collect();
+            if !extra.is_empty() {
+                lines.push(extra.to_owned());
+            }
             lines.sort();
             lines
         };
-        assert!(
-            check_sysroot_lines(&with(&format!("link:crt1.o\t/usr/lib/crt1.o\t{cid}"))).is_ok()
-        );
+        let with = |extra: &str| set(&[&driver, &crt1, &libc], extra);
+        assert!(check_sysroot_lines(&with("")).is_ok());
+        // The lines the probe always emits must be there: the driver, crt1.o and libc.so's
+        // libc.so.6 referent; any one link line is not enough.
+        let other = format!("link:libm.so\t/usr/lib64/libm.so\t{cid}");
+        for partial in [
+            set(&[&driver, &crt1], ""),
+            set(&[&driver, &libc], ""),
+            set(&[&crt1, &libc], ""),
+            set(&[&driver, &other], ""),
+        ] {
+            let error = check_sysroot_lines(&partial).unwrap_err();
+            assert!(error.contains("is missing"), "{partial:?}: {error}");
+        }
         for bad in [
             format!("link:crt1.o\tusr/lib/crt1.o\t{cid}"),
             format!("link:crt1.o\t/usr/lib/../../etc/shadow\t{cid}"),
@@ -1212,11 +1290,49 @@ mod tests {
         ] {
             assert!(check_sysroot_lines(&with(&bad)).is_err(), "{bad}");
         }
-        // No driver line, no link line with a path, nothing at all, or unsorted: refused.
-        let link = format!("link:crt1.o\t/usr/lib/crt1.o\t{cid}");
-        assert!(check_sysroot_lines(std::slice::from_ref(&link)).is_err());
-        assert!(check_sysroot_lines(&with("link:crt1.o\t-")).is_err());
+        // Nothing at all, or unsorted: refused.
         assert!(check_sysroot_lines(&[]).is_err());
-        assert!(check_sysroot_lines(&[driver, link]).is_err());
+        let mut unsorted = with("");
+        unsorted.reverse();
+        assert!(check_sysroot_lines(&unsorted).is_err());
+    }
+
+    /// A linker-script operand that is a symlink is re-resolved: retargeting it to another
+    /// installed file is a change even while the old target is intact and unchanged.
+    #[test]
+    fn sysroot_drift_sees_a_retargeted_script_operand() {
+        let fake = FakeSysroot::new();
+        let lib = fake.lib();
+        std::fs::rename(lib.join("libc.so.6"), lib.join("libc-2.39.so")).unwrap();
+        std::os::unix::fs::symlink("libc-2.39.so", lib.join("libc.so.6")).unwrap();
+        let lines = fake.lines(&fake.bin("a"));
+        assert!(drift(&lines).is_empty());
+        fake.put("libc-2.40.so", b"\x7fELF libc 2.40");
+        std::fs::remove_file(lib.join("libc.so.6")).unwrap();
+        std::os::unix::fs::symlink("libc-2.40.so", lib.join("libc.so.6")).unwrap();
+        assert_eq!(
+            drift(&lines),
+            vec![format!("link:libc.so>{}/libc.so.6", lib.display())]
+        );
+    }
+
+    /// The OS refusing a pipe reader is a failed probe, never a panic, and the driver's process
+    /// group is killed first.
+    #[test]
+    fn sysroot_probe_refused_reader_thread_is_an_error() {
+        let fake = FakeSysroot::new();
+        let a = fake.bin("a");
+        REFUSE_READER_THREADS.with(|refuse| refuse.set(true));
+        let result = std::panic::catch_unwind(|| {
+            sysroot_lines(&a, Instant::now() + Duration::from_secs(20))
+        });
+        REFUSE_READER_THREADS.with(|refuse| refuse.set(false));
+        let error = result
+            .expect("a refused thread must not panic")
+            .unwrap_err();
+        assert!(
+            error.to_string().contains("reader thread refused"),
+            "{error}"
+        );
     }
 }

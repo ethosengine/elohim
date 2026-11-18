@@ -100,16 +100,31 @@ fn observe_sysroot(
             why
         }
     })?;
-    let os = ["/etc/os-release", "/usr/lib/os-release"]
-        .iter()
-        .find_map(|file| fs::read_to_string(file).ok())
-        .and_then(|text| os_release(&text));
     Ok(SysrootObserved {
         lines,
-        os,
+        os: os_context(
+            &[
+                Path::new("/etc/os-release"),
+                Path::new("/usr/lib/os-release"),
+            ],
+            deadline,
+        ),
         glibc: glibc_version(),
     })
 }
+
+/// os-release is read only as context: through the bounded read (regular file, at most
+/// [`OS_RELEASE_LIMIT`] bytes, inside `deadline`); anything unreadable omits the context.
+fn os_context(files: &[&Path], deadline: std::time::Instant) -> Option<String> {
+    files
+        .iter()
+        .find_map(|file| crate::artifact::read_context(file, OS_RELEASE_LIMIT, deadline))
+        .and_then(|bytes| String::from_utf8(bytes).ok())
+        .and_then(|text| os_release(&text))
+}
+
+/// A real os-release is well under 1 KiB.
+const OS_RELEASE_LIMIT: u64 = 64 * 1024;
 
 /// `ID VERSION_ID` from an os-release document (either may be quoted); `ID` alone without a
 /// version.
@@ -199,7 +214,8 @@ fn sysroot_changed(was: &SysrootSeen, now: &SysrootSeen) -> Check {
         ),
         Some(format!(
             "none needed for correctness; expect cold builds and key misses; record the new image \
-             in the journal; this line settles {SYSROOT_NOTICE_DAYS} days after the change; \
+             in the journal; this line settles at the first arrival {SYSROOT_NOTICE_DAYS} days \
+             after the change (a status read alone does not store it); \
              {SYSROOT_BLIND}"
         )),
     )
@@ -499,6 +515,11 @@ pub(super) fn line(
 /// within bounds: the sysroot check runs no program and writes nothing. Only `epr device arrive`
 /// runs the full observation and replaces the record, under the arrivals' lock; one deadline of
 /// [`SYSROOT_PROBE_SECONDS`] covers the whole observation, and every exit path drops the lock.
+///
+/// Stated limits: a stalled filesystem can hold one synchronous open, read or `sync_all` past
+/// either budget, as it can every other check of this command; and a status read that sees the
+/// notice over does not persist settlement (only an arrival stores `settledAt`), so a clock
+/// stepped back before any such arrival can show the notice again.
 fn sysroot_check(
     observe: &dyn Fn(std::time::Instant) -> Result<SysrootObserved, String>,
     record_file: Result<PathBuf, String>,
@@ -713,8 +734,9 @@ mod tests {
                 "degraded sysroot: changed since 2026-11-18T10:00:00Z — was {}, now {}; \
                  artifact keys and pool build caches made before are for the previous system \
                  libraries — none needed for correctness; expect cold builds and key misses; \
-                 record the new image in the journal; this line settles 7 days after the \
-                 change; {SYSROOT_BLIND}",
+                 record the new image in the journal; this line settles at the first arrival \
+                 7 days after the change (a status read alone does not store it); \
+                 {SYSROOT_BLIND}",
                 describe_sysroot(&old),
                 describe_sysroot(&now)
             )
@@ -823,7 +845,9 @@ mod tests {
             v["current"]["lines"] = json!([]);
             v
         });
-        host.assert_unreadable("no driver line");
+        host.assert_unreadable(
+            "the driver line, link:crt1.o or libc.so's libc.so.6 referent is missing",
+        );
         restore();
         host.tamper(|mut v| {
             v["current"]["cid"] = json!(cid_of(b"another identity"));
@@ -957,6 +981,41 @@ mod tests {
         );
         assert_eq!(nowhere.state, State::Degraded);
         assert!(nowhere.detail.contains("no state directory"));
+    }
+
+    /// os-release is context only: a FIFO is not waited on, an oversized file is not read, and
+    /// either omits the context; the next candidate still answers.
+    #[test]
+    fn sysroot_os_release_is_read_within_bounds_or_omitted() {
+        let dir = tempfile::tempdir().unwrap();
+        let fifo = dir.path().join("fifo");
+        assert!(std::process::Command::new("mkfifo")
+            .arg(&fifo)
+            .status()
+            .unwrap()
+            .success());
+        let large = dir.path().join("large");
+        let mut text = b"ID=big\nVERSION_ID=1\n".to_vec();
+        text.resize(OS_RELEASE_LIMIT as usize + 1, b'#');
+        fs::write(&large, text).unwrap();
+        let good = dir.path().join("good");
+        fs::write(&good, "ID=rhel\nVERSION_ID=10.0\n").unwrap();
+        let (tx, rx) = std::sync::mpsc::channel();
+        let (fifo_c, large_c, good_c) = (fifo.clone(), large.clone(), good.clone());
+        std::thread::spawn(move || {
+            let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+            let _ = tx.send((
+                os_context(&[&fifo_c], deadline),
+                os_context(&[&large_c], deadline),
+                os_context(&[&fifo_c, &large_c, &good_c], deadline),
+            ));
+        });
+        let (from_fifo, from_large, from_good) = rx
+            .recv_timeout(std::time::Duration::from_secs(3))
+            .expect("os-release read waited on a FIFO");
+        assert_eq!(from_fifo, None);
+        assert_eq!(from_large, None);
+        assert_eq!(from_good.as_deref(), Some("rhel 10.0"));
     }
 
     #[test]

@@ -816,7 +816,7 @@ fn resolve_tool_path(name: &str, path: &str) -> Option<PathBuf> {
 
 mod host;
 use host::{check_linker, tool_lines};
-pub(crate) use host::{check_sysroot_lines, sysroot_drift, sysroot_lines};
+pub(crate) use host::{check_sysroot_lines, read_context, sysroot_drift, sysroot_lines};
 
 /// Untracked files `git status --ignored` lists inside the view are inputs no closure line names;
 /// `node_modules` directories are excluded by declaration (cargo never reads them; a residual the
