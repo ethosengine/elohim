@@ -212,6 +212,19 @@ tell whose each inherited memory is; a newcomer's correction is declared as thei
 graduation by another steward's verdict; two stewards' directions disagreeing; no inherited private
 picture of another person).
 
+*Where this story leads, as a breadcrumb only (operator, 2026-11-18).* The developer scenarios
+are one early flavour of a longer path: what onboarding with the protocol is like for a person.
+Today it is a developer starting an lvi workspace, and every participant is in effect "matthew",
+because there is one. The path it graduates into is human participation in the network's own
+evolution: the protocol getting to know someone; their becoming a contributor and becoming known;
+their contributor presence, where one already exists, being reconciled to them; and their coming
+to understand their relation to the network and to their communities. Establishing a person's
+identity durably on the network and reconciling them to themselves and their communities is a
+long piece of work and is deliberately not pursued now. What stands in for it is the minimum: an
+agent-written memory entry carries the steward of record of the session that wrote it, read from
+that session's envelope on the device. When the longer path is taken up, that stand-in is the
+first thing it replaces.
+
 Entity: **a memory entry that was said and crosses between one person's devices**
 - Classification: Private (B). It belongs to one person and no peer validates it. It is held today
   as a file in the repository and would be held as a leaf in the authoring device's channel tree,

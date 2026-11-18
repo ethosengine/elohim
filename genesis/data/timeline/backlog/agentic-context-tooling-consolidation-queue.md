@@ -573,18 +573,31 @@ before investing.
     - *project entries that are a person's, so the steward's* (11): the outreach threads
       (`project_*_outreach*`, `project_outreach_threads`, `project_canteen_outreach_thread`).
     - *Broken frontmatter in 22 entries*: an `id:` line at column 0 inside the `metadata:` block,
-      which closes the block before `type:` is read. The same shape in 22 files suggests a tool
-      wrote it, probably the cite id assigner; unconfirmed. Their recorded contributions carry
-      the right type, so nothing is lost today, and a re-import of any of them would be refused
-      for a missing type.
-    **Gap found while wiring the onboarding story (2026-11-18).** Import names a steward only
-    for a steward-of-record entry, where a human stands as its author. An entry an agent writes
-    in a person's session records the agent as author and the collective as steward, so its row
-    falls under "Direction with no steward on record" (11 of the 302 contributions today, 6 of
-    them feedback). The scenario "after import the correction is listed under the second
-    developer's name" passes on a contribution built by hand for that reason. The cure is for an
-    agent-written entry to carry the steward of record of the session that wrote it, which the
-    session covenant already records.
+      which closes the block before `type:` is read. Cause confirmed 2026-11-18: an earlier
+      `epr flow cites assign-id` inserted `id:` after the first `title:` it found, nested or not.
+      It is already fixed (`insert_id` in `epr-cli/src/flow/cites.rs` matches a top-level
+      `title:` only, pinned by `insert_id_never_lands_inside_a_nested_mapping`), so these 22 are
+      residue and it does not recur. Their recorded contributions carry the right type, so
+      nothing is lost today, and a re-import of any of them would be refused for a missing type.
+    **Steward attribution, the minimum (2026-11-18).** Import named a steward only for a
+    steward-of-record entry, where a human stands as its author. An entry an agent writes in a
+    person's session recorded the agent as author and the collective as steward, so its row fell
+    under "Direction with no steward on record" (11 of the 302 contributions, 6 of them
+    feedback). The minimum cure landed with this slice: when the session an entry is attributed
+    to has a steward of record that import can resolve on this device, and that person is an
+    active Steward of the collective, the contribution records them and the index files the row
+    under their name. Earlier contributions are frozen and stay where they are. This is a
+    stand-in. It knows a person only as a session envelope on a device; the fuller onboarding
+    path is noted in the collective-memory seed and is not pursued here.
+    Its limits, as built: it applies to steward-bound entries imported by name, which is the
+    form the memory hook uses when a session writes an entry; a directory import attributes
+    every entry to the importing session and records no session steward. The fact is read from
+    the writing session's envelope under the device key directory, so an entry written on
+    another device, or before envelopes existed, records nothing.
+    **Defect found and left (2026-11-18).** Committing an entry changes the `gitName` its
+    contribution would record, and a later directory import then rewrites that contribution
+    with the importer as author. That is re-authoring by another name, the thing the authorship
+    freeze exists to refuse. Not fixed in this slice.
 31. **Usefulness parity, and entries that carry their outcome** (same survey, T6 and S4). Two
     measures the recall work lacks. First, journeys whose answer needs two memories, neither of
     which states it (the shape of Memorilla's PersonalizationV4), added to the standing reader's

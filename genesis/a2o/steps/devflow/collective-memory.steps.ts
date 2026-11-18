@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict';
-import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import {
   existsSync,
@@ -27,6 +26,7 @@ interface MemoryFixture {
   recall?: ObjectValue;
   gate?: ObjectValue;
   indexText?: string;
+  deviceRoot?: string;
 }
 const fixtures = new WeakMap<object, MemoryFixture>();
 const repository = resolve('../..');
@@ -211,6 +211,7 @@ function setup(world: object, seeded = true): MemoryFixture {
 After(function () {
   const f = fixtures.get(this);
   if (f) rmSync(f.root, { recursive: true, force: true });
+  if (f?.deviceRoot) rmSync(f.deviceRoot, { recursive: true, force: true });
 });
 Given(
   'a declared local collective with an evidenced finding and a contested alternative',
@@ -395,7 +396,8 @@ Then('the report leaves the contested judgment unresolved', function () {
 const memoryDir = '.claude/memory';
 const indexPath = `${memoryDir}/MEMORY.md`;
 const firstSteward = 'human:matthew';
-const secondSteward = 'human:ruth';
+// The newcomer must already be an active Steward of the collective; the copied sidecar names adam.
+const newcomer = 'human:adam';
 const stewardedEntries = ['feedback_ruling', 'user_matthew'];
 const gateProbe = resolve(dirname(new URL(import.meta.url).pathname), 'memory-gate-probe.py');
 
@@ -450,27 +452,6 @@ function gate(f: MemoryFixture, content: string): ObjectValue {
 }
 const correction = (extra: string): string =>
   `---\nname: feedback_newcomer_correction\ntitle: Newcomer correction\ndescription: The newcomer's first correction of a practice.\n${extra}metadata:\n  type: feedback\n---\n\nbody\n`;
-/** The CID `epr` gives a file's raw bytes: CIDv1, raw codec, sha2-256, base32 lower. */
-function rawCid(bytes: Buffer): string {
-  const digest = createHash('sha256').update(bytes).digest();
-  const raw = Buffer.concat([Buffer.from([0x01, 0x55, 0x12, 0x20]), digest]);
-  const alphabet = 'abcdefghijklmnopqrstuvwxyz234567';
-  let bits = 0;
-  let acc = 0;
-  let out = '';
-  for (const byte of raw) {
-    acc = (acc << 8) | byte;
-    bits += 8;
-    while (bits >= 5) {
-      out += alphabet[(acc >>> (bits - 5)) & 31];
-      bits -= 5;
-    }
-    acc &= (1 << bits) - 1;
-  }
-  if (bits > 0) out += alphabet[(acc << (5 - bits)) & 31];
-  return 'b' + out;
-}
-
 Given(
   "a collective whose memory holds a shared finding, the first steward's direction and a note describing the first steward",
   function () {
@@ -560,50 +541,52 @@ Then("after import the correction is listed under the second developer's name", 
   const f = state(this);
   const stem = 'feedback_newcomer_correction';
   const rel = `${memoryDir}/${stem}.md`;
-  // `import` fills the steward slot with the collective's own party; a slot naming a participant
-  // is written directly with its attributed act (as `plant_stewarded` does in the Rust test).
-  const template = contributionOf(f, 'project_shared');
-  const imported = object(template.imported);
-  const bytes = readFileSync(join(f.root, rel));
-  const contribution = {
-    ...template,
-    steward: secondSteward,
-    concern: stem,
-    claim: `The claim of ${stem}.`,
-    uncertainty: [],
-    sources: [{ resource: { path: rel, cid: rawCid(bytes) }, reach: 'repository' }],
-    imported: {
-      ...imported,
-      display: stem,
-      file: `${stem}.md`,
-      scopePath: rel,
-      entryType: 'feedback',
-      appliesTo: 'steward',
-    },
-  };
-  const request = `.eprfs/status/memory/contributions/${stem}.json`;
-  const text = JSON.stringify(contribution, null, 2) + '\n';
-  write(f, request, text);
-  const note = spawnSync(
-    binary,
-    [
-      'flow',
-      'note',
-      '--on',
-      request,
-      '--kind',
-      'observation',
-      '--session',
-      'author',
-      '--reason',
-      `Collective contribution ${rawCid(Buffer.from(text))} under ${object(f.collective).cid}; unreviewed, no acceptance`,
-      '--root',
-      f.root,
-    ],
-    { cwd: f.root, env: f.env, encoding: 'utf8', timeout: 30_000 }
+  // The newcomer's session is known to the device: its envelope names its steward. The device key
+  // file need not exist, but its path must be absolute and outside any repository.
+  const device = join(mkdtempSync(join(tmpdir(), 'collective-memory-device-')), 'device');
+  f.deviceRoot = dirname(device);
+  mkdirSync(join(device, 'sessions'), { recursive: true });
+  writeFileSync(
+    join(device, 'sessions/author.json'),
+    JSON.stringify(
+      {
+        generation: 1,
+        predecessor: null,
+        identity: {
+          runtime: 'declared',
+          session: 'author',
+          ownerPid: null,
+          ownerStartTime: null,
+          source: 'declared',
+        },
+        ownerPidNamespace: null,
+        ownerBootId: null,
+        device: 'did:key:zfixture',
+        steward: newcomer,
+        model: null,
+        repository: join(device, 'sessions'),
+        berthStore: null,
+        openedAt: '2026-11-18T00:00:00Z',
+        closedAt: null,
+        covenantSeal: null,
+        witness: null,
+      },
+      null,
+      2
+    )
   );
-  assert.equal(note.status, 0, `${note.stdout}\n${note.stderr}`);
-  assert.equal(sectionOf(projectIndex(f), `${stem}.md`), directionFrom(secondSteward));
+  f.env.ELOHIM_DEVICE_KEY_FILE = join(device, 'ed25519.seed');
+  // The correction as its writing session left it: named origin and time, steward-bound.
+  write(
+    f,
+    rel,
+    correction('applies-to: steward\n').replace(
+      'type: feedback\n',
+      `type: feedback\n  originSessionId: author\n  modified: ${new Date().toISOString()}\n`
+    )
+  );
+  native(f, 'import', [rel, '--session', 'author']);
+  assert.equal(sectionOf(projectIndex(f), `${stem}.md`), directionFrom(newcomer));
 });
 
 When('an entry declared as applying to the device is imported', function () {

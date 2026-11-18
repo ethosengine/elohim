@@ -278,6 +278,7 @@ fn collect(
 /// Repository entries are the collective's. A steward-bound entry is the direction of
 /// the participant who STANDS for it: first the human a steward-of-record line names (that act
 /// writes the human into `author`, and the line is what says they stand rather than wrote), else
+/// the human a session-steward line names (the steward of the session an agent wrote it in), else
 /// the contribution's `steward` slot — but only when that slot names a participant. Import fills
 /// the slot with the collective's own party (`repo:<owner>/<name>` at the root, the child's
 /// `collective:<id>` below it), and crediting a preference to the repository would tell a second
@@ -295,8 +296,16 @@ fn holder(contribution: &Contribution, provenance: &Imported) -> entries::Holder
                 .uncertainty
                 .iter()
                 .any(|line| line.starts_with(super::import::STEWARD_OF_RECORD));
+            // Second: the human steward of the session an agent wrote the entry in, as import
+            // read it from that session's envelope (a stand-in; see `import::SESSION_STEWARD`).
+            let session_steward = contribution
+                .uncertainty
+                .iter()
+                .find_map(|line| super::import::session_steward_of(line));
             if steward_of_record && has_prefix(&contribution.author, "human:") {
                 entries::Holder::Steward(contribution.author.trim().to_string())
+            } else if let Some(human) = session_steward {
+                entries::Holder::Steward(human.to_string())
             } else if names_a_participant(&contribution.steward) {
                 entries::Holder::Steward(contribution.steward.trim().to_string())
             } else {

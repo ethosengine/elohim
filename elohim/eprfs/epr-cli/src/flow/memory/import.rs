@@ -279,6 +279,9 @@ struct EntryAct {
     as_of: Option<String>,
     /// `Some(origin)` on a steward-of-record act: the entry's origin session, if any.
     steward_origin: Option<Option<String>>,
+    /// The human Steward the WRITING session's envelope names, when an agent wrote the entry and
+    /// that envelope is on this device and names an active Steward (see [`session_steward`]).
+    session_steward: Option<String>,
 }
 
 pub fn run(root: &Path, opts: &Options) -> FlowResult<Value> {
@@ -326,6 +329,14 @@ pub fn run(root: &Path, opts: &Options) -> FlowResult<Value> {
     // writer or instant is refused; an entry whose instant is ambiguous, or whose writer held no
     // claim then, is refused as unattributable. All of it before any request file is written.
     let evidence = super::attribution::Evidence::load(&root)?;
+    // Where this device keeps its session envelopes. Unresolvable is not an error: it means no
+    // envelope can be read here, so no session steward is named (see [`session_steward`]).
+    let sessions_dir: Option<PathBuf> = match opts.sessions_dir {
+        Some(dir) => Some(dir.to_path_buf()),
+        None => crate::device_key::resolve_path()
+            .ok()
+            .and_then(|key| elohim_device_runtime::envelope::Store::sessions_directory(&key).ok()),
+    };
     let paths = match &named {
         Named::Directory(_) => list_entries(&root.join(&dir_rel))?,
         Named::Entries { files, .. } => files.iter().map(|f| root.join(f)).collect(),
@@ -355,6 +366,9 @@ pub fn run(root: &Path, opts: &Options) -> FlowResult<Value> {
                     session: opts.session.map(str::to_string),
                     as_of: None,
                     steward_origin: None,
+                    // The directory form attributes every entry to the IMPORTING session; it never
+                    // resolved which session wrote each one, so it names no writer's steward.
+                    session_steward: None,
                 })
                 .collect()
         }
@@ -368,6 +382,7 @@ pub fn run(root: &Path, opts: &Options) -> FlowResult<Value> {
                     session: opts.session.map(str::to_string),
                     as_of: None,
                     steward_origin: Some(origin),
+                    session_steward: None,
                 })
                 .collect()
         }
@@ -401,11 +416,17 @@ pub fn run(root: &Path, opts: &Options) -> FlowResult<Value> {
                         rel_str(rel)
                     )));
                 }
+                // Only an AGENT author needs a human named beside it; a human author is already
+                // the person whose direction it is.
+                let session_steward = (!author.starts_with("human:"))
+                    .then(|| session_steward(sessions_dir.as_deref(), &session, &governance))
+                    .flatten();
                 resolved.push(EntryAct {
                     author,
                     session: Some(session),
                     as_of: Some(as_of),
                     steward_origin: None,
+                    session_steward,
                 });
             }
             resolved
@@ -589,6 +610,37 @@ fn one(
             })
         }
     };
+    let request_rel =
+        contributions_rel.join(format!("{}.json", file.strip_suffix(".md").unwrap_or(file)));
+    let source_cid = BlobCid::compute_raw(&bytes).to_string();
+    // STAND-IN. Today a developer's standing reaches this record only through a session envelope
+    // on the device that wrote the entry: the human the envelope names as steward of record. The
+    // fuller path — a person becoming known to the network as a contributor, their contributor
+    // presence reconciled to them and to their communities — is not built; it is tracked under
+    // the onboarding story in
+    // genesis/data/timeline/backlog/native-peer-dev-channel-and-collective-memory-seed.md.
+    //
+    // Written only for a steward-bound entry (device and repository rows name no steward, so the
+    // line would be dead weight in their bytes), and only into a contribution being written for
+    // NEW entry bytes. When the request on disk already pins these exact bytes, its own line — or
+    // its absence — is carried over unchanged: an envelope that appeared since must not rewrite a
+    // recorded contribution, and one that has since gone must not strip it.
+    let steward_bound = applies_to.unwrap_or_else(|| AppliesTo::default_for_type(&entry_type))
+        == AppliesTo::Steward;
+    let session_line = match recorded_for(root, &request_rel, &source_cid) {
+        Some(prior) => prior
+            .uncertainty
+            .into_iter()
+            .find(|line| line.starts_with(SESSION_STEWARD)),
+        // The collective bounds each uncertainty line at 300 bytes; a handle long enough to pass
+        // it names no one here rather than failing the whole entry at `contribute`.
+        None if steward_bound => act
+            .session_steward
+            .as_deref()
+            .map(session_steward_line)
+            .filter(|line| line.len() <= 300),
+        None => None,
+    };
     let contribution = Contribution {
         version: 1,
         collective: collective_ref.clone(),
@@ -611,12 +663,15 @@ fn one(
             if let Some(origin) = &act.steward_origin {
                 lines.push(steward_of_record_line(author, origin.clone()));
             }
+            if let Some(line) = session_line {
+                lines.push(line);
+            }
             lines
         },
         sources: vec![Source {
             resource: FileRef {
                 path: rel_str(rel),
-                cid: BlobCid::compute_raw(&bytes).to_string(),
+                cid: source_cid,
             },
             reach: source_reach,
         }],
@@ -635,8 +690,6 @@ fn one(
         }),
     };
 
-    let request_rel =
-        contributions_rel.join(format!("{}.json", file.strip_suffix(".md").unwrap_or(file)));
     let request_text = format!("{}\n", serde_json::to_string_pretty(&contribution)?);
     if !contribution.supersedes.is_empty() {
         *supersession = fold_report(root, &contribution, &request_text);
@@ -1321,6 +1374,82 @@ fn steward_of_record_line(human: &str, origin: Option<String>) -> String {
          writing it, and this record does not say {human} wrote it. Origin session: {}.",
         origin.as_deref().unwrap_or("none recorded")
     )
+}
+
+/// The head of the session-steward line: the human Steward of record of the session an AGENT
+/// wrote the entry in. One spelling, shared with the index, which files the row under them.
+///
+/// It sits in `uncertainty` beside [`STEWARD_OF_RECORD`] rather than in the `steward` slot, which
+/// stays the collective's party, and rather than in a new field: it is what one device's envelope
+/// said about one session, not a claim the record can prove.
+pub(super) const SESSION_STEWARD: &str = "authorship: session-steward";
+
+/// The session-steward line itself. The handle is the first token after the em-dash, which is
+/// where [`session_steward_of`] reads it back.
+fn session_steward_line(human: &str) -> String {
+    format!(
+        "{SESSION_STEWARD} — {human} is steward of record of the session an agent wrote this \
+         entry in; the direction is theirs, and this record does not say {human} wrote it."
+    )
+}
+
+/// The human a session-steward line names, if the line is one and names a `human:` ref.
+pub(super) fn session_steward_of(line: &str) -> Option<&str> {
+    let human = line
+        .strip_prefix(SESSION_STEWARD)?
+        .strip_prefix(" — ")?
+        .split_whitespace()
+        .next()?;
+    human.starts_with("human:").then_some(human)
+}
+
+/// The human Steward the envelope of `session` names, or `None` — never a guess.
+///
+/// Read from this device's session envelopes (`<device key dir>/sessions/<session>.json`, the
+/// record `epr session show` prints), without taking the lifecycle lock or creating anything:
+/// envelopes are written by atomic rename, and an import is a reader of them. `None` whenever the
+/// answer is not known HERE: no such envelope (another device, an old session, a fresh checkout),
+/// an unreadable or mis-keyed one, a steward who is not a `human:` participant, or one who is not
+/// an active Steward of the collective on the affiliations the reader loaded. A fixture Steward is
+/// admitted: the line attributes a direction, it does not stand for fruit the way
+/// `--steward-of-record` does.
+fn session_steward(
+    sessions_dir: Option<&Path>,
+    session: &str,
+    governance: &super::validation::Governance,
+) -> Option<String> {
+    use elohim_device_runtime::envelope::{is_envelope_id, Envelope};
+    let dir = sessions_dir?;
+    if !is_envelope_id(session) {
+        return None;
+    }
+    let path = dir.join(format!("{session}.json"));
+    if path.is_symlink() {
+        return None;
+    }
+    let record: Envelope = serde_json::from_slice(&std::fs::read(&path).ok()?).ok()?;
+    if record.id() != session {
+        return None;
+    }
+    let steward = record.steward.trim();
+    if !steward.starts_with("human:") {
+        return None;
+    }
+    governance
+        .affiliation_of(steward)
+        .filter(|(_, a)| a.is_active_steward())?;
+    Some(steward.to_string())
+}
+
+/// The contribution already on disk at `request_rel` when it pins exactly `source_cid`.
+fn recorded_for(root: &Path, request_rel: &Path, source_cid: &str) -> Option<Contribution> {
+    let text = std::fs::read_to_string(root.join(request_rel)).ok()?;
+    let prior = serde_json::from_str::<Contribution>(&text).ok()?;
+    prior
+        .sources
+        .iter()
+        .any(|s| s.resource.cid == source_cid)
+        .then_some(prior)
 }
 
 /// Why `human` cannot stand as steward of record under `governance`, or `None` when they can:

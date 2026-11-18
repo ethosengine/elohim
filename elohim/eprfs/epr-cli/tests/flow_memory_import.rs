@@ -3124,3 +3124,182 @@ fn a_fold_over_an_uncontributed_entry_itself_or_a_cycle_is_refused() {
         "{refused}"
     );
 }
+
+// ── the steward of the session an agent wrote in (a stand-in) ───────────────────────────────────
+
+/// A session envelope on a fixture device: what `epr session show` prints, steward included.
+fn plant_envelope(sessions: &Path, session: &str, steward: &str) {
+    use elohim_device_runtime::{
+        envelope::Envelope,
+        session::{SessionIdentity, Source},
+    };
+    let record = Envelope {
+        generation: 1,
+        predecessor: None,
+        identity: SessionIdentity {
+            runtime: "declared".into(),
+            session: Some(session.into()),
+            owner_pid: None,
+            owner_start_time: None,
+            source: Source::Declared,
+        },
+        owner_pid_namespace: None,
+        owner_boot_id: None,
+        device: "did:key:zfixture".into(),
+        steward: steward.into(),
+        model: None,
+        repository: sessions.to_path_buf(),
+        berth_store: None,
+        opened_at: "2026-11-18T00:00:00Z".into(),
+        closed_at: None,
+        covenant_seal: None,
+        witness: None,
+        owner_holder: None,
+        release_receipt: None,
+        retirement: None,
+    };
+    std::fs::create_dir_all(sessions).expect("sessions dir");
+    std::fs::write(
+        sessions.join(format!("{session}.json")),
+        serde_json::to_vec_pretty(&record).expect("envelope json"),
+    )
+    .expect("envelope");
+}
+
+/// An entry the orchestrator wrote in WRITER_SESSION, witnessed, imported through the entry form
+/// against `sessions` as this device's envelope directory.
+fn import_written(root: &Path, stem: &str, extra: &str, sessions: &Path) -> serde_json::Value {
+    let file = memory_entry(root, stem, &format!("The claim of {stem}."), None, extra);
+    witness(root, &file, WRITER_SESSION, WITNESSED_AT);
+    memory::execute_with(
+        root,
+        "import",
+        &Options {
+            target: Some(&file),
+            sessions_dir: Some(sessions),
+            ..Options::default()
+        },
+    )
+    .expect("import")
+}
+
+fn session_line(root: &Path, stem: &str) -> Option<String> {
+    contribution_of(root, stem)["uncertainty"]
+        .as_array()
+        .expect("uncertainty")
+        .iter()
+        .filter_map(|v| v.as_str())
+        .find(|line| line.starts_with("authorship: session-steward"))
+        .map(str::to_string)
+}
+
+#[test]
+fn an_agent_entry_from_a_session_with_a_known_steward_is_filed_under_that_human() {
+    let dir = repo();
+    let root = dir.path();
+    let sessions = tempfile::tempdir().expect("sessions");
+    actor::claim_recorded_at(root, ORCHESTRATOR, WRITER_SESSION, "2026-09-25T09:00:00Z")
+        .expect("claim");
+    plant_envelope(sessions.path(), WRITER_SESSION, STANDING_HUMAN);
+    import_written(root, "feedback_correction", "", sessions.path());
+    // Repository and device entries name no steward, so they never carry the line.
+    import_written(
+        root,
+        "feedback_shared_fact",
+        "applies-to: repository\n",
+        sessions.path(),
+    );
+
+    assert_eq!(author_of(root, "feedback_correction"), ORCHESTRATOR);
+    assert_eq!(
+        contribution_of(root, "feedback_correction")["steward"],
+        "repo:ethosengine/elohim",
+        "the steward slot keeps naming the collective"
+    );
+    let line = session_line(root, "feedback_correction").expect("the session-steward line");
+    assert_eq!(
+        line,
+        "authorship: session-steward — human:matthew is steward of record of the session an agent \
+         wrote this entry in; the direction is theirs, and this record does not say human:matthew \
+         wrote it."
+    );
+    assert_eq!(session_line(root, "feedback_shared_fact"), None);
+
+    let (_, index) = project_index(root);
+    assert_eq!(
+        section_of(&index, "feedback_correction.md"),
+        Some("## Direction from human:matthew (theirs, on record)"),
+        "{index}"
+    );
+    assert_eq!(
+        section_of(&index, "feedback_shared_fact.md"),
+        Some("## Held by the collective")
+    );
+}
+
+#[test]
+fn with_no_envelope_or_no_active_steward_nothing_is_recorded() {
+    let dir = repo();
+    let root = dir.path();
+    let sessions = tempfile::tempdir().expect("sessions");
+    actor::claim_recorded_at(root, ORCHESTRATOR, WRITER_SESSION, "2026-09-25T09:00:00Z")
+        .expect("claim");
+    // No envelope for the writing session on this device: another device, an old session.
+    import_written(root, "feedback_elsewhere", "", sessions.path());
+    assert_eq!(session_line(root, "feedback_elsewhere"), None);
+
+    // An envelope naming a human with no Steward affiliation names no one; nor does an agent.
+    for steward in ["human:ruth", "agent:orchestrator@fixture", ""] {
+        plant_envelope(sessions.path(), WRITER_SESSION, steward);
+        let stem = format!("feedback_unaffiliated_{}", steward.len());
+        import_written(root, &stem, "", sessions.path());
+        assert_eq!(session_line(root, &stem), None, "{steward:?} was recorded");
+    }
+
+    let (_, index) = project_index(root);
+    assert_eq!(
+        section_of(&index, "feedback_elsewhere.md"),
+        Some("## Direction with no steward on record")
+    );
+    assert!(!index.contains("human:ruth"), "{index}");
+}
+
+#[test]
+fn a_recorded_contribution_keeps_its_bytes_whether_an_envelope_appears_or_goes() {
+    let dir = repo();
+    let root = dir.path();
+    let none = tempfile::tempdir().expect("no envelopes");
+    let known = tempfile::tempdir().expect("envelopes");
+    plant_envelope(known.path(), WRITER_SESSION, STANDING_HUMAN);
+    actor::claim_recorded_at(root, ORCHESTRATOR, WRITER_SESSION, "2026-09-25T09:00:00Z")
+        .expect("claim");
+    let request = |stem: &str| {
+        std::fs::read(root.join(format!(".eprfs/status/memory/contributions/{stem}.json")))
+            .expect("request")
+    };
+
+    // Recorded with no line; an envelope that appears later must not rewrite it.
+    import_written(root, "feedback_before", "", none.path());
+    let before = request("feedback_before");
+    let events_before = events(root);
+    let again = import_written(root, "feedback_before", "", known.path());
+    assert_eq!(again["counts"]["skipped"], 1, "{again}");
+    assert_eq!(request("feedback_before"), before);
+    assert_eq!(events(root), events_before);
+
+    // Recorded WITH the line; the envelope going away must not strip it.
+    import_written(root, "feedback_after", "", known.path());
+    let after = request("feedback_after");
+    assert!(session_line(root, "feedback_after").is_some());
+    let events_after = events(root);
+    let again = import_written(root, "feedback_after", "", none.path());
+    assert_eq!(again["counts"]["skipped"], 1, "{again}");
+    assert_eq!(request("feedback_after"), after);
+    assert_eq!(events(root), events_after);
+
+    // A directory import by another participant re-authors neither: it carries each recorded
+    // line (or its absence) over, so its candidate differs from the record only in `author`.
+    import(root, ".claude/memory");
+    assert_eq!(request("feedback_before"), before);
+    assert_eq!(request("feedback_after"), after);
+}

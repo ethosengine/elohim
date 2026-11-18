@@ -133,6 +133,10 @@ pub struct Options<'a> {
     /// claim); the
     /// contribution then carries the `authorship: steward-of-record` slot. Refused elsewhere.
     pub steward_of_record: bool,
+    /// The device's session-envelope directory `import` reads a writing session's steward from.
+    /// Absent: the `sessions/` directory beside this device's key. Named explicitly by tests, so a
+    /// fixture envelope never needs the process environment parallel tests share.
+    pub sessions_dir: Option<&'a std::path::Path>,
 }
 
 /// The operations this shell dispatches, in the order `usage` names them.
