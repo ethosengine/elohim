@@ -124,6 +124,21 @@ pub fn live_contract() -> Value {
     serde_json::from_slice(&raw).expect("contract parses")
 }
 
+/// The live embedding-model manifest the semantic measure's `ModelPin` names, read from its
+/// governed home. The gate input audit follows neither a caller's `common::repo_root()` nor a
+/// helper's argument, so the read is declared here, where the path is built; until 2026-11-18
+/// only another crate's test read kept the file in eprfs's key (review of E7).
+#[allow(
+    dead_code,
+    reason = "shared by every integration test binary; each binary uses only some helpers"
+)]
+pub fn live_model_manifest() -> Value {
+    // gate-reads: .epr-meta/elohim/algorithms/embedding-models/all-minilm-l6-v2.json
+    let raw = std::fs::read(repo_root().join(recall::embedder::MODEL_MANIFEST_REL))
+        .expect("live model manifest");
+    serde_json::from_slice(&raw).expect("model manifest parses")
+}
+
 pub fn write(root: &Path, rel: &str, text: &str) {
     let path = root.join(rel);
     std::fs::create_dir_all(path.parent().expect("parent")).expect("mkdir");

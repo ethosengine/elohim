@@ -205,7 +205,7 @@ fn the_chunk_rule_cid_addresses_the_declared_rule() {
 #[test]
 fn the_model_pin_resolves_to_the_model_manifest() {
     let root = common::repo_root();
-    let manifest = read_json(&root, MODEL_REL);
+    let manifest = common::live_model_manifest();
     assert_eq!(manifest["artifact_type"], "model-manifest");
     assert_eq!(manifest["license"], "Apache-2.0");
     assert_eq!(manifest["dims"], 384);
@@ -305,7 +305,7 @@ fn contract_v15_declares_the_native_semantic_provider_and_repins_the_bank() {
 fn the_model_manifest_pins_the_embedding_procedure() {
     use elohim_epr_cli::flow::memory::recall::embedder::PROCEDURE_REL;
     let root = common::repo_root();
-    let manifest = read_json(&root, MODEL_REL);
+    let manifest = common::live_model_manifest();
     let procedure = std::fs::read(root.join(PROCEDURE_REL)).expect("embed.py reads");
     let pinned: cid::Cid = manifest["procedure"]
         .as_str()
