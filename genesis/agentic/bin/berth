@@ -39,17 +39,22 @@ Commands:
                                                                    --to takes the full id or the 8-character
                                                                    prefix every berth line prints; prints
                                                                    `berth say: note #<dseq> at <time> to <who>`
+                                                                   on stderr
   berth inbox   --session S [--peek] [--all] [--follow] [--json]  read notes said to this session
-  berth inbox   --session S --reader R [--limit N] [--peek] [--json] [--follow]
+  berth inbox   --session S --reader R [--limit N] [--peek] [--json]
+  berth inbox   --session S --reader R --follow
+  berth inbox   --session S --reader R --ack OFFSET --claim TOKEN
                                                                    one reader's unread notes ADDRESSED to S
-                                                                   (no household broadcasts, no gate-red@1/
-                                                                   gate-final@1); its own cursor, never the
-                                                                   session's seen offset. The hook reader of
-                                                                   the main agent is `main`; an idle agent's
-                                                                   Monitor: `berth inbox --session S --reader
-                                                                   main --follow` (each line printed before
-                                                                   the cursor passes it; pipe it through no
-                                                                   head/cut)
+                                                                   (no household broadcasts, no well-formed
+                                                                   gate-red@1/gate-final@1 event) on its own
+                                                                   cursor, never the session's seen offset.
+                                                                   A read claims the notes; they are passed
+                                                                   once printed (text, --follow) or once the
+                                                                   caller acks the claim --json returned; an
+                                                                   unacked claim expires and they replay. The
+                                                                   main agent's hook reader is `main`; an idle
+                                                                   agent's Monitor: `berth inbox --session S
+                                                                   --reader main --follow` (no head/cut pipe)
   berth who     RESOURCE                                           json of the holder (or null)
   berth status                                                     moorings · leases · capacity, and the
                                                                    other devices' moorings and steward
@@ -109,9 +114,12 @@ the lock or dir) — the only code a wrapper may proceed past, unleased.
 import contextlib
 import errno
 import fcntl
+import hashlib
 import json
+import math
 import os
 import re
+import secrets
 import shutil
 import subprocess
 import sys
@@ -770,7 +778,13 @@ class Berth:
                 via = tag[4:]
         if not row.get("cid") or not fields.get("session") or "text" not in fields:
             return None
-        note = {"cid": row["cid"], "at": float(fields["at"]), "from_device": via,
+        # `at` is the sender's clock: a missing or non-finite one is 0, never a raise that stalls the scan.
+        try:
+            at = float(fields.get("at", 0))
+        except ValueError:
+            at = 0.0
+        at = at if math.isfinite(at) else 0.0
+        note = {"cid": row["cid"], "at": at, "from_device": via,
                 "session": fields["session"], "to": fields.get("to") or None,
                 "text": fields["text"]}
         # The sender's device record number: `berth say` prints it, so both ends can name one note.
@@ -876,67 +890,160 @@ class Berth:
     # Its cursor is its own offset into the normalized stream and never moves the session's seen
     # offset, so a note one reader was shown still reaches `berth inbox`. Reader delivery is the
     # wake path: notes ADDRESSED to the session only (a household broadcast wakes no one), and
-    # never the gate-live machine notes, which gate-live-inject and `gate-live.mjs follow` own.
-    def _inbox_reader_path(self, session, reader):
-        return os.path.join(self._inbox_dir(), "readers", f"{_safe(session)}--{_safe(reader)}.json")
+    # never a well-formed gate-live event, which gate-live-inject and `gate-live.mjs follow` own.
+    #
+    # Delivery is select, print, then acknowledge. A claim leases the selected notes to one
+    # consumer of this reader until it acknowledges them (or the lease expires and they replay),
+    # so the hook and a `--follow` Monitor of the same reader never both print one note, and a
+    # consumer that dies before acknowledging loses nothing.
+    READER_LEASE_S = 5.0
 
-    def reader_entries(self, session, reader, limit=None):
-        """([(note, offset_after)], scan_end): unread addressed notes for this reader, oldest first,
-        at most `limit`. Reading starts past both this reader's cursor and the session's seen
-        offset, so a note the session already read with `berth inbox` is not news. Moves nothing."""
+    def _inbox_reader_path(self, session, reader):
+        """One file per (session, reader): a hash of both joined by NUL, so no two pairs share it."""
+        key = hashlib.sha256(f"{session}\0{reader}".encode()).hexdigest()[:40]
+        return os.path.join(self._inbox_dir(), "readers", f"{key}.json")
+
+    def _reader_state(self, session, reader):
+        state = self._read_json(self._inbox_reader_path(session, reader), {})
+        if not isinstance(state, dict):
+            state = {}
+        offset = state.get("offset")
+        offset = offset if isinstance(offset, int) and not isinstance(offset, bool) and offset >= 0 else 0
+        pending = state.get("pending")
+        if not (isinstance(pending, dict) and isinstance(pending.get("token"), str)
+                and isinstance(pending.get("end"), int) and isinstance(pending.get("expires"), (int, float))):
+            pending = None
+        return offset, pending
+
+    def _reader_select(self, session, reader, limit):
+        """([(note, offset_after)], end, more) for this reader, oldest first, at most `limit`
+        (the inbox lock is held). Reading starts past both this reader's cursor and the session's
+        seen offset, so a note the session already read with `berth inbox` is not news. `end` is
+        where the cursor stands once every returned note is acknowledged; `more` says a further
+        addressed note waits past it. A line that cannot be read is passed, never a stall."""
+        offset, _ = self._reader_state(session, reader)
+        seen = self._read_json(self._inbox_seen_path(session), {}).get("offset", 0)
+        start = max(offset, seen if isinstance(seen, int) and seen >= 0 else 0)
+        entries, end, more = [], start, False
+        try:
+            with open(self._inbox_notes_path(), encoding="utf-8") as f:
+                f.seek(start)
+                while True:
+                    line = f.readline()
+                    if not line:
+                        break
+                    try:
+                        note = json.loads(line)
+                        wanted = (isinstance(note, dict) and note.get("session") != session
+                                  and _addressed_to(note.get("to"), session)
+                                  and not _gate_live_note(note.get("text")))
+                    except Exception:  # noqa: BLE001 — one unreadable line is passed, not fatal
+                        wanted = False
+                    if wanted and limit is not None and len(entries) >= limit:
+                        more = True
+                        break
+                    end = f.tell()
+                    if wanted:
+                        entries.append((note, end))
+        except FileNotFoundError:
+            pass
+        return entries, end, more
+
+    def reader_claim(self, session, reader, limit=None, lease_s=None):
+        """(entries, token, end, more, busy): select this reader's unread notes and lease them until
+        `reader_ack`. While another consumer's lease on this reader is live the claim is `busy` and
+        empty; an expired lease is taken over, so its notes replay rather than vanish. With nothing
+        to deliver, the cursor passes the lines read at once."""
         with self._locked("inbox"):
             os.makedirs(os.path.join(self._inbox_dir(), "readers"), exist_ok=True)
             self._scan_inbox()
-            start = max(self._read_json(self._inbox_reader_path(session, reader), {}).get("offset", 0),
-                        self._read_json(self._inbox_seen_path(session), {}).get("offset", 0))
-            entries, end = [], start
-            try:
-                with open(self._inbox_notes_path(), encoding="utf-8") as f:
-                    f.seek(start)
-                    while limit is None or len(entries) < limit:
-                        line = f.readline()
-                        if not line:
-                            break
-                        end = f.tell()
-                        note = json.loads(line)
-                        if (note.get("session") != session and _addressed_to(note.get("to"), session)
-                                and not _gate_live_note(note.get("text"))):
-                            entries.append((note, end))
-            except FileNotFoundError:
-                pass
-            return entries, end
+            offset, pending = self._reader_state(session, reader)
+            now = self.now()
+            if pending and pending["expires"] > now:
+                return [], None, None, False, True
+            entries, end, more = self._reader_select(session, reader, limit)
+            path = self._inbox_reader_path(session, reader)
+            if not entries:
+                if end > offset or pending:
+                    write_json_atomic(path, {"offset": max(offset, end)})
+                return [], None, max(offset, end), False, False
+            token = secrets.token_hex(12)
+            if lease_s is None:
+                try:
+                    lease_s = float(os.environ.get("BERTH_READER_LEASE_S") or self.READER_LEASE_S)
+                except ValueError:
+                    lease_s = self.READER_LEASE_S
+            lease = lease_s if math.isfinite(lease_s) and lease_s > 0 else self.READER_LEASE_S
+            write_json_atomic(path, {"offset": offset,
+                                     "pending": {"token": token, "end": end, "expires": now + lease}})
+            return entries, token, end, more, False
 
-    def advance_reader(self, session, reader, offset):
-        """Move this reader's cursor forward to `offset`; never back."""
+    def reader_ack(self, session, reader, token, offset):
+        """The consumer holding `token` has delivered every note before `offset`: the cursor moves
+        there (never past the lease's end, never back), and the lease ends when it reaches the end.
+        False when the token no longer holds this reader's lease."""
+        with self._locked("inbox"):
+            current, pending = self._reader_state(session, reader)
+            if not pending or pending["token"] != token:
+                return False
+            moved = max(current, min(int(offset), pending["end"]))
+            state = {"offset": moved}
+            if moved < pending["end"]:
+                state["pending"] = pending
+            write_json_atomic(self._inbox_reader_path(session, reader), state)
+            return True
+
+    def reader_release(self, session, reader, token):
+        """Give back a lease without acknowledging the rest: those notes go to the next claim."""
+        with self._locked("inbox"):
+            current, pending = self._reader_state(session, reader)
+            if pending and pending["token"] == token:
+                write_json_atomic(self._inbox_reader_path(session, reader), {"offset": current})
+
+    def reader_peek(self, session, reader, limit=None):
+        """(notes, more) this reader would be shown next; claims and moves nothing."""
         with self._locked("inbox"):
             os.makedirs(os.path.join(self._inbox_dir(), "readers"), exist_ok=True)
-            path = self._inbox_reader_path(session, reader)
-            if offset > self._read_json(path, {}).get("offset", 0):
-                write_json_atomic(path, {"offset": offset})
+            self._scan_inbox()
+            entries, _, more = self._reader_select(session, reader, limit)
+            return [note for note, _ in entries], more
 
     def reader_inbox(self, session, reader, limit=None, mark=True):
-        """The notes `reader_entries` names; with `mark`, this reader has now been shown them. When
-        `limit` cut the read short, the cursor stops at the last note returned, so the rest come
-        next time. Fail-open, like `inbox`."""
+        """The notes this reader would be shown, acknowledged at once with `mark`. Fail-open."""
         try:
-            entries, end = self.reader_entries(session, reader, limit=limit)
-            if mark:
-                self.advance_reader(session, reader, end)
+            if not mark:
+                return self.reader_peek(session, reader, limit)[0]
+            entries, token, end, _, _ = self.reader_claim(session, reader, limit=limit)
+            if token:
+                self.reader_ack(session, reader, token, end)
             return [note for note, _ in entries]
         except Exception:
             return []
 
     @staticmethod
     def _note_line(note, session, now):
+        """The one rendering of a note for every reader: `berth inbox`, `--follow` and the
+        berth-note hook. Provenance prints only when it is id-shaped: an absent device is this
+        device, a malformed one `unknown device`, never a guess; the text is one bounded quoted line."""
         device = note.get("from_device")
-        short = (device.split(":")[-1][:10] + "…") if device else "this device"
-        sender = str(note.get("session") or "?")
+        if device is None:
+            short = "this device"
+        elif (isinstance(device, str) and device.startswith("did:key:") and NOTE_ID.fullmatch(device)
+              and device.split(":")[-1]):
+            short = device.split(":")[-1][:10] + "…"
+        else:
+            short = "unknown device"
+        sender = note.get("session")
+        sender = sender[:8] if isinstance(sender, str) and NOTE_ID.fullmatch(sender) else "unknown sender"
         text = _one_line(note.get("text"))
         if len(text) > 600:
             text = text[:599] + "…"
+        at = note.get("at")
+        when = (f"{_age(now - at)} ago" if isinstance(at, (int, float)) and not isinstance(at, bool)
+                and math.isfinite(at) and math.isfinite(now) else "at an unknown time")
         direct = " to you" if _addressed_to(note.get("to"), session) else ""
         # Another device's words are data for the reader, never instructions to it.
-        return (f"NOTE from {short}/{sender[:8]} {_age(now - note.get('at', now))} ago{direct} "
+        return (f"NOTE from {short}/{sender} {when}{direct} "
                 f"(untrusted text from another device): «{text}»")
 
     @staticmethod
@@ -2005,18 +2112,65 @@ def _addressed_to(to, session):
     return to == session or (len(to) >= NOTE_PREFIX_MIN and session.startswith(to))
 
 
+# The only shape a sender, device or reader id may take to be printed.
+NOTE_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}")
 GATE_LIVE_NOTE_KINDS = ("gate-red@1", "gate-final@1")
+# gate-live.mjs idOr(): the only shape a string field of a gate event takes.
+GATE_ID = re.compile(r"[A-Za-z0-9._:@/+-]{1,200}")
+GATE_NOTE_MAX = 16384
+_RED_FIELDS = {"kind", "run", "device", "ref", "gate", "class", "fingerprint", "step", "ordinal", "atS",
+               "continuing"}
+_FINAL_FIELDS = {"kind", "run", "device", "ref", "verdict", "failures", "reds", "reused", "ran", "wallS",
+                 "redsOmitted", "ranOmitted", "reusedOmitted"}
+_RED_FACTS = {"gate", "class", "fingerprint", "step"}
+
+
+def _gate_id(value):
+    return value is None or (isinstance(value, str) and bool(GATE_ID.fullmatch(value)))
+
+
+def _gate_n(value, optional=True):
+    if value is None:
+        return optional
+    return isinstance(value, int) and not isinstance(value, bool) and 0 <= value < 10 ** 9
 
 
 def _gate_live_note(text):
-    """True for a gate-live machine note (a JSON body of kind gate-red@1 or gate-final@1)."""
-    if not isinstance(text, str) or not text.lstrip().startswith("{"):
+    """True only for a WELL-FORMED gate-live event (gate-live.mjs emitRed/finalBody): its own
+    fields and nothing else, every string id-shaped, every count a bounded integer. Such a body
+    carries no prose, and gate-live-inject renders all of it. Anything else that merely declares
+    the kind (a message in an extra field, prose after the JSON, a body too deep or too big to
+    parse) is an ordinary note, so no addressed prose can hide behind a gate kind."""
+    if not isinstance(text, str) or len(text) > GATE_NOTE_MAX or not text.lstrip().startswith("{"):
         return False
     try:
         body = json.loads(text)
-    except ValueError:
+    except Exception:  # noqa: BLE001 — ValueError, and RecursionError on deep nesting
         return False
-    return isinstance(body, dict) and body.get("kind") in GATE_LIVE_NOTE_KINDS
+    if not isinstance(body, dict):
+        return False
+    kind = body.get("kind")
+    common = (isinstance(body.get("run"), str) and _gate_id(body.get("run"))
+              and _gate_id(body.get("device")) and _gate_id(body.get("ref")))
+    if kind == "gate-red@1":
+        cont = body.get("continuing")
+        return (set(body) <= _RED_FIELDS and common
+                and all(_gate_id(body.get(k)) for k in _RED_FACTS)
+                and _gate_n(body.get("ordinal"), optional=False) and _gate_n(body.get("atS"))
+                and (cont is None or (isinstance(cont, dict) and set(cont) <= {"remaining", "total_s"}
+                                      and _gate_n(cont.get("remaining")) and _gate_n(cont.get("total_s")))))
+    if kind == "gate-final@1":
+        reds = body.get("reds", [])
+        names = [body.get("reused", []), body.get("ran", [])]
+        return (set(body) <= _FINAL_FIELDS and common and _gate_id(body.get("verdict"))
+                and _gate_n(body.get("failures")) and _gate_n(body.get("wallS"))
+                and all(_gate_n(body.get(k)) for k in ("redsOmitted", "ranOmitted", "reusedOmitted"))
+                and isinstance(reds, list) and all(isinstance(r, dict) and set(r) <= _RED_FACTS
+                                                   and all(_gate_id(r.get(k)) for k in _RED_FACTS)
+                                                   for r in reds)
+                and all(isinstance(n, list) and all(isinstance(x, str) and _gate_id(x) for x in n)
+                        for n in names))
+    return False
 
 
 def _one_line(text):
@@ -2025,6 +2179,15 @@ def _one_line(text):
     guillemets that quote it replaced so the text cannot close its own quotation."""
     text = "".join(c for c in str(text or "") if c.isspace() or unicodedata.category(c) not in ("Cc", "Cf"))
     return " ".join(text.split()).replace("«", "‹").replace("»", "›")
+
+
+def _reader_view(b, note, session):
+    """What a reader's JSON carries for one note: its id and the one rendered line, never the raw
+    text, so the output stays bounded whatever the sender wrote."""
+    dseq = note.get("dseq")
+    return {"cid": str(note.get("cid") or "")[:128],
+            "dseq": dseq if isinstance(dseq, int) and not isinstance(dseq, bool) else None,
+            "line": b._note_line(note, session, b.now())}
 
 
 def _age(secs):
@@ -2432,37 +2595,91 @@ def _main(argv):
         include_seen = "--all" in argv
         follow = "--follow" in argv
         as_json = "--json" in argv
-        reader = _opt(argv, "--reader")
-        limit = _opt(argv, "--limit")
-        try:
-            limit = int(limit) if limit is not None else None
-        except ValueError:
-            limit = 0
-        if reader is not None and (not reader.strip() or reader.startswith("--") or include_seen
-                                   or (limit is not None and limit < 1)):
-            print("usage: berth inbox --session S --reader R [--limit N] [--peek] [--json] [--follow] "
-                  "(--all reads the session's notes; a reader reads only its unread addressed notes)",
-                  file=sys.stderr)
+        valued = {}
+        for flag in ("--reader", "--limit", "--ack", "--claim"):
+            value = _opt(argv, flag)
+            # _opt leaves a flag that has no value in argv; a value that is itself a flag is no value.
+            if flag in argv or (value is not None and (not value.strip() or value.startswith("--"))):
+                valued[flag] = False
+            elif value is not None:
+                valued[flag] = value
+        reader, limit, ack, claim = (valued.get(f) for f in ("--reader", "--limit", "--ack", "--claim"))
+        reader_usage = ("usage: berth inbox --session S --reader R [--limit N] [--peek] [--json]\n"
+                        "       berth inbox --session S --reader R --follow\n"
+                        "       berth inbox --session S --reader R --ack OFFSET --claim TOKEN")
+
+        def refuse(why):
+            print(f"berth inbox: {why}\n{reader_usage}", file=sys.stderr)
             return 2
+
+        # Every reader option is checked before any mode runs: a malformed reader call must never
+        # fall through to the plain inbox and mark the session's notes seen.
+        missing = [flag for flag, value in valued.items() if value is False]
+        if missing:
+            return refuse(f"{', '.join(missing)} needs a value")
+        if reader is None and valued:
+            return refuse(f"{', '.join(valued)} needs --reader")
+        if reader is not None:
+            if not NOTE_ID.fullmatch(reader):
+                return refuse("a reader is an id: letters, digits and . _ : -")
+            if include_seen:
+                return refuse("--all reads the session's notes; a reader reads only its unread ones")
+            if limit is not None:
+                if not limit.isdigit() or int(limit) < 1:
+                    return refuse("--limit is a whole number of notes, at least 1")
+                limit = int(limit)
+            if follow and (peek or as_json or limit is not None or ack is not None or claim is not None):
+                return refuse("--follow prints every note as text and takes no --peek, --json, --limit or --ack")
+            if (ack is None) != (claim is None):
+                return refuse("--ack and --claim come together")
+            if ack is not None:
+                if peek or as_json or limit is not None:
+                    return refuse("--ack takes no --peek, --json or --limit")
+                if not ack.isdigit():
+                    return refuse("--ack is the offset a claim returned")
+                # 0 = acknowledged; 3 = the claim no longer holds this reader (expired, taken over).
+                return 0 if b.reader_ack(session, reader, claim, int(ack)) else 3
         if reader is not None and follow:
-            # The Monitor form: one line per note, printed and flushed BEFORE this reader's cursor
-            # passes it, so a closed pipe costs no note it did not print. Nothing else is moved.
+            # The Monitor form: claim, print and flush each note, THEN acknowledge it, so a closed
+            # pipe costs no note it did not print and a hook of the same reader never prints it too.
             while True:
-                entries, end = b.reader_entries(session, reader)
+                entries, token, end, _, _ = b.reader_claim(session, reader, lease_s=30.0)
                 for note, offset in entries:
                     try:
                         print(b._note_line(note, session, b.now()), flush=True)
                     except (BrokenPipeError, OSError):
+                        b.reader_release(session, reader, token)
                         return 0
-                    b.advance_reader(session, reader, offset)
-                b.advance_reader(session, reader, end)
+                    b.reader_ack(session, reader, token, offset)
+                if token:
+                    b.reader_ack(session, reader, token, end)
                 b.sleep(2)
-        if reader is not None:
-            notes = b.reader_inbox(session, reader, limit=limit, mark=not peek)
+        if reader is not None and peek:
+            notes, more = b.reader_peek(session, reader, limit=limit)
             if as_json:
-                print(json.dumps(notes, sort_keys=True))
+                print(json.dumps({"notes": [_reader_view(b, n, session) for n in notes], "more": more,
+                                  "claim": None, "ack": None, "busy": False}, sort_keys=True))
             elif notes:
                 print("\n".join(b._note_line(note, session, b.now()) for note in notes))
+            return 0
+        if reader is not None and as_json:
+            # The hook form: the claim is acknowledged by the caller (--ack) once it has delivered.
+            entries, token, end, more, busy = b.reader_claim(session, reader, limit=limit)
+            print(json.dumps({"notes": [_reader_view(b, n, session) for n, _ in entries], "more": more,
+                              "claim": token, "ack": end if token else None, "busy": busy},
+                             sort_keys=True), flush=True)
+            return 0
+        if reader is not None:
+            entries, token, end, _, _ = b.reader_claim(session, reader, limit=limit)
+            for note, offset in entries:
+                try:
+                    print(b._note_line(note, session, b.now()), flush=True)
+                except (BrokenPipeError, OSError):
+                    b.reader_release(session, reader, token)
+                    return 0
+                b.reader_ack(session, reader, token, offset)
+            if token:
+                b.reader_ack(session, reader, token, end)
             return 0
         if follow:
             while True:
@@ -2577,8 +2794,10 @@ def _main(argv):
         # The sender sees what left: the recipient, and the note's id (this device's record number,
         # which the recipient's `inbox --json` carries as `dseq`). Delivery is not read receipt: the
         # note reaches an agent at its next tool call, its Monitor, or its next `berth inbox`.
+        # On stderr: `gate-live.mjs subscribe` forwards berth's stdout ahead of its own JSON line.
         print(f"berth say: note #{row.get('dseq')} at {_rfc3339(row['at'] * 1000)} to "
-              f"{to if to else 'the household (every session moored before it; no --to)'}")
+              f"{to if to else 'the household (every session moored before it; no --to)'}",
+              file=sys.stderr)
         return 0
     print(__doc__.split("Commands:")[1].split("Resources")[0])
     return 2

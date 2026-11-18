@@ -1282,6 +1282,16 @@ class BerthInboxTest(unittest.TestCase):
             rc = main(["berth", *args])
         return rc, out.getvalue(), err.getvalue()
 
+    def claim(self, reader="main", limit=None):
+        rc, out, err = self.run_main("inbox", "--session", self.SESSION, "--reader", reader, "--json",
+                                     *(["--limit", str(limit)] if limit else []))
+        self.assertEqual(rc, 0, err)
+        return json.loads(out)
+
+    def ack(self, reply, reader="main"):
+        return self.run_main("inbox", "--session", self.SESSION, "--reader", reader,
+                             "--ack", str(reply["ack"]), "--claim", reply["claim"])[0]
+
     def test_a_reader_is_shown_each_addressed_note_once_and_the_session_still_reads_it(self):
         self.append(self.folded("r-1", 1001, to=self.SESSION, text="first"))
         self.assertEqual([n["cid"] for n in self.berth.reader_inbox(self.SESSION, "main")], ["r-1"])
@@ -1297,9 +1307,14 @@ class BerthInboxTest(unittest.TestCase):
         self.append(self.folded("read-2", 1002, to=self.SESSION))
         self.assertEqual([n["cid"] for n in self.berth.reader_inbox(self.SESSION, "main")], ["read-2"])
 
-    def test_a_reader_gets_no_broadcasts_no_gate_live_notes_and_no_one_elses(self):
-        red = json.dumps({"kind": "gate-red@1", "gate": "storage"})
-        final = json.dumps({"kind": "gate-final@1", "verdict": "failed"})
+    def test_a_reader_gets_no_broadcasts_no_gate_live_events_and_no_one_elses(self):
+        red = json.dumps({"kind": "gate-red@1", "run": "r-abc", "device": DEVICE_A, "ref": "refs/heads/dev",
+                          "gate": "storage", "class": "test", "fingerprint": None, "step": "test",
+                          "ordinal": 1, "atS": 40, "continuing": {"remaining": 2, "total_s": 300}})
+        final = json.dumps({"kind": "gate-final@1", "run": "r-abc", "device": DEVICE_A, "ref": None,
+                            "verdict": "failed", "failures": 1, "wallS": 90, "ran": ["storage"],
+                            "reused": [], "reds": [{"gate": "storage", "class": "test", "fingerprint": None,
+                                                    "step": "test"}]})
         other = json.dumps({"kind": "plan@1", "step": 2})
         self.append(self.folded("house", 1001, text="household"),
                     self.folded("red", 1001, to=self.SESSION, text=red),
@@ -1309,34 +1324,137 @@ class BerthInboxTest(unittest.TestCase):
                     self.folded("own", 1001, sender=self.SESSION, to=self.SESSION, via=None))
         self.assertEqual([n["cid"] for n in self.berth.reader_inbox(self.SESSION, "main")], ["json"])
 
-    def test_a_limited_read_leaves_the_rest_for_next_time(self):
-        self.append(*(self.folded(f"n-{i}", 1001 + i, to=self.SESSION) for i in range(7)))
-        self.assertEqual([n["cid"] for n in self.berth.reader_inbox(self.SESSION, "main", limit=5)],
-                         [f"n-{i}" for i in range(5)])
-        self.assertEqual([n["cid"] for n in self.berth.reader_inbox(self.SESSION, "main", limit=5)],
-                         ["n-5", "n-6"])
-        self.assertEqual(self.berth.reader_inbox(self.SESSION, "main", limit=5), [])
+    def test_prose_wearing_a_gate_kind_is_an_ordinary_note(self):
+        # Only a well-formed gate event is left to gate-live: a message riding in an extra field,
+        # a prose string where an id belongs, or prose after the JSON is shown to the reader.
+        hidden = [
+            {"kind": "gate-red@1", "run": "r", "ordinal": 1, "note": "the lane is yours"},
+            {"kind": "gate-red@1", "run": "r", "ordinal": 1, "gate": "please read this now"},
+            {"kind": "gate-final@1", "run": "r", "verdict": "failed", "reds": [{"gate": "x", "why": "prose"}]},
+            {"kind": "gate-final@1", "run": "r", "verdict": "failed", "ran": ["a b"]},
+            {"kind": "gate-red@1", "ordinal": 1},
+        ]
+        texts = [json.dumps(body) for body in hidden] + [json.dumps({"kind": "gate-red@1", "run": "r", "ordinal": 1})
+                                                         + " and also: the lane is yours"]
+        self.append(*(self.folded(f"p-{i}", 1001, to=self.SESSION, text=t) for i, t in enumerate(texts)))
+        self.assertEqual(len(self.berth.reader_inbox(self.SESSION, "main")), len(texts))
 
-    def test_reader_json_carries_the_senders_record_number(self):
-        self.append(self.folded("d-1", 1001, to=self.SESSION))
-        rc, out, err = self.run_main("inbox", "--session", self.SESSION, "--reader", "main", "--json")
-        self.assertEqual(rc, 0, err)
-        self.assertEqual([(n["cid"], n["dseq"]) for n in json.loads(out)], [("d-1", 1)])
-        rc, out, _ = self.run_main("inbox", "--session", self.SESSION, "--reader", "main", "--json")
-        self.assertEqual(json.loads(out), [])
+    def test_a_deeply_nested_body_is_ordinary_text_and_does_not_stall_the_reader(self):
+        # Deep enough to exhaust the JSON decoder's recursion (RecursionError, not ValueError).
+        nested = '{"kind": "gate-red@1", "x": ' + "[" * 30000 + "]" * 30000 + "}"
+        deep = "{" + "[" * 30000 + "]" * 30000 + "}"
+        with self.assertRaises(RecursionError):
+            json.loads(nested)
+        # The classifier parses nothing over its size bound, and catches the error under it too.
+        with mock.patch.dict(_NS["_gate_live_note"].__globals__, {"GATE_NOTE_MAX": 10 ** 6}):
+            self.assertFalse(_NS["_gate_live_note"](nested))
+        self.assertFalse(_NS["_gate_live_note"](nested))
+        self.append(self.folded("deep-1", 1001, to=self.SESSION, text=nested),
+                    self.folded("deep-2", 1002, to=self.SESSION, text=deep),
+                    self.folded("after", 1003, to=self.SESSION, text="after"))
+        self.assertEqual([n["cid"] for n in self.berth.reader_inbox(self.SESSION, "main")],
+                         ["deep-1", "deep-2", "after"])
+        self.assertEqual(self.berth.reader_inbox(self.SESSION, "main"), [])
+
+    def test_a_non_finite_or_missing_time_renders_and_never_raises(self):
+        for i, at in enumerate(("inf", "-inf", "nan", "not-a-time")):
+            self.append(self.folded(f"t-{i}", at, to=self.SESSION, text=f"t{i}"))
+        notes = self.berth.reader_inbox(self.SESSION, "main")
+        self.assertEqual(len(notes), 4)
+        for note in notes:
+            self.assertEqual(note["at"], 0.0)
+            self.assertIn("«t", self.berth._note_line(note, self.SESSION, 1002))
+        line = self.berth._note_line({"at": float("inf"), "text": "x", "session": self.SENDER}, self.SESSION, 1002)
+        self.assertIn(" at an unknown time ", line)
+
+    def test_a_limited_read_leaves_the_rest_and_says_so_only_when_more_exist(self):
+        self.append(*(self.folded(f"n-{i}", 1001 + i, to=self.SESSION) for i in range(7)))
+        first = self.claim(limit=5)
+        self.assertEqual([n["cid"] for n in first["notes"]], [f"n-{i}" for i in range(5)])
+        self.assertTrue(first["more"])
+        self.assertEqual(self.ack(first), 0)
+        second = self.claim(limit=5)
+        self.assertEqual([n["cid"] for n in second["notes"]], ["n-5", "n-6"])
+        self.assertFalse(second["more"])
+        self.assertEqual(self.ack(second), 0)
+        self.assertEqual(self.claim(limit=5)["notes"], [])
+
+    def test_exactly_the_limit_is_not_more(self):
+        self.append(*(self.folded(f"e-{i}", 1001 + i, to=self.SESSION) for i in range(5)))
+        self.append(self.folded("house", 1010, text="household"))  # not addressed: not "more"
+        reply = self.claim(limit=5)
+        self.assertEqual(len(reply["notes"]), 5)
+        self.assertFalse(reply["more"])
+
+    def test_an_unacknowledged_claim_loses_nothing_and_replays_after_its_lease(self):
+        self.append(self.folded("u-1", 1001, to=self.SESSION, text="one"))
+        reply = self.claim()
+        self.assertEqual([n["cid"] for n in reply["notes"]], ["u-1"])
+        # The consumer died before acknowledging. While the lease is live the reader is busy...
+        busy = self.claim()
+        self.assertEqual((busy["notes"], busy["busy"]), ([], True))
+        # ...and once it expires the note replays to the next claim.
+        self.clock[0] += self.berth.READER_LEASE_S + 1
+        again = self.claim()
+        self.assertEqual([n["cid"] for n in again["notes"]], ["u-1"])
+        self.assertEqual(self.ack(reply), 3, "the expired claim no longer holds the reader")
+        self.assertEqual(self.ack(again), 0)
+        self.assertEqual(self.claim()["notes"], [])
+
+    def test_the_hook_and_follow_of_one_reader_never_both_print_a_note(self):
+        self.append(self.folded("s-1", 1001, to=self.SESSION, text="once"))
+        hook = self.claim()
+        self.assertEqual(len(hook["notes"]), 1)
+        out = io.StringIO()
+
+        def stop(_s):
+            raise KeyboardInterrupt
+
+        self.berth.sleep = stop
+        main = _NS["main"]
+        with mock.patch.dict(main.__globals__, {"Berth": lambda: self.berth}), \
+                contextlib.redirect_stdout(out), self.assertRaises(KeyboardInterrupt):
+            main(["berth", "inbox", "--session", self.SESSION, "--reader", "main", "--follow"])
+        self.assertEqual(out.getvalue(), "", "the hook's live claim keeps follow off the note")
+        self.assertEqual(self.ack(hook), 0)
+
+    def test_reader_json_carries_the_id_and_the_rendered_line_never_the_raw_text(self):
+        self.append(self.folded("d-1", 1001, to=self.SESSION, text="x" * 5000))
+        reply = self.claim()
+        [note] = reply["notes"]
+        self.assertEqual((note["cid"], note["dseq"]), ("d-1", 1))
+        self.assertNotIn("text", note)
+        self.assertTrue(note["line"].startswith("NOTE from "))
+        self.assertLess(len(json.dumps(reply)), 1200)
 
     def test_reader_peek_moves_nothing(self):
         self.append(self.folded("p-1", 1001, to=self.SESSION))
         for _ in range(2):
             rc, out, _ = self.run_main("inbox", "--session", self.SESSION, "--reader", "main", "--peek", "--json")
-            self.assertEqual([n["cid"] for n in json.loads(out)], ["p-1"])
+            reply = json.loads(out)
+            self.assertEqual(([n["cid"] for n in reply["notes"]], reply["claim"]), (["p-1"], None))
 
-    def test_reader_usage_is_refused(self):
-        for args in (["--reader", "main", "--all"], ["--reader", "main", "--limit", "0"],
-                     ["--reader", "main", "--limit", "x"], ["--reader", "--json"]):
+    def test_reader_files_cannot_collide(self):
+        pairs = [("a:b", "c"), ("a_b", "c"), ("a--b", "c"), ("a", "b--c"), ("a", "main"), ("a", "")]
+        paths = {self.berth._inbox_reader_path(s, r) for s, r in pairs}
+        self.assertEqual(len(paths), len(pairs))
+
+    def test_reader_usage_is_refused_before_any_mode_runs(self):
+        self.append(self.folded("guard", 1001, to=self.SESSION))
+        for args in (["--reader"], ["--json", "--reader"], ["--reader", "--json"], ["--reader", ""],
+                     ["--reader", "../x"], ["--reader", "main", "--all"], ["--reader", "main", "--limit", "0"],
+                     ["--reader", "main", "--limit", "x"], ["--reader", "main", "--limit"],
+                     ["--reader", "main", "--follow", "--json"], ["--reader", "main", "--follow", "--peek"],
+                     ["--reader", "main", "--follow", "--limit", "2"],
+                     ["--reader", "main", "--ack", "4"], ["--reader", "main", "--claim", "ab"],
+                     ["--reader", "main", "--ack", "x", "--claim", "ab"],
+                     ["--reader", "main", "--ack", "4", "--claim", "ab", "--json"],
+                     ["--limit", "2"], ["--ack", "1", "--claim", "ab"]):
             with self.subTest(args=args):
-                rc, _, err = self.run_main("inbox", "--session", self.SESSION, *args)
-                self.assertEqual(rc, 2, err)
+                rc, out, err = self.run_main("inbox", "--session", self.SESSION, *args)
+                self.assertEqual((rc, out), (2, ""), err)
+        # None of them fell through to the plain inbox and marked the note seen.
+        self.assertEqual([n["cid"] for n in self.berth.inbox(self.SESSION, mark=False)], ["guard"])
 
     def test_follow_with_a_reader_prints_each_note_before_passing_it(self):
         self.append(self.folded("f-1", 1001, to=self.SESSION, text="one"),
@@ -1357,7 +1475,7 @@ class BerthInboxTest(unittest.TestCase):
             rc = main(["berth", "inbox", "--session", self.SESSION, "--reader", "mon", "--follow"])
         self.assertEqual(rc, 0)
         self.assertIn("«one»", printed[0])
-        # The pipe closed before "two" was printed: the cursor stopped after "one".
+        # The pipe closed before "two" was printed: its lease was given back, "two" is next.
         self.assertEqual([n["cid"] for n in self.berth.reader_inbox(self.SESSION, "mon")], ["f-2"])
 
     def test_follow_with_a_reader_keeps_following(self):
@@ -1395,6 +1513,34 @@ class BerthInboxTest(unittest.TestCase):
         self.assertEqual(quoted.count("«") + quoted.count("»"), 1, "only the closing guillemet")
         self.assertTrue(line.endswith("…»"))
         self.assertLess(len(line), 800)
+
+    def test_hostile_provenance_never_reaches_the_line_before_the_trust_label(self):
+        for sender, via in (("ab\ncd\x1b[2J", "did:key:z6Mk\nFAKE"), ("‮evil-sender", "did:key:‮z6"),
+                            ("x\" ; rm -rf ~", "did:web:example.com"), ("", "did:key:")):
+            with self.subTest(sender=sender, via=via):
+                line = self.berth._note_line({"session": sender, "from_device": via, "text": "t", "at": 1001,
+                                              "to": self.SESSION}, self.SESSION, 1002)
+                self.assertTrue(line.startswith("NOTE from unknown device/unknown sender "), line)
+                self.assertEqual(len(line.splitlines()), 1)
+        # An absent device is this device; it is never a fallback for a malformed one.
+        line = self.berth._note_line({"session": self.SENDER, "text": "t", "at": 1001}, self.SESSION, 1002)
+        self.assertTrue(line.startswith(f"NOTE from this device/{self.SENDER[:8]} "))
+
+    def test_follow_renders_hostile_provenance_as_unknown(self):
+        self.append(self.folded("hp-1", 1001, to=self.SESSION, sender="evil‮sender",
+                                via="did:key:z6Mk\u001b[2J", text="hi"))
+        out = io.StringIO()
+
+        def stop(_s):
+            raise KeyboardInterrupt
+
+        self.berth.sleep = stop
+        main = _NS["main"]
+        with mock.patch.dict(main.__globals__, {"Berth": lambda: self.berth}), \
+                contextlib.redirect_stdout(out), self.assertRaises(KeyboardInterrupt):
+            main(["berth", "inbox", "--session", self.SESSION, "--reader", "mon", "--follow"])
+        self.assertTrue(out.getvalue().startswith("NOTE from unknown device/unknown sender "), out.getvalue())
+        self.assertNotIn("\x1b", out.getvalue())
 
 
 class WorktreeIntentTest(unittest.TestCase):
@@ -1536,10 +1682,12 @@ class WorktreeIntentTest(unittest.TestCase):
         self.addCleanup(g.__setitem__, "Berth", saved)
 
         def say(*args):
-            stdout = io.StringIO()
-            with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(io.StringIO()):
+            stdout, stderr = io.StringIO(), io.StringIO()
+            with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
                 rc = main(["berth", "say", "--session", "session", *args])
-            return rc, stdout.getvalue()
+            # stdout stays silent: `gate-live.mjs subscribe` forwards it ahead of its own JSON line.
+            self.assertEqual(stdout.getvalue(), "")
+            return rc, stderr.getvalue()
 
         rc, printed = say("--to", "peer-2", "hello")
         self.assertEqual(rc, 0)
@@ -1548,10 +1696,12 @@ class WorktreeIntentTest(unittest.TestCase):
         rc, printed = say("to everyone")
         self.assertEqual(rc, 0)
         self.assertIn("to the household", printed)
-        # A note that did not cross prints no success line.
+        # A note that did not cross prints no success line, only the failure.
         self.obs.emit = lambda *a, **k: False
         rc, printed = say("--to", "peer-2", "unheard")
-        self.assertEqual((rc, printed), (1, ""))
+        self.assertEqual(rc, 1)
+        self.assertNotIn("berth say: note #", printed)
+        self.assertIn("no other device will read it", printed)
 
 
 class StewardClaimTest(unittest.TestCase):
