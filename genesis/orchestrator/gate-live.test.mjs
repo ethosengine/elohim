@@ -1483,3 +1483,19 @@ test('E6 #6: a red with every id at its longest still fits, and the formatter re
   const cut = { kind: 'gate-final@1', run: '0123456789abcdef', device: OTHER_DID, verdict: 'failed', failures: 3, wallS: 9, truncated: true };
   assert.match(live.formatSiblingNote({ text: JSON.stringify(cut), from_device: OTHER_DID }), /SIBLING FINAL .* failed in 9s — 3 red\(s\); ran 0, reused 0/);
 });
+
+// ── E8: the follower marks only what it printed; the reserve fits the longest admitted DID ──────
+test('E8 #1: a note after the final that ended the follow is still printed after a restart', async (t) => {
+  const root = mkdtempSync(join(tmpdir(), 'gate-live-e8-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const cursor = join(root, 'cursors', 's--sibling-follow.json');
+  const now = Date.now() / 1000;
+  const notes = [siblingRed('fa', { run: 'aaaaaaaaaaaaaaaa', kind: 'gate-final@1', at: now - 2 }), siblingRed('rb', { run: 'bbbbbbbbbbbbbbbb', at: now - 1, ordinal: 4 })];
+  const env = siblingEnv(root, stubBerth(root, { notes }));
+  const first = [];
+  assert.equal(await live.followSibling({ session: 's', env, write: (l) => first.push(l), pollMs: 10, timeoutMs: 2000, untilFinal: true, cursor }), 0);
+  assert.equal(first.filter((l) => l.startsWith('[gate-live] SIBLING')).length, 1, first.join('\n'));
+  const second = [];
+  await live.followSibling({ session: 's', env, write: (l) => second.push(l), pollMs: 10, timeoutMs: 150, cursor });
+  assert.deepEqual(second.filter((l) => l.startsWith('[gate-live] SIBLING')).map((l) => /red #(\d+)/.exec(l)?.[1]), ['4'], second.join('\n'));
+});
