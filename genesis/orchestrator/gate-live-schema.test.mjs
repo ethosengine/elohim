@@ -170,3 +170,10 @@ const negatives = [
   ['mine without a session', { ...failure, attribution: { label: 'mine', sessions: [] } }],
 ];
 for (const [name, value] of negatives) test(`rejects ${name}`, () => assert.equal(validate(value), false));
+
+test('a run-open record may carry the ref it is judged by, and only a refs/ ref', () => {
+  // Production run-open records carry ref since 994f10630; the schema refused it (unevaluatedProperties).
+  const open = { v: 1, run: 'r', seq: 0, at: '2026-11-18T13:00:00.000Z', kind: 'run-open', candidate: { sha: null, target: 'just gate' }, session: 's' };
+  assert.equal(validate({ ...open, ref: 'refs/heads/claude/nt-prep' }), true, JSON.stringify(validate.errors));
+  assert.equal(validate({ ...open, ref: '/home/m/x' }), false);
+});

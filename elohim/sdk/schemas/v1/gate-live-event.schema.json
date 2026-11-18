@@ -35,7 +35,12 @@
           },
           "description": "The candidate declared when the run opens; either field may be null for a local run."
         },
-        "session": { "type": ["string", "null"] }
+        "session": { "type": ["string", "null"] },
+        "ref": {
+          "type": "string",
+          "pattern": "^refs/\\S{1,240}$",
+          "description": "The ref the run is judged by (just gate: the checked-out branch; pre-push: the destination), so a sibling's subscription can match it. Optional."
+        }
       },
       "required": ["candidate", "session"]
     },
