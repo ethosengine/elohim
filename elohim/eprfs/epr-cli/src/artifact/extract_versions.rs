@@ -126,9 +126,10 @@ pub(super) fn glibc_versions(
                 )?;
                 if glibc {
                     if let Some(number) = name.strip_prefix("GLIBC_") {
+                        // libc.so.6 provides the markers; on another library one is unknown.
                         let marker = GLIBC_ABI_MARKERS
                             .iter()
-                            .find(|(marker, _)| *marker == name)
+                            .find(|(marker, _)| *marker == name && soname == "libc.so.6")
                             .map(|(_, version)| version.to_vec());
                         let components = match &marker {
                             Some(version) => version.clone(),

@@ -787,6 +787,16 @@ fn artifact_glibc_abi_dt_relr_is_a_2_36_floor_recorded_by_name() {
             "{error}"
         );
     }
+    // libc provides the RELR marker; on any other glibc library it is not a known marker.
+    let elsewhere = glibc_needs(&[
+        ("libc.so.6", &["GLIBC_2.34"]),
+        ("libm.so.6", &["GLIBC_ABI_DT_RELR"]),
+    ]);
+    let error = refusal_text("relr-on-libm.elf", &elsewhere);
+    assert!(
+        error.contains("unsupported libm.so.6 version need GLIBC_ABI_DT_RELR"),
+        "{error}"
+    );
 }
 
 /// Only glibc's own loaders for the admitted machines count; another `ld-linux*` name does not.
