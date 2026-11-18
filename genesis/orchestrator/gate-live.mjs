@@ -674,7 +674,8 @@ const READ_TIMEOUT_MS = 1200;
 // E4 (review of row 10a): a sibling note carries facts, never text. Raw failure lines, paths and
 // commands stay on the device that printed them; a line like `TOKEN=… FAILED` must not cross.
 const DELIVER_MS = 10_000;         // one berth say, process group killed at this deadline
-const WORKER_MS = 20_000;          // an emit worker's whole life
+// An emit worker's whole life; GATE_LIVE_WORKER_MS may only shorten it (tests use it).
+const WORKER_MS = Math.min(20_000, Number(process.env.GATE_LIVE_WORKER_MS) || 20_000);
 const EMIT_WORKERS_MAX = 8;        // per run, from one tap process; later reds ride the final
 const LIST_MAX = 20;               // reds, ran and reused entries in a final
 const BODY_MAX = 3_500;            // bytes of JSON handed to berth as one argv entry
@@ -838,8 +839,10 @@ async function peekNotes(session, { env = process.env, timeoutMs = READ_TIMEOUT_
  * caller records it, so a missing or stuck berth is a line in the run log, not silence.
  */
 export function sendNote(session, to, body, { env = process.env, deadlineMs = Number(env.GATE_LIVE_DELIVER_MS) || DELIVER_MS } = {}) {
-  // E5 #3: the kill must fire inside the worker's own life, whatever the override says.
-  deadlineMs = Math.min(deadlineMs, WORKER_MS - 2_000);
+  // E5 #3 / E6 #5: the kill must fire inside the worker's own life, whatever the override says and
+  // however long discovery took first: the bound is the time the worker has LEFT, not its whole life.
+  deadlineMs = Math.max(0, Math.min(deadlineMs, WORKER_MS - 2_000,
+    workerDeadlineAt === null ? Infinity : workerDeadlineAt - Date.now() - 1_000));
   return new Promise((done) => {
     const started = Date.now();
     let settled = false;
@@ -854,19 +857,39 @@ export function sendNote(session, to, body, { env = process.env, deadlineMs = Nu
       try { process.kill(-child.pid, 'SIGKILL'); } catch { /* already gone */ }
       finish({ ok: false, why: `berth say exceeded ${deadlineMs} ms` });
     }, deadlineMs);
+    const live = { kill: () => { try { process.kill(-child.pid, 'SIGKILL'); } catch { /* already gone */ } } };
     try {
       const args = ['say', '--session', session];
       if (to) args.push('--to', to);
       args.push(JSON.stringify(body));
       child = spawn(berthBin(env), args, { detached: true, stdio: 'ignore', env });
+      liveSends.add(live);
     } catch (error) {
       finish({ ok: false, why: `berth: ${error.message}` });
       return;
     }
-    child.on('error', (error) => finish({ ok: false, why: `berth: ${error.message}` }));
-    child.on('close', (code, signal) => finish(code === 0 ? { ok: true }
-      : { ok: false, why: `berth say exited ${code ?? signal}` }));
+    child.on('error', (error) => { liveSends.delete(live); finish({ ok: false, why: `berth: ${error.message}` }); });
+    child.on('close', (code, signal) => {
+      liveSends.delete(live);
+      finish(code === 0 ? { ok: true } : { ok: false, why: `berth say exited ${code ?? signal}` });
+    });
   });
+}
+
+// E6 #5: a worker's absolute end, set by its main, and the berth groups it still has running, so
+// the watchdog can kill them and say so instead of exiting past a live `berth say` without a line.
+let workerDeadlineAt = null;
+const liveSends = new Set();
+
+function workerWatchdog(path, verb) {
+  workerDeadlineAt = Date.now() + WORKER_MS;
+  setTimeout(() => {
+    const running = liveSends.size;
+    for (const send of liveSends) send.kill();
+    appendEvent(path, { kind: 'sibling-delivery', note: verb === 'emit-final' ? FINAL_KIND : RED_KIND, ok: false,
+      why: `worker life of ${WORKER_MS} ms ended${running ? `; ${running} berth say killed` : ' before any send'}` });
+    process.exit(0);
+  }, WORKER_MS).unref();
 }
 
 // Deliver `body` to every recipient and write one sibling-delivery line per attempt.
@@ -935,10 +958,14 @@ function runFacts(path) {
 async function subscribersFor(path, env, { recordMiss = false } = {}) {
   const { open } = runFacts(path);
   const session = open.session || env.ELOHIM_SESSION_ID || null;
-  if (!session) return null;
-  const [did, notes] = await Promise.all([deviceDid({ env }), peekNotes(session, { env })]);
   // A discovery that cannot run while a red is waiting is named in the run log (the actionable
-  // case); the final, written after run-close, stays quiet, and no subscriber at all is the norm.
+  // case); no subscriber at all is the norm. E6 #5: a missing session is named too, and the final
+  // names its miss whenever an earlier red of this run reached a subscriber (`recordMiss`).
+  if (!session) {
+    if (recordMiss) appendEvent(path, { kind: 'sibling-delivery', ok: false, why: 'no session (run-open names none and ELOHIM_SESSION_ID is unset)' });
+    return null;
+  }
+  const [did, notes] = await Promise.all([deviceDid({ env }), peekNotes(session, { env })]);
   if (!did || !notes) {
     if (recordMiss) appendEvent(path, {
       kind: 'sibling-delivery', ok: false,
@@ -1026,7 +1053,9 @@ function finalBody(path, { did, ref }) {
 export async function emitFinal(path, { env = process.env } = {}) {
   try {
     if (siblingOff(env)) return 0;
-    const found = await subscribersFor(path, env);
+    // A subscriber that heard a red of this run expects the final: its miss is a line, not silence.
+    const promised = runFacts(path).events.some((e) => e.kind === 'sibling-delivery' && e.note === RED_KIND && e.ok);
+    const found = await subscribersFor(path, env, { recordMiss: promised });
     if (!found || !found.subscribers.length) return 0;
     const body = finalBody(path, found);
     return await deliver(path, found.session, found.subscribers, body, env);
@@ -1219,22 +1248,44 @@ export async function followSibling({
   return 0;
 }
 
-/** The `subscribe` verb: one broadcast note, the recorded subscription. Returns berth's exit status. */
-export function subscribe(options, { env = process.env, now = () => new Date() } = {}) {
+/**
+ * The `subscribe` verb: one broadcast note, the recorded subscription. Resolves to berth's exit
+ * status. E6 #5: berth runs in its own process group, killed whole at DELIVER_MS, so a stuck berth
+ * leaves no descendant behind (spawnSync's timeout killed the direct child only).
+ */
+export function subscribe(options, { env = process.env, now = () => new Date(), deadlineMs = Number(env.GATE_LIVE_DELIVER_MS) || DELIVER_MS } = {}) {
   const body = subscriptionBody({
     session: options.session, device: options.device, ref: options.ref,
     every: Boolean(options.every), nth: options.nth, until: options.until, now,
   });
-  const result = spawnSync(berthBin(env), ['say', '--session', options.session, JSON.stringify(body)],
-    { encoding: 'utf8', env, timeout: 15000 });
-  if (result.stdout) process.stdout.write(result.stdout);
-  if (result.stderr) process.stderr.write(result.stderr);
-  if (result.error) {
-    process.stderr.write(`[gate-live] subscribe: berth: ${result.error.message}\n`);
-    return 1;
-  }
-  if (result.status === 0) process.stdout.write(`${JSON.stringify(body)}\n`);
-  return result.status ?? 1;
+  return new Promise((done) => {
+    let child;
+    let settled = false;
+    const finish = (status) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      if (status === 0) process.stdout.write(`${JSON.stringify(body)}\n`);
+      done(status);
+    };
+    const timer = setTimeout(() => {
+      try { process.kill(-child.pid, 'SIGKILL'); } catch { /* already gone */ }
+      process.stderr.write(`[gate-live] subscribe: berth say exceeded ${deadlineMs} ms; its process group was killed\n`);
+      finish(1);
+    }, deadlineMs);
+    try {
+      child = spawn(berthBin(env), ['say', '--session', options.session, JSON.stringify(body)],
+        { detached: true, stdio: ['ignore', 'pipe', 'pipe'], env });
+    } catch (error) {
+      process.stderr.write(`[gate-live] subscribe: berth: ${error.message}\n`);
+      finish(1);
+      return;
+    }
+    child.stdout.on('data', (chunk) => process.stdout.write(chunk));
+    child.stderr.on('data', (chunk) => process.stderr.write(chunk));
+    child.on('error', (error) => { process.stderr.write(`[gate-live] subscribe: berth: ${error.message}\n`); finish(1); });
+    child.on('close', (code) => finish(code ?? 1));
+  });
 }
 
 const USAGE = `Usage:
@@ -1396,13 +1447,14 @@ async function main(argv) {
         }
         return 0;
       case 'subscribe':
-        return subscribe(options);
+        return await subscribe(options);
       case 'emit-final':
       case 'emit-red': {
         // A worker's whole life is bounded, whatever berth or epr do; unref'd, so a worker whose
-        // sends are done exits at once (E5 #4: the queue starts the next red on that exit).
-        setTimeout(() => process.exit(0), WORKER_MS).unref();
+        // sends are done exits at once (E5 #4: the queue starts the next red on that exit). Reaching
+        // the bound kills any berth group still running and writes the receipt (E6 #5).
         const run = resolve(root, options.run);
+        workerWatchdog(run, command.verb);
         if (command.verb === 'emit-final') {
           await emitFinal(run);
         } else {

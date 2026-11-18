@@ -1410,3 +1410,49 @@ test('E6 #4: a note stamped far in the future is not printed', async (t) => {
   await live.followSibling({ session: 's', env: siblingEnv(root, stubBerth(root, { notes: [siblingRed('f', { at: Date.now() / 1000 + 3600 })] })), write: (l) => out.push(l), pollMs: 10, timeoutMs: 150 });
   assert.deepEqual(out, []);
 });
+
+// ── E6 #5: worker life, subscribe cleanup, silent misses ─────────────────────────────────────
+const readDeliveries = (path) => readFileSync(path, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)).filter((e) => e.kind === 'sibling-delivery');
+
+test('E6 #5: a worker kills its stuck berth say and writes the receipt inside its own life', async (t) => {
+  const root = fixture(t);
+  const bin = join(root, 'slow-berth');
+  writeFileSync(join(root, 'notes.json'), JSON.stringify([subNote({})]));
+  // The inbox read is slow (discovery eats the worker's life); the say never returns.
+  writeFileSync(bin, `#!/bin/bash\nif [ "$1" = say ]; then sleep 60; else sleep 1; cat "${root}/notes.json"; fi\n`, { mode: 0o755 });
+  const { path, reds } = threeRedRun(root);
+  const env = { ...siblingEnv(root, bin), GATE_LIVE_WORKER_MS: '4000', GATE_LIVE_DELIVER_MS: '10000' };
+  const worker = spawnSync(process.execPath, [SCRIPT, 'emit-red', '--run', path, '--seq', String(reds[0].seq)], { cwd: root, env, encoding: 'utf8', timeout: 8000 });
+  assert.notEqual(worker.error?.code, 'ETIMEDOUT', 'the worker ends within its life');
+  const lines = readDeliveries(path);
+  assert.ok(lines.some((d) => d.ok === false && /exceeded/.test(d.why ?? '')), JSON.stringify(lines));
+});
+
+test('E6 #5: subscribe kills berth and its descendants at the deadline', async (t) => {
+  const root = fixture(t);
+  const bin = join(root, 'hung-berth');
+  writeFileSync(bin, `#!/bin/bash\nsleep 60 &\necho $! > "${root}/grandchild"\nwait\n`, { mode: 0o755 });
+  const env = { ...siblingEnv(root, bin), GATE_LIVE_DELIVER_MS: '500' };
+  const started = Date.now();
+  const status = await live.subscribe({ session: 's' }, { env });
+  assert.notEqual(status, 0);
+  assert.ok(Date.now() - started < 5000, 'bounded by the deadline');
+  const pid = Number(readFileSync(join(root, 'grandchild'), 'utf8'));
+  await new Promise((r) => setTimeout(r, 100));
+  assert.throws(() => process.kill(pid, 0), 'the grandchild is gone');
+});
+
+test('E6 #5: a run with no session, and a final whose discovery fails after a delivered red, say so', async (t) => {
+  const root = fixture(t);
+  const { path: bare } = openRun({ root, sha: SHA, target: 'dev', session: null });
+  const red = appendEvent(bare, { ...RED, project: 'storage', test: 'one' });
+  const env = siblingEnv(root, stubBerth(root, { notes: [subNote({})] }));
+  delete env.ELOHIM_SESSION_ID;
+  assert.equal(await live.emitRed(bare, red, { env }), 0);
+  assert.ok(readDeliveries(bare).some((d) => /no session/.test(d.why ?? '')), JSON.stringify(readDeliveries(bare)));
+  const { path, reds } = threeRedRun(root);
+  appendEvent(path, { kind: 'sibling-delivery', note: 'gate-red@1', to: 'shem-orchestrator', ok: true, ms: 5 });
+  assert.equal(await live.emitFinal(path, { env: siblingEnv(root, join(root, 'no-berth')) }), 0);
+  assert.ok(readDeliveries(path).some((d) => d.ok === false && d.why === 'berth inbox unreadable'), 'the promised final names its miss');
+  void reds;
+});
