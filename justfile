@@ -388,7 +388,17 @@ dev action="status" profile="isolated" seed="false" build="false" *extra="":
         exec "{{ app_dir }}/scripts/hc-start.sh" --stop
         ;;
       status) just --justfile "{{ root }}/justfile" status runtime ;;
-      *) echo "dev action must be prep|start|conductor|app|package|shift|stop|status" >&2; exit 2 ;;
+      # This device's build notes to its own forge destination (ruling R4):
+      # refs/notes/brit/build/* -> refs/notes/brit/devices/<did>/build/*, fast-forward only.
+      # `just dev notes` is a dry run (no forge contact); `just dev notes publish` pushes.
+      notes)
+        case "{{ profile }}" in
+          isolated) exec node "{{ root }}/genesis/orchestrator/device-notes-publish.mjs" --root "{{ root }}" --dry-run {{extra}} ;;
+          publish) exec node "{{ root }}/genesis/orchestrator/device-notes-publish.mjs" --root "{{ root }}" {{extra}} ;;
+          *) echo "dev notes takes no argument (dry run) or publish" >&2; exit 2 ;;
+        esac
+        ;;
+      *) echo "dev action must be prep|start|conductor|app|package|shift|stop|status|notes" >&2; exit 2 ;;
     esac
 
 # Manage or measure the local multi-peer mesh. Safe default: status.

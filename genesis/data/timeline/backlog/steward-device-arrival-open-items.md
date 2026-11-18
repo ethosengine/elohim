@@ -122,6 +122,31 @@ ethosengine pushed 32 refs for `7c8cbb94e`, shem's push for `ef0b1db12` was reje
 refs; shem's verdicts for `ef0b1db12` and `521649ed0` are local only. No one should guess a merge
 strategy over signed attestations. Needs a ruling: how per-device verdict notes combine.
 
+Ruled 2026-11-17 (R4, `genesis/docs/superpowers/sprints/2026-11-17-native-throughput/journal.md`):
+they do not combine. Built 2026-11-18 on `claude/nt-r4-device-notes`:
+`genesis/orchestrator/device-notes-publish.mjs` (`just dev notes` dry run, `just dev notes
+publish`) pushes local `refs/notes/brit/build/<step>` to
+`refs/notes/brit/devices/<did>/build/<step>`, the DID in brit's ref segment encoding
+(`did%3Akey%3Az6Mk…`, reversible, method-agnostic, the encoding step names already use). The
+DID comes from `epr actor current --device`. Every destination the forge holds is compared first;
+a rewound, diverged or unseen forge tip refuses the whole publish with a named cure, and the push
+is `--atomic` with no `+`. The legacy shared refs are never a destination. The root gospel now
+names this command instead of the shared push. Tests (`device-notes-publish.test.mjs`, scratch
+forge) cover two devices publishing divergent notes with neither rejected, the shared-ref
+rejection as a control, rewound and diverged refusals, and brit push as the transport
+(`DEVICE_NOTES_PUSH=brit`, file remote only).
+
+Still open:
+
+- Nothing has been published to origin yet; the first real publish from each device is the receipt.
+- No reader fetches the device mirrors. Verified 2026-11-18: origin's only fetch refspec is
+  `+refs/heads/*`, Jenkins runs `brit-helper.sh verify` and `plan --since origin/dev` on a heads
+  checkout, and `delivery-series.mjs`, `epr flow walk`, ark's `brit_index` and brit read local
+  `refs/notes/brit/build/` only. Sibling verdicts cross on the peer channel.
+- The publish includes the `ci:*` notes the harvest writes (`brit-attest.mjs`), as the shared push
+  did. Whether a device mirror should carry only `gate:*` is not ruled.
+- The frozen shared refs on origin are not deleted; deleting them needs the steward.
+
 ## Row 4 — a fresh worktree's preflight refusal does not stop the push (by declared policy)
 
 Both devices pushed from a fresh worktree on 2026-11-16 and met a preflight `REFUSED` (first the
