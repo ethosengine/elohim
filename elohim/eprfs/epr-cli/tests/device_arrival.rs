@@ -131,8 +131,13 @@ fn status_keeps_dependency_order_and_does_not_mint_a_key() {
             "next step"
         ]
     );
-    // The sysroot is a fact, whatever this host's PATH lets the probe see: never a refusal.
-    assert_ne!(checks[12]["state"], "refused");
+    // A status read runs no probe: with nothing recorded, the sysroot is not yet observed.
+    assert_eq!(checks[12]["state"], "unknown");
+    assert!(checks[12]["detail"]
+        .as_str()
+        .unwrap()
+        .starts_with("not yet observed; an arrival records it"));
+    assert_eq!(checks[12]["cure"], "epr device arrive");
     // No serve lock is held: siblings read this device as silent.
     assert_eq!(checks[8]["state"], "degraded");
     assert!(checks[8]["detail"].as_str().unwrap().contains("silent"));

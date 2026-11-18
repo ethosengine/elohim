@@ -326,8 +326,14 @@ pub(super) fn driver_file(
     driver: &Path,
     input: &str,
     path: &str,
+    deadline: Option<std::time::Instant>,
 ) -> ArtifactResult<Option<String>> {
-    let output = super::probe(driver, &[&format!("-print-file-name={input}")], path)?;
+    let output = super::probe_until(
+        driver,
+        &[&format!("-print-file-name={input}")],
+        path,
+        deadline,
+    )?;
     let file = String::from_utf8(output.stdout).map_err(|e| {
         ArtifactError::Gap(format!(
             "{} returned a non-UTF-8 path for {input}: {e}",

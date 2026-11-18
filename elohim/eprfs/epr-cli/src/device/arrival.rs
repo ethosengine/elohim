@@ -153,7 +153,7 @@ pub(crate) fn status_at(root: &Path, remember: bool) -> Vec<Check> {
         // Restart-arrival facts (backlog container-restart-strands-session-envelope).
         toolchain_check(root, &env),
         sysroot_check(
-            observe_sysroot(root, &env),
+            &|| observe_sysroot(&env),
             device_layout
                 .as_ref()
                 .map_err(|refusal| refusal.to_string())
@@ -709,25 +709,48 @@ fn toolchain_missing(pin: &str, toolchains: &Path) -> Check {
 
 const SYSROOT_CHECK: &str = "sysroot";
 /// The remembered sysroot, under the layout's state directory (persistent across a workspace
-/// restart; `$HOME` is not).
+/// restart; `$HOME` is not), and the lock that serialises arrivals' read-update-replace of it.
 const SYSROOT_RECORD: &str = "sysroot/observed.json";
-/// How long a changed sysroot stays a degraded line after the change is first seen: long enough
-/// for every session of a working week to read it, short enough not to become wallpaper. A
-/// judgement, not a measured bound; the change itself stays in the record's `previous`.
+const SYSROOT_LOCK: &str = "observed.lock";
+/// A real record is a few KiB; anything past this is not one, and is never read into memory.
+const SYSROOT_RECORD_LIMIT: u64 = 64 * 1024;
+/// Earlier identities kept in the record, newest first, so a second change inside the notice
+/// does not erase the first.
+const SYSROOT_HISTORY: usize = 8;
+/// How long a changed sysroot stays a degraded line after the change is first recorded: long
+/// enough for every session of a working week to read it, short enough not to become wallpaper.
+/// A judgement, not a measured bound; the change itself stays in the record's history.
 const SYSROOT_NOTICE_DAYS: i64 = 7;
+/// Wall time an arrival's full observation may take; every child is killed at it. The SessionStart
+/// hook that runs `epr device arrive` gives all of arrival 30 s.
+const SYSROOT_PROBE_SECONDS: u64 = 10;
+/// How long an arrival waits for another arrival's hold on the record.
+const SYSROOT_LOCK_WAIT: std::time::Duration = std::time::Duration::from_secs(5);
+/// What the identity cannot see, said wherever a change is reported or nothing is recorded yet.
+const SYSROOT_BLIND: &str = "the identity covers cc's version and predefined macros and the crt, \
+     libgcc, libc and libm files it links; a same-path gcc rebuild with identical output is not \
+     seen";
 
-/// The system link inputs this host would key a build with, and the human context beside them.
+/// A full observation: the identity lines of the artifact key's probe and the human context.
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct SysrootObserved {
-    /// CID over the sorted `tool:link-driver` and `link:` lines of the artifact key's probe.
-    cid: String,
+    /// [`crate::artifact::sysroot_lines`]: sorted `tool:link-driver*` and `link:` lines.
+    lines: Vec<String>,
     /// `/etc/os-release` `ID VERSION_ID`, when readable.
     os: Option<String>,
     /// The loaded glibc's `gnu_get_libc_version`, on a glibc host.
     glibc: Option<String>,
 }
+impl SysrootObserved {
+    /// CID over the lines, one per line with a trailing newline.
+    fn cid(&self) -> String {
+        let document: String = self.lines.iter().map(|line| format!("{line}\n")).collect();
+        eprfs_core::BlobCid::compute_bytes(document.as_bytes()).to_string()
+    }
+}
 
-/// One remembered observation and when this device first saw it (RFC 3339, UTC).
+/// One remembered identity and when this device first recorded it (RFC 3339, UTC). Only the
+/// current identity keeps its lines, so a status read can re-check their files.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct SysrootSeen {
@@ -735,35 +758,41 @@ struct SysrootSeen {
     os: Option<String>,
     glibc: Option<String>,
     first_seen: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    lines: Vec<String>,
 }
 
-/// The last observed sysroot and the one before it, when it changed.
+/// The current identity and the earlier ones, newest first.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct SysrootRecord {
     current: SysrootSeen,
-    previous: Option<SysrootSeen>,
+    #[serde(default)]
+    history: Vec<SysrootSeen>,
 }
 
-/// Observe this host's sysroot with the artifact key's own link-input probe, under this
-/// process's PATH and the session's toolchain (else the gate pin). Never fails the caller.
-fn observe_sysroot(
-    root: &Path,
-    env: &dyn Fn(&str) -> Option<String>,
-) -> Result<SysrootObserved, String> {
-    let set = |name: &str| env(name).filter(|value| !value.is_empty());
-    let path = set("PATH").ok_or("PATH is not set")?;
-    let toolchain = set("RUSTUP_TOOLCHAIN")
-        .or_else(|| gate_toolchain(root))
-        .unwrap_or_else(|| "unpinned".into());
-    let lines = crate::artifact::sysroot_lines(&path, &toolchain).map_err(|e| e.to_string())?;
-    let document: String = lines.iter().map(|line| format!("{line}\n")).collect();
+/// Observe this host's sysroot with the artifact key's own link-input primitives under this
+/// process's PATH. Runs only the C driver, never rustc, every child bounded by the probe budget.
+fn observe_sysroot(env: &dyn Fn(&str) -> Option<String>) -> Result<SysrootObserved, String> {
+    let path = env("PATH")
+        .filter(|value| !value.is_empty())
+        .ok_or("PATH is not set")?;
+    let deadline =
+        std::time::Instant::now() + std::time::Duration::from_secs(SYSROOT_PROBE_SECONDS);
+    let lines = crate::artifact::sysroot_lines(&path, deadline).map_err(|e| {
+        let why = e.to_string();
+        if why.contains("exceeded the probe deadline") {
+            format!("probe exceeded {SYSROOT_PROBE_SECONDS}s: {why}")
+        } else {
+            why
+        }
+    })?;
     let os = ["/etc/os-release", "/usr/lib/os-release"]
         .iter()
         .find_map(|file| fs::read_to_string(file).ok())
         .and_then(|text| os_release(&text));
     Ok(SysrootObserved {
-        cid: eprfs_core::BlobCid::compute_bytes(document.as_bytes()).to_string(),
+        lines,
         os,
         glibc: glibc_version(),
     })
@@ -797,13 +826,14 @@ fn glibc_version() -> Option<String> {
 }
 
 /// `<short cid> (<os>, glibc <v>)`, leaving out what was not observed.
-fn describe_sysroot(cid: &str, os: Option<&str>, glibc: Option<&str>) -> String {
-    let context: Vec<String> = os
-        .map(str::to_owned)
+fn describe_sysroot(seen: &SysrootSeen) -> String {
+    let context: Vec<String> = seen
+        .os
+        .clone()
         .into_iter()
-        .chain(glibc.map(|v| format!("glibc {v}")))
+        .chain(seen.glibc.as_ref().map(|v| format!("glibc {v}")))
         .collect();
-    let short = crate::frames::short_cid(cid);
+    let short = crate::frames::short_cid(&seen.cid);
     if context.is_empty() {
         short
     } else {
@@ -811,141 +841,274 @@ fn describe_sysroot(cid: &str, os: Option<&str>, glibc: Option<&str>) -> String 
     }
 }
 
-/// Judge an observation against the remembered record. Returns the line and, when the record
-/// should change, the record to write; the caller decides whether this read writes. A changed
-/// sysroot is a fact, never a refusal: builds stay correct, only keys and caches go cold.
-fn sysroot_judge(
-    observed: Result<SysrootObserved, String>,
-    remembered: Result<Option<SysrootRecord>, String>,
-    now: chrono::DateTime<chrono::Utc>,
-) -> (Check, Option<SysrootRecord>) {
-    let observed = match observed {
-        Ok(observed) => observed,
-        Err(why) => {
-            return (
-                Check::new(
-                    SYSROOT_CHECK,
-                    State::Degraded,
-                    format!("unobserved ({why})"),
-                    None,
-                ),
-                None,
-            )
+fn parse_stamp(stamp: &str) -> Result<chrono::DateTime<chrono::Utc>, String> {
+    chrono::DateTime::parse_from_rfc3339(stamp)
+        .map(|time| time.with_timezone(&chrono::Utc))
+        .map_err(|e| format!("invalid firstSeen {stamp:?}: {e}"))
+}
+
+/// Whether `now` is inside the notice that began at `since`: `[since, since + 7 days)`. A clock
+/// behind the recorded change is outside it, so a backward step cannot revive a settled notice.
+fn in_notice(since: &str, now: chrono::DateTime<chrono::Utc>) -> bool {
+    parse_stamp(since).is_ok_and(|since| {
+        let elapsed = now.signed_duration_since(since);
+        elapsed >= chrono::TimeDelta::zero()
+            && elapsed < chrono::TimeDelta::days(SYSROOT_NOTICE_DAYS)
+    })
+}
+
+fn unobserved(why: impl fmt::Display, cure: Option<String>) -> Check {
+    Check::new(
+        SYSROOT_CHECK,
+        State::Degraded,
+        format!("unobserved ({why})"),
+        cure,
+    )
+}
+
+fn sysroot_changed(was: &SysrootSeen, now: &SysrootSeen) -> Check {
+    Check::new(
+        SYSROOT_CHECK,
+        State::Degraded,
+        format!(
+            "changed since {} — was {}, now {}; artifact keys and pool build caches made before \
+             are for the previous system libraries",
+            now.first_seen,
+            describe_sysroot(was),
+            describe_sysroot(now)
+        ),
+        Some(format!(
+            "none needed for correctness; expect cold builds and key misses; record the new image \
+             in the journal; this line settles {SYSROOT_NOTICE_DAYS} days after the change; \
+             {SYSROOT_BLIND}"
+        )),
+    )
+}
+
+/// The line for a recorded identity that is still current: a change inside its notice, else ok.
+fn sysroot_settled(record: &SysrootRecord, now: chrono::DateTime<chrono::Utc>) -> Check {
+    match record.history.first() {
+        Some(was) if in_notice(&record.current.first_seen, now) => {
+            sysroot_changed(was, &record.current)
         }
-    };
-    let stamp = now.to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
-    let seen = SysrootSeen {
-        cid: observed.cid.clone(),
-        os: observed.os.clone(),
-        glibc: observed.glibc.clone(),
-        first_seen: stamp,
-    };
-    let describe =
-        |seen: &SysrootSeen| describe_sysroot(&seen.cid, seen.os.as_deref(), seen.glibc.as_deref());
-    let ok = |note: Option<String>| {
-        let detail = describe(&seen);
-        Check::new(
+        _ => Check::new(
             SYSROOT_CHECK,
             State::Ok,
-            note.map_or_else(|| detail.clone(), |note| format!("{detail}; {note}")),
+            describe_sysroot(&record.current),
             None,
-        )
-    };
-    let changed = |was: &SysrootSeen, now: &SysrootSeen| {
-        Check::new(
-            SYSROOT_CHECK,
-            State::Degraded,
-            format!(
-                "changed since {} — was {}, now {}; artifact keys and pool build caches made \
-                 before are for the previous system libraries",
-                now.first_seen,
-                describe(was),
-                describe(now)
-            ),
-            Some(format!(
-                "none needed for correctness; expect cold builds and key misses; record the new \
-                 image in the journal; this line settles {SYSROOT_NOTICE_DAYS} days after the \
-                 change"
-            )),
-        )
+        ),
+    }
+}
+
+/// An arrival's judgement of a full observation against the remembered record. Returns the line
+/// and, when the record should change, the record to write.
+fn sysroot_judge(
+    observed: SysrootObserved,
+    remembered: Option<SysrootRecord>,
+    now: chrono::DateTime<chrono::Utc>,
+) -> (Check, Option<SysrootRecord>) {
+    let seen = SysrootSeen {
+        cid: observed.cid(),
+        os: observed.os,
+        glibc: observed.glibc,
+        first_seen: now.to_rfc3339_opts(chrono::SecondsFormat::Secs, true),
+        lines: observed.lines,
     };
     match remembered {
-        Ok(Some(record)) if record.current.cid == observed.cid => {
-            let recent = chrono::DateTime::parse_from_rfc3339(&record.current.first_seen)
-                .is_ok_and(|first| {
-                    now.signed_duration_since(first) < chrono::TimeDelta::days(SYSROOT_NOTICE_DAYS)
-                });
-            let check = match &record.previous {
-                Some(previous) if recent => changed(previous, &record.current),
-                _ => ok(None),
-            };
-            (check, None)
+        Some(record) if record.current.cid == seen.cid => (sysroot_settled(&record, now), None),
+        Some(record) => {
+            let check = sysroot_changed(&record.current, &seen);
+            let mut history = vec![SysrootSeen {
+                lines: Vec::new(),
+                ..record.current
+            }];
+            history.extend(record.history);
+            history.truncate(SYSROOT_HISTORY);
+            (
+                check,
+                Some(SysrootRecord {
+                    current: seen,
+                    history,
+                }),
+            )
         }
-        Ok(Some(record)) => {
-            let check = changed(&record.current, &seen);
-            let next = SysrootRecord {
+        None => (
+            Check::new(SYSROOT_CHECK, State::Ok, describe_sysroot(&seen), None),
+            Some(SysrootRecord {
                 current: seen,
-                previous: Some(record.current),
-            };
-            (check, Some(next))
-        }
-        Ok(None) => (
-            ok(None),
-            Some(SysrootRecord {
-                current: seen.clone(),
-                previous: None,
-            }),
-        ),
-        Err(why) => (
-            ok(Some(format!("previous record unreadable ({why})"))),
-            Some(SysrootRecord {
-                current: seen.clone(),
-                previous: None,
+                history: Vec::new(),
             }),
         ),
     }
 }
 
+/// A status read's judgement: the record, plus a cheap re-check of the files its current lines
+/// name ([`crate::artifact::sysroot_drift`]). Runs no program and writes nothing.
+fn sysroot_status(remembered: Option<SysrootRecord>, now: chrono::DateTime<chrono::Utc>) -> Check {
+    let Some(record) = remembered else {
+        return Check::new(
+            SYSROOT_CHECK,
+            State::Unknown,
+            format!("not yet observed; an arrival records it ({SYSROOT_BLIND})"),
+            Some("epr device arrive".into()),
+        );
+    };
+    let drifted = crate::artifact::sysroot_drift(&record.current.lines);
+    if drifted.is_empty() {
+        return sysroot_settled(&record, now);
+    }
+    let shown: Vec<&str> = drifted.iter().take(3).map(String::as_str).collect();
+    Check::new(
+        SYSROOT_CHECK,
+        State::Degraded,
+        format!(
+            "changed after {}: {} of {} recorded inputs differ ({}{}) from {}; artifact keys and \
+             pool build caches made before are for the previous system libraries",
+            record.current.first_seen,
+            drifted.len(),
+            record.current.lines.len(),
+            shown.join(", "),
+            if drifted.len() > shown.len() {
+                ", …"
+            } else {
+                ""
+            },
+            describe_sysroot(&record.current)
+        ),
+        Some(format!(
+            "epr device arrive records the new identity; none needed for correctness; expect cold \
+             builds and key misses; {SYSROOT_BLIND}"
+        )),
+    )
+}
+
+/// Read the record without following a link at its path, refusing anything but a regular file
+/// of at most [`SYSROOT_RECORD_LIMIT`] bytes, and refusing an unparseable timestamp.
 fn read_sysroot_record(file: &Path) -> Result<Option<SysrootRecord>, String> {
-    match fs::read(file) {
-        Ok(bytes) => serde_json::from_slice(&bytes)
-            .map(Some)
-            .map_err(|e| format!("{}: {e}", file.display())),
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
-        Err(e) => Err(format!("{}: {e}", file.display())),
+    use std::io::Read;
+    use std::os::unix::fs::OpenOptionsExt;
+    let opened = fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK)
+        .open(file);
+    let handle = match opened {
+        Ok(handle) => handle,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(e) if e.raw_os_error() == Some(libc::ELOOP) => {
+            return Err(format!("{} is a symbolic link", file.display()))
+        }
+        Err(e) => return Err(format!("{}: {e}", file.display())),
+    };
+    let meta = handle
+        .metadata()
+        .map_err(|e| format!("{}: {e}", file.display()))?;
+    if !meta.is_file() {
+        return Err(format!("{} is not a regular file", file.display()));
     }
+    let mut bytes = Vec::new();
+    handle
+        .take(SYSROOT_RECORD_LIMIT + 1)
+        .read_to_end(&mut bytes)
+        .map_err(|e| format!("{}: {e}", file.display()))?;
+    if bytes.len() as u64 > SYSROOT_RECORD_LIMIT {
+        return Err(format!(
+            "{} exceeds {} bytes",
+            file.display(),
+            SYSROOT_RECORD_LIMIT
+        ));
+    }
+    let record: SysrootRecord =
+        serde_json::from_slice(&bytes).map_err(|e| format!("{}: {e}", file.display()))?;
+    for seen in std::iter::once(&record.current).chain(&record.history) {
+        parse_stamp(&seen.first_seen)?;
+    }
+    Ok(Some(record))
 }
 
-/// Replace the record whole: write beside it, then rename over it.
+/// Replace the record whole through an exclusively created temporary file in its directory,
+/// renamed over it: a link or file at a predictable name is never written through.
 fn write_sysroot_record(file: &Path, record: &SysrootRecord) -> Result<(), String> {
+    use std::io::Write;
     let parent = file.parent().ok_or("record has no directory")?;
     fs::create_dir_all(parent).map_err(|e| format!("{}: {e}", parent.display()))?;
     let bytes = serde_json::to_vec_pretty(record).map_err(|e| e.to_string())?;
-    let staged = file.with_extension("json.new");
-    fs::write(&staged, bytes).map_err(|e| format!("{}: {e}", staged.display()))?;
-    fs::rename(&staged, file).map_err(|e| format!("{}: {e}", file.display()))
+    let mut temp = tempfile::NamedTempFile::new_in(parent)
+        .map_err(|e| format!("{}: {e}", parent.display()))?;
+    temp.write_all(&bytes)
+        .and_then(|()| temp.as_file().sync_all())
+        .map_err(|e| format!("{}: {e}", temp.path().display()))?;
+    temp.persist(file)
+        .map(drop)
+        .map_err(|e| format!("{}: {}", file.display(), e.error))
 }
 
-/// The sysroot line. `record` is set only by `epr device arrive`: a status read never writes,
-/// so a change it sees stays a change until an arrival remembers it.
+/// Hold the arrivals' exclusive lock beside the record (the kernel lock `arrival_work` uses for
+/// its worker), waiting at most `wait` for another arrival to finish.
+fn lock_sysroot(file: &Path, wait: std::time::Duration) -> Result<fs::File, String> {
+    use std::os::unix::fs::OpenOptionsExt;
+    let dir = file.parent().ok_or("record has no directory")?;
+    fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
+    let path = dir.join(SYSROOT_LOCK);
+    let lock = fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .custom_flags(libc::O_NOFOLLOW)
+        .open(&path)
+        .map_err(|e| format!("{}: {e}", path.display()))?;
+    let until = std::time::Instant::now() + wait;
+    loop {
+        match rustix::fs::flock(&lock, rustix::fs::FlockOperation::NonBlockingLockExclusive) {
+            Ok(()) => return Ok(lock),
+            Err(_) if std::time::Instant::now() < until => {
+                std::thread::sleep(std::time::Duration::from_millis(20))
+            }
+            Err(e) => return Err(format!("another arrival holds {} ({e})", path.display())),
+        }
+    }
+}
+
+/// The sysroot line. A status read (`remember` false) reads the record and re-checks its files
+/// cheaply: it runs no program and writes nothing. Only `epr device arrive` runs the full,
+/// deadline-bounded observation and replaces the record, under the arrivals' lock.
 fn sysroot_check(
-    observed: Result<SysrootObserved, String>,
+    observe: &dyn Fn() -> Result<SysrootObserved, String>,
     record_file: Result<PathBuf, String>,
-    record: bool,
+    remember: bool,
     now: chrono::DateTime<chrono::Utc>,
 ) -> Check {
     let file = match record_file {
         Ok(file) => file,
-        Err(why) => {
-            let (mut check, _) = sysroot_judge(observed, Ok(None), now);
-            if check.state == State::Ok {
-                check.detail = format!("{}; change not tracked: {why}", check.detail);
-            }
-            return check;
-        }
+        Err(why) => return unobserved(format!("no record place: {why}"), None),
     };
-    let (mut check, next) = sysroot_judge(observed, read_sysroot_record(&file), now);
-    if let (true, Some(next)) = (record, next) {
+    let unreadable = |why: String| {
+        unobserved(
+            format!("record unreadable: {why}"),
+            Some(format!(
+                "remove {}; the next epr device arrive records afresh",
+                file.display()
+            )),
+        )
+    };
+    if !remember {
+        return match read_sysroot_record(&file) {
+            Ok(remembered) => sysroot_status(remembered, now),
+            Err(why) => unreadable(why),
+        };
+    }
+    let _lock = match lock_sysroot(&file, SYSROOT_LOCK_WAIT) {
+        Ok(lock) => lock,
+        Err(why) => return unobserved(why, None),
+    };
+    let remembered = match read_sysroot_record(&file) {
+        Ok(remembered) => remembered,
+        Err(why) => return unreadable(why),
+    };
+    let observed = match observe() {
+        Ok(observed) => observed,
+        Err(why) => return unobserved(why, None),
+    };
+    let (mut check, next) = sysroot_judge(observed, remembered, now);
+    if let Some(next) = next {
         if let Err(why) = write_sysroot_record(&file, &next) {
             check.detail = format!("{}; not remembered: {why}", check.detail);
         }
@@ -2033,168 +2196,288 @@ mod tests {
         );
         assert_eq!(berth_check(dir.path(), None).state, State::Ok);
     }
-    fn sysroot(cid: &str, os: &str) -> Result<SysrootObserved, String> {
-        Ok(SysrootObserved {
-            cid: cid.into(),
-            os: Some(os.into()),
-            glibc: Some("2.39".into()),
-        })
-    }
     fn at(stamp: &str) -> chrono::DateTime<chrono::Utc> {
-        chrono::DateTime::parse_from_rfc3339(stamp)
-            .unwrap()
-            .with_timezone(&chrono::Utc)
+        parse_stamp(stamp).unwrap()
     }
-    const CID_A: &str = "bafkreiaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-    const CID_B: &str = "bafkreibbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+    /// A sysroot of real files under `dir`, whose identity lines name them by content.
+    struct Host {
+        dir: tempfile::TempDir,
+    }
+    impl Host {
+        fn new() -> Self {
+            let host = Self {
+                dir: tempfile::tempdir().unwrap(),
+            };
+            host.put("crt1.o", b"crt1 v1");
+            host.put("libc.so.6", b"libc 2.39");
+            host
+        }
+        fn put(&self, name: &str, bytes: &[u8]) {
+            fs::write(self.dir.path().join(name), bytes).unwrap();
+        }
+        fn record(&self) -> PathBuf {
+            self.dir.path().join("state").join(SYSROOT_RECORD)
+        }
+        /// The observation a full probe would make now, with `os` as context.
+        fn observe(&self, os: &str) -> SysrootObserved {
+            let mut lines: Vec<String> = ["crt1.o", "libc.so.6"]
+                .iter()
+                .map(|name| {
+                    let file = self.dir.path().join(name);
+                    let cid = eprfs_core::BlobCid::compute_bytes(&fs::read(&file).unwrap());
+                    format!("link:{name}\t{}\t{cid}", file.display())
+                })
+                .collect();
+            let driver = self.dir.path().join("gcc");
+            if !driver.exists() {
+                fs::write(&driver, b"#!/bin/sh\n").unwrap();
+            }
+            lines.push(format!(
+                "tool:link-driver\t{}\tbafkreidriver",
+                driver.display()
+            ));
+            lines.sort();
+            SysrootObserved {
+                lines,
+                os: Some(os.into()),
+                glibc: Some("2.39".into()),
+            }
+        }
+        fn arrive(&self, os: &str, now: &str) -> Check {
+            let observed = self.observe(os);
+            sysroot_check(&|| Ok(observed.clone()), Ok(self.record()), true, at(now))
+        }
+        /// A status read; its probe panics, proving a read never runs one.
+        fn status(&self, now: &str) -> Check {
+            sysroot_check(
+                &|| panic!("a status read must not run the probe"),
+                Ok(self.record()),
+                false,
+                at(now),
+            )
+        }
+        fn saved(&self) -> SysrootRecord {
+            read_sysroot_record(&self.record()).unwrap().unwrap()
+        }
+    }
+
     #[test]
-    fn sysroot_first_seen_is_ok_and_remembered_only_by_an_arrival() {
-        let dir = tempfile::tempdir().unwrap();
-        let file = dir.path().join(SYSROOT_RECORD);
-        let now = at("2026-11-18T10:00:00Z");
-        let read = sysroot_check(
-            sysroot(CID_A, "almalinux 10.2"),
-            Ok(file.clone()),
-            false,
-            now,
+    fn sysroot_status_runs_no_probe_and_writes_nothing_before_an_arrival() {
+        let host = Host::new();
+        let read = host.status("2026-11-18T10:00:00Z");
+        assert_eq!(read.state, State::Unknown);
+        assert!(read
+            .detail
+            .starts_with("not yet observed; an arrival records it ("));
+        assert!(read.detail.contains("same-path gcc rebuild"));
+        assert_eq!(read.cure.as_deref(), Some("epr device arrive"));
+        assert!(
+            !host.dir.path().join("state").exists(),
+            "a status read must not write"
         );
-        assert_eq!(read.state, State::Ok);
-        assert_eq!(
-            read.to_string(),
-            "ok sysroot: bafkreia…aaaa (almalinux 10.2, glibc 2.39)"
-        );
-        assert!(!file.exists(), "a status read must not write");
-        let arrival = sysroot_check(
-            sysroot(CID_A, "almalinux 10.2"),
-            Ok(file.clone()),
-            true,
-            now,
-        );
-        assert_eq!(arrival.to_string(), read.to_string());
-        let record = read_sysroot_record(&file).unwrap().unwrap();
-        assert_eq!(record.current.cid, CID_A);
+    }
+
+    #[test]
+    fn sysroot_arrival_records_then_status_reads_the_record() {
+        let host = Host::new();
+        let arrival = host.arrive("almalinux 10.2", "2026-11-18T10:00:00Z");
+        assert_eq!(arrival.state, State::Ok);
+        let record = host.saved();
         assert_eq!(record.current.first_seen, "2026-11-18T10:00:00Z");
-        assert!(record.previous.is_none());
+        assert_eq!(record.current.lines, host.observe("x").lines);
+        assert!(record.history.is_empty());
+        let before = fs::read(host.record()).unwrap();
+        let read = host.status("2026-11-19T10:00:00Z");
+        assert_eq!(read.to_string(), arrival.to_string());
+        assert!(arrival
+            .to_string()
+            .ends_with("(almalinux 10.2, glibc 2.39)"));
+        // An unchanged arrival leaves the record byte-identical.
+        host.arrive("almalinux 10.2", "2026-11-20T10:00:00Z");
+        assert_eq!(fs::read(host.record()).unwrap(), before);
     }
+
     #[test]
-    fn sysroot_unchanged_stays_ok_and_leaves_the_record() {
-        let dir = tempfile::tempdir().unwrap();
-        let file = dir.path().join(SYSROOT_RECORD);
-        sysroot_check(
-            sysroot(CID_A, "almalinux 10.2"),
-            Ok(file.clone()),
-            true,
-            at("2026-11-01T00:00:00Z"),
-        );
-        let before = fs::read(&file).unwrap();
-        let later = sysroot_check(
-            sysroot(CID_A, "almalinux 10.2"),
-            Ok(file.clone()),
-            true,
-            at("2026-11-18T10:00:00Z"),
-        );
-        assert_eq!(later.state, State::Ok);
-        assert_eq!(fs::read(&file).unwrap(), before);
-    }
-    #[test]
-    fn sysroot_change_degrades_with_both_identities_then_settles() {
-        let dir = tempfile::tempdir().unwrap();
-        let file = dir.path().join(SYSROOT_RECORD);
-        sysroot_check(
-            sysroot(CID_A, "almalinux 10.1"),
-            Ok(file.clone()),
-            true,
-            at("2026-11-01T00:00:00Z"),
-        );
-        let new = || sysroot(CID_B, "almalinux 10.2");
-        // A status read sees the change, names it, and writes nothing.
-        let read = sysroot_check(new(), Ok(file.clone()), false, at("2026-11-18T10:00:00Z"));
+    fn sysroot_status_sees_a_changed_input_without_a_probe_and_an_arrival_records_it() {
+        let host = Host::new();
+        host.arrive("almalinux 10.1", "2026-11-01T00:00:00Z");
+        host.put("libc.so.6", b"libc 2.39-145");
+        let read = host.status("2026-11-18T10:00:00Z");
         assert_eq!(read.state, State::Degraded);
-        assert_eq!(
-            read_sysroot_record(&file).unwrap().unwrap().current.cid,
-            CID_A
+        assert!(
+            read.detail.starts_with(
+                "changed after 2026-11-01T00:00:00Z: 1 of 3 recorded inputs differ (link:libc.so.6)"
+            ),
+            "{}",
+            read.detail
         );
-        let arrival = sysroot_check(new(), Ok(file.clone()), true, at("2026-11-18T10:00:00Z"));
+        assert!(read
+            .cure
+            .unwrap()
+            .starts_with("epr device arrive records the new identity"));
+        assert!(
+            host.saved().history.is_empty(),
+            "a status read must not write"
+        );
+        let arrival = host.arrive("almalinux 10.2", "2026-11-18T10:00:00Z");
+        let old = host.saved().history[0].clone();
+        let now = host.saved().current;
         assert_eq!(
             arrival.to_string(),
-            "degraded sysroot: changed since 2026-11-18T10:00:00Z — was bafkreia…aaaa \
-             (almalinux 10.1, glibc 2.39), now bafkreib…bbbb (almalinux 10.2, glibc 2.39); \
-             artifact keys and pool build caches made before are for the previous system \
-             libraries — none needed for correctness; expect cold builds and key misses; \
-             record the new image in the journal; this line settles 7 days after the change"
+            format!(
+                "degraded sysroot: changed since 2026-11-18T10:00:00Z — was {}, now {}; \
+                 artifact keys and pool build caches made before are for the previous system \
+                 libraries — none needed for correctness; expect cold builds and key misses; \
+                 record the new image in the journal; this line settles 7 days after the \
+                 change; {SYSROOT_BLIND}",
+                describe_sysroot(&old),
+                describe_sysroot(&now)
+            )
         );
-        assert_eq!(arrival.to_string(), read.to_string());
-        let record = read_sysroot_record(&file).unwrap().unwrap();
-        assert_eq!(record.current.cid, CID_B);
-        assert_eq!(record.previous.unwrap().cid, CID_A);
-        // The change stays visible on later reads within the notice, then is a plain fact.
-        let soon = sysroot_check(new(), Ok(file.clone()), true, at("2026-11-20T00:00:00Z"));
-        assert_eq!(soon.state, State::Degraded);
-        assert!(soon
-            .detail
-            .starts_with("changed since 2026-11-18T10:00:00Z"));
-        let settled = sysroot_check(new(), Ok(file.clone()), true, at("2026-11-26T00:00:00Z"));
-        assert_eq!(settled.state, State::Ok);
+        assert!(old.lines.is_empty() && !now.lines.is_empty());
         assert_eq!(
-            read_sysroot_record(&file)
-                .unwrap()
-                .unwrap()
-                .previous
-                .unwrap()
-                .cid,
-            CID_A
+            host.status("2026-11-18T11:00:00Z").to_string(),
+            arrival.to_string()
         );
     }
+
+    /// The notice is `[change, change + 7 days)`: settled at exactly seven days, not revived by a
+    /// clock stepped back before the change, and a second change keeps the first in history.
     #[test]
-    fn sysroot_unobservable_degrades_and_never_writes() {
-        let dir = tempfile::tempdir().unwrap();
-        let file = dir.path().join(SYSROOT_RECORD);
+    fn sysroot_notice_window_boundary_rollback_and_second_change() {
+        let host = Host::new();
+        host.arrive("v1", "2026-11-01T00:00:00Z");
+        host.put("crt1.o", b"crt1 v2");
+        host.arrive("v2", "2026-11-10T00:00:00Z");
+        for (now, state) in [
+            ("2026-11-10T00:00:00Z", State::Degraded),
+            ("2026-11-16T23:59:59Z", State::Degraded),
+            ("2026-11-17T00:00:00Z", State::Ok),
+            ("2026-11-09T23:59:59Z", State::Ok),
+            ("2020-01-01T00:00:00Z", State::Ok),
+        ] {
+            assert_eq!(host.status(now).state, state, "{now}");
+        }
+        host.put("crt1.o", b"crt1 v3");
+        host.arrive("v3", "2026-11-12T00:00:00Z");
+        let record = host.saved();
+        let os: Vec<_> = record
+            .history
+            .iter()
+            .map(|s| s.os.clone().unwrap())
+            .collect();
+        assert_eq!(os, ["v2", "v1"]);
+        for n in 4..=12 {
+            host.put("crt1.o", format!("crt1 v{n}").as_bytes());
+            host.arrive(&format!("v{n}"), "2026-11-13T00:00:00Z");
+        }
+        assert_eq!(host.saved().history.len(), SYSROOT_HISTORY);
+    }
+
+    /// The record is read without following a link, never past its size bound, never from a
+    /// non-regular file, and never with an unparseable time; each is said, never a refusal.
+    #[test]
+    fn sysroot_record_reads_are_bounded_and_refuse_links_and_bad_times() {
+        let host = Host::new();
+        host.arrive("v1", "2026-11-01T00:00:00Z");
+        let record = host.record();
+        let good = fs::read(&record).unwrap();
+        let elsewhere = host.dir.path().join("elsewhere.json");
+        fs::write(&elsewhere, &good).unwrap();
+        fs::remove_file(&record).unwrap();
+        std::os::unix::fs::symlink(&elsewhere, &record).unwrap();
+        let unread = |why: &str| {
+            let check = host.status("2026-11-18T10:00:00Z");
+            assert_eq!(check.state, State::Degraded, "{why}");
+            assert!(
+                check.detail.starts_with("unobserved (record unreadable: ")
+                    && check.detail.contains(why),
+                "{}",
+                check.detail
+            );
+            assert!(check.cure.unwrap().starts_with("remove "));
+        };
+        unread("is a symbolic link");
+        fs::remove_file(&record).unwrap();
+        fs::write(&record, vec![b' '; SYSROOT_RECORD_LIMIT as usize + 1]).unwrap();
+        unread("exceeds");
+        fs::remove_file(&record).unwrap();
+        fs::create_dir(&record).unwrap();
+        unread("not a regular file");
+        fs::remove_dir(&record).unwrap();
+        let text = String::from_utf8(good.clone()).unwrap();
+        fs::write(&record, text.replace("2026-11-01T00:00:00Z", "yesterday")).unwrap();
+        unread("invalid firstSeen");
+        // An arrival does not overwrite a record it cannot read.
+        let check = host.arrive("v1", "2026-11-18T10:00:00Z");
+        assert!(check.detail.starts_with("unobserved (record unreadable"));
+        assert!(fs::read_to_string(&record).unwrap().contains("yesterday"));
+    }
+
+    /// The record is replaced through an exclusively created file: a link planted at the record
+    /// or at the old predictable staging name is replaced or ignored, never written through.
+    #[test]
+    fn sysroot_record_writes_never_follow_a_planted_link() {
+        let host = Host::new();
+        let victim = host.dir.path().join("victim");
+        fs::write(&victim, b"keep me").unwrap();
+        let record = host.record();
+        fs::create_dir_all(record.parent().unwrap()).unwrap();
+        std::os::unix::fs::symlink(&victim, record.with_extension("json.new")).unwrap();
+        host.arrive("v1", "2026-11-01T00:00:00Z");
+        assert_eq!(fs::read(&victim).unwrap(), b"keep me");
+        assert_eq!(host.saved().current.os.as_deref(), Some("v1"));
+        let leftovers: Vec<_> = fs::read_dir(record.parent().unwrap())
+            .unwrap()
+            .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+            .filter(|name| name.starts_with(".tmp"))
+            .collect();
+        assert!(leftovers.is_empty(), "{leftovers:?}");
+    }
+
+    /// Arrivals serialise on the lock beside the record; a held lock makes another arrival say
+    /// so instead of racing the read-update-replace.
+    #[test]
+    fn sysroot_arrivals_serialise_on_the_record_lock() {
+        let host = Host::new();
+        let held = lock_sysroot(&host.record(), std::time::Duration::ZERO).unwrap();
+        let waited = lock_sysroot(&host.record(), std::time::Duration::from_millis(50));
+        assert!(waited.unwrap_err().starts_with("another arrival holds"));
+        drop(held);
+        assert!(lock_sysroot(&host.record(), std::time::Duration::ZERO).is_ok());
+    }
+
+    #[test]
+    fn sysroot_unobservable_arrival_degrades_and_never_writes() {
+        let host = Host::new();
         let check = sysroot_check(
-            Err("no C link driver cc under PATH".into()),
-            Ok(file.clone()),
+            &|| Err("probe exceeded 10s: cc -E -dM -x c - exceeded the probe deadline".into()),
+            Ok(host.record()),
             true,
             at("2026-11-18T10:00:00Z"),
         );
         assert_eq!(
             check.to_string(),
-            "degraded sysroot: unobserved (no C link driver cc under PATH)"
+            "degraded sysroot: unobserved (probe exceeded 10s: cc -E -dM -x c - exceeded the \
+             probe deadline)"
         );
-        assert!(!file.exists());
-        // A corrupt record is replaced, said once, never a refusal.
-        fs::create_dir_all(file.parent().unwrap()).unwrap();
-        fs::write(&file, b"not json").unwrap();
-        let check = sysroot_check(
-            sysroot(CID_A, "rhel 10.0"),
-            Ok(file.clone()),
-            true,
-            at("2026-11-18T10:00:00Z"),
-        );
-        assert_eq!(check.state, State::Ok);
-        assert!(
-            check.detail.contains("previous record unreadable"),
-            "{}",
-            check.detail
-        );
-        assert_eq!(
-            read_sysroot_record(&file).unwrap().unwrap().current.cid,
-            CID_A
-        );
-        // No state directory: the identity is still shown, the change is not tracked.
-        let check = sysroot_check(
-            sysroot(CID_A, "rhel 10.0"),
+        assert!(!host.record().exists());
+        let nowhere = sysroot_check(
+            &|| panic!("no record place: nothing to compare"),
             Err("no state directory".into()),
-            true,
+            false,
             at("2026-11-18T10:00:00Z"),
         );
-        assert_eq!(check.state, State::Ok);
-        assert!(check
-            .detail
-            .ends_with("change not tracked: no state directory"));
+        assert_eq!(nowhere.state, State::Degraded);
+        assert!(nowhere.detail.contains("no state directory"));
     }
+
     #[test]
     fn sysroot_context_reads_os_release_quoting() {
         assert_eq!(
-            os_release("NAME=\"AlmaLinux\"\nID=\"almalinux\"\nID_LIKE=\"rhel centos fedora\"\nVERSION_ID=\"10.2\"\n"),
+            os_release(
+                "NAME=\"AlmaLinux\"\nID=\"almalinux\"\nID_LIKE=\"rhel centos fedora\"\nVERSION_ID=\"10.2\"\n"
+            ),
             Some("almalinux 10.2".into())
         );
         assert_eq!(
@@ -2203,7 +2486,30 @@ mod tests {
         );
         assert_eq!(os_release("ID=arch\n"), Some("arch".into()));
         assert_eq!(os_release("NAME=x\n"), None);
-        assert_eq!(describe_sysroot(CID_A, None, None), "bafkreia…aaaa");
+    }
+
+    /// Measures the two paths on this host: `EPR_MEASURE_SYSROOT=1` prints the wall time of an
+    /// arrival's full probe and of a status read's cheap re-check; otherwise it does nothing.
+    #[test]
+    fn sysroot_probe_cost_on_this_host() {
+        if std::env::var_os("EPR_MEASURE_SYSROOT").is_none() {
+            return;
+        }
+        let env = |key: &str| std::env::var(key).ok();
+        let started = std::time::Instant::now();
+        let observed = observe_sysroot(&env).unwrap();
+        let full = started.elapsed();
+        let started = std::time::Instant::now();
+        let drifted = crate::artifact::sysroot_drift(&observed.lines);
+        let cheap = started.elapsed();
+        eprintln!(
+            "sysroot probe on this host: full {full:?} ({} lines, cid {}), cheap re-check {cheap:?} \
+             ({} drifted)",
+            observed.lines.len(),
+            observed.cid(),
+            drifted.len()
+        );
+        assert!(drifted.is_empty());
     }
     #[test]
     fn toolchain_pin_is_read_from_pool_policy_and_found_under_rustup_home() {

@@ -1,7 +1,9 @@
 //! Host inputs observed before a build, and the linker witness checked before recording it.
 
+use std::io::Read;
 use std::path::Path;
 use std::process::{Command, Output, Stdio};
+use std::time::{Duration, Instant};
 
 use object::{Object, ObjectSection};
 
@@ -20,20 +22,42 @@ const DRIVER_INPUTS: [&str; 8] = [
 ];
 
 fn probe(tool: &Path, args: &[&str], path: &str) -> ArtifactResult<Output> {
-    let output = Command::new(tool)
+    probe_until(tool, args, path, None)
+}
+
+/// [`probe`], killing the child's whole process group once `deadline` passes.
+fn probe_until(
+    tool: &Path,
+    args: &[&str],
+    path: &str,
+    deadline: Option<Instant>,
+) -> ArtifactResult<Output> {
+    let mut command = Command::new(tool);
+    command
         .args(args)
         .stdin(Stdio::null())
         .env_clear()
         .env("PATH", path)
-        .env("LANG", "C")
-        .output()
-        .map_err(|e| {
-            ArtifactError::Gap(format!(
-                "{} {} does not run: {e}",
-                tool.display(),
-                args.join(" ")
-            ))
-        })?;
+        .env("LANG", "C");
+    let ran = |e: std::io::Error| {
+        ArtifactError::Gap(format!(
+            "{} {} does not run: {e}",
+            tool.display(),
+            args.join(" ")
+        ))
+    };
+    let output = match deadline {
+        None => command.output().map_err(ran)?,
+        Some(deadline) => bounded_output(&mut command, deadline)
+            .map_err(ran)?
+            .ok_or_else(|| {
+                ArtifactError::Gap(format!(
+                    "{} {} exceeded the probe deadline",
+                    tool.display(),
+                    args.join(" ")
+                ))
+            })?,
+    };
     if !output.status.success() {
         return Err(ArtifactError::Gap(format!(
             "{} {} failed: {}",
@@ -45,6 +69,60 @@ fn probe(tool: &Path, args: &[&str], path: &str) -> ArtifactResult<Output> {
     Ok(output)
 }
 
+/// Run `command` to completion or until `deadline`; `None` when the deadline passed. The child
+/// leads its own process group, and the whole group is killed, so a driver's own children (cc1)
+/// cannot keep it alive. Pipe readers are left behind on expiry rather than joined: a descendant
+/// that left the group may still hold a pipe, and this caller must not wait for it.
+fn bounded_output(command: &mut Command, deadline: Instant) -> std::io::Result<Option<Output>> {
+    use std::os::unix::process::CommandExt;
+    let mut child = command
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .process_group(0)
+        .spawn()?;
+    let reader = |pipe: Option<Box<dyn Read + Send>>| {
+        std::thread::spawn(move || {
+            let mut bytes = Vec::new();
+            if let Some(mut pipe) = pipe {
+                // A read error ends the capture; the exit status still decides the probe.
+                let _ = pipe.read_to_end(&mut bytes);
+            }
+            bytes
+        })
+    };
+    let stdout = reader(
+        child
+            .stdout
+            .take()
+            .map(|p| Box::new(p) as Box<dyn Read + Send>),
+    );
+    let stderr = reader(
+        child
+            .stderr
+            .take()
+            .map(|p| Box::new(p) as Box<dyn Read + Send>),
+    );
+    let status = loop {
+        if let Some(status) = child.try_wait()? {
+            break status;
+        }
+        if Instant::now() >= deadline {
+            let group = i32::try_from(child.id()).unwrap_or(i32::MAX);
+            // SAFETY: kill(2) takes plain integers; the group is this child's own, created by
+            // process_group(0) above, so no unrelated process is signalled.
+            unsafe { libc::kill(-group, libc::SIGKILL) };
+            let _ = child.wait();
+            return Ok(None);
+        }
+        std::thread::sleep(Duration::from_millis(2));
+    };
+    Ok(Some(Output {
+        status,
+        stdout: stdout.join().unwrap_or_default(),
+        stderr: stderr.join().unwrap_or_default(),
+    }))
+}
+
 fn output_bytes(output: Output) -> Vec<u8> {
     [output.stdout, output.stderr].concat()
 }
@@ -53,14 +131,27 @@ mod native_libraries;
 mod selections;
 pub(super) use selections::{codegen_options, merge_configs, resolve, target, Selections};
 
-fn tool_version(lines: &mut String, label: &str, tool: &Path, path: &str) -> ArtifactResult<()> {
-    let version = BlobCid::compute_bytes(&output_bytes(probe(tool, &["--version"], path)?));
+fn tool_version(
+    lines: &mut String,
+    label: &str,
+    tool: &Path,
+    path: &str,
+    deadline: Option<Instant>,
+) -> ArtifactResult<()> {
+    let output = probe_until(tool, &["--version"], path, deadline)?;
+    let version = BlobCid::compute_bytes(&output_bytes(output));
     lines.push_str(&format!("tool:{label}\t{}\t{version}\n", tool.display()));
     Ok(())
 }
 
-fn driver_defaults(lines: &mut String, label: &str, tool: &Path, path: &str) -> ArtifactResult<()> {
-    let output = probe(tool, &["-E", "-dM", "-x", "c", "-"], path)?;
+fn driver_defaults(
+    lines: &mut String,
+    label: &str,
+    tool: &Path,
+    path: &str,
+    deadline: Option<Instant>,
+) -> ArtifactResult<()> {
+    let output = probe_until(tool, &["-E", "-dM", "-x", "c", "-"], path, deadline)?;
     let macros = String::from_utf8(output.stdout).map_err(|e| {
         ArtifactError::Gap(format!("{} macro dump is not UTF-8: {e}", tool.display()))
     })?;
@@ -152,10 +243,10 @@ pub(super) fn tool_lines(
     }
     let mut lines = String::new();
     if let Some(driver) = &driver {
-        tool_version(&mut lines, "link-driver", driver, path)?;
-        driver_defaults(&mut lines, "link-driver", driver, path)?;
+        tool_version(&mut lines, "link-driver", driver, path, None)?;
+        driver_defaults(&mut lines, "link-driver", driver, path, None)?;
         for input in DRIVER_INPUTS {
-            if let Some(file) = native_libraries::driver_file(driver, input, path)? {
+            if let Some(file) = native_libraries::driver_file(driver, input, path, None)? {
                 link_input(&mut lines, input, Path::new(&file), 0)?;
             } else {
                 lines.push_str(&format!("link:{input}\t-\n"));
@@ -163,11 +254,11 @@ pub(super) fn tool_lines(
         }
         for name in native_libraries::probe(descriptor, path)? {
             let shared = format!("lib{name}.so");
-            if let Some(file) = native_libraries::driver_file(driver, &shared, path)? {
+            if let Some(file) = native_libraries::driver_file(driver, &shared, path, None)? {
                 link_input(&mut lines, &shared, Path::new(&file), 0)?;
             } else {
                 let archive = format!("lib{name}.a");
-                if let Some(file) = native_libraries::driver_file(driver, &archive, path)? {
+                if let Some(file) = native_libraries::driver_file(driver, &archive, path, None)? {
                     link_input(&mut lines, &archive, Path::new(&file), 0)?;
                 } else {
                     lines.push_str(&format!("link:lib{name}\t-\n"));
@@ -189,8 +280,8 @@ pub(super) fn tool_lines(
     }
     if let Some(cc) = cc {
         if driver.as_ref() != Some(&cc) {
-            tool_version(&mut lines, "CC", &cc, path)?;
-            driver_defaults(&mut lines, "CC", &cc, path)?;
+            tool_version(&mut lines, "CC", &cc, path, None)?;
+            driver_defaults(&mut lines, "CC", &cc, path, None)?;
         }
     }
     if let Some(name) = &selections.external_linker {
@@ -200,70 +291,64 @@ pub(super) fn tool_lines(
                 "selected linker {label}={name} does not resolve under recorded PATH"
             ))
         })?;
-        tool_version(&mut lines, label, &resolved, path)?;
+        tool_version(&mut lines, label, &resolved, path, None)?;
     }
     Ok(lines)
 }
 
-/// This host's system link inputs, read by the same probe the artifact key's input uses: the
-/// `tool:link-driver` and `link:` lines [`tool_lines`] writes for a build of rustc's host triple
-/// under `path` with no flags and no cargo configuration (so the default `cc` driver and std's
-/// native libraries), sorted. Paths stay absolute, as the key's input document spells them.
-/// `toolchain` selects the compiler whose std names those libraries. A host with no `cc` has no
-/// observable sysroot and refuses.
-pub(crate) fn sysroot_lines(path: &str, toolchain: &str) -> ArtifactResult<Vec<String>> {
-    let rustc = super::resolve_tool_path("rustc", path)
-        .ok_or_else(|| ArtifactError::Gap("rustc does not resolve under PATH".into()))?;
-    // The identity `describe` records: `rustc -vV` in this process's environment, here with the
-    // toolchain pinned and rustup forbidden to install one.
-    let output = Command::new(&rustc)
-        .arg("-vV")
-        .stdin(Stdio::null())
-        .env("PATH", path)
-        .env("RUSTUP_TOOLCHAIN", toolchain)
-        .env("RUSTUP_AUTO_INSTALL", "0")
-        .output()
-        .map_err(|e| ArtifactError::Gap(format!("{} -vV does not run: {e}", rustc.display())))?;
-    if !output.status.success() {
-        return Err(ArtifactError::Gap(format!(
-            "{} -vV failed: {}",
-            rustc.display(),
-            String::from_utf8_lossy(&output.stderr).trim()
-        )));
+/// Libraries the sysroot identity reads beyond [`DRIVER_INPUTS`], as the C driver resolves them.
+/// Their GNU ld scripts pull in, by content, libc.so.6, the loader, libc_nonshared.a, libm.so.6,
+/// libmvec.so.1, libgcc_s.so.1 and libgcc.a. A fixed list, so no compiler other than the C driver
+/// decides what is read: a Rust toolchain switch cannot move the identity.
+const SYSROOT_LIBRARIES: [&str; 3] = ["libc.so", "libm.so", "libgcc_s.so"];
+
+/// This host's sysroot identity lines, read with the artifact key's own primitives: the C link
+/// driver `cc` under `path` (canonical path, `--version` digest, predefined-macro digest), then
+/// each of [`DRIVER_INPUTS`] and [`SYSROOT_LIBRARIES`] as `cc -print-file-name` resolves it,
+/// content-addressed through any linker script. Sorted; absolute canonical paths as the key's
+/// input document spells them. Every child is killed at `deadline`.
+///
+/// What it does NOT see: a same-path gcc rebuild whose `--version` output, predefined macros and
+/// selected inputs are unchanged (cc1, collect2, as and ld are not hashed, nor is the gcc binary
+/// itself); libraries outside these lists, including any a Rust build adds; header files.
+pub(crate) fn sysroot_lines(path: &str, deadline: Instant) -> ArtifactResult<Vec<String>> {
+    let driver = resolve_tool("cc", path)
+        .ok_or_else(|| ArtifactError::Gap("no C link driver cc under PATH".into()))?;
+    let mut lines = String::new();
+    tool_version(&mut lines, "link-driver", &driver, path, Some(deadline))?;
+    driver_defaults(&mut lines, "link-driver", &driver, path, Some(deadline))?;
+    for input in DRIVER_INPUTS.iter().chain(SYSROOT_LIBRARIES.iter()) {
+        match native_libraries::driver_file(&driver, input, path, Some(deadline))? {
+            Some(file) => link_input(&mut lines, input, Path::new(&file), 0)?,
+            None => lines.push_str(&format!("link:{input}\t-\n")),
+        }
     }
-    let identity = String::from_utf8(output.stdout)
-        .map_err(|e| ArtifactError::Gap(format!("rustc -vV is not UTF-8: {e}")))?;
-    let descriptor = MethodDescriptor {
-        name: "sysroot".into(),
-        tools: [
-            ("rustc".to_owned(), identity.trim().to_owned()),
-            ("toolchain".to_owned(), toolchain.to_owned()),
-        ]
-        .into(),
-        flags: vec![],
-        params: None,
-        exec: None,
-        step: None,
-        embedder: None,
-        view: vec![],
-        non_path_inputs: [(PATH_INPUT.to_owned(), path.to_owned())].into(),
-        deterministic: false,
-    };
-    let selections = resolve(
-        &mut descriptor.non_path_inputs.clone(),
-        &toml::Value::Table(Default::default()),
-        target(&descriptor),
-    )?;
-    let mut lines: Vec<String> = tool_lines(&descriptor, &selections)?
-        .lines()
-        .filter(|line| line.starts_with("link:") || line.starts_with("tool:link-driver"))
-        .map(str::to_owned)
-        .collect();
-    if lines.iter().any(|line| line == "tool:link-driver\t-") {
-        return Err(ArtifactError::Gap("no C link driver cc under PATH".into()));
-    }
+    let mut lines: Vec<String> = lines.lines().map(str::to_owned).collect();
     lines.sort_unstable();
     Ok(lines)
+}
+
+/// Re-check recorded [`sysroot_lines`] without running any program: every `link:` file is read
+/// and content-addressed again, and every `tool:` path must still be a file. Returns the labels
+/// that differ. A cheap, partial check: a driver whose output changed at the same path, or an
+/// input recorded as absent that has since appeared, is only seen by a full observation.
+pub(crate) fn sysroot_drift(lines: &[String]) -> Vec<String> {
+    let mut drifted = Vec::new();
+    for line in lines {
+        let fields: Vec<&str> = line.split('\t').collect();
+        let [label, file, cid] = fields[..] else {
+            continue;
+        };
+        let same = if label.starts_with("tool:") {
+            Path::new(file).is_file()
+        } else {
+            std::fs::read(file).is_ok_and(|bytes| BlobCid::compute_bytes(&bytes).to_string() == cid)
+        };
+        if !same {
+            drifted.push(label.to_owned());
+        }
+    }
+    drifted
 }
 
 fn linker_identity(text: &str) -> Option<(&str, &str)> {
@@ -593,81 +678,159 @@ mod tests {
             .contains("describe again"));
     }
 
-    /// PATH order and unrelated PATH entries do not move the sysroot identity: two spellings of
-    /// one `cc` resolve (canonically) to one driver, so the lines are equal; a `cc` with other
-    /// content is another sysroot.
-    #[test]
-    fn sysroot_lines_do_not_depend_on_path_order_or_unrelated_entries() {
-        use std::os::unix::fs::PermissionsExt;
-        let process_path = std::env::var("PATH").unwrap();
-        let rustc = super::super::resolve_tool_path("rustc", &process_path).unwrap();
-        let rustc_dir = rustc.parent().unwrap().display().to_string();
-        let toolchain = std::env::var("RUSTUP_TOOLCHAIN").unwrap_or_else(|_| {
-            let output = Command::new(&rustc).arg("-V").output().unwrap();
-            String::from_utf8(output.stdout)
-                .unwrap()
-                .split_whitespace()
-                .nth(1)
-                .unwrap()
-                .to_owned()
-        });
-        let root = tempfile::tempdir().unwrap();
-        let stub = |name: &str, version: &str| {
-            let file = root.path().join(name);
-            std::fs::write(
-                &file,
+    /// A fake toolchain: `cc` resolves inputs from `lib` (else echoes the name, as gcc does for
+    /// an unknown file), prints `version`, and dumps one macro. No rustc anywhere on PATH.
+    struct FakeSysroot {
+        root: tempfile::TempDir,
+    }
+    impl FakeSysroot {
+        fn new() -> Self {
+            let fake = Self {
+                root: tempfile::tempdir().unwrap(),
+            };
+            std::fs::create_dir(fake.lib()).unwrap();
+            for name in DRIVER_INPUTS {
+                fake.put(name, name.as_bytes());
+            }
+            fake.put("libc.so.6", b"\x7fELF libc 2.39");
+            fake.put("libc_nonshared.a", b"!<arch> nonshared");
+            fake.put("ld-linux-x86-64.so.2", b"\x7fELF loader");
+            fake.put("libm.so", b"\x7fELF libm");
+            let lib = fake.lib().display().to_string();
+            fake.put(
+                "libc.so",
                 format!(
-                    "#!/bin/sh\ncase \"$1\" in\n  -print-file-name=*) echo \"${{1#-print-file-name=}}\" ;;\n  \
-                     --version) echo '{version}' ;;\n  *) echo '#define __STUB__ 1' ;;\nesac\n"
+                    "/* GNU ld script */\nOUTPUT_FORMAT(elf64-x86-64)\nGROUP ( {lib}/libc.so.6 \
+                     {lib}/libc_nonshared.a  AS_NEEDED ( {lib}/ld-linux-x86-64.so.2 ) )\n"
+                )
+                .as_bytes(),
+            );
+            fake.driver("cc 14.3.1");
+            fake
+        }
+        fn lib(&self) -> std::path::PathBuf {
+            self.root.path().join("lib")
+        }
+        fn put(&self, name: &str, bytes: &[u8]) {
+            std::fs::write(self.lib().join(name), bytes).unwrap();
+        }
+        fn driver(&self, body: &str) {
+            use std::os::unix::fs::PermissionsExt;
+            let file = self.root.path().join("gcc");
+            let staged = self.root.path().join("gcc.new");
+            std::fs::write(
+                &staged,
+                format!(
+                    "#!/bin/sh\ncase \"$1\" in\n  -print-file-name=*) n=\"${{1#-print-file-name=}}\"; \
+                     if [ -e '{lib}'/\"$n\" ]; then echo '{lib}'/\"$n\"; else echo \"$n\"; fi ;;\n  \
+                     --version) echo '{body}' ;;\n  *) {body_macros} ;;\nesac\n",
+                    lib = self.lib().display(),
+                    // `sleep_ <command>` makes every probe but `--version` run <command>.
+                    body_macros = body
+                        .strip_prefix("sleep_ ")
+                        .unwrap_or("echo '#define __GNUC__ 14'"),
                 ),
             )
             .unwrap();
-            std::fs::set_permissions(&file, std::fs::Permissions::from_mode(0o755)).unwrap();
+            std::fs::set_permissions(&staged, std::fs::Permissions::from_mode(0o755)).unwrap();
+            std::fs::rename(&staged, &file).unwrap();
+            // `--version` answers at once even for the sleeping driver.
             fixture::wait_for_stub(&file);
-            file
-        };
-        let gcc = stub("gcc", "stub-cc 14.3.1");
-        let other = stub("other-gcc", "stub-cc 14.3.2");
-        let dirs: Vec<_> = ["a", "b", "unrelated", "c"]
-            .iter()
-            .map(|name| {
-                let dir = root.path().join(name);
+        }
+        /// A PATH directory named `name` holding a `cc` link to the fake driver.
+        fn bin(&self, name: &str) -> String {
+            let dir = self.root.path().join(name);
+            if !dir.exists() {
                 std::fs::create_dir(&dir).unwrap();
-                dir
-            })
-            .collect();
-        std::os::unix::fs::symlink(&gcc, dirs[0].join("cc")).unwrap();
-        std::os::unix::fs::symlink(&gcc, dirs[1].join("cc")).unwrap();
-        std::os::unix::fs::symlink(&other, dirs[3].join("cc")).unwrap();
-        let spell = |order: &[usize]| {
-            let mut entries: Vec<String> = order
-                .iter()
-                .map(|i| dirs[*i].display().to_string())
-                .collect();
-            entries.push(rustc_dir.clone());
-            entries.join(":")
-        };
-        let first = sysroot_lines(&spell(&[0]), &toolchain).unwrap();
-        assert!(
-            first
-                .iter()
-                .any(|line| line.starts_with("tool:link-driver\t")),
-            "{first:?}"
-        );
+                std::os::unix::fs::symlink(self.root.path().join("gcc"), dir.join("cc")).unwrap();
+            }
+            dir.display().to_string()
+        }
+        fn lines(&self, path: &str) -> Vec<String> {
+            sysroot_lines(path, Instant::now() + Duration::from_secs(20)).unwrap()
+        }
+    }
+
+    /// The identity names the driver and its inputs by canonical path and content: PATH order,
+    /// spelling and unrelated entries do not move it, no rustc is consulted, and a change to a
+    /// crt object or to a library behind a linker script does.
+    #[test]
+    fn sysroot_lines_are_the_drivers_inputs_by_content_not_path_or_rustc() {
+        let fake = FakeSysroot::new();
+        let (a, b) = (fake.bin("a"), fake.bin("b"));
+        let unrelated = fake.root.path().join("unrelated");
+        std::fs::create_dir(&unrelated).unwrap();
+        let unrelated = unrelated.display().to_string();
+        let first = fake.lines(&a);
+        for path in [
+            format!("{b}:{a}"),
+            format!("{unrelated}:{a}"),
+            format!("{b}:{unrelated}"),
+        ] {
+            assert_eq!(fake.lines(&path), first, "{path}");
+        }
+        // Labels keep the linker script's own spelling; the path field is canonical.
+        let lib = fake.lib().display().to_string();
+        let real = std::fs::canonicalize(fake.lib())
+            .unwrap()
+            .display()
+            .to_string();
         assert!(first
             .iter()
-            .all(|line| !line.contains(&format!("{}/", dirs[0].display()))));
-        for order in [&[1, 0][..], &[2, 1], &[2, 0, 1]] {
-            assert_eq!(
-                sysroot_lines(&spell(order), &toolchain).unwrap(),
-                first,
-                "{order:?}"
-            );
-        }
-        assert_ne!(sysroot_lines(&spell(&[3]), &toolchain).unwrap(), first);
-        assert!(sysroot_lines(&spell(&[2]), &toolchain)
-            .unwrap_err()
-            .to_string()
-            .contains("no C link driver cc"));
+            .any(|l| l.starts_with(&format!("link:crt1.o\t{real}/crt1.o\t"))));
+        assert!(first
+            .iter()
+            .any(|l| l.starts_with(&format!("link:libc.so>{lib}/libc.so.6\t{real}/libc.so.6\t"))));
+        assert!(first.contains(&"link:libgcc_s.so\t-".to_owned()));
+        assert!(first.iter().all(|l| !l.contains("rustc")));
+        assert!(sysroot_drift(&first).is_empty());
+
+        fake.put("libc.so.6", b"\x7fELF libc 2.40");
+        let libc = fake.lines(&a);
+        assert_ne!(libc, first);
+        assert_eq!(
+            sysroot_drift(&first),
+            vec![format!("link:libc.so>{lib}/libc.so.6")]
+        );
+        fake.put("crt1.o", b"another crt1");
+        assert_ne!(fake.lines(&a), libc);
+        assert!(sysroot_drift(&libc).contains(&"link:crt1.o".to_owned()));
+        // A driver whose output changes at the same path moves the identity, but only a full
+        // observation sees it: the cheap re-check runs no program.
+        let before = fake.lines(&a);
+        fake.driver("cc 14.3.2");
+        assert_ne!(fake.lines(&a), before);
+        assert!(sysroot_drift(&before).is_empty());
+        let empty = fake.root.path().join("empty").display().to_string();
+        assert!(
+            sysroot_lines(&empty, Instant::now() + Duration::from_secs(5))
+                .unwrap_err()
+                .to_string()
+                .contains("no C link driver cc")
+        );
+    }
+
+    /// A driver that never answers is killed at the deadline instead of holding the caller.
+    #[test]
+    fn sysroot_probe_kills_a_driver_that_overruns_its_deadline() {
+        let fake = FakeSysroot::new();
+        let a = fake.bin("a");
+        // The probe clears PATH to the fake's; the sleeper is a grandchild holding the pipes.
+        let sleep = ["/usr/bin/sleep", "/bin/sleep"]
+            .into_iter()
+            .find(|p| Path::new(p).exists())
+            .unwrap();
+        fake.driver(&format!("sleep_ {sleep} 30; true"));
+        let started = Instant::now();
+        let error = sysroot_lines(&a, Instant::now() + Duration::from_millis(300)).unwrap_err();
+        assert!(
+            error.to_string().contains("exceeded the probe deadline"),
+            "{error}"
+        );
+        assert!(
+            started.elapsed() < Duration::from_secs(10),
+            "{:?}",
+            started.elapsed()
+        );
     }
 }
