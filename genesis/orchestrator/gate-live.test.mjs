@@ -33,6 +33,10 @@ const {
 
 // Existing tests are not a sibling-notes run; the sibling tests below pass their own env.
 process.env.GATE_LIVE_SIBLING = 'off';
+// just gate exports GATE_LIVE_REF for the run it opens (994f10630); openRun defaults to it, so a test
+// that inherits it writes a ref its fixture did not ask for. Fixtures name their own ref.
+delete process.env.GATE_LIVE_REF;
+
 
 const SHA = '0123456789abcdef0123456789abcdef01234567';
 const AT = '2026-10-26T12:00:00.000Z';

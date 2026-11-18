@@ -10,6 +10,10 @@ import addFormats from 'ajv-formats';
 import { createRecognizer } from './gate-failure-lines.mjs';
 import { appendEvent, closeRun, openRun, readRun } from './gate-live.mjs';
 
+// just gate exports GATE_LIVE_REF for the run it opens (994f10630); openRun defaults to it, so a test
+// that inherits it writes a ref its fixture did not ask for. Fixtures name their own ref.
+delete process.env.GATE_LIVE_REF;
+
 // Ajv2020 + strict/allErrors follows schemas/scripts/test-replicates-content-schema.mjs.
 const schemaRoot = new URL('../../elohim/sdk/schemas/v1/', import.meta.url);
 const load = name => JSON.parse(readFileSync(new URL(name, schemaRoot), 'utf8'));
