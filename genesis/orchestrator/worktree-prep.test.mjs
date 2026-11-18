@@ -284,13 +284,18 @@ test('row 11 (b): a moved submodule whose pin no checkout holds refuses with the
   assert.match(f.logs.find(line => line.startsWith('[prep] REFUSED:')), /no local checkout holds the pinned commit/);
 });
 
-test('row 11: a checkout aborted mid-way (every file staged as deleted) is restored to its pin', t => {
+test('E8 #2: every tracked file staged as deleted is refused, never forced, and names the command', t => {
+  // An aborted checkout and a deliberate deletion of every file both leave an empty index.
   const f = movedFixture(t, { aborted: true, held: false });
-  assert.equal(prep(f.options), 0, f.logs.join('\n'));
-  assert.match(f.logs.join('\n'), /elohim\/brit: every tracked file is staged as deleted \(an aborted checkout\); restoring it/);
-  const update = f.calls.find(call => call[0] === 'git' && call.includes('--no-fetch') && call.at(-1) === 'elohim/brit' && !call.includes('--init'));
-  assert.ok(update.includes('--force'), update.join(' '));
-  assert.ok(f.calls.some(call => call.includes('fetch') && call.includes('/wt/nt-e2/elohim/brit')), 'the pin was fetched first');
+  assert.equal(prep(f.options), 1, f.logs.join('\n'));
+  const line = f.logs.find(l => l.startsWith('[prep] REFUSED elohim/brit:'));
+  assert.ok(line, f.logs.join('\n'));
+  assert.match(line, /every tracked file \(2\) is staged as deleted/);
+  assert.match(line, /git submodule update --force -- elohim\/brit$/);
+  assert.ok(!f.calls.some(call => call.includes('--force')), 'nothing is forced');
+  assert.ok(!f.calls.some(call => call.includes('--no-fetch') && call.at(-1) === 'elohim/brit' && !call.includes('--init')),
+    'no update of that submodule at all');
+  assert.ok(f.calls.some(call => call.includes('install')), 'the rest of prep still runs');
 });
 
 test('E6 #1: one intentionally staged deletion in a moved submodule is work, never forced away', t => {

@@ -117,6 +117,7 @@ export function prep({ root = ROOT, spawn = spawnSync, exists = existsSync,
     if (failure) throw new Error(failure);
   };
   let failed = false;
+  const refused = []; // moved submodules prep would not touch (E8 #2): prep exits 1 naming each
   try {
     const main = mainCheckout({ root, spawn });
     const modules = checkSubmodules({ root, spawn });
@@ -154,17 +155,23 @@ export function prep({ root = ROOT, spawn = spawnSync, exists = existsSync,
       const status = spawn('git', ['-C', dir, 'status', '--porcelain'], { encoding: 'utf8' });
       const lines = String(status.stdout ?? '').split('\n').filter(Boolean);
       // Row 11's signature: an aborted checkout leaves every tracked file staged as deleted, so its
-      // index holds NO entry. "Every status line is a staged deletion" alone is not proof (E6 #1):
-      // status lists only changed paths, so one intentional staged deletion beside untouched files
-      // looks the same. Only an empty index is no one's work, cured like a clean checkout.
+      // index holds NO entry. Status lists only changed paths, so staged deletions beside untouched
+      // files are someone's work (E6 #1) and keep the warning. An EMPTY index is still ambiguous
+      // (E8 #2): an aborted checkout and a deliberate deletion of every file look the same, so prep
+      // never forces it; it names the state and the one command that would, and refuses this
+      // submodule.
       const allDeleted = lines.length > 0 && lines.every((line) => line.startsWith('D  '));
       const index = allDeleted ? spawn('git', ['-C', dir, 'ls-files'], { encoding: 'utf8' }) : null;
-      const aborted = allDeleted && index?.status === 0 && !String(index.stdout ?? '').trim();
-      if (status.status !== 0 || (lines.length && !aborted)) {
+      const emptyIndex = allDeleted && index?.status === 0 && !String(index.stdout ?? '').trim();
+      if (emptyIndex) {
+        refused.push(module);
+        log(`[prep] REFUSED ${module}: differs from its pin and every tracked file (${lines.length}) is staged as deleted, an aborted checkout or a deliberate deletion; prep forces nothing. To restore the pin and discard those deletions: git submodule update --force -- ${module}`);
+        continue;
+      }
+      if (status.status !== 0 || lines.length) {
         log(`[prep] WARN ${module}: differs from its pin and has local changes (or cannot be read); left as is`);
         continue;
       }
-      if (aborted) log(`[prep] ${module}: every tracked file is staged as deleted (an aborted checkout); restoring it`);
       const pin = pinOf(root, module, spawn);
       if (!pin) throw new Error(`the pin of ${module} could not be read`);
       if (!pinSource(module, pin, { candidates: [root], spawn, exists })) {
@@ -175,7 +182,7 @@ export function prep({ root = ROOT, spawn = spawnSync, exists = existsSync,
         execute(['git', '-C', dir, ...LOCAL_ONLY, 'fetch', '--no-tags', join(source, module), pin]);
       }
       log(`[prep] ${module}: moving the clean checkout to its pin ${pin.slice(0, 12)}`);
-      execute(['git', ...LOCAL_ONLY, 'submodule', 'update', '--no-fetch', ...(aborted ? ['--force'] : []), '--', module]);
+      execute(['git', ...LOCAL_ONLY, 'submodule', 'update', '--no-fetch', '--', module]);
     }
     execute(WORKSPACE_INSTALL);
 
@@ -205,7 +212,7 @@ export function prep({ root = ROOT, spawn = spawnSync, exists = existsSync,
   log(executable
     ? '[prep] ok: .husky/_/pre-push is executable'
     : '[prep] REFUSED: .husky/_/pre-push is missing or not executable; run pnpm install with Husky enabled');
-  return failed || !executable ? 1 : 0;
+  return failed || refused.length || !executable ? 1 : 0;
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
