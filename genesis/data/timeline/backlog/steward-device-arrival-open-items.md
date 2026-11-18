@@ -395,3 +395,28 @@ previous branch `feat/steward-arrival` had a warm `steward` family. The first
 `eprfs-live-corpus` run compiled for 9 min 18 s for that reason alone. Probe: a worktree keeps
 its family across a branch rename, or the gate prints that it is starting a cold family and
 names the warm one.
+
+## Row 19 — the governance fence refuses a sibling's verdict for the whole push
+
+`SIBLING_REUSE_GOVERNANCE_PATHS` (`genesis/orchestrator/gate-evidence.mjs:442`) is read as one
+diff over the push. A change to `epr-cli/src/peer.rs`, `eprfs-peer/**`, any `gate-*.mjs`,
+`pool-policy.json` or `measures.yaml` refuses sibling reuse for every project, including ones
+whose tests cannot read the changed file. Landing 2 of the native-throughput sprint paid 162
+minutes on shem for a head ethosengine had gated in 48. Until the steward rules, the device
+that gated a fenced head lands it (ruling R6 in that sprint's journal). Decision for the
+steward: keep the fence whole, or scope it per project by the gate's own input closure. Probe
+if scoped: a `peer.rs` change reuses a sibling's `elohim-storage` verdict and still runs `eprfs`.
+
+## Row 20 — five gates write no verdict, so no device can reuse or list them
+
+`epr-storage`, `rust-style`, `rakia-validate`, `pipeline-list-fresh` and `cargo-coverage` print
+`evidence: unavailable (gate-only inputs, no step fingerprint)`. `epr-storage` cost 1272 s on
+landing 2 and is not enrolled for reuse; `genesis-a2o` (229 s) and `cargo-bridge` (63 s) record
+a verdict and are not enrolled either. Probe: each has a step fingerprint and a `gate_reuse`
+entry, or a written reason it cannot.
+
+## Row 21 — the hand-over record omits reused verdicts
+
+`handover-record.mjs` reads a build note at the pushed head only. A verdict that stood in from
+an older commit with the same closure is not listed, so the record under-reports what the
+sender holds. Probe: the record lists a verdict by closure, with the commit it was minted at.

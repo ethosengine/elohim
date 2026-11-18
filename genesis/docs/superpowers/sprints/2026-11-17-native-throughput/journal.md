@@ -174,3 +174,55 @@ its key (a recipe reached through `xargs` or a split command word; a `just` call
 script a recipe runs; an imported justfile; the `just` binary not pinned between dump and run).
 Measured on this landing it would have kept six small gates' keys. The patch is kept at
 `genesis/local-dev/native-throughput/s5-recipe-closure.patch`.
+
+### Hand-overs on `self/` (ethosengine, 2026-11-17 and 18)
+
+| Head | Lane | Push wall | What |
+|---|---|---|---|
+| `6616ce547` | `self/nt-e1` | 38 s | E1: requirements cross with the Produce and `select` admits only an offer this device can run; the published check runs before the draw |
+| `76cacc2a6` | `self/nt-e2` | 39.7 s | E2: a sibling's first red and thin final report cross as berth notes |
+| `faa225e05` | `self/nt-e3` | 39.5 s | E3: the six review findings on E1, each confirmed against the code and fixed with a test |
+
+The first half of line 3 is met: a hand-over costs under a minute. The hand-over record lists
+only the verdicts minted at the pushed head; a verdict reused from an older commit with the same
+closure is not listed, and five gates (`epr-storage`, `rust-style`, `rakia-validate`,
+`pipeline-list-fresh`, `cargo-coverage`) have no step fingerprint and write no note at all.
+
+A Codex review (gpt-6.2-astra) of E1 returned FIX FIRST with six findings: a disclosed decode gap
+was dropped; the size cap ran after decoding and a duplicate commit field took the last value;
+the newest offer masked an older compatible one; the build fallback ran before the published
+check; "published" accepted a local-only `dev`; an oversized Produce could block the ack of a
+sibling's head. E1 landed anyway, because it adds a check where `dev` had none, and the fixes
+became lane E3. Residual, recorded and not blocked on: the requirements are the producing
+device's own word.
+
+### Landing 2 (shem, 2026-11-18 00:46Z to 03:29Z): `bea497110..6616ce547`
+
+162 minutes, exit 0, no red. The producer ran in the gate: release
+`bafyreibp2zww66ca4esr4tw4lcvv3dnomflk5ut7lf53zuhjf7c5wralci` at `6616ce547`.
+
+**No verdict was reused from ethosengine.** Every reuse-enrolled gate printed `not reused:
+governance-class change: elohim/eprfs/epr-cli/src/peer.rs`. `SIBLING_REUSE_GOVERNANCE_PATHS`
+(`genesis/orchestrator/gate-evidence.mjs:442`) refuses a sibling's verdict for the whole push
+when the push changes `peer.rs`, `eprfs-peer/**`, any `gate-*.mjs`, `pool-policy.json`,
+`measures.yaml` or a compiler gate input. The rule is one diff over the push, not per project.
+
+| Gate | shem, landing 2 | ethosengine, same crates warm |
+|---|---|---|
+| `elohim-storage` | 3403 s | 876 s |
+| `eprfs` | 2392 s | 1187 s |
+| `epr-storage` | 1272 s | 150 s |
+| `steward-node` | 1128 s | 117 s |
+| `orchestrator` | 474 s | 199 s |
+
+The ethosengine column is its gate of `faa225e05`, one commit later. The integrating device
+compiled cold what the sending device had already compiled and judged.
+
+| # | Question | Ruling | Basis |
+|---|---|---|---|
+| R6 | Who lands a head the governance fence covers | The device that gated it. A device's own verdict is not fenced, so its landing reuses what it paid. The orchestrator orders the lane and holds it for one lander at a time. A head outside the fence is handed over on `self/` and landed by the other device, where the sibling's verdict stands in | Landing 2: 162 min on shem against 48 min of gate on ethosengine for the same closure. The fence itself (decision D5, "the space never rides what it upgrades") is not changed here |
+
+Open, for the steward: every head in this sprint touched a fenced path, because the sprint's
+subject is the gate and the peer channel. Whether the fence should be per project (a `peer.rs`
+change does not alter what `elohim-storage`'s tests judge) is a trust decision, recorded in the
+backlog and not taken.
