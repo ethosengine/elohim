@@ -575,3 +575,32 @@ two such worktrees at once removed each other's build tree (journal). The per-wo
 keeps a family across a rename; it does not give a new worktree its own. Owed: a delegated
 worktree gets a family of its own at creation, or the gate refuses a slot another live gate
 owns and does not clean it.
+
+## Row 27 — known limits of a sibling's live reds (review loop closed 2026-11-18)
+
+Left after three independent reviews (receipts `codex-e4-review`, `codex-e5-review`,
+`codex-e6-review` under `genesis/local-dev/native-throughput/`), recorded and not scheduled:
+one recognised diagnostic suppresses the stand-in for a separate opaque failed step; delivery
+addresses a session or an eight-character prefix, and an unknown local device id admits a
+note; a killed delivery worker leaves no receipt and `unsent` counts only queued reds; a
+subscriber to finals only can get silence when discovery fails; a push to two destinations
+announces one ref; `GATE_TAP=off` observes nothing; overlapping runs in one session can emit
+an early `unknown`; the hook drops a late note below an older overflow floor. A directed gate
+event that the gate hook rejects for a device mismatch is shown by the berth-note hook as an
+ordinary untrusted note.
+
+## Row 28 — the read audit misses real reads and says nothing
+
+Found 2026-11-18 while reviewing a narrowing of `gate-input-audit.mjs` (journal). Reads the
+gates really perform and the audit does not find, with zero reported unresolved:
+`elohim/eprfs/epr-cli/tests/flow_memory_recall_index.rs:208` (the embedding model manifest
+under `.epr-meta`), the cite verifier's dependence on every cited path
+(`epr-cli/src/flow/cites.rs:1277`), `genesis/orchestrator/gate-live-schema.test.mjs:20` (the
+event schema), `doorway/doorway-service/tests/schema_contract.rs:31` (a path built in two
+steps). Each is in its gate's key only through a dependency's test file that reads the same
+place and does not run in that gate. Consequences: a verdict's soundness rests on coincidence;
+removing the coincidence (which would save about 40 minutes on a rebase like shem's) is
+unsound until the real reads are keyed. In flight: lane E9 declares these reads. Open design,
+for the steward: the gate's own envelope observes what the recipe opens and which variables
+it reads, and the verdict is keyed on the observation; the scan becomes a cross-check. Rows
+20 and 21 (enrolment) wait on the same answer.

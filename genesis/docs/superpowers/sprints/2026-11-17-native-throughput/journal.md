@@ -372,7 +372,51 @@ and whether device mirrors carry those is the steward's open decision); `epr bin
 brit` from the published head ran 300 s with no output and was stopped, so shem's brit is
 still 0.2.0.
 
-### Definition of done, as of 2026-11-18 15:40Z
+### Evening: the live-red loop closes, and the read audit is found wanting (2026-11-18)
+
+| Time (Z) | Head on `dev` | Lander | Push | Reused |
+|---|---|---|---|---|
+| 15:56 | `40ad0c3cf` E6 items 2 to 6 | ethosengine | 268 s | schema-dna, genesis, orchestrator, elohim-storage |
+| 16:22 | `5449615ce` E8, three items | ethosengine | 51 s | orchestrator |
+
+The E6 review again returned FOLLOW-UP REQUIRED. Ruling: the gate-live review loop closes
+after E8 (a follower that marked notes seen before printing them, a prep that could still
+force over a deliberately emptied submodule, a final one byte over its cap). Each round fixed
+the last findings and surfaced smaller ones; the eight that remain are recorded as known
+limits in backlog row 27 and are not a reason for another round.
+
+**Why shem's rebase reused nothing (E7, ethosengine).** One read moved the eprfs key: the
+directory `elohim/sdk/schemas/v1`, where a property had been added to the gate-live event
+schema. The read comes from `elohim/epr/tests/schema_contract.rs` and
+`elohim/placement/core/tests/schema_contract.rs`. Those crates are dependencies of the
+`elohim/eprfs` workspace and not members, and `cargo test --workspace` never compiles a
+dependency's tests, so neither file runs in the gate. Skipping such files makes the eprfs key
+equal at both bases (`38cf5829…` at `542e5304c` and at `6a8a19767`; 217 reads against 230).
+
+**That narrowing is held, because the phantom reads carry real ones.** It was reviewed before
+landing, twice. The first review found that doorway's own schema-contract test reads
+`views/auth-response.schema.json` and that only the dependency's test had put the schema in
+doorway's key. The second found the same shape in the two projects the narrowing was for: a
+member test of eprfs reads `.epr-meta/elohim/algorithms/embedding-models/all-minilm-l6-v2.json`
+and asserts its dimensions, the live corpus fails if a cited path disappears, and the
+orchestrator's own `gate-live-schema.test.mjs` loads the event schema. The audit finds none of
+these reads and reports none unresolved. Today's keys hold them only because an unrelated test
+file in a dependency happens to read the same place. Lane E9 declares the real reads
+(widening only); the narrowing waits on `self/nt-audit` (`d9d7933c4`).
+
+Taken with the enrolment ruling, the finding is one statement: a static scan and an ambient
+shell are not authorities on what a gate reads. The envelope that runs the gate can observe
+its reads and its environment; a verdict keyed on that observation needs no scan to be
+complete. Backlog row 28.
+
+**Glibc floor.** Reviewed twice and split from the sysroot status line: the floor counts every
+glibc library's version needs, `GLIBC_ABI_DT_RELR` on libc is a 2.36 floor and no longer a
+refusal (reproduced on `/usr/bin/getconf` at `dev`), loader names match exactly, and a needed
+libc with no numeric need still refuses. The reviewer checked the binaries the devices
+exchange: each keeps its floor. The sysroot status line is in a third round (arrival could
+hang on a pipe held by a descendant; status trusted paths in its own record).
+
+### Definition of done, as of 2026-11-18 17:00Z
 
 | Line | State |
 |---|---|
@@ -381,4 +425,4 @@ still 0.2.0.
 | 3 hand-over in seconds, landed by the sibling | met: 22.9 s hand-over, `independence: sibling` on the landing |
 | 4 a sibling's red arrives live | met: 4.9 s on a scratch ref; the fix is on `dev`; E6 items 2 to 6 open |
 | 5 deployment path read, first step ruled | met earlier in the sprint; the sysroot review adds that the fleet cannot run a workspace build |
-| 6 backlog and habit deltas | current to row 26 |
+| 6 backlog and habit deltas | current to row 28 |
