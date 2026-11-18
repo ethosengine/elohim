@@ -17,7 +17,7 @@ import { dirname, isAbsolute, join, resolve } from 'path';
 import { createRecognizer } from './gate-failure-lines.mjs';
 import { GATE_ATTRIBUTION_WINDOW_MS, attribute, readEdits } from './gate-attribution.mjs';
 import { setTimeout as delay } from 'timers/promises';
-import { appendEvent, emitRedDetached, liveRoot, outlook } from './gate-live.mjs';
+import { appendEvent, emitRedDetached, liveRoot, noteUnsentReds, outlook } from './gate-live.mjs';
 
 function parseArgs(argv) {
   const split = argv.indexOf('--');
@@ -249,6 +249,7 @@ function main() {
       Promise.race([Promise.allSettled([...pending]), delay(1500)]).then(exit, exit);
     };
     const exit = () => {
+      if (run) noteUnsentReds(run);
       if (signal) {
         for (const s of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.removeAllListeners(s);
         process.kill(process.pid, signal);

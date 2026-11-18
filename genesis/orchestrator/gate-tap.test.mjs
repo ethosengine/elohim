@@ -353,4 +353,31 @@ describe('gate-tap sibling notes', () => {
     assert.ok(red, says(dir).join('\n'));
     assert.equal(red.class, 'step');
   });
+
+  const EVERY = { ...SUB, text: SUB.text.replace('"intent":"default"', '"intent":"every"') };
+  const twelve = n => Array.from({ length: n }, (_, i) => `echo "test t${i} ... FAILED"`).join('; ');
+  const deliveries = runPath => readFileSync(runPath, 'utf8').split('\n').filter(Boolean).map(l => JSON.parse(l))
+    .filter(e => e.kind === 'sibling-delivery');
+
+  test('E5 #4: twelve reds for an every subscriber all reach it while the tap lives (no total cap)', async t => {
+    const { runPath, env } = setup(t, { notes: [EVERY] });
+    const { result } = runTap(env, runPath, `${twelve(12)}; sleep 4; exit 101`);
+    assert.equal(result.status, 101);
+    let ok = [];
+    for (let i = 0; i < 60 && ok.length < 12; i++) {
+      await new Promise(r => setTimeout(r, 100));
+      ok = deliveries(runPath).filter(d => d.note === 'gate-red@1' && d.ok);
+    }
+    assert.equal(ok.length, 12, JSON.stringify(deliveries(runPath)));
+  });
+
+  test('E5 #4: reds still queued when the tap exits are named, not dropped in silence', async t => {
+    const { runPath, env } = setup(t, { notes: [EVERY], saySleepS: 3 });
+    const { result } = runTap(env, runPath, `${twelve(12)}; exit 101`);
+    assert.equal(result.status, 101);
+    const unsent = deliveries(runPath).find(d => d.unsent);
+    assert.ok(unsent, JSON.stringify(deliveries(runPath)));
+    assert.equal(unsent.unsent, 4, 'eight run at once, four waited');
+    assert.match(unsent.why, /still queued when the tap exited/);
+  });
 });

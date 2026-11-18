@@ -86,6 +86,7 @@ test('exports only the public run-log functions', () => {
     'isDeviceId',
     'liveRoot',
     'matchSubscriptions',
+    'noteUnsentReds',
     'opaqueRun',
     'openRun',
     'outlook',
@@ -1197,6 +1198,9 @@ test('E4 finding 3: a stuck or missing berth is bounded and named, never silent'
   assert.equal(late.ok, false);
   assert.match(late.why, /exceeded 300 ms/);
   assert.ok(Date.now() - started < 3000, 'the deadline holds');
+  // An override past the worker's 20 s life is clamped so the kill still fires inside it.
+  const long = await live.sendNote('s', 'to', { kind: 'gate-red@1' }, { env: { ...stuck, GATE_LIVE_DELIVER_MS: '30000' }, deadlineMs: 30_000 });
+  assert.match(long.why, /exceeded 18000 ms/);
   const missing = await live.sendNote('s', 'to', { kind: 'gate-red@1' }, { env: siblingEnv(root, join(root, 'no-berth')) });
   assert.equal(missing.ok, false);
   assert.match(missing.why, /berth/);
@@ -1240,9 +1244,8 @@ test('E4 finding 6: a self/* subscription matches a hand-over run, and a run kil
     delete process.env.GATE_LIVE_DEVICE;
     process.env.GATE_LIVE_SIBLING = 'off';
   });
-  const { path, reds } = threeRedRun(root);
-  assert.equal(await live.emitRed(path, reds[0], { env }), 1);
-  // The run is killed: no close. The session's next run reconciles it with a detached final.
+  // The run is killed before any red reached anyone (E5 #6): it still gets its final.
+  const { path } = threeRedRun(root);
   openRun({ root, sha: SHA, target: 'dev', session: 'gate-session', ref: 'refs/heads/dev' });
   const sent = await settle(root, 2, 8000);
   const final = sent.map(sayBody).find((b) => b.kind === 'gate-final@1');

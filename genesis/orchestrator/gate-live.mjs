@@ -831,6 +831,8 @@ async function peekNotes(session, { env = process.env, timeoutMs = READ_TIMEOUT_
  * caller records it, so a missing or stuck berth is a line in the run log, not silence.
  */
 export function sendNote(session, to, body, { env = process.env, deadlineMs = Number(env.GATE_LIVE_DELIVER_MS) || DELIVER_MS } = {}) {
+  // E5 #3: the kill must fire inside the worker's own life, whatever the override says.
+  deadlineMs = Math.min(deadlineMs, WORKER_MS - 2_000);
   return new Promise((done) => {
     const started = Date.now();
     let settled = false;
@@ -1026,11 +1028,12 @@ export async function emitFinal(path, { env = process.env } = {}) {
 
 // A detached worker does the berth reads and sends, so neither a gate-runner closing its run nor a
 // tap passing a red waits on berth. Each worker lives at most WORKER_MS (main enforces it).
-function spawnWorker(args, path) {
+function spawnWorker(args, path, onExit = () => {}) {
   try {
     const child = spawn(process.execPath, [fileURLToPath(import.meta.url), ...args],
       { detached: true, stdio: 'ignore', env: process.env });
     child.on('error', (error) => appendEvent(path, { kind: 'sibling-delivery', ok: false, why: `worker: ${error.message}` }));
+    child.on('exit', onExit);
     child.unref();
     return true;
   } catch (error) {
@@ -1044,7 +1047,9 @@ function reconcileUnclosed(previous) {
   try {
     const events = parseEvents(readFileSync(previous, 'utf8'));
     if (events.some((e) => e.kind === 'run-close')) return;
-    if (!events.some((e) => e.kind === 'sibling-delivery' && e.ok)) return;
+    // E5 #6: a run that did any work is reconciled, not only one whose red already reached someone:
+    // a subscriber may hear only finals. The worker sends nothing when no subscription matches.
+    if (!events.some((e) => e.kind === 'gate-verdict' || e.kind === 'failure' || e.kind === 'gate-start')) return;
     emitFinalDetached(previous);
   } catch { /* gone or unreadable: nothing to reconcile */ }
 }
@@ -1056,16 +1061,42 @@ function emitFinalDetached(path) {
 
 const emitWorkers = new Map();
 
+function startEmit(path, state, seq) {
+  state.running += 1;
+  const started = spawnWorker(['emit-red', '--run', path, '--seq', String(seq)], path, () => {
+    state.running -= 1;
+    const next = state.queue.shift();
+    if (next !== undefined) startEmit(path, state, next);
+  });
+  if (!started) state.running -= 1;
+  return started;
+}
+
 /**
- * The tap's call for each red it appends: one detached emit-red worker, at most EMIT_WORKERS_MAX
- * per run from one tap process; later reds are counted in the run's final. Never waits.
+ * The tap's call for each red it appends: one detached emit-red worker per red, at most
+ * EMIT_WORKERS_MAX running at once per run (E5 #4: a ninth red for an `every` subscriber was
+ * dropped by a total cap). A red over the limit waits for a worker to finish; whatever still waits
+ * when the tap exits is named in the run log by {@link noteUnsentReds}. Never waits itself.
  */
 export function emitRedDetached(path, event, { env = process.env } = {}) {
   if (siblingOff(env) || !event || event.kind !== 'failure' || !Number.isSafeInteger(event.seq)) return false;
-  const started = emitWorkers.get(path) ?? 0;
-  if (started >= EMIT_WORKERS_MAX) return false;
-  emitWorkers.set(path, started + 1);
-  return spawnWorker(['emit-red', '--run', path, '--seq', String(event.seq)], path);
+  const state = emitWorkers.get(path) ?? { running: 0, queue: [] };
+  emitWorkers.set(path, state);
+  if (state.running >= EMIT_WORKERS_MAX) {
+    state.queue.push(event.seq);
+    return true;
+  }
+  return startEmit(path, state, event.seq);
+}
+
+/** At tap exit: reds still queued for a worker are a sibling-delivery line, not silence. */
+export function noteUnsentReds(path) {
+  const state = emitWorkers.get(path);
+  if (!state?.queue.length) return 0;
+  const unsent = state.queue.length;
+  appendEvent(path, { kind: 'sibling-delivery', note: RED_KIND, ok: false, why: `${unsent} red(s) still queued when the tap exited; the run's final counts them`, unsent });
+  state.queue.length = 0;
+  return unsent;
 }
 
 export function formatSiblingNote(note) {
@@ -1307,8 +1338,9 @@ async function main(argv) {
         return subscribe(options);
       case 'emit-final':
       case 'emit-red': {
-        // A worker's whole life is bounded, whatever berth or epr do.
-        setTimeout(() => process.exit(0), WORKER_MS);
+        // A worker's whole life is bounded, whatever berth or epr do; unref'd, so a worker whose
+        // sends are done exits at once (E5 #4: the queue starts the next red on that exit).
+        setTimeout(() => process.exit(0), WORKER_MS).unref();
         const run = resolve(root, options.run);
         if (command.verb === 'emit-final') {
           await emitFinal(run);
