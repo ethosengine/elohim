@@ -429,6 +429,35 @@ pub(crate) mod sibling {
     pub(crate) struct Stated {
         pub cid: Option<String>,
         pub doc: Option<String>,
+        /// The Produce's `env:gaps`: what its recorder could not measure.
+        pub gaps: Vec<String>,
+    }
+
+    /// The requirement axes a recorder's gap can leave unmeasured: a gap named `<axis>` or
+    /// `<axis>.<detail>` (such as `isa.x86.partial-decode`) means the statement says nothing
+    /// trustworthy about that axis, however well its other clauses read.
+    #[cfg(all(test, feature = "peer"))]
+    pub(crate) fn unmeasured_axis_for_test(gap: &str) -> Option<&'static str> {
+        unmeasured_axis(gap)
+    }
+
+    #[cfg(feature = "peer")]
+    fn unmeasured_axis(gap: &str) -> Option<&'static str> {
+        use host_contract::names::axis;
+        [
+            axis::ARCH,
+            axis::OS,
+            axis::ISA_X86,
+            axis::KERNEL_LINUX,
+            axis::ABI_LIBC,
+            axis::ABI_LOADER,
+            axis::LIB,
+        ]
+        .into_iter()
+        .find(|name| {
+            gap.strip_prefix(name)
+                .is_some_and(|rest| rest.is_empty() || rest.starts_with('.'))
+        })
     }
 
     /// Whether `release` is one CID-shaped token: non-empty ASCII letters and digits only, so it
@@ -438,15 +467,27 @@ pub(crate) mod sibling {
         !release.is_empty() && release.bytes().all(|b| b.is_ascii_alphanumeric())
     }
 
-    /// The release to draw for `commit`: among admitted siblings' crossed Produces stamped with
-    /// `env:release` and `env:release-bin`, the newest (device, release) that holds every bin.
-    /// `me`'s own records are never offers.
-    #[cfg(feature = "peer")]
+    /// The newest offer [`offers`] lists.
+    #[cfg(all(test, feature = "peer"))]
     pub(crate) fn select(
         rows: &[crate::peer::SiblingArtifact],
         me: &str,
         commit: &str,
     ) -> Option<Offer> {
+        offers(rows, me, commit).into_iter().next()
+    }
+
+    /// The releases that could be drawn for `commit`, newest first: among admitted siblings'
+    /// crossed Produces stamped with `env:release` and `env:release-bin`, every
+    /// (device, release) that holds every bin. `me`'s own records are never offers. Admission
+    /// is judged per offer afterwards, so a newer offer this host cannot run never hides an
+    /// older one it can.
+    #[cfg(feature = "peer")]
+    pub(crate) fn offers(
+        rows: &[crate::peer::SiblingArtifact],
+        me: &str,
+        commit: &str,
+    ) -> Vec<Offer> {
         let mut offers = std::collections::BTreeMap::<(String, String), Offer>::new();
         for row in rows {
             let (Some(release), Some(bin)) = (&row.release, &row.release_bin) else {
@@ -477,16 +518,20 @@ pub(crate) mod sibling {
                 Stated {
                     cid: row.requires.clone(),
                     doc: row.requires_doc.clone(),
+                    gaps: row.gaps.clone(),
                 },
             );
             if row.at > offer.at {
                 offer.at.clone_from(&row.at);
             }
         }
-        offers
+        let mut complete: Vec<Offer> = offers
             .into_values()
             .filter(|offer| BINS.iter().all(|bin| offer.outputs.contains_key(*bin)))
-            .max_by(|a, b| a.at.cmp(&b.at).then_with(|| b.release.cmp(&a.release)))
+            .collect();
+        // Newest first; among equally new, the lower release CID first, as before.
+        complete.sort_by(|a, b| b.at.cmp(&a.at).then_with(|| a.release.cmp(&b.release)));
+        complete
     }
 
     /// Before `follow` or `bootstrap` lands: decide the path, say it, and draw when the path is
@@ -516,15 +561,24 @@ pub(crate) mod sibling {
         }
         // Row 14: the follow lands only a published HEAD, so a draw for one that is not (or for
         // one a stale remote-tracking ref hides) is bytes paid for a refusal. Nothing is fetched.
-        if let Some(detail) = store.unpublished(repo, &commit) {
-            let gap = format!("unpublished: {detail}");
-            eprintln!("follow: nothing drawn from a sibling ({gap})");
-            return Ok(Drawn {
-                record: None,
-                gap: Some(gap),
-            });
-        }
-        eprintln!("{why}");
+        let published = match store.published_on(repo, &commit) {
+            Ok(reference) => reference,
+            Err(detail) => {
+                let gap = format!("unpublished: {detail}");
+                eprintln!("follow: nothing drawn from a sibling ({gap})");
+                return Ok(Drawn {
+                    record: None,
+                    gap: Some(gap),
+                });
+            }
+        };
+        // Finding 5: say which ref made HEAD published, and when it is only a local branch.
+        let local = if elohim_device_runtime::bin_store::is_local_ref(&published) {
+            " (a local branch only: not on any remote-tracking publishedRef as of the last fetch)"
+        } else {
+            ""
+        };
+        eprintln!("{why}; {commit} is published on {published}{local}");
         let incoming = layout
             .ok()
             .and_then(|l| l.incoming().ok())
@@ -579,24 +633,99 @@ pub(crate) mod sibling {
     fn draw(store: &Store, repo: &Path, commit: &str, incoming: &Path) -> Result<Value, Draw> {
         let found = crate::peer::custody_artifacts(repo, None)
             .map_err(|e| Draw::Gap(format!("no-record: {e}")))?;
-        let offer = select(&found.rows, &found.device, commit).ok_or_else(|| {
-            Draw::Gap(format!(
+        let offers = offers(&found.rows, &found.device, commit);
+        if offers.is_empty() {
+            return Err(Draw::Gap(format!(
                 "no-offer: no admitted sibling recorded a crossed Produce of epr and bin-launch \
                  stamped with a release for {commit}"
-            ))
-        })?;
+            )));
+        }
         let host = ark_supervisor::host::observe_host();
-        draw_offer(
+        draw_first(
             store,
             repo,
             commit,
             incoming,
-            &offer,
-            &|_bin, document| admit_on(&host, document),
-            &|output, dest| {
-                crate::artifact::fetch_output(repo, output, dest).map_err(|e| e.to_string())
+            &offers,
+            &Judges {
+                admit: &|_bin, document| admit_on(&host, document),
+                fetch: &|output, dest| {
+                    crate::artifact::fetch_output(repo, output, dest).map_err(|e| e.to_string())
+                },
+                staged: &|bin, bytes| staged_admit(&host, bin, bytes),
             },
         )
+    }
+
+    /// How a draw judges and moves bytes: `admit` judges an offer's verified statement on this
+    /// host before anything is fetched, `fetch` copies an output CID to a destination, and
+    /// `staged` judges what the fetched bytes themselves require before either is executed.
+    #[cfg(feature = "peer")]
+    pub(crate) struct Judges<'a> {
+        pub admit: &'a Admit<'a>,
+        pub fetch: &'a dyn Fn(&str, &Path) -> Result<(), String>,
+        pub staged: &'a Admit<'a>,
+    }
+
+    /// The residual's cheap half: the statement that admitted an offer is the producing
+    /// sibling's own word, so before either drawn binary is executed (ingest runs
+    /// `epr --version`), this device re-extracts what the staged bytes require and judges that
+    /// on this host. A partial decode of the staged bytes is unmeasured, as at put time.
+    #[cfg(feature = "peer")]
+    fn staged_admit(host: &host_contract::Provides, bin: &str, bytes: &[u8]) -> Result<(), String> {
+        let (document, partial) = crate::artifact::staged_requires(Path::new(bin), bytes)?;
+        if partial {
+            return Err(format!(
+                "re-extraction decoded {bin}'s x86 code only partially, so its isa.x86 \
+                 requirement is unmeasured"
+            ));
+        }
+        admit_on(host, &document)
+    }
+
+    /// Finding 3: judge `offers` (newest first) in turn and draw the first this host admits;
+    /// nothing is fetched for an offer it does not. With none admissible, the gap is the newest
+    /// offer's, followed by every older one's.
+    #[cfg(feature = "peer")]
+    pub(crate) fn draw_first(
+        store: &Store,
+        repo: &Path,
+        commit: &str,
+        incoming: &Path,
+        offers: &[Offer],
+        judges: &Judges<'_>,
+    ) -> Result<Value, Draw> {
+        let mut gaps = Vec::new();
+        for offer in offers {
+            match admissible(offer, judges.admit) {
+                Ok(()) => {
+                    return take(
+                        store,
+                        repo,
+                        commit,
+                        incoming,
+                        offer,
+                        judges.fetch,
+                        judges.staged,
+                    )
+                }
+                Err(gap) => gaps.push(gap),
+            }
+        }
+        let mut gaps = gaps.into_iter();
+        let newest = gaps
+            .next()
+            .unwrap_or_else(|| format!("no-offer: no release offered for {commit}"));
+        let older: Vec<String> = gaps.collect();
+        Err(Draw::Gap(if older.is_empty() {
+            newest
+        } else {
+            format!(
+                "{newest}; and {} older offer(s): {}",
+                older.len(),
+                older.join("; ")
+            )
+        }))
     }
 
     /// Judge one verified requirement document against this host's observation, with the
@@ -677,6 +806,20 @@ pub(crate) mod sibling {
                     offer.release, offer.device
                 )
             })?;
+            // An honest recorder that could not measure an axis says so in env:gaps and leaves
+            // the axis out of its statement; the remaining clauses passing proves nothing
+            // about it (a partial ISA decode can hide an instruction this host lacks).
+            if let Some((gap, axis)) = stated
+                .gaps
+                .iter()
+                .find_map(|gap| unmeasured_axis(gap).map(|axis| (gap, axis)))
+            {
+                return Err(format!(
+                    "unmeasured-requirement: {bin} of release {} from {} records gap {gap}, so \
+                     its {axis} requirement is unmeasured; cure: build for this device",
+                    offer.release, offer.device
+                ));
+            }
             admit(bin, &document).map_err(|unmet| {
                 format!(
                     "requirement-unmet: {bin} of release {} from {} cannot run here: {unmet}; \
@@ -689,8 +832,9 @@ pub(crate) mod sibling {
     }
 
     /// [`admissible`], then [`take`]: the offer's statement is read and judged on this host
-    /// before `fetch` is called once.
-    #[cfg(feature = "peer")]
+    /// before `fetch` is called once. Test fixtures stage shell scripts, which no extraction
+    /// reads, so this form accepts the staged bytes as fetched; [`draw_first`] takes the judge.
+    #[cfg(all(test, feature = "peer"))]
     pub(crate) fn draw_offer(
         store: &Store,
         repo: &Path,
@@ -700,12 +844,23 @@ pub(crate) mod sibling {
         admit: &Admit<'_>,
         fetch: &dyn Fn(&str, &Path) -> Result<(), String>,
     ) -> Result<Value, Draw> {
-        admissible(offer, admit).map_err(Draw::Gap)?;
-        take(store, repo, commit, incoming, offer, fetch)
+        draw_first(
+            store,
+            repo,
+            commit,
+            incoming,
+            std::slice::from_ref(offer),
+            &Judges {
+                admit,
+                fetch,
+                staged: &|_, _| Ok(()),
+            },
+        )
     }
 
     /// Draw `offer`'s bins with `fetch` (exact output CID to destination), refuse bytes that do
-    /// not make the release it named, and ingest them as the sibling's.
+    /// not make the release it named, judge what the staged bytes require with `staged` before
+    /// either is executed, and ingest them as the sibling's.
     #[cfg(feature = "peer")]
     pub(crate) fn take(
         store: &Store,
@@ -714,6 +869,7 @@ pub(crate) mod sibling {
         incoming: &Path,
         offer: &Offer,
         fetch: &dyn Fn(&str, &Path) -> Result<(), String>,
+        staged: &Admit<'_>,
     ) -> Result<Value, Draw> {
         use std::os::unix::fs::PermissionsExt;
         if !names_one_release(&offer.release) {
@@ -747,6 +903,19 @@ pub(crate) mod sibling {
             };
             if fetched != offer.release {
                 return Err(mismatch(&fetched));
+            }
+            for bin in offer.outputs.keys() {
+                let path = dir.join(bin);
+                let bytes = std::fs::read(&path)
+                    .map_err(|e| Draw::Gap(format!("local-store: {}: {e}", path.display())))?;
+                staged(bin, &bytes).map_err(|why| {
+                    Draw::Gap(format!(
+                        "statement-understated: {bin} of release {} from {}: what its drawn \
+                         bytes require, re-extracted here before running either, is unmet: \
+                         {why}; nothing was ingested",
+                        offer.release, offer.device
+                    ))
+                })?;
             }
             let release = store
                 .ingest(
@@ -1012,6 +1181,7 @@ mod tests {
             release: (!release.is_empty()).then(|| release.into()),
             release_bin: (!bin.is_empty()).then(|| bin.into()),
             agent_id: None,
+            gaps: Vec::new(),
             at: at.into(),
             head_seq: None,
         }
@@ -1106,6 +1276,7 @@ mod tests {
         sibling::Stated {
             cid: Some(eprfs_core::BlobCid::compute_bytes(&bytes).to_string()),
             doc: Some(URL_SAFE_NO_PAD.encode(&bytes)),
+            gaps: Vec::new(),
         }
     }
 
@@ -1232,6 +1403,7 @@ mod tests {
                 sibling::Stated {
                     cid: good.cid.clone(),
                     doc: None,
+                    gaps: Vec::new(),
                 },
                 "unmeasured-requirement: ",
                 "offer predates requires-doc",
@@ -1241,6 +1413,7 @@ mod tests {
                 sibling::Stated {
                     cid: good.cid.clone(),
                     doc: other.doc.clone(),
+                    gaps: Vec::new(),
                 },
                 "unverifiable-requirement: ",
                 "not the env:requires",
@@ -1249,6 +1422,7 @@ mod tests {
                 sibling::Stated {
                     cid: good.cid.clone(),
                     doc: Some("not base64!".into()),
+                    gaps: Vec::new(),
                 },
                 "unverifiable-requirement: ",
                 "base64url",
@@ -1353,6 +1527,7 @@ mod tests {
             &incoming,
             &offer_for(&release),
             &serve,
+            &|_, _| Ok(()),
         ) {
             Ok(value) => value,
             Err(sibling::Draw::Gap(gap)) => panic!("gap: {gap}"),
@@ -1388,6 +1563,7 @@ mod tests {
             &incoming,
             &offer_for(&promised),
             &serve,
+            &|_, _| Ok(()),
         ) {
             Err(sibling::Draw::Refused(refusal)) => {
                 assert_eq!(refusal.kind, "sibling-release-mismatch");
@@ -1453,6 +1629,7 @@ mod tests {
             sibling::Stated {
                 cid: Some("req-cid".into()),
                 doc: Some("req-doc".into()),
+                gaps: Vec::new(),
             }
         );
         assert_eq!(offer.requires["bin-launch"], sibling::Stated::default());
@@ -1478,5 +1655,220 @@ mod tests {
             assert!(!sibling::names_one_release(escaping));
         }
         assert!(sibling::names_one_release("bafyreiabc234"));
+    }
+
+    #[cfg(feature = "peer")]
+    #[test]
+    fn a_recorded_gap_on_a_requirement_axis_leaves_the_offer_undrawn() {
+        // Finding 1: an honest producer whose ISA decode was partial says so in env:gaps and
+        // records no ISA clause. A host meeting every remaining clause must still not fetch.
+        let tmp = tempfile::tempdir().unwrap();
+        let store = two_bin_store(tmp.path());
+        let host = host_with_glibc(&[2, 99]);
+        let mut stated = glibc_at_least(&[2, 17]);
+        stated.gaps = vec![
+            "build-inputs.build-scripts".into(),
+            "isa.x86.partial-decode".into(),
+        ];
+        let offer = stating(offer_for("R1"), &stated);
+        let fetched = std::cell::Cell::new(0);
+        match sibling::draw_offer(
+            &store,
+            tmp.path(),
+            &"a".repeat(40),
+            &tmp.path().join("incoming"),
+            &offer,
+            &|_, document| sibling::admit_on(&host, document),
+            &|_, _| {
+                fetched.set(fetched.get() + 1);
+                Err("must not fetch".into())
+            },
+        ) {
+            Err(sibling::Draw::Gap(gap)) => {
+                assert!(gap.starts_with("unmeasured-requirement: "), "{gap}");
+                assert!(gap.contains("isa.x86.partial-decode"), "{gap}");
+                assert!(gap.contains("isa.x86 requirement is unmeasured"), "{gap}");
+            }
+            Err(sibling::Draw::Refused(r)) => panic!("a gap, not a refusal: {}", r.detail),
+            Ok(value) => panic!("a partial statement was drawn: {value}"),
+        }
+        assert_eq!(fetched.get(), 0, "nothing is fetched");
+        // A gap about how the output was built, not what it needs, does not block the draw.
+        let mut reach_only = glibc_at_least(&[2, 17]);
+        reach_only.gaps = vec!["build-inputs.build-scripts".into()];
+        assert_eq!(
+            sibling::admissible(&stating(offer_for("R1"), &reach_only), &|_, d| {
+                sibling::admit_on(&host, d)
+            }),
+            Ok(())
+        );
+    }
+
+    #[cfg(feature = "peer")]
+    #[test]
+    fn a_newer_offer_this_host_cannot_run_does_not_hide_an_older_one_it_can() {
+        // Finding 3: the newest complete offer is judged first, but its refusal is not the end.
+        const ME: &str = "did:key:me";
+        const A: &str = "did:key:a";
+        const B: &str = "did:key:b";
+        const HEAD: &str = "c0ffee";
+        let mut rows = vec![
+            row(A, HEAD, "OLD", "epr", "2026-11-17T01:00:00Z"),
+            row(A, HEAD, "OLD", "bin-launch", "2026-11-17T01:00:00Z"),
+            row(B, HEAD, "NEW", "epr", "2026-11-17T02:00:00Z"),
+            row(B, HEAD, "NEW", "bin-launch", "2026-11-17T02:00:00Z"),
+        ];
+        let compatible = glibc_at_least(&[2, 17]);
+        let too_new = glibc_at_least(&[2, 39]);
+        for row in &mut rows {
+            let stated = if row.release.as_deref() == Some("OLD") {
+                &compatible
+            } else {
+                &too_new
+            };
+            row.requires.clone_from(&stated.cid);
+            row.requires_doc.clone_from(&stated.doc);
+        }
+        let offers = sibling::offers(&rows, ME, HEAD);
+        assert_eq!(
+            offers
+                .iter()
+                .map(|o| o.release.as_str())
+                .collect::<Vec<_>>(),
+            ["NEW", "OLD"],
+            "newest first"
+        );
+
+        let tmp = tempfile::tempdir().unwrap();
+        let store = two_bin_store(tmp.path());
+        let landed = tmp.path().join("sibling");
+        sibling_bins(&landed, "#!/bin/sh\n# sibling launcher\n");
+        let release = store.release_cid_of(&landed).unwrap();
+        // OLD is the release whose bytes the fixture serves.
+        let mut offers = offers;
+        offers[1].release.clone_from(&release);
+        offers[1].outputs = offer_for(&release).outputs;
+        let host = host_with_glibc(&[2, 31]);
+        let serve = serving(&landed);
+        let fetched = std::cell::RefCell::new(Vec::new());
+        let commit = "b".repeat(40);
+        let drawn = match sibling::draw_first(
+            &store,
+            tmp.path(),
+            &commit,
+            &tmp.path().join("incoming"),
+            &offers,
+            &sibling::Judges {
+                admit: &|_, document| sibling::admit_on(&host, document),
+                fetch: &|output, dest| {
+                    fetched.borrow_mut().push(output.to_string());
+                    serve(output, dest)
+                },
+                staged: &|_, _| Ok(()),
+            },
+        ) {
+            Ok(value) => value,
+            Err(sibling::Draw::Gap(gap)) => panic!("gap: {gap}"),
+            Err(sibling::Draw::Refused(r)) => panic!("refused {}: {}", r.kind, r.detail),
+        };
+        assert_eq!(drawn["release"], release);
+        assert_eq!(drawn["device"], A);
+        assert_eq!(
+            fetched.borrow().len(),
+            2,
+            "only the admitted offer's two bins are fetched: {:?}",
+            fetched.borrow()
+        );
+
+        // With nothing admissible, the gap starts with the newest offer's and names the rest.
+        let ancient = host_with_glibc(&[2, 12]);
+        match sibling::draw_first(
+            &store,
+            tmp.path(),
+            &"9".repeat(40),
+            &tmp.path().join("incoming"),
+            &offers,
+            &sibling::Judges {
+                admit: &|_, document| sibling::admit_on(&ancient, document),
+                fetch: &|_, _| Err("must not fetch".into()),
+                staged: &|_, _| panic!("nothing is staged"),
+            },
+        ) {
+            Err(sibling::Draw::Gap(gap)) => {
+                assert!(gap.starts_with("requirement-unmet: "), "{gap}");
+                assert!(gap.contains("of release NEW"), "{gap}");
+                assert!(gap.contains("and 1 older offer(s)"), "{gap}");
+                assert!(gap.contains(&release), "{gap}");
+            }
+            Err(sibling::Draw::Refused(r)) => panic!("refused {}", r.detail),
+            Ok(value) => panic!("taken {value}"),
+        }
+    }
+
+    #[cfg(feature = "peer")]
+    #[test]
+    fn staged_bytes_whose_own_requirement_is_unmet_are_never_ingested_or_run() {
+        // The residual's cheap half: a statement that admits the offer does not excuse bytes
+        // that need more. The staged judge sees each drawn bin's bytes before ingest executes
+        // either one, and its refusal leaves nothing in the store.
+        let tmp = tempfile::tempdir().unwrap();
+        let store = two_bin_store(tmp.path());
+        let landed = tmp.path().join("sibling");
+        sibling_bins(&landed, "#!/bin/sh\n# sibling launcher\n");
+        let release = store.release_cid_of(&landed).unwrap();
+        let commit = "7".repeat(40);
+        let incoming = tmp.path().join("incoming");
+        let serve = serving(&landed);
+        let judged = std::cell::RefCell::new(Vec::new());
+        let result = sibling::take(
+            &store,
+            tmp.path(),
+            &commit,
+            &incoming,
+            &offer_for(&release),
+            &serve,
+            &|bin, bytes| {
+                judged.borrow_mut().push((bin.to_string(), bytes.len()));
+                if bin == "epr" {
+                    Err("isa.x86 missing-feature avx512f".into())
+                } else {
+                    Ok(())
+                }
+            },
+        );
+        match result {
+            Err(sibling::Draw::Gap(gap)) => {
+                assert!(gap.starts_with("statement-understated: epr "), "{gap}");
+                assert!(gap.contains("avx512f"), "{gap}");
+                assert!(gap.contains("nothing was ingested"), "{gap}");
+            }
+            Err(sibling::Draw::Refused(r)) => panic!("a gap, not a refusal: {}", r.detail),
+            Ok(value) => panic!("understated bytes were taken: {value}"),
+        }
+        // The launcher (first in name order) and epr were each judged on their full bytes.
+        let judged = judged.into_inner();
+        assert_eq!(judged[0].0, "bin-launch");
+        assert_eq!(judged[1].0, "epr");
+        assert_eq!(
+            judged[1].1,
+            std::fs::metadata(landed.join("epr")).unwrap().len() as usize
+        );
+        assert!(!store.holds_verified_for(&commit), "nothing is ingested");
+        assert!(!incoming.join(format!("sibling-{release}")).exists());
+    }
+
+    #[cfg(feature = "peer")]
+    #[test]
+    fn a_gap_names_an_axis_only_when_it_is_that_axis_or_under_it() {
+        for (gap, axis) in [
+            ("isa.x86.partial-decode", Some("isa.x86")),
+            ("abi.libc", Some("abi.libc")),
+            ("lib.unresolved", Some("lib")),
+            ("library", None),
+            ("build-inputs.build-scripts", None),
+            ("isa.x86x", None),
+        ] {
+            assert_eq!(sibling::unmeasured_axis_for_test(gap), axis, "{gap}");
+        }
     }
 }

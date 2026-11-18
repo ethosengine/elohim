@@ -218,17 +218,24 @@ pub(super) fn requires_gaps(
 ) -> ArtifactResult<()> {
     let (_, evidence) = requires::documents(bytes, output, caller, false)?;
     if let Some((_, evidence)) = evidence {
-        let evidence: serde_json::Value = serde_json::from_slice(&evidence)?;
-        if evidence[host_contract::names::axis::ISA_X86]["partialFunctions"]["count"]
-            .as_u64()
-            .is_some_and(|count| count > 0)
-        {
+        if partial_decode(&evidence)? {
             gaps.push(PARTIAL_DECODE_GAP.into());
         }
     }
     gaps.sort();
     gaps.dedup();
     Ok(())
+}
+
+/// Whether an extraction evidence document records x86 functions decoded only partially: the
+/// [`PARTIAL_DECODE_GAP`] put records, and a draw re-extracting staged bytes reads.
+pub(super) fn partial_decode(evidence: &[u8]) -> ArtifactResult<bool> {
+    let evidence: serde_json::Value = serde_json::from_slice(evidence)?;
+    Ok(
+        evidence[host_contract::names::axis::ISA_X86]["partialFunctions"]["count"]
+            .as_u64()
+            .is_some_and(|count| count > 0),
+    )
 }
 
 /// The Produce annotation shared by executable and archive recording; `None` when no gap is open,

@@ -285,6 +285,33 @@ impl Store {
                 "no local closure supplied (epr bin ingest --tool <tool> --closure <path>)".into(),
             );
         }
+        // Finding 4: every path below ends at a landing or a check that requires publication,
+        // so an unpublished commit refuses now rather than after a compile of up to 30 min.
+        let published_commit = if self.config.source["kind"] == "gitlink" {
+            self.git(repo, &["rev-parse", "HEAD"])?
+        } else {
+            commit.to_owned()
+        };
+        if let Err(detail) = self.published_on(repo, &published_commit) {
+            attempts.push("nothing built: the commit would refuse at landing".into());
+            return Err(Refusal::new(
+                "unpublished",
+                format!("{detail}; {}", attempts.join("; ")),
+            ));
+        }
+        // A host with no build target says so, rather than folding it into the build attempts.
+        if let Err(e) = self.build_target_with(repo, &files::env) {
+            return Err(Refusal::new(
+                "cannot-build",
+                format!(
+                    "this host cannot build {} ({}: {}); {}",
+                    self.tool,
+                    e.kind,
+                    e.detail,
+                    attempts.join("; ")
+                ),
+            ));
+        }
         match self.build_release(repo, commit, gate, &mut attempts, &files::env) {
             Ok(record) => self.finish_declared(record, commit, repo, &options),
             Err(e) => {

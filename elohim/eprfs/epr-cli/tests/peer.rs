@@ -1234,6 +1234,11 @@ fn peer_verdicts_reads_only_matching_folded_admitted_siblings() {
     let (keys, a, b) = household();
     let a_did = a.key.did_key();
     let stranger = Device::new(&keys, "stranger-verdict");
+    // A's record naming closure-x and then closure-a: inconsistent with itself, so no verdict
+    // (a last-value-wins read would have matched closure-a).
+    let mut twice = gate_verdict_record("eprfs", "closure-x", "twice", true, Some(&a_did));
+    twice.classified_as.push("env:closure=closure-a".into());
+    append(b.checkout.path(), [twice]);
     append(
         b.checkout.path(),
         [

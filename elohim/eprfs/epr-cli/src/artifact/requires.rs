@@ -12,6 +12,10 @@ use super::{ArtifactError, ArtifactResult};
 /// document keeps only its CID, and a reader treats that requirement as unmeasured.
 pub(crate) const INLINE_MAX: usize = 16 * 1024;
 
+/// The longest `env:requires-doc` value an [`INLINE_MAX`]-byte document encodes to (base64url,
+/// no padding): 21,846 characters. A longer slot is refused before a byte of it is decoded.
+pub(crate) const INLINE_MAX_ENCODED: usize = (INLINE_MAX * 4).div_ceil(3);
+
 /// The `env:requires-doc` slot for a requirement document, or `None` past [`INLINE_MAX`].
 /// The document is the artifact's own statement of what it needs, derived from its bytes; it
 /// carries nothing observed about this host, so it may cross wherever its Produce crosses.
@@ -25,6 +29,14 @@ pub(super) fn inline_slot(bytes: &[u8]) -> Option<String> {
 pub(crate) fn inline_doc(cid: &str, slot: &str) -> Result<Vec<u8>, String> {
     let expected =
         BlobCid::parse(cid).map_err(|e| format!("env:requires {cid} is not a CID: {e}"))?;
+    // The cap binds before decoding: a sibling's oversized slot costs this device no allocation.
+    if slot.len() > INLINE_MAX_ENCODED {
+        return Err(format!(
+            "env:requires-doc is {} encoded characters, over the {INLINE_MAX_ENCODED} an \
+             {INLINE_MAX}-byte inline cap allows; refused undecoded",
+            slot.len()
+        ));
+    }
     let bytes = URL_SAFE_NO_PAD
         .decode(slot)
         .map_err(|e| format!("env:requires-doc is not base64url: {e}"))?;
@@ -265,6 +277,23 @@ mod tests {
                 .unwrap_err()
                 .contains("inline cap")
         );
+    }
+
+    #[test]
+    fn an_inline_slot_over_the_encoded_cap_is_refused_before_it_is_decoded() {
+        // The largest document encodes to exactly the encoded cap and is still read.
+        let max = vec![b' '; INLINE_MAX];
+        let encoded = URL_SAFE_NO_PAD.encode(&max);
+        assert_eq!(encoded.len(), INLINE_MAX_ENCODED);
+        assert_eq!(INLINE_MAX_ENCODED, 21_846);
+        let cid = BlobCid::compute_bytes(&max).to_string();
+        assert_eq!(inline_doc(&cid, &encoded).unwrap(), max);
+        // One character more is refused by length alone: these characters are not even
+        // base64url, so a decode-first reader would have said something else.
+        let long = "!".repeat(INLINE_MAX_ENCODED + 1);
+        let why = inline_doc(&cid, &long).unwrap_err();
+        assert!(why.contains("refused undecoded"), "{why}");
+        assert!(why.contains("21847 encoded characters"), "{why}");
     }
 
     #[test]

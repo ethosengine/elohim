@@ -1214,6 +1214,45 @@ fn reach_gate_unconfirmed() -> Option<String> {
     }
 }
 
+/// What a staged executable requires, re-extracted here from its own `bytes` the way `put`
+/// extracts it (canonical requirement document), and whether its x86 decode was partial
+/// (the `isa.x86.partial-decode` gap). `path` only names the bytes in messages.
+///
+/// # Errors
+///
+/// When the bytes are not an executable extraction reads.
+pub(crate) fn staged_requires(path: &Path, bytes: &[u8]) -> Result<(Vec<u8>, bool), String> {
+    let (requires, evidence) =
+        requires::documents(bytes, path, None, false).map_err(|e| e.to_string())?;
+    let (_, document) = requires.ok_or_else(|| format!("{}: no requirement", path.display()))?;
+    let partial = match evidence {
+        Some((_, evidence)) => preflight::partial_decode(&evidence).map_err(|e| e.to_string())?,
+        None => false,
+    };
+    Ok((document.to_vec(), partial))
+}
+
+/// Finding 6: a crossing custody Produce must fit the fold's per-event cap
+/// ([`eprfs_peer::MAX_EVENT_BYTES`]) as encoded. A larger one would be quarantined unread by
+/// every sibling, and an unacknowledged quarantine holds that sibling's fold of this device
+/// incomplete, so it is refused here, before anything is attested or appended.
+fn crossing_fits(record: &elohim_epr_rea::FlowRecord) -> ArtifactResult<()> {
+    let elohim_epr_rea::FlowRecord::Event(event) = record else {
+        return Ok(());
+    };
+    let encoded = elohim_epr_rea::model::canonical_bytes(event)
+        .map_err(|e| unrecorded(format!("the custody Produce does not encode: {e}")))?;
+    if encoded.len() > eprfs_peer::MAX_EVENT_BYTES {
+        return Err(unrecorded(format!(
+            "the custody Produce encodes to {} bytes, over the {}-byte per-event cap a sibling's \
+             fold reads; it would stall that fold, so nothing is recorded",
+            encoded.len(),
+            eprfs_peer::MAX_EVENT_BYTES
+        )));
+    }
+    Ok(())
+}
+
 /// The `env:release` / `env:release-bin` slots for `--release CID --release-bin NAME`: both or
 /// neither, each one token, since a slot is `key=value` with no further structure.
 fn release_slots(options: &Options) -> ArtifactResult<Vec<String>> {
@@ -1492,6 +1531,9 @@ fn record_artifact(
         .next()
         .ok_or_else(|| unrecorded("custody produced no event"))?
         .1;
+    if crosses {
+        crossing_fits(&event)?;
+    }
     let duration = options.duration_ms.to_string();
     attestation::publish(
         repo,
@@ -1781,6 +1823,9 @@ fn fetch(options: &Options) -> ArtifactResult<ExitCode> {
     }
 }
 
+#[cfg(test)]
+#[path = "artifact/crossing_fits_tests.rs"]
+mod crossing_fits_tests;
 #[cfg(test)]
 #[path = "artifact/target_tests.rs"]
 mod target_tests;

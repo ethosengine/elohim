@@ -77,6 +77,7 @@ struct State {
     descended: bool,
     published: bool,
     published_ref: Option<String>,
+    pool_fail: bool,
     unchanged: bool,
     health_fail: bool,
     health_bad: Option<String>,
@@ -136,7 +137,9 @@ impl Runner for Fake {
                 _ => success = false,
             }
         } else if c.program.ends_with("/cargo-pool") && c.args == ["key"] {
-            out = format!("slot_dev={}\n", self.root.join("target").display());
+            if !s.pool_fail {
+                out = format!("slot_dev={}\n", self.root.join("target").display());
+            }
         } else if c.program == "gh" && c.args.starts_with(&["release".into(), "download".into()]) {
             if let Some(source) = &s.download {
                 let index = c
@@ -3475,3 +3478,61 @@ mod retained;
 
 #[path = "follow_record/tests.rs"]
 mod follow_outcome;
+
+#[test]
+fn bootstrap_of_an_unpublished_head_refuses_before_any_compile() {
+    // Finding 4: every path out of prepare_declared lands or requires publication, so an
+    // unpublished commit used to compile (up to 30 min) and then refuse. It now refuses first.
+    let f = Fixture::new("epr");
+    f.state.lock().unwrap().published = false;
+    let e = f.store.bootstrap(f.tmp.path(), None).unwrap_err();
+    assert_eq!(e.kind, "unpublished", "{e:?}");
+    assert!(e.detail.contains("nothing built"), "{}", e.detail);
+    let calls = f.state.lock().unwrap().calls.clone();
+    assert!(
+        !calls
+            .iter()
+            .any(|c| c.program == "cargo" && c.args.first().is_some_and(|a| a == "build")),
+        "no cargo build ran: {:?}",
+        calls
+            .iter()
+            .map(|c| (&c.program, &c.args))
+            .collect::<Vec<_>>()
+    );
+    // Published, the same bootstrap reaches the build (which the fake fails).
+    f.state.lock().unwrap().published = true;
+    let e = f.store.bootstrap(f.tmp.path(), None).unwrap_err();
+    assert_eq!(e.kind, "bootstrap-unavailable", "{e:?}");
+}
+#[test]
+fn a_host_with_no_build_target_is_named_as_such() {
+    let f = Fixture::new("epr");
+    f.state.lock().unwrap().pool_fail = true;
+    let e = f
+        .store
+        .build_target_with(f.tmp.path(), &|_| None)
+        .unwrap_err();
+    assert_eq!(e.kind, "bootstrap-pool-unavailable");
+    f.state.lock().unwrap().pool_fail = false;
+    assert!(f.store.build_target_with(f.tmp.path(), &|_| None).is_ok());
+}
+#[test]
+fn the_published_ref_is_named_remote_tracking_first() {
+    // Finding 5: which ref made a commit published is reported; the shared branch is preferred
+    // over a local one, and a local-only commit is recognisable from the ref named.
+    let f = Fixture::new("epr");
+    let refs = f.registry.tool("epr").unwrap().source["publishedRef"].clone();
+    assert_eq!(refs, json!(["refs/heads/dev", "refs/remotes/origin/dev"]));
+    let head = f.commit();
+    // Contained in both (the fake's default): the remote-tracking ref is named, though
+    // declared second.
+    assert_eq!(
+        f.store.published_on(f.tmp.path(), &head),
+        Ok("refs/remotes/origin/dev".to_owned())
+    );
+    // Only the local branch holds it: still published, and the ref says so.
+    f.state.lock().unwrap().published_ref = Some("refs/heads/dev".into());
+    let local = f.store.published_on(f.tmp.path(), &head).unwrap();
+    assert_eq!(local, "refs/heads/dev");
+    assert!(is_local_ref(&local) && !is_local_ref("refs/remotes/origin/dev"));
+}

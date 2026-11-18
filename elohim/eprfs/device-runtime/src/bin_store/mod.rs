@@ -18,7 +18,7 @@ pub use landing::{PeerServing, Transition};
 pub use launch::{launch, launch_os, Resolution};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
-pub use source::{CommandOutput, CommandSpec, Runner, SystemRunner};
+pub use source::{is_local_ref, CommandOutput, CommandSpec, Runner, SystemRunner};
 use std::{
     collections::BTreeMap,
     path::{Path, PathBuf},

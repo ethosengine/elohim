@@ -296,18 +296,34 @@ impl Store {
     /// it resolves to here (or that it is absent) and the cure, so a stale remote-tracking ref
     /// reads as stale rather than as a commit nobody landed.
     pub fn unpublished(&self, repo: &Path, commit: &str) -> Option<String> {
-        let refs: Vec<&str> = self.config.source["publishedRef"]
+        self.published_on(repo, commit).err()
+    }
+
+    /// Which of the tool's `source.publishedRef`s contains `commit`, so a line can say which
+    /// ref made it published; else why none does ([`Self::unpublished`]). A remote-tracking ref
+    /// (`refs/remotes/...`) is named first when it qualifies: it is what the shared branch
+    /// carried at this device's last fetch. epr also declares the local `refs/heads/dev`
+    /// (accepted by the 2026-10-24 slice A ruling, `land_accepts_either_local_or_remote_
+    /// published_ref`), so a commit only this device's local dev holds still counts; a caller
+    /// reads that from the ref it gets back ([`is_local_ref`]).
+    ///
+    /// # Errors
+    ///
+    /// Why `commit` is unpublished, naming each declared ref where it stands and the cure.
+    pub fn published_on(&self, repo: &Path, commit: &str) -> std::result::Result<String, String> {
+        let mut refs: Vec<&str> = self.config.source["publishedRef"]
             .as_array()
             .map(|refs| refs.iter().filter_map(Value::as_str).collect())
             .unwrap_or_default();
-        if refs
-            .iter()
-            .any(|reference| self.git_ok(repo, &["merge-base", "--is-ancestor", commit, reference]))
-        {
-            return None;
+        // Stable: remote-tracking refs first, each group in declared order.
+        refs.sort_by_key(|reference| is_local_ref(reference));
+        if let Some(reference) = refs.iter().find(|reference| {
+            self.git_ok(repo, &["merge-base", "--is-ancestor", commit, reference])
+        }) {
+            return Ok((*reference).to_owned());
         }
         if refs.is_empty() {
-            return Some(format!(
+            return Err(format!(
                 "{commit} is not contained in any publishedRef: the {} tool declares none",
                 self.tool
             ));
@@ -323,7 +339,7 @@ impl Store {
             })
             .collect::<Vec<_>>()
             .join(", ");
-        Some(format!(
+        Err(format!(
             "{commit} is not contained in any publishedRef ({seen}); if it is on dev, the \
              remote-tracking ref is stale: brit fetch -r origin moves it (brit fetch origin dev \
              does not), else land the commit on dev"
@@ -363,7 +379,15 @@ impl Store {
         .join("modules/elohim/brit"))
     }
     pub(super) fn build_target(&self, repo: &Path) -> Result<PathBuf> {
-        if let Some(target) = files::env("CARGO_TARGET_DIR") {
+        self.build_target_with(repo, &files::env)
+    }
+    /// [`Self::build_target`] reading the environment through `env`.
+    pub(super) fn build_target_with(
+        &self,
+        repo: &Path,
+        env: &dyn Fn(&str) -> Option<String>,
+    ) -> Result<PathBuf> {
+        if let Some(target) = env("CARGO_TARGET_DIR") {
             return files::absolute(Path::new(&target));
         }
         let mut spec = CommandSpec::new(
@@ -443,4 +467,10 @@ pub(super) fn registry_credential(
 
 pub(super) fn copy_executable(source: &Path, dest: &Path) -> Result<()> {
     files::atomic_bytes(dest, &fs::read(source)?, 0o555)
+}
+
+/// Whether `reference` is a branch of this repository rather than a remote-tracking ref: what
+/// it holds has not been shown to be on the shared branch.
+pub fn is_local_ref(reference: &str) -> bool {
+    !reference.starts_with("refs/remotes/")
 }

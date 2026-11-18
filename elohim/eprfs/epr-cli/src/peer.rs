@@ -1557,18 +1557,17 @@ fn verdict_from_event(
     {
         return None;
     }
-    let env: std::collections::BTreeMap<&str, &str> = slots(event)
-        .filter_map(|slot| slot.strip_prefix("env:")?.split_once('='))
-        .collect();
-    if env.get("project").copied()? != project || env.get("closure").copied()? != closure {
+    // Exactly one of each, as for custody records: a duplicate never lets a later value stand.
+    let once = |name: &str| one_slot(event, &format!("env:{name}="));
+    if once("project")? != project || once("closure")? != closure {
         return None;
     }
-    let success = match env.get("success").copied()? {
+    let success = match once("success")? {
         "true" => true,
         "false" => false,
         _ => return None,
     };
-    let seconds = env.get("seconds")?.parse::<f64>().ok()?;
+    let seconds = once("seconds")?.parse::<f64>().ok()?;
     if !seconds.is_finite() || seconds < 0.0 {
         return None;
     }
@@ -1576,11 +1575,11 @@ fn verdict_from_event(
         device: device.to_string(),
         project: project.to_string(),
         closure: closure.to_string(),
-        commit: (*env.get("commit")?).to_string(),
+        commit: once("commit")?.to_string(),
         success,
         seconds,
-        attestation_id: env.get("attestationId").map(|value| (*value).to_string()),
-        agent_id: env.get("agentId").map(|value| (*value).to_string()),
+        attestation_id: once("attestationId").map(str::to_string),
+        agent_id: once("agentId").map(str::to_string),
         at: event.occurred_at.clone(),
         head_seq: heads.devices.get(device).map(|head| head.seq),
     })
@@ -1700,6 +1699,11 @@ pub struct SiblingArtifact {
     pub release_bin: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub agent_id: Option<String>,
+    /// `env:gaps`: what the recorder could not measure about this output (for example
+    /// `isa.x86.partial-decode`). A gap on a requirement axis leaves that axis unmeasured, so
+    /// the statement in [`Self::requires`] is partial for it.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub gaps: Vec<String>,
     pub at: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub head_seq: Option<u64>,
@@ -1732,9 +1736,8 @@ fn artifact_from_event(
     {
         return None;
     }
-    let env: std::collections::BTreeMap<&str, &str> = slots(event)
-        .filter_map(|slot| slot.strip_prefix("env:")?.split_once('='))
-        .collect();
+    // Every value read is the record's only one of its kind: a second `env:commit` (or any
+    // other) makes the record inconsistent with itself, never "the last one stands".
     let key = one_slot(event, "env:key=")?;
     let output = one_slot(event, "env:output=")?;
     let resource = event.resource.to_string();
@@ -1742,6 +1745,25 @@ fn artifact_from_event(
         return None;
     }
     let manifest = one_slot(event, "manifest:")?;
+    let gaps = match slots(event)
+        .filter(|slot| slot.starts_with("env:gaps="))
+        .count()
+    {
+        0 => Vec::new(),
+        1 => one_slot(event, "env:gaps=")?
+            .split(',')
+            .filter(|gap| !gap.is_empty())
+            .map(str::to_string)
+            .collect(),
+        _ => return None,
+    };
+    let optional = |prefix: &str| -> Option<Option<String>> {
+        match slots(event).filter(|slot| slot.starts_with(prefix)).count() {
+            0 => Some(None),
+            1 => Some(one_slot(event, prefix).map(str::to_string)),
+            _ => None,
+        }
+    };
     Some(SiblingArtifact {
         record: record.to_string(),
         key: key.to_string(),
@@ -1753,11 +1775,12 @@ fn artifact_from_event(
         device: device.to_string(),
         output: output.to_string(),
         manifest: manifest.to_string(),
-        bytes: env.get("bytes")?.parse().ok()?,
-        commit: (*env.get("commit")?).to_string(),
+        bytes: one_slot(event, "env:bytes=")?.parse().ok()?,
+        commit: one_slot(event, "env:commit=")?.to_string(),
         release: one_slot(event, "env:release=").map(str::to_string),
         release_bin: one_slot(event, "env:release-bin=").map(str::to_string),
-        agent_id: env.get("agentId").map(|value| (*value).to_string()),
+        agent_id: optional("env:agentId=")?,
+        gaps,
         at: event.occurred_at.clone(),
         head_seq: heads.devices.get(device).map(|head| head.seq),
     })
@@ -2920,3 +2943,6 @@ mod serve_lock_tests {
         assert!(!SERVE_LOCK_HELD_LINE.contains('\n'));
     }
 }
+
+#[cfg(test)]
+mod custody_slot_tests;
