@@ -19,8 +19,8 @@
 //!   `-m` token selects an ISA: `-m64`, `-mtune=*` and `-mno-*` do not; every other `-m` token
 //!   refuses (`-mavx2`, `-msse4.2`, `-mcpu=*`, `-march=native` among them);
 //! - a script whose `OUT_DIR` holds `.o` or `.a` files and that logged no compile has no evidence
-//!   and refuses, and so does one whose log is older than an object it sits beside or that holds
-//!   an object no logged command produced ([`log_findings`]: a stale or restored log);
+//!   and refuses, and so does one holding an object older than the run its log records, or an
+//!   object no logged command produced ([`log_findings`]: a stale or restored log);
 //! - an [`EXCEPTIONS`] crate is judged by its own exception instead, which still reads its
 //!   commands: CPUID-dispatched assembly compiles only assembly (and cc's flag probe), and a crate
 //!   that compiles nothing on a declared target compiled nothing.
@@ -273,10 +273,13 @@ struct Script {
 /// A stale log must not pass (coordinator ruling on the L2a rework, point 3). Cargo reruns a
 /// build script when its fingerprint or a `rerun-if-*` input changes (cc declares
 /// `rerun-if-env-changed=CC_ENABLE_DEBUG_OUTPUT`, command_helpers.rs:153) and writes the
-/// script's output only after it exits, so a fresh build pairs that output with what the run left
-/// in OUT_DIR. A target directory restored from elsewhere can break the pairing without cargo
-/// noticing; these checks cover it: (a) the output is not older than any object or archive in
-/// OUT_DIR, and (b) every `.o` is the `-o` of a logged compile and every `.a` an argument of a
+/// script's output when it exits, stamping its mtime with the time the script STARTED (observed
+/// on this host with cargo 1.100: `run/stdout` carries exactly `run/invoked.timestamp`'s mtime,
+/// while the objects it logged are seconds newer), so a fresh build pairs that output with what
+/// the run left in OUT_DIR. A target directory restored from elsewhere can break the pairing
+/// without cargo noticing; these checks cover it: (a) no object or archive in OUT_DIR is older
+/// than the run its output records (one left by an earlier run, or copied in, is), and (b) every
+/// `.o` is the `-o` of a logged compile and every `.a` an argument of a
 /// logged archiver command (cc 1.11.1 logs `ar` through the same `running:` line, lib.rs:4032
 /// and command_helpers.rs:644). Any object with no logged producer is no evidence.
 fn log_findings(script: &Script) -> Vec<String> {
@@ -286,13 +289,13 @@ fn log_findings(script: &Script) -> Vec<String> {
         let path = script.out_dir.join(object);
         let made = std::fs::metadata(&path).and_then(|m| m.modified());
         let stale = match (&logged, made) {
-            (Ok(logged), Ok(made)) => made > *logged,
+            (Ok(started), Ok(made)) => made < *started,
             _ => true,
         };
         if stale {
             findings.push(format!(
-                "{DECLARED}: no evidence: {}'s build script output {} is older than {object} in \
-                 its OUT_DIR (a stale or restored log)",
+                "{DECLARED}: no evidence: {}'s build script output {} records a run, and \
+                 {object} is older than the run (left by another run, or a restored cache)",
                 script.package,
                 script.output.display()
             ));

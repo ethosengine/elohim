@@ -722,9 +722,6 @@ fn build_messages(dir: &Path, bin: &str, exe: &Path, messages: &Messages) -> Opt
         let out = unit.join("out");
         std::fs::create_dir_all(&out).unwrap();
         std::fs::create_dir_all(unit.join("run")).unwrap();
-        for object in script.objects {
-            std::fs::write(out.join(object), b"obj").unwrap();
-        }
         let log: String = script
             .running
             .iter()
@@ -735,7 +732,17 @@ fn build_messages(dir: &Path, bin: &str, exe: &Path, messages: &Messages) -> Opt
                 )
             })
             .collect();
+        // As cargo leaves it: the log stamped with the script's start, then what the run wrote.
         std::fs::write(unit.join("run/stdout"), log).unwrap();
+        std::fs::File::options()
+            .write(true)
+            .open(unit.join("run/stdout"))
+            .unwrap()
+            .set_modified(std::time::SystemTime::now() - std::time::Duration::from_secs(2))
+            .unwrap();
+        for object in script.objects {
+            std::fs::write(out.join(object), b"obj").unwrap();
+        }
         lines.push(
             serde_json::json!({
                 "reason": "build-script-executed",

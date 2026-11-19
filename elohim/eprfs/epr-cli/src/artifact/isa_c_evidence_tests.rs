@@ -32,9 +32,6 @@ impl Build {
         let unit = self.dir.path().join("build").join(package).join("0123");
         let out = unit.join("out");
         std::fs::create_dir_all(&out).unwrap();
-        for object in objects {
-            std::fs::write(out.join(object), b"obj").unwrap();
-        }
         let stdout = running
             .iter()
             .map(|line| {
@@ -51,7 +48,19 @@ impl Build {
         } else {
             unit.join("output")
         };
-        std::fs::write(output, stdout).unwrap();
+        // As cargo leaves it: the output stamped with the script's start (cargo sets its mtime to
+        // the invocation time), and every object the run wrote no older than that.
+        std::fs::write(&output, stdout).unwrap();
+        let started = std::time::SystemTime::now() - std::time::Duration::from_secs(2);
+        std::fs::File::options()
+            .write(true)
+            .open(&output)
+            .unwrap()
+            .set_modified(started)
+            .unwrap();
+        for object in objects {
+            std::fs::write(out.join(object), b"obj").unwrap();
+        }
         self.lines.push(
             serde_json::json!({
                 "reason": "build-script-executed",
@@ -305,20 +314,22 @@ fn out_dir(build: &Build, package: &str) -> PathBuf {
         .join("0123/out")
 }
 
-/// The coordinator's point 3: a stale log must not pass. A log older than an object it sits
-/// beside (a cache restored from elsewhere) is no evidence, for an exception crate too.
+/// The coordinator's point 3: a stale log must not pass. Cargo stamps a script's output with the
+/// time the script started, so every object the run wrote is no older than that; an object older
+/// than its log (left by another run, or a cache restored from elsewhere) is no evidence, for an
+/// exception crate too. A fresh run (the helper's order) passes.
 #[test]
-fn evidence_refuses_a_log_older_than_an_object_it_sits_beside() {
+fn evidence_refuses_an_object_older_than_the_run_its_log_records() {
     let ring = [compile(MARCH, "a.c"), ARCHIVE.to_owned()];
     let ring: Vec<&str> = ring.iter().map(String::as_str).collect();
     for package in ["ring", "blake3"] {
         let build = Build::new("epr").script(package, &ring, &["x.o", "libx.a"], true);
-        let later = std::time::SystemTime::now() + std::time::Duration::from_secs(3600);
+        let earlier = std::time::SystemTime::now() - std::time::Duration::from_secs(3600);
         std::fs::File::options()
             .write(true)
             .open(out_dir(&build, package).join("x.o"))
             .unwrap()
-            .set_modified(later)
+            .set_modified(earlier)
             .unwrap();
         let found = build.judge("epr", BYTES).unwrap_err();
         assert!(
@@ -328,7 +339,10 @@ fn evidence_refuses_a_log_older_than_an_object_it_sits_beside() {
             ),
             "{package}: {found:?}"
         );
-        assert!(has(&found, "is older than x.o"), "{package}: {found:?}");
+        assert!(
+            has(&found, "x.o is older than the run"),
+            "{package}: {found:?}"
+        );
     }
 }
 
