@@ -52,6 +52,8 @@ struct Build {
     bin: String,
     lines: Vec<String>,
     closure: BTreeSet<String>,
+    /// The closure packages the lock's metadata gives a custom-build target (hardening 4).
+    scripted: BTreeSet<String>,
     finished: Option<bool>,
 }
 
@@ -75,6 +77,7 @@ impl Build {
             bin: bin.to_owned(),
             lines,
             closure: [format!("{bin}@0.1.0")].into(),
+            scripted: BTreeSet::new(),
             finished: Some(true),
         }
     }
@@ -96,6 +99,18 @@ impl Build {
         self.lines.retain(|line| {
             let row: serde_json::Value = serde_json::from_str(line).unwrap();
             !(row["reason"] == reason && row["package_id"] == package_id.as_str())
+        });
+        self
+    }
+
+    /// Drop `package`'s compiler-artifact row of target `kind` from the stream.
+    fn without_kind(mut self, kind: &str, package: &str) -> Self {
+        let package_id = id(package);
+        self.lines.retain(|line| {
+            let row: serde_json::Value = serde_json::from_str(line).unwrap();
+            !(row["reason"] == "compiler-artifact"
+                && row["package_id"] == package_id.as_str()
+                && row["target"]["kind"][0] == kind)
         });
         self
     }
@@ -193,6 +208,7 @@ impl Build {
         let expected = Expected {
             package: format!("path+file:///repo/crate#{}@0.1.0", self.bin),
             closure: self.closure.clone(),
+            scripted: self.scripted.clone(),
         };
         judge(&messages, bytes, bin, MARCH, &expected)
     }
@@ -678,6 +694,27 @@ fn evidence_refuses_a_compile_whose_options_it_cannot_read() {
             "{form}: {found:?}"
         );
     }
+}
+
+/// Hardening 4: a closure package the lock's metadata gives a build script must have its
+/// build-script-executed row, even when the stream also dropped its custom-build compile.
+#[test]
+fn evidence_refuses_a_scripted_package_whose_script_row_is_gone() {
+    let ring = [compile(MARCH, "a.c")];
+    let ring: Vec<&str> = ring.iter().map(String::as_str).collect();
+    let mut build = Build::new("epr")
+        .script("ring", &ring, &["x.o"], true)
+        .without("build-script-executed", "ring")
+        .without_kind("custom-build", "ring");
+    build.scripted.insert(key("ring"));
+    let found = build.judge("epr", BYTES).unwrap_err();
+    assert!(
+        has(
+            &found,
+            "ring@1.0.0 has a build script and the stream no build-script-executed row"
+        ),
+        "{found:?}"
+    );
 }
 
 /// Hardening 3: an archive member whose judged object is no longer at its -o path has nothing to

@@ -59,6 +59,10 @@ const DECLARED: &str = "missing declared-target";
 pub(super) struct Expected {
     pub package: String,
     pub closure: BTreeSet<String>,
+    /// The closure packages (`name@version`) the lock's metadata gives a `custom-build`
+    /// target: each one's build script ran in the build, so the stream holds its
+    /// build-script-executed row (hardening 4).
+    pub scripted: BTreeSet<String>,
 }
 
 /// The [`Expected`] roster of `descriptor`'s build, from the lock's resolve for its triple.
@@ -144,7 +148,35 @@ pub(super) fn expected(repo: &Path, descriptor: &MethodDescriptor) -> Result<Exp
             "{DECLARED}: the build's roster is unread: cargo tree for {spec} names no package"
         ));
     }
-    Ok(Expected { package, closure })
+    // Hardening 4, from the metadata call already made (no further cargo call): every closure
+    // package with a custom-build target.
+    let scripted = metadata["packages"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter(|p| {
+            p["targets"].as_array().is_some_and(|targets| {
+                targets.iter().any(|t| {
+                    t["kind"]
+                        .as_array()
+                        .is_some_and(|kinds| kinds.iter().any(|k| k == "custom-build"))
+                })
+            })
+        })
+        .filter_map(|p| {
+            Some(format!(
+                "{}@{}",
+                p["name"].as_str()?,
+                p["version"].as_str()?
+            ))
+        })
+        .filter(|key| closure.contains(key))
+        .collect();
+    Ok(Expected {
+        package,
+        closure,
+        scripted,
+    })
 }
 
 /// The `name@version` of every package a `cargo tree --prefix none -f '{p}'` listing names:
@@ -972,6 +1004,19 @@ pub(super) fn judge(
         missing.push(format!(
             "{DECLARED}: no evidence: {id} has a custom-build compile and no \
              build-script-executed row, so its build script's commands are not in the stream"
+        ));
+    }
+    // Hardening 4: the lock's metadata, not the stream, says which closure packages have a
+    // build script; each one's build-script-executed row is in the stream.
+    let ran_keys: BTreeSet<String> = ran
+        .iter()
+        .map(|id| format!("{}@{}", package_of(id).0, version_of(id)))
+        .collect();
+    for key in expected.scripted.difference(&ran_keys) {
+        missing.push(format!(
+            "{DECLARED}: no evidence: {key} has a build script and the stream no \
+             build-script-executed row for it (the lock's metadata names its custom-build \
+             target)"
         ));
     }
     // Every build-script-executed unit counts, build-dependencies and proc-macros included, not
