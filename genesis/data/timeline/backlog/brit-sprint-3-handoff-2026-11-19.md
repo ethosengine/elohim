@@ -23,8 +23,7 @@ cites:
   - genesis/data/timeline/backlog/brit-daily-driver-handoff-2026-10-27.md
 shift_objective: |
   Continue brit sprint 3 in the decided order: an independent integrator merges sprint3/trust,
-  sprint3/push-transport, sprint3/diff-show and sprint3/refs-shem into sprint3/integrate as each
-  clears review; then the push-policy lane, the rebase recovery lane (steps 1-2), the epr-cli
+  sprint3/diff-show and sprint3/refs-shem into sprint3/integrate as each clears review; then the push-policy lane, the rebase recovery lane (steps 1-2), the epr-cli
   lane, worktree-side diff with gitlinks, and merge porcelain.
 ---
 
@@ -41,14 +40,19 @@ has not moved.
 
 **Integration branch** `sprint3/integrate` in the brit repo, worktree
 `/projects/elohim/.worktrees/brit-s3-integrate`. Pushed to the brit remote as
-`run-ci/sprint3-integrate` three times, through `brit push` and brit's reach gate (`epr ready` +
-`scripts/ci/rust-style.sh`), each push taking about 6 s:
+`run-ci/sprint3-integrate` four times, through `brit push` and brit's reach gate (`epr ready` +
+`scripts/ci/rust-style.sh`). The first three pushes took about 6 s each; the fourth exited 0.
 
 | Pushed head | CI run |
 |---|---|
 | `251d10e52a` | 44469917351 |
 | `da5e4a0504` | 44477093766 |
-| `7479ce453981f69832792113fe917bcf72b62dde` | third run in progress when this was written |
+| `7479ce4539` | 44481834878: finished. Every Linux and macOS job green. The two cross-platform compile fixes worked (Windows built and ran about 5,670 tests). Red: four tests on both Windows runners, all from the build-inputs lane, plus cargo-deny-advisories (red on main too) and therefore `Tests pass` |
+| `bd28ecd8cf6c9593c77825d734e7fb38e1923534` | run 4, in progress when this was written |
+
+A second integrator took over from the runbook note below and did the phase from `7479ce4539` to
+`bd28ecd8cf`. Besides the lane merges, that phase made two integration commits: `4f1d05a93a` (one
+fixture test gated to Unix) and `bd28ecd8cf` (`FingerprintError` marked non-exhaustive).
 
 **Lanes** (each in its own worktree under `/projects/elohim/.worktrees/`):
 
@@ -59,11 +63,11 @@ has not moved.
 | `sprint3/branch-tag` | `99caa43f` | merged | `brit-s3-branch-tag` |
 | `sprint3/fetch-tracking` | `06616a06` | merged | `brit-s3-fetch-tracking` |
 | `sprint3/lock` | `63173728` | merged | `brit-s3-lock` |
-| `sprint3/build-inputs` | `0feb451a` | merged | `brit-s3-build-inputs` |
-| `sprint3/trust` | `d96ff65b2d` | still in review rounds, not merged | `brit-s3-trust` |
-| `sprint3/push-transport` | `0ca127c2` | still in review rounds (second review), not merged | `brit-s3-push-transport` |
+| `sprint3/build-inputs` | `0feb451a`; Windows follow-up tip `a3a874d4` (commits `7810a60e`, `4f1dd2c8`, `a3a874d4`) | merged; follow-up merged in `bd28ecd8cf` | `brit-s3-build-inputs` |
+| `sprint3/trust` | `d96ff65b2d` | in review, not merged | `brit-s3-trust` |
+| `sprint3/push-transport` | `4a60a61d` | merged in `bd28ecd8cf` (three implementation rounds, two independent reviews, a doc-link fix) | `brit-s3-push-transport` |
 | `sprint3/diff-show` | `3d10b379cf` | in review, not merged | `brit-s3-diff-show` |
-| `sprint3/refs-shem` | `4a39e9dffa` | six patches from shem applied locally; held until shem's fix round | `brit-s3-refs-shem` |
+| `sprint3/refs-shem` | `4a39e9dffa` | six patches from shem applied locally; held until shem's fix round (shem's hand-over branch `self/nt-review-receipts` was still at `0a6389cf4c`, 05:01Z, with no fix round) | `brit-s3-refs-shem` |
 
 **Monorepo side:** branch `feat/ark-declared-trust` (worktree `brit-s3-ark-trust`), first written as
 three commits on origin/dev `01e4de7f1`, is now four commits (tip `d14e7357f`), reviewed, awaiting
@@ -76,6 +80,7 @@ rebase onto the landed dev.
 - **covenant-escape:** see `brit-covenant-session-segment-aliasing.md` (status 2026-11-19), including
   its residuals.
 - **lock:** see `brit-mutation-lock-blocks-isolated-lanes.md` (status 2026-11-19).
+- **push-transport:** see `brit-push-fails-after-green-hook-root-cause.md`.
 - **log-rev-path:** `brit log [REVISION]... [--oneline] [-n N] [-- PATH...]` with `A`, `^A`, `A..B`,
   `A...B`, `A^@`, `A^!`. With paths it follows git's default history simplification, and a trailing
   slash means directory only. Bare `brit log` now stops at a shallow boundary (monorepo: 12,839
@@ -111,6 +116,33 @@ rebase onto the landed dev.
   `-C target-cpu=x86-64-v2` (release and bin-store builds) cc passes no `-march`, so those builds still
   need their CFLAGS, and brit-cli's build probe refuses without them.
 
+  **Windows follow-up** (merged in `bd28ecd8cf`). CI run 3 showed four Windows failures, from two
+  causes: (1) a test helper formatted a Windows path into a command string that `gix_testtools::git`
+  splits, and the splitting ate the backslashes; (2) `globset`'s default makes a backslash an escape on
+  Unix and a path separator on Windows, so the same manifest glob compiled to a different matcher per
+  platform. Cure:
+  - Every step glob compiles through one function, `compile_step_glob`, with all five globset options
+    set explicitly to the Unix defaults. Linux/macOS keys are byte-identical: 25 monorepo manifests
+    identical, cargo-build-storage still 3170 inputs, CID
+    `bafyreiflnjxisflzqdrpy2seqmj4y6sy63wcjyznxboodamtq76i226jca`.
+  - A pattern with a backslash directly beside `**` is refused on every platform with `InvalidGlob`,
+    naming pattern and position (globset's `parse_star` consults the host separator rule there
+    whatever the options say).
+  - A tree path containing a backslash is refused on non-Unix hosts with
+    `FingerprintError::UnportableTreePath` (there globset rewrites `\` to `/` in candidates). On such a
+    host, one such path anywhere in the repository refuses every step's fingerprint.
+  - Fixtures are index-only.
+
+  Evidence: an independent reviewer emulated Windows with a patched globset copy (the old code
+  reproduces exactly the two misdecided rows and the 0-of-7 count CI showed) and fuzzed 118,522,235
+  patterns: zero accepted-and-not-refused patterns compile differently; 78,434 were refused, of which
+  49,343 would in fact compile identically (over-refusal; no manifest in the monorepo contains a
+  backslash, 224 checked). Not run on real Windows before the push.
+
+  Still open: rakia-core 0.1.1 `constellation.rs` `build_glob_set` compiles the same globs with plain
+  `Glob::new`, so step SELECTION by `brit build plan`/`affected` keeps the per-platform meaning and has
+  no gitlink/symlink reach (`elohim/rakia`, in no write-set).
+
 ## The sprint's backlog entries
 
 - New: `brit-push-fails-after-green-hook-root-cause.md`, `brit-rebase-cost-gitlinks-and-stranding.md`,
@@ -124,8 +156,8 @@ rebase onto the landed dev.
 
 ## Decided but not started, in order
 
-1. An independent integrator merges `sprint3/trust`, `sprint3/push-transport`, `sprint3/diff-show` and
-   `sprint3/refs-shem` as each clears review.
+1. An independent integrator merges `sprint3/trust`, `sprint3/diff-show` and `sprint3/refs-shem` as
+   each clears review (`sprint3/push-transport` is merged).
 2. A push-policy lane (`push.rs`): one handshake when no hook ran; the notes/tag fast-forward rule;
    refuse an ungated push when hooks are configured but missing or not executable; render the delivery
    note in the CLI. See `brit-push-fails-after-green-hook-root-cause.md`.
@@ -149,6 +181,10 @@ rebase onto the landed dev.
 - The upstream-owned gix changes in `sprint3/trust`.
 - Trust for linked worktrees.
 - The local-only commit `5d53c7ac8`.
+- brit-graph (0.2.1) gained an error variant and `#[non_exhaustive]` on
+  `brit_graph::fingerprint::FingerprintError`, so it needs a version bump at release.
+- brit's crate releases are recorded in `brit-epr/CHANGELOG.md`; `brit-cli/CHANGELOG.md` does not
+  record brit-graph API changes.
 - A write-set for `elohim/rakia`, for one of two items: the rakia-core selection hole needs one;
   nothing is needed there for the slot wall.
 - The spawn audit in `brit-declared-trust-and-reduced-trust-pack-cap.md` was run on a monorepo
@@ -161,7 +197,8 @@ rebase onto the landed dev.
 
 ## Coordination with shem
 
-- Hand-over ref: `origin self/nt-review-receipts`.
+- Hand-over ref: `origin self/nt-review-receipts`, still at `0a6389cf4c` (05:01Z) with no fix round
+  when this was updated.
 - shem's lanes in flight: the refs lane's fix round; `merge-base --is-ancestor` and
   `rev-list --count`, which shem also takes; and L1/L2a/L2b, which `feat/ark-declared-trust` lands
   behind.
@@ -170,7 +207,10 @@ rebase onto the landed dev.
 
 The text below is the integration worktree's handoff note, copied in full from the session
 scratchpad. Its `/tmp/claude-0/…/scratchpad/integrate/` paths (the `$S` scripts, summaries, logs and
-`bin-keep` binaries) are session scratch and will not survive a workspace restart.
+`bin-keep` binaries) are session scratch and will not survive a workspace restart. The scratch build
+directory `dev-nocflags` it mentions has been deleted. A second integrator took over from this note
+and did the phase that merged push-transport and the build-inputs Windows follow-up; the runbook
+stays valid.
 
 # Handoff: brit sprint 3 integration
 

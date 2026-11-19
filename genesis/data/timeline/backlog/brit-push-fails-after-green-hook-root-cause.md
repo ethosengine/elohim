@@ -69,21 +69,36 @@ Hook duration alone does not cause it: a hook longer than 90 s gets a fresh conn
 Every shipped brit is built `max-pure` (reqwest backend), while default cargo builds and brit's CI
 journeys use curl, so CI had never exercised the shipping transport.
 
-## Fix on lane `sprint3/push-transport` (tip `0ca127c2`, second review, not merged)
+## Fix on lane `sprint3/push-transport` (tip `4a60a61d`)
 
-- The real cause is reported for a failure anywhere in the body; the HTTP push body is now sent whole
-  with Content-Length.
+Merged on the integration branch `sprint3/integrate` (pushed head `bd28ecd8cf`). Not on brit `main`,
+not pinned. Three implementation rounds, two independent reviews, a doc-link fix.
+
+- The real cause is reported for a failure anywhere in the body. The push body is sent whole with
+  Content-Length up to a bound (`http.postBuffer` when configured, else 64 MiB) and streamed above it.
+  A cut upload above the bound reports "the transport closed while the pack was being streamed; the
+  cause could not be read". Measured cost of buffering: a 200 MB push peaked at 702 MB RSS, against
+  439 MB streamed and 396 MB for git.
 - A 60 s deadline and stall guard on handshakes and fetches; no deadline on the push upload.
 - A fresh connection after the pre-push hook, with re-validation that every ref's advertised id equals
-  what the hook judged ("remote moved while the before-send callback ran; nothing was sent").
+  what the hook judged ("remote moved while the before-send callback ran; nothing was sent"). A ref
+  whose requested id equals the id the hook judged is not re-validated: if it moved remotely, the other
+  refs still go and that ref is reported not pushed.
 - A ref already at the requested id is up to date.
-- A push verified as delivered whose report was lost exits 0.
-- Journeys on both backends with an HTTP fixture.
+- A push verified as delivered whose report was lost exits 0, with the note: "warning: the server's
+  report was lost (<cause>). A fresh advertisement shows every ref this push named at its requested id;
+  it cannot show whether this push applied them, whether server-side hooks ran, or what the server
+  printed."
+- Journeys on both backends with an HTTP fixture. The journeys file is Linux-only, and CI's
+  test-journey job builds the max-pure binary for it.
 - A CI step building the max-pure binary.
+- Test and diagnostic knobs: `BRIT_HTTP_REQUEST_DEADLINE_SECONDS`, `BRIT_REQWEST_BIN`,
+  `BRIT_REQWEST_REQUIRED`.
 
 ## Still open
 
-- Every push makes two handshakes and asks the credential helper twice, until
+- Every non-dry-run push handshakes twice and asks the credential helper twice, even with no hook or
+  with `--no-verify`: the CLI callback returns `()`, which maps to re-validate. It stays so until
   `gitoxide-core/src/repository/push.rs` returns "send on this connection" when no hook ran.
 - A fast-forward UPDATE of any non-`refs/heads` ref is refused before the hook ("refusing unverified
   fast-forward update of …"), so a combined branch+notes push fails whole. Creating notes works. The
@@ -93,6 +108,19 @@ journeys use curl, so CI had never exercised the shipping transport.
 - Packs are undeltified.
 - `--push-option` values are capability-checked but never transmitted.
 - The curl backend hangs on an early error response with a large body (upstream code).
+- The 60 s deadline also applies to fetch, clone and pull on max-pure builds, so a server silent for
+  more than 60 s without keepalives now fails where git waits.
+- `--atomic` is parsed but never requested from the server (`PushOptions.atomic` unused, no `atomic`
+  capability sent): an "atomic" push is not atomic today.
+- The CLI shows library wording ("before-send callback") where it used to say pre-push.
+- Human-readable output labels refs already at their new id ` * [new/updated]` (porcelain is right).
+- The lost-report warning is printed by the library itself, as a transitional measure.
+- When signed push is implemented, its nonce must come from the second handshake.
+- libcurl's retry of a POST on a dead reused connection is stopped only by the missing rewind
+  callback; adding one would silently re-send the pack.
+
+The two-handshake item and the items from the 60 s deadline onward belong to the follow-up lane in
+`gitoxide-core/src/repository/push.rs`.
 
 ## What retiring the CLAUDE.md exception needs
 

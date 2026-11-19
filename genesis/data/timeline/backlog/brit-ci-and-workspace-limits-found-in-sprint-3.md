@@ -21,7 +21,7 @@ cites:
 Each item below was met during brit sprint 3 (integration branch `sprint3/integrate`, pushed as
 `run-ci/sprint3-integrate`).
 
-## (a) Cross-platform compile breaks are invisible on the device
+## (a) Breaks the device's local lanes do not show: cross-platform and documentation
 
 No non-Linux Rust target is installed on the device, so two compile breaks reached CI or were caught
 only by a manual audit:
@@ -32,6 +32,18 @@ only by a manual audit:
 
 A third class, the `small`/doc lint legs, caught dead code and private intra-doc links that the
 default build never shows.
+
+Two more classes were met later in the sprint:
+
+- **Runtime differences on Windows that compile fine:** command-string splitting of paths (a test
+  helper formatted a Windows path into a command string that `gix_testtools::git` splits, and the
+  splitting ate the backslashes); a dependency's platform-dependent default (`globset` makes a
+  backslash an escape on Unix and a path separator on Windows); and Git for Windows refusing to stage
+  a path containing a backslash, found by reading before the push and gated. CI run 44481834878 showed
+  four such test failures on both Windows runners, all from the build-inputs lane.
+- **The documentation legs:** `just doc` builds with warnings denied and is part of the required
+  `lint` job. Lane-level verification never ran it, and a public doc comment linking to an item in a
+  private module broke it (caught at integration).
 
 ## (b) The first push of a new `run-ci/**` branch always fails brit-rust-style
 
@@ -54,6 +66,9 @@ The shared cargo pool is capped at 150 GB (`genesis/agentic/pool-policy.json`), 
 cargo build at a time. Six parallel lanes pushed the pool to 157 GB, and its enforcement evicted live
 lanes' build caches (twice for some), forcing cold rebuilds. A subagent pinned its slot against policy,
 and the pin was removed. Practical width on this device is about four build lanes.
+
+Build caches placed in session scratch sit on the same volume as the pool, and so sidestep its cap.
+One lane did this (about 11 GB, removed).
 
 ## (f) Attribution UNMEASURED on every brit commit
 

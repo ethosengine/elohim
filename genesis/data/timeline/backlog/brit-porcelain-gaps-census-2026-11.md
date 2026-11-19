@@ -66,7 +66,9 @@ The brit-first hook's own ledger keeps no command text, and its `epr feedback ca
 - config get/set.
 - Removing a path from the index (`rm --cached`).
 - Applying a patch series (`am` / `apply`).
-- `check-ignore` / `ls-files`.
+- `check-ignore`, and the `ls-files` spelling with its options. brit can list tracked paths
+  (`brit index entries`); an agent used plain `git ls-files` this sprint without checking, a recorded
+  slip.
 - `status --porcelain`.
 - Pickaxe (`log -S`).
 - Per-hunk staging and pathspec patterns in `add`. It stages whole literal paths, so interleaved
