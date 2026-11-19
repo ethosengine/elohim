@@ -2414,10 +2414,10 @@ habits:
       - "node --test genesis/orchestrator/fleet-roll-guard.test.mjs (a pushed dev or main ref for which CI's own graph would select an Edge build and its deploy step is red unless a pushed commit carries the declaration; each ref read from its own range; tags read on the tip as CI reads them; an undecidable range or a failed evaluator is red on a protected ref; the incident witnesses on real manifests)"
       - "node genesis/orchestrator/gate-live.mjs harvest --last 20 (live read of this device's run logs; green needs the slices it names to shrink across pushes)"
     evidence: >
-      DELTA 2026-11-19d (still RED): final check's list closed: changed paths read with `-z` and explicit options (a local `diff.ignoreSubmodules=all` no longer hides the conductor pin), batch reads by object id only with end-of-output checked, symlinked build-process files resolved inside the tree, the pin row decided from the pushed tree and names alone, a shallow range reaching its boundary cannot prove "no declaration", a long ref list no longer turns a protected startup failure advisory, `[build:edge]` forces a manual-only Edge as CI does, and the cure names every remaining request. Twelve probes unchanged. Checks: fleet-roll-guard + gate-preflight + prepush-gate-live 94/94; a docs-only push to dev costs about 0.4 s through the block.
-    evidence-fingerprint: sha256:779c46e4f9b01b02
-    evidence-bytes: 8871
-    evidence-entries: 9
+      DELTA 2026-11-19e (still RED): new preflight row `submodule-pins`, run only when the orchestrator project is selected: every submodule gitlink that suite-reads.json declares as a read must have its pinned commit in an object store the named half's view can read (the view's own `moduleStore` lookup, via `declaredPinStores` in suite-inventory.mjs), else `REFUSED submodule-pins: pinned commit in no object store here: <path>@<12 hex> …` with the cure `git submodule update --init <path…>`. Why: on a second device, in a fresh worktree after `just dev prep` printed `[preflight] ok submodules`, the gate refused `suite-run: submodule elohim/holochain-conductor at 993cf597a19b… is in no object store here`; prep and the `submodules` row only knew the attested three. `just dev prep` now brings the declared set into a store too, skipping any whose pin is already readable. A submodule `.gitmodules` declares `update = none` (elohim/holochain-conductor) is left out of the row and prep, since init skips it, and the named half's view now takes nothing from it on any device. Checks: gate-preflight 38/38, worktree-prep 23/23, suite-list 18/18.
+    evidence-fingerprint: sha256:3f8f752ca312f09c
+    evidence-bytes: 10020
+    evidence-entries: 10
     guard: >-
       Never let a recorded red reach `exit 0`: every early pass goes through pass_or_refuse. Never move a
       check into the preflight that is not seconds-cheap on a warm tree, and never make a WARN refuse.

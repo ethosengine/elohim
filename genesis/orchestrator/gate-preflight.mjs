@@ -20,6 +20,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadGateRegistry } from './pipeline-registry.mjs';
 import { SUITE_READ_LISTS, UNAUDITED_RECIPE_PROJECTS, globCovers, readSet, suiteReadSet } from './gate-input-audit.mjs';
+import { declaredPinStores } from './suite-inventory.mjs';
 import { dirtyPaths } from './gate-evidence.mjs';
 import { appendEvent } from './gate-live.mjs';
 import { applicableTargets, checkCBaseline, hostTripleOf, readDeclaredTargets } from './c-baseline.mjs';
@@ -107,6 +108,25 @@ export function checkSubmodules({ root, spawn = spawnSync }) {
       `git submodule update ${moved.join(' ')}   (or commit the pin you mean)`);
   }
   return row('submodules', 'ok');
+}
+
+/**
+ * The orchestrator gate's named half builds its view from the submodule pins its read list declares
+ * (suite-reads.json), read from an object store here. Missing one refuses that gate minutes in, so
+ * name it now. Found on a second device, 2026-11-19: a declared pin was in no store there while the
+ * attested-three check said `ok`. A submodule declared `update = none` is never named, because the
+ * view takes nothing from it. No row unless the orchestrator project is selected.
+ */
+export function checkSubmodulePins({ root, projects, env, pins = declaredPinStores }) {
+  if (!projects.some(project => project.name === 'orchestrator')) return null;
+  let declared;
+  try { declared = pins(env ? { root, env } : { root }); }
+  catch (error) { return row('submodule-pins', 'WARN', `could not read the declared submodule pins: ${String(error?.message || error).split('\n')[0]}`, 'git submodule status'); }
+  const missing = declared.filter(pin => !pin.store);
+  if (!missing.length) return row('submodule-pins', 'ok');
+  return row('submodule-pins', 'REFUSED',
+    `pinned commit in no object store here: ${missing.map(pin => `${pin.path}@${pin.oid.slice(0, 12)}`).join(' ')} — the orchestrator named half builds its view from them and refuses`,
+    `git submodule update --init ${missing.map(pin => pin.path).join(' ')}`);
 }
 
 /**
@@ -464,6 +484,7 @@ export function runPreflight({ root = ROOT, projects, env = process.env, spawn =
   };
   return [
     ...timed(() => checkSubmodules({ root, spawn })),
+    ...timed(() => checkSubmodulePins({ root, projects })),
     ...timed(() => checkTmpdir({ projects, env })),
     ...timed(() => checkNodeModules({ root, projects })),
     ...DIST_CHECKS.flatMap(check => timed(() => check({ root, projects }))),

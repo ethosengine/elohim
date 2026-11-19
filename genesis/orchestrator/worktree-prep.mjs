@@ -5,6 +5,7 @@ import { existsSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { projectsForChanges } from './gate-runner.mjs';
+import { declaredPinStores } from './suite-inventory.mjs';
 import { ATTESTED_SUBMODULES, checkSubmodules, DIST_CHECKS, formatRow, runPreflight, WORKSPACE_INSTALL } from './gate-preflight.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
@@ -105,7 +106,7 @@ function noSource(module, pin, candidates) {
 }
 
 export function prep({ root = ROOT, spawn = spawnSync, exists = existsSync,
-  select = projectsForChanges, preflight = runPreflight,
+  select = projectsForChanges, preflight = runPreflight, declaredPins = declaredPinStores,
   distChecks = DIST_CHECKS, log = console.log } = {}) {
   const attempt = ([command, ...args]) => {
     log(`[prep] ${[command, ...args].join(' ')}`);
@@ -127,9 +128,9 @@ export function prep({ root = ROOT, spawn = spawnSync, exists = existsSync,
     }
     // Where a pinned commit can come from, after the main checkout: every sibling worktree.
     const others = () => siblingCheckouts(root, spawn).filter(path => path !== main);
-    for (const module of modules.missing || []) {
+    const initModule = module => {
       const first = attempt(submoduleCommand(module, { main, exists }));
-      if (!first) continue;
+      if (!first) return;
       // Row 11 (a): the main checkout's copy lacks the pin ("unable to read tree"). Try each
       // sibling worktree's copy as the local source, and say which one served it.
       const pin = pinOf(root, module, spawn);
@@ -144,6 +145,15 @@ export function prep({ root = ROOT, spawn = spawnSync, exists = existsSync,
         execute(['git', '-C', join(root, module), ...LOCAL_ONLY, 'fetch', '--no-tags', join(source, module), pin]);
       }
       execute(submoduleCommand(module, { main: source, exists }));
+    };
+    for (const module of modules.missing || []) initModule(module);
+    // The orchestrator gate's view also reads the submodules its read list declares. Bring each into
+    // an object store unless its pinned commit is already readable (brit's store is several GB: never
+    // clone what is there). The attested three are handled above and by the moved-pin step below.
+    for (const { path: module, oid, store } of declaredPins({ root })) {
+      if (store || ATTESTED_SUBMODULES.includes(module)) continue;
+      log(`[prep] ${module}: pin ${oid.slice(0, 12)} is in no object store here; initializing it`);
+      initModule(module);
     }
     // Row 11 (b): an initialized submodule left at another commit (a rebase moved the gitlink)
     // makes the gate test bytes the push does not carry. A clean one is moved to its pin;

@@ -309,3 +309,18 @@ test('E6 #1: one intentionally staged deletion in a moved submodule is work, nev
     'no update at all');
 });
 
+
+test('declared submodules: prep initializes one whose pin is in no store and skips one that is present', t => {
+  const f = fixture(t);
+  f.options.select = () => [];
+  const pin = 'a'.repeat(40);
+  f.options.declaredPins = () => [
+    { path: 'elohim/holochain-conductor', oid: pin, store: null },
+    { path: 'che-devworkspaces', oid: pin, store: '/store/che-devworkspaces' },
+    { path: 'elohim/brit', oid: pin, store: null }, // attested: prep's existing loop owns it
+  ];
+  assert.equal(prep(f.options), 0, f.logs.join('\n'));
+  const clones = f.calls.filter(([cmd, arg]) => cmd === 'git' && arg === '-c').map(call => call.at(-1));
+  assert.deepEqual(clones, [...ATTESTED_SUBMODULES, 'elohim/holochain-conductor'], 'the attested three as before, then the absent declared one');
+  assert.match(f.logs.join('\n'), /elohim\/holochain-conductor: pin aaaaaaaaaaaa is in no object store here/);
+});
