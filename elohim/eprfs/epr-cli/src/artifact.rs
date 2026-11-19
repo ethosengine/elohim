@@ -1106,6 +1106,9 @@ fn brit_bin() -> ArtifactResult<PathBuf> {
         .ok_or_else(|| unrecorded("brit-build-ref not found on PATH"))
 }
 
+/// Run brit-build-ref on `repo`. brit runs git itself, so it gets this device's declared checkout
+/// trust as `GIT_CONFIG_*` variables (as the covenant and walk spawns do): a workspace restart
+/// wipes git's global `safe.directory`, and put must not fail on a checkout the device declared.
 fn brit(repo: &Path, args: &[&str]) -> ArtifactResult<String> {
     let bin = brit_bin()?;
     let mut command = std::process::Command::new(&bin);
@@ -1113,6 +1116,7 @@ fn brit(repo: &Path, args: &[&str]) -> ArtifactResult<String> {
     for key in crate::process::GIT_LOCATION_ENV {
         command.env_remove(key);
     }
+    command.envs(crate::git::trust_env(repo));
     let output = command
         .output()
         .map_err(|e| unrecorded(format!("cannot run {}: {e}", bin.display())))?;

@@ -949,6 +949,63 @@ fn put_takes_a_release_only_with_the_bin_it_names() {
     }
 }
 
+/// A workspace restart wipes git's global `safe.directory`, so the brit-build-ref put spawns runs
+/// git under only this device's declared checkout trust (`epr device trust`). It reaches brit as
+/// `GIT_CONFIG_*` variables, the way the covenant and walk spawns pass it.
+#[test]
+fn put_hands_brit_the_declared_checkout_trust() {
+    let keys = TempDir::new().unwrap();
+    let a = Device::new(&keys, "a");
+    let scratch = TempDir::new().unwrap();
+    let (method, _) = method_file(scratch.path(), &["crate/src"]);
+    let root = a.root().canonicalize().unwrap();
+    // A brit that, like git on a checkout it does not own, refuses unless trust is declared.
+    let stub = scratch.path().join("brit-build-ref");
+    std::fs::write(
+        &stub,
+        format!(
+            "#!/bin/sh\n[ \"$1\" = --version ] && exit 0\n\
+             if [ \"$GIT_CONFIG_KEY_0\" = safe.directory ] && [ \"$GIT_CONFIG_VALUE_0\" = '{}' ]; \
+             then echo '{{\"agentId\":\"{AGENT_ID}\"}}'; \
+             else echo 'fatal: detected dubious ownership' >&2; exit 128; fi\n",
+            root.display()
+        ),
+    )
+    .unwrap();
+    use std::os::unix::fs::PermissionsExt;
+    std::fs::set_permissions(&stub, std::fs::Permissions::from_mode(0o755)).unwrap();
+    wait_for_stub(&stub);
+    let put = || {
+        a.command()
+            .env("BRIT_BUILD_REF_BIN", &stub)
+            .env_remove("GIT_CONFIG_COUNT")
+            .args(["artifact", "put", "--method"])
+            .arg(&method)
+            .args(["--input", "x", "--project", "elohim-storage", "--repo"])
+            .arg(&root)
+            .output()
+            .unwrap()
+    };
+    let untrusted = put();
+    assert_eq!(untrusted.status.code(), Some(3), "{}", text(&untrusted));
+    assert!(
+        text(&untrusted).contains("missing attribution: brit signer"),
+        "{}",
+        text(&untrusted)
+    );
+    std::fs::write(
+        a.key_file.parent().unwrap().join("trusted-checkouts"),
+        format!("{}\n", root.display()),
+    )
+    .unwrap();
+    let trusted = put();
+    assert!(
+        !text(&trusted).contains("missing attribution: brit signer"),
+        "{}",
+        text(&trusted)
+    );
+}
+
 #[test]
 fn fetch_without_a_daemon_is_daemon_down_with_a_cure() {
     let keys = TempDir::new().unwrap();
