@@ -264,9 +264,16 @@ pub(crate) fn custody_refusal(
 /// empty where that file does not exist (so a group-writable key directory refuses there).
 #[cfg(unix)]
 pub(crate) fn own_groups() -> Vec<u32> {
-    let Ok(status) = fs::read_to_string("/proc/self/status") else {
-        return Vec::new();
-    };
+    fs::read_to_string("/proc/self/status")
+        .map(|status| parse_groups(&status))
+        .unwrap_or_default()
+}
+
+/// The group ids a `/proc/<pid>/status` text names: every numeric field of its `Gid:` line
+/// (real, effective, saved, filesystem) and its `Groups:` line (supplementary), in order. A
+/// field that is not a number is skipped; a missing line contributes nothing.
+#[cfg(unix)]
+pub(crate) fn parse_groups(status: &str) -> Vec<u32> {
     status
         .lines()
         .filter_map(|line| {

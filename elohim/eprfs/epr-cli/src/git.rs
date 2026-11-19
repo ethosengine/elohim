@@ -16,8 +16,12 @@
 //! - **Custody.** Before reading, the key directory is held to `device_key::check_key_dir` and
 //!   the file itself, stat'ed through the descriptor it is read from, to the same predicate: not
 //!   writable by everyone, nor by a group this process does not hold. Ownership is not checked.
-//!   A refusal declares nothing, class `custody`; a file that exists but cannot be read, class
-//!   `unreadable`; an absent file declares nothing and is not a reason.
+//!   A refusal declares nothing, class `custody`. The file is opened without blocking (so a FIFO
+//!   in its place cannot hang the reader), must be a regular file by the descriptor's own
+//!   metadata, must hold at most 1 MiB, and must be UTF-8; anything else — or any other open or
+//!   stat failure — declares nothing, class `unreadable`, worded `<path>: not a regular file`,
+//!   `<path>: larger than 1048576 bytes`, `<path>: not UTF-8` or `<path>: <io error>`. An absent
+//!   file (or device directory) declares nothing and is not a reason.
 //! - **Matching.** The working directory is canonicalized and its checkout is the nearest
 //!   ancestor holding a `.git` entry (a file is a boundary, so a parent never trusts a nested
 //!   repository). Trust applies when that root equals, as a `Path`, one line of the file (so a
@@ -365,7 +369,7 @@ pub(crate) fn trust_unapplied(cwd: &Path) -> Option<String> {
 fn read_in_custody(file: &Path) -> std::result::Result<Option<String>, Unapplied> {
     use std::io::Read;
     let unreadable =
-        |error: std::io::Error| Unapplied::Unreadable(format!("{}: {error}", file.display()));
+        |why: &dyn std::fmt::Display| Unapplied::Unreadable(format!("{}: {why}", file.display()));
     #[cfg(unix)]
     if let Some(dir) = file.parent().filter(|p| !p.as_os_str().is_empty()) {
         match std::fs::metadata(dir) {
@@ -380,26 +384,58 @@ fn read_in_custody(file: &Path) -> std::result::Result<Option<String>, Unapplied
                 }
             }
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
-            Err(error) => return Err(unreadable(error)),
+            Err(error) => return Err(unreadable(&error)),
         }
     }
-    let mut handle = match std::fs::File::open(file) {
+    let mut handle = match open_nonblocking(file) {
         Ok(handle) => handle,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
-        Err(error) => return Err(unreadable(error)),
+        Err(error) => return Err(unreadable(&error)),
     };
+    let meta = handle.metadata().map_err(|error| unreadable(&error))?;
+    if !meta.is_file() {
+        return Err(unreadable(&"not a regular file"));
+    }
     #[cfg(unix)]
     if let Some(refused) = crate::device_key::custody_refusal(
         "the checkout-trust declaration",
         file,
-        &handle.metadata().map_err(unreadable)?,
+        &meta,
         "can grant git trust to a checkout they plant",
     ) {
         return Err(Unapplied::Custody(refused.to_string()));
     }
-    let mut text = String::new();
-    handle.read_to_string(&mut text).map_err(unreadable)?;
-    Ok(Some(text))
+    let mut bytes = Vec::new();
+    handle
+        .by_ref()
+        .take(DECLARATION_CAP + 1)
+        .read_to_end(&mut bytes)
+        .map_err(|error| unreadable(&error))?;
+    if bytes.len() as u64 > DECLARATION_CAP {
+        return Err(unreadable(&format_args!(
+            "larger than {DECLARATION_CAP} bytes"
+        )));
+    }
+    String::from_utf8(bytes)
+        .map(Some)
+        .map_err(|_| unreadable(&"not UTF-8"))
+}
+
+/// The most bytes a declaration may hold: one path per line, so 1 MiB is ample, and a larger
+/// file (or a device that never ends) is refused rather than read.
+const DECLARATION_CAP: u64 = 1 << 20;
+
+/// Open for reading without blocking on a FIFO planted in the declaration's place. `O_NONBLOCK`
+/// changes nothing for the regular file the caller then requires.
+fn open_nonblocking(file: &Path) -> std::io::Result<std::fs::File> {
+    let mut options = std::fs::OpenOptions::new();
+    options.read(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.custom_flags(libc::O_NONBLOCK);
+    }
+    options.open(file)
 }
 
 /// Whether `text` lists `root` as a whole line (`str::lines` strips a trailing `\r`; `Path`
