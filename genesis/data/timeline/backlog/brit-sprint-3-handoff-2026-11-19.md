@@ -233,9 +233,13 @@ next landing, L2a, touches epr-cli's artifact and produce paths.
 ## What needs the steward
 
 - **A brit pin move does not select an Edge build in CI today (observed).**
-  - Observed: the last brit pin move was monorepo commit `c64967822` (0.2.0 to 0.2.6, 2026-11-17, one
-    path: `elohim/brit`). The orchestrator run that covered it is Jenkins `elohim-orchestrator/dev`
-    #2359. Its changed-files tree lists `elohim/brit`; it prints "3 external dep(s) to unmanaged
+  - Observed: the last brit pin move was monorepo commit `1602399eead0`, "chore(brit): pin brit 0.2.6
+    (1db7a955)" (0.2.0 to 0.2.6, committed 2026-11-17T21:01:08Z, one path: `elohim/brit`); the one
+    before it is `e239f339369b`, "chore(brit): pin brit 0.2.0 (e70fc8ad)", 2026-11-15. The id
+    c64967822 quoted by the other device for this commit is not on the remote; the id here was read
+    from the path's history on dev. The orchestrator run that covered it is Jenkins
+    `elohim-orchestrator/dev` #2359, whose checkout is `bea497110028` (2026-11-17T21:12:11Z, eleven
+    minutes after the pin commit). Its changed-files tree lists `elohim/brit`; it prints "3 external dep(s) to unmanaged
     pipelines (Sprint 2): elohim-brit:brit-ci, elohim-rakia:rakia-ci, elohim-sophia:build-sophia-umd";
     its plan table shows the `[elohim-edge]` block with `build-edge-image │ SKIP │ no changes` (shem
     reports every step of that block SKIP); and its only dispatch line is `Triggering elohim-eprfs/dev`.
