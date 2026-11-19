@@ -737,3 +737,108 @@ become a step input, so `cargo-build-storage` re-keys once when that brit is pin
 may be wider than its reads). Also in rakia: `brit build affected|plan|baseline` open the
 repository through `rakia-brit` on gix 0.81, which keeps a 32-slot pack-index ceiling at reduced
 trust. Both are in `elohim/rakia`, in nobody's write set this sprint.
+
+Delta 2026-11-19 (row 31): the line numbers above came from an audit on a checkout 142 commits
+behind `dev`. On `dev` `2080441f5` the sites are: `gate-attest.mjs:74-76` (`worktreeDirty`: a
+non-zero status reads as not dirty); `gate-evidence.mjs:157-164` (`gitRead` returns null on any
+failure), `:269` and `:288` (`signerIdentity` falls back to the seed agent id);
+`gate-runner.mjs:121-125` ("attested commit unreadable") and `:182-187` (the deliberate
+`GIT_CONFIG_*` deletion); `.claude/hooks/pre-flight-check.py:89`;
+`.claude/scripts/_lib/epr_meta_git.py:32-37` (`git()` returns None on an exception) and `:49`
+(`changed_files` returns an empty list); `elohim/eprfs/epr-cli/src/artifact.rs:1109` (`brit()`
+spawns `brit-build-ref` without the trust environment, so `epr artifact put` fails after a
+restart; one line, travels with L2a).
+
+Delta 2026-11-19 (row 32): brit's `sprint3/build-inputs` also keys a tracked symlink matched by a
+step glob, by the link's own object id (retargeting one used to leave the fingerprint unchanged).
+When a brit carrying both changes is pinned, sixteen monorepo steps re-key once: storage
+`cargo-build-storage` (gitlink `elohim/rakia` and symlink `elohim/sdk/schemas/current`), app
+`build-angular`, genesis `schema-codegen`, `schema-validate`, `validate-seeds` and
+`constants-sync`, the DNA steps `schema-dna`, `build-dna-wasm`, `build-happ`,
+`dna-extern-lints`, `manifest-hygiene` and `sweettest-check` (globs can match beneath the five
+tracked `target` symlinks), `build-conductor-image`, `build-edge-image`, and the orchestrator's
+`lint-jenkinsfiles`. These are local gate keys. The CI image closure key
+(`scripts/ci/closure-input-digest.sh`) computes from git object ids itself and does not call
+brit, so image keys do not move. Budget the pin move as one landing with cold storage, DNA and
+app gates on each device. Still open in `rakia-core`: selection misses a pin-only move and a
+symlink-only retarget, and `constellation.rs` `build_glob_set` keeps globset's per-platform
+default (a backslash is a separator on Windows), which brit fixed on its own side.
+
+Delta 2026-11-19 (row 29): the list of changes waiting on a deliberate Edge roll is now four.
+(1) The bin store's own judge. (2) cc >= 1.11.1 in `elohim/Cargo.lock`. (3) A custody check on
+`<config_dir>/layout.json`: `device-runtime/src/layout.rs` `read_saved` reads it with none, and
+the file sets the bin-store, state, cargo-pool and project-root paths, so a directory a stranger
+can write could redirect them (found by brit sprint 3 while holding the trusted-checkouts reader
+to the key directory's custody rule). (4) Moving the gate-live event schema out of
+`elohim/sdk/schemas/v1`: it is development tooling, and its place in the protocol schema
+directory makes every edit a storage build input (row 33). Until that move, the `notice` kind
+lives in an orchestrator-local addendum beside its only reader.
+
+Delta 2026-11-19 (rows 5 and 24): `brit rebase` on 0.2.6 is not safe on a repository with full
+history. Measured by brit sprint 3 on a full clone of brit (17,972 commits; the rebase's closure
+is 218,090 objects, 2.19 GB): replaying one commit published after about 26 minutes and about
+110 GB of temporary writes (git: 0.21 s), then cleanup ran 4.5 hours until stopped. Read in
+`gitoxide-core/src/repository/replay/`: every pass hashes every object reachable from both tips;
+cleanup lists the whole retained copy again for each object; and cleanup compares against a
+1 GiB scratch limit, so above that size it cannot finish. Afterwards `rebase --abort` refuses,
+`--continue` cannot end and `brit switch` refuses "pending replay", so every brit mutation in
+that repository is blocked and no brit command clears it. Ethosengine's monorepo clone is
+shallow and brit refuses a shallow rebase first. Shem's is not shallow: its own
+`brit rebase origin/dev` (6 minutes, 29 GB of temporary writes) ended in a clean refusal only
+because the tree holds gitlinks. Rule on both devices until a release carries the fix: rebase
+with git under a declared fallback. Brit sprint 3 opened a recovery lane the same day (abort of
+a `preparing` journal, a refusal before any spooling when the retained copy cannot fit, a way
+back for a repository already stuck). Its redesign would change the retained-manifest format so
+that an older brit refuses a copy a newer one wrote; that decision goes to the steward.
+
+Delta 2026-11-19 (row 24): three more from the installed 0.2.6. `brit fetch -r origin dev` with
+no destination reports up to date and leaves `refs/remotes/origin/dev` where it was; an explicit
+destination refspec moves it. Each fetch adds a pack index and nothing consolidates them: shem
+holds 28 and ethosengine 33, against a ceiling of 32 at reduced trust (`git repack -a -d` cures
+it; the steward's store, not run). And a correction: `rev-parse`, `ls-remote` and a directory
+option were reported from shem as missing, but 0.2.6 has them as `revision resolve`,
+`remote refs` and `-r`. The census behind that report still stands (3,767 git invocations by
+shem's agents since 2026-11-06, about 1,700 of the form `git -C <dir>`), and brit sprint 3 took
+shem's sixteen patches for the git spellings into its integration branch on 2026-11-19
+(`run-ci/sprint3-integrate` `9945331577`): `rev-parse`, `for-each-ref`, `ls-remote`,
+`check-ref-format`, `merge-base --is-ancestor`, `rev-list --count`, a global `-C`, and a closed
+reader ending a read-only command quietly. Two follow-ups stay with shem's lane: forward slashes
+in the path answers on Windows, and admitting the remaining read-only commands to the closed
+reader rule once each is checked.
+
+## Row 33 — nothing at push time says a landing will roll the fleet
+
+Found 2026-11-19. A stack about to land on `dev` carried a one-line edit to
+`elohim/sdk/schemas/v1/gate-live-event.schema.json`. `elohim/sdk/**` is an input of the Edge
+pipeline's `cargo-build-storage` step, so the push would have rebuilt storage and rolled the
+seven alpha peers, with `build-angular`, the DNA schema step and three genesis schema steps
+beside it. Ethosengine a222db7c caught it by running the dispatch walker over the stack's 43
+paths by hand; no gate, preflight line or hook would have said so. The walker answers in 0.6 s.
+The storage step's inputs are wide (46 globs, among them `elohim/sdk/**`, `crates/**`,
+`bridges/**`, `vendor/**`, `elohim/epr/**`, `elohim/eprfs/Cargo.toml`, `eprfs-core`,
+`eprfs-serve` and `device-runtime`), and the rule that nothing rolls the fleet except on purpose
+is kept by memory alone.
+
+In flight on shem (branch `claude/nt-fleet-roll-guard`): a preflight check, `fleet-roll`, under
+the habit `careless-reds-cost-seconds`. A push to a deploying branch whose paths select an Edge
+step other than `dataplane-validation`, or whose commits force one, is refused in the first
+seconds unless a pushed commit declares the roll with a tag; the mode (`refuse`, `warn`, `off`)
+is a key in `pool-policy.json`. Known limit: it reads the push's own paths and tags, so an Edge
+step left stale by an earlier landing is not seen. Refusing by default is a decision taken for
+the steward to overrule.
+
+## Row 34 — an agent held on an unanswered approval still reads as running
+
+Found 2026-11-19 on both devices. A delegated builder on shem showed `running` for four hours
+with no commits; its transcript ended on a tool call with no result, and no such process
+existed. Brit sprint 3 then found the same on ethosengine three times: two reviewers held two
+and three hours on a compound shell command that had not started, and its own session held two
+hours. The call was waiting for an approval while nobody was present. No completion notice
+arrives, the agent list says `running`, and the lane is lost silently; shem's was found when a
+peer asked why a hand-over ref had not moved. What works today: stop the agent and send it a
+message, which resumes it with its context (tell it not to issue the held command again);
+briefs that ask for short single-purpose commands under `timeout`; and no `pkill -f` or
+`pgrep -f` waits (nine leaked `until ! pgrep -f` loops on ethosengine matched their own command
+line; one `pkill -f "sleep 30"` on shem killed another agent's waiter). Owed: the wait made
+visible where a coordinator looks (a berth line "waiting on an approval since …" would do), and
+a time after which a held call in an unattended agent is refused rather than kept.

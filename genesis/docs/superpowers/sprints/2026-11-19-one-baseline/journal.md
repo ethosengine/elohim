@@ -211,3 +211,103 @@ it: it keeps no command text and its capture call fails. The review of the six f
 pipe fix too broad (a rejected push could exit as a closed pipe) and a dozen parity edges; the
 fix round, with `merge-base --is-ancestor` and `rev-list --count`, is in progress, and the brit
 session holds the branch out of its merge until then.
+
+## 2026-11-19: one landing for two changes; what a hand check missed
+
+**L1 and L2b are on `dev`** at `71069b1f5` (14:14Z, one push from ethosengine, 987 s). L2b's
+eight commits come first, byte-identical in content to the reviewed hand-over (same tree at the
+eighth commit as shem's own replay). L1's twenty-five follow: cc 1.11.1 in the eprfs lock, the
+per-triple record (`declared_targets` in `pool-policy.json`), the gate exporting the C flags to
+the four eprfs-workspace projects, the seconds check (it warns and withholds, it does not
+refuse), the producer withholding an unmeasured offer, the pin test, and a `notice` event kind
+that no red measure counts.
+
+| Push | Wall | What ran |
+|---|---|---|
+| first, `7edd733a0`, 13:15Z | 2,566 s, red on one test | eprfs 1,141 s, memory-ceremony 248 s, orchestrator 198 s (153 to 188 s before L1's new test files); all green and recorded except the one red |
+| second, `71069b1f5`, 13:57Z | 987 s, green | eprfs, eprfs-live-corpus, jenkins-bridge and rust-style-checker reused; orchestrator 133 s; memory-ceremony 224 s (not enrolled for reuse, by policy); agentic-shift 161 s |
+
+The red was `eprfs-produce.test.mjs`: a case that expects the C flag variables unset inherited
+them from the gate's own environment, which L1 now sets. Its author's suite run and shem's check
+of the hand-over (52 tests, 51 passed, 1 skipped) both ran outside a gate and passed. A check of
+a test that depends on the gate's environment has to run through `just gate`.
+
+**A fleet roll caught by hand.** Before pushing, ethosengine ran the dispatch walker over the
+stack's 43 paths. It selected Edge's `cargo-build-storage`, with `build-angular`, the DNA schema
+step and three genesis schema steps: L1 had added the `notice` kind to
+`elohim/sdk/schemas/v1/gate-live-event.schema.json`, and `elohim/sdk/**` is a storage build
+input. Ruled at 13:06Z: the fleet schema stays byte-identical; the kind validates against an
+orchestrator-local addendum beside its only reader; a test holds the two schemas' kinds disjoint
+and every written event valid against exactly one; moving the whole schema out of `elohim/sdk`
+joins the changes that wait for a deliberate Edge roll (four now, backlog row 29). No gate or
+hook would have said any of this at push time (row 33).
+
+**The hand check was weaker than we believed.** Shem started a preflight check, `fleet-roll`,
+under the habit `careless-reds-cost-seconds`. After two build rounds an independent review ended
+FIX FIRST, and its first finding is about the tool both devices had trusted that morning:
+
+| | the JS walker (`graph-walker.mjs`) | CI (`build-graph.groovy`) |
+|---|---|---|
+| a step whose dependency is stale | not marked (skips propagation by design) | marked, to a fixed point over `depends` |
+| a tracked dotfile under a watched directory | not matched (picomatch default) | matched (`**` covers dotfiles, `.epr-meta` excepted) |
+
+Reproduced against the real manifests: a push of only the `elohim/holochain-conductor` pin, or
+of `elohim/sdk/schemas/.gitignore`, selects an Edge build in CI and nothing in the walker.
+Edge's build steps depend on `elohim-conductor:build-conductor-image`, `elohim-rakia:rakia-ci`,
+`elohim-holochain:build-happ` and `elohim-brit:brit-ci`, so a conductor, rakia or brit pin move
+selects an Edge image build whatever the walker prints. The landed stack was re-checked with a
+fixed point over every manifest's `depends`: nothing propagates and no path is a dotfile under
+a storage input, so it reached Edge as validation only. The check is in a third round (parity
+with CI's graph, each pushed branch judged on its own commits, honest wording, named failure
+modes) and has not landed. Its refusal follows the hook's declared policy: red within seconds,
+the push refused when the hook ends, or at once under `GATE_ON_RED=stop`.
+
+**A `[skip ci]` tip swallows the push under it.** Read in `genesis/orchestrator/Jenkinsfile`
+by that lane's builder and confirmed: CI reads only the tip's message (`:2652`); a skip tag
+dispatches nothing (`:2657`), and a green run still moves the baseline to that tip (`:230`), from
+which the next run diffs (`:1450`). Shem did this twice on 2026-11-19: the push ending
+`8dc35ad48` carried two code fixes under a docs tip, and the push ending `2080441f5` carried
+T1's three test commits. The walker (with the limits above) selects no pipeline for the first
+and only `lint-jenkinsfiles` for the second, so nothing that mattered went unbuilt. From now a
+docs commit tagged `[skip ci]` is pushed alone; the fleet-roll lane adds a warning for a skip
+tag over any pipeline's inputs.
+
+**A near race, and what the silence was.** Ethosengine's session sent nothing for seven hours
+while it worked L1's fix round. At 13:02Z shem announced it would land L2b alone. The brit
+session, on the same device, took a read-only look: the stack had been replayed onto `dev`
+minutes earlier. Shem withdrew at 13:04Z and nothing was pushed. Two notes of shem's carried
+clock labels typed from estimate (13:05Z and 13:20Z for 13:02Z and 13:04Z), from which a peer
+inferred a clock skew that did not exist. Kept from this: ask the device's other session for a
+look before changing a landing plan; every stack gets a hand-over ref (`self/nt-l1` was pushed
+before the landing) so no landing depends on one session; read the clock, do not type it.
+
+**Also this day.** Agents held on an approval nobody was present to give read as `running` on
+both devices (row 34). `brit rebase` on 0.2.6 can leave a full-history repository refusing every
+brit mutation; rebase stays a git fallback (rows 5 and 24). Brit sprint 3 merged shem's sixteen
+patches for the git spellings into its integration branch; its CI found one red of shem's on
+Windows (a relative path printed with backslashes), fixed at integration.
+
+**Lanes from here.**
+
+| Lane | Owner | State |
+|---|---|---|
+| L2a, producer writes `env:isa-c` | ethosengine a222db7c | started on `71069b1f5` |
+| E11 rework, the suite's named half in a view of its declared reads | shem (builder) | in progress on the landed stack, in its own cargo family |
+| `fleet-roll` preflight check | shem (builder) | round 3 after review |
+| row 31, git refusals read as values | ethosengine a222db7c | after L2a |
+
+**Where the definition of done stands.**
+
+| Line | State |
+|---|---|
+| 1, two landings followed with no build | needs L2a; nothing measured yet |
+| 2, an unmarked release refused before a fetch | the rule is on `dev`; the receipt on shem's real store is being taken |
+| 3, a landing pays less | shem 270.6 s to 188.1 s; ethosengine 198 s then 133 s at the landed head, against 153 to 188 s before, with L1's new test files in between, so its before and after are not like for like |
+| 4, the suite keys on what it reads | E11 rework in progress |
+| 5, no collision, no accidental Edge dispatch | held, by a hand check that was weaker than believed; the check that would hold it is not landed |
+| 6, the record | this entry; backlog rows 29, 31 to 34 |
+
+**Decisions taken for the steward to overrule.** The schema ruling above. Shem takes the E11
+rework and ethosengine L2a. The `fleet-roll` check refuses by default (one policy key turns it
+to a warning or off) and keeps the hook's declared stop policy instead of a rule of its own.
+
