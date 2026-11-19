@@ -222,6 +222,11 @@ fn compile(flags: &str, source: &str) -> String {
     )
 }
 
+/// [`compile`] writing `$OUT/<object>`.
+fn compile_to(flags: &str, source: &str, object: &str) -> String {
+    compile(flags, source).replace("\"$OUT/x.o\"", &format!("\"$OUT/{object}\""))
+}
+
 const ARCHIVE: &str = "\"ar\" \"cqD\" \"$OUT/libx.a\" \"$OUT/x.o\"";
 const DETECT: &str = "\"gcc\" \"-E\" \"$OUT/detect_compiler_family.c\"";
 
@@ -233,16 +238,17 @@ fn has(found: &[String], needle: &str) -> bool {
 fn evidence_passes_every_compile_at_the_declared_march() {
     let ring = [
         DETECT.to_owned(),
-        compile(
+        compile_to(
             "-march=x86-64 -mtune=generic -mno-red-zone -march=x86-64",
             "curve25519.c",
+            "curve25519.o",
         ),
-        compile("-march=x86-64", "aesni-x86_64-elf.S"),
+        compile_to("-march=x86-64", "aesni-x86_64-elf.S", "aesni.o"),
         ARCHIVE.to_owned(),
     ];
     let ring: Vec<&str> = ring.iter().map(String::as_str).collect();
     let build = Build::new("epr")
-        .script("ring", &ring, &["x.o", "libx.a"], true)
+        .script("ring", &ring, &["curve25519.o", "aesni.o", "libx.a"], true)
         .script("serde", &[], &[], false)
         .script(
             "libsqlite3-sys",
@@ -410,17 +416,26 @@ fn evidence_refuses_an_out_dir_outside_the_target_or_absent() {
 fn an_exception_crate_passes_on_its_own_terms_and_no_further() {
     let blake3 = [
         DETECT.to_owned(),
-        compile("-march=x86-64 -mavx512f -march=x86-64", "$OUT/flag_check.c"),
-        compile("-march=x86-64 -std=c11", "c/blake3_avx2_x86-64_unix.S"),
-        compile(
+        compile_to(
+            "-march=x86-64 -mavx512f -march=x86-64",
+            "$OUT/flag_check.c",
+            "flag_check",
+        ),
+        compile_to(
+            "-march=x86-64 -std=c11",
+            "c/blake3_avx2_x86-64_unix.S",
+            "avx2.o",
+        ),
+        compile_to(
             "-march=x86-64 -mavx512f -mavx512vl",
             "c/blake3_avx512_x86-64_unix.S",
+            "avx512.o",
         ),
         ARCHIVE.to_owned(),
     ];
     let blake3: Vec<&str> = blake3.iter().map(String::as_str).collect();
     let notes = Build::new("epr")
-        .script("blake3", &blake3, &["x.o", "libx.a"], true)
+        .script("blake3", &blake3, &["avx2.o", "avx512.o", "libx.a"], true)
         .judge("epr", BYTES)
         .unwrap();
     assert!(has(&notes, "blake3 excepted (3 compile(s))"), "{notes:?}");
@@ -663,6 +678,40 @@ fn evidence_refuses_a_compile_whose_options_it_cannot_read() {
             "{form}: {found:?}"
         );
     }
+}
+
+/// Hardening 3: an archive member whose judged object is no longer at its -o path has nothing to
+/// be compared with, and refuses instead of passing by name; two compiles of one unit writing the
+/// same object name cannot tell their members apart, and refuse.
+#[test]
+fn evidence_refuses_a_member_it_cannot_compare_or_tell_apart() {
+    let running = [compile(MARCH, "a.c"), ARCHIVE.to_owned()];
+    let running: Vec<&str> = running.iter().map(String::as_str).collect();
+    let build = Build::new("epr").script("ring", &running, &["x.o", "libx.a"], true);
+    std::fs::remove_file(out_dir(&build, "ring").join("x.o")).unwrap();
+    let found = build.judge("epr", BYTES).unwrap_err();
+    assert!(
+        has(
+            &found,
+            "member x.o of libx.a has no object at its compile's -o path to compare"
+        ),
+        "{found:?}"
+    );
+    let twice = [
+        compile_to(MARCH, "a.c", "x.o"),
+        compile_to(MARCH, "sub/a.c", "sub/x.o"),
+    ];
+    let twice: Vec<&str> = twice.iter().map(String::as_str).collect();
+    let build = Build::new("epr");
+    std::fs::create_dir_all(out_dir(&build, "ring").join("sub")).unwrap();
+    let found = build
+        .script("ring", &twice, &["x.o", "sub/x.o"], true)
+        .judge("epr", BYTES)
+        .unwrap_err();
+    assert!(
+        has(&found, "2 compiles write an object named x.o"),
+        "{found:?}"
+    );
 }
 
 /// Hardening 2: more options whose effect on the instruction set the check cannot read refuse as

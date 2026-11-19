@@ -585,6 +585,24 @@ fn log_findings(script: &Script) -> Vec<String> {
             Some((name, path))
         })
         .collect();
+    // Hardening 3: two compiles of one unit writing the same object name cannot be told apart
+    // as archive members (cc's own flag probes write `flag_check`, not a `.o`, and are not
+    // archived).
+    let mut names: Vec<&str> = outputs
+        .iter()
+        .map(|(name, _)| name.as_str())
+        .filter(|name| name.ends_with(".o"))
+        .collect();
+    names.sort_unstable();
+    for pair in names.windows(2).filter(|w| w[0] == w[1]) {
+        let count = names.iter().filter(|n| **n == pair[0]).count();
+        findings.push(format!(
+            "{DECLARED}: no evidence: {count} compiles write an object named {} in {}'s build \
+             script, so its archive members cannot be told apart",
+            pair[0], script.package
+        ));
+    }
+    findings.dedup();
     for object in &script.objects {
         let path = script.out_dir.join(object).display().to_string();
         if object.ends_with(".o") {
@@ -646,17 +664,21 @@ fn log_findings(script: &Script) -> Vec<String> {
                 }
                 continue;
             }
-            // Where the compile's object is still at its -o path, the member is its bytes.
-            let held: Vec<Vec<u8>> = compiled
-                .iter()
-                .filter_map(|p| std::fs::read(p).ok())
-                .collect();
-            if !held.is_empty() && !held.contains(&member.data) {
-                findings.push(format!(
+            // The member is the bytes its compile left at its -o path (hardening 3: an object
+            // no longer there leaves nothing to compare, and refuses rather than passing by
+            // name; a name two compiles share was refused above).
+            match std::fs::read(compiled[0]) {
+                Ok(held) if held == member.data => {}
+                Ok(_) => findings.push(format!(
                     "{DECLARED}: no evidence: {}'s member {} of {object} is not the bytes its \
                      compile left at its -o path",
                     script.package, member.name
-                ));
+                )),
+                Err(e) => findings.push(format!(
+                    "{DECLARED}: no evidence: {}'s member {} of {object} has no object at its \
+                     compile's -o path to compare ({}: {e})",
+                    script.package, member.name, compiled[0]
+                )),
             }
         }
     }
