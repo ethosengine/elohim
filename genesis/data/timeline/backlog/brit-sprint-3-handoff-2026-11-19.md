@@ -232,8 +232,24 @@ next landing, L2a, touches epr-cli's artifact and produce paths.
 
 ## What needs the steward
 
-- **UNSETTLED: does moving the brit pin on dev select an Edge image build in CI?**
-  - `build-edge-image` in `elohim/holochain/build-manifest.json` declares `depends` on
+- **A brit pin move does not select an Edge build in CI today (observed).**
+  - Observed: the last brit pin move was monorepo commit `c64967822` (0.2.0 to 0.2.6, 2026-11-17, one
+    path: `elohim/brit`). The orchestrator run that covered it is Jenkins `elohim-orchestrator/dev`
+    #2359. Its changed-files tree lists `elohim/brit`; it prints "3 external dep(s) to unmanaged
+    pipelines (Sprint 2): elohim-brit:brit-ci, elohim-rakia:rakia-ci, elohim-sophia:build-sophia-umd";
+    its plan table shows the `[elohim-edge]` block with `build-edge-image │ SKIP │ no changes` (shem
+    reports every step of that block SKIP); and its only dispatch line is `Triggering elohim-eprfs/dev`.
+    Found by shem; the coordinator re-read lines 753, 828, 1079, 1082 and 1308 of that build log
+    through the Jenkins MCP on 2026-11-19, and they say what is quoted.
+  - So a brit pin move is not a fleet roll; it does dispatch the eprfs pipeline. Still unobserved, same
+    mechanism by the code: rakia and sophia pin moves. What DOES select Edge: a holochain-conductor pin
+    move (its manifest is in the superproject; `fleet-roll-guard.mjs` refuses it without
+    `[edge:roll]`).
+  - How to check any future pin move: search the orchestrator build log for the `║ [elohim-edge]` block
+    and the `Triggering` lines.
+  - The remaining preconditions of a brit pin move are the steward's word and an attestation that means
+    something (next item).
+  - How the question arose: `build-edge-image` in `elohim/holochain/build-manifest.json` declares `depends` on
     `cargo-build-doorway`, `cargo-build-storage`, `elohim-holochain:build-happ`, `elohim-brit:brit-ci`
     and `elohim-rakia:rakia-ci` (read on this branch). CI's `build-graph.groovy` propagates staleness
     through `depends`; the JS walker `genesis/orchestrator/graph-walker.mjs` does not (and ignores
@@ -243,9 +259,8 @@ next landing, L2a, touches epr-cli's artifact and produce paths.
     independent readers on shem concluded from the Jenkinsfile and `build-graph.groovy` that CI's
     checkout does not see a submodule's manifest, so CI does not carry a brit or rakia pin move into
     Edge today.
-  - That reading has not been checked against a real CI run, and it contradicts the standing note that
-    a pin move rolls the fleet.
-  - What settles it: the orchestrator run's dispatch list for the pin-move commit.
+  - That reading had not been checked against a real CI run, and it contradicted the standing note that
+    a pin move rolls the fleet. The observation above settles it for brit.
   - Since dev `0f48e02fbf43`, a pre-push check `genesis/orchestrator/fleet-roll-guard.mjs` (on dev at
     `0f48e02fbf43`; not on this branch, which is older) refuses a push to dev or main whose commits
     would make CI select an Edge build or deploy step, unless a pushed commit message carries
