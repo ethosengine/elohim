@@ -193,8 +193,12 @@ test('REAL: -march=x86-64 defines no macro above the baseline on this compiler',
   assert.deepEqual(checkCBaseline({ root: '/r', env: {}, record, readFile: noFiles, hostTriple: TRIPLE, spawn: spawnSync }), []);
 });
 
-const rhelGcc14 = /Red Hat 1[4-9]\./.test(String(hasCc.stdout || ''));
-test('REAL: RHEL gcc 14+ with no flag defines __AVX2__ (the cause of row 29.2)', { skip: hasCc.status !== 0 ? 'no cc installed' : !x86Linux ? 'not an x86_64 Linux host' : !rhelGcc14 ? `not RHEL gcc 14+ (${String(hasCc.stdout).split('\n')[0]})` : false }, () => {
+// The default level is the compiler's own configuration, not its distribution: read it, never infer
+// it from a version string (Fedora's gcc prints the same "Red Hat" marker with a plain x86-64
+// default). The AVX2 claim holds only where the default is v3 or above, as RHEL 10's gcc 14 is.
+const defaultMarch = /^\s*-march=\s+(\S+)/m.exec(String(spawnSync('cc', ['-Q', '--help=target'], { encoding: 'utf8' }).stdout || ''))?.[1] ?? null;
+const defaultAboveV2 = /^x86-64-v[34]$/.test(defaultMarch ?? '');
+test('REAL: a compiler whose default -march is x86-64-v3 or above defines __AVX2__ with no flag (the cause of row 29.2)', { skip: hasCc.status !== 0 ? 'no cc installed' : !x86Linux ? 'not an x86_64 Linux host' : !defaultAboveV2 ? `this compiler defaults to -march=${defaultMarch ?? 'unknown'}` : false }, () => {
   const r = preprocess([]);
   assert.equal(r.status, 0, r.stderr);
   assert.ok(aboveBaseline(r.stdout).includes('__AVX2__'), aboveBaseline(r.stdout).join(' '));
