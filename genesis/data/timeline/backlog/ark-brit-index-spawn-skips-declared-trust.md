@@ -7,7 +7,7 @@ title: "ark's brit index spawns brit-build-ref without the device's declared rep
 slug: "ark-brit-index-spawn-skips-declared-trust"
 written: "2026-10-27"
 author: "claude (overnight integration shift, session 3f9afd7a, steward human:matthew)"
-status: "open"
+status: "wip"
 priority: "medium"
 ci_status: none
 jobs: []
@@ -47,3 +47,45 @@ before ark can append the same `GIT_CONFIG_*` entries.
 - ark's `find()` appends it to the spawn.
 - A test proves `build find` succeeds in a scratch repo whose owner differs from the caller,
   with only the device declaration present. The test needs no global `safe.directory`.
+
+## Fix (branch `feat/ark-declared-trust`, 2026-11-19)
+
+epr-cli keeps the authoritative reader in `git.rs`, hardened in place:
+
+- The declaration and its directory are held to `device_key::check_key_dir`'s custody rule.
+  Neither may be writable by everyone or by a group the process does not hold. The file is
+  stat'ed through the descriptor it is read from, and ownership is not checked.
+- A non-UTF-8 `GIT_CONFIG_COUNT` is malformed and adds nothing.
+- A reason is kept when a declaration exists but cannot be used. `repository trusted` in
+  `epr device status` names it.
+
+The format contract is stated once, in that module's doc. ark has its own reader of the same
+format, `elohim/ark/cli/src/declared_trust.rs`. It carries the trust on all three `brit_index.rs`
+spawns: `build find`, `signer --json`, and the `git diff` of `unchanged_since`. When a child fails
+and the declaration could not be applied, each failure message ends with "; no declared trust
+applied: <why>".
+
+The two readers cannot drift silently. epr-cli mints
+`elohim/eprfs/epr-cli/tests/fixtures/declared-trust-vectors.json` from its own functions and
+compares it byte for byte, so a hand edit fails that test. ark's test runs its reader against the
+same file.
+
+The done-when cross-uid test is `a_checkout_another_uid_owns_is_read_with_only_the_device_declaration`.
+It is `#[ignore]`d because it needs root, and it fails if it cannot stage. The installed
+`brit-build-ref` was also probed by hand on a checkout owned by uid 65534, with global and system
+git config disabled:
+
+- without the entries, `build find` and `signer --json` exit 1 with "detected dubious ownership";
+- with `GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=safe.directory GIT_CONFIG_VALUE_0=<root>` they exit 0.
+
+### Why not elohim-device-runtime
+
+The first design moved the reader into `elohim-device-runtime`; it is kept on
+`backup/ark-brit-index-trust-device-runtime`. That crate is a declared input of the storage image
+step (`elohim/holochain/build-manifest.json` lines 102 and 427). Any change there selects
+`elohim-edge`, which runs the storage build and image and rolls the alpha fleet, and also selects
+`elohim-steward`. `genesis/orchestrator/graph-walker.mjs` confirms it: given that branch's paths, it
+selects `elohim-edge` with the reason `source: elohim/eprfs/device-runtime/src/checkout_trust.rs`.
+A developer-checkout trust reader also does not belong in a crate the node's storage runtime
+links.
+

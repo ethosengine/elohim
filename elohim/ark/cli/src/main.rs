@@ -1,6 +1,7 @@
 //! `ark` — run a RuntimeManifest in a Berth and inspect its local evidence.
 
 mod brit_index;
+mod declared_trust;
 mod host;
 mod material;
 mod task;

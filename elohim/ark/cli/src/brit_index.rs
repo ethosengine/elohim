@@ -20,6 +20,7 @@ use std::{
     sync::Mutex,
 };
 
+use crate::declared_trust::DeclaredTrust;
 use async_trait::async_trait;
 use eprfs_core::{
     BlobCid, DerivationBasis, DerivationIndex, DerivationKey, DerivationLookup, DerivationRecord,
@@ -195,21 +196,32 @@ pub fn reusable<'r>(
 /// `reuseSelector`, narrowed: an attested commit whose tree differs from the gated commit's is
 /// refused rather than judged, because ark does not consult the rakia dependency oracle that
 /// `gate-runner.mjs` asks. Stricter, never looser: an unchanged tree passes in both.
+///
+/// The diff carries this device's declared trust for `repo` ([`diff_command`]).
 pub fn unchanged_since(repo: &Path, gate_commit: &str) -> impl Fn(&str) -> Result<(), String> {
+    unchanged_since_with(repo, gate_commit, DeclaredTrust::device())
+}
+
+/// [`unchanged_since`] under the declarations `trust` reads.
+pub fn unchanged_since_with(
+    repo: &Path,
+    gate_commit: &str,
+    trust: DeclaredTrust,
+) -> impl Fn(&str) -> Result<(), String> {
     let repo = repo.to_path_buf();
     let gate_commit = gate_commit.to_string();
     move |attested: &str| {
         if attested.is_empty() {
             return Err("attested commit unreadable".into());
         }
-        let diff = Command::new("git")
-            .arg("-C")
-            .arg(&repo)
-            .args(["diff", "--name-only", attested, &gate_commit])
+        let diff = diff_command(&repo, attested, &gate_commit, &trust)
             .output()
             .map_err(|_| "attested commit unreadable".to_string())?;
         if !diff.status.success() {
-            return Err("attested commit unreadable".into());
+            return Err(format!(
+                "attested commit unreadable{}",
+                unapplied_clause(&trust, &repo)
+            ));
         }
         let changed = String::from_utf8_lossy(&diff.stdout);
         match changed.lines().find(|line| !line.is_empty()) {
@@ -220,6 +232,76 @@ pub fn unchanged_since(repo: &Path, gate_commit: &str) -> impl Fn(&str) -> Resul
             )),
         }
     }
+}
+
+/// `git diff --name-only <attested> <gate_commit>` in `repo`, with the `-c safe.directory=<root>`
+/// pair when this device declared `repo`'s checkout trusted (and nothing otherwise), so a
+/// checkout another uid owns after a restart is still read.
+pub fn diff_command(
+    repo: &Path,
+    attested: &str,
+    gate_commit: &str,
+    trust: &DeclaredTrust,
+) -> Command {
+    let mut command = Command::new("git");
+    command
+        .args(trust.git_args(repo))
+        .arg("-C")
+        .arg(repo)
+        .args(["diff", "--name-only", attested, gate_commit]);
+    command
+}
+
+/// `; no declared trust applied: <why>` when `trust` could not be applied to `repo` (the key
+/// home did not resolve, or the declaration is unreadable or refused its custody), for a failed
+/// child's message; empty in the ordinary states. Said only on failure, never on success.
+fn unapplied_clause(trust: &DeclaredTrust, repo: &Path) -> String {
+    trust
+        .unapplied(repo)
+        .map(|why| format!("; no declared trust applied: {why}"))
+        .unwrap_or_default()
+}
+
+/// A `brit-build-ref --repo <repo> <args>` command run in `repo`. brit runs git itself, so the
+/// device's declared trust for that checkout travels as `GIT_CONFIG_*` entries appended after
+/// any this process already passes on; an undeclared checkout gets none.
+fn brit_command(bin: &Path, repo: &Path, args: &[&str], trust: &DeclaredTrust) -> Command {
+    let mut command = Command::new(bin);
+    command
+        .arg("--repo")
+        .arg(repo)
+        .args(args)
+        .current_dir(repo)
+        .envs(trust.git_config_env_inherited(repo));
+    command
+}
+
+/// `build find --step <step> --inputs-hash <key>`, as [`find_rows`] spawns it.
+pub fn find_command(
+    bin: &Path,
+    repo: &Path,
+    step: &str,
+    inputs_hash: &str,
+    trust: &DeclaredTrust,
+) -> Command {
+    brit_command(
+        bin,
+        repo,
+        &[
+            "build",
+            "find",
+            "--step",
+            step,
+            "--inputs-hash",
+            inputs_hash,
+        ],
+        trust,
+    )
+}
+
+/// `signer --json`, as [`signer`] spawns it.
+pub fn signer_command(bin: &Path, repo: &Path, trust: &DeclaredTrust) -> Command {
+    brit_command(bin, repo, &["signer", "--json"], trust)
 }
 
 /// `brit-build-ref` as `gate-evidence.mjs::resolveBin` finds it: the first set of
@@ -327,24 +409,27 @@ pub struct Found {
 /// prints nothing itself, because one `ark task` reads the same closure twice (the look-up, then
 /// `record`). A read git could not answer (exit 1) is an error, never an absence.
 pub fn find_rows(bin: &Path, repo: &Path, step: &str, inputs_hash: &str) -> Result<Found, String> {
-    let out = Command::new(bin)
-        .arg("--repo")
-        .arg(repo)
-        .args([
-            "build",
-            "find",
-            "--step",
-            step,
-            "--inputs-hash",
-            inputs_hash,
-        ])
-        .current_dir(repo)
+    find_rows_with(bin, repo, step, inputs_hash, &DeclaredTrust::device())
+}
+
+/// [`find_rows`] under the declarations `trust` reads.
+pub fn find_rows_with(
+    bin: &Path,
+    repo: &Path,
+    step: &str,
+    inputs_hash: &str,
+    trust: &DeclaredTrust,
+) -> Result<Found, String> {
+    let out = find_command(bin, repo, step, inputs_hash, trust)
         .output()
         .map_err(|error| format!("build find: {error}"))?;
     let stderr = String::from_utf8_lossy(&out.stderr);
     if !out.status.success() {
         let last = stderr.trim().lines().last().unwrap_or("").to_string();
-        return Err(format!("build find failed: {last}"));
+        return Err(format!(
+            "build find failed: {last}{}",
+            unapplied_clause(trust, repo)
+        ));
     }
     let rows: Vec<Row> =
         serde_json::from_slice(&out.stdout).map_err(|_| "build find: not JSON rows".to_string())?;
@@ -420,11 +505,12 @@ const SIGNER_UNKNOWN: &str = "error: unrecognized subcommand 'signer'";
 
 /// `signer --json`, which never mints a key. An error is why brit could not be run at all.
 pub fn signer(bin: &Path, repo: &Path) -> Result<Signer, String> {
-    let out = Command::new(bin)
-        .arg("--repo")
-        .arg(repo)
-        .args(["signer", "--json"])
-        .current_dir(repo)
+    signer_with(bin, repo, &DeclaredTrust::device())
+}
+
+/// [`signer`] under the declarations `trust` reads.
+pub fn signer_with(bin: &Path, repo: &Path, trust: &DeclaredTrust) -> Result<Signer, String> {
+    let out = signer_command(bin, repo, trust)
         .output()
         .map_err(|error| format!("signer: {error}"))?;
     let stderr = String::from_utf8_lossy(&out.stderr);
@@ -433,11 +519,15 @@ pub fn signer(bin: &Path, repo: &Path) -> Result<Signer, String> {
         return Ok(Signer::Unsupported);
     }
     if !out.status.success() {
-        return Ok(Signer::Failed(if first.is_empty() {
+        let first = if first.is_empty() {
             format!("signer: {}", out.status)
         } else {
             first
-        }));
+        };
+        return Ok(Signer::Failed(format!(
+            "{first}{}",
+            unapplied_clause(trust, repo)
+        )));
     }
     #[derive(Deserialize)]
     #[serde(rename_all = "camelCase")]
@@ -759,6 +849,11 @@ mod tests {
             script.push_str(&format!("cat >&2 <<'BRIT_ERR'\n{stderr}\nBRIT_ERR\n"));
         }
         script.push_str(&format!("exit {code}\n"));
+        executable_script(dir, name, &script)
+    }
+
+    /// Write `script` as an executable in `dir` and wait out the ETXTBSY window before returning.
+    fn executable_script(dir: &Path, name: &str, script: &str) -> PathBuf {
         let path = dir.join(name);
         std::fs::write(&path, script).unwrap();
         std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755)).unwrap();
@@ -1148,5 +1243,310 @@ mod tests {
             unchanged_since(repo.path(), &changed)("").unwrap_err(),
             "attested commit unreadable"
         );
+    }
+
+    /// Strip everything a parent process could pass that changes which repository or config git
+    /// reads — inherited `GIT_CONFIG_*` entries, `GIT_CONFIG_PARAMETERS`, `GIT_DIR`,
+    /// `GIT_WORK_TREE`, `SUDO_UID` — except entries the command sets itself, and turn off the
+    /// global and system config so a host `safe.directory=*` cannot stand in for the declaration.
+    fn isolate(command: &mut Command) -> &mut Command {
+        let explicit: Vec<std::ffi::OsString> = command
+            .get_envs()
+            .filter(|(_, value)| value.is_some())
+            .map(|(key, _)| key.to_owned())
+            .collect();
+        for (key, _) in env::vars_os() {
+            let name = key.to_string_lossy();
+            let steers_git = name.starts_with("GIT_CONFIG_KEY_")
+                || name.starts_with("GIT_CONFIG_VALUE_")
+                || matches!(
+                    name.as_ref(),
+                    "GIT_CONFIG_COUNT"
+                        | "GIT_CONFIG_PARAMETERS"
+                        | "GIT_CONFIG"
+                        | "GIT_DIR"
+                        | "GIT_WORK_TREE"
+                        | "GIT_COMMON_DIR"
+                        | "GIT_INDEX_FILE"
+                        | "SUDO_UID"
+                );
+            if steers_git && !explicit.contains(&key) {
+                command.env_remove(&key);
+            }
+        }
+        command
+            .env("GIT_CONFIG_GLOBAL", "/dev/null")
+            .env("GIT_CONFIG_NOSYSTEM", "1")
+    }
+
+    fn isolated(mut command: Command) -> std::process::Output {
+        isolate(&mut command).output().unwrap()
+    }
+
+    /// A scratch checkout with one commit, and a declaration file for it outside the checkout.
+    struct Declared {
+        _dir: tempfile::TempDir,
+        repo: PathBuf,
+        file: PathBuf,
+        head: String,
+    }
+
+    fn declared_checkout() -> Declared {
+        let dir = tempfile::tempdir().unwrap();
+        let base = dir.path().canonicalize().unwrap();
+        let repo = base.join("repo");
+        std::fs::create_dir(&repo).unwrap();
+        let git = |args: &[&str]| {
+            let mut command = Command::new("git");
+            command.arg("-C").arg(&repo).args(args);
+            let out = isolated(command);
+            assert!(out.status.success(), "git {args:?}");
+            String::from_utf8(out.stdout).unwrap().trim().to_string()
+        };
+        git(&["init", "-q"]);
+        git(&[
+            "-c",
+            "user.name=t",
+            "-c",
+            "user.email=t@t",
+            "commit",
+            "-q",
+            "--allow-empty",
+            "-m",
+            "a",
+        ]);
+        let head = git(&["rev-parse", "HEAD"]);
+        let file = base.join("device").join("trusted-checkouts");
+        std::fs::create_dir(file.parent().unwrap()).unwrap();
+        std::fs::write(&file, format!("{}\n", repo.display())).unwrap();
+        Declared {
+            _dir: dir,
+            repo,
+            file,
+            head,
+        }
+    }
+
+    /// The declarations at `d.file`, as if this process passed on no `GIT_CONFIG_COUNT`.
+    fn trust_of(d: &Declared) -> DeclaredTrust {
+        DeclaredTrust::at(&d.file).inheriting(None)
+    }
+
+    fn args_of(command: &Command) -> Vec<String> {
+        command
+            .get_args()
+            .map(|arg| arg.to_string_lossy().into_owned())
+            .collect()
+    }
+
+    /// The `GIT_CONFIG_*` entries the command sets, by name.
+    fn config_env_of(command: &Command) -> BTreeMap<String, String> {
+        command
+            .get_envs()
+            .filter_map(|(k, v)| {
+                let k = k.to_string_lossy().into_owned();
+                k.starts_with("GIT_CONFIG_")
+                    .then(|| v.map(|v| (k, v.to_string_lossy().into_owned())))
+                    .flatten()
+            })
+            .collect()
+    }
+
+    #[test]
+    fn brit_spawns_carry_the_declared_trust_for_the_repo() {
+        let d = declared_checkout();
+        let bin = Path::new("/bin/brit-build-ref");
+        let root = d.repo.display().to_string();
+        for (inherited, index) in [(None, 0), (Some("2"), 2)] {
+            let trust = trust_of(&d).inheriting(inherited.map(Into::into));
+            let expected = BTreeMap::from([
+                (
+                    format!("GIT_CONFIG_KEY_{index}"),
+                    "safe.directory".to_string(),
+                ),
+                (format!("GIT_CONFIG_VALUE_{index}"), root.clone()),
+                ("GIT_CONFIG_COUNT".to_string(), (index + 1).to_string()),
+            ]);
+            for command in [
+                find_command(bin, &d.repo, "gate:x", "k", &trust),
+                signer_command(bin, &d.repo, &trust),
+            ] {
+                assert_eq!(config_env_of(&command), expected);
+                assert!(
+                    !args_of(&command)
+                        .iter()
+                        .any(|a| a.contains("safe.directory")),
+                    "brit takes trust through the environment, not as an argument"
+                );
+            }
+        }
+        assert_eq!(
+            args_of(&find_command(bin, &d.repo, "gate:x", "k", &trust_of(&d)))[2..],
+            ["build", "find", "--step", "gate:x", "--inputs-hash", "k"]
+        );
+    }
+
+    #[test]
+    fn git_diff_carries_the_declared_trust_as_arguments() {
+        let d = declared_checkout();
+        let command = diff_command(&d.repo, "a", "b", &trust_of(&d));
+        assert_eq!(
+            args_of(&command)[..2],
+            [
+                "-c".to_string(),
+                format!("safe.directory={}", d.repo.display())
+            ]
+        );
+        assert_eq!(
+            args_of(&command)[2..],
+            [
+                "-C".to_string(),
+                d.repo.display().to_string(),
+                "diff".into(),
+                "--name-only".into(),
+                "a".into(),
+                "b".into()
+            ]
+        );
+    }
+
+    #[test]
+    fn an_undeclared_or_other_checkout_gets_no_trust() {
+        let d = declared_checkout();
+        let elsewhere = tempfile::tempdir().unwrap();
+        std::fs::write(&d.file, format!("{}\n", elsewhere.path().display())).unwrap();
+        let bin = Path::new("/bin/brit-build-ref");
+        for trust in [trust_of(&d), DeclaredTrust::none().inheriting(None)] {
+            let find = find_command(bin, &d.repo, "gate:x", "k", &trust);
+            assert!(config_env_of(&find).is_empty());
+            assert!(config_env_of(&signer_command(bin, &d.repo, &trust)).is_empty());
+            let diff = diff_command(&d.repo, "a", "b", &trust);
+            assert!(!args_of(&diff).iter().any(|a| a.contains("safe.directory")));
+            assert!(!args_of(&diff).iter().any(|a| a.contains('*')));
+        }
+    }
+
+    /// A child that fails while the declaration could not be applied says why, in the message it
+    /// already returns; a healthy or absent declaration adds nothing to it.
+    #[test]
+    fn a_failed_child_names_the_trust_that_could_not_be_applied() {
+        use std::os::unix::fs::PermissionsExt;
+        let d = declared_checkout();
+        std::fs::set_permissions(&d.file, std::fs::Permissions::from_mode(0o666)).unwrap();
+        let refused = trust_of(&d);
+        let dir = tempfile::tempdir().unwrap();
+        let failed = stub(
+            dir.path(),
+            "failed",
+            "",
+            "fatal: detected dubious ownership",
+            1,
+        );
+
+        let why = find_rows_with(&failed, &d.repo, "gate:x", "k", &refused).unwrap_err();
+        assert!(
+            why.starts_with("build find failed: fatal: detected dubious ownership; no declared trust applied: the checkout-trust declaration"),
+            "{why}"
+        );
+        let Signer::Failed(why) = signer_with(&failed, &d.repo, &refused).unwrap() else {
+            panic!("signer failed");
+        };
+        assert!(
+            why.starts_with("fatal: detected dubious ownership; no declared trust applied: "),
+            "{why}"
+        );
+        let why = unchanged_since_with(&d.repo, "no-such-commit", refused.clone())("also-missing")
+            .unwrap_err();
+        assert!(
+            why.starts_with("attested commit unreadable; no declared trust applied: "),
+            "{why}"
+        );
+        let unresolved = DeclaredTrust::device_with(&|_| None);
+        let why = find_rows_with(&failed, &d.repo, "gate:x", "k", &unresolved).unwrap_err();
+        assert!(
+            why.contains("; no declared trust applied: device trust file not located"),
+            "{why}"
+        );
+
+        // The ordinary states say nothing extra.
+        std::fs::set_permissions(&d.file, std::fs::Permissions::from_mode(0o600)).unwrap();
+        for trust in [trust_of(&d), DeclaredTrust::none()] {
+            assert_eq!(
+                find_rows_with(&failed, &d.repo, "gate:x", "k", &trust).unwrap_err(),
+                "build find failed: fatal: detected dubious ownership"
+            );
+        }
+    }
+
+    /// Hand the scratch checkout to another uid, so git sees it as dubiously owned. Only root can.
+    fn hand_to_another_uid(repo: &Path) {
+        fn walk(path: &Path) -> std::io::Result<()> {
+            std::os::unix::fs::lchown(path, Some(65534), Some(65534))?;
+            if path.is_dir() && !path.is_symlink() {
+                for entry in std::fs::read_dir(path)? {
+                    walk(&entry?.path())?;
+                }
+            }
+            Ok(())
+        }
+        walk(repo).expect("staging the cross-uid checkout needs root (run with --ignored as root)");
+    }
+
+    fn stderr_of(out: &std::process::Output) -> String {
+        String::from_utf8_lossy(&out.stderr).into_owned()
+    }
+
+    #[test]
+    #[ignore = "needs root to chown a scratch repo to another uid"]
+    fn a_checkout_another_uid_owns_is_read_with_only_the_device_declaration() {
+        let d = declared_checkout();
+        hand_to_another_uid(&d.repo);
+        let trust = trust_of(&d);
+        let none = DeclaredTrust::none().inheriting(None);
+        let rev_parse = |trust: &DeclaredTrust| {
+            let mut command = Command::new("git");
+            command
+                .args(trust.git_args(&d.repo))
+                .arg("-C")
+                .arg(&d.repo)
+                .args(["rev-parse", "--git-dir"]);
+            isolated(command)
+        };
+
+        // git, given the `-c` pair: refused for its owner without it, read with it.
+        let refused = rev_parse(&none);
+        assert!(
+            stderr_of(&refused).contains("dubious ownership"),
+            "{}",
+            stderr_of(&refused)
+        );
+        assert!(rev_parse(&trust).status.success());
+        // `git diff` on an untrusted checkout falls out of repository mode and reports the commit
+        // as inaccessible rather than naming ownership (the rev-parse above names the cause).
+        let refused = isolated(diff_command(&d.repo, &d.head, &d.head, &none));
+        assert!(
+            stderr_of(&refused).contains("Could not access"),
+            "{}",
+            stderr_of(&refused)
+        );
+        let read = isolated(diff_command(&d.repo, &d.head, &d.head, &trust));
+        assert!(read.status.success(), "{}", stderr_of(&read));
+
+        // A child that runs git itself, given the GIT_CONFIG_* entries.
+        let bin_dir = tempfile::tempdir().unwrap();
+        let bin = executable_script(
+            bin_dir.path(),
+            "brit-build-ref",
+            "#!/bin/sh\ngit -C \"$2\" rev-parse --show-toplevel >/dev/null || exit 1\necho '[]'\n",
+        );
+        let refused = isolated(find_command(&bin, &d.repo, "gate:x", "k", &none));
+        assert!(
+            stderr_of(&refused).contains("dubious ownership"),
+            "{}",
+            stderr_of(&refused)
+        );
+        let found = isolated(find_command(&bin, &d.repo, "gate:x", "k", &trust));
+        assert!(found.status.success(), "{}", stderr_of(&found));
+        assert_eq!(String::from_utf8_lossy(&found.stdout).trim(), "[]");
     }
 }
