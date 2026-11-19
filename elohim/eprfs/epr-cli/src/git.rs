@@ -4,6 +4,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use elohim_device_runtime::checkout_trust;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -243,57 +244,26 @@ pub fn command(cwd: &Path) -> std::process::Command {
     command
 }
 
-/// The checkout holding `cwd`, when this device declared it trusted.
-fn declared_root(cwd: &Path) -> Option<PathBuf> {
-    let root = checkout(cwd)?;
-    trust_file()
-        .ok()
-        .is_some_and(|file| declared_at(&root, &file))
-        .then_some(root)
+/// This device's checkout-trust declarations, read by the shared device-runtime reader.
+fn declared() -> checkout_trust::DeclaredTrust {
+    checkout_trust::DeclaredTrust::device()
 }
 
 /// The arguments `command` adds, for a git spawned through another runner.
 pub(crate) fn trust_args(cwd: &Path) -> Vec<String> {
-    declared_root(cwd)
-        .map(|root| {
-            vec![
-                "-c".to_owned(),
-                format!("safe.directory={}", root.display()),
-            ]
-        })
-        .unwrap_or_default()
+    declared().git_args(cwd)
 }
 
 /// The same trust as `GIT_CONFIG_*` variables, for a child that runs git itself (brit).
 pub(crate) fn trust_env(cwd: &Path) -> Vec<(String, String)> {
-    let existing = std::env::var("GIT_CONFIG_COUNT").ok();
-    declared_root(cwd)
-        .map(|root| config_env(existing.as_deref(), &root))
-        .unwrap_or_default()
+    declared().git_config_env_inherited(cwd)
 }
 
 /// Append one `safe.directory` entry after any the caller already passes. A malformed count is
 /// left for git to refuse, never repaired over the caller's own entries.
+#[cfg(test)]
 fn config_env(existing: Option<&str>, root: &Path) -> Vec<(String, String)> {
-    let index = match existing.map(|count| count.trim().parse::<usize>()) {
-        None => 0,
-        Some(Ok(count)) => count,
-        Some(Err(_)) => return Vec::new(),
-    };
-    let Some(count) = index.checked_add(1) else {
-        return Vec::new();
-    };
-    vec![
-        (
-            format!("GIT_CONFIG_KEY_{index}"),
-            "safe.directory".to_owned(),
-        ),
-        (
-            format!("GIT_CONFIG_VALUE_{index}"),
-            root.display().to_string(),
-        ),
-        ("GIT_CONFIG_COUNT".to_owned(), count.to_string()),
-    ]
+    checkout_trust::config_env(existing, root)
 }
 
 /// A git command with no declared checkout trust: for reads that must see what git itself (and
@@ -309,28 +279,15 @@ pub(crate) fn native_command(cwd: &Path) -> std::process::Command {
 
 /// Locate a checkout without asking git to trust it first. Worktree `.git` files are boundaries.
 pub(crate) fn checkout(start: &Path) -> Option<PathBuf> {
-    let path = start.canonicalize().ok()?;
-    path.ancestors()
-        .find(|p| p.join(".git").exists())
-        .map(Path::to_owned)
+    checkout_trust::checkout(start)
 }
 
 fn trust_file() -> std::io::Result<PathBuf> {
-    let key = crate::device_key::resolve_path()?;
-    key.parent()
-        .map(|p| p.join("trusted-checkouts"))
-        .ok_or_else(|| {
-            std::io::Error::new(
-                std::io::ErrorKind::InvalidInput,
-                "device key has no directory",
-            )
-        })
+    checkout_trust::trust_file()
 }
 
 fn declared_at(root: &Path, file: &Path) -> bool {
-    std::fs::read_to_string(file)
-        .ok()
-        .is_some_and(|text| text.lines().any(|line| Path::new(line) == root))
+    checkout_trust::declared_at(root, file)
 }
 
 /// Declare one canonical checkout beside the device key. No global git configuration changes.
