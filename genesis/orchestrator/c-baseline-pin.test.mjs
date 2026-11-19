@@ -3,9 +3,10 @@
 // gcc defaults to -march=x86-64-v3; cc 1.2.65 passed no -march, so ring's curve25519.c
 // carried AVX2 into a drawn epr and a v2 sibling died with SIGILL. cc >= 1.11.0 pushes
 // -march=x86-64 itself ("Match rustc's CPU"). This test pins every home of that decision:
-// the pool-policy record, the producer recording the record's two variables, the cc floor in each
-// native lock, the cc source still carrying the push, and no tracked build config raising
-// the level behind the record's back. A drift in any one of them fails here.
+// the pool-policy record, the producer recording the record's two variables and declaring the
+// record's target to describe, the cc floor in each native lock, the cc source still carrying the
+// push, no tracked build config raising the level behind the record's back, and every cc-built
+// crate in epr's lock closure accounted for. A drift in any one of them fails here.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
@@ -455,6 +456,144 @@ test('no build of a declared workspace sets a target cpu, so cc keeps pushing th
   const projects = [...loadGateRegistry(ROOT).values()];
   assert.deepEqual(targetCpuProblems({ projects, overrides: policy.cargo_env_overrides, workspaces,
     binStoreSource: read('elohim/eprfs/device-runtime/src/bin_store/source.rs') }), []);
+});
+
+// ── Row 29.2 memo, PIN TEST: every crate in epr's lock closure that builds with cc is accounted
+// for. Its C is held at the declared level by the record, but only two units are read back: put
+// reads ring's GNU C producer string, and `epr doctor --exercise` runs ring (x25519) and SQLite on
+// the drawing host. A crate cc builds anything else for has neither reading, so a new one fails
+// here until it is on CC_BUILT_IN_EPR with one of two reasons: it is dispatched (each unit built
+// for one level and chosen at run time by CPUID) or compiles nothing on a declared target, or it
+// is exercised (`exercises` names what exercise.rs runs through it). An entry whose crate left the
+// closure fails too, so the list says what the closure holds. The lock is read as text: its
+// dependency edges are the union over features and platforms, so the closure is a superset of any
+// one build's, which is the safe side for a list of what must be accounted for. ─────────────────
+const DISPATCHED = 'dispatched or compiles nothing';
+const EXERCISED = 'exercised by epr doctor --exercise';
+// Seeded from elohim/eprfs/Cargo.lock at 71069b1f5, each reason read from the crate's build.rs.
+export const CC_BUILT_IN_EPR = {
+  ring: {
+    kind: EXERCISED,
+    exercises: 'x25519',
+    reason: 'curve25519.c and its other C units take the declared -march (the one GNU C producer string in a dev epr); ' +
+      'the exercise runs an x25519 agreement through it, and put reads that producer string',
+  },
+  'libsqlite3-sys': {
+    kind: EXERCISED,
+    exercises: 'sqlite',
+    reason: 'rusqlite "bundled" compiles sqlite3.c; it leaves no GNU C producer string in a dev epr, so put cannot read ' +
+      'its level and the exercise\'s SQLite round trip is its only check',
+  },
+  blake3: {
+    kind: DISPATCHED,
+    reason: 'on x86_64 Linux without "pure" or "prefer_intrinsics" its build.rs compiles only the SSE2/SSE4.1/AVX2/AVX-512 ' +
+      'assembly (.S, no C), each file for its own level and chosen at run time by CPUID; the portable path is Rust',
+  },
+  psm: {
+    kind: DISPATCHED,
+    reason: 'compiles no C: hand-written stack-switching assembly for the target arch (-xassembler-with-cpp), whose ' +
+      'instructions no -march chooses',
+  },
+  stacker: {
+    kind: DISPATCHED,
+    reason: 'compiles nothing on a declared target: its build.rs runs cc only for src/arch/windows.c on Windows',
+  },
+  generator: {
+    kind: DISPATCHED,
+    reason: 'compiles nothing on a declared target: its build.rs runs cc only for the powerpc64 context-switch assembly',
+  },
+  'iana-time-zone-haiku': {
+    kind: DISPATCHED,
+    reason: 'compiles nothing on a declared target: iana-time-zone depends on it only under cfg(target_os = "haiku")',
+  },
+};
+
+/** The lock's packages, each with its dependency edges as the lock writes them. */
+export function lockPackages(lock) {
+  return lock.split(/^\[\[package\]\]\s*$/m).slice(1).map(block => ({
+    name: block.match(/^name\s*=\s*"([^"]+)"/m)?.[1],
+    version: block.match(/^version\s*=\s*"([^"]+)"/m)?.[1],
+    deps: (block.match(/^dependencies\s*=\s*\[([\s\S]*?)\]/m)?.[1]?.match(/"[^"]+"/g) ?? []).map(d => d.slice(1, -1)),
+  }));
+}
+
+/** Names (sorted, one per crate) of the packages reachable from `root` that depend on cc. */
+export function ccBuiltCrates(packages, root) {
+  const byName = new Map();
+  for (const p of packages) byName.set(p.name, [...(byName.get(p.name) ?? []), p]);
+  // An edge is `name`, or `name version` when the lock holds more than one version, and may carry
+  // ` (source)` after that.
+  const targets = edge => {
+    const [name, version] = edge.split(' ');
+    return (byName.get(name) ?? []).filter(p => !version || p.version === version);
+  };
+  const seen = new Set();
+  const stack = [...(byName.get(root) ?? [])];
+  if (stack.length === 0) throw new Error(`the lock has no package ${root}`);
+  const built = new Set();
+  while (stack.length) {
+    const p = stack.pop();
+    const key = `${p.name} ${p.version}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    if (p.deps.some(edge => edge.split(' ')[0] === 'cc')) built.add(p.name);
+    for (const edge of p.deps) stack.push(...targets(edge));
+  }
+  return [...built].sort();
+}
+
+/** Problems with the list against the closure's cc-built crates and exercise.rs's source. */
+export function ccAccountProblems(built, list, exerciseSource) {
+  const problems = [];
+  for (const name of built) {
+    if (!Object.hasOwn(list, name)) {
+      problems.push(`${name} builds with cc in epr's lock closure and is not on CC_BUILT_IN_EPR: say whether it is ${DISPATCHED}, or ${EXERCISED} (and add the exercise)`);
+    }
+  }
+  for (const [name, entry] of Object.entries(list)) {
+    if (!built.includes(name)) problems.push(`CC_BUILT_IN_EPR lists ${name}, which no longer builds with cc in epr's lock closure`);
+    if (![DISPATCHED, EXERCISED].includes(entry?.kind)) problems.push(`CC_BUILT_IN_EPR.${name}.kind is ${JSON.stringify(entry?.kind)}, not "${DISPATCHED}" or "${EXERCISED}"`);
+    if (typeof entry?.reason !== 'string' || entry.reason.trim().length < 20) problems.push(`CC_BUILT_IN_EPR.${name} gives no reason`);
+    if (entry?.kind === EXERCISED && !(typeof entry.exercises === 'string' && entry.exercises && exerciseSource.includes(entry.exercises))) {
+      problems.push(`CC_BUILT_IN_EPR.${name} is exercised through ${JSON.stringify(entry.exercises)}, which epr-cli/src/exercise.rs does not run`);
+    }
+  }
+  return problems;
+}
+
+test('fixture: a cc-built crate reached from the root is found; one reached from nowhere is not', () => {
+  const lock = [
+    'version = 4',
+    '[[package]]\nname = "cc"\nversion = "1.2.65"\n',
+    '[[package]]\nname = "cc"\nversion = "1.11.1"\n',
+    '[[package]]\nname = "root"\nversion = "0.1.0"\ndependencies = [\n "mid",\n "ring",\n]\n',
+    '[[package]]\nname = "mid"\nversion = "1.0.0"\ndependencies = [\n "zlib-sys 2.0.0",\n]\n',
+    '[[package]]\nname = "zlib-sys"\nversion = "2.0.0"\ndependencies = [\n "cc 1.11.1",\n]\n',
+    '[[package]]\nname = "zlib-sys"\nversion = "1.0.0"\ndependencies = [\n "cc 1.2.65",\n]\n',
+    '[[package]]\nname = "ring"\nversion = "0.17.14"\ndependencies = [\n "cc 1.11.1 (registry+https://github.com/rust-lang/crates.io-index)",\n]\n',
+    '[[package]]\nname = "ccache-wrapper"\nversion = "1.0.0"\ndependencies = [\n "ccc",\n]\n',
+    '[[package]]\nname = "orphan-sys"\nversion = "1.0.0"\ndependencies = [\n "cc 1.11.1",\n]\n',
+  ].join('\n');
+  assert.deepEqual(ccBuiltCrates(lockPackages(lock), 'root'), ['ring', 'zlib-sys']);
+  assert.throws(() => ccBuiltCrates(lockPackages(lock), 'absent'), /no package absent/);
+  const exercise = 'exercise: ok (x25519 secret, sqlite rows)';
+  const list = {
+    ring: { kind: EXERCISED, exercises: 'x25519', reason: 'curve25519.c runs in the x25519 agreement' },
+    'zlib-sys': { kind: DISPATCHED, reason: 'compiles nothing on a declared target, fixture' },
+  };
+  assert.deepEqual(ccAccountProblems(['ring', 'zlib-sys'], list, exercise), []);
+  const { 'zlib-sys': _, ...short } = list;
+  assert.match(ccAccountProblems(['ring', 'zlib-sys'], short, exercise).join('\n'), /zlib-sys builds with cc .* not on CC_BUILT_IN_EPR/);
+  assert.match(ccAccountProblems(['ring'], list, exercise).join('\n'), /lists zlib-sys, which no longer builds/);
+  assert.match(ccAccountProblems(['ring', 'zlib-sys'], { ...list, ring: { ...list.ring, exercises: 'ed448' } }, exercise).join('\n'), /exercised through "ed448"/);
+  assert.match(ccAccountProblems(['ring', 'zlib-sys'], { ...list, ring: { ...list.ring, kind: 'fine' } }, exercise).join('\n'), /kind is "fine"/);
+  assert.match(ccAccountProblems(['ring', 'zlib-sys'], { ...list, 'zlib-sys': { kind: DISPATCHED, reason: '' } }, exercise).join('\n'), /zlib-sys gives no reason/);
+});
+
+test('every crate cc builds in epr\'s lock closure is dispatched, compiles nothing, or is exercised', () => {
+  const built = ccBuiltCrates(lockPackages(read('elohim/eprfs/Cargo.lock')), 'elohim-epr-cli');
+  assert.ok(built.includes('ring'), 'ring builds with cc in epr\'s closure (the crate that trapped on shem)');
+  assert.deepEqual(ccAccountProblems(built, CC_BUILT_IN_EPR, read('elohim/eprfs/epr-cli/src/exercise.rs')), []);
 });
 
 // ── Row 29.2 ruling: the only producer of a release for sibling draw is eprfs-produce, for a
