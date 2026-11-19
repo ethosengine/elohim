@@ -1,10 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { spawnSync } from 'child_process';
 import { existsSync, readFileSync, readdirSync } from 'fs';
 import { dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
-import { UNAUDITED_RECIPE_PROJECTS, auditProject, declarationScopes, declarationsIn, exhaustInputs, globCovers, isReadPattern, readCovers, readSet } from './gate-input-audit.mjs';
+import { UNAUDITED_RECIPE_PROJECTS, auditProject, declarationScopes, declarationsIn, exhaustInputs, globCovers, isReadPattern, readCovers, readSet, repositoryFiles } from './gate-input-audit.mjs';
 import { GATE_EXHAUST } from './gate-evidence.mjs';
 import { NAMED_READ_SET_PROJECTS } from './gate-preflight.mjs';
 import { loadGateRegistry } from './pipeline-registry.mjs';
@@ -498,10 +497,9 @@ test('REAL every gate keeps declared sources, recipes and audited reads disjoint
   const files = readdirSync(resolve(repo, '.claude/data')).map(name => `.claude/data/${name}`);
   // With no project named, a Rust file's reads do not depend on which gate scans it, so each file
   // is read once and a gate's reads are the union over the files its sources cover (63 gates
-  // re-scanned ~8000 files for ~2300). The same Rust listing as readSet's; the guard holds the
-  // union equal to readSet itself on eprfs's 700 files.
-  const rust = spawnSync('git', ['ls-files', '-z', '--cached', '--others', '--exclude-standard', '--', '*.rs'],
-    { cwd: repo, encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 }).stdout.split('\0').filter(Boolean);
+  // re-scanned ~8000 files for ~2300). readSet's own Rust listing (and its error handling); the
+  // guard holds the union equal to readSet itself on eprfs's 700 files.
+  const rust = repositoryFiles(repo);
   const perFile = new Map();
   const readsOf = sources => [...new Set(rust.filter(f => sources.some(glob => globCovers(glob, f))).flatMap(f => {
     if (!perFile.has(f)) perFile.set(f, readSet({ root: repo, sources: [f], listFiles: () => [f] }).paths);

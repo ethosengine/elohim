@@ -979,7 +979,7 @@ function stubBerth(root, { notes = [], sleepS = 0, exit = 0 } = {}) {
   writeFileSync(join(root, 'notes.json'), JSON.stringify(notes));
   const bin = join(root, 'berth-stub');
   writeFileSync(bin, `#!/bin/bash
-${sleepS ? `sleep ${sleepS}\n` : ''}if [ "$1" = say ]; then printf '%s\n' "$*" >> "${root}/says.log"; else cat "${root}/notes.json"; fi
+${sleepS ? `printf '%s\\n' "$$" >> "${root}/berth.pids"\nsleep ${sleepS}\n` : ''}if [ "$1" = say ]; then printf '%s\n' "$*" >> "${root}/says.log"; else cat "${root}/notes.json"; fi
 exit ${exit}
 `, { mode: 0o755 });
   return bin;
@@ -1191,25 +1191,25 @@ test('E4 finding 5: a subscription binds to its sender, its lease is capped, a l
   assert.equal(match([subNote({}, { at: nowS + 60 })]).length, 1);
 });
 
-// E4 finding 3's clamp case waits out the real 18 s bound (the 20 s worker life less 2 s, pinned
-// nowhere else), so it starts as the file loads and runs beside every other test; the last test in
-// this file awaits its result. Its stub sleeps far past the bound, so a busy event loop can delay
-// the kill but never turn it into a delivery.
-const CLAMP_ROOT = mkdtempSync(join(tmpdir(), 'gate-live-clamp-'));
-const CLAMPED = live.sendNote('s', 'to', { kind: 'gate-red@1' }, {
-  env: { ...siblingEnv(CLAMP_ROOT, stubBerth(CLAMP_ROOT, { sleepS: 120 })), GATE_LIVE_DELIVER_MS: '30000' },
-  deadlineMs: 30_000,
-}).finally(() => rmSync(CLAMP_ROOT, { recursive: true, force: true }));
-
 test('E4 finding 3: a stuck or missing berth is bounded and named, never silent', async (t) => {
   const root = fixture(t);
   const stuck = siblingEnv(root, stubBerth(root, { sleepS: 30 }));
+  // Each stuck stub leads its own process group (sendNote spawns it detached) and records its pid:
+  // reap every one, whichever assertion throws.
+  t.after(() => {
+    let pids = [];
+    try { pids = readFileSync(join(root, 'berth.pids'), 'utf8').split('\n').filter(Boolean); } catch { /* none started */ }
+    for (const pid of pids) try { process.kill(-Number(pid), 'SIGKILL'); } catch { /* already gone */ }
+  });
   const started = Date.now();
   const late = await live.sendNote('s', 'to', { kind: 'gate-red@1' }, { env: stuck, deadlineMs: 300 });
   assert.equal(late.ok, false);
   assert.match(late.why, /exceeded 300 ms/);
   assert.ok(Date.now() - started < 3000, 'the deadline holds');
-  // An override past the worker's 20 s life is clamped: CLAMPED, asserted by the file's last test.
+  // An override past the worker's 20 s life is clamped so the kill still fires inside it.
+  const long = await live.sendNote('s', 'to', { kind: 'gate-red@1' }, { env: { ...stuck, GATE_LIVE_DELIVER_MS: '30000' }, deadlineMs: 30_000 });
+  assert.equal(long.ok, false);
+  assert.match(long.why, /exceeded 18000 ms/);
   const missing = await live.sendNote('s', 'to', { kind: 'gate-red@1' }, { env: siblingEnv(root, join(root, 'no-berth')) });
   assert.equal(missing.ok, false);
   assert.match(missing.why, /berth/);
@@ -1533,11 +1533,4 @@ test('E8 #3: a final for the longest DID the validator admits fits BODY_MAX', as
   }
   assert.ok(says(root).length >= 195, 'every final was sent');
   assert.ok(largest <= 3500, `largest final ${largest} bytes`);
-});
-
-// Last in the file on purpose: CLAMPED (started at load, beside E4 finding 3) has run beside every test.
-test("E4 finding 3: an override past the worker's 20 s life is clamped so the kill still fires inside it", async () => {
-  const long = await CLAMPED;
-  assert.equal(long.ok, false);
-  assert.match(long.why, /exceeded 18000 ms/);
 });

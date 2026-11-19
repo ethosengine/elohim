@@ -8,6 +8,8 @@ import assert from "node:assert/strict";
 import {
   copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync,
 } from "node:fs";
+import { constants } from "node:fs";
+import { open } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawn, spawnSync } from "node:child_process";
@@ -119,14 +121,19 @@ test("live_run_counts_deferred_verdicts_before_later_push_refusal", (t) => {
 
 test("live_run_sigterm_closes_interrupted", async (t) => {
   const dir = fixture(t);
-  // Its own process group, signalled as a whole, as a terminal or supervisor signals a push: bash
-  // runs a trap only once its foreground child returns, so signalling bash alone waited out the
-  // whole `sleep 30` before the trap this test is about could run.
+  // Only bash is signalled, so the TERM trap alone can end the run: bash runs it once its
+  // foreground child returns, and that child (an external `cat` of a fifo) exits 0 only when the
+  // test releases it after the signal. A hook whose TERM trap does nothing therefore runs on to
+  // exit 0, which this test refuses. (A fixed `sleep 30` made the wait 30 s.)
+  const gate = join(dir, "foreground.fifo");
+  assert.equal(spawnSync("mkfifo", [gate]).status, 0, "mkfifo");
   const child = spawn(
     "bash",
-    ["-c", script(`HOOK_WORK_TREE='${dir}'`, PRELUDE, OPEN_BLOCK, "sleep 30")],
+    ["-c", script(`HOOK_WORK_TREE='${dir}'`, PRELUDE, OPEN_BLOCK, `cat '${gate}' > /dev/null`)],
     { cwd: dir, env: env(), stdio: ["ignore", "pipe", "ignore"], detached: true },
   );
+  // Its own process group, reaped whatever an assertion below does.
+  t.after(() => { try { process.kill(-child.pid, "SIGKILL"); } catch { /* already gone */ } });
   let out = "";
   child.stdout.on("data", (d) => { out += d; });
   const exited = new Promise((res) => child.on("exit", (code, signal) => res({ code, signal })));
@@ -136,7 +143,22 @@ test("live_run_sigterm_closes_interrupted", async (t) => {
     await new Promise((r) => setTimeout(r, 50));
   }
   assert.equal(runsOf(dir).length, 1, "run file exists before the kill");
-  process.kill(-child.pid, "SIGTERM");
+  child.kill("SIGTERM");
+  // Release the foreground child only after the signal is pending, so it is the trap that ends it.
+  // A non-blocking open finds no reader (ENXIO) until `cat` has the fifo open; stop once bash exits.
+  let gone = false;
+  exited.then(() => { gone = true; });
+  while (!gone) {
+    try {
+      const fifo = await open(gate, constants.O_WRONLY | constants.O_NONBLOCK);
+      await fifo.write("release\n");
+      await fifo.close();
+      break;
+    } catch (error) {
+      if (error.code !== "ENXIO") throw error;
+      await new Promise((r) => setTimeout(r, 20));
+    }
+  }
   const { code, signal } = await exited;
   assert.equal(signal, null);
   assert.equal(code, 143);

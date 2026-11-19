@@ -496,6 +496,21 @@ test("the C2 paths are refused without a receipt in default and strict modes, na
   });
 });
 
+// One refusal against THIS checkout, every landing: the scripts as they stand here, run in this
+// worktree under its own Git environment, refuse a serving path that has no receipt. The fixture
+// cases above prove the path classes; this proves the real tree's invocation still refuses.
+test("this checkout's t2-receipt.sh refuses a serving path with no receipt, naming its story", () => {
+  const dir = mkdtempSync(join(tmpdir(), "live-refused-"));
+  try {
+    const result = runT2(REPO, ["scripts/ci/fleet-write-readiness.sh"], dir);
+    assert.equal(result.status, 1, result.stdout + result.stderr);
+    assert.match(result.stderr, /NO-SERVING-RECEIPT/);
+    assert.match(result.stderr, /app-delivery-refuses-fast\.feature/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 // These run the real t2-receipt.sh inside a committed fixture repo: the live checkout's source
 // identity moves under concurrent sessions, and a receipt test must not race it.
 test("a current-source refuses-fast report admits stage-spa-blob.sh and the readiness paths, not a render change", async () => {
@@ -694,23 +709,43 @@ function householdNode(root, story, overrides = {}) {
   );
 }
 
+/**
+ * Drop every GIT_* variable from this process until the returned restore runs, so what the test
+ * computes in-process (storyReport, currentParts, checkReports) reads the fixture repository under
+ * the same environment as its scrubbed children: an exported GIT_DIR would otherwise point the
+ * producer and the verifier at different trees.
+ */
+function scrubGitEnv() {
+  const saved = {};
+  for (const key of Object.keys(process.env)) {
+    if (!key.startsWith("GIT_")) continue;
+    saved[key] = process.env[key];
+    delete process.env[key];
+  }
+  return () => Object.assign(process.env, saved);
+}
+
 function withFixture(fn) {
+  const restore = scrubGitEnv();
   const root = fixtureRepo();
   const reports = mkdtempSync(join(tmpdir(), "f2-reports-"));
   try {
     fn(root, reports);
   } finally {
+    restore();
     rmSync(root, { recursive: true, force: true });
     rmSync(reports, { recursive: true, force: true });
   }
 }
 
 async function withFixtureAsync(fn) {
+  const restore = scrubGitEnv();
   const root = fixtureRepo();
   const reports = mkdtempSync(join(tmpdir(), "f2-reports-"));
   try {
     await fn(root, reports);
   } finally {
+    restore();
     rmSync(root, { recursive: true, force: true });
     rmSync(reports, { recursive: true, force: true });
   }

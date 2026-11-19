@@ -67,7 +67,7 @@ export function exhaustInputs({ exhaust, files = [], sources = [], reads = [], r
     globCovers(input, path) || matchesGlob(path, input) || readCovers(input.replace(/\/\*\*$/, ''), path))))];
 }
 
-function repositoryFiles(root) {
+export function repositoryFiles(root) {
   const result = spawnSync('git', ['ls-files', '-z', '--cached', '--others', '--exclude-standard', '--', '*.rs'], {
     cwd: root, encoding: 'utf8', maxBuffer: 16 * 1024 * 1024,
   });
