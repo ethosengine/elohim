@@ -323,17 +323,26 @@ test('c-baseline: the gate\'s own declared flags pass, and the probe runs under 
   assert.equal(calls[0].env.GATE_CARGO_ENV, undefined, 'run-local-gate.sh exports the map and unsets it');
 });
 
-test('a withholding WARN reaches the live run too, marked as a WARN; an ordinary WARN does not', () => {
+test('a withholding WARN reaches the live run as a notice, never a failure; an ordinary WARN does not', () => {
   const appended = [];
   emitLive([
-    { check: 'c-baseline', level: 'WARN', why: 'CFLAGS is set', cure: 'unset CFLAGS', withholds: { offer: ['eprfs'] } },
+    { check: 'c-baseline', level: 'WARN', why: 'CFLAGS is set\nsecond line', cure: 'unset CFLAGS', withholds: { offer: ['eprfs'] } },
     { check: 'sophia-umd', level: 'WARN', why: 'absent', cure: 'build' },
     { check: 'c-baseline', level: 'ok', withholds: { offer: ['eprfs'] } },
+    { check: 'element-dists', level: 'REFUSED', why: 'unbuilt', cure: 'build' },
   ], { GATE_LIVE_RUN: '/run.jsonl' }, (path, event) => appended.push(event));
-  assert.equal(appended.length, 1);
-  assert.equal(appended[0].failure.class, 'c-baseline');
-  assert.match(appended[0].failure.excerpt[0], /^WARN, offer withheld \(the gate still runs\): CFLAGS is set/);
-  assert.equal(appended[0].failure.excerpt[1], 'cure: unset CFLAGS');
+  assert.equal(appended.length, 2);
+  // The notice contract: { kind: 'notice', project, notice: { class: 'offer-withheld', text } }.
+  const [notice, red] = appended;
+  assert.deepEqual(Object.keys(notice).sort(), ['kind', 'notice', 'project']);
+  assert.equal(notice.kind, 'notice');
+  assert.equal(notice.project, 'preflight');
+  assert.equal(notice.failure, undefined, 'never a red');
+  assert.deepEqual(Object.keys(notice.notice).sort(), ['class', 'text']);
+  assert.equal(notice.notice.class, 'offer-withheld');
+  assert.equal(notice.notice.text, 'c-baseline: offer of eprfs withheld, the gate still runs: CFLAGS is set second line — cure: unset CFLAGS');
+  assert.equal(red.kind, 'failure', 'a REFUSED is still a red');
+  assert.equal(red.failure.class, 'element-dists');
 });
 
 test('on-red policy: env, then pool-policy.json, then continue', (t) => {

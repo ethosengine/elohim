@@ -478,17 +478,26 @@ export function formatRow(r) {
 
 /**
  * Emit each REFUSED to the live run as a failure the session hears at its next tool call, and
- * each WARN that withholds the producer's offer (c-baseline), its excerpt marked as a WARN: the
- * gate's verdict is unchanged, but the device must hear why it offers nothing. Other WARNs stay local.
+ * each WARN that withholds the producer's offer (c-baseline) as a `notice` event: a non-red fact
+ * the session hears the same way (gate-live-inject, the follower's NOTICE line) while the gate
+ * stays green, and that nothing counts as a red. Other WARNs stay local.
  */
 export function emitLive(rows, env = process.env, append = appendEvent) {
   if (!env.GATE_LIVE_RUN) return;
-  for (const r of rows.filter(r => r.level === 'REFUSED' || (r.level === 'WARN' && r.withholds))) {
-    const why = r.level === 'WARN' ? `WARN, offer withheld (the gate still runs): ${r.why}` : `${r.why}`;
-    append(env.GATE_LIVE_RUN, {
-      kind: 'failure', project: 'preflight',
-      failure: { class: r.check, excerpt: [why, r.cure ? `cure: ${r.cure}` : ''].filter(Boolean) },
-    });
+  for (const r of rows) {
+    if (r.level === 'REFUSED') {
+      append(env.GATE_LIVE_RUN, {
+        kind: 'failure', project: 'preflight',
+        failure: { class: r.check, excerpt: [r.why, r.cure ? `cure: ${r.cure}` : ''].filter(Boolean) },
+      });
+    } else if (r.level === 'WARN' && r.withholds) {
+      const offer = (r.withholds.offer || []).join(' ') || 'this device';
+      const text = `${r.check}: offer of ${offer} withheld, the gate still runs: ${r.why}${r.cure ? ` — cure: ${r.cure}` : ''}`;
+      append(env.GATE_LIVE_RUN, {
+        kind: 'notice', project: 'preflight',
+        notice: { class: 'offer-withheld', text: text.replace(/\s*\n\s*/g, ' ') },
+      });
+    }
   }
 }
 
