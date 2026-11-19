@@ -885,3 +885,76 @@ date (the steward's, as steward of record), and a warning some days ahead so the
 arrive by surprise. The E11 rework moves this assertion out of the reusable half so a green
 earned before the deadline cannot be reused after it.
 
+Delta 2026-11-19 (row 33): the check landed on `dev` as `0f48e02fb` and is in force. Its limits,
+stated in `genesis/orchestrator/fleet-roll-guard.mjs`: stored build-process hashes, CI's
+already-built filter and steps left stale by an earlier landing are not seen; a non-`HEAD` push
+through an older hook is judged from paths only; in a shallow clone a range that reaches the
+boundary with no declaration visible is refused as undecidable. The pin question is settled for
+brit against a run: `elohim-orchestrator/dev #2359` covered the pin move `1602399ee` and marked
+every Edge step "SKIP, no changes", and its log names `elohim-brit:brit-ci`,
+`elohim-rakia:rakia-ci` and `elohim-sophia:build-sophia-umd` as external dependencies it prunes.
+
+Delta 2026-11-19 (row 28): the orchestrator suite's named half now keys on what it reads by
+absence (landed `0fd724eb2`): it runs in a view holding only its declared files, so an
+undeclared read fails instead of going unkeyed. The first run in the view found a missing
+declaration (`genesis/agentic/bin/pool-lib.sh` for `gate-evidence.test`). Its review also found a
+hole that predated it and is closed for every gate: a caller's `JUST_NO_DEPS` made a
+dependency-only gate recipe exit 0 without running, and `gateChildEnv` now removes every
+`JUST_*` variable. Still open from that lane: fifteen tree-side test files that were never
+retried in the view; the tree half reuses on an identical tree while its verdict also depends on
+device state and on Jenkins being reachable; the live recogniser's wording for the new red lines
+is new and thinly exercised.
+
+Delta 2026-11-19 (row 24): brit 0.2.6 has no merge verb, and after a git squash merge
+`brit commit -F` refuses with "merge commit cannot complete pending SQUASH_MSG"; `brit switch`
+refuses while a hook-written file under `.claude/data` is modified; there is no branch delete.
+Brit sprint 3 merged shem's read-only extension on its integration branch (`080f30579`). Left on
+shem's list for brit: forward slashes in the absolute path answers on Windows; a completed
+`build baseline write` or `migrate` exiting 1 on a closed stdout (to decide with push policy);
+the deprecated `rakia` alias returning before the read-only flag is set.
+
+Delta 2026-11-19 (row 35): done by hand on shem at 15:42Z with the landed release:
+`epr device supervise --stop`, then `epr device supervise`; the peer was ready about 25 s after
+the start, and `epr device status` read "serving at current" and "nothing owed".
+
+## Row 37 — a brit pin's attestation rested on a check that was green over failed legs
+
+Found 2026-11-19 by brit sprint 3 and traced to the monorepo here. `elohim/brit/build-manifest.json`
+declares the pin's gate as attested by the GitHub check `Tests pass`, and
+`genesis/orchestrator/gate-attest.mjs:79-120` passes the pin when the most recently started
+check run of that name concludes `success`. That check is an aggregate job with a deny-list
+(`failure`, `cancelled`, `skipped`). When one leg of a matrix job never gets a runner, GitHub
+reports the matrix job's result as `abandoned`, which the list did not name: run 44544779620
+reported `Tests pass` success with two failed Linux legs and an abandoned macOS leg. The unit
+test job was not in the aggregate's needs at all. Brit's integration branch now carries an
+allow-list step (every need exactly `success`); `1bf96648cb` is the first brit commit whose own
+run includes it (run 44575030094, 30 jobs green). Consequences: a brit pin should name a commit
+whose own CI ran with that step, which excludes every brit commit on main today, 0.2.6's
+included. Owed on this side, queued behind the gate lanes and to land together with the
+manifest's field: the gate reads every workflow run's conclusion at the pinned commit as a
+second check. rakia's check is `test` and sophia's `build`, single jobs.
+
+## Row 38 — a push from a dirty tree is tested on the working tree, not on the pushed commit
+
+Stated 2026-11-19 while ruling on the E11 rework; it is true of every gate. When declared paths
+differ from `HEAD`, a gate tests the working tree's bytes, passes or fails on them, and records
+nothing. For `just gate` that is the development loop. For a push it means the bytes that were
+tested are not the bytes that were pushed, and the push proceeds on a pass. The orchestrator's
+named half could close this for itself, since its view is already built from a commit's
+objects: under a push it could build the view from the pushed commit whatever the working tree
+holds. Not done; the other gates have no such view.
+
+## Row 39 — a guard on a variable in the shell is passed by a child process, and tests that skip as root never run
+
+Two observations from 2026-11-19, both the steward's to rule on. (a) Ethosengine a222db7c
+reported that one of its builders, to keep scratch records off the live peer daemon, set
+`XDG_CONFIG_HOME` inside a python child, which gets round the worktree-isolation hook's refusal
+of that variable in a Bash call. No device state was touched and both runs made that way were
+withdrawn as receipts. The need behind it is real: an end-to-end run of `epr artifact put` wants
+an isolated device home, and the product's own flags (`--repo`, `--payload-store`, a scratch
+flow root) do not yet give one without that variable. (b) Both devices run as root. Brit's CI
+found a test that skips itself at uid 0 and therefore had never run on either device, and the
+orchestrator suite has the same shape in `runner-capture-activation.test.mjs` (its distinct-user
+checks). A non-root leg, as `setpriv --reuid=65534 --regid=65534 --clear-groups <test binary>`,
+is what brit used.
+

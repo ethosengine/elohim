@@ -378,3 +378,90 @@ on every device until the grant is renewed or withdrawn. Its steward of record i
 | 5 | held by hand; the check is in its last build round |
 | 6 | this entry; backlog rows 33 and 35 |
 
+## 2026-11-19, later: two gate checks land; the marker goes back; what the day corrected
+
+**The fleet-roll check is on `dev`** (`0f48e02fb`, 15:41Z, push 644 s). A push to `dev` or `main`
+whose commits would make CI select an Edge build or deploy step is red in the first seconds
+unless a pushed commit carries `[edge:roll]`. It reads git objects only: manifests from the
+pushed commit, changed paths from each ref's own range, the mode from the destination tip's
+`pool-policy.json`. It follows CI's graph through an opt-in mode of the walker that reproduces
+`build-graph.groovy` (dotfiles, build-process references, propagation over `depends`). Three
+independent reviews, then a bounded round accepted against a fixed checklist: 94 tests, twelve
+probes on the real manifests, and four on real history through the real command (the conductor
+pin update `230c06042` refused, naming storage, the Edge image and the deploy step; this
+morning's stacked landing "validates only"). About 0.4 s on a docs-only push. Refusing by
+default is a decision for the steward to overrule.
+
+**The E11 rework is on `dev`** (`0fd724eb2`, 18:14Z, push 432 s). The orchestrator gate is two
+projects now. The named half (58 test files, about 1,150 tests) runs in a scratch view of 871
+files built in 1.4 s from the commit's objects, with a constructed environment; its key is one
+resolved inventory plus the copied packages and node's version. The tree half (35 files, the
+shell and python suites, the Jenkins lint) runs in the checkout. For each attempt the runner
+writes one result in a fresh directory and the gate decides from it: no result is a red, and a
+green is recorded only for a pass on exactly the keyed bytes. What it buys is a sound key, not
+seconds: a docs-only commit reuses the named half in about 26 s, the tree half takes about 140 s
+of tests on shem whenever its tree changes, and a docs-only landing selects neither. At its own
+landing both halves were reused from the green recorded minutes earlier at the branch head,
+because the squashed commit's tree is identical.
+
+| Review pass | What it found |
+|---|---|
+| 1 | a named test compares a checked-in grant with the clock; two tests passed without checking, one a regression of the view |
+| 2 | the new skip rule did not hold for the first test group; a lock's stale recovery could pair one run's receipt with another's exit |
+| 3 | my exit-code protocol could not carry two facts; a caller's `JUST_NO_DEPS` turned the dependency-only gate recipe into a no-op that exited 0, on `dev` too |
+| 4 | an unreadable Task log discarded a failing result for a retry; a same-user process could forge the result (ruled out of scope and stated as a limit) |
+
+The loop was closed by ruling after the fourth pass. `gateChildEnv` now removes every `JUST_*`
+variable for every gate project.
+
+**L2a came back from review.** Ethosengine handed over the producer half (`self/nt-l2a`
+`22a337c18`). The review confirmed the slot's name, value and ordering against the receiver and
+that nothing in it reaches a storage build input. It held the branch on one thing above the
+rest: the marker was stamped when a single acceptable compiler string was found in the binary,
+and bundled SQLite leaves no such string, so its instruction set was not checked at all. Ruled:
+every cc-built crate in the bin's lock closure needs affirmative evidence of the declared
+baseline from the build that made those bytes, or a named exception held against the crate's
+own build script. Ethosengine's design, approved: cc's own recorded compile commands, bound to
+the bytes by the build's artifact hash. Line 1 waits on it.
+
+**What the day corrected.**
+
+| Believed | Found |
+|---|---|
+| a by-hand run of the dispatch walker is CI's answer | it skips dependency propagation and dotfiles; CI does both |
+| a brit or rakia pin move rolls the Edge fleet (my note since October, an inference never observed) | orchestrator run #2359 covered the brit pin move `1602399ee` and marked every Edge step "SKIP, no changes"; CI prunes dependencies on pipelines whose manifests it cannot see, and names all three submodule pipelines so; the conductor pin does select Edge |
+| brit's `Tests pass` check means its tests passed | one matrix leg that never got a runner makes GitHub report the matrix job as `abandoned`, which the check's deny-list did not name; a commit with failed legs was green, and the monorepo's pin gate trusts exactly that check. Fixed on brit's integration branch with an allow-list; `1bf96648cb` is the first brit commit whose own run carries it |
+| a `[skip ci]` tip only skips its own commit | it moves CI's baseline past every commit under it |
+| one exit status can say "passed" and "on other bytes" | it cannot; a result written per attempt can |
+
+Two slips of mine while establishing these: clock labels typed from estimate, and a commit id
+(`c64967822`) read from shem's stale main checkout instead of a worktree at `dev`. Both were
+caught by the brit session checking what I sent.
+
+**Also.** Brit sprint 3 merged shem's read-only extension (28 more command paths end quietly on a
+closed reader; `show` went from "Broken pipe", exit 1, to 141). Shem's peer daemon was restarted
+by hand onto its landed release: stop, start and ready in about 30 s (row 35). Ethosengine
+reported that one of its builders set `XDG_CONFIG_HOME` inside a child process, which gets round
+the hook that refuses that variable in the shell; it withdrew the two runs made that way, and
+whether that guard should have a sanctioned way through is the steward's.
+
+**Line 3, restated.** A docs-only landing no longer selects the orchestrator gate, so the line as
+worded measures nothing. What was measured on shem: the suite's wall when it runs, 270.6 s to
+188.1 s (T1); and docs-only pushes of 372 s (the live-corpus gate rebuilding after a code
+landing) and 54 s (no project gate).
+
+| Line | State at the end of 2026-11-19 |
+|---|---|
+| 1, two landings followed with no build | L2a in rework after review; then two draws, and the daemon step is by hand |
+| 2, an unmarked release refused before a fetch | met |
+| 3, a landing pays less | measured on shem as restated; ethosengine's figures are not like for like |
+| 4, the suite keys on what it reads | met: landed, every test file in exactly one half, the named half in a view |
+| 5, no collision, no accidental Edge dispatch | the check is landed and in force |
+| 6, the record | this entry; backlog rows 33 to 39; habit lines in `careless-reds-cost-seconds`, `push-gate-pays-once` and `workspace-device-arrival` |
+
+**Waiting on the steward.** The fleet-roll check's default (refuse). The guard bypass above. The
+compute-worker grant that ends 2026-11-23T16:00Z (row 36). A brit pin move: his word, and a
+commit whose own CI carries the allow-list. Brit's rebase redesign, which changes a stored
+format. And from before: the R5 branch, the Edge roll's timing, the repacks, and this session's
+unrecorded covenant.
+
