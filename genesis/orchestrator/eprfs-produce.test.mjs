@@ -107,9 +107,11 @@ function fixture(t) {
 
 function run(f, mode, extra = {}) {
   const env = {};
-  // A controlled build environment: nothing of the caller's CARGO_*/RUST* leaks in.
+  // A controlled build environment: nothing of the caller's CARGO_*/RUST* leaks in, and nothing
+  // of its C family either: an eprfs-workspace gate exports CFLAGS_/CXXFLAGS_<triple> (row 29.2),
+  // so a test run inside that gate would otherwise see "unset" flags set.
   for (const [k, v] of Object.entries(process.env)) {
-    if (!/^(CARGO_|RUST|EPRFS_|GATE_|EPR_)/.test(k)) env[k] = v;
+    if (!/^(CARGO_|RUST|EPRFS_|GATE_|EPR_|C(XX)?FLAGS|CPPFLAGS|ASMFLAGS|CC_|CXX_|TARGET_C|HOST_C|CRATE_CC_)/.test(k)) env[k] = v;
   }
   Object.assign(env, {
     PATH: `${f.stubs}:${process.env.PATH}`,
