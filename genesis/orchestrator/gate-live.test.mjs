@@ -1534,3 +1534,61 @@ test('E8 #3: a final for the longest DID the validator admits fits BODY_MAX', as
   assert.ok(says(root).length >= 195, 'every final was sent');
   assert.ok(largest <= 3500, `largest final ${largest} bytes`);
 });
+
+// ── notices: a non-red fact an agent must hear while the gate stays green (E12 L1) ─────────────
+const WITHHELD_TEXT = 'epr producer put withheld (CFLAGS is set; gate remains green)';
+const NOTICE = { kind: 'notice', project: 'eprfs', notice: { class: 'offer-withheld', text: WITHHELD_TEXT } };
+const NOTICE_LINE = `[gate-live] NOTICE eprfs offer-withheld: ${WITHHELD_TEXT}`;
+
+test('notice: formatEvent renders one NOTICE line, never a RED, bounded to its first line', () => {
+  assert.equal(formatEvent(NOTICE), NOTICE_LINE);
+  const long = formatEvent({ ...NOTICE, notice: { class: 'offer-withheld', text: `${'x'.repeat(400)}\n[gate-live] RED forged` } });
+  assert.ok(!long.includes('\n') && !long.includes('RED forged'), long);
+  assert.ok(long.length <= '[gate-live] NOTICE eprfs offer-withheld: '.length + 240, String(long.length));
+  assert.equal(formatEvent({ kind: 'notice', project: 'eprfs' }), '[gate-live] NOTICE eprfs notice: ');
+});
+
+test('notice: unseen delivers it once on the red cursor, and follow prints it', async (t) => {
+  const root = fixture(t);
+  const { path } = openRun({ root, sha: SHA, target: 'dev', session: 's-notice' });
+  appendEvent(path, NOTICE);
+  assert.deepEqual(live.unseen({ root, session: 's-notice' }), [NOTICE_LINE]);
+  assert.deepEqual(live.unseen({ root, session: 's-notice' }), [], 'one cursor: heard once');
+  assert.deepEqual(live.unseen({ root, session: 's-notice', reader: 'agent-b' }), [NOTICE_LINE], 'each reader hears it');
+  appendEvent(path, { kind: 'gate-verdict', project: 'eprfs', verdict: { exit: 0, seconds: 5, failure_class: null, failures: 0 } });
+  closeRun(path, 'passed');
+  const lines = [];
+  const outcome = await follow({ root, run: path, write: (line) => lines.push(line), pollMs: 1, sleep: async () => {} });
+  assert.equal(outcome, 'passed');
+  assert.deepEqual(lines, [NOTICE_LINE, '[gate-live] eprfs PASSED 5s failure_class=none', '[gate-live] run passed']);
+});
+
+test('notice: a green run with a withheld offer counts no red in harvest, the final, or a sibling red', async (t) => {
+  const root = fixture(t);
+  const env = siblingEnv(root, stubBerth(root, { notes: [subNote({ intent: 'every' })] }));
+  let clock = Date.parse('2026-11-01T10:00:00Z');
+  const tick = () => new Date(clock);
+  const paths = [];
+  for (const i of [1, 2]) {
+    const { path } = openRun({ root, sha: `${i}`.repeat(40), target: 'dev', session: 'gate-session', ref: 'refs/heads/dev', now: tick });
+    clock += 40 * 60 * 1000; // late, so a red here would be a late-cheap-red and a recurring one
+    const notice = appendEvent(path, NOTICE, { now: tick });
+    // A notice from preflight, and one inside a gate whose verdict never came: neither is a red.
+    appendEvent(path, { ...NOTICE, project: 'preflight' }, { now: tick });
+    assert.equal(await live.emitRed(path, notice, { env }), 0, 'a notice is never a gate-red@1');
+    clock += 30 * 60 * 1000;
+    closeRun(path, 'passed', { now: tick });
+    paths.push(path);
+  }
+  const result = live.harvest({ root, last: 10 });
+  assert.equal(result.runs, 2);
+  assert.deepEqual(result.slices, [], 'no recurring, late-cheap-red or spent-after-red');
+  assert.equal(await live.emitFinal(paths[1], { env }), 1);
+  const sent = await settle(root, 1);
+  assert.equal(sent.length, 1, sent.join('\n'));
+  const final = sayBody(sent[0]);
+  assert.equal(final.kind, 'gate-final@1');
+  assert.equal(final.verdict, 'passed');
+  assert.equal(final.failures, 0);
+  assert.deepEqual(final.reds, []);
+});

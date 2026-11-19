@@ -17,7 +17,7 @@
       "description": "The journal writer's RFC3339 UTC timestamp, with milliseconds."
     },
     "kind": {
-      "enum": ["run-open", "gate-start", "failure", "detail", "step-failed", "gate-verdict", "run-close"],
+      "enum": ["run-open", "gate-start", "failure", "detail", "step-failed", "gate-verdict", "notice", "run-close"],
       "description": "Source of truth: this device-local v1 event vocabulary; it is not a DNA enum."
     }
   },
@@ -123,6 +123,15 @@
     },
     {
       "properties": {
+        "kind": { "const": "notice" },
+        "project": { "$ref": "#/$defs/name" },
+        "notice": { "$ref": "#/$defs/notice" }
+      },
+      "required": ["project", "notice"],
+      "description": "A non-red fact an agent must hear while the gate stays green (a withheld producer offer). Never a failure: no red count, outlook, first-red time, harvest slice or sibling red reads it."
+    },
+    {
+      "properties": {
         "kind": { "const": "run-close" },
         "outcome": {
           "enum": ["passed", "failed", "interrupted", "gates-passed"],
@@ -172,6 +181,24 @@
           "type": "string",
           "maxLength": 2048,
           "description": "Device-only diagnostic text: it never crosses to another device, CI subscriber, or observation channel. The emitter bounds it to 20 lines and 2048 UTF-8 bytes; JSON Schema's character limit does not prove that byte bound."
+        }
+      }
+    },
+    "notice": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["class", "text"],
+      "properties": {
+        "class": {
+          "enum": ["offer-withheld"],
+          "description": "Source of truth: the v1 notice vocabulary. offer-withheld: the device's gate is green but it offers nothing it built to siblings."
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512,
+          "pattern": "^[^\\r\\n]+$",
+          "description": "One device-local line, as printed; it never crosses to another device."
         }
       }
     },

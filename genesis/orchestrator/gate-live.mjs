@@ -382,6 +382,13 @@ export function formatEvent(raw) {
         .filter((part) => part !== undefined && part !== null && part !== '')
         .join(' ');
     }
+    case 'notice': {
+      // A non-red fact the agent must hear while the gate stays green (E12 L1: a withheld producer
+      // offer). Never a RED, and never counted where reds are: every measure below reads `failure`.
+      const notice = raw.notice && typeof raw.notice === 'object' ? raw.notice : {};
+      const text = String(notice.text ?? '').split(/\r?\n/)[0].slice(0, 240);
+      return `[gate-live] NOTICE ${event.project} ${notice.class ?? 'notice'}: ${text}`;
+    }
     case 'step-failed':
       return `[gate-live] step ${event.project}/${event.step} exit ${event.exit}`;
     case 'gate-verdict': {
@@ -468,10 +475,10 @@ export async function follow({
   }
 }
 
-// What an agent hears without asking: every red, a failed verdict, and the close.
+// What an agent hears without asking: every red, every notice, a failed verdict, and the close.
 function noteworthy(event) {
   if (event.kind !== 'gate-verdict') {
-    return ['failure', 'detail', 'step-failed', 'outlook', 'stop-request', 'run-close'].includes(event.kind);
+    return ['failure', 'notice', 'detail', 'step-failed', 'outlook', 'stop-request', 'run-close'].includes(event.kind);
   }
   const verdict = event.verdict && typeof event.verdict === 'object' ? event.verdict : null;
   return verdict

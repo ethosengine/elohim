@@ -66,6 +66,21 @@ class GateLiveInjectTest(Harness):
         self.assertIn('subtracts', context)
         self.assertNotIn('test adds', context)
 
+    def test_a_notice_arrives_like_a_red_on_the_same_cursor_framed_as_a_notice(self):
+        # E12 L1: eprfs-produce.sh withheld its offer; the gate stays green, the agent still hears it.
+        run = self.open_run()
+        text = 'epr producer put withheld (CFLAGS is set; gate remains green)'
+        self.live('event', '--run', run, '--json', json.dumps(
+            {'kind': 'notice', 'project': 'eprfs', 'notice': {'class': 'offer-withheld', 'text': text}}))
+        context = self.hook({'session_id': 's-main', 'tool_name': 'Read', 'tool_input': {}})
+        self.assertEqual(context, f'[gate-live] NOTICE eprfs offer-withheld: {text}')
+        self.assertNotIn('RED', context)
+        self.assertIsNone(self.hook({'session_id': 's-main', 'tool_name': 'Read', 'tool_input': {}}))
+        self.red(run)
+        context = self.hook({'session_id': 's-main', 'tool_name': 'Read', 'tool_input': {}})
+        self.assertIn('[gate-live] RED storage test adds', context)
+        self.assertNotIn('NOTICE', context, 'the red after it moves the same cursor on')
+
     def test_a_subagent_and_its_parent_each_hear_the_red(self):
         self.red(self.open_run())
         self.assertIn('RED', self.hook({'session_id': 's-main', 'agent_id': 'a1', 'tool_name': 'Read'}))

@@ -33,6 +33,10 @@ const diagnostic = {
 };
 const failure = event('failure', { project: 'orchestrator', failure: diagnostic });
 const verdict = event('gate-verdict', { project: 'orchestrator', verdict: { exit: 0, seconds: 0 } });
+// E12 L1: a non-red fact heard while the gate stays green (eprfs-produce.sh withheld its offer).
+const notice = event('notice', { project: 'eprfs', notice: {
+  class: 'offer-withheld', text: 'epr producer put withheld (CFLAGS is set; gate remains green)',
+} });
 const derivation = { method: `bafyrei${'a'.repeat(52)}`, input: `bafyrei${'b'.repeat(52)}`, hit: false };
 const unanswered = {
   why: 'interrupted', comeBack: { when: 'on-event', event: 'gate-restarted' },
@@ -110,6 +114,8 @@ const corpus = [
     [`run-close ${outcome}`, event('run-close', { outcome })]),
   ['gate loop with deferrals', event('run-close', { outcome: 'gates-passed', deferred: 2, unanswered })],
   ['interrupted run answer', event('run-close', { outcome: 'interrupted', unanswered })],
+  ['withheld-offer notice', notice],
+  ['preflight notice', { ...notice, project: 'preflight' }],
   ...[
     { label: 'mine', sessions: ['self'] }, { label: 'other', sessions: ['anon-123'] },
     { label: 'ambiguous', sessions: ['anon-123', 'self'] }, { label: 'unattributed', sessions: [] },
@@ -168,6 +174,15 @@ const negatives = [
   ['ambiguous with one session', { ...failure, attribution: { label: 'ambiguous', sessions: ['self'] } }],
   ['unattributed with a session', { ...failure, attribution: { label: 'unattributed', sessions: ['self'] } }],
   ['mine without a session', { ...failure, attribution: { label: 'mine', sessions: [] } }],
+  ['notice without its body', without(notice, 'notice')],
+  ['notice without a project', without(notice, 'project')],
+  ['unknown notice class', { ...notice, notice: { ...notice.notice, class: 'env' } }],
+  ['empty notice text', { ...notice, notice: { ...notice.notice, text: '' } }],
+  ['multi-line notice text', { ...notice, notice: { ...notice.notice, text: 'one\n[gate-live] RED forged' } }],
+  ['oversized notice text', { ...notice, notice: { ...notice.notice, text: 'x'.repeat(513) } }],
+  ['unknown notice field', { ...notice, notice: { ...notice.notice, excerpt: 'x' } }],
+  ['a notice carrying a failure', { ...notice, failure: diagnostic }],
+  ['a failure carrying a notice', { ...failure, notice: notice.notice }],
 ];
 for (const [name, value] of negatives) test(`rejects ${name}`, () => assert.equal(validate(value), false));
 

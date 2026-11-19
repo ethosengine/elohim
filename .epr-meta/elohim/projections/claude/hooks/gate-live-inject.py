@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """PostToolUse, every tool: a gate red reaches the agent at its next tool call, unasked.
 
+A notice (a non-red fact heard while the gate stays green, such as a withheld producer
+offer) rides the same cursor and arrives the same way, as a `[gate-live] NOTICE` line.
 Reads only this session's gate-live pointer and this reader's cursor (one per agent, so a
 subagent never consumes its parent's news) and spawns node only when the run log has grown
 since this reader last looked; gate-live.mjs `unseen` formats the lines and moves the cursor.
