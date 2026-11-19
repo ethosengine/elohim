@@ -38,7 +38,7 @@ use std::path::{Path, PathBuf};
 
 use eprfs_core::{BlobCid, MethodDescriptor};
 
-use super::{cargo_project, host, CRATE_INPUT};
+use super::{cargo_project, host, isa_c_archive, CRATE_INPUT};
 
 const DECLARED: &str = "missing declared-target";
 
@@ -209,6 +209,18 @@ fn package_of(id: &str) -> (String, String) {
     (name, source)
 }
 
+/// A cargo package id's version, in either spelling [`package_of`] reads; empty when it names
+/// none.
+fn version_of(id: &str) -> String {
+    match id.rsplit_once('#') {
+        Some((_, fragment)) => fragment
+            .rsplit_once('@')
+            .map_or(fragment, |(_, version)| version)
+            .to_owned(),
+        None => id.split_whitespace().nth(1).unwrap_or_default().to_owned(),
+    }
+}
+
 /// The words of one `running: <command>` line: cc prints the program and each argument with
 /// `{:?}` (command_helpers.rs:699), a Rust string literal each. `None` when the line is not that.
 pub(super) fn command_words(line: &str) -> Option<Vec<String>> {
@@ -360,6 +372,7 @@ fn assembly_or_probe(words: &[String], out_dir: &Path) -> bool {
 struct Script {
     package: String,
     source: String,
+    version: String,
     out_dir: PathBuf,
     /// The script's stdout as cargo kept it.
     output: PathBuf,
@@ -378,9 +391,15 @@ struct Script {
 /// the run left in OUT_DIR. A target directory restored from elsewhere can break the pairing
 /// without cargo noticing; these checks cover it: (a) no object or archive in OUT_DIR is older
 /// than the run its output records (one left by an earlier run, or copied in, is), and (b) every
-/// `.o` is the `-o` of a logged compile and every `.a` an argument of a
-/// logged archiver command (cc 1.11.1 logs `ar` through the same `running:` line, lib.rs:4032
-/// and command_helpers.rs:644). Any object with no logged producer is no evidence.
+/// `.o` is the `-o` of a logged compile and every `.a` the archive a logged archiver command
+/// CREATED (cc 1.11.1 logs `ar` through the same `running:` line, lib.rs:4032 and
+/// command_helpers.rs:644). Any object with no logged producer is no evidence.
+///
+/// Re-review ruling 2: every member of such an archive is the output (the basename of the `-o`)
+/// of a judged compile of the same unit, and where that object still sits at its `-o` path, the
+/// member is its bytes. cc's `Build::object` chains prebuilt objects from anywhere into the
+/// archive (cc-1.11.1 lib.rs:818, :3852); such a member is allowed only as a named
+/// [`PREBUILT_MEMBERS`] entry.
 fn log_findings(script: &Script) -> Vec<String> {
     let mut findings = Vec::new();
     let logged = std::fs::metadata(&script.output).and_then(|m| m.modified());
@@ -401,30 +420,115 @@ fn log_findings(script: &Script) -> Vec<String> {
             break;
         }
     }
+    // Every judged compile's output, by basename, with the path it was written to.
+    let outputs: Vec<(String, &str)> = script
+        .compiles
+        .iter()
+        .filter_map(|words| {
+            let path = words.windows(2).find(|w| w[0] == "-o")?[1].as_str();
+            let name = Path::new(path).file_name()?.to_str()?.to_owned();
+            Some((name, path))
+        })
+        .collect();
     for object in &script.objects {
         let path = script.out_dir.join(object).display().to_string();
-        let produced = if object.ends_with(".o") {
-            script
-                .compiles
-                .iter()
-                .any(|words| words.windows(2).any(|w| w[0] == "-o" && w[1] == path))
-        } else {
-            script
-                .commands
-                .iter()
-                .filter(|words| !words.iter().skip(1).any(|word| word == "-c"))
-                .any(|words| words.iter().skip(1).any(|word| *word == path))
-        };
-        if !produced {
+        if object.ends_with(".o") {
+            if !outputs.iter().any(|(_, written)| *written == path) {
+                findings.push(format!(
+                    "{DECLARED}: no evidence: {}'s OUT_DIR holds {object}, which no logged \
+                     command produced",
+                    script.package
+                ));
+            }
+            continue;
+        }
+        if !script
+            .commands
+            .iter()
+            .any(|words| archive_created(words).is_some_and(|created| created == path))
+        {
             findings.push(format!(
-                "{DECLARED}: no evidence: {}'s OUT_DIR holds {object}, which no logged command \
-                 produced",
+                "{DECLARED}: no evidence: {}'s OUT_DIR holds {object}, which no logged archiver \
+                 command created",
                 script.package
             ));
+            continue;
+        }
+        let members = std::fs::read(&path)
+            .map_err(|e| e.to_string())
+            .and_then(|bytes| isa_c_archive::members(&bytes));
+        let members = match members {
+            Ok(members) => members,
+            Err(why) => {
+                findings.push(format!(
+                    "{DECLARED}: no evidence: {}'s {object} does not read: {why}",
+                    script.package
+                ));
+                continue;
+            }
+        };
+        for member in members {
+            let compiled: Vec<&str> = outputs
+                .iter()
+                .filter(|(name, _)| *name == member.name)
+                .map(|(_, written)| *written)
+                .collect();
+            if compiled.is_empty() {
+                let named = PREBUILT_MEMBERS.iter().any(|p| {
+                    p.package == script.package
+                        && p.version == script.version
+                        && p.member == member.name
+                        && script.source == CRATES_IO
+                });
+                if !named {
+                    findings.push(format!(
+                        "{DECLARED}: no evidence: {}'s member {} of {object} is not the output \
+                         of a judged compile (a prebuilt object chained in by Build::object?)",
+                        script.package, member.name
+                    ));
+                }
+                continue;
+            }
+            // Where the compile's object is still at its -o path, the member is its bytes.
+            let held: Vec<Vec<u8>> = compiled
+                .iter()
+                .filter_map(|p| std::fs::read(p).ok())
+                .collect();
+            if !held.is_empty() && !held.iter().any(|bytes| *bytes == member.data) {
+                findings.push(format!(
+                    "{DECLARED}: no evidence: {}'s member {} of {object} is not the bytes its \
+                     compile left at its -o path",
+                    script.package, member.name
+                ));
+            }
         }
     }
     findings
 }
+
+/// The archive a logged `running:` line creates: cc's archiver call `<ar> [flags…] cq|cqD <dst>
+/// <objs…>` (cc-1.11.1 lib.rs:4032, :4035, :4038, :4046), `<ar>` named `ar`, `*-ar` or `llvm-ar`.
+/// An index call (`ar s|sD <dst>`, lib.rs:3930–3939) or any other command creates nothing.
+pub(super) fn archive_created(words: &[String]) -> Option<&str> {
+    let program = Path::new(words.first()?).file_name()?.to_str()?;
+    if !(program == "ar" || program == "llvm-ar" || program.ends_with("-ar")) {
+        return None;
+    }
+    let mode = words.iter().skip(1).position(|w| w == "cq" || w == "cqD")?;
+    words.get(mode + 2).map(String::as_str)
+}
+
+/// A prebuilt archive member allowed by name, with its reason (re-review ruling 2); none today.
+/// genesis/orchestrator/c-baseline-pin.test.mjs reads this list.
+#[derive(Debug)]
+pub(super) struct PrebuiltMember {
+    pub package: &'static str,
+    pub version: &'static str,
+    pub member: &'static str,
+    pub reason: &'static str,
+}
+
+pub(super) const PREBUILT_MEMBERS: &[PrebuiltMember] = &[];
 
 fn read_script(message: &serde_json::Value, root: &Path) -> Result<Script, String> {
     let id = message["package_id"].as_str().unwrap_or_default();
@@ -482,6 +586,7 @@ fn read_script(message: &serde_json::Value, root: &Path) -> Result<Script, Strin
     Ok(Script {
         package,
         source,
+        version: version_of(id),
         objects: objects(&out_dir)?,
         out_dir,
         output,

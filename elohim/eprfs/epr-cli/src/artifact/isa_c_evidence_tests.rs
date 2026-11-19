@@ -122,8 +122,17 @@ impl Build {
             .unwrap()
             .set_modified(started)
             .unwrap();
-        for object in objects {
+        for object in objects.iter().filter(|o| !o.ends_with(".a")) {
             std::fs::write(out.join(object), b"obj").unwrap();
+        }
+        // An archive is a real one, as cc's `ar cqD` writes it from the unit's objects.
+        for archive in objects.iter().filter(|o| o.ends_with(".a")) {
+            let members: Vec<PathBuf> = objects
+                .iter()
+                .filter(|o| o.ends_with(".o"))
+                .map(|o| out.join(o))
+                .collect();
+            ar(&out, archive, &members);
         }
         let package_id = id(package);
         for kind in ["custom-build", "lib"] {
@@ -165,6 +174,18 @@ impl Build {
         };
         judge(&messages, bytes, bin, MARCH, &expected)
     }
+}
+
+/// This host's binutils `ar` in cc's form (lib.rs:4032): `ar cqD <archive> <members>`.
+fn ar(dir: &Path, archive: &str, members: &[PathBuf]) {
+    let out = std::process::Command::new("ar")
+        .arg("cqD")
+        .arg(archive)
+        .args(members)
+        .current_dir(dir)
+        .output()
+        .unwrap();
+    assert!(out.status.success(), "ar cqD {archive}: {out:?}");
 }
 
 /// A gcc compile as cc 1.11.1 logs it, with `flags` before the output and the source last.
@@ -527,6 +548,69 @@ fn evidence_refuses_an_object_or_archive_no_logged_command_produced() {
             "{extra}: {found:?}"
         );
     }
+}
+
+/// Re-review ruling 2: archive members are reconciled with the unit's judged compiles. cc's
+/// `Build::object` chains a prebuilt object from outside OUT_DIR into the archive (cc-1.11.1
+/// lib.rs:818, :3852); a genuine archive holding one baseline object and one unjudged external
+/// member refuses, and so does a same-named member whose bytes are not the compile's output.
+#[test]
+fn evidence_reconciles_every_archive_member_with_a_judged_compile() {
+    let running = [compile(MARCH, "a.c"), ARCHIVE.to_owned()];
+    let running: Vec<&str> = running.iter().map(String::as_str).collect();
+    // One baseline object and one external member, archived by a genuine `ar cqD`.
+    let build = Build::new("epr").script("ring", &running, &["x.o"], true);
+    let out = out_dir(&build, "ring");
+    let elsewhere = tempfile::TempDir::new().unwrap();
+    let prebuilt = elsewhere.path().join("prebuilt-avx2.o");
+    std::fs::write(&prebuilt, b"vpaddd").unwrap();
+    ar(&out, "libx.a", &[out.join("x.o"), prebuilt]);
+    let found = build.judge("epr", BYTES).unwrap_err();
+    assert!(
+        has(
+            &found,
+            "member prebuilt-avx2.o of libx.a is not the output of a judged compile"
+        ),
+        "{found:?}"
+    );
+    // A same-named member whose bytes are not what the compile left at its -o path.
+    let build = Build::new("epr").script("ring", &running, &["x.o", "libx.a"], true);
+    std::fs::write(out_dir(&build, "ring").join("x.o"), b"other").unwrap();
+    let found = build.judge("epr", BYTES).unwrap_err();
+    assert!(
+        has(
+            &found,
+            "member x.o of libx.a is not the bytes its compile left"
+        ),
+        "{found:?}"
+    );
+    // An archive only an index (`ar sD`) or another command names was not created by a logged
+    // archiver command.
+    let index = [
+        compile(MARCH, "a.c"),
+        "\"ar\" \"sD\" \"$OUT/libx.a\"".to_owned(),
+        "\"nm\" \"$OUT/libx.a\"".to_owned(),
+    ];
+    let index: Vec<&str> = index.iter().map(String::as_str).collect();
+    let found = Build::new("epr")
+        .script("ring", &index, &["x.o", "libx.a"], true)
+        .judge("epr", BYTES)
+        .unwrap_err();
+    assert!(
+        has(
+            &found,
+            "OUT_DIR holds libx.a, which no logged archiver command created"
+        ),
+        "{found:?}"
+    );
+    // An archive that is not one, or not one this reader reads, refuses by name.
+    let build = Build::new("epr").script("ring", &running, &["x.o", "libx.a"], true);
+    std::fs::write(out_dir(&build, "ring").join("libx.a"), b"!<thin>\n").unwrap();
+    let found = build.judge("epr", BYTES).unwrap_err();
+    assert!(
+        has(&found, "libx.a does not read: a thin archive"),
+        "{found:?}"
+    );
 }
 
 /// Every exception's reason is one sentence (genesis/orchestrator/c-baseline-pin.test.mjs holds

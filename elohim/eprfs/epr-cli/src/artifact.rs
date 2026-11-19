@@ -55,6 +55,7 @@ mod extract;
 mod generated;
 mod inputs;
 mod isa_c;
+mod isa_c_archive;
 mod isa_c_evidence;
 mod preflight;
 mod reach;

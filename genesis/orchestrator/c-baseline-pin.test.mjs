@@ -728,6 +728,58 @@ test('fixture: the Rust EXCEPTIONS list is read with its continued reason string
   assert.throws(() => rustExceptions('const OTHER: u8 = 1;'), /declares no EXCEPTIONS list/);
 });
 
+/**
+ * The PREBUILT_MEMBERS list in isa_c_evidence.rs (re-review ruling 2): archive members put allows
+ * that no judged compile produced, `{ package, version, member, reason }` each.
+ */
+export function rustPrebuiltMembers(source) {
+  const list = source.match(/pub\(super\) const PREBUILT_MEMBERS: &\[PrebuiltMember\] = &\[([\s\S]*?)\];/)?.[1];
+  if (list === undefined) throw new Error(`${EVIDENCE_RS} declares no PREBUILT_MEMBERS list`);
+  return [...list.matchAll(/PrebuiltMember \{([\s\S]*?)\n {4}\},/g)].map(([, body]) => ({
+    package: body.match(/package: "([^"]+)"/)?.[1],
+    version: body.match(/version: "([^"]+)"/)?.[1],
+    member: body.match(/member: "([^"]+)"/)?.[1],
+    reason: body.match(/reason:\s*"((?:[^"\\]|\\[\s\S])*)"/)?.[1]?.replace(/\\\n\s*/g, '').replace(/\\"/g, '"'),
+  }));
+}
+
+/** Problems with the prebuilt-member list against the lock: each entry locked at its version, with a one-sentence reason. */
+export function prebuiltMemberProblems(entries, lock) {
+  const problems = [];
+  for (const e of entries) {
+    if (!e.package || !e.member) problems.push(`a PREBUILT_MEMBERS entry names no package or member: ${JSON.stringify(e)}`);
+    if (!lockedVersions(lock, e.package ?? '').includes(e.version)) problems.push(`PREBUILT_MEMBERS ${e.package} ${e.version} is not a version elohim/eprfs/Cargo.lock locks`);
+    const reason = e.reason ?? '';
+    if (reason.length < 40 || !reason.endsWith('.') || reason.includes('. ')) problems.push(`PREBUILT_MEMBERS ${e.package}/${e.member} gives no one-sentence reason`);
+  }
+  return problems;
+}
+
+test('fixture: a prebuilt archive member is allowed only by name, at a locked version, with its reason', () => {
+  assert.deepEqual(rustPrebuiltMembers('pub(super) const PREBUILT_MEMBERS: &[PrebuiltMember] = &[];'), []);
+  const one = [
+    'pub(super) const PREBUILT_MEMBERS: &[PrebuiltMember] = &[',
+    '    PrebuiltMember {',
+    '        package: "zlib-sys",',
+    '        version: "1.0.0",',
+    '        member: "crc.o",',
+    '        reason: "zlib-sys ships crc.o prebuilt for its CPUID-dispatched CRC path, reviewed.",',
+    '    },',
+    '];',
+  ].join('\n');
+  const parsed = rustPrebuiltMembers(one);
+  assert.deepEqual(parsed.map(e => [e.package, e.version, e.member]), [['zlib-sys', '1.0.0', 'crc.o']]);
+  const lock = '[[package]]\nname = "zlib-sys"\nversion = "1.0.0"\n';
+  assert.deepEqual(prebuiltMemberProblems(parsed, lock), []);
+  assert.match(prebuiltMemberProblems(parsed, lock.replace('1.0.0', '2.0.0')).join('\n'), /not a version/);
+  assert.match(prebuiltMemberProblems([{ ...parsed[0], reason: 'short.' }], lock).join('\n'), /one-sentence/);
+  assert.throws(() => rustPrebuiltMembers('const X: u8 = 0;'), /no PREBUILT_MEMBERS list/);
+});
+
+test('every prebuilt archive member put allows is locked and gives its reason', () => {
+  assert.deepEqual(prebuiltMemberProblems(rustPrebuiltMembers(read(EVIDENCE_RS)), read('elohim/eprfs/Cargo.lock')), []);
+});
+
 const rustExceptionList = () => rustExceptions(read(EVIDENCE_RS));
 const declaredClosures = () => {
   const packages = lockPackages(read('elohim/eprfs/Cargo.lock'));

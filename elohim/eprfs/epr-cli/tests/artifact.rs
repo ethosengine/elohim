@@ -804,8 +804,20 @@ fn build_messages(
             .unwrap()
             .set_modified(std::time::SystemTime::now() - std::time::Duration::from_secs(2))
             .unwrap();
-        for object in script.objects {
+        for object in script.objects.iter().filter(|o| o.ends_with(".o")) {
             std::fs::write(out.join(object), b"obj").unwrap();
+        }
+        // A real archive, as cc's `ar cqD` writes it from the unit's objects (re-review ruling 2
+        // reads its members).
+        for archive in script.objects.iter().filter(|o| o.ends_with(".a")) {
+            let status = std::process::Command::new("ar")
+                .arg("cqD")
+                .arg(archive)
+                .args(script.objects.iter().filter(|o| o.ends_with(".o")))
+                .current_dir(&out)
+                .status()
+                .unwrap();
+            assert!(status.success(), "ar cqD {archive}");
         }
         for kind in ["custom-build", "lib"] {
             lines.push(
