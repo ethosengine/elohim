@@ -643,3 +643,5 @@ refuses before fetch; (2) the gate builds C at a declared baseline so one device
 another's; (3) a check that runs a drawn binary's daemon path before it becomes current, since
 `--version` succeeding proved nothing here. Related: row 26 item 4 (the deploy floor) is the
 same question for glibc. Until (1) lands, shem follows only its own `epr` builds.
+
+Measurement probe 2026-11-19 (lane E11): a documentation-only edit, for the before/after landing measure.
