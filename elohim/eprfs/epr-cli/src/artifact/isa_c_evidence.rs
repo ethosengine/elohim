@@ -29,7 +29,10 @@
 //! its `-march`'s, so a compile of a `.S` at the declared `-march` is evidence of the command, not
 //! of the instructions (ring's CPUID-dispatched assembly is accepted on that evidence); an option
 //! outside the `-m` namespace (`-Wa,…`, `-Xassembler`, a response file `@file`) is not read; every
-//! build script in the replayed build is judged, which is a superset of one bin's closure.
+//! build script in the replayed build is judged, which is a superset of one bin's closure; and the
+//! C source itself can select instructions the command does not show: `__attribute__((target))`,
+//! `#pragma GCC target` and function multiversioning (`target_clones`) are not read, so a compile
+//! at the declared `-march` is evidence of the command's baseline, not of every function in it.
 use std::path::{Path, PathBuf};
 
 use eprfs_core::BlobCid;
