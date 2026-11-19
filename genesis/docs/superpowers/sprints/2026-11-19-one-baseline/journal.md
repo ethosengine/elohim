@@ -604,3 +604,41 @@ see, and the next one should start from the pipeline's own verdict, read every d
 **Waiting on the steward, added.** How to cure the publish collision: four version bumps with a
 deliberate Edge roll, or leaving the packed lock out of the publish comparison for library
 packages (row 43). The repack on both devices is now due: shem is at the 32-index ceiling.
+
+## 2026-11-19, 23:17Z: the first marked draw
+
+**L2a landed and shem drew it.** Ethosengine landed the producer half as `b950d74b1` (a push of
+1,826 s, of which the eprfs gate 1,198 s). Its producer printed
+`[gate] epr producer put: release bafyreieebfer3domlzorjhf6nlwzugnmy3do2ursyvf5ikhk463uecapuq at b950d74b1f32 … (crosses)`,
+and both Produce records on that device carry `env:isa-c=x86-64`: the first real Produce to
+carry the marker. On shem, from a clean checkout at that commit, with the device's current
+release and `EPR_FOLLOW_SIBLING=1`:
+
+`follow: drew epr release bafyreieebfer3…capuq from did:key:z6MkpZRh…VMZB in 22.8 s`
+
+The follow exited 0 in 32 s and compiled nothing. The landed record names the same two binaries
+as the producer's line. One `epr device supervise` then found the peer on the old bytes and
+restarted it in 6 s; the device read "serving at current" and exchanging 29 s after the command
+began. That restart is still made by hand (row 35).
+
+| | this morning (unmarked, refused before a fetch) | tonight (marked) |
+|---|---|---|
+| shem's follow | 1,924 s, a local build | 32 s, of which the draw 22.8 s |
+| what shem compiled | epr and bin-launch | nothing |
+| what the producing device paid | its own gate | its own gate, 1,198 s for eprfs |
+
+**How the review closed.** The third review (receipt `codex-l2a-r3.receipt.md`) still said fix
+first. Each input it built was a message stream edited after cargo wrote it, or a build script
+written to get round the check. I ruled those outside what the marker is for: it is the
+producing device's own signed statement about its own build, and it guards an honest producer
+against marking by accident. The one accident-shaped case, a stale stream against a reused
+executable path, cannot come from the producer script, which rewrites the stream on each run
+and withholds when the replay fails. Five small hardenings go in ethosengine's next landing:
+exact probe shapes, more options treated as unreadable, no pass by member name once the judged
+object is gone, the custom-build row for each closure package that has one, and the threat
+model written in the module doc. The ruling is the steward's to overrule.
+
+| Line | State after this entry |
+|---|---|
+| 1, two landings followed with no build | one followed: a 22.8 s draw, and the daemon on the drawn bytes by one command. The second is ethosengine's next epr-cli landing |
+| 2 to 6 | unchanged |
