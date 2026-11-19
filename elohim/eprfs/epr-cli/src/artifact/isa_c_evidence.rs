@@ -37,6 +37,12 @@
 //! C source itself can select instructions the command does not show: `__attribute__((target))`,
 //! `#pragma GCC target` and function multiversioning (`target_clones`) are not read, so a compile
 //! at the declared `-march` is evidence of the command's baseline, not of every function in it.
+//!
+//! These are limits of command evidence: a build's commands can show what it asked the compiler
+//! for, never every instruction the bytes hold. The second line is the receiver's: before it
+//! adopts a drawn release, the sibling runs the staged `epr doctor --exercise` on its own CPU,
+//! which executes the C paths the bin depends on (ring's x25519, SQLite) where a missing
+//! instruction would trap.
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
