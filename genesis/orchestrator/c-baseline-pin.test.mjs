@@ -342,6 +342,27 @@ test('pool-policy declares the C baseline as a top-level declared_targets record
   assert.deepEqual(declaredTargetProblems(policy), [], 'genesis/agentic/pool-policy.json declared_targets');
 });
 
+// Hardening 6: put reads the build's own compile commands (isa_c_evidence.rs); the retired
+// string scan of the bytes' debug section must not be described as what decides the marker.
+export const RETIRED_EVIDENCE = /producer strings? in the bytes|GNU C producer string|\.debug_str/i;
+
+test('fixture: a comment describing the retired producer-string check is named', () => {
+  assert.match('# put checks the C producer strings in the bytes', RETIRED_EVIDENCE);
+  assert.doesNotMatch('# put reads the compile commands of the build that produced the bytes', RETIRED_EVIDENCE);
+});
+
+test('neither the producer nor this pin test describes the retired producer-string check', () => {
+  const pin = read('genesis/orchestrator/c-baseline-pin.test.mjs').split('\n')
+    .filter(line => !line.includes('RETIRED_EVIDENCE') && !line.includes('producer strings in the bytes\''));
+  for (const [file, lines] of [
+    ['genesis/orchestrator/eprfs-produce.sh', read('genesis/orchestrator/eprfs-produce.sh').split('\n')],
+    ['genesis/orchestrator/c-baseline-pin.test.mjs', pin],
+  ]) {
+    const stale = lines.map((line, i) => [i + 1, line]).filter(([, line]) => RETIRED_EVIDENCE.test(line));
+    assert.deepEqual(stale.map(([n, line]) => `${file}:${n}: ${line.trim()}`), []);
+  }
+});
+
 test('the eprfs producer records both declared C flags variables as describe --env and declares the record\'s target', () => {
   const policy = JSON.parse(read('genesis/agentic/pool-policy.json'));
   assert.deepEqual(producerProblems(read('genesis/orchestrator/eprfs-produce.sh'), policy.declared_targets[TRIPLE]), []);

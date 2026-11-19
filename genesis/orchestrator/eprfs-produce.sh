@@ -101,8 +101,9 @@ fi
 
 # The declared target, read from the record at this checkout (pool-policy.json declared_targets,
 # row 29.2) for the build's triple and this workspace, never written here: describe takes it as
-# --target-isa / --target-cflags, and `put` checks the recorded CFLAGS_<triple> and the C
-# producer strings in the bytes against it before it writes the env:isa-c marker (E12 L2a). No
+# --target-isa / --target-cflags, and `put` checks the recorded CFLAGS_<triple> and the compile
+# commands of the build that produced the bytes (the --build-messages below) against it before it
+# writes the env:isa-c marker (E12 L2a). No
 # record for this host or workspace declares nothing, and put then writes no marker. A record that
 # names this host and workspace but cannot be read whole withholds: an offer whose target nobody
 # could read is the one that trapped on shem.
