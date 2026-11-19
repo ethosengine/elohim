@@ -22,9 +22,12 @@ cites:
   - genesis/data/timeline/backlog/brit-covenant-session-segment-aliasing.md
   - genesis/data/timeline/backlog/brit-daily-driver-handoff-2026-10-27.md
 shift_objective: |
-  Continue brit sprint 3 in the decided order: an independent integrator merges sprint3/trust,
-  sprint3/diff-show and sprint3/refs-shem into sprint3/integrate as each clears review; then the push-policy lane, the rebase recovery lane (steps 1-2), the epr-cli
-  lane, worktree-side diff with gitlinks, and merge porcelain.
+  Continue brit sprint 3 in the decided order: first the rebase recovery/stranding lane
+  (stranding fixes plus a preflight that refuses before any spooling when completion is
+  impossible; then the redesign, after the steward's format decision); an independent integrator
+  merges sprint3/trust, sprint3/diff-show and sprint3/refs-shem into sprint3/integrate as each
+  clears review; then the push-policy lane, the epr-cli lane, worktree-side diff with gitlinks,
+  and merge porcelain.
 ---
 
 # Brit sprint 3 handoff (2026-11-19)
@@ -48,7 +51,7 @@ has not moved.
 | `251d10e52a` | 44469917351 |
 | `da5e4a0504` | 44477093766 |
 | `7479ce4539` | 44481834878: finished. Every Linux and macOS job green. The two cross-platform compile fixes worked (Windows built and ran about 5,670 tests). Red: four tests on both Windows runners, all from the build-inputs lane, plus cargo-deny-advisories (red on main too) and therefore `Tests pass` |
-| `bd28ecd8cf6c9593c77825d734e7fb38e1923534` | run 4, in progress when this was written |
+| `bd28ecd8cf6c9593c77825d734e7fb38e1923534` | 44494603484: every required job green on Linux, macOS and both Windows runners; only cargo-deny-advisories red (as on main) |
 
 A second integrator took over from the runbook note below and did the phase from `7479ce4539` to
 `bd28ecd8cf`. Besides the lane merges, that phase made two integration commits: `4f1d05a93a` (one
@@ -64,16 +67,38 @@ fixture test gated to Unix) and `bd28ecd8cf` (`FingerprintError` marked non-exha
 | `sprint3/fetch-tracking` | `06616a06` | merged | `brit-s3-fetch-tracking` |
 | `sprint3/lock` | `63173728` | merged | `brit-s3-lock` |
 | `sprint3/build-inputs` | `0feb451a`; Windows follow-up tip `a3a874d4` (commits `7810a60e`, `4f1dd2c8`, `a3a874d4`) | merged; follow-up merged in `bd28ecd8cf` | `brit-s3-build-inputs` |
-| `sprint3/trust` | `d96ff65b2d` | in review, not merged | `brit-s3-trust` |
+| `sprint3/trust` | `d96ff65b2d` | independent review partial (see below), one regression being fixed, not merged | `brit-s3-trust` |
 | `sprint3/push-transport` | `4a60a61d` | merged in `bd28ecd8cf` (three implementation rounds, two independent reviews, a doc-link fix) | `brit-s3-push-transport` |
-| `sprint3/diff-show` | `3d10b379cf` | in review, not merged | `brit-s3-diff-show` |
-| `sprint3/refs-shem` | `4a39e9dffa` | six patches from shem applied locally; held until shem's fix round (shem's hand-over branch `self/nt-review-receipts` was still at `0a6389cf4c`, 05:01Z, with no fix round) | `brit-s3-refs-shem` |
+| `sprint3/diff-show` | `3d10b379cf` | independent review partial (see below), not merged | `brit-s3-diff-show` |
+| `sprint3/refs-shem` | `806ea8114b` (shem's `b8264afc4`) | sixteen patches applied after shem's two fix rounds; merge into the integration branch in progress | `brit-s3-refs-shem` |
 
 **Monorepo side:** branch `feat/ark-declared-trust` (worktree `brit-s3-ark-trust`), first written as
 three commits on origin/dev `01e4de7f1`, is now four commits (tip `d14e7357f`), reviewed, awaiting
 rebase onto the landed dev.
 
 **This record** is on monorepo branch `docs/brit-backlog-sprint3` (worktree `brit-s3-backlog`).
+
+### Review state of the unmerged lanes
+
+- **refs-shem:** shem delivered two fix rounds after two independent review passes on its side. Its
+  reviewer found, among others, a change that could send a mutating command to an outer repository;
+  it was removed in patch 0013. Sixteen patches are now applied as `sprint3/refs-shem` `806ea8114b`
+  (shem's `b8264afc4`); the merge into the integration branch is in progress. A deliberate difference
+  from git is kept: `rev-parse --verify missing` with a closed stderr exits 128 where git dies with
+  141.
+- **trust:** independent review partial. No security defect in the trust decision: it agrees with git
+  2.52 across exact root, parent/child/sibling, wildcards, symlinks, linked worktrees, bare,
+  submodules, repo-local config and includes, and hooksPath. One regression is being fixed: a
+  multi-pack-index over more than 512 packs is refused at reduced trust where 0.2.6 opened it; the
+  count must follow gix-odb's midx-aware accounting. Env-scope `includeIf` grants where git refuses
+  (low). The error-printer commit and most tests are not yet reviewed. Details:
+  `brit-declared-trust-and-reduced-trust-pack-cap.md`.
+- **diff-show:** independent review partial. `brit diff`: 1,155 of 1,230 comparisons byte-identical to
+  git, the other 75 clean refusals from one file carrying a `diff=<driver>` attribute; worktree forms
+  100% identical except refusals for intent-to-add entries and a conflicted index; shallow merge-base
+  264/264. `brit show` is verified on ordinary commits only (122 of 132 identical, 10 driver
+  refusals); merges, tags and encodings are still under review. Limits recorded in
+  `brit-porcelain-gaps-census-2026-11.md`.
 
 ## What the merged lanes deliver
 
@@ -156,12 +181,17 @@ rebase onto the landed dev.
 
 ## Decided but not started, in order
 
-1. An independent integrator merges `sprint3/trust`, `sprint3/diff-show` and `sprint3/refs-shem` as
-   each clears review (`sprint3/push-transport` is merged).
-2. A push-policy lane (`push.rs`): one handshake when no hook ran; the notes/tag fast-forward rule;
+1. The rebase recovery/stranding lane, in the order decided after the cost report in
+   `brit-rebase-cost-gitlinks-and-stranding.md`: (a) the stranding fixes (report §7 a–d) plus a
+   preflight that refuses before any spooling when completion is impossible; (b) the redesign (report
+   §6), after the steward's decision on the retained-manifest format below. Rebase stays a declared
+   git fallback on both devices.
+2. An independent integrator merges `sprint3/trust`, `sprint3/diff-show` and `sprint3/refs-shem` as
+   each clears review (`sprint3/push-transport` is merged; the `sprint3/refs-shem` merge is in
+   progress).
+3. A push-policy lane (`push.rs`): one handshake when no hook ran; the notes/tag fast-forward rule;
    refuse an ungated push when hooks are configured but missing or not executable; render the delivery
    note in the CLI. See `brit-push-fails-after-green-hook-root-cause.md`.
-3. The recovery lane: steps 1–2 of `brit-rebase-cost-gitlinks-and-stranding.md`.
 4. The epr-cli lane: a `device_store(…)` constructor that always attaches `DeviceRunner`, and a
    source-scan test, stacked on `feat/ark-declared-trust` after shem's L2b lands; `bin.rs` waits for
    the landed sha. See `brit-declared-trust-and-reduced-trust-pack-cap.md` (epr-cli spawn audit).
@@ -176,6 +206,10 @@ rebase onto the landed dev.
   be able to perform (or the publish script keeps using git, stated as a fallback); see
   `brit-push-fails-after-green-hook-root-cause.md`. The landing procedure changed during this sprint:
   re-read it from `CLAUDE.md` on origin/dev at landing time.
+- Decision: in the rebase redesign, the retained-manifest format change (v2 with a floor) would apply
+  to EVERY new copy, not only shallow ones as scoped earlier, so an older brit fails closed on any copy
+  a newer one wrote. This reverses the approved scope; see
+  `brit-rebase-cost-gitlinks-and-stranding.md`.
 - Landing `feat/ark-declared-trust` on dev behind shem's L1/L2a/L2b, with the one-line notice.
 - `git repack -a -d` in the monorepo.
 - The upstream-owned gix changes in `sprint3/trust`.
@@ -197,11 +231,10 @@ rebase onto the landed dev.
 
 ## Coordination with shem
 
-- Hand-over ref: `origin self/nt-review-receipts`, still at `0a6389cf4c` (05:01Z) with no fix round
-  when this was updated.
-- shem's lanes in flight: the refs lane's fix round; `merge-base --is-ancestor` and
-  `rev-list --count`, which shem also takes; and L1/L2a/L2b, which `feat/ark-declared-trust` lands
-  behind.
+- Hand-over ref: `origin self/nt-review-receipts`. shem's two refs-lane fix rounds have arrived
+  (shem's `b8264afc4`, applied as `sprint3/refs-shem` `806ea8114b`).
+- shem's lanes in flight: `merge-base --is-ancestor` and `rev-list --count`, which the refs lane now
+  also brings; and L1/L2a/L2b, which `feat/ark-declared-trust` lands behind.
 
 ## Integration runbook
 

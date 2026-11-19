@@ -46,13 +46,19 @@ The brit-first hook's own ledger keeps no command text, and its `epr feedback ca
 
 ## In hand
 
-- **shem's refs lane** (`sprint3/refs-shem`, six patches applied locally, tip `4a39e9dffa`, held until
-  shem's fix round): `rev-parse`, `for-each-ref`, `ls-remote`, `check-ref-format`, global `-C`, quiet
-  exit on a closed pipe. Its review found the closed-pipe patch too broad, and
-  `rev-parse --verify HEAD -- x` printing three lines with exit 0; the fix round is pending. shem also
-  takes `merge-base --is-ancestor` and `rev-list --count`.
+- **shem's refs lane** (`sprint3/refs-shem`): `rev-parse`, `for-each-ref`, `ls-remote`,
+  `check-ref-format`, global `-C`, quiet exit on a closed pipe, and now also `merge-base --is-ancestor`
+  and `rev-list --count`. Its first review found the closed-pipe patch too broad, and
+  `rev-parse --verify HEAD -- x` printing three lines with exit 0. shem delivered two fix rounds;
+  sixteen patches are now applied as tip `806ea8114b` (shem's `b8264afc4`), and the merge into the
+  integration branch is in progress. A deliberate difference is kept: `rev-parse --verify missing` with
+  a closed stderr exits 128 where git dies with 141.
 - **Lane `sprint3/diff-show`** (tip `3d10b379cf`, in review): `brit diff` with revisions, ranges, merge
-  bases and all output forms, and `brit show`.
+  bases and all output forms, and `brit show`. Measured limits from its review:
+  - any file with a `diff=<driver>` attribute makes diff and show refuse, even a built-in driver with
+    nothing configured; `--name-only` still works; no driver command or textconv is ever executed;
+  - intent-to-add entries and a conflicted index refuse the worktree forms;
+  - multiple merge bases refuse `--merge-base` (git refuses too, with a different exit code).
 
 ## Still missing after those
 

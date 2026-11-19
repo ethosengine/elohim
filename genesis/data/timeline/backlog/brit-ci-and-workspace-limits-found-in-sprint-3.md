@@ -96,3 +96,27 @@ couldn't be looked up even though it must exist". Seen once and not reproduced i
 
 On ethosengine, merge base `e239f3393`; local-only commits `a807b7ff6` and `5d53c7ac8`. Reported to the
 steward, untouched.
+
+## (k) Agents stall silently
+
+On 2026-11-19:
+
+- two reviewers sat 3 h and 2 h on one shell command each that never started: no process, held for an
+  approval with nobody present (long compound shell with a function definition, `source`, `chown -R`,
+  or files written outside the session scratch directory);
+- a scout waited five hours on an unbounded `while kill -0 <pid>`;
+- a retired integrator left nine wait loops of the form `until ! pgrep -f '<script>'`, each matching
+  its own command line;
+- the coordinating session itself was held about two hours on an edit outside the working directory;
+- a sibling session on shem had the same, with a builder stalled four hours.
+
+Detected only when the sibling reported its own. What worked: compare each agent's transcript mtime
+with the clock, list the session's child processes, stop the held agent and message it (it resumes
+with its context).
+
+## (l) Orphaned hook shells and scratch directories after journey runs
+
+After journey runs, eight orphaned hook shells (pre-commit, pre-push, pre-receive under
+git-receive-pack) from the `mutation_lock` journeys were still polling, some six hours old, cwd
+deleted, confirmed by their environment. A test-hygiene item for the lock follow-up. Thirteen leftover
+`/tmp/.brit-checkout-*` directories were on the host (see `brit-rebase-cost-gitlinks-and-stranding.md`).

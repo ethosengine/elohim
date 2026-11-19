@@ -71,6 +71,26 @@ candidates to offer upstream.
 
 rakia-brit 0.1.1 (gix 0.81) has no 32-slot wall.
 
+### Independent review (partial, 2026-11-19)
+
+- No security defect in the trust decision. It agrees with git 2.52 across exact root,
+  parent/child/sibling, wildcards, symlinks, linked worktrees, bare, submodules, repo-local config and
+  includes, and hooksPath.
+- One regression, being fixed: a multi-pack-index over more than 512 packs is refused at reduced trust
+  where 0.2.6 opened it. The count must follow gix-odb's midx-aware accounting.
+- Env-scope `includeIf` grants where git refuses (low).
+- The error-printer commit and most tests are not yet reviewed.
+
+Differences from git the review measured that pre-date the lane (not introduced by it):
+
+- a `safe.directory` value `<R>/*` grants R itself in gix, where git requires strictly below;
+- `GIT_CONFIG_PARAMETERS` is not read;
+- with `GIT_DIR` set, git skips the ownership check and brit does not;
+- `-c include.path=…` is not followed by gix.
+
+What a grant unlocks: hooks, including a repository-chosen `core.hooksPath`; the editor in replay;
+repo-local ssh and credential config. NOT external filters, which brit refuses.
+
 ## Audit base
 
 The gate-script and epr-cli audit below was run on a monorepo checkout at `5d53c7ac8`, 142 commits
