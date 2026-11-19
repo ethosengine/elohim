@@ -409,12 +409,26 @@ fn classify(words: &[String]) -> Result<Command, String> {
 }
 
 /// The option of a compile that hides what it passes to the compiler, assembler or a file:
-/// a response file (`@file`), `-Xclang`, `-Xassembler` or a `-Wa,` list (re-review ruling 3).
+/// a response file (`@file`), `-Xclang`, `-Xassembler` or a `-Wa,` list (re-review ruling 3);
+/// a specs file (`-specs`, `-specs=`), a compiler plugin (`-fplugin`, `-fplugin=`), another
+/// compiler-program prefix (`-B`, joined or separate), the `--march=` spelling, a bare
+/// `-target-feature` and a `-wrapper` (hardening 2).
 fn opaque(words: &[String]) -> Option<&str> {
     options(words)
         .iter()
         .find(|w| {
-            w.starts_with('@') || *w == "-Xclang" || *w == "-Xassembler" || w.starts_with("-Wa,")
+            let w = w.as_str();
+            w.starts_with('@')
+                || matches!(
+                    w,
+                    "-Xclang" | "-Xassembler" | "-specs" | "-fplugin" | "-wrapper"
+                )
+                || w.starts_with("-Wa,")
+                || w.starts_with("-specs=")
+                || w.starts_with("-fplugin=")
+                || w.starts_with("-B")
+                || w.starts_with("--march=")
+                || w.starts_with("-target-feature")
         })
         .map(String::as_str)
 }

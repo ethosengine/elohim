@@ -665,6 +665,36 @@ fn evidence_refuses_a_compile_whose_options_it_cannot_read() {
     }
 }
 
+/// Hardening 2: more options whose effect on the instruction set the check cannot read refuse as
+/// unjudgeable: a specs file, a compiler plugin, another compiler-program prefix, a `--march=`
+/// spelling, a bare target feature and a wrapper.
+#[test]
+fn evidence_refuses_more_options_it_cannot_read() {
+    for (flags, form) in [
+        ("-march=x86-64 -specs extra.specs", "-specs"),
+        ("-march=x86-64 -specs=extra.specs", "-specs=extra.specs"),
+        ("-march=x86-64 -fplugin plugin.so", "-fplugin"),
+        ("-march=x86-64 -fplugin=plugin.so", "-fplugin=plugin.so"),
+        ("-march=x86-64 -B /opt/other/bin", "-B"),
+        ("-march=x86-64 -B/opt/other/bin", "-B/opt/other/bin"),
+        ("-march=x86-64 --march=x86-64-v3", "--march=x86-64-v3"),
+        ("-march=x86-64 -target-feature +avx2", "-target-feature"),
+        ("-march=x86-64 -wrapper valgrind", "-wrapper"),
+    ] {
+        let found = Build::new("epr")
+            .script("ring", &[&compile(flags, "a.c")], &["x.o"], true)
+            .judge("epr", BYTES)
+            .unwrap_err();
+        assert!(
+            has(
+                &found,
+                &format!("unjudgeable: ring's compile of a.c carries {form}")
+            ),
+            "{form}: {found:?}"
+        );
+    }
+}
+
 /// Ruling 3: every logged command is a recognised compile, one of cc 1.11.1's own probes, or an
 /// archiver line; anything else refuses. Options are read only up to a bare `--`.
 #[test]
