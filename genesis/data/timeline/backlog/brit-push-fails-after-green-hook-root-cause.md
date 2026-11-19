@@ -13,6 +13,7 @@ relatedNodeIds: []
 tags: [brit, daily-driver, push, transport, reqwest, landing-exception]
 cites:
   - CLAUDE.md
+  - genesis/orchestrator/device-notes-publish.mjs
   - genesis/docs/superpowers/sprints/2026-11-05-regenesis-1/briefs/cycle-time-harvest-handoff.md
   - genesis/docs/superpowers/sprints/2026-11-05-regenesis-1/STATE.md
   - genesis/docs/superpowers/sprints/task-brit-feedback-producer-report.md
@@ -21,9 +22,11 @@ cites:
 shift_objective: |
   Retire the CLAUDE.md landing exception for brit push. Install as the pin a brit build that
   carries the push-transport fixes (lane sprint3/push-transport) and the push-policy fixes, then
-  make one supervised real landing to dev: full hook, `[pre-push]` lines in the log, a visible
-  second handshake, the notes refspec in the same invocation; then a second landing that updates
-  existing notes, from a linked worktree.
+  make one supervised real landing to dev (full hook, `[pre-push]` lines in the log, a visible
+  second handshake), followed by the device's own notes publish that CLAUDE.md prescribes, fast
+  forward to refs/notes/brit/devices/<did>/build/*; then a second landing, from a linked worktree,
+  whose notes publish updates existing device notes refs. Re-read the landing procedure in
+  CLAUDE.md on origin/dev at landing time first.
 ---
 
 # brit push fails after a green pre-push hook
@@ -82,9 +85,9 @@ journeys use curl, so CI had never exercised the shipping transport.
 
 - Every push makes two handshakes and asks the credential helper twice, until
   `gitoxide-core/src/repository/push.rs` returns "send on this connection" when no hook ran.
-- A fast-forward UPDATE of any non-`refs/heads` ref (for example `refs/notes/brit/build/*`) is refused
-  before the hook ("refusing unverified fast-forward update of …"), so a combined branch+notes push
-  fails whole. Creating notes works.
+- A fast-forward UPDATE of any non-`refs/heads` ref is refused before the hook ("refusing unverified
+  fast-forward update of …"), so a combined branch+notes push fails whole. Creating notes works. The
+  scratch example measured was a `refs/notes/brit/build/*` ref.
 - A configured `core.hooksPath` whose directory is missing, or a non-executable pre-push, pushes
   ungated silently, as git does.
 - Packs are undeltified.
@@ -93,10 +96,22 @@ journeys use curl, so CI had never exercised the shipping transport.
 
 ## What retiring the CLAUDE.md exception needs
 
-A brit build carrying the transport and push-policy fixes installed as the pin, then one supervised
-real landing to dev: full hook, `[pre-push]` lines in the log, a visible second handshake, the notes
-refspec in the same invocation; then a second landing that updates existing notes, from a linked
-worktree.
+The landing procedure in `CLAUDE.md` changed during this sprint, so re-read it from `CLAUDE.md` on
+origin/dev at landing time. As of this branch it says: each device publishes its validation receipts
+to its OWN forge destination, `refs/notes/brit/devices/<did>/build/*`, fast-forward only, with
+`just dev notes publish` (`genesis/orchestrator/device-notes-publish.mjs`), and never pushes the
+shared `refs/notes/brit/build/*` refs on origin.
+
+Retiring the exception then needs:
+
+1. A brit build carrying the transport and push-policy fixes, installed as the pin.
+2. One supervised real landing to dev: full hook, `[pre-push]` lines in the log, a visible second
+   handshake.
+3. After the landing, the device's own notes published fast-forward to
+   `refs/notes/brit/devices/<did>/build/*`. brit must be able to perform that fast-forward update of
+   an existing ref under `refs/notes/brit/devices/<did>/build/*` (the defect above refuses it today),
+   or the publish script keeps using git and that fallback is stated.
+4. A second landing from a linked worktree, whose notes publish updates existing device notes refs.
 
 The decided push-policy lane (one handshake when no hook ran, the notes/tag fast-forward rule,
 refusing an ungated push when hooks are configured but missing or not executable, rendering the

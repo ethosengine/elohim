@@ -60,14 +60,16 @@ has not moved.
 | `sprint3/fetch-tracking` | `06616a06` | merged | `brit-s3-fetch-tracking` |
 | `sprint3/lock` | `63173728` | merged | `brit-s3-lock` |
 | `sprint3/build-inputs` | `0feb451a` | merged | `brit-s3-build-inputs` |
-| `sprint3/trust` | `d96ff65b2d` | in review, not merged | `brit-s3-trust` |
-| `sprint3/push-transport` | `0ca127c2` | second review, not merged | `brit-s3-push-transport` |
+| `sprint3/trust` | `d96ff65b2d` | still in review rounds, not merged | `brit-s3-trust` |
+| `sprint3/push-transport` | `0ca127c2` | still in review rounds (second review), not merged | `brit-s3-push-transport` |
 | `sprint3/diff-show` | `3d10b379cf` | in review, not merged | `brit-s3-diff-show` |
 | `sprint3/refs-shem` | `4a39e9dffa` | six patches from shem applied locally; held until shem's fix round | `brit-s3-refs-shem` |
 
-**Monorepo side:** branch `feat/ark-declared-trust` (worktree `brit-s3-ark-trust`): three commits on
-origin/dev `01e4de7f1`, local only, review follow-ups in progress. This record is on branch
-`docs/brit-backlog-sprint3` (worktree `brit-s3-backlog`).
+**Monorepo side:** branch `feat/ark-declared-trust` (worktree `brit-s3-ark-trust`), first written as
+three commits on origin/dev `01e4de7f1`, is now four commits (tip `d14e7357f`), reviewed, awaiting
+rebase onto the landed dev.
+
+**This record** is on monorepo branch `docs/brit-backlog-sprint3` (worktree `brit-s3-backlog`).
 
 ## What the merged lanes deliver
 
@@ -137,7 +139,11 @@ origin/dev `01e4de7f1`, local only, review follow-ups in progress. This record i
 ## What needs the steward
 
 - Landing on brit `main` and the pin move. 16 monorepo steps re-key once (build-inputs above); one
-  supervised real landing is needed to retire the push exception in `CLAUDE.md`.
+  supervised real landing is needed to retire the push exception in `CLAUDE.md`. Its notes step is the
+  device's own notes publish, fast-forward to `refs/notes/brit/devices/<did>/build/*`, which brit must
+  be able to perform (or the publish script keeps using git, stated as a fallback); see
+  `brit-push-fails-after-green-hook-root-cause.md`. The landing procedure changed during this sprint:
+  re-read it from `CLAUDE.md` on origin/dev at landing time.
 - Landing `feat/ark-declared-trust` on dev behind shem's L1/L2a/L2b, with the one-line notice.
 - `git repack -a -d` in the monorepo.
 - The upstream-owned gix changes in `sprint3/trust`.
@@ -145,6 +151,13 @@ origin/dev `01e4de7f1`, local only, review follow-ups in progress. This record i
 - The local-only commit `5d53c7ac8`.
 - A write-set for `elohim/rakia`, for one of two items: the rakia-core selection hole needs one;
   nothing is needed there for the slot wall.
+- The spawn audit in `brit-declared-trust-and-reduced-trust-pack-cap.md` was run on a monorepo
+  checkout at `5d53c7ac8`, 142 commits behind origin/dev. Its sites are now named by function and were
+  re-located on this branch; re-locate them again before acting on them.
+- The six new standalone brit entries from this sprint are not yet listed in
+  `genesis/data/timeline/backlog/CLUSTERS.md`. No brit cluster exists, and the census entry
+  (`brit-porcelain-gaps-census-2026-11.md`) in particular is research-derived and belongs in a cluster
+  by the convention. To be done when this branch lands, or by whoever owns the clusters file.
 
 ## Coordination with shem
 

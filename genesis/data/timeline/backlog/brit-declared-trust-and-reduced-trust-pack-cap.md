@@ -71,26 +71,35 @@ candidates to offer upstream.
 
 rakia-brit 0.1.1 (gix 0.81) has no 32-slot wall.
 
+## Audit base
+
+The gate-script and epr-cli audit below was run on a monorepo checkout at `5d53c7ac8`, 142 commits
+behind origin/dev, so its original file:line references may have shifted. Each site is named here by
+function, re-located on this branch (based on origin/dev); re-locate them again before acting on them.
+
 ## Inside a gate brit has no command-scope trust
 
 The monorepo's gate-runner deliberately deletes `GIT_CONFIG_PARAMETERS` and
-`GIT_CONFIG_COUNT`/`KEY`/`VALUE` from its children (`genesis/orchestrator/gate-runner.mjs:186-188`),
-because `git -c core.hooksPath=… push` leaked into fixture repositories. So inside a gate brit runs with
-no command-scope trust. Reported to the session that owns those files, together with these
-silent-degrade sites:
+`GIT_CONFIG_COUNT`/`KEY`/`VALUE` from its children (`genesis/orchestrator/gate-runner.mjs`
+`gateChildEnv`), because `git -c core.hooksPath=… push` leaked into fixture repositories. So inside a
+gate brit runs with no command-scope trust. Reported to the session that owns those files, together
+with these silent-degrade sites:
 
-- `genesis/orchestrator/gate-attest.mjs:75` (a refusal reads as clean);
-- `genesis/orchestrator/gate-evidence.mjs:157` and `:269`;
-- `genesis/orchestrator/gate-runner.mjs:122`;
-- `.claude/hooks/pre-flight-check.py:77`;
-- `.claude/scripts/_lib/epr_meta_git.py:35`.
+- `genesis/orchestrator/gate-attest.mjs` `worktreeDirty`: it returns
+  `result?.status === 0 && (result.stdout || '').trim().length > 0`, so when git refuses (non-zero
+  status) it returns false, "not dirty": a refusal reads as clean;
+- `genesis/orchestrator/gate-evidence.mjs` `gitRead` and `signerIdentity`;
+- `genesis/orchestrator/gate-runner.mjs` `reuseSelector`;
+- `.claude/hooks/pre-flight-check.py` `check_git_status`;
+- `.claude/scripts/_lib/epr_meta_git.py` `git`.
 
-## epr-cli spawn audit (dev checkout)
+## epr-cli spawn audit
 
-- `elohim/eprfs/epr-cli/src/artifact.rs:1104` spawns brit-build-ref with no trust env.
-- `integrate.rs:210` gives the gate child no trust env.
-- `device/arrival_work.rs:45` builds a bin-store `Store` that keeps the plain runner, and its failure
-  goes only to `arrival.log`.
+- `elohim/eprfs/epr-cli/src/artifact.rs` `brit()` spawns brit-build-ref (found by `brit_bin()`) with
+  no trust env.
+- `integrate.rs` `quality_gate` gives the gate child no trust env.
+- `device/arrival_work.rs` `each_tool` builds a bin-store `Store` that keeps the plain runner, and its
+  failure goes only to `arrival.log`.
 - `git.rs` `discover_root` reports "could not find a git worktree" for a dubious-ownership refusal.
 
 ## Open for the steward
