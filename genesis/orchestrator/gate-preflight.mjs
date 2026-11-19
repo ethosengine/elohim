@@ -23,6 +23,8 @@ import { UNAUDITED_RECIPE_PROJECTS, globCovers, readSet } from './gate-input-aud
 import { dirtyPaths } from './gate-evidence.mjs';
 import { appendEvent } from './gate-live.mjs';
 import { applicableTargets, checkCBaseline, hostTripleOf, readDeclaredTargets } from './c-baseline.mjs';
+// gate-runner imports this module too; the cycle is safe because neither calls the other while loading.
+import { gateChildEnv } from './gate-runner.mjs';
 
 const ROOT = process.env.GATE_ROOT
   ? resolve(process.env.GATE_ROOT)
@@ -351,23 +353,57 @@ export function checkCargoLocks({ root, projects, spawn = spawnSync, env = proce
  * the declared level, or what it builds must not be offered to a sibling (a drawn epr whose ring C
  * carried AVX2 died with SIGILL on a v2 device). Never REFUSED: the device's own gate runs and
  * passes as before; the WARN withholds the producer's offer (`withholds.offer` names the projects).
+ * The env judged is each project's build env (gateBuildEnv), never the caller's alone: a C-family
+ * key the gate itself sets (manifest run.cargo.env, cargo_env_overrides) reaches the C it builds.
  */
-export function checkCBaselineOffer({ root, projects, env = process.env, spawn = spawnSync, record = readDeclaredTargets(root), hostTriple = hostTripleOf(), check = checkCBaseline }) {
+export function checkCBaselineOffer({ root, projects, env = process.env, spawn = spawnSync, record = readDeclaredTargets(root), hostTriple = hostTripleOf(), check = checkCBaseline, buildEnv = gateBuildEnv }) {
   const workspaces = [...new Set(projects.map(p => p.run?.cargo?.workspace).filter(Boolean))];
   const targets = applicableTargets(record, { workspaces, hostTriple });
   if (!targets.length) return null;
   const covered = new Set(targets.flatMap(t => t.workspaces));
-  const offered = projects.filter(p => covered.has(p.run?.cargo?.workspace)).map(p => p.name);
-  const findings = check({ root, env, record, spawn, workspaces, hostTriple });
+  const offered = projects.filter(p => covered.has(p.run?.cargo?.workspace));
+  // Each project is judged in the env its own gate builds with; projects whose build env is
+  // identical share one check (one probe).
+  const byEnv = new Map();
+  const findings = [];
+  const withheld = [];
+  for (const project of offered) {
+    const workspace = project.run.cargo.workspace;
+    const built = buildEnv(project, env, root);
+    const key = JSON.stringify([workspace, Object.entries(built).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))]);
+    if (!byEnv.has(key)) byEnv.set(key, check({ root, env: built, record, spawn, workspaces: [workspace], hostTriple }));
+    const own = byEnv.get(key);
+    if (!own.length) continue;
+    withheld.push(project.name);
+    for (const f of own) {
+      const seen = findings.find(g => g.why === f.why && g.check === f.check && g.triple === f.triple);
+      if (seen) seen.projects.push(project.name);
+      else findings.push({ ...f, projects: [project.name] });
+    }
+  }
   const declared = targets.map(t => `${t.triple} at ${t.cflags}`).join(', ');
   if (!findings.length) return row('c-baseline', 'ok', `C for ${declared}`);
+  const named = f => (offered.length > 1 ? `${f.why} (${f.projects.join(' ')})` : f.why);
   return {
     ...row('c-baseline', 'WARN',
-      `${findings.length} C-baseline finding(s) for ${declared} — ${findings.slice(0, 3).map(f => f.why).join('; ')}${findings.length > 3 ? `; +${findings.length - 3} more` : ''} — the gate still runs, but this device's offer of ${offered.join(' ')} is withheld`,
+      `${findings.length} C-baseline finding(s) for ${declared} — ${findings.slice(0, 3).map(named).join('; ')}${findings.length > 3 ? `; +${findings.length - 3} more` : ''} — the gate still runs, but this device's offer of ${withheld.join(' ')} is withheld`,
       [...new Set(findings.map(f => f.cure))].join(' ; ')),
-    withholds: { offer: offered },
+    withholds: { offer: withheld },
     findings,
   };
+}
+
+/**
+ * The environment a project's cargo build runs under: gate-runner's gateChildEnv over `env`
+ * (the one merge of manifest run.cargo.env, pool-policy cargo_env_overrides and declared_targets),
+ * with its GATE_CARGO_ENV map exported over the rest and the variable itself gone, as
+ * run-local-gate.sh does before `just`. gateChildEnv's conflict line is the gate's to print.
+ */
+export function gateBuildEnv(project, env, root) {
+  const { GATE_CARGO_ENV: map, ...child } = gateChildEnv(project, env, root, { warn: () => {} });
+  let declared = {};
+  try { declared = JSON.parse(map || '{}') || {}; } catch { /* gateChildEnv writes JSON; nothing to overlay otherwise */ }
+  return { ...child, ...Object.fromEntries(Object.entries(declared).map(([key, value]) => [key, String(value)])) };
 }
 
 /**

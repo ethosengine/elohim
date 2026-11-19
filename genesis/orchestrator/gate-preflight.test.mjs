@@ -286,6 +286,43 @@ test('c-baseline: runPreflight reads the record from pool-policy.json and the ro
   assert.match(row.why, /CFLAGS/);
 });
 
+// The env judged is the one the gate builds with: the caller's, with gateChildEnv's
+// GATE_CARGO_ENV map (manifest run.cargo.env, pool-policy cargo_env_overrides, declared
+// targets) exported over it as run-local-gate.sh does. A clean caller proves nothing.
+const TRIPLE = 'x86_64-unknown-linux-gnu';
+const cleanCc = (calls = []) => (cmd, args, opts) => { calls.push({ cmd, args, env: opts?.env }); return { status: 0, stdout: '#define __SSE2__ 1\n', stderr: '' }; };
+
+test('c-baseline: a C-family key the gate itself sets (pool-policy cargo_env_overrides) withholds, from a clean caller', (t) => {
+  const root = scratch(t);
+  put(root, 'genesis/agentic/pool-policy.json', JSON.stringify({ declared_targets: DECLARED, cargo_env_overrides: { eprfs: { CFLAGS: '-O3 -mavx2' } } }));
+  const r = checkCBaselineOffer({ root, projects: [eprfs], env: {}, record: DECLARED, hostTriple: TRIPLE, spawn: cleanCc() });
+  assert.equal(r?.level, 'WARN', JSON.stringify(r));
+  assert.match(r.why, /CFLAGS="-O3 -mavx2" is set/);
+  assert.deepEqual(r.withholds, { offer: ['eprfs'] });
+});
+
+test('c-baseline: a manifest run.cargo.env C-family key withholds that project only', (t) => {
+  const root = scratch(t);
+  put(root, 'genesis/agentic/pool-policy.json', JSON.stringify({ declared_targets: DECLARED }));
+  const tuned = { ...orchestrator, run: { ...orchestrator.run, cargo: { workspace: 'elohim/eprfs', env: { CXXFLAGS: '-march=native' } } } };
+  const r = checkCBaselineOffer({ root, projects: [eprfs, tuned], env: {}, record: DECLARED, hostTriple: TRIPLE, spawn: cleanCc() });
+  assert.equal(r?.level, 'WARN', JSON.stringify(r));
+  assert.match(r.why, /CXXFLAGS="-march=native" is set/);
+  assert.deepEqual(r.withholds, { offer: ['orchestrator'] });
+});
+
+test('c-baseline: the gate\'s own declared flags pass, and the probe runs under the build env', (t) => {
+  const root = scratch(t);
+  put(root, 'genesis/agentic/pool-policy.json', JSON.stringify({ declared_targets: DECLARED, cargo_env_overrides: { eprfs: { HOST_CC: 'gcc-pinned' } } }));
+  const calls = [];
+  // A stale declared variable in the caller is overwritten by the record's value in the build.
+  const r = checkCBaselineOffer({ root, projects: [eprfs], env: { CFLAGS_x86_64_unknown_linux_gnu: '-march=x86-64-v3' }, record: DECLARED, hostTriple: TRIPLE, spawn: cleanCc(calls) });
+  assert.equal(r?.level, 'ok', JSON.stringify(r));
+  assert.equal(calls[0].cmd, 'gcc-pinned', 'the compiler the gate env names');
+  assert.equal(calls[0].env.CFLAGS_x86_64_unknown_linux_gnu, '-march=x86-64');
+  assert.equal(calls[0].env.GATE_CARGO_ENV, undefined, 'run-local-gate.sh exports the map and unsets it');
+});
+
 test('a withholding WARN reaches the live run too, marked as a WARN; an ordinary WARN does not', () => {
   const appended = [];
   emitLive([
