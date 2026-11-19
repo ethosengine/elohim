@@ -106,3 +106,28 @@ test("a_tempdir_repo_still_finds_its_own_git", (t) => {
   assert.match(result.stdout, new RegExp(`^${fx.root}$`, "m"));
   assert.match(result.stdout, /RAN/);
 });
+
+// E12 (b): cc reads the C flags for one target from a triple-suffixed variable
+// (CFLAGS_x86_64_unknown_linux_gnu), so a declared cargo env key may carry lowercase after its
+// leading capital. Anything else still refuses before the recipe runs.
+test("a_triple_suffixed_c_flags_key_is_exported_to_the_recipe", (t) => {
+  const fx = fixture(t, '@echo "C=$CFLAGS_x86_64_unknown_linux_gnu"\n    @echo RAN');
+
+  const result = run(fx, {
+    env: { GATE_CARGO_ENV: JSON.stringify({ CFLAGS_x86_64_unknown_linux_gnu: "-march=x86-64" }) },
+  });
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /^C=-march=x86-64$/m);
+  assert.match(result.stdout, /RAN/);
+});
+
+test("a_malformed_cargo_env_key_still_refuses", (t) => {
+  for (const key of ["lowercase_first", "1LEADING_DIGIT", "HAS-DASH", "HAS SPACE", "_LEADING"]) {
+    const fx = fixture(t);
+    const result = run(fx, { env: { GATE_CARGO_ENV: JSON.stringify({ [key]: "1" }) } });
+    assert.equal(result.status, 2, `${key}: ${result.stderr}`);
+    assert.match(result.stderr, /refusing malformed cargo\.env key/);
+    assert.doesNotMatch(result.stdout, /RAN/);
+  }
+});

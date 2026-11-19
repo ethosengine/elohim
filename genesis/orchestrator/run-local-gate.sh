@@ -87,7 +87,7 @@ const map = JSON.parse(process.env.GATE_CARGO_ENV || "{}");
 const SQ = String.fromCharCode(39);
 const shellQuote = (value) => SQ + String(value).split(SQ).join(SQ + "\\" + SQ + SQ) + SQ;
 for (const [key, value] of Object.entries(map)) {
-  if (!/^[A-Z][A-Z0-9_]*$/.test(key)) {
+  if (!/^[A-Z][A-Za-z0-9_]*$/.test(key)) {
     console.error("gate: refusing malformed cargo.env key: " + key);
     process.exit(2);
   }
