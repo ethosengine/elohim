@@ -8,7 +8,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
   checkElementDists, checkEvidenceRecordable, checkNodeModules, checkReadSets, checkSophiaUmd,
-  checkArk, checkCargoDeny, checkCargoLocks, checkStorageClientDist, checkWorkspaceDists, checkSubmodules, checkTmpdir, emitLive, NAMED_READ_SET_PROJECTS, PREFLIGHT_READ_SET_PROJECTS, onRedPolicy,
+  checkArk, checkCargoDeny, checkCargoLocks, checkCBaselineOffer, checkStorageClientDist, checkWorkspaceDists, checkSubmodules, checkTmpdir, emitLive, NAMED_READ_SET_PROJECTS, PREFLIGHT_READ_SET_PROJECTS, onRedPolicy,
   runPreflight,
 } from './gate-preflight.mjs';
 import { orderByCost } from './gate-runner.mjs';
@@ -243,6 +243,60 @@ test('every REFUSED reaches the live run as a failure; ok and WARN do not', () =
   assert.equal(appended.length, 1);
   assert.equal(appended[0][1].project, 'preflight');
   assert.equal(appended[0][1].failure.class, 'element-dists');
+});
+
+// Row 29.2: the C-baseline row warns and withholds the producer's offer; it never refuses the gate.
+const DECLARED = { 'x86_64-unknown-linux-gnu': { isa: 'x86-64', cflags: '-march=x86-64', workspaces: ['elohim/eprfs'] } };
+const eprfs = { name: 'eprfs', dir: 'elohim/eprfs', run: { kind: 'root-just', cargo: { workspace: 'elohim/eprfs' } } };
+const orchestrator = { name: 'orchestrator', dir: 'genesis/orchestrator', run: { kind: 'just', cargo: { workspace: 'elohim/eprfs' } } };
+const storageWs = { ...storage, run: { kind: 'just', cargo: { workspace: 'elohim/elohim-storage' } } };
+
+test('c-baseline: a project on a declared workspace with a C finding WARNs, names the cure and withholds the offer', () => {
+  const finding = { triple: 'x86_64-unknown-linux-gnu', check: 'env', variable: 'CFLAGS', why: 'CFLAGS is set (-O3)', cure: 'unset CFLAGS' };
+  const seen = [];
+  const r = checkCBaselineOffer({ root: '/x', projects: [orchestrator, app], env: { CFLAGS: '-O3' }, record: DECLARED, hostTriple: 'x86_64-unknown-linux-gnu',
+    check: options => { seen.push(options.workspaces); return [finding]; } });
+  assert.deepEqual(seen, [['elohim/eprfs']]);
+  assert.equal(r.check, 'c-baseline');
+  assert.equal(r.level, 'WARN', 'never REFUSED: the device\'s own gate outcome does not change');
+  assert.match(r.why, /CFLAGS is set/);
+  assert.match(r.why, /offer .*withheld/);
+  assert.match(r.cure, /unset CFLAGS/);
+  assert.deepEqual(r.withholds, { offer: ['orchestrator'] });
+});
+
+test('c-baseline: clean is ok; no declared workspace, another host triple, or no record is silent', () => {
+  const clean = checkCBaselineOffer({ root: '/x', projects: [eprfs], env: {}, record: DECLARED, hostTriple: 'x86_64-unknown-linux-gnu', check: () => [] });
+  assert.equal(clean.level, 'ok');
+  assert.equal(clean.withholds, undefined);
+  const never = () => { throw new Error('must not check'); };
+  assert.equal(checkCBaselineOffer({ root: '/x', projects: [storageWs, app], env: {}, record: DECLARED, hostTriple: 'x86_64-unknown-linux-gnu', check: never }), null);
+  assert.equal(checkCBaselineOffer({ root: '/x', projects: [eprfs], env: {}, record: DECLARED, hostTriple: 'aarch64-unknown-linux-gnu', check: never }), null);
+  assert.equal(checkCBaselineOffer({ root: '/x', projects: [eprfs], env: {}, record: null, hostTriple: 'x86_64-unknown-linux-gnu', check: never }), null);
+});
+
+test('c-baseline: runPreflight reads the record from pool-policy.json and the row never refuses', (t) => {
+  const root = scratch(t);
+  put(root, 'genesis/agentic/pool-policy.json', JSON.stringify({ declared_targets: DECLARED }));
+  const spawn = (cmd) => (cmd === 'git' || cmd === 'bash' || cmd === 'cargo' ? { status: 0, stdout: '' } : { status: 0, stdout: '#define __AVX2__ 1\n' });
+  const rows = runPreflight({ root, projects: [eprfs], env: { CFLAGS: '-O3' }, spawn, registry: new Map(), changed: [], hostTriple: 'x86_64-unknown-linux-gnu' });
+  const row = rows.find(r => r.check === 'c-baseline');
+  assert.equal(row?.level, 'WARN', JSON.stringify(rows.map(r => [r.check, r.level])));
+  assert.match(row.why, /__AVX2__/);
+  assert.match(row.why, /CFLAGS/);
+});
+
+test('a withholding WARN reaches the live run too, marked as a WARN; an ordinary WARN does not', () => {
+  const appended = [];
+  emitLive([
+    { check: 'c-baseline', level: 'WARN', why: 'CFLAGS is set', cure: 'unset CFLAGS', withholds: { offer: ['eprfs'] } },
+    { check: 'sophia-umd', level: 'WARN', why: 'absent', cure: 'build' },
+    { check: 'c-baseline', level: 'ok', withholds: { offer: ['eprfs'] } },
+  ], { GATE_LIVE_RUN: '/run.jsonl' }, (path, event) => appended.push(event));
+  assert.equal(appended.length, 1);
+  assert.equal(appended[0].failure.class, 'c-baseline');
+  assert.match(appended[0].failure.excerpt[0], /^WARN, offer withheld \(the gate still runs\): CFLAGS is set/);
+  assert.equal(appended[0].failure.excerpt[1], 'cure: unset CFLAGS');
 });
 
 test('on-red policy: env, then pool-policy.json, then continue', (t) => {

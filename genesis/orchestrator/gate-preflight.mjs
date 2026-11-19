@@ -22,6 +22,7 @@ import { loadGateRegistry } from './pipeline-registry.mjs';
 import { UNAUDITED_RECIPE_PROJECTS, globCovers, readSet } from './gate-input-audit.mjs';
 import { dirtyPaths } from './gate-evidence.mjs';
 import { appendEvent } from './gate-live.mjs';
+import { applicableTargets, checkCBaseline, hostTripleOf, readDeclaredTargets } from './c-baseline.mjs';
 
 const ROOT = process.env.GATE_ROOT
   ? resolve(process.env.GATE_ROOT)
@@ -346,6 +347,30 @@ export function checkCargoLocks({ root, projects, spawn = spawnSync, env = proce
 }
 
 /**
+ * Row 29.2: a project on a declared workspace (pool-policy.json declared_targets) builds its C at
+ * the declared level, or what it builds must not be offered to a sibling (a drawn epr whose ring C
+ * carried AVX2 died with SIGILL on a v2 device). Never REFUSED: the device's own gate runs and
+ * passes as before; the WARN withholds the producer's offer (`withholds.offer` names the projects).
+ */
+export function checkCBaselineOffer({ root, projects, env = process.env, spawn = spawnSync, record = readDeclaredTargets(root), hostTriple = hostTripleOf(), check = checkCBaseline }) {
+  const workspaces = [...new Set(projects.map(p => p.run?.cargo?.workspace).filter(Boolean))];
+  const targets = applicableTargets(record, { workspaces, hostTriple });
+  if (!targets.length) return null;
+  const covered = new Set(targets.flatMap(t => t.workspaces));
+  const offered = projects.filter(p => covered.has(p.run?.cargo?.workspace)).map(p => p.name);
+  const findings = check({ root, env, record, spawn, workspaces, hostTriple });
+  const declared = targets.map(t => `${t.triple} at ${t.cflags}`).join(', ');
+  if (!findings.length) return row('c-baseline', 'ok', `C for ${declared}`);
+  return {
+    ...row('c-baseline', 'WARN',
+      `${findings.length} C-baseline finding(s) for ${declared} — ${findings.slice(0, 3).map(f => f.why).join('; ')}${findings.length > 3 ? `; +${findings.length - 3} more` : ''} — the gate still runs, but this device's offer of ${offered.join(' ')} is withheld`,
+      [...new Set(findings.map(f => f.cure))].join(' ; ')),
+    withholds: { offer: offered },
+    findings,
+  };
+}
+
+/**
  * A reuse-enabled gate that runs on a dirty closure records nothing, so the next push pays it
  * again in full (87 min for eprfs on 2026-10-27). Said before the gate starts, not after.
  */
@@ -375,7 +400,7 @@ export function checkEvidenceRecordable({ root, projects, env = process.env, reu
   return rows;
 }
 
-export function runPreflight({ root = ROOT, projects, env = process.env, spawn = spawnSync, registry = loadGateRegistry(root), changed = changedFromEnv(env), onRow = () => {} }) {
+export function runPreflight({ root = ROOT, projects, env = process.env, spawn = spawnSync, registry = loadGateRegistry(root), changed = changedFromEnv(env), hostTriple = hostTripleOf(), onRow = () => {} }) {
   const read = memoRead(readSet);
   let reuse = [];
   try { reuse = JSON.parse(readFileSync(join(root, 'genesis/agentic/pool-policy.json'), 'utf8')).gate_reuse?.projects || []; }
@@ -397,6 +422,7 @@ export function runPreflight({ root = ROOT, projects, env = process.env, spawn =
     ...timed(() => checkArk({ projects, env })),
     ...timed(() => checkCargoDeny({ root, projects, spawn })),
     ...timed(() => checkCargoLocks({ root, projects, spawn, env })),
+    ...timed(() => checkCBaselineOffer({ root, projects, env, spawn, hostTriple })),
     ...timed(() => checkReadSets({ root, projects, registry, changed, read })),
     ...timed(() => checkEvidenceRecordable({ root, projects, env, reuse, read })),
   ];
@@ -414,13 +440,18 @@ export function formatRow(r) {
   return `[preflight] ${r.level} ${r.check}: ${r.why}${r.cure ? `\n[preflight]   cure: ${r.cure}` : ''}`;
 }
 
-/** Emit each REFUSED to the live run as a failure the session hears at its next tool call. */
+/**
+ * Emit each REFUSED to the live run as a failure the session hears at its next tool call, and
+ * each WARN that withholds the producer's offer (c-baseline), its excerpt marked as a WARN: the
+ * gate's verdict is unchanged, but the device must hear why it offers nothing. Other WARNs stay local.
+ */
 export function emitLive(rows, env = process.env, append = appendEvent) {
   if (!env.GATE_LIVE_RUN) return;
-  for (const r of rows.filter(r => r.level === 'REFUSED')) {
+  for (const r of rows.filter(r => r.level === 'REFUSED' || (r.level === 'WARN' && r.withholds))) {
+    const why = r.level === 'WARN' ? `WARN, offer withheld (the gate still runs): ${r.why}` : `${r.why}`;
     append(env.GATE_LIVE_RUN, {
       kind: 'failure', project: 'preflight',
-      failure: { class: r.check, excerpt: [`${r.why}`, r.cure ? `cure: ${r.cure}` : ''].filter(Boolean) },
+      failure: { class: r.check, excerpt: [why, r.cure ? `cure: ${r.cure}` : ''].filter(Boolean) },
     });
   }
 }
