@@ -2,6 +2,7 @@
 // above it, or the device withholds its offer (backlog steward-device-arrival-open-items row 29.2:
 // a drawn epr whose ring C carried AVX2 died with SIGILL on a v2 sibling).
 import { spawnSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { arch, platform } from 'node:os';
@@ -171,6 +172,13 @@ test('the record is read from pool-policy.json declared_targets; absent is null'
 test('C-family keys: flags variables in every spelling, never the compiler choice', () => {
   for (const key of ['CFLAGS', 'CXXFLAGS_x86_64-unknown-linux-gnu', 'HOST_CXXFLAGS', 'ASMFLAGS', 'CRATE_CC_NO_DEFAULTS', 'TARGET_ASMFLAGS']) assert.ok(cFamilyKey(key), key);
   for (const key of ['CC', 'CXX', 'CC_x86_64_unknown_linux_gnu', 'RUSTFLAGS', 'CARGO_ENCODED_RUSTFLAGS', 'LDFLAGS_X']) assert.equal(cFamilyKey(key), false, key);
+});
+
+test('the orchestrator test chain runs this file and gate-preflight.test.mjs in its first node --test group', () => {
+  const script = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')).scripts.test;
+  const first = script.split('&&')[0].trim().split(/\s+/);
+  assert.equal(first.slice(0, 2).join(' '), 'node --test');
+  for (const file of ['c-baseline.test.mjs', 'gate-preflight.test.mjs', 'c-baseline-pin.test.mjs']) assert.ok(first.includes(file), file);
 });
 
 // The machine fact the record rests on, measured on this device's compiler, never a fixture.
