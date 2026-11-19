@@ -668,7 +668,7 @@ findings open, for the lane's first cross-platform CI run (it had never been com
 macOS). It is not a landing candidate. Reach gate: `epr ready` READY; rust-style PASS (15 files, 1
 crate, baseline `080f305797`).
 
-**Round 6 design (fresh implementer, design note 23:27Z; reported, measured with the probe build).**
+**Round 6 design (fresh implementer, design note 23:25Z; reported, measured with the probe build).**
 - Admission cannot see any stop: `admit` runs on an all-`pick` todo and the sequence editor runs
   afterwards, so nothing can be reserved at admission for an `edit`.
 - F1's cause, corrected: at `--amend` the authoring child writes a receipt for EVERY object reachable
@@ -683,7 +683,7 @@ crate, baseline `080f305797`).
   against a planned step of 17,400; it is stored as the stop's payload and staged again at
   publication.
 
-**Decision for round 6 (coordinator, 23:30Z).** One rule for every stop: a stop is entered only if its
+**Decision for round 6 (coordinator, 23:27Z).** One rule for every stop: a stop is entered only if its
 own completion at unchanged size is reserved — the stop's records and payloads, a result no larger
 than what the stop presents, and the publication. If that cannot be reserved, the rebase refuses when
 the stop is found, before asking anything of the user. After a stop is entered only bytes the user
