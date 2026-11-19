@@ -261,8 +261,19 @@ impl Options {
         };
         let mut i = 0;
         while i < args.len() {
-            let flag = args[i].as_str();
+            // `--flag=value` carries its value inline and consumes no next argument; `--flag
+            // value` takes the next argument as it is, even when it starts with `-`.
+            let (flag, inline) = match args[i].split_once('=') {
+                Some((flag, value)) if flag.starts_with("--") => (flag, Some(value.to_string())),
+                _ => (args[i].as_str(), None),
+            };
             match flag {
+                "--json" | "--cross" if inline.is_some() => {
+                    return Err(ArtifactError::InvalidArguments(format!(
+                        "{flag} takes no value\n{}",
+                        usage()
+                    )))
+                }
                 "--json" => {
                     options.json = true;
                     i += 1;
@@ -275,7 +286,8 @@ impl Options {
                 }
                 _ => {}
             }
-            let value = args.get(i + 1).cloned().ok_or_else(|| {
+            let step = if inline.is_some() { 1 } else { 2 };
+            let value = inline.or_else(|| args.get(i + 1).cloned()).ok_or_else(|| {
                 ArtifactError::InvalidArguments(format!("{flag} needs a value\n{}", usage()))
             })?;
             let seconds = |value: &str| {
@@ -339,7 +351,7 @@ impl Options {
                     )))
                 }
             }
-            i += 2;
+            i += step;
         }
         options.repo = std::fs::canonicalize(&options.repo).unwrap_or(options.repo);
         Ok(options)

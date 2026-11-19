@@ -163,6 +163,40 @@ fn artifact_describe_refuses_every_target_cpu_spelling_only_with_declared_isa() 
     }
 }
 
+/// `--target-cflags=-march=x86-64` is the producer's spelling: the inline `=` value is the slot's
+/// whole value and swallows no following argument, and the spaced form still takes a value that
+/// starts with `-`.
+#[test]
+fn artifact_describe_takes_a_value_inline_or_spaced() {
+    let fixture = Fixture::new();
+    for args in [
+        &["--target-cflags=-march=x86-64", "--target-isa", "x86-64"][..],
+        &["--target-cflags", "-march=x86-64", "--target-isa=x86-64"][..],
+        &["--target-isa=x86-64", "--target-cflags=-march=x86-64"][..],
+    ] {
+        let descriptor = fixture.descriptor(args);
+        assert_eq!(
+            descriptor.non_path_inputs["target.cflags"], "-march=x86-64",
+            "{args:?}"
+        );
+        assert_eq!(
+            descriptor.non_path_inputs["target.isa"], "x86-64",
+            "{args:?}"
+        );
+        assert!(
+            descriptor.non_path_inputs.keys().all(|k| !k.contains('=')),
+            "{args:?}: {:?}",
+            descriptor.non_path_inputs
+        );
+    }
+    let inline = fixture.descriptor(&["--env=EXTRA=1", "--rustflags=--cfg=fixture"]);
+    assert_eq!(inline.non_path_inputs["EXTRA"], "1");
+    assert_eq!(inline.non_path_inputs["RUSTFLAGS"], "--cfg=fixture");
+    let out = fixture.describe(&["--json=yes"]);
+    assert_ne!(out.status.code(), Some(0));
+    assert!(String::from_utf8_lossy(&out.stderr).contains("--json"));
+}
+
 #[test]
 fn artifact_describe_validates_all_target_slots_and_env_extension() {
     let fixture = Fixture::new();
