@@ -54,6 +54,7 @@
       {"file": "commit-tag-parser.test.mjs", "reads": ["**/build-manifest.json", "che-devworkspaces", "elohim/brit", "elohim/holochain-conductor", "elohim/rakia", "sophia"]},
       {"file": "orchestrator-integration.test.mjs", "reads": ["**/Jenkinsfile", "**/build-manifest.json", ".ci-ignore", ".husky/pre-push.bash", "che-devworkspaces", "elohim/brit", "elohim/holochain-conductor", "elohim/rakia", "sophia"]},
       {"file": "jenkinsfile-cps-scope.test.mjs", "reads": ["**/Jenkinsfile"]},
+      {"file": "eprfs-ci-parity.test.mjs", "reads": ["justfile", "elohim/eprfs/Jenkinsfile"]},
       {"file": "baseline-hold.test.mjs", "reads": []},
       {"file": "storage-build-inputs.test.mjs", "reads": ["**/Cargo.toml", "**/package.json", ".ci-ignore", "elohim/elohim-agent/elohim-agent-sdk/Dockerfile", "elohim/elohim-agent/elohim-agent-sdk/src", "elohim/elohim-agent/elohim-agent-sdk/tsconfig.json", "elohim/elohim-storage/Dockerfile", "elohim/holochain/Jenkinsfile", "elohim/holochain/build-manifest.json", "pnpm-workspace.yaml", "scripts/ci"]},
       {"file": "validate-only-pipeline.test.mjs", "reads": ["elohim/holochain/Jenkinsfile", "elohim/holochain/build-manifest.json", "scripts/ci/run-dataplane-validation.sh"]},

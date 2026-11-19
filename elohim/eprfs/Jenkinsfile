@@ -134,6 +134,11 @@ spec:
                 # workspace; checkout ran as a different UID, so without this git answers
                 # "dubious ownership" (exit 128) and the test reads it as an error.
                 git config --global --add safe.directory "*"
+                # bin_build_view reads the dep-info cargo writes beside epr, and cargo writes it
+                # only when the bin is built as a top-level target. This is the bins step of the
+                # device gate recipe (_gate-eprfs in the root justfile);
+                # genesis/orchestrator/eprfs-ci-parity.test.mjs holds the two together.
+                cargo build -p elohim-epr-cli --bin epr -p elohim-device-runtime --bin bin-launch
                 cargo nextest run --workspace --all-targets --no-fail-fast
               '
             '''
