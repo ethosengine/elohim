@@ -347,3 +347,93 @@ test('no tracked Dockerfile, devfile or .cargo/config.toml sets -march= or targe
     `a tracked build config sets a CPU level outside declared_targets.\nhits:\n${hits.join('\n')}\nscanned (${scanned.length}):\n${scanned.join('\n')}`,
   );
 });
+
+// ── cc pushes -march=x86-64 only when rustc's target cpu is unset or x86-64 (cc src/lib.rs ~3350;
+// brit sprint 3 measured no -march at all under -C target-cpu=x86-64-v2). So a declared workspace's
+// builds hold their C baseline only while nothing sets a target cpu for them: the gate's rustflags,
+// the policy's cargo env, and the bin store's own builds. Cargo configs are the test above. ─────────
+const CPU_FLAG = /target-cpu|target-feature|-C\s*target|-Ctarget/;
+const RUSTFLAG_KEYS = /^(RUSTFLAGS|CARGO_ENCODED_RUSTFLAGS|CARGO_BUILD_RUSTFLAGS|CARGO_TARGET_[A-Z0-9_]+_RUSTFLAGS)$/;
+const BIN_STORE_EMPTY_RUSTFLAGS = /insert\("RUSTFLAGS"\.into\(\),\s*Some\(String::new\(\)\)\)/g;
+
+export function targetCpuProblems({ projects, overrides, workspaces, binStoreSource }) {
+  const problems = [];
+  const declared = projects.filter(p => workspaces.includes(p.run?.cargo?.workspace));
+  if (!declared.length) problems.push('no gate project builds a declared workspace');
+  for (const p of declared) {
+    const rustflags = p.run.cargo.rustflags ?? '';
+    if (CPU_FLAG.test(rustflags)) problems.push(`${p.name}: run.cargo.rustflags sets a target cpu (${rustflags})`);
+    for (const scope of ['*', p.name]) {
+      for (const [key, value] of Object.entries(overrides?.[scope] ?? {})) {
+        if (RUSTFLAG_KEYS.test(key) && CPU_FLAG.test(String(value))) problems.push(`${p.name}: cargo_env_overrides["${scope}"].${key} sets a target cpu`);
+      }
+      for (const [key, value] of Object.entries(p.run.cargo.env ?? {})) {
+        if (scope === p.name && RUSTFLAG_KEYS.test(key) && CPU_FLAG.test(String(value))) problems.push(`${p.name}: run.cargo.env.${key} sets a target cpu`);
+      }
+    }
+  }
+  const empties = (binStoreSource.match(BIN_STORE_EMPTY_RUSTFLAGS) ?? []).length;
+  if (empties < 2) problems.push(`bin_store/source.rs clears RUSTFLAGS for ${empties} of its 2 builds (the bin store builds epr outside the gate)`);
+  return problems;
+}
+
+test('fixture: a target cpu anywhere an eprfs-workspace build reads it is named', () => {
+  const ok = { name: 'eprfs', run: { cargo: { workspace: 'elohim/eprfs', rustflags: '' } } };
+  const source = 'insert("RUSTFLAGS".into(), Some(String::new()));\ninsert("RUSTFLAGS".into(), Some(String::new()));';
+  const base = { projects: [ok], overrides: {}, workspaces: ['elohim/eprfs'], binStoreSource: source };
+  assert.deepEqual(targetCpuProblems(base), []);
+  assert.match(targetCpuProblems({ ...base, projects: [{ ...ok, run: { cargo: { ...ok.run.cargo, rustflags: '-C target-cpu=x86-64-v2' } } }] })[0], /rustflags sets a target cpu/);
+  assert.match(targetCpuProblems({ ...base, overrides: { '*': { RUSTFLAGS: '-Ctarget-cpu=native' } } })[0], /cargo_env_overrides\["\*"\]\.RUSTFLAGS/);
+  assert.match(targetCpuProblems({ ...base, overrides: { eprfs: { CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS: '-C target-feature=+avx2' } } })[0], /CARGO_TARGET_/);
+  assert.match(targetCpuProblems({ ...base, projects: [{ ...ok, run: { cargo: { ...ok.run.cargo, env: { RUSTFLAGS: '-C target-cpu=haswell' } } } }] })[0], /run\.cargo\.env\.RUSTFLAGS/);
+  assert.match(targetCpuProblems({ ...base, binStoreSource: source.split('\n')[0] })[0], /1 of its 2 builds/);
+  assert.deepEqual(targetCpuProblems({ ...base, projects: [{ ...ok, run: { cargo: { workspace: 'elohim', rustflags: '-C target-cpu=native' } } }] }),
+    ['no gate project builds a declared workspace'], 'another workspace is not this record\'s business');
+});
+
+test('no build of a declared workspace sets a target cpu, so cc keeps pushing the baseline', async () => {
+  const { loadGateRegistry } = await import('./pipeline-registry.mjs');
+  const policy = JSON.parse(read('genesis/agentic/pool-policy.json'));
+  const workspaces = Object.entries(policy.declared_targets).filter(([k]) => !k.startsWith('_')).flatMap(([, t]) => t.workspaces);
+  const projects = [...loadGateRegistry(ROOT).values()];
+  assert.deepEqual(targetCpuProblems({ projects, overrides: policy.cargo_env_overrides, workspaces,
+    binStoreSource: read('elohim/eprfs/device-runtime/src/bin_store/source.rs') }), []);
+});
+
+// ── Row 29.2 ruling: the only producer of a release for sibling draw is eprfs-produce, for a
+// workspace declared_targets lists. A new producer for another workspace fails here until that
+// workspace has a record. (hc-mesh.sh also crosses `artifact put`, without --release: mesh
+// artifacts for storage, doorway and the beacon, whose locks the floors above hold at cc >= 1.11.) ─
+const SCRIPT = /(^|\/)(justfile|Jenkinsfile[^/]*|[^/]+\.(sh|bash|mjs|js|py))$/;
+
+/** The `artifact put` commands in a script text that put a release (`--release`), with line numbers. */
+export function releasePuts(text) {
+  const lines = text.split('\n');
+  const found = [];
+  lines.forEach((line, i) => {
+    if (!/\bartifact put\b/.test(line) || /^\s*(#|\/\/)/.test(line)) return;
+    let span = line;
+    for (let j = i; j < lines.length - 1 && j < i + 8 && /\\\s*$/.test(lines[j]); j++) span += `\n${lines[j + 1]}`;
+    if (/(^|\s)--release(\s|=)/.test(span)) found.push(i + 1);
+  });
+  return found;
+}
+
+test('fixture: a release put is found across continuations; a comment or a plain crossing put is not', () => {
+  assert.deepEqual(releasePuts('x=$(epr artifact put --method m \\\n  --release "$r" --cross)'), [1]);
+  assert.deepEqual(releasePuts('epr artifact put --method m --bytes b --cross'), []);
+  assert.deepEqual(releasePuts('# then `epr artifact put --release <r>` of the gate\'s bytes'), []);
+  assert.deepEqual(releasePuts('a\nepr artifact put --release=r'), [2]);
+});
+
+test('the only script that puts a release for sibling draw is eprfs-produce, for a declared workspace', () => {
+  const tracked = execFileSync('git', ['ls-files', '-z'], { cwd: ROOT, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })
+    .split('\0').filter(path => path && SCRIPT.test(path) && !/\.test\.(mjs|js|sh)$|(^|\/)(__tests__|tests?)\//.test(path));
+  const producers = tracked.filter(path => existsSync(resolve(ROOT, path)) && releasePuts(read(path)).length > 0);
+  assert.deepEqual(producers, ['genesis/orchestrator/eprfs-produce.sh'],
+    'a new release producer needs its workspace in pool-policy declared_targets (row 29.2) before it may offer to siblings');
+  const policy = JSON.parse(read('genesis/agentic/pool-policy.json'));
+  const workspaces = Object.entries(policy.declared_targets).filter(([k]) => !k.startsWith('_')).flatMap(([, t]) => t.workspaces);
+  assert.match(read('genesis/orchestrator/eprfs-produce.sh'), /--project eprfs\b/);
+  assert.ok(workspaces.includes('elohim/eprfs'), 'eprfs-produce offers the elohim/eprfs workspace, which must be declared');
+});
