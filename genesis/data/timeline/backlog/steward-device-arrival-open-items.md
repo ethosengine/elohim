@@ -630,6 +630,24 @@ Covered only by another crate's test read and NOT verified to be read by the gat
 include reference the audit cannot read, so the narrowing held on `self/nt-audit` would skip nothing
 for them today.
 
+Delta 2026-11-19 (lane E11, follow-up (b) built, held on `self/nt-e11` for review): the orchestrator
+suite declares its reads in `genesis/orchestrator/suite-reads.json`, which is also the suite
+(`suite-run.mjs`), and enforces them at run time. `read-fence.mjs` watches node fs, module loads and
+child_process; `read-fence-preload.c` (LD_PRELOAD, built per device at `-march=x86-64`) watches every
+dynamically linked child and names, at exec, a static or set-id program or a child that clears the
+fence. The git common dir, the submodules and the repository's other checkouts are judged as the
+repository. `orchestrator` runs the 60 named files under the fence and keys on their union (78 reads);
+`orchestrator-tree` runs the 28 files whose reads cannot be named, the Jenkins validation and the
+python suites, and keeps the whole-tree key. The split was measured: a tracer over the green suite,
+fenced runs until no violation remained, then 11 read-only skeptics (steward-authorised workflow) for
+reads one traced run could not exercise; they found submodule manifests a basename walk never keys, a
+PATH through the main checkout's `genesis/agentic/bin`, and install state behind a bare import.
+Before, on dev `90ac778f9` plus a documentation-only commit: `orchestrator` missed and ran in full,
+160 s. Residual, named: the registry walk also reads gitignored manifest copies, which no commit key
+sees; a `**/<name>` walk may still depend on other names in a listing. Found on the way and not
+fixed: 11 test files under `genesis/orchestrator` run in no gate, 2 of them red at `90ac778f9`
+(`pending-deploy`, `prepush-notes-skip`); `suite-reads.json` names them under `notInSuite`.
+
 ## Row 29 — admission lets a v3 device's C code onto a v2 device
 
 Found 2026-11-18 20:28Z (journal). Shem (x86-64-v2) drew `epr` from ethosengine at
