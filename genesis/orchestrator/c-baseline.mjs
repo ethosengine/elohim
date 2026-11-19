@@ -8,7 +8,8 @@
 // it; the gate exports those flags as CFLAGS_<triple> / CXXFLAGS_<triple>.
 //
 // Three checks per declared target that covers the selection, on its own host triple:
-//   probe        `<CC or cc> <cflags> -dM -E -x c /dev/null` defines no macro above the baseline;
+//   probe        `<the compiler cc picks> <cflags> -dM -E -x c /dev/null` defines no macro above
+//                the baseline (compilerOf: CC_<triple>, CC_<triple_u>, HOST_CC, CC, else cc);
 //   env          no other C-family flags variable is set (cc reads CFLAGS, TARGET_CFLAGS,
 //                HOST_CFLAGS and the dashed triple spelling ahead of or beside the declared one),
 //                and the declared underscore variable, when set, equals the record's cflags;
@@ -92,8 +93,22 @@ export function applicableTargets(record, { workspaces = null, triple = null, ho
     .filter(target => !workspaces || target.workspaces.some(ws => workspaces.includes(ws)));
 }
 
+/**
+ * The C compiler cc would run for `triple` built natively, as argv: cc 1.11.1 target_envs reads
+ * CC_<triple>, CC_<triple with underscores>, HOST_CC (TARGET_CC only when cross-compiling, and a
+ * checked target is always the host's) and CC; the first present wins, and a blank one means
+ * cc's default. The value is split on whitespace and every word kept: a wrapper (`ccache gcc`)
+ * and a flag (`gcc -mavx2`) both reach the probe.
+ */
+export function compilerOf(env, triple) {
+  const names = [`CC_${triple}`, `CC_${underscored(triple)}`, 'HOST_CC', 'CC'];
+  const chosen = names.find(name => env[name] !== undefined && env[name] !== null);
+  const words = String(chosen ? env[chosen] : '').trim().split(/\s+/).filter(Boolean);
+  return words.length ? words : ['cc'];
+}
+
 function probe({ target, env, spawn }) {
-  const [cmd, ...wrapped] = String(env.CC || 'cc').trim().split(/\s+/);
+  const [cmd, ...wrapped] = compilerOf(env, target.triple);
   const flags = target.cflags.split(/\s+/).filter(Boolean);
   const shown = [cmd, ...wrapped, ...flags].join(' ');
   let r;

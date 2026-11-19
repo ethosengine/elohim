@@ -37,6 +37,33 @@ test('probe: the declared cflags are passed to CC, and a clean preprocessor is n
   assert.equal(calls[1].cmd, 'cc', 'no CC probes cc');
 });
 
+test('probe: the compiler is the one cc picks, CC_<dashed triple>, CC_<underscored>, HOST_CC, CC, else cc', () => {
+  // cc 1.11.1 target_envs: [CC_<target>, CC_<target_u>, <HOST|TARGET>_CC, CC], first present wins;
+  // a native build (the only one checked: the host triple) reads HOST_CC, never TARGET_CC.
+  const pick = env => { const calls = []; checkCBaseline({ ...base, env, spawn: probing(BASELINE_MACROS, calls) }); return calls[0].cmd; };
+  const all = { CC: 'gcc-plain', HOST_CC: 'gcc-host', TARGET_CC: 'gcc-target', CC_x86_64_unknown_linux_gnu: 'gcc-under', 'CC_x86_64-unknown-linux-gnu': 'gcc-dash' };
+  assert.equal(pick(all), 'gcc-dash');
+  const { 'CC_x86_64-unknown-linux-gnu': _d, ...noDash } = all;
+  assert.equal(pick(noDash), 'gcc-under');
+  const { CC_x86_64_unknown_linux_gnu: _u, ...noTriple } = noDash;
+  assert.equal(pick(noTriple), 'gcc-host');
+  const { HOST_CC: _h, ...noHost } = noTriple;
+  assert.equal(pick(noHost), 'gcc-plain', 'TARGET_CC is not read for a native build');
+  assert.equal(pick({ TARGET_CC: 'gcc-target' }), 'cc');
+  assert.equal(pick({ 'CC_x86_64-unknown-linux-gnu': ' ', CC: 'gcc-plain' }), 'cc', 'the first present wins; empty falls back to cc');
+});
+
+test('probe: a compiler value with arguments keeps every one, so -mavx2 in CC is caught', () => {
+  const calls = [];
+  const [f, ...rest] = checkCBaseline({ ...base, env: { HOST_CC: 'ccache gcc -mavx2' },
+    spawn: (cmd, args, opts) => { calls.push({ cmd, args }); return { status: 0, stdout: args.includes('-mavx2') ? V3_MACROS : BASELINE_MACROS, stderr: '' }; } });
+  assert.equal(rest.length, 0);
+  assert.equal(calls[0].cmd, 'ccache');
+  assert.deepEqual(calls[0].args, ['gcc', '-mavx2', '-march=x86-64', '-dM', '-E', '-x', 'c', '/dev/null']);
+  assert.equal(f.check, 'probe');
+  assert.match(f.why, /ccache gcc -mavx2 -march=x86-64 still defines __AVX2__/);
+});
+
 test('probe: a compiler that still defines AVX2 at the declared flags is a finding naming the macros', () => {
   const [f, ...rest] = checkCBaseline({ ...base, env: {}, spawn: probing(V3_MACROS) });
   assert.equal(rest.length, 0);
