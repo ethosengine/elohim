@@ -658,6 +658,30 @@ fn declared_put(
     debug_str: Option<&[u8]>,
     ring: bool,
 ) -> (Output, Vec<FlowEvent>) {
+    declared_put_under(
+        inputs,
+        debug_str,
+        ring,
+        Some(&declared_policy(X86_64_RECORD)),
+    )
+}
+
+/// The fixture's declared target record, as genesis/agentic/pool-policy.json writes it: the
+/// fixture's triple (its rustc's host) for its workspace (`crate`, the directory of its lock).
+const X86_64_RECORD: &str = r#""x86_64-unknown-linux-gnu": {"isa": "x86-64", "cflags": "-march=x86-64", "workspaces": ["crate"]}"#;
+
+fn declared_policy(records: &str) -> String {
+    format!("{{\"declared_targets\": {{\"_comment\": \"fixture\", {records}}}}}\n")
+}
+
+/// [`declared_put`] with `policy` committed as the checkout's genesis/agentic/pool-policy.json
+/// (none when `None`).
+fn declared_put_under(
+    inputs: &[(&str, &str)],
+    debug_str: Option<&[u8]>,
+    ring: bool,
+    policy: Option<&str>,
+) -> (Output, Vec<FlowEvent>) {
     let keys = TempDir::new().unwrap();
     let a = Device::new(&keys, "a");
     let scratch = TempDir::new().unwrap();
@@ -685,6 +709,12 @@ fn declared_put(
         .unwrap();
         git(a.root(), &["add", "crate/Cargo.lock"]);
         git(a.root(), &["commit", "-qm", "ring in the closure"]);
+    }
+    if let Some(policy) = policy {
+        std::fs::create_dir_all(a.root().join("genesis/agentic")).unwrap();
+        std::fs::write(a.root().join("genesis/agentic/pool-policy.json"), policy).unwrap();
+        git(a.root(), &["add", "genesis/agentic/pool-policy.json"]);
+        git(a.root(), &["commit", "-qm", "the declared target record"]);
     }
     let (stub, _log) = brit_stub(scratch.path());
     let command = || {
@@ -897,6 +927,44 @@ fn a_declared_target_its_c_does_not_realize_refuses_and_records_no_marker() {
         assert_eq!(out.status.code(), Some(3), "{why}: {}", text(&out));
         let said = String::from_utf8_lossy(&out.stdout);
         assert!(said.contains("unrecorded:"), "{why}: {said}");
+        assert!(said.contains(reason), "{why}: {reason} in {said}");
+        assert!(produces.is_empty(), "{why}: {produces:?}");
+    }
+}
+
+/// Ruling 3 (L2a rework): put does not trust the descriptor's declaration alone. Without a
+/// pool-policy.json record at HEAD that declares the method's own triple, for the bin's
+/// workspace, with the same isa and cflags, the put refuses and records nothing.
+#[test]
+fn a_declared_target_the_record_at_head_does_not_declare_refuses() {
+    let v1 = gnu_c("-march=x86-64");
+    let record = |triple: &str, isa: &str, workspace: &str| {
+        declared_policy(&format!(
+            r#""{triple}": {{"isa": "{isa}", "cflags": "-march={isa}", "workspaces": ["{workspace}"]}}"#
+        ))
+    };
+    for (why, policy, reason) in [
+        ("no record at HEAD", None, "does not read at HEAD"),
+        (
+            "the record's isa differs",
+            Some(record("x86_64-unknown-linux-gnu", "x86-64-v2", "crate")),
+            "x86-64-v2\\\", and the method declares x86-64",
+        ),
+        (
+            "only a same-architecture neighbour is declared",
+            Some(record("x86_64-unknown-linux-musl", "x86-64", "crate")),
+            "declares no target \\\"x86_64-unknown-linux-gnu\\\"",
+        ),
+        (
+            "another workspace",
+            Some(record("x86_64-unknown-linux-gnu", "x86-64", "elohim/eprfs")),
+            "not the bin's workspace crate",
+        ),
+    ] {
+        let (out, produces) =
+            declared_put_under(&DECLARED_X86_64, Some(&v1), true, policy.as_deref());
+        assert_eq!(out.status.code(), Some(3), "{why}: {}", text(&out));
+        let said = String::from_utf8_lossy(&out.stdout);
         assert!(said.contains(reason), "{why}: {reason} in {said}");
         assert!(produces.is_empty(), "{why}: {produces:?}");
     }

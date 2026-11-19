@@ -183,6 +183,114 @@ fn isa_c_accepts_only_a_declaration_the_record_applies() {
     }
 }
 
+/// A checkout whose HEAD holds `crate/Cargo.lock` and, when given, `policy` as
+/// genesis/agentic/pool-policy.json.
+fn checkout(policy: Option<&str>) -> tempfile::TempDir {
+    let dir = tempfile::TempDir::new().unwrap();
+    let root = dir.path();
+    let git = |args: &[&str]| {
+        let out = crate::git::native_command(root)
+            .args([
+                "-c",
+                "user.name=t",
+                "-c",
+                "user.email=t@t",
+                "-c",
+                "commit.gpgsign=false",
+            ])
+            .args(args)
+            .output()
+            .unwrap();
+        assert!(out.status.success(), "git {args:?}: {out:?}");
+    };
+    git(&["init", "-q"]);
+    std::fs::create_dir_all(root.join("crate")).unwrap();
+    std::fs::write(root.join("crate/Cargo.lock"), "version = 4\n").unwrap();
+    if let Some(policy) = policy {
+        std::fs::create_dir_all(root.join("genesis/agentic")).unwrap();
+        std::fs::write(root.join("genesis/agentic/pool-policy.json"), policy).unwrap();
+    }
+    git(&["add", "."]);
+    git(&["commit", "-qm", "fixture", "--no-verify"]);
+    dir
+}
+
+fn policy(triple: &str, isa: &str, cflags: &str, workspace: &str) -> String {
+    serde_json::json!({
+        "declared_targets": {
+            "_comment": "fixture",
+            triple: {"isa": isa, "cflags": cflags, "workspaces": [workspace]},
+        }
+    })
+    .to_string()
+}
+
+/// Ruling 3 (L2a rework): the record at HEAD, not the descriptor alone, declares the target, and
+/// only for exactly the triple the method was built for.
+#[test]
+fn isa_c_takes_the_declared_target_from_the_record_at_head_for_the_exact_triple() {
+    let gnu = "x86_64-unknown-linux-gnu";
+    let with_triple = |triple: &str| {
+        let mut d = descriptor(&[("crate", "crate")]);
+        d.flags[1] = format!("--target={triple}");
+        d
+    };
+    let target = Declared {
+        isa: "x86-64",
+        march: "-march=x86-64",
+    };
+    let held = checkout(Some(&policy(gnu, "x86-64", "-march=x86-64", "crate")));
+    let repo = held.path().canonicalize().unwrap();
+    assert_eq!(
+        policy_declares(&repo, &with_triple(gnu), &target),
+        Vec::<String>::new()
+    );
+    // A same-architecture neighbour the record does not name is undeclared.
+    for triple in ["x86_64-unknown-linux-musl", "x86_64-unknown-linux-gnux32"] {
+        let found = policy_declares(&repo, &with_triple(triple), &target);
+        assert!(
+            found
+                .iter()
+                .any(|m| m.contains(&format!("declares no target {triple:?}"))),
+            "{triple}: {found:?}"
+        );
+    }
+    // A record whose values differ from the descriptor's, or that names another workspace.
+    for (record, why) in [
+        (
+            policy(gnu, "x86-64-v2", "-march=x86-64", "crate"),
+            "isa \"x86-64-v2\"",
+        ),
+        (
+            policy(gnu, "x86-64", "-march=x86-64-v3", "crate"),
+            "cflags \"-march=x86-64-v3\"",
+        ),
+        (
+            policy(gnu, "x86-64", "-march=x86-64", "elohim/eprfs"),
+            "not the bin's workspace crate",
+        ),
+    ] {
+        let held = checkout(Some(&record));
+        let repo = held.path().canonicalize().unwrap();
+        let found = policy_declares(&repo, &with_triple(gnu), &target);
+        assert!(found.iter().any(|m| m.contains(why)), "{why}: {found:?}");
+    }
+    // No record at HEAD (a working-tree copy is not HEAD's).
+    let bare = checkout(None);
+    let repo = bare.path().canonicalize().unwrap();
+    std::fs::create_dir_all(repo.join("genesis/agentic")).unwrap();
+    std::fs::write(
+        repo.join("genesis/agentic/pool-policy.json"),
+        policy(gnu, "x86-64", "-march=x86-64", "crate"),
+    )
+    .unwrap();
+    let found = policy_declares(&repo, &with_triple(gnu), &target);
+    assert!(
+        found.iter().any(|m| m.contains("does not read at HEAD")),
+        "{found:?}"
+    );
+}
+
 /// Ruling 4 (L2a rework): a diagnostic-only switch the gate declares (cc's command log) is
 /// recorded and allowed under a declared target; every other C-tool input still refuses, the
 /// archiver and its flags included, and so does a switch that changes what cc builds.

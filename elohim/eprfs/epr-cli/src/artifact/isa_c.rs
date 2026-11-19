@@ -184,6 +184,89 @@ fn record_applies(descriptor: &MethodDescriptor, cflags: &str) -> Vec<String> {
     missing
 }
 
+/// The record a declared target must agree with, read at the checkout's HEAD.
+const POLICY: &str = "genesis/agentic/pool-policy.json";
+
+/// Ruling 3 (L2a rework): one triple source, the compiler's, and the record is the authority, not
+/// the descriptor's declaration alone. `declared_targets` in pool-policy.json at the checkout's
+/// HEAD (read with this device's declared checkout trust) must hold exactly the descriptor's
+/// triple (the one `rustc -vV` named to describe, never a same-architecture neighbour such as
+/// `x86_64-unknown-linux-musl` or `-gnux32`), listing the bin's cargo workspace (the directory of
+/// the `Cargo.lock` cargo uses for its crate), with the same `isa` and `cflags`. Every reason it
+/// does not is returned.
+pub(super) fn policy_declares(
+    repo: &Path,
+    descriptor: &MethodDescriptor,
+    declared: &Declared<'_>,
+) -> Vec<String> {
+    let triple = host::target(descriptor);
+    let crate_dir = descriptor
+        .non_path_inputs
+        .get(CRATE_INPUT)
+        .map_or(".", String::as_str);
+    let Some(workspace) = cargo_project::lock_path(repo, &repo.join(crate_dir))
+        .and_then(|lock| lock.parent().map(Path::to_path_buf))
+        .map(|dir| {
+            let relative = dir.strip_prefix(repo).unwrap_or(&dir).to_string_lossy();
+            if relative.is_empty() {
+                ".".to_owned()
+            } else {
+                relative.replace('\\', "/")
+            }
+        })
+    else {
+        return vec![format!(
+            "{DECLARED}: {crate_dir} has no Cargo.lock, so its workspace is not one {POLICY} can \
+             declare"
+        )];
+    };
+    let output = crate::git::command(repo)
+        .args(["show", &format!("HEAD:{POLICY}")])
+        .output();
+    let text = match output {
+        Ok(output) if output.status.success() => output.stdout,
+        Ok(output) => {
+            return vec![format!(
+                "{DECLARED}: {POLICY} does not read at HEAD ({}), so no record declares this \
+                 target",
+                String::from_utf8_lossy(&output.stderr).trim()
+            )]
+        }
+        Err(e) => return vec![format!("{DECLARED}: git show HEAD:{POLICY}: {e}")],
+    };
+    let policy: serde_json::Value = match serde_json::from_slice(&text) {
+        Ok(policy) => policy,
+        Err(e) => return vec![format!("{DECLARED}: {POLICY} at HEAD is not JSON: {e}")],
+    };
+    let Some(record) = policy["declared_targets"].get(triple) else {
+        return vec![format!(
+            "{DECLARED}: {POLICY} at HEAD declares no target {triple:?}, the triple the method was \
+             built for; a declared target is the record's, not the descriptor's alone"
+        )];
+    };
+    let mut missing = Vec::new();
+    let listed = record["workspaces"]
+        .as_array()
+        .is_some_and(|w| w.iter().any(|w| w.as_str() == Some(workspace.as_str())));
+    if !listed {
+        missing.push(format!(
+            "{DECLARED}: {POLICY} at HEAD declares {triple} for {}, not the bin's workspace \
+             {workspace}",
+            record["workspaces"]
+        ));
+    }
+    for (field, value) in [("isa", declared.isa), ("cflags", declared.march)] {
+        if record[field].as_str() != Some(value) {
+            missing.push(format!(
+                "{DECLARED}: {POLICY} at HEAD declares {triple} {field} {}, and the method \
+                 declares {value}",
+                record[field]
+            ));
+        }
+    }
+    missing
+}
+
 /// Check 2 over the bytes: every `GNU C` producer string carries `march` and no other ISA token.
 /// `Ok(n)` is the number of distinct producer strings read (zero is the caller's to judge).
 pub(super) fn producers(bytes: &[u8], march: &str) -> Result<usize, Vec<String>> {

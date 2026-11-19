@@ -7,7 +7,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { arch, platform, tmpdir } from "node:os";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -18,10 +18,10 @@ const ROOT = fileURLToPath(new URL("../../", import.meta.url));
 const RELEASE = "bafyreistubreleasestubreleasestubreleasestubrelease";
 const OUTPUTS = { epr: "bafkrstubeproutput", "bin-launch": "bafkrstublaunchoutput" };
 const SOURCES = "elohim/eprfs/bin-build-view.json#bin-build";
-// The triple the producer looks its declared target up under: this host's, as uname names it
-// (c-baseline.mjs hostTripleOf maps the same two). null on a host the record cannot name.
-const HOST = platform() === "linux" ? { x64: "x86_64", arm64: "aarch64" }[arch()] : undefined;
-const HOST_TRIPLE = HOST ? `${HOST}-unknown-linux-gnu` : null;
+// The triple the producer looks its declared target up under: the compiler's, as `rustc -vV`'s
+// host line names it (E12 L2a rework, ruling 3). The stub rustc names this one unless
+// STUB_RUSTC_HOST says otherwise (empty: no host line at all).
+const HOST_TRIPLE = "x86_64-unknown-linux-gnu";
 // A declared target whose values are no literal the script could carry, so passing them proves the
 // producer read them from the record (pool-policy.json declared_targets, row 29.2).
 const FIXTURE_TARGET = { isa: "x86-64-fixture", cflags: "-march=x86-64-fixture" };
@@ -55,6 +55,15 @@ if (args[0] === 'bin' && args[3] === 'source-state') {
   }
   console.log(JSON.stringify({ output: ${JSON.stringify(OUTPUTS)}[value('--release-bin')], crosses: true }));
 }
+`;
+
+// A stub rustc: `-vV` names STUB_RUSTC_HOST (default HOST_TRIPLE) as its host, the way the real one
+// names the triple it compiles for; an empty STUB_RUSTC_HOST prints no host line.
+const STUB_RUSTC = `#!/usr/bin/env node
+const host = process.env.STUB_RUSTC_HOST ?? ${JSON.stringify(HOST_TRIPLE)};
+console.log('rustc 1.100.0 (stub)');
+if (host) console.log('host: ' + host);
+console.log('release: 1.100.0');
 `;
 
 // A stub cargo: logs argv; `build` writes each named --bin (the stub epr for epr) and its dep-info.
@@ -116,7 +125,7 @@ function fixture(t, { policy } = {}) {
   git("-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false", "commit", "-qm", "fixture", "--no-verify");
   const head = git("rev-parse", "HEAD").stdout.trim();
   assert.match(head, /^[0-9a-f]{40}$/);
-  for (const [name, body] of [["epr", STUB_EPR], ["cargo", STUB_CARGO], ["c-baseline.mjs", STUB_CHECK]]) {
+  for (const [name, body] of [["epr", STUB_EPR], ["cargo", STUB_CARGO], ["rustc", STUB_RUSTC], ["c-baseline.mjs", STUB_CHECK]]) {
     writeFileSync(join(stubs, name), body);
     chmodSync(join(stubs, name), 0o755);
   }
@@ -273,7 +282,7 @@ function recognize(stdout, exitCode) {
 
 test("a_failing_c_baseline_check_withholds_the_offer_with_its_first_finding_and_never_describes", (t) => {
   // A declared target in the record changes nothing here: the check speaks first.
-  const f = fixture(t, HOST_TRIPLE ? { policy: policyWith(FIXTURE_TARGET) } : {});
+  const f = fixture(t, { policy: policyWith(FIXTURE_TARGET) });
   const r = run(f, "build", { ...C_LEVEL, STUB_CHECK_FAIL: "1" });
   assert.equal(r.status, 0, r.stderr);
   assert.deepEqual(skipped(r.stdout), [`[gate] epr producer put withheld (${FINDING}; gate remains green)`]);
@@ -368,7 +377,7 @@ test("unset_c_flags_are_not_recorded", (t) => {
   assert.ok(!d.some((a) => /^C(XX)?FLAGS/.test(a)), d.join(" "));
 });
 
-test("the_declared_target_for_this_host_is_passed_to_describe_from_the_record", { skip: !HOST_TRIPLE && "no triple names this host" }, (t) => {
+test("the_declared_target_for_this_host_is_passed_to_describe_from_the_record", (t) => {
   const policy = policyWith(FIXTURE_TARGET);
   policy.declared_targets["riscv64gc-unknown-linux-gnu"] = { isa: "rv64gc", cflags: "-march=rv64gc", workspaces: ["elohim/eprfs"] };
   const f = fixture(t, { policy });
@@ -382,18 +391,16 @@ test("the_declared_target_for_this_host_is_passed_to_describe_from_the_record", 
 });
 
 test("a_record_with_no_declared_target_for_this_host_and_workspace_passes_none", (t) => {
-  const other = HOST_TRIPLE === "aarch64-unknown-linux-gnu" ? "x86_64-unknown-linux-gnu" : "aarch64-unknown-linux-gnu";
+  const other = "aarch64-unknown-linux-gnu";
   const cases = [
     ["no pool-policy.json", undefined],
     ["no declared_targets", { cargo_env_overrides: {} }],
     ["only a _comment", { declared_targets: { _comment: "nothing declared" } }],
     ["another triple only", policyWith(FIXTURE_TARGET, other)],
   ];
-  if (HOST_TRIPLE) {
-    const elsewhere = policyWith(FIXTURE_TARGET);
-    elsewhere.declared_targets[HOST_TRIPLE].workspaces = ["elohim/elohim-storage"];
-    cases.push(["this triple, another workspace", elsewhere]);
-  }
+  const elsewhere = policyWith(FIXTURE_TARGET);
+  elsewhere.declared_targets[HOST_TRIPLE].workspaces = ["elohim/elohim-storage"];
+  cases.push(["this triple, another workspace", elsewhere]);
   for (const [why, policy] of cases) {
     const f = fixture(t, { policy });
     const r = run(f, "build", C_LEVEL);
@@ -406,7 +413,7 @@ test("a_record_with_no_declared_target_for_this_host_and_workspace_passes_none",
   }
 });
 
-test("an_unreadable_or_partial_declared_target_withholds_the_offer_and_never_describes", { skip: !HOST_TRIPLE && "no triple names this host" }, (t) => {
+test("an_unreadable_or_partial_declared_target_withholds_the_offer_and_never_describes", (t) => {
   const partial = policyWith(FIXTURE_TARGET);
   delete partial.declared_targets[HOST_TRIPLE].cflags;
   const blank = policyWith({ isa: "", cflags: "-march=x86-64" });
@@ -421,6 +428,38 @@ test("an_unreadable_or_partial_declared_target_withholds_the_offer_and_never_des
     assert.deepEqual(skipped(r.stdout), [`[gate] epr producer put withheld (${reason}; gate remains green)`]);
     assert.ok(!r.calls.some((c) => c[1] === "artifact"), "nothing is described, keyed or put");
   }
+});
+
+// Ruling 3 (E12 L2a rework): one triple source, the compiler's. An x86_64 build for another libc
+// or ABI is not the gnu record's, even on the same machine: it declares nothing, and the C
+// baseline check is asked about that triple, not the machine's.
+test("the_triple_is_the_compilers_and_an_undeclared_same_architecture_triple_declares_nothing", (t) => {
+  for (const host of ["x86_64-unknown-linux-musl", "x86_64-unknown-linux-gnux32"]) {
+    const f = fixture(t, { policy: policyWith(FIXTURE_TARGET) });
+    const r = run(f, "build", { ...C_LEVEL, STUB_RUSTC_HOST: host });
+    try {
+      assert.equal(r.status, 0, r.stderr);
+      assert.ok(verb(r.calls, "c-baseline", "--triple", host) >= 0, r.calls.map((c) => c.join(" ")).join("\n"));
+      assert.equal(verb(r.calls, "c-baseline", "--triple", HOST_TRIPLE), -1, "never the machine's triple");
+      const describes = r.calls.filter((c) => c[1] === "artifact" && c[2] === "describe");
+      assert.equal(describes.length, 2, r.stdout);
+      for (const d of describes) assert.ok(!d.some((a) => a.startsWith("--target-")), d.join(" "));
+      assert.equal(r.calls.filter((c) => c[1] === "artifact" && c[2] === "put").length, 2, r.stdout);
+    } catch (e) {
+      e.message = `${host}: ${e.message}`;
+      throw e;
+    }
+  }
+});
+
+test("a_rustc_that_names_no_host_triple_withholds_the_offer", (t) => {
+  const f = fixture(t, { policy: policyWith(FIXTURE_TARGET) });
+  const r = run(f, "build", { ...C_LEVEL, STUB_RUSTC_HOST: "" });
+  assert.equal(r.status, 0, r.stderr);
+  assert.deepEqual(skipped(r.stdout), [
+    "[gate] epr producer put withheld (rustc -vV names no host triple, so the build's target is unknown; gate remains green)",
+  ]);
+  assert.ok(!r.calls.some((c) => c[1] === "artifact"), "nothing is described, keyed or put");
 });
 
 test("the_producer_is_off_when_asked", (t) => {

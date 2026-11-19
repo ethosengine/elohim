@@ -75,6 +75,12 @@ release="$(json_field "$ingest_json" 'd.get("cid") or d.get("rcid")')"
 [[ -x "$epr" ]] || skip "$epr is not executable"
 [[ -f "$repo/${sources%%#*}" ]] || skip "${sources%%#*} is not in the checkout"
 
+# The triple the build compiled for, from the compiler that built it (`rustc -vV`'s host line, the
+# triple describe records): one source, so the record looked up below is the build's own and an
+# x86_64 musl or gnux32 build never reads the gnu record (E12 L2a rework, ruling 3).
+host_triple="$(rustc -vV 2>/dev/null | sed -n 's/^host: //p')"
+[[ -n "$host_triple" ]] || withhold "rustc -vV names no host triple, so the build's target is unknown"
+
 # The C level, in this same environment the build ran in. A missing checker withholds too: an
 # offer whose C level nobody read is the one that trapped on shem.
 check="${EPRFS_C_BASELINE_CHECK:-$here/c-baseline.mjs}"
@@ -84,7 +90,7 @@ check="${EPRFS_C_BASELINE_CHECK:-$here/c-baseline.mjs}"
 [[ -f "$check" ]] || withhold "the C baseline check $check is not there"
 # The finding is the checker's stdout alone; its stderr (a node warning, a trace) goes to the gate
 # log as it is, never into the withheld reason.
-said="$(node "$check" --triple x86_64-unknown-linux-gnu)"
+said="$(node "$check" --triple "$host_triple")"
 status=$?
 if ((status != 0)); then
   finding="$(reason_of "$said")"
@@ -92,18 +98,13 @@ if ((status != 0)); then
 fi
 
 # The declared target, read from the record at this checkout (pool-policy.json declared_targets,
-# row 29.2) for this host's triple and this workspace, never written here: describe takes it as
+# row 29.2) for the build's triple and this workspace, never written here: describe takes it as
 # --target-isa / --target-cflags, and `put` checks the recorded CFLAGS_<triple> and the C
 # producer strings in the bytes against it before it writes the env:isa-c marker (E12 L2a). No
 # record for this host or workspace declares nothing, and put then writes no marker. A record that
 # names this host and workspace but cannot be read whole withholds: an offer whose target nobody
 # could read is the one that trapped on shem.
 policy="genesis/agentic/pool-policy.json"
-case "$(uname -s)/$(uname -m)" in
-  Linux/x86_64) host_triple=x86_64-unknown-linux-gnu ;;
-  Linux/aarch64) host_triple=aarch64-unknown-linux-gnu ;;
-  *) host_triple= ;;
-esac
 said="$(python3 -c 'import json, os, sys
 path, triple, workspace = sys.argv[1:4]
 if not os.path.exists(path):
