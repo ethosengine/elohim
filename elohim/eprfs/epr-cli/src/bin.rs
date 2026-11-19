@@ -309,35 +309,46 @@ const ISA_C_CURE: &str =
     "the producer rebuilds under the declared target, or build for this device";
 
 /// Before an explicit `land <cid>` or `pin --cid <cid>`: a held release drawn from a sibling
-/// (`gateRun` `sibling:<device>`) runs its own `epr doctor --exercise`, and a signal death, a
-/// timeout or any non-zero exit refuses it. Executing the held bytes needs no sibling record, so
-/// the judgement survives a restart. A release this device built, or one whose record cannot be
-/// read (the store refuses those itself), is not judged here.
+/// runs its own `epr doctor --exercise`, and a signal death, a timeout or any non-zero exit
+/// refuses it. Executing the held bytes needs no sibling record, so the judgement survives a
+/// restart.
+///
+/// Nothing is executed before the store's own verification (`Store::verified`, which hashes
+/// every bin against the record and the record against its release CID) accepts the release: a
+/// damaged or replaced file is left for the store to refuse. Provenance is read from the typed
+/// record (`bin_store::Release`), and the release is judged when its original ingest or any later
+/// one came from a sibling (`gateRun` `sibling:<device>`). A release only this device built is
+/// not judged here.
 fn judge_held(store: &Store, cid: &str) -> Result<(), Refusal> {
-    if cid.is_empty() || !cid.bytes().all(|b| b.is_ascii_alphanumeric()) {
+    if !store.verified(cid) {
         return Ok(());
     }
     let dir = store.root().join(cid);
-    let Some(record) = std::fs::read(dir.join("record.json"))
+    let Some(release) = std::fs::read(dir.join("record.json"))
         .ok()
-        .and_then(|bytes| serde_json::from_slice::<Value>(&bytes).ok())
+        .and_then(|bytes| serde_json::from_slice::<bin_store::Release>(&bytes).ok())
     else {
         return Ok(());
     };
-    let Some(gate) = record["gateRun"]
-        .as_str()
-        .filter(|gate| gate.starts_with("sibling:"))
+    let Some(gate) = std::iter::once(&release.provenance)
+        .chain(&release.sources)
+        .filter_map(|source| source.gate_run.as_deref())
+        .find(|gate| gate.starts_with("sibling:"))
     else {
         return Ok(());
     };
-    crate::exercise::judge(&dir.join("epr"), crate::exercise::TIMEOUT).map_err(|verdict| {
-        Refusal {
-            kind: "sibling-exercise-failed".into(),
-            detail: format!(
-                "release {cid} was drawn from a sibling ({gate}) and its own {verdict}; nothing                  was landed or pinned; cure: {ISA_C_CURE}"
-            ),
-        }
-    })
+    let refused = |why: String| Refusal {
+        kind: "sibling-exercise-failed".into(),
+        detail: format!(
+            "release {cid} was drawn from a sibling ({gate}) and {why}; nothing was landed or \
+             pinned; cure: {ISA_C_CURE}"
+        ),
+    };
+    if !release.bins.contains_key("epr") {
+        return Err(refused("holds no epr to exercise".into()));
+    }
+    crate::exercise::judge(&dir.join("epr"), crate::exercise::TIMEOUT)
+        .map_err(|verdict| refused(format!("its own {verdict}")))
 }
 
 /// Whether `manifest` declares a supervised `peer serve` running `tool`'s landed release: a
@@ -409,19 +420,11 @@ pub(crate) mod sibling {
     #[cfg(feature = "peer")]
     const C_BASELINES: [(&str, &str); 1] = [("x86_64-unknown-linux-gnu", "x86-64")];
 
-    /// The target triple this epr was compiled for, when it is one [`C_BASELINES`] can name.
-    #[cfg(all(
-        feature = "peer",
-        target_arch = "x86_64",
-        target_os = "linux",
-        target_env = "gnu"
-    ))]
-    const OWN_TARGET: Option<&str> = Some("x86_64-unknown-linux-gnu");
-    #[cfg(all(
-        feature = "peer",
-        not(all(target_arch = "x86_64", target_os = "linux", target_env = "gnu"))
-    ))]
-    const OWN_TARGET: Option<&str> = None;
+    /// The target triple this epr was compiled for, exactly as cargo named it to `build.rs`.
+    /// Never synthesised from `cfg` predicates: GNU x32 (`x86_64-unknown-linux-gnux32`) also
+    /// satisfies x86_64, linux and gnu, and must not read as the x86_64 baseline.
+    #[cfg(feature = "peer")]
+    pub(crate) const OWN_TARGET: &str = env!("EPR_CLI_TARGET");
 
     /// The baseline [`C_BASELINES`] holds for `target`, with the triple it was found under.
     #[cfg(feature = "peer")]
@@ -445,9 +448,8 @@ pub(crate) mod sibling {
         let Some((triple, baseline)) = c_baseline(target) else {
             return Err(format!(
                 "unmeasured-requirement: {whose} cannot be judged: this epr knows no C baseline \
-                 for its target ({}-{}), so it reads no env:isa-c as measured; cure: {ISA_C_CURE}",
-                std::env::consts::ARCH,
-                std::env::consts::OS
+                 for its target ({}), so it reads no env:isa-c as measured; cure: {ISA_C_CURE}",
+                target.unwrap_or("unnamed")
             ));
         };
         match stated {
@@ -938,7 +940,7 @@ pub(crate) mod sibling {
             // Row 29.2: the statement is read from the Rust-visible bytes, and the C a release
             // links can still need a newer CPU than its clauses say. Only the producer's checked
             // marker vouches for that, so a bin without it is never fetched.
-            isa_c_admits(bin, offer, stated.isa_c.as_deref(), OWN_TARGET)?;
+            isa_c_admits(bin, offer, stated.isa_c.as_deref(), Some(OWN_TARGET))?;
             admit(bin, &document).map_err(|unmet| {
                 format!(
                     "requirement-unmet: {bin} of release {} from {} cannot run here: {unmet}; \
@@ -2145,24 +2147,30 @@ mod tests {
         }
     }
 
-    /// A held release `cid` whose record says `gate_run`, with `epr` running `body`.
-    fn held(store_root: &Path, cid: &str, gate_run: &str, body: &str) {
-        use std::os::unix::fs::PermissionsExt;
-        let dir = store_root.join(cid);
-        std::fs::create_dir_all(&dir).unwrap();
-        std::fs::write(
-            dir.join("record.json"),
-            json!({"cid": cid, "gateRun": gate_run}).to_string(),
-        )
-        .unwrap();
-        std::fs::write(dir.join("epr"), format!("#!/bin/sh\n{body}\n")).unwrap();
-        std::fs::set_permissions(dir.join("epr"), std::fs::Permissions::from_mode(0o755)).unwrap();
+    /// Ingests the two bins in `dir` as a release of `commit` supplied by `gate_run`, as the draw
+    /// or a gate ingests them, and returns its CID.
+    #[cfg(feature = "peer")]
+    fn held_release(store: &Store, dir: &Path, commit: &str, gate_run: &str) -> String {
+        let release = store
+            .ingest(
+                &dir.join("epr"),
+                &IngestOptions {
+                    repo: dir.parent().map(Path::to_path_buf),
+                    source_commit: Some(commit.into()),
+                    gate_run: Some(gate_run.into()),
+                    tree_clean: Some(true),
+                    closure: false,
+                },
+            )
+            .unwrap();
+        assert!(store.verified(&release.cid), "the fixture release verifies");
+        release.cid
     }
 
-    #[test]
-    fn an_explicit_land_or_pin_of_a_siblings_release_runs_its_exercise_first() {
-        let tmp = tempfile::tempdir().unwrap();
-        let registry = tmp.path().join("bin-tools.json");
+    /// `epr bin <verb…>` against the store [`two_bin_store`] opens under `root`.
+    #[cfg(feature = "peer")]
+    fn bin_command(root: &Path, verb: &[&str]) -> Result<String, Refusal> {
+        let registry = root.join("bin-tools.json");
         std::fs::write(
             &registry,
             json!({"version":1,"tools":{"epr":{"bins":["epr","bin-launch"],"aliases":{},
@@ -2170,32 +2178,36 @@ mod tests {
             .to_string(),
         )
         .unwrap();
-        let store_root = tmp.path().join("store/epr");
-        let args = |verb: &[&str]| -> Vec<String> {
-            let mut args: Vec<String> = verb.iter().map(|arg| (*arg).to_owned()).collect();
-            for (flag, value) in [
-                ("--registry", registry.to_str().unwrap()),
-                ("--store", store_root.to_str().unwrap()),
-                ("--tool", "epr"),
-            ] {
-                args.push(flag.into());
-                args.push(value.into());
-            }
-            args
-        };
-        held(
-            &store_root,
-            "bafyreicrashed",
-            "sibling:did:key:z6MkA",
-            "kill -ILL $$",
-        );
-        held(&store_root, "bafyreiold", "sibling:did:key:z6MkA", "exit 2");
-        for (cid, kind) in [("bafyreicrashed", "signal: "), ("bafyreiold", "exit: ")] {
+        let mut args: Vec<String> = verb.iter().map(|arg| (*arg).to_owned()).collect();
+        for (flag, value) in [
+            ("--registry", registry.to_str().unwrap()),
+            ("--store", root.join("store/epr").to_str().unwrap()),
+            ("--tool", "epr"),
+        ] {
+            args.push(flag.into());
+            args.push(value.into());
+        }
+        execute(&args)
+    }
+
+    #[cfg(feature = "peer")]
+    #[test]
+    fn an_explicit_land_or_pin_of_a_verified_siblings_release_runs_its_exercise_first() {
+        let tmp = tempfile::tempdir().unwrap();
+        let store = two_bin_store(tmp.path());
+        let launcher = "#!/bin/sh\n# sibling launcher\n";
+        for (name, body, kind) in [
+            ("crashed", "kill -ILL $$", "its own signal: "),
+            ("old", "exit 2", "its own exit: "),
+        ] {
+            let dir = tmp.path().join(name);
+            sibling_bins_with(&dir, &format!("#!/bin/sh\n{body}\n"), launcher);
+            let cid = held_release(&store, &dir, "c0ffee", "sibling:did:key:z6MkA");
             for verb in [
-                vec!["land", cid, "--expect", "none", "--commit", "c0ffee"],
-                vec!["pin", "--cid", cid],
+                vec!["land", &cid, "--expect", "none", "--commit", "c0ffee"],
+                vec!["pin", "--cid", &cid],
             ] {
-                let refusal = execute(&args(&verb)).unwrap_err();
+                let refusal = bin_command(tmp.path(), &verb).unwrap_err();
                 assert_eq!(refusal.kind, "sibling-exercise-failed", "{verb:?}");
                 assert!(
                     refusal.detail.contains(kind),
@@ -2207,28 +2219,87 @@ mod tests {
                     "{}",
                     refusal.detail
                 );
+                assert!(!refusal.detail.contains("  "), "{}", refusal.detail);
             }
         }
-        // A release this device built is not judged: whatever the store says of it stands.
-        held(&store_root, "bafyreimine", "gate:local", "kill -ILL $$");
-        let refusal = execute(&args(&["pin", "--cid", "bafyreimine"])).unwrap_err();
-        assert_ne!(
-            refusal.kind, "sibling-exercise-failed",
-            "{}",
-            refusal.detail
+        // A release only this device built is not judged; a sibling's that passes reaches the
+        // store. Either way the refusal, if any, is the store's own.
+        for (name, body, gate) in [
+            ("mine", "kill -ILL $$ # built here", "gate:local"),
+            ("good", "exit 0", "sibling:did:key:z6MkA"),
+        ] {
+            let dir = tmp.path().join(name);
+            sibling_bins_with(&dir, &format!("#!/bin/sh\n{body}\n"), launcher);
+            let cid = held_release(&store, &dir, "c0ffee", gate);
+            if let Err(refusal) = bin_command(tmp.path(), &["pin", "--cid", &cid]) {
+                assert_ne!(
+                    refusal.kind, "sibling-exercise-failed",
+                    "{}",
+                    refusal.detail
+                );
+            }
+        }
+    }
+
+    #[cfg(feature = "peer")]
+    #[test]
+    fn a_held_release_whose_bytes_do_not_make_its_cid_is_never_executed() {
+        use std::os::unix::fs::PermissionsExt;
+        let tmp = tempfile::tempdir().unwrap();
+        let store = two_bin_store(tmp.path());
+        let marker = tmp.path().join("executed");
+        let dir = tmp.path().join("drawn");
+        sibling_bins_with(
+            &dir,
+            &format!("#!/bin/sh\ntouch '{}'\n", marker.display()),
+            "#!/bin/sh\n# sibling launcher\n",
         );
-        // A sibling's release whose exercise passes reaches the store.
-        held(
-            &store_root,
-            "bafyreigood",
-            "sibling:did:key:z6MkA",
-            "exit 0",
-        );
-        let refusal = execute(&args(&["pin", "--cid", "bafyreigood"])).unwrap_err();
-        assert_ne!(
-            refusal.kind, "sibling-exercise-failed",
-            "{}",
-            refusal.detail
-        );
+        let cid = held_release(&store, &dir, "c0ffee", "sibling:did:key:z6MkA");
+        // The held epr is replaced after it was verified: its bytes no longer make the CID.
+        let held = store.root().join(&cid).join("epr");
+        std::fs::set_permissions(&held, std::fs::Permissions::from_mode(0o755)).unwrap();
+        std::fs::write(
+            &held,
+            format!("#!/bin/sh\ntouch '{}' # replaced\n", marker.display()),
+        )
+        .unwrap();
+        assert!(!store.verified(&cid));
+        for verb in [
+            vec!["land", &cid, "--expect", "none", "--commit", "c0ffee"],
+            vec!["pin", "--cid", &cid],
+        ] {
+            let refusal = bin_command(tmp.path(), &verb).unwrap_err();
+            assert_ne!(refusal.kind, "sibling-exercise-failed", "{verb:?}");
+            assert!(
+                !marker.exists(),
+                "{verb:?}: the unverified bytes were executed"
+            );
+        }
+    }
+
+    #[cfg(feature = "peer")]
+    #[test]
+    fn the_own_target_is_the_triple_cargo_compiled_for() {
+        assert_eq!(sibling::OWN_TARGET, env!("EPR_CLI_TARGET"));
+        // A test build is native, so its target is the host rustc reports.
+        let rustc = std::env::var("RUSTC").unwrap_or_else(|_| "rustc".into());
+        let out = std::process::Command::new(rustc)
+            .arg("-vV")
+            .output()
+            .unwrap();
+        let host = String::from_utf8_lossy(&out.stdout)
+            .lines()
+            .find_map(|line| line.strip_prefix("host: ").map(str::to_owned))
+            .expect("rustc -vV names its host");
+        assert_eq!(sibling::OWN_TARGET, host);
+        // GNU x32 satisfies x86_64, linux and gnu; it, like any triple without an entry, has no
+        // baseline.
+        for target in [
+            "x86_64-unknown-linux-gnux32",
+            "x86_64-unknown-linux-musl",
+            "aarch64-unknown-linux-gnu",
+        ] {
+            assert_eq!(sibling::c_baseline(Some(target)), None, "{target}");
+        }
     }
 }

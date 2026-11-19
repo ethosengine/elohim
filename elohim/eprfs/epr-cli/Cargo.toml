@@ -93,7 +93,9 @@ iced-x86 = { version = "1.21.0", default-features = false, features = ["std", "d
 toml = "0.8.23"
 # Advisory file locking for the recall executor's session continuation — a safe `flock`
 # wrapper, so the lock needs no `unsafe` block in this crate.
-rustix = { version = "1", features = ["fs"] }
+# `process`: `epr doctor --exercise`'s judge (`src/exercise.rs`) runs a release in a process
+# group of its own and kills the whole group at its deadline, without an `unsafe` block.
+rustix = { version = "1", features = ["fs", "process"] }
 # The semantic fold's derived store (`.eprfs/status/index/<measure-cid>/fold.sqlite`): chunks,
 # their vectors and an FTS5 table the lexical provider shares. `bundled` compiles SQLite with FTS5
 # in, so the store does not depend on whichever libsqlite3 a machine happens to carry.

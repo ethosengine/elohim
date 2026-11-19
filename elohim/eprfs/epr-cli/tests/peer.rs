@@ -496,35 +496,95 @@ fn serve_check_takes_no_serve_lock_and_writes_nothing() {
     );
 }
 
-/// `epr peer serve --check` with the exercise fault `fault` injected (test opt-in only).
-fn check_with_fault(device: &Device, policy: &Path, fault: &str) -> Output {
-    device
-        .command()
+/// The environment that makes [`serve_check_with_child`] act: the exercise outcome to inject
+/// (`trap`, `wrong` or `ok`) and the `peer serve` arguments as JSON. Read only by this test
+/// binary; the released `epr` has no such switch.
+const CHILD_OUTCOME_ENV: &str = "EPR_CLI_TEST_SERVE_CHECK_OUTCOME";
+const CHILD_ARGS_ENV: &str = "EPR_CLI_TEST_SERVE_CHECK_ARGS";
+
+/// The child half of the `serve_check_with` tests: this test binary, re-executed with a device's
+/// environment, runs `peer serve --check` in process with the exercise outcome it was given.
+/// Run on its own (no child environment) it does nothing.
+#[test]
+fn serve_check_with_child() {
+    use elohim_epr_cli::exercise::Failure;
+    use std::process::ExitCode;
+    let Ok(outcome) = std::env::var(CHILD_OUTCOME_ENV) else {
+        return;
+    };
+    let args: Vec<String> = serde_json::from_str(&std::env::var(CHILD_ARGS_ENV).unwrap()).unwrap();
+    let options = elohim_epr_cli::peer::Options::parse(&args).unwrap();
+    let trap = || -> Result<(), Failure> { std::process::abort() };
+    let wrong = || {
+        Err(Failure {
+            step: "sqlite",
+            detail: "an injected wrong answer".into(),
+        })
+    };
+    let passes = || Ok(());
+    let exercise: &dyn Fn() -> Result<(), Failure> = match outcome.as_str() {
+        "trap" => &trap,
+        "wrong" => &wrong,
+        _ => &passes,
+    };
+    let code = elohim_epr_cli::peer::serve_check_with(&options, exercise).unwrap();
+    std::process::exit(if code == ExitCode::SUCCESS { 0 } else { 1 });
+}
+
+/// `peer serve --check` for `device`, in a child of this test binary, with the exercise outcome
+/// `outcome` injected. The running executable is the test binary, so it is the exact `EPR_BIN`
+/// candidate the exec floor admits.
+fn check_in_child(device: &Device, policy: &Path, outcome: &str) -> Output {
+    let me = std::env::current_exe().unwrap();
+    let base = device.command();
+    let mut command = Command::new(&me);
+    for (key, value) in base.get_envs() {
+        match value {
+            Some(value) => command.env(key, value),
+            None => command.env_remove(key),
+        };
+    }
+    let args = [
+        "--check",
+        "--root",
+        device.root(),
+        "--policy",
+        policy.to_str().unwrap(),
+        "--json",
+    ];
+    command
+        .env("EPR_BIN", &me)
+        .env(CHILD_OUTCOME_ENV, outcome)
+        .env(CHILD_ARGS_ENV, serde_json::to_string(&args).unwrap())
         .args([
-            "peer",
-            "serve",
-            "--check",
-            "--root",
-            device.root(),
-            "--policy",
-            policy.to_str().unwrap(),
-            "--json",
-        ])
-        .env("EPR_UNDER_TEST", "1")
-        .env("EPR_EXERCISE_FAULT", fault)
-        .output()
-        .expect("epr runs")
+            "--exact",
+            "serve_check_with_child",
+            "--nocapture",
+            "--test-threads",
+            "1",
+            "-q",
+        ]);
+    command.output().expect("the test binary runs")
+}
+
+/// The pretty-printed JSON object in a child's stdout, among the test harness's own lines.
+fn child_json(stdout: &[u8]) -> serde_json::Value {
+    let text = String::from_utf8_lossy(stdout);
+    let start = text.find("\n{\n").map(|at| at + 1).expect("a JSON object");
+    let end = text[start..].find("\n}").expect("its end") + start + 2;
+    serde_json::from_str(&text[start..end]).unwrap()
 }
 
 #[test]
-fn serve_check_runs_the_bundled_c_exercise_first_and_notes_a_wrong_answer() {
+fn serve_check_runs_its_exercise_first_and_a_returned_failure_is_only_a_note() {
     use std::os::unix::process::ExitStatusExt;
     let (keys, a, _b) = household();
     let policy = policy(keys.path());
+    HeadTable::default().save(&a.peer_dir()).unwrap();
     // A trap in the exercise kills the check by signal even on a device it would refuse as
     // not-a-device: the exercise runs before every other step, and death needs no handling.
     let stranger = Device::new(&keys, "off-roster");
-    let trapped = check_with_fault(&stranger, &policy, "abort");
+    let trapped = check_in_child(&stranger, &policy, "trap");
     assert_eq!(
         trapped.status.signal(),
         Some(libc::SIGABRT),
@@ -532,17 +592,15 @@ fn serve_check_runs_the_bundled_c_exercise_first_and_notes_a_wrong_answer() {
         trapped.status,
         String::from_utf8_lossy(&trapped.stderr)
     );
-    assert!(
-        trapped.stdout.is_empty(),
-        "nothing was reported before the trap"
-    );
-    // A step that answers wrongly is an exercise bug: a note, and the check still passes.
-    HeadTable::default().save(&a.peer_dir()).unwrap();
-    let noted = check_with_fault(&a, &policy, "fail");
+    // A returned failure is a note: the check still passes.
+    let noted = check_in_child(&a, &policy, "wrong");
     let stderr = String::from_utf8_lossy(&noted.stderr);
     assert!(noted.status.success(), "{stderr}");
-    assert!(stderr.contains("note exercise-failed: sqlite"), "{stderr}");
-    let result: serde_json::Value = serde_json::from_slice(&noted.stdout).unwrap();
+    assert!(
+        stderr.contains("note exercise-failed: sqlite: an injected wrong answer"),
+        "{stderr}"
+    );
+    let result = child_json(&noted.stdout);
     assert_eq!(result["ok"], true, "{result}");
     assert!(
         result["notes"][0]
@@ -550,30 +608,26 @@ fn serve_check_runs_the_bundled_c_exercise_first_and_notes_a_wrong_answer() {
             .is_some_and(|note| note.starts_with("exercise-failed: sqlite")),
         "{result}"
     );
-    // Without a fault, the exercise passes and leaves no note.
-    let clean = check_with_fault(&a, &policy, "none");
-    let result: serde_json::Value = serde_json::from_slice(&clean.stdout).unwrap();
+    // A passing exercise leaves no note.
+    let clean = check_in_child(&a, &policy, "ok");
+    assert!(
+        clean.status.success(),
+        "{}",
+        String::from_utf8_lossy(&clean.stderr)
+    );
+    let result = child_json(&clean.stdout);
     assert_eq!(result["ok"], true, "{result}");
     assert!(result.get("notes").is_none(), "{result}");
 }
 
 #[test]
-fn doctor_exercise_answers_in_one_line_or_names_the_failing_step() {
-    use std::os::unix::process::ExitStatusExt;
-    let run = |fault: Option<&str>| {
-        let mut command = Command::new(env!("CARGO_BIN_EXE_epr"));
-        command
-            .args(["doctor", "--exercise"])
-            .current_dir(std::env::temp_dir());
-        if let Some(fault) = fault {
-            command
-                .env("EPR_UNDER_TEST", "1")
-                .env("EPR_EXERCISE_FAULT", fault);
-        }
-        command.output().expect("epr runs")
-    };
+fn doctor_exercise_answers_in_one_line_from_anywhere() {
     // Outside any checkout, with no device: the exercise needs nothing but the binary.
-    let ok = run(None);
+    let ok = Command::new(env!("CARGO_BIN_EXE_epr"))
+        .args(["doctor", "--exercise"])
+        .current_dir(std::env::temp_dir())
+        .output()
+        .expect("epr runs");
     let stdout = String::from_utf8_lossy(&ok.stdout);
     assert!(
         ok.status.success(),
@@ -585,14 +639,6 @@ fn doctor_exercise_answers_in_one_line_or_names_the_failing_step() {
         stdout.starts_with("exercise: ok (x25519, ed25519, sqlite)"),
         "{stdout}"
     );
-    let failed = run(Some("fail"));
-    assert_eq!(failed.status.code(), Some(1));
-    assert!(
-        String::from_utf8_lossy(&failed.stderr).contains("exercise: failed at sqlite"),
-        "{}",
-        String::from_utf8_lossy(&failed.stderr)
-    );
-    assert_eq!(run(Some("abort")).status.signal(), Some(libc::SIGABRT));
 }
 
 #[test]

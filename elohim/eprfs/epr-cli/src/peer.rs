@@ -262,7 +262,8 @@ pub struct Options {
 }
 
 impl Options {
-    fn parse(args: &[String]) -> PeerResult<Options> {
+    /// Read the options of one `epr peer` verb from its arguments (after the verb).
+    pub fn parse(args: &[String]) -> PeerResult<Options> {
         let mut options = Options {
             root: PathBuf::from("."),
             ..Options::default()
@@ -711,7 +712,9 @@ fn check_refusal(
 
 /// The note a failed exercise step leaves on `peer serve --check`. A step that traps never gets
 /// here: the check dies by signal, and the landing that ran it refuses the candidate. A step that
-/// answered wrongly is an exercise bug, never a reason for a device to stop serving.
+/// returns a failure (a wrong answer, or key generation refused because the operating system had
+/// no randomness to give) is not evidence that this CPU cannot run the release, so it is a note
+/// and never a reason for a device to stop serving.
 fn exercise_note(outcome: Result<(), crate::exercise::Failure>) -> Option<String> {
     outcome
         .err()
@@ -719,9 +722,19 @@ fn exercise_note(outcome: Result<(), crate::exercise::Failure>) -> Option<String
 }
 
 fn serve_check(options: &Options) -> PeerResult<ExitCode> {
+    serve_check_with(options, &crate::exercise::run)
+}
+
+/// `epr peer serve --check` with its bundled-C exercise supplied: `epr` passes
+/// [`crate::exercise::run`]; a test passes the outcome it needs to observe, so no switch in the
+/// released binary can make its own check fail.
+pub fn serve_check_with(
+    options: &Options,
+    exercise: &dyn Fn() -> Result<(), crate::exercise::Failure>,
+) -> PeerResult<ExitCode> {
     // First, before the exec floor and before the not-a-device return: this release's own C runs
     // here, so a candidate built for a CPU this device lacks dies before it can become current.
-    let notes: Vec<String> = exercise_note(crate::exercise::run()).into_iter().collect();
+    let notes: Vec<String> = exercise_note(exercise()).into_iter().collect();
     for note in &notes {
         eprintln!("note {note}");
     }
