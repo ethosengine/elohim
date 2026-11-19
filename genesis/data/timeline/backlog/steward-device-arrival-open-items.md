@@ -842,3 +842,46 @@ briefs that ask for short single-purpose commands under `timeout`; and no `pkill
 line; one `pkill -f "sleep 30"` on shem killed another agent's waiter). Owed: the wait made
 visible where a coordinator looks (a berth line "waiting on an approval since …" would do), and
 a time after which a held call in an unattended agent is refused rather than kept.
+
+Delta 2026-11-19 (row 33): what two reviews of the `fleet-roll` check established about the
+tools it replaces and about CI. The JS walker (`graph-walker.mjs`) skips dependency propagation
+and ignores dotfiles; CI's `build-graph.groovy` does both, so a by-hand walker run is not CI's
+answer. Edge's build steps depend on `elohim-conductor:build-conductor-image`,
+`elohim-rakia:rakia-ci`, `elohim-holochain:build-happ` and `elohim-brit:brit-ci`. CI's checkout
+initialises no submodule and prunes a dependency on a pipeline whose manifest it cannot see, so
+by the code a conductor pin move selects an Edge build and a brit or rakia pin move does not;
+that has not been checked against a CI run and contradicts the note that an attested pin move
+rolls the fleet. Three behaviours of CI itself, recorded here and not changed: `[build:all]`
+forces nothing on a fresh run (it is expanded at Checkout against a registry filled later,
+`genesis/orchestrator/Jenkinsfile:2688-2693`, `:2413`); `[deploy-only]` can re-add an Edge run
+that the already-built filter removed, with no class, which then reads as build and deploys
+(`:931-934`, `:1912`, `:1962-1964`, `:2828-2834`); and a `[skip ci]` or `[edge:validate-only]`
+tip moves the baseline past every commit under it once the run ends green (`:230`, `:1450`).
+The local path oracle (`GATE_ORACLE=path`) has the walker's dotfile hole; the default rakia
+oracle does not.
+
+## Row 35 — nothing restarts the supervised peer when a release lands
+
+Found 2026-11-19 on shem. `epr bin follow` built and landed a new `epr`
+(`bafyreifcq7qfsf…elhfe`), and the supervised `epr peer serve` kept running the previous
+release: `epr device status` reads `degraded peer daemon: running … ; current … ; restart epr
+peer serve to follow current`. `epr device supervise` reloads by restart when the device's
+manifest head moves, and a tool's current release moving is not that. The one-baseline sprint's
+first line says the daemon restarts on the drawn bytes and serves; today that is a manual stop
+and start of the supervisor. Missing step, in the chain's own terms: between "a release landed
+as current" and "the daemon serves from it", the supervisor notices that a supervised process's
+tool moved and restarts that process, with the same readiness check and death witness as any
+other restart. Until then the restart is by hand, from a clean command, never with `XDG_*`
+unset.
+
+## Row 36 — a checked-in grant's deadline reds the orchestrator suite on its own
+
+Found 2026-11-19 by the review of the E11 rework. `genesis/orchestrator/data/adam-compute-worker.json`
+carries `runnerGrant.enabled: true` with `validUntil: 2026-11-23T16:00:00Z`, and
+`compute-worker.test.mjs` asserts that an enabled grant is inside its window. After that instant
+the test fails on every device and in CI until the grant is renewed or withdrawn; nothing warns
+ahead of the deadline. The test is right to fail. Owed: the renewal or withdrawal before the
+date (the steward's, as steward of record), and a warning some days ahead so the red does not
+arrive by surprise. The E11 rework moves this assertion out of the reusable half so a green
+earned before the deadline cannot be reused after it.
+

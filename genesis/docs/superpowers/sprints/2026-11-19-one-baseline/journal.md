@@ -311,3 +311,70 @@ Windows (a relative path printed with backslashes), fixed at integration.
 rework and ethosengine L2a. The `fleet-roll` check refuses by default (one policy key turns it
 to a warning or off) and keeps the hook's declared stop policy instead of a rule of its own.
 
+## 2026-11-19: the second line is met; two reviews send two lanes back
+
+**An unmarked release is refused before it is fetched (line 2, met).** On shem's real store,
+from a clean checkout at `71069b1f5`, with ethosengine's daemon offering the release its landing
+push had published for that commit:
+
+| When (UTC) | What |
+|---|---|
+| 14:23:47 | `EPR_FOLLOW_SIBLING=1 epr bin follow --tool epr` starts |
+| within 10 s | `follow: drawing epr from a sibling first: EPR_FOLLOW_SIBLING=1; 71069b1f551f… is published on refs/remotes/origin/dev` |
+| | `follow: nothing drawn from a sibling (unmeasured-requirement: epr of release bafyreic276tjgy…vmvq from did:key:z6MkpZRh…VMZB records no env:isa-c, so the instruction set its C was compiled at is unmeasured (this device draws only env:isa-c=x86-64, the C baseline of x86_64-unknown-linux-gnu); cure: the producer rebuilds under the declared target, or build for this device); building locally` |
+| 14:55:51 | shem's own build landed: release `bafyreifcq7qfsf…elhfe`, source commit `71069b1f5`, tree clean; 1,924 s end to end |
+
+The store's incoming directory held no file before or after. The landed `epr` answers
+`doctor --exercise` in 1.6 ms. Two things to read with the receipt. The follow was run by an
+`epr` built from the landed commit in the gate's cache, because shem's installed release
+predated the rule; a new admission rule has that one bootstrap step. And 1,924 s is what shem
+pays to build its own release, which is the cost line 1 is there to remove.
+
+**Nothing restarts the supervised peer after a follow lands.** After the landing,
+`epr device status` reads `degraded peer daemon: running bafyreih54…; current bafyreifcq7…;
+restart epr peer serve to follow current`. The supervisor's manifest did not move, so it
+reloads nothing. Line 1 says the daemon restarts on the drawn bytes; today that is a manual
+stop and start of the supervisor. Missing step in the chain between "a release landed" and
+"the daemon serves it" (backlog row 35). Shem's daemon is left on the previous release until
+the two builders working in this session are idle.
+
+**E11 rework: built, reviewed, sent back.** The named half (60 files, 1,192 tests) runs in a
+view of 864 files built in about 1.2 s with a constructed environment; a docs commit, a habit
+edit and an unrelated Rust edit leave its key alone, and a docs-only commit reuses it in 24 s.
+The other half takes about 216 s on shem and runs on every landing, so this change buys a sound
+key and not seconds. The independent review ended FIX FIRST: a named test compares a checked-in
+grant with the clock, so a green would outlive what it proved; two tests passed without
+checking (one a regression of the view, which copied only files named exactly `Jenkinsfile` and
+so dropped the conductor pipeline from the budget test); the key and the view expanded the
+declarations separately; the copied packages and Node's version were not in the key; and the
+builder's habit exemption applied to every project. Confirmed sound: every earlier test file
+runs in exactly one half, no failed run records green, the launch environment. Fix round in
+progress.
+
+**`fleet-roll`: second review, last build round.** The second pass confirmed both false passes
+closed and six of eight probes against the real manifests in agreement with CI. The two that
+differ are brit and rakia pin moves, refused on a checkout that has those submodules and passed
+on one that does not. CI's checkout initialises no submodule and prunes a dependency on a
+pipeline whose manifest it cannot see, so by the code a brit or rakia pin move does not select
+an Edge build today, while a conductor pin does (its manifest is in the superproject). That
+reading contradicts the standing note that a pin move rolls the fleet and has not been checked
+against a CI run. Ruled for the last round: the check reads manifests from the pushed commit
+and its mode from the branch being pushed to, both as git objects, so no local state and no
+commit in the push can change the answer; a pin whose pipeline CI cannot see gets a warning;
+`[deploy-only]` on a tip asks for the declaration. Three behaviours of CI itself are recorded
+and not changed here (row 33).
+
+**A dated item.** `genesis/orchestrator/data/adam-compute-worker.json` carries an enabled
+runner grant valid until 2026-11-23T16:00:00Z. The test "the declared Adam runner grant is
+inside its window, or withdrawn" fails after that instant, so the orchestrator suite goes red
+on every device until the grant is renewed or withdrawn. Its steward of record is the steward.
+
+| Line | State now |
+|---|---|
+| 1 | needs L2a (in progress on ethosengine) and a daemon restart step |
+| 2 | met, receipt above |
+| 3 | unchanged |
+| 4 | built; in its fix round after review |
+| 5 | held by hand; the check is in its last build round |
+| 6 | this entry; backlog rows 33 and 35 |
+
