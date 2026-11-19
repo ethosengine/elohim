@@ -631,6 +631,77 @@ exceeded a measured copy, 1,037,757 against 870,356).
   can a copy larger than the limit break an abort or a cleanup, or meet any other size cap. Still owed
   after it: the non-root leg, full verification on both builds, push 10 and CI.
 
+**Final state of that round, 23:05Z.** Local head `99227182ad54991983d50d86f0ab11d799386f73` ("after
+admission an unmetered copy never refuses a step"): the copy check is out of `reserve_for`; the diff3
+boundary journey is strict (26 limits from 15,974,412 to 36,512,940, no refusal after admission);
+every verification leg EXIT 0 again (faults journeys 148, boundary 4, core faults 181 / 1 ignored,
+power_loss 4, replay unit 18, memory_replay 8 / 1 ignored, brit-cli 110 / 5 ignored, cli-journey
+501 / 0 / 73 ignored, gitoxide-core 202 / 5 ignored, clippy, docs, fmt). Reported by the implementer.
+
+**Fifth review (fresh reviewer, 22:37Z to 23:08Z, on `b122f0515d` and then on `99227182ad`): two
+must-fix, would not push.** Scripts and outputs in session scratch `review-recovery6/` (not durable).
+- Confirmed by running: a retained copy larger than the limit does NOT break recovery. At a limit of
+  9,832,107 the conflict stop's abort copy is 13.3 MB and the cleanup copy 10.76 MB; `--abort`
+  restores HEAD, index, every worktree file, the dirty tracked edit, the untracked file and the `.git`
+  listing exactly; an abort killed at six retained-copy and cleanup checkpoints restores exactly on
+  retry with `--status` naming a cure each time; a completed rebase's over-limit cleanup copy
+  completes. Read: no other size cap in the copy, manifest, receipt or cleanup code (members are
+  unmetered; the hard 1 GiB `Budget` in gix-utils is met only by per-record spools and per-object
+  streams).
+- Confirmed: the certain-copy tests are true lower bounds and refuse before anything changes; both
+  `--skip` paths reserve with the factor and no metered copy write failed; the reserve-on-the-saved-
+  record fix never under-reserved in the flows tried; no regression in the earlier reviewer's
+  fixtures; `memory_replay.rs` byte-identical.
+- **F1 (must-fix).** `rebase --interactive`, a pick turned into `edit`, a same-size change to a 4 MiB
+  file, `--stage`, `--amend --no-edit`, `--continue`: admitted from 27,081,047 bytes, completes only
+  from 32,666,659. In between it is refused at the child-acceptance step or at the final publication,
+  each before writing, `--abort` restoring exactly — but the user's amend then survives only in the
+  retained copy. Scaled to 1 GiB: an edited file of roughly 138 to 166 MB.
+- **F2 (must-fix).** A conflict under `merge.conflictStyle=diff3` or `zdiff3` where both sides shrink
+  a 1.6 MB base to 200 lines: admitted from 1,710,547, completes only from 4,356,033; refused at the
+  conflict stop itself, or (from 2.3M) at the step after it. The module doc's claim that the 5/4
+  factor covers the diff3 base is false. Under the default style the same shape completes.
+- Not established by it: the 64 MiB figures; the delivery-only 1 GiB `Budget` cap; a 60-commit replay.
+
+**Push 10, 23:10Z.** `99227182ad` was pushed to `origin run-ci/sprint3-integrate` WITH those two
+findings open, for the lane's first cross-platform CI run (it had never been compiled on Windows or
+macOS). It is not a landing candidate. Reach gate: `epr ready` READY; rust-style PASS (15 files, 1
+crate, baseline `080f305797`).
+
+**Round 6 design (fresh implementer, design note 23:27Z; reported, measured with the probe build).**
+- Admission cannot see any stop: `admit` runs on an all-`pick` todo and the sequence editor runs
+  afterwards, so nothing can be reserved at admission for an `edit`.
+- F1's cause, corrected: at `--amend` the authoring child writes a receipt for EVERY object reachable
+  from the stop's whole tree and its indexes, not only the edited file, and that child journal is
+  archived into the parent's metered journal. An edit changing a 14-byte file beside an unrelated
+  4 MiB file archived the unrelated blob: admitted from 4.22M, completes only from 6.35M. So the cost
+  of one edit-and-amend is proportional to the tree. The real cure — leave out of the child's walk
+  the objects the journal's closure already holds (`authoring/conflict.rs` near :2101) — is a custody
+  change and a follow-up, not part of round 6. Until then a repository whose tree approaches the
+  limit cannot edit-and-amend under brit at all.
+- F2's cause, measured: the diff3 conflict file was 1,657,432 bytes (all three versions plus markers)
+  against a planned step of 17,400; it is stored as the stop's payload and staged again at
+  publication.
+
+**Decision for round 6 (coordinator, 23:30Z).** One rule for every stop: a stop is entered only if its
+own completion at unchanged size is reserved — the stop's records and payloads, a result no larger
+than what the stop presents, and the publication. If that cannot be reserved, the rebase refuses when
+the stop is found, before asking anything of the user. After a stop is entered only bytes the user
+adds beyond that can be refused, and that refusal says where the work is kept.
+- Edit stops: a todo gate at todo acceptance reserves the sum for every planned edit (refusing a todo
+  before anything changes, or before it replaces the old one); the reservation is made again, exactly,
+  when an edit stop is entered; every other step reserve carries the remaining edits.
+- Conflict stops: reserved from the ACTUAL conflict files when the conflict is found — the stop, a
+  resolution of the same size, the child's records and the publication. This covers diff3 bases,
+  rename destinations and marker-heavy files alike.
+- Declined: pricing the merge base at admission under diff3/zdiff3. It is sound, but it would refuse
+  CLEAN merges of large both-changed files for every diff3 user (the 64 MiB neighbour fixture would be
+  refused at 1 GiB under zdiff3), and no tighter sound bound exists without merging at admission.
+- Known and to be stated in the docs: admission plans for one ordinary conflict; a later or larger
+  conflict can still be refused when it is found, and resolutions already accepted are then kept only
+  in the retained copy.
+Phase 2 (implementation) starts when the final-verification agent releases the integration worktree.
+
 
 **Queued follow-up round, not started.** Publish `metadata-lock-N.json`, `retention-N.json` and the
 other single-pass records whole (spool, rename, sync), or treat an unparseable record as not written;
