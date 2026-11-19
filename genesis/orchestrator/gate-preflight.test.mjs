@@ -9,7 +9,7 @@ import { join } from 'node:path';
 import {
   checkElementDists, checkEvidenceRecordable, checkNodeModules, checkReadSets, checkSophiaUmd,
   checkArk, checkCargoDeny, checkCargoLocks, checkStorageClientDist, checkWorkspaceDists, checkSubmodules, checkTmpdir, emitLive, NAMED_READ_SET_PROJECTS, PREFLIGHT_READ_SET_PROJECTS, onRedPolicy,
-  runPreflight,
+  fleetRollRows, runPreflight,
 } from './gate-preflight.mjs';
 import { orderByCost } from './gate-runner.mjs';
 import { appendEvent, closeRun, formatEvent, formatHarvest, harvest, openRun, outlook } from './gate-live.mjs';
@@ -245,41 +245,62 @@ test('every REFUSED reaches the live run as a failure; ok and WARN do not', () =
   assert.equal(appended[0][1].failure.class, 'element-dists');
 });
 
-test('fleet-roll: an undeclared Edge roll on a dev push is a preflight row, and its REFUSED reaches the live run', (t) => {
+const EDGE_WALK = () => ({ projects: [], meta: { 'elohim-edge': { jenkinsPath: 'elohim/holochain/Jenkinsfile', manualOnly: false, stepClasses: { 'cargo-build-storage': 'build' } } },
+  pipelines: [{ name: 'elohim-edge', runClass: 'build', reasons: [], steps: [{ name: 'cargo-build-storage', class: 'build',
+    reason: 'source: elohim/sdk/schemas/v1/gate-live-event.schema.json matches elohim/sdk/**', cause: 'elohim/sdk/schemas/v1/gate-live-event.schema.json', via: null }] }] });
+const PUSHED = 'b'.repeat(40);
+// git as the guard calls it for one protected ref: the tip is HEAD, no manifest drift, one changed path, no declaration.
+function fakeGit(cmd, args) {
+  const sub = args[2];
+  if (sub === 'rev-parse') return { status: 0, stdout: `${PUSHED}\n` };
+  if (sub === 'diff' && args.includes(':(glob)**/build-manifest.json')) return { status: 0, stdout: '' };
+  if (sub === 'diff') return { status: 0, stdout: 'elohim/sdk/schemas/v1/gate-live-event.schema.json\n' };
+  if (sub === 'log' && args.includes('-i')) return { status: 0, stdout: '' };
+  if (sub === 'log') return { status: 0, stdout: 'feat(sdk): one field\n' };
+  return { status: 0, stdout: '' };
+}
+const FLEET = { walk: EDGE_WALK, spawn: fakeGit, policy: { mode: 'refuse', why: null } };
+
+test('fleet-roll: an undeclared Edge selection on a dev push is a preflight row, and its REFUSED reaches the live run', (t) => {
   const root = scratch(t);
-  const walk = () => ({ projects: [], pipelines: [{ name: 'elohim-edge', reasons: ['source: elohim/sdk/schemas/v1/gate-live-event.schema.json'],
-    steps: [{ name: 'cargo-build-storage', class: 'build' }], runClass: 'build' }] });
-  const git = (cmd, args) => (cmd === 'git' && args.includes('log') ? { status: 0, stdout: 'feat(sdk): one field\x1e\n' } : { status: 0, stdout: '' });
-  const env = { GATE_PUSH_TARGETS: 'refs/heads/dev', GATE_PUSH_RANGES: 'refs/heads/dev a..b' };
-  const rows = runPreflight({ root, projects: [], env, spawn: git, registry: new Map(), changed: ['elohim/sdk/schemas/v1/gate-live-event.schema.json'],
-    fleet: { walk, spawn: git, mode: 'refuse' } });
+  const env = { GATE_PUSH_TARGETS: 'refs/heads/dev', GATE_PUSH_REFS: `refs/heads/dev ${PUSHED} ${'a'.repeat(40)}` };
+  const rows = runPreflight({ root, projects: [], env, spawn: fakeGit, registry: new Map(), changed: null, fleet: FLEET });
   const fleet = rows.find(r => r.check === 'fleet-roll');
   assert.equal(fleet?.level, 'REFUSED', JSON.stringify(rows));
-  assert.match(fleet.why, /cargo-build-storage/);
+  assert.match(fleet.why, /CI would select an Edge build and its deploy step for this push to dev: elohim-edge stale steps cargo-build-storage/);
   const appended = [];
   emitLive(rows, { GATE_LIVE_RUN: '/run.jsonl' }, (path, event) => appended.push(event));
   const red = appended.find(e => e.failure.class === 'fleet-roll');
   assert.equal(red.project, 'preflight');
   assert.match(red.failure.excerpt.at(-1), /^cure: .*\[edge:roll\]/);
-  // The hook runs it early, before its early passes, and says so; the later preflight skips it.
-  const later = runPreflight({ root, projects: [], env: { ...env, GATE_FLEET_ROLL_DONE: '1' }, spawn: git, registry: new Map(),
-    changed: ['elohim/sdk/schemas/v1/gate-live-event.schema.json'], fleet: { walk, spawn: git, mode: 'refuse' } });
-  assert.equal(later.some(r => r.check === 'fleet-roll'), false);
+  // The mark of the hook that ran it counts inside that hook's own process tree only.
+  const run = done => runPreflight({ root, projects: [], env: { ...env, GATE_FLEET_ROLL_DONE: done }, spawn: fakeGit, registry: new Map(), changed: null, fleet: FLEET });
+  assert.equal(run(String(process.ppid)).some(r => r.check === 'fleet-roll'), false);
+  assert.equal(run('1').some(r => r.check === 'fleet-roll'), true, 'an inherited 1 never switches the check off');
+  assert.equal(run('999999999').some(r => r.check === 'fleet-roll'), true);
 });
 
-test('fleet-roll under an older hook (no GATE_PUSH_RANGES): silent with no Edge build, refused with one', (t) => {
+test('fleet-roll under an older hook (no GATE_PUSH_REFS): silent with no Edge build, refused with one', (t) => {
   const root = scratch(t);
   const spawn = () => ({ status: 0, stdout: '' });
   const env = { GATE_PUSH_TARGETS: 'refs/heads/dev' };
-  const run = pipelines => runPreflight({ root, projects: [], env, spawn, registry: new Map(), changed: ['app/x.ts'],
-    fleet: { walk: () => ({ projects: [], pipelines }), mode: 'refuse' } });
-  const quiet = run([{ name: 'elohim', reasons: ['source: app/x.ts'], steps: [{ name: 'build-app', class: 'build' }], runClass: 'build' }]);
+  const run = walk => runPreflight({ root, projects: [], env, spawn, registry: new Map(), changed: ['app/x.ts'],
+    fleet: { walk, policy: { mode: 'refuse', why: null } } });
+  const quiet = run(() => ({ projects: [], meta: {}, pipelines: [{ name: 'elohim', runClass: 'build', reasons: [], steps: [{ name: 'build-app', class: 'build', reason: 'source: app/x.ts matches app/**', cause: 'app/x.ts', via: null }] }] }));
   assert.equal(quiet.some(r => r.check === 'fleet-roll'), false);
   assert.equal(quiet.some(r => r.level === 'REFUSED'), false, 'the preflight exits 0');
-  const red = run([{ name: 'elohim-edge', reasons: ['source: app/x.ts'], steps: [{ name: 'cargo-build-storage', class: 'build' }], runClass: 'build' }])
-    .find(r => r.check === 'fleet-roll');
+  const red = run(EDGE_WALK).find(r => r.check === 'fleet-roll');
   assert.equal(red.level, 'REFUSED');
-  assert.match(red.cure, /core\.hooksPath=<worktree>\/\.husky\/_/);
+  assert.match(red.cure, /^check the launcher first: test -x <worktree>\/\.husky\/_\/pre-push .*-c core\.hooksPath=<worktree>\/\.husky\/_/);
+});
+
+test('fleet-roll: a guard module that cannot load still gives a row, red only on a protected push under refuse', () => {
+  const error = new Error("Cannot find package 'picomatch'");
+  const red = fleetRollRows({ GATE_PUSH_TARGETS: 'refs/heads/dev' }, null, {}, null, error);
+  assert.equal(red.level, 'REFUSED');
+  assert.match(red.why, /^the fleet-roll check could not load: Cannot find package 'picomatch'$/);
+  assert.equal(fleetRollRows({ GATE_PUSH_TARGETS: 'refs/heads/self/a' }, null, {}, null, error).level, 'WARN');
+  assert.equal(fleetRollRows({}, ['x'], {}, null, error).level, 'WARN');
 });
 
 test('on-red policy: env, then pool-policy.json, then continue', (t) => {

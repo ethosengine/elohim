@@ -1041,23 +1041,30 @@ if [ -n "$CHANGE_UNREADABLE" ]; then
   exit 1
 fi
 
-# Fleet roll (seconds): would CI answer this push by rebuilding elohim-edge and rolling its fleet,
-# with no pushed commit declaring [edge:roll]? It selects no gate project, so it runs here, before
-# the early passes below; the logic is genesis/orchestrator/fleet-roll-guard.mjs. Each ref's range
-# is read against the base the diff above used (the remote tip, else origin/dev).
-GATE_PUSH_RANGES=""
+# Fleet roll (seconds): would CI select an Edge build and its deploy step for a pushed dev or main
+# ref with no pushed commit carrying [edge:roll]? It selects no gate project, so it runs here,
+# before the early passes below. Its red is a pre-gate red within seconds: live at once, and the
+# push is refused when the hook ends under gate_on_red continue, at once under GATE_ON_RED=stop.
+# Each ref goes over as "<remote ref> <pushed sha> <destination sha>"; fleet-roll-guard.mjs reads
+# each ref's own range. No eligible ref (notes, deletes) starts no node.
+GATE_PUSH_REFS=""
 for PUSH_LINE in "${PUSH_LINES[@]}"; do
   read -r _ FR_LOCAL FR_REF FR_REMOTE <<<"$PUSH_LINE"
   if is_notes_ref "$FR_REF" || [ "$FR_LOCAL" = "$ZERO_SHA" ]; then continue; fi
-  FR_BASE=origin/dev
-  if [ "$FR_REMOTE" != "$ZERO_SHA" ] && git cat-file -e "$FR_REMOTE^{commit}" 2>/dev/null; then FR_BASE=$FR_REMOTE; fi
-  GATE_PUSH_RANGES="${GATE_PUSH_RANGES:+$GATE_PUSH_RANGES$'\n'}$FR_REF $FR_BASE..$FR_LOCAL"
+  GATE_PUSH_REFS="${GATE_PUSH_REFS:+$GATE_PUSH_REFS$'\n'}$FR_REF $FR_LOCAL $FR_REMOTE"
 done
-export GATE_PUSH_RANGES
-if ! node genesis/orchestrator/gate-preflight.mjs --fleet-roll; then
-  leg_red fleet-roll "the fleet-roll check refused (above); its cure is printed beside it"
+export GATE_PUSH_REFS
+if [ -n "$GATE_PUSH_REFS" ]; then
+  node genesis/orchestrator/gate-preflight.mjs --fleet-roll
+  FR_STATUS=$?
+  if [ "$FR_STATUS" -eq 3 ]; then
+    leg_red fleet-roll "the fleet-roll check is red (above); its cure is printed beside it"
+  elif [ "$FR_STATUS" -ne 0 ]; then
+    leg_red fleet-roll "the fleet-roll check could not run (node exit $FR_STATUS, above)"
+  fi
 fi
-export GATE_FLEET_ROLL_DONE=1
+# The later preflight skips the check only inside this hook's own process tree.
+export GATE_FLEET_ROLL_DONE=$$
 # ── Fleet roll end
 
 # Nothing changed — let it through (a style refusal still refuses)

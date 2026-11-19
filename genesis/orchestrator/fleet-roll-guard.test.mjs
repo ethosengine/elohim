@@ -1,7 +1,7 @@
-// fleet-roll-guard.mjs: a push to dev or main that CI would answer by rebuilding elohim-edge and
-// rolling its fleet refuses in seconds unless a pushed commit declares `[edge:roll]`. Table tests
-// use an injected walker; the last block runs the real walker over this tree's manifests.
-// Habit `careless-reds-cost-seconds`.
+// fleet-roll-guard.mjs: a pushed dev or main ref for which CI would select an Edge build and its
+// deploy step is red unless a pushed commit carries `[edge:roll]`. Parity cases run CI's graph
+// (graph-walker.mjs walkGraphCi) over fixture manifests and over this tree's real ones; per-ref
+// cases use real git histories. Habit `careless-reds-cost-seconds`.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
@@ -9,372 +9,415 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { ciGlobMatch, walkGraph } from './graph-walker.mjs';
 import {
-  checkFleetRoll, evaluateFleetRoll, evaluateSkipCi, fleetRollMode, parseRanges, readMessages, treeWalker,
+  checkFleetRoll, ciWalker, doneFlagHonoured, evaluateRef, failureRows, fleetRollMode, parseRefs, predict,
 } from './fleet-roll-guard.mjs';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 
-const EDGE_BUILD = {
-  name: 'elohim-edge',
-  reasons: ['source: elohim/sdk/schemas/v1/gate-live-event.schema.json', 'source: elohim/Cargo.lock', 'source: elohim/Cargo.lock',
-    'source: crates/seam-contracts/src/lib.rs', 'source: genesis/a2o/steps/devflow/honest-draw.steps.ts'],
-  steps: [{ name: 'cargo-build-storage', class: 'build' }, { name: 'cargo-build-doorway', class: 'build' }, { name: 'dataplane-validation', class: 'build' }],
-  runClass: 'build',
-};
-const EDGE_VALIDATE = {
-  name: 'elohim-edge', reasons: ['source: genesis/a2o/steps/devflow/honest-draw.steps.ts'],
-  steps: [{ name: 'dataplane-validation', class: 'build' }], runClass: 'build',
-};
-const OTHER = { name: 'elohim', reasons: ['source: app/elohim-app/src/main.ts'], steps: [{ name: 'build-app', class: 'build' }], runClass: 'build' };
+// A small graph with the shapes that matter: a cross-pipeline dependency, a manual-only producer,
+// a dependency on a pipeline with no manifest, a validation step, the orchestrator, a pipeline
+// without a jenkinsPath.
+const FIXTURE = [
+  { path: './c/build-manifest.json', content: { pipeline: 'elohim-conductor', jenkinsPath: 'c/Jenkinsfile', steps: { 'build-conductor-image': { inputs: { sources: ['pin'] } } } } },
+  { path: './e/build-manifest.json', content: { pipeline: 'elohim-edge', jenkinsPath: 'e/Jenkinsfile', steps: {
+    'cargo-build-storage': { inputs: { sources: ['sdk/**', 'e/build-manifest.json'] }, depends: ['elohim-conductor:build-conductor-image', 'elohim-ghost:x'] },
+    'build-edge-image': { inputs: { sources: [] }, depends: ['cargo-build-storage', 'elohim-rakia:rakia-ci'] },
+    'dataplane-validation': { inputs: { sources: ['steps/**'] } },
+  } } },
+  { path: './a/build-manifest.json', content: { pipeline: 'elohim', jenkinsPath: 'Jenkinsfile', steps: { 'build-app': { inputs: { sources: ['app/**', 'a/build-manifest.json'] } } } } },
+  { path: './r/build-manifest.json', content: { pipeline: 'elohim-rakia', manualOnly: true, steps: { 'rakia-ci': { inputs: { sources: ['rk', 'rk/**'] } } } } },
+  { path: './o/build-manifest.json', content: { pipeline: 'elohim-orchestrator', jenkinsPath: 'o/Jenkinsfile', steps: { lint: { inputs: { sources: ['**/Jenkinsfile*'] } } } } },
+  { path: './l/build-manifest.json', content: { pipeline: 'local-only', steps: { s: { inputs: { sources: ['local/**'] } } } } },
+];
+// Every real manifest step declares `depends` (the path walker's topoSort reads it).
+for (const { content } of FIXTURE) for (const step of Object.values(content.steps)) step.depends ??= [];
+const fwalk = changed => walkGraph(FIXTURE, changed, { ci: true });
+const onDev = (changed, tip = 'feat: x', over = {}) => evaluateRef({ target: 'dev', walked: fwalk(changed), tip, mode: 'refuse', ...over });
+const only = rows => { assert.equal(rows.length, 1, JSON.stringify(rows)); return rows[0]; };
+const BASELINE = /the next run's diff starts past this push; a later change that selects the same pipeline still builds these bytes; a failed or aborted run keeps the old baseline/;
 
-function walkerOf(...pipelines) {
-  const calls = [];
-  const walk = changed => { calls.push(changed); return { projects: [], pipelines }; };
-  walk.calls = calls;
-  return walk;
-}
-const CHANGED = ['elohim/sdk/schemas/v1/gate-live-event.schema.json'];
-const registryWithEdge = () => new Map([
-  ['elohim-edge', { pipeline: 'elohim-edge', manualOnly: false, jenkinsPath: 'elohim/holochain/Jenkinsfile' }],
-  ['elohim', { pipeline: 'elohim', manualOnly: false, jenkinsPath: 'Jenkinsfile' }],
-  ['local-only', { pipeline: 'local-only', manualOnly: false }],
-]);
-const evaluate = (over = {}) => evaluateFleetRoll({
-  changed: CHANGED, messages: ['feat(x): a change'], target: 'dev', mode: 'refuse', walk: walkerOf(EDGE_BUILD), ...over,
+// ── CI's graph, as an option on the walker ──────────────────────────────────
+
+test('the default walker is unchanged: no propagation, picomatch dotfile rules', () => {
+  assert.deepEqual(walkGraph(FIXTURE, ['pin']).pipelines.map(p => p.name), ['elohim-conductor']);
+  assert.deepEqual(walkGraph(FIXTURE, ['sdk/.gitignore']).pipelines, []);
+});
+
+test('ci option: CI glob matches dotfiles, keeps segment wildcards, and skips .epr-meta', () => {
+  for (const [file, pattern, hit] of [
+    ['sdk/.gitignore', 'sdk/**', true], ['a/b.c', 'a/*.c', true], ['a/x/b.c', 'a/*.c', false],
+    ['a/b', 'a/**/b', true], ['a/x/y/b', 'a/**/b', true], ['ab', 'a?', true], ['aXc', 'a.c', false],
+  ]) assert.equal(ciGlobMatch(file, pattern), hit, `${file} ~ ${pattern}`);
+  assert.deepEqual(fwalk(['sdk/.gitignore']).pipelines.map(p => p.name), ['elohim-edge']);
+  assert.deepEqual(fwalk(['sdk/.epr-meta/rule.md']).pipelines, []);
+});
+
+test('ci option: staleness propagates over depends to a fixed point, with CI\'s reasons', () => {
+  const edge = fwalk(['pin']).pipelines.find(p => p.name === 'elohim-edge');
+  assert.deepEqual(edge.steps.map(s => [s.name, s.reason, s.cause]), [
+    ['cargo-build-storage', 'depends: elohim-conductor:build-conductor-image', 'pin'],
+    ['build-edge-image', 'depends: elohim-edge:cargo-build-storage', 'pin'],
+  ]);
+  assert.equal(fwalk(['sdk/x.json']).pipelines.find(p => p.name === 'elohim-edge').steps[0].reason, 'source: sdk/x.json matches sdk/**');
+});
+
+test('ci option: a manual-only step propagates but is not dispatched', () => {
+  const walked = fwalk(['rk']);
+  assert.deepEqual(walked.pipelines.map(p => p.name), ['elohim-edge']);
+  assert.deepEqual(walked.pipelines[0].steps.map(s => s.name), ['build-edge-image']);
+});
+
+test('ci option: the manifest-only cap needs every trigger a manifest and no stale dependency', () => {
+  assert.equal(fwalk(['a/build-manifest.json']).pipelines.find(p => p.name === 'elohim').runClass, 'verify');
+  assert.equal(fwalk(['a/build-manifest.json', 'app/x.ts']).pipelines.find(p => p.name === 'elohim').runClass, 'build');
+  // A step stale only by propagation is not "by source", so Edge's own manifest edit stays build in CI.
+  assert.equal(fwalk(['e/build-manifest.json']).pipelines.find(p => p.name === 'elohim-edge').runClass, 'build');
+});
+
+// ── Parity cases (fixtures) ─────────────────────────────────────────────────
+
+test('parity: propagation turns a push the path walker reads as validation only into a build', () => {
+  const plain = walkGraph(FIXTURE, ['steps/a.ts', 'pin']).pipelines.find(p => p.name === 'elohim-edge');
+  assert.deepEqual(plain.steps.map(s => s.name), ['dataplane-validation'], 'the trap: no propagation');
+  const r = only(onDev(['steps/a.ts', 'pin']));
+  assert.equal(r.level, 'REFUSED');
+  assert.match(r.why, /^CI would select an Edge build and its deploy step for this push to dev: elohim-edge stale steps cargo-build-storage, build-edge-image, from pin, through elohim-conductor:build-conductor-image/);
+});
+
+test('parity: [deploy-only] over validation-only stays validate-only; over nothing, or over build inputs, it deploys', () => {
+  const dv = only(onDev(['steps/a.ts'], 'ops: [deploy-only]'));
+  assert.equal(dv.level, 'ok');
+  assert.match(dv.why, /validates only/);
+  const bare = only(onDev(['docs/a.md'], 'ops: [deploy-only]'));
+  assert.equal(bare.level, 'REFUSED');
+  assert.match(bare.why, /^the tip's \[deploy-only\] makes CI select the Edge deploy step for this push to dev \(its build stages are skipped\)/);
+  assert.match(only(onDev(['sdk/x.json'], 'ops: [deploy-only]')).why, /^CI would select the Edge deploy step for this push to dev; the tip's \[deploy-only\] skips its build stages/);
+});
+
+test('parity: [build:all] on a docs tip is asked to be declared, saying CI forces nothing with it today', () => {
+  const r = only(onDev(['docs/a.md'], 'docs: refresh [build:all]'));
+  assert.equal(r.level, 'REFUSED');
+  assert.match(r.why, /^the tip's \[build:all\] asks for every pipeline, Edge included, on this push to dev: CI forces nothing with it today/);
+  assert.match(r.cure, /drop \[build:all\] from the tip commit/);
+  assert.equal(only(onDev(['docs/a.md'], 'docs: [build:all]', { declaredBy: 'a'.repeat(40) })).level, 'ok');
+});
+
+test('parity: an explicit edge token forces the selection; a space inside the tag breaks both grammars', () => {
+  for (const tip of ['ci: [build:edge]', 'ci: [BUILD:dna,Edge]']) {
+    const r = only(onDev(['docs/a.md'], tip));
+    assert.equal(r.level, 'REFUSED', tip);
+    assert.match(r.why, /^the tip's \[build:[^\]]+\] makes CI select an Edge build and its deploy step/i, tip);
+    assert.match(r.cure, /^drop \[build:[^\]]+\] from the tip commit/i, tip);
+  }
+  assert.deepEqual(onDev(['docs/a.md'], 'ci: [build:dna, edge]'), []);
 });
 
 // ── Outcomes ────────────────────────────────────────────────────────────────
 
-test('an undeclared roll on a push to dev refuses, naming each build step, three paths and the limit', () => {
-  const { row, prediction } = evaluate();
-  assert.equal(prediction.roll, true);
-  assert.equal(row.check, 'fleet-roll');
-  assert.equal(row.level, 'REFUSED');
-  assert.match(row.why, /^this push to dev would rebuild and roll the Edge fleet: elohim-edge builds cargo-build-storage, cargo-build-doorway, selected by /);
-  assert.doesNotMatch(row.why, /builds [^:]*dataplane-validation/, 'the validation step is not a build step');
-  assert.match(row.why, /elohim\/sdk\/schemas\/v1\/gate-live-event\.schema\.json, elohim\/Cargo\.lock, crates\/seam-contracts\/src\/lib\.rs and 1 more/);
-  assert.match(row.why, /no pushed commit declares \[edge:roll\]/);
-  assert.match(row.why, /an Edge step left stale by an earlier landing is not seen/);
-  assert.match(row.cure, /take the change out of the Edge build inputs/);
-  assert.match(row.cure, /land it with the next deliberate roll/);
-  assert.match(row.cure, /add \[edge:roll\] and the reason to a pushed commit message/);
-  assert.match(row.cure, /\[edge:validate-only\] on the tip also stops the roll, but it drops every other pipeline/);
-});
-
-test('a push to main refuses the same way', () => {
-  assert.equal(evaluate({ target: 'main' }).row.level, 'REFUSED');
-});
-
-test('a roll declared by [edge:roll] in any pushed commit is ok and names the building steps', () => {
-  const tip = evaluate({ messages: ['fix: tip', 'feat(sdk): schema field\n\nRolls alpha on purpose. [edge:roll]', 'chore: base'] }).row;
-  assert.equal(tip.level, 'ok');
-  assert.match(tip.why, /^roll declared by \[edge:roll\] in a pushed commit: elohim-edge builds cargo-build-storage, cargo-build-doorway/);
-  assert.match(evaluate({ messages: ['feat: [EDGE:ROLL] storage'] }).row.why, /in the tip commit/);
-});
-
-test('an Edge selection of dataplane-validation alone is ok: it validates only', () => {
-  const { row, prediction } = evaluate({ walk: walkerOf(EDGE_VALIDATE) });
-  assert.equal(prediction.roll, false);
-  assert.equal(row.level, 'ok');
-  assert.equal(row.why, 'elohim-edge validates only (dataplane-validation); no build, no fleet roll');
-});
-
-test('a manifest-only change capped below deploy validates only, as CI dispatches it', () => {
-  const capped = { ...EDGE_BUILD, steps: [{ name: 'cargo-build-storage', class: 'build' }], runClass: 'verify' };
-  assert.equal(evaluate({ walk: walkerOf(capped) }).row.level, 'ok');
-});
-
-test('no Edge selection stays silent, like every unaffected preflight check', () => {
-  assert.equal(evaluate({ walk: walkerOf(OTHER) }).row, null);
-  assert.equal(evaluate({ walk: walkerOf() }).row, null);
-});
-
-test('mode warn gives the refusal text as WARN; mode off gives no row and walks nothing', () => {
-  const refused = evaluate().row;
-  const warned = evaluate({ mode: 'warn' }).row;
-  assert.equal(warned.level, 'WARN');
-  assert.equal(warned.why, refused.why);
-  assert.equal(warned.cure, refused.cure);
-  const walk = walkerOf(EDGE_BUILD);
-  assert.deepEqual(evaluate({ mode: 'off', walk }), { prediction: null, row: null });
-  assert.equal(walk.calls.length, 0);
-});
-
-test('off a deploying branch, or outside a push, a would-be roll warns and never refuses', () => {
-  const feature = evaluate({ target: 'self/shem/x' }).row;
-  assert.equal(feature.level, 'WARN');
-  assert.match(feature.why, /^this change would roll the Edge fleet if pushed to dev \(target self\/shem\/x does not deploy\)/);
-  const gate = evaluate({ target: null, messages: [] }).row;
-  assert.equal(gate.level, 'WARN');
-  assert.match(gate.why, /if pushed to dev \(not a push\)/);
-  assert.equal(evaluate({ target: 'claude/feature', messages: new Error('x') }).row.level, 'WARN');
-});
-
-test('unreadable commit messages or changed paths refuse on a deploying push, never read as no tags', () => {
-  const r = evaluate({ messages: new Error('git log a..b exited 128: bad revision') }).row;
+test('an undeclared selection on dev is red, with cures that are true', () => {
+  const r = only(onDev(['sdk/x.json']));
   assert.equal(r.level, 'REFUSED');
-  assert.match(r.why, /^push to dev: the pushed commits' messages could not be read \(git log a\.\.b exited 128: bad revision\)/);
-  assert.match(r.why, /never reads as "nothing changed"/);
-  assert.match(r.cure, /git fetch origin/);
-  assert.equal(evaluate({ changed: null }).row.level, 'REFUSED');
-  assert.equal(evaluate({ messages: new Error('x'), mode: 'warn' }).row.level, 'WARN');
+  assert.match(r.why, /no pushed commit carries \[edge:roll\]\. Read from this ref's own range and its tip's tags; an Edge step left stale by an earlier landing is not seen$/);
+  assert.doesNotMatch(r.why, /\broll(s|ed)? the\b|rebuild and roll/);
+  assert.match(r.cure, /take the Edge build inputs out of this push, or land them with the next deliberate roll/);
+  assert.match(r.cure, /add \[edge:roll\] and the reason to a pushed commit message/);
+  assert.doesNotMatch(r.cure, /own push|documentation only/);
+  assert.equal(only(evaluateRef({ target: 'main', walked: fwalk(['sdk/x.json']), mode: 'refuse' })).level, 'REFUSED');
 });
 
-// ── Tags, read the way CI reads them: the tip commit's message ──────────────
+test('a declared selection is ok and names the commit', () => {
+  const r = only(onDev(['sdk/x.json'], 'feat: x', { declaredBy: 'abcdef0123456789' }));
+  assert.equal(r.level, 'ok');
+  assert.match(r.why, /declared by \[edge:roll\] in abcdef012345$/);
+});
 
-test('forcing tags on the tip predict a roll even with no Edge path: [build:edge], a list, [build:all], [deploy-only]', () => {
-  const none = walkerOf(OTHER);
-  for (const tip of ['ci: measure [build:edge]', 'ci: [build:dna,edge]', 'ci: [BUILD:Edge]', 'ci: [build:all]', 'ops: [deploy-only]']) {
-    const { row, prediction } = evaluate({ walk: none, messages: [tip], registry: registryWithEdge });
-    assert.equal(row?.level, 'REFUSED', tip);
-    assert.equal(prediction.roll, true, tip);
-    assert.match(row.why, /the tip's \[.*\] forces a full elohim-edge run/, tip);
-    assert.match(row.cure, /drop \[.*\] from the tip commit/, tip);
+test('validation-only selection is ok; no Edge selection is silent', () => {
+  assert.match(only(onDev(['steps/a.ts'])).why, /validates only \(dataplane-validation\); CI selects no Edge build or deploy/);
+  assert.deepEqual(onDev(['app/x.ts']), []);
+});
+
+test('mode warn gives the red text as WARN; off gives nothing; a default mode says why', () => {
+  const red = only(onDev(['sdk/x.json']));
+  const warn = only(onDev(['sdk/x.json'], 'feat: x', { mode: 'warn' }));
+  assert.equal(warn.level, 'WARN');
+  assert.equal(warn.why, red.why);
+  assert.deepEqual(onDev(['sdk/x.json'], 'feat: x', { mode: 'off' }), []);
+  assert.match(only(onDev(['sdk/x.json'], 'feat: x', { policyWhy: 'pool-policy.json is not valid JSON' })).why,
+    /\(policy: mode refuse, the default, because pool-policy.json is not valid JSON\)$/);
+});
+
+test('off a deploying branch, or outside a push, a selection warns and never goes red', () => {
+  const self = only(evaluateRef({ target: 'self/x', walked: fwalk(['sdk/x.json']), mode: 'refuse' }));
+  assert.equal(self.level, 'WARN');
+  assert.match(self.why, /for this change, were it pushed to dev \(target self\/x does not deploy\)/);
+  assert.match(only(evaluateRef({ target: null, walked: fwalk(['sdk/x.json']), mode: 'refuse' })).why, /were it pushed to dev \(not a push\)/);
+});
+
+test('a skip tag over Edge build inputs warns twice with the true baseline words', () => {
+  const rows = onDev(['sdk/x.json', 'app/y.ts', 'local/z', 'o/Jenkinsfile'], 'docs: notes [skip ci]');
+  assert.deepEqual(rows.map(r => [r.check, r.level]), [['fleet-roll', 'WARN'], ['skip-ci', 'WARN']]);
+  for (const r of rows) {
+    assert.match(r.why, BASELINE);
+    assert.doesNotMatch(r.why, /no later diff|only with a later forced/);
   }
-  assert.equal(evaluate({ walk: none, messages: ['ci: [build:edge] [edge:roll]'] }).row.level, 'ok', 'a forced roll can be declared');
+  assert.match(rows[1].why, /^the tip's \[skip ci\] dispatches none of elohim-edge, elohim, which this ref's paths select/);
+  assert.match(rows[1].cure, /a tip whose paths select no pipeline/);
 });
 
-test('a forcing tag below the tip is inert, as in CI', () => {
-  assert.equal(evaluate({ walk: walkerOf(OTHER), messages: ['feat: tip', 'ci: [build:edge]'] }).row, null);
+test('skip-ci: silent over paths that select nothing, and with no skip tag', () => {
+  assert.deepEqual(onDev(['docs/a.md'], 'docs [skip ci]'), []);
+  assert.deepEqual(onDev(['app/x.ts'], 'feat: x'), []);
+  assert.deepEqual(only(onDev(['app/x.ts'], 'docs [no ci]')).check, 'skip-ci');
 });
 
-test('a skip tag on the tip rolls nothing but warns that Edge build inputs land unbuilt past the baseline', () => {
-  for (const tip of ['docs: x [skip ci]', 'docs: x [ci skip]', 'docs: x [no ci]', 'docs: [SKIP CI] [build:edge]']) {
-    const { row, prediction } = evaluate({ messages: [tip], registry: registryWithEdge });
-    assert.equal(prediction.roll, false, tip);
-    assert.equal(row.level, 'WARN', tip);
-    assert.match(row.why, /^the tip's \[skip ci\] dispatches nothing for this push to dev: elohim-edge build inputs land unbuilt \(cargo-build-storage, cargo-build-doorway, from /, tip);
-    assert.match(row.why, /the next run's diff starts past this push, and the fleet gets them only with a later forced, declared roll$/, tip);
-  }
-  const validateOnly = evaluate({ messages: ['docs: x [skip ci]'], walk: walkerOf(EDGE_VALIDATE) }).row;
-  assert.equal(validateOnly.level, 'ok', 'validation-only inputs build nothing either way');
+test('[edge:validate-only] warns over Edge build inputs alone and over other pipelines; over validation alone it is ok', () => {
+  const alone = only(onDev(['sdk/x.json'], 'measure [edge:validate-only] [build:edge]'));
+  assert.equal(alone.level, 'WARN');
+  assert.match(alone.why, /makes elohim-edge validate only for this push to dev: its Edge build inputs \(elohim-edge stale steps cargo-build-storage, build-edge-image, from sdk\/x.json\) are not built by this run; once the run ends green, the next run's diff/);
+  assert.match(only(onDev(['app/x.ts', 'local/z'], 'measure [edge:validate-only]')).why, /it drops elohim from the run/);
+  assert.equal(only(onDev(['steps/a.ts'], 'measure [edge:validate-only]')).level, 'ok');
 });
 
-test('[edge:validate-only] on the tip warns when it drops other selected pipelines from the run', () => {
-  const { row } = evaluate({ messages: ['measure [edge:validate-only]'], walk: walkerOf(EDGE_BUILD, OTHER) });
-  assert.equal(row.level, 'WARN');
-  assert.match(row.why, /keeps elohim-edge from building or deploying for this push to dev, but it also drops elohim from that run, and once the run ends green the next run's diff starts past this push/);
-  assert.equal(evaluate({ messages: ['measure [edge:validate-only]'], walk: walkerOf(OTHER) }).row.level, 'WARN', 'even with Edge unselected');
+test('[run:verify] keeps Edge out unless forced; with [deploy-only] Edge still deploys', () => {
+  assert.match(only(onDev(['sdk/x.json'], '[run:verify]')).why, /^the tip's \[run:verify\] keeps elohim-edge out of the dispatch/);
+  assert.equal(only(onDev(['sdk/x.json'], '[run:verify] [build:edge]')).level, 'REFUSED');
+  assert.equal(only(onDev(['docs/a.md'], '[run:verify] [deploy-only]')).level, 'REFUSED');
 });
 
-test('suppressing tags on the tip: [edge:validate-only] (over [build:edge]) and [run:verify] keep Edge from rolling', () => {
-  for (const [tip, tag] of [
-    ['measure [build:edge] [edge:validate-only]', '[edge:validate-only]'],
-    ['measure [edge:validate-only] [deploy-only]', '[edge:validate-only]'],
-    ['measure [run:verify]', '[run:verify]'],
-  ]) {
-    const { row, prediction } = evaluate({ messages: [tip], registry: registryWithEdge });
-    assert.equal(prediction.roll, false, tip);
-    assert.equal(row.level, 'ok', tip);
-    assert.equal(row.why, `the tip's ${tag} keeps elohim-edge from building or deploying for this push to dev`, tip);
-  }
+test('predict reads tags from the tip only', () => {
+  assert.equal(predict(fwalk(['docs/a.md']), 'feat: tip').selects, false);
 });
 
-test('[run:verify] does not cap a forced or deploy-only Edge run; a suppressing tag below the tip is inert', () => {
-  assert.equal(evaluate({ messages: ['[run:verify] [build:edge]'], registry: registryWithEdge }).row.level, 'REFUSED');
-  assert.equal(evaluate({ messages: ['[run:verify] [deploy-only]'] }).row.level, 'REFUSED');
-  assert.equal(evaluate({ messages: ['feat: tip', 'docs: [skip ci]', 'x [edge:validate-only]'] }).row.level, 'REFUSED');
-});
+// ── Each protected ref on its own (real git) ────────────────────────────────
 
-// ── Reading the push ────────────────────────────────────────────────────────
-
-test('GATE_PUSH_RANGES lines parse into ref, range, pushed sha and branch', () => {
-  assert.deepEqual(parseRanges('refs/heads/dev abc..def\nrefs/tags/v1 origin/dev..123\n\n'), [
-    { ref: 'refs/heads/dev', range: 'abc..def', sha: 'def', branch: 'dev' },
-    { ref: 'refs/tags/v1', range: 'origin/dev..123', sha: '123', branch: null },
-  ]);
-});
-
-test('a failed git call is an error, never an empty message list', () => {
-  const failing = () => ({ status: 128, stdout: '', stderr: 'fatal: bad revision\n' });
-  const result = readMessages({ root: '/x', range: 'a..b', sha: 'b', spawn: failing });
-  assert.ok(result instanceof Error);
-  assert.match(result.message, /exited 128: fatal: bad revision/);
-  const spawned = () => ({ error: Object.assign(new Error('spawn git ENOENT'), { code: 'ENOENT' }), status: null, stdout: '' });
-  assert.ok(readMessages({ root: '/x', range: 'a..b', sha: 'b', spawn: spawned }) instanceof Error);
-  const rows = checkFleetRoll({ root: '/x', changed: CHANGED, walk: walkerOf(EDGE_BUILD), spawn: failing, mode: 'refuse',
-    env: { GATE_PUSH_TARGETS: 'refs/heads/dev', GATE_PUSH_RANGES: 'refs/heads/dev a..b' } });
-  assert.equal(rows.length, 1);
-  assert.equal(rows[0].level, 'REFUSED');
-  assert.match(rows[0].why, /could not be read/);
-});
-
-test('an older hook with no ranges variable and no Edge build predicted: no row', () => {
-  const env = { GATE_PUSH_TARGETS: 'refs/heads/dev' };
-  assert.equal(checkFleetRoll({ root: '/x', changed: CHANGED, walk: walkerOf(OTHER), mode: 'refuse', env }), null);
-  assert.equal(checkFleetRoll({ root: '/x', changed: CHANGED, walk: walkerOf(EDGE_VALIDATE), mode: 'refuse', env }), null);
-});
-
-test('an older hook with no ranges variable and an Edge build predicted refuses, naming the hook as the fix', () => {
-  const r = checkFleetRoll({ root: '/x', changed: CHANGED, walk: walkerOf(EDGE_BUILD), mode: 'refuse', env: { GATE_PUSH_TARGETS: 'refs/heads/self/a refs/heads/dev' } });
-  assert.equal(r.level, 'REFUSED');
-  assert.match(r.why, /^this push to dev would rebuild and roll the Edge fleet: elohim-edge builds cargo-build-storage/);
-  assert.match(r.why, /the running pre-push hook hands over no commit range \(GATE_PUSH_RANGES\), so whether a pushed commit declares \[edge:roll\] cannot be read$/);
-  assert.match(r.cure, /^push with -c core\.hooksPath=<worktree>\/\.husky\/_ so the current hook reads the commit messages, or bring the main checkout up to date/);
-  assert.equal(checkFleetRoll({ root: '/x', changed: CHANGED, walk: walkerOf(EDGE_BUILD), mode: 'refuse', env: { GATE_PUSH_TARGETS: 'refs/heads/self/a' } }).level, 'WARN');
-});
-
-test('ranges given but unreadable still refuse, with the fetch cure', () => {
-  const rows = checkFleetRoll({ root: '/x', changed: CHANGED, walk: walkerOf(OTHER), mode: 'refuse',
-    spawn: () => ({ status: 128, stdout: '', stderr: 'fatal: bad object b\n' }),
-    env: { GATE_PUSH_TARGETS: 'refs/heads/dev', GATE_PUSH_RANGES: 'refs/heads/dev a..b' } });
-  assert.equal(rows[0].level, 'REFUSED');
-  assert.match(rows[0].why, /could not be read \(git log -1 b exited 128: fatal: bad object b\)/);
-  assert.equal(rows[0].cure, 'git fetch origin, then push again');
-});
-
-test('outside a push the check needs a changed list', () => {
-  assert.equal(checkFleetRoll({ root: '/x', changed: null, walk: walkerOf(EDGE_BUILD), mode: 'refuse', env: {} }), null);
-  assert.equal(checkFleetRoll({ root: '/x', changed: CHANGED, walk: walkerOf(EDGE_BUILD), mode: 'refuse', env: {} }).level, 'WARN');
-  assert.equal(checkFleetRoll({ root: '/x', changed: CHANGED, walk: walkerOf(EDGE_BUILD), mode: 'off', env: { GATE_PUSH_TARGETS: 'refs/heads/dev' } }), null);
-});
-
-test('a real pushed range: the declaration in a middle commit is read through git log', (t) => {
+const cleanEnv = Object.fromEntries(Object.entries(process.env).filter(([k]) => !k.startsWith('GIT_') || k.startsWith('GIT_CONFIG_')));
+function repo(t) {
   const dir = mkdtempSync(join(tmpdir(), 'fleet-roll-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
-  const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !k.startsWith('GIT_') || k.startsWith('GIT_CONFIG_')));
   const git = (...args) => {
-    const r = spawnSync('git', ['-C', dir, '-c', 'user.name=t', '-c', 'user.email=t@t', '-c', 'commit.gpgsign=false', ...args], { encoding: 'utf8', env });
+    const r = spawnSync('git', ['-C', dir, '-c', 'user.name=t', '-c', 'user.email=t@t', '-c', 'commit.gpgsign=false', '-c', 'core.hooksPath=/dev/null', ...args],
+      { encoding: 'utf8', env: cleanEnv, maxBuffer: 64 * 1024 * 1024 });
     assert.equal(r.status, 0, r.stderr);
     return r.stdout.trim();
   };
-  git('init', '--quiet');
-  git('commit', '--quiet', '--allow-empty', '-m', 'base');
-  const base = git('rev-parse', 'HEAD');
-  git('commit', '--quiet', '--allow-empty', '-m', 'feat(sdk): a field\n\nThe roll is deliberate. [edge:roll]');
-  git('commit', '--quiet', '--allow-empty', '-m', 'fix: tip');
-  const tip = git('rev-parse', 'HEAD');
-  const messages = readMessages({ root: dir, range: `${base}..${tip}`, sha: tip });
-  assert.equal(messages[0], 'fix: tip');
-  assert.equal(messages.length, 3, 'the tip, then the two pushed commits');
-  const rows = checkFleetRoll({ root: dir, changed: CHANGED, walk: walkerOf(EDGE_BUILD), mode: 'refuse',
-    env: { GATE_PUSH_TARGETS: 'refs/heads/dev', GATE_PUSH_RANGES: `refs/heads/dev ${base}..${tip}` } });
-  assert.equal(rows[0].level, 'ok');
-  assert.match(rows[0].why, /^roll declared by \[edge:roll\] in a pushed commit/);
-  const undeclared = checkFleetRoll({ root: dir, changed: CHANGED, walk: walkerOf(EDGE_BUILD), mode: 'refuse',
-    env: { GATE_PUSH_TARGETS: 'refs/heads/dev', GATE_PUSH_RANGES: `refs/heads/dev ${tip}..${tip}` } });
-  assert.equal(undeclared[0].level, 'REFUSED', 'a range already upstream still reads its tip, and no declaration');
+  const commit = (files, message) => {
+    for (const [path, text] of Object.entries(files)) { mkdirSync(join(dir, path, '..'), { recursive: true }); writeFileSync(join(dir, path), text); }
+    git('add', '-A');
+    const msg = join(dir, '..', `${dir.split('/').at(-1)}.msg`);
+    writeFileSync(msg, message);
+    t.after(() => rmSync(msg, { force: true }));
+    git('commit', '--quiet', '--allow-empty', '-F', msg);
+    return git('rev-parse', 'HEAD');
+  };
+  git('init', '--quiet', '-b', 'dev');
+  return { dir, git, commit };
+}
+const spawnIn = (cmd, args, opts) => spawnSync(cmd, args, { ...opts, env: cleanEnv });
+const check = (dir, refs, extra = {}) => checkFleetRoll({
+  root: dir, walk: fwalk, spawn: spawnIn, policy: { mode: 'refuse', why: null },
+  env: { GATE_PUSH_TARGETS: refs.map(r => r[0]).join(' '), GATE_PUSH_REFS: refs.map(r => r.join(' ')).join('\n'), ...extra },
 });
 
-// ── skip-ci: a skip tag on a deploying tip over code ────────────────────────
-
-const skipEnv = { GATE_PUSH_TARGETS: 'refs/heads/dev', GATE_PUSH_RANGES: 'refs/heads/dev a..b' };
-const gitSays = (...messages) => (cmd, args) => ({ status: 0,
-  stdout: (args.includes('-1') ? messages.slice(0, 1) : messages).map(m => `${m}\x1e\n`).join('') });
-const skipRows = (walk, ...messages) => checkFleetRoll({ root: '/x', changed: CHANGED, walk, mode: 'refuse', env: skipEnv,
-  spawn: gitSays(...messages), registry: registryWithEdge });
-
-test('skip-ci: a skip tag over docs only is silent', () => {
-  assert.deepEqual(skipRows(walkerOf(), 'docs: notes [skip ci]'), []);
+test('per ref: a docs-only dev tip pushed with an Edge-changing self/x is not red', (t) => {
+  const { git, commit, dir } = repo(t);
+  const base = commit({ 'README.md': 'x' }, 'base');
+  const selfTip = commit({ 'sdk/x.json': '1' }, 'feat: edge input');
+  git('checkout', '--quiet', '-b', 'side', base);
+  const devTip = commit({ 'docs/a.md': 'y' }, 'docs: a');
+  git('checkout', '--quiet', 'dev');
+  git('reset', '--quiet', '--hard', devTip);
+  const rows = check(dir, [['refs/heads/dev', devTip, base], ['refs/heads/self/x', selfTip, base]]);
+  assert.deepEqual(rows, []);
 });
 
-test('skip-ci: a skip tag over one pipeline\'s inputs warns, naming it', () => {
-  const rows = skipRows(walkerOf(OTHER), 'docs: notes [skip ci]');
-  assert.equal(rows.length, 1);
-  assert.equal(rows[0].check, 'skip-ci');
-  assert.equal(rows[0].level, 'WARN');
-  assert.equal(rows[0].why, "the tip's skip tag on this push to dev means this run dispatches none of elohim, which this push's paths select, and the next run's diff starts past this push, so no later diff builds them");
-  const local = { name: 'local-only', reasons: ['source: x'], steps: [{ name: 's', class: 'build' }], runClass: 'build' };
-  assert.deepEqual(skipRows(walkerOf(local), 'docs: notes [skip ci]'), [], 'a pipeline with no jenkinsPath is never dispatched');
-  const both = skipRows(walkerOf(EDGE_BUILD, OTHER), 'docs: notes [ci skip]');
-  assert.deepEqual(both.map(r => [r.check, r.level]), [['fleet-roll', 'WARN'], ['skip-ci', 'WARN']]);
-  assert.match(both[1].why, /none of elohim-edge, elohim,/);
+test('per ref: dev and main pushed together are judged on their own ranges', (t) => {
+  const { git, commit, dir } = repo(t);
+  const base = commit({ 'README.md': 'x' }, 'base');
+  const edgeChange = commit({ 'sdk/x.json': '1' }, 'feat: edge input');
+  const tip = commit({ 'docs/a.md': 'y' }, 'docs: a');
+  const rows = check(dir, [['refs/heads/dev', tip, edgeChange], ['refs/heads/main', tip, base]]);
+  assert.equal(git('rev-parse', 'HEAD'), tip);
+  assert.equal(only(rows).level, 'REFUSED');
+  assert.match(rows[0].why, /for this push to main:/);
 });
 
-test('skip-ci: no skip tag, or a feature target, is silent', () => {
-  assert.deepEqual(skipRows(walkerOf(OTHER), 'feat: code'), []);
-  assert.deepEqual(skipRows(walkerOf(OTHER), 'feat: tip', 'docs: below [skip ci]'), [], 'a skip tag below the tip is inert');
-  const feature = checkFleetRoll({ root: '/x', changed: CHANGED, walk: walkerOf(OTHER), mode: 'refuse', spawn: gitSays('docs [skip ci]'),
-    registry: registryWithEdge, env: { GATE_PUSH_TARGETS: 'refs/heads/self/a', GATE_PUSH_RANGES: 'refs/heads/self/a a..b' } });
-  assert.deepEqual(feature, []);
+test('per ref: a declaration anywhere in a range over 1 MiB of messages is found; a 0x1e byte in the tip is harmless', (t) => {
+  const { commit, dir } = repo(t);
+  const base = commit({ 'README.md': 'x' }, 'base');
+  const filler = 'filler line of a long commit body\n'.repeat(18000);
+  commit({ 'sdk/x.json': '1' }, `feat: schema field\n\nRolls alpha on purpose. [Edge:Roll]\n${filler}`);
+  commit({}, `chore: middle\n\n${filler}`);
+  const tip = commit({}, `fix: tip \x1e with a separator byte\n\n${filler}`);
+  assert.ok(filler.length * 3 > 1024 * 1024);
+  const r = only(check(dir, [['refs/heads/dev', tip, base]]));
+  assert.equal(r.level, 'ok', r.why);
+  assert.match(r.why, /declared by \[edge:roll\] in [0-9a-f]{12}$/);
 });
 
-test('only deploying refs are judged when a push carries several', () => {
-  const rows = checkFleetRoll({ root: '/x', changed: CHANGED, walk: walkerOf(EDGE_BUILD), mode: 'refuse',
-    spawn: () => ({ status: 0, stdout: 'feat: x\x1e\n' }),
-    env: { GATE_PUSH_TARGETS: 'refs/heads/self/a refs/heads/dev', GATE_PUSH_RANGES: 'refs/heads/self/a b..c\nrefs/heads/dev b..c' } });
-  assert.equal(rows.length, 1);
-  assert.match(rows[0].why, /push to dev/);
+test('per ref: an unknown destination tip, or a push that creates dev, cannot be decided and is red', (t) => {
+  const { commit, dir } = repo(t);
+  const tip = commit({ 'docs/a.md': 'x' }, 'docs');
+  const unknown = only(check(dir, [['refs/heads/dev', tip, '1'.repeat(40)]]));
+  assert.equal(unknown.level, 'REFUSED');
+  assert.match(unknown.why, /the destination tip 111111111111 is not in this clone/);
+  assert.equal(unknown.cure, 'git fetch origin dev, then push again');
+  assert.match(only(check(dir, [['refs/heads/dev', tip, '0'.repeat(40)]])).why, /this push creates dev/);
 });
 
-test('the policy mode reads pool-policy.json fleet_roll_guard.mode; absent or unknown reads as refuse', (t) => {
+test('per ref: a pushed tip other than HEAD, or a build manifest that differs from it, is red', (t) => {
+  const { git, commit, dir } = repo(t);
+  const base = commit({ 'README.md': 'x', 'e/build-manifest.json': '{}' }, 'base');
+  const tip = commit({ 'docs/a.md': 'y' }, 'docs');
+  git('checkout', '--quiet', base);
+  assert.match(only(check(dir, [['refs/heads/dev', tip, base]])).why, /is not this checkout's HEAD/);
+  git('checkout', '--quiet', 'dev');
+  writeFileSync(join(dir, 'e/build-manifest.json'), '{"changed":true}');
+  const drift = only(check(dir, [['refs/heads/dev', tip, base]]));
+  assert.equal(drift.level, 'REFUSED');
+  assert.match(drift.why, /build-manifest.json differs between this checkout and the pushed tip \(e\/build-manifest.json\)/);
+  assert.equal(drift.cure, 'push from a checkout at the pushed commit, with its build-manifest.json files committed');
+  git('checkout', '--quiet', '--', 'e/build-manifest.json');
+  mkdirSync(join(dir, 'n'), { recursive: true });
+  writeFileSync(join(dir, 'n/build-manifest.json'), '{}');
+  assert.match(only(check(dir, [['refs/heads/dev', tip, base]])).why, /\(n\/build-manifest.json\)/);
+});
+
+test('per ref: a new branch that does not deploy stays advisory even when its base cannot be read', (t) => {
+  const { commit, dir } = repo(t);
+  const tip = commit({ 'sdk/x.json': '1' }, 'feat');
+  const r = only(check(dir, [['refs/heads/self/new', tip, '0'.repeat(40)]]));
+  assert.equal(r.level, 'WARN');
+});
+
+// ── Ambient inputs and failures ─────────────────────────────────────────────
+
+test('ambient: an empty or stale ref list that disagrees with the targets is red on a protected push', (t) => {
+  const { commit, dir } = repo(t);
+  const tip = commit({ 'docs/a.md': 'x' }, 'docs');
+  const policy = { mode: 'refuse', why: null };
+  const empty = only(checkFleetRoll({ root: dir, walk: fwalk, spawn: spawnIn, policy, env: { GATE_PUSH_TARGETS: 'refs/heads/dev', GATE_PUSH_REFS: '' } }));
+  assert.equal(empty.level, 'REFUSED');
+  assert.match(empty.why, /does not match — the check cannot decide/);
+  const stale = only(checkFleetRoll({ root: dir, walk: fwalk, spawn: spawnIn, policy,
+    env: { GATE_PUSH_TARGETS: 'refs/heads/dev', GATE_PUSH_REFS: `refs/heads/self/old ${tip} ${tip}` } }));
+  assert.equal(stale.level, 'REFUSED');
+  const selfOnly = only(checkFleetRoll({ root: dir, walk: fwalk, spawn: spawnIn, policy, env: { GATE_PUSH_TARGETS: 'refs/heads/self/a', GATE_PUSH_REFS: '' } }));
+  assert.equal(selfOnly.level, 'WARN');
+});
+
+test('an evaluator failure is red on a protected ref under refuse, a WARN otherwise, and never throws', (t) => {
+  const { commit, dir } = repo(t);
+  const base = commit({ 'README.md': 'x' }, 'base');
+  const tip = commit({ 'sdk/x.json': '1' }, 'feat');
+  const boom = () => { throw new SyntaxError('Unexpected token } in JSON at position 12'); };
+  const run = (mode, target) => only(checkFleetRoll({ root: dir, walk: boom, spawn: spawnIn, policy: { mode, why: null },
+    env: { GATE_PUSH_TARGETS: target, GATE_PUSH_REFS: `${target} ${tip} ${base}` } }));
+  const red = run('refuse', 'refs/heads/dev');
+  assert.equal(red.level, 'REFUSED');
+  assert.match(red.why, /^the fleet-roll check could not decide: Unexpected token \} in JSON at position 12$/);
+  assert.match(red.cure, /build-graph.groovy:815-827/);
+  assert.equal(run('warn', 'refs/heads/dev').level, 'WARN');
+  assert.equal(run('refuse', 'refs/heads/self/a').level, 'WARN');
+  assert.deepEqual(failureRows({ error: new Error('x'), deploying: true, mode: 'off' }), []);
+});
+
+test('a build-manifest.json that does not parse is named in the row', (t) => {
+  const dir = mkdtempSync(join(tmpdir(), 'fleet-roll-bad-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  mkdirSync(join(dir, 'x'));
+  writeFileSync(join(dir, 'x/build-manifest.json'), '{ "pipeline": ');
+  const r = only(checkFleetRoll({ root: dir, env: {}, changed: ['a.txt'] }));
+  assert.equal(r.level, 'WARN');
+  assert.match(r.why, /^the fleet-roll check could not decide: \.\/x\/build-manifest\.json: /);
+  assert.match(r.why, /\(policy: mode refuse, the default, because pool-policy.json could not be read \(ENOENT\)\)$/);
+});
+
+test('older hook (no ref list): silent with no Edge build; red with one, naming the launcher check first', () => {
+  const env = { GATE_PUSH_TARGETS: 'refs/heads/dev' };
+  const policy = { mode: 'refuse', why: null };
+  assert.deepEqual(checkFleetRoll({ env, changed: ['steps/a.ts', 'app/x.ts'], walk: fwalk, policy }), []);
+  const r = only(checkFleetRoll({ env, changed: ['pin'], walk: fwalk, policy }));
+  assert.equal(r.level, 'REFUSED');
+  assert.match(r.why, /hands over no ref list \(GATE_PUSH_REFS\), so neither this ref's own range nor a declaration can be read$/);
+  assert.ok(r.cure.indexOf('test -x <worktree>/.husky/_/pre-push') < r.cure.indexOf('-c core.hooksPath=<worktree>/.husky/_'), r.cure);
+  assert.equal(only(checkFleetRoll({ env, changed: null, walk: fwalk, policy })).level, 'REFUSED');
+  assert.equal(only(checkFleetRoll({ env: { GATE_PUSH_TARGETS: 'refs/heads/self/a' }, changed: ['pin'], walk: fwalk, policy })).level, 'WARN');
+});
+
+test('the done flag counts only for this process or an ancestor', () => {
+  assert.equal(doneFlagHonoured({ GATE_FLEET_ROLL_DONE: String(process.pid) }), true);
+  assert.equal(doneFlagHonoured({ GATE_FLEET_ROLL_DONE: String(process.ppid) }), true);
+  assert.equal(doneFlagHonoured({ GATE_FLEET_ROLL_DONE: '1' }), false);
+  assert.equal(doneFlagHonoured({ GATE_FLEET_ROLL_DONE: 'yes' }), false);
+  assert.equal(doneFlagHonoured({}), false);
+  const chain = { [process.pid]: `${process.pid} (node (x) y) S 4242 0`, 4242: '4242 (bash) S 1 0' };
+  assert.equal(doneFlagHonoured({ GATE_FLEET_ROLL_DONE: '4242' }, pid => chain[pid]), true);
+  assert.equal(doneFlagHonoured({ GATE_FLEET_ROLL_DONE: '777' }, pid => chain[pid]), false);
+});
+
+test('policy fixtures: refuse, warn, off; and refuse with its reason for missing key, unknown mode, malformed JSON, unreadable file', (t) => {
   const dir = mkdtempSync(join(tmpdir(), 'fleet-roll-policy-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
-  assert.equal(fleetRollMode(dir), 'refuse');
+  assert.match(fleetRollMode(dir).why, /could not be read \(ENOENT\)/);
   mkdirSync(join(dir, 'genesis/agentic'), { recursive: true });
-  for (const [mode, expected] of [['warn', 'warn'], ['off', 'off'], ['refuse', 'refuse'], ['sometimes', 'refuse']]) {
-    writeFileSync(join(dir, 'genesis/agentic/pool-policy.json'), JSON.stringify({ fleet_roll_guard: { mode } }));
-    assert.equal(fleetRollMode(dir), expected, mode);
+  const put = text => writeFileSync(join(dir, 'genesis/agentic/pool-policy.json'), text);
+  for (const mode of ['refuse', 'warn', 'off']) { put(JSON.stringify({ fleet_roll_guard: { mode } })); assert.deepEqual(fleetRollMode(dir), { mode, why: null }); }
+  put(JSON.stringify({ gate_on_red: { mode: 'continue' } }));
+  assert.deepEqual(fleetRollMode(dir), { mode: 'refuse', why: 'pool-policy.json declares no fleet_roll_guard.mode' });
+  put(JSON.stringify({ fleet_roll_guard: { mode: 'sometimes' } }));
+  assert.match(fleetRollMode(dir).why, /"sometimes" is not refuse, warn or off/);
+  put('{ not json');
+  assert.equal(fleetRollMode(dir).why, 'pool-policy.json is not valid JSON');
+  rmSync(join(dir, 'genesis/agentic/pool-policy.json'));
+  mkdirSync(join(dir, 'genesis/agentic/pool-policy.json'));
+  assert.match(fleetRollMode(dir).why, /could not be read \(EISDIR\)/);
+});
+
+test('GATE_PUSH_REFS lines parse into ref, pushed sha, destination sha and branch', () => {
+  assert.deepEqual(parseRefs('refs/heads/dev abc def\nrefs/tags/v1 123 000\n'), [
+    { ref: 'refs/heads/dev', local: 'abc', remote: 'def', branch: 'dev' },
+    { ref: 'refs/tags/v1', local: '123', remote: '000', branch: null },
+  ]);
+});
+
+test('an ambient GATE_ROOT does not make the CLI judge another checkout', (t) => {
+  const dir = mkdtempSync(join(tmpdir(), 'fleet-roll-root-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  writeFileSync(join(dir, 'changed.txt'), 'elohim/sdk/schemas/v1/gate-live-event.schema.json\n');
+  const env = { ...cleanEnv, GATE_ROOT: dir, GATE_CHANGED_FILES: join(dir, 'changed.txt'), GATE_LIVE_RUN: '' };
+  delete env.GATE_PUSH_TARGETS; delete env.GATE_PUSH_REFS;
+  const r = spawnSync('node', [join(ROOT, 'genesis/orchestrator/gate-preflight.mjs'), '--fleet-roll'], { cwd: ROOT, env, encoding: 'utf8' });
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.stdout, /WARN fleet-roll: .*cargo-build-storage/);
+});
+
+// ── Real manifests: the incident witnesses and the steward's named paths ────
+
+const real = ciWalker(ROOT);
+const realOnDev = changed => evaluateRef({ target: 'dev', walked: real(changed), tip: 'feat: x', mode: 'refuse' });
+const redFor = changed => realOnDev(changed).find(r => r.check === 'fleet-roll');
+
+test('real manifests: the conductor pin alone selects Edge through the conductor image', () => {
+  const p = predict(real(['elohim/holochain-conductor']), 'feat: pin');
+  assert.equal(p.selects, true);
+  for (const step of ['cargo-build-storage', 'build-edge-image', 'deploy-manifests']) assert.ok(p.buildSteps.some(s => s.name === step), step);
+  const r = redFor(['elohim/holochain-conductor']);
+  assert.equal(r.level, 'REFUSED');
+  assert.ok(r.why.includes('elohim-conductor:build-conductor-image'), r.why);
+});
+
+test('real manifests: the tracked elohim/sdk/schemas/.gitignore alone selects cargo-build-storage', () => {
+  assert.ok(predict(real(['elohim/sdk/schemas/.gitignore'])).buildSteps.some(s => s.name === 'cargo-build-storage'));
+  assert.equal(redFor(['elohim/sdk/schemas/.gitignore']).level, 'REFUSED');
+});
+
+test('real manifests: the 2026-11-19 schema edit and the steward\'s named paths each select an Edge build', () => {
+  for (const path of ['elohim/sdk/schemas/v1/gate-live-event.schema.json', 'elohim/eprfs/device-runtime/src/lib.rs', 'elohim/Cargo.lock']) {
+    const p = predict(real([path]));
+    assert.equal(p.selects, true, path);
+    assert.equal(redFor([path]).level, 'REFUSED', path);
   }
-  assert.equal(fleetRollMode(ROOT), 'refuse', 'this tree declares refuse');
-});
-
-// ── The real walker over this tree's manifests ──────────────────────────────
-
-const walk = treeWalker(ROOT);
-const onDev = changed => evaluateFleetRoll({ changed, messages: ['feat: x'], target: 'dev', mode: 'refuse', walk, registry: () => new Map() });
-
-test('real manifests: the steward\'s named paths each predict a roll', () => {
-  for (const path of ['elohim/eprfs/device-runtime/src/lib.rs', 'elohim/Cargo.lock']) {
-    const { row, prediction } = onDev([path]);
-    assert.equal(prediction.roll, true, path);
-    assert.equal(row.level, 'REFUSED', path);
-  }
-});
-
-test('real manifests: the 2026-11-19 schema edit predicts a roll naming cargo-build-storage', () => {
-  const { row } = onDev(['elohim/sdk/schemas/v1/gate-live-event.schema.json']);
-  assert.equal(row.level, 'REFUSED');
-  assert.match(row.why, /elohim-edge builds cargo-build-storage, selected by elohim\/sdk\/schemas\/v1\/gate-live-event\.schema\.json/);
-});
-
-test('real manifests: an a2o step file alone validates only', () => {
-  const { row, prediction } = onDev(['genesis/a2o/steps/devflow/honest-draw.steps.ts']);
-  assert.equal(prediction.roll, false);
-  assert.equal(row.level, 'ok');
-  assert.match(row.why, /validates only/);
-});
-
-// The seventeen paths of a real stack about to land on 2026-11-19
-// (.worktrees/steward-arrival/genesis/local-dev/native-throughput/l2b-paths.txt).
-const L2B_PATHS = [
-  'elohim/eprfs/Cargo.lock',
-  'elohim/eprfs/bin-build-view.json',
-  'elohim/eprfs/epr-cli/Cargo.toml',
-  'elohim/eprfs/epr-cli/build.rs',
-  'elohim/eprfs/epr-cli/src/bin.rs',
-  'elohim/eprfs/epr-cli/src/exercise.rs',
-  'elohim/eprfs/epr-cli/src/lib.rs',
-  'elohim/eprfs/epr-cli/src/main.rs',
-  'elohim/eprfs/epr-cli/src/peer.rs',
-  'elohim/eprfs/epr-cli/src/peer/custody_slot_tests.rs',
-  'elohim/eprfs/epr-cli/src/peer/serve_check_seam_tests.rs',
-  'elohim/eprfs/epr-cli/tests/artifact.rs',
-  'elohim/eprfs/epr-cli/tests/bin_build_view.rs',
-  'elohim/eprfs/epr-cli/tests/peer.rs',
-  'genesis/a2o/features/devflow/honest-draw.feature',
-  'genesis/a2o/steps/devflow/honest-draw.steps.ts',
-  'justfile',
-];
-
-// Documentation is not always outside every build: build-storybook (app/elohim-library) names nine
-// genesis/docs/content/elohim-protocol documents as sources, the manifesto among them. Walked on
-// 2026-11-19 over every file under genesis/docs and genesis/data/timeline: elohim-storybook was the
-// only pipeline selected, by those nine files alone.
-test('real manifests: a skip tag over docs selects nothing, except the documents storybook builds from', () => {
-  const skipOnDev = changed => evaluateSkipCi({ changed, messages: ['docs: notes [skip ci]'], target: 'dev', walk });
-  assert.equal(skipOnDev(['genesis/data/timeline/backlog/arch-frontend-bundle-seams-backlog.md',
-    'genesis/docs/superpowers/specs/2026-09-23-submodule-pin-attestation-gate-design.md']), null);
-  const manifesto = skipOnDev(['genesis/docs/content/elohim-protocol/manifesto.md']);
-  assert.equal(manifesto?.level, 'WARN');
-  assert.match(manifesto.why, /dispatches none of elohim-storybook,/);
-});
-
-test('real manifests: the seventeen-path L2b stack validates only', () => {
-  assert.equal(L2B_PATHS.length, 17);
-  const { row, prediction } = onDev(L2B_PATHS);
-  assert.equal(prediction.roll, false, JSON.stringify(prediction));
-  assert.equal(row.level, 'ok');
-  assert.match(row.why, /validates only/);
+  assert.ok(predict(real(['elohim/sdk/schemas/v1/gate-live-event.schema.json'])).buildSteps.some(s => s.name === 'cargo-build-storage'));
 });

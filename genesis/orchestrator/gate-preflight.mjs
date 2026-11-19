@@ -22,7 +22,10 @@ import { loadGateRegistry } from './pipeline-registry.mjs';
 import { UNAUDITED_RECIPE_PROJECTS, globCovers, readSet } from './gate-input-audit.mjs';
 import { dirtyPaths } from './gate-evidence.mjs';
 import { appendEvent } from './gate-live.mjs';
-import { checkFleetRoll } from './fleet-roll-guard.mjs';
+// Loaded so that a module that fails to load still gives a row, not a stack trace (fleetRollRows).
+let fleetGuard = null;
+let fleetGuardError = null;
+try { fleetGuard = await import('./fleet-roll-guard.mjs'); } catch (error) { fleetGuardError = error; }
 
 const ROOT = process.env.GATE_ROOT
   ? resolve(process.env.GATE_ROOT)
@@ -400,9 +403,28 @@ export function runPreflight({ root = ROOT, projects, env = process.env, spawn =
     ...timed(() => checkCargoLocks({ root, projects, spawn, env })),
     ...timed(() => checkReadSets({ root, projects, registry, changed, read })),
     ...timed(() => checkEvidenceRecordable({ root, projects, env, reuse, read })),
-    // pre-push runs this one alone before its early passes (`--fleet-roll`) and marks it done.
-    ...(env.GATE_FLEET_ROLL_DONE === '1' ? [] : timed(() => checkFleetRoll({ root, env, changed, ...fleet }))),
+    // pre-push runs this one alone before its early passes (`--fleet-roll`); its mark counts only
+    // inside that hook's own process tree.
+    ...(fleetGuard?.doneFlagHonoured(env) ? [] : timed(() => fleetRollRows(env, changed, fleet))),
   ];
+}
+
+/**
+ * The fleet-roll rows, from fleet-roll-guard.mjs, or when that module cannot load, one row saying
+ * so: red on a dev or main push under mode refuse, a WARN otherwise, as the guard's own failures.
+ */
+export function fleetRollRows(env, changed, options = {}, guard = fleetGuard, loadError = fleetGuardError) {
+  if (guard) return guard.checkFleetRoll({ env, changed, ...options });
+  const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
+  let mode = 'refuse';
+  try { mode = JSON.parse(readFileSync(join(root, 'genesis/agentic/pool-policy.json'), 'utf8')).fleet_roll_guard?.mode ?? 'refuse'; }
+  catch { /* unreadable policy: the default */ }
+  if (mode === 'off') return null;
+  const refs = `${env.GATE_PUSH_TARGETS ?? ''}\n${env.GATE_PUSH_REFS ?? ''}`;
+  const deploys = /(^|\s)refs\/heads\/(dev|main)(\s|$)/m.test(refs);
+  return row('fleet-roll', mode !== 'warn' && deploys ? 'REFUSED' : 'WARN',
+    `the fleet-roll check could not load: ${String(loadError?.message || loadError).split('\n')[0]}`,
+    'node genesis/orchestrator/fleet-roll-guard.mjs names the load error; fix it and push again');
 }
 
 /** pre-push exports the push range's file list; `just gate` has none and audits everything. */
@@ -435,10 +457,11 @@ function main(argv) {
   }
   if (argv.includes('--fleet-roll')) {
     // Project-independent, so pre-push runs it before the early passes that skip the preflight.
-    const rows = [].concat(checkFleetRoll({ root: ROOT, env: process.env, changed: changedFromEnv(process.env) }) ?? []);
+    // Exit 3 when red, so the hook tells a refusal from a node that could not start (any other code).
+    const rows = [].concat(fleetRollRows(process.env, changedFromEnv(process.env)) ?? []);
     for (const r of rows) process.stdout.write(`${formatRow(r)}\n`);
     emitLive(rows);
-    return rows.some(r => r.level === 'REFUSED') ? 1 : 0;
+    return rows.some(r => r.level === 'REFUSED') ? 3 : 0;
   }
   const index = argv.indexOf('--projects');
   const names = index >= 0 ? argv.slice(index + 1).filter(a => !a.startsWith('--')) : [];

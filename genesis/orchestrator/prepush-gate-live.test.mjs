@@ -234,18 +234,19 @@ test("a stop requested on the live run is seen by the hook's probe", (t) => {
   assert.ok(r.stdout.includes("NO-STOP-BEFORE") && r.stdout.includes("STOP-AFTER"), r.stdout);
 });
 
-// The fleet-roll block: it hands each pushed ref's range to the preflight, runs `--fleet-roll`
-// before the hook's early passes, records a refusal as a pre-gate red, and marks the check done.
+// The fleet-roll block: it hands each pushed ref over as "<remote ref> <pushed sha> <destination
+// sha>", runs `--fleet-roll` before the hook's early passes, records a red (exit 3) or a node that
+// could not run (any other non-zero) as a pre-gate red, and marks the check done with its own pid.
 const fleetBlock = () => slice("# Fleet roll (seconds):", "# ── Fleet roll end");
 const STUB_PREFLIGHT = [
   "import { writeFileSync } from 'node:fs';",
   "const argv = process.argv.slice(2);",
   "if (argv.includes('--on-red')) { process.stdout.write('continue\\n'); process.exit(0); }",
   "if (argv.includes('--fleet-roll')) {",
-  "  writeFileSync('ranges.out', process.env.GATE_PUSH_RANGES ?? '<unset>');",
-  "  const refuse = process.env.STUB_REFUSE === '1';",
-  "  process.stdout.write(refuse ? '[preflight] REFUSED fleet-roll: stub\\n' : '[preflight] ok fleet-roll (stub)\\n');",
-  "  process.exit(refuse ? 1 : 0);",
+  "  writeFileSync('refs.out', process.env.GATE_PUSH_REFS ?? '<unset>');",
+  "  const code = Number(process.env.STUB_EXIT || 0);",
+  "  process.stdout.write(code === 3 ? '[preflight] REFUSED fleet-roll: stub\\n' : '[preflight] ok fleet-roll (stub)\\n');",
+  "  process.exit(code);",
   "}",
   "process.exit(2);",
 ].join("\n");
@@ -253,57 +254,105 @@ const STUB_PREFLIGHT = [
 function fleetFixture(t) {
   const dir = fixture(t);
   writeFileSync(join(dir, "genesis/orchestrator/gate-preflight.mjs"), `${STUB_PREFLIGHT}\n`);
-  const git = (...args) => {
-    const r = spawnSync("git", ["-C", dir, "-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false", ...args],
-      { env: cleanEnv, encoding: "utf8" });
-    assert.equal(r.status, 0, r.stderr);
-    return r.stdout.trim();
-  };
-  git("commit", "--quiet", "--allow-empty", "-m", "base");
-  const base = git("rev-parse", "HEAD");
-  git("commit", "--quiet", "--allow-empty", "-m", "tip");
-  return { dir, base, tip: git("rev-parse", "HEAD") };
+  return { dir, base: "a".repeat(40), tip: "c".repeat(40) };
 }
 
-const fleetScript = (dir, base, tip) => [
+const fleetScript = (dir, lines) => [
   `HOOK_WORK_TREE='${dir}'`, PRELUDE, OPEN_BLOCK, RED_BLOCK,
   "hook_pass() { exit 0; }",
   `ZERO_SHA=${"0".repeat(40)}`,
   'is_notes_ref() { case "$1" in refs/notes/*) return 0 ;; esac; return 1; }',
-  "PUSH_LINES=(",
-  `  "refs/heads/x ${tip} refs/heads/dev ${base}"`,
-  `  "refs/notes/brit ${tip} refs/notes/brit/build/x ${base}"`,
-  `  "(delete) ${"0".repeat(40)} refs/heads/gone ${base}"`,
-  `  "refs/heads/x ${tip} refs/heads/self/new ${"0".repeat(40)}"`,
-  `  "refs/heads/x ${tip} refs/heads/self/unfetched ${"b".repeat(40)}"`,
-  ")",
-  fleetBlock(), 'echo "DONE=$GATE_FLEET_ROLL_DONE"', "pass_or_refuse",
+  "PUSH_LINES=(", ...lines.map((l) => `  "${l}"`), ")",
+  fleetBlock(), 'echo "DONE=$GATE_FLEET_ROLL_DONE SELF=$$"', "pass_or_refuse",
+];
+const mixedLines = (base, tip) => [
+  `refs/heads/x ${tip} refs/heads/dev ${base}`,
+  `refs/notes/brit ${tip} refs/notes/brit/build/x ${base}`,
+  `(delete) ${"0".repeat(40)} refs/heads/gone ${base}`,
+  `refs/heads/x ${tip} refs/heads/self/new ${"0".repeat(40)}`,
 ];
 
-test("fleet-roll: the hook hands each pushed ref's range over, and a refusal is a live pre-gate red that still refuses", (t) => {
+test("fleet-roll: the hook hands each eligible ref over, and exit 3 is a live pre-gate red that still refuses", (t) => {
   const { dir, base, tip } = fleetFixture(t);
-  const r = spawnSync("bash", ["-c", script(...fleetScript(dir, base, tip))],
-    { cwd: dir, env: { ...env(), STUB_REFUSE: "1" }, encoding: "utf8", timeout: 15000 });
+  const r = spawnSync("bash", ["-c", script(...fleetScript(dir, mixedLines(base, tip)))],
+    { cwd: dir, env: { ...env(), STUB_EXIT: "3" }, encoding: "utf8", timeout: 15000 });
   assert.equal(r.status, 1, r.stdout + r.stderr);
   assert.ok(r.stdout.includes("[preflight] REFUSED fleet-roll: stub"), r.stdout);
-  assert.ok(r.stdout.includes("DONE=1"), "the later preflight skips the check");
+  const [, done, self] = r.stdout.match(/DONE=(\d+) SELF=(\d+)/);
+  assert.equal(done, self, "the mark is this hook's own pid");
   assert.ok(r.stderr.includes("red before the gates: fleet-roll"), r.stderr);
-  assert.equal(readFileSync(join(dir, "ranges.out"), "utf8"), [
-    `refs/heads/dev ${base}..${tip}`,
-    `refs/heads/self/new origin/dev..${tip}`,
-    `refs/heads/self/unfetched origin/dev..${tip}`,
-  ].join("\n"), "notes and deletes carry no range; a new or unfetched remote reads against origin/dev");
+  assert.equal(readFileSync(join(dir, "refs.out"), "utf8"),
+    [`refs/heads/dev ${tip} ${base}`, `refs/heads/self/new ${tip} ${"0".repeat(40)}`].join("\n"), "notes and deletes are not handed over");
   const red = eventsOf(runsOf(dir)[0]).find((e) => e.kind === "failure");
   assert.equal(red.project, "fleet-roll");
 });
 
-test("fleet-roll: a clear check adds no red", (t) => {
+test("fleet-roll: a node that could not run is a red too; a clear check adds none", (t) => {
   const { dir, base, tip } = fleetFixture(t);
-  const r = spawnSync("bash", ["-c", script(...fleetScript(dir, base, tip))],
+  const crashed = spawnSync("bash", ["-c", script(...fleetScript(dir, mixedLines(base, tip)))],
+    { cwd: dir, env: { ...env(), STUB_EXIT: "1" }, encoding: "utf8", timeout: 15000 });
+  assert.equal(crashed.status, 1, crashed.stdout + crashed.stderr);
+  assert.ok(crashed.stderr.includes("the fleet-roll check could not run (node exit 1"), crashed.stderr);
+  const clear = spawnSync("bash", ["-c", script(...fleetScript(dir, mixedLines(base, tip)))],
     { cwd: dir, env: env(), encoding: "utf8", timeout: 15000 });
+  assert.equal(clear.status, 0, clear.stdout + clear.stderr);
+  assert.ok(clear.stdout.includes("[preflight] ok fleet-roll (stub)"), clear.stdout);
+});
+
+test("fleet-roll: a push of notes and deletes only starts no node", (t) => {
+  const { dir, base, tip } = fleetFixture(t);
+  const r = spawnSync("bash", ["-c", script(...fleetScript(dir, mixedLines(base, tip).slice(1, 3)))],
+    { cwd: dir, env: { ...env(), STUB_EXIT: "3" }, encoding: "utf8", timeout: 15000 });
   assert.equal(r.status, 0, r.stdout + r.stderr);
-  assert.ok(r.stdout.includes("[preflight] ok fleet-roll (stub)"), r.stdout);
-  assert.equal(eventsOf(runsOf(dir)[0]).filter((e) => e.kind === "failure").length, 0);
+  assert.equal(existsSync(join(dir, "refs.out")), false);
+});
+
+// The real CLI behind the hook block, in this checkout, against a shared clone whose commits carry
+// this checkout's own tree (so its manifests are the pushed ones) plus a one-byte schema edit.
+function realPush(t, message) {
+  const dir = mkdtempSync(join(tmpdir(), "prepush-fleet-real-"));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const gd = join(dir, "fx/.git");
+  const idx = join(dir, "index");
+  const id = { GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@t", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@t" };
+  const git = (args, opts = {}) => {
+    const r = spawnSync("git", args, { env: { ...cleanEnv, ...id, ...(opts.env || {}) }, encoding: "utf8", input: opts.input, maxBuffer: 64 * 1024 * 1024 });
+    assert.equal(r.status, 0, `git ${args.join(" ")}: ${r.stderr}`);
+    return r.stdout.trim();
+  };
+  const G = (args, opts = {}) => git(["--git-dir", gd, "--work-tree", ROOT, ...args], { ...opts, env: { GIT_INDEX_FILE: idx, ...(opts.env || {}) } });
+  const head = git(["-C", ROOT, "rev-parse", "HEAD"]);
+  git(["clone", "--shared", "--no-checkout", "--quiet", ROOT, join(dir, "fx")]);
+  G(["read-tree", head]);
+  for (const path of git(["-C", ROOT, "ls-files", "--", ":(glob)**/build-manifest.json"]).split("\n").filter(Boolean)) {
+    G(["update-index", "--cacheinfo", `100644,${git(["--git-dir", gd, "hash-object", "-w", join(ROOT, path)])},${path}`]);
+  }
+  const base = git(["--git-dir", gd, "commit-tree", G(["write-tree"]), "-p", head, "-m", "base"]);
+  const schema = "elohim/sdk/schemas/v1/gate-live-event.schema.json";
+  const edited = git(["--git-dir", gd, "hash-object", "-w", "--stdin"], { input: `${readFileSync(join(ROOT, schema), "utf8")}\n` });
+  G(["update-index", "--cacheinfo", `100644,${edited},${schema}`]);
+  const tip = git(["--git-dir", gd, "commit-tree", G(["write-tree"]), "-p", base, "-m", message]);
+  git(["--git-dir", gd, "update-ref", "HEAD", tip]);
+  git(["--git-dir", gd, "--work-tree", ROOT, "read-tree", tip]);
+  const lines = [`refs/heads/x ${tip} refs/heads/dev ${base}`];
+  const body = [`HOOK_WORK_TREE='${ROOT}'`, PRELUDE, "GATE_LIVE_RUN=''", RED_BLOCK, "hook_pass() { exit 0; }", `ZERO_SHA=${"0".repeat(40)}`,
+    'is_notes_ref() { case "$1" in refs/notes/*) return 0 ;; esac; return 1; }', "PUSH_LINES=(", ...lines.map((l) => `  "${l}"`), ")",
+    "export GATE_PUSH_TARGETS=refs/heads/dev", fleetBlock(), "pass_or_refuse"].join("\n");
+  return spawnSync("bash", ["-c", `set -o pipefail\n${body}\n`],
+    { cwd: ROOT, env: { ...cleanEnv, GIT_DIR: gd, GIT_WORK_TREE: ROOT, EPR_BIN: "/nonexistent/epr" }, encoding: "utf8", timeout: 60000 });
+}
+
+test("fleet-roll, real CLI: the schema edit pushed to dev without a declaration is red and the push is refused", (t) => {
+  const r = realPush(t, "feat(sdk): one schema field");
+  assert.equal(r.status, 1, r.stdout + r.stderr);
+  assert.match(r.stdout, /\[preflight\] REFUSED fleet-roll: CI would select an Edge build and its deploy step for this push to dev: elohim-edge stale steps [^\n]*cargo-build-storage/);
+  assert.ok(r.stderr.includes("red before the gates: fleet-roll"), r.stderr);
+});
+
+test("fleet-roll, real CLI: the same push with the declaration passes", (t) => {
+  const r = realPush(t, "feat(sdk): one schema field\n\nRebuilds storage on purpose. [edge:roll]");
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.match(r.stdout, /\[preflight\] ok fleet-roll \(CI would select an Edge build and its deploy step for this push to dev: .*declared by \[edge:roll\] in [0-9a-f]{12}\)/);
 });
 
 test("the hook is one brace group that exits inside it, so an edit during a push cannot reach the run", () => {

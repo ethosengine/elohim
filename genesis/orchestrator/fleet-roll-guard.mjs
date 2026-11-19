@@ -1,320 +1,382 @@
-// fleet-roll: refuse, in seconds, a push to dev or main that CI would answer by rebuilding the
-// Edge pipeline and rolling its fleet, unless a pushed commit declares the roll with `[edge:roll]`.
-// The steward's standing rule is that nothing rolls the Edge fleet except deliberately; on
-// 2026-11-19 a one-line edit to elohim/sdk/schemas/v1/gate-live-event.schema.json (an input of
-// cargo-build-storage) was about to roll all seven alpha peers and was caught only by hand.
+// fleet-roll: a seconds check that is red when CI would select an Edge build and its deploy step
+// for a pushed dev or main ref, unless a pushed commit carries `[edge:roll]`. The steward's
+// standing rule is that nothing rolls the Edge fleet except deliberately; on 2026-11-19 a one-line
+// edit to elohim/sdk/schemas/v1/gate-live-event.schema.json (an input of cargo-build-storage) was
+// about to roll all seven alpha peers and was caught only by hand. The red reaches the live run at
+// once; whether the push then stops is the hook's declared policy, as for every pre-gate red
+// (gate_on_red continue: refused when the hook ends; GATE_ON_RED=stop: at the first red).
 // Habit `careless-reds-cost-seconds` (genesis/orchestrator/.epr-meta).
 //
-// LIMIT: the prediction reads this push's own changed paths and its own commit tags. An Edge step
-// left stale by an earlier landing (a range CI has not dispatched yet, or a [skip ci] run that a
-// later push supersedes) is not seen. CI's own narrowing filters (the already-built filter, edge's
-// closure-keyed skips) are not applied either, so for this push's own paths and tags the error
-// lies on the side of predicting a roll that CI then skips.
-// A pre-push hook older than the fleet-roll block (a worktree pushing through a main checkout
-// whose .husky/pre-push.bash predates it) sets GATE_PUSH_TARGETS and GATE_CHANGED_FILES but not
-// GATE_PUSH_RANGES. Then only the paths are judged: no commit message is read, so a forcing tag
-// such as [build:edge] on the tip is not seen there (an accepted limit), a path set that predicts
-// no Edge build prints nothing, and one that does refuses, naming the hook as the fix.
+// WHAT IT CAN KNOW. "Selects", never "rolls": the guard predicts which Edge steps CI dispatches
+// and that Edge runs its deploy stage. Whether pods restart is decided later, by Edge itself: it
+// compares each peer's pod template and config before and after apply and skips the storage
+// restart when nothing a pod consumes moved (elohim/holochain/Jenkinsfile:2380-2393).
 //
-// A skip tag or [edge:validate-only] on the tip rolls nothing, but both move the orchestrator's
-// baseline past the push (below), so the changes they carry are never built by a later diff. The
-// fleet-roll row warns when Edge build inputs ride under a skip tag, or when other pipelines ride
-// under [edge:validate-only]; a second row, `skip-ci`, warns when any pipeline's inputs ride
-// under a skip tag on a deploying push.
+// LIMITS. Each protected ref is judged from its own range (destination tip..pushed tip) and its
+// tip's tags. Not seen: an Edge step left stale by an earlier landing (CI diffs from its stored
+// baseline, which a failed run holds back, Jenkinsfile:217-224, :1450); CI's stored build-process
+// hashes (a build-process file counts only when it is in this range); CI's already-built filter
+// (:1725-1764), which only drops work. CI's checkout initialises no submodule (:2587-2609; :2414-
+// :2420 says its walker cannot see sophia's manifest), so CI may not see the manifests inside
+// elohim/brit, elohim/rakia and sophia and then prunes the dependencies on them as external
+// (build-graph.groovy:104-119); the guard reads them and propagates through them, which can
+// predict a selection CI does not make. A pre-push hook older than the fleet-roll block (a
+// worktree pushing through a main checkout whose .husky/pre-push.bash predates it) hands over no
+// ref list: then only the union of changed paths is judged, no commit message is read (a forcing
+// tag on the tip is not seen there, an accepted limit), a path set that selects no Edge build
+// prints nothing, and one that does is red, naming the launcher check and the hook as the fix.
 //
-// The CI rule this mirrors (read 2026-11-19 at dev 2080441f5):
-// - The orchestrator reads ONE commit message, the tip it checked out: `git log -1 --format=%B`
-//   (genesis/orchestrator/Jenkinsfile:2652); elohim/holochain/Jenkinsfile:2552 does the same. A tag
-//   in an earlier commit of the range is inert, so forcing and suppressing tags are read on the tip.
-// - [skip ci] / [ci skip] / [no ci] (Jenkinsfile:2657) sets SKIP_CI: the plan, health check and
-//   Execute Builds stages are skipped (:2758, :2786, :2877, :2927), so nothing is dispatched. The
-//   post block still archives baselines and the run ends SUCCESS, so __global__ advances to that
-//   tip (:204-:230, :3512): the next run's diff starts past it.
-// - [build:edge] / [build:all] / [build:…,edge,…] force elohim-edge in as class build
-//   (:2666-:2705, parseBuildTagTokens :907, forced runClasses :1913). elohim-edge is not manualOnly,
-//   so [build:all] includes it. commit-tag-parser.mjs parseCommitTags is the JS mirror used here.
-// - [deploy-only] (webhook-gated, :2722-:2726; a push is a webhook) dispatches elohim-edge with
-//   DEPLOY_ONLY (:2828-:2834, :1331): it skips edge's build stages and runs its deploy stage. It is
-//   treated here as a roll; whether pods restart when the image tags are unchanged was not verified.
-// - [edge:validate-only] on the tip isolates the dispatch to elohim-edge alone (:2711-:2714,
-//   :2841-:2844) and sends it as RUN_CLASS=verify (:1286), which edge runs as validate-only
-//   (elohim/holochain/Jenkinsfile:2551-:2568): no build, no deploy. It wins over [build:edge] and
-//   [deploy-only]. It also drops every other pipeline from that run, and the run advances
-//   __global__, so the other pipelines' changes in that range are not dispatched later either.
-// - [run:verify|measure|profile] (:1915-:1925) dispatches only pipelines that declare a step at or
-//   below the tagged class, plus [build:*] force-includes. No elohim-edge step declares a class
-//   (all read as build), so the tag leaves elohim-edge undispatched unless forced; with
-//   [deploy-only] it is still dispatched (:2830) and rolls.
-// - With no tag, elohim-edge is dispatched validate-only when every stale step is
-//   dataplane-validation (:1858-:1879, a literal rule while that step declares no class), or when
-//   its derived run class is below deploy (the manifest-only cap). Any other stale step builds.
-// - Only dev and main deploy. Off dev/main (and for a PR build) the orchestrator dispatches edge
-//   gate-only, with no publish or deploy (gateOnlyRun :961, applyGateOnlyOverride :963,
-//   triggerPipeline :1288; edge isGateOnly elohim/holochain/Jenkinsfile:2598). dev deploys alpha
-//   (:3270-:3276); main deploys prod (:3538-:3544) and, being dispatched with FORCE_DEPLOY, alpha
-//   too. The staging stage (:3485) needs both !isGateOnly() and a staging branch, so it is
-//   unreachable today.
+// THE CI RULE (read 2026-11-19 at dev 2080441f5; orchestrator = genesis/orchestrator/Jenkinsfile):
+// - The graph: graph-walker.mjs walkGraphCi, a port of build-graph.groovy walkBuildGraph (its
+//   comment names the lines): CI's glob (dotfiles match, `.epr-meta` excluded), propagation over
+//   `depends` to a fixed point, manual-only steps not dispatched, and the manifest-only cap.
+// - Tags: the orchestrator and Edge read ONE message, the tip's (orchestrator :2652, Edge :2552).
+//   Effective order, highest first:
+//   1. [skip ci] / [ci skip] / [no ci] (:2657) sets SKIP_CI; nothing is dispatched (:2758, :2786,
+//      :2877, :2927). The post block still archives baselines and a green run advances __global__
+//      to that tip (:204-230, :3512), so the next run's diff starts past the push. A later change
+//      that selects the same pipeline still builds its bytes; a failed or aborted run keeps the
+//      old baseline (:217-224).
+//   2. [edge:validate-only] (:2711) dispatches elohim-edge alone (:2841-2844) as verify (:1286),
+//      over [build:edge] and [deploy-only]; Edge runs it validate-only (Edge :2551-2568). The other
+//      pipelines are dropped from that run, and the baseline moves the same way once it is green.
+//   3. [build:…] tokens (parseBuildTagTokens :907): `edge` forces elohim-edge in as build (:1886-
+//      :1896, :1913). `all` is expanded at Checkout (:2688-2693) against PIPELINE_REGISTRY_JSON,
+//      which only runBuildGraph fills later, in Determine Build Plan (:2413, :1855), so it forces
+//      nothing on a fresh run. The guard still reads [build:all] on a protected tip as asking for
+//      every pipeline and asks for the declaration (steward ruling 2026-11-19), and says so.
+//   4. With no forcing tag, elohim-edge whose only stale step is dataplane-validation is verify
+//      (:1874-1876, a literal rule while that step declares no class); a class below deploy (the
+//      manifest-only cap) is validate-only too (:1877).
+//   5. [run:verify|measure|profile] (:1915-1925) keeps only pipelines declaring a step at or below
+//      the class, plus [build:*] force-includes; no elohim-edge step declares a class, so Edge
+//      leaves the plan unless forced.
+//   6. PIPELINE_RUN_CLASSES is written from that plan (:1962-1964). [deploy-only] (webhook-gated,
+//      :2722-2726; a push is a webhook) then sets the dispatch to Edge (and Genesis) (:2828-2834)
+//      without touching it, and an Edge absent from it reads as build (runClassFor :931-934): so
+//      [deploy-only] over a verify-class Edge stays validate-only (no deploy), and over an absent
+//      or build-class Edge runs Edge's deploy stage without its build stages (:1331).
+// - Branches: only dev and main deploy. Off them, and for a PR build, Edge is dispatched
+//   gate-only (:961-967, :1288; Edge isGateOnly :2598). dev deploys alpha (Edge :3270-3276); main
+//   deploys prod (Edge :3538) and, dispatched with FORCE_DEPLOY, alpha too. The staging stage
+//   (Edge :3485) needs both !isGateOnly() and a staging branch, so it cannot run today.
+// - Dispatch lists name only what CI dispatches: no manual-only pipeline (build-graph.groovy :848),
+//   none without a jenkinsPath (:1882), never the orchestrator itself (:1957-1961).
 // - Unknown `[edge:…]` tags are inert: the orchestrator matches `[edge:validate-only]` (:2711) and
-//   `[edge:gate-only]` (:944) literally, and the edge Jenkinsfile matches `[edge:validate-only]`
-//   (:2556, :2562), `[compute-worker:…]` (:2558, :2618) and `[conductor-roll]` (:1930) literally.
-//   Neither file has a generic `[edge:` matcher, so `[edge:roll]` changes nothing in CI. It is a
-//   record in git history of who declared the roll and why.
+//   `[edge:gate-only]` (:944) literally; Edge matches `[edge:validate-only]`, `[compute-worker:…]`
+//   and `[conductor-roll]` literally (Edge :2556, :2558, :2618, :1930). `[edge:roll]` changes
+//   nothing in CI; it is the record in git history of who declared the selection and why.
 
 import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { walkGraph } from './graph-walker.mjs';
-import { loadManifests } from './manifest-utils.mjs';
-import { parseCommitTags, parseSkipCi } from './commit-tag-parser.mjs';
-import { loadPipelineRegistry, parseRunClassTag, runClassRank } from './pipeline-registry.mjs';
+import { discoverManifests } from './manifest-utils.mjs';
+import { parseRunClassTag, runClassRank } from './pipeline-registry.mjs';
 
+/** The checkout this module sits in; ambient GATE_ROOT never redirects the check. */
+export const MODULE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 export const CHECK = 'fleet-roll';
+export const SKIP_CHECK = 'skip-ci';
 export const EDGE = 'elohim-edge';
 export const VALIDATE_STEP = 'dataplane-validation';
-/** Branches whose orchestrator run can deploy the Edge fleet. */
+export const SELF_PIPELINE = 'elohim-orchestrator';
 export const DEPLOYING_BRANCHES = Object.freeze(['dev', 'main']);
 export const ROLL_TAG = '[edge:roll]';
 export const MODES = Object.freeze(['refuse', 'warn', 'off']);
+const BUFFER = 64 * 1024 * 1024;
+const BASELINE = "the next run's diff starts past this push; a later change that selects the same pipeline still builds these bytes; a failed or aborted run keeps the old baseline";
+const CHECKOUT_CURE = 'push from a checkout at the pushed commit, with its build-manifest.json files committed';
+const short = sha => String(sha ?? '').slice(0, 12);
+const isZero = sha => /^0+$/.test(String(sha ?? ''));
+const isDeploying = branch => DEPLOYING_BRANCHES.includes(branch);
+const branchOf = ref => (String(ref).startsWith('refs/heads/') ? String(ref).slice('refs/heads/'.length) : null);
+const row = (check, level, why, cure = '') => ({ check, level, why, cure });
 
-const hasRollTag = message => /\[edge:roll\]/i.test(message ?? '');
-const hasValidateOnly = message => /\[edge:validate-only\]/i.test(message ?? '');
-const hasDeployOnly = message => /\[deploy[-_ ]only\]/i.test(message ?? '');
-const short = sha => (sha ? String(sha).slice(0, 12) : '');
-
-/** `fleet_roll_guard.mode` in pool-policy.json; absent or unreadable reads as refuse. */
-export function fleetRollMode(root) {
-  try {
-    const mode = JSON.parse(readFileSync(join(root, 'genesis/agentic/pool-policy.json'), 'utf8')).fleet_roll_guard?.mode;
-    return MODES.includes(mode) ? mode : 'refuse';
-  } catch { return 'refuse'; }
+/** `fleet_roll_guard.mode` in pool-policy.json, and why the default `refuse` was taken when it was. */
+export function fleetRollMode(root = MODULE_ROOT) {
+  let text;
+  try { text = readFileSync(join(root, 'genesis/agentic/pool-policy.json'), 'utf8'); }
+  catch (error) { return { mode: 'refuse', why: `pool-policy.json could not be read (${error.code || error.message})` }; }
+  let policy;
+  try { policy = JSON.parse(text); } catch { return { mode: 'refuse', why: 'pool-policy.json is not valid JSON' }; }
+  const mode = policy?.fleet_roll_guard?.mode;
+  if (mode === undefined) return { mode: 'refuse', why: 'pool-policy.json declares no fleet_roll_guard.mode' };
+  if (!MODES.includes(mode)) return { mode: 'refuse', why: `fleet_roll_guard.mode ${JSON.stringify(mode)} is not refuse, warn or off` };
+  return { mode, why: null };
 }
 
-/** The CI walk of this tree: walkGraph over every build-manifest.json, no .ci-ignore (CI applies none). */
-export function treeWalker(root) {
+/** CI's graph over this checkout's manifests (one load, one walk per changed list). */
+export function ciWalker(root = MODULE_ROOT) {
   let manifests = null;
-  return changed => walkGraph(manifests ??= loadManifests(root), changed);
-}
-
-/**
- * The tip's [build:*] tag(s) that force elohim-edge, or null. `[build:all]` reads the registry's
- * manualOnly flags, so the registry is loaded only when a [build:*] tag is present.
- */
-function forcingBuildTag(tip, registry) {
-  const tags = tip.match(/\[build:[a-z,-]+\]/gi);
-  if (!tags || !parseCommitTags(tip, registry()).includes(EDGE)) return null;
-  return tags.join(' ');
-}
-
-const row = (level, why = '', cure = '') => ({ check: CHECK, level, why, cure });
-
-function cureFor(prediction) {
-  const parts = [];
-  if (prediction.forcedBy) parts.push(`drop ${prediction.forcedBy} from the tip commit`);
-  if (prediction.paths.length) {
-    parts.push('take the change out of the Edge build inputs (split it onto its own push)');
-    parts.push('or land it with the next deliberate roll');
-  }
-  parts.push(`or declare the roll: add ${ROLL_TAG} and the reason to a pushed commit message`);
-  return `${parts.join('; ')}. [edge:validate-only] on the tip also stops the roll, but it drops every other pipeline from that run and the next run's diff starts past it, so their changes in this range are never dispatched: not a cure for a mixed push.`;
-}
-
-function describe(prediction) {
-  const steps = prediction.steps.join(', ');
-  const paths = prediction.paths.slice(0, 3).join(', ');
-  const more = prediction.paths.length > 3 ? ` and ${prediction.paths.length - 3} more` : '';
-  if (!prediction.forcedBy) return `${EDGE} builds ${steps}, selected by ${paths}${more}`;
-  return `the tip's ${prediction.forcedBy} forces a full ${EDGE} run${steps ? ` (stale steps: ${steps}${paths ? `, from ${paths}${more}` : ''})` : ''}`;
-}
-
-/**
- * Predict whether this push rolls the Edge fleet, and the preflight row that says so.
- *
- * @param {object} args
- * @param {string[]} args.changed  this push's changed paths (union over its refs)
- * @param {string[]|Error} args.messages  the pushed commits' messages, tip first; an Error when
- *   they could not be read. `[]` for a run that is not a push (`just gate`).
- * @param {string|null} args.target  the pushed branch (`dev`, `self/x`), or null when not a push
- * @param {'refuse'|'warn'|'off'} args.mode  pool-policy.json fleet_roll_guard.mode
- * @param {(changed: string[]) => {pipelines: Array<{name: string, reasons: string[], steps: Array<{name: string, class: string}>, runClass: string}>}} args.walk
- * @param {() => Map<string, object>} [args.registry]  pipeline registry, read only for [build:all]
- * @param {boolean} [args.rangesMissing]  a push whose (older) hook handed over no commit range:
- *   judge the paths alone, and stay silent unless they predict an Edge build
- * @returns {{prediction: object|null, row: object|null}}
- */
-export function evaluateFleetRoll({ changed, messages, target, mode = 'refuse', walk, registry = () => new Map(), rangesMissing = false }) {
-  if (mode === 'off') return { prediction: null, row: null };
-  const deploying = DEPLOYING_BRANCHES.includes(target);
-  const pushed = target !== null && target !== undefined;
-  const where = pushed ? `push to ${target}` : 'run, which is not a push';
-  const severity = level => (level === 'REFUSED' && (mode === 'warn' || !deploying) ? 'WARN' : level);
-
-  if (messages instanceof Error || !Array.isArray(changed)) {
-    const what = messages instanceof Error ? `the pushed commits' messages could not be read (${messages.message})` : 'the changed paths could not be read';
-    return {
-      prediction: null,
-      row: row(severity('REFUSED'), `${where}: ${what} — a roll cannot be ruled out, and an unreadable range never reads as "nothing changed"`,
-        'git fetch origin, then push again'),
-    };
-  }
-
-  const tip = messages[0] ?? '';
-  const declaredIn = messages.findIndex(hasRollTag);
-  const selected = changed.length ? walk(changed).pipelines : [];
-  const edge = selected.find(p => p.name === EDGE);
-  const others = selected.filter(p => p.name !== EDGE).map(p => p.name);
-  const paths = [...new Set((edge?.reasons ?? []).map(r => r.replace(/^(source|buildProcess): /, '')))];
-  const staleSteps = (edge?.steps ?? []).map(s => s.name);
-  const buildSteps = staleSteps.filter(s => s !== VALIDATE_STEP);
-  const prediction = { roll: false, deploying, target: target ?? null, steps: buildSteps, paths, forcedBy: null, suppressedBy: null, declaredBy: null };
-
-  // Precedence mirrors the orchestrator (header): skip > validate-only > force > run-cap > graph.
-  const buildTag = parseSkipCi(tip) || hasValidateOnly(tip) ? null : forcingBuildTag(tip, registry);
-  if (parseSkipCi(tip)) prediction.suppressedBy = '[skip ci]';
-  else if (hasValidateOnly(tip)) prediction.suppressedBy = '[edge:validate-only]';
-  else if (buildTag) prediction.forcedBy = buildTag;
-  else if (parseRunClassTag(tip) && !hasDeployOnly(tip)) prediction.suppressedBy = `[run:${parseRunClassTag(tip)}]`;
-  else if (hasDeployOnly(tip)) prediction.forcedBy = '[deploy-only]';
-
-  if (prediction.forcedBy) {
-    prediction.roll = true;
-    if (!prediction.steps.length) prediction.steps = staleSteps;
-  } else if (!prediction.suppressedBy && edge) {
-    const belowDeploy = runClassRank(edge.runClass) < runClassRank('deploy');
-    prediction.roll = buildSteps.length > 0 && !belowDeploy;
-  }
-
-  if (rangesMissing && !prediction.roll) return { prediction, row: null };
-  const reach = deploying ? `this push to ${target} would rebuild and roll the Edge fleet` : `this change would roll the Edge fleet if pushed to dev (${pushed ? `target ${target} does not deploy` : 'not a push'})`;
-  if (rangesMissing) {
-    return {
-      prediction,
-      row: row(severity('REFUSED'),
-        `${reach}: ${describe(prediction)} — and the running pre-push hook hands over no commit range (GATE_PUSH_RANGES), so whether a pushed commit declares ${ROLL_TAG} cannot be read`,
-        `push with -c core.hooksPath=<worktree>/.husky/_ so the current hook reads the commit messages, or bring the main checkout up to date (its .husky/pre-push.bash predates the fleet-roll block)`),
-    };
-  }
-
-  if (prediction.suppressedBy) {
-    const skip = prediction.suppressedBy === '[skip ci]';
-    if (skip && buildSteps.length) {
-      return {
-        prediction,
-        row: row('WARN',
-          `the tip's ${prediction.suppressedBy} dispatches nothing for this ${where}: ${EDGE} build inputs land unbuilt (${buildSteps.join(', ')}, from ${paths.slice(0, 3).join(', ')}${paths.length > 3 ? ` and ${paths.length - 3} more` : ''}), the next run's diff starts past this push, and the fleet gets them only with a later forced, declared roll`,
-          `push them under a tip without the skip tag (declaring ${ROLL_TAG} if the roll is meant), or leave them for a later deliberate [build:edge] roll`),
-      };
-    }
-    if (prediction.suppressedBy === '[edge:validate-only]' && others.length) {
-      return {
-        prediction,
-        row: row('WARN',
-          `the tip's [edge:validate-only] keeps ${EDGE} from building or deploying for this ${where}, but it also drops ${others.join(', ')} from that run, and once the run ends green the next run's diff starts past this push, so their changes here are not built by a later diff either`,
-          `push those changes under a tip without [edge:validate-only], and keep the measuring commit on its own push`),
-      };
-    }
-    if (!edge) return { prediction, row: null };
-    return { prediction, row: row('ok', `the tip's ${prediction.suppressedBy} keeps ${EDGE} from building or deploying for this ${where}`) };
-  }
-  if (!prediction.roll) {
-    if (!edge) return { prediction, row: null };
-    return { prediction, row: row('ok', `${EDGE} validates only (${staleSteps.join(', ') || VALIDATE_STEP}); no build, no fleet roll`) };
-  }
-  if (declaredIn >= 0) {
-    prediction.declaredBy = declaredIn === 0 ? 'the tip commit' : 'a pushed commit';
-    return { prediction, row: row('ok', `roll declared by ${ROLL_TAG} in ${prediction.declaredBy}: ${describe(prediction)}`) };
-  }
-  return {
-    prediction,
-    row: row(severity('REFUSED'),
-      `${reach}: ${describe(prediction)} — and no pushed commit declares ${ROLL_TAG}. Read from this push's own paths and tags only; an Edge step left stale by an earlier landing is not seen`,
-      cureFor(prediction)),
+  const walked = new Map();
+  return changed => {
+    const key = changed.join('\n');
+    if (!walked.has(key)) walked.set(key, walkGraph(manifests ??= loadNamed(root), changed, { ci: true }));
+    return walked.get(key);
   };
 }
 
-/**
- * The `skip-ci` row: a push to dev or main whose tip carries [skip ci], [ci skip] or [no ci] while
- * the walker selects pipelines. That run dispatches none of them, and it advances the baseline
- * past the push, so no later diff builds them (orchestrator Jenkinsfile :2657, :204-:230, :3512).
- * Silent with no skip tag, off a deploying branch, and when the walker selects nothing.
- */
-export function evaluateSkipCi({ changed, messages, target, walk, registry = () => new Map() }) {
-  if (!DEPLOYING_BRANCHES.includes(target) || !Array.isArray(messages) || !Array.isArray(changed) || !changed.length) return null;
-  if (!parseSkipCi(messages[0] ?? '')) return null;
-  const known = registry();
-  // A pipeline the registry lists without a jenkinsPath is never dispatched (Jenkinsfile :1882).
-  const names = walk(changed).pipelines.map(p => p.name).filter(name => !known.has(name) || known.get(name).jenkinsPath);
-  if (!names.length) return null;
-  return {
-    check: 'skip-ci', level: 'WARN',
-    why: `the tip's skip tag on this push to ${target} means this run dispatches none of ${names.join(', ')}, which this push's paths select, and the next run's diff starts past this push, so no later diff builds them`,
-    cure: 'move the skip tag to a tip that carries documentation only, or drop it from this push\'s tip',
-  };
-}
-
-/** `GATE_PUSH_RANGES`: one `<remote ref> <base>..<pushed sha>` per line (pre-push.bash). */
-export function parseRanges(text) {
-  return String(text ?? '').split('\n').map(line => line.trim()).filter(Boolean).map(line => {
-    const [ref, range] = line.split(/\s+/);
-    const sha = range?.includes('..') ? range.slice(range.indexOf('..') + 2) : '';
-    return { ref, range, sha, branch: ref?.startsWith('refs/heads/') ? ref.slice('refs/heads/'.length) : null };
+/** loadManifests, but a file that does not parse is named in the error. */
+function loadNamed(root) {
+  return discoverManifests(root).map(path => {
+    try { return { path, content: JSON.parse(readFileSync(resolve(root, path), 'utf8')) }; }
+    catch (error) { throw new Error(`${path}: ${String(error.message).split('\n')[0]}`); }
   });
 }
 
-/** Messages of a pushed range, tip first. A failed `git` call is an Error, never an empty list. */
-export function readMessages({ root, range, sha, spawn = spawnSync }) {
-  const log = args => {
-    const r = spawn('git', ['-C', root, 'log', '--format=%B%x1e', ...args], { encoding: 'utf8' });
-    if (r.error || r.status !== 0) {
-      throw new Error(`git log ${args.join(' ')} exited ${r.status ?? r.error?.code}: ${String(r.stderr || r.error?.message || '').trim().split('\n')[0]}`);
+function buildTokens(tip) {
+  const tokens = [];
+  for (const m of tip.matchAll(/\[build:([a-z,-]+)\]/gi)) tokens.push(...m[1].split(',').map(t => t.trim().toLowerCase()));
+  return tokens;
+}
+
+const dispatchable = (meta, name) => name !== SELF_PIPELINE && !!meta?.[name]?.jenkinsPath && !meta[name].manualOnly;
+
+/** What CI does with elohim-edge for this walk and tip (header, "THE CI RULE"). Pure. */
+export function predict(walked, tip = '') {
+  const meta = walked.meta || {};
+  const edge = walked.pipelines.find(p => p.name === EDGE);
+  const buildSteps = (edge?.steps ?? []).filter(s => s.name !== VALIDATE_STEP);
+  const others = walked.pipelines.map(p => p.name).filter(name => name !== EDGE && dispatchable(meta, name));
+  const skipTag = /\[(skip ci|ci skip|no ci)\]/i.exec(tip)?.[0] ?? null;
+  const validateOnly = /\[edge:validate-only\]/i.test(tip);
+  const tokens = buildTokens(tip);
+  const forcedEdge = tokens.includes('edge');
+  const buildAll = tokens.includes('all');
+  const runTag = parseRunClassTag(tip);
+  const deployOnly = /\[deploy[-_ ]only\]/i.test(tip);
+  let edgeClass = null;
+  if (!skipTag && validateOnly) edgeClass = 'verify';
+  else if (!skipTag) {
+    let inPlan = !!edge;
+    let cls = edge ? edge.runClass : null;
+    if (edge && !forcedEdge && edge.steps.every(s => s.name === VALIDATE_STEP)) cls = 'verify';
+    if (forcedEdge) { inPlan = true; cls = 'build'; }
+    if (runTag && !forcedEdge) {
+      const declares = Object.values(meta[EDGE]?.stepClasses || {}).some(c => runClassRank(c) <= runClassRank(runTag));
+      inPlan = declares;
+      cls = declares ? runTag : null;
     }
-    const parts = String(r.stdout).split('\x1e');
-    parts.pop(); // what follows the last separator is not a message
-    return parts.map(m => m.trim());
-  };
-  try {
-    // The tip is read on its own (CI reads exactly it, and a range already upstream is empty);
-    // the whole range follows it, the tip again among them.
-    const tip = log(['-1', sha]);
-    if (tip.length !== 1) throw new Error(`git log -1 ${sha} returned ${tip.length} messages`);
-    return [tip[0], ...log([range])];
-  } catch (error) { return error; }
+    if (deployOnly) { cls = inPlan ? cls : 'build'; inPlan = true; }
+    edgeClass = inPlan ? cls : null;
+  }
+  const selects = edgeClass !== null && runClassRank(edgeClass) >= runClassRank('deploy');
+  const asks = buildAll && !selects && !skipTag && !validateOnly;
+  const forcedBy = forcedEdge ? (tip.match(/\[build:[a-z,-]+\]/gi) || []).find(t => buildTokens(t).includes('edge')) : null;
+  return { edge, buildSteps, others, skipTag, validateOnly, forcedBy, buildAll, runTag, deployOnly, edgeClass, selects, asks };
+}
+
+function edgeText(p) {
+  if (!p.buildSteps.length) return '';
+  const causes = [...new Set(p.buildSteps.map(s => s.cause))];
+  const through = [...new Set(p.buildSteps.map(s => s.via).filter(v => v && !v.startsWith(`${EDGE}:`)))];
+  const more = causes.length > 3 ? ` and ${causes.length - 3} more` : '';
+  return `${EDGE} stale steps ${p.buildSteps.map(s => s.name).join(', ')}, from ${causes.slice(0, 3).join(', ')}${more}${through.length ? `, through ${through.join(', ')}` : ''}`;
+}
+
+function reachText(p, where) {
+  if (p.selects) {
+    if (p.forcedBy) return `the tip's ${p.forcedBy} makes CI select an Edge build and its deploy step for this ${where}`;
+    if (p.deployOnly && p.edgeClass === 'build' && !p.edge) return `the tip's [deploy-only] makes CI select the Edge deploy step for this ${where} (its build stages are skipped)`;
+    if (p.deployOnly) return `CI would select the Edge deploy step for this ${where}; the tip's [deploy-only] skips its build stages`;
+    return `CI would select an Edge build and its deploy step for this ${where}`;
+  }
+  return `the tip's [build:all] asks for every pipeline, Edge included, on this ${where}: CI forces nothing with it today (it expands [build:all] at Checkout against a pipeline registry filled only later, orchestrator Jenkinsfile:2688-2693, :2413), but it is read here as asking, so the selection is asked to be declared`;
+}
+
+function cureFor(p) {
+  const parts = [];
+  if (p.forcedBy) parts.push(`drop ${p.forcedBy} from the tip commit`);
+  if (p.asks) parts.push('drop [build:all] from the tip commit');
+  if (p.deployOnly && p.selects) parts.push('drop [deploy-only] from the tip commit');
+  if (p.buildSteps.length && !p.forcedBy) parts.push('take the Edge build inputs out of this push, or land them with the next deliberate roll');
+  parts.push(`or declare the selection: add ${ROLL_TAG} and the reason to a pushed commit message`);
+  return `${parts.join('; ')}. [edge:validate-only] on the tip also stops the selection, but it drops every other pipeline from that run and moves the baseline past this push: not a cure for a mixed push.`;
 }
 
 /**
- * The preflight entry. Under pre-push, one row per deploying ref (else one for the first ref);
- * outside a push (`just gate`, `just status gates`), one row as if the change were pushed to dev,
- * never REFUSED. Silent when no changed-path list exists outside a push.
+ * The rows for one ref: `fleet-roll` and, on a protected ref with a skip tag, `skip-ci`. Pure.
+ * @param {{target: string|null, walked: object, tip: string, declaredBy: string|null,
+ *   mode: string, policyWhy?: string|null}} args
  */
-export function checkFleetRoll({ root, env = process.env, changed, walk: rawWalk = treeWalker(root), spawn = spawnSync, mode = fleetRollMode(root), registry: injected }) {
-  if (mode === 'off') return null;
-  // One walk per changed list, shared by the fleet-roll and skip-ci rows.
-  const walked = new Map();
-  const walk = list => { const key = list.join('\n'); if (!walked.has(key)) walked.set(key, rawWalk(list)); return walked.get(key); };
-  let pipelines = null;
-  const registry = injected ?? (() => (pipelines ??= loadPipelineRegistry(root)));
-  const pushing = !!(env.GATE_PUSH_TARGETS || env.GATE_PUSH_RANGES !== undefined);
-  if (!pushing) {
-    if (!Array.isArray(changed)) return null;
-    return evaluateFleetRoll({ changed, messages: [], target: null, mode, walk, registry }).row;
-  }
-  if (env.GATE_PUSH_RANGES === undefined) {
-    // An older hook: the paths alone are judged (header). A missing variable is not an unreadable range.
-    const branches = String(env.GATE_PUSH_TARGETS).split(/\s+/).filter(Boolean)
-      .map(ref => (ref.startsWith('refs/heads/') ? ref.slice('refs/heads/'.length) : ref));
-    const target = branches.find(b => DEPLOYING_BRANCHES.includes(b)) ?? branches[0] ?? 'dev';
-    return evaluateFleetRoll({ changed, messages: [], target, mode, walk, registry, rangesMissing: true }).row;
-  }
-  const ranges = parseRanges(env.GATE_PUSH_RANGES);
-  if (!ranges.length) return null;
-  const deploying = ranges.filter(r => DEPLOYING_BRANCHES.includes(r.branch));
+export function evaluateRef({ target, walked, tip = '', declaredBy = null, mode = 'refuse', policyWhy = null }) {
+  if (mode === 'off') return [];
+  const deploying = isDeploying(target);
+  const where = deploying ? `push to ${target}` : `change, were it pushed to dev (${target ? `target ${target} does not deploy` : 'not a push'})`;
+  const level = l => (l === 'REFUSED' && (mode === 'warn' || !deploying) ? 'WARN' : l);
+  const p = predict(walked, tip);
   const rows = [];
-  for (const r of deploying.length ? deploying : ranges.slice(0, 1)) {
-    const messages = r.range && r.sha ? readMessages({ root, range: r.range, sha: r.sha, spawn }) : new Error(`malformed range line for ${r.ref}`);
-    const target = r.branch ?? r.ref;
-    const { row: out } = evaluateFleetRoll({ changed, messages, target, mode, walk, registry });
-    if (out) rows.push(out);
-    const skip = evaluateSkipCi({ changed, messages, target, walk, registry });
-    if (skip) rows.push(skip);
+  const add = r => rows.push(policyWhy ? { ...r, why: `${r.why} (policy: mode ${mode}, the default, because ${policyWhy})` } : r);
+  const inputs = edgeText(p);
+  if (p.skipTag) {
+    if (p.buildSteps.length) {
+      add(row(CHECK, 'WARN', `the tip's ${p.skipTag} dispatches nothing for this ${where}, so the Edge build inputs it carries (${inputs}) are not built by this run; ${BASELINE}`,
+        `push them under a tip without the skip tag (with ${ROLL_TAG} if the selection is meant)`));
+    } else if (p.edge) {
+      add(row(CHECK, 'ok', `the tip's ${p.skipTag} dispatches nothing for this ${where}; its Edge inputs feed validation only`));
+    }
+  } else if (p.validateOnly) {
+    if (p.buildSteps.length || p.others.length) {
+      const parts = [p.buildSteps.length ? `its Edge build inputs (${inputs}) are not built by this run` : '', p.others.length ? `it drops ${p.others.join(', ')} from the run` : ''].filter(Boolean);
+      add(row(CHECK, 'WARN', `the tip's [edge:validate-only] makes ${EDGE} validate only for this ${where}: ${parts.join(', and ')}; once the run ends green, ${BASELINE}`,
+        'push those changes under a tip without [edge:validate-only], and keep the measuring commit on its own push'));
+    } else if (p.edge) {
+      add(row(CHECK, 'ok', `the tip's [edge:validate-only] makes ${EDGE} validate only for this ${where}; no build, no deploy`));
+    }
+  } else if (p.selects || p.asks) {
+    const what = `${reachText(p, where)}${inputs ? `: ${inputs}` : ''}`;
+    if (declaredBy) add(row(CHECK, 'ok', `${what} — declared by ${ROLL_TAG} in ${short(declaredBy)}`));
+    else {
+      add(row(CHECK, level('REFUSED'),
+        `${what} — and no pushed commit carries ${ROLL_TAG}. Read from ${target ? "this ref's own range and its tip's tags" : 'the changed paths given, with no commit read'}; an Edge step left stale by an earlier landing is not seen`,
+        cureFor(p)));
+    }
+  } else if (p.edge) {
+    const note = p.runTag ? `the tip's [run:${p.runTag}] keeps ${EDGE} out of the dispatch` : `${EDGE} validates only (${p.edge.steps.map(s => s.name).join(', ')})`;
+    add(row(CHECK, 'ok', `${note}; CI selects no Edge build or deploy for this ${where}`));
+  }
+  if (p.skipTag && deploying) {
+    const names = walked.pipelines.map(x => x.name).filter(name => dispatchable(walked.meta, name));
+    if (names.length) {
+      add(row(SKIP_CHECK, 'WARN', `the tip's ${p.skipTag} dispatches none of ${names.join(', ')}, which this ref's paths select; ${BASELINE}`,
+        "move the skip tag to a tip whose paths select no pipeline, or drop it from this push's tip"));
+    }
   }
   return rows;
 }
+
+/** `GATE_PUSH_REFS`: one `<remote ref> <pushed sha> <destination sha>` per line (pre-push.bash). */
+export function parseRefs(text) {
+  return String(text ?? '').split('\n').map(line => line.trim()).filter(Boolean).map(line => {
+    const [ref, local, remote] = line.split(/\s+/);
+    return { ref, local, remote, branch: branchOf(ref) };
+  });
+}
+
+function git(spawn, root, args) {
+  const r = spawn('git', ['-C', root, ...args], { encoding: 'utf8', maxBuffer: BUFFER });
+  if (r.error || r.status !== 0) {
+    const error = new Error(`git ${args.join(' ')} exited ${r.status ?? r.error?.code}: ${String(r.stderr || r.error?.message || '').trim().split('\n')[0]}`);
+    error.cure = 'git fetch origin, then push again';
+    throw error;
+  }
+  return String(r.stdout);
+}
+const lines = text => text.split('\n').map(l => l.trim()).filter(Boolean);
+const hasCommit = (spawn, root, sha) => spawn('git', ['-C', root, 'cat-file', '-e', `${sha}^{commit}`], { encoding: 'utf8' }).status === 0;
+
+/** Manifests that differ between this checkout and `sha` (tracked or untracked). */
+function manifestDrift(spawn, root, sha) {
+  const spec = ['--', ':(glob)**/build-manifest.json'];
+  return [...new Set([...lines(git(spawn, root, ['diff', '--name-only', sha, ...spec])),
+    ...lines(git(spawn, root, ['ls-files', '--others', '--exclude-standard', ...spec]))])];
+}
+
+function judgeRef({ ref, spawn, root, walk, mode, policyWhy }) {
+  const deploying = isDeploying(ref.branch);
+  const target = ref.branch ?? ref.ref;
+  const where = `push to ${target}`;
+  const indeterminate = (why, cure) => [row(CHECK, mode === 'warn' || !deploying ? 'WARN' : 'REFUSED', `${where}: ${why} — the check cannot decide, and an unreadable range never reads as "nothing changed"`, cure)];
+  let base = ref.remote;
+  if (isZero(ref.remote) || !hasCommit(spawn, root, ref.remote)) {
+    const why = isZero(ref.remote) ? `this push creates ${target}, so there is no destination tip to read a range from`
+      : `the destination tip ${short(ref.remote)} is not in this clone, so this ref's range cannot be read`;
+    if (deploying) {
+      return indeterminate(why, isZero(ref.remote)
+        ? `this check has no range to read for a new ${target}: create it deliberately, outside an ordinary push`
+        : `git fetch origin ${target}, then push again`);
+    }
+    base = git(spawn, root, ['merge-base', 'origin/dev', ref.local]).trim();
+  }
+  if (deploying) {
+    const head = git(spawn, root, ['rev-parse', 'HEAD']).trim();
+    if (head !== ref.local) return indeterminate(`the pushed tip ${short(ref.local)} is not this checkout's HEAD ${short(head)}, so the build manifests read here are not the pushed ones`, CHECKOUT_CURE);
+    const drift = manifestDrift(spawn, root, ref.local);
+    if (drift.length) return indeterminate(`build-manifest.json differs between this checkout and the pushed tip (${drift.slice(0, 3).join(', ')})`, CHECKOUT_CURE);
+  }
+  const changed = lines(git(spawn, root, ['diff', '--name-only', base, ref.local]));
+  // The tip alone carries CI's tags; the declaration is found with a search that returns one commit.
+  const tip = git(spawn, root, ['log', '-1', '--format=%B', ref.local]);
+  const declaredBy = git(spawn, root, ['log', '-i', '--fixed-strings', `--grep=${ROLL_TAG}`, '-1', '--format=%H', `${base}..${ref.local}`]).trim() || null;
+  return evaluateRef({ target, walked: walk(changed), tip, declaredBy, mode, policyWhy });
+}
+
+/** A failure to decide: red on a protected ref under refuse, a WARN otherwise; never silent. */
+export function failureRows({ error, deploying, mode, policyWhy = null }) {
+  if (mode === 'off') return [];
+  const first = String(error?.message || error).split('\n')[0];
+  const policy = policyWhy ? ` (policy: mode ${mode}, the default, because ${policyWhy})` : '';
+  return [row(CHECK, mode === 'refuse' && deploying ? 'REFUSED' : 'WARN', `the fleet-roll check could not decide: ${first}${policy}`,
+    error?.cure || 'fix what the error names and push again (a malformed build-manifest.json also stops CI\'s own graph, build-graph.groovy:815-827)')];
+}
+
+const words = text => String(text ?? '').split(/\s+/).filter(Boolean);
+/** Whether any pushed ref named by the environment is dev or main. */
+export function pushDeploys(env) {
+  return [...words(env.GATE_PUSH_TARGETS), ...parseRefs(env.GATE_PUSH_REFS).map(r => r.ref)].some(ref => isDeploying(branchOf(ref)));
+}
+
+/**
+ * GATE_FLEET_ROLL_DONE carries the pid of the pre-push hook that ran the check. It is honoured only
+ * when that process is this one or an ancestor of it, read from /proc; anywhere else (an inherited
+ * value, no /proc) the check runs again, which costs one more walk (well under a second).
+ */
+export function doneFlagHonoured(env = process.env, readStat = pid => readFileSync(`/proc/${pid}/stat`, 'utf8')) {
+  const done = Number(env.GATE_FLEET_ROLL_DONE);
+  if (!Number.isInteger(done) || done <= 1) return false;
+  for (let pid = process.pid, hops = 0; pid > 1 && hops < 64; hops += 1) {
+    if (pid === done) return true;
+    try {
+      const stat = readStat(pid); // "pid (comm) state ppid …"; comm may hold spaces or parentheses
+      pid = Number(stat.slice(stat.lastIndexOf(')') + 2).split(' ')[1]);
+    } catch { return false; }
+  }
+  return false;
+}
+
+/**
+ * The preflight entry. Under pre-push: each protected ref judged from its own range (else the
+ * first ref, advisory). Outside a push (`just gate`, `just status gates`): the changed list, as if
+ * pushed to dev, never red. Returns rows, or null when there is nothing to judge.
+ */
+export function checkFleetRoll({ env = process.env, changed = null, root = MODULE_ROOT, walk, spawn = spawnSync, policy } = {}) {
+  const { mode, why: policyWhy } = policy ?? fleetRollMode(root);
+  if (mode === 'off') return null;
+  walk ??= ciWalker(root);
+  const targets = words(env.GATE_PUSH_TARGETS);
+  try {
+    if (!targets.length && env.GATE_PUSH_REFS === undefined) {
+      if (!Array.isArray(changed)) return null;
+      return evaluateRef({ target: null, walked: walk(changed), mode, policyWhy });
+    }
+    if (env.GATE_PUSH_REFS === undefined) return olderHook({ targets, changed, walk, mode, policyWhy });
+    const refs = parseRefs(env.GATE_PUSH_REFS);
+    const named = [...new Set(refs.map(r => r.ref))].sort().join(' ');
+    if (named !== [...new Set(targets)].sort().join(' ')) {
+      return [row(CHECK, mode === 'refuse' && pushDeploys(env) ? 'REFUSED' : 'WARN',
+        `the push names refs [${targets.join(' ')}] that its ref list GATE_PUSH_REFS [${refs.map(r => r.ref).join(' ')}] does not match — the check cannot decide`,
+        'push again from a plain shell: an inherited GATE_PUSH_REFS or GATE_PUSH_TARGETS is the usual cause')];
+    }
+    const judged = refs.filter(r => isDeploying(r.branch));
+    return (judged.length ? judged : refs.slice(0, 1)).flatMap(ref => judgeRef({ ref, spawn, root, walk, mode, policyWhy }));
+  } catch (error) {
+    return failureRows({ error, deploying: pushDeploys(env), mode, policyWhy });
+  }
+}
+
+function olderHook({ targets, changed, walk, mode, policyWhy }) {
+  const target = targets.map(branchOf).find(isDeploying) ?? branchOf(targets[0]) ?? targets[0];
+  const deploying = isDeploying(target);
+  if (!Array.isArray(changed)) {
+    return failureRows({ error: Object.assign(new Error('the running pre-push hook handed over no changed-path list'), { cure: OLDER_HOOK_CURE }), deploying, mode, policyWhy });
+  }
+  const p = predict(walk(changed), '');
+  if (!p.selects) return [];
+  const why = `${reachText(p, `push to ${target}`)}: ${edgeText(p)} — and the running pre-push hook hands over no ref list (GATE_PUSH_REFS), so neither this ref's own range nor a declaration can be read`;
+  const r = row(CHECK, mode === 'warn' || !deploying ? 'WARN' : 'REFUSED', why, OLDER_HOOK_CURE);
+  return [policyWhy ? { ...r, why: `${r.why} (policy: mode ${mode}, the default, because ${policyWhy})` } : r];
+}
+
+const OLDER_HOOK_CURE = 'check the launcher first: test -x <worktree>/.husky/_/pre-push (pnpm install creates it; with it missing, git runs no hook at all, silently); then push with -c core.hooksPath=<worktree>/.husky/_ so the current hook reads each ref\'s range and messages, or bring the main checkout up to date (its .husky/pre-push.bash predates the fleet-roll block)';
