@@ -743,6 +743,11 @@ fn a_declared_target_realized_in_its_c_is_recorded_with_one_isa_c_slot() {
     let (out, produces) = declared_put(&with_cxx, Some(&gnu_c("-march=x86-64")), true);
     assert!(out.status.success(), "{}", text(&out));
     assert_eq!(isa_c_slots(&produces[0]), ["env:isa-c=x86-64"]);
+    // Ruling 4: cc's command log, the gate's declared diagnostic switch, recorded and allowed.
+    with_cxx.push(("CC_ENABLE_DEBUG_OUTPUT", "1"));
+    let (out, produces) = declared_put(&with_cxx, Some(&gnu_c("-march=x86-64")), true);
+    assert!(out.status.success(), "{}", text(&out));
+    assert_eq!(isa_c_slots(&produces[0]), ["env:isa-c=x86-64"]);
 }
 
 /// A bin with no C unit (bin-launch: no ring in its lock closure) and no GNU C producer string
@@ -1385,6 +1390,18 @@ fn an_unrecorded_c_family_var_refuses_the_key() {
         ("HOST_CC", "clang"),
         ("TARGET_CC", "clang"),
         ("CRATE_CC_NO_DEFAULTS", "1"),
+        // Ruling 4 (L2a rework): the archiver, ranlib and cc's own switches are C tools too.
+        ("HOST_AR", "llvm-ar"),
+        ("TARGET_AR", "llvm-ar"),
+        ("AR_x86_64_unknown_linux_gnu", "llvm-ar"),
+        ("AR_x86_64-unknown-linux-gnu", "llvm-ar"),
+        ("ARFLAGS", "-X"),
+        ("TARGET_ARFLAGS", "-X"),
+        ("RANLIB", "llvm-ranlib"),
+        ("RANLIBFLAGS", "-D"),
+        ("CC_FORCE_DISABLE", "1"),
+        // Recorded like the rest, though allowed under a declared target once recorded.
+        ("CC_ENABLE_DEBUG_OUTPUT", "1"),
     ] {
         let out = key_with(&a, &method, &[(declared, "-march=x86-64"), (name, value)]);
         assert_eq!(out.status.code(), Some(3), "{name}: {}", text(&out));

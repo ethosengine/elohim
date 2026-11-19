@@ -183,6 +183,41 @@ fn isa_c_accepts_only_a_declaration_the_record_applies() {
     }
 }
 
+/// Ruling 4 (L2a rework): a diagnostic-only switch the gate declares (cc's command log) is
+/// recorded and allowed under a declared target; every other C-tool input still refuses, the
+/// archiver and its flags included, and so does a switch that changes what cc builds.
+#[test]
+fn isa_c_allows_the_declared_diagnostic_switch_and_refuses_the_other_c_tools() {
+    let mut logged = DECLARED_V1.to_vec();
+    logged.push(("CC_ENABLE_DEBUG_OUTPUT", "1"));
+    assert!(
+        declared(&descriptor(&logged)).is_ok_and(|d| d.is_some()),
+        "{:?}",
+        declared(&descriptor(&logged)).err()
+    );
+    for (name, value) in [
+        ("HOST_AR", "llvm-ar"),
+        ("TARGET_AR", "llvm-ar"),
+        ("AR_x86_64_unknown_linux_gnu", "llvm-ar"),
+        ("AR_x86_64-unknown-linux-gnu", "llvm-ar"),
+        ("ARFLAGS", "-X"),
+        ("RANLIBFLAGS", "-D"),
+        ("CC_FORCE_DISABLE", "1"),
+    ] {
+        let mut inputs = logged.clone();
+        inputs.push((name, value));
+        let Err(missing) = declared(&descriptor(&inputs)) else {
+            panic!("{name} was accepted");
+        };
+        assert!(
+            missing
+                .iter()
+                .any(|m| m.contains(&format!("C-family variable {name};"))),
+            "{name}: {missing:?}"
+        );
+    }
+}
+
 /// Ruling 2 (L2a rework): `target.cflags` is exactly `-march=<target.isa>`. A declaration carrying
 /// an extra flag refuses even when every recorded variable agrees with it, so a record and a
 /// descriptor cannot declare `-mavx2` together.

@@ -23,7 +23,7 @@ use std::path::Path;
 use eprfs_core::MethodDescriptor;
 use object::{Object, ObjectSection};
 
-use super::{cargo_project, git_ok, host, is_c_family_var, CRATE_INPUT};
+use super::{cargo_project, git_ok, host, is_c_family_var, CRATE_INPUT, DIAGNOSTIC_C_ENV};
 
 /// The Produce slot naming the C baseline put checked the build against.
 pub(super) const SLOT: &str = "env:isa-c";
@@ -133,6 +133,14 @@ pub(super) fn declared(descriptor: &MethodDescriptor) -> Result<Option<Declared<
 /// declared one: the gate exports both variables with the declared value and the producer records
 /// both. `describe` records and `put` re-checks the environment (`is_build_var`), so the record is
 /// what the build ran under.
+///
+/// Extended at the L2a rework (ruling 4): the C family is every C tool and flag cc 1.11.1 reads
+/// (`is_c_family_var`: the archiver and ranlib, `HOST_AR`, `TARGET_AR`, `AR_<triple>` in both
+/// spellings, `ARFLAGS` and `RANLIBFLAGS` in every form, and cc's own `CC_*` switches), and every
+/// one of them refuses here except a diagnostic-only switch (`DIAGNOSTIC_C_ENV`:
+/// `CC_ENABLE_DEBUG_OUTPUT`), which changes no byte, is declared by the record's gate export, and
+/// is recorded and allowed. A switch that changes what cc builds (`CC_FORCE_DISABLE`,
+/// `CRATE_CC_NO_DEFAULTS`) keeps refusing.
 fn record_applies(descriptor: &MethodDescriptor, cflags: &str) -> Vec<String> {
     let triple = host::target(descriptor);
     if triple.is_empty() {
@@ -162,7 +170,11 @@ fn record_applies(descriptor: &MethodDescriptor, cflags: &str) -> Vec<String> {
         ));
     }
     for name in inputs.keys() {
-        if is_c_family_var(name) && *name != c && *name != cxx {
+        if is_c_family_var(name)
+            && *name != c
+            && *name != cxx
+            && !DIAGNOSTIC_C_ENV.contains(&name.as_str())
+        {
             missing.push(format!(
                 "{DECLARED}: the method records the C-family variable {name}; a declared \
                  target's C flags are {c} (and {cxx}) alone"

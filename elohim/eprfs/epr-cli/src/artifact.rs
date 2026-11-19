@@ -444,21 +444,49 @@ pub const NATIVE_BUILD_ENV: [&str; 9] = [
 ];
 
 /// The C-family flag stems the cc crate reads, alone, `HOST_`/`TARGET_`-prefixed, or
-/// `_<triple>`-suffixed in either spelling.
-const C_FAMILY_FLAGS: [&str; 5] = [
+/// `_<triple>`-suffixed in either spelling. cc 1.11.1 reads `CFLAGS`, `CXXFLAGS`, `ARFLAGS`
+/// (lib.rs:4725) and `RANLIBFLAGS` (lib.rs:4774) through `envflags` over `target_envs`
+/// (lib.rs:5452, 5482): `<var>_<target>`, `<var>_<target_u>`, `HOST_|TARGET_<var>`, `<var>`.
+/// `CPPFLAGS` and `ASMFLAGS` are conservative project inputs.
+const C_FAMILY_FLAGS: [&str; 7] = [
     "CFLAGS",
     "CXXFLAGS",
     "CPPFLAGS",
     "ASMFLAGS",
+    "ARFLAGS",
+    "RANLIBFLAGS",
     "CRATE_CC_NO_DEFAULTS",
 ];
 
+/// The C tools cc 1.11.1 selects by `getenv_with_target_prefixes` (lib.rs:5464) in every spelling
+/// of [`C_FAMILY_FLAGS`]: the compilers, the archiver and ranlib (`get_base_archiver_variant`,
+/// lib.rs:4744, 4785, 4788), nvcc (lib.rs:4372), the MASM assembler (lib.rs:3716) and the C++
+/// standard library (lib.rs:4608, 4685). Plain `CC`, `CXX` and `AR` are [`NATIVE_BUILD_ENV`].
+const C_FAMILY_TOOLS: [&str; 8] = [
+    "CC",
+    "CXX",
+    "AR",
+    "RANLIB",
+    "NVCC",
+    "CC_MASM_ASM",
+    "CXXSTDLIB",
+    "CXXSTDLIB_STATIC",
+];
+
+/// C-family variables cc reads that only make it log (`CC_ENABLE_DEBUG_OUTPUT`: each command it
+/// runs, as `running: <command>`, command_helpers.rs:56 and :644): recorded like the rest, and
+/// never refused under a declared target, whose gate declares them (pool-policy.json
+/// declared_targets `env`) so that put can read the compile commands as evidence.
+pub const DIAGNOSTIC_C_ENV: [&str; 1] = ["CC_ENABLE_DEBUG_OUTPUT"];
+
 /// Whether `name` is a C-family build variable (row 29.2): a flags variable in any spelling the
 /// cc crate reads (`CFLAGS`, `CFLAGS_<triple>` underscored or dashed, `HOST_`/`TARGET_` forms,
-/// `CXXFLAGS`, `CPPFLAGS`, `ASMFLAGS`, `CRATE_CC_NO_DEFAULTS`), or a per-target compiler selection
-/// (`CC_*`, `CXX_*`, `HOST_CC`, `TARGET_CC`, `HOST_CXX`, `TARGET_CXX`). Plain `CC`/`CXX` are
-/// [`NATIVE_BUILD_ENV`]. `describe` records each one set, as a build input; `key` and `put` refuse
-/// one set and not recorded with that value.
+/// `CXXFLAGS`, `CPPFLAGS`, `ASMFLAGS`, `ARFLAGS`, `RANLIBFLAGS`, `CRATE_CC_NO_DEFAULTS`), a tool
+/// selection in any of those spellings ([`C_FAMILY_TOOLS`]: `HOST_AR`, `AR_<triple>`, `RANLIB`, …),
+/// or any other `CC_*`/`CXX_*` name (cc's own switches, such as `CC_FORCE_DISABLE`, which changes
+/// what is built, and [`DIAGNOSTIC_C_ENV`]). Plain `CC`/`CXX`/`AR` are [`NATIVE_BUILD_ENV`].
+/// `describe` records each one set, as a build input; `key` and `put` refuse one set and not
+/// recorded with that value.
 pub fn is_c_family_var(name: &str) -> bool {
     let bare = name
         .strip_prefix("HOST_")
@@ -472,9 +500,12 @@ pub fn is_c_family_var(name: &str) -> bool {
         return true;
     }
     if bare == name {
-        name.starts_with("CC_") || name.starts_with("CXX_")
+        if NATIVE_BUILD_ENV.contains(&name) {
+            return false;
+        }
+        name.starts_with("CC_") || name.starts_with("CXX_") || C_FAMILY_TOOLS.into_iter().any(stem)
     } else {
-        matches!(bare, "CC" | "CXX")
+        C_FAMILY_TOOLS.contains(&bare)
     }
 }
 

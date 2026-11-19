@@ -74,6 +74,46 @@ fn artifact_c_family_names_every_spelling_the_cc_crate_reads() {
     }
 }
 
+/// Ruling 4 (L2a rework): the archiver and ranlib selectors and their flags are C tools too, in
+/// every spelling cc 1.11.1 reads (`get_base_archiver_variant` and `envflags` over `target_envs`,
+/// lib.rs 4725/4774/4788/5452), and the switches cc reads by name (`CC_FORCE_DISABLE`,
+/// `CC_ENABLE_DEBUG_OUTPUT`) are recorded like any other C-family input.
+#[test]
+fn artifact_c_family_names_the_archiver_and_ranlib_in_every_spelling() {
+    for name in [
+        "HOST_AR",
+        "TARGET_AR",
+        "AR_x86_64_unknown_linux_gnu",
+        "AR_x86_64-unknown-linux-gnu",
+        "ARFLAGS",
+        "HOST_ARFLAGS",
+        "TARGET_ARFLAGS",
+        "ARFLAGS_x86_64_unknown_linux_gnu",
+        "ARFLAGS_x86_64-unknown-linux-gnu",
+        "RANLIB",
+        "HOST_RANLIB",
+        "TARGET_RANLIB",
+        "RANLIB_x86_64_unknown_linux_gnu",
+        "RANLIB_x86_64-unknown-linux-gnu",
+        "RANLIBFLAGS",
+        "TARGET_RANLIBFLAGS",
+        "RANLIBFLAGS_x86_64_unknown_linux_gnu",
+        "NVCC",
+        "HOST_NVCC",
+        "CXXSTDLIB",
+        "CXXSTDLIB_x86_64_unknown_linux_gnu",
+        "TARGET_CXXSTDLIB_STATIC",
+        "CC_FORCE_DISABLE",
+        "CC_ENABLE_DEBUG_OUTPUT",
+    ] {
+        assert!(is_c_family_var(name), "{name}");
+        assert!(is_build_var(name), "{name}");
+    }
+    for name in ["ARCH", "RANLIBX", "HOST_ARX", "TARGET_ARCH"] {
+        assert!(!is_c_family_var(name), "{name}");
+    }
+}
+
 #[test]
 fn artifact_loaded_target_inputs_refuse_unknown_names_and_invalid_sysroot() {
     for (name, value) in [
