@@ -388,6 +388,42 @@ preparation, gitlink ids, the killed switch).
 
 Rebase stays a declared git fallback for the monorepo and for brit either way.
 
+**Round 3 reviewed: R1–R5 HOLD.** Round 3 (commits `b4183e93b9`, `e47ac0bbcd`, `a9fd9cc80a`)
+implemented the five rules and was reviewed a third time:
+
+- a conflict resolution of any size under a 1 MB limit is refused at `--stage` or `--continue`, and
+  `--abort` restores exactly;
+- a ten-checkpoint kill sweep restored HEAD, index, worktree and the user's uncommitted work exactly in
+  every case but one;
+- `--retire` refuses every live state and no longer touches another repository's locks;
+- no false "foreign journal" for a linked worktree or a symlinked path;
+- a 3-commit docs replay on a 1,171-object repository at the real limit is admitted and finishes in
+  22.5 s.
+
+Two strandings remain. Both are crash windows, neither is about quotas, both are at the real limit,
+and by reading neither is changed by this lane (so probably present in 0.2.6):
+
+1. A kill during conflict `--continue` after a complete `state.pending` is written and before its
+   rename. Afterwards `--abort`, `--continue` and `--skip` fail "foreign pending replay state", because
+   a retry builds a different successor and the equal-bytes rule for an existing pending record never
+   matches.
+2. A torn retained-copy manifest. `manifest.json` is not written atomically, and `persist_exact`
+   refuses a differing manifest even in an incomplete copy, so a retry of `--abort` fails (outcome
+   confirmed with a simulated torn file).
+
+Also: `brit switch` recovery is still metered. A part-way switch whose journal is over the limit fails
+`--status`, `--abort` and `--continue` (reached only by changing the limit between runs).
+
+Admission's smallest admitted limit is now about 1.9–3.2 times the real copy. Large repositories (over
+roughly 182,000 objects) are still refused in under a second, with wording that says brit rebase is not
+available at that size yet.
+
+**Round 4 in progress** under a fresh implementer: the two crash windows, R3 extended to switch and
+standalone authoring abort, three status wordings, and the lint leg that had not run.
+
+**Status:** not mergeable until a fourth delta review passes; fallback unchanged (land round 1's
+reviewed parts only).
+
 **Residuals recorded:** a process killed during any journal `save()` can leave `.git/.brit-checkout-*`;
 a `preparing` journal in a moved or copied repository cannot be cancelled (identity check;
 pre-existing).

@@ -157,9 +157,22 @@ non-root Linux in run 44544779620 (see `brit-declared-trust-and-reduced-trust-pa
 A non-root leg works on this host: `setpriv --reuid=65534 --regid=65534 --clear-groups <built test
 binary>` with `TMPDIR=/tmp`, a throwaway HOME and `GIT_CONFIG_NOSYSTEM=1` (`/etc/gitconfig` is 0640
 root:1234). Run it twice: with a plain HOME, and with a HOME holding `[safe] directory = *`. Session
-scratch under `/tmp/claude-0` is not reachable by that user.
+scratch under `/tmp/claude-0` is not reachable by that user. On the final integration head the two HOMEs (plain, and one with
+`[safe] directory = *`) gave identical results over 123 binaries.
 
 The converse gap: CI never exercises REAL foreign ownership. `foreign_owned.rs` is all `#[ignore]`
 (it needs root to chown), and `full_to_reduced_discovery_sizes_slots_from_the_indexes_present` and the
 safe.directory promotion fingerprint test skip their foreign-ownership portion on EPERM, so on non-root
 CI they pass without asserting it. Only a root container runs them.
+
+## (r) An aggregate job must allow-list
+
+brit's deny-list aggregate `Tests pass` failed only on `failure`, `cancelled` and `skipped`, and passed
+on an `abandoned` result (a matrix leg that never got a runner). Cause, evidence and the allow-list
+fix: the handoff entry's steward item "A brit pin must name a commit whose own CI run included the
+aggregate fix" (`brit-sprint-3-handoff-2026-11-19.md`).
+
+## (s) macOS runners abandoned
+
+macOS legs have been abandoned on both runs since about 14:30Z on 2026-11-19 (runs 44544779620 and
+44567300304), so macOS is unverified for every head after `9945331577`.

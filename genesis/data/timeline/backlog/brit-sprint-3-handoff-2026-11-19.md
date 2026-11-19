@@ -43,7 +43,7 @@ has not moved.
 
 **Integration branch** `sprint3/integrate` in the brit repo, worktree
 `/projects/elohim/.worktrees/brit-s3-integrate`. Pushed to the brit remote as
-`run-ci/sprint3-integrate` six times, through `brit push` and brit's reach gate (`epr ready` +
+`run-ci/sprint3-integrate` eight times, through `brit push` and brit's reach gate (`epr ready` +
 `scripts/ci/rust-style.sh`). The first three pushes took about 6 s each; the fourth exited 0.
 
 | Pushed head | CI run |
@@ -54,6 +54,8 @@ has not moved.
 | `bd28ecd8cf6c9593c77825d734e7fb38e1923534` | 44494603484: every required job green on Linux, macOS and both Windows runners; only cargo-deny-advisories red (as on main) |
 | `9945331577` | 44528984349: green on Linux and macOS. On both Windows runners ONE unit test red, `gitoxide_core::repository::git_spellings::rev_parse::tests::relative_paths_match_git`: `relative_path` rendered a collected PathBuf with `display()`, so Windows joined with `\` where the test asserts git's `/`. The journeys for the same cause had been gated before the push; this unit test was missed |
 | `e2b94f2da7dc11597222bd7074ebc657deb7cb28` | 44544779620: finished. Every Windows job green on both runners (first Windows run of the trust lane's tests; `relative_paths_match_git` passes unchanged). Non-root Linux red on ONE test, `brit-cli::repository_slots::an_unreadable_alternate_pack_directory_does_not_fail_the_open`: the test was unsound, not the product (see `brit-declared-trust-and-reduced-trust-pack-cap.md`); test-only fix `bd18b171` on `sprint3/trust`, to be merged with the diff/show merge, not yet pushed when written. macOS cancelled part-way, so unverified for that head. The aggregate "Tests pass" concluded `success` on this run although `test-fast` legs had failed (see the steward section) |
+| `8e5072ffd35cd31d7cfaf8d31fa6b28ae53dbda1` | 44567300304: every Linux and Windows test job green, including `test`; macOS abandoned; two Windows fixture jobs still running when written |
+| `1bf96648cbec09baf9a957477ea36d975aa7c1bf` | the aggregate fix; CI in progress when written |
 
 A second integrator took over from the runbook note below and did the phase from `7479ce4539` to
 `bd28ecd8cf`. Besides the lane merges, that phase made two integration commits: `4f1d05a93a` (one
@@ -74,6 +76,26 @@ A third integrator took over from the same note for the refs-shem and trust merg
   answers relative); `e2b94f2da7` (eight ssh-refusal snapshots updated for the new error layout,
   which the lane had left stale).
 
+Merged after that:
+
+- **diff-show:** merge `19ac68ad59` of `5a422ceb51`. Integration commits: `c2d017f72f` (census and
+  guard journeys for show and diff, and `-C` keeping diff/show's `--`); `1a0aef4526` (changelog);
+  `8e5072ffd3`, the merge of `c1e3580088`, which corrected two stale expectations in
+  `tests/cli-journey/tests/native_authoring.rs` that the lane had never run (`diff -- <untracked>` now
+  exits 0 like git; `diff --cached` over a staged gitlink move now prints git's `Subproject commit`
+  patch).
+- **trust follow-up:** `69aa5275b3`, merge of `bd18b171cb`.
+- **aggregate fix:** `4dceac3557` and `1bf96648cb` (see the steward section).
+
+Ten lanes are now merged on the integration branch: covenant-escape, log-rev-path, branch-tag,
+fetch-tracking, lock, build-inputs, push-transport, refs-shem, trust, diff-show. Not merged: recovery.
+
+Verification of the final head on this host: full cli-journey 496 passed on the default build, 357 on
+the max-pure journey list; a non-root leg over 123 test binaries (1028 ok; the six differences from
+root are host artifacts: this host's `/etc/gitconfig` is unreadable to an unprivileged user, and three
+tests write a lock into a read-only worktree); the reviewer's three diff/show comparison scripts re-run
+on the MERGED binary show only the documented refusals.
+
 **Lanes** (each in its own worktree under `/projects/elohim/.worktrees/`):
 
 | Lane branch | Tip | State | Worktree |
@@ -84,11 +106,11 @@ A third integrator took over from the same note for the refs-shem and trust merg
 | `sprint3/fetch-tracking` | `06616a06` | merged | `brit-s3-fetch-tracking` |
 | `sprint3/lock` | `63173728` | merged | `brit-s3-lock` |
 | `sprint3/build-inputs` | `0feb451a`; Windows follow-up tip `a3a874d4` (commits `7810a60e`, `4f1dd2c8`, `a3a874d4`) | merged; follow-up merged in `bd28ecd8cf` | `brit-s3-build-inputs` |
-| `sprint3/trust` | `bb0dd28837` | merged (`38427b921b`) | `brit-s3-trust` |
+| `sprint3/trust` | `bb0dd28837`; follow-up `bd18b171cb` | merged (`38427b921b`); follow-up merged (`69aa5275b3`) | `brit-s3-trust` |
 | `sprint3/push-transport` | `4a60a61d` | merged in `bd28ecd8cf` (three implementation rounds, two independent reviews, a doc-link fix) | `brit-s3-push-transport` |
-| `sprint3/diff-show` | `5a422ceb51` | two review passes and a delta review; merge in progress, not merged | `brit-s3-diff-show` |
+| `sprint3/diff-show` | `5a422ceb51` | merged (`19ac68ad59`) after two review passes and a delta review | `brit-s3-diff-show` |
 | `sprint3/refs-shem` | `806ea8114b` (shem's `b8264afc4`) | merged (`b9b4a294fc`) | `brit-s3-refs-shem` |
-| `sprint3/recovery` | round 1 up to `0d23297e22`; round 2 `9f3e6373`, `073cbfb0`, `5b107d72` | round 2 reviewed BROKEN; round 3 by a fresh implementer under rules R1–R5; not mergeable (see `brit-rebase-cost-gitlinks-and-stranding.md`) | `brit-s3-recovery` |
+| `sprint3/recovery` | round 1 up to `0d23297e22`; round 2 `9f3e6373`, `073cbfb0`, `5b107d72`; round 3 `b4183e93b9`, `e47ac0bbcd`, `a9fd9cc80a` | round 3: R1–R5 hold, two crash-window strandings remain; round 4 in progress; not mergeable until a fourth delta review passes (see `brit-rebase-cost-gitlinks-and-stranding.md`) | `brit-s3-recovery` |
 
 **Monorepo side:** branch `feat/ark-declared-trust` (worktree `brit-s3-ark-trust`), first written as
 three commits on origin/dev `01e4de7f1`, is now four commits (tip `d14e7357f`), reviewed, awaiting
@@ -117,7 +139,7 @@ next landing, L2a, touches epr-cli's artifact and produce paths.
   count must follow gix-odb's midx-aware accounting. Env-scope `includeIf` grants where git refuses
   (low). The error-printer commit and most tests are not yet reviewed. Details:
   `brit-declared-trust-and-reduced-trust-pack-cap.md`.
-- **diff-show** (merge in progress; final state in `brit-porcelain-gaps-census-2026-11.md`): the
+- **diff-show** (merged; final state in `brit-porcelain-gaps-census-2026-11.md`): the
   first, partial review read: `brit diff`: 1,155 of 1,230 comparisons byte-identical to
   git, the other 75 clean refusals from one file carrying a `diff=<driver>` attribute; worktree forms
   100% identical except refusals for intent-to-add entries and a conflicted index; shallow merge-base
@@ -212,8 +234,8 @@ next landing, L2a, touches epr-cli's artifact and produce paths.
    §6), after the steward's decision on the retained-manifest format below. Rebase stays a declared
    git fallback on both devices. Step (a) has started as lane `sprint3/recovery` (in progress, see the
    lane table).
-2. An independent integrator merges `sprint3/diff-show` once it clears review (merge in progress;
-   `sprint3/push-transport`, `sprint3/refs-shem` and `sprint3/trust` are merged).
+2. All reviewed lanes are merged on the integration branch (ten lanes, listed under "Where the work
+   is"); only `sprint3/recovery` remains.
 3. A push-policy lane (`push.rs`): one handshake when no hook ran; the notes/tag fast-forward rule;
    refuse an ungated push when hooks are configured but missing or not executable; render the delivery
    note in the CLI. See `brit-push-fails-after-green-hook-root-cause.md`. Also for this lane: push's
@@ -222,8 +244,21 @@ next landing, L2a, touches epr-cli's artifact and produce paths.
    - Closed-pipe leftovers: `println!` to a closed stdout still panics (exit 101) in brit-build-ref (21
      sites), brit-verify (7), brit-cli (3) and `brit build fingerprint` / `build graph discover`; no
      brit binary installs a panic hook. `brit log` prints a commit message with an `encoding` header as
-     raw bytes (`show` is fixed on the diff-show lane; `log` is separate code). `-C` refusals name the
-     clap id `change_dir`.
+     raw bytes (`show` is fixed on the diff-show lane; `log` is separate code); `show::to_utf8` is
+     private, so this needs it made `pub(crate)`. `-C` refusals name the clap id `change_dir`.
+   - `show` qualifies for the read-only command list but is not in it (`brit show … | head` exits 1
+     with "Broken pipe"). shem has started that extension as patches against `8e5072ffd3` (directory
+     `brit-s3-readonly/` on `self/nt-review-receipts` when delivered); its own review took `is-clean`,
+     `is-changed`, `commit describe`, `submodule list`, `remote refs` and `remote ref-map` off the
+     candidate list. `ls-remote` and its two siblings are to be treated alike (coordinator's preference:
+     admit all three, with the credential-helper caveat written beside the list).
+   - CI's `test-journey` job runs its named list against a standalone default-feature binary, not the
+     shipped max-pure one. Ten journey files added this sprint are not in that list (broken_pipe,
+     change_dir, check_ref_format, diff_revisions, for_each_ref, ls_remote, merge_base_is_ancestor,
+     rev_list, rev_parse, show), though test-fast runs them; whether to add them is the steward's call.
+   - 35 first-party test functions open a repository in-process without isolation from host git
+     config (brit-graph repo_fingerprint 21, gitoxide-core replay 11, others): the class that produced
+     the non-root CI failure. Listed in the integration note, not fixed.
 4. The epr-cli lane: a `device_store(…)` constructor that always attaches `DeviceRunner`, and a
    source-scan test, stacked on `feat/ark-declared-trust` after shem's L2b lands; `bin.rs` waits for
    the landed sha. See `brit-declared-trust-and-reduced-trust-pack-cap.md` (epr-cli spawn audit).
@@ -273,35 +308,42 @@ next landing, L2a, touches epr-cli's artifact and produce paths.
     shallow boundary with no declaration is refused as undecidable (cure: `git fetch --deepen=<n>
     origin`). A `[skip ci]` or `[edge:validate-only]` tip over inputs a pipeline builds gets a WARN that
     CI dispatches nothing for that push.
-- **Until the aggregate is explained, a brit pin's attestation is not evidence.**
-  - brit's `build-manifest.json` declares its gate as `run.kind: attested`, provider `github-checks`,
-    repo `ethosengine/brit`, check "Tests pass". `genesis/orchestrator/gate-attest.mjs` takes the most
-    recently started check run of that name at the pinned commit and passes on `success`, with no
-    local recipe.
-  - On brit CI run 44544779620 (commit `e2b94f2da7`) the one check run named "Tests pass" (id
-    135658475517, started 2026-11-19T15:12:32Z) concluded `success`, although in the same run and
-    single attempt `test-fast (ubuntu-latest)` and `test-fast (ubuntu-24.04-arm)` had concluded
-    `failure` (14:49–14:50Z) and `test-fast (macos-latest)` `cancelled` (14:48Z). `test-fast` is in the
-    aggregate's `needs`, has `fail-fast: false` and no `continue-on-error`. The aggregate's first step
-    is `if: contains(needs.*.result, 'failure') || … 'cancelled' || … 'skipped'` → `exit 1`, and it did
-    not run.
-  - Ruled out: a second workflow run or re-run for the commit; a `continue-on-error` on that job.
-    Unexplained.
-  - Only pattern (three data points, no cause): the aggregate failed correctly on run 44481834878
-    (head `7479ce4539`, red: `test-fast (windows-11-arm)`, the last matrix leg to finish) and on run
-    44528984349 (head `9945331577`, red: `test-fast (windows-11-arm)`, last to finish at 13:36:10Z,
-    aggregate failed at 13:36:20Z); it passed on run 44544779620, where the last leg to finish was
-    green.
-  - Separately, the job `test` (the unit-tests recipe), which also failed on that run, is not in the
-    aggregate's `needs` at all.
-  - Done in sprint 3: a diagnostic first step printing `toJSON(needs)` is being added to the aggregate
-    (no change to what passes).
-  - NOT done, proposals for the steward: have the aggregate read its own run's job conclusions from the
-    API; add `test` to `needs`.
-  - Agreed with shem for later, as one landing: `gate-attest.mjs` reads the conclusion of every
-    workflow run of the named workflow at the commit, and brit's manifest attestation field changes
-    with it.
-  - Precondition of any brit pin move: the aggregate is sound, beside the steward's word.
+- **A brit pin must name a commit whose own CI run included the aggregate fix.**
+  - Setup: brit's `build-manifest.json` declares its gate as `run.kind: attested`, provider
+    `github-checks`, repo `ethosengine/brit`, check "Tests pass". `genesis/orchestrator/gate-attest.mjs`
+    takes the most recently started check run of that name at the pinned commit and passes on
+    `success`, with no local recipe.
+  - What was seen: on brit CI run 44544779620 (commit `e2b94f2da7`) the one check run named "Tests
+    pass" (id 135658475517, started 2026-11-19T15:12:32Z) concluded `success`, although in the same run
+    and single attempt `test-fast (ubuntu-latest)` and `test-fast (ubuntu-24.04-arm)` had concluded
+    `failure` (14:49–14:50Z) and `test-fast (macos-latest)` `cancelled` (14:48Z). The aggregate's first
+    step is `if: contains(needs.*.result, 'failure') || … 'cancelled' || … 'skipped'` → `exit 1`, and it
+    did not run.
+  - CAUSE: when one leg of a matrix job never gets a runner, GitHub reports that whole job to
+    dependants as `needs.<job>.result == "abandoned"`, a value that is none of `failure`, `cancelled`,
+    `skipped`. brit's aggregate `Tests pass` failed only on those three, so it passed.
+  - Evidence: on run 44567300304 (head `8e5072ffd3`) a diagnostic step printed every need as `success`
+    except `"test-fast": { "result": "abandoned" }`. `test-fast (macos-latest)` shows in the jobs API as
+    `cancelled` 15 minutes after start (16:32:49Z → 16:47:51Z) with no steps and no log, exactly as on
+    run 44544779620 (14:32:05Z → 14:48:12Z), where the same abandoned leg hid two FAILED ubuntu legs of
+    the same matrix job. The earlier "last leg to finish" pattern was a coincidence and is withdrawn.
+  - FIX on the integration branch: commit `4dceac3557` (the diagnostic step `Show dependency results`)
+    and commit `1bf96648cb` (a step `Fail unless EVERY dependency succeeded`: an allow-list that fails
+    on any result other than `success` and on an empty result list). The older deny-list step is kept
+    because `scripts/ci/test_qualify_readiness.py` reads its `'skipped'` clause.
+  - CONSEQUENCE (in the other device's words, agreed): the monorepo's gate already passes a pin only
+    when the named check's conclusion is exactly `success` (`gate-attest.mjs`), so the hole was wholly
+    in what the aggregate reports. Therefore a brit pin should name a commit whose OWN CI run included
+    the allow-list step. A `Tests pass` from any commit built before it cannot be trusted either way,
+    even where its legs were in fact green; that covers every brit commit on main today, including the
+    pinned 0.2.6.
+  - Still proposals for the steward, not done: add the job `test` (the unit-tests recipe) to the
+    aggregate's `needs` (it also failed on run 44544779620 and is not in `needs` at all); on the
+    monorepo side, read every workflow run's conclusion at the commit as a second check (queued by shem
+    behind its gate lanes, to land together with the manifest's attestation field).
+  - Open observation: macOS legs have been abandoned on both runs since about 14:30Z on 2026-11-19, so
+    macOS is unverified for every head after `9945331577`. With the fix in place such a run now FAILS
+    the aggregate, as intended.
 - Landing on brit `main` and the pin move. 16 monorepo steps re-key once (build-inputs above); one
   supervised real landing is needed to retire the push exception in `CLAUDE.md`. Its notes step is the
   device's own notes publish, fast-forward to `refs/notes/brit/devices/<did>/build/*`, which brit must
