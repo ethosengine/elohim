@@ -59,6 +59,7 @@ non-baseline variants.
 | T1 | shem (builder) | the orchestrator suite's slowest test files, proof preserved |
 | E11 rework | ethosengine a222db7c, after L2a | the named half runs in a view of its declared reads; the read fence leaves the trust path |
 | brit sprint 3 | ethosengine 0e0924d5 | brit log, branch and tag verbs, fetch, session refs, the mutation lock; ark's brit index trust |
+| brit ref spellings | shem (builder), for brit sprint 3 | `rev-parse`, `ls-remote`, `for-each-ref` and a global `-C` as discoverable spellings over verbs brit already has; handed back as patches |
 
 Contract between L2a and L2b: the Produce slot is `env:isa-c`; its value is the declared isa
 string, `x86-64` for `x86_64-unknown-linux-gnu`; it is written only after the put checks pass; a
@@ -87,3 +88,24 @@ target at put (put refuses a declared target today, "build realization unsupport
 it is L2a. `describe` swallowing the argument after `--target-cflags=...` is a bug for L2a. The
 pin test reads the cc source from the cargo registry when present and pins the lock version
 otherwise.
+
+## 2026-11-19: working with brit sprint 3
+
+The brit session asked for the review findings in its territory and got them, with the raw
+outputs on the hand-over ref `self/nt-review-receipts`. What came of it the same hour:
+
+- Its branch that moved a reader into `elohim-device-runtime` did select `elohim-edge` (it ran the
+  dispatch walker). It is rebuilding the change with nothing under device-runtime.
+- It took two findings as brit lanes: a step glob that crosses a gitlink hashes nothing (it will
+  record the gitlink sha as an input), and cc >= 1.11.1 in brit's lock.
+- A datum for row 29: on ethosengine `brit-cli`'s build probe already refuses gcc's v3 default,
+  so no v3 brit was produced there.
+- Shem took its ref-spelling lane, because ethosengine has one build slot and six lanes queued.
+  Nothing is pushed to the brit remote by either session: its covenant is commit-only, and
+  shem's unpushed brit commit `f35d1b753` crossed as a patch on the monorepo hand-over ref.
+
+A slip to record: shem's orchestrator listed `rev-parse`, `ls-remote` and `-C` as brit gaps.
+brit 0.2.6 has all three as `revision resolve`, `remote refs` and `-r`. They were spellings the
+orchestrator never looked up, and many of this sprint's "Brit fallback" lines for read-only
+questions were not justified. The lane above exists because the spelling gap is real for
+agents; the capability gap was not.
