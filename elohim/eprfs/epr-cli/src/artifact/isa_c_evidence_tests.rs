@@ -20,6 +20,28 @@ fn id(package: &str) -> String {
     format!("{CRATES_IO}#{package}@{}", version(package))
 }
 
+/// A package as the roster names it (`cargo tree`'s `name vX.Y.Z`): `name@version`.
+fn key(package: &str) -> String {
+    format!("{package}@{}", version(package))
+}
+
+/// The roster parser reads `cargo tree --prefix none -f '{p}'` lines, sources and repeats too.
+#[test]
+fn evidence_reads_the_roster_from_cargo_trees_listing() {
+    let tree = "elohim-epr-cli v0.3.3 (/repo/elohim/eprfs/epr-cli)\nring v0.17.14\n\
+                serde_derive v1.0.228 (proc-macro)\nring v0.17.14 (*)\n\n";
+    assert_eq!(
+        tree_closure(tree).unwrap(),
+        BTreeSet::from([
+            "elohim-epr-cli@0.3.3".to_owned(),
+            "ring@0.17.14".to_owned(),
+            "serde_derive@1.0.228".to_owned(),
+        ])
+    );
+    assert!(tree_closure("ring 0.17.14\n").is_err());
+    assert!(tree_closure("ring\n").is_err());
+}
+
 /// One build of `bin` under a scratch target directory, as cargo's `--message-format=json`
 /// stream names it: the bin's executable under `<target>/debug`, per build script its lib and
 /// custom-build compiler-artifact rows, its build-script-executed row (the `running:` lines and
@@ -52,7 +74,7 @@ impl Build {
             dir,
             bin: bin.to_owned(),
             lines,
-            closure: [package].into(),
+            closure: [format!("{bin}@0.1.0")].into(),
             finished: Some(true),
         }
     }
@@ -155,7 +177,7 @@ impl Build {
             })
             .to_string(),
         );
-        self.closure.insert(package_id);
+        self.closure.insert(key(package));
         self
     }
 
@@ -345,7 +367,10 @@ fn evidence_refuses_a_stream_that_is_not_the_whole_build() {
         .judge("epr", BYTES)
         .unwrap_err();
     assert!(
-        has(&found, &format!("compiler-artifact row for {}", id("ring"))),
+        has(
+            &found,
+            &format!("compiler-artifact row for {}", key("ring"))
+        ),
         "{found:?}"
     );
     // A build that did not finish, or did not succeed.
@@ -709,7 +734,7 @@ fn an_exception_holds_only_for_its_version_and_reviewed_sources() {
     build.closure = build
         .closure
         .iter()
-        .map(|l| l.replace(&current, &other))
+        .map(|l| l.replace("blake3@1.8.5", "blake3@1.8.6"))
         .collect();
     let found = build.judge("epr", BYTES).unwrap_err();
     assert!(has(&found, "carries -mavx512f"), "{found:?}");

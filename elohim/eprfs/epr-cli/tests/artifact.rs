@@ -721,18 +721,35 @@ fn fixture_metadata(root: &Path, scratch: &Path, messages: &Messages) {
         }
     };
     let root_id = fixture_package(root);
-    let mut nodes = vec![serde_json::json!({
-        "id": root_id,
-        "deps": scripts.iter().map(|s| serde_json::json!({
-            "pkg": script_id(s.package),
-            "dep_kinds": [{"kind": null, "target": null}],
-        })).collect::<Vec<_>>(),
-    })];
+    // cargo metadata resolves features for the whole workspace, so its resolve can name an
+    // optional dependency the bin's own build never compiles (`optional-only`, enabled by another
+    // member); the bin's build, as `cargo tree -p` resolves it, does not hold it.
+    let optional = script_id("optional-only");
+    let mut deps: Vec<serde_json::Value> = scripts
+        .iter()
+        .map(|s| {
+            serde_json::json!({
+                "pkg": script_id(s.package),
+                "dep_kinds": [{"kind": null, "target": null}],
+            })
+        })
+        .collect();
+    deps.push(serde_json::json!({"pkg": optional, "dep_kinds": [{"kind": null, "target": null}]}));
+    let mut nodes = vec![serde_json::json!({"id": root_id, "deps": deps})];
     nodes.extend(
         scripts
             .iter()
             .map(|s| serde_json::json!({"id": script_id(s.package), "deps": []})),
     );
+    nodes.push(serde_json::json!({"id": optional, "deps": []}));
+    let tree: String = std::iter::once(format!("elohim-storage v0.1.0 ({}/crate)", root.display()))
+        .chain(scripts.iter().map(|s| {
+            let id = script_id(s.package);
+            let version = id.rsplit('@').next().unwrap_or_default().to_owned();
+            format!("{} v{version}", s.package)
+        }))
+        .collect::<Vec<_>>()
+        .join("\n");
     let metadata = serde_json::json!({
         "packages": [{
             "id": root_id,
@@ -745,7 +762,9 @@ fn fixture_metadata(root: &Path, scratch: &Path, messages: &Messages) {
     fake_tool(
         &scratch.join("tools"),
         "cargo",
-        &format!("cat <<'JSON'\n{metadata}\nJSON"),
+        &format!(
+            "if [ \"$1\" = tree ]; then cat <<'TREE'\n{tree}\nTREE\nelse cat <<'JSON'\n{metadata}\nJSON\nfi"
+        ),
     );
 }
 

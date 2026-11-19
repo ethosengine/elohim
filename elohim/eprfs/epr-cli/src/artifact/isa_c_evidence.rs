@@ -54,7 +54,7 @@ const DECLARED: &str = "missing declared-target";
 
 /// What the build of these bytes must show (re-review ruling 1): the cargo package id of the bin's
 /// package (the crate at `--crate`), and every package in that package's dependency closure for
-/// the declared triple, each of which the build must have compiled.
+/// the declared triple, as `name@version`, each of which the build must have compiled.
 #[derive(Debug, Clone, Default)]
 pub(super) struct Expected {
     pub package: String,
@@ -66,11 +66,12 @@ pub(super) struct Expected {
 /// The coordinator's decision (L2a re-review, ruling 1): the raw lock closure over-states, since
 /// it holds platform-gated packages never built on Linux (iana-time-zone-haiku is in epr's lock
 /// closure and is not compiled), so "every lock-closure package has a row" would refuse every
-/// real build. The roster is instead `cargo metadata --format-version 1 --locked --offline
+/// real build. The decision was `cargo metadata --format-version 1 --locked --offline
 /// --filter-platform <triple>` in the crate's workspace (put already requires a clean,
-/// HEAD-matching selected input set), and the bin package's transitive normal and build
-/// dependency closure in `resolve.nodes` (dev-dependencies are not built into a bin). If cargo
-/// metadata cannot run, the roster is unknown and put refuses with the reason.
+/// HEAD-matching selected input set) and the bin package's normal and build closure in its
+/// resolve; that names the bin's package id here, and the closure itself comes from `cargo tree`
+/// (below: the resolve over-stated on the real build). If either cannot run, the roster is
+/// unknown and put refuses with the reason.
 pub(super) fn expected(repo: &Path, descriptor: &MethodDescriptor) -> Result<Expected, String> {
     let crate_dir = descriptor
         .non_path_inputs
@@ -110,33 +111,61 @@ pub(super) fn expected(repo: &Path, descriptor: &MethodDescriptor) -> Result<Exp
             )
         })?
         .to_owned();
-    let nodes = metadata["resolve"]["nodes"].as_array().ok_or_else(|| {
-        format!("{DECLARED}: the build's roster is unread: cargo metadata has no resolve")
+    // The closure, as the bin's own build resolves it (the coordinator's caution 1, ratified):
+    // cargo metadata resolves features for the whole workspace, so its resolve named optional
+    // dependencies the gate's build of the bin never compiles (sha1, sha3, ripemd and some 150
+    // more refused the real build on this host); `cargo tree -p <pkg> -e normal,build --target
+    // <triple>` resolves features as that build does. Never the stream, which is what is checked.
+    let spec = format!("{}@{}", package_of(&package).0, version_of(&package));
+    let mut args = vec![
+        "tree",
+        "--locked",
+        "--offline",
+        "-p",
+        spec.as_str(),
+        "-e",
+        "normal,build",
+        "--target",
+        host::target(descriptor),
+        "--prefix",
+        "none",
+        "-f",
+        "{p}",
+    ];
+    if let Some(features) = features {
+        args.extend(["--features", features]);
+    }
+    let tree = super::tool_line("cargo", &args, &crate_path).map_err(|e| {
+        format!("{DECLARED}: the build's roster is unread: cargo tree for {spec} failed: {e}")
     })?;
-    let mut closure = BTreeSet::new();
-    let mut pending = vec![package.clone()];
-    while let Some(id) = pending.pop() {
-        if !closure.insert(id.clone()) {
-            continue;
-        }
-        let node = nodes
-            .iter()
-            .find(|n| n["id"] == id.as_str())
-            .ok_or_else(|| {
-                format!("{DECLARED}: the build's roster is unread: the resolve has no node {id}")
-            })?;
-        for dep in node["deps"].as_array().into_iter().flatten() {
-            let built = dep["dep_kinds"].as_array().is_some_and(|kinds| {
-                kinds
-                    .iter()
-                    .any(|k| k["kind"].is_null() || k["kind"] == "build")
-            });
-            if let (true, Some(pkg)) = (built, dep["pkg"].as_str()) {
-                pending.push(pkg.to_owned());
-            }
-        }
+    let closure = tree_closure(&tree)?;
+    if closure.is_empty() {
+        return Err(format!(
+            "{DECLARED}: the build's roster is unread: cargo tree for {spec} names no package"
+        ));
     }
     Ok(Expected { package, closure })
+}
+
+/// The `name@version` of every package a `cargo tree --prefix none -f '{p}'` listing names:
+/// `name vX.Y.Z`, optionally followed by a source in parentheses and `(*)` for a repeat.
+fn tree_closure(tree: &str) -> Result<BTreeSet<String>, String> {
+    let mut closure = BTreeSet::new();
+    for line in tree.lines().map(str::trim).filter(|l| !l.is_empty()) {
+        let mut words = line.split_whitespace();
+        let (Some(name), Some(version)) = (words.next(), words.next()) else {
+            return Err(format!(
+                "{DECLARED}: the build's roster is unread: cargo tree printed {line:?}"
+            ));
+        };
+        let Some(version) = version.strip_prefix('v') else {
+            return Err(format!(
+                "{DECLARED}: the build's roster is unread: cargo tree printed {line:?}"
+            ));
+        };
+        closure.insert(format!("{name}@{version}"));
+    }
+    Ok(closure)
 }
 
 /// How an exception is held against the build's own commands.
@@ -868,12 +897,13 @@ pub(super) fn judge(
     let mut notes = Vec::new();
     // The roster (ruling 1): every package the lock's resolve puts in the bin's closure for the
     // declared triple was compiled, and every compiled build script ran and is judged below.
-    let compiled: BTreeSet<&str> = artifacts
+    let compiled: BTreeSet<String> = artifacts
         .iter()
         .filter_map(|m| m["package_id"].as_str())
+        .map(|id| format!("{}@{}", package_of(id).0, version_of(id)))
         .collect();
     for id in &expected.closure {
-        if !compiled.contains(id.as_str()) {
+        if !compiled.contains(id) {
             missing.push(format!(
                 "{DECLARED}: the build messages name no compiler-artifact row for {id}, which \
                  the bin's dependency closure for the declared triple holds, so they are not the \
