@@ -136,39 +136,54 @@ function envFindings({ target, env }) {
   return findings;
 }
 
-/** Keys an `[env]` table sets in one cargo config text: `[env]` rows, `[env.KEY]` tables, `env.KEY =`. */
+/** A TOML dotted key (`env . "CFLAGS" . value`) as its segments, quotes removed. */
+function keyPath(raw) {
+  const segments = [];
+  const text = String(raw).trim();
+  const segment = /\s*(?:"((?:[^"\\]|\\.)*)"|'([^']*)'|([A-Za-z0-9_-]+))\s*(\.|$)/y;
+  for (let m = segment.exec(text); m; m = segment.exec(text)) {
+    segments.push(m[1] ?? m[2] ?? m[3]);
+    if (m[4] !== '.') break;
+  }
+  return segments;
+}
+
+/**
+ * Keys an `[env]` table sets in one cargo config text: `[env]` rows, `[env.KEY]` tables,
+ * `env.KEY =` and `env = { … }`. A dotted sub-key (`CFLAGS.value = …`, `env.CFLAGS.value`,
+ * `[env.CFLAGS]`) names its first segment under env: that is the variable cargo sets.
+ */
 export function cargoEnvKeys(text) {
-  const keys = [];
+  const keys = new Set();
   let table = null;
-  const key = raw => raw.trim().replace(/^["']|["']$/g, '');
   for (const raw of String(text).split('\n')) {
     const line = raw.replace(/\s+#.*$/, '').trim();
     if (!line || line.startsWith('#')) continue;
     if (line.startsWith('[[')) { table = '[array]'; continue; }
     const header = /^\[\s*([^\]]+?)\s*\]$/.exec(line);
     if (header) {
-      table = header[1];
-      const sub = /^env\.(.+)$/.exec(table);
-      if (sub) keys.push(key(sub[1]));
+      const path = keyPath(header[1]);
+      table = path.join('.');
+      if (path[0] === 'env' && path.length > 1) keys.add(path[1]);
       continue;
     }
     const assign = /^((?:"[^"]*"|'[^']*'|[^=])+?)\s*=/.exec(line);
     if (!assign) continue;
-    const name = assign[1].trim();
-    if (table === 'env') keys.push(key(name));
-    else if (table === null) {
-      const dotted = /^env\.(.+)$/.exec(name);
-      if (dotted) keys.push(key(dotted[1]));
-      else if (name === 'env') {
+    const path = keyPath(assign[1]);
+    if (table === 'env' && path.length) keys.add(path[0]);
+    else if (table === null && path[0] === 'env') {
+      if (path.length > 1) keys.add(path[1]);
+      else {
         const inline = /=\s*\{(.*)\}/.exec(line);
         for (const part of (inline?.[1] || '').split(',')) {
-          const m = /^\s*((?:"[^"]*"|'[^']*'|[A-Za-z0-9_-]+))\s*=/.exec(part);
-          if (m) keys.push(key(m[1]));
+          const m = /^\s*((?:"[^"]*"|'[^']*'|[^=,{}])+?)\s*=/.exec(part);
+          const name = m ? keyPath(m[1])[0] : undefined;
+          if (name) keys.add(name);
         }
       }
     }
   }
-  return keys;
+  return [...keys];
 }
 
 function cargoConfigFindings({ root, target, readFile, workspaces }) {

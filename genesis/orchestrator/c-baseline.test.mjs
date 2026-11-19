@@ -5,7 +5,7 @@ import { spawnSync } from 'node:child_process';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { arch, platform } from 'node:os';
-import { ABOVE_BASELINE, aboveBaseline, applicableTargets, checkCBaseline, cFamilyKey, readDeclaredTargets } from './c-baseline.mjs';
+import { ABOVE_BASELINE, aboveBaseline, applicableTargets, cargoEnvKeys, checkCBaseline, cFamilyKey, readDeclaredTargets } from './c-baseline.mjs';
 
 const TRIPLE = 'x86_64-unknown-linux-gnu';
 const record = {
@@ -108,6 +108,20 @@ test('cargo config: a C-family [env] key at the repo root or under the workspace
   const clean = { '/r/.cargo/config.toml': '[profile.dev]\ndebug = "line-tables-only"\n[env]\nRUST_LOG = "info" # CFLAGS in a comment\n' };
   const quiet = checkCBaseline({ ...base, env: {}, readFile: p => (p in clean ? clean[p] : noFiles()), spawn: probing(BASELINE_MACROS) });
   assert.deepEqual(quiet, []);
+});
+
+test('cargo config: a dotted sub-key names its first segment, in every place [env] can be written', () => {
+  // TOML dotted keys: `CFLAGS.value = …` in [env] is the table form `CFLAGS = { value = … }`.
+  assert.deepEqual(cargoEnvKeys('[env]\nCFLAGS.value = "-mavx2"\nCFLAGS.force = true\nRUST_LOG = "x"\n'), ['CFLAGS', 'RUST_LOG']);
+  assert.deepEqual(cargoEnvKeys('env.CXXFLAGS.value = "-mavx2"\n'), ['CXXFLAGS']);
+  assert.deepEqual(cargoEnvKeys('env . "TARGET_CFLAGS" . value = "-x"\n'), ['TARGET_CFLAGS']);
+  assert.deepEqual(cargoEnvKeys('[env.CFLAGS]\nvalue = "-mavx2"\n[ env . "ASMFLAGS" ]\nvalue = "-x"\n'), ['CFLAGS', 'ASMFLAGS']);
+  assert.deepEqual(cargoEnvKeys('[env.CPPFLAGS.extra]\nvalue = "-x"\n'), ['CPPFLAGS']);
+  assert.deepEqual(cargoEnvKeys('env = { CFLAGS.value = "-mavx2", RUST_LOG = "x" }\n'), ['CFLAGS', 'RUST_LOG']);
+  assert.deepEqual(cargoEnvKeys('[env]\n"CFLAGS.odd" = "-x"\n'), ['CFLAGS.odd'], 'a quoted key keeps its dot');
+  const files = { '/r/elohim/eprfs/.cargo/config.toml': '[env]\nCFLAGS.value = "-mavx2"\nCFLAGS.force = true\n' };
+  const found = checkCBaseline({ ...base, env: {}, readFile: p => (p in files ? files[p] : noFiles()), spawn: probing(BASELINE_MACROS) });
+  assert.deepEqual(found.map(f => `${f.check} ${f.variable}`), ['cargo-config CFLAGS'], 'one finding per key and file');
 });
 
 test('targets: only a declared target covering a selected workspace, on its own host triple, is checked', () => {
