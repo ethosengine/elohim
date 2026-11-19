@@ -108,6 +108,7 @@ pub(super) fn check(options: &Options, descriptor: &MethodDescriptor) -> Artifac
     });
     // Ruling 3 (L2a rework): the record at HEAD declares the target, not the descriptor alone.
     if let Some(target) = &target {
+        missing.extend(isa_c::native(descriptor));
         missing.extend(isa_c::policy_declares(&options.repo, descriptor, target));
     }
     if let Err(e) = check_build_env(descriptor) {

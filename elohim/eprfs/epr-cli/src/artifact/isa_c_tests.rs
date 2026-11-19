@@ -176,6 +176,35 @@ fn isa_c_takes_the_declared_target_from_the_record_at_head_for_the_exact_triple(
     );
 }
 
+/// The coordinator's point 1: a declared target is a native build. A method whose target triple
+/// is not the host its rustc names is a cross build, which these checks do not realize; a
+/// method whose rustc names no host cannot show it is native.
+#[test]
+fn isa_c_refuses_a_declared_target_built_for_another_triple_than_the_host() {
+    let with = |target: Option<&str>, host: Option<&str>| {
+        let mut d = descriptor(&[]);
+        d.flags.retain(|flag| !flag.starts_with("--target"));
+        if let Some(target) = target {
+            d.flags.push(format!("--target={target}"));
+        }
+        if let Some(host) = host {
+            d.tools
+                .insert("rustc".into(), format!("rustc 1.100.0\nhost: {host}\n"));
+        }
+        d
+    };
+    let gnu = "x86_64-unknown-linux-gnu";
+    assert_eq!(native(&with(Some(gnu), Some(gnu))), Vec::<String>::new());
+    assert_eq!(native(&with(None, Some(gnu))), Vec::<String>::new());
+    let cross = native(&with(Some("x86_64-unknown-linux-musl"), Some(gnu)));
+    assert!(cross.iter().any(|m| m.contains("cross build")), "{cross:?}");
+    let unknown = native(&with(Some(gnu), None));
+    assert!(
+        unknown.iter().any(|m| m.contains("names no host")),
+        "{unknown:?}"
+    );
+}
+
 /// Ruling 4 (L2a rework): a diagnostic-only switch the gate declares (cc's command log) is
 /// recorded and allowed under a declared target; every other C-tool input still refuses, the
 /// archiver and its flags included, and so does a switch that changes what cc builds.

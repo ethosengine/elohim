@@ -40,6 +40,33 @@ pub(super) fn bin_of(descriptor: &MethodDescriptor) -> Option<&str> {
     None
 }
 
+/// A declared target is a native build (coordinator ruling on the L2a rework, point 1): the
+/// method's triple is the host its recorded rustc names, so the declared `CFLAGS_<triple>` reach
+/// host-side C too and every build script's commands are its own evidence. A cross build is not
+/// realized here and refuses; so does a method whose rustc names no host.
+pub(super) fn native(descriptor: &MethodDescriptor) -> Vec<String> {
+    let Some(rustc_host) = descriptor
+        .tools
+        .get("rustc")
+        .and_then(|rustc| rustc.lines().find_map(|line| line.strip_prefix("host: ")))
+        .map(str::trim)
+    else {
+        return vec![format!(
+            "{DECLARED}: the method's rustc names no host triple, so the build cannot be shown \
+             to be native"
+        )];
+    };
+    let triple = host::target(descriptor);
+    if triple == rustc_host {
+        Vec::new()
+    } else {
+        vec![format!(
+            "{DECLARED}: the method builds for {triple} on a {rustc_host} host, a cross build; a \
+             declared target is realized only for a native build"
+        )]
+    }
+}
+
 /// The declared target inputs these checks realize.
 const REALIZED: [&str; 2] = ["target.isa", "target.cflags"];
 

@@ -296,6 +296,72 @@ fn evidence_reads_cc_command_lines_and_cargo_package_ids() {
     );
 }
 
+fn out_dir(build: &Build, package: &str) -> PathBuf {
+    build
+        .dir
+        .path()
+        .join("build")
+        .join(package)
+        .join("0123/out")
+}
+
+/// The coordinator's point 3: a stale log must not pass. A log older than an object it sits
+/// beside (a cache restored from elsewhere) is no evidence, for an exception crate too.
+#[test]
+fn evidence_refuses_a_log_older_than_an_object_it_sits_beside() {
+    let ring = [compile(MARCH, "a.c"), ARCHIVE.to_owned()];
+    let ring: Vec<&str> = ring.iter().map(String::as_str).collect();
+    for package in ["ring", "blake3"] {
+        let build = Build::new("epr").script(package, &ring, &["x.o", "libx.a"], true);
+        let later = std::time::SystemTime::now() + std::time::Duration::from_secs(3600);
+        std::fs::File::options()
+            .write(true)
+            .open(out_dir(&build, package).join("x.o"))
+            .unwrap()
+            .set_modified(later)
+            .unwrap();
+        let found = build.judge("epr", BYTES).unwrap_err();
+        assert!(
+            has(
+                &found,
+                &format!("no evidence: {package}'s build script output")
+            ),
+            "{package}: {found:?}"
+        );
+        assert!(has(&found, "is older than x.o"), "{package}: {found:?}");
+    }
+}
+
+/// Point 3(b): every object is the `-o` of a logged compile and every static library the
+/// archive of a logged archiver command (cc 1.11.1 logs `ar` through the same `running:` line,
+/// lib.rs:4032 and command_helpers.rs:644); one with no logged producer is no evidence.
+#[test]
+fn evidence_refuses_an_object_or_archive_no_logged_command_produced() {
+    let ring = [compile(MARCH, "a.c"), ARCHIVE.to_owned()];
+    let ring: Vec<&str> = ring.iter().map(String::as_str).collect();
+    for (extra, package) in [
+        ("extra.o", "ring"),
+        ("libother.a", "ring"),
+        ("extra.o", "blake3"),
+        ("nested/extra.o", "ring"),
+    ] {
+        let objects = ["x.o", "libx.a", extra];
+        let build = Build::new("epr");
+        std::fs::create_dir_all(out_dir(&build, package).join("nested")).unwrap();
+        let found = build
+            .script(package, &ring, &objects, true)
+            .judge("epr", BYTES)
+            .unwrap_err();
+        assert!(
+            has(
+                &found,
+                &format!("no evidence: {package}'s OUT_DIR holds {extra}")
+            ),
+            "{extra}: {found:?}"
+        );
+    }
+}
+
 /// Every exception's reason is one sentence (genesis/orchestrator/c-baseline-pin.test.mjs holds
 /// each against the crate's build.rs).
 #[test]

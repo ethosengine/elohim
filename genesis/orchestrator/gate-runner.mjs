@@ -226,7 +226,8 @@ function loadPoolPolicy(root) {
 // run.cargo.workspace is listed receives CFLAGS_<triple> and CXXFLAGS_<triple> (dashes
 // as underscores, the spelling cc reads) set to the target's `cflags`, and each variable of
 // the target's `env` map (CC_ENABLE_DEBUG_OUTPUT=1: cc's command log, the evidence `epr
-// artifact put` reads before it marks a release env:isa-c). The flag keys are
+// artifact put` reads before it marks a release env:isa-c; turning it on costs each device one
+// cold C rebuild and the gate one derivation-key change, by cc's rerun-if-env-changed). The flag keys are
 // triple-suffixed, so a host building another target never reads them. Precedence: the
 // record's value is KEPT over a manifest run.cargo.env or a cargo_env_overrides entry
 // that sets the same key, and the disagreement is printed (once per project and key),
@@ -247,6 +248,9 @@ function declaredTargetEnv(project, policy) {
     // The target's declared `env` (E12 L2a rework, ruling 1): CC_ENABLE_DEBUG_OUTPUT=1, so cc logs
     // each compile command into its build script's output, the evidence put reads before it
     // stamps env:isa-c. Only string values are exported; the same precedence as the flags.
+    // Expected once: cc emits cargo:rerun-if-env-changed=CC_ENABLE_DEBUG_OUTPUT, so the export
+    // reruns every cc build script once on each device (one cold C rebuild per device) and changes
+    // the gate's derivation-key inputs once; neither is a regression.
     const declaredEnv = target.env && typeof target.env === 'object' && !Array.isArray(target.env) ? target.env : {};
     for (const [key, value] of Object.entries(declaredEnv)) {
       if (typeof value === 'string') env[key] = value;

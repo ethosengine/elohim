@@ -19,7 +19,8 @@
 //!   `-m` token selects an ISA: `-m64`, `-mtune=*` and `-mno-*` do not; every other `-m` token
 //!   refuses (`-mavx2`, `-msse4.2`, `-mcpu=*`, `-march=native` among them);
 //! - a script whose `OUT_DIR` holds `.o` or `.a` files and that logged no compile has no evidence
-//!   and refuses;
+//!   and refuses, and so does one whose log is older than an object it sits beside or that holds
+//!   an object no logged command produced ([`log_findings`]: a stale or restored log);
 //! - an [`EXCEPTIONS`] crate is judged by its own exception instead, which still reads its
 //!   commands: CPUID-dispatched assembly compiles only assembly (and cc's flag probe), and a crate
 //!   that compiles nothing on a declared target compiled nothing.
@@ -261,8 +262,66 @@ struct Script {
     package: String,
     source: String,
     out_dir: PathBuf,
+    /// The script's stdout as cargo kept it.
+    output: PathBuf,
+    /// Every logged command; `compiles` are those carrying `-c`.
+    commands: Vec<Vec<String>>,
     compiles: Vec<Vec<String>>,
     objects: Vec<String>,
+}
+
+/// A stale log must not pass (coordinator ruling on the L2a rework, point 3). Cargo reruns a
+/// build script when its fingerprint or a `rerun-if-*` input changes (cc declares
+/// `rerun-if-env-changed=CC_ENABLE_DEBUG_OUTPUT`, command_helpers.rs:153) and writes the
+/// script's output only after it exits, so a fresh build pairs that output with what the run left
+/// in OUT_DIR. A target directory restored from elsewhere can break the pairing without cargo
+/// noticing; these checks cover it: (a) the output is not older than any object or archive in
+/// OUT_DIR, and (b) every `.o` is the `-o` of a logged compile and every `.a` an argument of a
+/// logged archiver command (cc 1.11.1 logs `ar` through the same `running:` line, lib.rs:4032
+/// and command_helpers.rs:644). Any object with no logged producer is no evidence.
+fn log_findings(script: &Script) -> Vec<String> {
+    let mut findings = Vec::new();
+    let logged = std::fs::metadata(&script.output).and_then(|m| m.modified());
+    for object in &script.objects {
+        let path = script.out_dir.join(object);
+        let made = std::fs::metadata(&path).and_then(|m| m.modified());
+        let stale = match (&logged, made) {
+            (Ok(logged), Ok(made)) => made > *logged,
+            _ => true,
+        };
+        if stale {
+            findings.push(format!(
+                "{DECLARED}: no evidence: {}'s build script output {} is older than {object} in \
+                 its OUT_DIR (a stale or restored log)",
+                script.package,
+                script.output.display()
+            ));
+            break;
+        }
+    }
+    for object in &script.objects {
+        let path = script.out_dir.join(object).display().to_string();
+        let produced = if object.ends_with(".o") {
+            script
+                .compiles
+                .iter()
+                .any(|words| words.windows(2).any(|w| w[0] == "-o" && w[1] == path))
+        } else {
+            script
+                .commands
+                .iter()
+                .filter(|words| !words.iter().skip(1).any(|word| word == "-c"))
+                .any(|words| words.iter().skip(1).any(|word| *word == path))
+        };
+        if !produced {
+            findings.push(format!(
+                "{DECLARED}: no evidence: {}'s OUT_DIR holds {object}, which no logged command \
+                 produced",
+                script.package
+            ));
+        }
+    }
+    findings
 }
 
 fn read_script(message: &serde_json::Value) -> Result<Script, String> {
@@ -284,6 +343,7 @@ fn read_script(message: &serde_json::Value) -> Result<Script, String> {
         )
     })?;
     let text = String::from_utf8_lossy(&text);
+    let mut commands = Vec::new();
     let mut compiles = Vec::new();
     for line in text.lines() {
         let Some(command) = line.strip_prefix("running: ") else {
@@ -297,14 +357,17 @@ fn read_script(message: &serde_json::Value) -> Result<Script, String> {
             )
         })?;
         if words.iter().skip(1).any(|word| word == "-c") {
-            compiles.push(words);
+            compiles.push(words.clone());
         }
+        commands.push(words);
     }
     Ok(Script {
         package,
         source,
         objects: objects(&out_dir),
         out_dir,
+        output,
+        commands,
         compiles,
     })
 }
@@ -419,6 +482,13 @@ pub(super) fn judge(
     }
     let mut missing = Vec::new();
     let mut notes = Vec::new();
+    // Every build-script-executed unit counts, build-dependencies and proc-macros included, not
+    // only the bin's target-side closure (coordinator ruling on L2a rework, point 1): a declared
+    // target is a native build (host triple == target triple; put refuses any other, `isa_c::native`,
+    // and requires the triple to be the one rustc reports), so the same CFLAGS_<triple> apply to
+    // host-side C; over-checking can only refuse, never admit; and the JSON messages do not mark
+    // host from target units, so restricting to the target closure would need cargo's unstable
+    // unit graph.
     for message in parsed
         .iter()
         .filter(|m| m["reason"] == "build-script-executed")
@@ -433,10 +503,11 @@ pub(super) fn judge(
         let exception = EXCEPTIONS
             .iter()
             .find(|e| e.package == script.package && script.source == CRATES_IO);
-        let findings = match exception {
+        let mut findings = match exception {
             Some(exception) => judge_exception(&script, exception),
             None => judge_script(&script, march),
         };
+        findings.extend(log_findings(&script));
         if !findings.is_empty() {
             missing.extend(findings);
             continue;

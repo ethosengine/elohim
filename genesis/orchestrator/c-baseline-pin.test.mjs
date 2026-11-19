@@ -597,7 +597,6 @@ export const EXCEPTION_HOLDS = {
     kind: 'CompilesNothing',
     holds: ({ lockedCrate }) => {
       const dir = lockedCrate('iana-time-zone');
-      if (!dir) return null;
       const manifest = readFileSync(join(dir, 'Cargo.toml'), 'utf8');
       const headers = manifest.split('\n').filter(line => /^\[.*iana-time-zone-haiku/.test(line));
       return headers.length > 0 && headers.every(h => h === '[target.\'cfg(target_os = "haiku")\'.dependencies.iana-time-zone-haiku]')
@@ -745,29 +744,28 @@ test('every crate cc builds in epr\'s or bin-launch\'s lock closure is judged or
 });
 
 // Ruling 1(d): each exception's reason is held against the locked crate's own source in the cargo
-// registry, not by its name alone; a crate whose source is not in the registry skips cleanly.
+// registry, not by its name alone. A named test may not skip (the orchestrator-tree half reds an
+// undeclared skip), so a source absent from the registry fails, naming the crate and version.
 for (const exception of existsSync(resolve(ROOT, EVIDENCE_RS)) ? rustExceptionList() : []) {
-  test(`the ${exception.package} exception holds against its locked build.rs`, t => {
+  test(`the ${exception.package} exception holds against its locked build.rs`, () => {
     const holder = EXCEPTION_HOLDS[exception.package];
     assert.ok(holder, `no check holds the ${exception.package} exception`);
     const lock = read('elohim/eprfs/Cargo.lock');
     const versions = lockedVersions(lock, exception.package);
     assert.ok(versions.length > 0, `elohim/eprfs/Cargo.lock locks no ${exception.package}`);
+    const located = (name, version) => {
+      const dir = crateSource(name, version);
+      assert.ok(dir, `${name}-${version} source is not in ${cargoHomes.join(' or ')}/registry/src, so the ${exception.package} exception cannot be held against it`);
+      return dir;
+    };
     const lockedCrate = name => {
       const [version] = lockedVersions(lock, name);
-      return version ? crateSource(name, version) : null;
+      assert.ok(version, `elohim/eprfs/Cargo.lock locks no ${name}`);
+      return located(name, version);
     };
     for (const version of versions) {
-      const dir = crateSource(exception.package, version);
-      if (!dir) {
-        t.skip(`${exception.package}-${version} source is not in ${cargoHomes.join(' or ')}/registry/src`);
-        return;
-      }
+      const dir = located(exception.package, version);
       const problems = holder.holds({ read: rel => readFileSync(join(dir, rel), 'utf8'), lockedCrate });
-      if (problems === null) {
-        t.skip(`a crate the ${exception.package} check reads is not in the registry`);
-        return;
-      }
       assert.deepEqual(problems, [], `${exception.package}-${version}: ${exception.reason}`);
     }
   });
