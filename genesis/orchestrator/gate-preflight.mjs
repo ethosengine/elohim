@@ -13,7 +13,7 @@
 // The fresh-worktree checklist this replaces lived in agent memory and was re-learned on
 // 2026-10-15, -17, -19, -22, -27, -31 and 11-01. Habit `careless-reds-cost-seconds`.
 
-import { accessSync, constants, existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
+import { accessSync, constants, existsSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -25,6 +25,10 @@ import { appendEvent } from './gate-live.mjs';
 import { applicableTargets, checkCBaseline, hostTripleOf, readDeclaredTargets } from './c-baseline.mjs';
 // gate-runner imports this module too; the cycle is safe because neither calls the other while loading.
 import { gateChildEnv } from './gate-runner.mjs';
+// Loaded so that a module that fails to load still gives a row, not a stack trace (fleetRollRows).
+let fleetGuard = null;
+let fleetGuardError = null;
+try { fleetGuard = await import('./fleet-roll-guard.mjs'); } catch (error) { fleetGuardError = error; }
 
 const ROOT = process.env.GATE_ROOT
   ? resolve(process.env.GATE_ROOT)
@@ -436,7 +440,7 @@ export function checkEvidenceRecordable({ root, projects, env = process.env, reu
   return rows;
 }
 
-export function runPreflight({ root = ROOT, projects, env = process.env, spawn = spawnSync, registry = loadGateRegistry(root), changed = changedFromEnv(env), hostTriple = hostTripleOf(), onRow = () => {} }) {
+export function runPreflight({ root = ROOT, projects, env = process.env, spawn = spawnSync, registry = loadGateRegistry(root), changed = changedFromEnv(env), hostTriple = hostTripleOf(), onRow = () => {}, fleet = {} }) {
   const read = memoRead(readSet);
   let reuse = [];
   try { reuse = JSON.parse(readFileSync(join(root, 'genesis/agentic/pool-policy.json'), 'utf8')).gate_reuse?.projects || []; }
@@ -461,7 +465,24 @@ export function runPreflight({ root = ROOT, projects, env = process.env, spawn =
     ...timed(() => checkCBaselineOffer({ root, projects, env, spawn, hostTriple })),
     ...timed(() => checkReadSets({ root, projects, registry, changed, read })),
     ...timed(() => checkEvidenceRecordable({ root, projects, env, reuse, read })),
+    // pre-push runs this one alone before its early passes (`--fleet-roll`); it is skipped here only
+    // when that run's mark file holds exactly this push's ref list.
+    ...(fleetGuard?.fleetRollMarkHonoured(env) ? [] : timed(() => fleetRollRows(env, changed, fleet))),
   ];
+}
+
+/**
+ * The fleet-roll rows, from fleet-roll-guard.mjs, or when that module cannot load, one row saying
+ * so: red on a push that names dev or main, in every mode (the policy in force is read from git
+ * objects by the module that failed), a WARN otherwise.
+ */
+export function fleetRollRows(env, changed, options = {}, guard = fleetGuard, loadError = fleetGuardError) {
+  if (guard) return guard.checkFleetRoll({ env, changed, ...options });
+  const refs = `${env.GATE_PUSH_TARGETS ?? ''}\n${env.GATE_PUSH_REFS ?? ''}`;
+  const deploys = /(^|\s)refs\/heads\/(dev|main)(\s|$)/m.test(refs);
+  return row('fleet-roll', deploys ? 'REFUSED' : 'WARN',
+    `the fleet-roll check could not load: ${String(loadError?.message || loadError).split('\n')[0]}`,
+    'node genesis/orchestrator/fleet-roll-guard.mjs names the load error; fix it and push again');
 }
 
 /** pre-push exports the push range's file list; `just gate` has none and audits everything. */
@@ -505,6 +526,18 @@ function main(argv) {
   if (argv.includes('--on-red')) {
     process.stdout.write(`${onRedPolicy().mode}\n`);
     return 0;
+  }
+  if (argv.includes('--fleet-roll')) {
+    // Project-independent, so pre-push runs it before the early passes that skip the preflight.
+    // Exit 3 when red, so the hook tells a refusal from a node that could not start (any other code).
+    const rows = [].concat(fleetRollRows(process.env, changedFromEnv(process.env)) ?? []);
+    for (const r of rows) process.stdout.write(`${formatRow(r)}\n`);
+    emitLive(rows);
+    // The mark the later preflight checks: this exact ref list was judged in this hook run.
+    if (process.env.GATE_FLEET_ROLL_MARK && process.env.GATE_PUSH_REFS) {
+      try { writeFileSync(process.env.GATE_FLEET_ROLL_MARK, process.env.GATE_PUSH_REFS); } catch { /* no mark: the later preflight runs the check again */ }
+    }
+    return rows.some(r => r.level === 'REFUSED') ? 3 : 0;
   }
   const index = argv.indexOf('--projects');
   const names = index >= 0 ? argv.slice(index + 1).filter(a => !a.startsWith('--')) : [];
