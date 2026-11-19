@@ -4,7 +4,7 @@ use super::*;
 pub(super) const LOCK: &str = "missing recipe.source-lock: Cargo.lock";
 pub(super) const COMMIT: &str = "missing recipe.source-commit";
 
-fn lock_path(repo: &Path, crate_path: &Path) -> Option<PathBuf> {
+pub(super) fn lock_path(repo: &Path, crate_path: &Path) -> Option<PathBuf> {
     crate_path
         .ancestors()
         .take_while(|p| p.starts_with(repo))

@@ -19,6 +19,9 @@ pub(super) struct Prepared {
     pub descriptor: MethodDescriptor,
     pub bytes: Bytes,
     pub gaps: Vec<String>,
+    /// The declared `target.isa` the C checks realized, for the one `env:isa-c` slot; `None`
+    /// when the method declares no target.
+    pub isa_c: Option<String>,
 }
 
 pub(super) fn refuse(mut missing: Vec<String>) -> ArtifactResult<()> {
@@ -97,14 +100,12 @@ pub(super) fn check(options: &Options, descriptor: &MethodDescriptor) -> Artifac
             options.project.as_deref().unwrap_or("")
         ));
     }
-    let declared: Vec<_> = descriptor
-        .non_path_inputs
-        .keys()
-        .filter(|n| n.starts_with("target."))
-        .collect();
-    if !declared.is_empty() {
-        missing.push(format!("missing declared-target: build realization unsupported; the method declares {}, and no build applies a declared target yet (K6)", declared.iter().map(|s| s.as_str()).collect::<Vec<_>>().join(", ")));
-    }
+    // A declared target is realized only through the C checks (`isa_c`); anything they do not
+    // realize still refuses (K6).
+    let target = isa_c::declared(descriptor).unwrap_or_else(|reasons| {
+        missing.extend(reasons);
+        None
+    });
     if let Err(e) = check_build_env(descriptor) {
         missing.push(format!("{COMPILER}: {e}"));
     }
@@ -145,6 +146,28 @@ pub(super) fn check(options: &Options, descriptor: &MethodDescriptor) -> Artifac
                 );
                 if let Err(e) = check_linker(descriptor, selections, bytes) {
                     missing.push(format!("{COMPILER}: {e}"));
+                }
+            }
+            if let Some(target) = &target {
+                match isa_c::producers(bytes, target.march) {
+                    Ok(0) => match isa_c::links_c_crate(&options.repo, descriptor) {
+                        Ok(false) => eprintln!(
+                            "isa-c: {} carries no GNU C producer string and its lock closure \
+                             holds no ring: no C unit, not applicable",
+                            bytes_path.display()
+                        ),
+                        Ok(true) => missing.push(format!(
+                            "missing declared-target: the bin's lock closure holds ring, and {} \
+                             carries no GNU C producer string, so its C level is unread \
+                             (stripped, or built without debug info)",
+                            bytes_path.display()
+                        )),
+                        Err(e) => missing.push(format!(
+                            "missing declared-target: whether the bin links ring is unread: {e}"
+                        )),
+                    },
+                    Ok(_) => {}
+                    Err(reasons) => missing.extend(reasons),
                 }
             }
             let declared = extract::declared(&descriptor.non_path_inputs);
@@ -210,12 +233,14 @@ pub(super) fn check(options: &Options, descriptor: &MethodDescriptor) -> Artifac
         missing.push(format!("missing recipe custody: {e}"));
     }
     refuse(missing)?;
+    let isa_c = target.map(|target| target.isa.to_owned());
     let (key, _, descriptor) = selection?;
     Ok(Prepared {
         key,
         descriptor,
         bytes: Bytes::from(bytes?),
         gaps,
+        isa_c,
     })
 }
 

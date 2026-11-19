@@ -3,14 +3,28 @@ pub const RUSTC_IDENTITY: &str = "rustc fixture\nbinary: rustc\ncommit-hash: fix
 
 /// Static Linux ELF: section names, .comment, baseline .text (ret), and a sized function.
 pub fn artifact_elf(comment: &[u8]) -> Vec<u8> {
-    artifact_elf_format(comment, true, true)
+    artifact_elf_format(comment, true, true, None)
 }
 
-pub fn artifact_elf_format(comment: &[u8], is64: bool, little: bool) -> Vec<u8> {
-    let names = b"\0.shstrtab\0.comment\0.text\0.symtab\0.strtab\0";
+/// [`artifact_elf`] in either class and byte order; `debug_str` (64-bit little-endian only)
+/// adds a seventh section, `.debug_str`, holding it as it is: the NUL-separated strings a DWARF
+/// producer record points into.
+pub fn artifact_elf_format(
+    comment: &[u8],
+    is64: bool,
+    little: bool,
+    debug_str: Option<&[u8]>,
+) -> Vec<u8> {
+    assert!(debug_str.is_none() || (is64 && little));
+    let mut names = b"\0.shstrtab\0.comment\0.text\0.symtab\0.strtab\0".to_vec();
+    let debug_str_name = names.len() as u64;
+    if debug_str.is_some() {
+        names.extend_from_slice(b".debug_str\0");
+    }
+    let count = if debug_str.is_some() { 7 } else { 6 };
     let header_size = if is64 { 64 } else { 52 };
     let section_size = if is64 { 64 } else { 40 };
-    let data = header_size + 6 * section_size;
+    let data = header_size + count * section_size;
     let mut bytes = vec![0u8; data];
     bytes[..7].copy_from_slice(b"\x7fELF\x02\x01\x01");
     bytes[7] = 3; // ELFOSABI_LINUX; no ABI-tag version floor.
@@ -36,7 +50,7 @@ pub fn artifact_elf_format(comment: &[u8], is64: bool, little: bool) -> Vec<u8> 
     let sizes = if is64 { 52 } else { 40 };
     write(sizes, 2, header_size as u64);
     write(sizes + 6, 2, section_size as u64);
-    write(sizes + 8, 2, 6);
+    write(sizes + 8, 2, count as u64);
     write(sizes + 10, 2, 1);
     for (header, name, kind, offset, size) in [
         (
@@ -101,7 +115,23 @@ pub fn artifact_elf_format(comment: &[u8], is64: bool, little: bool) -> Vec<u8> 
         if is64 { 8 } else { 4 },
         if is64 { 24 } else { 16 },
     );
-    bytes.extend_from_slice(names);
+    if let Some(debug_str) = debug_str {
+        let header = header_size + 6 * section_size;
+        let offset = data + names.len() + comment.len() + 1 + if is64 { 48 } else { 32 } + 9;
+        write(header, 4, debug_str_name);
+        write(header + 4, 4, 1); // SHT_PROGBITS
+        write(
+            header + if is64 { 24 } else { 16 },
+            if is64 { 8 } else { 4 },
+            offset as u64,
+        );
+        write(
+            header + if is64 { 32 } else { 20 },
+            if is64 { 8 } else { 4 },
+            debug_str.len() as u64,
+        );
+    }
+    bytes.extend_from_slice(&names);
     bytes.extend_from_slice(comment);
     bytes.push(0xc3);
     let symbol_size = if is64 { 24 } else { 16 };
@@ -122,6 +152,7 @@ pub fn artifact_elf_format(comment: &[u8], is64: bool, little: bool) -> Vec<u8> 
     symbol[if is64 { 4 } else { 12 }] = 0x12; // STB_GLOBAL | STT_FUNC
     bytes.extend(symbol);
     bytes.extend(b"\0fixture\0");
+    bytes.extend_from_slice(debug_str.unwrap_or_default());
     if is64 && little {
         let phoff = bytes.len() as u64;
         bytes[32..40].copy_from_slice(&phoff.to_le_bytes());

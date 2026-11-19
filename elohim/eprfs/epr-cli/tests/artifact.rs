@@ -23,7 +23,7 @@ use tempfile::TempDir;
 
 #[path = "support/artifact_elf.rs"]
 mod fixture;
-use fixture::{artifact_elf, wait_for_stub};
+use fixture::{artifact_elf, artifact_elf_format, wait_for_stub};
 
 #[path = "support/artifact_native_libraries.rs"]
 mod native_libraries;
@@ -486,6 +486,12 @@ async fn put_and_mount(overridden: bool, with_requires: bool) {
             .find_map(|s| s.strip_prefix("env:requires=")),
         Some(requires_cid.to_string()).as_deref()
     );
+    // No declared target, so no C level was checked and no marker is written.
+    assert!(
+        isa_c_slots(produce).is_empty(),
+        "{:?}",
+        produce.classified_as
+    );
     // Row 12: the statement crosses with the Produce, byte for byte, so a sibling can judge
     // the output before fetching it.
     {
@@ -625,6 +631,269 @@ async fn put_and_mount(overridden: bool, with_requires: bool) {
         1,
         "refusals record nothing"
     );
+}
+
+/// The descriptor inputs of a build declared at the x86-64 target, its C flags recorded as the
+/// gate exports them (pool-policy.json declared_targets).
+const DECLARED_X86_64: [(&str, &str); 3] = [
+    ("target.isa", "x86-64"),
+    ("target.cflags", "-march=x86-64"),
+    ("CFLAGS_x86_64_unknown_linux_gnu", "-march=x86-64"),
+];
+
+/// ring's producer string as gcc 14 records it in `.debug_str`, at `march`.
+fn gnu_c(march: &str) -> Vec<u8> {
+    format!(
+        "clang LLVM (rustc version 1.100.0)\0GNU C11 14.3.1 20251022 (Red Hat 14.3.1-4) -m64 \
+         -mtune=generic {march} -g3 -O2 -std=c11 -ffunction-sections -fPIC -fvisibility=hidden\0"
+    )
+    .into_bytes()
+}
+
+/// Put one recordable mesh build with `inputs` recorded (and set), the bytes carrying
+/// `debug_str` when given, and the bin's lock closure holding ring when `ring`. The put's output
+/// and every Produce recorded.
+fn declared_put(
+    inputs: &[(&str, &str)],
+    debug_str: Option<&[u8]>,
+    ring: bool,
+) -> (Output, Vec<FlowEvent>) {
+    let keys = TempDir::new().unwrap();
+    let a = Device::new(&keys, "a");
+    let scratch = TempDir::new().unwrap();
+    let (method, mut descriptor) =
+        method_file_with(scratch.path(), &["crate/src", "README.md"], inputs);
+    let bytes = scratch.path().join("elohim-storage");
+    let comment = b"Linker: LLD 22.1.2\0";
+    std::fs::write(
+        &bytes,
+        debug_str.map_or_else(
+            || artifact_elf(comment),
+            |strings| artifact_elf_format(comment, true, true, Some(strings)),
+        ),
+    )
+    .unwrap();
+    recordable_mesh_fixture(a.root(), scratch.path(), &method, &mut descriptor);
+    if ring {
+        std::fs::write(
+            a.root().join("crate/Cargo.lock"),
+            "version = 4\n\n[[package]]\nname = \"elohim-storage\"\nversion = \"0.1.0\"\n\
+             dependencies = [\"ring\"]\n\n[[package]]\nname = \"ring\"\nversion = \"0.17.14\"\n\
+             source = \"registry+https://github.com/rust-lang/crates.io-index\"\n\
+             checksum = \"a4689e6c2294d81e88dc6261c768b63bc4fcdb852be6d1352498b114f61383b7\"\n",
+        )
+        .unwrap();
+        git(a.root(), &["add", "crate/Cargo.lock"]);
+        git(a.root(), &["commit", "-qm", "ring in the closure"]);
+    }
+    let (stub, _log) = brit_stub(scratch.path());
+    let command = || {
+        let mut command = a.command();
+        command.envs(descriptor.non_path_inputs.iter());
+        command
+    };
+    let out = command()
+        .args(["artifact", "key", "--method"])
+        .arg(&method)
+        .args(["--print", "input", "--repo"])
+        .arg(a.root())
+        .output()
+        .unwrap();
+    assert!(out.status.success(), "{}", text(&out));
+    let input = String::from_utf8(out.stdout).unwrap().trim().to_string();
+    let out = command()
+        .env("BRIT_BUILD_REF_BIN", &stub)
+        .args(["artifact", "put", "--method"])
+        .arg(&method)
+        .args(["--input", &input, "--bytes"])
+        .arg(&bytes)
+        .args(["--project", "elohim-storage", "--cross", "--json", "--repo"])
+        .arg(a.root())
+        .output()
+        .unwrap();
+    let produces = events(a.root())
+        .into_iter()
+        .filter(|e| e.action == ReaVerb::Produce)
+        .collect();
+    (out, produces)
+}
+
+fn isa_c_slots(produce: &FlowEvent) -> Vec<&str> {
+    produce
+        .classified_as
+        .iter()
+        .filter(|slot| slot.starts_with("env:isa-c"))
+        .map(String::as_str)
+        .collect()
+}
+
+/// Row 29.2: a build declared at x86-64 whose recorded C flags are the declared ones and whose
+/// GNU C producer strings carry exactly the declared -march is recorded with one
+/// `env:isa-c=x86-64`, the marker a sibling draws by (L2b).
+#[test]
+fn a_declared_target_realized_in_its_c_is_recorded_with_one_isa_c_slot() {
+    let (out, produces) = declared_put(&DECLARED_X86_64, Some(&gnu_c("-march=x86-64")), true);
+    assert!(out.status.success(), "{}", text(&out));
+    assert_eq!(produces.len(), 1, "{}", text(&out));
+    assert_eq!(isa_c_slots(&produces[0]), ["env:isa-c=x86-64"]);
+    // The underscore and dashed CXXFLAGS spelling of the declared flags is the declared one too.
+    let mut with_cxx = DECLARED_X86_64.to_vec();
+    with_cxx.push(("CXXFLAGS_x86_64_unknown_linux_gnu", "-march=x86-64"));
+    let (out, produces) = declared_put(&with_cxx, Some(&gnu_c("-march=x86-64")), true);
+    assert!(out.status.success(), "{}", text(&out));
+    assert_eq!(isa_c_slots(&produces[0]), ["env:isa-c=x86-64"]);
+}
+
+/// A bin with no C unit (bin-launch: no ring in its lock closure) and no GNU C producer string
+/// is not applicable to the C read, and is recorded with the marker.
+#[test]
+fn a_declared_target_with_no_c_unit_is_recorded_with_its_isa_c_slot() {
+    let (out, produces) = declared_put(&DECLARED_X86_64, None, false);
+    assert!(out.status.success(), "{}", text(&out));
+    assert_eq!(isa_c_slots(&produces[0]), ["env:isa-c=x86-64"]);
+}
+
+/// One refused declared-target put: why, the recorded inputs, the bytes' `.debug_str`, whether
+/// the lock closure holds ring, and the reason the refusal must name.
+type Refusal<'a> = (
+    &'a str,
+    &'a [(&'a str, &'a str)],
+    Option<Vec<u8>>,
+    bool,
+    &'a str,
+);
+
+/// Every way the declared C level is not what the bytes or the record show refuses with exit 3
+/// `unrecorded: <reason>`, and records nothing, so no marker.
+#[test]
+fn a_declared_target_its_c_does_not_realize_refuses_and_records_no_marker() {
+    let v1 = gnu_c("-march=x86-64");
+    let mut other_cflags = DECLARED_X86_64.to_vec();
+    other_cflags[2] = ("CFLAGS_x86_64_unknown_linux_gnu", "-march=x86-64-v2");
+    let mut unrecorded_cflags = DECLARED_X86_64.to_vec();
+    unrecorded_cflags.pop();
+    let mut extra_family = DECLARED_X86_64.to_vec();
+    extra_family.push(("CFLAGS", "-O2"));
+    let mut dashed = DECLARED_X86_64.to_vec();
+    dashed.push(("CFLAGS_x86_64-unknown-linux-gnu", "-march=x86-64"));
+    let mut other_cxx = DECLARED_X86_64.to_vec();
+    other_cxx.push(("CXXFLAGS_x86_64_unknown_linux_gnu", "-march=x86-64-v3"));
+    let mut isa_mismatch = DECLARED_X86_64.to_vec();
+    isa_mismatch[0] = ("target.isa", "x86-64-v2");
+    let mut no_isa = DECLARED_X86_64.to_vec();
+    no_isa.remove(0);
+    let sysroot = BlobCid::compute(b"sysroot").to_string();
+    let mut with_sysroot = DECLARED_X86_64.to_vec();
+    with_sysroot.push(("target.sysroot", &sysroot));
+    let only_isa = [("target.isa", "x86-64")];
+    let cases: [Refusal; 14] = [
+        (
+            "v3 C",
+            &DECLARED_X86_64[..],
+            Some(gnu_c("-march=x86-64-v3")),
+            true,
+            "-march=x86-64-v3",
+        ),
+        (
+            "an extra ISA flag",
+            &DECLARED_X86_64[..],
+            Some(gnu_c("-march=x86-64 -mavx2")),
+            true,
+            "-mavx2",
+        ),
+        (
+            "no -march",
+            &DECLARED_X86_64[..],
+            Some(gnu_c("")),
+            true,
+            "no -march",
+        ),
+        (
+            "ring and no producer string",
+            &DECLARED_X86_64[..],
+            None,
+            true,
+            "holds ring",
+        ),
+        (
+            "recorded flags differ",
+            &other_cflags[..],
+            Some(v1.clone()),
+            true,
+            "CFLAGS_x86_64_unknown_linux_gnu",
+        ),
+        (
+            "declared flags unrecorded",
+            &unrecorded_cflags[..],
+            Some(v1.clone()),
+            true,
+            "CFLAGS_x86_64_unknown_linux_gnu",
+        ),
+        (
+            "another C variable recorded",
+            &extra_family[..],
+            Some(v1.clone()),
+            true,
+            "C-family variable CFLAGS;",
+        ),
+        (
+            "the dashed spelling recorded",
+            &dashed[..],
+            Some(v1.clone()),
+            true,
+            "CFLAGS_x86_64-unknown-linux-gnu",
+        ),
+        (
+            "CXXFLAGS differ",
+            &other_cxx[..],
+            Some(v1.clone()),
+            true,
+            "CXXFLAGS_x86_64_unknown_linux_gnu",
+        ),
+        (
+            "cflags level is not the isa",
+            &isa_mismatch[..],
+            Some(v1.clone()),
+            true,
+            "not target.isa x86-64-v2",
+        ),
+        (
+            "cflags without isa",
+            &no_isa[..],
+            Some(v1.clone()),
+            true,
+            "declares no target.isa",
+        ),
+        (
+            "isa without cflags",
+            &only_isa[..],
+            Some(v1.clone()),
+            true,
+            "declares no target.cflags",
+        ),
+        (
+            "a declared sysroot",
+            &with_sysroot[..],
+            Some(v1.clone()),
+            true,
+            "target.sysroot",
+        ),
+        (
+            "a second GNU C unit at v3",
+            &DECLARED_X86_64[..],
+            Some([v1.clone(), gnu_c("-march=x86-64-v3")].concat()),
+            true,
+            "-march=x86-64-v3",
+        ),
+    ];
+    for (why, inputs, debug_str, ring, reason) in cases {
+        let (out, produces) = declared_put(inputs, debug_str.as_deref(), ring);
+        assert_eq!(out.status.code(), Some(3), "{why}: {}", text(&out));
+        let said = String::from_utf8_lossy(&out.stdout);
+        assert!(said.contains("unrecorded:"), "{why}: {said}");
+        assert!(said.contains(reason), "{why}: {reason} in {said}");
+        assert!(produces.is_empty(), "{why}: {produces:?}");
+    }
 }
 
 fn produce_record(key: &str, output: &BlobCid, manifest: &str, via: Option<&str>) -> FlowEvent {

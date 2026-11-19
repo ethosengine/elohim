@@ -240,7 +240,7 @@ pub(super) fn compiler_root(descriptor: &MethodDescriptor) -> ArtifactResult<std
 
 #[cfg(test)]
 #[path = "../../tests/support/artifact_elf.rs"]
-mod fixture;
+pub(super) mod fixture;
 
 #[cfg(test)]
 mod tests {
@@ -275,7 +275,8 @@ mod tests {
     fn artifact_elf_class_and_endian_are_generic_and_other_formats_refuse_by_name() {
         for is64 in [false, true] {
             for little in [false, true] {
-                let bytes = fixture::artifact_elf_format(b"Linker: LLD 22.1.2\0", is64, little);
+                let bytes =
+                    fixture::artifact_elf_format(b"Linker: LLD 22.1.2\0", is64, little, None);
                 check_linker(&descriptor(), &bytes).unwrap();
             }
         }

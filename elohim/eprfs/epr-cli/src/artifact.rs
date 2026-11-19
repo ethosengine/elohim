@@ -54,6 +54,7 @@ mod destinations;
 mod extract;
 mod generated;
 mod inputs;
+mod isa_c;
 mod preflight;
 mod reach;
 mod requires;
@@ -120,6 +121,9 @@ pub fn usage() -> String {
      --cross unless private; extracts ELF Requires and evidence; --requires may only tighten; \
      Requires and evidence are stored locally, not yet served to siblings (K3 part 2: \
      explicit default-deny disclosure permission with admit, following K6 slice 1); \
+     a declared target is recorded only as target.isa with target.cflags whose recorded \
+     CFLAGS_<triple> is target.cflags and whose GNU C producer strings carry its -march alone, \
+     stamped env:isa-c=<target.isa>; \
      exits 3 `unrecorded: <reason>`)\n  \
      | sysroot pack --from DIR --triple T --out FILE [--json]\n  \
      | sysroot put --archive FILE [--project P] [--requires FILE.json] [--repository NAME] [--cross] [--repo ROOT] [--payload-store DIR] [--json]\n  \
@@ -1361,6 +1365,7 @@ fn put(options: &Options) -> ArtifactResult<ExitCode> {
         prepared.bytes,
         None,
         &prepared.gaps,
+        prepared.isa_c.as_deref(),
     )
 }
 
@@ -1382,6 +1387,7 @@ fn record_artifact(
     bytes: Bytes,
     sysroot_manifest: Option<&sysroot::Manifest>,
     gaps: &[String],
+    c_baseline: Option<&str>,
 ) -> ArtifactResult<ExitCode> {
     let basis = key.basis;
     check_payload_method(&descriptor.name, sysroot_manifest.is_some())?;
@@ -1526,6 +1532,11 @@ fn record_artifact(
         derived.slot(),
     ];
     extra.extend(preflight::gap_annotation(gaps));
+    // Exactly one C-baseline slot, and only for a declared target the C checks realized
+    // (`isa_c`): a sibling draws this release by it (row 29.2).
+    if let Some(isa) = c_baseline {
+        extra.push(format!("{}={isa}", isa_c::SLOT));
+    }
     if let Some((cid, bytes)) = &requires {
         extra.push(format!("env:requires={cid}"));
         // Row 12: the statement crosses with the Produce, so a device can refuse the output
