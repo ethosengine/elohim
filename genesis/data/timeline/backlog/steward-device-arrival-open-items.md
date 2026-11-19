@@ -710,3 +710,30 @@ runner sets, for its children only, `GIT_CONFIG_COUNT=1`, `GIT_CONFIG_KEY_0=safe
 `GIT_CONFIG_VALUE_0=<declared root>`, which git reads today and brit will after its trust lane.
 Owed: each site refuses by name instead of returning a value. Owner: ethosengine a222db7c,
 after L2a.
+
+Delta 2026-11-19 (row 29): waiting on a deliberate Edge roll, each a storage build input:
+the bin store's own judge (held releases, pins, bootstrap), and cc >= 1.11.1 in
+`elohim/Cargo.lock` (cc 1.2.52 today, with ring; gate projects elohim-epr, elohim-compute,
+elohim-live-session and domain-types; nothing from that workspace is offered across devices).
+cc applies `-march=x86-64` itself only while rustc is given no target-cpu, or `x86-64`: the eprfs
+builds qualify because the gate and the bin store both build with `RUSTFLAGS=""`
+(`device-runtime/src/bin_store/source.rs:193`, `:430`), and L1's pin test holds that condition.
+
+Delta 2026-11-19 (row 18): `epr-cli/tests/bin_build_view.rs` reads `$CARGO_TARGET_DIR/debug/epr.d`,
+which the gate's test step never refreshes; with one pool family shared by every `claude/*`
+worktree, the eprfs gate went red twice on ethosengine because another worktree had built the
+bin last. Cure in flight with L2b: the gate builds the bins before the tests, and the test names
+the cause. The shared family itself is still this row.
+
+## Row 32 — a pin-only submodule move selects nothing for a step that reads inside it
+
+Found 2026-11-19 by brit sprint 3 (session 0e0924d5). `rakia-core` 0.1.1
+`constellation::plan_from_changes` tests a changed path against a step's globs; a pin move
+changes the path `elohim/rakia`, which does not match `elohim/rakia/schemas/**`, so the step is
+not selected for that change. The matching fingerprint hole (a glob that crosses a gitlink
+hashed nothing) is fixed in brit's `sprint3/build-inputs`: the gitlink's path and pinned commit
+become a step input, so `cargo-build-storage` re-keys once when that brit is pinned, and genesis
+`constants-sync`, whose globs reach all five submodules, re-keys on every pin move (its globs
+may be wider than its reads). Also in rakia: `brit build affected|plan|baseline` open the
+repository through `rakia-brit` on gix 0.81, which keeps a 32-slot pack-index ceiling at reduced
+trust. Both are in `elohim/rakia`, in nobody's write set this sprint.

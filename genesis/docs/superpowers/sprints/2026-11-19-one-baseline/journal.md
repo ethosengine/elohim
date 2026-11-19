@@ -144,3 +144,70 @@ to `epr flow project`. What crossed between them:
 Open with the steward from this hour: pushing `sprint3/*` to the brit remote (that session is
 commit-only); a repack on each device; whether declared checkout trust covers linked worktrees
 (it is per exact path, and agents work in worktrees).
+
+## 2026-11-19: the exercise catches the crash; a landing costs less
+
+**The exercise caught a real SIGILL.** Ethosengine built the L2b head (`2d70875a9`) with its
+compiler at its default and offered the bytes with nothing made current (13 of 13 ring files at
+`-march=x86-64-v3`, sha256 `ac1689be…fafe0`). On shem, fetched in 4.2 s:
+
+| Run | Result |
+|---|---|
+| `epr doctor --exercise`, three runs | killed by SIGILL each time (exit 132); three new `trap invalid opcode` lines in the kernel log |
+| `--version` of the same bytes | exit 0, the check the crashed release passed on 2026-11-18 |
+| shem's own build of the same commit | `exercise: ok (x25519 32-byte secret, ed25519 signature e5564300c360ac72, sqlite 3 rows) in 1.7 ms` |
+
+It was not run as a daemon. This is the receipt that the receiver-side check stops the incident
+class on the CPU that crashed.
+
+**L2b's review loop** (`self/nt-l2b`, head `0544393d0` plus a last round in progress). Three
+independent passes, each ending FIX FIRST on something narrower: explicit land and pin ran held
+bytes before the store verified them; the exercise could outlive its deadline when a descendant
+kept the error stream open; the target was inferred from predicates an x32 build also satisfies;
+then the cleanup collected the child before signalling its process group, so a recycled group
+number could be signalled; then the same on the one path where the system reports the child
+already collected. Each was fixed with a test that fails first. The story had two fresh reads;
+their five correctness findings are fixed (a title claiming every processor, an unexercised
+marker value, two missing preconditions, a closing step that named a marker one row lacks). The
+loop closes after the round in progress. Known limits, needing the bin store's own crate: a held
+record for the commit being followed that fails landing health is returned before the local
+build; `EPR_PIN_CID`, existing session pins, bootstrap reuse, `bin ingest <path>` and `EPR_BIN`
+are not judged.
+
+**L1 on ethosengine.** The cc lock bump alone is proven by `cargo test`: the eprfs gate passed
+in 940 s and the gate-built `epr` has all 13 ring files at `-march=x86-64` with no C flag in the
+gate's environment. Its reviews sent two pieces back (a withheld offer and a preflight warning
+both rode the failure path, so a green run showed red). Ruled: a `notice` event kind that is
+never counted as a red. Ethosengine lands L1 and L2b in one push, so the eprfs gate is paid once.
+Ruled out of L1: widening to the `elohim` cargo workspace (cc 1.2.52, with ring). Nothing from
+it crosses between devices, and `elohim/Cargo.lock` is a storage build input, so its bump waits
+for a deliberate Edge roll.
+
+**DoD 3, shem's half.** The orchestrator suite as the gate runs it, on shem, both exit 0:
+
+| | wall |
+|---|---|
+| before (dev `01e4de7f1`) | 270.6 s |
+| after the five test files (`61ebe79d`) | 219.8 s |
+| after the review fixes (`c269111c`), which gave 18 s back on purpose | 228.7 s |
+| after the storage-image suite's doubles became shell (`dfd108f1`) | 188.1 s |
+
+No test case or assertion was removed; each changed test was shown failing under a mutation of
+the code it guards. What was slow: seventeen receipt cases run one after another against the
+real tree (now a fixture built from the tree's scripts at test time, plus one live refusal
+case); 63 read-set calls parsing about 8,000 Rust files for 2,300 unique ones; thirty selection
+tests each walking the tree for manifests; two tests waiting out timers (8 s for a note that is
+never sent; 30 s because only the shell was signalled); and 1,485 `node` startups for a fake
+`git` and `curl` (replaced after their answers were recorded and compared byte for byte). The
+review of the first commit found that two speed-ups had thinned a proof (a group signal let a
+broken interrupt handler pass; a timer started at file load); both were put right. Ethosengine's
+half of the measurement follows when this lands there.
+
+**For brit sprint 3, from shem.** Six patches (rev-parse, for-each-ref, ls-remote,
+check-ref-format, a global `-C`, a quiet closed pipe) on the hand-over ref, built from a census
+of shem's agent transcripts since 2026-11-06: 3,767 git invocations, 1,340 declared fallbacks,
+about 1,700 of the form `git -C <dir> …`. The brit-first hook's own ledger could rank none of
+it: it keeps no command text and its capture call fails. The review of the six found the closed
+pipe fix too broad (a rejected push could exit as a closed pipe) and a dozen parity edges; the
+fix round, with `merge-base --is-ancestor` and `rev-list --count`, is in progress, and the brit
+session holds the branch out of its merge until then.
