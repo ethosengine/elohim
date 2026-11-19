@@ -5,6 +5,8 @@
   "description": "CI/CD orchestrator - Jenkinsfile linting and pipeline management",
   "scripts": {
     "test": "node suite-run.mjs all",
+    "test:named": "node suite-run.mjs named",
+    "test:tree": "node suite-run.mjs tree",
     "test:integration": "node --test orchestrator-integration.test.mjs",
     "test:graph": "node --test graph-walker.test.mjs",
     "test:cargo-coverage": "node --test cargo-target-coverage.test.mjs",

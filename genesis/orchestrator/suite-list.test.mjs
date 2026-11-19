@@ -63,11 +63,15 @@ test('the two sides run every listed file exactly once, groups in order', () => 
 test('package.json, the justfile and the manifest run the suite through the list', () => {
   const pkg = JSON.parse(readFileSync(join(HERE, 'package.json'), 'utf8'));
   assert.equal(pkg.scripts.test, 'node suite-run.mjs all');
+  assert.equal(pkg.scripts['test:named'], 'node suite-run.mjs named');
+  assert.equal(pkg.scripts['test:tree'], 'node suite-run.mjs tree');
   const justfile = readFileSync(join(HERE, 'justfile'), 'utf8');
   assert.match(justfile, /^gate: test-suite$/m);
   assert.match(justfile, /^gate-tree: lint test-suite-tree test-harvest test-berth$/m);
   assert.match(justfile, /^test-suite: \(_suite "named"\)$/m);
   assert.match(justfile, /^test-suite-tree: \(_suite "tree"\)$/m);
+  // Through pnpm, so the native-epr test's pnpm stand-in sees the EPR_BIN the recipe resolved.
+  assert.match(justfile, /^    pnpm run test:\{\{side\}\}$/m);
   const projects = JSON.parse(readFileSync(join(HERE, 'build-manifest.json'), 'utf8')).gate.projects;
   const { orchestrator, 'orchestrator-tree': tree } = projects;
   assert.equal(orchestrator.run.recipe, 'gate');

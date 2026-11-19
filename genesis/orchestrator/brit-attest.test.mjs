@@ -362,10 +362,11 @@ test('attestation child budget defers before a git or note call', () => {
 
 
 test('the declared orchestrator gate includes Node and Python attestation regressions', () => {
-  const scripts = JSON.parse(readFileSync(join(import.meta.dirname, 'package.json'), 'utf8')).scripts;
-  assert.match(scripts.test, /(?:^| )brit-attest\.test\.mjs(?: |$)/);
+  // E11: the suite is suite-reads.json, and the python suites run in the orchestrator-tree half.
+  const suite = JSON.parse(readFileSync(join(import.meta.dirname, 'suite-reads.json'), 'utf8'));
+  assert.ok(suite.groups.some(group => group.files.some(entry => entry.file === 'brit-attest.test.mjs')));
   const recipes = readFileSync(join(import.meta.dirname, 'justfile'), 'utf8');
-  assert.match(recipes, /^gate:.*\btest-harvest\b/m);
+  assert.match(recipes, /^gate-tree:.*\btest-harvest\b/m);
   assert.match(recipes, /test-harvest:[\s\S]*ci_harvest_\*_test\.py/);
 });
 

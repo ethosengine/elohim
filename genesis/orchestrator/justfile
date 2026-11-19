@@ -60,7 +60,7 @@ _suite side:
       cargo build --manifest-path ../../elohim/eprfs/Cargo.toml --locked -p elohim-epr-cli --bin epr
       export EPR_BIN="$CARGO_TARGET_DIR/debug/epr"
     fi
-    node suite-run.mjs {{side}}
+    pnpm run test:{{side}}
 
 # Regenerate pipeline-list.json from build-manifest.json / pipeline-registry.mjs.
 # Run after editing PIPELINES.
