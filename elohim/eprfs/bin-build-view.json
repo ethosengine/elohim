@@ -10,6 +10,7 @@
           "elohim/eprfs/device-runtime/Cargo.toml",
           "elohim/eprfs/device-runtime/src/**",
           "elohim/eprfs/epr-cli/Cargo.toml",
+          "elohim/eprfs/epr-cli/build.rs",
           "elohim/eprfs/epr-cli/src/**",
           "elohim/eprfs/epr-lsp/Cargo.toml",
           "elohim/eprfs/epr-lsp/src/**",

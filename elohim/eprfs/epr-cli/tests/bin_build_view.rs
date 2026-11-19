@@ -46,6 +46,23 @@ fn covers(sources: &[String], path: &str) -> bool {
         })
 }
 
+/// The cure when the dep-info this test reads is not this checkout's: the target directory is
+/// shared, so `epr.d` is whichever checkout last built the bin.
+const CURE: &str = "build the bins from this checkout first (in elohim/eprfs: cargo build -p \
+                    elohim-epr-cli --bin epr -p elohim-device-runtime --bin bin-launch), then \
+                    run this test";
+
+/// The checkout a dep-info's epr build was compiled from: the path its `epr-cli/src/main.rs`
+/// input names, less that suffix.
+fn built_from(inputs: &[PathBuf]) -> Option<PathBuf> {
+    const MAIN: &str = "elohim/eprfs/epr-cli/src/main.rs";
+    inputs.iter().find_map(|input| {
+        let text = input.to_string_lossy();
+        text.strip_suffix(MAIN)
+            .map(|root| PathBuf::from(root.trim_end_matches('/')))
+    })
+}
+
 /// Dep-info is one Make rule per output: `target: dep dep …`, a space in a path escaped as `\ `.
 fn dep_info_inputs(text: &str) -> Vec<PathBuf> {
     let mut inputs = Vec::new();
@@ -102,12 +119,29 @@ fn every_tracked_file_a_build_of_epr_reads_is_inside_the_view() {
     let dep_info = PathBuf::from(format!("{}.d", env!("CARGO_BIN_EXE_epr")));
     let text = std::fs::read_to_string(&dep_info).unwrap_or_else(|error| {
         panic!(
-            "no dep-info at {}: {error}. Cargo writes it beside the epr binary it builds for \
-             these tests; without it this test cannot say what the build read",
+            "no dep-info at {}: {error}. Cargo writes it beside the epr binary it builds; \
+             without it this test cannot say what the build read. Cure: {CURE}",
             dep_info.display()
         )
     });
     let inputs = dep_info_inputs(&text);
+    // The target directory can be shared between checkouts, and `epr.d` is then whichever last
+    // built the bin. A dep-info from another checkout says nothing about this one: fail, naming it.
+    match built_from(&inputs) {
+        Some(origin) if origin.canonicalize().ok().as_deref() != Some(root.as_path()) => panic!(
+            "the epr bin whose dep-info is at {} was last built from {}, not from this checkout \
+             ({}); its dep-info cannot say what a build of this checkout reads. Cure: {CURE}",
+            dep_info.display(),
+            origin.display(),
+            root.display()
+        ),
+        Some(_) => {}
+        None => panic!(
+            "the dep-info at {} names no epr-cli/src/main.rs; it is not the epr binary's. \
+             Cure: {CURE}",
+            dep_info.display()
+        ),
+    }
     let mut inside = 0_usize;
     let mut uncovered = Vec::new();
     for input in &inputs {
