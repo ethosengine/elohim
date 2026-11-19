@@ -25,9 +25,10 @@ Feature: A device judges a sibling's epr from what it says it needs, before fetc
   device's processor lacks; that need is unmeasured, so it is not drawn.
 
   The scenarios that reach the marker check are written for a drawing device on that platform
-  (64-bit x86 Linux with the GNU C library, `x86_64-unknown-linux-gnu`) and are tagged with it.
-  An epr built for a platform with no declared baseline draws nothing from a sibling at all, so
-  on such a device those scenarios are held rather than run.
+  (64-bit x86 Linux with the GNU C library, `x86_64-unknown-linux-gnu`) and are tagged with it;
+  they assume the epr under test was built for the device running them. An epr built for a
+  platform with no declared baseline draws nothing from a sibling at all, so on a device of
+  another platform those scenarios are skipped rather than run.
 
   Before the drawing device fetches a single byte, it checks four things, in order:
   - the commit is published here: the device lands only a commit that its integration branch
@@ -76,14 +77,14 @@ Feature: A device judges a sibling's epr from what it says it needs, before fetc
     But device A's record carries <marker>
     When device B updates its epr
     Then device B fetches nothing
-    And device B says the instructions the release's C needs are unmeasured, naming the C baseline marker
+    And device B says the instructions the release's C needs are unmeasured, naming what the record carries: <said>
     And device B says A should rebuild for the declared platform, or B should build for itself
     And device B goes on to its own build
 
     Examples:
-      | marker                            |
-      | no C baseline marker              |
-      | the C baseline marker "x86-64-v3" |
+      | marker                            | said                          |
+      | no C baseline marker              | "records no env:isa-c"        |
+      | the C baseline marker "x86-64-v3" | "records env:isa-c=x86-64-v3" |
 
   @requires:x86_64-unknown-linux-gnu
   Scenario: A release this device cannot run is refused from its statement, and nothing is fetched
@@ -112,6 +113,9 @@ Feature: A device judges a sibling's epr from what it says it needs, before fetc
     And device B goes on to its own build
 
   Scenario: A commit that a stale integration branch does not contain is not drawn
+    An unpublished commit stops the device's own follow too, so this one ends with nothing
+    landed rather than with a build of its own.
+
     Given device B last fetched its integration branch before that commit landed on it
     When device B updates its epr
     Then device B fetches nothing

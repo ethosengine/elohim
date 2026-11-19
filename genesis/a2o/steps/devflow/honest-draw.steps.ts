@@ -578,13 +578,15 @@ Then(
 );
 
 Then(
-  "device B says the instructions the release's C needs are unmeasured, naming the C baseline marker",
-  function () {
-    // The stable part of the refusal: its kind and the slot it names. The sentence around them
-    // quotes the record's value, or says it has none.
+  "device B says the instructions the release's C needs are unmeasured, naming what the record carries: {string}",
+  function (fragment: string) {
+    // Each row's own diagnostic, on the refusal's line: its kind, the slot and the record's
+    // value (or that it has none). The sentence around them is not bound.
     const text = said(household(this));
-    assert.match(text, /unmeasured-requirement: [^\n]*env:isa-c/, text);
-    assert.match(text, /unmeasured-requirement: [^\n]*unmeasured/, text);
+    const line = text.split('\n').find(l => l.includes('unmeasured-requirement: ')) ?? '';
+    assert.ok(line.includes(fragment), `expected "${fragment}" in:\n${text}`);
+    assert.match(line, /env:isa-c/, text);
+    assert.match(line, /unmeasured-requirement: .*unmeasured/, text);
   }
 );
 
@@ -625,18 +627,25 @@ Then('device B says to fetch the remote branch with {string}', function (cure: s
 
 /**
  * `@requires:x86_64-unknown-linux-gnu`: the drawing device's epr must be built for that target,
- * the one platform with a declared C baseline. The epr under test is built for this host, so a
- * host of another platform holds the scenario. The suite's own `@requires:` gate treats a cap it
- * does not track as a precondition and lets it run; this hook is what holds it.
+ * the one platform with a declared C baseline. The scenarios assume the epr under test (EPR_BIN)
+ * was built for this host, so what is measured is the host Node runs on. The suite's own
+ * `@requires:` gate treats a cap it does not track as a precondition and lets it run; this hook
+ * skips the scenario, and only on a positive mismatch: a platform other than linux, an arch
+ * other than x64, or a process report that names the musl C library. A host whose C library
+ * cannot be read runs the scenario, so an eligible device is never skipped for want of a report.
  */
-function hostIsDeclaredTarget(): boolean {
-  const header = (process.report?.getReport() as { header?: { glibcVersionRuntime?: string } })
-    ?.header;
-  return process.platform === 'linux' && process.arch === 'x64' && !!header?.glibcVersionRuntime;
+function hostIsAnotherTarget(): boolean {
+  if (process.platform !== 'linux' || process.arch !== 'x64') return true;
+  try {
+    const report = process.report?.getReport() as { sharedObjects?: string[] } | undefined;
+    return report?.sharedObjects?.some(object => /ld-musl|libc\.musl/.test(object)) === true;
+  } catch {
+    return false;
+  }
 }
 
 Before({ tags: '@requires:x86_64-unknown-linux-gnu' }, function () {
-  return hostIsDeclaredTarget() ? undefined : 'skipped';
+  return hostIsAnotherTarget() ? 'skipped' : undefined;
 });
 
 After(function () {
