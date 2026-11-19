@@ -4,7 +4,8 @@
 # Re-runs worktree stewardship to catch any worktrees that were merged
 # during this session (e.g., the agent finished a branch and merged it
 # to dev, leaving its own worktree as a stale entry). Idempotent;
-# always safe to run.
+# always safe to run. Every walk runs detached; the hook itself only
+# launches the pass and returns.
 #
 # Hook input on stdin: { hook_event_name: "Stop", ... }
 # No additionalContext output — the session is ending.
@@ -27,8 +28,13 @@ fi
 pool_init
 
 DRY="${CARGO_TARGET_POOL_POSTFLIGHT_DRY:-0}"
-steward_all_worktrees "$DRY" >/dev/null 2>&1 || true
 
+# Stewardship walks every worktree under POOL_WORKTREES_DIR (a /proc scan and
+# several git calls each, one of them `ls-remote`). Measured 2026-11-19 with 8
+# worktrees at load 8: 8.4 s, 12.0 s and 10.8 s for the dry walk alone (about
+# 0.7 s of /proc scan and 0.5 s of classification per worktree), and the harness
+# cancelled the hook at 15.09 s. It now runs first in the detached pass below.
+#
 # Sample slot watermarks — HWM rises monotonically across sessions; feeds
 # `cargo-pool estimate` so it can ground predictions in observed peaks
 # rather than hardcoded 10G/3G.
@@ -43,19 +49,20 @@ steward_all_worktrees "$DRY" >/dev/null 2>&1 || true
 # against this Stop hook's 15 s timeout, so the harness cancelled the hook (17
 # times in one session) and killed enforcement mid-pass on every turn. They now
 # run DETACHED and single-flight: a second Stop while one pass is running skips.
-if [ "$DRY" != "1" ]; then
-  setsid bash -c '
-    exec 9>"$1" || exit 0
-    flock -n 9 || exit 0
-    # shellcheck disable=SC1091
-    source "$2/pool-lib.sh"
-    pool_init
-    record_all_slot_watermarks >/dev/null 2>&1 || true
-    if [ "${CARGO_TARGET_POOL_NO_ENFORCE:-0}" != "1" ]; then
-      enforce_pool 1 1 >/dev/null 2>&1 || true
-    fi
-  ' _ "$POOL_ROOT/.postflight.lock" "$SCRIPT_DIR" </dev/null >/dev/null 2>&1 &
-fi
+# A dry run walks stewardship as a plan and stops there.
+setsid bash -c '
+  exec 9>"$1" || exit 0
+  flock -n 9 || exit 0
+  # shellcheck disable=SC1091
+  source "$2/pool-lib.sh"
+  pool_init
+  steward_all_worktrees "$3" >/dev/null 2>&1 || true
+  [ "$3" != "1" ] || exit 0
+  record_all_slot_watermarks >/dev/null 2>&1 || true
+  if [ "${CARGO_TARGET_POOL_NO_ENFORCE:-0}" != "1" ]; then
+    enforce_pool 1 1 >/dev/null 2>&1 || true
+  fi
+' _ "$POOL_ROOT/.postflight.lock" "$SCRIPT_DIR" "$DRY" </dev/null >/dev/null 2>&1 &
 
 # Legacy opt-in cold-slot GC (superseded by enforce; kept for operators who
 # pinned a custom GC window via env).
