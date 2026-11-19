@@ -63,6 +63,7 @@ test('validates every event kind from the actual journal and recognizer writers'
     'src/check.ts(12,3): error TS2322: incompatible type',
     'Diff in /checkout/src/fmt.rs:3:', '/checkout/src/lint.ts',
     '  7:2  error  unexpected variable  no-unused-vars', 'No space left on device',
+    '[gate] epr producer put withheld (CFLAGS is set; gate remains green)',
     'error: Recipe `test` failed on line 18 with exit code 101',
   ]) recognizer.push(line);
   recognizer.end();
@@ -72,7 +73,7 @@ test('validates every event kind from the actual journal and recognizer writers'
   closeRun(path, 'failed', { now });
   const { events } = readRun(path);
   assert.deepEqual([...new Set(events.map(row => row.kind))].sort(), [
-    'detail', 'failure', 'gate-start', 'gate-verdict', 'run-close', 'run-open', 'step-failed',
+    'detail', 'failure', 'gate-start', 'gate-verdict', 'notice', 'run-close', 'run-open', 'step-failed',
   ]);
   assert.deepEqual([...new Set(events.filter(row => row.failure).map(row => row.failure.class))].sort(),
     ['compile', 'env', 'format', 'lint', 'test']);

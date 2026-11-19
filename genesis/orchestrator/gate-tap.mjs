@@ -6,7 +6,8 @@
 // Bytes reach this process's stdout/stderr unchanged and the command's exit status (or
 // signal) is this process's. Failure-level lines (gate-failure-lines.mjs) are appended to
 // the live run as they appear, so the session that started a push can begin on the first
-// red while later gates still run. When fd 3 is open, the classifyFailure signals and the
+// red while later gates still run. A notice (a withheld offer on a green gate) is appended
+// too, but only a failure starts the outlook or a sibling red. When fd 3 is open, the classifyFailure signals and the
 // first-red time are written there as one JSON object for the caller's cycle row.
 // Nothing here decides a verdict. The tap is the emitter adapter a CI stage or
 // rakia-executor can also wrap: genesis/docs/superpowers/specs/2026-10-26-gate-live-failure-channel-design.md

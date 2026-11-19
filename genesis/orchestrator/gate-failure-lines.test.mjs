@@ -208,17 +208,15 @@ describe('steps, preflight, environment', () => {
     assert.equal(classifyFailure(1, signals), 'environment');
   });
 
-  test('a withheld producer offer is class env, sets no failure signal and never reads as a red gate', () => {
-    const line = '[gate] epr producer put withheld (CFLAGS_x86_64_unknown_linux_gnu is not set; gate remains green)';
-    const { events, rec } = run(['test result: ok. 3 passed; 0 failed', line]);
-    const f = failures(events);
-    assert.equal(f.length, 1);
-    assert.equal(f[0].failure.class, 'env');
-    assert.deepEqual(f[0].failure.locus, {});
-    assert.equal(f[0].failure.excerpt, line);
-    // The live-event schema's diagnostic enum is the class contract; a class outside it is refused.
+  test('a withheld producer offer is a notice, never a failure: no red count, no first red, no signal', () => {
+    const text = 'epr producer put withheld (CFLAGS_x86_64_unknown_linux_gnu is not set; gate remains green)';
+    const { events, rec } = run(['test result: ok. 3 passed; 0 failed', `[gate] ${text}`, `[gate] ${text}`]);
+    assert.deepEqual(failures(events), []);
+    assert.deepEqual(events, [{ kind: 'notice', project: 'proj', notice: { class: 'offer-withheld', text } }], 'heard once');
+    // The notice contract is the live-event schema's notice class vocabulary.
     const schema = JSON.parse(readFileSync(new URL('../../elohim/sdk/schemas/v1/gate-live-event.schema.json', import.meta.url), 'utf8'));
-    assert.ok(schema.$defs.diagnostic.properties.class.enum.includes(f[0].failure.class));
+    assert.ok(schema.$defs.notice.properties.class.enum.includes(events[0].notice.class));
+    assert.deepEqual(rec.summary(), { failures: 0, overflow: 0, firstRedSeconds: null });
     const signals = rec.signals();
     assert.equal(signals.assertionFailed, false);
     assert.equal(signals.compilerError, false);
@@ -243,7 +241,9 @@ describe('steps, preflight, environment', () => {
     for (const line of lines) rec.push(line);
     rec.push('error: Recipe `_gate-x` failed on line 3 with exit code 1');
     rec.end(1);
-    assert.deepEqual(failures(events).map(e => e.failure.class), ['env', 'env', 'step']);
+    assert.deepEqual(failures(events).map(e => e.failure.class), ['step']);
+    assert.deepEqual(events.filter(e => e.kind === 'notice').map(e => e.notice.class), ['offer-withheld', 'offer-withheld']);
+    assert.equal(rec.summary().failures, 1, 'only the stand-in counts');
   });
 
   test('out-of-space output is class env', () => {

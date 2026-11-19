@@ -231,7 +231,12 @@ function recognize(stdout, exitCode) {
   const rec = createRecognizer({ project: "eprfs", emit: (e) => events.push(e) });
   for (const line of stdout.split("\n")) rec.push(line);
   rec.end(exitCode);
-  return { failures: events.filter((e) => e.kind === "failure"), signals: rec.signals() };
+  return {
+    failures: events.filter((e) => e.kind === "failure"),
+    notices: events.filter((e) => e.kind === "notice"),
+    summary: rec.summary(),
+    signals: rec.signals(),
+  };
 }
 
 test("a_failing_c_baseline_check_withholds_the_offer_with_its_first_finding_and_never_describes", (t) => {
@@ -242,7 +247,12 @@ test("a_failing_c_baseline_check_withholds_the_offer_with_its_first_finding_and_
   assert.ok(verb(r.calls, "c-baseline", "--triple", "x86_64-unknown-linux-gnu") >= 0, "the check ran");
   assert.ok(!r.calls.some((c) => c[1] === "artifact"), "nothing is described, keyed or put");
   const heard = recognize(r.stdout, r.status);
-  assert.deepEqual(heard.failures.map((e) => e.failure.class), ["env"], "the agent hears the withheld offer");
+  assert.deepEqual(heard.notices.map((e) => e.notice), [
+    { class: "offer-withheld", text: `epr producer put withheld (${FINDING}; gate remains green)` },
+  ], "the agent hears the withheld offer as a notice");
+  assert.deepEqual(heard.failures, [], "never as a red");
+  assert.equal(heard.summary.failures, 0);
+  assert.equal(heard.summary.firstRedSeconds, null);
   assert.equal(classifyFailure(r.status, heard.signals), undefined, "and the gate stays green");
   assert.equal(heard.signals.assertionFailed || heard.signals.compilerError, false);
 });
@@ -269,7 +279,8 @@ test("a_passing_c_baseline_check_describes_with_the_declared_c_flags_only", (t) 
     const cFamily = recorded.filter((e) => !/^(CARGO_|RUST)/.test(e));
     assert.deepEqual(cFamily.sort(), Object.entries(C_LEVEL).map(([k, v]) => `${k}=${v}`).sort());
   }
-  assert.deepEqual(recognize(r.stdout, r.status).failures, [], "an offer that crosses raises nothing");
+  const heard = recognize(r.stdout, r.status);
+  assert.deepEqual([...heard.failures, ...heard.notices], [], "an offer that crosses raises nothing");
 });
 
 test("unset_c_flags_are_not_recorded", (t) => {

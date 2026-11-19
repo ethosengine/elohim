@@ -354,6 +354,34 @@ describe('gate-tap sibling notes', () => {
     assert.equal(red.class, 'step');
   });
 
+  // E12 L1: eprfs-produce.sh withheld its offer on a green gate. The agent hears a notice; nothing
+  // reads it as a red: no failure event, no outlook, no first-red time, no sibling red, a zero final.
+  test('a green gate that withheld its offer reports zero reds, no outlook and no first red, and the follower shows the notice', async t => {
+    const { dir, runPath, env } = setup(t);
+    const text = 'epr producer put withheld (CFLAGS is set; gate remains green)';
+    const { result } = runTap(env, runPath, `echo 'test result: ok. 3 passed; 0 failed'; echo '[gate] ${text}'; exit 0`);
+    assert.equal(result.status, 0, result.stderr);
+    const summary = JSON.parse(String(result.output[3]).trim());
+    assert.equal(summary.failures, 0);
+    assert.equal(summary.firstRedSeconds, null, 'no first_red');
+    const events = readFileSync(runPath, 'utf8').split('\n').filter(Boolean).map(l => JSON.parse(l));
+    assert.deepEqual(events.filter(e => e.kind === 'failure'), []);
+    assert.deepEqual(events.filter(e => e.kind === 'outlook'), [], 'GATE_REMAINING is set, and still no outlook');
+    const notices = events.filter(e => e.kind === 'notice');
+    assert.deepEqual(notices.map(e => [e.project, e.notice]), [['fixture', { class: 'offer-withheld', text }]]);
+    const close = spawnSync(process.execPath, [GATE_LIVE, 'close', '--run', runPath, '--outcome', 'passed'], { encoding: 'utf8', env, timeout: 10000 });
+    assert.equal(close.status, 0, close.stderr);
+    await wait(dir, 1);
+    const bodies = says(dir).map(line => JSON.parse(line.slice(line.indexOf('{'))));
+    assert.deepEqual(bodies.map(b => b.kind), ['gate-final@1'], 'the final, never a gate-red@1');
+    assert.equal(bodies[0].failures, 0);
+    assert.deepEqual(bodies[0].reds, []);
+    const followed = spawnSync(process.execPath, [GATE_LIVE, 'follow', '--run', runPath, '--timeout-ms', '3000'], { encoding: 'utf8', env, timeout: 10000 });
+    assert.equal(followed.status, 0, followed.stderr);
+    assert.ok(followed.stdout.split('\n').includes(`[gate-live] NOTICE fixture offer-withheld: ${text}`), followed.stdout);
+    assert.ok(!followed.stdout.includes('RED'), followed.stdout);
+  });
+
   const EVERY = { ...SUB, text: SUB.text.replace('"intent":"default"', '"intent":"every"') };
   const twelve = n => Array.from({ length: n }, (_, i) => `echo "test t${i} ... FAILED"`).join('; ');
   const deliveries = runPath => readFileSync(runPath, 'utf8').split('\n').filter(Boolean).map(l => JSON.parse(l))

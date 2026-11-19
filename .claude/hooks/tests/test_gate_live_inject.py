@@ -81,6 +81,19 @@ class GateLiveInjectTest(Harness):
         self.assertIn('[gate-live] RED storage test adds', context)
         self.assertNotIn('NOTICE', context, 'the red after it moves the same cursor on')
 
+    def test_a_withheld_offer_printed_by_a_tapped_green_gate_reaches_the_agent_as_a_notice(self):
+        # End to end: the producer's line, through gate-tap's recognizer, to this hook.
+        run = self.open_run()
+        text = 'epr producer put withheld (CFLAGS is set; gate remains green)'
+        env = {k: v for k, v in self.env.items() if k != 'GATE_REMAINING'}
+        tapped = subprocess.run(
+            ['node', str(REPO / 'genesis/orchestrator/gate-tap.mjs'), '--project', 'eprfs', '--run', run,
+             '--', 'bash', '-c', f"echo '[gate] {text}'; exit 0"],
+            cwd=self.root, env={**env, 'GATE_LIVE_SIBLING': 'off'}, text=True, capture_output=True, timeout=20)
+        self.assertEqual(tapped.returncode, 0, tapped.stderr)
+        context = self.hook({'session_id': 's-main', 'tool_name': 'Read', 'tool_input': {}})
+        self.assertEqual(context, f'[gate-live] NOTICE eprfs offer-withheld: {text}')
+
     def test_a_subagent_and_its_parent_each_hear_the_red(self):
         self.red(self.open_run())
         self.assertIn('RED', self.hook({'session_id': 's-main', 'agent_id': 'a1', 'tool_name': 'Read'}))

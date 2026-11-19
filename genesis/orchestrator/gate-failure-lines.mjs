@@ -53,13 +53,11 @@ const RULES = [
   { cls: 'format', re: /^Diff in (\S+?)(?::(\d+))?(?: at line (\d+))?:?\s*$/, locus: m => ({ file: m[1], line: Number(m[2] || m[3]) || undefined }) },
   { cls: 'lint', re: /^\s+(\d+):\d+\s+error\s+(.+?)\s{2,}(\S+)$/, locus: (m, ctx) => ({ file: ctx.lastPath, line: Number(m[1]) }) },
   // eprfs-produce.sh kept a green gate's bytes from siblings (row 29.2: the build environment's C
-  // compiler built above the target's declared level). Only a failure event reaches the agent, so
-  // it is one, of class env: the cause is the environment, env is in the live-event schema's
-  // diagnostic enum, and it sets no classifyFailure signal, so it never makes a run read as code
-  // red and the verdict stays the exit status. Advisory: it explains no red step (end()). A `put
-  // skipped` line is routine and raises nothing. Before the env rule below, whose words a finding
-  // may quote.
-  { cls: 'env', re: /^\[gate\] epr producer put withheld \(.+; gate remains green\)$/, locus: () => ({}), advisory: true },
+  // compiler built above the target's declared level). A notice, never a failure: the agent hears
+  // it, but it counts in no red measure (failures, first red, signals, outlook, sibling red), and it
+  // explains no red step (end()). A `put skipped` line is routine and raises nothing. Before the
+  // env rule below, whose words a finding may quote.
+  { notice: 'offer-withheld', re: /^\[gate\] (epr producer put withheld \(.+; gate remains green\))$/ },
   { cls: 'env', re: /No space left on device|Cannot allocate memory|signal: 9, SIGKILL|\(signal: 15, SIGTERM/, locus: () => ({}) },
 ];
 
@@ -87,8 +85,8 @@ function boundedExcerpt(lines) {
 }
 
 /**
- * A line-at-a-time recognizer. `emit(event)` receives `failure`, `detail` and
- * `step-failed` events in the order the gate printed them; `signals()` is the
+ * A line-at-a-time recognizer. `emit(event)` receives `failure`, `detail`,
+ * `step-failed` and `notice` events in the order the gate printed them; `signals()` is the
  * input classifyFailure reads.
  */
 export function createRecognizer({ project, emit, now = () => Date.now() }) {
@@ -98,19 +96,27 @@ export function createRecognizer({ project, emit, now = () => Date.now() }) {
   const started = now();
   let firstRedMs = null;
   let failures = 0;
-  let named = false; // a failure that names a red (any but an advisory rule's) was recognized
+  const noticed = new Set();
   let overflow = 0;
   let lastPath = null;
   let block = null; // { kind: 'cargo-test' | 'rust', lines, event }
   const failedSteps = new Map(); // step name -> first non-zero exit printed for it
 
-  function raise(cls, locus, text, extra = {}, advisory = false) {
+  // A non-red fact (gate-live 'notice'): emitted once per distinct text, bounded to the schema's
+  // one line of 512 characters, and touching no failure count, first-red time or signal.
+  function notify(cls, text) {
+    const line = text.slice(0, 512);
+    if (noticed.has(`${cls}\u0000${line}`) || noticed.size >= MAX_FAILURES) return;
+    noticed.add(`${cls}\u0000${line}`);
+    emit({ kind: 'notice', project, notice: { class: cls, text: line } });
+  }
+
+  function raise(cls, locus, text, extra = {}) {
     if (cls === 'test') signals.assertionFailed = true;
     if (cls === 'compile' || cls === 'lint' || cls === 'format') signals.compilerError = true;
     const identifier = locus.test || `${locus.file || ''}:${normalize(text)}`;
     const fp = fingerprint(project, cls, identifier);
     if (seen.has(fp)) return null;
-    if (!advisory) named = true;
     if (failures >= MAX_FAILURES) {
       // Saturate when dedupe fills, rather than count repeated untracked failures.
       if (!overflowSeen.has(fp) && overflowSeen.size < 4 * MAX_FAILURES) {
@@ -185,7 +191,8 @@ export function createRecognizer({ project, emit, now = () => Date.now() }) {
       if (!m || rule.skip?.(m)) continue;
       if (rule.rust) { block = { kind: 'rust', lines: [line] }; return; }
       if (rule.signalOnly) { signals.assertionFailed = true; return; }
-      raise(rule.cls, rule.locus(m, { lastPath }), line, {}, rule.advisory === true);
+      if (rule.notice) { notify(rule.notice, m[1]); return; }
+      raise(rule.cls, rule.locus(m, { lastPath }), line);
       return;
     }
   }
@@ -196,12 +203,12 @@ export function createRecognizer({ project, emit, now = () => Date.now() }) {
      * `exitCode`: the child's status, once known. A child that exited non-zero with no failure this
      * recognizer could name (a Gherkin parse error) gets one `step` failure per distinct failed step,
      * raised like any other (fingerprint, nth, summary count), so every red gate is heard; a child
-     * that exited 0 never does, whatever it printed (E6 #2, DoD-4 receipt 2026-11-18). An advisory
-     * failure (a withheld offer) names no red, so it does not stand in for one.
+     * that exited 0 never does, whatever it printed (E6 #2, DoD-4 receipt 2026-11-18). A notice (a
+     * withheld offer) is no failure, so it never stands in for one.
      */
     end(exitCode) {
       closeBlock();
-      if (exitCode === undefined || exitCode === 0 || named) return;
+      if (exitCode === undefined || exitCode === 0 || failures > 0) return;
       for (const [name, exit] of failedSteps) {
         raise('step', {}, `${name} exited ${exit} with no failure line this recognizer knows`, { step: name });
       }
