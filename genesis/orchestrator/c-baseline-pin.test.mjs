@@ -3,7 +3,7 @@
 // gcc defaults to -march=x86-64-v3; cc 1.2.65 passed no -march, so ring's curve25519.c
 // carried AVX2 into a drawn epr and a v2 sibling died with SIGILL. cc >= 1.11.0 pushes
 // -march=x86-64 itself ("Match rustc's CPU"). This test pins every home of that decision:
-// the pool-policy record, the producer recording the record's variable, the cc floor in each
+// the pool-policy record, the producer recording the record's two variables, the cc floor in each
 // native lock, the cc source still carrying the push, and no tracked build config raising
 // the level behind the record's back. A drift in any one of them fails here.
 import { test } from 'node:test';
@@ -19,6 +19,7 @@ const read = rel => readFileSync(resolve(ROOT, rel), 'utf8');
 
 const TRIPLE = 'x86_64-unknown-linux-gnu';
 const CFLAGS_VAR = 'CFLAGS_x86_64_unknown_linux_gnu';
+const CXXFLAGS_VAR = 'CXXFLAGS_x86_64_unknown_linux_gnu';
 const EXPECTED_TARGET = { isa: 'x86-64', cflags: '-march=x86-64', workspaces: ['elohim/eprfs'] };
 
 // ---- pure checks (proved against fixtures below, then applied to the repository) ----
@@ -60,11 +61,43 @@ const uncommented = text =>
     .filter(line => !/^\s*#/.test(line))
     .join('\n');
 
-/** Problems with the producer script: it must record the record's variable and never declare a target to describe. */
+const globMatches = (pattern, name) =>
+  new RegExp(`^${pattern.replace(/[.+^${}()[\]\\]/g, '\\$&').replace(/\*/g, '.*').replace(/\?/g, '.')}$`).test(name);
+const RECORDS_NAME = /^recorded\+=\(--env "\$name=\$\{!name\}"\)\s*;;\s*$/;
+const recordsExplicitly = (body, name) => body.trim().startsWith(`recorded+=(--env "${name}=\${${name}}")`);
+
+/**
+ * Is `name` recorded as a describe --env value? In the recording `case "$name"` block (one
+ * whose arms append to `recorded`), the FIRST arm whose patterns match `name` (bash takes
+ * the first match) must append `--env "$name=${!name}"` or `--env "<name>=${<name>}"`.
+ */
+function recordsVariable(code, name) {
+  for (const [, block] of code.matchAll(/^\s*case\s+"?\$name"?\s+in\s*$([\s\S]*?)^\s*esac\b/gm)) {
+    if (!block.includes('recorded+=')) continue;
+    for (const line of block.split('\n')) {
+      const arm = line.match(/^\s*([A-Za-z0-9_*?| ]+)\)\s*(.*)$/);
+      if (!arm) continue;
+      if (!arm[1].split('|').some(p => globMatches(p.trim(), name))) continue;
+      return RECORDS_NAME.test(arm[2]) || recordsExplicitly(arm[2], name);
+    }
+  }
+  return false;
+}
+
+/** Problems with the producer script: it must record both declared variables as describe --env values and never declare a target to describe. */
 export function producerProblems(script) {
   const code = uncommented(script);
   const problems = [];
-  if (!code.includes(CFLAGS_VAR)) problems.push(`eprfs-produce.sh does not reference ${CFLAGS_VAR} outside comments`);
+  for (const name of [CFLAGS_VAR, CXXFLAGS_VAR]) {
+    if (!recordsVariable(code, name)) problems.push(`eprfs-produce.sh does not record ${name} as a describe --env value`);
+  }
+  const describes = code
+    .replace(/\\\n/g, ' ')
+    .split('\n')
+    .filter(line => /\bartifact describe\b/.test(line));
+  if (describes.length === 0 || describes.some(line => !line.includes('"${recorded[@]}"'))) {
+    problems.push('eprfs-produce.sh: an artifact describe does not pass "${recorded[@]}", so nothing recorded reaches it');
+  }
   for (const flag of ['--target-isa', '--target-cflags']) {
     if (code.includes(flag)) problems.push(`eprfs-produce.sh passes ${flag} (put refuses a declared target until L2a, K6)`);
   }
@@ -134,11 +167,59 @@ test('fixture: the decided declared_targets shape passes and every drift is name
   assert.match(declaredTargetProblems(noComment).join('\n'), /_comment/);
 });
 
-test('fixture: the producer check wants the variable recorded and no declared target', () => {
-  const records = `recorded+=(--env "${CFLAGS_VAR}=\${${CFLAGS_VAR}}")\n# never pass --target-isa here\n`;
-  assert.deepEqual(producerProblems(records), []);
-  assert.match(producerProblems(`# mentions ${CFLAGS_VAR} only in a comment\n`).join('\n'), /does not reference/);
-  const declares = `${records}"$epr" artifact describe --target-isa x86-64 --target-cflags -march=x86-64\n`;
+// The producer's recording code, in the shape eprfs-produce.sh has it: a case arm over the
+// environment's names appends `--env "$name=${!name}"`, and the array reaches describe.
+const producer = ({ arm = `    ${CFLAGS_VAR} | ${CXXFLAGS_VAR}) recorded+=(--env "$name=\${!name}") ;;`, before = '', describe = '"${recorded[@]}"' } = {}) =>
+  [
+    '# Of the C family only the declared target\'s flags are recorded; never pass --target-isa here.',
+    'recorded=()',
+    'while IFS= read -r name; do',
+    '  case "$name" in',
+    '    RUSTFLAGS) ;;',
+    before,
+    '    CARGO_* | RUST*) recorded+=(--env "$name=${!name}") ;;',
+    arm,
+    '  esac',
+    'done < <(compgen -e | LC_ALL=C sort)',
+    'for bin in "${bins[@]}"; do',
+    '  said="$("$epr" artifact describe --project eprfs --bin "$bin" --rustflags "${RUSTFLAGS-}" \\',
+    `    --sources "$sources" --out "$method" \\`,
+    `    ${describe} 2>&1)" || skip "describe $bin refused"`,
+    'done',
+    '',
+  ]
+    .filter(line => line !== '')
+    .join('\n');
+
+test('fixture: the producer check wants both variables recorded as describe --env and no declared target', () => {
+  assert.deepEqual(producerProblems(producer()), []);
+  const explicit = producer({
+    arm: `    ${CFLAGS_VAR}) recorded+=(--env "${CFLAGS_VAR}=\${${CFLAGS_VAR}}") ;;\n    ${CXXFLAGS_VAR}) recorded+=(--env "$name=\${!name}") ;;`,
+  });
+  assert.deepEqual(producerProblems(explicit), [], 'one arm per variable records them too');
+  const only = (said, missing, kept) => {
+    assert.match(said, new RegExp(`does not record ${missing} `));
+    assert.doesNotMatch(said, new RegExp(`does not record ${kept} `));
+  };
+  // Each variable dropped from the recording arm on its own.
+  only(producerProblems(producer({ arm: `    ${CFLAGS_VAR}) recorded+=(--env "$name=\${!name}") ;;` })).join('\n'), CXXFLAGS_VAR, CFLAGS_VAR);
+  only(producerProblems(producer({ arm: `    ${CXXFLAGS_VAR}) recorded+=(--env "$name=\${!name}") ;;` })).join('\n'), CFLAGS_VAR, CXXFLAGS_VAR);
+  // Named, but not recorded: in a comment, in other code, in an arm that drops them, or
+  // shadowed by an earlier arm that matches them first (bash takes the first match).
+  for (const [why, script] of [
+    ['comment only', producer({ arm: `    # ${CFLAGS_VAR} | ${CXXFLAGS_VAR} are recorded` })],
+    ['other code', producer({ arm: '' }) + `\necho "$${CFLAGS_VAR} $${CXXFLAGS_VAR}"\n`],
+    ['dropping arm', producer({ arm: `    ${CFLAGS_VAR} | ${CXXFLAGS_VAR}) ;;` })],
+    ['wrong value', producer({ arm: `    ${CFLAGS_VAR} | ${CXXFLAGS_VAR}) recorded+=(--env "$name=") ;;` })],
+    ['shadowed', producer({ before: '    C*FLAGS_*) ;;' })],
+  ]) {
+    const said = producerProblems(script).join('\n');
+    assert.match(said, new RegExp(`does not record ${CFLAGS_VAR} `), why);
+    assert.match(said, new RegExp(`does not record ${CXXFLAGS_VAR} `), why);
+  }
+  // Recorded, but the array never reaches describe.
+  assert.match(producerProblems(producer({ describe: '' })).join('\n'), /describe does not pass "\$\{recorded\[@\]\}"/);
+  const declares = `${producer()}\n"$epr" artifact describe --target-isa x86-64 --target-cflags -march=x86-64\n`;
   const said = producerProblems(declares).join('\n');
   assert.match(said, /--target-isa/);
   assert.match(said, /--target-cflags/);
@@ -192,7 +273,7 @@ test('pool-policy declares the C baseline as a top-level declared_targets record
   assert.deepEqual(declaredTargetProblems(policy), [], 'genesis/agentic/pool-policy.json declared_targets');
 });
 
-test('the eprfs producer records the declared C flags variable and declares no target', () => {
+test('the eprfs producer records both declared C flags variables as describe --env and declares no target', () => {
   assert.deepEqual(producerProblems(read('genesis/orchestrator/eprfs-produce.sh')), []);
 });
 
