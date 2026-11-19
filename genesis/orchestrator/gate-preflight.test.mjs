@@ -267,6 +267,21 @@ test('fleet-roll: an undeclared Edge roll on a dev push is a preflight row, and 
   assert.equal(later.some(r => r.check === 'fleet-roll'), false);
 });
 
+test('fleet-roll under an older hook (no GATE_PUSH_RANGES): silent with no Edge build, refused with one', (t) => {
+  const root = scratch(t);
+  const spawn = () => ({ status: 0, stdout: '' });
+  const env = { GATE_PUSH_TARGETS: 'refs/heads/dev' };
+  const run = pipelines => runPreflight({ root, projects: [], env, spawn, registry: new Map(), changed: ['app/x.ts'],
+    fleet: { walk: () => ({ projects: [], pipelines }), mode: 'refuse' } });
+  const quiet = run([{ name: 'elohim', reasons: ['source: app/x.ts'], steps: [{ name: 'build-app', class: 'build' }], runClass: 'build' }]);
+  assert.equal(quiet.some(r => r.check === 'fleet-roll'), false);
+  assert.equal(quiet.some(r => r.level === 'REFUSED'), false, 'the preflight exits 0');
+  const red = run([{ name: 'elohim-edge', reasons: ['source: app/x.ts'], steps: [{ name: 'cargo-build-storage', class: 'build' }], runClass: 'build' }])
+    .find(r => r.check === 'fleet-roll');
+  assert.equal(red.level, 'REFUSED');
+  assert.match(red.cure, /core\.hooksPath=<worktree>\/\.husky\/_/);
+});
+
 test('on-red policy: env, then pool-policy.json, then continue', (t) => {
   const root = scratch(t);
   assert.deepEqual(onRedPolicy({ env: {}, root }), { mode: 'continue', from: 'default' });

@@ -10,6 +10,17 @@
 // later push supersedes) is not seen. CI's own narrowing filters (the already-built filter, edge's
 // closure-keyed skips) are not applied either, so for this push's own paths and tags the error
 // lies on the side of predicting a roll that CI then skips.
+// A pre-push hook older than the fleet-roll block (a worktree pushing through a main checkout
+// whose .husky/pre-push.bash predates it) sets GATE_PUSH_TARGETS and GATE_CHANGED_FILES but not
+// GATE_PUSH_RANGES. Then only the paths are judged: no commit message is read, so a forcing tag
+// such as [build:edge] on the tip is not seen there (an accepted limit), a path set that predicts
+// no Edge build prints nothing, and one that does refuses, naming the hook as the fix.
+//
+// A skip tag or [edge:validate-only] on the tip rolls nothing, but both move the orchestrator's
+// baseline past the push (below), so the changes they carry are never built by a later diff. The
+// fleet-roll row warns when Edge build inputs ride under a skip tag, or when other pipelines ride
+// under [edge:validate-only]; a second row, `skip-ci`, warns when any pipeline's inputs ride
+// under a skip tag on a deploying push.
 //
 // The CI rule this mirrors (read 2026-11-19 at dev 2080441f5):
 // - The orchestrator reads ONE commit message, the tip it checked out: `git log -1 --format=%B`
@@ -126,9 +137,11 @@ function describe(prediction) {
  * @param {'refuse'|'warn'|'off'} args.mode  pool-policy.json fleet_roll_guard.mode
  * @param {(changed: string[]) => {pipelines: Array<{name: string, reasons: string[], steps: Array<{name: string, class: string}>, runClass: string}>}} args.walk
  * @param {() => Map<string, object>} [args.registry]  pipeline registry, read only for [build:all]
+ * @param {boolean} [args.rangesMissing]  a push whose (older) hook handed over no commit range:
+ *   judge the paths alone, and stay silent unless they predict an Edge build
  * @returns {{prediction: object|null, row: object|null}}
  */
-export function evaluateFleetRoll({ changed, messages, target, mode = 'refuse', walk, registry = () => new Map() }) {
+export function evaluateFleetRoll({ changed, messages, target, mode = 'refuse', walk, registry = () => new Map(), rangesMissing = false }) {
   if (mode === 'off') return { prediction: null, row: null };
   const deploying = DEPLOYING_BRANCHES.includes(target);
   const pushed = target !== null && target !== undefined;
@@ -140,13 +153,15 @@ export function evaluateFleetRoll({ changed, messages, target, mode = 'refuse', 
     return {
       prediction: null,
       row: row(severity('REFUSED'), `${where}: ${what} — a roll cannot be ruled out, and an unreadable range never reads as "nothing changed"`,
-        'git fetch origin, then push again (the hook hands the range over as GATE_PUSH_RANGES; a worktree push running an older checkout\'s hook needs -c core.hooksPath=<worktree>/.husky/_)'),
+        'git fetch origin, then push again'),
     };
   }
 
   const tip = messages[0] ?? '';
   const declaredIn = messages.findIndex(hasRollTag);
-  const edge = changed.length ? walk(changed).pipelines.find(p => p.name === EDGE) : undefined;
+  const selected = changed.length ? walk(changed).pipelines : [];
+  const edge = selected.find(p => p.name === EDGE);
+  const others = selected.filter(p => p.name !== EDGE).map(p => p.name);
   const paths = [...new Set((edge?.reasons ?? []).map(r => r.replace(/^(source|buildProcess): /, '')))];
   const staleSteps = (edge?.steps ?? []).map(s => s.name);
   const buildSteps = staleSteps.filter(s => s !== VALIDATE_STEP);
@@ -168,7 +183,35 @@ export function evaluateFleetRoll({ changed, messages, target, mode = 'refuse', 
     prediction.roll = buildSteps.length > 0 && !belowDeploy;
   }
 
+  if (rangesMissing && !prediction.roll) return { prediction, row: null };
+  const reach = deploying ? `this push to ${target} would rebuild and roll the Edge fleet` : `this change would roll the Edge fleet if pushed to dev (${pushed ? `target ${target} does not deploy` : 'not a push'})`;
+  if (rangesMissing) {
+    return {
+      prediction,
+      row: row(severity('REFUSED'),
+        `${reach}: ${describe(prediction)} — and the running pre-push hook hands over no commit range (GATE_PUSH_RANGES), so whether a pushed commit declares ${ROLL_TAG} cannot be read`,
+        `push with -c core.hooksPath=<worktree>/.husky/_ so the current hook reads the commit messages, or bring the main checkout up to date (its .husky/pre-push.bash predates the fleet-roll block)`),
+    };
+  }
+
   if (prediction.suppressedBy) {
+    const skip = prediction.suppressedBy === '[skip ci]';
+    if (skip && buildSteps.length) {
+      return {
+        prediction,
+        row: row('WARN',
+          `the tip's ${prediction.suppressedBy} dispatches nothing for this ${where}: ${EDGE} build inputs land unbuilt (${buildSteps.join(', ')}, from ${paths.slice(0, 3).join(', ')}${paths.length > 3 ? ` and ${paths.length - 3} more` : ''}), the next run's diff starts past this push, and the fleet gets them only with a later forced, declared roll`,
+          `push them under a tip without the skip tag (declaring ${ROLL_TAG} if the roll is meant), or leave them for a later deliberate [build:edge] roll`),
+      };
+    }
+    if (prediction.suppressedBy === '[edge:validate-only]' && others.length) {
+      return {
+        prediction,
+        row: row('WARN',
+          `the tip's [edge:validate-only] keeps ${EDGE} from building or deploying for this ${where}, but it also drops ${others.join(', ')} from that run, and once the run ends green the next run's diff starts past this push, so their changes here are not built by a later diff either`,
+          `push those changes under a tip without [edge:validate-only], and keep the measuring commit on its own push`),
+      };
+    }
     if (!edge) return { prediction, row: null };
     return { prediction, row: row('ok', `the tip's ${prediction.suppressedBy} keeps ${EDGE} from building or deploying for this ${where}`) };
   }
@@ -180,12 +223,31 @@ export function evaluateFleetRoll({ changed, messages, target, mode = 'refuse', 
     prediction.declaredBy = declaredIn === 0 ? 'the tip commit' : 'a pushed commit';
     return { prediction, row: row('ok', `roll declared by ${ROLL_TAG} in ${prediction.declaredBy}: ${describe(prediction)}`) };
   }
-  const reach = deploying ? `this push to ${target} would rebuild and roll the Edge fleet` : `this change would roll the Edge fleet if pushed to dev (${pushed ? `target ${target} does not deploy` : 'not a push'})`;
   return {
     prediction,
     row: row(severity('REFUSED'),
       `${reach}: ${describe(prediction)} — and no pushed commit declares ${ROLL_TAG}. Read from this push's own paths and tags only; an Edge step left stale by an earlier landing is not seen`,
       cureFor(prediction)),
+  };
+}
+
+/**
+ * The `skip-ci` row: a push to dev or main whose tip carries [skip ci], [ci skip] or [no ci] while
+ * the walker selects pipelines. That run dispatches none of them, and it advances the baseline
+ * past the push, so no later diff builds them (orchestrator Jenkinsfile :2657, :204-:230, :3512).
+ * Silent with no skip tag, off a deploying branch, and when the walker selects nothing.
+ */
+export function evaluateSkipCi({ changed, messages, target, walk, registry = () => new Map() }) {
+  if (!DEPLOYING_BRANCHES.includes(target) || !Array.isArray(messages) || !Array.isArray(changed) || !changed.length) return null;
+  if (!parseSkipCi(messages[0] ?? '')) return null;
+  const known = registry();
+  // A pipeline the registry lists without a jenkinsPath is never dispatched (Jenkinsfile :1882).
+  const names = walk(changed).pipelines.map(p => p.name).filter(name => !known.has(name) || known.get(name).jenkinsPath);
+  if (!names.length) return null;
+  return {
+    check: 'skip-ci', level: 'WARN',
+    why: `the tip's skip tag on this push to ${target} means this run dispatches none of ${names.join(', ')}, which this push's paths select, and the next run's diff starts past this push, so no later diff builds them`,
+    cure: 'move the skip tag to a tip that carries documentation only, or drop it from this push\'s tip',
   };
 }
 
@@ -223,16 +285,24 @@ export function readMessages({ root, range, sha, spawn = spawnSync }) {
  * outside a push (`just gate`, `just status gates`), one row as if the change were pushed to dev,
  * never REFUSED. Silent when no changed-path list exists outside a push.
  */
-export function checkFleetRoll({ root, env = process.env, changed, walk = treeWalker(root), spawn = spawnSync, mode = fleetRollMode(root) }) {
+export function checkFleetRoll({ root, env = process.env, changed, walk: rawWalk = treeWalker(root), spawn = spawnSync, mode = fleetRollMode(root), registry: injected }) {
   if (mode === 'off') return null;
-  const registry = () => loadPipelineRegistry(root);
+  // One walk per changed list, shared by the fleet-roll and skip-ci rows.
+  const walked = new Map();
+  const walk = list => { const key = list.join('\n'); if (!walked.has(key)) walked.set(key, rawWalk(list)); return walked.get(key); };
+  let pipelines = null;
+  const registry = injected ?? (() => (pipelines ??= loadPipelineRegistry(root)));
   const pushing = !!(env.GATE_PUSH_TARGETS || env.GATE_PUSH_RANGES !== undefined);
   if (!pushing) {
     if (!Array.isArray(changed)) return null;
     return evaluateFleetRoll({ changed, messages: [], target: null, mode, walk, registry }).row;
   }
   if (env.GATE_PUSH_RANGES === undefined) {
-    return evaluateFleetRoll({ changed, messages: new Error('GATE_PUSH_RANGES is not set by the running pre-push hook'), target: 'dev', mode, walk, registry }).row;
+    // An older hook: the paths alone are judged (header). A missing variable is not an unreadable range.
+    const branches = String(env.GATE_PUSH_TARGETS).split(/\s+/).filter(Boolean)
+      .map(ref => (ref.startsWith('refs/heads/') ? ref.slice('refs/heads/'.length) : ref));
+    const target = branches.find(b => DEPLOYING_BRANCHES.includes(b)) ?? branches[0] ?? 'dev';
+    return evaluateFleetRoll({ changed, messages: [], target, mode, walk, registry, rangesMissing: true }).row;
   }
   const ranges = parseRanges(env.GATE_PUSH_RANGES);
   if (!ranges.length) return null;
@@ -240,8 +310,11 @@ export function checkFleetRoll({ root, env = process.env, changed, walk = treeWa
   const rows = [];
   for (const r of deploying.length ? deploying : ranges.slice(0, 1)) {
     const messages = r.range && r.sha ? readMessages({ root, range: r.range, sha: r.sha, spawn }) : new Error(`malformed range line for ${r.ref}`);
-    const { row: out } = evaluateFleetRoll({ changed, messages, target: r.branch ?? r.ref, mode, walk, registry });
+    const target = r.branch ?? r.ref;
+    const { row: out } = evaluateFleetRoll({ changed, messages, target, mode, walk, registry });
     if (out) rows.push(out);
+    const skip = evaluateSkipCi({ changed, messages, target, walk, registry });
+    if (skip) rows.push(skip);
   }
   return rows;
 }

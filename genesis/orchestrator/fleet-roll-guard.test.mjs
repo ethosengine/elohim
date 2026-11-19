@@ -10,7 +10,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  checkFleetRoll, evaluateFleetRoll, fleetRollMode, parseRanges, readMessages, treeWalker,
+  checkFleetRoll, evaluateFleetRoll, evaluateSkipCi, fleetRollMode, parseRanges, readMessages, treeWalker,
 } from './fleet-roll-guard.mjs';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
@@ -36,8 +36,9 @@ function walkerOf(...pipelines) {
 }
 const CHANGED = ['elohim/sdk/schemas/v1/gate-live-event.schema.json'];
 const registryWithEdge = () => new Map([
-  ['elohim-edge', { pipeline: 'elohim-edge', manualOnly: false }],
-  ['elohim', { pipeline: 'elohim', manualOnly: false }],
+  ['elohim-edge', { pipeline: 'elohim-edge', manualOnly: false, jenkinsPath: 'elohim/holochain/Jenkinsfile' }],
+  ['elohim', { pipeline: 'elohim', manualOnly: false, jenkinsPath: 'Jenkinsfile' }],
+  ['local-only', { pipeline: 'local-only', manualOnly: false }],
 ]);
 const evaluate = (over = {}) => evaluateFleetRoll({
   changed: CHANGED, messages: ['feat(x): a change'], target: 'dev', mode: 'refuse', walk: walkerOf(EDGE_BUILD), ...over,
@@ -138,9 +139,27 @@ test('a forcing tag below the tip is inert, as in CI', () => {
   assert.equal(evaluate({ walk: walkerOf(OTHER), messages: ['feat: tip', 'ci: [build:edge]'] }).row, null);
 });
 
-test('suppressing tags on the tip: [skip ci], [edge:validate-only] (over [build:edge]) and [run:verify] keep Edge from rolling', () => {
+test('a skip tag on the tip rolls nothing but warns that Edge build inputs land unbuilt past the baseline', () => {
+  for (const tip of ['docs: x [skip ci]', 'docs: x [ci skip]', 'docs: x [no ci]', 'docs: [SKIP CI] [build:edge]']) {
+    const { row, prediction } = evaluate({ messages: [tip], registry: registryWithEdge });
+    assert.equal(prediction.roll, false, tip);
+    assert.equal(row.level, 'WARN', tip);
+    assert.match(row.why, /^the tip's \[skip ci\] dispatches nothing for this push to dev: elohim-edge build inputs land unbuilt \(cargo-build-storage, cargo-build-doorway, from /, tip);
+    assert.match(row.why, /the next run's diff starts past this push, and the fleet gets them only with a later forced, declared roll$/, tip);
+  }
+  const validateOnly = evaluate({ messages: ['docs: x [skip ci]'], walk: walkerOf(EDGE_VALIDATE) }).row;
+  assert.equal(validateOnly.level, 'ok', 'validation-only inputs build nothing either way');
+});
+
+test('[edge:validate-only] on the tip warns when it drops other selected pipelines from the run', () => {
+  const { row } = evaluate({ messages: ['measure [edge:validate-only]'], walk: walkerOf(EDGE_BUILD, OTHER) });
+  assert.equal(row.level, 'WARN');
+  assert.match(row.why, /keeps elohim-edge from building or deploying for this push to dev, but it also drops elohim from that run, and once the run ends green the next run's diff starts past this push/);
+  assert.equal(evaluate({ messages: ['measure [edge:validate-only]'], walk: walkerOf(OTHER) }).row.level, 'WARN', 'even with Edge unselected');
+});
+
+test('suppressing tags on the tip: [edge:validate-only] (over [build:edge]) and [run:verify] keep Edge from rolling', () => {
   for (const [tip, tag] of [
-    ['docs: x [skip ci]', '[skip ci]'], ['docs: x [ci skip]', '[skip ci]'], ['docs: x [no ci]', '[skip ci]'],
     ['measure [build:edge] [edge:validate-only]', '[edge:validate-only]'],
     ['measure [edge:validate-only] [deploy-only]', '[edge:validate-only]'],
     ['measure [run:verify]', '[run:verify]'],
@@ -181,10 +200,31 @@ test('a failed git call is an error, never an empty message list', () => {
   assert.match(rows[0].why, /could not be read/);
 });
 
-test('a push whose hook hands over no range refuses; outside a push the check needs a changed list', () => {
-  const rows = checkFleetRoll({ root: '/x', changed: CHANGED, walk: walkerOf(EDGE_BUILD), mode: 'refuse', env: { GATE_PUSH_TARGETS: 'refs/heads/dev' } });
-  assert.equal([].concat(rows)[0].level, 'REFUSED');
-  assert.match([].concat(rows)[0].why, /GATE_PUSH_RANGES is not set/);
+test('an older hook with no ranges variable and no Edge build predicted: no row', () => {
+  const env = { GATE_PUSH_TARGETS: 'refs/heads/dev' };
+  assert.equal(checkFleetRoll({ root: '/x', changed: CHANGED, walk: walkerOf(OTHER), mode: 'refuse', env }), null);
+  assert.equal(checkFleetRoll({ root: '/x', changed: CHANGED, walk: walkerOf(EDGE_VALIDATE), mode: 'refuse', env }), null);
+});
+
+test('an older hook with no ranges variable and an Edge build predicted refuses, naming the hook as the fix', () => {
+  const r = checkFleetRoll({ root: '/x', changed: CHANGED, walk: walkerOf(EDGE_BUILD), mode: 'refuse', env: { GATE_PUSH_TARGETS: 'refs/heads/self/a refs/heads/dev' } });
+  assert.equal(r.level, 'REFUSED');
+  assert.match(r.why, /^this push to dev would rebuild and roll the Edge fleet: elohim-edge builds cargo-build-storage/);
+  assert.match(r.why, /the running pre-push hook hands over no commit range \(GATE_PUSH_RANGES\), so whether a pushed commit declares \[edge:roll\] cannot be read$/);
+  assert.match(r.cure, /^push with -c core\.hooksPath=<worktree>\/\.husky\/_ so the current hook reads the commit messages, or bring the main checkout up to date/);
+  assert.equal(checkFleetRoll({ root: '/x', changed: CHANGED, walk: walkerOf(EDGE_BUILD), mode: 'refuse', env: { GATE_PUSH_TARGETS: 'refs/heads/self/a' } }).level, 'WARN');
+});
+
+test('ranges given but unreadable still refuse, with the fetch cure', () => {
+  const rows = checkFleetRoll({ root: '/x', changed: CHANGED, walk: walkerOf(OTHER), mode: 'refuse',
+    spawn: () => ({ status: 128, stdout: '', stderr: 'fatal: bad object b\n' }),
+    env: { GATE_PUSH_TARGETS: 'refs/heads/dev', GATE_PUSH_RANGES: 'refs/heads/dev a..b' } });
+  assert.equal(rows[0].level, 'REFUSED');
+  assert.match(rows[0].why, /could not be read \(git log -1 b exited 128: fatal: bad object b\)/);
+  assert.equal(rows[0].cure, 'git fetch origin, then push again');
+});
+
+test('outside a push the check needs a changed list', () => {
   assert.equal(checkFleetRoll({ root: '/x', changed: null, walk: walkerOf(EDGE_BUILD), mode: 'refuse', env: {} }), null);
   assert.equal(checkFleetRoll({ root: '/x', changed: CHANGED, walk: walkerOf(EDGE_BUILD), mode: 'refuse', env: {} }).level, 'WARN');
   assert.equal(checkFleetRoll({ root: '/x', changed: CHANGED, walk: walkerOf(EDGE_BUILD), mode: 'off', env: { GATE_PUSH_TARGETS: 'refs/heads/dev' } }), null);
@@ -215,6 +255,39 @@ test('a real pushed range: the declaration in a middle commit is read through gi
   const undeclared = checkFleetRoll({ root: dir, changed: CHANGED, walk: walkerOf(EDGE_BUILD), mode: 'refuse',
     env: { GATE_PUSH_TARGETS: 'refs/heads/dev', GATE_PUSH_RANGES: `refs/heads/dev ${tip}..${tip}` } });
   assert.equal(undeclared[0].level, 'REFUSED', 'a range already upstream still reads its tip, and no declaration');
+});
+
+// ── skip-ci: a skip tag on a deploying tip over code ────────────────────────
+
+const skipEnv = { GATE_PUSH_TARGETS: 'refs/heads/dev', GATE_PUSH_RANGES: 'refs/heads/dev a..b' };
+const gitSays = (...messages) => (cmd, args) => ({ status: 0,
+  stdout: (args.includes('-1') ? messages.slice(0, 1) : messages).map(m => `${m}\x1e\n`).join('') });
+const skipRows = (walk, ...messages) => checkFleetRoll({ root: '/x', changed: CHANGED, walk, mode: 'refuse', env: skipEnv,
+  spawn: gitSays(...messages), registry: registryWithEdge });
+
+test('skip-ci: a skip tag over docs only is silent', () => {
+  assert.deepEqual(skipRows(walkerOf(), 'docs: notes [skip ci]'), []);
+});
+
+test('skip-ci: a skip tag over one pipeline\'s inputs warns, naming it', () => {
+  const rows = skipRows(walkerOf(OTHER), 'docs: notes [skip ci]');
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].check, 'skip-ci');
+  assert.equal(rows[0].level, 'WARN');
+  assert.equal(rows[0].why, "the tip's skip tag on this push to dev means this run dispatches none of elohim, which this push's paths select, and the next run's diff starts past this push, so no later diff builds them");
+  const local = { name: 'local-only', reasons: ['source: x'], steps: [{ name: 's', class: 'build' }], runClass: 'build' };
+  assert.deepEqual(skipRows(walkerOf(local), 'docs: notes [skip ci]'), [], 'a pipeline with no jenkinsPath is never dispatched');
+  const both = skipRows(walkerOf(EDGE_BUILD, OTHER), 'docs: notes [ci skip]');
+  assert.deepEqual(both.map(r => [r.check, r.level]), [['fleet-roll', 'WARN'], ['skip-ci', 'WARN']]);
+  assert.match(both[1].why, /none of elohim-edge, elohim,/);
+});
+
+test('skip-ci: no skip tag, or a feature target, is silent', () => {
+  assert.deepEqual(skipRows(walkerOf(OTHER), 'feat: code'), []);
+  assert.deepEqual(skipRows(walkerOf(OTHER), 'feat: tip', 'docs: below [skip ci]'), [], 'a skip tag below the tip is inert');
+  const feature = checkFleetRoll({ root: '/x', changed: CHANGED, walk: walkerOf(OTHER), mode: 'refuse', spawn: gitSays('docs [skip ci]'),
+    registry: registryWithEdge, env: { GATE_PUSH_TARGETS: 'refs/heads/self/a', GATE_PUSH_RANGES: 'refs/heads/self/a a..b' } });
+  assert.deepEqual(feature, []);
 });
 
 test('only deploying refs are judged when a push carries several', () => {
@@ -284,6 +357,19 @@ const L2B_PATHS = [
   'genesis/a2o/steps/devflow/honest-draw.steps.ts',
   'justfile',
 ];
+
+// Documentation is not always outside every build: build-storybook (app/elohim-library) names nine
+// genesis/docs/content/elohim-protocol documents as sources, the manifesto among them. Walked on
+// 2026-11-19 over every file under genesis/docs and genesis/data/timeline: elohim-storybook was the
+// only pipeline selected, by those nine files alone.
+test('real manifests: a skip tag over docs selects nothing, except the documents storybook builds from', () => {
+  const skipOnDev = changed => evaluateSkipCi({ changed, messages: ['docs: notes [skip ci]'], target: 'dev', walk });
+  assert.equal(skipOnDev(['genesis/data/timeline/backlog/arch-frontend-bundle-seams-backlog.md',
+    'genesis/docs/superpowers/specs/2026-09-23-submodule-pin-attestation-gate-design.md']), null);
+  const manifesto = skipOnDev(['genesis/docs/content/elohim-protocol/manifesto.md']);
+  assert.equal(manifesto?.level, 'WARN');
+  assert.match(manifesto.why, /dispatches none of elohim-storybook,/);
+});
 
 test('real manifests: the seventeen-path L2b stack validates only', () => {
   assert.equal(L2B_PATHS.length, 17);
