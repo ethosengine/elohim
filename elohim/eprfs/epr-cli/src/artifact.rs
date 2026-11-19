@@ -439,6 +439,41 @@ pub const NATIVE_BUILD_ENV: [&str; 9] = [
     "PROTOC",
 ];
 
+/// The C-family flag stems the cc crate reads, alone, `HOST_`/`TARGET_`-prefixed, or
+/// `_<triple>`-suffixed in either spelling.
+const C_FAMILY_FLAGS: [&str; 5] = [
+    "CFLAGS",
+    "CXXFLAGS",
+    "CPPFLAGS",
+    "ASMFLAGS",
+    "CRATE_CC_NO_DEFAULTS",
+];
+
+/// Whether `name` is a C-family build variable (row 29.2): a flags variable in any spelling the
+/// cc crate reads (`CFLAGS`, `CFLAGS_<triple>` underscored or dashed, `HOST_`/`TARGET_` forms,
+/// `CXXFLAGS`, `CPPFLAGS`, `ASMFLAGS`, `CRATE_CC_NO_DEFAULTS`), or a per-target compiler selection
+/// (`CC_*`, `CXX_*`, `HOST_CC`, `TARGET_CC`, `HOST_CXX`, `TARGET_CXX`). Plain `CC`/`CXX` are
+/// [`NATIVE_BUILD_ENV`]. `describe` records each one set, as a build input; `key` and `put` refuse
+/// one set and not recorded with that value.
+pub fn is_c_family_var(name: &str) -> bool {
+    let bare = name
+        .strip_prefix("HOST_")
+        .or_else(|| name.strip_prefix("TARGET_"))
+        .unwrap_or(name);
+    let stem = |stem: &str| {
+        bare.strip_prefix(stem)
+            .is_some_and(|rest| rest.is_empty() || rest.starts_with('_'))
+    };
+    if C_FAMILY_FLAGS.into_iter().any(stem) {
+        return true;
+    }
+    if bare == name {
+        name.starts_with("CC_") || name.starts_with("CXX_")
+    } else {
+        matches!(bare, "CC" | "CXX")
+    }
+}
+
 /// The sole classification table for recorded environment and declared-target inputs.
 /// Benign variables remain method-class if explicitly recorded (resource caps are omitted).
 /// The final fallback covers caller-declared `--env` names, including Cargo's dynamic names.
@@ -531,11 +566,14 @@ fn validate_target_inputs(inputs: &BTreeMap<String, String>) -> ArtifactResult<(
 }
 
 fn is_build_var(name: &str) -> bool {
-    name.starts_with("CARGO_") || name.starts_with("RUST") || NATIVE_BUILD_ENV.contains(&name)
+    name.starts_with("CARGO_")
+        || name.starts_with("RUST")
+        || NATIVE_BUILD_ENV.contains(&name)
+        || is_c_family_var(name)
 }
 
 /// Why `env` is not the environment `descriptor` records (review H3), or `None` when it is: every
-/// `CARGO_*`, `RUST*` and native toolchain variable set must be benign or recorded with the same
+/// `CARGO_*`, `RUST*`, native toolchain and C-family variable set must be benign or recorded with the same
 /// value, and every recorded variable must be set to it (an empty `RUSTFLAGS` and an unset one are
 /// one build).
 pub fn build_env_refusal(

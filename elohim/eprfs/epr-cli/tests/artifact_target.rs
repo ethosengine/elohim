@@ -69,8 +69,14 @@ impl Fixture {
     }
 
     fn describe(&self, extra: &[&str]) -> Output {
+        self.describe_env(extra, &[])
+    }
+
+    /// [`Fixture::describe`] with `env` set in describe's otherwise cleared environment.
+    fn describe_env(&self, extra: &[&str], env: &[(&str, &str)]) -> Output {
         Command::new(env!("CARGO_BIN_EXE_epr"))
             .env_clear()
+            .envs(env.iter().copied())
             .env(
                 "PATH",
                 format!("{}:/bin", self.0.path().join("bin").display()),
@@ -236,5 +242,48 @@ fn artifact_describe_validates_all_target_slots_and_env_extension() {
         let out = fixture.describe(&args);
         assert_eq!(out.status.code(), Some(3), "{args:?}");
         assert!(String::from_utf8(out.stdout).unwrap().contains("target."));
+    }
+}
+
+/// Describe records every C-family variable it sees as a build input, as it records the native
+/// toolchain (row 29.2), and leaves the rest of the environment out.
+#[test]
+fn artifact_describe_records_the_c_family_it_sees() {
+    let fixture = Fixture::new();
+    let family = [
+        ("CFLAGS", "-O2"),
+        ("CXXFLAGS", "-O2"),
+        ("CPPFLAGS", "-DX=1"),
+        ("CFLAGS_x86_64_unknown_linux_gnu", "-march=x86-64"),
+        ("CXXFLAGS_x86_64_unknown_linux_gnu", "-march=x86-64"),
+        ("CFLAGS_x86_64-unknown-linux-gnu", "-march=x86-64"),
+        ("CXXFLAGS_x86_64-unknown-linux-gnu", "-march=x86-64"),
+        ("HOST_CFLAGS", "-O1"),
+        ("TARGET_CFLAGS", "-O1"),
+        ("HOST_CXXFLAGS", "-O1"),
+        ("TARGET_CXXFLAGS", "-O1"),
+        ("CC_x86_64_unknown_linux_gnu", "gcc"),
+        ("CC_x86_64-unknown-linux-gnu", "gcc"),
+        ("HOST_CC", "gcc"),
+        ("TARGET_CC", "gcc"),
+        ("CRATE_CC_NO_DEFAULTS", "1"),
+    ];
+    let env = [&family[..], &[("LDFLAGS", "-s"), ("UNRELATED", "1")]].concat();
+    let out = fixture.describe_env(&[], &env);
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let descriptor: MethodDescriptor = serde_json::from_slice(&out.stdout).unwrap();
+    for (name, value) in family {
+        assert_eq!(
+            descriptor.non_path_inputs.get(name).map(String::as_str),
+            Some(value),
+            "{name}"
+        );
+    }
+    for name in ["LDFLAGS", "UNRELATED"] {
+        assert!(!descriptor.non_path_inputs.contains_key(name), "{name}");
     }
 }

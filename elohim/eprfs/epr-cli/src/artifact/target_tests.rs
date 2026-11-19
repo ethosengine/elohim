@@ -37,6 +37,44 @@ fn artifact_every_recorded_build_variable_has_exactly_one_class() {
 }
 
 #[test]
+fn artifact_c_family_names_every_spelling_the_cc_crate_reads() {
+    for name in [
+        "CFLAGS",
+        "CXXFLAGS",
+        "CPPFLAGS",
+        "ASMFLAGS",
+        "CFLAGS_x86_64_unknown_linux_gnu",
+        "CFLAGS_x86_64-unknown-linux-gnu",
+        "CXXFLAGS_x86_64-unknown-linux-gnu",
+        "HOST_CFLAGS",
+        "TARGET_CXXFLAGS",
+        "CC_x86_64_unknown_linux_gnu",
+        "CXX_x86_64-unknown-linux-gnu",
+        "HOST_CC",
+        "TARGET_CC",
+        "HOST_CXX",
+        "CRATE_CC_NO_DEFAULTS",
+        "CRATE_CC_NO_DEFAULTS_x86_64_unknown_linux_gnu",
+    ] {
+        assert!(is_c_family_var(name), "{name}");
+        assert!(is_build_var(name), "{name}");
+    }
+    // Plain CC/CXX stay native toolchain inputs; linker and look-alike names are not C flags.
+    for name in [
+        "CC",
+        "CXX",
+        "AR",
+        "LDFLAGS",
+        "CFLAGSX",
+        "HOST_CC_x",
+        "CCACHE_DIR",
+        "TARGET",
+    ] {
+        assert!(!is_c_family_var(name), "{name}");
+    }
+}
+
+#[test]
 fn artifact_loaded_target_inputs_refuse_unknown_names_and_invalid_sysroot() {
     for (name, value) in [
         ("target.unknown", "value"),

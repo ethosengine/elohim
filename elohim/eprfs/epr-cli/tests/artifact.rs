@@ -97,11 +97,12 @@ impl Device {
     fn command(&self) -> Command {
         let mut command = Command::new(env!("CARGO_BIN_EXE_epr"));
         // The build environment `epr artifact key|put` judges is this child's: none of the test
-        // harness's own cargo variables reach it.
+        // harness's own cargo or C-family variables reach it.
         for (name, _) in std::env::vars() {
             if name.starts_with("CARGO_")
                 || name.starts_with("RUST")
                 || elohim_epr_cli::artifact::NATIVE_BUILD_ENV.contains(&name.as_str())
+                || elohim_epr_cli::artifact::is_c_family_var(&name)
             {
                 command.env_remove(name);
             }
@@ -1085,6 +1086,46 @@ fn an_unrecorded_cargo_env_var_refuses_the_key() {
     assert!(text(&out).contains("CC=gcc"), "{}", text(&out));
     let out = key_with(&a, &method, &[("CC", "clang")]);
     assert_eq!(out.status.code(), Some(3), "{}", text(&out));
+}
+
+/// The C family is a build input (row 29.2: a v3-default gcc put AVX2 into ring's C): every
+/// spelling the cc crate reads, set and not recorded with that value, refuses the key and put.
+#[test]
+fn an_unrecorded_c_family_var_refuses_the_key() {
+    let keys = TempDir::new().unwrap();
+    let a = Device::new(&keys, "a");
+    let scratch = TempDir::new().unwrap();
+    let declared = "CFLAGS_x86_64_unknown_linux_gnu";
+    let (method, _) = method_file_with(
+        scratch.path(),
+        &["crate/src"],
+        &[(declared, "-march=x86-64")],
+    );
+    key_of(&a, &method, &[(declared, "-march=x86-64")]);
+    for (name, value) in [
+        ("CFLAGS", "-march=native"),
+        ("CXXFLAGS", "-O3"),
+        ("CPPFLAGS", "-DX=1"),
+        ("CFLAGS_x86_64-unknown-linux-gnu", "-march=x86-64-v3"),
+        ("CXXFLAGS_x86_64_unknown_linux_gnu", "-march=x86-64-v3"),
+        ("HOST_CFLAGS", "-mavx2"),
+        ("TARGET_CFLAGS", "-mavx2"),
+        ("TARGET_CXXFLAGS", "-mavx2"),
+        ("CC_x86_64_unknown_linux_gnu", "clang"),
+        ("HOST_CC", "clang"),
+        ("TARGET_CC", "clang"),
+        ("CRATE_CC_NO_DEFAULTS", "1"),
+    ] {
+        let out = key_with(&a, &method, &[(declared, "-march=x86-64"), (name, value)]);
+        assert_eq!(out.status.code(), Some(3), "{name}: {}", text(&out));
+        assert!(text(&out).contains(name), "{name}: {}", text(&out));
+    }
+    // The recorded one set otherwise, or not set, refuses too.
+    let out = key_with(&a, &method, &[(declared, "-march=x86-64-v3")]);
+    assert_eq!(out.status.code(), Some(3), "{}", text(&out));
+    let out = key_with(&a, &method, &[]);
+    assert_eq!(out.status.code(), Some(3), "{}", text(&out));
+    assert!(text(&out).contains(declared), "{}", text(&out));
 }
 
 #[test]

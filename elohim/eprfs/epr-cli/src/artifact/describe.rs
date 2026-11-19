@@ -26,6 +26,12 @@ pub(super) fn describe(options: &Options) -> ArtifactResult<ExitCode> {
             non_path_inputs.insert(name.to_string(), value);
         }
     }
+    // So does every C-family variable the cc crate reads (row 29.2): recorded as it is set.
+    for (name, value) in std::env::vars() {
+        if is_c_family_var(&name) {
+            non_path_inputs.insert(name, value);
+        }
+    }
     for pair in &options.env {
         let (key, value) = pair.split_once('=').ok_or_else(|| {
             ArtifactError::InvalidArguments(format!("--env {pair}: expected K=V"))

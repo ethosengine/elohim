@@ -12,7 +12,9 @@ use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
 use eprfs_core::{BlobCid, MethodDescriptor};
 use serde::Serialize;
 
-use super::super::{CRATE_INPUT, MESH_BUILD, NATIVE_BUILD_ENV, PATH_INPUT, RESOURCE_CAPS};
+use super::super::{
+    is_c_family_var, CRATE_INPUT, MESH_BUILD, NATIVE_BUILD_ENV, PATH_INPUT, RESOURCE_CAPS,
+};
 
 /// Whether a difference can reach the build's bytes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -155,6 +157,12 @@ fn non_path_class(name: &str, remapped: bool) -> (Class, &'static str) {
         return (
             Class::ByteAffecting,
             "cargo and build scripts hand it to native compilation",
+        );
+    }
+    if is_c_family_var(name) {
+        return (
+            Class::ByteAffecting,
+            "the cc crate reads it as a C compiler or its flags",
         );
     }
     if RESOURCE_CAPS.contains(&name) {
