@@ -57,6 +57,9 @@ use elohim_epr::proof::{self, AgentKeypair};
 use rand_core::{OsRng, RngCore};
 use serde::{Deserialize, Serialize};
 
+use elohim_device_runtime::device_key_path::check_key_dir;
+#[cfg(test)]
+use elohim_device_runtime::device_key_path::own_groups;
 pub use elohim_device_runtime::device_key_path::{
     check_override_path, resolve_path, resolve_path_with, DEVICE_KEY_ENV, KEY_FILE_NAME,
 };
@@ -90,71 +93,6 @@ impl std::fmt::Debug for DeviceKey {
             .field("origin", &self.origin)
             .finish()
     }
-}
-
-/// Refuse a key directory that strangers may write: whoever can write it can replace the key.
-/// Only an EXISTING directory is checked — one this module creates is 0700 from birth.
-///
-/// World-writable is always refused. Group-writable is refused unless the directory's group is
-/// one THIS process already holds: a container home volume mounted with a Kubernetes `fsGroup`
-/// (Eclipse Che's is `2770 root:1234`) forces `g+rwx` on every directory the pod creates, and the
-/// only writers that group admits are the pod's own processes. A group this process is not in is
-/// a stranger. On a platform where the process's groups cannot be read, group-writable refuses.
-#[cfg(unix)]
-fn check_key_dir(path: &Path) -> io::Result<()> {
-    use std::os::unix::fs::{MetadataExt, PermissionsExt};
-    let Some(parent) = path.parent().filter(|p| !p.as_os_str().is_empty()) else {
-        return Ok(());
-    };
-    let meta = match fs::metadata(parent) {
-        Ok(meta) => meta,
-        Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(()),
-        Err(e) => return Err(e),
-    };
-    let mode = meta.permissions().mode();
-    let world = mode & 0o002 != 0;
-    let foreign_group = mode & 0o020 != 0 && !own_groups().contains(&meta.gid());
-    if world || foreign_group {
-        return Err(io::Error::new(
-            io::ErrorKind::PermissionDenied,
-            format!(
-                "the device key directory `{}` is writable by {} (mode {:o}, group {}) — anyone \
-                 who can write there can swap the key; `chmod {}` it first",
-                parent.display(),
-                if world {
-                    "everyone"
-                } else {
-                    "a group this process is not in"
-                },
-                mode & 0o7777,
-                meta.gid(),
-                if world { "o-w" } else { "g-w" }
-            ),
-        ));
-    }
-    Ok(())
-}
-
-/// This process's real, effective and supplementary group ids, read from `/proc/self/status`;
-/// empty where that file does not exist (so a group-writable key directory refuses there).
-#[cfg(unix)]
-fn own_groups() -> Vec<u32> {
-    let Ok(status) = fs::read_to_string("/proc/self/status") else {
-        return Vec::new();
-    };
-    status
-        .lines()
-        .filter_map(|line| {
-            line.strip_prefix("Gid:")
-                .or_else(|| line.strip_prefix("Groups:"))
-        })
-        .flat_map(|ids| ids.split_whitespace().filter_map(|id| id.parse().ok()))
-        .collect()
-}
-
-#[cfg(not(unix))]
-fn check_key_dir(_path: &Path) -> io::Result<()> {
-    Ok(())
 }
 
 impl DeviceKey {

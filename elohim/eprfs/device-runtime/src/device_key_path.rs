@@ -95,3 +95,132 @@ pub fn check_override_path(path: &Path) -> io::Result<()> {
     }
     Ok(())
 }
+
+/// Who, beside this process's own uid and groups, may write a path in the device directory.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Stranger {
+    /// The world-write bit is set.
+    Everyone,
+    /// The group-write bit is set for a group this process does not hold.
+    ForeignGroup,
+}
+
+/// The custody rule the device directory is held to, on a mode and group already read: a path is
+/// refused when everyone may write it, or a group this process is not in (`own` is this
+/// process's groups, see [`own_groups`]). Ownership is deliberately not part of the rule — the
+/// uid owning a container's home volume shifts across restarts.
+pub fn stranger_may_write(mode: u32, gid: u32, own: &[u32]) -> Option<Stranger> {
+    if mode & 0o002 != 0 {
+        Some(Stranger::Everyone)
+    } else if mode & 0o020 != 0 && !own.contains(&gid) {
+        Some(Stranger::ForeignGroup)
+    } else {
+        None
+    }
+}
+
+/// The refusal `what` (a path already stat'ed as `meta`) earns under [`stranger_may_write`],
+/// worded as `check_key_dir` words it; `None` when its custody holds.
+#[cfg(unix)]
+pub fn custody_refusal(
+    what: &str,
+    path: &Path,
+    meta: &std::fs::Metadata,
+    consequence: &str,
+) -> Option<io::Error> {
+    use std::os::unix::fs::{MetadataExt, PermissionsExt};
+    let mode = meta.permissions().mode();
+    let stranger = stranger_may_write(mode, meta.gid(), &own_groups())?;
+    let world = stranger == Stranger::Everyone;
+    Some(io::Error::new(
+        io::ErrorKind::PermissionDenied,
+        format!(
+            "{what} `{}` is writable by {} (mode {:o}, group {}) — anyone who can write there \
+             {consequence}; `chmod {}` it first",
+            path.display(),
+            if world {
+                "everyone"
+            } else {
+                "a group this process is not in"
+            },
+            mode & 0o7777,
+            meta.gid(),
+            if world { "o-w" } else { "g-w" }
+        ),
+    ))
+}
+
+/// Refuse a key directory that strangers may write: whoever can write it can replace the key.
+/// Only an EXISTING directory is checked — one `epr` creates is 0700 from birth.
+///
+/// World-writable is always refused. Group-writable is refused unless the directory's group is
+/// one THIS process already holds: a container home volume mounted with a Kubernetes `fsGroup`
+/// (Eclipse Che's is `2770 root:1234`) forces `g+rwx` on every directory the pod creates, and the
+/// only writers that group admits are the pod's own processes. A group this process is not in is
+/// a stranger. On a platform where the process's groups cannot be read, group-writable refuses.
+///
+/// The checkout-trust declaration beside the key is held to this same rule, directory and file
+/// ([`crate::checkout_trust`]): a directory acceptable for the key is acceptable for it.
+#[cfg(unix)]
+pub fn check_key_dir(path: &Path) -> io::Result<()> {
+    let Some(parent) = path.parent().filter(|p| !p.as_os_str().is_empty()) else {
+        return Ok(());
+    };
+    let meta = match std::fs::metadata(parent) {
+        Ok(meta) => meta,
+        Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(()),
+        Err(e) => return Err(e),
+    };
+    match custody_refusal(
+        "the device key directory",
+        parent,
+        &meta,
+        "can swap the key",
+    ) {
+        Some(refused) => Err(refused),
+        None => Ok(()),
+    }
+}
+
+/// This process's real, effective and supplementary group ids, read from `/proc/self/status`;
+/// empty where that file does not exist (so a group-writable key directory refuses there).
+#[cfg(unix)]
+pub fn own_groups() -> Vec<u32> {
+    let Ok(status) = std::fs::read_to_string("/proc/self/status") else {
+        return Vec::new();
+    };
+    status
+        .lines()
+        .filter_map(|line| {
+            line.strip_prefix("Gid:")
+                .or_else(|| line.strip_prefix("Groups:"))
+        })
+        .flat_map(|ids| ids.split_whitespace().filter_map(|id| id.parse().ok()))
+        .collect()
+}
+
+/// No custody rule where the platform has no unix modes.
+#[cfg(not(unix))]
+pub fn check_key_dir(_path: &Path) -> io::Result<()> {
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn strangers_are_everyone_or_a_group_this_process_does_not_hold() {
+        assert_eq!(stranger_may_write(0o600, 7, &[]), None);
+        assert_eq!(stranger_may_write(0o2770, 1234, &[0, 1234]), None);
+        assert_eq!(
+            stranger_may_write(0o2770, 1234, &[0]),
+            Some(Stranger::ForeignGroup)
+        );
+        assert_eq!(
+            stranger_may_write(0o777, 1234, &[1234]),
+            Some(Stranger::Everyone)
+        );
+        assert_eq!(stranger_may_write(0o640, 9, &[]), None, "group-read only");
+    }
+}
