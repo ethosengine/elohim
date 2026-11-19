@@ -547,7 +547,7 @@ advisory are both rejected.
 `memory_replay.rs` untouched as its acceptance test. It stops and reports if a fixture still cannot be
 admitted. It needs its own independent review, then the non-root leg, before push 10.
 
-**Round 5 stopped at 20:13Z as instructed, with the measurement** (head `a3b3ac71d5`: one docs commit,
+**Round 5 stopped at about 20:13Z as instructed, with the measurement** (head `a3b3ac71d5`: one docs commit,
 code unchanged; `memory_replay` still 2 passed / 6 failed at the delivery limit, 8 passed with a wide
 test limit). Measured on the merged faults build with a temporary probe at every gate and every
 metered write (reported by the implementer; probe and tables in session scratch `recovery5/`, not
@@ -570,7 +570,7 @@ durable):
   the base version. Removing the factor would open the admitted-then-refused band for diff3 conflicts.
 - One proven double count: the copy projection adds the initial checkout's upstream images twice.
 
-**Decision (coordinator, 20:14Z), superseding "tighten only" above:** the scratch limit meters the
+**Decision (coordinator, about 20:15Z), superseding "tighten only" above:** the scratch limit meters the
 journal. R3 already took an abort's and a cleanup's retained copy out from under it, so reserving a
 projected copy under that limit refuses work that fits and protects nothing: an unmetered copy cannot
 be refused part-way.
@@ -590,11 +590,47 @@ repository would then be admitted, run for many minutes and write a multi-gigaby
 it is refused in a second); a tight copy model (needs blob reads at admission and left about 134 MB of
 margin in the measured worst case); a larger separate limit for copies (a limit raise standing in for
 a model).
-The same implementer was resumed at 20:14Z with this decision. Owed before any push: `memory_replay`
+The same implementer was resumed at about 20:15Z with this decision. Owed before any push: `memory_replay`
 8 of 8 with the file untouched; journal soundness against measured peaks; a boundary journey and a
 band search across limits, including a diff3 conflict; an abort whose copy exceeds the limit restoring
 exactly; the reviewer's fixtures re-run; then a FRESH adversarial review, the non-root leg and full
 verification.
+
+**Implemented, 22:36Z (reported by the implementer; not yet independently reviewed).** Local head
+`b122f0515d00062af9e025bc78f17a96fdf6eae2` on `sprint3/integrate`, not pushed: `c4cb4ca6` (code and
+journeys), `cc9d7d94` (docs), `692a31a7` (journey margin), `b122f051` (the certain test at admission
+counts the copy's member bytes; `quota_usage`'s figure had included an upper bound of the manifest and
+exceeded a measured copy, 1,037,757 against 870,356).
+- `memory_replay` at the delivery limit: 8 passed, 1 ignored; the file is byte-identical to
+  `080f305797`'s. Full cli-journey on the default build 501 passed / 0 failed / 73 ignored; faults
+  journeys 148; core faults 181 / 1 ignored; power_loss 4; replay unit tests 18; clippy for default,
+  faults and max-pure; docs with `-D warnings`; fmt: every leg EXIT 0.
+- Measured at the delivery limit, 64 MiB fixtures: scaled journal figures 420,137,516 to 839,723,917
+  against measured journal peaks 268,604,247 to 336,519,779; certain-copy figures 134,218,923 to
+  604,002,427 against measured copies 671,420,038 to 806,141,095. On 54 small rebases every admitted
+  one had a scaled journal figure at least its measured peak (ratio 1.16 to 22.1), and the certain
+  figure was at most 0.869 of the smallest copy written.
+- Boundary journeys on the faults build: a clean replay is admitted from 3,356,531 bytes and
+  completes; one byte less is refused before anything changes; a diff3 conflict is admitted from
+  18,256,470. A rebase whose abort copy is larger than the limit is admitted, stops at its conflict,
+  and `--abort` restores HEAD, index, worktree and the user's edit exactly.
+- **Finding and second decision (coordinator, about 22:38Z).** As first built, `reserve` also refused
+  a forward step when the abort's copy already exceeded the limit. The implementer's band search
+  showed that this refuses PLANNED steps after admission on the diff3 fixture: the conflict stop at
+  limits 18,256,470 and 18,541,728, and `--stage` from about 19.4M to 27,099,448 (each before writing,
+  `--abort` restoring exactly). Decided: that check comes out of `reserve`. It stays at the preflight
+  and at admission; `--skip`'s metered copy keeps its scaled reservation. After admission only the
+  metered journal, or a metered skip copy, may refuse. The implementer is making that one change and
+  turning the diff3 journey strict (no refusal after admission at any searched limit).
+- Stated in `docs/rebase.md` and the changelog: the copy can exceed the limit by at most the closure
+  plus the journal plus two index copies plus, for each footprint path, its before-image, worktree
+  file and up to three staged versions, plus the manifest; measured 0.67 to 0.81 GB on the 64 MiB
+  fixtures, 0.94 GB with a stop and a resolution. New refusal thresholds: history over 1 GiB, or about
+  390,000 objects for a one-commit replay.
+- A fresh adversarial reviewer started at about 22:40Z on `a3b3ac71d5..b122f0515d`, first question:
+  can a copy larger than the limit break an abort or a cleanup, or meet any other size cap. Still owed
+  after it: the non-root leg, full verification on both builds, push 10 and CI.
+
 
 **Queued follow-up round, not started.** Publish `metadata-lock-N.json`, `retention-N.json` and the
 other single-pass records whole (spool, rename, sync), or treat an unparseable record as not written;

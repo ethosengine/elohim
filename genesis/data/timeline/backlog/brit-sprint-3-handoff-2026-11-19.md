@@ -528,11 +528,46 @@ and moved on to `0f48e02fbf43`.
   `brit-rebase-cost-gitlinks-and-stranding.md`.
 - `feat/ark-declared-trust` is LANDED on dev as `758fb4f6b` (20:28Z; see "Monorepo side" above). It
   was landed under the steward's "you can push when you get there", after the other device released
-  the lane. Its one behaviour change reaches every device that draws the next epr: `trust_env`
-  withholds the declared checkout trust when the device key directory or the declaration fails the
-  custody check. Both devices were checked first and pass (this one: directory mode 2770, group 1234,
-  held by the process; the other: 2700). For the steward to know, not to decide: this device's first
-  publication of its build notes went out with it (47 new refs under its own destination).
+  the lane. Its one behaviour change — `trust_env` withholds the declared checkout trust when the
+  device key directory or the declaration fails the custody check — reaches a device with the first
+  MARKED release it follows, or with a local build: this landing went before the other device's L2a
+  (the producer that marks releases), so it produced an unmarked release, which that device's follower
+  refuses before a fetch (reported by the other device). Both devices were checked first and pass
+  (this one: directory mode 2770, group 1234, held by the process; the other: 2700). For the steward
+  to know, not to decide: this device's first publication of its build notes went out with it (47 new
+  refs under its own destination).
+- CI after the landing (Jenkins, read-only). `elohim-orchestrator/dev` #2384 checked out `758fb4f6b`:
+  rust-style PASS; elohim-edge dispatched validate-only and then skipped by the already-built filter —
+  no Edge build, no fleet roll; it triggered `elohim-eprfs/dev` #189, which failed, and the
+  orchestrator build with it. #189: `2634 tests run: 2633 passed (1 slow), 1 failed, 1 skipped`; this
+  branch's tests passed there. The one failure predates the landing (identical in #188 on
+  `00dd77dfb` and #190 on `dd3186d7d`): `bin_build_view
+  every_tracked_file_a_build_of_epr_reads_is_inside_the_view`, "no dep-info at …/target/debug/epr.d".
+  Cause (confirmed by the other device in the two recipes): the device gate builds the `epr` and
+  `bin-launch` bins before its tests, the pipeline's test stage ran `cargo nextest` alone. Every device
+  was green and CI was red on that one test from #168 (2026-11-17) to #190; `elohim-eprfs/dev` had no
+  green since #167 and every `elohim-orchestrator/dev` build from #2380 to #2384 failed on it. The
+  other device fixed it on dev as `f27e22e69` (the same build line in the pipeline, and a test that
+  refuses a pipeline whose test stage lacks the gate's bins step). dev is `f27e22e69` (my four commits,
+  then that device's `4ce35271d`, `dd3186d7d`, `f27e22e69`).
+- **For the steward, raised by the other device, not by this sprint:** `elohim-eprfs/dev` #191 on
+  `f27e22e69` has its tests green for the first time since #167 (2634 passed) and then fails in the
+  publish stage: "eprfs-core 0.3.5: immutable version collision; bump the version". Today's `cc` bump
+  in `elohim/eprfs/Cargo.lock` (L1, `2090a4d82`) changed the lock cargo packs into each package, so
+  eprfs-core 0.3.5, eprfs-storage 0.3.8, eprfs-meta 0.3.6 and eprfs-local 0.3.6 differ from the
+  registry's copies (measured by that device against the registry; nothing uploaded). The choices it
+  is bringing: four version bumps, which move `elohim/Cargo.lock` and so an Edge build and deploy; or
+  leaving the packed lock out of the publish comparison for library packages. Until then: no lane of
+  this sprint bumps a published crate or touches `elohim/Cargo.lock` to make CI green.
+- Queued epr-cli lane (the spawn audit: one bin-store `Store` constructor that attaches the device
+  runner; `integrate.rs` `quality_gate` trust; `git.rs` `discover_root` wording; a source-scan test;
+  the waiting `bin.rs` hunk): agreed with the other device to start after the recovery review, in the
+  prepared worktree `brit-s3-ark-trust` on a new branch from dev; one berth line to `a222db7c` before
+  its first cargo build; handed over as a ref before landing; landed only after L2a, as the second of
+  that device's two marked landings; it stays out of `artifact.rs` and the `artifact/` tree; and that
+  device is told whether it changes `follow` or `device supervise` on an arrived device. Not started.
+- Pool: the landing gates left about 18 GB of slots under family `ark`; removed at 20:57Z when the
+  pool read 153 GB of its 150 GB cap. The later lane rebuilds them.
 - `git repack -a -d` in the monorepo.
 - The upstream-owned gix changes in `sprint3/trust` (now merged; `safe.rs` is byte-identical to
   upstream again).
