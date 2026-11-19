@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://elohim.host/schemas/orchestrator/gate-live-notice.schema.json",
   "title": "gate-live notice event",
-  "description": "E12 L1 (row 29.2): a non-red fact an agent must hear while the gate stays green, such as a withheld producer offer. Never a failure: no red count, outlook, first-red time, harvest slice or sibling red reads it. It lives here, beside its only consumer (gate-live-schema.test.mjs), and not in elohim/sdk/schemas/v1/gate-live-event.schema.json, because that directory is a storage build source: editing it would roll Edge for a device-local vocabulary. Moving the whole gate-live schema out of elohim/sdk is on the deliberate-Edge-roll list. The envelope fields are the v1 event schema's own.",
+  "description": "E12 L1 (row 29.2): a non-red fact an agent must hear while the gate stays green, such as a withheld producer offer. Never a failure: no red count, outlook, first-red time, harvest slice or sibling red reads it. It lives here, beside its only consumer (gate-live-schema.test.mjs), and not in elohim/sdk/schemas/v1/gate-live-event.schema.json, because that directory is a storage build source: editing it would roll Edge for a device-local vocabulary. Its end: it is merged with the v1 file into one orchestrator-local schema at the next deliberate Edge roll, which moves the gate-live event schema out of elohim/sdk/schemas/v1 (on the deliberate-Edge-roll list). Until then the two files partition the kinds, held by gate-live-schema.test.mjs. The envelope fields are the v1 event schema's own.",
   "type": "object",
   "additionalProperties": false,
   "required": ["v", "run", "seq", "at", "kind", "project", "notice"],

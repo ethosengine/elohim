@@ -55,7 +55,23 @@ const unanswered = {
 
 function accepts(value) {
   assert.equal(validate(value), true, JSON.stringify(validate.errors, null, 2));
+  // The split between the v1 file and the notice addendum is a partition: an event the writers
+  // emit validates against exactly one of the two, never neither and never both.
+  const both = [validateV1(value), validateNotice(value)].filter(Boolean).length;
+  assert.equal(both, 1, `${value.kind}: validated by ${both} of the two event schemas`);
 }
+
+test('the v1 event kinds and the notice addendum kinds are disjoint, and every kind belongs to one', () => {
+  const v1Kinds = schema.properties.kind.enum;
+  const addendumKinds = [noticeSchema.properties.kind.const];
+  assert.deepEqual(v1Kinds.filter(kind => addendumKinds.includes(kind)), [], 'a kind in both schemas');
+  assert.ok(addendumKinds.every(Boolean), 'the addendum names its kind');
+  // A kind added to neither file fails here: the writers' kinds are the union.
+  for (const kind of ['run-open', 'gate-start', 'failure', 'detail', 'step-failed', 'gate-verdict', 'run-close', 'notice']) {
+    assert.equal([v1Kinds.includes(kind), addendumKinds.includes(kind)].filter(Boolean).length, 1, kind);
+  }
+  assert.match(noticeSchema.description, /merged with the v1 file into one orchestrator-local schema at the next deliberate Edge roll/);
+});
 
 test('validates every event kind from the actual journal and recognizer writers', t => {
   const root = mkdtempSync(join(tmpdir(), 'gate-live-schema-'));
