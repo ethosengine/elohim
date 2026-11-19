@@ -49,7 +49,6 @@
 //! device key's signature over its own did:key and its own canonical directory, so a declaration
 //! copied from another device, moved to another directory, or edited no longer verifies.
 
-use std::ffi::OsString;
 use std::fs::{self, File, OpenOptions};
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
@@ -58,9 +57,9 @@ use elohim_epr::proof::{self, AgentKeypair};
 use rand_core::{OsRng, RngCore};
 use serde::{Deserialize, Serialize};
 
-/// Test-and-tooling override for the key's path. Its only intended uses are tests and the
-/// two-device enrolment rehearsal; an ordinary session resolves the config-home path.
-pub const DEVICE_KEY_ENV: &str = "ELOHIM_DEVICE_KEY_FILE";
+pub use elohim_device_runtime::device_key_path::{
+    check_override_path, resolve_path, resolve_path_with, DEVICE_KEY_ENV, KEY_FILE_NAME,
+};
 
 /// Raw ed25519 seed length in bytes.
 const SEED_LEN: usize = 32;
@@ -91,89 +90,6 @@ impl std::fmt::Debug for DeviceKey {
             .field("origin", &self.origin)
             .finish()
     }
-}
-
-/// Resolve the seed path from the process environment. See [`resolve_path_with`].
-pub fn resolve_path() -> io::Result<PathBuf> {
-    resolve_path_with(|name| std::env::var_os(name))
-}
-
-/// Resolve the seed path from an environment lookup, in order:
-///
-/// 1. `ELOHIM_DEVICE_KEY_FILE`, when set and non-empty — it must be ABSOLUTE and lie outside
-///    every git repository (see [`check_override_path`]); anything else is refused, never used.
-/// 2. `$XDG_CONFIG_HOME/elohim/device/ed25519.seed`, when `XDG_CONFIG_HOME` is set to an
-///    ABSOLUTE path (the XDG base-directory spec says a relative value is invalid and ignored).
-/// 3. `$HOME/.config/elohim/device/ed25519.seed`.
-///
-/// Steps 2 and 3 are the device layout's config-directory rule
-/// ([`elohim_device_runtime::layout::default_config_dir_with`]); only the key-FILE override,
-/// which names a file and is admitted by [`check_override_path`], stays here.
-///
-/// No home at all is an error, never a fallback into the working directory: a key written into a
-/// checkout is exactly the per-clone identity this module exists to avoid.
-///
-/// Takes the lookup as a function so the precedence is testable without mutating the process
-/// environment, which parallel tests share.
-pub fn resolve_path_with<F>(lookup: F) -> io::Result<PathBuf>
-where
-    F: Fn(&str) -> Option<OsString>,
-{
-    let non_empty = |name: &str| lookup(name).filter(|value| !value.is_empty());
-
-    if let Some(explicit) = non_empty(DEVICE_KEY_ENV) {
-        let explicit = PathBuf::from(explicit);
-        check_override_path(&explicit)?;
-        return Ok(explicit);
-    }
-    // The directory rule is the device layout's, so the key and every store beside it agree.
-    let dir = elohim_device_runtime::layout::default_config_dir_with(&lookup).ok_or_else(|| {
-        io::Error::new(
-            io::ErrorKind::NotFound,
-            format!(
-                "no device key path: {DEVICE_KEY_ENV}, XDG_CONFIG_HOME and HOME are all unset — \
-                 the device key lives in the OS user's config home, never in a checkout"
-            ),
-        )
-    })?;
-    Ok(dir.join(KEY_FILE_NAME))
-}
-
-/// The seed's file name inside the device config directory.
-pub const KEY_FILE_NAME: &str = "ed25519.seed";
-
-/// Refuse an `ELOHIM_DEVICE_KEY_FILE` that is relative, or that lies inside a git repository.
-///
-/// The repository test walks up from the path's parent looking for a `.git` entry (a directory in
-/// a clone, a file in a worktree or submodule); the first one found refuses.
-pub fn check_override_path(path: &Path) -> io::Result<()> {
-    if !path.is_absolute() {
-        return Err(io::Error::new(
-            io::ErrorKind::InvalidInput,
-            format!(
-                "{DEVICE_KEY_ENV}=`{}` is relative — a relative key path names a different key in \
-                 every checkout; give an absolute path outside any repository",
-                path.display()
-            ),
-        ));
-    }
-    let mut dir = path.parent();
-    while let Some(current) = dir {
-        if current.join(".git").exists() {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!(
-                    "{DEVICE_KEY_ENV}=`{}` lies inside the git repository at `{}` — a seed in a \
-                     repository is one commit from being published; keep it outside every \
-                     checkout",
-                    path.display(),
-                    current.display()
-                ),
-            ));
-        }
-        dir = current.parent();
-    }
-    Ok(())
 }
 
 /// Refuse a key directory that strangers may write: whoever can write it can replace the key.
@@ -769,6 +685,7 @@ fn hex_decode_lower(text: &str) -> Option<Vec<u8>> {
 mod tests {
     use super::*;
     use std::collections::HashMap;
+    use std::ffi::OsString;
     use std::sync::{Arc, Barrier};
 
     fn env(pairs: &[(&str, &str)]) -> impl Fn(&str) -> Option<OsString> {
