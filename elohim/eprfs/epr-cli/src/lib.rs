@@ -16,6 +16,7 @@ pub mod device;
 pub mod device_key;
 pub mod doctor;
 pub mod error;
+pub mod exercise;
 pub mod explain;
 pub mod feedback;
 pub mod flow;

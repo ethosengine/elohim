@@ -536,6 +536,9 @@ struct ServeCheckOutcome {
     layout: Vec<String>,
     /// Where a queued fetch may install.
     install: String,
+    /// What the check noted without refusing (an exercise step that answered wrongly).
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    notes: Vec<String>,
 }
 
 #[derive(Serialize)]
@@ -706,7 +709,22 @@ fn check_refusal(
     Ok(ExitCode::from(code))
 }
 
+/// The note a failed exercise step leaves on `peer serve --check`. A step that traps never gets
+/// here: the check dies by signal, and the landing that ran it refuses the candidate. A step that
+/// answered wrongly is an exercise bug, never a reason for a device to stop serving.
+fn exercise_note(outcome: Result<(), crate::exercise::Failure>) -> Option<String> {
+    outcome
+        .err()
+        .map(|failure| format!("exercise-failed: {failure}; the check goes on"))
+}
+
 fn serve_check(options: &Options) -> PeerResult<ExitCode> {
+    // First, before the exec floor and before the not-a-device return: this release's own C runs
+    // here, so a candidate built for a CPU this device lacks dies before it can become current.
+    let notes: Vec<String> = exercise_note(crate::exercise::run()).into_iter().collect();
+    for note in &notes {
+        eprintln!("note {note}");
+    }
     let executable_cid = match checked_executable() {
         Ok(cid) => cid,
         Err(error) => return check_refusal(options, 1, "exec-floor", error),
@@ -778,6 +796,7 @@ fn serve_check(options: &Options) -> PeerResult<ExitCode> {
         ok: true,
         layout: layout.lines(),
         install: describe_install(&install),
+        notes,
         executable_cid,
         device: device.key.did_key(),
         node_id: key.node_id().to_string(),
@@ -1704,6 +1723,13 @@ pub struct SiblingArtifact {
     /// the statement in [`Self::requires`] is partial for it.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub gaps: Vec<String>,
+    /// `env:isa-c`: the instruction-set baseline the producer checked its build's C was compiled
+    /// at (`x86-64` for `x86_64-unknown-linux-gnu`), written only after that check. The
+    /// producer's word: a device draws the output only when it equals the baseline it knows for
+    /// its own target. Absent from releases recorded before the producer checked, and `None`
+    /// when a record carries the slot more than once.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub isa_c: Option<String>,
     pub at: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub head_seq: Option<u64>,
@@ -1781,6 +1807,7 @@ fn artifact_from_event(
         release_bin: one_slot(event, "env:release-bin=").map(str::to_string),
         agent_id: optional("env:agentId=")?,
         gaps,
+        isa_c: one_slot(event, "env:isa-c=").map(str::to_string),
         at: event.occurred_at.clone(),
         head_seq: heads.devices.get(device).map(|head| head.seq),
     })

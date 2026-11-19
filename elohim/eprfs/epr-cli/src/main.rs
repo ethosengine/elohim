@@ -38,6 +38,18 @@ fn main() -> ExitCode {
     if raw.first().map(String::as_str) == Some("bin") {
         std::process::exit(elohim_epr_cli::bin::run(&raw[1..]));
     }
+    // `doctor --exercise` runs the C code this release links, in process, before any session or
+    // checkout work: a device judges a release it did not build by how this exits, from wherever
+    // the bytes are staged, so it must need nothing but itself.
+    if raw.len() == 2 && raw[0] == "doctor" && raw[1] == "--exercise" {
+        #[cfg(feature = "peer")]
+        return elohim_epr_cli::exercise::main();
+        #[cfg(not(feature = "peer"))]
+        {
+            eprintln!("epr doctor --exercise: this epr was built without the `peer` feature");
+            return ExitCode::from(2);
+        }
+    }
     // `lsp` is the editor's stdio endpoint and its daemon: it must answer before any session
     // envelope work, renders its own output, and never lets a missing server fail an edit.
     #[cfg(feature = "lsp")]
@@ -430,5 +442,5 @@ fn print_human(report: &Report) {
 }
 
 fn usage() -> &'static str {
-    "epr session id|open [--model MODEL]|show|close|gc [--json]\n\nusage: epr [--repo PATH] [--json] <setup|doctor|explain PATH|check [PATH...]|govern --path REL ...|ready [--target REF] [--deep]|integrate --acceptance CID [--root DIR]|view <declaration> --root DIR [--save STORE] [--json]|feedback <qualify|capacity|measure|reclaim|migrate|policy|record|capture|list|show|group|evidence|triage|propose|link|repair|ingest-genesis> ...|flow ...|actor <claim --as agent:<role>@<model> [--session ID]|current [--session ID]>|canon-lift [--check|--write]|device <ask|redeem|approve> ...|identity <begin|standing> ...|covenant <offer|show|check|record> [--session ID] ...|peer <id|serve|status> ...|artifact <describe|key|put|fetch> ...|lsp <attach|serve|show> ...>"
+    "epr session id|open [--model MODEL]|show|close|gc [--json]\n\nusage: epr [--repo PATH] [--json] <setup|doctor [--exercise]|explain PATH|check [PATH...]|govern --path REL ...|ready [--target REF] [--deep]|integrate --acceptance CID [--root DIR]|view <declaration> --root DIR [--save STORE] [--json]|feedback <qualify|capacity|measure|reclaim|migrate|policy|record|capture|list|show|group|evidence|triage|propose|link|repair|ingest-genesis> ...|flow ...|actor <claim --as agent:<role>@<model> [--session ID]|current [--session ID]>|canon-lift [--check|--write]|device <ask|redeem|approve> ...|identity <begin|standing> ...|covenant <offer|show|check|record> [--session ID] ...|peer <id|serve|status> ...|artifact <describe|key|put|fetch> ...|lsp <attach|serve|show> ...>"
 }

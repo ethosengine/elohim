@@ -23,7 +23,9 @@ default = ["peer", "lsp"]
 # The payload opener (`src/payload.rs`) reads and claims the format marker through
 # elohim-blob-store's `marker` module, the one implementation of it, so `peer` links the crate
 # (its eprfs tier stays behind `blob-store`).
-peer = ["dep:eprfs-peer", "dep:tokio", "dep:elohim-blob-store", "dep:ark-supervisor"]
+# It also links `ring` for `epr doctor --exercise` (`src/exercise.rs`), the bundled-C exercise a
+# device runs on a sibling's release before it lands; the bridges take neither.
+peer = ["dep:eprfs-peer", "dep:tokio", "dep:elohim-blob-store", "dep:ark-supervisor", "dep:ring"]
 # `epr lsp`: one shared, session-attributed language server per toolchain per checkout root.
 lsp = ["dep:elohim-epr-lsp", "dep:tokio"]
 # The `blob-store-v1` payload format (artifact-store E4): `src/payload.rs` creates new payload
@@ -96,6 +98,10 @@ rustix = { version = "1", features = ["fs"] }
 # their vectors and an FTS5 table the lexical provider shares. `bundled` compiles SQLite with FTS5
 # in, so the store does not depend on whichever libsqlite3 a machine happens to carry.
 rusqlite = { version = "0.37", features = ["bundled"] }
+# `epr doctor --exercise` (`peer`): one X25519 agreement and one Ed25519 signature through ring's C,
+# the code a release built for another CPU level trapped in (row 29.2). The version the workspace
+# lock already carries for iroh's TLS stack; no new crate enters the lock.
+ring = { version = "0.17.14", optional = true }
 serde.workspace = true
 serde_json.workspace = true
 serde_yaml.workspace = true

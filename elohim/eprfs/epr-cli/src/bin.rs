@@ -151,11 +151,13 @@ pub(crate) fn execute(args: &[String]) -> Result<String, Refusal> {
                 .copied()
                 .ok_or_else(|| argument("land requires --expect <cid|none>"))?;
             let transition = land_transition(&flags, &options, expected)?;
+            let cid = positional
+                .get(1)
+                .or_else(|| options.get("--cid"))
+                .ok_or_else(|| argument("land requires cid"))?;
+            judge_held(&store, cid)?;
             json!(store.land_expected(
-                positional
-                    .get(1)
-                    .or_else(|| options.get("--cid"))
-                    .ok_or_else(|| argument("land requires cid"))?,
+                cid,
                 options
                     .get("--commit")
                     .ok_or_else(|| argument("land requires --commit"))?,
@@ -164,12 +166,17 @@ pub(crate) fn execute(args: &[String]) -> Result<String, Refusal> {
                 (expected != "none").then_some(expected)
             )?)
         }
-        "pin" => json!(store.pin(
-            &identity,
-            options.get("--cid").copied(),
-            flags.contains("--provisional"),
-            options.get("--repo").map(Path::new)
-        )?),
+        "pin" => {
+            if let Some(cid) = options.get("--cid") {
+                judge_held(&store, cid)?;
+            }
+            json!(store.pin(
+                &identity,
+                options.get("--cid").copied(),
+                flags.contains("--provisional"),
+                options.get("--repo").map(Path::new)
+            )?)
+        }
         "resolve" => {
             let result = if flags.contains("--current") {
                 store.resolve_current(None)?
@@ -297,6 +304,42 @@ pub(crate) fn execute(args: &[String]) -> Result<String, Refusal> {
     serde_json::to_string(&value).map_err(|e| argument(e.to_string()))
 }
 
+/// The cure for a sibling's release whose C this device cannot vouch for.
+const ISA_C_CURE: &str =
+    "the producer rebuilds under the declared target, or build for this device";
+
+/// Before an explicit `land <cid>` or `pin --cid <cid>`: a held release drawn from a sibling
+/// (`gateRun` `sibling:<device>`) runs its own `epr doctor --exercise`, and a signal death, a
+/// timeout or any non-zero exit refuses it. Executing the held bytes needs no sibling record, so
+/// the judgement survives a restart. A release this device built, or one whose record cannot be
+/// read (the store refuses those itself), is not judged here.
+fn judge_held(store: &Store, cid: &str) -> Result<(), Refusal> {
+    if cid.is_empty() || !cid.bytes().all(|b| b.is_ascii_alphanumeric()) {
+        return Ok(());
+    }
+    let dir = store.root().join(cid);
+    let Some(record) = std::fs::read(dir.join("record.json"))
+        .ok()
+        .and_then(|bytes| serde_json::from_slice::<Value>(&bytes).ok())
+    else {
+        return Ok(());
+    };
+    let Some(gate) = record["gateRun"]
+        .as_str()
+        .filter(|gate| gate.starts_with("sibling:"))
+    else {
+        return Ok(());
+    };
+    crate::exercise::judge(&dir.join("epr"), crate::exercise::TIMEOUT).map_err(|verdict| {
+        Refusal {
+            kind: "sibling-exercise-failed".into(),
+            detail: format!(
+                "release {cid} was drawn from a sibling ({gate}) and its own {verdict}; nothing                  was landed or pinned; cure: {ISA_C_CURE}"
+            ),
+        }
+    })
+}
+
 /// Whether `manifest` declares a supervised `peer serve` running `tool`'s landed release: a
 /// process on the tool's channel whose arguments begin `peer serve` (not `--check`).
 pub(crate) fn declares_peer_serve(manifest: &ark_core::RuntimeManifest, tool: &str) -> bool {
@@ -343,6 +386,8 @@ pub(crate) fn daemon_proc_root() -> PathBuf {
 /// The sibling's word is never the authority: the drawn bytes must make the release CID its
 /// Produce named before anything is ingested, and ingest then verifies them like any other bytes.
 pub(crate) mod sibling {
+    #[cfg(feature = "peer")]
+    use super::ISA_C_CURE;
     use super::{Refusal, Store};
     use serde_json::Value;
     use std::path::Path;
@@ -356,6 +401,69 @@ pub(crate) mod sibling {
     /// The cure for an offer whose statement cannot be read here.
     #[cfg(feature = "peer")]
     const RE_PUT: &str = "the sibling re-puts the release with an epr that writes env:requires-doc";
+
+    /// The instruction-set baseline a release's C is built at, by Rust target triple (row 29.2:
+    /// C compiles at the baseline the Rust target already has). A sibling's bin is drawn only
+    /// when its Produce's `env:isa-c` equals the entry for this epr's own target; a target with
+    /// no entry draws nothing from a sibling and builds for itself.
+    #[cfg(feature = "peer")]
+    const C_BASELINES: [(&str, &str); 1] = [("x86_64-unknown-linux-gnu", "x86-64")];
+
+    /// The target triple this epr was compiled for, when it is one [`C_BASELINES`] can name.
+    #[cfg(all(
+        feature = "peer",
+        target_arch = "x86_64",
+        target_os = "linux",
+        target_env = "gnu"
+    ))]
+    const OWN_TARGET: Option<&str> = Some("x86_64-unknown-linux-gnu");
+    #[cfg(all(
+        feature = "peer",
+        not(all(target_arch = "x86_64", target_os = "linux", target_env = "gnu"))
+    ))]
+    const OWN_TARGET: Option<&str> = None;
+
+    /// The baseline [`C_BASELINES`] holds for `target`, with the triple it was found under.
+    #[cfg(feature = "peer")]
+    pub(crate) fn c_baseline(target: Option<&str>) -> Option<(&'static str, &'static str)> {
+        C_BASELINES
+            .into_iter()
+            .find(|(triple, _)| Some(*triple) == target)
+    }
+
+    /// Whether `stated`, one bin's `env:isa-c`, is the baseline this device knows for `target`.
+    /// Missing, unknown and different values are each an unmeasured requirement: no CPU level
+    /// is computed or compared, only the one declared value.
+    #[cfg(feature = "peer")]
+    pub(crate) fn isa_c_admits(
+        bin: &str,
+        offer: &Offer,
+        stated: Option<&str>,
+        target: Option<&str>,
+    ) -> Result<(), String> {
+        let whose = format!("{bin} of release {} from {}", offer.release, offer.device);
+        let Some((triple, baseline)) = c_baseline(target) else {
+            return Err(format!(
+                "unmeasured-requirement: {whose} cannot be judged: this epr knows no C baseline \
+                 for its target ({}-{}), so it reads no env:isa-c as measured; cure: {ISA_C_CURE}",
+                std::env::consts::ARCH,
+                std::env::consts::OS
+            ));
+        };
+        match stated {
+            Some(value) if value == baseline => Ok(()),
+            Some(value) => Err(format!(
+                "unmeasured-requirement: {whose} records env:isa-c={value}, not {baseline}, the \
+                 C baseline this epr knows for {triple}, so the instruction set its C needs is \
+                 unmeasured here; cure: {ISA_C_CURE}"
+            )),
+            None => Err(format!(
+                "unmeasured-requirement: {whose} records no env:isa-c, so the instruction set \
+                 its C was compiled at is unmeasured (this device draws only env:isa-c=\
+                 {baseline}, the C baseline of {triple}); cure: {ISA_C_CURE}"
+            )),
+        }
+    }
 
     /// What the draw left for the follow that runs after it.
     #[derive(Debug, Default)]
@@ -431,6 +539,8 @@ pub(crate) mod sibling {
         pub doc: Option<String>,
         /// The Produce's `env:gaps`: what its recorder could not measure.
         pub gaps: Vec<String>,
+        /// The Produce's `env:isa-c`: the C baseline its producer checked the build against.
+        pub isa_c: Option<String>,
     }
 
     /// The requirement axes a recorder's gap can leave unmeasured: a gap named `<axis>` or
@@ -522,6 +632,7 @@ pub(crate) mod sibling {
                     cid: row.requires.clone(),
                     doc: row.requires_doc.clone(),
                     gaps: row.gaps.clone(),
+                    isa_c: row.isa_c.clone(),
                 },
             );
             if row.at > offer.at {
@@ -824,6 +935,10 @@ pub(crate) mod sibling {
                     offer.release, offer.device
                 ));
             }
+            // Row 29.2: the statement is read from the Rust-visible bytes, and the C a release
+            // links can still need a newer CPU than its clauses say. Only the producer's checked
+            // marker vouches for that, so a bin without it is never fetched.
+            isa_c_admits(bin, offer, stated.isa_c.as_deref(), OWN_TARGET)?;
             admit(bin, &document).map_err(|unmet| {
                 format!(
                     "requirement-unmet: {bin} of release {} from {} cannot run here: {unmet}; \
@@ -921,6 +1036,17 @@ pub(crate) mod sibling {
                     ))
                 })?;
             }
+            // Row 29.2: before ingest executes either bin, the staged epr runs its own bundled C.
+            // A signal death (an instruction this CPU lacks), a timeout or any non-zero exit (a
+            // release from before the exercise has no such verb) leaves nothing ingested.
+            let program = dir.join(BINS[0]);
+            crate::exercise::judge(&program, crate::exercise::TIMEOUT).map_err(|verdict| {
+                Draw::Gap(format!(
+                    "exercise-failed: {} of release {} from {}: the staged bytes' {verdict}; \
+                     nothing was ingested; cure: {ISA_C_CURE}",
+                    BINS[0], offer.release, offer.device
+                ))
+            })?;
             let release = store
                 .ingest(
                     &dir.join(BINS[0]),
@@ -1186,6 +1312,7 @@ mod tests {
             release_bin: (!bin.is_empty()).then(|| bin.into()),
             agent_id: None,
             gaps: Vec::new(),
+            isa_c: None,
             at: at.into(),
             head_seq: None,
         }
@@ -1222,12 +1349,15 @@ mod tests {
 
     #[cfg(feature = "peer")]
     fn sibling_bins(dir: &Path, launcher: &str) {
+        sibling_bins_with(dir, "#!/bin/sh\n# sibling epr\n", launcher);
+    }
+
+    /// A sibling's two bins, the epr one being `epr` (a script `doctor --exercise` runs).
+    #[cfg(feature = "peer")]
+    fn sibling_bins_with(dir: &Path, epr: &str, launcher: &str) {
         use std::os::unix::fs::PermissionsExt;
         std::fs::create_dir_all(dir).unwrap();
-        for (bin, body) in [
-            ("epr", "#!/bin/sh\n# sibling epr\n"),
-            ("bin-launch", launcher),
-        ] {
+        for (bin, body) in [("epr", epr), ("bin-launch", launcher)] {
             std::fs::write(dir.join(bin), body).unwrap();
             std::fs::set_permissions(dir.join(bin), std::fs::Permissions::from_mode(0o755))
                 .unwrap();
@@ -1281,6 +1411,8 @@ mod tests {
             cid: Some(eprfs_core::BlobCid::compute_bytes(&bytes).to_string()),
             doc: Some(URL_SAFE_NO_PAD.encode(&bytes)),
             gaps: Vec::new(),
+            // As a producer that checked its C at the x86_64 baseline records it.
+            isa_c: Some("x86-64".into()),
         }
     }
 
@@ -1408,6 +1540,7 @@ mod tests {
                     cid: good.cid.clone(),
                     doc: None,
                     gaps: Vec::new(),
+                    isa_c: good.isa_c.clone(),
                 },
                 "unmeasured-requirement: ",
                 "offer predates requires-doc",
@@ -1418,6 +1551,7 @@ mod tests {
                     cid: good.cid.clone(),
                     doc: other.doc.clone(),
                     gaps: Vec::new(),
+                    isa_c: good.isa_c.clone(),
                 },
                 "unverifiable-requirement: ",
                 "not the env:requires",
@@ -1427,6 +1561,7 @@ mod tests {
                     cid: good.cid.clone(),
                     doc: Some("not base64!".into()),
                     gaps: Vec::new(),
+                    isa_c: good.isa_c.clone(),
                 },
                 "unverifiable-requirement: ",
                 "base64url",
@@ -1634,6 +1769,7 @@ mod tests {
                 cid: Some("req-cid".into()),
                 doc: Some("req-doc".into()),
                 gaps: Vec::new(),
+                isa_c: None,
             }
         );
         assert_eq!(offer.requires["bin-launch"], sibling::Stated::default());
@@ -1732,6 +1868,7 @@ mod tests {
             };
             row.requires.clone_from(&stated.cid);
             row.requires_doc.clone_from(&stated.doc);
+            row.isa_c.clone_from(&stated.isa_c);
         }
         let offers = sibling::offers(&rows, ME, HEAD);
         assert_eq!(
@@ -1876,5 +2013,222 @@ mod tests {
         ] {
             assert_eq!(sibling::unmeasured_axis_for_test(gap), axis, "{gap}");
         }
+    }
+
+    #[cfg(feature = "peer")]
+    #[test]
+    fn an_offer_without_this_devices_c_baseline_is_refused_before_any_fetch() {
+        // Row 29.2: shem drew a release whose bundled C needed x86-64-v3. A statement that
+        // admits on every clause still does not vouch for the C; only the producer's checked
+        // `env:isa-c` does, and only when it is the baseline this epr knows for its target.
+        let tmp = tempfile::tempdir().unwrap();
+        let store = two_bin_store(tmp.path());
+        let host = host_with_glibc(&[2, 99]);
+        for (marker, why) in [
+            (None, "records no env:isa-c"),
+            (Some("x86-64-v3"), "records env:isa-c=x86-64-v3, not x86-64"),
+            (Some("x86-64-v2"), "records env:isa-c=x86-64-v2, not x86-64"),
+            (Some(""), "records env:isa-c=, not x86-64"),
+        ] {
+            let mut stated = glibc_at_least(&[2, 17]);
+            stated.isa_c = marker.map(str::to_owned);
+            let offer = stating(offer_for("R1"), &stated);
+            let fetched = std::cell::Cell::new(0);
+            match sibling::draw_offer(
+                &store,
+                tmp.path(),
+                &"6".repeat(40),
+                &tmp.path().join("incoming"),
+                &offer,
+                &|_, document| sibling::admit_on(&host, document),
+                &|_, _| {
+                    fetched.set(fetched.get() + 1);
+                    Err("must not fetch".into())
+                },
+            ) {
+                Err(sibling::Draw::Gap(gap)) => {
+                    assert!(gap.starts_with("unmeasured-requirement: "), "{gap}");
+                    assert!(gap.contains(why), "{marker:?}: {gap}");
+                    assert!(
+                        gap.contains(
+                            "cure: the producer rebuilds under the declared target, or \
+                             build for this device"
+                        ),
+                        "{gap}"
+                    );
+                    assert!(!gap.contains("re-put"), "{gap}");
+                }
+                Err(sibling::Draw::Refused(r)) => panic!("a gap, not a refusal: {}", r.detail),
+                Ok(value) => panic!("{marker:?}: an unmarked release was drawn: {value}"),
+            }
+            assert_eq!(fetched.get(), 0, "{marker:?}: nothing is fetched");
+        }
+        // Every bin must carry it: a marked epr beside an unmarked launcher is not drawn.
+        let mut half = stating(offer_for("R1"), &glibc_at_least(&[2, 17]));
+        half.requires.get_mut("bin-launch").unwrap().isa_c = None;
+        let gap = sibling::admissible(&half, &|_, d| sibling::admit_on(&host, d)).unwrap_err();
+        assert!(gap.contains("bin-launch of release R1"), "{gap}");
+        assert!(gap.contains("records no env:isa-c"), "{gap}");
+    }
+
+    #[cfg(feature = "peer")]
+    #[test]
+    fn a_target_with_no_c_baseline_draws_no_sibling_offer() {
+        assert_eq!(
+            sibling::c_baseline(Some("x86_64-unknown-linux-gnu")),
+            Some(("x86_64-unknown-linux-gnu", "x86-64"))
+        );
+        let offer = offer_for("R1");
+        assert_eq!(
+            sibling::isa_c_admits(
+                "epr",
+                &offer,
+                Some("x86-64"),
+                Some("x86_64-unknown-linux-gnu")
+            ),
+            Ok(())
+        );
+        for target in [
+            None,
+            Some("aarch64-unknown-linux-gnu"),
+            Some("x86_64-unknown-linux-musl"),
+        ] {
+            let gap = sibling::isa_c_admits("epr", &offer, Some("x86-64"), target).unwrap_err();
+            assert!(gap.starts_with("unmeasured-requirement: "), "{gap}");
+            assert!(gap.contains("knows no C baseline for its target"), "{gap}");
+        }
+    }
+
+    #[cfg(feature = "peer")]
+    #[test]
+    fn staged_bytes_whose_exercise_fails_are_never_ingested() {
+        // Before ingest runs either bin, the staged epr runs `doctor --exercise`. A signal death
+        // and any non-zero exit (a release from before the verb) each leave the store as it was.
+        for (body, kind) in [
+            ("kill -ILL $$", "the staged bytes' signal: "),
+            ("exit 2", "the staged bytes' exit: "),
+        ] {
+            let tmp = tempfile::tempdir().unwrap();
+            let store = two_bin_store(tmp.path());
+            let landed = tmp.path().join("sibling");
+            sibling_bins_with(
+                &landed,
+                &format!("#!/bin/sh\n{body}\n"),
+                "#!/bin/sh\n# sibling launcher\n",
+            );
+            let release = store.release_cid_of(&landed).unwrap();
+            let commit = "5".repeat(40);
+            let incoming = tmp.path().join("incoming");
+            let serve = serving(&landed);
+            match sibling::take(
+                &store,
+                tmp.path(),
+                &commit,
+                &incoming,
+                &offer_for(&release),
+                &serve,
+                &|_, _| Ok(()),
+            ) {
+                Err(sibling::Draw::Gap(gap)) => {
+                    assert!(gap.starts_with("exercise-failed: epr of release "), "{gap}");
+                    assert!(gap.contains(kind), "{body}: {gap}");
+                    assert!(gap.contains("nothing was ingested"), "{gap}");
+                }
+                Err(sibling::Draw::Refused(r)) => panic!("a gap, not a refusal: {}", r.detail),
+                Ok(value) => panic!("{body}: bytes whose exercise failed were taken: {value}"),
+            }
+            assert!(
+                !store.holds_verified_for(&commit),
+                "{body}: nothing is ingested"
+            );
+            assert!(!incoming.join(format!("sibling-{release}")).exists());
+        }
+    }
+
+    /// A held release `cid` whose record says `gate_run`, with `epr` running `body`.
+    fn held(store_root: &Path, cid: &str, gate_run: &str, body: &str) {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = store_root.join(cid);
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(
+            dir.join("record.json"),
+            json!({"cid": cid, "gateRun": gate_run}).to_string(),
+        )
+        .unwrap();
+        std::fs::write(dir.join("epr"), format!("#!/bin/sh\n{body}\n")).unwrap();
+        std::fs::set_permissions(dir.join("epr"), std::fs::Permissions::from_mode(0o755)).unwrap();
+    }
+
+    #[test]
+    fn an_explicit_land_or_pin_of_a_siblings_release_runs_its_exercise_first() {
+        let tmp = tempfile::tempdir().unwrap();
+        let registry = tmp.path().join("bin-tools.json");
+        std::fs::write(
+            &registry,
+            json!({"version":1,"tools":{"epr":{"bins":["epr","bin-launch"],"aliases":{},
+                "longRunning":[],"candidateEnv":{"epr":["EPR_BIN"]}}}})
+            .to_string(),
+        )
+        .unwrap();
+        let store_root = tmp.path().join("store/epr");
+        let args = |verb: &[&str]| -> Vec<String> {
+            let mut args: Vec<String> = verb.iter().map(|arg| (*arg).to_owned()).collect();
+            for (flag, value) in [
+                ("--registry", registry.to_str().unwrap()),
+                ("--store", store_root.to_str().unwrap()),
+                ("--tool", "epr"),
+            ] {
+                args.push(flag.into());
+                args.push(value.into());
+            }
+            args
+        };
+        held(
+            &store_root,
+            "bafyreicrashed",
+            "sibling:did:key:z6MkA",
+            "kill -ILL $$",
+        );
+        held(&store_root, "bafyreiold", "sibling:did:key:z6MkA", "exit 2");
+        for (cid, kind) in [("bafyreicrashed", "signal: "), ("bafyreiold", "exit: ")] {
+            for verb in [
+                vec!["land", cid, "--expect", "none", "--commit", "c0ffee"],
+                vec!["pin", "--cid", cid],
+            ] {
+                let refusal = execute(&args(&verb)).unwrap_err();
+                assert_eq!(refusal.kind, "sibling-exercise-failed", "{verb:?}");
+                assert!(
+                    refusal.detail.contains(kind),
+                    "{verb:?}: {}",
+                    refusal.detail
+                );
+                assert!(
+                    refusal.detail.contains("sibling:did:key:z6MkA"),
+                    "{}",
+                    refusal.detail
+                );
+            }
+        }
+        // A release this device built is not judged: whatever the store says of it stands.
+        held(&store_root, "bafyreimine", "gate:local", "kill -ILL $$");
+        let refusal = execute(&args(&["pin", "--cid", "bafyreimine"])).unwrap_err();
+        assert_ne!(
+            refusal.kind, "sibling-exercise-failed",
+            "{}",
+            refusal.detail
+        );
+        // A sibling's release whose exercise passes reaches the store.
+        held(
+            &store_root,
+            "bafyreigood",
+            "sibling:did:key:z6MkA",
+            "exit 0",
+        );
+        let refusal = execute(&args(&["pin", "--cid", "bafyreigood"])).unwrap_err();
+        assert_ne!(
+            refusal.kind, "sibling-exercise-failed",
+            "{}",
+            refusal.detail
+        );
     }
 }

@@ -1433,6 +1433,7 @@ dependencies = [
  "libc",
  "object",
  "rand_core 0.6.4",
+ "ring",
  "rusqlite",
  "rustix",
  "serde",

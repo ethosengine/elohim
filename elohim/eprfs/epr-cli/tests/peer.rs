@@ -496,6 +496,105 @@ fn serve_check_takes_no_serve_lock_and_writes_nothing() {
     );
 }
 
+/// `epr peer serve --check` with the exercise fault `fault` injected (test opt-in only).
+fn check_with_fault(device: &Device, policy: &Path, fault: &str) -> Output {
+    device
+        .command()
+        .args([
+            "peer",
+            "serve",
+            "--check",
+            "--root",
+            device.root(),
+            "--policy",
+            policy.to_str().unwrap(),
+            "--json",
+        ])
+        .env("EPR_UNDER_TEST", "1")
+        .env("EPR_EXERCISE_FAULT", fault)
+        .output()
+        .expect("epr runs")
+}
+
+#[test]
+fn serve_check_runs_the_bundled_c_exercise_first_and_notes_a_wrong_answer() {
+    use std::os::unix::process::ExitStatusExt;
+    let (keys, a, _b) = household();
+    let policy = policy(keys.path());
+    // A trap in the exercise kills the check by signal even on a device it would refuse as
+    // not-a-device: the exercise runs before every other step, and death needs no handling.
+    let stranger = Device::new(&keys, "off-roster");
+    let trapped = check_with_fault(&stranger, &policy, "abort");
+    assert_eq!(
+        trapped.status.signal(),
+        Some(libc::SIGABRT),
+        "{:?} {}",
+        trapped.status,
+        String::from_utf8_lossy(&trapped.stderr)
+    );
+    assert!(
+        trapped.stdout.is_empty(),
+        "nothing was reported before the trap"
+    );
+    // A step that answers wrongly is an exercise bug: a note, and the check still passes.
+    HeadTable::default().save(&a.peer_dir()).unwrap();
+    let noted = check_with_fault(&a, &policy, "fail");
+    let stderr = String::from_utf8_lossy(&noted.stderr);
+    assert!(noted.status.success(), "{stderr}");
+    assert!(stderr.contains("note exercise-failed: sqlite"), "{stderr}");
+    let result: serde_json::Value = serde_json::from_slice(&noted.stdout).unwrap();
+    assert_eq!(result["ok"], true, "{result}");
+    assert!(
+        result["notes"][0]
+            .as_str()
+            .is_some_and(|note| note.starts_with("exercise-failed: sqlite")),
+        "{result}"
+    );
+    // Without a fault, the exercise passes and leaves no note.
+    let clean = check_with_fault(&a, &policy, "none");
+    let result: serde_json::Value = serde_json::from_slice(&clean.stdout).unwrap();
+    assert_eq!(result["ok"], true, "{result}");
+    assert!(result.get("notes").is_none(), "{result}");
+}
+
+#[test]
+fn doctor_exercise_answers_in_one_line_or_names_the_failing_step() {
+    use std::os::unix::process::ExitStatusExt;
+    let run = |fault: Option<&str>| {
+        let mut command = Command::new(env!("CARGO_BIN_EXE_epr"));
+        command
+            .args(["doctor", "--exercise"])
+            .current_dir(std::env::temp_dir());
+        if let Some(fault) = fault {
+            command
+                .env("EPR_UNDER_TEST", "1")
+                .env("EPR_EXERCISE_FAULT", fault);
+        }
+        command.output().expect("epr runs")
+    };
+    // Outside any checkout, with no device: the exercise needs nothing but the binary.
+    let ok = run(None);
+    let stdout = String::from_utf8_lossy(&ok.stdout);
+    assert!(
+        ok.status.success(),
+        "{}",
+        String::from_utf8_lossy(&ok.stderr)
+    );
+    assert_eq!(stdout.lines().count(), 1, "{stdout}");
+    assert!(
+        stdout.starts_with("exercise: ok (x25519, ed25519, sqlite)"),
+        "{stdout}"
+    );
+    let failed = run(Some("fail"));
+    assert_eq!(failed.status.code(), Some(1));
+    assert!(
+        String::from_utf8_lossy(&failed.stderr).contains("exercise: failed at sqlite"),
+        "{}",
+        String::from_utf8_lossy(&failed.stderr)
+    );
+    assert_eq!(run(Some("abort")).status.signal(), Some(libc::SIGABRT));
+}
+
 #[test]
 fn serve_check_refuses_bad_heads_policy_and_an_off_roster_device() {
     let (keys, a, _b) = household();

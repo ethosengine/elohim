@@ -892,6 +892,8 @@ fn a_follow_under_the_knob_draws_a_siblings_release_for_head_before_building() {
         [
             format!("env:requires={}", BlobCid::compute_bytes(&bytes)),
             format!("env:requires-doc={}", URL_SAFE_NO_PAD.encode(&bytes)),
+            // As a producer that checked its C at the x86_64 baseline records it (row 29.2).
+            "env:isa-c=x86-64".to_owned(),
         ]
     };
     let stating = |store: &mut SidecarFlowStore, glibc: u32| {
