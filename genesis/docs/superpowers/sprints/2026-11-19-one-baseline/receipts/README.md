@@ -13,3 +13,16 @@ Kept on this hand-over ref so the journal's claims can be checked without either
 
 The fleet-roll check landed on `dev` as `0f48e02fb`, squashed from `self/nt-fleet-roll` (`b4e451a14`, fourteen commits),
 after a bounded last round accepted against a fixed checklist rather than a fourth review.
+
+Added later the same day:
+
+| File | What |
+|---|---|
+| `codex-l2a-review.receipt.md` | review of the producer half (`self/nt-l2a` `22a337c18`): the marker was not bound to the C that was linked |
+| `codex-e11-view-final.receipt.md` | narrow check of the E11 view after the receipt file was removed: the exit-code protocol could not carry two facts |
+| `codex-e11-view-final2.receipt.md` | narrow re-check of the per-attempt result design; closed by ruling |
+| `codex-brit-readonly-review.receipt.md` | review of the brit read-only extension (also beside its patches) |
+
+The E11 rework landed on `dev` as `0fd724eb2`, squashed from `self/nt-e11-view` (`b916cd1fe`, sixteen commits); the squash's
+tree is identical to that head's.
+
