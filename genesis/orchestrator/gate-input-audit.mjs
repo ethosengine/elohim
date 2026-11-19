@@ -33,10 +33,11 @@ export const UNAUDITED_RECIPE_PROJECTS = Object.freeze(['orchestrator-tree']);
 export const SUITE_READ_LISTS = Object.freeze({ orchestrator: 'genesis/orchestrator/suite-reads.json' });
 
 /**
- * Reads every named-side run makes besides the ones the list declares: the dependency set behind
- * node_modules, which the fence does not follow (its contents are install state, named by the lock).
+ * Reads every named-side run makes besides the ones the list declares: what shapes node_modules,
+ * which the fence does not follow (install state: the lock, the workspace, the root manifest's
+ * overrides, and .npmrc's hoisting, which a bare import of an undeclared package rests on).
  */
-export const SUITE_IMPLICIT_READS = Object.freeze(['pnpm-lock.yaml']);
+export const SUITE_IMPLICIT_READS = Object.freeze(['.npmrc', 'package.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml']);
 
 /**
  * The read set of a suite list's named side, in readSet's shape: every declared read, every named

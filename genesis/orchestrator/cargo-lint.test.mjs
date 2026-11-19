@@ -10,7 +10,8 @@ import { createRecognizer } from './gate-failure-lines.mjs';
 
 const wrapper = fileURLToPath(new URL('./cargo-lint.mjs', import.meta.url));
 // A broken toolchain must fail the proof; only a missing cargo executable skips it.
-const cargoAvailable = spawnSync('cargo', ['--version']).error?.code !== 'ENOENT';
+// Probed outside the checkout: in it, rustup reads rust-toolchain and .cargo config files (E11).
+const cargoAvailable = spawnSync('cargo', ['--version'], { cwd: tmpdir() }).error?.code !== 'ENOENT';
 
 test('removes only deny-warnings and carries metadata resolution flags', () => {
   const result = argumentsFor([

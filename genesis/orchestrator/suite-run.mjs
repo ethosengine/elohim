@@ -10,7 +10,7 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { buildPreload, checkLog } from './read-fence.mjs';
+import { buildPreload, checkLog, submodulesOf } from './read-fence.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(HERE, '../..');
@@ -50,6 +50,17 @@ function runSide(suite, side, { env = process.env, spawn = spawnSync } = {}) {
     const common = spawn('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], { cwd: ROOT, encoding: 'utf8' });
     if (common.status !== 0 || !common.stdout.trim()) throw new Error('suite-run: cannot name the git common dir the fence guards');
     childEnv.GATE_READ_FENCE_GITDIR = common.stdout.trim();
+    // Every other checkout of this repository: the main one around a worktree, and siblings.
+    const listed = spawn('git', ['worktree', 'list', '--porcelain'], { cwd: ROOT, encoding: 'utf8' });
+    if (listed.status !== 0) throw new Error('suite-run: cannot list the checkouts the fence guards');
+    const others = listed.stdout.split('\n').filter(line => line.startsWith('worktree ')).map(line => resolve(line.slice(9)))
+      .filter(dir => dir !== ROOT);
+    childEnv.GATE_READ_FENCE_OTHERS = others.join(':');
+    childEnv.GATE_READ_FENCE_SUBMODULES = submodulesOf(ROOT).join(':');
+    // A command found on PATH inside a checkout is that checkout's bytes, not this commit's: the
+    // named side resolves commands from outside every checkout (the device's genesis/agentic/bin is one).
+    const inCheckout = dir => [ROOT, ...others].some(c => dir === c || dir.startsWith(`${c}/`));
+    childEnv.PATH = String(env.PATH || '').split(':').filter(dir => dir && !inCheckout(resolve(dir))).join(':');
     const so = buildPreload({ env, spawn });
     childEnv.GATE_READ_FENCE_SO = so;
     childEnv.LD_PRELOAD = env.LD_PRELOAD ? `${so}:${env.LD_PRELOAD}` : so;
@@ -64,7 +75,7 @@ function runSide(suite, side, { env = process.env, spawn = spawnSync } = {}) {
         if (status === 0) status = code;
       }
     }
-    if (fenced && checkLog(log, process.stdout, suite) !== 0 && status === 0) status = 1;
+    if (fenced && checkLog(log, process.stdout, suite, submodulesOf(ROOT)) !== 0 && status === 0) status = 1;
   } finally {
     if (scratch) rmSync(scratch, { recursive: true, force: true });
   }

@@ -45,6 +45,18 @@ const GIT_ENV = new Set(['GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_COMM
 const inside = (rel, dir) => rel === dir || rel.startsWith(`${dir}/`);
 const ancestorOf = (dir, rel) => dir === '.' || rel === dir || rel.startsWith(`${dir}/`);
 
+/** Submodule paths of the checkout at `root`, from its .gitmodules (empty when it has none). */
+export function submodulesOf(root) {
+  try {
+    return [...fs.readFileSync(path.join(root, '.gitmodules'), 'utf8').matchAll(/^\s*path\s*=\s*(\S+)\s*$/gm)].map(m => m[1]);
+  } catch { return []; }
+}
+
+/** The repository's other checkouts (the main one and sibling worktrees), as suite-run names them. */
+export function othersFromEnv(env = process.env) {
+  return String(env.GATE_READ_FENCE_OTHERS || '').split(':').filter(Boolean).map(p => path.resolve(p));
+}
+
 /** The suite list's entry for one test file, by its path relative to the repository root. */
 export function entryFor(list, rel) {
   for (const group of list.groups) {
@@ -59,10 +71,17 @@ export function entryFor(list, rel) {
  * Judge one read by a named test file. `read` is { op, path } with a repo-relative path; returns
  * null when it is allowed, else the reason.
  */
-export function judgeRead(read, entry, testFile) {
+export function judgeRead(read, entry, testFile, submodules = []) {
   const rel = read.path;
   const reads = entry.reads || [];
   if (inside(rel, PROJECT_DIR) || rel === testFile) return null;
+  // A submodule's files are not blobs of the commit: a **/<name> walk's digest never sees them, so
+  // a read inside one (or a listing of one) needs the gitlink itself, or a prefix above it, declared.
+  const module = submodules.find(s => rel.startsWith(`${s}/`) || (rel === s && LISTING.has(read.op)));
+  if (module) {
+    return reads.some(declared => !isReadPattern(declared) && readCovers(declared, module)) ? null
+      : `read inside submodule ${module}: declare the gitlink ${module}`;
+  }
   if (reads.some(declared => readCovers(declared, rel))) return null;
   if (LISTING.has(read.op)) {
     if (reads.some(isReadPattern)) return null;
@@ -94,14 +113,15 @@ function underRoot(root, value) {
  * Judge one child process. `spawn` is { cmd, args, cwd (absolute), env (the child's, or null when
  * inherited), shellText }. `baseEnv` is the environment the fence process itself started with.
  */
-export function judgeSpawn(spawn, { root, gitDir = null, fence, baseEnv }) {
+export function judgeSpawn(spawn, { root, gitDir = null, others = [], fence, baseEnv }) {
   const base = path.basename(String(spawn.cmd).trim().split(/\s+/)[0] || '');
   const env = spawn.env || baseEnv;
   if (base === 'node' || spawn.cmd === process.execPath) {
     // The fence installs only with its log and root: NODE_OPTIONS alone would load it inert.
     const fenced = String(env.NODE_OPTIONS || '').includes(fence)
       && env.GATE_READ_FENCE_LOG === baseEnv.GATE_READ_FENCE_LOG && env.GATE_READ_FENCE_ROOT === baseEnv.GATE_READ_FENCE_ROOT
-      && env.GATE_READ_FENCE_FILE === baseEnv.GATE_READ_FENCE_FILE && env.GATE_READ_FENCE_GITDIR === baseEnv.GATE_READ_FENCE_GITDIR;
+      && env.GATE_READ_FENCE_FILE === baseEnv.GATE_READ_FENCE_FILE && env.GATE_READ_FENCE_GITDIR === baseEnv.GATE_READ_FENCE_GITDIR
+      && env.GATE_READ_FENCE_OTHERS === baseEnv.GATE_READ_FENCE_OTHERS && env.GATE_READ_FENCE_SUBMODULES === baseEnv.GATE_READ_FENCE_SUBMODULES;
     return fenced ? null : 'node child without the read fence';
   }
   // A child carrying the preload library is seen: read-fence-preload.c logs what it reads and
@@ -110,8 +130,9 @@ export function judgeSpawn(spawn, { root, gitDir = null, fence, baseEnv }) {
   if (so && String(env.LD_PRELOAD || '').split(/[:\s]+/).includes(so)
     && env.GATE_READ_FENCE_SO === so && env.GATE_READ_FENCE_LOG === baseEnv.GATE_READ_FENCE_LOG
     && env.GATE_READ_FENCE_ROOT === baseEnv.GATE_READ_FENCE_ROOT && env.GATE_READ_FENCE_GITDIR === baseEnv.GATE_READ_FENCE_GITDIR
+    && env.GATE_READ_FENCE_OTHERS === baseEnv.GATE_READ_FENCE_OTHERS && env.GATE_READ_FENCE_SUBMODULES === baseEnv.GATE_READ_FENCE_SUBMODULES
     && env.GATE_READ_FENCE_FILE === baseEnv.GATE_READ_FENCE_FILE) return null;
-  const inRepo = value => underRoot(root, value) || (gitDir && underRoot(gitDir, value));
+  const inRepo = value => underRoot(root, value) || (gitDir && underRoot(gitDir, value)) || others.some(o => underRoot(o, value));
   const args = (spawn.args || []).map(String);
   // git -C <dir> works in <dir>, not in its process cwd; the argument check below still refuses a
   // -C, --git-dir or --work-tree that names this repository.
@@ -136,13 +157,13 @@ const CHILD_OP = { open: 'readFileSync', exec: 'readFileSync', stat: 'statSync',
  * A raw row with no file comes from a process no test owns (the runner starting up) and is not
  * judged: every test process and child carries GATE_READ_FENCE_FILE from read-fence.mjs.
  */
-export function judgeRows(rows, list) {
+export function judgeRows(rows, list, submodules = []) {
   return rows.flatMap(row => {
     if (row.reason) return [row];
     if (row.kind !== 'child' || !row.file) return [];
     const entry = entryFor(list, row.file);
     if (!entry || entry.tree) return []; // reported once by the node side, which saw the file run
-    const reason = judgeRead({ op: CHILD_OP[row.op] || 'readFileSync', path: row.path }, entry, row.file);
+    const reason = judgeRead({ op: CHILD_OP[row.op] || 'readFileSync', path: row.path }, entry, row.file, submodules);
     return reason ? [{ ...row, reason }] : [];
   });
 }
@@ -170,11 +191,11 @@ export function buildPreload({ env = process.env, spawn = childProcess.spawnSync
 }
 
 /** Print each violation in a fence log; exit status 1 when there is any. */
-export function checkLog(logPath, out = process.stdout, list = null) {
+export function checkLog(logPath, out = process.stdout, list = null, submodules = []) {
   let text = '';
   try { text = fs.readFileSync(logPath, 'utf8'); } catch (error) { if (error.code !== 'ENOENT') throw error; }
   const all = text.split('\n').filter(Boolean).map(line => JSON.parse(line));
-  const judged = list ? judgeRows(all, list) : all.filter(row => row.reason);
+  const judged = list ? judgeRows(all, list, submodules) : all.filter(row => row.reason);
   // One line per file and path or command: readFileSync and the openSync it makes are one read.
   const byWhat = new Map();
   for (const row of judged) {
@@ -194,6 +215,9 @@ export function checkLog(logPath, out = process.stdout, list = null) {
 function install() {
   const root = path.resolve(process.env.GATE_READ_FENCE_ROOT);
   const gitDir = process.env.GATE_READ_FENCE_GITDIR ? path.resolve(process.env.GATE_READ_FENCE_GITDIR) : null;
+  const others = othersFromEnv();
+  // From suite-run, not .gitmodules: a read here would be this test process's own (and the preload's).
+  const submodules = String(process.env.GATE_READ_FENCE_SUBMODULES || '').split(':').filter(Boolean);
   const log = process.env.GATE_READ_FENCE_LOG;
   const list = JSON.parse(fs.readFileSync(path.join(root, PROJECT_DIR, 'suite-reads.json'), 'utf8'));
   const own = process.execArgv.includes('--test-isolation=process') ? process.argv[1] : null;
@@ -230,7 +254,14 @@ function install() {
       s = path.resolve(s);
       // The object store holds every commit's tree: a read there is a read no declaration names.
       if (gitDir && (s === gitDir || s.startsWith(`${gitDir}/`))) return `<git-dir>/${path.relative(gitDir, s)}`;
-      if (s !== root && !s.startsWith(`${root}/`)) return null;
+      if (s !== root && !s.startsWith(`${root}/`)) {
+        // Another checkout of this repository (the main one around a worktree, a sibling worktree):
+        // its bytes are not this commit's, so no declaration keys them.
+        const other = others.find(o => s === o || s.startsWith(`${o}/`));
+        // A directory above this checkout is on the way to it, not another checkout's bytes.
+        if (!other || root.startsWith(`${s}/`)) return null;
+        return `<other-checkout>${s.slice(other.length) || '/'}`;
+      }
       const r = path.relative(root, s).split(path.sep).join('/') || '.';
       return /(^|\/)node_modules(\/|$)/.test(r) ? null : r;
     } catch { return null; }
@@ -238,7 +269,8 @@ function install() {
   const read = (op, target) => {
     const r = rel(target);
     if (!r) return;
-    const reason = r.startsWith('<git-dir>') ? 'repository object store read' : judgeRead({ op, path: r }, entry, testFile);
+    const reason = r.startsWith('<git-dir>') ? 'repository object store read'
+      : r.startsWith('<other-checkout>') ? 'read of another checkout of this repository' : judgeRead({ op, path: r }, entry, testFile, submodules);
     if (reason) report({ kind: 'read', op, path: r, reason });
   };
   const wrap = (holder, name, label) => {
@@ -261,7 +293,7 @@ function install() {
     const reason = judgeSpawn({
       cmd, args, cwd: opts?.cwd ? String(opts.cwd instanceof URL ? fileURLToPath(opts.cwd) : opts.cwd) : process.cwd(),
       env: opts?.env || null,
-    }, { root, gitDir, fence, baseEnv: process.env });
+    }, { root, gitDir, others, fence, baseEnv: process.env });
     if (reason) report({ kind: 'spawn', cmd: String(cmd).slice(0, 200), args: (args || []).map(String).slice(0, 8).map(a => a.slice(0, 120)), reason });
   };
   for (const name of ['spawn', 'spawnSync', 'execFile', 'execFileSync', 'fork']) {
@@ -298,5 +330,5 @@ if (process.env.GATE_READ_FENCE_LOG && process.env.GATE_READ_FENCE_ROOT && proce
 
 if (process.argv[1] === SELF && process.argv[2] === 'check') {
   const list = JSON.parse(fs.readFileSync(path.join(path.dirname(SELF), 'suite-reads.json'), 'utf8'));
-  process.exitCode = checkLog(process.argv[3], process.stdout, list);
+  process.exitCode = checkLog(process.argv[3], process.stdout, list, submodulesOf(path.resolve(path.dirname(SELF), '../..')));
 }

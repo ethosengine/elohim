@@ -81,6 +81,31 @@ test('git: -C names where it works; the object store and an inherited GIT_DIR ar
     'unfenced child in the repository');
 });
 
+test('a read inside a submodule needs its gitlink declared: a basename walk does not key module files', () => {
+  const subs = ['sophia', 'elohim/rakia'];
+  const walk = { file: 'x.test.mjs', reads: ['**/build-manifest.json'] };
+  assert.equal(judgeRead({ op: 'readFileSync', path: 'app/build-manifest.json' }, walk, testFile, subs), null);
+  assert.equal(judgeRead({ op: 'readFileSync', path: 'sophia/build-manifest.json' }, walk, testFile, subs),
+    'read inside submodule sophia: declare the gitlink sophia');
+  assert.equal(judgeRead({ op: 'readdirSync', path: 'sophia' }, walk, testFile, subs),
+    'read inside submodule sophia: declare the gitlink sophia');
+  const pinned = { file: 'x.test.mjs', reads: ['**/build-manifest.json', 'sophia', 'elohim'] };
+  assert.equal(judgeRead({ op: 'readFileSync', path: 'sophia/build-manifest.json' }, pinned, testFile, subs), null);
+  assert.equal(judgeRead({ op: 'readFileSync', path: 'elohim/rakia/schemas/x.json' }, pinned, testFile, subs), null,
+    'a prefix above the gitlink keys its tree, which holds the pin');
+  assert.equal(judgeRead({ op: 'statSync', path: 'sophia' }, walk, testFile, subs), 'undeclared read', 'probing the gitlink is a read like any other');
+  assert.equal(judgeRead({ op: 'statSync', path: 'sophia' }, pinned, testFile, subs), null);
+});
+
+test('another checkout of the repository is the repository: a child there is not bound to a fixture', () => {
+  const root = '/repo/.worktrees/w';
+  const ctx = { root, gitDir: '/repo/.git', others: ['/repo'], fence: FENCE, baseEnv: { PATH: '/bin' } };
+  assert.equal(judgeSpawn({ cmd: 'bash', args: ['/repo/genesis/agentic/bin/x'], cwd: '/tmp/f', env: null }, ctx),
+    'unfenced child names a repository path');
+  assert.equal(judgeSpawn({ cmd: 'bash', args: ['-c', 'true'], cwd: '/repo/genesis', env: null }, ctx), 'unfenced child in the repository');
+  assert.equal(judgeSpawn({ cmd: 'bash', args: ['-c', 'true'], cwd: '/repository-elsewhere', env: null }, ctx), null);
+});
+
 test('entryFor resolves list paths relative to genesis/orchestrator', () => {
   const list = { groups: [{ runner: 'node', files: [{ file: '../agentic/compute/a.test.mjs', reads: [] }, { file: 'b.test.mjs', tree: 'why' }] }] };
   assert.equal(entryFor(list, 'genesis/agentic/compute/a.test.mjs').file, '../agentic/compute/a.test.mjs');

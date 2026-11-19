@@ -27,6 +27,9 @@ const cleanEnv = Object.fromEntries(
     (!k.startsWith("GIT_") || k.startsWith("GIT_CONFIG_")) &&
     !["HUSKY", "GATE_ON_RED", "GATE_LIVE_RUN", "PUSH_IS_HANDOVER", "RUN_SWEETTEST", "SKIP_SWEETTEST"].includes(k)),
 );
+// The fixture's git reads no device config: a global or system file can name repository paths
+// (core.hooksPath, include.path) the gate key does not cover (E11). Identity is set per fixture.
+Object.assign(cleanEnv, { GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: "/dev/null" });
 
 const exe = (path, text) => {
   mkdirSync(join(path, ".."), { recursive: true });
@@ -164,7 +167,8 @@ function assertOrdinary(r, { status = 0 } = {}) {
 const line = (local, sha, remote, remoteSha = ZERO) => `${local} ${sha} ${remote} ${remoteSha}`;
 
 // The hook's paydown leg runs python3 on every push; without it the fixture cannot be driven.
-if (spawnSync("python3", ["-c", ""]).status !== 0) {
+// Probed outside the checkout: in it, a version manager reads .python-version or .tool-versions (E11).
+if (spawnSync("python3", ["-c", ""], { cwd: tmpdir() }).status !== 0) {
   test("prepush-self needs python3 (the hook's paydown leg runs it)", { skip: "python3 not on PATH" }, () => {});
   process.exit(0);
 }

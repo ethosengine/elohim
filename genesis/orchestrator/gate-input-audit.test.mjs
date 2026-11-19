@@ -654,7 +654,8 @@ test('suiteReadSet: declared reads, named files outside the list dir, the lock; 
     { file: '../../scripts/ci/c.test.mjs', reads: ['scripts/ci'] },
     { file: 'd.test.mjs', tree: 'reads the tree', reads: ['never/keyed.json'] }] }] });
   assert.deepEqual(suiteReadSet(text, 'genesis/orchestrator/suite-reads.json'), {
-    paths: ['**/build-manifest.json', 'genesis/agentic/b.test.mjs', 'pnpm-lock.yaml', 'scripts/ci', 'scripts/ci/c.test.mjs', 'shared/x.json'],
+    paths: ['**/build-manifest.json', '.npmrc', 'genesis/agentic/b.test.mjs', 'package.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml',
+      'scripts/ci', 'scripts/ci/c.test.mjs', 'shared/x.json'],
     unresolved: [],
   });
   for (const bad of ['not json', '{}', JSON.stringify({ groups: [{ files: [{ file: 'a.test.mjs' }] }] })]) {

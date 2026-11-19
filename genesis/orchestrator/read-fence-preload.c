@@ -25,6 +25,7 @@
 #include <unistd.h>
 
 static __thread int busy;
+static char others[4 * PATH_MAX];
 static char root[PATH_MAX], gitdir[PATH_MAX], skip[PATH_MAX], logpath[PATH_MAX], file[512], self_so[PATH_MAX];
 static int ready = -1;
 
@@ -33,6 +34,8 @@ static void init(void) {
   const char *r = getenv("GATE_READ_FENCE_ROOT"), *l = getenv("GATE_READ_FENCE_LOG");
   const char *g = getenv("GATE_READ_FENCE_GITDIR"), *f = getenv("GATE_READ_FENCE_FILE");
   const char *s = getenv("GATE_READ_FENCE_SO");
+  const char *o = getenv("GATE_READ_FENCE_OTHERS");
+  snprintf(others, sizeof others, "%s", o ? o : "");
   if (!r || !l || !*r || !*l) { ready = 0; return; }
   snprintf(root, sizeof root, "%s", r);
   snprintf(logpath, sizeof logpath, "%s", l);
@@ -103,6 +106,18 @@ static void refresh_file(void) {
   if (f && *f) snprintf(file, sizeof file, "%s", f);
 }
 
+// The repository's other checkouts, colon-separated: the main one around a worktree, siblings.
+static int under_other(const char *p) {
+  const char *s = others;
+  while (*s) {
+    const char *e = strchr(s, ':');
+    size_t len = e ? (size_t)(e - s) : strlen(s);
+    if (len && strncmp(p, s, len) == 0 && (p[len] == 0 || p[len] == '/')) return 1;
+    s += len + (e ? 1 : 0);
+  }
+  return 0;
+}
+
 static void json_string(char *out, size_t cap, size_t *at, const char *s) {
   if (*at < cap) out[(*at)++] = '"';
   for (; *s && *at + 7 < cap; s++) {
@@ -152,6 +167,8 @@ static void seen(int dirfd, const char *path, const char *op) {
       char rel[PATH_MAX + 16];
       snprintf(rel, sizeof rel, "<git-dir>%s", abs + strlen(gitdir));
       emit("child", op, rel, "repository object store read");
+    } else if (!under(root, abs) && under_other(abs) && !under(abs, root)) { // an ancestor is on the way here
+      emit("child", op, abs, "read of another checkout of this repository");
     } else if (under(root, abs) && !under(skip, abs) && !strstr(abs, "/node_modules/") && !strstr(abs, "/node_modules")) {
       emit("child", op, abs[strlen(root)] ? abs + strlen(root) + 1 : ".", NULL);
     }
@@ -263,26 +280,40 @@ static int resolve_program(const char *name, char *out) {
   return 0;
 }
 
-static int names_repo(const char *value) {
-  const char *dirs[2] = { root, gitdir };
-  for (int d = 0; d < 2; d++) {
-    size_t n = strlen(dirs[d]);
-    if (!n) continue;
-    for (const char *at = strstr(value, dirs[d]); at; at = strstr(at + 1, dirs[d])) {
-      char next = at[n];
-      if (next == 0 || next == '/' || !(next == '_' || next == '.' || next == '-' || (next >= '0' && next <= '9')
-          || (next >= 'a' && next <= 'z') || (next >= 'A' && next <= 'Z'))) return 1;
-    }
+static int names_dir(const char *value, const char *dir, size_t n) {
+  if (!n) return 0;
+  for (const char *at = value; (at = strstr(at, dir)) != NULL; at++) {
+    if (strncmp(at, dir, n)) continue;
+    char next = at[n];
+    if (next == 0 || next == '/' || !(next == '_' || next == '.' || next == '-' || (next >= '0' && next <= '9')
+        || (next >= 'a' && next <= 'z') || (next >= 'A' && next <= 'Z'))) return 1;
   }
   return 0;
 }
+
+static int names_repo(const char *value) {
+  if (names_dir(value, root, strlen(root)) || names_dir(value, gitdir, strlen(gitdir))) return 1;
+  for (const char *s = others; *s;) {
+    const char *e = strchr(s, ':');
+    size_t len = e ? (size_t)(e - s) : strlen(s);
+    char one[PATH_MAX];
+    if (len && len < sizeof one) {
+      memcpy(one, s, len);
+      one[len] = 0;
+      if (names_dir(value, one, len)) return 1;
+    }
+    s += len + (e ? 1 : 0);
+  }
+  return 0;
+}
+
 
 // An exec the library will not follow is acceptable when nothing ties it to the repository: its
 // cwd is outside it, and no argument, and no environment value but where-the-shell-was, names it.
 static int fixture_bound(const char *program, char *const argv[], char *const envp[]) {
   char cwd[PATH_MAX];
   if (syscall(SYS_getcwd, cwd, sizeof cwd) <= 0) return 0;
-  if (under(root, cwd) || (gitdir[0] && under(gitdir, cwd))) return 0;
+  if (under(root, cwd) || (gitdir[0] && under(gitdir, cwd)) || under_other(cwd)) return 0;
   if (names_repo(program)) return 0;
   for (char *const *a = argv; a && *a; a++) if (names_repo(*a)) return 0;
   for (char *const *e = envp; e && *e; e++) {

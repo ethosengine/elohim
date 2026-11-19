@@ -841,15 +841,16 @@ test('E11: orchestrator keys on its suite list, orchestrator-tree on the whole t
   const revs = [base, docs, data, outside, relisted];
   const named = revs.map(rev => at(gateProject('orchestrator', 'gate'), rev));
   const tree = revs.map(rev => at(gateProject('orchestrator-tree', 'gate-tree'), rev));
-  // pnpm-lock.yaml (implicit), shared/data.json, and the named test outside the project dir.
-  assert.match(named[0].line, /closure scope paths \(3 reads\)/, named[0].line);
+  // The four implicit install-state reads (.npmrc, package.json, pnpm-lock.yaml, pnpm-workspace.yaml),
+  // shared/data.json, and the named test outside the project dir.
+  assert.match(named[0].line, /closure scope paths \(6 reads\)/, named[0].line);
   assert.match(tree[0].line, /closure scope tree/, tree[0].line);
   assert.equal(named[1].key, named[0].key, 'a documentation commit keeps the named suite closure: its evidence still hits');
   assert.notEqual(tree[1].key, tree[0].key, 'a documentation commit re-keys orchestrator-tree');
   assert.notEqual(named[2].key, named[1].key, 'a declared read re-keys the named suite');
   assert.notEqual(named[3].key, named[2].key, 'a named test file outside the project dir re-keys it');
   assert.notEqual(named[4].key, named[3].key, 'the list itself re-keys it');
-  assert.match(named[4].line, /closure scope paths \(4 reads\)/);
+  assert.match(named[4].line, /closure scope paths \(7 reads\)/);
 });
 
 test('non-Rust projects and Cargo steps without covered Rust files get unknown tree scope', t => {
