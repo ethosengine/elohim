@@ -43,7 +43,7 @@ has not moved.
 
 **Integration branch** `sprint3/integrate` in the brit repo, worktree
 `/projects/elohim/.worktrees/brit-s3-integrate`. Pushed to the brit remote as
-`run-ci/sprint3-integrate` four times, through `brit push` and brit's reach gate (`epr ready` +
+`run-ci/sprint3-integrate` six times, through `brit push` and brit's reach gate (`epr ready` +
 `scripts/ci/rust-style.sh`). The first three pushes took about 6 s each; the fourth exited 0.
 
 | Pushed head | CI run |
@@ -52,10 +52,27 @@ has not moved.
 | `da5e4a0504` | 44477093766 |
 | `7479ce4539` | 44481834878: finished. Every Linux and macOS job green. The two cross-platform compile fixes worked (Windows built and ran about 5,670 tests). Red: four tests on both Windows runners, all from the build-inputs lane, plus cargo-deny-advisories (red on main too) and therefore `Tests pass` |
 | `bd28ecd8cf6c9593c77825d734e7fb38e1923534` | 44494603484: every required job green on Linux, macOS and both Windows runners; only cargo-deny-advisories red (as on main) |
+| `9945331577` | 44528984349: green on Linux and macOS. On both Windows runners ONE unit test red, `gitoxide_core::repository::git_spellings::rev_parse::tests::relative_paths_match_git`: `relative_path` rendered a collected PathBuf with `display()`, so Windows joined with `\` where the test asserts git's `/`. The journeys for the same cause had been gated before the push; this unit test was missed |
+| `e2b94f2da7dc11597222bd7074ebc657deb7cb28` | 44544779620, in progress when this was written |
 
 A second integrator took over from the runbook note below and did the phase from `7479ce4539` to
 `bd28ecd8cf`. Besides the lane merges, that phase made two integration commits: `4f1d05a93a` (one
 fixture test gated to Unix) and `bd28ecd8cf` (`FingerprintError` marked non-exhaustive).
+
+A third integrator took over from the same note for the refs-shem and trust merges; the note has a
+"Phase 4 (second integrator)" section. Merged in that phase:
+
+- **refs-shem:** merge `b9b4a294fc` of `806ea8114b`. Integration commits: `b2cc6435fc` (census and
+  guard-scope journey for the spellings and `-C`), `b6451a07be` (changelog), `9945331577` (gating of
+  `rev_parse.rs`, `change_dir.rs` and `ls_remote_matches_git` to Unix).
+- **trust:** merge `38427b921b` of lane tip `bb0dd28837`, no textual conflict. Integration commits:
+  `d3452c7816` (a failure reported to a closed stderr keeps its code and is recorded:
+  `brit log no-such-rev` and `brit branch delete no-such-branch` exited 101 before, 1 after);
+  `5e4327182c` (the read-only list's doc sentence); `1764e989ee` (changelogs); `c55525d236`
+  (`rev-parse`'s relative answers print `/` on every platform: `--show-toplevel`, `--git-dir`,
+  `--git-common-dir` after `--path-format=relative`, and `--git-common-dir` without a format when it
+  answers relative); `e2b94f2da7` (eight ssh-refusal snapshots updated for the new error layout,
+  which the lane had left stale).
 
 **Lanes** (each in its own worktree under `/projects/elohim/.worktrees/`):
 
@@ -67,33 +84,40 @@ fixture test gated to Unix) and `bd28ecd8cf` (`FingerprintError` marked non-exha
 | `sprint3/fetch-tracking` | `06616a06` | merged | `brit-s3-fetch-tracking` |
 | `sprint3/lock` | `63173728` | merged | `brit-s3-lock` |
 | `sprint3/build-inputs` | `0feb451a`; Windows follow-up tip `a3a874d4` (commits `7810a60e`, `4f1dd2c8`, `a3a874d4`) | merged; follow-up merged in `bd28ecd8cf` | `brit-s3-build-inputs` |
-| `sprint3/trust` | `d96ff65b2d` | independent review partial (see below), one regression being fixed, not merged | `brit-s3-trust` |
+| `sprint3/trust` | `bb0dd28837` | merged (`38427b921b`) | `brit-s3-trust` |
 | `sprint3/push-transport` | `4a60a61d` | merged in `bd28ecd8cf` (three implementation rounds, two independent reviews, a doc-link fix) | `brit-s3-push-transport` |
-| `sprint3/diff-show` | `3d10b379cf` | independent review partial (see below), not merged | `brit-s3-diff-show` |
-| `sprint3/refs-shem` | `806ea8114b` (shem's `b8264afc4`) | sixteen patches applied after shem's two fix rounds; merge into the integration branch in progress | `brit-s3-refs-shem` |
+| `sprint3/diff-show` | `5a422ceb51` | two review passes and a delta review; merge in progress, not merged | `brit-s3-diff-show` |
+| `sprint3/refs-shem` | `806ea8114b` (shem's `b8264afc4`) | merged (`b9b4a294fc`) | `brit-s3-refs-shem` |
+| `sprint3/recovery` | `0d23297e22` | second round in progress; not mergeable until a delta review passes (see `brit-rebase-cost-gitlinks-and-stranding.md`) | `brit-s3-recovery` |
 
 **Monorepo side:** branch `feat/ark-declared-trust` (worktree `brit-s3-ark-trust`), first written as
 three commits on origin/dev `01e4de7f1`, is now four commits (tip `d14e7357f`), reviewed, awaiting
-rebase onto the landed dev.
+rebase onto the landed dev. dev landed at `71069b1f551f` (the other ethosengine session's one push: L2b's
+eight commits, then L1's twenty-five). `feat/ark-declared-trust` and the queued epr-cli
+`device_store(…)` lane can rebase onto it; that is deferred until the brit integration frees room in
+the shared cargo pool. Announce over berth before anything lands under `elohim/eprfs`: that session's
+next landing, L2a, touches epr-cli's artifact and produce paths.
 
 **This record** is on monorepo branch `docs/brit-backlog-sprint3` (worktree `brit-s3-backlog`).
 
-### Review state of the unmerged lanes
+### Review state of the lanes merged or merging in this phase
 
-- **refs-shem:** shem delivered two fix rounds after two independent review passes on its side. Its
+- **refs-shem** (merged): shem delivered two fix rounds after two independent review passes on its side. Its
   reviewer found, among others, a change that could send a mutating command to an outer repository;
   it was removed in patch 0013. Sixteen patches are now applied as `sprint3/refs-shem` `806ea8114b`
   (shem's `b8264afc4`); the merge into the integration branch is in progress. A deliberate difference
   from git is kept: `rev-parse --verify missing` with a closed stderr exits 128 where git dies with
   141.
-- **trust:** independent review partial. No security defect in the trust decision: it agrees with git
+- **trust** (merged; final review state in `brit-declared-trust-and-reduced-trust-pack-cap.md`):
+  the first, partial review read: no security defect in the trust decision: it agrees with git
   2.52 across exact root, parent/child/sibling, wildcards, symlinks, linked worktrees, bare,
   submodules, repo-local config and includes, and hooksPath. One regression is being fixed: a
   multi-pack-index over more than 512 packs is refused at reduced trust where 0.2.6 opened it; the
   count must follow gix-odb's midx-aware accounting. Env-scope `includeIf` grants where git refuses
   (low). The error-printer commit and most tests are not yet reviewed. Details:
   `brit-declared-trust-and-reduced-trust-pack-cap.md`.
-- **diff-show:** independent review partial. `brit diff`: 1,155 of 1,230 comparisons byte-identical to
+- **diff-show** (merge in progress; final state in `brit-porcelain-gaps-census-2026-11.md`): the
+  first, partial review read: `brit diff`: 1,155 of 1,230 comparisons byte-identical to
   git, the other 75 clean refusals from one file carrying a `diff=<driver>` attribute; worktree forms
   100% identical except refusals for intent-to-add entries and a conflicted index; shallow merge-base
   264/264. `brit show` is verified on ordinary commits only (122 of 132 identical, 10 driver
@@ -185,13 +209,20 @@ rebase onto the landed dev.
    `brit-rebase-cost-gitlinks-and-stranding.md`: (a) the stranding fixes (report §7 a–d) plus a
    preflight that refuses before any spooling when completion is impossible; (b) the redesign (report
    §6), after the steward's decision on the retained-manifest format below. Rebase stays a declared
-   git fallback on both devices.
-2. An independent integrator merges `sprint3/trust`, `sprint3/diff-show` and `sprint3/refs-shem` as
-   each clears review (`sprint3/push-transport` is merged; the `sprint3/refs-shem` merge is in
-   progress).
+   git fallback on both devices. Step (a) has started as lane `sprint3/recovery` (in progress, see the
+   lane table).
+2. An independent integrator merges `sprint3/diff-show` once it clears review (merge in progress;
+   `sprint3/push-transport`, `sprint3/refs-shem` and `sprint3/trust` are merged).
 3. A push-policy lane (`push.rs`): one handshake when no hook ran; the notes/tag fast-forward rule;
    refuse an ungated push when hooks are configured but missing or not executable; render the delivery
-   note in the CLI. See `brit-push-fails-after-green-hook-root-cause.md`.
+   note in the CLI. See `brit-push-fails-after-green-hook-root-cause.md`. Also for this lane: push's
+   status lines use `writeln!(stderr, …)?` (`gitoxide-core/src/repository/push.rs`), so a DELIVERED
+   push with a closed stderr exits non-zero.
+   - Closed-pipe leftovers: `println!` to a closed stdout still panics (exit 101) in brit-build-ref (21
+     sites), brit-verify (7), brit-cli (3) and `brit build fingerprint` / `build graph discover`; no
+     brit binary installs a panic hook. `brit log` prints a commit message with an `encoding` header as
+     raw bytes (`show` is fixed on the diff-show lane; `log` is separate code). `-C` refusals name the
+     clap id `change_dir`.
 4. The epr-cli lane: a `device_store(…)` constructor that always attaches `DeviceRunner`, and a
    source-scan test, stacked on `feat/ark-declared-trust` after shem's L2b lands; `bin.rs` waits for
    the landed sha. See `brit-declared-trust-and-reduced-trust-pack-cap.md` (epr-cli spawn audit).
@@ -200,6 +231,14 @@ rebase onto the landed dev.
 
 ## What needs the steward
 
+- **Moving the brit pin on dev selects an Edge image build in CI.** `build-edge-image` in
+  `elohim/holochain/build-manifest.json` declares `depends` on `cargo-build-doorway`,
+  `cargo-build-storage`, `elohim-holochain:build-happ`, `elohim-brit:brit-ci` and
+  `elohim-rakia:rakia-ci` (read on this branch). CI's `build-graph.groovy` propagates staleness through
+  `depends`; the JS walker `genesis/orchestrator/graph-walker.mjs` does NOT (and ignores dotfiles), so a
+  by-hand walker check shows nothing for a pin move. Found by shem 2026-11-19; shem is building a
+  preflight that predicts it. The ark branch was re-checked against `depends`: Edge depends on nothing
+  from elohim-eprfs or elohim-ark.
 - Landing on brit `main` and the pin move. 16 monorepo steps re-key once (build-inputs above); one
   supervised real landing is needed to retire the push exception in `CLAUDE.md`. Its notes step is the
   device's own notes publish, fast-forward to `refs/notes/brit/devices/<did>/build/*`, which brit must
@@ -210,15 +249,20 @@ rebase onto the landed dev.
   to EVERY new copy, not only shallow ones as scoped earlier, so an older brit fails closed on any copy
   a newer one wrote. This reverses the approved scope; see
   `brit-rebase-cost-gitlinks-and-stranding.md`.
-- Landing `feat/ark-declared-trust` on dev behind shem's L1/L2a/L2b, with the one-line notice.
+- Landing `feat/ark-declared-trust` on dev, with the one-line notice: dev now carries L2b and L1
+  (`71069b1f551f`); the rebase onto it is deferred (see "Monorepo side" above), and L2a is that
+  session's next landing.
 - `git repack -a -d` in the monorepo.
-- The upstream-owned gix changes in `sprint3/trust`.
+- The upstream-owned gix changes in `sprint3/trust` (now merged; `safe.rs` is byte-identical to
+  upstream again).
 - Trust for linked worktrees.
 - The local-only commit `5d53c7ac8`.
 - brit-graph (0.2.1) gained an error variant and `#[non_exhaustive]` on
   `brit_graph::fingerprint::FingerprintError`, so it needs a version bump at release.
 - brit's crate releases are recorded in `brit-epr/CHANGELOG.md`; `brit-cli/CHANGELOG.md` does not
   record brit-graph API changes.
+- gix gained `REDUCED_TRUST_MAX_PACK_INDEXES` and gix-odb `Store::count_index_slots`, so both need
+  version bumps at release; brit-epr gained a public `diagnostic` module and a gix-error dependency.
 - A write-set for `elohim/rakia`, for one of two items: the rakia-core selection hole needs one;
   nothing is needed there for the slot wall.
 - The spawn audit in `brit-declared-trust-and-reduced-trust-pack-cap.md` was run on a monorepo
@@ -233,8 +277,11 @@ rebase onto the landed dev.
 
 - Hand-over ref: `origin self/nt-review-receipts`. shem's two refs-lane fix rounds have arrived
   (shem's `b8264afc4`, applied as `sprint3/refs-shem` `806ea8114b`).
-- shem's lanes in flight: `merge-base --is-ancestor` and `rev-list --count`, which the refs lane now
-  also brings; and L1/L2a/L2b, which `feat/ark-declared-trust` lands behind.
+- The refs lane (merged) brought `merge-base --is-ancestor` and `rev-list --count`.
+- Agreed with shem for sprint 4, under shem's lane: Windows `/` separators for rev-parse's ABSOLUTE
+  answers (helper `gix_path::to_unix_separators_on_windows`). Extending the read-only command list is
+  shem's, after trust and diff-show are merged, together with replacing `println!` in the build
+  commands.
 
 ## Integration runbook
 

@@ -24,8 +24,8 @@ cites:
   - elohim/eprfs/epr-cli/src/git.rs
   - elohim/eprfs/device-runtime/src/layout.rs
 shift_objective: |
-  An independent integrator merges lane sprint3/trust into sprint3/integrate once it clears
-  review (decided order: brit-sprint-3-handoff-2026-11-19.md).
+  Lane sprint3/trust is merged into sprint3/integrate (38427b921b). What remains is landing it on
+  brit main and moving the pin (steward; see brit-sprint-3-handoff-2026-11-19.md).
 ---
 
 # brit at reduced trust: command-scope safe.directory and the 32-slot pack cap
@@ -54,7 +54,7 @@ This is the reduced-trust leftover of
 `brit-build-fingerprint-cannot-resolve-any-commit-in-monorepo.md`, whose full-trust case is fixed in
 brit 0.2.6.
 
-## Lane `sprint3/trust` (tip `d96ff65b2d`, in review, not merged)
+## Lane `sprint3/trust` (first reviewed at `d96ff65b2d`; merged at tip `bb0dd28837`)
 
 - gix honours command-scope `safe.directory`.
 - At reduced trust, slots are sized from the pack indexes present, up to a ceiling of 512, with one
@@ -90,6 +90,41 @@ Differences from git the review measured that pre-date the lane (not introduced 
 
 What a grant unlocks: hooks, including a repository-chosen `core.hooksPath`; the editor in replay;
 repo-local ssh and credential config. NOT external filters, which brit refuses.
+
+### Merged on the integration branch, final review state (2026-11-19)
+
+Merged into `sprint3/integrate` (merge `38427b921b` of lane tip `bb0dd28837`). Not on brit `main`, not
+pinned.
+
+- Three independent review passes; no security defect.
+- The trust decision matches git 2.52 in all seventeen cases of the final table, including one 0.2.6
+  got wrong: a global `*` followed by an empty value from the environment, where git and the new brit
+  refuse and 0.2.6 granted.
+- The multi-pack-index regression is fixed by counting through gix-odb's own collection
+  (`Store::count_index_slots`).
+- An env-scope `includeIf` no longer grants trust, and the re-read honours the caller's includes
+  permission.
+- `safe.rs` is byte-identical to upstream again.
+- The last stderr line is the deepest real message, with gix-error's classification folded in as a
+  suffix. No reporting path panics on a closed stderr.
+
+Known differences, documented in brit at `docs/plans/2026-11-15-bounded-memory-backlog.md`: a
+conditional include (`gitdir:`, `onbranch:`, `hasconfig:`) in a GLOBAL or SYSTEM file is evaluated
+against the repository in gix, so the repository's own branch name or remotes can switch on an include
+the user made conditional, and with it a `safe.directory` entry git would not honour. Same on 0.2.6. A
+fix following the lane's environment pattern is about 40 lines in `gix/src/open/repository.rs` plus
+tests, and is a candidate to offer upstream. Advice meanwhile: do not keep `safe.directory` behind a
+conditional include.
+
+Not measured: the rev-parse exit-code table for brit-epr's `resolve_rev`; an unreadable pack directory
+as a non-root user (the test skips as root; first exercised on non-root CI); the foreign-ownership
+tests are root-only or `#[ignore]` and never run in CI.
+
+Minimum git for brit-epr: 2.30 (`rev-parse --end-of-options`).
+
+Release items: gix gained `REDUCED_TRUST_MAX_PACK_INDEXES` and gix-odb `Store::count_index_slots`,
+so both need version bumps at release; brit-epr gained a public `diagnostic` module and a gix-error
+dependency.
 
 ## Audit base
 

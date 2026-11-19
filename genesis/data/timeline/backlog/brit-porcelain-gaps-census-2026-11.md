@@ -50,11 +50,26 @@ The brit-first hook's own ledger keeps no command text, and its `epr feedback ca
   `check-ref-format`, global `-C`, quiet exit on a closed pipe, and now also `merge-base --is-ancestor`
   and `rev-list --count`. Its first review found the closed-pipe patch too broad, and
   `rev-parse --verify HEAD -- x` printing three lines with exit 0. shem delivered two fix rounds;
-  sixteen patches are now applied as tip `806ea8114b` (shem's `b8264afc4`), and the merge into the
-  integration branch is in progress. A deliberate difference is kept: `rev-parse --verify missing` with
+  sixteen patches were applied as tip `806ea8114b` (shem's `b8264afc4`) and merged into the
+  integration branch (`b9b4a294fc`). A deliberate difference is kept: `rev-parse --verify missing` with
   a closed stderr exits 128 where git dies with 141.
-- **Lane `sprint3/diff-show`** (tip `3d10b379cf`, in review): `brit diff` with revisions, ranges, merge
-  bases and all output forms, and `brit show`. Measured limits from its review:
+- **Lane `sprint3/diff-show`** (tip `5a422ceb51`, two review passes and a delta review, merge in
+  progress): `brit diff` with revisions, ranges, merge bases and all output forms, and `brit show`.
+  Final state:
+  - commit encodings re-encoded as git does (the whole commit, including author and committer names);
+    unknown labels, and non-ASCII text under a non-UTF-8 output encoding, refuse by name; ASCII-only
+    commits print;
+  - tree forms identical to git;
+  - a name that is both a revision and a file is refused as ambiguous in `show`, as in `diff`;
+    `diff <name> --` reads a revision;
+  - `brit diff -- <path>` selecting nothing exits 0 (was 1);
+  - git's first-line wording for unknown names; the exit code stays 1 where git exits 128;
+  - measured on the monorepo `origin/main...origin/dev` (debug build): `--name-status` identical;
+    `--numstat` differs on 3 of 26,673 files by a few lines on both sides (brit uses imara-diff's
+    Myers with gix's indent heuristic, git xdiff's Myers with its cost heuristic; neither is minimal;
+    the patch text differs in hunk placement).
+
+  Measured limits from its review:
   - any file with a `diff=<driver>` attribute makes diff and show refuse, even a built-in driver with
     nothing configured; `--name-only` still works; no driver command or textconv is ever executed;
   - intent-to-add entries and a conflicted index refuse the worktree forms;

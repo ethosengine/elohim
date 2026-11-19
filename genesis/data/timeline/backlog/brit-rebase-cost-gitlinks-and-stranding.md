@@ -7,7 +7,7 @@ title: "brit rebase spools gigabytes for a two-commit replay, refuses gitlinks, 
 slug: "brit-rebase-cost-gitlinks-and-stranding"
 written: "2026-11-19"
 author: "claude-opus-5-5 (brit sprint 3, session 0e0924d5, steward of record human:matthew)"
-status: "backlog"
+status: "wip"
 priority: "high"
 relatedNodeIds: []
 tags: [brit, daily-driver, rebase, switch, submodule, shallow, performance, perf-io, perf-latency, perf-scale, unit-history, lane-operator, open-question]
@@ -306,3 +306,51 @@ In the redesign, the retained-manifest format change (v2 with a floor) would app
 not only shallow ones as scoped earlier (v2 only when the floor is non-empty). An older brit would
 then fail closed on any copy a newer one wrote. This reverses the approved scope and needs the
 steward's decision again.
+
+## Recovery lane, 2026-11-19 (in progress)
+
+Lane `sprint3/recovery` (worktree `brit-s3-recovery`). Commits up to `0d23297e22`:
+
+- `c8a824dd`: `--abort` cancels a failed preparation without rolling it forward. An eleven-checkpoint
+  journey with INT and KILL. It also found a stranding the scout had not listed: KILL at
+  `replay-journal-ready` left an empty `brit-rebase/` on which `--abort` failed with ENOENT.
+- `0dda8356`: gitlink ids are never looked up as local objects. The absent-directory case is now an
+  early named refusal; no refusal was removed.
+- `041285ad`: a preflight refusing before any journal or spool when the retained copy cannot fit (1.0 s
+  on the scout's 218,090-object clone, against about 250 s and 12.5 GB for one verification pass).
+- `d6f06f8d`: a switch stopped before its first record is harmless and aborts.
+- Journals written by 0.2.6 in the gitlink-stranded state are cancelled without loss. Formats
+  unchanged; gix-* untouched.
+
+**Independent review of that range.**
+
+- The abort, gitlink and switch parts are SOUND: nothing outside brit's own artifacts was removed under
+  symlink, foreign-member, crafted-nonce and concurrency attacks, and the invariant "no live write
+  before a durable non-preparation phase" holds on every path by reading.
+- The preflight is a MUST-FIX. For a file of S bytes changed by a replayed commit, the copy needs about
+  7·S + 200 KB while the bound counts about 2·S + 50 KB, so it admits rebases from about 29% of the
+  limit upward that then publish and stick at cleanup (at the real 1 GiB limit: one replayed commit
+  touching roughly 120–480 MB of files). A worse variant, with the bound near 95% of the limit, exceeds
+  the JOURNAL quota inside the first checkout decision (phase `pre-approved`, `decision-1.json`
+  durable, worktree already changed), and both `--continue` and `--abort` fail.
+- Found by the author and independently by the reviewer: a `prepared` journal holding only
+  `index.pre-rebase` and an unstarted pre-rebase invocation falls to the full abort and strands over
+  the quota.
+
+**Decisions taken (coordinator, 2026-11-19).**
+
+- Admission must be conservative and cover both quotas, proven by a boundary test over shapes.
+- Recovery commands are never blocked by the quota.
+- No state may exist in which every command refuses. A retire command (working name
+  `--retire-cleanup` / `--retire`) moves the journal aside and keeps everything, for
+  `completed`-with-cleanup-pending, `retaining-abort`, and a mid-transition journal (where it names the
+  retained original-HEAD ref and the commands to return to it, and changes nothing live).
+- Only the pure reorders D1 (refStorage and branch-occupied first), D2 (merge bases before the walk)
+  and D5 (index-only pre-check for unmerged, split and both gitlink cases) are in this lane; D3, D4
+  and D6 belong to the redesign.
+
+**Status:** second round in progress; NOT mergeable until a delta review passes.
+
+**Residuals recorded:** a process killed during any journal `save()` can leave `.git/.brit-checkout-*`;
+a `preparing` journal in a moved or copied repository cannot be cancelled (identity check;
+pre-existing).

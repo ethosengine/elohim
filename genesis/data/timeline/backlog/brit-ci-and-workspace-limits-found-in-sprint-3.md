@@ -102,13 +102,17 @@ steward, untouched.
 On 2026-11-19:
 
 - two reviewers sat 3 h and 2 h on one shell command each that never started: no process, held for an
-  approval with nobody present (long compound shell with a function definition, `source`, `chown -R`,
-  or files written outside the session scratch directory);
+  approval with nobody present;
 - a scout waited five hours on an unbounded `while kill -0 <pid>`;
 - a retired integrator left nine wait loops of the form `until ! pgrep -f '<script>'`, each matching
   its own command line;
 - the coordinating session itself was held about two hours on an edit outside the working directory;
 - a sibling session on shem had the same, with a builder stalled four hours.
+
+Triggers: the suspects first listed were a long compound shell with a function definition, `source`,
+`chown -R`, or files written outside the session scratch directory. Corrected: all three subagent calls
+that hung on 2026-11-19 defined a shell function inline in the Bash command; that is the one pattern
+common to all three. The coordinator's own two-hour hold was an edit outside the working directory.
 
 Detected only when the sibling reported its own. What worked: compare each agent's transcript mtime
 with the clock, list the session's child processes, stop the held agent and message it (it resumes
@@ -120,3 +124,24 @@ After journey runs, eight orphaned hook shells (pre-commit, pre-push, pre-receiv
 git-receive-pack) from the `mutation_lock` journeys were still polling, some six hours old, cwd
 deleted, confirmed by their environment. A test-hygiene item for the lock follow-up. Thirteen leftover
 `/tmp/.brit-checkout-*` directories were on the host (see `brit-rebase-cost-gitlinks-and-stranding.md`).
+
+## (m) Pool arithmetic
+
+Almost everything evictable in the 150 GB pool was this sprint's. The integration slot held 26 GB of
+incremental-compilation cache; with `CARGO_INCREMENTAL=0` a lane slot is 3–5 GB where it was about 10.
+Another session's landing gate grew its own family to 57 GB at the same time. The pool reached 153 GB
+once and was trimmed by hand. See also (e).
+
+## (n) A lane that changes the error layout must run the bash journeys
+
+Eight snapshots went stale, and only the integrator's run found them (updated in `e2b94f2da7`).
+
+## (o) A path-rendering unit test failed on Windows after the journeys were gated
+
+A unit test of path rendering failed on Windows after the journeys for the same cause had been gated,
+costing one CI run (run 44528984349, `relative_paths_match_git`).
+
+## (p) Destructive removals must use literal paths
+
+A destructive removal written with shell variables is refused by the harness's safety check and must
+use literal paths.
