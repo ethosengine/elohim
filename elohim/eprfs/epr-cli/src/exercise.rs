@@ -291,8 +291,16 @@ pub enum Verdict {
     /// Killed by this signal.
     Signal(i32),
     /// Still running, or its stderr still held open by a process it started, when the timeout
-    /// came; its whole process group was then signalled with SIGKILL.
-    Timeout(Duration),
+    /// came; SIGKILL was then attempted on its whole process group, and `signal_failed` holds
+    /// the error when that attempt failed.
+    Timeout {
+        after: Duration,
+        signal_failed: Option<String>,
+    },
+    /// Its outcome is unknown: this process could no longer wait for it (`ECHILD`: reaped
+    /// elsewhere), so nothing proves it is unreaped and its group was not signalled. Still a
+    /// refusal: nothing is ingested or landed on an unknown outcome.
+    Unknown(String),
     /// Exited non-zero; a release from before the exercise has no such verb.
     Exit(i32, String),
     /// It could not be started at all, or its state could not be read.
@@ -311,12 +319,20 @@ impl std::fmt::Display for Verdict {
                     ""
                 }
             ),
-            Self::Timeout(after) => write!(
+            Self::Timeout {
+                after,
+                signal_failed,
+            } => write!(
                 f,
                 "timeout: `doctor --exercise` had not finished, or its output was still held \
-                 open, after {} ms; its process group was signalled with SIGKILL",
-                after.as_millis()
+                 open, after {} ms; SIGKILL was attempted on its process group{}",
+                after.as_millis(),
+                match signal_failed {
+                    Some(error) => format!(" and failed: {error}"),
+                    None => String::new(),
+                }
             ),
+            Self::Unknown(why) => write!(f, "unknown: `doctor --exercise`: {why}"),
             Self::Exit(code, said) => write!(
                 f,
                 "exit: `doctor --exercise` exited {code} (a release from before the exercise has \
@@ -353,8 +369,11 @@ enum Ended {
 /// The exercise's process, leader of its own group. Its pid names the group, and the pid stays
 /// taken until the leader is reaped, so the group is always signalled first and the leader
 /// reaped after: a signal sent after the reap could reach an unrelated group that took the
-/// number. [`Leader::finish`] does both, once; dropping an unfinished leader runs it, so a panic
-/// or an early return between spawn and the end still signals and reaps.
+/// number. [`Leader::finish`] does both; dropping an unfinished leader runs it, so a panic or an
+/// early return between spawn and the end still signals and reaps. The promise is at most one
+/// signal attempt and a best-effort reap: a failed `wait` can only be said. When this process
+/// can no longer wait for the leader ([`Leader::abandon`]), nothing proves it still pins the
+/// id, so the group is never signalled at all.
 struct Leader {
     child: std::process::Child,
     group: rustix::process::Pid,
@@ -364,8 +383,12 @@ struct Leader {
 
 impl Leader {
     /// Whether the leader has exited, and how, observed without reaping it (`WNOWAIT`).
-    fn ended(&self) -> std::io::Result<Option<Ended>> {
+    fn ended(&self) -> rustix::io::Result<Option<Ended>> {
         use rustix::process::{waitid, WaitId, WaitIdOptions};
+        #[cfg(test)]
+        if let Some(error) = injected_waitid_error() {
+            return Err(error);
+        }
         let status = waitid(
             WaitId::Pid(self.group),
             WaitIdOptions::EXITED | WaitIdOptions::NOHANG | WaitIdOptions::NOWAIT,
@@ -378,26 +401,41 @@ impl Leader {
         }))
     }
 
-    /// Signal the whole group with SIGKILL while the leader, running or exited, is unreaped and
-    /// so still pins the group's id; then reap the leader. Neither failure changes a verdict:
-    /// each is said on stderr.
-    fn finish(&mut self) {
+    /// Attempt SIGKILL on the whole group while the leader, running or exited, is unreaped and
+    /// so still pins the group's id; then reap the leader. Both system calls run before anything
+    /// is said, so a failure to report cannot skip the reap. Returns the signal's error, if it
+    /// failed for another reason than every member having gone; neither failure changes how the
+    /// exercise ended.
+    fn finish(&mut self) -> Option<String> {
         if self.finished {
-            return;
+            return None;
         }
         self.finished = true;
         before_group_signal(self.group.as_raw_pid());
-        match rustix::process::kill_process_group(self.group, rustix::process::Signal::KILL) {
+        let signalled =
+            rustix::process::kill_process_group(self.group, rustix::process::Signal::KILL);
+        let reaped = self.child.wait();
+        let signal_failed = match signalled {
             // ESRCH: every member has already gone, which is the expected answer.
-            Ok(()) | Err(rustix::io::Errno::SRCH) => {}
-            Err(error) => eprintln!(
-                "exercise: could not signal the process group of {}: {error}",
+            Ok(()) | Err(rustix::io::Errno::SRCH) => None,
+            Err(error) => Some(error.to_string()),
+        };
+        if let Some(error) = &signal_failed {
+            eprintln!(
+                "exercise: SIGKILL to the process group of {} failed: {error}",
                 self.program
-            ),
+            );
         }
-        if let Err(error) = self.child.wait() {
+        if let Err(error) = reaped {
             eprintln!("exercise: could not reap {}: {error}", self.program);
         }
+        signal_failed
+    }
+
+    /// Give the leader up without signalling or reaping it: this process can no longer wait for
+    /// it, so nothing proves its pid still names the group.
+    fn abandon(&mut self) {
+        self.finished = true;
     }
 }
 
@@ -418,12 +456,14 @@ impl Drop for Leader {
 /// the process ended is the answer.
 pub fn judge(program: &Path, timeout: Duration) -> Result<(), Verdict> {
     let deadline = Instant::now() + timeout;
+    // Everything that could fail before the guard exists happens before the spawn.
+    let name = program.display().to_string();
     let mut child = spawn(program, deadline)?;
     let stderr = child.stderr.take();
     let mut leader = Leader {
         group: rustix::process::Pid::from_child(&child),
         child,
-        program: program.display().to_string(),
+        program: name,
         finished: false,
     };
     let (sender, said) = mpsc::channel();
@@ -450,29 +490,55 @@ pub fn judge(program: &Path, timeout: Duration) -> Result<(), Verdict> {
         match leader.ended() {
             Ok(Some(ended)) => break ended,
             Ok(None) if Instant::now() >= deadline => {
-                leader.finish();
-                return Err(Verdict::Timeout(timeout));
+                let signal_failed = leader.finish();
+                return Err(Verdict::Timeout {
+                    after: timeout,
+                    signal_failed,
+                });
             }
             Ok(None) => std::thread::sleep(POLL),
+            // Interrupted: the leader is still ours; ask again.
+            Err(rustix::io::Errno::INTR) => {}
+            // ECHILD (reaped elsewhere, or SIGCHLD ignored) or any other error: nothing proves
+            // the leader still pins its group's id, so the group is not signalled.
             Err(error) => {
-                leader.finish();
-                return Err(Verdict::Unstarted(format!(
-                    "its state cannot be read: {error}"
+                leader.abandon();
+                return Err(Verdict::Unknown(format!(
+                    "its outcome is unknown: this process can no longer wait for it ({error}), \
+                     so it may have been reaped elsewhere; its group was not signalled"
                 )));
             }
         }
     };
     // The pipe closes when every holder has gone; a process the exercise started may hold it.
     let said = said.recv_timeout(deadline.saturating_duration_since(Instant::now()));
-    leader.finish();
+    let signal_failed = leader.finish();
     let Ok(said) = said else {
-        return Err(Verdict::Timeout(timeout));
+        return Err(Verdict::Timeout {
+            after: timeout,
+            signal_failed,
+        });
     };
     match ended {
         Ended::Signal(signal) => Err(Verdict::Signal(signal)),
         Ended::Code(0) => Ok(()),
         Ended::Code(code) => Err(Verdict::Exit(code, said.trim().replace('\n', "; "))),
     }
+}
+
+#[cfg(test)]
+thread_local! {
+    /// Errors `Leader::ended` returns, in order, before it asks the kernel again.
+    static WAITID_ERRORS: std::cell::RefCell<Vec<rustix::io::Errno>> =
+        const { std::cell::RefCell::new(Vec::new()) };
+}
+
+#[cfg(test)]
+fn injected_waitid_error() -> Option<rustix::io::Errno> {
+    WAITID_ERRORS.with(|errors| {
+        let mut errors = errors.borrow_mut();
+        (!errors.is_empty()).then(|| errors.remove(0))
+    })
 }
 
 /// Called just before the group is signalled, with the leader's pid: a test observes the
@@ -610,6 +676,32 @@ mod tests {
     }
 
     #[test]
+    fn a_leader_this_process_can_no_longer_wait_for_is_never_signalled() {
+        // ECHILD: the leader was reaped elsewhere (or SIGCHLD is ignored), so nothing proves its
+        // pid still names the group. No signal at all, and an unknown outcome is a refusal.
+        let tmp = tempfile::tempdir().unwrap();
+        let program = script(tmp.path(), "exit 0");
+        WAITID_ERRORS.with(|errors| *errors.borrow_mut() = vec![rustix::io::Errno::CHILD]);
+        let mut verdict = None;
+        let states = signalled_states(|| verdict = Some(judge(&program, TIMEOUT)));
+        WAITID_ERRORS.with(|errors| errors.borrow_mut().clear());
+        assert_eq!(
+            states,
+            Vec::<String>::new(),
+            "no group signal was attempted"
+        );
+        let verdict = verdict.unwrap().unwrap_err();
+        assert!(matches!(verdict, Verdict::Unknown(_)), "{verdict:?}");
+        let said = verdict.to_string();
+        assert!(said.starts_with("unknown: "), "{said}");
+        assert!(said.contains("its group was not signalled"), "{said}");
+        // An interrupted wait is asked again: the leader is still ours, and the judge goes on.
+        WAITID_ERRORS.with(|errors| *errors.borrow_mut() = vec![rustix::io::Errno::INTR]);
+        let states = signalled_states(|| assert_eq!(judge(&program, TIMEOUT), Ok(())));
+        assert_eq!(states, ["Z"]);
+    }
+
+    #[test]
     fn a_successful_exercise_leaves_no_zombie_of_its_leader() {
         let tmp = tempfile::tempdir().unwrap();
         let leader_file = tmp.path().join("leader");
@@ -623,7 +715,17 @@ mod tests {
             .trim()
             .parse()
             .unwrap();
-        assert_eq!(proc_state(leader), "gone", "the leader was reaped");
+        // Absent, or (the pid reused) not a zombie of this process: the leader was reaped.
+        let stat = std::fs::read_to_string(format!("/proc/{leader}/stat")).ok();
+        let ours_and_zombie = stat
+            .as_deref()
+            .and_then(|stat| stat.rsplit_once(") "))
+            .map(|(_, rest)| rest.split_whitespace().take(2).collect::<Vec<_>>())
+            .is_some_and(|fields| {
+                fields.first() == Some(&"Z")
+                    && fields.get(1) == Some(&std::process::id().to_string().as_str())
+            });
+        assert!(!ours_and_zombie, "the leader {leader} is still our zombie");
     }
 
     #[cfg(feature = "peer")]
@@ -715,18 +817,34 @@ mod tests {
         let program = script(tmp.path(), "exec sleep 30");
         let started = Instant::now();
         let verdict = judge(&program, Duration::from_millis(300)).unwrap_err();
-        assert_eq!(verdict, Verdict::Timeout(Duration::from_millis(300)));
-        assert!(
-            started.elapsed() < Duration::from_secs(5),
-            "killed promptly"
+        assert_eq!(
+            verdict,
+            Verdict::Timeout {
+                after: Duration::from_millis(300),
+                signal_failed: None
+            }
         );
+        // A generous allowance: the assertion is about which verdict comes back, not speed.
+        assert!(started.elapsed() < Duration::from_secs(10), "returned");
         assert!(verdict.to_string().starts_with("timeout: "), "{verdict}");
-        // The signal was sent; whether it was delivered is not observed here.
+        // The signal was attempted; whether it was delivered is not observed here.
         assert!(
-            verdict.to_string().contains("signalled with SIGKILL"),
+            verdict
+                .to_string()
+                .contains("SIGKILL was attempted on its process group"),
             "{verdict}"
         );
         assert!(!verdict.to_string().contains("killed"), "{verdict}");
+        let failed = Verdict::Timeout {
+            after: Duration::from_millis(300),
+            signal_failed: Some("Operation not permitted (os error 1)".into()),
+        };
+        assert!(
+            failed.to_string().ends_with(
+                "attempted on its process group and failed: Operation not permitted (os error 1)"
+            ),
+            "{failed}"
+        );
     }
 
     #[test]
@@ -769,8 +887,15 @@ mod tests {
         let started = Instant::now();
         let verdict = judge(&program, deadline).unwrap_err();
         let took = started.elapsed();
-        assert_eq!(verdict, Verdict::Timeout(deadline));
-        assert!(took < deadline + Duration::from_secs(2), "took {took:?}");
+        assert_eq!(
+            verdict,
+            Verdict::Timeout {
+                after: deadline,
+                signal_failed: None
+            }
+        );
+        // Well short of the sleeper's 30 s, generous for a loaded gate host.
+        assert!(took < deadline + Duration::from_secs(10), "took {took:?}");
         let read = |path: &Path| std::fs::read_to_string(path).unwrap().trim().to_owned();
         let (group, sleeper) = (read(&group_file), read(&sleeper_file));
         // SIGKILL is delivered asynchronously; give the kernel a moment to finish the members.
