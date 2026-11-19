@@ -463,3 +463,80 @@ shem does not draw `epr` from ethosengine; the other direction is sound. Lane E1
 | 4 a sibling's red arrives live | met: 4.9 s on a scratch ref; the fix is on `dev`; E6 items 2 to 6 open |
 | 5 deployment path read, first step ruled | met earlier in the sprint; the sysroot review adds that the fleet cannot run a workspace build |
 | 6 backlog and habit deltas | current to row 28 |
+
+## 2026-11-19: row 29.2 answered — C compiles at the Rust target's baseline
+
+**The record of the crash is corrected.** The trap was not in SQLite's `selectExpander`. All
+four `invalid opcode` lines in shem's kernel log share one offset, which decodes in the drawn
+binary to `vpbroadcastd ymm0,xmm0` (AVX2) in ring's C `curve25519.c`. The compiler wrote its own
+flags into that file's debug record: `-march=x86-64-v3` in ethosengine's build, `-march=x86-64-v2`
+in shem's. About 211 C functions in the drawn binary carry v3 instructions with no CPU check
+(mostly SQLite, plus ring's plain-C fallbacks); shem's own build has none.
+
+**Why only `epr`.** The cc crate decides. `elohim-storage`, `doorway` and `steward-node` lock cc
+1.11.1, which passes `-march=x86-64` itself for this target. `elohim/eprfs` locks cc 1.2.65,
+which passes nothing, so `epr` took each device's compiler default (v3 on RHEL 10, v2 on
+AlmaLinux 10).
+
+**The admission branch does not land.** `claude/nt-isa` (four rounds, head `1ac49d13e`)
+predicted the C level from a compiler probe and judged releases in the bin store. Three review
+passes and an eight-lens review each found new ways a predicted level differs from the compiled
+one (unrecorded variables, two environments in the mesh script, a second cc version, level
+rounding) or the judge is bypassed (a workspace restart, session pins, a missing sibling
+statement). Its store hook also lives in `elohim/eprfs/device-runtime`, a storage build input,
+so landing it would dispatch Edge and roll the alpha fleet. The branch stays as a reference.
+
+**The decision** (steward asked the orchestrator to answer it, 2026-11-19; a panel of six fact
+finders, five advocated options, fifteen adversarial critiques and three judges, unanimous on
+the level). The gate builds C at a declared, fixed level on every device, and the level is a
+rule, not a number chosen for two machines: C compiles at the baseline the Rust target already
+has. For `x86_64-unknown-linux-gnu` that is `-march=x86-64`.
+
+- Plain x86-64 over v2: it equals the Rust level, so a release has one declared level and
+  nothing to predict; it is what cc 1.11.1 and the fleet's bookworm images already produce; the
+  fleet runs four alpha peers on shem's v2 CPU today; and on SQLite v2 differs from v1 in 0.11%
+  of instructions at `-O2` and none at `-O0`.
+- Scope: the gate projects on the `elohim/eprfs` workspace (eprfs, eprfs-live-corpus,
+  memory-ceremony, orchestrator). Widening is one list entry and hours of one-off rebuild.
+- A triple with no record (aarch64 today) builds for itself and offers nothing until its record
+  exists.
+
+**What enforces it**, each a small landing (lane E12, ethosengine):
+
+| Step | What | Where |
+|---|---|---|
+| set | a per-triple record `declared_targets` (isa, cflags, workspaces); the gate exports `CFLAGS_<triple>` and `CXXFLAGS_<triple>` for listed workspaces, inside the gate key | `genesis/agentic/pool-policy.json`, `gate-runner.mjs` |
+| lock | cc >= 1.11.1 in `elohim/eprfs/Cargo.lock`, so manual cargo compiles the same flag | same landing as the record, one C rebuild per device |
+| check, seconds | the compiler is probed with the record's flags before any build; a mismatch or a stray C variable warns, and the release is not offered (the device's own gate still runs) | new `c-baseline.mjs` in preflight and in `eprfs-produce.sh` |
+| check, bytes | at put, the recorded flag must equal the declared one and ring's compiler-written flags in the binary must say the same; only then is `env:isa-c` written | `epr-cli`, producer side (L2a) |
+| refuse | a sibling release without the marker value this device knows is refused before fetch, as unmeasured | `epr-cli`, `sibling::admissible` (L2b) |
+| run | staged sibling bytes run one x25519 agreement and one SQLite round trip before ingest, and again inside `peer serve --check` before they become current; death by signal refuses | `epr-cli` (L2b) |
+| watch | a pin test holds the record, the producer script, the cc locks and the Dockerfiles together | new `c-baseline-pin.test.mjs` |
+
+**What it does not promise.** It sets and cross-checks flags; it does not prove every byte.
+SQLite has no debug record, so ring's thirteen files stand in for it, and the exercise runs two
+paths out of many. A dependency that adds its own flag, or compiles outside the cc crate, passes
+until it traps. Objects linked from the distribution are compiled at the distribution's level;
+only a linked sysroot closes that (row 26.4, whose ISA half this answers and whose glibc half
+stays open). Neither device is a v1 CPU, so the level proven on hardware is v2, on shem. Until
+the store hook lands on a deliberate Edge roll, the crashed release on shem stays reachable by
+`EPR_PIN_CID`, by `epr bin pin --cid`, by `epr bin land --revert`, and by bootstrap if
+`current.json` is lost; nobody runs those on shem meanwhile.
+
+**The experiment comes first.** Nobody has yet built `epr` on ethosengine at the baseline and
+run its daemon on shem. E12 starts there, before any landing. If it fails, the answer falls back
+to "declare, refuse, build locally" until a sysroot is linked.
+
+**Two fan-outs alongside it.** A read audit of the reuse-enrolled Rust gates (row 28) confirmed
+53 reads a gate performs outside its key (34 claims refuted): eprfs is the leakiest, through a
+Python fixture suite and `berth` reading `.claude/hooks`, `.claude/scripts/_lib` and the lens
+files; `pool-lib.sh` is unkeyed for every cargo gate; storage reads a schema inside the rakia
+submodule that neither its key nor its dirty check sees. The audit's critic: a static scan
+cannot close this, only an observed trace of a real gate run can. Ethosengine's E11 hand-over
+(`self/nt-e11`, an observed read fence for the orchestrator suite, 160 s to 107 s on a docs-only
+landing) is under review as that primitive.
+
+**Cost, stated.** The first two fan-outs ran every agent on the top model and hit its usage
+limit: 148 agents, 19.6M tokens, 55 failed. The rerun and the three later fan-outs completed.
+Also found: `berth say` fails silently-to-the-peer when the note write exceeds a fixed 5 s on a
+loaded device (backlog row 30).

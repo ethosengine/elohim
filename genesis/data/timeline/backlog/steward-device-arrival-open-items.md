@@ -643,3 +643,42 @@ refuses before fetch; (2) the gate builds C at a declared baseline so one device
 another's; (3) a check that runs a drawn binary's daemon path before it becomes current, since
 `--version` succeeding proved nothing here. Related: row 26 item 4 (the deploy floor) is the
 same question for glibc. Until (1) lands, shem follows only its own `epr` builds.
+
+Delta 2026-11-19 (row 29): item 2 is answered, and the answer changes item 1. The gate builds C
+at the Rust target's baseline, `-march=x86-64` on `x86_64-unknown-linux-gnu`, set by a per-triple
+record in `pool-policy.json` for the `elohim/eprfs` workspace, with cc >= 1.11.1 in its lock
+(journal, 2026-11-19). The level is then a constant the build sets and three checks confirm
+(compiler probe before the build; the recorded flag and ring's compiler-written flags at put;
+an x25519 and SQLite exercise on the receiving device before ingest and before current), so
+item 1's predicted level is dropped: `claude/nt-isa` does not land. A sibling release without
+the `env:isa-c` marker is refused before fetch as unmeasured. Item 3 is that exercise. The
+correction to this row: the trap was `vpbroadcastd` in ring's C x25519, not SQLite. Open, each
+its own row when taken: the bin-store judge (held releases, pins, bootstrap) waits for a
+deliberate Edge roll because its hook is a storage build input; whether ethosengine withdraws
+its marker-less releases; removing the crashed release from shem's store (no evict verb; `gc`
+takes it on or after 2026-12-02); labelled non-baseline variants; the first aarch64 record.
+
+Delta 2026-11-19 (row 28): an audit of the reuse-enrolled Rust gates confirmed 53 reads outside
+a gate's key, 34 claims refuted (results: `genesis/local-dev/native-throughput/wf-row28-audit.result.json`
+on shem). Worst first: eprfs (`genesis/agentic/session_envelope_test.py` and `berth`, run by its
+tests, read `.claude/hooks/*`, `.claude/scripts/_lib/*`, `.epr-meta/elohim/lenses/`, the recall
+question bank and root `.gitignore`); `genesis/agentic/bin/pool-lib.sh`, sourced by
+`run-local-gate.sh:28` for every cargo gate; elohim-storage's read of
+`elohim/rakia/schemas/v1/release-manifest.schema.json` (`release_adoption/verify.rs:1784`),
+which a `// gate-reads` line cannot name and whose submodule checkout drift the dirty check
+does not see; scripts the storage recipe spawns (`scripts/ci/check-image-include-targets.py`,
+`genesis/agentic/bin/cargo-jobs-flag`); tool configuration above a crate (`rustfmt.toml`,
+`clippy.toml`, the main checkout's `.cargo/config.toml` from a worktree); small crates whose
+`cargo fmt` runs over a whole workspace; and ambient inputs no scan sees (`EPR_BIN` for the
+orchestrator suite, `RUSTC`, `CARGO_ENCODED_RUSTFLAGS`). Confirmed sound: path-dependency
+crates outside a gate's directory are hashed. The cure is not 35 declarations: only an observed
+trace of a real gate run closes the class, which is the open design above and what E11 builds
+for one suite.
+
+## Row 30 — a note silently fails to cross when the device is loaded
+
+Found 2026-11-19. `berth say` writes its note through `_observation.emit`, whose limit is a
+fixed 5 s (`.claude/hooks/_observation.py:56`). On a loaded shem the write took about 10 s, so
+six sends in a row printed "said here, but the note record did not reach this device's channel
+store" and no other device read them. The sender is told; nothing retries. Owed: the limit
+scales or the write is retried, and a note that did not cross is queued, not dropped.
