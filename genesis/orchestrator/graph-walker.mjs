@@ -11,7 +11,7 @@ import { resolve, dirname } from 'path';
 import picomatch from 'picomatch';
 import { loadManifests, resolveStep } from './manifest-utils.mjs';
 import { filterChanged } from './ci-ignore.mjs';
-import { stepClass, deriveRunClass, capManifestOnly, manifestOnlyLine } from './pipeline-registry.mjs';
+import { stepClass, deriveRunClass, capManifestOnly, manifestOnlyLine, runClassRank } from './pipeline-registry.mjs';
 
 /**
  * Topologically sort steps using Kahn's algorithm.
@@ -175,7 +175,117 @@ export function projectsFromStale(manifests, stale, changedFiles) {
     .map(([name, { dir, reasons }]) => ({ name, dir, reasons }));
 }
 
-export function walkGraph(manifests, changedFiles) {
+/**
+ * build-graph.groovy matchesGlob (:186-218), ported literally: the pattern becomes a regex by
+ * escaping `.` only; a double star followed by a slash becomes `(.+/)?`, a remaining double star
+ * `.*`, a single star `[^/]*` and `?` `[^/]`; the regex must match the whole path. Unlike
+ * picomatch's default it matches dotfiles (the storage source `elohim/sdk/` + double star matches
+ * `elohim/sdk/schemas/.gitignore`). Other regex characters keep their regex meaning, as in Groovy.
+ */
+export function ciGlobMatch(filePath, pattern) {
+  const file = filePath.startsWith('./') ? filePath.slice(2) : filePath;
+  const pat = pattern.startsWith('./') ? pattern.slice(2) : pattern;
+  const SS = '\u0000SS\u0000';
+  const DS = '\u0000DS\u0000';
+  const regex = pat
+    .replaceAll('.', '\\.')
+    .replaceAll('**/', SS)
+    .replaceAll('**', DS)
+    .replaceAll('*', '[^/]*')
+    .replaceAll('?', '[^/]')
+    .replaceAll(SS, '(.+/)?')
+    .replaceAll(DS, '.*');
+  return new RegExp(`^(?:${regex})$`).test(file);
+}
+
+/**
+ * What build-graph.groovy walkBuildGraph computes (:802-864), for the fleet-roll guard:
+ * - steps keyed `pipeline:step`, a bare `depends` entry qualified to its own pipeline, and a
+ *   dependency on a pipeline with no manifest pruned (composeGraph :77-119);
+ * - a step is stale by source when a changed, non-governance file matches one of its sources
+ *   with CI's glob (checkSourceChanges :234-247, reason `source: <file> matches <pattern>`,
+ *   files outer, patterns inner); else by build process when a referenced file is in the
+ *   changeset (checkBuildProcessChanges' cold-start and no-prior-hash rule :329-348; CI's stored
+ *   hashes are not visible here);
+ * - staleness propagates to a fixed point over `depends`, whatever the dependency's class or
+ *   manual flag, reason `depends: <first stale dependency>` (propagateStaleness :360-375);
+ * - a manual-only pipeline's stale steps propagate but are not dispatched (:848);
+ * - a pipeline's run class is its stale steps' highest class (deriveRunClasses :471-482), capped
+ *   at verify when every stale step is stale by source, none has a stale dependency, and every
+ *   file matching its sources is a build-manifest.json (manifestOnlyPipelines :491-521).
+ * Each stale step carries `cause`: the changed file behind it, followed through propagation.
+ */
+export function walkGraphCi(manifests, changedFiles) {
+  const steps = new Map();
+  const meta = {};
+  for (const { content } of manifests) {
+    const pipeline = content.pipeline;
+    meta[pipeline] = {
+      jenkinsPath: content.jenkinsPath || null, manualOnly: content.manualOnly === true,
+      stepClasses: Object.fromEntries(Object.entries(content.steps || {}).map(([n, s]) => [n, stepClass(s)])),
+    };
+    for (const [name, step] of Object.entries(content.steps || {})) {
+      steps.set(`${pipeline}:${name}`, {
+        pipeline, name, step, cls: stepClass(step), manualOnly: content.manualOnly === true,
+        depends: (step.depends || []).map(dep => resolveStep(dep, pipeline)),
+      });
+    }
+  }
+  const pipelinesWithManifest = new Set(Object.keys(meta));
+  for (const s of steps.values()) {
+    s.depends = s.depends.filter(dep => steps.has(dep) || pipelinesWithManifest.has(dep.split(':', 1)[0]));
+  }
+  const stale = new Map();
+  for (const [qualified, s] of steps) {
+    let hit = null;
+    for (const file of changedFiles) {
+      if (isGovernancePath(file)) continue;
+      const pattern = (s.step.inputs?.sources || []).find(p => ciGlobMatch(file, p));
+      if (pattern) { hit = { reason: `source: ${file} matches ${pattern}`, cause: file }; break; }
+    }
+    if (!hit) {
+      const ref = (s.step.inputs?.buildProcess || []).find(r => changedFiles.includes(r.split('@')[0]));
+      if (ref) hit = { reason: `buildProcess: ${ref} in changeset`, cause: ref.split('@')[0] };
+    }
+    if (hit) stale.set(qualified, hit);
+  }
+  for (let changed = true; changed;) {
+    changed = false;
+    for (const [qualified, s] of steps) {
+      if (stale.has(qualified)) continue;
+      const dep = s.depends.find(d => stale.has(d));
+      if (dep) { stale.set(qualified, { reason: `depends: ${dep}`, cause: stale.get(dep).cause, via: stale.get(dep).via ?? dep }); changed = true; }
+    }
+  }
+  const byPipeline = new Map();
+  for (const [qualified, hit] of stale) {
+    const s = steps.get(qualified);
+    if (s.manualOnly) continue;
+    if (!byPipeline.has(s.pipeline)) byPipeline.set(s.pipeline, []);
+    byPipeline.get(s.pipeline).push({ name: s.name, class: s.cls, reason: hit.reason, cause: hit.cause, via: hit.via ?? null, qualified });
+  }
+  const pipelines = [...byPipeline].map(([name, list]) => {
+    let runClass = deriveRunClass(list.map(s => s.class));
+    let onlyManifests = true;
+    let triggers = 0;
+    for (const s of list) {
+      const step = steps.get(s.qualified);
+      if (!s.reason.startsWith('source:') || step.depends.some(d => stale.has(d))) { onlyManifests = false; break; }
+      for (const file of changedFiles) {
+        if (!(step.step.inputs?.sources || []).some(p => ciGlobMatch(file, p))) continue;
+        triggers += 1;
+        if (file !== 'build-manifest.json' && !file.endsWith('/build-manifest.json')) onlyManifests = false;
+      }
+      if (!onlyManifests) break;
+    }
+    if (onlyManifests && triggers > 0 && runClassRank(runClass) > runClassRank('verify')) runClass = 'verify';
+    return { name, steps: list.map(({ qualified, ...rest }) => rest), reasons: list.map(s => s.reason), runClass };
+  });
+  return { projects: projectsFromStale(manifests, new Map([...stale].map(([q, h]) => [q, [h.reason]])), changedFiles), pipelines, meta };
+}
+
+export function walkGraph(manifests, changedFiles, { ci = false } = {}) {
+  if (ci) return walkGraphCi(manifests, changedFiles);
   if (manifests.length === 0) return { projects: [], pipelines: [] };
 
   // Phase 1: Build index
