@@ -8,7 +8,7 @@ steward: human:matthew
 serves: [sprint-lands-each-closure-once, measure-runs-on-a-peer, workspace-device-arrival, dataplane-convergence]
 refines: host-compatibility-foundation-design
 cites:
-  - "host-compatibility-foundation-design | the design this plan lanes: contract, key, variant sets, immune loop and feedback rails | sha256:31df4116d3d82d04 | path: genesis/docs/superpowers/specs/2026-11-10-host-compatibility-foundation-design.md"
+  - "host-compatibility-foundation-design | the design this plan lanes: contract, key, variant sets, immune loop and feedback rails | sha256:2a32d608fe72292c | path: genesis/docs/superpowers/specs/2026-11-10-host-compatibility-foundation-design.md"
   - "artifact-store-sprint-2026-11-07 | the in-flight sprint whose owed receipts lane K re-runs and whose hub points here | sha256:4b76fac9f23efae3 | path: genesis/docs/superpowers/sprints/2026-11-07-artifact-store/plan.md"
   - genesis/data/timeline/backlog/2026-08-29-compute-envelope-virtual-peer-contract.md
   - genesis/orchestrator/.epr-meta/sprint-lands-each-closure-once.habit.md
@@ -544,4 +544,3 @@ types. Each shape passes the `p2p-design-gate` skill before it is proposed. ark-
 placement-core do not gain the contract crate (240693e34).
 
 Verify: the three types land with vector tests and seam-registry rows; V1, P1 and P2's briefs cite them by path; no behaviour change in `just gate elohim-ark`, `eprfs` or `elohim-compute`.
-
