@@ -371,9 +371,10 @@ fn classify(words: &[String]) -> Result<Command, String> {
     let is = |list: &[&str]| opts.len() == list.len() && opts.iter().zip(list).all(|(a, b)| a == b);
     if program == "ar" || program == "llvm-ar" || program.ends_with("-ar") {
         return if is(&["--version"])
-            || opts
+            || (opts
                 .iter()
                 .any(|w| matches!(w.as_str(), "cq" | "cqD" | "s" | "sD"))
+                && !opts.iter().any(|w| w == "-o"))
         {
             Ok(Command::Archiver)
         } else {
@@ -383,13 +384,21 @@ fn classify(words: &[String]) -> Result<Command, String> {
     if program == "ranlib" || program.ends_with("-ranlib") {
         return Ok(Command::Archiver);
     }
-    if opts.len() == 2 && opts[0] == "-E" && opts[1].ends_with("detect_compiler_family.c") {
-        return Ok(Command::Probe);
-    }
-    if opts.last().is_some_and(|w| w == "-?") && !opts.iter().any(|w| w == "-c") {
-        return Ok(Command::Probe);
-    }
-    if is(&["--version"]) || is(&["--print-search-dirs"]) {
+    // cc 1.11.1's probes, each exactly as cc builds it (hardening 1): the program and the
+    // arguments cc gives it, nothing else, so no `-o` and no flag rides along on one.
+    let args: Vec<&str> = words.iter().skip(1).map(String::as_str).collect();
+    let family = |file: &str| file.ends_with("detect_compiler_family.c");
+    let probe = match args.as_slice() {
+        // Family detection: `<cc> -E <file>` (tool.rs:320), or `<cc> -E -- <file>` after a
+        // -Wslash-u-filename warning (tool.rs:338-341).
+        ["-E", file] | ["-E", "--", file] => family(file),
+        // The cl-style probe `<cc> -?` (tool.rs:263-268; cc passes the compiler's own arguments
+        // before it, none for a plain CC), `<cc> --version` (tool.rs:236-238) and
+        // `<cc> --print-search-dirs` (lib.rs:5768-5769).
+        ["-?"] | ["--version"] | ["--print-search-dirs"] => true,
+        _ => false,
+    };
+    if probe {
         return Ok(Command::Probe);
     }
     let has = |flag: &str| opts.iter().any(|w| w == flag);

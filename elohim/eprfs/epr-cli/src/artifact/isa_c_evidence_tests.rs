@@ -705,6 +705,37 @@ fn evidence_refuses_a_command_it_cannot_classify() {
         .is_ok());
 }
 
+/// Hardening 1: a probe matches cc 1.11.1's exact shape, the arguments cc gives it and nothing
+/// else, so no `-o` and no flag can ride along on one; the second -E family form (`-E --
+/// <file>`, tool.rs:338-341) passes.
+#[test]
+fn a_probe_matches_ccs_exact_shape() {
+    for line in [
+        "\"gcc\" \"-o\" \"$OUT/x.o\" \"-?\"",
+        "\"gcc\" \"-march=x86-64-v3\" \"-?\"",
+        "\"gcc\" \"-o\" \"$OUT/x.o\" \"--version\"",
+        "\"gcc\" \"--version\" \"--version\"",
+        "\"gcc\" \"-o\" \"$OUT/x.o\" \"--print-search-dirs\"",
+        "\"gcc\" \"-o\" \"$OUT/x.o\" \"-E\" \"$OUT/detect_compiler_family.c\"",
+        "\"gcc\" \"-mavx2\" \"-E\" \"$OUT/detect_compiler_family.c\"",
+        "\"ar\" \"-o\" \"$OUT/x.o\" \"--version\"",
+    ] {
+        let found = Build::new("epr")
+            .script("ring", &[line], &[], true)
+            .judge("epr", BYTES)
+            .unwrap_err();
+        assert!(
+            has(&found, "logged a command the check cannot classify"),
+            "{line}: {found:?}"
+        );
+    }
+    let delimited = "\"gcc\" \"-E\" \"--\" \"$OUT/detect_compiler_family.c\"";
+    assert!(Build::new("epr")
+        .script("ring", &[delimited], &[], true)
+        .judge("epr", BYTES)
+        .is_ok());
+}
+
 /// Ruling 3: an exception matches the package's name, source and locked version, and blake3's
 /// covers exactly the assembly its build.rs names for x86_64 unix and cc's probe.
 #[test]
