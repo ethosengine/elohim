@@ -465,3 +465,90 @@ commit whose own CI carries the allow-list. Brit's rebase redesign, which change
 format. And from before: the R5 branch, the Edge roll's timing, the repacks, and this session's
 unrecorded covenant.
 
+## 2026-11-19, evening: the view asked for what a checkout does not hold; the marker's second review
+
+**A defect in the suite's view, found on the second device.** Line 4 was called met on shem's
+runs alone. On ethosengine, in a fresh worktree where `just dev prep` had printed
+`[preflight] ok submodules`, the named half refused:
+`suite-run: submodule elohim/holochain-conductor at 993cf597… is in no object store here`.
+Nine named files declare all five submodule pins, so the view took the files matching their
+walks from each submodule at its pin, 104 of them from the conductor fork. Shem happened to hold
+that fork's objects. Ethosengine does not, and the cure the refusal printed does nothing there:
+`.gitmodules` declares `update = none` for that submodule, because CI and a plain checkout read
+only its gitlink. Ethosengine's session reported the skip and did not override the declaration.
+
+The view was at fault, and so was my first answer: I sent the printed cure before reading
+`.gitmodules`. Ruling: a submodule declared `update = none` contributes its pin to the key and
+nothing to the view; its directory is there and empty, as in a fresh clone, whether or not the
+device holds the objects. It landed alone as `00dd77dfb` at 19:55Z. The named half's view went
+from 871 files to 767 and ran 779 + 376 tests with none failed, so no named test had needed
+those files. Ethosengine then ran `just gate orchestrator` in a fresh worktree at that commit,
+on a device that holds the conductor pin in no store: exit 0 in 492 s, both halves recorded.
+That is the receipt E11 lacked. The named half had been red on ethosengine since E11 landed at
+18:14Z, about 1 h 40 min. The pipelines I checked (orchestrator, genesis, the root Jenkinsfile
+and `scripts/ci`) do not run this suite, so CI was not red in between. The cost fell on
+ethosengine: the brit session's first push of its trust branch began 40 seconds before my
+warning arrived and could not pass the named half.
+
+A second change follows it (`4ce35271d`): a preflight row, `submodule-pins`, names within
+seconds any declared pin that no store on the device holds, with a cure that works for it, and
+`just dev prep` brings the same set into a store, skipping any pin already readable.
+`che-devworkspaces` was the pin prep did not know; ethosengine had initialised it by hand.
+
+What I got wrong, as a rule for the next gate change: I closed E11's review on a checklist run
+on one device, for a change whose subject is what a device holds. Row 40.
+
+**The marker's second review.** Ethosengine handed L2a back at 19:30Z on a new ref
+(`self/nt-l2a-r2`, `991df29fd`, then `bde9f6408`), with nothing force-pushed. The marker no
+longer rests on strings in the binary. `put` takes the JSON messages of the build replayed,
+binds them to the bytes by the executable's hash, and judges every C compile command the
+build's scripts ran (cc prints them under `CC_ENABLE_DEBUG_OUTPUT`, now a declared part of the
+record): each must carry the declared `-march` and no other instruction-set flag. On real
+bytes: ring's 30 compiles and SQLite's one at the baseline; a copy of ring's build with one
+`-mavx2` compile added was refused, naming `curve25519.c`. Its three judgement calls stand, one
+of them against my own list: `psm` does compile an assembly file, so it is judged, not excepted.
+
+The second review (receipt `codex-l2a-rereview.receipt.md`) confirmed three of the four fixes
+and still said fix first, on narrower ground: the checker could be satisfied without having
+judged what was linked. A message stream holding only the binary's own row passed with no build
+script judged. Archive members were not matched to judged compiles, and cc can chain a prebuilt
+object into an archive. Command forms the check cannot read (`@file`, `-Xclang`, `-Xassembler`,
+`-Wa,`) passed. Rulings: the stream must show it is the whole build (a finished row with
+success, a roster from an independent source, and an output directory that is missing or
+unreadable refuses instead of reading as empty); every archive member is the output of a judged
+compile or a named exception; unreadable forms refuse; exceptions bind to the locked version
+and the reviewed sources. Ethosengine's roster source is the platform-filtered resolve from
+`cargo metadata`, ratified with one caution: it resolves features for the whole workspace and
+may name a package the build does not compile, and the cure for that is the build's own
+selection (`cargo tree -p`), not the stream. The hand-back is expected on `self/nt-l2a-r3`, for
+a re-check of those three points only.
+
+**Order on dev.** Because L2a needed another round, the brit session's trust branch went ahead
+of it: `758fb4f6b` at 20:28Z. Its second push, rebased over the fix, saw shem's green for the
+named half, declined it because its own change selects that gate, and passed the real run in
+61 s with no submodule line. Before that, shem's device key directory was checked against the branch's new
+custody rule: mode 2700, the declaration 600, nothing writable by group or others, and the
+process holds the group, so trust stays applied here. The declaration names only the main
+checkout. A linked worktree is undeclared before and after that branch and passes on shem
+because git accepts it by ownership. Whether a device where git would not accept it needs a
+line for each worktree remains the steward's open item.
+
+**Also.** Shem's repository reached 32 pack indexes, the ceiling for brit reads at reduced
+trust; ethosengine is at 42. Fetches from this session now use
+`git -c fetch.unpackLimit=1000000 fetch`, which unpacks to loose objects and adds no index. The
+repack is still the steward's on both devices. The commit hook printed
+`[commit-attribution] UNMEASURED` once, because this session's pinned `epr` predates
+`session commit-trailers`; the commit was unpublished and was re-made through the hook with the
+current release. The queued second check on a brit pin (read every run's conclusion) is
+withdrawn: every brit commit's run concludes `failure` while `cargo-deny-advisories` is red, so
+the aggregate with its allow-list is the check that carries the verdict. Two lines the
+orchestrator suite prints into the gate log read like faults (`elohim-storage evidence … could
+not be read`, four times, and `fixture evidence … /usr/local/bin/node: bad option: --repo`).
+They look like the suite's own fixtures and were not checked; quieting or labelling them is owed.
+
+| Line | State after this entry |
+|---|---|
+| 1, two landings followed with no build | L2a in its second rework; then two draws, and the daemon step is by hand |
+| 4, the suite keys on what it reads | met on both devices as of `00dd77dfb`; before that it was met on one |
+| 2, 3, 5 | unchanged |
+| 6, the record | this entry; backlog row 40; habit lines in `push-gate-pays-once` and `careless-reds-cost-seconds` |

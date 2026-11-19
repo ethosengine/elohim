@@ -958,3 +958,29 @@ orchestrator suite has the same shape in `runner-capture-activation.test.mjs` (i
 checks). A non-root leg, as `setpriv --reuid=65534 --regid=65534 --clear-groups <test binary>`,
 is what brit used.
 
+## Row 40 — a gate change about what a device holds was verified on one device
+
+Found 2026-11-19 on ethosengine. E11 (landed `0fd724eb2`, 18:14Z) moved the orchestrator
+suite's named half into a view built from commit objects. Nine named files declare all five
+submodule pins, so the view took files from each submodule at its pin, 104 of them from
+`elohim/holochain-conductor`. Shem holds that fork's objects. Ethosengine does not, and
+`.gitmodules` declares `update = none` for it, so the cure the refusal printed
+(`git submodule update --init`) skips it. The named half was red on ethosengine for every push
+that selected it, for about 1 h 40 min, and one push (the brit session's trust branch) ran into
+it. `just dev prep` and the preflight said `ok submodules` throughout, because they knew only
+the three attested submodules.
+
+Fixed. `00dd77dfb`: a submodule declared `update = none` contributes its pin to the key and
+nothing to the view. Ethosengine's receipt at that commit, in a fresh worktree on a device with
+the conductor pin in no store: `just gate orchestrator` exit 0 in 492 s, both halves recorded,
+779 + 376 tests. `4ce35271d`: a `submodule-pins` preflight row and `just dev prep` for the
+pins the view does read.
+
+Still open, and the reason this is a row: nothing asks for a second device's run before a gate
+change is called landed. E11 had four review passes and a checklist, and every run in them was
+on shem. The cheap form is a habit of the hand-over: for a change under `genesis/orchestrator`
+that alters what the gate reads from the repository or from the device, the note to the sibling
+asks for one `just gate <project>` in a fresh worktree, and the line is not called met until
+the verdict lines are back. Whether that becomes a check (a sibling's green required before a
+push that changes the gate's own governance paths records evidence others may reuse) is a
+design question for the next sprint.
