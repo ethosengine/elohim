@@ -98,6 +98,14 @@
     "_comment": "Cargo reverse-dependency selection for push ranges with a real base. GATE_NARROW defaults to shadow; on applies the package set, off keeps the full workspace.",
     "projects": ["eprfs"]
   },
+  "declared_targets": {
+    "_comment": "The C baseline the local gate builds each Rust target's cc-compiled C/C++ at, per cargo workspace (decision row 29.2, backlog genesis/data/timeline/backlog/steward-device-arrival-open-items.md row 29). RHEL 10 gcc defaults to -march=x86-64-v3 and cc 1.2.65 (the elohim/eprfs lock) passes no -march, so ring's curve25519.c carried AVX2 and a drawn epr died with SIGILL on an x86-64-v2 sibling (shem); cc 1.11.1 (storage, doorway, steward-node locks) already passes -march=x86-64 itself. Read by genesis/orchestrator/gate-runner.mjs gateChildEnv, which puts CFLAGS_<triple> and CXXFLAGS_<triple> (dashes as underscores) = cflags into GATE_CARGO_ENV for every gate project whose run.cargo.workspace is listed, the record's value kept (and the conflict printed) over a manifest or cargo_env_overrides entry for the same key. A top-level key, never inside cargo_env_overrides, so hc-mesh.sh never reads it; describe/offer consumers read it to record and check the baseline.",
+    "x86_64-unknown-linux-gnu": {
+      "isa": "x86-64",
+      "cflags": "-march=x86-64",
+      "workspaces": ["elohim/eprfs"]
+    }
+  },
   "cargo_env_overrides": {
     "*": {
       "RUSTUP_TOOLCHAIN": "1.100.0"

@@ -505,6 +505,105 @@ describe('manifest-driven local gate registry', () => {
       '1.100.0', 'the declared pin is exported over the caller environment, like any other cargo env key');
   });
 
+  // Row 29.2 (backlog steward-device-arrival-open-items.md row 29): the gate builds C at the
+  // Rust target's declared baseline. RHEL 10 gcc defaults to -march=x86-64-v3 and cc 1.2.65
+  // passes no -march, so ring's curve25519.c carried AVX2 and a v2 sibling trapped (SIGILL).
+  const CFLAGS_KEY = 'CFLAGS_x86_64_unknown_linux_gnu';
+  const CXXFLAGS_KEY = 'CXXFLAGS_x86_64_unknown_linux_gnu';
+  const declaredTargetsRoot = (extra = {}) => {
+    const root = mkdtempSync(resolve(tmpdir(), 'gate-declared-targets-'));
+    mkdirSync(resolve(root, 'genesis/agentic'), { recursive: true });
+    writeFileSync(resolve(root, 'genesis/agentic/pool-policy.json'), JSON.stringify({
+      cargo_env_overrides: { '*': { RUSTUP_TOOLCHAIN: '1.100.0' }, ...(extra.overrides || {}) },
+      declared_targets: {
+        _comment: 'fixture',
+        'x86_64-unknown-linux-gnu': { isa: 'x86-64', cflags: '-march=x86-64', workspaces: ['elohim/eprfs'] },
+      },
+    }));
+    return root;
+  };
+
+  test('a declared target puts its C baseline on projects of its listed workspaces only', () => {
+    const root = declaredTargetsRoot();
+    try {
+      const eprfs = { name: 'fixture-eprfs', run: { cargo: { workspace: 'elohim/eprfs' } } };
+      const env = JSON.parse(gateChildEnv(eprfs, {}, root).GATE_CARGO_ENV);
+      assert.equal(env[CFLAGS_KEY], '-march=x86-64');
+      assert.equal(env[CXXFLAGS_KEY], '-march=x86-64');
+      assert.equal(env.RUSTUP_TOOLCHAIN, '1.100.0', 'the record adds to the merged cargo env, it replaces nothing');
+
+      const storage = { name: 'fixture-storage', run: { cargo: { workspace: 'elohim/elohim-storage', env: { CARGO_BUILD_JOBS: '1' } } } };
+      const stored = JSON.parse(gateChildEnv(storage, {}, root).GATE_CARGO_ENV);
+      assert.deepStrictEqual(stored, { RUSTUP_TOOLCHAIN: '1.100.0', CARGO_BUILD_JOBS: '1' },
+        'a project off the listed workspaces gets nothing new (cc 1.11.1 already pushes -march there)');
+      assert.equal(Object.hasOwn(gateChildEnv({ name: 'js', run: {} }, {}, root), 'GATE_CARGO_ENV'), false,
+        'a project without run.cargo gets no C flags');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test('a manifest or override that sets a declared-target key does not silently win', () => {
+    // Precedence: the record's value is kept (the baseline is a property of the binary every
+    // sibling runs, not a per-project tuning knob) and the conflict is printed, never dropped.
+    const root = declaredTargetsRoot({ overrides: { 'fixture-override': { [CXXFLAGS_KEY]: '-march=x86-64-v3' } } });
+    try {
+      const warnings = [];
+      const warn = line => warnings.push(line);
+      const manifest = { name: 'fixture-manifest', run: { cargo: { workspace: 'elohim/eprfs', env: { [CFLAGS_KEY]: '-march=native' } } } };
+      const env = JSON.parse(gateChildEnv(manifest, {}, root, { warn }).GATE_CARGO_ENV);
+      assert.equal(env[CFLAGS_KEY], '-march=x86-64', 'the declared target value is kept over the manifest');
+      assert.equal(warnings.length, 1, warnings.join('\n'));
+      assert.match(warnings[0], /fixture-manifest/);
+      assert.match(warnings[0], /CFLAGS_x86_64_unknown_linux_gnu/);
+      assert.match(warnings[0], /-march=native/);
+      assert.match(warnings[0], /declared_targets/);
+
+      warnings.length = 0;
+      const override = { name: 'fixture-override', run: { cargo: { workspace: 'elohim/eprfs' } } };
+      const env2 = JSON.parse(gateChildEnv(override, {}, root, { warn }).GATE_CARGO_ENV);
+      assert.equal(env2[CXXFLAGS_KEY], '-march=x86-64', 'the declared target value is kept over a pool-policy override');
+      assert.equal(warnings.length, 1, warnings.join('\n'));
+      assert.match(warnings[0], /-march=x86-64-v3/);
+
+      warnings.length = 0;
+      const agreeing = { name: 'fixture-agree', run: { cargo: { workspace: 'elohim/eprfs', env: { [CFLAGS_KEY]: '-march=x86-64' } } } };
+      gateChildEnv(agreeing, {}, root, { warn });
+      assert.deepStrictEqual(warnings, [], 'an agreeing value is not a conflict');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test('pool-policy declares the x86_64 C baseline record in its decided shape', () => {
+    const policy = JSON.parse(readFileSync(resolve(ROOT, 'genesis/agentic/pool-policy.json'), 'utf8'));
+    const { _comment, ...targets } = policy.declared_targets || {};
+    assert.equal(typeof _comment, 'string');
+    assert.match(_comment, /29\.2/, 'the comment names the decision row');
+    assert.deepStrictEqual(targets, {
+      'x86_64-unknown-linux-gnu': { isa: 'x86-64', cflags: '-march=x86-64', workspaces: ['elohim/eprfs'] },
+    });
+    assert.equal(Object.hasOwn(policy.cargo_env_overrides, 'declared_targets'), false,
+      'the record is a top-level key, never inside cargo_env_overrides (hc-mesh.sh reads that map)');
+  });
+
+  test('every real gate project on the eprfs workspace gets the C baseline, and only those', () => {
+    const onEprfs = [...registry.values()].filter(p => p.run.cargo && p.run.cargo.workspace === 'elohim/eprfs');
+    assert.deepStrictEqual(onEprfs.map(p => p.name).sort(), ['eprfs', 'eprfs-live-corpus', 'memory-ceremony', 'orchestrator']);
+    for (const project of onEprfs) {
+      const env = JSON.parse(gateChildEnv(project, {}).GATE_CARGO_ENV);
+      assert.equal(env[CFLAGS_KEY], '-march=x86-64', project.name);
+      assert.equal(env[CXXFLAGS_KEY], '-march=x86-64', project.name);
+    }
+    for (const project of registry.values()) {
+      if (onEprfs.includes(project)) continue;
+      const carried = gateChildEnv(project, {}).GATE_CARGO_ENV;
+      const env = carried ? JSON.parse(carried) : {};
+      assert.equal(Object.hasOwn(env, CFLAGS_KEY), false, project.name);
+      assert.equal(Object.hasOwn(env, CXXFLAGS_KEY), false, project.name);
+    }
+  });
+
   test('a pinned toolchain that is not installed refuses with the fix named', () => {
     const r = spawnSync(
       'bash',

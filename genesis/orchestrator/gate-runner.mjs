@@ -166,13 +166,54 @@ function loadPoolPolicy(root) {
 // run-local-gate.sh exports declared values over the caller's environment. This lets pool-policy carry today's cap (schema-pinned
 // out of the manifest) without silently overriding a project that later declares
 // its own value once the rakia schema is widened.
-export function gateChildEnv(project, baseEnv, root = ROOT) {
+//
+// Declared targets (row 29.2, backlog steward-device-arrival-open-items.md row 29):
+// pool-policy's top-level `declared_targets` names, per Rust target triple, the C
+// baseline a cargo workspace's cc-built C/C++ is compiled at. A project whose
+// run.cargo.workspace is listed receives CFLAGS_<triple> and CXXFLAGS_<triple> (dashes
+// as underscores, the spelling cc reads) set to the target's `cflags`. The keys are
+// triple-suffixed, so a host building another target never reads them. Precedence: the
+// record's value is KEPT over a manifest run.cargo.env or a cargo_env_overrides entry
+// that sets the same key, and the disagreement is printed (once per project and key),
+// never dropped silently: the baseline is a property of a binary every sibling runs, not
+// a per-project tuning knob. The gate's outcome is not changed by the conflict.
+const warnedTargetConflicts = new Set();
+
+function declaredTargetEnv(project, policy) {
+  const workspace = (project.run.cargo || {}).workspace;
+  const env = {};
+  if (!workspace) return env;
+  for (const [triple, target] of Object.entries(policy.declared_targets || {})) {
+    if (triple.startsWith('_') || !target || typeof target.cflags !== 'string') continue;
+    if (!Array.isArray(target.workspaces) || !target.workspaces.includes(workspace)) continue;
+    const suffix = triple.replace(/-/g, '_');
+    env[`CFLAGS_${suffix}`] = target.cflags;
+    env[`CXXFLAGS_${suffix}`] = target.cflags;
+  }
+  return env;
+}
+
+function defaultTargetWarn(line) {
+  if (warnedTargetConflicts.has(line)) return;
+  warnedTargetConflicts.add(line);
+  console.error(line);
+}
+
+export function gateChildEnv(project, baseEnv, root = ROOT, { warn = defaultTargetWarn } = {}) {
   const policy = loadPoolPolicy(root);
   const overrides = policy.cargo_env_overrides || {};
   // "*" is the all-cargo-projects default (the local gate's RUSTUP_TOOLCHAIN pin); only a
   // project that goes through the cargo path (declares run.cargo) receives it.
   const shared = project.run.cargo ? overrides['*'] || {} : {};
-  const declared = { ...shared, ...(overrides[project.name] || {}), ...((project.run.cargo || {}).env || {}) };
+  const merged = { ...shared, ...(overrides[project.name] || {}), ...((project.run.cargo || {}).env || {}) };
+  const targetEnv = declaredTargetEnv(project, policy);
+  for (const [key, value] of Object.entries(targetEnv)) {
+    if (Object.hasOwn(merged, key) && String(merged[key]) !== value) {
+      warn(`gate ${project.name}: ${key}=${merged[key]} (manifest run.cargo.env or pool-policy cargo_env_overrides) `
+        + `conflicts with pool-policy declared_targets; keeping the declared ${key}=${value}`);
+    }
+  }
+  const declared = { ...merged, ...targetEnv };
   const childEnv = { ...baseEnv };
   // A git hook exports GIT_DIR (the pre-push pins it absolute so gate cwds resolve the repo);
   // a gate that spawns `git` in a TEMP repo then operates on the main repo instead
