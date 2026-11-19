@@ -116,10 +116,12 @@ pub(super) fn declared(descriptor: &MethodDescriptor) -> Result<Option<Declared<
     }
 }
 
-/// Check 1: the recorded C flags are the declared ones, in the one spelling the record allows
-/// per language (`CFLAGS_<triple>`, `CXXFLAGS_<triple>`, underscored), and nothing else of the C
-/// family is recorded. `describe` records and `put` re-checks the environment (`is_build_var`), so
-/// the record is what the build ran under.
+/// Check 1, the contract (row 29.2, ruled at the L2a review): `CFLAGS_<triple>` and
+/// `CXXFLAGS_<triple>`, when recorded, each equal `target.cflags` exactly; any other recorded
+/// C-family variable refuses. No C-family variable may select an instruction set other than the
+/// declared one: the gate exports both variables with the declared value and the producer records
+/// both. `describe` records and `put` re-checks the environment (`is_build_var`), so the record is
+/// what the build ran under.
 fn record_applies(descriptor: &MethodDescriptor, cflags: &str) -> Vec<String> {
     let triple = host::target(descriptor);
     if triple.is_empty() {
