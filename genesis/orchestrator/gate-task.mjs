@@ -2,10 +2,11 @@
 //
 // The gate's closure material (gate-evidence.mjs `closureMaterial`, the bytes `closureKey`
 // hashes) becomes the Task's input, and ark computes every CID from it: the input root, the
-// method CID and the exec binding. ark places the Task in the device's own envelope, looks the
-// derivation up in brit under the same reuse rules as `reusableHit`, and runs
-// run-local-gate.sh only on a miss, its output passed through unchanged so gate-tap.mjs still
-// reads it. The brit attestation stays the verdict record and gate-runner.mjs stays its writer.
+// method CID and the exec binding. Reuse is decided before a Task exists, by gate-runner.mjs's
+// `decideReuse`, the same decision the direct path makes; the Task is handed reuse mode null, so
+// ark places it in the device's own envelope and runs run-local-gate.sh, its output passed
+// through unchanged so gate-tap.mjs still reads it. The brit attestation stays the verdict record
+// and gate-runner.mjs stays its writer.
 //
 // Nothing here decides a verdict. When ark is unavailable the gate runs as it always has, with
 // one visible line saying why.
@@ -31,6 +32,11 @@ export const TASK_ENV = [
   'RUSTUP_HOME', 'CARGO_HOME', 'CARGO_TARGET_POOL_ROOT', 'CARGO_TARGET_POOL_FAMILY',
   'EPR_BIN', 'JENKINS_URL', 'NODE_EXTRA_CA_CERTS', 'PNPM_HOME',
   'XDG_CONFIG_HOME', 'XDG_CACHE_HOME', 'XDG_DATA_HOME', 'XDG_STATE_HOME', 'LANG',
+  // The orchestrator suite's expectation (gated sha and key digests, colon-joined: no braces). It
+  // varies per commit, so a Task's method does too; gate-runner.mjs decides reuse, so no derivation look-up depends on it.
+  'GATE_SUITE_EXPECT',
+  // The fresh directory one attempt of the named half writes its result to (per run).
+  'GATE_SUITE_RESULT',
 ];
 
 /** How many Task directories are kept under .eprfs/status/ark/tasks. */

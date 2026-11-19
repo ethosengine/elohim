@@ -5,7 +5,7 @@
 
 import { spawnSync } from 'child_process';
 import { readFileSync } from 'fs';
-import { dirname, matchesGlob, relative, resolve } from 'path';
+import { dirname, matchesGlob, posix, relative, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import { loadGateRegistry } from './pipeline-registry.mjs';
 
@@ -22,8 +22,46 @@ import { loadGateRegistry } from './pipeline-registry.mjs';
  * registry tests, every .rs through the REAL read-set tests, .husky, scripts/ci, genesis/scripts/ci,
  * app/elohim-app/scripts/__tests__, ...); keyed on eprfs's Rust reads, a change to one of them could
  * reuse a green the suite never judged.
+ * E11: the suite declares those reads itself. orchestrator runs only the files that name every
+ * read, in a view holding only those bytes (suite-run.mjs), and keys on their union
+ * (SUITE_READ_LISTS); the files whose reads cannot be named, the python suites and the Jenkins
+ * lint run in orchestrator-tree, which keeps the whole-tree key.
  */
-export const UNAUDITED_RECIPE_PROJECTS = Object.freeze(['orchestrator']);
+export const UNAUDITED_RECIPE_PROJECTS = Object.freeze(['orchestrator-tree']);
+
+/** Gate projects whose suite declares its own reads, by the repo-relative path of the list. */
+export const SUITE_READ_LISTS = Object.freeze({ orchestrator: 'genesis/orchestrator/suite-reads.json' });
+
+/**
+ * Reads every named-side run makes besides the ones the list declares: what shapes the
+ * node_modules the view copies (the lock, the workspace, the root manifest's overrides, and
+ * .npmrc's hoisting, which a bare import resolves through).
+ */
+export const SUITE_IMPLICIT_READS = Object.freeze(['.npmrc', 'package.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml']);
+
+/**
+ * The read set of a suite list's named side, in readSet's shape: every declared read, every named
+ * test file outside the list's own directory (inside it, the project tree keys it), and the
+ * implicit reads. Null when the text is not a list, so the key falls back to the whole tree.
+ * suite-run.mjs builds the named half's view from this same set, so the view is never wider.
+ */
+export function suiteReadSet(text, listPath) {
+  let list;
+  try { list = JSON.parse(text); } catch { return null; }
+  if (!Array.isArray(list?.groups)) return null;
+  const dir = posix.dirname(listPath);
+  const paths = new Set(SUITE_IMPLICIT_READS);
+  for (const group of list.groups) {
+    for (const entry of group.files || []) {
+      if (entry.tree) continue;
+      if (!Array.isArray(entry.reads) || typeof entry.file !== 'string') return null;
+      const file = posix.normalize(posix.join(dir, entry.file));
+      if (!(file === dir || file.startsWith(`${dir}/`))) paths.add(file);
+      for (const read of entry.reads) paths.add(read);
+    }
+  }
+  return { paths: [...paths].sort(), unresolved: [] };
+}
 
 export function isReadPattern(path) {
   return /^\*\*\/[^/*\\]+$/.test(path);

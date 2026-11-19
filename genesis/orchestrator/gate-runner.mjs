@@ -2,9 +2,10 @@
 // One local gate path for humans and pre-push. Detection and execution both
 // come from build-manifest.json; no project-name command switch lives here.
 
-import { readFileSync } from 'fs';
+import { mkdtempSync, readFileSync, realpathSync, rmSync } from 'fs';
+import { tmpdir } from 'os';
 import { spawnSync } from 'child_process';
-import { resolve, dirname, basename } from 'path';
+import { resolve, dirname, basename, join } from 'path';
 import { fileURLToPath } from 'url';
 import { loadManifests } from './manifest-utils.mjs';
 import { loadGateRegistry } from './pipeline-registry.mjs';
@@ -13,16 +14,17 @@ import { filterChanged } from './ci-ignore.mjs';
 import { COST_FIELDS, classifyFailure, recordCycle, subjectFor } from './gate-cycle.mjs';
 import { CI_BRANCH_PATTERN, costOf, deferDecision, formatExpectation, readCycleUnion } from './gate-cost.mjs';
 import {
-  ageOf, emitGateVerdict, gateEvidence, recordEvidence, reusableHit, selfAgentId,
+  ageOf, attestedOutputParses, emitGateVerdict, findEvidence, gateEvidence, isHabitAtom, recordEvidence, reusableHit, selfAgentId,
   siblingGovernanceChange, siblingVerdicts,
 } from './gate-evidence.mjs';
 import { rakiaAffected, resolveRakiaBin } from './gate-oracle.mjs';
 import { CLAIMED_EXIT_CODE, runAttested } from './gate-attest.mjs';
 import { affectedPackages, loadMetadata } from './cargo-affected.mjs';
-import { readSet } from './gate-input-audit.mjs';
+import { SUITE_READ_LISTS, readSet } from './gate-input-audit.mjs';
 import { appendEvent, closeRun, formatHarvest, harvest, openRun, outlook, resolveSession, stopRequested } from './gate-live.mjs';
 import { emitLive, formatRow, onRedPolicy, runPreflight } from './gate-preflight.mjs';
 import { prepareTask, readTaskStatus, taskAnswer, taskEnabled } from './gate-task.mjs';
+import { SUITE_EXPECT_ENV, SUITE_RESULT_ENV, dirtyAfterRun, encodeExpectation, readResult, suiteDecision } from './suite-inventory.mjs';
 
 // GATE_ROOT lets a fixture repository drive the CLI (the a2o pin-attestation story).
 const ROOT = process.env.GATE_ROOT
@@ -71,6 +73,18 @@ export function selectGateProjects(registry, target) {
   return matches.filter(project => project.dir.length === longest);
 }
 
+/**
+ * A target a person names runs every gate project with the same dir, steps and inputs as it: the
+ * orchestrator suite's two halves (E11), so `just gate orchestrator` runs the whole suite. Pre-push
+ * runs each selected project by name and `--recipe` takes exactly one, so neither is expanded.
+ */
+export function withHalves(registry, projects, { env = process.env } = {}) {
+  if (env.GATE_RUN_KIND === 'pre-push' || projects.length !== 1) return projects;
+  const [one] = projects;
+  const shape = p => JSON.stringify([p.dir, p.steps ?? null, p.inputs ?? null]);
+  return [one, ...[...registry.values()].filter(p => p.name !== one.name && shape(p) === shape(one))];
+}
+
 export function projectsForChanges(root, changedFiles, opts = {}) {
   const env = opts.env || process.env;
   const mode = opts.oracle || oracleMode(env);
@@ -113,6 +127,41 @@ export function projectsForChanges(root, changedFiles, opts = {}) {
   });
 }
 
+/**
+ * The one reuse decision, for the Task path and the direct path alike. The sibling channel is
+ * asked first, so a red from either device for the same closure runs the gate before this
+ * workspace's own green is accepted; a sibling green stands in only when the push leaves the
+ * sibling-reuse governance paths alone.
+ */
+export function decideReuse(project, evidence, reuseContext, { root = ROOT, env = process.env, spawn = spawnSync } = {}) {
+  let candidates = [];
+  let governance = { changed: false };
+  if (reuseContext.mode === 'reuse' && reuseContext.enabled && reuseContext.selfId && evidence.key) {
+    candidates = siblingVerdicts(project, evidence.key, { root, env, spawn }).candidates;
+    if (candidates.some(candidate => candidate.success === true)) governance = siblingGovernanceChange({ root, spawn });
+  }
+  const decision = reusableHit(evidence, {
+    ...reuseContext,
+    candidates,
+    // Admission is established by `epr peer verdicts`; a sibling red always counts, a sibling green
+    // only when governance did not change.
+    admitCandidate: candidate => candidate.source === 'sibling' && (candidate.success !== true || !governance.changed),
+    governanceWhy: governance.changed ? governance.why : null,
+  });
+  if (!decision.reuse || decision.independence === 'sibling') return decision;
+  // Just before this workspace's green is accepted: its attested output parses as a CID, as ark
+  // required, and a fresh read of this closure's rows holds no newer local red.
+  if (!attestedOutputParses(decision.row)) return { reuse: false, why: 'the attested output is not a CID' };
+  const fresh = findEvidence(project, evidence.key, { buildRefBin: evidence.buildRefBin, root, spawn, warn: () => {} });
+  if (fresh.error) return { reuse: false, why: `rows unreadable just before reuse (${fresh.error})` };
+  if (fresh.unverifiable.length > 0) return { reuse: false, why: 'an unverifiable note arrived under this step' };
+  const at = Date.parse(decision.row.attestation?.builtAt || 0);
+  if (fresh.rows.some(row => row.attestation?.success === false && Date.parse(row.attestation?.builtAt || 0) > at)) {
+    return { reuse: false, why: 'a newer local red for this closure arrived' };
+  }
+  return decision;
+}
+
 /** Reuse needs the dependency oracle for changes outside the attested closure too. */
 export function reuseSelector(project, gateCommit, { root = ROOT, env = process.env, spawn = spawnSync } = {}) {
   return commit => {
@@ -124,7 +173,11 @@ export function reuseSelector(project, gateCommit, { root = ROOT, env = process.
     } catch {
       return { ok: false, message: 'attested commit unreadable' };
     }
-    const files = diff.stdout.split('\n').filter(Boolean);
+    // A habit atom is a ledger no recipe reads (gate-evidence.mjs isHabitAtom). Only a suite list's
+    // named half provably keys without them (its inventory drops them and it has no step
+    // fingerprint), so only there is a DELTA line no change since the attested commit.
+    const exempt = Boolean(SUITE_READ_LISTS[project.name]);
+    const files = diff.stdout.split('\n').filter(Boolean).filter(file => !(exempt && isHabitAtom(file)));
     if (files.length === 0) return { ok: true };
     try {
       let oracleAvailable = false;
@@ -227,6 +280,9 @@ export function gateChildEnv(project, baseEnv, root = ROOT, { warn = defaultTarg
   for (const k of Object.keys(childEnv)) {
     if (k === 'GIT_CONFIG_PARAMETERS' || k === 'GIT_CONFIG_COUNT' || /^GIT_CONFIG_(KEY|VALUE)_\d+$/.test(k)) delete childEnv[k];
   }
+  // A caller's JUST_NO_DEPS or JUST_DRY_RUN (any JUST_* setting) would turn a gate recipe into a
+  // no-op that exits 0; the recipe is the manifest's, never the caller's.
+  for (const k of Object.keys(childEnv)) if (k.startsWith('JUST_')) delete childEnv[k];
   if (declared && Object.keys(declared).length > 0) {
     childEnv.GATE_CARGO_ENV = JSON.stringify(declared);
   } else {
@@ -470,9 +526,17 @@ export function runProject(project, printOnly, namesOnly, {
   // input bytes at the pushed commit, the recipe, the resolved cargo env — already been
   // gated, by whom, and when? Reuse requires an audited project and either this workspace's
   // signer or an admitted sibling verdict under D5's stricter fences.
-  // GATE_COMMIT is the commit being pushed (pre-push exports it); a human
-  // running `just gate` is asking about HEAD. Fail-open: an exception here is one line.
-  const gateCommit = (env.GATE_COMMIT || '').trim() || 'HEAD';
+  // The gated commit is resolved once to a full sha, and evidence, reuse, recording and
+  // publication all name it: GATE_COMMIT is the commit being pushed (pre-push exports it), and
+  // `just gate` asks about HEAD. Fail-open: an exception in the evidence lookup is one line.
+  const revParse = rev => {
+    const r = spawn('git', ['rev-parse', '--verify', '--quiet', `${rev}^{commit}`], { cwd: root, encoding: 'utf8' });
+    const sha = r?.status === 0 ? String(r.stdout || '').trim() : '';
+    return /^[0-9a-f]{40,64}$/.test(sha) ? sha : null;
+  };
+  const headSha = revParse('HEAD');
+  const pushed = (env.GATE_COMMIT || '').trim();
+  const gateCommit = pushed ? (revParse(pushed) || pushed) : (headSha || 'HEAD');
   let evidence = { line: 'unavailable (evidence lookup threw)' };
   try {
     evidence = gateEvidence(project, { env: childEnv, root, commit: gateCommit, cargoEnv: cargoEnvOf(childEnv), spawn, warn });
@@ -480,66 +544,25 @@ export function runProject(project, printOnly, namesOnly, {
     evidence = { line: `unavailable (${String(error?.message || error).split('\n')[0]})` };
   }
   write(`[gate] ${project.name} evidence: ${evidence.line}\n`);
+  // The recipe tests this checkout; a gated commit that is not its HEAD is neither reusable nor
+  // recorded, on every entry path (pre-push also says so with GATE_EVIDENCE_RECORD=0).
+  if (pushed && gateCommit !== headSha) {
+    write(`[gate] ${project.name}: the gated commit ${String(gateCommit).slice(0, 9)} is not this checkout's HEAD ${String(headSha).slice(0, 9)}; not reusable, and nothing is recorded\n`);
+    evidence = { ...evidence, dirty: true };
+  }
   const enabled = loadPoolPolicy(root).gate_reuse?.projects;
-  // A Task (gate-task.mjs) carries the same reuse rules into ark's derivation look-up, which
-  // reads brit itself; the gate then runs through ark only on a miss.
-  let task = null;
   // The signer is asked of the binary gateEvidence resolved from childEnv, never one from process.env.
   const signerOptions = { env: childEnv, buildRefBin: evidence.buildRefBin };
-  if (taskEnabled(project, env)) {
-    const selfId = selfAgentId(root, spawn, signerOptions);
-    task = prepareTask(project, {
-      root, env, childEnv, args, evidence, spawn, device: selfId,
-      reuse: {
-        mode: env.GATE_EVIDENCE || null,
-        enabled: Array.isArray(enabled) && enabled.includes(project.name),
-        selfId: env.GATE_EVIDENCE === 'reuse' ? selfId : null,
-        dirty: evidence.dirty ?? null,
-        commit: gateCommit,
-      },
-    });
-    if (task.why) {
-      write(`gate-task: ark unavailable (${task.why}) — ran direct\n`);
-      task = null;
-    } else if (task.dropped.length > 0) {
-      write(`gate-task: not passed to the Task child (braces are ark template syntax): ${task.dropped.join(' ')}\n`);
-    }
-  }
+  const taskOn = taskEnabled(project, env);
+  const selfId = (taskOn || env.GATE_EVIDENCE === 'reuse') ? selfAgentId(root, spawn, signerOptions) : null;
   const reuseContext = {
     mode: env.GATE_EVIDENCE,
     enabled: Array.isArray(enabled) && enabled.includes(project.name),
-    selfId: env.GATE_EVIDENCE === 'reuse' ? selfAgentId(root, spawn, signerOptions) : null,
+    selfId: env.GATE_EVIDENCE === 'reuse' ? selfId : null,
     selectorCheck: reuseSelector(project, gateCommit, { root, env: childEnv, spawn }),
   };
-  // Under a Task, ark judges this workspace's own green (it reads no rakia oracle, so it reuses
-  // no more than reusableHit would); this check only asks whether one exists, so it spends no
-  // selector call on it, and a local miss here is a miss in ark too.
-  const local = reusableHit(evidence, task
-    ? { ...reuseContext, selectorCheck: () => ({ ok: true }) } : reuseContext);
-  let decision = task ? { reuse: false, why: 'decided by the Task' } : local;
-  // Preserve the local brit path exactly. Only a local miss asks the device channel, and the
-  // native read has already removed self, revoked and unadmitted devices. A sibling verdict is
-  // keyed by the closure key both paths record and emit (`evidence.key`, the sha256 of the
-  // Task's input material), so the channel is asked before a Task runs: a sibling green stands
-  // in for the Task, and anything else leaves the decision to ark.
-  if (!local.reuse && env.GATE_EVIDENCE === 'reuse'
-      && reuseContext.enabled && reuseContext.selfId && evidence.key) {
-    const sibling = siblingVerdicts(project, evidence.key, { root, env, spawn });
-    if (sibling.candidates.length > 0) {
-      const governance = siblingGovernanceChange({ root, spawn });
-      const asked = governance.changed
-        ? { reuse: false, why: governance.why }
-        : reusableHit(evidence, {
-          ...reuseContext,
-          candidates: sibling.candidates,
-          // Admission is established by `epr peer verdicts`; this callback keeps the decision
-          // seam explicit and lets alternate candidate sources fail closed.
-          admitCandidate: candidate => candidate.source === 'sibling',
-        });
-      if (!task || asked.reuse) decision = asked;
-      else write(`[gate] ${project.name} not reused from a sibling: ${asked.why}\n`);
-    }
-  }
+  // One admission decision for both run modes (decideReuse); ark is then asked only to run.
+  const decision = decideReuse(project, evidence, reuseContext, { root, env, spawn });
   if (decision.reuse) {
     const row = decision.row;
     const sibling = decision.independence === 'sibling';
@@ -560,7 +583,47 @@ export function runProject(project, printOnly, namesOnly, {
     liveEvent(env, { kind: 'gate-verdict', project: project.name, verdict: { exit: 0, seconds: 0, reused: true } });
     return 0;
   }
-  if (env.GATE_EVIDENCE === 'reuse' && !task) write(`[gate] ${project.name} not reused: ${decision.why}\n`);
+  if (env.GATE_EVIDENCE === 'reuse') write(`[gate] ${project.name} not reused: ${decision.why}\n`);
+  // A suite's named half is handed what its key expects (the gated sha and the inventory, package
+  // and node digests); the builder reports in its result whether its view held those bytes.
+  if (SUITE_READ_LISTS[project.name]) {
+    if (evidence.suite) childEnv[SUITE_EXPECT_ENV] = encodeExpectation(evidence.suite);
+    else delete childEnv[SUITE_EXPECT_ENV];
+  }
+  // A suite's named half writes one result per attempt into a fresh directory outside every
+  // checkout (the OS temporary directory, which a Task child writes to as well), removed after.
+  const suiteNamed = Boolean(SUITE_READ_LISTS[project.name]);
+  let suiteResult = null;
+  const newResultDir = () => {
+    if (!suiteNamed) return null;
+    const dir = mkdtempSync(join(realpathSync(tmpdir()), 'orchestrator-result-'));
+    childEnv[SUITE_RESULT_ENV] = dir;
+    return dir;
+  };
+  const collect = dir => {
+    if (!dir) return;
+    suiteResult = readResult(dir);
+    rmSync(dir, { recursive: true, force: true });
+  };
+  let resultDir = newResultDir();
+  let task = null;
+  if (taskOn) {
+    task = prepareTask(project, {
+      root, env, childEnv, args, evidence, spawn, device: selfId,
+      // gate-runner made the reuse decision; the Task is asked to run, never to reuse.
+      reuse: { mode: null, enabled: false, selfId: null, dirty: evidence.dirty ?? null, commit: gateCommit },
+    });
+    if (task.why) {
+      write(`gate-task: ark unavailable (${task.why}) — ran direct\n`);
+      task = null;
+    } else if (suiteNamed && task.dropped.some(key => key === SUITE_RESULT_ENV || key === SUITE_EXPECT_ENV)) {
+      // A Task whose child would not receive the result path or the expectation could never be read.
+      write(`gate-task: ${task.dropped.filter(key => key === SUITE_RESULT_ENV || key === SUITE_EXPECT_ENV).join(' ')} would not reach the Task child (braces are ark template syntax) — ran direct\n`);
+      task = null;
+    } else if (task.dropped.length > 0) {
+      write(`gate-task: not passed to the Task child (braces are ark template syntax): ${task.dropped.join(' ')}\n`);
+    }
+  }
   const direct = () => gateSpawn(project, 'bash', [resolve(root, 'genesis/orchestrator/run-local-gate.sh'), ...args], {
     cwd: root,
     stdio: 'inherit',
@@ -568,17 +631,33 @@ export function runProject(project, printOnly, namesOnly, {
   }, { spawn, env, tap });
   let ran;
   let answer = null;
-  if (task) {
-    ran = gateSpawn(project, task.bin, task.argv, { cwd: root, stdio: 'inherit', env: childEnv }, { spawn, env, tap });
-    answer = taskAnswer(readTaskStatus(task.status), ran.result.status);
-    if (answer.fallback) {
-      write(`gate-task: ${answer.fallback} — ran direct\n`);
-      task = null;
-      answer = null;
+  try {
+    if (task) {
+      ran = gateSpawn(project, task.bin, task.argv, { cwd: root, stdio: 'inherit', env: childEnv }, { spawn, env, tap });
+      answer = taskAnswer(readTaskStatus(task.status), ran.result.status);
+      collect(resultDir);
+      resultDir = null;
+      // A Task whose builder reported is decided from that result; the direct path runs only when
+      // the Task produced no result at all (it never ran the builder).
+      if (answer.fallback && suiteResult && ['pass', 'fail'].includes(suiteResult.verdict)) {
+        write(`gate-task: ${answer.fallback}, but the named half reported (${suiteResult.verdict}): its result stands, no second attempt\n`);
+        answer = { answered: { hit: false } };
+      }
+      if (answer.fallback) {
+        write(`gate-task: ${answer.fallback} — ran direct\n`);
+        task = null;
+        answer = null;
+        // A fresh directory for the second attempt: the first attempt's result never stands in.
+        suiteResult = null;
+        resultDir = newResultDir();
+        ran = direct();
+      }
+    } else {
       ran = direct();
     }
-  } else {
-    ran = direct();
+    collect(resultDir);
+  } finally {
+    if (resultDir) rmSync(resultDir, { recursive: true, force: true });
   }
   const { result, tapped } = ran;
   const cost = tapped ? Object.fromEntries(COST_FIELDS.map(k => [k, tapped[k] ?? null])) : undefined;
@@ -590,13 +669,21 @@ export function runProject(project, printOnly, namesOnly, {
     liveEvent(env, { kind: 'gate-verdict', project: project.name, verdict: { exit: 0, seconds: 0, reused: true }, derivation, status: 'Answered' });
     return 0;
   }
-  // The exit status is the verdict; what the tap recognized only classifies it.
-  const status = result.status ?? 1;
+  // The exit status is the verdict; what the tap recognized only classifies it. For a suite's named
+  // half the verdict comes from the attempt's written result, never the status alone (suiteDecision).
+  const outcome = suiteNamed
+    ? suiteDecision({ exit: result.status ?? 1, signal: result.signal ?? null, result: suiteResult, expected: evidence.suite,
+      gateSha: gateCommit, headAfter: revParse('HEAD'), dirtyAfter: dirtyAfterRun(root, gateCommit) })
+    : { status: result.status ?? 1, record: true };
+  const status = outcome.status;
   const seconds = Number(process.hrtime.bigint() - started) / 1e9;
   let evidenceCid = null;
   // The verdict is recorded against the closure — red too; a known-red closure is information.
-  // An interrupted Task has no verdict, so nothing is recorded for it.
-  if (evidence.key && evidence.buildRefBin && !answer?.unanswered) {
+  // An interrupted Task has no verdict, so nothing is recorded for it. A suite's named half is
+  // recorded only on its own bytes, with HEAD and the view's paths unchanged since the start.
+  const suiteCheck = outcome;
+  if (!suiteCheck.record) write(`[gate] ${project.name} evidence: not recorded (${suiteCheck.why})\n`);
+  if (evidence.key && evidence.buildRefBin && !answer?.unanswered && suiteCheck.record) {
     const put = recordEvidence(project, evidence.key, {
       success: status === 0,
       seconds,
@@ -705,6 +792,7 @@ if (isMain) {
       process.exit(2);
     }
     projects = selectGateProjects(registry, args[index + 1]);
+    if (!args.includes('--recipe')) projects = withHalves(registry, projects);
   }
 
   if (projects.length === 0) {

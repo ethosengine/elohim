@@ -39,9 +39,8 @@ const orchestrator = read("genesis/orchestrator/Jenkinsfile");
 const edge = read("elohim/holochain/Jenkinsfile");
 const buildGraph = read("genesis/orchestrator/build-graph.groovy");
 const mirrorSchema = JSON.parse(read("genesis/orchestrator/manifest.schema.json"));
-// The rakia submodule may be uninitialised (a fresh clone, a scratch worktree).
+// A declared read (suite-reads.json): the named half's view holds it at the rakia pin.
 const RAKIA_SCHEMA = resolve(ROOT, "elohim/rakia/schemas/v1/build-manifest.schema.json");
-const rakiaSchema = existsSync(RAKIA_SCHEMA) ? JSON.parse(readFileSync(RAKIA_SCHEMA, "utf8")) : null;
 
 function topLevelDef(text, name) {
   const start = text.search(new RegExp(`^def\\s+${name}\\s*\\(`, "m"));
@@ -200,9 +199,14 @@ describe("declared data — the manifests and both schemas", () => {
     assert.ok(!mirrorSchema.$defs.step.required.includes("class"), "class must stay optional");
   });
 
-  test("when the pinned rakia schema declares steps[].class, it is the same vocabulary", () => {
-    const cls = rakiaSchema?.$defs.step.properties.class;
-    if (!cls) return; // submodule absent, or the pin predates B1 — consumers default to build meanwhile
+  test("when the pinned rakia schema declares steps[].class, it is the same vocabulary", (t) => {
+    // An absent schema is a failure; a pinned schema with no class property is a pass, said aloud.
+    assert.ok(existsSync(RAKIA_SCHEMA), `${RAKIA_SCHEMA} is absent: initialise elohim/rakia, or declare it in suite-reads.json`);
+    const cls = JSON.parse(readFileSync(RAKIA_SCHEMA, "utf8")).$defs?.step?.properties?.class;
+    if (!cls) {
+      t.diagnostic("the pinned rakia schema has no steps[].class property (the pin predates B1); consumers default to build");
+      return;
+    }
     assert.deepEqual(cls.enum, RUN_CLASSES);
     assert.equal(cls.default, "build");
   });

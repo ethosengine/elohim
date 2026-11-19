@@ -8,7 +8,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, chmodSync, rmSync, readFileSync, existsSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, chmodSync, rmSync, readFileSync, existsSync, symlinkSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
@@ -21,6 +21,7 @@ import { architectureLedgerPath } from './gate-runner.mjs';
 import {
   COMPILER_GATE_INPUTS,
   attestationStep,
+  attestedOutputParses,
   closureKey,
   describeEvidence,
   deviceRoot,
@@ -923,7 +924,9 @@ test('selfAgentId runs the real signer streams through the pinned and the new br
   assert.equal(selfAgentId(root, undefined, { env }), null);
 });
 
-const greenRow = { commit: 'aaaaaaaaa1', attestation: { success: true, agentId: publicKey, builtAt: '2026-10-24T12:00:00Z' } };
+// A CIDv1 (dag-cbor 0x71, sha2-256 0x12, 32 bytes): the attested output a row must carry to be reused.
+const OUTPUT_CID = [1, 0x71, 0x12, 0x20, ...Array(32).fill(7)];
+const greenRow = { commit: 'aaaaaaaaa1', attestation: { success: true, agentId: publicKey, builtAt: '2026-10-24T12:00:00Z', outputCid: OUTPUT_CID } };
 // brit at 7e4a83115e: `signer --json` names the repository key; the pinned 76ba95d8a0 has no such subcommand.
 const signerReply = [isSigner, { status: 0, stdout: `{"agentId":"${publicKey}"}\n`, stderr: '' }];
 const OLD_BRIT_SIGNER = { status: 2, stdout: '', stderr: "error: unrecognized subcommand 'signer'\n\nUsage: brit-build-ref [OPTIONS] <COMMAND>\n\nFor more information, try '--help'.\n" };
@@ -1279,7 +1282,7 @@ test('runProject reuses without executing or attesting and observes run-kind=reu
   assert.equal(status, 0);
   assert.match(lines.join(''), /\[gate\] elohim-storage reused: green .* at aaaaaaaaa \(signer this workspace\)/);
   assert.equal(calls.filter(c => c.bin === 'bash' || isPut(c.bin, c.args)).length, 0);
-  const note = calls.find(c => c.bin === 'epr');
+  const note = calls.find(c => c.bin === 'epr' && c.args[0] !== 'peer');
   assert.ok(note.args.includes('run-kind=reused'));
   assert.ok(note.args.includes('exit=ok'));
   assert.equal(note.args[note.args.indexOf('--value') + 1], '0');
@@ -1415,7 +1418,7 @@ test('a Task gate runs its Task when the sibling verdict is red', async t => {
   const { runProject } = await import('./gate-runner.mjs');
   const f = taskSiblingFixture(t, { sibling: { ...siblingGreen, success: false } });
   assert.equal(f.status(runProject), 0);
-  assert.match(f.lines.join(''), /not reused from a sibling: sibling verdict is red/);
+  assert.match(f.lines.join(''), /not reused: sibling verdict is red/);
   assert.doesNotMatch(f.lines.join(''), /reused: green/);
   assert.equal(f.taskRuns(), 1);
 });
@@ -1424,17 +1427,48 @@ test('a Task gate runs its Task when the change touches sibling-reuse governance
   const { runProject } = await import('./gate-runner.mjs');
   const f = taskSiblingFixture(t, { diff: 'genesis/orchestrator/gate-task.mjs\n' });
   assert.equal(f.status(runProject), 0);
-  assert.match(f.lines.join(''), /not reused from a sibling: governance-class change: genesis\/orchestrator\/gate-task\.mjs/);
+  assert.match(f.lines.join(''), /not reused: governance-class change: genesis\/orchestrator\/gate-task\.mjs/);
   assert.equal(f.taskRuns(), 1);
 });
 
-test('a Task gate with its own green leaves the decision to ark and asks no sibling', async t => {
+test('a Task gate with its own green reuses it under the direct path\'s rules, before ark, after asking the sibling channel once', async t => {
   const { runProject } = await import('./gate-runner.mjs');
   const f = taskSiblingFixture(t, { rows: [greenRow] });
   assert.equal(f.status(runProject), 0);
-  assert.equal(f.calls.filter(c => isPeerVerdicts(c.bin, c.args)).length, 0);
-  assert.equal(f.calls.filter(c => c.bin === 'git' && c.args[0] === 'diff').length, 0, 'no selector call is spent');
-  assert.equal(f.taskRuns(), 1);
+  assert.equal(f.calls.filter(c => isPeerVerdicts(c.bin, c.args)).length, 1, 'a sibling red is looked up before the own green is accepted');
+  assert.equal(f.calls.filter(c => c.bin === 'git' && c.args[0] === 'diff' && c.args.includes(greenRow.commit)).length, 1, 'the selector is asked, as on the direct path');
+  assert.equal(f.taskRuns(), 0, 'ark is not asked');
+  assert.ok(f.lines.some(line => /reused: green/.test(line)), f.lines.join('\n'));
+});
+
+test('own green plus a sibling red for the same closure does not reuse, on the Task path and the direct path', async t => {
+  const { runProject } = await import('./gate-runner.mjs');
+  const red = { ...siblingGreen, success: false };
+  const task = taskSiblingFixture(t, { rows: [greenRow], sibling: red });
+  assert.equal(task.status(runProject), 0);
+  assert.equal(task.taskRuns(), 1, task.lines.join('\n'));
+  assert.ok(task.lines.some(line => /not reused: sibling verdict is red/.test(line)), task.lines.join('\n'));
+  const { decideReuse } = await import('./gate-runner.mjs');
+  const evidence = { project: project.name, key: 'k', rows: [greenRow], dirty: false, unverifiable: [] };
+  const context = { mode: 'reuse', enabled: true, selfId: greenRow.attestation.agentId, selectorCheck: () => ({ ok: true }) };
+  const spawn = (bin, args) => (isPeerVerdicts(bin, args)
+    ? { status: 0, stdout: JSON.stringify([{ ...red, project: project.name, closure: 'k' }]) }
+    : { status: 0, stdout: '' });
+  assert.deepEqual(decideReuse(project, evidence, context, { root: '/r', env: {}, spawn }), { reuse: false, why: 'sibling verdict is red' });
+  assert.equal(decideReuse(project, evidence, context, { root: '/r', env: {}, spawn: () => ({ status: 0, stdout: '[]' }) }).reuse, true);
+});
+
+test('a habit atom changed since the green is no selector veto only for a suite list\'s named half', async t => {
+  const { reuseSelector } = await import('./gate-runner.mjs');
+  const diff = files => (bin, args) => (bin === 'git' && args[0] === 'diff'
+    ? { status: 0, stdout: files.map(f => `${f}\n`).join('') }
+    : { status: 1, stdout: '', stderr: 'no oracle here' });
+  const env = { PATH: '/nonexistent' };
+  const habit = ['genesis/orchestrator/.epr-meta/x.habit.md'];
+  assert.deepEqual(reuseSelector({ name: 'orchestrator' }, 'HEAD', { root: '/r', env, spawn: diff(habit) })('a1'), { ok: true });
+  // Any other project, whose key does not provably drop habit atoms, keeps asking the oracle.
+  assert.equal(reuseSelector(project, 'HEAD', { root: '/r', env, spawn: diff(habit) })('a1').ok, false);
+  assert.equal(reuseSelector({ name: 'orchestrator' }, 'HEAD', { root: '/r', env, spawn: diff(['genesis/orchestrator/x.mjs']) })('a1').ok, false);
 });
 
 test('epr peer verdicts failure is a miss and the gate runs', async t => {
@@ -1799,4 +1833,237 @@ test('every repository file run-local-gate.sh sources is a closure input of ever
   const sourced = [...runner.matchAll(/^\s*(?:source|\.)\s+"\$repo_root\/([^"$]+)"/gm)].map(m => m[1]);
   assert.ok(sourced.includes('genesis/agentic/bin/pool-lib.sh'), `the runner still sources pool-lib.sh: ${sourced}`);
   for (const path of sourced) assert.ok(COMPILER_GATE_INPUTS.includes(path), `${path} is sourced by every cargo gate and keyed by none`);
+});
+
+// E11: the orchestrator suite declares its reads in genesis/orchestrator/suite-reads.json. Its named
+// side keys on those reads and its own directory, not on the step fingerprint, so a documentation
+// commit, a habit DELTA and a Rust change the list does not name keep its evidence; a declared read,
+// a named test outside the directory and the list itself re-key it. orchestrator-tree keys on the tree.
+test('E11: orchestrator keys on its suite list, orchestrator-tree on the whole tree', t => {
+  const root = mkdtempSync(join(tmpdir(), 'gate-evidence-suite-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const cleanEnv = { ...process.env };
+  for (const key of ['GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_PREFIX', 'GIT_COMMON_DIR', 'GATE_COMMIT']) delete cleanEnv[key];
+  Object.assign(cleanEnv, {
+    GIT_CEILING_DIRECTORIES: dirname(root), GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: '/dev/null', HOME: root,
+    GIT_AUTHOR_NAME: 'Test Author', GIT_AUTHOR_EMAIL: 'author@example.test',
+    GIT_COMMITTER_NAME: 'Test Committer', GIT_COMMITTER_EMAIL: 'committer@example.test',
+    GIT_AUTHOR_DATE: '2026-11-19T00:00:00Z', GIT_COMMITTER_DATE: '2026-11-19T00:00:00Z',
+  });
+  const git = (...args) => spawnSync('git', args, { cwd: root, env: cleanEnv, encoding: 'utf8' });
+  const commit = message => {
+    git('add', '.');
+    assert.equal(git('commit', '-m', message).status, 0);
+    return git('rev-parse', 'HEAD').stdout.trim();
+  };
+  assert.equal(git('init').status, 0);
+  const dir = join(root, 'genesis', 'orchestrator');
+  for (const d of [dir, join(dir, '.epr-meta'), join(root, 'shared'), join(root, 'docs'), join(root, 'genesis', 'agentic'), join(root, 'crates', 'x')]) {
+    mkdirSync(d, { recursive: true });
+  }
+  writeFileSync(join(dir, 'build-manifest.json'), JSON.stringify({ steps: { s: { inputs: { sources: ['genesis/orchestrator/**', 'crates/x/**'] } } } }));
+  writeFileSync(join(dir, 'justfile'), 'gate:\n  true\ngate-tree:\n  true\n');
+  writeFileSync(join(dir, 'run-local-gate.sh'), '#!/bin/sh\n');
+  writeFileSync(join(dir, '.epr-meta', 'h.habit.md'), '---\nid: h\n---\n');
+  const list = reads => JSON.stringify({ modules: { '.': ['p'] }, groups: [{ runner: 'node', files: [
+    { file: 'a.test.mjs', reads }, { file: '../agentic/b.test.mjs', reads: [] }, { file: 'c.test.mjs', tree: 'reads the tree' }] }] });
+  writeFileSync(join(dir, 'suite-reads.json'), list(['shared/data.json']));
+  // An install the list's `modules` names: ignored by git, hashed into the named key.
+  const pkg = join(root, 'node_modules', '.pnpm', 'p@1.0.0', 'node_modules', 'p');
+  mkdirSync(pkg, { recursive: true });
+  writeFileSync(join(pkg, 'package.json'), '{"name":"p","version":"1.0.0"}');
+  writeFileSync(join(pkg, 'index.js'), 'module.exports = 1;\n');
+  symlinkSync('.pnpm/p@1.0.0/node_modules/p', join(root, 'node_modules', 'p'));
+  writeFileSync(join(root, '.gitignore'), 'node_modules\n');
+  writeFileSync(join(root, 'genesis', 'agentic', 'b.test.mjs'), '// a named test outside the project dir\n');
+  writeFileSync(join(root, 'shared', 'data.json'), '{"v":1}\n');
+  writeFileSync(join(root, 'docs', 'a.md'), '# a\n');
+  writeFileSync(join(root, 'crates', 'x', 'lib.rs'), 'pub fn x() {}\n');
+  const revs = [commit('base')];
+  const edit = (path, text, message) => { writeFileSync(join(root, path), text); revs.push(commit(message)); };
+  edit('docs/a.md', '# a documentation edit\n', 'docs');
+  edit('genesis/orchestrator/.epr-meta/h.habit.md', '---\nid: h\n---\nDELTA\n', 'habit delta');
+  edit('crates/x/lib.rs', 'pub fn x() -> u8 { 1 }\n', 'a step source the list does not name');
+  edit('shared/data.json', '{"v":2}\n', 'declared read');
+  edit('genesis/agentic/b.test.mjs', '// the named test changed\n', 'named test outside the dir');
+  edit('genesis/orchestrator/suite-reads.json', list(['shared/data.json', 'docs']), 'list');
+  chmodSync(join(root, 'shared', 'data.json'), 0o755);
+  revs.push(commit('a mode-only change to a declared read'));
+
+  // The fake brit fingerprints the step from its sources, so a step-source edit moves it.
+  const brit = join(root, 'brit');
+  const buildRef = join(root, 'brit-build-ref');
+  writeFileSync(brit,
+    `#!/bin/sh\nprintf '{"fingerprints":[{"step":"%s","fingerprint":"%s%s"}]}' "$5" "$(git -C '${root}' rev-parse "$7:genesis/orchestrator")" "$(git -C '${root}' rev-parse "$7:crates/x")"\n`);
+  writeFileSync(buildRef, '#!/bin/sh\nprintf "[]"\n');
+  chmodSync(brit, 0o755);
+  chmodSync(buildRef, 0o755);
+  const env = { ...cleanEnv, BRIT_BIN: brit, BRIT_BUILD_REF_BIN: buildRef, PATH: cleanEnv.PATH || '' };
+  const isoSpawn = (cmd, args, opts) => spawnSync(cmd, args, { ...opts, env: { ...cleanEnv, ...(opts?.env || {}) } });
+  const gateProject = (name, recipe) => ({
+    name, dir: 'genesis/orchestrator', manifestPath: 'genesis/orchestrator/build-manifest.json', steps: ['s'],
+    run: { kind: 'just', recipe },
+  });
+  const at = (gp, rev) => gateEvidence(gp, { root, commit: rev, env, spawn: isoSpawn });
+  const named = revs.map(rev => at(gateProject('orchestrator', 'gate'), rev));
+  const tree = revs.map(rev => at(gateProject('orchestrator-tree', 'gate-tree'), rev));
+  const [base, docs, habit, rust, data, outside, relisted, moded] = named;
+  // The four implicit install-state reads (.npmrc, package.json, pnpm-lock.yaml, pnpm-workspace.yaml),
+  // shared/data.json, and the named test outside the project dir.
+  assert.match(base.line, /closure scope paths \(6 reads\)/, base.line);
+  assert.match(tree[0].line, /closure scope tree/, tree[0].line);
+  assert.equal(docs.key, base.key, 'a documentation commit keeps the named suite closure');
+  assert.equal(habit.key, docs.key, 'a habit DELTA under the project dir keeps it');
+  assert.equal(rust.key, habit.key, 'a step source the list does not name keeps it');
+  assert.notEqual(tree[1].key, tree[0].key, 'a documentation commit re-keys orchestrator-tree');
+  assert.notEqual(tree[3].key, tree[2].key, 'a step-source edit re-keys orchestrator-tree');
+  assert.notEqual(data.key, rust.key, 'a declared read re-keys the named suite');
+  assert.notEqual(outside.key, data.key, 'a named test file outside the project dir re-keys it');
+  assert.notEqual(relisted.key, outside.key, 'the list itself re-keys it');
+  assert.match(relisted.line, /closure scope paths \(7 reads\)/);
+  assert.notEqual(moded.key, relisted.key, 'a mode-only change to a declared read re-keys it');
+  assert.notEqual(moded.suite.inventory, relisted.suite.inventory);
+  assert.equal(moded.suite.commit, revs.at(-1), 'the key names the commit its inventory was resolved at');
+  writeFileSync(join(pkg, 'index.js'), 'module.exports = 2;\n');
+  const repackaged = at(gateProject('orchestrator', 'gate'), revs.at(-1));
+  assert.notEqual(repackaged.key, moded.key, 'an edited installed package re-keys it at the same commit');
+  assert.notEqual(repackaged.suite.packages, moded.suite.packages);
+  // An unreadable named listing never falls back to the tree: no key, so nothing is reused or recorded.
+  writeFileSync(join(dir, 'suite-reads.json'), '{ not a list');
+  const broken = at(gateProject('orchestrator', 'gate'), commit('a broken list'));
+  assert.equal(broken.key, undefined);
+  assert.match(broken.line, /unavailable \(the named listing at \w+: genesis\/orchestrator\/suite-reads\.json is unreadable or not a suite list; nothing is reused or recorded\)/);
+});
+
+test('a local green is refused when a fresh read finds a newer local red, or its output is not a CID', async t => {
+  const { decideReuse } = await import('./gate-runner.mjs');
+  const evidence = { project: project.name, key: 'k', rows: [greenRow], dirty: false, unverifiable: [], buildRefBin: '/b/brit-build-ref' };
+  const context = { mode: 'reuse', enabled: true, selfId: greenRow.attestation.agentId, selectorCheck: () => ({ ok: true }) };
+  const red = { commit: 'aaaaaaaaa2', attestation: { success: false, agentId: publicKey, builtAt: '2026-10-24T13:00:00Z', outputCid: OUTPUT_CID } };
+  const spawnWith = rows => (bin, args) => (isPeerVerdicts(bin, args) ? { status: 0, stdout: '[]' }
+    : isFind(bin, args) ? { status: 0, stdout: JSON.stringify(rows), stderr: '' } : { status: 1, stdout: '' });
+  assert.equal(decideReuse(project, evidence, context, { root: '/r', env: {}, spawn: spawnWith([greenRow]) }).reuse, true);
+  assert.deepEqual(decideReuse(project, evidence, context, { root: '/r', env: {}, spawn: spawnWith([greenRow, red]) }),
+    { reuse: false, why: 'a newer local red for this closure arrived' });
+  const bare = { ...greenRow, attestation: { ...greenRow.attestation, outputCid: [1, 2, 3] } };
+  assert.deepEqual(decideReuse(project, { ...evidence, rows: [bare] }, context, { root: '/r', env: {}, spawn: spawnWith([bare]) }),
+    { reuse: false, why: 'the attested output is not a CID' });
+  assert.equal(attestedOutputParses(greenRow), true);
+  assert.equal(attestedOutputParses({ attestation: { outputCid: [0x12, 0x20, ...Array(32).fill(1)] } }), true, 'a version 0 CID');
+  assert.equal(attestedOutputParses({ attestation: {} }), false);
+});
+
+
+// The named half's builder writes one result per attempt; the gate decides from it, never from the
+// status alone: no result is a red, a pass on other bytes records nothing, a red on the key's bytes
+// is recorded, and a pass on the key's bytes records a green.
+test('a named run is decided from its written result, through runProject', async t => {
+  const { runProject } = await import('./gate-runner.mjs');
+  const { decodeExpectation } = await import('./suite-inventory.mjs');
+  const root = mkdtempSync(join(tmpdir(), 'gate-suite-outcome-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const cleanEnv = { ...process.env };
+  for (const key of ['GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_PREFIX', 'GIT_COMMON_DIR', 'GATE_COMMIT', 'GATE_LIVE_RUN']) delete cleanEnv[key];
+  Object.assign(cleanEnv, {
+    GIT_CEILING_DIRECTORIES: dirname(root), GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: '/dev/null', HOME: root,
+    GIT_AUTHOR_NAME: 'T', GIT_AUTHOR_EMAIL: 't@example.test', GIT_COMMITTER_NAME: 'T', GIT_COMMITTER_EMAIL: 't@example.test',
+  });
+  const git = (...args) => spawnSync('git', args, { cwd: root, env: cleanEnv, encoding: 'utf8' });
+  const dir = join(root, 'genesis', 'orchestrator');
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, 'build-manifest.json'), JSON.stringify({ steps: { s: { inputs: { sources: ['genesis/orchestrator/**'] } } } }));
+  writeFileSync(join(dir, 'justfile'), 'gate:\n  true\n');
+  writeFileSync(join(dir, 'run-local-gate.sh'), '#!/bin/sh\n');
+  writeFileSync(join(dir, 'suite-reads.json'), JSON.stringify({ groups: [{ runner: 'node', files: [{ file: 'a.test.mjs', reads: [] }] }] }));
+  writeFileSync(join(dir, 'a.test.mjs'), '// a\n');
+  assert.equal(git('init', '-q').status, 0);
+  git('add', '.');
+  assert.equal(git('commit', '-q', '-m', 'base').status, 0);
+  const brit = join(root, 'brit');
+  writeFileSync(brit, `#!/bin/sh\nprintf '{"fingerprints":[{"step":"%s","fingerprint":"f"}]}' "$5"\n`);
+  chmodSync(brit, 0o755);
+  const buildRef = join(root, 'brit-build-ref');
+  writeFileSync(buildRef, '#!/bin/sh\nexit 0\n');
+  chmodSync(buildRef, 0o755);
+  const ark = join(root, 'ark');
+  writeFileSync(ark, '#!/bin/sh\nexit 0\n');
+  chmodSync(ark, 0o755);
+  // `write(expected)` returns the result the stub builder writes, or null for none. With `task`, the
+  // first attempt runs as an ark Task whose status log is never written (unreadable to the gate).
+  const run = (exit, write, { task = false } = {}) => {
+    const puts = [];
+    const lines = [];
+    const attempts = [];
+    let resultDir = null;
+    const builder = opts => {
+      resultDir = opts.env.GATE_SUITE_RESULT;
+      const result = write(decodeExpectation(opts.env.GATE_SUITE_EXPECT));
+      if (result) writeFileSync(join(resultDir, 'result.json'), JSON.stringify(result));
+      return { status: exit, signal: null, stdout: '', stderr: '' };
+    };
+    const spawn = (bin, args, opts = {}) => {
+      if (bin === ark && args[1] === 'spec') return { status: 0, stdout: JSON.stringify({ spec: {}, derivation: { method: 'm', input: 'i' } }), stderr: '' };
+      if (bin === ark && args[1] === 'run') { attempts.push('task'); return builder(opts); }
+      if (bin === 'bash' && String(args[0]).endsWith('run-local-gate.sh')) { attempts.push('direct'); return builder(opts); }
+      if (bin === buildRef && args.includes('put')) { puts.push(args); return { status: 0, stdout: 'bafyrecorded\n', stderr: '' }; }
+      if (bin === buildRef && args.includes('find')) return { status: 0, stdout: '[]', stderr: '' };
+      if (bin === buildRef) return { status: 1, stdout: '', stderr: 'no note' };
+      if (String(bin).endsWith('no-epr')) return { status: 0, stdout: '' };
+      return spawnSync(bin, args, { ...opts, env: { ...cleanEnv, ...(opts.env || {}) } });
+    };
+    const status = runProject({ name: 'orchestrator', dir: 'genesis/orchestrator', manifestPath: 'genesis/orchestrator/build-manifest.json',
+      steps: ['s'], run: { kind: 'just', recipe: 'gate' } }, false, false, {
+      root, spawn, write: line => lines.push(line), warn: () => {},
+      env: { ...cleanEnv, BRIT_BIN: brit, BRIT_BUILD_REF_BIN: buildRef, EPR_BIN: join(root, 'no-epr'), GATE_RUN_KIND: 'full-gate', JUST_NO_DEPS: 'true',
+        ...(task ? { GATE_TASK: 'on', ARK_BIN: ark } : { GATE_TASK: 'off' }) },
+    });
+    assert.ok(resultDir && !existsSync(resultDir), 'the attempt\'s result directory is removed');
+    return { status, puts, out: lines.join(''), attempts };
+  };
+  const result = (expected, verdict, extra = {}) => ({ v: 1, ...expected, bytes: 'key', why: [], full: true, groups: [], findings: [], verdict, ...extra });
+  const silent = run(0, () => null);
+  assert.equal(silent.status, 1, 'a recipe that exits 0 without a result is a red');
+  assert.match(silent.out, /evidence: not recorded \(the named half did not report \(no result\)\)/);
+  assert.equal(silent.puts.length, 0);
+  const contradicted = run(1, e => result(e, 'pass'));
+  assert.equal(contradicted.status, 1);
+  assert.match(contradicted.out, /did not report \(result pass, process exit 1\)/);
+  assert.equal(contradicted.puts.length, 0);
+  const other = run(0, e => result(e, 'pass', { bytes: 'other', why: ['the view holds working-tree bytes'] }));
+  assert.equal(other.status, 0, other.out);
+  assert.match(other.out, /evidence: not recorded \(a pass, recorded nowhere: it tested other bytes \(the view holds working-tree bytes\)\)/);
+  assert.equal(other.puts.length, 0);
+  const red = run(1, e => result(e, 'fail'));
+  assert.equal(red.status, 1, red.out);
+  assert.equal(red.puts.length, 1, 'a red on the key\'s bytes is recorded: it vetoes reuse');
+  const otherRed = run(1, e => result(e, 'fail', { packages: 'elsewhere' }));
+  assert.equal(otherRed.status, 1);
+  assert.equal(otherRed.puts.length, 0, 'a red on other bytes is recorded nowhere');
+  const green = run(0, e => result(e, 'pass'));
+  assert.equal(green.status, 0, green.out);
+  assert.equal(green.puts.length, 1, green.out);
+  assert.ok(green.puts[0].includes('--success'), green.puts[0].join(' '));
+  // A Task whose builder reported fail, with ark's status log unreadable: red, no second attempt.
+  const taskRed = run(1, e => result(e, 'fail'), { task: true });
+  assert.equal(taskRed.status, 1, taskRed.out);
+  assert.deepEqual(taskRed.attempts, ['task'], taskRed.out);
+  assert.match(taskRed.out, /but the named half reported \(fail\): its result stands, no second attempt/);
+  // A Task that produced no result at all falls back to the direct path, which reports.
+  let first = true;
+  const retried = run(0, e => (first ? (first = false, null) : result(e, 'pass')), { task: true });
+  assert.deepEqual(retried.attempts, ['task', 'direct'], retried.out);
+  assert.equal(retried.status, 0, retried.out);
+  // A result path the Task's declared environment would drop (a brace) runs direct, saying so.
+  const braced = mkdtempSync(join(tmpdir(), 'gate-suite-{brace}-'));
+  t.after(() => rmSync(braced, { recursive: true, force: true }));
+  const saved = process.env.TMPDIR;
+  process.env.TMPDIR = braced;
+  try {
+    const direct = run(0, e => result(e, 'pass'), { task: true });
+    assert.deepEqual(direct.attempts, ['direct'], direct.out);
+    assert.match(direct.out, /gate-task: GATE_SUITE_RESULT would not reach the Task child \(braces are ark template syntax\) — ran direct/);
+    assert.equal(direct.status, 0, direct.out);
+  } finally {
+    if (saved === undefined) delete process.env.TMPDIR; else process.env.TMPDIR = saved;
+  }
 });

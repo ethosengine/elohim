@@ -19,7 +19,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadGateRegistry } from './pipeline-registry.mjs';
-import { UNAUDITED_RECIPE_PROJECTS, globCovers, readSet } from './gate-input-audit.mjs';
+import { SUITE_READ_LISTS, UNAUDITED_RECIPE_PROJECTS, globCovers, readSet, suiteReadSet } from './gate-input-audit.mjs';
 import { dirtyPaths } from './gate-evidence.mjs';
 import { appendEvent } from './gate-live.mjs';
 import { applicableTargets, checkCBaseline, hostTripleOf, readDeclaredTargets } from './c-baseline.mjs';
@@ -414,6 +414,10 @@ export function gateBuildEnv(project, env, root) {
  * A reuse-enabled gate that runs on a dirty closure records nothing, so the next push pays it
  * again in full (87 min for eprfs on 2026-10-27). Said before the gate starts, not after.
  */
+function listedReads(root, list) {
+  try { return suiteReadSet(readFileSync(join(root, list), 'utf8'), list); } catch { return null; }
+}
+
 export function checkEvidenceRecordable({ root, projects, env = process.env, reuse, read = readSet, dirty = dirtyPaths }) {
   const enabled = new Set(reuse ?? []);
   const rows = [];
@@ -423,10 +427,14 @@ export function checkEvidenceRecordable({ root, projects, env = process.env, reu
     try {
       // Mirror the closure key (gate-evidence.mjs readSetAt): every cargo project is keyed on its
       // named reads when it has no unresolved one; a non-cargo gate, and a project whose recipe
-      // runs tests the audit cannot read (UNAUDITED_RECIPE_PROJECTS), keys on the whole tree.
-      const result = (NAMED_READ_SET_PROJECTS.includes(project.name) || project.run?.cargo)
-        && !UNAUDITED_RECIPE_PROJECTS.includes(project.name)
-        ? read({ root, project, sources: sourcesOf(root, project) }) : null;
+      // runs tests the audit cannot read (UNAUDITED_RECIPE_PROJECTS), keys on the whole tree. A
+      // suite list (SUITE_READ_LISTS) keys on its reads; an unreadable list keys on the tree, as
+      // readSetAt does.
+      const list = SUITE_READ_LISTS[project.name];
+      const result = list ? listedReads(root, list)
+        : (NAMED_READ_SET_PROJECTS.includes(project.name) || project.run?.cargo)
+          && !UNAUDITED_RECIPE_PROJECTS.includes(project.name)
+          ? read({ root, project, sources: sourcesOf(root, project) }) : null;
       const reads = result && result.unresolved.length === 0 && !result.paths.includes('.')
         ? { scope: 'paths', oids: result.paths.map(path => ({ path })) }
         : { scope: 'tree' };

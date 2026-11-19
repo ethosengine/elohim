@@ -429,3 +429,26 @@ describe('E6 #2: an unrecognized red step stands in only once the child is known
     }
   });
 });
+
+describe('the orchestrator suite named half', () => {
+  const one = line => failures(run([line]).events);
+  test('an undeclared skip is a test red naming its file and test', () => {
+    const [f] = one('[suite] named: skipped and not in allowedSkips: gate-cost.test.mjs › e11 proof: a skip (proof only)');
+    assert.equal(f.failure.class, 'test');
+    assert.deepEqual(f.failure.locus, { file: 'gate-cost.test.mjs', test: 'e11 proof: a skip' });
+  });
+  test('a missing group skip report is a test red', () => {
+    const [f] = one('[suite] named: group 3 wrote no skip report (/tmp/x/skips/group-3.jsonl)');
+    assert.equal(f.failure.class, 'test');
+    assert.equal(f.failure.locus.test, 'named group 3 skip report');
+  });
+  test('a failed group is a step red', () => {
+    const [f] = one('[suite] named group (node) failed with 1: 42 file(s)');
+    assert.equal(f.failure.class, 'step');
+    assert.equal(f.failure.locus.test, 'named group (node)');
+  });
+  test('a named half that did not report is a step red', () => {
+    const [f] = one('[gate] orchestrator evidence: not recorded (the named half did not report (no result))');
+    assert.equal(f.failure.class, 'step');
+  });
+});

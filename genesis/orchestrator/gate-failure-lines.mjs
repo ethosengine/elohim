@@ -59,6 +59,11 @@ const RULES = [
   // env rule below, whose words a finding may quote.
   { notice: 'offer-withheld', re: /^\[gate\] (epr producer put withheld \(.+; gate remains green\))$/ },
   { cls: 'env', re: /No space left on device|Cannot allocate memory|signal: 9, SIGKILL|\(signal: 15, SIGTERM/, locus: () => ({}) },
+  // The orchestrator suite's named half (suite-run.mjs, gate-runner.mjs): reds with no test line of their own.
+  { cls: 'test', re: /^\[suite\] named: skipped and not in allowedSkips: (\S+) › (.+?) \([^()]*\)$/, locus: m => ({ file: m[1], test: m[2] }) },
+  { cls: 'test', re: /^\[suite\] named: group (\d+) wrote no skip report/, locus: m => ({ test: `named group ${m[1]} skip report` }) },
+  { cls: 'step', re: /^\[suite\] named group \((\S+)\) failed with (\S+): (\d+) file\(s\)$/, locus: m => ({ test: `named group (${m[1]})` }) },
+  { cls: 'step', re: /^\[gate\] (\S+) evidence: not recorded \(the named half did not report/, locus: () => ({}) },
 ];
 
 const STEP_FAILED = /^error: [Rr]ecipe `(.+?)` failed(?: on line \d+)? with exit code (\d+)/;

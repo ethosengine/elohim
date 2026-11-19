@@ -9,10 +9,14 @@
 // — a rebase, a docs-only commit, the integrator's fast-forward — can read the evidence
 // instead of paying the recipe again (elohim-storage: 1875 s on average, measured).
 //
-// Reuse is opt-in. The local path accepts this workspace's newest green attestation unchanged;
-// after a local miss, an admitted sibling device's crossing verdict may stand in under D5's
-// red, dirt, selector and governance fences. Evidence reads are fail-open; a missing brit,
-// fingerprint, device read, or required git object runs the gate as it always has.
+// Reuse is opt-in, and gate-runner.mjs's `decideReuse` is its one decision for the Task path and
+// the direct path. The sibling channel is asked first: an admitted sibling's red for the same
+// closure runs the gate before this workspace's newest green is considered; a sibling green stands
+// in only when this workspace has none, under D5's red, dirt, selector and governance fences. Just
+// before a local green is accepted its rows are read again (a newer local red refuses it) and its
+// attested output must parse as a CID. Evidence reads are fail-open toward running: a missing
+// brit, fingerprint or required git object runs the gate. A failed sibling-channel read is an
+// empty candidate list, so a local green stays eligible, as before E11.
 //
 // Every read here is brit's VERIFIED read (`build find`, `build get`, `signer`): stdout holds
 // only what brit verified; a stored note that fails verification is `unverifiable: <commit>
@@ -26,7 +30,8 @@ import { spawnSync } from 'child_process';
 import { createHash, createPrivateKey, createPublicKey } from 'crypto';
 import { accessSync, constants, readFileSync } from 'fs';
 import { basename, delimiter, dirname, isAbsolute, join, relative, resolve } from 'path';
-import { UNAUDITED_RECIPE_PROJECTS, globCovers, isReadPattern, readSet } from './gate-input-audit.mjs';
+import { SUITE_READ_LISTS, UNAUDITED_RECIPE_PROJECTS, globCovers, isReadPattern, readSet, suiteReadSet } from './gate-input-audit.mjs';
+import { closureDigest, dirtyInView, gitEnv, packageClosure, suiteInventory } from './suite-inventory.mjs';
 import { buildNotesRef, expectedRefusal, heldNotes, noteEpoch, readBuildNote, unverifiableNotes } from './scripts/brit-attest.mjs';
 
 /** The attestation step name a gate PROJECT writes under: one closure per project, not per manifest step. */
@@ -194,6 +199,12 @@ function stepSources(project, root, commit, spawn) {
 const readSets = new Map();
 
 function readSetAt(project, root, commit, sources, tree, spawn) {
+  // A suite that declares its reads, and runs where only those bytes exist, keys on its list at the commit.
+  const list = SUITE_READ_LISTS[project.name];
+  if (list) {
+    const text = gitRead(root, ['show', `${commit}:${list}`], spawn);
+    return text === null ? null : suiteReadSet(text, list);
+  }
   if (!project.run.cargo || !sources || UNAUDITED_RECIPE_PROJECTS.includes(project.name)) return null;
   const key = JSON.stringify([resolve(root), project.name, commit, tree]);
   if (readSets.has(key)) return readSets.get(key);
@@ -330,7 +341,7 @@ export const COMPILER_GATE_INPUTS = [
  * verdict is a function of. A gate run as an ark Task names these exact bytes as its input
  * (`ark task spec --material`), where they become an eprfs tree; CID math stays in Rust.
  */
-export function closureMaterial({ project, fingerprints, manifestBlob: blob, cargoEnv, nativeKey, compilerTools = null, recipeFile = null, runner = null, dirTree = null, cargoConfig = null, rustc = null, gitlinks = null, packages = [], reads = null }) {
+export function closureMaterial({ project, fingerprints, manifestBlob: blob, cargoEnv, nativeKey, compilerTools = null, recipeFile = null, runner = null, dirTree = null, cargoConfig = null, rustc = null, gitlinks = null, packages = [], reads = null, suite = null }) {
   return JSON.stringify(sortedObject({
     v: 3,
     ...(nativeKey ? { native: nativeKey } : {}),
@@ -348,6 +359,8 @@ export function closureMaterial({ project, fingerprints, manifestBlob: blob, car
     gitlinks,
     packages,
     reads,
+    // Only a suite project carries this, so no other gate's key changes.
+    ...(suite ? { suite } : {}),
   }));
 }
 
@@ -446,6 +459,10 @@ export const SIBLING_REUSE_GOVERNANCE_PATHS = Object.freeze([
   'genesis/orchestrator/gate-evidence.mjs',
   'genesis/orchestrator/gate-runner.mjs',
   'genesis/orchestrator/gate-*.mjs',
+  'genesis/orchestrator/suite-run.mjs',
+  'genesis/orchestrator/suite-reads.json',
+  'genesis/orchestrator/suite-inventory.mjs',
+  'genesis/orchestrator/suite-skips.mjs',
   'genesis/agentic/pool-policy.json',
   'elohim/eprfs/eprfs-peer/**',
   'elohim/eprfs/epr-cli/src/peer.rs',
@@ -505,9 +522,35 @@ export function siblingVerdicts(project, key, { root, env = process.env, spawn =
   }
 }
 
+/**
+ * Whether a row's attested output id parses as a CID (version 1: varint codec, varint multihash
+ * code, varint length and exactly that many digest bytes; or a 34-byte version 0 sha2-256), the
+ * parse ark performed before accepting a local derivation (elohim/ark/cli/src/brit_index.rs
+ * record_of).
+ */
+export function attestedOutputParses(row) {
+  const bytes = row?.attestation?.outputCid;
+  if (!Array.isArray(bytes) || !bytes.every(b => Number.isInteger(b) && b >= 0 && b <= 255)) return false;
+  if (bytes.length === 34 && bytes[0] === 0x12 && bytes[1] === 0x20) return true;
+  let at = 0;
+  const varint = () => {
+    let value = 0;
+    for (let shift = 0; shift < 63 && at < bytes.length; shift += 7) {
+      const byte = bytes[at++];
+      value += (byte & 0x7f) * 2 ** shift;
+      if (byte < 0x80) return value;
+    }
+    return null;
+  };
+  if (varint() !== 1) return false;
+  if (varint() === null || varint() === null) return false;
+  const length = varint();
+  return length !== null && length > 0 && bytes.length - at === length;
+}
+
 /** A green older than a red is not a reusable verdict, even if the report shows it. */
 export function reusableHit(evidence, {
-  selfId, enabled, mode, selectorCheck, candidates = [], admitCandidate = () => false,
+  selfId, enabled, mode, selectorCheck, candidates = [], admitCandidate = () => false, governanceWhy = null,
 }) {
   if (mode !== 'reuse') return { reuse: false, why: 'report-only' };
   if (!enabled) return { reuse: false, why: 'project not enabled for reuse' };
@@ -519,6 +562,16 @@ export function reusableHit(evidence, {
   if (vetoed) {
     return { reuse: false, why: `unverifiable note under this step at ${String(vetoed.commit || '').slice(0, 9)}: ${vetoed.reason} (a red of any verification state vetoes; replace or remove the note)` };
   }
+  const siblings = candidates.filter(candidate =>
+    candidate?.source === 'sibling'
+    && candidate.project === evidence.project
+    && candidate.closure === evidence.key
+    && admitCandidate(candidate));
+  // A red from either device for this closure runs the gate, before this workspace's green is
+  // accepted. Cross-device clocks are display-only, so verdicts are never time-ordered.
+  if (siblings.some(candidate => candidate.success !== true)) {
+    return { reuse: false, why: 'sibling verdict is red' };
+  }
   const row = [...(evidence.rows || [])].sort(
     (a, b) => Date.parse(b.attestation?.builtAt || 0) - Date.parse(a.attestation?.builtAt || 0)
   )[0];
@@ -529,19 +582,11 @@ export function reusableHit(evidence, {
     return { reuse: true, row };
   }
 
-  const siblings = candidates.filter(candidate =>
-    candidate?.source === 'sibling'
-    && candidate.project === evidence.project
-    && candidate.closure === evidence.key
-    && admitCandidate(candidate));
   if (siblings.length === 0) {
+    if (governanceWhy) return { reuse: false, why: governanceWhy };
     if (!row) return { reuse: false, why: 'no attestation for this closure yet' };
     if (row.attestation?.success !== true) return { reuse: false, why: 'newest attestation is red' };
     return { reuse: false, why: `signer ${String(row.attestation.agentId || 'unsigned').slice(0, 12)} is not this workspace` };
-  }
-  // Cross-device clocks are display-only. Any red is a veto; verdicts are never time-ordered.
-  if (siblings.some(candidate => candidate.success !== true)) {
-    return { reuse: false, why: 'sibling verdict is red' };
   }
   if ((evidence.rows || []).some(local => local.attestation?.success === false)) {
     return { reuse: false, why: 'local attestation is red' };
@@ -616,19 +661,51 @@ export function gateEvidence(project, { env = process.env, root, commit, cargoEn
     : { scope: 'tree', oid: tree };
   const scope = reads.scope === 'paths' ? `paths (${read.paths.length} reads)`
     : `tree (${read ? 'unresolved' : 'unknown'} reads)`;
+  // The step fingerprint hashes every step source (genesis/orchestrator/**, elohim/eprfs/**, ...),
+  // habit atoms included. A suite whose named half runs in a view of its declared reads cannot read
+  // those bytes, so in paths scope its key leaves the fingerprint out; dirTree, reads, the manifest,
+  // the recipe and the runner name everything the view holds. Tree scope keeps it.
+  // The named half never falls back to the tree: an unreadable listing makes this run neither
+  // recordable nor reusable, with its cause.
+  if (SUITE_READ_LISTS[project.name] && reads.scope !== 'paths') {
+    const cause = read ? 'a declared **/<name> walk could not be listed' : `${SUITE_READ_LISTS[project.name]} is unreadable or not a suite list`;
+    return { line: `unavailable (the named listing at ${String(commit).slice(0, 9)}: ${cause}; nothing is reused or recorded)` };
+  }
+  const suiteNamed = Boolean(SUITE_READ_LISTS[project.name]);
+  // The suite's named half keys on its resolved inventory (every path, mode, type and object id the
+  // view holds, and each pin with its entries), its package closure's file digest and node's
+  // version: the same value suite-run.mjs builds the view from and reports in its result.
+  let suite = null;
+  if (suiteNamed) {
+    try {
+      const list = SUITE_READ_LISTS[project.name];
+      const listText = gitRead(root, ['show', `${commit}:${list}`], spawn);
+      const inventory = suiteInventory({ root, commit: resolvedCommit(root, commit, spawn), listText, env: gitEnv() });
+      const closure = packageClosure(root, JSON.parse(listText).modules || {});
+      suite = { inventory: inventory.digest, packages: closureDigest(closure, root), node: process.version,
+        commit: inventory.commit, matcher: inventory.matcher };
+    } catch (error) {
+      return { line: `unavailable (${String(error?.message || error).split('\n')[0]})` };
+    }
+  }
   const material = closureMaterial({
-    project, fingerprints: fp.fingerprints, manifestBlob: blob, cargoEnv, nativeKey,
+    project, fingerprints: suiteNamed ? [] : fp.fingerprints, manifestBlob: blob, cargoEnv, nativeKey,
     recipeFile: recipe.blob, compilerTools, runner, dirTree,
     cargoConfig: manifestBlob(root, commit, '.cargo/config.toml', spawn),
     rustc: rustcHash(project, root, env, cargoEnv, spawn),
     gitlinks: gitlinksAt(root, commit, sources, spawn),
     packages: (env.GATE_CARGO_PACKAGES || '').trim().split(/\s+/).filter(Boolean).sort(),
     reads,
+    suite: suite && { inventory: suite.inventory, packages: suite.packages, node: suite.node },
   });
   const key = createHash('sha256').update(material).digest('hex');
   const found = findEvidence(project, key, { buildRefBin, root, spawn, warn });
   if (found.error) return { key, material, line: `unavailable (${found.error}); closure scope ${scope}` };
-  const dirty = dirtyPaths(project, { root, spawn, sources, recipePath: recipe.path, reads });
+  // The suite's recording decision asks the builder's own status call, with its flags.
+  let dirty;
+  try {
+    dirty = suite ? dirtyInView(suite.matcher, { cwd: root }) : dirtyPaths(project, { root, spawn, sources, recipePath: recipe.path, reads });
+  } catch { dirty = null; }
   let line = `${describeEvidence(found.rows, now)}; closure scope ${scope}`;
   const ignored = found.unverifiable.length;
   if (ignored > 0) line += `; ${ignored} unverifiable note${ignored === 1 ? '' : 's'} (reuse vetoed)`;
@@ -645,6 +722,7 @@ export function gateEvidence(project, { env = process.env, root, commit, cargoEn
     line,
     buildRefBin,
     nativeKey,
+    ...(suite ? { suite: { inventory: suite.inventory, packages: suite.packages, node: suite.node, commit: suite.commit } } : {}),
     dirty: checkoutMismatch ? true : dirty === null ? null : dirty.length > 0,
   };
 }

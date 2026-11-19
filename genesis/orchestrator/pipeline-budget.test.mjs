@@ -67,10 +67,9 @@ function budgets() {
     if (!p.jenkinsPath || p.manualOnly || p.pipeline === ORCHESTRATOR) continue;
     const file = resolve(ROOT, p.jenkinsPath);
     if (!existsSync(file)) {
-      // Submodule-hosted Jenkinsfiles (sophia, che-devworkspaces) are absent in
-      // a worktree without initialized submodules. Their chains are shorter
-      // than DNA → edge → app → genesis today; when present they are counted.
-      unreadable.push(p.pipeline);
+      // A dispatchable pipeline whose Jenkinsfile cannot be read is a failure, never dropped: the
+      // named half's view holds every declared Jenkinsfile, submodule-hosted ones from the pin.
+      unreadable.push(`${p.pipeline} (${p.jenkinsPath})`);
       continue;
     }
     own.set(p.pipeline, ownTimeoutMinutes(readFileSync(file, 'utf8')));
@@ -146,7 +145,8 @@ test('ownTimeoutMinutes reads only the pipeline-level options block', () => {
 });
 
 test('every dispatchable pipeline owns a wall-clock budget in its Jenkinsfile', () => {
-  const { own } = budgets();
+  const { own, unreadable } = budgets();
+  assert.deepEqual(unreadable, [], 'a dispatchable pipeline whose Jenkinsfile is unreadable is not examined: declare it in suite-reads.json');
   const missing = [...own].filter(([, minutes]) => minutes == null).map(([name]) => name);
   assert.deepEqual(
     missing,
@@ -183,6 +183,7 @@ test('elohim-holochain → elohim-edge is a barrier pair in the orchestrator', (
 
 test("the orchestrator's budget covers the longest dependency chain, so it never times out a downstream", () => {
   const { registry, own, unreadable } = budgets();
+  assert.deepEqual(unreadable, [], 'every dispatchable budget is counted in the chain');
   const orchestrator = registry.get(ORCHESTRATOR);
   const orchestratorText = readFileSync(resolve(ROOT, orchestrator.jenkinsPath), 'utf8');
   const ceiling = ownTimeoutMinutes(orchestratorText);

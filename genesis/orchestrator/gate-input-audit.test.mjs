@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync, readdirSync } from 'fs';
 import { dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
-import { UNAUDITED_RECIPE_PROJECTS, auditProject, declarationScopes, declarationsIn, exhaustInputs, globCovers, isReadPattern, readCovers, readSet, repositoryFiles } from './gate-input-audit.mjs';
+import { SUITE_READ_LISTS, UNAUDITED_RECIPE_PROJECTS, auditProject, declarationScopes, declarationsIn, exhaustInputs, globCovers, isReadPattern, readCovers, readSet, repositoryFiles, suiteReadSet } from './gate-input-audit.mjs';
 import { GATE_EXHAUST } from './gate-evidence.mjs';
 import { NAMED_READ_SET_PROJECTS } from './gate-preflight.mjs';
 import { loadGateRegistry } from './pipeline-registry.mjs';
@@ -652,16 +652,35 @@ for (const [name, own, files] of [
   });
 }
 
-test('E9 REAL: orchestrator keys on the whole tree because its suite reads what neither its sources nor its Rust reads cover', () => {
-  // gate-evidence readSetAt and the preflight's evidence row both return tree scope for it.
-  assert.ok(UNAUDITED_RECIPE_PROJECTS.includes('orchestrator'));
+test('E11 REAL: the read E9 found only the whole tree covering is a declared read of the suite now', () => {
+  // E9 keyed orchestrator on the whole tree: its suite read this schema, which neither its sources
+  // nor its Rust reads cover. E11: the suite list declares it, the named half runs where only
+  // declared bytes exist, and only the files whose reads cannot be named (orchestrator-tree) keep
+  // the whole-tree key.
+  assert.ok(!UNAUDITED_RECIPE_PROJECTS.includes('orchestrator'));
+  assert.ok(UNAUDITED_RECIPE_PROJECTS.includes('orchestrator-tree'));
   const repo = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
   const schema = 'elohim/sdk/schemas/v1/gate-live-event.schema.json';
-  const suite = JSON.parse(readFileSync(resolve(repo, 'genesis/orchestrator/package.json'), 'utf8')).scripts.test;
-  assert.match(suite, /gate-live-schema\.test\.mjs/);
   assert.match(readFileSync(resolve(repo, 'genesis/orchestrator/gate-live-schema.test.mjs'), 'utf8'), /gate-live-event\.schema\.json/);
-  const sources = realSources('orchestrator');
-  assert.ok(!sources.some(glob => globCovers(glob, schema)), 'not a step source');
-  const own = readSet({ root: repo, project: loadGateRegistry(repo).get('orchestrator'), sources: ['genesis/orchestrator/**'] });
-  assert.ok(!own.paths.some(read => readCovers(read, schema)), 'not a Rust read of its own: only the whole tree keys it');
+  assert.ok(!realSources('orchestrator').some(glob => globCovers(glob, schema)), 'still not a step source');
+  const list = SUITE_READ_LISTS.orchestrator;
+  const reads = suiteReadSet(readFileSync(resolve(repo, list), 'utf8'), list);
+  assert.deepEqual(reads.unresolved, []);
+  assert.ok(reads.paths.some(read => readCovers(read, schema)), 'the suite list names it');
+});
+
+test('suiteReadSet: declared reads, named files outside the list dir, the install reads; tree files contribute nothing', () => {
+  const text = JSON.stringify({ groups: [{ runner: 'node', files: [
+    { file: 'a.test.mjs', reads: ['shared/x.json', '**/build-manifest.json'] },
+    { file: '../agentic/b.test.mjs', reads: [] },
+    { file: '../../scripts/ci/c.test.mjs', reads: ['scripts/ci'] },
+    { file: 'd.test.mjs', tree: 'reads the tree', reads: ['never/keyed.json'] }] }] });
+  assert.deepEqual(suiteReadSet(text, 'genesis/orchestrator/suite-reads.json'), {
+    paths: ['**/build-manifest.json', '.npmrc', 'genesis/agentic/b.test.mjs', 'package.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml',
+      'scripts/ci', 'scripts/ci/c.test.mjs', 'shared/x.json'],
+    unresolved: [],
+  });
+  for (const bad of ['not json', '{}', JSON.stringify({ groups: [{ files: [{ file: 'a.test.mjs' }] }] })]) {
+    assert.equal(suiteReadSet(bad, 'genesis/orchestrator/suite-reads.json'), null, bad);
+  }
 });

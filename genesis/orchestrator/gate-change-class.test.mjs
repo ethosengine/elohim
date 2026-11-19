@@ -134,7 +134,7 @@ const target = (cflags, workspaces) => ({
 
 test('a declared_targets cflags edit is low with reuse off for the listed workspaces', async function declared_targets_cflags_edit_is_low(t) {
   const eprfs = onWorkspaces('elohim/eprfs');
-  assert.ok(eprfs.includes('eprfs') && eprfs.includes('orchestrator'), eprfs.join(' '));
+  assert.ok(eprfs.includes('eprfs') && eprfs.includes('orchestrator-tree'), eprfs.join(' '));
   const rows = classifyPoolPolicy(
     JSON.stringify(target('-march=x86-64', ['elohim/eprfs'])),
     JSON.stringify(target('-march=x86-64-v2', ['elohim/eprfs'])),

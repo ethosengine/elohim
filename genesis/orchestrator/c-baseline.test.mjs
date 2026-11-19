@@ -174,11 +174,11 @@ test('C-family keys: flags variables in every spelling, never the compiler choic
   for (const key of ['CC', 'CXX', 'CC_x86_64_unknown_linux_gnu', 'RUSTFLAGS', 'CARGO_ENCODED_RUSTFLAGS', 'LDFLAGS_X']) assert.equal(cFamilyKey(key), false, key);
 });
 
-test('the orchestrator test chain runs this file and gate-preflight.test.mjs in its first node --test group', () => {
-  const script = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')).scripts.test;
-  const first = script.split('&&')[0].trim().split(/\s+/);
-  assert.equal(first.slice(0, 2).join(' '), 'node --test');
-  for (const file of ['c-baseline.test.mjs', 'gate-preflight.test.mjs', 'c-baseline-pin.test.mjs']) assert.ok(first.includes(file), file);
+test('the orchestrator suite runs this file, c-baseline-pin.test.mjs and gate-preflight.test.mjs', () => {
+  // E11: the suite is suite-reads.json; package.json test runs both of its halves.
+  const suite = JSON.parse(readFileSync(new URL('./suite-reads.json', import.meta.url), 'utf8'));
+  const listed = suite.groups.flatMap(group => group.files.map(entry => entry.file));
+  for (const file of ['c-baseline.test.mjs', 'gate-preflight.test.mjs', 'c-baseline-pin.test.mjs']) assert.ok(listed.includes(file), file);
 });
 
 // The machine fact the record rests on, measured on this device's compiler, never a fixture.

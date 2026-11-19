@@ -589,7 +589,7 @@ describe('manifest-driven local gate registry', () => {
 
   test('every real gate project on the eprfs workspace gets the C baseline, and only those', () => {
     const onEprfs = [...registry.values()].filter(p => p.run.cargo && p.run.cargo.workspace === 'elohim/eprfs');
-    assert.deepStrictEqual(onEprfs.map(p => p.name).sort(), ['eprfs', 'eprfs-live-corpus', 'memory-ceremony', 'orchestrator']);
+    assert.deepStrictEqual(onEprfs.map(p => p.name).sort(), ['eprfs', 'eprfs-live-corpus', 'memory-ceremony', 'orchestrator-tree']);
     for (const project of onEprfs) {
       const env = JSON.parse(gateChildEnv(project, {}).GATE_CARGO_ENV);
       assert.equal(env[CFLAGS_KEY], '-march=x86-64', project.name);

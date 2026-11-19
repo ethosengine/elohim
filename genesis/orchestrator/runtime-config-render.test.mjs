@@ -438,7 +438,7 @@ test("renderer refuses an unnamed EPR_BIN even when epr is on PATH", async () =>
 test("orchestrator gate supplies its declared native epr instead of a PATH launcher", async () => {
   const { chmodSync, rmSync } = await import("node:fs");
   const { fileURLToPath } = await import("node:url");
-  const run = JSON.parse(read("genesis/orchestrator/build-manifest.json")).gate.projects.orchestrator.run;
+  const run = JSON.parse(read("genesis/orchestrator/build-manifest.json")).gate.projects["orchestrator-tree"].run;
   assert.equal(run.cargo.workspace, "elohim/eprfs");
   assert.equal(run.cargo.rustflags, "");
   const scratch = mkdtempSync(join(tmpdir(), "orchestrator-epr-"));
@@ -457,7 +457,7 @@ test("orchestrator gate supplies its declared native epr instead of a PATH launc
       GATE_CARGO_ENV: "{}", CARGO_TARGET_POOL_ROOT: join(scratch, "pool"), POOL_PARENT_REPO: fileURLToPath(ROOT),
       M_METADATA_DIR: join(scratch, "metadata-dir"), M_BUILD_ARGS: join(scratch, "build"), M_SELECTED_EPR: join(scratch, "selected") };
     execFileSync("bash", [fileURLToPath(new URL("run-local-gate.sh", import.meta.url)),
-      fileURLToPath(ROOT), "orchestrator", "genesis/orchestrator", run.kind, "test-suite",
+      fileURLToPath(ROOT), "orchestrator-tree", "genesis/orchestrator", run.kind, "test-suite-tree",
       run.cargo.workspace, "", "dev", run.cargo.rustflags], { env });
     const selected = readFileSync(env.M_SELECTED_EPR, "utf8").trim();
     assert.ok(selected.startsWith(env.CARGO_TARGET_POOL_ROOT + "/"));
@@ -467,7 +467,7 @@ test("orchestrator gate supplies its declared native epr instead of a PATH launc
     env.EPR_BIN = "/explicit/lane/epr";
     rmSync(env.M_BUILD_ARGS);
     execFileSync("bash", [fileURLToPath(new URL("run-local-gate.sh", import.meta.url)),
-      fileURLToPath(ROOT), "orchestrator", "genesis/orchestrator", run.kind, "test-suite",
+      fileURLToPath(ROOT), "orchestrator-tree", "genesis/orchestrator", run.kind, "test-suite-tree",
       run.cargo.workspace, "", "dev", run.cargo.rustflags], { env });
     assert.equal(readFileSync(env.M_SELECTED_EPR, "utf8").trim(), env.EPR_BIN);
     assert.ok(!readdirSync(scratch).includes("build"), "explicit lane does not rebuild");

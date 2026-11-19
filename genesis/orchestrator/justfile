@@ -31,28 +31,41 @@ lint-fix:
 test-jenkinsfile-lints:
     node --test jenkinsfile-cps-scope.test.mjs baseline-hold.test.mjs validate-only-pipeline.test.mjs run-class.test.mjs
 
-# Quality gate: validate Jenkinsfiles against Jenkins itself, run the
-# Jenkinsfile static lints, and run the orchestrator suite. The suite is
-# non-optional here: gate-runner.mjs / pipeline-registry.mjs / graph-walker.mjs
-# are now the ONLY local gate detector+executor, so a break in them aborts
-# every push in the repo. Pre-push calls `just gate` on any orchestrator change.
-gate: lint test-jenkinsfile-lints test-suite test-harvest test-berth
+# Quality gates. The suite is non-optional: gate-runner.mjs / pipeline-registry.mjs /
+# graph-walker.mjs are the ONLY local gate detector+executor, so a break in them aborts every push
+# in the repo. It runs as two gate projects with the same dir, steps and inputs, so a change
+# selects both and `just gate orchestrator` runs both (E11, suite-reads.json): `orchestrator` runs
+# the test files that name every read they make, in a view holding only those bytes
+# (suite-run.mjs), and keys on those reads; `orchestrator-tree` runs the files whose reads cannot
+# be named, the Jenkins validation and the python suites, and keys on the whole tree.
+# test-jenkinsfile-lints is not in either: its four files run in the named half.
+# The runner is in the recipe's own body, not only a dependency, so JUST_NO_DEPS cannot skip it.
+gate:
+    node suite-run.mjs named
+
+gate-tree: lint test-suite-tree test-harvest test-berth
 
 # berth holds pre-push's dev-integration lease and every device's notes; its suite ran under no gate
 # until a pool-policy class (3899eb7f9) left one of its tests red unnoticed.
 test-berth:
     cd ../.. && python3 -m unittest genesis/agentic/berth_test.py
 
-# Full orchestrator node --test suite (registry, gate runner, graph walker, …).
+# The suite's named half, in a view of its declared reads with a constructed environment.
+# It builds nothing: no named test runs epr.
 test-suite:
+    node suite-run.mjs named
+
+# The suite's tree half, in this checkout. runtime-config-render.test.mjs runs the real epr.
+# Through pnpm, so that test's pnpm stand-in sees the EPR_BIN the recipe resolved.
+test-suite-tree:
     #!/usr/bin/env bash
     set -euo pipefail
     if [[ -z "${EPR_BIN:-}" ]]; then
-      : "${CARGO_TARGET_DIR:?EPR_BIN absent: run just gate orchestrator to resolve its native cargo slot}"
+      : "${CARGO_TARGET_DIR:?EPR_BIN absent: run just gate orchestrator-tree to resolve its native cargo slot}"
       cargo build --manifest-path ../../elohim/eprfs/Cargo.toml --locked -p elohim-epr-cli --bin epr
       export EPR_BIN="$CARGO_TARGET_DIR/debug/epr"
     fi
-    pnpm test
+    pnpm run test:tree
 
 # Regenerate pipeline-list.json from build-manifest.json / pipeline-registry.mjs.
 # Run after editing PIPELINES.
