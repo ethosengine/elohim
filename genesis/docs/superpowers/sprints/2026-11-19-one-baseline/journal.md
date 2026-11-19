@@ -552,3 +552,55 @@ They look like the suite's own fixtures and were not checked; quieting or labell
 | 4, the suite keys on what it reads | met on both devices as of `00dd77dfb`; before that it was met on one |
 | 2, 3, 5 | unchanged |
 | 6, the record | this entry; backlog row 40; habit lines in `push-gate-pays-once` and `careless-reds-cost-seconds` |
+
+## 2026-11-19, night: CI had been red for two days, and nobody was told
+
+**Found by a neighbour.** The brit session, reading Jenkins for its own landing, reported that
+`elohim-eprfs/dev` had not passed since #167. An investigator read the range: every build from
+#168 to #190 failed on one test, `bin_build_view`, with "no dep-info at …/target/debug/epr.d",
+except #173, a failed clone. #168 is the first build after that test landed (`1033395d5`,
+2026-11-17). Nothing else failed in the range. The two publish stages were skipped each time,
+and the orchestrator's dev job failed with it, its baseline held at `2080441f`.
+
+**The first cause: two recipes that had parted.** The device gate builds `epr` as a top-level
+target before its tests (the `bins` step of `_gate-eprfs`), because cargo writes `epr.d` only
+then. The pipeline's tests stage ran `cargo nextest` alone. Every device gate was green.
+`f27e22e69` (21:48Z) puts the same build in the pipeline, and adds
+`eprfs-ci-parity.test.mjs`, which reads the bins step out of the justfile and refuses a
+pipeline that does not run it before `cargo nextest`. It fails on the unfixed file and passes
+on the fixed one. CI's first run with it, #191: "2634 tests run: 2634 passed (1 slow),
+1 skipped".
+
+**The second cause, hidden behind the first.** #191 then failed one stage later:
+"eprfs-core 0.3.5: immutable version collision; bump the version". Measured against the
+registry with the publish script's own readers (no cargo, no credentials, nothing uploaded):
+today's `cc` bump (L1, `2090a4d82`) moved `cc` and `find-msvc-tools` in the eprfs lock, cargo
+packs that lock into each package, and so eprfs-core 0.3.5, eprfs-storage 0.3.8,
+eprfs-meta 0.3.6 and eprfs-local 0.3.6 each differ from the registry's copy at an unchanged
+version. The device precheck, whose job is to refuse this, compares only workspace members in
+the packed lock, so both devices passed it. The cure by the script's rule is four version
+bumps, and those move `elohim/Cargo.lock`: an Edge build and deploy. That is the steward's, with
+an alternative beside it (row 43). Until he rules, the pipeline is red at its publish stage
+with its tests green.
+
+**What the fix cost, and why.** The one-line change to `elohim/eprfs/Jenkinsfile` selected the
+full eprfs gate on shem: 1903 s of a 2756 s push. No device step reads that file. It is in the
+key because one `sources` list serves CI's dispatch and the device's key (row 42).
+
+**What I take from it.** Three reds today were invisible from where the work was done: the
+suite's view on the second device (row 40), the pipeline's missing build (row 41) and the
+packed lock (row 43). Each had a green device gate over it. The session-start lines on shem
+said "7 known finding(s) recurred (flake evidence)" about a failure that had recurred in
+twenty-two builds. A sprint about paying less at the gate has to count what the gate does not
+see, and the next one should start from the pipeline's own verdict, read every day.
+
+| Line | State after this entry |
+|---|---|
+| 1, two landings followed with no build | waiting on L2a's third hand-back; CI's publish red does not hold it |
+| 3, a landing pays less | measured the other way today: 2756 s for a pipeline-file line (row 42) |
+| 2, 4, 5 | unchanged |
+| 6, the record | this entry; backlog rows 41, 42 and 43; a habit line in `careless-reds-cost-seconds` |
+
+**Waiting on the steward, added.** How to cure the publish collision: four version bumps with a
+deliberate Edge roll, or leaving the packed lock out of the publish comparison for library
+packages (row 43). The repack on both devices is now due: shem is at the 32-index ceiling.

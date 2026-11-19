@@ -984,3 +984,92 @@ asks for one `just gate <project>` in a fresh worktree, and the line is not call
 the verdict lines are back. Whether that becomes a check (a sibling's green required before a
 push that changes the gate's own governance paths records evidence others may reuse) is a
 design question for the next sprint.
+
+## Row 41 — CI's eprfs pipeline was red for two days on one test and no session heard it
+
+Found 2026-11-19 by the brit sprint session reading Jenkins for its own landing. `elohim-eprfs/dev`
+last passed at #167. From #168, the first build after `1033395d5` added
+`epr-cli/tests/bin_build_view.rs` (2026-11-17), to #190, every build failed on that one test:
+"no dep-info at …/target/debug/epr.d". The exception is #173, a failed clone. Nothing else failed
+in that range: no other test, no compile, lint or format error. The two publish stages were
+skipped in every one of those builds, so no eprfs crate has been published since #167, and the
+orchestrator's dev job failed with it from #2378 on, holding its global baseline at `2080441f`.
+
+Cause: the two recipes had parted. The device gate (`_gate-eprfs`) got a `bins` step with the
+test, `cargo build -p elohim-epr-cli --bin epr -p elohim-device-runtime --bin bin-launch`,
+because cargo writes `epr.d` only when the bin is built as a top-level target. The pipeline's
+tests stage ran `cargo nextest` alone. Every device gate was green.
+
+Fixed: `f27e22e69`. The tests stage runs the same build first, and
+`genesis/orchestrator/eprfs-ci-parity.test.mjs` reads the bins step out of the justfile and
+refuses a pipeline that does not run it before `cargo nextest`. CI's first run with it, `elohim-eprfs/dev` #191, has the tests
+stage green ("2634 tests run: 2634 passed (1 slow), 1 skipped") and fails one stage later (row 43).
+
+Still open:
+
+1. **Nothing said so.** Twenty-two red builds, and the session-start lines on shem read
+   "7 known finding(s) recurred (flake evidence)" and "observe deferred: jenkins-bridge not on
+   PATH". A failure that recurs in every build of a pipeline is a standing red, not flake
+   evidence. The harvester should name it as one, with the count of builds and the last green,
+   where a session reads it first.
+2. **The orchestrator's own job did not stay red.** `elohim-orchestrator/dev` failed from #2359
+   to #2370, passed from #2371 to #2376 and failed again from #2377, while eprfs was red
+   throughout. Why those six passed is unread. A run that dispatches nothing passes and advances
+   the global baseline, which is how it came to be held at `2080441f`, a commit under which the
+   eprfs red already lay; and the harvester printed "graph unreadable" for five of those six.
+3. **The parity test covers one step of one project.** The same drift is possible for every
+   gate project whose device recipe and pipeline are written separately (the bridges, ark,
+   storage, doorway). The general form is one declared step list that both run.
+
+## Row 42 — a pipeline file inside a gate project's tree runs that project's whole device gate
+
+Measured 2026-11-19 on shem. `f27e22e69` changes one line of `elohim/eprfs/Jenkinsfile`, a test
+file and a list entry under `genesis/orchestrator`. The push selected address-profile-lint,
+eprfs-live-corpus, orchestrator-tree, cargo-bridge, jenkins-bridge, orchestrator and eprfs, and
+took 2756 s, of which the eprfs gate was 1903 s. No step of `_gate-eprfs` reads the Jenkinsfile.
+It is in the key because the manifest's `rust-build-test` step lists `elohim/eprfs/**` as its
+sources, and one list serves two readers: CI's dispatch, for which a pipeline file is an input,
+and the device gate's key, for which it is not.
+
+The cure belongs to the next sprint: the device key leaves out what only CI reads (the
+pipeline file, and whatever else under the tree no recipe step opens), found the way the read
+audit finds reads, while CI's dispatch keeps the whole list. Until then a pipeline-file change in
+a Rust gate project costs that project's full gate on the device that lands it.
+
+## Row 43 — a third-party lock change alters four published packages, and only CI's publish stage sees it
+
+Found 2026-11-19 in `elohim-eprfs/dev` #191, the first run to get past its tests since #167:
+"ERROR: eprfs-core 0.3.5: immutable version collision; bump the version".
+
+Measured against the registry with the publish script's own readers (no cargo, no credentials,
+nothing uploaded): the packages published as eprfs-core 0.3.5, eprfs-storage 0.3.8,
+eprfs-meta 0.3.6 and eprfs-local 0.3.6 each carry a `Cargo.lock` that pins `cc 1.2.65` and
+`find-msvc-tools 0.1.9`. The workspace lock has had `cc 1.11.1` and `find-msvc-tools 0.1.15`
+since `2090a4d82` (L1, the C baseline). Cargo packs the workspace lock, filtered to the crate's
+graph, into every package, so those four differ from the registry's copies at an unchanged
+version. eprfs-host and elohim-seam-contracts do not.
+
+Why no device saw it: `publish_eprfs.py --precheck`, the step of the device gate that exists to
+refuse this, compares the crate's source files and, in the packed lock, only workspace members
+(`locked_member_moves`). A third-party entry that moves is not compared. The publish stage
+compares whole archives.
+
+The cure is the steward's, because of what it pulls with it:
+
+1. **By the script's rule, bump the four versions.** `elohim-storage` depends on `eprfs-core`
+   by path, and `elohim/Cargo.lock` pins eprfs-core, eprfs-local and eprfs-storage, so the
+   bumps move that lock, which is a storage build input: an Edge build and deploy. The
+   fleet-roll check refuses it without `[edge:roll]`. The precheck's gap closes in the same
+   change (compare every package in the packed lock with the workspace lock) and not before
+   it: landed alone it turns each device's eprfs gate red on today's dev.
+2. **Or leave the packed lock out of the publish comparison for library packages.** A
+   dependent does not read the `Cargo.lock` inside a library's package. The sources and the
+   manifest are identical, so nothing would be republished and nothing would roll. It relaxes
+   a publish safeguard, and its tests, by one file.
+3. **Behind both:** under rule 1 a third-party lock change in a published crate's graph costs
+   an Edge roll, and three Dependabot fixes are waiting on this lock. Storage taking
+   eprfs-core from the registry by version, where today it takes it by path, would end that
+   coupling.
+
+Until he rules, `elohim-eprfs/dev` is red at its publish stage and the orchestrator's dev job
+with it. The tests stage is green.
