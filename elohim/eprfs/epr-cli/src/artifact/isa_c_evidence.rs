@@ -38,6 +38,12 @@
 //! `#pragma GCC target` and function multiversioning (`target_clones`) are not read, so a compile
 //! at the declared `-march` is evidence of the command's baseline, not of every function in it.
 //!
+//! The threat model, plainly: the marker is the producing device's own signed statement that the
+//! build it just made compiled its C at the declared baseline. It guards an honest producer
+//! against marking by accident: flags that did not reach a crate, a crate that adds its own `-m`
+//! option, an object left from before the declaration, a stream that is not this build. A device
+//! or a dependency that sets out to deceive is out of scope: either can write any log it likes.
+//!
 //! These are limits of command evidence: a build's commands can show what it asked the compiler
 //! for, never every instruction the bytes hold. The second line is the receiver's: before it
 //! adopts a drawn release, the sibling runs the staged `epr doctor --exercise` on its own CPU,
