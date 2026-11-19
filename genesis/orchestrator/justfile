@@ -31,20 +31,28 @@ lint-fix:
 test-jenkinsfile-lints:
     node --test jenkinsfile-cps-scope.test.mjs baseline-hold.test.mjs validate-only-pipeline.test.mjs run-class.test.mjs
 
-# Quality gate: validate Jenkinsfiles against Jenkins itself, run the
-# Jenkinsfile static lints, and run the orchestrator suite. The suite is
-# non-optional here: gate-runner.mjs / pipeline-registry.mjs / graph-walker.mjs
-# are now the ONLY local gate detector+executor, so a break in them aborts
-# every push in the repo. Pre-push calls `just gate` on any orchestrator change.
-gate: lint test-jenkinsfile-lints test-suite test-harvest test-berth
+# Quality gates. The suite is non-optional: gate-runner.mjs / pipeline-registry.mjs /
+# graph-walker.mjs are the ONLY local gate detector+executor, so a break in them aborts every push
+# in the repo. It runs in two gate projects that share these steps, so they are selected together
+# (E11, suite-reads.json): `orchestrator` runs the test files that name every read they make, under
+# read-fence.mjs, and keys on those reads; `orchestrator-tree` runs everything whose reads cannot be
+# named (the tree side of the list, the Jenkins validation, the python suites) and keys on the tree.
+gate: test-suite
+
+gate-tree: lint test-suite-tree test-harvest test-berth
 
 # berth holds pre-push's dev-integration lease and every device's notes; its suite ran under no gate
 # until a pool-policy class (3899eb7f9) left one of its tests red unnoticed.
 test-berth:
     cd ../.. && python3 -m unittest genesis/agentic/berth_test.py
 
-# Full orchestrator node --test suite (registry, gate runner, graph walker, …).
-test-suite:
+# The orchestrator suite's named side, under the read fence (registry, gate runner, graph walker, …).
+test-suite: (_suite "named")
+
+# The suite's tree side: files keyed on the whole commit tree, unfenced.
+test-suite-tree: (_suite "tree")
+
+_suite side:
     #!/usr/bin/env bash
     set -euo pipefail
     if [[ -z "${EPR_BIN:-}" ]]; then
@@ -52,7 +60,7 @@ test-suite:
       cargo build --manifest-path ../../elohim/eprfs/Cargo.toml --locked -p elohim-epr-cli --bin epr
       export EPR_BIN="$CARGO_TARGET_DIR/debug/epr"
     fi
-    pnpm test
+    node suite-run.mjs {{side}}
 
 # Regenerate pipeline-list.json from build-manifest.json / pipeline-registry.mjs.
 # Run after editing PIPELINES.

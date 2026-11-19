@@ -782,6 +782,76 @@ test('a scoped live-corpus read re-keys only its own project; a Rust change stil
   assert.notEqual(lv[2].key, lv[1].key, 'a Rust source change re-keys the live-corpus project too');
 });
 
+// E11: the orchestrator suite declares its reads in genesis/orchestrator/suite-reads.json. Its named
+// side keys on those reads, so a documentation commit keeps its evidence; a declared read or the
+// list itself re-keys it. orchestrator-tree runs the rest and keys on the whole tree.
+test('E11: orchestrator keys on its suite list, orchestrator-tree on the whole tree', t => {
+  const root = mkdtempSync(join(tmpdir(), 'gate-evidence-suite-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const cleanEnv = { ...process.env };
+  for (const key of ['GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_PREFIX', 'GIT_COMMON_DIR', 'GATE_COMMIT']) delete cleanEnv[key];
+  Object.assign(cleanEnv, {
+    GIT_CEILING_DIRECTORIES: dirname(root), GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: '/dev/null', HOME: root,
+    GIT_AUTHOR_NAME: 'Test Author', GIT_AUTHOR_EMAIL: 'author@example.test',
+    GIT_COMMITTER_NAME: 'Test Committer', GIT_COMMITTER_EMAIL: 'committer@example.test',
+    GIT_AUTHOR_DATE: '2026-11-19T00:00:00Z', GIT_COMMITTER_DATE: '2026-11-19T00:00:00Z',
+  });
+  const git = (...args) => spawnSync('git', args, { cwd: root, env: cleanEnv, encoding: 'utf8' });
+  const commit = message => {
+    git('add', '.');
+    assert.equal(git('commit', '-m', message).status, 0);
+    return git('rev-parse', 'HEAD').stdout.trim();
+  };
+  assert.equal(git('init').status, 0);
+  const dir = join(root, 'genesis', 'orchestrator');
+  for (const d of [dir, join(root, 'shared'), join(root, 'docs'), join(root, 'genesis', 'agentic')]) mkdirSync(d, { recursive: true });
+  writeFileSync(join(dir, 'build-manifest.json'), JSON.stringify({ steps: { s: { inputs: { sources: ['genesis/orchestrator/**'] } } } }));
+  writeFileSync(join(dir, 'justfile'), 'gate:\n  true\ngate-tree:\n  true\n');
+  writeFileSync(join(dir, 'run-local-gate.sh'), '#!/bin/sh\n');
+  const list = reads => JSON.stringify({ groups: [{ runner: 'node', files: [
+    { file: 'a.test.mjs', reads }, { file: '../agentic/b.test.mjs', reads: [] }, { file: 'c.test.mjs', tree: 'reads the tree' }] }] });
+  writeFileSync(join(dir, 'suite-reads.json'), list(['shared/data.json']));
+  writeFileSync(join(root, 'genesis', 'agentic', 'b.test.mjs'), '// a named test outside the project dir\n');
+  writeFileSync(join(root, 'shared', 'data.json'), '{"v":1}\n');
+  writeFileSync(join(root, 'docs', 'a.md'), '# a\n');
+  const base = commit('base');
+  writeFileSync(join(root, 'docs', 'a.md'), '# a documentation edit\n');
+  const docs = commit('docs');
+  writeFileSync(join(root, 'shared', 'data.json'), '{"v":2}\n');
+  const data = commit('declared read');
+  writeFileSync(join(root, 'genesis', 'agentic', 'b.test.mjs'), '// the named test changed\n');
+  const outside = commit('named test outside the dir');
+  writeFileSync(join(dir, 'suite-reads.json'), list(['shared/data.json', 'docs']));
+  const relisted = commit('list');
+
+  const brit = join(root, 'brit');
+  const buildRef = join(root, 'brit-build-ref');
+  writeFileSync(brit,
+    `#!/bin/sh\nprintf '{"fingerprints":[{"step":"%s","fingerprint":"%s"}]}' "$5" "$(git -C '${root}' rev-parse "$7:genesis/orchestrator")"\n`);
+  writeFileSync(buildRef, '#!/bin/sh\nprintf "[]"\n');
+  chmodSync(brit, 0o755);
+  chmodSync(buildRef, 0o755);
+  const env = { ...cleanEnv, BRIT_BIN: brit, BRIT_BUILD_REF_BIN: buildRef, PATH: cleanEnv.PATH || '' };
+  const isoSpawn = (cmd, args, opts) => spawnSync(cmd, args, { ...opts, env: { ...cleanEnv, ...(opts?.env || {}) } });
+  const gateProject = (name, recipe) => ({
+    name, dir: 'genesis/orchestrator', manifestPath: 'genesis/orchestrator/build-manifest.json', steps: ['s'],
+    run: { kind: 'just', recipe },
+  });
+  const at = (gp, rev) => gateEvidence(gp, { root, commit: rev, env, spawn: isoSpawn });
+  const revs = [base, docs, data, outside, relisted];
+  const named = revs.map(rev => at(gateProject('orchestrator', 'gate'), rev));
+  const tree = revs.map(rev => at(gateProject('orchestrator-tree', 'gate-tree'), rev));
+  // pnpm-lock.yaml (implicit), shared/data.json, and the named test outside the project dir.
+  assert.match(named[0].line, /closure scope paths \(3 reads\)/, named[0].line);
+  assert.match(tree[0].line, /closure scope tree/, tree[0].line);
+  assert.equal(named[1].key, named[0].key, 'a documentation commit keeps the named suite closure: its evidence still hits');
+  assert.notEqual(tree[1].key, tree[0].key, 'a documentation commit re-keys orchestrator-tree');
+  assert.notEqual(named[2].key, named[1].key, 'a declared read re-keys the named suite');
+  assert.notEqual(named[3].key, named[2].key, 'a named test file outside the project dir re-keys it');
+  assert.notEqual(named[4].key, named[3].key, 'the list itself re-keys it');
+  assert.match(named[4].line, /closure scope paths \(4 reads\)/);
+});
+
 test('non-Rust projects and Cargo steps without covered Rust files get unknown tree scope', t => {
   for (const options of [
     { gateProject: { ...project, run: { kind: 'root-just', recipe: 'gate' } } },

@@ -1,0 +1,594 @@
+{
+  "_comment": [
+    "The orchestrator suite, and the reads each of its test files makes outside genesis/orchestrator (E11).",
+    "suite-run.mjs runs it from this list, in these groups, in this order; package.json test runs `node suite-run.mjs all`.",
+    "A file with reads is a named file: the orchestrator gate keys on the union of these reads (gate-evidence.mjs readSetAt)",
+    "and runs the file under read-fence.mjs, which fails the gate naming any read or child the declaration does not cover.",
+    "A read is an exact path, a directory prefix, a submodule gitlink path (never a path inside one), or a **/<name> walk.",
+    "A file with tree is keyed on the whole commit tree: it runs in the orchestrator-tree gate project, with its reason.",
+    "notInSuite names the test files under genesis/orchestrator that no orchestrator recipe runs; suite-list.test.mjs fails on any other."
+  ],
+  "groups": [
+    {
+      "runner": "node",
+      "files": [
+        {
+          "file": "devfile.test.mjs",
+          "tree": "read-fence: unfenced child in the repository: /bin/bash --noprofile --norc; child cleared the read fence: /bin/bash"
+        },
+        {
+          "file": "serving-receipt.test.mjs",
+          "tree": "git ls-tree and git status over real-repo subtrees, and for-each-ref over refs/notes/brit/validate: a ref read no key covers"
+        },
+        {
+          "file": "prepush-berth.test.mjs",
+          "reads": [
+            ".husky/pre-push.bash"
+          ]
+        },
+        {
+          "file": "prepush-head-landing.test.mjs",
+          "reads": [
+            ".husky/pre-push.bash"
+          ]
+        },
+        {
+          "file": "../../.husky/hooks-path.test.mjs",
+          "tree": "read-fence: node child without the read fence: /usr/local/bin/node /projects/elohim/.worktrees/nt-e11/.husky/hooks-path.mjs; child cleared the read fence: /usr/local/bin/node"
+        },
+        {
+          "file": "prepush-landing.test.mjs",
+          "reads": [
+            ".husky/pre-push.bash"
+          ]
+        },
+        {
+          "file": "run-local-gate.test.mjs",
+          "tree": "read-fence: static program, unseen by the read fence: /usr/local/bin/just"
+        },
+        {
+          "file": "../../.husky/commit-msg.test.mjs",
+          "reads": [
+            ".husky/_/commit-msg",
+            ".husky/_/h",
+            ".husky/commit-msg"
+          ]
+        },
+        {
+          "file": "brit-helper.test.mjs",
+          "tree": "read-fence: unfenced child in the repository: sh /projects/elohim/.worktrees/nt-e11/genesis/orchestrator/scripts/brit-helper.sh plan; child cleared the read fence: /usr/bin/sh"
+        },
+        {
+          "file": "brit-attest.test.mjs",
+          "tree": "runs brit-helper.test.mjs, a tree file, as a nested suite"
+        },
+        {
+          "file": "manifest-utils.test.mjs",
+          "reads": []
+        },
+        {
+          "file": "pipeline-registry.test.mjs",
+          "reads": [
+            "**/build-manifest.json"
+          ]
+        },
+        {
+          "file": "pipeline-budget.test.mjs",
+          "reads": [
+            "**/Jenkinsfile",
+            "**/build-manifest.json",
+            "che-devworkspaces"
+          ]
+        },
+        {
+          "file": "delivery-series.test.mjs",
+          "reads": [
+            ".claude/epr-meta/measures.yaml"
+          ]
+        },
+        {
+          "file": "pipeline-results.test.mjs",
+          "reads": []
+        },
+        {
+          "file": "timer-dispatch.test.mjs",
+          "tree": "git cat-file, merge-base and diff over the real repository history"
+        },
+        {
+          "file": "record-pipeline-verdicts.test.mjs",
+          "reads": []
+        },
+        {
+          "file": "reconcile-build-graph.test.mjs",
+          "reads": []
+        },
+        {
+          "file": "gate-runner.test.mjs",
+          "tree": "read-fence: repository object store read: <git-dir>/worktrees/nt-e11/HEAD; repository object store read: <git-dir>/worktrees/nt-e11/commondir"
+        },
+        {
+          "file": "gate-evidence.test.mjs",
+          "reads": [
+            "**/build-manifest.json",
+            ".cargo/config.toml",
+            ".ci-ignore",
+            ".husky/pre-push.bash",
+            "justfile"
+          ]
+        },
+        {
+          "file": "gate-input-audit.test.mjs",
+          "tree": "its REAL tests run the audit over the repository: git ls-files of every .rs, and the files it names"
+        },
+        {
+          "file": "cargo-affected.test.mjs",
+          "tree": "read-fence: static program, unseen by the read fence: /usr/local/bin/just"
+        },
+        {
+          "file": "gate-cost.test.mjs",
+          "reads": []
+        },
+        {
+          "file": "rust-toolchain-pin.test.mjs",
+          "reads": [
+            "elohim/epr/flake.nix",
+            "elohim/epr/rust-toolchain.toml",
+            "genesis/agentic/pool-policy.json"
+          ]
+        },
+        {
+          "file": "jenkinsfile-sh-syntax.test.mjs",
+          "tree": "read-fence: repository object store read: <git-dir>/worktrees/nt-e11/HEAD; repository object store read: <git-dir>/worktrees/nt-e11/commondir"
+        },
+        {
+          "file": "build-inputs-closure.test.mjs",
+          "reads": [
+            "**/Cargo.lock",
+            "**/Cargo.toml",
+            "**/build-manifest.json",
+            ".gitmodules"
+          ]
+        },
+        {
+          "file": "gate-oracle.test.mjs",
+          "reads": []
+        },
+        {
+          "file": "gate-attest.test.mjs",
+          "reads": []
+        },
+        {
+          "file": "gate-cycle.test.mjs",
+          "reads": []
+        },
+        {
+          "file": "commit-tag-parser.test.mjs",
+          "reads": [
+            "**/build-manifest.json"
+          ]
+        },
+        {
+          "file": "orchestrator-integration.test.mjs",
+          "reads": [
+            "**/Jenkinsfile",
+            "**/build-manifest.json",
+            ".ci-ignore",
+            ".husky/pre-push.bash"
+          ]
+        },
+        {
+          "file": "jenkinsfile-cps-scope.test.mjs",
+          "reads": [
+            "**/Jenkinsfile"
+          ]
+        },
+        {
+          "file": "baseline-hold.test.mjs",
+          "reads": []
+        },
+        {
+          "file": "storage-build-inputs.test.mjs",
+          "reads": [
+            "**/Cargo.toml",
+            "**/package.json",
+            ".ci-ignore",
+            "elohim/elohim-agent/elohim-agent-sdk/Dockerfile",
+            "elohim/elohim-agent/elohim-agent-sdk/src",
+            "elohim/elohim-agent/elohim-agent-sdk/tsconfig.json",
+            "elohim/elohim-storage/Dockerfile",
+            "elohim/holochain/Jenkinsfile",
+            "elohim/holochain/build-manifest.json",
+            "pnpm-workspace.yaml",
+            "scripts/ci"
+          ]
+        },
+        {
+          "file": "validate-only-pipeline.test.mjs",
+          "reads": [
+            "elohim/holochain/Jenkinsfile",
+            "elohim/holochain/build-manifest.json",
+            "scripts/ci/run-dataplane-validation.sh"
+          ]
+        },
+        {
+          "file": "run-class.test.mjs",
+          "reads": [
+            "**/build-manifest.json",
+            "elohim/holochain/Jenkinsfile",
+            "elohim/rakia"
+          ]
+        },
+        {
+          "file": "graph-walker.test.mjs",
+          "reads": [
+            "**/build-manifest.json",
+            ".ci-ignore"
+          ]
+        },
+        {
+          "file": "dependents-closure.test.mjs",
+          "reads": [
+            "**/build-manifest.json",
+            ".ci-ignore"
+          ]
+        },
+        {
+          "file": "cargo-target-coverage.test.mjs",
+          "reads": []
+        },
+        {
+          "file": "runtime-config-render.test.mjs",
+          "tree": "read-fence: repository object store read: <git-dir>/worktrees/nt-e11/HEAD; repository object store read: <git-dir>/worktrees/nt-e11/commondir"
+        },
+        {
+          "file": "storage-data-size-render.test.mjs",
+          "reads": [
+            "elohim/holochain/Jenkinsfile"
+          ]
+        },
+        {
+          "file": "human-manifest-parity.test.mjs",
+          "reads": []
+        },
+        {
+          "file": "compute-worker.test.mjs",
+          "reads": [
+            "elohim/holochain/Jenkinsfile",
+            "genesis/agentic/compute/common.mjs",
+            "genesis/agentic/compute/grant-bootstrap.mjs"
+          ]
+        },
+        {
+          "file": "../agentic/compute/compute.test.mjs",
+          "reads": [
+            "genesis/a2o/package.json",
+            "genesis/a2o/scripts/lib/habit-delta.ts",
+            "genesis/a2o/scripts/lib/household-attestation.ts",
+            "genesis/a2o/scripts/lib/load-cucumber.ts",
+            "genesis/a2o/scripts/lib/package.json",
+            "genesis/a2o/scripts/package.json",
+            "genesis/a2o/src/framework/package.json",
+            "genesis/a2o/src/framework/session.ts",
+            "genesis/a2o/src/package.json",
+            "genesis/agentic/agent-runtimes.json",
+            "genesis/agentic/compute/common.mjs",
+            "genesis/agentic/compute/payloads.mjs",
+            "genesis/agentic/compute/retention.mjs",
+            "genesis/agentic/compute/stage/collect-stage.mjs",
+            "genesis/agentic/compute/stage/deliver-stage-result.mjs",
+            "genesis/agentic/compute/submission.mjs",
+            "genesis/agentic/compute/worker.mjs",
+            "genesis/agentic/compute/workspace.mjs",
+            "genesis/genesis/agentic"
+          ]
+        },
+        {
+          "file": "../agentic/compute/recovery.test.mjs",
+          "reads": [
+            "genesis/agentic/compute/common.mjs",
+            "genesis/agentic/compute/payloads.mjs",
+            "genesis/agentic/compute/retention.mjs",
+            "genesis/agentic/compute/worker.mjs"
+          ]
+        },
+        {
+          "file": "../agentic/compute/worker-start.test.mjs",
+          "tree": "read-fence: child cleared the read fence: /bin/bash; unfenced child in the repository: bash -c source"
+        },
+        {
+          "file": "../agentic/compute/grant-bootstrap.test.mjs",
+          "reads": [
+            "genesis/agentic/compute/common.mjs",
+            "genesis/agentic/compute/grant-bootstrap.mjs"
+          ]
+        },
+        {
+          "file": "../../scripts/ci/build-compute-worker.test.mjs",
+          "reads": [
+            "genesis/agentic/compute/Dockerfile.source",
+            "scripts/ci/build-compute-worker.sh"
+          ]
+        },
+        {
+          "file": "../../scripts/ci/publish-compute-worker.test.mjs",
+          "reads": [
+            "scripts/ci/publish-compute-worker.sh"
+          ]
+        },
+        {
+          "file": "../../scripts/ci/capture-compute-worker-grant.test.mjs",
+          "reads": [
+            "elohim/holochain/Jenkinsfile",
+            "scripts/ci/capture-compute-worker-grant.sh"
+          ]
+        },
+        {
+          "file": "../scripts/ci/runner-preflight.test.mjs",
+          "reads": [
+            "genesis/scripts/ci/runner-ensure.sh",
+            "genesis/scripts/ci/runner-preflight.sh"
+          ]
+        },
+        {
+          "file": "../scripts/ci/runner-capture-activation.test.mjs",
+          "reads": [
+            "genesis/agentic/compute/common.mjs",
+            "genesis/agentic/compute/grant-bootstrap.mjs",
+            "genesis/scripts/ci/runner-capture-activation.mjs",
+            "genesis/scripts/ci/runner-cluster-transport.mjs",
+            "genesis/scripts/ci/runner-provider-diagnostics.mjs",
+            "genesis/scripts/ci/runner-recovery-diagnostics.mjs"
+          ]
+        },
+        {
+          "file": "../scripts/ci/runner-provider-diagnostics.test.mjs",
+          "reads": [
+            "genesis/agentic/compute/common.mjs",
+            "genesis/agentic/compute/grant-bootstrap.mjs",
+            "genesis/scripts/ci/runner-provider-diagnostics.mjs"
+          ]
+        },
+        {
+          "file": "../scripts/ci/runner-recovery-diagnostics.test.mjs",
+          "reads": [
+            "genesis/scripts/ci/runner-recovery-diagnostics.mjs"
+          ]
+        },
+        {
+          "file": "../scripts/ci/runner-cluster-transport.test.mjs",
+          "tree": "read-fence: node child without the read fence: /usr/local/bin/node <tmp>/fake-kubectl.mjs; child cleared the read fence: /usr/local/bin/node"
+        },
+        {
+          "file": "../scripts/ci/runner-diagnostic-pod.test.mjs",
+          "tree": "read-fence: unfenced child in the repository: /bin/bash <tmp>/scripts/prepare.sh; child cleared the read fence: /bin/bash"
+        },
+        {
+          "file": "../scripts/ci/package-compute-worker.test.mjs",
+          "tree": "read-fence: repository object store read: <git-dir>/worktrees/nt-e11/HEAD; repository object store read: <git-dir>/worktrees/nt-e11/commondir"
+        },
+        {
+          "file": "../scripts/ci/package-compute-worker-registry.test.mjs",
+          "reads": [
+            "genesis/scripts/ci/package-compute-worker-registry.mjs"
+          ]
+        },
+        {
+          "file": "../scripts/ci/runner-authority-ci.test.mjs",
+          "reads": [
+            "genesis/scripts/ci/runner-authority-ci.mjs",
+            "genesis/scripts/ci/runner-cluster-transport.mjs"
+          ]
+        },
+        {
+          "file": "../scripts/ci/runner-authority-transport.test.mjs",
+          "reads": [
+            "genesis/scripts/ci/runner-authority-transport.mjs"
+          ]
+        },
+        {
+          "file": "../scripts/ci/reclaim-ephemeral-hosted.test.mjs",
+          "reads": [
+            "genesis/scripts/ci/reclaim-ephemeral-hosted.mjs"
+          ]
+        }
+      ]
+    },
+    {
+      "runner": "node-tsx",
+      "files": [
+        {
+          "file": "../scripts/ci/runner-stage.test.mjs",
+          "tree": "git ls-tree and git status over real-repo subtrees, and for-each-ref over refs/notes/brit/validate"
+        },
+        {
+          "file": "../scripts/ci/runner-authority-probe.test.mjs",
+          "reads": [
+            "genesis/a2o/package.json",
+            "genesis/a2o/scripts/compute-runner.ts",
+            "genesis/a2o/scripts/lib/compute-runner.ts",
+            "genesis/a2o/scripts/lib/habit-delta.ts",
+            "genesis/a2o/scripts/lib/household-attestation.ts",
+            "genesis/a2o/scripts/lib/load-cucumber.ts",
+            "genesis/a2o/scripts/lib/package.json",
+            "genesis/a2o/scripts/lib/steward-conductor.ts",
+            "genesis/a2o/scripts/lib/steward-credential.ts",
+            "genesis/a2o/scripts/package.json",
+            "genesis/a2o/src/framework/package.json",
+            "genesis/a2o/src/framework/session.ts",
+            "genesis/a2o/src/package.json",
+            "genesis/agentic/compute/cid-executor.mjs",
+            "genesis/agentic/compute/common.mjs",
+            "genesis/agentic/compute/package.json",
+            "genesis/agentic/compute/payloads.mjs",
+            "genesis/agentic/compute/stage/collect-stage.mjs",
+            "genesis/agentic/compute/stage/deliver-stage-result.mjs",
+            "genesis/agentic/compute/submission.mjs",
+            "genesis/agentic/package.json",
+            "genesis/package.json",
+            "genesis/scripts/ci/runner-authority-probe.mjs",
+            "genesis/scripts/ci/runner-stage.mjs",
+            "genesis/tsconfig.json",
+            "package.json",
+            "tsconfig.json"
+          ]
+        }
+      ]
+    },
+    {
+      "runner": "bash",
+      "files": [
+        {
+          "file": "../../scripts/ci/grow-conductor-pvc.test.sh",
+          "tree": "a shell suite: its reads and children are unseen by the fence"
+        },
+        {
+          "file": "../../app/elohim-app/scripts/__tests__/hc-mesh-storage-port.test.sh",
+          "tree": "a shell suite: its reads and children are unseen by the fence"
+        },
+        {
+          "file": "../../app/elohim-app/scripts/__tests__/hc-mesh-closure-staleness.test.sh",
+          "tree": "a shell suite: its reads and children are unseen by the fence"
+        },
+        {
+          "file": "../../app/elohim-app/scripts/__tests__/hc-mesh-initialization-continuation.test.sh",
+          "tree": "a shell suite: its reads and children are unseen by the fence"
+        }
+      ]
+    },
+    {
+      "runner": "node",
+      "files": [
+        {
+          "file": "gate-steps.test.mjs",
+          "reads": []
+        },
+        {
+          "file": "gate-failure-lines.test.mjs",
+          "reads": []
+        },
+        {
+          "file": "gate-tap.test.mjs",
+          "reads": []
+        },
+        {
+          "file": "gate-live.test.mjs",
+          "reads": []
+        },
+        {
+          "file": "gate-live-schema.test.mjs",
+          "reads": [
+            "elohim/sdk/schemas/v1/gate-live-event.schema.json",
+            "elohim/sdk/schemas/v1/objects/unanswered.schema.json"
+          ]
+        },
+        {
+          "file": "gate-attribution.test.mjs",
+          "reads": []
+        },
+        {
+          "file": "prepush-gate-live.test.mjs",
+          "reads": [
+            ".husky/pre-push.bash"
+          ]
+        },
+        {
+          "file": "prepush-ra-strays.test.mjs",
+          "reads": [
+            ".husky/pre-push.bash"
+          ]
+        },
+        {
+          "file": "prepush-submodules.test.mjs",
+          "reads": [
+            ".husky/pre-push.bash"
+          ]
+        },
+        {
+          "file": "gate-task.test.mjs",
+          "reads": []
+        },
+        {
+          "file": "gate-change-id.test.mjs",
+          "reads": []
+        },
+        {
+          "file": "gate-change-class.test.mjs",
+          "reads": [
+            "elohim/eprfs/epr-cli/src/flow/intend.rs"
+          ]
+        },
+        {
+          "file": "gate-landing-base.test.mjs",
+          "reads": []
+        },
+        {
+          "file": "gate-landing-markers.test.mjs",
+          "reads": []
+        },
+        {
+          "file": "eprfs-produce.test.mjs",
+          "tree": "read-fence: unfenced child in the repository: just --justfile /projects/elohim/.worktrees/nt-e11/justfile; child cleared the read fence: /usr/local/bin/just"
+        },
+        {
+          "file": "prepush-self.test.mjs",
+          "reads": [
+            ".ci-ignore",
+            ".husky/pre-push.bash"
+          ]
+        },
+        {
+          "file": "handover-record.test.mjs",
+          "reads": [
+            ".ci-ignore",
+            "genesis/agentic/pool-policy.json"
+          ]
+        },
+        {
+          "file": "read-fence.test.mjs",
+          "tree": "its fixtures run node --test runners deliberately outside the fence"
+        },
+        {
+          "file": "suite-list.test.mjs",
+          "reads": [
+            ".gitmodules"
+          ]
+        }
+      ]
+    },
+    {
+      "runner": "node",
+      "files": [
+        {
+          "file": "cargo-lint.test.mjs",
+          "reads": [
+            ".cargo/config",
+            ".cargo/config.toml",
+            "genesis/.cargo/config",
+            "genesis/.cargo/config.toml",
+            "genesis/rust-toolchain",
+            "genesis/rust-toolchain.toml",
+            "rust-toolchain",
+            "rust-toolchain.toml"
+          ]
+        },
+        {
+          "file": "device-notes-publish.test.mjs",
+          "tree": "brit --version reads its untracked feedback state under .eprfs/status, which no commit key covers"
+        }
+      ]
+    }
+  ],
+  "notInSuite": {
+    "advisory-stage-guard.test.mjs": "run by no gate (found by E11, green at 90ac778f9)",
+    "baseline-fetch.test.mjs": "run by no gate (found by E11, green at 90ac778f9)",
+    "build-artifacts.test.mjs": "run by no gate (found by E11, green at 90ac778f9)",
+    "changed-paths-env-cap.test.mjs": "run by no gate (found by E11, green at 90ac778f9)",
+    "copy-artifacts-target.test.mjs": "run by no gate (found by E11, green at 90ac778f9)",
+    "deploy-intent-commit.test.mjs": "run by no gate (found by E11, green at 90ac778f9)",
+    "gate-preflight.test.mjs": "run by no gate (found by E11, green at 90ac778f9)",
+    "non-dev-publishes-nothing.test.mjs": "run by no gate (found by E11, green at 90ac778f9)",
+    "pending-deploy.test.mjs": "run by no gate (found by E11); RED at 90ac778f9: the daily cron queues behind an active release instead of aborting it",
+    "prepush-notes-skip.test.mjs": "run by no gate (found by E11); RED at 90ac778f9: notes_ref_is_skipped_and_branch_ref_still_gated_by_the_pushed_ref_loop",
+    "worktree-prep.test.mjs": "run by no gate (found by E11, green at 90ac778f9)"
+  }
+}
