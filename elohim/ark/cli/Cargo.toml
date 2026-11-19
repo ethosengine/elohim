@@ -35,7 +35,9 @@ futures = { workspace = true }
 chrono = { workspace = true }
 sha2 = { workspace = true }
 hex = { workspace = true }
+# `src/brit_index.rs`: the device's declared checkout trust (`epr device trust`), carried by every
+# brit-build-ref and git spawn so a checkout another uid owns after a restart is still read.
+elohim-device-runtime = { path = "../../eprfs/device-runtime" }
 
 [dev-dependencies]
-elohim-device-runtime = { path = "../../eprfs/device-runtime" }
 tempfile = { workspace = true }
