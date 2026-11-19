@@ -1,0 +1,412 @@
+From b8264afc42d11f1213fdf608d3b0dd4011e6fe21 Mon Sep 17 00:00:00 2001
+From: Matthew Dowell <mbd06b+github@gmail.com>
+Date: Thu, 19 Nov 2026 10:23:41 +0000
+Subject: [PATCH 16/16] fix: rev-parse keeps Brit's conventions; usage errors
+ survive a closed stderr
+
+Re-review small items 4 to 7.
+
+- rev-parse: `--path-format relative` as two arguments is accepted again
+  after the first revision, and `--help` after a revision shows Brit's
+  help again unless it follows `--` (the spelling's parser reports
+  DisplayHelp; brit-cli's `subcommand_help()` prints the subcommand's
+  long help with clap's status).
+- Diagnostics on error paths no longer panic or turn into a closed-reader
+  write: `check-ref-format` usage, `-C` failure, `for-each-ref`'s broken-ref
+  warning use non-panicking writes; `merge-base --is-ancestor`, `rev-list`
+  and rev-parse's object-not-found note ignore a failed stderr write and
+  keep their own status. With a closed stderr, `check-ref-format` and
+  `-C missing` exited 101 (panic) and `merge-base --is-ancestor HEAD` /
+  `rev-list --count` exited 141; now 129, 128, 129, 129.
+- Docs: the broken_pipe journey says this change never gives a mutating
+  command 141 and that push's own write order is outside it; the `-C`
+  help says recognised subcommands only.
+- Known differences recorded: `-1` and `--all` refused, a lone `--`
+  dropped, an ambiguous prefix losing the resolver diagnostic (rev-parse);
+  `merge-base` with no argument exits 2; `rev-list --count <rev>^{tree}`
+  exits 128 where Git prints 0; lone `ls-remote -h` (already recorded).
+
+Journeys: `rev_parse_keeps_brits_conventions_after_a_revision` and the
+closed-stderr usage cases in `a_closed_reader_never_replaces_a_genuine_failure`,
+both failing on e534083f0's binary.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01PJB8fpkCKfb4CMYBh9vCEs
+Co-Authored-By: claude-fable-5-2 <noreply@anthropic.com>
+Claude-Session: b49f7c46-0cab-4b30-8b19-3294dddb61a7
+---
+ brit-cli/src/main.rs                          | 26 +++++++++++++++++-
+ .../git_spellings/check_ref_format.rs         |  9 ++++++-
+ .../repository/git_spellings/for_each_ref.rs  |  2 +-
+ .../src/repository/git_spellings/rev_list.rs  | 10 ++++---
+ .../src/repository/git_spellings/rev_parse.rs | 27 ++++++++++++++++---
+ gitoxide-core/src/repository/merge_base.rs    | 13 ++++-----
+ src/plumbing/main.rs                          |  8 ++++--
+ src/plumbing/options/git_spellings.rs         | 10 +++++++
+ src/plumbing/options/mod.rs                   |  7 ++---
+ tests/cli-journey/tests/broken_pipe.rs        | 13 +++++++--
+ tests/cli-journey/tests/rev_parse.rs          | 24 +++++++++++++++++
+ 11 files changed, 127 insertions(+), 22 deletions(-)
+
+diff --git a/brit-cli/src/main.rs b/brit-cli/src/main.rs
+index 6a356e20c..54b171192 100644
+--- a/brit-cli/src/main.rs
++++ b/brit-cli/src/main.rs
+@@ -229,6 +229,25 @@ fn change_dirs_before_command(args: &[std::ffi::OsString], command: &clap::Comma
+         .unwrap_or_default()
+ }
+ 
++/// Print the long help of the subcommand `matches` selected, for a spelling whose own parser met
++/// `--help` among arguments it takes verbatim (like `rev-parse HEAD --help`), and exit with clap's status.
++fn subcommand_help(command: &clap::Command, matches: &clap::ArgMatches) -> error::CliError {
++    let mut argv = vec!["brit".to_owned()];
++    let mut current = matches;
++    while let Some((name, sub)) = current.subcommand() {
++        argv.push(name.to_owned());
++        current = sub;
++    }
++    argv.push("--help".to_owned());
++    match command.clone().try_get_matches_from(argv) {
++        Err(help) => {
++            let _ = help.print();
++            error::CliError::ContextExit(help.exit_code())
++        }
++        Ok(_) => error::CliError::ContextExit(0),
++    }
++}
++
+ fn normalize_log_counts(args: &mut [std::ffi::OsString], index: usize) {
+     // Familiar bounded history spelling, scoped to log and before `--`. Never reinterpret
+     // a path after the option terminator or a numeric argument to another command. Let
+@@ -428,7 +447,12 @@ fn run(capture: &mut feedback::Capture, read_only: &mut bool) -> Result<()> {
+             BuildNamespace::Snapshot(command) => tree::run(command).map_err(error::CliError::Git),
+         }
+     } else {
+-        let args = plumbing::Args::from_arg_matches(&matches).map_err(|e| error::CliError::Args(e.to_string()))?;
++        let args = plumbing::Args::from_arg_matches(&matches).map_err(|e| {
++            if e.kind() == clap::error::ErrorKind::DisplayHelp {
++                return subcommand_help(&command, &matches);
++            }
++            error::CliError::Args(e.to_string())
++        })?;
+         plumbing::run_with_command(args, command).map_err(|err| error::CliError::Git(err.into()))
+     }
+ }
+diff --git a/gitoxide-core/src/repository/git_spellings/check_ref_format.rs b/gitoxide-core/src/repository/git_spellings/check_ref_format.rs
+index f22c0d67c..c6d41bddb 100644
+--- a/gitoxide-core/src/repository/git_spellings/check_ref_format.rs
++++ b/gitoxide-core/src/repository/git_spellings/check_ref_format.rs
+@@ -1,5 +1,7 @@
+ //! `brit check-ref-format`: Git's reference-name validity check, answered by the exit code alone.
+ 
++use std::io::Write;
++
+ use gix::bstr::{BStr, BString};
+ 
+ /// Answer like `git check-ref-format [--allow-onelevel] <refname>`: `Ok` for a valid name, status 1 for
+@@ -14,7 +16,12 @@ pub fn check(refname: Option<&BString>, allow_onelevel: bool) -> gix::Result<()>
+             }
+         }
+         _ => {
+-            eprintln!("usage: brit check-ref-format [--allow-onelevel] <refname>");
++            // A closed stderr must not turn the usage error into a panic.
++            writeln!(
++                std::io::stderr(),
++                "usage: brit check-ref-format [--allow-onelevel] <refname>"
++            )
++            .ok();
+             Err(super::exit(129))
+         }
+     }
+diff --git a/gitoxide-core/src/repository/git_spellings/for_each_ref.rs b/gitoxide-core/src/repository/git_spellings/for_each_ref.rs
+index 03645f061..80cf4d4b6 100644
+--- a/gitoxide-core/src/repository/git_spellings/for_each_ref.rs
++++ b/gitoxide-core/src/repository/git_spellings/for_each_ref.rs
+@@ -167,7 +167,7 @@ pub fn for_each_ref(repo: gix::Repository, mut out: impl Write, options: Options
+             continue;
+         }
+         let Ok(id) = reference.follow_to_object() else {
+-            eprintln!("warning: ignoring broken ref {name}");
++            writeln!(std::io::stderr(), "warning: ignoring broken ref {name}").ok();
+             continue;
+         };
+         let object = id.object()?;
+diff --git a/gitoxide-core/src/repository/git_spellings/rev_list.rs b/gitoxide-core/src/repository/git_spellings/rev_list.rs
+index 8939399ee..c2f743b9c 100644
+--- a/gitoxide-core/src/repository/git_spellings/rev_list.rs
++++ b/gitoxide-core/src/repository/git_spellings/rev_list.rs
+@@ -4,6 +4,10 @@
+ //! of the excluded ones, where a revision is `A`, `^A`, `A..B` or `A...B` (both sides, without their
+ //! merge bases). `--left-right --count` prints `<left>\t<right>`: commits reachable from the left side
+ //! of an `A...B`, and the rest. Listing commits without `--count` is refused and points to Brit's verb.
++//!
++//! ### Known differences from Git
++//!
++//! - A revision that names no commit, like `HEAD^{tree}`, fails with 128; Git counts it as 0.
+ 
+ use std::io::Write;
+ 
+@@ -29,7 +33,7 @@ pub fn rev_list(
+     options: Options,
+ ) -> Result<()> {
+     if revs.is_empty() {
+-        writeln!(err, "usage: brit rev-list --count [--left-right] <revision>...").or_error()?;
++        writeln!(err, "usage: brit rev-list --count [--left-right] <revision>...").ok();
+         return Err(exit(129));
+     }
+     if !options.count {
+@@ -37,7 +41,7 @@ pub fn rev_list(
+             err,
+             "brit rev-list only counts commits (`--count`); list them with `brit revision list <rev>` or `brit log`"
+         )
+-        .or_error()?;
++        .ok();
+         return Err(exit(128));
+     }
+ 
+@@ -85,7 +89,7 @@ pub fn rev_list(
+                     err,
+                     "brit rev-list does not implement `{rev}`; resolve it with `brit revision resolve`"
+                 )
+-                .or_error()?;
++                .ok();
+                 return Err(exit(128));
+             }
+         }
+diff --git a/gitoxide-core/src/repository/git_spellings/rev_parse.rs b/gitoxide-core/src/repository/git_spellings/rev_parse.rs
+index 9e93843c2..e5738866f 100644
+--- a/gitoxide-core/src/repository/git_spellings/rev_parse.rs
++++ b/gitoxide-core/src/repository/git_spellings/rev_parse.rs
+@@ -14,7 +14,12 @@
+ //! - `--abbrev-ref` always shortens strictly, as if `core.warnAmbiguousRefs` were true.
+ //! - Parent shorthands (`A^@`, `A^!`, `A^-`) and flags other than the ones listed in the help are
+ //!   refused by name instead of being interpreted.
+-//! - A `--` given before every revision and followed by nothing is not echoed.
++//! - A `--` given before every revision and followed by nothing, like a lone `--`, is not echoed.
++//! - Flags Git echoes or expands, like `-1` or `--all`, are refused by name with status 128.
++//! - An ambiguous object prefix loses the resolver's diagnostic: it is reported as an unknown
++//!   revision or path.
++//! - `--path-format relative` as two arguments is accepted, as Brit's clap parser always did; Git
++//!   needs `--path-format=relative`. `--help` after a revision shows Brit's help unless it follows `--`.
+ //! - Inside a `.git` directory itself, Brit's discovery fails, so only `--show-toplevel` answers like Git
+ //!   (`must be run in a work tree`, 128); `--git-dir` or a revision there fails at discovery with
+ //!   status 1. Below it, like in `.git/refs`, the queries work.
+@@ -88,7 +93,8 @@ pub fn rev_parse(repo: gix::Repository, args: Vec<String>, mut out: impl Write,
+         }
+     };
+ 
+-    for arg in &args {
++    let mut args = args.iter();
++    while let Some(arg) = args.next() {
+         if as_is > 0 {
+             if state.show_files {
+                 writeln!(out, "{arg}").or_error()?;
+@@ -151,6 +157,21 @@ pub fn rev_parse(repo: gix::Repository, args: Vec<String>, mut out: impl Write,
+                 }
+                 "--path-format=absolute" => state.format = Some(PathFormat::Absolute),
+                 "--path-format=relative" => state.format = Some(PathFormat::Relative),
++                // Brit's clap spelling `--path-format relative`, kept after the first revision too.
++                "--path-format" => match args.next().map(String::as_str) {
++                    Some("absolute") => state.format = Some(PathFormat::Absolute),
++                    Some("relative") => state.format = Some(PathFormat::Relative),
++                    value => {
++                        return Err(fail(
++                            &mut err,
++                            &format!(
++                                "fatal: unknown argument to --path-format: {}",
++                                value.unwrap_or_default()
++                            ),
++                            128,
++                        ));
++                    }
++                },
+                 other => match other.strip_prefix("--short") {
+                     Some("") => {
+                         state.verify = true;
+@@ -349,7 +370,7 @@ fn show(
+                     match repo.objects.disambiguate_prefix(candidate)? {
+                         Some(prefix) => prefix,
+                         None => {
+-                            writeln!(err, "fatal: {id}: object not found").or_error()?;
++                            writeln!(err, "fatal: {id}: object not found").ok();
+                             id.into()
+                         }
+                     }
+diff --git a/gitoxide-core/src/repository/merge_base.rs b/gitoxide-core/src/repository/merge_base.rs
+index ed55cf133..3f518a06d 100644
+--- a/gitoxide-core/src/repository/merge_base.rs
++++ b/gitoxide-core/src/repository/merge_base.rs
+@@ -38,7 +38,8 @@ pub fn merge_base(
+ 
+ /// `merge-base --is-ancestor <first> <second>`, answered through the exit code like Git: `Ok` when `first`
+ /// is an ancestor of `second` or the same commit, status 1 when it is not, 128 for a revision that names
+-/// no commit or for more than two revisions, and the usage status 129 for one.
++/// no commit or for more than two revisions, and the usage status 129 for one. With no revision at all,
++/// clap's required `first` answers with its usage status 2 where Git exits 129 (a known difference).
+ pub fn is_ancestor(
+     mut repo: gix::Repository,
+     first: &str,
+@@ -49,18 +50,18 @@ pub fn is_ancestor(
+     let second = match others {
+         [second] => second,
+         [] => {
+-            writeln!(err, "usage: brit merge-base --is-ancestor <commit> <commit>").or_error()?;
++            writeln!(err, "usage: brit merge-base --is-ancestor <commit> <commit>").ok();
+             return Err(exit(129));
+         }
+         _ => {
+-            writeln!(err, "fatal: --is-ancestor takes exactly two commits").or_error()?;
++            writeln!(err, "fatal: --is-ancestor takes exactly two commits").ok();
+             return Err(exit(128));
+         }
+     };
+     repo.object_cache_size_if_unset(50 * 1024 * 1024);
+     let mut commit = |name: &str| -> Result<gix::ObjectId> {
+         let Ok(id) = repo.rev_parse_single(name).map(gix::Id::detach) else {
+-            writeln!(err, "fatal: Not a valid object name {name}").or_error()?;
++            writeln!(err, "fatal: Not a valid object name {name}").ok();
+             return Err(exit(128));
+         };
+         match gix::object::bounded::Source::deferred(&repo).peel(id, gix::object::Kind::Commit) {
+@@ -68,9 +69,9 @@ pub fn is_ancestor(
+             Err(_) => {
+                 let kind = repo.find_header(id).map(|header| header.kind().to_string());
+                 if let Ok(kind) = kind {
+-                    writeln!(err, "error: object {id} is a {kind}, not a commit").or_error()?;
++                    writeln!(err, "error: object {id} is a {kind}, not a commit").ok();
+                 }
+-                writeln!(err, "fatal: Not a valid commit name {name}").or_error()?;
++                writeln!(err, "fatal: Not a valid commit name {name}").ok();
+                 Err(exit(128))
+             }
+         }
+diff --git a/src/plumbing/main.rs b/src/plumbing/main.rs
+index d2ec7269d..167a9ca5a 100644
+--- a/src/plumbing/main.rs
++++ b/src/plumbing/main.rs
+@@ -185,15 +185,19 @@ fn explicit_write_paths(cmd: &Subcommands) -> Vec<&std::path::Path> {
+ ///
+ /// A directory that cannot be entered ends like Git: `fatal: cannot change to '<dir>': <reason>` and 128.
+ pub fn change_dirs(dirs: &[std::ffi::OsString]) -> Result<()> {
++    use std::io::Write as _;
+     for dir in dirs.iter().filter(|dir| !dir.is_empty()) {
+         if let Err(err) = std::env::set_current_dir(dir) {
+             let reason = err.to_string();
+             // Git prints `strerror()`, without Rust's `(os error N)` suffix.
+             let reason = reason.split(" (os error ").next().unwrap_or(&reason);
+-            eprintln!(
++            // Written without `eprintln!`, which would panic on a closed stderr.
++            writeln!(
++                std::io::stderr(),
+                 "fatal: cannot change to '{}': {reason}",
+                 std::path::Path::new(dir).display()
+-            );
++            )
++            .ok();
+             return Err(core::repository::git_spellings::exit(128));
+         }
+     }
+diff --git a/src/plumbing/options/git_spellings.rs b/src/plumbing/options/git_spellings.rs
+index 13c8e92b6..c6fea52ed 100644
+--- a/src/plumbing/options/git_spellings.rs
++++ b/src/plumbing/options/git_spellings.rs
+@@ -103,6 +103,16 @@ impl clap::Args for RevParse {
+ 
+ impl clap::FromArgMatches for RevParse {
+     fn from_arg_matches(matches: &ArgMatches) -> Result<Self, clap::Error> {
++        // `REV` takes `--help` verbatim; it still asks for help, as everywhere in Brit, unless it follows `--`.
++        if matches
++            .get_many::<String>(REV)
++            .into_iter()
++            .flatten()
++            .take_while(|arg| *arg != "--")
++            .any(|arg| arg == "--help")
++        {
++            return Err(clap::Error::new(clap::error::ErrorKind::DisplayHelp));
++        }
+         let mut ordered: Vec<(usize, String)> = Vec::new();
+         let mut take = |id: &str, token: &dyn Fn(&str) -> String| {
+             if matches.value_source(id) != Some(clap::parser::ValueSource::CommandLine) {
+diff --git a/src/plumbing/options/mod.rs b/src/plumbing/options/mod.rs
+index 33966ba49..5c24a17b5 100644
+--- a/src/plumbing/options/mod.rs
++++ b/src/plumbing/options/mod.rs
+@@ -15,9 +15,10 @@ use crate::shared::{AsRange, AsTime};
+ pub struct Args {
+     /// Run as if Brit was started in this directory, like Git's `-C`; repeat to descend further.
+     ///
+-    /// Each one is applied relative to the previous one before the command runs, and before a subcommand's
+-    /// `--help` or usage error; an empty value is ignored, and one that cannot be entered ends with Git's
+-    /// `fatal: cannot change to '<dir>'` and status 128. Brit's own `--help` without a subcommand ignores it.
++    /// Each one is applied relative to the previous one before the command runs, and before a recognised
++    /// subcommand's `--help` or usage error (an unrecognised command gets clap's error first, and Brit's own
++    /// `--help` without a subcommand ignores it); an empty value is ignored, and one that cannot be entered
++    /// ends with Git's `fatal: cannot change to '<dir>'` and status 128.
+     /// Repository discovery and every relative path argument then start there, and `-r` is resolved
+     /// relative to the result. `-r` alone only selects the repository.
+     #[clap(short = 'C', value_name = "DIR", action = clap::ArgAction::Append, value_parser = clap::value_parser!(std::ffi::OsString))]
+diff --git a/tests/cli-journey/tests/broken_pipe.rs b/tests/cli-journey/tests/broken_pipe.rs
+index d0bc36c2b..2da3cec12 100644
+--- a/tests/cli-journey/tests/broken_pipe.rs
++++ b/tests/cli-journey/tests/broken_pipe.rs
+@@ -1,7 +1,9 @@
+ //! A reader that closes early (`brit … | head`) ends a command that only prints quietly with status 141,
+ //! the status a shell reports for Git killed by SIGPIPE, instead of `Error: Broken pipe (os error 32)`.
+-//! It is decided by the failed write's error kind on stdout or stderr, and only for commands classified
+-//! read-only; a command that changes the repository reports its own outcome (unit-tested in brit-cli).
++//! It is decided by the failed write's error kind on stdout or stderr, only for commands classified
++//! read-only, and only when the command did not fail for its own reason. This never gives a mutating
++//! command 141; how a mutating command orders its own writes (like `push --porcelain`'s report before
++//! its rejection) is outside this change.
+ #![cfg(target_os = "linux")]
+ 
+ use std::{
+@@ -127,6 +129,13 @@ fn a_closed_reader_never_replaces_a_genuine_failure() -> Result<()> {
+     for (which, args, code) in [
+         (2, &["rev-parse", "--verify", "missing"][..], 128),
+         (1, &["-v", "rev-parse", "HEAD", "missing"][..], 128),
++        // Usage errors write to a closed stderr without panicking.
++        (2, &["check-ref-format"][..], 129),
++        (2, &["merge-base", "--is-ancestor", "HEAD"][..], 129),
++        (2, &["merge-base", "--is-ancestor", "nope", "HEAD"][..], 128),
++        (2, &["rev-list", "--count"][..], 129),
++        (2, &["rev-list", "--count", "nope"][..], 128),
++        (2, &["-C", "does-not-exist", "rev-parse", "HEAD"][..], 128),
+     ] {
+         let out = brit_with_closed(repo.path(), which, args)?;
+         assert_eq!(
+diff --git a/tests/cli-journey/tests/rev_parse.rs b/tests/cli-journey/tests/rev_parse.rs
+index 98387db4f..295d6d548 100644
+--- a/tests/cli-journey/tests/rev_parse.rs
++++ b/tests/cli-journey/tests/rev_parse.rs
+@@ -215,3 +215,27 @@ fn a_worktree_named_dot_git_inside_another_repository_is_selected_like_git() ->
+     }
+     Ok(())
+ }
++
++/// Brit's own conventions after the first revision: `--path-format relative` as two arguments, and
++/// `--help` showing help unless it follows `--`.
++#[test]
++fn rev_parse_keeps_brits_conventions_after_a_revision() -> Result<()> {
++    let repo = TestRepo::new("rev-parse-conventions")?;
++    let root = repo.path();
++    let joined = brit(
++        root,
++        &["rev-parse", "HEAD", "--path-format=relative", "--git-common-dir"],
++    )?;
++    let split = brit(
++        root,
++        &["rev-parse", "HEAD", "--path-format", "relative", "--git-common-dir"],
++    )?;
++    assert_eq!(joined.code, Some(0), "{joined:?}");
++    assert_eq!(split, joined, "the two-argument spelling means the joined one");
++
++    let help = brit(root, &["rev-parse", "HEAD", "--help"])?;
++    assert_eq!(help.code, Some(0), "{help:?}");
++    assert!(help.stdout.contains("brit revision resolve"), "{help:?}");
++    assert_same_streams(root, &["rev-parse", "HEAD", "--", "--help"])?;
++    Ok(())
++}
+-- 
+2.52.0
+

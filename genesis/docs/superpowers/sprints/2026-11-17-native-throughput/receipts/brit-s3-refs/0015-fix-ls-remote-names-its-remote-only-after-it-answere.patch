@@ -1,0 +1,158 @@
+From 77346cdcf83f17e0486287180bbe011f62a75370 Mon Sep 17 00:00:00 2001
+From: Matthew Dowell <mbd06b+github@gmail.com>
+Date: Thu, 19 Nov 2026 10:20:09 +0000
+Subject: [PATCH 15/16] fix: ls-remote names its remote only after it answered,
+ password redacted
+
+Re-review FIX FIRST item 3. The `From <url>` line printed
+`url.to_bstring()`, which includes a password embedded in the URL, and it
+was printed before connecting, so it appeared even when the connection
+failed (Git prints no `From` line then).
+
+`from_line()` now formats the URL through its `Display`, which shows a
+password as `redacted`, and the line is written only after the ref
+advertisement was received. Unit test `the_from_line_never_shows_a_password`
+(fails on a `to_bstring()` stub); journey
+`ls_remote_names_the_default_remote_only_after_it_answered_and_without_its_password`:
+an unreachable default remote prints no `From` line (fails on e534083f0's
+binary), and a default remote URL `http://user:secret@127.0.0.1:1/...`
+never shows `secret` on stderr.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01PJB8fpkCKfb4CMYBh9vCEs
+Co-Authored-By: claude-fable-5-2 <noreply@anthropic.com>
+Claude-Session: b49f7c46-0cab-4b30-8b19-3294dddb61a7
+---
+ .../src/repository/git_spellings/ls_remote.rs | 34 +++++++++++++----
+ tests/cli-journey/tests/ls_remote.rs          | 38 ++++++++++++++++++-
+ 2 files changed, 63 insertions(+), 9 deletions(-)
+
+diff --git a/gitoxide-core/src/repository/git_spellings/ls_remote.rs b/gitoxide-core/src/repository/git_spellings/ls_remote.rs
+index 60fd89431..e86398432 100644
+--- a/gitoxide-core/src/repository/git_spellings/ls_remote.rs
++++ b/gitoxide-core/src/repository/git_spellings/ls_remote.rs
+@@ -3,7 +3,8 @@
+ //! Refs print in the server's order. An annotated tag prints its tag object and then its peeled
+ //! object as `<refname>^{}`, and patterns match the tail of a ref name at a `/` boundary, both
+ //! like Git. An unborn `HEAD` is not listed, as Git does not request it without `--symref`.
+-//! With the remote omitted, `From <url>` goes to stderr as Git writes it.
++//! With the remote omitted, `From <url>` goes to stderr once the remote answered, as Git writes it,
++//! except that a password in the URL is shown as `redacted`.
+ //!
+ //! ### Known differences from Git
+ //!
+@@ -56,6 +57,12 @@ fn selected(options: &Options, name: &str) -> bool {
+     kind && refs_only && tail_matches(&options.patterns, name)
+ }
+ 
++/// The `From <url>` line for an omitted remote. The URL's `Display` replaces a password with `redacted`,
++/// so a password in the configured URL never reaches stderr; Git prints the URL as configured.
++fn from_line(url: &gix::Url) -> String {
++    format!("From {url}")
++}
++
+ /// List the remote's refs like `git ls-remote`.
+ #[gix::protocol::bisync::bisync]
+ pub async fn ls_remote(
+@@ -66,12 +73,10 @@ pub async fn ls_remote(
+     options: Options,
+ ) -> Result<()> {
+     let remote = crate::repository::remote::by_name_or_url(&repo, options.remote.as_deref())?;
+-    if options.remote.is_none()
+-        && !options.quiet
+-        && let Some(url) = remote.url(gix::remote::Direction::Fetch)
+-    {
+-        writeln!(err, "From {}", url.to_bstring()).or_error()?;
+-    }
++    // Named only once the remote answered, like Git, which prints nothing when the connection fails.
++    let from = (options.remote.is_none() && !options.quiet)
++        .then(|| remote.url(gix::remote::Direction::Fetch).map(from_line))
++        .flatten();
+     let mut matched = false;
+     let (map, _handshake) = remote
+         .connect(gix::remote::Direction::Fetch)
+@@ -84,6 +89,9 @@ pub async fn ls_remote(
+             },
+         )
+         .await?;
++    if let Some(from) = from {
++        writeln!(err, "{from}").ok();
++    }
+     for remote_ref in &map.remote_refs {
+         let (name, object, peeled) = match remote_ref {
+             handshake::Ref::Direct { full_ref_name, object } => (full_ref_name, object, None),
+@@ -124,7 +132,17 @@ pub async fn ls_remote(
+ 
+ #[cfg(test)]
+ mod tests {
+-    use super::tail_matches;
++    use super::{from_line, tail_matches};
++
++    #[test]
++    fn the_from_line_never_shows_a_password() {
++        let url = gix::Url::from_bytes("https://user:secret@example.com/repo.git".into()).expect("valid URL");
++        let line = from_line(&url);
++        assert!(!line.contains("secret"), "{line}");
++        assert_eq!(line, "From https://user:redacted@example.com/repo.git");
++        let url = gix::Url::from_bytes("/srv/repo.git".into()).expect("valid path");
++        assert_eq!(from_line(&url), "From /srv/repo.git", "a path prints as configured");
++    }
+ 
+     #[test]
+     fn tail_patterns_match_like_git() {
+diff --git a/tests/cli-journey/tests/ls_remote.rs b/tests/cli-journey/tests/ls_remote.rs
+index e0c0f3f7b..d4e814174 100644
+--- a/tests/cli-journey/tests/ls_remote.rs
++++ b/tests/cli-journey/tests/ls_remote.rs
+@@ -3,7 +3,7 @@
+ use anyhow::Result;
+ use cli_journey::support::{
+     mock_remote::MockRemote,
+-    parity::{assert_help_names, assert_same, assert_same_streams, git_ok},
++    parity::{assert_help_names, assert_same, assert_same_streams, brit, git, git_ok},
+     test_repo::TestRepo,
+ };
+ 
+@@ -91,3 +91,39 @@ fn ls_remote_matches_git() -> Result<()> {
+ 
+     assert_help_names("ls-remote", "brit remote refs")
+ }
++
++/// The `From <url>` line appears only once the default remote answered, and never shows a password.
++#[test]
++fn ls_remote_names_the_default_remote_only_after_it_answered_and_without_its_password() -> Result<()> {
++    let local = TestRepo::new("ls-remote-unreachable")?;
++    let root = local.path();
++    let missing = root.join("no-such-remote.git");
++    git_ok(
++        root,
++        &["remote", "add", "origin", missing.to_str().expect("UTF-8 path")],
++    )?;
++    let git_out = git(root, &["ls-remote"])?;
++    let out = brit(root, &["ls-remote"])?;
++    assert_ne!(git_out.code, Some(0), "{git_out:?}");
++    assert_ne!(out.code, Some(0), "an unreachable remote fails: {out:?}");
++    assert!(out.stdout.is_empty(), "{out:?}");
++    assert!(
++        !git_out.stderr.contains("From "),
++        "Git names no remote it could not reach: {git_out:?}"
++    );
++    assert!(!out.stderr.contains("From "), "nor does Brit: {out:?}");
++
++    // Nothing listens on port 1, so the connection is refused at once.
++    git_ok(
++        root,
++        &["remote", "set-url", "origin", "http://user:secret@127.0.0.1:1/repo.git"],
++    )?;
++    let out = brit(root, &["ls-remote"])?;
++    assert_ne!(out.code, Some(0), "{out:?}");
++    assert!(
++        !out.stderr.contains("secret"),
++        "the password never reaches stderr: {out:?}"
++    );
++    assert!(!out.stderr.contains("From "), "{out:?}");
++    Ok(())
++}
+-- 
+2.52.0
+

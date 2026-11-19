@@ -45,3 +45,17 @@ failed looking for `./.git/objects`. That is a behaviour change for all commands
 and tested. Only the default `max` feature set was compiled.
 
 `review-of-0001-0006.md` is the independent review that round 2 answers.
+
+## Round 3 (2026-11-19, head `b8264afc4`)
+
+Four commits answering `review-of-0007-0012.md`; apply after 0012.
+
+| Patch | What |
+|---|---|
+| 0013 | REMOVES `discovery_start()` from 0008: the shared repository selector is `let repository = args.repository;` again, byte for byte as at `7786c8185`. From `/outer/sub/.git` (a worktree root with its own `.git`, inside another repository) 0008 selected the OUTER repository; a journey now holds that case equal to git. `rev-parse --show-toplevel` inside `.git` is answered by the spelling alone, after discovery has failed |
+| 0014 | a closed reader never replaces a command's own failure: `exit_status()` judges the command's result first and returns 141 only for a read-only command that otherwise succeeded; `READ_ONLY_COMMANDS` is matched on the exact subcommand path |
+| 0015 | `ls-remote`'s `From <url>` is the redacted URL and is printed only after the ref advertisement |
+| 0016 | `rev-parse` accepts `--path-format relative` as two arguments and `--help` after a revision again; usage and error diagnostics no longer panic on a closed stderr; doc corrections; known differences recorded |
+
+Deliberate difference from git, in 0014: `rev-parse --verify missing` with a closed stderr exits 128 here; git is killed
+by SIGPIPE and a shell sees 141. If 0008 was applied anywhere without 0013, its `discovery_start` hunk must not be kept.

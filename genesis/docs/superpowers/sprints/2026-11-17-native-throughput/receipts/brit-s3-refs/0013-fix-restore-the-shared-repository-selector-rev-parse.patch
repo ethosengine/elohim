@@ -1,0 +1,209 @@
+From 0230eb6849d20bfe80f5f75ef2d273ff6453e756 Mon Sep 17 00:00:00 2001
+From: Matthew Dowell <mbd06b+github@gmail.com>
+Date: Thu, 19 Nov 2026 10:12:10 +0000
+Subject: [PATCH 13/16] fix: restore the shared repository selector; rev-parse
+ answers in .git alone
+
+Re-review FIX FIRST item 1. `discovery_start()` (c4dd0d621) changed where
+discovery starts for every command: from `/outer/sub/.git`, a directory
+that is itself the top of a worktree with its own `.git`, the absolute
+start skipped the child `.git`, ascended and selected `/outer`, so a
+mutating command such as `branch create` would have written to the
+enclosing repository. The helper is removed and the selector line is the
+one at 7786c8185 again: `let repository = args.repository;`.
+
+The `.git`-directory case is now answered inside the rev-parse spelling
+only, after discovery has already failed: `outside_work_tree()` gives
+Git's "must be run in a work tree" and 128 for a `--show-toplevel`
+reached before any query that needs the repository. `--git-dir` or a
+revision from inside `.git` itself fails at discovery again (status 1),
+recorded as a known difference; below it (`.git/refs`) they work.
+
+Journey: `a_worktree_named_dot_git_inside_another_repository_is_selected_like_git`
+compares `rev-parse HEAD`, the path queries and `for-each-ref` with Git
+from `/outer/sub/.git`; it fails on e534083f0's binary (outer HEAD) and
+passes now.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01PJB8fpkCKfb4CMYBh9vCEs
+Co-Authored-By: claude-fable-5-2 <noreply@anthropic.com>
+Claude-Session: b49f7c46-0cab-4b30-8b19-3294dddb61a7
+---
+ .../src/repository/git_spellings/rev_parse.rs | 30 ++++++++++++-
+ src/plumbing/main.rs                          | 26 ++++++------
+ tests/cli-journey/tests/rev_parse.rs          | 42 +++++++++++++++++--
+ 3 files changed, 80 insertions(+), 18 deletions(-)
+
+diff --git a/gitoxide-core/src/repository/git_spellings/rev_parse.rs b/gitoxide-core/src/repository/git_spellings/rev_parse.rs
+index 9537e801d..9e93843c2 100644
+--- a/gitoxide-core/src/repository/git_spellings/rev_parse.rs
++++ b/gitoxide-core/src/repository/git_spellings/rev_parse.rs
+@@ -15,6 +15,9 @@
+ //! - Parent shorthands (`A^@`, `A^!`, `A^-`) and flags other than the ones listed in the help are
+ //!   refused by name instead of being interpreted.
+ //! - A `--` given before every revision and followed by nothing is not echoed.
++//! - Inside a `.git` directory itself, Brit's discovery fails, so only `--show-toplevel` answers like Git
++//!   (`must be run in a work tree`, 128); `--git-dir` or a revision there fails at discovery with
++//!   status 1. Below it, like in `.git/refs`, the queries work.
+ //! - The `<rev>:<path>` diagnostic omits Git's hint for a path given relative to a subdirectory.
+ 
+ use std::{
+@@ -215,6 +218,31 @@ pub fn rev_parse(repo: gix::Repository, args: Vec<String>, mut out: impl Write,
+     Ok(())
+ }
+ 
++/// Git's answer from inside a Git directory where Brit's discovery failed: Git then works like in a bare
++/// repository, so a `--show-toplevel` reached before any query that needs the repository is
++/// `fatal: this operation must be run in a work tree` and 128. `None` leaves the discovery error standing.
++///
++/// This runs only after discovery failed, so it never changes which repository a command selects.
++pub fn outside_work_tree(args: &[String], cwd: &Path, mut err: impl Write) -> Option<gix::Error> {
++    gix::discover::is_git(cwd).ok()?;
++    let mut args = args.iter();
++    while let Some(arg) = args.next() {
++        match arg.as_str() {
++            "--show-toplevel" => {
++                writeln!(err, "fatal: this operation must be run in a work tree").ok();
++                return Some(exit(128));
++            }
++            "--path-format" => {
++                args.next();
++            }
++            "--verify" | "-q" | "--quiet" | "--abbrev-ref" | "--abbrev-ref=strict" => {}
++            other if other.starts_with("--path-format=") || other.starts_with("--short") => {}
++            _ => return None,
++        }
++    }
++    None
++}
++
+ /// Git's `--short=<n>`: `strtoul()` of the value, clamped to at least 4 digits, so an empty, negative or
+ /// non-numeric value means 4.
+ fn git_abbrev_len(value: &str) -> usize {
+@@ -232,7 +260,7 @@ fn git_abbrev_len(value: &str) -> usize {
+ }
+ 
+ /// The worktree Git would see from `cwd`: none when `cwd` is inside the Git directory, as Git then works
+-/// like in a bare repository.
++/// like in a bare repository (reached from a directory below a `.git` directory, like `.git/refs`).
+ fn workdir(repo: &gix::Repository, cwd: &Path) -> Option<PathBuf> {
+     let workdir = absolute(repo.workdir()?, cwd);
+     let inside_git_dir = realpath(cwd).starts_with(realpath(&absolute(repo.git_dir(), cwd)));
+diff --git a/src/plumbing/main.rs b/src/plumbing/main.rs
+index d6e6349ee..d2ec7269d 100644
+--- a/src/plumbing/main.rs
++++ b/src/plumbing/main.rs
+@@ -200,18 +200,6 @@ pub fn change_dirs(dirs: &[std::ffi::OsString]) -> Result<()> {
+     Ok(())
+ }
+ 
+-/// Where discovery starts: the default `.` is made absolute when the current directory is a `.git`
+-/// directory, where discovery from the relative `.` looks for `./.git/objects` and fails.
+-fn discovery_start(repository: PathBuf) -> PathBuf {
+-    if repository.as_os_str() == "."
+-        && let Ok(cwd) = std::env::current_dir()
+-        && cwd.file_name().is_some_and(|name| name == ".git")
+-    {
+-        return cwd;
+-    }
+-    repository
+-}
+-
+ /// Execute an already parsed plumbing command, allowing another CLI to compose its command tree.
+ pub fn run(args: Args) -> Result<()> {
+     run_with_command(args, Args::command())
+@@ -256,7 +244,7 @@ pub fn run_with_command(args: Args, command: clap::Command) -> Result<()> {
+         .unwrap_or_default();
+     let object_hash = args.object_hash;
+     let config = args.config;
+-    let repository = discovery_start(args.repository);
++    let repository = args.repository;
+     let repository_path = repository.clone();
+     enum Mode {
+         Strict,
+@@ -1461,7 +1449,17 @@ pub fn run_with_command(args: Args, command: clap::Command) -> Result<()> {
+         },
+         Subcommands::RevParse(crate::plumbing::options::git_spellings::RevParse { args }) => {
+             prepare_and_run("rev-parse", verbose, None, move |_progress, out, err| {
+-                core::repository::git_spellings::rev_parse::rev_parse(repository(Mode::Lenient)?, args, out, err)
++                let repo = match repository(Mode::Lenient) {
++                    Ok(repo) => repo,
++                    Err(discovery) => {
++                        let cwd = std::env::current_dir().unwrap_or_default();
++                        return Err(core::repository::git_spellings::rev_parse::outside_work_tree(
++                            &args, &cwd, &mut *err,
++                        )
++                        .unwrap_or(discovery));
++                    }
++                };
++                core::repository::git_spellings::rev_parse::rev_parse(repo, args, out, err)
+             })
+         }
+         Subcommands::ForEachRef(crate::plumbing::options::git_spellings::ForEachRef {
+diff --git a/tests/cli-journey/tests/rev_parse.rs b/tests/cli-journey/tests/rev_parse.rs
+index 68b5e1b8a..98387db4f 100644
+--- a/tests/cli-journey/tests/rev_parse.rs
++++ b/tests/cli-journey/tests/rev_parse.rs
+@@ -154,16 +154,23 @@ fn rev_parse_reads_arguments_in_order_like_git() -> Result<()> {
+         assert_same_streams(root, form)?;
+     }
+ 
+-    // Inside the Git directory there is no worktree.
++    // Inside the Git directory there is no worktree. Only `--show-toplevel` answers there: the other
++    // queries fail at Brit's discovery, a recorded difference.
+     let git_dir = root.join(".git");
+     for form in [
+         &["rev-parse", "--show-toplevel"][..],
+-        &["rev-parse", "--git-dir", "HEAD"][..],
+-        &["rev-parse", "--git-common-dir"][..],
+         &["rev-parse", "--show-toplevel", "HEAD"][..],
++        &["rev-parse", "--verify", "--show-toplevel"][..],
+     ] {
+         assert_same_streams(&git_dir, form)?;
+     }
++    // Below it the worktree is still out of reach, and the Git directory is found.
++    for form in [
++        &["rev-parse", "--show-toplevel"][..],
++        &["rev-parse", "--git-dir", "HEAD"][..],
++    ] {
++        assert_same_streams(&git_dir.join("refs"), form)?;
++    }
+ 
+     // Global -v buffers output: a failure still forwards what was printed before it.
+     let verbose = brit(root, &["-v", "rev-parse", "HEAD", "missing"])?;
+@@ -179,3 +186,32 @@ fn rev_parse_reads_arguments_in_order_like_git() -> Result<()> {
+     );
+     Ok(())
+ }
++
++/// From `/outer/sub/.git`, where that directory is itself the top of a worktree with its own `.git`,
++/// Brit selects the same repository as Git: the inner one, never the enclosing `/outer`. A selector
++/// that skipped the child `.git` would make a mutating command write to the outer repository.
++#[test]
++fn a_worktree_named_dot_git_inside_another_repository_is_selected_like_git() -> Result<()> {
++    let outer = TestRepo::new("rev-parse-outer")?;
++    outer.commit_file("o", "o\n")?;
++    let inner_top = outer.path().join("sub/.git");
++    std::fs::create_dir_all(&inner_top)?;
++    git_ok(&inner_top, &["init", "-q", "--initial-branch=inner"])?;
++    std::fs::write(inner_top.join("i"), "i\n")?;
++    git_ok(&inner_top, &["add", "i"])?;
++    git_ok(&inner_top, &["commit", "-q", "-m", "inner"])?;
++    assert_ne!(
++        git_ok(&inner_top, &["rev-parse", "HEAD"])?,
++        git_ok(outer.path(), &["rev-parse", "HEAD"])?,
++        "the two repositories must be told apart by HEAD"
++    );
++    for form in [
++        &["rev-parse", "HEAD"][..],
++        &["rev-parse", "--show-toplevel", "--git-dir", "--absolute-git-dir"],
++        &["rev-parse", "--abbrev-ref", "HEAD"],
++        &["for-each-ref", "--format=%(refname)"],
++    ] {
++        assert_same_streams(&inner_top, form)?;
++    }
++    Ok(())
++}
+-- 
+2.52.0
+

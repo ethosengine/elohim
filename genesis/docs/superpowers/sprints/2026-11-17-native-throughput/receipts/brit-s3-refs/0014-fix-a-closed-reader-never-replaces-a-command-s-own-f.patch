@@ -1,0 +1,314 @@
+From b5acc89a920642019e164945ae887a6f2f8b308a Mon Sep 17 00:00:00 2001
+From: Matthew Dowell <mbd06b+github@gmail.com>
+Date: Thu, 19 Nov 2026 10:15:41 +0000
+Subject: [PATCH 14/16] fix: a closed reader never replaces a command's own
+ failure
+
+Re-review FIX FIRST item 2. `exit_status()` (brit-cli/src/main.rs, still
+the one place the status is decided) checked the closed reader before the
+command's result, so `rev-parse --verify missing` with a closed stderr and
+`-v rev-parse HEAD missing` with a closed stdout ended with 141 instead of
+their genuine 128.
+
+- The command's own result is judged first. An error, or a Git-shaped
+  non-zero exit, keeps its status whatever happened to the reader.
+- 141 only for a read-only command that otherwise succeeded: `Ok`, a zero
+  exit, or an error that is nothing but its write meeting the closed
+  reader (a typed `ErrorKind::BrokenPipe` in the chain: io, gix or
+  serde_json; never message text), and only when a watched write saw it.
+- `READ_ONLY_COMMANDS` is matched on the exact subcommand path; each
+  admitted leaf is listed (`diff`, `diff tree`, `diff file`, ...).
+- The `closed_reader::seen()` flag is documented as never reset (one
+  command per CLI process); the unit tests pass the booleans directly.
+
+Tests: unit `a_closed_reader_never_replaces_the_commands_own_failure` and
+`read_only_commands_are_classified_by_their_exact_path` (both fail on a
+stub of the previous ordering and prefix match); journey
+`a_closed_reader_never_replaces_a_genuine_failure` (fails on e534083f0's
+binary with 141). Git itself, killed by SIGPIPE, reports 141 for those
+cases; keeping the failure's status is a deliberate difference.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01PJB8fpkCKfb4CMYBh9vCEs
+Co-Authored-By: claude-fable-5-2 <noreply@anthropic.com>
+Claude-Session: b49f7c46-0cab-4b30-8b19-3294dddb61a7
+---
+ brit-cli/src/main.rs                   | 114 ++++++++++++++++++++-----
+ src/plumbing/mod.rs                    |   2 +-
+ src/shared.rs                          |   3 +
+ tests/cli-journey/tests/broken_pipe.rs |  40 +++++++++
+ 4 files changed, 136 insertions(+), 23 deletions(-)
+
+diff --git a/brit-cli/src/main.rs b/brit-cli/src/main.rs
+index d7550ec07..6a356e20c 100644
+--- a/brit-cli/src/main.rs
++++ b/brit-cli/src/main.rs
+@@ -247,8 +247,10 @@ fn normalize_log_counts(args: &mut [std::ffi::OsString], index: usize) {
+     }
+ }
+ 
+-/// Commands whose only effect is what they print, by subcommand path. A reader that closes their output
+-/// early may end them quietly; every other command's own outcome is reported.
++/// Commands whose only effect is what they print, each by its exact subcommand path. A reader that
++/// closes their output early may end them quietly; every other command's own outcome is reported.
++/// A path is admitted only when listed itself: a child of a listed command is not read-only until it
++/// is listed too.
+ const READ_ONLY_COMMANDS: &[&[&str]] = &[
+     &["rev-parse"],
+     &["for-each-ref"],
+@@ -260,6 +262,8 @@ const READ_ONLY_COMMANDS: &[&[&str]] = &[
+     &["cat"],
+     &["blame"],
+     &["diff"],
++    &["diff", "tree"],
++    &["diff", "file"],
+     &["branch", "list"],
+     &["revision", "resolve"],
+     &["revision", "explain"],
+@@ -268,6 +272,10 @@ const READ_ONLY_COMMANDS: &[&[&str]] = &[
+     &["env"],
+ ];
+ 
++fn read_only_path(path: &[&str]) -> bool {
++    READ_ONLY_COMMANDS.contains(&path)
++}
++
+ fn read_only_command(matches: &clap::ArgMatches) -> bool {
+     let mut path = Vec::new();
+     let mut current = matches;
+@@ -275,24 +283,56 @@ fn read_only_command(matches: &clap::ArgMatches) -> bool {
+         path.push(name);
+         current = sub;
+     }
+-    READ_ONLY_COMMANDS.iter().any(|command| path.starts_with(command))
++    read_only_path(&path)
++}
++
++/// Whether `error` is a write that met a closed reader, by the typed `ErrorKind::BrokenPipe` of an I/O
++/// error in its chain. Message text is never consulted.
++fn is_closed_reader_write(error: &error::CliError) -> bool {
++    let broken = |kind: Option<std::io::ErrorKind>| kind == Some(std::io::ErrorKind::BrokenPipe);
++    match error {
++        error::CliError::Io(io) => broken(Some(io.kind())),
++        error::CliError::Json(json) => broken(json.io_error_kind()),
++        error::CliError::Git(cause) => cause.chain().any(|cause| {
++            broken(cause.downcast_ref::<std::io::Error>().map(std::io::Error::kind))
++                || broken(
++                    cause
++                        .downcast_ref::<gix::Error>()
++                        .and_then(|error| error.downcast_any_ref::<std::io::Error>())
++                        .map(std::io::Error::kind),
++                )
++                || broken(
++                    cause
++                        .downcast_ref::<serde_json::Error>()
++                        .and_then(serde_json::Error::io_error_kind),
++                )
++        }),
++        _ => false,
++    }
+ }
+ 
+ /// How a finished run ends: its exit status, and whether its error still has to be reported.
+ ///
+-/// This is the one place the status is decided. `read_only` says the command only prints (see
+-/// [`READ_ONLY_COMMANDS`]); `reader_closed` says a write to stdout or stderr failed with
+-/// `ErrorKind::BrokenPipe`, as recorded at the write itself. Message text is never consulted.
++/// This is the one place the status is decided. The command's own result is judged first: an error,
++/// or a Git-shaped non-zero exit, keeps its own status whatever happened to the reader. Only a command
++/// that otherwise succeeded (`Ok`, a zero exit, or an error that is nothing but its write meeting the
++/// closed reader) ends with 141, the status of Git killed by SIGPIPE, and only when it is read-only
++/// (see [`READ_ONLY_COMMANDS`]) and `reader_closed` says a watched write to stdout or stderr failed
++/// with `ErrorKind::BrokenPipe`.
+ fn exit_status(outcome: &Result<()>, read_only: bool, reader_closed: bool) -> (i32, bool) {
++    let quiet_pipe = read_only && reader_closed;
+     match outcome {
++        Ok(()) | Err(error::CliError::ContextExit(0)) if quiet_pipe => (141, false),
+         Ok(()) => (0, false),
+         Err(error::CliError::ContextExit(code)) => (*code, false),
+-        // A command that only prints and lost its reader (`brit … | head`) ends like Git killed by SIGPIPE.
+-        Err(_) if read_only && reader_closed => (141, false),
+         // A Git spelling that answers through its exit code already wrote its diagnostic.
+         Err(error::CliError::Git(cause)) if cause.chain().any(|cause| plumbing::exit_status(cause).is_some()) => {
+-            (cause.chain().find_map(plumbing::exit_status).unwrap_or(1), false)
++            match cause.chain().find_map(plumbing::exit_status).unwrap_or(1) {
++                0 if quiet_pipe => (141, false),
++                code => (code, false),
++            }
+         }
++        Err(e) if quiet_pipe && is_closed_reader_write(e) => (141, false),
+         Err(e) => (e.exit_code(), true),
+     }
+ }
+@@ -613,33 +653,55 @@ mod tests {
+     }
+ 
+     #[test]
+-    fn only_a_read_only_command_that_lost_its_reader_ends_quietly() {
++    fn a_closed_reader_never_replaces_the_commands_own_failure() {
+         let git = |text: &str| -> Result<()> { Err(error::CliError::Git(anyhow::anyhow!("{text}"))) };
+-        let pipe_text = git("could not read commit message at /x/Broken pipe (os error 32)");
++        let typed = |code: i32| -> Result<()> {
++            Err(error::CliError::Git(anyhow::Error::from(gix::Error::from_error(
++                plumbing::GitExit(code),
++            ))))
++        };
++        let pipe = || std::io::Error::from(std::io::ErrorKind::BrokenPipe);
++        let pipe_write = || -> Result<()> {
++            Err(error::CliError::Git(anyhow::Error::from(
++                gix::Error::from_error(pipe()),
++            )))
++        };
++
++        // Failed, and the reader closed too: the failure's own status.
+         assert_eq!(
+-            exit_status(&pipe_text, true, false),
++            exit_status(&typed(128), true, true),
++            (128, false),
++            "rev-parse --verify missing"
++        );
++        assert_eq!(exit_status(&typed(1), true, true), (1, false));
++        assert_eq!(exit_status(&git("bad revision"), true, true), (1, true));
++        assert_eq!(
++            exit_status(&git("could not read x: Broken pipe (os error 32)"), true, true),
+             (1, true),
+             "an error that merely contains the text is reported"
+         );
++        // Succeeded, or failed only at the write that met the closed reader: 141.
++        assert_eq!(exit_status(&Ok(()), true, true), (141, false));
++        assert_eq!(exit_status(&typed(0), true, true), (141, false));
++        assert_eq!(exit_status(&pipe_write(), true, true), (141, false));
++        assert_eq!(exit_status(&Err(error::CliError::Io(pipe())), true, true), (141, false));
++        // Not read-only, or no watched write saw the closed reader: reported as it is.
+         assert_eq!(
+-            exit_status(&git("push rejected"), false, true),
++            exit_status(&pipe_write(), false, true),
+             (1, true),
+-            "a mutation's own outcome is reported even when its reader closed"
++            "a mutation's own outcome"
+         );
+-        assert_eq!(exit_status(&git("Broken pipe"), true, true), (141, false));
+-        assert_eq!(exit_status(&Ok(()), true, true), (0, false));
+-        let io = Err(error::CliError::Io(std::io::Error::from(
+-            std::io::ErrorKind::BrokenPipe,
+-        )));
+         assert_eq!(
+-            exit_status(&io, false, false),
++            exit_status(&pipe_write(), true, false),
+             (1, true),
+-            "a broken pipe the write sites did not record is reported"
++            "an unwatched broken pipe"
+         );
++        assert_eq!(exit_status(&Ok(()), false, true), (0, false));
++        assert_eq!(exit_status(&Ok(()), true, false), (0, false));
+     }
+ 
+     #[test]
+-    fn read_only_commands_are_classified_by_their_full_path() {
++    fn read_only_commands_are_classified_by_their_exact_path() {
+         let read_only = |args: &[&str]| {
+             read_only_command(
+                 &public_command()
+@@ -653,6 +715,7 @@ mod tests {
+             &["brit", "branch", "list"],
+             &["brit", "branches", "list"],
+             &["brit", "log"],
++            &["brit", "diff"],
+         ] {
+             assert!(read_only(args), "{args:?}");
+         }
+@@ -661,9 +724,16 @@ mod tests {
+             &["brit", "branch", "create", "x"],
+             &["brit", "commit", "-m", "x"],
+             &["brit", "add", "x"],
++            &["brit", "revision", "list", "HEAD"],
+         ] {
+             assert!(!read_only(args), "{args:?}");
+         }
++        assert!(read_only_path(&["diff", "tree"]));
++        assert!(
++            !read_only_path(&["rev-parse", "child"]),
++            "a path that only has a read-only prefix is not read-only"
++        );
++        assert!(!read_only_path(&["branch"]));
+     }
+ 
+     #[test]
+diff --git a/src/plumbing/mod.rs b/src/plumbing/mod.rs
+index 6ce5239f1..0a0b62a94 100644
+--- a/src/plumbing/mod.rs
++++ b/src/plumbing/mod.rs
+@@ -1,7 +1,7 @@
+ mod main;
+ mod mutation;
+ /// The status a Git-shaped ending asks for, when a command answers through its exit code.
+-pub use gitoxide_core::repository::git_spellings::exit_status;
++pub use gitoxide_core::repository::git_spellings::{Exit as GitExit, exit_status};
+ pub use main::change_dirs;
+ pub use main::main;
+ pub use main::run;
+diff --git a/src/shared.rs b/src/shared.rs
+index 78b4b5221..a604abec4 100644
+--- a/src/shared.rs
++++ b/src/shared.rs
+@@ -53,6 +53,9 @@ pub mod closed_reader {
+     static SEEN: AtomicBool = AtomicBool::new(false);
+ 
+     /// Whether a write through a [`Watch`] failed with [`io::ErrorKind::BrokenPipe`] in this process.
++    ///
++    /// The flag is never reset: it answers for the one command a CLI process runs. A caller that runs
++    /// several commands in one process, like a test harness, must not read it per command.
+     pub fn seen() -> bool {
+         SEEN.load(Ordering::Relaxed)
+     }
+diff --git a/tests/cli-journey/tests/broken_pipe.rs b/tests/cli-journey/tests/broken_pipe.rs
+index 957d1e523..d0bc36c2b 100644
+--- a/tests/cli-journey/tests/broken_pipe.rs
++++ b/tests/cli-journey/tests/broken_pipe.rs
+@@ -97,3 +97,43 @@ fn readers_closing_after_partial_output_end_read_only_listings_quietly() -> Resu
+     }
+     Ok(())
+ }
++
++/// Run `brit <args>` in `cwd` with stdout (`which == 1`) or stderr (`which == 2`) connected to a pipe
++/// whose reading end is already closed; the other stream is captured.
++fn brit_with_closed(cwd: &std::path::Path, which: u8, args: &[&str]) -> Result<std::process::Output> {
++    let mut fds = [0; 2];
++    // SAFETY: `fds` has room for the two descriptors `pipe` writes.
++    ensure!(unsafe { libc::pipe(fds.as_mut_ptr()) } == 0, "pipe(2) failed");
++    // SAFETY: both descriptors were just created by `pipe` and are owned here exactly once.
++    let (reader, writer) = unsafe { (std::fs::File::from_raw_fd(fds[0]), std::fs::File::from_raw_fd(fds[1])) };
++    drop(reader);
++    let mut command = Command::new(brit_bin().expect("built Brit"));
++    gix_testtools::configure_git_environment(&mut command, cwd);
++    command.current_dir(cwd).args(args);
++    if which == 1 {
++        command.stdout(writer);
++    } else {
++        command.stderr(writer);
++    }
++    Ok(command.output()?)
++}
++
++/// A command that fails keeps its own status even when its reader is gone, where Git, killed by SIGPIPE
++/// at its write, would report 141. (A failure at the write itself, like `rev-parse HEAD missing` with stdout
++/// closed before the object name is written, is the closed reader and ends with 141.)
++#[test]
++fn a_closed_reader_never_replaces_a_genuine_failure() -> Result<()> {
++    let repo = TestRepo::new("broken-pipe-failure")?;
++    for (which, args, code) in [
++        (2, &["rev-parse", "--verify", "missing"][..], 128),
++        (1, &["-v", "rev-parse", "HEAD", "missing"][..], 128),
++    ] {
++        let out = brit_with_closed(repo.path(), which, args)?;
++        assert_eq!(
++            out.status.code(),
++            Some(code),
++            "brit {args:?} with fd {which} closed: {out:?}"
++        );
++    }
++    Ok(())
++}
+-- 
+2.52.0
+
