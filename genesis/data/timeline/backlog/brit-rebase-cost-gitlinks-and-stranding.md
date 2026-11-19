@@ -614,7 +614,7 @@ exceeded a measured copy, 1,037,757 against 870,356).
   completes; one byte less is refused before anything changes; a diff3 conflict is admitted from
   18,256,470. A rebase whose abort copy is larger than the limit is admitted, stops at its conflict,
   and `--abort` restores HEAD, index, worktree and the user's edit exactly.
-- **Finding and second decision (coordinator, about 22:38Z).** As first built, `reserve` also refused
+- **Finding and second decision (coordinator, about 22:36Z).** As first built, `reserve` also refused
   a forward step when the abort's copy already exceeded the limit. The implementer's band search
   showed that this refuses PLANNED steps after admission on the diff3 fixture: the conflict stop at
   limits 18,256,470 and 18,541,728, and `--stage` from about 19.4M to 27,099,448 (each before writing,
@@ -627,7 +627,7 @@ exceeded a measured copy, 1,037,757 against 870,356).
   file and up to three staged versions, plus the manifest; measured 0.67 to 0.81 GB on the 64 MiB
   fixtures, 0.94 GB with a stop and a resolution. New refusal thresholds: history over 1 GiB, or about
   390,000 objects for a one-commit replay.
-- A fresh adversarial reviewer started at about 22:40Z on `a3b3ac71d5..b122f0515d`, first question:
+- A fresh adversarial reviewer started at 22:37Z on `a3b3ac71d5..b122f0515d`, first question:
   can a copy larger than the limit break an abort or a cleanup, or meet any other size cap. Still owed
   after it: the non-root leg, full verification on both builds, push 10 and CI.
 
