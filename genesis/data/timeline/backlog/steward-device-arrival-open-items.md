@@ -682,3 +682,31 @@ fixed 5 s (`.claude/hooks/_observation.py:56`). On a loaded shem the write took 
 six sends in a row printed "said here, but the note record did not reach this device's channel
 store" and no other device read them. The sender is told; nothing retries. Owed: the limit
 scales or the write is retried, and a note that did not cross is queued, not dropped.
+
+Delta 2026-11-19 (row 17): every editor terminal on shem is spawned with `EPR_BIN` naming the
+2 November build (`bafyreibrqqhx3…`, epr 0.3.2); six shells opened between 2026-11-10 and today
+carry it. The editor's pty host does not, and no shell startup file, repository setting,
+workspace file or user settings file sets it, so it is injected at terminal spawn; the setter
+is not found. Effects measured by session d9c6be9b: hooks run the old binary (`epr govern` 1.1
+to 1.6 s against about 0.45 s; the cite-seal hook reporting cites the current `epr` verifies),
+and commit attribution reads `UNMEASURED`. Station `Terminal-env` in the native-dev-tooling
+plan, section 8.
+
+## Row 31 — gate code reads a git refusal as a value
+
+Found 2026-11-19 by brit sprint 3's declared-trust audit (session 0e0924d5). When git refuses
+(a checkout it does not trust after a restart, a missing object), these return a value instead
+of failing: `gate-attest.mjs:75` `worktreeDirty` returns false, so dirty reads as clean;
+`gate-evidence.mjs:157` `gitRead` returns null for every failure (`manifestBlob`,
+`projectTree`, `gitlinksAt`); `:269` `signerIdentity` falls back to the seed agent id;
+`gate-runner.mjs:122` turns any failure into "attested commit unreadable";
+`.claude/hooks/pre-flight-check.py:77` reports clean; `.claude/scripts/_lib/epr_meta_git.py:35`
+fails open to "no changed files". With `RUST_BACKTRACE` set, brit's last stderr line is a
+backtrace frame, so callers that report the last line hide the cause (`gate-evidence.mjs:91`,
+`:401`). `gate-runner.mjs:186-188` deletes the inherited `GIT_CONFIG_*` block on purpose (the
+`git -c core.hooksPath` of every landing leaked into fixture repositories), so trust cannot
+ride that block. Proposed carrier, for the owner to take or decline: after the deletion the
+runner sets, for its children only, `GIT_CONFIG_COUNT=1`, `GIT_CONFIG_KEY_0=safe.directory`,
+`GIT_CONFIG_VALUE_0=<declared root>`, which git reads today and brit will after its trust lane.
+Owed: each site refuses by name instead of returning a value. Owner: ethosengine a222db7c,
+after L2a.

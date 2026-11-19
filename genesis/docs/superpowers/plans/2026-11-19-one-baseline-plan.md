@@ -102,8 +102,9 @@ The journal lists these as not in this sprint. They are stations so that they st
 
 - [ ] **Row-15 — a device's first `epr` is a forge release asset, checked by a verifier against a pin the steward authenticated before either file runs (ruling R5)** (serves workspace-device-arrival)
 
-State: held. Two review rounds, the second fixed at 22e0c2931; a third was not run and it has
-not landed.
+State: held. Three review rounds, each ending FIX FIRST. A fix round for the third is committed
+at b629535e0 on `claude/nt-r5-first-epr` (not pushed, not reviewed); whether it is kept is the
+steward's call, and the pin commit is his.
 
 - [ ] **Row-18 — a delegated worktree gets a pool family of its own at creation, or the gate refuses a slot another live gate owns** (serves push-gate-pays-once)
 

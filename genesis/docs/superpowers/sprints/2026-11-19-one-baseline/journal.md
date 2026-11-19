@@ -109,3 +109,38 @@ brit 0.2.6 has all three as `revision resolve`, `remote refs` and `-r`. They wer
 orchestrator never looked up, and many of this sprint's "Brit fallback" lines for read-only
 questions were not justified. The lane above exists because the spelling gap is real for
 agents; the capability gap was not.
+
+## 2026-11-19: four sessions, one lane
+
+By 04:30Z four sessions were working this tree: shem's orchestrator with three builders, two on
+ethosengine, and a third shem session (d9c6be9b) asked by the steward to make the epic legible
+to `epr flow project`. What crossed between them:
+
+- **E12 (b) landed** from ethosengine at `dccd7a963`: the gate's variable pattern admits a
+  triple-suffixed name, and `pool-lib.sh` is in every cargo gate's key (row 28's cheapest cure,
+  paid with the same re-key).
+- **Stations.** The third session handed over a branch (`claude/flow-legibility`, three commits,
+  proofs re-run by the orchestrator before landing): section 8 of the native-dev-tooling plan
+  turns the epic's tracks and joins into stations; `plans/2026-11-19-one-baseline-plan.md` restates
+  this sprint's definition of done, lanes and inherited rows as stations, because
+  `epr flow project` mints from checkboxes under `plans/` and `specs/` and reads neither a
+  journal nor a backlog table; the Stop hook no longer walks every worktree inline (5.8 s to
+  about 40 ms here); the `epr-meta` resolver hook parses under the memo.
+- **From brit sprint 3's audits**, things that are ours: gate code reads a git refusal as a
+  value (backlog row 31); `epr artifact put` spawns `brit-build-ref` with no declared trust
+  (one line, with L2a); the repository's pack-index count against a 32-slot ceiling when brit
+  runs at reduced trust (shem 28, ethosengine 33; the cure is a repack, the steward's store).
+- **`brit rebase` measured on shem.** Two docs commits over two upstream commits: six minutes
+  on one core, 29 GB of temporary writes, then `Directory staging is not supported`. It left no
+  state. `git rebase` took under two seconds. The brit session took the numbers as its cost
+  measurement; rebase stays a declared git fallback on both devices.
+- **Why `brit push` never landed on dev**, reproduced by the brit session on the installed
+  build: the upload request fails while brit is still sending and the cause is discarded, most
+  likely at a 30 s total request timeout the HTTP library applies and nothing overrides (brit
+  sends whole objects, about 351 KB for a landing against git's 24 KB, on a link recorded at
+  5 to 15 KiB/s). Hook length was not the cause. Retiring the landing exception needs a
+  supervised landing on a fixed build, the steward's word and a pin move.
+
+Open with the steward from this hour: pushing `sprint3/*` to the brit remote (that session is
+commit-only); a repack on each device; whether declared checkout trust covers linked worktrees
+(it is per exact path, and agents work in worktrees).
