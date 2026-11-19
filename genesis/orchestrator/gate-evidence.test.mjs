@@ -19,6 +19,7 @@ import { nativeGateState } from './gate-source-state.mjs';
 import { COST_FIELDS, recordCycle } from './gate-cycle.mjs';
 import { architectureLedgerPath } from './gate-runner.mjs';
 import {
+  COMPILER_GATE_INPUTS,
   attestationStep,
   closureKey,
   describeEvidence,
@@ -86,7 +87,7 @@ const closureReplies = [
   [isShow, { status: 0, stdout: JSON.stringify({ steps: { 'cargo-build-storage': { inputs: { sources } } } }), stderr: '' }],
   [isTree, { status: 0, stdout: '', stderr: '' }],
 ];
-const closureMaterial = { compilerTools: ['genesis/orchestrator/cargo-lint.mjs', 'genesis/orchestrator/gate-steps.sh'].map(path => ({ path, oid: 'blob1' })), recipeFile: 'blob1', runner: 'blob1', dirTree: 'blob1', cargoConfig: 'blob1', gitlinks: [], reads: { scope: 'tree', oid: 'blob1' } };
+const closureMaterial = { compilerTools: COMPILER_GATE_INPUTS.map(path => ({ path, oid: 'blob1' })), recipeFile: 'blob1', runner: 'blob1', dirTree: 'blob1', cargoConfig: 'blob1', gitlinks: [], reads: { scope: 'tree', oid: 'blob1' } };
 
 test('the attestation step is the gate project, not a manifest step', () => {
   assert.equal(attestationStep(project), 'gate:elohim-storage');
@@ -159,7 +160,7 @@ test('gateEvidence resolves the closure, asks brit-build-ref once with the key, 
     assert.equal(result.line, 'hit green (signer did:key:zSIG, 30m ago, commit ffffffff1); closure scope tree (unknown reads)');
     assert.equal(result.dirty, false);
     const status = calls.find(c => isStatus(c.bin, c.args));
-    assert.deepEqual(status.args, ['status', '--porcelain', '--untracked-files=normal', '--', ...['genesis/orchestrator/cargo-lint.mjs', 'genesis/orchestrator/gate-steps.sh', 'genesis/orchestrator/run-local-gate.sh'], 'elohim/elohim-storage', 'elohim/holochain/build-manifest.json', 'elohim/elohim-storage/src/', '.claude/data/', 'elohim/brit', 'elohim/elohim-storage/justfile', '.',
+    assert.deepEqual(status.args, ['status', '--porcelain', '--untracked-files=normal', '--', ...COMPILER_GATE_INPUTS, 'genesis/orchestrator/run-local-gate.sh', 'elohim/elohim-storage', 'elohim/holochain/build-manifest.json', 'elohim/elohim-storage/src/', '.claude/data/', 'elohim/brit', 'elohim/elohim-storage/justfile', '.',
       ...GATE_EXHAUST.map(path => `:(top,glob,exclude)${path}`)]);
     const find = calls.filter(c => isFind(c.bin, c.args));
     assert.equal(find.length, 1, 'one lookup per project');
@@ -1156,7 +1157,7 @@ test('dirtyPaths passes declared sources and recipe with exhaust exclusions', ()
   ]);
   assert.deepEqual(dirtyPaths(project, { root: '/repo', spawn }), ['.claude/data/failure-taxonomy.json']);
   assert.deepEqual(calls.find(c => isStatus(c.bin, c.args)).args, [
-    'status', '--porcelain', '--untracked-files=normal', '--', ...['genesis/orchestrator/cargo-lint.mjs', 'genesis/orchestrator/gate-steps.sh', 'genesis/orchestrator/run-local-gate.sh'], project.dir, project.manifestPath,
+    'status', '--porcelain', '--untracked-files=normal', '--', ...COMPILER_GATE_INPUTS, 'genesis/orchestrator/run-local-gate.sh', project.dir, project.manifestPath,
     'elohim/elohim-storage/src/', '.claude/data/', 'elohim/brit', 'elohim/elohim-storage/justfile', '.',
     ...GATE_EXHAUST.map(path => `:(top,glob,exclude)${path}`),
   ]);
@@ -1663,7 +1664,7 @@ test('compiler helpers move the closure key and are dirt even outside a narrow p
   const inspect = readEvidenceFixture(t);
   const { result } = inspect();
   const material = JSON.parse(result.material);
-  for (const path of ['genesis/orchestrator/cargo-lint.mjs', 'genesis/orchestrator/gate-steps.sh']) {
+  for (const path of COMPILER_GATE_INPUTS) {
     assert.ok(material.compilerTools.some(row => row.path === path && row.oid));
     const base = { project, ...closureMaterial };
     assert.notEqual(closureKey(base), closureKey({ ...base, compilerTools: base.compilerTools.map(row => row.path === path ? { ...row, oid: 'changed' } : row) }));
@@ -1711,7 +1712,7 @@ test('rust-style-checker keys on the checker closure alone; the scan project nev
   const copy = rel => put(rel, readFileSync(join(repo, rel), 'utf8'));
   for (const rel of [manifestRel, 'justfile', 'genesis/orchestrator/run-local-gate.sh', 'genesis/orchestrator/rust-style.sh',
     'genesis/orchestrator/rust-style-build-env.sh', 'genesis/orchestrator/rust-style-ci.sh', '.cargo/config.toml',
-    'genesis/orchestrator/cargo-lint.mjs', 'genesis/orchestrator/gate-steps.sh']) copy(rel);
+    ...COMPILER_GATE_INPUTS]) copy(rel);
   const checker = 'genesis/orchestrator/rust-style';
   for (const rel of ['Cargo.toml', 'Cargo.lock', 'scan/Cargo.toml', 'scan/src/lib.rs', 'hook_test.py', 'test_source_distribution.py', 'source-distribution.py']) copy(`${checker}/${rel}`);
   for (const sub of ['src', 'tests']) {
@@ -1788,4 +1789,14 @@ process.stdout.write(JSON.stringify({ fingerprints: [{ step, fingerprint: fp }] 
     assert.equal(scan.key, undefined);
     assert.match(scan.line, /gate-only inputs, no step fingerprint/);
   }
+});
+
+// Row 28 (E12 graft): run-local-gate.sh runs every cargo gate and sources repository scripts into
+// that run; a sourced file decides the slot the gate builds in, so it is an execution input of every
+// verdict. Each file the runner sources from the repository must be a COMPILER_GATE_INPUT.
+test('every repository file run-local-gate.sh sources is a closure input of every gate', () => {
+  const runner = readFileSync(join(import.meta.dirname, 'run-local-gate.sh'), 'utf8');
+  const sourced = [...runner.matchAll(/^\s*(?:source|\.)\s+"\$repo_root\/([^"$]+)"/gm)].map(m => m[1]);
+  assert.ok(sourced.includes('genesis/agentic/bin/pool-lib.sh'), `the runner still sources pool-lib.sh: ${sourced}`);
+  for (const path of sourced) assert.ok(COMPILER_GATE_INPUTS.includes(path), `${path} is sourced by every cargo gate and keyed by none`);
 });

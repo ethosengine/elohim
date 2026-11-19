@@ -317,10 +317,12 @@ function sortedObject(value) {
   return value;
 }
 
-// Shared compiler runners are execution inputs, never CI dispatch sources.
+// Shared compiler runners are execution inputs, never CI dispatch sources. pool-lib.sh is sourced
+// by run-local-gate.sh for every cargo gate and resolves the slot it builds in (row 28).
 export const COMPILER_GATE_INPUTS = [
   'genesis/orchestrator/cargo-lint.mjs',
   'genesis/orchestrator/gate-steps.sh',
+  'genesis/agentic/bin/pool-lib.sh',
 ];
 
 /**
