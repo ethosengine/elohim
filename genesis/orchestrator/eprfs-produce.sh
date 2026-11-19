@@ -76,7 +76,9 @@ release="$(json_field "$ingest_json" 'd.get("cid") or d.get("rcid")')"
 # offer whose C level nobody read is the one that trapped on shem.
 check="${EPRFS_C_BASELINE_CHECK:-$here/c-baseline.mjs}"
 [[ -f "$check" ]] || withhold "the C baseline check $check is not there"
-said="$(node "$check" --triple x86_64-unknown-linux-gnu 2>&1)"
+# The finding is the checker's stdout alone; its stderr (a node warning, a trace) goes to the gate
+# log as it is, never into the withheld reason.
+said="$(node "$check" --triple x86_64-unknown-linux-gnu)"
 status=$?
 if ((status != 0)); then
   finding="$(reason_of "$said")"

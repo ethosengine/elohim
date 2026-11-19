@@ -69,8 +69,11 @@ if (args[0] === 'build') {
 // A stub C-baseline check (the real one is genesis/orchestrator/c-baseline.mjs, row 29.2): logs its
 // argv; STUB_CHECK_FAIL prints two findings after a blank line and exits 1.
 const FINDING = "CFLAGS_x86_64_unknown_linux_gnu is not set: cc builds ring's C at the compiler default, not -march=x86-64";
+// STUB_CHECK_NOISE: the checker's stderr speaks first (a node warning), ahead of any finding.
+const NOISE = "(node:4242) ExperimentalWarning: stderr noise, never a finding";
 const STUB_CHECK = `import { appendFileSync } from 'node:fs';
 appendFileSync(process.env.STUB_LOG, JSON.stringify(['c-baseline', ...process.argv.slice(2)]) + '\\n');
+if (process.env.STUB_CHECK_NOISE) console.error(${JSON.stringify(NOISE)});
 if (process.env.STUB_CHECK_FAIL) {
   console.log('');
   console.log(${JSON.stringify(FINDING)});
@@ -255,6 +258,25 @@ test("a_failing_c_baseline_check_withholds_the_offer_with_its_first_finding_and_
   assert.equal(heard.summary.firstRedSeconds, null);
   assert.equal(classifyFailure(r.status, heard.signals), undefined, "and the gate stays green");
   assert.equal(heard.signals.assertionFailed || heard.signals.compilerError, false);
+});
+
+test("the_withheld_reason_is_the_checkers_stdout_and_its_stderr_goes_to_the_log", (t) => {
+  const f = fixture(t);
+  const r = run(f, "build", { ...C_LEVEL, STUB_CHECK_FAIL: "1", STUB_CHECK_NOISE: "1" });
+  assert.equal(r.status, 0, r.stderr);
+  assert.deepEqual(skipped(r.stdout), [`[gate] epr producer put withheld (${FINDING}; gate remains green)`]);
+  assert.ok(!r.stdout.includes(NOISE), "the checker's stderr is no part of the reason");
+  assert.ok(r.stderr.includes(NOISE), `the checker's stderr reaches the gate log:\n${r.stderr}`);
+});
+
+test("a_failing_check_with_nothing_on_stdout_names_its_exit_status", (t) => {
+  const f = fixture(t);
+  const quiet = join(f.stubs, "quiet-check.mjs");
+  writeFileSync(quiet, "console.error('only stderr'); process.exit(3);\n");
+  const r = run(f, "build", { ...C_LEVEL, EPRFS_C_BASELINE_CHECK: quiet });
+  assert.equal(r.status, 0, r.stderr);
+  assert.deepEqual(skipped(r.stdout), ["[gate] epr producer put withheld (the C baseline check exited 3; gate remains green)"]);
+  assert.ok(r.stderr.includes("only stderr"), r.stderr);
 });
 
 test("a_missing_c_baseline_check_withholds_the_offer", (t) => {
