@@ -186,7 +186,6 @@ pub fn check_override_path(path: &Path) -> io::Result<()> {
 /// a stranger. On a platform where the process's groups cannot be read, group-writable refuses.
 #[cfg(unix)]
 fn check_key_dir(path: &Path) -> io::Result<()> {
-    use std::os::unix::fs::{MetadataExt, PermissionsExt};
     let Some(parent) = path.parent().filter(|p| !p.as_os_str().is_empty()) else {
         return Ok(());
     };
@@ -195,34 +194,76 @@ fn check_key_dir(path: &Path) -> io::Result<()> {
         Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(()),
         Err(e) => return Err(e),
     };
-    let mode = meta.permissions().mode();
-    let world = mode & 0o002 != 0;
-    let foreign_group = mode & 0o020 != 0 && !own_groups().contains(&meta.gid());
-    if world || foreign_group {
-        return Err(io::Error::new(
-            io::ErrorKind::PermissionDenied,
-            format!(
-                "the device key directory `{}` is writable by {} (mode {:o}, group {}) — anyone \
-                 who can write there can swap the key; `chmod {}` it first",
-                parent.display(),
-                if world {
-                    "everyone"
-                } else {
-                    "a group this process is not in"
-                },
-                mode & 0o7777,
-                meta.gid(),
-                if world { "o-w" } else { "g-w" }
-            ),
-        ));
+    match custody_refusal(
+        "the device key directory",
+        parent,
+        &meta,
+        "can swap the key",
+    ) {
+        Some(refused) => Err(refused),
+        None => Ok(()),
     }
-    Ok(())
+}
+
+/// Who, beside this process's own uid and groups, may write a path in the device directory.
+#[cfg(unix)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Stranger {
+    /// The world-write bit is set.
+    Everyone,
+    /// The group-write bit is set for a group this process does not hold.
+    ForeignGroup,
+}
+
+/// The device directory's custody rule on a mode and group already read ([`check_key_dir`]):
+/// refused when everyone may write, or a group this process is not in (`own`, see
+/// [`own_groups`]). Ownership is not part of the rule: the uid owning a container's home volume
+/// shifts across restarts.
+#[cfg(unix)]
+pub(crate) fn stranger_may_write(mode: u32, gid: u32, own: &[u32]) -> Option<Stranger> {
+    if mode & 0o002 != 0 {
+        Some(Stranger::Everyone)
+    } else if mode & 0o020 != 0 && !own.contains(&gid) {
+        Some(Stranger::ForeignGroup)
+    } else {
+        None
+    }
+}
+
+/// The refusal `what` (at `path`, already stat'ed as `meta`) earns under
+/// [`stranger_may_write`], worded as [`check_key_dir`] words it; `None` when custody holds.
+#[cfg(unix)]
+pub(crate) fn custody_refusal(
+    what: &str,
+    path: &Path,
+    meta: &fs::Metadata,
+    consequence: &str,
+) -> Option<io::Error> {
+    use std::os::unix::fs::{MetadataExt, PermissionsExt};
+    let mode = meta.permissions().mode();
+    let world = stranger_may_write(mode, meta.gid(), &own_groups())? == Stranger::Everyone;
+    Some(io::Error::new(
+        io::ErrorKind::PermissionDenied,
+        format!(
+            "{what} `{}` is writable by {} (mode {:o}, group {}) — anyone who can write there \
+             {consequence}; `chmod {}` it first",
+            path.display(),
+            if world {
+                "everyone"
+            } else {
+                "a group this process is not in"
+            },
+            mode & 0o7777,
+            meta.gid(),
+            if world { "o-w" } else { "g-w" }
+        ),
+    ))
 }
 
 /// This process's real, effective and supplementary group ids, read from `/proc/self/status`;
 /// empty where that file does not exist (so a group-writable key directory refuses there).
 #[cfg(unix)]
-fn own_groups() -> Vec<u32> {
+pub(crate) fn own_groups() -> Vec<u32> {
     let Ok(status) = fs::read_to_string("/proc/self/status") else {
         return Vec::new();
     };

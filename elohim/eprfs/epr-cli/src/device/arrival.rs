@@ -1464,7 +1464,13 @@ pub(crate) fn repository_check(root: &Path) -> Check {
             State::Refused,
             match result {
                 Err(e) => e.to_string(),
-                _ => format!("git does not accept {}", root.display()),
+                _ => format!(
+                    "git does not accept {}{}",
+                    root.display(),
+                    git::trust_unapplied(root)
+                        .map(|why| format!("; no declared trust applied: {why}"))
+                        .unwrap_or_default()
+                ),
             },
             Some(format!(
                 "epr device trust '{}'",

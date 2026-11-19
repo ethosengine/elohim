@@ -1,0 +1,762 @@
+{
+  "cases": [
+    {
+      "expect": {
+        "configEnv": [
+          [
+            "GIT_CONFIG_KEY_0",
+            "safe.directory"
+          ],
+          [
+            "GIT_CONFIG_VALUE_0",
+            "{base}/repo"
+          ],
+          [
+            "GIT_CONFIG_COUNT",
+            "1"
+          ]
+        ],
+        "gitArgs": [
+          "-c",
+          "safe.directory={base}/repo"
+        ],
+        "root": "{base}/repo",
+        "trustFile": "{base}/device/trusted-checkouts",
+        "unapplied": null
+      },
+      "input": {
+        "cwd": "{base}/repo/src/deep",
+        "deviceDir": {
+          "mode": "700",
+          "path": "{base}/device"
+        },
+        "env": {
+          "ELOHIM_DEVICE_KEY_FILE": "{base}/device/ed25519.seed"
+        },
+        "inheritedCount": null,
+        "trustFile": {
+          "mode": "600",
+          "text": "{base}/repo\n"
+        }
+      },
+      "name": "declared checkout, deep cwd"
+    },
+    {
+      "expect": {
+        "configEnv": [
+          [
+            "GIT_CONFIG_KEY_2",
+            "safe.directory"
+          ],
+          [
+            "GIT_CONFIG_VALUE_2",
+            "{base}/repo"
+          ],
+          [
+            "GIT_CONFIG_COUNT",
+            "3"
+          ]
+        ],
+        "gitArgs": [
+          "-c",
+          "safe.directory={base}/repo"
+        ],
+        "root": "{base}/repo",
+        "trustFile": "{base}/device/trusted-checkouts",
+        "unapplied": null
+      },
+      "input": {
+        "cwd": "{base}/repo/src/deep",
+        "deviceDir": {
+          "mode": "700",
+          "path": "{base}/device"
+        },
+        "env": {
+          "ELOHIM_DEVICE_KEY_FILE": "{base}/device/ed25519.seed"
+        },
+        "inheritedCount": {
+          "utf8": "2"
+        },
+        "trustFile": {
+          "mode": "600",
+          "text": "{base}/repo\n"
+        }
+      },
+      "name": "inherited count 2"
+    },
+    {
+      "expect": {
+        "configEnv": [],
+        "gitArgs": [
+          "-c",
+          "safe.directory={base}/repo"
+        ],
+        "root": "{base}/repo",
+        "trustFile": "{base}/device/trusted-checkouts",
+        "unapplied": null
+      },
+      "input": {
+        "cwd": "{base}/repo/src/deep",
+        "deviceDir": {
+          "mode": "700",
+          "path": "{base}/device"
+        },
+        "env": {
+          "ELOHIM_DEVICE_KEY_FILE": "{base}/device/ed25519.seed"
+        },
+        "inheritedCount": {
+          "utf8": "bogus"
+        },
+        "trustFile": {
+          "mode": "600",
+          "text": "{base}/repo\n"
+        }
+      },
+      "name": "inherited count malformed"
+    },
+    {
+      "expect": {
+        "configEnv": [],
+        "gitArgs": [
+          "-c",
+          "safe.directory={base}/repo"
+        ],
+        "root": "{base}/repo",
+        "trustFile": "{base}/device/trusted-checkouts",
+        "unapplied": null
+      },
+      "input": {
+        "cwd": "{base}/repo/src/deep",
+        "deviceDir": {
+          "mode": "700",
+          "path": "{base}/device"
+        },
+        "env": {
+          "ELOHIM_DEVICE_KEY_FILE": "{base}/device/ed25519.seed"
+        },
+        "inheritedCount": {
+          "bytes": [
+            49,
+            255
+          ]
+        },
+        "trustFile": {
+          "mode": "600",
+          "text": "{base}/repo\n"
+        }
+      },
+      "name": "inherited count not utf-8"
+    },
+    {
+      "expect": {
+        "configEnv": [],
+        "gitArgs": [
+          "-c",
+          "safe.directory={base}/repo"
+        ],
+        "root": "{base}/repo",
+        "trustFile": "{base}/device/trusted-checkouts",
+        "unapplied": null
+      },
+      "input": {
+        "cwd": "{base}/repo/src/deep",
+        "deviceDir": {
+          "mode": "700",
+          "path": "{base}/device"
+        },
+        "env": {
+          "ELOHIM_DEVICE_KEY_FILE": "{base}/device/ed25519.seed"
+        },
+        "inheritedCount": {
+          "utf8": "18446744073709551615"
+        },
+        "trustFile": {
+          "mode": "600",
+          "text": "{base}/repo\n"
+        }
+      },
+      "name": "inherited count overflows"
+    },
+    {
+      "expect": {
+        "configEnv": [],
+        "gitArgs": [],
+        "root": null,
+        "trustFile": "{base}/device/trusted-checkouts",
+        "unapplied": null
+      },
+      "input": {
+        "cwd": "{base}/repo/src/deep",
+        "deviceDir": {
+          "mode": "700",
+          "path": "{base}/device"
+        },
+        "env": {
+          "ELOHIM_DEVICE_KEY_FILE": "{base}/device/ed25519.seed"
+        },
+        "inheritedCount": null,
+        "trustFile": null
+      },
+      "name": "no declaration file"
+    },
+    {
+      "expect": {
+        "configEnv": [],
+        "gitArgs": [],
+        "root": null,
+        "trustFile": "{base}/device/trusted-checkouts",
+        "unapplied": null
+      },
+      "input": {
+        "cwd": "{base}/repo/src/deep",
+        "deviceDir": null,
+        "env": {
+          "ELOHIM_DEVICE_KEY_FILE": "{base}/device/ed25519.seed"
+        },
+        "inheritedCount": null,
+        "trustFile": null
+      },
+      "name": "no device directory"
+    },
+    {
+      "expect": {
+        "configEnv": [],
+        "gitArgs": [],
+        "root": null,
+        "trustFile": "{base}/device/trusted-checkouts",
+        "unapplied": null
+      },
+      "input": {
+        "cwd": "{base}/repo/src/deep",
+        "deviceDir": {
+          "mode": "700",
+          "path": "{base}/device"
+        },
+        "env": {
+          "ELOHIM_DEVICE_KEY_FILE": "{base}/device/ed25519.seed"
+        },
+        "inheritedCount": null,
+        "trustFile": {
+          "mode": "600",
+          "text": "{base}/other\n"
+        }
+      },
+      "name": "another checkout declared"
+    },
+    {
+      "expect": {
+        "configEnv": [],
+        "gitArgs": [],
+        "root": null,
+        "trustFile": "{base}/device/trusted-checkouts",
+        "unapplied": null
+      },
+      "input": {
+        "cwd": "{base}/repo/vendor/sub",
+        "deviceDir": {
+          "mode": "700",
+          "path": "{base}/device"
+        },
+        "env": {
+          "ELOHIM_DEVICE_KEY_FILE": "{base}/device/ed25519.seed"
+        },
+        "inheritedCount": null,
+        "trustFile": {
+          "mode": "600",
+          "text": "{base}/repo\n"
+        }
+      },
+      "name": "nested checkout under a declared parent"
+    },
+    {
+      "expect": {
+        "configEnv": [],
+        "gitArgs": [],
+        "root": null,
+        "trustFile": "{base}/device/trusted-checkouts",
+        "unapplied": null
+      },
+      "input": {
+        "cwd": "{base}/repo/src/deep",
+        "deviceDir": {
+          "mode": "700",
+          "path": "{base}/device"
+        },
+        "env": {
+          "ELOHIM_DEVICE_KEY_FILE": "{base}/device/ed25519.seed"
+        },
+        "inheritedCount": null,
+        "trustFile": {
+          "mode": "600",
+          "text": "*\n{base}\n{base}/repo-sibling\n"
+        }
+      },
+      "name": "wildcard, parent and prefix lines"
+    },
+    {
+      "expect": {
+        "configEnv": [
+          [
+            "GIT_CONFIG_KEY_0",
+            "safe.directory"
+          ],
+          [
+            "GIT_CONFIG_VALUE_0",
+            "{base}/repo"
+          ],
+          [
+            "GIT_CONFIG_COUNT",
+            "1"
+          ]
+        ],
+        "gitArgs": [
+          "-c",
+          "safe.directory={base}/repo"
+        ],
+        "root": "{base}/repo",
+        "trustFile": "{base}/device/trusted-checkouts",
+        "unapplied": null
+      },
+      "input": {
+        "cwd": "{base}/repo/src/deep",
+        "deviceDir": {
+          "mode": "700",
+          "path": "{base}/device"
+        },
+        "env": {
+          "ELOHIM_DEVICE_KEY_FILE": "{base}/device/ed25519.seed"
+        },
+        "inheritedCount": null,
+        "trustFile": {
+          "mode": "600",
+          "text": "{base}/repo\r\n"
+        }
+      },
+      "name": "crlf line"
+    },
+    {
+      "expect": {
+        "configEnv": [
+          [
+            "GIT_CONFIG_KEY_0",
+            "safe.directory"
+          ],
+          [
+            "GIT_CONFIG_VALUE_0",
+            "{base}/repo"
+          ],
+          [
+            "GIT_CONFIG_COUNT",
+            "1"
+          ]
+        ],
+        "gitArgs": [
+          "-c",
+          "safe.directory={base}/repo"
+        ],
+        "root": "{base}/repo",
+        "trustFile": "{base}/device/trusted-checkouts",
+        "unapplied": null
+      },
+      "input": {
+        "cwd": "{base}/repo/src/deep",
+        "deviceDir": {
+          "mode": "700",
+          "path": "{base}/device"
+        },
+        "env": {
+          "ELOHIM_DEVICE_KEY_FILE": "{base}/device/ed25519.seed"
+        },
+        "inheritedCount": null,
+        "trustFile": {
+          "mode": "600",
+          "text": "{base}/repo/\n"
+        }
+      },
+      "name": "trailing slash line"
+    },
+    {
+      "expect": {
+        "configEnv": [
+          [
+            "GIT_CONFIG_KEY_0",
+            "safe.directory"
+          ],
+          [
+            "GIT_CONFIG_VALUE_0",
+            "{base}/repo"
+          ],
+          [
+            "GIT_CONFIG_COUNT",
+            "1"
+          ]
+        ],
+        "gitArgs": [
+          "-c",
+          "safe.directory={base}/repo"
+        ],
+        "root": "{base}/repo",
+        "trustFile": "{base}/device/trusted-checkouts",
+        "unapplied": null
+      },
+      "input": {
+        "cwd": "{base}/link/src",
+        "deviceDir": {
+          "mode": "700",
+          "path": "{base}/device"
+        },
+        "env": {
+          "ELOHIM_DEVICE_KEY_FILE": "{base}/device/ed25519.seed"
+        },
+        "inheritedCount": null,
+        "trustFile": {
+          "mode": "600",
+          "text": "{base}/repo\n"
+        }
+      },
+      "name": "symlinked cwd resolves to the declared real root"
+    },
+    {
+      "expect": {
+        "configEnv": [],
+        "gitArgs": [],
+        "root": null,
+        "trustFile": "{base}/device/trusted-checkouts",
+        "unapplied": null
+      },
+      "input": {
+        "cwd": "{base}/link",
+        "deviceDir": {
+          "mode": "700",
+          "path": "{base}/device"
+        },
+        "env": {
+          "ELOHIM_DEVICE_KEY_FILE": "{base}/device/ed25519.seed"
+        },
+        "inheritedCount": null,
+        "trustFile": {
+          "mode": "600",
+          "text": "{base}/link\n"
+        }
+      },
+      "name": "only the symlink path declared"
+    },
+    {
+      "expect": {
+        "configEnv": [],
+        "gitArgs": [],
+        "root": null,
+        "trustFile": "{base}/device/trusted-checkouts",
+        "unapplied": "custody"
+      },
+      "input": {
+        "cwd": "{base}/repo/src/deep",
+        "deviceDir": {
+          "mode": "700",
+          "path": "{base}/device"
+        },
+        "env": {
+          "ELOHIM_DEVICE_KEY_FILE": "{base}/device/ed25519.seed"
+        },
+        "inheritedCount": null,
+        "trustFile": {
+          "mode": "666",
+          "text": "{base}/repo\n"
+        }
+      },
+      "name": "world-writable declaration"
+    },
+    {
+      "expect": {
+        "configEnv": [],
+        "gitArgs": [],
+        "root": null,
+        "trustFile": "{base}/device/trusted-checkouts",
+        "unapplied": "custody"
+      },
+      "input": {
+        "cwd": "{base}/repo/src/deep",
+        "deviceDir": {
+          "mode": "777",
+          "path": "{base}/device"
+        },
+        "env": {
+          "ELOHIM_DEVICE_KEY_FILE": "{base}/device/ed25519.seed"
+        },
+        "inheritedCount": null,
+        "trustFile": {
+          "mode": "600",
+          "text": "{base}/repo\n"
+        }
+      },
+      "name": "world-writable device directory"
+    },
+    {
+      "expect": {
+        "configEnv": [
+          [
+            "GIT_CONFIG_KEY_0",
+            "safe.directory"
+          ],
+          [
+            "GIT_CONFIG_VALUE_0",
+            "{base}/repo"
+          ],
+          [
+            "GIT_CONFIG_COUNT",
+            "1"
+          ]
+        ],
+        "gitArgs": [
+          "-c",
+          "safe.directory={base}/repo"
+        ],
+        "root": "{base}/repo",
+        "trustFile": "{base}/device/trusted-checkouts",
+        "unapplied": null
+      },
+      "input": {
+        "cwd": "{base}/repo/src/deep",
+        "deviceDir": {
+          "mode": "2770",
+          "path": "{base}/device"
+        },
+        "env": {
+          "ELOHIM_DEVICE_KEY_FILE": "{base}/device/ed25519.seed"
+        },
+        "inheritedCount": null,
+        "trustFile": {
+          "mode": "660",
+          "text": "{base}/repo\n"
+        }
+      },
+      "name": "group-writable by this process's own group"
+    },
+    {
+      "expect": {
+        "configEnv": [],
+        "gitArgs": [],
+        "root": null,
+        "trustFile": "{base}/device/trusted-checkouts",
+        "unapplied": "unreadable"
+      },
+      "input": {
+        "cwd": "{base}/repo/src/deep",
+        "deviceDir": {
+          "mode": "700",
+          "path": "{base}/device"
+        },
+        "env": {
+          "ELOHIM_DEVICE_KEY_FILE": "{base}/device/ed25519.seed"
+        },
+        "inheritedCount": null,
+        "trustFile": {
+          "directory": true
+        }
+      },
+      "name": "declaration unreadable"
+    },
+    {
+      "expect": {
+        "configEnv": [],
+        "gitArgs": [],
+        "root": null,
+        "trustFile": null,
+        "unapplied": "unresolved"
+      },
+      "input": {
+        "cwd": "{base}/repo/src/deep",
+        "deviceDir": {
+          "mode": "700",
+          "path": "{base}/device"
+        },
+        "env": {},
+        "inheritedCount": null,
+        "trustFile": {
+          "mode": "600",
+          "text": "{base}/repo\n"
+        }
+      },
+      "name": "no key home at all"
+    },
+    {
+      "expect": {
+        "configEnv": [],
+        "gitArgs": [],
+        "root": null,
+        "trustFile": null,
+        "unapplied": "unresolved"
+      },
+      "input": {
+        "cwd": "{base}/repo/src/deep",
+        "deviceDir": {
+          "mode": "700",
+          "path": "{base}/device"
+        },
+        "env": {
+          "ELOHIM_DEVICE_KEY_FILE": "relative/ed25519.seed"
+        },
+        "inheritedCount": null,
+        "trustFile": {
+          "mode": "600",
+          "text": "{base}/repo\n"
+        }
+      },
+      "name": "relative key override"
+    },
+    {
+      "expect": {
+        "configEnv": [],
+        "gitArgs": [],
+        "root": null,
+        "trustFile": null,
+        "unapplied": "unresolved"
+      },
+      "input": {
+        "cwd": "{base}/repo/src/deep",
+        "deviceDir": {
+          "mode": "700",
+          "path": "{base}/device"
+        },
+        "env": {
+          "ELOHIM_DEVICE_KEY_FILE": "{base}/repo/keys/ed25519.seed"
+        },
+        "inheritedCount": null,
+        "trustFile": {
+          "mode": "600",
+          "text": "{base}/repo\n"
+        }
+      },
+      "name": "key override inside a repository"
+    },
+    {
+      "expect": {
+        "configEnv": [
+          [
+            "GIT_CONFIG_KEY_0",
+            "safe.directory"
+          ],
+          [
+            "GIT_CONFIG_VALUE_0",
+            "{base}/repo"
+          ],
+          [
+            "GIT_CONFIG_COUNT",
+            "1"
+          ]
+        ],
+        "gitArgs": [
+          "-c",
+          "safe.directory={base}/repo"
+        ],
+        "root": "{base}/repo",
+        "trustFile": "{base}/xdg/elohim/device/trusted-checkouts",
+        "unapplied": null
+      },
+      "input": {
+        "cwd": "{base}/repo/src/deep",
+        "deviceDir": {
+          "mode": "700",
+          "path": "{base}/xdg/elohim/device"
+        },
+        "env": {
+          "HOME": "{base}/home",
+          "XDG_CONFIG_HOME": "{base}/xdg"
+        },
+        "inheritedCount": null,
+        "trustFile": {
+          "mode": "600",
+          "text": "{base}/repo\n"
+        }
+      },
+      "name": "xdg config home"
+    },
+    {
+      "expect": {
+        "configEnv": [
+          [
+            "GIT_CONFIG_KEY_0",
+            "safe.directory"
+          ],
+          [
+            "GIT_CONFIG_VALUE_0",
+            "{base}/repo"
+          ],
+          [
+            "GIT_CONFIG_COUNT",
+            "1"
+          ]
+        ],
+        "gitArgs": [
+          "-c",
+          "safe.directory={base}/repo"
+        ],
+        "root": "{base}/repo",
+        "trustFile": "{base}/home/.config/elohim/device/trusted-checkouts",
+        "unapplied": null
+      },
+      "input": {
+        "cwd": "{base}/repo/src/deep",
+        "deviceDir": {
+          "mode": "700",
+          "path": "{base}/home/.config/elohim/device"
+        },
+        "env": {
+          "HOME": "{base}/home"
+        },
+        "inheritedCount": null,
+        "trustFile": {
+          "mode": "600",
+          "text": "{base}/repo\n"
+        }
+      },
+      "name": "home config"
+    },
+    {
+      "expect": {
+        "configEnv": [
+          [
+            "GIT_CONFIG_KEY_0",
+            "safe.directory"
+          ],
+          [
+            "GIT_CONFIG_VALUE_0",
+            "{base}/repo"
+          ],
+          [
+            "GIT_CONFIG_COUNT",
+            "1"
+          ]
+        ],
+        "gitArgs": [
+          "-c",
+          "safe.directory={base}/repo"
+        ],
+        "root": "{base}/repo",
+        "trustFile": "{base}/home/.config/elohim/device/trusted-checkouts",
+        "unapplied": null
+      },
+      "input": {
+        "cwd": "{base}/repo/src/deep",
+        "deviceDir": {
+          "mode": "700",
+          "path": "{base}/home/.config/elohim/device"
+        },
+        "env": {
+          "HOME": "{base}/home",
+          "XDG_CONFIG_HOME": "relative"
+        },
+        "inheritedCount": null,
+        "trustFile": {
+          "mode": "600",
+          "text": "{base}/repo\n"
+        }
+      },
+      "name": "relative xdg falls through to home"
+    }
+  ],
+  "contract": "elohim/eprfs/epr-cli/src/git.rs (module doc: the checkout-trust declaration)",
+  "format": "elohim-declared-trust-vectors@1",
+  "mintedBy": "elohim/eprfs/epr-cli/src/git/trust_vectors.rs; re-mint with EPR_MINT_TRUST_VECTORS=1, never edit by hand",
+  "tree": "{base}/repo/.git/, {base}/repo/src/deep/, {base}/repo/vendor/sub/.git (a file), {base}/other/.git/, {base}/link -> {base}/repo; deviceDir created (parents default) with trustFile written inside, file then directory modes applied"
+}

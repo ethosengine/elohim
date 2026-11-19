@@ -1,4 +1,31 @@
 //! Repository commands and the device-local, exact-checkout trust declaration.
+//!
+//! # The checkout-trust declaration (format contract)
+//!
+//! `epr device trust <path>` appends one line to `trusted-checkouts`, the file beside the device
+//! key (`<dir of resolve_path()>/trusted-checkouts`). It never changes global git configuration.
+//! Every reader of that file — this module, and ark's own reader
+//! (`elohim/ark/cli/src/declared_trust.rs`), kept identical by the shared vector file
+//! `tests/fixtures/declared-trust-vectors.json` which this module's tests mint — holds to:
+//!
+//! - **Location.** The device key path as `device_key::resolve_path_with` resolves it (an
+//!   absolute `ELOHIM_DEVICE_KEY_FILE` outside every repository, else
+//!   `$XDG_CONFIG_HOME/elohim/device/ed25519.seed` when absolute, else
+//!   `$HOME/.config/elohim/device/ed25519.seed`); the declaration is its sibling. An
+//!   unresolvable key path declares nothing, for reason class `unresolved`.
+//! - **Custody.** Before reading, the key directory is held to `device_key::check_key_dir` and
+//!   the file itself, stat'ed through the descriptor it is read from, to the same predicate: not
+//!   writable by everyone, nor by a group this process does not hold. Ownership is not checked.
+//!   A refusal declares nothing, class `custody`; a file that exists but cannot be read, class
+//!   `unreadable`; an absent file declares nothing and is not a reason.
+//! - **Matching.** The working directory is canonicalized and its checkout is the nearest
+//!   ancestor holding a `.git` entry (a file is a boundary, so a parent never trusts a nested
+//!   repository). Trust applies when that root equals, as a `Path`, one line of the file (so a
+//!   trailing `\r` or `/` names the same root; `*` and a parent path never match).
+//! - **Rendering.** For a git command line, `-c safe.directory=<root>`. For a child that runs git
+//!   itself, `GIT_CONFIG_KEY_<n>=safe.directory`, `GIT_CONFIG_VALUE_<n>=<root>` and
+//!   `GIT_CONFIG_COUNT=<n+1>`, where `n` is the inherited `GIT_CONFIG_COUNT` (0 when unset); an
+//!   inherited count that is not a UTF-8 decimal, or would overflow, adds nothing.
 use std::{
     collections::BTreeMap,
     path::{Path, PathBuf},
@@ -243,33 +270,175 @@ pub fn command(cwd: &Path) -> std::process::Command {
     command
 }
 
+/// Why a declaration could not be applied: the format contract's reason classes.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum Unapplied {
+    /// The device key path did not resolve.
+    Unresolved(String),
+    /// The declaration exists but could not be read.
+    Unreadable(String),
+    /// The declaration or its directory is refused by the custody rule.
+    Custody(String),
+}
+
+impl Unapplied {
+    /// The contract's name for this class.
+    #[cfg(test)]
+    pub(crate) fn class(&self) -> &'static str {
+        match self {
+            Self::Unresolved(_) => "unresolved",
+            Self::Unreadable(_) => "unreadable",
+            Self::Custody(_) => "custody",
+        }
+    }
+
+    /// The reason, for a failure message.
+    pub(crate) fn reason(&self) -> &str {
+        match self {
+            Self::Unresolved(why) | Self::Unreadable(why) | Self::Custody(why) => why,
+        }
+    }
+}
+
+/// How one look-up of the declaration came out.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum Declaration {
+    /// This device declared the checkout holding the working directory.
+    Trusted(PathBuf),
+    /// Nothing applies: no file yet, another checkout declared, or not a checkout.
+    Undeclared,
+    /// A declaration could not be used.
+    Unapplied(Unapplied),
+}
+
+/// The declaration for `cwd`, with the device key path resolved from `lookup`.
+pub(crate) fn declaration_with(
+    cwd: &Path,
+    lookup: &dyn Fn(&str) -> Option<std::ffi::OsString>,
+) -> Declaration {
+    let file = match crate::device_key::resolve_path_with(lookup)
+        .and_then(|key| trust_file_beside(&key))
+    {
+        Ok(file) => file,
+        Err(error) => {
+            return Declaration::Unapplied(Unapplied::Unresolved(format!(
+                "device trust file not located: {error}"
+            )))
+        }
+    };
+    let text = match read_in_custody(&file) {
+        Ok(Some(text)) => text,
+        Ok(None) => return Declaration::Undeclared,
+        Err(why) => return Declaration::Unapplied(why),
+    };
+    match checkout(cwd) {
+        Some(root) if lists(&text, &root) => Declaration::Trusted(root),
+        _ => Declaration::Undeclared,
+    }
+}
+
+fn declaration(cwd: &Path) -> Declaration {
+    declaration_with(cwd, &|name| std::env::var_os(name))
+}
+
 /// The checkout holding `cwd`, when this device declared it trusted.
 fn declared_root(cwd: &Path) -> Option<PathBuf> {
-    let root = checkout(cwd)?;
-    trust_file()
-        .ok()
-        .is_some_and(|file| declared_at(&root, &file))
-        .then_some(root)
+    match declaration(cwd) {
+        Declaration::Trusted(root) => Some(root),
+        Declaration::Undeclared | Declaration::Unapplied(_) => None,
+    }
+}
+
+/// Why this device's declaration could not be applied to `cwd`, for a failure message; `None`
+/// when it applies and in the ordinary undeclared states.
+pub(crate) fn trust_unapplied(cwd: &Path) -> Option<String> {
+    match declaration(cwd) {
+        Declaration::Unapplied(why) => Some(why.reason().to_owned()),
+        Declaration::Trusted(_) | Declaration::Undeclared => None,
+    }
+}
+
+/// The declaration file's text, read only when its directory and the file itself hold the
+/// device key directory's custody rule (the directory exactly as `device_key::check_key_dir`
+/// judges it). `Ok(None)`: no file yet. The file is stat'ed through the descriptor it is read
+/// from, so the mode judged is the mode of the bytes read.
+fn read_in_custody(file: &Path) -> std::result::Result<Option<String>, Unapplied> {
+    use std::io::Read;
+    let unreadable =
+        |error: std::io::Error| Unapplied::Unreadable(format!("{}: {error}", file.display()));
+    #[cfg(unix)]
+    if let Some(dir) = file.parent().filter(|p| !p.as_os_str().is_empty()) {
+        match std::fs::metadata(dir) {
+            Ok(meta) => {
+                if let Some(refused) = crate::device_key::custody_refusal(
+                    "the device key directory",
+                    dir,
+                    &meta,
+                    "can swap the key",
+                ) {
+                    return Err(Unapplied::Custody(refused.to_string()));
+                }
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+            Err(error) => return Err(unreadable(error)),
+        }
+    }
+    let mut handle = match std::fs::File::open(file) {
+        Ok(handle) => handle,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(error) => return Err(unreadable(error)),
+    };
+    #[cfg(unix)]
+    if let Some(refused) = crate::device_key::custody_refusal(
+        "the checkout-trust declaration",
+        file,
+        &handle.metadata().map_err(unreadable)?,
+        "can grant git trust to a checkout they plant",
+    ) {
+        return Err(Unapplied::Custody(refused.to_string()));
+    }
+    let mut text = String::new();
+    handle.read_to_string(&mut text).map_err(unreadable)?;
+    Ok(Some(text))
+}
+
+/// Whether `text` lists `root` as a whole line (`str::lines` strips a trailing `\r`; `Path`
+/// equality ignores a trailing `/`).
+fn lists(text: &str, root: &Path) -> bool {
+    text.lines().any(|line| Path::new(line) == root)
+}
+
+/// The `-c safe.directory=<root>` pair for a declared root.
+fn args_for(root: &Path) -> Vec<String> {
+    vec![
+        "-c".to_owned(),
+        format!("safe.directory={}", root.display()),
+    ]
 }
 
 /// The arguments `command` adds, for a git spawned through another runner.
 pub(crate) fn trust_args(cwd: &Path) -> Vec<String> {
     declared_root(cwd)
-        .map(|root| {
-            vec![
-                "-c".to_owned(),
-                format!("safe.directory={}", root.display()),
-            ]
-        })
+        .map(|root| args_for(&root))
         .unwrap_or_default()
 }
 
 /// The same trust as `GIT_CONFIG_*` variables, for a child that runs git itself (brit).
 pub(crate) fn trust_env(cwd: &Path) -> Vec<(String, String)> {
-    let existing = std::env::var("GIT_CONFIG_COUNT").ok();
+    let existing = std::env::var_os("GIT_CONFIG_COUNT");
     declared_root(cwd)
-        .map(|root| config_env(existing.as_deref(), &root))
+        .map(|root| config_env_os(existing.as_deref(), &root))
         .unwrap_or_default()
+}
+
+/// [`config_env`] after a count read as bytes: one that is not UTF-8 is malformed, so nothing
+/// is added rather than entry 0 written over the caller's own.
+fn config_env_os(existing: Option<&std::ffi::OsStr>, root: &Path) -> Vec<(String, String)> {
+    match existing.map(std::ffi::OsStr::to_str) {
+        None => config_env(None, root),
+        Some(Some(count)) => config_env(Some(count), root),
+        Some(None) => Vec::new(),
+    }
 }
 
 /// Append one `safe.directory` entry after any the caller already passes. A malformed count is
@@ -316,7 +485,11 @@ pub(crate) fn checkout(start: &Path) -> Option<PathBuf> {
 }
 
 fn trust_file() -> std::io::Result<PathBuf> {
-    let key = crate::device_key::resolve_path()?;
+    trust_file_beside(&crate::device_key::resolve_path()?)
+}
+
+/// The declaration beside a device key at `key`: `<key dir>/trusted-checkouts`.
+fn trust_file_beside(key: &Path) -> std::io::Result<PathBuf> {
     key.parent()
         .map(|p| p.join("trusted-checkouts"))
         .ok_or_else(|| {
@@ -327,10 +500,12 @@ fn trust_file() -> std::io::Result<PathBuf> {
         })
 }
 
+/// The writer's duplicate check (under the file's lock); readers deciding trust use
+/// [`declaration_with`], which also applies the custody rule.
 fn declared_at(root: &Path, file: &Path) -> bool {
     std::fs::read_to_string(file)
         .ok()
-        .is_some_and(|text| text.lines().any(|line| Path::new(line) == root))
+        .is_some_and(|text| lists(&text, root))
 }
 
 /// Declare one canonical checkout beside the device key. No global git configuration changes.
@@ -416,6 +591,9 @@ impl elohim_device_runtime::bin_store::Runner for DeviceRunner {
         SystemRunner.run(&spec)
     }
 }
+
+#[cfg(all(test, unix))]
+mod trust_vectors;
 
 #[cfg(test)]
 mod tests {
