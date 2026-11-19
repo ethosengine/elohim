@@ -16,10 +16,11 @@
  * - "goes on to its own build": `building locally` / `trying a local build` after the gap line; when the draw was
  *   refused before it began (unpublished), the follow's normal result on stdout and exit 0.
  *
- * The C baseline marker is the `env:isa-c=x86-64` slot on each crossed Produce. Every fixture
- * statement carries it unless a scenario removes it, so a refusal is about the one thing the
- * scenario changes; its absence is refused the same way on every processor, so no step reads
- * this host's CPU.
+ * The C baseline marker is the `env:isa-c=<value>` slot on each crossed Produce. Every fixture
+ * record carries `x86-64` unless a scenario says otherwise, so a refusal is about the one thing
+ * the scenario changes. The value B expects is compiled into the epr under test for its target,
+ * so scenarios that reach that check are tagged `@requires:x86_64-unknown-linux-gnu` and are
+ * held (skipped, not failed) on a host of another platform; no step reads this host's CPU.
  */
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
@@ -37,7 +38,7 @@ import {
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 
-import { After, Given, Then, When } from '@cucumber/cucumber';
+import { After, Before, Given, Then, When } from '@cucumber/cucumber';
 
 import { mintByteCid } from '../../src/framework/byte-address.js';
 
@@ -53,8 +54,8 @@ interface Household {
   head: string;
   parent: string;
   statement: Statement;
-  /** Whether A's records carry the C baseline marker `env:isa-c=x86-64`. */
-  marker: boolean;
+  /** The C baseline marker value A's records carry (`env:isa-c=<value>`), or none. */
+  marker: string | null;
   stderr?: string;
   stdout?: string;
   status?: number | null;
@@ -284,8 +285,8 @@ function statementSlots(statement: Statement): string[] {
   }
 }
 
-/** The C baseline marker a producer writes after checking its build's C (row 29.2). */
-const C_BASELINE_MARKER = 'env:isa-c=x86-64';
+/** The C baseline a producer on x86_64-unknown-linux-gnu writes after checking its C (row 29.2). */
+const C_BASELINE = 'x86-64';
 
 function appendRecord(h: Household, bin: string, statement: Statement): void {
   const output = mintByteCid(Buffer.from(`${h.head} ${bin}`));
@@ -319,7 +320,7 @@ function appendRecord(h: Household, bin: string, statement: Statement): void {
       `env:release=${RELEASE}`,
       `env:release-bin=${bin}`,
       ...statementSlots(statement),
-      ...(h.marker ? [C_BASELINE_MARKER] : []),
+      ...(h.marker === null ? [] : [`env:isa-c=${h.marker}`]),
     ],
   };
   const cid = recordCid(cbor(event));
@@ -356,7 +357,7 @@ Given("Matthew's devices A and B are admitted to each other", function () {
     head: '',
     parent: '',
     statement: 'meets',
-    marker: true,
+    marker: C_BASELINE,
   };
   households.set(this, h);
   mkdirSync(dirname(h.keyA), { recursive: true });
@@ -449,13 +450,12 @@ Given("the release's statement crossed with its record and matches its CID", fun
   household(this).statement = 'meets';
 });
 
-Given("the release's record carries the C baseline marker {string}", function (value: string) {
-  assert.equal(`env:isa-c=${value}`, C_BASELINE_MARKER);
-  household(this).marker = true;
+Given("device A's record carries the C baseline marker {string}", function (value: string) {
+  household(this).marker = value;
 });
 
-Given('device A recorded the release without the C baseline marker', function () {
-  household(this).marker = false;
+Given("device A's record carries no C baseline marker", function () {
+  household(this).marker = null;
 });
 
 Given('device B meets every requirement in the statement', function () {
@@ -578,11 +578,13 @@ Then(
 );
 
 Then(
-  "device B says the processor the release's C needs is unmeasured, naming the missing marker",
+  "device B says the instructions the release's C needs are unmeasured, naming the C baseline marker",
   function () {
+    // The stable part of the refusal: its kind and the slot it names. The sentence around them
+    // quotes the record's value, or says it has none.
     const text = said(household(this));
-    assert.match(text, /unmeasured-requirement: [^\n]*records no env:isa-c/, text);
-    assert.match(text, /instruction set its C was compiled at is unmeasured/, text);
+    assert.match(text, /unmeasured-requirement: [^\n]*env:isa-c/, text);
+    assert.match(text, /unmeasured-requirement: [^\n]*unmeasured/, text);
   }
 );
 
@@ -606,16 +608,35 @@ Then('device B says the statement cannot be verified', function () {
   assert.match(text, /not the env:requires/, text);
 });
 
-Then('device B names each branch it checked, with the commit each one points to here', function () {
-  const h = household(this);
-  const text = said(h);
-  assert.match(text, /unpublished: /, text);
-  assert.ok(text.includes('refs/heads/dev absent'), text);
-  assert.ok(text.includes(`refs/remotes/origin/dev at ${h.parent.slice(0, 12)}`), text);
-});
+Then(
+  'device B names each branch it checked, with the commit each one points to on this device',
+  function () {
+    const h = household(this);
+    const text = said(h);
+    assert.match(text, /unpublished: /, text);
+    assert.ok(text.includes('refs/heads/dev absent'), text);
+    assert.ok(text.includes(`refs/remotes/origin/dev at ${h.parent.slice(0, 12)}`), text);
+  }
+);
 
 Then('device B says to fetch the remote branch with {string}', function (cure: string) {
   assert.ok(said(household(this)).includes(cure), said(household(this)));
+});
+
+/**
+ * `@requires:x86_64-unknown-linux-gnu`: the drawing device's epr must be built for that target,
+ * the one platform with a declared C baseline. The epr under test is built for this host, so a
+ * host of another platform holds the scenario. The suite's own `@requires:` gate treats a cap it
+ * does not track as a precondition and lets it run; this hook is what holds it.
+ */
+function hostIsDeclaredTarget(): boolean {
+  const header = (process.report?.getReport() as { header?: { glibcVersionRuntime?: string } })
+    ?.header;
+  return process.platform === 'linux' && process.arch === 'x64' && !!header?.glibcVersionRuntime;
+}
+
+Before({ tags: '@requires:x86_64-unknown-linux-gnu' }, function () {
+  return hostIsDeclaredTarget() ? undefined : 'skipped';
 });
 
 After(function () {

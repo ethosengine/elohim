@@ -2,9 +2,10 @@
 Feature: A device judges a sibling's epr from what it says it needs, before fetching any of it
   Matthew keeps more than one device. When one of them lands a new build of epr (the Elohim
   protocol's command-line evaluator), it writes a record saying it holds that release, and the
-  record is copied to (crosses to) his other devices. A device that follows epr, meaning it is
-  set to keep its own epr at the newest landed build, can then draw that release: fetch the
-  sibling's bytes instead of compiling them, which saves a long build. A release is about 160 MB.
+  record is copied to (crosses to) his other devices. That crossed record is an offer: a
+  device that follows epr, meaning it is set to keep its own epr at the newest landed build, can
+  draw the release it names, fetching the sibling's bytes instead of compiling them, which saves
+  a long build. A release is about 160 MB.
 
   A build is honest about what it needs. When a device records a build, it also records the
   build's requirement statement: what the executable needs from the machine that runs it, such
@@ -15,16 +16,22 @@ Feature: A device judges a sibling's epr from what it says it needs, before fetc
   the one recorded.
 
   The statement cannot say which processor instructions the C code bundled inside epr needs
-  (its cryptography and its database are written in C). Every release is meant to compile that C for
-  the baseline instruction set of its platform, which on 64-bit Intel and AMD Linux is plain
-  x86-64, the set every such processor has. The device that builds a release checks that it
-  did, and only then adds a marker to its record: the C baseline, with the value `x86-64`. A
+  (its cryptography and its database are written in C). Every release is meant to compile that
+  C for the baseline instruction set of its platform, which on 64-bit Intel and AMD Linux is
+  plain x86-64, the set every such processor has. The device that builds a release checks that
+  it did, and only then adds a marker to its record: the C baseline, with the value `x86-64`.
+  The value a drawing device expects is compiled into its own epr, one value per platform. A
   release whose record has no marker, or a different value, may need instructions the drawing
-  device's processor lacks; that need is not measured, so it is not drawn.
+  device's processor lacks; that need is unmeasured, so it is not drawn.
+
+  The scenarios that reach the marker check are written for a drawing device on that platform
+  (64-bit x86 Linux with the GNU C library, `x86_64-unknown-linux-gnu`) and are tagged with it.
+  An epr built for a platform with no declared baseline draws nothing from a sibling at all, so
+  on such a device those scenarios are held rather than run.
 
   Before the drawing device fetches a single byte, it checks four things, in order:
   - the commit is published here: the device lands only a commit that its integration branch
-    contains, as it last fetched that branch;
+    contains, as it last fetched that branch (with brit, this workspace's repository tool);
   - the statement is readable: present, and matching the CID its record names;
   - the record carries the C baseline marker with the value this device's epr knows for its own
     platform;
@@ -49,27 +56,39 @@ Feature: A device judges a sibling's epr from what it says it needs, before fetc
     And device B follows epr and draws from a sibling first
     And device A has recorded a release of epr for the commit device B has checked out
 
+  @requires:x86_64-unknown-linux-gnu
   Scenario: A release this device can run is drawn
     Given device B's integration branch contains that commit
     And the release's statement crossed with its record and matches its CID
-    And the release's record carries the C baseline marker "x86-64"
+    And device A's record carries the C baseline marker "x86-64"
     And device B meets every requirement in the statement
     When device B updates its epr
     Then device B fetches device A's release
 
-  Scenario: A release recorded without the C baseline marker is not drawn, on any processor
+  @requires:x86_64-unknown-linux-gnu
+  Scenario Outline: A release whose record does not carry the C baseline this device knows is not drawn
+    Both cases are the same unmeasured requirement with the same cure: the refusal quotes the
+    marker the record carries, or says it carries none.
+
     Given device B's integration branch contains that commit
     And the release's statement crossed with its record and matches its CID
     And device B meets every requirement in the statement
-    But device A recorded the release without the C baseline marker
+    But device A's record carries <marker>
     When device B updates its epr
     Then device B fetches nothing
-    And device B says the processor the release's C needs is unmeasured, naming the missing marker
+    And device B says the instructions the release's C needs are unmeasured, naming the C baseline marker
     And device B says A should rebuild for the declared platform, or B should build for itself
     And device B goes on to its own build
 
+    Examples:
+      | marker                            |
+      | no C baseline marker              |
+      | the C baseline marker "x86-64-v3" |
+
+  @requires:x86_64-unknown-linux-gnu
   Scenario: A release this device cannot run is refused from its statement, and nothing is fetched
     Given device B's integration branch contains that commit
+    And the release's statement crossed with its record and matches its CID
     And the release's statement says it needs a newer C library than device B has
     When device B updates its epr
     Then device B fetches nothing
@@ -96,6 +115,6 @@ Feature: A device judges a sibling's epr from what it says it needs, before fetc
     Given device B last fetched its integration branch before that commit landed on it
     When device B updates its epr
     Then device B fetches nothing
-    And device B names each branch it checked, with the commit each one points to here
+    And device B names each branch it checked, with the commit each one points to on this device
     And device B says to fetch the remote branch with "brit fetch -r origin"
     And device B lands nothing
