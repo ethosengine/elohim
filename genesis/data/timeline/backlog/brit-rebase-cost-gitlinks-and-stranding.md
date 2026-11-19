@@ -307,7 +307,7 @@ not only shallow ones as scoped earlier (v2 only when the floor is non-empty). A
 then fail closed on any copy a newer one wrote. This reverses the approved scope and needs the
 steward's decision again.
 
-## Recovery lane, 2026-11-19 (four rounds reviewed; merge in progress)
+## Recovery lane, 2026-11-19 (four rounds reviewed; merged locally, not pushed; round 5 running)
 
 Lane `sprint3/recovery` (worktree `brit-s3-recovery`). Commits up to `0d23297e22`:
 
@@ -496,22 +496,66 @@ loss before the fsync can. None is new in this lane.
   review's table tested five of these records: torn `index.pre-rebase` and `proposal-0.json` were
   cleared by `--abort`, not refused as the list says.
 - **Not established by the review:** whether every `save` caller keeps nothing between "pending
-  synced" and "renamed" (asserted by the author's table; not every caller read; the integrator is asked
-  to list them); torn `directory-*.json`, `payload-license-*.json` and the authoring child's `*.new`
+  synced" and "renamed" (since settled by the integrator's audit, Phase 4g below); torn `directory-*.json`, `payload-license-*.json` and the authoring child's `*.new`
   (not produced); kills during an edit-stop `--amend`.
 - **Earlier residuals, unchanged:** a process killed during any journal `save()` can leave
   `.git/.brit-checkout-*`; a `preparing` journal in a moved or copied repository cannot be cancelled
   (identity check; pre-existing).
 
-**Decision (coordinator, after the fourth review): merge.** The merge into `sprint3/integrate` is
-integration Phase 4g; it was in progress, neither done nor pushed, when this was written. This
-supersedes the round-1-only fallback.
+**Decision (coordinator, after the fourth review): merge.** This superseded the round-1-only fallback.
+
+**Phase 4g: merged locally, NOT pushed, and not to be pushed as it stands.** `sprint3/integrate` is
+locally at `948a939f16e416d6357448e49eb2a4ac318e2f9d`: merge `b1010c4540` of `c63ef6bfa4` into
+`080f305797`, then `b0770fdead` (docs/rebase.md section "States this version can still strand" and its
+changelog entry) and `948a939f16` (the lane's changelog entries); commit details in the handoff entry,
+"Where the work is". `origin run-ci/sprint3-integrate` is still `080f305797`.
+
+- **The blocker** [M], found by the integration pass and by none of the four reviews, because none
+  ran CI's memory step (ci.yml:480): `tests/cli-journey/tests/memory_replay.rs`, unchanged since the
+  lane's base on both sides, gives 8 passed / 1 ignored on `080f305797` and 2 passed / 6 failed on the
+  lane's own round-4 binary and on the merged head alike. The lane's gates refuse rebases that
+  completed before:
+  - four `sixty_four_mib_*` tests are refused by the preflight (`copy_bound.rs`): "brit rebase is not
+    available on repositories of this size yet; its journal and retained copy can need up to
+    1259171527 bytes … over the 1073741824-byte scratch limit". 1,259,171,527 is the modelled sum,
+    about 1,007,337,221, times the 5/4 safety factor;
+  - `sixty_four_mib_edit_amend_preserves_authored_object_custody` is refused by `Session::admit`
+    ("with its exact records known … the 5/4 safety factor … exceeds");
+  - `twenty_mib_edit_scope_expansion_preserves_original_and_authored_bytes` is refused at
+    `--continue` by `Session::reserve`, with 797,595,909 bytes requested for the step.
+- **Everything else in the phase verified** [M]: full cli-journey 495 passed / 6 failed
+  (`memory_replay` only) / 73 ignored; journey faults 145 / 0; core faults 181 / 0 / 1 ignored;
+  max-pure journeys 374 / 0 / 6 ignored; all clippy and doc legs. The test seams are absent from the
+  default and max-pure binaries (0 occurrences of the variable names by `strings`; 12 with/without
+  comparisons identical). The reviewer's round-4 fixtures re-run against the MERGED binaries give the
+  same outcome lines. `rebase --status` writes nothing (measured), and is rightly not on the read-only
+  list because it shares the path `rebase` with every writer, so `brit rebase --status | head` can still
+  print "Broken pipe" and exit 1. The save-caller audit the review asked for found no write between
+  "pending synced" and "renamed" (`publish_state` has exactly two callers).
+- **Two discrepancies against the lane's stated rules** [R]: `--retire` and `rebase <upstream>` are
+  dispatched before `settle_pending`; `--retire` also accepts phase `retaining-skip` with zero
+  decisions, which the docs do not mention.
+- **Not run for this head:** the non-root leg and the bash journeys.
+
+**Decision (coordinator): tighten the gates, do not loosen them.** The gates stay sound upper bounds:
+an admitted rebase must not meet the metered limit part-way. The lost capability comes back by
+tightening them: the 5/4 multiplier is replaced with additive allowances that scale with decisions and
+objects, and double counts shown by measurement are removed. Raising the limit and making the gates
+advisory are both rejected.
+
+**Round 5, started 19:35Z** in the integration worktree on top of `948a939f16`, with that brief and
+`memory_replay.rs` untouched as its acceptance test. It stops and reports if a fixture still cannot be
+admitted. It needs its own independent review, then the non-root leg, before push 10.
+
+**Open, not decided by the coordinator:** whether to stop reserving scratch for an abort's retained
+copy, which R3 already leaves unmetered.
 
 **Queued follow-up round, not started.** Publish `metadata-lock-N.json`, `retention-N.json` and the
 other single-pass records whole (spool, rename, sync), or treat an unparseable record as not written;
 make `--status` say a record is unreadable instead of naming a cure that refuses; give the
 interrupted-abort-plus-foreign-index-write state a named cure; decide what a torn cleanup receipt from
-an older brit may be allowed to do. It needs its own independent review before it merges.
+an older brit may be allowed to do. It comes after round 5 and needs its own independent review
+before it merges.
 
 Rebase stays a declared git fallback for the monorepo and for brit: the preflight refuses repositories
 over roughly 182,000 objects, and the redesign above is not started.

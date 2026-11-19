@@ -165,6 +165,13 @@ The converse gap: CI never exercises REAL foreign ownership. `foreign_owned.rs` 
 safe.directory promotion fingerprint test skip their foreign-ownership portion on EPERM, so on non-root
 CI they pass without asserting it. Only a root container runs them.
 
+In the monorepo, the same non-root leg run for `feat/ark-declared-trust` (uid 65534, both HOME modes)
+passed every test of that branch, and found failures that are not the branch's: 19–22 other epr-cli
+tests fail unprivileged. Causes: git children that lose `GIT_CONFIG_NOSYSTEM` and meet the unreadable
+`/etc/gitconfig`; `epr peer serve --check` reading the real bin-store rather than a test home; three are
+cured by `safe.directory = *`. ark's root-only cross-uid test hard-codes uid 65534, so it cannot work
+when run as that user.
+
 ## (r) An aggregate job must allow-list
 
 brit's deny-list aggregate `Tests pass` failed only on `failure`, `cancelled` and `skipped`, and passed
@@ -176,7 +183,9 @@ aggregate fix" (`brit-sprint-3-handoff-2026-11-19.md`).
 
 macOS legs were abandoned on runs 44544779620 and 44567300304 (from about 14:30Z on 2026-11-19). On
 run 44575030094 (head `1bf96648cb`) the macOS leg got a runner and passed, the first macOS result
-since `9945331577`.
+since `9945331577`. On run 44583007601 (head `080f305797`) it was cancelled without a runner on
+attempts 1 and 2; attempt 3 was still queued for a runner at 19:34Z. Results per run: the handoff
+entry's head/push table.
 
 ## (t) An unbounded background follower holds its parent
 
@@ -194,5 +203,13 @@ environment variable, in place of the local edit.
 ## (v) A CI tool install can fail a required job
 
 On run 44583007601 `test-journey` failed in its `extractions/setup-just` step ("Server Error"), before
-any journey ran. Under the allow-list aggregate that fails `Tests pass` for the head; only a re-run
-of the job gives the head a verdict.
+any journey ran. Under the allow-list aggregate that fails `Tests pass` for the head. A re-run of the
+failed jobs (attempt 2) ran it green.
+
+## (w) A lane's verification and its reviews must run every journey CI runs
+
+Four independent reviews of the rebase recovery lane passed, and none ran CI's memory step
+(ci.yml:480). The integration pass found `tests/cli-journey/tests/memory_replay.rs`, a file neither
+side touched, red: 8 passed / 1 ignored before the merge, 2 passed / 6 failed after (details:
+`brit-rebase-cost-gitlinks-and-stranding.md`, Phase 4g). A lane's own verification and each review of
+it must run every journey CI runs, the memory step included.
