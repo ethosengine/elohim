@@ -199,42 +199,98 @@ export function ciGlobMatch(filePath, pattern) {
 }
 
 /**
+ * build-graph.groovy extractFunctionBody (:249-265): the body after `def <name>(…) {`, by brace
+ * count, or null when no such definition is found.
+ */
+export function extractFunctionBody(text, name) {
+  const m = new RegExp(`def\\s+${name}\\s*\\([^)]*\\)\\s*\\{`).exec(text);
+  if (!m) return null;
+  let depth = 1;
+  let pos = m.index + m[0].length;
+  while (pos < text.length && depth > 0) {
+    if (text[pos] === '{') depth += 1;
+    else if (text[pos] === '}') depth -= 1;
+    pos += 1;
+  }
+  return text.slice(m.index + m[0].length, pos - 1).trim();
+}
+
+/**
  * What build-graph.groovy walkBuildGraph computes (:802-864), for the fleet-roll guard:
- * - steps keyed `pipeline:step`, a bare `depends` entry qualified to its own pipeline, and a
- *   dependency on a pipeline with no manifest pruned (composeGraph :77-119);
- * - a step is stale by source when a changed, non-governance file matches one of its sources
- *   with CI's glob (checkSourceChanges :234-247, reason `source: <file> matches <pattern>`,
- *   files outer, patterns inner); else by build process when a referenced file is in the
- *   changeset (checkBuildProcessChanges' cold-start and no-prior-hash rule :329-348; CI's stored
- *   hashes are not visible here);
+ * - composeGraph (:58-137): steps keyed `pipeline:step`; an omitted `depends` is []; a bare
+ *   entry is qualified to its own pipeline; a second manifest naming a pipeline already seen is
+ *   an error and skipped (:66-75); a dependency on a pipeline with no manifest is pruned (:104-119);
+ *   a dependency on a missing step of a present pipeline is an error (:121-131); then, only when
+ *   nothing else failed, cycles (self-dependencies included) are errors (:140-178). Any error
+ *   stops CI's graph (:815-827): `errors` is returned and nothing is predicted.
+ * - a step is stale by source when a changed, non-governance file matches one of its sources with
+ *   CI's glob (checkSourceChanges :234-247, reason `source: <file> matches <pattern>`, files outer,
+ *   patterns inner); else by build process (:286-357), each reference in order: with `readFile`,
+ *   a file CI cannot read, or a named function it cannot find, is stale (:307-321); a referenced
+ *   file in the changeset is stale (the cold-start and no-prior-hash rule, :329-348). CI's stored
+ *   hashes are not visible here: a changed file whose referenced function CI would hash as
+ *   unchanged still reads as stale.
  * - staleness propagates to a fixed point over `depends`, whatever the dependency's class or
  *   manual flag, reason `depends: <first stale dependency>` (propagateStaleness :360-375);
  * - a manual-only pipeline's stale steps propagate but are not dispatched (:848);
  * - a pipeline's run class is its stale steps' highest class (deriveRunClasses :471-482), capped
  *   at verify when every stale step is stale by source, none has a stale dependency, and every
  *   file matching its sources is a build-manifest.json (manifestOnlyPipelines :491-521).
- * Each stale step carries `cause`: the changed file behind it, followed through propagation.
+ * Each stale step carries `cause`: the changed or unreadable file behind it, through propagation.
  */
-export function walkGraphCi(manifests, changedFiles) {
+export function walkGraphCi(manifests, changedFiles, { readFile = null } = {}) {
   const steps = new Map();
   const meta = {};
-  for (const { content } of manifests) {
+  const owner = {};
+  const errors = [];
+  const normalized = [];
+  for (const manifest of manifests) {
+    const { path, content } = manifest;
     const pipeline = content.pipeline;
+    if (Object.hasOwn(meta, pipeline)) { errors.push(`Duplicate pipeline name '${pipeline}' in ${path} and ${owner[pipeline]}`); continue; }
+    owner[pipeline] = path;
+    const stepDefs = Object.fromEntries(Object.entries(content.steps || {}).map(([n, s]) => [n, { ...s, depends: s.depends ?? [] }]));
+    normalized.push({ ...manifest, content: { ...content, steps: stepDefs } });
     meta[pipeline] = {
-      jenkinsPath: content.jenkinsPath || null, manualOnly: content.manualOnly === true,
-      stepClasses: Object.fromEntries(Object.entries(content.steps || {}).map(([n, s]) => [n, stepClass(s)])),
+      jenkinsPath: typeof content.jenkinsPath === 'string' && content.jenkinsPath.trim() ? content.jenkinsPath : null,
+      manualOnly: content.manualOnly === true,
+      stepClasses: Object.fromEntries(Object.entries(stepDefs).map(([n, s]) => [n, stepClass(s)])),
     };
-    for (const [name, step] of Object.entries(content.steps || {})) {
+    for (const [name, step] of Object.entries(stepDefs)) {
       steps.set(`${pipeline}:${name}`, {
         pipeline, name, step, cls: stepClass(step), manualOnly: content.manualOnly === true,
-        depends: (step.depends || []).map(dep => resolveStep(dep, pipeline)),
+        depends: step.depends.map(dep => resolveStep(dep, pipeline)),
       });
     }
   }
-  const pipelinesWithManifest = new Set(Object.keys(meta));
-  for (const s of steps.values()) {
-    s.depends = s.depends.filter(dep => steps.has(dep) || pipelinesWithManifest.has(dep.split(':', 1)[0]));
+  // Kept: an existing step, or a missing step of a present pipeline (an error below). Pruned: a
+  // dependency on a pipeline with no manifest.
+  for (const s of steps.values()) s.depends = s.depends.filter(dep => steps.has(dep) || Object.hasOwn(meta, dep.split(':', 1)[0]));
+  for (const [qualified, s] of steps) {
+    for (const dep of s.depends) if (!steps.has(dep)) errors.push(`Step '${qualified}' depends on '${dep}' which does not exist.`);
   }
+  if (!errors.length) {
+    const visited = new Set();
+    const inStack = new Set();
+    const dfs = (node, path) => {
+      const s = steps.get(node);
+      if (!s) return;
+      visited.add(node);
+      inStack.add(node);
+      const here = [...path, node];
+      for (const dep of s.depends) {
+        if (!visited.has(dep)) dfs(dep, here);
+        else if (inStack.has(dep)) {
+          errors.push(`Dependency cycle detected: ${[...here.slice(here.indexOf(dep)), dep].join(' -> ')}`);
+          inStack.delete(node);
+          return;
+        }
+      }
+      inStack.delete(node);
+    };
+    for (const node of steps.keys()) if (!visited.has(node)) dfs(node, []);
+  }
+  if (errors.length) return { projects: [], pipelines: [], meta, errors };
   const stale = new Map();
   for (const [qualified, s] of steps) {
     let hit = null;
@@ -243,9 +299,14 @@ export function walkGraphCi(manifests, changedFiles) {
       const pattern = (s.step.inputs?.sources || []).find(p => ciGlobMatch(file, p));
       if (pattern) { hit = { reason: `source: ${file} matches ${pattern}`, cause: file }; break; }
     }
-    if (!hit) {
-      const ref = (s.step.inputs?.buildProcess || []).find(r => changedFiles.includes(r.split('@')[0]));
-      if (ref) hit = { reason: `buildProcess: ${ref} in changeset`, cause: ref.split('@')[0] };
+    for (const ref of hit ? [] : (s.step.inputs?.buildProcess || [])) {
+      const [file, fn] = ref.split('@', 2);
+      if (readFile) {
+        const text = readFile(file);
+        if (text == null) { hit = { reason: `buildProcess: cannot read ${file}`, cause: file }; break; }
+        if (fn && extractFunctionBody(text, fn) === null) { hit = { reason: `buildProcess: function ${fn} not found in ${file}`, cause: file }; break; }
+      }
+      if (changedFiles.includes(file)) { hit = { reason: `buildProcess: ${ref} in changeset`, cause: file }; break; }
     }
     if (hit) stale.set(qualified, hit);
   }
@@ -281,11 +342,12 @@ export function walkGraphCi(manifests, changedFiles) {
     if (onlyManifests && triggers > 0 && runClassRank(runClass) > runClassRank('verify')) runClass = 'verify';
     return { name, steps: list.map(({ qualified, ...rest }) => rest), reasons: list.map(s => s.reason), runClass };
   });
-  return { projects: projectsFromStale(manifests, new Map([...stale].map(([q, h]) => [q, [h.reason]])), changedFiles), pipelines, meta };
+  const projects = projectsFromStale(normalized, new Map([...stale].map(([q, h]) => [q, [h.reason]])), changedFiles);
+  return { projects, pipelines, meta, errors: [] };
 }
 
-export function walkGraph(manifests, changedFiles, { ci = false } = {}) {
-  if (ci) return walkGraphCi(manifests, changedFiles);
+export function walkGraph(manifests, changedFiles, { ci = false, readFile = null } = {}) {
+  if (ci) return walkGraphCi(manifests, changedFiles, { readFile });
   if (manifests.length === 0) return { projects: [], pipelines: [] };
 
   // Phase 1: Build index
