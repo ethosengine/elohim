@@ -736,7 +736,8 @@ fn a_declared_target_realized_in_its_c_is_recorded_with_one_isa_c_slot() {
     assert!(out.status.success(), "{}", text(&out));
     assert_eq!(produces.len(), 1, "{}", text(&out));
     assert_eq!(isa_c_slots(&produces[0]), ["env:isa-c=x86-64"]);
-    // The underscore and dashed CXXFLAGS spelling of the declared flags is the declared one too.
+    // The underscore CXXFLAGS_<triple> spelling of the declared flags is the declared one too; the
+    // dashed spelling is refused under a declared target (see the refusal test).
     let mut with_cxx = DECLARED_X86_64.to_vec();
     with_cxx.push(("CXXFLAGS_x86_64_unknown_linux_gnu", "-march=x86-64"));
     let (out, produces) = declared_put(&with_cxx, Some(&gnu_c("-march=x86-64")), true);
