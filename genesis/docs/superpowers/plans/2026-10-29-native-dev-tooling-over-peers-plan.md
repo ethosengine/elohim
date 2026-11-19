@@ -393,3 +393,155 @@ tests); [brit-daily-driver-handoff](epr:brit-daily-driver-handoff-2026-10-27) ro
 transactional attestation); [commons-holonic-stewardship](epr:commons-holonic-stewardship-backlog)
 row 53 (verify against the standing recorded at publication; a named election with channel-scoped
 admission; the revoke matrix as the standing body's call).
+
+## 8. Delivery stations (2026-11-19)
+
+§6 wrote the tracks and joins as table rows and prose. `epr flow project` mints from `- [ ]`
+stations and reads neither, so until this section the epic's own sequence had no intents in the
+flow. Each track and join is restated below as one station. The states were first read on
+2026-11-19 from a checkout 134 commits behind dev, then checked against dev 01e4de7f1: every file
+a State line names is byte-identical there, and F1r-producer, F3 and F5 were corrected for what
+the steward-device-arrival and native-throughput sprints landed. The design and the receipts stay
+in [the native dev plane design](epr:native-dev-plane-one-derivation-earned-reach-design) §11;
+this list only makes them claimable.
+
+The sprints that work this epic keep their definition of done and lanes in a journal and their
+open rows in the `steward-device-arrival-open-items` backlog, and the projector reads neither.
+The open sprint's lines are stations in [the one-baseline plan](epr:one-baseline-plan), which
+also carries the rows the native-throughput sprint left open.
+
+Gap ids are positional. New stations are appended at the end of this section; stations are ticked,
+not reordered or removed. A tick is a claim that still awaits verification, not a fulfilment.
+
+Two joins have no station here, because the
+[host-compatibility plan](epr:host-compatibility-foundation-plan) already carries them and a second
+station would mint the same promise twice. F1r's two-device receipt is that plan's G1 (met on
+landing 39). F2's fetch between the two devices is its K6, K7 and K12.
+
+- [ ] **A — eprfs-core slice 4 is what the gate keys on: a component's view can be asked for by its `.epr-meta` root, and ark's closure-metadata projection is retired** (serves push-gate-pays-once)
+
+State: `walk_spine`, `project_view` and `derive_or_reuse` exist in eprfs-core (`walk.rs`,
+`derive.rs`). ark's `material.rs` still builds its view from the closure's field names over one
+metadata node.
+
+Verify: the `P` vectors are green, and ark keys one task on a projected root of real source trees.
+
+- [ ] **B — gate selection resolves through `brit build affected`, with no `rakia` name left on the reuse path** (serves push-gate-pays-once)
+
+State: `genesis/orchestrator/gate-oracle.mjs` resolves `RAKIA_BIN` or `rakia` on PATH and runs
+`rakia affected`.
+
+Verify: a reuse hit on a device with no `rakia` on PATH; with sibling worktrees present, a `sophia`
+change selects `elohim:build-angular`.
+
+- [ ] **C — brit signs `DerivationRecord` bodies and its notes carry them; a brit push keeps the fast-forward check under an explicit lease** (serves sprint-lands-each-closure-once)
+
+State: the brit checkout holds no `DerivationRecord`. The type lives in eprfs-core and in ark's
+`brit_index.rs`.
+
+Verify: the design's signed-record vectors (a tampered body and an unknown non-`ext` field are
+refused, an unknown epoch is held), and a Claude-family adversarial review before it lands.
+
+- [x] **D — honesty: `claimed` has its own exit code, a mix of passed and skipped reads `partly-measured`, and an integrity-marked rule declared below `ask` fails validation** (serves pin-attestation)
+
+State: all three are in code. `gate-attest.mjs` returns 3 for a claimed pass,
+`habits-status.py` reports `partly-measured`, and `eprfs-meta/src/integrity.rs` refuses the
+rule (test `integrity_marked_rules_declared_below_ask_fail_validation`). The tests were read, not
+re-run, in this pass.
+
+- [x] **E — the tier blob store: a local chunked put, the tolerant reader, and a `serve-blob` mount with scope enforcement** (serves sprint-lands-each-closure-once)
+
+State: landed by the artifact-store sprint, E3 in 3b266e41d and E2 in 1b76c2327 (that sprint's
+`RESULT.md`). The one-device failure tests the design names as this track's receipt were not
+re-read in this pass.
+
+- [ ] **F1r-producer — on a real push the gate hands ark a projected view of source trees and records `Use` and `Produce` events with quantities** (serves push-gate-pays-once)
+
+State: `gate-task.mjs` writes a `material.json` of closure metadata for `ark task spec --material`.
+It waits on A. The sibling half is done: a Task gate asks the sibling channel on a local miss
+(c031c1a4). Since 72e84ae8b every eprfs gate also records a crossed `Produce` for the `epr` and
+`bin-launch` it built, keyed by a build-input view (`elohim/eprfs/bin-build-view.json`); that is
+the release producer, and the gate task itself still keys on closure metadata.
+
+Verify: a `basis: Computed` sibling row with its `Use` event, from a gate that ran as an ark task.
+
+- [ ] **F3-probe — one landing is attempted with the forge unreachable from this device, and stops at the first step that needs the forge** (serves sprint-lands-each-closure-once)
+
+This runs the design's own test (§0) once, before F3 is built, so that the next station is named
+by a failure and not by a plan. Whatever step fails is appended below as a station.
+
+Verify: a journal entry carrying the log line of the first forge-dependent step, or a landing
+recorded between the two workspaces while the forge was away.
+
+- [ ] **F3 — a landing holds dev-integration only for the compare-and-set window, and the forge is a fast-forward-only mirror (S1b with D3)** (serves sprint-lands-each-closure-once)
+
+State: a landing is `git push origin HEAD:dev` under the temporary exception in the root gospel.
+All 21 scenarios of `genesis/a2o/features/devflow/landing-queue.feature` are `@wip`. One step
+toward it is on dev: a `self/<name>` push is a hand-over that runs seconds checks and leaves a
+record (bd6a23772; 22.9 s measured, landed by the sibling with `independence: sibling`). It still
+travels through the forge.
+
+Verify: a landing with the forge unreachable; the partition interleaving of design §8; mirror
+catch-up as a fast-forward; hold p90 under 120 s over ten landings.
+
+- [ ] **F4 — carrying is the one offload path: a peer carries a job from a projected view, and `just measure` runs on that path** (serves measure-runs-on-a-peer)
+
+State: not started. `measure.sh --on adam` refuses and names the operator items. It waits on A, E
+and F1r-producer, and on a carrier whose key is not exiled.
+
+Verify: a `basis: UnderGrant` record, and `NotCarried` when no carrier is present.
+
+- [ ] **F5 — one release plane for tools: brit, epr, rakia and ark publish as release-manifest channel heads named by derivation, and a changelog is a projection over fulfilled commitments** (serves runtime-upgrade-propagation)
+
+State: brit 0.2.6 was published through the forge's release workflow on 2026-11-17. `epr` now
+moves between a person's devices as a native draw (`epr bin follow`, c781db9ab; 5.8 s on
+2026-11-17). The release drawn on 2026-11-18 crashed on shem, because the two devices' C compilers
+default to different instruction levels; the sprint ruled that C compiles at the Rust target's
+baseline (lane E12, not yet landed). A device's first `epr` is ruled to be a forge release asset
+checked by a verifier (R5), and is not built: the laptop still compiles from source.
+
+Verify: a changelog reproduced from fulfilled commitments, and a release whose test status and
+publish status are reported separately.
+
+- [ ] **F6-standing — the standing record and council roster are redrafted as a Claude-ruled integrity design** (serves no declared habit)
+
+State: not started. The commons-pool and contextual-authority designs that would supply a standing
+read failed review (design §13).
+
+- [ ] **F6 — a second principal: the signer to `agent_cid` binding, the graduation verb, the `derivation` attestation kind and D5's three integrity fixes, in the batched DNA move** (serves no declared habit)
+
+State: waits on F6-standing, C and D.
+
+Verify: the one-human adversarial test yields k = 1; then the first graduation act.
+
+F6-standing and F6 serve no declared habit: nothing in the register yet states reach across
+principals. Under the rule that work serving no habit is held, they stay unclaimed until such a
+habit is declared.
+
+Two stations found while writing this section (2026-11-19):
+
+- [ ] **Flow-root — `epr flow project` mints only from a tree at the device's published head, or says which commit it read** (serves ledgers-fold-once)
+
+State: the projector reads the tree under `--root` and writes the store under the same root.
+The device's store belongs to the main checkout, which sprints do not fast-forward: on
+2026-11-19 it sat 134 commits behind dev. A projection run there that day minted 97 intents and
+29 commitments from that tree. Eight of them,
+`plans__2026-11-19-steward-device-arrives-outside-the-cluster-plan#1` to `#8`, came from a plan
+withdrawn the same day and name no open work. A minted intent has no withdrawal: the only
+outflow from the commitment stock is fulfilment (`epr flow stocks` says so), which stood at
+1,500 minted against 57 fulfilled.
+
+Verify: a projection from a checkout whose HEAD is not on `origin/dev` refuses or records the
+commit it read; a station removed from its document can be retired by a ruling.
+
+- [ ] **Terminal-env — no session starts with `EPR_BIN` naming a build older than the device's head** (serves workspace-device-arrival)
+
+State: backlog row 17 records one terminal exporting a stale `EPR_BIN`. On 2026-11-19 every
+editor terminal on shem opened since 2026-11-10 carried it, pointing at a build of 2026-11-02,
+while the editor's terminal host process did not; no shell startup file, repository setting,
+workspace file or direnv file sets it. With it set, `epr govern` took 1.1 to 1.6 s where the
+head takes about 0.45 s, the cite-seal hook reported unsealed cites the head verifies as sealed,
+and commits read `UNMEASURED`.
+
+Verify: `epr device status` names an `EPR_BIN` that resolves to something other than the head,
+and a new terminal on shem starts without one.

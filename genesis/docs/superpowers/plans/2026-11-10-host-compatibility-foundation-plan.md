@@ -458,7 +458,7 @@ items prove it and name what it does not see. A5 and K13 belong to lanes A and K
 only because items are appended, not inserted. Order: K13, then A4 part 2 and A5 together; G1
 needs no code and can run on the next landing.
 
-- [ ] **K13 — `epr artifact requires --output <cid>`: a read-only verb that returns a recorded output's requirement (the `env:requires` CID and the document bytes) and whether this device recorded the `Produce`, checked against this device's key and not taken from a flag; it is the missing node A4 part 2 names** (serves dataplane-convergence)
+- [x] **K13 — `epr artifact requires --output <cid>`: a read-only verb that returns a recorded output's requirement (the `env:requires` CID and the document bytes) and whether this device recorded the `Produce`, checked against this device's key and not taken from a flag; it is the missing node A4 part 2 names** (serves dataplane-convergence)
 
 Rules (steering verdict, 2026-11-14): it reads this device's own store and never the network.
 Several `Produce` events for one output are merged through `Requires::try_from`, so a conflict
@@ -469,6 +469,11 @@ it without treating it as a refusal. The `self` answer is the only source A5 acc
 own-build claim.
 
 Verify: on both devices the verb returns the mesh storage binary's requirement and `self: true`; for a sibling's fetched output it returns `self: false`; an output with no slot prints `unmeasured`.
+
+State (2026-11-19): built on shem and landed by ethosengine as landing 37 (35b5c996c). The live A4
+run on ethosengine read the real mesh records through it, and A5's `OwnProduce` is built only
+from its `self` answer (journal, "Lane A, second slice"). Ticked from those records on
+2026-11-19; the three verify lines were not re-run on both devices in that pass.
 
 - [x] **A5 — the admission effect and the own-build claim are bound by construction before any running path consumes them: `authenticate_candidate` re-checks that the verdict's subject is the executable, that its checks cover `arch` and `os`, and that an own-build waiver is present exactly when an own Produce is named; `CompatibilityEffect` is no longer deserializable (a record carries its recordable projection, and the effect is rebuilt by admission); `OwnProduce` is constructed only from K13's verified answer; `Provides` loses its derived `Debug`** (serves workspace-device-arrival)
 
