@@ -199,5 +199,9 @@
   "gate_on_red": {
     "_comment": "What a red does to the rest of a push or `just gate`. continue: every later check and gate still runs and reports, each red is live on the run as it happens, and the push is refused at the end; stop: nothing starts after the first red. GATE_ON_RED overrides per run; `gate-live.mjs stop --run <run>` is the integrator's stop either way. Operator ruling 2026-11-01: the stop call belongs to the developer/integrator or this declaration.",
     "mode": "continue"
+  },
+  "fleet_roll_guard": {
+    "_comment": "Preflight check fleet-roll (genesis/orchestrator/fleet-roll-guard.mjs): refuse refuses a push to dev or main that CI would answer by rebuilding elohim-edge and rolling its fleet unless a pushed commit message carries the [edge:roll] tag, warn prints the same text without refusing, off skips the check.",
+    "mode": "refuse"
   }
 }
