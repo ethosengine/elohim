@@ -213,9 +213,9 @@ describe('steps, preflight, environment', () => {
     const { events, rec } = run(['test result: ok. 3 passed; 0 failed', `[gate] ${text}`, `[gate] ${text}`]);
     assert.deepEqual(failures(events), []);
     assert.deepEqual(events, [{ kind: 'notice', project: 'proj', notice: { class: 'offer-withheld', text } }], 'heard once');
-    // The notice contract is the live-event schema's notice class vocabulary.
-    const schema = JSON.parse(readFileSync(new URL('../../elohim/sdk/schemas/v1/gate-live-event.schema.json', import.meta.url), 'utf8'));
-    assert.ok(schema.$defs.notice.properties.class.enum.includes(events[0].notice.class));
+    // The notice contract is the notice schema's class vocabulary (orchestrator-local, E12 L1).
+    const schema = JSON.parse(readFileSync(new URL('./gate-live-notice.schema.json', import.meta.url), 'utf8'));
+    assert.ok(schema.properties.notice.properties.class.enum.includes(events[0].notice.class));
     assert.deepEqual(rec.summary(), { failures: 0, overflow: 0, firstRedSeconds: null });
     const signals = rec.signals();
     assert.equal(signals.assertionFailed, false);

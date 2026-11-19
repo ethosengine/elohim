@@ -23,7 +23,17 @@ addFormats(ajv);
 ajv.addKeyword('tsType'); // The shared Unanswered envelope's codegen annotation.
 ajv.addSchema(load('objects/unanswered.schema.json'),
   new URL('objects/unanswered.schema.json', schema.$id).href);
-const validate = ajv.compile(schema);
+const validateV1 = ajv.compile(schema);
+// E12 L1: the notice kind validates against its orchestrator-local schema (see its description:
+// elohim/sdk/schemas/v1 is a storage build source, so the v1 file stays untouched).
+const noticeSchema = JSON.parse(readFileSync(new URL('./gate-live-notice.schema.json', import.meta.url), 'utf8'));
+const validateNotice = ajv.compile(noticeSchema);
+const validate = value => {
+  const check = value?.kind === 'notice' ? validateNotice : validateV1;
+  const ok = check(value);
+  validate.errors = check.errors;
+  return ok;
+};
 
 const at = '2026-10-26T12:00:00.000Z';
 const event = (kind, fields = {}) => ({ v: 1, run: '20261026T120000Z-abcdef-123456', seq: 1, at, kind, ...fields });
