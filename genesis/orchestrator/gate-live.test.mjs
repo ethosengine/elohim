@@ -1592,3 +1592,22 @@ test('notice: a green run with a withheld offer counts no red in harvest, the fi
   assert.equal(final.failures, 0);
   assert.deepEqual(final.reds, []);
 });
+
+// A reader that predates an event kind must drop it, never render or count it as a red. Measured
+// for `notice` against the pre-notice gate-live.mjs (dev dccd7a963): formatEvent returned null,
+// unseen returned [], follow printed only the verdict and the run outcome, harvest returned no
+// slice. That held because every reader path selects known kinds; this pins it for the next kind.
+test('a kind this reader does not know is dropped by every reader path and counts as no red', async (t) => {
+  const root = fixture(t);
+  const FUTURE = { kind: 'future-kind', project: 'eprfs', future: { text: 'from a newer writer' } };
+  assert.equal(formatEvent(FUTURE), null);
+  const { path } = openRun({ root, sha: SHA, target: 'dev', session: 's-future' });
+  fs.appendFileSync(path, `${JSON.stringify({ v: 1, seq: 2, at: new Date().toISOString(), run: 'r', ...FUTURE })}\n`);
+  assert.deepEqual(live.unseen({ root, session: 's-future' }), []);
+  appendEvent(path, { kind: 'gate-verdict', project: 'eprfs', verdict: { exit: 0, seconds: 5, failure_class: null, failures: 0 } });
+  closeRun(path, 'passed');
+  const lines = [];
+  assert.equal(await follow({ root, run: path, write: (line) => lines.push(line), pollMs: 1, sleep: async () => {} }), 'passed');
+  assert.deepEqual(lines, ['[gate-live] eprfs PASSED 5s failure_class=none', '[gate-live] run passed']);
+  assert.deepEqual(live.harvest({ root, last: 10 }).slices, []);
+});
