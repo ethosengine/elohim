@@ -590,6 +590,17 @@ test('fixture: a cc-built crate reached from the root is found; one reached from
   assert.match(ccAccountProblems(['ring', 'zlib-sys'], { ...list, 'zlib-sys': { kind: DISPATCHED, reason: '' } }, exercise).join('\n'), /zlib-sys gives no reason/);
 });
 
+// bin-launch carries env:isa-c on put's "not applicable" path: with ring out of its closure and no
+// GNU C producer string in its bytes, put stamps it without reading a C level, and it has no
+// `doctor --exercise` of its own. So every cc-built crate in its closure must be dispatched or
+// compile nothing on a declared target; "exercised" does not cover it (E12 L2a review).
+test('every crate cc builds in bin-launch\'s lock closure is dispatched or compiles nothing', () => {
+  const built = ccBuiltCrates(lockPackages(read('elohim/eprfs/Cargo.lock')), 'elohim-device-runtime');
+  assert.ok(!built.includes('ring'), 'ring entered bin-launch\'s closure: put would then require its producer string');
+  const unaccounted = built.filter(name => CC_BUILT_IN_EPR[name]?.kind !== DISPATCHED);
+  assert.deepEqual(unaccounted, [], `cc-built in bin-launch's closure and not "${DISPATCHED}" on CC_BUILT_IN_EPR: put stamps bin-launch without reading its C`);
+});
+
 test('every crate cc builds in epr\'s lock closure is dispatched, compiles nothing, or is exercised', () => {
   const built = ccBuiltCrates(lockPackages(read('elohim/eprfs/Cargo.lock')), 'elohim-epr-cli');
   assert.ok(built.includes('ring'), 'ring builds with cc in epr\'s closure (the crate that trapped on shem)');
