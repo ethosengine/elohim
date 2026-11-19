@@ -43,7 +43,7 @@
       {"file": "cargo-affected.test.mjs", "tree": "the hand-over trace saw static program, unseen by the read fence: /usr/local/bin/just; not yet retried in the view"},
       {"file": "gate-cost.test.mjs", "reads": []},
       {"file": "rust-toolchain-pin.test.mjs", "reads": ["elohim/epr/flake.nix", "elohim/epr/rust-toolchain.toml", "genesis/agentic/pool-policy.json"]},
-      {"file": "c-baseline-pin.test.mjs", "tree": "git ls-files pathspec scans over every tracked Dockerfile, devfile and .cargo/config.toml, and the cc crate source in the device cargo registry"},
+      {"file": "c-baseline-pin.test.mjs", "tree": "git ls-files pathspec scans over every tracked Dockerfile, devfile and .cargo/config.toml, and the device cargo registry: the cc crate source and, for each isa_c_evidence.rs exception, the locked blake3, stacker, generator and iana-time-zone sources it holds the reason against"},
       {"file": "c-baseline.test.mjs", "tree": "probes this device's C compiler, a machine fact no commit key covers"},
       {"file": "gate-preflight.test.mjs", "reads": []},
       {"file": "jenkinsfile-sh-syntax.test.mjs", "tree": "the hand-over trace saw repository object store read: <git-dir>/worktrees/nt-e11/HEAD; not yet retried in the view"},
