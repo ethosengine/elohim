@@ -220,7 +220,7 @@ fn run(case: &Case) -> Value {
     };
     let cwd = PathBuf::from(sub(case.cwd));
 
-    let trust_file = crate::device_key::resolve_path_with(&lookup)
+    let trust_file = crate::device_key::resolve_path_with(lookup)
         .and_then(|key| trust_file_beside(&key))
         .ok()
         .map(|file| unsub(file.display().to_string()));

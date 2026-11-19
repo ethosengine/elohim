@@ -266,6 +266,7 @@ fn read_in_custody(file: &Path) -> Result<Option<String>, Unapplied> {
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum Source {
     File(PathBuf),
+    #[cfg(test)]
     Nothing,
     Unresolved(String),
 }
@@ -324,6 +325,7 @@ impl DeclaredTrust {
     fn read(&self, cwd: &Path) -> Reading {
         let file = match &self.source {
             Source::File(file) => file,
+            #[cfg(test)]
             Source::Nothing => return Reading::Undeclared,
             Source::Unresolved(why) => {
                 return Reading::Unapplied(Unapplied::Unresolved(why.clone()))
