@@ -9,7 +9,7 @@ import { join } from 'node:path';
 import {
   checkElementDists, checkEvidenceRecordable, checkNodeModules, checkReadSets, checkSophiaUmd,
   checkArk, checkCargoDeny, checkCargoLocks, checkCBaselineOffer, checkStorageClientDist, checkWorkspaceDists, checkSubmodules, checkTmpdir, emitLive, NAMED_READ_SET_PROJECTS, PREFLIGHT_READ_SET_PROJECTS, onRedPolicy,
-  fleetRollRows, runPreflight,
+  fleetRollRows, runPreflight, checkSubmodulePins,
 } from './gate-preflight.mjs';
 import { orderByCost } from './gate-runner.mjs';
 import { appendEvent, closeRun, formatEvent, formatHarvest, harvest, openRun, outlook } from './gate-live.mjs';
@@ -513,4 +513,54 @@ test('workspace dists: a gate whose package.json names @elohim/epr needs its dis
   mkdirSync(join(root, 'elohim/sdk/epr-ts/dist'), { recursive: true });
   writeFileSync(join(root, 'elohim/sdk/epr-ts/dist/index.js'), '');
   assert.equal(checkWorkspaceDists({ root, projects: [app] }).level, 'ok');
+});
+
+// A fixture superproject whose suite list declares one submodule, pinned to a commit made in a second repository.
+function pinFixture(t, { present }) {
+  const env = {
+    ...process.env, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1',
+    GIT_AUTHOR_NAME: 't', GIT_AUTHOR_EMAIL: 't@example.invalid', GIT_COMMITTER_NAME: 't', GIT_COMMITTER_EMAIL: 't@example.invalid',
+  };
+  const run = (cwd, ...args) => {
+    const r = spawnSync('git', args, { cwd, env, encoding: 'utf8' });
+    assert.equal(r.status, 0, `git ${args.join(' ')}: ${r.stderr}`);
+    return r.stdout.trim();
+  };
+  const base = scratch(t);
+  const upstream = join(base, 'upstream');
+  const root = join(base, 'root');
+  mkdirSync(upstream); mkdirSync(root);
+  run(upstream, 'init', '-q');
+  put(upstream, 'f.txt', 'x');
+  run(upstream, 'add', '.');
+  run(upstream, 'commit', '-q', '-m', 'pin');
+  const oid = run(upstream, 'rev-parse', 'HEAD');
+  run(root, 'init', '-q');
+  put(root, 'genesis/orchestrator/suite-reads.json', JSON.stringify({
+    groups: [{ files: [{ file: 'x.test.mjs', reads: ['**/build-manifest.json', 'vendor/thing'] }] }],
+  }));
+  run(root, 'add', '.');
+  run(root, 'update-index', '--add', '--cacheinfo', `160000,${oid},vendor/thing`);
+  run(root, 'commit', '-q', '-m', 'root');
+  if (present) run(base, 'clone', '-q', upstream, join(root, 'vendor/thing'));
+  return { root, oid };
+}
+const pinGate = { name: 'orchestrator', dir: 'genesis/orchestrator', run: { kind: 'just' } };
+
+test('submodule pins: a declared submodule whose pin is in no store refuses, naming it and the init cure', (t) => {
+  const { root, oid } = pinFixture(t, { present: false });
+  const r = checkSubmodulePins({ root, projects: [pinGate] });
+  assert.equal(r.level, 'REFUSED');
+  assert.match(r.why, new RegExp(`vendor/thing@${oid.slice(0, 12)}`));
+  assert.equal(r.cure, 'git submodule update --init vendor/thing');
+});
+
+test('submodule pins: the same fixture with the pinned object present passes', (t) => {
+  const { root } = pinFixture(t, { present: true });
+  assert.equal(checkSubmodulePins({ root, projects: [pinGate] }).level, 'ok');
+});
+
+test('submodule pins: no row unless the orchestrator project is selected', (t) => {
+  const { root } = pinFixture(t, { present: false });
+  assert.equal(checkSubmodulePins({ root, projects: [app] }), null);
 });

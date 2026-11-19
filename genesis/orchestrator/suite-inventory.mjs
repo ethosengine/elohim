@@ -116,6 +116,26 @@ function moduleStore(root, path, oid, env) {
   return null;
 }
 
+/**
+ * The submodule pins the named half's view reads, and which of them no object store here holds.
+ * Declared set: the gitlink paths that `suite-reads.json` names as exact reads, found in `commit`'s
+ * tree. Lookup: `moduleStore`, the one the view builder uses. Nothing is fetched or written.
+ * A repository with no list at `commit` declares nothing.
+ */
+export function declaredPinStores({ root, commit = 'HEAD', env = gitEnv() }) {
+  let reads;
+  try { reads = suiteReadSet(blobAt(root, commit, SUITE_LIST, env), SUITE_LIST); } catch { return []; }
+  const exact = (reads?.paths || []).filter(path => !isReadPattern(path) && path !== '.');
+  if (!exact.length) return [];
+  const listing = git(['ls-tree', '-z', commit, '--', ...exact], { cwd: root, env }).split('\0').filter(Boolean);
+  return listing.map(entry => {
+    const tab = entry.indexOf('\t');
+    const [, type, oid] = entry.slice(0, tab).split(' ');
+    return { type, oid, path: entry.slice(tab + 1) };
+  }).filter(e => e.type === 'commit' && exact.includes(e.path))
+    .map(({ path, oid }) => ({ path, oid, store: moduleStore(root, path, oid, env) }));
+}
+
 /** The text of `path` at `commit`. */
 export function blobAt(root, commit, path, env = gitEnv()) {
   return git(['show', `${commit}:${path}`], { cwd: root, env });
