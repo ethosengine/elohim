@@ -688,18 +688,82 @@ enum Messages {
     Of(Vec<BuildScript>),
     /// A build whose bin executable is other bytes.
     OtherBytes(Vec<BuildScript>),
+    /// A build the lock's roster says compiled these scripts' crates, with every row of theirs
+    /// removed from the stream (re-review ruling 1).
+    Missing(Vec<BuildScript>),
 }
 
 /// Write `messages` for the bin `bin` built at `exe` into `dir`, as cargo's
 /// `--message-format=json` names them, each script's log in `run/stdout` beside its OUT_DIR.
-fn build_messages(dir: &Path, bin: &str, exe: &Path, messages: &Messages) -> Option<PathBuf> {
+/// The cargo package id of a fixture build script's crate: the exceptions' locked versions, else
+/// 1.0.0.
+fn script_id(package: &str) -> String {
+    let version = match package {
+        "blake3" => "1.8.5",
+        "stacker" => "0.1.25",
+        _ => "1.0.0",
+    };
+    format!("registry+https://github.com/rust-lang/crates.io-index#{package}@{version}")
+}
+
+/// The fixture crate's own cargo package id.
+fn fixture_package(root: &Path) -> String {
+    format!("path+file://{}/crate#elohim-storage@0.1.0", root.display())
+}
+
+/// Answer the fixture's `cargo metadata` with the crate's package and a resolve in which it
+/// depends (normal) on every script's crate: the roster put reads (re-review ruling 1).
+fn fixture_metadata(root: &Path, scratch: &Path, messages: &Messages) {
+    let scripts = match messages {
+        Messages::Absent => &[][..],
+        Messages::Of(scripts) | Messages::OtherBytes(scripts) | Messages::Missing(scripts) => {
+            &scripts[..]
+        }
+    };
+    let root_id = fixture_package(root);
+    let mut nodes = vec![serde_json::json!({
+        "id": root_id,
+        "deps": scripts.iter().map(|s| serde_json::json!({
+            "pkg": script_id(s.package),
+            "dep_kinds": [{"kind": null, "target": null}],
+        })).collect::<Vec<_>>(),
+    })];
+    nodes.extend(
+        scripts
+            .iter()
+            .map(|s| serde_json::json!({"id": script_id(s.package), "deps": []})),
+    );
+    let metadata = serde_json::json!({
+        "packages": [{
+            "id": root_id,
+            "manifest_path": format!("{}/crate/Cargo.toml", root.display()),
+            "source": null,
+            "targets": [{"name": "elohim-storage", "kind": ["bin"], "src_path": format!("{}/crate/src/main.rs", root.display())}],
+        }],
+        "resolve": {"nodes": nodes, "root": root_id},
+    });
+    fake_tool(
+        &scratch.join("tools"),
+        "cargo",
+        &format!("cat <<'JSON'\n{metadata}\nJSON"),
+    );
+}
+
+fn build_messages(
+    dir: &Path,
+    package: &str,
+    bin: &str,
+    exe: &Path,
+    messages: &Messages,
+) -> Option<PathBuf> {
     let (scripts, exe) = match messages {
         Messages::Absent => return None,
         _ if !dir.exists() => {
             std::fs::create_dir_all(dir).unwrap();
-            return build_messages(dir, bin, exe, messages);
+            return build_messages(dir, package, bin, exe, messages);
         }
         Messages::Of(scripts) => (scripts, exe.to_path_buf()),
+        Messages::Missing(_) => (&Vec::new(), exe.to_path_buf()),
         Messages::OtherBytes(scripts) => {
             let other = dir.join("other-exe");
             std::fs::write(&other, b"other bytes").unwrap();
@@ -708,7 +772,7 @@ fn build_messages(dir: &Path, bin: &str, exe: &Path, messages: &Messages) -> Opt
     };
     let mut lines = vec![serde_json::json!({
         "reason": "compiler-artifact",
-        "package_id": format!("path+file:///repo/crate#{bin}@0.1.0"),
+        "package_id": package,
         "target": {"kind": ["bin"], "name": bin},
         "executable": exe,
         "fresh": true,
@@ -743,18 +807,28 @@ fn build_messages(dir: &Path, bin: &str, exe: &Path, messages: &Messages) -> Opt
         for object in script.objects {
             std::fs::write(out.join(object), b"obj").unwrap();
         }
+        for kind in ["custom-build", "lib"] {
+            lines.push(
+                serde_json::json!({
+                    "reason": "compiler-artifact",
+                    "package_id": script_id(script.package),
+                    "target": {"kind": [kind], "name": script.package},
+                    "executable": null,
+                    "fresh": true,
+                })
+                .to_string(),
+            );
+        }
         lines.push(
             serde_json::json!({
                 "reason": "build-script-executed",
-                "package_id": format!(
-                    "registry+https://github.com/rust-lang/crates.io-index#{}@1.0.0",
-                    script.package
-                ),
+                "package_id": script_id(script.package),
                 "out_dir": out,
             })
             .to_string(),
         );
     }
+    lines.push(serde_json::json!({"reason": "build-finished", "success": true}).to_string());
     let path = dir.join("build-messages.json");
     std::fs::write(&path, lines.join("\n") + "\n").unwrap();
     Some(path)
@@ -796,8 +870,10 @@ fn declared_put_under(
         git(a.root(), &["add", "genesis/agentic/pool-policy.json"]);
         git(a.root(), &["commit", "-qm", "the declared target record"]);
     }
+    fixture_metadata(a.root(), scratch.path(), messages);
     let evidence = build_messages(
         &scratch.path().join("target"),
+        &fixture_package(a.root()),
         "elohim-storage",
         &bytes,
         messages,
@@ -961,7 +1037,7 @@ fn a_declared_target_its_c_does_not_realize_refuses_and_records_no_marker() {
         running: vec!["\"ar\" \"cqD\" \"$OUT/libsqlite3.a\" \"$OUT/x.o\"".into()],
         objects: &["x.o", "libsqlite3.a"],
     };
-    let cases: [Refusal; 19] = [
+    let cases: [Refusal; 20] = [
         (
             "v3 C",
             &DECLARED_X86_64[..],
@@ -1003,6 +1079,12 @@ fn a_declared_target_its_c_does_not_realize_refuses_and_records_no_marker() {
             &DECLARED_X86_64[..],
             Messages::OtherBytes(vec![ring_at("-march=x86-64")]),
             "is not --bytes",
+        ),
+        (
+            "a crate the lock's roster names with no rows in the stream",
+            &DECLARED_X86_64[..],
+            Messages::Missing(vec![ring_at("-march=x86-64")]),
+            "name no compiler-artifact row for",
         ),
         (
             "recorded flags differ",

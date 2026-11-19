@@ -33,11 +33,101 @@
 //! C source itself can select instructions the command does not show: `__attribute__((target))`,
 //! `#pragma GCC target` and function multiversioning (`target_clones`) are not read, so a compile
 //! at the declared `-march` is evidence of the command's baseline, not of every function in it.
+use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
-use eprfs_core::BlobCid;
+use eprfs_core::{BlobCid, MethodDescriptor};
+
+use super::{cargo_project, host, CRATE_INPUT};
 
 const DECLARED: &str = "missing declared-target";
+
+/// What the build of these bytes must show (re-review ruling 1): the cargo package id of the bin's
+/// package (the crate at `--crate`), and every package in that package's dependency closure for
+/// the declared triple, each of which the build must have compiled.
+#[derive(Debug, Clone, Default)]
+pub(super) struct Expected {
+    pub package: String,
+    pub closure: BTreeSet<String>,
+}
+
+/// The [`Expected`] roster of `descriptor`'s build, from the lock's resolve for its triple.
+///
+/// The coordinator's decision (L2a re-review, ruling 1): the raw lock closure over-states, since
+/// it holds platform-gated packages never built on Linux (iana-time-zone-haiku is in epr's lock
+/// closure and is not compiled), so "every lock-closure package has a row" would refuse every
+/// real build. The roster is instead `cargo metadata --format-version 1 --locked --offline
+/// --filter-platform <triple>` in the crate's workspace (put already requires a clean,
+/// HEAD-matching selected input set), and the bin package's transitive normal and build
+/// dependency closure in `resolve.nodes` (dev-dependencies are not built into a bin). If cargo
+/// metadata cannot run, the roster is unknown and put refuses with the reason.
+pub(super) fn expected(repo: &Path, descriptor: &MethodDescriptor) -> Result<Expected, String> {
+    let crate_dir = descriptor
+        .non_path_inputs
+        .get(CRATE_INPUT)
+        .map_or(".", String::as_str);
+    let crate_path = repo.join(crate_dir);
+    let features = descriptor
+        .flags
+        .iter()
+        .find_map(|f| f.strip_prefix("--features="));
+    let metadata = cargo_project::metadata(&crate_path, host::target(descriptor), features)
+        .map_err(|e| {
+            format!(
+                "{DECLARED}: the build's roster is unread: cargo metadata for {crate_dir} \
+                 failed: {e}"
+            )
+        })?;
+    let manifest = crate_path.join("Cargo.toml");
+    let same = |path: &str| {
+        let path = Path::new(path);
+        path == manifest
+            || path
+                .canonicalize()
+                .ok()
+                .is_some_and(|p| Some(p) == manifest.canonicalize().ok())
+    };
+    let package = metadata["packages"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .find(|p| p["manifest_path"].as_str().is_some_and(same))
+        .and_then(|p| p["id"].as_str())
+        .ok_or_else(|| {
+            format!(
+                "{DECLARED}: the build's roster is unread: cargo metadata names no package at \
+                 {crate_dir}/Cargo.toml"
+            )
+        })?
+        .to_owned();
+    let nodes = metadata["resolve"]["nodes"].as_array().ok_or_else(|| {
+        format!("{DECLARED}: the build's roster is unread: cargo metadata has no resolve")
+    })?;
+    let mut closure = BTreeSet::new();
+    let mut pending = vec![package.clone()];
+    while let Some(id) = pending.pop() {
+        if !closure.insert(id.clone()) {
+            continue;
+        }
+        let node = nodes
+            .iter()
+            .find(|n| n["id"] == id.as_str())
+            .ok_or_else(|| {
+                format!("{DECLARED}: the build's roster is unread: the resolve has no node {id}")
+            })?;
+        for dep in node["deps"].as_array().into_iter().flatten() {
+            let built = dep["dep_kinds"].as_array().is_some_and(|kinds| {
+                kinds
+                    .iter()
+                    .any(|k| k["kind"].is_null() || k["kind"] == "build")
+            });
+            if let (true, Some(pkg)) = (built, dep["pkg"].as_str()) {
+                pending.push(pkg.to_owned());
+            }
+        }
+    }
+    Ok(Expected { package, closure })
+}
 
 /// How an exception is held against the build's own commands.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -222,16 +312,22 @@ fn script_output(out_dir: &Path) -> Option<PathBuf> {
 }
 
 /// Compiled objects and static archives under `dir`, relative and sorted.
-fn objects(root: &Path) -> Vec<String> {
+fn objects(root: &Path) -> Result<Vec<String>, String> {
     let mut found = Vec::new();
     let mut pending = vec![root.to_path_buf()];
+    let unread = |dir: &Path, e: std::io::Error| {
+        format!(
+            "{DECLARED}: no evidence: {} does not read: {e}",
+            dir.display()
+        )
+    };
     while let Some(dir) = pending.pop() {
-        let Ok(entries) = std::fs::read_dir(&dir) else {
-            continue;
-        };
-        for entry in entries.flatten() {
+        let entries = std::fs::read_dir(&dir).map_err(|e| unread(&dir, e))?;
+        for entry in entries {
+            let entry = entry.map_err(|e| unread(&dir, e))?;
             let path = entry.path();
-            if entry.file_type().is_ok_and(|t| t.is_dir()) {
+            let kind = entry.file_type().map_err(|e| unread(&path, e))?;
+            if kind.is_dir() {
                 pending.push(path);
             } else if path.extension().is_some_and(|ext| ext == "o" || ext == "a") {
                 let shown = path.strip_prefix(root).unwrap_or(&path);
@@ -240,7 +336,7 @@ fn objects(root: &Path) -> Vec<String> {
         }
     }
     found.sort();
-    found
+    Ok(found)
 }
 
 /// Whether a compile's source is assembly, or cc's flag-support probe in the script's `OUT_DIR`
@@ -330,12 +426,28 @@ fn log_findings(script: &Script) -> Vec<String> {
     findings
 }
 
-fn read_script(message: &serde_json::Value) -> Result<Script, String> {
+fn read_script(message: &serde_json::Value, root: &Path) -> Result<Script, String> {
     let id = message["package_id"].as_str().unwrap_or_default();
     let (package, source) = package_of(id);
     let out_dir = message["out_dir"].as_str().map(PathBuf::from).ok_or_else(|| {
         format!("{DECLARED}: no evidence: the build-script-executed message of {id} names no out_dir")
     })?;
+    // Ruling 1: an out_dir that does not exist, or lies outside the executable's target
+    // directory, refuses; it never reads as an empty unit.
+    let real = out_dir.canonicalize().map_err(|e| {
+        format!(
+            "{DECLARED}: no evidence: {package}'s out_dir {} does not exist: {e}",
+            out_dir.display()
+        )
+    })?;
+    if !real.is_dir() || !real.starts_with(root) {
+        return Err(format!(
+            "{DECLARED}: no evidence: {package}'s out_dir {} lies outside the target directory \
+             {} of the executable these messages built",
+            out_dir.display(),
+            root.display()
+        ));
+    }
     let output = script_output(&out_dir).ok_or_else(|| {
         format!(
             "{DECLARED}: no evidence: {package}'s build script output beside {} does not read",
@@ -370,7 +482,7 @@ fn read_script(message: &serde_json::Value) -> Result<Script, String> {
     Ok(Script {
         package,
         source,
-        objects: objects(&out_dir),
+        objects: objects(&out_dir)?,
         out_dir,
         output,
         commands,
@@ -436,6 +548,7 @@ pub(super) fn judge(
     bytes: &[u8],
     bin: &str,
     march: &str,
+    expected: &Expected,
 ) -> Result<Vec<String>, Vec<String>> {
     let text = std::fs::read_to_string(messages).map_err(|e| {
         vec![format!(
@@ -458,36 +571,106 @@ pub(super) fn judge(
         })?;
         parsed.push(value);
     }
-    let executables: Vec<&str> = parsed
-        .iter()
-        .filter(|m| m["reason"] == "compiler-artifact" && m["target"]["name"] == bin)
-        .filter(|m| {
-            m["target"]["kind"]
-                .as_array()
-                .is_some_and(|kinds| kinds.iter().any(|k| k == "bin"))
-        })
-        .filter_map(|m| m["executable"].as_str())
-        .collect();
-    if executables.is_empty() {
+    // Re-review ruling 1: the stream proves it is the whole, successful build of these bytes.
+    if !parsed
+        .last()
+        .is_some_and(|m| m["reason"] == "build-finished" && m["success"] == true)
+    {
         return Err(vec![format!(
-            "{DECLARED}: the build messages {} name no executable for the bin {bin}, so they are \
-             not the build of these bytes",
+            "{DECLARED}: the build messages {} do not end in a build-finished row with success \
+             true, so they are not a whole, successful build",
             messages.display()
         )]);
     }
-    let want = BlobCid::compute_bytes(bytes);
-    if !executables
+    let kind_of = |m: &serde_json::Value, kind: &str| {
+        m["target"]["kind"]
+            .as_array()
+            .is_some_and(|kinds| kinds.iter().any(|k| k == kind))
+    };
+    let artifacts: Vec<&serde_json::Value> = parsed
         .iter()
-        .any(|path| std::fs::read(path).is_ok_and(|built| BlobCid::compute_bytes(&built) == want))
-    {
+        .filter(|m| m["reason"] == "compiler-artifact")
+        .collect();
+    let named: Vec<&serde_json::Value> = artifacts
+        .iter()
+        .copied()
+        .filter(|m| m["target"]["name"] == bin && kind_of(m, "bin"))
+        .collect();
+    let executables: Vec<&str> = named
+        .iter()
+        .filter(|m| m["package_id"] == expected.package.as_str())
+        .filter_map(|m| m["executable"].as_str())
+        .collect();
+    if executables.is_empty() {
+        let others: Vec<&str> = named
+            .iter()
+            .filter_map(|m| m["package_id"].as_str())
+            .collect();
+        return Err(vec![format!(
+            "{DECLARED}: the build messages {} name no executable for the bin {bin} of the \
+             package put, {}{}, so they are not the build of these bytes",
+            messages.display(),
+            expected.package,
+            if others.is_empty() {
+                String::new()
+            } else {
+                format!(" (only of {})", others.join(", "))
+            }
+        )]);
+    }
+    let want = BlobCid::compute_bytes(bytes);
+    let Some(exe) = executables
+        .iter()
+        .find(|path| std::fs::read(path).is_ok_and(|built| BlobCid::compute_bytes(&built) == want))
+    else {
         return Err(vec![format!(
             "{DECLARED}: the build messages' {bin} executable ({}) is not --bytes, so they are \
              not the build of these bytes",
             executables.join(", ")
         )]);
-    }
+    };
+    // The executable's `<target>/<profile>/` directory: every unit of its build lies under it.
+    let Some(root) = Path::new(exe)
+        .parent()
+        .and_then(|dir| dir.canonicalize().ok())
+    else {
+        return Err(vec![format!(
+            "{DECLARED}: the {bin} executable {exe} has no readable target directory"
+        )]);
+    };
     let mut missing = Vec::new();
     let mut notes = Vec::new();
+    // The roster (ruling 1): every package the lock's resolve puts in the bin's closure for the
+    // declared triple was compiled, and every compiled build script ran and is judged below.
+    let compiled: BTreeSet<&str> = artifacts
+        .iter()
+        .filter_map(|m| m["package_id"].as_str())
+        .collect();
+    for id in &expected.closure {
+        if !compiled.contains(id.as_str()) {
+            missing.push(format!(
+                "{DECLARED}: the build messages name no compiler-artifact row for {id}, which \
+                 the bin's dependency closure for the declared triple holds, so they are not the \
+                 whole build"
+            ));
+        }
+    }
+    let ran: BTreeSet<&str> = parsed
+        .iter()
+        .filter(|m| m["reason"] == "build-script-executed")
+        .filter_map(|m| m["package_id"].as_str())
+        .collect();
+    let scripted: BTreeSet<&str> = artifacts
+        .iter()
+        .filter(|m| kind_of(m, "custom-build"))
+        .filter_map(|m| m["package_id"].as_str())
+        .collect();
+    for id in scripted.difference(&ran) {
+        missing.push(format!(
+            "{DECLARED}: no evidence: {id} has a custom-build compile and no \
+             build-script-executed row, so its build script's commands are not in the stream"
+        ));
+    }
     // Every build-script-executed unit counts, build-dependencies and proc-macros included, not
     // only the bin's target-side closure (coordinator ruling on L2a rework, point 1): a declared
     // target is a native build (host triple == target triple; put refuses any other, `isa_c::native`,
@@ -499,7 +682,7 @@ pub(super) fn judge(
         .iter()
         .filter(|m| m["reason"] == "build-script-executed")
     {
-        let script = match read_script(message) {
+        let script = match read_script(message, &root) {
             Ok(script) => script,
             Err(reason) => {
                 missing.push(reason);

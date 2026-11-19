@@ -1,35 +1,99 @@
 use super::*;
 
+use std::collections::BTreeSet;
+
 const MARCH: &str = "-march=x86-64";
 const BYTES: &[u8] = b"\x7fELF the bin these messages built";
 
-/// One build of `bin` under a scratch target directory: its executable, and per build script the
-/// `running:` lines and the objects it left.
+/// The locked version of a crate as the fixtures name it: the exceptions' own, else 1.0.0.
+fn version(package: &str) -> &'static str {
+    match package {
+        "blake3" => "1.8.5",
+        "stacker" => "0.1.25",
+        "generator" => "0.8.11",
+        "iana-time-zone-haiku" => "0.1.2",
+        _ => "1.0.0",
+    }
+}
+
+fn id(package: &str) -> String {
+    format!("{CRATES_IO}#{package}@{}", version(package))
+}
+
+/// One build of `bin` under a scratch target directory, as cargo's `--message-format=json`
+/// stream names it: the bin's executable under `<target>/debug`, per build script its lib and
+/// custom-build compiler-artifact rows, its build-script-executed row (the `running:` lines and
+/// the objects it left), and a final `build-finished`. The expected roster is the bin's package
+/// and every script's package.
 struct Build {
     dir: tempfile::TempDir,
+    bin: String,
     lines: Vec<String>,
+    closure: BTreeSet<String>,
+    finished: Option<bool>,
 }
 
 impl Build {
     fn new(bin: &str) -> Self {
         let dir = tempfile::TempDir::new().unwrap();
-        let exe = dir.path().join(bin);
+        std::fs::create_dir_all(dir.path().join("debug")).unwrap();
+        let exe = dir.path().join("debug").join(bin);
         std::fs::write(&exe, BYTES).unwrap();
+        let package = format!("path+file:///repo/crate#{bin}@0.1.0");
         let lines = vec![serde_json::json!({
             "reason": "compiler-artifact",
-            "package_id": format!("path+file:///repo/crate#{bin}@0.1.0"),
+            "package_id": package,
             "target": {"kind": ["bin"], "name": bin},
             "executable": exe,
             "fresh": true,
         })
         .to_string()];
-        Self { dir, lines }
+        Self {
+            dir,
+            bin: bin.to_owned(),
+            lines,
+            closure: [package].into(),
+            finished: Some(true),
+        }
+    }
+
+    fn root(&self) -> PathBuf {
+        self.dir.path().join("debug")
     }
 
     /// A build script of `package` (crates.io) that logged `running` and left `objects`; `run`
     /// keeps the output in cargo's newer `run/stdout`, else in `output`.
-    fn script(mut self, package: &str, running: &[&str], objects: &[&str], run: bool) -> Self {
-        let unit = self.dir.path().join("build").join(package).join("0123");
+    fn script(self, package: &str, running: &[&str], objects: &[&str], run: bool) -> Self {
+        let root = self.root();
+        self.script_in(&root, package, running, objects, run)
+    }
+
+    /// Drop every row of `reason` for `package` from the stream.
+    fn without(mut self, reason: &str, package: &str) -> Self {
+        let package_id = id(package);
+        self.lines.retain(|line| {
+            let row: serde_json::Value = serde_json::from_str(line).unwrap();
+            !(row["reason"] == reason && row["package_id"] == package_id.as_str())
+        });
+        self
+    }
+
+    fn finished(mut self, finished: Option<bool>) -> Self {
+        self.finished = finished;
+        self
+    }
+
+    /// [`Build::script`] with its unit under `root` (another target directory when not
+    /// [`Build::root`]).
+    fn script_in(
+        mut self,
+        root: &Path,
+        package: &str,
+        running: &[&str],
+        objects: &[&str],
+        run: bool,
+    ) -> Self {
+        let unit = root.join("build").join(package).join("0123");
         let out = unit.join("out");
         std::fs::create_dir_all(&out).unwrap();
         let stdout = running
@@ -61,21 +125,45 @@ impl Build {
         for object in objects {
             std::fs::write(out.join(object), b"obj").unwrap();
         }
+        let package_id = id(package);
+        for kind in ["custom-build", "lib"] {
+            self.lines.push(
+                serde_json::json!({
+                    "reason": "compiler-artifact",
+                    "package_id": package_id,
+                    "target": {"kind": [kind], "name": package},
+                    "executable": null,
+                    "fresh": true,
+                })
+                .to_string(),
+            );
+        }
         self.lines.push(
             serde_json::json!({
                 "reason": "build-script-executed",
-                "package_id": format!("{CRATES_IO}#{package}@1.0.0"),
+                "package_id": package_id,
                 "out_dir": out,
             })
             .to_string(),
         );
+        self.closure.insert(package_id);
         self
     }
 
     fn judge(&self, bin: &str, bytes: &[u8]) -> Result<Vec<String>, Vec<String>> {
         let messages = self.dir.path().join("messages.json");
-        std::fs::write(&messages, self.lines.join("\n") + "\n").unwrap();
-        judge(&messages, bytes, bin, MARCH)
+        let mut lines = self.lines.clone();
+        if let Some(success) = self.finished {
+            lines.push(
+                serde_json::json!({"reason": "build-finished", "success": success}).to_string(),
+            );
+        }
+        std::fs::write(&messages, lines.join("\n") + "\n").unwrap();
+        let expected = Expected {
+            package: format!("path+file:///repo/crate#{}@0.1.0", self.bin),
+            closure: self.closure.clone(),
+        };
+        judge(&messages, bytes, bin, MARCH, &expected)
     }
 }
 
@@ -191,13 +279,83 @@ fn evidence_is_bound_to_the_bytes_by_the_bins_executable() {
     );
     let messages = build.dir.path().join("not-json");
     std::fs::write(&messages, "   Compiling ring v0.17.14\n").unwrap();
-    let found = judge(&messages, BYTES, "epr", MARCH).unwrap_err();
+    let none = Expected::default();
+    let found = judge(&messages, BYTES, "epr", MARCH, &none).unwrap_err();
     assert!(
         has(&found, "not cargo's --message-format=json"),
         "{found:?}"
     );
-    let found = judge(&build.dir.path().join("absent"), BYTES, "epr", MARCH).unwrap_err();
+    let found = judge(&build.dir.path().join("absent"), BYTES, "epr", MARCH, &none).unwrap_err();
     assert!(has(&found, "do not read"), "{found:?}");
+}
+
+/// Re-review ruling 1: the stream must prove it is the whole build that produced these bytes. An
+/// executable-only stream, or one missing a unit's rows, or one whose build did not finish, is not.
+#[test]
+fn evidence_refuses_a_stream_that_is_not_the_whole_build() {
+    let ring = [compile(MARCH, "a.c"), ARCHIVE.to_owned()];
+    let ring: Vec<&str> = ring.iter().map(String::as_str).collect();
+    let full = || Build::new("epr").script("ring", &ring, &["x.o", "libx.a"], true);
+    assert!(full().judge("epr", BYTES).is_ok(), "the whole build passes");
+    // Only the bin's own compiler-artifact row: nothing judged.
+    let mut only = Build::new("epr");
+    only.closure.insert(id("ring"));
+    let found = only.judge("epr", BYTES).unwrap_err();
+    assert!(
+        has(&found, "name no compiler-artifact row for"),
+        "{found:?}"
+    );
+    // One build script's build-script-executed row removed (its custom-build compile stays).
+    let found = full()
+        .without("build-script-executed", "ring")
+        .judge("epr", BYTES)
+        .unwrap_err();
+    assert!(
+        has(
+            &found,
+            "custom-build compile and no build-script-executed row"
+        ),
+        "{found:?}"
+    );
+    // Both of one package's rows removed: the lock's roster names it.
+    let found = full()
+        .without("build-script-executed", "ring")
+        .without("compiler-artifact", "ring")
+        .judge("epr", BYTES)
+        .unwrap_err();
+    assert!(
+        has(&found, &format!("compiler-artifact row for {}", id("ring"))),
+        "{found:?}"
+    );
+    // A build that did not finish, or did not succeed.
+    for finished in [None, Some(false)] {
+        let found = full().finished(finished).judge("epr", BYTES).unwrap_err();
+        assert!(has(&found, "build-finished"), "{finished:?}: {found:?}");
+    }
+    // The bin row of another package than the one put.
+    let mut other = full();
+    other.bin = "elsewhere".into();
+    let found = other.judge("epr", BYTES).unwrap_err();
+    assert!(
+        has(&found, "path+file:///repo/crate#elsewhere@0.1.0"),
+        "{found:?}"
+    );
+}
+
+/// Ruling 1: an out_dir outside the executable's target directory, or one that does not exist,
+/// refuses; it never reads as an empty unit.
+#[test]
+fn evidence_refuses_an_out_dir_outside_the_target_or_absent() {
+    let elsewhere = tempfile::TempDir::new().unwrap();
+    let found = Build::new("epr")
+        .script_in(elsewhere.path(), "ring", &[], &[], true)
+        .judge("epr", BYTES)
+        .unwrap_err();
+    assert!(has(&found, "outside the target directory"), "{found:?}");
+    let build = Build::new("epr").script("ring", &[], &[], true);
+    std::fs::remove_dir_all(out_dir(&build, "ring")).unwrap();
+    let found = build.judge("epr", BYTES).unwrap_err();
+    assert!(has(&found, "does not exist"), "{found:?}");
 }
 
 /// blake3's AVX-512 assembly and cc's flag probe carry -mavx512f: its exception holds while every
@@ -297,7 +455,7 @@ fn evidence_reads_cc_command_lines_and_cargo_package_ids() {
     );
     // A script whose output is in neither place cargo keeps it has no evidence.
     let build = Build::new("epr").script("ring", &[], &[], true);
-    std::fs::remove_file(build.dir.path().join("build/ring/0123/run/stdout")).unwrap();
+    std::fs::remove_file(build.root().join("build/ring/0123/run/stdout")).unwrap();
     let found = build.judge("epr", BYTES).unwrap_err();
     assert!(
         has(&found, "no evidence: ring's build script output"),
@@ -306,12 +464,7 @@ fn evidence_reads_cc_command_lines_and_cargo_package_ids() {
 }
 
 fn out_dir(build: &Build, package: &str) -> PathBuf {
-    build
-        .dir
-        .path()
-        .join("build")
-        .join(package)
-        .join("0123/out")
+    build.root().join("build").join(package).join("0123/out")
 }
 
 /// The coordinator's point 3: a stale log must not pass. Cargo stamps a script's output with the

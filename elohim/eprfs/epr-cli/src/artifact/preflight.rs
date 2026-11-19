@@ -169,7 +169,12 @@ pub(super) fn check(options: &Options, descriptor: &MethodDescriptor) -> Artifac
                             .into(),
                     ),
                     (Some(messages), Some(bin)) => {
-                        match isa_c_evidence::judge(messages, bytes, bin, target.march) {
+                        let judged = isa_c_evidence::expected(&options.repo, descriptor)
+                            .map_err(|reason| vec![reason])
+                            .and_then(|expected| {
+                                isa_c_evidence::judge(messages, bytes, bin, target.march, &expected)
+                            });
+                        match judged {
                             Ok(notes) => notes.iter().for_each(|note| eprintln!("{note}")),
                             Err(reasons) => missing.extend(reasons),
                         }
