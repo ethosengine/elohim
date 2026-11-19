@@ -109,6 +109,21 @@ test('env: an exported but empty C-family variable is no finding (cc adds no fla
   assert.deepEqual(set.map(f => f.variable).sort(), ['CFLAGS', 'CRATE_CC_NO_DEFAULTS']);
 });
 
+// E12 L2a rework, ruling 1: the record's `env` (CC_ENABLE_DEBUG_OUTPUT=1) is a gate export beside
+// the declared flags; it makes cc log its commands and selects no flag, so it is never an
+// offending C-family variable, while a C-family flag set beside it still is.
+test('env: the declared CC_ENABLE_DEBUG_OUTPUT is no finding', () => {
+  const declared = {
+    CFLAGS_x86_64_unknown_linux_gnu: '-march=x86-64', CXXFLAGS_x86_64_unknown_linux_gnu: '-march=x86-64',
+    CC_ENABLE_DEBUG_OUTPUT: '1',
+  };
+  assert.equal(cFamilyKey('CC_ENABLE_DEBUG_OUTPUT'), false);
+  const withEnv = { ...record, [TRIPLE]: { ...record[TRIPLE], env: { CC_ENABLE_DEBUG_OUTPUT: '1' } } };
+  assert.deepEqual(checkCBaseline({ ...base, record: withEnv, env: declared, spawn: probing(BASELINE_MACROS) }), []);
+  const extra = checkCBaseline({ ...base, record: withEnv, env: { ...declared, CFLAGS: '-O2' }, spawn: probing(BASELINE_MACROS) });
+  assert.deepEqual(extra.map(f => f.variable), ['CFLAGS']);
+});
+
 test('env: the declared underscore variable passes only at the record\'s cflags', () => {
   const ok = { CFLAGS_x86_64_unknown_linux_gnu: '-march=x86-64', CXXFLAGS_x86_64_unknown_linux_gnu: '-march=x86-64' };
   assert.deepEqual(checkCBaseline({ ...base, env: ok, spawn: probing(BASELINE_MACROS) }), []);

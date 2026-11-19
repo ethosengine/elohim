@@ -517,11 +517,28 @@ describe('manifest-driven local gate registry', () => {
       cargo_env_overrides: { '*': { RUSTUP_TOOLCHAIN: '1.100.0' }, ...(extra.overrides || {}) },
       declared_targets: {
         _comment: 'fixture',
-        'x86_64-unknown-linux-gnu': { isa: 'x86-64', cflags: '-march=x86-64', workspaces: ['elohim/eprfs'] },
+        'x86_64-unknown-linux-gnu': {
+          isa: 'x86-64', cflags: '-march=x86-64', env: { CC_ENABLE_DEBUG_OUTPUT: '1' }, workspaces: ['elohim/eprfs'],
+        },
       },
     }));
     return root;
   };
+
+  // E12 L2a rework, ruling 1: the record's `env` is exported beside the two flags, so cc logs every
+  // compile command for put to read; projects off the listed workspaces get none of it.
+  test('a declared target exports its env beside the C flags, on its listed workspaces only', () => {
+    const root = declaredTargetsRoot();
+    try {
+      const eprfs = { name: 'fixture-eprfs', run: { cargo: { workspace: 'elohim/eprfs' } } };
+      const env = JSON.parse(gateChildEnv(eprfs, {}, root).GATE_CARGO_ENV);
+      assert.equal(env.CC_ENABLE_DEBUG_OUTPUT, '1');
+      const storage = { name: 'fixture-storage', run: { cargo: { workspace: 'elohim/elohim-storage' } } };
+      assert.equal(Object.hasOwn(JSON.parse(gateChildEnv(storage, {}, root).GATE_CARGO_ENV), 'CC_ENABLE_DEBUG_OUTPUT'), false);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
 
   test('a declared target puts its C baseline on projects of its listed workspaces only', () => {
     const root = declaredTargetsRoot();
@@ -581,7 +598,9 @@ describe('manifest-driven local gate registry', () => {
     assert.equal(typeof _comment, 'string');
     assert.match(_comment, /29\.2/, 'the comment names the decision row');
     assert.deepStrictEqual(targets, {
-      'x86_64-unknown-linux-gnu': { isa: 'x86-64', cflags: '-march=x86-64', workspaces: ['elohim/eprfs'] },
+      'x86_64-unknown-linux-gnu': {
+        isa: 'x86-64', cflags: '-march=x86-64', env: { CC_ENABLE_DEBUG_OUTPUT: '1' }, workspaces: ['elohim/eprfs'],
+      },
     });
     assert.equal(Object.hasOwn(policy.cargo_env_overrides, 'declared_targets'), false,
       'the record is a top-level key, never inside cargo_env_overrides (hc-mesh.sh reads that map)');
@@ -594,6 +613,7 @@ describe('manifest-driven local gate registry', () => {
       const env = JSON.parse(gateChildEnv(project, {}).GATE_CARGO_ENV);
       assert.equal(env[CFLAGS_KEY], '-march=x86-64', project.name);
       assert.equal(env[CXXFLAGS_KEY], '-march=x86-64', project.name);
+      assert.equal(env.CC_ENABLE_DEBUG_OUTPUT, '1', project.name);
     }
     for (const project of registry.values()) {
       if (onEprfs.includes(project)) continue;
@@ -601,6 +621,7 @@ describe('manifest-driven local gate registry', () => {
       const env = carried ? JSON.parse(carried) : {};
       assert.equal(Object.hasOwn(env, CFLAGS_KEY), false, project.name);
       assert.equal(Object.hasOwn(env, CXXFLAGS_KEY), false, project.name);
+      assert.equal(Object.hasOwn(env, 'CC_ENABLE_DEBUG_OUTPUT'), false, project.name);
     }
   });
 

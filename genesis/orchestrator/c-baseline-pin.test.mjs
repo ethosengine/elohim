@@ -21,7 +21,11 @@ const read = rel => readFileSync(resolve(ROOT, rel), 'utf8');
 const TRIPLE = 'x86_64-unknown-linux-gnu';
 const CFLAGS_VAR = 'CFLAGS_x86_64_unknown_linux_gnu';
 const CXXFLAGS_VAR = 'CXXFLAGS_x86_64_unknown_linux_gnu';
-const EXPECTED_TARGET = { isa: 'x86-64', cflags: '-march=x86-64', workspaces: ['elohim/eprfs'] };
+// `env`: the gate exports these beside the two flags (E12 L2a rework, ruling 1): cc's command log,
+// the evidence `epr artifact put` reads before it stamps env:isa-c.
+const EXPECTED_TARGET = {
+  isa: 'x86-64', cflags: '-march=x86-64', env: { CC_ENABLE_DEBUG_OUTPUT: '1' }, workspaces: ['elohim/eprfs'],
+};
 
 // ---- pure checks (proved against fixtures below, then applied to the repository) ----
 
@@ -179,8 +183,11 @@ test('fixture: the decided declared_targets shape passes and every drift is name
   const nested = { cargo_env_overrides: { declared_targets: good.declared_targets } };
   assert.match(declaredTargetProblems(nested).join('\n'), /inside cargo_env_overrides/);
   const v3 = structuredClone(good);
-  v3.declared_targets[TRIPLE] = { isa: 'x86-64-v3', cflags: '-march=x86-64-v3', workspaces: ['elohim/eprfs'] };
+  v3.declared_targets[TRIPLE] = { ...EXPECTED_TARGET, isa: 'x86-64-v3', cflags: '-march=x86-64-v3' };
   assert.match(declaredTargetProblems(v3).join('\n'), /expected/);
+  const noLog = structuredClone(good);
+  delete noLog.declared_targets[TRIPLE].env;
+  assert.match(declaredTargetProblems(noLog).join('\n'), /expected/, 'the record declares the command log put reads');
   const extra = structuredClone(good);
   extra.declared_targets['aarch64-unknown-linux-gnu'] = { isa: 'armv8-a' };
   assert.match(declaredTargetProblems(extra).join('\n'), /keys are/);
