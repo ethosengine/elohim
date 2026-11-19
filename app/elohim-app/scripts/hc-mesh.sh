@@ -1986,8 +1986,10 @@ print_iroh_build_command() { # <binary>
 # then installs a COPY into <slot>/mesh-bin/, which the gate never writes and which the binary
 # resolution above prefers. Storage: features `p2p p2p-iroh`, its required custom getrandom
 # RUSTFLAGS. Doorway: RUSTFLAGS="". Both: the local gate's toolchain pin and cargo caps, merged
-# exactly as gate-runner.mjs gateChildEnv does (the crate manifest's gate run.cargo.env wins,
-# then pool-policy cargo_env_overrides[<project>], then ["*"]), over the caller's env.
+# with gate-runner.mjs gateChildEnv's precedence (the crate manifest's gate run.cargo.env wins,
+# then pool-policy cargo_env_overrides[<project>], then ["*"]), over the caller's env. Not
+# gateChildEnv's pool-policy declared_targets C flags: those go only to projects on the
+# workspaces a target lists (elohim/eprfs today), and this builds storage and doorway only.
 mesh_build_env() { # <gate-project-name> -> prints `KEY=VALUE` lines
   python3 - "$REPO_ROOT" "$1" <<'PY'
 import json, sys, pathlib
