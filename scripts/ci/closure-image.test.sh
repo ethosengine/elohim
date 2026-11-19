@@ -15,94 +15,123 @@ cp "$ROOT/scripts/ci/closure-input-digest.sh" "$ROOT/scripts/ci/storage-input-di
     "$ROOT/scripts/ci/harbor-oracle.sh" "$ROOT/scripts/ci/build-storage-image.sh" \
     "$ROOT/scripts/ci/build-doorway-app-image.sh" "$ROOT/scripts/ci/build-agent-sdk-image.sh" \
     "$T/repo/scripts/ci/"
-cat > "$T/bin/git" <<'JS'
-#!/usr/bin/env node
-const fs = require('node:fs'), crypto = require('node:crypto');
-const a = process.argv.slice(2);
-fs.appendFileSync(process.env.CALLS, `stub git ${a.join(' ')}\n`);
-if (a[0] === 'merge-base') {
-  if (a[1] !== '--is-ancestor' || a[2] !== 'c'.repeat(40) || a[3] !== 'origin/dev') process.exit(98);
-  process.exit(process.env.ORACLE_CASE === 'off-dev' ? 1 : 0);
+# The doubles are bash: the suite calls them ~1,500 times, and a node double paid a
+# runtime start-up (~50 ms) on every call. They answer each call exactly as the node
+# doubles they replace did (transcript-checked, byte for byte, for every call the suite makes).
+cat > "$T/bin/git" <<'SH'
+#!/usr/bin/env bash
+export LC_ALL=C
+printf 'stub git %s\n' "$*" >> "$CALLS"
+if [ "${1-}" = merge-base ]; then
+  [ "${2-}" = --is-ancestor ] && [ "${3-}" = cccccccccccccccccccccccccccccccccccccccc ] && [ "${4-}" = origin/dev ] || exit 98
+  [ "${ORACLE_CASE-}" = off-dev ] && exit 1
+  exit 0
+fi
+if [ "${1-}" = status ]; then [ "${DIRTY-}" = 1 ] && echo ' M source/value'; exit 0; fi
+p=''
+for a in "$@"; do case "$a" in HEAD:*) p="${a#HEAD:}"; break ;; esac; done
+# The bytes the object id is a sha1 of: a file's content as hex; a directory's sorted entries,
+# each name followed by its own bytes, joined by newlines.
+bytes() {
+  if [ -d "$1" ]; then
+    local first=1 entry
+    shopt -s dotglob nullglob
+    for entry in "$1"/*; do
+      [ "$first" = 1 ] || printf '\n'
+      first=0
+      printf '%s' "${entry##*/}"
+      bytes "$entry"
+    done
+  else
+    od -An -v -tx1 "$1" | tr -d ' \n'
+  fi
 }
-if (a[0] === 'status') { if(process.env.DIRTY === '1') console.log(' M source/value'); process.exit(0); }
-const p = (a.find(x => x.startsWith('HEAD:')) || '').slice(5);
-if (a[0] === 'rev-parse') {
-  if (p === 'elohim/holochain-conductor' || p === 'vendor/fork') { console.log(process.env.PIN || 'a'.repeat(40)); process.exit(0); }
-  if (!p || !fs.existsSync(p)) process.exit(1);
-  function bytes(path) {
-    if (fs.statSync(path).isDirectory()) return fs.readdirSync(path).sort().map(n => n+bytes(`${path}/${n}`)).join('\n');
-    return fs.readFileSync(path).toString('hex');
-  }
-  console.log(crypto.createHash('sha1').update(bytes(p)).digest('hex')); process.exit(0);
-}
-if (a[0] === 'ls-tree') {
-  const path = a.at(-1);
-  if (path === 'elohim/holochain-conductor' || path === 'vendor/fork') console.log(`160000 commit ${'a'.repeat(40)}\t${path}`);
-  else console.log(`100644 blob ${'b'.repeat(40)}\t${path}`);
-  process.exit(0);
-}
-throw Error(`unexpected stub git call: ${a}`);
-JS
-cat > "$T/bin/curl" <<'JS'
-#!/usr/bin/env node
-const fs = require('node:fs'), crypto = require('node:crypto');
-const a = process.argv.slice(2), mode = process.env.ORACLE_CASE || 'hit';
-for (const secret of [process.env.HARBOR_USER, process.env.HARBOR_PASS, 'fixture-token'].filter(Boolean)) {
-  if (a.some(arg => arg.includes(secret))) {
-    fs.writeFileSync(`${process.env.FIXTURE}/secret-in-argv`, 'leaked');
-    throw Error('secret in curl argv');
-  }
-}
-let curlConfig = '';
-for (let i = 0; i < a.length; i++) if (a[i] === '--config') {
-  const path = a[++i];
-  if ((fs.statSync(path).mode & 0o077) || (fs.statSync(require('node:path').dirname(path)).mode & 0o077)) throw Error('non-private auth file');
-  curlConfig += fs.readFileSync(path, 'utf8');
-}
-const authenticated = curlConfig.includes('Authorization: Bearer fixture-token');
-const url = a.find(x => x.startsWith('https://'));
-fs.appendFileSync(process.env.CALLS, `stub curl ${a.includes('-I') ? 'HEAD' : 'GET'} ${url}\n`);
-if (mode === 'unreachable') process.exit(7);
-const out = a[a.indexOf('-o')+1];
-if (url.includes('/service/token?')) { if (!curlConfig.includes(process.env.HARBOR_USER + ':' + process.env.HARBOR_PASS)) throw Error('missing credentials'); fs.writeFileSync(out, '{"token":"fixture-token"}'); process.exit(0); }
-const labels = {'elohim.host/closure':process.env.KEY, 'org.opencontainers.image.revision':'c'.repeat(40)};
-if (mode === 'missing-label') delete labels['elohim.host/closure'];
-if (mode === 'missing-revision') delete labels['org.opencontainers.image.revision'];
-if (mode === 'unequal') labels['elohim.host/closure'] = `sha256:${'0'.repeat(64)}`;
-if (mode === 'bad-revision') labels['org.opencontainers.image.revision'] = 'dev';
-const hash = body => `sha256:${crypto.createHash('sha256').update(body).digest('hex')}`;
-const config = mode === 'config-invalid-json' ? '{broken' : JSON.stringify({config:{Labels:labels}});
-const manifest = mode === 'invalid-json' ? '{broken' : JSON.stringify({schemaVersion:2,
-  mediaType:'application/vnd.oci.image.manifest.v1+json',
-  config: mode === 'missing-config' ? {} : {digest:hash(config)}});
-const index = JSON.stringify({schemaVersion:2, mediaType:'application/vnd.oci.image.index.v1+json', manifests:[
-  {digest:`sha256:${'1'.repeat(64)}`,platform:{os:'linux',architecture:'arm64'}},
-  ...(mode === 'index-no-amd64' ? [] : [
-    {digest:hash(manifest),platform:{os:'linux',architecture:'amd64'}},
-    {digest:`sha256:${'2'.repeat(64)}`,platform:{os:'linux',architecture:'amd64'}},
-  ]),
-]});
-const body = mode.startsWith('index') ? index : manifest;
-const digest = hash(body);
-if (a.includes('-I')) {
-  fs.writeFileSync(a[a.indexOf('-D')+1], mode === 'no-digest' ? '' : `Docker-Content-Digest: ${digest}\r\n`);
-  process.stdout.write(mode === '404' ? '404' : mode === 'auth' && !authenticated ? '401' : '200');
-} else {
-  if (mode === 'auth' && !authenticated) throw Error('GET lacks auth');
-  const blob = url.endsWith(`/blobs/${hash(config)}`);
-  const child = url.endsWith(`/manifests/${hash(manifest)}`) && mode.startsWith('index');
-  let payload;
-  if (blob) payload = config;
-  else if (child) payload = manifest;
-  else if (url.endsWith(`/manifests/${digest}`)) payload = body;
-  else throw Error('read was not pinned to an expected digest');
-  const failure = blob ? 'config' : child ? 'index-child' : 'fetch';
-  if (mode === `${failure}-unreachable`) process.exit(7);
-  fs.writeFileSync(out, mode === 'digest-mismatch' || mode === `${failure}-digest-mismatch` ? payload+' ' : payload);
-  process.stdout.write(mode === `${failure}-404` ? '404' : '200');
-}
-
-JS
+if [ "${1-}" = rev-parse ]; then
+  if [ "$p" = elohim/holochain-conductor ] || [ "$p" = vendor/fork ]; then echo "${PIN:-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa}"; exit 0; fi
+  [ -n "$p" ] && [ -e "$p" ] || exit 1
+  sum="$(bytes "$p" | sha1sum)"
+  echo "${sum%% *}"
+  exit 0
+fi
+if [ "${1-}" = ls-tree ]; then
+  path="${!#}"
+  if [ "$path" = elohim/holochain-conductor ] || [ "$path" = vendor/fork ]; then
+    printf '160000 commit aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\t%s\n' "$path"
+  else
+    printf '100644 blob bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\t%s\n' "$path"
+  fi
+  exit 0
+fi
+IFS=,; echo "unexpected stub git call: $*" >&2; exit 1
+SH
+cat > "$T/bin/curl" <<'SH'
+#!/usr/bin/env bash
+export LC_ALL=C
+fail() { echo "$*" >&2; exit 1; }
+args=("$@") mode="${ORACLE_CASE:-hit}"
+arg_after() { local i; for ((i = 0; i < ${#args[@]}; i++)); do [ "${args[$i]}" = "$1" ] && { printf '%s' "${args[$((i + 1))]-}"; return; }; done; printf '%s' "${args[0]-}"; }
+for secret in "${HARBOR_USER-}" "${HARBOR_PASS-}" fixture-token; do
+  [ -n "$secret" ] || continue
+  for a in "${args[@]}"; do
+    if [[ "$a" == *"$secret"* ]]; then printf leaked > "$FIXTURE/secret-in-argv"; fail 'secret in curl argv'; fi
+  done
+done
+config=''
+for ((i = 0; i < ${#args[@]}; i++)); do
+  [ "${args[$i]}" = --config ] || continue
+  i=$((i + 1)); path="${args[$i]}"
+  for target in "$path" "$(dirname "$path")"; do
+    perm="$(stat -c %a "$target")" || fail "cannot stat $target"
+    (( 8#$perm & 8#077 )) && fail 'non-private auth file'
+  done
+  config+="$(cat "$path"; printf x)"; config="${config%x}"
+done
+authenticated=0; [[ "$config" == *'Authorization: Bearer fixture-token'* ]] && authenticated=1
+url=undefined
+for a in "${args[@]}"; do case "$a" in https://*) url="$a"; break ;; esac; done
+head=0; for a in "${args[@]}"; do [ "$a" = -I ] && head=1; done
+printf 'stub curl %s %s\n' "$([ "$head" = 1 ] && echo HEAD || echo GET)" "$url" >> "$CALLS"
+[ "$mode" = unreachable ] && exit 7
+out="$(arg_after -o)"
+if [[ "$url" == */service/token\?* ]]; then
+  [[ "$config" == *"${HARBOR_USER-undefined}:${HARBOR_PASS-undefined}"* ]] || fail 'missing credentials'
+  printf '%s' '{"token":"fixture-token"}' > "$out"; exit 0
+fi
+sha_of() { local sum; sum="$(printf '%s' "$1" | sha256sum)"; printf 'sha256:%s' "${sum%% *}"; }
+closure="${KEY-}" revision=cccccccccccccccccccccccccccccccccccccccc
+[ "$mode" = unequal ] && closure="sha256:0000000000000000000000000000000000000000000000000000000000000000"
+[ "$mode" = bad-revision ] && revision=dev
+labels=()
+[ "$mode" = missing-label ] || { [ -z "${KEY+set}" ] && [ "$mode" != unequal ]; } || labels+=("\"elohim.host/closure\":\"$closure\"")
+[ "$mode" = missing-revision ] || labels+=("\"org.opencontainers.image.revision\":\"$revision\"")
+cfg="{\"config\":{\"Labels\":{$(IFS=,; printf '%s' "${labels[*]}")}}}"
+[ "$mode" = config-invalid-json ] && cfg='{broken'
+if [ "$mode" = missing-config ]; then cfg_ref='{}'; else cfg_ref="{\"digest\":\"$(sha_of "$cfg")\"}"; fi
+manifest="{\"schemaVersion\":2,\"mediaType\":\"application/vnd.oci.image.manifest.v1+json\",\"config\":$cfg_ref}"
+[ "$mode" = invalid-json ] && manifest='{broken'
+amd64=''
+[ "$mode" = index-no-amd64 ] || amd64=",{\"digest\":\"$(sha_of "$manifest")\",\"platform\":{\"os\":\"linux\",\"architecture\":\"amd64\"}},{\"digest\":\"sha256:2222222222222222222222222222222222222222222222222222222222222222\",\"platform\":{\"os\":\"linux\",\"architecture\":\"amd64\"}}"
+index="{\"schemaVersion\":2,\"mediaType\":\"application/vnd.oci.image.index.v1+json\",\"manifests\":[{\"digest\":\"sha256:1111111111111111111111111111111111111111111111111111111111111111\",\"platform\":{\"os\":\"linux\",\"architecture\":\"arm64\"}}$amd64]}"
+body="$manifest"; [[ "$mode" == index* ]] && body="$index"
+digest="$(sha_of "$body")"
+if [ "$head" = 1 ]; then
+  if [ "$mode" = no-digest ]; then : > "$(arg_after -D)"; else printf 'Docker-Content-Digest: %s\r\n' "$digest" > "$(arg_after -D)"; fi
+  if [ "$mode" = 404 ]; then printf 404; elif [ "$mode" = auth ] && [ "$authenticated" = 0 ]; then printf 401; else printf 200; fi
+  exit 0
+fi
+[ "$mode" = auth ] && [ "$authenticated" = 0 ] && fail 'GET lacks auth'
+blob=0 child=0
+[[ "$url" == *"/blobs/$(sha_of "$cfg")" ]] && blob=1
+[[ "$url" == *"/manifests/$(sha_of "$manifest")" ]] && [[ "$mode" == index* ]] && child=1
+if [ "$blob" = 1 ]; then payload="$cfg"; elif [ "$child" = 1 ]; then payload="$manifest"
+elif [[ "$url" == *"/manifests/$digest" ]]; then payload="$body"
+else fail 'read was not pinned to an expected digest'; fi
+failure=fetch; [ "$child" = 1 ] && failure=index-child; [ "$blob" = 1 ] && failure=config
+[ "$mode" = "$failure-unreachable" ] && exit 7
+if [ "$mode" = digest-mismatch ] || [ "$mode" = "$failure-digest-mismatch" ]; then printf '%s ' "$payload" > "$out"; else printf '%s' "$payload" > "$out"; fi
+if [ "$mode" = "$failure-404" ]; then printf 404; else printf 200; fi
+exit 0
+SH
 cat > "$T/bin/buildctl" <<'STUB'
 #!/usr/bin/env bash
 printf 'buildctl %s\n' "$*" >> "$CALLS"
