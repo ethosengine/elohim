@@ -16,8 +16,16 @@
 #   [gate] epr producer put skipped (<reason>; gate remains green)
 # and exits 0. EPRFS_PRODUCER=off turns the leg off. EPR_PRODUCER_BIN overrides the driving epr
 # (default: the epr this gate built).
+#
+# Before any describe, the C the build compiled is checked against the target's declared level
+# (pool-policy.json declared_targets, backlog steward-device-arrival row 29.2: a v3-default gcc put
+# AVX2 into ring's C and a v2 sibling died with SIGILL running the drawn epr). A finding prints
+#   [gate] epr producer put withheld (<first finding>; gate remains green)
+# and exits 0: these bytes are kept from siblings, and the device's own gate outcome is unchanged.
+# EPRFS_C_BASELINE_CHECK overrides the checker (default: c-baseline.mjs beside this script).
 set -uo pipefail
 
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 tested_head="${1:-}"
 tree_clean="${2:-}"
 ingest_json="${3:-}"
@@ -30,6 +38,11 @@ declare -A crate=([epr]=elohim/eprfs/epr-cli [bin-launch]=elohim/eprfs/device-ru
 
 skip() {
   echo "[gate] epr producer put skipped ($1; gate remains green)"
+  exit 0
+}
+
+withhold() {
+  echo "[gate] epr producer put withheld ($1; gate remains green)"
   exit 0
 }
 
@@ -59,16 +72,30 @@ release="$(json_field "$ingest_json" 'd.get("cid") or d.get("rcid")')"
 [[ -x "$epr" ]] || skip "$epr is not executable"
 [[ -f "$repo/${sources%%#*}" ]] || skip "${sources%%#*} is not in the checkout"
 
+# The C level, in this same environment the build ran in. A missing checker withholds too: an
+# offer whose C level nobody read is the one that trapped on shem.
+check="${EPRFS_C_BASELINE_CHECK:-$here/c-baseline.mjs}"
+[[ -f "$check" ]] || withhold "the C baseline check $check is not there"
+said="$(node "$check" --triple x86_64-unknown-linux-gnu 2>&1)"
+status=$?
+if ((status != 0)); then
+  finding="$(reason_of "$said")"
+  withhold "${finding:-the C baseline check exited $status}"
+fi
+
 # The environment as the build saw it. `describe` records PATH, RUSTFLAGS (given) and the native
 # toolchain variables itself; every other build variable set here is recorded as is, so the
 # method states what the bytes were built under and `put`'s environment check holds by
-# construction. The benign set mirrors epr-cli's BENIGN_BUILD_ENV.
+# construction. The benign set mirrors epr-cli's BENIGN_BUILD_ENV. Of the C family only the
+# declared target's triple-suffixed flags are recorded (as --env, never --target-isa or
+# --target-cflags: `put` refuses a declared target until L2a); the checker refuses the rest.
 recorded=()
 while IFS= read -r name; do
   case "$name" in
     CARGO_HOME | RUSTUP_HOME | CARGO_TARGET_DIR | CARGO_BUILD_JOBS | RUST_TEST_THREADS | RUST_BACKTRACE | RUST_LOG) ;;
     RUSTFLAGS) ;;
     CARGO_* | RUST*) recorded+=(--env "$name=${!name}") ;;
+    CFLAGS_x86_64_unknown_linux_gnu | CXXFLAGS_x86_64_unknown_linux_gnu) recorded+=(--env "$name=${!name}") ;;
   esac
 done < <(compgen -e | LC_ALL=C sort)
 

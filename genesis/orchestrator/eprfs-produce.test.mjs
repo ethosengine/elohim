@@ -11,6 +11,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { createRecognizer } from "./gate-failure-lines.mjs";
+import { classifyFailure } from "./gate-cycle.mjs";
 
 const ROOT = fileURLToPath(new URL("../../", import.meta.url));
 const RELEASE = "bafyreistubreleasestubreleasestubreleasestubrelease";
@@ -64,6 +66,20 @@ if (args[0] === 'build') {
 }
 `;
 
+// A stub C-baseline check (the real one is genesis/orchestrator/c-baseline.mjs, row 29.2): logs its
+// argv; STUB_CHECK_FAIL prints two findings after a blank line and exits 1.
+const FINDING = "CFLAGS_x86_64_unknown_linux_gnu is not set: cc builds ring's C at the compiler default, not -march=x86-64";
+const STUB_CHECK = `import { appendFileSync } from 'node:fs';
+appendFileSync(process.env.STUB_LOG, JSON.stringify(['c-baseline', ...process.argv.slice(2)]) + '\\n');
+if (process.env.STUB_CHECK_FAIL) {
+  console.log('');
+  console.log(${JSON.stringify(FINDING)});
+  console.error('CXXFLAGS_x86_64_unknown_linux_gnu is not set');
+  process.exit(1);
+}
+console.log('c-baseline: x86_64-unknown-linux-gnu builds C at -march=x86-64');
+`;
+
 function fixture(t) {
   const dir = mkdtempSync(join(tmpdir(), "eprfs-produce-"));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
@@ -79,7 +95,7 @@ function fixture(t) {
   git("-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false", "commit", "-qm", "fixture", "--no-verify");
   const head = git("rev-parse", "HEAD").stdout.trim();
   assert.match(head, /^[0-9a-f]{40}$/);
-  for (const [name, body] of [["epr", STUB_EPR], ["cargo", STUB_CARGO]]) {
+  for (const [name, body] of [["epr", STUB_EPR], ["cargo", STUB_CARGO], ["c-baseline.mjs", STUB_CHECK]]) {
     writeFileSync(join(stubs, name), body);
     chmodSync(join(stubs, name), 0o755);
   }
@@ -101,6 +117,7 @@ function run(f, mode, extra = {}) {
     RUSTFLAGS: "",
     STUB_LOG: f.log,
     STUB_EPR: join(f.stubs, "epr"),
+    EPRFS_C_BASELINE_CHECK: join(f.stubs, "c-baseline.mjs"),
     ...extra,
   });
   const r = spawnSync("just", ["--justfile", join(ROOT, "justfile"), "--working-directory", f.repo,
@@ -134,6 +151,10 @@ function assertOffered(f, r) {
     assert.ok(recorded.includes(`CARGO_TARGET_POOL_ROOT=${join(f.dir, "pool")}`), recorded.join(" "));
     assert.ok(recorded.includes("RUSTUP_TOOLCHAIN=1.100.0"), recorded.join(" "));
     assert.ok(!recorded.some((e) => /^(CARGO_HOME|CARGO_TARGET_DIR|RUSTFLAGS)=/.test(e)), recorded.join(" "));
+    // `put` refuses a declared target until L2a (K6): the C level is recorded as --env only.
+    assert.ok(!d.some((a) => a.startsWith("--target-")), d.join(" "));
+    const check = verb(r.calls, "c-baseline", "--triple", "x86_64-unknown-linux-gnu");
+    assert.ok(check >= 0 && check < describe, "the C baseline is checked before any describe");
     const p = r.calls[put];
     assert.equal(flag(p, "--release"), RELEASE);
     assert.ok(p.includes("--cross"), "the Produce crosses to siblings");
@@ -195,6 +216,68 @@ test("negative_control_a_failed_build_fails_the_gate_and_offers_nothing", (t) =>
   assert.equal(r.status, 101, "the build's failure is the gate's verdict");
   assert.ok(!r.calls.some((c) => c[0] === "epr" && (c[1] === "artifact" || c[3] === "ingest")));
   assert.deepEqual(skipped(r.stdout), []);
+});
+
+// Row 29.2: the C a gate builds is held at the Rust target's baseline (-march=x86-64), because a
+// v3-default gcc put AVX2 into ring's C and a v2 sibling died with SIGILL running a drawn epr.
+const C_LEVEL = {
+  CFLAGS_x86_64_unknown_linux_gnu: "-march=x86-64",
+  CXXFLAGS_x86_64_unknown_linux_gnu: "-march=x86-64",
+};
+
+// The withheld line reaches the agent as a live event, but its class names no failure of the gate.
+function recognize(stdout, exitCode) {
+  const events = [];
+  const rec = createRecognizer({ project: "eprfs", emit: (e) => events.push(e) });
+  for (const line of stdout.split("\n")) rec.push(line);
+  rec.end(exitCode);
+  return { failures: events.filter((e) => e.kind === "failure"), signals: rec.signals() };
+}
+
+test("a_failing_c_baseline_check_withholds_the_offer_with_its_first_finding_and_never_describes", (t) => {
+  const f = fixture(t);
+  const r = run(f, "build", { ...C_LEVEL, STUB_CHECK_FAIL: "1" });
+  assert.equal(r.status, 0, r.stderr);
+  assert.deepEqual(skipped(r.stdout), [`[gate] epr producer put withheld (${FINDING}; gate remains green)`]);
+  assert.ok(verb(r.calls, "c-baseline", "--triple", "x86_64-unknown-linux-gnu") >= 0, "the check ran");
+  assert.ok(!r.calls.some((c) => c[1] === "artifact"), "nothing is described, keyed or put");
+  const heard = recognize(r.stdout, r.status);
+  assert.deepEqual(heard.failures.map((e) => e.failure.class), ["env"], "the agent hears the withheld offer");
+  assert.equal(classifyFailure(r.status, heard.signals), undefined, "and the gate stays green");
+  assert.equal(heard.signals.assertionFailed || heard.signals.compilerError, false);
+});
+
+test("a_missing_c_baseline_check_withholds_the_offer", (t) => {
+  const f = fixture(t);
+  const absent = join(f.dir, "no-such-c-baseline.mjs");
+  const r = run(f, "build", { ...C_LEVEL, EPRFS_C_BASELINE_CHECK: absent });
+  assert.equal(r.status, 0, r.stderr);
+  assert.deepEqual(skipped(r.stdout), [
+    `[gate] epr producer put withheld (the C baseline check ${absent} is not there; gate remains green)`,
+  ]);
+  assert.ok(!r.calls.some((c) => c[1] === "artifact"));
+});
+
+test("a_passing_c_baseline_check_describes_with_the_declared_c_flags_only", (t) => {
+  const f = fixture(t);
+  // The rest of the C family is the checker's to refuse; the producer never records it.
+  const r = run(f, "build", { ...C_LEVEL, CFLAGS: "-O2", CXXFLAGS: "-O2", CC: "gcc", TARGET_CFLAGS: "-mavx2" });
+  assertOffered(f, r);
+  for (const d of r.calls.filter((c) => c[1] === "artifact" && c[2] === "describe")) {
+    const recorded = d.filter((_, i) => d[i - 1] === "--env");
+    for (const [k, v] of Object.entries(C_LEVEL)) assert.ok(recorded.includes(`${k}=${v}`), recorded.join(" "));
+    const cFamily = recorded.filter((e) => !/^(CARGO_|RUST)/.test(e));
+    assert.deepEqual(cFamily.sort(), Object.entries(C_LEVEL).map(([k, v]) => `${k}=${v}`).sort());
+  }
+  assert.deepEqual(recognize(r.stdout, r.status).failures, [], "an offer that crosses raises nothing");
+});
+
+test("unset_c_flags_are_not_recorded", (t) => {
+  const f = fixture(t);
+  const r = run(f, "build");
+  assertOffered(f, r);
+  const d = r.calls.find((c) => c[1] === "artifact" && c[2] === "describe");
+  assert.ok(!d.some((a) => /^C(XX)?FLAGS/.test(a)), d.join(" "));
 });
 
 test("the_producer_is_off_when_asked", (t) => {

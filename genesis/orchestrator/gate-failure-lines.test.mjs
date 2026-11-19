@@ -1,5 +1,6 @@
 import { describe, test } from 'node:test';
 import { strict as assert } from 'node:assert';
+import { readFileSync } from 'node:fs';
 import {
   createRecognizer, fingerprint, normalize, stripAnsi, MAX_FAILURES, MAX_EXCERPT_BYTES,
 } from './gate-failure-lines.mjs';
@@ -205,6 +206,44 @@ describe('steps, preflight, environment', () => {
     const signals = rec.signals();
     assert.equal(signals.preflight, 'refused');
     assert.equal(classifyFailure(1, signals), 'environment');
+  });
+
+  test('a withheld producer offer is class env, sets no failure signal and never reads as a red gate', () => {
+    const line = '[gate] epr producer put withheld (CFLAGS_x86_64_unknown_linux_gnu is not set; gate remains green)';
+    const { events, rec } = run(['test result: ok. 3 passed; 0 failed', line]);
+    const f = failures(events);
+    assert.equal(f.length, 1);
+    assert.equal(f[0].failure.class, 'env');
+    assert.deepEqual(f[0].failure.locus, {});
+    assert.equal(f[0].failure.excerpt, line);
+    // The live-event schema's diagnostic enum is the class contract; a class outside it is refused.
+    const schema = JSON.parse(readFileSync(new URL('../../elohim/sdk/schemas/v1/gate-live-event.schema.json', import.meta.url), 'utf8'));
+    assert.ok(schema.$defs.diagnostic.properties.class.enum.includes(f[0].failure.class));
+    const signals = rec.signals();
+    assert.equal(signals.assertionFailed, false);
+    assert.equal(signals.compilerError, false);
+    assert.equal(classifyFailure(0, signals), undefined);
+    // Were the run red for another reason, the offer would not make it a code failure.
+    assert.equal(classifyFailure(1, signals), 'unknown');
+  });
+
+  test('a skipped producer put is routine and raises nothing', () => {
+    const { events } = run(["[gate] epr producer put skipped (epr's source closure was not clean across the build; gate remains green)"]);
+    assert.deepEqual(events, []);
+  });
+
+  test('a withheld offer does not stand in for an unrecognized red step', () => {
+    const lines = [
+      '[gate] epr producer put withheld (x; gate remains green)',
+      // A finding that quotes the env rule's words is still the advisory offer line.
+      '[gate] epr producer put withheld (cc said: Cannot allocate memory; gate remains green)',
+    ];
+    const events = [];
+    const rec = createRecognizer({ project: 'proj', emit: e => events.push(e) });
+    for (const line of lines) rec.push(line);
+    rec.push('error: Recipe `_gate-x` failed on line 3 with exit code 1');
+    rec.end(1);
+    assert.deepEqual(failures(events).map(e => e.failure.class), ['env', 'env', 'step']);
   });
 
   test('out-of-space output is class env', () => {

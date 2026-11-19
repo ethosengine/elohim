@@ -52,6 +52,14 @@ const RULES = [
   { cls: 'compile', re: /^error(?:\[E\d+\])?: (?!could not compile|aborting due to|test failed|[Rr]ecipe `|\d+ previous error)(.+)$/, locus: () => ({}), rust: true },
   { cls: 'format', re: /^Diff in (\S+?)(?::(\d+))?(?: at line (\d+))?:?\s*$/, locus: m => ({ file: m[1], line: Number(m[2] || m[3]) || undefined }) },
   { cls: 'lint', re: /^\s+(\d+):\d+\s+error\s+(.+?)\s{2,}(\S+)$/, locus: (m, ctx) => ({ file: ctx.lastPath, line: Number(m[1]) }) },
+  // eprfs-produce.sh kept a green gate's bytes from siblings (row 29.2: the build environment's C
+  // compiler built above the target's declared level). Only a failure event reaches the agent, so
+  // it is one, of class env: the cause is the environment, env is in the live-event schema's
+  // diagnostic enum, and it sets no classifyFailure signal, so it never makes a run read as code
+  // red and the verdict stays the exit status. Advisory: it explains no red step (end()). A `put
+  // skipped` line is routine and raises nothing. Before the env rule below, whose words a finding
+  // may quote.
+  { cls: 'env', re: /^\[gate\] epr producer put withheld \(.+; gate remains green\)$/, locus: () => ({}), advisory: true },
   { cls: 'env', re: /No space left on device|Cannot allocate memory|signal: 9, SIGKILL|\(signal: 15, SIGTERM/, locus: () => ({}) },
 ];
 
@@ -90,17 +98,19 @@ export function createRecognizer({ project, emit, now = () => Date.now() }) {
   const started = now();
   let firstRedMs = null;
   let failures = 0;
+  let named = false; // a failure that names a red (any but an advisory rule's) was recognized
   let overflow = 0;
   let lastPath = null;
   let block = null; // { kind: 'cargo-test' | 'rust', lines, event }
   const failedSteps = new Map(); // step name -> first non-zero exit printed for it
 
-  function raise(cls, locus, text, extra = {}) {
+  function raise(cls, locus, text, extra = {}, advisory = false) {
     if (cls === 'test') signals.assertionFailed = true;
     if (cls === 'compile' || cls === 'lint' || cls === 'format') signals.compilerError = true;
     const identifier = locus.test || `${locus.file || ''}:${normalize(text)}`;
     const fp = fingerprint(project, cls, identifier);
     if (seen.has(fp)) return null;
+    if (!advisory) named = true;
     if (failures >= MAX_FAILURES) {
       // Saturate when dedupe fills, rather than count repeated untracked failures.
       if (!overflowSeen.has(fp) && overflowSeen.size < 4 * MAX_FAILURES) {
@@ -175,7 +185,7 @@ export function createRecognizer({ project, emit, now = () => Date.now() }) {
       if (!m || rule.skip?.(m)) continue;
       if (rule.rust) { block = { kind: 'rust', lines: [line] }; return; }
       if (rule.signalOnly) { signals.assertionFailed = true; return; }
-      raise(rule.cls, rule.locus(m, { lastPath }), line);
+      raise(rule.cls, rule.locus(m, { lastPath }), line, {}, rule.advisory === true);
       return;
     }
   }
@@ -186,11 +196,12 @@ export function createRecognizer({ project, emit, now = () => Date.now() }) {
      * `exitCode`: the child's status, once known. A child that exited non-zero with no failure this
      * recognizer could name (a Gherkin parse error) gets one `step` failure per distinct failed step,
      * raised like any other (fingerprint, nth, summary count), so every red gate is heard; a child
-     * that exited 0 never does, whatever it printed (E6 #2, DoD-4 receipt 2026-11-18).
+     * that exited 0 never does, whatever it printed (E6 #2, DoD-4 receipt 2026-11-18). An advisory
+     * failure (a withheld offer) names no red, so it does not stand in for one.
      */
     end(exitCode) {
       closeBlock();
-      if (exitCode === undefined || exitCode === 0 || failures > 0) return;
+      if (exitCode === undefined || exitCode === 0 || named) return;
       for (const [name, exit] of failedSteps) {
         raise('step', {}, `${name} exited ${exit} with no failure line this recognizer knows`, { step: name });
       }
