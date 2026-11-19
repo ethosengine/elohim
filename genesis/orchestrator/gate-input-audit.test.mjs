@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { spawnSync } from 'child_process';
 import { existsSync, readFileSync, readdirSync } from 'fs';
 import { dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
@@ -445,11 +446,20 @@ function realSources(name) {
   return [...new Set(project.steps.flatMap(step => manifest.steps[step].inputs.sources))];
 }
 
+// The REAL legs below read one repository: one read set per (project, sources) serves them all,
+// as one preflight run memoizes it (gate-preflight.mjs memoRead). Results are only read.
+const REAL_READ_SETS = new Map();
+function repoReadSet(options) {
+  const key = JSON.stringify([options.project?.name ?? null, options.sources]);
+  if (!REAL_READ_SETS.has(key)) REAL_READ_SETS.set(key, readSet(options));
+  return REAL_READ_SETS.get(key);
+}
+
 function realReadSet(name) {
   const repo = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
   const project = loadGateRegistry(repo).get(name);
   const manifest = JSON.parse(readFileSync(resolve(repo, project.manifestPath), 'utf8'));
-  return readSet({
+  return repoReadSet({
     root: repo, project,
     sources: [...new Set(project.steps.flatMap(step => manifest.steps[step].inputs.sources))],
   });
@@ -486,11 +496,24 @@ test('exhaust promise rejects sources, recipe references and audited reads, incl
 test('REAL every gate keeps declared sources, recipes and audited reads disjoint from exhaust', () => {
   const repo = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
   const files = readdirSync(resolve(repo, '.claude/data')).map(name => `.claude/data/${name}`);
+  // With no project named, a Rust file's reads do not depend on which gate scans it, so each file
+  // is read once and a gate's reads are the union over the files its sources cover (63 gates
+  // re-scanned ~8000 files for ~2300). The same Rust listing as readSet's; the guard holds the
+  // union equal to readSet itself on eprfs's 700 files.
+  const rust = spawnSync('git', ['ls-files', '-z', '--cached', '--others', '--exclude-standard', '--', '*.rs'],
+    { cwd: repo, encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 }).stdout.split('\0').filter(Boolean);
+  const perFile = new Map();
+  const readsOf = sources => [...new Set(rust.filter(f => sources.some(glob => globCovers(glob, f))).flatMap(f => {
+    if (!perFile.has(f)) perFile.set(f, readSet({ root: repo, sources: [f], listFiles: () => [f] }).paths);
+    return perFile.get(f);
+  }))].sort();
+  assert.deepEqual(readsOf(['elohim/eprfs/**']), repoReadSet({ root: repo, sources: ['elohim/eprfs/**'] }).paths,
+    'a per-file union must equal readSet');
   const failures = [];
   for (const project of loadGateRegistry(repo).values()) {
     const manifest = JSON.parse(readFileSync(resolve(repo, project.manifestPath), 'utf8'));
     const sources = [...new Set(project.steps.flatMap(step => manifest.steps[step].inputs?.sources || []))];
-    const reads = readSet({ root: repo, sources }).paths;
+    const reads = readsOf(sources);
     let recipe = '';
     if (project.run.kind !== 'attested') {
       const local = resolve(repo, project.dir, 'justfile');
@@ -530,7 +553,7 @@ test('eprfs-live-corpus keys on each cluster-state manifest and never on the hab
   const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
   const { paths, unresolved } = realReadSet('eprfs-live-corpus');
   assert.deepEqual(unresolved, []);
-  assert.equal(readSet({ root: ROOT, sources: ['elohim/eprfs/**'] }).paths.some(read => readCovers(read, 'genesis/manifests/habits.yaml')),
+  assert.equal(repoReadSet({ root: ROOT, sources: ['elohim/eprfs/**'] }).paths.some(read => readCovers(read, 'genesis/manifests/habits.yaml')),
     false, 'no eprfs scan, scoped or not, may cover the habits projection');
   const covered = file => paths.some(read => readCovers(read, file));
   assert.equal(covered('genesis/manifests/habits.yaml'), false,

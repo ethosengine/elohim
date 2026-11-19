@@ -1191,6 +1191,16 @@ test('E4 finding 5: a subscription binds to its sender, its lease is capped, a l
   assert.equal(match([subNote({}, { at: nowS + 60 })]).length, 1);
 });
 
+// E4 finding 3's clamp case waits out the real 18 s bound (the 20 s worker life less 2 s, pinned
+// nowhere else), so it starts as the file loads and runs beside every other test; the last test in
+// this file awaits its result. Its stub sleeps far past the bound, so a busy event loop can delay
+// the kill but never turn it into a delivery.
+const CLAMP_ROOT = mkdtempSync(join(tmpdir(), 'gate-live-clamp-'));
+const CLAMPED = live.sendNote('s', 'to', { kind: 'gate-red@1' }, {
+  env: { ...siblingEnv(CLAMP_ROOT, stubBerth(CLAMP_ROOT, { sleepS: 120 })), GATE_LIVE_DELIVER_MS: '30000' },
+  deadlineMs: 30_000,
+}).finally(() => rmSync(CLAMP_ROOT, { recursive: true, force: true }));
+
 test('E4 finding 3: a stuck or missing berth is bounded and named, never silent', async (t) => {
   const root = fixture(t);
   const stuck = siblingEnv(root, stubBerth(root, { sleepS: 30 }));
@@ -1199,9 +1209,7 @@ test('E4 finding 3: a stuck or missing berth is bounded and named, never silent'
   assert.equal(late.ok, false);
   assert.match(late.why, /exceeded 300 ms/);
   assert.ok(Date.now() - started < 3000, 'the deadline holds');
-  // An override past the worker's 20 s life is clamped so the kill still fires inside it.
-  const long = await live.sendNote('s', 'to', { kind: 'gate-red@1' }, { env: { ...stuck, GATE_LIVE_DELIVER_MS: '30000' }, deadlineMs: 30_000 });
-  assert.match(long.why, /exceeded 18000 ms/);
+  // An override past the worker's 20 s life is clamped: CLAMPED, asserted by the file's last test.
   const missing = await live.sendNote('s', 'to', { kind: 'gate-red@1' }, { env: siblingEnv(root, join(root, 'no-berth')) });
   assert.equal(missing.ok, false);
   assert.match(missing.why, /berth/);
@@ -1248,9 +1256,12 @@ test('E4 finding 6: a self/* subscription matches a hand-over run, and a run kil
   // The run is killed before any red reached anyone (E5 #6): it still gets its final.
   const { path } = threeRedRun(root);
   openRun({ root, sha: SHA, target: 'dev', session: 'gate-session', ref: 'refs/heads/dev' });
-  const sent = await settle(root, 2, 8000);
-  const final = sent.map(sayBody).find((b) => b.kind === 'gate-final@1');
-  assert.ok(final, sent.join('\n'));
+  // Wait for the final itself (up to 8 s), not for a second note: only the final is sent here, so
+  // waiting for two always ran out the clock.
+  const finalOf = () => says(root).map(sayBody).find((b) => b.kind === 'gate-final@1');
+  for (const end = Date.now() + 8000; Date.now() < end && !finalOf();) await new Promise((r) => setTimeout(r, 50));
+  const final = finalOf();
+  assert.ok(final, says(root).join('\n'));
   assert.equal(final.verdict, 'unknown');
   assert.equal(final.run, live.opaqueRun(path, HERE_DID));
   assert.equal(final.failures, 3);
@@ -1522,4 +1533,11 @@ test('E8 #3: a final for the longest DID the validator admits fits BODY_MAX', as
   }
   assert.ok(says(root).length >= 195, 'every final was sent');
   assert.ok(largest <= 3500, `largest final ${largest} bytes`);
+});
+
+// Last in the file on purpose: CLAMPED (started at load, beside E4 finding 3) has run beside every test.
+test("E4 finding 3: an override past the worker's 20 s life is clamped so the kill still fires inside it", async () => {
+  const long = await CLAMPED;
+  assert.equal(long.ok, false);
+  assert.match(long.why, /exceeded 18000 ms/);
 });

@@ -119,10 +119,13 @@ test("live_run_counts_deferred_verdicts_before_later_push_refusal", (t) => {
 
 test("live_run_sigterm_closes_interrupted", async (t) => {
   const dir = fixture(t);
+  // Its own process group, signalled as a whole, as a terminal or supervisor signals a push: bash
+  // runs a trap only once its foreground child returns, so signalling bash alone waited out the
+  // whole `sleep 30` before the trap this test is about could run.
   const child = spawn(
     "bash",
     ["-c", script(`HOOK_WORK_TREE='${dir}'`, PRELUDE, OPEN_BLOCK, "sleep 30")],
-    { cwd: dir, env: env(), stdio: ["ignore", "pipe", "ignore"] },
+    { cwd: dir, env: env(), stdio: ["ignore", "pipe", "ignore"], detached: true },
   );
   let out = "";
   child.stdout.on("data", (d) => { out += d; });
@@ -133,7 +136,7 @@ test("live_run_sigterm_closes_interrupted", async (t) => {
     await new Promise((r) => setTimeout(r, 50));
   }
   assert.equal(runsOf(dir).length, 1, "run file exists before the kill");
-  child.kill("SIGTERM");
+  process.kill(-child.pid, "SIGTERM");
   const { code, signal } = await exited;
   assert.equal(signal, null);
   assert.equal(code, 143);

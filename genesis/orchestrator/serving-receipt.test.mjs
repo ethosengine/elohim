@@ -10,7 +10,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { createPrivateKey, sign as edSign } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import {
@@ -134,13 +134,12 @@ test("renderer changes invalidate prior delivery receipts", () => {
   delete old.env.sutParts.renderer;
   assert.equal(validateReceipt(old, expected, names), false);
 });
-test("storage service alone cannot bypass mandatory receipt; caller file survives", () => {
-  // Hook git environment may make a relative GIT_WORK_TREE follow the gate cwd.
-  const root = fileURLToPath(new URL("../../", import.meta.url));
-  const dir = mkdtempSync(join(tmpdir(), "serving-receipt-"));
-  try {
-    const changed = join(dir, "changed");
-    for (const path of [
+// The refusal is the scripts' behaviour, not the live tree's: it runs the real t2-receipt.sh and
+// serving-receipt.mjs (copied byte for byte) in a committed fixture repo, every path at once. The
+// live tree's source identity is exercised by the test below, which needs it to ADMIT.
+test("storage service alone cannot bypass mandatory receipt; caller file survives", async () => {
+  await withFixtureAsync(async (root, dir) => {
+    const paths = [
       "elohim/elohim-storage/src/services/content_service.rs",
       "doorway/doorway-service/src/server/http.rs",
       "elohim/elohim-render/src/shim/node_builtins.rs",
@@ -149,48 +148,19 @@ test("storage service alone cannot bypass mandatory receipt; caller file survive
       "genesis/a2o/scripts/browser-shell.ts",
       "genesis/a2o/scripts/verify-served-shell.ts",
       "genesis/a2o/scripts/lib/sut.ts",
-    ]) {
-      writeFileSync(changed, `${path}\n`);
-      const result = spawnSync(
-        "bash",
-        [
-          join(root, "genesis/orchestrator/scripts/t2-receipt.sh"),
-          "--changed",
-          changed,
-          "--reports",
-          dir,
-        ],
-        // Report files only: the real repo may hold a signed household attestation for the
-        // current source (brit-build-ref on PATH writes one per receipt lane), which would
-        // admit these paths and hide the refusal under test.
-        {
-          cwd: root,
-          encoding: "utf8",
-          env: { ...process.env, SERVING_RECEIPT_ATTESTATIONS: "0" },
-        },
-      );
-      assert.equal(result.status, 1, path);
-      assert.match(result.stderr, /NO-SERVING-RECEIPT/);
-      assert.equal(existsSync(changed), true);
-    }
-    writeFileSync(changed, "app/unrelated.ts\n");
-    assert.equal(
-      spawnSync(
-        "bash",
-        [
-          join(root, "genesis/orchestrator/scripts/t2-receipt.sh"),
-          "--changed",
-          changed,
-          "--reports",
-          dir,
-        ],
-        { cwd: root },
-      ).status,
-      0,
+    ];
+    // Report files only (SERVING_RECEIPT_ATTESTATIONS=0): a signed attestation must not be what
+    // admits or refuses here.
+    const results = await Promise.all(
+      paths.map((path) => runT2Async(root, [path], dir)),
     );
-  } finally {
-    rmSync(dir, { recursive: true, force: true });
-  }
+    for (const [i, result] of results.entries()) {
+      assert.equal(result.status, 1, paths[i]);
+      assert.match(result.stderr, /NO-SERVING-RECEIPT/);
+      assert.equal(existsSync(result.changed), true, "the caller's list survives");
+    }
+    assert.equal((await runT2Async(root, ["app/unrelated.ts"], dir)).status, 0);
+  });
 });
 
 test("default producer source identities accept a complete report despite newer unrelated reports", () => {
@@ -404,6 +374,44 @@ function runT2(root, changedPaths, reportsDir, env = {}) {
   );
 }
 
+let t2Lists = 0;
+/**
+ * runT2 for a fixture repo, concurrently: each run gets its own changed list, no GIT_* from the
+ * caller can point it at another repository, and no optional index lock is taken, so read-only
+ * runs against one fixture never contend. Resolves with the list's path beside the exit status.
+ */
+function runT2Async(root, changedPaths, reportsDir, env = {}) {
+  const changed = join(reportsDir, `changed-${(t2Lists += 1)}.txt`);
+  writeFileSync(changed, changedPaths.join("\n") + "\n");
+  return new Promise((done, failed) => {
+    const child = spawn(
+      "bash",
+      [
+        join(root, "genesis/orchestrator/scripts/t2-receipt.sh"),
+        "--changed",
+        changed,
+        "--reports",
+        reportsDir,
+      ],
+      {
+        cwd: root,
+        env: {
+          ...NO_GIT_ENV,
+          GIT_OPTIONAL_LOCKS: "0",
+          SERVING_RECEIPT_ATTESTATIONS: "0",
+          ...env,
+        },
+      },
+    );
+    let stdout = "";
+    let stderr = "";
+    child.stdout.setEncoding("utf8").on("data", (d) => (stdout += d));
+    child.stderr.setEncoding("utf8").on("data", (d) => (stderr += d));
+    child.on("error", failed);
+    child.on("close", (status) => done({ status, stdout, stderr, changed }));
+  });
+}
+
 test("each changed serving path requires the story that witnesses it", () => {
   for (const path of REFUSES_FAST_PATHS)
     assert.deepEqual(requiredReceipts([path]), [["refusesFast"]], path);
@@ -468,39 +476,48 @@ test("the refuses-fast story is a receipt only with all four stations under its 
   );
 });
 
-test("the C2 paths are refused without a receipt in default and strict modes, naming the story", () => {
-  const dir = mkdtempSync(join(tmpdir(), "c2-refused-"));
-  try {
-    for (const path of [
-      ...REFUSES_FAST_PATHS,
-      "scripts/ci/stage-spa-blob.sh",
-    ]) {
-      for (const mode of ["", "strict"]) {
-        const result = runT2(REPO, [path], dir, { T2_RECEIPT: mode });
-        assert.equal(result.status, 1, `${path} mode=${mode || "default"}`);
-        assert.match(result.stderr, /NO-SERVING-RECEIPT/);
-        assert.match(result.stderr, /app-delivery-refuses-fast\.feature/);
-        assert.doesNotMatch(result.stdout + result.stderr, /NO-T2-RECEIPT/);
-      }
+test("the C2 paths are refused without a receipt in default and strict modes, naming the story", async () => {
+  await withFixtureAsync(async (root, dir) => {
+    const cases = [...REFUSES_FAST_PATHS, "scripts/ci/stage-spa-blob.sh"].flatMap(
+      (path) => ["", "strict"].map((mode) => ({ path, mode })),
+    );
+    const results = await Promise.all(
+      cases.map(({ path, mode }) =>
+        runT2Async(root, [path], dir, { T2_RECEIPT: mode }),
+      ),
+    );
+    for (const [i, result] of results.entries()) {
+      const { path, mode } = cases[i];
+      assert.equal(result.status, 1, `${path} mode=${mode || "default"}`);
+      assert.match(result.stderr, /NO-SERVING-RECEIPT/);
+      assert.match(result.stderr, /app-delivery-refuses-fast\.feature/);
+      assert.doesNotMatch(result.stdout + result.stderr, /NO-T2-RECEIPT/);
     }
-  } finally {
-    rmSync(dir, { recursive: true, force: true });
-  }
+  });
 });
 
 // These run the real t2-receipt.sh inside a committed fixture repo: the live checkout's source
 // identity moves under concurrent sessions, and a receipt test must not race it.
-test("a current-source refuses-fast report admits stage-spa-blob.sh and the readiness paths, not a render change", () => {
-  withFixture((root, dir) => {
+test("a current-source refuses-fast report admits stage-spa-blob.sh and the readiness paths, not a render change", async () => {
+  await withFixtureAsync(async (root, dir) => {
     writeFileSync(
       join(dir, "sprint-report-household-c2.json"),
       JSON.stringify(storyReport(root, RECEIPT_STORIES.refusesFast)),
     );
-    for (const path of [
-      "scripts/ci/stage-spa-blob.sh",
-      ...REFUSES_FAST_PATHS,
-    ]) {
-      const result = runT2(root, [path], dir);
+    const paths = ["scripts/ci/stage-spa-blob.sh", ...REFUSES_FAST_PATHS];
+    const [mixed, ...results] = await Promise.all([
+      runT2Async(
+        root,
+        [
+          "scripts/ci/fleet-write-readiness.sh",
+          "elohim/elohim-render/src/lib.rs",
+        ],
+        dir,
+      ),
+      ...paths.map((path) => runT2Async(root, [path], dir)),
+    ]);
+    for (const [i, result] of results.entries()) {
+      const path = paths[i];
       assert.equal(result.status, 0, `${path}: ${result.stderr}`);
       assert.match(
         result.stdout,
@@ -511,14 +528,6 @@ test("a current-source refuses-fast report admits stage-spa-blob.sh and the read
         /NO-T2-RECEIPT|NO-SERVING-RECEIPT/,
       );
     }
-    const mixed = runT2(
-      root,
-      [
-        "scripts/ci/fleet-write-readiness.sh",
-        "elohim/elohim-render/src/lib.rs",
-      ],
-      dir,
-    );
     assert.equal(
       mixed.status,
       1,
@@ -690,6 +699,17 @@ function withFixture(fn) {
   const reports = mkdtempSync(join(tmpdir(), "f2-reports-"));
   try {
     fn(root, reports);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+    rmSync(reports, { recursive: true, force: true });
+  }
+}
+
+async function withFixtureAsync(fn) {
+  const root = fixtureRepo();
+  const reports = mkdtempSync(join(tmpdir(), "f2-reports-"));
+  try {
+    await fn(root, reports);
   } finally {
     rmSync(root, { recursive: true, force: true });
     rmSync(reports, { recursive: true, force: true });
@@ -950,7 +970,7 @@ test("a source change under the same component still stales the receipt", () => 
   });
 });
 
-test("a changed path under .epr-meta is not a serving path, and the bash leg agrees with isGovernancePath", () => {
+test("a changed path under .epr-meta is not a serving path, and the bash leg agrees with isGovernancePath", async () => {
   assert.deepEqual(
     requiredReceipts([
       "elohim/elohim-render/.epr-meta/x.habit.md",
@@ -966,9 +986,9 @@ test("a changed path under .epr-meta is not a serving path, and the bash leg agr
     ]),
     [["deliverability"]],
   );
-  withFixture((root, dir) => {
+  await withFixtureAsync(async (root, dir) => {
     // Every sample sits under a serving prefix, so the script refuses exactly the non-governance ones.
-    const samples = {
+    const samples = Object.entries({
       ".epr-meta/x.habit.md": true,
       ".epr-meta": true,
       "src/.epr-meta/nested.habit.md": true,
@@ -977,22 +997,24 @@ test("a changed path under .epr-meta is not a serving path, and the bash leg agr
       "src/x.epr-meta": false,
       "src/.epr-metadata/z.rs": false,
       "src/not.epr-meta/z.rs": false,
-    };
-    for (const [suffix, governance] of Object.entries(samples)) {
-      const path = `elohim/elohim-render/${suffix}`;
+    }).map(([suffix, governance]) => [`elohim/elohim-render/${suffix}`, governance]);
+    const [mixed, ...results] = await Promise.all([
+      runT2Async(
+        root,
+        [
+          "elohim/elohim-render/.epr-meta/x.habit.md",
+          "elohim/elohim-render/src/lib.rs",
+        ],
+        dir,
+      ),
+      ...samples.map(([path]) => runT2Async(root, [path], dir)),
+    ]);
+    for (const [i, [path, governance]] of samples.entries()) {
       assert.equal(isGovernancePath(path), governance, `sut.ts: ${path}`);
-      const result = runT2(root, [path], dir);
+      const result = results[i];
       assert.equal(result.status, governance ? 0 : 1, `t2-receipt.sh: ${path}`);
       assert.equal(/NO-SERVING-RECEIPT/.test(result.stderr), !governance, path);
     }
-    const mixed = runT2(
-      root,
-      [
-        "elohim/elohim-render/.epr-meta/x.habit.md",
-        "elohim/elohim-render/src/lib.rs",
-      ],
-      dir,
-    );
     assert.equal(mixed.status, 1);
     assert.match(
       mixed.stderr,

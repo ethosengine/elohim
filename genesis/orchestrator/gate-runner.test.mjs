@@ -1,5 +1,5 @@
 import { gateEvidence, recordEvidence } from './gate-evidence.mjs';
-import { describe, test } from 'node:test';
+import { after, describe, test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import { chmodSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
@@ -7,11 +7,27 @@ import { tmpdir } from 'node:os';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { loadGateRegistry } from './pipeline-registry.mjs';
-import { loadManifests } from './manifest-utils.mjs';
+import { discoverManifests, loadManifests } from './manifest-utils.mjs';
 import { costLineAndDefer, gateChildEnv, oracleMode, projectsForChanges, runProject, selectGateProjects, worktreeTargetDir } from './gate-runner.mjs';
 import { resolveRakiaBin } from './gate-oracle.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
+
+// projectsForChanges re-walks the whole tree for build-manifest.json on every call (~1 s here,
+// dozens of calls). A selection that asks no oracle of the tree (path mode, or an injected rakia)
+// reads nothing but those manifests, so such calls read MANIFESTS: this repository's manifests
+// copied once, byte for byte, at their own paths, and held equal to the real walk below. Calls
+// that may ask the real rakia keep ROOT.
+const MANIFESTS = mkdtempSync(resolve(tmpdir(), 'gate-runner-manifests-'));
+for (const path of discoverManifests(ROOT)) {
+  mkdirSync(dirname(resolve(MANIFESTS, path)), { recursive: true });
+  writeFileSync(resolve(MANIFESTS, path), readFileSync(resolve(ROOT, path)));
+}
+after(() => rmSync(MANIFESTS, { recursive: true, force: true }));
+
+test("the manifest mirror is this repository's build graph", () => {
+  assert.deepStrictEqual(loadManifests(MANIFESTS), loadManifests(ROOT));
+});
 
 describe('gate expectations and feature-branch CI deferral', () => {
   const project = { name: 'fixture', dir: 'fixture', steps: ['build'], run: { kind: 'just', recipe: 'gate' } };
@@ -220,7 +236,7 @@ test('Rust style selects new crates and inherited lint configuration', () => {
     'some/crate/.epr-meta/manifest.md',
   ]) {
     for (const oracle of ['path', 'rakia']) {
-      const selected = projectsForChanges(ROOT, [changed], { oracle, rakia: () => new Map() }).map(p => p.name);
+      const selected = projectsForChanges(MANIFESTS, [changed], { oracle, rakia: () => new Map() }).map(p => p.name);
       assert.ok(selected.includes('rust-style'), `${changed} must select the style floor (${oracle})`);
     }
   }
@@ -229,7 +245,7 @@ test('Rust style selects new crates and inherited lint configuration', () => {
 // S6: the checker's own legs are a separate project. A checker change selects both; a Rust change
 // elsewhere selects only the always-run scan, whose baseline moves with origin/dev.
 test('a checker change selects rust-style-checker; a Rust change elsewhere selects only the scan', () => {
-  const select = (changed, oracle) => projectsForChanges(ROOT, [changed], { oracle, rakia: () => new Map() }).map(p => p.name);
+  const select = (changed, oracle) => projectsForChanges(MANIFESTS, [changed], { oracle, rakia: () => new Map() }).map(p => p.name);
   for (const oracle of ['path', 'rakia']) {
     for (const changed of [
       'genesis/orchestrator/rust-style/src/lib.rs', 'genesis/orchestrator/rust-style/tests/ratchet.rs',
@@ -297,7 +313,7 @@ describe('manifest-driven local gate registry', () => {
   });
 
   test('a rakia pin move fires the two schema gates directly', () => {
-    const selected = projectsForChanges(ROOT, ['elohim/rakia'], { oracle: 'path', log: () => {} }).map(p => p.name);
+    const selected = projectsForChanges(MANIFESTS, ['elohim/rakia'], { oracle: 'path', log: () => {} }).map(p => p.name);
     assert.ok(selected.includes('rakia-validate'));
     assert.ok(selected.includes('rakia-codegen'));
     assert.ok(selected.includes('rakia'));
@@ -525,14 +541,14 @@ describe('selection oracle — shadow, rakia, path', () => {
   const noOracle = () => null;
 
   test('path mode ignores the oracle entirely', () => {
-    const names = projectsForChanges(ROOT, ['sophia'], { oracle: 'path', rakia: withOracle, log: () => {} }).map(p => p.name);
+    const names = projectsForChanges(MANIFESTS, ['sophia'], { oracle: 'path', rakia: withOracle, log: () => {} }).map(p => p.name);
     assert.ok(names.includes('sophia'));
     assert.ok(!names.includes('elohim-app'), 'path-only never propagates');
   });
 
   test('shadow mode selects by path and prints one oracle-diff line when the sets differ', () => {
     const lines = [];
-    const names = projectsForChanges(ROOT, ['sophia'], { oracle: 'shadow', rakia: withOracle, log: l => lines.push(l) }).map(p => p.name);
+    const names = projectsForChanges(MANIFESTS, ['sophia'], { oracle: 'shadow', rakia: withOracle, log: l => lines.push(l) }).map(p => p.name);
     assert.ok(!names.includes('elohim-app'), 'shadow mode does not change selection');
     assert.equal(lines.length, 1);
     assert.match(lines[0], /^\[gate\] oracle-diff: \+elohim-app/);
@@ -542,13 +558,13 @@ describe('selection oracle — shadow, rakia, path', () => {
     const lines = [];
     // A documentation-only change selects nothing by path (proven below by the names-only CLI
     // case); an oracle that also finds nothing stale must not print a diff.
-    const selected = projectsForChanges(ROOT, ['genesis/data/timeline/backlog/CLUSTERS.md'], { oracle: 'shadow', rakia: () => new Map(), log: l => lines.push(l) });
+    const selected = projectsForChanges(MANIFESTS, ['genesis/data/timeline/backlog/CLUSTERS.md'], { oracle: 'shadow', rakia: () => new Map(), log: l => lines.push(l) });
     assert.deepEqual(selected, []);
     assert.deepEqual(lines, []);
   });
 
   test('rakia mode selects the direct component and its one-hop consumer with the upstream reason', () => {
-    const projects = projectsForChanges(ROOT, ['sophia'], { oracle: 'rakia', rakia: withOracle, log: () => {} });
+    const projects = projectsForChanges(MANIFESTS, ['sophia'], { oracle: 'rakia', rakia: withOracle, log: () => {} });
     const app = projects.find(p => p.name === 'elohim-app');
     assert.ok(app, 'elohim-app is a depth-one consumer of the sophia pin');
     assert.deepEqual(app.reasons, ['upstream: elohim-sophia:build-sophia-umd']);
@@ -557,14 +573,14 @@ describe('selection oracle — shadow, rakia, path', () => {
 
   test('rakia mode falls back to path selection and says so when the oracle is unavailable', () => {
     const lines = [];
-    const names = projectsForChanges(ROOT, ['sophia'], { oracle: 'rakia', rakia: noOracle, log: l => lines.push(l) }).map(p => p.name);
+    const names = projectsForChanges(MANIFESTS, ['sophia'], { oracle: 'rakia', rakia: noOracle, log: l => lines.push(l) }).map(p => p.name);
     assert.ok(names.includes('sophia'));
     assert.ok(!names.includes('elohim-app'));
     assert.deepEqual(lines, ['[gate] rakia unavailable — path-only selection']);
   });
 
   test('a gitlink path and files beneath it select the component once, reasons merged', () => {
-    const projects = projectsForChanges(ROOT, ['elohim/brit', 'elohim/brit/Cargo.toml'], { oracle: 'path', log: () => {} });
+    const projects = projectsForChanges(MANIFESTS, ['elohim/brit', 'elohim/brit/Cargo.toml'], { oracle: 'path', log: () => {} });
     assert.equal(projects.filter(p => p.name === 'brit').length, 1);
     const brit = projects.find(p => p.name === 'brit');
     assert.ok(brit.reasons.some(r => r === 'source: elohim/brit'));
@@ -671,7 +687,7 @@ describe('the hook parses stdout as project names — diagnostics never ride on 
   });
   test('shadow mode without a binary also says so, so the flip evidence cannot silently never arrive', () => {
     const lines = [];
-    projectsForChanges(ROOT, ['sophia'], { oracle: 'shadow', rakia: () => null, log: l => lines.push(l) });
+    projectsForChanges(MANIFESTS, ['sophia'], { oracle: 'shadow', rakia: () => null, log: l => lines.push(l) });
     assert.deepEqual(lines, ['[gate] rakia unavailable — path-only selection']);
   });
   test('--list names the attestation for attested projects instead of an undefined recipe', () => {
