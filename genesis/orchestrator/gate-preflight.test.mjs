@@ -245,6 +245,28 @@ test('every REFUSED reaches the live run as a failure; ok and WARN do not', () =
   assert.equal(appended[0][1].failure.class, 'element-dists');
 });
 
+test('fleet-roll: an undeclared Edge roll on a dev push is a preflight row, and its REFUSED reaches the live run', (t) => {
+  const root = scratch(t);
+  const walk = () => ({ projects: [], pipelines: [{ name: 'elohim-edge', reasons: ['source: elohim/sdk/schemas/v1/gate-live-event.schema.json'],
+    steps: [{ name: 'cargo-build-storage', class: 'build' }], runClass: 'build' }] });
+  const git = (cmd, args) => (cmd === 'git' && args.includes('log') ? { status: 0, stdout: 'feat(sdk): one field\x1e\n' } : { status: 0, stdout: '' });
+  const env = { GATE_PUSH_TARGETS: 'refs/heads/dev', GATE_PUSH_RANGES: 'refs/heads/dev a..b' };
+  const rows = runPreflight({ root, projects: [], env, spawn: git, registry: new Map(), changed: ['elohim/sdk/schemas/v1/gate-live-event.schema.json'],
+    fleet: { walk, spawn: git, mode: 'refuse' } });
+  const fleet = rows.find(r => r.check === 'fleet-roll');
+  assert.equal(fleet?.level, 'REFUSED', JSON.stringify(rows));
+  assert.match(fleet.why, /cargo-build-storage/);
+  const appended = [];
+  emitLive(rows, { GATE_LIVE_RUN: '/run.jsonl' }, (path, event) => appended.push(event));
+  const red = appended.find(e => e.failure.class === 'fleet-roll');
+  assert.equal(red.project, 'preflight');
+  assert.match(red.failure.excerpt.at(-1), /^cure: .*\[edge:roll\]/);
+  // The hook runs it early, before its early passes, and says so; the later preflight skips it.
+  const later = runPreflight({ root, projects: [], env: { ...env, GATE_FLEET_ROLL_DONE: '1' }, spawn: git, registry: new Map(),
+    changed: ['elohim/sdk/schemas/v1/gate-live-event.schema.json'], fleet: { walk, spawn: git, mode: 'refuse' } });
+  assert.equal(later.some(r => r.check === 'fleet-roll'), false);
+});
+
 test('on-red policy: env, then pool-policy.json, then continue', (t) => {
   const root = scratch(t);
   assert.deepEqual(onRedPolicy({ env: {}, root }), { mode: 'continue', from: 'default' });

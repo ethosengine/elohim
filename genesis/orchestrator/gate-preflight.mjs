@@ -22,6 +22,7 @@ import { loadGateRegistry } from './pipeline-registry.mjs';
 import { UNAUDITED_RECIPE_PROJECTS, globCovers, readSet } from './gate-input-audit.mjs';
 import { dirtyPaths } from './gate-evidence.mjs';
 import { appendEvent } from './gate-live.mjs';
+import { checkFleetRoll } from './fleet-roll-guard.mjs';
 
 const ROOT = process.env.GATE_ROOT
   ? resolve(process.env.GATE_ROOT)
@@ -375,7 +376,7 @@ export function checkEvidenceRecordable({ root, projects, env = process.env, reu
   return rows;
 }
 
-export function runPreflight({ root = ROOT, projects, env = process.env, spawn = spawnSync, registry = loadGateRegistry(root), changed = changedFromEnv(env), onRow = () => {} }) {
+export function runPreflight({ root = ROOT, projects, env = process.env, spawn = spawnSync, registry = loadGateRegistry(root), changed = changedFromEnv(env), onRow = () => {}, fleet = {} }) {
   const read = memoRead(readSet);
   let reuse = [];
   try { reuse = JSON.parse(readFileSync(join(root, 'genesis/agentic/pool-policy.json'), 'utf8')).gate_reuse?.projects || []; }
@@ -399,6 +400,8 @@ export function runPreflight({ root = ROOT, projects, env = process.env, spawn =
     ...timed(() => checkCargoLocks({ root, projects, spawn, env })),
     ...timed(() => checkReadSets({ root, projects, registry, changed, read })),
     ...timed(() => checkEvidenceRecordable({ root, projects, env, reuse, read })),
+    // pre-push runs this one alone before its early passes (`--fleet-roll`) and marks it done.
+    ...(env.GATE_FLEET_ROLL_DONE === '1' ? [] : timed(() => checkFleetRoll({ root, env, changed, ...fleet }))),
   ];
 }
 
@@ -429,6 +432,13 @@ function main(argv) {
   if (argv.includes('--on-red')) {
     process.stdout.write(`${onRedPolicy().mode}\n`);
     return 0;
+  }
+  if (argv.includes('--fleet-roll')) {
+    // Project-independent, so pre-push runs it before the early passes that skip the preflight.
+    const rows = [].concat(checkFleetRoll({ root: ROOT, env: process.env, changed: changedFromEnv(process.env) }) ?? []);
+    for (const r of rows) process.stdout.write(`${formatRow(r)}\n`);
+    emitLive(rows);
+    return rows.some(r => r.level === 'REFUSED') ? 1 : 0;
   }
   const index = argv.indexOf('--projects');
   const names = index >= 0 ? argv.slice(index + 1).filter(a => !a.startsWith('--')) : [];

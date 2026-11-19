@@ -234,6 +234,78 @@ test("a stop requested on the live run is seen by the hook's probe", (t) => {
   assert.ok(r.stdout.includes("NO-STOP-BEFORE") && r.stdout.includes("STOP-AFTER"), r.stdout);
 });
 
+// The fleet-roll block: it hands each pushed ref's range to the preflight, runs `--fleet-roll`
+// before the hook's early passes, records a refusal as a pre-gate red, and marks the check done.
+const fleetBlock = () => slice("# Fleet roll (seconds):", "# ── Fleet roll end");
+const STUB_PREFLIGHT = [
+  "import { writeFileSync } from 'node:fs';",
+  "const argv = process.argv.slice(2);",
+  "if (argv.includes('--on-red')) { process.stdout.write('continue\\n'); process.exit(0); }",
+  "if (argv.includes('--fleet-roll')) {",
+  "  writeFileSync('ranges.out', process.env.GATE_PUSH_RANGES ?? '<unset>');",
+  "  const refuse = process.env.STUB_REFUSE === '1';",
+  "  process.stdout.write(refuse ? '[preflight] REFUSED fleet-roll: stub\\n' : '[preflight] ok fleet-roll (stub)\\n');",
+  "  process.exit(refuse ? 1 : 0);",
+  "}",
+  "process.exit(2);",
+].join("\n");
+
+function fleetFixture(t) {
+  const dir = fixture(t);
+  writeFileSync(join(dir, "genesis/orchestrator/gate-preflight.mjs"), `${STUB_PREFLIGHT}\n`);
+  const git = (...args) => {
+    const r = spawnSync("git", ["-C", dir, "-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false", ...args],
+      { env: cleanEnv, encoding: "utf8" });
+    assert.equal(r.status, 0, r.stderr);
+    return r.stdout.trim();
+  };
+  git("commit", "--quiet", "--allow-empty", "-m", "base");
+  const base = git("rev-parse", "HEAD");
+  git("commit", "--quiet", "--allow-empty", "-m", "tip");
+  return { dir, base, tip: git("rev-parse", "HEAD") };
+}
+
+const fleetScript = (dir, base, tip) => [
+  `HOOK_WORK_TREE='${dir}'`, PRELUDE, OPEN_BLOCK, RED_BLOCK,
+  "hook_pass() { exit 0; }",
+  `ZERO_SHA=${"0".repeat(40)}`,
+  'is_notes_ref() { case "$1" in refs/notes/*) return 0 ;; esac; return 1; }',
+  "PUSH_LINES=(",
+  `  "refs/heads/x ${tip} refs/heads/dev ${base}"`,
+  `  "refs/notes/brit ${tip} refs/notes/brit/build/x ${base}"`,
+  `  "(delete) ${"0".repeat(40)} refs/heads/gone ${base}"`,
+  `  "refs/heads/x ${tip} refs/heads/self/new ${"0".repeat(40)}"`,
+  `  "refs/heads/x ${tip} refs/heads/self/unfetched ${"b".repeat(40)}"`,
+  ")",
+  fleetBlock(), 'echo "DONE=$GATE_FLEET_ROLL_DONE"', "pass_or_refuse",
+];
+
+test("fleet-roll: the hook hands each pushed ref's range over, and a refusal is a live pre-gate red that still refuses", (t) => {
+  const { dir, base, tip } = fleetFixture(t);
+  const r = spawnSync("bash", ["-c", script(...fleetScript(dir, base, tip))],
+    { cwd: dir, env: { ...env(), STUB_REFUSE: "1" }, encoding: "utf8", timeout: 15000 });
+  assert.equal(r.status, 1, r.stdout + r.stderr);
+  assert.ok(r.stdout.includes("[preflight] REFUSED fleet-roll: stub"), r.stdout);
+  assert.ok(r.stdout.includes("DONE=1"), "the later preflight skips the check");
+  assert.ok(r.stderr.includes("red before the gates: fleet-roll"), r.stderr);
+  assert.equal(readFileSync(join(dir, "ranges.out"), "utf8"), [
+    `refs/heads/dev ${base}..${tip}`,
+    `refs/heads/self/new origin/dev..${tip}`,
+    `refs/heads/self/unfetched origin/dev..${tip}`,
+  ].join("\n"), "notes and deletes carry no range; a new or unfetched remote reads against origin/dev");
+  const red = eventsOf(runsOf(dir)[0]).find((e) => e.kind === "failure");
+  assert.equal(red.project, "fleet-roll");
+});
+
+test("fleet-roll: a clear check adds no red", (t) => {
+  const { dir, base, tip } = fleetFixture(t);
+  const r = spawnSync("bash", ["-c", script(...fleetScript(dir, base, tip))],
+    { cwd: dir, env: env(), encoding: "utf8", timeout: 15000 });
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.ok(r.stdout.includes("[preflight] ok fleet-roll (stub)"), r.stdout);
+  assert.equal(eventsOf(runsOf(dir)[0]).filter((e) => e.kind === "failure").length, 0);
+});
+
 test("the hook is one brace group that exits inside it, so an edit during a push cannot reach the run", () => {
   // Bash reads a script as it executes; a same-inode rewrite mid-push (2026-11-01: 6352 s of green
   // gates, then `syntax error near unexpected token )`) is harmless only when everything already parsed.

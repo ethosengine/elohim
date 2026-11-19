@@ -1041,6 +1041,25 @@ if [ -n "$CHANGE_UNREADABLE" ]; then
   exit 1
 fi
 
+# Fleet roll (seconds): would CI answer this push by rebuilding elohim-edge and rolling its fleet,
+# with no pushed commit declaring [edge:roll]? It selects no gate project, so it runs here, before
+# the early passes below; the logic is genesis/orchestrator/fleet-roll-guard.mjs. Each ref's range
+# is read against the base the diff above used (the remote tip, else origin/dev).
+GATE_PUSH_RANGES=""
+for PUSH_LINE in "${PUSH_LINES[@]}"; do
+  read -r _ FR_LOCAL FR_REF FR_REMOTE <<<"$PUSH_LINE"
+  if is_notes_ref "$FR_REF" || [ "$FR_LOCAL" = "$ZERO_SHA" ]; then continue; fi
+  FR_BASE=origin/dev
+  if [ "$FR_REMOTE" != "$ZERO_SHA" ] && git cat-file -e "$FR_REMOTE^{commit}" 2>/dev/null; then FR_BASE=$FR_REMOTE; fi
+  GATE_PUSH_RANGES="${GATE_PUSH_RANGES:+$GATE_PUSH_RANGES$'\n'}$FR_REF $FR_BASE..$FR_LOCAL"
+done
+export GATE_PUSH_RANGES
+if ! node genesis/orchestrator/gate-preflight.mjs --fleet-roll; then
+  leg_red fleet-roll "the fleet-roll check refused (above); its cure is printed beside it"
+fi
+export GATE_FLEET_ROLL_DONE=1
+# ── Fleet roll end
+
 # Nothing changed — let it through (a style refusal still refuses)
 if [ -z "$CHANGED" ]; then
   pass_or_refuse
