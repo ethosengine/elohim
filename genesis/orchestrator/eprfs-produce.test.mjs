@@ -7,7 +7,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { arch, platform, tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -18,6 +18,17 @@ const ROOT = fileURLToPath(new URL("../../", import.meta.url));
 const RELEASE = "bafyreistubreleasestubreleasestubreleasestubrelease";
 const OUTPUTS = { epr: "bafkrstubeproutput", "bin-launch": "bafkrstublaunchoutput" };
 const SOURCES = "elohim/eprfs/bin-build-view.json#bin-build";
+// The triple the producer looks its declared target up under: this host's, as uname names it
+// (c-baseline.mjs hostTripleOf maps the same two). null on a host the record cannot name.
+const HOST = platform() === "linux" ? { x64: "x86_64", arm64: "aarch64" }[arch()] : undefined;
+const HOST_TRIPLE = HOST ? `${HOST}-unknown-linux-gnu` : null;
+// A declared target whose values are no literal the script could carry, so passing them proves the
+// producer read them from the record (pool-policy.json declared_targets, row 29.2).
+const FIXTURE_TARGET = { isa: "x86-64-fixture", cflags: "-march=x86-64-fixture" };
+const policyWith = (target, triple = HOST_TRIPLE) => ({
+  cargo_env_overrides: { "*": { RUSTUP_TOOLCHAIN: "1.100.0" } },
+  declared_targets: { _comment: "fixture record", [triple]: { ...target, workspaces: ["elohim/eprfs"] } },
+});
 
 // A stub epr, also the bytes the stub cargo "builds" into debug/epr. Logs its argv as one JSON
 // line. STUB_DIRTY reads the source closure dirty; STUB_PUT_REFUSE refuses every put.
@@ -83,7 +94,9 @@ if (process.env.STUB_CHECK_FAIL) {
 console.log('c-baseline: x86_64-unknown-linux-gnu builds C at -march=x86-64');
 `;
 
-function fixture(t) {
+// `policy`: the checkout's genesis/agentic/pool-policy.json (an object is written as JSON, a string
+// as it is); omitted, the checkout has none.
+function fixture(t, { policy } = {}) {
   const dir = mkdtempSync(join(tmpdir(), "eprfs-produce-"));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   const repo = join(dir, "repo");
@@ -92,6 +105,11 @@ function fixture(t) {
   mkdirSync(join(repo, "elohim/eprfs"), { recursive: true });
   mkdirSync(stubs);
   writeFileSync(join(repo, "elohim/eprfs/bin-build-view.json"), '{"steps":{"bin-build":{}}}\n');
+  if (policy !== undefined) {
+    mkdirSync(join(repo, "genesis/agentic"), { recursive: true });
+    writeFileSync(join(repo, "genesis/agentic/pool-policy.json"),
+      typeof policy === "string" ? policy : `${JSON.stringify(policy, null, 2)}\n`);
+  }
   const git = (...args) => spawnSync("git", ["-C", repo, ...args], { encoding: "utf8" });
   git("init", "-q");
   git("-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false", "add", ".");
@@ -136,7 +154,9 @@ const verb = (calls, ...prefix) => calls.findIndex((c) => prefix.every((p, i) =>
 const flag = (call, name) => call[call.indexOf(name) + 1];
 const skipped = (out) => out.split("\n").filter((l) => l.startsWith("[gate] epr producer put"));
 
-function assertOffered(f, r) {
+// `target`: the declared target describe must receive as --target-isa / --target-cflags, once each;
+// null, describe receives no --target-* at all.
+function assertOffered(f, r, target = null) {
   assert.equal(r.status, 0, r.stderr);
   const ingest = verb(r.calls, "epr", "bin", "--tool", "epr", "ingest");
   assert.ok(ingest >= 0, "the gate ingests first");
@@ -156,8 +176,15 @@ function assertOffered(f, r) {
     assert.ok(recorded.includes(`CARGO_TARGET_POOL_ROOT=${join(f.dir, "pool")}`), recorded.join(" "));
     assert.ok(recorded.includes("RUSTUP_TOOLCHAIN=1.100.0"), recorded.join(" "));
     assert.ok(!recorded.some((e) => /^(CARGO_HOME|CARGO_TARGET_DIR|RUSTFLAGS)=/.test(e)), recorded.join(" "));
-    // `put` refuses a declared target until L2a (K6): the C level is recorded as --env only.
-    assert.ok(!d.some((a) => a.startsWith("--target-")), d.join(" "));
+    // The declared target, read from the record, is the method's; the C flags the build saw are
+    // recorded beside it as --env, so put can check the one against the other (L2a).
+    if (target) {
+      assert.deepEqual(d.filter((a) => a.startsWith("--target-")), ["--target-isa", "--target-cflags"], d.join(" "));
+      assert.equal(flag(d, "--target-isa"), target.isa, d.join(" "));
+      assert.equal(flag(d, "--target-cflags"), target.cflags, d.join(" "));
+    } else {
+      assert.ok(!d.some((a) => a.startsWith("--target-")), d.join(" "));
+    }
     const check = verb(r.calls, "c-baseline", "--triple", "x86_64-unknown-linux-gnu");
     assert.ok(check >= 0 && check < describe, "the C baseline is checked before any describe");
     const p = r.calls[put];
@@ -245,7 +272,8 @@ function recognize(stdout, exitCode) {
 }
 
 test("a_failing_c_baseline_check_withholds_the_offer_with_its_first_finding_and_never_describes", (t) => {
-  const f = fixture(t);
+  // A declared target in the record changes nothing here: the check speaks first.
+  const f = fixture(t, HOST_TRIPLE ? { policy: policyWith(FIXTURE_TARGET) } : {});
   const r = run(f, "build", { ...C_LEVEL, STUB_CHECK_FAIL: "1" });
   assert.equal(r.status, 0, r.stderr);
   assert.deepEqual(skipped(r.stdout), [`[gate] epr producer put withheld (${FINDING}; gate remains green)`]);
@@ -338,6 +366,61 @@ test("unset_c_flags_are_not_recorded", (t) => {
   assertOffered(f, r);
   const d = r.calls.find((c) => c[1] === "artifact" && c[2] === "describe");
   assert.ok(!d.some((a) => /^C(XX)?FLAGS/.test(a)), d.join(" "));
+});
+
+test("the_declared_target_for_this_host_is_passed_to_describe_from_the_record", { skip: !HOST_TRIPLE && "no triple names this host" }, (t) => {
+  const policy = policyWith(FIXTURE_TARGET);
+  policy.declared_targets["riscv64gc-unknown-linux-gnu"] = { isa: "rv64gc", cflags: "-march=rv64gc", workspaces: ["elohim/eprfs"] };
+  const f = fixture(t, { policy });
+  const r = run(f, "build", C_LEVEL);
+  assertOffered(f, r, FIXTURE_TARGET);
+  // The C flags the build saw stay recorded beside the declared target.
+  for (const d of r.calls.filter((c) => c[1] === "artifact" && c[2] === "describe")) {
+    const recorded = d.filter((_, i) => d[i - 1] === "--env");
+    for (const [k, v] of Object.entries(C_LEVEL)) assert.ok(recorded.includes(`${k}=${v}`), recorded.join(" "));
+  }
+});
+
+test("a_record_with_no_declared_target_for_this_host_and_workspace_passes_none", (t) => {
+  const other = HOST_TRIPLE === "aarch64-unknown-linux-gnu" ? "x86_64-unknown-linux-gnu" : "aarch64-unknown-linux-gnu";
+  const cases = [
+    ["no pool-policy.json", undefined],
+    ["no declared_targets", { cargo_env_overrides: {} }],
+    ["only a _comment", { declared_targets: { _comment: "nothing declared" } }],
+    ["another triple only", policyWith(FIXTURE_TARGET, other)],
+  ];
+  if (HOST_TRIPLE) {
+    const elsewhere = policyWith(FIXTURE_TARGET);
+    elsewhere.declared_targets[HOST_TRIPLE].workspaces = ["elohim/elohim-storage"];
+    cases.push(["this triple, another workspace", elsewhere]);
+  }
+  for (const [why, policy] of cases) {
+    const f = fixture(t, { policy });
+    const r = run(f, "build", C_LEVEL);
+    try {
+      assertOffered(f, r);
+    } catch (e) {
+      e.message = `${why}: ${e.message}`;
+      throw e;
+    }
+  }
+});
+
+test("an_unreadable_or_partial_declared_target_withholds_the_offer_and_never_describes", { skip: !HOST_TRIPLE && "no triple names this host" }, (t) => {
+  const partial = policyWith(FIXTURE_TARGET);
+  delete partial.declared_targets[HOST_TRIPLE].cflags;
+  const blank = policyWith({ isa: "", cflags: "-march=x86-64" });
+  for (const [policy, reason] of [
+    [partial, `declared target ${HOST_TRIPLE} in genesis/agentic/pool-policy.json has no cflags`],
+    [blank, `declared target ${HOST_TRIPLE} in genesis/agentic/pool-policy.json has no isa`],
+    ["{ not json", "genesis/agentic/pool-policy.json cannot be read, so its declared target is unknown"],
+  ]) {
+    const f = fixture(t, { policy });
+    const r = run(f, "build", C_LEVEL);
+    assert.equal(r.status, 0, r.stderr);
+    assert.deepEqual(skipped(r.stdout), [`[gate] epr producer put withheld (${reason}; gate remains green)`]);
+    assert.ok(!r.calls.some((c) => c[1] === "artifact"), "nothing is described, keyed or put");
+  }
 });
 
 test("the_producer_is_off_when_asked", (t) => {

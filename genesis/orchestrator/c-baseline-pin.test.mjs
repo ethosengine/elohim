@@ -84,22 +84,46 @@ function recordsVariable(code, name) {
   return false;
 }
 
-/** Problems with the producer script: it must record both declared variables as describe --env values and never declare a target to describe. */
-export function producerProblems(script) {
+const TARGET_FLAGS = ['--target-isa', '--target-cflags'];
+const escape = text => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+/** `<flag> "$var"` or `<flag> "${var}"`: the value is an expansion, never a literal word. */
+const passesExpansion = (text, flag) =>
+  new RegExp(`${escape(flag)}\\s+"\\$(?:[A-Za-z_][A-Za-z0-9_]*|\\{[A-Za-z_][A-Za-z0-9_]*(?:\\[[0-9]+\\])?\\})"`).test(text);
+
+/**
+ * Problems with the producer script. It must record both declared variables as describe --env
+ * values, and declare the record's target to every describe: `--target-isa "$v" --target-cflags
+ * "$w"` on the describe line, or in an array `NAME=(...)` the describe line passes as
+ * "${NAME[@]}", with no literal of the record's isa or cflags anywhere in the code and the values
+ * read from pool-policy.json declared_targets. (That the values passed ARE the record's is proved
+ * by eprfs-produce.test.mjs against a fixture record whose values no script could carry.)
+ */
+export function producerProblems(script, target = EXPECTED_TARGET) {
   const code = uncommented(script);
   const problems = [];
   for (const name of [CFLAGS_VAR, CXXFLAGS_VAR]) {
     if (!recordsVariable(code, name)) problems.push(`eprfs-produce.sh does not record ${name} as a describe --env value`);
   }
-  const describes = code
-    .replace(/\\\n/g, ' ')
-    .split('\n')
-    .filter(line => /\bartifact describe\b/.test(line));
+  const joined = code.replace(/\\\n/g, ' ');
+  const describes = joined.split('\n').filter(line => /\bartifact describe\b/.test(line));
   if (describes.length === 0 || describes.some(line => !line.includes('"${recorded[@]}"'))) {
     problems.push('eprfs-produce.sh: an artifact describe does not pass "${recorded[@]}", so nothing recorded reaches it');
   }
-  for (const flag of ['--target-isa', '--target-cflags']) {
-    if (code.includes(flag)) problems.push(`eprfs-produce.sh passes ${flag} (put refuses a declared target until L2a, K6)`);
+  const arrays = [...joined.matchAll(/(?:^|[\s;&|])([A-Za-z_][A-Za-z0-9_]*)=\(([^()]*)\)/gm)]
+    .filter(([, , body]) => TARGET_FLAGS.every(flag => passesExpansion(body, flag)))
+    .map(([, name]) => name);
+  const declares = line =>
+    TARGET_FLAGS.every(flag => passesExpansion(line, flag)) || arrays.some(name => line.includes(`"\${${name}[@]}"`));
+  if (describes.length === 0 || describes.some(line => !declares(line))) {
+    problems.push(`eprfs-produce.sh: an artifact describe is not given ${TARGET_FLAGS.join(' and ')} as expansions of the record's values`);
+  }
+  for (const value of [target.cflags, target.isa]) {
+    if (new RegExp(`(^|[^\\w.-])${escape(value)}([^\\w.-]|$)`).test(code)) {
+      problems.push(`eprfs-produce.sh carries the literal ${value}; the declared target is read from the record, never written in the script`);
+    }
+  }
+  if (!/pool-policy\.json/.test(code) || !/\bdeclared_targets\b/.test(code)) {
+    problems.push('eprfs-produce.sh does not read pool-policy.json declared_targets, so its declared target comes from somewhere else');
   }
   return problems;
 }
@@ -168,10 +192,22 @@ test('fixture: the decided declared_targets shape passes and every drift is name
 });
 
 // The producer's recording code, in the shape eprfs-produce.sh has it: a case arm over the
-// environment's names appends `--env "$name=${!name}"`, and the array reaches describe.
-const producer = ({ arm = `    ${CFLAGS_VAR} | ${CXXFLAGS_VAR}) recorded+=(--env "$name=\${!name}") ;;`, before = '', describe = '"${recorded[@]}"' } = {}) =>
+// environment's names appends `--env "$name=${!name}"`, and the array reaches describe; the
+// declared target is read from the record into an array that reaches describe too.
+const DECLARES = 'if [[ -n "$isa" ]]; then declared=(--target-isa "$isa" --target-cflags "$cflags"); fi';
+const producer = ({
+  arm = `    ${CFLAGS_VAR} | ${CXXFLAGS_VAR}) recorded+=(--env "$name=\${!name}") ;;`,
+  before = '',
+  describe = '"${declared[@]}" "${recorded[@]}"',
+  declares = DECLARES,
+  reads = 'mapfile -t target < <(python3 "$read_target" "$repo/genesis/agentic/pool-policy.json" declared_targets)',
+} = {}) =>
   [
-    '# Of the C family only the declared target\'s flags are recorded; never pass --target-isa here.',
+    '# Of the C family only the declared target\'s flags are recorded; its -march=x86-64 is the record\'s.',
+    'declared=()',
+    reads,
+    'isa="${target[0]-}" cflags="${target[1]-}"',
+    declares,
     'recorded=()',
     'while IFS= read -r name; do',
     '  case "$name" in',
@@ -191,7 +227,7 @@ const producer = ({ arm = `    ${CFLAGS_VAR} | ${CXXFLAGS_VAR}) recorded+=(--env
     .filter(line => line !== '')
     .join('\n');
 
-test('fixture: the producer check wants both variables recorded as describe --env and no declared target', () => {
+test('fixture: the producer check wants both variables recorded as describe --env and the record\'s target declared', () => {
   assert.deepEqual(producerProblems(producer()), []);
   const explicit = producer({
     arm: `    ${CFLAGS_VAR}) recorded+=(--env "${CFLAGS_VAR}=\${${CFLAGS_VAR}}") ;;\n    ${CXXFLAGS_VAR}) recorded+=(--env "$name=\${!name}") ;;`,
@@ -218,11 +254,31 @@ test('fixture: the producer check wants both variables recorded as describe --en
     assert.match(said, new RegExp(`does not record ${CXXFLAGS_VAR} `), why);
   }
   // Recorded, but the array never reaches describe.
-  assert.match(producerProblems(producer({ describe: '' })).join('\n'), /describe does not pass "\$\{recorded\[@\]\}"/);
-  const declares = `${producer()}\n"$epr" artifact describe --target-isa x86-64 --target-cflags -march=x86-64\n`;
-  const said = producerProblems(declares).join('\n');
-  assert.match(said, /--target-isa/);
-  assert.match(said, /--target-cflags/);
+  assert.match(producerProblems(producer({ describe: '"${declared[@]}"' })).join('\n'), /describe does not pass "\$\{recorded\[@\]\}"/);
+  // The declared target: on the describe line itself is as good as through an array.
+  const inline = producer({ declares: '', describe: '--target-isa "${target[0]}" --target-cflags "$cflags" "${recorded[@]}"' });
+  assert.deepEqual(producerProblems(inline), [], 'flags on the describe line, values expanded');
+  const undeclared = /describe is not given --target-isa and --target-cflags as expansions/;
+  for (const [why, script] of [
+    ['the array never reaches describe', producer({ describe: '"${recorded[@]}"' })],
+    ['no declared array', producer({ declares: '' })],
+    ['one flag only', producer({ declares: 'declared=(--target-isa "$isa")' })],
+    ['a literal value', producer({ declares: 'declared=(--target-isa "$isa" --target-cflags -march="$isa")' })],
+  ]) {
+    assert.match(producerProblems(script).join('\n'), undeclared, why);
+  }
+  // Literal values: the record's isa or cflags written into the script, in any form, are named,
+  // whether or not the flags also look like expansions; a level above it is not this record's.
+  for (const literal of [
+    'declared=(--target-isa x86-64 --target-cflags -march=x86-64)',
+    'declared=(--target-isa "$isa" --target-cflags "$cflags"); cflags=-march=x86-64',
+    '"$epr" artifact describe --target-isa x86-64 --target-cflags=-march=x86-64',
+  ]) {
+    assert.match(producerProblems(`${producer()}\n${literal}\n`).join('\n'), /carries the literal (-march=)?x86-64;/, literal);
+  }
+  assert.deepEqual(producerProblems(`${producer()}\n# -march=x86-64 in a comment\nv=x86-64-v3\n`), [], 'a comment or another level is not the literal');
+  const elsewhere = producer({ reads: 'mapfile -t target < <(cat "$here/target.txt")' });
+  assert.match(producerProblems(elsewhere).join('\n'), /does not read pool-policy\.json declared_targets/);
 });
 
 test('fixture: lock versions parse per package and compare numerically', () => {
@@ -278,8 +334,9 @@ test('pool-policy declares the C baseline as a top-level declared_targets record
   assert.deepEqual(declaredTargetProblems(policy), [], 'genesis/agentic/pool-policy.json declared_targets');
 });
 
-test('the eprfs producer records both declared C flags variables as describe --env and declares no target', () => {
-  assert.deepEqual(producerProblems(read('genesis/orchestrator/eprfs-produce.sh')), []);
+test('the eprfs producer records both declared C flags variables as describe --env and declares the record\'s target', () => {
+  const policy = JSON.parse(read('genesis/agentic/pool-policy.json'));
+  assert.deepEqual(producerProblems(read('genesis/orchestrator/eprfs-produce.sh'), policy.declared_targets[TRIPLE]), []);
 });
 
 const LOCK_FLOORS = [

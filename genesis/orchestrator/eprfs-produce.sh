@@ -7,7 +7,8 @@
 #
 # Called by the root justfile's `_eprfs-ingest-around` in the same shell environment its
 # `cargo build` ran in, right after the ingest. For each of epr and bin-launch: `epr artifact
-# describe` (the bin-build view as sources, the environment recorded as it is), `epr artifact key`,
+# describe` (the bin-build view as sources, the environment recorded as it is, the declared target
+# from pool-policy.json declared_targets when one names this host and workspace), `epr artifact key`,
 # then `epr artifact put --release <ingested release> --release-bin <bin> --cross` of the gate's
 # own bytes in $CARGO_TARGET_DIR/debug. No second build: the method records the environment the
 # gate's build ran under, and `put` re-checks that this process's environment is that record.
@@ -90,12 +91,51 @@ if ((status != 0)); then
   withhold "${finding:-the C baseline check exited $status}"
 fi
 
+# The declared target, read from the record at this checkout (pool-policy.json declared_targets,
+# row 29.2) for this host's triple and this workspace, never written here: describe takes it as
+# --target-isa / --target-cflags, and `put` checks the recorded CFLAGS_<triple> and the C
+# producer strings in the bytes against it before it writes the env:isa-c marker (E12 L2a). No
+# record for this host or workspace declares nothing, and put then writes no marker. A record that
+# names this host and workspace but cannot be read whole withholds: an offer whose target nobody
+# could read is the one that trapped on shem.
+policy="genesis/agentic/pool-policy.json"
+case "$(uname -s)/$(uname -m)" in
+  Linux/x86_64) host_triple=x86_64-unknown-linux-gnu ;;
+  Linux/aarch64) host_triple=aarch64-unknown-linux-gnu ;;
+  *) host_triple= ;;
+esac
+said="$(python3 -c 'import json, os, sys
+path, triple, workspace = sys.argv[1:4]
+if not os.path.exists(path):
+    sys.exit(0)
+try:
+    with open(path, encoding="utf-8") as f:
+        record = json.load(f).get("declared_targets") or {}
+except Exception:
+    print(f"{sys.argv[4]} cannot be read, so its declared target is unknown")
+    sys.exit(2)
+target = record.get(triple) if isinstance(record, dict) and triple else None
+if not isinstance(target, dict) or workspace not in (target.get("workspaces") or []):
+    sys.exit(0)
+for field in ("isa", "cflags"):
+    if not isinstance(target.get(field), str) or not target[field].strip():
+        print(f"declared target {triple} in {sys.argv[4]} has no {field}")
+        sys.exit(2)
+print(target["isa"])
+print(target["cflags"])' "$repo/$policy" "$host_triple" elohim/eprfs "$policy")" \
+  || withhold "${said:-$policy could not be read}"
+declared=()
+if [[ -n "$said" ]]; then
+  mapfile -t isa_cflags <<<"$said"
+  declared=(--target-isa "${isa_cflags[0]}" --target-cflags "${isa_cflags[1]}")
+fi
+
 # The environment as the build saw it. `describe` records PATH, RUSTFLAGS (given) and the native
 # toolchain variables itself; every other build variable set here is recorded as is, so the
 # method states what the bytes were built under and `put`'s environment check holds by
 # construction. The benign set mirrors epr-cli's BENIGN_BUILD_ENV. Of the C family only the
-# declared target's triple-suffixed flags are recorded (as --env, never --target-isa or
-# --target-cflags: `put` refuses a declared target until L2a); the checker refuses the rest.
+# declared target's triple-suffixed flags are recorded, as --env beside the declared target, so
+# put compares the one with the other; the checker refuses the rest.
 recorded=()
 while IFS= read -r name; do
   case "$name" in
@@ -115,7 +155,7 @@ for bin in "${bins[@]}"; do
   method="$out/method-$bin.json"
   said="$("$epr" artifact describe --project eprfs --bin "$bin" --rustflags "${RUSTFLAGS-}" \
     --sources "$sources" --crate "${crate[$bin]}" --repo "$repo" --out "$method" \
-    "${recorded[@]}" 2>&1)" || skip "describe $bin refused: $(reason_of "$said")"
+    "${declared[@]}" "${recorded[@]}" 2>&1)" || skip "describe $bin refused: $(reason_of "$said")"
   said="$("$epr" artifact key --method "$method" --repo "$repo" --print input 2>"$out/key-$bin.err")" \
     || skip "key $bin refused: $(reason_of "$said
 $(cat "$out/key-$bin.err")")"
