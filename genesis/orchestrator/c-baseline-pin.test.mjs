@@ -249,7 +249,12 @@ test('fixture: the cc source check recognises the baseline push and its absence'
   ].join('\n');
   assert.equal(pushesBaselineMarch(v1_11), true);
   assert.equal(pushesBaselineMarch('"i686" => cmd.push_arg_str("-march=i686"),\n_ => {}'), false);
-  assert.equal(pushesBaselineMarch('"x86_64" => cmd.push_cc_str("-march=x86-64-v3")'), false);
+  // The guard alone is not enough: with rustc's baseline guard in place, a push of a higher
+  // level is still not the baseline push (this case tests the closing quote, not the guard).
+  const v3 = v1_11.replace('"-march=x86-64"', '"-march=x86-64-v3"');
+  assert.match(v3, /rustc_target_cpu\(\)/);
+  assert.equal(pushesBaselineMarch(v3), false);
+  assert.equal(pushesBaselineMarch('"x86_64" => cmd.push_cc_str("-march=x86-64")'), false, 'no guard');
 });
 
 test('fixture: build-config selection and CPU-level lines', () => {
