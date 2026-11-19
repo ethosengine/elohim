@@ -1,0 +1,95 @@
+From 5245423ae92a79f983d62028e71645c02987bc14 Mon Sep 17 00:00:00 2001
+From: Matthew Dowell <mbd06b+github@gmail.com>
+Date: Thu, 19 Nov 2026 17:16:36 +0000
+Subject: [PATCH 5/5] fix(brit-cli): admit `remote refs` and `remote ref-map`
+ alike with `ls-remote`
+
+Decided with the brit session: `ls-remote`, `remote refs` and
+`remote ref-map` are one function under three spellings and are treated
+alike, all admitted. The comment beside the list says why: their only
+effect is the credential helper's (approve after a successful
+authentication, erase after a failed one). After an erase the command has
+failed and its own failure wins; after an approve it otherwise succeeded,
+the stored credential is not read from the exit status, and Git dies of
+SIGPIPE in the same pipeline having done the same. The gap is stated: a
+helper's or prompt's output does not go through the watched writer, so on
+that path a closed reader is not guaranteed to be seen.
+
+Journey rows against the local `file://` remote are restored, and the unit
+test lists both as admitted. 28 paths are now admitted by this lane.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01PJB8fpkCKfb4CMYBh9vCEs
+Co-Authored-By: claude-fable-5-2 <noreply@anthropic.com>
+Claude-Session: b49f7c46-0cab-4b30-8b19-3294dddb61a7
+---
+ brit-cli/src/main.rs                           | 18 +++++++++++++-----
+ .../tests/read_only_closed_reader.rs           |  2 ++
+ 2 files changed, 15 insertions(+), 5 deletions(-)
+
+diff --git a/brit-cli/src/main.rs b/brit-cli/src/main.rs
+index 146098a7c..ec628b303 100644
+--- a/brit-cli/src/main.rs
++++ b/brit-cli/src/main.rs
+@@ -305,6 +305,17 @@ const READ_ONLY_COMMANDS: &[&[&str]] = &[
+     &["show"],
+     &["tag", "list"],
+     &["remote", "url"],
++    // `remote refs`, `remote ref-map` and `ls-remote` are one function under three spellings and are
++    // treated alike. This list exists so that a command with an effect its caller must learn about never
++    // has its outcome replaced by 141. Their only effect is the credential helper's: approve after a
++    // successful authentication, erase after a failed one. After an erase the command has failed, and
++    // its own failure wins. After an approve the command otherwise succeeded; the stored credential is
++    // not something a caller reads from the exit status, and Git dies of SIGPIPE in the same pipeline
++    // having done the same thing. Gap: when authentication makes a helper or a prompt write, that output
++    // does not go through the watched writer, so on that path a closed reader is not guaranteed to be
++    // seen, and the command behaves as an unlisted one.
++    &["remote", "refs"],
++    &["remote", "ref-map"],
+     &["revision", "previous-branches"],
+     &["verify"],
+     &["fsck"],
+@@ -335,9 +346,6 @@ const READ_ONLY_COMMANDS: &[&[&str]] = &[
+     //   answer a script reads; their status engine can also run a configured clean filter, an external
+     //   program with inherited stderr.
+     // - `commit describe`, `submodule list`: `--dirty-suffix` on the same path runs that status engine.
+-    // - `remote refs`, `remote ref-map`: authentication can make a credential helper store or erase a
+-    //   credential, and helper or askpass output bypasses the watched writer. `ls-remote`, admitted
+-    //   earlier, has the same property; the three should be decided alike.
+     // - bare `tag`: `tag <name>` creates a tag on the same path.
+     // - `revision list`: `--svg` writes and opens a file on the same path.
+     // - `commit verify`: runs the configured verifier and writes its output to an unwatched stderr.
+@@ -851,6 +859,8 @@ mod tests {
+         for args in [
+             &["brit", "show", "HEAD"][..],
+             &["brit", "tag", "list"],
++            &["brit", "remote", "refs"],
++            &["brit", "remote", "ref-map"],
+             &["brit", "config"],
+             &["brit", "submodule"],
+             &["brit", "build", "graph", "discover"],
+@@ -868,8 +878,6 @@ mod tests {
+             &["brit", "is-changed"],
+             &["brit", "commit", "describe"],
+             &["brit", "submodule", "list"],
+-            &["brit", "remote", "refs"],
+-            &["brit", "remote", "ref-map"],
+             &["brit", "config", "fmt"],
+             &["brit", "build", "baseline", "write", "p", "HEAD"],
+             &["brit", "build", "baseline", "migrate", "x.json"],
+diff --git a/tests/cli-journey/tests/read_only_closed_reader.rs b/tests/cli-journey/tests/read_only_closed_reader.rs
+index b1ff0dc0c..017b5c99c 100644
+--- a/tests/cli-journey/tests/read_only_closed_reader.rs
++++ b/tests/cli-journey/tests/read_only_closed_reader.rs
+@@ -103,6 +103,8 @@ const PRINTING: &[&[&str]] = &[
+     &["--no-verbose", "show", "HEAD:nonl"],
+     &["--no-verbose", "tag", "list"],
+     &["--no-verbose", "remote", "-n", "origin", "url"],
++    &["--no-verbose", "remote", "-n", "origin", "refs"],
++    &["--no-verbose", "remote", "-n", "origin", "ref-map"],
+     &["--no-verbose", "revision", "previous-branches"],
+     &["--no-verbose", "verify", "--statistics"],
+     &["--no-verbose", "tree", "entries"],
+-- 
+2.52.0
+

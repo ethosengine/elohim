@@ -1,0 +1,71 @@
+From f1ed4ee30eb494c7da67d4e73fdb59b90e6fcf0b Mon Sep 17 00:00:00 2001
+From: Matthew Dowell <mbd06b+github@gmail.com>
+Date: Thu, 19 Nov 2026 16:58:08 +0000
+Subject: [PATCH 1/5] fix(brit-cli): build output goes through the watched
+ writer
+
+`build graph discover`, `graph show` (JSON and DOT), `affected`, `plan`,
+`fingerprint` and `baseline read|write|migrate` printed with `println!`,
+which panics with status 101 when the reader closed early. `output.rs`
+now writes JSON and the DOT text through `gitoxide::shared::closed_reader::Watch`
+and returns the I/O error, so a closed reader is a typed
+`ErrorKind::BrokenPipe` and the shared exit decision can see it.
+Output to a live reader is unchanged.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01PJB8fpkCKfb4CMYBh9vCEs
+Co-Authored-By: claude-fable-5-2 <noreply@anthropic.com>
+Claude-Session: b49f7c46-0cab-4b30-8b19-3294dddb61a7
+---
+ brit-cli/src/commands/graph_show.rs |  2 +-
+ brit-cli/src/output.rs              | 21 ++++++++++++++++++---
+ 2 files changed, 19 insertions(+), 4 deletions(-)
+
+diff --git a/brit-cli/src/commands/graph_show.rs b/brit-cli/src/commands/graph_show.rs
+index 59fe836ee..7903e4b1f 100644
+--- a/brit-cli/src/commands/graph_show.rs
++++ b/brit-cli/src/commands/graph_show.rs
+@@ -81,7 +81,7 @@ pub fn run(repo: &Path, format: &str) -> Result<()> {
+                 }
+             }
+             let dot = Dot::with_config(&g, &[Config::EdgeNoLabel]);
+-            println!("{dot:?}");
++            crate::output::print_line(&format!("{dot:?}"))?;
+         }
+         other => {
+             return Err(CliError::Args(format!("unknown format: {other}")));
+diff --git a/brit-cli/src/output.rs b/brit-cli/src/output.rs
+index 66715b561..034fc3757 100644
+--- a/brit-cli/src/output.rs
++++ b/brit-cli/src/output.rs
+@@ -1,9 +1,24 @@
+-//! Output helpers — pretty JSON to stdout, errors to stderr.
++//! Output helpers — pretty JSON and text lines to stdout through the watched writer.
++//!
++//! Writes go through [`gitoxide::shared::closed_reader::Watch`] and return their I/O error, so a reader
++//! that closed early is seen by its typed `ErrorKind::BrokenPipe` instead of a `println!` panic.
++
++use std::io::Write;
+ 
+ use serde::Serialize;
+ 
+-pub fn print_json<T: Serialize>(value: &T) -> Result<(), serde_json::Error> {
++use crate::error::Result;
++
++/// Print `value` as pretty JSON followed by a newline.
++pub fn print_json<T: Serialize>(value: &T) -> Result<()> {
+     let s = serde_json::to_string_pretty(value)?;
+-    println!("{s}");
++    print_line(&s)
++}
++
++/// Print `line` followed by a newline.
++pub fn print_line(line: &str) -> Result<()> {
++    let mut stdout = gitoxide::shared::closed_reader::Watch(std::io::stdout().lock());
++    writeln!(stdout, "{line}")?;
++    stdout.flush()?;
+     Ok(())
+ }
+-- 
+2.52.0
+

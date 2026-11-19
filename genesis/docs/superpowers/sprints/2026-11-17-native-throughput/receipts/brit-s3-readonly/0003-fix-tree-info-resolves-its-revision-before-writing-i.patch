@@ -1,0 +1,41 @@
+From 37ddc144293391f886135a57e9bfa12242c9795b Mon Sep 17 00:00:00 2001
+From: Matthew Dowell <mbd06b+github@gmail.com>
+Date: Thu, 19 Nov 2026 17:12:40 +0000
+Subject: [PATCH 3/5] fix: `tree info` resolves its revision before writing its
+ format note
+
+With human output, `tree info` wrote "Only JSON is implemented" to stderr
+before resolving the revision. With a closed stderr that write failed
+first, so `tree info no-such-revision` ended with 141 and its real
+failure was never reached. The note now follows the resolution; nothing
+else moves.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01PJB8fpkCKfb4CMYBh9vCEs
+Co-Authored-By: claude-fable-5-2 <noreply@anthropic.com>
+Claude-Session: b49f7c46-0cab-4b30-8b19-3294dddb61a7
+---
+ gitoxide-core/src/repository/tree.rs | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/gitoxide-core/src/repository/tree.rs b/gitoxide-core/src/repository/tree.rs
+index b138325bb..4d4991112 100644
+--- a/gitoxide-core/src/repository/tree.rs
++++ b/gitoxide-core/src/repository/tree.rs
+@@ -171,11 +171,11 @@ pub fn info(
+     out: impl io::Write,
+     mut err: impl io::Write,
+ ) -> Result<()> {
++    // Resolve the revision before the note, so a bad revision keeps its own failure on a closed stderr.
++    let tree_id = treeish_to_tree(treeish, &repo)?;
+     if format == OutputFormat::Human {
+         writeln!(err, "Only JSON is implemented - using that instead").or_error()?;
+     }
+-
+-    let tree_id = treeish_to_tree(treeish, &repo)?;
+     let source = Source::new(
+         &repo,
+         gix::utils::stream::Budget::new(&std::env::temp_dir()).or_error()?,
+-- 
+2.52.0
+

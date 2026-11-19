@@ -1,0 +1,388 @@
+From 1cceb12643b0b9d1e44cb39328a3b25e6781876a Mon Sep 17 00:00:00 2001
+From: Matthew Dowell <mbd06b+github@gmail.com>
+Date: Thu, 19 Nov 2026 16:58:09 +0000
+Subject: [PATCH 2/5] feat(brit-cli): admit the checked read-only commands to
+ the closed-reader rule
+
+Each path was read before admission: it writes nothing (a network read
+is allowed) and everything it prints goes through `prepare_and_run`'s
+watched writers or `output::print_line`. Admitted: `show`, `tag list`,
+`remote url|refs|ref-map`, `commit describe`, `revision previous-branches`,
+`verify`, `fsck`, `tree entries|info`, `commit-graph list|verify`,
+`mailmap entries|check`, `attributes query`, `exclude query`, `submodule`
+and `submodule list`, `is-clean`, `is-changed`, `config` and
+`config show|list`, `index entries`, `dirwalk`, and `build graph
+discover|show`, `affected`, `plan`, `fingerprint`, `baseline read`.
+
+Left out, with the reason beside the list: bare `tag` (creates a tag
+when named), `revision list` (`--svg` writes and opens a file), `commit
+verify` (runs the verifier and prints through an unwatched stderr),
+`attributes validate-baseline` (its git children print past the watched
+writer), and every writer.
+
+`is_closed_reader_write()` also recognises JSON that a plumbing command
+wrote through `.or_error()` (a `serde_json::Error` inside a `gix::Error`):
+`tree info` otherwise ended with "Error: Broken pipe" and 1.
+
+Journey `read_only_closed_reader.rs` (Linux only, it closes a pipe with
+libc): every admitted command prints to a live reader, ends with 141 and
+an empty stderr when its reader closed first, and the six failing forms
+keep their own status. On the base 8e5072ff binary every row fails
+(1 with "Error: Broken pipe", 101 for the build commands, 0 for
+`index entries`).
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01PJB8fpkCKfb4CMYBh9vCEs
+Co-Authored-By: claude-fable-5-2 <noreply@anthropic.com>
+Claude-Session: b49f7c46-0cab-4b30-8b19-3294dddb61a7
+---
+ brit-cli/src/main.rs                          |  98 ++++++++
+ .../tests/read_only_closed_reader.rs          | 213 ++++++++++++++++++
+ 2 files changed, 311 insertions(+)
+ create mode 100644 tests/cli-journey/tests/read_only_closed_reader.rs
+
+diff --git a/brit-cli/src/main.rs b/brit-cli/src/main.rs
+index 289274cc7..361d5a717 100644
+--- a/brit-cli/src/main.rs
++++ b/brit-cli/src/main.rs
+@@ -301,6 +301,46 @@ const READ_ONLY_COMMANDS: &[&[&str]] = &[
+     &["worktree", "list"],
+     &["config-tree"],
+     &["env"],
++    // Admitted after reading each path: no write, and every line through the watched writer.
++    &["show"],
++    &["tag", "list"],
++    &["remote", "url"],
++    // Network reads, like `ls-remote`; a credential helper may store or erase a credential.
++    &["remote", "refs"],
++    &["remote", "ref-map"],
++    &["commit", "describe"],
++    &["revision", "previous-branches"],
++    &["verify"],
++    &["fsck"],
++    &["tree", "entries"],
++    &["tree", "info"],
++    &["commit-graph", "list"],
++    &["commit-graph", "verify"],
++    &["mailmap", "entries"],
++    &["mailmap", "check"],
++    &["attributes", "query"],
++    &["exclude", "query"],
++    &["submodule"],
++    &["submodule", "list"],
++    &["is-clean"],
++    &["is-changed"],
++    &["config"],
++    &["config", "show"],
++    &["config", "list"],
++    &["index", "entries"],
++    &["dirwalk"],
++    // Their JSON and DOT output goes through `output::print_line`, the watched writer.
++    &["build", "graph", "discover"],
++    &["build", "graph", "show"],
++    &["build", "affected"],
++    &["build", "plan"],
++    &["build", "fingerprint"],
++    &["build", "baseline", "read"],
++    // Left out: bare `tag` creates a tag when given a name; `revision list --svg` writes and opens a
++    // file; `commit verify` runs the configured verifier and prints its output through an unwatched
++    // stderr; `attributes validate-baseline` runs `git check-attr`/`check-ignore` children whose output
++    // bypasses the watched writer; `build run`, `build baseline write|migrate`, `config fmt`, `index
++    // from-tree`, `tag delete`, `commit sign` write.
+ ];
+ 
+ fn read_only_path(path: &[&str]) -> bool {
+@@ -337,6 +377,13 @@ fn is_closed_reader_write(error: &error::CliError) -> bool {
+                         .downcast_ref::<serde_json::Error>()
+                         .and_then(serde_json::Error::io_error_kind),
+                 )
++                // JSON written by a plumbing command, like `tree info`, arrives wrapped in a `gix::Error`.
++                || broken(
++                    cause
++                        .downcast_ref::<gix::Error>()
++                        .and_then(|error| error.downcast_any_ref::<serde_json::Error>())
++                        .and_then(serde_json::Error::io_error_kind),
++                )
+         }),
+         _ => false,
+     }
+@@ -779,6 +826,57 @@ mod tests {
+         assert!(!read_only_path(&["branch"]));
+     }
+ 
++    #[test]
++    fn the_extension_admits_read_only_paths_and_leaves_writers_out() {
++        let read_only = |args: &[&str]| {
++            read_only_command(
++                &public_command()
++                    .try_get_matches_from(args)
++                    .unwrap_or_else(|e| panic!("{args:?}: {e}")),
++            )
++        };
++        for args in [
++            &["brit", "show", "HEAD"][..],
++            &["brit", "tag", "list"],
++            &["brit", "remote", "refs"],
++            &["brit", "config"],
++            &["brit", "submodule"],
++            &["brit", "build", "graph", "discover"],
++            &["brit", "build", "fingerprint", "build-manifest.json"],
++            &["brit", "build", "baseline", "read", "p"],
++        ] {
++            assert!(read_only(args), "{args:?}");
++        }
++        for args in [
++            &["brit", "tag", "v1"][..],
++            &["brit", "tag"],
++            &["brit", "commit", "verify"],
++            &["brit", "attributes", "validate-baseline"],
++            &["brit", "config", "fmt"],
++            &["brit", "build", "baseline", "write", "p", "HEAD"],
++            &["brit", "build", "baseline", "migrate", "x.json"],
++        ] {
++            assert!(!read_only(args), "{args:?}");
++        }
++    }
++
++    #[test]
++    fn json_from_a_plumbing_command_that_met_the_closed_reader_is_recognised() {
++        let pipe = std::io::Error::from(std::io::ErrorKind::BrokenPipe);
++        let json = serde_json::Error::io(pipe);
++        let wrapped = error::CliError::Git(anyhow::Error::from(gix::Error::from_error(json)));
++        assert!(
++            is_closed_reader_write(&wrapped),
++            "`tree info` writes JSON through `.or_error()`"
++        );
++        let other = serde_json::from_str::<u8>("x").expect_err("not JSON");
++        let wrapped = error::CliError::Git(anyhow::Error::from(gix::Error::from_error(other)));
++        assert!(
++            !is_closed_reader_write(&wrapped),
++            "a JSON syntax error is not the closed reader"
++        );
++    }
++
+     #[test]
+     fn build_errors_keep_their_existing_format() {
+         assert_eq!(
+diff --git a/tests/cli-journey/tests/read_only_closed_reader.rs b/tests/cli-journey/tests/read_only_closed_reader.rs
+new file mode 100644
+index 000000000..005078096
+--- /dev/null
++++ b/tests/cli-journey/tests/read_only_closed_reader.rs
+@@ -0,0 +1,213 @@
++//! Every command admitted to brit-cli's `READ_ONLY_COMMANDS` after `8e5072ff` ends quietly with 141
++//! when its reader closed early, keeps its own status when it genuinely fails, and prints the same
++//! thing to a live reader. Linux only: the closed reader is a pipe whose reading end is closed with
++//! `libc` before Brit starts, like `broken_pipe.rs`.
++#![cfg(target_os = "linux")]
++
++use std::{
++    os::fd::FromRawFd,
++    path::{Path, PathBuf},
++    process::{Command, Output, Stdio},
++};
++
++use anyhow::{ensure, Result};
++use cli_journey::support::runner::brit_bin;
++
++fn git(cwd: &Path, args: &[&str]) -> Result<()> {
++    let status = gix_testtools::git_command(cwd).args(args).status()?;
++    ensure!(status.success(), "git {args:?} in {}", cwd.display());
++    Ok(())
++}
++
++fn brit(cwd: &Path) -> Command {
++    let mut command = Command::new(brit_bin().expect("built Brit"));
++    gix_testtools::configure_git_environment(&mut command, cwd);
++    command.current_dir(cwd).stdin(Stdio::null());
++    command
++}
++
++/// Run `brit <args>` with stdout connected to a pipe whose reading end is already closed.
++fn closed_stdout(cwd: &Path, args: &[&str]) -> Result<Output> {
++    let mut fds = [0; 2];
++    // SAFETY: `fds` has room for the two descriptors `pipe` writes.
++    ensure!(unsafe { libc::pipe(fds.as_mut_ptr()) } == 0, "pipe(2) failed");
++    // SAFETY: both descriptors were just created by `pipe` and are owned here exactly once.
++    let (reader, writer) = unsafe { (std::fs::File::from_raw_fd(fds[0]), std::fs::File::from_raw_fd(fds[1])) };
++    drop(reader);
++    Ok(brit(cwd).args(args).stdout(writer).stderr(Stdio::piped()).output()?)
++}
++
++/// A repository with a tag, a mailmap, attributes, an ignore file, a submodule, a commit-graph, a
++/// `file://` remote, an untracked file and a build manifest, so that every admitted command prints.
++fn fixture(root: &Path) -> Result<PathBuf> {
++    git(root, &["init", "-q", "--bare", "remote.git"])?;
++    git(root, &["init", "-q", "--initial-branch=main", "sub"])?;
++    git(&root.join("sub"), &["commit", "-q", "--allow-empty", "-m", "sub"])?;
++    git(root, &["init", "-q", "--initial-branch=main", "repo"])?;
++    let repo = root.join("repo");
++    std::fs::write(repo.join(".mailmap"), "Canonical <c@x> author <author@example.com>\n")?;
++    std::fs::write(repo.join(".gitattributes"), "*.txt text\n")?;
++    std::fs::write(repo.join(".gitignore"), "ignored.log\n")?;
++    std::fs::write(
++        repo.join("build-manifest.json"),
++        r#"{"manifestVersion":"1.0","pipeline":"probe","description":"probe","steps":{"lint":{"description":"lint","inputs":{"sources":["*.txt"],"buildProcess":[]},"outputs":{"artifacts":[],"verify":null},"depends":[],"executor":{"stage":"lint","function":null}}}}"#,
++    )?;
++    std::fs::write(repo.join("a.txt"), "a\n")?;
++    git(&repo, &["add", "-A"])?;
++    git(&repo, &["commit", "-q", "-m", "one"])?;
++    std::fs::write(repo.join("a.txt"), "a\nb\n")?;
++    git(&repo, &["commit", "-q", "-am", "two"])?;
++    git(&repo, &["tag", "-a", "v1", "-m", "tagged", "HEAD~1"])?;
++    git(&repo, &["checkout", "-q", "-b", "side"])?;
++    git(&repo, &["checkout", "-q", "main"])?;
++    let sub = root.join("sub");
++    git(
++        &repo,
++        &[
++            "-c",
++            "protocol.file.allow=always",
++            "submodule",
++            "add",
++            "-q",
++            sub.to_str().expect("UTF-8 path"),
++            "sub",
++        ],
++    )?;
++    git(&repo, &["commit", "-q", "-m", "submodule"])?;
++    git(&repo, &["commit-graph", "write", "--reachable"])?;
++    let remote = format!("file://{}", root.join("remote.git").display());
++    git(&repo, &["remote", "add", "origin", &remote])?;
++    git(&repo, &["push", "-q", "origin", "main"])?;
++    std::fs::write(repo.join("untracked.txt"), "u\n")?;
++    Ok(repo)
++}
++
++/// The admitted commands, each in a form that prints to stdout and nothing to stderr.
++const PRINTING: &[&[&str]] = &[
++    &["--no-verbose", "show", "HEAD"],
++    &["--no-verbose", "tag", "list"],
++    &["--no-verbose", "remote", "-n", "origin", "url"],
++    &["--no-verbose", "remote", "-n", "origin", "refs"],
++    &["--no-verbose", "remote", "-n", "origin", "ref-map"],
++    &["--no-verbose", "commit", "describe"],
++    &["--no-verbose", "revision", "previous-branches"],
++    &["--no-verbose", "verify", "--statistics"],
++    &["--no-verbose", "tree", "entries"],
++    &["--no-verbose", "-f", "json", "tree", "info"],
++    &["--no-verbose", "commit-graph", "list"],
++    &["--no-verbose", "commit-graph", "verify", "--statistics"],
++    &["--no-verbose", "-f", "json", "mailmap", "entries"],
++    &["--no-verbose", "mailmap", "check", "author <author@example.com>"],
++    &["--no-verbose", "attributes", "query", "a.txt"],
++    &["--no-verbose", "exclude", "query", "ignored.log"],
++    &["--no-verbose", "submodule"],
++    &["--no-verbose", "submodule", "list"],
++    &["--no-verbose", "is-clean"],
++    &["--no-verbose", "config"],
++    &["--no-verbose", "config", "show"],
++    &["--no-verbose", "config", "list"],
++    &["--no-verbose", "index", "entries"],
++    &["--no-verbose", "dirwalk"],
++    &["build", "graph", "discover"],
++    &["build", "graph", "show"],
++    &["build", "graph", "show", "--format", "dot"],
++    &["build", "affected", "--files", "a.txt"],
++    &["build", "plan", "--files", "a.txt"],
++    &["build", "fingerprint", "build-manifest.json"],
++    &["build", "baseline", "read", "probe"],
++];
++
++/// Admitted commands that genuinely fail here: a closed reader must not change their status.
++const FAILING: &[&[&str]] = &[
++    &["--no-verbose", "show", "nope"],
++    &["--no-verbose", "tree", "entries", "nope"],
++    &["--no-verbose", "commit", "describe", "nope"],
++    &["--no-verbose", "remote", "-n", "nope", "refs"],
++    &["--no-verbose", "is-changed"],
++    &["build", "fingerprint", "missing.json"],
++];
++
++#[test]
++fn admitted_read_only_commands_end_quietly_when_their_reader_closes() -> Result<()> {
++    let root = tempfile::tempdir()?;
++    let repo = fixture(root.path())?;
++    for args in PRINTING {
++        let live = brit(&repo).args(*args).output()?;
++        assert_eq!(live.status.code(), Some(0), "brit {args:?}: {live:?}");
++        assert!(!live.stdout.is_empty(), "brit {args:?} prints to a live reader");
++        let closed = closed_stdout(&repo, args)?;
++        assert_eq!(
++            (
++                closed.status.code(),
++                String::from_utf8_lossy(&closed.stderr).into_owned()
++            ),
++            (Some(141), String::new()),
++            "brit {args:?} with its reader closed"
++        );
++    }
++    for args in FAILING {
++        let live = brit(&repo).args(*args).output()?;
++        assert_ne!(live.status.code(), Some(0), "brit {args:?} fails here: {live:?}");
++        let closed = closed_stdout(&repo, args)?;
++        assert_eq!(
++            closed.status.code(),
++            live.status.code(),
++            "brit {args:?} keeps its own status with its reader closed: {closed:?}"
++        );
++        assert!(!closed.stderr.is_empty(), "the failure is still reported: {closed:?}");
++    }
++
++    // `is-changed` prints only once there is a change; `is-clean` then fails and keeps its status.
++    std::fs::write(repo.join("a.txt"), "changed\n")?;
++    let args = ["--no-verbose", "is-changed"];
++    let live = brit(&repo).args(args).output()?;
++    assert_eq!(live.status.code(), Some(0), "brit {args:?}: {live:?}");
++    let closed = closed_stdout(&repo, &args)?;
++    assert_eq!(
++        (
++            closed.status.code(),
++            String::from_utf8_lossy(&closed.stderr).into_owned()
++        ),
++        (Some(141), String::new()),
++        "brit {args:?} with its reader closed"
++    );
++    let closed = closed_stdout(&repo, &["--no-verbose", "is-clean"])?;
++    assert_eq!(closed.status.code(), Some(1), "is-clean fails on a change: {closed:?}");
++    Ok(())
++}
++
++/// `fsck` prints only what is missing, so it gets a repository with a deleted blob.
++#[test]
++fn fsck_reporting_a_missing_object_ends_quietly_when_its_reader_closes() -> Result<()> {
++    let root = tempfile::tempdir()?;
++    let repo = root.path();
++    git(repo, &["init", "-q", "--initial-branch=main"])?;
++    std::fs::write(repo.join("f"), "x\n")?;
++    git(repo, &["add", "f"])?;
++    git(repo, &["commit", "-q", "-m", "one"])?;
++    let blob = String::from_utf8(
++        gix_testtools::git_command(repo)
++            .args(["rev-parse", "HEAD:f"])
++            .output()?
++            .stdout,
++    )?;
++    let blob = blob.trim();
++    std::fs::remove_file(repo.join(".git/objects").join(&blob[..2]).join(&blob[2..]))?;
++
++    let args = ["--no-verbose", "fsck", "HEAD"];
++    let live = brit(repo).args(args).output()?;
++    assert!(
++        String::from_utf8_lossy(&live.stdout).contains(blob),
++        "fsck names the missing blob: {live:?}"
++    );
++    let closed = closed_stdout(repo, &args)?;
++    assert_eq!(
++        (
++            closed.status.code(),
++            String::from_utf8_lossy(&closed.stderr).into_owned()
++        ),
++        (Some(141), String::new()),
++        "brit {args:?} with its reader closed"
++    );
++    Ok(())
++}
+-- 
+2.52.0
+
