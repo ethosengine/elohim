@@ -611,6 +611,8 @@ fn log_findings(script: &Script) -> Vec<String> {
                         && p.version == script.version
                         && p.member == member.name
                         && script.source == CRATES_IO
+                        // Allowed only with its reason (the pin test holds it).
+                        && !p.reason.trim().is_empty()
                 });
                 if !named {
                     findings.push(format!(
@@ -626,7 +628,7 @@ fn log_findings(script: &Script) -> Vec<String> {
                 .iter()
                 .filter_map(|p| std::fs::read(p).ok())
                 .collect();
-            if !held.is_empty() && !held.iter().any(|bytes| *bytes == member.data) {
+            if !held.is_empty() && !held.contains(&member.data) {
                 findings.push(format!(
                     "{DECLARED}: no evidence: {}'s member {} of {object} is not the bytes its \
                      compile left at its -o path",
