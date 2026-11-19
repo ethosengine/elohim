@@ -563,7 +563,11 @@ def main():
 
 if __name__ == "__main__":
     try:
-        main()
+        # One invocation resolves the same manifests repeatedly; parse each distinct YAML text once
+        # with libyaml's C loader (3000 ms hook budget). Parse errors replay identically, so the
+        # fail-open and deny paths behave as before.
+        with epr_meta.parse_memo():
+            main()
     except SystemExit:
         raise
     except Exception as e:  # fail-open: internal error, NOT a deny

@@ -361,4 +361,15 @@ check("no evidence: no `[frame]` line", "[frame]" not in _ctx and "DISPATCH NOW"
 check("no evidence: no `classification` check witnessed",
       not any(str(c).startswith("classification ") for row in _rows for c in row.get("witness", [])))
 
+# resolves_under_parse_memo: the hook runs main() inside epr_meta.parse_memo() (libyaml C loader,
+# ~350 ms off a 3000 ms budget); a YAML syntax error replays as the same recoverable ASK.
+check("hook runs main() under parse_memo", "with epr_meta.parse_memo():" in HOOK.read_text())
+with tempfile.TemporaryDirectory() as _td:
+    _root = Path(_td)
+    (_root / ".git").mkdir()
+    _wr(_root / ".epr-meta", "---\nepr-meta-version: 1\nroot: true\nrules: [unclosed\n---\n")
+    _r = _hook({"tool_name": "Write", "tool_input": {"file_path": str(_root / "x.md"), "content": "x"}})
+    check("YAML syntax error under parse_memo still fails open or asks, never a hard deny",
+          _r.returncode == 0 and '"deny"' not in _r.stdout)
+
 print(f"\n  {_passed} assertions passed ✅")
