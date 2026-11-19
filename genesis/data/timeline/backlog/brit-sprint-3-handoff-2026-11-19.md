@@ -154,9 +154,23 @@ and moved on to `0f48e02fbf43`.
   (`a222db7c`, landing L2a in `elohim/eprfs`) confirmed over berth (notice 18:02Z, reply 18:04Z,
   answer 18:33Z) that L2a touches none of the branch's files and depends only on
   `git::trust_env(&Path)` and the read helpers keeping their signatures; they do. Asked of the other
-  device at 19:36Z, unanswered when written: when the landing lane is free, and whether its own device
-  key directory would pass the new custody check, because `trust_env` now withholds the declared trust
-  when that check fails.
+  device at about 19:30Z and answered by it at about 19:33Z (reported by the other device):
+  - Custody: its device key directory is mode 2700 and the declaration `trusted-checkouts` mode 600,
+    both uid 0 gid 1234, a 17-byte regular file, and its process holds that group. By the branch's
+    predicate it passes, so `trust_env` keeps applying the declared trust there. Its repository holds
+    32 pack indexes, exactly the reduced-trust cap, so a withheld trust would fail its next read.
+  - Linked worktrees: its declaration names only the main checkout and every landing there is made
+    from a linked worktree. Read at `285e8513b` against its base: `git::checkout()` is not changed by
+    the branch (the nearest ancestor with a `.git` entry, so a linked worktree is its own root) and
+    matching is still "that root equals one whole line of the declaration". An undeclared linked
+    worktree gets no declared trust before or after the branch; it works on both devices because git
+    accepts it by ownership. Whether declaring a main checkout should cover its linked worktrees is
+    the open steward item, not decided by this branch.
+  - Lane: the branch waits behind the other device's landing L2a. If L2a has not been handed back to
+    that device by 21:30Z, this branch lands first, with one line to it and to `a222db7c` on berth
+    ahead of the push. Either way: rebase onto dev as it then stands, run the fleet-roll check on the
+    range, land by fast-forward through the gated path, leave the peer daemon serving. That landing
+    does not move the brit pin or touch brit `main`.
 - The queued epr-cli `device_store(…)` lane stacks on this branch.
 
 **This record** is on monorepo branch `docs/brit-backlog-sprint3` (worktree `brit-s3-backlog`).

@@ -543,7 +543,7 @@ tightening them: the 5/4 multiplier is replaced with additive allowances that sc
 objects, and double counts shown by measurement are removed. Raising the limit and making the gates
 advisory are both rejected.
 
-**Round 5, started 19:35Z** in the integration worktree on top of `948a939f16`, with that brief and
+**Round 5, started 19:29Z** in the integration worktree on top of `948a939f16`, with that brief and
 `memory_replay.rs` untouched as its acceptance test. It stops and reports if a fixture still cannot be
 admitted. It needs its own independent review, then the non-root leg, before push 10.
 
