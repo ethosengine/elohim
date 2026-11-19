@@ -516,7 +516,7 @@ test('workspace dists: a gate whose package.json names @elohim/epr needs its dis
 });
 
 // A fixture superproject whose suite list declares one submodule, pinned to a commit made in a second repository.
-function pinFixture(t, { present }) {
+function pinFixture(t, { present, none = false }) {
   const env = {
     ...process.env, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1',
     GIT_AUTHOR_NAME: 't', GIT_AUTHOR_EMAIL: 't@example.invalid', GIT_COMMITTER_NAME: 't', GIT_COMMITTER_EMAIL: 't@example.invalid',
@@ -539,6 +539,7 @@ function pinFixture(t, { present }) {
   put(root, 'genesis/orchestrator/suite-reads.json', JSON.stringify({
     groups: [{ files: [{ file: 'x.test.mjs', reads: ['**/build-manifest.json', 'vendor/thing'] }] }],
   }));
+  if (none) put(root, '.gitmodules', '[submodule "vendor/thing"]\n\tpath = vendor/thing\n\turl = ./x\n\tupdate = none\n');
   run(root, 'add', '.');
   run(root, 'update-index', '--add', '--cacheinfo', `160000,${oid},vendor/thing`);
   run(root, 'commit', '-q', '-m', 'root');
@@ -563,4 +564,9 @@ test('submodule pins: the same fixture with the pinned object present passes', (
 test('submodule pins: no row unless the orchestrator project is selected', (t) => {
   const { root } = pinFixture(t, { present: false });
   assert.equal(checkSubmodulePins({ root, projects: [app] }), null);
+});
+
+test('submodule pins: one declared update = none is never named, since init would skip it', (t) => {
+  const { root } = pinFixture(t, { present: false, none: true });
+  assert.equal(checkSubmodulePins({ root, projects: [pinGate] }).level, 'ok');
 });
