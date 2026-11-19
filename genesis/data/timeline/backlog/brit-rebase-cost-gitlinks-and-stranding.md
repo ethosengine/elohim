@@ -547,8 +547,54 @@ advisory are both rejected.
 `memory_replay.rs` untouched as its acceptance test. It stops and reports if a fixture still cannot be
 admitted. It needs its own independent review, then the non-root leg, before push 10.
 
-**Open, not decided by the coordinator:** whether to stop reserving scratch for an abort's retained
-copy, which R3 already leaves unmetered.
+**Round 5 stopped at 20:13Z as instructed, with the measurement** (head `a3b3ac71d5`: one docs commit,
+code unchanged; `memory_replay` still 2 passed / 6 failed at the delivery limit, 8 passed with a wide
+test limit). Measured on the merged faults build with a temporary probe at every gate and every
+metered write (reported by the implementer; probe and tables in session scratch `recovery5/`, not
+durable):
+- None of the six fixtures writes a METERED retained copy. Every copy is an abort's or a cleanup's,
+  which R3 leaves unmetered.
+- After the tightening this brief allowed, four of the six are still refused, and in every case the
+  refusing figure is the reservation for that unmetered copy. The copy model runs 1.6 to 2.4 times the
+  measured copy: `sixty_four_mib_replay` admit-copy figure 1,594,532,078 as built and 1,208,516,799
+  at best, against a measured copy of 671,418,512; `…_preserved_staged_and_dirty_neighbor`
+  1,762,298,616 as built and 1,342,730,029 at best against 805,634,522. Limit 1,073,741,824.
+- The journal figures fit with the 5/4 factor kept: at most 755,597,307 as built (604,477,846
+  unscaled) against measured journals of 268,600,885 to 336,510,137.
+- The `--continue` refusals at 797,656,311 and 2,617,968,476 bytes "requested" measured the state held
+  in memory (a 20 MiB file inline, JSON-encoded, times three), not the record that is saved: the
+  after-image is replaced by its fingerprint before the save, and no record on disk exceeded about
+  85 MB. Reserving on the projected record gives 42,686,414 for the 20 MiB fixture (measured).
+- The 5/4 factor is covering a real under-estimate: with `merge.conflictStyle=diff3` a conflicted
+  payload was 7,680,032 bytes against a planned step of 5,220,000, because the conflict also writes
+  the base version. Removing the factor would open the admitted-then-refused band for diff3 conflicts.
+- One proven double count: the copy projection adds the initial checkout's upstream images twice.
+
+**Decision (coordinator, 20:14Z), superseding "tighten only" above:** the scratch limit meters the
+journal. R3 already took an abort's and a cleanup's retained copy out from under it, so reserving a
+projected copy under that limit refuses work that fits and protects nothing: an unmetered copy cannot
+be refused part-way.
+1. Journal gates stay exactly as built — sound upper bounds, WITH the 5/4 factor — at preflight,
+   `admit` and `reserve`.
+2. An unmetered retained copy is no longer projected. Its gates refuse only what is certain: at the
+   preflight, when the closure's object bytes alone exceed the limit (this keeps the one-second refusal
+   of a repository whose copy could never have fitted); at `admit` and `reserve`, when the copy an
+   abort would write now already exceeds it. No factor, no projection.
+3. A forward step that itself writes a metered copy (`--skip`) keeps its scaled reservation.
+4. The reserve-on-the-saved-record fix is applied.
+What this gives up, and the steward should know before brit `main`: an abort's or a cleanup's
+retained copy can exceed the 1 GiB scratch limit (bounded by the closure, plus the journal the limit
+bounds, plus the worktree and staged states it copies). That is the consequence of never refusing an
+abort. Rejected alternatives: dropping the copy gate entirely (a small rebase on a very large
+repository would then be admitted, run for many minutes and write a multi-gigabyte copy, where today
+it is refused in a second); a tight copy model (needs blob reads at admission and left about 134 MB of
+margin in the measured worst case); a larger separate limit for copies (a limit raise standing in for
+a model).
+The same implementer was resumed at 20:14Z with this decision. Owed before any push: `memory_replay`
+8 of 8 with the file untouched; journal soundness against measured peaks; a boundary journey and a
+band search across limits, including a diff3 conflict; an abort whose copy exceeds the limit restoring
+exactly; the reviewer's fixtures re-run; then a FRESH adversarial review, the non-root leg and full
+verification.
 
 **Queued follow-up round, not started.** Publish `metadata-lock-N.json`, `retention-N.json` and the
 other single-pass records whole (spool, rename, sync), or treat an unparseable record as not written;

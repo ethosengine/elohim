@@ -135,6 +135,46 @@ three commits on origin/dev `01e4de7f1`, then four (tip `d14e7357f`), reviewed. 
 `71069b1f551f` (the other ethosengine session's one push: L2b's eight commits, then L1's twenty-five)
 and moved on to `0f48e02fbf43`.
 
+- **LANDED on dev, 20:28Z 2026-11-19.** origin dev = `758fb4f6b55917baf4bc1a0a2270600cb3dc044b`
+  (`00dd77dfb..758fb4f6b`, fast-forward, read back from the remote): `fb8f3d7b3` the custody rule in
+  epr-cli, `9d52fd5bd` ark's brit index spawns carry the declared trust, `1e56768e5` clippy,
+  `758fb4f6b` bounded regular file and the vectors. `git patch-id --stable` equal to the reviewed
+  commits (6b3404874e8f, 35e8ad83338f, d83a2c6affa2, fe5b88f19588); nine files; no `Cargo.toml`, no
+  `Cargo.lock`. The brit pin and brit `main` were not touched.
+  - How: the other device released the lane at about 19:38Z (its L2a went back for another review
+    round). `just dev prep` in the worktree (local submodules, `pnpm install`, preflight clear, hook
+    executable), then `GATE_EVIDENCE=reuse git -c core.hooksPath=<worktree>/.husky/_ push origin
+    HEAD:dev` — Git by `CLAUDE.md`'s landing exception, the worktree's own hook. Notices to the other
+    device and to `a222db7c` on berth ahead of each push. The fleet-roll check on each range printed
+    no row.
+  - First attempt (tip `c97a1428c` on dev `c0b1ec5e3`, 19:46Z–20:21Z): every gate green and recorded
+    (address-profile-lint, orchestrator-tree 330 s, elohim-ark 89 s, cargo-bridge 107 s,
+    jenkins-bridge 111 s, rust-style, eprfs-live-corpus 216 s, eprfs 1233 s) except `orchestrator`,
+    which failed in 3 s: `suite-run: submodule elohim/holochain-conductor at 993cf597… is in no
+    object store here`. That was the other device's defect in dev `0fd724eb2` (the suite's view wanted
+    objects of a submodule that `.gitmodules` declares `update = none`); it fixed it on dev as
+    `00dd77dfb6bc` while the run was going. Nothing was sent; the hook was not bypassed and the
+    submodule was not initialised by override.
+  - Second attempt (rebased tip `758fb4f6b` on `00dd77dfb`, 20:23Z–20:28Z): `PRE-PUSH GATE: ALL CLEAR
+    (267s)`. Reused this workspace's own greens from the first attempt: elohim-ark, jenkins-bridge,
+    eprfs-live-corpus, eprfs. Ran: address-profile-lint, cargo-bridge (not enabled for reuse),
+    rust-style, orchestrator (61 s, a real run: "changed since attested commit and selects this
+    gate"), orchestrator-tree (94 s). The log carries eight `[pre-push]` lines.
+  - Build notes: `just dev notes publish` after the dry run — 47 refs, every one a NEW reference under
+    this device's own destination `refs/notes/brit/devices/<this device's did>/build/*` (this device
+    had not published there before); nothing to the shared `refs/notes/brit/build/*`; covenant notes
+    stayed local. The peer daemon was left serving.
+  - A slip of mine during the third rebase: the remote's ref listing prints dev twice, an unquoted
+    two-line variable became two arguments, and `git rebase <id> <id>` detached HEAD at dev. The
+    branch was untouched; I checked it out again and rebased onto one explicit id.
+  - Both push logs and the two scripts are kept at `/projects/elohim/.worktrees/brit-s3-keep/`
+    (`land.log`, `land2.log`, `land.sh`, `land2.sh`, `notes-publish.log`).
+  - Seen in the second log, not this branch's, passed to the other device: inside the orchestrator
+    suite, `[gate] elohim-storage evidence: … could not be read (no reply for …/brit-build-ref --repo
+    …)` four times, and `[gate] fixture evidence: … could not be read (/usr/local/bin/node: bad
+    option: --repo); writing anyway`.
+  The entries below are the history that led to it.
+
 - **Rebased and verified, still local.** `feat/ark-declared-trust` = `285e8513b` on dev
   `0f48e02fbf43` (commits `0c989cf91`, `4bdc2b7ca`, `f41477076`, `285e8513b`); backup branch
   `backup/ark-declared-trust-pre-rebase-2` at `d14e7357f`. No conflicts; `git patch-id --stable`
@@ -486,9 +526,13 @@ and moved on to `0f48e02fbf43`.
   to EVERY new copy, not only shallow ones as scoped earlier, so an older brit fails closed on any copy
   a newer one wrote. This reverses the approved scope; see
   `brit-rebase-cost-gitlinks-and-stranding.md`.
-- Landing `feat/ark-declared-trust` on dev: READY (rebased onto `0f48e02fbf43` and verified, local
-  only; one trivial rebase onto origin dev `c0b1ec5e3` first; the landing-lane and custody-check
-  questions to the other device are open; see "Monorepo side" above). Not landed.
+- `feat/ark-declared-trust` is LANDED on dev as `758fb4f6b` (20:28Z; see "Monorepo side" above). It
+  was landed under the steward's "you can push when you get there", after the other device released
+  the lane. Its one behaviour change reaches every device that draws the next epr: `trust_env`
+  withholds the declared checkout trust when the device key directory or the declaration fails the
+  custody check. Both devices were checked first and pass (this one: directory mode 2770, group 1234,
+  held by the process; the other: 2700). For the steward to know, not to decide: this device's first
+  publication of its build notes went out with it (47 new refs under its own destination).
 - `git repack -a -d` in the monorepo.
 - The upstream-owned gix changes in `sprint3/trust` (now merged; `safe.rs` is byte-identical to
   upstream again).
