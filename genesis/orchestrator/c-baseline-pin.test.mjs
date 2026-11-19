@@ -516,10 +516,12 @@ export function rustExceptions(source) {
   const entries = [];
   for (const [, body] of list.matchAll(/Exception \{([\s\S]*?)\n {4}\},/g)) {
     const package_ = body.match(/package: "([^"]+)"/)?.[1];
+    const version = body.match(/version: "([^"]+)"/)?.[1];
     const kind = body.match(/kind: ExceptionKind::(\w+)/)?.[1];
+    const sources = [...(body.match(/sources: &\[([\s\S]*?)\]/)?.[1] ?? '').matchAll(/"([^"]+)"/g)].map(m => m[1]);
     const raw = body.match(/reason:\s*"((?:[^"\\]|\\[\s\S])*)"/)?.[1];
     const reason = raw?.replace(/\\\n\s*/g, '').replace(/\\"/g, '"');
-    entries.push({ package: package_, kind, reason });
+    entries.push({ package: package_, version, kind, sources, reason });
   }
   return entries;
 }
@@ -547,10 +549,19 @@ const fnBody = (source, name) => source.match(new RegExp(`\\nfn ${name}\\([\\s\\
 export const EXCEPTION_HOLDS = {
   blake3: {
     kind: 'DispatchedAssembly',
-    holds: ({ read }) => {
+    holds: ({ read, exception }) => {
       const build = read('build.rs');
       const problems = [];
       const main = fnBody(build, 'main');
+      // Re-review ruling 3: the exception names exactly the unix assembly build.rs compiles.
+      const unixAssembly = ['build_sse2_sse41_avx2_assembly', 'build_avx512_assembly']
+        .flatMap(name => [...fnBody(build, name).matchAll(/build\.file\("([^"]+)"\)/g)].map(m => m[1]))
+        .filter(f => !/windows/.test(f))
+        .sort();
+      const named = [...(exception?.sources ?? [])].sort();
+      if (JSON.stringify(named) !== JSON.stringify(unixAssembly)) {
+        problems.push(`the exception reviews ${named.join(', ') || 'no sources'}, and build.rs compiles ${unixAssembly.join(', ')} on x86_64 unix`);
+      }
       if (!/should_prefer_intrinsics\(\) \|\| is_pure\(\)[\s\S]*?build_sse2_sse41_avx2_rust_intrinsics\(\);\s*\} else \{[\s\S]*?build_sse2_sse41_avx2_assembly\(\);/.test(main)) {
         problems.push('build.rs main no longer builds the SSE2/SSE4.1/AVX2 assembly unless pure or prefer_intrinsics');
       }
@@ -717,14 +728,35 @@ test('fixture: the Rust EXCEPTIONS list is read with its continued reason string
     'pub(super) const EXCEPTIONS: &[Exception] = &[',
     '    Exception {',
     '        package: "blake3",',
+    '        version: "1.8.5",',
     '        kind: ExceptionKind::DispatchedAssembly,',
+    '        sources: &[',
+    '            "c/a_unix.S",',
+    '            "c/b_unix.S",',
+    '        ],',
     '        reason:',
     '            "On x86_64 its build.rs \\',
     '                 compiles only \\"assembly\\".",',
     '    },',
     '];',
   ].join('\n');
-  assert.deepEqual(rustExceptions(source), [{ package: 'blake3', kind: 'DispatchedAssembly', reason: 'On x86_64 its build.rs compiles only "assembly".' }]);
+  assert.deepEqual(rustExceptions(source), [{
+    package: 'blake3', version: '1.8.5', kind: 'DispatchedAssembly', sources: ['c/a_unix.S', 'c/b_unix.S'],
+    reason: 'On x86_64 its build.rs compiles only "assembly".',
+  }]);
+  // The blake3 hold names a source list that differs from what build.rs compiles.
+  const build = [
+    'fn main() {}',
+    'fn build_sse2_sse41_avx2_assembly() {',
+    '    build.file("c/a_unix.S");',
+    '}',
+    'fn build_avx512_assembly() {',
+    '    build.file("c/b_unix.S");',
+    '}',
+  ].join('\n');
+  const read = rel => (rel === 'build.rs' ? build : '');
+  const said = EXCEPTION_HOLDS.blake3.holds({ read, exception: { sources: ['c/a_unix.S'] } }).join('\n');
+  assert.match(said, /reviews c\/a_unix\.S, and build\.rs compiles c\/a_unix\.S, c\/b_unix\.S/);
   assert.throws(() => rustExceptions('const OTHER: u8 = 1;'), /declares no EXCEPTIONS list/);
 });
 
@@ -805,6 +837,9 @@ for (const exception of existsSync(resolve(ROOT, EVIDENCE_RS)) ? rustExceptionLi
     const lock = read('elohim/eprfs/Cargo.lock');
     const versions = lockedVersions(lock, exception.package);
     assert.ok(versions.length > 0, `elohim/eprfs/Cargo.lock locks no ${exception.package}`);
+    // Re-review ruling 3: the exception names the version it reviewed, and the lock holds it.
+    assert.ok(versions.includes(exception.version),
+      `the ${exception.package} exception reviews ${exception.version}, and elohim/eprfs/Cargo.lock locks ${versions.join(', ')}`);
     const located = (name, version) => {
       const dir = crateSource(name, version);
       assert.ok(dir, `${name}-${version} source is not in ${cargoHomes.join(' or ')}/registry/src, so the ${exception.package} exception cannot be held against it`);
@@ -815,9 +850,9 @@ for (const exception of existsSync(resolve(ROOT, EVIDENCE_RS)) ? rustExceptionLi
       assert.ok(version, `elohim/eprfs/Cargo.lock locks no ${name}`);
       return located(name, version);
     };
-    for (const version of versions) {
+    for (const version of [exception.version]) {
       const dir = located(exception.package, version);
-      const problems = holder.holds({ read: rel => readFileSync(join(dir, rel), 'utf8'), lockedCrate });
+      const problems = holder.holds({ read: rel => readFileSync(join(dir, rel), 'utf8'), lockedCrate, exception });
       assert.deepEqual(problems, [], `${exception.package}-${version}: ${exception.reason}`);
     }
   });

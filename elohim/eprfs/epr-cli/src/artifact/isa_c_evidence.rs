@@ -13,22 +13,26 @@
 //! which still emit `compiler-artifact` and `build-script-executed`) and hands put those lines.
 //!
 //! The rule, per build script of that build:
-//! - a compile command is a `running:` line with a `-c` argument (cc's archiver, family-detection
-//!   `-E` and version probes carry none);
+//! - every `running:` line is a compile (`-c` among its options, which are read only up to a bare
+//!   `--`, an `-o` output, no `-E` or `-S`), one of cc's own probes, or an archiver line
+//!   ([`classify`]); anything else refuses, and so does a compile carrying an option whose effect
+//!   the check cannot read (`@file`, `-Xclang`, `-Xassembler`, `-Wa,…`: [`opaque`]);
 //! - each compile carries at least one `-march`, every `-march` is the declared one, and no other
 //!   `-m` token selects an ISA: `-m64`, `-mtune=*` and `-mno-*` do not; every other `-m` token
 //!   refuses (`-mavx2`, `-msse4.2`, `-mcpu=*`, `-march=native` among them);
 //! - a script whose `OUT_DIR` holds `.o` or `.a` files and that logged no compile has no evidence
 //!   and refuses, and so does one holding an object older than the run its log records, or an
 //!   object no logged command produced ([`log_findings`]: a stale or restored log);
-//! - an [`EXCEPTIONS`] crate is judged by its own exception instead, which still reads its
-//!   commands: CPUID-dispatched assembly compiles only assembly (and cc's flag probe), and a crate
-//!   that compiles nothing on a declared target compiled nothing.
+//! - an [`EXCEPTIONS`] crate (matched by name, crates.io source and locked version) is judged by
+//!   its own exception instead, which still reads its commands: CPUID-dispatched assembly
+//!   compiles only the sources it names (and cc's flag probe), and a crate that compiles nothing
+//!   on a declared target compiled nothing.
 //!
 //! Residuals, recorded rather than solved: an assembly unit's instructions are its source's, not
 //! its `-march`'s, so a compile of a `.S` at the declared `-march` is evidence of the command, not
-//! of the instructions (ring's CPUID-dispatched assembly is accepted on that evidence); an option
-//! outside the `-m` namespace (`-Wa,…`, `-Xassembler`, a response file `@file`) is not read; every
+//! of the instructions (ring's CPUID-dispatched assembly is accepted on that evidence); a
+//! compiler wrapper's injected options are not seen (an option outside the `-m` namespace that the
+//! log does show and the check can name refuses as unjudgeable, ruling 3); every
 //! build script in the replayed build is judged, which is a superset of one bin's closure; and the
 //! C source itself can select instructions the command does not show: `__attribute__((target))`,
 //! `#pragma GCC target` and function multiversioning (`target_clones`) are not read, so a compile
@@ -143,17 +147,30 @@ pub(super) enum ExceptionKind {
 #[derive(Debug)]
 pub(super) struct Exception {
     pub package: &'static str,
+    /// The locked version reviewed (re-review ruling 3); another version is judged by the rule.
+    pub version: &'static str,
     pub kind: ExceptionKind,
+    /// For dispatched assembly, the reviewed sources exactly as its build.rs names them (cc's
+    /// flag probe aside); any other compile under the exception refuses.
+    pub sources: &'static [&'static str],
     /// One sentence, held against the crate's build.rs by genesis/orchestrator/c-baseline-pin.test.mjs.
     pub reason: &'static str,
 }
 
-/// The named exceptions (ruling 1(d)); genesis/orchestrator/c-baseline-pin.test.mjs reads this
-/// list and holds each reason against the locked crate's build.rs.
+/// The named exceptions (ruling 1(d), re-review ruling 3); genesis/orchestrator/
+/// c-baseline-pin.test.mjs reads this list, holds each version against Cargo.lock and each
+/// reason and source list against the locked crate's build.rs.
 pub(super) const EXCEPTIONS: &[Exception] = &[
     Exception {
         package: "blake3",
+        version: "1.8.5",
         kind: ExceptionKind::DispatchedAssembly,
+        sources: &[
+            "c/blake3_sse2_x86-64_unix.S",
+            "c/blake3_sse41_x86-64_unix.S",
+            "c/blake3_avx2_x86-64_unix.S",
+            "c/blake3_avx512_x86-64_unix.S",
+        ],
         reason:
             "On x86_64 Linux without the pure or prefer_intrinsics features, blake3's build.rs \
                  compiles only its SSE2, SSE4.1, AVX2 and AVX-512 assembly (.S), passing \
@@ -162,19 +179,25 @@ pub(super) const EXCEPTIONS: &[Exception] = &[
     },
     Exception {
         package: "stacker",
+        version: "0.1.25",
         kind: ExceptionKind::CompilesNothing,
+        sources: &[],
         reason: "stacker's build.rs runs cc only for src/arch/windows.c when the target is \
                  Windows, so it compiles nothing on a declared Linux target.",
     },
     Exception {
         package: "generator",
+        version: "0.8.11",
         kind: ExceptionKind::CompilesNothing,
+        sources: &[],
         reason: "generator's build.rs runs cc only for its powerpc64 context-switch assembly, so \
                  it compiles nothing on a declared x86_64 target.",
     },
     Exception {
         package: "iana-time-zone-haiku",
+        version: "0.1.2",
         kind: ExceptionKind::CompilesNothing,
+        sources: &[],
         reason: "iana-time-zone depends on iana-time-zone-haiku only under cfg(target_os = \
                  \"haiku\"), so its build script never runs, and nothing is compiled, for a \
                  declared Linux target.",
@@ -278,6 +301,80 @@ pub(super) fn command_words(line: &str) -> Option<Vec<String>> {
     }
 }
 
+/// A command's options: its words after the program, up to a bare `--` (re-review ruling 3:
+/// after it every word is an operand, never an option).
+fn options(words: &[String]) -> &[String] {
+    let rest = words.get(1..).unwrap_or_default();
+    let end = rest.iter().position(|w| w == "--").unwrap_or(rest.len());
+    &rest[..end]
+}
+
+/// What a logged `running:` line is (re-review ruling 3).
+#[derive(Debug, PartialEq, Eq)]
+enum Command {
+    /// A compile: `-c` among its options, an `-o` output, and no `-E` or `-S` (cc's object
+    /// compile, lib.rs:2640; its flag probe compiles `<OUT_DIR>/flag_check.c` the same way,
+    /// lib.rs:1948/1966/2139, and is judged like any compile).
+    Compile,
+    /// One of cc 1.11.1's own probes, which compile nothing that reaches the bytes: family
+    /// detection `<cc> -E <OUT_DIR>/…detect_compiler_family.c` (tool.rs:309/320), the cl-style
+    /// probe `<cc> [args…] -?` (tool.rs:267), `<cc> --version` (tool.rs:238, and the archiver's
+    /// at lib.rs:4846/4919), and `<cc> --print-search-dirs` (lib.rs:5769).
+    Probe,
+    /// cc's archiver or index call (lib.rs:4032-4046, 3930-3939) or a ranlib.
+    Archiver,
+}
+
+/// The [`Command`] a logged line is, or why the check cannot classify it.
+fn classify(words: &[String]) -> Result<Command, String> {
+    let program = words
+        .first()
+        .and_then(|p| Path::new(p).file_name())
+        .and_then(|p| p.to_str())
+        .unwrap_or_default();
+    let opts = options(words);
+    let is = |list: &[&str]| opts.len() == list.len() && opts.iter().zip(list).all(|(a, b)| a == b);
+    if program == "ar" || program == "llvm-ar" || program.ends_with("-ar") {
+        return if is(&["--version"])
+            || opts
+                .iter()
+                .any(|w| matches!(w.as_str(), "cq" | "cqD" | "s" | "sD"))
+        {
+            Ok(Command::Archiver)
+        } else {
+            Err("an archiver call that is not cc's".into())
+        };
+    }
+    if program == "ranlib" || program.ends_with("-ranlib") {
+        return Ok(Command::Archiver);
+    }
+    if opts.len() == 2 && opts[0] == "-E" && opts[1].ends_with("detect_compiler_family.c") {
+        return Ok(Command::Probe);
+    }
+    if opts.last().is_some_and(|w| w == "-?") && !opts.iter().any(|w| w == "-c") {
+        return Ok(Command::Probe);
+    }
+    if is(&["--version"]) || is(&["--print-search-dirs"]) {
+        return Ok(Command::Probe);
+    }
+    let has = |flag: &str| opts.iter().any(|w| w == flag);
+    if has("-c") && !has("-E") && !has("-S") && opts.windows(2).any(|w| w[0] == "-o") {
+        return Ok(Command::Compile);
+    }
+    Err("neither a compile, one of cc's probes nor an archiver call".into())
+}
+
+/// The option of a compile that hides what it passes to the compiler, assembler or a file:
+/// a response file (`@file`), `-Xclang`, `-Xassembler` or a `-Wa,` list (re-review ruling 3).
+fn opaque(words: &[String]) -> Option<&str> {
+    options(words)
+        .iter()
+        .find(|w| {
+            w.starts_with('@') || *w == "-Xclang" || *w == "-Xassembler" || w.starts_with("-Wa,")
+        })
+        .map(String::as_str)
+}
+
 /// Every reason one compile command is not at `march` alone.
 pub(super) fn compile_findings(package: &str, words: &[String], march: &str) -> Vec<String> {
     let mut findings = Vec::new();
@@ -286,7 +383,7 @@ pub(super) fn compile_findings(package: &str, words: &[String], march: &str) -> 
         let source = words.last().map_or("", String::as_str);
         format!("{package}'s compile of {source}")
     };
-    for word in words.iter().skip(1) {
+    for word in options(words) {
         if word.starts_with("-march=") {
             marched = true;
             if word != march {
@@ -351,21 +448,21 @@ fn objects(root: &Path) -> Result<Vec<String>, String> {
     Ok(found)
 }
 
-/// Whether a compile's source is assembly, or cc's flag-support probe in the script's `OUT_DIR`
-/// (lib.rs:1948, 1966: `flag_check.c`, never archived).
-fn assembly_or_probe(words: &[String], out_dir: &Path) -> bool {
-    let Some(source) = words.last().map(Path::new) else {
+/// Whether a compile is one an exception reviewed (re-review ruling 3): its source is one of the
+/// exception's named sources, or cc's flag-support probe in the script's `OUT_DIR`
+/// (`flag_check.c`, lib.rs:1948/1966, never archived). No suffix admits a source by itself.
+fn reviewed(words: &[String], out_dir: &Path, sources: &[&str]) -> bool {
+    let Some(source) = words.last() else {
         return false;
     };
-    let assembly = source
-        .extension()
-        .is_some_and(|ext| ext == "S" || ext == "s" || ext == "asm");
-    let probe = source.parent() == Some(out_dir)
-        && source
+    let probe = Path::new(source).parent() == Some(out_dir)
+        && Path::new(source)
             .file_name()
             .and_then(|name| name.to_str())
-            .is_some_and(|name| name.starts_with("flag_check."));
-    assembly || probe
+            .is_some_and(|name| {
+                matches!(name, "flag_check.c" | "flag_check.cpp" | "flag_check.cu")
+            });
+    probe || sources.contains(&source.as_str())
 }
 
 /// What one build script showed: its package, its compile commands, the objects it left.
@@ -578,8 +675,26 @@ fn read_script(message: &serde_json::Value, root: &Path) -> Result<Script, Strin
                 line.chars().take(160).collect::<String>()
             )
         })?;
-        if words.iter().skip(1).any(|word| word == "-c") {
-            compiles.push(words.clone());
+        let shown = || line.chars().take(200).collect::<String>();
+        match classify(&words) {
+            Ok(Command::Compile) => {
+                if let Some(form) = opaque(&words) {
+                    return Err(format!(
+                        "{DECLARED}: unjudgeable: {package}'s compile of {} carries {form}, whose \
+                         effect on the instruction set the check cannot read",
+                        words.last().map_or("", String::as_str)
+                    ));
+                }
+                compiles.push(words.clone());
+            }
+            Ok(Command::Probe | Command::Archiver) => {}
+            Err(why) => {
+                return Err(format!(
+                    "{DECLARED}: no evidence: {package}'s build script logged a command the check \
+                     cannot classify ({why}): {}",
+                    shown()
+                ))
+            }
         }
         commands.push(words);
     }
@@ -600,11 +715,11 @@ fn judge_exception(script: &Script, exception: &Exception) -> Vec<String> {
         ExceptionKind::DispatchedAssembly => script
             .compiles
             .iter()
-            .filter(|words| !assembly_or_probe(words, &script.out_dir))
+            .filter(|words| !reviewed(words, &script.out_dir, exception.sources))
             .map(|words| {
                 format!(
                     "{DECLARED}: {}'s exception covers its CPUID-dispatched assembly, and it \
-                     compiled {}",
+                     compiled {}, which it does not review",
                     script.package,
                     words.last().map_or("", String::as_str)
                 )
@@ -794,9 +909,9 @@ pub(super) fn judge(
                 continue;
             }
         };
-        let exception = EXCEPTIONS
-            .iter()
-            .find(|e| e.package == script.package && script.source == CRATES_IO);
+        let exception = EXCEPTIONS.iter().find(|e| {
+            e.package == script.package && script.source == CRATES_IO && e.version == script.version
+        });
         let mut findings = match exception {
             Some(exception) => judge_exception(&script, exception),
             None => judge_script(&script, march),

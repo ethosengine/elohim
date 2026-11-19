@@ -584,12 +584,11 @@ fn evidence_reconciles_every_archive_member_with_a_judged_compile() {
         ),
         "{found:?}"
     );
-    // An archive only an index (`ar sD`) or another command names was not created by a logged
-    // archiver command.
+    // An archive only an index call (`ar sD`) names was not created by a logged archiver
+    // command (any other command naming it refuses as unclassifiable, ruling 3).
     let index = [
         compile(MARCH, "a.c"),
         "\"ar\" \"sD\" \"$OUT/libx.a\"".to_owned(),
-        "\"nm\" \"$OUT/libx.a\"".to_owned(),
     ];
     let index: Vec<&str> = index.iter().map(String::as_str).collect();
     let found = Build::new("epr")
@@ -611,6 +610,109 @@ fn evidence_reconciles_every_archive_member_with_a_judged_compile() {
         has(&found, "libx.a does not read: a thin archive"),
         "{found:?}"
     );
+}
+
+/// Re-review ruling 3: a compile whose effective options the check cannot read refuses as
+/// unjudgeable, and says so: a response file, `-Xclang` (a hidden target feature), `-Xassembler`
+/// and a `-Wa,` list.
+#[test]
+fn evidence_refuses_a_compile_whose_options_it_cannot_read() {
+    for (flags, form) in [
+        (
+            "-march=x86-64 -Xclang -target-feature -Xclang +avx2",
+            "-Xclang",
+        ),
+        ("-march=x86-64 -Wa,-mavx2", "-Wa,-mavx2"),
+        ("-march=x86-64 -Xassembler -mavx2", "-Xassembler"),
+        ("-march=x86-64 @extra.rsp", "@extra.rsp"),
+    ] {
+        let found = Build::new("epr")
+            .script("ring", &[&compile(flags, "a.c")], &["x.o"], true)
+            .judge("epr", BYTES)
+            .unwrap_err();
+        assert!(
+            has(
+                &found,
+                &format!("unjudgeable: ring's compile of a.c carries {form}")
+            ),
+            "{form}: {found:?}"
+        );
+    }
+}
+
+/// Ruling 3: every logged command is a recognised compile, one of cc 1.11.1's own probes, or an
+/// archiver line; anything else refuses. Options are read only up to a bare `--`.
+#[test]
+fn evidence_refuses_a_command_it_cannot_classify() {
+    for (line, what) in [
+        ("\"gcc\" \"-E\" \"$OUT/other.c\"", "-E"),
+        ("\"gcc\" \"-S\" \"-o\" \"$OUT/x.s\" \"a.c\"", "-S"),
+        (
+            "\"gcc\" \"-march=x86-64\" \"-o\" \"$OUT/x.o\" \"--\" \"-c\" \"a.c\"",
+            "--",
+        ),
+        ("\"nm\" \"$OUT/libx.a\"", "nm"),
+        (
+            "\"gcc\" \"-march=x86-64\" \"a.c\" \"-o\" \"$OUT/a.out\"",
+            "a.out",
+        ),
+    ] {
+        let found = Build::new("epr")
+            .script("ring", &[line], &[], true)
+            .judge("epr", BYTES)
+            .unwrap_err();
+        assert!(
+            has(&found, "logged a command the check cannot classify"),
+            "{what}: {found:?}"
+        );
+    }
+    // cc's own probes pass: family detection, the cl-style probe, the version probes.
+    let probes = [
+        DETECT,
+        "\"gcc\" \"-?\"",
+        "\"gcc\" \"--version\"",
+        "\"ar\" \"--version\"",
+        "\"gcc\" \"--print-search-dirs\"",
+    ];
+    assert!(Build::new("epr")
+        .script("ring", &probes, &[], true)
+        .judge("epr", BYTES)
+        .is_ok());
+}
+
+/// Ruling 3: an exception matches the package's name, source and locked version, and blake3's
+/// covers exactly the assembly its build.rs names for x86_64 unix and cc's probe.
+#[test]
+fn an_exception_holds_only_for_its_version_and_reviewed_sources() {
+    let extra = compile("-march=x86-64 -mavx512f", "c/blake3_avx10_x86-64_unix.S");
+    let found = Build::new("epr")
+        .script("blake3", &[&extra], &["x.o"], true)
+        .judge("epr", BYTES)
+        .unwrap_err();
+    assert!(
+        has(
+            &found,
+            "compiled c/blake3_avx10_x86-64_unix.S, which it does not review"
+        ),
+        "{found:?}"
+    );
+    // Another version of blake3 is judged by the rule, which refuses its -mavx512f.
+    let reviewed = compile("-march=x86-64 -mavx512f", "c/blake3_avx512_x86-64_unix.S");
+    let mut build = Build::new("epr").script("blake3", &[&reviewed], &["x.o"], true);
+    let current = id("blake3");
+    let other = current.replace("@1.8.5", "@1.8.6");
+    build.lines = build
+        .lines
+        .iter()
+        .map(|l| l.replace(&current, &other))
+        .collect();
+    build.closure = build
+        .closure
+        .iter()
+        .map(|l| l.replace(&current, &other))
+        .collect();
+    let found = build.judge("epr", BYTES).unwrap_err();
+    assert!(has(&found, "carries -mavx512f"), "{found:?}");
 }
 
 /// Every exception's reason is one sentence (genesis/orchestrator/c-baseline-pin.test.mjs holds
