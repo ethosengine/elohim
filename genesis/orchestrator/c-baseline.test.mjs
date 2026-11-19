@@ -56,7 +56,7 @@ test('probe: a compiler that cannot run is a finding, not a pass', () => {
 test('env: every other C-family flags variable is a finding; CC and CXX are allowed', () => {
   const env = {
     CC: 'gcc', CXX: 'g++', CC_x86_64_unknown_linux_gnu: 'gcc',
-    CFLAGS: '-O2', CXXFLAGS: '', CPPFLAGS: '-DX', ASMFLAGS: '-g', TARGET_CFLAGS: '-x', TARGET_CXXFLAGS: '-x',
+    CFLAGS: '-O2', CXXFLAGS: '-x', CPPFLAGS: '-DX', ASMFLAGS: '-g', TARGET_CFLAGS: '-x', TARGET_CXXFLAGS: '-x',
     HOST_CFLAGS: '-x', HOST_CXXFLAGS: '-x', CRATE_CC_NO_DEFAULTS: '1',
     'CFLAGS_x86_64-unknown-linux-gnu': '-march=x86-64', 'CXXFLAGS_x86_64-unknown-linux-gnu': '-march=x86-64',
     CFLAGS_aarch64_unknown_linux_gnu: '-O2',
@@ -67,6 +67,18 @@ test('env: every other C-family flags variable is a finding; CC and CXX are allo
     'ASMFLAGS', 'CFLAGS', 'CFLAGS_aarch64_unknown_linux_gnu', 'CFLAGS_x86_64-unknown-linux-gnu', 'CPPFLAGS', 'CRATE_CC_NO_DEFAULTS', 'CXXFLAGS',
     'CXXFLAGS_x86_64-unknown-linux-gnu', 'HOST_CFLAGS', 'HOST_CXXFLAGS', 'TARGET_CFLAGS', 'TARGET_CXXFLAGS',
   ], 'the dashed spelling is not the declared variable, even with the declared value');
+});
+
+test('env: an exported but empty C-family variable is no finding (cc adds no flag for it); a set one is', () => {
+  // cc 1.11.1 envflags splits the value on whitespace: '' and '  ' contribute nothing, and
+  // CRATE_CC_NO_DEFAULTS='' is not true (env_value_is_true).
+  const empty = {
+    CFLAGS: '', CXXFLAGS: '  ', CPPFLAGS: '', ASMFLAGS: '\t', TARGET_CFLAGS: '', HOST_CXXFLAGS: '',
+    'CFLAGS_x86_64-unknown-linux-gnu': '', CRATE_CC_NO_DEFAULTS: '',
+  };
+  assert.deepEqual(checkCBaseline({ ...base, env: empty, spawn: probing(BASELINE_MACROS) }), []);
+  const set = checkCBaseline({ ...base, env: { ...empty, CFLAGS: '-O2', CRATE_CC_NO_DEFAULTS: '1' }, spawn: probing(BASELINE_MACROS) });
+  assert.deepEqual(set.map(f => f.variable).sort(), ['CFLAGS', 'CRATE_CC_NO_DEFAULTS']);
 });
 
 test('env: the declared underscore variable passes only at the record\'s cflags', () => {

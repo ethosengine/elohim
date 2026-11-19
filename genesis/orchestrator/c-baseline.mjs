@@ -126,6 +126,9 @@ function envFindings({ target, env }) {
         cure: `unset ${variable} (the gate exports it) or set it to '${target.cflags}'` });
       continue;
     }
+    // cc splits a flags value on whitespace, so an exported empty one adds no flag; nor is an
+    // empty CRATE_CC_NO_DEFAULTS true (cc 1.11.1 envflags, env_value_is_true).
+    if (!value.trim()) continue;
     findings.push({ triple: target.triple, check: 'env', variable,
       why: `${variable}=${JSON.stringify(value)} is set — cc adds it to the C the gate builds, beside the declared ${declared[0]}`,
       cure: `unset ${variable}; the C level is declared in genesis/agentic/pool-policy.json declared_targets` });
