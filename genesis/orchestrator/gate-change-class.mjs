@@ -1,5 +1,10 @@
 import { spawnSync } from 'node:child_process';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { COMPILER_GATE_INPUTS, SIBLING_REUSE_GOVERNANCE_PATHS } from './gate-evidence.mjs';
+import { loadGateRegistry } from './pipeline-registry.mjs';
+
+const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
 export const CHANGE_CLASSES = Object.freeze(['0', 'low', 'channel', 'governance', 'high']);
 export const CLASS_EFFECTS = Object.freeze({
@@ -123,7 +128,40 @@ function changedLeaves(a, b, prefix = '') {
   return [prefix];
 }
 
-export function classifyPoolPolicy(baseText, headText) {
+// The gate projects whose run.cargo.workspace is one of `workspaces`, from the registry at
+// `root` (the projects gate-runner.mjs declaredTargetEnv gives a declared target's C flags).
+export function workspaceProjects(root = REPO_ROOT) {
+  let registry;
+  return workspaces => {
+    registry ||= loadGateRegistry(root);
+    return [...registry.values()]
+      .filter(p => p.run?.cargo && workspaces.includes(p.run.cargo.workspace))
+      .map(p => p.name)
+      .sort();
+  };
+}
+
+// A declared_targets leaf changes CFLAGS_/CXXFLAGS_<triple> for every project on the
+// workspaces the touched target lists, before or after the edit (a dropped workspace loses
+// the keys). The leaf is `declared_targets` (the whole record), `declared_targets.<triple>`
+// or a field under it; triples carry no dots.
+function declaredTargetWorkspaces(key, base, head) {
+  const triple = key.split('.')[1];
+  const targets = [base, head].flatMap(policy => {
+    const record = policy?.declared_targets;
+    if (!record || typeof record !== 'object') return [];
+    return triple === undefined ? Object.values(record) : [record[triple]];
+  });
+  return [
+    ...new Set(
+      targets.flatMap(target =>
+        target && Array.isArray(target.workspaces) ? target.workspaces : [],
+      ),
+    ),
+  ];
+}
+
+export function classifyPoolPolicy(baseText, headText, { projectsOn = workspaceProjects() } = {}) {
   let base;
   let head;
   try {
@@ -157,6 +195,24 @@ export function classifyPoolPolicy(baseText, headText) {
         reuseOff: [project],
       };
     }
+    if (key === 'declared_targets' || key.startsWith('declared_targets.')) {
+      let reuseOff;
+      try {
+        reuseOff = projectsOn(declaredTargetWorkspaces(key, base, head));
+      } catch {
+        return {
+          path: 'genesis/agentic/pool-policy.json',
+          class: 'governance',
+          why: `${key} (gate registry unreadable)`,
+        };
+      }
+      return {
+        path: 'genesis/agentic/pool-policy.json',
+        class: 'low',
+        why: key,
+        reuseOff,
+      };
+    }
     if (
       key === 'gate_reuse' ||
       key.startsWith('gate_reuse.') ||
@@ -177,12 +233,14 @@ export function classifyPoolPolicy(baseText, headText) {
   });
 }
 
-export function classifyChange({ paths, poolPolicy } = {}) {
+export function classifyChange({ paths, poolPolicy, projectsOn } = {}) {
   const rows = [];
   for (const path of paths || []) {
     const row = classifyPath(path);
     if (row.deferred === 'pool-policy')
-      rows.push(...classifyPoolPolicy(poolPolicy?.base, poolPolicy?.head));
+      rows.push(
+        ...classifyPoolPolicy(poolPolicy?.base, poolPolicy?.head, projectsOn ? { projectsOn } : {}),
+      );
     else rows.push(row);
   }
   if (rows.length === 0) rows.push({ path: '', class: '0', why: 'no changed paths' });
@@ -243,7 +301,10 @@ export function changeClass({ root, head = 'HEAD', spawn = spawnSync }) {
       head: after.status === 0 ? after.stdout : '',
     };
   }
-  return { ...classifyChange({ paths, poolPolicy }), base: baseOid };
+  return {
+    ...classifyChange({ paths, poolPolicy, projectsOn: workspaceProjects(root) }),
+    base: baseOid,
+  };
 }
 
 if (process.argv[1]?.endsWith('gate-change-class.mjs')) {

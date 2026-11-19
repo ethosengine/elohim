@@ -14,6 +14,7 @@ import {
   classifyPoolPolicy,
 } from './gate-change-class.mjs';
 import { SIBLING_REUSE_GOVERNANCE_PATHS } from './gate-evidence.mjs';
+import { loadGateRegistry } from './pipeline-registry.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 function fakeSpawn(table) {
@@ -115,6 +116,69 @@ test('pool policy classified by key', async function pool_policy_classified_by_k
   assert.equal(pair({ gate_reuse: 1 }, { gate_reuse: 2 })[0].class, 'governance');
   assert.equal(pair({ _comment: 1 }, { _comment: 2 })[0].class, '0');
   assert.equal(classifyPoolPolicy('{', '{}')[0].class, 'governance');
+});
+
+// A declared_targets leaf changes CFLAGS_/CXXFLAGS_<triple> for every gate project whose
+// run.cargo.workspace the target lists (gate-runner.mjs declaredTargetEnv), so it is the
+// same kind of change as a cargo_env_overrides entry: low, with reuse off for exactly those
+// projects, named from the real registry.
+const onWorkspaces = (...workspaces) =>
+  [...loadGateRegistry(ROOT).values()]
+    .filter(p => p.run.cargo && workspaces.includes(p.run.cargo.workspace))
+    .map(p => p.name)
+    .sort();
+const TRIPLE = 'x86_64-unknown-linux-gnu';
+const target = (cflags, workspaces) => ({
+  declared_targets: { _comment: 'c', [TRIPLE]: { isa: 'x86-64', cflags, workspaces } },
+});
+
+test('a declared_targets cflags edit is low with reuse off for the listed workspaces', async function declared_targets_cflags_edit_is_low(t) {
+  const eprfs = onWorkspaces('elohim/eprfs');
+  assert.ok(eprfs.includes('eprfs') && eprfs.includes('orchestrator'), eprfs.join(' '));
+  const rows = classifyPoolPolicy(
+    JSON.stringify(target('-march=x86-64', ['elohim/eprfs'])),
+    JSON.stringify(target('-march=x86-64-v2', ['elohim/eprfs'])),
+  );
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].class, 'low', rows[0].why);
+  assert.equal(rows[0].why, `declared_targets.${TRIPLE}.cflags`);
+  assert.deepEqual(rows[0].reuseOff, eprfs);
+  const change = classifyChange({
+    paths: ['genesis/agentic/pool-policy.json'],
+    poolPolicy: {
+      base: JSON.stringify(target('-march=x86-64', ['elohim/eprfs'])),
+      head: JSON.stringify(target('-march=x86-64-v2', ['elohim/eprfs'])),
+    },
+  });
+  assert.equal(change.class, 'low');
+  assert.equal(change.siblingVeto, false);
+  assert.deepEqual(change.reuseOff, eprfs);
+});
+
+test('a declared_targets workspaces edit names the projects on both lists', async function declared_targets_workspaces_edit_names_both_lists(t) {
+  const added = classifyPoolPolicy(
+    JSON.stringify(target('-march=x86-64', ['elohim/eprfs'])),
+    JSON.stringify(target('-march=x86-64', ['elohim/eprfs', 'elohim/elohim-storage'])),
+  );
+  assert.equal(added.length, 1);
+  assert.equal(added[0].class, 'low', added[0].why);
+  assert.equal(added[0].why, `declared_targets.${TRIPLE}.workspaces`);
+  const both = onWorkspaces('elohim/eprfs', 'elohim/elohim-storage');
+  assert.ok(both.includes('elohim-storage') && both.includes('eprfs'), both.join(' '));
+  assert.deepEqual(added[0].reuseOff, both);
+  // Dropping a workspace changes that workspace's env too (the keys disappear).
+  const dropped = classifyPoolPolicy(
+    JSON.stringify(target('-march=x86-64', ['elohim/eprfs'])),
+    JSON.stringify(target('-march=x86-64', [])),
+  );
+  assert.deepEqual(dropped[0].reuseOff, onWorkspaces('elohim/eprfs'));
+  // The whole record appearing is the same change for every workspace it lists.
+  const born = classifyPoolPolicy(
+    JSON.stringify({}),
+    JSON.stringify(target('-march=x86-64', ['elohim/eprfs'])),
+  );
+  assert.equal(born[0].class, 'low', born[0].why);
+  assert.deepEqual(born[0].reuseOff, onWorkspaces('elohim/eprfs'));
 });
 
 test('dna hash paths are high', async function dna_hash_paths_are_high(t) {
