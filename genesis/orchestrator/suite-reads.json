@@ -7,6 +7,7 @@
     "so a read the list does not declare is absent there and the test fails rather than reading unkeyed bytes.",
     "A read is an exact path, a directory prefix, a submodule gitlink path (never a path inside one), or a **/<name> walk;",
     "inside a declared submodule the view holds the files matching a declared **/<name> walk, at the pinned commit.",
+    "A submodule that .gitmodules declares `update = none` contributes its pin to the key and nothing to the view: its directory is empty there, as in a fresh clone, on every device.",
     "modules names the packages the view's node_modules holds: their closure is checked against pnpm-lock.yaml, copied, and hashed into the key.",
     "tools names a probe (argv) for each program the named files run; each runs with the view's environment and must exit 0, or the run is refused before any test starts.",
     "allowedSkips names each skipped test the named half may report ({file, test, reason}); any other skip turns it red.",
