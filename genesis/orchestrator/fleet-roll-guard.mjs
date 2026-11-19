@@ -32,7 +32,11 @@
 // union of changed paths, which is right only when HEAD is the pushed commit (a non-HEAD push
 // through an older hook is not read). If node cannot start at all, the hook block records a red
 // on a push that names dev or main, in every mode, because the mode cannot be read without node;
-// otherwise it prints a WARN.
+// otherwise it prints a WARN. A tree listing or batch read larger than 64 MiB cannot be judged
+// and is said so. [skip ci] or [edge:validate-only] on the tip suppress the request for a
+// declaration (CI then dispatches nothing, or validates only); their WARN rows say what that
+// costs. In a shallow clone, a range that reaches the shallow boundary cannot prove that no
+// pushed commit carries the declaration, so "none found" there cannot be decided.
 //
 // THE CI RULE (read 2026-11-19 at dev 2080441f5; orchestrator = genesis/orchestrator/Jenkinsfile):
 // - The graph: graph-walker.mjs walkGraphCi, a port of build-graph.groovy walkBuildGraph (its
@@ -68,14 +72,16 @@
 //   deploys prod (Edge :3538) and, dispatched with FORCE_DEPLOY, alpha too.
 // - Submodule pins: a dependency on a pipeline whose manifest CI cannot see is pruned
 //   (build-graph.groovy:104-119), so a brit or rakia pin move selects no Edge step in CI today; a
-//   WARN row says so and names the Edge steps it would select if CI ever checked the submodule out.
+//   WARN row says so, decided from the pushed tree alone (the gitlink, its .gitmodules name and the
+//   pruned pipeline names; never a local checkout), and names the Edge steps reached through those
+//   pruned dependencies.
 // - Unknown `[edge:…]` tags are inert: the orchestrator matches `[edge:validate-only]` (:2711) and
 //   `[edge:gate-only]` (:944) literally; Edge matches `[edge:validate-only]`, `[compute-worker:…]`
 //   and `[conductor-roll]` literally (Edge :2556, :2558, :2618, :1930).
 
 import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
-import { basename, dirname, join, resolve } from 'node:path';
+import { basename, dirname, join, posix, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { walkGraph } from './graph-walker.mjs';
 import { discoverManifests } from './manifest-utils.mjs';
@@ -144,52 +150,75 @@ function git(spawn, root, args) {
 }
 const hasCommit = (spawn, root, sha) => spawn('git', ['-C', root, 'cat-file', '-e', `${sha}^{commit}`], { encoding: 'utf8' }).status === 0;
 
+const TOO_LARGE = 'larger than 64 MiB; this check cannot judge a tree that large';
+function spawnFailure(r, what) {
+  if (r.error?.code === 'ENOBUFS') return gitError(`${what}: the output is ${TOO_LARGE}`);
+  return gitError(`${what} exited ${r.status ?? r.error?.code}: ${String(r.stderr || r.error?.message || '').trim().split('\n')[0]}`);
+}
+
 /**
- * `git cat-file --batch` for each spec, every response checked: the header names an object of
- * the stated size followed by a newline; a bare object id must come back as itself. A `missing`
- * response, or a spec that names no blob, is null; anything else unexpected is an error.
+ * `git cat-file --batch` by object id only (a path is never sent, so no path can shift another's
+ * response). Each response is checked: the header names the requested id, its type and size, the
+ * body is followed by a newline, and nothing follows the last response. `<id> missing` is null; a
+ * non-blob is null.
  */
-export function catBlobs(spawn, root, specs) {
+export function catBlobs(spawn, root, oids) {
   const out = new Map();
-  if (!specs.length) return out;
-  const r = spawn('git', ['-C', root, 'cat-file', '--batch'], { input: `${specs.join('\n')}\n`, maxBuffer: BUFFER });
-  if (r.error || r.status !== 0) throw gitError(`git cat-file --batch exited ${r.status ?? r.error?.code}: ${String(r.stderr || r.error?.message || '').trim().split('\n')[0]}`);
+  const wanted = [...new Set(oids)];
+  if (!wanted.length) return out;
+  for (const oid of wanted) if (!/^([0-9a-f]{40}|[0-9a-f]{64})$/.test(oid)) throw gitError(`not an object id: ${JSON.stringify(oid)}`);
+  const r = spawn('git', ['-C', root, 'cat-file', '--batch'], { input: `${wanted.join('\n')}\n`, maxBuffer: BUFFER });
+  if (r.error || r.status !== 0) throw spawnFailure(r, 'git cat-file --batch');
   const buf = Buffer.isBuffer(r.stdout) ? r.stdout : Buffer.from(String(r.stdout));
   let pos = 0;
-  for (const spec of specs) {
+  for (const oid of wanted) {
     const nl = buf.indexOf(0x0a, pos);
-    if (nl < 0) throw gitError(`git cat-file --batch gave no response for ${spec}`);
+    if (nl < 0) throw gitError(`git cat-file --batch gave no response for ${oid}`);
     const header = buf.subarray(pos, nl).toString('utf8');
     pos = nl + 1;
-    if (header === `${spec} missing`) { out.set(spec, null); continue; }
+    if (header === `${oid} missing`) { out.set(oid, null); continue; }
     const m = /^([0-9a-f]{40}|[0-9a-f]{64}) (\S+) (\d+)$/.exec(header);
-    if (!m) throw gitError(`git cat-file --batch answered "${header}" for ${spec}`);
+    if (!m || m[1] !== oid) throw gitError(`git cat-file --batch answered "${header}" for ${oid}`);
     const size = Number(m[3]);
-    if (pos + size >= buf.length || buf[pos + size] !== 0x0a) throw gitError(`git cat-file --batch returned a short object for ${spec}`);
-    if (/^([0-9a-f]{40}|[0-9a-f]{64})$/.test(spec) && m[1] !== spec) throw gitError(`git cat-file --batch returned ${m[1]} for ${spec}`);
-    out.set(spec, m[2] === 'blob' ? buf.subarray(pos, pos + size).toString('utf8') : null);
+    if (pos + size >= buf.length || buf[pos + size] !== 0x0a) throw gitError(`git cat-file --batch returned a short object for ${oid}`);
+    out.set(oid, m[2] === 'blob' ? buf.subarray(pos, pos + size).toString('utf8') : null);
     pos += size + 1;
   }
+  if (pos !== buf.length) throw gitError(`git cat-file --batch left ${buf.length - pos} bytes after the last response`);
   return out;
+}
+
+/** One file's text at a commit-ish, its id found with ls-tree; null when the path or ref is absent. */
+function blobAt(spawn, root, commitish, path) {
+  const r = spawn('git', ['-C', root, 'ls-tree', '-z', commitish, '--', path], { encoding: 'utf8' });
+  if (r.error || r.status !== 0) return null;
+  const entry = String(r.stdout).split('\0').find(e => e.endsWith(`\t${path}`));
+  const oid = entry?.slice(0, entry.indexOf('\t')).split(' ')[2];
+  return oid ? catBlobs(spawn, root, [oid]).get(oid) ?? null : null;
 }
 
 class Indeterminate extends Error {}
 
 /**
  * The build graph CI's checkout would hold at `sha`: every build-manifest.json in the commit's own
- * superproject tree outside the directories CI's find skips, parsed; the gitlinks; and a reader of
- * build-process files from the same tree. A symlinked manifest cannot be decided here.
+ * superproject tree outside the directories CI's find skips, parsed; the gitlinks; the .gitmodules
+ * names; and a reader of build-process files from the same tree, every read by object id from the
+ * listing. A symlinked manifest cannot be decided here. A symlinked build-process file is read
+ * through its target once, inside the tree; a target outside the tree, absent, or itself a link
+ * reads as unreadable, with that reason.
  */
 export function loadTree(spawn, root, sha) {
   const r = spawn('git', ['-C', root, 'ls-tree', '-r', '-z', '--full-tree', sha], { encoding: 'utf8', maxBuffer: BUFFER });
-  if (r.error || r.status !== 0) throw gitError(`git ls-tree ${sha} exited ${r.status ?? r.error?.code}: ${String(r.stderr || r.error?.message || '').trim().split('\n')[0]}`);
-  const blobs = [];
+  if (r.error || r.status !== 0) throw spawnFailure(r, `git ls-tree ${sha}`);
+  const index = new Map();
   const gitlinks = new Set();
+  const blobs = [];
   for (const entry of String(r.stdout).split('\0').filter(Boolean)) {
     const tab = entry.indexOf('\t');
     const [mode, type, oid] = entry.slice(0, tab).split(' ');
     const path = entry.slice(tab + 1);
     if (type === 'commit') { gitlinks.add(path); continue; }
+    index.set(path, { mode, type, oid });
     if (basename(path) !== MANIFEST || path.split('/').slice(0, -1).some(d => CI_SKIPPED_DIRS.has(d))) continue;
     if (mode === '120000') throw new Indeterminate(`${path} is a symlink in the pushed tree; CI's find lists it and its readFile follows it, which this check does not do`);
     blobs.push({ path, oid });
@@ -201,10 +230,39 @@ export function loadTree(spawn, root, sha) {
     try { manifests.push({ path: `./${path}`, content: JSON.parse(contents.get(oid)) }); }
     catch (error) { errors.push(`./${path}: ${String(error.message).split('\n')[0]}`); }
   }
+  const norm = file => posix.normalize(String(file)).replace(/^\.\//, '');
   const processFiles = [...new Set(manifests.flatMap(m => Object.values(m.content.steps || {})
-    .flatMap(s => (s.inputs?.buildProcess || []).map(ref => String(ref).split('@')[0]))))];
-  const files = catBlobs(spawn, root, processFiles.map(f => `${sha}:${f}`));
-  return { manifests, errors, gitlinks, readFile: file => files.get(`${sha}:${file}`) ?? null };
+    .flatMap(s => (s.inputs?.buildProcess || []).map(ref => norm(String(ref).split('@')[0])))))];
+  const first = catBlobs(spawn, root, [...processFiles, '.gitmodules'].map(f => index.get(f)?.oid).filter(Boolean));
+  const targets = new Map();
+  for (const file of processFiles) {
+    const entry = index.get(file);
+    if (entry?.mode !== '120000') continue;
+    const link = first.get(entry.oid) ?? '';
+    const resolved = posix.normalize(posix.join(posix.dirname(file), link));
+    if (posix.isAbsolute(link) || resolved.startsWith('../') || resolved === '..') targets.set(file, { why: `a symlink to ${link}, outside the tree` });
+    else if (!index.has(resolved)) targets.set(file, { why: `a symlink to ${resolved}, which is not in the tree` });
+    else if (index.get(resolved).mode === '120000') targets.set(file, { why: `a symlink to ${resolved}, itself a symlink` });
+    else targets.set(file, { oid: index.get(resolved).oid });
+  }
+  const second = catBlobs(spawn, root, [...targets.values()].map(t => t.oid).filter(Boolean));
+  const readFile = file => {
+    const path = norm(file);
+    const entry = index.get(path);
+    if (!entry) return null;
+    if (entry.mode !== '120000') return first.get(entry.oid) ?? null;
+    const target = targets.get(path);
+    return target.why ? { why: target.why } : (second.get(target.oid) ?? null);
+  };
+  const gitmodules = new Map();
+  let name = null;
+  for (const line of String(first.get(index.get('.gitmodules')?.oid) ?? '').split('\n')) {
+    const section = /^\s*\[submodule\s+"(.+)"\]\s*$/.exec(line);
+    if (section) { name = section[1]; continue; }
+    const path = /^\s*path\s*=\s*(.+?)\s*$/.exec(line);
+    if (path && name) gitmodules.set(path[1], name);
+  }
+  return { manifests, errors, gitlinks, gitmodules, readFile };
 }
 
 // ── Prediction ──────────────────────────────────────────────────────────────
@@ -220,7 +278,9 @@ const dispatchable = (meta, name) => name !== SELF_PIPELINE && !!meta?.[name]?.j
 /** What CI does with elohim-edge for this walk and tip (header, "THE CI RULE"). Pure. */
 export function predict(walked, tip = '') {
   const meta = walked.meta || {};
-  const edgeOk = dispatchable(meta, EDGE);
+  // CI dispatches Edge on a jenkinsPath alone (:1886-1893, :1269); manual-only steps already left
+  // the graph walk, so a manual-only Edge is reached only by a forcing or mode tag.
+  const edgeOk = !!meta?.[EDGE]?.jenkinsPath;
   const edge = edgeOk ? walked.pipelines.find(p => p.name === EDGE) : undefined;
   const buildSteps = (edge?.steps ?? []).filter(s => s.name !== VALIDATE_STEP);
   const others = walked.pipelines.map(p => p.name).filter(name => name !== EDGE && dispatchable(meta, name));
@@ -270,11 +330,13 @@ function reachText(p, where) {
 
 function cureFor(p) {
   const parts = [];
-  const andPaths = p.pathSelects ? ' and take the Edge build inputs out of this push (dropping the tag alone leaves the selection by path)' : '';
-  if (p.forcedBy) parts.push(`drop ${p.forcedBy} from the tip commit${andPaths}`);
-  if (p.deployAsk) parts.push(`drop [deploy-only] from the tip commit${p.forcedBy ? '' : andPaths}`);
-  if (p.asks) parts.push('drop [build:all] from the tip commit');
-  if (!p.forcedBy && !p.deployAsk && p.buildSteps.length) parts.push('take the Edge build inputs out of this push, or land them with the next deliberate roll');
+  const tags = [p.forcedBy, p.deployAsk ? '[deploy-only]' : null, p.buildAll && !p.skipTag && !p.validateOnly ? '[build:all]' : null].filter(Boolean);
+  if (tags.length) {
+    const requests = tags.length + (p.pathSelects ? 1 : 0);
+    parts.push(`drop ${tags.join(' and ')} from the tip commit${p.pathSelects ? ' and take the Edge build inputs out of this push' : ''}${requests > 1 ? ' (each one left in place still asks)' : ''}`);
+  } else if (p.buildSteps.length) {
+    parts.push('take the Edge build inputs out of this push, or land them with the next deliberate roll');
+  }
   parts.push(`or declare the selection: add ${ROLL_TAG} to a pushed commit message, with the reason (asked for, not checked)`);
   return `${parts.join('; ')}. [edge:validate-only] on the tip also stops the selection, but it drops every other pipeline from that run, and once the run ends green the next run's diff starts past this push: not a cure for a mixed push.`;
 }
@@ -284,7 +346,7 @@ function cureFor(p) {
  * @param {{target: string|null, walked: object, tip?: string, declaredBy?: string|null,
  *   mode?: string, policyWhy?: string|null, policySource?: string|null}} args
  */
-export function evaluateRef({ target, walked, tip = '', declaredBy = null, mode = 'refuse', policyWhy = null, policySource = null }) {
+export function evaluateRef({ target, walked, tip = '', declaredBy = null, mode = 'refuse', policyWhy = null, policySource = null, historyCut = null }) {
   if (mode === 'off') return [];
   const deploying = isDeploying(target);
   const where = deploying ? `push to ${target}` : `change, were it pushed to dev (${target ? `target ${target} does not deploy` : 'not a push'})`;
@@ -317,7 +379,11 @@ export function evaluateRef({ target, walked, tip = '', declaredBy = null, mode 
   } else if (p.selects || p.asks) {
     const what = `${reachText(p, where)}${inputs ? `: ${inputs}` : ''}`;
     if (declaredBy) add(row(CHECK, 'ok', `${what} — declared by ${ROLL_TAG} in ${short(declaredBy)}`));
-    else {
+    else if (historyCut) {
+      add(row(CHECK, level('REFUSED'),
+        `${what} — and whether a pushed commit carries ${ROLL_TAG} cannot be decided: this clone is shallow and the range reaches its boundary at ${short(historyCut.commit)}, so a declaration further back is not visible`,
+        `fetch enough history (git fetch --deepen=<n> ${historyCut.remote} or git fetch --unshallow ${historyCut.remote}), then push again`));
+    } else {
       add(row(CHECK, level('REFUSED'),
         `${what} — and no pushed commit carries ${ROLL_TAG}. Read from ${target ? "this ref's own range and its tip's tags" : 'the changed paths given, with no commit read'}; an Edge step left stale by an earlier landing is not seen`,
         cureFor(p)));
@@ -336,37 +402,31 @@ export function evaluateRef({ target, walked, tip = '', declaredBy = null, mode 
   return rows;
 }
 
-/** The pipeline a checked-out submodule's own manifest names, or null. */
-function checkoutPipeline(root) {
-  return path => {
-    try { return JSON.parse(readFileSync(join(root, path, MANIFEST), 'utf8')).pipeline || null; } catch { return null; }
-  };
-}
-
 /**
- * One WARN per moved gitlink whose submodule carries a pipeline an Edge build step depends on and
- * the pushed tree does not define: CI cannot see that manifest today (header, "Submodule pins").
- * The pipeline is named from the submodule's checkout when present, else by the dependency's name
- * (`elohim-<dir>` or `<dir>`), so the verdict is the same with or without the checkout.
+ * One WARN per moved gitlink P, decided from the pushed tree alone: an Edge build step depends on
+ * a pipeline no manifest in that tree defines (CI prunes it) and whose name P's path or its
+ * .gitmodules name gives (`<name>` or `elohim-<last segment>`). The hypothetical steps are those
+ * reached from P through those pruned dependencies only.
  */
-function pinRows({ tree, changed, readCheckout }) {
+function pinRows({ tree, changed }) {
   const edge = tree.manifests.find(m => m.content.pipeline === EDGE);
   if (!edge) return [];
   const defined = new Set(tree.manifests.map(m => m.content.pipeline));
-  const deps = Object.values(edge.content.steps || {}).flatMap(s => s.depends ?? []).filter(d => String(d).includes(':'));
+  const pruned = Object.values(edge.content.steps || {}).flatMap(s => s.depends ?? [])
+    .filter(d => String(d).includes(':') && !defined.has(String(d).split(':')[0]));
   const rows = [];
   for (const path of changed.filter(p => tree.gitlinks.has(p))) {
-    const fromCheckout = readCheckout(path);
-    const names = fromCheckout ? [fromCheckout] : [`elohim-${basename(path)}`, basename(path)];
-    const hits = deps.filter(d => names.includes(d.split(':')[0]) && !defined.has(d.split(':')[0]));
+    const names = new Set([path, tree.gitmodules.get(path)].filter(Boolean).flatMap(n => [basename(n), `elohim-${basename(n)}`]));
+    const hits = pruned.filter(d => names.has(d.split(':')[0]));
     if (!hits.length) continue;
-    const pipeline = hits[0].split(':')[0];
-    const steps = Object.fromEntries([...new Set(hits.map(d => d.split(':')[1]))].map(step => [step, { inputs: { sources: [path] }, depends: [] }]));
-    const would = walkGraph([...tree.manifests, { path: `./${path}/${MANIFEST}`, content: { pipeline, steps } }], changed, { ci: true, readFile: tree.readFile });
+    const pipelines = [...new Set(hits.map(d => d.split(':')[0]))];
+    const synthetic = pipelines.map(pipeline => ({ path: `./(pruned)/${pipeline}`, content: { pipeline,
+      steps: Object.fromEntries(hits.filter(d => d.startsWith(`${pipeline}:`)).map(d => [d.split(':')[1], { inputs: { sources: [path] }, depends: [] }])) } }));
+    const would = walkGraph([...tree.manifests, ...synthetic], [path], { ci: true, readFile: tree.readFile });
     const selected = (would.pipelines.find(p => p.name === EDGE)?.steps ?? []).filter(s => s.name !== VALIDATE_STEP).map(s => s.name);
     if (!selected.length) continue;
     rows.push(row(CHECK, 'WARN',
-      `this push moves the ${path} pin, whose submodule carries pipeline ${pipeline} (${fromCheckout ? 'read from its checkout' : 'by its name'}); ${EDGE}'s build steps depend on it, but CI's checkout initialises no submodule (orchestrator Jenkinsfile:2587-2609), so CI does not see that manifest, prunes the dependency (build-graph.groovy:104-119) and does not carry this pin move into Edge today; if CI ever checked the submodule out, this push would select ${selected.join(', ')}`,
+      `this push moves the ${path} pin, a submodule whose manifest CI's checkout cannot see (it initialises no submodule, orchestrator Jenkinsfile:2587-2609); ${EDGE}'s build steps depend on ${pipelines.join(', ')}, a pipeline no manifest in the pushed tree defines, which CI prunes (build-graph.groovy:104-119), so this pin move selects no Edge step today; if CI ever saw that manifest watching ${path}, this push would also select ${selected.join(', ')}`,
       `nothing to do for today's CI; a pin move meant to reach the fleet needs a deliberate Edge build with ${ROLL_TAG}`));
   }
   return rows;
@@ -376,15 +436,15 @@ function pinRows({ tree, changed, readCheckout }) {
  * The rows for `changed` judged against the build graph at commit `sha` (git objects). Used for
  * every pushed ref, and directly by the real-manifest probes.
  */
-export function evaluatePaths({ root = MODULE_ROOT, sha, changed, target, tip = '', declaredBy = null, spawn = spawnSync, readCheckout = checkoutPipeline(root), policy = { mode: 'refuse', why: null } }) {
+export function evaluatePaths({ root = MODULE_ROOT, sha, changed, target, tip = '', declaredBy = null, historyCut = null, spawn = spawnSync, policy = { mode: 'refuse', why: null } }) {
   if (policy.mode === 'off') return [];
   const tree = loadTree(spawn, root, sha);
   const walked = tree.errors.length ? { pipelines: [], meta: {}, errors: tree.errors } : walkGraph(tree.manifests, changed, { ci: true, readFile: tree.readFile });
-  const args = { target, tip, declaredBy, mode: policy.mode, policyWhy: policy.why, policySource: policy.source };
+  const args = { target, tip, declaredBy, historyCut, mode: policy.mode, policyWhy: policy.why, policySource: policy.source };
   const rows = evaluateRef({ walked, ...args });
   if (walked.errors?.length) return rows;
   const note = policyNote({ mode: policy.mode, why: policy.why, source: policy.source });
-  return [...rows, ...pinRows({ tree, changed, readCheckout }).map(r => ({ ...r, why: `${r.why}${note}` }))];
+  return [...rows, ...pinRows({ tree, changed }).map(r => ({ ...r, why: `${r.why}${note}` }))];
 }
 
 // ── Pushes ──────────────────────────────────────────────────────────────────
@@ -406,7 +466,21 @@ export function failureRows({ error, deploying, mode = 'refuse', policyWhy = nul
     error?.cure || 'fix what the error names and push again (a malformed build-manifest.json also stops CI\'s own graph, build-graph.groovy:815-827)')];
 }
 
-function judgeRef({ ref, spawn, root, remoteName, readCheckout }) {
+/**
+ * In a shallow clone, `git log base..tip` stops at the boundary and still exits 0. The range
+ * reaches the boundary when one of its commits is a shallow root; then a declaration further back
+ * is not visible. Returns { commit, remote } or null.
+ */
+function shallowCut(spawn, root, base, tip, remote) {
+  if (git(spawn, root, ['rev-parse', '--is-shallow-repository']).trim() !== 'true') return null;
+  const shallowFile = resolve(root, git(spawn, root, ['rev-parse', '--git-path', 'shallow']).trim());
+  let roots;
+  try { roots = new Set(lines(readFileSync(shallowFile, 'utf8'))); } catch { return null; }
+  const hit = lines(git(spawn, root, ['rev-list', `${base}..${tip}`])).find(c => roots.has(c));
+  return hit ? { commit: hit, remote } : null;
+}
+
+function judgeRef({ ref, spawn, root, remoteName }) {
   const deploying = isDeploying(ref.branch);
   const target = ref.branch ?? ref.ref;
   const where = `push to ${target}`;
@@ -421,20 +495,23 @@ function judgeRef({ ref, spawn, root, remoteName, readCheckout }) {
       }
       base = git(spawn, root, ['merge-base', `${remoteName}/dev`, ref.local]).trim();
     } else {
-      policy = parsePolicy(catBlobs(spawn, root, [`${ref.remote}:${POLICY_PATH}`]).get(`${ref.remote}:${POLICY_PATH}`), `${target}'s tip ${short(ref.remote)}`);
+      policy = parsePolicy(blobAt(spawn, root, ref.remote, POLICY_PATH), `${target}'s tip ${short(ref.remote)}`);
       if (!policy.why) policy.source = `${target}'s ${POLICY_PATH} at ${short(ref.remote)}`;
     }
     if (policy.mode === 'off') return [];
-    const changed = lines(git(spawn, root, ['diff', '--name-only', base, ref.local]));
+    // Explicit options and NUL separators: no local diff setting (ignoreSubmodules, renames,
+    // relative, quotePath) changes which paths this reads.
+    const changed = git(spawn, root, ['diff', '--name-only', '-z', '--no-renames', '--ignore-submodules=none', '--no-relative', '--no-ext-diff', base, ref.local]).split('\0').filter(Boolean);
     // The tip alone carries CI's tags; the declaration is found with a search that returns one commit.
-    const tip = git(spawn, root, ['log', '-1', '--format=%B', ref.local]);
-    const declaredBy = git(spawn, root, ['log', '-i', '--fixed-strings', `--grep=${ROLL_TAG}`, '-1', '--format=%H', `${base}..${ref.local}`]).trim() || null;
-    return evaluatePaths({ root, sha: ref.local, changed, target, tip, declaredBy, spawn, readCheckout, policy });
+    const tip = git(spawn, root, ['log', '-1', '--no-show-signature', '--format=%B', ref.local]);
+    const declaredBy = git(spawn, root, ['log', '--no-show-signature', '-i', '--fixed-strings', `--grep=${ROLL_TAG}`, '-1', '--format=%H', `${base}..${ref.local}`]).trim() || null;
+    const historyCut = declaredBy ? null : shallowCut(spawn, root, base, ref.local, remoteName);
+    return evaluatePaths({ root, sha: ref.local, changed, target, tip, declaredBy, historyCut, spawn, policy });
   } catch (error) {
     if (error instanceof Indeterminate) {
       return [row(CHECK, policy.mode === 'warn' || !deploying ? 'WARN' : 'REFUSED',
         `${where}: ${error.message} — the check cannot decide, and an unreadable range never reads as "nothing changed"`,
-        error.cure || 'push from a tree without a symlinked build-manifest.json, or declare the selection deliberately')];
+        error.cure || 'replace the symlinked build-manifest.json with a regular file in the pushed commit; this check cannot load such a tree, so a declaration cannot be honoured either')];
     }
     return failureRows({ error, deploying, mode: policy.mode, policyWhy: policy.why, policySource: policy.source });
   }
@@ -460,13 +537,12 @@ const OLDER_HOOK_CURE = 'check the launcher first: test -x <worktree>/.husky/_/p
 function olderHook({ targets, changed, root, spawn, remoteName }) {
   const target = targets.map(branchOf).find(isDeploying) ?? branchOf(targets[0]) ?? targets[0];
   const deploying = isDeploying(target);
-  const spec = `${remoteName}/${target}:${POLICY_PATH}`;
   let policy = { mode: 'refuse', why: null };
   try {
-    policy = parsePolicy(catBlobs(spawn, root, [spec]).get(spec), `${remoteName}/${target}`);
+    policy = parsePolicy(blobAt(spawn, root, `${remoteName}/${target}`, POLICY_PATH), `${remoteName}/${target}`);
     if (policy.mode === 'off') return [];
     if (!Array.isArray(changed)) throw Object.assign(new Error('the running pre-push hook handed over no changed-path list'), { cure: OLDER_HOOK_CURE });
-    const tip = git(spawn, root, ['log', '-1', '--format=%B', 'HEAD']);
+    const tip = git(spawn, root, ['log', '-1', '--no-show-signature', '--format=%B', 'HEAD']);
     const tree = loadTree(spawn, root, 'HEAD');
     const walked = tree.errors.length ? { pipelines: [], meta: {}, errors: tree.errors } : walkGraph(tree.manifests, changed, { ci: true, readFile: tree.readFile });
     if (walked.errors?.length) return evaluateRef({ target, walked, mode: policy.mode, policyWhy: policy.why, policySource: policy.source });
@@ -534,6 +610,5 @@ export function checkFleetRoll({ env = process.env, changed = null, root = MODUL
       'push again from a plain shell: an inherited GATE_PUSH_REFS or GATE_PUSH_TARGETS is the usual cause')];
   }
   const judged = refs.filter(r => isDeploying(r.branch));
-  const readCheckout = checkoutPipeline(root);
-  return (judged.length ? judged : refs.slice(0, 1)).flatMap(ref => judgeRef({ ref, spawn, root, remoteName, readCheckout }));
+  return (judged.length ? judged : refs.slice(0, 1)).flatMap(ref => judgeRef({ ref, spawn, root, remoteName }));
 }

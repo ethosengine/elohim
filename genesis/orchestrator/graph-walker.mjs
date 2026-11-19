@@ -302,8 +302,8 @@ export function walkGraphCi(manifests, changedFiles, { readFile = null } = {}) {
     for (const ref of hit ? [] : (s.step.inputs?.buildProcess || [])) {
       const [file, fn] = ref.split('@', 2);
       if (readFile) {
-        const text = readFile(file);
-        if (text == null) { hit = { reason: `buildProcess: cannot read ${file}`, cause: file }; break; }
+        const text = readFile(file); // a string, null, or { why } when the reader can say why not
+        if (typeof text !== 'string') { hit = { reason: `buildProcess: cannot read ${file}${text?.why ? ` (${text.why})` : ''}`, cause: file }; break; }
         if (fn && extractFunctionBody(text, fn) === null) { hit = { reason: `buildProcess: function ${fn} not found in ${file}`, cause: file }; break; }
       }
       if (changedFiles.includes(file)) { hit = { reason: `buildProcess: ${ref} in changeset`, cause: file }; break; }

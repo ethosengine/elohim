@@ -304,6 +304,16 @@ test("fleet-roll: a node that could not run is a red on a dev or main push, a WA
   assert.ok(clear.stdout.includes("[preflight] ok fleet-roll (stub)"), clear.stdout);
 });
 
+test("round 5, seen failing first: a node that could not run on a push naming dev first among 800 more refs is a red", (t) => {
+  const { dir, base, tip } = fleetFixture(t);
+  const lines = [`refs/heads/x ${tip} refs/heads/dev ${base}`,
+    ...Array.from({ length: 800 }, (_, i) => `refs/heads/x ${tip} refs/heads/self/handover-${String(i).padStart(4, "0")} ${base}`)];
+  const r = spawnSync("bash", ["-c", script(...fleetScript(dir, lines))],
+    { cwd: dir, env: { ...env(), STUB_EXIT: "1" }, encoding: "utf8", timeout: 30000 });
+  assert.equal(r.status, 1, r.stdout.slice(-400) + r.stderr.slice(-400));
+  assert.ok(r.stderr.includes("could not run (node exit 1, above) on a push to dev or main"), r.stderr.slice(-400));
+});
+
 test("fleet-roll: a push of notes and deletes only starts no node", (t) => {
   const { dir, base, tip } = fleetFixture(t);
   const r = spawnSync("bash", ["-c", script(...fleetScript(dir, mixedLines(base, tip).slice(1, 3)))],

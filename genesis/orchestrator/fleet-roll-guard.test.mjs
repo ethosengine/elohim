@@ -11,7 +11,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ciGlobMatch, walkGraph } from './graph-walker.mjs';
-import { checkFleetRoll, evaluatePaths, evaluateRef, fleetRollMarkHonoured, fleetRollMode, parseRefs, predict } from './fleet-roll-guard.mjs';
+import { catBlobs, checkFleetRoll, evaluatePaths, evaluateRef, fleetRollMarkHonoured, fleetRollMode, parseRefs, predict } from './fleet-roll-guard.mjs';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 
@@ -137,7 +137,7 @@ test('[build:edge] with [deploy-only] says what CI does: it forwards deploy-only
 
 test('a forcing tag over path-selected Edge inputs: the cure names both', () => {
   const r = only(onDev(['sdk/x.json'], 'ci: [build:edge]'));
-  assert.match(r.cure, /^drop \[build:edge\] from the tip commit and take the Edge build inputs out of this push \(dropping the tag alone leaves the selection by path\)/);
+  assert.match(r.cure, /^drop \[build:edge\] from the tip commit and take the Edge build inputs out of this push \(each one left in place still asks\)/);
   assert.match(only(onDev(['docs/a.md'], 'ci: [build:edge]')).cure, /^drop \[build:edge\] from the tip commit; or declare/);
 });
 
@@ -218,6 +218,7 @@ const MANIFESTS = {
   'c/build-manifest.json': json({ pipeline: 'elohim-conductor', jenkinsPath: 'c/Jenkinsfile', steps: { 'build-conductor-image': { inputs: { sources: ['pin'] }, depends: [] } } }),
   'e/build-manifest.json': json({ pipeline: 'elohim-edge', jenkinsPath: 'e/Jenkinsfile', steps: {
     'cargo-build-storage': { inputs: { sources: ['sdk/**'] }, depends: ['elohim-conductor:build-conductor-image', 'elohim-rakia:rakia-ci'] },
+    'cargo-build-doorway': { inputs: { sources: ['door/**'] }, depends: [] },
     'build-edge-image': { inputs: { sources: [] }, depends: ['cargo-build-storage'] },
     'dataplane-validation': { inputs: { sources: ['steps/**'] }, depends: [] },
   } }),
@@ -270,20 +271,130 @@ test('seen failing first: a manifest-only edit that adds an unreadable Edge buil
   assert.match(r.why, /cargo-build-storage/);
 });
 
-test('seen failing first: a pin move gives the same verdict with and without the submodule checked out', (t) => {
+test('round 5, seen failing first: the pin row reads no checkout, and lists only steps reached through the pruned dependency', (t) => {
   const { dir, commit, write } = repo(t);
   const base = commit(MANIFESTS, 'base', { gitlinks: { 'elohim/rakia': '1'.repeat(40) } });
-  const tip = commit({}, 'chore(rakia): bump pin', { gitlinks: { 'elohim/rakia': '2'.repeat(40) } });
-  const without = push(dir, [['refs/heads/dev', tip, base]]);
-  write({ 'elohim/rakia/build-manifest.json': json({ pipeline: 'elohim-rakia', manualOnly: true, steps: { 'rakia-ci': { inputs: { sources: ['elohim/rakia', 'elohim/rakia/**'] }, depends: [] } } }) });
-  const withCheckout = push(dir, [['refs/heads/dev', tip, base]]);
-  assert.deepEqual(withCheckout.map(r => [r.check, r.level]), without.map(r => [r.check, r.level]));
-  assert.equal(without.some(r => r.level === 'REFUSED'), false, JSON.stringify(without));
-  const warn = only(without);
-  assert.equal(warn.level, 'WARN');
-  assert.match(warn.why, /^this push moves the elohim\/rakia pin, whose submodule carries pipeline elohim-rakia \(by its name\); elohim-edge's build steps depend on it, but CI's checkout initialises no submodule/);
-  assert.match(warn.why, /if CI ever checked the submodule out, this push would select cargo-build-storage, build-edge-image$/);
-  assert.match(only(withCheckout).why, /carries pipeline elohim-rakia \(read from its checkout\)/);
+  const tip = commit({ 'door/x.rs': '1\n' }, 'chore(rakia): bump pin, and a doorway edit', { gitlinks: { 'elohim/rakia': '2'.repeat(40) } });
+  const rows = () => push(dir, [['refs/heads/dev', tip, base]]);
+  const without = rows();
+  write({ 'elohim/rakia/build-manifest.json': json({ pipeline: 'elohim-rakia', manualOnly: true, steps: { 'rakia-ci': { inputs: { sources: ['elohim/rakia'] }, depends: [] } } }) });
+  const matching = rows();
+  write({ 'elohim/rakia/build-manifest.json': json({ pipeline: 'something-else', steps: {} }) });
+  const unrelated = rows();
+  assert.deepEqual(matching, without);
+  assert.deepEqual(unrelated, without);
+  const pin = without.find(r => r.why.startsWith('this push moves the elohim/rakia pin'));
+  assert.equal(pin?.level, 'WARN', JSON.stringify(without));
+  assert.match(pin.why, /a submodule whose manifest CI's checkout cannot see/);
+  assert.match(pin.why, /depend on elohim-rakia, a pipeline no manifest in the pushed tree defines/);
+  assert.match(pin.why, /this push would also select cargo-build-storage, build-edge-image$/, 'the doorway step is not reached through the pin');
+});
+
+test('the pin row is silent for a gitlink no pruned pipeline name matches', (t) => {
+  const { dir, commit } = repo(t);
+  const base = commit(MANIFESTS, 'base', { gitlinks: { 'che-devworkspaces': '1'.repeat(40) } });
+  const tip = commit({}, 'chore: bump che pin', { gitlinks: { 'che-devworkspaces': '2'.repeat(40) } });
+  assert.deepEqual(push(dir, [['refs/heads/dev', tip, base]]), []);
+});
+
+test('round 5, seen failing first: changed paths ignore local diff settings and keep spaces and newlines', (t) => {
+  const { dir, git, commit } = repo(t);
+  git('config', 'diff.ignoreSubmodules', 'all');
+  git('config', 'diff.renames', 'true');
+  git('config', 'diff.relative', 'true');
+  const base = commit(MANIFESTS, 'base', { gitlinks: { pin: '1'.repeat(40) } });
+  const tip = commit({}, 'chore: conductor pin', { gitlinks: { pin: '2'.repeat(40) } });
+  const pinRow = only(push(dir, [['refs/heads/dev', tip, base]]));
+  assert.equal(pinRow.level, 'REFUSED');
+  assert.match(pinRow.why, /from pin, through elohim-conductor:build-conductor-image/);
+  // core.quotePath (on by default) quotes a non-ASCII name in plain --name-only output; -z does not.
+  const odd = commit({ 'sdk/café b.json': '1\n', 'docs/x\ny.md': '1\n' }, 'feat: odd names');
+  assert.ok(only(push(dir, [['refs/heads/dev', odd, tip]])).why.includes('from sdk/café b.json'));
+  // A newline survives the read, and CI's glob (Java's `.`) does not match across it either.
+  assert.equal(ciGlobMatch('sdk/a\nb.json', 'sdk/**'), false);
+});
+
+test('round 5, seen failing first: build-process reads go by object id, so a newline in one path shifts nothing', (t) => {
+  const { dir, commit } = repo(t);
+  const edge = JSON.parse(MANIFESTS['e/build-manifest.json']);
+  edge.steps['cargo-build-storage'].inputs.buildProcess = ['scripts/a\nb.sh'];
+  edge.steps['cargo-build-doorway'].inputs.buildProcess = ['scripts/gone.sh'];
+  const base = commit({ ...MANIFESTS, 'e/build-manifest.json': json(edge), 'scripts/a\nb.sh': 'echo\n' }, 'base');
+  const tip = commit({ 'docs/a.md': 'a\n' }, 'docs');
+  const r = only(push(dir, [['refs/heads/dev', tip, base]]));
+  assert.equal(r.level, 'REFUSED', r.why);
+  assert.match(r.why, /stale steps cargo-build-doorway, from scripts\/gone\.sh/);
+  assert.doesNotMatch(r.why, /cargo-build-storage|could not decide/);
+});
+
+test('round 5, seen failing first: trailing bytes after the last batch response are an error', () => {
+  const oid = 'a'.repeat(40);
+  const spawn = () => ({ status: 0, stdout: Buffer.from(`${oid} blob 2\nhi\nEXTRA`) });
+  assert.throws(() => catBlobs(spawn, '/x', [oid]), /bytes after the last response/);
+  assert.equal(catBlobs(() => ({ status: 0, stdout: Buffer.from(`${oid} blob 2\nhi\n`) }), '/x', [oid]).get(oid), 'hi');
+  assert.throws(() => catBlobs(() => ({ status: null, error: Object.assign(new Error('spawnSync git ENOBUFS'), { code: 'ENOBUFS' }) }), '/x', [oid]),
+    /larger than 64 MiB; this check cannot judge a tree that large/);
+});
+
+test('round 5, seen failing first: a symlinked build-process file is read through its target inside the tree, else stale', (t) => {
+  const { dir, commit } = repo(t);
+  const edge = JSON.parse(MANIFESTS['e/build-manifest.json']);
+  edge.steps['cargo-build-storage'].inputs.buildProcess = ['scripts/good.sh'];
+  edge.steps['cargo-build-doorway'].inputs.buildProcess = ['scripts/dangling.sh'];
+  mkdirSync(join(dir, 'scripts'), { recursive: true });
+  symlinkSync('real.sh', join(dir, 'scripts/good.sh'));
+  symlinkSync('nowhere.sh', join(dir, 'scripts/dangling.sh'));
+  const base = commit({ ...MANIFESTS, 'e/build-manifest.json': json(edge), 'scripts/real.sh': 'echo\n' }, 'base');
+  const tip = commit({ 'docs/a.md': 'a\n' }, 'docs');
+  const r = only(push(dir, [['refs/heads/dev', tip, base]]));
+  assert.match(r.why, /stale steps cargo-build-doorway, from scripts\/dangling\.sh/);
+  assert.doesNotMatch(r.why, /cargo-build-storage/);
+});
+
+test('round 5, seen failing first: a shallow range that touches the boundary cannot prove no declaration; a linear one can', (t) => {
+  const { dir, git, commit } = repo(t);
+  commit(MANIFESTS, 'base');
+  git('tag', 't1');
+  const c1 = git('rev-parse', 't1');
+  commit({ 'sdk/x.json': '1\n' }, 'feat: edge input\n\nDeliberate. [edge:roll]');
+  const c3 = commit({ 'docs/a.md': 'a\n' }, 'docs: a');
+  const clone = `${dir}-shallow`;
+  t.after(() => rmSync(clone, { recursive: true, force: true }));
+  const cg = (...args) => {
+    const r = spawnSync('git', ['-C', clone, '-c', 'user.name=t', '-c', 'user.email=t@t', '-c', 'commit.gpgsign=false', '-c', 'core.hooksPath=/dev/null', ...args], { encoding: 'utf8', env: cleanEnv });
+    assert.equal(r.status, 0, `git ${args.join(' ')}: ${r.stderr}`);
+    return r.stdout.trim();
+  };
+  assert.equal(spawnSync('git', ['clone', '--quiet', '--depth', '1', '--branch', 'dev', `file://${dir}`, clone], { env: cleanEnv }).status, 0);
+  cg('fetch', '--quiet', '--depth', '1', 'origin', 'tag', 't1');
+  const deep = checkFleetRoll({ root: clone, spawn: spawnIn, env: { GATE_PUSH_TARGETS: 'refs/heads/dev', GATE_PUSH_REFS: `refs/heads/dev ${c3} ${c1}` } });
+  const red = only(deep);
+  assert.equal(red.level, 'REFUSED');
+  assert.match(red.why, /shallow/);
+  assert.match(red.cure, /git fetch --deepen|--unshallow/);
+  const add = (path, message) => {
+    mkdirSync(join(clone, path, '..'), { recursive: true });
+    writeFileSync(join(clone, path), 'x\n');
+    cg('add', '-A');
+    cg('commit', '--quiet', '-m', message);
+    return cg('rev-parse', 'HEAD');
+  };
+  const c4 = add('docs/b.md', 'docs: b');
+  assert.deepEqual(checkFleetRoll({ root: clone, spawn: spawnIn, env: { GATE_PUSH_TARGETS: 'refs/heads/dev', GATE_PUSH_REFS: `refs/heads/dev ${c4} ${c3}` } }), []);
+  const c5 = add('sdk/y.json', 'feat: another input\n\nDeliberate. [edge:roll]');
+  assert.equal(only(checkFleetRoll({ root: clone, spawn: spawnIn, env: { GATE_PUSH_TARGETS: 'refs/heads/dev', GATE_PUSH_REFS: `refs/heads/dev ${c5} ${c4}` } })).level, 'ok');
+});
+
+test('round 5, seen failing first: [build:edge] forces a manual-only Edge that has a jenkinsPath, as CI does', () => {
+  const manual = FIXTURE.map(m => (m.content.pipeline === 'elohim-edge' ? { ...m, content: { ...m.content, manualOnly: true } } : m));
+  assert.equal(only(evaluateRef({ target: 'dev', walked: walkGraph(manual, ['docs/a.md'], { ci: true }), tip: 'ci: [build:edge]', mode: 'refuse' })).level, 'REFUSED');
+});
+
+test('round 5, seen failing first: with [build:all] beside another request, the cure names every one', () => {
+  const both = only(onDev(['docs/a.md'], 'ci: [build:all] [build:edge]'));
+  assert.match(both.cure, /^drop \[build:edge\] and \[build:all\] from the tip commit/);
+  const paths = only(onDev(['sdk/x.json'], 'ci: [build:all]'));
+  assert.match(paths.cure, /^drop \[build:all\] from the tip commit and take the Edge build inputs out of this push/);
 });
 
 test('seen failing first: two protected refs at different tips are each judged from their own objects', (t) => {
@@ -333,6 +444,7 @@ test('a symlink named build-manifest.json in the pushed tree cannot be decided',
   const r = only(push(dir, [['refs/heads/dev', tip, base]]));
   assert.equal(r.level, 'REFUSED');
   assert.match(r.why, /x\/build-manifest\.json is a symlink in the pushed tree/);
+  assert.doesNotMatch(r.cure, /declare/, 'a tree that cannot be loaded cannot honour a declaration');
 });
 
 test('a declaration anywhere in a range over 1 MiB of messages is found; a 0x1e byte in the tip is harmless', (t) => {
@@ -467,12 +579,10 @@ test('real manifests: the incident witnesses select an Edge build', () => {
   assert.ok(probe('elohim/holochain-conductor')[0].why.includes('elohim-conductor:build-conductor-image'));
 });
 
-test('real manifests: a brit or rakia pin alone is a WARN about CI\'s checkout, the same whether or not the submodule is checked out', () => {
+test('real manifests: a brit or rakia pin alone is a WARN about CI\'s checkout', () => {
   for (const path of ['elohim/brit', 'elohim/rakia']) {
     const here = probe(path);
-    const absent = evaluatePaths({ root: ROOT, sha: 'HEAD', changed: [path], target: 'dev', tip: 'feat: x', spawn: spawnIn, readCheckout: () => null });
     assert.equal(verdict(here), 'WARN', path);
-    assert.deepEqual(absent.map(r => r.level), here.map(r => r.level), path);
-    assert.match(here[0].why, /CI's checkout initialises no submodule/, path);
+    assert.match(here[0].why, /a submodule whose manifest CI's checkout cannot see/, path);
   }
 });

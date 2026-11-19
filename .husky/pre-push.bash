@@ -1067,7 +1067,12 @@ if [ -n "$GATE_PUSH_REFS" ]; then
   if [ "$FR_STATUS" -eq 3 ]; then
     leg_red fleet-roll "the fleet-roll check is red (above); its cure is printed beside it"
   elif [ "$FR_STATUS" -ne 0 ]; then
-    if printf '%s\n' "$GATE_PUSH_REFS" | grep -qE '^refs/heads/(dev|main) '; then
+    # No pipe: under pipefail an early-exiting grep fails its writer on a long list (2026-11-19).
+    FR_PROTECTED=""
+    while IFS= read -r FR_LINE; do
+      case "$FR_LINE" in "refs/heads/dev "* | "refs/heads/main "*) FR_PROTECTED=1 ;; esac
+    done <<<"$GATE_PUSH_REFS"
+    if [ -n "$FR_PROTECTED" ]; then
       leg_red fleet-roll "the fleet-roll check could not run (node exit $FR_STATUS, above) on a push to dev or main"
     else
       echo "[preflight] WARN fleet-roll: the check could not run (node exit $FR_STATUS, above); no pushed ref deploys, so this is not a red"
