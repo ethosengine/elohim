@@ -307,7 +307,7 @@ not only shallow ones as scoped earlier (v2 only when the floor is non-empty). A
 then fail closed on any copy a newer one wrote. This reverses the approved scope and needs the
 steward's decision again.
 
-## Recovery lane, 2026-11-19 (in progress)
+## Recovery lane, 2026-11-19 (four rounds reviewed; merge in progress)
 
 Lane `sprint3/recovery` (worktree `brit-s3-recovery`). Commits up to `0d23297e22`:
 
@@ -348,8 +348,6 @@ Lane `sprint3/recovery` (worktree `brit-s3-recovery`). Commits up to `0d23297e22
 - Only the pure reorders D1 (refStorage and branch-occupied first), D2 (merge bases before the walk)
   and D5 (index-only pre-check for unmerged, split and both gitlink cases) are in this lane; D3, D4
   and D6 belong to the redesign.
-
-**Status (earlier):** second round in progress; NOT mergeable until a delta review passes.
 
 **Round 2 reviewed: BROKEN.** Round 2 (commits `9f3e6373`, `073cbfb0`, `5b107d72`: three admission
 gates, `--retire`, unlaunched-hook cancellation) was reviewed and broken in three ways, all confirmed
@@ -418,12 +416,102 @@ Admission's smallest admitted limit is now about 1.9–3.2 times the real copy. 
 roughly 182,000 objects) are still refused in under a second, with wording that says brit rebase is not
 available at that size yet.
 
-**Round 4 in progress** under a fresh implementer: the two crash windows, R3 extended to switch and
-standalone authoring abort, three status wordings, and the lint leg that had not run.
+Below, the first of these is M1 and the second M2. The third review also asked for unmetered
+`brit switch` recovery and three status wordings.
 
-**Status:** not mergeable until a fourth delta review passes; fallback unchanged (land round 1's
-reviewed parts only).
+**Round 4: done and reviewed; no must-fix on SIGKILL paths.** A fresh implementer, seven commits
+`a9fd9cc80ad061c3f7868e91a335bc339dbe0975..c63ef6bfa4fa520364ebf4f1d8318aa307db68d9`:
 
-**Residuals recorded:** a process killed during any journal `save()` can leave `.git/.brit-checkout-*`;
-a `preparing` journal in a moved or copied repository cannot be cancelled (identity check;
-pre-existing).
+- `1d24e1a87e83539893d629b7ce3a70900e9f8276` (M2): the manifest, `COPY_COMPLETE` and the cleanup
+  receipt are published whole (spool, rename, sync). A manifest that is not a whole checksummed record
+  in an incomplete copy is replaced; a whole differing manifest still refuses.
+- `1b6f2f94f260b60f155630ba4aaea0a2a6ce72da`: switch `--status`/`--abort`, pull `--abort` and rolling a
+  durable decision forward are unmetered; fault builds accept `BRIT_SWITCH_CHECKPOINT=name#N`.
+- `0f30fb0c672d3579f794a5e3c7f0a9f334f84227` (M1): `Session::settle_pending` discards a pending record
+  beside a valid `state.json` at the entry of every rebase command except `--status` (a
+  preparation-phase successor excepted); torn decision records are discarded; a torn `plan.json` beside
+  a whole owner record is rewritten; an abandoned never-decided plan's recorded locks are released.
+  The last fixes an `--abort` killed at `lock-acquired` that refused on every retry, a stranding older
+  than the lane. Also the status wordings.
+- `6b3ade669030e6974de9222f4d783e5dad6a0f09`: journeys, including a sweep that kills four commands at
+  every journal save at three points each.
+- `8ef125b05e45186d2717f7d120e3e3333d4e3817`: docs.
+- `1f7036bf3a6caa2d50ec79f4613a1c135580c9a5` and `c63ef6bfa4`: the author's own corrections after its
+  core suites went red on two intermediate changes.
+
+Reported by the author: every verification leg EXIT 0 on `c63ef6bfa4` (rebase journeys 46 with faults,
+switch 28, pull 44), the same counts as uid 65534.
+
+Fourth independent review (the reviewer of rounds 1–3; its scripts and outputs were session scratch
+and are not kept, so the results are recorded here). Verdict: merge with the residuals documented.
+Confirmed by running:
+
+- **Lock release holds.** `release_undecided_locks` (`transition.rs:58`) goes through `reclaim_locks`,
+  which checks per lock that the receipt path equals the resource's lock, that anchor and external lock
+  have the same device, inode and checksum, and that the receipt is private and owned. An `--abort` was
+  killed in repository A at `lock-acquired`, and separately at `lock-intent`; every rebase command was
+  then run in a copy B and in a moved copy C. A's lock files, journal and refs were byte-identical
+  afterwards; B and C refused everything except `--status`; A then aborted and restored exactly. With
+  the owner alive and paused at `lock-acquired`, `--abort`, `--continue` and `--retire` refused naming
+  the holder and left its locks untouched. (Lock deletion was what removed another repository's locks
+  in round 2.)
+- **M1 fixed.** After a kill at `replay-state-file-synced` in a conflict `--continue` or `--skip`,
+  `--status` names the leftover and `--abort` restores exactly. With kills at saves #1–#4 of a conflict
+  `--continue` and of the first run, `--abort` restores HEAD, index, worktree and the user's dirty file
+  exactly, leaving no journal and no `brit-authoring`; from an identical crash `--continue` finishes
+  with the right history (or, on the first run, stops at the expected conflict).
+- **M2 fixed.** Killed at `replay-retained-member`, or at `replay-retained-manifest` with the manifest
+  then truncated, the retried `--abort` restores exactly.
+- **Switch quota fixed.** Under a 1,000-byte limit `switch --status` and `--abort` work and restore
+  exactly; killed at `index-published`, `--continue` finishes. The changed `conflict_authoring` test
+  is correctly retargeted (the oversized receipt is still refused, for its length).
+- **No regressions** in the round-1 preparation-cancel attacks or the moved/copied-repository
+  fixtures; the round-1 band case is now refused before anything changes.
+
+**Residuals.** The reviewer produced each by killing at the nearest checkpoint and cutting the record
+to half its length. A SIGKILL cannot realistically tear these small fsynced records; a crash or power
+loss before the fsync can. None is new in this lane.
+
+| Record | How produced | Outcome |
+|---|---|---|
+| `metadata-lock-0.json` in an abort transition | abort killed at `lock-acquired` | stranded: `--abort`, `--continue`, `--skip` and `--retire` all refuse; `--status` says "--abort finishes restoring", which is wrong |
+| `metadata-lock-0.json` in the forward first checkout | rebase killed at `lock-acquired` | stranded: all four refuse; `--status` says "--continue carries on; --abort restores", wrong |
+| `retention-0.json` | killed at `replay-intermediate-retained` | stranded: all four refuse; `--status` wrong the same way |
+| `index.pre-rebase` | killed at `replay-decision-durable` | cleared by `--abort`, exact restore |
+| `proposal-0.json` | killed at `replay-retention-recipe` | cleared: live state restored exactly, journal then retired |
+| cleanup receipt (285 KB) | clean rebase killed at `replay-cleanup-receipt-durable` | stranded: the rebase is published; `--continue` refuses and every mutation is blocked. The receipt is now published whole, so this torn form comes only from an older brit or a power loss |
+
+- **Should-fix 1.** After an `--abort` killed mid-copy, a stock `git add` of an unrelated dirty file
+  followed by `git reset -- <file>` does not restore the index byte for byte. From then on `--abort`
+  refuses "foreign replay metadata before abort", `--retire` refuses, and `--status` names no cure (the
+  manual cure would be copying the retained copy's observed index back; nothing says so). At an
+  ordinary conflict stop the same reset does let `--abort` work.
+- **Should-fix 2.** `--status` gives the wrong cure in every stranded row above, and at a conflict stop
+  where `git add` was run and not undone.
+- **The author's own not-fixed list:** records still written in one non-atomic pass whose torn form
+  makes a retry refuse: `metadata-lock-N.json` and `directory-*.json` (a lock receipt with a git lock
+  held), `proposal-N.json`, `retention-*.json`, `index.pre-rebase`, `payload-license-*.json`; a
+  leftover `*.new` of the authoring child, not checked; a torn cleanup receipt left by an older brit or
+  a power loss still blocks every mutation; phase `published-foreign-state` prints no cure. The
+  review's table tested five of these records: torn `index.pre-rebase` and `proposal-0.json` were
+  cleared by `--abort`, not refused as the list says.
+- **Not established by the review:** whether every `save` caller keeps nothing between "pending
+  synced" and "renamed" (asserted by the author's table; not every caller read; the integrator is asked
+  to list them); torn `directory-*.json`, `payload-license-*.json` and the authoring child's `*.new`
+  (not produced); kills during an edit-stop `--amend`.
+- **Earlier residuals, unchanged:** a process killed during any journal `save()` can leave
+  `.git/.brit-checkout-*`; a `preparing` journal in a moved or copied repository cannot be cancelled
+  (identity check; pre-existing).
+
+**Decision (coordinator, after the fourth review): merge.** The merge into `sprint3/integrate` is
+integration Phase 4g; it was in progress, neither done nor pushed, when this was written. This
+supersedes the round-1-only fallback.
+
+**Queued follow-up round, not started.** Publish `metadata-lock-N.json`, `retention-N.json` and the
+other single-pass records whole (spool, rename, sync), or treat an unparseable record as not written;
+make `--status` say a record is unreadable instead of naming a cure that refuses; give the
+interrupted-abort-plus-foreign-index-write state a named cure; decide what a torn cleanup receipt from
+an older brit may be allowed to do. It needs its own independent review before it merges.
+
+Rebase stays a declared git fallback for the monorepo and for brit: the preflight refuses repositories
+over roughly 182,000 objects, and the redesign above is not started.

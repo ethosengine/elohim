@@ -174,5 +174,25 @@ aggregate fix" (`brit-sprint-3-handoff-2026-11-19.md`).
 
 ## (s) macOS runners abandoned
 
-macOS legs have been abandoned on both runs since about 14:30Z on 2026-11-19 (runs 44544779620 and
-44567300304), so macOS is unverified for every head after `9945331577`.
+macOS legs were abandoned on runs 44544779620 and 44567300304 (from about 14:30Z on 2026-11-19). On
+run 44575030094 (head `1bf96648cb`) the macOS leg got a runner and passed, the first macOS result
+since `9945331577`.
+
+## (t) An unbounded background follower holds its parent
+
+An agent's unbounded background follower (`tail -f <file> | grep …`) keeps its parent reporting
+"waiting on background work" indefinitely. Bound every follower with `timeout`, or use bounded reads.
+
+## (u) A verification that needs a local-only edit is not repeatable across agents
+
+The bash journeys' git:// sections need a git-daemon this host lacks; earlier integrators skipped them
+with a local-only edit to `tests/helpers.sh` (handoff runbook §4). For the readonly-shem merge the
+session's automatic permission check refused that edit, so three of four variants ran only up to their
+first git:// section. Proposal, not done: a tracked skip in `tests/helpers.sh`, switched by an
+environment variable, in place of the local edit.
+
+## (v) A CI tool install can fail a required job
+
+On run 44583007601 `test-journey` failed in its `extractions/setup-just` step ("Server Error"), before
+any journey ran. Under the allow-list aggregate that fails `Tests pass` for the head; only a re-run
+of the job gives the head a verdict.

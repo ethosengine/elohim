@@ -22,12 +22,11 @@ cites:
   - genesis/data/timeline/backlog/brit-covenant-session-segment-aliasing.md
   - genesis/data/timeline/backlog/brit-daily-driver-handoff-2026-10-27.md
 shift_objective: |
-  Continue brit sprint 3 in the decided order: first the rebase recovery/stranding lane
-  (stranding fixes plus a preflight that refuses before any spooling when completion is
-  impossible; then the redesign, after the steward's format decision); an independent integrator
-  merges sprint3/trust, sprint3/diff-show and sprint3/refs-shem into sprint3/integrate as each
-  clears review; then the push-policy lane, the epr-cli lane, worktree-side diff with gitlinks,
-  and merge porcelain.
+  Continue brit sprint 3 in the decided order: finish merging the reviewed rebase recovery lane
+  into sprint3/integrate (Phase 4g), then its queued follow-up round (every journal record
+  published whole, truthful --status) under its own independent review; then the redesign, after
+  the steward's format decision; then the push-policy lane, the epr-cli lane, worktree-side diff
+  with gitlinks, and merge porcelain.
 ---
 
 # Brit sprint 3 handoff (2026-11-19)
@@ -43,8 +42,9 @@ has not moved.
 
 **Integration branch** `sprint3/integrate` in the brit repo, worktree
 `/projects/elohim/.worktrees/brit-s3-integrate`. Pushed to the brit remote as
-`run-ci/sprint3-integrate` eight times, through `brit push` and brit's reach gate (`epr ready` +
-`scripts/ci/rust-style.sh`). The first three pushes took about 6 s each; the fourth exited 0.
+`run-ci/sprint3-integrate` nine times, through `brit push` and brit's reach gate (`epr ready` +
+`scripts/ci/rust-style.sh`). The first three pushes took about 6 s each; the fourth exited 0. Head
+now: `080f3057973e6c5c19e38a1b78a1330917d3851d` (push 9).
 
 | Pushed head | CI run |
 |---|---|
@@ -54,8 +54,9 @@ has not moved.
 | `bd28ecd8cf6c9593c77825d734e7fb38e1923534` | 44494603484: every required job green on Linux, macOS and both Windows runners; only cargo-deny-advisories red (as on main) |
 | `9945331577` | 44528984349: green on Linux and macOS. On both Windows runners ONE unit test red, `gitoxide_core::repository::git_spellings::rev_parse::tests::relative_paths_match_git`: `relative_path` rendered a collected PathBuf with `display()`, so Windows joined with `\` where the test asserts git's `/`. The journeys for the same cause had been gated before the push; this unit test was missed |
 | `e2b94f2da7dc11597222bd7074ebc657deb7cb28` | 44544779620: finished. Every Windows job green on both runners (first Windows run of the trust lane's tests; `relative_paths_match_git` passes unchanged). Non-root Linux red on ONE test, `brit-cli::repository_slots::an_unreadable_alternate_pack_directory_does_not_fail_the_open`: the test was unsound, not the product (see `brit-declared-trust-and-reduced-trust-pack-cap.md`); test-only fix `bd18b171` on `sprint3/trust`, to be merged with the diff/show merge, not yet pushed when written. macOS cancelled part-way, so unverified for that head. The aggregate "Tests pass" concluded `success` on this run although `test-fast` legs had failed (see the steward section) |
-| `8e5072ffd35cd31d7cfaf8d31fa6b28ae53dbda1` | 44567300304: every Linux and Windows test job green, including `test`; macOS abandoned; two Windows fixture jobs still running when written |
-| `1bf96648cbec09baf9a957477ea36d975aa7c1bf` | the aggregate fix; CI in progress when written |
+| `8e5072ffd35cd31d7cfaf8d31fa6b28ae53dbda1` | 44567300304: finished (last job 17:19:14Z). 29 jobs succeeded, among them every Linux and Windows test job, both `test-fixtures-windows` jobs and `test`. Not green: cargo-deny-advisories (failure, as on main) and `test-fast (macos-latest)` (cancelled 16:47:51Z with no steps: it never got a runner, the leg the diagnostic step printed as `abandoned`). The pre-fix `Tests pass` concluded `success` at 17:09:53Z all the same (see the steward section) |
+| `1bf96648cbec09baf9a957477ea36d975aa7c1bf` | 44575030094: GREEN, the first run with the aggregate fix. Finished 17:58:03Z (`Tests pass` 17:55:51Z). 30 jobs succeeded; the only non-green job is cargo-deny-advisories. `test-fast (macos-latest)` got a runner and passed (17:26:05Z), the first macOS result since `9945331577`; `test` passed; `Tests pass` succeeded, its diagnostic step printing 17 needs, every one `success`, and the allow-list step silent. Same product tree as `8e5072ffd3` plus the allow-list step |
+| `080f3057973e6c5c19e38a1b78a1330917d3851d` | 44583007601 (pushed 17:59Z; the read-only merge). Read at 18:11Z, still running: `test-journey` FAILED at 18:00:52Z in its step 5, the `extractions/setup-just` install, annotated "Server Error"; no journey ran (every later step skipped). cargo-deny-advisories failed as on main. Succeeded so far: lint, test-doc, brit-rust-style, cargo-deny, pure-rust-build, both MSRV checks, the three WebAssembly builds, auditable, brit-feature-census, brit-readiness-contract, brit-release-package-contract, check-blocking, check-no-persist-credentials, MSRV badge. In progress: `test`, `test-fast` on ubuntu-latest, ubuntu-24.04-arm and windows-11-arm, both `test-fixtures-windows`, the three 32-bit jobs, brit-cpu-compatibility; `test-fast (macos-latest)` queued. With the allow-list, the failed `test-journey` makes this run's `Tests pass` fail; a re-run of that job is needed before this head can be judged |
 
 A second integrator took over from the runbook note below and did the phase from `7479ce4539` to
 `bd28ecd8cf`. Besides the lane merges, that phase made two integration commits: `4f1d05a93a` (one
@@ -86,11 +87,17 @@ Merged after that:
   patch).
 - **trust follow-up:** `69aa5275b3`, merge of `bd18b171cb`.
 - **aggregate fix:** `4dceac3557` and `1bf96648cb` (see the steward section).
+- **read-only extension (shem):** merge `93287e5f19256ca281c4dca348e2afdabb2b554b` of
+  `6f5a82f130180d34293c99c2901663d207026bac` (parents `1bf96648cb` and `6f5a82f130`), by a fresh
+  integrator, no conflict and no integration fix; changelog commit `080f305797` is the head. What it
+  delivers, how it was verified and what it leaves: "What the merged lanes deliver", read-only entry.
 
-Ten lanes are now merged on the integration branch: covenant-escape, log-rev-path, branch-tag,
-fetch-tracking, lock, build-inputs, push-transport, refs-shem, trust, diff-show. Not merged: recovery.
+Eleven lanes are now merged on the integration branch: covenant-escape, log-rev-path, branch-tag,
+fetch-tracking, lock, build-inputs, push-transport, refs-shem, trust, diff-show, readonly-shem. Not
+merged: recovery (its merge, Phase 4g, was in progress and not pushed when written).
 
-Verification of the final head on this host: full cli-journey 496 passed on the default build, 357 on
+Verification of the ten-lane head on this host (before the read-only merge; the merge's own legs are
+in the read-only entry): full cli-journey 496 passed on the default build, 357 on
 the max-pure journey list; a non-root leg over 123 test binaries (1028 ok; the six differences from
 root are host artifacts: this host's `/etc/gitconfig` is unreadable to an unprivileged user, and three
 tests write a lock into a read-only worktree); the reviewer's three diff/show comparison scripts re-run
@@ -110,16 +117,17 @@ on the MERGED binary show only the documented refusals.
 | `sprint3/push-transport` | `4a60a61d` | merged in `bd28ecd8cf` (three implementation rounds, two independent reviews, a doc-link fix) | `brit-s3-push-transport` |
 | `sprint3/diff-show` | `5a422ceb51` | merged (`19ac68ad59`) after two review passes and a delta review | `brit-s3-diff-show` |
 | `sprint3/refs-shem` | `806ea8114b` (shem's `b8264afc4`) | merged (`b9b4a294fc`) | `brit-s3-refs-shem` |
-| `sprint3/recovery` | round 1 up to `0d23297e22`; round 2 `9f3e6373`, `073cbfb0`, `5b107d72`; round 3 `b4183e93b9`, `e47ac0bbcd`, `a9fd9cc80a` | round 3: R1–R5 hold, two crash-window strandings remain; round 4 in progress; not mergeable until a fourth delta review passes (see `brit-rebase-cost-gitlinks-and-stranding.md`) | `brit-s3-recovery` |
+| `sprint3/readonly-shem` | `6f5a82f130` (five patches from shem's `origin self/nt-review-receipts` `ee7d60ecc65a`, applied with `git am` on `8e5072ffd3`) | merged (`93287e5f19`) | `brit-s3-readonly-shem` |
+| `sprint3/recovery` | round 1 up to `0d23297e22`; round 2 `9f3e6373`, `073cbfb0`, `5b107d72`; round 3 `b4183e93b9`, `e47ac0bbcd`, `a9fd9cc80a`; round 4 `a9fd9cc80a..c63ef6bfa4fa520364ebf4f1d8318aa307db68d9` (seven commits) | fourth independent review done at `c63ef6bfa4`: no must-fix on SIGKILL paths, merge recommended with the residuals documented. Coordinator decided to merge: integration Phase 4g in progress, NOT yet merged or pushed when written. A follow-up round publishing every journal record whole is queued, not started (see `brit-rebase-cost-gitlinks-and-stranding.md`, round 4) | `brit-s3-recovery` |
 
 **Monorepo side:** branch `feat/ark-declared-trust` (worktree `brit-s3-ark-trust`), first written as
-three commits on origin/dev `01e4de7f1`, is now four commits (tip `d14e7357f`), reviewed, awaiting
-rebase onto the landed dev. dev landed at `71069b1f551f` (the other ethosengine session's one push: L2b's
-eight commits, then L1's twenty-five), and is now at `0f48e02fbf43`, the rebase target for
-`feat/ark-declared-trust`. `feat/ark-declared-trust` and the queued epr-cli
-`device_store(…)` lane can rebase onto it; that is deferred until the brit integration frees room in
-the shared cargo pool. Announce over berth before anything lands under `elohim/eprfs`: that session's
-next landing, L2a, touches epr-cli's artifact and produce paths.
+three commits on origin/dev `01e4de7f1`, is now four commits (tip `d14e7357f` before the rebase),
+reviewed. dev landed at `71069b1f551f` (the other ethosengine session's one push: L2b's eight commits,
+then L1's twenty-five), and is now at `0f48e02fbf43`. The branch is being rebased onto `0f48e02fbf43`
+and re-verified in its worktree, local only; nothing is landed. The queued epr-cli `device_store(…)`
+lane stacks on it. The other session on this device (`a222db7c`, landing L2a in `elohim/eprfs`, which
+touches epr-cli's artifact and produce paths) was told over berth at 18:02Z which epr-cli files the
+branch touches.
 
 **This record** is on monorepo branch `docs/brit-backlog-sprint3` (worktree `brit-s3-backlog`).
 
@@ -127,8 +135,8 @@ next landing, L2a, touches epr-cli's artifact and produce paths.
 
 - **refs-shem** (merged): shem delivered two fix rounds after two independent review passes on its side. Its
   reviewer found, among others, a change that could send a mutating command to an outer repository;
-  it was removed in patch 0013. Sixteen patches are now applied as `sprint3/refs-shem` `806ea8114b`
-  (shem's `b8264afc4`); the merge into the integration branch is in progress. A deliberate difference
+  it was removed in patch 0013. Sixteen patches are applied as `sprint3/refs-shem` `806ea8114b`
+  (shem's `b8264afc4`), merged as `b9b4a294fc`. A deliberate difference
   from git is kept: `rev-parse --verify missing` with a closed stderr exits 128 where git dies with
   141.
 - **trust** (merged; final review state in `brit-declared-trust-and-reduced-trust-pack-cap.md`):
@@ -214,6 +222,73 @@ next landing, L2a, touches epr-cli's artifact and produce paths.
   Still open: rakia-core 0.1.1 `constellation.rs` `build_glob_set` compiles the same globs with plain
   `Glob::new`, so step SELECTION by `brit build plan`/`affected` keeps the per-platform meaning and has
   no gitlink/symlink reach (`elohim/rakia`, in no write-set).
+- **readonly-shem** (the other device's lane, merged as `93287e5f19`). Source: five patches written
+  against `8e5072ffd3`, in `genesis/docs/superpowers/sprints/2026-11-17-native-throughput/receipts/brit-s3-readonly/`
+  on `origin self/nt-review-receipts` `ee7d60ecc65a`, with a README, a before/after table and the
+  lane's own independent review receipt. Commits: `4aa01ebcd34d3d0afb98f7866e87ecd0d9abf37a` (build
+  output goes through the watched writer), `be1cee434309205af12f189389fb2343e6a1dadf` (admit the
+  checked read-only commands), `a313829d8f96b986d59f8d4c558fdbd5c0800d35` (`tree info` resolves its
+  revision first), `274ffa04f6e986648878866cde336b1fef76ccf5` (narrow the list; flush stdout before the status is decided),
+  `6f5a82f130180d34293c99c2901663d207026bac` (admit `remote refs` and `remote ref-map` alike with `ls-remote`).
+  - **What it does.** The closed-reader rule (a read-only command that otherwise succeeded exits 141
+    when its reader closed; a command's own failure always wins) now covers 46 exact command paths, 28
+    of them new: show, tag list, remote url, remote refs, remote ref-map, revision previous-branches,
+    verify, fsck, tree entries, tree info, commit-graph list, commit-graph verify, mailmap entries,
+    mailmap check, attributes query, exclude query, bare submodule, config, config show, config list,
+    index entries, dirwalk; and the build forms graph discover, graph show, affected, plan, fingerprint,
+    baseline read. Left out, each with its reason beside the list (`READ_ONLY_COMMANDS` in
+    `brit-cli/src/main.rs`): bare tag, commit verify, commit describe, revision list, attributes
+    validate-baseline, submodule list, is-clean, is-changed, config fmt, build run, build baseline
+    write and migrate.
+  - **Measured** on the merged binaries; default and max-pure gave the same result in every row.
+
+    | Case | Before | After |
+    |---|---|---|
+    | `show HEAD`, stdout closed | 1, "Error: Broken pipe" | 141, empty stderr |
+    | `build fingerprint`, stdout closed | 101 (panic) | 141 |
+    | `index entries`, stdout closed | 0 | 141 |
+    | `show HEAD:<short blob without a newline>`, stdout closed | 0 | 141 |
+    | `tree info no-such-revision`, stderr closed | 1 | 1 (the base did not list `tree info`; the other device's table showed 141 from its own intermediate commit, and it has corrected its record) |
+    | `build baseline write`, stdout closed | 101 (panic) | 1, "error: io error: Broken pipe", the ref already written |
+    | `verify`, stderr closed | 0 | 0 |
+
+    Genuine failures keep their own status with a closed reader (1 both live and closed):
+    `-f json config list`, `remote -n nosuch refs`, `build baseline read --repo no-such-dir`,
+    `mailmap check` with no contacts. With a live reader, output is byte-identical before and after on
+    both builds (the `generatedAt` field masked) for build fingerprint, graph show (JSON and DOT), plan
+    (`--files` and `--since`), graph discover, affected and baseline read.
+  - **Read by the integrator.** The flush is at `brit-cli/src/main.rs:571-575`, after `run()` and
+    before `exit_status()`, on the read-only branch only, its result ignored. `exit_status`
+    (`:416-431`) gives 141 only for success, a plumbing exit of 0, or an error that is itself a typed
+    BrokenPipe write. The closed-stderr ordering from `d3452c7816` is intact. Path strings are built
+    from clap's canonical names (`read_only_command`, `:366`), so aliases resolve to the listed path.
+    Six admitted commands re-read for "writes nothing, prints only through the watched writer": remote
+    url, config list/show, index entries, verify, build fingerprint, build plan. None writes and none
+    takes a guard.
+  - **Verification on this host** (every leg EXIT 0): brit-cli 110 passed / 5 ignored; cli-journey
+    full 499 / 0 failed / 73 ignored; brit-epr + brit-build-ref 177; gitoxide-core 199 / 5 ignored;
+    brit-graph 54; power_loss 4; core faults 181 / 1 ignored; journey faults 113; max-pure brit-cli
+    110 / 5 ignored; max-pure journeys 372 / 6 ignored; clippy for the four workspace legs plus
+    `-p brit-cli --all-targets` under small, lean-async and max-pure; both doc legs with
+    `-D warnings`; fmt. Non-root leg (uid 65534; plain HOME and HOME with `[safe] directory = *`;
+    default and max-pure): 117 ok, 0 failed, 5 ignored in all six runs, no per-test difference from
+    root. Reach-gate probes against `1bf96648cb`: rust-style PASS, `epr ready` READY.
+  - **Not established.** The bash journeys for the pure, async and max variants ran here only up to
+    their first `git://` section: this host has no git-daemon, and the local-only skip earlier
+    integrators applied in `tests/helpers.sh` (runbook §4) was refused by the session's automatic
+    permission check this time and was not worked around. The small variant ran fully (62
+    assertions). CI's journey job runs all four; on run 44583007601 it did not get past installing
+    `just` (head/push table). Windows, macOS and 32-bit compiles of this merge are known only from
+    that run. The new journey file `read_only_closed_reader.rs` is `#![cfg(target_os = "linux")]` and
+    runs in `test-fast` only (whether to add it to `test-journey`: "Decided but not started", item 3).
+  - **Follow-ups the other device accepted as its lane's, none blocking.** A completed `build baseline
+    write` or `migrate` exits 1 on a closed stdout after its ref changed; both devices agree this
+    belongs with the push-policy lane's rule "a delivered operation reports success" and is decided
+    there together with push, not patched in the list. The deprecated `rakia` alias returns before the
+    read-only flag is set (`brit-cli/src/main.rs:440-451`), so `rakia fingerprint | head` should still
+    end 1 (read, not measured). `remote -n <unknown> url` exits 0 printing the name as a URL (predates
+    the lane). With the Windows separators for rev-parse's absolute answers, the other device says
+    that is the whole of what its lane still owes brit.
 
 ## The sprint's backlog entries
 
@@ -232,30 +307,30 @@ next landing, L2a, touches epr-cli's artifact and produce paths.
    `brit-rebase-cost-gitlinks-and-stranding.md`: (a) the stranding fixes (report §7 a–d) plus a
    preflight that refuses before any spooling when completion is impossible; (b) the redesign (report
    §6), after the steward's decision on the retained-manifest format below. Rebase stays a declared
-   git fallback on both devices. Step (a) has started as lane `sprint3/recovery` (in progress, see the
-   lane table).
-2. All reviewed lanes are merged on the integration branch (ten lanes, listed under "Where the work
-   is"); only `sprint3/recovery` remains.
+   git fallback on both devices. Step (a) is lane `sprint3/recovery`: reviewed four times, merge in
+   progress as Phase 4g (lane table). Its queued follow-up round (every journal record published whole,
+   truthful `--status` for unreadable records) is part of step (a) and needs its own independent review.
+2. All reviewed lanes but recovery are merged on the integration branch (eleven lanes, listed under
+   "Where the work is").
 3. A push-policy lane (`push.rs`): one handshake when no hook ran; the notes/tag fast-forward rule;
    refuse an ungated push when hooks are configured but missing or not executable; render the delivery
    note in the CLI. See `brit-push-fails-after-green-hook-root-cause.md`. Also for this lane: push's
    status lines use `writeln!(stderr, …)?` (`gitoxide-core/src/repository/push.rs`), so a DELIVERED
-   push with a closed stderr exits non-zero.
-   - Closed-pipe leftovers: `println!` to a closed stdout still panics (exit 101) in brit-build-ref (21
-     sites), brit-verify (7), brit-cli (3) and `brit build fingerprint` / `build graph discover`; no
-     brit binary installs a panic hook. `brit log` prints a commit message with an `encoding` header as
-     raw bytes (`show` is fixed on the diff-show lane; `log` is separate code); `show::to_utf8` is
-     private, so this needs it made `pub(crate)`. `-C` refusals name the clap id `change_dir`.
-   - `show` qualifies for the read-only command list but is not in it (`brit show … | head` exits 1
-     with "Broken pipe"). shem has started that extension as patches against `8e5072ffd3` (directory
-     `brit-s3-readonly/` on `self/nt-review-receipts` when delivered); its own review took `is-clean`,
-     `is-changed`, `commit describe`, `submodule list`, `remote refs` and `remote ref-map` off the
-     candidate list. `ls-remote` and its two siblings are to be treated alike (coordinator's preference:
-     admit all three, with the credential-helper caveat written beside the list).
+   push with a closed stderr exits non-zero. The same rule, "a delivered operation reports success",
+   is to decide `build baseline write` and `migrate`, which exit 1 on a closed stdout after their ref
+   changed (read-only entry under "What the merged lanes deliver").
+   - Closed-pipe leftovers: the read-only merge routed brit-cli's build output through the watched
+     writer, so `brit build fingerprint` no longer panics (101 → 141) and `build graph discover` is on
+     the list. Not established as changed by it: the `println!` sites counted earlier in
+     brit-build-ref (21), brit-verify (7) and brit-cli (3); no brit binary installs a panic hook. `brit log` prints a commit message with an
+     `encoding` header as raw bytes (`show` is fixed on the diff-show lane; `log` is separate code);
+     `show::to_utf8` is private, so this needs it made `pub(crate)`. `-C` refusals name the clap id
+     `change_dir`.
    - CI's `test-journey` job runs its named list against a standalone default-feature binary, not the
-     shipped max-pure one. Ten journey files added this sprint are not in that list (broken_pipe,
+     shipped max-pure one. Eleven journey files added this sprint are not in that list (broken_pipe,
      change_dir, check_ref_format, diff_revisions, for_each_ref, ls_remote, merge_base_is_ancestor,
-     rev_list, rev_parse, show), though test-fast runs them; whether to add them is the steward's call.
+     rev_list, rev_parse, show, read_only_closed_reader), though test-fast runs them; whether to add
+     them is the steward's call.
    - 35 first-party test functions open a repository in-process without isolation from host git
      config (brit-graph repo_fingerprint 21, gitoxide-core replay 11, others): the class that produced
      the non-root CI failure. Listed in the integration note, not fixed.
@@ -327,6 +402,8 @@ next landing, L2a, touches epr-cli's artifact and produce paths.
     `cancelled` 15 minutes after start (16:32:49Z → 16:47:51Z) with no steps and no log, exactly as on
     run 44544779620 (14:32:05Z → 14:48:12Z), where the same abandoned leg hid two FAILED ubuntu legs of
     the same matrix job. The earlier "last leg to finish" pattern was a coincidence and is withdrawn.
+    On run 44567300304 the pre-fix `Tests pass` again concluded `success` (17:09:53Z) over the
+    abandoned macOS leg.
   - FIX on the integration branch: commit `4dceac3557` (the diagnostic step `Show dependency results`)
     and commit `1bf96648cb` (a step `Fail unless EVERY dependency succeeded`: an allow-list that fails
     on any result other than `success` and on an empty result list). The older deny-list step is kept
@@ -337,14 +414,22 @@ next landing, L2a, touches epr-cli's artifact and produce paths.
     the allow-list step. A `Tests pass` from any commit built before it cannot be trusted either way,
     even where its legs were in fact green; that covers every brit commit on main today, including the
     pinned 0.2.6.
+  - FIRST COMMIT THAT MEETS IT: `1bf96648cbec09baf9a957477ea36d975aa7c1bf`. Its own CI run
+    44575030094 included the allow-list step and is green on Linux, macOS and Windows with ten lanes
+    merged (head/push table). It is on `run-ci/sprint3-integrate`, not on brit `main`. The other device
+    has recorded the same commit and run on its side. Landing on main and moving the pin remain the
+    steward's decisions; nothing has been done toward either. The later head `080f305797` (eleven
+    lanes) has no green run yet (head/push table).
   - Still proposals for the steward, not done: add the job `test` (the unit-tests recipe) to the
-    aggregate's `needs` (it also failed on run 44544779620 and is not in `needs` at all); on the
-    monorepo side, read every workflow run's conclusion at the commit as a second check (queued by shem
-    behind its gate lanes, to land together with the manifest's attestation field).
-  - Open observation: macOS legs have been abandoned on both runs since about 14:30Z on 2026-11-19, so
-    macOS is unverified for every head after `9945331577`. With the fix in place such a run now FAILS
-    the aggregate, as intended.
-- Landing on brit `main` and the pin move. 16 monorepo steps re-key once (build-inputs above); one
+    aggregate's `needs` (it also failed on run 44544779620 and is not in `needs` at all; it passed on
+    44575030094, whose aggregate printed 17 needs without it); on the monorepo side, read every
+    workflow run's conclusion at the commit as a second check (queued by shem behind its gate lanes, to
+    land together with the manifest's attestation field). Read on GitHub: the run conclusion of
+    44575030094 is `failure`, as is 44567300304's, solely because cargo-deny-advisories is red, so that
+    second check as worded would refuse every brit commit while the advisory job stays red.
+  - macOS: abandoned on runs 44544779620 and 44567300304 (from about 14:30Z), it got a runner and passed
+    on 44575030094 (17:26:05Z). The fix makes an abandoned leg FAIL the aggregate.
+- Landing on brit `main` and the pin move. Candidate commit: previous item. 16 monorepo steps re-key once (build-inputs above); one
   supervised real landing is needed to retire the push exception in `CLAUDE.md`. Its notes step is the
   device's own notes publish, fast-forward to `refs/notes/brit/devices/<did>/build/*`, which brit must
   be able to perform (or the publish script keeps using git, stated as a fallback); see
@@ -354,9 +439,9 @@ next landing, L2a, touches epr-cli's artifact and produce paths.
   to EVERY new copy, not only shallow ones as scoped earlier, so an older brit fails closed on any copy
   a newer one wrote. This reverses the approved scope; see
   `brit-rebase-cost-gitlinks-and-stranding.md`.
-- Landing `feat/ark-declared-trust` on dev, with the one-line notice: dev now carries L2b and L1
-  (`71069b1f551f`); the rebase onto it is deferred (see "Monorepo side" above), and L2a is that
-  session's next landing.
+- Landing `feat/ark-declared-trust` on dev, with the one-line notice: dev now carries L2b and L1 and
+  is at `0f48e02fbf43`; the branch's rebase onto it and re-verification are under way, local only (see
+  "Monorepo side" above), and L2a is the other session's next landing.
 - `git repack -a -d` in the monorepo.
 - The upstream-owned gix changes in `sprint3/trust` (now merged; `safe.rs` is byte-identical to
   upstream again).
@@ -383,10 +468,12 @@ next landing, L2a, touches epr-cli's artifact and produce paths.
 - Hand-over ref: `origin self/nt-review-receipts`. shem's two refs-lane fix rounds have arrived
   (shem's `b8264afc4`, applied as `sprint3/refs-shem` `806ea8114b`).
 - The refs lane (merged) brought `merge-base --is-ancestor` and `rev-list --count`.
-- Agreed with shem for sprint 4, under shem's lane: Windows `/` separators for rev-parse's ABSOLUTE
-  answers (helper `gix_path::to_unix_separators_on_windows`). Extending the read-only command list is
-  shem's, after trust and diff-show are merged, together with replacing `println!` in the build
-  commands.
+- shem's read-only extension, together with the build commands' output through the watched writer,
+  arrived as five patches on `self/nt-review-receipts` `ee7d60ecc65a` and is merged (`93287e5f19`).
+- Still shem's, for sprint 4: Windows `/` separators for rev-parse's ABSOLUTE answers (helper
+  `gix_path::to_unix_separators_on_windows`), and the read-only lane's three accepted follow-ups
+  (read-only entry under "What the merged lanes deliver"). shem says that is the whole of what its lane
+  still owes brit.
 
 ## Integration runbook
 
@@ -394,8 +481,9 @@ The text below is the integration worktree's handoff note, copied in full from t
 scratchpad. Its `/tmp/claude-0/…/scratchpad/integrate/` paths (the `$S` scripts, summaries, logs and
 `bin-keep` binaries) are session scratch and will not survive a workspace restart. The scratch build
 directory `dev-nocflags` it mentions has been deleted. A second integrator took over from this note
-and did the phase that merged push-transport and the build-inputs Windows follow-up; the runbook
-stays valid.
+and did the phase that merged push-transport and the build-inputs Windows follow-up; later integrators
+merged refs-shem, trust, diff-show and readonly-shem from it, and the recovery merge (Phase 4g) is in
+progress. The procedure stays valid; the facts in §1 and §9 that changed are corrected in place.
 
 # Handoff: brit sprint 3 integration
 
@@ -424,9 +512,9 @@ S=/tmp/claude-0/-projects-elohim/0e0924d5-52e0-4709-b329-ea2463064148/scratchpad
 **Branch and commits**
 - Branch: `sprint3/integrate`.
 - Base: `1db7a955197b10bc7672c9aa544768a329bb9008` (brit 0.2.6).
-- Head: `7479ce453981f69832792113fe917bcf72b62dde`.
-  - The coordinator pushed it to `origin run-ci/sprint3-integrate`, and CI run 3 is running.
-  - The previous pushed heads were `251d10e52a` (run 1) and `da5e4a0504` (run 2).
+- Head: `080f3057973e6c5c19e38a1b78a1330917d3851d` (eleven lanes), pushed to
+  `origin run-ci/sprint3-integrate` as push 9. Every pushed head and its CI run: the head/push table at
+  the top of this entry.
 - `branch.sprint3/integrate.britReachBase` is set (by the coordinator).
 
 **Repo state**
@@ -465,13 +553,10 @@ First-parent history, oldest first (2nd parent = lane tip):
 | 483ad2f992 | test(brit-cli): counting upload-pack wrapper `#[cfg(unix)]` (Windows compile) |
 | 7479ce4539 | fix(gitoxide-core): export `reacquire_shared` from the non-Linux stub |
 
-**Lanes not yet merged.** Merge none of them before the coordinator says so:
-- sprint3/trust and sprint3/diff-show (tip 3d10b379cf, on top of log 4ec68b1669) are in review.
-  - diff-show makes `merge_bases`, `Literal` and its fields and `new`, and `worktree_path` in `gitoxide-core/src/repository/log.rs` `pub(crate)`. It also re-splits one signature with rustfmt.
-  - That touches the same lines as log 71bbb86aa3, which is already merged, so expect a conflict.
-- sprint3/push-transport is in its second review.
-- sprint3/refs-shem (the sibling device's six-patch lane) is waiting on its fix round.
-- Expect more follow-ups on existing lanes.
+**Lanes not yet merged.** Only `sprint3/recovery`. The coordinator decided after its fourth review to
+merge it as Phase 4g; that merge was in progress and not pushed when this was written. Its queued
+follow-up round is not started and merges only after its own independent review. Merge nothing else
+before the coordinator says so; expect more follow-ups on existing lanes.
 
 ## 2. Cargo wrapper and build slot
 
@@ -589,6 +674,10 @@ Local-only workarounds. **Never commit these:**
    if ! test -x "$(git --exec-path)/git-daemon"; then echo 1>&2 "SKIPPED git:// section: no git-daemon"; exit 0; fi
    ```
    This skips two sections per variant: `remote refs` over git:// and `free pack receive` over git://.
+   For the readonly-shem merge the session's automatic permission check refused this edit, so pure,
+   async and max ran only up to their first git:// section; a verification that depends on a
+   local-only edit is not repeatable across agents (`brit-ci-and-workspace-limits-found-in-sprint-3.md`,
+   item (u)).
 2. **Host-specific pack checksums.** In pure (and max), seven snapshots differ only in pack/index checksums produced by this host's stock git 2.52 upload-pack (index `c02d9bdd…`, pack `9380796d…`). CI's git produces the committed ones, and the installed base brit (1db7a955) reproduces the host values here, so they are not ours:
    `tests/snapshots/plumbing/no-repo/pack/receive/{file-v-any-no-output,file-v-any-no-output-json,file-v-any-no-output-json-p2,file-v-any-no-output-p2,file-v-any-with-output,file-v-any-with-output-p2,ls-in-output-dir}`.
 
@@ -758,7 +847,8 @@ Coverage notes:
 **CI history:**
 - run 1 (251d10e5): three reds. test-journey (the small snapshot), brit-rust-style (all-zeros base), advisories.
 - run 2 (da5e4a05): only the four Windows jobs, at the remote_tracking compile.
-- run 3 (7479ce45): in progress.
+- run 3 (7479ce45): Linux and macOS green; four Windows tests red (build-inputs lane).
+- Later runs: the head/push table at the top of this entry.
 
 ## 10. Open watch items (raised, not acted on)
 

@@ -53,8 +53,8 @@ The brit-first hook's own ledger keeps no command text, and its `epr feedback ca
   sixteen patches were applied as tip `806ea8114b` (shem's `b8264afc4`) and merged into the
   integration branch (`b9b4a294fc`). A deliberate difference is kept: `rev-parse --verify missing` with
   a closed stderr exits 128 where git dies with 141.
-- **Lane `sprint3/diff-show`** (tip `5a422ceb51`, two review passes and a delta review, merge in
-  progress): `brit diff` with revisions, ranges, merge bases and all output forms, and `brit show`.
+- **Lane `sprint3/diff-show`** (tip `5a422ceb51`, two review passes and a delta review, merged as
+  `19ac68ad59`): `brit diff` with revisions, ranges, merge bases and all output forms, and `brit show`.
   Final state:
   - commit encodings re-encoded as git does (the whole commit, including author and committer names);
     unknown labels, and non-ASCII text under a non-UTF-8 output encoding, refuse by name; ASCII-only
@@ -74,6 +74,14 @@ The brit-first hook's own ledger keeps no command text, and its `epr feedback ca
     nothing configured; `--name-only` still works; no driver command or textconv is ever executed;
   - intent-to-add entries and a conflicted index refuse the worktree forms;
   - multiple merge bases refuse `--merge-base` (git refuses too, with a different exit code).
+- **shem's read-only extension** (`sprint3/readonly-shem`, merged as `93287e5f19`): the closed-reader
+  rule (exit 141 when the reader closed; a command's own failure wins) covers 46 command paths, 28 of
+  them new, among them `show`, `config list`, `index entries`, `remote refs` and the read-only build
+  forms. Measured with stdout closed: `brit show HEAD` 1 "Error: Broken pipe" → 141; `brit build
+  fingerprint` 101 (panic) → 141. Not covered: bare `tag`, `revision list`, `submodule
+  list`, `is-clean`/`is-changed`, `build run`, `build baseline write`/`migrate` (exits 1 on a closed
+  stdout after writing its ref) and others, each with a reason in `READ_ONLY_COMMANDS`. Full list,
+  measurements and follow-ups: the handoff entry, "What the merged lanes deliver", read-only entry.
 
 ## Still missing after those
 
@@ -98,4 +106,5 @@ The brit-first hook's own ledger keeps no command text, and its `epr feedback ca
 - Shallow clone.
 - `brit log` range output with a format or body.
 
-Global: `brit … | head` prints "Error: Broken pipe (os error 32)" on 0.2.6.
+Global: `brit … | head` prints "Error: Broken pipe (os error 32)" on 0.2.6. On the integration branch
+a command on the read-only list (above) that otherwise succeeded ends 141 instead.
