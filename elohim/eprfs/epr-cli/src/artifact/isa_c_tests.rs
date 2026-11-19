@@ -182,3 +182,32 @@ fn isa_c_accepts_only_a_declaration_the_record_applies() {
         );
     }
 }
+
+/// Ruling 2 (L2a rework): `target.cflags` is exactly `-march=<target.isa>`. A declaration carrying
+/// an extra flag refuses even when every recorded variable agrees with it, so a record and a
+/// descriptor cannot declare `-mavx2` together.
+#[test]
+fn isa_c_refuses_declared_cflags_beyond_the_march_even_when_the_record_agrees() {
+    for extra in [
+        "-march=x86-64 -mavx2",
+        "-mavx2 -march=x86-64",
+        "-march=x86-64 -O2",
+        " -march=x86-64",
+    ] {
+        let inputs = [
+            ("target.isa", "x86-64"),
+            ("target.cflags", extra),
+            ("CFLAGS_x86_64_unknown_linux_gnu", extra),
+            ("CXXFLAGS_x86_64_unknown_linux_gnu", extra),
+        ];
+        let Err(missing) = declared(&descriptor(&inputs)) else {
+            panic!("{extra:?} declared and recorded alike was accepted");
+        };
+        assert!(
+            missing
+                .iter()
+                .any(|m| m.contains("is not exactly -march=x86-64")),
+            "{extra:?}: {missing:?}"
+        );
+    }
+}

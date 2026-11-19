@@ -3,8 +3,9 @@
 //! died with SIGILL running the drawn `epr`.
 //!
 //! A method that declares `target.isa` and `target.cflags` is accepted only when
-//! 1. the recorded `CFLAGS_<triple>` is `target.cflags` (a recorded `CXXFLAGS_<triple>` too) and
-//!    no other C-family variable is recorded: string equality, with no model of the cc crate;
+//! 1. `target.cflags` is exactly `-march=<target.isa>`, the recorded `CFLAGS_<triple>` is
+//!    `target.cflags` (a recorded `CXXFLAGS_<triple>` too) and no other C-family variable is
+//!    recorded: string equality, with no model of the cc crate;
 //! 2. every `GNU C` producer string in the bytes' `.debug_str` carries the declared `-march`
 //!    and no other `-m<isa>` token (`-mno-*`, `-m64` and `-mtune=` are ignored); a bin with no
 //!    such string is not applicable when its lock closure holds no `ring`, and fails when it does.
@@ -89,6 +90,9 @@ pub(super) fn declared(descriptor: &MethodDescriptor) -> Result<Option<Declared<
         }
         (None, None) => return Err(missing),
     };
+    // Ruling 2 (L2a rework): the declaration is exactly `-march=<target.isa>`, one token and no
+    // other flag, so no record or descriptor can declare an ISA flag beside it, even when every
+    // recorded variable agrees with that extra flag.
     let marches: Vec<&str> = cflags
         .split_whitespace()
         .filter(|token| token.starts_with("-march="))
@@ -108,6 +112,13 @@ pub(super) fn declared(descriptor: &MethodDescriptor) -> Result<Option<Declared<
                 "{DECLARED}: target.cflags declares -march={level}, not target.isa {isa}"
             ));
         }
+    }
+    let exact = format!("-march={isa}");
+    if cflags != exact {
+        missing.push(format!(
+            "{DECLARED}: target.cflags {cflags:?} is not exactly {exact}; a declared target's C \
+             flags are its -march alone"
+        ));
     }
     missing.extend(record_applies(descriptor, cflags));
     match march {
