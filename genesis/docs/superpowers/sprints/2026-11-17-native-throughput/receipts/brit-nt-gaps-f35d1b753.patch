@@ -1,0 +1,595 @@
+From f35d1b753306d1aa6110f7c657aa21efa491bc99 Mon Sep 17 00:00:00 2001
+From: Matthew Dowell <mbd06b+github@gmail.com>
+Date: Wed, 18 Nov 2026 05:45:44 +0000
+Subject: [PATCH] feat: `brit log` takes revisions and ranges; `diff tree
+ --name-only`
+
+Agents fell back to Git for two daily questions: "which commits are on
+`origin/dev` and not here" and "which files changed since the merge base".
+
+`brit log` read every positional argument as a path and refused it, so
+`brit log origin/dev` and `brit log A..B` could not be used at all. It now
+takes revisions before `--`: `A`, `^A`, `A..B`, `A...B`, `A^@` and `A^!`,
+combinable and limited by `-n`. Commits are selected and ordered like
+`git rev-list --date-order`, the order plain `brit log` already used. A
+literal path after `--` keeps its existing refusal. The topological walk
+queues tips before applying ends, so a tip that is itself excluded
+(`HEAD..HEAD`) is dropped first.
+
+`diff tree` gains `--name-only` (paths like
+`git diff --name-only --no-renames`, quoted under `core.quotePath`; a rename
+is its deleted and added path, a gitlink its path), `--merge-base A B`, and
+one-argument `A..B` / `A...B` forms. The endpoint forms apply to the
+existing object and `--stat` outputs too.
+
+Oracles: `revision_ranges::log_lists_revisions_and_ranges_like_rev_list_date_order`
+and `diff_name_only::name_only_lists_changed_paths_for_two_trees_ranges_and_merge_bases`
+compare with stock Git on skewed-date merges, unrelated roots, annotated tags,
+byte-order neighbours of `/`, renames, non-ASCII names and a gitlink. On the
+elohim monorepo, `origin/main..origin/dev` (11457 commits) and
+`origin/main...origin/dev` (26659 paths) matched Git byte for byte.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01PJB8fpkCKfb4CMYBh9vCEs
+---
+ README.md                                  |  13 +++
+ gitoxide-core/src/repository/diff.rs       |  79 ++++++++++++++
+ gitoxide-core/src/repository/log.rs        |  91 ++++++++++++++++-
+ src/plumbing/main.rs                       |  24 +++--
+ src/plumbing/options/mod.rs                |  20 +++-
+ tests/cli-journey/tests/diff_name_only.rs  | 113 +++++++++++++++++++++
+ tests/cli-journey/tests/revision_ranges.rs |  98 ++++++++++++++++++
+ 7 files changed, 425 insertions(+), 13 deletions(-)
+ create mode 100644 tests/cli-journey/tests/diff_name_only.rs
+
+diff --git a/README.md b/README.md
+index 1983960f6..2e3e0077a 100644
+--- a/README.md
++++ b/README.md
+@@ -153,6 +153,19 @@ after staging. Existing `diff tree` and `diff file` commands remain available.
+ See the [native authoring scope and verification](docs/plans/2026-09-28-daily-driver.md#native-authoring-sprint--2026-10-12)
+ for the full compatibility limits.
+ 
++## Compare branches
++
++```bash
++brit log origin/dev -n 5                    # revisions instead of HEAD
++brit log origin/dev..HEAD                   # also ^A, A...B, A^@ and A^!
++brit diff tree --name-only origin/dev...HEAD  # paths changed since the merge base
++brit diff tree --name-only A B              # two trees; also A..B and --merge-base A B
++```
++
++`brit log` selects and orders commits like `git rev-list --date-order`; limiting
++the log to a path is not supported yet. `--name-only` lists paths like
++`git diff --name-only --no-renames`: a rename is its deleted and added path.
++
+ For linear replay, edit-stop authoring and interrupted-operation recovery, see
+ [Native rebase and retained-copy recovery](docs/rebase.md), including the bounded
+ Linux interface and separate retained-copy helper installation.
+diff --git a/gitoxide-core/src/repository/diff.rs b/gitoxide-core/src/repository/diff.rs
+index 7b1347b2a..e7861a0c8 100644
+--- a/gitoxide-core/src/repository/diff.rs
++++ b/gitoxide-core/src/repository/diff.rs
+@@ -815,6 +815,85 @@ pub fn tree_stat(
+     write_diff_output(out, &mut rendered)
+ }
+ 
++/// Resolve what `diff tree` compares: `OLD NEW` unchanged, `--merge-base OLD NEW` as the merge base
++/// of both commits and `NEW`, or a lone `A..B` (`A` and `B`) or `A...B` (merge base of both and `B`).
++pub fn tree_endpoints(
++    repo: &gix::Repository,
++    old_treeish: BString,
++    new_treeish: Option<BString>,
++    merge_base: bool,
++) -> Result<(BString, BString)> {
++    use gix::revision::plumbing::Spec;
++    let (ours, theirs) = match new_treeish {
++        Some(new_treeish) if !merge_base => return Ok((old_treeish, new_treeish)),
++        Some(new_treeish) => (
++            repo.rev_parse_single(old_treeish.as_bstr())?.detach(),
++            repo.rev_parse_single(new_treeish.as_bstr())?.detach(),
++        ),
++        None => match repo.rev_parse(old_treeish.as_bstr())?.detach() {
++            Spec::Range { from, to } => return Ok((from.to_string().into(), to.to_string().into())),
++            Spec::Merge { theirs, ours } => (theirs, ours),
++            _ => bail!(
++                message!("`{old_treeish}` needs a second tree, or must be a range like `A..B` or `A...B`").validation()
++            ),
++        },
++    };
++    let source = gix::object::bounded::Source::deferred(repo);
++    let commit = |id| {
++        source
++            .peel(id, gix::objs::Kind::Commit)
++            .or_raise(|| message!("merge-base comparison needs commits, but {id} is not one").validation())
++    };
++    let new_commit_id = commit(theirs)?;
++    let base_commit_id = repo
++        .merge_base(commit(ours)?, new_commit_id)?
++        .ok_or_raise(|| message!("{ours} and {theirs} have no merge base").validation())?;
++    Ok((base_commit_id.to_string().into(), new_commit_id.to_string().into()))
++}
++
++/// Print each path whose mode or object differs between two trees, in index order and
++/// without rename detection, quoted like Git's `diff --name-only --no-renames`.
++pub fn tree_name_only(
++    repo: gix::Repository,
++    out: &mut dyn std::io::Write,
++    old_treeish: BString,
++    new_treeish: BString,
++) -> Result<()> {
++    use std::cmp::Ordering;
++    let old_tree = repo.rev_parse_single(old_treeish.as_bstr())?.object()?.peel_to_tree()?;
++    let new_tree = repo.rev_parse_single(new_treeish.as_bstr())?.object()?.peel_to_tree()?;
++    let before = repo.index_from_tree(&old_tree.id)?;
++    let after = repo.index_from_tree(&new_tree.id)?;
++    let quote_high = repo.config_snapshot().try_boolean("core.quotePath")?.unwrap_or(true);
++    let budget = Budget::new(&std::env::temp_dir()).or_error()?;
++    let mut rendered = std::io::BufWriter::new(budget.spool().or_error()?);
++    // Both flattened indexes are sorted by path, so one merge walk finds every difference.
++    let (mut old_entries, mut new_entries) = (before.entries().iter().peekable(), after.entries().iter().peekable());
++    loop {
++        check_interrupted()?;
++        let path = match (old_entries.peek().copied(), new_entries.peek().copied()) {
++            (None, None) => break,
++            (Some(old), None) => old_entries.next().map(|_| old.path(&before)),
++            (None, Some(new)) => new_entries.next().map(|_| new.path(&after)),
++            (Some(old), Some(new)) => match old.path(&before).cmp(new.path(&after)) {
++                Ordering::Less => old_entries.next().map(|_| old.path(&before)),
++                Ordering::Greater => new_entries.next().map(|_| new.path(&after)),
++                Ordering::Equal => {
++                    let changed = (old.mode, old.id) != (new.mode, new.id);
++                    old_entries.next();
++                    new_entries.next();
++                    changed.then(|| new.path(&after))
++                }
++            },
++        };
++        if let Some(path) = path {
++            rendered.write_all(&quote_patch_path(path, quote_high)).or_error()?;
++            rendered.write_all(b"\n").or_error()?;
++        }
++    }
++    write_diff_output(out, &mut rendered)
++}
++
+ struct FileStat {
+     name: BString,
+     added: usize,
+diff --git a/gitoxide-core/src/repository/log.rs b/gitoxide-core/src/repository/log.rs
+index 7bc0daf4a..030c62dca 100644
+--- a/gitoxide-core/src/repository/log.rs
++++ b/gitoxide-core/src/repository/log.rs
+@@ -15,15 +15,86 @@ pub fn log_limited(
+     out: &mut dyn std::io::Write,
+     path: Option<BString>,
+     max_count: Option<usize>,
++) -> Result<()> {
++    log_revisions(repo, out, &[], path, max_count)
++}
++
++/// List the commits selected by `revisions` like `git rev-list --date-order`, or those
++/// reachable from `HEAD` when there are none.
++///
++/// Each revision may include (`A`), exclude (`^A`), or name a range (`A..B`, `A...B`,
++/// `A^@`, `A^!`); excluded commits hide everything reachable from them.
++pub fn log_revisions(
++    repo: gix::Repository,
++    out: &mut dyn std::io::Write,
++    revisions: &[BString],
++    path: Option<BString>,
++    max_count: Option<usize>,
+ ) -> Result<()> {
+     if let Some(path) = path {
+         log_file(repo, out, path)
+     } else {
+-        log_all(repo, out, max_count)
++        log_all(repo, out, revisions, max_count)
++    }
++}
++
++/// Resolve `revisions` into the commits to start from and the commits whose ancestry is hidden.
++fn tips_and_ends(
++    repo: &gix::Repository,
++    source: &Source<'_>,
++    revisions: &[BString],
++) -> Result<(Vec<gix::ObjectId>, Vec<gix::ObjectId>)> {
++    use gix::revision::plumbing::Spec;
++    let commit = |id| {
++        source
++            .peel(id, Kind::Commit)
++            .or_raise(|| message!("revision {id} does not name a commit").validation())
++    };
++    let parents = |commit_id: gix::ObjectId| -> Result<Vec<gix::ObjectId>> {
++        let mut buffer = Buffer::default();
++        let commit = source
++            .load(&commit_id, &mut buffer)?
++            .try_into_commit_iter()
++            .ok_or_raise(|| message!("Expected commit {commit_id}").validation())?;
++        Ok(commit.parent_ids().collect())
++    };
++    let (mut tips, mut ends) = (Vec::new(), Vec::new());
++    for revision in revisions {
++        // Git would read an unknown name as a path; path-limited logs stay refused here.
++        let spec = repo.rev_parse(revision.as_bstr()).or_raise(|| {
++            message!(
++                "`{revision}` is not a revision, and File-based lookup isn't yet implemented in a way that is competitively fast"
++            )
++        })?;
++        match spec.detach() {
++            Spec::Include(id) => tips.push(commit(id)?),
++            Spec::Exclude(id) => ends.push(commit(id)?),
++            Spec::Range { from, to } => {
++                ends.push(commit(from)?);
++                tips.push(commit(to)?);
++            }
++            Spec::Merge { theirs, ours } => {
++                let (theirs, ours) = (commit(theirs)?, commit(ours)?);
++                ends.extend(repo.merge_bases_many(theirs, &[ours])?.into_iter().map(gix::Id::detach));
++                tips.extend([theirs, ours]);
++            }
++            Spec::IncludeOnlyParents(id) => tips.extend(parents(commit(id)?)?),
++            Spec::ExcludeParents(id) => {
++                let id = commit(id)?;
++                ends.extend(parents(id)?);
++                tips.push(id);
++            }
++        }
+     }
++    Ok((tips, ends))
+ }
+ 
+-fn log_all(repo: gix::Repository, out: &mut dyn std::io::Write, max_count: Option<usize>) -> Result<()> {
++fn log_all(
++    repo: gix::Repository,
++    out: &mut dyn std::io::Write,
++    revisions: &[BString],
++    max_count: Option<usize>,
++) -> Result<()> {
+     if max_count == Some(0) {
+         return Ok(());
+     }
+@@ -31,10 +102,24 @@ fn log_all(repo: gix::Repository, out: &mut dyn std::io::Write, max_count: Optio
+         &repo,
+         gix::utils::stream::Budget::new(&std::env::temp_dir()).or_error()?,
+     )?;
++    let mut buffer = Buffer::default();
++    if !revisions.is_empty() {
++        let (mut tips, ends) = tips_and_ends(&repo, &source, revisions)?;
++        // The topological walk queues every tip before it applies the ends, so a tip that is
++        // itself excluded (`HEAD..HEAD`) would still be printed.
++        tips.retain(|tip| !ends.contains(tip));
++        if tips.is_empty() {
++            return Ok(());
++        }
++        let topo = gix::traverse::commit::topo::Builder::from_iters(source.clone(), tips, Some(ends)).build()?;
++        for info in topo.take(max_count.unwrap_or(usize::MAX)) {
++            write_info(&source, &mut buffer, &mut *out, &info?)?;
++        }
++        return Ok(());
++    }
+     // Follow symbolic references without loading their terminal commit into a Vec.
+     let mut head = repo.find_reference("HEAD")?.follow_to_object()?.detach();
+     let mut seen = std::collections::HashSet::new();
+-    let mut buffer = Buffer::default();
+     loop {
+         match repo.find_header(head)?.kind() {
+             Kind::Commit => break,
+diff --git a/src/plumbing/main.rs b/src/plumbing/main.rs
+index 8d89ddf2d..b1f7ebef6 100644
+--- a/src/plumbing/main.rs
++++ b/src/plumbing/main.rs
+@@ -459,13 +459,21 @@ pub fn run_with_command(args: Args, command: clap::Command) -> Result<()> {
+             }),
+             Some(crate::plumbing::options::diff::SubCommands::Tree {
+                 stat,
++                name_only,
++                merge_base,
+                 old_treeish,
+                 new_treeish,
+             }) => prepare_and_run("diff-tree", verbose, None, move |_progress, out, _err| {
++                let mode = if stat || name_only { Mode::Strict } else { Mode::Lenient };
++                let repo = repository(mode)?;
++                let (old_treeish, new_treeish) =
++                    core::repository::diff::tree_endpoints(&repo, old_treeish, new_treeish, merge_base)?;
+                 if stat {
+-                    core::repository::diff::tree_stat(repository(Mode::Strict)?, out, old_treeish, new_treeish)
++                    core::repository::diff::tree_stat(repo, out, old_treeish, new_treeish)
++                } else if name_only {
++                    core::repository::diff::tree_name_only(repo, out, old_treeish, new_treeish)
+                 } else {
+-                    core::repository::diff::tree(repository(Mode::Lenient)?, out, old_treeish, new_treeish)
++                    core::repository::diff::tree(repo, out, old_treeish, new_treeish)
+                 }
+             }),
+             Some(crate::plumbing::options::diff::SubCommands::File {
+@@ -475,11 +483,13 @@ pub fn run_with_command(args: Args, command: clap::Command) -> Result<()> {
+                 core::repository::diff::file(repository(Mode::Lenient)?, out, old_revspec, new_revspec)
+             }),
+         },
+-        Subcommands::Log(crate::plumbing::options::log::Platform { pathspec, max_count }) => {
+-            prepare_and_run("log", verbose, None, move |_progress, out, _err| {
+-                core::repository::log::log_limited(repository(Mode::Lenient)?, out, pathspec, max_count)
+-            })
+-        }
++        Subcommands::Log(crate::plumbing::options::log::Platform {
++            revisions,
++            pathspec,
++            max_count,
++        }) => prepare_and_run("log", verbose, None, move |_progress, out, _err| {
++            core::repository::log::log_revisions(repository(Mode::Lenient)?, out, &revisions, pathspec, max_count)
++        }),
+         Subcommands::Worktree(worktree::Platform { cmd }) => match cmd {
+             worktree::SubCommands::List => {
+                 prepare_and_run("worktree-list", verbose, None, move |_progress, out, _err| {
+diff --git a/src/plumbing/options/mod.rs b/src/plumbing/options/mod.rs
+index 27d0619da..6a4aab37c 100644
+--- a/src/plumbing/options/mod.rs
++++ b/src/plumbing/options/mod.rs
+@@ -717,12 +717,21 @@ pub mod diff {
+             /// Show an 80-column summary instead of object changes.
+             #[clap(long)]
+             stat: bool,
+-            /// A rev-spec representing the 'before' or old tree.
++            /// Print only the changed paths, one per line, like `git diff --name-only --no-renames`.
++            ///
++            /// A rename is listed as its deleted and its added path.
++            #[clap(long, conflicts_with = "stat")]
++            name_only: bool,
++            /// Compare the merge base of both commits with NEW_TREEISH, like `git diff --merge-base`.
++            #[clap(long, requires = "new_treeish")]
++            merge_base: bool,
++            /// A rev-spec representing the 'before' or old tree, or alone a range: `A..B` compares
++            /// `A` with `B`, and `A...B` compares the merge base of `A` and `B` with `B`.
+             #[clap(value_parser = crate::shared::AsBString)]
+             old_treeish: BString,
+             /// A rev-spec representing the 'after' or new tree.
+             #[clap(value_parser = crate::shared::AsBString)]
+-            new_treeish: BString,
++            new_treeish: Option<BString>,
+         },
+         /// Diff two versions of a file.
+         File {
+@@ -745,8 +754,13 @@ pub mod log {
+         /// Stop after this many commits (Brit also accepts -N; zero prints none).
+         #[clap(short = 'n', long)]
+         pub max_count: Option<usize>,
+-        /// The git path specification to show a log for.
++        /// Revisions to list instead of HEAD, like `origin/dev`, `^A`, `A..B`, `A...B`, `A^@` or `A^!`.
++        ///
++        /// Commits are selected and ordered like `git rev-list --date-order`.
+         #[clap(value_parser = crate::shared::AsBString)]
++        pub revisions: Vec<BString>,
++        /// The git path specification to show a log for, after `--` (not yet supported).
++        #[clap(last = true, value_parser = crate::shared::AsBString)]
+         pub pathspec: Option<BString>,
+     }
+ }
+diff --git a/tests/cli-journey/tests/diff_name_only.rs b/tests/cli-journey/tests/diff_name_only.rs
+new file mode 100644
+index 000000000..a3d410506
+--- /dev/null
++++ b/tests/cli-journey/tests/diff_name_only.rs
+@@ -0,0 +1,113 @@
++//! Changed paths between two revisions, with `git diff --name-only --no-renames` as the oracle.
++//!
++//! Agents select gates and reviewers from "which files differ between A and the
++//! merge base of A and B". Without this, each such question fell back to Git.
++use std::{fs, path::Path, process::Command};
++
++use anyhow::{ensure, Result};
++use cli_journey::support::{runner::brit_bin, test_repo::TestRepo};
++
++fn git(root: &Path, args: &[&str]) -> Result<String> {
++    let out = gix_testtools::git_command(root).args(args).output()?;
++    ensure!(
++        out.status.success(),
++        "Git {args:?}: {}",
++        String::from_utf8_lossy(&out.stderr)
++    );
++    Ok(String::from_utf8(out.stdout)?)
++}
++
++fn brit(root: &Path, args: &[&str]) -> Result<std::process::Output> {
++    let mut command = Command::new(brit_bin().expect("built Brit"));
++    gix_testtools::configure_git_environment(&mut command, root);
++    Ok(command.current_dir(root).args(args).output()?)
++}
++
++fn commit_all(root: &Path, message: &str) -> Result<()> {
++    git(root, &["add", "-A"])?;
++    git(root, &["commit", "-q", "-m", message])?;
++    Ok(())
++}
++
++/// The fixture diverges `topic` from `main` after a shared base so that `A..B`
++/// (two-tree) and `A...B` (merge-base) select different path sets. The names
++/// `a-b`, `a.txt` and `a/c` sit on both sides of `/` in byte order, a rename is
++/// listed as deletion plus addition, and a gitlink is reported by its path.
++#[test]
++fn name_only_lists_changed_paths_for_two_trees_ranges_and_merge_bases() -> Result<()> {
++    let repo = TestRepo::new("diff-name-only")?;
++    let root = repo.path();
++    fs::create_dir_all(root.join("a"))?;
++    for (path, content) in [("a-b", "1\n"), ("a.txt", "1\n"), ("a/c", "1\n"), ("moved", "keep\n")] {
++        fs::write(root.join(path), content)?;
++    }
++    commit_all(root, "base")?;
++    git(root, &["branch", "topic"])?;
++    fs::write(root.join("a.txt"), "main\n")?;
++    commit_all(root, "main side")?;
++    git(root, &["switch", "-q", "topic"])?;
++    fs::write(root.join("a-b"), "topic\n")?;
++    fs::write(root.join("a/c"), "topic\n")?;
++    fs::rename(root.join("moved"), root.join("renamed"))?;
++    fs::write(root.join("new file"), "added\n")?;
++    // Non-ASCII names are quoted under the default `core.quotePath`.
++    fs::write(root.join("caf\u{e9}"), "added\n")?;
++    commit_all(root, "topic side")?;
++    let head = git(root, &["rev-parse", "HEAD"])?;
++    git(
++        root,
++        &[
++            "update-index",
++            "--add",
++            "--cacheinfo",
++            &format!("160000,{},sub", head.trim()),
++        ],
++    )?;
++    git(root, &["commit", "-q", "-m", "gitlink"])?;
++
++    let cases: [(&[&str], &[&str]); 5] = [
++        (&["main", "topic"], &["main", "topic"]),
++        (&["topic", "main"], &["topic", "main"]),
++        (&["main..topic"], &["main..topic"]),
++        (&["main...topic"], &["main...topic"]),
++        (&["--merge-base", "main", "topic"], &["--merge-base", "main", "topic"]),
++    ];
++    for (native, oracle) in cases {
++        let mut oracle_args = vec!["diff", "--no-ext-diff", "--no-renames", "--name-only"];
++        oracle_args.extend(oracle);
++        let expected = git(root, &oracle_args)?;
++        ensure!(!expected.is_empty(), "fixture yields changes for {oracle:?}");
++        let mut native_args = vec!["diff", "tree", "--name-only"];
++        native_args.extend(native);
++        let out = brit(root, &native_args)?;
++        ensure!(
++            out.status.success(),
++            "Brit {native:?}: {}",
++            String::from_utf8_lossy(&out.stderr)
++        );
++        assert_eq!(
++            String::from_utf8(out.stdout)?,
++            expected,
++            "brit diff tree --name-only {native:?} lists Git's paths in Git's order"
++        );
++    }
++    Ok(())
++}
++
++/// One-argument forms must be ranges, and `--name-only` excludes `--stat`.
++#[test]
++fn name_only_refuses_ambiguous_forms() -> Result<()> {
++    let repo = TestRepo::new("diff-name-only-refusals")?;
++    repo.commit_file("tracked", "one\n")?;
++    repo.commit_file("tracked", "two\n")?;
++    for args in [
++        &["diff", "tree", "--name-only", "HEAD"][..],
++        &["diff", "tree", "--name-only", "--stat", "HEAD~1", "HEAD"][..],
++        &["diff", "tree", "--name-only", "--merge-base", "HEAD~1..HEAD"][..],
++    ] {
++        let out = brit(repo.path(), args)?;
++        assert!(!out.status.success(), "{args:?} must be refused");
++        assert!(out.stdout.is_empty(), "{args:?} prints no paths");
++    }
++    Ok(())
++}
+diff --git a/tests/cli-journey/tests/revision_ranges.rs b/tests/cli-journey/tests/revision_ranges.rs
+index 5109e1a0c..a5e442151 100644
+--- a/tests/cli-journey/tests/revision_ranges.rs
++++ b/tests/cli-journey/tests/revision_ranges.rs
+@@ -82,3 +82,101 @@ fn ranges_exclude_ancestry_without_timestamp_cutoffs() -> Result<()> {
+     }
+     Ok(())
+ }
++
++/// `brit log` takes revisions and ranges, with `git rev-list --date-order` as the
++/// oracle for the selected commits and their order. Before this, every positional
++/// argument was taken as a path and refused, so `brit log origin/dev` and
++/// `brit log A..B` could not be used at all.
++#[test]
++fn log_lists_revisions_and_ranges_like_rev_list_date_order() -> Result<()> {
++    let repo = TestRepo::new("log-revision-ranges")?;
++    let root = repo.path();
++    let tree = git(root, &["write-tree"])?;
++    // Dates are skewed against ancestry so that a timestamp cutoff would be wrong.
++    let base = commit(root, &tree, &[], "1000000300 +0000")?;
++    let left = commit(root, &tree, &[&base], "1000000200 +0000")?;
++    let right = commit(root, &tree, &[&base], "1000000100 +0000")?;
++    let merge = commit(root, &tree, &[&left, &right], "1000000400 +0000")?;
++    let after = commit(root, &tree, &[&merge], "1000000050 +0000")?;
++    let unrelated = commit(root, &tree, &[], "1000000500 +0000")?;
++    git(root, &["update-ref", "refs/heads/main", &after])?;
++    git(root, &["symbolic-ref", "HEAD", "refs/heads/main"])?;
++    git(root, &["update-ref", "refs/remotes/origin/dev", &right])?;
++    git(root, &["tag", "-a", "left", "-m", "annotated boundary", &left])?;
++    let unrelated_range = format!("{unrelated}..HEAD");
++    let cases: Vec<Vec<&str>> = vec![
++        vec!["HEAD"],
++        vec!["origin/dev"],
++        vec!["left"],
++        vec!["left..main"],
++        vec!["main..left"],
++        vec!["origin/dev..HEAD"],
++        vec!["HEAD..origin/dev"],
++        vec!["HEAD..HEAD"],
++        vec!["main..main~1"],
++        vec!["main~2..main"],
++        vec!["main", "^main~1", "^main"],
++        vec!["origin/dev.."],
++        vec![&unrelated_range],
++        vec!["left...origin/dev"],
++        vec!["origin/dev...main"],
++        vec!["main^@"],
++        vec!["main~1^!"],
++        vec!["main", "^left"],
++        vec!["left", "origin/dev"],
++        vec!["^origin/dev"],
++    ];
++    for args in cases {
++        let mut oracle = vec!["rev-list", "--date-order"];
++        oracle.extend(&args);
++        let expected: Vec<String> = git(root, &oracle)?.lines().map(|id| id[..8].to_owned()).collect();
++        for limit in [None, Some(2usize)] {
++            let mut command = Command::new(brit_bin().expect("built Brit"));
++            gix_testtools::configure_git_environment(&mut command, root);
++            command.current_dir(root).arg("log").args(&args);
++            if let Some(limit) = limit {
++                command.args(["-n", &limit.to_string()]);
++            }
++            let out = command.output()?;
++            ensure!(
++                out.status.success(),
++                "Brit log {args:?}: {}",
++                String::from_utf8_lossy(&out.stderr)
++            );
++            let actual: Vec<String> = String::from_utf8(out.stdout)?
++                .lines()
++                .map(|row| row.split_whitespace().next().expect("abbreviated OID").to_owned())
++                .collect();
++            let expected = &expected[..limit.unwrap_or(usize::MAX).min(expected.len())];
++            assert_eq!(
++                actual, expected,
++                "log {args:?} selects rev-list's commits in its order, limit {limit:?}"
++            );
++        }
++    }
++    Ok(())
++}
++
++/// A positional argument that names no revision is still refused rather than read
++/// as an empty range, and a literal path after `--` keeps its existing refusal.
++#[test]
++fn log_refuses_unknown_revisions_and_path_limiting() -> Result<()> {
++    let repo = TestRepo::new("log-revision-refusals")?;
++    repo.commit_file("tracked", "content\n")?;
++    for args in [
++        &["log", "no-such-ref"][..],
++        &["log", "tracked"][..],
++        &["log", "--", "tracked"][..],
++    ] {
++        let mut command = Command::new(brit_bin().expect("built Brit"));
++        gix_testtools::configure_git_environment(&mut command, repo.path());
++        let out = command.current_dir(repo.path()).args(args).output()?;
++        assert!(!out.status.success(), "{args:?} must fail");
++        assert!(out.stdout.is_empty(), "{args:?} prints no commits");
++        assert!(
++            String::from_utf8_lossy(&out.stderr).contains("File-based lookup isn't yet implemented"),
++            "{args:?} keeps the path-limiting refusal"
++        );
++    }
++    Ok(())
++}
+-- 
+2.52.0
+
