@@ -7,7 +7,7 @@ title: "ark's brit index spawns brit-build-ref without the device's declared rep
 slug: "ark-brit-index-spawn-skips-declared-trust"
 written: "2026-10-27"
 author: "claude (overnight integration shift, session 3f9afd7a, steward human:matthew)"
-status: "open"
+status: "wip"
 priority: "medium"
 ci_status: none
 jobs: []
@@ -47,3 +47,21 @@ before ark can append the same `GIT_CONFIG_*` entries.
 - ark's `find()` appends it to the spawn.
 - A test proves `build find` succeeds in a scratch repo whose owner differs from the caller,
   with only the device declaration present. The test needs no global `safe.directory`.
+
+## Fix (branch `feat/ark-brit-index-trust`, 2026-11-19)
+
+The reader moved to `elohim-device-runtime`: `device_key_path` (the key path resolution, moved
+verbatim from epr-cli's `device_key` and re-exported there) and `checkout_trust`
+(`DeclaredTrust` with `git_args` and `git_config_env`). epr-cli's `trust_args` and `trust_env`
+delegate to it. ark's `find_command`, `signer_command` and `diff_command` in
+`elohim/ark/cli/src/brit_index.rs` carry it on all three spawns (`build find`, `signer --json`
+and the `git diff` of `unchanged_since`).
+
+The done-when test runs as a unit test when the suite runs as root:
+`a_checkout_another_uid_owns_is_read_with_only_the_device_declaration` hands a scratch checkout
+to uid 65534 and disables global and system git config. A non-root run prints that the case was
+not staged and checks command construction only. The installed `brit-build-ref` was also probed
+by hand on such a checkout. Without the entries, `build find` and `signer --json` exit 1 with
+"detected dubious ownership". With `GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=safe.directory
+GIT_CONFIG_VALUE_0=<root>` they exit 0 (`[]` and `{"agentId":null}`).
+
