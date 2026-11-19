@@ -15,6 +15,11 @@
  * - "fetches nothing": no `fetch gap` line and nothing staged in `<bin store>/incoming`.
  * - "goes on to its own build": `building locally` / `trying a local build` after the gap line; when the draw was
  *   refused before it began (unpublished), the follow's normal result on stdout and exit 0.
+ *
+ * The C baseline marker is the `env:isa-c=x86-64` slot on each crossed Produce. Every fixture
+ * statement carries it unless a scenario removes it, so a refusal is about the one thing the
+ * scenario changes; its absence is refused the same way on every processor, so no step reads
+ * this host's CPU.
  */
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
@@ -48,6 +53,8 @@ interface Household {
   head: string;
   parent: string;
   statement: Statement;
+  /** Whether A's records carry the C baseline marker `env:isa-c=x86-64`. */
+  marker: boolean;
   stderr?: string;
   stdout?: string;
   status?: number | null;
@@ -277,6 +284,9 @@ function statementSlots(statement: Statement): string[] {
   }
 }
 
+/** The C baseline marker a producer writes after checking its build's C (row 29.2). */
+const C_BASELINE_MARKER = 'env:isa-c=x86-64';
+
 function appendRecord(h: Household, bin: string, statement: Statement): void {
   const output = mintByteCid(Buffer.from(`${h.head} ${bin}`));
   const scope = recordCid(cbor('repo-scope'));
@@ -309,6 +319,7 @@ function appendRecord(h: Household, bin: string, statement: Statement): void {
       `env:release=${RELEASE}`,
       `env:release-bin=${bin}`,
       ...statementSlots(statement),
+      ...(h.marker ? [C_BASELINE_MARKER] : []),
     ],
   };
   const cid = recordCid(cbor(event));
@@ -345,6 +356,7 @@ Given("Matthew's devices A and B are admitted to each other", function () {
     head: '',
     parent: '',
     statement: 'meets',
+    marker: true,
   };
   households.set(this, h);
   mkdirSync(dirname(h.keyA), { recursive: true });
@@ -435,6 +447,15 @@ Given("device B's integration branch contains that commit", function () {
 
 Given("the release's statement crossed with its record and matches its CID", function () {
   household(this).statement = 'meets';
+});
+
+Given("the release's record carries the C baseline marker {string}", function (value: string) {
+  assert.equal(`env:isa-c=${value}`, C_BASELINE_MARKER);
+  household(this).marker = true;
+});
+
+Given('device A recorded the release without the C baseline marker', function () {
+  household(this).marker = false;
 });
 
 Given('device B meets every requirement in the statement', function () {
@@ -553,6 +574,29 @@ Then(
     assert.match(text, /unmeasured-requirement: /, text);
     assert.match(text, /predates requires-doc/, text);
     assert.match(text, /sibling re-puts the release/, text);
+  }
+);
+
+Then(
+  "device B says the processor the release's C needs is unmeasured, naming the missing marker",
+  function () {
+    const text = said(household(this));
+    assert.match(text, /unmeasured-requirement: [^\n]*records no env:isa-c/, text);
+    assert.match(text, /instruction set its C was compiled at is unmeasured/, text);
+  }
+);
+
+Then(
+  'device B says A should rebuild for the declared platform, or B should build for itself',
+  function () {
+    const text = said(household(this));
+    assert.ok(
+      text.includes(
+        'cure: the producer rebuilds under the declared target, or build for this device'
+      ),
+      text
+    );
+    assert.ok(!/unmeasured-requirement: [^\n]*env:isa-c[^\n]*re-put/.test(text), text);
   }
 );
 
