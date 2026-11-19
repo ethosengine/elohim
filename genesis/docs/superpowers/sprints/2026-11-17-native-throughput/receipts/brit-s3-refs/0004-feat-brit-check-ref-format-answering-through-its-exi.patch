@@ -1,0 +1,186 @@
+From df9eb4eba2d01dc92e96a3d86af73fbb99c71f39 Mon Sep 17 00:00:00 2001
+From: Matthew Dowell <mbd06b+github@gmail.com>
+Date: Thu, 19 Nov 2026 04:58:22 +0000
+Subject: [PATCH 4/6] feat: `brit check-ref-format` answering through its exit
+ code
+
+Validates a reference name like `git check-ref-format`: at least two components
+unless `--allow-onelevel`, and gitoxide's partial-name rules otherwise. It needs no
+repository and prints nothing; the journey compares exit codes with Git for valid
+and invalid names, including the build-note ref names the workspace checks.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01PJB8fpkCKfb4CMYBh9vCEs
+---
+ .../git_spellings/check_ref_format.rs         | 39 +++++++++++++++++++
+ .../src/repository/git_spellings/mod.rs       |  1 +
+ src/plumbing/main.rs                          | 13 ++++++-
+ src/plumbing/options/git_spellings.rs         | 11 ++++++
+ src/plumbing/options/mod.rs                   |  2 +
+ tests/cli-journey/tests/check_ref_format.rs   | 33 ++++++++++++++++
+ 6 files changed, 98 insertions(+), 1 deletion(-)
+ create mode 100644 gitoxide-core/src/repository/git_spellings/check_ref_format.rs
+ create mode 100644 tests/cli-journey/tests/check_ref_format.rs
+
+diff --git a/gitoxide-core/src/repository/git_spellings/check_ref_format.rs b/gitoxide-core/src/repository/git_spellings/check_ref_format.rs
+new file mode 100644
+index 000000000..40866ede3
+--- /dev/null
++++ b/gitoxide-core/src/repository/git_spellings/check_ref_format.rs
+@@ -0,0 +1,39 @@
++//! `brit check-ref-format`: Git's reference-name validity check, answered by the exit code alone.
++
++use gix::bstr::BStr;
++
++/// Whether `name` is a valid reference name for `git check-ref-format`: at least two components
++/// unless `allow_onelevel`, and every rule of [`gix::validate::reference::name_partial()`].
++pub fn is_valid(name: &BStr, allow_onelevel: bool) -> bool {
++    (allow_onelevel || name.contains(&b'/')) && gix::validate::reference::name_partial(name).is_ok()
++}
++
++#[cfg(test)]
++mod tests {
++    use super::is_valid;
++    use gix::bstr::ByteSlice;
++
++    #[test]
++    fn names_are_judged_like_git() {
++        for valid in [
++            "refs/heads/main",
++            "refs/notes/brit/devices/x/build/gate%3Aelohim-storage",
++            "heads/x",
++        ] {
++            assert!(is_valid(valid.as_bytes().as_bstr(), false), "{valid}");
++        }
++        for invalid in [
++            "main",
++            "refs/heads/a..b",
++            "refs/heads/x.lock",
++            "refs/heads/",
++            "refs//x",
++            "refs/heads/a b",
++            "refs/@{x}",
++            "refs/*",
++        ] {
++            assert!(!is_valid(invalid.as_bytes().as_bstr(), false), "{invalid}");
++        }
++        assert!(is_valid(b"main".as_bstr(), true));
++    }
++}
+diff --git a/gitoxide-core/src/repository/git_spellings/mod.rs b/gitoxide-core/src/repository/git_spellings/mod.rs
+index d748a5853..bd6a66be5 100644
+--- a/gitoxide-core/src/repository/git_spellings/mod.rs
++++ b/gitoxide-core/src/repository/git_spellings/mod.rs
+@@ -4,6 +4,7 @@
+ //! `branch list`) stay the native interface; these exist so that a guessed Git spelling works and
+ //! points back to them.
+ 
++pub mod check_ref_format;
+ pub mod for_each_ref;
+ #[cfg(any(feature = "blocking-client", feature = "async-client"))]
+ pub mod ls_remote;
+diff --git a/src/plumbing/main.rs b/src/plumbing/main.rs
+index f60475f65..118333ab7 100644
+--- a/src/plumbing/main.rs
++++ b/src/plumbing/main.rs
+@@ -62,7 +62,8 @@ fn requires_mutation_guard(cmd: &Subcommands) -> bool {
+         | Subcommands::Log(_)
+         | Subcommands::Blame { .. }
+         | Subcommands::RevParse(_)
+-        | Subcommands::ForEachRef(_) => false,
++        | Subcommands::ForEachRef(_)
++        | Subcommands::CheckRefFormat(_) => false,
+         Subcommands::Commit(commit::Platform {
+             cmd: Some(commit::Subcommands::Verify { .. } | commit::Subcommands::Describe { .. }),
+             ..
+@@ -1475,6 +1476,16 @@ pub fn run_with_command(args: Args, command: clap::Command) -> Result<()> {
+                 res
+             },
+         ),
++        Subcommands::CheckRefFormat(crate::plumbing::options::git_spellings::CheckRefFormat {
++            allow_onelevel,
++            refname,
++        }) => {
++            if core::repository::git_spellings::check_ref_format::is_valid(refname.as_ref(), allow_onelevel) {
++                Ok(())
++            } else {
++                std::process::exit(1)
++            }
++        }
+         Subcommands::Cat { revspec } => prepare_and_run("cat", verbose, None, move |_progress, out, _err| {
+             core::repository::cat(repository(Mode::Lenient)?, &revspec, out)
+         }),
+diff --git a/src/plumbing/options/git_spellings.rs b/src/plumbing/options/git_spellings.rs
+index 3cc13ca81..c42a638d7 100644
+--- a/src/plumbing/options/git_spellings.rs
++++ b/src/plumbing/options/git_spellings.rs
+@@ -191,3 +191,14 @@ pub struct LsRemote {
+     /// `refs/heads/feat/*`.
+     pub patterns: Vec<String>,
+ }
++
++/// `check-ref-format` answering through its exit code, like Git.
++#[derive(Debug, clap::Parser)]
++pub struct CheckRefFormat {
++    /// Accept a name without a `/`, like `main` or `HEAD`.
++    #[clap(long)]
++    pub allow_onelevel: bool,
++    /// The reference name to validate, like `refs/heads/main`.
++    #[clap(value_parser = crate::shared::AsBString)]
++    pub refname: gix::bstr::BString,
++}
+diff --git a/src/plumbing/options/mod.rs b/src/plumbing/options/mod.rs
+index 80bde2fc2..b8bf46513 100644
+--- a/src/plumbing/options/mod.rs
++++ b/src/plumbing/options/mod.rs
+@@ -265,6 +265,8 @@ pub enum Subcommands {
+     /// Git's spelling of `brit remote refs`, printing Git's `<oid>\t<refname>` lines.
+     #[cfg(any(feature = "gitoxide-core-async-client", feature = "gitoxide-core-blocking-client"))]
+     LsRemote(git_spellings::LsRemote),
++    /// Validate a reference name like Git, answering only through the exit code.
++    CheckRefFormat(git_spellings::CheckRefFormat),
+     /// Generate shell completions to stdout or a directory.
+     #[clap(visible_alias = "generate-completions", visible_alias = "shell-completions")]
+     Completions {
+diff --git a/tests/cli-journey/tests/check_ref_format.rs b/tests/cli-journey/tests/check_ref_format.rs
+new file mode 100644
+index 000000000..2eed10a86
+--- /dev/null
++++ b/tests/cli-journey/tests/check_ref_format.rs
+@@ -0,0 +1,33 @@
++//! `brit check-ref-format` answers like `git check-ref-format`, through its exit code alone.
++use anyhow::Result;
++use cli_journey::support::parity::assert_same;
++
++#[test]
++fn check_ref_format_matches_git() -> Result<()> {
++    let cwd = tempfile::tempdir()?;
++    for name in [
++        "refs/heads/main",
++        "refs/notes/brit/devices/x/build/gate%3Aelohim-storage",
++        "heads/x",
++        "main",
++        "HEAD",
++        "refs/heads/a..b",
++        "refs/heads/x.lock",
++        "refs/heads/",
++        "refs//x",
++        "/refs/x",
++        "refs/heads/a b",
++        "refs/heads/a~b",
++        "refs/heads/a:b",
++        "refs/@{x}",
++        "refs/*",
++        "refs/heads/.hidden",
++        "refs/heads/end.",
++        "@",
++    ] {
++        let out = assert_same(cwd.path(), &["check-ref-format", name])?;
++        assert!(out.stdout.is_empty(), "{name}: {out:?}");
++        assert_same(cwd.path(), &["check-ref-format", "--allow-onelevel", name])?;
++    }
++    Ok(())
++}
+-- 
+2.52.0
+

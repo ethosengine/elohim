@@ -1,0 +1,507 @@
+From 8a3634eeb980a9d1da79d84d9ca50253778f8a9c Mon Sep 17 00:00:00 2001
+From: Matthew Dowell <mbd06b+github@gmail.com>
+Date: Thu, 19 Nov 2026 04:57:20 +0000
+Subject: [PATCH 2/6] feat: `brit for-each-ref` with Git's format atoms and
+ sort keys
+
+Lists refs with Git's default `%(objectname) %(objecttype)\t%(refname)` format,
+sorted by refname, with Git's pattern rules (a prefix at a `/` boundary or an
+`fnmatch` glob whose `*` does not cross `/`). `--format` implements the atoms in
+real use: `refname`, `refname:short` (Git's unambiguous shortening), `objectname`,
+`objectname:short`, `objecttype`, `subject`, `committerdate`,
+`committerdate:short` and `committerdate:iso`, plus `%%` and `%xx`. `--sort`
+takes `refname` and `committerdate`, `-` reversing, the last key primary and
+refname breaking ties. Any other atom or key is refused by name before output.
+
+The help points to `brit branch list`, Brit's own branch listing.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01PJB8fpkCKfb4CMYBh9vCEs
+---
+ .../repository/git_spellings/for_each_ref.rs  | 285 ++++++++++++++++++
+ .../src/repository/git_spellings/mod.rs       |   1 +
+ src/plumbing/main.rs                          |  18 +-
+ src/plumbing/options/git_spellings.rs         |  18 ++
+ src/plumbing/options/mod.rs                   |   2 +
+ tests/cli-journey/tests/for_each_ref.rs       |  90 ++++++
+ 6 files changed, 413 insertions(+), 1 deletion(-)
+ create mode 100644 gitoxide-core/src/repository/git_spellings/for_each_ref.rs
+ create mode 100644 tests/cli-journey/tests/for_each_ref.rs
+
+diff --git a/gitoxide-core/src/repository/git_spellings/for_each_ref.rs b/gitoxide-core/src/repository/git_spellings/for_each_ref.rs
+new file mode 100644
+index 000000000..69631787b
+--- /dev/null
++++ b/gitoxide-core/src/repository/git_spellings/for_each_ref.rs
+@@ -0,0 +1,285 @@
++//! `brit for-each-ref`: Git's ref listing, with the format atoms and sort keys agents use.
++//!
++//! The default format is Git's `%(objectname) %(objecttype)\t%(refname)`, sorted by refname.
++//! Patterns match like Git's: a prefix ending at a `/` boundary, or an `fnmatch` glob where `*`
++//! does not cross `/`. Atoms and sort keys that are not implemented are refused by name.
++
++use std::{collections::HashSet, io::Write};
++
++use gix::{
++    Result,
++    bstr::{BStr, BString, ByteSlice},
++    error::{ResultExt, bail, message},
++    glob::wildmatch,
++    prelude::ObjectIdExt,
++};
++
++use super::shorten_unambiguous;
++
++/// What `for-each-ref` was asked for.
++pub struct Options {
++    /// The `--format` string, or Git's default.
++    pub format: Option<String>,
++    /// `--sort` keys in command-line order; the last one is primary.
++    pub sort: Vec<String>,
++    /// Ref name patterns; all refs when empty.
++    pub patterns: Vec<String>,
++}
++
++#[derive(Debug, Clone, Copy, PartialEq, Eq)]
++enum Atom {
++    RefName,
++    RefNameShort,
++    ObjectName,
++    ObjectNameShort,
++    ObjectType,
++    Subject,
++    CommitterDate,
++    CommitterDateShort,
++    CommitterDateIso,
++}
++
++impl Atom {
++    const IMPLEMENTED: &'static str = "refname, refname:short, objectname, objectname:short, objecttype, subject, committerdate, committerdate:short, committerdate:iso";
++
++    fn parse(name: &str) -> Result<Self> {
++        Ok(match name {
++            "refname" => Atom::RefName,
++            "refname:short" => Atom::RefNameShort,
++            "objectname" => Atom::ObjectName,
++            "objectname:short" => Atom::ObjectNameShort,
++            "objecttype" => Atom::ObjectType,
++            "subject" => Atom::Subject,
++            "committerdate" => Atom::CommitterDate,
++            "committerdate:short" => Atom::CommitterDateShort,
++            "committerdate:iso" | "committerdate:iso8601" => Atom::CommitterDateIso,
++            other => bail!(message!(
++                "brit for-each-ref does not implement the field `%({other})`; implemented: {}",
++                Atom::IMPLEMENTED
++            )),
++        })
++    }
++}
++
++enum Piece {
++    Literal(BString),
++    Atom(Atom),
++}
++
++fn parse_format(format: &str) -> Result<Vec<Piece>> {
++    let mut pieces = Vec::new();
++    let mut literal = BString::default();
++    let bytes = format.as_bytes();
++    let mut i = 0;
++    while i < bytes.len() {
++        if bytes[i] == b'%' {
++            if bytes.get(i + 1) == Some(&b'(') {
++                let Some(end) = bytes[i + 2..].find_byte(b')') else {
++                    bail!(message!("malformed format string {format}"));
++                };
++                let name = &format[i + 2..i + 2 + end];
++                if !literal.is_empty() {
++                    pieces.push(Piece::Literal(std::mem::take(&mut literal)));
++                }
++                pieces.push(Piece::Atom(Atom::parse(name)?));
++                i += end + 3;
++                continue;
++            }
++            if bytes.get(i + 1) == Some(&b'%') {
++                literal.push(b'%');
++                i += 2;
++                continue;
++            }
++            if let Some(byte) = bytes
++                .get(i + 1..i + 3)
++                .and_then(|hex| std::str::from_utf8(hex).ok())
++                .and_then(|hex| u8::from_str_radix(hex, 16).ok())
++            {
++                literal.push(byte);
++                i += 3;
++                continue;
++            }
++        }
++        literal.push(bytes[i]);
++        i += 1;
++    }
++    if !literal.is_empty() {
++        pieces.push(Piece::Literal(literal));
++    }
++    Ok(pieces)
++}
++
++#[derive(Debug, Clone, Copy, PartialEq, Eq)]
++enum SortKey {
++    RefName,
++    CommitterDate,
++}
++
++struct Entry {
++    name: BString,
++    id: gix::ObjectId,
++    kind: gix::object::Kind,
++    subject: BString,
++    committer_time: Option<gix::date::Time>,
++}
++
++/// Git's `match_name_as_path()`.
++fn matches(patterns: &[String], name: &BStr) -> bool {
++    patterns.is_empty()
++        || patterns.iter().any(|pattern| {
++            let pattern = pattern.as_bytes();
++            let boundary = name.starts_with(pattern)
++                && (name.len() == pattern.len() || name[pattern.len()] == b'/' || pattern.last() == Some(&b'/'));
++            boundary || wildmatch(pattern.as_bstr(), name, wildmatch::Mode::NO_MATCH_SLASH_LITERAL)
++        })
++}
++
++/// List refs like `git for-each-ref`.
++pub fn for_each_ref(repo: gix::Repository, mut out: impl Write, options: Options) -> Result<()> {
++    let pieces = parse_format(
++        options
++            .format
++            .as_deref()
++            .unwrap_or("%(objectname) %(objecttype)\t%(refname)"),
++    )?;
++    let mut keys = Vec::new();
++    for key in options.sort.iter().rev() {
++        let (descending, name) = key.strip_prefix('-').map_or((false, key.as_str()), |name| (true, name));
++        let key = match name {
++            "refname" => SortKey::RefName,
++            "committerdate" => SortKey::CommitterDate,
++            other => bail!(message!(
++                "brit for-each-ref does not implement the sort key `{other}`; implemented: refname, committerdate (prefix `-` to reverse)"
++            )),
++        };
++        keys.push((key, descending));
++    }
++
++    let mut all_names = HashSet::new();
++    let mut entries = Vec::new();
++    for reference in repo.references()?.all()? {
++        let Ok(mut reference) = reference else { continue };
++        let name = reference.name().as_bstr().to_owned();
++        all_names.insert(name.to_string());
++        if !matches(&options.patterns, name.as_ref()) {
++            continue;
++        }
++        let Ok(id) = reference.follow_to_object() else {
++            eprintln!("warning: ignoring broken ref {name}");
++            continue;
++        };
++        let object = id.object()?;
++        let kind = object.kind;
++        let (subject, committer_time) = match kind {
++            gix::object::Kind::Commit => {
++                let commit = object.into_commit();
++                let subject = commit.message()?.summary().into_owned();
++                (subject, Some(commit.committer()?.time()?))
++            }
++            gix::object::Kind::Tag => {
++                let tag = object.into_tag();
++                let decoded = tag.decode()?;
++                let subject = gix::objs::commit::MessageRef::from_bytes(decoded.message)
++                    .summary()
++                    .into_owned();
++                (subject, None)
++            }
++            _ => (BString::default(), None),
++        };
++        entries.push(Entry {
++            name,
++            id: id.detach(),
++            kind,
++            subject,
++            committer_time,
++        });
++    }
++
++    entries.sort_by(|a, b| {
++        for (key, descending) in &keys {
++            let ordering = match key {
++                SortKey::RefName => a.name.cmp(&b.name),
++                SortKey::CommitterDate => a
++                    .committer_time
++                    .map_or(0, |t| t.seconds)
++                    .cmp(&b.committer_time.map_or(0, |t| t.seconds)),
++            };
++            let ordering = if *descending { ordering.reverse() } else { ordering };
++            if ordering.is_ne() {
++                return ordering;
++            }
++        }
++        a.name.cmp(&b.name)
++    });
++
++    let exists = |candidate: &str| {
++        if candidate.starts_with("refs/") {
++            all_names.contains(candidate)
++        } else {
++            super::rev_parse::ref_exists(&repo, candidate)
++        }
++    };
++    let mut line = BString::default();
++    for entry in &entries {
++        line.clear();
++        for piece in &pieces {
++            match piece {
++                Piece::Literal(text) => line.extend_from_slice(text),
++                Piece::Atom(atom) => match atom {
++                    Atom::RefName => line.extend_from_slice(&entry.name),
++                    Atom::RefNameShort => {
++                        line.extend_from_slice(shorten_unambiguous(&entry.name.to_str_lossy(), exists).as_bytes());
++                    }
++                    Atom::ObjectName => line.extend_from_slice(entry.id.to_string().as_bytes()),
++                    Atom::ObjectNameShort => {
++                        line.extend_from_slice(entry.id.attach(&repo).shorten_or_id().to_string().as_bytes());
++                    }
++                    Atom::ObjectType => line.extend_from_slice(entry.kind.as_bytes()),
++                    Atom::Subject => line.extend_from_slice(&entry.subject),
++                    Atom::CommitterDate | Atom::CommitterDateShort | Atom::CommitterDateIso => {
++                        if let Some(time) = entry.committer_time {
++                            let format = match atom {
++                                Atom::CommitterDateShort => gix::date::time::format::SHORT,
++                                Atom::CommitterDateIso => gix::date::time::format::ISO8601,
++                                _ => gix::date::time::format::DEFAULT,
++                            };
++                            line.extend_from_slice(time.format_or_unix(format).as_bytes());
++                        }
++                    }
++                },
++            }
++        }
++        line.push(b'\n');
++        out.write_all(&line).or_error()?;
++    }
++    Ok(())
++}
++
++#[cfg(test)]
++mod tests {
++    use super::{matches, parse_format};
++    use gix::bstr::ByteSlice;
++
++    #[test]
++    fn patterns_match_like_git() {
++        let p = |list: &[&str]| list.iter().map(|s| (*s).to_owned()).collect::<Vec<_>>();
++        assert!(matches(&p(&["refs/heads"]), b"refs/heads/main".as_bstr()));
++        assert!(matches(&p(&["refs/heads/"]), b"refs/heads/main".as_bstr()));
++        assert!(!matches(&p(&["refs/hea"]), b"refs/heads/main".as_bstr()));
++        assert!(matches(&p(&["refs/*/main"]), b"refs/heads/main".as_bstr()));
++        assert!(!matches(&p(&["refs/*/main"]), b"refs/remotes/origin/main".as_bstr()));
++        assert!(matches(
++            &p(&["refs/heads/explore/0.7.1*"]),
++            b"refs/heads/explore/0.7.1-a".as_bstr()
++        ));
++    }
++
++    #[test]
++    fn unknown_atoms_are_refused_by_name() {
++        let error = parse_format("%(refname) %(authorname)")
++            .err()
++            .expect("unimplemented atom");
++        assert!(error.to_string().contains("%(authorname)"), "{error}");
++        assert!(parse_format("%% %41 %(refname:short)").is_ok());
++    }
++}
+diff --git a/gitoxide-core/src/repository/git_spellings/mod.rs b/gitoxide-core/src/repository/git_spellings/mod.rs
+index 8385637a7..b6def2d5d 100644
+--- a/gitoxide-core/src/repository/git_spellings/mod.rs
++++ b/gitoxide-core/src/repository/git_spellings/mod.rs
+@@ -4,6 +4,7 @@
+ //! `branch list`) stay the native interface; these exist so that a guessed Git spelling works and
+ //! points back to them.
+ 
++pub mod for_each_ref;
+ pub mod rev_parse;
+ 
+ /// Git's `shorten_unambiguous_ref()` in its default strict mode (`core.warnAmbiguousRefs`): the
+diff --git a/src/plumbing/main.rs b/src/plumbing/main.rs
+index acb22f002..7742549ca 100644
+--- a/src/plumbing/main.rs
++++ b/src/plumbing/main.rs
+@@ -61,7 +61,8 @@ fn requires_mutation_guard(cmd: &Subcommands) -> bool {
+         | Subcommands::Diff(_)
+         | Subcommands::Log(_)
+         | Subcommands::Blame { .. }
+-        | Subcommands::RevParse(_) => false,
++        | Subcommands::RevParse(_)
++        | Subcommands::ForEachRef(_) => false,
+         Subcommands::Commit(commit::Platform {
+             cmd: Some(commit::Subcommands::Verify { .. } | commit::Subcommands::Describe { .. }),
+             ..
+@@ -1428,6 +1429,21 @@ pub fn run_with_command(args: Args, command: clap::Command) -> Result<()> {
+                 )
+             })
+         }
++        Subcommands::ForEachRef(crate::plumbing::options::git_spellings::ForEachRef {
++            format: ref_format,
++            sort,
++            patterns,
++        }) => prepare_and_run("for-each-ref", verbose, None, move |_progress, out, _err| {
++            core::repository::git_spellings::for_each_ref::for_each_ref(
++                repository(Mode::Lenient)?,
++                out,
++                core::repository::git_spellings::for_each_ref::Options {
++                    format: ref_format,
++                    sort,
++                    patterns,
++                },
++            )
++        }),
+         Subcommands::Cat { revspec } => prepare_and_run("cat", verbose, None, move |_progress, out, _err| {
+             core::repository::cat(repository(Mode::Lenient)?, &revspec, out)
+         }),
+diff --git a/src/plumbing/options/git_spellings.rs b/src/plumbing/options/git_spellings.rs
+index e99cecd57..765ba2d2d 100644
+--- a/src/plumbing/options/git_spellings.rs
++++ b/src/plumbing/options/git_spellings.rs
+@@ -154,3 +154,21 @@ impl clap::FromArgMatches for RevParse {
+         Ok(())
+     }
+ }
++
++/// `for-each-ref` with Git's default format, `--format` atoms and `--sort` keys in real use.
++#[derive(Debug, clap::Parser)]
++pub struct ForEachRef {
++    /// Interpolate `%(atom)` for each ref; implemented atoms: refname, refname:short, objectname,
++    /// objectname:short, objecttype, subject, committerdate, committerdate:short, committerdate:iso.
++    ///
++    /// The default is Git's `%(objectname) %(objecttype)\t%(refname)`. An unimplemented atom is refused by name.
++    #[clap(long)]
++    pub format: Option<String>,
++    /// Sort by `refname` (the default) or `committerdate`; prefix `-` for descending. Repeat to add keys, the last
++    /// one primary, like Git.
++    #[clap(long, value_name = "KEY", action = clap::ArgAction::Append)]
++    pub sort: Vec<String>,
++    /// Only refs matching these prefixes (at a `/` boundary) or `fnmatch` globs, like `refs/heads/` or
++    /// `refs/heads/feat-*`.
++    pub patterns: Vec<String>,
++}
+diff --git a/src/plumbing/options/mod.rs b/src/plumbing/options/mod.rs
+index 56c3961b3..8b8acc332 100644
+--- a/src/plumbing/options/mod.rs
++++ b/src/plumbing/options/mod.rs
+@@ -260,6 +260,8 @@ pub enum Subcommands {
+     },
+     /// Git's spelling of `brit revision resolve`, plus repository path queries, with Git's output.
+     RevParse(git_spellings::RevParse),
++    /// List local refs like Git. Brit's own branch listing is `brit branch list`.
++    ForEachRef(git_spellings::ForEachRef),
+     /// Generate shell completions to stdout or a directory.
+     #[clap(visible_alias = "generate-completions", visible_alias = "shell-completions")]
+     Completions {
+diff --git a/tests/cli-journey/tests/for_each_ref.rs b/tests/cli-journey/tests/for_each_ref.rs
+new file mode 100644
+index 000000000..3b22c7cf1
+--- /dev/null
++++ b/tests/cli-journey/tests/for_each_ref.rs
+@@ -0,0 +1,90 @@
++//! `brit for-each-ref` prints what `git for-each-ref` prints for the patterns, `--format` atoms and
++//! `--sort` keys agents use, refuses an unimplemented atom by name, and leads to `brit branch list`.
++use anyhow::Result;
++use cli_journey::support::{
++    parity::{assert_help_names, assert_same, brit, git_ok},
++    test_repo::TestRepo,
++};
++
++fn commit_at(root: &std::path::Path, message: &str, date: &str) -> Result<String> {
++    let out = gix_testtools::git_command(root)
++        .args(["commit", "-q", "--allow-empty", "-m", message])
++        .env("GIT_COMMITTER_DATE", date)
++        .output()?;
++    anyhow::ensure!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
++    git_ok(root, &["rev-parse", "HEAD"])
++}
++
++#[test]
++fn for_each_ref_matches_git() -> Result<()> {
++    let repo = TestRepo::new("for-each-ref")?;
++    let root = repo.path();
++    let old = commit_at(root, "old subject\n\nbody line", "1000000100 +0000")?;
++    git_ok(root, &["branch", "feat/old"])?;
++    let newer = commit_at(root, "newer subject", "1000000300 +0200")?;
++    git_ok(root, &["branch", "explore/0.7.1-a"])?;
++    commit_at(root, "newest subject", "1000000500 -0500")?;
++    git_ok(root, &["tag", "-a", "v1", "-m", "tag subject", &old])?;
++    git_ok(root, &["tag", "light", &newer])?;
++    git_ok(root, &["update-ref", "refs/remotes/origin/main", &newer])?;
++    git_ok(
++        root,
++        &["symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main"],
++    )?;
++    git_ok(root, &["update-ref", "refs/notes/brit/build/abc", &old])?;
++    // `heads/main` is ambiguous with a tag named `main`, so it needs its `heads/` prefix.
++    git_ok(root, &["tag", "main", &old])?;
++
++    let forms: &[&[&str]] = &[
++        &["for-each-ref"],
++        &["for-each-ref", "refs/heads"],
++        &["for-each-ref", "refs/heads/", "refs/tags/"],
++        &["for-each-ref", "refs/*/main"],
++        &["for-each-ref", "refs/hea"],
++        &["for-each-ref", "refs/heads/explore/0.7.1*", "refs/heads/*0.7.1*"],
++        &["for-each-ref", "--format=%(refname)", "refs/notes/brit/build/"],
++        &["for-each-ref", "--format=%(refname:short)"],
++        &[
++            "for-each-ref",
++            "--format=%(refname:short) %(objectname:short) %(committerdate:short) [%(subject)] %(objecttype) %% %41",
++        ],
++        &[
++            "for-each-ref",
++            "--format=%(refname) %(objectname) %(committerdate:iso) %(committerdate)",
++        ],
++        &[
++            "for-each-ref",
++            "--sort=-committerdate",
++            "--format=%(refname) %(committerdate:iso)",
++        ],
++        &["for-each-ref", "--sort=committerdate", "--format=%(refname)"],
++        &["for-each-ref", "--sort=-refname"],
++        &[
++            "for-each-ref",
++            "--sort=refname",
++            "--sort=-committerdate",
++            "--format=%(refname)",
++            "refs/heads",
++        ],
++    ];
++    for form in forms {
++        assert_same(root, form)?;
++    }
++
++    let refused = brit(root, &["for-each-ref", "--format=%(refname) %(authorname)"])?;
++    assert_ne!(
++        refused.code,
++        Some(0),
++        "an unimplemented atom must be refused: {refused:?}"
++    );
++    assert!(
++        refused.stderr.contains("%(authorname)"),
++        "the refusal names the atom: {refused:?}"
++    );
++    assert!(
++        refused.stdout.is_empty(),
++        "nothing is listed before the refusal: {refused:?}"
++    );
++
++    assert_help_names("for-each-ref", "brit branch list")
++}
+-- 
+2.52.0
+

@@ -1,0 +1,330 @@
+From ac20fd98b4b04e48ae9042ca21bfe3c5a47666e5 Mon Sep 17 00:00:00 2001
+From: Matthew Dowell <mbd06b+github@gmail.com>
+Date: Thu, 19 Nov 2026 04:57:55 +0000
+Subject: [PATCH 3/6] feat: `brit ls-remote`, Git's spelling of `brit remote
+ refs`
+
+Prints Git's `<oid>\t<refname>` lines in the server's order, annotated tags followed
+by their peeled `<refname>^{}` line, with Git's tail-matching patterns (`dev`,
+`refs/heads/dev`, `refs/heads/feat/*`) and `--heads`, `--tags` and `--refs`. The
+remote is a configured name, URL or path, or the current branch's remote. Agents
+used `git ls-remote origin refs/heads/dev` to check whether the integration branch
+moved; that now works in brit with the output they already parse with `cut -f1`.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01PJB8fpkCKfb4CMYBh9vCEs
+---
+ .../src/repository/git_spellings/ls_remote.rs | 115 ++++++++++++++++++
+ .../src/repository/git_spellings/mod.rs       |   2 +
+ src/plumbing/main.rs                          |  31 +++++
+ src/plumbing/options/git_spellings.rs         |  19 +++
+ src/plumbing/options/mod.rs                   |   3 +
+ tests/cli-journey/tests/ls_remote.rs          |  71 +++++++++++
+ 6 files changed, 241 insertions(+)
+ create mode 100644 gitoxide-core/src/repository/git_spellings/ls_remote.rs
+ create mode 100644 tests/cli-journey/tests/ls_remote.rs
+
+diff --git a/gitoxide-core/src/repository/git_spellings/ls_remote.rs b/gitoxide-core/src/repository/git_spellings/ls_remote.rs
+new file mode 100644
+index 000000000..0a3869c31
+--- /dev/null
++++ b/gitoxide-core/src/repository/git_spellings/ls_remote.rs
+@@ -0,0 +1,115 @@
++//! `brit ls-remote`: Git's spelling of `brit remote refs`, printing `<oid>\t<refname>` lines.
++//!
++//! Refs print in the server's order. An annotated tag prints its tag object and then its peeled
++//! object as `<refname>^{}`, and patterns match the tail of a ref name at a `/` boundary, both
++//! like Git. An unborn `HEAD` is not listed, as Git does not request it without `--symref`.
++
++use gix::{Result, bstr::BString, error::ResultExt, protocol::handshake};
++
++/// What `ls-remote` was asked for.
++pub struct Options {
++    /// A configured remote, URL or path; the default remote when `None`.
++    pub remote: Option<String>,
++    /// Tail patterns; all refs when empty.
++    pub patterns: Vec<String>,
++    /// `--heads`
++    pub heads: bool,
++    /// `--tags`
++    pub tags: bool,
++    /// `--refs`
++    pub refs: bool,
++}
++
++/// Git's `tail_match()`: `pattern` matches `name` when `*/<pattern>` matches `/<name>`.
++fn tail_matches(patterns: &[String], name: &str) -> bool {
++    if patterns.is_empty() {
++        return true;
++    }
++    let name: BString = format!("/{name}").into();
++    patterns.iter().any(|pattern| {
++        let pattern: BString = format!("*/{pattern}").into();
++        gix::glob::wildmatch(pattern.as_ref(), name.as_ref(), gix::glob::wildmatch::Mode::empty())
++    })
++}
++
++fn selected(options: &Options, name: &str) -> bool {
++    let kind = (!options.heads && !options.tags)
++        || (options.heads && name.starts_with("refs/heads/"))
++        || (options.tags && name.starts_with("refs/tags/"));
++    let refs_only = !options.refs || (name.starts_with("refs/") && !name.ends_with("^{}"));
++    kind && refs_only && tail_matches(&options.patterns, name)
++}
++
++/// List the remote's refs like `git ls-remote`.
++#[gix::protocol::bisync::bisync]
++pub async fn ls_remote(
++    repo: gix::Repository,
++    mut progress: impl gix::Progress,
++    mut out: impl std::io::Write,
++    options: Options,
++) -> Result<()> {
++    let remote = crate::repository::remote::by_name_or_url(&repo, options.remote.as_deref())?;
++    let (map, _handshake) = remote
++        .connect(gix::remote::Direction::Fetch)
++        .await?
++        .ref_map(
++            &mut progress,
++            gix::remote::ref_map::Options {
++                prefix_from_spec_as_filter_on_remote: false,
++                ..Default::default()
++            },
++        )
++        .await?;
++    for remote_ref in &map.remote_refs {
++        let (name, object, peeled) = match remote_ref {
++            handshake::Ref::Direct { full_ref_name, object } => (full_ref_name, object, None),
++            handshake::Ref::Peeled {
++                full_ref_name,
++                tag,
++                object,
++            } => (full_ref_name, tag, Some(object)),
++            handshake::Ref::Symbolic {
++                full_ref_name,
++                tag,
++                object,
++                ..
++            } => match tag {
++                Some(tag) => (full_ref_name, tag, Some(object)),
++                None => (full_ref_name, object, None),
++            },
++            handshake::Ref::Unborn { .. } => continue,
++        };
++        let name = name.to_string();
++        if selected(&options, &name) {
++            writeln!(out, "{object}\t{name}").or_error()?;
++        }
++        if let Some(peeled) = peeled {
++            let peeled_name = format!("{name}^{{}}");
++            if selected(&options, &peeled_name) {
++                writeln!(out, "{peeled}\t{peeled_name}").or_error()?;
++            }
++        }
++    }
++    Ok(())
++}
++
++#[cfg(test)]
++mod tests {
++    use super::tail_matches;
++
++    #[test]
++    fn tail_patterns_match_like_git() {
++        let p = |list: &[&str]| list.iter().map(|s| (*s).to_owned()).collect::<Vec<_>>();
++        assert!(tail_matches(&p(&["dev"]), "refs/heads/dev"));
++        assert!(tail_matches(&p(&["refs/heads/dev"]), "refs/heads/dev"));
++        assert!(!tail_matches(&p(&["ev"]), "refs/heads/dev"));
++        assert!(!tail_matches(&p(&["refs/heads/dev"]), "refs/heads/dev2"));
++        assert!(tail_matches(&p(&["refs/heads/*"]), "refs/heads/feat/x"));
++        assert!(tail_matches(
++            &p(&["refs/heads/feat/steward-arrival*"]),
++            "refs/heads/feat/steward-arrival-2"
++        ));
++        assert!(!tail_matches(&p(&["refs/tags/v1"]), "refs/tags/v1^{}"));
++        assert!(tail_matches(&p(&["refs/tags/*"]), "refs/tags/v1^{}"));
++    }
++}
+diff --git a/gitoxide-core/src/repository/git_spellings/mod.rs b/gitoxide-core/src/repository/git_spellings/mod.rs
+index b6def2d5d..d748a5853 100644
+--- a/gitoxide-core/src/repository/git_spellings/mod.rs
++++ b/gitoxide-core/src/repository/git_spellings/mod.rs
+@@ -5,6 +5,8 @@
+ //! points back to them.
+ 
+ pub mod for_each_ref;
++#[cfg(any(feature = "blocking-client", feature = "async-client"))]
++pub mod ls_remote;
+ pub mod rev_parse;
+ 
+ /// Git's `shorten_unambiguous_ref()` in its default strict mode (`core.warnAmbiguousRefs`): the
+diff --git a/src/plumbing/main.rs b/src/plumbing/main.rs
+index 7742549ca..f60475f65 100644
+--- a/src/plumbing/main.rs
++++ b/src/plumbing/main.rs
+@@ -85,6 +85,8 @@ fn requires_mutation_guard(cmd: &Subcommands) -> bool {
+         Subcommands::Pull { .. } => false,
+         #[cfg(any(feature = "gitoxide-core-async-client", feature = "gitoxide-core-blocking-client"))]
+         Subcommands::Remote(_) => false,
++        #[cfg(any(feature = "gitoxide-core-async-client", feature = "gitoxide-core-blocking-client"))]
++        Subcommands::LsRemote(_) => false,
+         _ => true,
+     }
+ }
+@@ -1444,6 +1446,35 @@ pub fn run_with_command(args: Args, command: clap::Command) -> Result<()> {
+                 },
+             )
+         }),
++        #[cfg(any(feature = "gitoxide-core-async-client", feature = "gitoxide-core-blocking-client"))]
++        Subcommands::LsRemote(crate::plumbing::options::git_spellings::LsRemote {
++            heads,
++            tags,
++            refs,
++            remote,
++            patterns,
++        }) => prepare_and_run(
++            "ls-remote",
++            verbose,
++            core::repository::remote::refs::PROGRESS_RANGE,
++            move |progress, out, _err| {
++                let res = core::repository::git_spellings::ls_remote::ls_remote(
++                    repository(Mode::LenientWithGitInstallConfig)?,
++                    progress,
++                    out,
++                    core::repository::git_spellings::ls_remote::Options {
++                        remote,
++                        patterns,
++                        heads,
++                        tags,
++                        refs,
++                    },
++                );
++                #[cfg(feature = "gitoxide-core-async-client")]
++                let res = futures_lite::future::block_on(res);
++                res
++            },
++        ),
+         Subcommands::Cat { revspec } => prepare_and_run("cat", verbose, None, move |_progress, out, _err| {
+             core::repository::cat(repository(Mode::Lenient)?, &revspec, out)
+         }),
+diff --git a/src/plumbing/options/git_spellings.rs b/src/plumbing/options/git_spellings.rs
+index 765ba2d2d..3cc13ca81 100644
+--- a/src/plumbing/options/git_spellings.rs
++++ b/src/plumbing/options/git_spellings.rs
+@@ -172,3 +172,22 @@ pub struct ForEachRef {
+     /// `refs/heads/feat-*`.
+     pub patterns: Vec<String>,
+ }
++
++/// `ls-remote` printing Git's `<oid>\t<refname>` lines.
++#[derive(Debug, clap::Parser)]
++pub struct LsRemote {
++    /// Only branches under `refs/heads/`.
++    #[clap(long, visible_alias = "branches")]
++    pub heads: bool,
++    /// Only tags under `refs/tags/`.
++    #[clap(long, short = 't')]
++    pub tags: bool,
++    /// Omit peeled tags (`^{}`) and pseudo-refs like `HEAD`.
++    #[clap(long)]
++    pub refs: bool,
++    /// A configured remote, URL or path; the current branch's remote (else `origin`) when omitted.
++    pub remote: Option<String>,
++    /// Show only refs whose name ends with a pattern at a `/` boundary, like `dev`, `refs/heads/dev` or
++    /// `refs/heads/feat/*`.
++    pub patterns: Vec<String>,
++}
+diff --git a/src/plumbing/options/mod.rs b/src/plumbing/options/mod.rs
+index 8b8acc332..80bde2fc2 100644
+--- a/src/plumbing/options/mod.rs
++++ b/src/plumbing/options/mod.rs
+@@ -262,6 +262,9 @@ pub enum Subcommands {
+     RevParse(git_spellings::RevParse),
+     /// List local refs like Git. Brit's own branch listing is `brit branch list`.
+     ForEachRef(git_spellings::ForEachRef),
++    /// Git's spelling of `brit remote refs`, printing Git's `<oid>\t<refname>` lines.
++    #[cfg(any(feature = "gitoxide-core-async-client", feature = "gitoxide-core-blocking-client"))]
++    LsRemote(git_spellings::LsRemote),
+     /// Generate shell completions to stdout or a directory.
+     #[clap(visible_alias = "generate-completions", visible_alias = "shell-completions")]
+     Completions {
+diff --git a/tests/cli-journey/tests/ls_remote.rs b/tests/cli-journey/tests/ls_remote.rs
+new file mode 100644
+index 000000000..f169ccbba
+--- /dev/null
++++ b/tests/cli-journey/tests/ls_remote.rs
+@@ -0,0 +1,71 @@
++//! `brit ls-remote` prints what `git ls-remote` prints, `<oid>\t<refname>` in server order with
++//! peeled tags, for the remote and pattern forms agents use, and leads to `brit remote refs`.
++use anyhow::Result;
++use cli_journey::support::{
++    mock_remote::MockRemote,
++    parity::{assert_help_names, assert_same, git_ok},
++    test_repo::TestRepo,
++};
++
++#[test]
++fn ls_remote_matches_git() -> Result<()> {
++    let remote = MockRemote::new("ls-remote")?;
++    let source = TestRepo::new("ls-remote-source")?;
++    let src = source.path();
++    source.commit_file("a", "a\n")?;
++    git_ok(src, &["branch", "dev"])?;
++    git_ok(src, &["branch", "feat/steward-arrival-2"])?;
++    git_ok(src, &["branch", "handoff/x"])?;
++    git_ok(src, &["tag", "-a", "v1", "-m", "annotated", "HEAD~1"])?;
++    git_ok(src, &["tag", "light"])?;
++    let url = remote.url();
++    git_ok(
++        src,
++        &[
++            "push",
++            "-q",
++            &url,
++            "refs/heads/*:refs/heads/*",
++            "refs/tags/*:refs/tags/*",
++        ],
++    )?;
++    git_ok(remote.path(), &["symbolic-ref", "HEAD", "refs/heads/main"])?;
++
++    let local = TestRepo::new("ls-remote-local")?;
++    let root = local.path();
++    git_ok(root, &["remote", "add", "origin", &url])?;
++    let path = remote.path().to_str().expect("UTF-8 path");
++
++    let forms: &[&[&str]] = &[
++        &["ls-remote"],
++        &["ls-remote", "origin"],
++        &["ls-remote", "origin", "refs/heads/dev"],
++        &["ls-remote", "origin", "dev"],
++        &["ls-remote", "origin", "refs/heads/main", "refs/heads/dev"],
++        &[
++            "ls-remote",
++            "origin",
++            "refs/heads/dev",
++            "refs/heads/feat/steward-arrival*",
++        ],
++        &["ls-remote", "origin", "refs/heads/*", "refs/tags/v1*"],
++        &["ls-remote", "origin", "refs/tags/*"],
++        &["ls-remote", "origin", "refs/tags/v1"],
++        &["ls-remote", "origin", "nothing-matches"],
++        &["ls-remote", "--heads", "origin"],
++        &["ls-remote", "--heads", "origin", "dev"],
++        &["ls-remote", "--tags", "origin"],
++        &["ls-remote", "--refs", "origin"],
++        &["ls-remote", &url, "refs/heads/dev"],
++        &["ls-remote", path, "dev"],
++    ];
++    for form in forms {
++        let out = assert_same(root, form)?;
++        assert!(
++            out.stdout.lines().all(|line| line.split_once('\t').is_some()),
++            "every line is `<oid>\\t<refname>`: {out:?}"
++        );
++    }
++
++    assert_help_names("ls-remote", "brit remote refs")
++}
+-- 
+2.52.0
+

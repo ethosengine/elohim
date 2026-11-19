@@ -1,0 +1,905 @@
+From efcac61e69d89ff7f1b2b4a884af22ae66e6d7d5 Mon Sep 17 00:00:00 2001
+From: Matthew Dowell <mbd06b+github@gmail.com>
+Date: Thu, 19 Nov 2026 04:56:28 +0000
+Subject: [PATCH 1/6] feat: `brit rev-parse`, Git's spelling of `brit revision
+ resolve`
+
+Agents guess `git rev-parse` first and fell back to Git when brit refused the
+name. `brit rev-parse` answers the forms the workspace census found, with Git's
+output: full object names, `--short[=n]` (which implies `--verify`, as in Git),
+`--verify` with `-q`/`--quiet`, `--abbrev-ref`, `A..B` as `B` and `^A`, and the
+path queries `--show-toplevel`, `--git-dir`, `--absolute-git-dir`,
+`--git-common-dir` and `--path-format=absolute|relative` in command-line order.
+`--git-dir` and `--git-common-dir` follow Git's relative/absolute choices in a
+main worktree, its subdirectories, linked worktrees and submodules. Failures print
+Git's messages with exit 128, or exit 1 silently for `--verify --quiet`.
+
+The arguments are parsed by a hand-written `clap::Args` so that ordering survives
+while every flag stays visible to `--cli-surface-json`. The command is read-only and
+classified with the other inspection commands in `requires_mutation_guard`.
+
+The journey `tests/cli-journey/tests/rev_parse.rs` compares stdout and exit code
+with Git in four directories and checks that the help names `brit revision resolve`.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01PJB8fpkCKfb4CMYBh9vCEs
+---
+ .../src/repository/git_spellings/mod.rs       |  61 +++
+ .../src/repository/git_spellings/rev_parse.rs | 354 ++++++++++++++++++
+ gitoxide-core/src/repository/mod.rs           |   1 +
+ src/plumbing/main.rs                          |  14 +-
+ src/plumbing/options/git_spellings.rs         | 156 ++++++++
+ src/plumbing/options/mod.rs                   |   3 +
+ tests/cli-journey/src/support/mod.rs          |   1 +
+ tests/cli-journey/src/support/parity.rs       |  80 ++++
+ tests/cli-journey/tests/rev_parse.rs          | 106 ++++++
+ 9 files changed, 775 insertions(+), 1 deletion(-)
+ create mode 100644 gitoxide-core/src/repository/git_spellings/mod.rs
+ create mode 100644 gitoxide-core/src/repository/git_spellings/rev_parse.rs
+ create mode 100644 src/plumbing/options/git_spellings.rs
+ create mode 100644 tests/cli-journey/src/support/parity.rs
+ create mode 100644 tests/cli-journey/tests/rev_parse.rs
+
+diff --git a/gitoxide-core/src/repository/git_spellings/mod.rs b/gitoxide-core/src/repository/git_spellings/mod.rs
+new file mode 100644
+index 000000000..8385637a7
+--- /dev/null
++++ b/gitoxide-core/src/repository/git_spellings/mod.rs
+@@ -0,0 +1,61 @@
++//! Git's spellings of ref resolution and listing, with Git's output shapes for the forms agents use.
++//!
++//! Each module answers one Git command name. Brit's own verbs (`revision resolve`, `remote refs`,
++//! `branch list`) stay the native interface; these exist so that a guessed Git spelling works and
++//! points back to them.
++
++pub mod rev_parse;
++
++/// Git's `shorten_unambiguous_ref()` in its default strict mode (`core.warnAmbiguousRefs`): the
++/// shortest name that no other lookup rule resolves, where `exists` answers whether a full ref name exists.
++pub(crate) fn shorten_unambiguous(full_name: &str, exists: impl Fn(&str) -> bool) -> String {
++    const RULES: [(&str, &str); 6] = [
++        ("", ""),
++        ("refs/", ""),
++        ("refs/tags/", ""),
++        ("refs/heads/", ""),
++        ("refs/remotes/", ""),
++        ("refs/remotes/", "/HEAD"),
++    ];
++    for matched in (1..RULES.len()).rev() {
++        let (prefix, suffix) = RULES[matched];
++        let Some(short) = full_name
++            .strip_prefix(prefix)
++            .and_then(|rest| rest.strip_suffix(suffix))
++            .filter(|short| !short.is_empty())
++        else {
++            continue;
++        };
++        let ambiguous = RULES
++            .iter()
++            .enumerate()
++            .filter(|(rule, _)| *rule != matched)
++            .any(|(_, (prefix, suffix))| exists(&format!("{prefix}{short}{suffix}")));
++        if !ambiguous {
++            return short.to_owned();
++        }
++    }
++    full_name.to_owned()
++}
++
++#[cfg(test)]
++mod tests {
++    use super::shorten_unambiguous;
++
++    #[test]
++    fn shortening_follows_git_rules_and_ambiguity() {
++        let none = |_: &str| false;
++        assert_eq!(shorten_unambiguous("refs/heads/main", none), "main");
++        assert_eq!(shorten_unambiguous("refs/tags/v1", none), "v1");
++        assert_eq!(shorten_unambiguous("refs/remotes/origin/dev", none), "origin/dev");
++        assert_eq!(shorten_unambiguous("refs/remotes/origin/HEAD", none), "origin");
++        assert_eq!(
++            shorten_unambiguous("refs/notes/brit/build/x", none),
++            "notes/brit/build/x"
++        );
++        assert_eq!(shorten_unambiguous("HEAD", none), "HEAD");
++        let both = |name: &str| name == "refs/tags/main" || name == "refs/heads/main";
++        assert_eq!(shorten_unambiguous("refs/heads/main", both), "heads/main");
++        assert_eq!(shorten_unambiguous("refs/tags/main", both), "tags/main");
++    }
++}
+diff --git a/gitoxide-core/src/repository/git_spellings/rev_parse.rs b/gitoxide-core/src/repository/git_spellings/rev_parse.rs
+new file mode 100644
+index 000000000..ab0abf704
+--- /dev/null
++++ b/gitoxide-core/src/repository/git_spellings/rev_parse.rs
+@@ -0,0 +1,354 @@
++//! `brit rev-parse`: Git's spelling of `brit revision resolve`, plus Git's repository path queries.
++//!
++//! Output follows `git rev-parse` for the forms agents use: full or abbreviated object names, one
++//! per line; `A..B` as `B` and `^A`; `--abbrev-ref` short ref names; and the path queries in the
++//! order they were given, with Git's relative/absolute choices in main and linked worktrees.
++//! Failures print Git's messages and exit 128 (or 1 for `--verify --quiet`).
++
++use std::{
++    io::Write,
++    path::{Component, Path, PathBuf},
++};
++
++use gix::{
++    Result,
++    bstr::{BStr, ByteSlice},
++    error::ResultExt,
++    prelude::ObjectIdExt,
++};
++
++use super::shorten_unambiguous;
++
++/// One ordered command-line item.
++#[derive(Debug, Clone, PartialEq, Eq)]
++pub enum Arg {
++    /// A revision to resolve.
++    Rev(String),
++    /// `--show-toplevel`
++    ShowToplevel,
++    /// `--git-dir`
++    GitDir,
++    /// `--absolute-git-dir`
++    AbsoluteGitDir,
++    /// `--git-common-dir`
++    GitCommonDir,
++    /// `--path-format=…`, applying to the path queries after it.
++    PathFormat(PathFormat),
++    /// Everything after `--`, printed verbatim.
++    Paths(Vec<String>),
++}
++
++/// How path queries are printed after `--path-format`.
++#[derive(Debug, Clone, Copy, PartialEq, Eq)]
++pub enum PathFormat {
++    /// Canonical absolute paths.
++    Absolute,
++    /// Paths relative to the current directory.
++    Relative,
++}
++
++/// Modes that apply to every revision.
++#[derive(Debug, Default, Clone, Copy)]
++pub struct Options {
++    /// Require exactly one revision.
++    pub verify: bool,
++    /// With `verify`, fail silently with exit code 1.
++    pub quiet: bool,
++    /// Print short ref names instead of object names.
++    pub abbrev_ref: bool,
++    /// Abbreviate object names: `Some(None)` uses `core.abbrev`, `Some(Some(n))` at least `n` digits.
++    pub short: Option<Option<usize>>,
++}
++
++/// Print each argument like `git rev-parse` would.
++pub fn rev_parse(
++    repo: gix::Repository,
++    args: Vec<Arg>,
++    mut out: impl Write,
++    mut err: impl Write,
++    options: Options,
++) -> Result<()> {
++    let verify = options.verify || options.short.is_some();
++    let cwd = repo.current_dir().to_owned();
++    let mut format = None;
++    let mut as_is = false;
++    let mut single: Option<(bool, gix::ObjectId, String)> = None;
++    for arg in args {
++        match arg {
++            Arg::PathFormat(wanted) => format = Some(wanted),
++            Arg::ShowToplevel => match repo.workdir() {
++                Some(workdir) => {
++                    let workdir = absolute(workdir, &cwd);
++                    print_path(
++                        &mut out,
++                        &realpath(&workdir),
++                        &cwd,
++                        format.unwrap_or(PathFormat::Absolute),
++                    )?;
++                }
++                None => die(
++                    &mut out,
++                    &mut err,
++                    "fatal: this operation must be run in a work tree",
++                    128,
++                ),
++            },
++            Arg::GitDir => {
++                let git_dir = absolute(repo.git_dir(), &cwd);
++                match format {
++                    Some(format) => print_path(&mut out, &realpath(&git_dir), &cwd, format)?,
++                    None if git_dir == cwd.join(".git") && git_dir.is_dir() => writeln!(out, ".git").or_error()?,
++                    None if git_dir == cwd => writeln!(out, ".").or_error()?,
++                    None => writeln!(out, "{}", git_dir.display()).or_error()?,
++                }
++            }
++            Arg::AbsoluteGitDir => {
++                let git_dir = absolute(repo.git_dir(), &cwd);
++                print_path(&mut out, &realpath(&git_dir), &cwd, PathFormat::Absolute)?;
++            }
++            Arg::GitCommonDir => {
++                let common_dir = absolute(repo.common_dir(), &cwd);
++                // Git prints the shared directory relative to the current one only when it found it as
++                // the `.git` directory of this worktree; a linked worktree or a submodule names it absolutely.
++                let dot_git_here = common_dir == absolute(repo.git_dir(), &cwd)
++                    && repo
++                        .workdir()
++                        .is_some_and(|workdir| absolute(workdir, &cwd).join(".git") == common_dir);
++                match format {
++                    Some(format) => print_path(&mut out, &realpath(&common_dir), &cwd, format)?,
++                    None if common_dir == cwd => writeln!(out, ".").or_error()?,
++                    None if dot_git_here => writeln!(out, "{}", relative_path(&common_dir, &cwd)).or_error()?,
++                    None => writeln!(out, "{}", common_dir.display()).or_error()?,
++                }
++            }
++            Arg::Paths(paths) => {
++                writeln!(out, "--").or_error()?;
++                for path in paths {
++                    writeln!(out, "{path}").or_error()?;
++                }
++            }
++            Arg::Rev(rev) if as_is => {
++                if !cwd.join(&rev).exists() {
++                    die(
++                        &mut out,
++                        &mut err,
++                        &format!(
++                            "fatal: {rev}: no such path in the working tree.\nUse 'git <command> -- <path>...' to specify paths that do not exist locally."
++                        ),
++                        128,
++                    );
++                }
++                writeln!(out, "{rev}").or_error()?;
++            }
++            Arg::Rev(rev) => {
++                let spec = repo
++                    .rev_parse(BStr::new(rev.as_bytes()))
++                    .ok()
++                    .map(gix::revision::Spec::detach);
++                let shown = match spec {
++                    Some(gix::revision::plumbing::Spec::Include(id)) if verify => {
++                        if single.replace((false, id, rev.clone())).is_some() {
++                            die_no_single_rev(&mut out, &mut err, options.quiet);
++                        }
++                        continue;
++                    }
++                    Some(_) if verify => die_no_single_rev(&mut out, &mut err, options.quiet),
++                    None if verify => die_no_single_rev(&mut out, &mut err, options.quiet),
++                    Some(gix::revision::plumbing::Spec::Include(id)) => vec![(false, id, rev.clone())],
++                    Some(gix::revision::plumbing::Spec::Exclude(id)) => {
++                        vec![(true, id, rev.trim_start_matches('^').to_owned())]
++                    }
++                    Some(gix::revision::plumbing::Spec::Range { from, to }) => {
++                        let (left, right) = rev.split_once("..").unwrap_or(("", ""));
++                        let name = |side: &str| if side.is_empty() { "HEAD" } else { side }.to_owned();
++                        vec![(false, to, name(right)), (true, from, name(left))]
++                    }
++                    Some(_) => die(
++                        &mut out,
++                        &mut err,
++                        &format!(
++                            "brit rev-parse: `{rev}` is not implemented; list commits with `brit revision list` or find bases with `brit merge-base`"
++                        ),
++                        128,
++                    ),
++                    None => {
++                        writeln!(out, "{rev}").or_error()?;
++                        if !cwd.join(&rev).exists() {
++                            die(
++                                &mut out,
++                                &mut err,
++                                &format!(
++                                    "fatal: ambiguous argument '{rev}': unknown revision or path not in the working tree.\nUse '--' to separate paths from revisions, like this:\n'git <command> [<revision>...] -- [<file>...]'"
++                                ),
++                                128,
++                            );
++                        }
++                        as_is = true;
++                        continue;
++                    }
++                };
++                for (reversed, id, name) in shown {
++                    show(&repo, &mut out, &mut err, options, reversed, id, &name)?;
++                }
++            }
++        }
++    }
++    if verify {
++        match single {
++            Some((reversed, id, name)) => show(&repo, &mut out, &mut err, options, reversed, id, &name)?,
++            None => die_no_single_rev(&mut out, &mut err, options.quiet),
++        }
++    }
++    Ok(())
++}
++
++fn show(
++    repo: &gix::Repository,
++    mut out: impl Write,
++    mut err: impl Write,
++    options: Options,
++    reversed: bool,
++    id: gix::ObjectId,
++    name: &str,
++) -> Result<()> {
++    let marker = if reversed { "^" } else { "" };
++    if options.abbrev_ref {
++        // Git prints nothing for a revision that is not a ref, like `HEAD~1`.
++        if let Some(full) = dwim_full_name(repo, name) {
++            let short = shorten_unambiguous(&full, |candidate| ref_exists(repo, candidate));
++            writeln!(out, "{marker}{short}").or_error()?;
++        }
++        return Ok(());
++    }
++    match options.short {
++        Some(len) => {
++            let prefix = match len {
++                None => id.attach(repo).shorten()?,
++                Some(len) => {
++                    let len = len.clamp(4, id.kind().len_in_hex());
++                    let candidate = gix::odb::store::prefix::disambiguate::Candidate::new(id, len).or_error()?;
++                    match repo.objects.disambiguate_prefix(candidate)? {
++                        Some(prefix) => prefix,
++                        None => {
++                            writeln!(err, "fatal: {id}: object not found").or_error()?;
++                            id.into()
++                        }
++                    }
++                }
++            };
++            writeln!(out, "{marker}{prefix}").or_error()?;
++        }
++        None => writeln!(out, "{marker}{id}").or_error()?,
++    }
++    Ok(())
++}
++
++/// The full ref name that `name` resolves to, following symbolic refs, or `None` for a non-ref.
++fn dwim_full_name(repo: &gix::Repository, name: &str) -> Option<String> {
++    let name = if name == "@" { "HEAD" } else { name };
++    let lower = name.to_ascii_lowercase();
++    if let Some(branch) = lower
++        .strip_suffix("@{upstream}")
++        .or_else(|| lower.strip_suffix("@{u}"))
++        .map(|branch| &name[..branch.len()])
++    {
++        let branch = if branch.is_empty() || branch == "HEAD" || branch == "@" {
++            repo.head_name().ok()??
++        } else {
++            repo.try_find_reference(branch).ok()??.name().to_owned()
++        };
++        let tracking = repo
++            .branch_remote_tracking_ref_name(branch.as_ref(), gix::remote::Direction::Fetch)?
++            .ok()?;
++        return Some(tracking.as_bstr().to_string());
++    }
++    let mut reference = repo.try_find_reference(name).ok()??;
++    for _ in 0..5 {
++        match reference.follow() {
++            Some(Ok(next)) => reference = next,
++            Some(Err(_)) => return None,
++            None => break,
++        }
++    }
++    Some(reference.name().as_bstr().to_string())
++}
++
++/// Whether a ref with exactly this full name exists; the lookup rules never stand in for it.
++pub(crate) fn ref_exists(repo: &gix::Repository, full_name: &str) -> bool {
++    repo.try_find_reference(full_name)
++        .ok()
++        .flatten()
++        .is_some_and(|reference| reference.name().as_bstr() == full_name.as_bytes().as_bstr())
++}
++
++fn die_no_single_rev(mut out: impl Write, mut err: impl Write, quiet: bool) -> ! {
++    if quiet {
++        die(&mut out, &mut err, "", 1)
++    }
++    die(&mut out, &mut err, "fatal: Needed a single revision", 128)
++}
++
++fn die(mut out: impl Write, mut err: impl Write, message: &str, code: i32) -> ! {
++    out.flush().ok();
++    if !message.is_empty() {
++        writeln!(err, "{message}").ok();
++    }
++    err.flush().ok();
++    std::process::exit(code)
++}
++
++fn absolute(path: &Path, cwd: &Path) -> PathBuf {
++    let joined = if path.is_absolute() {
++        path.to_owned()
++    } else {
++        cwd.join(path)
++    };
++    gix::path::normalize(joined.as_path().into(), cwd).map_or(joined.clone(), std::borrow::Cow::into_owned)
++}
++
++fn realpath(path: &Path) -> PathBuf {
++    gix::path::realpath(path).unwrap_or_else(|_| path.to_owned())
++}
++
++fn print_path(mut out: impl Write, path: &Path, cwd: &Path, format: PathFormat) -> Result<()> {
++    match format {
++        PathFormat::Absolute => writeln!(out, "{}", path.display()),
++        PathFormat::Relative => writeln!(out, "{}", relative_path(path, &realpath(cwd))),
++    }
++    .or_error()
++}
++
++/// Git's `relative_path()`: `./` for the directory itself, `../` steps (with a trailing slash) for
++/// an ancestor, and a plain relative path otherwise.
++fn relative_path(path: &Path, base: &Path) -> String {
++    let path: Vec<Component<'_>> = path.components().collect();
++    let base: Vec<Component<'_>> = base.components().collect();
++    let common = path.iter().zip(&base).take_while(|(a, b)| a == b).count();
++    let ups = base.len() - common;
++    let rest: PathBuf = path[common..].iter().collect();
++    match (ups, rest.as_os_str().is_empty()) {
++        (0, true) => "./".into(),
++        (0, false) => rest.display().to_string(),
++        (ups, true) => "../".repeat(ups),
++        (ups, false) => format!("{}{}", "../".repeat(ups), rest.display()),
++    }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::relative_path;
++    use std::path::Path;
++
++    #[test]
++    fn relative_paths_match_git() {
++        assert_eq!(relative_path(Path::new("/a/b"), Path::new("/a/b")), "./");
++        assert_eq!(relative_path(Path::new("/a/b"), Path::new("/a/b/c")), "../");
++        assert_eq!(relative_path(Path::new("/a"), Path::new("/a/b/c")), "../../");
++        assert_eq!(relative_path(Path::new("/a/b/.git"), Path::new("/a/b")), ".git");
++        assert_eq!(relative_path(Path::new("/a/b/.git"), Path::new("/a/b/c")), "../.git");
++        assert_eq!(
++            relative_path(Path::new("/a/main/.git"), Path::new("/a/wt")),
++            "../main/.git"
++        );
++    }
++}
+diff --git a/gitoxide-core/src/repository/mod.rs b/gitoxide-core/src/repository/mod.rs
+index e551336e0..4ad0258ad 100644
+--- a/gitoxide-core/src/repository/mod.rs
++++ b/gitoxide-core/src/repository/mod.rs
+@@ -27,6 +27,7 @@ pub mod diff;
+ pub mod dirty;
+ pub mod dirwalk;
+ mod editor;
++pub mod git_spellings;
+ pub use editor::function as editor;
+ #[cfg(feature = "blocking-client")]
+ pub mod clone;
+diff --git a/src/plumbing/main.rs b/src/plumbing/main.rs
+index 8d89ddf2d..acb22f002 100644
+--- a/src/plumbing/main.rs
++++ b/src/plumbing/main.rs
+@@ -60,7 +60,8 @@ fn requires_mutation_guard(cmd: &Subcommands) -> bool {
+         | Subcommands::Env
+         | Subcommands::Diff(_)
+         | Subcommands::Log(_)
+-        | Subcommands::Blame { .. } => false,
++        | Subcommands::Blame { .. }
++        | Subcommands::RevParse(_) => false,
+         Subcommands::Commit(commit::Platform {
+             cmd: Some(commit::Subcommands::Verify { .. } | commit::Subcommands::Describe { .. }),
+             ..
+@@ -1416,6 +1417,17 @@ pub fn run_with_command(args: Args, command: clap::Command) -> Result<()> {
+                 )
+             }),
+         },
++        Subcommands::RevParse(crate::plumbing::options::git_spellings::RevParse { args, options }) => {
++            prepare_and_run("rev-parse", verbose, None, move |_progress, out, err| {
++                core::repository::git_spellings::rev_parse::rev_parse(
++                    repository(Mode::Lenient)?,
++                    args,
++                    out,
++                    err,
++                    options,
++                )
++            })
++        }
+         Subcommands::Cat { revspec } => prepare_and_run("cat", verbose, None, move |_progress, out, _err| {
+             core::repository::cat(repository(Mode::Lenient)?, &revspec, out)
+         }),
+diff --git a/src/plumbing/options/git_spellings.rs b/src/plumbing/options/git_spellings.rs
+new file mode 100644
+index 000000000..e99cecd57
+--- /dev/null
++++ b/src/plumbing/options/git_spellings.rs
+@@ -0,0 +1,156 @@
++//! Git's spellings of ref resolution and listing, each leading back to Brit's own verb.
++//!
++//! Agents guess Git's names first. These subcommands answer those names with Git's output
++//! shapes for the forms in real use, and their help names the native Brit verb.
++
++use clap::{Arg, ArgAction, ArgMatches, Command};
++use gitoxide_core::repository::git_spellings::rev_parse;
++
++/// `rev-parse`, parsed by hand so that path queries and revisions keep their command-line order.
++#[derive(Debug)]
++pub struct RevParse {
++    pub args: Vec<rev_parse::Arg>,
++    pub options: rev_parse::Options,
++}
++
++const REV: &str = "rev";
++const PATHS: &str = "paths";
++const SHOW_TOPLEVEL: &str = "show-toplevel";
++const GIT_DIR: &str = "git-dir";
++const ABSOLUTE_GIT_DIR: &str = "absolute-git-dir";
++const GIT_COMMON_DIR: &str = "git-common-dir";
++const PATH_FORMAT: &str = "path-format";
++const SHORT: &str = "short";
++const VERIFY: &str = "verify";
++const QUIET: &str = "quiet";
++const ABBREV_REF: &str = "abbrev-ref";
++
++fn flag(id: &'static str, help: &'static str) -> Arg {
++    Arg::new(id).long(id).action(ArgAction::Count).help(help)
++}
++
++impl clap::Args for RevParse {
++    fn augment_args(cmd: Command) -> Command {
++        cmd.arg(
++            Arg::new(REV)
++                .value_name("REV")
++                .action(ArgAction::Append)
++                .num_args(0..)
++                .help("Revisions like `HEAD`, `origin/dev`, `HEAD^{tree}`, `HEAD:path` or `A..B`"),
++        )
++        .arg(
++            Arg::new(PATHS)
++                .value_name("PATH")
++                .action(ArgAction::Append)
++                .num_args(0..)
++                .last(true)
++                .help("Printed verbatim after `--`, as Git does"),
++        )
++        .arg(flag(SHOW_TOPLEVEL, "Print the absolute path of the worktree's top-level directory"))
++        .arg(flag(
++            GIT_DIR,
++            "Print the repository's private Git directory: `.git` at a main worktree's top, else absolute",
++        ))
++        .arg(flag(ABSOLUTE_GIT_DIR, "Print the private Git directory as an absolute path"))
++        .arg(flag(
++            GIT_COMMON_DIR,
++            "Print the Git directory shared by all worktrees; differs from --git-dir in a linked worktree",
++        ))
++        .arg(
++            Arg::new(PATH_FORMAT)
++                .long(PATH_FORMAT)
++                .value_name("FORMAT")
++                .value_parser(["absolute", "relative"])
++                .action(ArgAction::Append)
++                .help("Print the path queries that follow as absolute or cwd-relative paths"),
++        )
++        .arg(
++            Arg::new(SHORT)
++                .long(SHORT)
++                .value_name("N")
++                .num_args(0..=1)
++                .require_equals(true)
++                .default_missing_value("")
++                .action(ArgAction::Set)
++                .help("Print a unique abbreviation of at least N hex digits (core.abbrev when N is absent); implies --verify"),
++        )
++        .arg(flag(VERIFY, "Require exactly one revision and print its full object name"))
++        .arg(
++            Arg::new(QUIET)
++                .long(QUIET)
++                .short('q')
++                .action(ArgAction::Count)
++                .help("With --verify, print nothing on failure and exit with 1"),
++        )
++        .arg(flag(
++            ABBREV_REF,
++            "Print the shortest unambiguous ref name instead of the object name; non-refs print nothing",
++        ))
++    }
++
++    fn augment_args_for_update(cmd: Command) -> Command {
++        Self::augment_args(cmd)
++    }
++}
++
++impl clap::FromArgMatches for RevParse {
++    fn from_arg_matches(matches: &ArgMatches) -> Result<Self, clap::Error> {
++        let mut ordered: Vec<(usize, rev_parse::Arg)> = Vec::new();
++        let mut take = |id: &str, item: &dyn Fn(Option<&String>) -> rev_parse::Arg| {
++            // Counted flags default to zero, and defaults have indices too: only typed arguments count.
++            if matches.value_source(id) != Some(clap::parser::ValueSource::CommandLine) {
++                return;
++            }
++            let values: Vec<Option<&String>> = matches
++                .try_get_many::<String>(id)
++                .ok()
++                .flatten()
++                .map(|values| values.map(Some).collect())
++                .unwrap_or_default();
++            for (position, index) in matches.indices_of(id).into_iter().flatten().enumerate() {
++                ordered.push((index, item(values.get(position).copied().flatten())));
++            }
++        };
++        take(REV, &|value| rev_parse::Arg::Rev(value.cloned().unwrap_or_default()));
++        take(SHOW_TOPLEVEL, &|_| rev_parse::Arg::ShowToplevel);
++        take(GIT_DIR, &|_| rev_parse::Arg::GitDir);
++        take(ABSOLUTE_GIT_DIR, &|_| rev_parse::Arg::AbsoluteGitDir);
++        take(GIT_COMMON_DIR, &|_| rev_parse::Arg::GitCommonDir);
++        take(PATH_FORMAT, &|value| {
++            rev_parse::Arg::PathFormat(if value.is_some_and(|v| v == "relative") {
++                rev_parse::PathFormat::Relative
++            } else {
++                rev_parse::PathFormat::Absolute
++            })
++        });
++        ordered.sort_by_key(|(index, _)| *index);
++        let mut args: Vec<_> = ordered.into_iter().map(|(_, arg)| arg).collect();
++        if let Some(paths) = matches.get_many::<String>(PATHS) {
++            args.push(rev_parse::Arg::Paths(paths.cloned().collect()));
++        }
++        let short = match matches.get_one::<String>(SHORT) {
++            None => None,
++            Some(value) if value.is_empty() => Some(None),
++            Some(value) => Some(Some(value.parse::<usize>().map_err(|_| {
++                clap::Error::raw(
++                    clap::error::ErrorKind::InvalidValue,
++                    format!("--short expects a number of hex digits, got `{value}`\n"),
++                )
++            })?)),
++        };
++        Ok(RevParse {
++            args,
++            options: rev_parse::Options {
++                verify: matches.get_count(VERIFY) > 0,
++                quiet: matches.get_count(QUIET) > 0,
++                abbrev_ref: matches.get_count(ABBREV_REF) > 0,
++                short,
++            },
++        })
++    }
++
++    fn update_from_arg_matches(&mut self, matches: &ArgMatches) -> Result<(), clap::Error> {
++        *self = Self::from_arg_matches(matches)?;
++        Ok(())
++    }
++}
+diff --git a/src/plumbing/options/mod.rs b/src/plumbing/options/mod.rs
+index 27d0619da..56c3961b3 100644
+--- a/src/plumbing/options/mod.rs
++++ b/src/plumbing/options/mod.rs
+@@ -1,3 +1,4 @@
++pub mod git_spellings;
+ pub mod rebase;
+ use std::path::PathBuf;
+ 
+@@ -257,6 +258,8 @@ pub enum Subcommands {
+         #[clap(long,  value_parser=AsTime, value_name = "DATE")]
+         since: Option<gix::date::Time>,
+     },
++    /// Git's spelling of `brit revision resolve`, plus repository path queries, with Git's output.
++    RevParse(git_spellings::RevParse),
+     /// Generate shell completions to stdout or a directory.
+     #[clap(visible_alias = "generate-completions", visible_alias = "shell-completions")]
+     Completions {
+diff --git a/tests/cli-journey/src/support/mod.rs b/tests/cli-journey/src/support/mod.rs
+index 39d984c7d..54a8afc1b 100644
+--- a/tests/cli-journey/src/support/mod.rs
++++ b/tests/cli-journey/src/support/mod.rs
+@@ -2,5 +2,6 @@
+ 
+ pub mod mock_remote;
+ pub mod normalize;
++pub mod parity;
+ pub mod runner;
+ pub mod test_repo;
+diff --git a/tests/cli-journey/src/support/parity.rs b/tests/cli-journey/src/support/parity.rs
+new file mode 100644
+index 000000000..95ab888c9
+--- /dev/null
++++ b/tests/cli-journey/src/support/parity.rs
+@@ -0,0 +1,80 @@
++//! Git-as-oracle helpers: run the same arguments through `git` and `brit` in the same directory.
++
++use std::{path::Path, process::Command};
++
++use anyhow::{ensure, Result};
++
++use crate::support::runner::brit_bin;
++
++/// What one invocation printed and how it exited.
++#[derive(Debug, Clone, PartialEq, Eq)]
++pub struct Outcome {
++    pub stdout: String,
++    pub stderr: String,
++    pub code: Option<i32>,
++}
++
++fn outcome(mut command: Command) -> Result<Outcome> {
++    let out = command.output()?;
++    Ok(Outcome {
++        stdout: String::from_utf8(out.stdout)?,
++        stderr: String::from_utf8(out.stderr)?,
++        code: out.status.code(),
++    })
++}
++
++/// Run isolated `git <args>` in `cwd`.
++pub fn git(cwd: &Path, args: &[&str]) -> Result<Outcome> {
++    outcome({
++        let mut command = gix_testtools::git_command(cwd);
++        command.args(args);
++        command
++    })
++}
++
++/// Run isolated `git <args>` in `cwd`, requiring success, and return trimmed stdout.
++pub fn git_ok(cwd: &Path, args: &[&str]) -> Result<String> {
++    let out = git(cwd, args)?;
++    ensure!(out.code == Some(0), "git {args:?} in {}: {}", cwd.display(), out.stderr);
++    Ok(out.stdout.trim().to_owned())
++}
++
++/// Run isolated `brit <args>` in `cwd`, with the same environment `git` gets.
++pub fn brit(cwd: &Path, args: &[&str]) -> Result<Outcome> {
++    let mut command = Command::new(brit_bin().expect("built Brit"));
++    gix_testtools::configure_git_environment(&mut command, cwd);
++    // gix treats the null device as an unreadable Git config, unlike Git: name an absent file instead.
++    command.env(
++        "GIT_CONFIG_GLOBAL",
++        std::env::temp_dir().join("brit-journey-absent-global.gitconfig"),
++    );
++    command.current_dir(cwd).args(args);
++    outcome(command)
++}
++
++/// Assert that `brit <args>` prints the same stdout and exits like `git <args>` in `cwd`.
++pub fn assert_same(cwd: &Path, args: &[&str]) -> Result<Outcome> {
++    let expected = git(cwd, args)?;
++    let actual = brit(cwd, args)?;
++    assert_eq!(
++        (&actual.stdout, actual.code),
++        (&expected.stdout, expected.code),
++        "brit {args:?} in {} differs from git\nbrit stderr: {}\ngit stderr: {}",
++        cwd.display(),
++        actual.stderr,
++        expected.stderr
++    );
++    Ok(actual)
++}
++
++/// Assert that `brit <spelling> --help` names Brit's own verb.
++pub fn assert_help_names(spelling: &str, native: &str) -> Result<()> {
++    let help = brit(&std::env::temp_dir(), &[spelling, "--help"])?;
++    ensure!(help.code == Some(0), "brit {spelling} --help: {}", help.stderr);
++    ensure!(
++        help.stdout.contains(native),
++        "brit {spelling} --help must name `{native}`:\n{}",
++        help.stdout
++    );
++    Ok(())
++}
+diff --git a/tests/cli-journey/tests/rev_parse.rs b/tests/cli-journey/tests/rev_parse.rs
+new file mode 100644
+index 000000000..31760cf57
+--- /dev/null
++++ b/tests/cli-journey/tests/rev_parse.rs
+@@ -0,0 +1,106 @@
++//! `brit rev-parse` prints what `git rev-parse` prints for the forms agents use, from a main
++//! worktree, its subdirectory, and a linked worktree, and its help leads to `brit revision resolve`.
++use anyhow::Result;
++use cli_journey::support::{
++    parity::{assert_help_names, assert_same, brit, git_ok},
++    test_repo::TestRepo,
++};
++
++#[test]
++fn rev_parse_matches_git_in_main_and_linked_worktrees() -> Result<()> {
++    let repo = TestRepo::new("rev-parse")?;
++    let root = repo.path();
++    repo.commit_file("sub/f", "f\n")?;
++    git_ok(root, &["tag", "-a", "v1", "-m", "annotated subject"])?;
++    git_ok(root, &["tag", "light", "HEAD~1"])?;
++    git_ok(root, &["update-ref", "refs/remotes/origin/main", "HEAD~1"])?;
++    let elsewhere = tempfile::tempdir()?;
++    let worktree = elsewhere.path().join("wt");
++    git_ok(
++        root,
++        &[
++            "worktree",
++            "add",
++            "-q",
++            "-b",
++            "topic",
++            worktree.to_str().expect("UTF-8 path"),
++        ],
++    )?;
++    std::fs::create_dir_all(worktree.join("sub"))?;
++
++    let forms: &[&[&str]] = &[
++        &["rev-parse", "HEAD"],
++        &["rev-parse", "HEAD", "main", "v1", "light"],
++        &["rev-parse", "HEAD^{tree}", "HEAD:sub/f", "v1^{commit}", "origin/main"],
++        &["rev-parse", "HEAD~1..HEAD"],
++        &["rev-parse", "^HEAD~1", "HEAD"],
++        &["rev-parse", "--short", "HEAD"],
++        &["rev-parse", "--short=12", "HEAD"],
++        &["rev-parse", "--short=2", "origin/main"],
++        &["rev-parse", "--short", "HEAD", "main"],
++        &["rev-parse", "--verify", "HEAD"],
++        &["rev-parse", "--verify", "HEAD^{commit}"],
++        &["rev-parse", "--verify", "-q", "HEAD^{commit}"],
++        &["rev-parse", "--verify", "--quiet", "--short", "HEAD"],
++        &["rev-parse", "--verify", "nope"],
++        &["rev-parse", "--verify", "-q", "nope"],
++        &["rev-parse", "--verify", "HEAD", "main"],
++        &["rev-parse", "nope"],
++        &["rev-parse", "HEAD", "--", "x"],
++        &["rev-parse", "--abbrev-ref", "HEAD"],
++        &[
++            "rev-parse",
++            "--abbrev-ref",
++            "HEAD",
++            "v1",
++            "main",
++            "origin/main",
++            "refs/heads/main",
++            "HEAD~1",
++        ],
++        &["rev-parse", "--show-toplevel"],
++        &["rev-parse", "--show-toplevel", "HEAD"],
++        &["rev-parse", "--git-dir"],
++        &["rev-parse", "--absolute-git-dir"],
++        &["rev-parse", "--git-common-dir"],
++        &["rev-parse", "--git-dir", "--git-common-dir", "--show-toplevel"],
++        &[
++            "rev-parse",
++            "--path-format=absolute",
++            "--git-common-dir",
++            "--git-dir",
++            "--show-toplevel",
++        ],
++        &[
++            "rev-parse",
++            "--path-format=relative",
++            "--git-common-dir",
++            "--show-toplevel",
++        ],
++    ];
++    for cwd in [
++        root.to_owned(),
++        root.join("sub"),
++        worktree.clone(),
++        worktree.join("sub"),
++    ] {
++        for form in forms {
++            assert_same(&cwd, form)?;
++        }
++    }
++
++    // In a linked worktree the private and the shared Git directories differ.
++    let dirs = brit(&worktree, &["rev-parse", "--git-dir", "--git-common-dir"])?;
++    let lines: Vec<_> = dirs.stdout.lines().collect();
++    assert_eq!(lines.len(), 2, "{dirs:?}");
++    assert_ne!(
++        lines[0], lines[1],
++        "linked worktree: --git-dir and --git-common-dir must differ"
++    );
++
++    let quiet = brit(root, &["rev-parse", "--verify", "-q", "nope"])?;
++    assert!(quiet.stderr.is_empty(), "--verify -q is silent: {quiet:?}");
++
++    assert_help_names("rev-parse", "brit revision resolve")
++}
+-- 
+2.52.0
+

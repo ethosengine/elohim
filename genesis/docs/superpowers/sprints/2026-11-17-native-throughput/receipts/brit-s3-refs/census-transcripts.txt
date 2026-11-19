@@ -1,0 +1,260 @@
+bash git invocations: 3767 fallback-declared commands: 1340
+
+== ref-family forms ==
+    70  ls-remote
+    64  -C rev-parse  HEAD
+    58  -C rev-parse  <ref>
+    48  rev-parse  <ref>
+    42  rev-parse --short <ref>
+    39  merge-base --is-ancestor
+    32  -C ls-remote
+    29  -C merge-base --is-ancestor
+    28  -C rev-parse --short HEAD
+    14  -C rev-parse --short <ref>
+    13  for-each-ref --format
+    13  ls-tree
+    12  -C ls-tree
+    11  merge-base
+     9  rev-parse  HEAD
+     8  rev-parse --verify -q <ref>
+     8  -C rev-list --count
+     8  -C rev-parse --show-toplevel
+     7  -C rev-parse --short <ref> HEAD
+     7  -C for-each-ref --format
+     7  rev-parse --short HEAD
+     7  -C merge-base
+     6  rev-list --count
+     5  -C rev-parse  <ref> HEAD
+     4  -C ls-tree --name-only -r
+     4  rev-parse --show-toplevel <ref>
+     4  rev-parse --short <ref> HEAD
+     4  rev-list --topo-order
+     4  check-ref-format
+     3  ls-tree -- --name-only -r
+     3  rev-parse --git-common-dir --path-format
+     3  -C rev-parse --abbrev-ref HEAD
+     3  -C rev-parse --abbrev-ref <ref>
+     3  ls-tree -r
+     3  rev-parse  <ref> HEAD
+     3  rev-list --date-order
+     3  rev-parse --git-common-dir <ref>
+     2  -C rev-parse --abbrev-ref <ref> HEAD
+     2  -C rev-list --reverse
+     2  for-each-ref
+     2  -C rev-parse --git-common-dir) --path-format
+     2  -C rev-parse --git-common-dir --path-format
+     2  -C ls-tree -l -r
+     2  rev-parse
+     1  ls-tree --name-only -r
+     1  -C rev-parse --show-toplevel <ref>
+     1  rev-parse --git-common-dir
+     1  ls-tree --name-only
+     1  rev-list --reverse
+     1  rev-parse --git-dir)/HEAD"
+     1  symbolic-ref
+     1  -C rev-parse --git-dir)
+     1  -C rev-parse --show-toplevel)"
+     1  -C ls-remote --heads
+     1  ls-remote --heads
+     1  symbolic-ref --short
+     1  rev-list --count --left-right
+     1  -C rev-list --count --left-right
+     1  rev-parse --abbrev-ref <ref> HEAD
+     1  rev-parse --cross --duration-ms --json --release --release-bin --repo <ref>
+     1  ls-tree -- -r
+     1  -C rev-parse  <rev>^{..} HEAD
+     1  -C rev-list --count --merges
+     1  rev-parse  <oid> <ref>
+     1  for-each-ref --format --sort
+     1  -C describe --tags
+     1  rev-parse --absolute-git-dir <ref>
+     1  -C rev-parse --git-common-dir
+     1  rev-list
+     1  -C rev-list --date-order
+     1  rev-parse --git-dir)
+     1  rev-parse --git-dir
+     1  -C ls-tree -- --name-only -r
+     1  -C rev-parse --verify -q <ref>
+     1  -C rev-parse --git-common-dir' <ref>
+     1  -C rev-parse --git-common-dir <ref>
+     1  -C ls-tree -- -r
+     1  -C ls-tree -r
+     1  ls-tree --
+     1  -C rev-parse -- <ref> HEAD
+
+== git -C <dir> by subcommand ==
+   324  log
+   237  diff
+   219  status
+   205  rev-parse
+   158  show
+    45  ls-files
+    44  commit
+    42  add
+    38  fetch
+    36  merge-base
+    36  merge
+    36  submodule
+    33  ls-remote
+    28  worktree
+    25  rebase
+    23  cherry-pick
+    21  ls-tree
+    20  branch
+    20  push
+    20  checkout
+    19  grep
+    13  rev-list
+    13  config
+    12  check-ignore
+    12  switch
+
+== for-each-ref atoms ==
+    17  refname
+     4  refname:short
+     3  objectname:short
+     1  committerdate:short
+     1  committerdate:iso
+     1  subject
+
+== for-each-ref sorts ==
+     1  --sort=-committerdate
+
+== fallback reasons by family keyword ==
+   255  diff
+           # Brit fallback: range name listing (brit diff has no range form)
+           # Brit fallback: brit diff has no --stat, and brit status gives no per-file size; read-only
+           # Brit fallback: read-only diffs; brit diff output is not per-path scoped with stats
+           # Brit fallback: reading three specific commits' diffs by sha from fetched objects; brit log has no patch view I know of
+   150  push
+           # Brit fallback: CLAUDE.md landing exception — brit 0.1.12 closes send-pack after a green hook; land with git push
+           # Brit fallback: CLAUDE.md landing exception — brit 0.1.12 closes send-pack after a green hook; land with git push through the worktree hook
+           # Brit fallback: CLAUDE.md landing exception — build notes refspec pushed with git
+           # Brit fallback: CLAUDE.md landing exception — build notes refspec pushed with git
+   123  log
+           # Brit fallback: brit rev list rejects range revspecs (HEAD..origin/dev); read-only range log and tree search
+           # Brit fallback: brit rev list rejects range revspecs; read-only range log
+           # Brit fallback: brit worktree add refuses "another Brit mutation is active" — Codex 01a1cbeb's brit push to dev holds the repo-wide lock (backlog brit-mutation-lock-blocks-isolated-lanes)
+           # Brit fallback: brit log takes no range or limit; reading recent main history shape
+   116  worktree
+           # Brit fallback: brit merge writes merge trees/objects only; no worktree merge with conflict resolution
+           # Brit fallback: completing the in-progress git merge (brit merge cannot conclude a worktree merge)
+           # Brit fallback: brit merge writes trees/objects only; it cannot merge into the worktree branch
+           # Brit fallback: brit merge writes trees/objects only; it cannot merge into the worktree branch
+   112  other
+           # Brit fallback: read-only comparison of working files against a revision
+           # Brit fallback: read-only comparison against dev
+           # Brit fallback: read-only check of which artifact-store docs dev lacks
+           # Brit fallback: check-ignore has no brit equivalent
+    84  commit
+           # Brit fallback: brit cannot stage a gitlink to a named commit (brit add takes literal paths; brit submodule only lists)
+           # Brit fallback: brit has no patch-apply command; git apply --3way for the reviewed side-line commit
+           # Brit fallback: cherry-pick one commit; brit has no cherry-pick
+           # Brit fallback: save a one-file patch, restore the file, cherry-pick one commit; brit has no path restore or cherry-pick
+    69  show
+           # Brit fallback: brit has no cat-file/show for blob comparison against a revision; read-only
+           # Brit fallback: reading file contents at a specific remote commit; no brit show equivalent known
+           # Brit fallback: grep/show of file contents at a remote commit; no brit equivalent known
+           # Brit fallback: brit names cherry-pick/show as Git bridge operations
+    59  ls-remote
+           # Brit fallback: brit has no ls-remote and its fetch did not move refs/remotes/origin/dev (still b606631e9 while the sibling reports d32131dfa)
+           # Brit fallback: brit has no ls-remote, and brit fetch did not update refs/remotes/origin/dev earlier this session
+           # Brit fallback: brit has no ls-remote
+           # Brit fallback: brit has no ls-remote
+    57  rev-parse
+           # Brit fallback: rev-parse --show-toplevel to prove a candidate TMPDIR is outside any repository; brit has no such probe
+           # Brit fallback: rev-parse to prove the scratch TMPDIR is outside any repository
+           # Brit fallback: brit has no rev-parse --git-common-dir query
+           # Brit fallback: read-only rev-parse/porcelain status in a pre-push checklist alongside berth calls
+    45  fetch
+           # Brit fallback: brit has no notes fetch/merge; union-merge remote build notes like the sibling does
+           # Brit fallback: brit fetch of an explicit branch refspec failed (backtrace); read-only git fetch
+           # Brit fallback: brit fetch did not update remote-tracking refs earlier; reading the new dev head's history needs the objects
+           # Brit fallback: brit fetch left origin/dev stale earlier this session; need the true remote history
+    41  submodule
+           # Brit fallback: brit submodule has only `list`; no init/update capability
+           # Brit fallback: brit submodule has only `list`; no init/update capability
+           # Brit fallback: brit submodule has only `list`; no init/update capability
+           # Brit fallback: brit submodule offers only `list`; it cannot init or update submodules
+    40  merge
+           # Brit fallback: concluding an in-progress git merge (brit merge cannot)
+           # Brit fallback: brit commit refuses "commit during Merge is not yet supported; use git commit"
+           # Brit fallback: brit has no branch-updating merge (only merge file/tree/commit plumbing)
+           # Brit fallback: fast-forward merge — brit merge has no ff-only working-tree form (only file/tree/commit object merges)
+    30  checkout
+           # Brit fallback: diagnosing why git cannot resolve HEAD in the main checkout (read-only)
+           # Brit fallback: brit submodule cannot init/update submodules; cloning from the main checkout's local module repos
+           # Brit fallback: brit submodule cannot init/update submodules; cloning from the main checkout's local module repos
+           # Brit fallback: resolving a git cherry-pick conflict (bridge operation) needs git checkout --ours / git add
+    23  ls-tree
+           # Brit fallback: read-only comparison against dev; brit has no ls-tree/cat-file
+           # Brit fallback: ls-tree gitlink pins — read-only object query; brit status has no per-path gitlink read
+           # Brit fallback: fetch + ls-tree of the conductor gitlink at origin/dev — read-only; brit fetch SIGILLs on shem
+           # Brit fallback: brit has no ls-tree to read a submodule gitlink
+    22  rebase
+           # Brit fallback: brit rebase hostcompat/a1 errored "Directory staging is not supported; name explicit files"; no rebase active, tree clean
+           # Brit fallback: brit rebase refuses repositories with gitlinks; bringing the sprint branch onto the landed dev
+           # Brit fallback: installed brit 0.2.0 has no rebase
+           # Brit fallback: installed brit 0.2.0 has no rebase
+    19  status
+           # Brit fallback: brit status output is not porcelain; confirming nothing of stage B was left unstaged
+           # Brit fallback: read-only status after brit add panicked, to see whether anything was staged
+           # Brit fallback: brit status has no rebase/am-in-progress reporting
+           # Brit fallback: read-only status — inspect what blocks the rebase
+    18  config
+           # Brit fallback: read the configured core.hooksPath; brit has no config read
+           # Brit fallback: read global/system git config — brit has no config reader; read-only
+           # Brit fallback: brit config has no write form; the reach hook prescribes git config for britReachBase
+           # Brit fallback: brit config has no write form; the reach hook prescribes git config for britReachBase
+    18  cherry-pick
+           # Brit fallback: add + cherry-pick --continue/next — brit has no cherry-pick; resolving the recorded conflict
+           # Brit fallback: brit has no cherry-pick, so conflict resolution and continuation use git
+           # Brit fallback: continue cherry-pick — brit has no cherry-pick
+           # Brit fallback: brit cherry-pick is a Git bridge operation (brit says: run git cherry-pick)
+    14  merge-base
+           # Brit fallback: ancestry test (no brit equivalent of merge-base --is-ancestor)
+           # Brit fallback: three-dot diff name listing for gate selection (brit diff has no merge-base range form)
+           # Brit fallback: merge-base --is-ancestor and log of a bare sha have no brit equivalent
+           # Brit fallback: worktree listing and ancestry checks (brit has no merge-base/worktree list)
+     9  tag
+           # Brit fallback: read-only listing of unstaged tracked changes
+           # Brit fallback: foreign fork clone; reading upstream workspace dependency pins at both tags
+           # Brit fallback: foreign fork clone; reading dependency pins in workspace manifests at both tags and pin
+           # Brit fallback: foreign fork clone; reading lockfile versions of kitsune2/iroh at the tags and pin
+     8  branch
+           # Brit fallback: brit branch only lists; creating and switching a branch in this clone needs git switch -c
+           # Brit fallback: read-only containment checks on separate brit clones — need branch --contains against remote refs
+           # Brit fallback: delete two remote run-ci branches on the brit repo (plan Part 1 step 7) — Brit has no remote branch delete
+           # Brit fallback: branch -D — brit has no branch deletion verb
+     8  -c
+           # Brit fallback: brit has no grep over a non-checked-out revision (origin/dev); read-only
+           # Brit fallback: brit has no grep over a non-checked-out revision; read-only
+           # Brit fallback: brit has no grep over a non-checked-out revision; read-only
+           # Brit fallback: brit has no patch-apply command; read-only git apply --check
+     5  notes
+           # Brit fallback: brit has no notes read command
+           # Brit fallback: brit has no notes listing
+           # Brit fallback: brit has no notes read command
+           # Brit fallback: list notes refs and read one note blob; brit has no notes command (bridged)
+     3  add
+           # Brit fallback: brit add -A panicked (backtrace above); inspecting index state with git before any retry
+           # Brit fallback: brit cat cannot address a path at a revision spec like origin/dev:path
+           # Brit fallback: read-only archive extraction of additional root files into scratch
+     3  for-each-ref
+           # Brit fallback: read-only branch/blob listing inside the holochain-conductor submodule (brit has no for-each-ref/show)
+           # Brit fallback: brit has no for-each-ref/ls-tree-by-ref/cherry equivalent; read-only queries
+           # Brit fallback: read-only for-each-ref / notes lookup of build attestations for the branch commits (brit-build-ref find needs the closure key, which is what is being checked)
+     3  describe
+           # Brit fallback: brit commit has only verify/sign/describe — no commit creation
+           # Brit fallback: brit commit has only verify/sign/describe — no commit creation
+           # Brit fallback: brit commit has only verify/sign/describe — no commit creation
+     2  rev-list
+           # Brit fallback: brit log takes no revision range and has no rev-list count
+           # Brit fallback: git rev-list is the oracle for verifying the new brit log range walk on a large real repository (read-only)
+     2  stash
+           # Brit fallback: brit rebase refuses "Directory staging is not supported; name explicit files"; ledgers set aside instead of the shared stash
+           # Brit fallback: brit rebase refuses "Directory staging is not supported" on this tree; hook ledgers set aside instead of the shared stash
+     1  symbolic-ref
+           # Brit fallback: brit has no symbolic-ref/current-branch read; confirming HEAD branch
+     1  check-ref-format
+           # Brit fallback: tracing the exact `git check-ref-format` child the test spawns (test.mjs:75) under the fence shim; brit cannot stand in for the traced program

@@ -1,0 +1,111 @@
+From 7786c8185dd0747fbdb174ddca8e2bfd9838ba98 Mon Sep 17 00:00:00 2001
+From: Matthew Dowell <mbd06b+github@gmail.com>
+Date: Thu, 19 Nov 2026 04:59:28 +0000
+Subject: [PATCH 6/6] fix: end quietly when the reader closes the pipe
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+`brit … | head` printed `Error: Broken pipe (os error 32)` and exited 1 for every
+command, because Rust ignores SIGPIPE and the write error travelled up as a failure.
+A broken pipe now ends brit without a message and with status 141, the status a shell
+reports for Git killed by SIGPIPE, so `set -o pipefail` still sees it. Only the final
+reporting in `brit-cli/src/main.rs` changes: a mutation still sees the write error
+where it happens, rather than being killed mid-operation by a restored SIGPIPE.
+
+Kept as its own commit so it can be dropped if another lane fixes the same line.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01PJB8fpkCKfb4CMYBh9vCEs
+---
+ brit-cli/src/main.rs                   | 18 +++++++++++
+ tests/cli-journey/tests/broken_pipe.rs | 42 ++++++++++++++++++++++++++
+ 2 files changed, 60 insertions(+)
+ create mode 100644 tests/cli-journey/tests/broken_pipe.rs
+
+diff --git a/brit-cli/src/main.rs b/brit-cli/src/main.rs
+index c300a37c5..f259d47a6 100644
+--- a/brit-cli/src/main.rs
++++ b/brit-cli/src/main.rs
+@@ -339,12 +339,30 @@ fn diagnostic(error: &error::CliError) -> String {
+     }
+ }
+ 
++fn is_broken_pipe(error: &error::CliError) -> bool {
++    let broken = |cause: &(dyn std::error::Error + 'static)| {
++        cause
++            .downcast_ref::<std::io::Error>()
++            .is_some_and(|io| io.kind() == std::io::ErrorKind::BrokenPipe)
++            // Errors converted on their way up keep only the operating system's message.
++            || cause.to_string().ends_with("Broken pipe (os error 32)")
++    };
++    match error {
++        error::CliError::Io(io) => io.kind() == std::io::ErrorKind::BrokenPipe,
++        error::CliError::Git(cause) => cause.chain().any(broken),
++        _ => false,
++    }
++}
++
+ fn main() -> ExitCode {
+     gix::utils::stream::Budget::share_process_quota();
+     let mut capture = feedback::Capture::new();
+     let code = match run(&mut capture) {
+         Ok(()) => 0,
+         Err(error::CliError::ContextExit(code)) => code,
++        // A reader that stopped early (`brit … | head`) is not a failure to report: end quietly with
++        // the status a shell shows for Git killed by SIGPIPE.
++        Err(e) if is_broken_pipe(&e) => 141,
+         Err(e) => {
+             eprintln!("{}", diagnostic(&e));
+             if matches!(e, error::CliError::Args(_)) {
+diff --git a/tests/cli-journey/tests/broken_pipe.rs b/tests/cli-journey/tests/broken_pipe.rs
+new file mode 100644
+index 000000000..0c87ae8e3
+--- /dev/null
++++ b/tests/cli-journey/tests/broken_pipe.rs
+@@ -0,0 +1,42 @@
++//! A reader that closes early (`brit … | head`) ends Brit quietly with status 141, the status a
++//! shell reports for Git killed by SIGPIPE, instead of `Error: Broken pipe (os error 32)`.
++#![cfg(target_os = "linux")]
++
++use std::{os::fd::FromRawFd, process::Command};
++
++use anyhow::{ensure, Result};
++use cli_journey::support::{runner::brit_bin, test_repo::TestRepo};
++
++/// Run `brit <args>` in `cwd` with stdout connected to a pipe whose reading end is already closed.
++fn brit_into_closed_pipe(cwd: &std::path::Path, args: &[&str]) -> Result<(Option<i32>, String)> {
++    let mut fds = [0; 2];
++    // SAFETY: `fds` has room for the two descriptors `pipe` writes.
++    ensure!(unsafe { libc::pipe(fds.as_mut_ptr()) } == 0, "pipe(2) failed");
++    // SAFETY: both descriptors were just created by `pipe` and are owned here exactly once.
++    let (reader, writer) = unsafe { (std::fs::File::from_raw_fd(fds[0]), std::fs::File::from_raw_fd(fds[1])) };
++    drop(reader);
++    let mut command = Command::new(brit_bin().expect("built Brit"));
++    gix_testtools::configure_git_environment(&mut command, cwd);
++    let out = command.current_dir(cwd).args(args).stdout(writer).output()?;
++    Ok((out.status.code(), String::from_utf8(out.stderr)?))
++}
++
++#[test]
++fn closed_readers_end_brit_quietly() -> Result<()> {
++    let repo = TestRepo::new("broken-pipe")?;
++    for index in 0..50 {
++        let made = gix_testtools::git_command(repo.path())
++            .args(["branch", &format!("b{index}")])
++            .status()?;
++        ensure!(made.success(), "git branch b{index}");
++    }
++    for args in [&["branch", "list"][..], &["log"][..], &["--cli-surface-json"][..]] {
++        let (code, stderr) = brit_into_closed_pipe(repo.path(), args)?;
++        assert!(
++            !stderr.contains("Broken pipe"),
++            "brit {args:?} must not report the closed reader: {stderr}"
++        );
++        assert_eq!(code, Some(141), "brit {args:?}: {stderr}");
++    }
++    Ok(())
++}
+-- 
+2.52.0
+
