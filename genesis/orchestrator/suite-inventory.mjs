@@ -103,6 +103,25 @@ function treeEntries(cwd, commit, env) {
   });
 }
 
+/**
+ * The submodule paths `.gitmodules` declares `update = none`: a fresh clone and CI never hold their
+ * files, so the view takes nothing from them (their pin is still keyed). From `commit`'s copy of
+ * the file, or the working tree's when `file` is given. No file, or none readable, is the empty set.
+ */
+export function updateNoneSubmodules({ root, commit, file, env = gitEnv() }) {
+  const source = file ? ['--file', file] : ['--blob', `${commit}:.gitmodules`];
+  const r = spawnSync('git', ['config', '-z', ...source, '--get-regexp', '^submodule\\..*\\.(path|update)$'], { cwd: root, env, encoding: 'utf8' });
+  if (r.status !== 0) return new Set();
+  const path = new Map(), update = new Map();
+  for (const record of String(r.stdout).split('\0').filter(Boolean)) {
+    const nl = record.indexOf('\n');
+    const key = record.slice(0, nl), value = record.slice(nl + 1);
+    const match = /^submodule\.(.*)\.(path|update)$/.exec(key);
+    if (match) (match[2] === 'path' ? path : update).set(match[1], value);
+  }
+  return new Set([...path].filter(([name]) => update.get(name)?.toLowerCase() === 'none').map(([, value]) => value));
+}
+
 /** A git dir that holds `oid`: the submodule's checkout, then this checkout's module store, then the common dir's. */
 function moduleStore(root, path, oid, env) {
   const candidates = [];
@@ -130,7 +149,10 @@ export function suiteInventory({ root, commit, listText, env = gitEnv() }) {
   const matcher = viewMatcher(listText);
   const all = treeEntries(root, commit, env).filter(e => matcher.has(e.path));
   const entries = all.filter(e => e.type === 'blob');
+  const none = updateNoneSubmodules({ root, commit, env });
   const pins = all.filter(e => e.type === 'commit').map(link => {
+    // update = none: the pin is keyed, nothing is taken from the submodule, here or on any device.
+    if (none.has(link.path)) return { path: link.path, oid: link.oid, store: null, entries: [] };
     const store = moduleStore(root, link.path, link.oid, env);
     if (!store) {
       throw new Error(`suite-run: submodule ${link.path} at ${link.oid} is in no object store here; run: git submodule update --init ${link.path}`);
@@ -182,6 +204,7 @@ export function materialise(inventory, dest, { root, env = gitEnv() }) {
   let files = writeBlobs(root, inventory.entries, dest, env);
   for (const pin of inventory.pins) {
     mkdirSync(join(dest, pin.path), { recursive: true });
+    if (!pin.store) continue;
     files += writeBlobs(pin.store, pin.entries, join(dest, pin.path), env);
   }
   return files;
@@ -219,6 +242,7 @@ function copyWorkingFile(from, to) {
 /** Copies the working tree's bytes of every path the view holds (a dirty run, recorded nowhere). */
 export function copyWorkingTree(matcher, dest, { root, env = gitEnv() }) {
   let files = 0;
+  const none = updateNoneSubmodules({ root, file: join(root, '.gitmodules'), env });
   const rows = git(['ls-files', '-z', '--cached', '--others', '--exclude-standard', '--stage'], { cwd: root, env }).split('\0').filter(Boolean);
   for (const row of rows) {
     // --stage prints `<mode> <oid> <stage>\t<path>` for tracked files and a bare path for untracked ones.
@@ -229,6 +253,7 @@ export function copyWorkingTree(matcher, dest, { root, env = gitEnv() }) {
     if (mode === '160000') {
       const module = join(root, path);
       mkdirSync(join(dest, path), { recursive: true });
+      if (none.has(path)) continue;
       if (existsSync(join(module, '.git'))) {
         for (const inner of git(['ls-files', '-z', '--cached', '--others', '--exclude-standard'], { cwd: module, env }).split('\0').filter(Boolean)) {
           if (!matcher.inside(inner) || !existsSync(join(module, inner))) continue;

@@ -353,3 +353,54 @@ test('`gate-runner.mjs --target orchestrator --print` names both halves outside 
   assert.deepEqual(run(by).stdout.trim().split('\n'), ['orchestrator', 'orchestrator-tree']);
   assert.deepEqual(run({ ...by, GATE_RUN_KIND: 'pre-push' }).stdout.trim().split('\n'), ['orchestrator']);
 });
+
+test('a submodule declared update = none keys its pin and gives the view an empty directory, on any device', t => {
+  const root = mkdtempSync(join(tmpdir(), 'suite-none-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const git = (cwd, ...args) => {
+    const r = spawnSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@example.test', ...args], { cwd, encoding: 'utf8' });
+    assert.equal(r.status, 0, `${args.join(' ')}: ${r.stderr}`);
+    return r.stdout.trim();
+  };
+  const sub = join(root, 'sub');
+  mkdirSync(join(sub, 'x'), { recursive: true });
+  git(sub, 'init', '-q');
+  writeFileSync(join(sub, 'x/build-manifest.json'), '{"s":1}\n');
+  git(sub, 'add', '.');
+  git(sub, 'commit', '-q', '-m', 'sub');
+  const pin = git(sub, 'rev-parse', 'HEAD');
+  const listText = JSON.stringify({ groups: [{ runner: 'node', files: [{ file: 'a.test.mjs', reads: ['sub', '**/build-manifest.json'] }] }] });
+  const build = (name, { none }) => {
+    const top = join(root, name);
+    mkdirSync(join(top, 'genesis/orchestrator'), { recursive: true });
+    git(top, 'init', '-q');
+    writeFileSync(join(top, 'genesis/orchestrator/suite-reads.json'), listText);
+    writeFileSync(join(top, '.gitmodules'), `[submodule "sub"]\n\tpath = sub\n\turl = ./sub\n${none ? '\tupdate = none\n' : ''}`);
+    git(top, 'add', '.');
+    git(top, 'update-index', '--add', '--cacheinfo', `160000,${pin},sub`);
+    git(top, 'commit', '-q', '-m', 'top');
+    return top;
+  };
+  const bare = build('bare', { none: true });
+  const held = build('held', { none: true });
+  git(root, 'clone', '-q', '--bare', sub, join(held, '.git/modules/sub'));
+  const a = suiteInventory({ root: bare, commit: 'HEAD', listText });
+  assert.deepEqual(a.pins.map(p => [p.path, p.oid, p.store, p.entries.length]), [['sub', pin, null, 0]]);
+  const view = join(root, 'view');
+  assert.equal(materialise(a, view, { root: bare }), 1, 'only suite-reads.json');
+  assert.deepEqual(readdirSync(join(view, 'sub')), [], 'an empty directory');
+  assert.equal(suiteInventory({ root: held, commit: 'HEAD', listText }).digest, a.digest, 'a device holding the objects keys and views the same');
+  const heldView = join(root, 'held-view');
+  materialise(suiteInventory({ root: held, commit: 'HEAD', listText }), heldView, { root: held });
+  assert.deepEqual(readdirSync(join(heldView, 'sub')), []);
+  // Moving the pin moves the digest.
+  writeFileSync(join(sub, 'y.txt'), 'y\n');
+  git(sub, 'add', '.');
+  git(sub, 'commit', '-q', '-m', 'sub2');
+  git(held, 'update-index', '--cacheinfo', `160000,${git(sub, 'rev-parse', 'HEAD')},sub`);
+  git(held, 'commit', '-q', '-m', 'move');
+  assert.notEqual(suiteInventory({ root: held, commit: 'HEAD', listText }).digest, a.digest);
+  // Without the declaration and with no store, the refusal names its cure.
+  const plain = build('plain', { none: false });
+  assert.throws(() => suiteInventory({ root: plain, commit: 'HEAD', listText }), /git submodule update --init sub/);
+});
