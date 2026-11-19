@@ -13,7 +13,7 @@
 // The fresh-worktree checklist this replaces lived in agent memory and was re-learned on
 // 2026-10-15, -17, -19, -22, -27, -31 and 11-01. Habit `careless-reds-cost-seconds`.
 
-import { accessSync, constants, existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
+import { accessSync, constants, existsSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -403,26 +403,22 @@ export function runPreflight({ root = ROOT, projects, env = process.env, spawn =
     ...timed(() => checkCargoLocks({ root, projects, spawn, env })),
     ...timed(() => checkReadSets({ root, projects, registry, changed, read })),
     ...timed(() => checkEvidenceRecordable({ root, projects, env, reuse, read })),
-    // pre-push runs this one alone before its early passes (`--fleet-roll`); its mark counts only
-    // inside that hook's own process tree.
-    ...(fleetGuard?.doneFlagHonoured(env) ? [] : timed(() => fleetRollRows(env, changed, fleet))),
+    // pre-push runs this one alone before its early passes (`--fleet-roll`); it is skipped here only
+    // when that run's mark file holds exactly this push's ref list.
+    ...(fleetGuard?.fleetRollMarkHonoured(env) ? [] : timed(() => fleetRollRows(env, changed, fleet))),
   ];
 }
 
 /**
  * The fleet-roll rows, from fleet-roll-guard.mjs, or when that module cannot load, one row saying
- * so: red on a dev or main push under mode refuse, a WARN otherwise, as the guard's own failures.
+ * so: red on a push that names dev or main, in every mode (the policy in force is read from git
+ * objects by the module that failed), a WARN otherwise.
  */
 export function fleetRollRows(env, changed, options = {}, guard = fleetGuard, loadError = fleetGuardError) {
   if (guard) return guard.checkFleetRoll({ env, changed, ...options });
-  const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
-  let mode = 'refuse';
-  try { mode = JSON.parse(readFileSync(join(root, 'genesis/agentic/pool-policy.json'), 'utf8')).fleet_roll_guard?.mode ?? 'refuse'; }
-  catch { /* unreadable policy: the default */ }
-  if (mode === 'off') return null;
   const refs = `${env.GATE_PUSH_TARGETS ?? ''}\n${env.GATE_PUSH_REFS ?? ''}`;
   const deploys = /(^|\s)refs\/heads\/(dev|main)(\s|$)/m.test(refs);
-  return row('fleet-roll', mode !== 'warn' && deploys ? 'REFUSED' : 'WARN',
+  return row('fleet-roll', deploys ? 'REFUSED' : 'WARN',
     `the fleet-roll check could not load: ${String(loadError?.message || loadError).split('\n')[0]}`,
     'node genesis/orchestrator/fleet-roll-guard.mjs names the load error; fix it and push again');
 }
@@ -461,6 +457,10 @@ function main(argv) {
     const rows = [].concat(fleetRollRows(process.env, changedFromEnv(process.env)) ?? []);
     for (const r of rows) process.stdout.write(`${formatRow(r)}\n`);
     emitLive(rows);
+    // The mark the later preflight checks: this exact ref list was judged in this hook run.
+    if (process.env.GATE_FLEET_ROLL_MARK && process.env.GATE_PUSH_REFS) {
+      try { writeFileSync(process.env.GATE_FLEET_ROLL_MARK, process.env.GATE_PUSH_REFS); } catch { /* no mark: the later preflight runs the check again */ }
+    }
     return rows.some(r => r.level === 'REFUSED') ? 3 : 0;
   }
   const index = argv.indexOf('--projects');

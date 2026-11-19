@@ -1046,25 +1046,34 @@ fi
 # before the early passes below. Its red is a pre-gate red within seconds: live at once, and the
 # push is refused when the hook ends under gate_on_red continue, at once under GATE_ON_RED=stop.
 # Each ref goes over as "<remote ref> <pushed sha> <destination sha>"; fleet-roll-guard.mjs reads
-# each ref's own range. No eligible ref (notes, deletes) starts no node.
+# each ref's own range and objects. No eligible ref (notes, deletes) starts no node. The run
+# writes the ref list it judged to GATE_FLEET_ROLL_MARK, a temporary file removed on exit; the
+# later preflight skips the check only when that file holds this push's ref list. If node cannot
+# start, a push naming dev or main is red in every mode (the mode is read by node); else a WARN.
 GATE_PUSH_REFS=""
 for PUSH_LINE in "${PUSH_LINES[@]}"; do
   read -r _ FR_LOCAL FR_REF FR_REMOTE <<<"$PUSH_LINE"
   if is_notes_ref "$FR_REF" || [ "$FR_LOCAL" = "$ZERO_SHA" ]; then continue; fi
   GATE_PUSH_REFS="${GATE_PUSH_REFS:+$GATE_PUSH_REFS$'\n'}$FR_REF $FR_LOCAL $FR_REMOTE"
 done
-export GATE_PUSH_REFS
+export GATE_PUSH_REFS GATE_PUSH_REMOTE="${PHASE_L_REMOTE:-origin}"
+GATE_FLEET_ROLL_MARK=$(mktemp 2>/dev/null) || GATE_FLEET_ROLL_MARK=""
+gate_remove_fleet_mark() { [ -z "$GATE_FLEET_ROLL_MARK" ] || rm -f -- "$GATE_FLEET_ROLL_MARK"; }
+HOOK_ON_EXIT="$HOOK_ON_EXIT gate_remove_fleet_mark"
+export GATE_FLEET_ROLL_MARK
 if [ -n "$GATE_PUSH_REFS" ]; then
   node genesis/orchestrator/gate-preflight.mjs --fleet-roll
   FR_STATUS=$?
   if [ "$FR_STATUS" -eq 3 ]; then
     leg_red fleet-roll "the fleet-roll check is red (above); its cure is printed beside it"
   elif [ "$FR_STATUS" -ne 0 ]; then
-    leg_red fleet-roll "the fleet-roll check could not run (node exit $FR_STATUS, above)"
+    if printf '%s\n' "$GATE_PUSH_REFS" | grep -qE '^refs/heads/(dev|main) '; then
+      leg_red fleet-roll "the fleet-roll check could not run (node exit $FR_STATUS, above) on a push to dev or main"
+    else
+      echo "[preflight] WARN fleet-roll: the check could not run (node exit $FR_STATUS, above); no pushed ref deploys, so this is not a red"
+    fi
   fi
 fi
-# The later preflight skips the check only inside this hook's own process tree.
-export GATE_FLEET_ROLL_DONE=$$
 # ── Fleet roll end
 
 # Nothing changed — let it through (a style refusal still refuses)

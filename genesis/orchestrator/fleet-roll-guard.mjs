@@ -8,28 +8,38 @@
 // Habit `careless-reds-cost-seconds` (genesis/orchestrator/.epr-meta).
 //
 // WHAT IT CAN KNOW. "Selects", never "rolls": the guard predicts which Edge steps CI dispatches
-// and that Edge runs its deploy stage. Whether pods restart is decided later, by Edge itself: it
-// compares each peer's pod template and config before and after apply and skips the storage
-// restart when nothing a pod consumes moved (elohim/holochain/Jenkinsfile:2380-2393).
+// and that Edge runs its deploy stage. Whether pods restart is decided later by Edge itself, which
+// skips a peer's storage restart when nothing its pod consumes moved
+// (elohim/holochain/Jenkinsfile:2380-2393). What `[edge:roll]` establishes is only that a pushed
+// commit message carries it; a reason beside it is asked for and not checked.
 //
-// LIMITS. Each protected ref is judged from its own range (destination tip..pushed tip) and its
-// tip's tags. Not seen: an Edge step left stale by an earlier landing (CI diffs from its stored
+// WHAT IT READS. Under a push, git objects only, never the working tree: each pushed ref's range
+// (destination tip..pushed tip), the pushed tip's message, and the build manifests of the pushed
+// commit's own superproject tree (`git ls-tree`, contents through `git cat-file --batch`). That
+// is what CI's checkout holds: it initialises no submodule (orchestrator Jenkinsfile:2587-2609),
+// so the verdict does not depend on which submodules, ignored files or sparse paths a developer
+// has. Build-process files are read from the same tree. The policy in force is the DESTINATION
+// tip's genesis/agentic/pool-policy.json, so a push cannot switch off its own check and an
+// uncommitted edit changes nothing; outside a push (`just gate`) the working tree is read and the
+// check can only warn.
+//
+// LIMITS. Not seen: an Edge step left stale by an earlier landing (CI diffs from its stored
 // baseline, which a failed run holds back, Jenkinsfile:217-224, :1450); CI's stored build-process
-// hashes (a build-process file counts only when it is in this range); CI's already-built filter
-// (:1725-1764), which only drops work. CI's checkout initialises no submodule (:2587-2609; :2414-
-// :2420 says its walker cannot see sophia's manifest), so CI may not see the manifests inside
-// elohim/brit, elohim/rakia and sophia and then prunes the dependencies on them as external
-// (build-graph.groovy:104-119); the guard reads them and propagates through them, which can
-// predict a selection CI does not make. A pre-push hook older than the fleet-roll block (a
-// worktree pushing through a main checkout whose .husky/pre-push.bash predates it) hands over no
-// ref list: then only the union of changed paths is judged, no commit message is read (a forcing
-// tag on the tip is not seen there, an accepted limit), a path set that selects no Edge build
-// prints nothing, and one that does is red, naming the launcher check and the hook as the fix.
+// hashes (a referenced file in the range reads as stale even when the hashed function did not
+// change); CI's already-built filter (:1725-1764), which can drop a pipeline, including a
+// validate-only Edge that [deploy-only] then re-adds as build. A pre-push hook older than the
+// fleet-roll block hands over no ref list: then HEAD's tree and HEAD's message are read with the
+// union of changed paths, which is right only when HEAD is the pushed commit (a non-HEAD push
+// through an older hook is not read). If node cannot start at all, the hook block records a red
+// on a push that names dev or main, in every mode, because the mode cannot be read without node;
+// otherwise it prints a WARN.
 //
 // THE CI RULE (read 2026-11-19 at dev 2080441f5; orchestrator = genesis/orchestrator/Jenkinsfile):
 // - The graph: graph-walker.mjs walkGraphCi, a port of build-graph.groovy walkBuildGraph (its
-//   comment names the lines): CI's glob (dotfiles match, `.epr-meta` excluded), propagation over
-//   `depends` to a fixed point, manual-only steps not dispatched, and the manifest-only cap.
+//   comment names the lines): CI's glob, structural validation, build-process reads, propagation
+//   over `depends` to a fixed point, manual-only steps not dispatched, the manifest-only cap.
+//   A pipeline with a blank or missing jenkinsPath, Edge included, is never dispatched (:1882,
+//   :1892, :1269); the orchestrator never dispatches itself (:1957-1961).
 // - Tags: the orchestrator and Edge read ONE message, the tip's (orchestrator :2652, Edge :2552).
 //   Effective order, highest first:
 //   1. [skip ci] / [ci skip] / [no ci] (:2657) sets SKIP_CI; nothing is dispatched (:2758, :2786,
@@ -38,38 +48,34 @@
 //      that selects the same pipeline still builds its bytes; a failed or aborted run keeps the
 //      old baseline (:217-224).
 //   2. [edge:validate-only] (:2711) dispatches elohim-edge alone (:2841-2844) as verify (:1286),
-//      over [build:edge] and [deploy-only]; Edge runs it validate-only (Edge :2551-2568). The other
-//      pipelines are dropped from that run, and the baseline moves the same way once it is green.
-//   3. [build:…] tokens (parseBuildTagTokens :907): `edge` forces elohim-edge in as build (:1886-
-//      :1896, :1913). `all` is expanded at Checkout (:2688-2693) against PIPELINE_REGISTRY_JSON,
-//      which only runBuildGraph fills later, in Determine Build Plan (:2413, :1855), so it forces
-//      nothing on a fresh run. The guard still reads [build:all] on a protected tip as asking for
-//      every pipeline and asks for the declaration (steward ruling 2026-11-19), and says so.
-//   4. With no forcing tag, elohim-edge whose only stale step is dataplane-validation is verify
-//      (:1874-1876, a literal rule while that step declares no class); a class below deploy (the
-//      manifest-only cap) is validate-only too (:1877).
-//   5. [run:verify|measure|profile] (:1915-1925) keeps only pipelines declaring a step at or below
-//      the class, plus [build:*] force-includes; no elohim-edge step declares a class, so Edge
-//      leaves the plan unless forced.
-//   6. PIPELINE_RUN_CLASSES is written from that plan (:1962-1964). [deploy-only] (webhook-gated,
-//      :2722-2726; a push is a webhook) then sets the dispatch to Edge (and Genesis) (:2828-2834)
-//      without touching it, and an Edge absent from it reads as build (runClassFor :931-934): so
-//      [deploy-only] over a verify-class Edge stays validate-only (no deploy), and over an absent
-//      or build-class Edge runs Edge's deploy stage without its build stages (:1331).
+//      over [build:edge] and [deploy-only]; Edge runs it validate-only (Edge :2551-2568).
+//   3. [deploy-only] (webhook-gated, :2722-2726): the dispatch becomes Edge (and Genesis)
+//      (:2828-2834) with DEPLOY_ONLY, so Edge skips its build stages and runs its deploy stage
+//      (:1331, Edge :2586-2595), unless its class from PIPELINE_RUN_CLASSES (:1962-1964) is below
+//      deploy; an Edge absent from that list reads as build (:931-934), and the already-built
+//      filter (:1912) can remove a validate-only Edge before the list is written. The guard
+//      cannot see that filter, so a tip with [deploy-only] always asks for the declaration.
+//   4. [build:…] tokens (:907): `edge` forces elohim-edge in as build (:1886-1896, :1913). `all`
+//      is expanded at Checkout (:2688-2693) against PIPELINE_REGISTRY_JSON, which runBuildGraph
+//      fills only later (:2413, :1855), so it forces nothing on a fresh run; the guard still asks
+//      for the declaration when a protected tip carries it (steward ruling 2026-11-19).
+//   5. With no forcing tag, an Edge whose only stale step is dataplane-validation is verify
+//      (:1874-1876); a class below deploy (the manifest-only cap) is validate-only too (:1877).
+//   6. [run:verify|measure|profile] (:1915-1925) keeps only pipelines declaring a step at or below
+//      the class, plus [build:*] force-includes; no Edge step declares a class, so Edge leaves.
 // - Branches: only dev and main deploy. Off them, and for a PR build, Edge is dispatched
 //   gate-only (:961-967, :1288; Edge isGateOnly :2598). dev deploys alpha (Edge :3270-3276); main
-//   deploys prod (Edge :3538) and, dispatched with FORCE_DEPLOY, alpha too. The staging stage
-//   (Edge :3485) needs both !isGateOnly() and a staging branch, so it cannot run today.
-// - Dispatch lists name only what CI dispatches: no manual-only pipeline (build-graph.groovy :848),
-//   none without a jenkinsPath (:1882), never the orchestrator itself (:1957-1961).
+//   deploys prod (Edge :3538) and, dispatched with FORCE_DEPLOY, alpha too.
+// - Submodule pins: a dependency on a pipeline whose manifest CI cannot see is pruned
+//   (build-graph.groovy:104-119), so a brit or rakia pin move selects no Edge step in CI today; a
+//   WARN row says so and names the Edge steps it would select if CI ever checked the submodule out.
 // - Unknown `[edge:…]` tags are inert: the orchestrator matches `[edge:validate-only]` (:2711) and
 //   `[edge:gate-only]` (:944) literally; Edge matches `[edge:validate-only]`, `[compute-worker:…]`
-//   and `[conductor-roll]` literally (Edge :2556, :2558, :2618, :1930). `[edge:roll]` changes
-//   nothing in CI; it is the record in git history of who declared the selection and why.
+//   and `[conductor-roll]` literally (Edge :2556, :2558, :2618, :1930).
 
 import { spawnSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { existsSync, readFileSync } from 'node:fs';
+import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { walkGraph } from './graph-walker.mjs';
 import { discoverManifests } from './manifest-utils.mjs';
@@ -85,46 +91,123 @@ export const SELF_PIPELINE = 'elohim-orchestrator';
 export const DEPLOYING_BRANCHES = Object.freeze(['dev', 'main']);
 export const ROLL_TAG = '[edge:roll]';
 export const MODES = Object.freeze(['refuse', 'warn', 'off']);
+const POLICY_PATH = 'genesis/agentic/pool-policy.json';
+const MANIFEST = 'build-manifest.json';
+// build-graph.groovy:27 — `find … -not -path '*/<dir>/*'` for each of these.
+const CI_SKIPPED_DIRS = new Set(['node_modules', '.superpowers', '.claude', 'local-dev']);
 const BUFFER = 64 * 1024 * 1024;
-const BASELINE = "the next run's diff starts past this push; a later change that selects the same pipeline still builds these bytes; a failed or aborted run keeps the old baseline";
-const CHECKOUT_CURE = 'push from a checkout at the pushed commit, with its build-manifest.json files committed';
+const BASELINE = "once the run ends green, the next run's diff starts past this push; a later change that selects the same pipeline still builds these bytes; a failed or aborted run keeps the old baseline";
 const short = sha => String(sha ?? '').slice(0, 12);
 const isZero = sha => /^0+$/.test(String(sha ?? ''));
 const isDeploying = branch => DEPLOYING_BRANCHES.includes(branch);
 const branchOf = ref => (String(ref).startsWith('refs/heads/') ? String(ref).slice('refs/heads/'.length) : null);
 const row = (check, level, why, cure = '') => ({ check, level, why, cure });
+const words = text => String(text ?? '').split(/\s+/).filter(Boolean);
+const lines = text => String(text).split('\n').map(l => l.trim()).filter(Boolean);
 
-/** `fleet_roll_guard.mode` in pool-policy.json, and why the default `refuse` was taken when it was. */
+// ── Policy ──────────────────────────────────────────────────────────────────
+
+/** `fleet_roll_guard.mode` from one policy file's text; `where` names it in a default's reason. */
+export function parsePolicy(text, where) {
+  if (text == null) return { mode: 'refuse', why: `${where} has no ${POLICY_PATH}` };
+  let policy;
+  try { policy = JSON.parse(text); } catch { return { mode: 'refuse', why: `${where}'s ${POLICY_PATH} is not valid JSON` }; }
+  const mode = policy?.fleet_roll_guard?.mode;
+  if (mode === undefined) return { mode: 'refuse', why: `${where}'s ${POLICY_PATH} declares no fleet_roll_guard.mode` };
+  if (!MODES.includes(mode)) return { mode: 'refuse', why: `fleet_roll_guard.mode ${JSON.stringify(mode)} is not refuse, warn or off` };
+  return { mode, why: null, source: `${where}'s ${POLICY_PATH}` };
+}
+
+/** The working tree's policy: what `just gate` and other runs outside a push read. */
 export function fleetRollMode(root = MODULE_ROOT) {
   let text;
-  try { text = readFileSync(join(root, 'genesis/agentic/pool-policy.json'), 'utf8'); }
-  catch (error) { return { mode: 'refuse', why: `pool-policy.json could not be read (${error.code || error.message})` }; }
-  let policy;
-  try { policy = JSON.parse(text); } catch { return { mode: 'refuse', why: 'pool-policy.json is not valid JSON' }; }
-  const mode = policy?.fleet_roll_guard?.mode;
-  if (mode === undefined) return { mode: 'refuse', why: 'pool-policy.json declares no fleet_roll_guard.mode' };
-  if (!MODES.includes(mode)) return { mode: 'refuse', why: `fleet_roll_guard.mode ${JSON.stringify(mode)} is not refuse, warn or off` };
-  return { mode, why: null };
+  try { text = readFileSync(join(root, POLICY_PATH), 'utf8'); }
+  catch (error) { return { mode: 'refuse', why: `${POLICY_PATH} could not be read (${error.code || error.message})` }; }
+  return parsePolicy(text, 'this checkout');
 }
 
-/** CI's graph over this checkout's manifests (one load, one walk per changed list). */
-export function ciWalker(root = MODULE_ROOT) {
-  let manifests = null;
-  const walked = new Map();
-  return changed => {
-    const key = changed.join('\n');
-    if (!walked.has(key)) walked.set(key, walkGraph(manifests ??= loadNamed(root), changed, { ci: true }));
-    return walked.get(key);
-  };
+function policyNote({ mode, why, source }) {
+  if (why) return ` (policy: mode ${mode}, the default, because ${why})`;
+  if (mode !== 'refuse' && source) return ` (policy: mode ${mode}, declared in ${source})`;
+  return '';
 }
 
-/** loadManifests, but a file that does not parse is named in the error. */
-function loadNamed(root) {
-  return discoverManifests(root).map(path => {
-    try { return { path, content: JSON.parse(readFileSync(resolve(root, path), 'utf8')) }; }
-    catch (error) { throw new Error(`${path}: ${String(error.message).split('\n')[0]}`); }
-  });
+// ── Git objects ─────────────────────────────────────────────────────────────
+
+function gitError(message, cure = 'the git error above names what failed; correct it and push again') {
+  return Object.assign(new Error(message), { cure });
 }
+function git(spawn, root, args) {
+  const r = spawn('git', ['-C', root, ...args], { encoding: 'utf8', maxBuffer: BUFFER });
+  if (r.error || r.status !== 0) throw gitError(`git ${args.join(' ')} exited ${r.status ?? r.error?.code}: ${String(r.stderr || r.error?.message || '').trim().split('\n')[0]}`);
+  return String(r.stdout);
+}
+const hasCommit = (spawn, root, sha) => spawn('git', ['-C', root, 'cat-file', '-e', `${sha}^{commit}`], { encoding: 'utf8' }).status === 0;
+
+/**
+ * `git cat-file --batch` for each spec, every response checked: the header names an object of
+ * the stated size followed by a newline; a bare object id must come back as itself. A `missing`
+ * response, or a spec that names no blob, is null; anything else unexpected is an error.
+ */
+export function catBlobs(spawn, root, specs) {
+  const out = new Map();
+  if (!specs.length) return out;
+  const r = spawn('git', ['-C', root, 'cat-file', '--batch'], { input: `${specs.join('\n')}\n`, maxBuffer: BUFFER });
+  if (r.error || r.status !== 0) throw gitError(`git cat-file --batch exited ${r.status ?? r.error?.code}: ${String(r.stderr || r.error?.message || '').trim().split('\n')[0]}`);
+  const buf = Buffer.isBuffer(r.stdout) ? r.stdout : Buffer.from(String(r.stdout));
+  let pos = 0;
+  for (const spec of specs) {
+    const nl = buf.indexOf(0x0a, pos);
+    if (nl < 0) throw gitError(`git cat-file --batch gave no response for ${spec}`);
+    const header = buf.subarray(pos, nl).toString('utf8');
+    pos = nl + 1;
+    if (header === `${spec} missing`) { out.set(spec, null); continue; }
+    const m = /^([0-9a-f]{40}|[0-9a-f]{64}) (\S+) (\d+)$/.exec(header);
+    if (!m) throw gitError(`git cat-file --batch answered "${header}" for ${spec}`);
+    const size = Number(m[3]);
+    if (pos + size >= buf.length || buf[pos + size] !== 0x0a) throw gitError(`git cat-file --batch returned a short object for ${spec}`);
+    if (/^([0-9a-f]{40}|[0-9a-f]{64})$/.test(spec) && m[1] !== spec) throw gitError(`git cat-file --batch returned ${m[1]} for ${spec}`);
+    out.set(spec, m[2] === 'blob' ? buf.subarray(pos, pos + size).toString('utf8') : null);
+    pos += size + 1;
+  }
+  return out;
+}
+
+class Indeterminate extends Error {}
+
+/**
+ * The build graph CI's checkout would hold at `sha`: every build-manifest.json in the commit's own
+ * superproject tree outside the directories CI's find skips, parsed; the gitlinks; and a reader of
+ * build-process files from the same tree. A symlinked manifest cannot be decided here.
+ */
+export function loadTree(spawn, root, sha) {
+  const r = spawn('git', ['-C', root, 'ls-tree', '-r', '-z', '--full-tree', sha], { encoding: 'utf8', maxBuffer: BUFFER });
+  if (r.error || r.status !== 0) throw gitError(`git ls-tree ${sha} exited ${r.status ?? r.error?.code}: ${String(r.stderr || r.error?.message || '').trim().split('\n')[0]}`);
+  const blobs = [];
+  const gitlinks = new Set();
+  for (const entry of String(r.stdout).split('\0').filter(Boolean)) {
+    const tab = entry.indexOf('\t');
+    const [mode, type, oid] = entry.slice(0, tab).split(' ');
+    const path = entry.slice(tab + 1);
+    if (type === 'commit') { gitlinks.add(path); continue; }
+    if (basename(path) !== MANIFEST || path.split('/').slice(0, -1).some(d => CI_SKIPPED_DIRS.has(d))) continue;
+    if (mode === '120000') throw new Indeterminate(`${path} is a symlink in the pushed tree; CI's find lists it and its readFile follows it, which this check does not do`);
+    blobs.push({ path, oid });
+  }
+  const contents = catBlobs(spawn, root, blobs.map(b => b.oid));
+  const manifests = [];
+  const errors = [];
+  for (const { path, oid } of blobs.sort((a, b) => a.path.localeCompare(b.path))) {
+    try { manifests.push({ path: `./${path}`, content: JSON.parse(contents.get(oid)) }); }
+    catch (error) { errors.push(`./${path}: ${String(error.message).split('\n')[0]}`); }
+  }
+  const processFiles = [...new Set(manifests.flatMap(m => Object.values(m.content.steps || {})
+    .flatMap(s => (s.inputs?.buildProcess || []).map(ref => String(ref).split('@')[0]))))];
+  const files = catBlobs(spawn, root, processFiles.map(f => `${sha}:${f}`));
+  return { manifests, errors, gitlinks, readFile: file => files.get(`${sha}:${file}`) ?? null };
+}
+
+// ── Prediction ──────────────────────────────────────────────────────────────
 
 function buildTokens(tip) {
   const tokens = [];
@@ -137,35 +220,34 @@ const dispatchable = (meta, name) => name !== SELF_PIPELINE && !!meta?.[name]?.j
 /** What CI does with elohim-edge for this walk and tip (header, "THE CI RULE"). Pure. */
 export function predict(walked, tip = '') {
   const meta = walked.meta || {};
-  const edge = walked.pipelines.find(p => p.name === EDGE);
+  const edgeOk = dispatchable(meta, EDGE);
+  const edge = edgeOk ? walked.pipelines.find(p => p.name === EDGE) : undefined;
   const buildSteps = (edge?.steps ?? []).filter(s => s.name !== VALIDATE_STEP);
   const others = walked.pipelines.map(p => p.name).filter(name => name !== EDGE && dispatchable(meta, name));
   const skipTag = /\[(skip ci|ci skip|no ci)\]/i.exec(tip)?.[0] ?? null;
   const validateOnly = /\[edge:validate-only\]/i.test(tip);
   const tokens = buildTokens(tip);
-  const forcedEdge = tokens.includes('edge');
+  const forcedEdge = edgeOk && tokens.includes('edge');
   const buildAll = tokens.includes('all');
   const runTag = parseRunClassTag(tip);
   const deployOnly = /\[deploy[-_ ]only\]/i.test(tip);
+  let graphClass = edge ? edge.runClass : null;
+  if (edge && edge.steps.every(s => s.name === VALIDATE_STEP)) graphClass = 'verify';
+  const pathSelects = graphClass !== null && runClassRank(graphClass) >= runClassRank('deploy');
   let edgeClass = null;
-  if (!skipTag && validateOnly) edgeClass = 'verify';
-  else if (!skipTag) {
-    let inPlan = !!edge;
-    let cls = edge ? edge.runClass : null;
-    if (edge && !forcedEdge && edge.steps.every(s => s.name === VALIDATE_STEP)) cls = 'verify';
-    if (forcedEdge) { inPlan = true; cls = 'build'; }
+  if (!skipTag && validateOnly && edgeOk) edgeClass = 'verify';
+  else if (!skipTag && !validateOnly) {
+    edgeClass = forcedEdge ? 'build' : graphClass;
     if (runTag && !forcedEdge) {
       const declares = Object.values(meta[EDGE]?.stepClasses || {}).some(c => runClassRank(c) <= runClassRank(runTag));
-      inPlan = declares;
-      cls = declares ? runTag : null;
+      edgeClass = declares && edge ? runTag : null;
     }
-    if (deployOnly) { cls = inPlan ? cls : 'build'; inPlan = true; }
-    edgeClass = inPlan ? cls : null;
   }
-  const selects = edgeClass !== null && runClassRank(edgeClass) >= runClassRank('deploy');
+  const deployAsk = deployOnly && !skipTag && !validateOnly && edgeOk;
+  const selects = deployAsk || (edgeClass !== null && runClassRank(edgeClass) >= runClassRank('deploy'));
   const asks = buildAll && !selects && !skipTag && !validateOnly;
-  const forcedBy = forcedEdge ? (tip.match(/\[build:[a-z,-]+\]/gi) || []).find(t => buildTokens(t).includes('edge')) : null;
-  return { edge, buildSteps, others, skipTag, validateOnly, forcedBy, buildAll, runTag, deployOnly, edgeClass, selects, asks };
+  const forcedBy = forcedEdge ? (tip.match(/\[build:[a-z,-]+\]/gi) || []).filter(t => buildTokens(t).includes('edge')).join(' ') : null;
+  return { edge, buildSteps, others, skipTag, validateOnly, forcedBy, buildAll, runTag, deployOnly, deployAsk, edgeClass, pathSelects, selects, asks };
 }
 
 function edgeText(p) {
@@ -177,38 +259,45 @@ function edgeText(p) {
 }
 
 function reachText(p, where) {
-  if (p.selects) {
-    if (p.forcedBy) return `the tip's ${p.forcedBy} makes CI select an Edge build and its deploy step for this ${where}`;
-    if (p.deployOnly && p.edgeClass === 'build' && !p.edge) return `the tip's [deploy-only] makes CI select the Edge deploy step for this ${where} (its build stages are skipped)`;
-    if (p.deployOnly) return `CI would select the Edge deploy step for this ${where}; the tip's [deploy-only] skips its build stages`;
-    return `CI would select an Edge build and its deploy step for this ${where}`;
+  if (p.deployAsk && p.forcedBy) return `the tip's ${p.forcedBy} and [deploy-only] make CI dispatch ${EDGE} with DEPLOY_ONLY: Edge skips its build stages and runs its deploy step on this ${where}`;
+  if (p.deployAsk) {
+    return `the tip's [deploy-only] asks CI for the Edge deploy step on this ${where}: CI runs it unless it dispatches Edge validate-only, and CI's already-built filter, which this check cannot see, can drop a validate-only Edge that [deploy-only] then re-adds as build and deploys (orchestrator Jenkinsfile:1912, :1962-1964, :2828-2834, :931-934)`;
   }
+  if (p.forcedBy) return `the tip's ${p.forcedBy} makes CI select an Edge build and its deploy step for this ${where}`;
+  if (p.selects) return `CI would select an Edge build and its deploy step for this ${where}`;
   return `the tip's [build:all] asks for every pipeline, Edge included, on this ${where}: CI forces nothing with it today (it expands [build:all] at Checkout against a pipeline registry filled only later, orchestrator Jenkinsfile:2688-2693, :2413), but it is read here as asking, so the selection is asked to be declared`;
 }
 
 function cureFor(p) {
   const parts = [];
-  if (p.forcedBy) parts.push(`drop ${p.forcedBy} from the tip commit`);
+  const andPaths = p.pathSelects ? ' and take the Edge build inputs out of this push (dropping the tag alone leaves the selection by path)' : '';
+  if (p.forcedBy) parts.push(`drop ${p.forcedBy} from the tip commit${andPaths}`);
+  if (p.deployAsk) parts.push(`drop [deploy-only] from the tip commit${p.forcedBy ? '' : andPaths}`);
   if (p.asks) parts.push('drop [build:all] from the tip commit');
-  if (p.deployOnly && p.selects) parts.push('drop [deploy-only] from the tip commit');
-  if (p.buildSteps.length && !p.forcedBy) parts.push('take the Edge build inputs out of this push, or land them with the next deliberate roll');
-  parts.push(`or declare the selection: add ${ROLL_TAG} and the reason to a pushed commit message`);
-  return `${parts.join('; ')}. [edge:validate-only] on the tip also stops the selection, but it drops every other pipeline from that run and moves the baseline past this push: not a cure for a mixed push.`;
+  if (!p.forcedBy && !p.deployAsk && p.buildSteps.length) parts.push('take the Edge build inputs out of this push, or land them with the next deliberate roll');
+  parts.push(`or declare the selection: add ${ROLL_TAG} to a pushed commit message, with the reason (asked for, not checked)`);
+  return `${parts.join('; ')}. [edge:validate-only] on the tip also stops the selection, but it drops every other pipeline from that run, and once the run ends green the next run's diff starts past this push: not a cure for a mixed push.`;
 }
 
 /**
  * The rows for one ref: `fleet-roll` and, on a protected ref with a skip tag, `skip-ci`. Pure.
- * @param {{target: string|null, walked: object, tip: string, declaredBy: string|null,
- *   mode: string, policyWhy?: string|null}} args
+ * @param {{target: string|null, walked: object, tip?: string, declaredBy?: string|null,
+ *   mode?: string, policyWhy?: string|null, policySource?: string|null}} args
  */
-export function evaluateRef({ target, walked, tip = '', declaredBy = null, mode = 'refuse', policyWhy = null }) {
+export function evaluateRef({ target, walked, tip = '', declaredBy = null, mode = 'refuse', policyWhy = null, policySource = null }) {
   if (mode === 'off') return [];
   const deploying = isDeploying(target);
   const where = deploying ? `push to ${target}` : `change, were it pushed to dev (${target ? `target ${target} does not deploy` : 'not a push'})`;
   const level = l => (l === 'REFUSED' && (mode === 'warn' || !deploying) ? 'WARN' : l);
-  const p = predict(walked, tip);
+  const note = policyNote({ mode, why: policyWhy, source: policySource });
   const rows = [];
-  const add = r => rows.push(policyWhy ? { ...r, why: `${r.why} (policy: mode ${mode}, the default, because ${policyWhy})` } : r);
+  const add = r => rows.push({ ...r, why: `${r.why}${note}` });
+  if (walked.errors?.length) {
+    add(row(CHECK, level('REFUSED'), `the build graph at the pushed commit is not valid: ${walked.errors[0]}; CI stops there too (build-graph.groovy:815-827), so no selection is predicted`,
+      'correct the build manifests named above; CI cannot plan this push either'));
+    return rows;
+  }
+  const p = predict(walked, tip);
   const inputs = edgeText(p);
   if (p.skipTag) {
     if (p.buildSteps.length) {
@@ -220,7 +309,7 @@ export function evaluateRef({ target, walked, tip = '', declaredBy = null, mode 
   } else if (p.validateOnly) {
     if (p.buildSteps.length || p.others.length) {
       const parts = [p.buildSteps.length ? `its Edge build inputs (${inputs}) are not built by this run` : '', p.others.length ? `it drops ${p.others.join(', ')} from the run` : ''].filter(Boolean);
-      add(row(CHECK, 'WARN', `the tip's [edge:validate-only] makes ${EDGE} validate only for this ${where}: ${parts.join(', and ')}; once the run ends green, ${BASELINE}`,
+      add(row(CHECK, 'WARN', `the tip's [edge:validate-only] makes ${EDGE} validate only for this ${where}: ${parts.join(', and ')}; ${BASELINE}`,
         'push those changes under a tip without [edge:validate-only], and keep the measuring commit on its own push'));
     } else if (p.edge) {
       add(row(CHECK, 'ok', `the tip's [edge:validate-only] makes ${EDGE} validate only for this ${where}; no build, no deploy`));
@@ -234,8 +323,8 @@ export function evaluateRef({ target, walked, tip = '', declaredBy = null, mode 
         cureFor(p)));
     }
   } else if (p.edge) {
-    const note = p.runTag ? `the tip's [run:${p.runTag}] keeps ${EDGE} out of the dispatch` : `${EDGE} validates only (${p.edge.steps.map(s => s.name).join(', ')})`;
-    add(row(CHECK, 'ok', `${note}; CI selects no Edge build or deploy for this ${where}`));
+    const what = p.runTag ? `the tip's [run:${p.runTag}] keeps ${EDGE} out of the dispatch` : `${EDGE} validates only (${p.edge.steps.map(s => s.name).join(', ')})`;
+    add(row(CHECK, 'ok', `${what}; CI selects no Edge build or deploy for this ${where}`));
   }
   if (p.skipTag && deploying) {
     const names = walked.pipelines.map(x => x.name).filter(name => dispatchable(walked.meta, name));
@@ -247,6 +336,59 @@ export function evaluateRef({ target, walked, tip = '', declaredBy = null, mode 
   return rows;
 }
 
+/** The pipeline a checked-out submodule's own manifest names, or null. */
+function checkoutPipeline(root) {
+  return path => {
+    try { return JSON.parse(readFileSync(join(root, path, MANIFEST), 'utf8')).pipeline || null; } catch { return null; }
+  };
+}
+
+/**
+ * One WARN per moved gitlink whose submodule carries a pipeline an Edge build step depends on and
+ * the pushed tree does not define: CI cannot see that manifest today (header, "Submodule pins").
+ * The pipeline is named from the submodule's checkout when present, else by the dependency's name
+ * (`elohim-<dir>` or `<dir>`), so the verdict is the same with or without the checkout.
+ */
+function pinRows({ tree, changed, readCheckout }) {
+  const edge = tree.manifests.find(m => m.content.pipeline === EDGE);
+  if (!edge) return [];
+  const defined = new Set(tree.manifests.map(m => m.content.pipeline));
+  const deps = Object.values(edge.content.steps || {}).flatMap(s => s.depends ?? []).filter(d => String(d).includes(':'));
+  const rows = [];
+  for (const path of changed.filter(p => tree.gitlinks.has(p))) {
+    const fromCheckout = readCheckout(path);
+    const names = fromCheckout ? [fromCheckout] : [`elohim-${basename(path)}`, basename(path)];
+    const hits = deps.filter(d => names.includes(d.split(':')[0]) && !defined.has(d.split(':')[0]));
+    if (!hits.length) continue;
+    const pipeline = hits[0].split(':')[0];
+    const steps = Object.fromEntries([...new Set(hits.map(d => d.split(':')[1]))].map(step => [step, { inputs: { sources: [path] }, depends: [] }]));
+    const would = walkGraph([...tree.manifests, { path: `./${path}/${MANIFEST}`, content: { pipeline, steps } }], changed, { ci: true, readFile: tree.readFile });
+    const selected = (would.pipelines.find(p => p.name === EDGE)?.steps ?? []).filter(s => s.name !== VALIDATE_STEP).map(s => s.name);
+    if (!selected.length) continue;
+    rows.push(row(CHECK, 'WARN',
+      `this push moves the ${path} pin, whose submodule carries pipeline ${pipeline} (${fromCheckout ? 'read from its checkout' : 'by its name'}); ${EDGE}'s build steps depend on it, but CI's checkout initialises no submodule (orchestrator Jenkinsfile:2587-2609), so CI does not see that manifest, prunes the dependency (build-graph.groovy:104-119) and does not carry this pin move into Edge today; if CI ever checked the submodule out, this push would select ${selected.join(', ')}`,
+      `nothing to do for today's CI; a pin move meant to reach the fleet needs a deliberate Edge build with ${ROLL_TAG}`));
+  }
+  return rows;
+}
+
+/**
+ * The rows for `changed` judged against the build graph at commit `sha` (git objects). Used for
+ * every pushed ref, and directly by the real-manifest probes.
+ */
+export function evaluatePaths({ root = MODULE_ROOT, sha, changed, target, tip = '', declaredBy = null, spawn = spawnSync, readCheckout = checkoutPipeline(root), policy = { mode: 'refuse', why: null } }) {
+  if (policy.mode === 'off') return [];
+  const tree = loadTree(spawn, root, sha);
+  const walked = tree.errors.length ? { pipelines: [], meta: {}, errors: tree.errors } : walkGraph(tree.manifests, changed, { ci: true, readFile: tree.readFile });
+  const args = { target, tip, declaredBy, mode: policy.mode, policyWhy: policy.why, policySource: policy.source };
+  const rows = evaluateRef({ walked, ...args });
+  if (walked.errors?.length) return rows;
+  const note = policyNote({ mode: policy.mode, why: policy.why, source: policy.source });
+  return [...rows, ...pinRows({ tree, changed, readCheckout }).map(r => ({ ...r, why: `${r.why}${note}` }))];
+}
+
+// ── Pushes ──────────────────────────────────────────────────────────────────
+
 /** `GATE_PUSH_REFS`: one `<remote ref> <pushed sha> <destination sha>` per line (pre-push.bash). */
 export function parseRefs(text) {
   return String(text ?? '').split('\n').map(line => line.trim()).filter(Boolean).map(line => {
@@ -255,128 +397,143 @@ export function parseRefs(text) {
   });
 }
 
-function git(spawn, root, args) {
-  const r = spawn('git', ['-C', root, ...args], { encoding: 'utf8', maxBuffer: BUFFER });
-  if (r.error || r.status !== 0) {
-    const error = new Error(`git ${args.join(' ')} exited ${r.status ?? r.error?.code}: ${String(r.stderr || r.error?.message || '').trim().split('\n')[0]}`);
-    error.cure = 'git fetch origin, then push again';
-    throw error;
-  }
-  return String(r.stdout);
-}
-const lines = text => text.split('\n').map(l => l.trim()).filter(Boolean);
-const hasCommit = (spawn, root, sha) => spawn('git', ['-C', root, 'cat-file', '-e', `${sha}^{commit}`], { encoding: 'utf8' }).status === 0;
-
-/** Manifests that differ between this checkout and `sha` (tracked or untracked). */
-function manifestDrift(spawn, root, sha) {
-  const spec = ['--', ':(glob)**/build-manifest.json'];
-  return [...new Set([...lines(git(spawn, root, ['diff', '--name-only', sha, ...spec])),
-    ...lines(git(spawn, root, ['ls-files', '--others', '--exclude-standard', ...spec]))])];
-}
-
-function judgeRef({ ref, spawn, root, walk, mode, policyWhy }) {
-  const deploying = isDeploying(ref.branch);
-  const target = ref.branch ?? ref.ref;
-  const where = `push to ${target}`;
-  const indeterminate = (why, cure) => [row(CHECK, mode === 'warn' || !deploying ? 'WARN' : 'REFUSED', `${where}: ${why} — the check cannot decide, and an unreadable range never reads as "nothing changed"`, cure)];
-  let base = ref.remote;
-  if (isZero(ref.remote) || !hasCommit(spawn, root, ref.remote)) {
-    const why = isZero(ref.remote) ? `this push creates ${target}, so there is no destination tip to read a range from`
-      : `the destination tip ${short(ref.remote)} is not in this clone, so this ref's range cannot be read`;
-    if (deploying) {
-      return indeterminate(why, isZero(ref.remote)
-        ? `this check has no range to read for a new ${target}: create it deliberately, outside an ordinary push`
-        : `git fetch origin ${target}, then push again`);
-    }
-    base = git(spawn, root, ['merge-base', 'origin/dev', ref.local]).trim();
-  }
-  if (deploying) {
-    const head = git(spawn, root, ['rev-parse', 'HEAD']).trim();
-    if (head !== ref.local) return indeterminate(`the pushed tip ${short(ref.local)} is not this checkout's HEAD ${short(head)}, so the build manifests read here are not the pushed ones`, CHECKOUT_CURE);
-    const drift = manifestDrift(spawn, root, ref.local);
-    if (drift.length) return indeterminate(`build-manifest.json differs between this checkout and the pushed tip (${drift.slice(0, 3).join(', ')})`, CHECKOUT_CURE);
-  }
-  const changed = lines(git(spawn, root, ['diff', '--name-only', base, ref.local]));
-  // The tip alone carries CI's tags; the declaration is found with a search that returns one commit.
-  const tip = git(spawn, root, ['log', '-1', '--format=%B', ref.local]);
-  const declaredBy = git(spawn, root, ['log', '-i', '--fixed-strings', `--grep=${ROLL_TAG}`, '-1', '--format=%H', `${base}..${ref.local}`]).trim() || null;
-  return evaluateRef({ target, walked: walk(changed), tip, declaredBy, mode, policyWhy });
-}
-
 /** A failure to decide: red on a protected ref under refuse, a WARN otherwise; never silent. */
-export function failureRows({ error, deploying, mode, policyWhy = null }) {
+export function failureRows({ error, deploying, mode = 'refuse', policyWhy = null, policySource = null }) {
   if (mode === 'off') return [];
   const first = String(error?.message || error).split('\n')[0];
-  const policy = policyWhy ? ` (policy: mode ${mode}, the default, because ${policyWhy})` : '';
-  return [row(CHECK, mode === 'refuse' && deploying ? 'REFUSED' : 'WARN', `the fleet-roll check could not decide: ${first}${policy}`,
+  return [row(CHECK, mode === 'refuse' && deploying ? 'REFUSED' : 'WARN',
+    `the fleet-roll check could not decide: ${first}${policyNote({ mode, why: policyWhy, source: policySource })}`,
     error?.cure || 'fix what the error names and push again (a malformed build-manifest.json also stops CI\'s own graph, build-graph.groovy:815-827)')];
 }
 
-const words = text => String(text ?? '').split(/\s+/).filter(Boolean);
+function judgeRef({ ref, spawn, root, remoteName, readCheckout }) {
+  const deploying = isDeploying(ref.branch);
+  const target = ref.branch ?? ref.ref;
+  const where = `push to ${target}`;
+  let policy = { mode: 'refuse', why: null };
+  try {
+    let base = ref.remote;
+    if (isZero(ref.remote) || !hasCommit(spawn, root, ref.remote)) {
+      if (deploying) {
+        throw Object.assign(new Indeterminate(isZero(ref.remote) ? `this push creates ${target}, so there is no destination tip to read a range from`
+          : `the destination tip ${short(ref.remote)} is not in this clone, so this ref's range cannot be read`),
+        { cure: isZero(ref.remote) ? `this check has no range to read for a new ${target}: create it deliberately, outside an ordinary push` : `git fetch ${remoteName} ${target}, then push again` });
+      }
+      base = git(spawn, root, ['merge-base', `${remoteName}/dev`, ref.local]).trim();
+    } else {
+      policy = parsePolicy(catBlobs(spawn, root, [`${ref.remote}:${POLICY_PATH}`]).get(`${ref.remote}:${POLICY_PATH}`), `${target}'s tip ${short(ref.remote)}`);
+      if (!policy.why) policy.source = `${target}'s ${POLICY_PATH} at ${short(ref.remote)}`;
+    }
+    if (policy.mode === 'off') return [];
+    const changed = lines(git(spawn, root, ['diff', '--name-only', base, ref.local]));
+    // The tip alone carries CI's tags; the declaration is found with a search that returns one commit.
+    const tip = git(spawn, root, ['log', '-1', '--format=%B', ref.local]);
+    const declaredBy = git(spawn, root, ['log', '-i', '--fixed-strings', `--grep=${ROLL_TAG}`, '-1', '--format=%H', `${base}..${ref.local}`]).trim() || null;
+    return evaluatePaths({ root, sha: ref.local, changed, target, tip, declaredBy, spawn, readCheckout, policy });
+  } catch (error) {
+    if (error instanceof Indeterminate) {
+      return [row(CHECK, policy.mode === 'warn' || !deploying ? 'WARN' : 'REFUSED',
+        `${where}: ${error.message} — the check cannot decide, and an unreadable range never reads as "nothing changed"`,
+        error.cure || 'push from a tree without a symlinked build-manifest.json, or declare the selection deliberately')];
+    }
+    return failureRows({ error, deploying, mode: policy.mode, policyWhy: policy.why, policySource: policy.source });
+  }
+}
+
 /** Whether any pushed ref named by the environment is dev or main. */
 export function pushDeploys(env) {
   return [...words(env.GATE_PUSH_TARGETS), ...parseRefs(env.GATE_PUSH_REFS).map(r => r.ref)].some(ref => isDeploying(branchOf(ref)));
 }
 
 /**
- * GATE_FLEET_ROLL_DONE carries the pid of the pre-push hook that ran the check. It is honoured only
- * when that process is this one or an ancestor of it, read from /proc; anywhere else (an inherited
- * value, no /proc) the check runs again, which costs one more walk (well under a second).
+ * The early hook block's mark: the --fleet-roll run writes the exact ref list it judged to the
+ * file GATE_FLEET_ROLL_MARK names (a temporary file the hook removes on exit). The ordinary
+ * preflight skips the check only when that file holds this push's ref list.
  */
-export function doneFlagHonoured(env = process.env, readStat = pid => readFileSync(`/proc/${pid}/stat`, 'utf8')) {
-  const done = Number(env.GATE_FLEET_ROLL_DONE);
-  if (!Number.isInteger(done) || done <= 1) return false;
-  for (let pid = process.pid, hops = 0; pid > 1 && hops < 64; hops += 1) {
-    if (pid === done) return true;
-    try {
-      const stat = readStat(pid); // "pid (comm) state ppid …"; comm may hold spaces or parentheses
-      pid = Number(stat.slice(stat.lastIndexOf(')') + 2).split(' ')[1]);
-    } catch { return false; }
-  }
-  return false;
-}
-
-/**
- * The preflight entry. Under pre-push: each protected ref judged from its own range (else the
- * first ref, advisory). Outside a push (`just gate`, `just status gates`): the changed list, as if
- * pushed to dev, never red. Returns rows, or null when there is nothing to judge.
- */
-export function checkFleetRoll({ env = process.env, changed = null, root = MODULE_ROOT, walk, spawn = spawnSync, policy } = {}) {
-  const { mode, why: policyWhy } = policy ?? fleetRollMode(root);
-  if (mode === 'off') return null;
-  walk ??= ciWalker(root);
-  const targets = words(env.GATE_PUSH_TARGETS);
-  try {
-    if (!targets.length && env.GATE_PUSH_REFS === undefined) {
-      if (!Array.isArray(changed)) return null;
-      return evaluateRef({ target: null, walked: walk(changed), mode, policyWhy });
-    }
-    if (env.GATE_PUSH_REFS === undefined) return olderHook({ targets, changed, walk, mode, policyWhy });
-    const refs = parseRefs(env.GATE_PUSH_REFS);
-    const named = [...new Set(refs.map(r => r.ref))].sort().join(' ');
-    if (named !== [...new Set(targets)].sort().join(' ')) {
-      return [row(CHECK, mode === 'refuse' && pushDeploys(env) ? 'REFUSED' : 'WARN',
-        `the push names refs [${targets.join(' ')}] that its ref list GATE_PUSH_REFS [${refs.map(r => r.ref).join(' ')}] does not match — the check cannot decide`,
-        'push again from a plain shell: an inherited GATE_PUSH_REFS or GATE_PUSH_TARGETS is the usual cause')];
-    }
-    const judged = refs.filter(r => isDeploying(r.branch));
-    return (judged.length ? judged : refs.slice(0, 1)).flatMap(ref => judgeRef({ ref, spawn, root, walk, mode, policyWhy }));
-  } catch (error) {
-    return failureRows({ error, deploying: pushDeploys(env), mode, policyWhy });
-  }
-}
-
-function olderHook({ targets, changed, walk, mode, policyWhy }) {
-  const target = targets.map(branchOf).find(isDeploying) ?? branchOf(targets[0]) ?? targets[0];
-  const deploying = isDeploying(target);
-  if (!Array.isArray(changed)) {
-    return failureRows({ error: Object.assign(new Error('the running pre-push hook handed over no changed-path list'), { cure: OLDER_HOOK_CURE }), deploying, mode, policyWhy });
-  }
-  const p = predict(walk(changed), '');
-  if (!p.selects) return [];
-  const why = `${reachText(p, `push to ${target}`)}: ${edgeText(p)} — and the running pre-push hook hands over no ref list (GATE_PUSH_REFS), so neither this ref's own range nor a declaration can be read`;
-  const r = row(CHECK, mode === 'warn' || !deploying ? 'WARN' : 'REFUSED', why, OLDER_HOOK_CURE);
-  return [policyWhy ? { ...r, why: `${r.why} (policy: mode ${mode}, the default, because ${policyWhy})` } : r];
+export function fleetRollMarkHonoured(env = process.env) {
+  if (!env.GATE_FLEET_ROLL_MARK || !env.GATE_PUSH_REFS) return false;
+  try { return readFileSync(env.GATE_FLEET_ROLL_MARK, 'utf8') === env.GATE_PUSH_REFS; } catch { return false; }
 }
 
 const OLDER_HOOK_CURE = 'check the launcher first: test -x <worktree>/.husky/_/pre-push (pnpm install creates it; with it missing, git runs no hook at all, silently); then push with -c core.hooksPath=<worktree>/.husky/_ so the current hook reads each ref\'s range and messages, or bring the main checkout up to date (its .husky/pre-push.bash predates the fleet-roll block)';
+
+function olderHook({ targets, changed, root, spawn, remoteName }) {
+  const target = targets.map(branchOf).find(isDeploying) ?? branchOf(targets[0]) ?? targets[0];
+  const deploying = isDeploying(target);
+  const spec = `${remoteName}/${target}:${POLICY_PATH}`;
+  let policy = { mode: 'refuse', why: null };
+  try {
+    policy = parsePolicy(catBlobs(spawn, root, [spec]).get(spec), `${remoteName}/${target}`);
+    if (policy.mode === 'off') return [];
+    if (!Array.isArray(changed)) throw Object.assign(new Error('the running pre-push hook handed over no changed-path list'), { cure: OLDER_HOOK_CURE });
+    const tip = git(spawn, root, ['log', '-1', '--format=%B', 'HEAD']);
+    const tree = loadTree(spawn, root, 'HEAD');
+    const walked = tree.errors.length ? { pipelines: [], meta: {}, errors: tree.errors } : walkGraph(tree.manifests, changed, { ci: true, readFile: tree.readFile });
+    if (walked.errors?.length) return evaluateRef({ target, walked, mode: policy.mode, policyWhy: policy.why, policySource: policy.source });
+    const p = predict(walked, tip);
+    if (!p.selects && !p.asks) return [];
+    const inputs = edgeText(p);
+    return [row(CHECK, policy.mode === 'warn' || !deploying ? 'WARN' : 'REFUSED',
+      `${reachText(p, `push to ${target}`)}${inputs ? `: ${inputs}` : ''} — and the running pre-push hook hands over no ref list (GATE_PUSH_REFS), so this ref's range and any declaration cannot be read; HEAD's message was read for CI's tags, which is right only when HEAD is the pushed commit${policyNote(policy)}`,
+      OLDER_HOOK_CURE)];
+  } catch (error) {
+    return failureRows({ error, deploying, mode: policy.mode, policyWhy: policy.why, policySource: policy.source });
+  }
+}
+
+// ── Outside a push ──────────────────────────────────────────────────────────
+
+/**
+ * This checkout's working-tree manifests, as CI's find would list them in a checkout without
+ * submodules: no manifest inside a directory that holds its own `.git`, none under the
+ * directories CI skips. A file that does not parse is named in the error.
+ */
+function workingTreeGraph(root) {
+  const inSubmodule = rel => {
+    for (let dir = dirname(rel); dir && dir !== '.'; dir = dirname(dir)) if (existsSync(join(root, dir, '.git'))) return true;
+    return false;
+  };
+  const manifests = [];
+  const errors = [];
+  for (const path of discoverManifests(root)) {
+    const rel = path.replace(/^\.[/\\]/, '');
+    if (rel.split('/').slice(0, -1).some(d => CI_SKIPPED_DIRS.has(d)) || inSubmodule(rel)) continue;
+    try { manifests.push({ path, content: JSON.parse(readFileSync(resolve(root, path), 'utf8')) }); }
+    catch (error) { errors.push(`${path}: ${String(error.message).split('\n')[0]}`); }
+  }
+  const readFile = file => { try { return readFileSync(join(root, file), 'utf8'); } catch { return null; } };
+  return { manifests, errors, readFile };
+}
+
+/**
+ * The preflight entry. Under pre-push: each protected ref judged from its own range and objects
+ * (else the first ref, advisory). Outside a push (`just gate`, `just status gates`): the changed
+ * list against this checkout's working tree, as if pushed to dev, never red. Returns rows, or null.
+ */
+export function checkFleetRoll({ env = process.env, changed = null, root = MODULE_ROOT, spawn = spawnSync } = {}) {
+  const targets = words(env.GATE_PUSH_TARGETS);
+  const remoteName = env.GATE_PUSH_REMOTE || 'origin';
+  if (!targets.length && env.GATE_PUSH_REFS === undefined) {
+    if (!Array.isArray(changed)) return null;
+    const policy = fleetRollMode(root);
+    if (policy.mode === 'off') return null;
+    try {
+      const tree = workingTreeGraph(root);
+      const walked = tree.errors.length ? { pipelines: [], meta: {}, errors: tree.errors } : walkGraph(tree.manifests, changed, { ci: true, readFile: tree.readFile });
+      return evaluateRef({ target: null, walked, mode: policy.mode, policyWhy: policy.why, policySource: policy.source });
+    } catch (error) {
+      return failureRows({ error, deploying: false, mode: policy.mode, policyWhy: policy.why });
+    }
+  }
+  if (env.GATE_PUSH_REFS === undefined) return olderHook({ targets, changed, root, spawn, remoteName });
+  const refs = parseRefs(env.GATE_PUSH_REFS);
+  const named = [...new Set(refs.map(r => r.ref))].sort().join(' ');
+  if (named !== [...new Set(targets)].sort().join(' ')) {
+    return [row(CHECK, pushDeploys(env) ? 'REFUSED' : 'WARN',
+      `the push names refs [${targets.join(' ')}] that its ref list GATE_PUSH_REFS [${refs.map(r => r.ref).join(' ')}] does not match — the check cannot decide`,
+      'push again from a plain shell: an inherited GATE_PUSH_REFS or GATE_PUSH_TARGETS is the usual cause')];
+  }
+  const judged = refs.filter(r => isDeploying(r.branch));
+  const readCheckout = checkoutPipeline(root);
+  return (judged.length ? judged : refs.slice(0, 1)).flatMap(ref => judgeRef({ ref, spawn, root, remoteName, readCheckout }));
+}
