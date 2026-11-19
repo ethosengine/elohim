@@ -22,7 +22,9 @@
 # AVX2 into ring's C and a v2 sibling died with SIGILL running the drawn epr). A finding prints
 #   [gate] epr producer put withheld (<first finding>; gate remains green)
 # and exits 0: these bytes are kept from siblings, and the device's own gate outcome is unchanged.
-# EPRFS_C_BASELINE_CHECK overrides the checker (default: c-baseline.mjs beside this script).
+# EPRFS_C_BASELINE_CHECK overrides the checker (default: c-baseline.mjs beside this script); an
+# override prints one `[gate] epr producer C baseline check overridden: ...` line. The reason is
+# the checker's stdout; its stderr goes to the gate log.
 set -uo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
@@ -75,6 +77,9 @@ release="$(json_field "$ingest_json" 'd.get("cid") or d.get("rcid")')"
 # The C level, in this same environment the build ran in. A missing checker withholds too: an
 # offer whose C level nobody read is the one that trapped on shem.
 check="${EPRFS_C_BASELINE_CHECK:-$here/c-baseline.mjs}"
+# An override decides what gates an offer, so the gate log names it, before the check runs.
+[[ -n "${EPRFS_C_BASELINE_CHECK:-}" ]] \
+  && echo "[gate] epr producer C baseline check overridden: EPRFS_C_BASELINE_CHECK=$check (not $here/c-baseline.mjs)"
 [[ -f "$check" ]] || withhold "the C baseline check $check is not there"
 # The finding is the checker's stdout alone; its stderr (a node warning, a trace) goes to the gate
 # log as it is, never into the withheld reason.

@@ -279,6 +279,31 @@ test("a_failing_check_with_nothing_on_stdout_names_its_exit_status", (t) => {
   assert.ok(r.stderr.includes("only stderr"), r.stderr);
 });
 
+const overridden = (out) => out.split("\n").filter((l) => l.includes("EPRFS_C_BASELINE_CHECK"));
+
+test("an_overridden_c_baseline_check_is_named_once_in_the_gate_log", (t) => {
+  const f = fixture(t);
+  const stub = join(f.stubs, "c-baseline.mjs");
+  const r = run(f, "build", C_LEVEL);
+  assertOffered(f, r);
+  assert.deepEqual(overridden(r.stdout), [
+    `[gate] epr producer C baseline check overridden: EPRFS_C_BASELINE_CHECK=${stub} (not ${join(ROOT, "genesis/orchestrator/c-baseline.mjs")})`,
+  ]);
+  // Said before the check runs, so a withheld or missing check is read beside it too.
+  const absent = join(f.dir, "no-such-c-baseline.mjs");
+  const missing = run(f, "build", { ...C_LEVEL, EPRFS_C_BASELINE_CHECK: absent });
+  assert.equal(overridden(missing.stdout).length, 1, missing.stdout);
+  assert.ok(missing.stdout.indexOf("overridden") < missing.stdout.indexOf("put withheld"), missing.stdout);
+});
+
+test("the_default_c_baseline_check_prints_no_override_line", (t) => {
+  const f = fixture(t);
+  // Empty is unset (${VAR:-default}): the real checker beside the script runs, whatever it finds.
+  const r = run(f, "build", { ...C_LEVEL, EPRFS_C_BASELINE_CHECK: "" });
+  assert.equal(r.status, 0, r.stderr);
+  assert.deepEqual(overridden(r.stdout), []);
+});
+
 test("a_missing_c_baseline_check_withholds_the_offer", (t) => {
   const f = fixture(t);
   const absent = join(f.dir, "no-such-c-baseline.mjs");
