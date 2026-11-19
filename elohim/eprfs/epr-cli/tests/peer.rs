@@ -496,130 +496,6 @@ fn serve_check_takes_no_serve_lock_and_writes_nothing() {
     );
 }
 
-/// The environment that makes [`serve_check_with_child`] act: the exercise outcome to inject
-/// (`trap`, `wrong` or `ok`) and the `peer serve` arguments as JSON. Read only by this test
-/// binary; the released `epr` has no such switch.
-const CHILD_OUTCOME_ENV: &str = "EPR_CLI_TEST_SERVE_CHECK_OUTCOME";
-const CHILD_ARGS_ENV: &str = "EPR_CLI_TEST_SERVE_CHECK_ARGS";
-
-/// The child half of the `serve_check_with` tests: this test binary, re-executed with a device's
-/// environment, runs `peer serve --check` in process with the exercise outcome it was given.
-/// Run on its own (no child environment) it does nothing.
-#[test]
-fn serve_check_with_child() {
-    use elohim_epr_cli::exercise::Failure;
-    use std::process::ExitCode;
-    let Ok(outcome) = std::env::var(CHILD_OUTCOME_ENV) else {
-        return;
-    };
-    let args: Vec<String> = serde_json::from_str(&std::env::var(CHILD_ARGS_ENV).unwrap()).unwrap();
-    let options = elohim_epr_cli::peer::Options::parse(&args).unwrap();
-    let trap = || -> Result<(), Failure> { std::process::abort() };
-    let wrong = || {
-        Err(Failure {
-            step: "sqlite",
-            detail: "an injected wrong answer".into(),
-        })
-    };
-    let passes = || Ok(());
-    let exercise: &dyn Fn() -> Result<(), Failure> = match outcome.as_str() {
-        "trap" => &trap,
-        "wrong" => &wrong,
-        _ => &passes,
-    };
-    let code = elohim_epr_cli::peer::serve_check_with(&options, exercise).unwrap();
-    std::process::exit(if code == ExitCode::SUCCESS { 0 } else { 1 });
-}
-
-/// `peer serve --check` for `device`, in a child of this test binary, with the exercise outcome
-/// `outcome` injected. The running executable is the test binary, so it is the exact `EPR_BIN`
-/// candidate the exec floor admits.
-fn check_in_child(device: &Device, policy: &Path, outcome: &str) -> Output {
-    let me = std::env::current_exe().unwrap();
-    let base = device.command();
-    let mut command = Command::new(&me);
-    for (key, value) in base.get_envs() {
-        match value {
-            Some(value) => command.env(key, value),
-            None => command.env_remove(key),
-        };
-    }
-    let args = [
-        "--check",
-        "--root",
-        device.root(),
-        "--policy",
-        policy.to_str().unwrap(),
-        "--json",
-    ];
-    command
-        .env("EPR_BIN", &me)
-        .env(CHILD_OUTCOME_ENV, outcome)
-        .env(CHILD_ARGS_ENV, serde_json::to_string(&args).unwrap())
-        .args([
-            "--exact",
-            "serve_check_with_child",
-            "--nocapture",
-            "--test-threads",
-            "1",
-            "-q",
-        ]);
-    command.output().expect("the test binary runs")
-}
-
-/// The pretty-printed JSON object in a child's stdout, among the test harness's own lines.
-fn child_json(stdout: &[u8]) -> serde_json::Value {
-    let text = String::from_utf8_lossy(stdout);
-    let start = text.find("\n{\n").map(|at| at + 1).expect("a JSON object");
-    let end = text[start..].find("\n}").expect("its end") + start + 2;
-    serde_json::from_str(&text[start..end]).unwrap()
-}
-
-#[test]
-fn serve_check_runs_its_exercise_first_and_a_returned_failure_is_only_a_note() {
-    use std::os::unix::process::ExitStatusExt;
-    let (keys, a, _b) = household();
-    let policy = policy(keys.path());
-    HeadTable::default().save(&a.peer_dir()).unwrap();
-    // A trap in the exercise kills the check by signal even on a device it would refuse as
-    // not-a-device: the exercise runs before every other step, and death needs no handling.
-    let stranger = Device::new(&keys, "off-roster");
-    let trapped = check_in_child(&stranger, &policy, "trap");
-    assert_eq!(
-        trapped.status.signal(),
-        Some(libc::SIGABRT),
-        "{:?} {}",
-        trapped.status,
-        String::from_utf8_lossy(&trapped.stderr)
-    );
-    // A returned failure is a note: the check still passes.
-    let noted = check_in_child(&a, &policy, "wrong");
-    let stderr = String::from_utf8_lossy(&noted.stderr);
-    assert!(noted.status.success(), "{stderr}");
-    assert!(
-        stderr.contains("note exercise-failed: sqlite: an injected wrong answer"),
-        "{stderr}"
-    );
-    let result = child_json(&noted.stdout);
-    assert_eq!(result["ok"], true, "{result}");
-    assert!(
-        result["notes"][0]
-            .as_str()
-            .is_some_and(|note| note.starts_with("exercise-failed: sqlite")),
-        "{result}"
-    );
-    // A passing exercise leaves no note.
-    let clean = check_in_child(&a, &policy, "ok");
-    assert!(
-        clean.status.success(),
-        "{}",
-        String::from_utf8_lossy(&clean.stderr)
-    );
-    let result = child_json(&clean.stdout);
-    assert_eq!(result["ok"], true, "{result}");
-    assert!(result.get("notes").is_none(), "{result}");
-}
-
 #[test]
 fn doctor_exercise_answers_in_one_line_from_anywhere() {
     // Outside any checkout, with no device: the exercise needs nothing but the binary.
@@ -635,8 +511,12 @@ fn doctor_exercise_answers_in_one_line_from_anywhere() {
         String::from_utf8_lossy(&ok.stderr)
     );
     assert_eq!(stdout.lines().count(), 1, "{stdout}");
+    // The line is made of the answers: a 32-byte agreed secret, the RFC 8032 test 1 signature
+    // (its first eight bytes) and the three SQLite rows.
     assert!(
-        stdout.starts_with("exercise: ok (x25519, ed25519, sqlite)"),
+        stdout.starts_with(
+            "exercise: ok (x25519 32-byte secret, ed25519 signature e5564300c360ac72, sqlite 3 rows)"
+        ),
         "{stdout}"
     );
 }

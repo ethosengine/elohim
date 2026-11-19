@@ -2280,18 +2280,9 @@ mod tests {
     #[cfg(feature = "peer")]
     #[test]
     fn the_own_target_is_the_triple_cargo_compiled_for() {
+        // The build-time TARGET is the fact: it holds for a cross-target build too, and needs no
+        // rustc where the tests run.
         assert_eq!(sibling::OWN_TARGET, env!("EPR_CLI_TARGET"));
-        // A test build is native, so its target is the host rustc reports.
-        let rustc = std::env::var("RUSTC").unwrap_or_else(|_| "rustc".into());
-        let out = std::process::Command::new(rustc)
-            .arg("-vV")
-            .output()
-            .unwrap();
-        let host = String::from_utf8_lossy(&out.stdout)
-            .lines()
-            .find_map(|line| line.strip_prefix("host: ").map(str::to_owned))
-            .expect("rustc -vV names its host");
-        assert_eq!(sibling::OWN_TARGET, host);
         // GNU x32 satisfies x86_64, linux and gnu; it, like any triple without an entry, has no
         // baseline.
         for target in [

@@ -19,6 +19,10 @@
 //! build, so a device holding such a record repeats the refusal until the record is removed; and
 //! `EPR_PIN_CID`, existing session pins, bootstrap reuse of a current or cached candidate,
 //! `bin ingest <path>`, a caller-supplied closure and an `EPR_BIN` candidate are never exercised.
+//! Within [`judge`]: a process outside the exercise's group that holds its stderr open keeps the
+//! reader thread and its descriptor alive after the judge has returned; and a held release is
+//! verified by name and then run by name, so whoever controls those paths between the two is
+//! trusted.
 
 use std::{
     io::Read,
@@ -43,12 +47,30 @@ impl std::fmt::Display for Failure {
     }
 }
 
+/// One SQLite row as the query returned it: id, amount doubled, amount formatted, the next day
+/// and a `strftime` of the day.
+pub type SqliteRow = (i64, f64, String, String, String);
+
+/// What the exercise computed, step by step: a caller can check the answers rather than trust a
+/// bare "ok".
+#[derive(Debug, Clone, PartialEq)]
+pub struct Exercised {
+    /// The length in bytes of the secret both X25519 sides agreed on.
+    pub x25519_secret_len: usize,
+    /// The Ed25519 signature of the RFC 8032 test 1 message.
+    pub ed25519_signature: [u8; 64],
+    /// The SQLite rows, in query order.
+    pub sqlite_rows: Vec<SqliteRow>,
+}
+
 /// Run every step in order. A step that traps never returns: the process dies by signal.
 #[cfg(feature = "peer")]
-pub fn run() -> Result<(), Failure> {
-    x25519()?;
-    ed25519_against(&RFC8032_TEST_1_SIGNATURE)?;
-    sqlite_against(&SQLITE_ROWS)
+pub fn run() -> Result<Exercised, Failure> {
+    Ok(Exercised {
+        x25519_secret_len: x25519()?,
+        ed25519_signature: ed25519_against(&RFC8032_TEST_1_SIGNATURE)?,
+        sqlite_rows: sqlite_against(&SQLITE_ROWS)?,
+    })
 }
 
 #[cfg(feature = "peer")]
@@ -59,10 +81,10 @@ fn fail(step: &'static str, detail: impl std::fmt::Display) -> Failure {
     }
 }
 
-/// Two fresh X25519 keypairs agree on one secret. ring offers no fixed-key agreement outside its
-/// test module, so this is the two-way check, not a known answer.
+/// Two fresh X25519 keypairs agree on one secret; its length is the answer. ring offers no
+/// fixed-key agreement outside its test module, so this is the two-way check, not a known answer.
 #[cfg(feature = "peer")]
-fn x25519() -> Result<(), Failure> {
+fn x25519() -> Result<usize, Failure> {
     use ring::agreement::{agree_ephemeral, EphemeralPrivateKey, UnparsedPublicKey, X25519};
     let rng = ring::rand::SystemRandom::new();
     let key = || {
@@ -90,7 +112,7 @@ fn x25519() -> Result<(), Failure> {
     if ab != ba || ab.iter().all(|byte| *byte == 0) {
         return Err(fail("x25519", "the two sides derived different secrets"));
     }
-    Ok(())
+    Ok(ab.len())
 }
 
 /// RFC 8032 section 7.1, TEST 1: the secret key (seed), its public key, and the signature of the
@@ -140,9 +162,9 @@ const fn hex64(text: &str) -> [u8; 64] {
 }
 
 /// The RFC 8032 key signs the empty message to exactly `expected`; that signature verifies, and
-/// does not verify over another message.
+/// does not verify over another message. The signature is the answer.
 #[cfg(feature = "peer")]
-fn ed25519_against(expected: &[u8; 64]) -> Result<(), Failure> {
+fn ed25519_against(expected: &[u8; 64]) -> Result<[u8; 64], Failure> {
     use ring::signature::{Ed25519KeyPair, UnparsedPublicKey, ED25519};
     let pair =
         Ed25519KeyPair::from_seed_and_public_key(&RFC8032_TEST_1_SEED, &RFC8032_TEST_1_PUBLIC)
@@ -164,7 +186,9 @@ fn ed25519_against(expected: &[u8; 64]) -> Result<(), Failure> {
     {
         return Err(fail("ed25519", "a signature verified over another message"));
     }
-    Ok(())
+    let mut computed = [0u8; 64];
+    computed.copy_from_slice(signature.as_ref());
+    Ok(computed)
 }
 
 /// One row the SQLite step must return: id, amount doubled, amount formatted, the next day and a
@@ -180,9 +204,10 @@ const SQLITE_ROWS: [Row; 3] = [
 ];
 
 /// An in-memory SQLite database: create, insert, then select in order with a date function, a
-/// `strftime` and a float formatted as text, compared exactly with `expected`.
+/// `strftime` and a float formatted as text, compared exactly with `expected`. The rows are the
+/// answer.
 #[cfg(feature = "peer")]
-fn sqlite_against(expected: &[Row]) -> Result<(), Failure> {
+fn sqlite_against(expected: &[Row]) -> Result<Vec<SqliteRow>, Failure> {
     let wrong = |e: rusqlite::Error| fail("sqlite", e);
     let db = rusqlite::Connection::open_in_memory().map_err(wrong)?;
     db.execute_batch(
@@ -198,7 +223,7 @@ fn sqlite_against(expected: &[Row]) -> Result<(), Failure> {
              FROM draw ORDER BY amount DESC",
         )
         .map_err(wrong)?;
-    let rows: Vec<(i64, f64, String, String, String)> = query
+    let rows: Vec<SqliteRow> = query
         .query_map([], |row| {
             Ok((
                 row.get(0)?,
@@ -222,15 +247,22 @@ fn sqlite_against(expected: &[Row]) -> Result<(), Failure> {
     if !matches {
         return Err(fail("sqlite", format!("unexpected rows {rows:?}")));
     }
-    Ok(())
+    Ok(rows)
 }
 
-/// What `epr doctor --exercise` prints for `outcome`: the success line for stdout, or the failure
-/// line for stderr.
-pub fn report(outcome: Result<(), Failure>, took: Duration) -> Result<String, String> {
+/// What `epr doctor --exercise` prints for `outcome`: the success line for stdout, made only of
+/// what each step returned, or the failure line for stderr.
+pub fn report(outcome: Result<Exercised, Failure>, took: Duration) -> Result<String, String> {
     match outcome {
-        Ok(()) => Ok(format!(
-            "exercise: ok (x25519, ed25519, sqlite) in {:.1} ms",
+        Ok(done) => Ok(format!(
+            "exercise: ok (x25519 {}-byte secret, ed25519 signature {}, sqlite {} rows) in {:.1} ms",
+            done.x25519_secret_len,
+            done.ed25519_signature
+                .iter()
+                .take(8)
+                .map(|byte| format!("{byte:02x}"))
+                .collect::<String>(),
+            done.sqlite_rows.len(),
             took.as_secs_f64() * 1000.0
         )),
         Err(failure) => Err(format!("exercise: failed at {failure}")),
@@ -259,7 +291,7 @@ pub enum Verdict {
     /// Killed by this signal.
     Signal(i32),
     /// Still running, or its stderr still held open by a process it started, when the timeout
-    /// came; its whole process group was killed.
+    /// came; its whole process group was then signalled with SIGKILL.
     Timeout(Duration),
     /// Exited non-zero; a release from before the exercise has no such verb.
     Exit(i32, String),
@@ -282,7 +314,7 @@ impl std::fmt::Display for Verdict {
             Self::Timeout(after) => write!(
                 f,
                 "timeout: `doctor --exercise` had not finished, or its output was still held \
-                 open, after {} ms; its process group was killed",
+                 open, after {} ms; its process group was signalled with SIGKILL",
                 after.as_millis()
             ),
             Self::Exit(code, said) => write!(
@@ -308,78 +340,171 @@ impl std::fmt::Display for Verdict {
 /// for itself.
 pub const TIMEOUT: Duration = Duration::from_secs(10);
 
+/// How often [`judge`] looks for the exercise's exit.
+const POLL: Duration = Duration::from_millis(5);
+
+/// How the exercise's process ended, read without reaping it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Ended {
+    Code(i32),
+    Signal(i32),
+}
+
+/// The exercise's process, leader of its own group. Its pid names the group, and the pid stays
+/// taken until the leader is reaped, so the group is always signalled first and the leader
+/// reaped after: a signal sent after the reap could reach an unrelated group that took the
+/// number. [`Leader::finish`] does both, once; dropping an unfinished leader runs it, so a panic
+/// or an early return between spawn and the end still signals and reaps.
+struct Leader {
+    child: std::process::Child,
+    group: rustix::process::Pid,
+    program: String,
+    finished: bool,
+}
+
+impl Leader {
+    /// Whether the leader has exited, and how, observed without reaping it (`WNOWAIT`).
+    fn ended(&self) -> std::io::Result<Option<Ended>> {
+        use rustix::process::{waitid, WaitId, WaitIdOptions};
+        let status = waitid(
+            WaitId::Pid(self.group),
+            WaitIdOptions::EXITED | WaitIdOptions::NOHANG | WaitIdOptions::NOWAIT,
+        )?;
+        Ok(status.and_then(|status| {
+            status
+                .terminating_signal()
+                .map(Ended::Signal)
+                .or_else(|| status.exit_status().map(Ended::Code))
+        }))
+    }
+
+    /// Signal the whole group with SIGKILL while the leader, running or exited, is unreaped and
+    /// so still pins the group's id; then reap the leader. Neither failure changes a verdict:
+    /// each is said on stderr.
+    fn finish(&mut self) {
+        if self.finished {
+            return;
+        }
+        self.finished = true;
+        before_group_signal(self.group.as_raw_pid());
+        match rustix::process::kill_process_group(self.group, rustix::process::Signal::KILL) {
+            // ESRCH: every member has already gone, which is the expected answer.
+            Ok(()) | Err(rustix::io::Errno::SRCH) => {}
+            Err(error) => eprintln!(
+                "exercise: could not signal the process group of {}: {error}",
+                self.program
+            ),
+        }
+        if let Err(error) = self.child.wait() {
+            eprintln!("exercise: could not reap {}: {error}", self.program);
+        }
+    }
+}
+
+impl Drop for Leader {
+    fn drop(&mut self) {
+        self.finish();
+    }
+}
+
 /// Run `program doctor --exercise` in a process group of its own and judge how it ended.
 ///
-/// The bound it keeps: it returns within `timeout`, plus the time to send SIGKILL to the group and
-/// reap the direct child. The wait for the exit and the drain of stderr share that one deadline,
-/// so a process the exercise started that keeps stderr open cannot hold it longer; at the
-/// deadline, and on every return, the whole group is killed. Output is read only to quote a
-/// failing step, never trusted: how the process ended is the answer.
+/// The bound it keeps: it returns within `timeout` plus one 5 ms polling interval, plus the time
+/// to signal the group and reap the leader. Starting the process (retried while the file is
+/// still busy being written), the wait for its exit and the drain of its stderr all count
+/// against that one deadline, so a process the exercise started that keeps stderr open cannot
+/// hold it longer. On every return the group is signalled with SIGKILL and then the leader is
+/// reaped, in that order, once. Output is read only to quote a failing step, never trusted: how
+/// the process ended is the answer.
 pub fn judge(program: &Path, timeout: Duration) -> Result<(), Verdict> {
-    use std::os::unix::process::ExitStatusExt;
-    let started = Instant::now();
-    let mut child = spawn(program)?;
-    let group = rustix::process::Pid::from_child(&child);
-    let kill_group = || {
-        // ESRCH once every member has gone is the expected answer, not an error.
-        let _ = rustix::process::kill_process_group(group, rustix::process::Signal::KILL);
+    let deadline = Instant::now() + timeout;
+    let mut child = spawn(program, deadline)?;
+    let stderr = child.stderr.take();
+    let mut leader = Leader {
+        group: rustix::process::Pid::from_child(&child),
+        child,
+        program: program.display().to_string(),
+        finished: false,
     };
     let (sender, said) = mpsc::channel();
-    let stderr = child.stderr.take();
-    std::thread::spawn(move || {
-        let mut kept = Vec::new();
-        if let Some(mut pipe) = stderr {
-            // Drain to the end so a chatty child never blocks on a full pipe; keep the first
-            // few lines, enough to name a failing step.
-            let mut chunk = [0u8; 4096];
-            while let Ok(read) = pipe.read(&mut chunk) {
-                if read == 0 {
-                    break;
+    std::thread::Builder::new()
+        .name("exercise-stderr".into())
+        .spawn(move || {
+            let mut kept = Vec::new();
+            if let Some(mut pipe) = stderr {
+                // Drain to the end so a chatty child never blocks on a full pipe; keep the
+                // first few lines, enough to name a failing step.
+                let mut chunk = [0u8; 4096];
+                while let Ok(read) = pipe.read(&mut chunk) {
+                    if read == 0 {
+                        break;
+                    }
+                    let room = 4096usize.saturating_sub(kept.len());
+                    kept.extend_from_slice(&chunk[..read.min(room)]);
                 }
-                let room = 4096usize.saturating_sub(kept.len());
-                kept.extend_from_slice(&chunk[..read.min(room)]);
             }
-        }
-        let _ = sender.send(String::from_utf8_lossy(&kept).into_owned());
-    });
-    let status = loop {
-        match child.try_wait() {
-            Ok(Some(status)) => break status,
-            Ok(None) if started.elapsed() >= timeout => {
-                kill_group();
-                let _ = child.wait();
+            let _ = sender.send(String::from_utf8_lossy(&kept).into_owned());
+        })
+        .map_err(|error| Verdict::Unstarted(format!("no thread to read its stderr: {error}")))?;
+    let ended = loop {
+        match leader.ended() {
+            Ok(Some(ended)) => break ended,
+            Ok(None) if Instant::now() >= deadline => {
+                leader.finish();
                 return Err(Verdict::Timeout(timeout));
             }
-            Ok(None) => std::thread::sleep(Duration::from_millis(5)),
+            Ok(None) => std::thread::sleep(POLL),
             Err(error) => {
-                kill_group();
-                let _ = child.wait();
-                return Err(Verdict::Unstarted(error.to_string()));
+                leader.finish();
+                return Err(Verdict::Unstarted(format!(
+                    "its state cannot be read: {error}"
+                )));
             }
         }
     };
     // The pipe closes when every holder has gone; a process the exercise started may hold it.
-    let said = said.recv_timeout(timeout.saturating_sub(started.elapsed()));
-    kill_group();
+    let said = said.recv_timeout(deadline.saturating_duration_since(Instant::now()));
+    leader.finish();
     let Ok(said) = said else {
         return Err(Verdict::Timeout(timeout));
     };
-    if let Some(signal) = status.signal() {
-        return Err(Verdict::Signal(signal));
+    match ended {
+        Ended::Signal(signal) => Err(Verdict::Signal(signal)),
+        Ended::Code(0) => Ok(()),
+        Ended::Code(code) => Err(Verdict::Exit(code, said.trim().replace('\n', "; "))),
     }
-    match status.code() {
-        Some(0) => Ok(()),
-        Some(code) => Err(Verdict::Exit(code, said.trim().replace('\n', "; "))),
-        None => Err(Verdict::Unstarted("no exit status".into())),
-    }
+}
+
+/// Called just before the group is signalled, with the leader's pid: a test observes the
+/// leader's state at that moment. Nothing in a release build.
+#[cfg(not(test))]
+fn before_group_signal(_leader: i32) {}
+
+/// The hook a test installs: it sees the leader's pid just before the group is signalled.
+#[cfg(test)]
+type SignalHook = Box<dyn Fn(i32)>;
+
+#[cfg(test)]
+thread_local! {
+    static BEFORE_GROUP_SIGNAL: std::cell::RefCell<Option<SignalHook>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+#[cfg(test)]
+fn before_group_signal(leader: i32) {
+    BEFORE_GROUP_SIGNAL.with(|hook| {
+        if let Some(hook) = hook.borrow().as_ref() {
+            hook(leader);
+        }
+    });
 }
 
 /// Start `program doctor --exercise` as the leader of a new process group. A file just written
 /// can still be open for writing in a child another thread forked a moment ago (ETXTBSY); that
-/// clears in milliseconds.
-fn spawn(program: &Path) -> Result<std::process::Child, Verdict> {
+/// clears in milliseconds, and it is retried until `deadline`.
+fn spawn(program: &Path, deadline: Instant) -> Result<std::process::Child, Verdict> {
     use std::os::unix::process::CommandExt;
-    let mut attempts = 0;
+    const RETRY: Duration = Duration::from_millis(20);
     loop {
         let mut command = Command::new(program);
         command
@@ -393,9 +518,11 @@ fn spawn(program: &Path) -> Result<std::process::Child, Verdict> {
         }
         match command.spawn() {
             Ok(child) => return Ok(child),
-            Err(error) if error.raw_os_error() == Some(libc::ETXTBSY) && attempts < 50 => {
-                attempts += 1;
-                std::thread::sleep(Duration::from_millis(20));
+            Err(error)
+                if error.raw_os_error() == Some(libc::ETXTBSY)
+                    && Instant::now() + RETRY < deadline =>
+            {
+                std::thread::sleep(RETRY);
             }
             Err(error) => {
                 return Err(Verdict::Unstarted(format!(
@@ -438,10 +565,79 @@ mod tests {
         live
     }
 
+    /// The state letter `/proc/<pid>/stat` shows for `pid`, or `gone` when it has no entry.
+    fn proc_state(pid: i32) -> String {
+        std::fs::read_to_string(format!("/proc/{pid}/stat"))
+            .ok()
+            .and_then(|stat| {
+                stat.rsplit_once(") ")
+                    .and_then(|(_, rest)| rest.split_whitespace().next().map(str::to_owned))
+            })
+            .unwrap_or_else(|| "gone".into())
+    }
+
+    /// Run `body` with a hook that records the leader's state each time the group is signalled.
+    fn signalled_states(body: impl FnOnce()) -> Vec<String> {
+        let seen = std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
+        let record = seen.clone();
+        BEFORE_GROUP_SIGNAL.with(|hook| {
+            *hook.borrow_mut() = Some(Box::new(move |leader| {
+                record.borrow_mut().push(proc_state(leader));
+            }));
+        });
+        body();
+        BEFORE_GROUP_SIGNAL.with(|hook| *hook.borrow_mut() = None);
+        let states = seen.borrow().clone();
+        states
+    }
+
+    #[test]
+    fn the_group_is_signalled_while_its_exited_leader_still_pins_the_id() {
+        // A reaped leader frees its pid, and an empty group's id with it: a signal sent after
+        // the reap can reach an unrelated group that took the number. The leader must still be
+        // a zombie (state Z) when its group is signalled, and the signal is sent once.
+        let tmp = tempfile::tempdir().unwrap();
+        let program = script(tmp.path(), "exit 0");
+        let states = signalled_states(|| assert_eq!(judge(&program, TIMEOUT), Ok(())));
+        assert_eq!(states, ["Z"], "leader state at each group signal");
+        // At the deadline the leader is still running when the group is signalled.
+        let program = script(tmp.path(), "exec sleep 30");
+        let states = signalled_states(|| {
+            assert!(judge(&program, Duration::from_millis(200)).is_err());
+        });
+        assert_eq!(states.len(), 1, "{states:?}");
+        assert_ne!(states[0], "gone", "{states:?}");
+    }
+
+    #[test]
+    fn a_successful_exercise_leaves_no_zombie_of_its_leader() {
+        let tmp = tempfile::tempdir().unwrap();
+        let leader_file = tmp.path().join("leader");
+        let program = script(
+            tmp.path(),
+            &format!("echo $$ > '{}'", leader_file.display()),
+        );
+        assert_eq!(judge(&program, TIMEOUT), Ok(()));
+        let leader: i32 = std::fs::read_to_string(&leader_file)
+            .unwrap()
+            .trim()
+            .parse()
+            .unwrap();
+        assert_eq!(proc_state(leader), "gone", "the leader was reaped");
+    }
+
     #[cfg(feature = "peer")]
     #[test]
-    fn the_exercise_passes_on_this_host() {
-        assert_eq!(run(), Ok(()));
+    fn the_exercise_passes_on_this_host_with_the_known_answers() {
+        // The answers themselves, so an exercise that skipped its steps cannot pass.
+        let done = run().unwrap();
+        assert_eq!(done.x25519_secret_len, 32);
+        assert_eq!(done.ed25519_signature, RFC8032_TEST_1_SIGNATURE);
+        let expected: Vec<SqliteRow> = SQLITE_ROWS
+            .iter()
+            .map(|row| (row.0, row.1, row.2.into(), row.3.into(), row.4.into()))
+            .collect();
+        assert_eq!(done.sqlite_rows, expected);
     }
 
     #[cfg(feature = "peer")]
@@ -461,8 +657,17 @@ mod tests {
 
     #[test]
     fn the_report_is_one_line_either_way() {
-        let ok = report(Ok(()), Duration::from_micros(1700)).unwrap();
-        assert_eq!(ok, "exercise: ok (x25519, ed25519, sqlite) in 1.7 ms");
+        let done = Exercised {
+            x25519_secret_len: 32,
+            ed25519_signature: [0xab; 64],
+            sqlite_rows: vec![(1, 2.0, "3".into(), "4".into(), "5".into())],
+        };
+        let ok = report(Ok(done), Duration::from_micros(1700)).unwrap();
+        assert_eq!(
+            ok,
+            "exercise: ok (x25519 32-byte secret, ed25519 signature abababababababab, sqlite 1 \
+             rows) in 1.7 ms"
+        );
         let failed = report(
             Err(Failure {
                 step: "sqlite",
@@ -516,6 +721,33 @@ mod tests {
             "killed promptly"
         );
         assert!(verdict.to_string().starts_with("timeout: "), "{verdict}");
+        // The signal was sent; whether it was delivered is not observed here.
+        assert!(
+            verdict.to_string().contains("signalled with SIGKILL"),
+            "{verdict}"
+        );
+        assert!(!verdict.to_string().contains("killed"), "{verdict}");
+    }
+
+    #[test]
+    fn a_file_still_busy_being_written_counts_against_the_same_deadline() {
+        // While a writer holds the file open, exec answers ETXTBSY; the retries stop at the
+        // judge's deadline, not after a fixed count of their own.
+        let tmp = tempfile::tempdir().unwrap();
+        let program = script(tmp.path(), "exit 0");
+        let _writer = std::fs::OpenOptions::new()
+            .append(true)
+            .open(&program)
+            .unwrap();
+        let deadline = Duration::from_millis(100);
+        let started = Instant::now();
+        let verdict = judge(&program, deadline).unwrap_err();
+        let took = started.elapsed();
+        assert!(matches!(verdict, Verdict::Unstarted(_)), "{verdict:?}");
+        assert!(
+            took < deadline + Duration::from_millis(300),
+            "took {took:?}"
+        );
     }
 
     #[test]

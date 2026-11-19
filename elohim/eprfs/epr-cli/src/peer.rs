@@ -262,8 +262,7 @@ pub struct Options {
 }
 
 impl Options {
-    /// Read the options of one `epr peer` verb from its arguments (after the verb).
-    pub fn parse(args: &[String]) -> PeerResult<Options> {
+    fn parse(args: &[String]) -> PeerResult<Options> {
         let mut options = Options {
             root: PathBuf::from("."),
             ..Options::default()
@@ -715,7 +714,9 @@ fn check_refusal(
 /// returns a failure (a wrong answer, or key generation refused because the operating system had
 /// no randomness to give) is not evidence that this CPU cannot run the release, so it is a note
 /// and never a reason for a device to stop serving.
-fn exercise_note(outcome: Result<(), crate::exercise::Failure>) -> Option<String> {
+fn exercise_note(
+    outcome: Result<crate::exercise::Exercised, crate::exercise::Failure>,
+) -> Option<String> {
     outcome
         .err()
         .map(|failure| format!("exercise-failed: {failure}; the check goes on"))
@@ -726,11 +727,12 @@ fn serve_check(options: &Options) -> PeerResult<ExitCode> {
 }
 
 /// `epr peer serve --check` with its bundled-C exercise supplied: `epr` passes
-/// [`crate::exercise::run`]; a test passes the outcome it needs to observe, so no switch in the
-/// released binary can make its own check fail.
-pub fn serve_check_with(
+/// [`crate::exercise::run`]; the crate's own tests pass the outcome they need to observe. It is
+/// crate-private, so neither a switch in the released binary nor a library caller can skip or
+/// fake the exercise.
+pub(crate) fn serve_check_with(
     options: &Options,
-    exercise: &dyn Fn() -> Result<(), crate::exercise::Failure>,
+    exercise: &dyn Fn() -> Result<crate::exercise::Exercised, crate::exercise::Failure>,
 ) -> PeerResult<ExitCode> {
     // First, before the exec floor and before the not-a-device return: this release's own C runs
     // here, so a candidate built for a CPU this device lacks dies before it can become current.
@@ -2986,3 +2988,5 @@ mod serve_lock_tests {
 
 #[cfg(test)]
 mod custody_slot_tests;
+#[cfg(test)]
+mod serve_check_seam_tests;
