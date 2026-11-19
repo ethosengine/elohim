@@ -53,7 +53,7 @@ has not moved.
 | `7479ce4539` | 44481834878: finished. Every Linux and macOS job green. The two cross-platform compile fixes worked (Windows built and ran about 5,670 tests). Red: four tests on both Windows runners, all from the build-inputs lane, plus cargo-deny-advisories (red on main too) and therefore `Tests pass` |
 | `bd28ecd8cf6c9593c77825d734e7fb38e1923534` | 44494603484: every required job green on Linux, macOS and both Windows runners; only cargo-deny-advisories red (as on main) |
 | `9945331577` | 44528984349: green on Linux and macOS. On both Windows runners ONE unit test red, `gitoxide_core::repository::git_spellings::rev_parse::tests::relative_paths_match_git`: `relative_path` rendered a collected PathBuf with `display()`, so Windows joined with `\` where the test asserts git's `/`. The journeys for the same cause had been gated before the push; this unit test was missed |
-| `e2b94f2da7dc11597222bd7074ebc657deb7cb28` | 44544779620, in progress when this was written |
+| `e2b94f2da7dc11597222bd7074ebc657deb7cb28` | 44544779620: finished. Every Windows job green on both runners (first Windows run of the trust lane's tests; `relative_paths_match_git` passes unchanged). Non-root Linux red on ONE test, `brit-cli::repository_slots::an_unreadable_alternate_pack_directory_does_not_fail_the_open`: the test was unsound, not the product (see `brit-declared-trust-and-reduced-trust-pack-cap.md`); test-only fix `bd18b171` on `sprint3/trust`, to be merged with the diff/show merge, not yet pushed when written. macOS cancelled part-way, so unverified for that head. The aggregate "Tests pass" concluded `success` on this run although `test-fast` legs had failed (see the steward section) |
 
 A second integrator took over from the runbook note below and did the phase from `7479ce4539` to
 `bd28ecd8cf`. Besides the lane merges, that phase made two integration commits: `4f1d05a93a` (one
@@ -88,12 +88,13 @@ A third integrator took over from the same note for the refs-shem and trust merg
 | `sprint3/push-transport` | `4a60a61d` | merged in `bd28ecd8cf` (three implementation rounds, two independent reviews, a doc-link fix) | `brit-s3-push-transport` |
 | `sprint3/diff-show` | `5a422ceb51` | two review passes and a delta review; merge in progress, not merged | `brit-s3-diff-show` |
 | `sprint3/refs-shem` | `806ea8114b` (shem's `b8264afc4`) | merged (`b9b4a294fc`) | `brit-s3-refs-shem` |
-| `sprint3/recovery` | `0d23297e22` | second round in progress; not mergeable until a delta review passes (see `brit-rebase-cost-gitlinks-and-stranding.md`) | `brit-s3-recovery` |
+| `sprint3/recovery` | round 1 up to `0d23297e22`; round 2 `9f3e6373`, `073cbfb0`, `5b107d72` | round 2 reviewed BROKEN; round 3 by a fresh implementer under rules R1–R5; not mergeable (see `brit-rebase-cost-gitlinks-and-stranding.md`) | `brit-s3-recovery` |
 
 **Monorepo side:** branch `feat/ark-declared-trust` (worktree `brit-s3-ark-trust`), first written as
 three commits on origin/dev `01e4de7f1`, is now four commits (tip `d14e7357f`), reviewed, awaiting
 rebase onto the landed dev. dev landed at `71069b1f551f` (the other ethosengine session's one push: L2b's
-eight commits, then L1's twenty-five). `feat/ark-declared-trust` and the queued epr-cli
+eight commits, then L1's twenty-five), and is now at `0f48e02fbf43`, the rebase target for
+`feat/ark-declared-trust`. `feat/ark-declared-trust` and the queued epr-cli
 `device_store(…)` lane can rebase onto it; that is deferred until the brit integration frees room in
 the shared cargo pool. Announce over berth before anything lands under `elohim/eprfs`: that session's
 next landing, L2a, touches epr-cli's artifact and produce paths.
@@ -231,14 +232,57 @@ next landing, L2a, touches epr-cli's artifact and produce paths.
 
 ## What needs the steward
 
-- **Moving the brit pin on dev selects an Edge image build in CI.** `build-edge-image` in
-  `elohim/holochain/build-manifest.json` declares `depends` on `cargo-build-doorway`,
-  `cargo-build-storage`, `elohim-holochain:build-happ`, `elohim-brit:brit-ci` and
-  `elohim-rakia:rakia-ci` (read on this branch). CI's `build-graph.groovy` propagates staleness through
-  `depends`; the JS walker `genesis/orchestrator/graph-walker.mjs` does NOT (and ignores dotfiles), so a
-  by-hand walker check shows nothing for a pin move. Found by shem 2026-11-19; shem is building a
-  preflight that predicts it. The ark branch was re-checked against `depends`: Edge depends on nothing
-  from elohim-eprfs or elohim-ark.
+- **UNSETTLED: does moving the brit pin on dev select an Edge image build in CI?**
+  - `build-edge-image` in `elohim/holochain/build-manifest.json` declares `depends` on
+    `cargo-build-doorway`, `cargo-build-storage`, `elohim-holochain:build-happ`, `elohim-brit:brit-ci`
+    and `elohim-rakia:rakia-ci` (read on this branch). CI's `build-graph.groovy` propagates staleness
+    through `depends`; the JS walker `genesis/orchestrator/graph-walker.mjs` does not (and ignores
+    dotfiles), so a by-hand walker check shows nothing for a pin move. The ark branch was re-checked
+    against `depends`: Edge depends on nothing from elohim-eprfs or elohim-ark.
+  - But brit's manifest (`elohim/brit/build-manifest.json`) lives inside the submodule. Two
+    independent readers on shem concluded from the Jenkinsfile and `build-graph.groovy` that CI's
+    checkout does not see a submodule's manifest, so CI does not carry a brit or rakia pin move into
+    Edge today.
+  - That reading has not been checked against a real CI run, and it contradicts the standing note that
+    a pin move rolls the fleet.
+  - What settles it: the orchestrator run's dispatch list for the pin-move commit.
+  - Since dev `0f48e02fbf43`, a pre-push check `genesis/orchestrator/fleet-roll-guard.mjs` (on dev at
+    `0f48e02fbf43`; not on this branch, which is older) refuses a push to dev or main whose commits
+    would make CI select an Edge build or deploy step, unless a pushed commit message carries
+    `[edge:roll]`. It REFUSES a holochain-conductor pin move (manifest in the superproject) and only
+    WARNs for a brit or rakia pin. It reads git objects only, so on a shallow clone a range reaching the
+    shallow boundary with no declaration is refused as undecidable (cure: `git fetch --deepen=<n>
+    origin`). A `[skip ci]` or `[edge:validate-only]` tip over inputs a pipeline builds gets a WARN that
+    CI dispatches nothing for that push.
+- **Until the aggregate is explained, a brit pin's attestation is not evidence.**
+  - brit's `build-manifest.json` declares its gate as `run.kind: attested`, provider `github-checks`,
+    repo `ethosengine/brit`, check "Tests pass". `genesis/orchestrator/gate-attest.mjs` takes the most
+    recently started check run of that name at the pinned commit and passes on `success`, with no
+    local recipe.
+  - On brit CI run 44544779620 (commit `e2b94f2da7`) the one check run named "Tests pass" (id
+    135658475517, started 2026-11-19T15:12:32Z) concluded `success`, although in the same run and
+    single attempt `test-fast (ubuntu-latest)` and `test-fast (ubuntu-24.04-arm)` had concluded
+    `failure` (14:49–14:50Z) and `test-fast (macos-latest)` `cancelled` (14:48Z). `test-fast` is in the
+    aggregate's `needs`, has `fail-fast: false` and no `continue-on-error`. The aggregate's first step
+    is `if: contains(needs.*.result, 'failure') || … 'cancelled' || … 'skipped'` → `exit 1`, and it did
+    not run.
+  - Ruled out: a second workflow run or re-run for the commit; a `continue-on-error` on that job.
+    Unexplained.
+  - Only pattern (three data points, no cause): the aggregate failed correctly on run 44481834878
+    (head `7479ce4539`, red: `test-fast (windows-11-arm)`, the last matrix leg to finish) and on run
+    44528984349 (head `9945331577`, red: `test-fast (windows-11-arm)`, last to finish at 13:36:10Z,
+    aggregate failed at 13:36:20Z); it passed on run 44544779620, where the last leg to finish was
+    green.
+  - Separately, the job `test` (the unit-tests recipe), which also failed on that run, is not in the
+    aggregate's `needs` at all.
+  - Done in sprint 3: a diagnostic first step printing `toJSON(needs)` is being added to the aggregate
+    (no change to what passes).
+  - NOT done, proposals for the steward: have the aggregate read its own run's job conclusions from the
+    API; add `test` to `needs`.
+  - Agreed with shem for later, as one landing: `gate-attest.mjs` reads the conclusion of every
+    workflow run of the named workflow at the commit, and brit's manifest attestation field changes
+    with it.
+  - Precondition of any brit pin move: the aggregate is sound, beside the steward's word.
 - Landing on brit `main` and the pin move. 16 monorepo steps re-key once (build-inputs above); one
   supervised real landing is needed to retire the push exception in `CLAUDE.md`. Its notes step is the
   device's own notes publish, fast-forward to `refs/notes/brit/devices/<did>/build/*`, which brit must

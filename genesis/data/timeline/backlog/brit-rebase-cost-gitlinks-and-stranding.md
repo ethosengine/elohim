@@ -349,7 +349,44 @@ Lane `sprint3/recovery` (worktree `brit-s3-recovery`). Commits up to `0d23297e22
   and D5 (index-only pre-check for unmerged, split and both gitlink cases) are in this lane; D3, D4
   and D6 belong to the redesign.
 
-**Status:** second round in progress; NOT mergeable until a delta review passes.
+**Status (earlier):** second round in progress; NOT mergeable until a delta review passes.
+
+**Round 2 reviewed: BROKEN.** Round 2 (commits `9f3e6373`, `073cbfb0`, `5b107d72`: three admission
+gates, `--retire`, unlaunched-hook cancellation) was reviewed and broken in three ways, all confirmed
+by running:
+
+- **(M1) A conflict resolution strands.** `--stage` is not gated, and `--abort` itself passed through
+  the forward reserve (`accept_discard_child`). With a 1 MB limit, a 100 KB resolution made
+  `--continue`, `--abort` and `--retire` all refuse; at 200 KB `--retire` was accepted but left
+  `.git/brit-authoring` behind, with every mutation refusing.
+- **(M2) `--retire` in a COPIED repository deleted the ORIGINAL repository's git lock files.**
+  `release_recorded_locks` removed recorded absolute paths by device and inode without checking that
+  they lie under this repository.
+- **(M3) `--retire` was accepted, and `--status` steered to it, where `--abort` would have restored
+  everything.** Its printed advice `git checkout --force <branch>` then discarded the user's
+  uncommitted work.
+
+Sound in round 2: the admission gates' refusals leave nothing behind; the unlaunched-hook cancellation;
+opening a journal without the quota.
+
+Consequence stated by the reviewer and accepted: the conservative preflight charges about 5,900 bytes
+per closure object, so any repository over roughly 182,000 objects, or with a closure over about
+0.86 GB decompressed, is refused for every rebase in under a second, brit's own repository and the
+monorepo included: "safe there by being unavailable".
+
+**Decision (coordinator): simplify, do not patch.** Round 3, by a fresh implementer, under five rules:
+
+- R1: admission refuses before anything changes.
+- R2: a forward step may be refused before it writes anything, naming `--abort`.
+- R3: `--abort` and cleanup are NEVER refused by any quota in any phase.
+- R4: `--retire` only for this repository's own journal in a terminal or retaining phase, removing no
+  lock files and printing no checkout advice.
+- R5: a journal brit cannot verify as its own is reported truthfully and never touched.
+
+Fallback if round 3 does not pass review in time: land only round 1's reviewed parts (abort of a failed
+preparation, gitlink ids, the killed switch).
+
+Rebase stays a declared git fallback for the monorepo and for brit either way.
 
 **Residuals recorded:** a process killed during any journal `save()` can leave `.git/.brit-checkout-*`;
 a `preparing` journal in a moved or copied repository cannot be cancelled (identity check;

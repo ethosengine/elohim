@@ -145,3 +145,21 @@ costing one CI run (run 44528984349, `relative_paths_match_git`).
 
 A destructive removal written with shell variables is refused by the harness's safety check and must
 use literal paths.
+
+## (q) This host runs as root
+
+Tests that stage unreadable paths with chmod, or guard themselves on uid 0 / EPERM, never exercise
+their claim here, and CI's runners are not root. The test
+`brit-cli::repository_slots::an_unreadable_alternate_pack_directory_does_not_fail_the_open` skipped
+through its author's run, three review passes and the integrator's verification, then failed on
+non-root Linux in run 44544779620 (see `brit-declared-trust-and-reduced-trust-pack-cap.md`).
+
+A non-root leg works on this host: `setpriv --reuid=65534 --regid=65534 --clear-groups <built test
+binary>` with `TMPDIR=/tmp`, a throwaway HOME and `GIT_CONFIG_NOSYSTEM=1` (`/etc/gitconfig` is 0640
+root:1234). Run it twice: with a plain HOME, and with a HOME holding `[safe] directory = *`. Session
+scratch under `/tmp/claude-0` is not reachable by that user.
+
+The converse gap: CI never exercises REAL foreign ownership. `foreign_owned.rs` is all `#[ignore]`
+(it needs root to chown), and `full_to_reduced_discovery_sizes_slots_from_the_indexes_present` and the
+safe.directory promotion fingerprint test skip their foreign-ownership portion on EPERM, so on non-root
+CI they pass without asserting it. Only a root container runs them.

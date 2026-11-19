@@ -116,6 +116,21 @@ fix following the lane's environment pattern is about 40 lines in `gix/src/open/
 tests, and is a candidate to offer upstream. Advice meanwhile: do not keep `safe.directory` behind a
 conditional include.
 
+**Non-root CI failure after the merge (run 44544779620, commit `e2b94f2da7`).** One test,
+`brit-cli::repository_slots::an_unreadable_alternate_pack_directory_does_not_fail_the_open`, failed on
+non-root Linux. Cause, established by reproducing as uid 65534: the TEST was unsound, not the product.
+It opened its repository without process isolation, so a host-wide `safe.directory = *` (CI runners
+appear to have one; inferred from the exact reproduction) raised it to full trust, where the object
+store lists every pack directory at open (upstream behaviour, unchanged by the lane, same on 0.2.6)
+and fails on the unreadable one. At reduced trust the open succeeds and the first lookup fails naming
+the directory; 0.2.6 measured the same. Fix: test-only commit `bd18b171` on `sprint3/trust` (test
+renamed `an_unreadable_alternate_pack_directory_fails_the_first_lookup_not_a_reduced_trust_open`, runs
+isolated, asserts both trust levels), to be merged with the diff/show merge; not yet pushed when
+written.
+
+Pre-existing difference it surfaced: at FULL trust an unreadable alternate pack directory fails the
+open in gix (0.2.6 too), where git prints an error and continues.
+
 Not measured: the rev-parse exit-code table for brit-epr's `resolve_rev`; an unreadable pack directory
 as a non-root user (the test skips as root; first exercised on non-root CI); the foreign-ownership
 tests are root-only or `#[ignore]` and never run in CI.
