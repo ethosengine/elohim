@@ -346,3 +346,22 @@ Each item belongs to another owner; none was changed by the sprint.
 - **Superseded:** the unmerged brit branch `feat/build-put-success-value` (`06f9f234a4`, ReachLevel as a view over protocol Reach) is superseded by the deletion of unsigned `reach`, unless rebuilt over verified reads.
 - **Devspace environment:** the workspace exports `JENKINS_URL`, so every tool that sniffs for CI (the `is_ci` crate and its kin) treats a developer's devspace as a CI runner. gix-testtools therefore never writes fixture archives locally and changes its git-version skip logic. Found when a new gix fixture's archive was produced only on GitHub (brit run 40935986385). Scope what reads it, or stop exporting it into interactive shells.
 - **brit security:** `cargo-deny-advisories` is red on brit main at `76ba95d8a0` (RUSTSEC-2026-0418 libz-sys, -0414 wikilinks, -0346 to -0349 rustls). "Tests pass" does not require that job, so it does not block landing, but it is open dependency/security work.
+
+## Status 2026-11-19 (brit sprint 3, session 0e0924d5)
+
+Where each item of this handoff stands; the body above is unchanged.
+
+| Item | State |
+|---|---|
+| Win 1, landing intents as brit notes | Superseded: the landing intent is the closure-keyed `Intent` atom; there is no `refs/notes/brit/proposal` in brit |
+| Win 2, sibling verdict reuse | Landed monorepo-side: sibling verdicts in `genesis/orchestrator/gate-evidence.mjs` |
+| Win 3, stable change id | Landed monorepo-side: `Change-Id` in the pre-push (minted by `.husky/commit-msg` through `genesis/orchestrator/gate-change-id.mjs`) |
+| Win 4, walkthrough records | Not started |
+| Win 5, CAS with expected-prior head | Partial: brit note writes publish against the prior they read (`bfbc949765`); push branch leases (`4701b8f4a4`) |
+| Win 6, output binding | Open: ark builds `DerivationRecord.output` from `output_cid` with no comparison against the byte manifest; its precondition, a verified `build find`, is met |
+| Operational agility, step 1 (snapshot artifacts) | Partial: per main commit (`2d4acccb08`) |
+| Operational agility, step 2 (brit off GitHub) | Not started |
+| Native storage, base slice | Landed (`4730ba4b6b`, `94b71c3644`, `69d283b068`) |
+| Native storage, successor stations 1–5 | Not started |
+
+Sprint record: `brit-sprint-3-handoff-2026-11-19.md`.

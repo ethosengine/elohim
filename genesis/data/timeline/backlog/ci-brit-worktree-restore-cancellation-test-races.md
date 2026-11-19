@@ -40,3 +40,8 @@ Two different windows on two runners in three runs is a race in the test, not a 
 **Cure (brit side, out of this shift's write-set):** gate the suspend on an observable from the restore — the first temporary write appearing — instead of a sleep; or split the two assertions into two tests each driven by its own observable. Until then a red on exactly this test with one of the two texts above is re-run, not investigated.
 
 **Closes when:** the test passes on 10 consecutive `test-fast` runs across runners without a re-run, or is rewritten to wait on the restore's own signal.
+
+## Status 2026-11-19: fixed before brit sprint 3 (verified against brit 0.2.6)
+
+Fixed in brit by `e93a0206eb`, `0102f5ddf6` and `e1798cfed0`: the suspend waits on the restore's own
+temporary file and stopped state.

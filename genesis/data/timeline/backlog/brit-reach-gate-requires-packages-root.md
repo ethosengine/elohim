@@ -53,3 +53,8 @@ its own governance) and is likely the right home.
 
 A brit push from this workspace passes the reach gate with no bypass, and the readiness finding
 names only roots that brit itself declares.
+
+## Status 2026-11-19: fixed before brit sprint 3 (verified against brit 0.2.6)
+
+Fixed in the monorepo by `06c1c43f3`; `epr doctor` in brit passes `governance.native-root`. A clone
+still needs `epr setup` once to activate brit's hooks (done on this sprint's device on 2026-11-19).

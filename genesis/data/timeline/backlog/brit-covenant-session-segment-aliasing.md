@@ -174,3 +174,31 @@ Its scoped measurements and ordered successor stations live there, with runnable
 commands in the owning sprint result. This covenant/session-segment bug remains
 open: local source execution does not repair ref encoding, clause verification or
 session authority, and its evidence must not be read as closure of this note.
+
+## Status 2026-11-19 (brit sprint 3, session 0e0924d5)
+
+Fixed on brit lane `sprint3/covenant-escape` (tip `4ef74edb69`), merged into `sprint3/integrate`
+and pushed to the brit remote as `run-ci/sprint3-integrate` (head
+`7479ce453981f69832792113fe917bcf72b62dde`). Nothing has landed on brit `main` and the monorepo pin
+has not moved.
+
+What the lane does:
+
+- A covenant session label gets exactly one ref component: `%`→`%25`, `/`→`%2F`, a leading `.` and
+  the `.` of a trailing `.lock` escaped; an empty label is refused.
+- Sessions that already hold a verified clause at the old nested spelling keep writing there, so an
+  older brit build still sees new revocations — except labels containing a literal `%`.
+- Listing reads both spellings and dedupes by CID.
+
+Residuals:
+
+- (R1) A session already split across spellings is not migrated.
+- (R2) A grant arriving by fetch/restore into the old directory after a revocation was written at the
+  new spelling is missed by pre-fix readers.
+- R1 and R2 both need covenant refs to travel, which they do not today.
+- Loose refs on case-folding or Unicode-normalising filesystems can collide.
+- Build, deploy and validate ref names still nest on `/`, and `decode_segment` is not the inverse of
+  `encode_segment`. Left because `genesis/a2o/scripts/lib/household-attestation.ts` copies that
+  encoding and build notes are pushed between devices.
+
+Sprint record: `brit-sprint-3-handoff-2026-11-19.md`.

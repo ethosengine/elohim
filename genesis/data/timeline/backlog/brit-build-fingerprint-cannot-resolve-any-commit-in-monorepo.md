@@ -116,3 +116,15 @@ value first, so `origin` is parsed as a repository path (diagnosis shared with s
 session 01a1a894). Not in either current slice; a Git fallback fetched
 `run-ci/rebase-reliability-20261104`. Probe for the cure: `brit fetch -r origin <refspec>` inside a
 submodule fetches.
+
+## Status 2026-11-19: fixed before brit sprint 3 (verified against brit 0.2.6)
+
+Fixed in brit by `fe6da99ffb` (object-store slots sized from the final trust) and `a927812c98`
+(tests `brit-cli/tests/repository_slots.rs`; slot exhaustion names itself).
+`brit build fingerprint elohim/eprfs/build-manifest.json --commit HEAD` exits 0 in the monorepo.
+
+Related leftover found in brit sprint 3: at REDUCED trust (no global `safe.directory`) brit 0.2.6
+still caps the object store at 32 pack indexes and then cannot open the repository. The monorepo
+passed 32 on 2026-11-19 (36 by the end of the day; every `brit fetch` adds a pack and nothing
+consolidates). Fixed on lane `sprint3/trust`, not merged; tracked in
+`brit-declared-trust-and-reduced-trust-pack-cap.md`.
