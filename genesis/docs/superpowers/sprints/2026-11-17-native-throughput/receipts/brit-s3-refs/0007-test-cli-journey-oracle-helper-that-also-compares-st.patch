@@ -1,0 +1,61 @@
+From bc329b25709c5b2efb9fad4fb89a4aa7c869f562 Mon Sep 17 00:00:00 2001
+From: Matthew Dowell <mbd06b+github@gmail.com>
+Date: Thu, 19 Nov 2026 09:38:19 +0000
+Subject: [PATCH 07/12] test(cli-journey): oracle helper that also compares
+ stderr emptiness
+
+`assert_same` compares stdout and the exit status only, so a missing
+`From <url>` line or a diagnostic printed where Git prints none passed.
+`assert_same_streams` additionally requires stderr to be empty exactly
+when Git's is, without demanding byte-equal diagnostics.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01PJB8fpkCKfb4CMYBh9vCEs
+Co-Authored-By: claude-fable-5-2 <noreply@anthropic.com>
+Claude-Session: b49f7c46-0cab-4b30-8b19-3294dddb61a7
+---
+ tests/cli-journey/src/support/parity.rs | 21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
+
+diff --git a/tests/cli-journey/src/support/parity.rs b/tests/cli-journey/src/support/parity.rs
+index 95ab888c9..934252d5e 100644
+--- a/tests/cli-journey/src/support/parity.rs
++++ b/tests/cli-journey/src/support/parity.rs
+@@ -53,6 +53,9 @@ pub fn brit(cwd: &Path, args: &[&str]) -> Result<Outcome> {
+ }
+ 
+ /// Assert that `brit <args>` prints the same stdout and exits like `git <args>` in `cwd`.
++///
++/// Stderr is shown on failure but not compared; use [`assert_same_streams()`] where a script
++/// would notice whether anything was written to it.
+ pub fn assert_same(cwd: &Path, args: &[&str]) -> Result<Outcome> {
+     let expected = git(cwd, args)?;
+     let actual = brit(cwd, args)?;
+@@ -67,6 +70,24 @@ pub fn assert_same(cwd: &Path, args: &[&str]) -> Result<Outcome> {
+     Ok(actual)
+ }
+ 
++/// Like [`assert_same()`], and also require that stderr is empty exactly when Git's is.
++///
++/// Diagnostics are not compared byte for byte, but a script that treats any stderr as a warning,
++/// or that expects Git's `From <url>` line, sees the same thing from both.
++pub fn assert_same_streams(cwd: &Path, args: &[&str]) -> Result<Outcome> {
++    let expected = git(cwd, args)?;
++    let actual = brit(cwd, args)?;
++    assert_eq!(
++        (&actual.stdout, actual.code, actual.stderr.is_empty()),
++        (&expected.stdout, expected.code, expected.stderr.is_empty()),
++        "brit {args:?} in {} differs from git (stdout, status, empty stderr)\nbrit stderr: {}\ngit stderr: {}",
++        cwd.display(),
++        actual.stderr,
++        expected.stderr
++    );
++    Ok(actual)
++}
++
+ /// Assert that `brit <spelling> --help` names Brit's own verb.
+ pub fn assert_help_names(spelling: &str, native: &str) -> Result<()> {
+     let help = brit(&std::env::temp_dir(), &[spelling, "--help"])?;
+-- 
+2.52.0
+

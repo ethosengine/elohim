@@ -1,0 +1,1139 @@
+From c4dd0d621d6f5453177427eaa7aa242f0cc188a2 Mon Sep 17 00:00:00 2001
+From: Matthew Dowell <mbd06b+github@gmail.com>
+Date: Thu, 19 Nov 2026 09:38:44 +0000
+Subject: [PATCH 08/12] fix: rev-parse reads its arguments in Git's order; -C
+ fails like Git
+
+Review FIX FIRST items A1, A3 and A4, plus the rev-parse parity cases
+that fall out of reading arguments the way Git does.
+
+- `rev-parse` now reads flags, path queries and revisions in one ordered
+  pass modelled on Git's argv loop. `--verify`/`--short` stop files and
+  `--` from reaching stdout, so `--verify HEAD -- x` prints one object
+  name; `HEAD --` keeps the delimiter; `missing -- x` is a bad revision
+  with empty stdout. Flags apply from their position (`HEAD --short HEAD`),
+  `--verify ^HEAD` prints `^<oid>`, `--verify A..B` prints the range and
+  fails as Git 2.52 does, `A...B` shows the merge bases, `--short=` and
+  `--short=-1` use the 4-digit minimum, repeated `--git-dir` prints each
+  time, and `HEAD:missing` / `:missing` name the path like Git.
+- Failures return a typed `Exit` instead of calling `process::exit`, so
+  global `-v` forwards buffered stdout and stderr before the process ends;
+  brit-cli maps `Exit` to its status without an `Error:` report.
+- Inside a `.git` directory discovery no longer looks for `./.git/objects`
+  (`discovery_start`), and `--show-toplevel` fails with Git's
+  "must be run in a work tree" and 128.
+- `-C <missing>` prints `fatal: cannot change to '<dir>': <strerror>` and
+  exits 128, also before a subcommand's `--help` or usage error.
+- The module docs list the remaining known differences and no longer
+  claim Git's messages for every failure; the `-C` help no longer says
+  "before anything else".
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01PJB8fpkCKfb4CMYBh9vCEs
+Co-Authored-By: claude-fable-5-2 <noreply@anthropic.com>
+Claude-Session: b49f7c46-0cab-4b30-8b19-3294dddb61a7
+---
+ brit-cli/src/main.rs                          |  35 +-
+ .../src/repository/git_spellings/mod.rs       |  29 +
+ .../src/repository/git_spellings/rev_parse.rs | 503 +++++++++++-------
+ src/plumbing/main.rs                          |  40 +-
+ src/plumbing/mod.rs                           |   3 +
+ src/plumbing/options/git_spellings.rs         | 107 ++--
+ src/plumbing/options/mod.rs                   |   4 +-
+ tests/cli-journey/tests/change_dir.rs         |  23 +-
+ tests/cli-journey/tests/rev_parse.rs          |  77 ++-
+ 9 files changed, 562 insertions(+), 259 deletions(-)
+
+diff --git a/brit-cli/src/main.rs b/brit-cli/src/main.rs
+index f259d47a6..86bbffa65 100644
+--- a/brit-cli/src/main.rs
++++ b/brit-cli/src/main.rs
+@@ -205,6 +205,30 @@ fn command_prefix(args: &[std::ffi::OsString], command: &clap::Command) -> Optio
+     })
+ }
+ 
++/// The global `-C` directories given before the subcommand, read from the arguments up to it so that
++/// they are known even when clap stops at `--help` or a usage error after it.
++fn change_dirs_before_command(args: &[std::ffi::OsString], command: &clap::Command) -> Vec<std::ffi::OsString> {
++    args.iter()
++        .enumerate()
++        .skip(1)
++        .find_map(|(index, arg)| {
++            command.find_subcommand(arg.to_str()?)?;
++            let partial = command
++                .clone()
++                .ignore_errors(true)
++                .try_get_matches_from(&args[..=index])
++                .ok()?;
++            partial.subcommand_name()?;
++            Some(
++                partial
++                    .get_many::<std::ffi::OsString>("change_dir")
++                    .map(|dirs| dirs.cloned().collect())
++                    .unwrap_or_default(),
++            )
++        })
++        .unwrap_or_default()
++}
++
+ fn normalize_log_counts(args: &mut [std::ffi::OsString], index: usize) {
+     // Familiar bounded history spelling, scoped to log and before `--`. Never reinterpret
+     // a path after the option terminator or a numeric argument to another command. Let
+@@ -269,7 +293,12 @@ fn run(capture: &mut feedback::Capture) -> Result<()> {
+         println!();
+         return Ok(());
+     }
+-    let matches = command.clone().try_get_matches_from(args).map_err(|error| {
++    let matches = command.clone().try_get_matches_from(&args).map_err(|error| {
++        // Git enters every `-C` directory before it reads the command: a missing one wins over help and usage.
++        if plumbing::change_dirs(&change_dirs_before_command(&args, &command)).is_err() {
++            capture.outcome = Some("refused");
++            return error::CliError::ContextExit(128);
++        }
+         let code = error.exit_code();
+         capture.outcome = Some(if code == 0 { "passed" } else { "refused" });
+         let _ = error.print();
+@@ -360,6 +389,10 @@ fn main() -> ExitCode {
+     let code = match run(&mut capture) {
+         Ok(()) => 0,
+         Err(error::CliError::ContextExit(code)) => code,
++        // A Git spelling that answers through its exit code already wrote its diagnostic.
++        Err(error::CliError::Git(cause)) if cause.chain().any(|cause| plumbing::exit_status(cause).is_some()) => {
++            cause.chain().find_map(plumbing::exit_status).unwrap_or(1)
++        }
+         // A reader that stopped early (`brit … | head`) is not a failure to report: end quietly with
+         // the status a shell shows for Git killed by SIGPIPE.
+         Err(e) if is_broken_pipe(&e) => 141,
+diff --git a/gitoxide-core/src/repository/git_spellings/mod.rs b/gitoxide-core/src/repository/git_spellings/mod.rs
+index bd6a66be5..f371c9858 100644
+--- a/gitoxide-core/src/repository/git_spellings/mod.rs
++++ b/gitoxide-core/src/repository/git_spellings/mod.rs
+@@ -10,6 +10,35 @@ pub mod for_each_ref;
+ pub mod ls_remote;
+ pub mod rev_parse;
+ 
++/// A Git-shaped ending: its diagnostic, if any, was already written, and the process should exit with
++/// this status instead of reporting an error. Returned as the error of a spelling that answers
++/// through its exit code, so that buffered output is still forwarded before the process ends.
++#[derive(Debug, Clone, Copy, PartialEq, Eq)]
++pub struct Exit(pub i32);
++
++impl std::fmt::Display for Exit {
++    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
++        write!(f, "exit status {}", self.0)
++    }
++}
++
++impl std::error::Error for Exit {}
++
++/// End like Git with `code`.
++pub fn exit(code: i32) -> gix::Error {
++    gix::Error::from_error(Exit(code))
++}
++
++/// The status a Git-shaped ending in `error` asks for, if it is one.
++pub fn exit_status(error: &(dyn std::error::Error + 'static)) -> Option<i32> {
++    error.downcast_ref::<Exit>().map(|exit| exit.0).or_else(|| {
++        error
++            .downcast_ref::<gix::Error>()
++            .and_then(|error| error.downcast_any_ref::<Exit>())
++            .map(|exit| exit.0)
++    })
++}
++
+ /// Git's `shorten_unambiguous_ref()` in its default strict mode (`core.warnAmbiguousRefs`): the
+ /// shortest name that no other lookup rule resolves, where `exists` answers whether a full ref name exists.
+ pub(crate) fn shorten_unambiguous(full_name: &str, exists: impl Fn(&str) -> bool) -> String {
+diff --git a/gitoxide-core/src/repository/git_spellings/rev_parse.rs b/gitoxide-core/src/repository/git_spellings/rev_parse.rs
+index ab0abf704..9537e801d 100644
+--- a/gitoxide-core/src/repository/git_spellings/rev_parse.rs
++++ b/gitoxide-core/src/repository/git_spellings/rev_parse.rs
+@@ -1,9 +1,21 @@
+ //! `brit rev-parse`: Git's spelling of `brit revision resolve`, plus Git's repository path queries.
+ //!
+-//! Output follows `git rev-parse` for the forms agents use: full or abbreviated object names, one
+-//! per line; `A..B` as `B` and `^A`; `--abbrev-ref` short ref names; and the path queries in the
+-//! order they were given, with Git's relative/absolute choices in main and linked worktrees.
+-//! Failures print Git's messages and exit 128 (or 1 for `--verify --quiet`).
++//! The arguments are read in order, like `git rev-parse` reads them: a flag such as `--verify`,
++//! `--short` or `--abbrev-ref` applies to the revisions after it, and the path queries print where
++//! they appear. Output follows Git for the forms agents use: full or abbreviated object names, one
++//! per line; `A..B` as `B` and `^A`; `A...B` with its merge bases; short ref names; `--` and the
++//! paths after it; and Git's relative/absolute choices for the path queries in main and linked
++//! worktrees. The common failures print Git's diagnostic and exit 128 (or 1 for `--verify --quiet`),
++//! and the known differences are listed below.
++//!
++//! ### Known differences from Git
++//!
++//! - A relative `GIT_DIR` is printed as an absolute `--git-dir`.
++//! - `--abbrev-ref` always shortens strictly, as if `core.warnAmbiguousRefs` were true.
++//! - Parent shorthands (`A^@`, `A^!`, `A^-`) and flags other than the ones listed in the help are
++//!   refused by name instead of being interpreted.
++//! - A `--` given before every revision and followed by nothing is not echoed.
++//! - The `<rev>:<path>` diagnostic omits Git's hint for a path given relative to a subdirectory.
+ 
+ use std::{
+     io::Write,
+@@ -17,26 +29,7 @@ use gix::{
+     prelude::ObjectIdExt,
+ };
+ 
+-use super::shorten_unambiguous;
+-
+-/// One ordered command-line item.
+-#[derive(Debug, Clone, PartialEq, Eq)]
+-pub enum Arg {
+-    /// A revision to resolve.
+-    Rev(String),
+-    /// `--show-toplevel`
+-    ShowToplevel,
+-    /// `--git-dir`
+-    GitDir,
+-    /// `--absolute-git-dir`
+-    AbsoluteGitDir,
+-    /// `--git-common-dir`
+-    GitCommonDir,
+-    /// `--path-format=…`, applying to the path queries after it.
+-    PathFormat(PathFormat),
+-    /// Everything after `--`, printed verbatim.
+-    Paths(Vec<String>),
+-}
++use super::{exit, shorten_unambiguous};
+ 
+ /// How path queries are printed after `--path-format`.
+ #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+@@ -47,172 +40,270 @@ pub enum PathFormat {
+     Relative,
+ }
+ 
+-/// Modes that apply to every revision.
+-#[derive(Debug, Default, Clone, Copy)]
+-pub struct Options {
+-    /// Require exactly one revision.
+-    pub verify: bool,
+-    /// With `verify`, fail silently with exit code 1.
+-    pub quiet: bool,
+-    /// Print short ref names instead of object names.
+-    pub abbrev_ref: bool,
+-    /// Abbreviate object names: `Some(None)` uses `core.abbrev`, `Some(Some(n))` at least `n` digits.
+-    pub short: Option<Option<usize>>,
++/// Git's `filter` bits that `--verify` and `--short` clear: from then on, files and `--` are not printed.
++#[derive(Debug, Clone, Copy)]
++struct State {
++    verify: bool,
++    quiet: bool,
++    abbrev_ref: bool,
++    /// `Some(None)` uses `core.abbrev`, `Some(Some(n))` at least `n` digits.
++    abbrev: Option<Option<usize>>,
++    /// Files and `--` are echoed until `--verify` or `--short` turns that off.
++    show_files: bool,
++    format: Option<PathFormat>,
+ }
+ 
+-/// Print each argument like `git rev-parse` would.
+-pub fn rev_parse(
+-    repo: gix::Repository,
+-    args: Vec<Arg>,
+-    mut out: impl Write,
+-    mut err: impl Write,
+-    options: Options,
+-) -> Result<()> {
+-    let verify = options.verify || options.short.is_some();
++/// Print each argument like `git rev-parse` would, reading `args` in order as Git reads its argv.
++///
++/// A Git-shaped failure writes its diagnostic to `err` and returns [`super::Exit`] with Git's status.
++pub fn rev_parse(repo: gix::Repository, args: Vec<String>, mut out: impl Write, mut err: impl Write) -> Result<()> {
+     let cwd = repo.current_dir().to_owned();
+-    let mut format = None;
+-    let mut as_is = false;
+-    let mut single: Option<(bool, gix::ObjectId, String)> = None;
+-    for arg in args {
+-        match arg {
+-            Arg::PathFormat(wanted) => format = Some(wanted),
+-            Arg::ShowToplevel => match repo.workdir() {
+-                Some(workdir) => {
+-                    let workdir = absolute(workdir, &cwd);
+-                    print_path(
+-                        &mut out,
+-                        &realpath(&workdir),
+-                        &cwd,
+-                        format.unwrap_or(PathFormat::Absolute),
+-                    )?;
+-                }
+-                None => die(
+-                    &mut out,
+-                    &mut err,
+-                    "fatal: this operation must be run in a work tree",
+-                    128,
+-                ),
+-            },
+-            Arg::GitDir => {
+-                let git_dir = absolute(repo.git_dir(), &cwd);
+-                match format {
+-                    Some(format) => print_path(&mut out, &realpath(&git_dir), &cwd, format)?,
+-                    None if git_dir == cwd.join(".git") && git_dir.is_dir() => writeln!(out, ".git").or_error()?,
+-                    None if git_dir == cwd => writeln!(out, ".").or_error()?,
+-                    None => writeln!(out, "{}", git_dir.display()).or_error()?,
++    let has_dashdash = args.iter().any(|arg| arg == "--");
++    let mut state = State {
++        verify: false,
++        quiet: false,
++        abbrev_ref: false,
++        abbrev: None,
++        show_files: true,
++        format: None,
++    };
++    // 0: revisions, 1: after a path (still verified to exist), 2: after `--`.
++    let mut as_is = 0_u8;
++    let mut revs_count = 0_usize;
++    let mut last: Option<(bool, gix::ObjectId, String)> = None;
++    let fail = |err: &mut dyn Write, message: &str, code: i32| -> gix::Error {
++        if !message.is_empty() {
++            writeln!(err, "{message}").ok();
++        }
++        exit(code)
++    };
++    let no_single_rev = |err: &mut dyn Write, quiet: bool| -> gix::Error {
++        if quiet {
++            fail(err, "", 1)
++        } else {
++            fail(err, "fatal: Needed a single revision", 128)
++        }
++    };
++
++    for arg in &args {
++        if as_is > 0 {
++            if state.show_files {
++                writeln!(out, "{arg}").or_error()?;
++                if as_is < 2 {
++                    verify_filename(&cwd, arg, None).map_err(|message| fail(&mut err, &message, 128))?;
+                 }
+             }
+-            Arg::AbsoluteGitDir => {
+-                let git_dir = absolute(repo.git_dir(), &cwd);
+-                print_path(&mut out, &realpath(&git_dir), &cwd, PathFormat::Absolute)?;
+-            }
+-            Arg::GitCommonDir => {
+-                let common_dir = absolute(repo.common_dir(), &cwd);
+-                // Git prints the shared directory relative to the current one only when it found it as
+-                // the `.git` directory of this worktree; a linked worktree or a submodule names it absolutely.
+-                let dot_git_here = common_dir == absolute(repo.git_dir(), &cwd)
+-                    && repo
+-                        .workdir()
+-                        .is_some_and(|workdir| absolute(workdir, &cwd).join(".git") == common_dir);
+-                match format {
+-                    Some(format) => print_path(&mut out, &realpath(&common_dir), &cwd, format)?,
+-                    None if common_dir == cwd => writeln!(out, ".").or_error()?,
+-                    None if dot_git_here => writeln!(out, "{}", relative_path(&common_dir, &cwd)).or_error()?,
+-                    None => writeln!(out, "{}", common_dir.display()).or_error()?,
++            continue;
++        }
++        if arg.starts_with('-') {
++            match arg.as_str() {
++                "--" => {
++                    as_is = 2;
++                    if state.show_files {
++                        writeln!(out, "--").or_error()?;
++                    }
+                 }
+-            }
+-            Arg::Paths(paths) => {
+-                writeln!(out, "--").or_error()?;
+-                for path in paths {
+-                    writeln!(out, "{path}").or_error()?;
++                "--verify" => {
++                    state.verify = true;
++                    state.show_files = false;
+                 }
+-            }
+-            Arg::Rev(rev) if as_is => {
+-                if !cwd.join(&rev).exists() {
+-                    die(
++                "-q" | "--quiet" => state.quiet = true,
++                "--abbrev-ref" | "--abbrev-ref=strict" => state.abbrev_ref = true,
++                "--show-toplevel" => match workdir(&repo, &cwd) {
++                    Some(workdir) => print_path(
+                         &mut out,
+-                        &mut err,
+-                        &format!(
+-                            "fatal: {rev}: no such path in the working tree.\nUse 'git <command> -- <path>...' to specify paths that do not exist locally."
+-                        ),
+-                        128,
+-                    );
++                        &realpath(&workdir),
++                        &cwd,
++                        state.format.unwrap_or(PathFormat::Absolute),
++                    )?,
++                    None => return Err(fail(&mut err, "fatal: this operation must be run in a work tree", 128)),
++                },
++                "--git-dir" => {
++                    let git_dir = absolute(repo.git_dir(), &cwd);
++                    match state.format {
++                        Some(format) => print_path(&mut out, &realpath(&git_dir), &cwd, format)?,
++                        None if git_dir == cwd.join(".git") && git_dir.is_dir() => writeln!(out, ".git").or_error()?,
++                        None if git_dir == cwd => writeln!(out, ".").or_error()?,
++                        None => writeln!(out, "{}", git_dir.display()).or_error()?,
++                    }
+                 }
+-                writeln!(out, "{rev}").or_error()?;
+-            }
+-            Arg::Rev(rev) => {
+-                let spec = repo
+-                    .rev_parse(BStr::new(rev.as_bytes()))
+-                    .ok()
+-                    .map(gix::revision::Spec::detach);
+-                let shown = match spec {
+-                    Some(gix::revision::plumbing::Spec::Include(id)) if verify => {
+-                        if single.replace((false, id, rev.clone())).is_some() {
+-                            die_no_single_rev(&mut out, &mut err, options.quiet);
+-                        }
+-                        continue;
++                "--absolute-git-dir" => {
++                    let git_dir = absolute(repo.git_dir(), &cwd);
++                    print_path(&mut out, &realpath(&git_dir), &cwd, PathFormat::Absolute)?;
++                }
++                "--git-common-dir" => {
++                    let common_dir = absolute(repo.common_dir(), &cwd);
++                    // Git prints the shared directory relative to the current one only when it found it as
++                    // the `.git` directory of this worktree; a linked worktree or a submodule names it absolutely.
++                    let dot_git_here = common_dir == absolute(repo.git_dir(), &cwd)
++                        && repo
++                            .workdir()
++                            .is_some_and(|workdir| absolute(workdir, &cwd).join(".git") == common_dir);
++                    match state.format {
++                        Some(format) => print_path(&mut out, &realpath(&common_dir), &cwd, format)?,
++                        None if common_dir == cwd => writeln!(out, ".").or_error()?,
++                        None if dot_git_here => writeln!(out, "{}", relative_path(&common_dir, &cwd)).or_error()?,
++                        None => writeln!(out, "{}", common_dir.display()).or_error()?,
+                     }
+-                    Some(_) if verify => die_no_single_rev(&mut out, &mut err, options.quiet),
+-                    None if verify => die_no_single_rev(&mut out, &mut err, options.quiet),
+-                    Some(gix::revision::plumbing::Spec::Include(id)) => vec![(false, id, rev.clone())],
+-                    Some(gix::revision::plumbing::Spec::Exclude(id)) => {
+-                        vec![(true, id, rev.trim_start_matches('^').to_owned())]
++                }
++                "--path-format=absolute" => state.format = Some(PathFormat::Absolute),
++                "--path-format=relative" => state.format = Some(PathFormat::Relative),
++                other => match other.strip_prefix("--short") {
++                    Some("") => {
++                        state.verify = true;
++                        state.show_files = false;
++                        state.abbrev = Some(None);
+                     }
+-                    Some(gix::revision::plumbing::Spec::Range { from, to }) => {
+-                        let (left, right) = rev.split_once("..").unwrap_or(("", ""));
+-                        let name = |side: &str| if side.is_empty() { "HEAD" } else { side }.to_owned();
+-                        vec![(false, to, name(right)), (true, from, name(left))]
++                    Some(value) if value.starts_with('=') => {
++                        state.verify = true;
++                        state.show_files = false;
++                        state.abbrev = Some(Some(git_abbrev_len(&value[1..])));
+                     }
+-                    Some(_) => die(
+-                        &mut out,
+-                        &mut err,
+-                        &format!(
+-                            "brit rev-parse: `{rev}` is not implemented; list commits with `brit revision list` or find bases with `brit merge-base`"
+-                        ),
+-                        128,
+-                    ),
+-                    None => {
+-                        writeln!(out, "{rev}").or_error()?;
+-                        if !cwd.join(&rev).exists() {
+-                            die(
+-                                &mut out,
+-                                &mut err,
+-                                &format!(
+-                                    "fatal: ambiguous argument '{rev}': unknown revision or path not in the working tree.\nUse '--' to separate paths from revisions, like this:\n'git <command> [<revision>...] -- [<file>...]'"
+-                                ),
+-                                128,
+-                            );
+-                        }
+-                        as_is = true;
+-                        continue;
++                    _ => {
++                        return Err(fail(
++                            &mut err,
++                            &format!(
++                                "brit rev-parse does not implement `{other}`; resolve revisions with `brit revision resolve`"
++                            ),
++                            128,
++                        ));
+                     }
+-                };
+-                for (reversed, id, name) in shown {
+-                    show(&repo, &mut out, &mut err, options, reversed, id, &name)?;
+-                }
++                },
+             }
++            continue;
+         }
+-    }
+-    if verify {
+-        match single {
+-            Some((reversed, id, name)) => show(&repo, &mut out, &mut err, options, reversed, id, &name)?,
+-            None => die_no_single_rev(&mut out, &mut err, options.quiet),
++
++        // Not a flag argument.
++        if let Some(shown) = try_difference(&repo, arg).map_err(|message| fail(&mut err, &message, 128))? {
++            for (reversed, id, name) in shown {
++                show(&repo, &mut out, &mut err, state, reversed, id, name.as_deref())?;
++            }
++            continue;
++        }
++        let (reversed, name) = match arg.strip_prefix('^') {
++            Some(name) => (true, name),
++            None => (false, arg.as_str()),
++        };
++        if let Some(id) = resolve(&repo, name).map_err(|message| fail(&mut err, &message, 128))? {
++            if state.verify {
++                revs_count += 1;
++                last = Some((reversed, id, name.to_owned()));
++            } else {
++                show(&repo, &mut out, &mut err, state, reversed, id, Some(name))?;
++            }
++            continue;
++        }
++        if state.verify {
++            return Err(no_single_rev(&mut err, state.quiet));
++        }
++        if has_dashdash {
++            return Err(fail(&mut err, &format!("fatal: bad revision '{arg}'"), 128));
+         }
++        as_is = 1;
++        if !state.show_files {
++            continue;
++        }
++        writeln!(out, "{arg}").or_error()?;
++        verify_filename(&cwd, arg, Some(&repo)).map_err(|message| fail(&mut err, &message, 128))?;
++    }
++    if state.verify {
++        return match last.filter(|_| revs_count == 1) {
++            Some((reversed, id, name)) => show(&repo, &mut out, &mut err, state, reversed, id, Some(&name)),
++            None => Err(no_single_rev(&mut err, state.quiet)),
++        };
+     }
+     Ok(())
+ }
+ 
++/// Git's `--short=<n>`: `strtoul()` of the value, clamped to at least 4 digits, so an empty, negative or
++/// non-numeric value means 4.
++fn git_abbrev_len(value: &str) -> usize {
++    let value = value.trim_start();
++    let (negative, digits) = match value.as_bytes().first() {
++        Some(b'-') => (true, &value[1..]),
++        Some(b'+') => (false, &value[1..]),
++        _ => (false, value),
++    };
++    let digits: String = digits.chars().take_while(char::is_ascii_digit).collect();
++    let len = digits
++        .parse::<usize>()
++        .unwrap_or(if digits.is_empty() { 0 } else { usize::MAX });
++    if negative && len != 0 { 0 } else { len }
++}
++
++/// The worktree Git would see from `cwd`: none when `cwd` is inside the Git directory, as Git then works
++/// like in a bare repository.
++fn workdir(repo: &gix::Repository, cwd: &Path) -> Option<PathBuf> {
++    let workdir = absolute(repo.workdir()?, cwd);
++    let inside_git_dir = realpath(cwd).starts_with(realpath(&absolute(repo.git_dir(), cwd)));
++    (!inside_git_dir).then_some(workdir)
++}
++
++/// One revision without range syntax, or `None` if it does not name an object. `Err` refuses a form
++/// that names several objects, like `A^@`, with the diagnostic to print.
++fn resolve(repo: &gix::Repository, name: &str) -> std::result::Result<Option<gix::ObjectId>, String> {
++    match repo
++        .rev_parse(BStr::new(name.as_bytes()))
++        .map(gix::revision::Spec::detach)
++    {
++        Ok(gix::revision::plumbing::Spec::Include(id)) => Ok(Some(id)),
++        Ok(_) => Err(format!(
++            "brit rev-parse: `{name}` is not implemented; list commits with `brit revision list` or find bases with `brit merge-base`"
++        )),
++        Err(_) => Ok(None),
++    }
++}
++
++/// One printed row: whether it is excluded (`^`), the object, and the name `--abbrev-ref` shortens.
++type Shown = (bool, gix::ObjectId, Option<String>);
++
++/// Git's `try_difference()`: `A..B` shows `B` and `^A`, and `A...B` shows `B`, `A` and `^<base>` for each
++/// merge base. An empty side means `HEAD`; `None` when `arg` is not such a range.
++fn try_difference(repo: &gix::Repository, arg: &str) -> std::result::Result<Option<Vec<Shown>>, String> {
++    let Some(dotdot) = arg.find("..") else {
++        return Ok(None);
++    };
++    let symmetric = arg[dotdot + 2..].starts_with('.');
++    let (start, end) = (&arg[..dotdot], &arg[dotdot + 2 + usize::from(symmetric)..]);
++    if start.is_empty() && end.is_empty() && !symmetric {
++        // Just `..` is the parent directory, not a range.
++        return Ok(None);
++    }
++    let side = |name: &str| if name.is_empty() { "HEAD" } else { name }.to_owned();
++    let (start, end) = (side(start), side(end));
++    let (Some(start_id), Some(end_id)) = (resolve(repo, &start)?, resolve(repo, &end)?) else {
++        return Ok(None);
++    };
++    let mut shown = vec![(false, end_id, Some(end)), (!symmetric, start_id, Some(start))];
++    if symmetric {
++        let source = gix::object::bounded::Source::deferred(repo);
++        let (Ok(a), Ok(b)) = (
++            source.peel(start_id, gix::object::Kind::Commit),
++            source.peel(end_id, gix::object::Kind::Commit),
++        ) else {
++            return Ok(None);
++        };
++        let bases = repo
++            .merge_bases_many(a, &[b])
++            .map_err(|err| format!("fatal: cannot find the merge base of '{arg}': {err}"))?;
++        for base in bases {
++            shown.push((true, base.detach(), None));
++        }
++    }
++    Ok(Some(shown))
++}
++
+ fn show(
+     repo: &gix::Repository,
+     mut out: impl Write,
+     mut err: impl Write,
+-    options: Options,
++    state: State,
+     reversed: bool,
+     id: gix::ObjectId,
+-    name: &str,
++    name: Option<&str>,
+ ) -> Result<()> {
+     let marker = if reversed { "^" } else { "" };
+-    if options.abbrev_ref {
++    if let (true, Some(name)) = (state.abbrev_ref, name) {
+         // Git prints nothing for a revision that is not a ref, like `HEAD~1`.
+         if let Some(full) = dwim_full_name(repo, name) {
+             let short = shorten_unambiguous(&full, |candidate| ref_exists(repo, candidate));
+@@ -220,7 +311,7 @@ fn show(
+         }
+         return Ok(());
+     }
+-    match options.short {
++    match state.abbrev {
+         Some(len) => {
+             let prefix = match len {
+                 None => id.attach(repo).shorten()?,
+@@ -243,6 +334,59 @@ fn show(
+     Ok(())
+ }
+ 
++/// Git's `verify_filename()`: `Err` holds the diagnostic for an argument that is neither a revision nor an
++/// existing path. With `repo`, a misspelt `<rev>:<path>` is diagnosed like Git does first.
++fn verify_filename(cwd: &Path, arg: &str, repo: Option<&gix::Repository>) -> std::result::Result<(), String> {
++    if arg.starts_with('-') {
++        return Err(format!("fatal: option '{arg}' must come before non-option arguments"));
++    }
++    let looks_like_pathspec = arg.contains(['*', '?', '[', '\\']) || arg.starts_with(":(");
++    if looks_like_pathspec || cwd.join(arg).symlink_metadata().is_ok() {
++        return Ok(());
++    }
++    let Some(repo) = repo else {
++        return Err(format!(
++            "fatal: {arg}: no such path in the working tree.\nUse 'git <command> -- <path>...' to specify paths that do not exist locally."
++        ));
++    };
++    if let Some(diagnostic) = misspelt_object_path(repo, arg) {
++        return Err(diagnostic);
++    }
++    Err(format!(
++        "fatal: ambiguous argument '{arg}': unknown revision or path not in the working tree.\nUse '--' to separate paths from revisions, like this:\n'git <command> [<revision>...] -- [<file>...]'"
++    ))
++}
++
++/// Git's `diagnose_invalid_oid_path()` and `diagnose_invalid_index_path()` for `<rev>:<path>` and `:<path>`.
++fn misspelt_object_path(repo: &gix::Repository, arg: &str) -> Option<String> {
++    let top = repo.workdir().map(|workdir| absolute(workdir, repo.current_dir()));
++    let on_disk = |path: &str| {
++        top.as_ref()
++            .is_some_and(|top| top.join(path).symlink_metadata().is_ok())
++    };
++    if let Some(path) = arg.strip_prefix(':') {
++        // Git leaves magic pathspecs like `:(icase)x` or `:/x` alone.
++        if !path.starts_with(|c: char| c.is_ascii_alphanumeric()) {
++            return None;
++        }
++        return Some(if on_disk(path) {
++            format!("fatal: path '{path}' exists on disk, but not in the index")
++        } else {
++            format!("fatal: path '{path}' does not exist (neither on disk nor in the index)")
++        });
++    }
++    let (object_name, path) = arg.split_once(':')?;
++    let id = resolve(repo, object_name).ok()??;
++    gix::object::bounded::Source::deferred(repo)
++        .peel(id, gix::object::Kind::Tree)
++        .ok()?;
++    Some(if on_disk(path) {
++        format!("fatal: path '{path}' exists on disk, but not in '{object_name}'")
++    } else {
++        format!("fatal: path '{path}' does not exist in '{object_name}'")
++    })
++}
++
+ /// The full ref name that `name` resolves to, following symbolic refs, or `None` for a non-ref.
+ fn dwim_full_name(repo: &gix::Repository, name: &str) -> Option<String> {
+     let name = if name == "@" { "HEAD" } else { name };
+@@ -281,22 +425,6 @@ pub(crate) fn ref_exists(repo: &gix::Repository, full_name: &str) -> bool {
+         .is_some_and(|reference| reference.name().as_bstr() == full_name.as_bytes().as_bstr())
+ }
+ 
+-fn die_no_single_rev(mut out: impl Write, mut err: impl Write, quiet: bool) -> ! {
+-    if quiet {
+-        die(&mut out, &mut err, "", 1)
+-    }
+-    die(&mut out, &mut err, "fatal: Needed a single revision", 128)
+-}
+-
+-fn die(mut out: impl Write, mut err: impl Write, message: &str, code: i32) -> ! {
+-    out.flush().ok();
+-    if !message.is_empty() {
+-        writeln!(err, "{message}").ok();
+-    }
+-    err.flush().ok();
+-    std::process::exit(code)
+-}
+-
+ fn absolute(path: &Path, cwd: &Path) -> PathBuf {
+     let joined = if path.is_absolute() {
+         path.to_owned()
+@@ -336,7 +464,7 @@ fn relative_path(path: &Path, base: &Path) -> String {
+ 
+ #[cfg(test)]
+ mod tests {
+-    use super::relative_path;
++    use super::{git_abbrev_len, relative_path};
+     use std::path::Path;
+ 
+     #[test]
+@@ -351,4 +479,19 @@ mod tests {
+             "../main/.git"
+         );
+     }
++
++    #[test]
++    fn short_lengths_parse_like_strtoul() {
++        for (value, len) in [
++            ("", 0),
++            ("-1", 0),
++            ("abc", 0),
++            ("12", 12),
++            ("12abc", 12),
++            ("+7", 7),
++            (" 9", 9),
++        ] {
++            assert_eq!(git_abbrev_len(value), len, "{value:?}");
++        }
++    }
+ }
+diff --git a/src/plumbing/main.rs b/src/plumbing/main.rs
+index ab06d61e8..4ac6cb05a 100644
+--- a/src/plumbing/main.rs
++++ b/src/plumbing/main.rs
+@@ -181,14 +181,36 @@ fn explicit_write_paths(cmd: &Subcommands) -> Vec<&std::path::Path> {
+ }
+ 
+ /// Apply each `-C <dir>` in order, each relative to the one before, as Git does; empty values are ignored.
+-fn change_dirs(dirs: &[std::ffi::OsString]) -> Result<()> {
++///
++/// A directory that cannot be entered ends like Git: `fatal: cannot change to '<dir>': <reason>` and 128.
++pub fn change_dirs(dirs: &[std::ffi::OsString]) -> Result<()> {
+     for dir in dirs.iter().filter(|dir| !dir.is_empty()) {
+-        std::env::set_current_dir(dir)
+-            .or_raise(|| message!("cannot change to '{}'", std::path::Path::new(dir).display()))?;
++        if let Err(err) = std::env::set_current_dir(dir) {
++            let reason = err.to_string();
++            // Git prints `strerror()`, without Rust's `(os error N)` suffix.
++            let reason = reason.split(" (os error ").next().unwrap_or(&reason);
++            eprintln!(
++                "fatal: cannot change to '{}': {reason}",
++                std::path::Path::new(dir).display()
++            );
++            return Err(core::repository::git_spellings::exit(128));
++        }
+     }
+     Ok(())
+ }
+ 
++/// Where discovery starts: the default `.` is made absolute when the current directory is a `.git`
++/// directory, where discovery from the relative `.` looks for `./.git/objects` and fails.
++fn discovery_start(repository: PathBuf) -> PathBuf {
++    if repository.as_os_str() == "."
++        && let Ok(cwd) = std::env::current_dir()
++        && cwd.file_name().is_some_and(|name| name == ".git")
++    {
++        return cwd;
++    }
++    repository
++}
++
+ /// Execute an already parsed plumbing command, allowing another CLI to compose its command tree.
+ pub fn run(args: Args) -> Result<()> {
+     run_with_command(args, Args::command())
+@@ -233,7 +255,7 @@ pub fn run_with_command(args: Args, command: clap::Command) -> Result<()> {
+         .unwrap_or_default();
+     let object_hash = args.object_hash;
+     let config = args.config;
+-    let repository = args.repository;
++    let repository = discovery_start(args.repository);
+     let repository_path = repository.clone();
+     enum Mode {
+         Strict,
+@@ -1431,15 +1453,9 @@ pub fn run_with_command(args: Args, command: clap::Command) -> Result<()> {
+                 )
+             }),
+         },
+-        Subcommands::RevParse(crate::plumbing::options::git_spellings::RevParse { args, options }) => {
++        Subcommands::RevParse(crate::plumbing::options::git_spellings::RevParse { args }) => {
+             prepare_and_run("rev-parse", verbose, None, move |_progress, out, err| {
+-                core::repository::git_spellings::rev_parse::rev_parse(
+-                    repository(Mode::Lenient)?,
+-                    args,
+-                    out,
+-                    err,
+-                    options,
+-                )
++                core::repository::git_spellings::rev_parse::rev_parse(repository(Mode::Lenient)?, args, out, err)
+             })
+         }
+         Subcommands::ForEachRef(crate::plumbing::options::git_spellings::ForEachRef {
+diff --git a/src/plumbing/mod.rs b/src/plumbing/mod.rs
+index c9a5308d8..6ce5239f1 100644
+--- a/src/plumbing/mod.rs
++++ b/src/plumbing/mod.rs
+@@ -1,5 +1,8 @@
+ mod main;
+ mod mutation;
++/// The status a Git-shaped ending asks for, when a command answers through its exit code.
++pub use gitoxide_core::repository::git_spellings::exit_status;
++pub use main::change_dirs;
+ pub use main::main;
+ pub use main::run;
+ pub use main::run_with_command;
+diff --git a/src/plumbing/options/git_spellings.rs b/src/plumbing/options/git_spellings.rs
+index c42a638d7..450c6c5c8 100644
+--- a/src/plumbing/options/git_spellings.rs
++++ b/src/plumbing/options/git_spellings.rs
+@@ -4,13 +4,16 @@
+ //! shapes for the forms in real use, and their help names the native Brit verb.
+ 
+ use clap::{Arg, ArgAction, ArgMatches, Command};
+-use gitoxide_core::repository::git_spellings::rev_parse;
+ 
+-/// `rev-parse`, parsed by hand so that path queries and revisions keep their command-line order.
++/// `rev-parse`, parsed by hand so that flags, path queries and revisions keep their command-line order.
++///
++/// Flags before the first revision are parsed by clap; from the first revision on, every argument
++/// (flags and `--` included) is taken verbatim, and all of them are read in order the way Git reads
++/// its argv, so `HEAD --short HEAD` prints a full and then a short object name.
+ #[derive(Debug)]
+ pub struct RevParse {
+-    pub args: Vec<rev_parse::Arg>,
+-    pub options: rev_parse::Options,
++    /// The arguments in command-line order, with each flag in its canonical spelling.
++    pub args: Vec<String>,
+ }
+ 
+ const REV: &str = "rev";
+@@ -25,8 +28,14 @@ const VERIFY: &str = "verify";
+ const QUIET: &str = "quiet";
+ const ABBREV_REF: &str = "abbrev-ref";
+ 
++/// A flag that records every occurrence with its position; a counted flag keeps only the last one.
+ fn flag(id: &'static str, help: &'static str) -> Arg {
+-    Arg::new(id).long(id).action(ArgAction::Count).help(help)
++    Arg::new(id)
++        .long(id)
++        .action(ArgAction::Append)
++        .num_args(0)
++        .default_missing_value("")
++        .help(help)
+ }
+ 
+ impl clap::Args for RevParse {
+@@ -36,7 +45,8 @@ impl clap::Args for RevParse {
+                 .value_name("REV")
+                 .action(ArgAction::Append)
+                 .num_args(0..)
+-                .help("Revisions like `HEAD`, `origin/dev`, `HEAD^{tree}`, `HEAD:path` or `A..B`"),
++                .allow_hyphen_values(true)
++                .help("Revisions like `HEAD`, `origin/dev`, `HEAD^{tree}`, `HEAD:path`, `A..B` or `A...B`; flags after the first one apply from their position, as in Git"),
+         )
+         .arg(
+             Arg::new(PATHS)
+@@ -44,7 +54,7 @@ impl clap::Args for RevParse {
+                 .action(ArgAction::Append)
+                 .num_args(0..)
+                 .last(true)
+-                .help("Printed verbatim after `--`, as Git does"),
++                .help("Printed verbatim after `--`, as Git does, unless --verify or --short came first"),
+         )
+         .arg(flag(SHOW_TOPLEVEL, "Print the absolute path of the worktree's top-level directory"))
+         .arg(flag(
+@@ -70,17 +80,15 @@ impl clap::Args for RevParse {
+                 .value_name("N")
+                 .num_args(0..=1)
+                 .require_equals(true)
+-                .default_missing_value("")
+-                .action(ArgAction::Set)
+-                .help("Print a unique abbreviation of at least N hex digits (core.abbrev when N is absent); implies --verify"),
++                .allow_hyphen_values(true)
++                // A NUL cannot arrive in argv, so it tells `--short` from an explicit empty `--short=`.
++                .default_missing_value("\0")
++                .action(ArgAction::Append)
++                .help("Print a unique abbreviation of at least N hex digits (core.abbrev when N is absent, at least 4); implies --verify"),
+         )
+-        .arg(flag(VERIFY, "Require exactly one revision and print its full object name"))
++        .arg(flag(VERIFY, "Require exactly one revision and print only its object name"))
+         .arg(
+-            Arg::new(QUIET)
+-                .long(QUIET)
+-                .short('q')
+-                .action(ArgAction::Count)
+-                .help("With --verify, print nothing on failure and exit with 1"),
++            flag(QUIET, "With --verify, print nothing on failure and exit with 1").short('q'),
+         )
+         .arg(flag(
+             ABBREV_REF,
+@@ -95,58 +103,43 @@ impl clap::Args for RevParse {
+ 
+ impl clap::FromArgMatches for RevParse {
+     fn from_arg_matches(matches: &ArgMatches) -> Result<Self, clap::Error> {
+-        let mut ordered: Vec<(usize, rev_parse::Arg)> = Vec::new();
+-        let mut take = |id: &str, item: &dyn Fn(Option<&String>) -> rev_parse::Arg| {
+-            // Counted flags default to zero, and defaults have indices too: only typed arguments count.
++        let mut ordered: Vec<(usize, String)> = Vec::new();
++        let mut take = |id: &str, token: &dyn Fn(&str) -> String| {
+             if matches.value_source(id) != Some(clap::parser::ValueSource::CommandLine) {
+                 return;
+             }
+-            let values: Vec<Option<&String>> = matches
+-                .try_get_many::<String>(id)
+-                .ok()
+-                .flatten()
+-                .map(|values| values.map(Some).collect())
+-                .unwrap_or_default();
+-            for (position, index) in matches.indices_of(id).into_iter().flatten().enumerate() {
+-                ordered.push((index, item(values.get(position).copied().flatten())));
++            let values: Vec<&String> = matches.get_many::<String>(id).into_iter().flatten().collect();
++            for (value, index) in values.into_iter().zip(matches.indices_of(id).into_iter().flatten()) {
++                ordered.push((index, token(value)));
+             }
+         };
+-        take(REV, &|value| rev_parse::Arg::Rev(value.cloned().unwrap_or_default()));
+-        take(SHOW_TOPLEVEL, &|_| rev_parse::Arg::ShowToplevel);
+-        take(GIT_DIR, &|_| rev_parse::Arg::GitDir);
+-        take(ABSOLUTE_GIT_DIR, &|_| rev_parse::Arg::AbsoluteGitDir);
+-        take(GIT_COMMON_DIR, &|_| rev_parse::Arg::GitCommonDir);
+-        take(PATH_FORMAT, &|value| {
+-            rev_parse::Arg::PathFormat(if value.is_some_and(|v| v == "relative") {
+-                rev_parse::PathFormat::Relative
++        take(REV, &str::to_owned);
++        for id in [
++            SHOW_TOPLEVEL,
++            GIT_DIR,
++            ABSOLUTE_GIT_DIR,
++            GIT_COMMON_DIR,
++            VERIFY,
++            ABBREV_REF,
++        ] {
++            take(id, &|_| format!("--{id}"));
++        }
++        take(QUIET, &|_| "--quiet".to_owned());
++        take(PATH_FORMAT, &|value| format!("--path-format={value}"));
++        take(SHORT, &|value| {
++            if value == "\0" {
++                "--short".to_owned()
+             } else {
+-                rev_parse::PathFormat::Absolute
+-            })
++                format!("--short={value}")
++            }
+         });
+         ordered.sort_by_key(|(index, _)| *index);
+         let mut args: Vec<_> = ordered.into_iter().map(|(_, arg)| arg).collect();
+         if let Some(paths) = matches.get_many::<String>(PATHS) {
+-            args.push(rev_parse::Arg::Paths(paths.cloned().collect()));
++            args.push("--".to_owned());
++            args.extend(paths.cloned());
+         }
+-        let short = match matches.get_one::<String>(SHORT) {
+-            None => None,
+-            Some(value) if value.is_empty() => Some(None),
+-            Some(value) => Some(Some(value.parse::<usize>().map_err(|_| {
+-                clap::Error::raw(
+-                    clap::error::ErrorKind::InvalidValue,
+-                    format!("--short expects a number of hex digits, got `{value}`\n"),
+-                )
+-            })?)),
+-        };
+-        Ok(RevParse {
+-            args,
+-            options: rev_parse::Options {
+-                verify: matches.get_count(VERIFY) > 0,
+-                quiet: matches.get_count(QUIET) > 0,
+-                abbrev_ref: matches.get_count(ABBREV_REF) > 0,
+-                short,
+-            },
+-        })
++        Ok(RevParse { args })
+     }
+ 
+     fn update_from_arg_matches(&mut self, matches: &ArgMatches) -> Result<(), clap::Error> {
+diff --git a/src/plumbing/options/mod.rs b/src/plumbing/options/mod.rs
+index bae47c779..c77d0944c 100644
+--- a/src/plumbing/options/mod.rs
++++ b/src/plumbing/options/mod.rs
+@@ -15,7 +15,9 @@ use crate::shared::{AsRange, AsTime};
+ pub struct Args {
+     /// Run as if Brit was started in this directory, like Git's `-C`; repeat to descend further.
+     ///
+-    /// Each one is applied before anything else, relative to the previous one; an empty value is ignored.
++    /// Each one is applied relative to the previous one before the command runs, and before a subcommand's
++    /// `--help` or usage error; an empty value is ignored, and one that cannot be entered ends with Git's
++    /// `fatal: cannot change to '<dir>'` and status 128. Brit's own `--help` without a subcommand ignores it.
+     /// Repository discovery and every relative path argument then start there, and `-r` is resolved
+     /// relative to the result. `-r` alone only selects the repository.
+     #[clap(short = 'C', value_name = "DIR", action = clap::ArgAction::Append, value_parser = clap::value_parser!(std::ffi::OsString))]
+diff --git a/tests/cli-journey/tests/change_dir.rs b/tests/cli-journey/tests/change_dir.rs
+index c3917fc48..20fe69e9c 100644
+--- a/tests/cli-journey/tests/change_dir.rs
++++ b/tests/cli-journey/tests/change_dir.rs
+@@ -2,7 +2,7 @@
+ //! discovery and relative path arguments, repeatable, and composing with `-r`. Proven in a normal
+ //! repository, a linked worktree, and from a superproject into a submodule.
+ use anyhow::Result;
+-use cli_journey::support::parity::{assert_same, brit, git_ok};
++use cli_journey::support::parity::{assert_same, assert_same_streams, brit, git_ok};
+ 
+ fn s(path: &std::path::Path) -> &str {
+     path.to_str().expect("UTF-8 temporary path")
+@@ -67,12 +67,21 @@ fn change_dir_matches_git_in_a_repository_a_linked_worktree_and_a_submodule() ->
+         let out = brit(away, args)?;
+         assert_eq!(out.stdout, format!("{}\n", repo.display()), "{args:?}: {out:?}");
+     }
+-    let missing = brit(away, &["-C", "does-not-exist", "rev-parse", "HEAD"])?;
+-    assert_ne!(missing.code, Some(0), "{missing:?}");
+-    assert!(
+-        missing.stderr.contains("cannot change to 'does-not-exist'"),
+-        "{missing:?}"
+-    );
++    // A directory that cannot be entered ends like Git, before the subcommand's help or usage.
++    for args in [
++        &["-C", "does-not-exist", "rev-parse", "HEAD"][..],
++        &["-C", "does-not-exist", "rev-parse", "--help"][..],
++        &["-C", "does-not-exist", "rev-parse", "--unknown-flag"][..],
++        &["-C", s(&repo), "-C", "does-not-exist", "for-each-ref"][..],
++    ] {
++        let missing = assert_same_streams(away, args)?;
++        assert!(
++            missing
++                .stderr
++                .starts_with("fatal: cannot change to 'does-not-exist': No such file or directory"),
++            "{args:?}: {missing:?}"
++        );
++    }
+ 
+     // A linked worktree: its private Git directory differs from the shared one.
+     for args in [
+diff --git a/tests/cli-journey/tests/rev_parse.rs b/tests/cli-journey/tests/rev_parse.rs
+index 31760cf57..68b5e1b8a 100644
+--- a/tests/cli-journey/tests/rev_parse.rs
++++ b/tests/cli-journey/tests/rev_parse.rs
+@@ -2,7 +2,7 @@
+ //! worktree, its subdirectory, and a linked worktree, and its help leads to `brit revision resolve`.
+ use anyhow::Result;
+ use cli_journey::support::{
+-    parity::{assert_help_names, assert_same, brit, git_ok},
++    parity::{assert_help_names, assert_same, assert_same_streams, brit, git, git_ok},
+     test_repo::TestRepo,
+ };
+ 
+@@ -104,3 +104,78 @@ fn rev_parse_matches_git_in_main_and_linked_worktrees() -> Result<()> {
+ 
+     assert_help_names("rev-parse", "brit revision resolve")
+ }
++
++/// Flags apply from their position, `--verify` lets exactly one revision and nothing else reach stdout,
++/// and the failures a script checks exit and write to stderr like Git.
++#[test]
++fn rev_parse_reads_arguments_in_order_like_git() -> Result<()> {
++    let repo = TestRepo::new("rev-parse-order")?;
++    let root = repo.path();
++    repo.commit_file("sub/f", "f\n")?;
++    repo.commit_file("g", "g\n")?;
++    git_ok(root, &["switch", "-q", "-c", "side", "HEAD~1"])?;
++    repo.commit_file("s", "s\n")?;
++    git_ok(root, &["switch", "-q", "main"])?;
++
++    let forms: &[&[&str]] = &[
++        // --verify: one revision, nothing else on stdout.
++        &["rev-parse", "--verify", "HEAD", "--", "x"],
++        &["rev-parse", "--verify", "HEAD", "--"],
++        &["rev-parse", "--verify", "^HEAD"],
++        &["rev-parse", "--verify", "HEAD~1..HEAD"],
++        &["rev-parse", "--verify", "-q", "HEAD~1..HEAD"],
++        &["rev-parse", "--verify", "main...side"],
++        &["rev-parse", "--verify", "missing", "--", "x"],
++        &["rev-parse", "HEAD", "--verify"],
++        // `--` is kept, and a missing revision before it is a bad revision.
++        &["rev-parse", "HEAD", "--"],
++        &["rev-parse", "HEAD", "--", "x", "y"],
++        &["rev-parse", "--", "x"],
++        &["rev-parse", "missing", "--", "x"],
++        &["rev-parse", "main...side"],
++        &["rev-parse", "side...main"],
++        // --short: Git's 4-digit minimum and positional effect.
++        &["rev-parse", "--short=", "HEAD"],
++        &["rev-parse", "--short=-1", "HEAD"],
++        &["rev-parse", "--short=0", "HEAD"],
++        &["rev-parse", "HEAD", "--short", "HEAD"],
++        &["rev-parse", "HEAD", "--short=5", "main"],
++        // Repeated path queries print once per occurrence.
++        &["rev-parse", "--git-dir", "--git-dir"],
++        &["rev-parse", "--git-dir", "HEAD", "--git-dir"],
++        // Diagnostics name the missing path.
++        &["rev-parse", "HEAD:missing"],
++        &["rev-parse", "HEAD:g", "HEAD:missing"],
++        &["rev-parse", ":missing"],
++        &["rev-parse", "HEAD", "missing"],
++        &["rev-parse", "sub/f", "--git-dir"],
++    ];
++    for form in forms {
++        assert_same_streams(root, form)?;
++    }
++
++    // Inside the Git directory there is no worktree.
++    let git_dir = root.join(".git");
++    for form in [
++        &["rev-parse", "--show-toplevel"][..],
++        &["rev-parse", "--git-dir", "HEAD"][..],
++        &["rev-parse", "--git-common-dir"][..],
++        &["rev-parse", "--show-toplevel", "HEAD"][..],
++    ] {
++        assert_same_streams(&git_dir, form)?;
++    }
++
++    // Global -v buffers output: a failure still forwards what was printed before it.
++    let verbose = brit(root, &["-v", "rev-parse", "HEAD", "missing"])?;
++    let expected = git(root, &["rev-parse", "HEAD", "missing"])?;
++    assert_eq!(
++        (&verbose.stdout, verbose.code),
++        (&expected.stdout, expected.code),
++        "brit -v: {verbose:?}"
++    );
++    assert!(
++        verbose.stderr.contains("ambiguous argument 'missing'"),
++        "brit -v forwards the diagnostic: {verbose:?}"
++    );
++    Ok(())
++}
+-- 
+2.52.0
+

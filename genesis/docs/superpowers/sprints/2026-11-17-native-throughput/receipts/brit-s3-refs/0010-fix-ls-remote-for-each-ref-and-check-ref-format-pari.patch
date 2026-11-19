@@ -1,0 +1,426 @@
+From 1fb4bba43d6d812997543fcb2b2e81c46a7c31c5 Mon Sep 17 00:00:00 2001
+From: Matthew Dowell <mbd06b+github@gmail.com>
+Date: Thu, 19 Nov 2026 09:48:20 +0000
+Subject: [PATCH 10/12] fix: ls-remote, for-each-ref and check-ref-format
+ parity cases
+
+Review items B6-B8 and the C notes, each proven against real Git.
+
+- ls-remote: the subcommand reclaims `-h` for `--heads` (help stays
+  `--help`), `-b` is `--branches`; with the remote omitted, `From <url>`
+  goes to stderr unless `-q`; `--exit-code` ends with 2 when nothing
+  matched.
+- for-each-ref: `--sort -refname` works as two arguments; `%+1` and other
+  escapes that are not two hex digits stay literal, like Git's hex2chr.
+- check-ref-format: a missing name, `-`, or an option in its place is a
+  usage error with Git's status 129.
+- Known differences (relative GIT_DIR, strict refname:short, lossy
+  non-UTF-8 names, ls-remote needing a repository, `-r` versus Git's
+  `--git-dir`, credential helpers that wait) are listed in the module
+  docs. The credential note was checked against a local HTTP 401 server:
+  a sleeping helper held Brit until killed, and `-c credential.helper=`
+  with `GIT_TERMINAL_PROMPT=0` failed at once with status 1.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01PJB8fpkCKfb4CMYBh9vCEs
+Co-Authored-By: claude-fable-5-2 <noreply@anthropic.com>
+Claude-Session: b49f7c46-0cab-4b30-8b19-3294dddb61a7
+---
+ .../git_spellings/check_ref_format.rs         | 20 ++++++++++++-
+ .../repository/git_spellings/for_each_ref.rs  |  9 ++++++
+ .../src/repository/git_spellings/ls_remote.rs | 29 +++++++++++++++++++
+ .../src/repository/git_spellings/mod.rs       | 11 +++++++
+ src/plumbing/main.rs                          | 16 +++++-----
+ src/plumbing/options/git_spellings.rs         | 27 +++++++++++++----
+ tests/cli-journey/tests/check_ref_format.rs   | 13 ++++++++-
+ tests/cli-journey/tests/for_each_ref.rs       | 18 +++++++++++-
+ tests/cli-journey/tests/ls_remote.rs          | 24 ++++++++++++++-
+ 9 files changed, 150 insertions(+), 17 deletions(-)
+
+diff --git a/gitoxide-core/src/repository/git_spellings/check_ref_format.rs b/gitoxide-core/src/repository/git_spellings/check_ref_format.rs
+index 40866ede3..f22c0d67c 100644
+--- a/gitoxide-core/src/repository/git_spellings/check_ref_format.rs
++++ b/gitoxide-core/src/repository/git_spellings/check_ref_format.rs
+@@ -1,6 +1,24 @@
+ //! `brit check-ref-format`: Git's reference-name validity check, answered by the exit code alone.
+ 
+-use gix::bstr::BStr;
++use gix::bstr::{BStr, BString};
++
++/// Answer like `git check-ref-format [--allow-onelevel] <refname>`: `Ok` for a valid name, status 1 for
++/// an invalid one, and Git's usage status 129 when the name is missing or looks like an option.
++pub fn check(refname: Option<&BString>, allow_onelevel: bool) -> gix::Result<()> {
++    match refname {
++        Some(name) if !name.starts_with(b"-") => {
++            if is_valid(name.as_ref(), allow_onelevel) {
++                Ok(())
++            } else {
++                Err(super::exit(1))
++            }
++        }
++        _ => {
++            eprintln!("usage: brit check-ref-format [--allow-onelevel] <refname>");
++            Err(super::exit(129))
++        }
++    }
++}
+ 
+ /// Whether `name` is a valid reference name for `git check-ref-format`: at least two components
+ /// unless `allow_onelevel`, and every rule of [`gix::validate::reference::name_partial()`].
+diff --git a/gitoxide-core/src/repository/git_spellings/for_each_ref.rs b/gitoxide-core/src/repository/git_spellings/for_each_ref.rs
+index 69631787b..03645f061 100644
+--- a/gitoxide-core/src/repository/git_spellings/for_each_ref.rs
++++ b/gitoxide-core/src/repository/git_spellings/for_each_ref.rs
+@@ -90,8 +90,10 @@ fn parse_format(format: &str) -> Result<Vec<Piece>> {
+                 i += 2;
+                 continue;
+             }
++            // Git's `hex2chr()`: exactly two hex digits; `from_str_radix` alone would accept `%+1`.
+             if let Some(byte) = bytes
+                 .get(i + 1..i + 3)
++                .filter(|hex| hex.iter().all(u8::is_ascii_hexdigit))
+                 .and_then(|hex| std::str::from_utf8(hex).ok())
+                 .and_then(|hex| u8::from_str_radix(hex, 16).ok())
+             {
+@@ -281,5 +283,12 @@ mod tests {
+             .expect("unimplemented atom");
+         assert!(error.to_string().contains("%(authorname)"), "{error}");
+         assert!(parse_format("%% %41 %(refname:short)").is_ok());
++        let literal = |format: &str| match parse_format(format).expect("valid format").as_slice() {
++            [super::Piece::Literal(text)] => text.clone(),
++            _ => panic!("{format} is one literal"),
++        };
++        assert_eq!(literal("%+1"), "%+1", "a sign is not a hex digit");
++        assert_eq!(literal("%-1"), "%-1");
++        assert_eq!(literal("%41"), "A");
+     }
+ }
+diff --git a/gitoxide-core/src/repository/git_spellings/ls_remote.rs b/gitoxide-core/src/repository/git_spellings/ls_remote.rs
+index 0a3869c31..60fd89431 100644
+--- a/gitoxide-core/src/repository/git_spellings/ls_remote.rs
++++ b/gitoxide-core/src/repository/git_spellings/ls_remote.rs
+@@ -3,6 +3,18 @@
+ //! Refs print in the server's order. An annotated tag prints its tag object and then its peeled
+ //! object as `<refname>^{}`, and patterns match the tail of a ref name at a `/` boundary, both
+ //! like Git. An unborn `HEAD` is not listed, as Git does not request it without `--symref`.
++//! With the remote omitted, `From <url>` goes to stderr as Git writes it.
++//!
++//! ### Known differences from Git
++//!
++//! - It needs a local repository even for an explicit path or URL, where Git can list from anywhere.
++//! - Ref names that are not UTF-8 are converted lossily before matching and printing.
++//! - `-h` alone lists the default remote's branches; Git prints its usage for a lone `-h`.
++//! - Like Git, it asks the configured credential helpers when the remote wants authentication, and a
++//!   helper may wait indefinitely (checked 2026-11-19 against a local HTTP 401 server: a helper that
++//!   sleeps held Brit until it was killed). A non-interactive caller passes `-c credential.helper=`, which
++//!   clears every configured helper, and sets `GIT_TERMINAL_PROMPT=0` (no terminal prompt) and an empty
++//!   or harmless `GIT_ASKPASS`; Brit then fails at once with status 1 naming the URL.
+ 
+ use gix::{Result, bstr::BString, error::ResultExt, protocol::handshake};
+ 
+@@ -18,6 +30,10 @@ pub struct Options {
+     pub tags: bool,
+     /// `--refs`
+     pub refs: bool,
++    /// `--exit-code`: end with status 2 when no ref matched.
++    pub exit_code: bool,
++    /// `--quiet`: no `From <url>` line.
++    pub quiet: bool,
+ }
+ 
+ /// Git's `tail_match()`: `pattern` matches `name` when `*/<pattern>` matches `/<name>`.
+@@ -46,9 +62,17 @@ pub async fn ls_remote(
+     repo: gix::Repository,
+     mut progress: impl gix::Progress,
+     mut out: impl std::io::Write,
++    mut err: impl std::io::Write,
+     options: Options,
+ ) -> Result<()> {
+     let remote = crate::repository::remote::by_name_or_url(&repo, options.remote.as_deref())?;
++    if options.remote.is_none()
++        && !options.quiet
++        && let Some(url) = remote.url(gix::remote::Direction::Fetch)
++    {
++        writeln!(err, "From {}", url.to_bstring()).or_error()?;
++    }
++    let mut matched = false;
+     let (map, _handshake) = remote
+         .connect(gix::remote::Direction::Fetch)
+         .await?
+@@ -81,15 +105,20 @@ pub async fn ls_remote(
+         };
+         let name = name.to_string();
+         if selected(&options, &name) {
++            matched = true;
+             writeln!(out, "{object}\t{name}").or_error()?;
+         }
+         if let Some(peeled) = peeled {
+             let peeled_name = format!("{name}^{{}}");
+             if selected(&options, &peeled_name) {
++                matched = true;
+                 writeln!(out, "{peeled}\t{peeled_name}").or_error()?;
+             }
+         }
+     }
++    if options.exit_code && !matched {
++        return Err(super::exit(2));
++    }
+     Ok(())
+ }
+ 
+diff --git a/gitoxide-core/src/repository/git_spellings/mod.rs b/gitoxide-core/src/repository/git_spellings/mod.rs
+index f371c9858..a1b61b914 100644
+--- a/gitoxide-core/src/repository/git_spellings/mod.rs
++++ b/gitoxide-core/src/repository/git_spellings/mod.rs
+@@ -3,6 +3,17 @@
+ //! Each module answers one Git command name. Brit's own verbs (`revision resolve`, `remote refs`,
+ //! `branch list`) stay the native interface; these exist so that a guessed Git spelling works and
+ //! points back to them.
++//!
++//! ### Known differences shared by these spellings
++//!
++//! - A relative `GIT_DIR` is printed absolute by `rev-parse --git-dir`.
++//! - Short ref names are always strict, as if `core.warnAmbiguousRefs` were true: with a tag and a
++//!   branch both named `x` and the setting false, Git may print `x` where Brit prints `tags/x`.
++//! - Ref names that are not UTF-8 are shortened, matched and printed lossily.
++//! - `ls-remote` needs a local repository even for an explicit path or URL.
++//! - Brit's global `-r <dir>` starts discovery at `<dir>` and may find an ancestor; Git's
++//!   `--git-dir=<dir>` requires `<dir>` itself to be a Git directory. `GIT_DIR` overrides `-r`.
++//! - `ls-remote` may wait on a configured credential helper; see its module for how a caller avoids it.
+ 
+ pub mod check_ref_format;
+ pub mod for_each_ref;
+diff --git a/src/plumbing/main.rs b/src/plumbing/main.rs
+index 4ac6cb05a..e3d35c73e 100644
+--- a/src/plumbing/main.rs
++++ b/src/plumbing/main.rs
+@@ -1475,26 +1475,32 @@ pub fn run_with_command(args: Args, command: clap::Command) -> Result<()> {
+         }),
+         #[cfg(any(feature = "gitoxide-core-async-client", feature = "gitoxide-core-blocking-client"))]
+         Subcommands::LsRemote(crate::plumbing::options::git_spellings::LsRemote {
++            help: _,
+             heads,
+             tags,
+             refs,
++            exit_code,
++            quiet,
+             remote,
+             patterns,
+         }) => prepare_and_run(
+             "ls-remote",
+             verbose,
+             core::repository::remote::refs::PROGRESS_RANGE,
+-            move |progress, out, _err| {
++            move |progress, out, err| {
+                 let res = core::repository::git_spellings::ls_remote::ls_remote(
+                     repository(Mode::LenientWithGitInstallConfig)?,
+                     progress,
+                     out,
++                    err,
+                     core::repository::git_spellings::ls_remote::Options {
+                         remote,
+                         patterns,
+                         heads,
+                         tags,
+                         refs,
++                        exit_code,
++                        quiet,
+                     },
+                 );
+                 #[cfg(feature = "gitoxide-core-async-client")]
+@@ -1505,13 +1511,7 @@ pub fn run_with_command(args: Args, command: clap::Command) -> Result<()> {
+         Subcommands::CheckRefFormat(crate::plumbing::options::git_spellings::CheckRefFormat {
+             allow_onelevel,
+             refname,
+-        }) => {
+-            if core::repository::git_spellings::check_ref_format::is_valid(refname.as_ref(), allow_onelevel) {
+-                Ok(())
+-            } else {
+-                std::process::exit(1)
+-            }
+-        }
++        }) => core::repository::git_spellings::check_ref_format::check(refname.as_ref(), allow_onelevel),
+         Subcommands::Cat { revspec } => prepare_and_run("cat", verbose, None, move |_progress, out, _err| {
+             core::repository::cat(repository(Mode::Lenient)?, &revspec, out)
+         }),
+diff --git a/src/plumbing/options/git_spellings.rs b/src/plumbing/options/git_spellings.rs
+index 450c6c5c8..6470a2ee3 100644
+--- a/src/plumbing/options/git_spellings.rs
++++ b/src/plumbing/options/git_spellings.rs
+@@ -149,6 +149,9 @@ impl clap::FromArgMatches for RevParse {
+ }
+ 
+ /// `for-each-ref` with Git's default format, `--format` atoms and `--sort` keys in real use.
++///
++/// A ref name that is not UTF-8 is shortened lossily by `%(refname:short)`, and `refname:short`
++/// always shortens strictly, as if `core.warnAmbiguousRefs` were true.
+ #[derive(Debug, clap::Parser)]
+ pub struct ForEachRef {
+     /// Interpolate `%(atom)` for each ref; implemented atoms: refname, refname:short, objectname,
+@@ -159,7 +162,7 @@ pub struct ForEachRef {
+     pub format: Option<String>,
+     /// Sort by `refname` (the default) or `committerdate`; prefix `-` for descending. Repeat to add keys, the last
+     /// one primary, like Git.
+-    #[clap(long, value_name = "KEY", action = clap::ArgAction::Append)]
++    #[clap(long, value_name = "KEY", action = clap::ArgAction::Append, allow_hyphen_values = true)]
+     pub sort: Vec<String>,
+     /// Only refs matching these prefixes (at a `/` boundary) or `fnmatch` globs, like `refs/heads/` or
+     /// `refs/heads/feat-*`.
+@@ -167,10 +170,16 @@ pub struct ForEachRef {
+ }
+ 
+ /// `ls-remote` printing Git's `<oid>\t<refname>` lines.
++///
++/// `-h` means `--heads`, as in Git; help is `--help` only.
+ #[derive(Debug, clap::Parser)]
++#[command(disable_help_flag = true)]
+ pub struct LsRemote {
+-    /// Only branches under `refs/heads/`.
+-    #[clap(long, visible_alias = "branches")]
++    /// Print help.
++    #[clap(long, action = clap::ArgAction::Help)]
++    pub help: Option<bool>,
++    /// Only branches under `refs/heads/`; `-h` like Git.
++    #[clap(long, short = 'h', visible_alias = "branches", short_alias = 'b')]
+     pub heads: bool,
+     /// Only tags under `refs/tags/`.
+     #[clap(long, short = 't')]
+@@ -178,6 +187,12 @@ pub struct LsRemote {
+     /// Omit peeled tags (`^{}`) and pseudo-refs like `HEAD`.
+     #[clap(long)]
+     pub refs: bool,
++    /// Exit with status 2 when no ref matched.
++    #[clap(long)]
++    pub exit_code: bool,
++    /// Do not print `From <url>` on stderr when the remote is omitted.
++    #[clap(long, short = 'q')]
++    pub quiet: bool,
+     /// A configured remote, URL or path; the current branch's remote (else `origin`) when omitted.
+     pub remote: Option<String>,
+     /// Show only refs whose name ends with a pattern at a `/` boundary, like `dev`, `refs/heads/dev` or
+@@ -186,12 +201,14 @@ pub struct LsRemote {
+ }
+ 
+ /// `check-ref-format` answering through its exit code, like Git.
++///
++/// A missing name, or an argument starting with `-` in its place, is a usage error with Git's status 129.
+ #[derive(Debug, clap::Parser)]
+ pub struct CheckRefFormat {
+     /// Accept a name without a `/`, like `main` or `HEAD`.
+     #[clap(long)]
+     pub allow_onelevel: bool,
+     /// The reference name to validate, like `refs/heads/main`.
+-    #[clap(value_parser = crate::shared::AsBString)]
+-    pub refname: gix::bstr::BString,
++    #[clap(value_parser = crate::shared::AsBString, allow_hyphen_values = true)]
++    pub refname: Option<gix::bstr::BString>,
+ }
+diff --git a/tests/cli-journey/tests/check_ref_format.rs b/tests/cli-journey/tests/check_ref_format.rs
+index 2eed10a86..4477d0e0d 100644
+--- a/tests/cli-journey/tests/check_ref_format.rs
++++ b/tests/cli-journey/tests/check_ref_format.rs
+@@ -1,6 +1,6 @@
+ //! `brit check-ref-format` answers like `git check-ref-format`, through its exit code alone.
+ use anyhow::Result;
+-use cli_journey::support::parity::assert_same;
++use cli_journey::support::parity::{assert_same, assert_same_streams};
+ 
+ #[test]
+ fn check_ref_format_matches_git() -> Result<()> {
+@@ -29,5 +29,16 @@ fn check_ref_format_matches_git() -> Result<()> {
+         assert!(out.stdout.is_empty(), "{name}: {out:?}");
+         assert_same(cwd.path(), &["check-ref-format", "--allow-onelevel", name])?;
+     }
++    // A missing name, or `-` in its place, is a usage error: Git's 129 and a usage line on stderr.
++    for args in [
++        &["check-ref-format"][..],
++        &["check-ref-format", "--allow-onelevel"],
++        &["check-ref-format", "-"],
++        &["check-ref-format", "--allow-onelevel", "-"],
++        &["check-ref-format", "-x"],
++    ] {
++        let out = assert_same_streams(cwd.path(), args)?;
++        assert_eq!(out.code, Some(129), "{args:?}: {out:?}");
++    }
+     Ok(())
+ }
+diff --git a/tests/cli-journey/tests/for_each_ref.rs b/tests/cli-journey/tests/for_each_ref.rs
+index 3b22c7cf1..a707eedba 100644
+--- a/tests/cli-journey/tests/for_each_ref.rs
++++ b/tests/cli-journey/tests/for_each_ref.rs
+@@ -2,7 +2,7 @@
+ //! `--sort` keys agents use, refuses an unimplemented atom by name, and leads to `brit branch list`.
+ use anyhow::Result;
+ use cli_journey::support::{
+-    parity::{assert_help_names, assert_same, brit, git_ok},
++    parity::{assert_help_names, assert_same, assert_same_streams, brit, git_ok},
+     test_repo::TestRepo,
+ };
+ 
+@@ -71,6 +71,22 @@ fn for_each_ref_matches_git() -> Result<()> {
+         assert_same(root, form)?;
+     }
+ 
++    // A descending key as its own argument, and escapes that are not two hex digits stay literal.
++    for form in [
++        &["for-each-ref", "--sort", "-refname", "--format=%(refname)"][..],
++        &[
++            "for-each-ref",
++            "--sort",
++            "-committerdate",
++            "--sort",
++            "refname",
++            "--format=%(refname)",
++        ],
++        &["for-each-ref", "--format=%+1 %-1 %4 %zz %41%(refname)", "refs/heads"],
++    ] {
++        assert_same_streams(root, form)?;
++    }
++
+     let refused = brit(root, &["for-each-ref", "--format=%(refname) %(authorname)"])?;
+     assert_ne!(
+         refused.code,
+diff --git a/tests/cli-journey/tests/ls_remote.rs b/tests/cli-journey/tests/ls_remote.rs
+index f169ccbba..e0c0f3f7b 100644
+--- a/tests/cli-journey/tests/ls_remote.rs
++++ b/tests/cli-journey/tests/ls_remote.rs
+@@ -3,7 +3,7 @@
+ use anyhow::Result;
+ use cli_journey::support::{
+     mock_remote::MockRemote,
+-    parity::{assert_help_names, assert_same, git_ok},
++    parity::{assert_help_names, assert_same, assert_same_streams, git_ok},
+     test_repo::TestRepo,
+ };
+ 
+@@ -67,5 +67,27 @@ fn ls_remote_matches_git() -> Result<()> {
+         );
+     }
+ 
++    // `-h` lists heads as in Git, the omitted remote is named on stderr, and --exit-code reports no match.
++    for form in [
++        &["ls-remote", "-h", "origin"][..],
++        &["ls-remote", "-h", "origin", "dev"],
++        &["ls-remote", "-b", "origin"],
++        &["ls-remote"],
++        &["ls-remote", "-q"],
++        &["ls-remote", "--quiet", "--heads"],
++        &["ls-remote", "origin"],
++        &["ls-remote", "--exit-code", "origin", "nothing-matches"],
++        &["ls-remote", "--exit-code", "origin", "dev"],
++        &["ls-remote", "--exit-code", "--tags", "origin", "refs/heads/*"],
++    ] {
++        assert_same_streams(root, form)?;
++    }
++    let from = assert_same_streams(root, &["ls-remote", "--refs"])?;
++    assert_eq!(
++        from.stderr,
++        format!("From {url}\n"),
++        "the default remote's URL: {from:?}"
++    );
++
+     assert_help_names("ls-remote", "brit remote refs")
+ }
+-- 
+2.52.0
+

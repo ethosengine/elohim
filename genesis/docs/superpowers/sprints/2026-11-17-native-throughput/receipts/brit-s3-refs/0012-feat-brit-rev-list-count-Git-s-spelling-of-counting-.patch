@@ -1,0 +1,303 @@
+From e534083f051fc1b380fe2729b19c514ff3c72156 Mon Sep 17 00:00:00 2001
+From: Matthew Dowell <mbd06b+github@gmail.com>
+Date: Thu, 19 Nov 2026 09:53:49 +0000
+Subject: [PATCH 12/12] feat: `brit rev-list --count`, Git's spelling of
+ counting a revision walk
+
+Requested by the integrating session (about 25 uses in the agents'
+fallback census). A real clap subcommand whose help leads to
+`brit revision list`; the walk is gix's `rev_walk` with hidden tips, the
+same traversal `revision list` uses for `A..B`.
+
+- `--count <rev>...` with `A`, `^A`, `A..B` and `A...B` (both sides minus
+  the commits reachable from their merge bases) prints one number.
+- `--left-right --count A...B` prints `<left>\t<right>`; without a
+  symmetric range every commit counts on the right, as in Git.
+- An unknown revision fails with Git's ambiguous-argument diagnostic and
+  128; no revision is a usage error (129); listing without `--count` is
+  refused with a pointer to `brit revision list` / `brit log`.
+- `rev-list` joins the read-only arm of `requires_mutation_guard` (one
+  appended pattern) and brit-cli's `READ_ONLY_COMMANDS`.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01PJB8fpkCKfb4CMYBh9vCEs
+Co-Authored-By: claude-fable-5-2 <noreply@anthropic.com>
+Claude-Session: b49f7c46-0cab-4b30-8b19-3294dddb61a7
+---
+ .../src/repository/git_spellings/mod.rs       |   1 +
+ .../src/repository/git_spellings/rev_list.rs  | 118 ++++++++++++++++++
+ src/plumbing/main.rs                          |  16 ++-
+ src/plumbing/options/git_spellings.rs         |  13 ++
+ src/plumbing/options/mod.rs                   |   2 +
+ tests/cli-journey/tests/rev_list.rs           |  54 ++++++++
+ 6 files changed, 203 insertions(+), 1 deletion(-)
+ create mode 100644 gitoxide-core/src/repository/git_spellings/rev_list.rs
+ create mode 100644 tests/cli-journey/tests/rev_list.rs
+
+diff --git a/gitoxide-core/src/repository/git_spellings/mod.rs b/gitoxide-core/src/repository/git_spellings/mod.rs
+index a1b61b914..e461d7e6d 100644
+--- a/gitoxide-core/src/repository/git_spellings/mod.rs
++++ b/gitoxide-core/src/repository/git_spellings/mod.rs
+@@ -19,6 +19,7 @@ pub mod check_ref_format;
+ pub mod for_each_ref;
+ #[cfg(any(feature = "blocking-client", feature = "async-client"))]
+ pub mod ls_remote;
++pub mod rev_list;
+ pub mod rev_parse;
+ 
+ /// A Git-shaped ending: its diagnostic, if any, was already written, and the process should exit with
+diff --git a/gitoxide-core/src/repository/git_spellings/rev_list.rs b/gitoxide-core/src/repository/git_spellings/rev_list.rs
+new file mode 100644
+index 000000000..8939399ee
+--- /dev/null
++++ b/gitoxide-core/src/repository/git_spellings/rev_list.rs
+@@ -0,0 +1,118 @@
++//! `brit rev-list --count`: Git's spelling of counting what `brit revision list` walks.
++//!
++//! `--count <rev>…` prints the number of commits reachable from the included revisions and from none
++//! of the excluded ones, where a revision is `A`, `^A`, `A..B` or `A...B` (both sides, without their
++//! merge bases). `--left-right --count` prints `<left>\t<right>`: commits reachable from the left side
++//! of an `A...B`, and the rest. Listing commits without `--count` is refused and points to Brit's verb.
++
++use std::io::Write;
++
++use gix::{Result, bstr::BStr, error::ResultExt};
++
++use super::exit;
++
++/// What `rev-list` was asked for.
++#[derive(Debug, Default, Clone, Copy)]
++pub struct Options {
++    /// `--count`
++    pub count: bool,
++    /// `--left-right`
++    pub left_right: bool,
++}
++
++/// Count commits like `git rev-list --count [--left-right] <rev>…`.
++pub fn rev_list(
++    repo: gix::Repository,
++    revs: Vec<String>,
++    mut out: impl Write,
++    mut err: impl Write,
++    options: Options,
++) -> Result<()> {
++    if revs.is_empty() {
++        writeln!(err, "usage: brit rev-list --count [--left-right] <revision>...").or_error()?;
++        return Err(exit(129));
++    }
++    if !options.count {
++        writeln!(
++            err,
++            "brit rev-list only counts commits (`--count`); list them with `brit revision list <rev>` or `brit log`"
++        )
++        .or_error()?;
++        return Err(exit(128));
++    }
++
++    let source = gix::object::bounded::Source::deferred(&repo);
++    let mut left = Vec::new();
++    let mut right = Vec::new();
++    let mut hidden = Vec::new();
++    for rev in &revs {
++        let unknown = |err: &mut dyn Write| -> gix::Error {
++            writeln!(
++                err,
++                "fatal: ambiguous argument '{rev}': unknown revision or path not in the working tree.\nUse '--' to separate paths from revisions, like this:\n'git <command> [<revision>...] -- [<file>...]'"
++            )
++            .ok();
++            exit(128)
++        };
++        let Ok(spec) = repo
++            .rev_parse(BStr::new(rev.as_bytes()))
++            .map(gix::revision::Spec::detach)
++        else {
++            return Err(unknown(&mut err));
++        };
++        let mut commit = |id: gix::ObjectId| -> Result<gix::ObjectId> {
++            source.peel(id, gix::object::Kind::Commit).map_err(|_| {
++                writeln!(err, "fatal: '{rev}' does not name a commit").ok();
++                exit(128)
++            })
++        };
++        use gix::revision::plumbing::Spec;
++        match spec {
++            Spec::Include(id) => right.push(commit(id)?),
++            Spec::Exclude(id) => hidden.push(commit(id)?),
++            Spec::Range { from, to } => {
++                hidden.push(commit(from)?);
++                right.push(commit(to)?);
++            }
++            Spec::Merge { theirs, ours } => {
++                let (theirs, ours) = (commit(theirs)?, commit(ours)?);
++                left.push(theirs);
++                right.push(ours);
++                hidden.extend(repo.merge_bases_many(theirs, &[ours])?.into_iter().map(gix::Id::detach));
++            }
++            _ => {
++                writeln!(
++                    err,
++                    "brit rev-list does not implement `{rev}`; resolve it with `brit revision resolve`"
++                )
++                .or_error()?;
++                return Err(exit(128));
++            }
++        }
++    }
++
++    let count = |tips: Vec<gix::ObjectId>| -> Result<usize> {
++        if tips.is_empty() {
++            return Ok(0);
++        }
++        let mut count = 0;
++        for commit in repo
++            .rev_walk(tips)
++            .sorting(gix::revision::walk::Sorting::ByCommitTime(Default::default()))
++            .with_hidden(hidden.iter().copied())
++            .all()?
++        {
++            commit?;
++            count += 1;
++        }
++        Ok(count)
++    };
++    let left_count = count(left.clone())?;
++    let total = count(left.into_iter().chain(right).collect())?;
++    if options.left_right {
++        writeln!(out, "{left_count}\t{}", total - left_count).or_error()?;
++    } else {
++        writeln!(out, "{total}").or_error()?;
++    }
++    Ok(())
++}
+diff --git a/src/plumbing/main.rs b/src/plumbing/main.rs
+index 8b1b9a48b..d6e6349ee 100644
+--- a/src/plumbing/main.rs
++++ b/src/plumbing/main.rs
+@@ -63,7 +63,8 @@ fn requires_mutation_guard(cmd: &Subcommands) -> bool {
+         | Subcommands::Blame { .. }
+         | Subcommands::RevParse(_)
+         | Subcommands::ForEachRef(_)
+-        | Subcommands::CheckRefFormat(_) => false,
++        | Subcommands::CheckRefFormat(_)
++        | Subcommands::RevList(_) => false,
+         Subcommands::Commit(commit::Platform {
+             cmd: Some(commit::Subcommands::Verify { .. } | commit::Subcommands::Describe { .. }),
+             ..
+@@ -1517,6 +1518,19 @@ pub fn run_with_command(args: Args, command: clap::Command) -> Result<()> {
+             allow_onelevel,
+             refname,
+         }) => core::repository::git_spellings::check_ref_format::check(refname.as_ref(), allow_onelevel),
++        Subcommands::RevList(crate::plumbing::options::git_spellings::RevList {
++            count,
++            left_right,
++            revs,
++        }) => prepare_and_run("rev-list", verbose, None, move |_progress, out, err| {
++            core::repository::git_spellings::rev_list::rev_list(
++                repository(Mode::Lenient)?,
++                revs,
++                out,
++                err,
++                core::repository::git_spellings::rev_list::Options { count, left_right },
++            )
++        }),
+         Subcommands::Cat { revspec } => prepare_and_run("cat", verbose, None, move |_progress, out, _err| {
+             core::repository::cat(repository(Mode::Lenient)?, &revspec, out)
+         }),
+diff --git a/src/plumbing/options/git_spellings.rs b/src/plumbing/options/git_spellings.rs
+index 6470a2ee3..13c8e92b6 100644
+--- a/src/plumbing/options/git_spellings.rs
++++ b/src/plumbing/options/git_spellings.rs
+@@ -212,3 +212,16 @@ pub struct CheckRefFormat {
+     #[clap(value_parser = crate::shared::AsBString, allow_hyphen_values = true)]
+     pub refname: Option<gix::bstr::BString>,
+ }
++
++/// `rev-list --count` like Git; Brit's own commit walk is `brit revision list`.
++#[derive(Debug, clap::Parser)]
++pub struct RevList {
++    /// Print the number of commits instead of listing them; listing is `brit revision list` or `brit log`.
++    #[clap(long)]
++    pub count: bool,
++    /// With `--count`, print `<left>\t<right>`: commits reachable from the left side of `A...B`, and the rest.
++    #[clap(long)]
++    pub left_right: bool,
++    /// Revisions like `HEAD`, `^A`, `A..B` or `A...B`.
++    pub revs: Vec<String>,
++}
+diff --git a/src/plumbing/options/mod.rs b/src/plumbing/options/mod.rs
+index fd1f02ccf..33966ba49 100644
+--- a/src/plumbing/options/mod.rs
++++ b/src/plumbing/options/mod.rs
+@@ -277,6 +277,8 @@ pub enum Subcommands {
+     LsRemote(git_spellings::LsRemote),
+     /// Validate a reference name like Git, answering only through the exit code.
+     CheckRefFormat(git_spellings::CheckRefFormat),
++    /// Count commits like Git's `rev-list --count`. Brit's own walk is `brit revision list`.
++    RevList(git_spellings::RevList),
+     /// Generate shell completions to stdout or a directory.
+     #[clap(visible_alias = "generate-completions", visible_alias = "shell-completions")]
+     Completions {
+diff --git a/tests/cli-journey/tests/rev_list.rs b/tests/cli-journey/tests/rev_list.rs
+new file mode 100644
+index 000000000..da995ffd6
+--- /dev/null
++++ b/tests/cli-journey/tests/rev_list.rs
+@@ -0,0 +1,54 @@
++//! `brit rev-list --count` prints what `git rev-list --count` prints for a revision, `A..B`, `^A` and
++//! `--left-right A...B`, fails like Git for an unknown revision, and leads to `brit revision list`.
++use anyhow::Result;
++use cli_journey::support::{
++    parity::{assert_help_names, assert_same_streams, git_ok},
++    test_repo::TestRepo,
++};
++
++#[test]
++fn rev_list_count_matches_git() -> Result<()> {
++    let repo = TestRepo::new("rev-list-count")?;
++    let root = repo.path();
++    repo.commit_file("a", "a\n")?;
++    repo.commit_file("b", "b\n")?;
++    git_ok(root, &["switch", "-q", "-c", "side", "HEAD~1"])?;
++    repo.commit_file("s1", "s\n")?;
++    repo.commit_file("s2", "s\n")?;
++    git_ok(root, &["switch", "-q", "main"])?;
++    // A merge, so that both sides share history below a merge base and above it.
++    git_ok(root, &["switch", "-q", "-c", "merged", "main"])?;
++    git_ok(root, &["merge", "-q", "--no-edit", "--no-ff", "side"])?;
++    repo.commit_file("m", "m\n")?;
++    git_ok(root, &["switch", "-q", "main"])?;
++    repo.commit_file("c", "c\n")?;
++    git_ok(root, &["tag", "-a", "v1", "-m", "annotated", "side"])?;
++
++    for args in [
++        &["rev-list", "--count", "HEAD"][..],
++        &["rev-list", "--count", "side"],
++        &["rev-list", "--count", "v1"],
++        &["rev-list", "--count", "main..side"],
++        &["rev-list", "--count", "side..main"],
++        &["rev-list", "--count", "main..merged"],
++        &["rev-list", "--count", "HEAD", "^side"],
++        &["rev-list", "--count", "main", "side"],
++        &["rev-list", "--count", "main...side"],
++        &["rev-list", "--left-right", "--count", "main...side"],
++        &["rev-list", "--left-right", "--count", "side...main"],
++        &["rev-list", "--left-right", "--count", "merged...main"],
++        &["rev-list", "--left-right", "--count", "main..side"],
++        &["rev-list", "--count", "--left-right", "main...merged"],
++        &["rev-list", "HEAD", "--count"],
++        &["rev-list", "--count", "nope"],
++        &["rev-list", "--count", "HEAD~20"],
++        &["rev-list", "--count"],
++    ] {
++        let out = assert_same_streams(root, args)?;
++        if out.code == Some(0) {
++            assert!(!out.stdout.is_empty(), "{args:?} prints a count: {out:?}");
++        }
++    }
++
++    assert_help_names("rev-list", "brit revision list")
++}
+-- 
+2.52.0
+

@@ -24,3 +24,24 @@ subcommands. No `--wait`/`-w`.
 keeps no command text, and its `epr feedback capture` call fails with "unknown command feedback".
 
 Built with default `max` features only; `small`, `max-pure` and `lean-async` were not compiled.
+
+## Round 2 (2026-11-19, head `e534083f0`)
+
+Six more commits on top of `7786c8185`; apply after 0001-0006 with `git am 0007*.patch … 0012*.patch`.
+
+| Patch | What |
+|---|---|
+| 0007 | the oracle helper also compares whether stderr is empty (`assert_same_streams`) |
+| 0008 | `rev-parse` reads its arguments in one ordered pass like Git's argv loop (`--verify HEAD -- x` prints one oid); failures return a typed exit so `-v` no longer loses output; `-C <missing>` fails as Git does (`fatal: cannot change to …`, exit 128) and is applied before clap's help and usage exits |
+| 0009 | the closed-reader fix, narrowed, in its own commit: error KIND on a stdout/stderr write, read-only commands only; the exit code is decided in one place, `exit_status()` in `brit-cli/src/main.rs`; the text match is gone. `push.rs` untouched |
+| 0010 | `ls-remote -h` means heads, `From <url>` on stderr, `--exit-code`; `for-each-ref --sort -refname` as two arguments, `%+1` literal; `check-ref-format` usage exits 129 |
+| 0011 | `brit merge-base --is-ancestor` (a flag on the existing verb), exit 0 / 1 / 128 |
+| 0012 | `brit rev-list --count`, `--left-right --count A...B`, over `brit revision list` |
+
+Two things to look at when merging. (1) 0008 adds `discovery_start()` in `src/plumbing/main.rs` and changes one line to
+`let repository = discovery_start(args.repository);`: before it, every brit command run from inside a `.git` directory
+failed looking for `./.git/objects`. That is a behaviour change for all commands, wider than this lane. (2) The tree at
+0011 alone was never built: it was split out of the 0012 tree by removing hunks; every other commit's tree was built
+and tested. Only the default `max` feature set was compiled.
+
+`review-of-0001-0006.md` is the independent review that round 2 answers.

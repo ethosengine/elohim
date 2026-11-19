@@ -1,0 +1,198 @@
+From a2f2a3b5231b15637ec5260aaa476f42561e2c47 Mon Sep 17 00:00:00 2001
+From: Matthew Dowell <mbd06b+github@gmail.com>
+Date: Thu, 19 Nov 2026 09:53:24 +0000
+Subject: [PATCH 11/12] feat: `brit merge-base --is-ancestor` answering through
+ its exit code
+
+Requested by the integrating session (68 uses in the agents' fallback
+census, all reading the exit code). Added to Brit's existing `merge-base`
+verb: one field on its clap struct, one branch in its dispatch arm, and
+`is_ancestor` beside `merge_base` in gitoxide-core.
+
+Like Git: 0 when the first commit is an ancestor of the second or the
+same commit, 1 when it is not, 128 with `fatal: Not a valid object name`
+or `Not a valid commit name` for a bad revision, 128 for more than two
+commits, and the usage status 129 for one. Nothing is printed on stdout.
+The oracle journey compares stdout, status and stderr emptiness with Git.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01PJB8fpkCKfb4CMYBh9vCEs
+Co-Authored-By: claude-fable-5-2 <noreply@anthropic.com>
+Claude-Session: b49f7c46-0cab-4b30-8b19-3294dddb61a7
+---
+ gitoxide-core/src/repository/merge_base.rs    | 55 +++++++++++++++++++
+ gitoxide-core/src/repository/mod.rs           |  1 +
+ src/plumbing/main.rs                          | 15 +++--
+ src/plumbing/options/mod.rs                   |  5 ++
+ .../tests/merge_base_is_ancestor.rs           | 39 +++++++++++++
+ 5 files changed, 110 insertions(+), 5 deletions(-)
+ create mode 100644 tests/cli-journey/tests/merge_base_is_ancestor.rs
+
+diff --git a/gitoxide-core/src/repository/merge_base.rs b/gitoxide-core/src/repository/merge_base.rs
+index b4003fde8..ed55cf133 100644
+--- a/gitoxide-core/src/repository/merge_base.rs
++++ b/gitoxide-core/src/repository/merge_base.rs
+@@ -36,6 +36,61 @@ pub fn merge_base(
+     Ok(())
+ }
+ 
++/// `merge-base --is-ancestor <first> <second>`, answered through the exit code like Git: `Ok` when `first`
++/// is an ancestor of `second` or the same commit, status 1 when it is not, 128 for a revision that names
++/// no commit or for more than two revisions, and the usage status 129 for one.
++pub fn is_ancestor(
++    mut repo: gix::Repository,
++    first: &str,
++    others: &[String],
++    mut err: impl std::io::Write,
++) -> Result<()> {
++    use crate::repository::git_spellings::exit;
++    let second = match others {
++        [second] => second,
++        [] => {
++            writeln!(err, "usage: brit merge-base --is-ancestor <commit> <commit>").or_error()?;
++            return Err(exit(129));
++        }
++        _ => {
++            writeln!(err, "fatal: --is-ancestor takes exactly two commits").or_error()?;
++            return Err(exit(128));
++        }
++    };
++    repo.object_cache_size_if_unset(50 * 1024 * 1024);
++    let mut commit = |name: &str| -> Result<gix::ObjectId> {
++        let Ok(id) = repo.rev_parse_single(name).map(gix::Id::detach) else {
++            writeln!(err, "fatal: Not a valid object name {name}").or_error()?;
++            return Err(exit(128));
++        };
++        match gix::object::bounded::Source::deferred(&repo).peel(id, gix::object::Kind::Commit) {
++            Ok(commit) => Ok(commit),
++            Err(_) => {
++                let kind = repo.find_header(id).map(|header| header.kind().to_string());
++                if let Ok(kind) = kind {
++                    writeln!(err, "error: object {id} is a {kind}, not a commit").or_error()?;
++                }
++                writeln!(err, "fatal: Not a valid commit name {name}").or_error()?;
++                Err(exit(128))
++            }
++        }
++    };
++    let ancestor = commit(first)?;
++    let descendant = commit(second)?;
++    if ancestor == descendant {
++        return Ok(());
++    }
++    let cache = repo.commit_graph_if_enabled()?;
++    let mut graph = repo.revision_graph(cache.as_ref());
++    // The merge base of an ancestor and its descendant is the ancestor itself.
++    let bases = repo.merge_bases_many_with_graph(ancestor, &[descendant], &mut graph)?;
++    if bases.iter().any(|base| *base == ancestor) {
++        Ok(())
++    } else {
++        Err(exit(1))
++    }
++}
++
+ fn commit_id(repo: &gix::Repository, revspec: &str) -> Result<gix::ObjectId> {
+     gix::object::bounded::Source::deferred(repo)
+         .peel(repo.rev_parse_single(revspec)?.detach(), gix::object::Kind::Commit)
+diff --git a/gitoxide-core/src/repository/mod.rs b/gitoxide-core/src/repository/mod.rs
+index 4ad0258ad..d7d94f4ba 100644
+--- a/gitoxide-core/src/repository/mod.rs
++++ b/gitoxide-core/src/repository/mod.rs
+@@ -48,6 +48,7 @@ pub mod index;
+ pub mod log;
+ pub mod mailmap;
+ mod merge_base;
++pub use merge_base::is_ancestor as merge_base_is_ancestor;
+ pub use merge_base::merge_base;
+ pub mod merge;
+ pub mod odb;
+diff --git a/src/plumbing/main.rs b/src/plumbing/main.rs
+index e3d35c73e..8b1b9a48b 100644
+--- a/src/plumbing/main.rs
++++ b/src/plumbing/main.rs
+@@ -420,11 +420,16 @@ pub fn run_with_command(args: Args, command: clap::Command) -> Result<()> {
+                 )
+             }),
+         },
+-        Subcommands::MergeBase(crate::plumbing::options::merge_base::Command { first, others }) => {
+-            prepare_and_run("merge-base", verbose, None, move |_progress, out, _err| {
+-                core::repository::merge_base(repository(Mode::Lenient)?, first, others, out, format)
+-            })
+-        }
++        Subcommands::MergeBase(crate::plumbing::options::merge_base::Command {
++            first,
++            others,
++            is_ancestor,
++        }) => prepare_and_run("merge-base", verbose, None, move |_progress, out, err| {
++            if is_ancestor {
++                return core::repository::merge_base_is_ancestor(repository(Mode::Lenient)?, &first, &others, err);
++            }
++            core::repository::merge_base(repository(Mode::Lenient)?, first, others, out, format)
++        }),
+         Subcommands::Add { paths, update, all: _ } => {
+             prepare_and_run("add", verbose, None, move |_progress, _out, _err| {
+                 core::repository::index::stage_paths(repository(Mode::Strict)?, &paths, update)
+diff --git a/src/plumbing/options/mod.rs b/src/plumbing/options/mod.rs
+index c77d0944c..fd1f02ccf 100644
+--- a/src/plumbing/options/mod.rs
++++ b/src/plumbing/options/mod.rs
+@@ -481,6 +481,11 @@ pub mod merge_base {
+         pub first: String,
+         /// Revspecs for the other commits to compute the merge-base with.
+         pub others: Vec<String>,
++        /// Answer through the exit code alone, like Git: 0 when the first commit is an ancestor of the
++        /// one other commit (or the same), 1 when it is not, 128 for a revision that names no commit or
++        /// for more than two revisions. Brit's own answer without the flag lists every merge base.
++        #[clap(long)]
++        pub is_ancestor: bool,
+     }
+ }
+ 
+diff --git a/tests/cli-journey/tests/merge_base_is_ancestor.rs b/tests/cli-journey/tests/merge_base_is_ancestor.rs
+new file mode 100644
+index 000000000..6c9adbd9f
+--- /dev/null
++++ b/tests/cli-journey/tests/merge_base_is_ancestor.rs
+@@ -0,0 +1,39 @@
++//! `brit merge-base --is-ancestor <A> <B>` answers like Git through its exit code alone: 0 when `A` is
++//! an ancestor of `B` (or the same commit), 1 when it is not, 128 for a revision that names no commit.
++use anyhow::Result;
++use cli_journey::support::{
++    parity::{assert_same_streams, git_ok},
++    test_repo::TestRepo,
++};
++
++#[test]
++fn merge_base_is_ancestor_matches_git() -> Result<()> {
++    let repo = TestRepo::new("merge-base-is-ancestor")?;
++    let root = repo.path();
++    repo.commit_file("a", "a\n")?;
++    repo.commit_file("b", "b\n")?;
++    git_ok(root, &["tag", "-a", "v1", "-m", "annotated", "HEAD~1"])?;
++    git_ok(root, &["switch", "-q", "-c", "side", "HEAD~1"])?;
++    repo.commit_file("s", "s\n")?;
++    git_ok(root, &["switch", "-q", "main"])?;
++
++    for (args, code) in [
++        (&["merge-base", "--is-ancestor", "HEAD~1", "HEAD"][..], 0),
++        (&["merge-base", "--is-ancestor", "HEAD~2", "side"], 0),
++        (&["merge-base", "--is-ancestor", "v1", "main"], 0),
++        (&["merge-base", "--is-ancestor", "HEAD", "HEAD"], 0),
++        (&["merge-base", "--is-ancestor", "HEAD", "HEAD~1"], 1),
++        (&["merge-base", "--is-ancestor", "side", "main"], 1),
++        (&["merge-base", "--is-ancestor", "main", "side"], 1),
++        (&["merge-base", "--is-ancestor", "nope", "HEAD"], 128),
++        (&["merge-base", "--is-ancestor", "HEAD", "nope"], 128),
++        (&["merge-base", "--is-ancestor", "HEAD^{tree}", "HEAD"], 128),
++        (&["merge-base", "--is-ancestor", "HEAD"], 129),
++        (&["merge-base", "--is-ancestor", "HEAD~1", "HEAD", "side"], 128),
++    ] {
++        let out = assert_same_streams(root, args)?;
++        assert_eq!(out.code, Some(code), "{args:?}: {out:?}");
++        assert!(out.stdout.is_empty(), "the answer is the exit code alone: {out:?}");
++    }
++    Ok(())
++}
+-- 
+2.52.0
+
