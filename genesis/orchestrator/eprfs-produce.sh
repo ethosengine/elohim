@@ -12,6 +12,8 @@
 # then `epr artifact put --release <ingested release> --release-bin <bin> --cross` of the gate's
 # own bytes in $CARGO_TARGET_DIR/debug. No second build: the method records the environment the
 # gate's build ran under, and `put` re-checks that this process's environment is that record.
+# Under a declared target the build is replayed once with --message-format=json (a no-op over its
+# fresh units) and put is handed those messages as --build-messages, the evidence of the C level.
 #
 # A put never fails the gate. Every refusal prints one line
 #   [gate] epr producer put skipped (<reason>; gate remains green)
@@ -149,10 +151,30 @@ done < <(compgen -e | LC_ALL=C sort)
 
 out="$target/producer"
 mkdir -p "$out" || skip "$out cannot be created"
-declare -A input
 for bin in "${bins[@]}"; do
   [[ -f "$target/debug/$bin" && -f "$target/debug/$bin.d" ]] \
     || skip "$target/debug/$bin or its dep-info was not built"
+done
+
+# The build's own evidence of its C level (E12 L2a rework, ruling 1): under a declared target, the
+# gate's build is replayed with the ingest build's package arguments and --message-format=json, a
+# no-op over its fresh units that still names each bin's executable and every build script's
+# OUT_DIR, beside which cargo keeps cc's `running:` log (the record's CC_ENABLE_DEBUG_OUTPUT). put
+# binds the messages to the bytes by the executable and judges every compile command in them, and
+# stamps env:isa-c only on that evidence. A replay that fails withholds: these bytes have no
+# evidence then.
+build_args=(-p elohim-epr-cli --bin epr -p elohim-device-runtime --bin bin-launch)
+evidence=()
+if ((${#declared[@]})); then
+  messages="$out/build-messages.json"
+  (cd "$repo/elohim/eprfs" && cargo build "${build_args[@]}" --message-format=json) \
+    >"$messages" 2>"$out/build-messages.err" \
+    || withhold "the build's --message-format=json replay failed: $(reason_of "$(cat "$out/build-messages.err")")"
+  evidence=(--build-messages "$messages")
+fi
+
+declare -A input
+for bin in "${bins[@]}"; do
   method="$out/method-$bin.json"
   said="$("$epr" artifact describe --project eprfs --bin "$bin" --rustflags "${RUSTFLAGS-}" \
     --sources "$sources" --crate "${crate[$bin]}" --repo "$repo" --out "$method" \
@@ -167,7 +189,8 @@ declare -A output
 for bin in "${bins[@]}"; do
   said="$(timeout 600 "$epr" artifact put --method "$out/method-$bin.json" --input "${input[$bin]}" \
     --bytes "$target/debug/$bin" --project eprfs --commit "$tested_head" \
-    --release "$release" --release-bin "$bin" --cross --repo "$repo" --json 2>"$out/put-$bin.err")" \
+    --release "$release" --release-bin "$bin" "${evidence[@]}" --cross --repo "$repo" --json \
+    2>"$out/put-$bin.err")" \
     || skip "put $bin refused: $(reason_of "$said
 $(cat "$out/put-$bin.err")")"
   printf '%s\n' "$said" >"$out/put-$bin.json"

@@ -72,7 +72,17 @@ const { appendFileSync, copyFileSync, chmodSync, mkdirSync, writeFileSync } = re
 const args = process.argv.slice(2);
 appendFileSync(process.env.STUB_LOG, JSON.stringify(['cargo', ...args]) + '\\n');
 if (process.env.STUB_CARGO_FAIL) process.exit(101);
-if (args[0] === 'build') {
+if (args[0] === 'build' && args.includes('--message-format=json')) {
+  // The producer's replay: fresh units, one compiler-artifact line per bin, nothing rebuilt.
+  if (process.env.STUB_REPLAY_FAIL) { console.error('error: could not compile'); process.exit(101); }
+  const debug = process.env.CARGO_TARGET_DIR + '/debug';
+  args.forEach((arg, i) => {
+    if (arg !== '--bin') return;
+    const name = args[i + 1];
+    console.log(JSON.stringify({ reason: 'compiler-artifact', target: { kind: ['bin'], name }, executable: debug + '/' + name, fresh: true }));
+  });
+  console.log(JSON.stringify({ reason: 'build-finished', success: true }));
+} else if (args[0] === 'build') {
   const debug = process.env.CARGO_TARGET_DIR + '/debug';
   mkdirSync(debug, { recursive: true });
   args.forEach((arg, i) => {
@@ -206,8 +216,27 @@ function assertOffered(f, r, target = null) {
   assert.deepEqual(skipped(r.stdout), [
     `[gate] epr producer put: release ${RELEASE} at ${f.head.slice(0, 12)}, epr ${OUTPUTS.epr}, bin-launch ${OUTPUTS["bin-launch"]} (crosses)`,
   ]);
+  const replay = (c) => c.includes("--message-format=json");
   const builds = r.calls.filter((c) => c[0] === "cargo" && c[1] === "build");
-  assert.equal(builds.length, 1, "one build; the producer adds none");
+  assert.equal(builds.filter((c) => !replay(c)).length, 1, "one build; the producer adds none");
+  // Under a declared target the build is replayed once, with the build's own package arguments and
+  // --message-format=json, after the ingest and before any put, and every put is handed those
+  // messages (E12 L2a rework, ruling 1); with none declared there is no replay and no messages.
+  const replays = builds.filter(replay);
+  const puts = r.calls.filter((c) => c[1] === "artifact" && c[2] === "put");
+  if (target) {
+    assert.equal(replays.length, 1, builds.map((c) => c.join(" ")).join("\n"));
+    const [build] = builds.filter((c) => !replay(c));
+    assert.deepEqual(replays[0].filter((a) => a !== "--message-format=json"), build, "the replay is the ingest build");
+    const at = r.calls.indexOf(replays[0]);
+    assert.ok(at > verb(r.calls, "epr", "bin", "--tool", "epr", "ingest") && puts.every((p) => r.calls.indexOf(p) > at));
+    for (const p of puts) assert.equal(flag(p, "--build-messages"), join(f.target, "producer/build-messages.json"));
+    const lines = readFileSync(join(f.target, "producer/build-messages.json"), "utf8").trim().split("\n").map((l) => JSON.parse(l));
+    assert.deepEqual(lines.filter((m) => m.reason === "compiler-artifact").map((m) => m.target.name), ["epr", "bin-launch"]);
+  } else {
+    assert.deepEqual(replays, []);
+    for (const p of puts) assert.ok(!p.includes("--build-messages"), p.join(" "));
+  }
 }
 
 test("build_mode_offers_the_gate_bytes_of_both_bins_with_release_and_cross", (t) => {
@@ -388,6 +417,16 @@ test("the_declared_target_for_this_host_is_passed_to_describe_from_the_record", 
     const recorded = d.filter((_, i) => d[i - 1] === "--env");
     for (const [k, v] of Object.entries(C_LEVEL)) assert.ok(recorded.includes(`${k}=${v}`), recorded.join(" "));
   }
+});
+
+test("a_failed_message_replay_withholds_the_offer_before_any_describe", (t) => {
+  const f = fixture(t, { policy: policyWith(FIXTURE_TARGET) });
+  const r = run(f, "build", { ...C_LEVEL, STUB_REPLAY_FAIL: "1" });
+  assert.equal(r.status, 0, r.stderr);
+  assert.deepEqual(skipped(r.stdout), [
+    "[gate] epr producer put withheld (the build's --message-format=json replay failed: error: could not compile; gate remains green)",
+  ]);
+  assert.ok(!r.calls.some((c) => c[1] === "artifact"), "nothing is described, keyed or put");
 });
 
 test("a_record_with_no_declared_target_for_this_host_and_workspace_passes_none", (t) => {

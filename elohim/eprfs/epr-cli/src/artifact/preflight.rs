@@ -152,26 +152,27 @@ pub(super) fn check(options: &Options, descriptor: &MethodDescriptor) -> Artifac
                     missing.push(format!("{COMPILER}: {e}"));
                 }
             }
+            // Ruling 1 (L2a rework): the marker rests on the compile commands of the build that
+            // produced these bytes, never on strings in the bytes.
             if let Some(target) = &target {
-                match isa_c::producers(bytes, target.march) {
-                    Ok(0) => match isa_c::links_c_crate(&options.repo, descriptor) {
-                        Ok(false) => eprintln!(
-                            "isa-c: {} carries no GNU C producer string and its lock closure \
-                             holds no ring: no C unit, not applicable",
-                            bytes_path.display()
-                        ),
-                        Ok(true) => missing.push(format!(
-                            "missing declared-target: the bin's lock closure holds ring, and {} \
-                             carries no GNU C producer string, so its C level is unread \
-                             (stripped, or built without debug info)",
-                            bytes_path.display()
-                        )),
-                        Err(e) => missing.push(format!(
-                            "missing declared-target: whether the bin links ring is unread: {e}"
-                        )),
-                    },
-                    Ok(_) => {}
-                    Err(reasons) => missing.extend(reasons),
+                match (options.build_messages.as_deref(), isa_c::bin_of(descriptor)) {
+                    (None, _) => missing.push(format!(
+                        "missing declared-target: a declared target needs --build-messages, the \
+                         cargo --message-format=json output of the build that produced {}, as \
+                         the evidence of its C level",
+                        bytes_path.display()
+                    )),
+                    (Some(_), None) => missing.push(
+                        "missing declared-target: the method names no --bin, so no build \
+                         message names its executable"
+                            .into(),
+                    ),
+                    (Some(messages), Some(bin)) => {
+                        match isa_c_evidence::judge(messages, bytes, bin, target.march) {
+                            Ok(notes) => notes.iter().for_each(|note| eprintln!("{note}")),
+                            Err(reasons) => missing.extend(reasons),
+                        }
+                    }
                 }
             }
             let declared = extract::declared(&descriptor.non_path_inputs);

@@ -55,6 +55,7 @@ mod extract;
 mod generated;
 mod inputs;
 mod isa_c;
+mod isa_c_evidence;
 mod preflight;
 mod reach;
 mod requires;
@@ -114,6 +115,7 @@ pub fn usage() -> String {
      | key --method FILE [--repo ROOT] [--print input|key] [--json] \
      (the derivation key at HEAD; exits 3 when the view has uncommitted changes)\n  \
      | put --method FILE --input CID --bytes PATH --project P [--commit SHA] [--duration-ms N] \
+     [--build-messages FILE] \
      [--requires FILE.json] [--repository NAME] [--cross] [--release CID --release-bin NAME] \
      [--repo ROOT] [--payload-store DIR] [--json] \
      (record a built artifact: descriptor, brit build attestation, one custody Produce carrying \
@@ -121,9 +123,11 @@ pub fn usage() -> String {
      --cross unless private; extracts ELF Requires and evidence; --requires may only tighten; \
      Requires and evidence are stored locally, not yet served to siblings (K3 part 2: \
      explicit default-deny disclosure permission with admit, following K6 slice 1); \
-     a declared target is recorded only as target.isa with target.cflags whose recorded \
-     CFLAGS_<triple> is target.cflags and whose GNU C producer strings carry its -march alone, \
-     stamped env:isa-c=<target.isa>; \
+     a declared target is recorded only as target.isa with target.cflags exactly \
+     -march=<target.isa>, declared alike by pool-policy.json declared_targets at HEAD for the \
+     method's triple and workspace, whose recorded CFLAGS_<triple> is target.cflags, and whose \
+     --build-messages (the cargo --message-format=json output of the build of --bytes) show every \
+     cc compile at that -march alone or a named exception, stamped env:isa-c=<target.isa>; \
      exits 3 `unrecorded: <reason>`)\n  \
      | sysroot pack --from DIR --triple T --out FILE [--json]\n  \
      | sysroot put --archive FILE [--project P] [--requires FILE.json] [--repository NAME] [--cross] [--repo ROOT] [--payload-store DIR] [--json]\n  \
@@ -233,6 +237,9 @@ struct Options {
     print: Option<String>,
     input: Option<String>,
     bytes: Option<PathBuf>,
+    /// The cargo `--message-format=json` lines of the build that produced `bytes`: under a
+    /// declared target, put's evidence of the C level (`isa_c_evidence`).
+    build_messages: Option<PathBuf>,
     commit: Option<String>,
     /// The bin-store release these bytes are one bin of, stamped on the Produce as
     /// `env:release` with `env:release-bin`, so a sibling following that release finds it.
@@ -323,6 +330,7 @@ impl Options {
                 "--print" => options.print = Some(value),
                 "--input" => options.input = Some(value),
                 "--bytes" => options.bytes = Some(PathBuf::from(value)),
+                "--build-messages" => options.build_messages = Some(PathBuf::from(value)),
                 "--commit" => options.commit = Some(value),
                 "--release" => options.release = Some(value),
                 "--release-bin" => options.release_bin = Some(value),

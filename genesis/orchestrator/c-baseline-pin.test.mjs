@@ -465,53 +465,144 @@ test('no build of a declared workspace sets a target cpu, so cc keeps pushing th
     binStoreSource: read('elohim/eprfs/device-runtime/src/bin_store/source.rs') }), []);
 });
 
-// ── Row 29.2 memo, PIN TEST: every crate in epr's lock closure that builds with cc is accounted
-// for. Its C is held at the declared level by the record, but only two units are read back: put
-// reads ring's GNU C producer string, and `epr doctor --exercise` runs ring (x25519) and SQLite on
-// the drawing host. A crate cc builds anything else for has neither reading, so a new one fails
-// here until it is on CC_BUILT_IN_EPR with one of two reasons: it is dispatched (each unit built
-// for one level and chosen at run time by CPUID) or compiles nothing on a declared target, or it
-// is exercised (`exercises` names what exercise.rs runs through it). An entry whose crate left the
-// closure fails too, so the list says what the closure holds. The lock is read as text: its
-// dependency edges are the union over features and platforms, so the closure is a superset of any
-// one build's, which is the safe side for a list of what must be accounted for. ─────────────────
-const DISPATCHED = 'dispatched or compiles nothing';
-const EXERCISED = 'exercised by epr doctor --exercise';
-// Seeded from elohim/eprfs/Cargo.lock at 71069b1f5, each reason read from the crate's build.rs.
+// ── Row 29.2 memo, PIN TEST, as reworked at E12 L2a (ruling 1): every crate in epr's and
+// bin-launch's lock closures that builds with cc is accounted for. `epr artifact put` reads the
+// compile commands of the build that produced the bytes (cc's `running:` log, enabled by the
+// record's CC_ENABLE_DEBUG_OUTPUT) and stamps env:isa-c only when each one carries the declared
+// -march and no other ISA selection, or the crate is a named exception in
+// elohim/eprfs/epr-cli/src/artifact/isa_c_evidence.rs EXCEPTIONS. So each cc-built crate here is
+// JUDGED (put judges its commands) or EXCEPTED (on that Rust list, with its reason held below
+// against the crate's own build.rs), and the two lists agree. An entry whose crate left the
+// closures fails too. The lock is read as text: its dependency edges are the union over features
+// and platforms, so the closure is a superset of any one build's, the safe side for a list of what
+// must be accounted for. ────────────────────────────────────────────────────────────────────────
+const JUDGED = 'judged by put from its compile commands';
+const EXCEPTED = 'a named exception in isa_c_evidence.rs';
+// Seeded from elohim/eprfs/Cargo.lock at 71069b1f5, each reason read from the crate's build.rs and
+// from its compile commands in a gate build (CC_ENABLE_DEBUG_OUTPUT=1, 2026-11-19).
 export const CC_BUILT_IN_EPR = {
   ring: {
-    kind: EXERCISED,
+    kind: JUDGED,
     exercises: 'x25519',
-    reason: 'curve25519.c and its other C units take the declared -march (the one GNU C producer string in a dev epr); ' +
-      'the exercise runs an x25519 agreement through it, and put reads that producer string',
+    reason: 'curve25519.c, its other C units and its assembly each compile at the declared -march, which put reads ' +
+      'from each command; the exercise also runs an x25519 agreement through it',
   },
   'libsqlite3-sys': {
-    kind: EXERCISED,
+    kind: JUDGED,
     exercises: 'sqlite',
-    reason: 'rusqlite "bundled" compiles sqlite3.c; it leaves no GNU C producer string in a dev epr, so put cannot read ' +
-      'its level and the exercise\'s SQLite round trip is its only check',
-  },
-  blake3: {
-    kind: DISPATCHED,
-    reason: 'on x86_64 Linux without "pure" or "prefer_intrinsics" its build.rs compiles only the SSE2/SSE4.1/AVX2/AVX-512 ' +
-      'assembly (.S, no C), each file for its own level and chosen at run time by CPUID; the portable path is Rust',
+    reason: 'rusqlite "bundled" compiles sqlite3.c in one command carrying the declared -march, which put reads; the ' +
+      'exercise also runs a SQLite round trip',
   },
   psm: {
-    kind: DISPATCHED,
-    reason: 'compiles no C: hand-written stack-switching assembly for the target arch (-xassembler-with-cpp), whose ' +
-      'instructions no -march chooses',
+    kind: JUDGED,
+    reason: 'on x86_64 Linux its build.rs compiles src/arch/x86_64.s (-xassembler-with-cpp) in one command carrying ' +
+      'the declared -march, which put reads; it is not a crate that compiles nothing',
+  },
+  blake3: { kind: EXCEPTED },
+  stacker: { kind: EXCEPTED },
+  generator: { kind: EXCEPTED },
+  'iana-time-zone-haiku': { kind: EXCEPTED },
+};
+
+const EVIDENCE_RS = 'elohim/eprfs/epr-cli/src/artifact/isa_c_evidence.rs';
+
+/**
+ * The EXCEPTIONS list in isa_c_evidence.rs: `{ package, kind, reason }` per entry, the reason's
+ * Rust string continuations (`\` and the next line's indentation) joined as rustc joins them.
+ */
+export function rustExceptions(source) {
+  const list = source.match(/pub\(super\) const EXCEPTIONS: &\[Exception\] = &\[([\s\S]*?)\n\];/)?.[1];
+  if (!list) throw new Error(`${EVIDENCE_RS} declares no EXCEPTIONS list`);
+  const entries = [];
+  for (const [, body] of list.matchAll(/Exception \{([\s\S]*?)\n {4}\},/g)) {
+    const package_ = body.match(/package: "([^"]+)"/)?.[1];
+    const kind = body.match(/kind: ExceptionKind::(\w+)/)?.[1];
+    const raw = body.match(/reason:\s*"((?:[^"\\]|\\[\s\S])*)"/)?.[1];
+    const reason = raw?.replace(/\\\n\s*/g, '').replace(/\\"/g, '"');
+    entries.push({ package: package_, kind, reason });
+  }
+  return entries;
+}
+
+function crateSource(name, version) {
+  for (const home of cargoHomes) {
+    const src = join(home, 'registry', 'src');
+    if (!existsSync(src)) continue;
+    for (const index of readdirSync(src)) {
+      const dir = join(src, index, `${name}-${version}`);
+      if (existsSync(dir)) return dir;
+    }
+  }
+  return null;
+}
+
+/** The body of `fn <name>(` in a Rust source, up to the next top-level `fn`. */
+const fnBody = (source, name) => source.match(new RegExp(`\\nfn ${name}\\([\\s\\S]*?(?=\\nfn |$)`))?.[0] ?? '';
+
+/**
+ * Each exception's reason held against what its crate's source does, per crate: problems, empty
+ * when the source still says what the reason says. `read(relative)` reads the crate's file;
+ * `lockedCrate(name)` the source dir of another locked crate (iana-time-zone).
+ */
+export const EXCEPTION_HOLDS = {
+  blake3: {
+    kind: 'DispatchedAssembly',
+    holds: ({ read }) => {
+      const build = read('build.rs');
+      const problems = [];
+      const main = fnBody(build, 'main');
+      if (!/should_prefer_intrinsics\(\) \|\| is_pure\(\)[\s\S]*?build_sse2_sse41_avx2_rust_intrinsics\(\);\s*\} else \{[\s\S]*?build_sse2_sse41_avx2_assembly\(\);/.test(main)) {
+        problems.push('build.rs main no longer builds the SSE2/SSE4.1/AVX2 assembly unless pure or prefer_intrinsics');
+      }
+      if (!/else if is_x86_32\(\) \|\| should_prefer_intrinsics\(\) \{\s*build_avx512_c_intrinsics\(\);\s*\} else \{\s*build_avx512_assembly\(\);/.test(main)) {
+        problems.push('build.rs main no longer builds the AVX-512 assembly, not C, unless prefer_intrinsics');
+      }
+      for (const name of ['build_sse2_sse41_avx2_assembly', 'build_avx512_assembly']) {
+        const files = [...fnBody(build, name).matchAll(/build\.file\("([^"]+)"\)/g)].map(m => m[1]);
+        const unix = files.filter(f => !/windows/.test(f));
+        if (!unix.length || unix.some(f => !f.endsWith('_unix.S'))) problems.push(`${name} compiles ${unix.join(', ') || 'nothing'} on unix, not only _unix.S assembly`);
+      }
+      const cFiles = [...build.matchAll(/build\.file\("([^"]+\.c)"\)/g)].map(m => m[1]);
+      const cHomes = cFiles.filter(f => !['build_avx512_c_intrinsics', 'build_neon_c_intrinsics'].some(fn => fnBody(build, fn).includes(f)));
+      if (cHomes.length) problems.push(`build.rs compiles C outside the intrinsics paths: ${cHomes.join(', ')}`);
+      const platform = read('src/platform.rs');
+      if (!/fn avx512_detected\(\)/.test(platform) || !/cpufeatures::new!\(has_avx512, "avx512f", "avx512vl"\)/.test(platform)) {
+        problems.push('src/platform.rs no longer chooses the AVX-512 path by a run-time CPUID check');
+      }
+      return problems;
+    },
   },
   stacker: {
-    kind: DISPATCHED,
-    reason: 'compiles nothing on a declared target: its build.rs runs cc only for src/arch/windows.c on Windows',
+    kind: 'CompilesNothing',
+    holds: ({ read }) => {
+      const build = read('build.rs');
+      const guarded = build.match(/if target\.contains\("windows"\) \{([\s\S]*?)\n {4}\}/)?.[1] ?? '';
+      const files = [...build.matchAll(/\.file\(/g)].length;
+      return files > 0 && [...guarded.matchAll(/\.file\(/g)].length === files && /\.compile\(/.test(guarded)
+        ? [] : ['build.rs runs cc outside its Windows branch'];
+    },
   },
   generator: {
-    kind: DISPATCHED,
-    reason: 'compiles nothing on a declared target: its build.rs runs cc only for the powerpc64 context-switch assembly',
+    kind: 'CompilesNothing',
+    holds: ({ read }) => {
+      const build = read('build.rs');
+      const problems = [];
+      if (!/let external_assembly_required = target_arch == "powerpc64";/.test(build)) problems.push('build.rs no longer limits its assembly to powerpc64');
+      const guarded = build.match(/if external_assembly_required \{([\s\S]*?)\n {4}\}/)?.[1] ?? '';
+      if ([...build.matchAll(/\.file\(/g)].length !== [...guarded.matchAll(/\.file\(/g)].length) problems.push('build.rs runs cc outside its powerpc64 branch');
+      return problems;
+    },
   },
   'iana-time-zone-haiku': {
-    kind: DISPATCHED,
-    reason: 'compiles nothing on a declared target: iana-time-zone depends on it only under cfg(target_os = "haiku")',
+    kind: 'CompilesNothing',
+    holds: ({ lockedCrate }) => {
+      const dir = lockedCrate('iana-time-zone');
+      if (!dir) return null;
+      const manifest = readFileSync(join(dir, 'Cargo.toml'), 'utf8');
+      const headers = manifest.split('\n').filter(line => /^\[.*iana-time-zone-haiku/.test(line));
+      return headers.length > 0 && headers.every(h => h === '[target.\'cfg(target_os = "haiku")\'.dependencies.iana-time-zone-haiku]')
+        ? [] : [`iana-time-zone depends on iana-time-zone-haiku outside cfg(target_os = "haiku"): ${headers.join(' ')}`];
+    },
   },
 };
 
@@ -549,20 +640,37 @@ export function ccBuiltCrates(packages, root) {
   return [...built].sort();
 }
 
-/** Problems with the list against the closure's cc-built crates and exercise.rs's source. */
-export function ccAccountProblems(built, list, exerciseSource) {
+/**
+ * Problems with the list against the closures' cc-built crates, the Rust EXCEPTIONS list
+ * (`exceptions`, from rustExceptions) and exercise.rs's source. A JUDGED crate gives its reason and
+ * is not excepted; an EXCEPTED one is on the Rust list, whose reason is one sentence.
+ */
+export function ccAccountProblems(built, list, exerciseSource, exceptions) {
   const problems = [];
+  const excepted = new Map(exceptions.map(e => [e.package, e]));
   for (const name of built) {
     if (!Object.hasOwn(list, name)) {
-      problems.push(`${name} builds with cc in epr's lock closure and is not on CC_BUILT_IN_EPR: say whether it is ${DISPATCHED}, or ${EXERCISED} (and add the exercise)`);
+      problems.push(`${name} builds with cc in a declared bin's lock closure and is not on CC_BUILT_IN_EPR: say whether it is ${JUDGED}, or ${EXCEPTED} (and add it there with its reason)`);
     }
   }
   for (const [name, entry] of Object.entries(list)) {
-    if (!built.includes(name)) problems.push(`CC_BUILT_IN_EPR lists ${name}, which no longer builds with cc in epr's lock closure`);
-    if (![DISPATCHED, EXERCISED].includes(entry?.kind)) problems.push(`CC_BUILT_IN_EPR.${name}.kind is ${JSON.stringify(entry?.kind)}, not "${DISPATCHED}" or "${EXERCISED}"`);
-    if (typeof entry?.reason !== 'string' || entry.reason.trim().length < 20) problems.push(`CC_BUILT_IN_EPR.${name} gives no reason`);
-    if (entry?.kind === EXERCISED && !(typeof entry.exercises === 'string' && entry.exercises && exerciseSource.includes(entry.exercises))) {
+    if (!built.includes(name)) problems.push(`CC_BUILT_IN_EPR lists ${name}, which no longer builds with cc in a declared bin's lock closure`);
+    if (![JUDGED, EXCEPTED].includes(entry?.kind)) problems.push(`CC_BUILT_IN_EPR.${name}.kind is ${JSON.stringify(entry?.kind)}, not "${JUDGED}" or "${EXCEPTED}"`);
+    if (entry?.kind === JUDGED) {
+      if (typeof entry.reason !== 'string' || entry.reason.trim().length < 20) problems.push(`CC_BUILT_IN_EPR.${name} gives no reason`);
+      if (excepted.has(name)) problems.push(`${name} is judged here and excepted in ${EVIDENCE_RS}; it is one or the other`);
+    }
+    if (entry?.kind === EXCEPTED && !excepted.has(name)) problems.push(`CC_BUILT_IN_EPR.${name} is excepted here and not on ${EVIDENCE_RS} EXCEPTIONS`);
+    if (entry?.exercises !== undefined && !(typeof entry.exercises === 'string' && entry.exercises && exerciseSource.includes(entry.exercises))) {
       problems.push(`CC_BUILT_IN_EPR.${name} is exercised through ${JSON.stringify(entry.exercises)}, which epr-cli/src/exercise.rs does not run`);
+    }
+  }
+  for (const exception of exceptions) {
+    if (list[exception.package]?.kind !== EXCEPTED) problems.push(`${EVIDENCE_RS} excepts ${exception.package}, which CC_BUILT_IN_EPR does not list as ${EXCEPTED}`);
+    const reason = exception.reason ?? '';
+    if (reason.length < 40 || !reason.endsWith('.') || reason.includes('. ')) problems.push(`the exception for ${exception.package} gives no one-sentence reason: ${JSON.stringify(reason)}`);
+    if (EXCEPTION_HOLDS[exception.package]?.kind !== exception.kind) {
+      problems.push(`the exception for ${exception.package} (${exception.kind}) has no check here holding it against its build.rs`);
     }
   }
   return problems;
@@ -585,33 +693,95 @@ test('fixture: a cc-built crate reached from the root is found; one reached from
   assert.throws(() => ccBuiltCrates(lockPackages(lock), 'absent'), /no package absent/);
   const exercise = 'exercise: ok (x25519 secret, sqlite rows)';
   const list = {
-    ring: { kind: EXERCISED, exercises: 'x25519', reason: 'curve25519.c runs in the x25519 agreement' },
-    'zlib-sys': { kind: DISPATCHED, reason: 'compiles nothing on a declared target, fixture' },
+    ring: { kind: JUDGED, exercises: 'x25519', reason: 'curve25519.c compiles at the declared -march' },
+    stacker: { kind: EXCEPTED },
   };
-  assert.deepEqual(ccAccountProblems(['ring', 'zlib-sys'], list, exercise), []);
-  const { 'zlib-sys': _, ...short } = list;
-  assert.match(ccAccountProblems(['ring', 'zlib-sys'], short, exercise).join('\n'), /zlib-sys builds with cc .* not on CC_BUILT_IN_EPR/);
-  assert.match(ccAccountProblems(['ring'], list, exercise).join('\n'), /lists zlib-sys, which no longer builds/);
-  assert.match(ccAccountProblems(['ring', 'zlib-sys'], { ...list, ring: { ...list.ring, exercises: 'ed448' } }, exercise).join('\n'), /exercised through "ed448"/);
-  assert.match(ccAccountProblems(['ring', 'zlib-sys'], { ...list, ring: { ...list.ring, kind: 'fine' } }, exercise).join('\n'), /kind is "fine"/);
-  assert.match(ccAccountProblems(['ring', 'zlib-sys'], { ...list, 'zlib-sys': { kind: DISPATCHED, reason: '' } }, exercise).join('\n'), /zlib-sys gives no reason/);
+  const exceptions = [{ package: 'stacker', kind: 'CompilesNothing', reason: 'stacker runs cc only on Windows, so it compiles nothing on Linux.' }];
+  const said = (...args) => ccAccountProblems(...args).join('\n');
+  assert.deepEqual(ccAccountProblems(['ring', 'stacker'], list, exercise, exceptions), []);
+  const { stacker: _, ...short } = list;
+  assert.match(said(['ring', 'stacker'], short, exercise, exceptions), /stacker builds with cc .* not on CC_BUILT_IN_EPR/);
+  assert.match(said(['ring'], list, exercise, exceptions), /lists stacker, which no longer builds/);
+  assert.match(said(['ring', 'stacker'], { ...list, ring: { ...list.ring, exercises: 'ed448' } }, exercise, exceptions), /exercised through "ed448"/);
+  assert.match(said(['ring', 'stacker'], { ...list, ring: { ...list.ring, kind: 'fine' } }, exercise, exceptions), /kind is "fine"/);
+  assert.match(said(['ring', 'stacker'], { ...list, ring: { kind: JUDGED, reason: '' } }, exercise, exceptions), /ring gives no reason/);
+  assert.match(said(['ring', 'stacker'], list, exercise, []), /stacker is excepted here and not on/);
+  assert.match(said(['ring', 'stacker'], list, exercise, [...exceptions, { package: 'ring', kind: 'CompilesNothing', reason: exceptions[0].reason }]),
+    /ring is judged here and excepted/);
+  assert.match(said(['ring', 'stacker'], list, exercise, [{ ...exceptions[0], reason: 'too short.' }]), /no one-sentence reason/);
+  assert.match(said(['ring', 'stacker'], list, exercise, [{ ...exceptions[0], reason: `${exceptions[0].reason} Then more.` }]), /no one-sentence reason/);
+  assert.match(said(['ring', 'stacker'], list, exercise, [{ ...exceptions[0], kind: 'DispatchedAssembly' }]), /no check here holding it/);
 });
 
-// bin-launch carries env:isa-c on put's "not applicable" path: with ring out of its closure and no
-// GNU C producer string in its bytes, put stamps it without reading a C level, and it has no
-// `doctor --exercise` of its own. So every cc-built crate in its closure must be dispatched or
-// compile nothing on a declared target; "exercised" does not cover it (E12 L2a review).
-test('every crate cc builds in bin-launch\'s lock closure is dispatched or compiles nothing', () => {
-  const built = ccBuiltCrates(lockPackages(read('elohim/eprfs/Cargo.lock')), 'elohim-device-runtime');
-  assert.ok(!built.includes('ring'), 'ring entered bin-launch\'s closure: put would then require its producer string');
-  const unaccounted = built.filter(name => CC_BUILT_IN_EPR[name]?.kind !== DISPATCHED);
-  assert.deepEqual(unaccounted, [], `cc-built in bin-launch's closure and not "${DISPATCHED}" on CC_BUILT_IN_EPR: put stamps bin-launch without reading its C`);
+test('fixture: the Rust EXCEPTIONS list is read with its continued reason strings joined', () => {
+  const source = [
+    'pub(super) const EXCEPTIONS: &[Exception] = &[',
+    '    Exception {',
+    '        package: "blake3",',
+    '        kind: ExceptionKind::DispatchedAssembly,',
+    '        reason:',
+    '            "On x86_64 its build.rs \\',
+    '                 compiles only \\"assembly\\".",',
+    '    },',
+    '];',
+  ].join('\n');
+  assert.deepEqual(rustExceptions(source), [{ package: 'blake3', kind: 'DispatchedAssembly', reason: 'On x86_64 its build.rs compiles only "assembly".' }]);
+  assert.throws(() => rustExceptions('const OTHER: u8 = 1;'), /declares no EXCEPTIONS list/);
 });
 
-test('every crate cc builds in epr\'s lock closure is dispatched, compiles nothing, or is exercised', () => {
-  const built = ccBuiltCrates(lockPackages(read('elohim/eprfs/Cargo.lock')), 'elohim-epr-cli');
+const rustExceptionList = () => rustExceptions(read(EVIDENCE_RS));
+const declaredClosures = () => {
+  const packages = lockPackages(read('elohim/eprfs/Cargo.lock'));
+  return [...new Set([...ccBuiltCrates(packages, 'elohim-epr-cli'), ...ccBuiltCrates(packages, 'elohim-device-runtime')])].sort();
+};
+
+// bin-launch and epr are marked env:isa-c by the same rule: put reads the compile commands of the
+// build that produced their bytes, so a cc-built crate in either closure is judged or a named
+// exception, and nothing passes for want of a string (E12 L2a rework, ruling 1(e)).
+test('every crate cc builds in epr\'s or bin-launch\'s lock closure is judged or a named exception', () => {
+  const built = declaredClosures();
   assert.ok(built.includes('ring'), 'ring builds with cc in epr\'s closure (the crate that trapped on shem)');
-  assert.deepEqual(ccAccountProblems(built, CC_BUILT_IN_EPR, read('elohim/eprfs/epr-cli/src/exercise.rs')), []);
+  assert.deepEqual(ccAccountProblems(built, CC_BUILT_IN_EPR, read('elohim/eprfs/epr-cli/src/exercise.rs'), rustExceptionList()), []);
+});
+
+// Ruling 1(d): each exception's reason is held against the locked crate's own source in the cargo
+// registry, not by its name alone; a crate whose source is not in the registry skips cleanly.
+for (const exception of existsSync(resolve(ROOT, EVIDENCE_RS)) ? rustExceptionList() : []) {
+  test(`the ${exception.package} exception holds against its locked build.rs`, t => {
+    const holder = EXCEPTION_HOLDS[exception.package];
+    assert.ok(holder, `no check holds the ${exception.package} exception`);
+    const lock = read('elohim/eprfs/Cargo.lock');
+    const versions = lockedVersions(lock, exception.package);
+    assert.ok(versions.length > 0, `elohim/eprfs/Cargo.lock locks no ${exception.package}`);
+    const lockedCrate = name => {
+      const [version] = lockedVersions(lock, name);
+      return version ? crateSource(name, version) : null;
+    };
+    for (const version of versions) {
+      const dir = crateSource(exception.package, version);
+      if (!dir) {
+        t.skip(`${exception.package}-${version} source is not in ${cargoHomes.join(' or ')}/registry/src`);
+        return;
+      }
+      const problems = holder.holds({ read: rel => readFileSync(join(dir, rel), 'utf8'), lockedCrate });
+      if (problems === null) {
+        t.skip(`a crate the ${exception.package} check reads is not in the registry`);
+        return;
+      }
+      assert.deepEqual(problems, [], `${exception.package}-${version}: ${exception.reason}`);
+    }
+  });
+}
+
+test('fixture: an exception check names a build.rs that no longer says what its reason says', () => {
+  const stacker = EXCEPTION_HOLDS.stacker.holds;
+  const guarded = 'fn main() {\n    let mut cfg = cc::Build::new();\n    if target.contains("windows") {\n        cfg.file("src/arch/windows.c");\n        cfg.compile("libstacker.a");\n    }\n}\n';
+  assert.deepEqual(stacker({ read: () => guarded }), []);
+  assert.ok(stacker({ read: () => `${guarded}fn extra() { cc::Build::new().file("x.c").compile("x"); }\n` }).length > 0);
+  const generator = EXCEPTION_HOLDS.generator.holds;
+  const ppc = 'fn main() {\n    let external_assembly_required = target_arch == "powerpc64";\n    if external_assembly_required {\n        cc::Build::new().file("a.S").compile("a");\n    }\n}\n';
+  assert.deepEqual(generator({ read: () => ppc }), []);
+  assert.ok(generator({ read: () => ppc.replace('"powerpc64"', '"x86_64"') }).length > 0);
 });
 
 // ── Row 29.2 ruling: the only producer of a release for sibling draw is eprfs-produce, for a

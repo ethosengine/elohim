@@ -6,30 +6,39 @@
 //! 1. `target.cflags` is exactly `-march=<target.isa>`, the recorded `CFLAGS_<triple>` is
 //!    `target.cflags` (a recorded `CXXFLAGS_<triple>` too) and no other C-family variable is
 //!    recorded: string equality, with no model of the cc crate;
-//! 2. every `GNU C` producer string in the bytes' `.debug_str` carries the declared `-march`
-//!    and no other `-m<isa>` token (`-mno-*`, `-m64` and `-mtune=` are ignored); a bin with no
-//!    such string is not applicable when its lock closure holds no `ring`, and fails when it does.
+//! 2. pool-policy.json `declared_targets` at the checkout's HEAD declares exactly the method's
+//!    triple, for the bin's workspace, with the same `isa` and `cflags` ([`policy_declares`]);
+//! 3. the build that produced the bytes shows, in its own compile commands, every cc-built crate
+//!    at the declared `-march` alone, or a named exception (`isa_c_evidence`, from the cargo
+//!    `--message-format=json` lines put is handed as `--build-messages`). Strings in the bytes
+//!    decide nothing: one acceptable producer string once passed the whole binary, and bundled
+//!    SQLite leaves none (L2a review, ruling 1).
 //!
 //! Only then is the Produce stamped with one [`SLOT`]`=<target.isa>`, which a sibling draws by.
 //! Any other declared target input (`arch`, `os`, `libc`, `sysroot`) is still unrealized (K6).
-//!
-//! Residuals, recorded rather than solved: the producer string is a ring-unit proxy for the C
-//! driver, not a reading of every C object (a C unit built without debug info is invisible); a
-//! producer string in `.debug_info` as an inline `DW_FORM_string` is not read; the lock closure is
-//! a superset of what the build compiles (features and platforms are not resolved).
-use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
 use eprfs_core::MethodDescriptor;
-use object::{Object, ObjectSection};
 
-use super::{cargo_project, git_ok, host, is_c_family_var, CRATE_INPUT, DIAGNOSTIC_C_ENV};
+use super::{cargo_project, host, is_c_family_var, CRATE_INPUT, DIAGNOSTIC_C_ENV};
 
 /// The Produce slot naming the C baseline put checked the build against.
 pub(super) const SLOT: &str = "env:isa-c";
 
-/// The C-bearing crate whose presence in a bin's lock closure makes an unread C level a failure.
-const C_CRATE: &str = "ring";
+/// The bin the method builds (`--bin=<name>` or `--bin <name>`), whose executable the build
+/// messages must name.
+pub(super) fn bin_of(descriptor: &MethodDescriptor) -> Option<&str> {
+    let mut flags = descriptor.flags.iter();
+    while let Some(flag) = flags.next() {
+        if let Some(bin) = flag.strip_prefix("--bin=") {
+            return Some(bin);
+        }
+        if flag == "--bin" {
+            return flags.next().map(String::as_str);
+        }
+    }
+    None
+}
 
 /// The declared target inputs these checks realize.
 const REALIZED: [&str; 2] = ["target.isa", "target.cflags"];
@@ -265,158 +274,6 @@ pub(super) fn policy_declares(
         }
     }
     missing
-}
-
-/// Check 2 over the bytes: every `GNU C` producer string carries `march` and no other ISA token.
-/// `Ok(n)` is the number of distinct producer strings read (zero is the caller's to judge).
-pub(super) fn producers(bytes: &[u8], march: &str) -> Result<usize, Vec<String>> {
-    let file = object::File::parse(bytes).map_err(|e| {
-        vec![format!(
-            "{DECLARED}: the bytes do not parse as an object: {e}"
-        )]
-    })?;
-    let Some(section) = file.section_by_name(".debug_str") else {
-        return Ok(0);
-    };
-    let data = section
-        .uncompressed_data()
-        .map_err(|e| vec![format!("{DECLARED}: .debug_str does not read: {e}")])?;
-    let strings: BTreeSet<String> = data
-        .split(|byte| *byte == 0)
-        .filter(|s| s.starts_with(b"GNU C"))
-        .map(|s| String::from_utf8_lossy(s).into_owned())
-        .collect();
-    let mut missing = Vec::new();
-    for producer in &strings {
-        let mut marched = false;
-        for token in producer.split_whitespace() {
-            if token.starts_with("-march=") {
-                marched = true;
-                if token != march {
-                    missing.push(format!(
-                        "{DECLARED}: the C is not at {march}: `{producer}` carries {token}"
-                    ));
-                }
-            } else if token.starts_with("-m")
-                && token != "-m64"
-                && !token.starts_with("-mno-")
-                && !token.starts_with("-mtune=")
-            {
-                missing.push(format!(
-                    "{DECLARED}: the C is not at {march} alone: `{producer}` carries {token}"
-                ));
-            }
-        }
-        if !marched {
-            missing.push(format!(
-                "{DECLARED}: the C level is unread: `{producer}` carries no -march"
-            ));
-        }
-    }
-    if missing.is_empty() {
-        Ok(strings.len())
-    } else {
-        Err(missing)
-    }
-}
-
-/// Whether the descriptor's bin links [`C_CRATE`]: its package (the crate's `Cargo.toml` at
-/// HEAD) reaches it through the dependency edges of the lock at HEAD.
-pub(super) fn links_c_crate(repo: &Path, descriptor: &MethodDescriptor) -> Result<bool, String> {
-    let crate_dir = descriptor
-        .non_path_inputs
-        .get(CRATE_INPUT)
-        .map_or(".", String::as_str);
-    let crate_path = repo.join(crate_dir);
-    let at_head = |path: &Path| {
-        let relative = path.strip_prefix(repo).unwrap_or(path).to_string_lossy();
-        git_ok(repo, &["show", &format!("HEAD:{relative}")])
-            .map_err(|e| format!("{relative} does not read at HEAD: {e}"))
-    };
-    let manifest: toml::Value = at_head(&crate_path.join("Cargo.toml"))?
-        .parse()
-        .map_err(|e| format!("{crate_dir}/Cargo.toml is not TOML: {e}"))?;
-    let package = manifest
-        .get("package")
-        .and_then(|p| p.get("name"))
-        .and_then(toml::Value::as_str)
-        .ok_or_else(|| format!("{crate_dir}/Cargo.toml names no package"))?;
-    let lock_path = cargo_project::lock_path(repo, &crate_path)
-        .ok_or_else(|| format!("{crate_dir} has no Cargo.lock"))?;
-    let lock: toml::Value = at_head(&lock_path)?
-        .parse()
-        .map_err(|e| format!("the Cargo.lock is not TOML: {e}"))?;
-    lock_closure_holds(&lock, package, C_CRATE)
-}
-
-/// Whether `needle` is in the dependency closure of the local package `root` in `lock`. An edge
-/// is `name`, `name version` or `name version (source)`; one that names no version reaches every
-/// locked package of that name, so the closure can only over-state.
-pub(super) fn lock_closure_holds(
-    lock: &toml::Value,
-    root: &str,
-    needle: &str,
-) -> Result<bool, String> {
-    let packages: Vec<&toml::Value> = lock
-        .get("package")
-        .and_then(toml::Value::as_array)
-        .map(|packages| packages.iter().collect())
-        .unwrap_or_default();
-    let field = |package: &toml::Value, name: &str| {
-        package
-            .get(name)
-            .and_then(toml::Value::as_str)
-            .map(str::to_owned)
-    };
-    let mut by_name: BTreeMap<String, Vec<usize>> = BTreeMap::new();
-    for (index, package) in packages.iter().enumerate() {
-        if let Some(name) = field(package, "name") {
-            by_name.entry(name).or_default().push(index);
-        }
-    }
-    let mut pending: Vec<usize> = by_name
-        .get(root)
-        .into_iter()
-        .flatten()
-        .copied()
-        .filter(|index| packages[*index].get("source").is_none())
-        .collect();
-    if pending.is_empty() {
-        return Err(format!("the Cargo.lock locks no local package {root}"));
-    }
-    let mut seen = BTreeSet::new();
-    while let Some(index) = pending.pop() {
-        if !seen.insert(index) {
-            continue;
-        }
-        let package = packages[index];
-        if field(package, "name").as_deref() == Some(needle) {
-            return Ok(true);
-        }
-        for edge in package
-            .get("dependencies")
-            .and_then(toml::Value::as_array)
-            .into_iter()
-            .flatten()
-            .filter_map(toml::Value::as_str)
-        {
-            let mut parts = edge.split_whitespace();
-            let name = parts.next().unwrap_or_default();
-            let version = parts.next();
-            pending.extend(
-                by_name
-                    .get(name)
-                    .into_iter()
-                    .flatten()
-                    .copied()
-                    .filter(|candidate| {
-                        version.is_none()
-                            || field(packages[*candidate], "version").as_deref() == version
-                    }),
-            );
-        }
-    }
-    Ok(false)
 }
 
 #[cfg(test)]

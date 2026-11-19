@@ -23,7 +23,7 @@ use tempfile::TempDir;
 
 #[path = "support/artifact_elf.rs"]
 mod fixture;
-use fixture::{artifact_elf, artifact_elf_format, wait_for_stub};
+use fixture::{artifact_elf, wait_for_stub};
 
 #[path = "support/artifact_native_libraries.rs"]
 mod native_libraries;
@@ -641,34 +641,128 @@ const DECLARED_X86_64: [(&str, &str); 3] = [
     ("CFLAGS_x86_64_unknown_linux_gnu", "-march=x86-64"),
 ];
 
-/// ring's producer string as gcc 14 records it in `.debug_str`, at `march`.
-fn gnu_c(march: &str) -> Vec<u8> {
-    format!(
-        "clang LLVM (rustc version 1.100.0)\0GNU C11 14.3.1 20251022 (Red Hat 14.3.1-4) -m64 \
-         -mtune=generic {march} -g3 -O2 -std=c11 -ffunction-sections -fPIC -fvisibility=hidden\0"
-    )
-    .into_bytes()
+/// One build script of the build put is handed, as cargo and cc leave it: its crates.io crate,
+/// the `running:` lines cc logged (`$OUT` is its OUT_DIR) and the objects it left there.
+#[derive(Clone)]
+struct BuildScript {
+    package: &'static str,
+    running: Vec<String>,
+    objects: &'static [&'static str],
 }
 
-/// Put one recordable mesh build with `inputs` recorded (and set), the bytes carrying
-/// `debug_str` when given, and the bin's lock closure holding ring when `ring`. The put's output
-/// and every Produce recorded.
-fn declared_put(
-    inputs: &[(&str, &str)],
-    debug_str: Option<&[u8]>,
-    ring: bool,
-) -> (Output, Vec<FlowEvent>) {
-    declared_put_under(
-        inputs,
-        debug_str,
-        ring,
-        Some(&declared_policy(X86_64_RECORD)),
+/// A gcc compile as cc 1.11.1 logs it, `flags` before the output, the source last.
+fn cc_compile(flags: &str, source: &str) -> String {
+    let flags: String = flags
+        .split_whitespace()
+        .map(|f| format!(" {f:?}"))
+        .collect();
+    format!("\"gcc\" \"-O2\" \"-fPIC\" \"-m64\"{flags} \"-o\" \"$OUT/x.o\" \"-c\" {source:?}")
+}
+
+/// A crate's build script with these compile commands, cc's family probe and its archive.
+fn script(package: &'static str, compiles: &[String]) -> BuildScript {
+    let mut running = vec!["\"gcc\" \"-E\" \"$OUT/detect_compiler_family.c\"".to_string()];
+    running.extend(compiles.iter().cloned());
+    running.push("\"ar\" \"cqD\" \"$OUT/libx.a\" \"$OUT/x.o\"".into());
+    BuildScript {
+        package,
+        running,
+        objects: &["x.o", "libx.a"],
+    }
+}
+
+/// ring's build with its curve25519.c compiled at `flags`.
+fn ring_at(flags: &str) -> BuildScript {
+    script(
+        "ring",
+        &[cc_compile(flags, "crypto/curve25519/curve25519.c")],
     )
+}
+
+/// The build messages a put is handed.
+#[derive(Clone)]
+enum Messages {
+    /// No `--build-messages` at all.
+    Absent,
+    /// The build of these bytes.
+    Of(Vec<BuildScript>),
+    /// A build whose bin executable is other bytes.
+    OtherBytes(Vec<BuildScript>),
+}
+
+/// Write `messages` for the bin `bin` built at `exe` into `dir`, as cargo's
+/// `--message-format=json` names them, each script's log in `run/stdout` beside its OUT_DIR.
+fn build_messages(dir: &Path, bin: &str, exe: &Path, messages: &Messages) -> Option<PathBuf> {
+    let (scripts, exe) = match messages {
+        Messages::Absent => return None,
+        _ if !dir.exists() => {
+            std::fs::create_dir_all(dir).unwrap();
+            return build_messages(dir, bin, exe, messages);
+        }
+        Messages::Of(scripts) => (scripts, exe.to_path_buf()),
+        Messages::OtherBytes(scripts) => {
+            let other = dir.join("other-exe");
+            std::fs::write(&other, b"other bytes").unwrap();
+            (scripts, other)
+        }
+    };
+    let mut lines = vec![serde_json::json!({
+        "reason": "compiler-artifact",
+        "package_id": format!("path+file:///repo/crate#{bin}@0.1.0"),
+        "target": {"kind": ["bin"], "name": bin},
+        "executable": exe,
+        "fresh": true,
+    })
+    .to_string()];
+    for (n, script) in scripts.iter().enumerate() {
+        let unit = dir
+            .join("build")
+            .join(script.package)
+            .join(format!("{n:04}"));
+        let out = unit.join("out");
+        std::fs::create_dir_all(&out).unwrap();
+        std::fs::create_dir_all(unit.join("run")).unwrap();
+        for object in script.objects {
+            std::fs::write(out.join(object), b"obj").unwrap();
+        }
+        let log: String = script
+            .running
+            .iter()
+            .map(|line| {
+                format!(
+                    "running: {}\n",
+                    line.replace("$OUT", &out.display().to_string())
+                )
+            })
+            .collect();
+        std::fs::write(unit.join("run/stdout"), log).unwrap();
+        lines.push(
+            serde_json::json!({
+                "reason": "build-script-executed",
+                "package_id": format!(
+                    "registry+https://github.com/rust-lang/crates.io-index#{}@1.0.0",
+                    script.package
+                ),
+                "out_dir": out,
+            })
+            .to_string(),
+        );
+    }
+    let path = dir.join("build-messages.json");
+    std::fs::write(&path, lines.join("\n") + "\n").unwrap();
+    Some(path)
+}
+
+/// Put one recordable mesh build with `inputs` recorded (and set), handed `messages` as the
+/// evidence of its C level, under the fixture's declared target record. The put's output and
+/// every Produce recorded.
+fn declared_put(inputs: &[(&str, &str)], messages: &Messages) -> (Output, Vec<FlowEvent>) {
+    declared_put_under(inputs, messages, Some(&declared_policy(X86_64_RECORD)))
 }
 
 /// The fixture's declared target record, as genesis/agentic/pool-policy.json writes it: the
 /// fixture's triple (its rustc's host) for its workspace (`crate`, the directory of its lock).
-const X86_64_RECORD: &str = r#""x86_64-unknown-linux-gnu": {"isa": "x86-64", "cflags": "-march=x86-64", "workspaces": ["crate"]}"#;
+const X86_64_RECORD: &str = r#""x86_64-unknown-linux-gnu": {"isa": "x86-64", "cflags": "-march=x86-64", "env": {"CC_ENABLE_DEBUG_OUTPUT": "1"}, "workspaces": ["crate"]}"#;
 
 fn declared_policy(records: &str) -> String {
     format!("{{\"declared_targets\": {{\"_comment\": \"fixture\", {records}}}}}\n")
@@ -678,8 +772,7 @@ fn declared_policy(records: &str) -> String {
 /// (none when `None`).
 fn declared_put_under(
     inputs: &[(&str, &str)],
-    debug_str: Option<&[u8]>,
-    ring: bool,
+    messages: &Messages,
     policy: Option<&str>,
 ) -> (Output, Vec<FlowEvent>) {
     let keys = TempDir::new().unwrap();
@@ -688,34 +781,20 @@ fn declared_put_under(
     let (method, mut descriptor) =
         method_file_with(scratch.path(), &["crate/src", "README.md"], inputs);
     let bytes = scratch.path().join("elohim-storage");
-    let comment = b"Linker: LLD 22.1.2\0";
-    std::fs::write(
-        &bytes,
-        debug_str.map_or_else(
-            || artifact_elf(comment),
-            |strings| artifact_elf_format(comment, true, true, Some(strings)),
-        ),
-    )
-    .unwrap();
+    std::fs::write(&bytes, artifact_elf(b"Linker: LLD 22.1.2\0")).unwrap();
     recordable_mesh_fixture(a.root(), scratch.path(), &method, &mut descriptor);
-    if ring {
-        std::fs::write(
-            a.root().join("crate/Cargo.lock"),
-            "version = 4\n\n[[package]]\nname = \"elohim-storage\"\nversion = \"0.1.0\"\n\
-             dependencies = [\"ring\"]\n\n[[package]]\nname = \"ring\"\nversion = \"0.17.14\"\n\
-             source = \"registry+https://github.com/rust-lang/crates.io-index\"\n\
-             checksum = \"a4689e6c2294d81e88dc6261c768b63bc4fcdb852be6d1352498b114f61383b7\"\n",
-        )
-        .unwrap();
-        git(a.root(), &["add", "crate/Cargo.lock"]);
-        git(a.root(), &["commit", "-qm", "ring in the closure"]);
-    }
     if let Some(policy) = policy {
         std::fs::create_dir_all(a.root().join("genesis/agentic")).unwrap();
         std::fs::write(a.root().join("genesis/agentic/pool-policy.json"), policy).unwrap();
         git(a.root(), &["add", "genesis/agentic/pool-policy.json"]);
         git(a.root(), &["commit", "-qm", "the declared target record"]);
     }
+    let evidence = build_messages(
+        &scratch.path().join("target"),
+        "elohim-storage",
+        &bytes,
+        messages,
+    );
     let (stub, _log) = brit_stub(scratch.path());
     let command = || {
         let mut command = a.command();
@@ -731,16 +810,18 @@ fn declared_put_under(
         .unwrap();
     assert!(out.status.success(), "{}", text(&out));
     let input = String::from_utf8(out.stdout).unwrap().trim().to_string();
-    let out = command()
-        .env("BRIT_BUILD_REF_BIN", &stub)
+    let mut put = command();
+    put.env("BRIT_BUILD_REF_BIN", &stub)
         .args(["artifact", "put", "--method"])
         .arg(&method)
         .args(["--input", &input, "--bytes"])
         .arg(&bytes)
         .args(["--project", "elohim-storage", "--cross", "--json", "--repo"])
-        .arg(a.root())
-        .output()
-        .unwrap();
+        .arg(a.root());
+    if let Some(evidence) = evidence {
+        put.arg("--build-messages").arg(evidence);
+    }
+    let out = put.output().unwrap();
     let produces = events(a.root())
         .into_iter()
         .filter(|e| e.action == ReaVerb::Produce)
@@ -757,53 +838,86 @@ fn isa_c_slots(produce: &FlowEvent) -> Vec<&str> {
         .collect()
 }
 
-/// Row 29.2: a build declared at x86-64 whose recorded C flags are the declared ones and whose
-/// GNU C producer strings carry exactly the declared -march is recorded with one
-/// `env:isa-c=x86-64`, the marker a sibling draws by (L2b).
+/// Row 29.2, as reworked (ruling 1): a build declared at x86-64 whose recorded C flags are the
+/// declared ones and whose every cc compile carries exactly the declared -march is recorded with
+/// one `env:isa-c=x86-64`, the marker a sibling draws by (L2b).
 #[test]
 fn a_declared_target_realized_in_its_c_is_recorded_with_one_isa_c_slot() {
-    let (out, produces) = declared_put(&DECLARED_X86_64, Some(&gnu_c("-march=x86-64")), true);
+    let sqlite = script(
+        "libsqlite3-sys",
+        &[cc_compile(
+            "-march=x86-64 -mtune=generic -mno-red-zone",
+            "sqlite3.c",
+        )],
+    );
+    let built = Messages::Of(vec![ring_at("-march=x86-64"), sqlite]);
+    let (out, produces) = declared_put(&DECLARED_X86_64, &built);
     assert!(out.status.success(), "{}", text(&out));
     assert_eq!(produces.len(), 1, "{}", text(&out));
     assert_eq!(isa_c_slots(&produces[0]), ["env:isa-c=x86-64"]);
+    assert!(
+        text(&out).contains("isa-c: ring: 1 compile(s) at -march=x86-64"),
+        "{}",
+        text(&out)
+    );
     // The underscore CXXFLAGS_<triple> spelling of the declared flags is the declared one too; the
     // dashed spelling is refused under a declared target (see the refusal test).
     let mut with_cxx = DECLARED_X86_64.to_vec();
     with_cxx.push(("CXXFLAGS_x86_64_unknown_linux_gnu", "-march=x86-64"));
-    let (out, produces) = declared_put(&with_cxx, Some(&gnu_c("-march=x86-64")), true);
+    let (out, produces) = declared_put(&with_cxx, &built);
     assert!(out.status.success(), "{}", text(&out));
     assert_eq!(isa_c_slots(&produces[0]), ["env:isa-c=x86-64"]);
     // Ruling 4: cc's command log, the gate's declared diagnostic switch, recorded and allowed.
     with_cxx.push(("CC_ENABLE_DEBUG_OUTPUT", "1"));
-    let (out, produces) = declared_put(&with_cxx, Some(&gnu_c("-march=x86-64")), true);
+    let (out, produces) = declared_put(&with_cxx, &built);
     assert!(out.status.success(), "{}", text(&out));
     assert_eq!(isa_c_slots(&produces[0]), ["env:isa-c=x86-64"]);
 }
 
-/// A bin with no C unit (bin-launch: no ring in its lock closure) and no GNU C producer string
-/// is not applicable to the C read, and is recorded with the marker.
+/// Ruling 1(e, f): bin-launch is marked by the same rule from its own build messages; a build
+/// whose only cc-built crates are named exceptions (blake3's CPUID-dispatched assembly, a
+/// stacker that compiles nothing) and whose other scripts compile nothing is recorded.
 #[test]
-fn a_declared_target_with_no_c_unit_is_recorded_with_its_isa_c_slot() {
-    let (out, produces) = declared_put(&DECLARED_X86_64, None, false);
+fn a_declared_target_whose_build_compiles_only_exception_crates_is_recorded() {
+    let blake3 = script(
+        "blake3",
+        &[cc_compile(
+            "-march=x86-64 -mavx512f -mavx512vl",
+            "c/blake3_avx512_x86-64_unix.S",
+        )],
+    );
+    let stacker = BuildScript {
+        package: "stacker",
+        running: Vec::new(),
+        objects: &[],
+    };
+    let serde = BuildScript {
+        package: "serde",
+        running: Vec::new(),
+        objects: &[],
+    };
+    let (out, produces) = declared_put(
+        &DECLARED_X86_64,
+        &Messages::Of(vec![blake3, stacker, serde]),
+    );
     assert!(out.status.success(), "{}", text(&out));
     assert_eq!(isa_c_slots(&produces[0]), ["env:isa-c=x86-64"]);
+    assert!(
+        text(&out).contains("isa-c: blake3 excepted"),
+        "{}",
+        text(&out)
+    );
 }
 
-/// One refused declared-target put: why, the recorded inputs, the bytes' `.debug_str`, whether
-/// the lock closure holds ring, and the reason the refusal must name.
-type Refusal<'a> = (
-    &'a str,
-    &'a [(&'a str, &'a str)],
-    Option<Vec<u8>>,
-    bool,
-    &'a str,
-);
+/// One refused declared-target put: why, the recorded inputs, the build messages, and the
+/// reason the refusal must name.
+type Refusal<'a> = (&'a str, &'a [(&'a str, &'a str)], Messages, &'a str);
 
-/// Every way the declared C level is not what the bytes or the record show refuses with exit 3
+/// Every way the declared C level is not what the build or the record shows refuses with exit 3
 /// `unrecorded: <reason>`, and records nothing, so no marker.
 #[test]
 fn a_declared_target_its_c_does_not_realize_refuses_and_records_no_marker() {
-    let v1 = gnu_c("-march=x86-64");
+    let v1 = || Messages::Of(vec![ring_at("-march=x86-64")]);
     let mut other_cflags = DECLARED_X86_64.to_vec();
     other_cflags[2] = ("CFLAGS_x86_64_unknown_linux_gnu", "-march=x86-64-v2");
     let mut unrecorded_cflags = DECLARED_X86_64.to_vec();
@@ -822,108 +936,148 @@ fn a_declared_target_its_c_does_not_realize_refuses_and_records_no_marker() {
     let mut with_sysroot = DECLARED_X86_64.to_vec();
     with_sysroot.push(("target.sysroot", &sysroot));
     let only_isa = [("target.isa", "x86-64")];
-    let cases: [Refusal; 14] = [
+    // Ruling 2: the declaration and the record agree on an extra flag; still refused.
+    let agreeing_extra = [
+        ("target.isa", "x86-64"),
+        ("target.cflags", "-march=x86-64 -mavx2"),
+        ("CFLAGS_x86_64_unknown_linux_gnu", "-march=x86-64 -mavx2"),
+    ];
+    let baseline_and_above = script(
+        "ring",
+        &[
+            cc_compile("-march=x86-64", "crypto/curve25519/curve25519.c"),
+            cc_compile("-march=x86-64 -mavx2", "crypto/fipsmodule/ec/p256.c"),
+        ],
+    );
+    let silent_sqlite = BuildScript {
+        package: "libsqlite3-sys",
+        running: vec!["\"ar\" \"cqD\" \"$OUT/libsqlite3.a\" \"$OUT/x.o\"".into()],
+        objects: &["x.o", "libsqlite3.a"],
+    };
+    let cases: [Refusal; 19] = [
         (
             "v3 C",
             &DECLARED_X86_64[..],
-            Some(gnu_c("-march=x86-64-v3")),
-            true,
+            Messages::Of(vec![ring_at("-march=x86-64-v3")]),
             "-march=x86-64-v3",
         ),
         (
             "an extra ISA flag",
             &DECLARED_X86_64[..],
-            Some(gnu_c("-march=x86-64 -mavx2")),
-            true,
+            Messages::Of(vec![ring_at("-march=x86-64 -mavx2")]),
             "-mavx2",
         ),
         (
             "no -march",
             &DECLARED_X86_64[..],
-            Some(gnu_c("")),
-            true,
+            Messages::Of(vec![ring_at("-O2")]),
             "no -march",
         ),
         (
-            "ring and no producer string",
+            "one compile at the baseline and one above it",
             &DECLARED_X86_64[..],
-            None,
-            true,
-            "holds ring",
+            Messages::Of(vec![baseline_and_above]),
+            "ring's compile of crypto/fipsmodule/ec/p256.c carries -mavx2",
+        ),
+        (
+            "objects with no logged compile",
+            &DECLARED_X86_64[..],
+            Messages::Of(vec![ring_at("-march=x86-64"), silent_sqlite]),
+            "no evidence: libsqlite3-sys's build script left",
+        ),
+        (
+            "no build messages",
+            &DECLARED_X86_64[..],
+            Messages::Absent,
+            "needs --build-messages",
+        ),
+        (
+            "messages of other bytes",
+            &DECLARED_X86_64[..],
+            Messages::OtherBytes(vec![ring_at("-march=x86-64")]),
+            "is not --bytes",
         ),
         (
             "recorded flags differ",
             &other_cflags[..],
-            Some(v1.clone()),
-            true,
+            v1(),
             "CFLAGS_x86_64_unknown_linux_gnu",
         ),
         (
             "declared flags unrecorded",
             &unrecorded_cflags[..],
-            Some(v1.clone()),
-            true,
+            v1(),
             "CFLAGS_x86_64_unknown_linux_gnu",
         ),
         (
             "another C variable recorded",
             &extra_family[..],
-            Some(v1.clone()),
-            true,
+            v1(),
             "C-family variable CFLAGS;",
         ),
         (
             "the dashed spelling recorded",
             &dashed[..],
-            Some(v1.clone()),
-            true,
+            v1(),
             "CFLAGS_x86_64-unknown-linux-gnu",
         ),
         (
             "CXXFLAGS differ",
             &other_cxx[..],
-            Some(v1.clone()),
-            true,
+            v1(),
             "CXXFLAGS_x86_64_unknown_linux_gnu",
         ),
         (
             "cflags level is not the isa",
             &isa_mismatch[..],
-            Some(v1.clone()),
-            true,
+            v1(),
             "not target.isa x86-64-v2",
         ),
         (
             "cflags without isa",
             &no_isa[..],
-            Some(v1.clone()),
-            true,
+            v1(),
             "declares no target.isa",
         ),
         (
             "isa without cflags",
             &only_isa[..],
-            Some(v1.clone()),
-            true,
+            v1(),
             "declares no target.cflags",
         ),
         (
             "a declared sysroot",
             &with_sysroot[..],
-            Some(v1.clone()),
-            true,
+            v1(),
             "target.sysroot",
         ),
         (
-            "a second GNU C unit at v3",
+            "declaration and record agree on an extra flag",
+            &agreeing_extra[..],
+            v1(),
+            "is not exactly -march=x86-64",
+        ),
+        (
+            "an exception crate compiling C",
             &DECLARED_X86_64[..],
-            Some([v1.clone(), gnu_c("-march=x86-64-v3")].concat()),
-            true,
-            "-march=x86-64-v3",
+            Messages::Of(vec![script(
+                "blake3",
+                &[cc_compile("-march=x86-64 -mavx512f", "c/blake3_avx512.c")],
+            )]),
+            "blake3's exception covers its CPUID-dispatched assembly",
+        ),
+        (
+            "a second crate above the baseline",
+            &DECLARED_X86_64[..],
+            Messages::Of(vec![
+                ring_at("-march=x86-64"),
+                script("zstd-sys", &[cc_compile("-march=x86-64-v3", "zstd.c")]),
+            ]),
+            "zstd-sys's compile of zstd.c carries -march=x86-64-v3",
         ),
     ];
-    for (why, inputs, debug_str, ring, reason) in cases {
-        let (out, produces) = declared_put(inputs, debug_str.as_deref(), ring);
+    for (why, inputs, messages, reason) in cases {
+        let (out, produces) = declared_put(inputs, &messages);
         assert_eq!(out.status.code(), Some(3), "{why}: {}", text(&out));
         let said = String::from_utf8_lossy(&out.stdout);
         assert!(said.contains("unrecorded:"), "{why}: {said}");
@@ -937,7 +1091,6 @@ fn a_declared_target_its_c_does_not_realize_refuses_and_records_no_marker() {
 /// workspace, with the same isa and cflags, the put refuses and records nothing.
 #[test]
 fn a_declared_target_the_record_at_head_does_not_declare_refuses() {
-    let v1 = gnu_c("-march=x86-64");
     let record = |triple: &str, isa: &str, workspace: &str| {
         declared_policy(&format!(
             r#""{triple}": {{"isa": "{isa}", "cflags": "-march={isa}", "workspaces": ["{workspace}"]}}"#
@@ -961,8 +1114,8 @@ fn a_declared_target_the_record_at_head_does_not_declare_refuses() {
             "not the bin's workspace crate",
         ),
     ] {
-        let (out, produces) =
-            declared_put_under(&DECLARED_X86_64, Some(&v1), true, policy.as_deref());
+        let messages = Messages::Of(vec![ring_at("-march=x86-64")]);
+        let (out, produces) = declared_put_under(&DECLARED_X86_64, &messages, policy.as_deref());
         assert_eq!(out.status.code(), Some(3), "{why}: {}", text(&out));
         let said = String::from_utf8_lossy(&out.stdout);
         assert!(said.contains(reason), "{why}: {reason} in {said}");
