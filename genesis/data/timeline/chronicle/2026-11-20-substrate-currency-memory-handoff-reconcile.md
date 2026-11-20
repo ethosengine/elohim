@@ -1,8 +1,18 @@
 ---
+id: chronicle-substrate-currency-memory-handoff-reconcile
 kind: chronicle
-status: complete
-date: 2026-11-20
-ceremony: memory-ceremony
+contentType: chronicle-entry
+contentFormat: markdown
+title: "Memory hand-off reconcile, 2026-11-20"
+slug: substrate-currency-memory-handoff-reconcile
+written: '2026-11-20'
+occurred_at: '2026-11-20'
+author: "agent:librarian@claude-opus-5-5 (steward human:matthew)"
+status: noted
+significance: meaningful
+relatedNodeIds: []
+tags: [memory-ceremony]
+ceremony: substrate-currency
 surfaces_rewritten: 30 memory entries (+59 frontmatter-only title/id repairs)
 diff_review_verdict: refute-checked per item (workflow wf_2cd1d4fd-22a); no independent post-apply diff review
 coherence_verdict: not run
