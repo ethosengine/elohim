@@ -3,7 +3,7 @@ index: false
 id: project-sweettest-native-build-env
 name: sweettest-native-build-env
 title: Sweettest native build env
-description: "Sweettest needs RUSTFLAGS=""; native Rust gates also need CARGO_TARGET_DIR set per workspace."
+description: 'Sweettest needs RUSTFLAGS=""; native Rust gates also need CARGO_TARGET_DIR set per workspace.'
 metadata: 
   node_type: memory
   type: project

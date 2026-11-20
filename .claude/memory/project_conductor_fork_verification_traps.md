@@ -1,5 +1,6 @@
 ---
 name: project_conductor_fork_verification_traps
+title: "project_conductor_fork_verification_traps"
 description: "How to verify a conductor-fork change locally — patch-crate tests in-dir, one build at a time, timing the startup window from storage, metrics have no exporter"
 id: project-conductor-fork-verification-traps
 metadata:

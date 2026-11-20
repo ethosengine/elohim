@@ -1,11 +1,15 @@
 ---
 name: project_delivery_sprints_2026_09_24_25
 title: Delivery sprints 2026-09-24/25 (umbrella)
+id: project-delivery-sprints-2026-09-24-25
 description: "Plans hold sprint state; kept here: pin now e0bfc6c7a, 7e553f9c3 unbisected, fork has no forge CI, K0 store archive, auditor routine, adam compute-chain home."
 supersedes: [project_native_delivery_sprint_2026_09_24, project_post_station_4_sprint_2026_09_25, project_next_sprint_adam_measurement_peer_compute_agreements, project_conductor_pin_7e553f9c3_convergence_regression]
 metadata:
   node_type: memory
   type: project
+cites:
+  - "native-delivery-sprint-plan | Native delivery sprint | sha256:583c586a70649e89 | path: genesis/docs/superpowers/plans/2026-09-24-native-delivery-sprint-plan.md"
+  - "post-station-4-participant-classifier-search-attention-sprint | Post-station-4 sprint | sha256:e894efd3782afb89 | path: genesis/docs/superpowers/plans/2026-09-25-post-station-4-participant-classifier-search-attention-sprint.md"
 ---
 
 # Delivery sprints 2026-09-24/25 (umbrella)

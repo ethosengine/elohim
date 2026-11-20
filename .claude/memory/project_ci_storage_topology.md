@@ -7,7 +7,7 @@ description: "CI cache PVCs (nix/cargo/sweettest-target) are openebs-hostpath in
 type: project
 originSessionId: 91882765-aece-476c-a49a-85b618774d32
 cites:
-  - genesis/manifests/nix-cache-pvc.yaml
+  - genesis/orchestrator/manifests/ci-infra/nix-cache-pvc.yaml
   - elohim/holochain/Jenkinsfile
   - elohim/holochain/dna/Jenkinsfile
   - steward/device/Jenkinsfile
@@ -29,7 +29,7 @@ The CI cluster splits build CPU/RAM from build storage:
 - New build cache PVC? Use `storageClassName: openebs-jiva-csi-default`, ReadWriteOnce, in namespace `ethosengine`. Define in `genesis/manifests/`. Backing data lands on hp-micro10 by default; no nodeSelector/affinity tricks needed for placement.
 - Builder pod schedule constraints (`operations` or `edge`) come from the Jenkinsfile pod template, not the PVC.
 - ReadWriteOnce + `disableConcurrentBuilds()` on the pipeline is the pattern that prevents two builds racing on the same volume.
-- Reference: `genesis/manifests/nix-cache-pvc.yaml` is the canonical pattern document — it has the architectural comment headers explaining the split.
+- Reference: `genesis/orchestrator/manifests/ci-infra/nix-cache-pvc.yaml` is the canonical pattern document — it has the architectural comment headers explaining the split.
 - Don't reach for hostpath/local-path PVCs on operations or edge nodes for build artifacts — that defeats the storage-on-hp-micro10 design.
 
 ---
@@ -45,7 +45,7 @@ The Holochain/edge CI cache PVCs were cut over from `openebs-jiva-csi-default` (
 
 **Fix — make hostpath binding deterministic:** add a `kubernetes.io/hostname` nodeAffinity to each pipeline's Jenkinsfile pod spec. Operator assignment: elohim-edge → `thinkc-p1s`; elohim-holochain (DNA) + steward → `intel-nuc`.
 
-**Namespace:** the CI cache PVCs (nix-cache, cargo-cache, sweettest-target-cache) live in the `jenkins` namespace (per `genesis/manifests/nix-cache-pvc.yaml`), NOT `ethosengine` — the superseded section's namespace guidance is stale too.
+**Namespace:** the CI cache PVCs (nix-cache, cargo-cache, sweettest-target-cache) live in the `jenkins` namespace (per `genesis/orchestrator/manifests/ci-infra/nix-cache-pvc.yaml`), NOT `ethosengine` — the superseded section's namespace guidance is stale too.
 
 **Tradeoff:** if a PVC had previously bound to a DIFFERENT node, the pin triggers an immediate `FailedScheduling` and the operator must delete+reapply that PVC. Dead `nix-store` volume declarations are intentionally left in the Jenkinsfiles as breadcrumbs for future sccache work.
 

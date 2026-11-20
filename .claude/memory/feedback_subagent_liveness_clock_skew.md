@@ -8,6 +8,8 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: 8f8685c8-7840-46a2-9dd2-f43936b1d36b
+cites:
+  - .claude/skills/orchestrate/SKILL.md
 ---
 
 During the 2026-06-04 portal-handoff sprint, two background agents were presumed dead because their transcript JSONL mtimes read ~1h stale vs `date` — but the clocks were skewed (shell `date` said 06:15 UTC while vitest in the same env stamped 12:13). Both agents were alive; one later raced the main session's edits on the same spec file (mystery `Promise.resolve()`→`settle()` rewrites that looked like a linter).

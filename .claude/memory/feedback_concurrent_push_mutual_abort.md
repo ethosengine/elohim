@@ -12,9 +12,9 @@ cites:
   - genesis/orchestrator/Jenkinsfile
 ---
 
-Observed 2026-06-06 evening: five consecutive `elohim-orchestrator/dev` ABORTED runs (#1172–#1176, "Queue task was cancelled") and two push events that never spawned a run at all. Two causes layered:
+Observed 2026-06-06 evening: five consecutive `elohim-orchestrator/dev` ABORTED runs (#1172–#1176, "Queue task was cancelled") and two push events that never spawned a run at all. **Cause of #1172–#1176 unproven:** the same evening an EIO on the registry volume killed every CI pod at image pull. That shape (~75 s, no stage entered, `Commit: null`) reads exactly like supersession (see the museum record genesis/docs/content/elohim-protocol/history/2026-06-02-ci-orchestrator-recurring-anti-patterns-museum.md, 'fourth shape (a)'). Rule it out before reading an abort run as mutual abort. Two candidate causes:
 
-1. **Mutual abort**: the orchestrator job carries `DisableConcurrentBuildsJobProperty` (abort-previous). Two active sessions pushing `dev` minutes apart — retriggers, sentinel commits, `[build:*]` nudges — each new BranchEventCause killed the predecessor before it could dispatch downstream. Nobody's intent ever shipped.
+1. **Mutual abort (hypothesis for that run; confirmed mechanism 2026-06-27 below)**: the orchestrator job carries `DisableConcurrentBuildsJobProperty` (abort-previous). Two active sessions pushing `dev` minutes apart — retriggers, sentinel commits, `[build:*]` nudges — each new BranchEventCause killed the predecessor before it could dispatch downstream. Nobody's intent ever shipped.
 2. **Silent webhook loss**: after the abort storm + a transient storage-503/harbor-500 window, later push events produced NO queue item (queue empty, agents online, job buildable, nextBuildNumber unchanged) — consistent with GitHub auto-muting the hook after repeated delivery failures. More pushes cannot fix this; it needs operator-side redelivery / "Scan Multibranch Now" / a manual UserIdCause build.
 
 **Why:** push-as-trigger is a shared, last-writer-kills-previous channel; "carrying queued intent" in a commit message only works if that event actually lands AND survives.

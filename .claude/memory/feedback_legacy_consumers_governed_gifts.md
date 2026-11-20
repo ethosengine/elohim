@@ -1,6 +1,7 @@
 ---
 name: feedback_legacy_consumers_governed_gifts
 title: Legacy consumers get governed gifts
+id: feedback-legacy-consumers-governed-gifts
 description: "Operator 2026-09-25 — legacy apps serve, never control; gifts are distinct-Steward-governed offers; settlement to token/fiat is a governance act."
 metadata:
   node_type: memory
@@ -8,6 +9,9 @@ metadata:
   type: feedback
   originSessionId: 0ca6c494-abc4-4dac-a4ac-bb7badb7b4a0
   modified: 2026-09-26T04:36:48.892Z
+cites:
+  - bridges/jenkins/
+  - "reliance-as-cite-shared-provenance-primitives-design | the Jenkins edge and disclosure.inflows design that implements the governed-gift seam | sha256:ed648f3378dba82a | path: genesis/docs/superpowers/specs/2026-10-15-reliance-as-cite-shared-provenance-primitives-design.md"
 ---
 
 A non-native consuming app (Jenkins, first case) serves the network and never controls it:

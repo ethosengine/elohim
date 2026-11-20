@@ -43,4 +43,6 @@ credential (process-local `git -c url.…insteadOf` in a `scripts/ci/*.sh`, toke
 and a step that only feeds an ADVISORY test (the rakia schema mirror) must be warn-only — print `RAKIA-UNAVAILABLE` and
 exit 0 — so it can never take the deploy path down.
 
+**A local toolchain move is not a CI toolchain move (2026-11-12, regenesis-2 track T).** All 27 local gates went green on Rust 1.100.0 while the CI images still built on `rust:1.94.0` (storage, both stages), `1.93` (doorway) and `1.94` (steward-node), and a fix for a 1.100 deprecation (`fetch_update`→`try_update`) needs 1.95+. Also the official `rust:1.100.0-*` Docker Hub tags did not exist three days after the release (newest 1.99.1). Before landing any pin move: grep every `FROM rust:` / `image: rust:` / `nerdctl pull rust:` for the new code's minimum Rust, and check the tag exists on Docker Hub (`hub.docker.com/v2/repositories/library/rust/tags/<tag>` returns 200). Fallback with no published tag: `rustup toolchain install <v>` inside the stage (as `genesis/agentic/compute/Dockerfile.source` does).
+
 - [[feedback_sccache_failure_classes]] — folded (index: false); three distinct sccache failures, not one: cache corruption (null-byte / unclosed-delimiter in a cached object), spawn ENOENT, and AccessDenied against a dead Garage key — the last turns the DNA pipeline red in ~85s.

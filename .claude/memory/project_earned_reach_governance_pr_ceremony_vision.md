@@ -7,6 +7,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 6267f18d-a5f8-42b9-9703-372bf56bcea2
+  modified: 2026-11-09T14:14:23.811Z
 cites:
   - .husky/pre-push.bash
   - genesis/seeder/src/cid-artifact.ts
@@ -19,6 +20,13 @@ Operator's north-star (2026-07-09) for how the earned-authority / canonical-HEAD
 - **The whole thing sits on the resilient p2p blobstore (no Google/AWS datacenter)** — custody/salvage N-way replication — so "people just don't worry about it anymore." Resilience is the floor that makes the governance ceremony trustworthy.
 
 Design consequence: authority = earned attestations → reach promoted amber→green at the commons threshold → canonical HEAD elected + adopted cross-peer (verified against the notary witness). No earned attestations ⇒ the authoring stays **private/limited-reach**. See [[project_rea_compute_commitment_primitive]] (the bounded-authority-delegation primitive), [[project_weave_epic_arc]] (VSM/tier-capability seeds), [[feedback-identity-sovereignty-ontology-guard]] (community governance backstops individuals — this is that made concrete), [[feedback-justice-mishpat-not-punishment-guard]] (restored-capability framing), [[project_reach_enum_drift_reconciliation]] (the reach taxonomy that must carry the promotion lifecycle).
+
+**Tool releases climb the same ladder (operator, 2026-11-09, ethosengine ⇄ shem "as pair devs"):** an epr
+build's reach is private (a session's `EPR_BIN`) → device (landed `current`) → pair (a sibling device adopts the
+same bytes, verified, and attests) → the steward's devices → commons. Crossing a lineage break in `current`
+(ethosengine's landed head cbc56bd7c was off dev) is the pair *electing* a common head, not a revert; `epr bin land`
+had no ring for that, so its only bypass (`--revert`) would have mislabelled it. Design a release rung as an
+election carrying the sibling's attestation, and the p2p devspace as the transport for the shared bytes.
 
 **Folded members (memorialized 2026-09-22 — detail lives in each file):**
 

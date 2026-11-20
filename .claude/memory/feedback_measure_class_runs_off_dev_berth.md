@@ -1,6 +1,7 @@
 ---
 name: feedback_measure_class_runs_off_dev_berth
 title: Measure-class runs go to a peer, never the dev berth
+id: feedback-measure-class-runs-off-dev-berth
 description: "Operator 2026-09-25: long measured runs (A/B windows, soaks, proofs on grown stores) never run on the workspace a human develops in — delegate to a measurement peer; dev berth runs bounded verify lanes only."
 metadata:
   node_type: memory
@@ -8,6 +9,8 @@ metadata:
   type: feedback
   originSessionId: 9adf9f01-3f4d-4b27-8758-d78fda7cada3
   modified: 2026-09-25T13:09:00.927Z
+cites:
+  - genesis/agentic/compute/measure.sh
 ---
 
 Operator, 2026-09-25, after the K0 conductor A/B and the household proof held this workspace's mesh

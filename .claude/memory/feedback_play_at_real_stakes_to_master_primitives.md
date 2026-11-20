@@ -1,12 +1,17 @@
 ---
 name: feedback_play_at_real_stakes_to_master_primitives
+title: "Play at real stakes to master primitives"
 description: "Operator 2026-09-25: the matthew↔adam compute market is play — play with the real primitives at Bootstrap stakes; no shortcut that skips a primitive."
+id: feedback-play-at-real-stakes-to-master-primitives
 metadata:
   node_type: memory
   title: Play at real stakes to master primitives
   type: feedback
   originSessionId: 184fb351-36f9-402f-b933-974a3cf7b37c
   modified: 2026-09-25T15:10:12.882Z
+cites:
+  - elohim/elohim-storage/src/trust/stage.rs
+  - elohim/elohim-storage/src/api/compute_grants.rs
 ---
 
 **Operator 2026-09-25**, on the compute-agreement sprint: "I know it's not a 'real' market — this is play, and if we play, learn, and master, we will build something that holds up when this becomes the foundation for that realized market."

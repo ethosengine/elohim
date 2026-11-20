@@ -1,12 +1,16 @@
 ---
 name: feedback_controller_holds_vision_opus_implements
-description: "Operator 2026-09-23: on a multi-task plan the top model focuses on fidelity to the vision, design rulings and alignment review; Opus 5.5 absorbs every implementation task."
+title: "feedback_controller_holds_vision_opus_implements"
+description: "Operator 2026-09-23: on a multi-task plan the top model keeps vision fidelity, design rulings and alignment review; Opus 5.5 implements."
+id: feedback-controller-holds-vision-opus-implements
 metadata:
   node_type: memory
   title: Controller holds vision and reviews alignment; Opus implements
   type: feedback
   originSessionId: 4264e76d-be32-47a9-939b-6b00665dcd45
   modified: 2026-09-24T17:30:00.000Z
+cites:
+  - .claude/skills/orchestrate/SKILL.md
 ---
 
 Operator, 2026-09-23, while picking up the governed-discovery station-4 plan: "opus 5.5 is

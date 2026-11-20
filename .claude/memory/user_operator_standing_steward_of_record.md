@@ -1,13 +1,17 @@
 ---
 name: user-operator-standing-steward-of-record
 title: Matthew is the standing steward of record
+id: user-operator-standing-steward-of-record
 description: "Operator 2026-09-26 — Matthew stands as steward of record for unattributable memory entries, affirmed once per session at startup."
 metadata:
   node_type: memory
   title: Matthew is the standing steward of record
   type: user
   originSessionId: 4750a644-a508-47ec-9220-8a193f383cf6
-  modified: 2026-09-27T01:05:58.758Z
+  modified: 2026-10-07T13:03:40.095Z
+cites:
+  - elohim/eprfs/epr-cli/src/flow/memory/attribution.rs
+  - .claude/hooks/participant-standing.py
 ---
 
 "I'm basically the steward of record pretty much all the time until another developer shows up..
@@ -29,3 +33,9 @@ for its author. This never overrides a real author: `steward_of_record()` in
 could have written the bytes. It is standing for entries, not identity: witnessing
 `human:<handle>` still needs a present agent and a basis ([[feedback_elohim_witness_human_identity]]).
 Retire when a second developer joins.
+
+**The greeting is the affirmation (operator, 2026-10-07):** when the session opens with the
+operator naming themself ("good morning matthew here…"), that already is the witness record. Do
+not ask the steward-of-record question again; treat it as affirmed and import. Ask only when the
+opening message does not say who is present. Said after I asked anyway at the end of a long turn:
+"I think earlier 'Good Morning, matthew here...' should have sufficed as that witness record."

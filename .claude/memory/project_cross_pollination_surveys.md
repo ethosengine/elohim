@@ -2,13 +2,14 @@
 name: project_cross_pollination_surveys
 title: Cross-pollination surveys (umbrella)
 id: project-cross-pollination-surveys
-description: "Holepunch/Hypercore transport, Hypha DAO holonics, p2panda crate-discipline; borrow mechanics, reject truth-chain."
+description: "Holepunch/Hypercore transport, Hypha DAO holonics, p2panda crate-discipline, ngit + Radicle forges; borrow mechanics, reject truth-chain."
 metadata:
   type: project
 cites:
   - genesis/research/holepunch-p2p-dataplane-cross-pollination-2026-06-24.md
   - genesis/research/hypha-dao-autonomous-collectives-cross-pollination-2026-06-24.md
   - genesis/research/p2panda-cross-pollination-2026-08-04.md
+  - genesis/research/radicle-heartwood-cross-pollination-2026-11-05.md
 ---
 
 # Cross-pollination surveys (umbrella)
@@ -18,3 +19,4 @@ Folds the external-project cross-pollination survey cluster. Members:
 - [[project_holepunch_cross_pollination]] — borrow Holepunch/Hypercore transport patterns for the p2p data plane; reject anything truth-shaped — Hypercore proves integrity, only the DHT validates.
 - [[project_hypha_dao_cross_pollination]] — Hypha DHO green/red-team: same holonic shape, opposite trust root (capital- vs care-weighted); borrow mechanics, reject chain+tokens; bridges must be lossy.
 - [[project_p2panda_cross_pollination]] — p2panda surveyed 2026-08-04; 7-item discipline adoption program + extraction sequence; p2panda-encryption candidate (audit-gated); truth-plane line holds.
+- [[project_radicle_lessons_reconciled_into_roadmap]] — Radicle/Heartwood surveyed 2026-11-05 as a failure archive for the artifact-store sprint; lessons sorted by reach into plan §7; the Forge Problem index section holds it beside ngit.

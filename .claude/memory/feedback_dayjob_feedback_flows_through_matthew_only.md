@@ -1,5 +1,6 @@
 ---
 name: feedback_dayjob_feedback_flows_through_matthew_only
+title: "Dayjob feedback flows through Matthew only"
 description: Operator 2026-11-06 — the dayjob never submits MRs or feedback; Matthew carries the pain of using his own stewardship back in; cures built upstream on his own time
 metadata:
   node_type: memory

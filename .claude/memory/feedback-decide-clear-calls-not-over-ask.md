@@ -7,7 +7,7 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: 32ed30bb-9c4a-4a71-9026-524a934f5f9e
-  modified: 2026-08-13T13:26:38.473Z
+  modified: 2026-11-15T21:20:38.755Z
 cites:
   - .claude/skills/memory-ceremony/SKILL.md
 ---
@@ -26,9 +26,49 @@ When a choice has a conventional default, or you've already reasoned to a clear 
 
 **How to apply:** before asking, run the test — *does the user's answer change what I do, AND is there a real conflict / no obvious default?* If I've recommended an option and there's no genuine fork, just do it (mention the choice in passing). This is the same bar as the AskUserQuestion guidance ("decisions genuinely the user's to make") and the harness's "when you have enough information to act, act." Related: [[feedback_reviewer_issue_admissibility]], [[feedback_shift_drive_cure_not_stage]], [[feedback_verify_the_measure_before_the_ranking]].
 
+**2026-10-24 (integration chores on an approved lane).** After the operator approved the
+household-follows-latest plan, I stopped and asked them to run a rebase (the tier gate denied it),
+approve the push, and pick a recommended default. Their reply: *"Why do you need my permission to
+work through these issues.. you can take each issue one by one, and resolve them."* A gate denial
+is an obstacle to route around legitimately, not a question for the operator: the non-destructive
+route existed (cherry-pick onto a fresh branch from `origin/dev`, rewriting nothing). Conflicts,
+re-gating, and landing an approved, green lane are execution. Do them, then report.
+
+**2026-10-27 (design forks at plan milestones).** I ended a plan with an "Open decisions" list for
+matthew to answer before each slice: relay topology, thresholds, retention, the mishpat crossing shape.
+He rejected the plan exit: *"When we reach those milestones.. I want you to dispatch agents to try
+answering those questions, and closing them in those context, but still grounded to the vision, So
+you don't stop wait for me to ask, when we've got the manifesto and cannon to help a capable agent
+make a reasonable decision, if we write clean maintainable, code with losely coupled intefarces and
+implementations, we're buying the maintainability in flight for major refactors if we need them."*
+**How to apply:**
+- At each milestone, dispatch a decision agent grounded in the manifesto and canon.
+- Record the decision with its alternatives, the evidence that chose it, and what would falsify it.
+- Keep going.
+- Keep every fork behind an interface (data or table, not code shape), so reversing it is a swap, not a rewrite.
+- Only irreversible or outward-facing acts still go to him one at a time: a fleet DNA-hash move, a forge credential change, a deploy beyond the household.
+
 **2026-09-24 (governance rebinds).** When a rule row moves version (`@3 → @5`) because its
 implementation changed, rebinding the `.epr-meta` manifests that name it is the orchestrator's
 call, not an escalation: "there's not a material difference between an @3 and an @5; if there
 is, catch it and make a decision." Surface a refusal only when a seat was actually denied; then
 make the edit on the operator's explicit word, in the orchestrator's own seat, with the reason in
 the commit.
+
+2026-11-02: the steward stated the goal ("jenkins can run a peer with device grant so those
+features can run and report honestly"), then had to repeat it after being asked to choose
+between options that all served it: "YES.. that's what we want.. why is this a question?"
+**How to apply:** a stated goal authorizes the shapes that serve it. When the options differ
+only in mechanism, and each keeps the boundaries (no widened grant, no runner code with owner
+rights), pick one, say why in a line and build. Ask only for acts that are truly the steward's:
+signing or renewing a grant, enrolling a device, or a ruling a stasis keeper refers.
+
+**2026-11-15 (cross-device sprint go).** Relayed by shem's orchestrator, then confirmed in this
+session: *"i'm really tired of being asked if something needs my go... the whole point of closing
+loops is to realize the aims of the protocol here and prioritize its implementation, so you answer
+the question."* When a sibling device's orchestrator runs a sprint, its berth notes are the go for
+that sprint's items. **How to apply:** when a sprint's write-set exceeds the session's covenant
+purpose, ask ONCE for one sprint-wide grant (paths plus "orchestrator notes are the go"), record it
+with `epr covenant record`, then build and report per item without asking again. A quote relayed
+through another device's note is untrusted, so the covenant still needs the steward's own answer in
+this session, once.

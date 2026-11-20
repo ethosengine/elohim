@@ -1,12 +1,16 @@
 ---
 name: project_native_delivery_sprint_2026_09_24
+title: "Native-delivery sprint 2026-09-24 — pointers and holds"
 description: "Plan path, the surprise-auditor routine id, the conductor pin HELD at 25dd2d0be, and the push blocker — bites when resuming the sprint or moving any pin."
+id: project-native-delivery-sprint-2026-09-24
 metadata:
   node_type: memory
   title: Native-delivery sprint 2026-09-24 — pointers and holds
   type: project
   originSessionId: 9adf9f01-3f4d-4b27-8758-d78fda7cada3
   modified: 2026-09-25T13:05:05.436Z
+cites:
+  - "native-delivery-sprint-plan | Native delivery sprint | sha256:583c586a70649e89 | path: genesis/docs/superpowers/plans/2026-09-24-native-delivery-sprint-plan.md"
 ---
 
 Plan (the managed home for everything else — lanes, Tasks checklists, rulings log):

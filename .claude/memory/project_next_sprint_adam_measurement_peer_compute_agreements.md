@@ -1,6 +1,7 @@
 ---
 name: project_next_sprint_adam_measurement_peer_compute_agreements
 title: Next sprint — adam as measurement peer, compute agreements
+id: project-next-sprint-adam-measurement-peer-compute-agreements
 description: "Operator 2026-09-25: next sprint = adam on shem accepts declared rakia compute agreements (run, store, attest), measure-class runs offload from the dev berth, ark/berth limits make pod equivalents for epr-apps."
 metadata:
   node_type: memory
@@ -8,6 +9,9 @@ metadata:
   type: project
   originSessionId: 9adf9f01-3f4d-4b27-8758-d78fda7cada3
   modified: 2026-09-25T13:21:01.318Z
+cites:
+  - genesis/agentic/compute/measure.sh
+  - "peer-executed-stage-design | The first Jenkins stage executed by a peer | sha256:41d3536b4a97b0f8 | path: genesis/docs/superpowers/specs/2026-09-08-peer-executed-stage-design.md"
 ---
 
 Named by the operator 2026-09-25 after the K0 A/B held the dev berth ~16 h. Captured in the

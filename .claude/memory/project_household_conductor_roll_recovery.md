@@ -1,9 +1,13 @@
 ---
+index: false
 name: project_household_conductor_roll_recovery
-title: "Household conductor roll — carried-record cure, stranded cell, infrastructure BlockSpan"
-description: "2026-09-25 mesh proof: after a conductor roll propagate-landing-to-B recovers only with a carried record; jessica's cell can stay STRANDED (CellDisabled, database is locked) so the shared lamad readiness rail refuses; a mutual BlockSpan sits on the infrastructure DNA."
+title: "Household conductor roll recovery"
+id: project-household-conductor-roll-recovery
+description: "2026-09-25 mesh proof: after a conductor roll, landing propagates to B only with a carried record; jessica's cell can stay STRANDED (CellDisabled, db locked) and the lamad readiness rail refuses."
 metadata:
   type: project
+cites:
+  - app/elohim-app/scripts/hc-mesh.sh
 ---
 
 **Seen 2026-09-25 (post-station-4 mesh proof, Opus agent, household-dowell fixture, fork pin 25dd2d0be144):**

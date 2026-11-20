@@ -1,12 +1,16 @@
 ---
 name: project_conductor_pin_7e553f9c3_convergence_regression
+title: "Conductor pin 7e553f9c3 misses the household's 75 s converg…"
 description: "Household A/B on 2026-09-24 — deliverability lane passes on fleet pin 25dd2d0be, misses doorway-B convergence 3× on 7e553f9c3; pin held, bisect owed"
+id: project-conductor-pin-7e553f9c3-convergence-regression
 metadata:
   node_type: memory
   title: "Conductor pin 7e553f9c3 misses the household's 75 s convergence"
   type: project
   originSessionId: 3a11e1a8-7c12-4116-80f9-fcf59b56702c
   modified: 2026-09-24T13:22:05.591Z
+cites:
+  - elohim/holochain-conductor
 ---
 
 **The finding (2026-09-24, household /tmp/hh, same host state).** `epr-app-deliverability` scenario 5, step "within 75 seconds both doorways serve the new browser bundle by content address": on conductor fork **25dd2d0be** (the fleet pin) it passed 102/102 at 05:01Z and 05:25Z (doorway B converged in 27 s); on **7e553f9c3** it missed three times (04:19Z, 04:44Z, 04:47Z) — jessica applies the announced change within 1 s but her green row waits for the DHT election to carry the declaration, and that never landed inside 75 s. CORRECTED 13:05Z the same day: the fleet-pin lane also missed that step at host load 10→16 (the fleet's own roll on this node), and every new-pin run had a load spike inside its 75 s window. Evidence: old pin PASS at load ≤5.5 (3 runs), FAIL at ≥10 (2 runs); new pin FAIL ×3, all with load spikes. Load is the dominant factor; the pin's effect on convergence is **unresolved** — settle it only with a quiet-host A/B (both pins, same tree, load < 6 throughout).

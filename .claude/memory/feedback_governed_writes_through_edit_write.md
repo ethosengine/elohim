@@ -1,5 +1,6 @@
 ---
 name: feedback-governed-writes-through-edit-write
+title: "Governed writes go through Edit/Write"
 description: "Compose gates match Edit|Write only; python/sed in Bash on backlog, research, specs or memory writes around every edit-time governance rule."
 metadata:
   node_type: memory

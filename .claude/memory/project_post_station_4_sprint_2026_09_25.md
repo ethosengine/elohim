@@ -1,12 +1,16 @@
 ---
 name: project_post_station_4_sprint_2026_09_25
+title: "Post-station-4 sprint (participant, classifier, search, att…"
 description: "Landed on dev 2026-09-25 (plan 73a351fd5), not pushed (rides the next batch); artifact + rulings under genesis/a2o/reports/post-station-4-2026-09-25/; open backlog and the operator's one remaining decision."
+id: project-post-station-4-sprint-2026-09-25
 metadata:
   node_type: memory
-  title: "Post-station-4 sprint (participant, classifier, search, attention) — landed 2026-09-25, push held"
+  title: "Post-station-4 sprint (participant, classifier, search, attention) — landed 2026-09-25 (since pushed)"
   type: project
   originSessionId: 8e88ae01-a389-45ee-a961-31b36b2c793a
   modified: 2026-09-25T14:11:17.153Z
+cites:
+  - "post-station-4-participant-classifier-search-attention-sprint | Post-station-4 sprint | sha256:e894efd3782afb89 | path: genesis/docs/superpowers/plans/2026-09-25-post-station-4-participant-classifier-search-attention-sprint.md"
 ---
 
 **State (2026-09-25):** the four-lane sprint landed on `dev` and the plan is `Landed`

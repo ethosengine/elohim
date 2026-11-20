@@ -1,6 +1,7 @@
 ---
 name: feedback-sweep-leftovers-before-closing
 title: Sweep side-findings into homes before closing a pass
+id: feedback-sweep-leftovers-before-closing
 description: "Operator 2026-09-26 — before closing a pass, fix or record every defect and stale claim noticed; nothing stays only in chat."
 metadata:
   node_type: memory
@@ -8,6 +9,9 @@ metadata:
   type: feedback
   originSessionId: 4750a644-a508-47ec-9220-8a193f383cf6
   modified: 2026-09-27T00:47:16.334Z
+cites:
+  - genesis/data/timeline/backlog/CLUSTERS.md
+  - genesis/a2o/CLAUDE.md
 ---
 
 "Update anything you noticed along the way, we don't want to leave anything leftover." Asked at the
