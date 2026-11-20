@@ -369,7 +369,14 @@ pub fn open(model: Option<&str>) -> Result<Envelope> {
     {
         return Ok(record);
     }
-    recall::initialize(&root, record.id(), &executor_cid()?).map_err(err)?;
+    // Still under the exclusive guard: recall reads the session's claim through it.
+    recall::initialize(
+        &root,
+        record.id(),
+        &record.covenant_session(),
+        &executor_cid()?,
+    )
+    .map_err(err)?;
     Ok(record)
 }
 

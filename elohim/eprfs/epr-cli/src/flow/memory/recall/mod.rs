@@ -901,6 +901,10 @@ pub struct Args {
     /// module tree — `Args` never crosses that boundary today. A `pub` field of a `pub(super)`
     /// type is `private_interfaces`-denied under `-D warnings`.
     lens: Option<LensLevel>,
+    /// The session's generation key, set only by [`initialize`]: `session open` already holds
+    /// the exclusive lifecycle guard and resolved it, so the reader lens reads the claim under
+    /// that guard. No flag sets it; every other operation resolves the key itself.
+    held_scope: Option<String>,
     /// Exact metadata tags a discovery must carry, repeatable. Every named tag must be present.
     pub tags: Vec<String>,
     /// Whether `--root`/`--contract` were named, so linked next actions repeat only real overrides.
@@ -960,6 +964,7 @@ impl Args {
             phase: "baseline".into(),
             footprint_lens: None,
             lens: None,
+            held_scope: None,
             tags: Vec::new(),
             root_explicit: false,
             contract_explicit: false,
@@ -1328,7 +1333,9 @@ fn take_flag(argv: &[String], flag: &str) -> Option<String> {
 
 /// `epr flow memory recall …`.
 /// Complete recall's own open operation for a hookless session, including its usage.
-pub fn initialize(root: &Path, session: &str, executor: &str) -> FlowResult<()> {
+/// The caller holds the exclusive lifecycle guard and passes the generation key it resolved
+/// (`covenant_scope`), so nothing here asks that guard for a second, shared lock.
+pub fn initialize(root: &Path, session: &str, scope: &str, executor: &str) -> FlowResult<()> {
     let argv = [
         "open",
         "--root",
@@ -1339,7 +1346,8 @@ pub fn initialize(root: &Path, session: &str, executor: &str) -> FlowResult<()> 
         "Session context",
     ]
     .map(str::to_owned);
-    let (args, _, _, _) = parse_args(&argv)?;
+    let (mut args, _, _, _) = parse_args(&argv)?;
+    args.held_scope = Some(scope.to_owned());
     let contract = Contract::load(&args.contract_path)?;
     let method = contract.method_cid();
     let limit = contract

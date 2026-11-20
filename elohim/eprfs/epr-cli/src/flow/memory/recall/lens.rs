@@ -184,11 +184,21 @@ pub(super) enum ReaderRef {
 const ACTOR_LOG_REL: &str = ".eprfs/status/actors.jsonl";
 
 /// WHO is reading in `session`: the actor sidecar's current claim, or [`ReaderRef::Unknown`].
-pub(super) fn reader_from_session(root: &Path, session: &str) -> ReaderRef {
+/// `held_scope` is the session's generation key when the caller already holds the lifecycle
+/// guard (`session open`); the claim is then read under that guard instead of a second one.
+pub(super) fn reader_from_session(
+    root: &Path,
+    session: &str,
+    held_scope: Option<&str>,
+) -> ReaderRef {
     if session.trim().is_empty() || !root.join(ACTOR_LOG_REL).is_file() {
         return ReaderRef::Unknown;
     }
-    match crate::actor::current_claim(root, session) {
+    let claim = match held_scope {
+        Some(scope) => crate::actor::current_claim_scoped(root, scope),
+        None => crate::actor::current_claim(root, session),
+    };
+    match claim {
         Ok(Some((_record_cid, claim))) => ReaderRef::Agent(claim.claimed),
         Ok(None) | Err(_) => ReaderRef::Unknown,
     }
@@ -684,6 +694,41 @@ fn compute_cid(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// `session open` initializes recall under its exclusive lifecycle guard and hands down the
+    /// generation key it resolved there. The claim is read under exactly that key, with no second
+    /// guard: a fast path that skipped the lookup would read `Unknown` here.
+    #[test]
+    fn a_held_scope_reads_the_claim_registered_under_that_generation_key() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let root = dir.path();
+        std::fs::write(root.join("notes.md"), "fixture\n").unwrap();
+        for args in [
+            &["init", "-q"][..],
+            &["add", "-A"],
+            &["commit", "-q", "-m", "fixture"],
+        ] {
+            let out = crate::process::build_command("git", args, root, &[])
+                .env("GIT_AUTHOR_NAME", "Fixture Author")
+                .env("GIT_AUTHOR_EMAIL", "author@example.test")
+                .env("GIT_COMMITTER_NAME", "Fixture Author")
+                .env("GIT_COMMITTER_EMAIL", "author@example.test")
+                .output()
+                .expect("git runs");
+            assert!(out.status.success(), "git {args:?} failed");
+        }
+        crate::actor::claim(root, "agent:reader@fixture-model", "fixture-session").unwrap();
+        let claimed = |scope| match reader_from_session(root, "fixture-session", Some(scope)) {
+            ReaderRef::Agent(agent) => Some(agent.0),
+            ReaderRef::Human { .. } | ReaderRef::Unknown => None,
+        };
+        assert_eq!(
+            claimed("fixture-session").as_deref(),
+            Some("agent:reader@fixture-model")
+        );
+        // The held key decides: another generation's key reads that generation's (absent) claim.
+        assert_eq!(claimed("fixture-session/generations/2"), None);
+    }
 
     #[test]
     fn level_parse_and_display_round_trip_the_graphos_vocabulary() {

@@ -580,6 +580,44 @@ fn open_arms_the_holder_and_re_arms_it_once_the_lock_is_not_held() {
     assert_eq!(cli.record()["ownerHolder"]["lock"], holder["lock"]);
 }
 
+// A first open initializes recall while it still holds the exclusive lifecycle guard. Recall's
+// reader lens resolves the session's claim; it must read through the guard `open` holds, not ask
+// for a second (shared) one, which `flock` refuses across two descriptions of one file even in one
+// process. That cost every first open a 5 s `lock-timeout`, swallowed into an unknown reader, and
+// charged the wait to the session's own recall budget. The fixture's `actor witness` stage writes
+// the actor log, so the lens lookup runs here exactly as it does in a real checkout.
+#[test]
+fn a_first_open_does_not_wait_on_its_own_lifecycle_guard() {
+    let cli = Cli::new();
+    assert!(cli
+        .base
+        .path()
+        .join("repo/.eprfs/status/actors.jsonl")
+        .is_file());
+    let began = std::time::Instant::now();
+    let opened = cli.ok(4101, &["session", "open", "--json"], &[]);
+    let wall = began.elapsed();
+    assert_eq!(opened["generation"], 1);
+    // The store's own wait is 5 s; anything that reaches it cannot pass these bounds.
+    let continuation = cli
+        .base
+        .path()
+        .join("repo/.eprfs/status/recall")
+        .join(CLAUDE_ID)
+        .join("continuation.json");
+    let state: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(&continuation).unwrap()).unwrap();
+    let charged = state["totals"]["elapsed_seconds"].as_f64().unwrap();
+    assert!(
+        charged < 3.0,
+        "recall's first operation was charged {charged}s: {state}"
+    );
+    assert!(
+        wall < std::time::Duration::from_secs(4),
+        "a first open took {wall:?}"
+    );
+}
+
 #[test]
 fn the_real_holder_releases_when_the_owner_start_changes_or_its_proc_entry_vanishes() {
     for how in ["start-changes", "entry-vanishes"] {

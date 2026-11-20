@@ -881,7 +881,8 @@ pub(super) fn execute(
             .ok_or_else(|| refused("open --purpose resume needs --habit <id>"))?;
         resume_view(args, contract, habit_id, &mut view)?;
         view["orientation"] = orientation(&recipe, &state);
-        let reader = lens::reader_from_session(&args.root, &args.session);
+        let reader =
+            lens::reader_from_session(&args.root, &args.session, args.held_scope.as_deref());
         let resolved_lens = lens::resolve(&reader, contract, args.lens, &args.root);
         if let Some(message) = &resolved_lens.malformed {
             push_unresolved(&mut view, message.clone());
@@ -1727,7 +1728,7 @@ pub(super) fn execute(
     view["orientation"] = orientation(&recipe, &state);
     // The reader lens: WHO is reading, resolved once per operation and printed on every view —
     // never refused, never silently skipped. See `lens.rs`.
-    let reader = lens::reader_from_session(&args.root, &args.session);
+    let reader = lens::reader_from_session(&args.root, &args.session, args.held_scope.as_deref());
     let resolved_lens = lens::resolve(&reader, contract, args.lens, &args.root);
     if let Some(message) = &resolved_lens.malformed {
         push_unresolved(&mut view, message.clone());

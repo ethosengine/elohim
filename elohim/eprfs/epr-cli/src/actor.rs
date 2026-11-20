@@ -795,7 +795,17 @@ pub fn current_on_device(
 pub(crate) fn current_claim(root: &Path, session: &str) -> ActorResult<Option<(Cid, ActorClaim)>> {
     let (facet_session, _scope) =
         crate::session_envelope::covenant_scope(session).map_err(ActorError::InvalidArguments)?;
-    Ok(SidecarActorStore::open(root)?.current_for(&facet_session)?)
+    current_claim_scoped(root, &facet_session)
+}
+
+/// [`current_claim`] for a caller that already holds the lifecycle lock and resolved the
+/// generation key: `session open` initializing recall under its exclusive guard. Resolving
+/// again would ask for a shared guard the same process already excludes.
+pub(crate) fn current_claim_scoped(
+    root: &Path,
+    facet_session: &str,
+) -> ActorResult<Option<(Cid, ActorClaim)>> {
+    Ok(SidecarActorStore::open(root)?.current_for(facet_session)?)
 }
 
 /// The caller already holds the lifecycle lock and resolved the generation key. Closure
