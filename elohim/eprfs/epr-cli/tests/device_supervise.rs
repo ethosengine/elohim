@@ -1869,3 +1869,49 @@ fn after_landing_finds_the_data_root_from_the_running_arks_record() {
         .join(".eprfs/status/ark/device/supervise.json")
         .exists());
 }
+
+/// A pid no process has now.
+fn dead_pid() -> u64 {
+    (1_000_000..4_000_000)
+        .rev()
+        .find(|pid| !Path::new(&format!("/proc/{pid}")).exists())
+        .expect("a free pid")
+}
+
+/// The device's copy of the running ark's record is private (0600), and it is believed only
+/// while it names the running ark itself: a record whose pid is no longer that process is
+/// ignored, even when it points at a data root whose own record names a live process.
+#[test]
+fn the_devices_ark_record_is_private_and_a_stale_one_is_ignored() {
+    let Some(lane) = lane(None, None) else { return };
+    let fx = &lane.fx;
+    let (ark1, _) = ready_child(fx, "the resident on X");
+    let pointer = fx.base.join("device/ark-supervise.json");
+    let mode = fs::metadata(&pointer).unwrap().permissions().mode() & 0o777;
+    assert_eq!(mode, 0o600, "{}", pointer.display());
+
+    // A stale copy: an ark that is gone, pointing at a decoy data root whose record names a live
+    // process (this test), so only the copy's own pid and start time can tell it is stale.
+    let decoy = fx.base.join("decoy");
+    fs::create_dir_all(&decoy).unwrap();
+    let me = u64::from(std::process::id());
+    let mut live: Value = serde_json::from_slice(&fs::read(&pointer).unwrap()).unwrap();
+    live["pid"] = json!(me);
+    live["startTicks"] = json!(start_ticks(me).parse::<u64>().unwrap());
+    live["dataRoot"] = json!(decoy);
+    fs::write(decoy.join("supervise.json"), live.to_string()).unwrap();
+    let mut stale = live.clone();
+    stale["pid"] = json!(dead_pid());
+    fs::write(&pointer, stale.to_string()).unwrap();
+
+    let (_, y) = lane.next("y");
+    let followed = lane.follow();
+    let said = text(&followed);
+    assert!(followed.status.success(), "{said}");
+    assert!(said.contains("restarting (after follow"), "{said}");
+    let (ark2, child2) = ready_child(fx, "the resident on Y");
+    assert_ne!(ark2, ark1);
+    assert_eq!(running_release(child2), y);
+    assert_eq!(rows_len(fx), 1, "the row is in the device's own data root");
+    assert!(!decoy.join("restarts.jsonl").exists());
+}
