@@ -35,7 +35,7 @@ use iroh::protocol::{AcceptError, ProtocolHandler};
 use iroh::{Endpoint, NodeAddr, NodeId};
 use seam_contracts::Unanswered;
 use serde::{Deserialize, Serialize};
-use tokio::sync::Semaphore;
+use tokio::sync::{watch, Semaphore};
 use tokio::task::JoinSet;
 
 use crate::blob_mount::{self, Answered, BlobMount};
@@ -75,6 +75,117 @@ const REFUSED_FRAME: u32 = 1;
 
 /// The QUIC error code a stream shed at the in-flight bound is reset with.
 const BUSY: u32 = 2;
+
+/// The QUIC error code a draining tier closes a new connection, or resets a new stream, with.
+const DRAINING: u32 = 3;
+
+/// How long a drain waits, after it cuts what outlasted its bound, for the cut streams' tasks to
+/// be dropped. An aborted task is dropped at its next poll; this only lets that happen.
+pub(crate) const CUT_SETTLE: Duration = Duration::from_secs(1);
+
+/// Where a tier is in a drain.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+enum Phase {
+    /// Taking connections and streams.
+    Open,
+    /// Taking none; the streams in flight finish.
+    Draining,
+    /// The streams still in flight are aborted.
+    Cut,
+}
+
+/// Row 35 B2: a tier's streams in flight, and the switch that drains them when the daemon stops.
+/// Every [`TierProtocol`] built with one shares it, and every clone shares its state.
+#[derive(Debug, Clone)]
+pub(crate) struct TierDrain {
+    inner: Arc<DrainState>,
+}
+
+#[derive(Debug)]
+struct DrainState {
+    phase: watch::Sender<Phase>,
+    streams: watch::Sender<usize>,
+}
+
+/// What a drain did: how long it took and how many streams it cut.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct Drained {
+    pub elapsed: Duration,
+    pub cut: usize,
+}
+
+impl TierDrain {
+    pub(crate) fn new() -> TierDrain {
+        TierDrain {
+            inner: Arc::new(DrainState {
+                phase: watch::Sender::new(Phase::Open),
+                streams: watch::Sender::new(0),
+            }),
+        }
+    }
+
+    /// Tier streams being answered now.
+    pub(crate) fn in_flight(&self) -> usize {
+        *self.inner.streams.borrow()
+    }
+
+    /// Take no new connection or stream, let the streams in flight finish for up to `bound`,
+    /// then abort what remains. Returns how long that took and how many it aborted.
+    pub(crate) async fn drain(&self, bound: Duration) -> Drained {
+        let started = tokio::time::Instant::now();
+        self.inner.phase.send_replace(Phase::Draining);
+        let mut streams = self.inner.streams.subscribe();
+        let cut = if settled(&mut streams, bound).await {
+            0
+        } else {
+            let cut = *streams.borrow();
+            self.inner.phase.send_replace(Phase::Cut);
+            let _ = settled(&mut streams, CUT_SETTLE).await;
+            cut
+        };
+        Drained {
+            elapsed: started.elapsed(),
+            cut,
+        }
+    }
+
+    fn phase(&self) -> watch::Receiver<Phase> {
+        self.inner.phase.subscribe()
+    }
+
+    /// Count one stream in flight until the returned guard drops, however its task ends.
+    fn stream(&self) -> InFlight {
+        self.inner.streams.send_modify(|n| *n += 1);
+        InFlight(self.clone())
+    }
+}
+
+/// One stream counted in flight.
+struct InFlight(TierDrain);
+
+impl Drop for InFlight {
+    fn drop(&mut self) {
+        self.0
+            .inner
+            .streams
+            .send_modify(|n| *n = n.saturating_sub(1));
+    }
+}
+
+/// Whether no stream is in flight within `within`.
+async fn settled(streams: &mut watch::Receiver<usize>, within: Duration) -> bool {
+    tokio::time::timeout(within, streams.wait_for(|n| *n == 0))
+        .await
+        .is_ok_and(|waited| waited.is_ok())
+}
+
+/// Wait until `phase` reaches `at`. The sender lives as long as the tier, so a closed channel
+/// never ends the wait.
+async fn reached(phase: &mut watch::Receiver<Phase>, at: Phase) {
+    if phase.wait_for(|now| *now >= at).await.is_err() {
+        std::future::pending::<()>().await;
+    }
+}
 
 /// How a [`TierProtocol`] bounds its work. `Clone` shares the two in-flight pools: every protocol
 /// cloned from one set of limits draws on the same bounds.
@@ -258,6 +369,8 @@ pub struct TierProtocol {
     book: crate::connections::ConnectionBook,
     /// The admission the gate reads, held here too so a connection is booked under the same read.
     admission: SharedAdmission,
+    /// The streams in flight and the switch that drains them.
+    drain: TierDrain,
 }
 
 struct Inner {
@@ -322,6 +435,7 @@ impl TierProtocol {
         Ok(TierProtocol {
             book: crate::connections::ConnectionBook::default(),
             admission,
+            drain: TierDrain::new(),
             inner: Arc::new(Inner {
                 gate,
                 endpoint,
@@ -341,6 +455,13 @@ impl TierProtocol {
         self
     }
 
+    /// Count this tier's streams in `drain`, and stop taking connections and streams when it
+    /// drains (row 35 B2).
+    pub(crate) fn with_drain(mut self, drain: TierDrain) -> TierProtocol {
+        self.drain = drain;
+        self
+    }
+
     pub fn counters(&self) -> TierCountersSnapshot {
         self.inner.counters.snapshot()
     }
@@ -353,6 +474,12 @@ impl TierProtocol {
 
 impl ProtocolHandler for TierProtocol {
     async fn accept(&self, connection: Connection) -> Result<(), AcceptError> {
+        // A draining tier takes no new connection: it is closed before it is booked or read.
+        let mut phase = self.drain.phase();
+        if *phase.borrow() != Phase::Open {
+            connection.close(VarInt::from_u32(DRAINING), b"draining");
+            return Ok(());
+        }
         // The handshake proved the peer holds this node id's key; nothing it sends names it.
         let remote = connection.remote_node_id()?;
         // Booked under the same read of admission that admitted it, so a reload (which takes the
@@ -370,16 +497,31 @@ impl ProtocolHandler for TierProtocol {
         let connection_id = connection.stable_id();
         let per_connection = self.inner.limits.max_streams_per_connection.max(1);
         let mut streams = JoinSet::new();
-        loop {
+        'accept: loop {
             while streams.try_join_next().is_some() {}
             while streams.len() >= per_connection {
-                if streams.join_next().await.is_none() {
-                    break;
+                tokio::select! {
+                    biased;
+                    () = reached(&mut phase, Phase::Draining) => break 'accept,
+                    joined = streams.join_next() => if joined.is_none() {
+                        break;
+                    },
                 }
             }
-            let Ok((mut send, mut recv)) = connection.accept_bi().await else {
+            let accepted = tokio::select! {
+                biased;
+                () = reached(&mut phase, Phase::Draining) => break 'accept,
+                accepted = connection.accept_bi() => accepted,
+            };
+            let Ok((mut send, mut recv)) = accepted else {
                 break;
             };
+            // A stream that arrived as the drain began is refused unread, like a shed one.
+            if *phase.borrow() != Phase::Open {
+                let _ = recv.stop(VarInt::from_u32(DRAINING));
+                let _ = send.reset(VarInt::from_u32(DRAINING));
+                break;
+            }
             // The pool is chosen by the authenticated node id's admission now, read once and fail
             // closed; the request is still judged on decode. The permit is taken before any byte
             // is read and held until the stream's task ends, on every path (a dropped or aborted
@@ -397,12 +539,36 @@ impl ProtocolHandler for TierProtocol {
                 continue;
             };
             let inner = Arc::clone(&self.inner);
+            // Counted until the task ends, answered or aborted.
+            let in_flight = self.drain.stream();
             streams.spawn(async move {
                 inner.answer_stream(remote, connection_id, send, recv).await;
                 drop(permit);
+                drop(in_flight);
             });
         }
-        while streams.join_next().await.is_some() {}
+        // The streams taken finish, unless a drain outlasts its bound and cuts them.
+        loop {
+            tokio::select! {
+                biased;
+                () = reached(&mut phase, Phase::Cut) => {
+                    streams.abort_all();
+                    while streams.join_next().await.is_some() {}
+                    break;
+                }
+                joined = streams.join_next() => if joined.is_none() {
+                    break;
+                },
+            }
+        }
+        // A drained connection stays open until the drain ends or its requester closes it, so the
+        // answers its streams finished are delivered before the router closes the endpoint.
+        if *phase.borrow() != Phase::Open {
+            tokio::select! {
+                () = reached(&mut phase, Phase::Cut) => {}
+                _ = connection.closed() => {}
+            }
+        }
         // The requester went away: what it was drawing on this connection closes as partial.
         if let Some(mount) = &self.inner.mount {
             mount.connection_closed(connection_id);

@@ -65,7 +65,13 @@ use crate::head_table::{HeadTable, StorePlace};
 use crate::key::PeerKey;
 use crate::local_blob::LocalBlobContext;
 use crate::rules::{Rules, RulesState};
-use crate::tier::{TierLimits, TierProtocol, TIER_ALPN};
+use crate::tier::{TierDrain, TierLimits, TierProtocol, TIER_ALPN};
+
+/// Row 35 B2: how long a stopping daemon lets the tier streams already in flight finish before it
+/// cuts them. Its supervisor, ark, gives `epr peer serve` 20 s after the signal before it sends
+/// SIGKILL; 15 s leaves about 5 s of that grace for the rest of the shutdown (the loop's join and
+/// state save, the router's close), so ark never escalates. Raise it only with ark's grace.
+pub(crate) const DRAIN_BOUND: Duration = Duration::from_secs(15);
 
 /// How often the daemon looks at its roster and flow store and asks whether a head is due.
 pub const TICK: Duration = Duration::from_millis(250);
@@ -298,6 +304,9 @@ pub struct PeerDaemon {
     stop: Option<oneshot::Sender<()>>,
     task: Option<JoinHandle<Result<(), PeerError>>>,
     stats: Arc<RunStats>,
+    /// The tier's streams in flight, drained on the way out.
+    drain: TierDrain,
+    log: Arc<dyn Fn(&str) + Send + Sync>,
 }
 
 impl PeerDaemon {
@@ -363,6 +372,9 @@ impl PeerDaemon {
             reason: e.to_string(),
         })?
         .with_book(book.clone());
+        let drain = TierDrain::new();
+        let tier = tier.with_drain(drain.clone());
+        let log = config.log.clone();
 
         let endpoint = bind_on(
             &config.key,
@@ -446,7 +458,14 @@ impl PeerDaemon {
             stop: Some(stop),
             task: Some(task),
             stats,
+            drain,
+            log,
         })
+    }
+
+    /// Tier streams being answered now. A test/diagnostic surface only, like [`Self::fold_stats`].
+    pub fn tier_streams_in_flight(&self) -> usize {
+        self.drain.in_flight()
     }
 
     /// This daemon's node id.
@@ -479,8 +498,22 @@ impl PeerDaemon {
         wait_for_task(&mut self.task).await
     }
 
-    /// Stop the loop, then the router (which closes the endpoint and both protocols).
-    pub async fn shutdown(mut self) {
+    /// Drain the tier for [`DRAIN_BOUND`], then stop the loop, then the router (which closes the
+    /// endpoint and both protocols).
+    pub async fn shutdown(self) {
+        self.shutdown_draining(DRAIN_BOUND).await;
+    }
+
+    /// [`Self::shutdown`] with the drain bounded by `bound`: the tier takes no new connection or
+    /// stream, the streams in flight finish for up to `bound`, what remains is cut and counted in
+    /// one line, and the daemon then shuts down as it always has.
+    pub async fn shutdown_draining(mut self, bound: Duration) {
+        let drained = self.drain.drain(bound).await;
+        (self.log)(&format!(
+            "drain ended after {:.1} s; {} stream(s) cut",
+            drained.elapsed.as_secs_f64(),
+            drained.cut
+        ));
         if let Some(stop) = self.stop.take() {
             // The loop may already have ended; either way it is stopping.
             let _ = stop.send(());
@@ -1868,6 +1901,17 @@ fn roster_named_nodes(rows: &[ParticipantRow], chain_root: &str) -> Vec<String> 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_drain_ends_inside_arks_grace() {
+        // ark gives `epr peer serve` 20 s after SIGTERM/SIGINT before SIGKILL.
+        let ark_grace = Duration::from_secs(20);
+        let worst = DRAIN_BOUND + crate::tier::CUT_SETTLE;
+        assert!(
+            worst + Duration::from_secs(3) <= ark_grace,
+            "a drain of up to {worst:?} leaves the rest of the shutdown under 3 s of ark's grace"
+        );
+    }
 
     #[tokio::test]
     async fn cancelling_wait_keeps_the_daemon_task_joinable() {

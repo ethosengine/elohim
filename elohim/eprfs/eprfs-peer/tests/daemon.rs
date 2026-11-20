@@ -1587,3 +1587,168 @@ async fn a_contested_device_is_disconnected_refused_like_a_stranger_and_counted(
     endpoint_c.close().await;
     endpoint_d.close().await;
 }
+
+/// A length-prefixed DAG-CBOR frame, as the tier writes one.
+fn frame_of<T: serde::Serialize>(value: &T) -> Vec<u8> {
+    let body = serde_ipld_dagcbor::to_vec(value).expect("encode");
+    let mut frame = u32::try_from(body.len())
+        .expect("small")
+        .to_be_bytes()
+        .to_vec();
+    frame.extend_from_slice(&body);
+    frame
+}
+
+/// Row 35 B2: a stopping daemon takes no new tier connection or stream, lets the streams in
+/// flight finish for the drain bound, cuts what outlasts it, says how many it cut, and returns
+/// well inside ark's 20 s grace.
+#[tokio::test(flavor = "multi_thread")]
+async fn a_stopping_daemon_drains_its_tier_streams_and_cuts_what_outlasts_the_bound() {
+    let a = device("DeviceA", 1);
+    let b = device("DeviceB", 2);
+    let (key_dir_a, key_dir_b) = (tempfile::tempdir().unwrap(), tempfile::tempdir().unwrap());
+    let (key_a, key_b) = (load_key(key_dir_a.path()), load_key(key_dir_b.path()));
+    let rows = vec![
+        genesis(&a),
+        binding(&a, &b),
+        endpoint_row(&a, &a, &key_a),
+        endpoint_row(&a, &b, &key_b),
+    ];
+    let side_b = Side::new(&rows);
+    side_b
+        .checkout
+        .append(berth_event("claim", "cargo", "sb", "1.0"));
+    let mut config_b = config(
+        &b,
+        &a.did,
+        key_b,
+        &side_b,
+        &[&a, &b],
+        Vec::new(),
+        local(free_port()),
+    );
+    let port_b = config_b.listen.expect("listen").port();
+    let logged = Arc::new(Mutex::new(Vec::<String>::new()));
+    let lines = logged.clone();
+    config_b.log = Arc::new(move |line: &str| lines.lock().unwrap().push(line.to_owned()));
+    let daemon_b = PeerDaemon::start(config_b).await.expect("B starts");
+    eventually("B announces", || side_b.table().own.is_some()).await;
+    let root_b = side_b.table().own.expect("own head").root;
+    let request = eprfs_peer::TierRequest::List {
+        root: root_b,
+        path: eprfs_core::TreePath::from_slash_bytes(b"channel/events").expect("path"),
+    };
+    let frame = frame_of(&request);
+
+    let client = eprfs_peer::bind(&key_a, None, vec![])
+        .await
+        .expect("bind A");
+    let to_b = iroh::NodeAddr::new(daemon_b.node_id())
+        .with_direct_addresses([std::net::SocketAddr::V4(local(port_b))]);
+    let connection =
+        tokio::time::timeout(WITHIN, client.connect(to_b.clone(), eprfs_peer::TIER_ALPN))
+            .await
+            .expect("connects in time")
+            .expect("connects");
+    // Two streams in flight: each has sent only the head of its request.
+    let (mut finishing, mut finishing_answer) = connection.open_bi().await.expect("stream");
+    finishing.write_all(&frame[..4]).await.expect("head");
+    let (mut outlasting, mut outlasting_answer) = connection.open_bi().await.expect("stream");
+    outlasting.write_all(&frame[..4]).await.expect("head");
+    eventually("B holds both streams", || {
+        daemon_b.tier_streams_in_flight() == 2
+    })
+    .await;
+
+    let bound = Duration::from_secs(2);
+    let started = std::time::Instant::now();
+    let stopping = tokio::spawn(daemon_b.shutdown_draining(bound));
+    tokio::time::sleep(Duration::from_millis(300)).await;
+    // Draining: a new connection is closed at once, never answered.
+    let late_dir = tempfile::tempdir().unwrap();
+    let late = eprfs_peer::bind(&load_key(late_dir.path()), None, vec![])
+        .await
+        .expect("bind a late client");
+    let refused = tokio::time::timeout(
+        WITHIN,
+        eprfs_peer::tier_call(
+            &late,
+            to_b,
+            request.clone(),
+            &eprfs_core::TreeLimits::default(),
+        ),
+    )
+    .await
+    .expect("the late call ends");
+    assert!(
+        refused.is_err(),
+        "a draining tier answered a new connection: {refused:?}"
+    );
+    // The stream in flight when the drain began finishes inside the bound and is answered.
+    finishing.write_all(&frame[4..]).await.expect("body");
+    finishing.finish().expect("finish");
+    let answered = tokio::time::timeout(WITHIN, finishing_answer.read_to_end(1 << 20))
+        .await
+        .expect("answered in time")
+        .expect("answered");
+    let answer: eprfs_peer::TierAnswer =
+        serde_ipld_dagcbor::from_slice(&answered[4..]).expect("an answer frame");
+    assert!(
+        matches!(answer, eprfs_peer::TierAnswer::List(_)),
+        "{answer:?}"
+    );
+    assert!(started.elapsed() < bound, "answered inside the drain bound");
+    // A new stream on the open connection is not answered.
+    let unanswered = tokio::time::timeout(
+        WITHIN,
+        eprfs_peer::tier_request(&connection, &request, &eprfs_core::TreeLimits::default()),
+    )
+    .await
+    .expect("the new stream ends");
+    assert!(
+        unanswered.is_err(),
+        "a draining tier answered a new stream: {unanswered:?}"
+    );
+
+    tokio::time::timeout(WITHIN, stopping)
+        .await
+        .expect("shutdown returns")
+        .expect("shutdown joins");
+    let took = started.elapsed();
+    assert!(
+        took >= bound,
+        "the outlasting stream was waited for: {took:?}"
+    );
+    assert!(
+        took < Duration::from_secs(20),
+        "inside ark's grace: {took:?}"
+    );
+    // The stream still waiting for its body at the bound was cut, not answered: it ends with no
+    // byte of an answer (its task's send half is dropped, or the endpoint's close loses it).
+    let cut = tokio::time::timeout(WITHIN, outlasting_answer.read_to_end(1 << 20))
+        .await
+        .expect("the cut stream ends");
+    assert!(
+        !matches!(&cut, Ok(bytes) if !bytes.is_empty()),
+        "the outlasting stream was answered: {cut:?}"
+    );
+    let drained: Vec<String> = logged
+        .lock()
+        .unwrap()
+        .iter()
+        .filter(|line| line.starts_with("drain ended after "))
+        .cloned()
+        .collect();
+    assert_eq!(drained.len(), 1, "one drain line: {drained:?}");
+    assert!(drained[0].ends_with("; 1 stream(s) cut"), "{}", drained[0]);
+    let seconds: f64 = drained[0]
+        .trim_start_matches("drain ended after ")
+        .split(' ')
+        .next()
+        .and_then(|s| s.parse().ok())
+        .expect("seconds");
+    assert!((2.0..20.0).contains(&seconds), "{}", drained[0]);
+    let _ = outlasting.finish();
+    client.close().await;
+    late.close().await;
+}
