@@ -732,6 +732,7 @@ _gate-epr-ts:
 _gate-eprfs:
     @before="$("$CARGO_TARGET_DIR/debug/epr" bin --tool epr source-state 2>/dev/null || "${EPR_BIN:-epr}" bin --tool epr source-state 2>/dev/null || echo none)"; \
       tested_head="$(git rev-parse HEAD)"; \
+      export ARK_BIN="${CARGO_TARGET_DIR:-$(pwd)/elohim/target}/debug/ark"; \
       set -- --workspace; \
       if [ -n "${GATE_CARGO_PACKAGES:-}" ]; then set --; for package in $GATE_CARGO_PACKAGES; do set -- "$@" -p "$package"; done; fi; \
       (cd elohim/eprfs && bash "{{justfile_directory()}}/genesis/orchestrator/gate-steps.sh" \
@@ -739,6 +740,7 @@ _gate-eprfs:
         ::: precheck -- python3 "{{justfile_directory()}}/scripts/ci/publish_eprfs.py" --precheck \
         ::: lint -- node "{{justfile_directory()}}/genesis/orchestrator/cargo-lint.mjs" "$@" --all-targets -- -D warnings \
         ::: bins -- cargo build -p elohim-epr-cli --bin epr -p elohim-device-runtime --bin bin-launch \
+        ::: ark -- cargo build --manifest-path ../Cargo.toml -p elohim-ark --bin ark \
         ::: test -- cargo test "$@" -- --skip live_corpus_) || exit $?; \
       EPRFS_SOURCE_BEFORE="$before" EPRFS_TESTED_HEAD="$tested_head" just _eprfs-ingest-around build
 

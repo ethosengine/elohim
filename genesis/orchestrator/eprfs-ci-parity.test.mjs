@@ -70,3 +70,50 @@ test('a comment that only mentions the build does not satisfy the check', () => 
   const stage = `stage('Rust — tests') {\n  # ${bins}\n  cargo nextest run --workspace\n}`;
   assert.equal(commands(stage).indexOf(bins), -1);
 });
+
+/** Every `<name> -- cargo build …` step the recipe runs before its test step, in order. */
+function buildSteps() {
+  const recipe = gateRecipe();
+  const before = recipe.slice(0, recipe.indexOf('test -- '));
+  return [...before.matchAll(/^\s*(?:::: )?([\w-]+) -- (cargo build\b.*?)\s*\\$/gm)].map(
+    ([, name, command]) => ({ name, command }),
+  );
+}
+
+// Row 35: the device_supervise stories run a real ark and fail, naming its build command, when
+// none is found. The device gate and the pipeline therefore build one the way they build epr.
+test('the device recipe builds the ark the supervise stories run, and hands it to the tests', () => {
+  const ark = gateStep('ark');
+  assert.match(ark, /^cargo build\b/);
+  assert.match(ark, /-p elohim-ark\b/);
+  assert.match(ark, /--bin ark\b/);
+  const recipe = gateRecipe();
+  assert.ok(recipe.indexOf('ark -- ') < recipe.indexOf('test -- '), 'the ark step comes before the test step');
+  assert.match(recipe, /export ARK_BIN=/, 'the recipe hands the ark it built to the test step');
+});
+
+test('every build step the device recipe runs before its tests, the pipeline runs before nextest', () => {
+  const steps = buildSteps();
+  assert.ok(steps.some(step => step.name === 'bins') && steps.some(step => step.name === 'ark'),
+    `the recipe's build steps are ${JSON.stringify(steps.map(step => step.name))}`);
+  const lines = commands(testsStage());
+  const tested = lines.findIndex(line => line.startsWith('cargo nextest run'));
+  assert.ok(tested >= 0, 'the tests stage runs cargo nextest');
+  for (const { name, command } of steps) {
+    const built = lines.indexOf(command);
+    assert.ok(built >= 0 && built < tested,
+      `the pipeline's tests stage must run the device recipe's ${name} step before cargo nextest:\n  ${command}`);
+  }
+  const exported = lines.findIndex(line => line.startsWith('export ARK_BIN='));
+  assert.ok(exported >= 0 && exported < tested, 'the tests stage exports ARK_BIN before cargo nextest');
+});
+
+test('the tests stage script stays one single-quoted bash string: no apostrophe inside it', () => {
+  const stage = testsStage();
+  const open = stage.indexOf("--command bash -c '");
+  assert.ok(open >= 0, 'the stage runs its commands through bash -c');
+  const body = stage.slice(open + "--command bash -c '".length);
+  const close = body.indexOf("\n              '");
+  assert.ok(close >= 0, 'the bash -c string closes on its own line');
+  assert.equal(body.slice(0, close).indexOf("'"), -1, 'an apostrophe would end the bash -c string early');
+});
