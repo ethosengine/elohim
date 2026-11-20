@@ -769,9 +769,12 @@ fn proc_uid(pid: u32) -> Option<u32> {
         })
 }
 
-/// After arrival moved a tool's current: when this device's ark runs and the head declares a
-/// process, supervise once so a child still on the old bytes restarts onto the new ones. An
-/// ark nobody started stays unstarted; arrival never begins supervision on its own.
+/// After arrival moved a tool's current, or found a supervised child behind it: when this
+/// device's ark runs, the head declares a process and `device_restart.on_landing` is not `off`,
+/// supervise once (serialised with every other restart of this ark by `restart.lock`) so a
+/// child still on the old bytes restarts onto the new ones, and write the row. An ark nobody
+/// started stays unstarted; arrival never begins supervision on its own. Its authority is the
+/// hand command's (row 35, F6): an unresolvable session still supervises unleased.
 pub(crate) fn after_landing(checkout: &Path) -> Outcome<()> {
     let data_root = default_data_root(checkout);
     let head = super::declaration::store(None, None, None)?
@@ -780,47 +783,161 @@ pub(crate) fn after_landing(checkout: &Path) -> Outcome<()> {
     if head.processes.is_empty() {
         return Ok(());
     }
-    if running(&data_root)?.is_none() {
+    let Some(before) = running(&data_root)? else {
         say!("device ark: not running; the landed binary waits for `epr device supervise`");
         return Ok(());
+    };
+    let stale = match child_identity(&data_root, &head, &before) {
+        Ok(Identity::Stale {
+            child,
+            running,
+            current,
+        }) => Some(StaleChild {
+            child,
+            running,
+            current,
+        }),
+        _ => None,
+    };
+    let row = || {
+        receipt::Row::new(
+            "arrival",
+            stale.as_ref().map(|s| s.running.clone()),
+            stale.as_ref().map(|s| s.current.clone()),
+        )
+    };
+    if !receipt::restart_on_landing(&main_checkout(checkout)) {
+        let reason = format!(
+            "device_restart.on_landing is off in {} at HEAD; the landed binary waits for `epr \
+             device supervise`",
+            main_checkout(checkout).join(receipt::POLICY).display()
+        );
+        say!("device ark: not restarting: {reason}");
+        if stale.is_some() {
+            row().record(&data_root, "skipped", Some(reason), 0);
+        }
+        return Ok(());
     }
-    supervise(&data_root, &head, lease_tool(checkout).as_deref(), false).map(|_| ())
+    let turn = RestartTurn::take(&data_root)?;
+    let supervised = supervise(&data_root, &head, lease_tool(checkout).as_deref(), false);
+    drop(turn);
+    let after = running(&data_root).ok().flatten();
+    match supervised {
+        Ok(_) => {
+            let (Some(stale), Some(after)) = (&stale, after) else {
+                return Ok(());
+            };
+            if after.pid == before.pid {
+                return Ok(());
+            }
+            let tool = head
+                .processes
+                .iter()
+                .find(|p| p.name == stale.child)
+                .and_then(|p| channel_tool(&p.artifact))
+                .unwrap_or_default()
+                .to_owned();
+            match wait_landed(&data_root, &head, &after, &tool) {
+                Ok(took) => {
+                    say!(
+                        "device ark: {} ready on {} in {} s",
+                        stale.child,
+                        child_release(&data_root, &head, &after, &tool)
+                            .unwrap_or_else(|| stale.current.clone()),
+                        whole_seconds(took)
+                    );
+                    row().record(&data_root, "ready", None, whole_seconds(took));
+                }
+                Err((took, why)) => {
+                    say!(
+                        "device ark: {} not ready after {} s ({why}); the device is degraded; \
+                         cure: epr device supervise --status",
+                        stale.current,
+                        whole_seconds(took)
+                    );
+                    row().record(&data_root, "not-ready", Some(why), whole_seconds(took));
+                }
+            }
+            Ok(())
+        }
+        Err(error) => {
+            // The ark that ran is gone: the failure came after the stop, and the device is down.
+            if after.is_none() {
+                say!("device ark: {error}; the device is degraded; cure: epr device supervise");
+                row().record(&data_root, "failed", Some(error.clone()), 0);
+            }
+            Err(error)
+        }
+    }
 }
 
 /// How long a landing waits its turn behind another restart of the same ark.
 const RESTART_TURN: Duration = Duration::from_secs(120);
-/// A child that declares no readiness is ready once ark runs it; it gets this long to appear,
-/// and no child's readiness budget is ever shorter.
+/// No child's readiness budget is shorter than this, and a child ark has not spawned yet gets
+/// this long from the ark's start to appear.
 const READY_FLOOR: Duration = Duration::from_secs(10);
 /// Ark publishes a passed rung a little after its own deadline clock reads it.
 const READY_SLACK: Duration = Duration::from_secs(2);
 
-/// How the restart after a landing ended (row 35, A-min).
+/// What a restart after a landing did, as the landing's own record carries it (row 35, F1).
+pub(crate) struct Report {
+    /// `ready`, `not-ready`, `failed` or `skipped`.
+    pub(crate) outcome: &'static str,
+    /// What the child ran before.
+    pub(crate) from: Option<String>,
+    /// What the child runs now, read from the child itself; else what it was restarted onto.
+    pub(crate) to: Option<String>,
+    pub(crate) seconds: u64,
+    pub(crate) reason: Option<String>,
+    /// The command that restores the device, when it is degraded.
+    pub(crate) cure: Option<String>,
+}
+
+impl Report {
+    pub(crate) fn json(&self) -> serde_json::Value {
+        serde_json::json!({
+            "outcome": self.outcome,
+            "from": self.from,
+            "to": self.to,
+            "seconds": self.seconds,
+            "reason": self.reason,
+            "cure": self.cure,
+        })
+    }
+}
+
+/// How the restart after a landing ended.
 pub(crate) enum AfterLanding {
-    /// Nothing was stopped, and the reason (if any was owed) was said: no ark, nothing on the
-    /// landed channel behind current, the switch, the lease, a custom data root, a race.
+    /// Nothing was owed: no ark, no child on the landed channel behind current, no main checkout.
     Untouched,
-    /// The landed tool's children came up on the landed release.
-    Ready,
-    /// They did not come up; the device is degraded. The detail names the cure.
-    NotReady(String),
-    /// Something failed after the old ark was stopped. The detail names the cure.
-    Failed(String),
+    /// A restart was owed; this is what happened (written to the receipt too).
+    Reported(Report),
 }
 
 /// After `epr bin follow` or a forward `epr bin land` moved `tool`'s current: the hand command
-/// `epr device supervise`, run for the person, with the failure behaviour it has.
+/// `epr device supervise`, run for the person, with the failure behaviour it has. The landing's
+/// own exit status is never this function's: its outcome goes into the record, the receipt and
+/// status, and a degraded device says so in one line with the cure.
 ///
 /// The device root comes from the main checkout of `checkout` (git's common directory), as the
-/// hand command finds it. Only a child on `tool`'s channel that runs other bytes than its
-/// current is restarted, and only its own readiness is waited for, on ark's clock. Nothing is
-/// reverted or held: a release that does not come up leaves the device degraded and saying so.
+/// hand command finds it. It acts only when a child on `tool`'s channel runs other bytes than
+/// its current, and then restarts the WHOLE ark, as the hand command does: ark cannot restart
+/// one child (a per-child restart goes with ark's admin socket). The verdict is judged on the
+/// landed tool's children alone, on ark's clock; the other children's state is reported.
+/// Nothing is reverted or held.
 ///
 /// The restart is by itself only when this act holds the device-ark lease (it claims it; berth
 /// renews a lease the session already holds) or no live holder exists. With no berth, no
 /// session berth can resolve, or another live holder, nothing restarts, the reason is said, and
-/// a known holder is sent a berth note naming the one command to run.
-pub(crate) fn after_landed(checkout: &Path, trigger: &str, tool: &str) -> AfterLanding {
+/// a known holder is sent a berth note naming the one command to run. Under `restart.lock` the
+/// lease, the declaration and the switch are judged again, and the decision is made from the
+/// child: a child another act already restarted is waited for, never assumed.
+pub(crate) fn after_landed(
+    checkout: &Path,
+    trigger: &str,
+    tool: &str,
+    landed: Option<&str>,
+) -> AfterLanding {
     let Some(device) = device_checkout(checkout) else {
         say!(
             "device ark: {} has no main checkout git can name; no automatic restart — run `epr \
@@ -830,20 +947,23 @@ pub(crate) fn after_landed(checkout: &Path, trigger: &str, tool: &str) -> AfterL
         return AfterLanding::Untouched;
     };
     let data_root = device.join(DATA_REL);
-    let head = match super::declaration::store(None, None, None)
-        .and_then(|store| store.read().map_err(|e| e.to_string()))
-    {
+    let read_head = || {
+        super::declaration::store(None, None, None)
+            .and_then(|store| store.read().map_err(|e| e.to_string()))
+    };
+    let declares = |head: &RuntimeManifest| {
+        head.processes
+            .iter()
+            .any(|p| channel_tool(&p.artifact) == Some(tool))
+    };
+    let head = match read_head() {
         Ok(head) => head,
         Err(error) => {
             say!("device ark: device manifest unreadable ({error}); no automatic restart");
             return AfterLanding::Untouched;
         }
     };
-    if !head
-        .processes
-        .iter()
-        .any(|p| channel_tool(&p.artifact) == Some(tool))
-    {
+    if !declares(&head) {
         return AfterLanding::Untouched;
     }
     let started = match running(&data_root) {
@@ -868,15 +988,31 @@ pub(crate) fn after_landed(checkout: &Path, trigger: &str, tool: &str) -> AfterL
             return AfterLanding::Untouched;
         }
     };
+    let report = |outcome: &'static str,
+                  stale: Option<&StaleChild>,
+                  to: Option<String>,
+                  seconds: u64,
+                  reason: Option<String>,
+                  cure: Option<&str>| {
+        let report = Report {
+            outcome,
+            from: stale.map(|s| s.running.clone()),
+            to: to.or_else(|| stale.map(|s| s.current.clone())),
+            seconds,
+            reason,
+            cure: cure.map(str::to_owned),
+        };
+        receipt::Row::new(trigger, report.from.clone(), report.to.clone()).record(
+            &data_root,
+            outcome,
+            report.reason.clone(),
+            seconds,
+        );
+        AfterLanding::Reported(report)
+    };
     let skip = |stale: Option<&StaleChild>, reason: String| {
         say!("device ark: not restarting: {reason}");
-        receipt::Row::new(
-            trigger,
-            stale.map(|s| s.running.clone()),
-            stale.map(|s| s.current.clone()),
-        )
-        .record(&data_root, "skipped", Some(reason), 0);
-        AfterLanding::Untouched
+        report("skipped", stale, None, 0, Some(reason), None)
     };
     let head_cid = match head.cid() {
         Ok(cid) => cid,
@@ -907,15 +1043,17 @@ pub(crate) fn after_landed(checkout: &Path, trigger: &str, tool: &str) -> AfterL
         Err(error) => return skip(None, error),
     };
     let stale = Some(&stale);
-    if !receipt::restart_on_landing(&device) {
-        return skip(
-            stale,
+    let off = |device: &Path| {
+        (!receipt::restart_on_landing(device)).then(|| {
             format!(
                 "device_restart.on_landing is off in {} at HEAD; the landed binary waits for \
                  `epr device supervise`",
                 device.join(receipt::POLICY).display()
-            ),
-        );
+            )
+        })
+    };
+    if let Some(reason) = off(&device) {
+        return skip(stale, reason);
     }
     // The hand command's own refusals, before anything is claimed or stopped.
     let refused = refuse_declared_launcher_env(&head)
@@ -937,28 +1075,47 @@ pub(crate) fn after_landed(checkout: &Path, trigger: &str, tool: &str) -> AfterL
         Err(error) => return skip(stale, error),
     };
     let berth = lease_tool(&device);
-    match claim_for_landing(berth.as_deref(), &head_cid) {
-        Lease::Held => {}
-        Lease::Refused { why, holder } => {
-            if let (Some(berth), Some(holder)) = (berth.as_deref(), holder.as_deref()) {
-                tell_holder(berth, holder, trigger, stale);
-            }
-            return skip(
-                stale,
-                format!(
+    let authorised =
+        |stale: Option<&StaleChild>| match claim_for_landing(berth.as_deref(), &head_cid) {
+            Lease::Held => None,
+            Lease::Refused { why, holder } => {
+                if let (Some(berth), Some(holder)) = (berth.as_deref(), holder.as_deref()) {
+                    tell_holder(berth, holder, trigger, stale);
+                }
+                Some(format!(
                     "{why}; nothing restarted — run `epr device supervise` from the session that \
-                     holds device-ark"
-                ),
-            );
-        }
+                 holds device-ark"
+                ))
+            }
+        };
+    if let Some(reason) = authorised(stale) {
+        return skip(stale, reason);
     }
-    // One restart of this ark at a time; the ark and its child are judged again once it is this
-    // act's turn, so two landings racing to restart it restart it once.
-    let seen = started.pid;
+    // One restart of this ark at a time.
     let turn = match RestartTurn::take(&data_root) {
         Ok(turn) => turn,
         Err(error) => return skip(stale, error),
     };
+    // F4: what authorised the stop is judged again at the stop boundary, under the lock: the
+    // lease (claimed or renewed again), the declaration and the switch.
+    match read_head() {
+        Ok(now) if now.cid().ok().as_deref() == Some(head_cid.as_str()) && declares(&now) => {}
+        Ok(_) => {
+            return skip(
+                stale,
+                "the device manifest changed while this landing waited its turn; run `epr \
+                 device supervise`"
+                    .into(),
+            )
+        }
+        Err(error) => return skip(stale, error),
+    }
+    if let Some(reason) = off(&device) {
+        return skip(stale, reason);
+    }
+    if let Some(reason) = authorised(stale) {
+        return skip(stale, reason);
+    }
     let started = match running(&data_root) {
         Ok(Some(started)) => started,
         _ => {
@@ -968,30 +1125,7 @@ pub(crate) fn after_landed(checkout: &Path, trigger: &str, tool: &str) -> AfterL
             )
         }
     };
-    let already = |by: String| {
-        say!(
-            "device ark: {} already runs current ({by}); nothing to restart",
-            stale.map_or("the child", |s| s.child.as_str())
-        );
-        receipt::Row::new(
-            trigger,
-            stale.map(|s| s.running.clone()),
-            stale.map(|s| s.current.clone()),
-        )
-        .record(
-            &data_root,
-            "skipped",
-            Some(format!("already current: {by}")),
-            0,
-        );
-        AfterLanding::Untouched
-    };
-    if started.pid != seen {
-        return already(format!(
-            "another landing restarted ark as pid {}",
-            started.pid
-        ));
-    }
+    // F2: decide from the child, never from the ark's pid.
     let stale = match child_identity_on(&data_root, &head, &started, Some(tool)) {
         Ok(Identity::Stale {
             child,
@@ -1002,43 +1136,52 @@ pub(crate) fn after_landed(checkout: &Path, trigger: &str, tool: &str) -> AfterL
             running,
             current,
         },
-        Ok(Identity::Current) => return already("it is current".into()),
-        Ok(Identity::NoLiveChild) => {
-            return skip(
-                stale,
-                "no child on the landed channel is live yet (another restart is under way)".into(),
-            )
+        Ok(Identity::Current | Identity::NoLiveChild) => {
+            drop(turn);
+            let child = stale.map_or("the child", |s| s.child.as_str()).to_owned();
+            say!(
+                "device ark: {child} was already restarted (ark pid {}); waiting for it to be \
+                 ready rather than restarting it again",
+                started.pid
+            );
+            return settle(
+                &data_root, &head, &started, tool, landed, &child, stale, &report,
+            );
         }
         Err(error) => return skip(stale, error),
     };
     say!(
-        "device ark: {} runs {}, current is {}; restarting (after {trigger}, session {})",
+        "device ark: {} runs {}, current is {}; restarting the ark (after {trigger}, session \
+         {}): every child restarts with it, as with `epr device supervise`",
         stale.child,
         stale.running,
         stale.current,
         session_id().as_deref().unwrap_or("none")
     );
-    let row = || {
-        receipt::Row::new(
-            trigger,
-            Some(stale.running.clone()),
-            Some(stale.current.clone()),
-        )
-    };
-    // From the stop on, every failure fails the act that landed: the device is down or degraded.
+    // From the stop on, every failure leaves the device down or degraded; it is said once, with
+    // the cure, and reported. The landing itself stands either way.
     let failed = |error: String| {
-        let detail = format!("{error}; the device is degraded; cure: epr device supervise");
-        say!("device ark: {detail}");
-        row().record(&data_root, "not-ready", Some(error), 0);
+        say!("device ark: {error}; the device is degraded; cure: epr device supervise");
         release_lease(berth.as_deref());
-        AfterLanding::Failed(detail)
+        report(
+            "failed",
+            Some(&stale),
+            None,
+            0,
+            Some(error),
+            Some("epr device supervise"),
+        )
     };
     if let Err(error) = stop_ark(&data_root, &started) {
         return failed(error);
     }
     let restarted = match start_ark(&data_root, &head, &head_cid, &ark) {
         Ok(restarted) => restarted,
-        Err(error) => return failed(format!("the old ark stopped and none started: {error}")),
+        Err(error) => {
+            return failed(format!(
+                "the old ark stopped and its replacement did not start cleanly: {error}"
+            ))
+        }
     };
     say!(
         "device ark: started pid {} at manifest {head_cid} (log {})",
@@ -1046,29 +1189,139 @@ pub(crate) fn after_landed(checkout: &Path, trigger: &str, tool: &str) -> AfterL
         data_root.join("ark.log").display()
     );
     drop(turn);
-    match wait_landed(&data_root, &head, &restarted, tool) {
+    let child = stale.child.clone();
+    settle(
+        &data_root,
+        &head,
+        &restarted,
+        tool,
+        landed,
+        &child,
+        Some(&stale),
+        &report,
+    )
+}
+
+/// Record one outcome: `(outcome, stale, observed release, seconds, reason, cure)`.
+type ReportFn<'a> = dyn Fn(
+        &'static str,
+        Option<&StaleChild>,
+        Option<String>,
+        u64,
+        Option<String>,
+        Option<&str>,
+    ) -> AfterLanding
+    + 'a;
+
+/// Wait for `tool`'s children under `started`, report what the child actually runs (F3) and the
+/// other children's state (F5), and write the row through `report`.
+#[allow(
+    clippy::too_many_arguments,
+    reason = "The settlement takes the restart's context as the call site already holds it"
+)]
+fn settle(
+    data_root: &Path,
+    head: &RuntimeManifest,
+    started: &Started,
+    tool: &str,
+    landed: Option<&str>,
+    child: &str,
+    stale: Option<&StaleChild>,
+    report: &ReportFn<'_>,
+) -> AfterLanding {
+    let waited = wait_landed(data_root, head, started, tool);
+    let observed = child_release(data_root, head, started, tool);
+    let aimed = observed
+        .clone()
+        .or_else(|| stale.map(|s| s.current.clone()))
+        .unwrap_or_else(|| "current".into());
+    let also = match landed {
+        Some(landed) if landed != aimed => format!(" (this act landed {landed})"),
+        _ => String::new(),
+    };
+    for other in head
+        .processes
+        .iter()
+        .filter(|p| channel_tool(&p.artifact) != Some(tool))
+    {
+        let row = load_passport(data_root)
+            .and_then(|p| p.processes.into_iter().find(|row| row.name == other.name));
+        let state = match row {
+            Some(row)
+                if row
+                    .pid
+                    .is_some_and(|pid| proc_ppid(pid) == Some(started.pid)) =>
+            {
+                if other.readiness.is_empty() || row.ready {
+                    "ready"
+                } else {
+                    "not ready"
+                }
+            }
+            _ => "not running",
+        };
+        say!(
+            "device ark: {} ({}) restarted with the ark: {state}; not judged for this landing",
+            other.name,
+            match &other.artifact {
+                ark_core::ArtifactRef::Channel { channel_id } => channel_id.as_str(),
+                ark_core::ArtifactRef::Pinned { .. } => "pinned",
+            }
+        );
+    }
+    match waited {
         Ok(took) => {
             say!(
-                "device ark: {} ready on {} in {} s",
-                stale.child,
-                stale.current,
+                "device ark: {child} ready on {aimed} in {} s{also}",
                 whole_seconds(took)
             );
-            row().record(&data_root, "ready", None, whole_seconds(took));
-            AfterLanding::Ready
+            report("ready", stale, observed, whole_seconds(took), None, None)
         }
         Err((took, why)) => {
-            let detail = format!(
-                "{} not ready after {} s ({why}); the device is degraded; cure: epr device \
-                 supervise --status",
-                stale.current,
+            say!(
+                "device ark: {aimed} not ready after {} s ({why}){also}; the device is degraded; \
+                 cure: epr device supervise --status",
                 whole_seconds(took)
             );
-            say!("device ark: {detail}");
-            row().record(&data_root, "not-ready", Some(why), whole_seconds(took));
-            AfterLanding::NotReady(detail)
+            report(
+                "not-ready",
+                stale,
+                observed,
+                whole_seconds(took),
+                Some(why),
+                Some("epr device supervise --status"),
+            )
         }
     }
+}
+
+/// The release the first live child of `started` on `tool`'s channel executes, read from the
+/// child itself (`/proc/<pid>/exe`).
+fn child_release(
+    data_root: &Path,
+    head: &RuntimeManifest,
+    started: &Started,
+    tool: &str,
+) -> Option<String> {
+    let registry = manifest_store::registry(head).ok()?;
+    let store = Store::from_environment(tool, &registry).ok()?;
+    load_passport(data_root)?
+        .processes
+        .iter()
+        .filter(|row| {
+            head.processes
+                .iter()
+                .any(|p| p.name == row.name && channel_tool(&p.artifact) == Some(tool))
+        })
+        .filter_map(|row| row.pid)
+        .filter(|pid| proc_ppid(*pid) == Some(started.pid))
+        .find_map(|pid| {
+            let exe = PathBuf::from(format!("/proc/{pid}/exe"));
+            store
+                .executable_cid(&exe)
+                .ok()
+                .or_else(|| file_cid(&exe).ok())
+        })
 }
 
 /// A child found on other bytes than its channel's current.
@@ -1243,11 +1496,12 @@ impl RestartTurn {
     }
 }
 
-/// Wait for the children on `tool`'s channel of the freshly started ark, on ark's clock: each
+/// Wait for the children on `tool`'s channel of `started`, on ark's clock (row 35, F7): each
 /// child's budget is its own declared readiness patience (never less than [`READY_FLOOR`]),
-/// counted from when ark first spawned it under this ark (from the ark's start until then). A
-/// child that declares no readiness is ready once ark runs it. Other children are never judged.
-/// Reads the passport only; holds nothing.
+/// counted from its own first spawn as the passport records it. Until ark has spawned a child,
+/// only the floor runs, from the ark's start. A child that declares no readiness is ready once
+/// ark runs it. Any child past its budget fails the wait, whatever time a sibling has left.
+/// Other channels' children are never judged. Reads the passport only; holds nothing.
 fn wait_landed(
     data_root: &Path,
     head: &RuntimeManifest,
@@ -1259,6 +1513,7 @@ fn wait_landed(
         .iter()
         .filter(|p| channel_tool(&p.artifact) == Some(tool))
         .collect();
+    let millis = |duration: Duration| u64::try_from(duration.as_millis()).unwrap_or(u64::MAX);
     let budget = |child: &ark_core::ChildSpec| {
         let declared: u64 = child
             .readiness
@@ -1269,8 +1524,9 @@ fn wait_landed(
                 | ark_core::Probe::TcpListen { patience_ms, .. } => *patience_ms,
             })
             .fold(0, u64::saturating_add);
-        Duration::from_millis(declared).max(READY_FLOOR) + READY_SLACK
+        millis(Duration::from_millis(declared).max(READY_FLOOR) + READY_SLACK)
     };
+    let unseen = millis(READY_FLOOR + READY_SLACK);
     let begun = Instant::now();
     let mut spawned: std::collections::BTreeMap<String, u64> = Default::default();
     loop {
@@ -1280,7 +1536,7 @@ fn wait_landed(
         let passport = load_passport(data_root);
         let now = epoch_ms();
         let mut waiting = Vec::new();
-        let mut within = false;
+        let mut overdue = Vec::new();
         for child in &children {
             let row = passport
                 .as_ref()
@@ -1296,64 +1552,69 @@ fn wait_landed(
                 continue;
             }
             waiting.push(child.name.as_str());
-            let from = spawned
-                .get(&child.name)
-                .copied()
-                .unwrap_or(started.started_at_epoch_ms);
-            let budget = u64::try_from(budget(child).as_millis()).unwrap_or(u64::MAX);
-            if now < from.saturating_add(budget) {
-                within = true;
+            let deadline = match spawned.get(&child.name) {
+                Some(first) => first.saturating_add(budget(child)),
+                None => started.started_at_epoch_ms.saturating_add(unseen),
+            };
+            if now >= deadline {
+                overdue.push(child.name.as_str());
             }
         }
         if waiting.is_empty() {
             return Ok(begun.elapsed());
         }
-        if !within {
+        if !overdue.is_empty() {
             return Err((
                 begun.elapsed(),
-                format!("not ready: {}", waiting.join(", ")),
+                format!("not ready: {}", overdue.join(", ")),
             ));
         }
         thread::sleep(Duration::from_millis(200));
     }
 }
 
-/// What the newest restart row says on the peer daemon line: `(true, suffix)` for a ready
-/// restart, said only on a line serving at current; `(false, note)` for one that did not come
-/// up or was skipped, said on the line whatever it reads.
-pub(crate) fn restart_note(checkout: &Path) -> Option<(bool, String)> {
+/// What the newest restart row says on the peer daemon line.
+pub(crate) enum RestartNote {
+    /// A ready restart: the suffix for a line serving at current.
+    Ready(String),
+    /// A restart that did not come up or failed after the stop: the line is degraded while the
+    /// supervisor reads anything short of every child ready.
+    Degraded { note: String, cure: String },
+    /// A landing that skipped its restart, and why.
+    Note(String),
+}
+
+/// The newest restart row this device's ark data root holds, as the peer daemon line says it.
+pub(crate) fn restart_note(checkout: &Path) -> Option<RestartNote> {
     let data_root = device_checkout(checkout)
         .map(|device| device.join(DATA_REL))
         .unwrap_or_else(|| default_data_root(checkout));
     let row = receipt::newest(&data_root)?;
     let to = row.to.as_deref().unwrap_or("-");
+    let reason = row.reason.clone().unwrap_or_default();
     Some(match row.outcome.as_str() {
-        "ready" => (
-            true,
-            format!(
-                " (restarted by {} at {} in {} s)",
+        "ready" => RestartNote::Ready(format!(
+            " (restarted by {} at {} in {} s)",
+            row.trigger, row.at, row.seconds
+        )),
+        "not-ready" => RestartNote::Degraded {
+            note: format!(
+                " (last restart by {} at {}: {to} not ready after {} s: {reason})",
                 row.trigger, row.at, row.seconds
             ),
-        ),
-        "not-ready" => (
-            false,
-            format!(
-                " (last restart by {} at {}: {to} not ready after {} s{})",
-                row.trigger,
-                row.at,
-                row.seconds,
-                row.reason.map(|r| format!(": {r}")).unwrap_or_default()
+            cure: "epr device supervise --status".into(),
+        },
+        "failed" => RestartNote::Degraded {
+            note: format!(
+                " (last restart by {} at {} failed after the old ark stopped: {reason})",
+                row.trigger, row.at
             ),
-        ),
-        _ => (
-            false,
-            format!(
-                " (the {} at {} did not restart: {})",
-                row.trigger,
-                row.at,
-                row.reason.unwrap_or_default()
-            ),
-        ),
+            cure: "epr device supervise".into(),
+        },
+        _ => RestartNote::Note(format!(
+            " (the {} at {} did not restart: {reason})",
+            row.trigger, row.at
+        )),
     })
 }
 

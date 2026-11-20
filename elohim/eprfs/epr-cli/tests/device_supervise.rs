@@ -56,6 +56,8 @@ impl Fixture {
             .args(args)
             .current_dir(&self.repo)
             .env("HOME", &self.base)
+            // A launcher an arrival installs lands in the fixture, never the host's cargo home.
+            .env("CARGO_HOME", self.base.join("cargo-home"))
             .env("XDG_CONFIG_HOME", self.base.join("config"))
             .env("ELOHIM_DEVICE_KEY_FILE", self.base.join("device/seed"))
             .env("BIN_STORE", self.base.join("bins"))
@@ -1545,7 +1547,7 @@ fn a_follow_restarts_the_landed_tools_child_when_the_lease_is_held() {
     assert!(followed.status.success(), "{said}");
     assert!(
         said.contains(&format!(
-            "device ark: peer runs {}, current is {y}; restarting (after follow, session ",
+            "device ark: peer runs {}, current is {y}; restarting the ark (after follow, session ",
             lane.x
         )),
         "{said}"
@@ -1560,6 +1562,8 @@ fn a_follow_restarts_the_landed_tools_child_when_the_lease_is_held() {
         y.as_str(),
         "stdout is still the follow's record"
     );
+    assert_eq!(record["restart"]["outcome"], "ready", "{record}");
+    assert_eq!(record["restart"]["to"], y.as_str(), "{record}");
     assert!(
         lane.berth_log()
             .contains("claim device-ark --class device-ark"),
@@ -1626,7 +1630,10 @@ fn a_forward_land_from_a_linked_worktree_restarts_too() {
     let landed = fx.epr(&args);
     let said = text(&landed);
     assert!(landed.status.success(), "{said}");
-    assert!(said.contains("restarting (after land, session "), "{said}");
+    assert!(
+        said.contains("restarting the ark (after land, session "),
+        "{said}"
+    );
     let (ark2, child2) = ready_child(fx, "the resident on Y");
     assert_ne!(ark2, ark1);
     assert_eq!(running_release(child2), y);
@@ -1679,7 +1686,7 @@ fn a_revert_and_a_bootstrap_restart_nothing() {
     ]);
     let said = text(&reverted);
     assert!(reverted.status.success(), "{said}");
-    assert!(!said.contains("; restarting ("), "{said}");
+    assert!(!said.contains("restarting the ark"), "{said}");
     assert_eq!(fx.current().0, lane.x);
     assert_eq!(fx.status()["pid"].as_u64().unwrap(), ark_y);
     assert_eq!(rows(fx).len(), 1, "a revert writes no restart row");
@@ -1696,7 +1703,7 @@ fn a_revert_and_a_bootstrap_restart_nothing() {
     ]);
     let said = text(&booted);
     assert!(booted.status.success(), "{said}");
-    assert!(!said.contains("; restarting ("), "{said}");
+    assert!(!said.contains("restarting the ark"), "{said}");
     assert_eq!(fx.status()["pid"].as_u64().unwrap(), ark_y);
     assert_eq!(rows(fx).len(), 1, "a bootstrap writes no restart row");
 }
@@ -1714,7 +1721,7 @@ fn on_landing_off_lands_and_restarts_nothing() {
     assert!(followed.status.success(), "{said}");
     assert_eq!(fx.current().0, y, "the follow landed");
     assert!(said.contains("device_restart.on_landing is off"), "{said}");
-    assert!(!said.contains("; restarting ("), "{said}");
+    assert!(!said.contains("restarting the ark"), "{said}");
     assert_eq!(fx.status()["pid"].as_u64().unwrap(), ark1);
     assert_eq!(running_release(child1), lane.x);
     let rows = rows(fx);
@@ -1737,7 +1744,7 @@ fn without_the_lease_a_follow_lands_and_restarts_nothing() {
     let unchanged = |said: &str| {
         assert_eq!(fx.status()["pid"].as_u64().unwrap(), ark1, "{said}");
         assert_eq!(running_release(child1), lane.x, "{said}");
-        assert!(!said.contains("; restarting ("), "{said}");
+        assert!(!said.contains("restarting the ark"), "{said}");
     };
 
     let (_, y) = lane.next("y");
@@ -1787,31 +1794,51 @@ fn without_the_lease_a_follow_lands_and_restarts_nothing() {
 }
 
 /// A release whose child never prints its ready line: the follow waits out that child's own
-/// readiness on ark's clock, then exits non-zero saying the device is degraded with the cure.
-/// Nothing is reverted or held: the release stays current, as after a failed manual restart.
+/// readiness on ark's clock. The landing happened, so the follow exits 0 and its record carries
+/// the restart's outcome; the device's degradation is said once on stderr with the cure, and
+/// written to the receipt and to status. Nothing is reverted or held (row 35, F1).
 #[test]
-fn a_release_that_never_comes_up_degrades_the_device_and_fails_the_follow() {
+fn a_release_that_never_comes_up_degrades_the_device_and_the_follow_still_lands() {
     let lane = lane(None, Some((4_000, 2_000)));
     let fx = &lane.fx;
     let (_, y) = lane.next("y");
     lane.never_serves(&y);
     let followed = lane.follow();
     let said = text(&followed);
-    assert!(!followed.status.success(), "{said}");
+    assert_eq!(
+        followed.status.code(),
+        Some(0),
+        "a landing's exit is the landing's: {said}"
+    );
+    assert_eq!(
+        said.matches("; the device is degraded; cure: epr device supervise --status")
+            .count(),
+        1,
+        "one line with the cure: {said}"
+    );
     assert!(
-        said.contains(&format!("device ark: {y} not ready after "))
-            && said.contains("; the device is degraded; cure: "),
+        said.contains(&format!("device ark: {y} not ready after ")),
         "{said}"
     );
     assert_eq!(fx.current().0, y, "nothing is reverted");
+    let record: Value = serde_json::from_slice(&followed.stdout)
+        .unwrap_or_else(|e| panic!("stdout is the follow's record ({e}): {said}"));
+    assert_eq!(record["cid"], y.as_str(), "{said}");
+    let restart = &record["restart"];
+    assert_eq!(restart["outcome"], "not-ready", "{record}");
+    assert_eq!(restart["from"], lane.x.as_str(), "{record}");
+    assert_eq!(restart["to"], y.as_str(), "{record}");
+    assert!(restart["seconds"].as_u64().unwrap() >= 4, "{record}");
+    assert!(
+        restart["reason"].as_str().is_some_and(|r| !r.is_empty()),
+        "{record}"
+    );
+    assert_eq!(restart["cure"], "epr device supervise --status", "{record}");
     let rows = rows(fx);
     assert_eq!(rows.len(), 1, "{rows:?}");
     assert_eq!(rows[0]["outcome"], "not-ready");
-    assert!(
-        rows[0]["seconds"].as_u64().unwrap() >= 4,
-        "the child's own patience was waited out: {rows:?}"
-    );
     let line = row_named(fx, "peer daemon");
+    assert_eq!(line["state"], "degraded", "{line}");
     assert!(
         line["detail"]
             .as_str()
@@ -1821,8 +1848,35 @@ fn a_release_that_never_comes_up_degrades_the_device_and_fails_the_follow() {
     );
 }
 
-/// Only the landed tool's own children are judged: an unrelated child on another channel that
-/// never becomes ready neither fails nor delays the follow.
+/// A forward land whose restart does not come up still exits 0 with the restart in its record,
+/// and status reads degraded with the restart's cure while a peer serves (row 35, F1).
+#[test]
+fn a_forward_land_with_a_degraded_restart_exits_zero() {
+    let lane = lane(None, Some((4_000, 2_000)));
+    let fx = &lane.fx;
+    let (c2, y) = lane.next("y");
+    lane.never_serves(&y);
+    let landed = lane.land(&y, &c2, &lane.x);
+    let said = text(&landed);
+    assert_eq!(landed.status.code(), Some(0), "{said}");
+    let record: Value = serde_json::from_slice(&landed.stdout)
+        .unwrap_or_else(|e| panic!("stdout is the land's record ({e}): {said}"));
+    assert_eq!(record["cid"], y.as_str(), "{said}");
+    assert_eq!(record["restart"]["outcome"], "not-ready", "{record}");
+    let Some(mut holder) = Holder::start(fx, &fx.repo) else {
+        return;
+    };
+    fx.lease(holder.pid());
+    let line = row_named(fx, "peer daemon");
+    assert_eq!(line["state"], "degraded", "{line}");
+    assert_eq!(line["cure"], "epr device supervise --status", "{line}");
+    assert!(holder.running());
+}
+
+/// Landing one tool restarts the whole ark, as the hand command does (ark cannot restart one
+/// child): an unrelated child on another channel restarts with it and its state is reported,
+/// but only the landed tool's child is judged, so the unrelated child, never ready, neither
+/// fails nor delays the follow (row 35, F5).
 #[test]
 fn only_the_landed_tools_children_are_judged() {
     let base = tempfile::tempdir().unwrap();
@@ -1880,90 +1934,144 @@ fn only_the_landed_tools_children_are_judged() {
     };
     let fx = &lane.fx;
     let (ark1, _) = ready_child(fx, "the resident on X under the new head");
+    let side_pid = |status: &Value| {
+        status["processes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|p| p["name"] == "side")
+            .and_then(|p| p["pid"].as_u64())
+    };
+    let side1 = wait_for("the unrelated child to run", || {
+        side_pid(&fx.status()).map(Value::from)
+    })
+    .as_u64()
+    .unwrap();
     let (_, y) = lane.next("y");
     let followed = lane.follow();
     let said = text(&followed);
     assert!(followed.status.success(), "{said}");
     assert!(
+        said.contains("restarting the ark (after follow") && said.contains("every child restarts"),
+        "{said}"
+    );
+    assert!(
         said.contains(&format!("device ark: peer ready on {y} in ")),
         "{said}"
     );
     assert!(
-        !said.contains("side"),
-        "the unrelated child is not judged: {said}"
+        said.contains("device ark: side (bin:brit) restarted with the ark: ")
+            && said.contains("; not judged for this landing"),
+        "the unrelated child's state is reported: {said}"
     );
     assert_ne!(fx.status()["pid"].as_u64().unwrap(), ark1);
+    let side2 = wait_for("the unrelated child under the new ark", || {
+        side_pid(&fx.status()).map(Value::from)
+    })
+    .as_u64()
+    .unwrap();
+    assert_ne!(side2, side1, "the unrelated child restarted with the ark");
+    assert!(!alive(side1));
     let rows = rows(fx);
     assert_eq!(rows.len(), 1, "{rows:?}");
     assert_eq!(rows[0]["outcome"], "ready");
 }
 
-/// Any failure after the old ark was stopped fails the follow with the cure: here the ark that
-/// would start in its place exits at once.
+/// A failure after the old ark was stopped (here the ark that would start in its place exits at
+/// once) leaves the device down: it is said once with the cure and reported in the record, and
+/// the follow, whose landing happened, exits 0 (row 35, F1).
 #[test]
-fn a_failure_after_the_old_ark_stopped_fails_the_follow() {
+fn a_failure_after_the_old_ark_stopped_is_reported_and_the_follow_still_lands() {
     let lane = lane(None, None);
     let fx = &lane.fx;
     let (_, y) = lane.next("y");
     let followed = lane.follow_with(&[("ARK_BIN", OsStr::new("/bin/false"))]);
     let said = text(&followed);
-    assert!(!followed.status.success(), "{said}");
+    assert_eq!(followed.status.code(), Some(0), "{said}");
     assert_eq!(fx.current().0, y);
-    assert!(said.contains("cure: epr device supervise"), "{said}");
+    assert_eq!(
+        said.matches("; the device is degraded; cure: epr device supervise")
+            .count(),
+        1,
+        "{said}"
+    );
     assert!(!said.contains("stands"), "{said}");
+    assert!(!said.contains("none started"), "{said}");
     assert_eq!(fx.status()["running"], false, "{said}");
+    let record: Value = serde_json::from_slice(&followed.stdout)
+        .unwrap_or_else(|e| panic!("stdout is the follow's record ({e}): {said}"));
+    assert_eq!(record["cid"], y.as_str(), "{said}");
+    assert_eq!(record["restart"]["outcome"], "failed", "{record}");
+    assert_eq!(
+        record["restart"]["cure"], "epr device supervise",
+        "{record}"
+    );
+    assert_eq!(rows(fx)[0]["outcome"], "failed");
 }
 
-/// Two landings racing to restart the same ark restart it once: the restart is serialised per
-/// device, and the second re-reads the child under that serialisation and finds it current.
-#[test]
-fn two_landings_restart_once() {
+/// An `epr` with the fixture's environment, spawned with piped output.
+fn spawn_epr(fx: &Fixture, args: &[String], extra: &[(&str, &OsStr)]) -> Child {
+    let mut command = Command::new(env!("CARGO_BIN_EXE_epr"));
+    command
+        .args(args)
+        .current_dir(&fx.repo)
+        .env("HOME", &fx.base)
+        .env("CARGO_HOME", fx.base.join("cargo-home"))
+        .env("XDG_CONFIG_HOME", fx.base.join("config"))
+        .env("ELOHIM_DEVICE_KEY_FILE", fx.base.join("device/seed"))
+        .env("BIN_STORE", fx.base.join("bins"))
+        .env("ARK_BIN", &fx.ark)
+        .env("EPR_BERTH_BIN", fx.berth.as_ref().unwrap())
+        .env("EPR_PROC_ROOT", fx.base.join("proc"))
+        .env("ELOHIM_SESSION_ID", "supervise-fixture")
+        .env("DEVWORKSPACE_ID", "supervise-fixture")
+        .env("CLAUDE_CONFIG_DIR", fx.base.join("berth-config"))
+        .env("PATH", "/usr/bin:/bin")
+        .env("GIT_CONFIG_GLOBAL", "/dev/null")
+        .env("GIT_CONFIG_NOSYSTEM", "1")
+        .env_remove("EPR_SESSION_LAZY")
+        .env_remove("EPR_BIN_TOOLS")
+        .env_remove("EPR_STORE")
+        .env_remove("BRIT_STORE")
+        .env_remove("GIT_DIR")
+        .env_remove("GIT_WORK_TREE")
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    for (key, value) in extra {
+        command.env(key, value);
+    }
+    command.spawn().unwrap()
+}
+
+/// Take `<data root>/restart.lock` from this process, as another restart would hold it.
+fn hold_restart_lock(fx: &Fixture) -> fs::File {
     use std::os::fd::AsRawFd;
-    let lane = lane(None, None);
-    let fx = &lane.fx;
-    let lock_path = fx.data_root().join("restart.lock");
     let lock = fs::OpenOptions::new()
         .create(true)
         .append(true)
-        .open(&lock_path)
+        .open(fx.data_root().join("restart.lock"))
         .unwrap();
     // SAFETY: the fd is open for this call and flock retains no pointer.
     assert_eq!(unsafe { libc::flock(lock.as_raw_fd(), libc::LOCK_EX) }, 0);
-    let spawn = |args: Vec<String>| {
-        let mut command = Command::new(env!("CARGO_BIN_EXE_epr"));
-        command
-            .args(&args)
-            .current_dir(&fx.repo)
-            .env("HOME", &fx.base)
-            .env("XDG_CONFIG_HOME", fx.base.join("config"))
-            .env("ELOHIM_DEVICE_KEY_FILE", fx.base.join("device/seed"))
-            .env("BIN_STORE", fx.base.join("bins"))
-            .env("ARK_BIN", &fx.ark)
-            .env("EPR_BERTH_BIN", fx.berth.as_ref().unwrap())
-            .env("EPR_PROC_ROOT", fx.base.join("proc"))
-            .env("ELOHIM_SESSION_ID", "supervise-fixture")
-            .env("DEVWORKSPACE_ID", "supervise-fixture")
-            .env("CLAUDE_CONFIG_DIR", fx.base.join("berth-config"))
-            .env("PATH", "/usr/bin:/bin")
-            .env("GIT_CONFIG_GLOBAL", "/dev/null")
-            .env("GIT_CONFIG_NOSYSTEM", "1")
-            .env_remove("EPR_SESSION_LAZY")
-            .env_remove("EPR_BIN_TOOLS")
-            .env_remove("EPR_STORE")
-            .env_remove("BRIT_STORE")
-            .env_remove("GIT_DIR")
-            .env_remove("GIT_WORK_TREE")
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped());
-        command.spawn().unwrap()
-    };
+    lock
+}
+
+/// Two landings racing to restart the same ark restart it once: the restart is serialised per
+/// device, and the second decides from the child under that serialisation, waits for it to be
+/// ready, and says what it actually runs, naming what it landed itself when that differs (row
+/// 35, F2 and F3).
+#[test]
+fn two_landings_restart_once() {
+    let lane = lane(None, None);
+    let fx = &lane.fx;
+    let lock = hold_restart_lock(fx);
     let (c2, y) = lane.next("y");
-    let first = spawn(lane.land_args(&y, &c2, &lane.x, &fx.repo));
+    let first = spawn_epr(fx, &lane.land_args(&y, &c2, &lane.x, &fx.repo), &[]);
     wait_for("the first landing", || {
         (fx.current().0 == y).then_some(Value::Null)
     });
     let (c3, z) = lane.next("z");
-    let second = spawn(lane.land_args(&z, &c3, &y, &fx.repo));
+    let second = spawn_epr(fx, &lane.land_args(&z, &c3, &y, &fx.repo), &[]);
     wait_for("the second landing", || {
         (fx.current().0 == z).then_some(Value::Null)
     });
@@ -1974,26 +2082,230 @@ fn two_landings_restart_once() {
     let said = format!("{}\n{}", text(&first), text(&second));
     assert!(first.status.success() && second.status.success(), "{said}");
     assert_eq!(
-        said.matches("; restarting (after land").count(),
+        said.matches("restarting the ark (after land").count(),
         1,
         "{said}"
     );
-    assert!(said.contains("already runs"), "{said}");
+    assert!(said.contains("was already restarted"), "{said}");
+    assert_eq!(
+        said.matches(&format!("device ark: peer ready on {z} in "))
+            .count(),
+        2,
+        "both report what the child runs: {said}"
+    );
+    assert!(said.contains(&format!("(this act landed {y})")), "{said}");
     let (_, child) = ready_child(fx, "the resident on Z");
     assert_eq!(running_release(child), z);
+    for output in [&first, &second] {
+        let record: Value = serde_json::from_slice(&output.stdout).unwrap();
+        assert_eq!(record["restart"]["outcome"], "ready", "{record}");
+        assert_eq!(record["restart"]["to"], z.as_str(), "{record}");
+    }
     let rows = rows(fx);
     assert_eq!(rows.len(), 2, "{rows:?}");
-    assert_eq!(
-        rows.iter().filter(|row| row["outcome"] == "ready").count(),
-        1,
+    assert!(rows.iter().all(|row| row["outcome"] == "ready"), "{rows:?}");
+}
+
+/// The second of two racing landings never says "already current" for a child that is not
+/// ready: when the winner's restart does not come up, the second waits for that child too and
+/// reports it not ready (row 35, F2).
+#[test]
+fn a_racing_landing_waits_for_the_winners_child() {
+    let lane = lane(None, Some((4_000, 2_000)));
+    let fx = &lane.fx;
+    let lock = hold_restart_lock(fx);
+    let (c2, y) = lane.next("y");
+    let first = spawn_epr(fx, &lane.land_args(&y, &c2, &lane.x, &fx.repo), &[]);
+    wait_for("the first landing", || {
+        (fx.current().0 == y).then_some(Value::Null)
+    });
+    let (c3, z) = lane.next("z");
+    lane.never_serves(&z);
+    let second = spawn_epr(fx, &lane.land_args(&z, &c3, &y, &fx.repo), &[]);
+    wait_for("the second landing", || {
+        (fx.current().0 == z).then_some(Value::Null)
+    });
+    thread::sleep(Duration::from_millis(1_000));
+    drop(lock);
+    let first = first.wait_with_output().unwrap();
+    let second = second.wait_with_output().unwrap();
+    let said = format!("{}\n{}", text(&first), text(&second));
+    assert!(!said.contains("already runs current"), "{said}");
+    assert_eq!(said.matches("not ready after").count(), 2, "{said}");
+    let rows = rows(fx);
+    assert_eq!(rows.len(), 2, "{rows:?}");
+    assert!(
+        rows.iter().all(|row| row["outcome"] == "not-ready"),
         "{rows:?}"
     );
-    assert_eq!(
-        rows.iter()
-            .filter(|row| row["outcome"] == "skipped")
-            .count(),
-        1,
+}
+
+/// What authorised the stop is judged again at the stop boundary: a landing that waited for
+/// its turn does not restart when, meanwhile, another session took device-ark or the switch was
+/// turned off (row 35, F4).
+#[test]
+fn the_lease_and_the_switch_are_judged_again_under_the_lock() {
+    let lane = lane(None, None);
+    let fx = &lane.fx;
+    let (ark1, child1) = ready_child(fx, "the resident on X");
+    let claims = || lane.berth_log().matches("claim device-ark").count();
+
+    let lock = hold_restart_lock(fx);
+    let before = claims();
+    let (_, y) = lane.next("y");
+    let follow = spawn_epr(
+        fx,
+        &["bin", "--tool", "epr", "follow", "--repo"]
+            .iter()
+            .map(|s| (*s).to_owned())
+            .chain([fx.repo.display().to_string()])
+            .collect::<Vec<_>>(),
+        &[],
+    );
+    wait_for("the follow to claim and wait its turn", || {
+        (fx.current().0 == y && claims() > before).then_some(Value::Null)
+    });
+    fs::write(fx.base.join("berth-held-by"), "other-session").unwrap();
+    thread::sleep(Duration::from_millis(500));
+    drop(lock);
+    let followed = follow.wait_with_output().unwrap();
+    let said = text(&followed);
+    assert!(followed.status.success(), "{said}");
+    assert!(said.contains("held by other-session"), "{said}");
+    assert!(!said.contains("restarting the ark"), "{said}");
+    assert_eq!(fx.status()["pid"].as_u64().unwrap(), ark1);
+    assert_eq!(running_release(child1), lane.x);
+    fs::remove_file(fx.base.join("berth-held-by")).unwrap();
+
+    let lock = hold_restart_lock(fx);
+    let before = claims();
+    let (_, z) = lane.next("z");
+    let follow = spawn_epr(
+        fx,
+        &["bin", "--tool", "epr", "follow", "--repo"]
+            .iter()
+            .map(|s| (*s).to_owned())
+            .chain([fx.repo.display().to_string()])
+            .collect::<Vec<_>>(),
+        &[],
+    );
+    wait_for("the follow to claim and wait its turn", || {
+        (fx.current().0 == z && claims() > before).then_some(Value::Null)
+    });
+    fs::write(
+        fx.repo.join("genesis/agentic/pool-policy.json"),
+        json!({ "device_restart": { "on_landing": "off" } }).to_string(),
+    )
+    .unwrap();
+    git_in(&fx.repo, &["commit", "-q", "-am", "turn restarts off"]);
+    drop(lock);
+    let followed = follow.wait_with_output().unwrap();
+    let said = text(&followed);
+    assert!(followed.status.success(), "{said}");
+    assert!(said.contains("device_restart.on_landing is off"), "{said}");
+    assert!(!said.contains("restarting the ark"), "{said}");
+    assert_eq!(fx.status()["pid"].as_u64().unwrap(), ark1);
+    let rows = rows(fx);
+    assert_eq!(rows.len(), 2, "{rows:?}");
+    assert!(
+        rows.iter().all(|row| row["outcome"] == "skipped"),
         "{rows:?}"
+    );
+}
+
+/// Arrival's own restart honours `device_restart.on_landing = "off"` and writes its row; and a
+/// failure after it stopped the ark says the device is degraded with the cure rather than only
+/// "continuing" (row 35, F6).
+#[test]
+fn arrival_honours_the_switch_and_says_a_failed_restart() {
+    let lane = lane(Some(json!({ "on_landing": "off" })), None);
+    let fx = &lane.fx;
+    let (ark1, child1) = ready_child(fx, "the resident on X");
+    let (_, y) = lane.next("y");
+    assert!(lane.follow().status.success());
+    assert_eq!(fx.current().0, y);
+    let arrive = |extra: &[(&str, &OsStr)]| {
+        let args: Vec<String> = ["device", "arrive", "--worker", "--root"]
+            .iter()
+            .map(|s| (*s).to_owned())
+            .chain([fx.repo.display().to_string()])
+            .collect();
+        spawn_epr(fx, &args, extra).wait_with_output().unwrap()
+    };
+    let arrived = arrive(&[]);
+    let said = text(&arrived);
+    assert!(said.contains("device_restart.on_landing is off"), "{said}");
+    assert_eq!(fx.status()["pid"].as_u64().unwrap(), ark1, "{said}");
+    assert_eq!(running_release(child1), lane.x, "{said}");
+    let rows = rows(fx);
+    assert_eq!(rows.last().unwrap()["trigger"], "arrival", "{rows:?}");
+    assert_eq!(rows.last().unwrap()["outcome"], "skipped", "{rows:?}");
+
+    // Restarts on, and the ark that would start exits at once.
+    fs::write(
+        fx.repo.join("genesis/agentic/pool-policy.json"),
+        json!({ "device_restart": { "on_landing": "restart" } }).to_string(),
+    )
+    .unwrap();
+    git_in(&fx.repo, &["commit", "-q", "-am", "turn restarts on"]);
+    let arrived = arrive(&[("ARK_BIN", OsStr::new("/bin/false"))]);
+    let said = text(&arrived);
+    assert!(
+        said.contains("; the device is degraded; cure: epr device supervise"),
+        "{said}"
+    );
+    assert_eq!(fx.status()["running"], false, "{said}");
+    assert_eq!(self::rows(fx).last().unwrap()["outcome"], "failed");
+}
+
+/// Each child's readiness budget is its own: a landed child past its budget fails the wait
+/// even while a sibling on the same channel still has a long one (row 35, F7).
+#[test]
+fn an_overdue_child_fails_the_wait_whatever_time_a_sibling_has() {
+    let lane = lane(None, Some((4_000, 2_000)));
+    let fx = &lane.fx;
+    // A sibling on the same channel that runs and never prints its ready line, with the
+    // default (two-minute) patience.
+    let quiet = fx.base.join("quiet");
+    fs::create_dir_all(quiet.join("genesis/agentic/bin")).unwrap();
+    let berth = quiet.join("genesis/agentic/bin/berth");
+    fs::write(&berth, "#!/bin/sh\nexit 0\n").unwrap();
+    fs::set_permissions(&berth, fs::Permissions::from_mode(0o755)).unwrap();
+    fx.ok(&[
+        "device",
+        "run",
+        "epr",
+        "--name",
+        "quiet",
+        "--ready-line",
+        "never-printed",
+        "--",
+        "lsp",
+        "serve",
+        "--device",
+        "--root",
+        quiet.to_str().unwrap(),
+    ]);
+    assert!(fx.ok(&["device", "supervise"]).contains("reloading"));
+    ready_child(fx, "the resident on X under the new head");
+    let (_, y) = lane.next("y");
+    lane.never_serves(&y);
+    let begun = Instant::now();
+    let followed = lane.follow();
+    let said = text(&followed);
+    assert!(
+        begun.elapsed() < Duration::from_secs(60),
+        "the overdue peer failed the wait at once: {said}"
+    );
+    assert!(said.contains(&format!("{y} not ready after ")), "{said}");
+    let record: Value = serde_json::from_slice(&followed.stdout).unwrap();
+    assert!(
+        record["restart"]["reason"]
+            .as_str()
+            .unwrap()
+            .contains("peer")
+            || record["restart"]["reason"] == "ark exited",
+        "{record}"
     );
 }
 
@@ -2033,7 +2345,7 @@ fn a_custom_data_root_gets_no_automatic_restart() {
     assert!(followed.status.success(), "{said}");
     assert_eq!(fx.current().0, y);
     assert!(said.contains("custom data root"), "{said}");
-    assert!(!said.contains("; restarting ("), "{said}");
+    assert!(!said.contains("restarting the ark"), "{said}");
     assert_eq!(custom_status()["pid"].as_u64().unwrap(), ark1);
     let _ = fx.epr(&["device", "supervise", "--stop", "--data-root", custom_arg]);
 }
@@ -2123,5 +2435,8 @@ fn the_readiness_wait_holds_no_lock() {
     }
     let status = child.wait().unwrap();
     assert!(checked, "the restart never began: {seen}");
-    assert!(!status.success(), "{seen}");
+    assert!(
+        status.success(),
+        "a landing exits as the landing did: {seen}"
+    );
 }

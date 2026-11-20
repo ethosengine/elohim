@@ -1071,14 +1071,24 @@ fn peer_daemon_cure() -> String {
 /// The peer daemon line, with what the newest restart after a landing said (row 35): a ready
 /// restart on a line serving at current, anything else on the line whatever it reads.
 fn peer_daemon_check(root: &Path) -> Check {
+    use super::supervise::RestartNote;
     let mut check = peer_daemon_line();
     match super::supervise::restart_note(root) {
-        Some((true, suffix)) => {
+        Some(RestartNote::Ready(suffix)) => {
             if let Some(rest) = check.detail.strip_prefix("serving at current") {
                 check.detail = format!("serving at current{suffix}{rest}");
             }
         }
-        Some((false, note)) => check.detail.push_str(&note),
+        // A restart that did not come up keeps the line degraded until the supervisor reads
+        // every child ready again (row 35, F1).
+        Some(RestartNote::Degraded { note, cure }) => {
+            check.detail.push_str(&note);
+            if !super::supervise::check(root).0 {
+                check.state = State::Degraded;
+                check.cure = Some(cure);
+            }
+        }
+        Some(RestartNote::Note(note)) => check.detail.push_str(&note),
         None => {}
     }
     check

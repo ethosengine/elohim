@@ -170,7 +170,7 @@ fn execute_with(args: &[String], restart: bool) -> Result<String, Refusal> {
             // Only a forward landing restarts the device; a revert or a lineage rebase never.
             let restarts = restart && transition == Transition::Forward;
             let before = current_cid(&store);
-            let value = json!(store.land_expected(
+            let mut value = json!(store.land_expected(
                 cid,
                 options
                     .get("--commit")
@@ -180,7 +180,10 @@ fn execute_with(args: &[String], restart: bool) -> Result<String, Refusal> {
                 (expected != "none").then_some(expected)
             )?);
             if restarts {
-                restart_after_landing(&store, tool, "land", before, &repo)?;
+                with_restart(
+                    &mut value,
+                    restart_after_landing(&store, tool, "land", before, &repo),
+                );
             }
             value
         }
@@ -276,7 +279,7 @@ fn execute_with(args: &[String], restart: bool) -> Result<String, Refusal> {
                     } else {
                         sibling::Drawn::default()
                     };
-                    let value = match store.follow_declared(&repo, closure, follow) {
+                    let mut value = match store.follow_declared(&repo, closure, follow) {
                         Ok(mut value) => {
                             if let (Some(record), Some(map)) = (drawn.record, value.as_object_mut())
                             {
@@ -287,7 +290,10 @@ fn execute_with(args: &[String], restart: bool) -> Result<String, Refusal> {
                         Err(refusal) => return Err(drawn.explain(refusal)),
                     };
                     if restart {
-                        restart_after_landing(&store, tool, "follow", before, &repo)?;
+                        with_restart(
+                            &mut value,
+                            restart_after_landing(&store, tool, "follow", before, &repo),
+                        );
                     }
                     value
                 }
@@ -335,32 +341,33 @@ fn current_cid(store: &Store) -> Option<String> {
         .and_then(|record| record["cid"].as_str().map(str::to_owned))
 }
 
-/// After a follow or forward land: when it moved current, run the hand command for the person.
-/// A restart that does not come up, or fails after the old ark stopped, fails this verb with
-/// the cure; one that was not attempted (no ark, the switch, the lease) leaves it as it was,
-/// having said why.
+/// After a follow or forward land: when it moved current, run the hand command for the person,
+/// and return what the restart did for the landing's record. A landing's exit status stays the
+/// landing's (row 35, F1): a caller that parses the record keeps the landing, whatever the
+/// daemon did, and a degraded device is said on stderr with its cure, written to the receipt
+/// and read by `epr device status`.
 fn restart_after_landing(
     store: &Store,
     tool: &str,
     trigger: &str,
     before: Option<String>,
     repo: &Path,
-) -> Result<(), Refusal> {
+) -> Option<Value> {
     let after = current_cid(store);
     if after.is_none() || after == before {
-        return Ok(());
+        return None;
     }
     use crate::device::supervise::{after_landed, AfterLanding};
-    match after_landed(repo, trigger, tool) {
-        AfterLanding::Untouched | AfterLanding::Ready => Ok(()),
-        AfterLanding::NotReady(detail) => Err(Refusal {
-            kind: "restart-not-ready".into(),
-            detail,
-        }),
-        AfterLanding::Failed(detail) => Err(Refusal {
-            kind: "restart-failed".into(),
-            detail,
-        }),
+    match after_landed(repo, trigger, tool, after.as_deref()) {
+        AfterLanding::Untouched => None,
+        AfterLanding::Reported(report) => Some(report.json()),
+    }
+}
+
+/// Put the restart's report into a landing's record as `restart`.
+fn with_restart(record: &mut Value, restart: Option<Value>) {
+    if let (Some(map), Some(restart)) = (record.as_object_mut(), restart) {
+        map.insert("restart".into(), restart);
     }
 }
 
