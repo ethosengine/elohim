@@ -1,0 +1,4 @@
+ok peer daemon: serving at current; newest sibling head folded 11s ago (last restart by follow at 2026-11-20T05:54:03Z: bafyreicfbac2w4mfx3lhkkngktihuecid46qeypcrqi7r7krvfeaplem4i not ready after 13 s: not ready: peer)
+ok sibling exchange: did:key:z6MkpZRh…VMZB acknowledges this device's head to seq 78189; its own head (seq 75000) was folded here 11s ago
+ok device supervisor: ark pid 3838751 at head bafyreidzvu6k5uwk4l4vuoqkpguxli77so3hyndrwom6n3pu3jbd6rl3s4, 1 ready
+ok next step: nothing owed; this device is arrived and exchanging

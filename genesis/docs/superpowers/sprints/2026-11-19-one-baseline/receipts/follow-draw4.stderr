@@ -1,0 +1,5 @@
+follow: drawing epr from a sibling first: EPR_FOLLOW_SIBLING=1; aeada11961d9fb0b72acd531604878fb993d8269 is published on refs/remotes/origin/dev
+follow: drew epr release bafyreicfbac2w4mfx3lhkkngktihuecid46qeypcrqi7r7krvfeaplem4i from did:key:z6MkpZRhMwWJpv7HeZyArTUkbnG6DUyukQp18MxUs2fHVMZB in 23.4 s
+device ark: peer runs bafyreida7g4j2jf4aqaxti3vusziqjggvunynzxozmjy64emnpo43vh7hu, current is bafyreicfbac2w4mfx3lhkkngktihuecid46qeypcrqi7r7krvfeaplem4i; restarting the ark (after follow, session b49f7c46-0cab-4b30-8b19-3294dddb61a7): every child restarts with it, as with `epr device supervise`
+device ark: started pid 3838751 at manifest bafyreidzvu6k5uwk4l4vuoqkpguxli77so3hyndrwom6n3pu3jbd6rl3s4 (log /projects/elohim/.eprfs/status/ark/device/ark.log)
+device ark: bafyreicfbac2w4mfx3lhkkngktihuecid46qeypcrqi7r7krvfeaplem4i not ready after 13 s (not ready: peer); the device is degraded; cure: epr device supervise --status
