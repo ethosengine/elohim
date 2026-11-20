@@ -747,3 +747,55 @@ learning it is a storage build input; the fix it found needed none of it.
 | the session-open fix, first push, failed at the end | 3,311, of which eprfs 1,684, memory-ceremony 412 |
 | the same with the pin test cured, eprfs reused | 870, of which memory-ceremony 367, orchestrator-tree 234 |
 | a documentation commit | 84 to 281 |
+
+## 2026-11-20, 05:55Z: both peers restart by themselves
+
+**What landed.** The cut-down restart went through a second outside review (receipt
+`codex-row35amin.receipt.md`), which found six things, two of them my own rulings pulling
+against each other: I had asked for a non-zero exit when the daemon does not come up, and two
+callers read a non-zero land as a failed landing (the native bootstrap worker would then pay
+for another local build; pre-push would print "household head not landed"). Ruled: a landing
+that succeeded exits 0, and the restart's outcome goes into the record, one stderr line with
+the cure, the receipt row and status. With that and six smaller fixes it landed as `fcf1f3137`
+(04:03Z): after a follow or forward land, when the acting session holds the device-ark lease,
+the existing stale-child restart runs, the landed tool's children are waited for on ark's
+clock, and the outcome is reported. The gate recipe and the eprfs pipeline now build the `ark`
+those stories run, and the parity test holds every build step that precedes the tests.
+
+**CI caught the floor an hour later.** `elohim-eprfs/dev` #197 built the ark without trouble
+and failed four of the new stories, each "not ready after 13 s": the wait allowed 12 s for a
+child to be seen, and the pipeline was busy. Fixed as `aeada1196` (05:52Z): 60 s for the first
+spawn while the replacement ark lives, then the child's own patience. The same landing makes a
+hand `epr device supervise` leave a row too.
+
+**The first two.** Each device followed `aeada1196` with the release that carries the restart:
+
+| Device | What it printed by itself | Record and row |
+|---|---|---|
+| shem, 05:54:03Z | `restarting the ark (after follow, session b49f7c46…)`, then `not ready after 13 s (not ready: peer); the device is degraded` | `restart.outcome` not-ready, 13 s; row with trigger follow. About 20 s later the supervisor read the peer ready and status read serving at current |
+| ethosengine, 05:55:48Z | `restarting the ark (after follow, session a222db7c…)`, then `peer ready on bafyreicfbac2w4… in 5 s` | `restart.outcome` ready, 5 s; row with trigger follow; status "serving at current (restarted by follow … in 5 s)" |
+
+So the restart needs no hand on either device. Shem's report was the false "not ready" of the
+12 s floor, on a real device, exactly as CI had shown; the binary that did that follow was the
+one before the fix, and shem now runs the one after it.
+
+**A correction, and a find.** I wrote that ethosengine's peer had been behind its own current
+all night. It had not: the "degraded" line there came from an orphan, a test daemon from a
+`devices-share-one-berth` run of 2026-11-17 whose lease landed in the device's real bin store.
+Ethosengine found it, stopped before touching it, and ended it on one interrupt; the lease read
+dead by itself (row 48). What was true: that device was on the release of 2026-11-18 until it
+adopted by hand tonight, because its hook defers the household head to the next session
+arrival.
+
+**What this does not yet do.** It restarts only when the following session holds the lease or
+no live holder exists. It does not revert or hold a release that fails to start (row 46). A
+follower that meets a restarting holder still falls back to a local build until the second
+landing (the follower's wait and the peer's drain), which is built and waits for its review.
+And the eprfs pipeline is red at its publish stage until the steward rules on row 43.
+
+| Line | State after this entry |
+|---|---|
+| 1, two landings followed with no build | met; and since 05:54Z the daemon step needs no hand when the follower holds the lease |
+| 3, a landing pays less | the eprfs gate on ethosengine: 1,198, 988, 1,246 (with the ark), 1,097 s; on shem 1,903 then 1,684 s |
+| 2, 4, 5 | unchanged |
+| 6, the record | this entry; rows 47 and 48; a second addition to row 35; a habit line |

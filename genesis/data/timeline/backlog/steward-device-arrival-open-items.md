@@ -1137,3 +1137,47 @@ needs lease authority, with berth's "no session" exit a refusal.
 The store-level revert and the hold at promotion and spawn are `elohim/eprfs/device-runtime`
 and `elohim/ark`, so this lands with a deliberate Edge roll. The built first attempt is kept at
 `self/nt-row35-a` (`8f247f683`).
+
+## Row 35, second addition (2026-11-20, 05:55Z)
+
+Landed: `fcf1f3137` (the restart after a landing) and `aeada1196` (a 60 s wait for the first
+spawn; a row for a hand restart). Receipts, each device following `aeada1196` with the release
+that carries the restart: shem at 05:54:03Z restarted by itself and reported `not ready after
+13 s`, the old floor's false report, with the peer ready about 20 s later; ethosengine at
+05:55:48Z restarted by itself and reported `peer ready on … in 5 s`. Both wrote a row with
+trigger follow.
+
+Still open on this row: (a) the restart is by itself only when the follower holds the
+device-ark lease or no live holder exists; a lease the device holds goes with the ark's socket.
+(b) The second landing (a follower waits for an admitted offer whose holder gives no route; a
+stopping peer drains) is built at `self/nt-row35-b` and waits for its review. (c) A restart's
+outcome is in the device's `restarts.jsonl` and in status, not in the native journal: a
+declared measure for seconds-to-ready, with a not-ready as pain, is owed. (d) Ethosengine's
+push hook defers the household head to the next session arrival, so a producing device does
+not adopt what it produces until someone follows. (e) The supervisor binary a device runs is a
+cargo pool slot's `debug/ark`, which pool reclamation can remove or leave stale.
+
+## Row 47 — the eprfs gate builds and runs an ark that its key does not name
+
+Since `fcf1f3137` the eprfs gate builds `ark` from the elohim workspace
+(`cargo build --manifest-path ../Cargo.toml -p elohim-ark --bin ark`) and runs the
+device_supervise stories against it. The gate's input closure names `elohim/ark/core` and
+`elohim/ark/supervisor` and not `elohim/ark/cli` or the elohim workspace's manifest and lock,
+so under `GATE_EVIDENCE=reuse` a green eprfs verdict can be carried across a change to the ark
+those stories ran. Found by ethosengine while building the step. The cure is in the gate
+project's inputs in `elohim/eprfs/build-manifest.json`, which is a gate-governance path: its
+own landing.
+
+## Row 48 — a test left a peer daemon running, and its lease went into the device's real store
+
+Found 2026-11-20 on ethosengine. `epr device status` there had read "degraded peer daemon"
+since 2026-11-17 because of a live orphan: pid 4039220, parent 1, a deleted debug `epr`
+serving `--root /tmp/devices-share-one-berth-…`, with its HOME and config under that fixture.
+Two defects. The a2o scenario `devices-share-one-berth`
+(`genesis/a2o/features/devflow/devices-share-one-berth.feature`; steps in
+`genesis/a2o/steps/devflow/devices-share-one-berth.steps.ts`, its `After` hook at line 106 and
+the process-group kill at line 963) can leave one of its two daemons alive past the run. And
+that daemon's lease was written into the HOST bin store, whose root
+(`/projects/.claude-config/tools/bin-store`) the fixture's HOME and XDG do not move. Ended with
+one interrupt; the lease then read dead by itself. Not fixed: the scenario's teardown, and a
+fixture-scoped bin store root for anything a test starts.
