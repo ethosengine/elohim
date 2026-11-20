@@ -14,9 +14,9 @@ tags: [brit, daily-driver, push, transport, reqwest, landing-exception]
 cites:
   - CLAUDE.md
   - genesis/orchestrator/device-notes-publish.mjs
-  - genesis/docs/superpowers/sprints/2026-11-05-regenesis-1/briefs/cycle-time-harvest-handoff.md
+  - "cycle-time-harvest-handoff | Cycle-time harvest from re-genesis 1 | sha256:38837fef544ae219 | path: genesis/docs/superpowers/sprints/2026-11-05-regenesis-1/briefs/cycle-time-harvest-handoff.md"
   - genesis/docs/superpowers/sprints/2026-11-05-regenesis-1/STATE.md
-  - genesis/docs/superpowers/sprints/task-brit-feedback-producer-report.md
+  - "task-brit-feedback-producer-report-20261111 | task-brit-feedback-producer-report | sha256:a226cd79248a91e0 | path: genesis/docs/superpowers/sprints/task-brit-feedback-producer-report.md"
   - genesis/data/timeline/backlog/ci-app-full-clone-under-degraded-github-egress.md
   - genesis/data/timeline/backlog/brit-sprint-3-handoff-2026-11-19.md
 shift_objective: |

@@ -13,7 +13,7 @@ ci_status: none
 jobs: []
 tags: [brit, epr, reach-gate, governance, evaluator-skew, submodule]
 cites:
-  - genesis/docs/superpowers/specs/2026-10-19-session-covenant-epr-design.md
+  - "session-covenant-epr-design | epr covenant | sha256:7f61efd8c94c45bb | path: genesis/docs/superpowers/specs/2026-10-19-session-covenant-epr-design.md"
 ---
 
 # brit's reach gate refuses every push: an evaluator/repo skew
