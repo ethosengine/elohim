@@ -749,6 +749,68 @@ The fifth reviewer was resumed on this head, and a sixth integrator started its 
 (max-pure, the non-root leg with `memory_replay`, bash journeys, docs consistency, seams) at 00:51Z.
 Push 11 follows only if the reviewer finds no must-fix.
 
+**Sixth review (the same reviewer, resumed 00:50Z, reported by 01:36Z): two must-fix in round 6; it
+is NOT pushed.** Scripts and outputs: `/projects/elohim/.worktrees/brit-s3-keep/review-recovery7/`
+(durable copy).
+- **F1 (must-fix, at the real limit).** A todo with three `edit` entries on a 4 MiB file; at the
+  first stop 8 bytes are overwritten, then `--stage`, `--amend`, `--continue`: the todo is accepted,
+  and the first `--continue` is refused, "the work at this stop has grown past what was reserved …
+  1327246308 bytes for the edit stops still ahead" — false, nothing grew. It reproduces on the
+  DELIVERY build at 1 GiB and completes only at 2 GB. Cause: `edits_ahead` sizes the state image from
+  the in-memory state, which carries the adopted file inline at about twelve times its size (the same
+  mistake the previous round fixed for another figure). So round 6 breaks an ordinary multi-edit
+  rebase that the pushed head completes.
+- **F2 (must-fix).** After a stop is entered, unchanged-size work is still refused at `--continue`:
+  a diff3 resolution exactly the size of the conflict file between limits 6,831,175 and 6,912,343
+  (the stop reservation misses the child's acceptance and the publication by about 1%); and a tiny
+  conflict beside 3,000 other index entries between 99,725,856 and 109,254,662, where the child's
+  records exceed the fixed multiple of the state image the stop reserves, with the false "grown"
+  message.
+- Independently, the verification agent's run of round 6's own pinned margin test failed, as root and
+  as uid 65534: `public_edit_stop_child_records_fit_their_allowance` measured 10.22 state images
+  against the allowance of 10 on a fixture under a longer path. The allowance is path-length
+  sensitive.
+- Should-fix: `--stage --expand-scope` of an 8 MiB file reserves 8,404,992 bytes and writes about
+  twice that; at limits from 13M to 16.9M it fails part-way with the raw scratch-limit text, leaves
+  an 8 MiB payload in the journal, `--status` shows a plain edit stop, a retried `--stage` is refused
+  as growth, `--amend` and `--continue` refuse "worktree mutation outside resolution scope";
+  `--abort` restores HEAD and keeps the file (pre-existing; the same in the pushed head). After a
+  refused `--edit-todo`, `--continue` re-applies the refused todo and refuses again.
+- Held: the earlier reproductions refuse only before the user works; reword, squash, fixup and an
+  edit on a conflicting commit; a rename conflict under diff3; a path conflicting twice (the second
+  stop refused when found, the first resolution really in the retained copy); the over-limit-copy
+  abort and cleanup killed at every retained-copy checkpoint; the lock, pending, abort-kill and
+  prepared regressions. Capability: the smallest completing limit of an ordinary conflict is
+  unchanged under the default style (9,833,434) and 1.28 times larger under diff3 (12,584,655).
+
+**Decision (coordinator, 01:44Z): the lane closes at the reviewed, pushed state; round 6 is set
+aside.** Six rounds in, a model of each record's size keeps leaking at a new shape, and round 6
+introduced a failure at the real limit. The guarantee it was after — nothing refused once the user
+has worked — is worth having, but not by estimating each record: the next attempt should make the
+reservation mechanical (a stop draws on a budget reserved in the meter itself when it is entered,
+and later writes are checked against that budget, not against a recomputed model).
+- `sprint3/integrate` was moved back from `6c7dd8644f` to `6ee2d85a8d` (local, unpushed commits
+  only); round 6 is kept as local branch `sprint3/recovery-r6` at
+  `6c7dd8644fa2284a403f4df7c16cb5c3073f0409` (`93b16885` code, `5c34cc5f` journeys, `6c7dd864` docs).
+- Push 11 (01:44Z): `6507caaaa18c51f7f251fc31187753a16537489a` on `origin
+  run-ci/sprint3-integrate` = the head CI passed on three platforms (`99227182ad`) + `6ee2d85a8d`
+  (two documentation corrections) + `6507caaaa1` (documentation only, with one source comment: the
+  docs said admission promised its steps and that the 5/4 factor covered the diff3 base; they now
+  list the three known cases in which an admitted rebase is refused at a later step, before that
+  step writes, with `--abort` restoring exactly). fmt, `cargo doc -D warnings` and `cargo check` for
+  gitoxide-core and brit-cli passed on it here; no behaviour changes. CI run on it in progress when
+  written.
+- What the pushed lane is, as reviewed: recovery cannot strand under a kill; `--abort` and cleanup
+  are never refused by the limit, including with a retained copy larger than it; the journal stays
+  metered and reserved; `memory_replay` passes untouched at the real limit; green on Linux, macOS
+  and Windows. Its known limits are the three cases now in `docs/rebase.md`, plus the torn-record
+  states listed there.
+- Follow-ups, in order of value: (1) leave out of the authoring child's walk the objects the
+  journal's closure already holds, so an edit-and-amend stops costing the whole tree; (2) the
+  mechanical reservation above, with the two reviews' reproductions as its acceptance tests; (3) fix
+  `--stage --expand-scope`'s reservation and say so in `--status` after a part-way failure; (4)
+  publish every single-pass record whole.
+
 
 **Queued follow-up round, not started.** Publish `metadata-lock-N.json`, `retention-N.json` and the
 other single-pass records whole (spool, rename, sync), or treat an unparseable record as not written;
