@@ -2414,10 +2414,10 @@ habits:
       - "node --test genesis/orchestrator/fleet-roll-guard.test.mjs (a pushed dev or main ref for which CI's own graph would select an Edge build and its deploy step is red unless a pushed commit carries the declaration; each ref read from its own range; tags read on the tip as CI reads them; an undecidable range or a failed evaluator is red on a protected ref; the incident witnesses on real manifests)"
       - "node genesis/orchestrator/gate-live.mjs harvest --last 20 (live read of this device's run logs; green needs the slices it names to shrink across pushes)"
     evidence: >
-      DELTA 2026-11-19f (still RED): `eprfs-ci-parity.test.mjs` (named half) reads the `bins` step out of the root justfile's `_gate-eprfs` recipe and refuses an eprfs pipeline whose tests stage does not run that build before `cargo nextest`. Why: the device recipe got the step on 2026-11-17 with `bin_build_view`, the pipeline did not, and `elohim-eprfs/dev` failed on that one test in each build from #168 to #190 (bar #173, a failed clone) while the device gates were green. Receipts: the test fails on the unfixed Jenkinsfile and passes on f27e22e69; CI #191 on f27e22e69, `2634 tests run: 2634 passed (1 slow), 1 skipped`. Not covered: the other gate projects' recipes against their pipelines, and what only CI's publish stage compares (backlog rows 41 and 43).
-    evidence-fingerprint: sha256:24e5e552d1cf8fd3
-    evidence-bytes: 10783
-    evidence-entries: 11
+      DELTA 2026-11-20 (still RED; a seconds-class red surfaced 55 minutes into a push): shem's push of 7213bb589 failed after 3,311 s on one test of the tree half, `generator-0.8.11 source is not in /opt/rust/cargo …`: c-baseline-pin held each reviewed exception against the crate's build.rs in the device's cargo registry, and generator is locked only through loom (cfg(loom)), so shem never downloaded it. Cured at d6e9c69aa: each exception is held against the lock's checksum on every device and against build.rs where the source is present (34 tests pass on shem, 0 skipped); the second push cleared in 870 s with the eprfs verdict reused. Not yet moved left: nothing at preflight says a test of the tree half reads device state this device does not hold (backlog rows 40 and 45).
+    evidence-fingerprint: sha256:fa9965824997bd74
+    evidence-bytes: 11566
+    evidence-entries: 12
     guard: >-
       Never let a recorded red reach `exit 0`: every early pass goes through pass_or_refuse. Never move a
       check into the preflight that is not seconds-cheap on a warm tree, and never make a WARN refuse.

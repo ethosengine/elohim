@@ -1073,3 +1073,67 @@ The cure is the steward's, because of what it pulls with it:
 
 Until he rules, `elohim-eprfs/dev` is red at its publish stage and the orchestrator's dev job
 with it. The tests stage is green.
+
+## Row 35, addition (2026-11-20)
+
+Tonight's three restarts on shem were each one `epr device supervise` typed by hand (6 s, 9 s
+and 7 s for the command; serving 29 s to 43 s after it began). The automatic form is in work on
+ethosengine in two landings. A-min (`self/nt-row35-a2`, in progress): after a successful follow
+or forward land, when the acting session holds the device-ark lease, run the existing
+stale-child restart, wait on ark's clock for the landed tool's own children, and report ready
+or degraded with the cure; any error after the old ark stopped is a non-zero exit; one switch,
+`device_restart.on_landing`. B (`self/nt-row35-b`): a follower retries an admitted offer whose
+holder gives no route, up to `device_restart.draw_patience_seconds`, before it falls back to a
+local build, and a stopping peer drains its streams for up to 15 s. The limit that stays: the
+restart is by itself only when the follower holds the lease or no live holder exists. A lease
+the device holds, not a session, goes with the ark's socket.
+
+## Row 44 — a first `epr session open` waited five seconds on its own guard
+
+Found 2026-11-20 through the eprfs gate's slowest test binary (`session_envelope`, 433 s of
+1,198 s). `session open` held the exclusive sessions guard and, through `recall::initialize`,
+`actor::current_claim` and `covenant_scope`, asked for a shared guard on the same file in the
+same process; it waited the lock's five seconds, timed out, and the error was swallowed as an
+unknown reader. Real sessions paid it at each first open and had it charged to their recall
+budget. Fixed in epr-cli alone, `7213bb589`: `open` hands recall the key it already holds.
+Fixture 457.5 s to 230.7 s; the eprfs gate on shem 1,903 s to 1,684 s.
+
+Still open: (a) `reader_from_session` still turns any error into an unknown reader, so the next
+failure there will be as quiet as this one was; (b) under a loaded host the fixture's own
+`epr bin ingest` setup step can pass its 45 s subprocess timeout (four cases in one run, green
+on rerun); (c) the fixture is still 231 s of serial cases and the largest single cost in the
+gate; (d) `memory-ceremony` is 367 to 412 s on each epr-cli landing and is not enrolled for
+reuse.
+
+## Row 45 — a test demanded a crate source that a device never downloads
+
+Found 2026-11-20 on shem, 55 minutes into a push. `c-baseline-pin.test.mjs` held each reviewed
+exception against the crate's `build.rs` in the device's cargo registry and failed when the
+source was absent. `generator-0.8.11` is in the eprfs lock only through `loom`, under
+`cfg(loom)`; 43 of the lock's 611 crates.io packages have no source on shem. Ethosengine had it
+by accident, so the test passed where it was written. Row 40's class with the devices swapped,
+approved by the same reviewer a day later.
+
+Fixed, `d6e9c69aa`: each exception carries the reviewed lock checksum and is held against the
+lock on every device, against `build.rs` where the source is present; an absent source still
+fails for a crate a build here must have downloaded. Still open: `builtHere` is written by
+hand; the check that every such crate is absent from the closure the producer's roster computes
+is owed. And row 40's open item now has two instances.
+
+## Row 46 — an unattended restart cannot yet revert or hold a release
+
+The first build of row 35 reverted one step and held the release when the new bytes did not
+become ready. Its outside review (2026-11-20, `codex-row35a.receipt.md` on
+`self/nt-review-receipts`) is this row's specification. Seven findings: readiness must be
+judged for the landed tool's own children on ark's clock; every failure after the old ark stops
+must be recovered or reported, never a successful landing with no peer; a rollback must
+establish that it can restore before it stops anything, survive being killed between steps, and
+work for a gitlink tool; a hold must be enforced where a release is promoted and where a child
+is spawned, on every arm (follow, arrival, bootstrap, cold supervise, manifest reload); the
+settlement must be bound to the store transition that caused it and serialised against a racing
+follow; the device root and the policy checkout must be bound to the running ark; and a restart
+needs lease authority, with berth's "no session" exit a refusal.
+
+The store-level revert and the hold at promotion and spawn are `elohim/eprfs/device-runtime`
+and `elohim/ark`, so this lands with a deliberate Edge roll. The built first attempt is kept at
+`self/nt-row35-a` (`8f247f683`).

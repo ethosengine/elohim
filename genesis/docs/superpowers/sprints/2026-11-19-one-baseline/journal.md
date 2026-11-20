@@ -689,3 +689,61 @@ agent on shem (branch `claude/nt-session-open-wait`); nothing is landed from it 
 | 4, the suite keys on what it reads | met on both devices |
 | 5, no collision, no accidental Edge dispatch | in force |
 | 6, the record | this entry; rows 40 to 43; habit lines |
+
+## 2026-11-20, 02:10Z: five seconds in every first session open; a push that failed for the other device's accident; the restart cut down
+
+**The slow test was the product.** Traced at the lock itself: `session open` holds the exclusive
+sessions guard and calls `recall::initialize`, which resolves who is reading through
+`actor::current_claim`, whose `covenant_scope` asks for a shared guard on the same file. It
+waits five seconds, times out, and `reader_from_session` swallows the error as an unknown
+reader. Forty-five such waits across the fixture, each one this chain. On a real device each
+first open, and each lazy open that repairs a missing continuation, paid five seconds of wall
+and had them charged to the session's recall budget; the reader was read as unknown for the
+wrong reason. The fix (`7213bb589`, six files, all in epr-cli) hands recall the generation key
+`open` has already resolved. I checked it is the key the locked lookup returns for the same
+record; the guard and its timeouts are unchanged. A new test read 5.02 s on the unfixed sources
+and passes now. The fixture went from 457.5 s to 230.7 s, and the eprfs gate on shem from
+1,903 s to 1,684 s.
+
+**A push that failed after 55 minutes, for row 40 turned round.** The first push of that fix
+went red on one test of the tree half that has nothing to do with it:
+`generator-0.8.11 source is not in /opt/rust/cargo …`. The pin test that L2a added holds each
+reviewed exception against the crate's `build.rs` in the device's cargo registry, and fails
+when the source is absent. `generator` is in the lock only through `loom`, under `cfg(loom)`,
+which no build compiles: 43 of the lock's 611 crates.io packages have no source on shem.
+Ethosengine has that one by accident. I had approved "fails when absent" without asking for
+shem's run, the day after writing row 40. The cure (`d6e9c69aa`): a reviewed exception is a
+statement about one crate's bytes, and the lock's checksum names those bytes on every device,
+so each exception is held against the lock everywhere and against `build.rs` where the source
+is present. The second push cleared in 870 s with the eprfs verdict reused. Rows 44 and 45.
+
+**The restart, reviewed and cut.** Ethosengine designed and built row 35 to my rulings: a
+landing restarts the supervised peer, waits for readiness, and on a failed start reverts one
+step and holds the release. The outside review (receipt `codex-row35a.receipt.md`) found seven
+ways that goes wrong unattended, none of them contrived: an unrelated process gets a healthy
+release reverted; a failure between stopping the old ark and the readiness wait is reported as
+a successful landing with no peer running; the rollback stops supervision before it knows it
+can restore; a held release is re-landed by arrival, bootstrap or a cold supervise; two follows
+can revert more than one step; a pointer file can select another device root; an unresolved
+session can stop another session's ark. The fault was in my ruling: a hold is only a hold where
+a release is promoted and where a child is spawned, and that is device-runtime and ark, which
+need an Edge roll. So the landing is cut to the command typed three times tonight, made
+automatic: restart when the acting session holds the lease, wait on ark's clock for the landed
+tool's own children, report ready or degraded with the cure, exit non-zero on any error after
+the old ark stopped. No revert, no hold. Revert-and-hold is row 46, with the seven findings as
+its specification. A second landing gives a follower patience with a holder that is restarting
+and gives the peer a drain; a ruling of mine there was also wrong on the facts (the relay
+carries no artifact bytes this sprint, so waiting on a relay-only holder only delays a build)
+and is reversed.
+
+**Two slips of mine in this stretch.** I told ethosengine a landing's head from a read made
+seconds before the send completed, and corrected it within a minute: the head is read back
+after the push returns. And I briefed an agent that device-runtime was in bounds before
+learning it is a storage build input; the fix it found needed none of it.
+
+| What a landing paid on shem tonight | Seconds |
+|---|---|
+| a pipeline-file line (`f27e22e69`) | 2,756, of which eprfs 1,903 |
+| the session-open fix, first push, failed at the end | 3,311, of which eprfs 1,684, memory-ceremony 412 |
+| the same with the pin test cured, eprfs reused | 870, of which memory-ceremony 367, orchestrator-tree 234 |
+| a documentation commit | 84 to 281 |
