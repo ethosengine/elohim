@@ -702,7 +702,7 @@ adds beyond that can be refused, and that refusal says where the work is kept.
   in the retained copy.
 Phase 2 (implementation) starts when the final-verification agent releases the integration worktree.
 
-**CI run 10 (44635383858) on `99227182ad`, finished 23:57Z:** 30 jobs succeeded — every Linux, macOS
+**CI run 10 (44635383858) on `99227182ad`, last job finished 23:56Z:** 30 jobs succeeded — every Linux, macOS
 and Windows test job, `test-fast (macos-latest)` among them, `test-journey` (memory step included) and
 `test` — `Tests pass` succeeded; the only failure is `cargo-deny-advisories`, as on main. So the
 recovery lane compiles and passes on all three platforms. That head still carries the two findings.
@@ -816,8 +816,10 @@ and later writes are checked against that budget, not against a recomputed model
 other single-pass records whole (spool, rename, sync), or treat an unparseable record as not written;
 make `--status` say a record is unreadable instead of naming a cure that refuses; give the
 interrupted-abort-plus-foreign-index-write state a named cure; decide what a torn cleanup receipt from
-an older brit may be allowed to do. It comes after round 5 and needs its own independent review
-before it merges.
+an older brit may be allowed to do. It is item (4) of the follow-ups above and needs its own
+independent review before it merges.
 
-Rebase stays a declared git fallback for the monorepo and for brit: the preflight refuses repositories
-over roughly 182,000 objects, and the redesign above is not started.
+Rebase stays a declared git fallback for the monorepo and for brit: as pushed, the preflight refuses a
+history over 1 GiB decompressed, or about 390,000 objects for a one-commit replay (the figure of
+roughly 182,000 objects earlier in this entry belongs to the round-2 preflight, which also charged
+for the retained copy), and the redesign above is not started.
