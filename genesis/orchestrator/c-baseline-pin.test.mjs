@@ -567,8 +567,15 @@ const fnBody = (source, name) => source.match(new RegExp(`\\nfn ${name}\\([\\s\\
  * when the source still says what the reason says. `read(relative)` reads the crate's file;
  * `lockedCrate(name)` the source dir of another locked crate (iana-time-zone).
  */
+// `checksum` is the sha256 of the reviewed crate's .crate file as elohim/eprfs/Cargo.lock records it: the
+// bytes the reviews read (2026-11-19). A lock that moves to other bytes fails here until the exception
+// is reviewed again. `builtHere` is whether a build on a device must have downloaded the crate's source:
+// true means its absence from the registry is a failure; false means it is not compiled on a device
+// (cfg-gated away), so the lock's checksum alone holds it there and the source, when present, is read.
 export const EXCEPTION_HOLDS = {
   blake3: {
+    checksum: '0aa83c34e62843d924f905e0f5c866eb1dd6545fc4d719e803d9ba6030371fce',
+    builtHere: true, // the real build compiles its unix assembly (compile commands recorded above in this file)
     kind: 'DispatchedAssembly',
     holds: ({ read, exception }) => {
       const build = read('build.rs');
@@ -605,6 +612,8 @@ export const EXCEPTION_HOLDS = {
     },
   },
   stacker: {
+    checksum: '707f49d46706bacf8a2b00d51dace3f9de527c13eec3778f570c411f89e69967',
+    builtHere: true, // in the real build, its build.rs runs and cc compiles nothing (cc-built crate in the epr closure)
     kind: 'CompilesNothing',
     holds: ({ read }) => {
       const build = read('build.rs');
@@ -615,6 +624,8 @@ export const EXCEPTION_HOLDS = {
     },
   },
   generator: {
+    checksum: '1be81b31c9ce4caf7f3178eeb90662bb1864d3ad363ec6bdada3201adff19c37',
+    builtHere: false, // reached only through loom, under cfg(loom)
     kind: 'CompilesNothing',
     holds: ({ read }) => {
       const build = read('build.rs');
@@ -626,6 +637,8 @@ export const EXCEPTION_HOLDS = {
     },
   },
   'iana-time-zone-haiku': {
+    checksum: 'f31827a206f56af32e590ba56d5d2d085f558508192593743f16b2306495269f',
+    builtHere: false, // target_os = "haiku" only
     kind: 'CompilesNothing',
     holds: ({ lockedCrate }) => {
       const dir = lockedCrate('iana-time-zone');
@@ -636,6 +649,51 @@ export const EXCEPTION_HOLDS = {
     },
   },
 };
+
+/** The `checksum` a Cargo.lock records for name@version, or null. */
+export function lockChecksum(lock, name, version) {
+  for (const block of lock.split(/^\[\[package\]\]\s*$/m).slice(1)) {
+    if (block.match(/^name\s*=\s*"([^"]+)"/m)?.[1] === name && block.match(/^version\s*=\s*"([^"]+)"/m)?.[1] === version) {
+      return block.match(/^checksum\s*=\s*"([^"]+)"/m)?.[1] ?? null;
+    }
+  }
+  return null;
+}
+
+/**
+ * One exception held against the lock first, on every device, then against the crate's source where
+ * the device has it. `findSource(name, version)` gives a source dir or null. Problems, empty when held.
+ */
+export function exceptionProblems({ exception, holder, lock, findSource }) {
+  const name = exception.package;
+  const versions = lockedVersions(lock, name);
+  if (!versions.length) return [`elohim/eprfs/Cargo.lock locks no ${name}`];
+  if (!versions.includes(exception.version)) {
+    return [`the ${name} exception reviews ${exception.version}, and elohim/eprfs/Cargo.lock locks ${versions.join(', ')}`];
+  }
+  const locked = lockChecksum(lock, name, exception.version);
+  if (locked !== holder.checksum) {
+    return [`the ${name}-${exception.version} exception reviewed checksum ${holder.checksum}, and elohim/eprfs/Cargo.lock locks ${locked}; review the exception again`];
+  }
+  const dir = findSource(name, exception.version);
+  if (!dir) {
+    return holder.builtHere
+      ? [`${name}-${exception.version} source is not in the cargo registry, though a build on this device compiles ${name}, so the exception cannot be held against it`]
+      : [];
+  }
+  const lockedCrate = other => {
+    const [version] = lockedVersions(lock, other);
+    if (!version) throw new Error(`elohim/eprfs/Cargo.lock locks no ${other}`);
+    const found = findSource(other, version);
+    if (!found) throw new Error(`${other}-${version} source is not in the cargo registry, so the ${name} exception cannot be held against it`);
+    return found;
+  };
+  try {
+    return holder.holds({ read: rel => readFileSync(join(dir, rel), 'utf8'), lockedCrate, exception });
+  } catch (e) {
+    return [e.message];
+  }
+}
 
 /** The lock's packages, each with its dependency edges as the lock writes them. */
 export function lockPackages(lock) {
@@ -848,36 +906,36 @@ test('every crate cc builds in epr\'s or bin-launch\'s lock closure is judged or
   assert.deepEqual(ccAccountProblems(built, CC_BUILT_IN_EPR, read('elohim/eprfs/epr-cli/src/exercise.rs'), rustExceptionList()), []);
 });
 
-// Ruling 1(d): each exception's reason is held against the locked crate's own source in the cargo
-// registry, not by its name alone. A named test may not skip (the orchestrator-tree half reds an
-// undeclared skip), so a source absent from the registry fails, naming the crate and version.
+// Ruling 1(d): each exception is held against the lock's checksum on every device, and its reason
+// against the locked crate's own source where the device has it. A source absent for a crate a device
+// builds fails; for one it never compiles (builtHere: false) the lock's checksum alone holds it. A
+// named test may not skip (the orchestrator-tree half reds an undeclared skip).
 for (const exception of existsSync(resolve(ROOT, EVIDENCE_RS)) ? rustExceptionList() : []) {
   test(`the ${exception.package} exception holds against its locked build.rs`, () => {
     const holder = EXCEPTION_HOLDS[exception.package];
     assert.ok(holder, `no check holds the ${exception.package} exception`);
-    const lock = read('elohim/eprfs/Cargo.lock');
-    const versions = lockedVersions(lock, exception.package);
-    assert.ok(versions.length > 0, `elohim/eprfs/Cargo.lock locks no ${exception.package}`);
-    // Re-review ruling 3: the exception names the version it reviewed, and the lock holds it.
-    assert.ok(versions.includes(exception.version),
-      `the ${exception.package} exception reviews ${exception.version}, and elohim/eprfs/Cargo.lock locks ${versions.join(', ')}`);
-    const located = (name, version) => {
-      const dir = crateSource(name, version);
-      assert.ok(dir, `${name}-${version} source is not in ${cargoHomes.join(' or ')}/registry/src, so the ${exception.package} exception cannot be held against it`);
-      return dir;
-    };
-    const lockedCrate = name => {
-      const [version] = lockedVersions(lock, name);
-      assert.ok(version, `elohim/eprfs/Cargo.lock locks no ${name}`);
-      return located(name, version);
-    };
-    for (const version of [exception.version]) {
-      const dir = located(exception.package, version);
-      const problems = holder.holds({ read: rel => readFileSync(join(dir, rel), 'utf8'), lockedCrate, exception });
-      assert.deepEqual(problems, [], `${exception.package}-${version}: ${exception.reason}`);
-    }
+    const problems = exceptionProblems({ exception, holder, lock: read('elohim/eprfs/Cargo.lock'), findSource: crateSource });
+    assert.deepEqual(problems, [], `${exception.package}-${exception.version}: ${exception.reason}`);
   });
 }
+
+test('fixture: a lock checksum that differs from the reviewed one fails naming both', () => {
+  const lock = '[[package]]\nname = "generator"\nversion = "0.8.11"\nchecksum = "ffff"\n';
+  const problems = exceptionProblems({ exception: { package: 'generator', version: '0.8.11' }, holder: EXCEPTION_HOLDS.generator, lock, findSource: () => null });
+  assert.equal(problems.length, 1);
+  assert.ok(problems[0].includes(EXCEPTION_HOLDS.generator.checksum) && problems[0].includes('ffff'), problems[0]);
+});
+
+test('fixture: an absent source passes for builtHere false and fails for builtHere true', () => {
+  const lockFor = (name, version, checksum) => `[[package]]\nname = "${name}"\nversion = "${version}"\nchecksum = "${checksum}"\n`;
+  const exception = { package: 'generator', version: '0.8.11' };
+  const lock = lockFor('generator', '0.8.11', EXCEPTION_HOLDS.generator.checksum);
+  const absent = () => null;
+  assert.deepEqual(exceptionProblems({ exception, holder: { ...EXCEPTION_HOLDS.generator, builtHere: false }, lock, findSource: absent }), []);
+  const built = exceptionProblems({ exception, holder: { ...EXCEPTION_HOLDS.generator, builtHere: true }, lock, findSource: absent });
+  assert.equal(built.length, 1);
+  assert.ok(built[0].includes('generator-0.8.11 source is not in the cargo registry'), built[0]);
+});
 
 test('fixture: an exception check names a build.rs that no longer says what its reason says', () => {
   const stacker = EXCEPTION_HOLDS.stacker.holds;
