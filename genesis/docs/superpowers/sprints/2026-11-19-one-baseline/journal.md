@@ -642,3 +642,50 @@ model written in the module doc. The ruling is the steward's to overrule.
 |---|---|
 | 1, two landings followed with no build | one followed: a 22.8 s draw, and the daemon on the drawn bytes by one command. The second is ethosengine's next epr-cli landing |
 | 2 to 6 | unchanged |
+
+## 2026-11-20, 00:14Z: the second marked draw; the first line is met
+
+**Two landings, two draws.** Ethosengine landed the hardening of the producer's check as
+`b077336ca` (a push of 1,262 s; the eprfs gate 988 s, down from 1,198 s). Its producer printed
+`[gate] epr producer put: release bafyreide6r7pbgpf5y6e7llt6kakrfpwyj2wdrck56muhfnf7g4ltmlvv4 at b077336ca85a … (crosses)`,
+both Produce records marked `env:isa-c=x86-64`. On shem, from a clean checkout at that commit,
+running the release drawn an hour earlier:
+
+`follow: drew epr release bafyreide6r7…lvv4 from did:key:z6MkpZRh…VMZB in 19.0 s`
+
+The follow exited 0 in 30 s and compiled nothing. One `epr device supervise` restarted the peer
+onto the drawn bytes: the command took 9 s, and the device read "serving at current" 33 s after
+it began.
+
+| Landing from ethosengine | Draw on shem | Whole follow | Compiled on shem | Daemon on the drawn bytes |
+|---|---|---|---|---|
+| `b950d74b1` (23:16Z) | 22.8 s | 32 s | nothing | one command, 6 s; serving after 29 s |
+| `b077336ca` (00:13Z) | 19.0 s | 30 s | nothing | one command, 9 s; serving after 33 s |
+| for comparison, `71069b1f5` this morning, unmarked | refused before a fetch | 1,924 s | epr and bin-launch | by hand, about 30 s |
+
+The line as written is met: two consecutive landings from ethosengine followed on shem with
+`EPR_FOLLOW_SIBLING=1` and no local build, the daemon restarted on the drawn bytes. Two things
+it does not say and should: shem landed a documentation commit between the two, which produces
+no release and was not followed; and the restart is still a command someone types (row 35).
+The hardening itself was read on shem against the five-item list and found whole; no outside
+review, by the ruling of the entry before this one.
+
+**Where a third of the eprfs gate goes.** Ethosengine timed the phases of its 1,198 s gate:
+lint 100 s, test build 213 s, test run 798.5 s, and of that one test binary,
+`session_envelope`, 432.7 s. That binary runs a Python fixture of 30 cases against the debug
+`epr`. Timed alone on shem it took 461 s, no case dominant. Traced, each case's `epr session
+open` takes 5.13 s of wall and 0.07 s of CPU, polling every 50 ms: the five-second lock wait in
+device-runtime, reached while the same process already holds the sessions guard. The timeout is
+swallowed and the open succeeds. So the slow test is a defect of the product seen through a
+test: a first `session open` very likely stalls five seconds on a real device too, and whatever
+asked for the lock fails silently each time. The exact call and a fix, test first, are with an
+agent on shem (branch `claude/nt-session-open-wait`); nothing is landed from it yet.
+
+| Line | State after this entry |
+|---|---|
+| 1, two landings followed with no build | met, as the table above reads; the restart is by hand |
+| 2, an unmarked release refused before a fetch | met |
+| 3, a landing pays less | measured both ways: 1,924 s to 30 s for the follower; the eprfs gate still 988 to 1,903 s for whoever lands, a third of it one stalled command |
+| 4, the suite keys on what it reads | met on both devices |
+| 5, no collision, no accidental Edge dispatch | in force |
+| 6, the record | this entry; rows 40 to 43; habit lines |
