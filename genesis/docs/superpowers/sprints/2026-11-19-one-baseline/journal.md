@@ -848,3 +848,29 @@ overrule: the fleet-roll check refuses; `device_restart.on_landing` is `restart`
 half's review was closed by ruling. The compute grant that ends 2026-11-23T16:00Z (row 36).
 The memory cleanup loop, whose line has read failed all night and needs his word to run. And
 this session's unrecorded covenant.
+
+## 2026-11-20, 13:43Z: ethosengine closes
+
+Ethosengine answered at 13:43Z and stopped, as recommended. Its watch on the inbox had lapsed,
+so it read the 10:00Z verdict three and a half hours late; another session on that device
+pointed it at the notes. The second landing of row 35 stays at `self/nt-row35-b2`
+(`9ada5b173`) with its receipt as the specification, and no session now owns it.
+
+What a next session on ethosengine must know, in its words and checked against nothing here:
+
+| Fact | State |
+|---|---|
+| Current release | `bafyreicfbac2w4…` (`aeada1196`), adopted by the automatic restart at 05:55:48Z; peer serving at current; one row in its `restarts.jsonl` |
+| Its closing session's pin | the release before the restart landed; a fresh session starts on current |
+| The supervisor binary | the pool slot's `debug/ark`, rebuilt 2026-11-20 02:24; the row-35 stories fail, naming the cure, when it goes stale |
+| Dead leases | about 247 `daemon-*.json` files left in the host bin store by test daemons; they read dead (row 48) |
+| The household head | still deferred to the next session arrival on every landing from that device |
+| Local only, on that device | `.worktrees/nt-e12` at `d1c680c43` with the night's logs; branch `claude/nt-row35-a` carries `cea0e4388`, a test that was never run, beyond `self/nt-row35-a` |
+
+Unowned since it closed: the second landing of row 35 (G1 to G6); row 31 (gate code that reads
+a git refusal as a value); the hand-over refs `self/nt-l2a*` and `self/nt-row35*` on origin,
+of which the merged ones can be cleared.
+
+One more for the list of what I would do differently: both of us watched the inbox with a
+background loop that ends, and each of us lost hours to a watch that had ended without saying
+so. Row 50.

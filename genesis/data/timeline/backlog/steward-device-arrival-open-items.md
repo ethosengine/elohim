@@ -1207,3 +1207,15 @@ then run its staged exercise on the second's bytes by pathname, before its own p
 comparison. It needs two followers at once and an offer whose bytes differ under one claimed
 release, so it is narrow. The cure is a staging directory per attempt, verified and exercised
 in place.
+
+## Row 50 — a watch on the inbox ends without saying so
+
+2026-11-20. Two sessions on two devices coordinated by berth notes, each reading its inbox
+with a background loop that polls and exits. Ethosengine's loop lapsed and a review verdict
+sat unread from 10:00Z to 13:42Z; earlier in the sprint the steward had to tell each session
+by hand to check its inbox. `berth inbox --follow` marks notes seen as it prints, so a loop
+that pipes it loses notes, and a `--peek` poll has to be re-armed after every exit. Nothing
+tells the sender that the addressee has stopped listening: `berth status` showed the sibling
+STALE on its mooring record while it was still sending. Owed: a note's sender can read whether
+it was seen, and a moored session with unread notes addressed to it hears about them on its
+next tool call the way a gate red does.
