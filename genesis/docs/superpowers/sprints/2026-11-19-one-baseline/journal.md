@@ -874,3 +874,45 @@ of which the merged ones can be cleared.
 One more for the list of what I would do differently: both of us watched the inbox with a
 background loop that ends, and each of us lost hours to a watch that had ended without saying
 so. Row 50.
+
+## 2026-11-20, 15:30Z: both devices cleaned up
+
+The steward asked each device to clean itself and the remote. Shem's part, each removal logged
+with its commit id under `genesis/local-dev/cleanup-2026-11-20/` on shem (not in the tree):
+
+| What | Before | After | How it was decided |
+|---|---|---|---|
+| Main checkout | 265 commits behind dev, 35 modified and 14 untracked files, head a pin commit not on origin | at dev | every uncommitted file saved first to local branch `wip/shem-main-checkout-2026-11-20`, a stash and a patch; then a rebase, which dropped the duplicate pin commit |
+| Monorepo worktrees | 131 | 59 | removed only when the head was on dev, or every file the branch changed had reached dev with the branch's content, and the tree was clean with nothing under `local-dev` or `reports/recovery` |
+| Other directories under `.worktrees` | 201 in all | 90 | the October brit acceptance clone and its twelve worktrees (every head in brit 0.2.6), four submodule worktrees already in their pins, six directories holding one leftover file |
+| Branches on origin | 61 | 24 | shem deleted 29: fifteen whose tip is on dev and fourteen landed by squash, each of those kept on shem as `refs/archive/origin/<name>`; ethosengine deleted eight of its own |
+| Pack indexes | 32, the reduced-trust cap | 5 | `git repack -a -d`; four packs carry keep files; connectivity check clean; status reads "full trust now" |
+| Volume | 196 GB | 163 GB | |
+
+The main checkout matters most. A session started there loads its hooks from it, and the hook
+that hands a peer's note to its addressee was on dev and not in that checkout. On the first
+tool call after the checkout reached dev, the hook delivered two notes from ethosengine. That
+is row 50's correction, observed.
+
+Left alone on shem, on purpose: the submodule checkouts `elohim/brit` (21 uncommitted
+entries), `elohim/rakia` (3) and `elohim/holochain-conductor` (1); an unlanded "execution
+compatibility" piece of 2026-11-08 (ten new files and edits under `elohim/epr`,
+`elohim/placement` and `elohim/ark`), now only on the snapshot branch; 28 worktrees whose
+branches never fully reached dev and 21 that hold local work or receipts; stand-alone clones
+with unpushed commits, the holochain fork among them. On origin, besides `dev`, `main`,
+`staging` and the receipts ref: `self/nt-row35-a`, `self/nt-row35-b2` and `self/nt-audit`
+(unlanded, kept as specifications), three superseded hand-over refs of shem's
+(`self/nt-e11`, `self/nt-e11-prep`, `self/nt-fleet-roll`), and fourteen older branches that
+could not be shown integrated.
+
+Ethosengine's part, in its words: eight of its own refs deleted, 22 sprint worktrees removed,
+38 integrated branches deleted, each checked against dev; kept locally and not on dev,
+`claude/nt-row35-a` with its one never-run test, `claude/nt-audit`, `claude/nt-e11`; its logs
+under `genesis/local-dev/native-throughput-ethosengine/`; peer serving at current.
+
+Not done here: the memory cleanup loop, which needs the steward's word to run as a workflow;
+the repack on ethosengine, which is its own to report.
+
+For the next sprint, also learned today: brit `main` moved to `e65a9158e` (0.2.7, an upstream
+sync landed from the steward's laptop). Sprint 3's twelve lanes are still on
+`run-ci/sprint3-integrate`, 174 commits ahead of and 468 behind that main, merge base 0.2.6.
