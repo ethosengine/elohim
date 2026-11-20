@@ -1219,3 +1219,20 @@ tells the sender that the addressee has stopped listening: `berth status` showed
 STALE on its mooring record while it was still sending. Owed: a note's sender can read whether
 it was seen, and a moored session with unread notes addressed to it hears about them on its
 next tool call the way a gate red does.
+
+## Row 50, correction (2026-11-20, 14:20Z)
+
+Half of row 50 was wrong when I wrote it. The delivery it asks for exists on dev:
+`.claude/hooks/berth-note-inject.py` adds each unread note addressed to the acting session to
+its next tool call, and the root guidance describes it under "Peer notes". It did not run in
+shem's session because a session started in the main checkout loads its hooks from the main
+checkout, and shem's is 265 commits behind dev (head `c64967822`, a pin commit that is not on
+origin, with 35 modified and 14 untracked files) and has no such hook. This is the second time
+in two days that a stale main checkout cost hours (2026-11-19: 134 commits behind; status,
+stations and a projection all read stale). Whether ethosengine's main checkout carries the
+hook was not read.
+
+What is owed, restated: (a) a main checkout that follows dev on each device, or a line at
+session start that says how far behind it is and names the hooks it lacks; (b) still true as
+written: a note's sender cannot see whether it was read, since seen state stays on the
+receiving device.
