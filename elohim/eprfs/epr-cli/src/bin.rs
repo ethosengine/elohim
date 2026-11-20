@@ -1,4 +1,5 @@
 //! Thin command adapter for the device-runtime library.
+use crate::device::supervise::{self, Landing, Settled, Trigger};
 use elohim_device_runtime::{
     bin_store::{self, IngestOptions, PeerServing, Refusal, Registry, Store, Transition},
     manifest_store::ManifestStore,
@@ -50,7 +51,9 @@ fn land_transition(
 }
 /// Parse, call the device library, and render one bin command. Returns a process exit code.
 pub fn run(args: &[String]) -> i32 {
-    match execute(args) {
+    // Stdout is this verb's JSON; a restart after a landing speaks on stderr.
+    crate::device::supervise::say_on_stderr();
+    match execute_with(args, true) {
         Ok(text) => {
             println!("{text}");
             0
@@ -61,7 +64,15 @@ pub fn run(args: &[String]) -> i32 {
         }
     }
 }
+/// Run one bin verb without the restart after a landing: arrival drives its own (see
+/// `device::arrival_work::after_moves`), naming itself as the cause.
 pub(crate) fn execute(args: &[String]) -> Result<String, Refusal> {
+    execute_with(args, false)
+}
+
+/// `restart`: a successful `follow` or forward `land` that moves current asks the device ark to
+/// restart onto it (row 35; see [`restart_after_landing`]).
+fn execute_with(args: &[String], restart: bool) -> Result<String, Refusal> {
     let mut options = BTreeMap::new();
     let mut flags = BTreeSet::new();
     let mut positional = Vec::new();
@@ -156,15 +167,26 @@ pub(crate) fn execute(args: &[String]) -> Result<String, Refusal> {
                 .or_else(|| options.get("--cid"))
                 .ok_or_else(|| argument("land requires cid"))?;
             judge_held(&store, cid)?;
-            json!(store.land_expected(
+            let repo = repo()?;
+            // Only a forward landing restarts the device; a revert or a lineage rebase never.
+            let restarts = restart && transition == Transition::Forward;
+            if restarts {
+                refuse_readiness_held(&repo, cid)?;
+            }
+            let before = Head::read(&store);
+            let value = json!(store.land_expected(
                 cid,
                 options
                     .get("--commit")
                     .ok_or_else(|| argument("land requires --commit"))?,
-                &repo()?,
+                &repo,
                 transition,
                 (expected != "none").then_some(expected)
-            )?)
+            )?);
+            if restarts {
+                restart_after_landing(&store, tool, Trigger::Land, &before, &repo)?;
+            }
+            value
         }
         "pin" => {
             if let Some(cid) = options.get("--cid") {
@@ -251,13 +273,21 @@ pub(crate) fn execute(args: &[String]) -> Result<String, Refusal> {
             {
                 Some(follow) => {
                     let repo = repo()?;
+                    if restart {
+                        if let Some(why) = held_for_follow(&store, &repo, closure) {
+                            eprintln!("{tool} follow: {why}");
+                            return serde_json::to_string(&json!({"followed":false,"why":why}))
+                                .map_err(|e| argument(e.to_string()));
+                        }
+                    }
+                    let before = Head::read(&store);
                     // A closure the caller supplied is the bytes to follow; nothing is drawn.
                     let drawn = if follow.mode.applies() && closure.is_none() {
                         sibling::before_landing(&store, tool, &repo)?
                     } else {
                         sibling::Drawn::default()
                     };
-                    match store.follow_declared(&repo, closure, follow) {
+                    let value = match store.follow_declared(&repo, closure, follow) {
                         Ok(mut value) => {
                             if let (Some(record), Some(map)) = (drawn.record, value.as_object_mut())
                             {
@@ -266,7 +296,11 @@ pub(crate) fn execute(args: &[String]) -> Result<String, Refusal> {
                             value
                         }
                         Err(refusal) => return Err(drawn.explain(refusal)),
+                    };
+                    if restart {
+                        restart_after_landing(&store, tool, Trigger::Follow, &before, &repo)?;
                     }
+                    value
                 }
                 None => {
                     serde_json::json!({"followed":false,"why":"device does not follow this tool"})
@@ -302,6 +336,167 @@ pub(crate) fn execute(args: &[String]) -> Result<String, Refusal> {
         _ => return Err(argument(format!("unknown bin verb {verb}"))),
     };
     serde_json::to_string(&value).map_err(|e| argument(e.to_string()))
+}
+
+/// The committed head the moment before a landing: what one revert step returns to.
+struct Head {
+    cid: Option<String>,
+    commit: Option<String>,
+}
+
+impl Head {
+    fn read(store: &Store) -> Head {
+        let record: Option<Value> = std::fs::read(store.root().join("current.json"))
+            .ok()
+            .and_then(|bytes| serde_json::from_slice(&bytes).ok());
+        let field = |key: &str| {
+            record
+                .as_ref()
+                .and_then(|r| r[key].as_str())
+                .map(str::to_owned)
+        };
+        Head {
+            cid: field("cid"),
+            commit: field("commit"),
+        }
+    }
+}
+
+fn held_refusal(cid: &str, at: &str, what: &str) -> Refusal {
+    Refusal {
+        kind: "release-held".into(),
+        detail: format!(
+            "{cid} is held: it failed readiness on this device at {at}; {what} — cure: epr device \
+             supervise --release {cid}"
+        ),
+    }
+}
+
+/// A forward land of a release this device holds is refused before anything moves.
+fn refuse_readiness_held(repo: &Path, cid: &str) -> Result<(), Refusal> {
+    match supervise::held_at(repo, cid) {
+        Some(at) => Err(held_refusal(cid, &at, "land does not take it again")),
+        None => Ok(()),
+    }
+}
+
+/// Why a follow lands nothing: the release it would take (the closure's, or one built from
+/// HEAD) is held on this device. No automatic act lands a held release again.
+fn held_for_follow(store: &Store, repo: &Path, closure: Option<&Path>) -> Option<String> {
+    if let Some(cid) = closure.and_then(|dir| store.release_cid_of(dir).ok()) {
+        if let Some(at) = supervise::held_at(repo, &cid) {
+            return Some(held_refusal(&cid, &at, "follow does not land it again").detail);
+        }
+    }
+    let head = crate::git::command(repo)
+        .args(["rev-parse", "HEAD"])
+        .output()
+        .ok()
+        .filter(|out| out.status.success())
+        .map(|out| String::from_utf8_lossy(&out.stdout).trim().to_owned())?;
+    let (cid, at) = supervise::held_for_commit(repo, &head)?;
+    Some(
+        held_refusal(
+            &cid,
+            &at,
+            &format!(
+                "it was built from this checkout's HEAD {head}, so follow does not land it again"
+            ),
+        )
+        .detail,
+    )
+}
+
+/// After a follow or forward land: when it moved current, ask the device ark to restart onto the
+/// landed release (row 35). A held outcome refuses the verb, since a held landing is not a
+/// landed one; a supervise that could not run leaves the landing standing and says why.
+fn restart_after_landing(
+    store: &Store,
+    tool: &str,
+    trigger: Trigger,
+    before: &Head,
+    repo: &Path,
+) -> Result<(), Refusal> {
+    let after = Head::read(store);
+    let Some(to) = after.cid.filter(|to| before.cid.as_ref() != Some(to)) else {
+        return Ok(());
+    };
+    let revert = || revert_one_step(store, before, &to, repo);
+    if let Some(at) = supervise::held_at(repo, &to) {
+        // Bytes that came out identical to a held release: undo the landing, restart nothing.
+        let undone = match revert() {
+            Ok(()) => "the landing was reverted one step".to_owned(),
+            Err(error) => format!("reverting the landing refused ({error})"),
+        };
+        return Err(held_refusal(&to, &at, &undone));
+    }
+    let landing = Landing {
+        trigger,
+        tool: Some(tool),
+        from: before.cid.clone(),
+        to: Some(to.clone()),
+        revert: before
+            .cid
+            .is_some()
+            .then_some(&revert as &dyn Fn() -> Result<(), String>),
+    };
+    match supervise::after_landed(repo, &landing) {
+        Ok(settled) if settled.held() => {
+            let state = match settled {
+                Settled::Reverted => format!(
+                    "current is {} again",
+                    before.cid.as_deref().unwrap_or("the previous release")
+                ),
+                Settled::Left => "it is still current".to_owned(),
+                _ => "the device is degraded".to_owned(),
+            };
+            Err(held_refusal(
+                &to,
+                &supervise::held_at(repo, &to).unwrap_or_else(|| "now".into()),
+                &format!("a held landing is not a landed one, and {state}"),
+            ))
+        }
+        Ok(_) => Ok(()),
+        Err(error) => {
+            eprintln!("device ark (the landing of {to} stands): {error}");
+            Ok(())
+        }
+    }
+}
+
+/// Revert this act's own landing ONE step: `to` back to what was current the moment before,
+/// through the store's own revert transition. A revert is made from a checkout at the previous
+/// release's commit, so it runs in a throwaway detached worktree of `repo` there, under the
+/// device data root, removed afterwards. Never a session's pin, never a second step.
+fn revert_one_step(store: &Store, before: &Head, to: &str, repo: &Path) -> Result<(), String> {
+    let (Some(previous), Some(commit)) = (&before.cid, &before.commit) else {
+        return Err("no release was current before this landing".into());
+    };
+    let dir = supervise::device_data_root(repo).join(format!("revert-{}", std::process::id()));
+    let run = |args: &[&str]| {
+        crate::git::command(repo)
+            .args(args)
+            .output()
+            .map_err(|e| e.to_string())
+            .and_then(|out| {
+                if out.status.success() {
+                    Ok(())
+                } else {
+                    Err(String::from_utf8_lossy(&out.stderr).trim().to_owned())
+                }
+            })
+    };
+    let path = dir.to_string_lossy().into_owned();
+    run(&["worktree", "add", "--detach", "--quiet", &path, commit])
+        .map_err(|e| format!("a checkout at {commit} for the revert: {e}"))?;
+    let reverted = store
+        .land_expected(previous, commit, &dir, Transition::Revert, Some(to))
+        .map(|_| ())
+        .map_err(|refusal| refusal.to_string());
+    if let Err(error) = run(&["worktree", "remove", "--force", &path]) {
+        eprintln!("device ark: the revert's checkout {path} was not removed: {error}");
+    }
+    reverted
 }
 
 /// The cure for a sibling's release whose C this device cannot vouch for.

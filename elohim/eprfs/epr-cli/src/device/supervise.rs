@@ -57,6 +57,28 @@ const HANDOVER_WAIT: Duration = Duration::from_secs(20);
 
 type Outcome<T> = Result<T, String>;
 
+mod restart;
+pub(crate) use restart::{Landing, Settled, Trigger};
+
+/// Whether supervise speaks on stderr: a `bin` verb's stdout is its JSON, which a restart's lines
+/// must not precede.
+static SAY_ON_STDERR: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// Route this process's supervise lines to stderr (the `bin` verbs do).
+pub(crate) fn say_on_stderr() {
+    SAY_ON_STDERR.store(true, std::sync::atomic::Ordering::Relaxed);
+}
+
+macro_rules! say {
+    ($($arg:tt)*) => {
+        if SAY_ON_STDERR.load(std::sync::atomic::Ordering::Relaxed) {
+            eprintln!($($arg)*)
+        } else {
+            println!($($arg)*)
+        }
+    };
+}
+
 /// What `supervise` recorded about the ark it started.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -67,6 +89,10 @@ struct Started {
     manifest_cid: String,
     ark: PathBuf,
     started_at_epoch_ms: u64,
+    /// The data root this ark runs, so the device's copy of this record (see [`device_record`])
+    /// finds it from any checkout. Absent in records written before row 35.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    data_root: Option<PathBuf>,
 }
 
 /// One supervised child as the passport reports it.
@@ -105,6 +131,8 @@ struct Options {
     root: Option<PathBuf>,
     data_root: Option<PathBuf>,
     handover: bool,
+    /// A held release a person clears (row 35's cure).
+    release: Option<String>,
 }
 
 pub(super) fn run(args: &[String]) -> Outcome<ExitCode> {
@@ -115,6 +143,7 @@ pub(super) fn run(args: &[String]) -> Outcome<ExitCode> {
         root: None,
         data_root: None,
         handover: false,
+        release: None,
     };
     let mut iter = args.iter();
     while let Some(arg) = iter.next() {
@@ -123,6 +152,13 @@ pub(super) fn run(args: &[String]) -> Outcome<ExitCode> {
             "--stop" => opts.stop = true,
             "--json" => opts.json = true,
             "--handover" => opts.handover = true,
+            "--release" => {
+                opts.release = Some(
+                    iter.next()
+                        .ok_or("--release needs the held release's CID")?
+                        .clone(),
+                );
+            }
             "--root" | "--data-root" => {
                 let value = iter
                     .next()
@@ -144,9 +180,11 @@ pub(super) fn run(args: &[String]) -> Outcome<ExitCode> {
     if opts.status && opts.stop {
         return Err("--status reads and --stop acts; ask for one".into());
     }
-    if opts.handover && (opts.status || opts.stop) {
+    if (opts.handover || opts.release.is_some()) && (opts.status || opts.stop) {
         return Err(
-            "--handover belongs to a supervise that starts ark, not --status or --stop".into(),
+            "--handover and --release belong to a supervise that starts ark, not --status or \
+             --stop"
+                .into(),
         );
     }
     let checkout = here_checkout();
@@ -174,26 +212,76 @@ pub(super) fn run(args: &[String]) -> Outcome<ExitCode> {
         match running(&data_root)? {
             Some(started) => {
                 stop_ark(&data_root, &started)?;
-                println!(
+                say!(
                     "device ark: stopped pid {} (manifest {})",
-                    started.pid, started.manifest_cid
+                    started.pid,
+                    started.manifest_cid
                 );
             }
-            None => println!("device ark: not running"),
+            None => say!("device ark: not running"),
         }
         release_lease(berth.as_deref());
         return Ok(ExitCode::SUCCESS);
     }
-    supervise(&data_root, &head, berth.as_deref(), opts.handover)
+    if let Some(cid) = &opts.release {
+        if restart::release(&data_root, cid)? {
+            say!("device ark: release {cid} is no longer held; a follow or land may take it again");
+        } else {
+            say!("device ark: release {cid} was not held on this device");
+        }
+    }
+    let hand = Landing {
+        trigger: Trigger::Hand,
+        tool: None,
+        from: None,
+        to: None,
+        revert: None,
+    };
+    match supervise(&data_root, &head, berth.as_deref(), opts.handover, None)? {
+        Supervised::Started {
+            started,
+            stale: Some(stale),
+        } => {
+            // A person's restart onto new bytes is waited for and written down like any other;
+            // with no landing of its own to undo, a failed start is held and left.
+            let settled = settle(&data_root, &head, &started, &hand, stale, None)?;
+            Ok(if settled.held() {
+                ExitCode::from(1)
+            } else {
+                ExitCode::SUCCESS
+            })
+        }
+        _ => Ok(ExitCode::SUCCESS),
+    }
 }
 
 pub(super) fn usage() -> &'static str {
-    "usage: epr device supervise [--handover] [--status [--json] | --stop] \
+    "usage: epr device supervise [--handover] [--release <cid>] [--status [--json] | --stop] \
      [--root <device root>] [--data-root <path>]\n  \
      (ark runs this device's declared manifest from <main checkout>/.eprfs/status/ark/device; \
      a moved head or a child running other bytes than its channel's current reloads it by \
      restart; --handover interrupts an `epr peer serve` this ark did not start so the \
-     declared one can take its serve lock)"
+     declared one can take its serve lock; --release clears the hold on a release that failed \
+     readiness here, so a follow or land may take it again)"
+}
+
+/// A child found on other bytes than its channel's current, which supervise restarted.
+#[derive(Clone, Debug)]
+struct StaleChild {
+    child: String,
+    running: String,
+    current: String,
+}
+
+/// What one supervise did to the ark.
+enum Supervised {
+    /// Nothing was stopped or started.
+    Unchanged,
+    /// Ark was started (fresh, reloaded for a moved head, or restarted for `stale`).
+    Started {
+        started: Started,
+        stale: Option<StaleChild>,
+    },
 }
 
 fn supervise(
@@ -201,7 +289,8 @@ fn supervise(
     head: &RuntimeManifest,
     berth: Option<&Path>,
     handover: bool,
-) -> Outcome<ExitCode> {
+    cause: Option<&str>,
+) -> Outcome<Supervised> {
     let head_cid = head.cid().map_err(|e| e.to_string())?;
     let started = running(data_root)?;
     let berth_path = data_root.join("berth.json");
@@ -223,10 +312,10 @@ fn supervise(
     let holder = peer_serve_preflight(head, data_root, started.as_ref(), handover)?;
     // At the head, the manifest alone cannot say a child is current: ark resolves `bin:` at
     // each spawn, so a child started before a landing still runs the bytes it was started on.
-    let mut stale_binary = false;
+    let mut stale_binary = None;
     if let Some(started) = &started {
         if started.manifest_cid == head_cid && holder.is_some() {
-            println!(
+            say!(
                 "device ark: running pid {} at current manifest {head_cid}, but an epr peer \
                  serve it did not start holds the serve lock; handing over, then restarting",
                 started.pid
@@ -234,30 +323,46 @@ fn supervise(
         } else if started.manifest_cid == head_cid {
             match child_identity(data_root, head, started)? {
                 Identity::Current => {
-                    println!(
+                    say!(
                         "device ark: running pid {} at current manifest {head_cid}",
                         started.pid
                     );
-                    return Ok(ExitCode::SUCCESS);
+                    return Ok(Supervised::Unchanged);
                 }
                 Identity::NoLiveChild => {
-                    println!(
+                    say!(
                         "device ark: running pid {} at current manifest {head_cid}; no child is \
                          live yet (starting or in restart backoff), so none is judged stale and \
                          nothing restarts",
                         started.pid
                     );
-                    return Ok(ExitCode::SUCCESS);
+                    return Ok(Supervised::Unchanged);
                 }
                 Identity::Stale {
                     child,
                     running,
                     current,
                 } => {
-                    println!(
-                        "device ark: {child} runs {running}, current is {current}; restarting"
+                    // No restart, by any trigger, lands a child on a release that failed
+                    // readiness here: only a different release or `--release` clears it.
+                    if let Some(hold) = restart::held(data_root, &current) {
+                        say!(
+                            "device ark: {child} runs {running}, current is {current}, but \
+                             {current} is held (failed readiness at {}); not restarting onto \
+                             it — cure: epr device supervise --release {current}",
+                            hold.at
+                        );
+                        return Ok(Supervised::Unchanged);
+                    }
+                    say!(
+                        "device ark: {child} runs {running}, current is {current}; restarting{}",
+                        cause.map(|c| format!(" ({c})")).unwrap_or_default()
                     );
-                    stale_binary = true;
+                    stale_binary = Some(StaleChild {
+                        child,
+                        running,
+                        current,
+                    });
                 }
             }
         }
@@ -266,17 +371,17 @@ fn supervise(
         if let Some(started) = &started {
             stop_ark(data_root, started)?;
             release_lease(berth);
-            println!(
+            say!(
                 "device ark: the head {head_cid} declares no process; stopped pid {}",
                 started.pid
             );
         } else {
-            println!(
+            say!(
                 "device ark: the head {head_cid} declares no process; nothing to supervise \
                  (declare one with `epr device run <tool>`)"
             );
         }
-        return Ok(ExitCode::SUCCESS);
+        return Ok(Supervised::Unchanged);
     }
     preflight(head)?;
     let (ark, ark_source) = ark_bin(data_root)?;
@@ -296,15 +401,16 @@ fn supervise(
             None => error,
         };
         if let Some(started) = &started {
-            if stale_binary {
-                println!(
+            if stale_binary.is_some() {
+                say!(
                     "device ark: stopping pid {} (manifest {head_cid}) to start current bytes",
                     started.pid
                 );
             } else {
-                println!(
+                say!(
                     "device ark: reloading — stopping pid {} (manifest {}) for head {head_cid}",
-                    started.pid, started.manifest_cid
+                    started.pid,
+                    started.manifest_cid
                 );
             }
             stop_ark(data_root, started).map_err(interrupted)?;
@@ -313,13 +419,16 @@ fn supervise(
     })();
     match result {
         Ok(started) => {
-            println!(
+            say!(
                 "device ark: started pid {} at manifest {head_cid} (log {}; ark {}, {ark_source})",
                 started.pid,
                 data_root.join("ark.log").display(),
                 ark.display()
             );
-            Ok(ExitCode::SUCCESS)
+            Ok(Supervised::Started {
+                started,
+                stale: stale_binary,
+            })
         }
         Err(error) => {
             if leased {
@@ -606,7 +715,7 @@ fn peer_serve_preflight(
 fn hand_over(holder: &Holder) -> Outcome<()> {
     if is_same_process(holder.pid, holder.start_ticks) {
         let pid = libc::pid_t::try_from(holder.pid).map_err(|e| e.to_string())?;
-        println!(
+        say!(
             "device ark: handing over — SIGINT to epr peer serve pid {}",
             holder.pid
         );
@@ -741,18 +850,317 @@ fn proc_uid(pid: u32) -> Option<u32> {
 /// process, supervise once so a child still on the old bytes restarts onto the new ones. An
 /// ark nobody started stays unstarted; arrival never begins supervision on its own.
 pub(crate) fn after_landing(checkout: &Path) -> Outcome<()> {
-    let data_root = default_data_root(checkout);
+    after_landed(
+        checkout,
+        &Landing {
+            trigger: Trigger::Arrival,
+            tool: None,
+            from: None,
+            to: None,
+            revert: None,
+        },
+    )
+    .map(|_| ())
+}
+
+/// After an act moved a tool's current (row 35): when `device_restart.on_landing` allows, this
+/// device's ark runs and the head declares a process on that tool's channel, restart the child
+/// that runs other bytes onto the landed release and settle it (see [`settle`]).
+///
+/// The data root is the running ark's own (its record beside the device key names it), never
+/// the caller's checkout: a follow may run from any checkout of the repository. The device
+/// manifest decides what runs; the act and its session are written down as the cause only. A
+/// foreign ark refuses as a plain supervise does.
+pub(crate) fn after_landed(checkout: &Path, landing: &Landing) -> Outcome<Settled> {
+    let data_root = device_data_root(checkout);
+    let device_checkout = checkout_of(&data_root).unwrap_or_else(|| main_checkout(checkout));
     let head = super::declaration::store(None, None, None)?
         .read()
         .map_err(|e| e.to_string())?;
-    if head.processes.is_empty() {
-        return Ok(());
+    let declared = |tool: &str| {
+        head.processes
+            .iter()
+            .any(|p| channel_tool(&p.artifact) == Some(tool))
+    };
+    if head.processes.is_empty() || landing.tool.is_some_and(|tool| !declared(tool)) {
+        return Ok(Settled::Untouched);
     }
     if running(&data_root)?.is_none() {
-        println!("device ark: not running; the landed binary waits for `epr device supervise`");
-        return Ok(());
+        say!("device ark: not running; the landed binary waits for `epr device supervise`");
+        return Ok(Settled::Untouched);
     }
-    supervise(&data_root, &head, lease_tool(checkout).as_deref(), false).map(|_| ())
+    let policy = restart::policy(&device_checkout);
+    if !policy.restart_on_landing {
+        say!(
+            "device ark: device_restart.on_landing is off in {} at HEAD; the landed binary \
+             waits for `epr device supervise`",
+            device_checkout.join(restart::POLICY).display()
+        );
+        return Ok(Settled::Untouched);
+    }
+    let cause = format!(
+        "after {}, session {}",
+        landing.trigger.as_str(),
+        session_id().as_deref().unwrap_or("none")
+    );
+    match supervise(
+        &data_root,
+        &head,
+        lease_tool(&device_checkout).as_deref(),
+        false,
+        Some(&cause),
+    )? {
+        Supervised::Started {
+            started,
+            stale: Some(stale),
+        } => settle(&data_root, &head, &started, landing, stale, Some(policy)),
+        Supervised::Started { stale: None, .. } | Supervised::Unchanged => Ok(Settled::Untouched),
+    }
+}
+
+/// The session an act runs in, written down as its cause.
+fn session_id() -> Option<String> {
+    elohim_device_runtime::session::resolve().session
+}
+
+/// Whole seconds, rounded up so a quick start never reads as zero.
+fn seconds(took: Duration) -> u64 {
+    took.as_millis()
+        .div_ceil(1000)
+        .try_into()
+        .unwrap_or(u64::MAX)
+}
+
+/// The commit current.json records for `cid` on `child`'s channel, while `cid` is current.
+fn landed_commit(head: &RuntimeManifest, child: &str, cid: &str) -> Option<String> {
+    let tool = head
+        .processes
+        .iter()
+        .find(|p| p.name == child)
+        .and_then(|p| channel_tool(&p.artifact))?;
+    let registry = manifest_store::registry(head).ok()?;
+    let store = Store::from_environment(tool, &registry).ok()?;
+    let record: serde_json::Value =
+        serde_json::from_slice(&fs::read(store.root().join("current.json")).ok()?).ok()?;
+    (record["cid"] == cid)
+        .then(|| record["commit"].as_str().map(str::to_owned))
+        .flatten()
+}
+
+/// Wait for the ark `supervise` just restarted onto `stale.current` and settle the restart.
+///
+/// Ready: one ready row. Not ready within the manifest's readiness patience, or ark exited: the
+/// release is held, and then exactly one of three things, never more — `on_failed_start =
+/// leave` (or an act with nothing of its own to undo) leaves it current; otherwise the act's
+/// own landing is reverted ONE step, to what was current the moment before, and ark starts on
+/// that and is waited for too. If the previous also fails, it stops there, degraded.
+///
+/// Nothing here holds a lock: supervise and start release everything they took, the revert
+/// takes and drops the store's own, and the waits only read the passport.
+fn settle(
+    data_root: &Path,
+    head: &RuntimeManifest,
+    started: &Started,
+    landing: &Landing,
+    stale: StaleChild,
+    policy: Option<restart::Policy>,
+) -> Outcome<Settled> {
+    let to = stale.current.clone();
+    let from = landing
+        .from
+        .clone()
+        .unwrap_or_else(|| stale.running.clone());
+    let receipt = restart::Receipt {
+        data_root,
+        trigger: landing.trigger,
+        session: session_id(),
+        process: stale.child.clone(),
+        from: Some(from.clone()),
+        to: Some(to.clone()),
+    };
+    let since = started
+        .started_at_epoch_ms
+        .saturating_sub(u64::try_from(START_WATCH.as_millis()).unwrap_or(0));
+    let took = match restart::wait_ready(data_root, head, started) {
+        Ok(took) => {
+            receipt.record(Settled::Ready, seconds(took), None)?;
+            say!(
+                "device ark: {} ready on {to} in {} s",
+                stale.child,
+                seconds(took)
+            );
+            return Ok(Settled::Ready);
+        }
+        Err((took, why)) => {
+            say!(
+                "device ark: {} on {to} did not come up within {} s ({})",
+                stale.child,
+                seconds(took),
+                why.describe()
+            );
+            took
+        }
+    };
+    let names: Vec<String> = head.processes.iter().map(|p| p.name.clone()).collect();
+    let witness = restart::witness_since(data_root, &names, since);
+    if let Some(witness) = &witness {
+        say!(
+            "device ark: ark witnessed the death: {} ({})",
+            witness.cid,
+            witness.path.display()
+        );
+    }
+    receipt.hold(landed_commit(head, &stale.child, &to), witness.clone())?;
+    let cure = format!("epr device supervise --release {to}");
+    let policy = policy.unwrap_or_default();
+    // Only the release this very act landed is ever reverted, and only to what was current the
+    // moment before it.
+    let revert = landing
+        .revert
+        .filter(|_| landing.from.is_some() && landing.to.as_deref() == Some(to.as_str()));
+    let Some(revert) = revert.filter(|_| policy.revert_on_failed_start) else {
+        receipt.record(Settled::Left, seconds(took), witness)?;
+        let why = if policy.revert_on_failed_start {
+            format!(
+                "this {} has no landing of its own to undo",
+                landing.trigger.as_str()
+            )
+        } else {
+            "device_restart.on_failed_start=leave".to_owned()
+        };
+        say!(
+            "device ark: {to} failed readiness in {} s; left current ({why}); {to} held — cure: \
+             {cure}",
+            seconds(took)
+        );
+        return Ok(Settled::Left);
+    };
+    let degraded = |error: String| -> Outcome<Settled> {
+        receipt.record(Settled::Held, seconds(took), witness.clone())?;
+        say!(
+            "device ark: {to} failed readiness in {} s; {error}; {to} held and the device is \
+             degraded — cure: {cure}",
+            seconds(took)
+        );
+        Ok(Settled::Held)
+    };
+    // Stop the failing ark first, so it never respawns onto whichever release is current while
+    // the revert runs.
+    if let Err(error) = stop_ark(data_root, started) {
+        return degraded(error);
+    }
+    if let Err(error) = revert() {
+        return degraded(format!(
+            "reverting to {from} refused ({error}); nothing runs now"
+        ));
+    }
+    let head_cid = head.cid().map_err(|e| e.to_string())?;
+    let previous = match start_ark(data_root, head, &head_cid, &started.ark) {
+        Ok(previous) => previous,
+        Err(error) => {
+            return degraded(format!(
+                "reverted to {from}, but ark did not start on it ({error})"
+            ))
+        }
+    };
+    say!(
+        "device ark: reverted to {from}; started pid {} on it",
+        previous.pid
+    );
+    match restart::wait_ready(data_root, head, &previous) {
+        Ok(_) => {
+            receipt.record(Settled::Reverted, seconds(took), witness)?;
+            say!(
+                "device ark: {to} failed readiness in {} s; reverted to {from}; {to} held",
+                seconds(took)
+            );
+            Ok(Settled::Reverted)
+        }
+        Err((again, why)) => degraded(format!(
+            "the previous release {from} also failed readiness in {} s ({}); stopping there, \
+             never a third start",
+            seconds(again),
+            why.describe()
+        )),
+    }
+}
+
+/// Where this device keeps its copy of the running ark's record: beside the device key, which
+/// every checkout of every repository on this device resolves alike.
+fn device_record() -> Option<PathBuf> {
+    crate::device_key::resolve_path()
+        .ok()?
+        .parent()
+        .map(|home| home.join("ark-supervise.json"))
+}
+
+/// The data root of the ark that runs on this device, from its own record; else the data root
+/// of `checkout`'s main checkout.
+pub(crate) fn device_data_root(checkout: &Path) -> PathBuf {
+    device_record()
+        .and_then(|path| fs::read(path).ok())
+        .and_then(|bytes| serde_json::from_slice::<Started>(&bytes).ok())
+        .and_then(|record| record.data_root)
+        .filter(|root| matches!(running(root), Ok(Some(_))))
+        .unwrap_or_else(|| default_data_root(checkout))
+}
+
+/// The main checkout a data root lives in, when it is the default `<checkout>/.eprfs/…` one.
+fn checkout_of(data_root: &Path) -> Option<PathBuf> {
+    let mut checkout = data_root;
+    for _ in Path::new(DATA_REL).components() {
+        checkout = checkout.parent()?;
+    }
+    (checkout.join(DATA_REL) == data_root).then(|| checkout.to_owned())
+}
+
+/// How the newest restart reads on the peer daemon line.
+pub(crate) enum Reading {
+    /// The newest restart came up: the suffix for a serving line.
+    Restarted(String),
+    /// A release is held: the degraded detail and its cure.
+    Held { detail: String, cure: String },
+}
+
+/// The newest restart this device recorded, while it still says something: a ready restart,
+/// or a failed one whose release is still held.
+pub(crate) fn restart_reading(checkout: &Path) -> Option<Reading> {
+    let data_root = device_data_root(checkout);
+    let row = restart::newest(&data_root)?;
+    if row.outcome == "ready" {
+        return Some(Reading::Restarted(format!(
+            " (restarted by {} at {} in {} s)",
+            row.trigger, row.at, row.seconds
+        )));
+    }
+    let to = row.to.as_deref()?;
+    let hold = restart::held(&data_root, to)?;
+    let from = row.from.as_deref().unwrap_or("-");
+    let failed = format!("release {to} held (failed readiness at {})", hold.at);
+    let detail = match row.outcome.as_str() {
+        "reverted" => format!("serving previous {from}; {failed}"),
+        "left" => format!("{failed}; it is still current and nothing serves it"),
+        _ => format!(
+            "{failed}; nothing recovered it (the revert to {from}, or {from} itself, failed too)"
+        ),
+    };
+    Some(Reading::Held {
+        detail,
+        cure: format!("epr device supervise --release {to}"),
+    })
+}
+
+/// The held release built from `commit`, and when it failed readiness, if this device holds one.
+pub(crate) fn held_for_commit(checkout: &Path, commit: &str) -> Option<(String, String)> {
+    restart::holds(&device_data_root(checkout))
+        .into_iter()
+        .find(|(_, hold)| hold.commit.as_deref() == Some(commit))
+        .map(|(cid, hold)| (cid, hold.at))
+}
+
+/// When `cid` is held on this device: the time it failed readiness.
+pub(crate) fn held_at(checkout: &Path, cid: &str) -> Option<String> {
+    restart::held(&device_data_root(checkout), cid).map(|hold| hold.at)
 }
 
 /// Whether this device's running ark, at the head manifest, holds a child on other bytes than
@@ -871,11 +1279,21 @@ fn start_ark(
         manifest_cid: head_cid.to_owned(),
         ark: ark.to_owned(),
         started_at_epoch_ms: epoch_ms(),
+        data_root: Some(data_root.to_owned()),
     };
-    write_atomic(
-        &data_root.join("supervise.json"),
-        &serde_json::to_vec_pretty(&started).map_err(|e| e.to_string())?,
-    )?;
+    let record = serde_json::to_vec_pretty(&started).map_err(|e| e.to_string())?;
+    write_atomic(&data_root.join("supervise.json"), &record)?;
+    // The device's copy, so an act from any checkout finds the ark that runs (row 35). The data
+    // root's own record stays the authority; a missing copy only falls back to the checkout's.
+    if let Some(copy) = device_record() {
+        let written = copy
+            .parent()
+            .map_or(Ok(()), create_private_dir)
+            .and_then(|()| write_atomic(&copy, &record));
+        if let Err(error) = written {
+            eprintln!("device ark: could not record the running ark for this device: {error}");
+        }
+    }
     Ok(started)
 }
 
@@ -1268,7 +1686,7 @@ fn lease_tool(checkout: &Path) -> Option<PathBuf> {
 /// start` does; any other code is a refusal. Returns whether a lease is now held.
 fn claim_lease(berth: Option<&Path>, head_cid: &str) -> Outcome<bool> {
     let Some(berth) = berth else {
-        println!("device ark: no berth on this device; supervising unleased");
+        say!("device ark: no berth on this device; supervising unleased");
         return Ok(false);
     };
     let output = Command::new(berth)
@@ -1279,7 +1697,7 @@ fn claim_lease(berth: Option<&Path>, head_cid: &str) -> Outcome<bool> {
     match output.status.code() {
         Some(0) => Ok(true),
         Some(4) => {
-            println!("device ark: no berth session resolvable; supervising unleased");
+            say!("device ark: no berth session resolvable; supervising unleased");
             Ok(false)
         }
         code => Err(format!(
@@ -1402,6 +1820,7 @@ mod tests {
             manifest_cid: "bafy".into(),
             ark: ark.clone(),
             started_at_epoch_ms: 0,
+            data_root: None,
         };
         write_atomic(
             &dir.path().join("supervise.json"),
@@ -1431,6 +1850,7 @@ mod tests {
             manifest_cid: "bafy".into(),
             ark: "/bin/true".into(),
             started_at_epoch_ms: 0,
+            data_root: None,
         };
         write_atomic(
             &dir.path().join("supervise.json"),

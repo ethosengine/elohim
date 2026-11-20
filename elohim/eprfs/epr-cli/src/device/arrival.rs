@@ -147,7 +147,7 @@ pub(crate) fn status_at(root: &Path, remember: bool) -> Vec<Check> {
             ),
         },
         repository_check(root),
-        peer_daemon_check(),
+        peer_daemon_check(root),
         sibling_check(root, &current),
         supervisor_check(root),
         // Restart-arrival facts (backlog container-restart-strands-session-envelope).
@@ -1068,7 +1068,17 @@ fn peer_daemon_cure() -> String {
     }
 }
 
-fn peer_daemon_check() -> Check {
+fn peer_daemon_check(root: &Path) -> Check {
+    // A release held for failing readiness is the first thing this line says, serving or not:
+    // the device runs something other than what it landed, or nothing (row 35).
+    let reading = super::supervise::restart_reading(root);
+    if let Some(super::supervise::Reading::Held { detail, cure }) = reading {
+        return Check::new("peer daemon", State::Degraded, detail, Some(cure));
+    }
+    let restarted = match reading {
+        Some(super::supervise::Reading::Restarted(suffix)) => Some(suffix),
+        _ => None,
+    };
     match serve_liveness() {
         Ok((false, evidence)) => Check::new(
             "peer daemon",
@@ -1079,7 +1089,7 @@ fn peer_daemon_check() -> Check {
             ),
             Some(peer_daemon_cure()),
         ),
-        Ok((true, evidence)) => peer_daemon_version_check(evidence),
+        Ok((true, evidence)) => peer_daemon_version_check(evidence, restarted),
         Err(error) => Check::new(
             "peer daemon",
             State::Unknown,
@@ -1089,7 +1099,8 @@ fn peer_daemon_check() -> Check {
     }
 }
 
-fn peer_daemon_version_check(evidence: Option<String>) -> Check {
+/// `restarted` is the newest restart's receipt suffix, said only on a line serving at current.
+fn peer_daemon_version_check(evidence: Option<String>, restarted: Option<String>) -> Check {
     let evidence = evidence.map(|e| format!("; {e}")).unwrap_or_default();
     let observed = (|| {
         let store = crate::bin::daemon_store()?;
@@ -1108,7 +1119,10 @@ fn peer_daemon_version_check(evidence: Option<String>) -> Check {
                 Check::new(
                     "peer daemon",
                     State::Ok,
-                    format!("serving at current{evidence}"),
+                    format!(
+                        "serving at current{}{evidence}",
+                        restarted.unwrap_or_default()
+                    ),
                     None,
                 )
             } else {
