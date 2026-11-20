@@ -44,11 +44,11 @@ Twelve lanes are merged on `sprint3/integrate` and pushed to `origin run-ci/spri
 | `1bf96648cbec09baf9a957477ea36d975aa7c1bf` | ten | run 44575030094: 30 jobs green, macOS among them; `Tests pass` succeeded with all 17 needs `success`. The first commit whose own CI included the aggregate fix |
 | `080f3057973e6c5c19e38a1b78a1330917d3851d` | eleven (+ the other device's read-only extension) | run 44583007601, three attempts: every Linux and Windows job green (`test-journey` green on attempt 2 after an install "Server Error"); `test-fast (macos-latest)` cancelled without a runner three times, so `Tests pass` is red. macOS unverified on this head |
 | `99227182ad54991983d50d86f0ab11d799386f73` | twelve (+ rebase/switch recovery) | run 44635383858, last job 23:56:29Z: 30 jobs green, macOS, `test-journey` and `test` among them; `Tests pass` succeeded |
-| `6507caaaa18c51f7f251fc31187753a16537489a` | twelve: `99227182ad` + `6ee2d85a8d7d84f5315f9383e53189e02b126464` + `6507caaaa1`, documentation only apart from one source comment | push 11, 01:44Z on 2026-11-20. Run 44655755627, read at 01:54:23Z: in progress; 17 jobs succeeded, 12 running (`test-fast (macos-latest)` among them, on a runner since 01:44:06Z; `test`; `test-journey`), `cargo-deny-advisories` failed; no `Tests pass` yet |
+| `6507caaaa18c51f7f251fc31187753a16537489a` | twelve: `99227182ad` + `6ee2d85a8d7d84f5315f9383e53189e02b126464` + `6507caaaa1`, documentation only apart from one source comment | push 11, 01:44Z on 2026-11-20. Run 44655755627, completed 02:28Z: 30 jobs succeeded — every Linux, macOS and Windows test job, `test-fast (macos-latest)` (02:04Z), `test` (02:10Z) and `test-journey` (02:28:12Z) among them; `Tests pass` succeeded (02:28:17Z); the only failure is `cargo-deny-advisories` |
 
 On every run the only other failing job is `cargo-deny-advisories`, which is red on brit `main` too.
 
-**Recommendation (the coordinator's).** If the run on `6507caaaa1` is green, it is the head to land on
+**Recommendation (the coordinator's).** The run on `6507caaaa1` is green, so it is the head to land on
 brit `main`: it is `99227182ad`'s code, which passed on three platforms, with documentation that states
 its limits truthfully. If the steward prefers to hold the recovery lane and its new flag, `1bf96648cb`
 (ten lanes, complete green) is the conservative choice; `080f305797` adds the read-only extension but

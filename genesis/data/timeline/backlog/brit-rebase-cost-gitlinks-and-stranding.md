@@ -798,8 +798,9 @@ and later writes are checked against that budget, not against a recomputed model
   docs said admission promised its steps and that the 5/4 factor covered the diff3 base; they now
   list the three known cases in which an admitted rebase is refused at a later step, before that
   step writes, with `--abort` restoring exactly). fmt, `cargo doc -D warnings` and `cargo check` for
-  gitoxide-core and brit-cli passed on it here; no behaviour changes. CI run on it in progress when
-  written.
+  gitoxide-core and brit-cli passed on it here; no behaviour changes. Its CI run 44655755627 completed 02:28Z
+  on 2026-11-20: 30 jobs succeeded on Linux, macOS and Windows, `Tests pass` among them; only
+  `cargo-deny-advisories` failed, as on main.
 - What the pushed lane is, as reviewed: recovery cannot strand under a kill; `--abort` and cleanup
   are never refused by the limit, including with a retained copy larger than it; the journal stays
   metered and reserved; `memory_replay` passes untouched at the real limit; green on Linux, macOS
