@@ -873,9 +873,14 @@ pub(crate) fn after_landing(checkout: &Path) -> Outcome<()> {
 
 /// How long a landing waits its turn behind another restart of the same ark.
 const RESTART_TURN: Duration = Duration::from_secs(120);
-/// No child's readiness budget is shorter than this, and a child ark has not spawned yet gets
-/// this long from the ark's start to appear.
+/// No child's readiness budget, counted from its own spawn, is shorter than this.
 const READY_FLOOR: Duration = Duration::from_secs(10);
+/// While the replacement ark lives and has not yet spawned a child of the landed tool, the wait
+/// is for that first spawn, this long from the ark's start. A wrong "not ready" costs more than
+/// a slow one: it tells the person the device is degraded when it is only busy (CI #197 read
+/// four healthy restarts as not ready on a 12 s floor; the device's real restarts on
+/// 2026-11-20 served 23-43 s after the command).
+const FIRST_SPAWN_WAIT: Duration = Duration::from_secs(60);
 /// Ark publishes a passed rung a little after its own deadline clock reads it.
 const READY_SLACK: Duration = Duration::from_secs(2);
 
@@ -1499,7 +1504,8 @@ impl RestartTurn {
 /// Wait for the children on `tool`'s channel of `started`, on ark's clock (row 35, F7): each
 /// child's budget is its own declared readiness patience (never less than [`READY_FLOOR`]),
 /// counted from its own first spawn as the passport records it. Until ark has spawned a child,
-/// only the floor runs, from the ark's start. A child that declares no readiness is ready once
+/// the wait is for that first spawn, up to [`FIRST_SPAWN_WAIT`] from the ark's start, while
+/// the ark lives. A child that declares no readiness is ready once
 /// ark runs it. Any child past its budget fails the wait, whatever time a sibling has left.
 /// Other channels' children are never judged. Reads the passport only; holds nothing.
 fn wait_landed(
@@ -1526,7 +1532,7 @@ fn wait_landed(
             .fold(0, u64::saturating_add);
         millis(Duration::from_millis(declared).max(READY_FLOOR) + READY_SLACK)
     };
-    let unseen = millis(READY_FLOOR + READY_SLACK);
+    let unseen = millis(FIRST_SPAWN_WAIT);
     let begun = Instant::now();
     let mut spawned: std::collections::BTreeMap<String, u64> = Default::default();
     loop {

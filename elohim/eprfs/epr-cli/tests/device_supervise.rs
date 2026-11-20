@@ -1186,6 +1186,10 @@ fn a_current_ark_does_not_hide_an_unowned_daemon_from_supervise() {
 // ---------------------------------------------------------------------------------------------
 
 const LSP_READY: &str = "epr-lsp: listening";
+/// The resident's declared readiness patience, (ready line, identity) in milliseconds: room
+/// for a loaded host (CI #197 ran four stories out on a 12 s floor) in stories that expect it
+/// to come up.
+const RESIDENT_PATIENCE: (u64, u64) = (60_000, 10_000);
 
 struct Lane {
     fx: Fixture,
@@ -1447,7 +1451,10 @@ fn lane_with(
             script,
         ]);
     }
-    if let Some((line, identity)) = patience {
+    // The resident always declares its readiness patience here, so no story rests on a floor
+    // of the product's choosing; stories that expect a failure pass a shorter one.
+    {
+        let (line, identity) = patience.unwrap_or(RESIDENT_PATIENCE);
         let mut base: Value =
             serde_json::from_str(&fx.ok(&["device", "show", "--render", "manifest"])).unwrap();
         base["processes"][0]["readiness"][0]["stdout_line"]["patience_ms"] = json!(line);
@@ -2438,5 +2445,37 @@ fn the_readiness_wait_holds_no_lock() {
     assert!(
         status.success(),
         "a landing exits as the landing did: {seen}"
+    );
+}
+
+/// A replacement ark that is slow to spawn its first child (here an `ark` the fixture wraps
+/// to sleep 15 s before it runs, as a loaded host can be) still reads ready: until the landed
+/// tool's first child is seen, the wait is for the first spawn, up to 60 s, not a 12 s floor
+/// (CI #197 read four healthy restarts as not ready on that floor).
+#[test]
+fn a_first_spawn_slower_than_twelve_seconds_still_reads_ready() {
+    let lane = lane(None, None);
+    let fx = &lane.fx;
+    let slow = fx.base.join("slow-ark");
+    fs::write(
+        &slow,
+        format!("#!/bin/sh\nsleep 15\nexec {} \"$@\"\n", fx.ark.display()),
+    )
+    .unwrap();
+    fs::set_permissions(&slow, fs::Permissions::from_mode(0o755)).unwrap();
+    let (_, y) = lane.next("y");
+    let followed = lane.follow_with(&[("ARK_BIN", slow.as_os_str())]);
+    let said = text(&followed);
+    assert!(followed.status.success(), "{said}");
+    let record: Value = serde_json::from_slice(&followed.stdout)
+        .unwrap_or_else(|e| panic!("stdout is the follow's record ({e}): {said}"));
+    assert_eq!(record["restart"]["outcome"], "ready", "{said}");
+    assert!(
+        record["restart"]["seconds"].as_u64().unwrap() >= 12,
+        "the first spawn really came late: {record}"
+    );
+    assert!(
+        said.contains(&format!("device ark: peer ready on {y} in ")),
+        "{said}"
     );
 }
