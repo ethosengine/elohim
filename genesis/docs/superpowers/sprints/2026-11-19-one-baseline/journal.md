@@ -799,3 +799,52 @@ And the eprfs pipeline is red at its publish stage until the steward rules on ro
 | 3, a landing pays less | the eprfs gate on ethosengine: 1,198, 988, 1,246 (with the ark), 1,097 s; on shem 1,903 then 1,684 s |
 | 2, 4, 5 | unchanged |
 | 6, the record | this entry; rows 47 and 48; a second addition to row 35; a habit line |
+
+## 2026-11-20, 10:00Z: the second landing goes back; where the night ends
+
+**CI.** `elohim-eprfs/dev` #198 on `aeada1196`: "2695 tests run: 2695 passed (9 slow),
+1 skipped". The tests stage was green from #191 to #196, red at #197 for the 12 s floor, and
+is green again. Each of those builds then ends at the publish stage on
+"eprfs-core 0.3.5: immutable version collision", which is row 43 and the steward's.
+
+**The second landing of row 35 is not on dev.** Ethosengine handed it over as
+`self/nt-row35-b2` (`9ada5b173`): a follower retries an admitted offer whose holder gives no
+route, and a stopping peer drains its streams. Its outside review (receipt
+`codex-row35b.receipt.md`) found no path that uses unverified or partial bytes and no lock held
+in a pause, and seven things that block: a refusal or a wrong-CID chunk can come out of one
+fetch as "no route" and be waited on; admission is checked once and not again on a retry; the
+patience bounds the sleeps and not the retry fetches, each of which can run for half an hour;
+two followers of one release share a staging directory, which predates the branch (row 49); a
+stream can register after the drain has counted zero; gossip and the daemon's tick still start
+work while it drains; and the whole shutdown can pass the supervisor's 20 s. I sent a fix list
+of six and recommended stopping there: a producing device's peer does not restart at its own
+landing, because its hook defers the household head, so the window this change closes is open
+only when someone follows on the holder at the moment a sibling draws. Ethosengine had not
+answered when this was written. The branch and its receipt are the specification for whoever
+picks it up.
+
+**What the night put on dev**, in the order it landed:
+
+| Commit | What it is |
+|---|---|
+| `00dd77dfb`, `dd3186d7d` | the suite's view takes nothing from a submodule declared `update = none`; prep and the preflight name the pins it does read |
+| `f27e22e69` | the eprfs pipeline builds `epr` before its tests; a parity test holds the two recipes together |
+| `b950d74b1`, `b077336ca` | the producer marks a release `env:isa-c` from the build's own compile commands; hardening |
+| `7213bb589`, `d6e9c69aa` | a first `session open` no longer waits five seconds on its own guard; a reviewed exception is held against the lock's checksum on every device |
+| `fcf1f3137`, `aeada1196` | a landing restarts the supervised peer; a 60 s wait for the first spawn; a row for a hand restart |
+
+**What I would do differently.** Three times tonight a change was verified on the device that
+wrote it and failed on the other, or in CI: my view on ethosengine, its pin test on shem, its
+restart stories on a loaded pipeline. Twice I ruled a default before asking where it would be
+enforced or who would read its exit status. And I led a sprint about what a landing pays for a
+day before reading what the pipeline itself was saying. Each is now a row or a habit line, and
+the first two are in the notes I keep for the next session.
+
+**Waiting on the steward.** Row 43: bump four crate versions with an Edge roll, or leave the
+packed lock out of the publish comparison for library packages (my recommendation). The repack
+on both devices. An Edge roll's timing, which now also carries row 46. The brit pin:
+`6507caaaa1`, green on three platforms, or `1bf96648cb`. The defaults I chose for him to
+overrule: the fleet-roll check refuses; `device_restart.on_landing` is `restart`; the producer
+half's review was closed by ruling. The compute grant that ends 2026-11-23T16:00Z (row 36).
+The memory cleanup loop, whose line has read failed all night and needs his word to run. And
+this session's unrecorded covenant.

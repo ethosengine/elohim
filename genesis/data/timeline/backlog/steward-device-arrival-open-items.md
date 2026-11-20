@@ -1181,3 +1181,29 @@ that daemon's lease was written into the HOST bin store, whose root
 (`/projects/.claude-config/tools/bin-store`) the fixture's HOME and XDG do not move. Ended with
 one interrupt; the lease then read dead by itself. Not fixed: the scenario's teardown, and a
 fixture-scoped bin store root for anything a test starts.
+
+## Row 35, third addition (2026-11-20, 10:00Z)
+
+The second landing is built and NOT on dev: `self/nt-row35-b2` (`9ada5b173`, four commits, six
+files). Its outside review is `codex-row35b.receipt.md` on `self/nt-review-receipts`. What it
+must do before it lands: (G1) a decisive failure, a refusal or an integrity failure, outranks a
+transport one when a fetch is abandoned, and the gap named is the offering holder's own, so a
+refusal is not waited on; (G2) the patience is an elapsed deadline, with no retry started after
+it, a retry given what remains as its own deadline, and the policy value capped; (G3) admission
+is checked again before each retry; (G4) a tier stream's registration is atomic with the
+drain's phase; (G5) once draining the peer accepts no gossip connection and its loop starts no
+new work, and the whole shutdown has one deadline inside the supervisor's grace, tested against
+the real bound; (G6) the late-connection story pins the close code and reason, and the
+classifier story goes through the production formatter. Until it lands, a follower that meets
+a holder in the middle of a restart falls back to a local build.
+
+## Row 49 — two followers of one release share a staging directory
+
+From the review of row 35's second landing; it predates that branch. Two followers drawing
+offers that name the same release use the same staging directory
+(`elohim/eprfs/epr-cli/src/bin.rs`, about lines 1271 to 1347). The first verifies the release's
+CID there; the second deletes and recreates the directory for its own attempt; the first can
+then run its staged exercise on the second's bytes by pathname, before its own post-ingest
+comparison. It needs two followers at once and an offer whose bytes differ under one claimed
+release, so it is narrow. The cure is a staging directory per attempt, verified and exercised
+in place.
