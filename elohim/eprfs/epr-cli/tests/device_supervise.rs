@@ -2479,3 +2479,38 @@ fn a_first_spawn_slower_than_twelve_seconds_still_reads_ready() {
         "{said}"
     );
 }
+
+/// The receipt holds every restart, whoever caused it: a hand `epr device supervise` that
+/// restarts a child onto a newer current writes a row with trigger `hand` (what the child runs
+/// read from the child), and a hand supervise with nothing stale writes none.
+#[test]
+fn a_hand_supervise_onto_a_newer_current_writes_a_hand_row() {
+    let lane = lane(None, None);
+    let fx = &lane.fx;
+    let (_, y) = lane.next("y");
+    // No berth for the follow: it lands Y and restarts nothing, leaving the child behind.
+    let followed = lane.follow_with(&[("EPR_BERTH_BIN", OsStr::new(""))]);
+    assert!(followed.status.success(), "{}", text(&followed));
+    let before = rows(fx).len();
+    let said = fx.ok(&["device", "supervise"]);
+    assert!(
+        said.contains(&format!("current is {y}; restarting")),
+        "{said}"
+    );
+    let rows = rows(fx);
+    assert_eq!(rows.len(), before + 1, "{rows:?}");
+    let row = rows.last().unwrap();
+    assert_eq!(row["trigger"], "hand", "{row}");
+    assert_eq!(row["outcome"], "ready", "{row}");
+    assert_eq!(row["from"], lane.x.as_str(), "{row}");
+    assert_eq!(row["to"], y.as_str(), "{row}");
+    assert_eq!(row["session"], "supervise-fixture", "{row}");
+    assert!(
+        row["seconds"].as_u64().is_some() && row["at"].is_string(),
+        "{row}"
+    );
+
+    let again = fx.ok(&["device", "supervise"]);
+    assert!(again.contains("at current manifest"), "{again}");
+    assert_eq!(self::rows(fx).len(), before + 1, "nothing stale, no row");
+}
