@@ -702,6 +702,53 @@ adds beyond that can be refused, and that refusal says where the work is kept.
   in the retained copy.
 Phase 2 (implementation) starts when the final-verification agent releases the integration worktree.
 
+**CI run 10 (44635383858) on `99227182ad`, finished 23:57Z:** 30 jobs succeeded — every Linux, macOS
+and Windows test job, `test-fast (macos-latest)` among them, `test-journey` (memory step included) and
+`test` — `Tests pass` succeeded; the only failure is `cargo-deny-advisories`, as on main. So the
+recovery lane compiles and passes on all three platforms. That head still carries the two findings.
+The final-verification agent started on it was stopped at 23:47Z to free the worktree for round 6;
+what it had established on `99227182ad`: the max-pure build's brit-cli tests, journey list and
+`memory_replay` EXIT 0; clippy for small, lean-async and max-pure; both doc legs; and, as uid 65534 in
+both HOME modes on the faults build, rebase 49 / switch 28 / pull 44 passed, identical to root. Its
+unprivileged `memory_replay` run was not finished. Its two documentation corrections are commit
+`6ee2d85a8d` (`--retire` also covers a skip retaining; of the three states that can still strand, the
+third follows an ordinary kill and a stock Git staging, with no record torn).
+
+**Round 6 implemented, reported between 00:41Z and 00:50Z (author-reported; under review).** Local head
+`6c7dd8644fa2284a403f4df7c16cb5c3073f0409` = `99227182ad` + `6ee2d85a8d` + `93b16885` (code) +
+`5c34cc5f` (journeys) + `6c7dd864` (docs); not pushed.
+- Verification, every leg EXIT 0 (its summary file read DONE at 00:40Z): faults and default builds,
+  faults journeys, boundary journeys, core faults, power_loss, replay unit tests, `memory_replay` (8
+  passed; the file's sha256 equal to `080f305797`'s), brit-cli, the full cli-journey leg, gitoxide-core,
+  six clippy legs, three doc legs, fmt, the rust-style reach check.
+- The reviewer's reproductions with the new faults binary: F1 completes from 44,014,696 and every
+  limit below is refused inside `rebase -i`, at todo acceptance, with nothing live changed; F2 under
+  diff3 and zdiff3 is refused when the conflict is found up to about 6.8M and completes above. No shape
+  is refused at `--stage`, `--amend` or `--continue`.
+- Journeys, smallest admitting / smallest completing limit: clean 3,356,531 / 3,356,531; the existing
+  diff3 conflict 18,256,470 / 24,151,019; base-heavy diff3 1,711,772 / 6,837,221 and zdiff3 1,711,763
+  / 6,837,289; edit of a large file 7,416,531 / 12,757,985; a small edit beside an unrelated large
+  file 1,074,615 / 3,580,709; two edits 1,140,370 / 6,569,188. Between the two figures each shape is
+  refused before the user works (at todo acceptance, at stop entry, or when the conflict is found).
+- The cost of the rule, stated plainly: the existing diff3 conflict completed from 18,256,470 before
+  this round and needs 24,151,019 now, because a conflict stop is entered only when a resolution as
+  large as the conflict files and the publication are reserved too.
+- Measured at the real limit: the 64 MiB edit fixture's todo gate is 538,709,251 unscaled, 673,386,563
+  scaled, 400.4 MB under 1 GiB; admission and preflight figures are unchanged from the previous round.
+- Child records are pinned by a journey: 9.37 and 9.62 times the state image against an allowance of
+  10. Thin; a test, not a user, meets it first.
+- Found and left alone, pre-existing (the same in `99227182ad`): `--stage --expand-scope` of a large
+  file reserves about half of what the same process then meters (21,334,654 against 42,290,216 on the
+  20 MiB fixture), so at a tight limit it can be stopped by the meter part-way instead of refused
+  before it writes. Sent to the reviewer to establish what state that leaves.
+- Not established by the author: byte-level monotonicity of reservations across a long todo; a
+  conflict inside an `edit` stop; renames under diff3; several conflicting commits; split commits.
+- Timing: `memory_replay` 271.4 s before, 265.5 s after; per-command times on the 64 MiB edit fixture
+  within noise; the four new journeys take 466 s together.
+The fifth reviewer was resumed on this head, and a sixth integrator started its delta verification
+(max-pure, the non-root leg with `memory_replay`, bash journeys, docs consistency, seams) at 00:51Z.
+Push 11 follows only if the reviewer finds no must-fix.
+
 
 **Queued follow-up round, not started.** Publish `metadata-lock-N.json`, `retention-N.json` and the
 other single-pass records whole (spool, rename, sync), or treat an unparseable record as not written;
