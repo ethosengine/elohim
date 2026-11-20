@@ -3,7 +3,7 @@ id: "backlog-brit-sprint-3-handoff-2026-11-19"
 kind: "backlog"
 contentType: "backlog-item"
 contentFormat: "markdown"
-title: "Brit sprint 3 handoff: where the lanes are, what is decided next, what needs the steward, and the integration runbook"
+title: "Brit sprint 3 handoff: the state at the sprint's close, what needs the steward, the queued work, and the integration runbook"
 slug: "brit-sprint-3-handoff-2026-11-19"
 written: "2026-11-19"
 author: "claude-opus-5-5 (brit sprint 3, session 0e0924d5, steward of record human:matthew)"
@@ -22,44 +22,145 @@ cites:
   - genesis/data/timeline/backlog/brit-covenant-session-segment-aliasing.md
   - genesis/data/timeline/backlog/brit-daily-driver-handoff-2026-10-27.md
 shift_objective: |
-  Continue brit sprint 3 in the decided order: recovery round 5 (tighten the admission gates
-  until tests/cli-journey/tests/memory_replay.rs passes unchanged), its independent review and the
-  non-root leg, then push 10 of the integration branch with Phase 4g; then the recovery lane's
-  queued follow-up round (every journal record published whole, truthful --status) under its own
-  independent review; then the redesign, after the steward's format decision; then the push-policy
-  lane, the epr-cli lane, worktree-side diff with gitlinks, and merge porcelain.
+  Sprint 3 is closed and nothing is in flight. The steward decides the items listed in "State at the
+  sprint's close". The next integrator starts from 6507caaaa18c51f7f251fc31187753a16537489a on
+  origin run-ci/sprint3-integrate and takes the work listed in "Queued work, not started".
 ---
 
 # Brit sprint 3 handoff (2026-11-19)
 
-Read this first. Sprint session `0e0924d5`; steward of record human:matthew. The other device is shem
-(session `b49f7c46`).
-
-The brit repository is the submodule `elohim/brit`. Sprint base: brit 0.2.6 =
+Sprint session `0e0924d5`; steward of record human:matthew. The other device is shem (session
+`b49f7c46`). The brit repository is the submodule `elohim/brit`; sprint base brit 0.2.6 =
 `1db7a955197b10bc7672c9aa544768a329bb9008`. Nothing has landed on brit `main`, and the monorepo pin
 has not moved.
+
+## State at the sprint's close
+
+Twelve lanes are merged on `sprint3/integrate` and pushed to `origin run-ci/sprint3-integrate`
+(eleven pushes; push history below). Nothing is in flight.
+
+| Head | Lanes | CI |
+|---|---|---|
+| `1bf96648cbec09baf9a957477ea36d975aa7c1bf` | ten | run 44575030094: 30 jobs green, macOS among them; `Tests pass` succeeded with all 17 needs `success`. The first commit whose own CI included the aggregate fix |
+| `080f3057973e6c5c19e38a1b78a1330917d3851d` | eleven (+ the other device's read-only extension) | run 44583007601, three attempts: every Linux and Windows job green (`test-journey` green on attempt 2 after an install "Server Error"); `test-fast (macos-latest)` cancelled without a runner three times, so `Tests pass` is red. macOS unverified on this head |
+| `99227182ad54991983d50d86f0ab11d799386f73` | twelve (+ rebase/switch recovery) | run 44635383858, last job 23:56:29Z: 30 jobs green, macOS, `test-journey` and `test` among them; `Tests pass` succeeded |
+| `6507caaaa18c51f7f251fc31187753a16537489a` | twelve: `99227182ad` + `6ee2d85a8d7d84f5315f9383e53189e02b126464` + `6507caaaa1`, documentation only apart from one source comment | push 11, 01:44Z on 2026-11-20. Run 44655755627, read at 01:54:23Z: in progress; 17 jobs succeeded, 12 running (`test-fast (macos-latest)` among them, on a runner since 01:44:06Z; `test`; `test-journey`), `cargo-deny-advisories` failed; no `Tests pass` yet |
+
+On every run the only other failing job is `cargo-deny-advisories`, which is red on brit `main` too.
+
+**Recommendation (the coordinator's).** If the run on `6507caaaa1` is green, it is the head to land on
+brit `main`: it is `99227182ad`'s code, which passed on three platforms, with documentation that states
+its limits truthfully. If the steward prefers to hold the recovery lane and its new flag, `1bf96648cb`
+(ten lanes, complete green) is the conservative choice; `080f305797` adds the read-only extension but
+has no macOS result.
+
+**Decisions that are the steward's.**
+
+1. **Landing on brit `main`: which head** (recommendation above). Precondition met: a commit whose own
+   CI included the aggregate allow-list (evidence: "A brit pin must name …" below).
+2. **Moving the brit pin on dev.** Observed: a brit pin move does not select an Edge build; it
+   dispatches `elohim-eprfs/dev` (evidence below). When a brit carrying build-inputs is pinned, 16
+   monorepo steps re-key once.
+3. **`brit rebase --retire`**, a new flag: it sets aside this repository's own finished journal with
+   zero decisions, and deletes nothing.
+4. **The scratch policy.** Because an abort or a cleanup is never refused, its retained copy can exceed
+   the 1 GiB scratch limit: measured 0.67 to 0.94 GB on the 64 MiB fixtures, bounded by the closure
+   plus the journal plus the copied states.
+5. **Whether and how to continue "reserve before the user works".** The coordinator's view: make it
+   mechanical (a budget reserved in the meter when a stop is entered), not a model of each record, and
+   first stop the authoring child archiving the whole tree at `--amend`. Round 6 (modelling each
+   record) is set aside: it refused an ordinary three-edit rebase at the real 1 GiB limit.
+6. **CI's aggregate and journey list.** Add the `test` job to `Tests pass`'s needs; add the sprint's
+   journey files (twelve lanes' worth, `read_only_closed_reader.rs` among them) to `test-journey`'s
+   list. With the allow-list, a macOS leg left without a runner turns `Tests pass` red and needs a
+   re-run.
+7. **Upstream-owned gix changes** carried by the trust and push-transport lanes.
+8. **`git repack -a -d` in the monorepo main checkout on both devices.** This device has 42 pack
+   indexes, the other 32, against a reduced-trust cap of 32; nothing fails while declared trust is
+   applied.
+9. **Trust for linked worktrees.** Declaring a main checkout does not cover its linked worktrees; they
+   work on both devices because git accepts them by ownership.
+10. **Raised by the other device, not by this sprint.** `elohim-eprfs/dev` #191 has its tests green for
+    the first time since #167, then fails publishing ("eprfs-core 0.3.5: immutable version
+    collision"): a `cc` bump in `elohim/eprfs/Cargo.lock` changed the lock packed into four published
+    crates. Choices: four version bumps (which move `elohim/Cargo.lock`, and so an Edge build and
+    deploy), or leaving the packed lock out of the publish comparison for library crates.
+11. **To know, not to decide.** The ark landing published this device's build notes for the first time:
+    47 new refs under its own `refs/notes/brit/devices/<did>/build/*`, nothing to the shared refs;
+    covenant notes stayed local.
+12. **Still open from earlier.** The main checkout's local-only dev commits `a807b7ff6` and
+    `5d53c7ac8`; a write-set for `elohim/rakia` (rakia-core's glob defaults and its selection hole);
+    the retained-manifest format of the rebase redesign.
+
+**Where the evidence is.** The recovery lane's history, six reviews and measurements:
+`brit-rebase-cost-gitlinks-and-stranding.md` (newest at the end). Reproduction scripts, measurement
+tables, the runbook's scripts and the two landing logs: `/projects/elohim/.worktrees/brit-s3-keep/`
+(`review-recovery-r1-r4/`, `review-recovery6/`, `review-recovery7/`, `recovery5/`, `recovery6/`,
+`integrate/`, `land.log`, `land2.log`). Lanes, pushes, the monorepo side and each item's evidence:
+below.
+
+## Queued work, not started
+
+The first four are the recovery lane's follow-ups in the coordinator's order of value; the rest are
+unordered.
+
+1. Leave out of the authoring child's walk the objects the journal's closure already holds
+   (`authoring/conflict.rs`), so an edit-and-amend stops costing the whole tree.
+2. The mechanical stop reservation (steward item 5), with the fifth and sixth reviews' reproductions as
+   its acceptance tests.
+3. `--stage --expand-scope`'s reservation (it reserves about half of what it writes), and what
+   `--status` says after a part-way failure.
+4. Publish every single-pass journal record whole (`metadata-lock-N.json`, `retention-N.json` and the
+   others: spool, rename, sync), or treat an unparseable record as not written; `--status` names an
+   unreadable record instead of a cure that refuses.
+5. The push-policy lane (`push.rs`; `brit-push-fails-after-green-hook-root-cause.md`): one handshake
+   when no hook ran; a delivered push exits non-zero on a closed stderr (its status lines use
+   `writeln!(stderr, …)?` in `gitoxide-core/src/repository/push.rs`); `--atomic`; the rule that a
+   delivered operation reports success, which also decides `build baseline write` and `migrate` (exit
+   1 on a closed stdout after their ref changed). Also listed for this lane earlier in the sprint: the
+   notes/tag fast-forward rule, refusing an ungated push when hooks are configured but missing or not
+   executable, and rendering the delivery note in the CLI.
+6. `brit log` prints a commit message with an `encoding` header as raw bytes (`show` is fixed;
+   `show::to_utf8` is private and would need `pub(crate)`). Cosmetic: `-C` refusals name the clap id
+   `change_dir`.
+7. `println!` sites that panic on a closed stdout (counted earlier: brit-build-ref 21, brit-verify 7,
+   brit-cli 3), and a panic hook (no brit binary installs one).
+8. Merge porcelain (brit cannot record a two-parent commit).
+9. The rebase redesign: retention scaled to the replayed range (report §6 of the rebase entry), after
+   the retained-manifest decision. Rebase stays a declared git fallback on both devices until then.
+10. The 35 first-party test functions that open a repository in-process without isolation from host
+    git config (brit-graph `repo_fingerprint` 21, gitoxide-core replay 11, others): the class that
+    produced the non-root CI failure.
+11. The epr-cli spawn-audit lane (monorepo): one bin-store `Store` constructor that attaches the device
+    runner, `integrate.rs` `quality_gate` trust, `git.rs` `discover_root` wording, a source-scan test,
+    the waiting `bin.rs` hunk. Free to land in its own time: one berth line to session `a222db7c`
+    before its first cargo build; it stays out of `artifact.rs`, the `artifact/` tree, device-runtime
+    `envelope.rs` and epr-cli `session_envelope.rs`; it never bumps a published crate or touches
+    `elohim/Cargo.lock`. Sites: `brit-declared-trust-and-reduced-trust-pack-cap.md` (epr-cli spawn
+    audit), to be re-located before acting.
+12. Worktree-side `brit diff` with gitlinks in the index (`brit-porcelain-gaps-census-2026-11.md`).
+13. The habit-atom delta, at landing time.
 
 ## Where the work is
 
 **Integration branch** `sprint3/integrate` in the brit repo, worktree
-`/projects/elohim/.worktrees/brit-s3-integrate`. Pushed to the brit remote as
-`run-ci/sprint3-integrate` nine times, through `brit push` and brit's reach gate (`epr ready` +
-`scripts/ci/rust-style.sh`). The first three pushes took about 6 s each; the fourth exited 0. Pushed
-head: `080f3057973e6c5c19e38a1b78a1330917d3851d` (push 9). Local head:
-`948a939f16e416d6357448e49eb2a4ac318e2f9d` (Phase 4g, the recovery merge), NOT pushed and not to be
-pushed as it stands (recovery entry in the lane table).
+`/projects/elohim/.worktrees/brit-s3-integrate`, head `6507caaaa1`, the same as `origin
+run-ci/sprint3-integrate`. Every push went through `brit push` and brit's reach gate (`epr ready` +
+`scripts/ci/rust-style.sh`).
 
-| Pushed head | CI run |
-|---|---|
-| `251d10e52a` | 44469917351 |
-| `da5e4a0504` | 44477093766 |
-| `7479ce4539` | 44481834878: finished. Every Linux and macOS job green. The two cross-platform compile fixes worked (Windows built and ran about 5,670 tests). Red: four tests on both Windows runners, all from the build-inputs lane, plus cargo-deny-advisories (red on main too) and therefore `Tests pass` |
-| `bd28ecd8cf6c9593c77825d734e7fb38e1923534` | 44494603484: every required job green on Linux, macOS and both Windows runners; only cargo-deny-advisories red (as on main) |
-| `9945331577` | 44528984349: green on Linux and macOS. On both Windows runners ONE unit test red, `gitoxide_core::repository::git_spellings::rev_parse::tests::relative_paths_match_git`: `relative_path` rendered a collected PathBuf with `display()`, so Windows joined with `\` where the test asserts git's `/`. The journeys for the same cause had been gated before the push; this unit test was missed |
-| `e2b94f2da7dc11597222bd7074ebc657deb7cb28` | 44544779620: finished. Every Windows job green on both runners (first Windows run of the trust lane's tests; `relative_paths_match_git` passes unchanged). Non-root Linux red on ONE test, `brit-cli::repository_slots::an_unreadable_alternate_pack_directory_does_not_fail_the_open`: the test was unsound, not the product (see `brit-declared-trust-and-reduced-trust-pack-cap.md`); test-only fix `bd18b171` on `sprint3/trust`, to be merged with the diff/show merge, not yet pushed when written. macOS cancelled part-way, so unverified for that head. The aggregate "Tests pass" concluded `success` on this run although `test-fast` legs had failed (see the steward section) |
-| `8e5072ffd35cd31d7cfaf8d31fa6b28ae53dbda1` | 44567300304: finished (last job 17:19:14Z). 29 jobs succeeded, among them every Linux and Windows test job, both `test-fixtures-windows` jobs and `test`. Not green: cargo-deny-advisories (failure, as on main) and `test-fast (macos-latest)` (cancelled 16:47:51Z with no steps: it never got a runner, the leg the diagnostic step printed as `abandoned`). The pre-fix `Tests pass` concluded `success` at 17:09:53Z all the same (see the steward section) |
-| `1bf96648cbec09baf9a957477ea36d975aa7c1bf` | 44575030094: GREEN, the first run with the aggregate fix. Finished 17:58:03Z (`Tests pass` 17:55:51Z). 30 jobs succeeded; the only non-green job is cargo-deny-advisories. `test-fast (macos-latest)` got a runner and passed (17:26:05Z), the first macOS result since `9945331577`; `test` passed; `Tests pass` succeeded, its diagnostic step printing 17 needs, every one `success`, and the allow-list step silent. Same product tree as `8e5072ffd3` plus the allow-list step |
-| `080f3057973e6c5c19e38a1b78a1330917d3851d` | 44583007601 (pushed 17:59Z; the read-only merge). Attempt 1, finished 18:46:21Z: 27 succeeded; `test-journey` failed at 18:00:52Z in its `extractions/setup-just` step ("Server Error"), no journey ran; `test-fast (macos-latest)` cancelled 18:14:29Z without a runner; cargo-deny-advisories failed as on main; `Tests pass` FAILED (18:36:53Z), the allow-list refusing the abandoned-macOS shape the old aggregate passed on run 44567300304 (push 7). Attempt 2 (failed jobs re-run, 18:47:00Z–19:22:13Z): `test-journey` succeeded (all four bash variants and the journeys, memory step included); macOS cancelled again (19:02:04Z); `Tests pass` failed (19:22:12Z). Attempt 3 started 19:26:08Z; read at 19:34Z: `test-fast (macos-latest)` queued for a runner, cargo-deny-advisories failed again, no `Tests pass` yet. So this head is green on everything that ran and unverified on macOS; `1bf96648cb` remains the only commit with a complete green aggregate |
+| Push | Head | CI run and result |
+|---|---|---|
+| 1 | `251d10e52a` | 44469917351: three reds: test-journey (the small-build snapshot), brit-rust-style (all-zeros base), advisories |
+| 2 | `da5e4a0504` | 44477093766: only the four Windows jobs red, at the remote_tracking compile |
+| 3 | `7479ce4539` | 44481834878: every Linux and macOS job green; the two cross-platform compile fixes worked (Windows built and ran about 5,670 tests). Red: four tests on both Windows runners, all from the build-inputs lane, plus cargo-deny-advisories and therefore `Tests pass` |
+| 4 | `bd28ecd8cf6c9593c77825d734e7fb38e1923534` | 44494603484: every required job green on Linux, macOS and both Windows runners |
+| 5 | `9945331577` | 44528984349: green on Linux and macOS. On both Windows runners one unit test red, `gitoxide_core::repository::git_spellings::rev_parse::tests::relative_paths_match_git`: `relative_path` rendered a collected PathBuf with `display()`, so Windows joined with `\` where the test asserts git's `/`. The journeys for the same cause had been gated before the push; this unit test was missed |
+| 6 | `e2b94f2da7dc11597222bd7074ebc657deb7cb28` | 44544779620: every Windows job green on both runners (first Windows run of the trust lane's tests). Non-root Linux red on one test, `brit-cli::repository_slots::an_unreadable_alternate_pack_directory_does_not_fail_the_open`: the test was unsound, not the product (`brit-declared-trust-and-reduced-trust-pack-cap.md`); its test-only fix `bd18b171cb` merged as `69aa5275b3`. macOS cancelled part-way. The pre-fix `Tests pass` concluded `success` although `test-fast` legs had failed (evidence below) |
+| 7 | `8e5072ffd35cd31d7cfaf8d31fa6b28ae53dbda1` | 44567300304 (last job 17:19:14Z): 29 jobs succeeded, every Linux and Windows test job, both `test-fixtures-windows` jobs and `test` among them. Not green: cargo-deny-advisories and `test-fast (macos-latest)` (cancelled 16:47:51Z with no steps: it never got a runner). The pre-fix `Tests pass` concluded `success` at 17:09:53Z all the same |
+| 8 | `1bf96648cb` | 44575030094: green (table above). Finished 17:58:03Z; `test-fast (macos-latest)` got a runner and passed (17:26:05Z), the first macOS result since `9945331577`; the aggregate's diagnostic step printed 17 needs, every one `success`, and the allow-list step was silent. Same product tree as `8e5072ffd3` plus the allow-list step |
+| 9 | `080f305797` | 44583007601 (pushed 17:59Z). Attempt 1 (to 18:46:21Z): `test-journey` failed in its `extractions/setup-just` step ("Server Error") before any journey ran; macOS cancelled without a runner; `Tests pass` failed (18:36:53Z), the allow-list refusing the abandoned-macOS shape the old aggregate passed on push 7. Attempt 2 (18:47:00Z–19:22:13Z): `test-journey` succeeded (all four bash variants and the journeys, memory step included); macOS cancelled again; `Tests pass` failed. Attempt 3 (from 19:26:08Z): macOS cancelled without a runner a third time; `Tests pass` red |
+| 10 | `99227182ad` | 44635383858 (pushed 23:10Z): green on three platforms (table above). Pushed with the fifth review's two must-fix findings open, for the lane's first cross-platform run; both are now among the limits `docs/rebase.md` states |
+| 11 | `6507caaaa1` | pushed 01:44Z on 2026-11-20; run in the table above |
 
 A second integrator took over from the runbook note below and did the phase from `7479ce4539` to
 `bd28ecd8cf`. Besides the lane merges, that phase made two integration commits: `4f1d05a93a` (one
@@ -89,29 +190,28 @@ Merged after that:
   exits 0 like git; `diff --cached` over a staged gitlink move now prints git's `Subproject commit`
   patch).
 - **trust follow-up:** `69aa5275b3`, merge of `bd18b171cb`.
-- **aggregate fix:** `4dceac3557` and `1bf96648cb` (see the steward section).
+- **aggregate fix:** `4dceac3557` and `1bf96648cb` (evidence below).
 - **read-only extension (shem):** merge `93287e5f19256ca281c4dca348e2afdabb2b554b` of
   `6f5a82f130180d34293c99c2901663d207026bac` (parents `1bf96648cb` and `6f5a82f130`), by a fresh
-  integrator, no conflict and no integration fix; changelog commit `080f305797` is the head. What it
-  delivers, how it was verified and what it leaves: "What the merged lanes deliver", read-only entry.
+  integrator, no conflict and no integration fix; changelog commit `080f305797`. What it delivers, how
+  it was verified and what it leaves: "What the merged lanes deliver", read-only entry.
+- **recovery:** merge `b1010c4540c791a6a81d9cd573797d714e25ff2f` of `sprint3/recovery` `c63ef6bfa4`
+  into `080f305797`, no conflicts (`brit-cli/CHANGELOG.md` and `tests/cli-journey/tests/cli_surface.rs`
+  auto-merged; the lane's base is `9945331577`); then `b0770fdeadcaae2d8d39d2a5172fcbcc332b691d` and
+  `948a939f16e416d6357448e49eb2a4ac318e2f9d` (documentation and changelog); round 5 on the integration
+  branch, `a3b3ac71d5a73e7d272864ebd62f690e40ece456` through `99227182ad`, after which
+  `memory_replay.rs` passes untouched; and the documentation commits `6ee2d85a8d` and `6507caaaa1`.
+  What it delivers and its limits: "What the merged lanes deliver", recovery entry.
 
-- **recovery (Phase 4g, local only, NOT pushed):** merge `b1010c4540c791a6a81d9cd573797d714e25ff2f`
-  of `sprint3/recovery` `c63ef6bfa4` into `080f305797`, no conflicts (`brit-cli/CHANGELOG.md` and
-  `tests/cli-journey/tests/cli_surface.rs` auto-merged; the lane's base is `9945331577`), then
-  `b0770fdeadcaae2d8d39d2a5172fcbcc332b691d` (docs/rebase.md section "States this version can still strand" and its changelog
-  entry) and `948a939f16` (the lane's changelog entries). Blocked from push 10 by `memory_replay.rs`
-  (recovery entry in `brit-rebase-cost-gitlinks-and-stranding.md`).
+The twelve lanes: covenant-escape, log-rev-path, branch-tag, fetch-tracking, lock, build-inputs,
+push-transport, refs-shem, trust, diff-show, readonly-shem, recovery.
 
-Eleven lanes are merged and pushed on the integration branch: covenant-escape, log-rev-path,
-branch-tag, fetch-tracking, lock, build-inputs, push-transport, refs-shem, trust, diff-show,
-readonly-shem. The twelfth, recovery, is merged locally only.
-
-Verification of the ten-lane head on this host (before the read-only merge; the merge's own legs are
-in the read-only entry): full cli-journey 496 passed on the default build, 357 on
-the max-pure journey list; a non-root leg over 123 test binaries (1028 ok; the six differences from
-root are host artifacts: this host's `/etc/gitconfig` is unreadable to an unprivileged user, and three
-tests write a lock into a read-only worktree); the reviewer's three diff/show comparison scripts re-run
-on the MERGED binary show only the documented refusals.
+Verification of the ten-lane head on this host (before the read-only merge; later merges' own legs are
+in their entries): full cli-journey 496 passed on the default build, 357 on the max-pure journey list;
+a non-root leg over 123 test binaries (1028 ok; the six differences from root are host artifacts: this
+host's `/etc/gitconfig` is unreadable to an unprivileged user, and three tests write a lock into a
+read-only worktree); the reviewer's three diff/show comparison scripts re-run on the MERGED binary show
+only the documented refusals.
 
 **Lanes** (each in its own worktree under `/projects/elohim/.worktrees/`):
 
@@ -128,90 +228,57 @@ on the MERGED binary show only the documented refusals.
 | `sprint3/diff-show` | `5a422ceb51` | merged (`19ac68ad59`) after two review passes and a delta review | `brit-s3-diff-show` |
 | `sprint3/refs-shem` | `806ea8114b` (shem's `b8264afc4`) | merged (`b9b4a294fc`) | `brit-s3-refs-shem` |
 | `sprint3/readonly-shem` | `6f5a82f130` (five patches from shem's `origin self/nt-review-receipts` `ee7d60ecc65a`, applied with `git am` on `8e5072ffd3`) | merged (`93287e5f19`) | `brit-s3-readonly-shem` |
-| `sprint3/recovery` | round 1 up to `0d23297e22`; round 2 `9f3e6373`, `073cbfb0`, `5b107d72`; round 3 `b4183e93b9`, `e47ac0bbcd`, `a9fd9cc80a`; round 4 `a9fd9cc80a..c63ef6bfa4fa520364ebf4f1d8318aa307db68d9` (seven commits) | four independent reviews; merged LOCALLY as Phase 4g (`948a939f16`), NOT pushed: the lane's admission gates make `memory_replay.rs` (untouched by either side) go from 8 passed / 1 ignored to 2 passed / 6 failed. Round 5 (tighten the gates) started 19:35Z in the integration worktree; then its own review and the non-root leg before push 10. The follow-up round publishing every journal record whole is queued, not started (see `brit-rebase-cost-gitlinks-and-stranding.md`, Phase 4g and round 5) | `brit-s3-recovery` |
+| `sprint3/recovery` | `c63ef6bfa4fa520364ebf4f1d8318aa307db68d9` (rounds 1 to 4; round 5 and two documentation commits were made on the integration branch) | merged (`b1010c4540`) and pushed (pushes 10 and 11); six adversarial reviews | `brit-s3-recovery` |
+| `sprint3/recovery-r6` | `6c7dd8644fa2284a403f4df7c16cb5c3073f0409` (round 6: `93b168857516de78ccd58e5281fb1319c00a0cb9` code, `5c34cc5fb69749b7421d98bceff8362d002b1fac` journeys, `6c7dd864` docs, on `6ee2d85a8d`) | set aside, local only, never pushed: its review found it refusing an ordinary three-edit rebase at the real 1 GiB limit | none |
 
-**Monorepo side:** branch `feat/ark-declared-trust` (worktree `brit-s3-ark-trust`), first written as
-three commits on origin/dev `01e4de7f1`, then four (tip `d14e7357f`), reviewed. dev landed at
-`71069b1f551f` (the other ethosengine session's one push: L2b's eight commits, then L1's twenty-five)
-and moved on to `0f48e02fbf43`.
+**Monorepo side.**
 
-- **LANDED on dev, 20:28Z 2026-11-19.** origin dev = `758fb4f6b55917baf4bc1a0a2270600cb3dc044b`
-  (`00dd77dfb..758fb4f6b`, fast-forward, read back from the remote): `fb8f3d7b3` the custody rule in
-  epr-cli, `9d52fd5bd` ark's brit index spawns carry the declared trust, `1e56768e5` clippy,
-  `758fb4f6b` bounded regular file and the vectors. `git patch-id --stable` equal to the reviewed
-  commits (6b3404874e8f, 35e8ad83338f, d83a2c6affa2, fe5b88f19588); nine files; no `Cargo.toml`, no
-  `Cargo.lock`. The brit pin and brit `main` were not touched.
-  - How: the other device released the lane at about 19:38Z (its L2a went back for another review
-    round). `just dev prep` in the worktree (local submodules, `pnpm install`, preflight clear, hook
-    executable), then `GATE_EVIDENCE=reuse git -c core.hooksPath=<worktree>/.husky/_ push origin
-    HEAD:dev` — Git by `CLAUDE.md`'s landing exception, the worktree's own hook. Notices to the other
-    device and to `a222db7c` on berth ahead of each push. The fleet-roll check on each range printed
-    no row.
-  - First attempt (tip `c97a1428c` on dev `c0b1ec5e3`, 19:46Z–20:21Z): every gate green and recorded
-    (address-profile-lint, orchestrator-tree 330 s, elohim-ark 89 s, cargo-bridge 107 s,
-    jenkins-bridge 111 s, rust-style, eprfs-live-corpus 216 s, eprfs 1233 s) except `orchestrator`,
-    which failed in 3 s: `suite-run: submodule elohim/holochain-conductor at 993cf597… is in no
-    object store here`. That was the other device's defect in dev `0fd724eb2` (the suite's view wanted
-    objects of a submodule that `.gitmodules` declares `update = none`); it fixed it on dev as
-    `00dd77dfb6bc` while the run was going. Nothing was sent; the hook was not bypassed and the
-    submodule was not initialised by override.
+- **`feat/ark-declared-trust` LANDED on dev at 20:28Z on 2026-11-19.** origin dev =
+  `758fb4f6b55917baf4bc1a0a2270600cb3dc044b` (`00dd77dfb..758fb4f6b`, fast-forward, read back from the
+  remote): `fb8f3d7b3` the custody rule in epr-cli, `9d52fd5bd` ark's brit index spawns carry the
+  declared trust, `1e56768e5` clippy, `758fb4f6b` bounded regular file and the vectors. `git patch-id
+  --stable` equal to the reviewed commits; nine files; no `Cargo.toml`, no `Cargo.lock`. The brit pin
+  and brit `main` were not touched. Its one behaviour change: `trust_env` withholds the declared
+  checkout trust when the device key directory or the declaration fails the custody check. Both
+  devices pass it (this one: directory mode 2770, group 1234, held by the process; the other, reported
+  by it: directory mode 2700, declaration mode 600, uid 0 gid 1234, a 17-byte regular file).
+  - Verified before landing: epr-cli 1714 passed / 1 ignored (the ignored foreign-group test passes as
+    root); ark 67 passed / 2 ignored (the two root-only tests pass); clippy, fmt, `[rust-style] PASS`;
+    the fleet-roll guard prints no row for the range and refuses dev's `cde35de1b` as a control;
+    non-root (uid 65534, both HOME modes) every test of the branch passes. Failures found that are not
+    the branch's: `brit-ci-and-workspace-limits-found-in-sprint-3.md`, item (q).
+  - Linked worktrees, read at the branch: `git::checkout()` is unchanged (the nearest ancestor with a
+    `.git` entry, so a linked worktree is its own root), and matching is still "that root equals one
+    whole line of the declaration". An undeclared linked worktree gets no declared trust before or
+    after the branch (steward item 9).
+  - How: the other device released the lane at about 19:38Z. `just dev prep` in the worktree, then
+    `GATE_EVIDENCE=reuse git -c core.hooksPath=<worktree>/.husky/_ push origin HEAD:dev` (Git by
+    `CLAUDE.md`'s landing exception, the worktree's own hook). Notices to the other device and to
+    `a222db7c` on berth ahead of each push. The fleet-roll check on each range printed no row.
+  - First attempt (tip `c97a1428c` on dev `c0b1ec5e3`, 19:46Z–20:21Z): every gate green except
+    `orchestrator`, which failed in 3 s: `suite-run: submodule elohim/holochain-conductor at 993cf597…
+    is in no object store here`, the other device's defect in dev `0fd724eb2`, fixed by it as
+    `00dd77dfb6bc` during the run. Nothing was sent; the hook was not bypassed.
   - Second attempt (rebased tip `758fb4f6b` on `00dd77dfb`, 20:23Z–20:28Z): `PRE-PUSH GATE: ALL CLEAR
-    (267s)`. Reused this workspace's own greens from the first attempt: elohim-ark, jenkins-bridge,
-    eprfs-live-corpus, eprfs. Ran: address-profile-lint, cargo-bridge (not enabled for reuse),
-    rust-style, orchestrator (61 s, a real run: "changed since attested commit and selects this
-    gate"), orchestrator-tree (94 s). The log carries eight `[pre-push]` lines.
-  - Build notes: `just dev notes publish` after the dry run — 47 refs, every one a NEW reference under
-    this device's own destination `refs/notes/brit/devices/<this device's did>/build/*` (this device
-    had not published there before); nothing to the shared `refs/notes/brit/build/*`; covenant notes
-    stayed local. The peer daemon was left serving.
-  - A slip of mine during the third rebase: the remote's ref listing prints dev twice, an unquoted
-    two-line variable became two arguments, and `git rebase <id> <id>` detached HEAD at dev. The
-    branch was untouched; I checked it out again and rebased onto one explicit id.
-  - Both push logs and the two scripts are kept at `/projects/elohim/.worktrees/brit-s3-keep/`
-    (`land.log`, `land2.log`, `land.sh`, `land2.sh`, `notes-publish.log`).
-  - Seen in the second log, not this branch's, passed to the other device: inside the orchestrator
-    suite, `[gate] elohim-storage evidence: … could not be read (no reply for …/brit-build-ref --repo
-    …)` four times, and `[gate] fixture evidence: … could not be read (/usr/local/bin/node: bad
-    option: --repo); writing anyway`.
-  The entries below are the history that led to it.
-
-- **Rebased and verified, still local.** `feat/ark-declared-trust` = `285e8513b` on dev
-  `0f48e02fbf43` (commits `0c989cf91`, `4bdc2b7ca`, `f41477076`, `285e8513b`); backup branch
-  `backup/ark-declared-trust-pre-rebase-2` at `d14e7357f`. No conflicts; `git patch-id --stable`
-  identical for all four; the nine files' content identical to the backup (tree diff empty, checked by
-  the coordinator); the last commit message now says 47 cases. The vector file is unchanged by a
-  re-mint (the mint run exits 101 by design).
-- **Verification.** epr-cli 1714 passed / 1 ignored (1692 before the rebase); the ignored
-  foreign-group test passes as root. ark 67 passed / 2 ignored; the two root-only tests pass. clippy
-  and fmt clean; `[rust-style] PASS`. The fleet-roll guard, run as pre-push runs it
-  (`GATE_PUSH_TARGETS=refs/heads/dev GATE_PUSH_REFS="refs/heads/dev <HEAD> <base>" node
-  genesis/orchestrator/gate-preflight.mjs --fleet-roll`), prints no row and exits 0 for the range,
-  and refuses dev's `cde35de1b` as a control. Non-root (uid 65534, both HOME modes): every test of the
-  branch passes; ark 67 ok in all three legs. Failures found that are not this branch's:
-  `brit-ci-and-workspace-limits-found-in-sprint-3.md`, item (q).
-- **Before landing.** origin dev has since moved to `c0b1ec5e3` (gate code, pool policy and docs
-  only), so one more trivial rebase precedes any landing. The other session on this device
-  (`a222db7c`, landing L2a in `elohim/eprfs`) confirmed over berth (notice 18:02Z, reply 18:04Z,
-  answer 18:33Z) that L2a touches none of the branch's files and depends only on
-  `git::trust_env(&Path)` and the read helpers keeping their signatures; they do. Asked of the other
-  device at about 19:30Z and answered by it at about 19:33Z (reported by the other device):
-  - Custody: its device key directory is mode 2700 and the declaration `trusted-checkouts` mode 600,
-    both uid 0 gid 1234, a 17-byte regular file, and its process holds that group. By the branch's
-    predicate it passes, so `trust_env` keeps applying the declared trust there. Its repository holds
-    32 pack indexes, exactly the reduced-trust cap, so a withheld trust would fail its next read.
-  - Linked worktrees: its declaration names only the main checkout and every landing there is made
-    from a linked worktree. Read at `285e8513b` against its base: `git::checkout()` is not changed by
-    the branch (the nearest ancestor with a `.git` entry, so a linked worktree is its own root) and
-    matching is still "that root equals one whole line of the declaration". An undeclared linked
-    worktree gets no declared trust before or after the branch; it works on both devices because git
-    accepts it by ownership. Whether declaring a main checkout should cover its linked worktrees is
-    the open steward item, not decided by this branch.
-  - Lane: the branch waits behind the other device's landing L2a. If L2a has not been handed back to
-    that device by 21:30Z, this branch lands first, with one line to it and to `a222db7c` on berth
-    ahead of the push. Either way: rebase onto dev as it then stands, run the fleet-roll check on the
-    range, land by fast-forward through the gated path, leave the peer daemon serving. That landing
-    does not move the brit pin or touch brit `main`.
-- The queued epr-cli `device_store(…)` lane stacks on this branch.
+    (267s)`; four gates reused this workspace's greens from the first attempt; orchestrator ran for
+    real (61 s). The log carries eight `[pre-push]` lines.
+  - Build notes: `just dev notes publish` after the dry run (steward item 11). The peer daemon was left
+    serving.
+  - A slip during the third rebase: an unquoted two-line variable became two arguments and `git rebase
+    <id> <id>` detached HEAD at dev; the branch was untouched and was checked out and rebased again.
+  - Logs and scripts: `/projects/elohim/.worktrees/brit-s3-keep/` (`land.log`, `land2.log`,
+    `land.sh`, `land2.sh`, `notes-publish.log`). Seen in the second log and passed to the other
+    device, not this branch's: `[gate] elohim-storage evidence: … could not be read (no reply for
+    …/brit-build-ref --repo …)` four times, and `[gate] fixture evidence: … could not be read
+    (/usr/local/bin/node: bad option: --repo); writing anyway`.
+- **Since then (reported by the other device).** Its L2a landed as dev
+  `b950d74b1f32de2cf451ab1f07b57f7ecc2823a2` (23:16Z) and a hardening landing as
+  `b077336ca85aaa7e63cd0423214c8f4dd4f3d31f` (00:13Z on 2026-11-20). It followed both releases from a
+  clean checkout with no local build: draws of 22.8 s and 19.0 s, whole follows of 32 s and 30 s,
+  against 1,924 s of building that morning. The declared-trust code is in both drawn releases and runs
+  on that device, from linked worktrees and from the main checkout at 32 pack indexes with trust
+  applied, printing nothing about trust or packs.
+- CI after the ark landing: "Evidence behind the steward's items" below.
 
 **This record** is on monorepo branch `docs/brit-backlog-sprint3` (worktree `brit-s3-backlog`).
 
@@ -229,13 +296,15 @@ and moved on to `0f48e02fbf43`.
   security defect; the trust decision matches git 2.52 in all seventeen cases of the final table. The
   multi-pack-index regression and the env-scope `includeIf` grant the first pass found are fixed
   (trust entry).
-- **diff-show** (merged; final state in `brit-porcelain-gaps-census-2026-11.md`): the
-  first, partial review read: `brit diff`: 1,155 of 1,230 comparisons byte-identical to
-  git, the other 75 clean refusals from one file carrying a `diff=<driver>` attribute; worktree forms
-  100% identical except refusals for intent-to-add entries and a conflicted index; shallow merge-base
-  264/264. `brit show` is verified on ordinary commits only (122 of 132 identical, 10 driver
-  refusals); merges, tags and encodings are still under review. Limits recorded in
+- **diff-show** (merged): two review passes and a delta review. The first pass measured `brit diff`
+  at 1,155 of 1,230 comparisons byte-identical to git, the other 75 clean refusals from one file
+  carrying a `diff=<driver>` attribute; worktree forms identical except refusals for intent-to-add
+  entries and a conflicted index; shallow merge-base 264/264; `brit show` on ordinary commits 122 of
+  132 identical, 10 driver refusals. The final state, encodings included, and the measured limits:
   `brit-porcelain-gaps-census-2026-11.md`.
+- **recovery** (merged and pushed): six adversarial reviews, four of the lane (rounds 1 to 4), a fifth
+  of round 5 and a sixth of round 6 (which set round 6 aside). Each review's findings and what held:
+  `brit-rebase-cost-gitlinks-and-stranding.md`.
 
 ## What the merged lanes deliver
 
@@ -362,9 +431,10 @@ and moved on to `0f48e02fbf43`.
     integrators applied in `tests/helpers.sh` (runbook §4) was refused by the session's automatic
     permission check this time and was not worked around. The small variant ran fully (62
     assertions). CI covers this: on run 44583007601 attempt 2, `test-journey` ran all four variants
-    green, and Windows and 32-bit were green; macOS is unverified for this head (head/push table).
+    green, and Windows and 32-bit were green; macOS is unverified for this head (push table). On
+    `99227182ad` (run 44635383858) every platform, macOS included, was green with this lane merged.
     The new journey file `read_only_closed_reader.rs` is `#![cfg(target_os = "linux")]` and
-    runs in `test-fast` only (whether to add it to `test-journey`: "Decided but not started", item 3).
+    runs in `test-fast` only (whether to add it to `test-journey`: steward item 6).
   - **Follow-ups the other device accepted as its lane's, none blocking.** A completed `build baseline
     write` or `migrate` exits 1 on a closed stdout after its ref changed; both devices agree this
     belongs with the push-policy lane's rule "a delivered operation reports success" and is decided
@@ -373,6 +443,24 @@ and moved on to `0f48e02fbf43`.
     end 1 (read, not measured). `remote -n <unknown> url` exits 0 printing the name as a URL (predates
     the lane). With the Windows separators for rev-parse's absolute answers, the other device says
     that is the whole of what its lane still owes brit.
+- **recovery** (merged as `b1010c4540`, then round 5 and two documentation commits on the integration
+  branch; pushed as `99227182ad` and `6507caaaa1`). Full history, reviews and measurements:
+  `brit-rebase-cost-gitlinks-and-stranding.md`.
+  - **What it does.** Rebase and switch recovery cannot strand a repository under a kill. `--abort`
+    and cleanup are never refused by the scratch limit, including when the retained copy is larger
+    than the limit (steward item 4). The journal is metered and reserved with a 5/4 factor.
+    `tests/cli-journey/tests/memory_replay.rs` passes untouched at the real limit (8 passed / 1
+    ignored). New flag `brit rebase --retire` (steward item 3).
+  - **Verified.** CI run 44635383858 on `99227182ad`: green on Linux, macOS and Windows,
+    `test-journey` with its memory step and `test` included. Local legs on that head: the rebase
+    entry's "Final state of that round, 23:05Z" and "CI run 10".
+  - **Documented limits** (`docs/rebase.md` at `6507caaaa1`): three cases in which an admitted rebase
+    is refused at a later step, before that step writes, with `--abort` restoring exactly: an edit stop
+    whose accepted amend archives the whole tree's objects; a diff3/zdiff3 conflict whose base is far
+    larger than both sides; `--stage --expand-scope` reserving about half of what it writes. Also the
+    torn-record states listed there.
+  - **Not pushed.** Round 6 ("reserve every stop before the user works"), kept as local branch
+    `sprint3/recovery-r6` (lane table; steward item 5).
 
 ## The sprint's backlog entries
 
@@ -385,90 +473,48 @@ and moved on to `0f48e02fbf43`.
   `brit-build-fingerprint-cannot-resolve-any-commit-in-monorepo.md`,
   `ci-brit-worktree-restore-cancellation-test-races.md`, `brit-reach-gate-requires-packages-root.md`.
 
-## Decided but not started, in order
+## Evidence behind the steward's items
 
-1. The rebase recovery/stranding lane, in the order decided after the cost report in
-   `brit-rebase-cost-gitlinks-and-stranding.md`: (a) the stranding fixes (report §7 a–d) plus a
-   preflight that refuses before any spooling when completion is impossible; (b) the redesign (report
-   §6), after the steward's decision on the retained-manifest format below. Rebase stays a declared
-   git fallback on both devices. Step (a) is lane `sprint3/recovery`: reviewed four times, merged
-   locally as Phase 4g, not pushed; round 5 (tightening the admission gates) is running (lane table).
-   Its queued follow-up round (every journal record published whole, truthful `--status` for
-   unreadable records) is part of step (a) and needs its own independent review.
-2. Eleven reviewed lanes are merged and pushed on the integration branch (listed under "Where the
-   work is"); recovery is merged locally only.
-3. A push-policy lane (`push.rs`): one handshake when no hook ran; the notes/tag fast-forward rule;
-   refuse an ungated push when hooks are configured but missing or not executable; render the delivery
-   note in the CLI. See `brit-push-fails-after-green-hook-root-cause.md`. Also for this lane: push's
-   status lines use `writeln!(stderr, …)?` (`gitoxide-core/src/repository/push.rs`), so a DELIVERED
-   push with a closed stderr exits non-zero. The same rule, "a delivered operation reports success",
-   is to decide `build baseline write` and `migrate`, which exit 1 on a closed stdout after their ref
-   changed (read-only entry under "What the merged lanes deliver").
-   - Closed-pipe leftovers: the read-only merge routed brit-cli's build output through the watched
-     writer, so `brit build fingerprint` no longer panics (101 → 141) and `build graph discover` is on
-     the list. Not established as changed by it: the `println!` sites counted earlier in
-     brit-build-ref (21), brit-verify (7) and brit-cli (3); no brit binary installs a panic hook. `brit log` prints a commit message with an
-     `encoding` header as raw bytes (`show` is fixed on the diff-show lane; `log` is separate code);
-     `show::to_utf8` is private, so this needs it made `pub(crate)`. `-C` refusals name the clap id
-     `change_dir`.
-   - CI's `test-journey` job runs its named list against a standalone default-feature binary, not the
-     shipped max-pure one. Eleven journey files added this sprint are not in that list (broken_pipe,
-     change_dir, check_ref_format, diff_revisions, for_each_ref, ls_remote, merge_base_is_ancestor,
-     rev_list, rev_parse, show, read_only_closed_reader), though test-fast runs them; whether to add
-     them is the steward's call.
-   - 35 first-party test functions open a repository in-process without isolation from host git
-     config (brit-graph repo_fingerprint 21, gitoxide-core replay 11, others): the class that produced
-     the non-root CI failure. Listed in the integration note, not fixed.
-4. The epr-cli lane: a `device_store(…)` constructor that always attaches `DeviceRunner`, and a
-   source-scan test, stacked on `feat/ark-declared-trust` after shem's L2b lands; `bin.rs` waits for
-   the landed sha. See `brit-declared-trust-and-reduced-trust-pack-cap.md` (epr-cli spawn audit).
-5. Worktree-side diff with gitlinks.
-6. Merge porcelain.
+The list itself is in "State at the sprint's close"; the queued work is in "Queued work, not started".
 
-## What needs the steward
-
-- **A brit pin move does not select an Edge build in CI today (observed).**
+- **A brit pin move does not select an Edge build in CI today (observed; item 2).**
   - Observed: the last brit pin move was monorepo commit `1602399eead0`, "chore(brit): pin brit 0.2.6
     (1db7a955)" (0.2.0 to 0.2.6, committed 2026-11-17T21:01:08Z, one path: `elohim/brit`); the one
     before it is `e239f339369b`, "chore(brit): pin brit 0.2.0 (e70fc8ad)", 2026-11-15. The id
     c64967822 quoted by the other device for this commit is not on the remote; the id here was read
     from the path's history on dev. The orchestrator run that covered it is Jenkins
     `elohim-orchestrator/dev` #2359, whose checkout is `bea497110028` (2026-11-17T21:12:11Z, eleven
-    minutes after the pin commit). Its changed-files tree lists `elohim/brit`; it prints "3 external dep(s) to unmanaged
-    pipelines (Sprint 2): elohim-brit:brit-ci, elohim-rakia:rakia-ci, elohim-sophia:build-sophia-umd";
-    its plan table shows the `[elohim-edge]` block with `build-edge-image │ SKIP │ no changes` (shem
-    reports every step of that block SKIP); and its only dispatch line is `Triggering elohim-eprfs/dev`.
-    Found by shem; the coordinator re-read lines 753, 828, 1079, 1082 and 1308 of that build log
-    through the Jenkins MCP on 2026-11-19, and they say what is quoted.
+    minutes after the pin commit). Its changed-files tree lists `elohim/brit`; it prints "3 external
+    dep(s) to unmanaged pipelines (Sprint 2): elohim-brit:brit-ci, elohim-rakia:rakia-ci,
+    elohim-sophia:build-sophia-umd"; its plan table shows the `[elohim-edge]` block with
+    `build-edge-image │ SKIP │ no changes` (shem reports every step of that block SKIP); and its only
+    dispatch line is `Triggering elohim-eprfs/dev`. Found by shem; the coordinator re-read lines 753,
+    828, 1079, 1082 and 1308 of that build log through the Jenkins MCP on 2026-11-19, and they say
+    what is quoted.
   - So a brit pin move is not a fleet roll; it does dispatch the eprfs pipeline. Still unobserved, same
     mechanism by the code: rakia and sophia pin moves. What DOES select Edge: a holochain-conductor pin
     move (its manifest is in the superproject; `fleet-roll-guard.mjs` refuses it without
-    `[edge:roll]`).
-  - How to check any future pin move: search the orchestrator build log for the `║ [elohim-edge]` block
-    and the `Triggering` lines.
-  - The remaining preconditions of a brit pin move are the steward's word and an attestation that means
-    something (next item).
-  - How the question arose: `build-edge-image` in `elohim/holochain/build-manifest.json` declares `depends` on
-    `cargo-build-doorway`, `cargo-build-storage`, `elohim-holochain:build-happ`, `elohim-brit:brit-ci`
-    and `elohim-rakia:rakia-ci` (read on this branch). CI's `build-graph.groovy` propagates staleness
+    `[edge:roll]`). How to check any future pin move: search the orchestrator build log for the
+    `║ [elohim-edge]` block and the `Triggering` lines.
+  - How the question arose: `build-edge-image` in `elohim/holochain/build-manifest.json` declares
+    `depends` on `cargo-build-doorway`, `cargo-build-storage`, `elohim-holochain:build-happ`,
+    `elohim-brit:brit-ci` and `elohim-rakia:rakia-ci`. CI's `build-graph.groovy` propagates staleness
     through `depends`; the JS walker `genesis/orchestrator/graph-walker.mjs` does not (and ignores
-    dotfiles), so a by-hand walker check shows nothing for a pin move. The ark branch was re-checked
-    against `depends`: Edge depends on nothing from elohim-eprfs or elohim-ark.
-  - But brit's manifest (`elohim/brit/build-manifest.json`) lives inside the submodule. Two
-    independent readers on shem concluded from the Jenkinsfile and `build-graph.groovy` that CI's
-    checkout does not see a submodule's manifest, so CI does not carry a brit or rakia pin move into
-    Edge today.
-  - That reading had not been checked against a real CI run, and it contradicted the standing note that
-    a pin move rolls the fleet. The observation above settles it for brit.
-  - Since dev `0f48e02fbf43`, a pre-push check `genesis/orchestrator/fleet-roll-guard.mjs` (on dev at
-    `0f48e02fbf43`; not on this branch, which is older) refuses a push to dev or main whose commits
-    would make CI select an Edge build or deploy step, unless a pushed commit message carries
-    `[edge:roll]`. It REFUSES a holochain-conductor pin move (manifest in the superproject) and only
+    dotfiles), so a by-hand walker check shows nothing for a pin move. brit's manifest
+    (`elohim/brit/build-manifest.json`) lives inside the submodule, and two independent readers on shem
+    concluded from the Jenkinsfile and `build-graph.groovy` that CI's checkout does not see a
+    submodule's manifest. The observation above settles it for brit, against the older note that a pin
+    move rolls the fleet.
+  - Since dev `0f48e02fbf43`, the pre-push check `genesis/orchestrator/fleet-roll-guard.mjs` refuses a
+    push to dev or main whose commits would make CI select an Edge build or deploy step, unless a
+    pushed commit message carries `[edge:roll]`. It REFUSES a holochain-conductor pin move and only
     WARNs for a brit or rakia pin. It reads git objects only, so on a shallow clone a range reaching the
     shallow boundary with no declaration is refused as undecidable (cure: `git fetch --deepen=<n>
     origin`). A `[skip ci]` or `[edge:validate-only]` tip over inputs a pipeline builds gets a WARN that
     CI dispatches nothing for that push.
-- **A brit pin must name a commit whose own CI run included the aggregate fix.**
+  - The pin move's other preconditions: the steward's word and an attestation that means something
+    (next item). 16 monorepo steps re-key once (build-inputs entry).
+- **A brit pin must name a commit whose own CI run included the aggregate fix (item 1).**
   - Setup: brit's `build-manifest.json` declares its gate as `run.kind: attested`, provider
     `github-checks`, repo `ethosengine/brit`, check "Tests pass". `genesis/orchestrator/gate-attest.mjs`
     takes the most recently started check run of that name at the pinned commit and passes on
@@ -486,108 +532,68 @@ and moved on to `0f48e02fbf43`.
     except `"test-fast": { "result": "abandoned" }`. `test-fast (macos-latest)` shows in the jobs API as
     `cancelled` 15 minutes after start (16:32:49Z → 16:47:51Z) with no steps and no log, exactly as on
     run 44544779620 (14:32:05Z → 14:48:12Z), where the same abandoned leg hid two FAILED ubuntu legs of
-    the same matrix job. The earlier "last leg to finish" pattern was a coincidence and is withdrawn.
-    On run 44567300304 the pre-fix `Tests pass` again concluded `success` (17:09:53Z) over the
-    abandoned macOS leg.
+    the same matrix job. On run 44567300304 the pre-fix `Tests pass` again concluded `success`
+    (17:09:53Z) over the abandoned macOS leg.
   - FIX on the integration branch: commit `4dceac3557` (the diagnostic step `Show dependency results`)
     and commit `1bf96648cb` (a step `Fail unless EVERY dependency succeeded`: an allow-list that fails
     on any result other than `success` and on an empty result list). The older deny-list step is kept
     because `scripts/ci/test_qualify_readiness.py` reads its `'skipped'` clause.
   - CONSEQUENCE (in the other device's words, agreed): the monorepo's gate already passes a pin only
     when the named check's conclusion is exactly `success` (`gate-attest.mjs`), so the hole was wholly
-    in what the aggregate reports. Therefore a brit pin should name a commit whose OWN CI run included
-    the allow-list step. A `Tests pass` from any commit built before it cannot be trusted either way,
-    even where its legs were in fact green; that covers every brit commit on main today, including the
-    pinned 0.2.6.
-  - FIRST COMMIT THAT MEETS IT: `1bf96648cbec09baf9a957477ea36d975aa7c1bf`. Its own CI run
-    44575030094 included the allow-list step and is green on Linux, macOS and Windows with ten lanes
-    merged (head/push table). It is on `run-ci/sprint3-integrate`, not on brit `main`. The other device
-    has recorded the same commit and run on its side. Landing on main and moving the pin remain the
-    steward's decisions; nothing has been done toward either. The later head `080f305797` (eleven
-    lanes) is green on everything that ran and unverified on macOS (run 44583007601, three attempts;
-    head/push table), so `1bf96648cb` remains the only commit with a complete green aggregate.
-  - Still proposals for the steward, not done: add the job `test` (the unit-tests recipe) to the
-    aggregate's `needs` (it also failed on run 44544779620 and is not in `needs` at all; it passed on
-    44575030094, whose aggregate printed 17 needs without it); on the monorepo side, read every
-    workflow run's conclusion at the commit as a second check (queued by shem behind its gate lanes, to
-    land together with the manifest's attestation field). Read on GitHub: the run conclusion of
-    44575030094 is `failure`, as is 44567300304's, solely because cargo-deny-advisories is red, so that
-    second check as worded would refuse every brit commit while the advisory job stays red.
-  - macOS: abandoned on runs 44544779620 and 44567300304 (from about 14:30Z), it got a runner and passed
-    on 44575030094 (17:26:05Z), then was cancelled without a runner on attempts 1 and 2 of 44583007601.
-    The fix makes an abandoned leg FAIL the aggregate, as it did on both those attempts.
-- Landing on brit `main` and the pin move. Candidate commit: previous item. 16 monorepo steps re-key once (build-inputs above); one
-  supervised real landing is needed to retire the push exception in `CLAUDE.md`. Its notes step is the
-  device's own notes publish, fast-forward to `refs/notes/brit/devices/<did>/build/*`, which brit must
-  be able to perform (or the publish script keeps using git, stated as a fallback); see
-  `brit-push-fails-after-green-hook-root-cause.md`. The landing procedure changed during this sprint:
-  re-read it from `CLAUDE.md` on origin/dev at landing time.
-- Decision: in the rebase redesign, the retained-manifest format change (v2 with a floor) would apply
-  to EVERY new copy, not only shallow ones as scoped earlier, so an older brit fails closed on any copy
-  a newer one wrote. This reverses the approved scope; see
+    in what the aggregate reports. A brit pin should therefore name a commit whose OWN CI run included
+    the allow-list step. A `Tests pass` from any commit built before it cannot be trusted either way;
+    that covers every brit commit on main today, including the pinned 0.2.6. `1bf96648cb` was the first
+    commit to meet it; `99227182ad` meets it too (state table). The other device has recorded
+    `1bf96648cb` and its run on its side.
+  - Proposals, not done (item 6): add the job `test` (the unit-tests recipe) to the aggregate's `needs`
+    (it failed on run 44544779620 and is not in `needs`; the aggregate on 44575030094 printed 17 needs
+    without it). On the monorepo side, reading every workflow run's conclusion at the commit as a
+    second check is queued by shem behind its gate lanes; as worded it would refuse every brit commit
+    while cargo-deny-advisories stays red (the run conclusions of 44575030094 and 44567300304 are
+    `failure` for that job alone).
+  - `test-journey`'s list (item 6): the job runs its named list against a standalone default-feature
+    binary, not the shipped max-pure one. Eleven journey files added this sprint are not in it
+    (broken_pipe, change_dir, check_ref_format, diff_revisions, for_each_ref, ls_remote,
+    merge_base_is_ancestor, rev_list, rev_parse, show, read_only_closed_reader), though test-fast runs
+    them. The recovery lane's journey files were not checked against the list in this record.
+- **Landing on brit `main` (item 1).** One supervised real landing is needed to retire the push
+  exception in `CLAUDE.md`. Its notes step is the device's own notes publish, fast-forward to
+  `refs/notes/brit/devices/<did>/build/*`, which brit must be able to perform (or the publish script
+  keeps using git, stated as a fallback); see `brit-push-fails-after-green-hook-root-cause.md`. The
+  landing procedure changed during this sprint: re-read it from `CLAUDE.md` on origin/dev at landing
+  time.
+- **The retained-manifest format (item 12).** In the rebase redesign the format change (v2 with a
+  floor) would apply to EVERY new copy, not only shallow ones as scoped earlier, so an older brit fails
+  closed on any copy a newer one wrote. This reverses the approved scope; see
   `brit-rebase-cost-gitlinks-and-stranding.md`.
-- `feat/ark-declared-trust` is LANDED on dev as `758fb4f6b` (20:28Z; see "Monorepo side" above). It
-  was landed under the steward's "you can push when you get there", after the other device released
-  the lane. Its one behaviour change — `trust_env` withholds the declared checkout trust when the
-  device key directory or the declaration fails the custody check — reaches a device with the first
-  MARKED release it follows, or with a local build: this landing went before the other device's L2a
-  (the producer that marks releases), so it produced an unmarked release, which that device's follower
-  refuses before a fetch (reported by the other device). Both devices were checked first and pass
-  (this one: directory mode 2770, group 1234, held by the process; the other: 2700). For the steward
-  to know, not to decide: this device's first publication of its build notes went out with it (47 new
-  refs under its own destination).
-- CI after the landing (Jenkins, read-only). `elohim-orchestrator/dev` #2384 checked out `758fb4f6b`:
-  rust-style PASS; elohim-edge dispatched validate-only and then skipped by the already-built filter —
-  no Edge build, no fleet roll; it triggered `elohim-eprfs/dev` #189, which failed, and the
-  orchestrator build with it. #189: `2634 tests run: 2633 passed (1 slow), 1 failed, 1 skipped`; this
-  branch's tests passed there. The one failure predates the landing (identical in #188 on
-  `00dd77dfb` and #190 on `dd3186d7d`): `bin_build_view
-  every_tracked_file_a_build_of_epr_reads_is_inside_the_view`, "no dep-info at …/target/debug/epr.d".
-  Cause (confirmed by the other device in the two recipes): the device gate builds the `epr` and
-  `bin-launch` bins before its tests, the pipeline's test stage ran `cargo nextest` alone. Every device
-  was green and CI was red on that one test from #168 (2026-11-17) to #190; `elohim-eprfs/dev` had no
-  green since #167 and every `elohim-orchestrator/dev` build from #2380 to #2384 failed on it. The
-  other device fixed it on dev as `f27e22e69` (the same build line in the pipeline, and a test that
-  refuses a pipeline whose test stage lacks the gate's bins step). dev is `f27e22e69` (my four commits,
-  then that device's `4ce35271d`, `dd3186d7d`, `f27e22e69`).
-- **For the steward, raised by the other device, not by this sprint:** `elohim-eprfs/dev` #191 on
-  `f27e22e69` has its tests green for the first time since #167 (2634 passed) and then fails in the
-  publish stage: "eprfs-core 0.3.5: immutable version collision; bump the version". Today's `cc` bump
-  in `elohim/eprfs/Cargo.lock` (L1, `2090a4d82`) changed the lock cargo packs into each package, so
-  eprfs-core 0.3.5, eprfs-storage 0.3.8, eprfs-meta 0.3.6 and eprfs-local 0.3.6 differ from the
-  registry's copies (measured by that device against the registry; nothing uploaded). The choices it
-  is bringing: four version bumps, which move `elohim/Cargo.lock` and so an Edge build and deploy; or
-  leaving the packed lock out of the publish comparison for library packages. Until then: no lane of
-  this sprint bumps a published crate or touches `elohim/Cargo.lock` to make CI green.
-- Queued epr-cli lane (the spawn audit: one bin-store `Store` constructor that attaches the device
-  runner; `integrate.rs` `quality_gate` trust; `git.rs` `discover_root` wording; a source-scan test;
-  the waiting `bin.rs` hunk): agreed with the other device to start after the recovery review, in the
-  prepared worktree `brit-s3-ark-trust` on a new branch from dev; one berth line to `a222db7c` before
-  its first cargo build; handed over as a ref before landing; landed only after L2a, as the second of
-  that device's two marked landings; it stays out of `artifact.rs` and the `artifact/` tree; and that
-  device is told whether it changes `follow` or `device supervise` on an arrived device. Not started.
-- Pool: the landing gates left about 18 GB of slots under family `ark`; removed at 20:57Z when the
-  pool read 153 GB of its 150 GB cap. The later lane rebuilds them.
-- `git repack -a -d` in the monorepo.
-- The upstream-owned gix changes in `sprint3/trust` (now merged; `safe.rs` is byte-identical to
-  upstream again).
-- Trust for linked worktrees.
-- The local-only commit `5d53c7ac8`.
-- brit-graph (0.2.1) gained an error variant and `#[non_exhaustive]` on
-  `brit_graph::fingerprint::FingerprintError`, so it needs a version bump at release.
-- brit's crate releases are recorded in `brit-epr/CHANGELOG.md`; `brit-cli/CHANGELOG.md` does not
-  record brit-graph API changes.
-- gix gained `REDUCED_TRUST_MAX_PACK_INDEXES` and gix-odb `Store::count_index_slots`, so both need
-  version bumps at release; brit-epr gained a public `diagnostic` module and a gix-error dependency.
-- A write-set for `elohim/rakia`, for one of two items: the rakia-core selection hole needs one;
-  nothing is needed there for the slot wall.
-- The spawn audit in `brit-declared-trust-and-reduced-trust-pack-cap.md` was run on a monorepo
-  checkout at `5d53c7ac8`, 142 commits behind origin/dev. Its sites are now named by function and were
-  re-located on this branch; re-locate them again before acting on them.
-- The six new standalone brit entries from this sprint are not yet listed in
-  `genesis/data/timeline/backlog/CLUSTERS.md`. No brit cluster exists, and the census entry
-  (`brit-porcelain-gaps-census-2026-11.md`) in particular is research-derived and belongs in a cluster
-  by the convention. To be done when this branch lands, or by whoever owns the clusters file.
+- **CI after the ark landing (Jenkins, read-only; background to item 10).** `elohim-orchestrator/dev`
+  #2384 checked out `758fb4f6b`: rust-style PASS; elohim-edge dispatched validate-only and was then
+  skipped by the already-built filter (no Edge build, no fleet roll); it triggered `elohim-eprfs/dev`
+  #189, which failed on one test that predates the landing (identical in #188 and #190):
+  `bin_build_view every_tracked_file_a_build_of_epr_reads_is_inside_the_view`, "no dep-info at
+  …/target/debug/epr.d". The device gate builds the `epr` and `bin-launch` bins before its tests; the
+  pipeline's test stage ran `cargo nextest` alone. CI was red on that test from #168 (2026-11-17) to
+  #190. The other device fixed it on dev as `f27e22e69`. Then #191 on `f27e22e69` had its tests green
+  (2634 passed) and failed in the publish stage, "eprfs-core 0.3.5: immutable version collision; bump
+  the version": the `cc` bump in `elohim/eprfs/Cargo.lock` (L1, `2090a4d82`) changed the lock cargo
+  packs into each package, so eprfs-core 0.3.5, eprfs-storage 0.3.8, eprfs-meta 0.3.6 and eprfs-local
+  0.3.6 differ from the registry's copies (measured by that device against the registry; nothing
+  uploaded). Until the steward decides, no lane bumps a published crate or touches `elohim/Cargo.lock`
+  to make CI green.
+- **The upstream-owned gix changes (item 7).** The trust lane changes `gix/src/open/*` (`safe.rs` is
+  byte-identical to upstream again): `brit-declared-trust-and-reduced-trust-pack-cap.md`. The
+  push-transport lane's: `brit-push-fails-after-green-hook-root-cause.md`.
+- **Release-time items (no decision; for whoever releases).** brit-graph (0.2.1) gained an error
+  variant and `#[non_exhaustive]` on `brit_graph::fingerprint::FingerprintError`, so it needs a version
+  bump; gix gained `REDUCED_TRUST_MAX_PACK_INDEXES` and gix-odb `Store::count_index_slots`, so both
+  need version bumps; brit-epr gained a public `diagnostic` module and a gix-error dependency. brit's
+  crate releases are recorded in `brit-epr/CHANGELOG.md`; `brit-cli/CHANGELOG.md` does not record
+  brit-graph API changes.
+- **Housekeeping.** The six new standalone brit entries from this sprint are not yet listed in
+  `genesis/data/timeline/backlog/CLUSTERS.md`; no brit cluster exists, and the census entry is
+  research-derived and belongs in a cluster by the convention. Pool: the landing gates left about 18 GB
+  of slots under family `ark`, removed at 20:57Z on 2026-11-19 when the pool read 153 GB of its 150 GB
+  cap.
 
 ## Coordination with shem
 
@@ -604,14 +610,16 @@ and moved on to `0f48e02fbf43`.
 ## Integration runbook
 
 The text below is the integration worktree's handoff note, copied in full from the session
-scratchpad. Its `/tmp/claude-0/…/scratchpad/integrate/` paths (the `$S` scripts, summaries, logs and
-`bin-keep` binaries) are session scratch and will not survive a workspace restart. The scratch build
-directory `dev-nocflags` it mentions has been deleted. A second integrator took over from this note
-and did the phase that merged push-transport and the build-inputs Windows follow-up; later integrators
-merged refs-shem, trust, diff-show and readonly-shem from it, and recovery locally as Phase 4g (not
-pushed). The procedure stays valid; the facts in §1, §3 and §9 that changed are corrected in place.
-Phase 4g's full cli-journey leg (§3) found the `memory_replay.rs` red that the recovery lane's four
-reviews, none of which ran CI's memory step (ci.yml:480), had missed.
+scratchpad. Its `/tmp/claude-0/…/scratchpad/integrate/` paths are session scratch and will not
+survive a workspace restart; the scripts, their summaries and the note itself (`HANDOFF.md`) are
+copied to `/projects/elohim/.worktrees/brit-s3-keep/integrate/` (durable), which a next integrator
+uses as `$S`. The `bin-keep` binaries were not copied; rebuild them (§3). The scratch build directory
+`dev-nocflags` it mentions has been deleted. A second integrator took over from this note and did the
+phase that merged push-transport and the build-inputs Windows follow-up; later integrators merged
+refs-shem, trust, diff-show, readonly-shem and recovery from it. The procedure stays valid; the facts
+in §1, §3, §8 and §9 that changed are corrected in place. The recovery merge's full cli-journey leg
+(§3) found the `memory_replay.rs` red that the recovery lane's four reviews, none of which ran CI's
+memory step (ci.yml:480), had missed.
 
 # Handoff: brit sprint 3 integration
 
@@ -640,9 +648,9 @@ S=/tmp/claude-0/-projects-elohim/0e0924d5-52e0-4709-b329-ea2463064148/scratchpad
 **Branch and commits**
 - Branch: `sprint3/integrate`.
 - Base: `1db7a955197b10bc7672c9aa544768a329bb9008` (brit 0.2.6).
-- Head: `080f3057973e6c5c19e38a1b78a1330917d3851d` (eleven lanes), pushed to
-  `origin run-ci/sprint3-integrate` as push 9. Every pushed head and its CI run: the head/push table at
-  the top of this entry.
+- Head: `6507caaaa18c51f7f251fc31187753a16537489a` (twelve lanes), pushed to
+  `origin run-ci/sprint3-integrate` as push 11. Every pushed head and its CI run: the push table under
+  "Where the work is"; the four candidate heads: "State at the sprint's close".
 - `branch.sprint3/integrate.britReachBase` is set (by the coordinator).
 
 **Repo state**
@@ -681,11 +689,13 @@ First-parent history, oldest first (2nd parent = lane tip):
 | 483ad2f992 | test(brit-cli): counting upload-pack wrapper `#[cfg(unix)]` (Windows compile) |
 | 7479ce4539 | fix(gitoxide-core): export `reacquire_shared` from the non-Linux stub |
 
-**Lanes not yet pushed.** `sprint3/recovery` is merged locally as Phase 4g (local head `948a939f16`)
-and must not be pushed until round 5, its independent review and the non-root leg pass (recovery
-entry in `brit-rebase-cost-gitlinks-and-stranding.md`). Its queued follow-up round is not started and
-merges only after its own independent review. Merge nothing else before the coordinator says so;
-expect more follow-ups on existing lanes.
+The table stops at `7479ce4539`; the later merges are listed under "Where the work is". From
+`080f305797` the first-parent history is `b1010c4540` (the recovery merge), `b0770fdead`, `948a939f16`,
+round 5 (`a3b3ac71d5` to `99227182ad`), `6ee2d85a8d`, `6507caaaa1`.
+
+**What comes next.** Nothing is in flight and no lane is waiting to be merged. The next integrator
+starts from `6507caaaa1` and takes the queued work in "Queued work, not started". Round 6 is local
+branch `sprint3/recovery-r6` (`6c7dd8644f`), set aside; do not merge it as it stands.
 
 ## 2. Cargo wrapper and build slot
 
@@ -780,7 +790,7 @@ How the binaries are selected:
 - `cargo test --locked --no-fail-fast -p brit-graph --features repo`
 - `scripts/ci/test-cpu-baseline.sh` with `RUSTFLAGS='-C target-cpu=x86-64-v2' CFLAGS='-march=x86-64-v2' CARGO_BUILD_JOBS=1`. It expects `cpu-baseline=passed …`.
 
-Last results (head 7479ce4539, or 0cdf5dae/14a9c239 for legs not re-run after the cfg-only fixes): every leg 0 except cli-journey's known `rakia` red. max-pure gave identical counts to the default build: mutation_lock 20, pull 32, pre_push 14 (2 ignored), brit 16, explicit_leases 10, daily_driver 3, revision_ranges 3, diff_name_only 2. No journey uses an HTTP remote yet, so the reqwest transport itself is untested until push-transport lands.
+Results at head 7479ce4539 (or 0cdf5dae/14a9c239 for legs not re-run after the cfg-only fixes): every leg 0 except cli-journey's `rakia` red (since cleared, §9). max-pure gave identical counts to the default build: mutation_lock 20, pull 32, pre_push 14 (2 ignored), brit 16, explicit_leases 10, daily_driver 3, revision_ranges 3, diff_name_only 2. Latest full legs: on `99227182ad`, every leg EXIT 0 (cli-journey 501 / 0 failed / 73 ignored, `memory_replay` 8 / 1 ignored, brit-cli 110 / 5 ignored, gitoxide-core 202 / 5 ignored, clippy, docs, fmt; reported by the implementer, recovery entry in `brit-rebase-cost-gitlinks-and-stranding.md`). `6507caaaa1` changes documentation and one comment only; fmt, `cargo doc -D warnings` and `cargo check` for gitoxide-core and brit-cli passed on it.
 
 ## 4. Bash journeys (`tests/journey.sh`; CI test-journey's `just ci-journey-tests`)
 
@@ -954,7 +964,7 @@ Per-file conclusions so far:
 | non-test: CPU probe | C check only when `CARGO_CFG_TARGET_OS == linux` |
 | non-test: guard_label.rs, mutation.rs, branch.rs | no Unix APIs; mutation.rs tests are `cfg(all(test, target_os = "linux"))` |
 
-Still to audit when they arrive: the trust, push-transport and diff-show lanes' new files.
+The trust, push-transport, diff-show, readonly-shem and recovery lanes' new files are not in this table. CI compiled and passed all of them on Windows and macOS on run 44635383858 (`99227182ad`).
 
 ## 9. Known reds that are not ours, and what CI requires
 
@@ -977,7 +987,7 @@ Coverage notes:
 - run 1 (251d10e5): three reds. test-journey (the small snapshot), brit-rust-style (all-zeros base), advisories.
 - run 2 (da5e4a05): only the four Windows jobs, at the remote_tracking compile.
 - run 3 (7479ce45): Linux and macOS green; four Windows tests red (build-inputs lane).
-- Later runs: the head/push table at the top of this entry.
+- Later runs: the push table under "Where the work is".
 
 ## 10. Open watch items (raised, not acted on)
 
@@ -987,6 +997,7 @@ Coverage notes:
 4. **CI test lists:**
    - test-journey's explicit `--test` list in ci.yml omits older cli-journey targets that run only via test-fast: brit, commit_signing, filter_scope, inherited_git_environment, mock_remote, native_source, normalize, rakia, runner, test_repo. mutation_lock and diff_name_only were added (49ce98e281).
    - The release workflow's (brit-release.yml) cli-journey list also omits mutation_lock and diff_name_only.
+   - The sprint's own journey files not in test-journey's list: steward item 6.
 5. **Hidden `branch force-delete`:** `-D` needs a subcommand name, so `brit branch force-delete X` is typeable; git has no such spelling. clap can't avoid it; left as is.
 6. **Fetch double handshake:** a short name matching several advertised refs makes fetch connect twice.
 7. **`branch::rename` atomicity:** the reflog carry-over and config section move happen after the ref transaction, and errors there say so. A crash in between leaves refs renamed with the old config and reflog.

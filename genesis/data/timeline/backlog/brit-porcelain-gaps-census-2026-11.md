@@ -82,6 +82,10 @@ The brit-first hook's own ledger keeps no command text, and its `epr feedback ca
   list`, `is-clean`/`is-changed`, `build run`, `build baseline write`/`migrate` (exits 1 on a closed
   stdout after writing its ref) and others, each with a reason in `READ_ONLY_COMMANDS`. Full list,
   measurements and follow-ups: the handoff entry, "What the merged lanes deliver", read-only entry.
+- **Lane `sprint3/recovery`** (merged as `b1010c4540`, pushed in `6507caaaa1`): rebase and switch
+  recovery that cannot strand under a kill, and a new `brit rebase --retire`. It does not make rebase a
+  daily driver: rebase stays a declared git fallback on both devices until the redesign (state, limits
+  and thresholds: `brit-rebase-cost-gitlinks-and-stranding.md`).
 
 ## Still missing after those
 

@@ -50,6 +50,11 @@ packs); shem had 28. Every `brit fetch` adds a pack and nothing consolidates. It
 global `safe.directory = *` is present; after a workspace restart every brit read fails until setup
 restores it. Cure today: `git repack -a -d`.
 
+At the sprint's close (2026-11-20) the main checkout holds 42 pack indexes on ethosengine and 32 on
+shem (reported by shem), against the reduced-trust cap of 32. Nothing fails on either device while the
+declared trust (monorepo dev `758fb4f6b`) is applied; the repack in both main checkouts is a steward
+item in `brit-sprint-3-handoff-2026-11-19.md`.
+
 This is the reduced-trust leftover of
 `brit-build-fingerprint-cannot-resolve-any-commit-in-monorepo.md`, whose full-trust case is fixed in
 brit 0.2.6.
@@ -125,8 +130,8 @@ store lists every pack directory at open (upstream behaviour, unchanged by the l
 and fails on the unreadable one. At reduced trust the open succeeds and the first lookup fails naming
 the directory; 0.2.6 measured the same. Fix: test-only commit `bd18b171` on `sprint3/trust` (test
 renamed `an_unreadable_alternate_pack_directory_fails_the_first_lookup_not_a_reduced_trust_open`, runs
-isolated, asserts both trust levels), to be merged with the diff/show merge; not yet pushed when
-written.
+isolated, asserts both trust levels), merged as `69aa5275b3`; it passes on every CI run from 44575030094
+(head `1bf96648cb`) on.
 
 Pre-existing difference it surfaced: at FULL trust an unreadable alternate pack directory fails the
 open in gix (0.2.6 too), where git prints an error and continues.
@@ -175,8 +180,9 @@ with these silent-degrade sites:
 ## Open for the steward
 
 - Declared trust applies per exact checkout root, and trusted-checkouts on ethosengine lists
-  `/projects/elohim` and one worktree, so it does not apply in other linked worktrees. This is a design
-  question for the steward.
+  `/projects/elohim` and one worktree, so it does not apply in other linked worktrees. They work on
+  both devices because git accepts them by ownership. Whether declaring a main checkout should cover
+  its linked worktrees is a design question for the steward (handoff entry, steward item 9).
 - `elohim/eprfs/device-runtime/src/layout.rs` `read_saved` reads `layout.json` (bin-store, state,
   cargo-pool, project-root paths) with no custody check. It is on shem's deliberate-roll list.
 - The custody predicate checks writable-by-others, not owned-by-others.

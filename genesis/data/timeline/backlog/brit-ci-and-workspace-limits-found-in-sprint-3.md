@@ -176,16 +176,16 @@ when run as that user.
 
 brit's deny-list aggregate `Tests pass` failed only on `failure`, `cancelled` and `skipped`, and passed
 on an `abandoned` result (a matrix leg that never got a runner). Cause, evidence and the allow-list
-fix: the handoff entry's steward item "A brit pin must name a commit whose own CI run included the
+fix: the handoff entry's "Evidence behind the steward's items", "A brit pin must name a commit whose own CI run included the
 aggregate fix" (`brit-sprint-3-handoff-2026-11-19.md`).
 
 ## (s) macOS runners abandoned
 
 macOS legs were abandoned on runs 44544779620 and 44567300304 (from about 14:30Z on 2026-11-19). On
 run 44575030094 (head `1bf96648cb`) the macOS leg got a runner and passed, the first macOS result
-since `9945331577`. On run 44583007601 (head `080f305797`) it was cancelled without a runner on
-attempts 1 and 2; attempt 3 was still queued for a runner at 19:34Z. Results per run: the handoff
-entry's head/push table.
+since `9945331577`. On run 44583007601 (head `080f305797`) it was cancelled without a runner on all
+three attempts, so that head has no macOS result. On run 44635383858 (head `99227182ad`) it got a
+runner and passed. Results per run: the handoff entry's push table.
 
 ## (t) An unbounded background follower holds its parent
 
@@ -213,3 +213,28 @@ Four independent reviews of the rebase recovery lane passed, and none ran CI's m
 side touched, red: 8 passed / 1 ignored before the merge, 2 passed / 6 failed after (details:
 `brit-rebase-cost-gitlinks-and-stranding.md`, Phase 4g). A lane's own verification and each review of
 it must run every journey CI runs, the memory step included.
+
+The same lane showed the converse limit of fixture-led review. The four reviews that passed each
+checked the lane against fixtures. The fifth and sixth reviews were asked to search the limits (the
+smallest admitting and completing scratch limit of each shape, and the shapes between them) rather
+than to run fixtures, and each found must-fix shapes the earlier four had not: an edit-and-amend and a
+diff3 conflict refused after admission (fifth), and an ordinary three-edit rebase refused at the real
+1 GiB limit (sixth). A review of a resource bound must be asked to search for the bound, not to
+confirm fixtures.
+
+## (x) A margin measured against path- or nonce-bearing records needs asserted slack
+
+Round 6 of the recovery lane pinned its own margin in a test,
+`public_edit_stop_child_records_fit_their_allowance` (child records 9.37 and 9.62 times the state
+image against an allowance of 10). An independent verification run of that test failed, as root and as
+uid 65534, at 10.22 state images on a fixture under a longer path. Margins measured against record
+sizes that carry a path or a nonce move with the path and the nonce; the slack has to be part of the
+test's assertion (measured over the longest path the test may run under), not left to the distance
+between the measured value and the allowance. Details: `brit-rebase-cost-gitlinks-and-stranding.md`,
+sixth review.
+
+## (y) Times written ahead of the clock
+
+The coordinator wrote times into this sprint's record that were ahead of the clock three times before
+it began reading the clock (`date -u`) before writing any time. A time in this record is one read from
+the clock, a log or an API at the moment of writing, or one given by whoever observed it.
