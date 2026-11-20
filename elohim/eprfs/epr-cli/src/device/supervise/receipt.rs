@@ -93,6 +93,10 @@ impl Row {
 }
 
 fn append(data_root: &Path, row: &Row) -> Result<(), String> {
+    // restarts.jsonl is device-private state, a receipt per restart read by `epr device status`,
+    // with no level judged against a limit and no cursor or closure rule of its own
+    // (limit-model-reuse-rs ruled intentional by the coordinator, 2026-11-20); the journal
+    // hearing a restart is its own item under row 35.
     let path = data_root.join(RECEIPT);
     let mut line = serde_json::to_vec(row).map_err(|e| e.to_string())?;
     line.push(b'\n');
