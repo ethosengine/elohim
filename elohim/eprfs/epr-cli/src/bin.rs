@@ -469,6 +469,8 @@ pub(crate) mod sibling {
     use super::{Refusal, Store};
     use serde_json::Value;
     use std::path::Path;
+    #[cfg(feature = "peer")]
+    use std::time::{Duration, Instant};
 
     /// The knob that makes a host that can build draw from a sibling first.
     #[cfg(feature = "peer")]
@@ -772,25 +774,28 @@ pub(crate) mod sibling {
                     .map(|p| p.join(elohim_device_runtime::layout::INCOMING_DIR))
             })
             .ok_or_else(|| refused("layout-no-data-home", "no incoming directory to draw into"))?;
-        match draw(store, repo, &commit, &incoming) {
+        let then = if can_build {
+            "building locally"
+        } else {
+            "trying a local build"
+        };
+        match draw(store, repo, &commit, &incoming, then) {
             Ok(record) => Ok(Drawn {
                 record: Some(record),
                 gap: None,
             }),
             Err(Draw::Gap(gap)) => {
-                eprintln!(
-                    "follow: nothing drawn from a sibling ({gap}); {}",
-                    if can_build {
-                        "building locally"
-                    } else {
-                        "trying a local build"
-                    }
-                );
+                eprintln!("follow: nothing drawn from a sibling ({gap}); {then}");
                 Ok(Drawn {
                     record: None,
                     gap: Some(gap),
                 })
             }
+            // The wait already said who did not answer and for how long.
+            Err(Draw::Unanswered(gap)) => Ok(Drawn {
+                record: None,
+                gap: Some(gap),
+            }),
             Err(Draw::Refused(refusal)) => Err(refusal),
         }
     }
@@ -808,12 +813,122 @@ pub(crate) mod sibling {
     pub(crate) enum Draw {
         /// Nothing was drawn and nothing was ingested; the follow may still build.
         Gap(String),
+        /// Row 35 B: an admitted offer's holder did not answer for as long as this device waits
+        /// ([`Patience`]). The waiting line has been said; this is the gap the follow carries.
+        /// Nothing was ingested, and the follow may still build.
+        Unanswered(String),
         /// The sibling's bytes are not what it promised, or the store refused them.
         Refused(Refusal),
     }
 
+    /// Where the draw's patience is declared, read at the checkout's HEAD.
     #[cfg(feature = "peer")]
-    fn draw(store: &Store, repo: &Path, commit: &str, incoming: &Path) -> Result<Value, Draw> {
+    const PATIENCE_POLICY: &str = "genesis/agentic/pool-policy.json";
+
+    /// The patience when [`PATIENCE_POLICY`] declares none: about three times the slowest
+    /// restart-to-ready measured when it was set (30 s and 33 s on shem, ~25 s on ethosengine).
+    #[cfg(feature = "peer")]
+    pub(crate) const DEFAULT_PATIENCE: Duration = Duration::from_secs(90);
+
+    /// The first pause after a holder did not answer; each later pause doubles, up to
+    /// [`PATIENCE_PAUSE_CAP`].
+    #[cfg(feature = "peer")]
+    const PATIENCE_PAUSE_FIRST: Duration = Duration::from_secs(2);
+
+    #[cfg(feature = "peer")]
+    const PATIENCE_PAUSE_CAP: Duration = Duration::from_secs(16);
+
+    /// Row 35 B1: how long a draw waits for the holder of an offer this device already admitted
+    /// (host admission passed, release named, statement verified) when the only failure is that
+    /// the holder did not answer: a producer's peer restarts onto each landed release minutes
+    /// before its siblings come to draw from it. `now` and `sleep` are the clock (tests inject
+    /// their own so nothing really waits); `say` is where the waiting line goes; `then` is what
+    /// the follow does when the wait runs out, as the fallback line says it.
+    #[cfg(feature = "peer")]
+    pub(crate) struct Patience<'a> {
+        pub bound: Duration,
+        pub now: &'a dyn Fn() -> Instant,
+        pub sleep: &'a dyn Fn(Duration),
+        pub say: &'a dyn Fn(&str),
+        pub then: &'a str,
+    }
+
+    #[cfg(all(test, feature = "peer"))]
+    impl Patience<'static> {
+        /// No patience: an unanswered holder falls back at once.
+        pub(crate) fn none() -> Patience<'static> {
+            Patience {
+                bound: Duration::ZERO,
+                now: &Instant::now,
+                sleep: &std::thread::sleep,
+                say: &say_stderr,
+                then: "building locally",
+            }
+        }
+    }
+
+    #[cfg(feature = "peer")]
+    fn say_stderr(line: &str) {
+        eprintln!("{line}");
+    }
+
+    /// `device_restart.draw_patience_seconds` in [`PATIENCE_POLICY`] at `repo`'s HEAD, read the
+    /// way `declared_targets` is (`crate::git::command`, with this device's declared checkout
+    /// trust); [`DEFAULT_PATIENCE`] when the record, the file or the key does not read.
+    #[cfg(feature = "peer")]
+    pub(crate) fn draw_patience(repo: &Path) -> Duration {
+        crate::git::command(repo)
+            .args(["show", &format!("HEAD:{PATIENCE_POLICY}")])
+            .output()
+            .ok()
+            .filter(|output| output.status.success())
+            .and_then(|output| serde_json::from_slice::<Value>(&output.stdout).ok())
+            .and_then(|policy| policy["device_restart"]["draw_patience_seconds"].as_u64())
+            .map_or(DEFAULT_PATIENCE, Duration::from_secs)
+    }
+
+    /// Whether a fetch error says only that the holder did not answer, so the same admitted
+    /// offer may be asked again once it is back. That is the daemon's `no-route` gap, as
+    /// `epr artifact fetch` prints it (`fetch gap: no-route: ...`): the holder refused the dial,
+    /// could not be reached, did not connect within the dial's own bound, or its direct stream
+    /// failed (a holder that restarts mid-draw hangs up). Every other kind is not a silent
+    /// holder: `refused` and `manifest-rejected` are answers, `transport-cannot-deliver` is a
+    /// relay too slow or a holder's error, `deadline-exceeded` is the fetch's own deadline or
+    /// this device's daemon not answering the queue, `daemon-down` is this device's daemon,
+    /// `local-store` this device's store, and the rest are about the record, not the holder.
+    #[cfg(feature = "peer")]
+    pub(crate) fn holder_unanswered(error: &str) -> bool {
+        let silent = eprfs_peer::FetchGap::NoRoute {
+            device: String::new(),
+        };
+        error
+            .strip_prefix("fetch gap: ")
+            .and_then(|rest| rest.split_once(": "))
+            .is_some_and(|(kind, _)| kind == silent.kind())
+    }
+
+    /// One attempt's failure: a holder that did not answer, or the draw's own answer.
+    #[cfg(feature = "peer")]
+    enum Attempt {
+        Unanswered(String),
+        Draw(Draw),
+    }
+
+    #[cfg(feature = "peer")]
+    impl From<Draw> for Attempt {
+        fn from(draw: Draw) -> Attempt {
+            Attempt::Draw(draw)
+        }
+    }
+
+    #[cfg(feature = "peer")]
+    fn draw(
+        store: &Store,
+        repo: &Path,
+        commit: &str,
+        incoming: &Path,
+        then: &str,
+    ) -> Result<Value, Draw> {
         let found = crate::peer::custody_artifacts(repo, None)
             .map_err(|e| Draw::Gap(format!("no-record: {e}")))?;
         let offers = offers(&found.rows, &found.device, commit);
@@ -824,6 +939,15 @@ pub(crate) mod sibling {
             )));
         }
         let host = ark_supervisor::host::observe_host();
+        // Read before any wait; nothing the wait holds is a lock (the store takes and releases
+        // its own around each ingest and release read, inside `take`).
+        let patience = Patience {
+            bound: draw_patience(repo),
+            now: &Instant::now,
+            sleep: &std::thread::sleep,
+            say: &say_stderr,
+            then,
+        };
         draw_first(
             store,
             repo,
@@ -836,6 +960,7 @@ pub(crate) mod sibling {
                     crate::artifact::fetch_output(repo, output, dest).map_err(|e| e.to_string())
                 },
                 staged: &|bin, bytes| staged_admit(&host, bin, bytes),
+                patience: &patience,
             },
         )
     }
@@ -843,11 +968,13 @@ pub(crate) mod sibling {
     /// How a draw judges and moves bytes: `admit` judges an offer's verified statement on this
     /// host before anything is fetched, `fetch` copies an output CID to a destination, and
     /// `staged` judges what the fetched bytes themselves require before either is executed.
+    /// `patience` is how long an admitted offer's silent holder is waited for.
     #[cfg(feature = "peer")]
     pub(crate) struct Judges<'a> {
         pub admit: &'a Admit<'a>,
         pub fetch: &'a dyn Fn(&str, &Path) -> Result<(), String>,
         pub staged: &'a Admit<'a>,
+        pub patience: &'a Patience<'a>,
     }
 
     /// The residual's cheap half: the statement that admitted an offer is the producing
@@ -882,17 +1009,7 @@ pub(crate) mod sibling {
         let mut gaps = Vec::new();
         for offer in offers {
             match admissible(offer, judges.admit) {
-                Ok(()) => {
-                    return take(
-                        store,
-                        repo,
-                        commit,
-                        incoming,
-                        offer,
-                        judges.fetch,
-                        judges.staged,
-                    )
-                }
+                Ok(()) => return take_patiently(store, repo, commit, incoming, offer, judges),
                 Err(gap) => gaps.push(gap),
             }
         }
@@ -1042,14 +1159,79 @@ pub(crate) mod sibling {
                 admit,
                 fetch,
                 staged: &|_, _| Ok(()),
+                patience: &Patience::none(),
             },
         )
     }
 
+    /// [`take`], asked again while `offer`'s holder does not answer, for as long as
+    /// `judges.patience` allows: pauses of 2, 4, 8, then 16 s, the last cut to the bound. Only a
+    /// fetch error [`holder_unanswered`] reads as a silent holder is waited for; every other gap,
+    /// and a mismatch, is the answer at once. Nothing is held across a pause: `take` has removed
+    /// what it staged, and the store's locks are taken and released inside each attempt.
+    #[cfg(feature = "peer")]
+    fn take_patiently(
+        store: &Store,
+        repo: &Path,
+        commit: &str,
+        incoming: &Path,
+        offer: &Offer,
+        judges: &Judges<'_>,
+    ) -> Result<Value, Draw> {
+        let patience = judges.patience;
+        let mut pause = PATIENCE_PAUSE_FIRST;
+        // When the holder was first found silent: the seconds waited are counted from there.
+        let mut since: Option<Instant> = None;
+        loop {
+            let failed = match attempt(
+                store,
+                repo,
+                commit,
+                incoming,
+                offer,
+                judges.fetch,
+                judges.staged,
+            ) {
+                Ok(value) => {
+                    if let Some(since) = since {
+                        (patience.say)(&format!(
+                            "follow: holder {} not answering for release {}; waited {} s; drew it",
+                            offer.device,
+                            offer.release,
+                            (patience.now)().saturating_duration_since(since).as_secs()
+                        ));
+                    }
+                    return Ok(value);
+                }
+                Err(Attempt::Draw(draw)) => return Err(draw),
+                Err(Attempt::Unanswered(gap)) => gap,
+            };
+            let since = *since.get_or_insert_with(|| (patience.now)());
+            let waited = (patience.now)().saturating_duration_since(since);
+            if waited >= patience.bound {
+                let seconds = waited.as_secs();
+                (patience.say)(&format!(
+                    "follow: holder {} not answering for release {}; waited {seconds} s; {}",
+                    offer.device, offer.release, patience.then
+                ));
+                return Err(Draw::Unanswered(format!(
+                    "holder-not-answering: holder {} not answering for release {}; waited \
+                     {seconds} s (device_restart.draw_patience_seconds {}); last: {failed}",
+                    offer.device,
+                    offer.release,
+                    patience.bound.as_secs()
+                )));
+            }
+            (patience.sleep)(pause.min(patience.bound - waited));
+            pause = (pause * 2).min(PATIENCE_PAUSE_CAP);
+        }
+    }
+
     /// Draw `offer`'s bins with `fetch` (exact output CID to destination), refuse bytes that do
     /// not make the release it named, judge what the staged bytes require with `staged` before
-    /// either is executed, and ingest them as the sibling's.
-    #[cfg(feature = "peer")]
+    /// either is executed, and ingest them as the sibling's. One attempt, with no patience: the
+    /// draw itself goes through [`take_patiently`]; tests take one attempt directly.
+    #[cfg(all(test, feature = "peer"))]
     pub(crate) fn take(
         store: &Store,
         repo: &Path,
@@ -1059,12 +1241,32 @@ pub(crate) mod sibling {
         fetch: &dyn Fn(&str, &Path) -> Result<(), String>,
         staged: &Admit<'_>,
     ) -> Result<Value, Draw> {
+        attempt(store, repo, commit, incoming, offer, fetch, staged).map_err(
+            |failed| match failed {
+                Attempt::Unanswered(gap) => Draw::Gap(gap),
+                Attempt::Draw(draw) => draw,
+            },
+        )
+    }
+
+    /// One [`take`], telling a holder that did not answer apart from every other gap.
+    #[cfg(feature = "peer")]
+    fn attempt(
+        store: &Store,
+        repo: &Path,
+        commit: &str,
+        incoming: &Path,
+        offer: &Offer,
+        fetch: &dyn Fn(&str, &Path) -> Result<(), String>,
+        staged: &Admit<'_>,
+    ) -> Result<Value, Attempt> {
         use std::os::unix::fs::PermissionsExt;
         if !names_one_release(&offer.release) {
             return Err(Draw::Gap(format!(
                 "no-offer: {} named a release that is not one CID token",
                 offer.device
-            )));
+            ))
+            .into());
         }
         let dir = incoming.join(format!("sibling-{}", offer.release));
         // A previous partial draw is replaced, never trusted.
@@ -1072,10 +1274,16 @@ pub(crate) mod sibling {
         std::fs::create_dir_all(&dir)
             .map_err(|e| Draw::Gap(format!("local-store: {}: {e}", dir.display())))?;
         let started = std::time::Instant::now();
-        let result = (|| {
+        let result = (|| -> Result<_, Attempt> {
             for (bin, output) in &offer.outputs {
                 let dest = dir.join(bin);
-                fetch(output, &dest).map_err(Draw::Gap)?;
+                fetch(output, &dest).map_err(|error| {
+                    if holder_unanswered(&error) {
+                        Attempt::Unanswered(error)
+                    } else {
+                        Attempt::Draw(Draw::Gap(error))
+                    }
+                })?;
                 std::fs::set_permissions(&dest, std::fs::Permissions::from_mode(0o755))
                     .map_err(|e| Draw::Gap(format!("local-store: {}: {e}", dest.display())))?;
             }
@@ -1090,7 +1298,7 @@ pub(crate) mod sibling {
                 ))
             };
             if fetched != offer.release {
-                return Err(mismatch(&fetched));
+                return Err(mismatch(&fetched).into());
             }
             for bin in offer.outputs.keys() {
                 let path = dir.join(bin);
@@ -1137,7 +1345,7 @@ pub(crate) mod sibling {
                     ))
                 })?;
             if release.cid != offer.release {
-                return Err(mismatch(&release.cid));
+                return Err(mismatch(&release.cid).into());
             }
             Ok(release.provenance.gate_run)
         })();
@@ -1157,6 +1365,10 @@ pub(crate) mod sibling {
         }))
     }
 }
+
+#[cfg(all(test, feature = "peer"))]
+#[path = "bin_draw_patience_tests.rs"]
+mod draw_patience_tests;
 
 #[cfg(test)]
 mod tests {
@@ -1406,7 +1618,7 @@ mod tests {
     }
 
     #[cfg(feature = "peer")]
-    fn two_bin_store(root: &Path) -> Store {
+    pub(super) fn two_bin_store(root: &Path) -> Store {
         let registry: Registry = serde_json::from_value(json!({"version":1,"tools":{"epr":{
             "bins":["epr","bin-launch"],"aliases":{},"longRunning":[],
             "candidateEnv":{"epr":["EPR_BIN"]}}}}))
@@ -1417,7 +1629,7 @@ mod tests {
     }
 
     #[cfg(feature = "peer")]
-    fn sibling_bins(dir: &Path, launcher: &str) {
+    pub(super) fn sibling_bins(dir: &Path, launcher: &str) {
         sibling_bins_with(dir, "#!/bin/sh\n# sibling epr\n", launcher);
     }
 
@@ -1434,7 +1646,7 @@ mod tests {
     }
 
     #[cfg(feature = "peer")]
-    fn offer_for(release: &str) -> sibling::Offer {
+    pub(super) fn offer_for(release: &str) -> sibling::Offer {
         sibling::Offer {
             device: "did:key:z6MkSibling".into(),
             release: release.into(),
@@ -1450,7 +1662,7 @@ mod tests {
     /// A requirement document asking for glibc at least `min`, as `put` would record it: the
     /// `env:requires` CID and the inline `env:requires-doc` slot value.
     #[cfg(feature = "peer")]
-    fn glibc_at_least(min: &[u32]) -> sibling::Stated {
+    pub(super) fn glibc_at_least(min: &[u32]) -> sibling::Stated {
         use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
         use host_contract::{names::axis, AxisId, Clause, ClauseSource, Predicate, Requires};
         // As `put` records it: arch and os always (admission demands both), then the floor.
@@ -1500,7 +1712,7 @@ mod tests {
 
     /// An x86_64 Linux host that observed glibc `version`.
     #[cfg(feature = "peer")]
-    fn host_with_glibc(version: &[u32]) -> host_contract::Provides {
+    pub(super) fn host_with_glibc(version: &[u32]) -> host_contract::Provides {
         use host_contract::{names::axis, AxisId, AxisValue, Version};
         let mut host = linux_host();
         host.observe(
@@ -1515,7 +1727,7 @@ mod tests {
 
     /// `offer` with every bin stating `stated`.
     #[cfg(feature = "peer")]
-    fn stating(mut offer: sibling::Offer, stated: &sibling::Stated) -> sibling::Offer {
+    pub(super) fn stating(mut offer: sibling::Offer, stated: &sibling::Stated) -> sibling::Offer {
         offer.requires = sibling::BINS
             .iter()
             .map(|bin| ((*bin).to_owned(), stated.clone()))
@@ -1558,6 +1770,7 @@ mod tests {
                 );
                 assert!(gap.contains(&release), "{gap}");
             }
+            Err(sibling::Draw::Unanswered(gap)) => panic!("unanswered: {gap}"),
             Err(sibling::Draw::Refused(r)) => panic!("a gap, not a refusal: {}", r.detail),
             Ok(value) => panic!("an offer this host cannot run was taken: {value}"),
         }
@@ -1582,6 +1795,7 @@ mod tests {
         ) {
             Ok(value) => value,
             Err(sibling::Draw::Gap(gap)) => panic!("gap: {gap}"),
+            Err(sibling::Draw::Unanswered(gap)) => panic!("unanswered: {gap}"),
             Err(sibling::Draw::Refused(r)) => panic!("refused {}: {}", r.kind, r.detail),
         };
         assert_eq!(drawn["release"], release);
@@ -1657,6 +1871,7 @@ mod tests {
                         "{stated:?}: {gap}"
                     );
                 }
+                Err(sibling::Draw::Unanswered(gap)) => panic!("unanswered: {gap}"),
                 Err(sibling::Draw::Refused(r)) => panic!("{stated:?}: refused {}", r.detail),
                 Ok(value) => panic!("{stated:?}: taken {value}"),
             }
@@ -1703,7 +1918,7 @@ mod tests {
 
     /// Serves `dir`'s bins by output CID, as a sibling's daemon would.
     #[cfg(feature = "peer")]
-    fn serving(dir: &Path) -> impl Fn(&str, &Path) -> Result<(), String> + '_ {
+    pub(super) fn serving(dir: &Path) -> impl Fn(&str, &Path) -> Result<(), String> + '_ {
         move |output: &str, dest: &Path| {
             let bin = if output == "out-epr" {
                 "epr"
@@ -1739,6 +1954,7 @@ mod tests {
         ) {
             Ok(value) => value,
             Err(sibling::Draw::Gap(gap)) => panic!("gap: {gap}"),
+            Err(sibling::Draw::Unanswered(gap)) => panic!("unanswered: {gap}"),
             Err(sibling::Draw::Refused(r)) => panic!("refused {}: {}", r.kind, r.detail),
         };
         assert_eq!(drawn["release"], release);
@@ -1773,6 +1989,7 @@ mod tests {
             &serve,
             &|_, _| Ok(()),
         ) {
+            Err(sibling::Draw::Unanswered(gap)) => panic!("unanswered: {gap}"),
             Err(sibling::Draw::Refused(refusal)) => {
                 assert_eq!(refusal.kind, "sibling-release-mismatch");
                 assert!(refusal.detail.contains(&promised), "{}", refusal.detail);
@@ -1898,6 +2115,7 @@ mod tests {
                 assert!(gap.contains("isa.x86.partial-decode"), "{gap}");
                 assert!(gap.contains("isa.x86 requirement is unmeasured"), "{gap}");
             }
+            Err(sibling::Draw::Unanswered(gap)) => panic!("unanswered: {gap}"),
             Err(sibling::Draw::Refused(r)) => panic!("a gap, not a refusal: {}", r.detail),
             Ok(value) => panic!("a partial statement was drawn: {value}"),
         }
@@ -1975,10 +2193,12 @@ mod tests {
                     serve(output, dest)
                 },
                 staged: &|_, _| Ok(()),
+                patience: &sibling::Patience::none(),
             },
         ) {
             Ok(value) => value,
             Err(sibling::Draw::Gap(gap)) => panic!("gap: {gap}"),
+            Err(sibling::Draw::Unanswered(gap)) => panic!("unanswered: {gap}"),
             Err(sibling::Draw::Refused(r)) => panic!("refused {}: {}", r.kind, r.detail),
         };
         assert_eq!(drawn["release"], release);
@@ -2002,6 +2222,7 @@ mod tests {
                 admit: &|_, document| sibling::admit_on(&ancient, document),
                 fetch: &|_, _| Err("must not fetch".into()),
                 staged: &|_, _| panic!("nothing is staged"),
+                patience: &sibling::Patience::none(),
             },
         ) {
             Err(sibling::Draw::Gap(gap)) => {
@@ -2010,6 +2231,7 @@ mod tests {
                 assert!(gap.contains("and 1 older offer(s)"), "{gap}");
                 assert!(gap.contains(&release), "{gap}");
             }
+            Err(sibling::Draw::Unanswered(gap)) => panic!("unanswered: {gap}"),
             Err(sibling::Draw::Refused(r)) => panic!("refused {}", r.detail),
             Ok(value) => panic!("taken {value}"),
         }
@@ -2052,6 +2274,7 @@ mod tests {
                 assert!(gap.contains("avx512f"), "{gap}");
                 assert!(gap.contains("nothing was ingested"), "{gap}");
             }
+            Err(sibling::Draw::Unanswered(gap)) => panic!("unanswered: {gap}"),
             Err(sibling::Draw::Refused(r)) => panic!("a gap, not a refusal: {}", r.detail),
             Ok(value) => panic!("understated bytes were taken: {value}"),
         }
@@ -2127,6 +2350,7 @@ mod tests {
                     );
                     assert!(!gap.contains("re-put"), "{gap}");
                 }
+                Err(sibling::Draw::Unanswered(gap)) => panic!("unanswered: {gap}"),
                 Err(sibling::Draw::Refused(r)) => panic!("a gap, not a refusal: {}", r.detail),
                 Ok(value) => panic!("{marker:?}: an unmarked release was drawn: {value}"),
             }
@@ -2203,6 +2427,7 @@ mod tests {
                     assert!(gap.contains(kind), "{body}: {gap}");
                     assert!(gap.contains("nothing was ingested"), "{gap}");
                 }
+                Err(sibling::Draw::Unanswered(gap)) => panic!("unanswered: {gap}"),
                 Err(sibling::Draw::Refused(r)) => panic!("a gap, not a refusal: {}", r.detail),
                 Ok(value) => panic!("{body}: bytes whose exercise failed were taken: {value}"),
             }
