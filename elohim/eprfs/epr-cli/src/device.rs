@@ -31,7 +31,7 @@ mod arrival;
 mod arrival_work;
 pub(crate) mod declaration;
 mod layout;
-mod supervise;
+pub(crate) mod supervise;
 pub use arrival::{status, Check, State};
 
 use std::fs::{self, OpenOptions};

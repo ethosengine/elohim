@@ -212,5 +212,9 @@
   "fleet_roll_guard": {
     "_comment": "Preflight check fleet-roll (genesis/orchestrator/fleet-roll-guard.mjs): refuse refuses a push to dev or main that CI would answer by rebuilding elohim-edge and rolling its fleet unless a pushed commit message carries the [edge:roll] tag, warn prints the same text without refusing, off skips the check.",
     "mode": "refuse"
+  },
+  "device_restart": {
+    "_comment": "What a landing does to this device's supervised children (row 35; elohim/eprfs/epr-cli/src/device/supervise.rs after_landed), read at the device checkout's HEAD. on_landing: restart = after `epr bin follow` or a forward `epr bin land` moves the current of a channel a declared process runs, the hand command `epr device supervise` runs for the person: when this act holds the device-ark lease (or no live holder exists and the claim succeeds), the child on that channel running the old bytes restarts onto the new ones and its own readiness is waited for; a child that does not come up leaves the device degraded and the act exits non-zero naming the cure, exactly as a failed manual restart. Nothing is reverted or held. off = the landed binary waits for `epr device supervise`. The default is shem's choice (coordinator, 2026-11-20) for the steward to overrule here without a code change.",
+    "on_landing": "restart"
   }
 }

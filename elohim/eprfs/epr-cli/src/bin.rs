@@ -50,7 +50,9 @@ fn land_transition(
 }
 /// Parse, call the device library, and render one bin command. Returns a process exit code.
 pub fn run(args: &[String]) -> i32 {
-    match execute(args) {
+    // Stdout is this verb's JSON; a restart after a landing speaks on stderr.
+    crate::device::supervise::say_on_stderr();
+    match execute_with(args, true) {
         Ok(text) => {
             println!("{text}");
             0
@@ -61,7 +63,15 @@ pub fn run(args: &[String]) -> i32 {
         }
     }
 }
+/// Run one bin verb without the restart after a landing: arrival asks the device ark itself
+/// (see `device::arrival_work::after_moves`).
 pub(crate) fn execute(args: &[String]) -> Result<String, Refusal> {
+    execute_with(args, false)
+}
+
+/// `restart`: a `follow` or forward `land` that moved current runs the hand command `epr device
+/// supervise` for the person (row 35; see [`restart_after_landing`]).
+fn execute_with(args: &[String], restart: bool) -> Result<String, Refusal> {
     let mut options = BTreeMap::new();
     let mut flags = BTreeSet::new();
     let mut positional = Vec::new();
@@ -156,15 +166,23 @@ pub(crate) fn execute(args: &[String]) -> Result<String, Refusal> {
                 .or_else(|| options.get("--cid"))
                 .ok_or_else(|| argument("land requires cid"))?;
             judge_held(&store, cid)?;
-            json!(store.land_expected(
+            let repo = repo()?;
+            // Only a forward landing restarts the device; a revert or a lineage rebase never.
+            let restarts = restart && transition == Transition::Forward;
+            let before = current_cid(&store);
+            let value = json!(store.land_expected(
                 cid,
                 options
                     .get("--commit")
                     .ok_or_else(|| argument("land requires --commit"))?,
-                &repo()?,
+                &repo,
                 transition,
                 (expected != "none").then_some(expected)
-            )?)
+            )?);
+            if restarts {
+                restart_after_landing(&store, tool, "land", before, &repo)?;
+            }
+            value
         }
         "pin" => {
             if let Some(cid) = options.get("--cid") {
@@ -251,13 +269,14 @@ pub(crate) fn execute(args: &[String]) -> Result<String, Refusal> {
             {
                 Some(follow) => {
                     let repo = repo()?;
+                    let before = current_cid(&store);
                     // A closure the caller supplied is the bytes to follow; nothing is drawn.
                     let drawn = if follow.mode.applies() && closure.is_none() {
                         sibling::before_landing(&store, tool, &repo)?
                     } else {
                         sibling::Drawn::default()
                     };
-                    match store.follow_declared(&repo, closure, follow) {
+                    let value = match store.follow_declared(&repo, closure, follow) {
                         Ok(mut value) => {
                             if let (Some(record), Some(map)) = (drawn.record, value.as_object_mut())
                             {
@@ -266,7 +285,11 @@ pub(crate) fn execute(args: &[String]) -> Result<String, Refusal> {
                             value
                         }
                         Err(refusal) => return Err(drawn.explain(refusal)),
+                    };
+                    if restart {
+                        restart_after_landing(&store, tool, "follow", before, &repo)?;
                     }
+                    value
                 }
                 None => {
                     serde_json::json!({"followed":false,"why":"device does not follow this tool"})
@@ -302,6 +325,43 @@ pub(crate) fn execute(args: &[String]) -> Result<String, Refusal> {
         _ => return Err(argument(format!("unknown bin verb {verb}"))),
     };
     serde_json::to_string(&value).map_err(|e| argument(e.to_string()))
+}
+
+/// The committed current the store records, if any.
+fn current_cid(store: &Store) -> Option<String> {
+    std::fs::read(store.root().join("current.json"))
+        .ok()
+        .and_then(|bytes| serde_json::from_slice::<Value>(&bytes).ok())
+        .and_then(|record| record["cid"].as_str().map(str::to_owned))
+}
+
+/// After a follow or forward land: when it moved current, run the hand command for the person.
+/// A restart that does not come up, or fails after the old ark stopped, fails this verb with
+/// the cure; one that was not attempted (no ark, the switch, the lease) leaves it as it was,
+/// having said why.
+fn restart_after_landing(
+    store: &Store,
+    tool: &str,
+    trigger: &str,
+    before: Option<String>,
+    repo: &Path,
+) -> Result<(), Refusal> {
+    let after = current_cid(store);
+    if after.is_none() || after == before {
+        return Ok(());
+    }
+    use crate::device::supervise::{after_landed, AfterLanding};
+    match after_landed(repo, trigger, tool) {
+        AfterLanding::Untouched | AfterLanding::Ready => Ok(()),
+        AfterLanding::NotReady(detail) => Err(Refusal {
+            kind: "restart-not-ready".into(),
+            detail,
+        }),
+        AfterLanding::Failed(detail) => Err(Refusal {
+            kind: "restart-failed".into(),
+            detail,
+        }),
+    }
 }
 
 /// The cure for a sibling's release whose C this device cannot vouch for.

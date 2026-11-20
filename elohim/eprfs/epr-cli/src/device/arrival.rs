@@ -147,7 +147,7 @@ pub(crate) fn status_at(root: &Path, remember: bool) -> Vec<Check> {
             ),
         },
         repository_check(root),
-        peer_daemon_check(),
+        peer_daemon_check(root),
         sibling_check(root, &current),
         supervisor_check(root),
         // Restart-arrival facts (backlog container-restart-strands-session-envelope).
@@ -1068,7 +1068,23 @@ fn peer_daemon_cure() -> String {
     }
 }
 
-fn peer_daemon_check() -> Check {
+/// The peer daemon line, with what the newest restart after a landing said (row 35): a ready
+/// restart on a line serving at current, anything else on the line whatever it reads.
+fn peer_daemon_check(root: &Path) -> Check {
+    let mut check = peer_daemon_line();
+    match super::supervise::restart_note(root) {
+        Some((true, suffix)) => {
+            if let Some(rest) = check.detail.strip_prefix("serving at current") {
+                check.detail = format!("serving at current{suffix}{rest}");
+            }
+        }
+        Some((false, note)) => check.detail.push_str(&note),
+        None => {}
+    }
+    check
+}
+
+fn peer_daemon_line() -> Check {
     match serve_liveness() {
         Ok((false, evidence)) => Check::new(
             "peer daemon",

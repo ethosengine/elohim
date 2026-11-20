@@ -41,6 +41,8 @@ struct Fixture {
     base: PathBuf,
     repo: PathBuf,
     ark: PathBuf,
+    /// The berth stand-in `EPR_BERTH_BIN` names; `None` is no berth on this device.
+    berth: Option<PathBuf>,
 }
 
 impl Fixture {
@@ -58,7 +60,12 @@ impl Fixture {
             .env("ELOHIM_DEVICE_KEY_FILE", self.base.join("device/seed"))
             .env("BIN_STORE", self.base.join("bins"))
             .env("ARK_BIN", &self.ark)
-            .env("EPR_BERTH_BIN", "")
+            .env(
+                "EPR_BERTH_BIN",
+                self.berth
+                    .as_deref()
+                    .map_or(OsStr::new(""), Path::as_os_str),
+            )
             .env("EPR_PROC_ROOT", self.base.join("proc"))
             .env("ELOHIM_SESSION_ID", "supervise-fixture")
             // These fixtures stand for a workspace container, whose peer starts from its devfile;
@@ -84,11 +91,18 @@ impl Fixture {
 
     fn ok(&self, args: &[&str]) -> String {
         let output = self.epr(args);
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        // An ark older than this device-runtime cannot verify the store's current; name the cure
+        // instead of leaving a reader to decode the refusal.
+        let cure = if stderr.contains("unverified-current") {
+            format!("\n{}", ark_cure(&self.ark))
+        } else {
+            String::new()
+        };
         assert!(
             output.status.success(),
-            "epr {args:?}: {}\n{}",
+            "epr {args:?}: {}\n{stderr}{cure}",
             String::from_utf8_lossy(&output.stdout),
-            String::from_utf8_lossy(&output.stderr)
         );
         String::from_utf8_lossy(&output.stdout).into_owned()
     }
@@ -170,6 +184,24 @@ fn fixture() -> Option<Fixture> {
 }
 
 fn fixture_with(ark: PathBuf) -> Fixture {
+    let fx = fixture_bare(ark);
+    land(&fx, "source", b"");
+    fx
+}
+
+/// How to build an `ark` these stories can run, and where `ARK_BIN` would name it.
+fn ark_cure(ark: &Path) -> String {
+    format!(
+        "the ark at {} is missing or older than this device-runtime (it refuses the store's \
+         current as unverified-current); rebuild it: (cd elohim/ark && \
+         CARGO_TARGET_DIR=/projects/.cargo-target-pool/family/dev/elohim/dev RUSTFLAGS= \
+         RUSTUP_TOOLCHAIN=1.100.0 cargo build -p elohim-ark --bin ark), or set ARK_BIN to one",
+        ark.display()
+    )
+}
+
+/// A fixture whose bin store holds nothing yet, for stories that land through `epr bin`.
+fn fixture_bare(ark: PathBuf) -> Fixture {
     let temp = tempfile::tempdir().unwrap();
     let base = temp.path().to_owned();
     let repo = base.join("repo");
@@ -186,14 +218,13 @@ fn fixture_with(ark: PathBuf) -> Fixture {
     // `#!` script would run as its interpreter and the rung would rightly refuse it. The
     // resident is declared as the workspace base's own `epr` tool, because the bin store
     // ingests only the tools it knows how to identify; its bytes here are a copy of bash.
-    let fx = Fixture {
+    Fixture {
         _temp: temp,
         base,
         repo,
         ark,
-    };
-    land(&fx, "source", b"");
-    fx
+        berth: None,
+    }
 }
 
 /// Ingest a copy of bash (with `tail` appended, so each landing is new bytes that still run)
@@ -1133,4 +1164,964 @@ fn a_current_ark_does_not_hide_an_unowned_daemon_from_supervise() {
         (status["processes"][0]["ready"] == true).then_some(status)
     });
     assert_ne!(ready["pid"].as_u64().unwrap(), ark1, "ark was restarted");
+}
+
+// ---------------------------------------------------------------------------------------------
+// Row 35 (A-min): a landing runs the hand command `epr device supervise` for the person, with
+// the failure behaviour that command has.
+//
+// These stories land through `epr bin land` and `epr bin follow` themselves, so every landing
+// passes the store's real health checks: the releases are copies of this build's own `epr`
+// (each with a different tail, so each is new bytes), and the resident is that `epr` running
+// `lsp serve --device`, whose ready line is `epr-lsp: listening`. The lsp mux claims its berth
+// through `<lsp root>/genesis/agentic/bin/berth`; that stand-in refuses the claim of any release
+// named in `<lsp root>/bad`, so a chosen release starts and never prints its ready line. The
+// device's own berth is a second stand-in (`EPR_BERTH_BIN`) that grants the device-ark lease,
+// or refuses it as held by another session or with no session resolvable, and logs every call.
+//
+// They need a built `ark` and never pass without one: `ARK_BIN`, else this device's pool slot;
+// a missing or stale ark fails them with the build command.
+// ---------------------------------------------------------------------------------------------
+
+const LSP_READY: &str = "epr-lsp: listening";
+
+struct Lane {
+    fx: Fixture,
+    lsp: PathBuf,
+    /// The first release and its commit.
+    x: String,
+    c1: String,
+}
+
+/// The ark these stories run: `ARK_BIN`, else this device's pool slot. Never `None`: a story
+/// that cannot run fails naming the cure.
+fn story_ark() -> PathBuf {
+    let pool = elohim_device_runtime::layout::resolve()
+        .ok()
+        .and_then(|layout| {
+            layout
+                .cargo_pool()
+                .map(|pool| pool.join("family/dev/elohim/dev/debug/ark"))
+        });
+    let ark = std::env::var_os("ARK_BIN")
+        .filter(|v| !v.is_empty())
+        .map(PathBuf::from)
+        .or(pool)
+        .unwrap_or_else(|| PathBuf::from("<cargo pool>/family/dev/elohim/dev/debug/ark"));
+    assert!(ark.is_file(), "{}", ark_cure(&ark));
+    ark
+}
+
+fn git_in(dir: &Path, args: &[&str]) -> String {
+    let output = Command::new("git")
+        .args(args)
+        .current_dir(dir)
+        .env("GIT_CONFIG_GLOBAL", "/dev/null")
+        .env("GIT_CONFIG_NOSYSTEM", "1")
+        .env("GIT_AUTHOR_NAME", "Fixture")
+        .env("GIT_AUTHOR_EMAIL", "fixture@example.test")
+        .env("GIT_COMMITTER_NAME", "Fixture")
+        .env("GIT_COMMITTER_EMAIL", "fixture@example.test")
+        .env_remove("GIT_DIR")
+        .env_remove("GIT_WORK_TREE")
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "git {args:?}: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    String::from_utf8_lossy(&output.stdout).trim().to_owned()
+}
+
+/// Commit `text` to the epr source closure, so a follow sees an epr change.
+fn commit_source(repo: &Path, text: &str) -> String {
+    fs::write(repo.join("elohim/eprfs/source.txt"), text).unwrap();
+    git_in(repo, &["add", "-A"]);
+    git_in(repo, &["commit", "-q", "-m", text]);
+    git_in(repo, &["rev-parse", "HEAD"])
+}
+
+/// Stage a release built from this test's own `epr`, with `tag` appended so its bytes are new.
+fn release_dir(fx: &Fixture, tag: &str) -> PathBuf {
+    let dir = fx.base.join(format!("release-{tag}"));
+    fs::create_dir_all(&dir).unwrap();
+    let mut epr = fs::read(env!("CARGO_BIN_EXE_epr")).unwrap();
+    epr.extend_from_slice(format!("\n# release {tag}\n").as_bytes());
+    fs::write(dir.join("epr"), epr).unwrap();
+    fs::copy("/bin/bash", dir.join("bin-launch")).unwrap();
+    for bin in ["epr", "bin-launch"] {
+        fs::set_permissions(dir.join(bin), fs::Permissions::from_mode(0o755)).unwrap();
+    }
+    dir
+}
+
+/// `epr bin ingest` a release for `commit` in `repo`, returning its CID.
+fn ingest_in(fx: &Fixture, repo: &Path, tag: &str, commit: &str) -> String {
+    let dir = release_dir(fx, tag);
+    let out = fx.ok(&[
+        "bin",
+        "--tool",
+        "epr",
+        "ingest",
+        dir.join("epr").to_str().unwrap(),
+        "--source-commit",
+        commit,
+        "--tree-clean",
+        "true",
+        "--repo",
+        repo.to_str().unwrap(),
+    ]);
+    let record: Value = serde_json::from_str(out.trim()).unwrap();
+    record["cid"].as_str().unwrap().to_owned()
+}
+
+fn rows(fx: &Fixture) -> Vec<Value> {
+    fs::read_to_string(fx.data_root().join("restarts.jsonl"))
+        .unwrap_or_default()
+        .lines()
+        .map(|line| serde_json::from_str(line).unwrap())
+        .collect()
+}
+
+fn text(output: &Output) -> String {
+    format!(
+        "{}\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    )
+}
+
+fn row_named(fx: &Fixture, name: &str) -> Value {
+    let rows: Vec<Value> =
+        serde_json::from_slice(&fx.epr(&["device", "status", "--json"]).stdout).unwrap();
+    rows.into_iter()
+        .find(|row| row["name"] == name)
+        .unwrap_or_else(|| panic!("a {name} line"))
+}
+
+/// The ark's pid and its first child's, once that child is ready under a live ark.
+fn ready_child(fx: &Fixture, what: &str) -> (u64, u64) {
+    let status = wait_for(what, || {
+        let status = fx.status();
+        (status["running"] == true && status["processes"][0]["ready"] == true).then_some(status)
+    });
+    (
+        status["pid"].as_u64().unwrap(),
+        status["processes"][0]["pid"].as_u64().unwrap(),
+    )
+}
+
+/// The release a live child executes, by its directory in the bin store.
+fn running_release(child: u64) -> String {
+    let exe = fs::read_link(format!("/proc/{child}/exe")).unwrap();
+    exe.parent()
+        .unwrap()
+        .file_name()
+        .unwrap()
+        .to_string_lossy()
+        .into_owned()
+}
+
+/// The device's berth stand-in: grants `claim` unless `<base>/berth-held-by` names a holder
+/// (exit 3, as berth refuses a live holder) or `<base>/berth-no-session` exists (exit 4), and
+/// logs every call to `<base>/berth.log`.
+fn device_berth(base: &Path) -> PathBuf {
+    let path = base.join("device-berth");
+    let (log, held, nosession) = (
+        base.join("berth.log"),
+        base.join("berth-held-by"),
+        base.join("berth-no-session"),
+    );
+    fs::write(
+        &path,
+        format!(
+            "#!/bin/sh\nPATH=/usr/bin:/bin\nprintf '%s\\n' \"$*\" >> {log}\n\
+             if [ \"$1\" = claim ]; then\n\
+             if [ -f {held} ]; then h=$(cat {held}); \
+             echo \"device-ark: REFUSED — held by $h since 01:02:03Z. Ask them, or wait\" >&2; exit 3; fi\n\
+             if [ -f {nosession} ]; then echo \"berth: no session resolvable\" >&2; exit 4; fi\n\
+             fi\nexit 0\n",
+            log = log.display(),
+            held = held.display(),
+            nosession = nosession.display(),
+        ),
+    )
+    .unwrap();
+    fs::set_permissions(&path, fs::Permissions::from_mode(0o755)).unwrap();
+    path
+}
+
+/// A device on release X at commit C1, following `bin:epr`, with ark running the resident
+/// `peer` on X and ready. `policy` is `device_restart` in the checkout's pool-policy.json;
+/// `patience` shortens the declared readiness rungs (ready line, identity) in milliseconds.
+fn lane(policy: Option<Value>, patience: Option<(u64, u64)>) -> Lane {
+    lane_with(policy, patience, &[])
+}
+
+/// [`lane`], with `extra` declared after `peer` as `(name, tool, ready line, script)`.
+fn lane_with(
+    policy: Option<Value>,
+    patience: Option<(u64, u64)>,
+    extra: &[(&str, &str, &str, &str)],
+) -> Lane {
+    let mut fx = fixture_bare(story_ark());
+    fx.berth = Some(device_berth(&fx.base));
+    let repo = fx.repo.clone();
+    git_in(&repo, &["symbolic-ref", "HEAD", "refs/heads/dev"]);
+    fs::create_dir_all(repo.join("elohim/eprfs")).unwrap();
+    fs::write(repo.join("elohim/eprfs/Cargo.toml"), "[workspace]\n").unwrap();
+    fs::create_dir_all(repo.join("genesis/agentic")).unwrap();
+    let mut record = json!({ "_comment": "fixture" });
+    if let Some(policy) = policy {
+        record["device_restart"] = policy;
+    }
+    fs::write(
+        repo.join("genesis/agentic/pool-policy.json"),
+        record.to_string(),
+    )
+    .unwrap();
+    // The device data root is device-private and never part of the checkout.
+    fs::write(repo.join(".gitignore"), ".eprfs/\n").unwrap();
+    let c1 = commit_source(&repo, "one");
+    let x = ingest_in(&fx, &repo, "x", &c1);
+    fx.ok(&[
+        "bin",
+        "--tool",
+        "epr",
+        "land",
+        &x,
+        "--commit",
+        &c1,
+        "--expect",
+        "none",
+        "--repo",
+        repo.to_str().unwrap(),
+    ]);
+
+    let lsp = fx.base.join("lsp");
+    fs::create_dir_all(lsp.join("genesis/agentic/bin")).unwrap();
+    let berth = lsp.join("genesis/agentic/bin/berth");
+    fs::write(
+        &berth,
+        format!(
+            "#!/bin/sh\nPATH=/usr/bin:/bin\n[ \"$1\" = claim ] || exit 0\n\
+             cid=$(basename \"$(dirname \"$(readlink /proc/$PPID/exe)\")\")\n\
+             if grep -qx \"$cid\" {bad} 2>/dev/null; then echo \"fixture: $cid may not serve\" >&2; exit 1; fi\n\
+             exit 0\n",
+            bad = lsp.join("bad").display()
+        ),
+    )
+    .unwrap();
+    fs::set_permissions(&berth, fs::Permissions::from_mode(0o755)).unwrap();
+
+    fx.ok(&["device", "follow", "bin:epr", "--mode", "apply"]);
+    fx.ok(&[
+        "device",
+        "run",
+        "epr",
+        "--name",
+        "peer",
+        "--ready-line",
+        LSP_READY,
+        "--",
+        "lsp",
+        "serve",
+        "--device",
+        "--root",
+        lsp.to_str().unwrap(),
+    ]);
+    for (name, tool, ready, script) in extra {
+        fx.ok(&[
+            "device",
+            "run",
+            tool,
+            "--name",
+            name,
+            "--ready-line",
+            ready,
+            "--",
+            "-c",
+            script,
+        ]);
+    }
+    if let Some((line, identity)) = patience {
+        let mut base: Value =
+            serde_json::from_str(&fx.ok(&["device", "show", "--render", "manifest"])).unwrap();
+        base["processes"][0]["readiness"][0]["stdout_line"]["patience_ms"] = json!(line);
+        base["processes"][0]["readiness"][1]["executable_identity"]["patience_ms"] =
+            json!(identity);
+        base.as_object_mut().unwrap().remove("supersedes");
+        let path = fx.base.join("base-patience.json");
+        fs::write(&path, base.to_string()).unwrap();
+        fx.ok(&["device", "run", "epr", "--name", "peer", "--stop"]);
+        fx.ok(&["device", "apply", "--base", path.to_str().unwrap()]);
+    }
+    assert!(fx.ok(&["device", "supervise"]).contains("started pid"));
+    let (_, child) = wait_for("the resident on X", || {
+        let status = fx.status();
+        let peer = status["processes"]
+            .as_array()?
+            .iter()
+            .find(|p| p["name"] == "peer")?
+            .clone();
+        (status["running"] == true && peer["ready"] == true)
+            .then(|| json!([status["pid"], peer["pid"]]))
+    })
+    .as_array()
+    .map(|pair| (pair[0].as_u64().unwrap(), pair[1].as_u64().unwrap()))
+    .unwrap();
+    assert_eq!(running_release(child), x);
+    Lane { fx, lsp, x, c1 }
+}
+
+impl Lane {
+    /// A new commit and its ingested (not landed) release.
+    fn next(&self, tag: &str) -> (String, String) {
+        let commit = commit_source(&self.fx.repo, tag);
+        let cid = ingest_in(&self.fx, &self.fx.repo, tag, &commit);
+        (commit, cid)
+    }
+
+    fn follow_with(&self, extra: &[(&str, &OsStr)]) -> Output {
+        self.fx.epr_with(
+            &[
+                "bin",
+                "--tool",
+                "epr",
+                "follow",
+                "--repo",
+                self.fx.repo.to_str().unwrap(),
+            ],
+            extra,
+        )
+    }
+
+    fn follow(&self) -> Output {
+        self.follow_with(&[])
+    }
+
+    fn land_args(&self, cid: &str, commit: &str, expect: &str, repo: &Path) -> Vec<String> {
+        [
+            "bin", "--tool", "epr", "land", cid, "--commit", commit, "--expect", expect, "--repo",
+        ]
+        .iter()
+        .map(|s| (*s).to_owned())
+        .chain([repo.display().to_string()])
+        .collect()
+    }
+
+    fn land(&self, cid: &str, commit: &str, expect: &str) -> Output {
+        let args = self.land_args(cid, commit, expect, &self.fx.repo);
+        let args: Vec<&str> = args.iter().map(String::as_str).collect();
+        self.fx.epr(&args)
+    }
+
+    fn never_serves(&self, cid: &str) {
+        let mut bad = fs::read_to_string(self.lsp.join("bad")).unwrap_or_default();
+        bad.push_str(cid);
+        bad.push('\n');
+        fs::write(self.lsp.join("bad"), bad).unwrap();
+    }
+
+    fn berth_log(&self) -> String {
+        fs::read_to_string(self.fx.base.join("berth.log")).unwrap_or_default()
+    }
+}
+
+/// A follow onto a new release, by a session that holds (here: is granted) the device-ark lease,
+/// restarts the landed tool's child onto it with no supervise call, waits for it to be ready on
+/// ark's clock, and writes one ready row naming the follow and its session. Stdout stays the
+/// follow's record; status reads the receipt; a second follow at the same head restarts nothing.
+#[test]
+fn a_follow_restarts_the_landed_tools_child_when_the_lease_is_held() {
+    let lane = lane(None, None);
+    let fx = &lane.fx;
+    let (ark1, child1) = ready_child(fx, "the resident on X");
+    let (_, y) = lane.next("y");
+
+    let followed = lane.follow();
+    let said = text(&followed);
+    assert!(followed.status.success(), "{said}");
+    assert!(
+        said.contains(&format!(
+            "device ark: peer runs {}, current is {y}; restarting (after follow, session ",
+            lane.x
+        )),
+        "{said}"
+    );
+    assert!(
+        said.contains(&format!("device ark: peer ready on {y} in ")),
+        "{said}"
+    );
+    let record: Value = serde_json::from_slice(&followed.stdout).unwrap();
+    assert_eq!(
+        record["cid"],
+        y.as_str(),
+        "stdout is still the follow's record"
+    );
+    assert!(
+        lane.berth_log()
+            .contains("claim device-ark --class device-ark"),
+        "{}",
+        lane.berth_log()
+    );
+
+    let (ark2, child2) = ready_child(fx, "the resident on Y");
+    assert_ne!(ark2, ark1, "ark was restarted");
+    assert!(!alive(child1));
+    assert_eq!(running_release(child2), y, "the new child executes Y");
+    let rows = rows(fx);
+    assert_eq!(rows.len(), 1, "{rows:?}");
+    let row = &rows[0];
+    assert_eq!(row["trigger"], "follow");
+    assert_eq!(row["outcome"], "ready");
+    assert_eq!(row["from"], lane.x.as_str());
+    assert_eq!(row["to"], y.as_str());
+    assert_eq!(row["session"], "supervise-fixture");
+    assert!(row["seconds"].as_u64().is_some() && row["at"].is_string());
+
+    let again = lane.follow();
+    assert!(again.status.success(), "{}", text(&again));
+    assert_eq!(self::rows(fx).len(), 1);
+    assert_eq!(fx.status()["pid"].as_u64().unwrap(), ark2);
+
+    // Status reads the receipt on the peer daemon line while a peer serves at current.
+    let Some(mut holder) = Holder::start(fx, &fx.repo) else {
+        return;
+    };
+    fx.lease(holder.pid());
+    let line = row_named(fx, "peer daemon");
+    assert_eq!(line["state"], "ok", "{line}");
+    let detail = line["detail"].as_str().unwrap();
+    assert!(
+        detail.starts_with("serving at current (restarted by follow at ") && detail.contains(" s)"),
+        "{detail}"
+    );
+    assert!(holder.running());
+}
+
+/// A forward land made from a linked worktree restarts the device's ark too: the device root
+/// comes from the main checkout through git's common directory.
+#[test]
+fn a_forward_land_from_a_linked_worktree_restarts_too() {
+    let lane = lane(None, None);
+    let fx = &lane.fx;
+    let (ark1, _) = ready_child(fx, "the resident on X");
+    let (c2, y) = lane.next("y");
+    let linked = fx.base.join("linked");
+    git_in(
+        &fx.repo,
+        &[
+            "worktree",
+            "add",
+            "-q",
+            "--detach",
+            linked.to_str().unwrap(),
+            &c2,
+        ],
+    );
+    let args = lane.land_args(&y, &c2, &lane.x, &linked);
+    let args: Vec<&str> = args.iter().map(String::as_str).collect();
+    let landed = fx.epr(&args);
+    let said = text(&landed);
+    assert!(landed.status.success(), "{said}");
+    assert!(said.contains("restarting (after land, session "), "{said}");
+    let (ark2, child2) = ready_child(fx, "the resident on Y");
+    assert_ne!(ark2, ark1);
+    assert_eq!(running_release(child2), y);
+    let rows = rows(fx);
+    assert_eq!(rows.len(), 1, "{rows:?}");
+    assert_eq!(rows[0]["trigger"], "land");
+    assert_eq!(rows[0]["outcome"], "ready");
+    assert!(!linked
+        .join(".eprfs/status/ark/device/restarts.jsonl")
+        .exists());
+}
+
+/// A revert and a bootstrap move current but restart nothing. (The forward land before them
+/// restarts, which is what makes this story fail before row 35.)
+#[test]
+fn a_revert_and_a_bootstrap_restart_nothing() {
+    let lane = lane(None, None);
+    let fx = &lane.fx;
+    let (c2, y) = lane.next("y");
+    assert!(lane.land(&y, &c2, &lane.x).status.success());
+    let (ark_y, child_y) = ready_child(fx, "the resident on Y");
+    assert_eq!(running_release(child_y), y);
+    assert_eq!(rows(fx).len(), 1);
+
+    let at_c1 = fx.base.join("at-c1");
+    git_in(
+        &fx.repo,
+        &[
+            "worktree",
+            "add",
+            "-q",
+            "--detach",
+            at_c1.to_str().unwrap(),
+            &lane.c1,
+        ],
+    );
+    let reverted = fx.epr(&[
+        "bin",
+        "--tool",
+        "epr",
+        "land",
+        &lane.x,
+        "--commit",
+        &lane.c1,
+        "--expect",
+        &y,
+        "--revert",
+        "--repo",
+        at_c1.to_str().unwrap(),
+    ]);
+    let said = text(&reverted);
+    assert!(reverted.status.success(), "{said}");
+    assert!(!said.contains("; restarting ("), "{said}");
+    assert_eq!(fx.current().0, lane.x);
+    assert_eq!(fx.status()["pid"].as_u64().unwrap(), ark_y);
+    assert_eq!(rows(fx).len(), 1, "a revert writes no restart row");
+
+    fs::remove_file(fx.store().root().join("current.json")).unwrap();
+    let _ = fs::remove_file(fx.store().root().join("current"));
+    let booted = fx.epr(&[
+        "bin",
+        "--tool",
+        "epr",
+        "bootstrap",
+        "--repo",
+        fx.repo.to_str().unwrap(),
+    ]);
+    let said = text(&booted);
+    assert!(booted.status.success(), "{said}");
+    assert!(!said.contains("; restarting ("), "{said}");
+    assert_eq!(fx.status()["pid"].as_u64().unwrap(), ark_y);
+    assert_eq!(rows(fx).len(), 1, "a bootstrap writes no restart row");
+}
+
+/// `device_restart.on_landing = "off"`: the follow lands, says the switch is off, restarts
+/// nothing, and the receipt says it skipped and why.
+#[test]
+fn on_landing_off_lands_and_restarts_nothing() {
+    let lane = lane(Some(json!({ "on_landing": "off" })), None);
+    let fx = &lane.fx;
+    let (ark1, child1) = ready_child(fx, "the resident on X");
+    let (_, y) = lane.next("y");
+    let followed = lane.follow();
+    let said = text(&followed);
+    assert!(followed.status.success(), "{said}");
+    assert_eq!(fx.current().0, y, "the follow landed");
+    assert!(said.contains("device_restart.on_landing is off"), "{said}");
+    assert!(!said.contains("; restarting ("), "{said}");
+    assert_eq!(fx.status()["pid"].as_u64().unwrap(), ark1);
+    assert_eq!(running_release(child1), lane.x);
+    let rows = rows(fx);
+    assert_eq!(rows.len(), 1, "{rows:?}");
+    assert_eq!(rows[0]["outcome"], "skipped");
+    assert!(rows[0]["reason"]
+        .as_str()
+        .unwrap()
+        .contains("on_landing is off"));
+}
+
+/// Without the lease the follow lands and restarts nothing, saying why on stderr: no berth on
+/// this device, no session berth can resolve (exit 4), or another live session holding
+/// device-ark, which is sent a berth note naming the one command to run.
+#[test]
+fn without_the_lease_a_follow_lands_and_restarts_nothing() {
+    let lane = lane(None, None);
+    let fx = &lane.fx;
+    let (ark1, child1) = ready_child(fx, "the resident on X");
+    let unchanged = |said: &str| {
+        assert_eq!(fx.status()["pid"].as_u64().unwrap(), ark1, "{said}");
+        assert_eq!(running_release(child1), lane.x, "{said}");
+        assert!(!said.contains("; restarting ("), "{said}");
+    };
+
+    let (_, y) = lane.next("y");
+    let followed = lane.follow_with(&[("EPR_BERTH_BIN", OsStr::new(""))]);
+    let said = text(&followed);
+    assert!(followed.status.success(), "{said}");
+    assert_eq!(fx.current().0, y);
+    assert!(said.contains("no berth on this device"), "{said}");
+    assert!(said.contains("epr device supervise"), "{said}");
+    unchanged(&said);
+
+    fs::write(fx.base.join("berth-no-session"), "").unwrap();
+    let (_, z) = lane.next("z");
+    let followed = lane.follow();
+    let said = text(&followed);
+    assert!(followed.status.success(), "{said}");
+    assert_eq!(fx.current().0, z);
+    assert!(said.contains("no berth session"), "{said}");
+    unchanged(&said);
+    fs::remove_file(fx.base.join("berth-no-session")).unwrap();
+
+    fs::write(fx.base.join("berth-held-by"), "other-session").unwrap();
+    let (_, w) = lane.next("w");
+    let followed = lane.follow();
+    let said = text(&followed);
+    assert!(followed.status.success(), "{said}");
+    assert_eq!(fx.current().0, w);
+    assert!(said.contains("held by other-session"), "{said}");
+    unchanged(&said);
+    let log = lane.berth_log();
+    let note = log
+        .lines()
+        .find(|line| line.starts_with("say "))
+        .unwrap_or_else(|| panic!("a note to the holder: {log}"));
+    assert!(
+        note.contains("--session supervise-fixture") && note.contains("--to other-session"),
+        "{note}"
+    );
+    assert!(note.contains("epr device supervise"), "{note}");
+
+    let rows = rows(fx);
+    assert_eq!(rows.len(), 3, "{rows:?}");
+    assert!(
+        rows.iter().all(|row| row["outcome"] == "skipped"),
+        "{rows:?}"
+    );
+}
+
+/// A release whose child never prints its ready line: the follow waits out that child's own
+/// readiness on ark's clock, then exits non-zero saying the device is degraded with the cure.
+/// Nothing is reverted or held: the release stays current, as after a failed manual restart.
+#[test]
+fn a_release_that_never_comes_up_degrades_the_device_and_fails_the_follow() {
+    let lane = lane(None, Some((4_000, 2_000)));
+    let fx = &lane.fx;
+    let (_, y) = lane.next("y");
+    lane.never_serves(&y);
+    let followed = lane.follow();
+    let said = text(&followed);
+    assert!(!followed.status.success(), "{said}");
+    assert!(
+        said.contains(&format!("device ark: {y} not ready after "))
+            && said.contains("; the device is degraded; cure: "),
+        "{said}"
+    );
+    assert_eq!(fx.current().0, y, "nothing is reverted");
+    let rows = rows(fx);
+    assert_eq!(rows.len(), 1, "{rows:?}");
+    assert_eq!(rows[0]["outcome"], "not-ready");
+    assert!(
+        rows[0]["seconds"].as_u64().unwrap() >= 4,
+        "the child's own patience was waited out: {rows:?}"
+    );
+    let line = row_named(fx, "peer daemon");
+    assert!(
+        line["detail"]
+            .as_str()
+            .unwrap()
+            .contains(&format!("{y} not ready after")),
+        "{line}"
+    );
+}
+
+/// Only the landed tool's own children are judged: an unrelated child on another channel that
+/// never becomes ready neither fails nor delays the follow.
+#[test]
+fn only_the_landed_tools_children_are_judged() {
+    let base = tempfile::tempdir().unwrap();
+    let dir = base.path().join("brit");
+    fs::create_dir_all(&dir).unwrap();
+    let registry = manifest_store::registry(&manifest_store::workspace_base().unwrap()).unwrap();
+    let lane = {
+        // The unrelated child runs `bin:brit`, so the device needs a verified brit current
+        // first; the lane's own store is created inside it.
+        let lane = lane_with(None, None, &[]);
+        for bin in [
+            "brit",
+            "brit-build-ref",
+            "brit-rebase-retained",
+            "brit-verify",
+        ] {
+            fs::copy("/bin/bash", dir.join(bin)).unwrap();
+            fs::set_permissions(dir.join(bin), fs::Permissions::from_mode(0o755)).unwrap();
+        }
+        let store = Store::new(lane.fx.base.join("bins/brit"), "brit", &registry)
+            .unwrap()
+            .with_runner(std::sync::Arc::new(IdentityRunner));
+        let release = store
+            .ingest(
+                &dir.join("brit"),
+                &IngestOptions {
+                    source_commit: Some("fixture".into()),
+                    tree_clean: Some(true),
+                    gate_run: Some("fixture".into()),
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+        symlink(&release.cid, store.root().join("current")).unwrap();
+        fs::write(
+            store.root().join("current.json"),
+            json!({ "cid": release.cid }).to_string(),
+        )
+        .unwrap();
+        lane.fx.ok(&[
+            "device",
+            "run",
+            "brit",
+            "--name",
+            "side",
+            "--ready-line",
+            "never-printed",
+            "--",
+            "-c",
+            "while :; do sleep 1; done",
+        ]);
+        // The head moved: one hand supervise reloads ark under it.
+        assert!(lane.fx.ok(&["device", "supervise"]).contains("reloading"));
+        lane
+    };
+    let fx = &lane.fx;
+    let (ark1, _) = ready_child(fx, "the resident on X under the new head");
+    let (_, y) = lane.next("y");
+    let followed = lane.follow();
+    let said = text(&followed);
+    assert!(followed.status.success(), "{said}");
+    assert!(
+        said.contains(&format!("device ark: peer ready on {y} in ")),
+        "{said}"
+    );
+    assert!(
+        !said.contains("side"),
+        "the unrelated child is not judged: {said}"
+    );
+    assert_ne!(fx.status()["pid"].as_u64().unwrap(), ark1);
+    let rows = rows(fx);
+    assert_eq!(rows.len(), 1, "{rows:?}");
+    assert_eq!(rows[0]["outcome"], "ready");
+}
+
+/// Any failure after the old ark was stopped fails the follow with the cure: here the ark that
+/// would start in its place exits at once.
+#[test]
+fn a_failure_after_the_old_ark_stopped_fails_the_follow() {
+    let lane = lane(None, None);
+    let fx = &lane.fx;
+    let (_, y) = lane.next("y");
+    let followed = lane.follow_with(&[("ARK_BIN", OsStr::new("/bin/false"))]);
+    let said = text(&followed);
+    assert!(!followed.status.success(), "{said}");
+    assert_eq!(fx.current().0, y);
+    assert!(said.contains("cure: epr device supervise"), "{said}");
+    assert!(!said.contains("stands"), "{said}");
+    assert_eq!(fx.status()["running"], false, "{said}");
+}
+
+/// Two landings racing to restart the same ark restart it once: the restart is serialised per
+/// device, and the second re-reads the child under that serialisation and finds it current.
+#[test]
+fn two_landings_restart_once() {
+    use std::os::fd::AsRawFd;
+    let lane = lane(None, None);
+    let fx = &lane.fx;
+    let lock_path = fx.data_root().join("restart.lock");
+    let lock = fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&lock_path)
+        .unwrap();
+    // SAFETY: the fd is open for this call and flock retains no pointer.
+    assert_eq!(unsafe { libc::flock(lock.as_raw_fd(), libc::LOCK_EX) }, 0);
+    let spawn = |args: Vec<String>| {
+        let mut command = Command::new(env!("CARGO_BIN_EXE_epr"));
+        command
+            .args(&args)
+            .current_dir(&fx.repo)
+            .env("HOME", &fx.base)
+            .env("XDG_CONFIG_HOME", fx.base.join("config"))
+            .env("ELOHIM_DEVICE_KEY_FILE", fx.base.join("device/seed"))
+            .env("BIN_STORE", fx.base.join("bins"))
+            .env("ARK_BIN", &fx.ark)
+            .env("EPR_BERTH_BIN", fx.berth.as_ref().unwrap())
+            .env("EPR_PROC_ROOT", fx.base.join("proc"))
+            .env("ELOHIM_SESSION_ID", "supervise-fixture")
+            .env("DEVWORKSPACE_ID", "supervise-fixture")
+            .env("CLAUDE_CONFIG_DIR", fx.base.join("berth-config"))
+            .env("PATH", "/usr/bin:/bin")
+            .env("GIT_CONFIG_GLOBAL", "/dev/null")
+            .env("GIT_CONFIG_NOSYSTEM", "1")
+            .env_remove("EPR_SESSION_LAZY")
+            .env_remove("EPR_BIN_TOOLS")
+            .env_remove("EPR_STORE")
+            .env_remove("BRIT_STORE")
+            .env_remove("GIT_DIR")
+            .env_remove("GIT_WORK_TREE")
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
+        command.spawn().unwrap()
+    };
+    let (c2, y) = lane.next("y");
+    let first = spawn(lane.land_args(&y, &c2, &lane.x, &fx.repo));
+    wait_for("the first landing", || {
+        (fx.current().0 == y).then_some(Value::Null)
+    });
+    let (c3, z) = lane.next("z");
+    let second = spawn(lane.land_args(&z, &c3, &y, &fx.repo));
+    wait_for("the second landing", || {
+        (fx.current().0 == z).then_some(Value::Null)
+    });
+    thread::sleep(Duration::from_millis(1_000));
+    drop(lock);
+    let first = first.wait_with_output().unwrap();
+    let second = second.wait_with_output().unwrap();
+    let said = format!("{}\n{}", text(&first), text(&second));
+    assert!(first.status.success() && second.status.success(), "{said}");
+    assert_eq!(
+        said.matches("; restarting (after land").count(),
+        1,
+        "{said}"
+    );
+    assert!(said.contains("already runs"), "{said}");
+    let (_, child) = ready_child(fx, "the resident on Z");
+    assert_eq!(running_release(child), z);
+    let rows = rows(fx);
+    assert_eq!(rows.len(), 2, "{rows:?}");
+    assert_eq!(
+        rows.iter().filter(|row| row["outcome"] == "ready").count(),
+        1,
+        "{rows:?}"
+    );
+    assert_eq!(
+        rows.iter()
+            .filter(|row| row["outcome"] == "skipped")
+            .count(),
+        1,
+        "{rows:?}"
+    );
+}
+
+/// An ark run under a custom `--data-root` is never restarted by a landing; the follow says so.
+#[test]
+fn a_custom_data_root_gets_no_automatic_restart() {
+    let lane = lane(None, None);
+    let fx = &lane.fx;
+    assert!(fx
+        .ok(&["device", "supervise", "--stop"])
+        .contains("stopped"));
+    let custom = fx.base.join("custom-root");
+    let custom_arg = custom.to_str().unwrap();
+    assert!(fx
+        .ok(&["device", "supervise", "--data-root", custom_arg])
+        .contains("started pid"));
+    let custom_status = || -> Value {
+        serde_json::from_str(&fx.ok(&[
+            "device",
+            "supervise",
+            "--status",
+            "--json",
+            "--data-root",
+            custom_arg,
+        ]))
+        .unwrap()
+    };
+    let ark1 = wait_for("the resident under the custom root", || {
+        let status = custom_status();
+        (status["processes"][0]["ready"] == true).then_some(status)
+    })["pid"]
+        .as_u64()
+        .unwrap();
+    let (_, y) = lane.next("y");
+    let followed = lane.follow();
+    let said = text(&followed);
+    assert!(followed.status.success(), "{said}");
+    assert_eq!(fx.current().0, y);
+    assert!(said.contains("custom data root"), "{said}");
+    assert!(!said.contains("; restarting ("), "{said}");
+    assert_eq!(custom_status()["pid"].as_u64().unwrap(), ark1);
+    let _ = fx.epr(&["device", "supervise", "--stop", "--data-root", custom_arg]);
+}
+
+fn locks_free(paths: &[PathBuf]) -> Result<(), String> {
+    use std::os::fd::AsRawFd;
+    for path in paths {
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        let file = fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(path)
+            .unwrap();
+        // SAFETY: the fd is open for the duration of this call and flock retains no pointer.
+        let got = unsafe { libc::flock(file.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) };
+        if got != 0 {
+            return Err(format!("{} is held", path.display()));
+        }
+        // SAFETY: as above; releases the lock just taken.
+        unsafe { libc::flock(file.as_raw_fd(), libc::LOCK_UN) };
+    }
+    Ok(())
+}
+
+/// While a follow waits for readiness it holds no lock a follow, a land, `epr session open` or
+/// another restart could want: the bin store's lock, its follow lock, the sessions guard and the
+/// device's restart lock are each granted at once to this process during the wait.
+#[test]
+fn the_readiness_wait_holds_no_lock() {
+    let lane = lane(None, Some((8_000, 2_000)));
+    let fx = &lane.fx;
+    let (_, y) = lane.next("y");
+    lane.never_serves(&y);
+    let mut command = Command::new(env!("CARGO_BIN_EXE_epr"));
+    command
+        .args(["bin", "--tool", "epr", "follow", "--repo"])
+        .arg(&fx.repo)
+        .current_dir(&fx.repo)
+        .env("HOME", &fx.base)
+        .env("XDG_CONFIG_HOME", fx.base.join("config"))
+        .env("ELOHIM_DEVICE_KEY_FILE", fx.base.join("device/seed"))
+        .env("BIN_STORE", fx.base.join("bins"))
+        .env("ARK_BIN", &fx.ark)
+        .env("EPR_BERTH_BIN", fx.berth.as_ref().unwrap())
+        .env("EPR_PROC_ROOT", fx.base.join("proc"))
+        .env("ELOHIM_SESSION_ID", "supervise-fixture")
+        .env("DEVWORKSPACE_ID", "supervise-fixture")
+        .env("CLAUDE_CONFIG_DIR", fx.base.join("berth-config"))
+        .env("PATH", "/usr/bin:/bin")
+        .env("GIT_CONFIG_GLOBAL", "/dev/null")
+        .env("GIT_CONFIG_NOSYSTEM", "1")
+        .env_remove("EPR_SESSION_LAZY")
+        .env_remove("EPR_BIN_TOOLS")
+        .env_remove("EPR_STORE")
+        .env_remove("BRIT_STORE")
+        .env_remove("GIT_DIR")
+        .env_remove("GIT_WORK_TREE")
+        .stdout(Stdio::null())
+        .stderr(Stdio::piped());
+    let mut child = command.spawn().unwrap();
+    let stderr = BufReader::new(child.stderr.take().unwrap());
+    let mut seen = String::new();
+    let mut checked = false;
+    for line in stderr.lines() {
+        let line = line.unwrap();
+        seen.push_str(&line);
+        seen.push('\n');
+        // The new ark is up: the wait begins after this line.
+        if !checked && line.contains("device ark: started pid") {
+            thread::sleep(Duration::from_millis(1_000));
+            assert!(child.try_wait().unwrap().is_none(), "still waiting: {seen}");
+            let started = Instant::now();
+            let free = locks_free(&[
+                fx.base.join("bins/epr/.lock"),
+                fx.base.join("bins/epr/.follow.lock"),
+                fx.base.join("device/sessions/.lock"),
+                fx.data_root().join("restart.lock"),
+            ]);
+            assert!(free.is_ok(), "{free:?}\n{seen}");
+            assert!(started.elapsed() < Duration::from_millis(500));
+            assert!(
+                child.try_wait().unwrap().is_none(),
+                "the locks were granted during the wait, not after it: {seen}"
+            );
+            checked = true;
+        }
+    }
+    let status = child.wait().unwrap();
+    assert!(checked, "the restart never began: {seen}");
+    assert!(!status.success(), "{seen}");
 }
