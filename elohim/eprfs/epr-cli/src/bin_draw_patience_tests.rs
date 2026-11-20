@@ -137,15 +137,11 @@ fn draw_with(
     )
 }
 
-/// The kinds a draw waits on: a holder it could not dial or whose direct stream failed
-/// (`no-route`), and a holder reached only by relay that did not deliver
-/// (`transport-cannot-deliver`; shem's ruling B-b: the two devices hear each other through
-/// the relay, so a restarting holder can read either way).
+/// The one kind a draw waits on: a holder it could not dial or whose direct stream failed
+/// (`no-route`). A relay-only holder (`transport-cannot-deliver`) is not waited on: the relay
+/// carries no artifact bytes this sprint, so that pair builds locally whatever the wait.
 fn waited_on(gap: &eprfs_peer::FetchGap) -> bool {
-    matches!(
-        gap,
-        eprfs_peer::FetchGap::NoRoute { .. } | eprfs_peer::FetchGap::TransportCannotDeliver { .. }
-    )
+    matches!(gap, eprfs_peer::FetchGap::NoRoute { .. })
 }
 
 /// A relay-only holder that did not deliver, as the daemon reports it.
@@ -158,9 +154,8 @@ fn relay_undelivered(device: &str) -> String {
 
 #[test]
 fn only_a_holder_that_did_not_answer_is_waited_for() {
-    // Row 35 B1: `no-route` is the kind the daemon gives a holder it could not dial (refused,
-    // unreachable, the dial's own bound elapsed) or whose direct stream failed;
-    // `transport-cannot-deliver` is a holder reached only by relay that did not deliver.
+    // Row 35 B1: `no-route` is the one kind the daemon gives a holder it could not dial
+    // (refused, unreachable, the dial's own bound elapsed) or whose direct stream failed.
     for gap in every_fetch_gap() {
         let error = printed(&gap);
         assert_eq!(
@@ -299,62 +294,8 @@ fn a_holder_silent_past_the_bound_falls_back_naming_the_holder_and_the_seconds()
 }
 
 #[test]
-fn a_relay_only_holder_that_cannot_deliver_twice_then_serves_is_drawn_after_the_wait() {
-    let tmp = tempfile::tempdir().unwrap();
-    let store = two_bin_store(tmp.path());
-    let landed = tmp.path().join("sibling");
-    sibling_bins(&landed, "#!/bin/sh\n# sibling launcher\n");
-    let release = store.release_cid_of(&landed).unwrap();
-    let offer = stating(offer_for(&release), &glibc_at_least(&[2, 17]));
-    let serve = serving(&landed);
-    let undelivered = std::cell::Cell::new(0);
-    let fetch = |output: &str, dest: &Path| {
-        if undelivered.get() < 2 {
-            undelivered.set(undelivered.get() + 1);
-            return Err(relay_undelivered(&offer.device));
-        }
-        serve(output, dest)
-    };
-    let clock = Clock::new();
-    let said = std::cell::RefCell::new(Vec::<String>::new());
-    let patience = sibling::Patience {
-        bound: sibling::DEFAULT_PATIENCE,
-        now: &|| clock.now(),
-        sleep: &|pause| {
-            assert_store_unlocked(store.root());
-            clock.sleep(pause);
-        },
-        say: &|line| said.borrow_mut().push(line.to_owned()),
-        then: "building locally",
-    };
-    let drawn = match draw_with(
-        &store,
-        tmp.path(),
-        &offer,
-        &host_with_glibc(&[2, 40]),
-        &fetch,
-        &|_, _| Ok(()),
-        &patience,
-    ) {
-        Ok(value) => value,
-        Err(sibling::Draw::Gap(gap)) => panic!("gap: {gap}"),
-        Err(sibling::Draw::Unanswered(gap)) => panic!("unanswered: {gap}"),
-        Err(sibling::Draw::Refused(r)) => panic!("refused {}: {}", r.kind, r.detail),
-    };
-    assert_eq!(drawn["release"], release);
-    assert_eq!(clock.slept(), [2, 4], "two pauses, doubling");
-    assert_eq!(
-        said.borrow().as_slice(),
-        [format!(
-            "follow: holder did:key:z6MkSibling not answering for release {release}; \
-             waited 6 s; drew it"
-        )]
-    );
-    assert!(store.holds_verified_for(DRAWN));
-}
-
-#[test]
-fn a_relay_only_holder_that_never_delivers_falls_back_naming_the_holder_and_the_seconds() {
+fn a_relay_only_holder_that_cannot_deliver_falls_back_at_once_with_no_wait() {
+    // The relay carries no artifact bytes this sprint: waiting would only delay the build.
     let tmp = tempfile::tempdir().unwrap();
     let store = two_bin_store(tmp.path());
     let offer = stating(offer_for("R1"), &glibc_at_least(&[2, 17]));
@@ -381,28 +322,19 @@ fn a_relay_only_holder_that_never_delivers_falls_back_naming_the_holder_and_the_
         &|_, _| Ok(()),
         &patience,
     ) {
-        Err(sibling::Draw::Unanswered(gap)) => {
-            assert!(gap.starts_with("holder-not-answering: "), "{gap}");
-            assert!(gap.contains("did:key:z6MkSibling"), "{gap}");
-            assert!(gap.contains("waited 90 s"), "{gap}");
+        Err(sibling::Draw::Gap(gap)) => {
             assert!(
-                gap.contains("transport-cannot-deliver"),
-                "the last gap: {gap}"
+                gap.starts_with("fetch gap: transport-cannot-deliver: "),
+                "{gap}"
             );
         }
-        Err(sibling::Draw::Gap(gap)) => panic!("the wait ends unanswered, not a gap: {gap}"),
+        Err(sibling::Draw::Unanswered(gap)) => panic!("a relay-only holder was waited on: {gap}"),
         Err(sibling::Draw::Refused(r)) => panic!("refused {}", r.detail),
         Ok(value) => panic!("nothing delivered, yet {value}"),
     }
-    assert_eq!(clock.slept(), [2, 4, 8, 16, 16, 16, 16, 12]);
-    assert_eq!(asked.get(), 9);
-    assert_eq!(
-        said.borrow().as_slice(),
-        [
-            "follow: holder did:key:z6MkSibling not answering for release R1; waited 90 s; \
-             building locally"
-        ]
-    );
+    assert_eq!(clock.slept(), Vec::<u64>::new(), "no pause");
+    assert_eq!(asked.get(), 1, "asked once");
+    assert!(said.borrow().is_empty(), "{:?}", said.borrow());
     assert!(!store.holds_verified_for(DRAWN));
 }
 

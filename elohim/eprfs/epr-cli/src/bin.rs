@@ -888,32 +888,23 @@ pub(crate) mod sibling {
     }
 
     /// Whether a fetch error says only that the holder did not answer, so the same admitted
-    /// offer may be asked again once it is back. Two of the daemon's gaps say so, as
-    /// `epr artifact fetch` prints them (`fetch gap: <kind>: ...`): `no-route`, the holder
-    /// refused the dial, could not be reached, did not connect within the dial's own bound, or
-    /// its direct stream failed (a holder that restarts mid-draw hangs up); and
-    /// `transport-cannot-deliver`, a holder reached only by relay that did not deliver (shem's
-    /// ruling B-b: siblings hear each other through the relay, so which road a draw takes is
-    /// not known, and a restarting holder reads this way on that road). Every other kind is not
-    /// a silent holder: `refused` and `manifest-rejected` are answers, `deadline-exceeded` is
-    /// the fetch's own deadline or this device's daemon not answering the queue, `daemon-down`
-    /// is this device's daemon, `local-store` this device's store, and the rest are about the
-    /// record, not the holder.
+    /// offer may be asked again once it is back. That is the daemon's `no-route` gap, as
+    /// `epr artifact fetch` prints it (`fetch gap: no-route: ...`): the holder refused the dial,
+    /// could not be reached, did not connect within the dial's own bound, or its direct stream
+    /// failed (a holder that restarts mid-draw hangs up). Every other kind is not a silent
+    /// holder: `refused` and `manifest-rejected` are answers, `deadline-exceeded` is the fetch's
+    /// own deadline or this device's daemon not answering the queue, `daemon-down` is this
+    /// device's daemon, `local-store` this device's store, and the rest are about the record.
     #[cfg(feature = "peer")]
     pub(crate) fn holder_unanswered(error: &str) -> bool {
-        let silent = [
-            eprfs_peer::FetchGap::NoRoute {
-                device: String::new(),
-            },
-            eprfs_peer::FetchGap::TransportCannotDeliver {
-                mode: String::new(),
-                cause: None,
-            },
-        ];
+        // Not transport-cannot-deliver: no artifact bytes cross the relay yet; wait once they do.
+        let silent = eprfs_peer::FetchGap::NoRoute {
+            device: String::new(),
+        };
         error
             .strip_prefix("fetch gap: ")
             .and_then(|rest| rest.split_once(": "))
-            .is_some_and(|(kind, _)| silent.iter().any(|gap| gap.kind() == kind))
+            .is_some_and(|(kind, _)| kind == silent.kind())
     }
 
     /// One attempt's failure: a holder that did not answer, or the draw's own answer.
