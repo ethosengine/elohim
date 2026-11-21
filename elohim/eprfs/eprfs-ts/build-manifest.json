@@ -9,9 +9,11 @@
         "sources": [
           "elohim/eprfs/eprfs-ts/**",
           "elohim/sdk/epr-ts/**",
-          "elohim/eprfs/fixtures/**"
+          "elohim/eprfs/fixtures/**",
+          "pnpm-workspace.yaml",
+          "pnpm-lock.yaml"
         ],
-        "buildProcess": ["pnpm-workspace.yaml", "pnpm-lock.yaml"]
+        "buildProcess": []
       },
       "outputs": { "artifacts": [], "verify": null },
       "depends": [],

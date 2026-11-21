@@ -11,13 +11,12 @@
           "elohim/sdk/epr-ts/**",
           "elohim/eprfs/eprfs-ts/**",
           "elohim/sdk/schemas/v1/enums/answer-reason.schema.json",
-          "elohim/sdk/schemas/v1/views/placement-explanation-view.schema.json"
-        ],
-        "buildProcess": [
+          "elohim/sdk/schemas/v1/views/placement-explanation-view.schema.json",
           "elohim/sdk/schemas/scripts/codegen-ts.mjs",
           "pnpm-workspace.yaml",
           "pnpm-lock.yaml"
-        ]
+        ],
+        "buildProcess": []
       },
       "outputs": {
         "artifacts": [],

@@ -70,24 +70,11 @@ describe('pipeline-registry', () => {
   // script as buildProcess; an independent review caught that a lockfile bump would then have reused
   // a stale green. An input the gate's own recipe reads is a source. A gate project's OWN `inputs`
   // block is the gate's, both classes, and is not checked here: nothing is ever dropped from it.
-  //
-  // PARKED holds those five entries, still wrong on dev. Moving them to sources is the fix, and CI
-  // reads an edit to either manifest as an Edge build input: the fleet-roll check refuses it without
-  // a declared roll (arrival backlog row 42, delta 5). They move with the next deliberate Edge roll.
-  // The assertion is exact, so a sixth offender fails here, and so does the corrected tree until
-  // this list is deleted with it. gate-inputs.mjs names this among what `on` needs first.
-  const PARKED = [
-    './elohim/eprfs/eprfs-ts/build-manifest.json gate-eprfs-ts: pnpm-lock.yaml is neither a pipeline file nor a scripts/ci/ build script',
-    './elohim/eprfs/eprfs-ts/build-manifest.json gate-eprfs-ts: pnpm-workspace.yaml is neither a pipeline file nor a scripts/ci/ build script',
-    './elohim/sdk/storage-client-ts/build-manifest.json gate-storage-client-ts: elohim/sdk/schemas/scripts/codegen-ts.mjs is neither a pipeline file nor a scripts/ci/ build script',
-    './elohim/sdk/storage-client-ts/build-manifest.json gate-storage-client-ts: pnpm-lock.yaml is neither a pipeline file nor a scripts/ci/ build script',
-    './elohim/sdk/storage-client-ts/build-manifest.json gate-storage-client-ts: pnpm-workspace.yaml is neither a pipeline file nor a scripts/ci/ build script',
-  ];
   test('a borrowed step lists only another executor\'s process files as buildProcess, and its gate\'s justfile names none', () => {
-    assert.deepEqual(buildProcessOffenders(ROOT), PARKED,
-      'the borrowed steps that break the executor boundary are not exactly the parked five. A new one lists a buildProcess entry that is not '
-      + 'a pipeline file or a scripts/ci/ build script, or that a command in the justfile its gate runs from names: if the gate\'s recipe '
-      + 'reads the file, list it under sources; if it does not, do not name it in a command. A missing one was corrected: delete it from PARKED');
+    assert.deepEqual(buildProcessOffenders(ROOT), [],
+      'a borrowed step breaks the executor boundary: it lists a buildProcess entry that is not a pipeline file or a scripts/ci/ build script, '
+      + 'or that a command in the justfile its gate runs from names. If the gate\'s recipe reads the file, list it under sources; '
+      + 'if it does not, do not name it in a command');
   });
 
   test('loads every build-manifest.json with a pipeline field', () => {
