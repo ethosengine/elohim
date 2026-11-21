@@ -1236,3 +1236,189 @@ What is owed, restated: (a) a main checkout that follows dev on each device, or 
 session start that says how far behind it is and names the hooks it lacks; (b) still true as
 written: a note's sender cannot see whether it was read, since seen state stays on the
 receiving device.
+
+## Row 43, delta (2026-11-21): ruled, built; what the precheck still does not see
+
+The steward ruled the first cure on 2026-11-21: bump the four versions and roll Edge. Built in
+`79ceff095` (eprfs-core 0.3.6, eprfs-storage 0.3.9, eprfs-meta 0.3.7, eprfs-local 0.3.7, eight
+lockfiles, `[edge:roll]`) and `5535405d4` (the precheck). The precheck's gap is closed for the
+class that caused this: each entry of the published lock must still be reachable from the crate
+in the workspace lock, a path member at the same version, any other package at the same version,
+source and checksum. Against the six published archives it refuses nothing with the lock before
+the `cc` move and exactly `cc 1.2.65` and `find-msvc-tools 0.1.9` after it.
+
+Still open behind it, each one the publish stage catches and a device does not:
+
+1. An entry the crate has gained, an entry's own dependency list, and the lockfile's format are
+   not compared. The script reads no manifest graph.
+2. A change in an inherited manifest field and a file-mode change escape the source comparison
+   (found by the reviewer, present before this change).
+3. The publish stage waits 55 s in all for a new version to appear in the index and retries
+   nothing else; a slow registry fails a first publication after a successful upload.
+4. Rule 3 of the row stands: while storage takes eprfs-core by path, every bump of a published
+   eprfs crate is an Edge roll.
+
+## Row 42, delta (2026-11-21): four layers hold the pipeline file in the device's key
+
+Read by a design leg (Codex gpt-6-astra, receipt in the session's campaign directory). A
+pipeline file under `elohim/eprfs` reaches the device's verdict through four places, and all
+four must let go of it: the manifest's `sources` (`elohim/eprfs/build-manifest.json:15,49`), the
+step fingerprint and the project tree in `gate-evidence.mjs` (about line 691), and the bin
+store's source state, which hashes the whole tree
+(`device-runtime/src/bin_store/source.rs:208,274`). Narrowing only the first three would let a
+landing reuse its gate while a follower finds no offer for its source state and builds for
+itself. The fourth is in `device-runtime`, an Edge build input. So the cure is one change across
+JS and `device-runtime`, landed with a deliberate roll. brit 0.3.0's build-inputs work does not
+do this: it adds gitlink and symlink identity to a step's inputs.
+
+## Row 51 — a lock move selects gates whose crates cannot reach it
+
+Measured on the row 43 landing (2026-11-21, shem). Three path entries moved in
+`elohim/Cargo.lock` (eprfs-core, eprfs-storage, eprfs-local). Five of the 21 selected gates were
+selected for that file alone, and none of their crates reaches a moved entry in the lock's
+dependency lists: doorway 618 s, elohim-epr 118 s, elohim-placement 65 s, elohim-live-session
+17 s, elohim-compute 12 s. 830 s of a landing for lock bytes those builds never read.
+
+The same holds for every third-party move in a shared lock. A security fix to one package in
+`elohim/Cargo.lock` re-keys every project that lists the file, whether or not its crates use
+the package.
+
+The cure belongs in the step-input model, not in a gate script: a lockfile input keyed as the
+entries reachable from the step's own packages (name, version, source, checksum), computed the
+way `publish_eprfs.py locked_graph` now walks a lock. `brit build fingerprint` is where a
+step's inputs are hashed. A whole-lock property, that the lock is consistent with every
+manifest, still has to be checked by one gate per workspace on every lock change. Receipt: a
+landing that moves one entry in `elohim/Cargo.lock` prints `reused` for a project whose crates
+do not reach it.
+
+## Row 52 — ark hashes a child's bytes three times per spawn, with a debug build of SHA-256
+
+Found 2026-11-21 by a delegated read of the `device_supervise` stories (Claude Opus 5.5; the
+hash times are its own measurements with the pool's debug `ark`, at load average 9 to 11). On a
+`bin:` spawn ark hashes the file twice before exec (`elohim/ark/supervisor/src/native.rs:111`
+and `:130`, the same file both times) and once for the identity rung (`:203`). The device's ark
+is a debug build and `elohim/Cargo.toml` has no `[profile]`, so SHA-256 is unoptimised: 11.2 to
+12.2 s per hash of the 158 MB debug `epr`, against 1.3 s for `sha256sum`. About 33 s of hashing
+per peer spawn. `FIRST_SPAWN_WAIT` cites real restarts of 23 to 43 s, which fits.
+
+This is paid by every real restart on a device and by every one of the 18 lane stories the
+eprfs gate runs since `62aef22a`.
+
+Cures, none taken tonight because each re-keys every cargo gate in the workspace or is an Edge
+build input:
+
+1. `[profile.dev.package.sha2] opt-level = 3` for the `elohim` workspace (the eprfs workspace
+   already optimises its dependencies in dev builds). Dev profiles only; a release build is
+   unchanged.
+2. Hash once per spawn: absolutise the path first, then hash, in the `ArtifactRef::Channel`
+   branch.
+3. `START_WATCH` (`epr-cli/src/device/supervise.rs:51`) is a fixed 1.5 s on every ark start
+   that waits for something not to happen; a real cure needs ark to say it got past its
+   refusals.
+
+The test-side cut, a stripped fixture release (66 MB, 4.8 s per hash), is on branch
+`wallclock/test-wall` and is in the sprint journal.
+
+## Row 53 — the device runs the eprfs tests one at a time, and no record says why
+
+`genesis/agentic/pool-policy.json` sets `cargo_env_overrides.eprfs.RUST_TEST_THREADS = "1"` on
+a device with 24 CPUs, so a test binary's wall is the sum of its tests. CI's nextest run of the
+same workspace overlaps them (2,695 tests in 804 s, with `device_supervise` alone summing to
+1,707 s). No comment, habit line or journal entry found gives the reason for the setting. If it
+guards the timing-sensitive stories, those can be named and held serial while the rest run on
+threads; if it guards memory, the measured peak belongs beside the value, as
+`CARGO_BUILD_JOBS` has for storage.
+
+## Row 54 — a session inherits `EPR_BIN` at a release the device has moved past
+
+Met by two sessions on shem on 2026-11-20 and 21. The launching shell exports `EPR_BIN` at epr
+0.3.2 (`bafyreibrqq…`) while the device's current release is 0.3.3 (`bafyreicfbac…`, which the
+peer daemon already runs). Session start says "degraded epr binary … (candidate)". With the old
+value: `epr session commit-trailers` does not exist, so a commit carries no trailers and no
+warning; every brit command prints "feedback capture gap"; and one orchestrator test fails on
+"native evaluator … emitted closureCid bafkrei…, not a byte CID; it predates abd66bdb1", a red
+that is not in the tree. Each session worked round it by passing `EPR_BIN` per command. Owed:
+the arrival step that makes the candidate current, or a session start that exports the
+session's pinned epr and not the device's landed one.
+
+## Row 55 — the a2o devflow unit tests run in no gate, and eight of thirteen are red on dev
+
+`genesis/a2o/steps/devflow/__tests__/landing-queue-fixture.test.ts` on `dev` `4ecd40d4f`, run
+with the package's own runner (`pnpm exec tsx --test`): 5 pass, 8 fail. Seven fail on
+`EISDIR: illegal operation on a directory, read` from `orchestratorClosure`
+(`gate-closure.seed.ts:84`), which follows the gate's imports and meets a directory. The a2o
+gate is lint, format and typecheck (`_gate-genesis-a2o`), so nothing runs this file and nobody
+was told. Found when Track B migrated the one test in it that called the oracle.
+
+## Row 56 — `epr session gc` cannot seal an envelope whose worktree is gone
+
+2026-11-21: `epr session gc --json` sealed 26 dead envelopes and failed on two,
+"brit-build-ref covenant list failed … not a git repository" for
+`/projects/elohim/.worktrees/hc-vectors` and `hc-stories`, both removed by the cleanup of
+2026-11-20. Those two sessions stay unsealed on every later gc. A removed checkout has no
+covenant to list; the seal should say so and close.
+
+## Row 57 — an interactive session ignored TERM and HUP
+
+2026-11-21: asked by the steward to end a finished session whose terminal he could not reach
+(pid 1736356, `claude` on a pts), this session sent TERM, waited 30 s, sent HUP, waited 15 s,
+and ended it with KILL. Its hook child `dialogue-stasis-sense.py --rewake` was left as an
+orphan and ended by hand; `berth unmoor` for another session's mooring is refused
+("envelope-owner-mismatch"), correctly, so the mooring was cleared by `epr session gc`. There is
+no supported way for one session to close another at its steward's word.
+
+## Row 58 — the stasis loop reads an unattended run as a silence stall
+
+2026-11-21: with the steward asleep and a three-hour push running, the dialogue-stasis hook
+opened incidents `…:5`, `…:9` and `…:17` as "silence stall", parked at rungs 1 to 3 with "tool
+and shape are null", spent keeper calls on each, and asked three times for a push notification.
+No effect was blocked. This session did not send the notification: nothing needed the steward's
+decision, and he had said good night. The loop has no state for "the steward directed an
+unattended run"; the standing ruling it looks for was on record (the covenant's two clauses) and
+did not count.
+
+## Row 59 — one root justfile is in the key of every gate that runs from it
+
+`gate-evidence.mjs` `recipeAt` (about line 177) keys a `root-just` project on the blob of the
+whole root `justfile`. Editing one recipe therefore re-keys every such gate, and because
+manifests list the justfile under `buildProcess`, the edit also selects them: a one-line change
+to `_gate-eprfs` costs a landing every gate, not eprfs's. Met on 2026-11-21 when the cheapest
+cut to the eprfs gate, a step of its own for the ark stories with its own thread count, was
+priced: it would have cost more than it saved for many landings. Same class as rows 42 and 51:
+a whole file in the key where a part is read. The cure keys a gate on its own recipe's text
+and the recipes it calls (`just --show`, followed through), which `just` can print.
+
+## Row 60 — the device runs `cargo test`, CI runs `cargo nextest`
+
+The device gate's test step is `cargo test --workspace` with one thread; the pipeline's is
+`cargo nextest`. They differ in more than the missing build that row 41 found. nextest runs
+one process per test, so tests there may mutate the process environment or working directory
+freely, and it overlaps them, so 2,695 tests take 804 s where the device takes 2,536 s. A
+device at four threads would be neither: threads share a process. One unit test in
+`eprfs-local` changes the working directory mid-test
+(`eprfs-local/src/capture/tests.rs:784`), which is safe under both of today's runners and a
+race under threads. nextest is not installed on the devices (root guidance, 2026-07-30).
+Installing it through the bin store and running the pipeline's command in the device gate would
+make the two recipes one and give the device the parallelism, at the price of row 59's re-key
+once.
+
+## Row 61 — a quiet sibling fences the lander at the end of a long gate
+
+2026-11-21, shem: after 13,175 s of green gates the hook's Phase L renewed the pushing
+session's own `dev-integration` lease and berth refused, "self-demoted: no head from
+did:key:z6MkpZRh…VMZB within 570s". Eight seconds later that device's head was fresh. Its
+sessions had closed for the night, so its heads came only when it had something to record, and
+at that instant the last one was older than the fence window.
+
+The hook claims through a landing agent with `--offline-ok`, which writes an override for one
+silent device and waits for it (at most 660 s). That path was not taken, because the pushing
+session already held the lease (claimed by hand before the push, as the root guidance asks:
+"coordinate the landing lane before pushing"), and a renewal as that session is a plain claim.
+So the careful path, claim then push, is the one that can be refused after hours, and the
+refusal names no cure but "push again".
+
+Owed, any one of: the renewal of a lease the pushing session already holds goes through the
+same `--offline-ok` rule as the landing agent; or a device with no live session still sends a
+head at a cadence shorter than the fence window; or the lane is claimed and checked before the
+gates as well as after, so a fence is known before hours are spent. The gates were not paid
+again: the second push reused their verdicts.
