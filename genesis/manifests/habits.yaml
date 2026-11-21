@@ -2579,10 +2579,10 @@ habits:
       - "node --test genesis/orchestrator/suite-list.test.mjs (the orchestrator suite list holds every test file once; the named half's view holds what its key hashes and its environment is constructed)"
       - "a2o genesis/a2o/features/devflow/native-gate-evidence.feature reuse rule (this workspace's own green stands in; a red or an unadmitted signer never does)"
     evidence: >
-      DELTA 2026-11-21 (status unchanged; the oracle asks brit, a shadow recipe key, and one landing measured): the gate oracle resolves `brit` and runs `brit build affected`; `resolveRakiaBin`, `rakiaAffected` and every `RAKIA_BIN` read are deleted, and an unavailable oracle says why in the path-only line and in the reuse refusal. Receipt on shem with no `rakia` on PATH: `[gate] elohim-compute reused: green 4h ago at 5535405d4 (signer this workspace)`. A shadow recipe key (`GATE_RECIPE_KEY=shadow|off`, no `on`) prints whether a justfile edit since the integration base left a root-just gate's recipe closure unchanged, and changes no key, verdict or recorded duration; first evidence, at 62aef22a only eprfs's closure changed of 40. Measured on the row 43 landing (dev 5535405d4): 21 gates, 13,184 s; refused at the lane (row 61), the second push reused 16 verdicts and landed in 561 s. Five gates of the 21 were selected by lock bytes their crates cannot reach, 830 s (row 51). The eprfs manifest declares CARGO_BUILD_JOBS=6 (measured peak 4.0 GB); two test binaries go from 1,765 s to 864 s.
-    evidence-fingerprint: sha256:b190bc3da0b46f41
-    evidence-bytes: 30687
-    evidence-entries: 31
+      DELTA 2026-11-21c (no status change; the eprfs test step measured by thread count, nothing changed): seventeen runs of the eprfs workspace tests on shem. One thread about 1,620 s; four threads 604 to 656 s, five clean of five, the I/O guard pausing three; three threads 696 to 752 s, eight clean of ten, the guard pausing four and two of those failing on a timeout shorter than its 36 s freeze; two threads 923 s clean and one failure from a test's own timing assumption (arrival backlog row 66, fixed on a branch). The bar of ten clean runs was not met, so `RUST_TEST_THREADS` stays at one. The bound is the workspace's write burst (58 to 72 MB/s) against the guard's 10% line; the cut is the 66 MB release the slow test file strips and ingests per story (row 65). Table: row 53, delta.
+    evidence-fingerprint: sha256:14ca9fe2fc7289eb
+    evidence-bytes: 31476
+    evidence-entries: 32
     guard: >
       Regression risks: (1) reusing on a key that omits something the recipe reads — the recipe
       body, the project tree, a submodule pin, a repo file a test include_str!s; the input audit
@@ -2675,10 +2675,10 @@ habits:
       - "node --test genesis/orchestrator/gate-landing-base.test.mjs (device-DID tiebreak, cap of 4: unobservable in the one-DID fixture)"
       - "over >= 10 pushes, from the device's flow store dev-landing@1 rows and berth's hold fold: hold p50/p90 vs 233/3,321 s; Σ regated_s on landed_as=moved vs Σ gate seconds saved on landed_as=ff; chain_len p90; duplicate gated closures = 0, duplicate claims = 0, >= 2 intents per Jenkins wave (unwired until S6)"
     evidence: >
-      DELTA 2026-11-21 (RED preserved, inactive; the market reading and the order it gives): the steward's picture of the pipeline as requests and offers between peers is read as ruling D9 and join F4, reached by the arrival backlog's row 9 ladder (native-dev-tooling-over-peers-plan §9); nothing new is designed. Measured the same day: one landing ran 21 gates one after another in 13,184 s with three gates at 80% of it; a two-Jenkinsfile landing paid six gates in 1,860 s, steward-node 1,133 s of it. Read from dev f1e3540fd: the crossing `intent` is written only after the gates ran and lists no misses, the push hook raises none, and the lander asks for a sibling's verdict once per gate and never waits, so no device can take a gate another still owes. The build hook admits one build where the policy offers two seats (arrival backlog row 64); the steward ruled two, then measure. Station F4-probe is appended to that plan's §8. No status change: no carried gate has been observed.
-    evidence-fingerprint: sha256:b792cd44abdbb680
-    evidence-bytes: 56432
-    evidence-entries: 41
+      DELTA 2026-11-21b (RED preserved, inactive; a carrier contract, in shadow): where a gate step runs is now a contract (`genesis/orchestrator/gate-carry.mjs`: admit, offer, collect, withdraw; one pure plan; a contract test run against two implementors) with this device's second cargo seat as its first carrier and `berth room cargo` as the one capacity answer. `GATE_CARRY` defaults to shadow, which starts nothing. Landed e83d0931b. No carried gate has been observed: station F4-probe's first rung is still owed, and two gates that share a cargo target are not yet carried together.
+    evidence-fingerprint: sha256:7b2e7b776f4c4055
+    evidence-bytes: 57016
+    evidence-entries: 42
     refs:
       - "spec: genesis/docs/superpowers/specs/2026-10-27-steward-space-landing-plane-design.md (§2 Arm A slices A0-A13; §3 this habit and the WIP fence)"
       - "upstream of: genesis/orchestrator/.epr-meta/push-delivers-within-budget.habit.md (active red; A9/A10 move its measured ratio)"
