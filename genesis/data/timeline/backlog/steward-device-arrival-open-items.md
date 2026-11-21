@@ -1502,3 +1502,30 @@ Still owed:
    side: "suppress automatic SCM triggering" on the multibranch jobs.
 2. An admitted build that never gets an agent still waits without bound, as `#1919` did.
 3. The 18 branches on origin that received the events.
+
+## Row 64 — the build hook counts compiler processes against a seat limit of two
+
+Found 2026-11-21 while reading the open rows against the steward's market picture
+(native-dev-tooling-over-peers-plan §9, test 3). `genesis/agentic/pool-policy.json` sets
+`io.max_concurrent_heavy` to 2 and berth offers `cargo: 2`, both by the operator's ruling of
+2026-09-09. Rule 4 of `.claude/hooks/cargo-disk-guard.py` compares that limit with the number of
+distinct heavy processes `running_heavy()` finds: every cargo driver, every `rustc`, the linkers
+and `gate-runner.mjs`. One running gate is at least two of those, so the hook refuses a second
+build with "ONE BUILD AT A TIME" whatever the limit says. A device therefore gives two answers to
+"is there room": berth grants a second seat and the hook refuses its use. The hook also reads only
+the command text, so a script that runs cargo passes it; that is how a measurement ran beside a
+landing's build on this sprint's first night (journal, 06:15Z to 08:10Z).
+
+The steward ruled the same day: two seats, then measure. Owed, in order:
+
+1. The hook counts builds, and its refusal says how many seats are taken. Its memory and I/O
+   rules stay as they are.
+2. The push loop can hold one gate in flight on the second seat and collect its verdict at the
+   end; a red from either gate still refuses the push.
+3. One landing that selects `elohim-storage` is measured with two gates overlapping, with
+   ram-guard and io-guard lines recorded through the overlap, against the serial figure. If the
+   overlap saves nothing or a guard sheds, item 2 stays behind a switch that defaults off.
+
+The design sentence "Gates still serialize on one device" (native dev plane §11) described a
+workspace of 31 GiB. ram-guard read 14.6 of 41.0 GB committed on 2026-11-21. This host's storage,
+not its memory, is the stated bottleneck, which is why item 3 comes before any reliance on item 2.

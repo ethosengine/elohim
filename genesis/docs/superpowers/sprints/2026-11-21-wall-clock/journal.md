@@ -497,3 +497,57 @@ stale and, through it, the Edge image and its deploy. So two land now, app and s
 are parked on `wallclock/jenkins-guard-rest` for the next deliberate roll: dna, edge, epr,
 eprfs, genesis and library.
 
+### 14:56Z: the app and steward guard is on dev, and what its landing paid
+
+`2eb40f2e1..f1e3540fd` at 14:56:31Z. Six gates in 1,860 s: genesis 50 s, orchestrator-tree 208 s,
+orchestrator 76 s, eprfs-live-corpus 66 s, elohim-app 327 s, steward-node 1,133 s. None was
+reused. `dev-integration` was claimed in 6 s and held 1 s. The change was two Jenkinsfiles and
+documentation, and it paid a 19-minute cargo gate because a pipeline file is in `steward-node`'s
+key (row 42). This device's build notes are published (6 refs moved, 42 already current).
+
+The pipeline's verdict at 16:07Z: `elohim-edge/dev #1920` SUCCESS in 67 min, which is the Edge
+roll the four eprfs versions waited for, and `#1921` SUCCESS in 8 min after it;
+`elohim-eprfs/dev #207` SUCCESS in 26 min; orchestrator `#2403` still running at 133 min. No
+steward build has started since the guard landed, so its refusal path is not yet observed.
+
+### 14:40Z to 16:10Z: the steward's picture of the pipeline, and the order it gives
+
+The steward described the next integration pipeline as a market on the REA primitives: a device
+publishes the steps it needs, and devices with room see one that fits, admit it, run it and
+return a signed result, with no controller or queue. He bounded the work twice: "this shouldn't
+be re-inventing the wheel", and "our priority should still be actually harvesting that
+wall-clock.. but the goal here is to mint the right design primitives to keep the whole aligned
+to the vision."
+
+Three read-only explorations and one planning check found the picture already written, nearly in
+his words: the peers plan's §5 "requests and offers", backlog row 77, ruling D9 (one offload
+path), slice S3a (the carry) and the four-rung hand-over ladder in the arrival backlog's row 9.
+The first answer given in this session mapped the picture onto mechanisms from the night's logs
+before reading any of that, and two of its mappings were wrong: the request is the landing intent
+and its misses, and the claim is the designed `carry`. The reading, five tests, one vocabulary
+and the order of work are now the peers plan's §9, with one station appended to its §8,
+`F4-probe`.
+
+Found while reading:
+
+- The crossing `intent` event is written only after the gates have run, names a tree and lists
+  no misses. The push hook raises no intent. So nothing publishes what a landing still needs.
+- The lander asks for a sibling's verdict once, when a gate starts, and never waits.
+- The build hook compares the policy's limit of two heavy builds with a count of compiler
+  processes, so it admits one build (row 64). The refusal this sprint met on its first night was
+  that count, and the note written then, that one build at a time is the rule, was wrong.
+- The sibling device's head was 16 s old and acknowledged this device's when read.
+
+Ruled by the steward the same afternoon, through a question: cargo seats are two, then measure.
+
+The order, by seconds per landing: the eprfs tests in parallel (rows 53 and 60); the hook counts
+builds and the push loop holds one gate in flight (row 64); the lane fence (row 61); the keys
+narrowed (rows 42, 51, 59); the soundness rows before a second device takes a gate; then the
+probe.
+
+One thing not done. A covenant clause naming this plan's write set, in the steward's words, was
+refused by the session's permission classifier and was not retried: a clause in his name is his
+to record. Until he does, each commit under this plan that touches a path outside the signed set
+says so. This landing touches `genesis/docs/superpowers/plans/`. Later steps touch
+`.husky/pre-push.bash`, `.claude/hooks/cargo-disk-guard.py` and
+`genesis/agentic/pool-policy.json`.

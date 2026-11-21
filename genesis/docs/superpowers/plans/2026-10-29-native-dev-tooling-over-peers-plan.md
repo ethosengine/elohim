@@ -426,10 +426,14 @@ metadata node.
 
 Verify: the `P` vectors are green, and ark keys one task on a projected root of real source trees.
 
-- [ ] **B — gate selection resolves through `brit build affected`, with no `rakia` name left on the reuse path** (serves push-gate-pays-once)
+- [x] **B — gate selection resolves through `brit build affected`, with no `rakia` name left on the reuse path** (serves push-gate-pays-once)
 
-State: `genesis/orchestrator/gate-oracle.mjs` resolves `RAKIA_BIN` or `rakia` on PATH and runs
-`rakia affected`.
+State: on dev since 2026-11-21 (5535405d4..b74f60096). `genesis/orchestrator/gate-oracle.mjs`
+resolves `BRIT_BIN` or `brit` on PATH and runs `brit build affected`; when that cannot run, the
+gate says why and selects by path alone. Receipt, on a device with no `rakia` on PATH:
+`[gate] elohim-compute reused: green 4h ago at 5535405d4 (signer this workspace)` (wall-clock
+sprint journal). The second half of Verify, the `sophia` selection with sibling worktrees present,
+was not re-run in that pass.
 
 Verify: a reuse hit on a device with no `rakia` on PATH; with sibling worktrees present, a `sophia`
 change selects `elohim:build-angular`.
@@ -545,3 +549,114 @@ and commits read `UNMEASURED`.
 
 Verify: `epr device status` names an `EPR_BIN` that resolves to something other than the head,
 and a new terminal on shem starts without one.
+
+One station found while reading the open work against the steward's market picture (2026-11-21,
+§9):
+
+- [ ] **F4-probe — one landing where another seat or another device pays one long gate with no new wire kind, and the lander reuses its verdict** (serves sprint-lands-each-closure-once)
+
+This runs F4's promise once with what already crosses, before the carry is built, so that the
+next station is named by a failure and not by a plan, as F3-probe does for F3. It has two rungs.
+On the first, the carrier is the lander's own second cargo seat: the push loop starts one long
+gate there, runs the others, and collects its verdict at the end. On the second, the carrier is
+another device of the same steward: the lander makes its commit reachable with a `self/<name>`
+push and says so with a `berth say` note; a device whose own guard lines admit it runs that gate
+in a clean checkout at that commit; its green crosses as `gate-verdict@1`. Nobody is assigned:
+whether a device takes the gate is its own answer.
+
+State: neither rung has run. The push hook runs gates one after another and asks for a sibling's
+verdict once, when a gate starts, without waiting (`genesis/orchestrator/gate-runner.mjs`
+`decideReuse`). A push that touches a governance path refuses every sibling green. The second rung
+travels through the forge, so it does not pass the design's §0 test. The first rung waits on
+arrival backlog row 64: the build hook admits one build where the policy offers two seats.
+
+Verify: a landing log that shows two gates overlapping on one device, with ram-guard and io-guard
+under their soft lines, and its total against the serial figure; then a landing log that prints
+`independence: sibling` for a gate another device ran for that landing's commit. Either way the
+journal carries the seconds saved or the first blocker, and the blocker is appended here as a
+station.
+
+## 9. Reconciliation 2026-11-21: the market reading
+
+The steward's picture, given on 2026-11-21: the integration pipeline should work like a market on
+the REA primitives. A device publishes the steps it needs derived. Devices that sense spare
+capacity see a step that fits, admit it, run it and return a signed result. There is no central
+controller, queue or executor pool. He bounded the reading twice: it refines what is in flight
+and invents nothing, and it steers while the wall-clock harvest stays the priority.
+
+**The reading.** For one steward the picture is ruling D9 and join F4 of
+[the native dev plane design](epr:native-dev-plane-one-derivation-earned-reach-design): one
+offload path, a `TaskSpec` claimed by a carrier whose own guard lines admit it, and `NotCarried`
+with a 0 s wait when none is present. The way there is the hand-over ladder in the
+`steward-device-arrival-open-items` backlog, row 9: `self/<name>`, then the hand-over as a landing
+intent both devices read, then carriers that write their results back, then offers in place of
+branches. Between principals the picture is §5's requests and offers (row 77 of the
+`arch-workspace-discipline` backlog), which stay held with F6 until a habit states reach across
+principals. Slice S3a of [the landing plane design](epr:closure-keyed-landing-plane-design) is the
+same carry at its first rung. Nothing here is a new design.
+
+What exists, by role, as read from dev f1e3540fd:
+
+| Role | Its name here | State |
+|---|---|---|
+| Request | the landing intent and its misses (`epr flow intend`, `dev-landing@1`) | The `intent` event crosses only after the gates have run (`verified`). It names a tree and lists no misses. The push hook raises none. |
+| Claim | `carry`, a `Commitment{Produce, satisfies:[intent], bound}` | Designed in S3a. Not built. |
+| Performance | `ark task run` in the carrier's own envelope | Built for the device's own envelope, for the `orchestrator` gate. |
+| Settlement | `gate-verdict@1`, later a `DerivationRecord{basis: UnderGrant}` | Crossing. 25 projects are enrolled for reuse. |
+| Capacity | the carrier's own guard lines; only a claim or a refusal crosses | Sensed on the device. Not yet one admission answer (below). |
+
+**Five tests.** A change to the gate plane is read against these. Each is already ruled; the last
+column is what broke it on 2026-11-21. Row numbers are the arrival backlog's.
+
+| # | Test | Ruled in | Broken by |
+|---|---|---|---|
+| 1 | A request reserves nothing. Asking costs no seat, pod or lease until a peer admits the work. | berth: a second claimant is refused, never queued; S3a "post the intent's misses" | Sixty Jenkins builds each held a pod request for 21 hours before they could refuse (row 63). |
+| 2 | A claim is bounded and expires, and the requester can always run the work alone. | design §1 "Peers add; they never gate"; D9 | A landing with green gates was fenced by a quiet sibling (row 61). |
+| 3 | Capacity is sensed by the carrier, and only its effect crosses. A device answers "is there room" once, from its own lines. | D9; `elohim/placement/core/src/offer.rs` | The policy and berth offer two cargo seats and the build hook admits one (row 64). |
+| 4 | The unit on offer is a step keyed on exactly what its recipe reads. | D2; habit push-gate-pays-once | Too wide: rows 42, 51 and 59 (a two-Jenkinsfile edit paid a 1,133 s cargo gate). Too narrow: rows 47, 26 and 29, an inherited `EPR_BIN`, the node version. |
+| 5 | Settlement is a signed record keyed on that closure. Speed and reach are separate: a sibling's result buys speed and never counts as an independent witness. | D1, D4 | Nothing. A carried result must keep it. |
+
+Jenkins is tests 1 and 2 applied to a participant: it refuses before it reserves, and it builds
+what no device carried.
+
+**Vocabulary.** Code, stories and documents use the words the code has: landing intent and its
+misses, `carry`, carrier, `NotCarried`, verdict, derivation record. They do not introduce job,
+queue, executor, worker pool, scheduler, bid or price. "Market" is the picture and "requests and
+offers" is the name. Which device carries is an outcome of who admits, never a policy line.
+Admission rests on standing and a grant. Trust prices verification, and nothing in a record is a
+price.
+
+**Two wordings reconciled.**
+
+- *Cargo seats.* The design's §11 says "Gates still serialize on one device". The policy has
+  offered two seats since 2026-09-09, and the build hook admits one because it counts compiler
+  processes (row 64). The steward ruled on 2026-11-21: two seats, then measure. The design's
+  sentence described a workspace of 31 GiB; ram-guard read 14.6 of 41.0 GB committed on the day of
+  the ruling. A device's own second seat is the first carrier: the push loop that can hold one
+  gate in flight there is the loop a carry needs.
+- *Measure-class work.* S3a says "measure-class is never carried"; D9, which is later, says
+  "`just measure` becomes one method on this path". This session's reading, which is not a ruling:
+  there is one path, and a carrier's own posture says which class it admits. A dev berth never
+  admits measure-class work; a provider that holds the stores does.
+
+**Order.** Harvest first, by seconds per landing. Each line names its test.
+
+1. The eprfs tests run in parallel (rows 53 and 60): 800 to 1,700 s on every landing that selects
+   eprfs. No test applies; a carrier would pay the same.
+2. One answer for room (test 3, row 64): the hook counts builds, then the push loop holds one gate
+   in flight on the second seat. Up to the storage gate's 3,535 s when storage is selected;
+   unmeasured.
+3. The lane fence (test 2, row 61): 561 s when it bites.
+4. The keys narrowed (test 4): row 42, row 51, then `GATE_RECIPE_KEY` on once its shadow lines
+   show no disagreement.
+5. Soundness before a second device takes a gate (tests 4 and 5): rows 47, 26 and 29, the
+   Terminal-env station, the node version, the scope of row 19's governance fence, and Row-20 of
+   [the one-baseline plan](epr:one-baseline-plan). These save no seconds. Without them a crossed
+   verdict can be wrong.
+6. Station F4-probe (§8), then row 9's ladder as far as the probe asks.
+
+Not built under this reading: a request with no named provider on the DHT, `rakia-peer`, any
+published capacity vector, any price or reciprocity ledger. The rows named here keep their homes
+in the two backlogs and in the sprint journal
+(`genesis/docs/superpowers/sprints/2026-11-21-wall-clock/journal.md`). This section orders them
+and mints nothing else.
