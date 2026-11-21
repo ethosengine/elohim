@@ -121,7 +121,7 @@ class YieldTest(unittest.TestCase):
         with mock.patch.object(guard, 'read_io_policy', return_value={**guard.IO_DEFAULTS, 'max_concurrent_heavy': 2}):
             result = self.run_hook()
         self.assertEqual(result['permissionDecision'], 'deny')
-        self.assertIn('ONE BUILD AT A TIME', result['permissionDecisionReason'])
+        self.assertIn('CARGO SEATS FULL', result['permissionDecisionReason'])
         self.assertIn('200', result['permissionDecisionReason'])
         self.assertIn('201', result['permissionDecisionReason'])
         self.kill.assert_not_called()

@@ -26,11 +26,15 @@ Two deterministic rules (policy: genesis/agentic/pool-policy.json):
    two worn QLC NVMes (past rated TBW) that cannot absorb concurrent builds.
    Starting another build into that is the proximate trigger.
 
-4. ONE BUILD AT A TIME — a heavy cargo (or `just gate`) while another cargo
-   build/test/check (or its rustc/rust-lld children) is already running in
-   this container is DENIED, naming the pid to wait for. Two gates at once
-   on a box whose storage is the bottleneck is what the operator asked us to
-   stop doing; the deny replaces "remember not to". Marked LSP flychecks
+4. BUILD SEATS — a heavy cargo (or `just gate`) while `io.max_concurrent_heavy`
+   builds are already running in this container is DENIED, naming each
+   build and what to wait for. A build is a cargo driver or gate-runner that
+   has no other driver below it or is itself compiling, together with its
+   rustc/rust-lld/cc1 children: a gate is one build, not many processes, and
+   two cargos compiling at once are two, nested or side by side
+   (`group_builds`). Too many builds at once on a box
+   whose storage is the bottleneck is what the operator asked us to stop
+   doing; the deny replaces "remember not to". Marked LSP flychecks
    yield to builds: stop their wrappers and let their cleanup release leases.
 
 5. JOBS CAP — heavy cargo with no `-j/--jobs` and no CARGO_BUILD_JOBS (in the
@@ -97,8 +101,12 @@ WASM_MARKERS = ["holochain/dna/", "elohim-wasm", "wasm32-unknown-unknown", "rust
 
 HEAVY_VERBS = {
     "build", "b", "test", "t", "check", "c", "clippy", "run", "r",
-    "nextest", "bench", "doc", "install",
+    "nextest", "bench", "doc", "d", "install",
 }
+# Compiler and linker processes a build runs; rule 4 groups them under their cargo.
+COMPILER_HEADS = (
+    "rustc", "rustdoc", "clippy-driver", "rust-lld", "ld.lld", "cc1", "cc1plus", "clang",
+)
 WRAPPERS = {"timeout", "nice", "env", "command", "sudo"}
 ENV_ASSIGN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
 SEGMENT_SPLIT = re.compile(r"\|\||&&|;|\||\n")
@@ -249,6 +257,24 @@ def yield_flychecks(live):
     return messages
 
 
+CARGO_VALUE_OPTIONS = {"--color", "--config", "--explain", "-C", "-Z"}
+
+
+def cargo_verb(argv):
+    """The subcommand of a cargo argv: the first argument that is neither a
+    `+toolchain`, an option, nor the value of an option cargo takes before
+    its subcommand (`cargo --color always build`)."""
+    skip = False
+    for arg in argv[1:]:
+        if skip:
+            skip = False
+        elif arg in CARGO_VALUE_OPTIONS:
+            skip = True
+        elif not arg.startswith(("+", "-")):
+            return arg
+    return None
+
+
 def running_heavy():
     """Live cargo drivers (heavy verb) and compiler/linker children in this
     container, excluding this hook and parent. [(pid, short cmd, yieldable)].
@@ -264,10 +290,10 @@ def running_heavy():
                 continue
             head = os.path.basename(argv[0])
             if head == "cargo":
-                verb = next((a for a in argv[1:] if not a.startswith("+")), None)
+                verb = cargo_verb(argv)
                 if verb in HEAVY_VERBS:
                     found.append((int(name), " ".join(argv[:4]), flycheck_marked(name)))
-            elif head in ("rustc", "rust-lld", "ld.lld", "cc1", "gate-runner.mjs"):
+            elif head in COMPILER_HEADS or head == "gate-runner.mjs":
                 found.append((int(name), head, flycheck_marked(name)))
             elif head in ("node", "nodejs"):
                 script = next((a for a in argv[1:] if not a.startswith("-")), "")
@@ -276,6 +302,106 @@ def running_heavy():
     except Exception:
         return []
     return found
+
+
+MAX_ANCESTRY_DEPTH = 64
+
+
+def proc_parent(pid):
+    """Parent pid, or None when the process is gone or unreadable; never raises."""
+    try:
+        stat = proc_stat(pid)
+        return stat[1] if stat else None
+    except Exception:
+        return None
+
+
+def owning_cargo(pid):
+    """The nearest ancestor that is a cargo of ANY subcommand, or None."""
+    seen, cur = {pid}, pid
+    for _ in range(MAX_ANCESTRY_DEPTH):
+        cur = proc_parent(cur)
+        if cur is None or cur <= 1 or cur in seen:
+            return None
+        seen.add(cur)
+        argv = proc_argv(cur)
+        if argv and os.path.basename(argv[0]) == "cargo":
+            return cur
+    return None
+
+
+def group_builds(live):
+    """Count the builds among the non-yieldable heavy processes.
+
+    `live` is [(pid, cmd)]. A DRIVER is a cargo with a heavy verb or a
+    gate-runner; everything else is a compiler or linker. Each of these holds
+    a seat:
+      - a driver with no driver below it (a gate-runner between cargo steps,
+        or the cargo it is running);
+      - a driver that is the nearest driver above a live compiler or linker,
+        so a cargo still compiling while a child cargo also compiles is two
+        builds, as are two cargos side by side under one parent: ancestry
+        alone does not make concurrent compiles one;
+      - a cargo of any subcommand with a live compiler under it, listed by
+        running_heavy or not, so an unrecognised cargo spelling cannot hide
+        two builds behind the gate-runner above them;
+      - a compiler with no driver above it (its cargo died), at its highest
+        compiler ancestor;
+      - any process whose ancestry walk was cut short by a parent loop or by
+        MAX_ANCESTRY_DEPTH, counted on its own.
+    Every ancestor up to pid 1 is walked, since bash, just and
+    run-local-gate.sh sit between a gate-runner and its cargo.
+
+    Returns [(pid, cmd, root_pid, root_cmd)] sorted by pid, where the root is
+    the highest heavy ancestor found: the thing to wait for. A vanished or
+    unreadable stat ends that walk, which can only split one build into more.
+    If the grouping fails, or finds no build among live processes, every
+    process counts as its own build: an error here must refuse work, never
+    admit it. Never raises."""
+    try:
+        cmds = dict(live)
+        # A cargo that running_heavy did not list (a subcommand it does not know)
+        # is still a build while a compiler runs under it.
+        for pid, cmd in live:
+            if cmd in COMPILER_HEADS:
+                owner = owning_cargo(pid)
+                if owner is not None and owner not in cmds:
+                    cmds[owner] = " ".join(proc_argv(owner)[:4]) or "cargo"
+        drivers = {pid for pid, cmd in cmds.items() if cmd not in COMPILER_HEADS}
+
+        def heavy_ancestors(pid):  # ([nearest first], walk reached the top)
+            found, seen, cur = [], {pid}, pid
+            for _ in range(MAX_ANCESTRY_DEPTH):
+                cur = proc_parent(cur)
+                if cur is None or cur <= 1:
+                    return found, True
+                if cur in seen:
+                    return found, False
+                seen.add(cur)
+                if cur in cmds:
+                    found.append(cur)
+            return found, False
+
+        walks = {pid: heavy_ancestors(pid) for pid in cmds}
+        above = {pid: walk[0] for pid, walk in walks.items()}
+        cut = {pid for pid, walk in walks.items() if not walk[1]}
+        has_driver_below = {a for pid in drivers - cut for a in above[pid] if a in drivers}
+        builds = (drivers - has_driver_below) | cut
+        for pid in set(cmds) - drivers - cut:
+            nearest = next((a for a in above[pid] if a in drivers), None)
+            if nearest is not None:
+                builds.add(nearest)
+            else:
+                builds.add(above[pid][-1] if above[pid] else pid)
+        if cmds and not builds:
+            raise ValueError("live processes but no build")
+        rows = []
+        for pid in builds:
+            root = above[pid][-1] if above[pid] else pid
+            rows.append((pid, cmds[pid], root, cmds[root]))
+        return sorted(rows)
+    except Exception:
+        return sorted((pid, cmd, pid, cmd) for pid, cmd in set(live))
 
 
 def has_jobs_cap(command: str, heavy: list) -> bool:
@@ -609,17 +735,21 @@ def main():
                 f"hard resets. Wait and re-check with `cat /proc/pressure/io`; light commands are never gated."
             )
 
-    # Rule 4 — one build at a time in this container.
+    # Rule 4 — build seats: io.max_concurrent_heavy concurrent builds (not processes).
     processes = running_heavy()
     live = [(pid, cmd) for pid, cmd, yieldable in processes if not yieldable]
-    if live and len({p for p, _ in live}) >= int(io_pol["max_concurrent_heavy"]):
-        drivers = [c for _, c in live if c.startswith("cargo") or c == "gate-runner.mjs"] or [live[0][1]]
-        pids = ", ".join(str(p) for p, c in live if c.startswith("cargo") or c == "gate-runner.mjs") or str(live[0][0])
+    seats = int(io_pol["max_concurrent_heavy"])
+    builds = group_builds(live) if live else []
+    if builds and len(builds) >= seats:
+        named = "; ".join(
+            f"pid {p}: {c}" + ("" if r == p else f" (under pid {r}: {rc})") for p, c, r, rc in builds)
+        waits = " && ".join(f"[ -d /proc/{r} ]" for r in sorted({r for _, _, r, _ in builds}))
         deny(
-            f"ONE BUILD AT A TIME: a build is already running in this workspace — pid {pids}: "
-            f"{drivers[0]} ({len(live)} compiler/linker processes). Two concurrent builds saturate "
-            f"the host's worn NVMe mirror (2026-08-29 resets). Wait for it: "
-            f"`while pgrep -x rustc >/dev/null || pgrep -x cargo >/dev/null; do sleep 15; done` (exact names — a `pgrep -f` pattern matches other sessions' waiter shells and never exits) "
+            f"CARGO SEATS FULL: {len(builds)} of {seats} builds running in this workspace — {named} "
+            f"({len(live)} heavy processes in all; seats = pool-policy `io.max_concurrent_heavy`). "
+            f"Too many concurrent builds saturate the host's worn NVMe mirror (2026-08-29 resets). "
+            f"Wait until fewer than {seats} remain, then retry: `while {waits}; do sleep 15; done` "
+            f"returns when one of them has ended, and the retry is checked again "
             f"— never kill another session's build."
         )
 

@@ -66,7 +66,7 @@ Commands:
 
 Resources (capacity 1 unless pool-policy.json `berth.resources` says otherwise):
   mesh        the household mesh (start/stop/prologue/test mesh)
-  cargo       one heavy cargo build/test/check per container (pool-policy io.max_concurrent_heavy)
+  cargo       cargo build/test/check seats per container: io.max_concurrent_heavy concurrent builds (pool-policy)
   disk-heavy  any sustained-write job that is not cargo (prologue seed, pnpm install, blob sync)
 
 Steward-scoped resources (pool-policy.json `berth.resources.<name>.scope: steward`) are shared by every
