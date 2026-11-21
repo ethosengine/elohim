@@ -3047,5 +3047,137 @@ class EnvelopeGuardTest(unittest.TestCase):
             self.assertIn("envelope-owner-mismatch", str(refused.exception))
 
 
+
+class CargoRoomTest(unittest.TestCase):
+    """`berth room cargo`: the one capacity answer a carrier asks (gate-carry.mjs's second seat):
+    the declared seats, the guards' own lines, and the builds the cargo guard hook counts."""
+
+    cargo_room = staticmethod(_NS["cargo_room"])
+    NOW = 1_000_000.0
+
+    def ram(self, level="ok", age=1):
+        return {"ts": self.NOW - age, "level": level, "pct": 21.0}
+
+    def io(self, level="ok", action="ok", paused=(), age=1):
+        return {"ts": self.NOW - age, "level": level, "action_level": action, "paused": list(paused),
+                "psi_full_avg10": 0.5}
+
+    def verdict(self, want=2, seats=2, ram=None, io=None, builds=()):
+        room = self.cargo_room(want, seats, self.ram() if ram is None else ram, self.io() if io is None else io,
+                               None if builds is None else list(builds), self.NOW)
+        return room["verdict"], room["axis"], room["owner"], room["reason"]
+
+    def test_admits_when_seats_and_both_guards_allow(self):
+        verdict, axis, owner, _ = self.verdict()
+        self.assertEqual((verdict, axis, owner), ("admit", None, None))
+
+    def test_declared_seats_below_the_ask_refuse_on_the_operator_line(self):
+        verdict, axis, owner, reason = self.verdict(seats=1)
+        self.assertEqual((verdict, axis, owner), ("refuse", "seats:cargo", "operator"))
+        self.assertIn("max_concurrent_heavy is 1", reason)
+
+    def test_ram_guard_not_ok_refuses_on_the_device_own_line(self):
+        for level in ("soft", "high", "hard"):
+            verdict, axis, owner, reason = self.verdict(ram=self.ram(level))
+            self.assertEqual((verdict, axis, owner), ("refuse", "host-floor:memory", "self"), level)
+            self.assertIn(f"level {level}", reason)
+
+    def test_missing_unreadable_or_stale_guard_state_admits_nothing(self):
+        for ram in (None, {}, {"level": "ok"}, "garbage"):
+            room = self.cargo_room(2, 2, ram, self.io(), [], self.NOW)
+            self.assertEqual((room["verdict"], room["axis"]), ("refuse", "host-floor:memory"), ram)
+            self.assertIn("missing or unreadable", room["reason"])
+        verdict, axis, _, reason = self.verdict(ram=self.ram(age=31))
+        self.assertEqual((verdict, axis), ("refuse", "host-floor:memory"))
+        self.assertIn("stale", reason)
+        room = self.cargo_room(2, 2, self.ram(), None, [], self.NOW)
+        self.assertEqual((room["verdict"], room["axis"], room["owner"]), ("refuse", "host-floor:io", "self"))
+
+    def test_a_guard_stamped_in_the_future_is_stale(self):
+        for name, ram, io, axis in (("ram", self.ram(age=-6), None, "host-floor:memory"),
+                                    ("io", None, self.io(age=-60), "host-floor:io")):
+            room = self.cargo_room(2, 2, self.ram() if ram is None else ram, self.io() if io is None else io,
+                                   [], self.NOW)
+            self.assertEqual((room["verdict"], room["axis"], room["owner"]), ("refuse", axis, "self"), name)
+            self.assertIn("in the future", room["reason"])
+            self.assertIn(f"{name}-guard", room["reason"])
+        self.assertEqual(self.verdict(ram=self.ram(age=-5))[0], "admit", "a small skew is not a refusal")
+
+    def test_a_missing_or_unrecognised_io_level_refuses(self):
+        for io in ({"ts": self.NOW - 1}, {"ts": self.NOW - 1, "level": "weird", "action_level": "ok", "paused": []},
+                   {"ts": self.NOW - 1, "level": None, "action_level": "ok", "paused": []}):
+            verdict, axis, owner, reason = self.verdict(io=io)
+            self.assertEqual((verdict, axis, owner), ("refuse", "host-floor:io", "self"), io)
+            self.assertIn("io-guard level", reason)
+
+    def test_an_unrecognised_ram_level_refuses(self):
+        verdict, axis, owner, reason = self.verdict(ram=self.ram("weird"))
+        self.assertEqual((verdict, axis, owner), ("refuse", "host-floor:memory", "self"))
+        self.assertIn("not one of", reason)
+
+    def test_io_guard_high_acting_or_pausing_refuses(self):
+        for io in (self.io(level="high"), self.io(level="hard"), self.io(action="high"),
+                   self.io(paused=[{"root": 7}])):
+            verdict, axis, owner, _ = self.verdict(io=io)
+            self.assertEqual((verdict, axis, owner), ("refuse", "host-floor:io", "self"), io)
+        self.assertEqual(self.verdict(io=self.io(level="soft"))[0], "admit", "soft is advisory")
+
+    def test_builds_running_fill_the_seats(self):
+        verdict, axis, owner, reason = self.verdict(builds=[(41, "cargo test", 41, "cargo test")])
+        self.assertEqual((verdict, axis, owner), ("refuse", "seats:cargo", "operator"))
+        self.assertIn("1 of 2 seats taken (pid 41: cargo test)", reason)
+        self.assertEqual(self.verdict(want=1, builds=[(41, "cargo test", 41, "cargo test")])[0], "admit")
+
+    def test_an_uncounted_build_list_is_unknown_never_zero(self):
+        verdict, axis, owner, reason = self.verdict(builds=None)
+        self.assertEqual((verdict, axis, owner), ("refuse", "seats:cargo", "self"))
+        self.assertIn("could not be counted", reason)
+
+    def _cli(self, base, *args, proc=None):
+        env = {**os.environ, "CLAUDE_CONFIG_DIR": str(base / "config"), "CLAUDE_PROJECT_DIR": str(base / "project"),
+               "CARGO_GUARD_PROC_DIR": str(proc or (base / "proc"))}
+        return subprocess.run([sys.executable, str(REPO / "genesis/agentic/bin/berth"), "room", *args],
+                              capture_output=True, text=True, env=env, timeout=30)
+
+    def _device(self, base, seats=2):
+        (base / "project/genesis/agentic").mkdir(parents=True)
+        (base / "project/genesis/agentic/pool-policy.json").write_text(json.dumps({"io": {"max_concurrent_heavy": seats}}))
+        for name, state in (("ram-guard", {"level": "ok", "pct": 20.0}),
+                            ("io-guard", {"level": "ok", "action_level": "ok", "paused": []})):
+            (base / "config" / name).mkdir(parents=True)
+            (base / "config" / name / "state.json").write_text(json.dumps({"ts": time.time(), **state}))
+        (base / "proc").mkdir()
+
+    def test_cli_counts_builds_through_the_cargo_guard_hook(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            self._device(base)
+            empty = self._cli(base, "cargo", "--json", "--want", "2")
+            self.assertEqual(empty.returncode, 0, empty.stderr)
+            room = json.loads(empty.stdout)
+            self.assertEqual((room["verdict"], room["seats"], room["want"], room["builds"]), ("admit", 2, 2, []))
+            self.assertEqual(room["guards"]["ram-guard"]["state"], "ok")
+            build = base / "proc" / "4242"
+            build.mkdir()
+            (build / "cmdline").write_bytes(b"cargo\0build\0--release\0")
+            (build / "environ").write_bytes(b"")
+            (build / "stat").write_text("4242 (cargo) S 1 " + "0 " * 20 + "\n")
+            full = self._cli(base, "cargo", "--json", "--want", "2")
+            self.assertEqual(full.returncode, 3, full.stderr)
+            room = json.loads(full.stdout)
+            self.assertEqual((room["verdict"], room["axis"], room["owner"]), ("refuse", "seats:cargo", "operator"))
+            self.assertEqual([b["pid"] for b in room["builds"]], [4242])
+            one = self._cli(base, "cargo")
+            self.assertEqual(one.returncode, 0, one.stderr)
+            self.assertTrue(one.stdout.startswith("cargo: admit 1"), one.stdout)
+
+    def test_cli_refuses_usage_it_does_not_know(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            self._device(base)
+            for args in (("mesh",), ("cargo", "--want", "0"), ("cargo", "--want"), ()):
+                self.assertEqual(self._cli(base, *args).returncode, 2, args)
+
+
 if __name__ == "__main__":
     unittest.main()

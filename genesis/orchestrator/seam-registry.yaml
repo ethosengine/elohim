@@ -359,3 +359,41 @@ decisionPoints:
   contractTests:
   - { path: genesis/orchestrator/gate-change-id.test.mjs, testName: stamp_mints_once_over_final_message, kind: unit }
   - { path: genesis/orchestrator/gate-change-id.test.mjs, testName: amend_and_rebase_keep_one_trailer, kind: unit }
+- name: planCarry
+  kind: pure-decision-predicate
+  sourceLocation: { file: gate-carry.mjs, modulePath: planCarry }
+  summary: Decide which of a push's selected gate steps run inline in the loop and which step is offered to which
+    carrier, from the steps (manifest run block, resolved build jobs, cargo slot, recorded p90) and each carrier's
+    declared terms only; every step not offered carries the first refusing carrier's reason and its owner. Capacity is
+    not decided here; the carrier asks `berth room cargo` at offer time. Switch GATE_CARRY=off|shadow|on, default shadow.
+  concernIds:
+  - { id: C0, status: n-a, justification: "A local scheduling decision over this device's own gate processes; no custody, reach or head plane." }
+  - { id: C1, status: n-a, justification: "Nothing is elected; the plan only places work the push already selected." }
+  - { id: C2, status: answered, justification: "Order is declared: largest recorded p90 first, a tie keeps the given (cost-sorted) order; no clock or arrival order decides." }
+  - { id: C3, status: answered, justification: "Liveness: every step not offered runs inline; an offer refused or failed leaves it inline; an overlap-only carrier always leaves one step inline; a carried step can always be collected or withdrawn, and the hook's exit trap withdraws it." }
+  - { id: C4, status: answered, justification: "Honest absence: no recorded run, undeclared build jobs and an unknown project are named refusals, never zero; an unreadable `berth room` refuses on the device's own line (self); a carried step whose end was not recorded collects as exit unknown, status 1, never a pass." }
+  - { id: C5, status: answered, justification: "Evidence, not authority: recorded p90 and guard lines only decide whether to offer; the push's verdict is the carried gate's own exit status, collected unchanged and accounted exactly as an inline gate's." }
+  - { id: C6a, status: answered, justification: "Bounded work: the plan is linear in the selected steps; one `berth room` query with a 15 s deadline per offer; withdraw is SIGTERM to the step's process group, 5 s, then SIGKILL, 2 s; collect waits only on this device's own process, as the inline loop waits on its gate." }
+  - { id: C6b, status: answered, justification: "Withdraw after collect, or twice, finds no process and does nothing; collect re-reads the recorded exit." }
+  - { id: C7, status: answered, justification: "The terms planCarry reads are the terms the carrier's admit re-checks before it asks for room, so a step outside them is refused at offer too." }
+  - { id: C8, status: partial, justification: "Every step not offered has a reason and owner (the `plan` verb prints them all) and the hook prints `not carried: <reason> (<owner>)` or `carried: …`, plus the seconds the overlap saved; no counter or flow measure records carry outcomes yet." }
+  - { id: C9, status: n-a, justification: "No agent identity is referenced." }
+  - { id: C10, status: answered, justification: "An unknown GATE_CARRY value reads as shadow and says so; a berth room answer with no admit|refuse verdict refuses." }
+  - { id: C11, status: answered, justification: "Externally-imposed backpressure: under load this push did not schedule, `berth room cargo` refuses on the axis it measured (seats:cargo operator, host-floor:memory self, host-floor:io self) and the step declines to the inline loop; nothing queues. The verdict's own tests are berth_test.py CargoRoomTest (Python, outside this registry's test kinds)." }
+  - { id: C12, status: answered, justification: "May-act: work moves only under GATE_CARRY=on set by the person pushing; the default shadow changes nothing; the carrier acts only on this device's own process, under no remote grant." }
+  - { id: C13, status: n-a, justification: "No social authority tier; a sibling carrier, when built, needs its own row and grant." }
+  - { id: C14, status: partial, justification: "An offer that throws prints one line and leaves every step inline; a withdraw that leaves a process names its pids; no diagnostic capsule is written." }
+  contractTests:
+  - { path: genesis/orchestrator/gate-carry.test.mjs, testName: plan_one_step_stays_inline, kind: unit }
+  - { path: genesis/orchestrator/gate-carry.test.mjs, testName: plan_carries_long_one_job_cargo, kind: unit }
+  - { path: genesis/orchestrator/gate-carry.test.mjs, testName: plan_refuses_each_term, kind: unit }
+  - { path: genesis/orchestrator/gate-carry.test.mjs, testName: plan_largest_p90_then_order, kind: unit }
+  - { path: genesis/orchestrator/gate-carry.test.mjs, testName: plan_keeps_one_inline, kind: unit }
+  - { path: genesis/orchestrator/gate-carry.test.mjs, testName: carry_mode_switch, kind: unit }
+  - { path: genesis/orchestrator/gate-carry.test.mjs, testName: contract_in_memory_carrier, kind: unit }
+  - { path: genesis/orchestrator/gate-carry.test.mjs, testName: contract_second_seat, kind: integration }
+  - { path: genesis/orchestrator/gate-carry.test.mjs, testName: second_seat_refusals, kind: unit }
+  - { path: genesis/orchestrator/prepush-carry.test.mjs, testName: carry_off_equals_nothing_carried, kind: integration }
+  - { path: genesis/orchestrator/prepush-carry.test.mjs, testName: carry_on_overlaps, kind: integration }
+  - { path: genesis/orchestrator/prepush-carry.test.mjs, testName: carry_interrupt_withdraws, kind: integration }
+  - { path: genesis/orchestrator/prepush-carry.test.mjs, testName: carry_red_under_stop_stops_the_loop, kind: integration }

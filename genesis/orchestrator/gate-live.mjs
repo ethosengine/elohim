@@ -12,6 +12,7 @@ import {
   readdirSync,
   readFileSync,
   readSync,
+  rmSync,
   statSync,
   unlinkSync,
   writeFileSync,
@@ -19,6 +20,7 @@ import {
 import { basename, dirname, isAbsolute, join, resolve } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
+import { withFileLock } from './file-lock.mjs';
 
 const STALE_MS = 6 * 60 * 60 * 1000;
 const OUTCOMES = new Set(['passed', 'gates-passed', 'failed', 'interrupted']);
@@ -199,6 +201,9 @@ export function openRun({
       ) continue;
       unlinkSync(oldPath);
       nextSeq.delete(oldPath);
+      // Only here, when this run's own log is pruned under the retention rule: its carried step's
+      // record and output (gate-carry.mjs) go with it, and at no other time.
+      rmSync(oldPath.replace(/\.jsonl$/, '.carry'), { recursive: true, force: true });
     } catch (error) {
       if (error.code !== 'ENOENT') throw error;
     }
@@ -207,45 +212,55 @@ export function openRun({
   return { runId, path };
 }
 
+// Two writers can append to one run at once (a carried gate beside the loop's gate, each with its
+// tap): without a lock both read the same size and write the same `seq`, and a reader whose cursor
+// already passed that seq never sees the second event. The lock is file-lock.mjs's: never broken
+// while its holder lives; a lock that cannot be had runs the append unlocked, as before.
+const withAppendLock = (path, append) => withFileLock(path, append);
+
 export function appendEvent(path, event, { now = () => new Date() } = {}) {
   try {
     path = resolve(path);
-    // Several processes append to one run (gate-runner and each gate's tap), so a cached seq
-    // is only good while the file is the size this process last left it; otherwise count the
-    // lines in the bytes appended since, never the whole file again.
-    const cached = nextSeq.get(path);
-    let size = 0;
-    try {
-      size = statSync(path).size;
-    } catch (error) {
-      if (error.code !== 'ENOENT') throw error;
-    }
-    let seq;
-    let torn = false;
-    if (cached && cached.size === size) {
-      seq = cached.seq;
-    } else {
-      const from = cached && cached.size < size ? cached.size : 0;
-      const base = cached && cached.size < size ? cached.seq : 0;
-      seq = base + countLines(path, from, size);
-      torn = size > 0 && lastByte(path, size) !== 0x0a;
-    }
-
-    const written = {
-      ...event,
-      v: 1,
-      run: basename(path, '.jsonl'),
-      seq,
-      at: new Date(now()).toISOString(),
-    };
-    // A torn last line (a writer killed mid-line) is closed off, so this event is its own line.
-    const line = `${torn ? '\n' : ''}${JSON.stringify(written)}\n`;
-    appendFileSync(path, line, 'utf8');
-    nextSeq.set(path, { seq: seq + 1, size: size + Buffer.byteLength(line) });
-    return written;
+    return withAppendLock(path, () => appendLocked(path, event, now));
   } catch {
     return null;
   }
+}
+
+function appendLocked(path, event, now) {
+  // Several processes append to one run (gate-runner and each gate's tap), so a cached seq
+  // is only good while the file is the size this process last left it; otherwise count the
+  // lines in the bytes appended since, never the whole file again.
+  const cached = nextSeq.get(path);
+  let size = 0;
+  try {
+    size = statSync(path).size;
+  } catch (error) {
+    if (error.code !== 'ENOENT') throw error;
+  }
+  let seq;
+  let torn = false;
+  if (cached && cached.size === size) {
+    seq = cached.seq;
+  } else {
+    const from = cached && cached.size < size ? cached.size : 0;
+    const base = cached && cached.size < size ? cached.seq : 0;
+    seq = base + countLines(path, from, size);
+    torn = size > 0 && lastByte(path, size) !== 0x0a;
+  }
+
+  const written = {
+    ...event,
+    v: 1,
+    run: basename(path, '.jsonl'),
+    seq,
+    at: new Date(now()).toISOString(),
+  };
+  // A torn last line (a writer killed mid-line) is closed off, so this event is its own line.
+  const line = `${torn ? '\n' : ''}${JSON.stringify(written)}\n`;
+  appendFileSync(path, line, 'utf8');
+  nextSeq.set(path, { seq: seq + 1, size: size + Buffer.byteLength(line) });
+  return written;
 }
 
 function lastByte(path, size) {

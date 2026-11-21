@@ -49,7 +49,10 @@ function fixture(t, { brokenCli = false } = {}) {
   mkdirSync(orch, { recursive: true });
   const cli = join(orch, "gate-live.mjs");
   if (brokenCli) writeFileSync(cli, "process.exit(1);\n");
-  else copyFileSync(join(ROOT, "genesis/orchestrator/gate-live.mjs"), cli);
+  else {
+    copyFileSync(join(ROOT, "genesis/orchestrator/gate-live.mjs"), cli);
+    copyFileSync(join(ROOT, "genesis/orchestrator/file-lock.mjs"), join(orch, "file-lock.mjs"));
+  }
   return dir;
 }
 

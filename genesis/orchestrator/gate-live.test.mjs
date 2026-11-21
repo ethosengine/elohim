@@ -1611,3 +1611,29 @@ test('a kind this reader does not know is dropped by every reader path and count
   assert.deepEqual(lines, ['[gate-live] eprfs PASSED 5s failure_class=none', '[gate-live] run passed']);
   assert.deepEqual(live.harvest({ root, last: 10 }).slices, []);
 });
+
+test('concurrent writers to one run never share a seq', async function concurrent_appends_get_unique_seqs() {
+  // Two gates now append at once (a carried gate beside the loop's): each event needs its own seq,
+  // or a reader whose cursor passed it skips the other (unseen() reads `seq > cursor`).
+  const dir = fs.mkdtempSync(join(tmpdir(), 'gate-live-concurrent-'));
+  try {
+    const run = join(dir, 'run.jsonl');
+    fs.writeFileSync(run, `${JSON.stringify({ kind: 'run-open', seq: 0 })}\n`);
+    const writer = `import { appendEvent } from ${JSON.stringify(fileURLToPath(new URL('./gate-live.mjs', import.meta.url)))};
+for (let i = 0; i < 150; i += 1) appendEvent(process.argv[2], { kind: 'notice', writer: process.argv[3], i });`;
+    const script = join(dir, 'writer.mjs');
+    fs.writeFileSync(script, writer);
+    const { spawn } = await import('node:child_process');
+    await Promise.all(['a', 'b', 'c', 'd'].map(name => new Promise((done, fail) => {
+      const child = spawn(process.execPath, [script, run, name], { stdio: 'inherit' });
+      child.on('exit', code => (code === 0 ? done() : fail(new Error(`writer ${name} exit ${code}`))));
+    })));
+    const events = fs.readFileSync(run, 'utf8').trim().split('\n').map(line => JSON.parse(line));
+    assert.equal(events.length, 601);
+    const seqs = events.map(event => event.seq).sort((x, y) => x - y);
+    assert.deepEqual(seqs, Array.from({ length: 601 }, (_, i) => i), 'one seq per event, none skipped or repeated');
+    assert.equal(fs.existsSync(`${run}.lock`), false, 'the lock is released');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});

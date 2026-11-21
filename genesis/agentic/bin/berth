@@ -56,6 +56,11 @@ Commands:
                                                                    agent's Monitor: `berth inbox --session S
                                                                    --reader main --follow` (no head/cut pipe)
   berth who     RESOURCE                                           json of the holder (or null)
+  berth room    cargo [--json] [--want N]                          read-only: may N more builds start here now?
+                                                                   seats (io.max_concurrent_heavy), the builds
+                                                                   running (the cargo guard hook's own count),
+                                                                   ram-guard/io-guard levels; verdict admit|refuse
+                                                                   with axis and owner; exit 0 admit · 3 refuse
   berth status                                                     moorings · leases · capacity, and the
                                                                    other devices' moorings and steward
                                                                    leases, read from this device's fold
@@ -119,6 +124,7 @@ import json
 import math
 import os
 import re
+import runpy
 import secrets
 import shutil
 import subprocess
@@ -2221,6 +2227,117 @@ def _guard_state(name):
         return None
 
 
+# ---- room: may more builds start on this device now (read-only) ---------------------------------
+
+# The cargo guard hook owns the count of builds running now (`running_heavy`, `group_builds`); berth
+# and lsp-flycheck load it rather than keep a second copy, so the hook, this verb and every caller of
+# it count the same builds.
+CARGO_GUARD = os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "..", "..",
+                           ".claude", "hooks", "cargo-disk-guard.py")
+# io-guard's own status calls a state older than this STALE (daemon not running); ram-guard writes
+# every 2 s. A stale line is not a current reading, so it admits nothing.
+GUARD_STALE_S = 30
+HIGH_LEVELS = ("high", "hard")
+GUARD_LEVELS = ("ok", "soft", "high", "hard")
+# A timestamp this far ahead of now is a clock that went backwards, not a fresh reading.
+GUARD_FUTURE_S = 5
+
+
+def cargo_builds(guard_path=CARGO_GUARD):
+    """[(pid, cmd, root, root_cmd)] builds running now, by the hook's own grouping; None when the hook
+    cannot be loaded or read (an unknown count, never zero)."""
+    try:
+        guard = runpy.run_path(guard_path)
+        live = [(pid, cmd) for pid, cmd, yieldable in guard["running_heavy"]() if not yieldable]
+        return guard["group_builds"](live) if live else []
+    except Exception:
+        return None
+
+
+def _guard_line(name, state, now):
+    """(summary dict, None) for a current reading, or (summary, why it admits nothing)."""
+    if not isinstance(state, dict) or not isinstance(state.get("ts"), (int, float)):
+        return {"state": "missing"}, f"{name} state missing or unreadable (no daemon line to read)"
+    if state["ts"] - now > GUARD_FUTURE_S:
+        ahead = round(state["ts"] - now)
+        return ({"state": "stale", "ageS": -ahead, "level": state.get("level")},
+                f"{name} state is stamped {ahead}s in the future (clock went backwards; not a current reading)")
+    age = max(0, round(now - state["ts"]))
+    summary = {"state": "ok", "ageS": age, "level": state.get("level")}
+    if age > GUARD_STALE_S:
+        summary["state"] = "stale"
+        return summary, f"{name} state is {age}s old (stale past {GUARD_STALE_S}s; is the daemon running?)"
+    return summary, None
+
+
+def cargo_room(want, seats, ram, io, builds, now):
+    """The one capacity answer for `want` more builds: a pure verdict over this device's own lines.
+    Order: the declared seats, the RAM guard, the I/O guard, then the builds already running."""
+    ram_line, ram_why = _guard_line("ram-guard", ram, now)
+    if not ram_why:
+        ram_line["pct"] = ram.get("pct")
+        if ram.get("level") not in GUARD_LEVELS:
+            ram_why = f"ram-guard level {ram.get('level')!r} is not one of {'/'.join(GUARD_LEVELS)}"
+        elif ram.get("level") != "ok":
+            ram_why = f"ram-guard level {ram.get('level')} at {ram.get('pct')}% committed"
+    io_line, io_why = _guard_line("io-guard", io, now)
+    if not io_why:
+        paused = io.get("paused") or []
+        io_line.update(actionLevel=io.get("action_level"), paused=len(paused), psiFull10=io.get("psi_full_avg10"))
+        if io.get("level") not in GUARD_LEVELS:
+            io_why = f"io-guard level {io.get('level')!r} is missing or not one of {'/'.join(GUARD_LEVELS)}"
+        elif io.get("level") in HIGH_LEVELS or io.get("action_level") in HIGH_LEVELS:
+            io_why = f"io-guard level {io.get('level')} (acting on {io.get('action_level')})"
+        elif paused:
+            io_why = f"io-guard is pausing {len(paused)} build(s)"
+    rows = None if builds is None else [
+        {"pid": pid, "cmd": cmd, "root": root, "rootCmd": root_cmd} for pid, cmd, root, root_cmd in builds]
+    room = {"resource": "cargo", "seats": seats, "want": want, "builds": rows,
+            "guards": {"ram-guard": ram_line, "io-guard": io_line},
+            "verdict": "refuse", "axis": None, "owner": None, "reason": None}
+
+    def refuse(axis, owner, reason):
+        room.update(axis=axis, owner=owner, reason=reason)
+        return room
+    if seats < want:
+        return refuse("seats:cargo", "operator",
+                      f"pool-policy io.max_concurrent_heavy is {seats}; {want} asked for")
+    if ram_why:
+        return refuse("host-floor:memory", "self", ram_why)
+    if io_why:
+        return refuse("host-floor:io", "self", io_why)
+    if rows is None:
+        return refuse("seats:cargo", "self", "the builds running now could not be counted")
+    if len(rows) + want > seats:
+        named = ", ".join(f"pid {r['pid']}: {r['cmd']}" for r in rows)
+        return refuse("seats:cargo", "operator",
+                      f"{len(rows)} of {seats} seats taken ({named}); {want} asked for")
+    room.update(verdict="admit",
+                reason=f"{seats} seats, {len(rows)} build(s) running, ram-guard ok, io-guard ok")
+    return room
+
+
+def room_main(argv, now=None, builds=None):
+    """`berth room cargo [--json] [--want N]`: read-only; 0 admit, 3 refuse, 2 usage."""
+    usage = "usage: berth room cargo [--json] [--want N]"
+    want_arg = _opt(argv, "--want", "1")
+    as_json = "--json" in argv
+    rest = [a for a in argv if a != "--json"]
+    if rest != ["cargo"] or not str(want_arg).isdigit() or int(want_arg) < 1:
+        print(usage, file=sys.stderr)
+        return 2
+    room = cargo_room(int(want_arg), load_capacities().get("cargo", 1), _guard_state("ram-guard"),
+                      _guard_state("io-guard"), cargo_builds() if builds is None else builds,
+                      time.time() if now is None else now)
+    if as_json:
+        print(json.dumps(room))
+    elif room["verdict"] == "admit":
+        print(f"cargo: admit {room['want']} — {room['reason']}")
+    else:
+        print(f"cargo: refuse {room['want']} — {room['axis']} ({room['owner']}): {room['reason']}")
+    return 0 if room["verdict"] == "admit" else 3
+
+
 def render_status(b):
     now = b.now()
     lines = ["BERTH (this workspace as one blade — moorings · leases · capacity)"]
@@ -2474,6 +2591,9 @@ def _main(argv):
         # A flag is never a resource: `berth claim --help` once took a lease named "--help".
         print(__doc__.split("Commands:")[1].split("Resources")[0])
         return 0
+    if cmd == "room":
+        # Read-only and store-free: capacity is this device's own lines, never a lease.
+        return room_main(argv)
     b = Berth(read_only=True) if cmd == "verify-released" else Berth()
     session = _opt(argv, "--session")
     source = "flag" if session else None

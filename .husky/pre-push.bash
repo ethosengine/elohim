@@ -1771,16 +1771,71 @@ FAILED=""
 RESULTS=""
 INDEX=0
 
+# ── Carry: offer before the loop ──────────────────────────────────
+# gate-carry.mjs owns the decision (planCarry over the Carrier contract), the capacity question
+# (`berth room cargo`) and the switch, GATE_CARRY=off|shadow|on (default shadow). This hook only
+# calls it: `offer` prints one "<project><TAB><handle>" line per step it carried and says the rest
+# on stderr; the loop skips a carried step; `collect` reports it after the loop, and the exit trap
+# withdraws whatever was not collected. With nothing carried the loop below runs as it always has.
+# Only an explicit GATE_CARRY=on may honour the helper's stdout: under off the helper is not called,
+# under shadow (the default) or anything else its stdout is discarded, and under on a row counts only
+# when its project is one being pushed and its handle directory holds handle.json. A helper that is
+# missing, exits non-zero or prints garbage leaves the loop exactly as it was.
+GATE_CARRIED=""
+gate_carry_handles() { local p h; while IFS=$'\t' read -r p h; do [ -z "$h" ] || echo "$h"; done <<<"$GATE_CARRIED"; }
+gate_carried() { local p h; while IFS=$'\t' read -r p h; do [ "$p" = "$1" ] && return 0; done <<<"$GATE_CARRIED"; return 1; }
+gate_carry_withdraw() {
+  [ -n "$GATE_CARRIED" ] || return 0
+  # shellcheck disable=SC2046 # one handle directory per line
+  node genesis/orchestrator/gate-carry.mjs withdraw $(gate_carry_handles) || true
+}
+# A carried step that went red counts as a red for GATE_ON_RED=stop before it is collected.
+gate_carry_red() {
+  local h status
+  for h in $(gate_carry_handles); do
+    status=$(node genesis/orchestrator/gate-carry.mjs peek "$h" 2>/dev/null) || continue
+    case "$status" in running | 0) ;; *) return 0 ;; esac
+  done
+  return 1
+}
+HOOK_ON_EXIT="gate_carry_withdraw $HOOK_ON_EXIT"
+GATE_CARRY_MODE="${GATE_CARRY:-shadow}"
+GATE_CARRY_USED=""
+if [ "$GATE_CARRY_MODE" = on ]; then
+  # shellcheck disable=SC2086 # PROJECTS is a word list of manifest keys
+  # Kept whatever offer exits with: a handle it printed is a step running, and the trap must see it.
+  GATE_CARRY_RAW=$(node genesis/orchestrator/gate-carry.mjs offer $PROJECTS || true)
+  while IFS=$'\t' read -r CARRY_P CARRY_H; do
+    [ -n "$CARRY_P$CARRY_H" ] || continue
+    case " $PROJECTS " in
+      *" $CARRY_P "*) [ -n "$CARRY_H" ] && [ -f "$CARRY_H/handle.json" ] && { GATE_CARRIED="$GATE_CARRIED${GATE_CARRIED:+$'\n'}$CARRY_P"$'\t'"$CARRY_H"; continue; } ;;
+    esac
+    echo "[pre-push] carry: dropped a row from gate-carry offer that names no carried step here: ${CARRY_P:-?} ${CARRY_H:-?}" >&2
+  done <<<"$GATE_CARRY_RAW"
+elif [ "$GATE_CARRY_MODE" != off ]; then
+  # shellcheck disable=SC2086
+  node genesis/orchestrator/gate-carry.mjs offer $PROJECTS >/dev/null || true
+fi
+
+GATE_INLINE="$PROJECTS"
+if [ -n "$GATE_CARRIED" ]; then
+  GATE_CARRY_USED=1
+  GATE_INLINE=""
+  for PROJECT in $PROJECTS; do gate_carried "$PROJECT" || GATE_INLINE="$GATE_INLINE $PROJECT"; done
+fi
+GATE_SECONDS_SUM=0
+# ── Carry: offered
+
 NOT_RUN=""
 STOP_REASON=""
-# shellcheck disable=SC2206 # PROJECTS is a word list of manifest keys
-PROJECT_LIST=($PROJECTS)
-for PROJECT in $PROJECTS; do
+# shellcheck disable=SC2206 # GATE_INLINE is a word list of manifest keys
+PROJECT_LIST=($GATE_INLINE)
+for PROJECT in $GATE_INLINE; do
   INDEX=$((INDEX + 1))
   if [ -z "$STOP_REASON" ] && gate_stop_requested; then
     STOP_REASON="stop requested on the live run"
   fi
-  if [ -z "$STOP_REASON" ] && [ "$GATE_ON_RED_MODE" = stop ] && [ -n "$FAILED$PREGATE_FAILED" ]; then
+  if [ -z "$STOP_REASON" ] && [ "$GATE_ON_RED_MODE" = stop ] && { [ -n "$FAILED$PREGATE_FAILED" ] || gate_carry_red; }; then
     STOP_REASON="GATE_ON_RED=stop after a red"
   fi
   if [ -n "$STOP_REASON" ]; then
@@ -1797,6 +1852,7 @@ for PROJECT in $PROJECTS; do
 
   PROJECT_END=$(date +%s)
   PROJECT_ELAPSED=$((PROJECT_END - PROJECT_START))
+  GATE_SECONDS_SUM=$((GATE_SECONDS_SUM + PROJECT_ELAPSED))
 
   if [ $GATE_EXIT -ne 0 ]; then
     echo "$PROJECT: FAILED (${PROJECT_ELAPSED}s)"
@@ -1813,8 +1869,53 @@ for PROJECT in $PROJECTS; do
   RESULTS="$RESULTS  $PROJECT: $([ $GATE_EXIT -eq 0 ] && echo PASSED || echo FAILED) (${PROJECT_ELAPSED}s)\n"
 done
 
+# ── Carry: collect after the loop ─────────────────────────────────
+# A carried step, once started, is always waited for and its verdict reported, under a stop too: a
+# stop means nothing new starts, and it started before the loop. Its accounting is the loop's.
+if [ -n "$GATE_CARRIED" ]; then
+  mapfile -t CARRY_ROWS <<<"$GATE_CARRIED"
+  GATE_CARRY_LEFT=""
+  for CARRY_ROW in "${CARRY_ROWS[@]}"; do
+    IFS=$'\t' read -r CARRY_PROJECT CARRY_HANDLE <<<"$CARRY_ROW"
+    CARRY_STATUS=1
+    CARRY_SECONDS=0
+    CARRY_SEEN=""
+    while IFS= read -r CARRY_LINE; do
+      case "$CARRY_LINE" in
+        "carry-verdict $CARRY_PROJECT "*) CARRY_SEEN=1; read -r _ _ CARRY_STATUS CARRY_SECONDS <<<"$CARRY_LINE" ;;
+        *) printf '%s\n' "$CARRY_LINE" ;;
+      esac
+    done < <(node genesis/orchestrator/gate-carry.mjs collect "$CARRY_HANDLE")
+    # No verdict line: the collect failed. The step is FAILED for this push and its handle stays in
+    # the set the exit trap withdraws; only a collected step is cleared.
+    if [ -z "$CARRY_SEEN" ]; then
+      echo "[pre-push] carry: collect of $CARRY_PROJECT printed no verdict; counting it FAILED and leaving it to be withdrawn" >&2
+      GATE_CARRY_LEFT="$GATE_CARRY_LEFT${GATE_CARRY_LEFT:+$'\n'}$CARRY_ROW"
+      CARRY_STATUS=1
+      CARRY_SECONDS=0
+    fi
+    GATE_SECONDS_SUM=$((GATE_SECONDS_SUM + CARRY_SECONDS))
+    if [ "$CARRY_STATUS" != 0 ]; then
+      echo "$CARRY_PROJECT: FAILED (${CARRY_SECONDS}s)"
+      FAILED="$FAILED $CARRY_PROJECT"
+      if [ -n "$GATE_LIVE_RUN" ]; then
+        node genesis/orchestrator/gate-live.mjs outlook --run "$GATE_LIVE_RUN" --remaining "" >/dev/null 2>&1 || true
+      fi
+    else
+      echo "$CARRY_PROJECT: PASSED (${CARRY_SECONDS}s)"
+    fi
+    echo ""
+    RESULTS="$RESULTS  $CARRY_PROJECT: $([ "$CARRY_STATUS" = 0 ] && echo PASSED || echo FAILED) (${CARRY_SECONDS}s)\n"
+  done
+fi
+GATE_CARRIED="$GATE_CARRY_LEFT" # only what was collected is cleared; the exit trap withdraws the rest
+# ── Carry: collected
+
 TOTAL_END=$(date +%s)
 TOTAL_ELAPSED=$((TOTAL_END - TOTAL_START))
+if [ -n "$GATE_CARRY_USED" ]; then
+  echo "[pre-push] carry: the overlap saved $((GATE_SECONDS_SUM - TOTAL_ELAPSED))s (gates ${GATE_SECONDS_SUM}s, wall ${TOTAL_ELAPSED}s)"
+fi
 if [ -n "$NOT_RUN" ]; then
   echo "[pre-push] stopped: $STOP_REASON; not run:$NOT_RUN"
   FAILED="$FAILED${FAILED:+ }stopped"

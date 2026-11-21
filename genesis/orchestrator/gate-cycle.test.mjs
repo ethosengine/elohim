@@ -345,3 +345,28 @@ test('recordCycle propagates sampled cost on failed runs without judging their d
   for (const [key, value] of Object.entries(cost)) assert.ok(notes[0].includes(`${key}=${value}`));
   assert.equal(existsSync(ledger), false);
 });
+
+test('concurrent gates recording a cycle each lose no ledger row', async () => {
+  const { dir, measures, ledger } = sandbox();
+  try {
+    const { spawn } = await import('node:child_process');
+    const goAt = Date.now() + 1500;
+    const child = n => new Promise((done, fail) => {
+      const code = `
+        import { recordCycle } from ${JSON.stringify(new URL('./gate-cycle.mjs', import.meta.url).href)};
+        while (Date.now() < ${goAt}) { /* start together */ }
+        recordCycle({ name: 'proj-${n}', dir: 'dir/proj-${n}' }, 1980, 0, {},
+          { measuresPath: ${JSON.stringify(measures)}, ledgerPath: ${JSON.stringify(ledger)}, runEpr: () => 0,
+            print: () => {}, now: () => 't' });`;
+      const p = spawn(process.execPath, ['--input-type=module', '-e', code], { stdio: 'inherit' });
+      p.on('error', fail);
+      p.on('exit', status => (status === 0 ? done() : fail(new Error(`child ${n} exited ${status}`))));
+    });
+    await Promise.all([1, 2, 3, 4, 5, 6].map(child));
+    const rows = readFileSync(ledger, 'utf8').trim().split('\n').map(l => JSON.parse(l));
+    assert.deepEqual(rows.map(r => r.path).sort(), [1, 2, 3, 4, 5, 6].map(n => `dir/proj-${n}`));
+    assert.ok(!existsSync(`${ledger}.lock`), 'the lock is released');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

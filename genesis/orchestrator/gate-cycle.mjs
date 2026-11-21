@@ -11,6 +11,7 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } fr
 import { createHash } from 'crypto';
 import { dirname, join } from 'path';
 import { parse as parseYaml } from 'yaml';
+import { withFileLock } from './file-lock.mjs';
 
 export const GATE_CYCLE_MEASURE = 'gate-cycle-seconds@1';
 export const COST_FIELDS = ['cpu_s', 'throttled_s', 'rss_peak_bytes', 'memory_high_events', 'io_full_pct_max'];
@@ -159,51 +160,55 @@ export function recordCycle(project, seconds, status, env, deps, signals = {}) {
     const verdict = judgeCycle(seconds, ceiling);
     if (!ceiling) return;
     const fp = fingerprint(ceiling.id, project.dir, kind);
-    const rows = readLedger(deps.ledgerPath);
-    const open = rows.find(row => row.fp === fp && row.status === 'open');
+    // The read-modify-write is one critical section: two gates finishing together must not erase
+    // each other's row (file-lock.mjs never breaks a live holder).
+    mkdirSync(dirname(deps.ledgerPath), { recursive: true });
+    withFileLock(deps.ledgerPath, () => {
+      const rows = readLedger(deps.ledgerPath);
+      const open = rows.find(row => row.fp === fp && row.status === 'open');
 
-    if (verdict === 'hard') {
-      if (open) {
-        // The ledger is tracked: a steady "still over" run must not rewrite it, or every gate run
-        // dirties the tree it is keyed on (row 73). This run's duration is already in the native
-        // observation above; the row changes only when a recovery streak is broken.
-        if (open.under_streak) {
-          open.under_streak = 0;
-          writeLedger(deps.ledgerPath, rows);
+      if (verdict === 'hard') {
+        if (open) {
+          // The ledger is tracked: a steady "still over" run must not rewrite it, or every gate run
+          // dirties the tree it is keyed on (row 73). This run's duration is already in the native
+          // observation above; the row changes only when a recovery streak is broken.
+          if (open.under_streak) {
+            open.under_streak = 0;
+            writeLedger(deps.ledgerPath, rows);
+          }
+          deps.print(`[gate-cycle] ${project.name}: ${minutes(seconds)} — still over ${ceiling.id}; finding ${fp} is open.`);
+          return;
         }
-        deps.print(`[gate-cycle] ${project.name}: ${minutes(seconds)} — still over ${ceiling.id}; finding ${fp} is open.`);
+        appendFileSync(deps.ledgerPath, JSON.stringify({
+          fp,
+          rule: 'gate-cycle-ceiling',
+          policy: ceiling.id,
+          path: project.dir,
+          detail: `\`${project.name}\` ${kind} took ${Math.round(seconds)} s — at/over the ${ceiling.hard} s hard ceiling. ${ceiling.prompt || ''}`.trim(),
+          first_seen: deps.now(),
+          status: 'open',
+          stock: Math.round(seconds),
+          limit: ceiling.hard,
+          concern: ceiling.concern,
+          run_kind: kind,
+          under_streak: 0,
+        }) + '\n');
+        deps.print(directive(project, seconds, ceiling, kind));
         return;
       }
-      mkdirSync(dirname(deps.ledgerPath), { recursive: true });
-      appendFileSync(deps.ledgerPath, JSON.stringify({
-        fp,
-        rule: 'gate-cycle-ceiling',
-        policy: ceiling.id,
-        path: project.dir,
-        detail: `\`${project.name}\` ${kind} took ${Math.round(seconds)} s — at/over the ${ceiling.hard} s hard ceiling. ${ceiling.prompt || ''}`.trim(),
-        first_seen: deps.now(),
-        status: 'open',
-        stock: Math.round(seconds),
-        limit: ceiling.hard,
-        concern: ceiling.concern,
-        run_kind: kind,
-        under_streak: 0,
-      }) + '\n');
-      deps.print(directive(project, seconds, ceiling, kind));
-      return;
-    }
 
-    if (verdict === 'soft') {
-      deps.print(`[gate-cycle] ${project.name}: ${minutes(seconds)} is over the ${ceiling.soft} s soft ceiling ${ceiling.id} (hard ${ceiling.hard} s).`);
-    }
-    if (open) {
-      open.under_streak = (open.under_streak || 0) + 1;
-      if (open.under_streak >= CLOSE_STREAK) {
-        open.status = 'closed';
-        open.closed_at = deps.now();
-        deps.print(`[gate-cycle] ${project.name}: back under ${ceiling.id} for ${CLOSE_STREAK} runs — finding ${fp} closed.`);
+      if (verdict === 'soft') {
+        deps.print(`[gate-cycle] ${project.name}: ${minutes(seconds)} is over the ${ceiling.soft} s soft ceiling ${ceiling.id} (hard ${ceiling.hard} s).`);
       }
-      writeLedger(deps.ledgerPath, rows);
-    }
+      if (open) {
+        open.under_streak = (open.under_streak || 0) + 1;
+        if (open.under_streak >= CLOSE_STREAK) {
+          open.status = 'closed';
+          open.closed_at = deps.now();
+          deps.print(`[gate-cycle] ${project.name}: back under ${ceiling.id} for ${CLOSE_STREAK} runs — finding ${fp} closed.`);
+        }
+        writeLedger(deps.ledgerPath, rows);
+      }
+    });
   } catch { /* fail-open by contract */ }
 }

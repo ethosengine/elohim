@@ -790,6 +790,7 @@ function usage() {
   console.error('  env: GATE_ON_RED=continue|stop (default from pool-policy.json gate_on_red) · GATE_PREFLIGHT=off · GATE_PREFLIGHT_DONE=1 (pre-push ran it)');
   console.error('  env: GATE_ORACLE=rakia|shadow|path (default rakia; without a brit binary every mode is path-only) · BRIT_BIN · GATE_ROOT (fixture repository root)');
   console.error('  env: GATE_RECIPE_KEY=shadow|off (default shadow): a root-just gate prints whether a justfile edit since the integration base left its recipe closure unchanged; it changes no key, reuse decision or record');
+  console.error('  env: GATE_CARRY=off|shadow|on (default shadow, read by gate-carry.mjs under pre-push): carry one long one-build-job cargo gate on this device\'s second cargo seat beside the loop when `berth room cargo` admits it; shadow prints what would be carried and why and changes nothing');
 }
 
 const isMain = import.meta.url === `file://${process.argv[1]}` ||
