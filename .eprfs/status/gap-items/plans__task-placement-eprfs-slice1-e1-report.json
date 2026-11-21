@@ -1,0 +1,78 @@
+{
+ "doc": "genesis/docs/superpowers/plans/task-placement-eprfs-slice1-e1-report.md",
+ "slug": "plans__task-placement-eprfs-slice1-e1-report",
+ "method": "agent-decomposition",
+ "class": "architecture",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-11-21 (stasis round 2). E1 REPORT (DONE_WITH_CONCERNS): View and the view-scoped walk in eprfs-core. Delivered CLAIMED; slice-2 and reviewer residue OPEN.",
+ "count": 8,
+ "items": [
+  {
+   "text": "eprfs-core walk.rs: TreePath, View with placement(), walk() pull cursor, walk_collect() and WalkItem/AbsentReason incl. NotHeld (R6)",
+   "line": 29,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-eprfs-slice1-e1-report#1",
+   "cites": "genesis/docs/superpowers/plans/task-placement-eprfs-slice1-e1-report.md#L29",
+   "class": "architecture"
+  },
+  {
+   "text": "tree.rs refactor onto Budget/fetch_node/check_root_codec with the loader tests unchanged and five new TreeError variants",
+   "line": 40,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-eprfs-slice1-e1-report#2",
+   "cites": "genesis/docs/superpowers/plans/task-placement-eprfs-slice1-e1-report.md#L40",
+   "class": "architecture"
+  },
+  {
+   "text": "eprfs build-manifest no longer describes the test step as nextest",
+   "line": 82,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-eprfs-slice1-e1-report#3",
+   "cites": "genesis/docs/superpowers/plans/task-placement-eprfs-slice1-e1-report.md#L82",
+   "class": "architecture",
+   "note": "build-manifest.json carries no nextest 2026-11-21"
+  },
+  {
+   "text": "Habit flip to red with checks: line (E4 seat)",
+   "line": 85,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-eprfs-slice1-e1-report#4",
+   "cites": "genesis/docs/superpowers/plans/task-placement-eprfs-slice1-e1-report.md#L85",
+   "class": "architecture",
+   "note": "materialize-what-is-read reads status: red"
+  },
+  {
+   "text": "R6 \"local nodes stream first\": when a remote tier lands, decide which held nodes go ahead of remote fetches (e.g. a held-first frontier pass)",
+   "line": 71,
+   "state": "OPEN",
+   "id": "plans__task-placement-eprfs-slice1-e1-report#5",
+   "cites": "genesis/docs/superpowers/plans/task-placement-eprfs-slice1-e1-report.md#L71",
+   "class": "architecture"
+  },
+  {
+   "text": "Walk memory bounded by max_total_bytes via the visited-node cache, not by the frontier alone \u2014 confirm acceptable or bound it",
+   "line": 75,
+   "state": "OPEN",
+   "id": "plans__task-placement-eprfs-slice1-e1-report#6",
+   "cites": "genesis/docs/superpowers/plans/task-placement-eprfs-slice1-e1-report.md#L75",
+   "class": "architecture"
+  },
+  {
+   "text": "Spec/code divergences for the reviewer seat: walk is a free function, a pull cursor not a Stream, matched on byte TreePaths \u2014 absorb into the interfaces spec or revise",
+   "line": 78,
+   "state": "OPEN",
+   "id": "plans__task-placement-eprfs-slice1-e1-report#7",
+   "cites": "genesis/docs/superpowers/plans/task-placement-eprfs-slice1-e1-report.md#L78",
+   "class": "architecture"
+  },
+  {
+   "text": "Brit-sealed probe eprfs-storage/examples/walk_view.rs (E5 seat)",
+   "line": 86,
+   "state": "OPEN",
+   "id": "plans__task-placement-eprfs-slice1-e1-report#8",
+   "cites": "genesis/docs/superpowers/plans/task-placement-eprfs-slice1-e1-report.md#L86",
+   "class": "architecture",
+   "note": "no eprfs-storage/examples/ directory 2026-11-21"
+  }
+ ]
+}

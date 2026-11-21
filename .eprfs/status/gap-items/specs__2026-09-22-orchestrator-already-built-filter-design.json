@@ -1,0 +1,69 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-09-22-orchestrator-already-built-filter-design.md",
+ "slug": "specs__2026-09-22-orchestrator-already-built-filter-design",
+ "method": "agent-decomposition",
+ "class": "process-meta",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-11-21 (stasis round 2). Active spec describing a landed mechanism: timer-dispatch.mjs (groups/decide, with tests) and walkNarrowGroups in genesis/orchestrator/Jenkinsfile verified 2026-11-21. Only the production graduation evidence is OPEN.",
+ "count": 7,
+ "items": [
+  {
+   "text": "timer-dispatch.mjs groups: per-pipeline baseline diffs grouped by baseline, git and manifest reads only",
+   "line": 24,
+   "state": "CLAIMED",
+   "id": "specs__2026-09-22-orchestrator-already-built-filter-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-09-22-orchestrator-already-built-filter-design.md#L24",
+   "class": "process-meta",
+   "note": "genesis/orchestrator/timer-dispatch.mjs + .test.mjs"
+  },
+  {
+   "text": "walkNarrowGroups re-invokes build-graph walkBuildGraph once per distinct baseline",
+   "line": 25,
+   "state": "CLAIMED",
+   "id": "specs__2026-09-22-orchestrator-already-built-filter-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-09-22-orchestrator-already-built-filter-design.md#L25",
+   "class": "process-meta",
+   "note": "genesis/orchestrator/Jenkinsfile:1627"
+  },
+  {
+   "text": "timer-dispatch.mjs decide: skip only when the walker excludes the pipeline and after the producer-readiness rule; [build:*] overrides; genesis auto-include after",
+   "line": 26,
+   "state": "CLAIMED",
+   "id": "specs__2026-09-22-orchestrator-already-built-filter-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-09-22-orchestrator-already-built-filter-design.md#L26",
+   "class": "process-meta"
+  },
+  {
+   "text": "walkNarrowGroups restores BUILD_STATE_JSON bytes in a finally",
+   "line": 28,
+   "state": "CLAIMED",
+   "id": "specs__2026-09-22-orchestrator-already-built-filter-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-09-22-orchestrator-already-built-filter-design.md#L28",
+   "class": "process-meta"
+  },
+  {
+   "text": "Skip line names the baseline provenance; a producer a survivor needs is never dropped; no controller-evidence exception",
+   "line": 32,
+   "state": "CLAIMED",
+   "id": "specs__2026-09-22-orchestrator-already-built-filter-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-09-22-orchestrator-already-built-filter-design.md#L32",
+   "class": "process-meta"
+  },
+  {
+   "text": "Every uncertainty dispatches (short/missing baseline, missing __global__, non-ancestor, git failure, unanswered group, non-zero exit)",
+   "line": 42,
+   "state": "CLAIMED",
+   "id": "specs__2026-09-22-orchestrator-already-built-filter-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-09-22-orchestrator-already-built-filter-design.md#L42",
+   "class": "process-meta"
+  },
+  {
+   "text": "Graduation: one further frozen-baseline wave skipped in production with no false-skip or false-dispatch since #188 \u2014 record the receipt, then retire to history",
+   "line": 10,
+   "state": "OPEN",
+   "id": "specs__2026-09-22-orchestrator-already-built-filter-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-09-22-orchestrator-already-built-filter-design.md#L10",
+   "class": "process-meta"
+  }
+ ]
+}

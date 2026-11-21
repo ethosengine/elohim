@@ -1,0 +1,99 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-10-08-name-binding-design.md",
+ "slug": "specs__2026-10-08-name-binding-design",
+ "method": "agent-decomposition",
+ "class": "protocol-canonical",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-11-21 (stasis round 2). Draft P2P-design-gate output for NameBinding. Four of six binding components ride the canonical-head link today; nothing named resolve_name_binding was found in content_store 2026-11-21.",
+ "count": 11,
+ "items": [
+  {
+   "text": "Carry the elector through CanonicalCandidate and CanonicalElectionOutput (coordinator-only, DNA-hash-neutral)",
+   "line": 134,
+   "state": "OPEN",
+   "id": "specs__2026-10-08-name-binding-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-10-08-name-binding-design.md#L134",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "New coordinator read content_store::resolve_name_binding returning elector, clock, head and standing reference beside the CID",
+   "line": 92,
+   "state": "OPEN",
+   "id": "specs__2026-10-08-name-binding-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-10-08-name-binding-design.md#L92",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Address-keyed read route by binding (CreateLink ActionHash); existing routes are name-keyed",
+   "line": 94,
+   "state": "OPEN",
+   "id": "specs__2026-10-08-name-binding-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-10-08-name-binding-design.md#L94",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "A bound slug resolves through two bindings in series: the answer names both electors and both clocks",
+   "line": 135,
+   "state": "OPEN",
+   "id": "specs__2026-10-08-name-binding-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-10-08-name-binding-design.md#L135",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Row 17 integrity rules for channel bindings (these move the lamad DNA hash; the bridge view does not)",
+   "line": 91,
+   "state": "OPEN",
+   "id": "specs__2026-10-08-name-binding-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-10-08-name-binding-design.md#L91",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Petname as a private imagodei entry: imagodei::set_petname / get_petnames (moves imagodei_integrity hash)",
+   "line": 108,
+   "state": "OPEN",
+   "id": "specs__2026-10-08-name-binding-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-10-08-name-binding-design.md#L108",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "FollowSet source of truth moves from deployments.json ELOHIM_RELEASE_CHANNELS to the holder source chain; follow-set CID on every name answer",
+   "line": 122,
+   "state": "OPEN",
+   "id": "specs__2026-10-08-name-binding-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-10-08-name-binding-design.md#L122",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Scope-declaration CID (fourth component) \u2014 per-plane reach declaration, referenced not designed",
+   "line": 130,
+   "state": "OPEN",
+   "id": "specs__2026-10-08-name-binding-design#8",
+   "cites": "genesis/docs/superpowers/specs/2026-10-08-name-binding-design.md#L130",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Council electors wait on authority backlog row 14 (membership authority is coordinator-only)",
+   "line": 136,
+   "state": "OPEN",
+   "id": "specs__2026-10-08-name-binding-design#9",
+   "cites": "genesis/docs/superpowers/specs/2026-10-08-name-binding-design.md#L136",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Concern canon partials C1/C2 for resolve_name_binding (self-electable staging links, clock rule coordinator-only)",
+   "line": 139,
+   "state": "OPEN",
+   "id": "specs__2026-10-08-name-binding-design#10",
+   "cites": "genesis/docs/superpowers/specs/2026-10-08-name-binding-design.md#L139",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Graduation: a coordinator read answers any name with elector, clock, head and standing beside the CID, and two doorways answering differently can be told apart",
+   "line": 10,
+   "state": "OPEN",
+   "id": "specs__2026-10-08-name-binding-design#11",
+   "cites": "genesis/docs/superpowers/specs/2026-10-08-name-binding-design.md#L10",
+   "class": "protocol-canonical"
+  }
+ ]
+}

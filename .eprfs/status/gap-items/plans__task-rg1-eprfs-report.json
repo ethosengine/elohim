@@ -1,0 +1,75 @@
+{
+ "doc": "genesis/docs/superpowers/plans/task-rg1-eprfs-report.md",
+ "slug": "plans__task-rg1-eprfs-report",
+ "method": "agent-decomposition",
+ "class": "substrate",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-11-21 (stasis round 2). A re-genesis-1 (2026-11-05 sprint) task REPORT; T3 (gap regenesis-1#T3), landed a3315d6da on dev (L2).",
+ "count": 8,
+ "items": [
+  {
+   "text": "What landed: eprfs carries the amended R1 byte profile",
+   "line": 23,
+   "state": "CLAIMED",
+   "id": "plans__task-rg1-eprfs-report#1",
+   "cites": "genesis/docs/superpowers/plans/task-rg1-eprfs-report.md#L23",
+   "class": "substrate"
+  },
+  {
+   "text": "Interfaces block for downstream tracks",
+   "line": 63,
+   "state": "CLAIMED",
+   "id": "plans__task-rg1-eprfs-report#2",
+   "cites": "genesis/docs/superpowers/plans/task-rg1-eprfs-report.md#L63",
+   "class": "substrate"
+  },
+  {
+   "text": "just gate eprfs green with RS-GOV-04 PASS (touched eprfs crates debt 0 -> 0)",
+   "line": 139,
+   "state": "CLAIMED",
+   "id": "plans__task-rg1-eprfs-report#3",
+   "cites": "genesis/docs/superpowers/plans/task-rg1-eprfs-report.md#L139",
+   "class": "substrate"
+  },
+  {
+   "text": "Habit addresses-are-declared-profiles declared red with checks:",
+   "line": 169,
+   "state": "CLAIMED",
+   "id": "plans__task-rg1-eprfs-report#4",
+   "cites": "genesis/docs/superpowers/plans/task-rg1-eprfs-report.md#L169",
+   "class": "substrate"
+  },
+  {
+   "text": "compute_raw still mints non-citation bytes in ~140 call sites (tree file blobs, memory/flow, eprfs-serve testing, device-runtime source closures); moving them changes pinned epoch-0 vectors",
+   "line": 174,
+   "state": "OPEN",
+   "id": "plans__task-rg1-eprfs-report#5",
+   "cites": "genesis/docs/superpowers/plans/task-rg1-eprfs-report.md#L174",
+   "class": "substrate"
+  },
+  {
+   "text": "Device bin-store custody minted before the change is no longer admissible; a device on the new epr must re-ingest its release (no dual-read, C9)",
+   "line": 178,
+   "state": "OPEN",
+   "id": "plans__task-rg1-eprfs-report#6",
+   "cites": "genesis/docs/superpowers/plans/task-rg1-eprfs-report.md#L178",
+   "class": "substrate"
+  },
+  {
+   "text": "just gate eprfs-ts not run for T3",
+   "line": 148,
+   "state": "OPEN",
+   "id": "plans__task-rg1-eprfs-report#7",
+   "cites": "genesis/docs/superpowers/plans/task-rg1-eprfs-report.md#L148",
+   "class": "substrate"
+  },
+  {
+   "text": "genesis/research cite health: 3 dead and 9 stale stamp verdicts and 11 documents with no frontmatter (pre-existing)",
+   "line": 198,
+   "state": "OPEN",
+   "id": "plans__task-rg1-eprfs-report#8",
+   "cites": "genesis/docs/superpowers/plans/task-rg1-eprfs-report.md#L198",
+   "class": "substrate"
+  }
+ ]
+}

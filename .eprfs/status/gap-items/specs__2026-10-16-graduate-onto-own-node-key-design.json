@@ -1,0 +1,95 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-10-16-graduate-onto-own-node-key-design.md",
+ "slug": "specs__2026-10-16-graduate-onto-own-node-key-design",
+ "method": "agent-decomposition",
+ "class": "imagodei",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-11-21 (stasis round 2). Draft. The three-step bind ceremony exists (imagodei sign_account_bind_challenge coordinator; doorway user.rs and chaperone.rs reference /auth/node-key/bind; imagodei-portal account-bind route). The release-hosted-apps slice and the graduates-onto-own-key habit (red) remain.",
+ "count": 10,
+ "items": [
+  {
+   "text": "Step 1: doorway POST /auth/node-key/challenge with session and re-entered password",
+   "line": 49,
+   "state": "CLAIMED",
+   "id": "specs__2026-10-16-graduate-onto-own-node-key-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-10-16-graduate-onto-own-node-key-design.md#L49",
+   "class": "imagodei"
+  },
+  {
+   "text": "Step 2: human node signs the challenge (imagodei::sign_account_bind_challenge)",
+   "line": 50,
+   "state": "CLAIMED",
+   "id": "specs__2026-10-16-graduate-onto-own-node-key-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-10-16-graduate-onto-own-node-key-design.md#L50",
+   "class": "imagodei",
+   "note": "dna/imagodei/zomes/imagodei/src/sign_account_bind_challenge.rs:124"
+  },
+  {
+   "text": "Step 3: doorway POST /auth/node-key/bind verifying signature over the live unspent challenge",
+   "line": 51,
+   "state": "CLAIMED",
+   "id": "specs__2026-10-16-graduate-onto-own-node-key-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-10-16-graduate-onto-own-node-key-design.md#L51",
+   "class": "imagodei",
+   "note": "doorway db/schemas/user.rs:286"
+  },
+  {
+   "text": "Next slice: GET /auth/hosted-apps and POST /auth/hosted-apps/release (NOT_YOURS / IN_USE refusals)",
+   "line": 154,
+   "state": "OPEN",
+   "id": "specs__2026-10-16-graduate-onto-own-node-key-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-10-16-graduate-onto-own-node-key-design.md#L154",
+   "class": "imagodei",
+   "note": "no hosted-apps route found 2026-11-21"
+  },
+  {
+   "text": "No witnessed lineage linking old key to new; the doorway does not follow the identity head (rotation lands or Matthew rules it out of scope)",
+   "line": 169,
+   "state": "OPEN",
+   "id": "specs__2026-10-16-graduate-onto-own-node-key-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-10-16-graduate-onto-own-node-key-design.md#L169",
+   "class": "imagodei"
+  },
+  {
+   "text": "External-node routing when the key sits on a conductor the doorway does not pool",
+   "line": 174,
+   "state": "OPEN",
+   "id": "specs__2026-10-16-graduate-onto-own-node-key-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-10-16-graduate-onto-own-node-key-design.md#L174",
+   "class": "imagodei"
+  },
+  {
+   "text": "Older sessions stay valid until expiry: token_version incremented but no validator checks it",
+   "line": 177,
+   "state": "OPEN",
+   "id": "specs__2026-10-16-graduate-onto-own-node-key-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-10-16-graduate-onto-own-node-key-design.md#L177",
+   "class": "imagodei"
+  },
+  {
+   "text": "Challenge store has no size cap (pruned of expired entries only); password guesses limited only by the request membrane",
+   "line": 182,
+   "state": "OPEN",
+   "id": "specs__2026-10-16-graduate-onto-own-node-key-design#8",
+   "cites": "genesis/docs/superpowers/specs/2026-10-16-graduate-onto-own-node-key-design.md#L182",
+   "class": "imagodei"
+  },
+  {
+   "text": "Accounts with no declared agency_phase (pre-2026-10-15 rows) are still auto-provisioned",
+   "line": 184,
+   "state": "OPEN",
+   "id": "specs__2026-10-16-graduate-onto-own-node-key-design#9",
+   "cites": "genesis/docs/superpowers/specs/2026-10-16-graduate-onto-own-node-key-design.md#L184",
+   "class": "imagodei"
+  },
+  {
+   "text": "Graduation: graduates-onto-own-key goes green on a household run of auth/graduation/01-onto-my-own-node.feature",
+   "line": 11,
+   "state": "OPEN",
+   "id": "specs__2026-10-16-graduate-onto-own-node-key-design#10",
+   "cites": "genesis/docs/superpowers/specs/2026-10-16-graduate-onto-own-node-key-design.md#L11",
+   "class": "imagodei",
+   "note": "habit status red 2026-11-21"
+  }
+ ]
+}

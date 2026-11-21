@@ -1,0 +1,68 @@
+{
+ "doc": "genesis/docs/superpowers/plans/task-rg1-dna-report.md",
+ "slug": "plans__task-rg1-dna-report",
+ "method": "agent-decomposition",
+ "class": "protocol-canonical",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-11-21 (stasis round 2). A re-genesis-1 (2026-11-05 sprint) task REPORT; T1 (gap regenesis-1#T1), landed on dev e85eeeee5..6a31ed270. Cross-track drift (a)-(e) re-checked 2026-11-21: content_hash/blob_hash gone from the named storage/SDK files.",
+ "count": 7,
+ "items": [
+  {
+   "text": "Six DNA commits cherry-picked to dev from regenesis/dna",
+   "line": 26,
+   "state": "CLAIMED",
+   "id": "plans__task-rg1-dna-report#1",
+   "cites": "genesis/docs/superpowers/plans/task-rg1-dna-report.md#L26",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Interfaces: ShardManifest, ContentServer content_cid, blob_cid payloads",
+   "line": 40,
+   "state": "CLAIMED",
+   "id": "plans__task-rg1-dna-report#2",
+   "cites": "genesis/docs/superpowers/plans/task-rg1-dna-report.md#L40",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Beyond the brief: ContentSuccession content_cid validated; get_storage_dids_for_blob reads the registered anchor; ContentServer update arm validates",
+   "line": 125,
+   "state": "CLAIMED",
+   "id": "plans__task-rg1-dna-report#3",
+   "cites": "genesis/docs/superpowers/plans/task-rg1-dna-report.md#L125",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Cross-track drift (a)-(d): storage ShardAssignment, SDK infrastructure and lamad types, import_handler blob_cid",
+   "line": 134,
+   "state": "CLAIMED",
+   "id": "plans__task-rg1-dna-report#4",
+   "cites": "genesis/docs/superpowers/plans/task-rg1-dna-report.md#L134",
+   "class": "protocol-canonical",
+   "note": "no content_hash/blob_hash in node_registry_api.rs or import_handler.rs 2026-11-21"
+  },
+  {
+   "text": "Record the CI-built DNA hashes as the baseline (local packs were rustc 1.99 + --import-undefined, reference only)",
+   "line": 85,
+   "state": "OPEN",
+   "id": "plans__task-rg1-dna-report#5",
+   "cites": "genesis/docs/superpowers/plans/task-rg1-dna-report.md#L85",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Sweettests for ShardManifest create/get (just gate sweettest-check) not run",
+   "line": 111,
+   "state": "OPEN",
+   "id": "plans__task-rg1-dna-report#6",
+   "cites": "genesis/docs/superpowers/plans/task-rg1-dna-report.md#L111",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Anchor strings and LinkTypes indices changed (BlobToReplicas deletion shifts later indices) \u2014 confirm no persisted-link reader depends on the old indices",
+   "line": 142,
+   "state": "OPEN",
+   "id": "plans__task-rg1-dna-report#7",
+   "cites": "genesis/docs/superpowers/plans/task-rg1-dna-report.md#L142",
+   "class": "protocol-canonical"
+  }
+ ]
+}

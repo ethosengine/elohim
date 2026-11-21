@@ -1,0 +1,85 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-11-06-licence-tiers-decision.md",
+ "slug": "specs__2026-11-06-licence-tiers-decision",
+ "method": "agent-decomposition",
+ "class": "governance",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-11-21 (stasis round 2). Decided; adopted 2026-11-07 as EPR-LICENSE-1.0.md (present at repo root) and enforced by habit licence-tiers-declared (green) via genesis/orchestrator/licence-tiers-check.mjs. Working postures are stances with named reopen triggers, tracked OPEN only where an act is owed.",
+ "count": 9,
+ "items": [
+  {
+   "text": "Tier rule: primitives MPL-2.0, services AGPL-3.0, tooling/apps/default Apache-2.0, canon CC BY-SA 4.0, inherited unchanged",
+   "line": 36,
+   "state": "CLAIMED",
+   "id": "specs__2026-11-06-licence-tiers-decision#1",
+   "cites": "genesis/docs/superpowers/specs/2026-11-06-licence-tiers-decision.md#L36",
+   "class": "governance"
+  },
+  {
+   "text": "Adopted as EPR-LICENSE-1.0.md, the protocol licence and working commitment",
+   "line": 154,
+   "state": "CLAIMED",
+   "id": "specs__2026-11-06-licence-tiers-decision#2",
+   "cites": "genesis/docs/superpowers/specs/2026-11-06-licence-tiers-decision.md#L154",
+   "class": "governance",
+   "note": "EPR-LICENSE-1.0.md"
+  },
+  {
+   "text": "licence-tiers-check.mjs walks every first-party Cargo.toml and package.json; habit licence-tiers-declared green",
+   "line": 218,
+   "state": "CLAIMED",
+   "id": "specs__2026-11-06-licence-tiers-decision#3",
+   "cites": "genesis/docs/superpowers/specs/2026-11-06-licence-tiers-decision.md#L218",
+   "class": "governance"
+  },
+  {
+   "text": "Graduation: counsel confirms the three tiers and a downstream organisation pins the first published primitive or tooling crate",
+   "line": 10,
+   "state": "OPEN",
+   "id": "specs__2026-11-06-licence-tiers-decision#4",
+   "cites": "genesis/docs/superpowers/specs/2026-11-06-licence-tiers-decision.md#L10",
+   "class": "governance"
+  },
+  {
+   "text": "Tooling release: tag a 0.x of epr-cli and the eprfs crates and flip epr-cli publish = false when the next sprint touches eprfs/epr-cli (workspace-discipline backlog row 3)",
+   "line": 193,
+   "state": "OPEN",
+   "id": "specs__2026-11-06-licence-tiers-decision#5",
+   "cites": "genesis/docs/superpowers/specs/2026-11-06-licence-tiers-decision.md#L193",
+   "class": "governance"
+  },
+  {
+   "text": "Constitution absorbs the clauses the licence states first at its next amendment, reconciling governance-layers-architecture \u00a72 and \u00a74",
+   "line": 197,
+   "state": "OPEN",
+   "id": "specs__2026-11-06-licence-tiers-decision#6",
+   "cites": "genesis/docs/superpowers/specs/2026-11-06-licence-tiers-decision.md#L197",
+   "class": "governance"
+  },
+  {
+   "text": "Each of the six commons-held-by-the-network conditions gets its check when observable, the fourth (record refuses an addition under other terms) first",
+   "line": 201,
+   "state": "OPEN",
+   "id": "specs__2026-11-06-licence-tiers-decision#7",
+   "cites": "genesis/docs/superpowers/specs/2026-11-06-licence-tiers-decision.md#L201",
+   "class": "governance"
+  },
+  {
+   "text": "Before the relying organisation first pins: a dated prior-work notice pointing at the public history",
+   "line": 210,
+   "state": "OPEN",
+   "id": "specs__2026-11-06-licence-tiers-decision#8",
+   "cites": "genesis/docs/superpowers/specs/2026-11-06-licence-tiers-decision.md#L210",
+   "class": "governance"
+  },
+  {
+   "text": "Licence commits ride with the next landing on dev",
+   "line": 176,
+   "state": "CLAIMED",
+   "id": "specs__2026-11-06-licence-tiers-decision#9",
+   "cites": "genesis/docs/superpowers/specs/2026-11-06-licence-tiers-decision.md#L176",
+   "class": "governance",
+   "note": "EPR-LICENSE-1.0.md present on dev"
+  }
+ ]
+}

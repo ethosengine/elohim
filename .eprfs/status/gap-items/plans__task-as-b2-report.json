@@ -1,0 +1,44 @@
+{
+ "doc": "genesis/docs/superpowers/plans/task-as-b2-report.md",
+ "slug": "plans__task-as-b2-report",
+ "method": "agent-decomposition",
+ "class": "process-meta",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-11-21 (stasis round 2). An artifact-store sprint (2026-11-07) task REPORT, status landed; landed 3b266e41d. Seeder retries a deferred 400 (verified in doorway-client.ts 2026-11-21).",
+ "count": 4,
+ "items": [
+  {
+   "text": "sendRetryingDeferredCommitmentWrite re-issues a commitment write only on HTTP 400 whose body contains \"deferred\"",
+   "line": 13,
+   "state": "CLAIMED",
+   "id": "plans__task-as-b2-report#1",
+   "cites": "genesis/docs/superpowers/plans/task-as-b2-report.md#L13",
+   "class": "process-meta",
+   "note": "genesis/seeder/src/doorway-client.ts:349"
+  },
+  {
+   "text": "Call path verified through ProjectionClient.createCommitment and CommitmentClient",
+   "line": 15,
+   "state": "CLAIMED",
+   "id": "plans__task-as-b2-report#2",
+   "cites": "genesis/docs/superpowers/plans/task-as-b2-report.md#L15",
+   "class": "process-meta"
+  },
+  {
+   "text": "doorway-client-deferred-commitment tests 3/3; seeder suite 742 passed EXIT=0",
+   "line": 17,
+   "state": "CLAIMED",
+   "id": "plans__task-as-b2-report#3",
+   "cites": "genesis/docs/superpowers/plans/task-as-b2-report.md#L17",
+   "class": "process-meta"
+  },
+  {
+   "text": "just gate genesis ran at the integration closure L2",
+   "line": 19,
+   "state": "CLAIMED",
+   "id": "plans__task-as-b2-report#4",
+   "cites": "genesis/docs/superpowers/plans/task-as-b2-report.md#L19",
+   "class": "process-meta"
+  }
+ ]
+}

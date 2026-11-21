@@ -1,0 +1,52 @@
+{
+ "doc": "genesis/docs/superpowers/plans/task-placement-c6-brief.md",
+ "slug": "plans__task-placement-c6-brief",
+ "method": "agent-decomposition",
+ "class": "architecture",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-11-21 (stasis round 2). A task BRIEF for the placement-contract plan; its report task-placement-c6-report.md returned DONE_WITH_CONCERNS, so delivered deliverables are CLAIMED and residue lives in the report's own gap items.",
+ "count": 5,
+ "items": [
+  {
+   "text": "verifyAddress in @elohim/epr as the one TypeScript verifier; raw-cid-verify.ts stays a raw-only wrapper (R-T3)",
+   "line": 19,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-c6-brief#1",
+   "cites": "genesis/docs/superpowers/plans/task-placement-c6-brief.md#L19",
+   "class": "architecture"
+  },
+  {
+   "text": "HttpTier and the placement status surface in @elohim/storage-client against eprfs-ts types",
+   "line": 19,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-c6-brief#2",
+   "cites": "genesis/docs/superpowers/plans/task-placement-c6-brief.md#L19",
+   "class": "architecture"
+  },
+  {
+   "text": "apps-sw.ts CacheTier with the R-T2 lint rule",
+   "line": 19,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-c6-brief#3",
+   "cites": "genesis/docs/superpowers/plans/task-placement-c6-brief.md#L19",
+   "class": "architecture",
+   "note": "app/elohim-app/src/apps-sw.ts carries CacheTier"
+  },
+  {
+   "text": "Keep R6a: the service worker keeps asking each ingress doorway for delivery peers",
+   "line": 19,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-c6-brief#4",
+   "cites": "genesis/docs/superpowers/plans/task-placement-c6-brief.md#L19",
+   "class": "architecture"
+  },
+  {
+   "text": "Each package's tests and lint plus the app vitest for the service worker",
+   "line": 19,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-c6-brief#5",
+   "cites": "genesis/docs/superpowers/plans/task-placement-c6-brief.md#L19",
+   "class": "architecture"
+  }
+ ]
+}

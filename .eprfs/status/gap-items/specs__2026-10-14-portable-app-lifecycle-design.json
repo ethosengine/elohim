@@ -1,0 +1,81 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-10-14-portable-app-lifecycle-design.md",
+ "slug": "specs__2026-10-14-portable-app-lifecycle-design",
+ "method": "agent-decomposition",
+ "class": "process-meta",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-11-21 (stasis round 2). Draft design; its four delivery stages are executed by plans__2026-10-14-portable-app-migration-plan (decomposed this round). Items here are the design commitments; each points at the plan item that carries it rather than duplicating the work.",
+ "count": 8,
+ "items": [
+  {
+   "text": "Foundation: shared interfaces, refusing default adapters, bounded demand leases in elohim-seam-contracts",
+   "line": 92,
+   "state": "CLAIMED",
+   "id": "specs__2026-10-14-portable-app-lifecycle-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-10-14-portable-app-lifecycle-design.md#L92",
+   "class": "process-meta",
+   "note": "see plans__2026-10-14-portable-app-migration-plan#1-#3"
+  },
+  {
+   "text": "Che access: compose device consent, browser session exchange and peer-side scoped permission independently",
+   "line": 102,
+   "state": "OPEN",
+   "id": "specs__2026-10-14-portable-app-lifecycle-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-10-14-portable-app-lifecycle-design.md#L102",
+   "class": "process-meta",
+   "note": "see plans__2026-10-14-portable-app-migration-plan#4"
+  },
+  {
+   "text": "Che access: authenticated outbound WSS service attachment to doorway HTTPS; retire the fragment-capability launcher after both paths pass",
+   "line": 103,
+   "state": "OPEN",
+   "id": "specs__2026-10-14-portable-app-lifecycle-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-10-14-portable-app-lifecycle-design.md#L103",
+   "class": "process-meta",
+   "note": "see plans__2026-10-14-portable-app-migration-plan#5-#6"
+  },
+  {
+   "text": "Rakia adoption: compatible artifacts with complete dependency set, start under Ark, versioned continuation with operation dedup; original runtime kept until handoff",
+   "line": 114,
+   "state": "OPEN",
+   "id": "specs__2026-10-14-portable-app-lifecycle-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-10-14-portable-app-lifecycle-design.md#L114",
+   "class": "process-meta",
+   "note": "see plans__2026-10-14-portable-app-migration-plan#7-#9"
+  },
+  {
+   "text": "Residency: follow/reside/carry distinct; reclaim only unpinned executable bytes; offline needs verified executables plus data",
+   "line": 121,
+   "state": "OPEN",
+   "id": "specs__2026-10-14-portable-app-lifecycle-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-10-14-portable-app-lifecycle-design.md#L121",
+   "class": "process-meta"
+  },
+  {
+   "text": "Platform integration: inventory first-party bundles from manifests; resident services outside app windows under Ark",
+   "line": 129,
+   "state": "OPEN",
+   "id": "specs__2026-10-14-portable-app-lifecycle-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-10-14-portable-app-lifecycle-design.md#L129",
+   "class": "process-meta",
+   "note": "see plans__2026-10-14-portable-app-migration-plan#10"
+  },
+  {
+   "text": "ObservationEmitter durable local append before ack, dedup, own-device reconciliation; dashboard refresh via demand leases",
+   "line": 134,
+   "state": "OPEN",
+   "id": "specs__2026-10-14-portable-app-lifecycle-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-10-14-portable-app-lifecycle-design.md#L134",
+   "class": "process-meta",
+   "note": "see plans__2026-10-14-portable-app-migration-plan#11"
+  },
+  {
+   "text": "Acceptance chain genesis/a2o/features/devflow/portable-app-lifecycle.feature passes against real authorized runtimes and cold offline clients (graduation)",
+   "line": 33,
+   "state": "OPEN",
+   "id": "specs__2026-10-14-portable-app-lifecycle-design#8",
+   "cites": "genesis/docs/superpowers/specs/2026-10-14-portable-app-lifecycle-design.md#L33",
+   "class": "process-meta"
+  }
+ ]
+}

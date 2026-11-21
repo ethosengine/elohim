@@ -1,0 +1,37 @@
+{
+ "doc": "genesis/docs/superpowers/plans/task-placement-c3-brief.md",
+ "slug": "plans__task-placement-c3-brief",
+ "method": "agent-decomposition",
+ "class": "architecture",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-11-21 (stasis round 2). A task BRIEF for the placement-contract plan; its report task-placement-c3-report.md returned DONE_WITH_CONCERNS, so delivered deliverables are CLAIMED and residue lives in the report's own gap items.",
+ "count": 3,
+ "items": [
+  {
+   "text": "ark-core src/task.rs as \u00a72.F defines it (task spec, berth offer, task kind)",
+   "line": 19,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-c3-brief#1",
+   "cites": "genesis/docs/superpowers/plans/task-placement-c3-brief.md#L19",
+   "class": "architecture",
+   "note": "elohim/ark/core/src/task.rs present"
+  },
+  {
+   "text": "Depend on eprfs-core and placement-core with boundary::no_runtime_or_io_deps and no_fs_in_pure_core (R-A1) passing",
+   "line": 19,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-c3-brief#2",
+   "cites": "genesis/docs/superpowers/plans/task-placement-c3-brief.md#L19",
+   "class": "architecture",
+   "note": "no_runtime_or_io_deps reads both cores' manifests"
+  },
+  {
+   "text": "Ordering: run after C2 and C4 exist",
+   "line": 19,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-c3-brief#3",
+   "cites": "genesis/docs/superpowers/plans/task-placement-c3-brief.md#L19",
+   "class": "architecture"
+  }
+ ]
+}

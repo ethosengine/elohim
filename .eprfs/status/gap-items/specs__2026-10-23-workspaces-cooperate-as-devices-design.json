@@ -1,0 +1,86 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-10-23-workspaces-cooperate-as-devices-design.md",
+ "slug": "specs__2026-10-23-workspaces-cooperate-as-devices-design",
+ "method": "agent-decomposition",
+ "class": "process-meta",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-11-21 (stasis round 2). Draft at authoring; implemented since: eprfs-peer serves ALPN /elohim/eprfs-tier/1.0.0 and the steward-channel gossip topic, berth confirm wait in epr-cli peer.rs, devices-share-one-berth.feature present, habit devices-share-one-berth green (T8 run 2026-10-26). ledgers-fold-once stays red.",
+ "count": 9,
+ "items": [
+  {
+   "text": "3.1 admission: a device peer endpoint is a roster row",
+   "line": 76,
+   "state": "CLAIMED",
+   "id": "specs__2026-10-23-workspaces-cooperate-as-devices-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-10-23-workspaces-cooperate-as-devices-design.md#L76",
+   "class": "process-meta"
+  },
+  {
+   "text": "3.2 device peer: ALPN /elohim/eprfs-tier/1.0.0 TierEndpoint and the steward-channel gossip topic",
+   "line": 100,
+   "state": "CLAIMED",
+   "id": "specs__2026-10-23-workspaces-cooperate-as-devices-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-10-23-workspaces-cooperate-as-devices-design.md#L100",
+   "class": "process-meta",
+   "note": "eprfs-peer/src/tier.rs, announce.rs"
+  },
+  {
+   "text": "3.3 channel root and the fold",
+   "line": 125,
+   "state": "CLAIMED",
+   "id": "specs__2026-10-23-workspaces-cooperate-as-devices-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-10-23-workspaces-cooperate-as-devices-design.md#L125",
+   "class": "process-meta"
+  },
+  {
+   "text": "3.4 steward-scoped berth resources: pending / confirming (confirm_wait_s) / settled",
+   "line": 158,
+   "state": "CLAIMED",
+   "id": "specs__2026-10-23-workspaces-cooperate-as-devices-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-10-23-workspaces-cooperate-as-devices-design.md#L158",
+   "class": "process-meta",
+   "note": "epr-cli/src/peer.rs"
+  },
+  {
+   "text": "3.5 integration over the channel",
+   "line": 202,
+   "state": "CLAIMED",
+   "id": "specs__2026-10-23-workspaces-cooperate-as-devices-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-10-23-workspaces-cooperate-as-devices-design.md#L202",
+   "class": "process-meta"
+  },
+  {
+   "text": "Habit devices-share-one-berth declared and green with a2o devices-share-one-berth.feature",
+   "line": 264,
+   "state": "CLAIMED",
+   "id": "specs__2026-10-23-workspaces-cooperate-as-devices-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-10-23-workspaces-cooperate-as-devices-design.md#L264",
+   "class": "process-meta"
+  },
+  {
+   "text": "Graduation: same-second claims on two workspaces, exactly one holds, the silent device reads unconfirmed",
+   "line": 12,
+   "state": "CLAIMED",
+   "id": "specs__2026-10-23-workspaces-cooperate-as-devices-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-10-23-workspaces-cooperate-as-devices-design.md#L12",
+   "class": "process-meta",
+   "note": "T8 GREEN 2026-10-26 run t8-20261025-03 (memory record)"
+  },
+  {
+   "text": "ledgers-fold-once stays red until the harvesters fold too",
+   "line": 277,
+   "state": "OPEN",
+   "id": "specs__2026-10-23-workspaces-cooperate-as-devices-design#8",
+   "cites": "genesis/docs/superpowers/specs/2026-10-23-workspaces-cooperate-as-devices-design.md#L277",
+   "class": "process-meta"
+  },
+  {
+   "text": "Second plan on this link: build outputs as eprfs trees served by the same ALPN; graduation = shem runs just mesh preflight on binaries built on ethosengine with no cargo",
+   "line": 294,
+   "state": "OPEN",
+   "id": "specs__2026-10-23-workspaces-cooperate-as-devices-design#9",
+   "cites": "genesis/docs/superpowers/specs/2026-10-23-workspaces-cooperate-as-devices-design.md#L294",
+   "class": "process-meta"
+  }
+ ]
+}

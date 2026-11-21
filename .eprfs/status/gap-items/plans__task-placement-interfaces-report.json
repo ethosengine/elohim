@@ -1,0 +1,53 @@
+{
+ "doc": "genesis/docs/superpowers/plans/task-placement-interfaces-report.md",
+ "slug": "plans__task-placement-interfaces-report",
+ "method": "agent-decomposition",
+ "class": "architecture",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-11-21 (stasis round 2). I1 INTERFACES REPORT (DONE_WITH_CONCERNS): wrote the composed interfaces spec. Its named follow-ons were dispatched as lanes C1-C6/S/E and are on disk.",
+ "count": 5,
+ "items": [
+  {
+   "text": "Interfaces spec fixes crate graph and rails (\u00a71), seams A-I with signatures, contracts and worked examples (\u00a72), reuse/retire map (\u00a73), performance (\u00a74), resolutions (\u00a75)",
+   "line": 36,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-interfaces-report#1",
+   "cites": "genesis/docs/superpowers/plans/task-placement-interfaces-report.md#L36",
+   "class": "architecture"
+  },
+  {
+   "text": "Signatures compiled by the I2 seam check and the C-lanes rather than checked only by reading",
+   "line": 67,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-interfaces-report#2",
+   "cites": "genesis/docs/superpowers/plans/task-placement-interfaces-report.md#L67",
+   "class": "architecture"
+  },
+  {
+   "text": "Operator rulings for \u00a75 items 3, 6, 8, 15",
+   "line": 69,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-interfaces-report#3",
+   "cites": "genesis/docs/superpowers/plans/task-placement-interfaces-report.md#L69",
+   "class": "architecture",
+   "note": "answered 2026-10-20 as recorded in each C-lane brief"
+  },
+  {
+   "text": "Lane E confirms slice-1 renames (Placement -> Coverage, #[non_exhaustive] AbsentReason)",
+   "line": 73,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-interfaces-report#4",
+   "cites": "genesis/docs/superpowers/plans/task-placement-interfaces-report.md#L73",
+   "class": "architecture",
+   "note": "C4 brief applied decision 12 names"
+  },
+  {
+   "text": "Named follow-ons outside the write-set built by lanes C1-C6 (placement-core, task.rs, storage adapters, compute split, probe.rs, verifyAddress, HttpTier, apps-sw)",
+   "line": 75,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-interfaces-report#5",
+   "cites": "genesis/docs/superpowers/plans/task-placement-interfaces-report.md#L75",
+   "class": "architecture"
+  }
+ ]
+}

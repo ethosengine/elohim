@@ -1,0 +1,107 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-10-04-working-version-sdk-standard-design.md",
+ "slug": "specs__2026-10-04-working-version-sdk-standard-design",
+ "method": "agent-decomposition",
+ "class": "protocol-canonical",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-11-21 (stasis round 2). Draft standard. No working-version verbs found in storage-client-ts or crates/elohim-sdk 2026-11-21. \u00a79 is the spec own list of missing nodes; each is an item.",
+ "count": 12,
+ "items": [
+  {
+   "text": "A content type declares its working version in its manifest",
+   "line": 195,
+   "state": "OPEN",
+   "id": "specs__2026-10-04-working-version-sdk-standard-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-10-04-working-version-sdk-standard-design.md#L195",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "SDK verbs open/start/edit in @elohim/storage-client, mirrored in crates/elohim-sdk",
+   "line": 224,
+   "state": "OPEN",
+   "id": "specs__2026-10-04-working-version-sdk-standard-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-10-04-working-version-sdk-standard-design.md#L224",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "widen(to): signed admission record of named people to the circle",
+   "line": 227,
+   "state": "OPEN",
+   "id": "specs__2026-10-04-working-version-sdk-standard-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-10-04-working-version-sdk-standard-design.md#L227",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "fix() / republish(): freeze, address and sign by the caller path",
+   "line": 228,
+   "state": "OPEN",
+   "id": "specs__2026-10-04-working-version-sdk-standard-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-10-04-working-version-sdk-standard-design.md#L228",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "state(): per other copy caught up / behind / unknown and the republish outcome",
+   "line": 230,
+   "state": "OPEN",
+   "id": "specs__2026-10-04-working-version-sdk-standard-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-10-04-working-version-sdk-standard-design.md#L230",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Sync routes ask who is calling and what reach admits them; reach check called on every sync path (p2p/reach_authorization.rs)",
+   "line": 310,
+   "state": "OPEN",
+   "id": "specs__2026-10-04-working-version-sdk-standard-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-10-04-working-version-sdk-standard-design.md#L310",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "A document held for its author alone is excluded from listing, serving and sync (p2p/mod.rs, sync/doc_store.rs)",
+   "line": 311,
+   "state": "OPEN",
+   "id": "specs__2026-10-04-working-version-sdk-standard-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-10-04-working-version-sdk-standard-design.md#L311",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Per-document, per-copy sync state (api/dataplane.ts, sync.ts)",
+   "line": 312,
+   "state": "OPEN",
+   "id": "specs__2026-10-04-working-version-sdk-standard-design#8",
+   "cites": "genesis/docs/superpowers/specs/2026-10-04-working-version-sdk-standard-design.md#L312",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Changes sealed to a circle (blind custody spec 2026-08-23) and cell-qualified document ids (spec 2026-09-08)",
+   "line": 315,
+   "state": "OPEN",
+   "id": "specs__2026-10-04-working-version-sdk-standard-design#9",
+   "cites": "genesis/docs/superpowers/specs/2026-10-04-working-version-sdk-standard-design.md#L315",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Browser keeps documents across a reload (content-doc-sync.service.ts) so hosted people get working versions",
+   "line": 317,
+   "state": "OPEN",
+   "id": "specs__2026-10-04-working-version-sdk-standard-design#10",
+   "cites": "genesis/docs/superpowers/specs/2026-10-04-working-version-sdk-standard-design.md#L317",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Schema version carried on a change and a reader translation mechanism (\u00a78 requirement)",
+   "line": 318,
+   "state": "OPEN",
+   "id": "specs__2026-10-04-working-version-sdk-standard-design#11",
+   "cites": "genesis/docs/superpowers/specs/2026-10-04-working-version-sdk-standard-design.md#L318",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Graduation: one content type declares a working version, \u00a75 verbs exist, and the shared-sheet offline-edit scenario passes on the household mesh",
+   "line": 10,
+   "state": "OPEN",
+   "id": "specs__2026-10-04-working-version-sdk-standard-design#12",
+   "cites": "genesis/docs/superpowers/specs/2026-10-04-working-version-sdk-standard-design.md#L10",
+   "class": "protocol-canonical"
+  }
+ ]
+}

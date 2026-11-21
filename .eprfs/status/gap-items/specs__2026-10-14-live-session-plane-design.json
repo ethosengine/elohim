@@ -1,0 +1,107 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-10-14-live-session-plane-design.md",
+ "slug": "specs__2026-10-14-live-session-plane-design",
+ "method": "agent-decomposition",
+ "class": "protocol-canonical",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-11-21 (stasis round 2). Draft. \u00a710 is the spec own missing-node list; none is built per its text and no session host exists in elohim-hub (not re-verified per row). The household slice-1 story live-session-own-devices.feature exists (stories T4 report). No measurement in \u00a711 has been taken.",
+ "count": 12,
+ "items": [
+  {
+   "text": "Signed circle admission record (blocks building this design; shared with the working-version standard \u00a79)",
+   "line": 439,
+   "state": "OPEN",
+   "id": "specs__2026-10-14-live-session-plane-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-10-14-live-session-plane-design.md#L439",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "A session host (elohim/elohim-hub holds local projections only)",
+   "line": 441,
+   "state": "OPEN",
+   "id": "specs__2026-10-14-live-session-plane-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-10-14-live-session-plane-design.md#L441",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "A session object in storage-client-ts and crates/elohim-sdk",
+   "line": 442,
+   "state": "OPEN",
+   "id": "specs__2026-10-14-live-session-plane-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-10-14-live-session-plane-design.md#L442",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "passing declarable in the app-manifest schema",
+   "line": 443,
+   "state": "OPEN",
+   "id": "specs__2026-10-14-live-session-plane-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-10-14-live-session-plane-design.md#L443",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "A peer posture that offers the host role, written on change never on a timer",
+   "line": 444,
+   "state": "OPEN",
+   "id": "specs__2026-10-14-live-session-plane-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-10-14-live-session-plane-design.md#L444",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "live-session as a compute grant scope (api/compute_grants.rs)",
+   "line": 445,
+   "state": "OPEN",
+   "id": "specs__2026-10-14-live-session-plane-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-10-14-live-session-plane-design.md#L445",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Settled thin-client wire format and a chosen frame encoding",
+   "line": 447,
+   "state": "OPEN",
+   "id": "specs__2026-10-14-live-session-plane-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-10-14-live-session-plane-design.md#L447",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Browser-to-browser direct connection (two hosted people always go through a doorway)",
+   "line": 449,
+   "state": "OPEN",
+   "id": "specs__2026-10-14-live-session-plane-design#8",
+   "cites": "genesis/docs/superpowers/specs/2026-10-14-live-session-plane-design.md#L449",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Measurement 1 Rest: host posture with no session adds zero calls/timers on household-at-rest",
+   "line": 456,
+   "state": "OPEN",
+   "id": "specs__2026-10-14-live-session-plane-design#9",
+   "cites": "genesis/docs/superpowers/specs/2026-10-14-live-session-plane-design.md#L456",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Measurements 2-7: delay, one host lost, both hosts lost, doubling, signing cost, split view",
+   "line": 459,
+   "state": "OPEN",
+   "id": "specs__2026-10-14-live-session-plane-design#10",
+   "cites": "genesis/docs/superpowers/specs/2026-10-14-live-session-plane-design.md#L459",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Story: a local-first-shared-sheet scenario where two people see each other and one host is lost, with household-at-rest still passing",
+   "line": 483,
+   "state": "OPEN",
+   "id": "specs__2026-10-14-live-session-plane-design#11",
+   "cites": "genesis/docs/superpowers/specs/2026-10-14-live-session-plane-design.md#L483",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Graduation: presence/cursor across separately enrolled devices on the household mesh survive host loss",
+   "line": 10,
+   "state": "OPEN",
+   "id": "specs__2026-10-14-live-session-plane-design#12",
+   "cites": "genesis/docs/superpowers/specs/2026-10-14-live-session-plane-design.md#L10",
+   "class": "protocol-canonical"
+  }
+ ]
+}

@@ -1,0 +1,67 @@
+{
+ "doc": "genesis/docs/superpowers/plans/task-as-f2-report.md",
+ "slug": "plans__task-as-f2-report",
+ "method": "agent-decomposition",
+ "class": "substrate",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-11-21 (stasis round 2). An artifact-store sprint (2026-11-07) task REPORT, status landed; landed 79acec4eb after astra BLOCK + re-review and orchestrator ruling; named residuals carried OPEN.",
+ "count": 7,
+ "items": [
+  {
+   "text": "eprfs-peer fetch.rs fetch_artifact(endpoint, store, key, output, holders, budget) \u2014 sibling fetch consumer F2b",
+   "line": 35,
+   "state": "CLAIMED",
+   "id": "plans__task-as-f2-report#1",
+   "cites": "genesis/docs/superpowers/plans/task-as-f2-report.md#L35",
+   "class": "substrate"
+  },
+  {
+   "text": "Tests incl. interrupted fetch resumes only missing chunks; pure-iroh mode reports a typed transport gap",
+   "line": 111,
+   "state": "CLAIMED",
+   "id": "plans__task-as-f2-report#2",
+   "cites": "genesis/docs/superpowers/plans/task-as-f2-report.md#L111",
+   "class": "substrate"
+  },
+  {
+   "text": "F-E2-1 recorded why a record ext need not change the manifest CID through the fetch",
+   "line": 163,
+   "state": "CLAIMED",
+   "id": "plans__task-as-f2-report#3",
+   "cites": "genesis/docs/superpowers/plans/task-as-f2-report.md#L163",
+   "class": "substrate"
+  },
+  {
+   "text": "F-E2-2 peer-level held-manifest unavailable Use test added",
+   "line": 171,
+   "state": "CLAIMED",
+   "id": "plans__task-as-f2-report#4",
+   "cites": "genesis/docs/superpowers/plans/task-as-f2-report.md#L171",
+   "class": "substrate"
+  },
+  {
+   "text": "Residuals: build-time TOCTOU, node_modules excluded from the ignored-file refusal, same-account staging swap between inode check and rename",
+   "line": 7,
+   "state": "OPEN",
+   "id": "plans__task-as-f2-report#5",
+   "cites": "genesis/docs/superpowers/plans/task-as-f2-report.md#L7",
+   "class": "substrate"
+  },
+  {
+   "text": "Key input is the interim KeyInput::Raw(git-tree closure CID), not KeyInput::Projected: no producer of the HEAD tree as an eprfs Tree v1 closure exists",
+   "line": 7,
+   "state": "OPEN",
+   "id": "plans__task-as-f2-report#6",
+   "cites": "genesis/docs/superpowers/plans/task-as-f2-report.md#L7",
+   "class": "substrate"
+  },
+  {
+   "text": "F2r: no real cargo build has run under the env -i allowlist; the 454 MB receipt and two-device relay throughput floor not run",
+   "line": 448,
+   "state": "OPEN",
+   "id": "plans__task-as-f2-report#7",
+   "cites": "genesis/docs/superpowers/plans/task-as-f2-report.md#L448",
+   "class": "substrate"
+  }
+ ]
+}

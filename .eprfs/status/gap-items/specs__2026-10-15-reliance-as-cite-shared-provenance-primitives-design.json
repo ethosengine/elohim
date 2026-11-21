@@ -1,0 +1,104 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-10-15-reliance-as-cite-shared-provenance-primitives-design.md",
+ "slug": "specs__2026-10-15-reliance-as-cite-shared-provenance-primitives-design",
+ "method": "agent-decomposition",
+ "class": "governance",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-11-21 (stasis round 2). Draft. On disk 2026-11-21: COVENANT.md at root, cite in rea-action enum, bridges/cargo crate with tests and gate manifest, external-artifact manifest schema test. No cites-own-dependencies habit atom exists, so the graduation habit is not yet born.",
+ "count": 11,
+ "items": [
+  {
+   "text": "Sequence 2: COVENANT.md at the repository root with Today/Promised terms",
+   "line": 428,
+   "state": "CLAIMED",
+   "id": "specs__2026-10-15-reliance-as-cite-shared-provenance-primitives-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-10-15-reliance-as-cite-shared-provenance-primitives-design.md#L428",
+   "class": "governance",
+   "note": "COVENANT.md"
+  },
+  {
+   "text": "Sequence 3: shared primitives \u2014 cite action enum (node 3), external CID identity (node 2), external-artifact manifest schema (node 4)",
+   "line": 432,
+   "state": "CLAIMED",
+   "id": "specs__2026-10-15-reliance-as-cite-shared-provenance-primitives-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-10-15-reliance-as-cite-shared-provenance-primitives-design.md#L432",
+   "class": "governance",
+   "note": "rea-action.schema.json lists cite; test-external-artifact-manifest-schema.mjs"
+  },
+  {
+   "text": "Sequence 4: bridges/cargo",
+   "line": 435,
+   "state": "CLAIMED",
+   "id": "specs__2026-10-15-reliance-as-cite-shared-provenance-primitives-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-10-15-reliance-as-cite-shared-provenance-primitives-design.md#L435",
+   "class": "governance",
+   "note": "bridges/cargo with src, tests, build-manifest.json"
+  },
+  {
+   "text": "Sequence 1: blind-reader pass and move backlog dependency-graph-cited-contributor-economy to designed",
+   "line": 426,
+   "state": "OPEN",
+   "id": "specs__2026-10-15-reliance-as-cite-shared-provenance-primitives-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-10-15-reliance-as-cite-shared-provenance-primitives-design.md#L426",
+   "class": "governance"
+  },
+  {
+   "text": "Sequence 5: node 5 derivation declarations; seed presences with standing relied-on in presences.schema.json",
+   "line": 437,
+   "state": "OPEN",
+   "id": "specs__2026-10-15-reliance-as-cite-shared-provenance-primitives-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-10-15-reliance-as-cite-shared-provenance-primitives-design.md#L437",
+   "class": "governance"
+  },
+  {
+   "text": "Sequence 6: habit cites-own-dependencies (born unwired) and a gate project running the bridge in verify mode, RELIANCE=strict opt-in",
+   "line": 439,
+   "state": "OPEN",
+   "id": "specs__2026-10-15-reliance-as-cite-shared-provenance-primitives-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-10-15-reliance-as-cite-shared-provenance-primitives-design.md#L439",
+   "class": "governance",
+   "note": "no habit atom found 2026-11-21"
+  },
+  {
+   "text": "Sequence 7: node 6 Path-2 summary per lockfile in the epr flow store, superseded each release",
+   "line": 443,
+   "state": "OPEN",
+   "id": "specs__2026-10-15-reliance-as-cite-shared-provenance-primitives-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-10-15-reliance-as-cite-shared-provenance-primitives-design.md#L443",
+   "class": "governance"
+  },
+  {
+   "text": "Sequence 8: commons-pool:dependency-index on the pool spec with the charter declarations and node 7",
+   "line": 445,
+   "state": "OPEN",
+   "id": "specs__2026-10-15-reliance-as-cite-shared-provenance-primitives-design#8",
+   "cites": "genesis/docs/superpowers/specs/2026-10-15-reliance-as-cite-shared-provenance-primitives-design.md#L445",
+   "class": "governance"
+  },
+  {
+   "text": "Sequence 9: npm through a bridges/pnpm crate",
+   "line": 448,
+   "state": "OPEN",
+   "id": "specs__2026-10-15-reliance-as-cite-shared-provenance-primitives-design#9",
+   "cites": "genesis/docs/superpowers/specs/2026-10-15-reliance-as-cite-shared-provenance-primitives-design.md#L448",
+   "class": "governance",
+   "note": "no bridges/pnpm 2026-11-21"
+  },
+  {
+   "text": "Operator questions 1, 2, 5-9: where the reader lives, settlement and bridges, presence promotion, pool treasury, held-presence steward, backlog rows 32-38, four drifting relationship vocabularies",
+   "line": 480,
+   "state": "OPEN",
+   "id": "specs__2026-10-15-reliance-as-cite-shared-provenance-primitives-design#10",
+   "cites": "genesis/docs/superpowers/specs/2026-10-15-reliance-as-cite-shared-provenance-primitives-design.md#L480",
+   "class": "governance"
+  },
+  {
+   "text": "Graduation: cites-own-dependencies turns green on the \u00a78 verification with the gate run cited in its DELTA",
+   "line": 11,
+   "state": "OPEN",
+   "id": "specs__2026-10-15-reliance-as-cite-shared-provenance-primitives-design#11",
+   "cites": "genesis/docs/superpowers/specs/2026-10-15-reliance-as-cite-shared-provenance-primitives-design.md#L11",
+   "class": "governance"
+  }
+ ]
+}

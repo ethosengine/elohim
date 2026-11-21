@@ -1,0 +1,68 @@
+{
+ "doc": "genesis/docs/superpowers/plans/task-placement-integration-report.md",
+ "slug": "plans__task-placement-integration-report",
+ "method": "agent-decomposition",
+ "class": "architecture",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-11-21 (stasis round 2). INTEGRATION REPORT (DONE_WITH_CONCERNS, 2026-10-21): receipts under genesis/local-dev/placement-codex-handoff/; landing authorized by /shift. Runtime graduation not claimed.",
+ "count": 7,
+ "items": [
+  {
+   "text": "Serial native integration gates with declared toolchain, pool, limits and RUSTFLAGS; receipts retained",
+   "line": 19,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-integration-report#1",
+   "cites": "genesis/docs/superpowers/plans/task-placement-integration-report.md#L19",
+   "class": "architecture"
+  },
+  {
+   "text": "Integration corrections: probe readings expose getters over private fields; storage metadata failures stay unreachable, not false absence; app gate typechecks the service worker",
+   "line": 48,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-integration-report#2",
+   "cites": "genesis/docs/superpowers/plans/task-placement-integration-report.md#L48",
+   "class": "architecture"
+  },
+  {
+   "text": "H1 ratchet: one evidence DELTA appended to materialize-what-is-read preserving red/inactive; habits-project --check EXIT=0",
+   "line": 103,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-integration-report#3",
+   "cites": "genesis/docs/superpowers/plans/task-placement-integration-report.md#L103",
+   "class": "architecture"
+  },
+  {
+   "text": "Intermittent eprfs failure migration_provider_is_the_session_claim_when_one_exists \u2014 cause unestablished",
+   "line": 70,
+   "state": "OPEN",
+   "id": "plans__task-placement-integration-report#4",
+   "cites": "genesis/docs/superpowers/plans/task-placement-integration-report.md#L70",
+   "class": "architecture"
+  },
+  {
+   "text": "Runtime adoption, first-acceptance wiring, remote HTTP batch/signer integration, live service-worker root/head discovery, resident views, persistence, broadcasts and live probes",
+   "line": 76,
+   "state": "OPEN",
+   "id": "plans__task-placement-integration-report#5",
+   "cites": "genesis/docs/superpowers/plans/task-placement-integration-report.md#L76",
+   "class": "architecture"
+  },
+  {
+   "text": "Membership-by-inclusion does not enforce an independent per-object reach restriction; policy needed before remote serving",
+   "line": 78,
+   "state": "OPEN",
+   "id": "plans__task-placement-integration-report#6",
+   "cites": "genesis/docs/superpowers/plans/task-placement-integration-report.md#L78",
+   "class": "architecture"
+  },
+  {
+   "text": "Release/licensing decision for the unpublished AGPL dependency and Apache-licensed eprfs release boundary",
+   "line": 80,
+   "state": "OPEN",
+   "id": "plans__task-placement-integration-report#7",
+   "cites": "genesis/docs/superpowers/plans/task-placement-integration-report.md#L80",
+   "class": "architecture",
+   "note": "see specs/2026-11-06-licence-tiers-decision.md (Decided) \u2014 verify it covers this boundary, then CLAIM"
+  }
+ ]
+}

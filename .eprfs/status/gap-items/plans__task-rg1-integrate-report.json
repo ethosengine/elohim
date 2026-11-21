@@ -1,0 +1,69 @@
+{
+ "doc": "genesis/docs/superpowers/plans/task-rg1-integrate-report.md",
+ "slug": "plans__task-rg1-integrate-report",
+ "method": "agent-decomposition",
+ "class": "substrate",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-11-21 (stasis round 2). A re-genesis-1 (2026-11-05 sprint) task REPORT; L2 integration, landed on dev 9f9fef877..e85eeeee5 and e85eeeee5..6a31ed270. Stale-gospel list re-checked 2026-11-21: storage/doorway/app CLAUDE.md, rust-architect and lamad .epr-meta are current; the p2p-design-gate skill still names bafkrei for blobs.",
+ "count": 7,
+ "items": [
+  {
+   "text": "Stack on regenesis/kernel with conflicts resolved and one fix-up commit per seam",
+   "line": 21,
+   "state": "CLAIMED",
+   "id": "plans__task-rg1-integrate-report#1",
+   "cites": "genesis/docs/superpowers/plans/task-rg1-integrate-report.md#L21",
+   "class": "substrate"
+  },
+  {
+   "text": "Compile/test ladder across the integrated tree",
+   "line": 70,
+   "state": "CLAIMED",
+   "id": "plans__task-rg1-integrate-report#2",
+   "cites": "genesis/docs/superpowers/plans/task-rg1-integrate-report.md#L70",
+   "class": "substrate"
+  },
+  {
+   "text": "Stale gospel in storage/doorway/app CLAUDE.md, rust-architect.md and lamad .epr-meta updated to byte CIDs",
+   "line": 108,
+   "state": "CLAIMED",
+   "id": "plans__task-rg1-integrate-report#3",
+   "cites": "genesis/docs/superpowers/plans/task-rg1-integrate-report.md#L108",
+   "class": "substrate"
+  },
+  {
+   "text": ".claude/skills/p2p-design-gate/SKILL.md (and projections) still says bafkrei (raw) for blobs; blobs are bafkr4i (BLAKE3) since re-genesis 1",
+   "line": 116,
+   "state": "OPEN",
+   "id": "plans__task-rg1-integrate-report#4",
+   "cites": "genesis/docs/superpowers/plans/task-rg1-integrate-report.md#L116",
+   "class": "substrate",
+   "note": "SKILL.md:323 2026-11-21"
+  },
+  {
+   "text": "death-witness.steps.ts design ruling",
+   "line": 134,
+   "state": "CLAIMED",
+   "id": "plans__task-rg1-integrate-report#5",
+   "cites": "genesis/docs/superpowers/plans/task-rg1-integrate-report.md#L134",
+   "class": "substrate",
+   "note": "T9 ruling 2: reads witness blob_cid"
+  },
+  {
+   "text": "rakia gitlink f9787c9e58 local-only at L2 \u2014 confirm pin attestation green on the current pin",
+   "line": 136,
+   "state": "OPEN",
+   "id": "plans__task-rg1-integrate-report#6",
+   "cites": "genesis/docs/superpowers/plans/task-rg1-integrate-report.md#L136",
+   "class": "substrate"
+  },
+  {
+   "text": "Seeder isByteCid and household-chaos/delivery step admission are regex/prefix checks, not the kernel full decode (plan \u00a72.5.2)",
+   "line": 138,
+   "state": "OPEN",
+   "id": "plans__task-rg1-integrate-report#7",
+   "cites": "genesis/docs/superpowers/plans/task-rg1-integrate-report.md#L138",
+   "class": "substrate"
+  }
+ ]
+}

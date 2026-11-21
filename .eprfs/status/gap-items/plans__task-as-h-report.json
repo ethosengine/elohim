@@ -1,0 +1,107 @@
+{
+ "doc": "genesis/docs/superpowers/plans/task-as-h-report.md",
+ "slug": "plans__task-as-h-report",
+ "method": "agent-decomposition",
+ "class": "substrate",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-11-21 (stasis round 2). An artifact-store sprint (2026-11-07) task REPORT, status landed; landed 1b76c2327 (L3) after red-team third read; household chaos 3/3, blob-durability lane, epr-app-deliverability 7/7. Follow-ups filed, not done, carried OPEN.",
+ "count": 12,
+ "items": [
+  {
+   "text": "R1 salvage ads signed, bound, fresh and replay-ordered (SignedSalvageAd)",
+   "line": 32,
+   "state": "CLAIMED",
+   "id": "plans__task-as-h-report#1",
+   "cites": "genesis/docs/superpowers/plans/task-as-h-report.md#L32",
+   "class": "substrate"
+  },
+  {
+   "text": "Pass 2 red-team BLOCK fixes: every binding and floor read through p2p::transport_authority (beb0888b)",
+   "line": 84,
+   "state": "CLAIMED",
+   "id": "plans__task-as-h-report#2",
+   "cites": "genesis/docs/superpowers/plans/task-as-h-report.md#L84",
+   "class": "substrate"
+  },
+  {
+   "text": "Pass 4 DHT-confirmed authority (82d545cc) and pass 5 confirmer/mint unstarvable (f99fb0f3)",
+   "line": 118,
+   "state": "CLAIMED",
+   "id": "plans__task-as-h-report#3",
+   "cites": "genesis/docs/superpowers/plans/task-as-h-report.md#L118",
+   "class": "substrate"
+  },
+  {
+   "text": "Worker B R8 BlobStore::list_units()/unit_names(), R9 SelfHeldOutcome::Unchanged",
+   "line": 225,
+   "state": "CLAIMED",
+   "id": "plans__task-as-h-report#4",
+   "cites": "genesis/docs/superpowers/plans/task-as-h-report.md#L225",
+   "class": "substrate"
+  },
+  {
+   "text": "Filename-set custody outside R7: services::custody_rotation authors custody from BlobStoreSnapshot",
+   "line": 13,
+   "state": "OPEN",
+   "id": "plans__task-as-h-report#5",
+   "cites": "genesis/docs/superpowers/plans/task-as-h-report.md#L13",
+   "class": "substrate"
+  },
+  {
+   "text": "flush_held_pages records a reorder-window page as end-to-end (no arrival plane); lows 8/9 filed",
+   "line": 14,
+   "state": "OPEN",
+   "id": "plans__task-as-h-report#6",
+   "cites": "genesis/docs/superpowers/plans/task-as-h-report.md#L14",
+   "class": "substrate"
+  },
+  {
+   "text": "Custody-adjacent readers ignore the witness: reconcile_pass placement-gap last_seen, distribution_view replica_count, peer_topology_view, services::resilience",
+   "line": 15,
+   "state": "OPEN",
+   "id": "plans__task-as-h-report#7",
+   "cites": "genesis/docs/superpowers/plans/task-as-h-report.md#L15",
+   "class": "substrate"
+  },
+  {
+   "text": "#9 multi-device salvage seq: devices of one agent compete on one per-agent seq row; per-device rows need the transport id in the key",
+   "line": 137,
+   "state": "OPEN",
+   "id": "plans__task-as-h-report#8",
+   "cites": "genesis/docs/superpowers/plans/task-as-h-report.md#L137",
+   "class": "substrate"
+  },
+  {
+   "text": "M1 first writer wins on the unsigned anchor; M2 confirmations never re-checked, no max validity, revocations not joined",
+   "line": 200,
+   "state": "OPEN",
+   "id": "plans__task-as-h-report#9",
+   "cites": "genesis/docs/superpowers/plans/task-as-h-report.md#L200",
+   "class": "substrate"
+  },
+  {
+   "text": "M4 servable index keeps a phantom entry after delete",
+   "line": 202,
+   "state": "OPEN",
+   "id": "plans__task-as-h-report#10",
+   "cites": "genesis/docs/superpowers/plans/task-as-h-report.md#L202",
+   "class": "substrate"
+  },
+  {
+   "text": "L2 test_util compiled into production; L3 authority lookup O(rows) per PeerId; L4 recon responder cap is global",
+   "line": 203,
+   "state": "OPEN",
+   "id": "plans__task-as-h-report#11",
+   "cites": "genesis/docs/superpowers/plans/task-as-h-report.md#L203",
+   "class": "substrate"
+  },
+  {
+   "text": "Binding mint is once-per-process: a process outliving its binding's 30-day window does not re-mint until restart",
+   "line": 206,
+   "state": "OPEN",
+   "id": "plans__task-as-h-report#12",
+   "cites": "genesis/docs/superpowers/plans/task-as-h-report.md#L206",
+   "class": "substrate"
+  }
+ ]
+}

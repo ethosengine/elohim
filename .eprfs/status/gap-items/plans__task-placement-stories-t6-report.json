@@ -1,0 +1,51 @@
+{
+ "doc": "genesis/docs/superpowers/plans/task-placement-stories-t6-report.md",
+ "slug": "plans__task-placement-stories-t6-report",
+ "method": "agent-decomposition",
+ "class": "architecture",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-11-21 (stasis round 2). T6 STORIES REPORT (DONE_WITH_CONCERNS): four files extended/new under the blind-reader loop.",
+ "count": 5,
+ "items": [
+  {
+   "text": "dataplane/served-under-standing.feature extended (anonymous visitor sees commons and nothing narrower)",
+   "line": 17,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-stories-t6-report#1",
+   "cites": "genesis/docs/superpowers/plans/task-placement-stories-t6-report.md#L17",
+   "class": "architecture"
+  },
+  {
+   "text": "doorway/projection-withdrawal.feature (new)",
+   "line": 18,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-stories-t6-report#2",
+   "cites": "genesis/docs/superpowers/plans/task-placement-stories-t6-report.md#L18",
+   "class": "architecture"
+  },
+  {
+   "text": "dataplane/doorway-failover.feature extended (@requires:owned-substrate)",
+   "line": 19,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-stories-t6-report#3",
+   "cites": "genesis/docs/superpowers/plans/task-placement-stories-t6-report.md#L19",
+   "class": "architecture"
+  },
+  {
+   "text": "federation/outward-projection-optional.feature (new)",
+   "line": 20,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-stories-t6-report#4",
+   "cites": "genesis/docs/superpowers/plans/task-placement-stories-t6-report.md#L20",
+   "class": "architecture"
+  },
+  {
+   "text": "Round-6 findings left for the operator to defer (served-under-standing in older text; projection-withdrawal in own text)",
+   "line": 24,
+   "state": "OPEN",
+   "id": "plans__task-placement-stories-t6-report#5",
+   "cites": "genesis/docs/superpowers/plans/task-placement-stories-t6-report.md#L24",
+   "class": "architecture"
+  }
+ ]
+}

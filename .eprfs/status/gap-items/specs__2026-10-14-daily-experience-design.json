@@ -1,0 +1,99 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-10-14-daily-experience-design.md",
+ "slug": "specs__2026-10-14-daily-experience-design",
+ "method": "agent-decomposition",
+ "class": "design",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-11-21 (stasis round 2). Draft epic-to-proof map. The table owns the human promise; mechanics belong to the working-version standard, portable lifecycle and device-footprint specs (each decomposed separately), so items here are the per-promise missing proofs, not the mechanics.",
+ "count": 11,
+ "items": [
+  {
+   "text": "Reopen unfinished work offline: prove crash/reopen persistence in local-first-shared-sheet.feature",
+   "line": 92,
+   "state": "OPEN",
+   "id": "specs__2026-10-14-daily-experience-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-10-14-daily-experience-design.md#L92",
+   "class": "design"
+  },
+  {
+   "text": "Try through a hub, then keep locally: portable-app-lifecycle.feature browser-to-local continuation",
+   "line": 93,
+   "state": "OPEN",
+   "id": "specs__2026-10-14-daily-experience-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-10-14-daily-experience-design.md#L93",
+   "class": "design"
+  },
+  {
+   "text": "Know what is ready offline: cold reopen with complete code AND selected data before any readiness claim",
+   "line": 94,
+   "state": "OPEN",
+   "id": "specs__2026-10-14-daily-experience-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-10-14-daily-experience-design.md#L94",
+   "class": "design"
+  },
+  {
+   "text": "Continue across devices: per-copy caught-up/behind/unknown with preserved local edits",
+   "line": 95,
+   "state": "OPEN",
+   "id": "specs__2026-10-14-daily-experience-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-10-14-daily-experience-design.md#L95",
+   "class": "design"
+  },
+  {
+   "text": "Invite help without publishing: shared-sheet refuses unauthorized discovery, distinguishes merged from accepted publication",
+   "line": 96,
+   "state": "OPEN",
+   "id": "specs__2026-10-14-daily-experience-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-10-14-daily-experience-design.md#L96",
+   "class": "design"
+  },
+  {
+   "text": "Remove local installation, keep records, open through hub: the explicit human unpin journey",
+   "line": 97,
+   "state": "OPEN",
+   "id": "specs__2026-10-14-daily-experience-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-10-14-daily-experience-design.md#L97",
+   "class": "design"
+  },
+  {
+   "text": "Device quiet and foreground responsive: a measured UX budget acceptance beyond idle-is-free and runtime-performance",
+   "line": 98,
+   "state": "OPEN",
+   "id": "specs__2026-10-14-daily-experience-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-10-14-daily-experience-design.md#L98",
+   "class": "design"
+  },
+  {
+   "text": "Understand who carries the service and its cost: owner-specific support/terms view and capacity-change journey",
+   "line": 99,
+   "state": "OPEN",
+   "id": "specs__2026-10-14-daily-experience-design#8",
+   "cites": "genesis/docs/superpowers/specs/2026-10-14-daily-experience-design.md#L99",
+   "class": "design"
+  },
+  {
+   "text": "Receive help without losing voice: supported-decision, accessibility and revocation journeys",
+   "line": 100,
+   "state": "OPEN",
+   "id": "specs__2026-10-14-daily-experience-design#9",
+   "cites": "genesis/docs/superpowers/specs/2026-10-14-daily-experience-design.md#L100",
+   "class": "design"
+  },
+  {
+   "text": "First missing acceptance journey Try/Host/Leave/Continue/Release/Return/Lose-the-hub bound to producer gates and device evidence",
+   "line": 135,
+   "state": "OPEN",
+   "id": "specs__2026-10-14-daily-experience-design#10",
+   "cites": "genesis/docs/superpowers/specs/2026-10-14-daily-experience-design.md#L135",
+   "class": "design"
+  },
+  {
+   "text": "Next implementation brief binds the journey to producer gates and browser/device evidence (no mock launcher)",
+   "line": 196,
+   "state": "OPEN",
+   "id": "specs__2026-10-14-daily-experience-design#11",
+   "cites": "genesis/docs/superpowers/specs/2026-10-14-daily-experience-design.md#L196",
+   "class": "design"
+  }
+ ]
+}

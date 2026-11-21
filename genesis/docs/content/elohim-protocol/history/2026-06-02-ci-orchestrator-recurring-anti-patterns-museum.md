@@ -260,6 +260,7 @@ all`). Host-green ≠ CI-green; the gap is the environment, not your code.
 
 - **This record → canonical:** the [orchestrator README](../../../../orchestrator/README.md) (the canonical orchestrator doc — dispatch, NOT_BUILT, baseline, trigger semantics).
 - **Sibling record:** [deploy-is-not-a-graph-node](2026-06-02-deploy-is-not-a-graph-node.md) (the baseline-drift / deploy-dispatch incident that anchors patterns #1/#2).
+- **Sibling record:** [october-shift-journals-distilled](2026-11-21-october-shift-journals-distilled.md) (sixteen October 2026 shift journals: the judge-was-wrong and `pipefail`-early-exit shapes, the unprepared landing tree, and each shift's durable home).
 - **Mechanism (live memory entries):** linked per-pattern in the table above and in `memory_anchors`.
 - **Pattern #16 → live concern:** `genesis/data/timeline/backlog/ci-genesis-doorway-503-seed-phase-wedge.md` (the genesis measurement-by-restart entry, where the cure and the remaining substrate leg are tracked).
 - **Pattern #17 → live concern:** `genesis/data/timeline/backlog/ci-cid-artifact-twin-source-side-freshness-gap.md` (the CID-twin drift and the source-side pre-push rail that closes it).

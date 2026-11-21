@@ -1,0 +1,100 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-10-03-plane-separation-design.md",
+ "slug": "specs__2026-10-03-plane-separation-design",
+ "method": "agent-decomposition",
+ "class": "protocol-canonical",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-11-21 (stasis round 2). Approved rulings (2026-10-03); each ruling becomes its own plan when work starts. Items follow the spec own \u00a710 order plus the \u00a713 footprint list. Most items are NOT re-verified against the tree after re-genesis 1/2; doorway services/signing_credentials.rs suggests \u00a710.4 derived credential may have landed (verify). Zome wasm still has no size profile on lamad/imagodei 2026-11-21.",
+ "count": 11,
+ "items": [
+  {
+   "text": "Order 1: read the publish pass again on the option E roll (\u00a77)",
+   "line": 294,
+   "state": "OPEN",
+   "id": "specs__2026-10-03-plane-separation-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-10-03-plane-separation-design.md#L294",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Order 2: fork secret-keyed grant lookup (33722d5a1) pinned after independent review and a household mesh proof",
+   "line": 295,
+   "state": "OPEN",
+   "id": "specs__2026-10-03-plane-separation-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-10-03-plane-separation-design.md#L295",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Order 3: doorway single-cell mint, sent/unsent fault typing, no second key (\u00a74.2-3)",
+   "line": 297,
+   "state": "OPEN",
+   "id": "specs__2026-10-03-plane-separation-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-10-03-plane-separation-design.md#L297",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Order 4: fork idempotent grant + second-scale histogram boundaries; doorway derived credential and listed functions (\u00a73.2-4)",
+   "line": 298,
+   "state": "OPEN",
+   "id": "specs__2026-10-03-plane-separation-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-10-03-plane-separation-design.md#L298",
+   "class": "protocol-canonical",
+   "note": "doorway-service/src/services/signing_credentials.rs exists \u2014 verify, then CLAIM the doorway half"
+  },
+  {
+   "text": "Order 5: one coordinator hot-swap \u2014 bounded latest-status read, election-keyed declare guard, closed staging tier, writer tag (\u00a75.6, \u00a76.3-5)",
+   "line": 300,
+   "state": "OPEN",
+   "id": "specs__2026-10-03-plane-separation-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-10-03-plane-separation-design.md#L300",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Order 6: storage attestations out of the head plane and the two-lane trigger; substrate liveness on iroh, then consumers, then the heartbeat writer",
+   "line": 302,
+   "state": "OPEN",
+   "id": "specs__2026-10-03-plane-separation-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-10-03-plane-separation-design.md#L302",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Order 7: period-closing health records with their reader; the registration saga, reaper and conductor-reported capacity (\u00a74)",
+   "line": 304,
+   "state": "OPEN",
+   "id": "specs__2026-10-03-plane-separation-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-10-03-plane-separation-design.md#L304",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Footprint 1: build zome wasm for size (only node-registry sets a size profile; nothing runs wasm-opt)",
+   "line": 390,
+   "state": "OPEN",
+   "id": "specs__2026-10-03-plane-separation-design#8",
+   "cites": "genesis/docs/superpowers/specs/2026-10-03-plane-separation-design.md#L390",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Footprint 2: checkpoint logs down on small and idle stores (fork)",
+   "line": 395,
+   "state": "OPEN",
+   "id": "specs__2026-10-03-plane-separation-design#9",
+   "cites": "genesis/docs/superpowers/specs/2026-10-03-plane-separation-design.md#L395",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Footprint 4: framing and custody open design question (smallest holder set, what a receipt is for)",
+   "line": 398,
+   "state": "OPEN",
+   "id": "specs__2026-10-03-plane-separation-design#10",
+   "cites": "genesis/docs/superpowers/specs/2026-10-03-plane-separation-design.md#L398",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Graduation: every ruling in \u00a73-\u00a78 is shipped with its falsifier read or overturned; retire with a one-line lesson per plane",
+   "line": 10,
+   "state": "OPEN",
+   "id": "specs__2026-10-03-plane-separation-design#11",
+   "cites": "genesis/docs/superpowers/specs/2026-10-03-plane-separation-design.md#L10",
+   "class": "protocol-canonical"
+  }
+ ]
+}

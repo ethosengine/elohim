@@ -1,0 +1,76 @@
+{
+ "doc": "genesis/docs/superpowers/plans/task-placement-stories-brief.md",
+ "slug": "plans__task-placement-stories-brief",
+ "method": "agent-decomposition",
+ "class": "architecture",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-11-21 (stasis round 2). Stories BRIEF for T1-T7 (gaps #15-#21); all seven t<N> reports returned DONE_WITH_CONCERNS. Step definitions were out of scope here: every scenario was born @wip.",
+ "count": 8,
+ "items": [
+  {
+   "text": "One seat per group T1-T7 writes its \u00a716 stories and closes each file through the review loop",
+   "line": 15,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-stories-brief#1",
+   "cites": "genesis/docs/superpowers/plans/task-placement-stories-brief.md#L15",
+   "class": "architecture"
+  },
+  {
+   "text": "Every new scenario born @wip with no step definitions in this lane",
+   "line": 29,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-stories-brief#2",
+   "cites": "genesis/docs/superpowers/plans/task-placement-stories-brief.md#L29",
+   "class": "architecture"
+  },
+  {
+   "text": "Tag each feature @concern:<id> per its \u00a716 row, reusing existing concern tags and naming new ones",
+   "line": 30,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-stories-brief#3",
+   "cites": "genesis/docs/superpowers/plans/task-placement-stories-brief.md#L30",
+   "class": "architecture"
+  },
+  {
+   "text": "@requires:household-nodes where the row needs the mesh; never @requires:shem for household-testable stories",
+   "line": 32,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-stories-brief#4",
+   "cites": "genesis/docs/superpowers/plans/task-placement-stories-brief.md#L32",
+   "class": "architecture"
+  },
+  {
+   "text": "Stories of not-yet-built behavior say in the header which \u00a717 slice they are held for",
+   "line": 36,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-stories-brief#5",
+   "cites": "genesis/docs/superpowers/plans/task-placement-stories-brief.md#L36",
+   "class": "architecture"
+  },
+  {
+   "text": "Full blind-reader loop per file until a round returns no correctness or interpretability finding",
+   "line": 53,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-stories-brief#6",
+   "cites": "genesis/docs/superpowers/plans/task-placement-stories-brief.md#L53",
+   "class": "architecture"
+  },
+  {
+   "text": "cucumber-js --dry-run parse check per file",
+   "line": 58,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-stories-brief#7",
+   "cites": "genesis/docs/superpowers/plans/task-placement-stories-brief.md#L58",
+   "class": "architecture"
+  },
+  {
+   "text": "Step definitions for the placement-contract \u00a716 stories (every scenario is @wip) \u2014 the stories are not yet runnable proof",
+   "line": 29,
+   "state": "OPEN",
+   "id": "plans__task-placement-stories-brief#8",
+   "cites": "genesis/docs/superpowers/plans/task-placement-stories-brief.md#L29",
+   "class": "architecture",
+   "note": "residue the brief explicitly deferred; owned by the slice that lands each behavior"
+  }
+ ]
+}

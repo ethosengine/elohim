@@ -1,0 +1,75 @@
+{
+ "doc": "genesis/docs/superpowers/plans/task-as-e3-report.md",
+ "slug": "plans__task-as-e3-report",
+ "method": "agent-decomposition",
+ "class": "substrate",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-11-21 (stasis round 2). An artifact-store sprint (2026-11-07) task REPORT, status landed; landed 3b266e41d after astra BLOCK, re-review (H1-H4 closed, N1-N3 fixed) and eprfs gate EXIT=0.",
+ "count": 8,
+ "items": [
+  {
+   "text": "eprfs-peer gate.rs: Served{Channel,Artifact,Unknown} and ServeScope trait; StewardDevicesGate over Arc<dyn ServeScope>",
+   "line": 20,
+   "state": "CLAIMED",
+   "id": "plans__task-as-e3-report#1",
+   "cites": "genesis/docs/superpowers/plans/task-as-e3-report.md#L20",
+   "class": "substrate"
+  },
+  {
+   "text": "Refusal shapes under self_id = channel_tier_id()",
+   "line": 88,
+   "state": "CLAIMED",
+   "id": "plans__task-as-e3-report#2",
+   "cites": "genesis/docs/superpowers/plans/task-as-e3-report.md#L88",
+   "class": "substrate"
+  },
+  {
+   "text": "serve-blob Use event (provider holder did, receiver requester did, resource artifact)",
+   "line": 109,
+   "state": "CLAIMED",
+   "id": "plans__task-as-e3-report#3",
+   "cites": "genesis/docs/superpowers/plans/task-as-e3-report.md#L109",
+   "class": "substrate"
+  },
+  {
+   "text": "serve_blob tests 19/19 incl. reload-drops-a-device-mid-connection",
+   "line": 121,
+   "state": "CLAIMED",
+   "id": "plans__task-as-e3-report#4",
+   "cites": "genesis/docs/superpowers/plans/task-as-e3-report.md#L121",
+   "class": "substrate"
+  },
+  {
+   "text": "Astra BLOCK H1-H4 (stale index, folded events as local custody, M3, M4) closed; N1-N3 (event-order supersession, rebuild never blocks the tick, bounded supersession history) fixed",
+   "line": 206,
+   "state": "CLAIMED",
+   "id": "plans__task-as-e3-report#5",
+   "cites": "genesis/docs/superpowers/plans/task-as-e3-report.md#L206",
+   "class": "substrate"
+  },
+  {
+   "text": "Breaking TierRequest/TierAnswer variants for exhaustive matches downstream \u2014 confirm every consumer outside eprfs updated",
+   "line": 7,
+   "state": "OPEN",
+   "id": "plans__task-as-e3-report#6",
+   "cites": "genesis/docs/superpowers/plans/task-as-e3-report.md#L7",
+   "class": "substrate"
+  },
+  {
+   "text": "A granted artifact root passes admit_root for tree reads; the tree endpoint then answers Failed/Unanswered \u2014 design \u00a71.3 should say whether tree reads of artifact roots are refused earlier",
+   "line": 189,
+   "state": "OPEN",
+   "id": "plans__task-as-e3-report#7",
+   "cites": "genesis/docs/superpowers/plans/task-as-e3-report.md#L189",
+   "class": "substrate"
+  },
+  {
+   "text": "epr session envelope refused session-conflict inside a worktree lane; commit printed UNMEASURED attribution",
+   "line": 195,
+   "state": "OPEN",
+   "id": "plans__task-as-e3-report#8",
+   "cites": "genesis/docs/superpowers/plans/task-as-e3-report.md#L195",
+   "class": "substrate"
+  }
+ ]
+}

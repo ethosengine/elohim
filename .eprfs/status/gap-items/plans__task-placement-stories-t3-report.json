@@ -1,0 +1,76 @@
+{
+ "doc": "genesis/docs/superpowers/plans/task-placement-stories-t3-report.md",
+ "slug": "plans__task-placement-stories-t3-report",
+ "method": "agent-decomposition",
+ "class": "architecture",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-11-21 (stasis round 2). T3 STORIES REPORT (DONE_WITH_CONCERNS): six files parse; four open correctness findings (re-checked 2026-11-21: \"Lane N\" placeholder still at app-bundle-elected-delivery L2).",
+ "count": 8,
+ "items": [
+  {
+   "text": "federation/app-inherits-placement.feature and runtime-closure-shared.feature (new)",
+   "line": 19,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-stories-t3-report#1",
+   "cites": "genesis/docs/superpowers/plans/task-placement-stories-t3-report.md#L19",
+   "class": "architecture"
+  },
+  {
+   "text": "resilience/household-diversity-dataplane.feature and storage/declared-storage-policy.feature (extended)",
+   "line": 21,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-stories-t3-report#2",
+   "cites": "genesis/docs/superpowers/plans/task-placement-stories-t3-report.md#L21",
+   "class": "architecture"
+  },
+  {
+   "text": "delivery/space-scoped-channel.feature (new) and app-bundle-elected-delivery.feature (extended)",
+   "line": 23,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-stories-t3-report#3",
+   "cites": "genesis/docs/superpowers/plans/task-placement-stories-t3-report.md#L23",
+   "class": "architecture"
+  },
+  {
+   "text": "Mint habit app-inherits-placement at slice 9 (operator's); no habit names the new concern tags",
+   "line": 78,
+   "state": "OPEN",
+   "id": "plans__task-placement-stories-t3-report#4",
+   "cites": "genesis/docs/superpowers/plans/task-placement-stories-t3-report.md#L78",
+   "class": "architecture"
+  },
+  {
+   "text": "app-bundle-elected-delivery L98-107: description names nine scenarios by position, file has ten",
+   "line": 103,
+   "state": "OPEN",
+   "id": "plans__task-placement-stories-t3-report#5",
+   "cites": "genesis/docs/superpowers/plans/task-placement-stories-t3-report.md#L103",
+   "class": "architecture"
+  },
+  {
+   "text": "app-bundle-elected-delivery L2: \"Lane N / stations N1-N6\" placeholder",
+   "line": 104,
+   "state": "OPEN",
+   "id": "plans__task-placement-stories-t3-report#6",
+   "cites": "genesis/docs/superpowers/plans/task-placement-stories-t3-report.md#L104",
+   "class": "architecture",
+   "note": "still present 2026-11-21"
+  },
+  {
+   "text": "household-diversity-dataplane L120: Then asserts jessica's own photos with no Given setting them up",
+   "line": 105,
+   "state": "OPEN",
+   "id": "plans__task-placement-stories-t3-report#7",
+   "cites": "genesis/docs/superpowers/plans/task-placement-stories-t3-report.md#L105",
+   "class": "architecture"
+  },
+  {
+   "text": "household-diversity-dataplane Rule L36 claims a universal invariant proved only on the hub-addition path",
+   "line": 106,
+   "state": "OPEN",
+   "id": "plans__task-placement-stories-t3-report#8",
+   "cites": "genesis/docs/superpowers/plans/task-placement-stories-t3-report.md#L106",
+   "class": "architecture"
+  }
+ ]
+}

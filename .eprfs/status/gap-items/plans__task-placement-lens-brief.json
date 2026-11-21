@@ -1,0 +1,75 @@
+{
+ "doc": "genesis/docs/superpowers/plans/task-placement-lens-brief.md",
+ "slug": "plans__task-placement-lens-brief",
+ "method": "agent-decomposition",
+ "class": "architecture",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-11-21 (stasis round 2). P0b lens-seat BRIEF; task-placement-lens-report.md returned DONE_WITH_CONCERNS. The /tmp lens input is scratch; the binding reconciliations 1-6 are recorded here.",
+ "count": 8,
+ "items": [
+  {
+   "text": "Reconciliation 1: posture and berth offer notarized on the elohim-DNA Intent only for public/commons reach; household-local signed records otherwise",
+   "line": 28,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-lens-brief#1",
+   "cites": "genesis/docs/superpowers/plans/task-placement-lens-brief.md#L28",
+   "class": "architecture"
+  },
+  {
+   "text": "Reconciliation 2: battery/metered/not-always-on defaults off for carrying for others; own-household holding deferred, never refused",
+   "line": 32,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-lens-brief#2",
+   "cites": "genesis/docs/superpowers/plans/task-placement-lens-brief.md#L32",
+   "class": "architecture"
+  },
+  {
+   "text": "Reconciliation 3: leases long-lived; a lapse re-places before it releases (R1)",
+   "line": 36,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-lens-brief#3",
+   "cites": "genesis/docs/superpowers/plans/task-placement-lens-brief.md#L36",
+   "class": "architecture"
+  },
+  {
+   "text": "Reconciliation 4: no space-elohim; every parameter set ratified by the participants it touches (R5)",
+   "line": 38,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-lens-brief#4",
+   "cites": "genesis/docs/superpowers/plans/task-placement-lens-brief.md#L38",
+   "class": "architecture"
+  },
+  {
+   "text": "Reconciliation 5: move the holons \u00a79.1 bullet into \u00a73 as a working hypothesis under product review",
+   "line": 41,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-lens-brief#5",
+   "cites": "genesis/docs/superpowers/plans/task-placement-lens-brief.md#L41",
+   "class": "architecture"
+  },
+  {
+   "text": "Apply every blocker and major lens finding; name each refusal",
+   "line": 48,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-lens-brief#6",
+   "cites": "genesis/docs/superpowers/plans/task-placement-lens-brief.md#L48",
+   "class": "architecture"
+  },
+  {
+   "text": "Rename or add the \u00a716 stories and \u00a715 missing nodes the lenses call for",
+   "line": 50,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-lens-brief#7",
+   "cites": "genesis/docs/superpowers/plans/task-placement-lens-brief.md#L50",
+   "class": "architecture"
+  },
+  {
+   "text": "Report task-placement-lens-report.md with a per-finding table",
+   "line": 55,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-lens-brief#8",
+   "cites": "genesis/docs/superpowers/plans/task-placement-lens-brief.md#L55",
+   "class": "architecture"
+  }
+ ]
+}

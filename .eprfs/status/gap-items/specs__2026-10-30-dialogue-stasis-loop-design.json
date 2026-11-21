@@ -1,0 +1,137 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-10-30-dialogue-stasis-loop-design.md",
+ "slug": "specs__2026-10-30-dialogue-stasis-loop-design",
+ "method": "agent-decomposition",
+ "class": "process-meta",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-11-21 (stasis round 2). Draft; slices are the spec own 13 numbered Slices (A Observe, B Govern, C Act, D Compose and learn). On disk 2026-11-21: genesis/agentic/bin/stasis-probe, .claude/hooks/dialogue-stasis-sense.py, device-runtime session_stasis (classify, event, journal, live, policy \u2014 a shadow regulator that executes nothing), genesis/agentic/stasis-policy-operations.md and stasis-settings.patch.json. Habit dialogue-stalls-are-answered is red. Slices 2, 4, 6, 7 have partial artefacts and need verification against the Verification table before being CLAIMED.",
+ "count": 15,
+ "items": [
+  {
+   "text": "Slice 1: spec, schema, unwired habit and measure rows; headless stasis-probe",
+   "line": 1532,
+   "state": "CLAIMED",
+   "id": "specs__2026-10-30-dialogue-stasis-loop-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-10-30-dialogue-stasis-loop-design.md#L1532",
+   "class": "process-meta",
+   "note": "genesis/agentic/bin/stasis-probe; dialogue-blocked-seconds in measures.yaml"
+  },
+  {
+   "text": "Slice 1: steward-assisted interactive probe for the six unsupported capabilities (permission-prompt timing, human-deny emissions, idle-prompt timing, asyncRewake waking an idle session, Remote Control push on AskUserQuestion, channel deny-relay)",
+   "line": 1536,
+   "state": "OPEN",
+   "id": "specs__2026-10-30-dialogue-stasis-loop-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-10-30-dialogue-stasis-loop-design.md#L1536",
+   "class": "process-meta"
+  },
+  {
+   "text": "Slice 2: package tooling \u2014 hook registration as an array, reconcile every registration, compare async and asyncRewake",
+   "line": 1542,
+   "state": "OPEN",
+   "id": "specs__2026-10-30-dialogue-stasis-loop-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-10-30-dialogue-stasis-loop-design.md#L1542",
+   "class": "process-meta",
+   "note": "stasis-settings.patch.json carries asyncRewake; verify against the Verification row 2 fixture"
+  },
+  {
+   "text": "Slice 3: observe-only adapter",
+   "line": 1550,
+   "state": "CLAIMED",
+   "id": "specs__2026-10-30-dialogue-stasis-loop-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-10-30-dialogue-stasis-loop-design.md#L1550",
+   "class": "process-meta",
+   "note": ".claude/hooks/dialogue-stasis-sense.py"
+  },
+  {
+   "text": "Slice 4: shared algedonic reset (fake-clock latch Recovered transition, recovery evidence, reset threshold)",
+   "line": 1573,
+   "state": "OPEN",
+   "id": "specs__2026-10-30-dialogue-stasis-loop-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-10-30-dialogue-stasis-loop-design.md#L1573",
+   "class": "process-meta"
+  },
+  {
+   "text": "Slice 5: native fold and inert regulator",
+   "line": 1579,
+   "state": "CLAIMED",
+   "id": "specs__2026-10-30-dialogue-stasis-loop-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-10-30-dialogue-stasis-loop-design.md#L1579",
+   "class": "process-meta",
+   "note": "elohim/eprfs/device-runtime/src/session_stasis/*"
+  },
+  {
+   "text": "Slice 6: S5 boundary policy pinned with its ruling and the S3* independent audit",
+   "line": 1604,
+   "state": "OPEN",
+   "id": "specs__2026-10-30-dialogue-stasis-loop-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-10-30-dialogue-stasis-loop-design.md#L1604",
+   "class": "process-meta",
+   "note": "stasis-policy-operations.md exists \u2014 verify"
+  },
+  {
+   "text": "Slice 7: keeper policy agent and skill packages (restricted read-only keeper)",
+   "line": 1607,
+   "state": "OPEN",
+   "id": "specs__2026-10-30-dialogue-stasis-loop-design#8",
+   "cites": "genesis/docs/superpowers/specs/2026-10-30-dialogue-stasis-loop-design.md#L1607",
+   "class": "process-meta"
+  },
+  {
+   "text": "Slice 8: coordinator daemon per device owning every incident under journal locking",
+   "line": 1614,
+   "state": "OPEN",
+   "id": "specs__2026-10-30-dialogue-stasis-loop-design#9",
+   "cites": "genesis/docs/superpowers/specs/2026-10-30-dialogue-stasis-loop-design.md#L1614",
+   "class": "process-meta"
+  },
+  {
+   "text": "Slice 9: control on \u2014 presence handling, automated park and harvesting",
+   "line": 1626,
+   "state": "OPEN",
+   "id": "specs__2026-10-30-dialogue-stasis-loop-design#10",
+   "cites": "genesis/docs/superpowers/specs/2026-10-30-dialogue-stasis-loop-design.md#L1626",
+   "class": "process-meta"
+  },
+  {
+   "text": "Slices 10-11: agentic-developer silence sensor; audited L1/L2 automatic promotion and advisory routing",
+   "line": 1635,
+   "state": "OPEN",
+   "id": "specs__2026-10-30-dialogue-stasis-loop-design#11",
+   "cites": "genesis/docs/superpowers/specs/2026-10-30-dialogue-stasis-loop-design.md#L1635",
+   "class": "process-meta"
+  },
+  {
+   "text": "Slice 12: valueflow placement (code and spec stations accomplished by their own evidence)",
+   "line": 1641,
+   "state": "OPEN",
+   "id": "specs__2026-10-30-dialogue-stasis-loop-design#12",
+   "cites": "genesis/docs/superpowers/specs/2026-10-30-dialogue-stasis-loop-design.md#L1641",
+   "class": "process-meta"
+  },
+  {
+   "text": "Slice 13: bad fruit, restoration and coupled responsibility",
+   "line": 1657,
+   "state": "OPEN",
+   "id": "specs__2026-10-30-dialogue-stasis-loop-design#13",
+   "cites": "genesis/docs/superpowers/specs/2026-10-30-dialogue-stasis-loop-design.md#L1657",
+   "class": "process-meta"
+  },
+  {
+   "text": "Review gates before runtime implementation: gpt-6-astra round-4 review and a fresh blind-reader pass",
+   "line": 1701,
+   "state": "OPEN",
+   "id": "specs__2026-10-30-dialogue-stasis-loop-design#14",
+   "cites": "genesis/docs/superpowers/specs/2026-10-30-dialogue-stasis-loop-design.md#L1701",
+   "class": "process-meta"
+  },
+  {
+   "text": "Graduation: two shifts (one unattended) under the dialogue-blocked-seconds ceiling, falling human share, zero S3* faults; dialogue-stalls-are-answered green",
+   "line": 10,
+   "state": "OPEN",
+   "id": "specs__2026-10-30-dialogue-stasis-loop-design#15",
+   "cites": "genesis/docs/superpowers/specs/2026-10-30-dialogue-stasis-loop-design.md#L10",
+   "class": "process-meta",
+   "note": "habit status red 2026-11-21"
+  }
+ ]
+}

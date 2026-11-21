@@ -1,0 +1,119 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-09-26-record-proves-model-composes-design.md",
+ "slug": "specs__2026-09-26-record-proves-model-composes-design",
+ "method": "agent-decomposition",
+ "class": "protocol-canonical",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-11-21 (stasis round 2). Draft claim + slices. Slices 1-3 found on disk (SW verifies archives, apps/_heads/{slug} remembered heads in apps-sw.ts); blob_serve_verdict exists for the reach gate; no CARv1 responder found 2026-11-21. Licensing owed decision closed by specs/2026-11-06-licence-tiers-decision.md.",
+ "count": 13,
+ "items": [
+  {
+   "text": "Slice 1: deterministic version.json (buildTime from the commit)",
+   "line": 152,
+   "state": "CLAIMED",
+   "id": "specs__2026-09-26-record-proves-model-composes-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-09-26-record-proves-model-composes-design.md#L152",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Slice 2: service worker verifies the archive before caching; single files served uncached; old caches dropped",
+   "line": 153,
+   "state": "CLAIMED",
+   "id": "specs__2026-09-26-record-proves-model-composes-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-09-26-record-proves-model-composes-design.md#L153",
+   "class": "protocol-canonical",
+   "note": "apps-sw.ts apps-v4 (re-genesis T7)"
+  },
+  {
+   "text": "Slice 3: client remembers the last verified version so a view resolves offline; record-proves check runnable",
+   "line": 155,
+   "state": "CLAIMED",
+   "id": "specs__2026-09-26-record-proves-model-composes-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-09-26-record-proves-model-composes-design.md#L155",
+   "class": "protocol-canonical",
+   "note": "apps-sw.ts /apps/_heads/{slug}; client-resilience.feature @concern:record-proves"
+  },
+  {
+   "text": "Slice 4: per-file addresses \u2014 tree root over per-file CIDs alongside the zip (owed decision: brit EprMeta authoritative, UnixFS as projection)",
+   "line": 157,
+   "state": "OPEN",
+   "id": "specs__2026-09-26-record-proves-model-composes-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-09-26-record-proves-model-composes-design.md#L157",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Slice 5: /ipfs/{cid} trustless-gateway raw responses with reach gate and heal via get_blob_or_heal",
+   "line": 161,
+   "state": "OPEN",
+   "id": "specs__2026-09-26-record-proves-model-composes-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-09-26-record-proves-model-composes-design.md#L161",
+   "class": "protocol-canonical",
+   "note": "blob_serve_verdict exists (reach_verifier/rules/http_blob.rs); wiring to /ipfs not verified"
+  },
+  {
+   "text": "Slice 6: CARv1 responses and a doorway proxy for /ipfs/",
+   "line": 163,
+   "state": "OPEN",
+   "id": "specs__2026-09-26-record-proves-model-composes-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-09-26-record-proves-model-composes-design.md#L163",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Slice 7: client verified fetch pointed at household peers as trustless gateways",
+   "line": 164,
+   "state": "OPEN",
+   "id": "specs__2026-09-26-record-proves-model-composes-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-09-26-record-proves-model-composes-design.md#L164",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Slice 8: client resolves the address from the elected head, not a doorway header",
+   "line": 165,
+   "state": "OPEN",
+   "id": "specs__2026-09-26-record-proves-model-composes-design#8",
+   "cites": "genesis/docs/superpowers/specs/2026-09-26-record-proves-model-composes-design.md#L165",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Slice 9: the protocol own artifacts live on the protocol (rakia MVP) \u2014 no external registry origin",
+   "line": 166,
+   "state": "OPEN",
+   "id": "specs__2026-09-26-record-proves-model-composes-design#9",
+   "cites": "genesis/docs/superpowers/specs/2026-09-26-record-proves-model-composes-design.md#L166",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Slice 10: brit one chain of addresses from source to served file",
+   "line": 189,
+   "state": "OPEN",
+   "id": "specs__2026-09-26-record-proves-model-composes-design#10",
+   "cites": "genesis/docs/superpowers/specs/2026-09-26-record-proves-model-composes-design.md#L189",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Slice 11: one client resolver owning naming and verification",
+   "line": 201,
+   "state": "OPEN",
+   "id": "specs__2026-09-26-record-proves-model-composes-design#11",
+   "cites": "genesis/docs/superpowers/specs/2026-09-26-record-proves-model-composes-design.md#L201",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Owed decision: repository-wide licensing",
+   "line": 238,
+   "state": "CLAIMED",
+   "id": "specs__2026-09-26-record-proves-model-composes-design#12",
+   "cites": "genesis/docs/superpowers/specs/2026-09-26-record-proves-model-composes-design.md#L238",
+   "class": "protocol-canonical",
+   "note": "licence-tiers decision, EPR-LICENSE-1.0.md"
+  },
+  {
+   "text": "Graduation: record-proves check green twice on the household mesh, then Stance + seam-map rows + habit in app/elohim-app/.epr-meta",
+   "line": 12,
+   "state": "OPEN",
+   "id": "specs__2026-09-26-record-proves-model-composes-design#13",
+   "cites": "genesis/docs/superpowers/specs/2026-09-26-record-proves-model-composes-design.md#L12",
+   "class": "protocol-canonical"
+  }
+ ]
+}

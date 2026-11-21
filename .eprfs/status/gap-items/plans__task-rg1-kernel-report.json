@@ -1,0 +1,85 @@
+{
+ "doc": "genesis/docs/superpowers/plans/task-rg1-kernel-report.md",
+ "slug": "plans__task-rg1-kernel-report",
+ "method": "agent-decomposition",
+ "class": "substrate",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-11-21 (stasis round 2). A re-genesis-1 (2026-11-05 sprint) task REPORT; T0 (gap regenesis-1#T0), landed 77c83e07b on dev (L1).",
+ "count": 9,
+ "items": [
+  {
+   "text": "Kernel: ByteCid, byte profile, Multikey, SignatureScheme, signing transcript (elohim-address/elohim-epr)",
+   "line": 22,
+   "state": "CLAIMED",
+   "id": "plans__task-rg1-kernel-report#1",
+   "cites": "genesis/docs/superpowers/plans/task-rg1-kernel-report.md#L22",
+   "class": "substrate"
+  },
+  {
+   "text": "Interfaces block for downstream tracks",
+   "line": 65,
+   "state": "CLAIMED",
+   "id": "plans__task-rg1-kernel-report#2",
+   "cites": "genesis/docs/superpowers/plans/task-rg1-kernel-report.md#L65",
+   "class": "substrate"
+  },
+  {
+   "text": "Gate evidence for the kernel lane",
+   "line": 224,
+   "state": "CLAIMED",
+   "id": "plans__task-rg1-kernel-report#3",
+   "cites": "genesis/docs/superpowers/plans/task-rg1-kernel-report.md#L224",
+   "class": "substrate"
+  },
+  {
+   "text": "EPR signing transcript changed by design; signed vectors regenerated",
+   "line": 245,
+   "state": "CLAIMED",
+   "id": "plans__task-rg1-kernel-report#4",
+   "cites": "genesis/docs/superpowers/plans/task-rg1-kernel-report.md#L245",
+   "class": "substrate"
+  },
+  {
+   "text": "Downstream compile breaks in elohim-storage and storage-client-ts adapted by T2/T5",
+   "line": 257,
+   "state": "CLAIMED",
+   "id": "plans__task-rg1-kernel-report#5",
+   "cites": "genesis/docs/superpowers/plans/task-rg1-kernel-report.md#L257",
+   "class": "substrate",
+   "note": "re-genesis 1 landed on dev"
+  },
+  {
+   "text": "chunk_bytes panics on parameters outside fastcdc ranges (release builds); wire-read profiles use try_chunk_bytes",
+   "line": 271,
+   "state": "OPEN",
+   "id": "plans__task-rg1-kernel-report#6",
+   "cites": "genesis/docs/superpowers/plans/task-rg1-kernel-report.md#L271",
+   "class": "substrate"
+  },
+  {
+   "text": "Pinned toolchain lacks wasm32-unknown-unknown std; _gate-seam-contracts wasm legs drop RUSTUP_TOOLCHAIN",
+   "line": 284,
+   "state": "OPEN",
+   "id": "plans__task-rg1-kernel-report#7",
+   "cites": "genesis/docs/superpowers/plans/task-rg1-kernel-report.md#L284",
+   "class": "substrate",
+   "note": "re-check under the 1.100.0 pin"
+  },
+  {
+   "text": "CI stage for crates/elohim-address (kernel tests run only in the local gate)",
+   "line": 289,
+   "state": "OPEN",
+   "id": "plans__task-rg1-kernel-report#8",
+   "cites": "genesis/docs/superpowers/plans/task-rg1-kernel-report.md#L289",
+   "class": "substrate"
+  },
+  {
+   "text": "ts-rs/schema wire home for ByteProfile; the TS chunker twin (BigInt); Signature elohim-views mirror",
+   "line": 302,
+   "state": "OPEN",
+   "id": "plans__task-rg1-kernel-report#9",
+   "cites": "genesis/docs/superpowers/plans/task-rg1-kernel-report.md#L302",
+   "class": "substrate"
+  }
+ ]
+}

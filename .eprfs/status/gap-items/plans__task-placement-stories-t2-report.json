@@ -1,0 +1,75 @@
+{
+ "doc": "genesis/docs/superpowers/plans/task-placement-stories-t2-report.md",
+ "slug": "plans__task-placement-stories-t2-report",
+ "method": "agent-decomposition",
+ "class": "architecture",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-11-21 (stasis round 2). T2 STORIES REPORT (DONE_WITH_CONCERNS): seven files parse; four open correctness findings for the operator.",
+ "count": 8,
+ "items": [
+  {
+   "text": "compute/berth-offer.feature (new) and measure-on-a-peer.feature (extended)",
+   "line": 19,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-stories-t2-report#1",
+   "cites": "genesis/docs/superpowers/plans/task-placement-stories-t2-report.md#L19",
+   "class": "architecture"
+  },
+  {
+   "text": "compute/placement-floor-converges.feature and placement-tuning-ratified.feature (new)",
+   "line": 21,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-stories-t2-report#2",
+   "cites": "genesis/docs/superpowers/plans/task-placement-stories-t2-report.md#L21",
+   "class": "architecture"
+  },
+  {
+   "text": "dataplane/device-role-refusal.feature (new), peer-executed-stage.feature (extended), eligible-is-not-enlisted.feature (new)",
+   "line": 23,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-stories-t2-report#3",
+   "cites": "genesis/docs/superpowers/plans/task-placement-stories-t2-report.md#L23",
+   "class": "architecture"
+  },
+  {
+   "text": "New concern tags berth-offer-matched, placement-floor, placement-ceiling, device-capacity-declared are named by no habit checks:",
+   "line": 44,
+   "state": "OPEN",
+   "id": "plans__task-placement-stories-t2-report#4",
+   "cites": "genesis/docs/superpowers/plans/task-placement-stories-t2-report.md#L44",
+   "class": "architecture"
+  },
+  {
+   "text": "eligible-is-not-enlisted Background/scenario 1: circular proof (Background declares matthew eligible and the Then asserts it)",
+   "line": 66,
+   "state": "OPEN",
+   "id": "plans__task-placement-stories-t2-report#5",
+   "cites": "genesis/docs/superpowers/plans/task-placement-stories-t2-report.md#L66",
+   "class": "architecture"
+  },
+  {
+   "text": "eligible-is-not-enlisted scenario 4: no Then asserts matthew's presence message count rises",
+   "line": 67,
+   "state": "OPEN",
+   "id": "plans__task-placement-stories-t2-report#6",
+   "cites": "genesis/docs/superpowers/plans/task-placement-stories-t2-report.md#L67",
+   "class": "architecture"
+  },
+  {
+   "text": "measure-on-a-peer L19: preamble promises a rate-limited grant but no scenario tests rate enforcement",
+   "line": 68,
+   "state": "OPEN",
+   "id": "plans__task-placement-stories-t2-report#7",
+   "cites": "genesis/docs/superpowers/plans/task-placement-stories-t2-report.md#L68",
+   "class": "architecture"
+  },
+  {
+   "text": "peer-executed-stage scenario 1: second When starts an unlinked proof \u2014 split or bridge",
+   "line": 69,
+   "state": "OPEN",
+   "id": "plans__task-placement-stories-t2-report#8",
+   "cites": "genesis/docs/superpowers/plans/task-placement-stories-t2-report.md#L69",
+   "class": "architecture"
+  }
+ ]
+}

@@ -1,0 +1,45 @@
+{
+ "doc": "genesis/docs/superpowers/plans/task-placement-c1-brief.md",
+ "slug": "plans__task-placement-c1-brief",
+ "method": "agent-decomposition",
+ "class": "architecture",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-11-21 (stasis round 2). A task BRIEF for the placement-contract plan; its report task-placement-c1-report.md returned DONE_WITH_CONCERNS, so delivered deliverables are CLAIMED and residue lives in the report's own gap items.",
+ "count": 4,
+ "items": [
+  {
+   "text": "seam-contracts src/unanswered.rs as the interfaces spec defines it, alloc-only",
+   "line": 19,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-c1-brief#1",
+   "cites": "genesis/docs/superpowers/plans/task-placement-c1-brief.md#L19",
+   "class": "architecture",
+   "note": "crates/seam-contracts/src/unanswered.rs present"
+  },
+  {
+   "text": "seam-contracts src/probe.rs (probe reading / status channel), alloc-only",
+   "line": 19,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-c1-brief#2",
+   "cites": "genesis/docs/superpowers/plans/task-placement-c1-brief.md#L19",
+   "class": "architecture",
+   "note": "crates/seam-contracts/src/probe.rs present"
+  },
+  {
+   "text": "Zero-first-party-dependency boundary test kept green with contract tests for every new type",
+   "line": 19,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-c1-brief#3",
+   "cites": "genesis/docs/superpowers/plans/task-placement-c1-brief.md#L19",
+   "class": "architecture"
+  },
+  {
+   "text": "Report task-placement-c1-report.md listing files, tests, gate EXITs and every code/spec disagreement",
+   "line": 34,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-c1-brief#4",
+   "cites": "genesis/docs/superpowers/plans/task-placement-c1-brief.md#L34",
+   "class": "architecture"
+  }
+ ]
+}

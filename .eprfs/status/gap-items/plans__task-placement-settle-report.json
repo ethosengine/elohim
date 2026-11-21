@@ -1,0 +1,70 @@
+{
+ "doc": "genesis/docs/superpowers/plans/task-placement-settle-report.md",
+ "slug": "plans__task-placement-settle-report",
+ "method": "agent-decomposition",
+ "class": "architecture",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-11-21 (stasis round 2). P0 SETTLE REPORT (DONE_WITH_CONCERNS): 58 UPHELD corrections and 17 coherence findings applied or tabled. Concerns 1 and 3 were closed by the lens seat; seals verified 2026-11-21.",
+ "count": 7,
+ "items": [
+  {
+   "text": "Corrections table: 63 items (58 UPHELD applied or changed-differently, 5 REJECTED skipped)",
+   "line": 75,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-settle-report#1",
+   "cites": "genesis/docs/superpowers/plans/task-placement-settle-report.md#L75",
+   "class": "architecture"
+  },
+  {
+   "text": "Coherence findings table: 17 items applied by class",
+   "line": 143,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-settle-report#2",
+   "cites": "genesis/docs/superpowers/plans/task-placement-settle-report.md#L143",
+   "class": "architecture"
+  },
+  {
+   "text": "Rulings touched named per brief rule 3",
+   "line": 57,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-settle-report#3",
+   "cites": "genesis/docs/superpowers/plans/task-placement-settle-report.md#L57",
+   "class": "architecture"
+  },
+  {
+   "text": "Design-lens findings applied by their own seat",
+   "line": 167,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-settle-report#4",
+   "cites": "genesis/docs/superpowers/plans/task-placement-settle-report.md#L167",
+   "class": "architecture",
+   "note": "task-placement-lens-report.md"
+  },
+  {
+   "text": "Downstream seals re-sealed after settle",
+   "line": 172,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-settle-report#5",
+   "cites": "genesis/docs/superpowers/plans/task-placement-settle-report.md#L172",
+   "class": "architecture",
+   "note": "epr flow cites verify on the architecture plan: all cites content-addressed + resolvable (2026-11-21)"
+  },
+  {
+   "text": "Spaces hypothesis moved out of \"already ruled\"",
+   "line": 174,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-settle-report#6",
+   "cites": "genesis/docs/superpowers/plans/task-placement-settle-report.md#L174",
+   "class": "architecture",
+   "note": "lens brief reconciliation 5"
+  },
+  {
+   "text": "\u00a75.3 Authority cell still says \"no signed circle-admission record\" while \u00a75.7/\u00a78 say \"none that validators check\" \u2014 steward to choose one wording",
+   "line": 176,
+   "state": "OPEN",
+   "id": "plans__task-placement-settle-report#7",
+   "cites": "genesis/docs/superpowers/plans/task-placement-settle-report.md#L176",
+   "class": "architecture"
+  }
+ ]
+}

@@ -1,0 +1,63 @@
+{
+ "doc": "genesis/docs/superpowers/plans/task-placement-c4-brief.md",
+ "slug": "plans__task-placement-c4-brief",
+ "method": "agent-decomposition",
+ "class": "architecture",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-11-21 (stasis round 2). A task BRIEF for the placement-contract plan; its report task-placement-c4-report.md returned DONE_WITH_CONCERNS, so delivered deliverables are CLAIMED and residue lives in the report's own gap items.",
+ "count": 6,
+ "items": [
+  {
+   "text": "Apply decision 12 slice-1 names (Coverage, NotHeld.tried, Withheld, public constructors) and #[non_exhaustive] marks",
+   "line": 19,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-c4-brief#1",
+   "cites": "genesis/docs/superpowers/plans/task-placement-c4-brief.md#L19",
+   "class": "architecture"
+  },
+  {
+   "text": "Defaulted EprfsStorage methods plus tier.rs, reach.rs, view_decl.rs and the R-E1/R-E2/R-E3 rails",
+   "line": 19,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-c4-brief#2",
+   "cites": "genesis/docs/superpowers/plans/task-placement-c4-brief.md#L19",
+   "class": "architecture"
+  },
+  {
+   "text": "Create eprfs-serve crate (TierEndpoint, reason labels, testing feature with assert_tier_contract and CountingTier)",
+   "line": 19,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-c4-brief#3",
+   "cites": "genesis/docs/superpowers/plans/task-placement-c4-brief.md#L19",
+   "class": "architecture",
+   "note": "elohim/eprfs/eprfs-serve present"
+  },
+  {
+   "text": "Create pure eprfs-ts package with tree-vectors fixture shared by Rust and TypeScript tests",
+   "line": 19,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-c4-brief#4",
+   "cites": "genesis/docs/superpowers/plans/task-placement-c4-brief.md#L19",
+   "class": "architecture",
+   "note": "fixture landed at elohim/eprfs/fixtures/tree-vectors.json, not eprfs-ts/fixtures/ as the brief names it"
+  },
+  {
+   "text": "E4: teach the view-walk seam in eprfs-core/.epr-meta and add seam-registry rows for the new decision points",
+   "line": 19,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-c4-brief#5",
+   "cites": "genesis/docs/superpowers/plans/task-placement-c4-brief.md#L19",
+   "class": "architecture",
+   "note": "elohim/eprfs/eprfs-serve/seam-registry.yaml"
+  },
+  {
+   "text": "Move materialize-what-is-read habit from unwired to red with a checks: line naming the headline walk test, then re-project",
+   "line": 19,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-c4-brief#6",
+   "cites": "genesis/docs/superpowers/plans/task-placement-c4-brief.md#L19",
+   "class": "architecture",
+   "note": "habit atom reads status: red with checks:"
+  }
+ ]
+}

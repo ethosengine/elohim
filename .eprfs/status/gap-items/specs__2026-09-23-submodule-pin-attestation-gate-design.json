@@ -1,0 +1,94 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-09-23-submodule-pin-attestation-gate-design.md",
+ "slug": "specs__2026-09-23-submodule-pin-attestation-gate-design",
+ "method": "agent-decomposition",
+ "class": "process-meta",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-11-21 (stasis round 2). The mechanism is live per root CLAUDE.md (attested run.kind, gate-attest.mjs, rakia oracle default, pin-attestation.feature) \u2014 landing rows 1-4 CLAIMED. The pin-attestation habit atom still reads red 2026-11-21, so the graduation evidence is OPEN.",
+ "count": 10,
+ "items": [
+  {
+   "text": "4.1 rakia schema step: attested run.kind and cargo.env lifted into the rakia manifest schema",
+   "line": 78,
+   "state": "CLAIMED",
+   "id": "specs__2026-09-23-submodule-pin-attestation-gate-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-09-23-submodule-pin-attestation-gate-design.md#L78",
+   "class": "process-meta"
+  },
+  {
+   "text": "4.2 component manifests: brit, rakia, sophia declare themselves attested with the gitlink as step input",
+   "line": 97,
+   "state": "CLAIMED",
+   "id": "specs__2026-09-23-submodule-pin-attestation-gate-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-09-23-submodule-pin-attestation-gate-design.md#L97",
+   "class": "process-meta"
+  },
+  {
+   "text": "4.3 consumer edges declared (depends / orchestrator inputs)",
+   "line": 113,
+   "state": "CLAIMED",
+   "id": "specs__2026-09-23-submodule-pin-attestation-gate-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-09-23-submodule-pin-attestation-gate-design.md#L113",
+   "class": "process-meta"
+  },
+  {
+   "text": "4.4 selection by rakia affected at depth one, shadow first, then flipped (GATE_ORACLE=rakia default)",
+   "line": 131,
+   "state": "CLAIMED",
+   "id": "specs__2026-09-23-submodule-pin-attestation-gate-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-09-23-submodule-pin-attestation-gate-design.md#L131",
+   "class": "process-meta",
+   "note": "gate-runner.mjs:39"
+  },
+  {
+   "text": "4.5 attested gate: gate-attest.mjs reads the pinned commit check run; unreachable passes as claimed",
+   "line": 151,
+   "state": "CLAIMED",
+   "id": "specs__2026-09-23-submodule-pin-attestation-gate-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-09-23-submodule-pin-attestation-gate-design.md#L151",
+   "class": "process-meta",
+   "note": "genesis/orchestrator/gate-attest.mjs"
+  },
+  {
+   "text": "4.6 pin-attestation@1 measure emitted per attested run \u2014 confirm folds exist",
+   "line": 174,
+   "state": "OPEN",
+   "id": "specs__2026-09-23-submodule-pin-attestation-gate-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-09-23-submodule-pin-attestation-gate-design.md#L174",
+   "class": "process-meta"
+  },
+  {
+   "text": "Story genesis/a2o/features/devflow/pin-attestation.feature @concern:pin-attestation",
+   "line": 214,
+   "state": "CLAIMED",
+   "id": "specs__2026-09-23-submodule-pin-attestation-gate-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-09-23-submodule-pin-attestation-gate-design.md#L214",
+   "class": "process-meta"
+  },
+  {
+   "text": "Graduation: a habit delta per landing commit, one real push whose oracle-diff was only the intended propagation; move pin-attestation red -> green with that evidence",
+   "line": 10,
+   "state": "OPEN",
+   "id": "specs__2026-09-23-submodule-pin-attestation-gate-design#8",
+   "cites": "genesis/docs/superpowers/specs/2026-09-23-submodule-pin-attestation-gate-design.md#L10",
+   "class": "process-meta",
+   "note": "habit atom status red 2026-11-21"
+  },
+  {
+   "text": "Open question: sophia check name (aggregate job is build) if its workflow gains a tests-pass rollup",
+   "line": 243,
+   "state": "OPEN",
+   "id": "specs__2026-09-23-submodule-pin-attestation-gate-design#9",
+   "cites": "genesis/docs/superpowers/specs/2026-09-23-submodule-pin-attestation-gate-design.md#L243",
+   "class": "process-meta"
+  },
+  {
+   "text": "Open question: depth one selects the ~33-minute elohim-storage gate on a rakia pin move (paid down by the storage crate decomposition)",
+   "line": 248,
+   "state": "OPEN",
+   "id": "specs__2026-09-23-submodule-pin-attestation-gate-design#10",
+   "cites": "genesis/docs/superpowers/specs/2026-09-23-submodule-pin-attestation-gate-design.md#L248",
+   "class": "process-meta"
+  }
+ ]
+}

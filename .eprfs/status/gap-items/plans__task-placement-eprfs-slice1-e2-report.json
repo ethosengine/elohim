@@ -1,0 +1,67 @@
+{
+ "doc": "genesis/docs/superpowers/plans/task-placement-eprfs-slice1-e2-report.md",
+ "slug": "plans__task-placement-eprfs-slice1-e2-report",
+ "method": "agent-decomposition",
+ "class": "architecture",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-11-21 (stasis round 2). E2 REPORT (DONE, no concerns): the three view-scoped queries in eprfs-core. Two reviewer-choice notes kept as OPEN review questions.",
+ "count": 7,
+ "items": [
+  {
+   "text": "read_path query",
+   "line": 28,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-eprfs-slice1-e2-report#1",
+   "cites": "genesis/docs/superpowers/plans/task-placement-eprfs-slice1-e2-report.md#L28",
+   "class": "architecture"
+  },
+  {
+   "text": "list_dir query",
+   "line": 36,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-eprfs-slice1-e2-report#2",
+   "cites": "genesis/docs/superpowers/plans/task-placement-eprfs-slice1-e2-report.md#L36",
+   "class": "architecture"
+  },
+  {
+   "text": "diff_trees query whose cost follows the change",
+   "line": 42,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-eprfs-slice1-e2-report#3",
+   "cites": "genesis/docs/superpowers/plans/task-placement-eprfs-slice1-e2-report.md#L42",
+   "class": "architecture"
+  },
+  {
+   "text": "Refusals: every query checks the root codec before fetching",
+   "line": 59,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-eprfs-slice1-e2-report#4",
+   "cites": "genesis/docs/superpowers/plans/task-placement-eprfs-slice1-e2-report.md#L59",
+   "class": "architecture"
+  },
+  {
+   "text": "R6: a single answer cannot be partial",
+   "line": 69,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-eprfs-slice1-e2-report#5",
+   "cites": "genesis/docs/superpowers/plans/task-placement-eprfs-slice1-e2-report.md#L69",
+   "class": "architecture"
+  },
+  {
+   "text": "Reviewer question: spine entries changed other than dir-to-dir are reported at the spine path, not expanded \u2014 confirm",
+   "line": 79,
+   "state": "OPEN",
+   "id": "plans__task-placement-eprfs-slice1-e2-report#6",
+   "cites": "genesis/docs/superpowers/plans/task-placement-eprfs-slice1-e2-report.md#L79",
+   "class": "architecture"
+  },
+  {
+   "text": "Reviewer question: diff matches names to view paths by linear filter (scope_for) while walk uses a merge pass \u2014 confirm acceptable",
+   "line": 82,
+   "state": "OPEN",
+   "id": "plans__task-placement-eprfs-slice1-e2-report#7",
+   "cites": "genesis/docs/superpowers/plans/task-placement-eprfs-slice1-e2-report.md#L82",
+   "class": "architecture"
+  }
+ ]
+}

@@ -1,0 +1,109 @@
+{
+ "doc": "genesis/docs/superpowers/plans/2026-10-14-portable-app-migration-plan.md",
+ "slug": "plans__2026-10-14-portable-app-migration-plan",
+ "method": "agent-decomposition",
+ "class": "process-meta",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-11-21 (stasis round 2). Four-stage execution order for the portable-app lifecycle. Stage 1 contract surfaces exist on disk (crates/elohim-sdk lifecycle, seam-contracts demand.rs, bridges/browser and bridges/workspace gate projects) and are CLAIMED pending their gate receipts; stages 2-4 found no producer code 2026-11-21.",
+ "count": 12,
+ "items": [
+  {
+   "text": "Stage 1: compile lifecycle interfaces with explicit unsupported defaults and generated TS types",
+   "line": 31,
+   "state": "CLAIMED",
+   "id": "plans__2026-10-14-portable-app-migration-plan#1",
+   "cites": "genesis/docs/superpowers/plans/2026-10-14-portable-app-migration-plan.md#L31",
+   "class": "process-meta",
+   "note": "crates/elohim-sdk/src/lifecycle, storage-client-ts app-lifecycle.ts"
+  },
+  {
+   "text": "Stage 1: generic bounded demand leases below the SDK; per-device retained progress",
+   "line": 34,
+   "state": "CLAIMED",
+   "id": "plans__2026-10-14-portable-app-migration-plan#2",
+   "cites": "genesis/docs/superpowers/plans/2026-10-14-portable-app-migration-plan.md#L34",
+   "class": "process-meta",
+   "note": "crates/seam-contracts/src/demand.rs, lifecycle/sync_demand.rs"
+  },
+  {
+   "text": "Stage 1 verify: real gate results for app-lifecycle-contracts, elohim-sdk, seam-contracts, browser-bridge, workspace-bridge recorded in release-retention",
+   "line": 38,
+   "state": "OPEN",
+   "id": "plans__2026-10-14-portable-app-migration-plan#3",
+   "cites": "genesis/docs/superpowers/plans/2026-10-14-portable-app-migration-plan.md#L38",
+   "class": "process-meta"
+  },
+  {
+   "text": "Stage 2: node adapter for ensure-instance reusing Ark, first consumer the native declared-view reader",
+   "line": 49,
+   "state": "OPEN",
+   "id": "plans__2026-10-14-portable-app-migration-plan#4",
+   "cites": "genesis/docs/superpowers/plans/2026-10-14-portable-app-migration-plan.md#L49",
+   "class": "process-meta"
+  },
+  {
+   "text": "Stage 2: scoped outbound WSS service attachment to doorway HTTPS with bounded frames, expiry, reconnect, revocation in the producer schema",
+   "line": 54,
+   "state": "OPEN",
+   "id": "plans__2026-10-14-portable-app-migration-plan#5",
+   "cites": "genesis/docs/superpowers/plans/2026-10-14-portable-app-migration-plan.md#L54",
+   "class": "process-meta"
+  },
+  {
+   "text": "Stage 2 proof: real sign-in, repeat launch, revocation, different-person refusal, tampering, restart, interruption on the real Che hostname",
+   "line": 65,
+   "state": "OPEN",
+   "id": "plans__2026-10-14-portable-app-migration-plan#6",
+   "cites": "genesis/docs/superpowers/plans/2026-10-14-portable-app-migration-plan.md#L65",
+   "class": "process-meta"
+  },
+  {
+   "text": "Stage 3: release artifact declaration and compatibility selection for native targets; acquire and verify the executable dependency set",
+   "line": 75,
+   "state": "OPEN",
+   "id": "plans__2026-10-14-portable-app-migration-plan#7",
+   "cites": "genesis/docs/superpowers/plans/2026-10-14-portable-app-migration-plan.md#L75",
+   "class": "process-meta"
+  },
+  {
+   "text": "Stage 3: continuation preparation and activation with a durable operation identity; acquisition pins, archive and idle reclamation",
+   "line": 81,
+   "state": "OPEN",
+   "id": "plans__2026-10-14-portable-app-migration-plan#8",
+   "cites": "genesis/docs/superpowers/plans/2026-10-14-portable-app-migration-plan.md#L81",
+   "class": "process-meta"
+  },
+  {
+   "text": "Stage 3 proof: coding and orchard with the same client, shell takeover, cold offline reopen, corruption/full-disk recovery",
+   "line": 87,
+   "state": "OPEN",
+   "id": "plans__2026-10-14-portable-app-migration-plan#9",
+   "cites": "genesis/docs/superpowers/plans/2026-10-14-portable-app-migration-plan.md#L87",
+   "class": "process-meta"
+  },
+  {
+   "text": "Stage 4: inventory app bundles from manifests and migrate main client, Avodah, Lamad and shell onto SDK contracts",
+   "line": 97,
+   "state": "OPEN",
+   "id": "plans__2026-10-14-portable-app-migration-plan#10",
+   "cites": "genesis/docs/superpowers/plans/2026-10-14-portable-app-migration-plan.md#L97",
+   "class": "process-meta"
+  },
+  {
+   "text": "Stage 4: AppObservationJournal around ObservationEmitter with checked local append before acknowledgement",
+   "line": 103,
+   "state": "OPEN",
+   "id": "plans__2026-10-14-portable-app-migration-plan#11",
+   "cites": "genesis/docs/superpowers/plans/2026-10-14-portable-app-migration-plan.md#L103",
+   "class": "process-meta"
+  },
+  {
+   "text": "Stage 4 proof: cold restart, serving processes stopped, offline accumulation, low power, idle-at-rest; browser receipt per app",
+   "line": 112,
+   "state": "OPEN",
+   "id": "plans__2026-10-14-portable-app-migration-plan#12",
+   "cites": "genesis/docs/superpowers/plans/2026-10-14-portable-app-migration-plan.md#L112",
+   "class": "process-meta"
+  }
+ ]
+}

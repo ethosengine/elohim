@@ -1,0 +1,85 @@
+{
+ "doc": "genesis/docs/superpowers/plans/task-rg1-a2o-report.md",
+ "slug": "plans__task-rg1-a2o-report",
+ "method": "agent-decomposition",
+ "class": "substrate",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-11-21 (stasis round 2). A re-genesis-1 (2026-11-05 sprint) task REPORT; T9, landed on dev e85eeeee5..6a31ed270 (L2c+L3) with genesis-a2o GREEN on the integrated tree.",
+ "count": 9,
+ "items": [
+  {
+   "text": "a2o-wide wire rename blobHash/serverBlobHash/blob_hash/shard_hash -> byte-CID names across 53 files",
+   "line": 20,
+   "state": "CLAIMED",
+   "id": "plans__task-rg1-a2o-report#1",
+   "cites": "genesis/docs/superpowers/plans/task-rg1-a2o-report.md#L20",
+   "class": "substrate"
+  },
+  {
+   "text": "Shared admission genesis/a2o/src/framework/byte-address.ts (mintByteCid, parse/is/assertByteCid by full decode)",
+   "line": 23,
+   "state": "CLAIMED",
+   "id": "plans__task-rg1-a2o-report#2",
+   "cites": "genesis/docs/superpowers/plans/task-rg1-a2o-report.md#L23",
+   "class": "substrate"
+  },
+  {
+   "text": "Steps and scripts moved to the byte profile (delivery, chaos, name-routing, deliverability, lineage, release, ...)",
+   "line": 26,
+   "state": "CLAIMED",
+   "id": "plans__task-rg1-a2o-report#3",
+   "cites": "genesis/docs/superpowers/plans/task-rg1-a2o-report.md#L26",
+   "class": "substrate"
+  },
+  {
+   "text": "Design ruling 2: death-witness.steps.ts reads the custody address from the witness row's blob_cid",
+   "line": 41,
+   "state": "CLAIMED",
+   "id": "plans__task-rg1-a2o-report#4",
+   "cites": "genesis/docs/superpowers/plans/task-rg1-a2o-report.md#L41",
+   "class": "substrate",
+   "note": "death-witness.steps.ts reads blob_cid"
+  },
+  {
+   "text": "ark witness ls JSON gained blob_cid (WitnessSummary.blob_cid in supervisor spool.rs)",
+   "line": 46,
+   "state": "CLAIMED",
+   "id": "plans__task-rg1-a2o-report#5",
+   "cites": "genesis/docs/superpowers/plans/task-rg1-a2o-report.md#L46",
+   "class": "substrate"
+  },
+  {
+   "text": "address-profile-lint genesis/a2o hits 367 -> 0",
+   "line": 58,
+   "state": "CLAIMED",
+   "id": "plans__task-rg1-a2o-report#6",
+   "cites": "genesis/docs/superpowers/plans/task-rg1-a2o-report.md#L58",
+   "class": "substrate"
+  },
+  {
+   "text": "epr-release-package.ts eslint errors (T5) cleared",
+   "line": 67,
+   "state": "CLAIMED",
+   "id": "plans__task-rg1-a2o-report#7",
+   "cites": "genesis/docs/superpowers/plans/task-rg1-a2o-report.md#L67",
+   "class": "substrate",
+   "note": "genesis-a2o gate GREEN on the integrated tree per verified_by"
+  },
+  {
+   "text": "Legacy fixture epr-follows-its-head (\"legacy sha256 store\" launcher) flagged for the clean-break decision",
+   "line": 63,
+   "state": "OPEN",
+   "id": "plans__task-rg1-a2o-report#8",
+   "cites": "genesis/docs/superpowers/plans/task-rg1-a2o-report.md#L63",
+   "class": "substrate"
+  },
+  {
+   "text": "app-bundle-elected-delivery /shard/<cid> PUT assumes the route accepts the byte CID \u2014 unverified against a live peer (just test mesh not run)",
+   "line": 69,
+   "state": "OPEN",
+   "id": "plans__task-rg1-a2o-report#9",
+   "cites": "genesis/docs/superpowers/plans/task-rg1-a2o-report.md#L69",
+   "class": "substrate"
+  }
+ ]
+}

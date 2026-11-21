@@ -1,0 +1,62 @@
+{
+ "doc": "genesis/docs/superpowers/plans/task-as-e2-report.md",
+ "slug": "plans__task-as-e2-report",
+ "method": "agent-decomposition",
+ "class": "substrate",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-11-21 (stasis round 2). An artifact-store sprint (2026-11-07) task REPORT, status landed; landed 1b76c2327 with the review fix re-applied as d77171ffd via the E4 storage closure (landed 2026-11-10); explicit_null_ext_is_refused_not_normalized is on dev.",
+ "count": 6,
+ "items": [
+  {
+   "text": "tier_blob.rs: TierBlobManifest deny_unknown_fields; epochs other than 2 answer UnsupportedEpoch (held, not parsed)",
+   "line": 14,
+   "state": "CLAIMED",
+   "id": "plans__task-as-e2-report#1",
+   "cites": "genesis/docs/superpowers/plans/task-as-e2-report.md#L14",
+   "class": "substrate"
+  },
+  {
+   "text": "Three new local_tier_blob tests (epoch 3 held, unknown ext roundtrip, held never a hit)",
+   "line": 16,
+   "state": "CLAIMED",
+   "id": "plans__task-as-e2-report#2",
+   "cites": "genesis/docs/superpowers/plans/task-as-e2-report.md#L16",
+   "class": "substrate"
+  },
+  {
+   "text": "just gate eprfs EXIT=0 (gate-E2-eprfs.log)",
+   "line": 25,
+   "state": "CLAIMED",
+   "id": "plans__task-as-e2-report#3",
+   "cites": "genesis/docs/superpowers/plans/task-as-e2-report.md#L25",
+   "class": "substrate"
+  },
+  {
+   "text": "Peer-level test that a held manifest records draw:unavailable",
+   "line": 30,
+   "state": "CLAIMED",
+   "id": "plans__task-as-e2-report#4",
+   "cites": "genesis/docs/superpowers/plans/task-as-e2-report.md#L30",
+   "class": "substrate",
+   "note": "F2 follow-up F-E2-2: eprfs-peer/tests/local_blob.rs"
+  },
+  {
+   "text": "Landing gap: astra review fix (refuse explicit null ext) reaches dev with an eprfs-storage version bump",
+   "line": 35,
+   "state": "CLAIMED",
+   "id": "plans__task-as-e2-report#5",
+   "cites": "genesis/docs/superpowers/plans/task-as-e2-report.md#L35",
+   "class": "substrate",
+   "note": "eprfs-storage/tests/local_tier_blob.rs:596 explicit_null_ext_is_refused_not_normalized"
+  },
+  {
+   "text": "Nested DerivationRecord still discards its own ext on decode; matters once a signature verifier over the record body arrives (Track C D7)",
+   "line": 31,
+   "state": "OPEN",
+   "id": "plans__task-as-e2-report#6",
+   "cites": "genesis/docs/superpowers/plans/task-as-e2-report.md#L31",
+   "class": "substrate",
+   "note": "eprfs-core/src/derive.rs ext: Option<IgnoredAny> 2026-11-21"
+  }
+ ]
+}

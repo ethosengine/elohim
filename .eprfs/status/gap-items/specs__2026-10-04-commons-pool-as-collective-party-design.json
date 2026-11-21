@@ -1,0 +1,115 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-10-04-commons-pool-as-collective-party-design.md",
+ "slug": "specs__2026-10-04-commons-pool-as-collective-party-design",
+ "method": "agent-decomposition",
+ "class": "protocol-canonical",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-11-21 (stasis round 2). Draft; the orchestrator ruled 2026-10-08 that the slice stays HELD with no habit yet (decision 1). Items are the one missing node, each service gap, the owed spec corrections and the operator decisions \u2014 all OPEN; the 2026-10-08 rulings are recorded, not work.",
+ "count": 13,
+ "items": [
+  {
+   "text": "The one missing node: a collective can be a party to a commitment (recipient holds the collective ActionHash, decision 7)",
+   "line": 44,
+   "state": "OPEN",
+   "id": "specs__2026-10-04-commons-pool-as-collective-party-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-10-04-commons-pool-as-collective-party-design.md#L44",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Shared data: blind custody so holders cannot read what they hold (blocks any non-public pool)",
+   "line": 259,
+   "state": "OPEN",
+   "id": "specs__2026-10-04-commons-pool-as-collective-party-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-10-04-commons-pool-as-collective-party-design.md#L259",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Shared inference: model address, a real node backend, a delegation path",
+   "line": 260,
+   "state": "OPEN",
+   "id": "specs__2026-10-04-commons-pool-as-collective-party-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-10-04-commons-pool-as-collective-party-design.md#L260",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Serving near the reader: a patron own device serving has no story",
+   "line": 261,
+   "state": "OPEN",
+   "id": "specs__2026-10-04-commons-pool-as-collective-party-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-10-04-commons-pool-as-collective-party-design.md#L261",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Compute near the work: berth offers and matching; fulfilment notarized",
+   "line": 262,
+   "state": "OPEN",
+   "id": "specs__2026-10-04-commons-pool-as-collective-party-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-10-04-commons-pool-as-collective-party-design.md#L262",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "A view across many holders: carrier for an aggregate across DHTs with a witness quorum",
+   "line": 263,
+   "state": "OPEN",
+   "id": "specs__2026-10-04-commons-pool-as-collective-party-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-10-04-commons-pool-as-collective-party-design.md#L263",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Reader reach checked on every path pools serve through (document-sync routes and the p2p document handler ask nothing; no freshness stamp)",
+   "line": 310,
+   "state": "OPEN",
+   "id": "specs__2026-10-04-commons-pool-as-collective-party-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-10-04-commons-pool-as-collective-party-design.md#L310",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Standing record redraft (who may steward or speak for a pool)",
+   "line": 315,
+   "state": "OPEN",
+   "id": "specs__2026-10-04-commons-pool-as-collective-party-design#8",
+   "cites": "genesis/docs/superpowers/specs/2026-10-04-commons-pool-as-collective-party-design.md#L315",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Decision 3: the holder that bears the cost records the carrying (today the fetcher records serve-blob, blob_fetch.rs:417)",
+   "line": 475,
+   "state": "OPEN",
+   "id": "specs__2026-10-04-commons-pool-as-collective-party-design#9",
+   "cites": "genesis/docs/superpowers/specs/2026-10-04-commons-pool-as-collective-party-design.md#L475",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Decision 6: fix subject_can_view composition to honour capabilities_dashboard first",
+   "line": 478,
+   "state": "OPEN",
+   "id": "specs__2026-10-04-commons-pool-as-collective-party-design#10",
+   "cites": "genesis/docs/superpowers/specs/2026-10-04-commons-pool-as-collective-party-design.md#L478",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Owed spec corrections: \u00a73 serve-blob emitter and \u00a73 integrity claim",
+   "line": 481,
+   "state": "OPEN",
+   "id": "specs__2026-10-04-commons-pool-as-collective-party-design#11",
+   "cites": "genesis/docs/superpowers/specs/2026-10-04-commons-pool-as-collective-party-design.md#L481",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Operator decisions: the first pool, the revenue cap per pool kind, who may train on a pool",
+   "line": 324,
+   "state": "OPEN",
+   "id": "specs__2026-10-04-commons-pool-as-collective-party-design#12",
+   "cites": "genesis/docs/superpowers/specs/2026-10-04-commons-pool-as-collective-party-design.md#L324",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Graduation: one pool as a Collective on the household mesh with two members contributing through commitments naming it",
+   "line": 10,
+   "state": "OPEN",
+   "id": "specs__2026-10-04-commons-pool-as-collective-party-design#13",
+   "cites": "genesis/docs/superpowers/specs/2026-10-04-commons-pool-as-collective-party-design.md#L10",
+   "class": "protocol-canonical"
+  }
+ ]
+}

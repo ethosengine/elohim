@@ -1,0 +1,121 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-10-29-closure-keyed-landing-plane-design.md",
+ "slug": "specs__2026-10-29-closure-keyed-landing-plane-design",
+ "method": "agent-decomposition",
+ "class": "process-meta",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-11-21 (stasis round 2). Draft sprint design. Found on disk 2026-11-21: closure-<key16> storage image tags (scripts/ci/build-storage-image.sh), Change-Id trailer (.husky commit-msg + test), dev-landing@1 in epr flow intend, dev-integration lease in pre-push, ark task gate path. Carry, DNA closure re-tag and Envelope::demand not found.",
+ "count": 13,
+ "items": [
+  {
+   "text": "S1a: off dev/main a wave publishes nothing; storage and doorway images keyed on closure and skipped on a verified hit",
+   "line": 115,
+   "state": "CLAIMED",
+   "id": "specs__2026-10-29-closure-keyed-landing-plane-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-10-29-closure-keyed-landing-plane-design.md#L115",
+   "class": "process-meta",
+   "note": "scripts/ci/build-storage-image.sh closure tag"
+  },
+  {
+   "text": "S1b: hook splits Phase V (no lease) and Phase L (dev-integration for the CAS window only)",
+   "line": 127,
+   "state": "CLAIMED",
+   "id": "specs__2026-10-29-closure-keyed-landing-plane-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-10-29-closure-keyed-landing-plane-design.md#L127",
+   "class": "process-meta",
+   "note": ".husky/pre-push.bash names dev-integration"
+  },
+  {
+   "text": "S1c: cost vector, union, dead sensor, berth fold and reap, stale rationale",
+   "line": 139,
+   "state": "OPEN",
+   "id": "specs__2026-10-29-closure-keyed-landing-plane-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-10-29-closure-keyed-landing-plane-design.md#L139",
+   "class": "process-meta"
+  },
+  {
+   "text": "S2a: A8 live receipt with ark in the dev slot",
+   "line": 150,
+   "state": "CLAIMED",
+   "id": "specs__2026-10-29-closure-keyed-landing-plane-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-10-29-closure-keyed-landing-plane-design.md#L150",
+   "class": "process-meta",
+   "note": "GATE_TASK ark task run path in root CLAUDE.md"
+  },
+  {
+   "text": "S2c: DNA pack keyed on its closure and re-tagged, never repacked, on a hit (conductor-roll lever)",
+   "line": 161,
+   "state": "OPEN",
+   "id": "specs__2026-10-29-closure-keyed-landing-plane-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-10-29-closure-keyed-landing-plane-design.md#L161",
+   "class": "process-meta"
+  },
+  {
+   "text": "S2d: attestation on the device at harvest time (brit ci: notes, bridge observations), no daemon",
+   "line": 170,
+   "state": "OPEN",
+   "id": "specs__2026-10-29-closure-keyed-landing-plane-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-10-29-closure-keyed-landing-plane-design.md#L170",
+   "class": "process-meta"
+  },
+  {
+   "text": "S2e: native lanes' cucumber JSON reaches the Jenkins report as an attested artifact",
+   "line": 181,
+   "state": "OPEN",
+   "id": "specs__2026-10-29-closure-keyed-landing-plane-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-10-29-closure-keyed-landing-plane-design.md#L181",
+   "class": "process-meta"
+  },
+  {
+   "text": "S2b: split the corpus gate; keep hook ledgers out of the closure",
+   "line": 192,
+   "state": "OPEN",
+   "id": "specs__2026-10-29-closure-keyed-landing-plane-design#8",
+   "cites": "genesis/docs/superpowers/specs/2026-10-29-closure-keyed-landing-plane-design.md#L192",
+   "class": "process-meta",
+   "note": "partly met by gate-reads(eprfs-live-corpus) keying per root CLAUDE.md \u2014 verify"
+  },
+  {
+   "text": "S3b: leases derive from the path selection; the already-built filter reads closures",
+   "line": 199,
+   "state": "OPEN",
+   "id": "specs__2026-10-29-closure-keyed-landing-plane-design#9",
+   "cites": "genesis/docs/superpowers/specs/2026-10-29-closure-keyed-landing-plane-design.md#L199",
+   "class": "process-meta"
+  },
+  {
+   "text": "S3a: the carry \u2014 a closure neither device paid runs on the device whose own guard lines admit it (dev-landing@1 carry over eprfs-peer)",
+   "line": 206,
+   "state": "OPEN",
+   "id": "specs__2026-10-29-closure-keyed-landing-plane-design#10",
+   "cites": "genesis/docs/superpowers/specs/2026-10-29-closure-keyed-landing-plane-design.md#L206",
+   "class": "process-meta"
+  },
+  {
+   "text": "S4: Envelope::demand beside Envelope::bound in ark-core manifest.rs, heap-derived hosted ceiling, declared recycle cadence",
+   "line": 218,
+   "state": "OPEN",
+   "id": "specs__2026-10-29-closure-keyed-landing-plane-design#11",
+   "cites": "genesis/docs/superpowers/specs/2026-10-29-closure-keyed-landing-plane-design.md#L218",
+   "class": "process-meta",
+   "note": "no demand field in ark/core/src/manifest.rs 2026-11-21"
+  },
+  {
+   "text": "Primitive: Change-Id commit trailer minted once (Gerrit recipe)",
+   "line": 92,
+   "state": "CLAIMED",
+   "id": "specs__2026-10-29-closure-keyed-landing-plane-design#12",
+   "cites": "genesis/docs/superpowers/specs/2026-10-29-closure-keyed-landing-plane-design.md#L92",
+   "class": "process-meta",
+   "note": ".husky/commit-msg.test.mjs"
+  },
+  {
+   "text": "Graduation: over ten dev pushes dev-integration hold p90 < 120 s, unchanged closures skipped, DNA-unchanged wave rolls no conductor, unpaid gate carried \u2014 each a habit DELTA, features green @act:host",
+   "line": 14,
+   "state": "OPEN",
+   "id": "specs__2026-10-29-closure-keyed-landing-plane-design#13",
+   "cites": "genesis/docs/superpowers/specs/2026-10-29-closure-keyed-landing-plane-design.md#L14",
+   "class": "process-meta"
+  }
+ ]
+}

@@ -1,0 +1,45 @@
+{
+ "doc": "genesis/docs/superpowers/plans/task-placement-c5-brief.md",
+ "slug": "plans__task-placement-c5-brief",
+ "method": "agent-decomposition",
+ "class": "architecture",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-11-21 (stasis round 2). A task BRIEF for the placement-contract plan; its report task-placement-c5-report.md returned DONE_WITH_CONCERNS, so delivered deliverables are CLAIMED and residue lives in the report's own gap items.",
+ "count": 4,
+ "items": [
+  {
+   "text": "Re-home ranking: reconcile/placement.rs PlacementStrategy becomes a shim over placement-core Ranking with salvage tests unchanged",
+   "line": 19,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-c5-brief#1",
+   "cites": "genesis/docs/superpowers/plans/task-placement-c5-brief.md#L19",
+   "class": "architecture",
+   "note": "DiversityAware moved to placement_core"
+  },
+  {
+   "text": "Blob-store tier implementing EprfsStorage and the RootReachGate per \u00a72.A",
+   "line": 19,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-c5-brief#2",
+   "cites": "genesis/docs/superpowers/plans/task-placement-c5-brief.md#L19",
+   "class": "architecture",
+   "note": "elohim-storage/src/eprfs_tier"
+  },
+  {
+   "text": "Add rail R-P8",
+   "line": 19,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-c5-brief#3",
+   "cites": "genesis/docs/superpowers/plans/task-placement-c5-brief.md#L19",
+   "class": "architecture"
+  },
+  {
+   "text": "Run alone after C2 and C4, then just gate elohim-storage",
+   "line": 19,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-c5-brief#4",
+   "cites": "genesis/docs/superpowers/plans/task-placement-c5-brief.md#L19",
+   "class": "architecture"
+  }
+ ]
+}

@@ -1,0 +1,123 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-10-26-shared-toolchain-servers-design.md",
+ "slug": "specs__2026-10-26-shared-toolchain-servers-design",
+ "method": "agent-decomposition",
+ "class": "process-meta",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-11-21 (stasis round 2). Draft; Rust slice 1 is implemented on disk (elohim/eprfs/epr-lsp: attach, mux, attrib, deliver, limits, daemon, gatefeed; genesis/agentic/bin/lsp-flycheck; .claude/marketplace) but the spec own \u00a7Verification (c) records ALL 23 acceptance items PENDING with no recorded evidence. Items group the checklist by contract; the owning habit atom is genesis/agentic/.epr-meta/edit-diagnostics-reach-every-session.habit.md.",
+ "count": 14,
+ "items": [
+  {
+   "text": "Slice 1 attach path and mux semantics (epr-lsp attach.rs, mux.rs; foreground mux and readiness line in epr-cli lsp.rs)",
+   "line": 204,
+   "state": "CLAIMED",
+   "id": "specs__2026-10-26-shared-toolchain-servers-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-10-26-shared-toolchain-servers-design.md#L204",
+   "class": "process-meta"
+  },
+  {
+   "text": "Slice 1 attribution through epr session (C1 identity, C2 edit events, C7 ownership and delivery) \u2014 epr-lsp attrib.rs, deliver.rs",
+   "line": 399,
+   "state": "CLAIMED",
+   "id": "specs__2026-10-26-shared-toolchain-servers-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-10-26-shared-toolchain-servers-design.md#L399",
+   "class": "process-meta"
+  },
+  {
+   "text": "C6 flycheck wrapper genesis/agentic/bin/lsp-flycheck with C6b cargo-disk-guard Rule 4 yield",
+   "line": 1460,
+   "state": "CLAIMED",
+   "id": "specs__2026-10-26-shared-toolchain-servers-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-10-26-shared-toolchain-servers-design.md#L1460",
+   "class": "process-meta"
+  },
+  {
+   "text": "Acceptance 1-3: owning checks incl. live edit-diagnostics-share-one-server.feature, installation/root selection, foreground entry and supervision",
+   "line": 878,
+   "state": "OPEN",
+   "id": "specs__2026-10-26-shared-toolchain-servers-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-10-26-shared-toolchain-servers-design.md#L878",
+   "class": "process-meta"
+  },
+  {
+   "text": "Acceptance 4-7: discovery and resident ownership, idle and resident shutdown at 900 s, pin replacement, absence/failure attach exits",
+   "line": 901,
+   "state": "OPEN",
+   "id": "specs__2026-10-26-shared-toolchain-servers-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-10-26-shared-toolchain-servers-design.md#L901",
+   "class": "process-meta"
+  },
+  {
+   "text": "Acceptance 8-12: transport and shutdown bounds (64 MiB frames), initialization routing, server-request matrix (D12), disk authority (D13), C2 writer/reader contract",
+   "line": 934,
+   "state": "OPEN",
+   "id": "specs__2026-10-26-shared-toolchain-servers-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-10-26-shared-toolchain-servers-design.md#L934",
+   "class": "process-meta"
+  },
+  {
+   "text": "Acceptance 13-15: attribution identity and time, delivery data and anchors, live downstream delivery across concurrent Claude sessions",
+   "line": 968,
+   "state": "OPEN",
+   "id": "specs__2026-10-26-shared-toolchain-servers-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-10-26-shared-toolchain-servers-design.md#L968",
+   "class": "process-meta"
+  },
+  {
+   "text": "Acceptance 16-19: Rust policy/environment (pinned toolchain, one Cargo job), saved-file and build-script admission, Rule 4 yielding in both arrival orders",
+   "line": 992,
+   "state": "OPEN",
+   "id": "specs__2026-10-26-shared-toolchain-servers-design#8",
+   "cites": "genesis/docs/superpowers/specs/2026-10-26-shared-toolchain-servers-design.md#L992",
+   "class": "process-meta"
+  },
+  {
+   "text": "Acceptance 20-22: external feed C8, governance and observability, post-warm-up RSS measurement",
+   "line": 1031,
+   "state": "OPEN",
+   "id": "specs__2026-10-26-shared-toolchain-servers-design#9",
+   "cites": "genesis/docs/superpowers/specs/2026-10-26-shared-toolchain-servers-design.md#L1031",
+   "class": "process-meta"
+  },
+  {
+   "text": "Acceptance 23: completion artifacts and the habit atom measured evidence with sealed cites",
+   "line": 1050,
+   "state": "OPEN",
+   "id": "specs__2026-10-26-shared-toolchain-servers-design#10",
+   "cites": "genesis/docs/superpowers/specs/2026-10-26-shared-toolchain-servers-design.md#L1050",
+   "class": "process-meta"
+  },
+  {
+   "text": "S2: measured RAM/I-O classes and bounds with enforcement (native tier None in ark supervisor native.rs:83)",
+   "line": 757,
+   "state": "OPEN",
+   "id": "specs__2026-10-26-shared-toolchain-servers-design#11",
+   "cites": "genesis/docs/superpowers/specs/2026-10-26-shared-toolchain-servers-design.md#L757",
+   "class": "process-meta"
+  },
+  {
+   "text": "S3 TypeScript server policy and persistent installation; S4 Python server policy",
+   "line": 758,
+   "state": "OPEN",
+   "id": "specs__2026-10-26-shared-toolchain-servers-design#12",
+   "cites": "genesis/docs/superpowers/specs/2026-10-26-shared-toolchain-servers-design.md#L758",
+   "class": "process-meta"
+  },
+  {
+   "text": "S5: D10 plugin package kind/projection backend, broader arrival health checks and DevspaceSeed mapping",
+   "line": 760,
+   "state": "OPEN",
+   "id": "specs__2026-10-26-shared-toolchain-servers-design#13",
+   "cites": "genesis/docs/superpowers/specs/2026-10-26-shared-toolchain-servers-design.md#L760",
+   "class": "process-meta"
+  },
+  {
+   "text": "Graduation: Rust slice 1 passes owning gates and edit-diagnostics-share-one-server with shared servers, C7 views, yielding and idle retirement",
+   "line": 11,
+   "state": "OPEN",
+   "id": "specs__2026-10-26-shared-toolchain-servers-design#14",
+   "cites": "genesis/docs/superpowers/specs/2026-10-26-shared-toolchain-servers-design.md#L11",
+   "class": "process-meta"
+  }
+ ]
+}

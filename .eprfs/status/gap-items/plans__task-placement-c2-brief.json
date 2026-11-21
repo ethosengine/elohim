@@ -1,0 +1,52 @@
+{
+ "doc": "genesis/docs/superpowers/plans/task-placement-c2-brief.md",
+ "slug": "plans__task-placement-c2-brief",
+ "method": "agent-decomposition",
+ "class": "architecture",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-11-21 (stasis round 2). A task BRIEF for the placement-contract plan; its report task-placement-c2-report.md returned DONE_WITH_CONCERNS, so delivered deliverables are CLAIMED and residue lives in the report's own gap items.",
+ "count": 5,
+ "items": [
+  {
+   "text": "Gate elohim-compute runtime modules behind a default-on runtime feature so actuation.rs builds with default features off",
+   "line": 19,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-c2-brief#1",
+   "cites": "genesis/docs/superpowers/plans/task-placement-c2-brief.md#L19",
+   "class": "architecture"
+  },
+  {
+   "text": "Create elohim/placement/core as an elohim/Cargo.toml member with every \u00a72.D/\u00a72.E floor and ceiling interface",
+   "line": 19,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-c2-brief#2",
+   "cites": "genesis/docs/superpowers/plans/task-placement-c2-brief.md#L19",
+   "class": "architecture",
+   "note": "elohim/placement/core/src/{floor,ceiling,decide,explain}.rs"
+  },
+  {
+   "text": "Built-in ranking method(s) and assert_ranking_contract; decide() and explain as pure functions",
+   "line": 19,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-c2-brief#3",
+   "cites": "genesis/docs/superpowers/plans/task-placement-c2-brief.md#L19",
+   "class": "architecture"
+  },
+  {
+   "text": "Every R-P rail as a failing-build test (compile_fail doctests where the spec says so)",
+   "line": 19,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-c2-brief#4",
+   "cites": "genesis/docs/superpowers/plans/task-placement-c2-brief.md#L19",
+   "class": "architecture"
+  },
+  {
+   "text": ".epr-meta for the new crate modeled on elohim/ark/core and a build-manifest gate project",
+   "line": 19,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-c2-brief#5",
+   "cites": "genesis/docs/superpowers/plans/task-placement-c2-brief.md#L19",
+   "class": "architecture"
+  }
+ ]
+}

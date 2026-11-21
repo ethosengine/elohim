@@ -1,0 +1,77 @@
+{
+ "doc": "genesis/docs/superpowers/plans/2026-10-16-doorway-operator-surface-under-standing-plan.md",
+ "slug": "plans__2026-10-16-doorway-operator-surface-under-standing-plan",
+ "method": "agent-decomposition",
+ "class": "governance",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-11-21 (stasis round 2). Operator surface under recorded standing. doorway auth/operator.rs (capability snapshot over operate-doorway bindings) predates this plan; the plan's per-request resolve_operator_standing / OperatorStandingView were not found 2026-11-21. S1d partly landed (b1e42ad8: seed-operator-bindings gets the steward of record's storage).",
+ "count": 8,
+ "items": [
+  {
+   "text": "S0: 8 actuators require Admin (Bearer JWT or admin X-API-Key); 401/403 split; fixtures send X-API-Key",
+   "line": 85,
+   "state": "OPEN",
+   "id": "plans__2026-10-16-doorway-operator-surface-under-standing-plan#1",
+   "cites": "genesis/docs/superpowers/plans/2026-10-16-doorway-operator-surface-under-standing-plan.md#L85",
+   "class": "governance"
+  },
+  {
+   "text": "S1a: operate-doorway conductor-required on create/cancel; find_active_operator_binding requires anchor, active, provider, window, scope membership, issuer = steward of record",
+   "line": 86,
+   "state": "OPEN",
+   "id": "plans__2026-10-16-doorway-operator-surface-under-standing-plan#2",
+   "cites": "genesis/docs/superpowers/plans/2026-10-16-doorway-operator-surface-under-standing-plan.md#L86",
+   "class": "governance"
+  },
+  {
+   "text": "S1b: OperatorStandingView schema + codegen; resolve_operator_standing per request with no positive cache; route policy table; unknown /admin route denied",
+   "line": 87,
+   "state": "OPEN",
+   "id": "plans__2026-10-16-doorway-operator-surface-under-standing-plan#3",
+   "cites": "genesis/docs/superpowers/plans/2026-10-16-doorway-operator-surface-under-standing-plan.md#L87",
+   "class": "governance",
+   "note": "no OperatorStandingView schema 2026-11-21"
+  },
+  {
+   "text": "S1c: doorway-app dashboard guard on standing, standing banner, refusal page that says why",
+   "line": 88,
+   "state": "OPEN",
+   "id": "plans__2026-10-16-doorway-operator-surface-under-standing-plan#4",
+   "cites": "genesis/docs/superpowers/plans/2026-10-16-doorway-operator-surface-under-standing-plan.md#L88",
+   "class": "governance"
+  },
+  {
+   "text": "S1d: seeder authors bindings with provider = the registration agent key, through the steward's storage, anchored readback verified",
+   "line": 89,
+   "state": "CLAIMED",
+   "id": "plans__2026-10-16-doorway-operator-surface-under-standing-plan#5",
+   "cites": "genesis/docs/superpowers/plans/2026-10-16-doorway-operator-surface-under-standing-plan.md#L89",
+   "class": "governance",
+   "note": "genesis/seeder/src/seed-operator-bindings.ts; b1e42ad8"
+  },
+  {
+   "text": "S2: read-only hosting census (stuck accounts, registry rows for absent conductors) with remedy addressed to the owner",
+   "line": 90,
+   "state": "OPEN",
+   "id": "plans__2026-10-16-doorway-operator-surface-under-standing-plan#6",
+   "cites": "genesis/docs/superpowers/plans/2026-10-16-doorway-operator-surface-under-standing-plan.md#L90",
+   "class": "governance"
+  },
+  {
+   "text": "S3: cleanup actuators as capability-gated verbs that name the commitment and record the act",
+   "line": 91,
+   "state": "OPEN",
+   "id": "plans__2026-10-16-doorway-operator-surface-under-standing-plan#7",
+   "cites": "genesis/docs/superpowers/plans/2026-10-16-doorway-operator-surface-under-standing-plan.md#L91",
+   "class": "governance"
+  },
+  {
+   "text": "Matthew's alpha account on a dead custodial key cannot read green standing until his own rebind lands (graduate-onto-node-key)",
+   "line": 122,
+   "state": "OPEN",
+   "id": "plans__2026-10-16-doorway-operator-surface-under-standing-plan#8",
+   "cites": "genesis/docs/superpowers/plans/2026-10-16-doorway-operator-surface-under-standing-plan.md#L122",
+   "class": "governance"
+  }
+ ]
+}

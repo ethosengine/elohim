@@ -1,0 +1,84 @@
+{
+ "doc": "genesis/docs/superpowers/plans/task-rg1-brit-note-readers-report.md",
+ "slug": "plans__task-rg1-brit-note-readers-report",
+ "method": "agent-decomposition",
+ "class": "process-meta",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-11-21 (stasis round 2). A re-genesis-1 (2026-11-05 sprint) task REPORT; status landed-on-branch at authoring; the readers are on dev 2026-11-21 (NoteEpoch in ark brit_index.rs, heldNotes/noteEpoch in brit-attest.mjs, held in gate-evidence.mjs, epoch-2 fixture present).",
+ "count": 9,
+ "items": [
+  {
+   "text": "ark brit_index.rs Attestation epoch/scheme/key/sig with NoteEpoch {V1,V2,Held} decided on epoch alone",
+   "line": 22,
+   "state": "CLAIMED",
+   "id": "plans__task-rg1-brit-note-readers-report#1",
+   "cites": "genesis/docs/superpowers/plans/task-rg1-brit-note-readers-report.md#L22",
+   "class": "process-meta"
+  },
+  {
+   "text": "brit-attest.mjs heldNotes/noteEpoch/noteSignature; readBuildNote state held",
+   "line": 23,
+   "state": "CLAIMED",
+   "id": "plans__task-rg1-brit-note-readers-report#2",
+   "cites": "genesis/docs/superpowers/plans/task-rg1-brit-note-readers-report.md#L23",
+   "class": "process-meta"
+  },
+  {
+   "text": "gate-evidence.mjs findEvidence returns {rows, unverifiable, held} with epoch tests",
+   "line": 24,
+   "state": "CLAIMED",
+   "id": "plans__task-rg1-brit-note-readers-report#3",
+   "cites": "genesis/docs/superpowers/plans/task-rg1-brit-note-readers-report.md#L24",
+   "class": "process-meta"
+  },
+  {
+   "text": "a2o household-attestation.ts verifies epoch-2 ed25519 over the elohim-epr signing transcript v1",
+   "line": 31,
+   "state": "CLAIMED",
+   "id": "plans__task-rg1-brit-note-readers-report#4",
+   "cites": "genesis/docs/superpowers/plans/task-rg1-brit-note-readers-report.md#L31",
+   "class": "process-meta"
+  },
+  {
+   "text": "Reviewer divergences fixed: weak-key universal forgery, unsigned riders, held/refused inversion, loose validatorId hex",
+   "line": 47,
+   "state": "CLAIMED",
+   "id": "plans__task-rg1-brit-note-readers-report#5",
+   "cites": "genesis/docs/superpowers/plans/task-rg1-brit-note-readers-report.md#L47",
+   "class": "process-meta"
+  },
+  {
+   "text": "Real brit-minted epoch-2 vector fixture and parity probes (42/42 tests)",
+   "line": 56,
+   "state": "CLAIMED",
+   "id": "plans__task-rg1-brit-note-readers-report#6",
+   "cites": "genesis/docs/superpowers/plans/task-rg1-brit-note-readers-report.md#L56",
+   "class": "process-meta"
+  },
+  {
+   "text": "No unit test for the writer's new held-defer branch",
+   "line": 35,
+   "state": "OPEN",
+   "id": "plans__task-rg1-brit-note-readers-report#7",
+   "cites": "genesis/docs/superpowers/plans/task-rg1-brit-note-readers-report.md#L35",
+   "class": "process-meta"
+  },
+  {
+   "text": "Residual parity gaps (no forgery path): CID bytes not structurally parsed; JSON number normalisation differs from serde",
+   "line": 54,
+   "state": "OPEN",
+   "id": "plans__task-rg1-brit-note-readers-report#8",
+   "cites": "genesis/docs/superpowers/plans/task-rg1-brit-note-readers-report.md#L54",
+   "class": "process-meta"
+  },
+  {
+   "text": "Gate EXIT=1 from submodule-absent preflight only: re-run just gate elohim-ark and orchestrator from a checkout with submodules",
+   "line": 12,
+   "state": "OPEN",
+   "id": "plans__task-rg1-brit-note-readers-report#9",
+   "cites": "genesis/docs/superpowers/plans/task-rg1-brit-note-readers-report.md#L12",
+   "class": "process-meta",
+   "note": "superseded in practice by later dev gates; no dedicated receipt"
+  }
+ ]
+}

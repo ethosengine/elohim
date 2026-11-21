@@ -1,0 +1,43 @@
+{
+ "doc": "genesis/docs/superpowers/plans/task-placement-seam-check-brief.md",
+ "slug": "plans__task-placement-seam-check-brief",
+ "method": "agent-decomposition",
+ "class": "architecture",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-11-21 (stasis round 2). A reviewer BRIEF (item I2); task-placement-seam-check-report.md returned DONE_WITH_CONCERNS.",
+ "count": 4,
+ "items": [
+  {
+   "text": "For each seam A-I try to break the interface against the code that must implement or adapt it, and against the design rulings and R1-R6",
+   "line": 14,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-seam-check-brief#1",
+   "cites": "genesis/docs/superpowers/plans/task-placement-seam-check-brief.md#L14",
+   "class": "architecture"
+  },
+  {
+   "text": "Cover EprfsStorage implementors, PlacementStrategy, the salvage author, ark-core berth/candidate/intent types, app manifest and intents schemas, apps-sw.ts, storage-client-ts",
+   "line": 18,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-seam-check-brief#2",
+   "cites": "genesis/docs/superpowers/plans/task-placement-seam-check-brief.md#L18",
+   "class": "architecture"
+  },
+  {
+   "text": "Each finding names seam, code path:line, the break and the revision; a reviser applies surviving findings",
+   "line": 22,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-seam-check-brief#3",
+   "cites": "genesis/docs/superpowers/plans/task-placement-seam-check-brief.md#L22",
+   "class": "architecture"
+  },
+  {
+   "text": "Report lists each finding as applied or refused, with why",
+   "line": 23,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-seam-check-brief#4",
+   "cites": "genesis/docs/superpowers/plans/task-placement-seam-check-brief.md#L23",
+   "class": "architecture"
+  }
+ ]
+}

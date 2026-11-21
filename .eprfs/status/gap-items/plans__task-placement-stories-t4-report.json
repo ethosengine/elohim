@@ -1,0 +1,67 @@
+{
+ "doc": "genesis/docs/superpowers/plans/task-placement-stories-t4-report.md",
+ "slug": "plans__task-placement-stories-t4-report",
+ "method": "agent-decomposition",
+ "class": "architecture",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-11-21 (stasis round 2). T4 STORIES REPORT (DONE_WITH_CONCERNS): seven files parse; no correctness finding open; five new concern tags.",
+ "count": 7,
+ "items": [
+  {
+   "text": "federation/local-first-shared-sheet.feature extended (live-session-plane)",
+   "line": 20,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-stories-t4-report#1",
+   "cites": "genesis/docs/superpowers/plans/task-placement-stories-t4-report.md#L20",
+   "class": "architecture"
+  },
+  {
+   "text": "qahal/group-thread.feature and wake-a-sleeping-device.feature (new)",
+   "line": 21,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-stories-t4-report#2",
+   "cites": "genesis/docs/superpowers/plans/task-placement-stories-t4-report.md#L21",
+   "class": "architecture"
+  },
+  {
+   "text": "dataplane/household-at-rest.feature extended (idle-is-free)",
+   "line": 23,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-stories-t4-report#3",
+   "cites": "genesis/docs/superpowers/plans/task-placement-stories-t4-report.md#L23",
+   "class": "architecture"
+  },
+  {
+   "text": "dataplane/peer-reach-through-relay.feature and browser/browser-to-hub-by-key.feature (new)",
+   "line": 24,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-stories-t4-report#4",
+   "cites": "genesis/docs/superpowers/plans/task-placement-stories-t4-report.md#L24",
+   "class": "architecture"
+  },
+  {
+   "text": "New concern tags live-session-plane, chat-is-a-record, wake-reveals-nothing, reach-by-key, browser-to-hub-by-key named by no habit checks:",
+   "line": 76,
+   "state": "OPEN",
+   "id": "plans__task-placement-stories-t4-report#5",
+   "cites": "genesis/docs/superpowers/plans/task-placement-stories-t4-report.md#L76",
+   "class": "architecture"
+  },
+  {
+   "text": "household-at-rest.feature lacks feature-level @requires:household-nodes (pre-existing)",
+   "line": 86,
+   "state": "OPEN",
+   "id": "plans__task-placement-stories-t4-report#6",
+   "cites": "genesis/docs/superpowers/plans/task-placement-stories-t4-report.md#L86",
+   "class": "architecture"
+  },
+  {
+   "text": "Round-6 interpretability findings left for the operator to defer",
+   "line": 27,
+   "state": "OPEN",
+   "id": "plans__task-placement-stories-t4-report#7",
+   "cites": "genesis/docs/superpowers/plans/task-placement-stories-t4-report.md#L27",
+   "class": "architecture"
+  }
+ ]
+}

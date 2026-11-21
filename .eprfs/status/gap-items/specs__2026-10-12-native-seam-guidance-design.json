@@ -1,0 +1,83 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-10-12-native-seam-guidance-design.md",
+ "slug": "specs__2026-10-12-native-seam-guidance-design",
+ "method": "agent-decomposition",
+ "class": "process-meta",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-11-21 (stasis round 2). Status Implemented (verified 2026-10-12: native gate 1,202 tests; seam_guidance.rs probes). Live harness activation was claimed separately and remains named limits.",
+ "count": 9,
+ "items": [
+  {
+   "text": "Authority and composition of seam guidance across harnesses",
+   "line": 25,
+   "state": "CLAIMED",
+   "id": "specs__2026-10-12-native-seam-guidance-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-10-12-native-seam-guidance-design.md#L25",
+   "class": "process-meta"
+  },
+  {
+   "text": "Governable algorithm and application with pinned identity",
+   "line": 51,
+   "state": "CLAIMED",
+   "id": "specs__2026-10-12-native-seam-guidance-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-10-12-native-seam-guidance-design.md#L51",
+   "class": "process-meta"
+  },
+  {
+   "text": "Native request and evidence contract",
+   "line": 69,
+   "state": "CLAIMED",
+   "id": "specs__2026-10-12-native-seam-guidance-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-10-12-native-seam-guidance-design.md#L69",
+   "class": "process-meta"
+  },
+  {
+   "text": "Active-agent review and private memory (no local output store, no proposed-file mutation)",
+   "line": 92,
+   "state": "CLAIMED",
+   "id": "specs__2026-10-12-native-seam-guidance-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-10-12-native-seam-guidance-design.md#L92",
+   "class": "process-meta"
+  },
+  {
+   "text": "Native probes governed_method_and_application_are_pinned_and_executed and abstention_cannot_hide_failure... in epr-cli tests/seam_guidance.rs",
+   "line": 179,
+   "state": "CLAIMED",
+   "id": "specs__2026-10-12-native-seam-guidance-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-10-12-native-seam-guidance-design.md#L179",
+   "class": "process-meta"
+  },
+  {
+   "text": "Codex hook activation: complete the /hooks review so hooks/list stops reporting the definition untrusted",
+   "line": 210,
+   "state": "OPEN",
+   "id": "specs__2026-10-12-native-seam-guidance-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-10-12-native-seam-guidance-design.md#L210",
+   "class": "process-meta"
+  },
+  {
+   "text": "Claude live lifecycle invocation unobserved \u2014 record a trusted runtime activation receipt per harness (this session still prints \"claude/Bash invocation adapter unsupported\")",
+   "line": 212,
+   "state": "OPEN",
+   "id": "specs__2026-10-12-native-seam-guidance-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-10-12-native-seam-guidance-design.md#L212",
+   "class": "process-meta"
+  },
+  {
+   "text": "Named limits: broader language parsing, fuzzy patch equivalence, automatic review resubmission",
+   "line": 155,
+   "state": "OPEN",
+   "id": "specs__2026-10-12-native-seam-guidance-design#8",
+   "cites": "genesis/docs/superpowers/specs/2026-10-12-native-seam-guidance-design.md#L155",
+   "class": "process-meta"
+  },
+  {
+   "text": "Harvested regression scenarios are design-level descriptions, not wired Cucumber steps",
+   "line": 178,
+   "state": "OPEN",
+   "id": "specs__2026-10-12-native-seam-guidance-design#9",
+   "cites": "genesis/docs/superpowers/specs/2026-10-12-native-seam-guidance-design.md#L178",
+   "class": "process-meta"
+  }
+ ]
+}

@@ -103,3 +103,9 @@ Use folded interval unions; overlapping classes must not inflate the shift total
 |----|------|-------------|------------------|
 | `AP-NNN` | `<name>` | `<count>` | `<excerpt>` |
 ````
+
+Before naming a new `AP-NNN`, check the distilled indexes of earlier journals:
+[the October 2026 shift journals](../content/elohim-protocol/history/2026-11-21-october-shift-journals-distilled.md)
+and the [CI/orchestrator museum](../content/elohim-protocol/history/2026-06-02-ci-orchestrator-recurring-anti-patterns-museum.md).
+Journals under `.claude/shifts/` are gitignored working state: past about 14 days, distil a journal's
+lessons into `history/` and its open items into backlog rows, then delete the journal.

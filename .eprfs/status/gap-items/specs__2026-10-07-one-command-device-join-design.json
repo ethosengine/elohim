@@ -1,0 +1,101 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-10-07-one-command-device-join-design.md",
+ "slug": "specs__2026-10-07-one-command-device-join-design",
+ "method": "agent-decomposition",
+ "class": "imagodei",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-11-21 (stasis round 2). status in-flight; epr device join/ask/approve are in the installed CLI and the live proof (2026-10-07) enrolled a fresh device with one yes. Residue is the hosted slice, the doorway relay carrier and the open findings from the proof.",
+ "count": 11,
+ "items": [
+  {
+   "text": "consent-grant ReturnPath::Hold / Collection / MemoryStore::collect (117 crate tests)",
+   "line": 82,
+   "state": "CLAIMED",
+   "id": "specs__2026-10-07-one-command-device-join-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-10-07-one-command-device-join-design.md#L82",
+   "class": "imagodei"
+  },
+  {
+   "text": "elohim-storage approving node holds the issued code and hands it over on collect",
+   "line": 116,
+   "state": "CLAIMED",
+   "id": "specs__2026-10-07-one-command-device-join-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-10-07-one-command-device-join-design.md#L116",
+   "class": "imagodei"
+  },
+  {
+   "text": "epr-cli node discovery replacing DEFAULT_NODE; refuses to guess among several nodes",
+   "line": 149,
+   "state": "CLAIMED",
+   "id": "specs__2026-10-07-one-command-device-join-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-10-07-one-command-device-join-design.md#L149",
+   "class": "imagodei"
+  },
+  {
+   "text": "Capability refusal before anything is asked",
+   "line": 157,
+   "state": "CLAIMED",
+   "id": "specs__2026-10-07-one-command-device-join-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-10-07-one-command-device-join-design.md#L157",
+   "class": "imagodei"
+  },
+  {
+   "text": "epr device join [--label] [--portal] [--approver] [--node]: one command that finishes on its own",
+   "line": 167,
+   "state": "CLAIMED",
+   "id": "specs__2026-10-07-one-command-device-join-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-10-07-one-command-device-join-design.md#L167",
+   "class": "imagodei",
+   "note": "epr device --help 2026-11-21"
+  },
+  {
+   "text": "Consent element + doorway-app: probe /auth/consent/view before sign-in, consent_unavailable refusal with the approve command",
+   "line": 178,
+   "state": "CLAIMED",
+   "id": "specs__2026-10-07-one-command-device-join-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-10-07-one-command-device-join-design.md#L178",
+   "class": "imagodei",
+   "note": "alpha refuses before sign-in (e87ee7c69, edge #1572)"
+  },
+  {
+   "text": "Doorway relay carrier: relay sealed ask/answer between nodes that cannot see each other and mount /auth/consent/* for hosted people (device-recognition backlog row 2)",
+   "line": 212,
+   "state": "OPEN",
+   "id": "specs__2026-10-07-one-command-device-join-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-10-07-one-command-device-join-design.md#L212",
+   "class": "imagodei"
+  },
+  {
+   "text": "A join that fails on stale coordinator zomes should say \"this device conductor runs older zomes than the network; update it\"",
+   "line": 245,
+   "state": "OPEN",
+   "id": "specs__2026-10-07-one-command-device-join-design#8",
+   "cites": "genesis/docs/superpowers/specs/2026-10-07-one-command-device-join-design.md#L245",
+   "class": "imagodei"
+  },
+  {
+   "text": "device-provisioning-paths.feature scenarios stay @wip until their step definitions land",
+   "line": 254,
+   "state": "OPEN",
+   "id": "specs__2026-10-07-one-command-device-join-design#9",
+   "cites": "genesis/docs/superpowers/specs/2026-10-07-one-command-device-join-design.md#L254",
+   "class": "imagodei"
+  },
+  {
+   "text": "Household serving receipt owed on the join tip (recast household reproduced the dead-anchor wedge)",
+   "line": 220,
+   "state": "OPEN",
+   "id": "specs__2026-10-07-one-command-device-join-design#10",
+   "cites": "genesis/docs/superpowers/specs/2026-10-07-one-command-device-join-design.md#L220",
+   "class": "imagodei"
+  },
+  {
+   "text": "Graduation: join completes on the household with one approve and the relay carrier has a plan \u2014 then retire to history",
+   "line": 10,
+   "state": "OPEN",
+   "id": "specs__2026-10-07-one-command-device-join-design#11",
+   "cites": "genesis/docs/superpowers/specs/2026-10-07-one-command-device-join-design.md#L10",
+   "class": "imagodei"
+  }
+ ]
+}

@@ -1,0 +1,91 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-10-13-shared-working-versions-social-coding-design.md",
+ "slug": "specs__2026-10-13-shared-working-versions-social-coding-design",
+ "method": "agent-decomposition",
+ "class": "design",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-11-21 (stasis round 2). Draft. Acceptance stories in devflow/shared-working-versions.feature are @wip; the owning habit is red. Depends on the working-version SDK standard (decomposed separately), which is not built.",
+ "count": 10,
+ "items": [
+  {
+   "text": "Brit default creates live attributed proposals visible across the steward own admitted devices",
+   "line": 107,
+   "state": "OPEN",
+   "id": "specs__2026-10-13-shared-working-versions-social-coding-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-10-13-shared-working-versions-social-coding-design.md#L107",
+   "class": "design"
+  },
+  {
+   "text": "Project agreement supplies a branch template (purpose, intended reach, gates needed)",
+   "line": 111,
+   "state": "OPEN",
+   "id": "specs__2026-10-13-shared-working-versions-social-coding-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-10-13-shared-working-versions-social-coding-design.md#L111",
+   "class": "design"
+  },
+  {
+   "text": "Explicit device-private option keeps exploration on its originating device (no listing)",
+   "line": 115,
+   "state": "OPEN",
+   "id": "specs__2026-10-13-shared-working-versions-social-coding-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-10-13-shared-working-versions-social-coding-design.md#L115",
+   "class": "design"
+  },
+  {
+   "text": "Following a branch materializes source like checking out a worktree",
+   "line": 117,
+   "state": "OPEN",
+   "id": "specs__2026-10-13-shared-working-versions-social-coding-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-10-13-shared-working-versions-social-coding-design.md#L117",
+   "class": "design"
+  },
+  {
+   "text": "Agents make attributed proposals by default, merged whole or in part",
+   "line": 121,
+   "state": "OPEN",
+   "id": "specs__2026-10-13-shared-working-versions-social-coding-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-10-13-shared-working-versions-social-coding-design.md#L121",
+   "class": "design"
+  },
+  {
+   "text": "Connected editors exchange live text operations; tools and agents contribute saved changes",
+   "line": 125,
+   "state": "OPEN",
+   "id": "specs__2026-10-13-shared-working-versions-social-coding-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-10-13-shared-working-versions-social-coding-design.md#L125",
+   "class": "design"
+  },
+  {
+   "text": "Compatible concurrent changes merge; ambiguous text, rename/delete and competing binaries surface",
+   "line": 128,
+   "state": "OPEN",
+   "id": "specs__2026-10-13-shared-working-versions-social-coding-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-10-13-shared-working-versions-social-coding-design.md#L128",
+   "class": "design"
+  },
+  {
+   "text": "Delivery order: persistent working versions -> editor/filesystem adapters -> fixed-candidate ceremonies -> Avodah subscriptions -> verified peer/doorway delivery",
+   "line": 283,
+   "state": "OPEN",
+   "id": "specs__2026-10-13-shared-working-versions-social-coding-design#8",
+   "cites": "genesis/docs/superpowers/specs/2026-10-13-shared-working-versions-social-coding-design.md#L283",
+   "class": "design"
+  },
+  {
+   "text": "Read-only project view from current native readings (deliverable independently)",
+   "line": 286,
+   "state": "OPEN",
+   "id": "specs__2026-10-13-shared-working-versions-social-coding-design#9",
+   "cites": "genesis/docs/superpowers/specs/2026-10-13-shared-working-versions-social-coding-design.md#L286",
+   "class": "design"
+  },
+  {
+   "text": "Graduation: acceptance stories pass on two independently enrolled devices with offline resumption, unbuilt source, exact-candidate ceremony evidence and a member-ratified charter with probes",
+   "line": 10,
+   "state": "OPEN",
+   "id": "specs__2026-10-13-shared-working-versions-social-coding-design#10",
+   "cites": "genesis/docs/superpowers/specs/2026-10-13-shared-working-versions-social-coding-design.md#L10",
+   "class": "design"
+  }
+ ]
+}

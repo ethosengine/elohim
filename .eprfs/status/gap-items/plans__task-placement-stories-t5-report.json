@@ -1,0 +1,68 @@
+{
+ "doc": "genesis/docs/superpowers/plans/task-placement-stories-t5-report.md",
+ "slug": "plans__task-placement-stories-t5-report",
+ "method": "agent-decomposition",
+ "class": "architecture",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-11-21 (stasis round 2). T5 STORIES REPORT (DONE_WITH_CONCERNS): seven files, none closed; one open correctness finding in ci-runner-stewarded. compute/.epr-meta still stale 2026-11-21.",
+ "count": 7,
+ "items": [
+  {
+   "text": "auth/hosted-human/08-told-who-holds-my-key.feature (new)",
+   "line": 17,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-stories-t5-report#1",
+   "cites": "genesis/docs/superpowers/plans/task-placement-stories-t5-report.md#L17",
+   "class": "architecture"
+  },
+  {
+   "text": "auth/remote-signing/01-device-signs-hub-runs.feature (new dir + .epr-meta)",
+   "line": 18,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-stories-t5-report#2",
+   "cites": "genesis/docs/superpowers/plans/task-placement-stories-t5-report.md#L18",
+   "class": "architecture"
+  },
+  {
+   "text": "auth/recovery identity-key-lineage-recovery (extended) and root-secured-at-first-contact (new)",
+   "line": 19,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-stories-t5-report#3",
+   "cites": "genesis/docs/superpowers/plans/task-placement-stories-t5-report.md#L19",
+   "class": "architecture"
+  },
+  {
+   "text": "stewardship/agent-act-attributed.feature and compute/inference-grant-revoked.feature (new)",
+   "line": 22,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-stories-t5-report#4",
+   "cites": "genesis/docs/superpowers/plans/task-placement-stories-t5-report.md#L22",
+   "class": "architecture"
+  },
+  {
+   "text": "compute/.epr-meta still says \"two feature files\" and does not cover inference-grant-revoked.feature",
+   "line": 79,
+   "state": "OPEN",
+   "id": "plans__task-placement-stories-t5-report#5",
+   "cites": "genesis/docs/superpowers/plans/task-placement-stories-t5-report.md#L79",
+   "class": "architecture",
+   "note": "confirmed 2026-11-21 (L6)"
+  },
+  {
+   "text": "ci-runner-stewarded Scenario 2 L82-84: Then mixes results of two actions \u2014 split",
+   "line": 91,
+   "state": "OPEN",
+   "id": "plans__task-placement-stories-t5-report#6",
+   "cites": "genesis/docs/superpowers/plans/task-placement-stories-t5-report.md#L91",
+   "class": "architecture"
+  },
+  {
+   "text": "Ten round-6 findings in pre-existing text for their owners (graduated identity, REA, household topology, rotation vs enrollment, ...)",
+   "line": 43,
+   "state": "OPEN",
+   "id": "plans__task-placement-stories-t5-report#7",
+   "cites": "genesis/docs/superpowers/plans/task-placement-stories-t5-report.md#L43",
+   "class": "architecture"
+  }
+ ]
+}

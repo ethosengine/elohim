@@ -1,0 +1,67 @@
+{
+ "doc": "genesis/docs/superpowers/plans/task-rg1-steward-report.md",
+ "slug": "plans__task-rg1-steward-report",
+ "method": "agent-decomposition",
+ "class": "substrate",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-11-21 (stasis round 2). A re-genesis-1 (2026-11-05 sprint) task REPORT; T10+T11, landed on dev 9f9fef877..e85eeeee5 (L2); steward-node and elohim-ark gates green post-L2.",
+ "count": 7,
+ "items": [
+  {
+   "text": "steward/node shard protocol /elohim/shard/2.0.0 re-exporting storage ShardCodec types",
+   "line": 25,
+   "state": "CLAIMED",
+   "id": "plans__task-rg1-steward-report#1",
+   "cites": "genesis/docs/superpowers/plans/task-rg1-steward-report.md#L25",
+   "class": "substrate"
+  },
+  {
+   "text": "Action params take blob_cid parsed by ByteCid::parse",
+   "line": 26,
+   "state": "CLAIMED",
+   "id": "plans__task-rg1-steward-report#2",
+   "cites": "genesis/docs/superpowers/plans/task-rg1-steward-report.md#L26",
+   "class": "substrate"
+  },
+  {
+   "text": "CLI exec replicate-blob/evict-blob take --cid",
+   "line": 27,
+   "state": "CLAIMED",
+   "id": "plans__task-rg1-steward-report#3",
+   "cites": "genesis/docs/superpowers/plans/task-rg1-steward-report.md#L27",
+   "class": "substrate"
+  },
+  {
+   "text": "BlobManager on the new BlobStore; insert refuses bytes whose recomputed CID differs",
+   "line": 28,
+   "state": "CLAIMED",
+   "id": "plans__task-rg1-steward-report#4",
+   "cites": "genesis/docs/superpowers/plans/task-rg1-steward-report.md#L28",
+   "class": "substrate"
+  },
+  {
+   "text": "ark ArtifactRef::Pinned cid must satisfy ByteCid::parse; ingestion verifies bytes",
+   "line": 34,
+   "state": "CLAIMED",
+   "id": "plans__task-rg1-steward-report#5",
+   "cites": "genesis/docs/superpowers/plans/task-rg1-steward-report.md#L34",
+   "class": "substrate"
+  },
+  {
+   "text": "just gate steward-node EXIT=0 after rust-style paydown 113 -> 111; just gate elohim-ark EXIT=0",
+   "line": 42,
+   "state": "CLAIMED",
+   "id": "plans__task-rg1-steward-report#6",
+   "cites": "genesis/docs/superpowers/plans/task-rg1-steward-report.md#L42",
+   "class": "substrate"
+  },
+  {
+   "text": "No striped RS port in steward (nothing to port) \u2014 decide whether steward needs striped shards",
+   "line": 48,
+   "state": "OPEN",
+   "id": "plans__task-rg1-steward-report#7",
+   "cites": "genesis/docs/superpowers/plans/task-rg1-steward-report.md#L48",
+   "class": "substrate"
+  }
+ ]
+}

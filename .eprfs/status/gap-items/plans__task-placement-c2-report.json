@@ -1,0 +1,96 @@
+{
+ "doc": "genesis/docs/superpowers/plans/task-placement-c2-report.md",
+ "slug": "plans__task-placement-c2-report",
+ "method": "agent-decomposition",
+ "class": "architecture",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-11-21 (stasis round 2). C2 REPORT (DONE_WITH_CONCERNS) with fix rounds, two Codex reviews and an integration addendum; consumer gates elohim-storage, doorway and k8s-bridge EXIT=0. Residue re-checked against the tree 2026-11-21.",
+ "count": 10,
+ "items": [
+  {
+   "text": "elohim-compute default-on runtime feature; actuation/build_info/detail_level ungated",
+   "line": 29,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-c2-report#1",
+   "cites": "genesis/docs/superpowers/plans/task-placement-c2-report.md#L29",
+   "class": "architecture"
+  },
+  {
+   "text": "elohim/placement/core crate with floor, ceiling, decide, explain, ranking contract and R-P rails",
+   "line": 35,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-c2-report#2",
+   "cites": "genesis/docs/superpowers/plans/task-placement-c2-report.md#L35",
+   "class": "architecture"
+  },
+  {
+   "text": "epr-rea pub cid_serde replaces placement-core's local copy (blocked landing per \u00a71.4)",
+   "line": 105,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-c2-report#3",
+   "cites": "genesis/docs/superpowers/plans/task-placement-c2-report.md#L105",
+   "class": "architecture",
+   "note": "placement/core now uses elohim_epr_rea::index::cid_serde; no local cid_serde.rs"
+  },
+  {
+   "text": "LimitOwner::Charter",
+   "line": 106,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-c2-report#4",
+   "cites": "genesis/docs/superpowers/plans/task-placement-c2-report.md#L106",
+   "class": "architecture",
+   "note": "line 250 records it landed"
+  },
+  {
+   "text": "ark-core no_runtime_or_io_deps must see [dependencies.<pkg>] and [target.*.dependencies] tables",
+   "line": 254,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-c2-report#5",
+   "cites": "genesis/docs/superpowers/plans/task-placement-c2-report.md#L254",
+   "class": "architecture",
+   "note": "lib.rs declared_dependencies now walks target tables via toml_edit"
+  },
+  {
+   "text": "_gate-elohim-compute does not test --no-default-features (root justfile recipe still runs plain cargo test)",
+   "line": 104,
+   "state": "OPEN",
+   "id": "plans__task-placement-c2-report#6",
+   "cites": "genesis/docs/superpowers/plans/task-placement-c2-report.md#L104",
+   "class": "architecture",
+   "note": "covered only indirectly by just gate elohim-placement"
+  },
+  {
+   "text": "fulfilment_id and commitment_id share hex16 and ignore len_secs: a mid-period period-length change drafts one id for two lengths",
+   "line": 313,
+   "state": "OPEN",
+   "id": "plans__task-placement-c2-report#7",
+   "cites": "genesis/docs/superpowers/plans/task-placement-c2-report.md#L313",
+   "class": "architecture"
+  },
+  {
+   "text": "fulfilment_promise names a promise only for custody kinds; relay, live-session, wake-ingress, hub-runtime, inference and index-fold settle through no reading",
+   "line": 424,
+   "state": "OPEN",
+   "id": "plans__task-placement-c2-report#8",
+   "cites": "genesis/docs/superpowers/plans/task-placement-c2-report.md#L424",
+   "class": "architecture",
+   "note": "placement/core/src/adopt.rs:186 still custody-only"
+  },
+  {
+   "text": "Reading carries no provider: no reading proves which carrier held the bytes (custody Ports::evidence adapter obligation)",
+   "line": 425,
+   "state": "OPEN",
+   "id": "plans__task-placement-c2-report#9",
+   "cites": "genesis/docs/superpowers/plans/task-placement-c2-report.md#L425",
+   "class": "architecture"
+  },
+  {
+   "text": "Production Floor adapters and the task runner / materialization / completion path remain follow-on work",
+   "line": 455,
+   "state": "OPEN",
+   "id": "plans__task-placement-c2-report#10",
+   "cites": "genesis/docs/superpowers/plans/task-placement-c2-report.md#L455",
+   "class": "architecture"
+  }
+ ]
+}

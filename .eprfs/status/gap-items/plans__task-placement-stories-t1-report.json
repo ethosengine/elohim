@@ -1,0 +1,75 @@
+{
+ "doc": "genesis/docs/superpowers/plans/task-placement-stories-t1-report.md",
+ "slug": "plans__task-placement-stories-t1-report",
+ "method": "agent-decomposition",
+ "class": "architecture",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-11-21 (stasis round 2). T1 STORIES REPORT (DONE_WITH_CONCERNS): seven @wip feature files, none closed the six-round loop; correctness pass 2026-10-20 left no correctness finding open.",
+ "count": 8,
+ "items": [
+  {
+   "text": "storage/materialize-what-is-read.feature (new, @wip, parses)",
+   "line": 19,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-stories-t1-report#1",
+   "cites": "genesis/docs/superpowers/plans/task-placement-stories-t1-report.md#L19",
+   "class": "architecture"
+  },
+  {
+   "text": "dataplane/reach-on-tree-root.feature (new, @wip, parses)",
+   "line": 20,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-stories-t1-report#2",
+   "cites": "genesis/docs/superpowers/plans/task-placement-stories-t1-report.md#L20",
+   "class": "architecture"
+  },
+  {
+   "text": "lms/kept-offline-app-opens.feature (new, @wip, parses)",
+   "line": 21,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-stories-t1-report#3",
+   "cites": "genesis/docs/superpowers/plans/task-placement-stories-t1-report.md#L21",
+   "class": "architecture"
+  },
+  {
+   "text": "storage/derived-by-identity.feature (new, @wip, parses)",
+   "line": 22,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-stories-t1-report#4",
+   "cites": "genesis/docs/superpowers/plans/task-placement-stories-t1-report.md#L22",
+   "class": "architecture"
+  },
+  {
+   "text": "storage/index-rederivable.feature (new, @wip, parses)",
+   "line": 23,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-stories-t1-report#5",
+   "cites": "genesis/docs/superpowers/plans/task-placement-stories-t1-report.md#L23",
+   "class": "architecture"
+  },
+  {
+   "text": "devflow/repository-depth-by-device.feature and agent-session-holds-its-read-set.feature (new, @wip, parse)",
+   "line": 24,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-stories-t1-report#6",
+   "cites": "genesis/docs/superpowers/plans/task-placement-stories-t1-report.md#L24",
+   "class": "architecture"
+  },
+  {
+   "text": "concern kept-offline has no habit: mint one or retag to an existing concern",
+   "line": 21,
+   "state": "OPEN",
+   "id": "plans__task-placement-stories-t1-report#7",
+   "cites": "genesis/docs/superpowers/plans/task-placement-stories-t1-report.md#L21",
+   "class": "architecture"
+  },
+  {
+   "text": "Round-6 interpretability findings left for the operator to defer or fix",
+   "line": 27,
+   "state": "OPEN",
+   "id": "plans__task-placement-stories-t1-report#8",
+   "cites": "genesis/docs/superpowers/plans/task-placement-stories-t1-report.md#L27",
+   "class": "architecture"
+  }
+ ]
+}

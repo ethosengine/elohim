@@ -1,0 +1,84 @@
+{
+ "doc": "genesis/docs/superpowers/plans/task-rg1-app-report.md",
+ "slug": "plans__task-rg1-app-report",
+ "method": "agent-decomposition",
+ "class": "ui-truth-layer",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-11-21 (stasis round 2). A re-genesis-1 (2026-11-05 sprint) task REPORT; T7 (gap regenesis-1#T7), landed b71acbc42 on dev (L2); elohim-app + storybook GREEN post-L2.",
+ "count": 9,
+ "items": [
+  {
+   "text": "raw-cid-verify.ts is a thin wrapper over @elohim/epr addressForm/verifyAddress (verifyByteCid only for the bytes form)",
+   "line": 20,
+   "state": "CLAIMED",
+   "id": "plans__task-rg1-app-report#1",
+   "cites": "genesis/docs/superpowers/plans/task-rg1-app-report.md#L20",
+   "class": "ui-truth-layer"
+  },
+  {
+   "text": "Service worker apps-v4 cache, staleAppCaches evicts v1-v3, capability probe reads X-Content-Address",
+   "line": 21,
+   "state": "CLAIMED",
+   "id": "plans__task-rg1-app-report#2",
+   "cites": "genesis/docs/superpowers/plans/task-rg1-app-report.md#L21",
+   "class": "ui-truth-layer"
+  },
+  {
+   "text": "blobHash -> blobCid across app, lamad and library; lamad blob-url fails closed",
+   "line": 23,
+   "state": "CLAIMED",
+   "id": "plans__task-rg1-app-report#3",
+   "cites": "genesis/docs/superpowers/plans/task-rg1-app-report.md#L23",
+   "class": "ui-truth-layer"
+  },
+  {
+   "text": "lamad blob-verification.service.ts rewritten to local BLAKE3 against the expected byte CID",
+   "line": 24,
+   "state": "CLAIMED",
+   "id": "plans__task-rg1-app-report#4",
+   "cites": "genesis/docs/superpowers/plans/task-rg1-app-report.md#L24",
+   "class": "ui-truth-layer"
+  },
+  {
+   "text": "elohim-core loader admits only a canonical byte CID, BLAKE3-verified",
+   "line": 25,
+   "state": "CLAIMED",
+   "id": "plans__task-rg1-app-report#5",
+   "cites": "genesis/docs/superpowers/plans/task-rg1-app-report.md#L25",
+   "class": "ui-truth-layer"
+  },
+  {
+   "text": "~114 sha256- spec fixtures re-minted as real byte CIDs",
+   "line": 27,
+   "state": "CLAIMED",
+   "id": "plans__task-rg1-app-report#6",
+   "cites": "genesis/docs/superpowers/plans/task-rg1-app-report.md#L27",
+   "class": "ui-truth-layer"
+  },
+  {
+   "text": "Eyes-first pnpm look and the X-Content-Address console check on a served shell",
+   "line": 58,
+   "state": "OPEN",
+   "id": "plans__task-rg1-app-report#7",
+   "cites": "genesis/docs/superpowers/plans/task-rg1-app-report.md#L58",
+   "class": "ui-truth-layer"
+  },
+  {
+   "text": "WTR element suites not run; a shared byte-CID leaf package (three ~60-line copies: app raw-cid-verify, lamad utils/byte-cid.ts, elohim-core loader/byte-cid.ts)",
+   "line": 59,
+   "state": "OPEN",
+   "id": "plans__task-rg1-app-report#8",
+   "cites": "genesis/docs/superpowers/plans/task-rg1-app-report.md#L59",
+   "class": "ui-truth-layer",
+   "note": "both copies still present 2026-11-21"
+  },
+  {
+   "text": "@noble/hashes major split in the lock (1.x and 2.0.1); blake3 subpath is the 1.x spelling",
+   "line": 60,
+   "state": "OPEN",
+   "id": "plans__task-rg1-app-report#9",
+   "cites": "genesis/docs/superpowers/plans/task-rg1-app-report.md#L60",
+   "class": "ui-truth-layer"
+  }
+ ]
+}

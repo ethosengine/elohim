@@ -1,0 +1,84 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-10-19-session-covenant-epr-design.md",
+ "slug": "specs__2026-10-19-session-covenant-epr-design",
+ "method": "agent-decomposition",
+ "class": "governance",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-11-21 (stasis round 2). Rung-1 covenant verbs (offer, the clause-recording verb, check, show) are implemented in the installed epr CLI and brit covenant listings are bound to the signed session (brit 10d083b5); habit rule-variance-under-covenant reads green 2026-11-21, so the graduation trigger appears met and the spec is owed its decompose into the habit atom + brit spec.",
+ "count": 9,
+ "items": [
+  {
+   "text": "Covenant offer verb",
+   "line": 58,
+   "state": "CLAIMED",
+   "id": "specs__2026-10-19-session-covenant-epr-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-10-19-session-covenant-epr-design.md#L58",
+   "class": "governance"
+  },
+  {
+   "text": "Clause-recording verb (steward-of-record clauses signed by the repository brit agent key)",
+   "line": 76,
+   "state": "CLAIMED",
+   "id": "specs__2026-10-19-session-covenant-epr-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-10-19-session-covenant-epr-design.md#L76",
+   "class": "governance"
+  },
+  {
+   "text": "Covenant check --rule ID --path P with the six admission conditions",
+   "line": 112,
+   "state": "CLAIMED",
+   "id": "specs__2026-10-19-session-covenant-epr-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-10-19-session-covenant-epr-design.md#L112",
+   "class": "governance"
+  },
+  {
+   "text": "Covenant show verb",
+   "line": 135,
+   "state": "CLAIMED",
+   "id": "specs__2026-10-19-session-covenant-epr-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-10-19-session-covenant-epr-design.md#L135",
+   "class": "governance"
+  },
+  {
+   "text": "Blind-reader hook reads a held variance; rule-variance-under-covenant carries the evidence",
+   "line": 12,
+   "state": "CLAIMED",
+   "id": "specs__2026-10-19-session-covenant-epr-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-10-19-session-covenant-epr-design.md#L12",
+   "class": "governance",
+   "note": ".claude/hooks/blind-reader-review.py + covenant_hooks_test.py; habit status green"
+  },
+  {
+   "text": "Graduation action: decompose this spec into the habit atom and the brit spec, then retire it (compaction BACK fire)",
+   "line": 14,
+   "state": "OPEN",
+   "id": "specs__2026-10-19-session-covenant-epr-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-10-19-session-covenant-epr-design.md#L14",
+   "class": "governance"
+  },
+  {
+   "text": "Rung 1b: bind the brit agent key to the device roster",
+   "line": 159,
+   "state": "OPEN",
+   "id": "specs__2026-10-19-session-covenant-epr-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-10-19-session-covenant-epr-design.md#L159",
+   "class": "governance"
+  },
+  {
+   "text": "Rung 2: the human own key co-signs each clause",
+   "line": 160,
+   "state": "OPEN",
+   "id": "specs__2026-10-19-session-covenant-epr-design#8",
+   "cites": "genesis/docs/superpowers/specs/2026-10-19-session-covenant-epr-design.md#L160",
+   "class": "governance"
+  },
+  {
+   "text": "Rung 3: notarize the clause as a Mishpat Commitment with action varies-rule (coordinator-only)",
+   "line": 161,
+   "state": "OPEN",
+   "id": "specs__2026-10-19-session-covenant-epr-design#9",
+   "cites": "genesis/docs/superpowers/specs/2026-10-19-session-covenant-epr-design.md#L161",
+   "class": "governance"
+  }
+ ]
+}

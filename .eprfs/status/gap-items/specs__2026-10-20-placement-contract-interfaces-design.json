@@ -1,0 +1,182 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-10-20-placement-contract-interfaces-design.md",
+ "slug": "specs__2026-10-20-placement-contract-interfaces-design",
+ "method": "agent-decomposition",
+ "class": "architecture",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-11-21 (stasis round 2). Interfaces spec (gap plans__2026-10-20-placement-contract-architecture-plan#3). Every seam A-I and \u00a72.0 has a first instance per the 2026-10-21 implementation reconciliation table (C1-C6 lanes, decomposed this round) \u2014 CLAIMED. OPEN = the \u00a73.2 retire table (mechanisms still present 2026-11-21: SALVAGE_TARGET_REPLICAS and SALVAGE_DIVERSITY_PLACEMENT in elohim-storage main.rs, select_diverse in elohim-peer-fabric, tryDeliveryPeers in apps-sw.ts), the \"still open before runtime graduation\" list and the \u00a76 undecided numbers. Runtime follow-ons overlap plans__task-placement-c2-report and plans__task-placement-c3-report items; they are cited there too, not duplicated as work.",
+ "count": 20,
+ "items": [
+  {
+   "text": "\u00a72.0 unanswered type and status channel (R7) \u2014 first instance in seam-contracts",
+   "line": 334,
+   "state": "CLAIMED",
+   "id": "specs__2026-10-20-placement-contract-interfaces-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-10-20-placement-contract-interfaces-design.md#L334",
+   "class": "architecture",
+   "note": "C1"
+  },
+  {
+   "text": "Seam A storage tier and tier chain with reach injected \u2014 TierChain, BlobStoreTier, RootReachGate",
+   "line": 450,
+   "state": "CLAIMED",
+   "id": "specs__2026-10-20-placement-contract-interfaces-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-10-20-placement-contract-interfaces-design.md#L450",
+   "class": "architecture",
+   "note": "C4, C5"
+  },
+  {
+   "text": "Seam B view, walk and query",
+   "line": 956,
+   "state": "CLAIMED",
+   "id": "specs__2026-10-20-placement-contract-interfaces-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-10-20-placement-contract-interfaces-design.md#L956",
+   "class": "architecture",
+   "note": "E1, E2"
+  },
+  {
+   "text": "Seam C derivation by identity \u2014 interfaces only; derived tree-path form not admitted by a serving tier yet",
+   "line": 1182,
+   "state": "CLAIMED",
+   "id": "specs__2026-10-20-placement-contract-interfaces-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-10-20-placement-contract-interfaces-design.md#L1182",
+   "class": "architecture",
+   "note": "C4"
+  },
+  {
+   "text": "Seam D placement floor and Seam E ceiling (interfaces) in placement-core",
+   "line": 1416,
+   "state": "CLAIMED",
+   "id": "specs__2026-10-20-placement-contract-interfaces-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-10-20-placement-contract-interfaces-design.md#L1416",
+   "class": "architecture",
+   "note": "C2"
+  },
+  {
+   "text": "Seam F a task placed on a berth (ark-core task.rs)",
+   "line": 2339,
+   "state": "CLAIMED",
+   "id": "specs__2026-10-20-placement-contract-interfaces-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-10-20-placement-contract-interfaces-design.md#L2339",
+   "class": "architecture",
+   "note": "C3"
+  },
+  {
+   "text": "Seam G manifest needs and SDK schemas; Seam H TypeScript surface and the service worker as a tier; Seam I probe shape",
+   "line": 2490,
+   "state": "CLAIMED",
+   "id": "specs__2026-10-20-placement-contract-interfaces-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-10-20-placement-contract-interfaces-design.md#L2490",
+   "class": "architecture",
+   "note": "S, C6, C1"
+  },
+  {
+   "text": "Retire: ingest selector household-first greedy and select_diverse household pass, once ingest expresses needs to the floor and serve routing feeds a TierOrder",
+   "line": 3033,
+   "state": "OPEN",
+   "id": "specs__2026-10-20-placement-contract-interfaces-design#8",
+   "cites": "genesis/docs/superpowers/specs/2026-10-20-placement-contract-interfaces-design.md#L3033",
+   "class": "architecture",
+   "note": "select_diverse still in elohim-peer-fabric/src/score.rs"
+  },
+  {
+   "text": "Retire: salvage ticker / custody_sweep_seconds as placement triggers, salvage self-append and per-blob honored counts, once the custody Ports lands",
+   "line": 3036,
+   "state": "OPEN",
+   "id": "specs__2026-10-20-placement-contract-interfaces-design#9",
+   "cites": "genesis/docs/superpowers/specs/2026-10-20-placement-contract-interfaces-design.md#L3036",
+   "class": "architecture"
+  },
+  {
+   "text": "Retire: SALVAGE_TARGET_REPLICAS and SALVAGE_DIVERSITY_PLACEMENT, replaced by Charter::resolve(loss) and Demand.domains",
+   "line": 3039,
+   "state": "OPEN",
+   "id": "specs__2026-10-20-placement-contract-interfaces-design#10",
+   "cites": "genesis/docs/superpowers/specs/2026-10-20-placement-contract-interfaces-design.md#L3039",
+   "class": "architecture",
+   "note": "both still in elohim-storage main.rs 2026-11-21"
+  },
+  {
+   "text": "Retire: per-blob placement granularity for NeedKey::TreeView via the custody migration",
+   "line": 3041,
+   "state": "OPEN",
+   "id": "specs__2026-10-20-placement-contract-interfaces-design#11",
+   "cites": "genesis/docs/superpowers/specs/2026-10-20-placement-contract-interfaces-design.md#L3041",
+   "class": "architecture"
+  },
+  {
+   "text": "Retire: uncached peer bytes in the worker (tryDeliveryPeers) for verified HttpTier reads through TierChain",
+   "line": 3042,
+   "state": "OPEN",
+   "id": "specs__2026-10-20-placement-contract-interfaces-design#12",
+   "cites": "genesis/docs/superpowers/specs/2026-10-20-placement-contract-interfaces-design.md#L3042",
+   "class": "architecture",
+   "note": "apps-sw.ts:392"
+  },
+  {
+   "text": "Retire: MaterializationPolicy as the materializer input and LocalMaterializer second verify, after eprfs-local materializes by view",
+   "line": 3044,
+   "state": "OPEN",
+   "id": "specs__2026-10-20-placement-contract-interfaces-design#13",
+   "cites": "genesis/docs/superpowers/specs/2026-10-20-placement-contract-interfaces-design.md#L3044",
+   "class": "architecture"
+  },
+  {
+   "text": "Retire: the doorway locality-ladder reach function for Reach::openness (owner reach-enforced-everywhere)",
+   "line": 3047,
+   "state": "OPEN",
+   "id": "specs__2026-10-20-placement-contract-interfaces-design#14",
+   "cites": "genesis/docs/superpowers/specs/2026-10-20-placement-contract-interfaces-design.md#L3047",
+   "class": "architecture"
+  },
+  {
+   "text": "Reach after inclusion: operator resolves membership-by-inclusion vs per-object restriction before a remote tier ships",
+   "line": 3371,
+   "state": "OPEN",
+   "id": "specs__2026-10-20-placement-contract-interfaces-design#15",
+   "cites": "genesis/docs/superpowers/specs/2026-10-20-placement-contract-interfaces-design.md#L3371",
+   "class": "architecture"
+  },
+  {
+   "text": "Publication and licensing of eprfs-serve and seam-contracts (publish = false; AGPL vs Apache)",
+   "line": 3375,
+   "state": "OPEN",
+   "id": "specs__2026-10-20-placement-contract-interfaces-design#16",
+   "cites": "genesis/docs/superpowers/specs/2026-10-20-placement-contract-interfaces-design.md#L3375",
+   "class": "architecture",
+   "note": "licence-tiers decision 2026-11-06 sets the tiers; the release is still owed"
+  },
+  {
+   "text": "Runtime serving and the worker: Rust remote tier route, signer agreement, live cache/head-plane paths, persistence, tier broadcast",
+   "line": 3383,
+   "state": "OPEN",
+   "id": "specs__2026-10-20-placement-contract-interfaces-design#17",
+   "cites": "genesis/docs/superpowers/specs/2026-10-20-placement-contract-interfaces-design.md#L3383",
+   "class": "architecture"
+  },
+  {
+   "text": "Identity and tuning follow-ons: commitment ids omit scope; fulfilment identity omits period length; posture-less receiver household source",
+   "line": 3388,
+   "state": "OPEN",
+   "id": "specs__2026-10-20-placement-contract-interfaces-design#18",
+   "cites": "genesis/docs/superpowers/specs/2026-10-20-placement-contract-interfaces-design.md#L3388",
+   "class": "architecture"
+  },
+  {
+   "text": "Not decided: the numbers (period length, forwarding budgets, retention floors, max_moves_per_event defaults), prefetch policy for depth 2, WeightedCapacity weights",
+   "line": 3229,
+   "state": "OPEN",
+   "id": "specs__2026-10-20-placement-contract-interfaces-design#19",
+   "cites": "genesis/docs/superpowers/specs/2026-10-20-placement-contract-interfaces-design.md#L3229",
+   "class": "architecture"
+  },
+  {
+   "text": "Graduation: each seam first instance compiles unchanged with its contract test green in its owning gate",
+   "line": 12,
+   "state": "OPEN",
+   "id": "specs__2026-10-20-placement-contract-interfaces-design#20",
+   "cites": "genesis/docs/superpowers/specs/2026-10-20-placement-contract-interfaces-design.md#L12",
+   "class": "architecture"
+  }
+ ]
+}

@@ -1,0 +1,76 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-10-22-sense-organ-design.md",
+ "slug": "specs__2026-10-22-sense-organ-design",
+ "method": "agent-decomposition",
+ "class": "process-meta",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-11-21 (stasis round 2). Draft. S1 and S3 are on disk (epr flow sense, flow/sense.rs, tests/flow_sense.rs, genesis/agentic/fixtures/sense-restraint/); the headline sense: slot reads 13 of 64 bounds observed, numb 51 on 2026-11-21. Habit sensing-rides-the-measure-plane red.",
+ "count": 8,
+ "items": [
+  {
+   "text": "S0: spec plus census and probe rulings recorded as notes",
+   "line": 161,
+   "state": "CLAIMED",
+   "id": "specs__2026-10-22-sense-organ-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-10-22-sense-organ-design.md#L161",
+   "class": "process-meta"
+  },
+  {
+   "text": "S1: probe:/dispatch-* parse, flow/sense.rs, three probes, two lenses, --breaches, sense: headline slot, tests/flow_sense.rs",
+   "line": 162,
+   "state": "CLAIMED",
+   "id": "specs__2026-10-22-sense-organ-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-10-22-sense-organ-design.md#L162",
+   "class": "process-meta"
+  },
+  {
+   "text": "S3: shift contract example and restraint fixture under genesis/agentic/fixtures/sense-restraint/",
+   "line": 164,
+   "state": "CLAIMED",
+   "id": "specs__2026-10-22-sense-organ-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-10-22-sense-organ-design.md#L164",
+   "class": "process-meta"
+  },
+  {
+   "text": "S2: concern dev-system-equilibrium on memory/drift lenses; each *-drift-signal producer becomes a probe as its procedure is made exact",
+   "line": 163,
+   "state": "OPEN",
+   "id": "specs__2026-10-22-sense-organ-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-10-22-sense-organ-design.md#L163",
+   "class": "process-meta"
+  },
+  {
+   "text": "S4: write-time inject rail (watermark comparisons, .jsonl appenders, wall-clock reads in measurement code) naming epr flow sense and elohim_epr_rea::Bound",
+   "line": 165,
+   "state": "OPEN",
+   "id": "specs__2026-10-22-sense-organ-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-10-22-sense-organ-design.md#L165",
+   "class": "process-meta"
+  },
+  {
+   "text": "Later: migrate the findings ledgers (ledgers-fold-once)",
+   "line": 168,
+   "state": "OPEN",
+   "id": "specs__2026-10-22-sense-organ-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-10-22-sense-organ-design.md#L168",
+   "class": "process-meta"
+  },
+  {
+   "text": "Named debt: the concern: key carries two relations (prices on a lens, governed-by on a policy) \u2014 spell each explicitly",
+   "line": 135,
+   "state": "OPEN",
+   "id": "specs__2026-10-22-sense-organ-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-10-22-sense-organ-design.md#L135",
+   "class": "process-meta"
+  },
+  {
+   "text": "Graduation: the sense: numb count falls from its first reading; every bypass/duplication candidate carries a ruling; a fresh agent takes one candidate to a ruling from --breaches alone",
+   "line": 12,
+   "state": "OPEN",
+   "id": "specs__2026-10-22-sense-organ-design#8",
+   "cites": "genesis/docs/superpowers/specs/2026-10-22-sense-organ-design.md#L12",
+   "class": "process-meta",
+   "note": "headline 2026-11-21: numb 51"
+  }
+ ]
+}

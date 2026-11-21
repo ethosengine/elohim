@@ -1,0 +1,94 @@
+{
+ "doc": "genesis/docs/superpowers/plans/2026-08-14-dataplane-sdk-path.md",
+ "slug": "plans__2026-08-14-dataplane-sdk-path",
+ "method": "agent-decomposition",
+ "class": "substrate",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-11-21 (stasis round 2). Ranked blockers to a packageable dataplane SDK (2026-08-14). Critical-path step 3 and the native-mode write-loss fix are marked DONE in the doc; IrohSyncClient is now wired from elohim-storage main.rs (2026-11-21) but parity is not verified here. Steps 1, 2, 4, 5 are not re-verified since 2026-08-16.",
+ "count": 10,
+ "items": [
+  {
+   "text": "Close the convergence algebra: SPIN discharge (anchor-divergent + undeclared rows), durable MissLedger, the named stuck-state family",
+   "line": 143,
+   "state": "OPEN",
+   "id": "plans__2026-08-14-dataplane-sdk-path#1",
+   "cites": "genesis/docs/superpowers/plans/2026-08-14-dataplane-sdk-path.md#L143",
+   "class": "substrate"
+  },
+  {
+   "text": "Head-plane L1-L3: batched head externs, head-plane corpus digest, seed-path reach expression",
+   "line": 145,
+   "state": "OPEN",
+   "id": "plans__2026-08-14-dataplane-sdk-path#2",
+   "cites": "genesis/docs/superpowers/plans/2026-08-14-dataplane-sdk-path.md#L145",
+   "class": "substrate"
+  },
+  {
+   "text": "Brainstorm the three .dataplane() design questions and land the facade with substrate-verify.ts as first consumer",
+   "line": 148,
+   "state": "CLAIMED",
+   "id": "plans__2026-08-14-dataplane-sdk-path#3",
+   "cites": "genesis/docs/superpowers/plans/2026-08-14-dataplane-sdk-path.md#L148",
+   "class": "substrate",
+   "note": "DONE 2026-08-16, genesis #1477/#1478"
+  },
+  {
+   "text": "Facade residue: codegen-consumer wiring and http.rs input validation (TS query interfaces hand-declared)",
+   "line": 159,
+   "state": "OPEN",
+   "id": "plans__2026-08-14-dataplane-sdk-path#4",
+   "cites": "genesis/docs/superpowers/plans/2026-08-14-dataplane-sdk-path.md#L159",
+   "class": "substrate"
+  },
+  {
+   "text": "Factor the minimal seam set: shared codec crate, P2PDispatcher trait, EprValidator",
+   "line": 161,
+   "state": "OPEN",
+   "id": "plans__2026-08-14-dataplane-sdk-path#5",
+   "cites": "genesis/docs/superpowers/plans/2026-08-14-dataplane-sdk-path.md#L161",
+   "class": "substrate",
+   "note": "no trait P2PDispatcher / EprValidator found 2026-11-21"
+  },
+  {
+   "text": "Decide the transport story (iroh parity vs pinned-libp2p v1) as an explicit contract line",
+   "line": 163,
+   "state": "OPEN",
+   "id": "plans__2026-08-14-dataplane-sdk-path#6",
+   "cites": "genesis/docs/superpowers/plans/2026-08-14-dataplane-sdk-path.md#L163",
+   "class": "substrate"
+  },
+  {
+   "text": "Trust gradient: verify_trust_context only at handshake, TrustService::handle a stub, flat 3600 s TTL, dev_mode socket inert",
+   "line": 121,
+   "state": "OPEN",
+   "id": "plans__2026-08-14-dataplane-sdk-path#7",
+   "cites": "genesis/docs/superpowers/plans/2026-08-14-dataplane-sdk-path.md#L121",
+   "class": "substrate"
+  },
+  {
+   "text": "Draft-to-graduate content path (Category B drafts) has no substrate verb",
+   "line": 129,
+   "state": "OPEN",
+   "id": "plans__2026-08-14-dataplane-sdk-path#8",
+   "cites": "genesis/docs/superpowers/plans/2026-08-14-dataplane-sdk-path.md#L129",
+   "class": "substrate"
+  },
+  {
+   "text": "crates/elohim-sdk Native-mode flush silent write loss and feature-matrix CI coverage",
+   "line": 104,
+   "state": "CLAIMED",
+   "id": "plans__2026-08-14-dataplane-sdk-path#9",
+   "cites": "genesis/docs/superpowers/plans/2026-08-14-dataplane-sdk-path.md#L104",
+   "class": "substrate",
+   "note": "fixed 2026-08-15"
+  },
+  {
+   "text": "Mint the dataplane-sdk habit (proposed, probe green 2026-08-16; blocked only by the habit cap at the time)",
+   "line": 12,
+   "state": "OPEN",
+   "id": "plans__2026-08-14-dataplane-sdk-path#10",
+   "cites": "genesis/docs/superpowers/plans/2026-08-14-dataplane-sdk-path.md#L12",
+   "class": "substrate"
+  }
+ ]
+}

@@ -1,0 +1,95 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-10-22-habit-progress-scalar-design.md",
+ "slug": "specs__2026-10-22-habit-progress-scalar-design",
+ "method": "agent-decomposition",
+ "class": "process-meta",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-11-21 (stasis round 2). Status active. API surface \u00a77 is on disk (epr-rea fold::level_evidence, stock::coverage_time, epr ClaimKind::rank/weaker; habits-status.py reads red mass via epr flow stocks --stock red-mass --window). Graduation and \u00a78 frontier OPEN.",
+ "count": 10,
+ "items": [
+  {
+   "text": "Habit atom rea: block declaration (parts, budget, return)",
+   "line": 70,
+   "state": "CLAIMED",
+   "id": "specs__2026-10-22-habit-progress-scalar-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-10-22-habit-progress-scalar-design.md#L70",
+   "class": "process-meta",
+   "note": "e.g. .epr-meta/reach-enforced-everywhere.habit.md"
+  },
+  {
+   "text": "Episodes, red mass and the history walk (history-derived time, annotations never discharge)",
+   "line": 126,
+   "state": "CLAIMED",
+   "id": "specs__2026-10-22-habit-progress-scalar-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-10-22-habit-progress-scalar-design.md#L126",
+   "class": "process-meta"
+  },
+  {
+   "text": "Readout: red-mass stock over a window, per-habit rows, headline segment, --full columns",
+   "line": 168,
+   "state": "CLAIMED",
+   "id": "specs__2026-10-22-habit-progress-scalar-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-10-22-habit-progress-scalar-design.md#L168",
+   "class": "process-meta",
+   "note": ".claude/scripts/habits-status.py:309-324"
+  },
+  {
+   "text": "progress module, public fold::level_evidence and stock::coverage_time",
+   "line": 198,
+   "state": "CLAIMED",
+   "id": "specs__2026-10-22-habit-progress-scalar-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-10-22-habit-progress-scalar-design.md#L198",
+   "class": "process-meta",
+   "note": "elohim/epr-rea/src/fold.rs:88, stock.rs:283"
+  },
+  {
+   "text": "ClaimKind::rank() / weaker() promoted into elohim-epr",
+   "line": 208,
+   "state": "CLAIMED",
+   "id": "specs__2026-10-22-habit-progress-scalar-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-10-22-habit-progress-scalar-design.md#L208",
+   "class": "process-meta",
+   "note": "elohim/epr/src/measure.rs:567"
+  },
+  {
+   "text": "Graduation: first sprint window read with epr flow stocks --stock red-mass cited in that sprint record, drained mass / hours spent / returned matching atoms and flow log",
+   "line": 12,
+   "state": "OPEN",
+   "id": "specs__2026-10-22-habit-progress-scalar-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-10-22-habit-progress-scalar-design.md#L12",
+   "class": "process-meta"
+  },
+  {
+   "text": "Frontier: a withdrawn arm for retired promises (VF has no withdrawn discharge)",
+   "line": 220,
+   "state": "OPEN",
+   "id": "specs__2026-10-22-habit-progress-scalar-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-10-22-habit-progress-scalar-design.md#L220",
+   "class": "process-meta"
+  },
+  {
+   "text": "Frontier: metered attribution \u2014 delivery-cost@1 and gate-cycle-seconds@1 folds as spend events",
+   "line": 221,
+   "state": "OPEN",
+   "id": "specs__2026-10-22-habit-progress-scalar-design#8",
+   "cites": "genesis/docs/superpowers/specs/2026-10-22-habit-progress-scalar-design.md#L221",
+   "class": "process-meta"
+  },
+  {
+   "text": "Frontier: independent recomputation (witnessed) waits on the fold-attestation path",
+   "line": 222,
+   "state": "OPEN",
+   "id": "specs__2026-10-22-habit-progress-scalar-design#9",
+   "cites": "genesis/docs/superpowers/specs/2026-10-22-habit-progress-scalar-design.md#L222",
+   "class": "process-meta"
+  },
+  {
+   "text": "Frontier: unify the two limit models (flow/measures.rs Bound vs elohim_epr_rea::Bound)",
+   "line": 223,
+   "state": "OPEN",
+   "id": "specs__2026-10-22-habit-progress-scalar-design#10",
+   "cites": "genesis/docs/superpowers/specs/2026-10-22-habit-progress-scalar-design.md#L223",
+   "class": "process-meta"
+  }
+ ]
+}

@@ -1,0 +1,52 @@
+{
+ "doc": "genesis/docs/superpowers/plans/task-placement-lens-report.md",
+ "slug": "plans__task-placement-lens-report",
+ "method": "agent-decomposition",
+ "class": "architecture",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-11-21 (stasis round 2). P0b LENS REPORT (DONE_WITH_CONCERNS): 67 design-lens findings applied under reconciliations 1-6. Doorway-ask passages re-checked 2026-11-21 and now read R6a-consistent.",
+ "count": 5,
+ "items": [
+  {
+   "text": "Every finding tabled as applied, applied-differently or refused",
+   "line": 64,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-lens-report#1",
+   "cites": "genesis/docs/superpowers/plans/task-placement-lens-report.md#L64",
+   "class": "architecture"
+  },
+  {
+   "text": "Two passages still reading the doorway ask as a gap reconciled with R6a",
+   "line": 141,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-lens-report#2",
+   "cites": "genesis/docs/superpowers/plans/task-placement-lens-report.md#L141",
+   "class": "architecture",
+   "note": "what-every-app-inherits spec L856 and L1165 now name doorways as a legitimate source"
+  },
+  {
+   "text": "Ratification record carrying entry unverified (F48): the ceiling slice must read which elohim-DNA record carries proposals and votes before it is built",
+   "line": 149,
+   "state": "OPEN",
+   "id": "plans__task-placement-lens-report#3",
+   "cites": "genesis/docs/superpowers/plans/task-placement-lens-report.md#L149",
+   "class": "architecture"
+  },
+  {
+   "text": "Rules the spec states that nothing enforces yet (slices 5 and 9): floor reads only what it holds, guarded self-candidacy, per-root commitments, household-local records below public reach, battery default, method/parameter-set CIDs, ratification gate",
+   "line": 151,
+   "state": "OPEN",
+   "id": "plans__task-placement-lens-report#4",
+   "cites": "genesis/docs/superpowers/plans/task-placement-lens-report.md#L151",
+   "class": "architecture"
+  },
+  {
+   "text": "Gate line ambiguous for a design doc: no just gate project owns the spec; only epr flow cites verify runs",
+   "line": 155,
+   "state": "OPEN",
+   "id": "plans__task-placement-lens-report#5",
+   "cites": "genesis/docs/superpowers/plans/task-placement-lens-report.md#L155",
+   "class": "architecture"
+  }
+ ]
+}

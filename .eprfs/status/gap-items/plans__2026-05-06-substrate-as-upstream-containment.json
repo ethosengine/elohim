@@ -1,0 +1,83 @@
+{
+ "doc": "genesis/docs/superpowers/plans/2026-05-06-substrate-as-upstream-containment.md",
+ "slug": "plans__2026-05-06-substrate-as-upstream-containment",
+ "method": "agent-decomposition",
+ "class": "provisional",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-11-21 (stasis round 2). A parked DESIGN SKETCH (not yet a phase): its own Action says pick up after brit Phase 3 lands substrate-replicated git. Items are the MVP cut and open questions, all OPEN; none is in flight.",
+ "count": 9,
+ "items": [
+  {
+   "text": "Prerequisite: brit Phase 2 (ContentNode adapter) and Phase 3 (git over libp2p /brit/fetch/1.0.0) land",
+   "line": 68,
+   "state": "OPEN",
+   "id": "plans__2026-05-06-substrate-as-upstream-containment#1",
+   "cites": "genesis/docs/superpowers/plans/2026-05-06-substrate-as-upstream-containment.md#L68",
+   "class": "provisional"
+  },
+  {
+   "text": "Repo-replication app in elohim-storage whose manifest declares which repos a household replicates; policy as an REA commitment",
+   "line": 69,
+   "state": "OPEN",
+   "id": "plans__2026-05-06-substrate-as-upstream-containment#2",
+   "cites": "genesis/docs/superpowers/plans/2026-05-06-substrate-as-upstream-containment.md#L69",
+   "class": "provisional"
+  },
+  {
+   "text": "Doorway git-projection route /git/<owner>/<repo> speaking dumb-HTTP git over substrate objects",
+   "line": 70,
+   "state": "OPEN",
+   "id": "plans__2026-05-06-substrate-as-upstream-containment#3",
+   "cites": "genesis/docs/superpowers/plans/2026-05-06-substrate-as-upstream-containment.md#L70",
+   "class": "provisional"
+  },
+  {
+   "text": "Jenkins / graph-walker fetch from the doorway path instead of github.com (configurable per pipeline)",
+   "line": 71,
+   "state": "OPEN",
+   "id": "plans__2026-05-06-substrate-as-upstream-containment#4",
+   "cites": "genesis/docs/superpowers/plans/2026-05-06-substrate-as-upstream-containment.md#L71",
+   "class": "provisional"
+  },
+  {
+   "text": "Sync-from-upstream worker importing github.com commits into the substrate off the build's critical path",
+   "line": 72,
+   "state": "OPEN",
+   "id": "plans__2026-05-06-substrate-as-upstream-containment#5",
+   "cites": "genesis/docs/superpowers/plans/2026-05-06-substrate-as-upstream-containment.md#L72",
+   "class": "provisional"
+  },
+  {
+   "text": "Decide: new brit phase or extend Phase 3; where the sync worker lives; manifest shape for \"replicate this repo\"",
+   "line": 97,
+   "state": "OPEN",
+   "id": "plans__2026-05-06-substrate-as-upstream-containment#6",
+   "cites": "genesis/docs/superpowers/plans/2026-05-06-substrate-as-upstream-containment.md#L97",
+   "class": "provisional"
+  },
+  {
+   "text": "Decide minimum reach (replica diversity) for a build to consume a substrate-replicated repo",
+   "line": 100,
+   "state": "OPEN",
+   "id": "plans__2026-05-06-substrate-as-upstream-containment#7",
+   "cites": "genesis/docs/superpowers/plans/2026-05-06-substrate-as-upstream-containment.md#L100",
+   "class": "provisional"
+  },
+  {
+   "text": "Decide GitHub-to-substrate write-back direction (import-from-GitHub vs push-to-substrate-and-export)",
+   "line": 101,
+   "state": "OPEN",
+   "id": "plans__2026-05-06-substrate-as-upstream-containment#8",
+   "cites": "genesis/docs/superpowers/plans/2026-05-06-substrate-as-upstream-containment.md#L101",
+   "class": "provisional"
+  },
+  {
+   "text": "Add the upstream-containment axis to brit->rakia dimension planning notes",
+   "line": 107,
+   "state": "OPEN",
+   "id": "plans__2026-05-06-substrate-as-upstream-containment#9",
+   "cites": "genesis/docs/superpowers/plans/2026-05-06-substrate-as-upstream-containment.md#L107",
+   "class": "provisional"
+  }
+ ]
+}

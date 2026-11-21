@@ -1,0 +1,59 @@
+{
+ "doc": "genesis/docs/superpowers/plans/task-placement-stories-t7-report.md",
+ "slug": "plans__task-placement-stories-t7-report",
+ "method": "agent-decomposition",
+ "class": "architecture",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-11-21 (stasis round 2). T7 STORIES REPORT (DONE_WITH_CONCERNS): four files parse; correctness pass left no correctness finding open.",
+ "count": 6,
+ "items": [
+  {
+   "text": "resilience/member-leaves-replaced-first.feature (new, blob-durability)",
+   "line": 19,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-stories-t7-report#1",
+   "cites": "genesis/docs/superpowers/plans/task-placement-stories-t7-report.md#L19",
+   "class": "architecture"
+  },
+  {
+   "text": "qahal/leaving-a-collective.feature (new, leave-is-clean)",
+   "line": 20,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-stories-t7-report#2",
+   "cites": "genesis/docs/superpowers/plans/task-placement-stories-t7-report.md#L20",
+   "class": "architecture"
+  },
+  {
+   "text": "resilience/observable-distribution.feature (appended)",
+   "line": 21,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-stories-t7-report#3",
+   "cites": "genesis/docs/superpowers/plans/task-placement-stories-t7-report.md#L21",
+   "class": "architecture"
+  },
+  {
+   "text": "qahal/hostile-joiner.feature (new, peer-admission)",
+   "line": 22,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-stories-t7-report#4",
+   "cites": "genesis/docs/superpowers/plans/task-placement-stories-t7-report.md#L22",
+   "class": "architecture"
+  },
+  {
+   "text": "New concern tags leave-is-clean and peer-admission named by no habit checks:",
+   "line": 20,
+   "state": "OPEN",
+   "id": "plans__task-placement-stories-t7-report#5",
+   "cites": "genesis/docs/superpowers/plans/task-placement-stories-t7-report.md#L20",
+   "class": "architecture"
+  },
+  {
+   "text": "observable-distribution.feature pre-existing-text findings for its owner (e.g. \"As an operator\" not tied to the steps)",
+   "line": 38,
+   "state": "OPEN",
+   "id": "plans__task-placement-stories-t7-report#6",
+   "cites": "genesis/docs/superpowers/plans/task-placement-stories-t7-report.md#L38",
+   "class": "architecture"
+  }
+ ]
+}

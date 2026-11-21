@@ -1,0 +1,101 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-09-23-admission-receiver-granted-lanes-design.md",
+ "slug": "specs__2026-09-23-admission-receiver-granted-lanes-design",
+ "method": "agent-decomposition",
+ "class": "substrate",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-11-21 (stasis round 2). Story 3.3 design INPUT (Draft). AdmissionClass {Interactive, Background} and Retry-After shedding exist in conductor_admission.rs; the \u00a74 direction (reserved floor, SRPT, slow start) was not found 2026-11-21. Retires when the 3.3 brainstorm writes its plan.",
+ "count": 11,
+ "items": [
+  {
+   "text": "Existing lanes AdmissionClass::{Interactive, Background}, CONDUCTOR_RESERVE and 503 + Retry-After shedding",
+   "line": 55,
+   "state": "CLAIMED",
+   "id": "specs__2026-09-23-admission-receiver-granted-lanes-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-09-23-admission-receiver-granted-lanes-design.md#L55",
+   "class": "substrate",
+   "note": "elohim-storage/src/conductor_admission.rs:184"
+  },
+  {
+   "text": "Reserve, do not just bound: split the semaphore into a reserved interactive floor r",
+   "line": 90,
+   "state": "OPEN",
+   "id": "specs__2026-09-23-admission-receiver-granted-lanes-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-09-23-admission-receiver-granted-lanes-design.md#L90",
+   "class": "substrate"
+  },
+  {
+   "text": "Shortest-expected-first (SRPT) ordering inside a lane by expected zome hold",
+   "line": 95,
+   "state": "OPEN",
+   "id": "specs__2026-09-23-admission-receiver-granted-lanes-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-09-23-admission-receiver-granted-lanes-design.md#L95",
+   "class": "substrate"
+  },
+  {
+   "text": "Limited overcommitment for background after restart (slow start)",
+   "line": 99,
+   "state": "OPEN",
+   "id": "specs__2026-09-23-admission-receiver-granted-lanes-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-09-23-admission-receiver-granted-lanes-design.md#L99",
+   "class": "substrate"
+  },
+  {
+   "text": "Legible grant: every shed carries a Retry-After computed from the receiver state",
+   "line": 103,
+   "state": "OPEN",
+   "id": "specs__2026-09-23-admission-receiver-granted-lanes-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-09-23-admission-receiver-granted-lanes-design.md#L103",
+   "class": "substrate"
+  },
+  {
+   "text": "Ordered change 1: Node Registry shard registration moves off the blob PUT path to the Background lane",
+   "line": 120,
+   "state": "OPEN",
+   "id": "specs__2026-09-23-admission-receiver-granted-lanes-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-09-23-admission-receiver-granted-lanes-design.md#L120",
+   "class": "substrate",
+   "note": "in flight on another branch at authoring; not re-verified"
+  },
+  {
+   "text": "Ordered change 2: receiver-granted doorway->storage blob forward (bulk slot, single-flight per hash, HEAD before re-send) \u2014 arch-dataplane-borrows-backlog row 16",
+   "line": 122,
+   "state": "OPEN",
+   "id": "specs__2026-09-23-admission-receiver-granted-lanes-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-09-23-admission-receiver-granted-lanes-design.md#L122",
+   "class": "substrate"
+  },
+  {
+   "text": "Ordered change 4: conductor fork telemetry for publish rate and pending receipts first, then receipt-aware republish backoff and per-peer publish caps (row 17)",
+   "line": 126,
+   "state": "OPEN",
+   "id": "specs__2026-09-23-admission-receiver-granted-lanes-design#8",
+   "cites": "genesis/docs/superpowers/specs/2026-09-23-admission-receiver-granted-lanes-design.md#L126",
+   "class": "substrate"
+  },
+  {
+   "text": "Brainstorm decisions: size of r on a 5-permit gate; whether SRPT needs its own waiter queue; whether control traffic gets a third lane",
+   "line": 135,
+   "state": "OPEN",
+   "id": "specs__2026-09-23-admission-receiver-granted-lanes-design#9",
+   "cites": "genesis/docs/superpowers/specs/2026-09-23-admission-receiver-granted-lanes-design.md#L135",
+   "class": "substrate"
+  },
+  {
+   "text": "Household proof: saturate background (reconcile flood) while a scripted read measures p99 admission wait; moves conductor-capacity-represented",
+   "line": 141,
+   "state": "OPEN",
+   "id": "specs__2026-09-23-admission-receiver-granted-lanes-design#10",
+   "cites": "genesis/docs/superpowers/specs/2026-09-23-admission-receiver-granted-lanes-design.md#L141",
+   "class": "substrate"
+  },
+  {
+   "text": "Run the story 3.3 brainstorm that adopts, reshapes or rejects \u00a74 and write its plan; then retire this note to history",
+   "line": 10,
+   "state": "OPEN",
+   "id": "specs__2026-09-23-admission-receiver-granted-lanes-design#11",
+   "cites": "genesis/docs/superpowers/specs/2026-09-23-admission-receiver-granted-lanes-design.md#L10",
+   "class": "substrate"
+  }
+ ]
+}

@@ -1,0 +1,52 @@
+{
+ "doc": "genesis/docs/superpowers/plans/task-as-b1-report.md",
+ "slug": "plans__task-as-b1-report",
+ "method": "agent-decomposition",
+ "class": "process-meta",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-11-21 (stasis round 2). An artifact-store sprint (2026-11-07) task REPORT, status landed; landed 3b266e41d. Pre-push skips refs/notes/* (verified in .husky/pre-push.bash 2026-11-21).",
+ "count": 5,
+ "items": [
+  {
+   "text": ".husky/pre-push.bash is_notes_ref(): change-detection loop prints \"notes: <ref> skipped\" and continues before style reach, PUSH_TARGETS and sha tracking",
+   "line": 14,
+   "state": "CLAIMED",
+   "id": "plans__task-as-b1-report#1",
+   "cites": "genesis/docs/superpowers/plans/task-as-b1-report.md#L14",
+   "class": "process-meta",
+   "note": "is_notes_ref at L107/L861"
+  },
+  {
+   "text": "genesis/orchestrator/prepush-notes-skip.test.mjs added",
+   "line": 15,
+   "state": "CLAIMED",
+   "id": "plans__task-as-b1-report#2",
+   "cites": "genesis/docs/superpowers/plans/task-as-b1-report.md#L15",
+   "class": "process-meta"
+  },
+  {
+   "text": "notes_ref_is_skipped_and_branch_ref_still_gated_by_the_pushed_ref_loop passes in a scratch repo",
+   "line": 18,
+   "state": "CLAIMED",
+   "id": "plans__task-as-b1-report#3",
+   "cites": "genesis/docs/superpowers/plans/task-as-b1-report.md#L18",
+   "class": "process-meta"
+  },
+  {
+   "text": "just gate orchestrator EXIT=0 (evidence/gate-B1-orchestrator.log)",
+   "line": 21,
+   "state": "CLAIMED",
+   "id": "plans__task-as-b1-report#4",
+   "cites": "genesis/docs/superpowers/plans/task-as-b1-report.md#L21",
+   "class": "process-meta"
+  },
+  {
+   "text": "Environmental gate reds in the worktree explained and superseded by the green orchestrator run",
+   "line": 7,
+   "state": "CLAIMED",
+   "id": "plans__task-as-b1-report#5",
+   "cites": "genesis/docs/superpowers/plans/task-as-b1-report.md#L7",
+   "class": "process-meta"
+  }
+ ]
+}

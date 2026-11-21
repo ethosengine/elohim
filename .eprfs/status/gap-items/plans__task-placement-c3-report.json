@@ -1,0 +1,88 @@
+{
+ "doc": "genesis/docs/superpowers/plans/task-placement-c3-report.md",
+ "slug": "plans__task-placement-c3-report",
+ "method": "agent-decomposition",
+ "class": "architecture",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-11-21 (stasis round 2). C3 REPORT (DONE_WITH_CONCERNS): ark-core task.rs with gate elohim-ark EXIT=0 and eprfs EXIT=0 (1,326 tests). Delivered CLAIMED; runtime follow-ons OPEN. Residue re-checked 2026-11-21.",
+ "count": 9,
+ "items": [
+  {
+   "text": "ark-core src/task.rs: validated private TaskSpec/TaskOutcome, bounded BerthOffer::holds(), TaskKind over the measured input view",
+   "line": 44,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-c3-report#1",
+   "cites": "genesis/docs/superpowers/plans/task-placement-c3-report.md#L44",
+   "class": "architecture"
+  },
+  {
+   "text": "tests/task_contract.rs contract tests incl. a_pending_task_reserves_its_trusted_view_before_earlier_classes",
+   "line": 63,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-c3-report#2",
+   "cites": "genesis/docs/superpowers/plans/task-placement-c3-report.md#L63",
+   "class": "architecture"
+  },
+  {
+   "text": "Consumer lockfiles (elohim-storage, bridges/k8s) refreshed after ark-core took eprfs-core",
+   "line": 136,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-c3-report#3",
+   "cites": "genesis/docs/superpowers/plans/task-placement-c3-report.md#L136",
+   "class": "architecture",
+   "note": "c2 report integration addendum: k8s-bridge gate EXIT=0 with refreshed lock"
+  },
+  {
+   "text": "rea.rs REA intent for the berth offer",
+   "line": 351,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-c3-report#4",
+   "cites": "genesis/docs/superpowers/plans/task-placement-c3-report.md#L351",
+   "class": "architecture",
+   "note": "ark/core/src/rea.rs imports task::BerthOffer"
+  },
+  {
+   "text": "\u00a7F flow steps 1-9: walk/project, DerivationIndex lookup, provider-less acceptance in compute_task.rs, TaskRunner materialization with {input}/{output} and sealing, completion event, PendingStatus cursor",
+   "line": 144,
+   "state": "OPEN",
+   "id": "plans__task-placement-c3-report#5",
+   "cites": "genesis/docs/superpowers/plans/task-placement-c3-report.md#L144",
+   "class": "architecture"
+  },
+  {
+   "text": "Schema mappings for compute-task and compute-receipt to the task interfaces",
+   "line": 148,
+   "state": "OPEN",
+   "id": "plans__task-placement-c3-report#6",
+   "cites": "genesis/docs/superpowers/plans/task-placement-c3-report.md#L148",
+   "class": "architecture",
+   "note": "compute-task/compute-receipt schemas exist in sdk/schemas/v1; mapping to TaskSpec/TaskOutcome not verified"
+  },
+  {
+   "text": "Contracts \"a derivation hit raises no need\", \"one request yields one commitment\", \"a completed task is never re-adopted\" (eprfs-core slice 4, content_store zome, ark-supervisor, placement floor)",
+   "line": 149,
+   "state": "OPEN",
+   "id": "plans__task-placement-c3-report#7",
+   "cites": "genesis/docs/superpowers/plans/task-placement-c3-report.md#L149",
+   "class": "architecture"
+  },
+  {
+   "text": "Seam-registry rows for TaskKind / TaskSpec::new in elohim/ark/core/seam-registry.yaml after a reviewed concern-by-concern pass",
+   "line": 152,
+   "state": "OPEN",
+   "id": "plans__task-placement-c3-report#8",
+   "cites": "genesis/docs/superpowers/plans/task-placement-c3-report.md#L152",
+   "class": "architecture",
+   "note": "no TaskKind row in the registry 2026-11-21"
+  },
+  {
+   "text": "Unexplained intermittent eprfs failure migration_provider_is_the_session_claim_when_one_exists (passed 21 focused reruns)",
+   "line": 459,
+   "state": "OPEN",
+   "id": "plans__task-placement-c3-report#9",
+   "cites": "genesis/docs/superpowers/plans/task-placement-c3-report.md#L459",
+   "class": "architecture",
+   "note": "root cause unestablished; shared with the integration report"
+  }
+ ]
+}

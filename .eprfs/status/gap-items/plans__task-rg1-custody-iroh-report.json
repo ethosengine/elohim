@@ -1,0 +1,93 @@
+{
+ "doc": "genesis/docs/superpowers/plans/task-rg1-custody-iroh-report.md",
+ "slug": "plans__task-rg1-custody-iroh-report",
+ "method": "agent-decomposition",
+ "class": "substrate",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-11-21 (stasis round 2). A re-genesis-1 (2026-11-05 sprint) task REPORT; R1 custody over iroh, status claimed-not-verified at authoring; signed custody_announce::admit and the h_app_id push field are on dev 2026-11-21. Household validation of the ruling follow-up never ran.",
+ "count": 10,
+ "items": [
+  {
+   "text": "Signed custody wire shape in p2p/custody_announce.rs (MessagePack map-keyed, topic elohim/storage/custody/2)",
+   "line": 33,
+   "state": "CLAIMED",
+   "id": "plans__task-rg1-custody-iroh-report#1",
+   "cites": "genesis/docs/superpowers/plans/task-rg1-custody-iroh-report.md#L33",
+   "class": "substrate"
+  },
+  {
+   "text": "Verification order custody_announce::admit",
+   "line": 50,
+   "state": "CLAIMED",
+   "id": "plans__task-rg1-custody-iroh-report#2",
+   "cites": "genesis/docs/superpowers/plans/task-rg1-custody-iroh-report.md#L50",
+   "class": "substrate",
+   "note": "elohim-storage/src/p2p/custody_announce.rs:399"
+  },
+  {
+   "text": "Producer, metrics and rust-style paydown",
+   "line": 63,
+   "state": "CLAIMED",
+   "id": "plans__task-rg1-custody-iroh-report#3",
+   "cites": "genesis/docs/superpowers/plans/task-rg1-custody-iroh-report.md#L63",
+   "class": "substrate"
+  },
+  {
+   "text": "Household validation of the relay-source ruling follow-up (33bf2b742) has not been run; afadfb5c9 run showed refused_binding 3",
+   "line": 129,
+   "state": "OPEN",
+   "id": "plans__task-rg1-custody-iroh-report#4",
+   "cites": "genesis/docs/superpowers/plans/task-rg1-custody-iroh-report.md#L129",
+   "class": "substrate"
+  },
+  {
+   "text": "just gate elohim-storage not run as a unit for R1; integration-test targets compiled not executed",
+   "line": 130,
+   "state": "OPEN",
+   "id": "plans__task-rg1-custody-iroh-report#5",
+   "cites": "genesis/docs/superpowers/plans/task-rg1-custody-iroh-report.md#L130",
+   "class": "substrate"
+  },
+  {
+   "text": "Mixed fleet over libp2p: positional ShardRequest::Push decoder refuses the trailing h_app_id from a new distributor (falls back once to iroh)",
+   "line": 10,
+   "state": "OPEN",
+   "id": "plans__task-rg1-custody-iroh-report#6",
+   "cites": "genesis/docs/superpowers/plans/task-rg1-custody-iroh-report.md#L10",
+   "class": "substrate"
+  },
+  {
+   "text": "Relay-source refusal falls back to UNVERIFIED binding rows; an unverified row can refuse a genuine libp2p delivery",
+   "line": 12,
+   "state": "OPEN",
+   "id": "plans__task-rg1-custody-iroh-report#7",
+   "cites": "genesis/docs/superpowers/plans/task-rg1-custody-iroh-report.md#L12",
+   "class": "substrate"
+  },
+  {
+   "text": "Pure-iroh mode publishes no custody claims (distribute_shards and the held-shard sink live on the libp2p node)",
+   "line": 14,
+   "state": "OPEN",
+   "id": "plans__task-rg1-custody-iroh-report#8",
+   "cites": "genesis/docs/superpowers/plans/task-rg1-custody-iroh-report.md#L14",
+   "class": "substrate"
+  },
+  {
+   "text": "Custody catch-up arm reconcile_shard_locations_from_peers dormant: a missed gossip claim is never repaired, and its inventory entries are unsigned",
+   "line": 15,
+   "state": "OPEN",
+   "id": "plans__task-rg1-custody-iroh-report#9",
+   "cites": "genesis/docs/superpowers/plans/task-rg1-custody-iroh-report.md#L15",
+   "class": "substrate",
+   "note": "projection_reconcile.rs:8170"
+  },
+  {
+   "text": "Shared canonical DAG-CBOR signed-body helper for InventoryEnvelope and custody envelopes (elohim/epr src/cbor.rs)",
+   "line": 18,
+   "state": "OPEN",
+   "id": "plans__task-rg1-custody-iroh-report#10",
+   "cites": "genesis/docs/superpowers/plans/task-rg1-custody-iroh-report.md#L18",
+   "class": "substrate"
+  }
+ ]
+}

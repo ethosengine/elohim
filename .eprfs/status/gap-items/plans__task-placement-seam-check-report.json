@@ -1,0 +1,60 @@
+{
+ "doc": "genesis/docs/superpowers/plans/task-placement-seam-check-report.md",
+ "slug": "plans__task-placement-seam-check-report",
+ "method": "agent-decomposition",
+ "class": "architecture",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-11-21 (stasis round 2). I2 SEAM-CHECK REPORT (DONE_WITH_CONCERNS): 155 findings applied, 0 refused; spec grew to ~3,000 lines. Landing happened later via the integration /shift.",
+ "count": 6,
+ "items": [
+  {
+   "text": "Adversarial seam check: 155 findings applied against the working tree, 0 refused",
+   "line": 23,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-seam-check-report#1",
+   "cites": "genesis/docs/superpowers/plans/task-placement-seam-check-report.md#L23",
+   "class": "architecture"
+  },
+  {
+   "text": "Central revision recorded",
+   "line": 65,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-seam-check-report#2",
+   "cites": "genesis/docs/superpowers/plans/task-placement-seam-check-report.md#L65",
+   "class": "architecture"
+  },
+  {
+   "text": "Spec revision and report landed by a landing seat",
+   "line": 341,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-seam-check-report#3",
+   "cites": "genesis/docs/superpowers/plans/task-placement-seam-check-report.md#L341",
+   "class": "architecture",
+   "note": "integration report: /shift landing authorized"
+  },
+  {
+   "text": "Write-set floor for G5/H15/H16: S2, S5, R-G1 and the eprfs-ts gate need paths outside elohim/eprfs/** and elohim/sdk/schemas/v1/** \u2014 confirm each follow-on path landed",
+   "line": 344,
+   "state": "OPEN",
+   "id": "plans__task-placement-seam-check-report#4",
+   "cites": "genesis/docs/superpowers/plans/task-placement-seam-check-report.md#L344",
+   "class": "architecture"
+  },
+  {
+   "text": "Operator decisions 22, 24, R-E1 reversal and CustodyRoot weighted method; 3/6/8/15 answered 2026-10-20",
+   "line": 347,
+   "state": "CLAIMED",
+   "id": "plans__task-placement-seam-check-report#5",
+   "cites": "genesis/docs/superpowers/plans/task-placement-seam-check-report.md#L347",
+   "class": "architecture"
+  },
+  {
+   "text": "Graduation trigger: each first instance must compile against the spec signatures unchanged or record a revision in \u00a76",
+   "line": 351,
+   "state": "OPEN",
+   "id": "plans__task-placement-seam-check-report#6",
+   "cites": "genesis/docs/superpowers/plans/task-placement-seam-check-report.md#L351",
+   "class": "architecture"
+  }
+ ]
+}
