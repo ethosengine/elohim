@@ -7,7 +7,7 @@ title: "Brit sprint 3 handoff: the state at the sprint's close, what needs the s
 slug: "brit-sprint-3-handoff-2026-11-19"
 written: "2026-11-19"
 author: "claude-opus-5-5 (brit sprint 3, session 0e0924d5, steward of record human:matthew)"
-status: "wip"
+status: "open"
 priority: "high"
 relatedNodeIds: []
 tags: [brit, handoff, daily-driver, integration, shem]
@@ -28,6 +28,13 @@ shift_objective: |
 ---
 
 # Brit sprint 3 handoff (2026-11-19)
+
+**Landed 2026-11-20 (session 46c39d0c, shem, steward human:matthew).** The steward took decision 1
+(land all twelve lanes) and decision 2 (move the pin). `6507caaaa1` was merged onto brit `main`
+(0.2.6 + the gitoxide upstream integration) as `325faff2a1`, and brit `main` reached `4eb2e8cc0b`
+(brit 0.3.0). Decision 6 and queued items 5, 6 and 7 are delivered in that release. Queued items 1–4
+and 8–13 and decisions 3–5 and 7–12 remain as written below. What landed, the runs and the gaps that
+run found: [brit-0-3-0-release-findings-2026-11-20](epr:brit-0-3-0-release-findings-2026-11-20).
 
 Sprint session `0e0924d5`; steward of record human:matthew. The other device is shem (session
 `b49f7c46`). The brit repository is the submodule `elohim/brit`; sprint base brit 0.2.6 =

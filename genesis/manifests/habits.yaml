@@ -2481,10 +2481,10 @@ habits:
       - "node --test genesis/orchestrator/gate-attest.test.mjs genesis/orchestrator/gate-oracle.test.mjs (the four outcomes, latest-run-wins, reads-the-pin-not-the-checkout, depth one)"
       - "epr flow note observations on pin-attestation@1 exist for every pin-moving push (GATE_ORACLE and the attested dispatch are live in gate-runner.mjs)"
     evidence: >
-      DELTA 2026-11-05 (status unchanged; native-dev Track D): gate-attest now exits 3 for `claimed`, distinct from pass, refusal and manifest error; gate-runner admits a claimed gate with debt until F3 lands debt-aware landing — run exit 0, printed `claimed (admitted with debt; no green evidence)`, no exit-0 live verdict and no reusable closure evidence — while refusals still fail. Probe: gate-attest.test.mjs 25/25 and gate-runner.test.mjs's claimed/refusal cases; orchestrator gate green on native-dev/land-1. Open: pre-push still prints a generic PASSED after the claimed line, and the live-run schema has no `claimed` verdict (F3).
-    evidence-fingerprint: sha256:dbfae5bf8b21d5f3
-    evidence-bytes: 6797
-    evidence-entries: 10
+      DELTA 2026-11-21 (RED preserved; brit 0.3.0 pin): the gitlink moves 1db7a95519 (brit-v0.2.6) -> 4eb2e8cc0b (brit-v0.3.0: the gitoxide upstream integration, sprint 3's twelve lanes and four sprint-3 queue lanes). Upstream evidence read before the move: brit main CI run 44847379696 on 4eb2e8cc0b, `Tests pass` success and "Publish brit crates to Nexus" success (non-gating reds: advisories, size, the deferred tests@linux-arm leg); release qualification run 44839064593 success. The worktree gate before the commit read the committed pin (`attested: ethosengine/brit@1db7a955197b Tests pass success`, "worktree dirty — the committed pin is what is read"); the pre-push of the pin commit is the read of 4eb2e8cc0b. Evidence: genesis/local-dev/release-20261120/ (integrate-gate.log, push logs); backlog brit-0-3-0-release-findings-2026-11-20.
+    evidence-fingerprint: sha256:c1bd843690fdfa1f
+    evidence-bytes: 7640
+    evidence-entries: 11
     guard: >
       Regression risks: (1) a matcher that special-cases gitlinks instead of the manifest
       listing the pin path — both oracles must agree by declaration, not by code;
