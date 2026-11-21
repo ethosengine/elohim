@@ -28,13 +28,17 @@ A developer should be able to arrive with local work, see what landed since thei
 
 Record time to local readiness, time to first verified exchange, and the manual steps the hand-over required against `workspace-device-arrival`. Repeat with a legacy Brit on PATH, an unpublished roster row, and a published row with the sibling offline. A supported first install should reach local readiness without Cargo.
 
-## Discover what is offered, then ask
+## Discover in low-trust channels and continue by consent
 
 Start with the developer's immediate need. For example, the laptop needs a steward peer who can confirm roster pickup. A device resuming a task might need a copy of the prior gate result. A new contributor might need the decision behind a change or someone authorized to review it. Surface relevant offers, roles, and published context within the developer's current reach. Show who made each offer, what it covers, and whether it is current. A visible peer is evidence of presence. An offer or declared role gives the developer a reason to ask.
 
+Use a low-trust discovery channel for what people or spaces deliberately advertise at that reach. A newcomer can see what a space works on, the help it offers, and where to send a first request. Show the source and freshness of those claims. Keep private rosters, device details, work in progress, and restricted memory outside that view.
+
 Let the developer review one scoped request before sending it to a chosen recipient. Say what is needed, why, what evidence the recipient can see, and when a reply would still help. Sending reserves no capacity and creates no obligation. The recipient can accept within their authority, decline, or let the request expire without giving a reason. Show the requester what happened and what they can do locally while waiting. Keep a pending request visible across reconnects and send it only once. A decline or timeout ends the request unless the developer chooses to ask again.
 
-In the two-device pilot, discover an offer for one gate result or artifact and ask the sibling for it. Exercise acceptance, refusal, and an offline sibling. Observe whether the developer can tell which offer is usable, whether anyone accepted, and whether local work can continue. For a contribution across principals, begin with a request for context or review through the existing governed path. Carry automated requests and offers across principals only when the existing admission and reach work is ready.
+Move the next step into a more trusted channel when the people involved consent and the existing admission or grant covers it. Carry forward the purpose and any references the requester chose to share. Show which space the developer is joining, what becomes visible, and which actions their standing permits. A first request can open a conversation. Device coordination stays inside the steward's admitted channel, and collective review and memory follow the receiving space's rules.
+
+In the two-device pilot, discover an offer for one gate result or artifact and ask the sibling for it. Exercise acceptance, refusal, and an offline sibling. In the next pilot, start with a newcomer who can discover a space and ask for context or review. Verify that restricted context stays hidden while the request is pending or declined, and that approval opens only the scope granted. Carry automated requests and offers across principals only when the existing admission and reach work is ready.
 
 ## Next horizon — another developer joins
 
