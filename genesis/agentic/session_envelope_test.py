@@ -22,6 +22,19 @@ def write(path, text):
     path.write_text(text)
 
 
+def link_or_copy(source, dest):
+    """`dest` names `source`'s bytes: a hard link where one filesystem holds both, else a copy.
+
+    The tested epr is the run's one shared (stripped) file; linking it into every fixture keeps
+    setup from writing it again. A shared inode must never be written in place: nothing writes a
+    fixture's candidate or launcher, and the rebuilt-target case replaces the candidate's path.
+    """
+    try:
+        os.link(source, dest)
+    except OSError:
+        shutil.copy2(source, dest)
+
+
 class Fixture:
     def __init__(self, base):
         self.base = Path(base)
@@ -98,11 +111,11 @@ recipes:
         self.run([BINARY, 'actor','witness','--subject',f'human:{human}','--as','agent:reader@fixture','--session','enrollment','--basis','Fixture person present','--json'])
         candidate = self.base / 'cargo-target/debug/epr'
         candidate.parent.mkdir(parents=True)
-        shutil.copy2(BINARY, candidate)
+        link_or_copy(BINARY, candidate)
         cid = json.loads(self.run([BINARY,'bin','ingest',candidate,'--tool','epr','--source-commit',self.run(['git','rev-parse','HEAD'],native=False).strip(),'--tree-clean','true','--gate-run','fixture','--repo',self.root,'--json']))['cid']
         write(self.base / 'cid', cid)
         (self.base / 'launch').mkdir()
-        shutil.copy2(BINARY.with_name('bin-launch'), self.base / 'launch/epr')
+        link_or_copy(BINARY.with_name('bin-launch'), self.base / 'launch/epr')
         write(self.base / 'hook-bin/epr', f'#!/bin/sh\nexec {sys.executable} {self.base}/exec.py {self.base}/launch/epr "$@"\n')
         (self.base / 'hook-bin/epr').chmod(0o755)
         for runtime in RUNTIMES:
@@ -211,8 +224,10 @@ assert 'bootstrap: skipped' not in out,out
         state_path = self.root/f'.eprfs/status/recall/{self.id("claude")}/continuation.json'
         before = json.loads(state_path.read_text())['executor_digest']
         # Cargo installs a freshly linked executable by replacement, not in-place writes.
+        # A fresh file of its own (the candidate may be a link to the shared, read-only epr),
+        # mode 0755 as cargo writes it.
         rebuilt = self.base/'cargo-target/debug/rebuilt'
-        shutil.copy2(BINARY,rebuilt)
+        shutil.copyfile(BINARY,rebuilt); rebuilt.chmod(0o755)
         with rebuilt.open('ab') as f: f.write(b'\nrebuilt cargo target\n')
         rebuilt.replace(self.base/'cargo-target/debug/epr')
         second = self.run([sys.executable,hook,REPO,self.root,"prompt"])
@@ -1262,8 +1277,10 @@ def run_parallel(jobs, exclude, case_timeout):
             shutil.rmtree(home, ignore_errors=True)
 
     ids = case_ids(exclude)
-    # Every case's setup copies and ingests the tested epr; the 158 MB debug build made that the
-    # heaviest step of each case and, at eight fixtures at once, outran the 45 s command guard.
+    # Every case's setup links (or copies) and ingests the tested epr; the 158 MB debug build
+    # made that the heaviest step of each case and, at eight fixtures at once, outran the 45 s
+    # command guard. (The Rust harness already hands over a stripped epr; stripping it again
+    # writes one 66 MB file.)
     # The cases run one stripped copy instead (66 MB), with bin-launch beside it as setup looks
     # for it. It must be BINARY itself, not only the ingested candidate: cases mix direct BINARY
     # calls with launcher calls that run the candidate, and recall's executor digest

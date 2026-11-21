@@ -1,4 +1,68 @@
 //! The shipped CLI and hooks share the a2o fixture, including real flow claims and closure.
+
+/// The `epr` every Python run of the fixture executes and ingests: this process's one stripped
+/// copy of the debug build (66 MB, not 160 MB), with `bin-launch` beside it where the fixture
+/// looks for it. Each fixture's setup copied that file and `epr bin ingest` wrote it again,
+/// synced, into the fixture's store, so 14 fixtures here wrote about 4.5 GB of debug bytes. Now
+/// setup hard-links the shared file and ingest writes the stripped bytes.
+///
+/// It is the file Python runs, not only the one it ingests: cases mix launcher calls (the pinned,
+/// ingested bytes) with direct calls, and recall refuses `executor bytes changed` unless both are
+/// the same bytes (`session_envelope::executor_cid`). The fixture's parallel runner strips for
+/// the same reason. Nothing the cases run reads symbols. Rust's own direct calls below keep
+/// `CARGO_BIN_EXE_epr`. The files are published mode 0555 by a rename and never written again:
+/// fixtures link them, and nothing in a fixture writes its candidate or launcher in place.
+///
+/// A static is never dropped, so the directory is named by this process's pid and outlives it;
+/// each new process first removes the directories of processes that no longer run.
+fn fixture_epr() -> &'static std::path::Path {
+    use std::os::unix::fs::PermissionsExt;
+    static EPR: std::sync::OnceLock<std::path::PathBuf> = std::sync::OnceLock::new();
+    EPR.get_or_init(|| {
+        const PREFIX: &str = "epr-session-envelope-release-";
+        let temp = std::env::temp_dir();
+        for entry in std::fs::read_dir(&temp).into_iter().flatten().flatten() {
+            let name = entry.file_name().to_string_lossy().into_owned();
+            let Some(pid) = name.strip_prefix(PREFIX) else {
+                continue;
+            };
+            if pid.parse::<u32>().is_ok() && !std::path::Path::new("/proc").join(pid).exists() {
+                let _ = std::fs::remove_dir_all(entry.path());
+            }
+        }
+        let root = temp.join(format!("{PREFIX}{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let built = std::path::Path::new(env!("CARGO_BIN_EXE_epr"));
+        let publish = |name: &str, make: &dyn Fn(&std::path::Path)| {
+            let partial = root.join(format!(".{name}.partial"));
+            make(&partial);
+            std::fs::set_permissions(&partial, std::fs::Permissions::from_mode(0o555)).unwrap();
+            std::fs::rename(&partial, root.join(name)).unwrap();
+        };
+        publish("bin-launch", &|partial| {
+            std::fs::copy(built.with_file_name("bin-launch"), partial).unwrap();
+        });
+        publish("epr", &|partial| {
+            let stripped = std::process::Command::new("strip")
+                .arg("--strip-all")
+                .arg("-o")
+                .arg(partial)
+                .arg(built)
+                .stdout(std::process::Stdio::null())
+                .status()
+                .is_ok_and(|status| status.success());
+            if !stripped {
+                eprintln!(
+                    "session_envelope: strip unavailable; the fixture runs the unstripped epr"
+                );
+                std::fs::copy(built, partial).unwrap();
+            }
+        });
+        root.join("epr")
+    })
+}
+
 fn run_fixture_stage(base: &std::path::Path, stage: &str) {
     // gate-reads: genesis/agentic/session_envelope_test.py
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..");
@@ -6,7 +70,7 @@ fn run_fixture_stage(base: &std::path::Path, stage: &str) {
         .arg(root.join("genesis/agentic/session_envelope_test.py"))
         .args(["--stage", stage, "--base"])
         .arg(base)
-        .env("EPR_BIN", env!("CARGO_BIN_EXE_epr"))
+        .env("EPR_BIN", fixture_epr())
         .output()
         .unwrap();
     assert!(
@@ -23,7 +87,7 @@ fn runtime_child_resumes_without_inheriting_authority() {
     let result = std::process::Command::new("python3")
         .arg(root.join("genesis/agentic/session_envelope_test.py"))
         .arg("ResumeEnvelopeTest.test_runtime_child_resumes_without_inheriting_authority")
-        .env("EPR_BIN", env!("CARGO_BIN_EXE_epr"))
+        .env("EPR_BIN", fixture_epr())
         .output()
         .expect("native resume fixture starts");
     assert!(
@@ -49,7 +113,7 @@ fn session_envelope_native_facets_and_hook_pin_regressions() {
             "--exclude",
             "ResumeEnvelopeTest.test_runtime_child_resumes_without_inheriting_authority",
         ])
-        .env("EPR_BIN", env!("CARGO_BIN_EXE_epr"))
+        .env("EPR_BIN", fixture_epr())
         .output()
         .expect("python fixture starts");
     assert!(
