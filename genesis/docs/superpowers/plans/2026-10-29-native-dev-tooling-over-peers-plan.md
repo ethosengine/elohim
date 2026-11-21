@@ -637,15 +637,21 @@ never on an implementor.
 
 | Concern | Contract | First implementor | Later implementors | Native home |
 |---|---|---|---|---|
-| Where a step runs | A carrier: `offer(step)` answers carried, with a handle, or not carried, with a reason and whose line refused; `collect` returns the gate's own verdict; `withdraw` leaves nothing running | this device's second cargo seat | a sibling device over the peer channel; an enrolled carrier such as Jenkins | D9: a `TaskSpec` offer, `ark task run`, placement-core `decide` |
-| Whether there is room | One answer per device and resource: admit, or refuse with the axis and the owner of the limit | berth, from the policy's seats, the build count and the guards (`berth room cargo`) | ark's `BerthOffer` posture with a host-floor refusal | `elohim/placement/core` (`Posture`), `elohim-compute` (`Refusal`, `LimitOwner`) |
+| Where a step runs | A carrier: `offer(step)` answers carried, with a handle, or not carried, with a reason and whose line refused; `collect` returns the gate's own verdict; `withdraw` leaves nothing running | `second-seat` in `genesis/orchestrator/gate-carry.mjs` (`GATE_CARRY=off\|shadow\|on`, default shadow): one long single-job cargo gate on this device's second cargo seat | a sibling device over the peer channel; an enrolled carrier such as Jenkins | D9: a `TaskSpec` offer, `ark task run`, placement-core `decide` |
+| Whether there is room | One answer per device and resource: admit, or refuse with the axis and the owner of the limit | `berth room cargo --json`: the policy's seats, the build hook's own count of builds, the RAM and I/O guards; it refuses on anything it cannot read as healthy | ark's `BerthOffer` posture with a host-floor refusal | `elohim/placement/core` (`Posture`), `elohim-compute` (`Refusal`, `LimitOwner`) |
 | What a landing still needs | The landing intent's misses, raised before the gates run | none yet (row 9, step 2) | | `epr-rea` `Intent`; `epr flow intend` |
 | What a gate is keyed on | Its step's sources and its own recipe. A step's `buildProcess` is an input of the executor that runs that process, which for a pipeline file is CI and not the device | the JS gate key, for projects without a native closure | eprfs, whose bin store hashes the whole tree (needs a roll; row 42) | D2: the projected view; the method CID |
 | The result | A verdict that names its basis (computed here, carried, reused) and its carrier | `gate-verdict@1` | `DerivationRecord` | D1 |
 
 A contract is proven by a test any implementor must pass, run against at least two implementors,
-one of them a fake. The first-implementor column is what exists or is being built on 2026-11-21;
-a row is corrected here when its implementor lands.
+one of them a fake. The first-implementor column is what exists on 2026-11-21; a row is corrected
+here when its implementor lands. The carrier contract's test is `carrierContract` in
+`genesis/orchestrator/gate-carry.test.mjs`, run against `second-seat` and an in-memory carrier. A
+sibling carrier needs four things from the peer channel to pass it: an offer that answers admit or
+refuse with that device's axis and owner, never silence; a step it can transfer (closure key,
+commit, recipe); a handle that outlives the requester's process; and a withdraw the peer
+acknowledges. Its results carry the basis `under-grant`, and an unreachable peer collects as
+`unknown`, so the step runs here.
 
 **Two wordings reconciled.**
 

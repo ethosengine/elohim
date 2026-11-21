@@ -1,22 +1,28 @@
 
 
-## Row 61, delta (2026-11-21): a fenced hand-held lease is handed back and claimed afresh
+### Row 64, delta 2 (2026-11-21): the second seat is a carrier behind a contract, landed in shadow
 
-The cause is in berth's settle step (`_settle_steward` in `genesis/agentic/bin/berth`): the
-one-device override that `--offline-ok` writes is taken only for a lease that is not yet fenced.
-A lease claimed by hand before hours of gates is already past its fence window when the hook
-renews it, so the renewal is refused where a fresh claim would have written the override and
-waited for it. berth's behaviour is unchanged.
+Item 2 is built, and not as logic in the push hook. `genesis/orchestrator/gate-carry.mjs` holds a
+carrier contract (admit, offer, collect, withdraw), one pure algorithm (`planCarry`) and the first
+carrier, `second-seat`. `berth room cargo --json` is the one capacity answer, and the push hook
+only calls in. The switch `GATE_CARRY=off|shadow|on` defaults to shadow, which prints what it would
+carry and starts nothing (native-dev-tooling-over-peers-plan §9, "Interfaces").
 
-The cure is the first of the three owed, in the hook: when the pushing session's renewal is
-refused with exit 3 and berth's reason is `self-demoted: no head from …`, `phase_l_claim`
-releases the session's lease, says so in one line, and lets the landing agent claim afresh under
-`--offline-ok`; the session does not hold the lease afterwards. A failed release refuses with
-both reasons. Every other refusal of a renewal reads as before. The match on berth's phrase
-lives in one function (`phase_l_fenced_reason`), and `genesis/agentic/berth_test.py` already pins
-the phrase. Three tests in `genesis/orchestrator/prepush-berth.test.mjs` drive it against the
-fake berth: the order claim, release, claim; a failed release; another device holding the lease.
+Found while building it:
 
-Not observed against a real lease: the tests fake berth. The other two cures stay open, and the
-second (a device with no live session still sends a head inside the fence window) is the one
-that would also keep an idle device visible as a carrier.
+- Two writers to one gate run's event log could take the same sequence number: four concurrent
+  writers gave 481 unique numbers for 601 events, so a cursor could skip an event. Two gates
+  finishing together could also lose a row of the cycle ledger. Both now go through
+  `genesis/orchestrator/file-lock.mjs`.
+- `elohim-storage` and `epr-storage` build in one cargo target, as do `eprfs`, `memory-ceremony`
+  and `orchestrator-tree`. Two gates that share a target queue on cargo's own lock, so `planCarry`
+  refuses to carry one beside the other. A landing that selects both storage gates therefore
+  carries nothing today. The refinement that makes the 21-gate landing pay: the unit carried is
+  the group of steps that share a target, run in turn on the second seat (3,535 s and 1,360 s).
+- The build hook counts every gate-runner as a seat, including the fixture gate-runners that the
+  orchestrator's own hook tests start. A real build was refused for seven minutes by a fixture a
+  killed test run had left behind. The tests now reap their fixtures; the count is unchanged and
+  stays the safe direction.
+
+Not yet observed: `GATE_CARRY=on` with a real gate. Item 3, the measured landing, is still owed,
+and the measurement taken the same day (below, and the sprint journal) bears on it.
