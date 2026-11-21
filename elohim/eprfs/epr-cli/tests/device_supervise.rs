@@ -1249,12 +1249,35 @@ fn commit_source(repo: &Path, text: &str) -> String {
 }
 
 /// Stage a release built from this test's own `epr`, with `tag` appended so its bytes are new.
+///
+/// The release is that `epr` without its symbols and debug information. Ark hashes a `bin:`
+/// child's bytes three times per spawn (twice before exec, once for the identity rung) with the
+/// gate's debug build of SHA-256: about 11 s each for the 158 MB debug `epr` on a loaded device,
+/// about 4.8 s for the stripped 66 MB. The stories prove which release runs and when it reads
+/// ready, never its symbols; with no `strip` on PATH the release is the unstripped copy.
 fn release_dir(fx: &Fixture, tag: &str) -> PathBuf {
+    use std::io::Write;
     let dir = fx.base.join(format!("release-{tag}"));
     fs::create_dir_all(&dir).unwrap();
-    let mut epr = fs::read(env!("CARGO_BIN_EXE_epr")).unwrap();
-    epr.extend_from_slice(format!("\n# release {tag}\n").as_bytes());
-    fs::write(dir.join("epr"), epr).unwrap();
+    let epr = dir.join("epr");
+    let stripped = Command::new("strip")
+        .arg("--strip-all")
+        .arg("-o")
+        .arg(&epr)
+        .arg(env!("CARGO_BIN_EXE_epr"))
+        .stdout(Stdio::null())
+        .status()
+        .is_ok_and(|status| status.success());
+    if !stripped {
+        eprintln!("device_supervise: strip unavailable; the release is the unstripped epr");
+        fs::copy(env!("CARGO_BIN_EXE_epr"), &epr).unwrap();
+    }
+    fs::OpenOptions::new()
+        .append(true)
+        .open(&epr)
+        .unwrap()
+        .write_all(format!("\n# release {tag}\n").as_bytes())
+        .unwrap();
     fs::copy("/bin/bash", dir.join("bin-launch")).unwrap();
     for bin in ["epr", "bin-launch"] {
         fs::set_permissions(dir.join(bin), fs::Permissions::from_mode(0o755)).unwrap();
@@ -1933,7 +1956,11 @@ fn only_the_landed_tools_children_are_judged() {
             "never-printed",
             "--",
             "-c",
-            "while :; do sleep 1; done",
+            // The trap lets ark's stop signal end it within a second. A bare loop ignores a
+            // SIGINT sent to bash alone (bash waits out its foreground `sleep` and continues),
+            // so every ark stop waited out the 20 s default grace for a child this story only
+            // needs to run, never print its ready line, and restart with the ark.
+            "trap 'exit 0' INT TERM; while :; do sleep 1; done",
         ]);
         // The head moved: one hand supervise reloads ark under it.
         assert!(lane.fx.ok(&["device", "supervise"]).contains("reloading"));

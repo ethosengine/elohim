@@ -1132,9 +1132,200 @@ assert b.claim('racing', os.environ['SESSION'])[0]
             f=Fixture(base); f.setup(); f.hooks()
 
 
+# Cases that assert on a hook or native call with a 5-10 s budget whose expiry the case reads
+# as a product failure, not a tolerated degradation. They run one at a time after the parallel
+# batch, so four-way load cannot spend those budgets. Remove one only on measured evidence.
+SERIAL_TAIL = (
+    # load-project-context.py's 5 s recall and run-projection.py's 6 s budgets: an expiry
+    # prints `bootstrap: skipped`, which the case refuses.
+    'EnvelopeTest.test_rebuilt_cargo_target_does_not_replace_hook_executor',
+    # commit-attribution.py's 5 s `epr session commit-trailers`: an expiry leaves the message
+    # UNMEASURED and undecorated, and the case asserts the trailers.
+    'EnvelopeTest.test_commit_decoration_uses_mounted_model_and_session_without_claiming_authority',
+    # _lib/session.py's 5 s `epr session show` in capability-tier-gate.py: an expiry reads as no
+    # envelope, so the gate denies where the case expects it to pass.
+    'EnvelopeTest.test_harness_model_caps_the_real_envelope_claim',
+    # The 10 s rendezvous includes a launcher `epr flow note` that lazily opens the envelope.
+    'EnvelopeTest.test_berth_direct_claim_racing_close_is_fenced_and_post_close_refuses',
+)
+
+
+def case_ids(exclude=()):
+    """Every test case in this module, `Class.method`, longest source first.
+
+    Each case builds its own Fixture under its own TemporaryDirectory: config (XDG_CONFIG_HOME),
+    the bin store, berth, proc view, git checkout and flow stores all live under that base.
+    Outside it, the cases read this repository's hooks, berth and tested epr, and write three
+    things: epr_client's resolution and candidate caches and _observation's probe cache, all in
+    `tempfile.gettempdir()`, and Python bytecode beside the hooks they import. `run_parallel`
+    gives each case its own TMPDIR and PYTHONDONTWRITEBYTECODE=1, so no two cases share a
+    writable path. The order is a balance heuristic only: long cases start first.
+    """
+    import inspect
+    cases = [obj for obj in globals().values()
+             if isinstance(obj, type) and issubclass(obj, unittest.TestCase)]
+    ids, size = [], {}
+    for case in cases:
+        for name in unittest.TestLoader().getTestCaseNames(case):
+            ids.append(f'{case.__name__}.{name}')
+            size[ids[-1]] = len(inspect.getsourcelines(getattr(case, name))[0])
+    unknown = sorted((set(exclude) | set(SERIAL_TAIL)) - set(ids))
+    if unknown:
+        raise SystemExit(f'session_envelope_test: --exclude or SERIAL_TAIL names no case: {unknown}')
+    return sorted((i for i in ids if i not in exclude), key=lambda i: -size[i])
+
+
+def run_parallel(jobs, exclude, case_timeout):
+    """Run each case once, in its own process and its own TMPDIR, `jobs` at a time, then the
+    SERIAL_TAIL one at a time. Results print as they complete; a case that fails, times out,
+    is interrupted or cannot be run prints its whole output, and the last line names them all.
+
+    Every exit path of a case removes its TMPDIR, which holds its fixture base: a detached
+    `epr session hold` (its own session, out of reach of the group signal) then finds its fake
+    owner gone and exits by its own one-second poll. An interrupt or an exception in the runner
+    ends every running case, starts no more, and exits non-zero.
+    """
+    import signal
+    import threading
+    import time
+    import traceback
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    me = str(Path(__file__).resolve())
+    stopping = threading.Event()
+
+    def end(proc):
+        # SIGINT, not SIGTERM: Python's default SIGTERM exits without unwinding, so the case's
+        # TemporaryDirectory would not be removed; SIGINT raises KeyboardInterrupt through it.
+        # Then SIGKILL whatever of the group remains. Both waits are bounded.
+        for sig in (signal.SIGINT, signal.SIGKILL):
+            try:
+                os.killpg(proc.pid, sig)
+            except ProcessLookupError:
+                pass
+            try:
+                proc.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                pass
+
+    def collect(proc):
+        try:
+            return proc.communicate(timeout=10)
+        except subprocess.TimeoutExpired:
+            for pipe in (proc.stdout, proc.stderr):
+                pipe.close()
+            return '', '(output lost: a descendant of the case kept its pipes open)'
+
+    def one(case):
+        started = time.monotonic()
+        home = tempfile.mkdtemp(prefix='envelope-case-')
+        proc = None
+        try:
+            if stopping.is_set():
+                return case, 'NOT RUN (interrupted)', '', '', 0.0
+            env = {**os.environ, 'TMPDIR': home, 'PYTHONDONTWRITEBYTECODE': '1'}
+            proc = subprocess.Popen([sys.executable, me, case], stdout=subprocess.PIPE,
+                                    stderr=subprocess.PIPE, text=True, start_new_session=True,
+                                    env=env)
+            deadline = started + case_timeout
+            while True:
+                try:
+                    out, err = proc.communicate(timeout=1)
+                    verdict = 'ok' if proc.returncode == 0 else 'FAIL'
+                    break
+                except subprocess.TimeoutExpired:
+                    if stopping.is_set():
+                        verdict = 'INTERRUPTED'
+                    elif time.monotonic() >= deadline:
+                        verdict = f'TIMEOUT after {case_timeout:.0f}s'
+                    else:
+                        continue
+                    end(proc)
+                    out, err = collect(proc)
+                    break
+            return case, verdict, out, err, time.monotonic() - started
+        except Exception:  # a runner failure is this case's failure, reported with its text
+            if proc is not None and proc.poll() is None:
+                end(proc)
+                collect(proc)
+            return case, 'ERROR', '', traceback.format_exc(), time.monotonic() - started
+        finally:
+            shutil.rmtree(home, ignore_errors=True)
+
+    ids = case_ids(exclude)
+    # Every case's setup copies and ingests the tested epr; the 158 MB debug build made that the
+    # heaviest step of each case and, at eight fixtures at once, outran the 45 s command guard.
+    # The cases run one stripped copy instead (66 MB), with bin-launch beside it as setup looks
+    # for it. It must be BINARY itself, not only the ingested candidate: cases mix direct BINARY
+    # calls with launcher calls that run the candidate, and recall's executor digest
+    # (`session_envelope::executor_cid`, the running file's CID) holds only while both are the
+    # same bytes. Nothing the cases run reads symbols or debug info. Without `strip`, unchanged.
+    binary_dir = tempfile.mkdtemp(prefix='envelope-epr-')
+    binary = BINARY
+    try:
+        stripped = subprocess.run(['strip', '--strip-all', '-o', os.path.join(binary_dir, 'epr'),
+                                   str(BINARY)], capture_output=True, timeout=120).returncode == 0
+    except (OSError, subprocess.SubprocessError):
+        stripped = False
+    if stripped:
+        shutil.copy2(BINARY.with_name('bin-launch'), os.path.join(binary_dir, 'bin-launch'))
+        binary = Path(binary_dir) / 'epr'
+    else:
+        print('session_envelope_test: strip unavailable; the cases run the unstripped epr',
+              file=sys.stderr, flush=True)
+    os.environ['EPR_BIN'] = str(binary)  # case processes inherit it; BINARY is read from it
+    batches = ([i for i in ids if i not in SERIAL_TAIL], jobs), ([i for i in ids if i in SERIAL_TAIL], 1)
+    failed, reported, interrupted = [], set(), None
+
+    def report(future):
+        if future in reported or future.cancelled() or not future.done():
+            return
+        reported.add(future)
+        case, verdict, out, err, took = future.result()
+        print(f'{verdict} {case} ({took:.1f}s)', file=sys.stderr, flush=True)
+        if verdict != 'ok':
+            failed.append(case)
+            print(f'--- {case} stdout ---\n{out}--- {case} stderr ---\n{err}',
+                  file=sys.stderr, flush=True)
+
+    try:
+        for cases, width in batches:
+            pool = ThreadPoolExecutor(max_workers=max(1, width))
+            futures = [pool.submit(one, case) for case in cases]
+            try:
+                for future in as_completed(futures):
+                    report(future)
+            except BaseException:
+                stopping.set()
+                raise
+            finally:
+                pool.shutdown(wait=True, cancel_futures=True)
+                for future in futures:
+                    report(future)
+    except BaseException as error:  # KeyboardInterrupt included: every case above was ended
+        interrupted = f'{type(error).__name__}: {error}'
+        traceback.print_exc()
+    finally:
+        shutil.rmtree(binary_dir, ignore_errors=True)
+        print(f'session_envelope_test: {len(ids)} cases ({len(batches[1][0])} serial), '
+              f'{jobs} at a time; {len(failed)} failed'
+              f'{": " + ", ".join(failed) if failed else ""}'
+              f'{"; runner stopped: " + interrupted if interrupted else ""}',
+              file=sys.stderr, flush=True)
+    return 1 if failed or interrupted else 0
+
+
 if __name__ == '__main__':
     if '--stage' in sys.argv:
         p=argparse.ArgumentParser();p.add_argument('--stage');p.add_argument('--base');a=p.parse_args()
         getattr(Fixture(a.base),a.stage)()
+    elif '--parallel' in sys.argv:
+        p = argparse.ArgumentParser()
+        p.add_argument('--parallel', action='store_true')
+        p.add_argument('--jobs', type=int, default=min(4, os.cpu_count() or 1))
+        p.add_argument('--exclude', action='append', default=[],
+                       help='a Class.method another runner already runs')
+        p.add_argument('--case-timeout', type=float, default=600.0)
+        a = p.parse_args()
+        sys.exit(run_parallel(a.jobs, a.exclude, a.case_timeout))
     else:
         unittest.main()

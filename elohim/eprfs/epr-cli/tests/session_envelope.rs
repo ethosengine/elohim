@@ -34,12 +34,21 @@ fn runtime_child_resumes_without_inheriting_authority() {
     );
 }
 
+/// Every other case of the fixture, each once in its own process, four at a time: the cases
+/// share no mutable state (each builds its own temporary base; see `case_ids` there), and run
+/// serially they were one 184 s chain. The resume case is excluded because the test above runs
+/// it. A failure's own unittest output and the failing case ids are in the assertion message.
 #[test]
 fn session_envelope_native_facets_and_hook_pin_regressions() {
     // gate-reads: genesis/agentic/session_envelope_test.py
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..");
     let result = std::process::Command::new("python3")
         .arg(root.join("genesis/agentic/session_envelope_test.py"))
+        .args([
+            "--parallel",
+            "--exclude",
+            "ResumeEnvelopeTest.test_runtime_child_resumes_without_inheriting_authority",
+        ])
         .env("EPR_BIN", env!("CARGO_BIN_EXE_epr"))
         .output()
         .expect("python fixture starts");
