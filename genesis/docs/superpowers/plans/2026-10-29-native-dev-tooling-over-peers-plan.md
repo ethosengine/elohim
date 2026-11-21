@@ -626,6 +626,27 @@ offers" is the name. Which device carries is an outcome of who admits, never a p
 Admission rests on standing and a grant. Trust prices verification, and nothing in a record is a
 price.
 
+**Interfaces.** The steward, the same day: "the right design choices, and the direction of the
+implementation plan.. for beautiful APIs, SDKs, Interfaces and composition." Each cut below is
+therefore built as one implementor behind a contract. A patch to the push hook is acceptable only
+as a thin caller of one.
+
+The landing is one algorithm: for each selected step, reuse a verdict, else offer the step to a
+carrier, else run it here; then collect and settle. It depends on the contracts in this table and
+never on an implementor.
+
+| Concern | Contract | First implementor | Later implementors | Native home |
+|---|---|---|---|---|
+| Where a step runs | A carrier: `offer(step)` answers carried, with a handle, or not carried, with a reason and whose line refused; `collect` returns the gate's own verdict; `withdraw` leaves nothing running | this device's second cargo seat | a sibling device over the peer channel; an enrolled carrier such as Jenkins | D9: a `TaskSpec` offer, `ark task run`, placement-core `decide` |
+| Whether there is room | One answer per device and resource: admit, or refuse with the axis and the owner of the limit | berth, from the policy's seats, the build count and the guards (`berth room cargo`) | ark's `BerthOffer` posture with a host-floor refusal | `elohim/placement/core` (`Posture`), `elohim-compute` (`Refusal`, `LimitOwner`) |
+| What a landing still needs | The landing intent's misses, raised before the gates run | none yet (row 9, step 2) | | `epr-rea` `Intent`; `epr flow intend` |
+| What a gate is keyed on | Its step's sources and its own recipe. A step's `buildProcess` is an input of the executor that runs that process, which for a pipeline file is CI and not the device | the JS gate key, for projects without a native closure | eprfs, whose bin store hashes the whole tree (needs a roll; row 42) | D2: the projected view; the method CID |
+| The result | A verdict that names its basis (computed here, carried, reused) and its carrier | `gate-verdict@1` | `DerivationRecord` | D1 |
+
+A contract is proven by a test any implementor must pass, run against at least two implementors,
+one of them a fake. The first-implementor column is what exists or is being built on 2026-11-21;
+a row is corrected here when its implementor lands.
+
 **Two wordings reconciled.**
 
 - *Cargo seats.* The design's §11 says "Gates still serialize on one device". The policy has
