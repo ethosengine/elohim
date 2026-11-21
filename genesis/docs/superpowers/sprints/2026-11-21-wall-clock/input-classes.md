@@ -118,7 +118,10 @@ both `sources` and `buildProcess`).
 
 - `brit build affected --inputs <sources|all>`. Flag omitted: the legacy planner and today's
   bytes. Given (either value): the classified planner, every reason carrying `inputClass`.
-  `all` selects the same steps as today, with provenance. `sources` selects from sources alone.
+  `all` selects the steps today's planner selects, with provenance, with one difference: a
+  `File@fn` buildProcess entry is matched as `File` (the legacy glob keeps the suffix and
+  matches nothing). Shem scanned 2034 entries on dev on 2026-11-21 and found none with `@`.
+  `sources` selects from sources alone.
 - `brit build fingerprint --inputs <sources|all>`. Flag omitted: the legacy union and the same
   CID and JSON as today. Given: rakia's `step_input_patterns`, the rule the classified planner
   matches, so a change that selects a step under a selection also moves its key under it (a
@@ -219,3 +222,15 @@ Found on the way. Commit `101b7b767` (the build hook's seat count) shrank
 40, and the sprint's `journal.md` by about 573 lines. Its message names neither file. Rows 16
 to 62, row 42 among them, exist only at `101b7b767^`. Shem found landings 7 to 10 did the same (an append that opened
 for write before reading) and repaired both files in `b83575402`.
+
+Release train, 2026-11-21 21:50Z (steward authorized in this session: "Yes, run the release").
+rakia PR #4 (`ethos/input-classes` to `main`, a fast-forward of three commits: `f9787c9e`,
+`158f2365`, `8a4f184a`) ran CI, and its `test` check failed. The input-class tests pass. The
+failure is `rakia-executor/tests/contract.rs:34`
+(`canonical_identity_matches_the_javascript_oracle_including_null`): it expects the blake3
+artifact CID `bafkr4igyfkfu6h3vwzbc3zsulgdn6okd2eh6ovuqiyouihuyxrgt7s4ude`, and the executor
+emits the sha256 CID `bafkreigyfkfu6h3vwzbc3zsulgdn6okd2eh6ovuqiyouihuyxrgt7s4ude`.
+`f9787c9e` ("executor kernel swap staged") changed that file. It has no CI run of its own,
+and it is the commit dev pins. The swap waits on elohim-epr 0.2 (the test file's TODO). The PR
+is open and unmerged, and nothing is published. Either the swap finishes, or the assertion is
+staged with its ignored sibling. That decision belongs to the executor-swap lane.
