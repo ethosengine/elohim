@@ -215,6 +215,28 @@ class Journal:
             'effect': effect, 'incidentId': incident, 'rung': rung, 'key': key, **details})
 
 
+def external_close(events, iid):
+    """How the steward's dialog for `iid` ended, read from the journal under the held lock.
+
+    Native keeps the first closer: a live park (closedBy parked) shadows a later
+    `prompt-closed approved`, so the fold can still call the incident open after the
+    steward approved it. The sensor's own close record is the fresher truth. A close
+    this coordinator caused (`parked`) never counts. Native `fold` takes the same
+    journal.lock, so it cannot be re-run from inside a locked advance.
+    """
+    try:
+        opened = int(iid.rsplit(':', 1)[1])
+    except (IndexError, ValueError):
+        opened = 0
+    for event in reversed(events):
+        if (event['kind'] == 'prompt-closed' and event.get('closedBy') != 'parked'
+                and event.get('correlation', {}).get('incidentId') == iid):
+            return event.get('closedBy') or 'unknown'
+        if event['kind'] == 'session-ended' and event['seq'] > opened:
+            return 'session-ended'
+    return None
+
+
 def schema_valid(value, schema):
     """The standard-library validator for the keywords in KeeperDecision.
 
@@ -495,6 +517,10 @@ class Coordinator:
         stall = policy.get('stall', {'limit': 300, 'thresholdPct': 60})
         breach, approach = stall['limit'], stall['limit'] * stall['thresholdPct'] / 100
         delivery = control.Delivery(journal.directory) if live else None
+        # The journal cannot change while this lock is held, so one read here serves
+        # every rung and every delivery below; a consultation in flight re-reads on finish.
+        if self.end_if_closed(journal, session, presence, incident):
+            return
         if live and any(r['kind'] == 'park-state' and r['incidentId'] == iid
                         and r['state'] in {'answered', 'withdrawn', 'expired'} for r in delivery.rows):
             return
@@ -506,7 +532,7 @@ class Coordinator:
         if presence['disposition'] != 'automated' and age < approach:
             return
         history = journal.hypothetical(iid)
-        if not live and any(e['effect'] == 'incident-closure' or
+        if not live and any(e['effect'] in {'incident-closure', 'ladder-ended'} or
                (e['effect'] == 'incident-advancement' and e['rung'] == 5) for e in history):
             return
         starts, results = journal.claims(iid)
@@ -615,6 +641,30 @@ class Coordinator:
                                             presence, incident, claim, runtime, binding, brief, stage)
             return
         self.human(journal, session, presence, iid, 'ladder exhausted', agent=incident.get('agentId', 'main'))
+
+    def end_if_closed(self, journal, session, presence, incident):
+        """True when the steward's dialog for this incident is over: the ladder ends here.
+
+        Writes one row saying so, withdraws any parked ask and delivers nothing further.
+        Live rows go to delivery.jsonl; shadow records the would-have. Idempotent.
+        """
+        iid = incident['id']
+        by = external_close(journal.events, iid)
+        if by is None:
+            return False
+        reason = f'incident closed ({by}); ladder ended, nothing further delivered'
+        if getattr(journal, 'activation', None):
+            delivery = control.Delivery(journal.directory)
+            touched = any(r.get('incidentId') == iid and r['kind'] in {'guidance', 'PushNotification', 'park'}
+                          for r in delivery.rows)
+            if incident['state'] != 'Closed' or touched:
+                delivery.add('ladder-ended', f'ladder-ended:{iid}', incidentId=iid, closedBy=by,
+                             rung=incident['rung'], policyCid=journal.activation['policyCid'], reason=reason)
+                delivery.add('park-state', f'closed:{iid}', incidentId=iid, state='withdrawn', reason=reason)
+        elif incident['state'] != 'Closed':
+            journal.would(session, presence, iid, 'ladder-ended', min(5, max(0, incident['rung'])),
+                          key=f'ladder-ended:{iid}', closedBy=by, reason=reason)
+        return True
 
     @staticmethod
     def invocation_probed(runtime, invocation, binding):
@@ -828,12 +878,8 @@ class Coordinator:
             key = (incident['id'], claim['consultation']['rung'])
             if key not in results and starts.get(key, {}).get('seq') == claim['seq']:
                 result = self.finish(journal, session, presence, claim, answer, tokens, phase)
-                closed = any(e['seq'] > claim['seq'] and (e['kind'] == 'session-ended' or (
-                    e['kind'] == 'prompt-closed' and e.get('correlation', {}).get('incidentId') == incident['id']))
-                             for e in journal.events)
-                parked = any(e['kind'] == 'prompt-closed' and e.get('closedBy') == 'parked'
-                             and e.get('correlation', {}).get('incidentId') == incident['id'] for e in journal.events)
-                if not closed or (activation and parked):
+                # The result is recorded above; a closed incident gets no delivery from it.
+                if not self.end_if_closed(journal, session, presence, incident):
                     self.effects(journal, session, presence, incident, result['consultation'], stage)
 
     def context_check(self, answer, incident, claim):

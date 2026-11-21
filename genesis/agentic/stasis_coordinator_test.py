@@ -877,6 +877,115 @@ class CoordinatorTest(unittest.TestCase):
         self.assertFalse(self.calls())
         self.assertFalse(self.would())
 
+    # --- A closed incident ends its ladder -------------------------------------------------
+
+    PIN = {'policyCid': 'bafkreipinnedfixture', '_policy': {}}
+
+    def live_after_rung_one(self, close=None):
+        """Rung 1 parked live (native folds that as closedBy parked, still open); then maybe a close."""
+        self.env['STASIS_BERTH_BIN'] = '/bin/true'
+        os.environ['STASIS_BERTH_BIN'] = '/bin/true'
+        self.addCleanup(os.environ.pop, 'STASIS_BERTH_BIN', None)
+        self.finish_claim(self.PIN, [{}])
+        subject = coordinator.Coordinator(SimpleNamespace(
+            live=True, keeper_cmd_override=str(self.keeper), consultation_timeout=2, fold_timeout=2, repo=[]))
+        self.addCleanup(subject.worker.shutdown)
+        subject.activation = lambda *_: self.PIN
+        with coordinator.locked(self.directory, True) as journal:
+            first = journal.events[0]
+            control = coordinator.control.Delivery(self.directory)
+            control.park('s1:1', self.PIN['policyCid'], 'main', summary='parked')
+            control.add('guidance', 'guidance:s1:1:1', incidentId='s1:1', policyCid=self.PIN['policyCid'],
+                        rung=1, agentId='main', pivot='park', message='parked as stasis s1:1')
+            if close:
+                journal.append('prompt-closed', first['session'], self.presence,
+                               correlation=first['correlation'], closedBy=close)
+        self.incident.update(state='Breach', rung=1, closedBy='parked')
+        return subject
+
+    def advance_live(self, subject):
+        with coordinator.locked(self.directory, True) as journal:
+            journal.activation, journal.repo = self.PIN, ROOT
+            journal.hypothetical('s1:1')
+            subject.advance(ROOT, journal, journal.events[0]['session'], self.presence,
+                            copy.deepcopy(self.incident), {'seconds': 0, 'tokens': 0})
+        if subject.future:
+            subject.future.result(timeout=10)
+
+    def rows(self, *kinds):
+        return [r for r in coordinator.control.Delivery(self.directory).rows if r['kind'] in kinds]
+
+    def test_approved_close_after_rung_one_ends_the_ladder_and_delivers_nothing(self):
+        subject = self.live_after_rung_one(close='approved')
+        before = len(self.rows('guidance', 'PushNotification', 'berth-note'))
+        self.advance_live(subject)
+        self.advance_live(subject)  # a later tick changes nothing
+        self.assertEqual(len(self.starts()), 1)
+        self.assertFalse(self.calls() and len(self.calls()) > 0)
+        self.assertEqual(len(self.rows('guidance', 'PushNotification', 'berth-note')), before)
+        ended = self.rows('ladder-ended')
+        self.assertEqual([(r['incidentId'], r['closedBy']) for r in ended], [('s1:1', 'approved')])
+        delivery = coordinator.control.Delivery(self.directory)
+        self.assertEqual(delivery.news('main'), [])  # the rung-1 guidance is no longer injected
+        self.assertEqual(delivery.pending(), [])      # no parked ask for a Stop-hook batch
+
+    def test_open_incident_still_gets_its_next_rung(self):
+        subject = self.live_after_rung_one()
+        self.advance_live(subject)
+        self.assertEqual([e['consultation']['rung'] for e in self.starts()], [1, 2])
+        self.assertEqual(self.rows('ladder-ended'), [])
+        self.assertEqual(len(self.rows('PushNotification')), 1)
+
+    def test_shadow_ladder_also_ends_on_close(self):
+        self.finish_claim()
+        self.incident.update(state='Breach', rung=1)
+        with coordinator.locked(self.directory, True) as journal:
+            first = journal.events[0]
+            journal.append('prompt-closed', first['session'], self.presence,
+                           correlation=first['correlation'], closedBy='approved')
+        self.save_fold()
+        self.run_cmd()
+        self.assertEqual(len(self.starts()), 1)
+        self.assertEqual([(w['effect'], w['closedBy']) for w in self.would() if w['effect'] == 'ladder-ended'],
+                         [('ladder-ended', 'approved')])
+
+    def test_consultation_in_flight_at_close_records_result_and_delivers_nothing(self):
+        subject = self.live_after_rung_one()
+        starts = len(self.starts())
+        with coordinator.locked(self.directory, True) as journal:
+            first = journal.events[0]
+            now = coordinator.clock()
+            claim = journal.append('consultation', first['session'], self.presence,
+                                   correlation=first['correlation'], consultation={
+                                       'phase': 'start', 'rung': 2, 'level': 'C2', 'binding': 'sonnet',
+                                       'startedAt': now, 'deadlineAt': coordinator.wall(time.time() + 2),
+                                       'timeoutSeconds': 2,
+                                       'claimedBy': {'pid': os.getpid(), 'bootId': now['bootId']}})
+            coordinator.control.Delivery(self.directory).add(
+                'claim', f"claim:{claim['seq']}", claimSeq=claim['seq'], incidentId='s1:1',
+                policyCid=self.PIN['policyCid'])
+            # The steward approves while the keeper is still thinking.
+            journal.append('prompt-closed', first['session'], self.presence,
+                           correlation=first['correlation'], closedBy='approved')
+        guidance = len(self.rows('guidance', 'PushNotification', 'berth-note'))
+        subject.consult(ROOT, self.directory, {'runtime': 'claude-code', 'session': 's1'}, self.presence,
+                        copy.deepcopy(self.incident), claim, {}, {'model': 'sonnet', 'effort': 'low'},
+                        'brief', 'Breach')
+        self.assertEqual(len(self.starts()), starts + 1)
+        self.assertEqual([c['rung'] for c in self.completions()], [1, 2])  # result recorded
+        self.assertEqual(len(self.rows('guidance', 'PushNotification', 'berth-note')), guidance)
+        self.assertEqual([r['closedBy'] for r in self.rows('ladder-ended')], ['approved'])
+        self.assertEqual(coordinator.control.Delivery(self.directory).news('main'), [])
+
+    def test_a_close_by_our_own_park_is_not_a_closed_incident(self):
+        events = [{'kind': 'prompt-closed', 'closedBy': 'parked', 'seq': 5,
+                   'correlation': {'incidentId': 's1:1'}}]
+        self.assertIsNone(coordinator.external_close(events, 's1:1'))
+        events.append({'kind': 'session-ended', 'seq': 9})
+        self.assertEqual(coordinator.external_close(events, 's1:1'), 'session-ended')
+        self.assertIsNone(coordinator.external_close(events[:1] + [{'kind': 'session-ended', 'seq': 0}], 's1:1'))
+
+
     def test_start_detaches_idempotently_and_stop_releases_pid_lock(self):
         self.addCleanup(lambda: self.run_cmd('stop'))
         result = self.run_cmd('start', STASIS_LADDER='off')

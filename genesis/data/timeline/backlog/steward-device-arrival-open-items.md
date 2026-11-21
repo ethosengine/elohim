@@ -1,28 +1,23 @@
 
 
-### Row 64, delta 2 (2026-11-21): the second seat is a carrier behind a contract, landed in shadow
+## Row 58, delta (2026-11-21): the keeper ladder climbed on after the steward approved the prompt
 
-Item 2 is built, and not as logic in the push hook. `genesis/orchestrator/gate-carry.mjs` holds a
-carrier contract (admit, offer, collect, withdraw), one pure algorithm (`planCarry`) and the first
-carrier, `second-seat`. `berth room cargo --json` is the one capacity answer, and the push hook
-only calls in. The switch `GATE_CARRY=off|shadow|on` defaults to shadow, which prints what it would
-carry and starts nothing (native-dev-tooling-over-peers-plan §9, "Interfaces").
+Incident `824f0d7e…:145`. A command met an ask rule at 17:32:44Z and the steward's dialog stayed
+open for eight and a half minutes, so the ladder's first rung ran while the wait was real. The
+steward approved at 17:41:20Z and the sensor recorded `prompt-closed, closedBy: approved`. The
+coordinator then ran rung 2 (a Sonnet keeper) and rung 3 (an Opus keeper), kept telling the
+session not to retry a command that had already run, asked for a push notification, and blocked
+the session's stop.
 
-Found while building it:
+Two causes. The native fold keeps the first closer: the first rung's Permit closes the incident
+as `parked`, and the later `approved` is ignored (`elohim/eprfs/device-runtime/src/session_stasis.rs`,
+`close()` is first-wins and Parked is not Closed). And the ladder in
+`genesis/agentic/bin/stasis-coordinator` treats `parked` as still open and takes the next rung.
 
-- Two writers to one gate run's event log could take the same sequence number: four concurrent
-  writers gave 481 unique numbers for 601 events, so a cursor could skip an event. Two gates
-  finishing together could also lose a row of the cycle ledger. Both now go through
-  `genesis/orchestrator/file-lock.mjs`.
-- `elohim-storage` and `epr-storage` build in one cargo target, as do `eprfs`, `memory-ceremony`
-  and `orchestrator-tree`. Two gates that share a target queue on cargo's own lock, so `planCarry`
-  refuses to carry one beside the other. A landing that selects both storage gates therefore
-  carries nothing today. The refinement that makes the 21-gate landing pay: the unit carried is
-  the group of steps that share a target, run in turn on the second seat (3,535 s and 1,360 s).
-- The build hook counts every gate-runner as a seat, including the fixture gate-runners that the
-  orchestrator's own hook tests start. A real build was refused for seven minutes by a fixture a
-  killed test run had left behind. The tests now reap their fixtures; the count is unchanged and
-  stays the safe direction.
-
-Not yet observed: `GATE_CARRY=on` with a real gate. Item 3, the measured landing, is still owed,
-and the measurement taken the same day (below, and the sprint journal) bears on it.
+Fixed in the ladder: before a rung or a delivery it reads the sensor's own close record for the
+incident from the journal it already holds locked, and if the dialog is over it ends, writes one
+`ladder-ended` row, withdraws the parked ask and delivers nothing more. Five tests. Still owed:
+the native fold should let an approval close a parked incident, which is a change in
+`device-runtime` and so waits for a deliberate roll; and the coordinator daemon on shem has run
+since 2026-11-10 and takes the fix only when restarted, which is the steward's to do because it
+serves every session on the device.

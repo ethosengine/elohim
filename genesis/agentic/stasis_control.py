@@ -155,8 +155,11 @@ class Delivery:
     def news(self, reader):
         consumed = {r['deliverySeq'] for r in self.rows if r['kind'] == 'receipt'
                     and r['reader'] == reader}
+        # An incident whose dialog already closed has nothing left to say.
+        ended = {r['incidentId'] for r in self.rows if r['kind'] == 'ladder-ended'}
         return [r for r in self.rows if r['kind'] in {'guidance', 'PushNotification'}
-                and r['seq'] not in consumed and r.get('agentId', 'main') == reader]
+                and r['seq'] not in consumed and r.get('agentId', 'main') == reader
+                and r.get('incidentId') not in ended]
 
     def park(self, iid, cid, agent='main', summary='A step is awaiting steward guidance.',
              ask='Resolve this parked step? Recommendation: keep it parked pending fresh validation.'):
