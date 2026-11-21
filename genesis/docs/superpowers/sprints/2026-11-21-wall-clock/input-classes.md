@@ -234,3 +234,21 @@ emits the sha256 CID `bafkreigyfkfu6h3vwzbc3zsulgdn6okd2eh6ovuqiyouihuyxrgt7s4ud
 and it is the commit dev pins. The swap waits on elohim-epr 0.2 (the test file's TODO). The PR
 is open and unmerged, and nothing is published. Either the swap finishes, or the assertion is
 staged with its ignored sibling. That decision belongs to the executor-swap lane.
+
+The release train resumed at 21:57Z, after shem's diagnosis, which was verified here. The
+red literal was a prefix-only rewrite in `f9787c9e`: a sha256 digest sitting under the blake3
+code 0x1e, a value no hash produces. `70d9c4a0` restored the sha256 CID, and the swap stays
+staged in the ignored `executor_uses_kernel_bytes_cid`.
+
+| Step | Result |
+|---|---|
+| rakia PR #4 CI on `70d9c4a0` | green, rakia-executor included |
+| rakia main `f2c0d3c05597f4701a92b886ceb15acfd82ba597` (CI run 44954373726) | test and Publish to Nexus green; rakia-core and rakia-brit 0.1.2 in the index |
+| brit release commit `02d4654fa73d387e5ac9e5d29b72699740d3488d` | brit-cli 0.3.1; changelog; `docs/releases/brit-0.3.1.md`; Cargo.lock changed in three entries |
+| local check of the release commit | `--locked` against the published crates: clippy 0, tests 23/114/18 passed |
+| CI run 44955011127 on that head | Tests pass green; advisories and size red, as on 0.3.0 |
+| brit main | fast-forwarded to `02d4654f` |
+| tag `brit-v0.3.1` | release run 44961634302 green; GitHub release published with three max-pure archives |
+
+No dev pin moved and genesis/orchestrator was not touched. Shem moves both pins and adopts the
+flag.
