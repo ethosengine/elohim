@@ -1422,3 +1422,20 @@ same `--offline-ok` rule as the landing agent; or a device with no live session 
 head at a cadence shorter than the fence window; or the lane is claimed and checked before the
 gates as well as after, so a fence is known before hours are spent. The gates were not paid
 again: the second push reused their verdicts.
+
+## Row 62 — a security fix in the k8s bridge's lock is an Edge roll, and waits for one
+
+2026-11-21. The security ratchet named `bridges/k8s/Cargo.lock` on the row 43 landing: four
+alerts on rustls 0.23.43, patched in 0.23.46, the one lock-only fix among the four lockfiles
+that landing touched. It is built and parked on local branch `wallclock/k8s-rustls`
+(`c6149616`, on shem; `cargo metadata --locked` exits 0). It did not land. The preflight showed
+what a walk of the changed paths had not: `bridges/k8s/Cargo.lock` is a storage build input, so
+the commit selects the storage gate on a device and, in CI, `cargo-build-storage`,
+`build-edge-image` and `deploy-manifests`. A second fleet roll hours after the first is the
+steward's to time. It rides the next deliberate roll.
+
+The alerts on the storage, node and eprfs locks from the same ratchet output need the libp2p
+0.56 upgrade (hickory 0.24, libp2p-gossipsub 0.47, libp2p-quic 0.11, the rustls-webpki 0.101
+line, ring 0.16) or the iroh upgrade (hickory 0.25 and lru 0.13 in the eprfs lock). None is a
+lock move.
+

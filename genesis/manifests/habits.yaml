@@ -2414,10 +2414,10 @@ habits:
       - "node --test genesis/orchestrator/fleet-roll-guard.test.mjs (a pushed dev or main ref for which CI's own graph would select an Edge build and its deploy step is red unless a pushed commit carries the declaration; each ref read from its own range; tags read on the tip as CI reads them; an undecidable range or a failed evaluator is red on a protected ref; the incident witnesses on real manifests)"
       - "node genesis/orchestrator/gate-live.mjs harvest --last 20 (live read of this device's run logs; green needs the slices it names to shrink across pushes)"
     evidence: >
-      DELTA 2026-11-20 (still RED; a seconds-class red surfaced 55 minutes into a push): shem's push of 7213bb589 failed after 3,311 s on one test of the tree half, `generator-0.8.11 source is not in /opt/rust/cargo …`: c-baseline-pin held each reviewed exception against the crate's build.rs in the device's cargo registry, and generator is locked only through loom (cfg(loom)), so shem never downloaded it. Cured at d6e9c69aa: each exception is held against the lock's checksum on every device and against build.rs where the source is present (34 tests pass on shem, 0 skipped); the second push cleared in 870 s with the eprfs verdict reused. Not yet moved left: nothing at preflight says a test of the tree half reads device state this device does not hold (backlog rows 40 and 45).
-    evidence-fingerprint: sha256:fa9965824997bd74
-    evidence-bytes: 11566
-    evidence-entries: 12
+      DELTA 2026-11-21 (still RED; a red only CI's publish stage could see is now a one-second device check, and one late red is new): `publish_eprfs.py --precheck` compares every entry of the published lock that is reachable from the crate, so a third-party lock move in a published crate's graph is refused on the device (dev 5535405d4). Receipt: on the tree both devices passed for four days it exits 1 with "eprfs-core 0.3.5: the published Cargo.lock pins cc 1.2.65 but the workspace now locks 1.11.1 (1 more moved)", and against the lock before the cc move it refuses nothing. The preflight's fleet-roll row caught, before a push, a lock change that would have rolled Edge a second time (row 62). New late red, not yet a check: the landing lane refused after 13,175 s of green gates, on a fence that could have been read before the first gate (row 61).
+    evidence-fingerprint: sha256:ac7fa27bb850561f
+    evidence-bytes: 12419
+    evidence-entries: 13
     guard: >-
       Never let a recorded red reach `exit 0`: every early pass goes through pass_or_refuse. Never move a
       check into the preflight that is not seconds-cheap on a warm tree, and never make a WARN refuse.
@@ -2449,10 +2449,10 @@ habits:
       - "python3 .claude/hooks/tests/test_gate_live_inject.py (every agent hears a red at its next tool call, one cursor per agent; a background push gets the Monitor command)"
       - "@concern:gate-failures-arrive-live"
     evidence: >
-      DELTA 2026-11-18b (status unchanged until the fix is on dev; a sibling's red crossed devices in 4.9 s): with the stand-in failure fix on scratch head `5804e04b3`, ethosengine's `gherkin-prepush-lint` step failed at 10:50:03.608Z and shem's `gate-live.mjs follow --sibling` printed `SIBLING RED … red #1 +7s; 5 gate(s) still to run` at 10:50:08.474Z. A `SIBLING FINAL` for the earlier run arrived 5.6 s after it was recorded. Log genesis/local-dev/native-throughput/dod4-follow-2.log.
-    evidence-fingerprint: sha256:d7407c61541c2212
-    evidence-bytes: 4614
-    evidence-entries: 6
+      DELTA 2026-11-21 (status unchanged; a false verdict on the live run, found on a real push and closed): while the row 43 push ran its orchestrator gate, the push's own live run received five start and verdict pairs for a fixture project named eprfs, and a listener printed "eprfs PASSED 0s" five times for a gate that had not started (run 20261121T053143Z-5535405d45d6-31d8da, seq 28 to 33; the same pairs are in two runs of that morning). `cargo-affected.test.mjs` spread its environment into a fixture gate and `gate-runner` appends to whatever `GATE_LIVE_RUN` it is handed; the same leak could have carried a false red. The suite's tree half now starts without the variable (`suite-run.mjs treeEnv`) and that test clears it; a test is red with the fix reverted, and a census of every orchestrator test file with a scratch run found no other writer.
+    evidence-fingerprint: sha256:3a736583ad6445e3
+    evidence-bytes: 5466
+    evidence-entries: 7
     guard: >-
       Preserve output bytes, exit status, and termination signals. Keep excerpts
       device-only. Require real-push evidence of first_red_s, continued later
@@ -2518,10 +2518,10 @@ habits:
       - "ledger liveness (algedonic sensor, observation only): fold ci-harvest-cursor-lag@1 per job per its procedure in .claude/epr-meta/measures.yaml (Jenkins lastCompletedBuild minus .claude/data/ci-cursor.json); lens ci-harvest-cursor-lag-ceiling@1 reads red at 11 or more builds, where one harvest drops builds for good (`epr flow report --bound ci-harvest-cursor-lag-ceiling`)."
       - "a2o @concern:push-delivers-within-budget (genesis/a2o/features/dataplane/app-delivery-refuses-fast.feature — @act:i, four household stations: the not-ready window is answered in seconds; `just test mesh features/dataplane/app-delivery-refuses-fast.feature`)"
     evidence: >
-      DELTA 2026-11-03 (second consecutive pass-3 reading — "a push that changed nothing deployed does not roll the fleet" held on two waves; habit status unchanged, other clauses not re-run): edge #1793 (b61b9a79c, build class, no closure input changed, no deployed declaration changed) answered closure HIT for storage 02b05303…, doorway 58635694…, doorway-app 70eca07d… and agent-sdk cfbde683… (the same digests as #1791). No pod restarted: both doorways printed "pod template + config unchanged — no doorway restart" with the same fingerprints as #1791 (alpha ae307ace…, alpha-b 768b8128…), and every conductor held on hApp bundle 51218255…. Validation run #1794 then had 0 failed scenarios (9 passed), where #1786 and #1790, each after a doorway roll, failed on doorway-B catch-up (p2p.caughtUp false for 600 s). Its only red was adam's compute worker activation, which is outside this clause.
-    evidence-fingerprint: sha256:791f1137dba3bf15
-    evidence-bytes: 44157
-    evidence-entries: 40
+      DELTA 2026-11-21 (RED preserved; one landing read line by line): the row 43 landing on shem, 14 files (four version lines, eight lock entries, one script and its test), 05:31:42Z to 09:26:09Z. First push 13,175 s of gates across 21 projects, all green, then refused at the landing lane on a ten-minute silence from the other device (row 61); second push 561 s on the recorded verdicts. Three gates were 80% of the first push: eprfs 4,487 s, elohim-storage 3,535 s, steward-node 1,334 s. Inside eprfs: 1,892 s compiling on one job, and 1,765 s in two test binaries whose stories each paid about 33 s of debug-build hashing per ark spawn (row 52). Cut on this sprint: those two binaries to 864 s and the build to six jobs. Not cut, with their rows: thread parallelism (59, 60), the lock-reach key (51), the whole-justfile key (59, shadow only), the hashing itself (52).
+    evidence-fingerprint: sha256:90d7c2e32313b9fd
+    evidence-bytes: 45026
+    evidence-entries: 41
     refs:
       - "genesis/data/timeline/backlog/edge-quiesce-gate-timeout-aborts.md (the budget arithmetic, one layer down then up)"
       - "genesis/data/timeline/backlog/ci-edge-a2o-steps-glob-redeploys-fleet.md (no-op fleet rolls)"
@@ -2579,10 +2579,10 @@ habits:
       - "node --test genesis/orchestrator/suite-list.test.mjs (the orchestrator suite list holds every test file once; the named half's view holds what its key hashes and its environment is constructed)"
       - "a2o genesis/a2o/features/devflow/native-gate-evidence.feature reuse rule (this workspace's own green stands in; a red or an unadmitted signer never does)"
     evidence: >
-      DELTA 2026-11-19e (status unchanged; a defect of the view found on the second device, fixed on dev 00dd77dfb): the named half's inventory took 104 files from elohim/holochain-conductor at its pin, a submodule `.gitmodules` declares `update = none`. A device that holds that fork in no object store (ethosengine) could neither compute the key nor build the view, and the cure the refusal printed skips such a submodule. Now a submodule declared `update = none` contributes its pin to the key and nothing to the view: 767 files (was 871), 779 + 376 tests, none failed. Receipts: shem's push of 00dd77dfb (named half recorded); ethosengine, a fresh worktree at 00dd77dfb with the pin in no store, `just gate orchestrator` exit 0 in 492 s, both halves recorded; ethosengine's landing 758fb4f6b, whose hook printed `orchestrator evidence: hit green (signer 1fc315045b0c, 20m ago, commit 00dd77dfb)`, declined it for a selecting change, and passed the real run in 61 s. 4ce35271d adds the `submodule-pins` preflight row and prep for the pins the view does read. E11's own receipts had all been taken on shem (backlog row 40).
-    evidence-fingerprint: sha256:f29481265f64a0a7
-    evidence-bytes: 29591
-    evidence-entries: 30
+      DELTA 2026-11-21 (status unchanged; the oracle asks brit, a shadow recipe key, and one landing measured): the gate oracle resolves `brit` and runs `brit build affected`; `resolveRakiaBin`, `rakiaAffected` and every `RAKIA_BIN` read are deleted, and an unavailable oracle says why in the path-only line and in the reuse refusal. Receipt on shem with no `rakia` on PATH: `[gate] elohim-compute reused: green 4h ago at 5535405d4 (signer this workspace)`. A shadow recipe key (`GATE_RECIPE_KEY=shadow|off`, no `on`) prints whether a justfile edit since the integration base left a root-just gate's recipe closure unchanged, and changes no key, verdict or recorded duration; first evidence, at 62aef22a only eprfs's closure changed of 40. Measured on the row 43 landing (dev 5535405d4): 21 gates, 13,184 s; refused at the lane (row 61), the second push reused 16 verdicts and landed in 561 s. Five gates of the 21 were selected by lock bytes their crates cannot reach, 830 s (row 51). The eprfs manifest declares CARGO_BUILD_JOBS=6 (measured peak 4.0 GB); two test binaries go from 1,765 s to 864 s.
+    evidence-fingerprint: sha256:b190bc3da0b46f41
+    evidence-bytes: 30687
+    evidence-entries: 31
     guard: >
       Regression risks: (1) reusing on a key that omits something the recipe reads — the recipe
       body, the project tree, a submodule pin, a repo file a test include_str!s; the input audit

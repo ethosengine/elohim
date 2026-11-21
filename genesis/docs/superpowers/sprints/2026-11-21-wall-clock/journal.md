@@ -309,3 +309,58 @@ device that was not landing anything. Row 61.
 
 The second push started at 09:15Z with the same head and the recorded verdicts.
 
+### 09:26Z: row 43 is on dev
+
+`4ecd40d4f..5535405d4  HEAD -> dev` at 09:26:09Z. The second push took 561 s. Sixteen gates
+printed `reused`; five are not enabled for reuse and ran again on warm builds (cargo-coverage,
+rust-style, elohim-blob-store, cargo-bridge, epr-storage, which took 69 s where it had taken
+1,360). Phase L renewed the lease this session already held and landed as a fast-forward. This
+device's build notes went to its own destination: 18 refs moved, 30 already current.
+
+The pipeline's first run on the landed head is `elohim-orchestrator/dev` #2402 (09:45Z) with
+`elohim-eprfs/dev` #206 (09:52Z). Its verdict is in the next entry.
+
+### 09:27Z to 10:10Z: the second landing, assembled
+
+**T2 verified at the gate's own setting.** Bins and ark built first, as the recipe does, then
+both binaries at one thread: `device_supervise` 718.0 s (29 pass), `session_envelope` 145.7 s
+(12 pass). Against 1,456.0 and 309.0 s on the first landing, that is 901 s off each eprfs gate
+run. A first attempt at this check failed all twelve `session_envelope` tests in 34 s, and the
+fault was the check: it skipped the bins step, so the fixture found no `bin-launch`, and the
+slot had been emptied in between, so everything rebuilt.
+
+**The build cap, measured.** At six jobs in that slot: bins 148 s once the dependencies were
+built (550 s from nothing), ark 46 s, the whole workspace's test build 307 s, peak 4.0 GB of the
+41 GB limit. The eprfs manifest now declares `CARGO_BUILD_JOBS=6` on its own `run.cargo.env`,
+which wins over the pool policy's 1.
+
+**The rustls fix came out of this landing.** An earlier entry says it "rides the second
+landing, where it costs the k8s-bridge gate and rolls nothing". That was wrong. The preflight,
+run on the assembled branch, named `bridges/k8s/Cargo.lock` as a storage build input: the
+commit selects the storage gate and, in CI, an Edge build and deploy. It is parked on
+`wallclock/k8s-rustls` for the next deliberate roll (row 62). Without it the branch selects
+thirteen gates and no Edge build.
+
+**Track B's receipt.** With every `rakia` taken off PATH and `brit` left on it, at this
+landing's head: `[gate] elohim-compute reused: green 4h ago at 5535405d4 (signer this
+workspace)`. Both backlog entries are closed.
+
+**A shadow recipe key (row 59).** Built by an Opus leg and reviewed by Codex gpt-6-astra, whose
+six findings are closed (an unbounded subprocess, shadow time counted in the recorded duration,
+a dynamic argument that hid a recipe, an overstated line, uncached lookups, thin tests). It
+changes no key and no verdict. Its first evidence: at `62aef22a`, the last edit of the eprfs
+recipe, only eprfs's closure changed among 40 root-just gates. On today's file an unrelated
+recipe edit would spare nine of them; the rest hold the justfile through their tree, their
+read scope or their inputs. Turning it on is the steward's ruling.
+
+**Git, where brit was not used, and why.** The two landing pushes (the root guidance's
+landing exception). `submodule update --init` in a new worktree (brit has `submodule list`
+only). One rebase of five commits (brit's rebase cost on this non-shallow repository is not
+re-verified on 0.3.0; 0.2.6 spooled 29 GB here for two commits). Three cherry-picks (no such
+verb). One fast-forward of a local branch (brit's `merge` is plumbing and `pull` takes a remote
+branch). Everything else went through brit: status, log, show, diff, blame, add, commit,
+`commit --amend`, branch, switch, `worktree add`, `revision resolve`, `remote refs`.
+
+**What this landing carries.** Track B; the live-run leak fix; the shadow recipe key; T2 with
+the build cap; this journal, the backlog rows and four habit deltas.
+

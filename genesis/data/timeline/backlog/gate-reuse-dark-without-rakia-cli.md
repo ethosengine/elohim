@@ -7,7 +7,7 @@ title: "Gate evidence reuse never hits on a device without a rakia CLI, so every
 slug: "gate-reuse-dark-without-rakia-cli"
 written: "2026-10-29"
 author: "claude (overnight integration pass, session 3f9afd7a, steward human:matthew)"
-status: "open"
+status: "resolved"
 priority: "high"
 ci_status: none
 jobs: []
@@ -46,3 +46,24 @@ brit's `build plan` as its oracle in place of rakia.
 ## 2026-11-04 note (native-dev-plane-one-derivation-earned-reach-design)
 
 Spec §11 Track B cures this by resolving selection through `brit build affected` rather than the deprecated `rakia` PATH binary (`gate-oracle.mjs:24-37` re-verified). Tracked in `native-dev-track-b-gate-oracle-via-brit-build-affected`; close both together. Receipt: a reuse hit with no `rakia` on PATH.
+
+## 2026-11-21: closed (wall-clock sprint, session 824f0d7e)
+
+`gate-oracle.mjs` resolves `brit` (`BRIT_BIN`, else PATH) and runs
+`brit build affected --repo <root> --files a,b`. `resolveRakiaBin`, `rakiaAffected` and every
+`RAKIA_BIN` read are deleted, with the a2o devflow fixtures that called them. An unavailable
+oracle now prints its reason in the path-only line and in the reuse refusal.
+
+Receipt, shem, at the landing's head with every `rakia` taken off PATH (both
+`~/.local/bin/rakia` and `/opt/rust/cargo/bin/rakia` are launcher aliases on this device) and
+`brit` left on it, `GATE_EVIDENCE=reuse just gate elohim-compute`:
+
+```
+[gate] elohim-compute evidence: hit green (signer 8b4cf6856d65, 4h ago, commit 5535405d4); closure scope paths (0 reads)
+[gate] elohim-compute reused: green 4h ago at 5535405d4 (signer this workspace)
+```
+
+`brit build affected` and the `rakia` alias printed byte-identical JSON for the same change set
+on this device (0.08 s each), so selection did not move. The pin-move receipt of the 2026-11-04
+correction (dependents planned with sibling worktrees present) was not re-run.
+
