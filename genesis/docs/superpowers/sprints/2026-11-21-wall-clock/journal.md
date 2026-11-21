@@ -740,3 +740,9 @@ over as `self/ethosengine-input-classes`. Its finding changes the rule this jour
 (eprfs and epr `rust-build-test`, brit-ci, rakia-ci, the library's storybook build) cover their
 own pipeline file with a source glob, so leaving `buildProcess` out would not have cured row 42
 on its own. Not yet read by this session: the branches themselves.
+
+### 21:30Z: the eprfs test changes go to dev together
+
+Landing 12 carries two test-only commits so the eprfs gate is paid once: the session-envelope
+timing fix (row 66) and the shared release in the supervise stories (row 65, delta). Neither
+changes a product source or a manifest; the thread count stays at one.

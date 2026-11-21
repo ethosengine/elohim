@@ -1746,3 +1746,24 @@ heading (83 here, 34 in the journal). Nothing was lost, because every stump was 
 Owed: a seconds check before the gates that refuses a pushed commit which removes most of a
 tracked document without saying so. It would have stopped the first of the five. The session's
 own habit is changed too: read into a variable, then write.
+
+### Row 65, delta (2026-11-21): one stripped release per tag; what is left is the product's ingest
+
+The count in the row was wrong: it is one strip per release, 41 across 18 stories, and the 11
+stories that use a bash fixture strip nothing. A release's bytes depend only on its tag, so the
+test file now makes each tag's bytes once per process, read-only, and hard-links them into each
+story's release directory (landing 12). Written bytes fall from 5.83 GB to 3.27 GB and bytes
+reaching the disk by about 23%. The time barely moves: 707 to 711 s at one thread against 719 s.
+
+Two things this did not settle. The remaining 2.8 GB is the product's own ingest, which reads
+its source and writes an fsynced copy, 41 times; linking or reflinking a read-only source into
+staging is a change in `device-runtime` and waits for a roll. And this file may not own the
+burst that trips the I/O guard at three and four threads: alone at four threads it peaked at
+26 MB/s before the change, against 58 to 72 MB/s in the whole-workspace runs, and both runs that
+failed were frozen while the session-envelope cases ran. The next measurement is which test
+binary owns that burst, before any thread count is tried again.
+
+### Row 66, delta (2026-11-21): landed
+
+The two cases keep their predecessor's entry until their assertion has run, on dev with landing
+12.
