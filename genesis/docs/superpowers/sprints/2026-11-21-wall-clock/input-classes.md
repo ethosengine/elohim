@@ -91,28 +91,41 @@ both `sources` and `buildProcess`).
   `pub fn plan_from_changes_classified(&Constellation, &[String], InputSelection) -> Result<TopoPlan, ConstellationError>`.
   - Each class is matched separately. A directly affected step gets one `changedFile` reason
     per class that matched, in the fixed order sources, buildProcess. Each reason's `path` is the
-    first matching changed path in caller order **within that class**. One path that matches both
-    classes yields both reasons with that path.
+    first matching changed path in caller order **within that class**. A path that matches both
+    of one step's classes (its own pipeline file under a broad source glob) is subtracted from
+    that step's sources and yields the buildProcess reason alone; test 4 pins it. Corrected
+    2026-11-21 after shem's review: an earlier draft said such a path yields both reasons.
   - Sources class = the step's `sources` globs, minus paths matched by its own `buildProcess`.
-  - buildProcess class = the step's `buildProcess` entries with any `@functionName` suffix
-    stripped before matching. The legacy planner keeps passing the suffix to the glob, as today.
+  - buildProcess class = the step's `buildProcess` entries with a trailing `@functionName`
+    suffix stripped before matching (only a final `@` followed by an identifier, so a path such
+    as `@scope/pkg` is kept whole). The legacy planner keeps passing the suffix to the glob, as
+    today.
   - `Sources` drops the buildProcess class **before** propagation is seeded, so a step selected
     only through its pipeline file selects neither itself nor its dependents.
   - Upstream: a selected step gets one `upstreamNode` reason, `inputClass: "upstream"`, for each
     immediate dependency that is selected, including when the step is also selected directly.
     The legacy planner keeps recording only the first upstream of a step it reaches only
     transitively.
-- A shared helper returns a step's input patterns for a selection, so brit's fingerprint and
-  the planner cannot drift (`Step::input_patterns(InputSelection) -> (include, exclude)`).
+- One shared rule returns a step's input patterns for a selection, so brit's fingerprint and the
+  planner cannot drift: `inputs::step_input_patterns(sources, build_process, selection) ->
+  InputPatterns { include, exclude }`. `All` is sources plus stripped buildProcess entries;
+  `Sources` is sources, excluding the stripped buildProcess entries.
+- Compatibility: `AffectedReason` gains a public field and is not `#[non_exhaustive]`, so code
+  outside rakia that builds it with a struct literal stops compiling. Only rakia's own tests do
+  that today. The rakia release (0.1.2) says so in its note.
 
 ### brit
 
 - `brit build affected --inputs <sources|all>`. Flag omitted: the legacy planner and today's
   bytes. Given (either value): the classified planner, every reason carrying `inputClass`.
   `all` selects the same steps as today, with provenance. `sources` selects from sources alone.
-- `brit build fingerprint --inputs <sources|all>`. Default `all`, the same CID and JSON as today.
-  `sources` hashes the step's sources minus its own buildProcess, so the pipeline file's bytes
-  are not in the fingerprint. A new `ContentFingerprint::from_repo_globs_excluding(repo, commit,
+- `brit build fingerprint --inputs <sources|all>`. Flag omitted: the legacy union and the same
+  CID and JSON as today. Given: rakia's `step_input_patterns`, the rule the classified planner
+  matches, so a change that selects a step under a selection also moves its key under it (a
+  `File@fn` pipeline entry moves the `all` key; the legacy union's suffixed glob matches no
+  file). `sources` hashes the step's sources minus its own buildProcess, so the pipeline file's
+  bytes are not in the fingerprint. Corrected 2026-11-21 after shem's review: an earlier draft
+  defaulted to `all` and hashed the unstripped entry. A new `ContentFingerprint::from_repo_globs_excluding(repo, commit,
   include, exclude)` in brit-graph carries the subtraction. `from_repo_globs` is unchanged.
 - `brit build plan` is unchanged (legacy planner, legacy fingerprint).
 - The JSON key added is `inputClass`, inside each `affected_by` entry. Its spelling comes from
@@ -148,16 +161,19 @@ ran every build and test. Nothing is published, released, tagged or pinned.
 
 | Repo | Branch (pushed to its own origin) | Head | Base |
 |---|---|---|---|
-| ethosengine/rakia | `ethos/input-classes` | `158f2365f571979a150d10d22cdea6b6da9238f1` | the dev pin `f9787c9e` (on `run-ci/regenesis-1-schemas`, not `main`) |
-| ethosengine/brit | `ethos/input-classes` | `3f6b0c8d816bb8ad556eb50bc485b6111444ace7` | the dev pin `4eb2e8cc` (brit 0.3.0) |
+| ethosengine/rakia | `ethos/input-classes` | `8a4f184a` (on `158f2365`) | the dev pin `f9787c9e` (on `run-ci/regenesis-1-schemas`, not `main`) |
+| ethosengine/brit | `ethos/input-classes` | `10fa5cac` (on `3f6b0c8d`) | the dev pin `4eb2e8cc` (brit 0.3.0) |
 
 rakia, on its CI toolchain (stable): `cargo fmt --all --check` exit 0. `cargo clippy --workspace
---all-targets -- -D warnings` exit 0. `cargo test --workspace` exit 0, 49 passed and 0 failed,
-including the 11 new tests in `rakia-core/tests/input_classes_test.rs` and `src/inputs.rs`.
+--all-targets -- -D warnings` exit 0. `cargo test --workspace` exit 0, 50 passed and 0 failed
+at `8a4f184a` (49 at `158f2365`), including the new tests in
+`rakia-core/tests/input_classes_test.rs` and `src/inputs.rs`.
 `rakia:codegen:rs:verify` exit 0, and `node --test schemas/tests/*.test.mjs` passed 3 of 3.
 
-brit, on its pin (1.100.0), built against the rakia branch through a non-committed
-`--config patch.elohim.{rakia-core,rakia-brit}.path=…`, with Cargo.lock restored after each run:
+brit at `10fa5cac`, on its pin (1.100.0), built against rakia `8a4f184a` (0.1.2) through a
+non-committed `--config patch.elohim.{rakia-core,rakia-brit}.path=…` with `--offline`. For
+that run the lock's two rakia entries were rewritten to the patched form, and Cargo.lock was
+restored after it:
 
 | Check | Exit | Result |
 |---|---|---|
@@ -165,7 +181,7 @@ brit, on its pin (1.100.0), built against the rakia branch through a non-committ
 | `cargo clippy --all-targets -p brit-cli -p brit-graph -p cli-journey -- -D warnings -A unknown-lints --no-deps` | 0 | |
 | `-p brit-graph` tests | 0 | 23 passed |
 | `-p brit-cli` tests | 0 | 114 passed, 5 ignored |
-| `-p cli-journey --test input_classes` | 0 | 5 passed |
+| `-p cli-journey --test input_classes` | 0 | 6 passed |
 | `--test rakia` | 0 | 8 passed |
 | `--test memory_build` | 0 | 4 passed, 1 ignored |
 
@@ -182,15 +198,24 @@ Not verified, and why:
 - **Two parts of brit's suite did not run.** These are the exhaustive `just clippy` feature
   matrix (`small`, `max-pure`, `lean-async`) and the inherited gitoxide QA (nextest).
 - **The brit branch does not build against the registry yet.** It needs the rakia publish
-  first. `rakia-core = "0.1"` in brit-cli admits the next 0.1.x, so the release is a lockfile
-  bump. Neither branch bumps rakia's `[workspace.package].version` (0.1.1): on `main`, that
-  bump is what publishes.
+  first. brit-cli requires rakia-core and rakia-brit 0.1.2, and its Cargo.lock still pins
+  0.1.1, so the brit branch does not resolve `--locked` until the release bumps the lock. The
+  rakia branch bumps `[workspace.package].version` to 0.1.2. On `main` that bump is what
+  publishes, so merging the rakia branch is the release step.
 - **Device trap, for whoever repeats this.** A leading `cargo --config … clippy` is not
   forwarded to the external cargo-clippy subcommand, which then checks the registry crate. Put
   `--config` after `clippy`.
 
+Review. Shem read both branches independently (no build) and sent five advisories, all
+applied: `strip_function_suffix` strips only a trailing `@identifier`; `fingerprint --inputs`
+is optional and, when given, keys through `step_input_patterns`; brit requires rakia 0.1.2;
+the both-classes claim above is corrected; the 0.1.2 note names the struct-literal break, and
+rakia's CLAUDE.md documents the classified planner. Shem's `324dcb4e6` moves five recipe-read
+files in `gate-storage-client-ts` and `gate-eprfs-ts` from buildProcess to sources, which
+adoption needs.
+
 Found on the way. Commit `101b7b767` (the build hook's seat count) shrank
 `genesis/data/timeline/backlog/steward-device-arrival-open-items.md` from 1531 lines to about
 40, and the sprint's `journal.md` by about 573 lines. Its message names neither file. Rows 16
-to 62, row 42 among them, exist only at `101b7b767^`. Shem has been told; this record does not
-repair it (both files are outside this session's write set).
+to 62, row 42 among them, exist only at `101b7b767^`. Shem found landings 7 to 10 did the same (an append that opened
+for write before reading) and repaired both files in `b83575402`.
