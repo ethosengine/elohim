@@ -397,3 +397,48 @@ decisionPoints:
   - { path: genesis/orchestrator/prepush-carry.test.mjs, testName: carry_on_overlaps, kind: integration }
   - { path: genesis/orchestrator/prepush-carry.test.mjs, testName: carry_interrupt_withdraws, kind: integration }
   - { path: genesis/orchestrator/prepush-carry.test.mjs, testName: carry_red_under_stop_stops_the_loop, kind: integration }
+- name: resolveGateInputs
+  kind: pure-decision-predicate
+  sourceLocation: { file: gate-inputs.mjs, modulePath: resolveGateInputs }
+  summary: Decide, once per run, the input class a device gate selects and keys a BORROWED step on, and whether its
+    shadow compares the narrower class. Two implementors, LEGACY_ALL (today's flag-omitted bytes) and SOURCES (a
+    step's sources minus its own buildProcess); a gate project's own inputs block is never narrowed and CI dispatch
+    never reads the policy. GATE_INPUTS=shadow|off, default shadow, and deliberately no `on` yet, so the class
+    decided is always LEGACY_ALL. Shadow runs when the resolved brit's `build affected --help` and
+    `build fingerprint --help` both name `--inputs`, and prints, once per push, the borrowed steps all selects and
+    sources would not, and per gate when, since the integration base, the step fingerprints moved under all and are
+    unchanged under sources (the rest of the key is not compared).
+  concernIds:
+  - { id: C0, status: n-a, justification: "A local choice over this device's own gate selection and key; nothing is written but a per-push state file in the OS temporary directory." }
+  - { id: C1, status: n-a, justification: "Mints nothing: shadow only reads fingerprints and prints." }
+  - { id: C2, status: n-a, justification: "No ordering is introduced." }
+  - { id: C3, status: answered, justification: "Liveness: a failed, unknown or timed-out probe, a probe cut by the shadow budget, a missing brit, and an unreadable, unwritable or mismatched state file all mean no shadow, or a probe of the child's own; the decided class is LEGACY_ALL in every case." }
+  - { id: C4, status: answered, justification: "Honest absence: an incapable brit prints `[gate] inputs: --inputs unavailable; selection and keys use legacy all` once per push when the state handoff holds, else once per process that probes; a refusal of the flag during shadow ends shadow's printing with one line naming brit's error; a spent budget says so once per process." }
+  - { id: C5, status: answered, justification: "Evidence, not authority: a capability is read from the binary's own help text and bound to its realpath, device, inode, size and mtime; the state file carries only mode, that identity and the answer, and is accepted only when all three match." }
+  - { id: C6a, status: answered, justification: "Bounded work: two `--help` probes of at most 2 s each, killed at it, once per push when the state handoff holds and once per process when it does not; all of shadow's work, probes included, runs under one 10 s absolute deadline per process, checked before every subprocess, each given min(remaining, 5 s) with SIGKILL at it; subprocess time added is at most 9 + 10N s for N gate processes with the handoff and 13 + 10N s without (synchronous JS is not preempted); the gate's own timed span excludes it." }
+  - { id: C6b, status: answered, justification: "Resolving twice in a process returns the same frozen policy; the state file is written by rename, so a child reads a whole answer or none." }
+  - { id: C7, status: answered, justification: "Selection, propagation and the key read the class from the one policy, and the reuse selector is asked under the class its key was computed under; with no `on` that class is always LEGACY_ALL." }
+  - { id: C8, status: partial, justification: "Shadow prints its per-push and per-gate lines; no flow measure counts them yet." }
+  - { id: C9, status: n-a, justification: "No agent identity is referenced." }
+  - { id: C10, status: answered, justification: "Any GATE_INPUTS value but off, `on` included, reads as shadow; a state file that is not version 1 JSON for this mode and brit is ignored." }
+  - { id: C11, status: n-a, justification: "No load is shed or queued." }
+  - { id: C12, status: answered, justification: "May-act: nothing acts; shadow decides, records and times as off, and `on` waits on the four items in gate-inputs.mjs's header." }
+  - { id: C13, status: n-a, justification: "No social authority tier." }
+  - { id: C14, status: partial, justification: "A probe failure prints the generic unavailable line, not its cause (the cause is kept in the policy's `why`); a refusal of the flag names brit's error; a failed state handoff is silent and costs a probe per child; no diagnostic capsule is written." }
+  contractTests:
+  - { path: genesis/orchestrator/gate-inputs.test.mjs, testName: inputs_mode_switch, kind: unit }
+  - { path: genesis/orchestrator/gate-inputs.test.mjs, testName: sources_rule_native_case, kind: unit }
+  - { path: genesis/orchestrator/gate-inputs.test.mjs, testName: legacy_all_is_todays_matcher, kind: unit }
+  - { path: genesis/orchestrator/gate-inputs.test.mjs, testName: project_owned_inputs_never_narrowed, kind: unit }
+  - { path: genesis/orchestrator/gate-inputs.test.mjs, testName: ci_prediction_unchanged_by_class, kind: unit }
+  - { path: genesis/orchestrator/gate-inputs.test.mjs, testName: graph_walker_cli_bytes_unchanged, kind: integration }
+  - { path: genesis/orchestrator/gate-inputs.test.mjs, testName: oracle_passes_sources_flag, kind: unit }
+  - { path: genesis/orchestrator/gate-inputs.test.mjs, testName: incapable_brit_is_legacy, kind: unit }
+  - { path: genesis/orchestrator/gate-inputs.test.mjs, testName: probe_once_per_brit, kind: unit }
+  - { path: genesis/orchestrator/gate-inputs.test.mjs, testName: probe_is_bounded, kind: unit }
+  - { path: genesis/orchestrator/gate-inputs.test.mjs, testName: state_file_handoff, kind: unit }
+  - { path: genesis/orchestrator/gate-inputs.test.mjs, testName: shadow_budget_is_elapsed, kind: unit }
+  - { path: genesis/orchestrator/gate-inputs.test.mjs, testName: shadow_refusal_ends_printing, kind: unit }
+  - { path: genesis/orchestrator/gate-inputs.test.mjs, testName: selection_follows_the_policy, kind: unit }
+  - { path: genesis/orchestrator/gate-inputs.test.mjs, testName: shadow_equals_off, kind: integration }
+  - { path: genesis/orchestrator/gate-inputs.test.mjs, testName: shadow_fingerprint_refusal, kind: integration }

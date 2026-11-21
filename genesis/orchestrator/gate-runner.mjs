@@ -9,13 +9,16 @@ import { resolve, dirname, basename, join } from 'path';
 import { fileURLToPath } from 'url';
 import { loadManifests } from './manifest-utils.mjs';
 import { loadGateRegistry } from './pipeline-registry.mjs';
-import { projectsFromStale, walkGraph } from './graph-walker.mjs';
+import { projectsFromStale, staleSteps, walkGraph } from './graph-walker.mjs';
+import {
+  LEGACY_ALL, SOURCES, endShadow, inShadowBudget, resolveGateInputs, selectionShadowLine,
+} from './gate-inputs.mjs';
 import { filterChanged } from './ci-ignore.mjs';
 import { COST_FIELDS, classifyFailure, recordCycle, subjectFor } from './gate-cycle.mjs';
 import { CI_BRANCH_PATTERN, costOf, deferDecision, formatExpectation, readCycleUnion } from './gate-cost.mjs';
 import {
-  ageOf, attestedOutputParses, emitGateVerdict, findEvidence, gateEvidence, isHabitAtom, recordEvidence, reusableHit, selfAgentId,
-  siblingGovernanceChange, siblingVerdicts,
+  ageOf, attestedOutputParses, emitGateVerdict, findEvidence, gateEvidence, isHabitAtom, recordEvidence, resolveBin, reusableHit,
+  selfAgentId, siblingGovernanceChange, siblingVerdicts, stepFingerprints,
 } from './gate-evidence.mjs';
 import { britAffected, resolveBritBin } from './gate-oracle.mjs';
 import { recipeKeyShadow } from './gate-recipe-key.mjs';
@@ -86,41 +89,80 @@ export function withHalves(registry, projects, { env = process.env } = {}) {
   return [one, ...[...registry.values()].filter(p => p.name !== one.name && shape(p) === shape(one))];
 }
 
+/**
+ * The gate projects a change set selects. The input class of every borrowed step comes from the
+ * run's one policy (gate-inputs.mjs): `opts.inputs` pins a class (reuseSelector does), `opts.policy`
+ * hands one in, and otherwise it is resolved here. In shadow, with a capable brit, one line says
+ * which borrowed steps the legacy class selects and sources would not, from calls bounded by
+ * shadow's deadline; it changes nothing chosen (`announce: false` keeps a reuse selector quiet).
+ * The policy's own lines go to stderr, apart from `log`, the oracle's diagnostics.
+ */
 export function projectsForChanges(root, changedFiles, opts = {}) {
   const env = opts.env || process.env;
   const mode = opts.oracle || oracleMode(env);
   // Diagnostics go to STDERR: the pre-push hook parses this command's stdout as
   // project names (`--names`), so a line on stdout becomes a bogus gate target.
   const log = opts.log || (line => process.stderr.write(`${line}\n`));
+  const inputsLog = opts.inputsLog || (line => process.stderr.write(`${line}\n`));
+  const spawn = opts.spawn || spawnSync;
   const manifests = loadManifests(root);
   const registry = loadGateRegistry(root);
   const files = filterChanged(changedFiles);
+  const policy = opts.inputs ? null
+    : (opts.policy || resolveGateInputs({ env, britBin: resolveBritBin(env), spawn, log: inputsLog }));
 
-  const byPath = walkGraph(manifests, files).projects;
-  let chosen = byPath;
-  let oracleAvailable = false;
-  let reason = 'no reason reported';
+  const select = (cls, run = spawn) => {
+    const byPath = walkGraph(manifests, files, { gateInputs: cls }).projects;
+    if (mode === 'path') return { cls, byPath, stale: null, reason: null, refused: false };
+    let reason = 'no reason reported';
+    let refused = false;
+    const ask = opts.ask
+      ? () => opts.ask(cls)
+      : () => britAffected(root, files, {
+        britBin: resolveBritBin(env), spawn: run, inputs: cls,
+        onUnavailable: (r, info) => { reason = r; refused = Boolean(info?.refusedFlag); },
+      });
+    return { cls, byPath, stale: ask(), reason, refused };
+  };
+  const selected = select(opts.inputs || policy.cls);
 
+  let chosen = selected.byPath;
+  const oracleAvailable = mode !== 'path' && selected.stale !== null;
+  const reason = selected.reason || 'no reason reported';
   if (mode !== 'path') {
-    const ask = opts.ask || (() => britAffected(root, files, { britBin: resolveBritBin(env), spawn: opts.spawn || spawnSync, onUnavailable: r => { reason = r; } }));
-    const stale = ask();
-    oracleAvailable = stale !== null;
-    if (stale === null) {
+    if (selected.stale === null) {
       // Said in both modes: in shadow mode an absent binary would otherwise mean the
       // flip evidence silently never arrives.
       log(`[gate] brit build affected unavailable (${reason}) — path-only selection`);
     } else {
-      const byOracle = projectsFromStale(manifests, stale, files);
+      const byOracle = projectsFromStale(manifests, selected.stale, files);
       if (mode === 'rakia') {
         chosen = byOracle;
       } else {
-        const diff = oracleDiffLine(byPath, byOracle);
+        const diff = oracleDiffLine(selected.byPath, byOracle);
         if (diff) log(diff);
       }
     }
   }
   // Keep the array contract; reuse callers also need to know whether selection fell back.
   opts.onOracle?.(oracleAvailable, oracleAvailable ? null : reason);
+
+  // Shadow: the same question under SOURCES, inside its budget; it changes nothing chosen above.
+  if (policy?.shadow && opts.announce !== false) {
+    inShadowBudget(inputsLog, bound => {
+      const shadow = select(policy.shadow, bound(spawn));
+      if (shadow.refused) {
+        endShadow(shadow.reason, inputsLog);
+        return;
+      }
+      const byOracle = mode === 'rakia' && selected.stale !== null && shadow.stale !== null;
+      const legacyStale = byOracle ? selected.stale : staleSteps(manifests, files, LEGACY_ALL);
+      const sourcesStale = byOracle ? shadow.stale : staleSteps(manifests, files, policy.shadow);
+      const sourcesProjects = byOracle ? projectsFromStale(manifests, shadow.stale, files) : shadow.byPath;
+      const line = selectionShadowLine(manifests, legacyStale, sourcesStale, chosen, sourcesProjects);
+      if (line) inputsLog(line);
+    });
+  }
 
   return chosen.map(project => {
     const registered = registry.get(project.name);
@@ -164,8 +206,12 @@ export function decideReuse(project, evidence, reuseContext, { root = ROOT, env 
   return decision;
 }
 
-/** Reuse needs the dependency oracle for changes outside the attested closure too. */
-export function reuseSelector(project, gateCommit, { root = ROOT, env = process.env, spawn = spawnSync } = {}) {
+/**
+ * Reuse needs the dependency oracle for changes outside the attested closure too. `inputs` is the
+ * input class the key being reused was computed under (gate-inputs.mjs), so selection and key agree;
+ * omitted, the run's policy decides.
+ */
+export function reuseSelector(project, gateCommit, { root = ROOT, env = process.env, spawn = spawnSync, inputs = null } = {}) {
   return commit => {
     let diff;
     try {
@@ -185,7 +231,8 @@ export function reuseSelector(project, gateCommit, { root = ROOT, env = process.
       let oracleAvailable = false;
       let why = '';
       const projects = projectsForChanges(root, files, {
-        env, spawn, oracle: 'rakia', onOracle: (available, reason) => { oracleAvailable = available; why = reason || ''; },
+        env, spawn, oracle: 'rakia', announce: false, ...(inputs ? { inputs } : {}),
+        onOracle: (available, reason) => { oracleAvailable = available; why = reason || ''; },
       });
       if (!oracleAvailable) return { ok: false, message: `graph oracle unavailable${why ? ` (${why})` : ''}; reuse needs it` };
       if (projects.some(p => p.name === project.name)) {
@@ -196,6 +243,37 @@ export function reuseSelector(project, gateCommit, { root = ROOT, env = process.
       return { ok: false, message: 'graph oracle unavailable; reuse needs it' };
     }
   };
+}
+
+/**
+ * GATE_INPUTS=shadow's per-gate line: since the integration base, the step fingerprints moved under
+ * the legacy class and are unchanged under sources. It says nothing about the rest of the key
+ * (manifest, recipe, project tree, audited reads). Every subprocess goes through `run`, shadow's
+ * bounded spawn. `{ lines }`, or `{ refused }` when brit refused the flag after all. Changes nothing the
+ * decision, the key or the record reads.
+ */
+function inputsShadow(project, evidence, { root, gateCommit, run }) {
+  if (!evidence?.key || !evidence.britBin || SUITE_READ_LISTS[project.name] || !evidence.fingerprints?.length) return { lines: [] };
+  const fingerprints = (cls, commit) => stepFingerprints(project, commit, { britBin: evidence.britBin, root, spawn: run, inputs: cls });
+  const sourcesNow = fingerprints(SOURCES, gateCommit);
+  if (sourcesNow.refusedFlag) return { refused: sourcesNow.error };
+  if (sourcesNow.error) return { lines: [] };
+  let base = null;
+  for (const ref of ['origin/dev', 'dev']) {
+    const r = run('git', ['merge-base', gateCommit, ref], { cwd: root, encoding: 'utf8' });
+    if (r?.status === 0 && String(r.stdout || '').trim()) { base = String(r.stdout).trim(); break; }
+  }
+  if (!base) return { lines: [] };
+  const allBase = fingerprints(LEGACY_ALL, base);
+  const sourcesBase = fingerprints(SOURCES, base);
+  if (sourcesBase.refusedFlag) return { refused: sourcesBase.error };
+  if (allBase.error || sourcesBase.error) return { lines: [] };
+  const moved = (before, after) => after.filter(row => before.find(b => b.step === row.step)?.fingerprint !== row.fingerprint).map(row => row.step);
+  const allMoved = moved(allBase.fingerprints, evidence.fingerprints);
+  const sourcesMoved = moved(sourcesBase.fingerprints, sourcesNow.fingerprints);
+  return allMoved.length > 0 && sourcesMoved.length === 0
+    ? { lines: [`[gate] ${project.name} inputs (shadow): since ${base.slice(0, 9)} the step fingerprints moved under all (${allMoved.join(' ')}) and are unchanged under sources`] }
+    : { lines: [] };
 }
 
 // The rakia-validated manifest schema accepts `run.cargo.env` since rakia 2b2cedb
@@ -384,7 +462,7 @@ function liveEvent(env, event) {
 export function runProject(project, printOnly, namesOnly, {
   root = ROOT, env = process.env, spawn = spawnSync,
   write = text => process.stdout.write(text), warn = text => process.stderr.write(text),
-  readsOf, recipe = null, tap = spawn === spawnSync, clock = () => process.hrtime.bigint(),
+  readsOf, recipe = null, tap = spawn === spawnSync, clock = () => process.hrtime.bigint(), inputsPolicy = null,
 } = {}) {
   const cargo = project.run.cargo || {};
   const targetDir = worktreeTargetDir(cargo.targetDir || '', root);
@@ -553,12 +631,24 @@ export function runProject(project, printOnly, namesOnly, {
   const headSha = revParse('HEAD');
   const pushed = (env.GATE_COMMIT || '').trim();
   const gateCommit = pushed ? (revParse(pushed) || pushed) : (headSha || 'HEAD');
+  // The run's input class (gate-inputs.mjs), read by this key and its reuse selector.
+  // Resolving it (a probe at most once per push) is taken out of the gate's timed span.
+  const policyStarted = clock();
+  const inputsLine = line => write(`${line}\n`);
+  let inputs = inputsPolicy;
+  try {
+    inputs ||= resolveGateInputs({ env: childEnv, britBin: resolveBin('brit', ['BRIT_BIN'], childEnv), spawn, log: inputsLine });
+  } catch {
+    inputs = null;
+  }
+  started += clock() - policyStarted;
   let evidence = { line: 'unavailable (evidence lookup threw)' };
   try {
-    evidence = gateEvidence(project, { env: childEnv, root, commit: gateCommit, cargoEnv: cargoEnvOf(childEnv), spawn, warn });
+    evidence = gateEvidence(project, { env: childEnv, root, commit: gateCommit, cargoEnv: cargoEnvOf(childEnv), spawn, warn, inputs });
   } catch (error) {
     evidence = { line: `unavailable (${String(error?.message || error).split('\n')[0]})` };
   }
+  const inputsClass = inputs?.cls ?? LEGACY_ALL;
   write(`[gate] ${project.name} evidence: ${evidence.line}\n`);
   // Shadow only (gate-recipe-key.mjs): whether a justfile edit since the integration base left this
   // root-just gate's recipe closure unchanged. It reads `evidence.material` and changes nothing the
@@ -587,10 +677,21 @@ export function runProject(project, printOnly, namesOnly, {
     mode: env.GATE_EVIDENCE,
     enabled: Array.isArray(enabled) && enabled.includes(project.name),
     selfId: env.GATE_EVIDENCE === 'reuse' ? selfId : null,
-    selectorCheck: reuseSelector(project, gateCommit, { root, env: childEnv, spawn }),
+    selectorCheck: reuseSelector(project, gateCommit, { root, env: childEnv, spawn, inputs: inputsClass }),
   };
   // One admission decision for both run modes (decideReuse); ark is then asked only to run.
   const decision = decideReuse(project, evidence, reuseContext, { root, env, spawn });
+  // GATE_INPUTS=shadow: whether a sources key would have moved. Read only, under shadow's deadline,
+  // and its span is taken out of the gate's timed span.
+  if (inputs?.shadow) {
+    const shadowSpan = clock();
+    inShadowBudget(inputsLine, bound => {
+      const shadow = inputsShadow(project, evidence, { root, gateCommit, run: bound(spawn) });
+      if (shadow.refused) endShadow(shadow.refused, inputsLine);
+      for (const line of shadow.lines || []) write(`${line}\n`);
+    });
+    started += clock() - shadowSpan;
+  }
   if (decision.reuse) {
     const row = decision.row;
     const sibling = decision.independence === 'sibling';
@@ -790,6 +891,7 @@ function usage() {
   console.error('  env: GATE_ON_RED=continue|stop (default from pool-policy.json gate_on_red) · GATE_PREFLIGHT=off · GATE_PREFLIGHT_DONE=1 (pre-push ran it)');
   console.error('  env: GATE_ORACLE=rakia|shadow|path (default rakia; without a brit binary every mode is path-only) · BRIT_BIN · GATE_ROOT (fixture repository root)');
   console.error('  env: GATE_RECIPE_KEY=shadow|off (default shadow): a root-just gate prints whether a justfile edit since the integration base left its recipe closure unchanged; it changes no key, reuse decision or record');
+  console.error('  env: GATE_INPUTS=shadow|off (default shadow; no on yet): prints, once per push, the borrowed steps whose own buildProcess alone selects them, and per gate when, since the integration base, its step fingerprints moved under all and are unchanged under sources; it changes no selection, key, reuse decision or record');
   console.error('  env: GATE_CARRY=off|shadow|on (default shadow, read by gate-carry.mjs under pre-push): carry one long one-build-job cargo gate on this device\'s second cargo seat beside the loop when `berth room cargo` admits it; shadow prints what would be carried and why and changes nothing');
 }
 

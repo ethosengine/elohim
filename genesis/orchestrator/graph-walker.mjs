@@ -12,6 +12,7 @@ import picomatch from 'picomatch';
 import { loadManifests, resolveStep } from './manifest-utils.mjs';
 import { filterChanged } from './ci-ignore.mjs';
 import { stepClass, deriveRunClass, capManifestOnly, manifestOnlyLine, runClassRank } from './pipeline-registry.mjs';
+import { LEGACY_ALL, isGovernancePath, matchInputs } from './gate-inputs.mjs';
 
 /**
  * Topologically sort steps using Kahn's algorithm.
@@ -87,36 +88,24 @@ export function dependentsClosure(pipelineMeta, failed) {
   return [...doomed].sort();
 }
 
-// A governance path is never a source change: `.epr-meta` (the compose-gate
-// manifest file, or a directory of habit atoms and rules) sits inside the tree
-// it governs, so a source glob matches it. Mirrors build-graph.groovy's
-// isGovernancePath; orchestrator #1987 rolled the edge fleet for an edit to
-// elohim/elohim-storage/src/.epr-meta.
-export function isGovernancePath(filePath) {
-  const normalized = filePath.startsWith('./') ? filePath.slice(2) : filePath;
-  return normalized.split('/').includes('.epr-meta');
-}
+// The governance-path rule and today's matcher live in gate-inputs.mjs, the one place a gate's
+// input class is decided; isGovernancePath stays exported here for its existing importers.
+export { isGovernancePath };
 
-function matchInputs(inputs, changedFiles, { includeGovernance = false } = {}) {
-  const reasons = [];
-  if (!inputs) return reasons;
-
-  for (const pattern of inputs.sources || []) {
-    const matcher = picomatch(pattern);
-    for (const file of changedFiles) {
-      if (!includeGovernance && isGovernancePath(file)) continue;
-      if (matcher(file)) {
-        reasons.push(`source: ${file}`);
-        break;
-      }
+/**
+ * The stale set of every step under an input class: qualified step → reasons. LEGACY_ALL is the
+ * matcher CI prediction and the local gate always used; SOURCES (gate-inputs.mjs) drops a step's
+ * own buildProcess, for the local gate path only.
+ */
+export function staleSteps(manifests, changedFiles, cls = LEGACY_ALL) {
+  const stale = new Map();
+  for (const { content } of manifests) {
+    for (const [name, step] of Object.entries(content.steps)) {
+      const reasons = cls.stepReasons(step.inputs, changedFiles);
+      if (reasons.length > 0) stale.set(`${content.pipeline}:${name}`, reasons);
     }
   }
-
-  for (const ref of inputs.buildProcess || []) {
-    const fileName = ref.split('@')[0];
-    if (changedFiles.includes(fileName)) reasons.push(`buildProcess: ${ref}`);
-  }
-  return reasons;
+  return stale;
 }
 
 /**
@@ -346,7 +335,12 @@ export function walkGraphCi(manifests, changedFiles, { readFile = null } = {}) {
   return { projects, pipelines, meta, errors: [] };
 }
 
-export function walkGraph(manifests, changedFiles, { ci = false, readFile = null } = {}) {
+/**
+ * `gateInputs` is the input class of the LOCAL gate path's borrowed steps (gate-inputs.mjs policy
+ * `cls`), default LEGACY_ALL. It never reaches CI prediction: `ci` ignores it, and the path-only
+ * walk's `pipelines` are always computed from the legacy stale set.
+ */
+export function walkGraph(manifests, changedFiles, { ci = false, readFile = null, gateInputs = LEGACY_ALL } = {}) {
   if (ci) return walkGraphCi(manifests, changedFiles, { readFile });
   if (manifests.length === 0) return { projects: [], pipelines: [] };
 
@@ -374,7 +368,8 @@ export function walkGraph(manifests, changedFiles, { ci = false, readFile = null
   // dependencies — "did files in this project change?" is its whole question.
   // Propagation (one hop, locally) comes from the graph oracle (`brit build affected`) in gate-oracle.mjs,
   // which hands projectsFromStale an externally computed stale set.
-  const projects = projectsFromStale(manifests, stale, changedFiles);
+  const gateStale = gateInputs === LEGACY_ALL ? stale : staleSteps(manifests, changedFiles, gateInputs);
+  const projects = projectsFromStale(manifests, gateStale, changedFiles);
 
   // Phase 5: Map stale steps to PIPELINES.
   //

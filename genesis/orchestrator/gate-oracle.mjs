@@ -10,6 +10,7 @@
 import { accessSync, constants, statSync } from 'fs';
 import { spawnSync } from 'child_process';
 import { delimiter, isAbsolute, join } from 'path';
+import { refusesInputsFlag } from './gate-inputs.mjs';
 
 /** A stalled `brit build affected` degrades to path-only selection instead of blocking the push. */
 export const ORACLE_TIMEOUT_MS = 60_000;
@@ -59,23 +60,28 @@ export function depthOne(affected) {
  * Ask `brit build affected` which steps a change set affects. Returns a Map of
  * qualified step → reasons at depth one, or null when the oracle is unavailable
  * (no binary, timeout, non-zero exit, unparsable output) so the caller can fall
- * back; in that case `onUnavailable(reason)` receives one short reason string.
+ * back; in that case `onUnavailable(reason, { refusedFlag })` receives one short reason
+ * string, and `refusedFlag` says brit refused the input class's flag. `inputs` is an input
+ * class (gate-inputs.mjs LEGACY_ALL or SOURCES); its `britArgs` follow the change set, and
+ * omitted it is today's call byte for byte.
  */
-export function britAffected(root, changedFiles, { britBin, spawn = spawnSync, onUnavailable } = {}) {
+export function britAffected(root, changedFiles, { britBin, spawn = spawnSync, onUnavailable, inputs = null } = {}) {
+  let refusedFlag = false;
   const unavailable = reason => {
-    onUnavailable?.(reason);
+    onUnavailable?.(reason, { refusedFlag });
     return null;
   };
   if (!britBin) return unavailable('no brit executable (BRIT_BIN or PATH)');
   const files = changedFiles.filter(Boolean);
   if (files.length === 0) return new Map();
   // A hung planner must never block selection for every push: bounded, then fall back.
-  const result = spawn(britBin, ['build', 'affected', '--repo', root, '--files', files.join(',')], { encoding: 'utf8', timeout: ORACLE_TIMEOUT_MS });
+  const result = spawn(britBin, ['build', 'affected', '--repo', root, '--files', files.join(','), ...(inputs?.britArgs ?? [])], { encoding: 'utf8', timeout: ORACLE_TIMEOUT_MS });
   if (result?.error?.code === 'ETIMEDOUT') return unavailable(`brit build affected timed out after ${ORACLE_TIMEOUT_MS / 1000} s`);
   // Not a timeout: a spawn that never ran, or a child another process ended (the RAM guard sheds with SIGTERM).
   if (result?.error) return unavailable(`brit build affected could not run: ${result.error.code || result.error.message}`);
   if (result && result.status === null && result.signal) return unavailable(`brit build affected was ended by ${result.signal}`);
   if (!result || result.status !== 0) {
+    refusedFlag = Boolean(inputs?.britArgs?.length) && refusesInputsFlag(result);
     const line = String(result?.stderr || '').split('\n').map(l => l.trim()).find(Boolean) || '';
     return unavailable(`brit build affected exited ${result?.status ?? 'without a status'}${line ? `: ${line.slice(0, 160)}` : ''}`);
   }

@@ -1033,6 +1033,20 @@ if [ -z "$GATE_CHANGED_FILES" ] || ! printf '%s\n' "$UNFILTERED_CHANGED" > "$GAT
 fi
 export GATE_CHANGED_FILES GATE_NARROW_BASE
 
+# One input-class policy per push (genesis/orchestrator/gate-inputs.mjs; GATE_INPUTS=shadow|off,
+# default shadow, no on yet): the brit capability probe is paid here, once, and every gate child
+# reads the answer from this file, accepted only for the same mode and the same brit executable,
+# instead of probing again. The policy's one line goes to stderr.
+GATE_INPUTS_STATE=$(mktemp) || GATE_INPUTS_STATE=""
+gate_remove_inputs_state() {
+  [ -z "$GATE_INPUTS_STATE" ] || rm -f -- "$GATE_INPUTS_STATE"
+}
+HOOK_ON_EXIT="$HOOK_ON_EXIT gate_remove_inputs_state"
+export GATE_INPUTS_STATE
+if [ -f genesis/orchestrator/gate-inputs.mjs ]; then
+  node genesis/orchestrator/gate-inputs.mjs resolve || true
+fi
+
 # Gate evidence and household landing follow the exact object destined for dev. For pushes that
 # do not include dev, preserve the former last-ref behavior for the ordinary union gate.
 GATE_COMMIT="${DEV_LOCAL_SHA:-$LAST_LOCAL_SHA}"

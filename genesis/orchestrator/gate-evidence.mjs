@@ -33,6 +33,7 @@ import { basename, delimiter, dirname, isAbsolute, join, relative, resolve } fro
 import { SUITE_READ_LISTS, UNAUDITED_RECIPE_PROJECTS, globCovers, isReadPattern, readSet, suiteReadSet } from './gate-input-audit.mjs';
 import { closureDigest, dirtyInView, gitEnv, packageClosure, suiteInventory } from './suite-inventory.mjs';
 import { buildNotesRef, expectedRefusal, heldNotes, noteEpoch, readBuildNote, unverifiableNotes } from './scripts/brit-attest.mjs';
+import { LEGACY_ALL, refusesInputsFlag } from './gate-inputs.mjs';
 
 /** The attestation step name a gate PROJECT writes under: one closure per project, not per manifest step. */
 export function attestationStep(project) {
@@ -77,23 +78,28 @@ export function resolveBin(name, envKeys, env = process.env) {
 
 /**
  * `brit build fingerprint <manifest> --step <s> --commit <c>` per declared step of the gate
- * project. A project that declares only gate `inputs` (no manifest steps) has no fingerprint
- * yet — that is reported, not guessed.
+ * project, followed by the input class's `britArgs` (gate-inputs.mjs; LEGACY_ALL passes none, so
+ * the call is today's byte for byte). A project that declares only gate `inputs` (no manifest
+ * steps) has no fingerprint yet — that is reported, not guessed. A failure for want of the class's
+ * flag says so (`refusedFlag`).
  */
-export function stepFingerprints(project, commit, { britBin, root, spawn = spawnSync }) {
+export function stepFingerprints(project, commit, { britBin, root, spawn = spawnSync, inputs = LEGACY_ALL }) {
   if (!project.steps || project.steps.length === 0) {
     return { error: 'gate-only inputs, no step fingerprint' };
   }
   const manifest = resolve(root, project.manifestPath);
   const out = [];
   for (const step of project.steps) {
-    const r = spawn(britBin, ['build', 'fingerprint', manifest, '--step', step, '--commit', commit], {
+    const r = spawn(britBin, ['build', 'fingerprint', manifest, '--step', step, '--commit', commit, ...inputs.britArgs], {
       cwd: root,
       encoding: 'utf8',
       timeout: 60_000,
     });
     if (r.status !== 0) {
-      return { error: `fingerprint of ${step} failed: ${(r.stderr || '').trim().split('\n').pop() || `exit ${r.status}`}` };
+      return {
+        error: `fingerprint of ${step} failed: ${(r.stderr || '').trim().split('\n').pop() || `exit ${r.status}`}`,
+        refusedFlag: inputs.britArgs.length > 0 && refusesInputsFlag(r),
+      };
     }
     let parsed;
     try {
@@ -620,7 +626,7 @@ export function describeEvidence(rows, now = Date.now()) {
  * Resolve the closure and look for evidence. Returns `{ key, rows, line }` on a resolved
  * closure (rows may be empty) or `{ line }` alone when the closure is unavailable.
  */
-export function gateEvidence(project, { env = process.env, root, commit, cargoEnv, spawn = spawnSync, now = Date.now(), warn = stderrWarn } = {}) {
+export function gateEvidence(project, { env = process.env, root, commit, cargoEnv, spawn = spawnSync, now = Date.now(), warn = stderrWarn, inputs = null } = {}) {
   if (project.run?.kind === 'attested') return { line: 'unavailable (attested project, no local recipe)' };
   const britBin = resolveBin('brit', ['BRIT_BIN'], env);
   const buildRefBin = resolveBin('brit-build-ref', BUILD_REF_ENV, env);
@@ -631,7 +637,8 @@ export function gateEvidence(project, { env = process.env, root, commit, cargoEn
     ? nativeGateState(project, { root, env, run: spawn, toolchain: cargoEnv?.RUSTUP_TOOLCHAIN, commit }) : undefined;
   if (native?.miss) return { line: `unavailable (${native.miss})`, dirty: true };
   const nativeKey = native?.key;
-  const fp = stepFingerprints(project, commit, { britBin, root, spawn });
+  // The run's input class (gate-inputs.mjs policy `cls`; LEGACY_ALL until `on` exists).
+  const fp = stepFingerprints(project, commit, { britBin, root, spawn, inputs: inputs?.cls ?? LEGACY_ALL });
   if (fp.error) return { line: `unavailable (${fp.error})` };
   const blob = manifestBlob(root, commit, project.manifestPath, spawn);
   if (!blob) return { line: `unavailable (manifest ${project.manifestPath} absent at ${String(commit).slice(0, 9)})` };
@@ -717,6 +724,9 @@ export function gateEvidence(project, { env = process.env, root, commit, cargoEn
     project: project.name,
     key,
     material,
+    // What gate-inputs' shadow compares with: the brit that keyed this and the step fingerprints.
+    britBin,
+    fingerprints: suiteNamed ? [] : fp.fingerprints,
     rows: found.rows,
     unverifiable: found.unverifiable,
     line,

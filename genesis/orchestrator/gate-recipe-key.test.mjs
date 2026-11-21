@@ -458,6 +458,9 @@ async function runFixture(t, mode, { reuse }) {
     now += 1_000_000_000n;
     const call = [bin, ...args];
     if (bin === 'git' || bin === JUST) return spawnSync(bin === 'git' ? GIT : bin, args, opts);
+    // A brit without --inputs: GATE_INPUTS (unset, so shadow) prints its unavailable line in both
+    // runs and decides as off, so the two switches are proven together.
+    if (bin.endsWith('/brit') && args[2] === '--help') return { status: 0, stdout: 'Usage: brit build fingerprint [OPTIONS] <MANIFEST>\n', stderr: '' };
     if (bin.endsWith('/brit') && args[0] === 'build' && args[1] === 'fingerprint') {
       return { status: 0, stdout: JSON.stringify({ fingerprints: [{ step: 's', fingerprint: 'bafy-fixture' }] }), stderr: '' };
     }
@@ -516,6 +519,7 @@ for (const reuse of [false, true]) {
     // Every key looked up and recorded, the verdict JSON, --duration-ms and the cycle note args.
     assert.deepEqual(shadow.recorded, off.recorded);
     assert.deepEqual(shadow.lines, off.lines);
+    assert.ok(off.lines.includes('[gate] inputs: --inputs unavailable; selection and keys use legacy all'), 'GATE_INPUTS shadow ran, and said why it compares nothing');
     assert.ok(shadow.recorded.some(([kind]) => kind === 'find'));
     if (reuse) assert.match(shadow.lines.join('\n'), /fixture-gate reused: green/);
     else {
