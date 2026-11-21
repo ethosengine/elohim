@@ -174,9 +174,17 @@ export function seedGateClosure(
 const BRIT_STUB = String.raw`#!/usr/bin/env node
 import { spawnSync } from 'node:child_process';
 const args = process.argv.slice(2);
+const value = key => args[args.indexOf(key) + 1];
+if (args[0] === 'build' && args[1] === 'affected') {
+  if (!args.includes('--repo')) process.exit(2);
+  const files = (value('--files') || '').split(',').filter(Boolean);
+  const hit = files.filter(path => path.startsWith('app/'));
+  const affected = hit.length ? [{ qualified_name: 'fixture:gate-app', affected_by: hit.map(path => ({ kind: 'changedFile', path })) }] : [];
+  process.stdout.write(JSON.stringify({ affected }));
+  process.exit(0);
+}
 if (args[0] !== 'build' || args[1] !== 'fingerprint') process.exit(2);
 const manifest = args[2];
-const value = key => args[args.indexOf(key) + 1];
 const step = value('--step');
 const commit = value('--commit');
 const root = manifest.replace(/\/app\/build-manifest\.json$/, '');
@@ -214,32 +222,20 @@ if (args[0] === 'signer') {
 } else process.exit(2);
 `;
 
-const RAKIA_STUB = `#!/usr/bin/env node
-const args = process.argv.slice(2);
-if (args[0] !== 'affected') process.exit(2);
-const value = key => args[args.indexOf(key) + 1];
-const files = (value('--files') || '').split(',').filter(Boolean);
-const affected = files.some(path => path.startsWith('app/')) ? [{ qualified_name: 'fixture:gate-app', affected_by: files.filter(path => path.startsWith('app/')).map(path => ({ kind: 'changedFile', path })) }] : [];
-process.stdout.write(JSON.stringify({ affected }));
-`;
-
 /** Write deterministic command-line stand-ins in exactly the shapes the gate parsers consume. */
 export function stubTools(base: string): {
   BRIT_BIN: string;
   BRIT_BUILD_REF_BIN: string;
-  RAKIA_BIN: string;
 } {
   const bin = join(base, 'bin');
   mkdirSync(bin, { recursive: true });
   const tools = {
     BRIT_BIN: join(bin, 'brit'),
     BRIT_BUILD_REF_BIN: join(bin, 'brit-build-ref'),
-    RAKIA_BIN: join(bin, 'rakia'),
   };
   for (const [path, source] of [
     [tools.BRIT_BIN, BRIT_STUB],
     [tools.BRIT_BUILD_REF_BIN, BUILD_REF_STUB],
-    [tools.RAKIA_BIN, RAKIA_STUB],
   ] as const) {
     writeFileSync(path, source);
     chmodSync(path, 0o755);

@@ -9,7 +9,7 @@ import { fileURLToPath } from 'url';
 import { loadGateRegistry } from './pipeline-registry.mjs';
 import { discoverManifests, loadManifests } from './manifest-utils.mjs';
 import { costLineAndDefer, gateChildEnv, oracleMode, projectsForChanges, runProject, selectGateProjects, worktreeTargetDir } from './gate-runner.mjs';
-import { resolveRakiaBin } from './gate-oracle.mjs';
+import { resolveBritBin } from './gate-oracle.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
@@ -236,7 +236,7 @@ test('Rust style selects new crates and inherited lint configuration', () => {
     'some/crate/.epr-meta/manifest.md',
   ]) {
     for (const oracle of ['path', 'rakia']) {
-      const selected = projectsForChanges(MANIFESTS, [changed], { oracle, rakia: () => new Map() }).map(p => p.name);
+      const selected = projectsForChanges(MANIFESTS, [changed], { oracle, ask: () => new Map() }).map(p => p.name);
       assert.ok(selected.includes('rust-style'), `${changed} must select the style floor (${oracle})`);
     }
   }
@@ -245,7 +245,7 @@ test('Rust style selects new crates and inherited lint configuration', () => {
 // S6: the checker's own legs are a separate project. A checker change selects both; a Rust change
 // elsewhere selects only the always-run scan, whose baseline moves with origin/dev.
 test('a checker change selects rust-style-checker; a Rust change elsewhere selects only the scan', () => {
-  const select = (changed, oracle) => projectsForChanges(MANIFESTS, [changed], { oracle, rakia: () => new Map() }).map(p => p.name);
+  const select = (changed, oracle) => projectsForChanges(MANIFESTS, [changed], { oracle, ask: () => new Map() }).map(p => p.name);
   for (const oracle of ['path', 'rakia']) {
     for (const changed of [
       'genesis/orchestrator/rust-style/src/lib.rs', 'genesis/orchestrator/rust-style/tests/ratchet.rs',
@@ -661,14 +661,14 @@ describe('selection oracle — shadow, rakia, path', () => {
   const noOracle = () => null;
 
   test('path mode ignores the oracle entirely', () => {
-    const names = projectsForChanges(MANIFESTS, ['sophia'], { oracle: 'path', rakia: withOracle, log: () => {} }).map(p => p.name);
+    const names = projectsForChanges(MANIFESTS, ['sophia'], { oracle: 'path', ask: withOracle, log: () => {} }).map(p => p.name);
     assert.ok(names.includes('sophia'));
     assert.ok(!names.includes('elohim-app'), 'path-only never propagates');
   });
 
   test('shadow mode selects by path and prints one oracle-diff line when the sets differ', () => {
     const lines = [];
-    const names = projectsForChanges(MANIFESTS, ['sophia'], { oracle: 'shadow', rakia: withOracle, log: l => lines.push(l) }).map(p => p.name);
+    const names = projectsForChanges(MANIFESTS, ['sophia'], { oracle: 'shadow', ask: withOracle, log: l => lines.push(l) }).map(p => p.name);
     assert.ok(!names.includes('elohim-app'), 'shadow mode does not change selection');
     assert.equal(lines.length, 1);
     assert.match(lines[0], /^\[gate\] oracle-diff: \+elohim-app/);
@@ -678,13 +678,13 @@ describe('selection oracle — shadow, rakia, path', () => {
     const lines = [];
     // A documentation-only change selects nothing by path (proven below by the names-only CLI
     // case); an oracle that also finds nothing stale must not print a diff.
-    const selected = projectsForChanges(MANIFESTS, ['genesis/data/timeline/backlog/CLUSTERS.md'], { oracle: 'shadow', rakia: () => new Map(), log: l => lines.push(l) });
+    const selected = projectsForChanges(MANIFESTS, ['genesis/data/timeline/backlog/CLUSTERS.md'], { oracle: 'shadow', ask: () => new Map(), log: l => lines.push(l) });
     assert.deepEqual(selected, []);
     assert.deepEqual(lines, []);
   });
 
   test('rakia mode selects the direct component and its one-hop consumer with the upstream reason', () => {
-    const projects = projectsForChanges(MANIFESTS, ['sophia'], { oracle: 'rakia', rakia: withOracle, log: () => {} });
+    const projects = projectsForChanges(MANIFESTS, ['sophia'], { oracle: 'rakia', ask: withOracle, log: () => {} });
     const app = projects.find(p => p.name === 'elohim-app');
     assert.ok(app, 'elohim-app is a depth-one consumer of the sophia pin');
     assert.deepEqual(app.reasons, ['upstream: elohim-sophia:build-sophia-umd']);
@@ -693,10 +693,10 @@ describe('selection oracle — shadow, rakia, path', () => {
 
   test('rakia mode falls back to path selection and says so when the oracle is unavailable', () => {
     const lines = [];
-    const names = projectsForChanges(MANIFESTS, ['sophia'], { oracle: 'rakia', rakia: noOracle, log: l => lines.push(l) }).map(p => p.name);
+    const names = projectsForChanges(MANIFESTS, ['sophia'], { oracle: 'rakia', ask: noOracle, log: l => lines.push(l) }).map(p => p.name);
     assert.ok(names.includes('sophia'));
     assert.ok(!names.includes('elohim-app'));
-    assert.deepEqual(lines, ['[gate] rakia unavailable — path-only selection']);
+    assert.deepEqual(lines, ['[gate] brit build affected unavailable (no reason reported) — path-only selection']);
   });
 
   test('a gitlink path and files beneath it select the component once, reasons merged', () => {
@@ -783,13 +783,12 @@ describe('the oracle flip', () => {
 
 describe('the hook parses stdout as project names — diagnostics never ride on it', () => {
   const cli = resolve(ROOT, 'genesis/orchestrator/gate-runner.mjs');
-  // The shadow assertion needs the REAL oracle: without a `rakia` binary the runner
-  // honestly prints "rakia unavailable — path-only selection" (covered by the next test),
-  // and the oracle-diff line cannot exist. The pinned elohim/rakia builds no CLI, so a
-  // checkout without one skips this case instead of failing every other developer's gate.
-  const rakiaBin = resolveRakiaBin(process.env);
+  // The shadow assertion needs the REAL oracle: without a `brit` binary the runner
+  // honestly prints "brit build affected unavailable (…) — path-only selection" (covered by the next test),
+  // and the oracle-diff line cannot exist. A device without a brit binary skips this case instead of failing every other developer's gate.
+  const britBin = resolveBritBin(process.env);
   test('shadow mode: --names stdout is only names; the oracle-diff line goes to stderr',
-    { skip: rakiaBin ? false : 'no rakia binary on PATH or RAKIA_BIN — the shadow oracle-diff needs the real oracle' }, () => {
+    { skip: britBin ? false : 'no brit binary on PATH or BRIT_BIN — the shadow oracle-diff needs the real oracle' }, () => {
     const out = spawnSync(process.execPath, [cli, '--changed-file-list', '--names'], {
       cwd: ROOT, encoding: 'utf8', input: 'sophia\n', env: { ...process.env, GATE_ORACLE: 'shadow' },
     });
@@ -797,18 +796,29 @@ describe('the hook parses stdout as project names — diagnostics never ride on 
     assert.equal(out.stdout.trim(), 'sophia');
     assert.match(out.stderr, /\[gate\] oracle-diff: \+elohim-app/);
   });
-  test('rakia mode without a binary: --names stdout is only names; the fallback line goes to stderr', () => {
+  test('rakia mode without a brit binary: --names stdout is only names; the fallback line goes to stderr', () => {
     const out = spawnSync(process.execPath, [cli, '--changed-file-list', '--names'], {
-      cwd: ROOT, encoding: 'utf8', input: 'sophia\n', env: { ...process.env, GATE_ORACLE: 'rakia', RAKIA_BIN: '/nonexistent/rakia' },
+      cwd: ROOT, encoding: 'utf8', input: 'sophia\n', env: { ...process.env, GATE_ORACLE: 'rakia', BRIT_BIN: '/nonexistent/brit' },
     });
     assert.equal(out.status, 0, out.stderr);
     assert.equal(out.stdout.trim(), 'sophia');
-    assert.match(out.stderr, /\[gate\] rakia unavailable — path-only selection/);
+    assert.match(out.stderr, /\[gate\] brit build affected unavailable \(no brit executable \(BRIT_BIN or PATH\)\) — path-only selection/);
   });
   test('shadow mode without a binary also says so, so the flip evidence cannot silently never arrive', () => {
     const lines = [];
-    projectsForChanges(MANIFESTS, ['sophia'], { oracle: 'shadow', rakia: () => null, log: l => lines.push(l) });
-    assert.deepEqual(lines, ['[gate] rakia unavailable — path-only selection']);
+    projectsForChanges(MANIFESTS, ['sophia'], { oracle: 'shadow', ask: () => null, log: l => lines.push(l) });
+    assert.deepEqual(lines, ['[gate] brit build affected unavailable (no reason reported) — path-only selection']);
+  });
+  test('the real resolution path prints the oracle reason in the path-only line', () => {
+    const lines = [];
+    projectsForChanges(MANIFESTS, ['sophia'], { oracle: 'rakia', env: { BRIT_BIN: '/nonexistent/brit', PATH: '' }, log: l => lines.push(l) });
+    assert.deepEqual(lines, ['[gate] brit build affected unavailable (no brit executable (BRIT_BIN or PATH)) — path-only selection']);
+  });
+  test('a failing brit build affected prints its stderr in the path-only line', () => {
+    const lines = [];
+    const spawn = () => ({ status: 3, stdout: '', stderr: 'bad repo\n' });
+    projectsForChanges(MANIFESTS, ['sophia'], { oracle: 'rakia', env: { BRIT_BIN: process.execPath }, spawn, log: l => lines.push(l) });
+    assert.deepEqual(lines, ['[gate] brit build affected unavailable (brit build affected exited 3: bad repo) — path-only selection']);
   });
   test('--list names the attestation for attested projects instead of an undefined recipe', () => {
     const out = spawnSync(process.execPath, [cli, '--list'], { cwd: ROOT, encoding: 'utf8' });

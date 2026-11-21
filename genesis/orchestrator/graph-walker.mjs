@@ -372,7 +372,7 @@ export function walkGraph(manifests, changedFiles, { ci = false, readFile = null
 
   // Phase 3+4: the path-only walk does NOT propagate staleness through
   // dependencies — "did files in this project change?" is its whole question.
-  // Propagation (one hop, locally) comes from the rakia oracle in gate-oracle.mjs,
+  // Propagation (one hop, locally) comes from the graph oracle (`brit build affected`) in gate-oracle.mjs,
   // which hands projectsFromStale an externally computed stale set.
   const projects = projectsFromStale(manifests, stale, changedFiles);
 

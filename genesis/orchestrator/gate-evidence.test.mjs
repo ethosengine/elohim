@@ -527,13 +527,13 @@ const publicKey = 'd75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f7075
 function evidenceFixture(t) {
   const root = mkdtempSync(join(tmpdir(), 'gate-evidence-'));
   t.after(() => rmSync(root, { recursive: true, force: true }));
-  for (const name of ['brit', 'brit-build-ref', 'rakia']) {
+  for (const name of ['brit', 'brit-build-ref']) {
     writeFileSync(join(root, name), '#!/bin/sh\nexit 0\n');
     chmodSync(join(root, name), 0o755);
   }
   return {
     root,
-    env: { BRIT_BIN: join(root, 'brit'), BRIT_BUILD_REF_BIN: join(root, 'brit-build-ref'), RAKIA_BIN: join(root, 'rakia'), PATH: '' },
+    env: { BRIT_BIN: join(root, 'brit'), BRIT_BUILD_REF_BIN: join(root, 'brit-build-ref'), PATH: '' },
   };
 }
 
@@ -1243,14 +1243,14 @@ test('reuseSelector requires a readable diff and a real oracle answer when files
   const cases = [
     { diff: { status: 128, stdout: '' }, expected: { ok: false, message: 'attested commit unreadable' } },
     { diff: { status: 0, stdout: '' }, expected: { ok: true } },
-    { diff: { status: 0, stdout: 'other/file\n' }, oracle: { status: 1, stdout: '' }, expected: { ok: false, message: 'rakia oracle unavailable; reuse needs it' } },
+    { diff: { status: 0, stdout: 'other/file\n' }, oracle: { status: 1, stdout: '' }, expected: { ok: false, message: 'graph oracle unavailable (brit build affected exited 1); reuse needs it' } },
     { diff: { status: 0, stdout: 'src/file\n' }, oracle: { status: 0, stdout: JSON.stringify({ affected: [{ qualified_name: 'fixture:build', affected_by: [{ kind: 'changedFile', path: 'src/file' }] }] }) }, expected: { ok: false, message: 'changed since attested commit and selects this gate: src/file' } },
     { diff: { status: 0, stdout: 'other/file\n' }, oracle: { status: 0, stdout: '{"affected":[]}' }, expected: { ok: true } },
   ];
   for (const c of cases) {
     const { spawn, calls } = fakeSpawn([
       [(bin, args) => bin === 'git' && args[0] === 'diff', c.diff],
-      [(bin) => bin.endsWith('rakia'), c.oracle],
+      [(bin, args) => bin.endsWith('brit') && args[0] === 'build' && args[1] === 'affected', c.oracle],
     ]);
     assert.deepEqual(reuseSelector(p, 'new', { root, env: { ...env, GATE_ORACLE: 'path' }, spawn })('old'), c.expected);
     assert.deepEqual(calls[0].args, ['diff', '--name-only', 'old', 'new']);

@@ -252,16 +252,16 @@ void test('the stub brit-build-ref answers signer, put, get and find in the pars
   );
 });
 
-void test('the stub rakia parses through rakiaAffected', async () => {
+void test('the stub brit parses through britAffected', async () => {
   const f = seeded();
   const tools = stubTools(f.base);
   const oracle = await import(
     pathToFileURL(join(repository, 'genesis/orchestrator/gate-oracle.mjs')).href
   );
   assert.ok(
-    oracle.rakiaAffected(f.seed, ['app/x'], { rakiaBin: tools.RAKIA_BIN }).has('fixture:gate-app')
+    oracle.britAffected(f.seed, ['app/x'], { britBin: tools.BRIT_BIN }).has('fixture:gate-app')
   );
-  assert.equal(oracle.rakiaAffected(f.seed, ['docs/x'], { rakiaBin: tools.RAKIA_BIN }).size, 0);
+  assert.equal(oracle.britAffected(f.seed, ['docs/x'], { britBin: tools.BRIT_BIN }).size, 0);
 });
 
 void test("pathWithout('epr') hides epr and keeps node, git and just", () => {

@@ -17,7 +17,7 @@ import {
   ageOf, attestedOutputParses, emitGateVerdict, findEvidence, gateEvidence, isHabitAtom, recordEvidence, reusableHit, selfAgentId,
   siblingGovernanceChange, siblingVerdicts,
 } from './gate-evidence.mjs';
-import { rakiaAffected, resolveRakiaBin } from './gate-oracle.mjs';
+import { britAffected, resolveBritBin } from './gate-oracle.mjs';
 import { CLAIMED_EXIT_CODE, runAttested } from './gate-attest.mjs';
 import { affectedPackages, loadMetadata } from './cargo-affected.mjs';
 import { SUITE_READ_LISTS, readSet } from './gate-input-audit.mjs';
@@ -98,15 +98,16 @@ export function projectsForChanges(root, changedFiles, opts = {}) {
   const byPath = walkGraph(manifests, files).projects;
   let chosen = byPath;
   let oracleAvailable = false;
+  let reason = 'no reason reported';
 
   if (mode !== 'path') {
-    const ask = opts.rakia || (() => rakiaAffected(root, files, { rakiaBin: resolveRakiaBin(env), spawn: opts.spawn || spawnSync }));
+    const ask = opts.ask || (() => britAffected(root, files, { britBin: resolveBritBin(env), spawn: opts.spawn || spawnSync, onUnavailable: r => { reason = r; } }));
     const stale = ask();
     oracleAvailable = stale !== null;
     if (stale === null) {
       // Said in both modes: in shadow mode an absent binary would otherwise mean the
       // flip evidence silently never arrives.
-      log('[gate] rakia unavailable — path-only selection');
+      log(`[gate] brit build affected unavailable (${reason}) — path-only selection`);
     } else {
       const byOracle = projectsFromStale(manifests, stale, files);
       if (mode === 'rakia') {
@@ -118,7 +119,7 @@ export function projectsForChanges(root, changedFiles, opts = {}) {
     }
   }
   // Keep the array contract; reuse callers also need to know whether selection fell back.
-  opts.onOracle?.(oracleAvailable);
+  opts.onOracle?.(oracleAvailable, oracleAvailable ? null : reason);
 
   return chosen.map(project => {
     const registered = registry.get(project.name);
@@ -181,16 +182,17 @@ export function reuseSelector(project, gateCommit, { root = ROOT, env = process.
     if (files.length === 0) return { ok: true };
     try {
       let oracleAvailable = false;
+      let why = '';
       const projects = projectsForChanges(root, files, {
-        env, spawn, oracle: 'rakia', onOracle: available => { oracleAvailable = available; },
+        env, spawn, oracle: 'rakia', onOracle: (available, reason) => { oracleAvailable = available; why = reason || ''; },
       });
-      if (!oracleAvailable) return { ok: false, message: 'rakia oracle unavailable; reuse needs it' };
+      if (!oracleAvailable) return { ok: false, message: `graph oracle unavailable${why ? ` (${why})` : ''}; reuse needs it` };
       if (projects.some(p => p.name === project.name)) {
         return { ok: false, message: `changed since attested commit and selects this gate: ${files[0]}` };
       }
       return { ok: true };
     } catch {
-      return { ok: false, message: 'rakia oracle unavailable; reuse needs it' };
+      return { ok: false, message: 'graph oracle unavailable; reuse needs it' };
     }
   };
 }
@@ -773,7 +775,7 @@ export function orderByCost(projects, { root = ROOT, rows } = {}) {
 function usage() {
   console.error('usage: gate-runner.mjs (--target <project-or-path> | --changed-file-list | --list) [--print] [--names [--order cost]] [--recipe <name>]');
   console.error('  env: GATE_ON_RED=continue|stop (default from pool-policy.json gate_on_red) · GATE_PREFLIGHT=off · GATE_PREFLIGHT_DONE=1 (pre-push ran it)');
-  console.error('  env: GATE_ORACLE=rakia|shadow|path (default rakia; without a rakia binary every mode is path-only) · RAKIA_BIN · GATE_ROOT (fixture repository root)');
+  console.error('  env: GATE_ORACLE=rakia|shadow|path (default rakia; without a brit binary every mode is path-only) · BRIT_BIN · GATE_ROOT (fixture repository root)');
 }
 
 const isMain = import.meta.url === `file://${process.argv[1]}` ||

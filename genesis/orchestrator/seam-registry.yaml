@@ -161,7 +161,7 @@ decisionPoints:
     file: gate-runner.mjs
     modulePath: reuseSelector
   summary: Refuse reuse when a file changed between the attested commit and the pushed commit would
-    itself select this gate, or when the rakia oracle did not answer.
+    itself select this gate, or when the graph oracle (`brit build affected`) did not answer.
   concernIds:
   - id: C0
     status: answered

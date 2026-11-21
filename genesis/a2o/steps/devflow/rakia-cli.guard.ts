@@ -1,6 +1,7 @@
 /**
- * The `@requires:rakia-cli` gate — the rakia planner is a FIXTURE precondition (a binary on
- * PATH or RAKIA_BIN), not a substrate capability, so the cluster-state arms ignore it. A
+ * The `@requires:rakia-cli` gate — the graph oracle (`brit build affected`, rakia's planner
+ * served by the brit CLI) is a FIXTURE precondition (a `brit` binary on PATH or BRIT_BIN; the tag
+ * name is kept because feature files carry it), not a substrate capability, so the cluster-state arms ignore it. A
  * scenario that needs it is SKIPPED with the reason printed once when the binary is absent;
  * it is never failed and nothing is installed. Mirrors steps/devflow/epr-cli.guard.ts.
  */
@@ -9,7 +10,7 @@ import { delimiter, isAbsolute, join } from 'node:path';
 
 import { Before } from '@cucumber/cucumber';
 
-const binary = process.env.RAKIA_BIN ?? 'rakia';
+const binary = process.env.BRIT_BIN ?? 'brit';
 
 function isExecutableFile(candidate: string): boolean {
   try {
@@ -38,7 +39,7 @@ Before({ tags: '@requires:rakia-cli' }, function () {
     announced = true;
     // eslint-disable-next-line no-console
     console.log(
-      `  [rakia-cli] '${binary}' is not on PATH — @requires:rakia-cli scenarios SKIPPED, not measured`
+      `  [rakia-cli] brit ('${binary}', BRIT_BIN or PATH) is not executable — @requires:rakia-cli scenarios SKIPPED, not measured`
     );
   }
   return 'skipped';

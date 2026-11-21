@@ -1,6 +1,9 @@
 import { describe, test } from 'node:test';
 import { strict as assert } from 'node:assert';
-import { depthOne, rakiaAffected, resolveRakiaBin } from './gate-oracle.mjs';
+import { chmodSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { britAffected, depthOne, ORACLE_TIMEOUT_MS, resolveBritBin } from './gate-oracle.mjs';
 
 const direct = (name, path) => ({ qualified_name: name, affected_by: [{ kind: 'changedFile', path }] });
 const viaUp = (name, upstream) => ({ qualified_name: name, affected_by: [{ kind: 'upstreamNode', upstream }] });
@@ -33,48 +36,136 @@ describe('depthOne — the local gate stops one hop from a direct change', () =>
   });
 });
 
-describe('rakiaAffected — the binary is optional and its failure is a fallback, never a crash', () => {
+describe('britAffected — the binary is optional and its failure is a fallback, never a crash', () => {
   const root = '/repo';
-  test('returns null when no binary resolves', () => {
-    assert.equal(rakiaAffected(root, ['sophia'], { rakiaBin: null, spawn: () => { throw new Error('must not spawn'); } }), null);
+  const reasons = (spawn, britBin = '/bin/brit', files = ['sophia']) => {
+    const seen = [];
+    const result = britAffected(root, files, { britBin, spawn, onUnavailable: r => seen.push(r) });
+    return { result, seen };
+  };
+
+  test('returns null with the no-executable reason when no binary resolves', () => {
+    const { result, seen } = reasons(() => { throw new Error('must not spawn'); }, null);
+    assert.equal(result, null);
+    assert.deepEqual(seen, ['no brit executable (BRIT_BIN or PATH)']);
   });
 
-  test('returns null on a non-zero exit', () => {
-    const spawn = () => ({ status: 2, stdout: '', stderr: 'manifest error' });
-    assert.equal(rakiaAffected(root, ['sophia'], { rakiaBin: '/bin/rakia', spawn }), null);
+  test('a non-zero exit names the status and the first non-empty stderr line', () => {
+    const { result, seen } = reasons(() => ({ status: 2, stdout: '', stderr: '\n  manifest error: bad step \nsecond line\n' }));
+    assert.equal(result, null);
+    assert.deepEqual(seen, ['brit build affected exited 2: manifest error: bad step']);
   });
 
-  test('passes --repo, --files as one comma-joined argument, and parses the affected list', () => {
+  test('a long stderr line is trimmed to 160 characters', () => {
+    const { seen } = reasons(() => ({ status: 1, stdout: '', stderr: 'x'.repeat(500) }));
+    assert.equal(seen[0], `brit build affected exited 1: ${'x'.repeat(160)}`);
+  });
+
+  test('a timeout (ETIMEDOUT error) reports the timeout', () => {
+    const { result, seen } = reasons(() => ({ status: null, stdout: '', stderr: '', error: Object.assign(new Error('spawnSync ETIMEDOUT'), { code: 'ETIMEDOUT' }) }));
+    assert.equal(result, null);
+    assert.deepEqual(seen, ['brit build affected timed out after 60 s']);
+  });
+
+  test('a child ended by a signal with no timeout names the signal, not a timeout', () => {
+    // The workspace RAM guard sheds with SIGTERM; spawnSync reports a timeout as an ETIMEDOUT error.
+    const { result, seen } = reasons(() => ({ status: null, signal: 'SIGTERM', stdout: '', stderr: '' }));
+    assert.equal(result, null);
+    assert.deepEqual(seen, ['brit build affected was ended by SIGTERM']);
+  });
+
+  test('a spawn that never ran names its error code', () => {
+    const { result, seen } = reasons(() => ({ status: null, stdout: '', stderr: '', error: Object.assign(new Error('spawnSync brit ENOENT'), { code: 'ENOENT' }) }));
+    assert.equal(result, null);
+    assert.deepEqual(seen, ['brit build affected could not run: ENOENT']);
+  });
+
+  test('a spawn that returns nothing reports exited without a status', () => {
+    const { result, seen } = reasons(() => undefined);
+    assert.equal(result, null);
+    assert.deepEqual(seen, ['brit build affected exited without a status']);
+  });
+
+  test('an error with no code reports its message', () => {
+    const { result, seen } = reasons(() => ({ status: null, stdout: '', stderr: '', error: new Error('spawn blew up') }));
+    assert.equal(result, null);
+    assert.deepEqual(seen, ['brit build affected could not run: spawn blew up']);
+  });
+
+  test('stdout that is not JSON reports no affected list', () => {
+    const { result, seen } = reasons(() => ({ status: 0, stdout: 'not json', stderr: '' }));
+    assert.equal(result, null);
+    assert.deepEqual(seen, ['brit build affected printed no affected list']);
+  });
+
+  test('JSON without an affected array reports no affected list', () => {
+    const { result, seen } = reasons(() => ({ status: 0, stdout: '{"changed_paths":[]}', stderr: '' }));
+    assert.equal(result, null);
+    assert.deepEqual(seen, ['brit build affected printed no affected list']);
+  });
+
+  test('a zero exit with a warning on stderr still succeeds and reports nothing', () => {
+    const { result, seen } = reasons(() => ({ status: 0, stdout: '{"affected":[]}', stderr: 'warning: something\n' }));
+    assert.equal(result.size, 0);
+    assert.deepEqual(seen, []);
+  });
+
+  test('onUnavailable is optional', () => {
+    assert.equal(britAffected(root, ['sophia'], { britBin: null }), null);
+  });
+
+  test('passes build affected --repo --files as one comma-joined argument, and parses the affected list', () => {
     let seen;
     const spawn = (bin, args) => {
       seen = [bin, args];
       return { status: 0, stdout: JSON.stringify({ changed_paths: ['sophia'], affected: [direct('elohim-sophia:build-sophia-umd', 'sophia'), viaUp('elohim:build-angular', 'elohim-sophia:build-sophia-umd')] }), stderr: '' };
     };
-    const kept = rakiaAffected(root, ['sophia', 'a b'], { rakiaBin: '/bin/rakia', spawn });
-    assert.deepEqual(seen, ['/bin/rakia', ['affected', '--repo', root, '--files', 'sophia,a b']]);
+    const kept = britAffected(root, ['sophia', 'a b'], { britBin: '/bin/brit', spawn });
+    assert.deepEqual(seen, ['/bin/brit', ['build', 'affected', '--repo', root, '--files', 'sophia,a b']]);
     assert.deepEqual([...kept.keys()], ['elohim-sophia:build-sophia-umd', 'elohim:build-angular']);
   });
 
   test('an empty changed list never spawns and returns an empty map', () => {
-    const kept = rakiaAffected(root, [], { rakiaBin: '/bin/rakia', spawn: () => { throw new Error('must not spawn'); } });
+    const kept = britAffected(root, [], { britBin: '/bin/brit', spawn: () => { throw new Error('must not spawn'); } });
     assert.equal(kept.size, 0);
   });
-});
 
-describe('resolveRakiaBin', () => {
-  test('prefers RAKIA_BIN when it points at an executable file', () => {
-    assert.equal(resolveRakiaBin({ RAKIA_BIN: process.execPath }), process.execPath);
-  });
-  test('returns null when RAKIA_BIN is set but not executable and PATH has no rakia', () => {
-    assert.equal(resolveRakiaBin({ RAKIA_BIN: '/nonexistent/rakia', PATH: '/nonexistent' }), null);
-  });
-});
-
-describe('rakiaAffected — bounded by a timeout', () => {
-  test('the spawn carries a timeout and a timed-out oracle falls back', () => {
+  test('the spawn carries the timeout', () => {
     let opts;
-    const spawn = (bin, args, o) => { opts = o; return { status: null, stdout: '', stderr: '', error: Object.assign(new Error('ETIMEDOUT'), { code: 'ETIMEDOUT' }) }; };
-    assert.equal(rakiaAffected('/repo', ['sophia'], { rakiaBin: '/bin/rakia', spawn }), null);
-    assert.ok(opts.timeout >= 30000, 'rakia spawn carries a timeout');
+    britAffected(root, ['sophia'], { britBin: '/bin/brit', spawn: (b, a, o) => { opts = o; return { status: 0, stdout: '{"affected":[]}' }; } });
+    assert.equal(opts.timeout, ORACLE_TIMEOUT_MS);
+    assert.equal(ORACLE_TIMEOUT_MS, 60_000);
+  });
+});
+
+describe('resolveBritBin', () => {
+  const fakeBin = (t, name) => {
+    const dir = mkdtempSync(join(tmpdir(), 'gate-oracle-'));
+    t.after(() => rmSync(dir, { recursive: true, force: true }));
+    writeFileSync(join(dir, name), '#!/bin/sh\nexit 0\n');
+    chmodSync(join(dir, name), 0o755);
+    return dir;
+  };
+  test('prefers BRIT_BIN when it points at an executable file', () => {
+    assert.equal(resolveBritBin({ BRIT_BIN: process.execPath }), process.execPath);
+  });
+  test('returns null when BRIT_BIN is set but not executable, even with a brit on PATH', t => {
+    const dir = fakeBin(t, 'brit');
+    assert.equal(resolveBritBin({ BRIT_BIN: '/nonexistent/brit', PATH: dir }), null);
+  });
+  test('finds the first executable brit on PATH', t => {
+    const dir = fakeBin(t, 'brit');
+    assert.equal(resolveBritBin({ PATH: `/nonexistent${':'}${dir}` }), join(dir, 'brit'));
+  });
+  test('a rakia on PATH is not an oracle', t => {
+    const dir = fakeBin(t, 'rakia');
+    assert.equal(resolveBritBin({ PATH: dir }), null);
+  });
+  test('the spawn receives exactly the brit argv when only a fake brit is on PATH', t => {
+    const dir = fakeBin(t, 'brit');
+    const britBin = resolveBritBin({ PATH: dir });
+    let args;
+    britAffected('/r', ['a', 'b'], { britBin, spawn: (bin, a) => { args = a; return { status: 0, stdout: '{"affected":[]}' }; } });
+    assert.deepEqual(args, ['build', 'affected', '--repo', '/r', '--files', 'a,b']);
   });
 });
