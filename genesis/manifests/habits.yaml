@@ -2580,9 +2580,9 @@ habits:
       - "a2o genesis/a2o/features/devflow/native-gate-evidence.feature reuse rule (this workspace's own green stands in; a red or an unadmitted signer never does)"
     evidence: >
       DELTA 2026-11-21c (no status change; the eprfs test step measured by thread count, nothing changed): seventeen runs of the eprfs workspace tests on shem. One thread about 1,620 s; four threads 604 to 656 s, five clean of five, the I/O guard pausing three; three threads 696 to 752 s, eight clean of ten, the guard pausing four and two of those failing on a timeout shorter than its 36 s freeze; two threads 923 s clean and one failure from a test's own timing assumption (arrival backlog row 66, fixed on a branch). The bar of ten clean runs was not met, so `RUST_TEST_THREADS` stays at one. The bound is the workspace's write burst (58 to 72 MB/s) against the guard's 10% line; the cut is the 66 MB release the slow test file strips and ingests per story (row 65). Table: row 53, delta.
-    evidence-fingerprint: sha256:14ca9fe2fc7289eb
-    evidence-bytes: 31476
-    evidence-entries: 32
+    evidence-fingerprint: sha256:7cda74580cba9aaa
+    evidence-bytes: 32687
+    evidence-entries: 33
     guard: >
       Regression risks: (1) reusing on a key that omits something the recipe reads — the recipe
       body, the project tree, a submodule pin, a repo file a test include_str!s; the input audit

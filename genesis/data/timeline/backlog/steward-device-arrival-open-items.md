@@ -1778,3 +1778,182 @@ shorter, and is cleared by `[doc:cut]` on a pushed commit that touches the file.
 history it refuses the first of the five commits in 0.22 s and names both documents. Known
 limits: a rename git cannot pair reads as a delete and an add and is not seen; the hook's own
 call has a syntax check and node-side tests but no end-to-end hook test.
+
+## Row 42, delta 2 (2026-11-21): the native cut is built and reviewed, and the rule it rests on was wrong as first stated
+
+The sibling device built the first two of the four layers natively: rakia's planner can say which
+input class selected a step and plan from sources alone, and `brit build affected` and
+`brit build fingerprint` take `--inputs sources|all` (rakia `ethos/input-classes` 158f2365, brit
+`ethos/input-classes` 3f6b0c8d; record `genesis/docs/superpowers/sprints/2026-11-21-wall-clock/input-classes.md`
+on the hand-over branch `self/ethosengine-input-classes`). With the flag omitted every output is
+byte-identical and pinned as a literal. Its finding: a step's sources class has to be its sources
+minus its own `buildProcess`, because five steps cover their own pipeline file with a source glob.
+
+An independent review on shem then found the rule this session had written into the peers plan
+to be false on today's manifests. "A step's `buildProcess` is CI's" does not hold for two
+gate-only TypeScript steps, which listed `pnpm-lock.yaml`, `pnpm-workspace.yaml` and a codegen
+script there; under `--inputs sources` a lockfile bump would have reused a stale green. A census
+of 25 manifests: 38 `buildProcess` entries, 19 pipeline files, 14 CI build scripts, and those
+five. On the working branch the five were moved to sources (the union every current caller
+hashes is unchanged; delta 5 records why that move is parked), and
+`pipeline-registry.test.mjs` refuses a gate step whose `buildProcess` is anything but a pipeline
+file or a `scripts/ci/` build script. The earlier design read had warned that CI ownership of a
+file does not prove a device does not read it; this session kept its analysis and dropped that
+caveat.
+
+Owed before any consumer passes `--inputs sources`: on the two branches, the review's advisories
+(a path containing `@` is truncated by the suffix strip; the `all` fingerprint bypasses the shared
+helper; brit must require rakia-core 0.1.2; the record says a path matched by both classes yields
+both reasons and the code, rightly, reports one). Then the release order, which is the steward's
+to rule: rakia publishes, brit bumps and releases, two pins move, devices follow the new brit,
+and the JS consumers adopt the flag, which re-keys every reusable verdict once. Layers three and
+four of this row (the JS project-tree material and the bin store's whole-tree source state) are
+not touched by any of this.
+
+## Row 42, delta 3 (2026-11-21): the boundary is the executor, and a gate's own inputs block keeps both classes
+
+Two more readings on the same day, before any consumer adopted the flag.
+
+The second independent read of the sibling's fix commits found them release-ready: all five
+review points fixed, and output with the flag omitted is the base code path word for word
+(rakia 8a4f184a, brit 10fa5cac).
+
+A design read of the adoption (Codex astra, receipt `astra-inputs-adoption.receipt.md` in the
+sprint's campaign directory) pointed at gate projects that declare their own `inputs` block and
+list `justfile` as `buildProcess`. A census of those blocks changes the rule's statement rather
+than the manifests. 31 gate projects declare their own inputs, and there `buildProcess` is used
+for the gate's own scripts: the rust-style checker and its policy file, rakia's validator, the
+pipeline-list generator, the root justfile. Those are read by the gate's recipe. So the class
+boundary is the executor, not the field name:
+
+- A gate project's own `inputs` block is the gate's, both classes. Nothing is dropped from it.
+- A step the gate borrows from a pipeline contributes its sources class only. Across every gate
+  project there are 21 such `buildProcess` entries: 13 pipeline files and 8 image-build scripts
+  under `scripts/ci/`. None is named in the justfile its gate runs from.
+
+Design decisions taken from that read, for the adoption:
+
+- One policy, read by selection, propagation and key alike, with a switch that starts in shadow
+  (the plane's pattern for a behaviour change). A device whose brit predates the flag decides as
+  today and says so once.
+- No one-time re-run of every gate. A green recorded under today's key covers a superset of the
+  files the narrower key covers, with every other piece of key material the same, so on a miss
+  under the new key the gate may look up the old one and reuse it, saying which key matched.
+  The old key is the one computed with the flag omitted, not with `--inputs all`, which strips
+  function suffixes and so differs.
+- Still owed by this row after adoption, unchanged: a pipeline file under a gate project's
+  directory moves that gate's key through the project tree, and the bin store hashes whole
+  source trees (layers three and four).
+
+## Row 69 — dev pins a rakia commit that has no CI check, and one of its tests is red
+
+Found 2026-11-21 when the input-class release stopped at its first step. Dev has pinned rakia
+`f9787c9e` (the regenesis-1 release-manifest 2.0 schema commit, on `run-ci/regenesis-1-schemas`)
+since 2026-11-05. The forge holds no check run for that commit (`check-runs` total 0, read
+2026-11-21), so today's pin gate would refuse it as absent; how the pin landed is not
+established here. Rakia's `main` was one commit behind it.
+
+When the sibling opened rakia PR #4 to bring that commit and the input-class work to `main`, CI
+ran it for the first time and one test was red:
+`rakia-executor/tests/contract.rs`, `canonical_identity_matches_the_javascript_oracle_including_null`.
+The schema commit had changed one line of that passing test: the expected address
+`bafkreigyfkfu6h3…` became `bafkr4igyfkfu6h3…` with the digest characters untouched. Computed on
+shem: the first is exactly the sha2-256 of the fixture bytes as a raw CIDv1; the second is the
+same sha2-256 digest under the BLAKE3 multihash code. No hash of those bytes produces it. A
+spelling sweep had rewritten a test vector's prefix. The commit's own message says the executor
+keeps its earlier descriptors until the kernel swap, and its ignored sibling test holds the true
+BLAKE3 vector.
+
+Decided (shem, as the sprint's orchestrator): restore that one literal on the PR branch, leave
+the swap staged, and carry on with the release. Done the same hour: rakia `main` is `f2c0d3c0`
+(PR #4 with the restoring commit `70d9c4a0`), its `test` check and its publish both green on the
+forge, and rakia-core and rakia-brit 0.1.2 are in the registry. Not decided here and owed in its own lane: the
+executor kernel swap itself, whose stated precondition (elohim-epr 0.2.0 on the registry) the
+sibling reports as met.
+
+Two things this row keeps:
+
+- A prefix is not an address. A string with the byte-CID prefix and another hash's digest passes
+  a pattern and fails a full decode; the schema commit's own pattern is described there as a
+  syntactic floor. Any sweep that rewrites address spellings has to recompute, never respell.
+- A pinned commit with no check is unattested however long it has been pinned. The pin move
+  that follows rakia 0.1.2 puts dev on a `main` commit with a green check.
+
+## Row 42, delta 4 (2026-11-21): the adoption lands in shadow only; a bridge was built, reviewed and deleted
+
+Delta 3 recorded a design decision that did not survive review: "no one-time re-run of every
+gate", by looking a miss up under the old key and reusing that green. It was built that way
+(`ebd1c22c2`), with the green promoted to a derived record under the new key. An independent
+review (Codex astra, `astra-inputs-review.receipt.md` in the sprint's campaign directory) found
+two defects in the promotion: a red that arrived between its two reads could be overwritten, and
+a promoted green outlived a later failure recorded under the old key. Neither was reachable in
+the default mode. The review also called the bridge over-built, and it was right, because the
+premise was wrong. A verdict is reusable only for an identical closure, and identical closures
+recur within hours: a retry, a re-gate after a moved base, a stacked landing, a sibling's
+check. Changing what a gate is keyed on therefore costs at most one genuine run of a gate that
+is selected while its closure is otherwise unchanged. It never meant every gate running once.
+
+What is on the branch now (`e29cacd02`): `genesis/orchestrator/gate-inputs.mjs`, with
+`GATE_INPUTS=shadow|off`, default shadow, and deliberately no `on`, as `gate-recipe-key.mjs`
+does. Shadow decides nothing. With a brit that has the flag it prints, once per push, the
+borrowed steps that only their own `buildProcess` selects, and per gate when a sources-only
+key would not have moved; with a brit that predates the flag it prints one line saying so. Its
+work runs under one deadline per process. The bridge, the derived-record shape and the
+downgrade path are deleted.
+
+What turning it on needs first, from the same review, and now written in the module's header:
+
+1. A differential fixture of this plane's own path matcher against a brit that has the flag.
+   They differ on dotfiles, on `*` across a directory separator, on `.epr-meta` paths and on a
+   gitlink a glob reaches. The difference exists today in the legacy path as well.
+2. A capability lost in the middle of a push refuses the gate with a named cure. A downgrade
+   after selection cannot restore a gate that selection already left out.
+3. Selection and execution agreeing in a standalone `just gate`.
+4. The executor-boundary test reading a gate's audited recipe reads and not only the filenames
+   its justfile names.
+
+Not yet true of any of this: that it has run against a brit that has the flag. This device's
+brit predates it; brit 0.3.1 is the sibling's release in progress.
+
+## Row 65, delta 2 (2026-11-21): the burst belongs to `session_envelope`, measured
+
+Three runs of the whole workspace's tests at four threads on dev `1b5f40212`, unloaded, with
+each second's written bytes (the I/O guard's own source, the container's `io.stat`) attributed
+to the test binary running then (records under `burst/` in the sprint's campaign directory):
+
+| Test binary | Seconds | Written | Peak over 10 s | Highest I/O pressure | Guard pauses |
+|---|---|---|---|---|---|
+| `session_envelope` | 129 to 138 | 5.31 to 5.45 GB | 74 to 82 MB/s | 15.1 to 16.9% | one in every run |
+| `device_supervise` | about 185 | 3.2 GB | 34 to 39 MB/s | 4.7% | none |
+| everything else | | under 0.1 GB each | | | none |
+
+All three runs passed, in 640 to 658 s, each with one pause of 36 to 41 s. A pause that lands
+on one of that binary's 15 s subprocess timeouts fails the run, which is what two of ten
+three-thread runs did earlier in the day. So the earlier attribution to `device_supervise` was
+wrong twice: it is neither the burst nor what the guard acts on.
+
+The cause is the same shape as the one fixed in `device_supervise`: `Fixture.setup()` in
+`genesis/agentic/session_envelope_test.py` copies the 160 MB debug `epr` into every case's
+fixture and then has the product ingest it, which writes a second synced copy. Owed, in work at
+the time of writing: link one shared stripped copy into each fixture, so a fixture costs one
+66 MB ingest and no copy; then the ten-run bar at four threads.
+
+## Row 42, delta 5 (2026-11-21): the manifest correction is parked for a deliberate roll; the shadow and the pins land without it
+
+The fleet-roll check, run by hand on the assembled landing before any gate, refused it: CI would
+select an Edge build and its deploy step for an edit to
+`elohim/sdk/storage-client-ts/build-manifest.json` or `elohim/eprfs/eprfs-ts/build-manifest.json`
+(stale steps `cargo-build-storage`, `build-doorway-app`, `build-edge-image`, `deploy-manifests`).
+Moving five entries between two lists in a manifest changes no built byte, and CI still reads it
+as an Edge input, which is this row's own subject seen from the pipeline's side. A second fleet
+roll in a day is the steward's to time, so the correction does not land here.
+
+What lands: the input-class shadow, the two pin moves, and the contract test with those five
+entries held in an exact parked list (a sixth offender fails; so does the corrected tree until
+the list is deleted). The module's header names the correction among what `on` needs first,
+because under the sources class a lockfile bump would neither select nor re-key those two gates.
+
+Parked for the next deliberate Edge roll, with the six Jenkinsfile guards already waiting for
+it (row 63): commit `324dcb4e6` on the local branch `wallclock/process-inputs` (the two manifest
+edits), plus deleting `PARKED` from `pipeline-registry.test.mjs`. The pin moves do not select an
+Edge build: CI's checkout initialises no submodule and prunes the dependency.

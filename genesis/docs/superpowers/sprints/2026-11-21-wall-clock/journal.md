@@ -746,3 +746,96 @@ on its own. Not yet read by this session: the branches themselves.
 Landing 12 carries two test-only commits so the eprfs gate is paid once: the session-envelope
 timing fix (row 66) and the shared release in the supervise stories (row 65, delta). Neither
 changes a product source or a manifest; the thread count stays at one.
+
+### 21:35Z to 22:20Z: the input-class branches reviewed, and a rule corrected
+
+An Opus reader, independent of the Codex legs that wrote them, reviewed the sibling's two
+branches. Publishing them is byte-safe. Adopting `--inputs sources` as this session had framed it
+is not: the framing said a step's `buildProcess` is CI's, and two device gates list a lockfile
+there (arrival backlog row 42, delta 2). The five wrong entries are corrected on the working
+branch, a test pins the convention, and the peers plan's fourth interface row says what `buildProcess` means. The
+release order waits on the steward.
+
+### 21:45Z to 22:10Z: release-ready, the release ruled, and the rule stated by executor
+
+The second read of the sibling's fix commits says release-ready. The steward ruled the release
+(fix, then release; the regenesis-1 schema commit goes to rakia main with the new work), and the
+go went to the sibling with his two selections quoted. Shem holds the manifest correction to
+ride with the two pin moves: alone it selects sixteen gates including eprfs and storage, and
+the rakia pin move selects storage anyway. A design read of the adoption and a census of gate
+projects' own inputs blocks restated the rule by executor (arrival backlog row 42, delta 3).
+The recipe-key shadow (row 59) printed no line in landings 6 to 12; why is not confirmed, and
+no landing in that span edited the root justfile.
+
+### Landing 12 (22:06Z, `1b5f40212`): the envelope timing fix, the shared release fixture, the document-cut check
+
+Pushed 21:18:53Z, landed 22:06:19Z: 2,846 s, of which gates 2,787 s. Eight gates, all green, none
+reused (every one was re-keyed by what the landing touched).
+
+| Gate | Seconds | Inside it |
+|---|---|---|
+| address-profile-lint | 18 | |
+| rust-style | 32 | check 29 |
+| orchestrator | 84 | |
+| cargo-bridge | 239 | lint 91, test 116 |
+| jenkins-bridge | 36 | |
+| orchestrator-tree | 203 | |
+| eprfs-live-corpus | 65 | |
+| eprfs | 2,110 | lint 83, bins 205, ark 47, test 1,729 |
+
+The eprfs test step at one thread is 62% of the landing. The carrier's shadow line was the same
+as before: nothing carried, because eprfs builds with six jobs and the second seat takes one.
+Notes published to this device's own destination (11 refs). The document-cut check is in the
+hook from this landing on.
+
+Pipeline reads after it: orchestrator #2405 to #2408 (landings 8 to 11) each SUCCESS with no
+build needed; #2409 (this landing) dispatched `elohim-eprfs` only and was running at the time of writing. Orchestrator #2404 was
+UNSTABLE through `elohim-genesis` #1788, which carries the same counts as every genesis build
+this week (26 of 514 scenarios passed, none failed). `elohim-genesis` #1787 was aborted by its
+own budget after 5,492 s; it started at 15:07Z, about when the deliberate Edge roll was in
+progress, which is the likely cause and is not established here.
+
+### 22:10Z to 22:40Z: rakia 0.1.2 out, the adoption built in shadow, the burst being measured
+
+The release stopped red at its first step and was unblocked the same hour (arrival backlog row
+69): a test vector whose prefix had been respelled. rakia 0.1.2 is published from `main`
+`f2c0d3c0`; the brit release is the sibling's next step.
+
+The adoption is built as one module, `genesis/orchestrator/gate-inputs.mjs`, read by selection,
+propagation and key (`GATE_INPUTS=off|shadow|on`, default shadow; commits `ebd1c22c2` and
+`05b65c196`). Both orchestrator gates are green on it. It has not run against a brit that has
+the flag: this device's brit predates it, so every capable path is exercised with doubles. A
+second model is reviewing it before it lands.
+
+With the cargo seats free, the eprfs test step is being measured at four threads on the landed
+head, with each second's writes attributed to the test binary running then, to name the binary
+that trips the I/O guard.
+
+### 22:40Z to 23:15Z: the bridge deleted after review, and the burst's owner named
+
+A second model's review of the adoption found two defects in the bridge that carried a green
+from the old key to the new one, and called the bridge over-built. It was, on a premise of this
+session's that was wrong (arrival backlog row 42, delta 4). The module is now shadow or off,
+579 lines lighter, with what turning it on needs written in its header.
+
+The burst that pauses a four-thread test run belongs to `session_envelope`, measured over three
+runs (row 65, delta 2): 5.3 GB in about 130 s, where `device_supervise` writes 3.2 GB at half
+the rate and never trips the guard. Its fixture copies the debug `epr` into every case and has
+the product ingest it. A change that links one shared stripped copy is in work.
+
+The pipeline's verdict on landing 12: `elohim-eprfs` #208 SUCCESS in 1,110 s; the build before
+it took 1,606 s. How much of that is the shared release fixture is not established.
+
+### 23:25Z to 23:50Z: both releases out, and the seconds-check that kept this landing from rolling the fleet
+
+brit 0.3.1 is released (`main` and tag `brit-v0.3.1` at `02d4654f`, `Tests pass` green; its
+`size` and `advisories` checks are red as they were on 0.3.0). The policy module took one more
+small pass from a second review of its reduced form: the per-gate line now says only what it
+knows, the probe is bounded, and a comment naming a pipeline file no longer fails the contract
+test.
+
+Assembling the landing, the fleet-roll check was run by hand first and refused it: CI reads an
+edit to either of the two corrected manifests as an Edge build input. The correction is parked
+for the next deliberate roll (arrival backlog row 42, delta 5), the landing branch was rebuilt
+from dev's head without it, and the check then passed. Cost of finding this by a seconds-check
+instead of at the push: nothing; the gates had not started.
