@@ -109,6 +109,7 @@
       {"file": "gate-live-schema.test.mjs", "reads": ["elohim/sdk/schemas/v1/gate-live-event.schema.json", "elohim/sdk/schemas/v1/objects/unanswered.schema.json"]},
       {"file": "gate-attribution.test.mjs", "reads": []},
       {"file": "prepush-gate-live.test.mjs", "tree": "its fleet-roll CLI tests (added with the fleet-roll preflight on dev) run git rev-parse HEAD on this repository; the view has no repository"},
+      {"file": "doc-cut-guard.test.mjs", "reads": []},
       {"file": "fleet-roll-guard.test.mjs", "tree": "its real-manifest tests run git ls-tree and cat-file on this repository's HEAD (evaluatePaths at sha HEAD); in the view there is no repository, so 2 of its 50 tests fail there"},
       {"file": "prepush-ra-strays.test.mjs", "reads": [".husky/pre-push.bash"]},
       {"file": "prepush-submodules.test.mjs", "reads": [".husky/pre-push.bash"]},

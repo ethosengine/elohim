@@ -9,7 +9,7 @@ import { join } from 'node:path';
 import {
   checkElementDists, checkEvidenceRecordable, checkNodeModules, checkReadSets, checkSophiaUmd,
   checkArk, checkCargoDeny, checkCargoLocks, checkCBaselineOffer, checkStorageClientDist, checkWorkspaceDists, checkSubmodules, checkTmpdir, emitLive, NAMED_READ_SET_PROJECTS, PREFLIGHT_READ_SET_PROJECTS, onRedPolicy,
-  fleetRollRows, runPreflight, checkSubmodulePins,
+  fleetRollRows, docCutRows, runPreflight, checkSubmodulePins,
 } from './gate-preflight.mjs';
 import { orderByCost } from './gate-runner.mjs';
 import { appendEvent, closeRun, formatEvent, formatHarvest, harvest, openRun, outlook } from './gate-live.mjs';
@@ -399,6 +399,42 @@ test('fleet-roll under an older hook (no GATE_PUSH_REFS): silent with no Edge bu
   const red = run(['sdk/schema.json']).find(r => r.check === 'fleet-roll');
   assert.equal(red.level, 'REFUSED');
   assert.match(red.cure, /^check the launcher first: test -x <worktree>\/\.husky\/_\/pre-push .*-c core\.hooksPath=<worktree>\/\.husky\/_/);
+});
+
+test('doc-cut: a document cut on a dev push is a preflight row, its REFUSED reaches the live run, and the mark skips it', (t) => {
+  const { dir, spawn } = fleetRepo(t);
+  const long = Array.from({ length: 300 }, (_, i) => `row ${i}\n`).join('');
+  put(dir, 'docs/plan.md', long);
+  const git = (...args) => { const r = spawn('git', ['-C', dir, '-c', 'user.name=t', '-c', 'user.email=t@t', '-c', 'commit.gpgsign=false', '-c', 'core.hooksPath=/dev/null', ...args], { encoding: 'utf8' }); assert.equal(r.status, 0, r.stderr); return r.stdout.trim(); };
+  git('add', '-A'); git('commit', '--quiet', '-m', 'add plan');
+  const base = git('rev-parse', 'HEAD');
+  put(dir, 'docs/plan.md', 'row 0\n');
+  git('add', '-A'); git('commit', '--quiet', '-m', 'docs: append a section');
+  const tip = git('rev-parse', 'HEAD');
+  const env = { GATE_PUSH_TARGETS: 'refs/heads/dev', GATE_PUSH_REFS: `refs/heads/dev ${tip} ${base}` };
+  const run = extra => runPreflight({ root: dir, projects: [], env: { ...env, ...extra }, spawn, registry: new Map(), changed: null, fleet: { root: dir, spawn }, docCut: { root: dir, spawn } });
+  const rows = run({});
+  const cut = rows.find(r => r.check === 'doc-cut');
+  assert.equal(cut?.level, 'REFUSED', JSON.stringify(rows));
+  assert.match(cut.why, /push to dev: docs\/plan\.md falls from 300 to 1 lines/);
+  const appended = [];
+  emitLive(rows, { GATE_LIVE_RUN: '/run.jsonl' }, (path, event) => appended.push(event));
+  const red = appended.find(e => e.failure?.class === 'doc-cut');
+  assert.equal(red.project, 'preflight');
+  assert.match(red.failure.excerpt.at(-1), /^cure: .*\[doc:cut\]/);
+  const mark = join(dir, 'dc-mark');
+  writeFileSync(mark, env.GATE_PUSH_REFS);
+  assert.equal(run({ GATE_DOC_CUT_MARK: mark }).some(r => r.check === 'doc-cut'), false);
+  writeFileSync(mark, `refs/heads/dev ${base} ${base}`);
+  assert.equal(run({ GATE_DOC_CUT_MARK: mark }).some(r => r.check === 'doc-cut'), true, 'a mark for other refs proves nothing');
+});
+
+test('doc-cut: a guard module that cannot load still gives a row, red on a protected push', () => {
+  const error = new Error('Cannot find module x');
+  const red = docCutRows({ GATE_PUSH_TARGETS: 'refs/heads/dev' }, {}, null, error);
+  assert.equal(red.level, 'REFUSED');
+  assert.match(red.why, /^the doc-cut check could not load: Cannot find module x$/);
+  assert.equal(docCutRows({ GATE_PUSH_TARGETS: 'refs/heads/self/a' }, {}, null, error).level, 'WARN');
 });
 
 test('fleet-roll: a guard module that cannot load still gives a row, red on a protected push in every mode', () => {

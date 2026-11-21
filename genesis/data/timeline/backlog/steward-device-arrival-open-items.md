@@ -1767,3 +1767,14 @@ binary owns that burst, before any thread count is tried again.
 
 The two cases keep their predecessor's entry until their assertion has run, on dev with landing
 12.
+
+### Row 68, delta (2026-11-21): the check exists
+
+`doc-cut` runs before the gates beside fleet-roll (`genesis/orchestrator/doc-cut-guard.mjs`,
+wired in `gate-preflight.mjs` and `.husky/pre-push.bash`; the gate knobs in the root guidance
+describe it). It compares the two ends of a push, refuses on dev or main when a `.md`,
+`.feature` or `.yaml` document would be left under half its length and at least 100 lines
+shorter, and is cleared by `[doc:cut]` on a pushed commit that touches the file. Against the real
+history it refuses the first of the five commits in 0.22 s and names both documents. Known
+limits: a rename git cannot pair reads as a delete and an add and is not seen; the hook's own
+call has a syntax check and node-side tests but no end-to-end hook test.

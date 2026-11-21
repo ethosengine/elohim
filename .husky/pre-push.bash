@@ -1101,6 +1101,32 @@ if [ -n "$GATE_PUSH_REFS" ]; then
 fi
 # ── Fleet roll end
 
+# Doc cut (seconds): does the push leave a long document under half its length at the destination
+# (at least 100 lines fewer) with no pushed commit that touches it carrying [doc:cut]? A
+# documents-only push selects no gate project, so it runs here beside fleet-roll, with its own mark.
+GATE_DOC_CUT_MARK=$(mktemp 2>/dev/null) || GATE_DOC_CUT_MARK=""
+gate_remove_doc_cut_mark() { [ -z "$GATE_DOC_CUT_MARK" ] || rm -f -- "$GATE_DOC_CUT_MARK"; }
+HOOK_ON_EXIT="$HOOK_ON_EXIT gate_remove_doc_cut_mark"
+export GATE_DOC_CUT_MARK
+if [ -n "$GATE_PUSH_REFS" ]; then
+  node genesis/orchestrator/gate-preflight.mjs --doc-cut
+  DC_STATUS=$?
+  if [ "$DC_STATUS" -eq 3 ]; then
+    leg_red doc-cut "the doc-cut check is red (above); its cure is printed beside it"
+  elif [ "$DC_STATUS" -ne 0 ]; then
+    DC_PROTECTED=""
+    while IFS= read -r DC_LINE; do
+      case "$DC_LINE" in "refs/heads/dev "* | "refs/heads/main "*) DC_PROTECTED=1 ;; esac
+    done <<<"$GATE_PUSH_REFS"
+    if [ -n "$DC_PROTECTED" ]; then
+      leg_red doc-cut "the doc-cut check could not run (node exit $DC_STATUS, above) on a push to dev or main"
+    else
+      echo "[preflight] WARN doc-cut: the check could not run (node exit $DC_STATUS, above); no pushed ref deploys, so this is not a red"
+    fi
+  fi
+fi
+# ── Doc cut end
+
 # Nothing changed — let it through (a style refusal still refuses)
 if [ -z "$CHANGED" ]; then
   pass_or_refuse

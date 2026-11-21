@@ -33,6 +33,8 @@ refs:
   - genesis/orchestrator/.epr-meta/gate-failures-arrive-live.habit.md
 retire-when: "the edit-time and commit-time hooks catch every class the preflight refuses, and the harvest names no recurring or late cheap red across 20 consecutive pushes"
 ---
+DELTA 2026-11-21b (no status change; a seconds check for an undeclared document cut): `doc-cut` joins the pre-gate checks beside fleet-roll (`genesis/orchestrator/doc-cut-guard.mjs`, 15 tests). A push to dev or main that would leave a document under half its length and at least 100 lines shorter, with no `[doc:cut]` on a pushed commit touching it, is refused before any gate. Run against the real history it refuses 21a8060cd..101b7b767 in 0.22 s, naming the arrival backlog (1,531 to 39 lines) and the sprint journal (553 to 38), the first of five landings that carried that cut green (arrival backlog row 68).
+
 
 DELTA 2026-11-21 (still RED; a red only CI's publish stage could see is now a one-second device check, and one late red is new): `publish_eprfs.py --precheck` compares every entry of the published lock that is reachable from the crate, so a third-party lock move in a published crate's graph is refused on the device (dev 5535405d4). Receipt: on the tree both devices passed for four days it exits 1 with "eprfs-core 0.3.5: the published Cargo.lock pins cc 1.2.65 but the workspace now locks 1.11.1 (1 more moved)", and against the lock before the cc move it refuses nothing. The preflight's fleet-roll row caught, before a push, a lock change that would have rolled Edge a second time (row 62). New late red, not yet a check: the landing lane refused after 13,175 s of green gates, on a fence that could have been read before the first gate (row 61).
 
