@@ -1,4 +1,4 @@
-import { describe, test } from 'node:test';
+import { after, before, describe, test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
@@ -158,6 +158,21 @@ describe('metadata discovery without building', () => {
 });
 
 describe('gate-runner package environment', () => {
+  // A fixture project named `eprfs` must never append to the live run of the push that launched the
+  // suite: stand in for that push with a scratch run file and require it to stay absent.
+  let live;
+  let inherited;
+  before(() => {
+    live = resolve(mkdtempSync(resolve(tmpdir(), 'cargo-affected-live-')), 'run.jsonl');
+    inherited = process.env.GATE_LIVE_RUN;
+    process.env.GATE_LIVE_RUN = live;
+  });
+  after(() => {
+    if (inherited === undefined) delete process.env.GATE_LIVE_RUN; else process.env.GATE_LIVE_RUN = inherited;
+    const leaked = existsSync(live);
+    rmSync(dirname(live), { recursive: true, force: true });
+    assert.equal(leaked, false, 'a fixture gate appended to the inherited live run');
+  });
   test('shadow clears inherited packages; on passes the selected packages to the probe recipe', () => {
     const root = mkdtempSync(resolve(tmpdir(), 'cargo-affected-'));
     mkdirSync(resolve(root, 'genesis/agentic'), { recursive: true });
@@ -175,7 +190,7 @@ describe('gate-runner package environment', () => {
         let childEnv;
         const status = runProject(project, false, false, {
           root, readsOf: () => [],
-          env: { ...process.env, GATE_NARROW: mode, GATE_NARROW_BASE: 'ok', GATE_CHANGED_FILES: changed,
+          env: { ...process.env, GATE_LIVE_RUN: '', GATE_NARROW: mode, GATE_NARROW_BASE: 'ok', GATE_CHANGED_FILES: changed,
             GATE_CARGO_PACKAGES: 'stale', GATE_EVIDENCE: 'off', BRIT_BIN: '/nonexistent/brit', EPR_BIN: '/nonexistent/epr' },
           write: text => { output += text; },
           spawn: (command, args, options) => {

@@ -319,11 +319,23 @@ function readExpected(env = process.env) {
   return decodeExpectation(env[EXPECT_ENV]);
 }
 
-function runTree(suite, { spawn = spawnSync } = {}) {
-  const env = { ...process.env };
+/**
+ * The tree half's environment: the caller's, without the gate's own bookkeeping. GATE_LIVE_RUN names
+ * the live run of the push that launched this suite; the gate's failure lines reach it through the
+ * tap that wraps the suite from outside (`gate-tap.mjs --run`), so a test that inherited it could only
+ * append fixture events to a real run (a false eprfs PASSED on the channel that carries reds).
+ */
+export function treeEnv(base = process.env) {
+  const env = { ...base };
   delete env.NODE_TEST_CONTEXT;
   delete env[EXPECT_ENV];
   delete env[SUITE_RESULT_ENV];
+  delete env.GATE_LIVE_RUN;
+  return env;
+}
+
+function runTree(suite, { spawn = spawnSync } = {}) {
+  const env = treeEnv();
   const started = process.hrtime.bigint();
   const { status } = runSteps(plan(suite, 'tree'), 'tree', { cwd: HERE, env, spawn });
   process.stdout.write(`[suite] tree: ${status === 0 ? 'green' : `red (${status})`} in ${seconds(started)} s\n`);

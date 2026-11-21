@@ -8,7 +8,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, posix, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { isReadPattern } from './gate-input-audit.mjs';
-import { dirtyInView, loadSuite, missingTools, namedEnv, plan, skipFindings, unexpectedSkips, viewMatcher } from './suite-run.mjs';
+import { dirtyInView, loadSuite, missingTools, namedEnv, plan, skipFindings, treeEnv, unexpectedSkips, viewMatcher } from './suite-run.mjs';
 import { checkLockVersions, closureDigest, copyClosure, decodeExpectation, encodeExpectation, linksOutside, materialise, packageClosure, readResult, suiteDecision, suiteInventory, writeBlobs, writeResult } from './suite-inventory.mjs';
 import { gateChildEnv } from './gate-runner.mjs';
 import { createHash } from 'node:crypto';
@@ -403,4 +403,12 @@ test('a submodule declared update = none keys its pin and gives the view an empt
   // Without the declaration and with no store, the refusal names its cure.
   const plain = build('plain', { none: false });
   assert.throws(() => suiteInventory({ root: plain, commit: 'HEAD', listText }), /git submodule update --init sub/);
+});
+
+test('the suite never hands its tests the push\'s live run: treeEnv drops GATE_LIVE_RUN and namedEnv never carried it', () => {
+  const env = treeEnv({ PATH: '/bin', GATE_LIVE_RUN: '/run/live.jsonl', NODE_TEST_CONTEXT: 'child', KEEP: '1' });
+  assert.equal(Object.hasOwn(env, 'GATE_LIVE_RUN'), false);
+  assert.equal(Object.hasOwn(env, 'NODE_TEST_CONTEXT'), false);
+  assert.equal(env.KEEP, '1');
+  assert.equal(Object.hasOwn(namedEnv('/scratch'), 'GATE_LIVE_RUN'), false);
 });
