@@ -18,6 +18,7 @@ import {
   siblingGovernanceChange, siblingVerdicts,
 } from './gate-evidence.mjs';
 import { britAffected, resolveBritBin } from './gate-oracle.mjs';
+import { recipeKeyShadow } from './gate-recipe-key.mjs';
 import { CLAIMED_EXIT_CODE, runAttested } from './gate-attest.mjs';
 import { affectedPackages, loadMetadata } from './cargo-affected.mjs';
 import { SUITE_READ_LISTS, readSet } from './gate-input-audit.mjs';
@@ -383,7 +384,7 @@ function liveEvent(env, event) {
 export function runProject(project, printOnly, namesOnly, {
   root = ROOT, env = process.env, spawn = spawnSync,
   write = text => process.stdout.write(text), warn = text => process.stderr.write(text),
-  readsOf, recipe = null, tap = spawn === spawnSync,
+  readsOf, recipe = null, tap = spawn === spawnSync, clock = () => process.hrtime.bigint(),
 } = {}) {
   const cargo = project.run.cargo || {};
   const targetDir = worktreeTargetDir(cargo.targetDir || '', root);
@@ -470,7 +471,7 @@ export function runProject(project, printOnly, namesOnly, {
     write(`${costDecision.line}\n`);
   }
   const childEnv = gateChildEnv(project, env, root);
-  const started = process.hrtime.bigint();
+  let started = clock();
   const cycleEnv = { ...env, ...cargoEnvOf(childEnv) };
   const cycleDeps = {
     root,
@@ -482,7 +483,7 @@ export function runProject(project, printOnly, namesOnly, {
   };
   if (costDecision?.defer) {
     write(`[gate] ${project.name} deferred to CI: ${costDecision.why}\n`);
-    const seconds = Number(process.hrtime.bigint() - started) / 1e9;
+    const seconds = Number(clock() - started) / 1e9;
     recordCycle(project, seconds, 0, { ...cycleEnv, GATE_RUN_KIND: 'deferred' }, cycleDeps);
     liveEvent(env, { kind: 'gate-verdict', project: project.name, verdict: { exit: 0, seconds: 0, deferred: true } });
     return 0;
@@ -559,6 +560,18 @@ export function runProject(project, printOnly, namesOnly, {
     evidence = { line: `unavailable (${String(error?.message || error).split('\n')[0]})` };
   }
   write(`[gate] ${project.name} evidence: ${evidence.line}\n`);
+  // Shadow only (gate-recipe-key.mjs): whether a justfile edit since the integration base left this
+  // root-just gate's recipe closure unchanged. It reads `evidence.material` and changes nothing the
+  // reuse decision, the key or the record below reads; GATE_RECIPE_KEY=off silences it.
+  // Its own span is taken out of the gate's timed span, so the durations recorded below (verdict
+  // JSON, --duration-ms, the cycle row) are what they are with the shadow off.
+  const shadowStarted = clock();
+  try {
+    const shadow = recipeKeyShadow(project, { root, commit: gateCommit, material: evidence.material,
+      dirty: pushed && gateCommit !== headSha ? true : evidence.dirty, env, spawn });
+    if (shadow) write(`[gate] ${project.name} recipe-key (shadow): ${shadow}\n`);
+  } catch { /* a shadow is never a red */ }
+  started += clock() - shadowStarted;
   // The recipe tests this checkout; a gated commit that is not its HEAD is neither reusable nor
   // recorded, on every entry path (pre-push also says so with GATE_EVIDENCE_RECORD=0).
   if (pushed && gateCommit !== headSha) {
@@ -591,7 +604,7 @@ export function runProject(project, printOnly, namesOnly, {
       ? `in ${Math.round(Number(row.seconds) || 0)} s on the sibling`
       : ageOf(row.attestation.builtAt);
     write(`[gate] ${project.name} reused: green ${when} at ${String(row.commit).slice(0, 9)} (${signer})\n`);
-    const seconds = Number(process.hrtime.bigint() - started) / 1e9;
+    const seconds = Number(clock() - started) / 1e9;
     recordCycle(project, seconds, 0, {
       ...cycleEnv, GATE_RUN_KIND: sibling ? 'sibling-reused' : 'reused',
     }, cycleDeps);
@@ -679,7 +692,7 @@ export function runProject(project, printOnly, namesOnly, {
   const derivation = task ? { ...task.derivation, hit: answer.answered?.hit === true } : undefined;
   if (answer?.answered?.hit) {
     write(`[gate] ${project.name} reused: derivation hit (method ${derivation.method}, input ${derivation.input})\n`);
-    const seconds = Number(process.hrtime.bigint() - started) / 1e9;
+    const seconds = Number(clock() - started) / 1e9;
     recordCycle(project, seconds, 0, { ...cycleEnv, GATE_RUN_KIND: 'reused' }, cycleDeps);
     liveEvent(env, { kind: 'gate-verdict', project: project.name, verdict: { exit: 0, seconds: 0, reused: true }, derivation, status: 'Answered' });
     return 0;
@@ -691,7 +704,7 @@ export function runProject(project, printOnly, namesOnly, {
       gateSha: gateCommit, headAfter: revParse('HEAD'), dirtyAfter: dirtyAfterRun(root, gateCommit) })
     : { status: result.status ?? 1, record: true };
   const status = outcome.status;
-  const seconds = Number(process.hrtime.bigint() - started) / 1e9;
+  const seconds = Number(clock() - started) / 1e9;
   let evidenceCid = null;
   // The verdict is recorded against the closure — red too; a known-red closure is information.
   // An interrupted Task has no verdict, so nothing is recorded for it. A suite's named half is
@@ -776,6 +789,7 @@ function usage() {
   console.error('usage: gate-runner.mjs (--target <project-or-path> | --changed-file-list | --list) [--print] [--names [--order cost]] [--recipe <name>]');
   console.error('  env: GATE_ON_RED=continue|stop (default from pool-policy.json gate_on_red) · GATE_PREFLIGHT=off · GATE_PREFLIGHT_DONE=1 (pre-push ran it)');
   console.error('  env: GATE_ORACLE=rakia|shadow|path (default rakia; without a brit binary every mode is path-only) · BRIT_BIN · GATE_ROOT (fixture repository root)');
+  console.error('  env: GATE_RECIPE_KEY=shadow|off (default shadow): a root-just gate prints whether a justfile edit since the integration base left its recipe closure unchanged; it changes no key, reuse decision or record');
 }
 
 const isMain = import.meta.url === `file://${process.argv[1]}` ||
