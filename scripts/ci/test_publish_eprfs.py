@@ -371,6 +371,82 @@ class PrecheckTests(unittest.TestCase):
         self.assertEqual(status, 0, stderr)
         self.assertIn(f"verified existing: {NAME} {VERSION}", stdout)
 
+    def third_party(self, published: str, workspace: str, uses: str = '"cc"') -> tuple[int, str]:
+        self.files["Cargo.lock"] = (
+            b'[[package]]\nname = "eprfs-core"\nversion = "0.1.0"\n\n' + published.encode()
+        )
+        (self.workspace / "Cargo.lock").write_text(
+            f'[[package]]\nname = "eprfs-core"\nversion = "0.1.0"\ndependencies = [{uses}]\n\n' + workspace
+        )
+        status, _, stderr = self.run_precheck()
+        return status, stderr
+
+    CC_PUBLISHED = '[[package]]\nname = "cc"\nversion = "1.2.65"\nsource = "registry+x"\nchecksum = "aa"\n'
+    CC_MOVED = '[[package]]\nname = "cc"\nversion = "1.11.1"\nsource = "registry+x"\nchecksum = "bb"\n'
+    CC_MIRROR = '[[package]]\nname = "cc"\nversion = "1.2.65"\nsource = "registry+y"\nchecksum = "aa"\n'
+    OTHER = '[[package]]\nname = "eprfs-peer"\nversion = "0.1.0"\ndependencies = ["cc 1.2.65"]\n'
+
+    def test_third_party_version_moved_since_publication_refuses(self):
+        status, stderr = self.third_party(self.CC_PUBLISHED, self.CC_MOVED)
+        self.assertEqual(status, 1)
+        self.assertIn(
+            f"{NAME} {VERSION}: the published Cargo.lock pins cc 1.2.65 but the workspace now locks 1.11.1, "
+            "so the package differs; bump the version",
+            stderr,
+        )
+
+    def test_third_party_unchanged_since_publication_passes(self):
+        status, stderr = self.third_party(self.CC_PUBLISHED, self.CC_PUBLISHED)
+        self.assertEqual(status, 0, stderr)
+
+    def test_third_party_reached_through_another_package_passes(self):
+        through = '[[package]]\nname = "ring"\nversion = "0.17.0"\nsource = "registry+x"\ndependencies = ["cc"]\n'
+        published = self.CC_PUBLISHED + "\n" + through.replace('dependencies = ["cc"]\n', "")
+        status, stderr = self.third_party(published, self.CC_PUBLISHED + "\n" + through, uses='"ring"')
+        self.assertEqual(status, 0, stderr)
+
+    def test_third_party_kept_beside_a_second_version_passes(self):
+        status, stderr = self.third_party(
+            self.CC_PUBLISHED, self.CC_PUBLISHED + "\n" + self.CC_MOVED, uses='"cc 1.2.65"',
+        )
+        self.assertEqual(status, 0, stderr)
+
+    def test_third_party_kept_beside_the_same_version_from_another_source_passes(self):
+        for workspace in (self.CC_PUBLISHED + "\n" + self.CC_MIRROR, self.CC_MIRROR + "\n" + self.CC_PUBLISHED):
+            with self.subTest(workspace=workspace):
+                status, stderr = self.third_party(self.CC_PUBLISHED, workspace, uses='"cc 1.2.65 (registry+x)"')
+                self.assertEqual(status, 0, stderr)
+
+    def test_third_party_switched_to_a_version_another_member_keeps_refuses(self):
+        workspace = self.CC_PUBLISHED + "\n" + self.CC_MOVED + "\n" + self.OTHER
+        status, stderr = self.third_party(self.CC_PUBLISHED, workspace, uses='"cc 1.11.1"')
+        self.assertEqual(status, 1)
+        self.assertIn("pins cc 1.2.65 but the workspace now locks 1.11.1,", stderr)
+
+    def test_third_party_left_only_to_another_member_refuses(self):
+        status, stderr = self.third_party(self.CC_PUBLISHED, self.CC_PUBLISHED + "\n" + self.OTHER, uses="")
+        self.assertEqual(status, 1)
+        self.assertIn("pins cc 1.2.65 but the workspace now locks it only for other packages", stderr)
+
+    def test_third_party_dropped_since_publication_refuses(self):
+        status, stderr = self.third_party(self.CC_PUBLISHED, "", uses="")
+        self.assertEqual(status, 1)
+        self.assertIn("pins cc 1.2.65 but the workspace now no longer locks it", stderr)
+
+    def test_third_party_checksum_or_source_changed_refuses(self):
+        for changed in ('checksum = "aa"', 'source = "registry+x"'):
+            with self.subTest(changed=changed):
+                workspace = self.CC_PUBLISHED.replace(changed, changed[:-1] + '-other"')
+                status, stderr = self.third_party(self.CC_PUBLISHED, workspace)
+                self.assertEqual(status, 1)
+                self.assertIn("pins cc 1.2.65 but the workspace now locks it from another source", stderr)
+
+    def test_every_moved_entry_is_counted_and_the_first_is_named(self):
+        find = '[[package]]\nname = "find-msvc-tools"\nversion = "0.1.9"\nsource = "registry+x"\nchecksum = "cc"\n'
+        status, stderr = self.third_party(self.CC_PUBLISHED + "\n" + find, self.CC_MOVED)
+        self.assertEqual(status, 1)
+        self.assertIn("pins cc 1.2.65 but the workspace now locks 1.11.1 (1 more moved)", stderr)
+
     def test_absent_version_passes(self):
         responses = self.responses()
         responses[1] = HTTPError(BASE, 404, "missing", {}, None)

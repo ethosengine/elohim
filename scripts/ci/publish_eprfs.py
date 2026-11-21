@@ -350,15 +350,15 @@ def package_version(crate: Path, workspace_version: str | None = None) -> str:
     return version
 
 
-def workspace_members(lock: Path) -> dict[str, str]:
-    """Path packages (no `source`) a workspace lockfile builds, by name."""
+def workspace_lock(lock: Path) -> list[dict]:
+    """Every package a workspace lockfile names; empty when the workspace has no lockfile."""
     if not lock.is_file():
-        return {}
+        return []
     try:
         packages = tomllib.loads(lock.read_text()).get("package", [])
     except (UnicodeDecodeError, tomllib.TOMLDecodeError):
         raise PublishError(f"{lock}: unreadable workspace lockfile") from None
-    return {p["name"]: p["version"] for p in packages if "source" not in p and "name" in p and "version" in p}
+    return [p for p in packages if "name" in p and "version" in p]
 
 
 def archive_member(data: bytes, name: str, version: str, path: str) -> bytes | None:
@@ -374,14 +374,59 @@ def archive_member(data: bytes, name: str, version: str, path: str) -> bytes | N
         return handle.read() if handle else None
 
 
-def locked_member_moves(remote: bytes, name: str, version: str, members: dict[str, str]) -> list[tuple[str, str, str]]:
-    """Workspace members the published package locked at a version the workspace no longer builds.
+def lock_identity(package: dict) -> tuple:
+    return (package["name"], package["version"], package.get("source"), package.get("checksum"))
 
-    Cargo packs the workspace lockfile, filtered to the crate's graph, into every package, so a
-    sibling's version bump changes this crate's package even when none of its own files move —
-    the publish stage then refuses the unchanged version as an immutable collision.
+
+def locked_graph(workspace: list[dict], name: str) -> list[dict]:
+    """The lock entries `name` reaches through `dependencies`, or the whole lock when it has no single path entry.
+
+    A `dependencies` item is `name`, `name version` or `name version (source)`. An item that
+    cannot be told apart keeps every candidate, so the result can only be wider than the graph.
     """
-    if not members:
+    named: dict[str, list[dict]] = {}
+    for package in workspace:
+        named.setdefault(package["name"], []).append(package)
+    roots = [package for package in named.get(name, []) if "source" not in package]
+    if len(roots) != 1:
+        return workspace
+    reached: dict[int, dict] = {}
+    pending = roots
+    while pending:
+        package = pending.pop()
+        if id(package) in reached:
+            continue
+        reached[id(package)] = package
+        for item in package.get("dependencies", []):
+            dependency, _, rest = item.partition(" ")
+            wanted, _, source = rest.partition(" ")
+            candidates = named.get(dependency, [])
+            versioned = [c for c in candidates if c["version"] == wanted] if wanted else candidates
+            sourced = [c for c in versioned if c.get("source") == source.strip("()")] if source else versioned
+            pending.extend(sourced or versioned or candidates)
+    return list(reached.values())
+
+
+def locked_moves(remote: bytes, name: str, version: str, workspace: list[dict]) -> list[tuple[str, str, str]]:
+    """Entries the published package locked that the workspace lockfile no longer gives this crate.
+
+    Cargo writes a lockfile into every package, resolved from the workspace lockfile for the
+    crate alone, so the package changes when none of the crate's own files do: a sibling's version
+    bump moves a path entry, and a third-party update moves a registry entry (`cc 1.2.65` to
+    `1.11.1` changed four published packages on 2026-11-19, and only the publish stage saw it).
+    The publish stage then refuses the unchanged version as an immutable collision.
+
+    Each entry of the published lock must still be reachable from this crate in the workspace
+    lock: a workspace path package (no `source`) at the same version, any other package at the
+    same version, source and checksum. Reachable, because a version another member still locks is
+    no evidence that this crate still uses it.
+
+    Not compared, so the publish stage's whole-archive comparison stays the authority: an entry
+    the crate has gained, an entry's own dependency list, and the lockfile's format. A refusal
+    can be wrong in one known case: a path prerequisite published by another pipeline that changed
+    its dependencies at an unchanged version, which that pipeline's own publish refuses.
+    """
+    if not workspace:
         return []
     lock = archive_member(remote, name, version, "Cargo.lock")
     if lock is None:
@@ -390,11 +435,31 @@ def locked_member_moves(remote: bytes, name: str, version: str, members: dict[st
         packages = tomllib.loads(lock.decode()).get("package", [])
     except (UnicodeDecodeError, tomllib.TOMLDecodeError):
         raise PublishError(f"{name} {version}: published Cargo.lock is unreadable") from None
-    return sorted(
-        (p["name"], p["version"], members[p["name"]])
-        for p in packages
-        if p.get("name") != name and p.get("name") in members and p.get("version") != members[p["name"]]
-    )
+    members = {p["name"]: p["version"] for p in workspace if "source" not in p}
+    graph = [p for p in locked_graph(workspace, name) if "source" in p]
+    reached = {lock_identity(p) for p in graph}
+    elsewhere = {(p["name"], p["version"]) for p in workspace if "source" in p}
+    moves = []
+    for package in packages:
+        dependency, published = package.get("name"), package.get("version")
+        if dependency is None or published is None or dependency == name:
+            continue
+        if lock_identity(package) in reached:
+            continue
+        if dependency in members:
+            if published != members[dependency]:
+                moves.append((dependency, published, f"builds {members[dependency]}"))
+            continue
+        versions = sorted({p["version"] for p in graph if p["name"] == dependency})
+        if published in versions:
+            moves.append((dependency, published, "locks it from another source or with another checksum"))
+        elif versions:
+            moves.append((dependency, published, f"locks {', '.join(versions)}"))
+        elif (dependency, published) in elsewhere:
+            moves.append((dependency, published, "locks it only for other packages"))
+        else:
+            moves.append((dependency, published, "no longer locks it"))
+    return sorted(moves)
 
 
 def precheck(repo: Path) -> None:
@@ -447,12 +512,13 @@ def precheck(repo: Path) -> None:
                     f"({sorted(differences)[0]}); bump the version"
                 )
             lockfile = (crate if name == "elohim-seam-contracts" else eprfs_workspace) / "Cargo.lock"
-            moved = locked_member_moves(remote, name, version, workspace_members(lockfile))
+            moved = locked_moves(remote, name, version, workspace_lock(lockfile))
             if moved:
                 dependency, published, current = moved[0]
+                others = f" ({len(moved) - 1} more moved)" if len(moved) > 1 else ""
                 raise PublishError(
                     f"{name} {version}: the published Cargo.lock pins {dependency} {published} but the "
-                    f"workspace now builds {current}, so the package differs; bump the version"
+                    f"workspace now {current}{others}, so the package differs; bump the version"
                 )
             print(f"verified existing: {name} {version}", flush=True)
     except RegistryUnavailable as error:
