@@ -1255,34 +1255,101 @@ fn commit_source(repo: &Path, text: &str) -> String {
 /// gate's debug build of SHA-256: about 11 s each for the 158 MB debug `epr` on a loaded device,
 /// about 4.8 s for the stripped 66 MB. The stories prove which release runs and when it reads
 /// ready, never its symbols; with no `strip` on PATH the release is the unstripped copy.
+///
+/// A release's bytes are a function of `tag` alone, so every story's release `x` is the same
+/// release (as it always was: each story has its own bin store), and only releases within one
+/// story must differ. The process makes each tag's bytes once ([`shared_release`]) and a story
+/// hard-links them into its own release directory, copying when the link fails.
 fn release_dir(fx: &Fixture, tag: &str) -> PathBuf {
-    use std::io::Write;
     let dir = fx.base.join(format!("release-{tag}"));
     fs::create_dir_all(&dir).unwrap();
-    let epr = dir.join("epr");
-    let stripped = Command::new("strip")
-        .arg("--strip-all")
-        .arg("-o")
-        .arg(&epr)
-        .arg(env!("CARGO_BIN_EXE_epr"))
-        .stdout(Stdio::null())
-        .status()
-        .is_ok_and(|status| status.success());
-    if !stripped {
-        eprintln!("device_supervise: strip unavailable; the release is the unstripped epr");
-        fs::copy(env!("CARGO_BIN_EXE_epr"), &epr).unwrap();
-    }
-    fs::OpenOptions::new()
-        .append(true)
-        .open(&epr)
-        .unwrap()
-        .write_all(format!("\n# release {tag}\n").as_bytes())
-        .unwrap();
-    fs::copy("/bin/bash", dir.join("bin-launch")).unwrap();
-    for bin in ["epr", "bin-launch"] {
-        fs::set_permissions(dir.join(bin), fs::Permissions::from_mode(0o755)).unwrap();
+    let (epr, launch) = shared_release(tag);
+    for (shared, name) in [(epr, "epr"), (launch, "bin-launch")] {
+        let own = dir.join(name);
+        // Never copy onto an existing name: if it were a link to the shared bytes, the copy
+        // would truncate and rewrite them for every story.
+        let _ = fs::remove_file(&own);
+        if fs::hard_link(&shared, &own).is_err() {
+            fs::copy(&shared, &own).unwrap();
+        }
     }
     dir
+}
+
+/// This process's read-only release bytes for `tag`: the stripped `epr` with `tag` appended,
+/// and the `bin-launch` beside it (a copy of bash), each made once and never written again.
+///
+/// Every story's release directory hard-links these files, so they are immutable once made:
+/// they are published mode 0555 by a rename after their last write, nothing in a story opens a
+/// release directory except `epr bin ingest`, and ingest only reads its source (it copies the
+/// bytes into the store's own staging and executes that copy, never the source). A story that
+/// needs different bytes asks for a different tag; none writes into a release.
+fn shared_release(tag: &str) -> (PathBuf, PathBuf) {
+    use std::io::Write;
+    static ROOT: std::sync::Mutex<Option<PathBuf>> = std::sync::Mutex::new(None);
+    // The lock is held while bytes are made, so two stories never make the same tag at once.
+    let mut root = ROOT
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    let root = root.get_or_insert_with(shared_release_root).clone();
+    let publish = |name: &str, make: &dyn Fn(&Path)| {
+        let path = root.join(name);
+        if !path.is_file() {
+            let partial = root.join(format!(".{name}.partial"));
+            let _ = fs::remove_file(&partial);
+            make(&partial);
+            fs::set_permissions(&partial, fs::Permissions::from_mode(0o555)).unwrap();
+            fs::rename(&partial, &path).unwrap();
+        }
+        path
+    };
+    let launch = publish("bin-launch", &|partial| {
+        fs::copy("/bin/bash", partial).unwrap();
+    });
+    let epr = publish(&format!("epr-{tag}"), &|partial| {
+        let stripped = Command::new("strip")
+            .arg("--strip-all")
+            .arg("-o")
+            .arg(partial)
+            .arg(env!("CARGO_BIN_EXE_epr"))
+            .stdout(Stdio::null())
+            .status()
+            .is_ok_and(|status| status.success());
+        if !stripped {
+            eprintln!("device_supervise: strip unavailable; the release is the unstripped epr");
+            fs::copy(env!("CARGO_BIN_EXE_epr"), partial).unwrap();
+        }
+        fs::OpenOptions::new()
+            .append(true)
+            .open(partial)
+            .unwrap()
+            .write_all(format!("\n# release {tag}\n").as_bytes())
+            .unwrap();
+    });
+    (epr, launch)
+}
+
+/// The directory holding this process's shared release bytes, beside the stories' own temp
+/// directories so a hard link from one to the other stays on one filesystem.
+///
+/// A static is never dropped, so the directory is named by this process's pid and outlives it;
+/// each new process first removes the directories of processes that no longer run.
+fn shared_release_root() -> PathBuf {
+    const PREFIX: &str = "epr-device-supervise-releases-";
+    let temp = std::env::temp_dir();
+    for entry in fs::read_dir(&temp).into_iter().flatten().flatten() {
+        let name = entry.file_name().to_string_lossy().into_owned();
+        let Some(pid) = name.strip_prefix(PREFIX) else {
+            continue;
+        };
+        if pid.parse::<u32>().is_ok() && !Path::new("/proc").join(pid).exists() {
+            let _ = fs::remove_dir_all(entry.path());
+        }
+    }
+    let root = temp.join(format!("{PREFIX}{}", std::process::id()));
+    let _ = fs::remove_dir_all(&root);
+    fs::create_dir_all(&root).unwrap();
+    root
 }
 
 /// `epr bin ingest` a release for `commit` in `repo`, returning its CID.
