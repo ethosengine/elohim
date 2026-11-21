@@ -555,7 +555,13 @@ rules:
                 session = opened['identity']['session']
                 if refusal not in ('live', 'unclosed'):
                     f.epr('session', 'close', '--json')
-                if refusal in ('declared', 'unclosed', 'namespace'):
+                # The namespace case keeps its predecessor's /proc entry: with it gone the
+                # predecessor's holder exits within its one-second poll and releases its lock,
+                # and a released holder is, by design, proof of death across a foreign pid
+                # namespace (device-runtime envelope.rs, `holder_released`). The refusal asserted
+                # below then held only for as long as the holder took to notice, and a loaded
+                # device ran `session open` after it (2026-11-21, one run in eleven).
+                if refusal in ('declared', 'unclosed'):
                     shutil.rmtree(f.base/'proc/4101')
                 if refusal == 'namespace':
                     namespace = f.base/'proc/self/ns/pid'
@@ -705,8 +711,12 @@ class EnvelopeTest(unittest.TestCase):
             namespace=f.base/'proc/self/ns/pid'
             namespace.rename(namespace.with_suffix('.original'))
             namespace.write_text('another namespace')
-            shutil.rmtree(stat.parent)
+            # The owner's /proc entry stays until this assertion has run: removing it first lets
+            # the holder exit and release its lock, which across a foreign namespace is proof of
+            # death by design, so gc would then be right to close the envelope and this line
+            # would pass only while the holder had not yet noticed.
             assert json.loads(f.run([BINARY,'session','gc','--json']))['closed']==[]
+            shutil.rmtree(stat.parent)
             write(f.base/'proc/sys/kernel/random/boot_id','another boot')
             closed=json.loads(f.run([BINARY,'session','gc','--json']))['closed']
             assert len(closed)==1 and closed[0]['identity']['session']==f.id('claude')
