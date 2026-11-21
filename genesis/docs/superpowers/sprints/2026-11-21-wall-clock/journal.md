@@ -364,3 +364,97 @@ branch). Everything else went through brit: status, log, show, diff, blame, add,
 **What this landing carries.** Track B; the live-run leak fix; the shadow recipe key; T2 with
 the build cap; this journal, the backlog rows and four habit deltas.
 
+### 11:11Z: the second landing is on dev; what the eprfs gate costs now
+
+`5535405d4..b74f60096  HEAD -> dev` at 11:11:33Z. Before the push this session released the
+lane lease it held by hand. Phase L's landing agent claimed it in 6 s and released it after
+the transfer; no fence. Thirteen gates, 3,685 s:
+
+| Gate | Seconds | Steps |
+|---|---|---|
+| eprfs | 2,117 | lint 80; bins 204; ark 46; test 1,750 |
+| eprfs-live-corpus | 487 | |
+| jenkins-bridge | 244 | |
+| cargo-bridge | 240 | |
+| genesis-a2o | 238 | |
+| orchestrator-tree | 207 | |
+| orchestrator | 76 | |
+| genesis, rust-style, address-profile-lint and three more | 114 | |
+
+The eprfs gate, the two landings side by side, same device:
+
+| | landing 1 (`5535405d4`) | landing 2 (`b74f60096`) |
+|---|---|---|
+| whole gate | 4,487 s | 2,117 s |
+| lint, bins, ark | 404, 927, 172 s | 80, 204, 46 s |
+| test, building | 389 s | 81 s |
+| test, running | 2,536 s | 1,613 s |
+| `device_supervise` | 1,456.0 s | 719.5 s |
+| `session_envelope` | 309.0 s | 144.7 s |
+| tests passed | 2,698 | 2,698 |
+
+Read with care: landing 1 rebuilt the workspace because it bumped a core crate's version, and
+landing 2 changed only tests and a manifest, so the three build rows compare a cold closure at
+one job with a warm one at six. The like-for-like rows are the test run and the two binaries:
+923 s less, every landing.
+
+### 11:30Z: the pipeline's verdict
+
+`elohim-eprfs/dev` #206, on `5535405d4`: "2695 tests run: 2695 passed (16 slow), 1 skipped",
+then "verified published: eprfs-core 0.3.6", "verified existing: eprfs-host 0.3.3", "verified
+published: eprfs-storage 0.3.9", "verified published: eprfs-meta 0.3.7", "verified published:
+eprfs-local 0.3.7", "eprfs publish complete", "Finished: SUCCESS". The first green since #167
+on 2026-11-16. The device's precheck, run after it, reads "verified existing" for all six: the
+packages cargo packed pin what the workspace builds.
+
+`elohim-edge/dev` #1919, the roll the steward ruled, started at 09:52Z and was still running at
+11:46Z; `elohim-orchestrator/dev` #2402 waits on it and has not yet advanced its baseline. The
+pipeline's run on the second landing follows that one. Neither was read to its end by this
+entry.
+
+### 11:17Z: the memory loop
+
+Started as workflow `wf_7ce4164c-8f2` in the main checkout, which was first brought to
+`b74f60096` with `brit pull --ff-only origin dev`. The stasis hook advised against it ("no for
+now; keep it parked"); the steward's ruling S3 is on record and it runs under that. Its measure
+legs run on Haiku and its drain legs on the librarian, historian, cartographer and storyteller
+definitions, one at a time.
+
+### Where the sprint stands
+
+| Line | State |
+|---|---|
+| 1, CI green end to end | the eprfs pipeline is green (#206). The orchestrator's dev job advances when the Edge roll (#1919) ends; not yet read green |
+| 2, a device sees what the publish stage sees | met: the precheck is red on the tree that passed for four days and green after the bump and after publication |
+| 3, what a landing pays, per gate and step | met: two push logs with a time on every line, tabled above |
+| 4, the lander pays less, with a receipt | met for the eprfs gate: 923 s less test run on every landing, measured on the next landing's own gate; six build jobs declared |
+| 5, the record is current | this journal; backlog rows 42, 43 and 51 to 62; the two Track B entries resolved; four habit deltas |
+
+### Waiting on the steward
+
+1. **Row 62.** The rustls fix for the k8s bridge is on local branch `wallclock/k8s-rustls`
+   (`c6149616`). It is an Edge roll and waits for one.
+2. **Thread parallelism for the eprfs tests (rows 59, 60).** `device_supervise` takes 188 s at
+   four threads against 719 s at one. Three ways to get it: declare `RUST_TEST_THREADS` for the
+   whole workspace in the manifest (one `eprfs-local` unit test changes the working directory
+   mid-test and would race); give the stories a step of their own (a root `justfile` edit, which
+   today re-keys every gate); or run the pipeline's `cargo nextest` on the device.
+3. **Turning the recipe key on (row 59).** It is shadow. What `on` changes is in the module's
+   comment block: the key's recipe piece for root-just gates, and the reuse selector's refusal
+   for the justfile path.
+4. **Row 52.** `[profile.dev.package.sha2] opt-level = 3` for the `elohim` workspace would cut
+   about 30 s from every ark spawn on a device, real restarts included. It re-keys the
+   workspace's cargo gates and is an Edge build input.
+5. **Row 61.** Which of the three cures for the lane fence.
+6. **Row 54.** The session's inherited `EPR_BIN`; the candidate epr that device arrival has not
+   made current.
+7. **The root guidance.** Two sentences still describe the oracle as `rakia affected` and "no
+   rakia oracle"; and "coordinate the landing lane before pushing" reads as "claim it by hand",
+   which is the path row 61 refuses. The file is outside this session's write set.
+8. **Two paths written outside the declared write set**, for the reasons given above:
+   `genesis/a2o/steps/devflow/**` and `genesis/agentic/session_envelope_test.py`.
+9. **Left on shem.** Worktrees `wallclock-lane2` and `wallclock-t2` (with pool family
+   `wallclock-t2`), the inherited `integrate-20261120`, and local branches `wallclock/*`. Four
+   `epr session hold` daemons from fixture runs of 2026-11-16 and 17 are still polling under
+   `/tmp`; they are not this session's and were left alone.
+
