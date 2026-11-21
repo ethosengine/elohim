@@ -1145,6 +1145,22 @@ def mayPublishPackages() {
     !env.CHANGE_ID && (env.BRANCH_NAME == 'dev' || env.BRANCH_NAME == 'main')
 }
 
+// Refuse on the controller, before any agent is requested. This is plain script ahead of the
+// declarative block, so a build that Check Trigger would skip never asks for a pod. On
+// 2026-11-20 sixty first builds of branch jobs, started by push events, each waited on an
+// agent for 21 hours and starved the dev roll (backlog steward-device-arrival-open-items,
+// row 63): the stage that refuses them runs only once the pipeline's agent exists. Keep this
+// rule identical to Check Trigger's.
+if (!currentBuild.getBuildCauses().any { cause ->
+        cause._class.contains('UserIdCause') ||
+        cause._class.contains('UpstreamCause') ||
+        cause._class.contains('BranchIndexingCause') }) {
+    echo "⏭️ PIPELINE SKIPPED before any agent. Triggered by: ${currentBuild.getBuildCauses()*.shortDescription.join(', ')}"
+    currentBuild.result = 'NOT_BUILT'
+    currentBuild.displayName = "#${env.BUILD_NUMBER} SKIPPED"
+    return
+}
+
 pipeline {
     agent {
         kubernetes {
