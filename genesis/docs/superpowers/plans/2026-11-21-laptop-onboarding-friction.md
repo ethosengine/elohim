@@ -8,6 +8,7 @@ cites:
   - .epr-meta/workspace-device-arrival.habit.md
   - "steward-device-arrival-journal | The laptop runbook establishes the enrollment and verified exchange still owed | sha256:1c9dde7401bbc78d | path: genesis/docs/superpowers/sprints/2026-11-16-steward-device-arrival/journal.md"
   - "native-dev-tooling-over-peers-plan | The existing hand-over and evidence rules explain what changes across principals | sha256:0ffa5c75af02fc2a | path: genesis/docs/superpowers/plans/2026-10-29-native-dev-tooling-over-peers-plan.md"
+  - "collective-memory-integration | The memory integration plan grounds selective contributions, provenance, and review at each audience | sha256:00249865b48968ac | path: genesis/docs/superpowers/plans/2026-09-09-collective-memory-integration.md"
 ---
 
 # From one device to distributed developer participation
@@ -40,6 +41,14 @@ Ostrom's principles apply to the capacity of these spaces as well as to what the
 
 Each space should be able to govern its own reception within the wider commons' rules. Start with a notice when someone oversteps, use graduated responses for repeated misuse, and offer a nearby way to resolve disputes or appeal. Start with the smallest space able to answer the request. Wider spaces can help route a visitor and recognize locally made rules. Measure whether the people receiving requests can sustain the work without turning public discovery into surveillance. These are questions to test in the pilots, informed by [Ostrom's lecture on polycentric governance](https://www.nobelprize.org/uploads/2018/06/ostrom_lecture.pdf).
 
+## The shelves hold collective intelligence
+
+The public shelves hold what the network has chosen to make widely useful. Special collections inside the library hold the decisions, evidence, and practices of a particular working group or community. Their value comes from the context that goes with them and the people who keep that context current. A newcomer can start with a public guide, then ask for access to a relevant collection when they need more depth. Discovery shows a collection's existence only where the space has chosen to advertise it.
+
+Native agentic memory gives knowledge a path from private work to the collections where it can help. An agent can help a developer extract a lesson from private work and draft a contribution for the immediate collaborators. The developer chooses what to offer. The receiving group reviews it alongside what it already knows, retains relevant disagreement, and decides what belongs in its collection. A lesson can later reach another group or the public shelves after renewed review for that audience. Each step carries the purpose, provenance, and evidence that audience may see. Private source material stays with its holder, and a useful lesson may stay in a special collection indefinitely.
+
+Agentic stewards can help people move through the knowledge they already have access to. They can point a reader to the applicable decision, flag a stale guide or competing account, and prepare a proposed revision or wider contribution. People acting under the space's rules decide admission, acceptance, and wider release. Exercise one lesson from private work through a shared collection to a public guide. Verify that a reader can recover why it was accepted, find an authorized correction, and learn what they can use without exposing the private work or a restricted collection.
+
 ## Discover in low-trust channels and continue by consent
 
 Start with the developer's immediate need. For example, the laptop needs a steward peer who can confirm roster pickup. A device resuming a task might need a copy of the prior gate result. A new contributor might need the decision behind a change or someone authorized to review it. Surface relevant offers, roles, and published context within the developer's current reach. Show who made each offer, what it covers, and whether it is current. A visible peer is evidence of presence. An offer or declared role gives the developer a reason to ask.
@@ -55,7 +64,5 @@ In the two-device pilot, discover an offer for one gate result or artifact and a
 ## Next horizon — another developer joins
 
 Walk one incoming developer through the same journey with their own identity and scoped standing. Start with one real contribution. They should be able to find the governing decisions and evidence, understand their role, reconcile local work with the current shared state, and submit a contribution with provenance. Show who can review and accept it and whether it is awaiting review or accepted. Independent review comes from another admitted principal under the space's rules. Devices belonging to one steward share that steward's standing.
-
-Let developers move from personal working context into collective memory by deliberately offering what belongs in the shared space. Attach the purpose, evidence, and provenance so another person can review and reconcile it. Personal drafts, private feedback, and recall session records stay private. Test that a useful contribution can be shared without exposing the private work that led to it.
 
 **The long-term entry point is one click.** An invitation opens the relevant workspace and explains who invited the developer, what they can do now, and what requires consent or approval. It starts a resumable journey through the existing consent and admission paths. While approvals are pending, the first useful view offers context already within the developer's reach and shows how to ask for what is missing. Prove the journey through the two pilots before implementing the invitation link.
