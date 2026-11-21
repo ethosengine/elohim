@@ -568,6 +568,13 @@ phase_l_release_now() { # why
   PHASE_L_AGENT=""
 }
 
+# True when berth's refusal text says the lease is fenced by a silent device. Berth gives no distinct
+# exit code (3 also means held by another device); the phrase is formatted by `steward_reason` in
+# genesis/agentic/bin/berth and pinned by genesis/agentic/berth_test.py. Change both together.
+phase_l_fenced_reason() { # berth output
+  grep -q 'self-demoted: no head from' <<<"$1"
+}
+
 phase_l_claim() {
   local show kept whom out rc session
   # The pushing session's own lease: renewed as that session and left held.
@@ -588,7 +595,20 @@ phase_l_claim() {
       echo "[pre-push] Phase L: dev-integration claimed by this session already (renewed); it stays held after the push — release it when done: berth release dev-integration"
       return 0
     fi
-    phase_l_refuse "[pre-push] REFUSED: this push needs dev-integration (reason above). Your gates are recorded; push again when it is free."
+    if [ "$rc" -eq 3 ] && phase_l_fenced_reason "$out"; then
+      # Row 61: hours of gates after a hand claim, the lease reads as fenced by a silent device and a
+      # renewal can never write the one-device override. A fresh claim can, so hand the lease back and
+      # let the landing agent below claim afresh.
+      local fenced_why rel_out
+      fenced_why=$(grep -m1 -o 'self-demoted: no head from.*' <<<"$out")
+      if ! rel_out=$("$BERTH_BIN" release dev-integration 2>&1); then
+        [ -n "$rel_out" ] && printf '%s\n' "$rel_out" >&2
+        phase_l_refuse "[pre-push] REFUSED: this session's dev-integration lease is fenced (${fenced_why}) and releasing it to claim afresh failed (above). Your gates are recorded; push again when it is free."
+      fi
+      echo "[pre-push] Phase L: the hand-held dev-integration lease could not be renewed (${fenced_why}); the landing agent is claiming afresh, and this session will not hold the lease after the push"
+    else
+      phase_l_refuse "[pre-push] REFUSED: this push needs dev-integration (reason above). Your gates are recorded; push again when it is free."
+    fi
   fi
   [ "${whom:--}" != - ] || whom=$(git config user.email || git config user.name || id -un)
   if ! PHASE_L_DIR=$(mktemp -d) || ! mkfifo "$PHASE_L_DIR/fifo" || ! : >"$PHASE_L_DIR/status"; then

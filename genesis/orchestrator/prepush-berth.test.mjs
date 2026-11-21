@@ -57,12 +57,13 @@ case "$1" in
  session-show) if [ "\${SESSION_HELD-}" = 1 ]; then echo '{"mooring":{"session":"claude-9"},"leases":{"dev-integration":{}}}'; else echo '{"mooring":{"session":"claude-9"},"leases":{}}'; fi;;
  moor) exit "\${MOOR_RC:-0}";; unmoor) exit 0;;
  owner-check) m=$(mode "owner:$2"); [ "$m" = 0 ] && exit 0; echo "$2: REFUSED — held by a watcher" >&2; exit "$m";;
- release) echo "$2: released"; exit 0;;
+ release) m=$(mode "release:$2"); [ "$m" = 0 ] || { echo "$2: release failed" >&2; exit 1; }; echo "$2: released"; exit 0;;
  claim)
   n=$(grep -c "|claim $2 " "$here/calls.log" 2>/dev/null || true); m=$(mode "$2"); token=1001.125
   [ "$m" != N ] || [ "$n" -lt 2 ] || token=1009.500
   case "$m" in
    3) echo "$2: REFUSED — held by did:key:z6MkDeviceA/claude-1" >&2; exit 3;;
+   F) if [ "$n" -le 1 ]; then echo "$2: REFUSED — self-demoted: no head from did:key:z6MkDeviceA within 570s" >&2; exit 3; fi;;
    U) echo "$2: renewed here, but the renew record did not reach this device's channel store" >&2; exit 1;;
    E) echo Traceback >&2; exit 1;;
    W|D)
@@ -289,6 +290,40 @@ test("a_session_that_already_holds_dev_integration_keeps_it", (t) => {
     r.calls.some((l) => /^(moor|release) /.test(argv(l))),
     false,
   );
+});
+test("a_hand_held_lease_refused_as_fenced_is_released_and_claimed_afresh", (t) => {
+  const r = runBlock(fixture(t), {
+    env: { SESSION_HELD: "1", BERTH_MODES: '{"dev-integration":"F"}' },
+  });
+  assert.equal(r.status, 0, r.out);
+  assert.match(r.out, /hand-held dev-integration lease could not be renewed/);
+  assert.match(r.out, /self-demoted: no head from did:key:z6MkDeviceA within 570s/);
+  assert.match(r.out, /will not hold the lease after the push/);
+  assert.doesNotMatch(r.out, /stays held after the push/);
+  const v = r.calls
+    .map(argv)
+    .filter((a) => /^(claim|release) dev-integration/.test(a))
+    .map((a) => a.split(" ")[0]);
+  assert.deepEqual(v.slice(0, 3), ["claim", "release", "claim"], r.calls.join("\n"));
+});
+test("a_fenced_hand_held_lease_whose_release_fails_refuses_with_the_reason", (t) => {
+  const r = runBlock(fixture(t), {
+    env: {
+      SESSION_HELD: "1",
+      BERTH_MODES: '{"dev-integration":"F","release:dev-integration":"1"}',
+    },
+  });
+  assert.equal(r.status, 1, r.out);
+  assert.match(r.out, /REFUSED: this session's dev-integration lease is fenced \(self-demoted: no head from did:key:z6MkDeviceA within 570s\) and releasing it to claim afresh failed/);
+  assert.equal(r.calls.filter((l) => argv(l).startsWith("claim ")).length, 1);
+});
+test("a_hand_held_lease_refused_because_another_device_holds_it_is_refused_as_before", (t) => {
+  const r = runBlock(fixture(t), {
+    env: { SESSION_HELD: "1", BERTH_MODES: '{"dev-integration":"3"}' },
+  });
+  assert.equal(r.status, 1, r.out);
+  assert.match(r.out, /\[pre-push\] REFUSED: this push needs dev-integration \(reason above\)\. Your gates are recorded; push again when it is free\./);
+  assert.equal(r.calls.some((l) => argv(l).startsWith("release ")), false);
 });
 test("prepush_waits_for_the_override_then_lands", async (t) => {
   const fx = fixture(t),
