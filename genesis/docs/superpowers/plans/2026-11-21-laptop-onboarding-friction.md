@@ -28,6 +28,14 @@ A developer should be able to arrive with local work, see what landed since thei
 
 Record time to local readiness, time to first verified exchange, and the manual steps the hand-over required against `workspace-device-arrival`. Repeat with a legacy Brit on PATH, an unpublished roster row, and a published row with the sibling offline. A supported first install should reach local readiness without Cargo.
 
+## A public library as the front door
+
+Think of a public library on a town square. The square helps people find the places that welcome them. Inside the library, anyone can read the material on the public shelves, orient themselves, and ask a question at the reference desk. They can leave with something useful without joining. A workshop or reading room has a stated purpose, a host, and terms for taking part. The library gives us the civic welcome of the square, the human scale of a front porch, and a way to ask for help without spending the visit in a waiting room.
+
+Ostrom's principles apply to the library's capacity as well as to what it shares. Many people can read the same published guide. Hosting, relaying, answering requests, and reviewing contributions consume time and capacity. Let the people who bear those costs set visible boundaries on what their space offers and how much it can carry. They should be able to see demand, response load, and available capacity at the appropriate reach, and revise the rules together. Keep ordinary reading open wherever the material already permits it. A request for scarce help can be narrowed, deferred, or declined.
+
+Each space should be able to govern its own reception within the wider commons' rules. Start with a notice when someone oversteps, use graduated responses for repeated misuse, and offer a nearby way to resolve disputes or appeal. Start with the smallest space able to answer the request. Wider spaces can help route a visitor and recognize locally made rules. Measure whether the people receiving requests can sustain the work without turning public discovery into surveillance. These are questions to test in the pilots, informed by [Ostrom's lecture on polycentric governance](https://www.nobelprize.org/uploads/2018/06/ostrom_lecture.pdf).
+
 ## Discover in low-trust channels and continue by consent
 
 Start with the developer's immediate need. For example, the laptop needs a steward peer who can confirm roster pickup. A device resuming a task might need a copy of the prior gate result. A new contributor might need the decision behind a change or someone authorized to review it. Surface relevant offers, roles, and published context within the developer's current reach. Show who made each offer, what it covers, and whether it is current. A visible peer is evidence of presence. An offer or declared role gives the developer a reason to ask.
