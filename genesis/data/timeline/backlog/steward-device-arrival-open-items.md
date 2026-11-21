@@ -1439,3 +1439,66 @@ The alerts on the storage, node and eprfs locks from the same ratchet output nee
 line, ring 0.16) or the iroh upgrade (hickory 0.25 and lru 0.13 in the eprfs lock). None is a
 lock move.
 
+
+## Row 63 — sixty branch builds that could not refuse themselves starved the Edge roll for four hours
+
+Read on 2026-11-21 at 13:10Z from Jenkins' queue and node lists. 62 items were queued and 61 were
+flagged stuck, each waiting on a Kubernetes agent that was offline:
+
+| Items | What | Queued since |
+|---|---|---|
+| 60 | build #1 of feature-branch jobs: elohim-dna 18, elohim-steward 17, elohim-edge 14, elohim-app 11, over 18 branches | 56 between 15:28Z and 15:50Z on 2026-11-20, four at 18:18Z |
+| 1 | `elohim-edge » dev #1919`, the Edge roll of the row 43 landing | 09:52:10Z, its first second |
+| 1 | the next `elohim-orchestrator » dev` run | blocked behind #2402, which waited on #1919 |
+
+Each of the 60 was started by "Push event to branch …" (`jenkins.branch.BranchEventCause`), not by
+the orchestrator. Two things in the repository let that through. `overrideIndexTriggers(false)`
+sits in each downstream Jenkinsfile's `options`, and a branch job's first build runs before
+Jenkins has ever read them. And the dna, steward and app Jenkinsfiles request their pod at the top
+level (`elohim/holochain/dna/Jenkinsfile:239`, `steward/device/Jenkinsfile:22`, `Jenkinsfile:1149`)
+and check the build's cause in a later stage (`:396`, `:121`, `:1263`), so a build asks for an
+agent before it can refuse itself. The pipeline's `timeout` does not cover the wait for that
+agent, so they hung for 21 hours.
+
+`#1919` never got an agent. From the outside it read as a build "running" for four hours; the
+session watching it reported the roll as slow until the queue was read. Jenkins' log readers time
+out on such a build, so the queue and the node list are the only place it shows. The steward
+aborted the 60 and `#1919` by hand at about 13:50Z; `#1920`, dispatched by orchestrator `#2403`,
+had an agent within minutes.
+
+Not determined: why the agents were offline (the cluster's view is the operator's), and which push
+produced events for about fifteen old branches at 15:28Z on 2026-11-20. It coincides with that
+day's branch cleanup on origin.
+
+Owed: the downstream Jenkinsfiles check the cause before any pod is requested (`agent none` at the
+top, the check on the controller, the pod per stage) and bound the wait for an agent; the
+multibranch jobs suppress automatic triggering for every branch; and the session-start line that
+reads the pipeline's verdict also reads the queue's stuck count, which is one public request.
+
+### Row 63, delta (2026-11-21, 14:30Z): two pipelines refuse before the pod; six wait for a roll
+
+The steward asked for the cure. The rule each pipeline's Check Trigger stage applies now also
+runs as plain script above `pipeline {}`, where the controller evaluates it before any agent is
+requested; a refused build ends NOT_BUILT in seconds. The stage stays as it was. Jenkins's
+`pipeline-model-converter` accepts the shape for all eight downstream Jenkinsfiles and the CPS
+method-size gate is unmoved, since the check sits outside the pipeline block. Wrapping the
+stages in a parent stage that holds the agent, which would also bound the wait for an agent,
+was not possible for the app and genesis pipelines: both sit at the stage-model limit.
+
+Landed: the app and steward pipelines (two of the four that jammed). Parked on local branch
+`wallclock/jenkins-guard-rest` (shem): dna, edge, epr, eprfs, genesis and library. Their files
+are build inputs far beyond their own pipelines (row 42): `elohim/holochain/Jenkinsfile` selects
+an Edge build and deploy; `elohim/holochain/dna/Jenkinsfile` makes `build-dna-wasm` stale and,
+through it, the Edge image and its deploy, which a walk of the file's own pipeline did not show
+and the preflight's fleet-roll row did; `elohim/epr/Jenkinsfile` selects `cargo-build-storage`
+and twenty device gates; `genesis/Jenkinsfile` selects `seed-content`. They ride the next
+deliberate roll.
+
+Still owed:
+
+1. A refused build no longer runs the pipeline block, so a branch job that has only ever been
+   refused never receives `overrideIndexTriggers(false)`, and each later push event starts
+   another build that ends in seconds. The cure that stops them starting is on the Jenkins
+   side: "suppress automatic SCM triggering" on the multibranch jobs.
+2. An admitted build that never gets an agent still waits without bound, as `#1919` did.
+3. The 18 branches on origin that received the events.

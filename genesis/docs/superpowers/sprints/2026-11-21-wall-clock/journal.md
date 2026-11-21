@@ -458,3 +458,42 @@ definitions, one at a time.
    `epr session hold` daemons from fixture runs of 2026-11-16 and 17 are still polling under
    `/tmp`; they are not this session's and were left alone.
 
+### 13:10Z to 14:01Z: the roll had never started
+
+The steward asked why Jenkins' queue was so long. It held 62 items, 61 stuck on agents that
+were offline: 60 first builds of feature-branch jobs, started by push events the afternoon
+before, and `elohim-edge » dev #1919`, queued since its first second. An earlier entry here and
+this session's report both said the roll "was still running". It was not running. It had no
+agent, and the session read a build number where it should have read the queue. Row 63.
+
+The steward cleared the queue by hand. Orchestrator #2403 started at 13:53:45Z on the head and
+dispatched `elohim-edge » dev #1920`, which had an agent by 14:00Z.
+
+**The memory loop ended** after six rounds and twelve agents, at a residual and not at stasis
+(score 0.830 to 0.847): un-captured plans 74 to 0, the shift dump 19 to 0, and 63 files still
+under pressure, of which 38 claim a landing with no `verified_by`. Its first round deleted 31
+October shift journals after distilling them; they were never in git, and the only copy was a
+tarball in this session's scratch directory, now kept at
+`genesis/local-dev/wallclock-20261121/shifts-2026-10-retired.tgz` on shem. Its output landed as
+`9e33a7b2a..2eb40f2e1`. The cleanup reset is recorded: the line read 269 against 120 before it
+and 0 after.
+
+### 14:10Z to 14:35Z: the pipelines refuse before the pod
+
+The steward asked for the cure to row 63 ("That sounds like the right move. If you can do it do
+it."), and the covenant's write set was extended to the Jenkinsfiles in those words.
+
+The obvious change, `agent none` at the top and the agent on a parent stage, was ruled out by
+the repository's own size gate: the app and genesis pipelines are at the stage-model limit and
+the gate says not to add a stage. The change made is smaller. Each pipeline's Check Trigger rule
+now also runs as plain script above `pipeline {}`, which the controller evaluates before any
+agent is requested. Jenkins's validator accepts all eight files.
+
+Then the preflight priced it, and row 42 was the price: eight pipeline files select 24 device
+gates and, in CI, nearly every pipeline, with an Edge build and deploy among them. Read file by
+file, three of the four pipelines that jammed looked free of a roll. The preflight, run again on
+that smaller landing, named a third coupling: the dna pipeline's file makes `build-dna-wasm`
+stale and, through it, the Edge image and its deploy. So two land now, app and steward, and six
+are parked on `wallclock/jenkins-guard-rest` for the next deliberate roll: dna, edge, epr,
+eprfs, genesis and library.
+
