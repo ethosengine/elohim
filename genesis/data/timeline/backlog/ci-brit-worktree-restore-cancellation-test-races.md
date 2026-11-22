@@ -7,7 +7,7 @@ title: "brit cli-journey worktree_restore cancellation test races its own suspen
 slug: "ci-brit-worktree-restore-cancellation-test-races"
 written: "2026-10-29"
 author: "integration shift 2026-10-29 (session dff40885)"
-status: "backlog"
+status: "resolved"
 priority: "medium"
 ci_status: open
 fingerprints: []
@@ -45,3 +45,14 @@ Two different windows on two runners in three runs is a race in the test, not a 
 
 Fixed in brit by `e93a0206eb`, `0102f5ddf6` and `e1798cfed0`: the suspend waits on the restore's own
 temporary file and stopped state.
+
+## 2026-11-21 resolved (brit 0.3.1 `02d4654f`, laptop, session f0b335e0)
+
+Closed on the second condition, "rewritten to wait on the restore's own signal". All three fix
+commits are ancestors of the pinned brit 0.3.1. In `tests/cli-journey/tests/worktree_restore.rs`,
+`suspended_restore_attempt` sends `SIGSTOP` only once a `.brit-restore-*` temporary file exceeds
+1 MiB, then polls `/proc/<pid>/status` until the kernel reports state `T` before changing the target
+or queuing cancellation. A restore that published before the stop landed is a missed setup window:
+`suspended_restore` starts a fresh fixture, up to eight times, and any product error still fails.
+Neither red window in the table above can now be reached from a clock. Verified by reading the code,
+not by a local run (the fixture writes a 128 MiB blob per attempt).

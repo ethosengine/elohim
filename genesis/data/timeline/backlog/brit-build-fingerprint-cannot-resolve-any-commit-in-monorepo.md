@@ -7,7 +7,7 @@ title: "brit build fingerprint cannot resolve any commit in the monorepo, so eve
 slug: "brit-build-fingerprint-cannot-resolve-any-commit-in-monorepo"
 written: "2026-11-04"
 author: "claude (row-5 precursor session a340d2e2)"
-status: "backlog"
+status: "resolved"
 priority: "high"
 tags: [gate-evidence, reuse, brit, rakia-brit, gix, fingerprint, push-gate-pays-once]
 cites:
@@ -128,3 +128,22 @@ still caps the object store at 32 pack indexes and then cannot open the reposito
 passed 32 on 2026-11-19 (36 by the end of the day; every `brit fetch` adds a pack and nothing
 consolidates). Fixed on lane `sprint3/trust`, not merged; tracked in
 `brit-declared-trust-and-reduced-trust-pack-cap.md`.
+
+## 2026-11-21 resolved: the sprint 3 lane is released in brit 0.3.0 (laptop, session f0b335e0)
+
+The cure landed by moving off gix 0.81: `brit-cli` and `brit-graph` now depend on the in-tree
+gix 0.90.1, and `fingerprint.rs` opens through `crate::repository::discover`. gix's
+`Options::resolve_object_store_slots` (`gix/src/open/options.rs`) picks the slot count only once
+trust is final: sized from disk when fully trusted; at reduced trust, the store's own index count
+plus headroom (floor 32, refused above `REDUCED_TRUST_MAX_PACK_INDEXES` = 512). Neither path stops
+at a fixed 32.
+
+**Receipt:** in the main checkout (39 pack indexes, above the old 32), the gate's exact call
+`brit build fingerprint genesis/orchestrator/build-manifest.json --step lint-jenkinsfiles --commit
+<HEAD sha>` printed `bafyreieifnep3p6x…` over 1,412 inputs. This device fully trusts its `.git`;
+the reduced-trust path is covered by the gix change, not by this receipt. The `brit fetch -r`
+shadowing defect noted above is also cured: `brit fetch -r origin main` fetches in the brit
+submodule.
+
+The reduced-trust leftover (lane `sprint3/trust`) is the in-tree gix code quoted above and ships in 0.3.0; `brit-declared-trust-and-reduced-trust-pack-cap.md` owns its closure. Residual: `rakia-brit` still pins gix 0.81 (`elohim/rakia/rakia-brit/Cargo.toml`). Brit's
+fingerprint no longer opens through it; anything that still does inherits the old slot rule.

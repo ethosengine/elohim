@@ -7,12 +7,13 @@ title: "One repository-wide Brit lock, held for a whole push, stops every other 
 slug: "brit-mutation-lock-blocks-isolated-lanes"
 written: "2026-11-12"
 author: "claude-opus-5-5 (shem, host-compatibility K6 slice 2, session 3dd97e3d)"
-status: "wip"
+status: "resolved"
 priority: "high"
 tags: [brit, daily-driver, worktree, concurrency, push, lock]
 cites:
   - elohim/brit/gitoxide-core/src/repository/switch/linux/mod.rs
   - elohim/brit/src/plumbing/mutation.rs
+  - elohim/brit/docs/mutation-guards.md
 ---
 
 # One repository-wide Brit lock, held for a whole push, stops every other worktree's Brit writes
@@ -118,3 +119,20 @@ The related gaps above:
   (`sprint3/refs-shem`, not merged).
 
 Sprint record: `brit-sprint-3-handoff-2026-11-19.md`.
+
+## 2026-11-21 resolved: the sprint 3 lane is released in brit 0.3.0 (laptop, session f0b335e0)
+
+All four needs are in Brit: `docs/mutation-guards.md` names a worktree lock and a repository
+guard; worktree-local writers and push take the repository guard shared; push releases it across
+`pre-push` and re-takes it only for send-pack; a refusal names the holder (pid, start time); and
+every writer accepts `--wait[=SECONDS]` / `BRIT_MUTATION_WAIT`.
+
+**Receipt (the original failure, reproduced in a scratch repository):** `brit push origin main`
+ran a `pre-push` hook that slept 25 s (18:50:58–18:51:23). During it, from a second worktree,
+`brit worktree add -b lane2 ../wt2 HEAD` and `brit add -- c` both exited 0 at 18:51:02, and the
+push then exited 0 having delivered `refs/heads/main`.
+
+Related gaps: `brit ls-remote` now exists; `brit fetch` updates `refs/remotes/origin/*`
+(`brit fetch -r origin main` in the brit submodule reported `[up-to-date]`). Still open:
+`brit submodule` offers only `list`, so `git submodule update --init` remains the declared
+fallback.

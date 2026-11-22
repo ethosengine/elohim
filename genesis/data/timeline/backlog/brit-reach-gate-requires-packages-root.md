@@ -7,7 +7,7 @@ title: "brit's reach gate refuses every push from this workspace: the installed 
 slug: "brit-reach-gate-requires-packages-root"
 written: "2026-10-19"
 author: "claude (session-covenant session 182f26d8, operator-directed)"
-status: "open"
+status: "resolved"
 priority: "medium"
 ci_status: none
 jobs: []
@@ -58,3 +58,11 @@ names only roots that brit itself declares.
 
 Fixed in the monorepo by `06c1c43f3`; `epr doctor` in brit passes `governance.native-root`. A clone
 still needs `epr setup` once to activate brit's hooks (done on this sprint's device on 2026-11-19).
+
+## 2026-11-21 resolved (brit 0.3.1 `02d4654f`, laptop, session f0b335e0)
+
+The close condition holds without a push, by the gate's own command. On this clone,
+`epr --repo elohim/brit ready --target 02d4654f…` first refused only `git.hooks-path [reach]`
+(hooks not activated); `governance.native-root` already passed and no package-root finding
+appeared. After the one-time `epr setup`, the same command printed `READY: governance floor is
+coherent for requested reach` (exit 0). Every finding named a root brit itself declares.
