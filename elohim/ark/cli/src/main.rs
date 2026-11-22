@@ -4,6 +4,7 @@ mod brit_index;
 mod declared_trust;
 mod host;
 mod material;
+mod source_view;
 mod task;
 mod task_files;
 mod task_native;
@@ -138,6 +139,22 @@ enum TaskCommand {
         root: Option<String>,
         #[arg(long, requires = "root")]
         store: Option<PathBuf>,
+    },
+    /// Print the projected root of concrete source files captured from a checkout (a shadow
+    /// candidate input; nothing decides on it).
+    SourceRoot {
+        /// The checkout the listed paths are relative to.
+        #[arg(long)]
+        checkout: PathBuf,
+        /// A JSON array of repository-relative file paths (regular files or literal symlinks).
+        #[arg(long)]
+        files: PathBuf,
+        /// The directory store captured objects go to; it must not lie inside the checkout.
+        #[arg(long)]
+        store: PathBuf,
+        /// A path the projection keeps (repeatable); none keeps the whole captured tree.
+        #[arg(long)]
+        view: Vec<String>,
     },
     /// Validate, place, look up and run a task; append its status lines to --status.
     Run {
@@ -299,6 +316,12 @@ fn execute(command: Command) -> Result<u8, Failure> {
                     "select material or a whole-tree root and store",
                 )),
             },
+            TaskCommand::SourceRoot {
+                checkout,
+                files,
+                store,
+                view,
+            } => source_view::source_root(&checkout, &files, &store, &view),
             TaskCommand::Run {
                 spec,
                 request,

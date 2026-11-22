@@ -13,9 +13,14 @@
 
 import { spawnSync } from 'child_process';
 import { createHash } from 'crypto';
-import { accessSync, constants, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'fs';
+import {
+  accessSync, chmodSync, closeSync, constants, mkdirSync, mkdtempSync, openSync, readFileSync, readdirSync, realpathSync,
+  renameSync, rmSync, statSync, writeFileSync,
+} from 'fs';
 import { isAbsolute, join, resolve } from 'path';
+import { fileURLToPath } from 'url';
 import { attestationStep } from './gate-evidence.mjs';
+import { SUITE_LIST, blobAt, git, materialise, suiteInventory } from './suite-inventory.mjs';
 
 /** The projects a Task runs for when GATE_TASK is unset: the proving gate only. */
 export const TASK_DEFAULT_PROJECTS = ['orchestrator'];
@@ -137,7 +142,10 @@ function prune(dir) {
  * Writes the Task's files and asks ark for its spec. Returns `{ bin, argv, status, derivation }`
  * for gateSpawn, or `{ why }` when the Task cannot be prepared.
  */
-export function prepareTask(project, { root, env, childEnv, args, evidence, reuse, device, spawn = spawnSync, now = Date.now }) {
+export function prepareTask(project, {
+  root, env, childEnv, args, evidence, reuse, device, spawn = spawnSync, now = Date.now,
+  write = text => process.stdout.write(text),
+}) {
   if (!evidence?.material) return { why: `no closure material (evidence ${evidence?.line || 'unavailable'})` };
   const ark = resolveArk({ root, env, spawn });
   if (ark.why) return { why: ark.why };
@@ -168,6 +176,16 @@ export function prepareTask(project, { root, env, childEnv, args, evidence, reus
     return { why: 'ark task spec printed no JSON' };
   }
   writeFileSync(files.spec, JSON.stringify(spec.spec));
+  // Track A, shadow only and opt-in (GATE_SOURCE_VIEW=shadow): a candidate input root over the
+  // gate's real source files, printed beside the legacy key. It never changes the Task, its key or
+  // its verdict, and any failure is one line; its time does count in the gate's recorded seconds.
+  if (sourceViewMode(env) === 'shadow') {
+    try {
+      write(`${sourceViewShadow(project, { root, ark: ark.bin, commit: reuse?.commit, evidence, spawn, now })}\n`);
+    } catch (error) {
+      write(`[gate-task] source-view shadow: unmeasured (${oneLine(error?.message || error)})\n`);
+    }
+  }
   const argv = [
     'task', 'run', '--spec', files.spec, '--material', files.material,
     '--artifact', resolve(root, 'genesis/orchestrator/run-local-gate.sh'),
@@ -201,4 +219,229 @@ export function taskAnswer(statuses, exit) {
       : { unanswered: last.value };
   }
   return { fallback: `unexpected status ${last.status}` };
+}
+
+// ---------------------------------------------------------------------------------------------
+// Source view (Track A, shadow). The legacy input root is a tree of the closure material's JSON
+// fields, so it moves whenever any keyed field does. The candidate is a projected view of the
+// files the gate actually reads: the orchestrator suite's inventory at the gated commit
+// (suite-inventory.mjs, the same function the key and the view builder use), materialised from
+// git objects into a scratch checkout and captured by `ark task source-root`. Each run prints the
+// two side by side and, against the last run's pair, whether each moved: agreement is about
+// change, never about equal hashes. Nothing reads the line to decide anything.
+
+/** The projects whose concrete source list is known: the suite inventory is orchestrator's. */
+export const SOURCE_VIEW_PROJECTS = ['orchestrator'];
+
+/** The whole shadow, inventory and capture included, is killed past this. */
+export const SOURCE_VIEW_BUDGET_MS = 20_000;
+
+/** A scratch run directory older than this is a leftover and is swept. */
+export const SOURCE_VIEW_SWEEP_MS = 10 * 60_000;
+
+/**
+ * GATE_SOURCE_VIEW=shadow|off; unset is off. The shadow runs synchronously before the Task and
+ * gate-runner.mjs counts that time in the gate's seconds, so it is opt-in.
+ */
+export function sourceViewMode(env = process.env) {
+  return (env?.GATE_SOURCE_VIEW || '').trim() === 'shadow' ? 'shadow' : 'off';
+}
+
+/** Where the shadow's scratch run directories live: the checkout's own volume (see below). */
+export function sourceViewBase(root) {
+  return resolve(root, '.eprfs/status/ark/source-view');
+}
+
+/** Removes `run-*` scratch directories (and their output files) older than SOURCE_VIEW_SWEEP_MS. */
+export function sweepSourceView(base, { now = Date.now } = {}) {
+  let names = [];
+  try { names = readdirSync(base); } catch { return 0; }
+  let swept = 0;
+  for (const name of names) {
+    if (!name.startsWith('run-')) continue;
+    const path = join(base, name);
+    try {
+      if (now() - statSync(path).mtimeMs < SOURCE_VIEW_SWEEP_MS) continue;
+      rmSync(path, { recursive: true, force: true });
+      swept++;
+    } catch { /* gone already, or unreadable: the next sweep tries again */ }
+  }
+  return swept;
+}
+
+const oneLine = text => String(text).split('\n').map(line => line.trim()).filter(Boolean).pop() || 'no detail';
+const short = (text, n = 12) => String(text || '').slice(0, n);
+
+/**
+ * The orchestrator gate's concrete files at `commit`, materialised under `dest`: every
+ * superproject blob the view holds and every entry taken from a declared pin, repository-relative.
+ */
+export function sourceViewFiles({ root, commit, dest }) {
+  const inventory = suiteInventory({ root, commit, listText: blobAt(root, commit, SUITE_LIST) });
+  materialise(inventory, dest, { root });
+  // materialise writes modes through the host umask, and capture hashes the executable bit, so each
+  // regular file is set explicitly from its git mode (chmod is not subject to the umask).
+  const files = [];
+  const fix = (path, mode) => {
+    if (mode === '100755' || mode === '100644') chmodSync(join(dest, path), mode === '100755' ? 0o755 : 0o644);
+    files.push(path);
+  };
+  for (const entry of inventory.entries) fix(entry.path, entry.mode);
+  for (const pin of inventory.pins) for (const entry of pin.entries) fix(`${pin.path}/${entry.path}`, entry.mode);
+  return { files: files.sort(), inventory: inventory.digest };
+}
+
+/**
+ * Runs in the child the parent spawns under SOURCE_VIEW_BUDGET_MS: resolves the commit, builds the
+ * scratch checkout and asks ark for the projected root. Returns `{ commit, candidate, files }`.
+ */
+export function sourceViewCandidate({ root, commit = 'HEAD', ark, deadline, scratch, scratchBase, spawn = spawnSync }) {
+  const sha = git(['rev-parse', '--verify', `${commit}^{commit}`], { cwd: root }).trim();
+  // The scratch checkout and store sit on the checkout's own filesystem by default: capture syncs
+  // every object, and on this workspace's overlay /tmp that alone outran the budget (23 s for 810
+  // files against 8 s on the checkout's volume). They are siblings, so neither contains the other.
+  // The parent hands the child its scratch directory and removes it itself: SIGKILL at the cap
+  // skips this function's `finally`.
+  const owned = !scratch;
+  if (owned) {
+    const base = scratchBase || sourceViewBase(root);
+    mkdirSync(base, { recursive: true });
+    scratch = mkdtempSync(join(realpathSync(base), 'run-'));
+  }
+  try {
+    const checkout = join(scratch, 'checkout');
+    mkdirSync(checkout);
+    const { files } = sourceViewFiles({ root, commit: sha, dest: checkout });
+    const list = join(scratch, 'files.json');
+    writeFileSync(list, JSON.stringify(files));
+    const timeout = Math.max(1000, (deadline ?? Date.now() + SOURCE_VIEW_BUDGET_MS) - Date.now());
+    const made = spawn(ark, ['task', 'source-root', '--checkout', checkout, '--files', list, '--store', join(scratch, 'store')],
+      { encoding: 'utf8', timeout, killSignal: 'SIGKILL', maxBuffer: 1024 * 1024 });
+    if (made.error || made.status !== 0) {
+      throw new Error(`ark task source-root: ${made.error?.message || oneLine(made.stderr || `exit ${made.status}`)}`);
+    }
+    const printed = JSON.parse(made.stdout);
+    if (typeof printed?.projected !== 'string') throw new Error('ark task source-root printed no projected root');
+    return { commit: sha, candidate: printed.projected, files: files.length };
+  } finally {
+    // A scratch handed in by the parent holds the parent's output files; the parent removes it.
+    if (owned) rmSync(scratch, { recursive: true, force: true });
+  }
+}
+
+/** Where the previous run's pair is kept, per project, to say what moved. */
+function shadowStatePath(root) {
+  return resolve(root, '.eprfs/status/ark/source-view-shadow.json');
+}
+
+/** The previous pairs, per project; a missing, unreadable or malformed file is no previous run. */
+export function readShadowState(path) {
+  try {
+    const state = JSON.parse(readFileSync(path, 'utf8'));
+    return state && typeof state === 'object' && !Array.isArray(state) ? state : {};
+  } catch {
+    return {};
+  }
+}
+
+/** Writes the state whole: a temporary file in the same directory, then a rename over the old. */
+export function writeShadowState(path, state) {
+  const tmp = `${path}.${process.pid}.${Date.now()}.tmp`;
+  try {
+    writeFileSync(tmp, JSON.stringify(state));
+    renameSync(tmp, path);
+  } finally {
+    rmSync(tmp, { force: true });
+  }
+}
+
+/** SIGKILLs every process left in the group `pid` leads; an empty or absent group is no error. */
+function killGroup(pid) {
+  if (!Number.isInteger(pid) || pid <= 0) return;
+  try { process.kill(-pid, 'SIGKILL'); } catch { /* the group is already empty */ }
+}
+
+/** `vs=…` and, against the previous pair, whether each key moved and whether they agree. */
+export function sourceViewComparison(previous, current) {
+  if (!previous?.legacy || !previous?.candidate) return 'vs=none';
+  const legacy = previous.legacy === current.legacy ? 'same' : 'changed';
+  const candidate = previous.candidate === current.candidate ? 'same' : 'changed';
+  return `vs=${short(previous.commit)} legacy:${legacy} candidate:${candidate} ${legacy === candidate ? 'agree' : 'DISAGREE'}`;
+}
+
+/**
+ * One shadow line for `project`. The candidate is computed in a child process killed at
+ * SOURCE_VIEW_BUDGET_MS, so a stuck git or ark costs the gate at most that; every failure is
+ * `unmeasured (<reason>)`. Never throws for a failure it can name.
+ */
+export function sourceViewShadow(project, {
+  root, ark, commit, evidence, spawn = spawnSync, now = Date.now, execPath = process.execPath,
+  budgetMs = SOURCE_VIEW_BUDGET_MS,
+}) {
+  const prefix = '[gate-task] source-view shadow:';
+  if (!SOURCE_VIEW_PROJECTS.includes(project.name)) return `${prefix} unmeasured (no concrete source list for ${project.name})`;
+  const legacy = evidence?.key || (evidence?.material ? createHash('sha256').update(evidence.material).digest('hex') : null);
+  if (!legacy) return `${prefix} unmeasured (no legacy key)`;
+  const started = now();
+  const base = sourceViewBase(root);
+  mkdirSync(base, { recursive: true });
+  sweepSourceView(base);
+  // The parent owns the run's scratch directory and the child's output files, and removes all of
+  // them however the child ends. Output goes to files, not pipes, so a descendant that outlives
+  // the child cannot hold spawnSync open past the cap.
+  const scratch = mkdtempSync(join(realpathSync(base), 'run-'));
+  const outPath = join(scratch, 'shadow.out');
+  const errPath = join(scratch, 'shadow.err');
+  let ran;
+  let out = '';
+  let err = '';
+  try {
+    const request = JSON.stringify({ root, commit: commit || 'HEAD', ark, scratch, deadline: Date.now() + budgetMs - 500 });
+    const outFd = openSync(outPath, 'w');
+    const errFd = openSync(errPath, 'w');
+    try {
+      // detached: the child leads its own process group, so the cap can kill every descendant.
+      ran = spawn(execPath, [fileURLToPath(import.meta.url), 'source-view', request],
+        { cwd: root, stdio: ['ignore', outFd, errFd], detached: true, timeout: budgetMs, killSignal: 'SIGKILL' });
+    } finally {
+      killGroup(ran?.pid);
+      closeSync(outFd);
+      closeSync(errFd);
+    }
+    try { out = readFileSync(outPath, 'utf8'); } catch { /* no output */ }
+    try { err = readFileSync(errPath, 'utf8'); } catch { /* no output */ }
+  } finally {
+    rmSync(scratch, { recursive: true, force: true });
+  }
+  const ms = Math.round(now() - started);
+  // A fake spawn in tests may answer with its own streams.
+  const stdout = out || String(ran?.stdout || '');
+  const stderr = err || String(ran?.stderr || '');
+  if (ran?.error?.code === 'ETIMEDOUT' || (ran?.signal && ran?.status === null)) {
+    return `${prefix} unmeasured (timed out after ${budgetMs / 1000} s)`;
+  }
+  if (ran?.error || ran?.status !== 0) {
+    return `${prefix} unmeasured (${oneLine(ran?.error?.message || stderr || `exit ${ran?.status}`)})`;
+  }
+  let got;
+  try { got = JSON.parse(stdout); } catch { return `${prefix} unmeasured (the shadow printed no JSON)`; }
+  if (typeof got?.candidate !== 'string' || typeof got?.commit !== 'string') return `${prefix} unmeasured (the shadow printed no candidate)`;
+  const current = { commit: got.commit, legacy, candidate: got.candidate };
+  const statePath = shadowStatePath(root);
+  const state = readShadowState(statePath);
+  const comparison = sourceViewComparison(state[project.name], current);
+  try {
+    writeShadowState(statePath, { ...state, [project.name]: current });
+  } catch { /* an unwritable state only loses the next comparison */ }
+  return `${prefix} project=${project.name} commit=${short(got.commit)} legacy=${short(legacy)} candidate=${got.candidate} files=${got.files} ms=${ms} ${comparison}`;
+}
+
+// `node gate-task.mjs source-view <request-json>`: the child sourceViewShadow spawns.
+if (process.argv[2] === 'source-view' && process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  try {
+    process.stdout.write(`${JSON.stringify(sourceViewCandidate(JSON.parse(process.argv[3] || '{}')))}\n`);
+  } catch (error) {
+    process.stderr.write(`${oneLine(error?.message || error)}\n`);
+    process.exitCode = 1;
+  }
 }
