@@ -49,6 +49,7 @@
       {"file": "jenkinsfile-sh-syntax.test.mjs", "tree": "the hand-over trace saw repository object store read: <git-dir>/worktrees/nt-e11/HEAD; not yet retried in the view"},
       {"file": "build-inputs-closure.test.mjs", "reads": ["**/Cargo.lock", "**/Cargo.toml", "**/build-manifest.json", ".gitmodules", "che-devworkspaces", "elohim/brit", "elohim/holochain-conductor", "elohim/rakia", "sophia"]},
       {"file": "gate-oracle.test.mjs", "reads": []},
+      {"file": "gate-impact.test.mjs", "reads": []},
       {"file": "gate-inputs.test.mjs", "reads": ["**/build-manifest.json", ".ci-ignore", "che-devworkspaces", "elohim/brit", "elohim/holochain-conductor", "elohim/rakia", "sophia"]},
       {"file": "gate-recipe-key.test.mjs", "tree": "runs just and git over temporary repositories and drives runProject; just is not a probed tool of the view"},
       {"file": "gate-attest.test.mjs", "reads": []},
