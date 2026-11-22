@@ -839,3 +839,36 @@ edit to either of the two corrected manifests as an Edge build input. The correc
 for the next deliberate roll (arrival backlog row 42, delta 5), the landing branch was rebuilt
 from dev's head without it, and the check then passed. Cost of finding this by a seconds-check
 instead of at the push: nothing; the gates had not started.
+
+### Landing 13 (2026-11-22 00:13Z, `9dbfbac2d`): both pins, the input-class shadow, the fixture change, and the first carried gate
+
+Pushed 23:33:22Z with `GATE_CARRY=on`, landed 00:13:32Z: 2,410 s. Thirteen gates, all green, none
+reused.
+
+| Gate | Seconds | |
+|---|---|---|
+| brit | 2 | attested: `Tests pass` on `02d4654f` |
+| rakia | 1 | attested: `test` on `f2c0d3c0` |
+| rakia-validate | 5 | |
+| address-profile-lint | 17 | |
+| rust-style | 36 | |
+| eprfs-live-corpus | 72 | |
+| orchestrator | 112 | |
+| rakia-codegen | 4 | |
+| cargo-bridge | 40 | |
+| jenkins-bridge | 41 | |
+| orchestrator-tree | 237 | |
+| eprfs | 1,702 | test 1,653 at one thread; lint, bins and ark warm |
+| elohim-storage | 1,384 | carried on the second seat |
+
+Sum 3,653 s; the gate phase took 2,311 s. Arrival backlog row 64, delta 3 has the carry's
+measurement and its limits. The input-class shadow printed its one line on this device (`--inputs
+unavailable; selection and keys use legacy all`): the installed brit predates the flag. The
+sibling confirmed the brit 0.3.1 release complete (tag, three platform archives, no keystroke
+needed).
+
+Pipeline reads: orchestrator #2409 (landing 12) SUCCESS, having dispatched `elohim-eprfs` only
+(#208, SUCCESS in 1,110 s); #2410 (this landing) running at the time of writing.
+
+After it: brit 0.3.1 is being built into this device's bin store, and the four-thread bar (ten
+runs of the workspace's tests beside a running build) is under way on the landed fixture.

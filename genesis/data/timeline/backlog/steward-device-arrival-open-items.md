@@ -1957,3 +1957,42 @@ Parked for the next deliberate Edge roll, with the six Jenkinsfile guards alread
 it (row 63): commit `324dcb4e6` on the local branch `wallclock/process-inputs` (the two manifest
 edits), plus deleting `PARKED` from `pipeline-registry.test.mjs`. The pin moves do not select an
 Edge build: CI's checkout initialises no submodule and prunes the dependency.
+
+### Row 64, delta 3 (2026-11-22): the first carried gate, measured
+
+Landing 13 (`9dbfbac2d`, pushed 2026-11-21T23:33:22Z, on dev 00:13:32Z) was pushed with
+`GATE_CARRY=on`. Thirteen gates were selected. The carrier admitted one, `elohim-storage` (one
+build job, recorded p90 above its 600 s floor), and ran it on this device's second seat beside
+the loop; the other twelve ran in the loop in order, eprfs last.
+
+| | Seconds |
+|---|---|
+| The thirteen gates, summed from the hook's own lines | 3,653 |
+| `elohim-storage`, carried | 1,384 |
+| `eprfs`, in the loop beside it | 1,702 (its test step 1,653) |
+| From the carry's start to the last verdict | 2,311 |
+| The whole push | 2,410 |
+
+The carried gate was collected 39 s after the loop ended, so the overlap paid for all but 39 s
+of it: about 1,340 s saved against running the same thirteen in order. Running beside a second
+build did not slow the eprfs test step: 1,653 s here against 1,729 s alone in landing 12, with
+the fixture change of row 65 between them.
+
+Both guards, sampled every 5 s through the push (482 samples, `landing13-guards.jsonl` in the
+sprint's campaign directory): committed memory at most 28%, level `ok` throughout; host I/O
+pressure at most 6.75% against the I/O guard's line of 10%; no pause and no guard event. The
+highest readings, and the one sample at the advisory write level (60 MB/s), fell at 00:09Z
+while `session_envelope` ran in the loop, which is that binary's own burst and not the overlap.
+
+What this does not establish. It is one landing. The carried gate compiled little (its target
+was warm), so the memory figure is not the worst case the storage manifest's one-job cap was
+set for. Only one gate qualifies today: eprfs asks for six build jobs and the second seat's
+terms take one. `GATE_CARRY` stays in shadow by default; this session passes `on` by hand and
+records each carried landing here, and proposes the default change after three with both guards
+under their lines (this session's bar, not a ruled one).
+
+Two tools were found wanting by this landing: `brit pull --ff-only` refuses a range that moves a
+gitlink (`affected gitlink or unsupported mode: elohim/brit`), so the main checkout was
+fast-forwarded with git; and the campaign's timing script misreads a log that crosses midnight
+or carries a collected gate's replayed output, so the figures above are the hook's own
+`PASSED (N s)` lines.

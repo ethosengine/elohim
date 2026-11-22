@@ -2675,10 +2675,10 @@ habits:
       - "node --test genesis/orchestrator/gate-landing-base.test.mjs (device-DID tiebreak, cap of 4: unobservable in the one-DID fixture)"
       - "over >= 10 pushes, from the device's flow store dev-landing@1 rows and berth's hold fold: hold p50/p90 vs 233/3,321 s; Σ regated_s on landed_as=moved vs Σ gate seconds saved on landed_as=ff; chain_len p90; duplicate gated closures = 0, duplicate claims = 0, >= 2 intents per Jenkins wave (unwired until S6)"
     evidence: >
-      DELTA 2026-11-21b (RED preserved, inactive; a carrier contract, in shadow): where a gate step runs is now a contract (`genesis/orchestrator/gate-carry.mjs`: admit, offer, collect, withdraw; one pure plan; a contract test run against two implementors) with this device's second cargo seat as its first carrier and `berth room cargo` as the one capacity answer. `GATE_CARRY` defaults to shadow, which starts nothing. Landed e83d0931b. No carried gate has been observed: station F4-probe's first rung is still owed, and two gates that share a cargo target are not yet carried together.
-    evidence-fingerprint: sha256:7b2e7b776f4c4055
-    evidence-bytes: 57016
-    evidence-entries: 42
+      DELTA 2026-11-22 (RED preserved, inactive; the first carried gate): landing 13 (`9dbfbac2d`) was pushed with `GATE_CARRY=on`. Of thirteen selected gates the carrier admitted one, `elohim-storage`, and ran it on this device's second seat beside the loop: 1,384 s, collected 39 s after the loop ended, so thirteen gates summing to 3,653 s finished in 2,311 s (about 1,340 s saved). Both guards stayed under their lines through the overlap (memory at most 28%, host I/O pressure at most 6.75% against 10%, no pause). One landing, a warm target, one qualifying gate: `GATE_CARRY` stays in shadow by default and each carried landing is recorded in arrival backlog row 64. A carried gate here is the same step a sibling device would carry; no intent has yet crossed before a gate ran.
+    evidence-fingerprint: sha256:db03da5a8a1c7598
+    evidence-bytes: 57796
+    evidence-entries: 43
     refs:
       - "spec: genesis/docs/superpowers/specs/2026-10-27-steward-space-landing-plane-design.md (§2 Arm A slices A0-A13; §3 this habit and the WIP fence)"
       - "upstream of: genesis/orchestrator/.epr-meta/push-delivers-within-budget.habit.md (active red; A9/A10 move its measured ratio)"
