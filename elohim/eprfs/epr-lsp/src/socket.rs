@@ -128,8 +128,17 @@ pub struct ServeLock {
 
 impl Drop for ServeLock {
     fn drop(&mut self) {
-        // A failed unlock leaves the close that follows to release it, as before.
-        let _ = rustix::fs::flock(&self.file, rustix::fs::FlockOperation::Unlock);
+        // On a descriptor this lock owns, `LOCK_UN` fails only for a bad descriptor, an invalid
+        // operation or kernel resource exhaustion: it should not happen. If it does, the release is
+        // left to the close that follows, which waits for the last copy of the descriptor, so a
+        // forked child's copy keeps the device lock held until its `exec` or exit. Said on the
+        // mux's stderr.
+        if let Err(errno) = rustix::fs::flock(&self.file, rustix::fs::FlockOperation::Unlock) {
+            eprintln!(
+                "WARNING: device lock unlock failed ({errno}); it is released when the last copy \
+                 of its descriptor closes"
+            );
+        }
     }
 }
 

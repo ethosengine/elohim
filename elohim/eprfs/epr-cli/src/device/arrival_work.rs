@@ -185,6 +185,8 @@ fn worker_dir() -> Result<std::path::PathBuf> {
         })
 }
 /// Serialize long work across runtimes on this device; kernel lock release survives worker death.
+/// The worker unlocks when it finishes rather than leaving the release to the close, which a
+/// child it forked could still hold a copy of until its `exec`.
 pub(super) fn work(root: &Path) -> Result<()> {
     let dir = worker_dir()?;
     fs::create_dir_all(&dir)?;
@@ -192,10 +194,11 @@ pub(super) fn work(root: &Path) -> Result<()> {
         .create(true)
         .append(true)
         .open(dir.join("worker.lock"))?;
-    if rustix::fs::flock(&lock, rustix::fs::FlockOperation::NonBlockingLockExclusive).is_err() {
+    // Any refusal to lock reads as another worker, as it always has.
+    let Ok(Ok(_held)) = elohim_device_runtime::flock::Flock::try_exclusive(lock) else {
         eprintln!("device arrival: another worker is already following tools");
         return Ok(());
-    }
+    };
     each_tool(root, true)
 }
 
