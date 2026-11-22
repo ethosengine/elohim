@@ -13,6 +13,12 @@ use std::os::fd::{AsFd, BorrowedFd};
 use rustix::fs::{flock, FlockOperation};
 
 /// A held flock on its file. Dropping it unlocks, then closes.
+///
+/// One guard is one holder. [`Flock::file`] and [`AsFd`] let a caller duplicate the descriptor,
+/// but a duplicate is the same open file description, not an independent holder: a lock taken
+/// through it (a shared lock converted to exclusive, say) converts this one lock, a failed
+/// conversion can lose it, and unlocking or dropping either side releases both. Take a second
+/// holder through a second open of the file, never through a copy of this one.
 #[derive(Debug)]
 pub struct Flock {
     file: File,

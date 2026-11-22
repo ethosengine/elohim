@@ -23,8 +23,8 @@ struct PrepareOptions<'a> {
     candidate: Option<&'a RefCell<Option<String>>>,
 }
 
-/// The bound on one brit build attempt. One that runs out is reported as such, with the
-/// resume: its crates stay in the persistent build target, so the next follow continues.
+/// The bound on one brit build attempt. One that runs out is reported as such, with how to
+/// continue: the attempts share `<target>/brit-follow/<commit12>`, which outlives the checkout.
 const BRIT_BUILD_BOUND: Duration = Duration::from_secs(1800);
 
 impl Store {
@@ -540,10 +540,14 @@ impl Store {
                     let stage = ["offline", "anonymous", "authenticated"][stage];
                     attempts.push(match ran {
                         Err(e) if e.kind == "command-timeout" => format!(
-                            "brit build {stage} ran out of its {} s bound ({command}); the crates \
-                             it compiled stay in its target, so a second `epr bin follow` \
-                             resumes the build",
-                            BRIT_BUILD_BOUND.as_secs()
+                            "brit build {stage} ran out of its {} s bound ({command}); every \
+                             attempt builds into {} and only the checkout is removed, so running \
+                             the command that started this build again with the same repository \
+                             and store options (`epr bin follow --tool brit` on a device that \
+                             follows bin:brit, otherwise `epr bin bootstrap --tool brit`) reuses \
+                             the artifacts already compiled there",
+                            BRIT_BUILD_BOUND.as_secs(),
+                            build_target.display()
                         ),
                         _ => format!("brit build {stage} failed ({command})"),
                     });
