@@ -104,13 +104,17 @@ export function readCheck(attestation, sha, { ghBin, spawn = spawnSync, now = Da
   if (named.length === 0) return { read: 'ok', status: 'absent', conclusion: 'absent' };
   const read = { read: 'ok', status: named[0].status, conclusion: named[0].conclusion };
   if (read.status !== 'completed') return read;
-  // One budget for both reads (the bin store bounds this whole process at 75 s): the second gets what is left of 60 s, at most 15 s.
+  // One budget for both reads: the second gets what is left of 60 s, at most 15 s. It bounds the two reads, not the process:
+  // start-up, child termination and the observation runAttested records afterwards are outside it, and the bin store's caller allows 75 s.
   const timeout = Math.min(SECOND_READ_MAX_MS, GH_TIMEOUT_MS - (now() - began));
   return { ...read, ...newerRun(attestation, sha, named[0].check_suite?.id, { ghBin, spawn, timeout }) };
 }
 
 /** The second read's share of the first read's budget: the bin store kills this process at 75 s, so both reads fit one 60 s. */
 export const SECOND_READ_MAX_MS = 15_000;
+
+/** GitHub's run states that mean a run is still on its way; `completed` is done; any other word is not understood. */
+const IN_FLIGHT = new Set(['queued', 'in_progress', 'waiting', 'requested', 'pending']);
 
 const idOf = v => (typeof v === 'string' && v !== '') || (typeof v === 'number' && Number.isFinite(v)) ? String(v) : null;
 const startOf = r => {
@@ -155,18 +159,24 @@ function newerRun(attestation, sha, suiteId, { ghBin, spawn, timeout }) {
   if (!judged) return { unchecked: 'the judged run is not in the workflow-run list' };
   const workflow = idOf(judged.workflow_id);
   const judgedStart = startOf(judged);
-  if (workflow === null || judgedStart === null || typeof judged.status !== 'string') {
+  if (workflow === null || judgedStart === null || (judged.status !== 'completed' && !IN_FLIGHT.has(judged.status))) {
     return { unchecked: 'the judged run lacks a workflow id, status or start time' };
   }
-  const waitsOn = r => ({ status: r.status, conclusion: null, waitsOn: { name: r.name, id: r.id, status: r.status } });
+  // Display fields come from the API: only a non-empty string name and a normalised id reach the line.
+  const waitsOn = r => ({ status: r.status, conclusion: null, waitsOn: { name: typeof r.name === 'string' && r.name !== '' ? r.name : 'unnamed workflow', id: idOf(r.id) ?? 'unknown run', status: r.status } });
+  // A completed judged run's `conclusion` is not consulted: the newest named check stays the newest reading even if it started
+  // before the run's latest attempt. A re-run of only the failed jobs legitimately leaves an earlier green check in place, and
+  // telling that from a full re-run cancelled before the check ran needs the run's job list, which this gate does not read
+  // (backlog steward-device-arrival-open-items row 71).
   if (judged.status !== 'completed') return { ...waitsOn(judged), waitsOn: { ...waitsOn(judged).waitsOn, rerun: true } };
   let unreadable = false;
   const waiting = [];
   for (const r of runs) {
     if (r === judged || idOf(r.workflow_id) !== workflow) continue;
     const start = startOf(r);
-    if (typeof r.status !== 'string' || start === null) { unreadable = true; continue; }
-    if (r.status !== 'completed' && start > judgedStart) waiting.push({ r, start });
+    if (r.status === 'completed') continue;
+    if (!IN_FLIGHT.has(r.status) || start === null) { unreadable = true; continue; }
+    if (start > judgedStart) waiting.push({ r, start });
   }
   if (waiting.length > 0) return waitsOn(waiting.sort((a, b) => b.start - a.start)[0].r);
   return unreadable ? { unchecked: 'a run of the same workflow could not be read, so newer runs were not fully checked' } : {};
