@@ -24,6 +24,8 @@ workspace. Store: $BERTH_DIR, else $CLAUDE_CONFIG_DIR/berth, else <the device la
 
 Commands:
   berth observed --session S <path>…                            silently observe writes
+  berth status [--json [--no-peer]]                              who is moored here and on sibling devices; --json is a
+                                                                   pure read that creates nothing (contract status-json@1)
   berth moor    --session S [--model M] [--lab L] [--runtime R] [--principal P] [--task T]
                 [--writes a,b,c | --writes-add a,b,c] [--pid N] [--ttl SECONDS]         register / refresh this session
   berth unmoor  --session S                                        leave; releases every lease held
@@ -2699,7 +2701,7 @@ def gate_impact(paths, writes):
         return {"fallback": "gate-impact unavailable"}
 
 
-def sibling_moorings(b, view=None, read_peer=True):
+def sibling_moorings(b, view=None, read_peer=True, unavailable=None):
     """Live sibling declarations from at most the final 64 MiB of the channel store."""
     try:
         if read_peer:
@@ -2761,8 +2763,11 @@ def sibling_moorings(b, view=None, read_peer=True):
             if 0 <= now - since < ttl:
                 live.append(row)
         return live
-    except Exception:
-        print("berth: sibling intent unavailable", file=sys.stderr)
+    except Exception as error:
+        if unavailable is not None:
+            unavailable.append({"source": "siblings", "reason": str(error)})
+        else:
+            print("berth: sibling intent unavailable", file=sys.stderr)
         return []
 
 
@@ -2842,6 +2847,57 @@ def writes_line(writes):
         line = prefix + ",".join(writes[:count]) + ("," if count and suffix else "") + suffix
         if len(line) <= 200:
             return line
+
+
+def status_json(b, no_peer=False):
+    """Presence only: never read leases, remember a channel, or advance a cursor."""
+    now = b.now()
+    result = dict(device=None, moorings=[], siblings=[], devices=[], unavailable=[])
+    moorings = b.moorings() if os.path.isdir(b.moor_dir) else {}
+    for session, m in sorted(moorings.items(), key=lambda kv: -kv[1].get("last_seen", 0)):
+        if not b.is_live(m):
+            continue
+        recipient = m.get("recipient", {})
+        result["moorings"].append(dict(
+            session=session, runtime=recipient.get("runtime"), model=recipient.get("model"),
+            task=m.get("task"), writes=declared_writes(m),
+            seenS=int(now - m.get("last_seen", now)),
+            declaredS=int(now - m["writes_declared_at"]) if "writes_declared_at" in m else None,
+            observedS=int(now - m["writes_observed_at"]) if "writes_observed_at" in m else None))
+    view = None
+    if no_peer:
+        result["unavailable"].append(dict(source="devices", reason="skipped"))
+    else:
+        # The public peer_leases wrapper persists a channel cache; use its read-only core.
+        view, error = b._read_peer_leases(PEER_TIMEOUT_S)
+        if error:
+            result["unavailable"].append(dict(source="devices", reason=error))
+        elif view:
+            result["device"] = view.get("device")
+            if view.get("standing") == "device":
+                b.channel_root = view.get("store")
+                status = b._read_peer_status()
+                if not isinstance(status, dict) or not isinstance(status.get("devices"), list):
+                    result["unavailable"].append(dict(source="devices", reason="peer status unavailable"))
+                else:
+                    others = view.get("others") or {}
+                    ack_rows = {row["device"]: row for row in status["devices"]
+                                if isinstance(row, dict) and isinstance(row.get("device"), str)}
+                    for did in sorted(set(others) | set(ack_rows)):
+                        seen = (others.get(did) or {}).get("last_seen")
+                        age = (b._view_now(view) - seen) / 1000 if seen is not None else None
+                        reason = unacked(status.get("ownSeq"), ack_rows.get(did, {}), now, b.freshness_s)
+                        result["devices"].append(dict(
+                            device=did, headAgeS=int(age) if age is not None else None,
+                            silent=age is None or age > b.freshness_s,
+                            unacked=dict(reason=reason["reason"], gap=reason.get("gap")) if reason else None))
+    for row in sibling_moorings(b, view=view, read_peer=False, unavailable=result["unavailable"]):
+        result["siblings"].append(dict(
+            device=row["device"], session=row["session"],
+            runtime=None if row["runtime"] == "?" else row["runtime"],
+            task=None if row["task"] == "-" else row["task"],
+            writes=row["write_set"], seenS=int(now - row["at"])))
+    return result
 
 
 def render_status(b):
@@ -3083,6 +3139,9 @@ def main(argv):
     """Exit 4 when this invocation cannot open its store — e.g. the stage runner's guest (UID 65534,
     BERTH_DIR stripped) meeting the host's root-owned berth.lock: the lane proceeds unleased and says
     so, rather than dying with a traceback the wrapper would propagate."""
+    if len(argv) > 1 and argv[1] == "status" and "--json" in argv:
+        # Presence is a local read, never a lease-proxy request.
+        return _main(argv)
     if len(argv) > 1 and argv[1] == 'observed':
         try:
             args = list(argv[2:])
@@ -3153,6 +3212,9 @@ def _main(argv):
     if cmd == "room":
         # Read-only and store-free: capacity is this device's own lines, never a lease.
         return room_main(argv)
+    if cmd == "status" and "--json" in argv:
+        print(json.dumps(status_json(Berth(read_only=True), no_peer="--no-peer" in argv)))
+        return 0
     b = Berth(read_only=True) if cmd in ("verify-released", "holds", "impact") else Berth()
     session = _opt(argv, "--session")
     source = "flag" if session else None

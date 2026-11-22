@@ -443,6 +443,134 @@ class SiblingMoorings(DeclaredWrites):
         self.assertIn("~122s of gates between you (+1 unmeasured)", self.cli("impact", "src/a")[1])
 
 
+class StatusJson(unittest.TestCase):
+    def setUp(self):
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        self.root = Path(directory.name)
+        self.store = self.root / "berth"
+        self.flow = self.root / ".eprfs/status/flows.jsonl"
+        self.flow.parent.mkdir(parents=True)
+        self.flow.write_text("")
+        self.b = Berth(str(self.store), now=lambda: 1000, read_only=True,
+                       policy_path=MISSING_POLICY)
+        self.b.channel_root = str(self.root)
+        self.b.pid_alive = lambda pid: False
+        self.main = _NS["_main"]
+        self.view = {"standing": "device", "device": "did:key:local", "now": 1000000,
+                     "store": str(self.root), "others": {
+                         "did:key:sibling": {"last_seen": 990000, "moorings": {"remote": 990000}}}}
+        self.b._read_peer_leases = mock.Mock(return_value=(self.view, None))
+        self.b._read_peer_status = mock.Mock(return_value={
+            "ownSeq": 100, "devices": [{"device": "did:key:sibling", "acked": None}]})
+        patch = mock.patch.dict(self.main.__globals__, {"sibling_moorings": _sibling_scanner})
+        patch.start()
+        self.addCleanup(patch.stop)
+
+    def snapshot(self):
+        return {str(p.relative_to(self.root)): (p.read_bytes() if p.is_file() else None)
+                for p in self.root.rglob("*")}
+
+    def cli(self, *args):
+        out, err = io.StringIO(), io.StringIO()
+        constructor = mock.Mock(return_value=self.b)
+        with mock.patch.dict(self.main.__globals__, {"Berth": constructor}), \
+                contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            code = self.main(["berth", "status", *args])
+        self.assertEqual(code, 0)
+        self.assertEqual(err.getvalue(), "")
+        if "--json" in args:
+            constructor.assert_called_once_with(read_only=True)
+        return out.getvalue()
+
+    def local(self, session, **fields):
+        Path(self.b.moor_dir).mkdir(parents=True, exist_ok=True)
+        row = dict(session=session, last_seen=990, ttl_s=100, recipient={}, **fields)
+        Path(self.b._moor_path(session)).write_text(json.dumps(row))
+
+    def sibling(self, session="remote", runtime="codex"):
+        tags = ["measure:dev-berth-events@1", "via:did:key:sibling",
+                "env:kind=moor", "env:at=990", "env:session=" + session,
+                "env:task=repair", 'env:bounds={"write_set":["src/**"]}',
+                "env:recipient=" + json.dumps({"runtime": runtime})]
+        with self.flow.open("a") as stream:
+            stream.write(json.dumps({"record": {"classifiedAs": tags}}) + "\n")
+
+    def test_shape_liveness_siblings_and_never_acknowledged(self):
+        self.local("live", writes_declared_at=980, writes_observed_at=985,
+                   writes=["local/**"], task="fix")
+        self.local("dead", pid=123)
+        self.local("expired")
+        path = Path(self.b._moor_path("expired"))
+        row = json.loads(path.read_text())
+        row["last_seen"] = 0
+        path.write_text(json.dumps(row))
+        self.sibling()
+        self.sibling("hook", "git-hook")
+        before = self.snapshot()
+        result = json.loads(self.cli("--json"))
+        self.assertEqual(result, {
+            "device": "did:key:local",
+            "moorings": [{"session": "live", "runtime": None, "model": None, "task": "fix",
+                          "writes": ["local/**"], "seenS": 10, "declaredS": 20, "observedS": 15}],
+            "siblings": [{"device": "did:key:sibling", "session": "remote", "runtime": "codex",
+                          "task": "repair", "writes": ["src/**"], "seenS": 10}],
+            "devices": [{"device": "did:key:sibling", "headAgeS": 10, "silent": False,
+                         "unacked": {"reason": "never", "gap": None}}],
+            "unavailable": []})
+        self.assertEqual(self.snapshot(), before)
+
+    def test_absent_directory_creates_nothing_and_no_peer_skips_subprocesses(self):
+        before = self.snapshot()
+        with mock.patch("subprocess.run", side_effect=AssertionError("subprocess")):
+            result = json.loads(self.cli("--json", "--no-peer"))
+        self.assertEqual(result, dict(device=None, moorings=[], siblings=[], devices=[],
+                                     unavailable=[dict(source="devices", reason="skipped")]))
+        self.b._read_peer_leases.assert_not_called()
+        self.b._read_peer_status.assert_not_called()
+        self.assertEqual(self.snapshot(), before)
+        self.assertFalse(self.store.exists())
+
+    def test_failing_epr_and_missing_sibling_store_are_unavailable(self):
+        self.flow.unlink()
+        self.b._read_peer_leases = Berth._read_peer_leases.__get__(self.b, Berth)
+        self.b.epr_bin = lambda: "/fake/epr"
+        with mock.patch("subprocess.run", return_value=subprocess.CompletedProcess(
+                [], 1, "", "cannot read peer")) as run:
+            result = json.loads(self.cli("--json"))
+        self.assertEqual(result["devices"], [])
+        self.assertEqual(result["siblings"], [])
+        self.assertEqual({row["source"] for row in result["unavailable"]}, {"devices", "siblings"})
+        self.assertIn("cannot read peer", result["unavailable"][0]["reason"])
+        self.assertEqual(run.call_args.kwargs["timeout"], _NS["PEER_TIMEOUT_S"])
+
+    def test_failed_peer_status_is_unavailable_and_bounded(self):
+        self.b._read_peer_status = _read_peer_status.__get__(self.b, Berth)
+        self.b.epr_bin = lambda: "/fake/epr"
+        with mock.patch("subprocess.run", side_effect=subprocess.TimeoutExpired("epr", 5)) as run:
+            result = json.loads(self.cli("--json"))
+        self.assertEqual(result["devices"], [])
+        self.assertEqual(result["unavailable"], [
+            {"source": "devices", "reason": "peer status unavailable"}])
+        self.assertEqual(run.call_args.kwargs["timeout"], min(5, _NS["PEER_TIMEOUT_S"]))
+
+    def test_text_status_unchanged(self):
+        self.local("live")
+        with mock.patch.dict(render_status.__globals__, {"_guard_state": lambda _: None}):
+            before = (
+                "BERTH (this workspace as one blade — moorings · leases · capacity)\n"
+                "  live  live           ?            ?@?  for ?  task=-  seen 10s ago\n"
+                "  leases:\n"
+                "    cargo       free\n"
+                "    disk-heavy  free\n"
+                "    mesh        free\n"
+                "  holds (last 7 days, completed; refusals by requester):\n"
+                "    dev-integration hold p50/p90/max unknown/unknown/unknown (n=0), refusals 0\n")
+            self.assertEqual(self.cli(), before)
+            self.cli("--json", "--no-peer")
+            self.assertEqual(self.cli(), before)
+
+
 class LocationResolutionTest(unittest.TestCase):
     """berth finds its store and policy through the device layout, never by a guess of its own."""
 
