@@ -23,6 +23,8 @@ REPO = Path(__file__).resolve().parents[2]
 # spawns, which inherits it) never folds a record into the checkout it lives in through the real
 # emitter. A suite that wants a fold injects an emitter or points the store at a scratch checkout.
 os.environ["BERTH_UNDER_TEST"] = "1"
+# Never resolve the host's native binary; peer tests explicitly inject their own fake.
+os.environ["EPR_BIN"] = "/nonexistent-berth-test-epr"
 # A standalone berth, never this machine's device: with the variable unset the envelope guard
 # falls back to the real device key, and the real `epr` refuses fixture sessions such as "dev".
 # CI has no device key, so this only bit on a device. Tests that need a key patch it in.
@@ -40,6 +42,8 @@ CLASSES = {"mesh": {"verify": {"default_ttl_s": 1800, "max_ttl_s": 3600},
 
 _PROXY_KEYS = ("ELOHIM_SHIFT_BERTH_ADDRESS", "ELOHIM_SHIFT_BERTH_TOKEN")
 _saved_proxy_env = {}
+_read_peer_status = Berth._read_peer_status
+_peer_status_patch = mock.patch.object(Berth, "_read_peer_status", return_value=None)
 _sibling_scanner = _NS["sibling_moorings"]
 _sibling_patch = mock.patch.dict(_sibling_scanner.__globals__, {"sibling_moorings": lambda *a, **k: []})
 
@@ -47,6 +51,7 @@ _sibling_patch = mock.patch.dict(_sibling_scanner.__globals__, {"sibling_mooring
 def setUpModule():
     # These fixtures exercise their own BERTH_DIR, including direct main() calls.
     # A gate worker's guardian proxy belongs to the enclosing workload instead.
+    _peer_status_patch.start()
     _sibling_patch.start()  # only SiblingMoorings opts into scanning its temporary flow store
     _saved_proxy_env.clear()
     for key in _PROXY_KEYS:
@@ -55,6 +60,7 @@ def setUpModule():
 
 
 def tearDownModule():
+    _peer_status_patch.stop()
     _sibling_patch.stop()
     for key in _PROXY_KEYS:
         os.environ.pop(key, None)
@@ -3731,6 +3737,128 @@ class CargoRoomTest(unittest.TestCase):
             self._device(base)
             for args in (("mesh",), ("cargo", "--want", "0"), ("cargo", "--want"), ()):
                 self.assertEqual(self._cli(base, *args).returncode, 2, args)
+
+
+class UnackedPeer(unittest.TestCase):
+    """Outgoing notices use fake native JSON and never touch a real peer or berth."""
+
+    def setUp(self):
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        self.clock = [1000.0]
+        self.b = Berth(directory.name, now=lambda: self.clock[0],
+                       policy_path=MISSING_POLICY, obs=FakeObservation())
+        self.b.steward_names = {"dev-integration"}
+        self.b.policy_error = None
+        self.did = "did:key:sibling"
+        self.session = "peer-session"
+        self.view = {"standing": "device", "now": 1000000, "others": {
+            self.did: {"seq": 16423, "last_seen": 1000000,
+                       "moorings": {self.session: 1000000}}}}
+        self.b.channel_view = self.view
+        self.b._read_peer_leases = mock.Mock(return_value=(self.view, None))
+        self.b.peer_leases = mock.Mock(return_value=(self.view, None))
+        self.b.epr_bin = mock.Mock(return_value="/fake/epr")
+        self.b._read_peer_status = _read_peer_status.__get__(self.b, Berth)
+        runner = mock.patch("subprocess.run")
+        self.run = runner.start()
+        self.addCleanup(runner.stop)
+        self.answer(None)
+        self.watch = _NS["_SilenceWatch"](self.b)
+
+    def answer(self, acked):
+        self.status = {"ownSeq": 85596, "devices": [{"device": self.did, "seq": 16423,
+                       "ageS": 16, "eventsFolded": 31, "acked": acked}]}
+        self.run.return_value = subprocess.CompletedProcess([], 0, json.dumps(self.status), "")
+
+    def status_lines(self):
+        return [line for line in render_status(self.b).splitlines() if "UNACKED" in line]
+
+    def say_lines(self):
+        stderr = io.StringIO()
+        # Exercise the actual CLI printing and exit status without a native write.
+        row = {"dseq": 7, "at": self.clock[0]}
+        with mock.patch.dict(_NS["main"].__globals__, {"Berth": lambda *a, **k: self.b}), \
+                mock.patch.object(self.b, "say", return_value=row), \
+                contextlib.redirect_stderr(stderr), contextlib.redirect_stdout(io.StringIO()):
+            rc = _NS["main"](["berth", "say", "--session", "sender", "--to", self.session, "hello"])
+        self.assertEqual(rc, 0)
+        return [line for line in stderr.getvalue().splitlines() if "UNACKED" in line]
+
+    def poll(self):
+        self.clock[0] += _NS["SILENCE_POLL_S"]
+        self.view["now"] = round(self.clock[0] * 1000)
+        self.view["others"][self.did]["last_seen"] = self.view["now"]
+        return self.watch.lines()
+
+    def test_never_acked_status_say_and_one_follow_notice(self):
+        lines = self.status_lines() + self.say_lines() + self.poll()
+        self.assertEqual(len(lines), 3, lines)
+        self.assertTrue(all("has acknowledged none" in line for line in lines))
+        self.assertIn("just status device", lines[1])
+        self.assertEqual(self.poll(), [])
+        for line in lines:
+            self.assertNotRegex(line.lower(), r"\b(wait|refused|lock)\b")
+        for call in self.run.call_args_list:
+            self.assertEqual(call.args[0][:4], ["/fake/epr", "peer", "status", "--json"])
+            self.assertLessEqual(call.kwargs["timeout"], 5)
+
+    def test_fully_acked_and_small_lags_are_quiet(self):
+        for lag in (0, 1, 2, _NS["UNACKED_LAG"]):
+            with self.subTest(lag=lag):
+                self.answer(85596 - lag)
+                self.assertEqual(self.status_lines() + self.say_lines() + self.poll(), [])
+
+    def test_behind_reports_gap_without_inventing_ack_age(self):
+        self.answer(85000)
+        reason = _NS["unacked"](85596, self.status["devices"][0], 1000, 90)
+        self.assertEqual(reason, {"reason": "behind", "acked": 85000, "own_seq": 85596, "gap": 596})
+        lines = self.status_lines() + self.say_lines() + self.poll()
+        self.assertEqual(len(lines), 3)
+        for line in lines:
+            self.assertIn("seq 85000 of 85596 (gap 596; acknowledgement age unavailable)", line)
+            self.assertNotRegex(line.lower(), r"\b(wait|refused|lock)\b")
+
+    def test_recovery_once_and_unknown_is_not_recovery(self):
+        self.assertEqual(len(self.poll()), 1)
+        self.run.return_value = subprocess.CompletedProcess([], 1, "", "unavailable")
+        self.assertEqual(self.poll(), [])
+        self.answer(None)
+        self.assertEqual(self.poll(), [])
+        self.answer(85596)
+        self.assertEqual(self.poll(), [f"[berth] device {self.did} is acknowledging again"])
+        self.assertEqual(self.poll(), [])
+        self.answer(None)
+        self.assertEqual(len(self.poll()), 1)
+
+    def test_missing_malformed_and_failed_status_are_silent(self):
+        payloads = [{}, {"devices": self.status["devices"]}, {"ownSeq": 85596},
+                    {"ownSeq": 85596, "devices": [{"device": self.did}]},
+                    {"ownSeq": None, "devices": self.status["devices"]},
+                    {"ownSeq": True, "devices": self.status["devices"]},
+                    {"ownSeq": 85596, "devices": [None, {"device": self.did, "acked": "none"}]}, []]
+        for payload in payloads:
+            self.run.return_value = subprocess.CompletedProcess([], 0, json.dumps(payload), "")
+            self.assertEqual(self.status_lines() + self.say_lines() + self.poll(), [])
+        self.run.return_value = subprocess.CompletedProcess([], 0, "not json", "")
+        self.assertEqual(self.status_lines() + self.say_lines() + self.poll(), [])
+        for error in (OSError("unavailable"), subprocess.TimeoutExpired("fake-epr", 5)):
+            self.run.side_effect = error
+            self.assertEqual(self.status_lines() + self.say_lines() + self.poll(), [])
+        self.run.side_effect = None
+        self.b.epr_bin.return_value = None
+        self.assertEqual(self.status_lines() + self.say_lines() + self.poll(), [])
+
+    def test_follow_only_devices_with_moorings(self):
+        self.view["others"][self.did]["moorings"] = {}
+        self.assertEqual(self.poll(), [])
+        self.assertEqual(len(self.status_lines()), 1)
+        self.assertEqual(self.say_lines(), [])
+
+    def test_no_own_records_and_missing_ack_are_unknown_or_quiet(self):
+        for own, row in ((0, {"acked": None}), (None, {"acked": None}),
+                         (85596, {}), (85596, {"acked": -1})):
+            self.assertIsNone(_NS["unacked"](own, row, 1000, 90))
 
 
 if __name__ == "__main__":

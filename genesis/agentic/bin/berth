@@ -1881,6 +1881,22 @@ class Berth:
             self._remember_channel(None)
         return view, err
 
+    def _read_peer_status(self):
+        """Optional outgoing-delivery evidence; never changes the lease view or its errors."""
+        epr = self.epr_bin()
+        if not epr:
+            return None
+        try:
+            result = subprocess.run(
+                [epr, "peer", "status", "--json", "--root", main_checkout(REPO_ROOT)],
+                capture_output=True, text=True, timeout=min(5, PEER_TIMEOUT_S))
+            if result.returncode:
+                return None
+            view = json.loads(result.stdout)
+            return view if isinstance(view, dict) else None
+        except (OSError, subprocess.TimeoutExpired, ValueError):
+            return None
+
     def _run_peer_leases(self, epr, timeout):
         try:
             return subprocess.run([epr, "peer", "leases", "--json", "--root", main_checkout(REPO_ROOT),
@@ -2128,6 +2144,75 @@ def _addressed_to(to, session):
     return to == session or (len(to) >= NOTE_PREFIX_MIN and session.startswith(to))
 
 
+# Allow the existing settle window's number of polling turns (10 by default) as
+# a small sequence lag. This is an advisory allowance, not an inferred event rate.
+UNACKED_LAG = int(DEFAULT_CONFIRM_WAIT_S / POLL_S)
+
+
+def _ack_row_known(own_seq, row):
+    return (type(own_seq) is int and own_seq >= 0 and isinstance(row, dict)
+            and "acked" in row and (row["acked"] is None
+                                      or (type(row["acked"]) is int and row["acked"] >= 0)))
+
+
+def unacked(own_seq, device_row, now, freshness_s):
+    """Pure outgoing acknowledgement assessment, or None for caught-up/unknown.
+
+    peer status has no ack timestamp: ageS is the age of the incoming head, not
+    how long its ack has stayed put. Neither now nor freshness_s can date that
+    ack; report a sequence gap only, even when the incoming head is fresh.
+    """
+    if not _ack_row_known(own_seq, device_row) or own_seq == 0:
+        return None
+    acked = device_row["acked"]
+    if acked is None:
+        return {"reason": "never"}
+    gap = own_seq - acked
+    if gap <= UNACKED_LAG:
+        return None
+    return {"reason": "behind", "acked": acked, "own_seq": own_seq, "gap": gap}
+
+
+def _ack_observations(b):
+    """Known device -> assessment (None means recovered); omit unavailable evidence."""
+    view = b._read_peer_status()
+    if not isinstance(view, dict) or not isinstance(view.get("devices"), list):
+        return {}
+    own = view.get("ownSeq")
+    return {row["device"]: unacked(own, row, b.now(), b.freshness_s)
+            for row in view["devices"] if _ack_row_known(own, row)
+            and isinstance(row.get("device"), str) and NOTE_ID.fullmatch(row["device"])}
+
+
+def _unacked_reason(reason):
+    if reason["reason"] == "never":
+        return "has acknowledged none of this device's records"
+    return (f"acknowledges ours to seq {reason['acked']} of {reason['own_seq']} "
+            f"(gap {reason['gap']}; acknowledgement age unavailable)")
+
+
+def _unacked_addressee_line(b, to):
+    view = b.channel_view
+    if not to or not isinstance(view, dict):
+        return None
+    others = view.get("others")
+    if not isinstance(others, dict):
+        return None
+    devices = [did for did, info in others.items() if isinstance(info, dict)
+               and isinstance(info.get("moorings"), dict)
+               and any(_addressed_to(to, session) for session in info["moorings"])]
+    if not devices:
+        return None
+    observations = _ack_observations(b)
+    for did in devices:
+        reason = observations.get(did)
+        if reason:
+            return (f"berth say: {to} is moored on device {did}, which is UNACKED "
+                    f"({_unacked_reason(reason)}) — the note is recorded and crosses when that "
+                    f"device acknowledges; read `just status device` on that device")
+    return None
+
+
 def _silent_addressee_line(b, to):
     """One line for a sender whose addressee is moored on a device that has gone quiet, else None.
 
@@ -2139,8 +2224,8 @@ def _silent_addressee_line(b, to):
     were sent into it, each answered `note #N ... to <session>`, and the sender read the missing
     replies as an idle session (backlog `steward-device-arrival-open-items` row 76).
 
-    Not seen here: a stall in one direction only (their heads arrive, ours do not), a household
-    note (it names no device), and a session this device has folded no mooring for."""
+    The outgoing direction is reported separately by _unacked_addressee_line.
+    Household notes and sessions without a folded mooring name no device here."""
     view = b.channel_view
     if not to or not isinstance(view, dict):
         return None
@@ -2185,6 +2270,7 @@ class _SilenceWatch:
     def __init__(self, b):
         self.b = b
         self.silent = {}  # device -> whether it was silent at the last reading that counted it
+        self.unacked = {}  # unknown reads preserve the last observed acknowledgement state
         self.next_at = 0.0
 
     def lines(self):
@@ -2198,10 +2284,23 @@ class _SilenceWatch:
         others = view.get("others") if isinstance(view.get("others"), dict) else {}
         now_ms = b._view_now(view)
         out = []
+        acknowledgements = _ack_observations(b) if others else {}
         for did in sorted(others):
             info = others[did] if isinstance(others[did], dict) else {}
             if not isinstance(did, str) or not NOTE_ID.fullmatch(did):
                 continue
+            # Only devices with a moored session are relevant to outgoing notices.
+            # Addressed-note history is not available in this watch's lease view.
+            if info.get("moorings") and did in acknowledgements:
+                reason = acknowledgements[did]
+                previous = self.unacked.get(did, False)
+                self.unacked[did] = bool(reason)
+                if reason and not previous:
+                    out.append(f"[berth] device {did} has not acknowledged this device's records "
+                               f"({_unacked_reason(reason)}) — what you send from here may not have "
+                               "arrived there")
+                elif previous and not reason:
+                    out.append(f"[berth] device {did} is acknowledging again")
             seen = info.get("last_seen")
             known = isinstance(seen, (int, float))
             quiet = not known or now_ms - seen > b.freshness_s * 1000
@@ -2770,6 +2869,7 @@ def _other_devices_lines(b, view, view_line):
     lines = ["  other devices (read from this device's fold of their records):"]
     if not others and not held:
         lines.append("    none — no other device is admitted on this roster")
+    acknowledgements = _ack_observations(b) if others or held else {}
     for did in sorted(set(others) | set(held)):
         info = others.get(did) or {}
         seen = info.get("last_seen")
@@ -2781,6 +2881,10 @@ def _other_devices_lines(b, view, view_line):
             if age > b.freshness_s * 1000:
                 head += f" — SILENT past {b.freshness_s}s"
         lines.append(f"    device {did}  {head}")
+        reason = acknowledgements.get(did)
+        if reason:
+            lines.append(f"      UNACKED: {_unacked_reason(reason)} — notes and verdicts from here "
+                         "may not have arrived there")
         for session, since in sorted((info.get("moorings") or {}).items()):
             # A folded mooring is that device's latest moor record. Touches do not cross, so a long
             # session can be alive past the ttl; the label says only what the record shows.
@@ -3267,6 +3371,9 @@ def _main(argv):
         quiet = _silent_addressee_line(b, to)
         if quiet:
             print(quiet, file=sys.stderr)
+        outgoing = _unacked_addressee_line(b, to)
+        if outgoing:
+            print(outgoing, file=sys.stderr)
         return 0
     print(__doc__.split("Commands:")[1].split("Resources")[0])
     return 2
