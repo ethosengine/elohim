@@ -872,3 +872,25 @@ Pipeline reads: orchestrator #2409 (landing 12) SUCCESS, having dispatched `eloh
 
 After it: brit 0.3.1 is being built into this device's bin store, and the four-thread bar (ten
 runs of the workspace's tests beside a running build) is under way on the landed fixture.
+
+### 00:15Z to 02:35Z: what a second device and a capable brit showed
+
+- **Second-device check of landing 13:** both orchestrator gates green on the sibling in a fresh
+  worktree at `9dbfbac2d`.
+- **brit 0.3.1 cannot be installed yet on either device** (arrival backlog rows 70 and 71). The
+  push to brit `main` ran CI a second time on the release commit, and that run ended red when a
+  hosted runner was lost; the installer reads the newest check. The pin gate had passed on the
+  earlier green run while this one was still running. The sibling's permission check refused to
+  re-run the failed leg as an outward action, and shem did not run it in its place; the steward
+  was told, and the re-run was started from outside both agent sessions.
+- **The shadow's first lines** against a brit that has the flag, by pointing `BRIT_BIN` at the
+  built, uninstalled binary (row 42, delta 6): pipeline-file edits would skip eprfs, storage,
+  doorway, sdk and genesis; a lockfile bump would wrongly skip the two parked TypeScript gates.
+- **A defect in the shadow, found the same way on the sibling** (row 42, delta 7): it spent its
+  budget on an unchanged head. Fixed so it is free unless a pipeline file changed.
+- **Four threads held the bar** (row 65, delta 3): ten of ten runs clean beside another build,
+  577 to 861 s. The change is one manifest line, `ae99ed59a`, handed over on
+  `self/shem-eprfs-threads4` with `brit push` in 56 s for the sibling to gate first: the first
+  probe of another device paying a long gate before a landing (station F4-probe).
+- **Jenkins:** orchestrator #2410 (landing 13) SUCCESS, dispatching `elohim-eprfs` only; no Edge
+  build, as the hand-run fleet-roll check had said.

@@ -1996,3 +1996,112 @@ gitlink (`affected gitlink or unsupported mode: elohim/brit`), so the main check
 fast-forwarded with git; and the campaign's timing script misreads a log that crosses midnight
 or carries a collected gate's replayed output, so the figures above are the hook's own
 `PASSED (N s)` lines.
+
+## Row 65, delta 3 (2026-11-22): the fixture change landed, and four threads held the bar
+
+The `session_envelope` fixture change is on dev (landing 13, `e90a3178e`): one stripped `epr`
+and one launcher per test process, linked into each fixture. That binary now writes 3.6 to
+3.8 GB where it wrote 5.3 to 5.45 GB.
+
+The bar the plan set for a thread count was ten clean runs beside a running build. Measured on
+that head (records under `bar-t4/` in the sprint's campaign directory): ten runs of the gate's
+own test command at four threads, each beside another build on the second cargo seat (the brit
+0.3.1 install, then storage gates).
+
+| | |
+|---|---|
+| Clean runs | 10 of 10 (exit 0, no failed test) |
+| Seconds per run | 577 to 861 (one thread: 1,653 to 1,729) |
+| Guard pauses | none |
+| Highest I/O pressure | 11.78% and 11.10% in two runs; 4.6 to 6.8% in the other eight |
+| Peak write rate over 10 s | 53 to 72 MB/s, `session_envelope` in every run |
+
+The margin is thin and is stated as such: pressure passed the guard's 10% line twice without
+lasting long enough for it to act, and the 1 Hz sampler cannot show how long it stayed there.
+What remains of the burst is the product's synced ingest of a 66 MB file per fixture, four
+fixtures at a time. If pauses return, the lever that needs no product change is fewer parallel
+Python workers in that one binary.
+
+A by-product: the companion storage gates, run beside those tests on a warm target, took 1,443
+to 1,711 s (four runs), against 1,384 s when carried in landing 13.
+
+The thread count is declared on the eprfs gate project's own `run.cargo.env` (commit
+`ae99ed59a`, handed over on `self/shem-eprfs-threads4` for the sibling device to gate before it
+lands). The pool policy's override for eprfs still says one thread and is now shadowed by the
+manifest; removing the shadowed value is owed so the device has one answer.
+
+## Row 42, delta 6 (2026-11-22): the shadow's first lines against a brit that has the flag
+
+Neither device could install brit 0.3.1 yet (row 71), so both pointed `BRIT_BIN` at the candidate
+each had built from the pinned source (`02d4654f`) for a read-only run; nothing was installed
+and the shadow decides nothing. The probe reports the flag present and prints no line; with
+brit 0.3.0 it prints the one unavailable line. Feeding the selector one changed path:
+
+| Changed path | Gates selected today | Of those, gates the sources class would not run |
+|---|---|---|
+| `elohim/eprfs/Jenkinsfile` | cargo-bridge, jenkins-bridge, eprfs, eprfs-live-corpus, orchestrator, orchestrator-tree | eprfs, eprfs-live-corpus |
+| `elohim/holochain/Jenkinsfile` | doorway, elohim-sdk, orchestrator, orchestrator-tree, elohim-storage, genesis | doorway, elohim-sdk, elohim-storage, genesis |
+| `pnpm-lock.yaml` | elohim-storybook, doorway-app, eprfs-ts, storage-client-ts, elohim-app | eprfs-ts, storage-client-ts |
+
+The first two rows are this row's cost seen as the instrument reports it: on landing 13's
+figures, about 1,770 s of gates for an eprfs pipeline edit and more than 1,380 s for an Edge
+pipeline edit. The third row is the hazard of delta 5 shown by the same instrument: those two
+gates' recipes read the lockfile, and their manifests still list it as `buildProcess`. Turning
+the class on before that correction would skip them on a lockfile bump.
+
+Not yet seen: a per-gate fingerprint line, which needs a push whose range moves a step's
+fingerprint under one class and not the other; and any of this on an installed brit.
+
+## Row 42, delta 7 (2026-11-22): the shadow spent its budget on an unchanged head, found on the second device
+
+The sibling device ran both orchestrator gates in a fresh worktree at dev `9dbfbac2d` with a brit
+that has the flag and saw one line: the shadow's 10 s budget was spent, on a head equal to its
+base. Read in the code and measured with the same brit on shem: the budget was a deadline that
+started at the first probe, so unrelated gate and test time used it up; the orchestrator suite's
+own tests inherit `BRIT_BIN` and each ran the shadow's second planner call; and one gate step
+with an empty `buildProcess` was fingerprinted three times at about 2.2 s each. Shem's own gates
+could not see any of it, because shem's installed brit predates the flag.
+
+Fixed before any device installed brit 0.3.1 (`1b0f5190a`): the shadow does no brit work unless
+the range from the integration base to the gated commit changed a file some step lists as its
+own `buildProcess`, which is the only way either of its lines can be non-empty. Equal base and
+commit: nothing. No such file changed: two git reads. Otherwise three fingerprints per touched
+step and one planner call per push, under a budget that now counts only the shadow's own time.
+
+## Row 70 — installing a tool release beside another build ran into the installer's own time bound, reported as a failed build
+
+Found 2026-11-22. `epr bin follow --tool brit` for brit 0.3.1 refused after 1,803 s with
+`bootstrap-unavailable`, listing three failed builds (offline, anonymous, authenticated) and a
+failed download of `brit-build-02d4654fa73d`. Read from the code
+(`elohim/eprfs/device-runtime/src/bin_store/lifecycle.rs`): each build stage is given 1,800 s.
+The offline stage failed at once because rakia 0.1.2 was not yet in the device's registry cache;
+the anonymous stage then ran the one-job release build beside a four-thread test run on the
+other cargo seat and was cut at its bound; a `cargo fetch --locked` by hand succeeds, so reach
+to the registry was never the problem. The refusal says "failed" for a build that was still
+making progress when its time ran out, and names no bound.
+
+Owed: the refusal says which stage ran out of time and how long it was given; and a build cut
+at its bound is resumable by a second `follow`, which the refusal should say. Whether 1,800 s is
+the right bound for a one-job release build on a device that now runs two builds at once is the
+same question as the storage gate's p90: measure it with both seats busy.
+
+## Row 71 — the pin gate passed on the older of two CI runs on one commit while the newer was still running
+
+Found 2026-11-22. brit `02d4654f` carries two runs of the same workflow: the release branch's
+(suite 121667682136, `Tests pass` success at 23:23Z) and the push to `main`'s (suite
+121684736606). Landing 13's `brit` gate read `Tests pass success` at 23:34:36Z. The `main` run
+was still running then (`tests@windows-aarch64`, started 23:27Z) and its aggregate `Tests pass`
+check did not exist yet, so the gate saw only the earlier green. That run ended red at 01:00Z:
+the hosted runner for `tests@windows-aarch64` lost contact at 93 minutes, with no test verdict.
+
+Effects seen: `epr bin follow --tool brit` on both devices built the candidate and then refused
+it (`attestation-refused: attestation did not witness successful checks`), because the bin
+store reads the newest check; brit's `publish-build` refused for the same reason. Dev's pin
+stands on a green that was true when read and is not the newest reading. Cure in work: the
+sibling re-runs the failed leg of the `main` run; a green there completes the 0.3.1 release the
+steward ruled.
+
+Owed in the pin gate (`gate-attest.mjs`): a newer run of the same workflow that is still in
+progress is a `still-running` refusal, as a pending named check already is; today it is
+invisible until its named check exists. The cost of that refusal is a wait of the run's
+remaining minutes at pin-move time, against a pin that a later red contradicts.

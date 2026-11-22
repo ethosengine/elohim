@@ -2579,10 +2579,10 @@ habits:
       - "node --test genesis/orchestrator/suite-list.test.mjs (the orchestrator suite list holds every test file once; the named half's view holds what its key hashes and its environment is constructed)"
       - "a2o genesis/a2o/features/devflow/native-gate-evidence.feature reuse rule (this workspace's own green stands in; a red or an unadmitted signer never does)"
     evidence: >
-      DELTA 2026-11-21c (no status change; the eprfs test step measured by thread count, nothing changed): seventeen runs of the eprfs workspace tests on shem. One thread about 1,620 s; four threads 604 to 656 s, five clean of five, the I/O guard pausing three; three threads 696 to 752 s, eight clean of ten, the guard pausing four and two of those failing on a timeout shorter than its 36 s freeze; two threads 923 s clean and one failure from a test's own timing assumption (arrival backlog row 66, fixed on a branch). The bar of ten clean runs was not met, so `RUST_TEST_THREADS` stays at one. The bound is the workspace's write burst (58 to 72 MB/s) against the guard's 10% line; the cut is the 66 MB release the slow test file strips and ingests per story (row 65). Table: row 53, delta.
-    evidence-fingerprint: sha256:7cda74580cba9aaa
-    evidence-bytes: 32687
-    evidence-entries: 33
+      DELTA 2026-11-22 (status unchanged; the shadow's first real lines, and a cost a second device found): against a brit that has `--inputs` (the built 0.3.1 binary named by `BRIT_BIN`, not installed), the shadow says an `elohim/eprfs/Jenkinsfile` edit would not run eprfs or eprfs-live-corpus under the sources class, an `elohim/holochain/Jenkinsfile` edit would not run doorway, elohim-sdk, elohim-storage or genesis, and a `pnpm-lock.yaml` bump would wrongly skip the two parked TypeScript gates. The sibling device, running both orchestrator gates at `9dbfbac2d` with that brit, saw the shadow spend its 10 s budget on a head equal to its base; it now does no brit work unless a step's own `buildProcess` file changed in the range (`1b0f5190a`). Arrival backlog row 42, deltas 6 and 7. Not measured: any of this on an installed brit.
+    evidence-fingerprint: sha256:f52da78932f31af3
+    evidence-bytes: 33522
+    evidence-entries: 34
     guard: >
       Regression risks: (1) reusing on a key that omits something the recipe reads — the recipe
       body, the project tree, a submodule pin, a repo file a test include_str!s; the input audit
