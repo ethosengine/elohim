@@ -6,7 +6,7 @@ class: process-meta
 date: 2026-10-29
 steward: human:matthew
 author: "Claude (fork of the overnight integration-capacity shift), at the operator's direction"
-serves: [push-delivers-within-budget, sprint-lands-each-closure-once, push-gate-pays-once, workspace-device-arrival, devices-share-one-berth]
+serves: [push-delivers-within-budget, sprint-lands-each-closure-once, push-gate-pays-once, workspace-device-arrival, devices-share-one-berth, build-earns-reach-by-attestation]
 refines: closure-keyed-landing-plane-design
 tags: [rakia, brit, lvi, epr-peer, berth, ark, onboarding, native-ci, scaffold]
 cites:
@@ -507,20 +507,25 @@ checked by a verifier (R5), and is not built: the laptop still compiles from sou
 Verify: a changelog reproduced from fulfilled commitments, and a release whose test status and
 publish status are reported separately.
 
-- [ ] **F6-standing — the standing record and council roster are redrafted as a Claude-ruled integrity design** (serves no declared habit)
+- [ ] **F6-standing — the standing record and council roster are redrafted as a Claude-ruled integrity design** (serves build-earns-reach-by-attestation)
 
-State: not started. The commons-pool and contextual-authority designs that would supply a standing
-read failed review (design §13).
+State: drafted 2026-11-22 as a narrower design than the one that failed review: a standing read
+for counting only (`genesis/docs/superpowers/specs/2026-11-22-standing-read-for-counting-principals-design.md`,
+rulings S1 to S8), with how standing is made, changed and recovered left to the general redraft
+it names in its §7. Draft status; one adversarial review was run the same day and its findings
+are recorded in the design's last section. The contextual-authority design failed review twice
+(its §12); the commons-pool design deferred standing to it.
 
-- [ ] **F6 — a second principal: the signer to `agent_cid` binding, the graduation verb, the `derivation` attestation kind and D5's three integrity fixes, in the batched DNA move** (serves no declared habit)
+- [ ] **F6 — a second principal: the signer to `agent_cid` binding, the graduation verb, the `derivation` attestation kind and D5's three integrity fixes, in the batched DNA move** (serves build-earns-reach-by-attestation)
 
 State: waits on F6-standing, C and D.
 
 Verify: the one-human adversarial test yields k = 1; then the first graduation act.
 
-F6-standing and F6 serve no declared habit: nothing in the register yet states reach across
-principals. Under the rule that work serving no habit is held, they stay unclaimed until such a
-habit is declared.
+F6-standing and F6 were held from 2026-11-19 to 2026-11-22 because nothing in the register
+stated reach across principals. The habit `build-earns-reach-by-attestation`
+(`genesis/orchestrator/.epr-meta/`, unwired) states it since 2026-11-22 (§10), so both are
+claimable. F6 still waits on F6-standing, C and D.
 
 Two stations found while writing this section (2026-11-19):
 
@@ -642,6 +647,46 @@ input is touched.
 Verify: one landing where the hand-over push posts the misses, a second device's log shows it took
 one from `epr peer intents` with no note sent, and the lander's log shows the reuse line for it.
 
+Two stations found while reading the plan against the steward's reach reading (2026-11-22, §10):
+
+- [ ] **F6-k1 — one human with two devices and an agent counts as one voice wherever attestations are counted toward reach** (serves build-earns-reach-by-attestation)
+
+D5 gates graduation on three integrity fixes. Two of them are in elohim-storage and need no DNA
+move: release promotion counts distinct agent strings, and reanchor backfill admits attestations.
+This station is those two, each with its adversarial test. The third, the DNA issuer floor, stays
+in F6 with the batched DNA move.
+
+State: not started. `tally` in `elohim/elohim-storage/src/services/release_attestation.rs` keeps
+one voice per agent string, so a peer that attests twice counts once, and one human's two devices
+count twice. `is_canonical_content_type` in `reanchor_backfill.rs` admits the `attestation:`
+prefix. Counting principals needs a signer-to-principal read, which F6-standing supplies; the
+tests can be written first against a fake resolver, the way §9's contracts are proven.
+
+Verify: a storage test in which three agent keys bound to one human yield one qualifying voice,
+and one in which the backfill sweep leaves an attestation row unauthored; both run by
+`just gate elohim-storage`.
+
+- [ ] **F6-probe — one green gate verdict is offered for graduation with what exists today, and the journal records the first check that refuses it** (serves build-earns-reach-by-attestation)
+
+This runs F6's promise once before the verb is built, as F3-probe and F4-probe do for their
+joins, so that the order of F6's parts is set by a refusal and not by this plan. The candidate is
+a `gate-verdict@1` this device computed for a landed closure. The probe walks D5's list by hand:
+the signer resolves to an `agent_cid`; a standing proof exists for the principal; a second
+principal's record for the same (derivation, output) exists; an attestation kind exists to mint.
+
+State: a first read by grep on dev 6934782dc, 2026-11-22; no verdict was offered and no command
+of the plane was run, so the station stays open. (1) Signer: `gate-evidence.mjs` `signerIdentity`
+reads brit's hex agent id, and `epr-cli/src/peer.rs` `standing` resolves a device's `did:key` to
+its steward's handle through the roster; `brit-epr/src` names no `agent_cid`, so the brit signer
+is bound to a principal by nothing this read found. This is the first refusal. (2) Standing proof:
+the roster row reads "claimed by themselves", which binds keys to a handle and proves no distinct
+human. (3) No second principal's record exists. (4) The DNA's 24 attestation kinds include no
+derivation or build kind; `attestation:gate-decision` is among them and its subject was not read,
+so whether it could be mistaken for a build gate's verdict is open.
+
+Verify: a journal entry naming each of the four checks as held or refused with the command or
+file that showed it; the first refusal is appended here as a station or names an existing one.
+
 ## 9. Reconciliation 2026-11-21: the market reading
 
 The steward's picture, given on 2026-11-21: the integration pipeline should work like a market on
@@ -753,3 +798,67 @@ published capacity vector, any price or reciprocity ledger. The rows named here 
 in the two backlogs and in the sprint journal
 (`genesis/docs/superpowers/sprints/2026-11-21-wall-clock/journal.md`). This section orders them
 and mints nothing else.
+
+## 10. Reconciliation 2026-11-22: the reach reading
+
+The steward asked whether this plane differs from the ephemeral sandboxes the industry gives its
+coding agents, and then stated where the difference lies: "It's the reach ladder that builds the
+layers of trust, and the actual attesting network (connected to it's REA/vsm systems) that allows
+something to become trusted, sutained in the public/commons, the holochain DNA notary (unique
+holons) that affords it the distributed cryptographic integrity and network-based soverigenty over
+anything's provenance." (his words, unedited)
+
+**The reading.** Nothing in that sentence is new to
+[the native dev plane design](epr:native-dev-plane-one-derivation-earned-reach-design). Each layer
+has a ruling:
+
+| The steward's layer | Where it is ruled | State on dev 6934782dc |
+|---|---|---|
+| The reach ladder builds trust | §0 premise 4; §5 "the gradient emerges": inside a result's earned reach a peer pays a `Use`, outside it a `Produce`, and the reproduction earns the next rung | Reach is derived per read. `self` and `sibling` are in use. `trusted` is empty: k = 1 |
+| The attesting network, joined to REA and VSM, makes a thing trusted and sustains it | D4: independence counts principals with standing. D5: graduation is one governed act with a standing proof per counted principal. §9 test 5 here: settlement is a signed record, speed and reach separate | Verdicts cross between one steward's devices. No signer resolves to a principal. The standing design failed review (design §13) |
+| The DNA notary gives integrity and network sovereignty over provenance | D5: one notarized attestation per converged (derivation, output), a new `derivation` kind in the batched DNA move. D6: DNA links for releases | No build or derivation kind exists among the DNA's attestation kinds. The issuer floor accepts all. Nothing from the gate plane is notarized |
+
+So the vision was written and was not in flight. §8 held F6-standing and F6 because no habit
+stated reach across principals, and the rule that work serving no habit is held kept them
+unclaimed. Everything this plan has built since 2026-11-04 is the part a hosted build system also
+has. The part it does not have was parked by a missing habit.
+
+**What changes.**
+
+1. A habit states it: `build-earns-reach-by-attestation`, in `genesis/orchestrator/.epr-meta/`,
+   `unwired` and inactive. It names no check, because nothing observes it yet. F6-standing and F6
+   are claimable under it.
+2. Two stations are appended to §8. F6-k1 takes the two of D5's three integrity fixes that need
+   no DNA move. F6-probe walks one verdict through D5's list by hand and records the first
+   refusal.
+3. A sixth test joins §9's five, for any change to the gate plane:
+
+| # | Test | Ruled in | What it sorts |
+|---|---|---|---|
+| 6 | Would this behave the same on rented sandboxes with a remote cache? If yes, take the known answer and do not design one. If no, it is the part to build natively, and it names the rung of reach it serves. | The steward, 2026-11-21: "this shouldn't be re-inventing the wheel"; design §0 premise 7 | Known answers: what a step is keyed on (test 4), a fresh envelope for each carried step, hermetic inputs. Native: admission by the carrier (tests 1 to 3), the signed record and its lineage (test 5), the grant, graduation |
+
+   Test 4 has the most rows broken against it in §9 and is the one with a known answer. The
+   soundness rows of §9's order 5 (an inherited `EPR_BIN`, the node version, rows 47, 26 and 29)
+   are what a fresh envelope removes: a device that persists carries state a new sandbox cannot.
+   F4's carrier therefore runs each carried step in an envelope that inherits nothing it did not
+   declare, which F4's row already begins with `TMPDIR`.
+
+**Order.** §9's order stands and the harvest stays first. Three lines are added beside it. None
+takes a cargo seat from the harvest except the storage gate F6-k1 pays once.
+
+- F6-standing was drafted the same day as a read for counting only (its station's State). Every
+  other F6 part waits on it. It is Claude-ruled and integrity-class.
+- F6-probe runs now, by hand, and is a journal entry.
+- F6-k1's tests are written against a fake resolver once F6-standing names the resolver's
+  contract, and its storage change lands with the next landing that selects `elohim-storage`.
+
+The first carrier from a second principal is still blocked outside this plan: adam's agent key is
+chain-fork-warranted until exile D1 is decided (F4's row in the design).
+
+**What "trustful market" may be claimed.** Until one graduation act has minted an attestation at
+`trusted`, the plane is measured at one principal, and a document that describes it says so. A
+rung with no measured saving reads unmeasured (design §5).
+
+Not built under this reading: a build attestation riding `attestation:device-health` (D5 refused
+it), one DHT attestation per reproduction (D5 refused it), any score, ranking or reputation
+number for a device or a signer, any new entry type outside the batched DNA move.
