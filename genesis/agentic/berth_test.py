@@ -1628,6 +1628,132 @@ class BerthInboxTest(unittest.TestCase):
         self.assertNotIn("\x1b", out.getvalue())
 
 
+class ReaderDeliveryInterleavings(unittest.TestCase):
+    # Reuse only the isolated fixture/helpers, not BerthInboxTest's test methods.
+    SESSION = BerthInboxTest.SESSION
+    SENDER = BerthInboxTest.SENDER
+    setUp = BerthInboxTest.setUp
+    folded = BerthInboxTest.folded
+    append = BerthInboxTest.append
+    run_main = BerthInboxTest.run_main
+    claim = BerthInboxTest.claim
+    ack = BerthInboxTest.ack
+
+    def test_1_arrival_during_claim(self):
+        """A note arriving during an unacknowledged claim is delivered after ack."""
+        self.append(self.folded("earlier", 1001, to=self.SESSION))
+        first = self.claim("agent-1")
+        self.assertEqual([n["cid"] for n in first["notes"]], ["earlier"])
+        self.append(self.folded("during", 1002, to=self.SESSION))
+        busy = self.claim("agent-1")
+        self.assertEqual((busy["notes"], busy["busy"]), ([], True))
+        self.assertEqual(self.ack(first, "agent-1"), 0)
+        second = self.claim("agent-1")
+        self.assertEqual([n["cid"] for n in second["notes"]], ["during"])
+        self.assertEqual(self.ack(second, "agent-1"), 0)
+        self.assertEqual(self.claim("agent-1")["notes"], [])
+
+    def test_2_expired_hook_claim(self):
+        """A hook claim with no ack replays to the same reader after expiry."""
+        self.append(self.folded("unacked", 1001, to=self.SESSION))
+        with mock.patch.dict(os.environ, {"BERTH_READER_LEASE_S": "5"}):
+            first = self.claim("agent-1")
+            self.assertEqual([n["cid"] for n in first["notes"]], ["unacked"])
+            self.clock[0] += 4
+            busy = self.claim("agent-1")
+            self.assertEqual((busy["notes"], busy["busy"]), ([], True))
+            self.clock[0] += 2
+            replay = self.claim("agent-1")
+        self.assertEqual([n["cid"] for n in replay["notes"]], ["unacked"])
+        self.assertNotEqual(first["claim"], replay["claim"])
+        self.assertEqual(self.ack(replay, "agent-1"), 0)
+        self.assertEqual(self.claim("agent-1")["notes"], [])
+
+    def test_3_two_consumers_of_one_reader(self):
+        """The main agent's hook and its Monitor share reader `main` and print a note once."""
+        self.append(self.folded("shared", 1001, to=self.SESSION, text="shared-note"))
+        hook = self.claim("main")
+        # The hook writes its rendered context before acknowledging; the Monitor runs in that gap.
+        hook_output = "\n".join(n["line"] for n in hook["notes"])
+        rc, main_output, err = self.run_main(
+            "inbox", "--session", self.SESSION, "--reader", "main")
+        self.assertEqual(rc, 0, err)
+        if hook["claim"]:
+            self.assertEqual(self.ack(hook, "main"), 0)
+        self.assertEqual((hook_output + main_output).count("«shared-note»"), 1,
+                         "two consumers of reader main must neither duplicate nor both skip")
+
+    def test_3b_each_agent_reader_has_its_own_copy(self):
+        """A subagent's reader and `main` each see a session's note: a cursor per agent."""
+        self.append(self.folded("shared", 1001, to=self.SESSION, text="shared-note"))
+        sub = self.claim("agent-1")
+        if sub["claim"]:
+            self.assertEqual(self.ack(sub, "agent-1"), 0)
+        main = self.claim("main")
+        self.assertEqual(len(sub["notes"]), 1)
+        self.assertEqual(len(main["notes"]), 1, "a subagent's read must not consume its parent's")
+
+    def test_4_arrival_between_follow_read_and_ack(self):
+        """A note arriving between follow's read and ack is printed next iteration."""
+        self.append(self.folded("follow-first", 1001, to=self.SESSION, text="first-note"))
+        main = _NS["main"]
+        out = io.StringIO()
+        original_ack = self.berth.reader_ack
+        inserted = []
+        sleeps = []
+
+        def ack_with_arrival(session, reader, token, offset):
+            if not inserted:
+                self.assertIn("«first-note»", out.getvalue())
+                self.append(self.folded("follow-gap", 1002, to=self.SESSION, text="gap-note"))
+                inserted.append(True)
+            return original_ack(session, reader, token, offset)
+
+        def sleep(_seconds):
+            sleeps.append(True)
+            if len(sleeps) == 2:
+                raise KeyboardInterrupt
+
+        self.berth.sleep = sleep
+        with mock.patch.dict(main.__globals__, {"Berth": lambda: self.berth}), \
+                mock.patch.object(_NS["_SilenceWatch"], "lines", return_value=[]), \
+                mock.patch.object(self.berth, "reader_ack", side_effect=ack_with_arrival), \
+                contextlib.redirect_stdout(out), self.assertRaises(KeyboardInterrupt):
+            main(["berth", "inbox", "--session", self.SESSION, "--reader", "main", "--follow"])
+        self.assertEqual(len(out.getvalue().splitlines()), 2)
+        self.assertEqual(out.getvalue().count("«first-note»"), 1)
+        self.assertEqual(out.getvalue().count("«gap-note»"), 1)
+        self.assertEqual(self.claim()["notes"], [])
+
+    def test_5_out_of_order_fold(self):
+        """A late remote fold is delivered despite older timestamp and sequence."""
+        newer = self.folded("newer", 1100, to=self.SESSION, via=DEVICE_A)
+        row = json.loads(newer)
+        tags = row["record"]["classifiedAs"]
+        tags[tags.index("env:dseq=1")] = "env:dseq=99"
+        self.append(json.dumps(row) + "\n")
+        first = self.claim("agent-1")
+        self.assertEqual([n["cid"] for n in first["notes"]], ["newer"])
+        self.assertEqual(self.ack(first, "agent-1"), 0)
+        # Advance the session's seen offset too, without including the late arrival.
+        self.assertEqual([n["cid"] for n in self.berth.inbox(self.SESSION)], ["newer"])
+        self.append(self.folded("late-remote", 900, to=self.SESSION, via=DEVICE_A))
+        late = self.claim("agent-1")
+        self.assertEqual([n["cid"] for n in late["notes"]], ["late-remote"])
+        self.assertEqual(self.ack(late, "agent-1"), 0)
+        self.assertEqual(self.claim("agent-1")["notes"], [])
+
+    def test_6_arrival_without_reader(self):
+        """A note arriving with no reader running reaches the first reader to start."""
+        self.append(self.folded("waiting", 1001, to=self.SESSION, text="waiting-note"))
+        self.clock[0] += 3600
+        rc, out, err = self.run_main(
+            "inbox", "--session", self.SESSION, "--reader", "main")
+        self.assertEqual(rc, 0, err)
+        self.assertEqual(out.count("«waiting-note»"), 1)
+        self.assertEqual(self.claim()["notes"], [])
+
+
 class WorktreeIntentTest(unittest.TestCase):
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()
