@@ -210,3 +210,100 @@ operator's ruling the same day: master peer utilization of compute before adding
 machines enter as enrolled devices running `epr peer serve`, never as Jenkins agents; the onboarding
 story is "fork an lvi workspace, join, and your peer carries integration jobs while it is on".
 
+## Field evidence, 2026-11-22: one evening's coordination ran on the Claude bridge, none on the mesh
+
+Recorded by claude-opus-5-5 (laptop device z6MkgHju…xMbu, session f0b335e0) at the steward's request ("note frictions or improvements for collaboration over the mesh as compared to your own native channel"). Marks: [M] measured or observed this session.
+
+### What happened (2026-11-21/22)
+
+Three agent sessions on three of the steward's devices coordinated one brit release (0.3.2), one
+monorepo landing order and one write-set check: this laptop (session f0b335e0), ethosengine (session
+elohim-b0, "Input classes for build steps") and shem (reached only through ethosengine). Every
+message travelled over the Claude Code cross-session bridge (`SendMessage` to
+`bridge:session_…`). The Elohim mesh carried none of it. The steward asked for both channels to be
+reliable, so this entry records what each one did.
+
+### The bridge (Claude Code cross-session messaging)
+
+What worked [M]: ethosengine found this session by name and messaged first; replies arrived within
+the session and were acted on (ownership of the release settled, a scope error corrected, a
+write-set overlap withdrawn, a landing order agreed, a design finding relayed to shem).
+
+Frictions [M]:
+
+1. **No read receipt, and declining confidence.** Every send returned "not confirmed read". From the
+   fourth message on it also said "delivery is not confirmed: no recent listing here shows that it
+   can receive cross-session messages". Only the next inbound reply proved receipt.
+2. **Unsigned and unrecorded.** Messages carry no device or covenant signature and leave nothing in
+   the repository; the coordination (who owns the release, who moves the pin, the landing order)
+   exists only in two transcripts.
+3. **Discovery by chat title.** `ListAgents` listed 138 peer sessions by conversation title, most
+   offline. This session could not have found ethosengine's session by role or device; ethosengine
+   found it.
+4. **No direct path to the third device.** Shem was reachable only as a relay through ethosengine,
+   which doubled latency and made ethosengine the editor of shem's words ("relayed verbatim in
+   substance").
+5. **Authority framing is manual.** Each inbound message is framed as untrusted teammate text; there
+   is no attested link from a message to the steward's standing or to a covenant clause, so each
+   agent re-derives whether a claim ("Matthew asked me…") is real.
+
+### The mesh (berth, epr peer)
+
+Frictions [M]:
+
+1. **This device was never admitted.** The laptop's roster rows (`binding`, `peerEndpoint`) existed
+   only in local commit `c6a5f57fc` from 2026-11-16. SessionStart reported "degraded roster bound …
+   local only (in a local commit), not on origin/dev" every session for six days; nothing turned that
+   line into a landing. They now ride the integration branch `fix/dialogue-stasis-askuser-20261121`.
+2. **Admission depends on each sibling's checked-out branch.** Each peer daemon reads the roster from
+   its `--root` working tree (`read_roster`: `root.join(PARTICIPANTS_REL)`), not from a published
+   ref. ethosengine's root `/projects/elohim` is on `memory/ceremony-2026-11-20` with 4 rows and no
+   row for this laptop, so landing the row on dev does not admit the device there. Whether the daemon
+   re-reads the roster or needs a restart is unverified. (Handed to shem for
+   `steward-device-arrival-open-items.md`, its write set, as a missing node: "the admitting daemon's
+   roster source carries the row".)
+3. **`berth` is not on PATH** on this host; it runs only as `genesis/agentic/bin/berth` from a
+   checkout. `berth status` shows each sibling as "SILENT: no head folded yet" without saying why
+   (unadmitted, unreachable or idle look the same).
+4. **`epr peer status` answers by directory.** Run inside the `elohim/brit` submodule it refused "this
+   device … is on no participant roster in this checkout"; from the superproject worktree it named
+   the device and its head. A refusal that depends on the cwd reads like a device fault.
+5. **The mesh cannot bootstrap itself.** Arranging the laptop's admission needed a working channel
+   between the devices, and the only one was the bridge.
+6. **No cross-device session view.** `berth status` is "this workspace as one blade"; it cannot list
+   the sessions moored on a sibling, so an agent cannot find whom to `berth say --to` across devices.
+
+### Improvements (each with its probe)
+
+1. Land roster rows through the normal gate as soon as they are written: when SessionStart reports
+   "roster row … local only", `just status device` names the exact landing command. Probe: a new
+   device's row reaches origin/dev within the session that wrote it.
+2. Read the roster from a published ref (or a declared roster ref) rather than the daemon's working
+   tree; at minimum `epr peer status` says "roster source is <branch>, which lacks <did> that
+   origin/dev has". Probe: a sibling admits a device whose row is only on origin/dev, with no checkout
+   switched by hand.
+3. `berth` on PATH through the bin store like brit and epr; `berth status` distinguishes unadmitted,
+   unreachable and idle siblings.
+4. `epr peer status` resolves the superproject from inside a submodule, or names the checkout it read.
+5. A cross-device session listing (moored sessions per admitted device, with role and task), so
+   `berth say --to` has an address book; then direct notes to shem need no relay.
+6. Delivery acknowledgement on the mesh that the sender can see (today seen-state stays on the
+   receiver by design); a signed ack note is enough.
+7. Mirror decisions made over the bridge into the repository: a coordination decision (owner of a
+   release, pin mover, landing order) becomes a dated line in the owning backlog entry or a covenant
+   note, so it outlives the transcripts. This session recorded the release ownership and the steward
+   ruling in `brit-rebase-cost-gitlinks-and-stranding.md`; the landing order lives only in transcripts.
+
+### Close when
+
+The three devices exchange a `berth say` note in both directions with acknowledgement, and a
+coordination like this one can run on the mesh alone.
+
+### Evidence
+
+- Bridge send results: msg ids `eef9e77b…`, `5749f600…`, `11e6c190…`, `228cc82f…`, `f994eef2…`
+  (session f0b335e0 transcript); the last two carry the "no recent listing" warning.
+- `epr peer status` from the integration worktree (2026-11-22): this device at head seq 15885, both
+  siblings "no head folded yet"; laptop daemon `epr peer serve --root /home/matthew/git/elohim
+  --handle matthew`.
+- ethosengine's report of its daemon root and roster (4 rows, branch `memory/ceremony-2026-11-20`).
