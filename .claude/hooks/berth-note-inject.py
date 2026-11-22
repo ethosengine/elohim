@@ -290,6 +290,10 @@ def deliver(session, reader, emit, now=None, started=None, transcripts=None):
     more = reply.get("more") is True
     # A busy reader (its Monitor is printing) or a backlog is asked again at the next tool call.
     again = more or reply.get("busy") is True
+    if not notes and not again:
+        # Nothing waits for this reader and nobody else is printing: whatever was repeating has been
+        # read through another consumer, so the next note is a first showing at the first grace.
+        unreceipted = 0
     save(checked_at=now, again=again)
     if not notes:
         return

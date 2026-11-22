@@ -510,6 +510,17 @@ class ReceiptTest(Harness):
         self.assertEqual(len(self.acks()), 1)
         self.assertEqual(self.state()[1]['unreceipted'], 0)
 
+    def test_a_drained_reader_after_a_dropped_delivery_clears_the_repeat_count(self):
+        # Another consumer read the notes while this hook's delivery was unconfirmed. The reader is
+        # drained and not busy, so a later note is a first showing, not "Shown again".
+        env = self.spy()  # the second claim answers with no notes, more False, busy False
+        self.emit(env, self.transcript())
+        self.age(21)
+        self.assertIsNone(self.go(env, self.transcript()), 'past the grace: dropped, claimed again, nothing there')
+        self.assertEqual(self.acks(), [])
+        self.assertEqual(len(self.claims()), 2)
+        self.assertEqual(self.state()[1].get('unreceipted'), 0)
+
     def test_the_grace_is_capped_at_900_s(self):
         env = self.spy(renotify=True)
         self.emit(env, self.transcript())
