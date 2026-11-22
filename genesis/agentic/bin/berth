@@ -509,6 +509,7 @@ class Berth:
         self.channel_root = None
         self.channel_standing = None
         self.channel_error = None
+        self.channel_view = None  # the view the last `peer_leases` read, for a second reading of it
         self._channel_read = False
         self.fold_failures = []  # (resource, kind, why): steward records that did not reach the channel store
         self.sleep = time.sleep  # injectable: tests advance a fake clock instead
@@ -1862,6 +1863,7 @@ class Berth:
         self._channel_read = True
         view, err = self._read_peer_leases(timeout)
         self.channel_error = err
+        self.channel_view = view
         self.channel_standing = view.get("standing") if view else None
         store = view.get("store") if view and view.get("standing") == "device" else None
         self.channel_root = store if isinstance(store, str) and store else None
@@ -2116,6 +2118,42 @@ def _addressed_to(to, session):
     if not to or not session:
         return False
     return to == session or (len(to) >= NOTE_PREFIX_MIN and session.startswith(to))
+
+
+def _silent_addressee_line(b, to):
+    """One line for a sender whose addressee is moored on a device that has gone quiet, else None.
+
+    Read from the view the note's own write already fetched (`epr peer leases --json`: `others`),
+    so it costs no second read. A device is quiet when this device has folded no head of it within
+    `freshness_s`, the line `berth status` calls SILENT. The note is recorded and crosses when the
+    exchange resumes; until then its addressee cannot read it, and the sender is the only party
+    placed to know. 2026-11-22: an exchange stalled both ways for more than nine hours; eight notes
+    were sent into it, each answered `note #N ... to <session>`, and the sender read the missing
+    replies as an idle session (backlog `steward-device-arrival-open-items` row 76).
+
+    Not seen here: a stall in one direction only (their heads arrive, ours do not), a household
+    note (it names no device), and a session this device has folded no mooring for."""
+    view = b.channel_view
+    if not to or not isinstance(view, dict):
+        return None
+    others = view.get("others") if isinstance(view.get("others"), dict) else {}
+    now_ms = b._view_now(view)
+    for did in sorted(others):
+        info = others[did] if isinstance(others[did], dict) else {}
+        moorings = info.get("moorings") if isinstance(info.get("moorings"), dict) else {}
+        if not any(_addressed_to(to, session) for session in moorings):
+            continue
+        seen = info.get("last_seen")
+        if not isinstance(seen, (int, float)):
+            quiet = "no head of it has been folded here yet"
+        elif now_ms - seen > b.freshness_s * 1000:
+            quiet = f"its last head was folded here {_peer_age(now_ms - seen)} ago"
+        else:
+            return None
+        return (f"berth say: {to} is moored on device {did}, which is SILENT ({quiet}; past "
+                f"{b.freshness_s}s) — the note is recorded and crosses when the exchange resumes; until "
+                f"then {to} cannot read it (`just status device` on each device names the cure)")
+    return None
 
 
 # The only shape a sender, device or reader id may take to be printed.
@@ -2918,6 +2956,9 @@ def _main(argv):
         print(f"berth say: note #{row.get('dseq')} at {_rfc3339(row['at'] * 1000)} to "
               f"{to if to else 'the household (every session moored before it; no --to)'}",
               file=sys.stderr)
+        quiet = _silent_addressee_line(b, to)
+        if quiet:
+            print(quiet, file=sys.stderr)
         return 0
     print(__doc__.split("Commands:")[1].split("Resources")[0])
     return 2
