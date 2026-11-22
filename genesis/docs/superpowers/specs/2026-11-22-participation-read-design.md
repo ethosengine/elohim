@@ -212,6 +212,46 @@ P2, P3 and P9 are read.
 - How a person's rhythm comes to be known is theirs to declare and is held on their own device.
   This design builds none of it. It is the missing node of P3, and it stops there.
 
+**P12 — What reaches a person is sorted by kind before it is paced.** Added 2026-11-22 by a later
+session (4ce727b3, Claude Fable 5.2) from a reading of "Building always-on agents" (claude.com,
+2026-11-13), whose outbox is told to "start quiet" and tune its volume. P3, P9 and P11 pace asks.
+They do not make a red quiet. The kinds were already ruled in four places; this table only
+gathers them.
+
+| Kind | How it reaches a person | Ruled in |
+|---|---|---|
+| A red or a pain | Printed on its own line above the headline and outside any rollup; one open signal per declarer, target and kind, held and not repeated | Verification guidestar, Law IV; algedonic signal design |
+| An ask for what is theirs alone | Prepared, gathered with the others, asked once; held for a time they would welcome when they are not reachable | P3, P11; dialogue-stasis design, "Legitimate stops" |
+| Work that is ready | Stays ready and says for when | P9 |
+| Status and context | Pulled by the reader, not pushed | §6 |
+
+Quiet is the rule for the last three kinds and not for the first. A red that reaches nobody is
+the opposite failure, and the one-baseline sprint met it: a pipeline red for two days and nobody
+told. Whether any kind may interrupt a person who has declared `not to be disturbed` is theirs to
+declare and belongs to the missing node of P3. This ruling adds no record, signal or surface.
+
+**P13 — An ask to a person has one identity, and its silence has one meaning.** Added with P12,
+from the same article and the practitioners' thread under it. Three of their rules, as they hold
+here.
+
+- An ask is shown once per identity. Delivery to a session is at least once (arrival backlog,
+  row 76, delta 2026-11-22), so a repeat is recognised as the same ask and is not a second claim
+  on the person's attention.
+- An unanswered ask means the effect has not run. It is neither approval nor refusal, and the
+  item stays ready (P9). The thread's rule is "if nobody approves before a deadline, it doesn't
+  go". Ours keeps the first half and moves the deadline: a time may be set after which the agent
+  stops waiting and does what it may do alone, and none is set by which a person must answer.
+- Who widens what reaches a person is the person, by declaration (P3). "Start quiet and earn
+  more" has the direction of our reach rule, where a build record is born `self` and widens by
+  attestation, but nothing rules that reach governs what is said to a person, and this ruling
+  does not either. It fixes only that the widening is not earned from how the person responded
+  before: attention on content is witnessed privately on a person's own node (habit
+  `attention-witnessed-privately`), and engagement is refused as a measure
+  (`global-orchestra.md`, "receivability-when-ready").
+
+This constrains whatever carries an ask today: a parked ask in the stasis journal, a berth note.
+It designs no record for one.
+
 ## 4. P2P design gate
 
 The answer is class C: ephemeral composition reconstructed from permitted local source records.
@@ -258,6 +298,8 @@ Test follow replay for one upstream line per revision and no change to local con
 It must not assign or dispatch work automatically, compare participants on a leaderboard, nag at
 session start, become a second backlog, or surveil a person's activity. The caller asks for context.
 The answer never adopts incoming work, mints a claim, contacts a person or invokes an agent.
+It must not become an outbox either: nothing here tunes how often a person is reached from how
+they have responded (P13).
 
 ## 7. Open
 
@@ -266,3 +308,9 @@ The standing contract's full native-to-DNA join remains its own work. Grant-to-r
 is unknown wherever the recorded links are absent. Sibling freshness and follow attachment need
 explicit bounds; no latency is promised here. A Jenkins or sibling carrier needs its own contract
 implementation. The later AgentRef correction remains separately gated after this view is proven.
+
+P11 and the dialogue-stasis design's notification per incident per stage are not reconciled
+(arrival backlog, row 58, delta 2026-11-22); what may interrupt the steward is his to rule. The
+measures that would show how much reaches a person are declared and unread on 2026-11-22
+(`dialogue-blocked-seconds` is among the numb bounds on shem's session-start line), so P12 and
+P13 are rules with no reading behind them yet.

@@ -647,6 +647,32 @@ input is touched.
 Verify: one landing where the hand-over push posts the misses, a second device's log shows it took
 one from `epr peer intents` with no note sent, and the lander's log shows the reuse line for it.
 
+Read against an outside pattern (2026-11-22, session 4ce727b3, at the steward's request). The
+article "Building always-on agents" (claude.com, 2026-11-13) builds an unattended agent from an
+event inbox, timers, memory, permissions and an outbox, and a practitioners' thread under it adds
+what broke for them. Read against this station it changes nothing in the slice above and sharpens
+what the slice should show. The wider reading is in the arrival backlog (rows 23, 30, 50 and 76,
+delta of the same day).
+
+| The pattern says | What this station already holds | What the reading adds |
+|---|---|---|
+| Every source writes to an inbox that outlives the worker; nothing calls the agent directly | The ask is a record on the intent, read from a device's own fold whether or not a session is at its inbox | Nothing. It is this station's own sentence, and the general form of what rows 23, 50 and 76 each met with a note |
+| The inbox dedupes by the source's id, because delivery is at least once | A crossing event has a CID; berth's inbox takes a note from the fold once per CID (`genesis/agentic/bin/berth`, `known`), and the note hook is at least once since row 76's delta | A replayed or re-raised hand-over is the same ask. The `misses` event should be read once per CID by whatever lists it, and the slice's test should include a replay |
+| A follow-up is a timer in its own store that fires an event | Step 2: a miss settles by fold and not by a clock, and no time crosses that a second device must agree with. Step 3: the requester waits for nothing | No timer and no store. Where an asker does wait (a question, not a carry), the time it stops waiting is its own: written on the ask so the other side can see it, binding on nobody else. That is the "bound" in this station's title and row 76's last owed line |
+| One active worker per inbox | Nobody is assigned; a device takes a miss by its own answer | Nothing here. The pattern's rule is the `carry` claim's, and it stays in the next slice |
+| A wake should ask whether the lane can afford to run (the thread) | §9's test 3: capacity is sensed by the carrier, from its own lines | Nothing. It is the same rule in our words |
+
+Two things the pattern has that this plane has already refused, named so that a later reader does
+not add them: a scheduler that polls a store and wakes a worker (§9's vocabulary; the landing-plane
+design's "No agent wakes another agent" at S1), and a queue that holds what was asked (test 1: a
+request reserves nothing).
+
+One missing node, named and not built here. Chain: an ask that waits. Between "the asker's own
+stop-waiting time passes" and "the asker does the work alone": the asker's own session hears that
+the time has passed. Probe: a session whose only activity is a `--follow` on its inbox prints one
+line when an ask it raised passes its time, as it now prints one when a device goes silent.
+Current state: nothing reads an ask's time; the bound is the asker's own habit (row 76).
+
 Two stations found while reading the plan against the steward's reach reading (2026-11-22, §10):
 
 - [ ] **F6-k1 — one human with two devices and an agent counts as one voice wherever attestations are counted toward reach** (serves build-earns-reach-by-attestation)

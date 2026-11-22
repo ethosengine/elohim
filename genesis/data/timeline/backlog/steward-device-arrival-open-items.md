@@ -2525,3 +2525,138 @@ exchanging) and `next step: nothing owed; this device is arrived and exchanging`
 of an admitted device with no head, though every landing from this device now waits for that
 device at the lease step (delta above). Owed: the status names each admitted device it has never
 heard from, and says what that costs a landing.
+
+## Rows 23, 30, 50 and 76, delta (2026-11-22): read against an outside pattern, they are one property
+
+Read on 2026-11-22 by session 4ce727b3, at the steward's request, against the article "Building
+always-on agents" (claude.com, 2026-11-13) and the practitioners' thread under it. The article
+puts five things around an ordinary agent loop: an event inbox, timers, memory, permissions and an
+outbox. Its first rule is that no source calls the agent directly. Every source writes to an inbox
+that outlives the worker, and a worker that dies loses nothing because the inbox is what is true.
+
+These four rows are that rule's absence, met four ways. Each addressed something to a session: a
+note that waited for a look (23), a note that did not cross and was not retried (30), a watch that
+ended (50), an exchange that stalled under a session that was only waiting (76). What has landed
+since makes delivery to a session honest: the note hook is at least once (row 76's delta), a `say`
+names a silent device, a `--follow` says when one stops exchanging. A session is still the
+addressee.
+
+The record that is not addressed to a session is already designed. It is station F4-ask of the
+native-dev-tooling plan: a landing intent that a device reads from its own fold whether or not a
+session is at its inbox. That station is for the ask to carry a gate. The questions in row 76
+needed the same shape ("which commit to gate" sat for hours as a note). Nothing here widens
+F4-ask; the plan now carries this reading under it.
+
+What the pattern has and this plane does not add, checked against what is already ruled:
+
+| The pattern has | Why it is not added here |
+|---|---|
+| An inbox table per user | Berth's inbox is already a projection of notes on the one flow store, taken once per CID, with a cursor per reader and a claim that replays when it is not acknowledged (`genesis/agentic/bin/berth`). The habit `ledgers-fold-once` counts ledger files that keep their own cursor, not kinds of event, so an ask on the fold adds none |
+| A timer store and a scheduler | F4-ask, step 2: a miss settles by fold and not by a clock. The time an asker stops waiting is its own. The landing-plane design rules "No agent wakes another agent" at S1, and the plan's vocabulary introduces no queue or scheduler |
+| One active worker per inbox | The `carry` claim in F4-ask's next slice; for a landing, one lander per head (native-throughput ruling R6) |
+| A wake that asks whether the lane can afford to run | The steering plan's test 3: capacity is sensed by the carrier, from its own lines |
+
+Still owed, gathered here and unchanged in substance. Row 30: a note that did not cross is queued
+and not dropped. Rows 23 and 50(b): a sender can read whether its note was shown. Row 76: why the
+exchange stalled, a stall in one direction, and a bound on an ask. The last is the missing node the
+plan now names under F4-ask: the asker's own session hears when the time on its ask has passed.
+
+## Row 34, delta (2026-11-22): the held call, read against the same pattern
+
+The article's answer to an approval nobody is present to give is to end the run. The session is
+saved in the middle of the call, the request is shown to the person, and the answer comes back as
+an inbox event that starts a new run on the saved session. The thread adds three things from
+practice. Tie the approval to the exact payload. If nobody approves before a deadline, it does not
+go. And, from someone running ten sessions for months: "a session waiting on an approval prompt
+leaves no trace, so from outside it looks exactly like 'working'", which is this row.
+
+What is ours already. The dialogue-stasis design parks the call inside the live session with a
+fixed denial, lets independent authorized work continue, and does not approve for the person. A
+parked item's expiry "leaves the Refer unanswered, never a Refuse", and running the step later
+needs fresh validation (`2026-10-30-dialogue-stasis-loop-design.md`, "Pivots"). So the payload
+point holds by another route: no approval is carried forward to a later call.
+
+Where ours differs, on purpose. The thread's deadline is a deadline for the person. Ours is for the
+agent. The participation-read design's P11 reads silence from a person as the ordinary case and
+not as a fault, so when the time passes the effect stays unrun and stays ready, and the agent goes
+on to what it may do alone (P13, added with this delta). What this row owes is the agent's half and
+is unchanged: "a time after which a held call in an unattended agent is refused rather than kept".
+
+What the reading adds:
+
+| Added | Why |
+|---|---|
+| The end-the-run form is not available here yet | It needs a session that can end and be resumed as itself. Backlog `session-envelope-resume-after-restart` (partial) records that a session resumed in a new process after a workspace restart cannot reopen its envelope, and every berth claim it makes is refused. The shift launcher resumes by exact saved session id and is dormant. Until one of those is live, parking in the running session is the form we have, and a held delegated agent is resumed by stop-and-message, as this row found |
+| The trace should come from the held agent's own record | The same practitioner judges liveness "per session from that session's own outputs" and not from shared state. "The agent list says running" is shared state. The line this row asks for ("waiting on an approval since …") would be read from the held call itself |
+
+Not checked for this delta: whether the stasis sensor's hooks run inside a delegated agent, which
+is where this row was found.
+
+## Row 58, delta (2026-11-22): two of our own rulings about silence are not reconciled
+
+Found while reading the article's outbox section ("start quiet", tune message volume with evals)
+against our own writing. Two rulings meet at this row and say different things.
+
+The participation-read design, P11 (2026-11-22): silence from a person is the ordinary case and is
+not read as a fault; attention is spent last; it names five notifications in about ten minutes for
+one silence as the failure. The dialogue-stasis design (2026-10-30): the coordinator times an
+unanswered dialog, Approach at three minutes and Breach at five, and sends one berth note and one
+push-notification request per incident per stage.
+
+They agree on more than they differ. The stasis timing changes who handles a stall, the ladder and
+not the steward, and it does not change the person's standing; an unanswered ask expires as
+unanswered. But a person can still be notified at each stage of each incident, and this row is
+three incidents opened in one night's silence, with a second instance named by P11 the next day.
+
+What our own writing already sorts, in four places, gathered as P12 of the participation-read
+design with this delta: a red or a pain is printed on its own line and outside any rollup; an ask
+for what is the steward's alone is prepared, gathered and held for a time he would welcome; work
+that is ready stays ready; status is pulled. Quiet is the rule for the last three and not for the
+first, which is the other failure this sprint family knows (a pipeline red for two days and nobody
+told, one-baseline journal, 2026-11-19).
+
+Owed, and the steward's to rule because it sets what may interrupt him: whether the notification
+per stage stands once a person can declare reachability (the missing node of P3), and what it is
+until then, while reachability reads `unknown`. This row's first owed item is unchanged: a state
+for "the steward directed an unattended run".
+
+On the article's "evals": the measures that would say how much reaches the steward are declared and
+unread. `dialogue-blocked-seconds` is among the numb bounds on shem's session-start line
+(2026-11-22), and the habit `dialogue-stalls-are-answered` is red. Both dated overruns were found
+by the steward and not by a measure.
+
+## Row 79 — nothing enforces a session's write set, and no row owned that
+
+Found 2026-11-22 while reading the article's permissions section against our own writing. The
+article says an unattended run "holds the user's access" and recommends a proxy outside the agent
+that holds the credentials, so that what the agent could do is answerable from the proxy's
+configuration.
+
+Its premise is true of an interactive session here, in our own words. A runtime and its children
+"are one principal on this device", and the session guard "is an accident guard, not
+authentication" (backlog `session-envelope-resume-after-restart`). A covenant clause is signed
+with the repository's brit key, "a recorded promise, not a proof" until the human's own key
+co-signs (habit `rule-variance-under-covenant`, guard). And the wall-clock journal wrote: "Nothing
+enforces the write set, so it is said here and in the commits". Bounded, expiring grants are real
+for the delegated agents (the CI runner, the compute worker) and not for the session that holds
+the shell.
+
+What is already ruled, so that the cure is not read as "add a gate":
+
+| Ruling | Where |
+|---|---|
+| Within one principal a gate can already be bypassed; it carries weight once a second principal is admitted | landing-plane design, the S2 gaps |
+| The operator's loop is not gated; a covenant-altitude promotion may be | verification guidestar, Law III |
+| The harness witnesses an agent's writes; an agent narrating its own bookkeeping is a harness gap | `.claude/memory/feedback_harness_witnesses_agents_dont_narrate.md` |
+| A participant signs its own events with its own key and refuses outside its bounds; the substrate checks `bounded_by` | `genesis/docs/architecture/rea-compute-commitment-primitive.md` |
+
+So the keyless agent behind a proxy is not our general model, and effects are already mediated
+where a place exists: the shift guardian owns leases, commit, landing and push, and the shift
+launcher is dormant. What is owed is narrower than enforcement. A write outside an honoured
+covenant's write set is witnessed by the harness and shown, to the session and beside the write
+sets `berth status` already prints, with no agent having to say so. Whether it should refuse is a
+question for the arrival of a second principal.
+
+Not read for this row: whether any hook already compares a write's path with the write set. A
+search of `.claude/hooks` for the write set found it in the covenant ask
+(`participant-standing.py`) and in tests, and in `genesis/agentic/bin/berth`.
