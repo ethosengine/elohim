@@ -67,7 +67,7 @@
         "run": {
           "kind": "root-just",
           "recipe": "_gate-eprfs",
-          "cargo": { "workspace": "elohim/eprfs", "profile": "dev", "rustflags": "", "env": { "CARGO_BUILD_JOBS": "6" } }
+          "cargo": { "workspace": "elohim/eprfs", "profile": "dev", "rustflags": "", "env": { "CARGO_BUILD_JOBS": "6", "RUST_TEST_THREADS": "4" } }
         }
       },
       "eprfs-live-corpus": {
