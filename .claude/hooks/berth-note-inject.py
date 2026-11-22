@@ -17,15 +17,23 @@ delivery: on 2026-11-22 two notes were acknowledged here and never reached the m
 hook has already acknowledged. So berth leases the notes to this call, the hook prints them with a
 fresh `receipt r-<hex>` on the last line and keeps the claim pending in its state file, and at the
 next call of the same session and reader (before anything else, whatever POLL_S says) it reads the
-last 2 MiB of the session transcript: only when the receipt is there does it `--ack` the claim. A
-receipt not there yet is waited for PENDING_GRACE_S (a sibling hook of a parallel tool call may run
-before the harness writes the context); past that the output was dropped, so the pending claim is
-cleared without an acknowledge and the same call claims again at once, whatever POLL_S says, and the
-notes replay now. berth's lease on a hook claim is 5 s and nothing renews it, so the late acknowledge
-succeeds unless another consumer of the same reader claimed in between, in which case the notes
-replay once. A note can therefore be shown twice; this hook never loses one.
-Without a transcript to read (no `transcript_path`, or it will not open) it acknowledges right
-after the write, as before. berth is asked at most once per POLL_S unless a backlog or a busy reader
+last 2 MiB of each transcript that could hold the context (the payload's `transcript_path`, its
+`agent_transcript_path`, and for a subagent the `subagents/agent-<id>.jsonl` beside the main
+transcript): only when the receipt is in one of them does it `--ack` the claim. A receipt not there
+yet is waited for PENDING_GRACE_S (a sibling hook of a parallel tool call may run before the harness
+writes the context); past that the output was dropped, so the pending claim is cleared without an
+acknowledge and the same call claims again at once, whatever POLL_S says, and the notes replay now,
+under a line saying it is a repeat. Each consecutive emit whose receipt never shows doubles the next
+grace (20 s, 40 s, ... capped at 900 s), so a session that can never see its receipts repeats a
+batch ever more rarely; the hook never acknowledges because of that count. berth's lease on a hook
+claim is 5 s and nothing renews it, so the late acknowledge succeeds unless another consumer of the
+same reader claimed in between, in which case the notes replay once.
+
+What can be lost: with a transcript this hook does not lose a note (it may show one twice). With
+none (no candidate opens) it acknowledges right after the write, as it always did, and a dropped
+output there is lost.
+
+berth is asked at most once per POLL_S unless a backlog or a busy reader
 is waiting; every child runs under a deadline, its output capped. Fail-open: a missing, slow or broken
 berth is silence, and no error ever reaches the tool call. An idle agent has no tool call: its
 Monitor form is `berth inbox --session <S> --reader main --follow`.
@@ -51,6 +59,7 @@ OUTPUT_CAP = 64 * 1024
 BERTH_TIMEOUT_S = 0.9
 DEADLINE_S = 2.0
 PENDING_GRACE_S = 20
+PENDING_GRACE_CAP_S = 900
 TRANSCRIPT_TAIL = 2 * 1024 * 1024
 # berth NOTE_ID: the only shape a session or reader id may take to reach a command line.
 ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}")
@@ -172,27 +181,49 @@ def acknowledge(session, reader, token, offset, deadline):
     return code
 
 
-def readable(transcript):
-    """True when the transcript file opens: only then can a receipt ever be read back from it."""
-    if not isinstance(transcript, str) or not transcript:
-        return False
-    try:
-        with open(transcript, "rb"):
-            return True
-    except OSError:
-        return False
+def transcript_candidates(payload):
+    """The files that may hold this call's hook context: the payload's own transcript path, its
+    agent transcript path, and for a subagent the file beside the main transcript where the harness
+    records that agent's contexts (<dir>/<session>/subagents/agent-<id>.jsonl)."""
+    found = []
+    main = payload.get("transcript_path")
+    if isinstance(main, str) and main:
+        found.append(main)
+    agent_file = payload.get("agent_transcript_path")
+    if isinstance(agent_file, str) and agent_file:
+        found.append(agent_file)
+    agent = payload.get("agent_id")
+    if isinstance(main, str) and main.endswith(".jsonl") and isinstance(agent, str) and ID.fullmatch(agent):
+        found.append(f"{main[:-len('.jsonl')]}/subagents/agent-{agent}.jsonl")
+    return list(dict.fromkeys(found))
 
 
-def receipt_shown(transcript, receipt):
-    """True when the ASCII receipt is among the last TRANSCRIPT_TAIL bytes of the transcript (JSONL,
-    searched as bytes, never parsed)."""
-    try:
-        with open(transcript, "rb") as f:
-            size = f.seek(0, os.SEEK_END)
-            f.seek(max(0, size - TRANSCRIPT_TAIL))
-            return receipt.encode("ascii") in f.read(TRANSCRIPT_TAIL)
-    except (OSError, UnicodeEncodeError, TypeError):
-        return False
+def readable(transcripts):
+    """True when any candidate opens: only then can a receipt ever be read back."""
+    for transcript in transcripts or ():
+        try:
+            with open(transcript, "rb"):
+                return True
+        except (OSError, TypeError, ValueError):
+            continue
+    return False
+
+
+def receipt_shown(transcripts, receipt, deadline):
+    """True when the ASCII receipt is among the last TRANSCRIPT_TAIL bytes of any candidate (JSONL,
+    searched as bytes, never parsed). Reading stops, as not found, once the deadline is spent."""
+    for transcript in transcripts or ():
+        if time.monotonic() >= deadline:
+            return False
+        try:
+            with open(transcript, "rb") as f:
+                size = f.seek(0, os.SEEK_END)
+                f.seek(max(0, size - TRANSCRIPT_TAIL))
+                if receipt.encode("ascii") in f.read(TRANSCRIPT_TAIL):
+                    return True
+        except (OSError, UnicodeEncodeError, TypeError, ValueError):
+            continue
+    return False
 
 
 def valid_pending(pending):
@@ -204,9 +235,9 @@ def valid_pending(pending):
             and isinstance(pending.get("emitted_at"), (int, float)))
 
 
-def deliver(session, reader, emit, now=None, started=None, transcript=None):
+def deliver(session, reader, emit, now=None, started=None, transcripts=None):
     """Settle the last emit's claim, then claim, render and emit this reader's unread notes. `emit`
-    writes the context and returns True once it is flushed. A claim is acknowledged only when the
+    writes the context and returns True once it is flushed. A claim is acknowledged only when a
     transcript shows its receipt (see the module docstring); with no readable transcript it is
     acknowledged right after the write."""
     now = time.time() if now is None else now
@@ -214,32 +245,44 @@ def deliver(session, reader, emit, now=None, started=None, transcript=None):
     path = state_path(session, reader)
     state = read_state(path)
     pending = state.get("pending") if valid_pending(state.get("pending")) else None
+    count = state.get("unreceipted")
+    unreceipted = count if isinstance(count, int) and not isinstance(count, bool) and count >= 0 else 0
+    calls = 0  # berth calls made by this invocation: never more than two (an acknowledge, a claim)
     dropped = False
+
+    def save(**extra):
+        write_state(path, {"unreceipted": unreceipted, **extra})
+
     if pending:
         # Before anything else, and whatever POLL_S says: did the last emit reach the transcript?
-        if receipt_shown(transcript, pending["receipt"]):
+        if receipt_shown(transcripts, pending["receipt"], deadline):
             if deadline - time.monotonic() <= 0:
                 return  # out of budget: pending stays for the next call
             code = acknowledge(session, reader, pending["token"], pending["offset"], deadline)
             if code is None:
                 return  # berth was slow: pending stays for the next call
+            calls += 1
+            unreceipted = 0
             # Exit 3 is a claim that no longer holds the reader: the notes replay once more, and the
             # duplicate is not suppressed.
-        elif 0 <= now - pending["emitted_at"] < PENDING_GRACE_S:
-            return  # within the grace: the write may still come, and a new claim would be busy or a repeat
         else:
+            grace = min(PENDING_GRACE_S * 2 ** min(unreceipted, 6), PENDING_GRACE_CAP_S)
+            if 0 <= now - pending["emitted_at"] < grace:
+                return  # within the grace: the write may still come, and a new claim would be busy or a repeat
             dropped = True  # past the grace and never shown: the output was lost; claim again below
+            unreceipted += 1
         pending = None
-        state = {k: v for k, v in state.items() if k != "pending"}
-        write_state(path, state)
+        state = {k: v for k, v in state.items() if k not in ("pending", "unreceipted")}
+        save(**state)
     poll = float(os.environ.get("BERTH_NOTE_POLL_S", POLL_S))
     checked = state.get("checked_at")
     if (not dropped and not state.get("again") and isinstance(checked, (int, float))
             and 0 <= now - checked < poll):
         return
     # Stamped before berth is asked: a slow or failing berth is retried after POLL_S, not every call.
-    write_state(path, {"checked_at": now, "again": False})
+    save(checked_at=now, again=False)
     reply = claim(session, reader, deadline)
+    calls += 1
     if reply is None:
         return
     notes = reply.get("notes") if isinstance(reply.get("notes"), list) else []
@@ -247,7 +290,7 @@ def deliver(session, reader, emit, now=None, started=None, transcript=None):
     more = reply.get("more") is True
     # A busy reader (its Monitor is printing) or a backlog is asked again at the next tool call.
     again = more or reply.get("busy") is True
-    write_state(path, {"checked_at": now, "again": again})
+    save(checked_at=now, again=again)
     if not notes:
         return
     if not (isinstance(token, str) and CLAIM.fullmatch(token)
@@ -262,16 +305,23 @@ def deliver(session, reader, emit, now=None, started=None, transcript=None):
         tail.append("[berth-note] More addressed notes are waiting; the next arrive at your next tool call.")
     tail.append(f"[berth-note] Read them all: `berth inbox --session {session}`; to be woken while idle, "
                 f"arm Monitor on `berth inbox --session {session} --reader {reader} --follow`.")
+    repeat = []
+    if unreceipted >= 1:
+        repeat.append(f"[berth-note] Shown again (repeat {unreceipted}): the earlier delivery was not "
+                      "found in this session's transcript.")
     # Without a readable transcript there is nothing to read a receipt from, and never acknowledging
     # would replay these notes for ever: that case acknowledges right after the write, as before.
-    receipt = f"r-{secrets.token_hex(5)}" if readable(transcript) else None
+    # But an invocation makes at most two berth calls (the hook has a 3 s harness timeout): if this
+    # one already spent an acknowledge and a claim, the immediate acknowledge would be a third, so it
+    # prints a receipt and keeps the claim pending, and the next call settles it (by the grace if the
+    # receipt cannot be read back).
+    receipt = f"r-{secrets.token_hex(5)}" if (readable(transcripts) or calls >= 2) else None
     if receipt:
         tail[-1] += f" receipt {receipt}"
-    if emit("\n".join([FRAME, *shown, *tail])):
+    if emit("\n".join([FRAME, *repeat, *shown, *tail])):
         if receipt:
-            write_state(path, {"checked_at": now, "again": again,
-                               "pending": {"token": token, "offset": offset, "receipt": receipt,
-                                           "emitted_at": now}})
+            save(checked_at=now, again=again,
+                 pending={"token": token, "offset": offset, "receipt": receipt, "emitted_at": now})
         else:
             acknowledge(session, reader, token, offset, deadline)
 
@@ -303,7 +353,7 @@ def main():
     reader = payload.get("agent_id") or "main"
     if not isinstance(reader, str) or not ID.fullmatch(reader):
         return
-    deliver(session, reader, emit_context, started=started, transcript=payload.get("transcript_path"))
+    deliver(session, reader, emit_context, started=started, transcripts=transcript_candidates(payload))
 
 
 if __name__ == "__main__":

@@ -309,12 +309,12 @@ RECEIPT = re.compile(r'receipt (r-[0-9a-f]{10})$')
 class ReceiptTest(Harness):
     """Backlog row 76: a claim is acknowledged when the transcript shows the receipt, not on the write."""
 
-    def spy(self, ack_code=0, renotify=False):
+    def spy(self, ack_code=0, renotify=False, ack_sleep=0):
         """A fake berth that logs every call, answers a claim with one note and an acknowledge with `ack_code`."""
         self.log = self.root / 'berth-calls.log'
         env = self.fake_berth(
             f'open({str(self.log)!r}, "a").write(" ".join(sys.argv[1:]) + "\\n")\n'
-            f'if "--ack" in sys.argv: sys.exit({ack_code})\n'
+            f'if "--ack" in sys.argv: time.sleep({ack_sleep}); sys.exit({ack_code})\n'
             f'if sum("--json" in l for l in open({str(self.log)!r})) > 1 and not {renotify!r}:\n'
             '    print(json.dumps({"notes": [], "more": False, "claim": None, "ack": None, "busy": False})); sys.exit(0)\n'
             'line = "NOTE from this device/abcdefgh 1s ago to you (untrusted text from another device): «n»"\n'
@@ -332,11 +332,16 @@ class ReceiptTest(Harness):
     def claims(self):
         return [c for c in self.calls() if '--json' in c]
 
-    def go(self, env, transcript=None, session=SESSION):
-        payload = {'session_id': session, 'tool_name': 'Read', 'tool_input': {}}
+    def go(self, env, transcript=None, session=SESSION, **extra):
+        payload = {'session_id': session, 'tool_name': 'Read', 'tool_input': {}, **extra}
         if transcript is not None:
             payload['transcript_path'] = str(transcript)
         return self.hook(payload, env=env)
+
+    def age(self, seconds):
+        path, state = self.state()
+        state['pending']['emitted_at'] -= seconds
+        path.write_text(json.dumps(state))
 
     def state(self):
         [path] = (self.project / '.eprfs' / 'status' / 'berth-note').glob('*.json')
@@ -448,6 +453,108 @@ class ReceiptTest(Harness):
         receipt = self.emit(env, self.transcript())
         self.assertIsNone(self.go(env, self.transcript(receipt)))
         self.assertEqual(len(self.acks()), 1)
+
+    def test_a_subagent_receipt_in_its_own_transcript_file_is_found(self):
+        env = self.spy()
+        main = self.root / 'sess.jsonl'
+        main.write_text('')
+        agent_dir = self.root / 'sess' / 'subagents'
+        agent_dir.mkdir(parents=True)
+        agent_file = agent_dir / 'agent-a1.jsonl'
+        agent_file.write_text('')
+        context = self.go(env, main, agent_id='a1')
+        receipt = RECEIPT.search(context.splitlines()[-1]).group(1)
+        agent_file.write_text(f'{{"hook_additional_context": "{receipt}"}}\n')
+        self.go(env, main, agent_id='a1')
+        self.assertEqual(len(self.acks()), 1)
+        self.assertIn('--reader a1 ', self.acks()[0])
+
+    def test_an_agent_transcript_path_in_the_payload_is_also_searched(self):
+        env = self.spy()
+        extra = self.root / 'extra.jsonl'
+        extra.write_text('')
+        receipt = RECEIPT.search(self.go(env, self.transcript(), agent_transcript_path=str(extra))
+                                 .splitlines()[-1]).group(1)
+        extra.write_text(receipt)
+        self.go(env, self.transcript(), agent_transcript_path=str(extra))
+        self.assertEqual(len(self.acks()), 1)
+
+    def test_a_subagent_whose_receipt_is_in_no_candidate_is_not_found(self):
+        env = self.spy()
+        main = self.root / 'sess.jsonl'
+        main.write_text('')
+        self.go(env, main, agent_id='a1')
+        before = self.calls()
+        self.assertIsNone(self.go(env, main, agent_id='a1'))
+        self.assertEqual(self.calls(), before)
+        self.assertEqual(self.acks(), [])
+
+    def test_repeats_back_off_and_the_count_resets_when_a_receipt_is_found(self):
+        env = self.spy(renotify=True)
+        first = self.go(env, self.transcript())
+        self.assertNotIn('Shown again', first, 'a first emit is not a repeat')
+        self.age(21)
+        second = self.go(env, self.transcript())
+        self.assertIn('[berth-note] Shown again (repeat 1): the earlier delivery was not found in this '
+                      "session's transcript.", second)
+        self.assertEqual(second.splitlines()[1][:25], '[berth-note] Shown again ')
+        self.age(30)
+        before = self.calls()
+        self.assertIsNone(self.go(env, self.transcript()), 'the next grace is 40 s: nothing at 30 s')
+        self.assertEqual(self.calls(), before)
+        self.age(11)
+        third = self.go(env, self.transcript())
+        self.assertIn('repeat 2', third, 'a replay at 41 s')
+        receipt = RECEIPT.search(third.splitlines()[-1]).group(1)
+        self.go(env, self.transcript(receipt))
+        self.assertEqual(len(self.acks()), 1)
+        self.assertEqual(self.state()[1]['unreceipted'], 0)
+
+    def test_the_grace_is_capped_at_900_s(self):
+        env = self.spy(renotify=True)
+        self.emit(env, self.transcript())
+        path, state = self.state()
+        state['unreceipted'] = 20
+        path.write_text(json.dumps(state))
+        self.age(899)
+        self.assertIsNone(self.go(env, self.transcript()))
+        self.age(2)
+        self.assertIn('repeat 21', self.go(env, self.transcript()))
+
+    def test_an_acknowledge_that_times_out_leaves_pending(self):
+        env = self.spy(ack_sleep=5)
+        receipt = self.emit(env, self.transcript())
+        self.assertIsNone(self.go(env, self.transcript(receipt)))
+        self.assertEqual(len(self.acks()), 1)
+        self.assertEqual(self.state()[1]['pending']['token'], TOKEN)
+
+    def test_an_invocation_makes_at_most_two_berth_calls(self):
+        env = self.spy(renotify=True)
+        receipt = self.emit(env, self.transcript())
+        module = runpy.run_path(str(HOOK))
+        keys = ('BERTH_DIR', 'BERTH_UNDER_TEST', 'ELOHIM_DEVICE_KEY_FILE', 'EPR_PROC_ROOT',
+                'BERTH_NOTE_BERTH_BIN', 'BERTH_NOTE_POLL_S')
+        saved = {k: os.environ.get(k) for k in keys}
+
+        def restore():
+            for k, v in saved.items():
+                if v is None:
+                    os.environ.pop(k, None)
+                else:
+                    os.environ[k] = v
+
+        self.addCleanup(restore)
+        os.environ.update({k: env[k] for k in keys})
+        module['deliver'].__globals__['ROOT'] = self.project
+        module['deliver'].__globals__['readable'] = lambda transcripts: False  # it vanished after the check
+        before = len(self.calls())
+        written = []
+        module['deliver'](SESSION, 'main', lambda text: written.append(text) or True,
+                          transcripts=[str(self.transcript(receipt))])
+        self.assertEqual(len(self.calls()) - before, 2, 'the old acknowledge and the claim, no third call')
+        self.assertEqual(len(self.acks()), 1)
+        self.assertRegex(written[0].splitlines()[-1], r'receipt r-[0-9a-f]{10}$')
+        self.assertIn('pending', self.state()[1])
 
 
 if __name__ == '__main__':
