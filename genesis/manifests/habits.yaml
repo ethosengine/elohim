@@ -2301,10 +2301,10 @@ habits:
       - "a2o @concern:devices-share-one-berth (genesis/a2o/features/devflow/devices-share-one-berth.feature, two devices in one container: a held claim refused naming the holder; a push stopped at its landing while the other device holds dev-integration, alpha-fleet or jenkins-dispatch; a silent device read as unconfirmed; an override in effect at once after a long silence that binds the returning device; concurrent claims settled once; a retired device's lease dropped without restart; @act:host; cd genesis/a2o && EPR_BIN=<the pinned epr, not the launcher> pnpm exec cucumber-js --profile devices-share-one-berth --tags '@concern:devices-share-one-berth and not @requires:shem and not @wip'. it selects all ten in-container scenarios)"
       - "a2o @concern:devices-share-one-berth and @requires:shem (the same feature's cross-workspace scenario: the held-claim refusal between the ethosengine and shem workspaces over their own link, no coordination record carried by git, a shared server or the operator; holder/contender halves selected by A2O_T8_ROLE, held when unset; green requires the joined real-workspace receipt)"
     evidence: >
-      DELTA 2026-11-22b (status unchanged; who is working near you, and whether a device is hearing you, are readable): on dev `c71f584f8` `berth status` prints each live mooring's declared paths; `berth impact <paths>` (alias `holds`) is an advisory read that always exits 0 and names, per nearby session on this device or a sibling, the gate projects shared with it and their last recorded seconds, from `brit build affected` over both path sets (2.5 s per pair on shem; ark cli against eprfs-core shares `elohim-ark` at about 122 s); a device that has acknowledged none of this device's records prints `UNACKED` in status, on `berth say` and once in the follow; and the session-start line names the follow command and asks for declared paths. Observed between shem and ethosengine the same day: a reply read with no follow armed took 23 min to be seen, and the next three, with it armed, 4 s each. Not observed: a live sibling mooring in `berth impact` (every sibling mooring held here was past its ttl), and the laptop (`z6MkgHju…xMbu`) has still acknowledged nothing from shem. The follow repeats its UNACKED line each time it is re-armed.
-    evidence-fingerprint: sha256:d57cf0072ffb6949
-    evidence-bytes: 26157
-    evidence-entries: 29
+      DELTA 2026-11-22c (status unchanged; a declaration follows what a session writes, presence has a machine form, and one read answers where, what and how): a PostToolUse hook, `berth-writes-observe`, extends a session's declared paths with each repository path it edits, silently and fail-open, after a stale declaration let two sessions append the same backlog row (arrival row 79); `berth status --json` (contract `status-json@1`) is a pure read of live moorings here and on siblings and of each device's silence and acknowledgement, 3.2 s on shem with the peer read and 0.35 s without; and `epr flow context <dir> --participate` composes it with open stations, commitments, habits, landing intents and notes for one caller, a session on this device, opening nothing that creates. A follow now announces a silent or unacknowledging device when it begins and ends, not at each re-arm. Unknown in that read and printed so: covenant scope, habit red mass, graph relation, grant, and every person's reachability. Not run on a second device at the time of writing.
+    evidence-fingerprint: sha256:684f96c427f8be2d
+    evidence-bytes: 27218
+    evidence-entries: 30
     refs:
       - "spec: genesis/docs/superpowers/specs/2026-10-23-workspaces-cooperate-as-devices-design.md §3.4 (steward-scoped resources, effectiveness, tie-break, refusal wording), §3.5 (pre-push claims dev-integration), §6 (this habit)"
       - "plan: genesis/docs/superpowers/plans/2026-10-23-workspaces-cooperate-as-devices-plan.md (T0 story and habit; T6 lease view; T7 pre-push and status; T8 the cross-workspace receipt that flips this green)"
@@ -2412,10 +2412,10 @@ habits:
     active: false
     checks: []
     evidence: >
-      DELTA 2026-11-22 (declared UNWIRED, inactive): the steward's reading the same day, that the reach ladder builds the layers of trust, the attesting network joined to its REA and VSM systems is what lets a thing become trusted and sustained in the commons, and the DNA notary gives it distributed integrity and network sovereignty over provenance, is what the design's premises 4 and 5 and rulings D4 and D5 already say. No habit stated it, so stations F6-standing and F6 were held under the rule that work serving no habit stays unclaimed. This atom states it and names no check: nothing observes it yet. Read on dev 6934782dc: `trusted` is empty (k = 1), no build attestation kind exists in the DNA, the issuer floor accepts all, and release promotion counts agent strings.
-    evidence-fingerprint: sha256:23d28070afe7c186
-    evidence-bytes: 773
-    evidence-entries: 1
+      DELTA 2026-11-22b (UNWIRED, inactive; the standing read has had two adversarial rounds, and its code waits for a roll): round two found three more ways a count could exceed the people counted, all cured in the design: the witnessing body is named by a prior policy with a quorum independent of the acting steward and the builder, the witness certifies the overlap between a person and the collectives they belong to, and the builder's own identity and every principal they represent are excluded, so `count` takes the builder. The participation read is its second consumer and today reports native standing only. Its two first code items change `elohim-storage` and the published `epr-rea`; both select the Edge build and its deploy, so neither was started (arrival backlog row 75, delta 2).
+    evidence-fingerprint: sha256:86678015eb8a824e
+    evidence-bytes: 1566
+    evidence-entries: 2
     first_move: >-
       Two things are observable before a second principal exists. First, the standing read: redraft
       the standing record and council roster (station F6-standing) so a signer resolves to a principal;
@@ -2622,9 +2622,9 @@ habits:
       - "a2o genesis/a2o/features/devflow/native-gate-evidence.feature reuse rule (this workspace's own green stands in; a red or an unadmitted signer never does)"
     evidence: >
       DELTA 2026-11-22b (status unchanged; the two gates that run the eprfs workspace's tests run them at four threads): the eprfs gate in landing 15 (`005649870`), behind the lock fix a second device asked for (arrival backlog row 73); `memory-ceremony` in `5f74946ad` (row 60, delta 2). Measured: the eprfs workspace's tests about 1,620 to 1,730 s at one thread on shem (2,110 s for the whole gate in landing 12) against 578 to 669 s at four, and 802 s for the whole gate from a cold slot on the sibling; `memory-ceremony`'s two test legs 243 s at one thread in landing 15 against 81 s at four (the whole gate 588 s against 323 s, the second run with a warm build). On landing 15 itself the eprfs gate did not run on shem: the sibling's verdict was reused in 32 s. Both caps are declared on the gate projects' own manifests and `pool-policy.json` names no project. The first run on the second device had been red at four threads (a lock released by closing outlives its holder while a forked child has a copy); ten clean runs on shem had not shown it. The complete lock fix touches a crate CI reads as an Edge build input and waits for a roll (row 75).
-    evidence-fingerprint: sha256:a451a0c8a3cb34e1
-    evidence-bytes: 35940
-    evidence-entries: 36
+    evidence-fingerprint: sha256:3b03eaa9bb808f04
+    evidence-bytes: 36769
+    evidence-entries: 37
     guard: >
       Regression risks: (1) reusing on a key that omits something the recipe reads — the recipe
       body, the project tree, a submodule pin, a repo file a test include_str!s; the input audit
