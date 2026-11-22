@@ -39,7 +39,8 @@ Commands:
                                                                    --to takes the full id or the 8-character
                                                                    prefix every berth line prints; prints
                                                                    `berth say: note #<dseq> at <time> to <who>`
-                                                                   on stderr
+                                                                   on stderr, and a second line when the
+                                                                   addressee is moored on a SILENT device
   berth inbox   --session S [--peek] [--all] [--follow] [--json]  read notes said to this session
   berth inbox   --session S --reader R [--limit N] [--peek] [--json]
   berth inbox   --session S --reader R --follow
@@ -54,7 +55,11 @@ Commands:
                                                                    unacked claim expires and they replay. The
                                                                    main agent's hook reader is `main`; an idle
                                                                    agent's Monitor: `berth inbox --session S
-                                                                   --reader main --follow` (no head/cut pipe)
+                                                                   --reader main --follow` (no head/cut pipe).
+                                                                   --follow also prints `[berth] device <did>
+                                                                   is SILENT: ...` when a device with a moored
+                                                                   session stops exchanging, and `... is
+                                                                   exchanging again` when it resumes
   berth who     RESOURCE                                           json of the holder (or null)
   berth room    cargo [--json] [--want N]                          read-only: may N more builds start here now?
                                                                    seats (io.max_concurrent_heavy), the builds
@@ -2156,6 +2161,67 @@ def _silent_addressee_line(b, to):
     return None
 
 
+# How often a follower re-reads the other devices' heads. Silence is `freshness_s` (90 s) without
+# a head, so a follower hears of it within that plus this.
+SILENCE_POLL_S = 60
+
+
+class _SilenceWatch:
+    """What a waiting session is told about the devices it may be waiting on.
+
+    `berth inbox --follow` prints notes, and a stalled exchange delivers none, so a follower heard
+    nothing at all while its peer's device was unreachable (2026-11-22, backlog
+    `steward-device-arrival-open-items` row 76). Every SILENCE_POLL_S this reads the lease view and
+    returns one line when a device goes SILENT (no head folded here within `freshness_s`) and one
+    when it resumes. A device counts when a session is moored on it within the mooring ttl, or
+    when this follower saw it exchanging earlier: a device gone for weeks says nothing at each
+    start. Lines begin `[berth] device`, are built here from this device's own fold, and carry no
+    text another session wrote. The read changes nothing this berth remembers, and an unreadable
+    view or a workspace that is not a device is silence."""
+
+    def __init__(self, b):
+        self.b = b
+        self.silent = {}  # device -> whether it was silent at the last reading that counted it
+        self.next_at = 0.0
+
+    def lines(self):
+        b = self.b
+        if b.now() < self.next_at:
+            return []
+        self.next_at = b.now() + SILENCE_POLL_S
+        view, err = b._read_peer_leases(PEER_TIMEOUT_S)
+        if err or not isinstance(view, dict):
+            return []
+        others = view.get("others") if isinstance(view.get("others"), dict) else {}
+        now_ms = b._view_now(view)
+        out = []
+        for did in sorted(others):
+            info = others[did] if isinstance(others[did], dict) else {}
+            if not isinstance(did, str) or not NOTE_ID.fullmatch(did):
+                continue
+            seen = info.get("last_seen")
+            known = isinstance(seen, (int, float))
+            quiet = not known or now_ms - seen > b.freshness_s * 1000
+            was = self.silent.get(did)
+            if was is None:
+                moorings = info.get("moorings") if isinstance(info.get("moorings"), dict) else {}
+                live = any(isinstance(since, (int, float)) and now_ms - since <= b.mooring_ttl_s * 1000
+                           for since in moorings.values())
+                if quiet and not live:
+                    continue  # long gone, and nobody moored there to wait for
+            self.silent[did] = quiet
+            if quiet and not was:
+                age = f"its last head was folded here {_peer_age(now_ms - seen)} ago" if known \
+                    else "no head of it has been folded here yet"
+                out.append(f"[berth] device {did} is SILENT: {age} (past {b.freshness_s}s) — notes from its "
+                           f"sessions cannot arrive until the exchange resumes; `just status device` on each "
+                           f"device names the cure")
+            elif was and not quiet:
+                out.append(f"[berth] device {did} is exchanging again: head seq {info.get('seq')} folded "
+                           f"{_peer_age(now_ms - seen)} ago")
+        return out
+
+
 # The only shape a sender, device or reader id may take to be printed.
 NOTE_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}")
 GATE_LIVE_NOTE_KINDS = ("gate-red@1", "gate-final@1")
@@ -2800,6 +2866,7 @@ def _main(argv):
         if reader is not None and follow:
             # The Monitor form: claim, print and flush each note, THEN acknowledge it, so a closed
             # pipe costs no note it did not print and a hook of the same reader never prints it too.
+            watch = _SilenceWatch(b)
             while True:
                 entries, token, end, _, _ = b.reader_claim(session, reader, lease_s=30.0)
                 for note, offset in entries:
@@ -2811,6 +2878,11 @@ def _main(argv):
                     b.reader_ack(session, reader, token, offset)
                 if token:
                     b.reader_ack(session, reader, token, end)
+                try:
+                    for line in watch.lines():
+                        print(line, flush=True)
+                except (BrokenPipeError, OSError):
+                    return 0
                 b.sleep(2)
         if reader is not None and peek:
             notes, more = b.reader_peek(session, reader, limit=limit)
@@ -2840,10 +2912,13 @@ def _main(argv):
                 b.reader_ack(session, reader, token, end)
             return 0
         if follow:
+            watch = _SilenceWatch(b)
             while True:
                 for note in b.inbox(session, mark=True, include_seen=include_seen):
                     print(b._note_line(note, session, b.now()), flush=True)
                 include_seen = False
+                for line in watch.lines():
+                    print(line, flush=True)
                 b.sleep(2)
         notes = b.inbox(session, mark=not peek, include_seen=include_seen)
         if as_json:
