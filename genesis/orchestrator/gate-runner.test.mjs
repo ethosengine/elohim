@@ -9,7 +9,6 @@ import { fileURLToPath } from 'url';
 import { loadGateRegistry } from './pipeline-registry.mjs';
 import { discoverManifests, loadManifests } from './manifest-utils.mjs';
 import { costLineAndDefer, gateChildEnv, oracleMode, projectsForChanges, runProject, selectGateProjects, worktreeTargetDir } from './gate-runner.mjs';
-import { resolveBritBin } from './gate-oracle.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
@@ -327,16 +326,20 @@ describe('manifest-driven local gate registry', () => {
     );
   });
 
+  // A test's result must not depend on which brit the caller's shell names (BRIT_BIN or PATH): these
+  // ask the manifests alone, through the path walk, with no brit at all.
+  const noBrit = { env: { BRIT_BIN: '/nonexistent/brit', PATH: '' }, oracle: 'path', log: () => {}, inputsLog: () => {} };
+
   test('representative diffs select manifest and gate-only projects', () => {
-    const epr = projectsForChanges(ROOT, ['elohim/sdk/epr-ts/src/index.ts']).map(p => p.name);
+    const epr = projectsForChanges(ROOT, ['elohim/sdk/epr-ts/src/index.ts'], noBrit).map(p => p.name);
     assert.ok(epr.includes('epr-ts'));
     assert.ok(!epr.includes('elements-codegen'), 'gate-only inputs must not default to every pipeline step');
 
-    const app = projectsForChanges(ROOT, ['app/elohim-library/projects/foo.ts']).map(p => p.name);
+    const app = projectsForChanges(ROOT, ['app/elohim-library/projects/foo.ts'], noBrit).map(p => p.name);
     assert.ok(app.includes('elohim-library'));
     assert.ok(app.includes('elohim-storybook'));
 
-    const seam = projectsForChanges(ROOT, ['crates/seam-contracts/src/lib.rs']).map(p => p.name);
+    const seam = projectsForChanges(ROOT, ['crates/seam-contracts/src/lib.rs'], noBrit).map(p => p.name);
     assert.ok(seam.includes('seam-contracts'));
     assert.equal(registry.get('seam-contracts').run.cargo.workspace, 'crates/seam-contracts');
     assert.equal(registry.get('elohim-compute').run.cargo.workspace, 'elohim');
@@ -363,7 +366,7 @@ describe('manifest-driven local gate registry', () => {
     ];
 
     for (const [expected, changed] of cases) {
-      const selected = projectsForChanges(ROOT, [changed]).map(project => project.name);
+      const selected = projectsForChanges(ROOT, [changed], noBrit).map(project => project.name);
       assert.ok(selected.includes(expected), `${changed} must select ${expected}`);
     }
   });
@@ -373,7 +376,7 @@ describe('manifest-driven local gate registry', () => {
     const command = [resolve(ROOT, 'genesis/orchestrator/gate-runner.mjs'), '--changed-file-list'];
     const input = 'genesis/data/timeline/backlog/CLUSTERS.md\n';
     const names = spawnSync(process.execPath, [...command, '--names'], {
-      cwd: ROOT, encoding: 'utf8', input,
+      cwd: ROOT, encoding: 'utf8', input, env: { ...process.env, BRIT_BIN: '/nonexistent/brit' },
     });
     assert.equal(names.status, 0, names.stderr);
     assert.equal(names.stdout, '', 'pre-push must not interpret status prose as gate names');
@@ -783,14 +786,20 @@ describe('the oracle flip', () => {
 
 describe('the hook parses stdout as project names — diagnostics never ride on it', () => {
   const cli = resolve(ROOT, 'genesis/orchestrator/gate-runner.mjs');
-  // The shadow assertion needs the REAL oracle: without a `brit` binary the runner
-  // honestly prints "brit build affected unavailable (…) — path-only selection" (covered by the next test),
-  // and the oracle-diff line cannot exist. A device without a brit binary skips this case instead of failing every other developer's gate.
-  const britBin = resolveBritBin(process.env);
-  test('shadow mode: --names stdout is only names; the oracle-diff line goes to stderr',
-    { skip: britBin ? false : 'no brit binary on PATH or BRIT_BIN — the shadow oracle-diff needs the real oracle' }, () => {
+  // The shadow assertion needs an oracle that answers. It is a brit double, so the result never
+  // depends on which brit (if any) the caller's shell names: it reports the sophia step changed and
+  // the app build one hop upstream, and its `--help` has no `--inputs`, so GATE_INPUTS stays quiet.
+  test('shadow mode: --names stdout is only names; the oracle-diff line goes to stderr', t => {
+    const bins = mkdtempSync(resolve(tmpdir(), 'gate-runner-brit-'));
+    t.after(() => rmSync(bins, { recursive: true, force: true }));
+    const affected = JSON.stringify({ changed_paths: ['sophia'], affected: [
+      { qualified_name: 'elohim-sophia:build-sophia-umd', affected_by: [{ kind: 'changedFile', path: 'sophia' }] },
+      { qualified_name: 'elohim:build-angular', affected_by: [{ kind: 'upstreamNode', upstream: 'elohim-sophia:build-sophia-umd' }] },
+    ] });
+    writeFileSync(resolve(bins, 'brit'), `#!/bin/sh\ncase "$*" in\n  *--help*) echo 'Usage: brit build affected [OPTIONS]' ;;\n  'build affected '*) echo '${affected}' ;;\n  *) exit 1 ;;\nesac\n`);
+    chmodSync(resolve(bins, 'brit'), 0o755);
     const out = spawnSync(process.execPath, [cli, '--changed-file-list', '--names'], {
-      cwd: ROOT, encoding: 'utf8', input: 'sophia\n', env: { ...process.env, GATE_ORACLE: 'shadow' },
+      cwd: ROOT, encoding: 'utf8', input: 'sophia\n', env: { ...process.env, GATE_ORACLE: 'shadow', BRIT_BIN: resolve(bins, 'brit') },
     });
     assert.equal(out.status, 0, out.stderr);
     assert.equal(out.stdout.trim(), 'sophia');

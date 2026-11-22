@@ -32,13 +32,17 @@
 //           and the audited reads are the rest of a gate's key, and it does not compare them.
 //           Both lines can only be non-empty when a changed path is a step's OWN buildProcess file
 //           (the two classes differ by exactly those files), so that is decided first, from the
-//           change set and a cached `git diff --name-only` of the range, with no brit spawn. Only a
-//           gate whose borrowed step's buildProcess file changed fingerprints, and only those steps.
-//           The work, the capability probe included, runs inside a per-process budget of the
-//           shadow's own elapsed time (SHADOW_BUDGET, summed over its calls, so a gate running
-//           between two calls spends none of it): every subprocess gets min(what remains, per-call
-//           cap) and SIGKILL at it. A call that fails for want of the flag ends shadow's printing for
-//           the process with one line.
+//           change set and a cached `git diff --name-only --no-renames -z` of the range, with no
+//           brit spawn. Only a gate whose borrowed step's buildProcess file changed fingerprints, and
+//           only those steps. That pre-check matches with the JS matcher; every buildProcess entry
+//           today is a literal path, where it is exact, but for a glob entry or a gitlink it can miss
+//           a line the native fingerprints would have produced (the matcher differences under "What
+//           `on` needs first"). That costs a diagnostic, never a decision.
+//           All of it, git reads and the capability probe included, runs inside a per-process
+//           budget of the shadow's own elapsed time (SHADOW_BUDGET, summed over its calls, so a gate
+//           running between two calls spends none of it): every subprocess gets min(what remains,
+//           per-call cap) and SIGKILL at it. A call that fails for want of the flag ends shadow's
+//           printing for the process with one line.
 // Capability is `brit build affected --help` and `brit build fingerprint --help` both naming
 // `--inputs` and `sources`, probed once per resolved brit executable (realpath, device, inode, size,
 // mtime), each probe at most PROBE_TIMEOUT_MS and killed at it. Under pre-push the hook runs
@@ -48,14 +52,17 @@
 // per process when it does not. A failed or unknown probe prints `[gate] inputs: --inputs unavailable;
 // selection and keys use legacy all` (without the probe's cause) once per push or per process, and
 // shadow prints nothing else.
-// Cost. A push that changes no step's buildProcess file pays the probe (two `--help`, at most 2 s
-// each, once per push with the state handoff) and per gate process at most two cheap git reads
-// (merge-base, then one cached `diff --name-only`; none when the base is the gated commit), and no
-// other brit spawn. When such a file changed, the shadow's subprocess time is bounded by its budget:
-// at most 4 s of probes, 5 s for selection's second `brit build affected`, and 10 s per gate process
-// whose borrowed step was touched, so 9 + 10M s for M such gates with the handoff, 13 + 10M s
-// without (synchronous JS between spawns is not preempted and is not counted). A standalone
-// `just gate` runs every project in one process, which shares one 10 s budget.
+// Cost, with a capable brit (an incapable one costs the probe and nothing else). A gate whose
+// borrowed steps' buildProcess files did not change pays `git merge-base <commit> origin/dev` (and
+// `dev` only if that fails), and `git diff --name-only --no-renames -z` only when the base is not the
+// gated commit: under 10 ms each, measured on shem, and no brit spawn; the push pays the probe
+// (two `--help`, at most 2 s each, once with the state handoff) and no second `brit build affected`
+// unless some step's buildProcess file changed. Every shadow subprocess, git and brit, runs inside the
+// process's 10 s budget, given min(what remains, 5 s) and SIGKILL at it, so the bounded worst case
+// is 10 s per process: per push 4 s for the resolve step's probes, at most 5 s for selection (9 s if
+// it must probe for itself), and 10 s per gate process, so 9 + 10N s for N gate processes with the
+// handoff and 13 + 10N s without (synchronous JS between spawns is not preempted and is not
+// counted). A standalone `just gate` runs every project in one process, which shares one 10 s.
 //
 // The shadow is an instrument with an end. Once a capable brit is installed it costs, on a push that
 // changes a step's buildProcess file, three brit fingerprint spawns per touched borrowed step and one

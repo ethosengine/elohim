@@ -253,29 +253,37 @@ export function reuseSelector(project, gateCommit, { root = ROOT, env = process.
   };
 }
 
-// One integration base and one changed-path list per gated commit, per process: two git reads.
+// One integration base and one changed-path list per gated commit, per process.
 const shadowRanges = new Map();
 
 /**
  * The borrowed steps of `project` whose OWN buildProcess file changed between the integration base
  * and `gateCommit` ({ base, steps }), read with git alone and no brit spawn. Only these steps can
- * have a fingerprint that moved under the legacy class and not under sources. No base, or a base that
- * is the gated commit, is no step.
+ * have a fingerprint that moved under the legacy class and not under sources. `gateCommit` is the
+ * full sha runProject resolved; `spawn` is shadow's bounded spawn, so these reads are inside its
+ * budget and killed at their timeout. Per gated commit and process: `git merge-base <commit>
+ * origin/dev` (then `dev` only if that fails), and, only when the base is not the gated commit, one
+ * `git diff --name-only --no-renames -z`, NUL-split, so a renamed or deleted file shows under its old
+ * name and no path is quoted. No base, or a base that is the gated commit, is no step. A read the
+ * budget refused is not remembered.
  */
 export function touchedProcessSteps(project, { root, gateCommit, spawn = spawnSync }) {
   const key = `${resolve(root)}\0${gateCommit}`;
   if (!shadowRanges.has(key)) {
     let range = { base: null, files: [] };
+    let refused = false;
     for (const ref of ['origin/dev', 'dev']) {
-      const r = spawn('git', ['merge-base', gateCommit, ref], { cwd: root, encoding: 'utf8', timeout: 5_000 });
+      const r = spawn('git', ['merge-base', gateCommit, ref], { cwd: root, encoding: 'utf8' });
+      if (r?.error?.code === 'EBUDGET') { refused = true; break; }
       const base = r?.status === 0 ? String(r.stdout || '').trim() : '';
       if (!base) continue;
-      const head = spawn('git', ['rev-parse', '--verify', '--quiet', `${gateCommit}^{commit}`], { cwd: root, encoding: 'utf8', timeout: 5_000 });
-      if (head?.status === 0 && String(head.stdout || '').trim() === base) { range = { base, files: [] }; break; }
-      const diff = spawn('git', ['diff', '--name-only', base, gateCommit], { cwd: root, encoding: 'utf8', timeout: 5_000 });
-      range = { base, files: diff?.status === 0 ? String(diff.stdout || '').split('\n').filter(Boolean) : [] };
+      if (base === gateCommit) { range = { base, files: [] }; break; }
+      const diff = spawn('git', ['diff', '--name-only', '--no-renames', '-z', base, gateCommit], { cwd: root, encoding: 'utf8' });
+      if (diff?.error?.code === 'EBUDGET') { refused = true; break; }
+      range = { base, files: diff?.status === 0 ? String(diff.stdout || '').split('\0').filter(Boolean) : [] };
       break;
     }
+    if (refused) return { base: null, steps: [] };
     shadowRanges.set(key, range);
   }
   const { base, files } = shadowRanges.get(key);
@@ -717,20 +725,19 @@ export function runProject(project, printOnly, namesOnly, {
   const decision = decideReuse(project, evidence, reuseContext, { root, env, spawn });
   // GATE_INPUTS=shadow: whether the step fingerprints are unchanged under sources. Read only, inside
   // shadow's budget, and its span is taken out of the gate's timed span.
-  // Free unless a borrowed step's own buildProcess file changed: that is decided from git first, and
-  // only then are the touched steps fingerprinted inside the budget.
+  // No brit spawn unless a borrowed step's own buildProcess file changed: that is decided from git
+  // first, and only then are the touched steps fingerprinted. Every read, git and brit, is inside the
+  // budget and killed at its timeout.
   if (inputs?.shadow && evidence?.key && evidence.britBin && evidence.fingerprints?.length && !SUITE_READ_LISTS[project.name]) {
     const shadowSpan = clock();
-    try {
-      const { base, steps } = touchedProcessSteps(project, { root, gateCommit, spawn });
-      if (steps.length > 0) {
-        inShadowBudget(inputsLine, bound => {
-          const shadow = inputsShadow(project, evidence, { root, gateCommit, base, steps, run: bound(spawn) });
-          if (shadow.refused) endShadow(shadow.refused, inputsLine);
-          for (const line of shadow.lines || []) write(`${line}\n`);
-        });
-      }
-    } catch { /* a shadow is never a red */ }
+    inShadowBudget(inputsLine, bound => {
+      const run = bound(spawn);
+      const { base, steps } = touchedProcessSteps(project, { root, gateCommit, spawn: run });
+      if (steps.length === 0) return;
+      const shadow = inputsShadow(project, evidence, { root, gateCommit, base, steps, run });
+      if (shadow.refused) endShadow(shadow.refused, inputsLine);
+      for (const line of shadow.lines || []) write(`${line}\n`);
+    });
     started += clock() - shadowSpan;
   }
   if (decision.reuse) {

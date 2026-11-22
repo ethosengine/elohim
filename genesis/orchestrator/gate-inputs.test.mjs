@@ -450,7 +450,8 @@ function commitFiles(repo, files, message) {
   return git(repo, ['rev-parse', 'HEAD']);
 }
 
-// Two borrowed steps: `s` lists p/Jenkinsfile as its own buildProcess, `t` lists p/t.Jenkinsfile.
+// Two borrowed steps: `s` lists p/Jenkinsfile as its own buildProcess, `t` a path with a space and a
+// non-ASCII letter, which git quotes in a newline listing and not in a NUL one.
 const gateProject = {
   name: 'fixture-gate', dir: 'p', pipeline: 'fixture', steps: ['s', 't'], manifestPath: 'p/build-manifest.json',
   run: { kind: 'just', recipe: 'gate' },
@@ -459,7 +460,7 @@ const manifestText = extra => JSON.stringify({
   pipeline: 'fixture',
   steps: {
     s: { inputs: { sources: ['p/**'], buildProcess: ['p/Jenkinsfile'] }, depends: [], ...extra },
-    t: { inputs: { sources: ['p/t/**'], buildProcess: ['p/t.Jenkinsfile'] }, depends: [] },
+    t: { inputs: { sources: ['p/t/**'], buildProcess: ['p/t ëin.Jenkinsfile'] }, depends: [] },
   },
   gate: { projects: { 'fixture-gate': { dir: 'p', steps: ['s', 't'], run: { kind: 'just', recipe: 'gate' } } } },
 });
@@ -666,6 +667,19 @@ describe('the shadow is free unless a step\'s own buildProcess file changed', ()
     assert.ok(extra.every(c => c.includes('--step s ')), extra.join('\n'));
     assert.deepEqual(run.lines.filter(l => l.includes('inputs (shadow)')),
       [`[gate] fixture-gate inputs (shadow): since ${base.slice(0, 9)} the step fingerprints moved under all (s) and are unchanged under sources`]);
+  });
+
+  test('a renamed pipeline file shows under its old name, and a quoted-looking path still matches', async function shadow_reads_renames_and_odd_paths(t) {
+    const moved = gateRepo(t, { headFiles: null });
+    git(moved.repo, ['mv', 'p/Jenkinsfile', 'p/ci.Jenkinsfile']);
+    git(moved.repo, ['commit', '-q', '--no-verify', '-m', 'rename the pipeline file']);
+    const renamed = await compare(t, moved.repo);
+    assert.equal(renamed.extra.length, 3, renamed.extra.join('\n'));
+    assert.ok(renamed.extra.every(c => c.includes('--step s ')));
+    const odd = gateRepo(t, { headFiles: { 'p/t ëin.Jenkinsfile': 'pipeline\n' } });
+    const quoted = await compare(t, odd.repo);
+    assert.equal(quoted.extra.length, 3, quoted.extra.join('\n'));
+    assert.ok(quoted.extra.every(c => c.includes('--step t ')));
   });
 
   test('selection asks the second planner call only for a change to some step\'s buildProcess file', async function selection_free_without_process_change(t) {
