@@ -2105,3 +2105,60 @@ Owed in the pin gate (`gate-attest.mjs`): a newer run of the same workflow that 
 progress is a `still-running` refusal, as a pending named check already is; today it is
 invisible until its named check exists. The cost of that refusal is a wait of the run's
 remaining minutes at pin-move time, against a pin that a later red contradicts.
+
+## Row 42, delta 8 (2026-11-22): the shadow's cost stated truthfully
+
+A review of the fix in delta 7 found its claim too strong: the shadow's git reads ran outside
+its budget, so an untouched gate was not free and the stated worst case was wrong. Now
+(`1ae2a5af2`) every shadow subprocess, git and brit, runs inside one budget with a kill signal.
+An untouched gate costs one merge-base and one name-only diff (each under 10 ms measured on
+shem) and no brit call; the bound is 10 s per gate process. The changed-path read no longer
+follows renames and splits on NUL, so a renamed pipeline file is seen under its old name. Four
+runner tests that took their brit from the caller's shell now name their own; the suites give
+the same counts with no brit and with brit 0.3.1.
+
+## Row 72 — brit 0.3.1 released its binaries and its tag, and its crates did not publish
+
+Found 2026-11-22 when the re-run of brit's `main` CI on `02d4654f` passed its tests and then
+failed at `Publish brit crates to Nexus`: `immutable version collision for brit-graph 0.2.3`.
+The input-class change edited `brit-graph` (`src/fingerprint.rs`, `src/repo_fingerprint.rs`,
+`tests/repo_fingerprint.rs`) and the release commit bumped only `brit-cli`. Every crate before
+`brit-graph` in the publish order was skip-equivalent, so nothing new reached the registry: it
+holds the earlier `brit-graph` 0.2.3 and no `brit-cli` 0.3.1. The GitHub release, the tag
+`brit-v0.3.1`, the pin on dev and installs from source are unaffected; brit `main`'s run stays
+red at its publish step until `brit-graph` is bumped.
+
+Two readers missed it. The independent review of the release mechanics checked `brit-cli`'s
+version, changelog and lock and did not ask which other published crates the diff touched.
+The rule was already written down from 2026-11-16 (a change to a published brit crate's source
+needs a version bump in the same commit) and was not turned into a check: the collision is
+detectable before the merge by the publish script's own comparison, run without publishing.
+
+Owed: a follow-up release (`brit-graph` 0.2.4, `brit-cli` requiring it, brit 0.3.2) and the pin
+move after it; and, on brit's side, the publish comparison as a required check on the release
+branch, so a collision is a red before `main` and not after.
+
+## Row 73 — the first F4 probe: a hand-over in 56 s, and a red on the second device that ten runs here did not show
+
+2026-11-22. The four-thread change (`ae99ed59a`, one manifest line) was handed over on
+`self/shem-eprfs-threads4` with `brit push` (56 s; the hook ran its seconds checks and no
+project gate, and recorded the hand-over). The sibling device ran `just gate eprfs` at that
+commit in a fresh worktree as a genuine run.
+
+Result: red in 548 s (a cold pool slot; four compiles of about two minutes each). One test of
+703 failed: `flow::memory::recall::index::tests::a_v2_store_is_rebuilt_under_schema_v3`, where a
+second fold in the test's own temporary directory reported `Busy`. Twenty reruns of the built
+binary there were green; ten whole-workspace runs on shem had been green. The reading both
+devices reached: the fold's lock is a `flock`, which belongs to the open file description; a
+child forked by another test thread holds a copy of the descriptor until its `exec`, so the lock
+can outlive the first fold's drop for a moment, and the non-blocking second attempt reports a
+fold that is not running. At one thread no other thread forks.
+
+What the probe showed about the ladder: the hand-over is cheap and works over the forge with
+brit; a second device will pay a long gate on request; its verdict is recorded and would have
+crossed. What it did not reach: reuse of a sibling green by the lander, because there was no
+green. The four-thread change is not landed. Owed first: the fold tolerates a lock released
+within milliseconds (in work), then four threads again on top, handed over a second time.
+
+Also seen: the ten-run bar on one device was not enough to find a failure of this rate. A gate
+change that alters concurrency wants its runs on two devices before it is called met.

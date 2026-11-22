@@ -894,3 +894,18 @@ runs of the workspace's tests beside a running build) is under way on the landed
   probe of another device paying a long gate before a landing (station F4-probe).
 - **Jenkins:** orchestrator #2410 (landing 13) SUCCESS, dispatching `elohim-eprfs` only; no Edge
   build, as the hand-run fleet-roll check had said.
+
+### 02:35Z to 03:00Z: the probe's red, the unpublished crates, and what lands now
+
+- **The F4 probe returned a red** (arrival backlog row 73). The sibling's eprfs gate at four
+  threads failed one unit test that ten runs on shem had passed: a fold reported busy with no
+  other fold running, because a `flock` outlives its holder's drop while a child forked by
+  another thread still holds the descriptor. Four threads is not landed; the fold's lock is
+  being made to tolerate it first.
+- **brit's re-run passed its tests and failed its crate publish** (row 72): `brit-graph` was
+  edited and not bumped. The newest test check on the pinned commit is green, so the sibling
+  installed brit 0.3.1 in 2.1 s; shem's install waits for a clean checkout on a commit published
+  on dev. A follow-up release is the steward's to call.
+- **The shadow's cost was stated too strongly and is now bounded as stated** (row 42, delta 8).
+
+This landing carries the shadow's two fixes and these records. It does not carry four threads.
