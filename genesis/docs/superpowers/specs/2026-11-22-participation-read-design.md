@@ -88,9 +88,9 @@ The branch baseline is `reliability/coord-writes-and-follow`. Built this day mea
 | Surface | State and source |
 |---|---|
 | Declared write sets in `berth status` | Built: live local moorings print writes (`genesis/agentic/bin/berth:2631`) |
-| `berth impact` with graph impact | Built: local and sibling declarations compose impact (`genesis/agentic/bin/berth:2553`); shared/upstream/downstream derive from direct ownership (`genesis/orchestrator/gate-impact.mjs:78`) |
-| Sibling-device moorings | Built: reads the channel flow store, write sets and expiry (`genesis/agentic/bin/berth:2486`) |
-| Device capacity | Built: seats, RAM and I/O guards and running builds determine the device's answer (`genesis/agentic/bin/berth:2380`) |
+| `berth impact` with graph impact | Built: local and sibling declarations compose impact (`genesis/agentic/bin/berth` `declared_impact`); shared/upstream/downstream derive from direct ownership (`genesis/orchestrator/gate-impact.mjs:78`) |
+| Sibling-device moorings | Built: reads the channel flow store, write sets and expiry (`genesis/agentic/bin/berth` `sibling_moorings`) |
+| Device capacity | Built: seats, RAM and I/O guards and running builds determine the device's answer (`genesis/agentic/bin/berth` `cargo_room`) |
 | Participation read | Not built: the existing context result composes intents, commitments, notes, habits, gates and reconciliation (`elohim/eprfs/epr-cli/src/flow/context.rs:127`); `--participate` is this proposal |
 | Declared human presence | Not built; no declared-human-presence record exists today |
 | Live upstream lines in the follow | Not built: reader follow emits notes and silence notices (`genesis/agentic/bin/berth:3099`); ordinary follow does the same (`genesis/agentic/bin/berth:3147`) |
@@ -124,8 +124,8 @@ Missing node: standing → **person-owned reachability declaration** → decisio
 reader. No schema is designed here. Until that node exists, human reachability is `unknown`.
 
 **P4 — For whom is plural and role-bearing.** Stewards, gifters and receivers are each sets.
-Who needs what is standing joined with presence at read time. No beneficiary field is stored, and no singular beneficiary is shown. Use `resolve` and `count` from the standing spec §3,
-retaining uncounted reasons. This participation read is their second consumer. Today native standing reaches only one handle, not authenticated distinct membership in a space:
+Who needs what is standing joined with presence at read time. No beneficiary field is stored, and no singular beneficiary is shown. The standing spec's `resolve` and `count` (its §3) are this read's source for it once they
+exist, and this read is their second consumer. They do not exist yet, so cut 1 does not call them: it reports the one handle native standing gives (`standing_human_pinned`) and prints every other role set as unknown with its reason. Today native standing reaches only one handle, not authenticated distinct membership in a space:
 `AgentRef` receives `human:<handle>` (`elohim/epr-rea/src/participants.rs:1117`). Say so explicitly. A one-member role set stays a set; unresolved roles remain unknown, not manufactured identities.
 
 **P5 — Enrich the A on the read side first.** Compose identity and standing when asked. Presence never becomes part of the A and is never written into a notarized record. This design
@@ -204,7 +204,8 @@ P2, P3 and P9 are read.
 - Nothing in this design raises throughput by spending a person's attention. Attention is spent
   last.
 - The asymmetry runs one way. An agent absorbs what it can so the person is asked less: it
-  waits, gathers its asks into one, does the independent work first and has the question ready.
+  gathers its asks into one, does the independent work first and has the question ready. Only
+  the effect that depends on the person stays pending; the agent's other work never waits.
   A person is not asked to work around an agent's limits.
 - Silence from a person is the ordinary case and is never read as a fault. On 2026-11-22 a
   session's stall sensor prompted five notifications in about ten minutes for one silence while
@@ -239,8 +240,8 @@ here.
   on the person's attention.
 - An unanswered ask means the effect has not run. It is neither approval nor refusal, and the
   item stays ready (P9). The thread's rule is "if nobody approves before a deadline, it doesn't
-  go". Ours keeps the first half and moves the deadline: a time may be set after which the agent
-  stops waiting and does what it may do alone, and none is set by which a person must answer.
+  go". Ours keeps the first half and moves the deadline: the agent continues its independent work at once, only the dependent effect stays pending, and
+  no time is set by which a person must answer.
 - Who widens what reaches a person is the person, by declaration (P3). "Start quiet and earn
   more" has the direction of our reach rule, where a build record is born `self` and widens by
   attestation, but nothing rules that reach governs what is said to a person, and this ruling
@@ -251,6 +252,56 @@ here.
 
 This constrains whatever carries an ask today: a parked ask in the stasis journal, a berth note.
 It designs no record for one.
+
+**P14 — Cut 1 has one caller: a session on this device, reading this device's own stores.** No
+source the read composes carries a reach the reader can enforce: flow records
+(`elohim/epr-rea/src/model.rs:82`, `:352`, `:377`), moorings, habits and covenant clauses have no
+caller-reach field, and `context.rs:161` loads every record before it filters by scope. So cut 1
+serves only the device's own steward's session, for whom every local record is `self`, and it
+says so on its first line. It consumes a source only when that source is authorised for this
+caller as a whole; otherwise the source is reported unavailable. Every dependency is filtered
+before any join, count, error text or empty-result decision, so a record the caller may not see
+cannot move a visible count. Serving any other caller waits for reach on the records.
+
+**P15 — The read opens nothing that creates.** `SidecarFlowStore::open` creates storage
+(`context.rs:161`, `ledger.rs:89`), and covenant `show` opens actor storage on its way to
+standing (`elohim/eprfs/epr-cli/src/actor.rs:818`). Cut 1 uses snapshot paths only:
+
+| Source | Non-initialising read |
+|---|---|
+| Flows: stations, landing intents, ledger and cost rows | read the sidecar file and `decode_flow_records` (`elohim/epr-rea/src/store.rs:344`) |
+| Habits | `read_habits` / `parse_habit` |
+| Local moorings | `Berth(read_only=True).moorings()`, an absent directory being an empty answer |
+| Capacity | `berth room cargo --json` |
+| Sibling moorings | `sibling_moorings(read_peer=False)` |
+| Honoured covenant write set | none found: reported `unknown` until a non-initialising reader exists |
+
+A test asserts that a run against a directory with no stores leaves it byte-identical.
+
+**P16 — What cut 1 prints.** Source order is kept; nothing is ordered by worth.
+
+```text
+Participation: this device's own records, for its steward's session; completeness unknown
+Sources: <each available or unavailable, with no detail of unseen records>
+Capacity: <the device's own answer, or unknown>; grant: <evidence or unknown>
+Covenant scope: unknown (no non-initialising reader)
+<source group>
+  <item reference> — <the source's own state>
+  Serves: <recorded references, or unknown>
+  For whom: stewards […]; gifters […]; receivers […]
+  Standing: <human:<handle> by native standing, or the reason it is unresolved>
+  Worth: <recorded unit, value, source and time, or unknown>
+  Testimony: <author, reference and time, or none recorded>
+  Taking would record: <the existing act>
+  Fit: <covenant, capacity and graph annotations>
+  Person: ready for unknown — reachability undeclared
+  Agent: <running or invocable only with evidence, else unknown>
+Excluded: <items this caller may see, each with its reason>
+```
+
+JSON keys: `scope, completeness, sources, capacity, grant, covenant, groups[{source, items[{ref,
+state, serves, roles, standing, worth, testimony, taking, fit, person, agent}]}], excluded,
+outcome`. An unknown carries its reason. There is no total of anything unseen.
 
 ## 4. P2P design gate
 
@@ -273,7 +324,10 @@ activity inference or compelled attention is permitted. Unknown is safe to displ
 
 1. **Local composition.** Write set: epr-cli flow dispatch, `flow/context.rs`, a participation
    reader and focused tests under `elohim/eprfs/epr-cli/`. Compose the read-side A view in Rust.
-   Cargo is required; no published-crate change or Edge roll is required by this cut.
+   Cargo is required; no published-crate change or Edge roll is required by this cut. It is
+   bounded by P14 to P16: one caller, snapshot reads only, and unknowns where a source is not
+   there. Its scope argument is a directory (the plain `context` read resolves a file's CID,
+   `context.rs:423`); an item is in scope when its subject path lies under that directory.
 2. **Sibling context.** Write set: `genesis/agentic/bin/berth`, `genesis/agentic/berth_test.py`,
    `genesis/orchestrator/gate-impact.mjs` and its tests, and epr-cli participation tests.
    Carry freshness, graph provenance and optional upstream lines through the existing follow.
@@ -300,6 +354,23 @@ session start, become a second backlog, or surveil a person's activity. The call
 The answer never adopts incoming work, mints a claim, contacts a person or invokes an agent.
 It must not become an outbox either: nothing here tunes how often a person is reached from how
 they have responded (P13).
+
+## 7a. Adversarial review, 2026-11-22
+
+One round by a fresh reader (gpt-6-astra, read-only), against a stated bar: no unauthorised
+disclosure, no write, no coordination signal that blocks, no undeclared dependency on a published
+crate. It answered fix first on five points; all were accepted and cured by the session model.
+
+| Finding | What it showed | Cure |
+|---|---|---|
+| Visibility | No composed source carries an enforceable reach, and the present read loads every record before filtering; a hidden fulfilment could move a visible count | P14 |
+| Writes | The store and covenant openers the design leaned on create storage | P15 |
+| Standing | P4 called `resolve` and `count`, which are proposed and do not exist, inside a cut promised as CLI-only | P4 reworded: cut 1 reports native standing and unknowns |
+| Waiting | P13 and P11 could be read as an agent waiting before independent work | Both reworded: only the dependent effect stays pending |
+| Scope | The existing read resolves a file CID; a directory scope was undefined | §5 cut 1 |
+
+Fifteen citations were checked and hold; three line locators into `berth` had gone stale and now
+name the function.
 
 ## 7. Open
 

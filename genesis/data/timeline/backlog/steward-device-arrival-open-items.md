@@ -2686,3 +2686,18 @@ State: neither is cured. ethosengine restored its record the same day with one p
 orchestrator 66 s and orchestrator-tree 80 s, and the gate printed that the note for closure
 `a8d119421a34` held a red and was being replaced. So the record is green again by a rerun, which
 is the cost concern 2 names: the closure was paid twice on that device.
+
+## Row 75, delta 2 (2026-11-22): two items from the standing design wait for a deliberate Edge roll
+
+Read on dev 8293f3e6b with `brit build affected --files <path>`. Two pieces of
+[the standing read for counting](epr:standing-read-for-counting-principals-design) §5 select the
+Edge build and its deploy step, so neither lands without a roll the steward chooses:
+
+| Item | Path it changes | What the oracle selects | Ready when the roll comes |
+|---|---|---|---|
+| Counting principals where attestations are counted (its item 2; plan station F6-k1) | `elohim/elohim-storage/src/services/release_attestation.rs` (`tally`, `for_release`) | `elohim-edge:cargo-build-storage`, `build-edge-image`, `deploy-manifests` | Not written. Its tests are named in the station; `count` takes the builder (S9, round two) |
+| A roster row binding a brit clone's signer to a device (its item 1) | `elohim/epr-rea/src/participants.rs`, a published crate | the same three Edge steps, plus `elohim-epr` and `elohim-eprfs` | Not written. Needs a version bump and a lockfile move with it |
+
+Neither is started, by decision: this session's sprint stopped at anything that rolls the fleet.
+The standing design itself has had two adversarial rounds and says which parts are sound to
+build.

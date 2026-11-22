@@ -96,7 +96,13 @@ standing of its own; its record counts as its sponsor, once.
 A signer resolves to exactly one member of the space. A `Collective` member counts only through an
 act of its own steward under that collective's roster, never through any one of its members'
 devices. A `Person` counted directly excludes every collective they belong to from the same
-count, and a collective counted excludes its members.
+count, and a collective counted excludes its members. The exclusion needs the whole overlap, and
+the acting steward cannot be trusted to cite it: a `Membership` is one edge and records nothing
+about completeness (`imagodei_integrity/src/qahal.rs:37`), so citing a person's membership in the
+space and a collective's, while omitting the person's membership in that collective, would evade
+it. The witnessing body of S7 certifies the complete overlap closure for the counted members, the
+validator applies the exclusions to that certified set, and an act without a certified closure is
+refused.
 
 **S5 — Distinctness is the space's admission and nothing else.** Two members are distinct because
 the space admitted two members, each by a sponsor who is already a member and who authored or
@@ -126,7 +132,11 @@ records to cite, so the validator alone would let the steward decide who counts.
 named witnessing body checks what the validator cannot: that each cited membership, binding and
 grant is current when it witnesses, that no contest or revocation was left out, and that the
 cited records are the whole of what the space holds for those signers. Until it has witnessed,
-the act is provisional, readers ignore it, and the result's reach is unchanged. This is the
+the act is provisional, readers ignore it, and the result's reach is unchanged. The body is not
+the acting steward's to choose. It is named by a witness policy the space authorised before the
+act; its signatures are authenticated; and its quorum is independent of the acting steward and of
+the builder, neither of whom counts toward it. An act witnessed by its own steward is
+unwitnessed. This is the
 operator's ruling of 2026-10-04, "final by witness", applied to one act. A member who withdraws later
 does not undo a graduation. A member shown to have been wrongly counted is a ground for the
 space to narrow the result's reach, which D5 already allows in that direction only.
@@ -139,6 +149,12 @@ devices is unaffected: it is labelled `self` or `sibling` and never needed a cou
 the count of their own work. Excluding "nothing" because the builder's signer did not resolve
 would let the builder's second clone or device count as an independent voice, which is a failure
 that raises k. So an unresolved builder refuses the graduation and is never treated as zero.
+
+Resolution alone is not enough either. A builder whose signer resolves through a grant to a
+friend would have only the friend excluded, leaving the builder's own second device countable.
+So the exclusion covers the builder's own authenticated identity and every principal the builder
+represents under any grant cited in the act. `count` therefore takes the builder as an argument:
+`count(records, space, head, builder)`.
 
 ## 3. The read, as a contract
 
@@ -233,6 +249,27 @@ The review found that S2 held on the day only because no witnessing body is name
 can graduate. That is recorded here as the design's condition of safety: it is sound to build
 §5 items 1 and 2, and unsound to graduate anything before items 3 and 5.
 
-Still open after this review, and for the next one: whether a witnessing body can itself read
+### Round two, 2026-11-22
+
+A second fresh reader (gpt-6-astra, read-only) was asked whether, with round one's cures applied,
+k could still exceed the number of real distinct people, or an act be accepted that should not
+be, other than by §6's residuals. It found three more ways; all were accepted and cured.
+
+| Finding | What it showed | Cure |
+|---|---|---|
+| B1 | S7 named a witnessing body and did not constrain who chooses it; a steward could witness their own stale selection | S7: a prior witness policy, authenticated signatures, a quorum independent of steward and builder |
+| B2 | S4's exclusion had no evaluator and no complete input; one of two overlapping memberships could simply be left uncited | S4: the witness certifies the overlap closure, the validator applies it, no closure refuses |
+| B3 | A builder resolving through a friend's grant excluded only the friend | S9: the builder's own identity and every represented principal are excluded; `count` takes the builder |
+
+Its verdict for §5 items 1 and 2: fix first, the fix being builder-aware counting, which S9 now
+states. Graduation stays behind witness independence, overlap completeness and a represented-role
+proof.
+
+Still open after round two: a complete witnessed snapshot protocol for currency (withdrawal
+updates exist at `qahal_coordinator.rs:752`, and nothing yet says how a witness reads all of
+them); and how an act of a collective's steward is told from that steward acting for themselves,
+which S4 requires and does not encode. The earlier list follows as round one left it.
+
+Still open after round one: whether a witnessing body can itself read
 currency completely; how a collective's steward act is told apart from that steward acting for
 themselves; and one review is not the two rounds the earlier design received.
