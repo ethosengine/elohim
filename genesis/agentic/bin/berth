@@ -2264,14 +2264,47 @@ class _SilenceWatch:
     when it resumes. A device counts when a session is moored on it within the mooring ttl, or
     when this follower saw it exchanging earlier: a device gone for weeks says nothing at each
     start. Lines begin `[berth] device`, are built here from this device's own fold, and carry no
-    text another session wrote. The read changes nothing this berth remembers, and an unreadable
-    view or a workspace that is not a device is silence."""
+    text another session wrote. Reader follows remember announced conditions across restarts;
+    an unreadable view or a workspace that is not a device is silence."""
 
-    def __init__(self, b):
+    def __init__(self, b, session=None, reader=None):
         self.b = b
-        self.silent = {}  # device -> whether it was silent at the last reading that counted it
+        self.silent = {}  # device -> reason if silent, otherwise False
         self.unacked = {}  # unknown reads preserve the last observed acknowledgement state
         self.next_at = 0.0
+        self.state_path = (b._inbox_reader_path(session, reader)[:-5] + ".watch.json"
+                           if session is not None and reader is not None else None)
+        if self.state_path:
+            try:
+                if time.time() - os.stat(self.state_path).st_mtime > 24 * 3600:
+                    return
+                with open(self.state_path) as f:
+                    state = json.load(f)
+                if not isinstance(state, dict):
+                    return
+                for name in ("silent", "unacked"):
+                    entries = state.get(name)
+                    if not isinstance(entries, dict) or not all(
+                            isinstance(did, str) and NOTE_ID.fullmatch(did)
+                            and isinstance(reason, str) and reason
+                            for did, reason in entries.items()):
+                        return
+                self.silent = state["silent"]
+                self.unacked = state["unacked"]
+            except (OSError, ValueError, TypeError):
+                pass  # advisory state must never stop note delivery
+
+    def save(self):
+        """Call after notices have been printed and flushed, using the reader's atomic idiom."""
+        if self.state_path:
+            try:
+                os.makedirs(os.path.dirname(self.state_path), exist_ok=True)
+                write_json_atomic(self.state_path, {
+                    "silent": {did: reason for did, reason in self.silent.items() if reason},
+                    "unacked": {did: reason for did, reason in self.unacked.items() if reason},
+                })
+            except (OSError, ValueError, TypeError):
+                pass
 
     def lines(self):
         b = self.b
@@ -2294,7 +2327,7 @@ class _SilenceWatch:
             if info.get("moorings") and did in acknowledgements:
                 reason = acknowledgements[did]
                 previous = self.unacked.get(did, False)
-                self.unacked[did] = bool(reason)
+                self.unacked[did] = _unacked_reason(reason) if reason else False
                 if reason and not previous:
                     out.append(f"[berth] device {did} has not acknowledged this device's records "
                                f"({_unacked_reason(reason)}) — what you send from here may not have "
@@ -2311,10 +2344,10 @@ class _SilenceWatch:
                            for since in moorings.values())
                 if quiet and not live:
                     continue  # long gone, and nobody moored there to wait for
-            self.silent[did] = quiet
+            age = (f"its last head was folded here {_peer_age(now_ms - seen)} ago" if known
+                   else "no head of it has been folded here yet")
+            self.silent[did] = age if quiet else False
             if quiet and not was:
-                age = f"its last head was folded here {_peer_age(now_ms - seen)} ago" if known \
-                    else "no head of it has been folded here yet"
                 out.append(f"[berth] device {did} is SILENT: {age} (past {b.freshness_s}s) — notes from its "
                            f"sessions cannot arrive until the exchange resumes; `just status device` on each "
                            f"device names the cure")
@@ -3203,7 +3236,7 @@ def _main(argv):
         if reader is not None and follow:
             # The Monitor form: claim, print and flush each note, THEN acknowledge it, so a closed
             # pipe costs no note it did not print and a hook of the same reader never prints it too.
-            watch = _SilenceWatch(b)
+            watch = _SilenceWatch(b, session, reader)
             while True:
                 entries, token, end, _, _ = b.reader_claim(session, reader, lease_s=30.0)
                 for note, offset in entries:
@@ -3218,6 +3251,7 @@ def _main(argv):
                 try:
                     for line in watch.lines():
                         print(line, flush=True)
+                    watch.save()
                 except (BrokenPipeError, OSError):
                     return 0
                 b.sleep(2)

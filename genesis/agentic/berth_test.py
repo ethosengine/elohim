@@ -1919,6 +1919,95 @@ class BerthInboxTest(unittest.TestCase):
         self.assertNotIn("\x1b", out.getvalue())
 
 
+class WatchStateAcrossRestarts(unittest.TestCase):
+    SESSION = BerthInboxTest.SESSION
+    SENDER = BerthInboxTest.SENDER
+    setUp = BerthInboxTest.setUp
+    follow_through = BerthInboxTest.follow_through
+    others = BerthInboxTest.others
+    append = BerthInboxTest.append
+    folded = BerthInboxTest.folded
+
+    def start(self, devices=None, cleared=False, reader="main"):
+        devices = devices or [DEVICE_A]
+        observations = {did: None if cleared else {"reason": "never"} for did in devices}
+
+        def view(now_ms):
+            return {"standing": "device", "others": {
+                did: self.others(5 if cleared else 7200, device=did)(now_ms)["others"][did]
+                for did in devices}}
+
+        with mock.patch.dict(_NS["_SilenceWatch"].lines.__globals__, {
+                "_ack_observations": lambda b: observations}):
+            return self.follow_through([view], "--reader", reader)[0]
+
+    def state_path(self):
+        return Path(_NS["_SilenceWatch"](self.berth, self.SESSION, "main").state_path)
+
+    def assert_begins(self, lines, device=DEVICE_A):
+        self.assertEqual(len(lines), 2, lines)
+        self.assertTrue(any(f"device {device} is SILENT:" in line for line in lines))
+        self.assertTrue(any(f"device {device} has not acknowledged" in line for line in lines))
+
+    def test_unchanged_conditions_are_announced_once_across_starts(self):
+        self.assert_begins(self.start())
+        self.assertEqual(self.start(), [])
+        state = json.loads(self.state_path().read_text())
+        self.assertIn("last head", state["silent"][DEVICE_A])
+        self.assertIn("acknowledged none", state["unacked"][DEVICE_A])
+
+    def test_recovery_while_stopped_is_announced_on_restart(self):
+        self.start()
+        lines = self.start(cleared=True)
+        self.assertEqual(len(lines), 2)
+        self.assertIn(f"[berth] device {DEVICE_A} is acknowledging again", lines)
+        self.assertTrue(any("is exchanging again" in line for line in lines))
+        self.assertEqual(self.start(cleared=True), [])
+
+    def test_new_device_is_announced_on_second_start(self):
+        self.start()
+        self.assert_begins(self.start([DEVICE_A, "did:key:new"]), "did:key:new")
+
+    def test_old_state_reannounces(self):
+        self.start()
+        old = time.time() - 24 * 3600 - 1
+        os.utime(self.state_path(), (old, old))
+        self.assert_begins(self.start())
+
+    def test_malformed_state_reannounces_without_raising(self):
+        self.start()
+        for data in ("{broken", "[]", '{"silent": {}, "unacked": []}',
+                     '{"silent": {"device": true}, "unacked": {}}'):
+            with self.subTest(data=data):
+                self.state_path().write_text(data)
+                self.assert_begins(self.start())
+
+    def test_reader_and_session_state_are_separate(self):
+        self.start()
+        self.assert_begins(self.start(reader="another"))
+        self.SESSION = "another-session"
+        self.assert_begins(self.start())
+
+    def test_failed_state_write_does_not_stop_follow(self):
+        self.start()
+        self.state_path().unlink()
+        self.state_path().mkdir()
+        self.assert_begins(self.start())
+
+    def test_notes_still_print_and_acknowledge_across_restarts(self):
+        self.append(self.folded("first", 1001, to=self.SESSION, text="first note"))
+        lines = self.start()
+        self.assertIn("«first note»", lines[0])
+        self.assert_begins(lines[1:])
+        self.assertEqual(self.berth.reader_peek(self.SESSION, "main")[0], [])
+        self.append(self.folded("second", 1002, to=self.SESSION, text="second note"))
+        lines = self.start()
+        self.assertEqual(len(lines), 1)
+        self.assertIn("«second note»", lines[0])
+        self.assertEqual(self.start(), [])
+        self.assertEqual(self.berth.reader_peek(self.SESSION, "main")[0], [])
+
+
 class ReaderDeliveryInterleavings(unittest.TestCase):
     # Reuse only the isolated fixture/helpers, not BerthInboxTest's test methods.
     SESSION = BerthInboxTest.SESSION

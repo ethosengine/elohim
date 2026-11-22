@@ -2681,5 +2681,8 @@ Two concerns, kept apart:
    closure that was paid into one the next push pays again, and a sibling asking for that verdict
    is refused by it.
 
-State: neither is cured. ethosengine was asked whether it restores the green by one plain rerun
-or holds the red until the race is fixed; its answer is not recorded here yet.
+State: neither is cured. ethosengine restored its record the same day with one plain
+`just gate orchestrator` at `c71f584f` (no shadow, default evidence): exit 0 in 159 s,
+orchestrator 66 s and orchestrator-tree 80 s, and the gate printed that the note for closure
+`a8d119421a34` held a red and was being replaced. So the record is green again by a rerun, which
+is the cost concern 2 names: the closure was paid twice on that device.
