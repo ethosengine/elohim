@@ -82,7 +82,7 @@ describe('readCheck and judge — a newer run of the same workflow (backlog row 
     verdictFor([judged], (bin, args, o) => { calls.push({ args, o }); return ghReturning([green], [judged])(bin, args); });
     assert.equal(calls.length, 2);
     assert.deepEqual(calls[1].args, ['api', `repos/ethosengine/brit/actions/runs?head_sha=${SHA}&per_page=100`]);
-    assert.ok(calls[1].o.timeout >= 30000);
+    assert.ok(calls[1].o.timeout > 0 && calls[1].o.timeout <= 15000, 'the second read is bounded by what is left of the first read\'s budget');
   });
   test('(b) a newer in-progress run of the same workflow with no named check yet refuses as pending, naming the run', () => {
     const { read, verdict } = verdictFor([judged, wfRun(11, 'ci', 'in_progress', null, 9999, '2026-11-21T23:27:00Z')]);
@@ -144,6 +144,66 @@ describe('readCheck and judge — a newer run of the same workflow (backlog row 
       readCheck(attestation, SHA, { ghBin: 'gh', spawn: (...a) => { n++; return spawn(...a); } });
       assert.equal(n, 1);
     }
+  });
+});
+
+describe('the second read — re-runs, malformed data, one time budget (review of f394f1459)', () => {
+  const green = run('Tests pass', 'completed', 'success', '2026-11-21T23:23:17Z');
+  const judgedRun = (over = {}) => ({ ...wfRun(10, 'ci', 'completed', 'success', SUITE, '2026-11-21T22:06:44Z'), ...over });
+  const read = (workflowRuns, extra = {}) => readCheck(attestation, SHA, { ghBin: 'gh', spawn: ghReturning([green], workflowRuns), ...extra });
+  const line = (workflowRuns) => judge(read(workflowRuns), attestation, SHA);
+
+  test('the judged run itself in progress (a re-run) refuses; completed is unchanged', () => {
+    const v = line([judgedRun({ status: 'in_progress', conclusion: null, run_started_at: '2026-11-22T03:00:00Z' })]);
+    assert.equal(v.outcome, 'refuse'); assert.equal(v.conclusion, 'pending');
+    assert.equal(v.line, 'attested: REFUSED — ethosengine/brit@b86c5104d339 Tests pass not yet concluded at b86c5104d339: a re-run of the same run (ci, run 10, in_progress) has not produced this check yet');
+    assert.equal(line([judgedRun()]).outcome, 'pass');
+  });
+  test('a null or non-object member fails open with the clause', () => {
+    for (const bad of [null, 'x', 7]) {
+      const v = line([judgedRun(), bad]);
+      assert.equal(v.outcome, 'pass'); assert.equal(v.tier, 'witnessed');
+      assert.match(v.line, /newer runs not checked: /);
+    }
+  });
+  test('a judged run without workflow_id, or with no usable start time, fails open', () => {
+    for (const over of [{ workflow_id: undefined }, { run_started_at: 'garbage', created_at: null }]) {
+      const v = line([judgedRun(over), wfRun(11, 'ci', 'in_progress', null, 9999, '2026-11-21T23:27:00Z')]);
+      assert.equal(v.outcome, 'pass'); assert.match(v.line, /newer runs not checked: /);
+    }
+  });
+  test('two missing workflow_ids never match each other', () => {
+    const v = line([judgedRun({ workflow_id: undefined }), wfRun(11, 'ci', 'in_progress', null, 9999, '2026-11-21T23:27:00Z', undefined)]);
+    assert.equal(v.outcome, 'pass'); assert.match(v.line, /newer runs not checked: /);
+  });
+  test('a same-workflow candidate without status, or with a bad date, is skipped and named, not pending', () => {
+    for (const cand of [{ status: undefined }, { run_started_at: 'garbage', created_at: 'garbage' }]) {
+      const v = line([judgedRun(), { ...wfRun(11, 'ci', 'in_progress', null, 9999, '2026-11-21T23:27:00Z'), ...cand }]);
+      assert.equal(v.outcome, 'pass'); assert.match(v.line, /newer runs not (fully )?checked: /);
+    }
+  });
+  test('workflow ids compare as strings: 259568938 equals "259568938"', () => {
+    const v = line([judgedRun({ workflow_id: 259568938 }), wfRun(11, 'ci', 'in_progress', null, 9999, '2026-11-21T23:27:00Z', '259568938')]);
+    assert.equal(v.outcome, 'refuse'); assert.match(v.line, /run 11, in_progress/);
+  });
+  test('the second read gets what is left of the first read\'s 60 s, at most 15 s', () => {
+    const timeouts = [];
+    const spawn = (bin, args, o) => { timeouts.push(o.timeout); return ghReturning([green], [judgedRun()])(bin, args); };
+    const clock = [0, 50_000]; 
+    readCheck(attestation, SHA, { ghBin: 'gh', spawn, now: () => clock.shift() });
+    assert.deepEqual(timeouts, [60_000, 10_000]);
+    timeouts.length = 0; const early = [0, 1_000];
+    readCheck(attestation, SHA, { ghBin: 'gh', spawn, now: () => early.shift() });
+    assert.deepEqual(timeouts, [60_000, 15_000]);
+  });
+  test('a first read that used the whole 60 s makes no second call and says the budget was spent', () => {
+    let calls = 0;
+    const clock = [0, 60_000];
+    const spawn = (bin, args) => { calls++; return ghReturning([green], [judgedRun()])(bin, args); };
+    const v = judge(readCheck(attestation, SHA, { ghBin: 'gh', spawn, now: () => clock.shift() }), attestation, SHA);
+    assert.equal(calls, 1);
+    assert.equal(v.outcome, 'pass'); assert.equal(v.tier, 'witnessed');
+    assert.match(v.line, /newer runs not checked: the time budget was spent/);
   });
 });
 
