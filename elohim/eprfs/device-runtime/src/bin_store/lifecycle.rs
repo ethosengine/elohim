@@ -23,6 +23,10 @@ struct PrepareOptions<'a> {
     candidate: Option<&'a RefCell<Option<String>>>,
 }
 
+/// The bound on one brit build attempt. One that runs out is reported as such, with the
+/// resume: its crates stay in the persistent build target, so the next follow continues.
+const BRIT_BUILD_BOUND: Duration = Duration::from_secs(1800);
+
 impl Store {
     pub(super) fn committed_current(&self) -> Option<String> {
         self.root
@@ -486,7 +490,7 @@ impl Store {
                         ],
                     );
                     spec.cwd = Some(work.clone());
-                    spec.timeout = Duration::from_secs(1800);
+                    spec.timeout = BRIT_BUILD_BOUND;
                     spec.env = self.build_environment(repo, &build_target);
                     spec.env.insert("CARGO_BUILD_JOBS".into(), Some("1".into()));
                     for key in ["CARGO_REGISTRIES_ELOHIM_TOKEN", "NPM_TOKEN"] {
@@ -503,7 +507,9 @@ impl Store {
                         }
                         spec.env.extend(credentials);
                     }
-                    if self.run(&spec).is_ok_and(|o| o.success) {
+                    // A bound that expires is the runner's `command-timeout`, not a failed exit.
+                    let ran = self.run(&spec);
+                    if ran.as_ref().is_ok_and(|o| o.success) {
                         let release = build_target.join("release-github");
                         let mut sums = std::collections::BTreeMap::new();
                         for bin in &self.config.bins {
@@ -527,11 +533,20 @@ impl Store {
                             },
                         );
                     }
-                    attempts.push(format!(
-                        "brit build {} failed (cargo build {}--locked --profile release-github)",
-                        ["offline", "anonymous", "authenticated"][stage],
+                    let command = format!(
+                        "cargo build {}--locked --profile release-github",
                         if stage == 0 { "--offline " } else { "" }
-                    ));
+                    );
+                    let stage = ["offline", "anonymous", "authenticated"][stage];
+                    attempts.push(match ran {
+                        Err(e) if e.kind == "command-timeout" => format!(
+                            "brit build {stage} ran out of its {} s bound ({command}); the crates \
+                             it compiled stay in its target, so a second `epr bin follow` \
+                             resumes the build",
+                            BRIT_BUILD_BOUND.as_secs()
+                        ),
+                        _ => format!("brit build {stage} failed ({command})"),
+                    });
                 }
                 Err(Refusal::new(
                     "brit-build-failed",
