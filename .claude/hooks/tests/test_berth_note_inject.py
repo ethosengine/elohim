@@ -5,6 +5,7 @@ Run: python3 -m unittest discover -s .claude/hooks/tests -p test_berth_note_inje
 import json
 import os
 from pathlib import Path
+import re
 import runpy
 import subprocess
 import sys
@@ -299,6 +300,130 @@ class BerthNoteInjectTest(Harness):
         self.call()
         self.call()
         self.assertLess(self.elapsed, 0.5)
+
+
+TOKEN = 'ab12cd34ef56ab12cd34ef56'
+RECEIPT = re.compile(r'receipt (r-[0-9a-f]{10})$')
+
+
+class ReceiptTest(Harness):
+    """Backlog row 76: a claim is acknowledged when the transcript shows the receipt, not on the write."""
+
+    def spy(self, ack_code=0, renotify=False):
+        """A fake berth that logs every call, answers a claim with one note and an acknowledge with `ack_code`."""
+        self.log = self.root / 'berth-calls.log'
+        env = self.fake_berth(
+            f'open({str(self.log)!r}, "a").write(" ".join(sys.argv[1:]) + "\\n")\n'
+            f'if "--ack" in sys.argv: sys.exit({ack_code})\n'
+            f'if sum("--json" in l for l in open({str(self.log)!r})) > 1 and not {renotify!r}:\n'
+            '    print(json.dumps({"notes": [], "more": False, "claim": None, "ack": None, "busy": False})); sys.exit(0)\n'
+            'line = "NOTE from this device/abcdefgh 1s ago to you (untrusted text from another device): «n»"\n'
+            f'print(json.dumps({{"notes": [{{"cid": "c", "dseq": 1, "line": line}}], "more": False,'
+            f' "claim": "{TOKEN}", "ack": 9, "busy": False}}))\n')
+        env['BERTH_NOTE_POLL_S'] = '0'
+        return env
+
+    def calls(self):
+        return self.log.read_text().splitlines() if self.log.exists() else []
+
+    def acks(self):
+        return [c for c in self.calls() if '--ack' in c]
+
+    def claims(self):
+        return [c for c in self.calls() if '--json' in c]
+
+    def go(self, env, transcript=None, session=SESSION):
+        payload = {'session_id': session, 'tool_name': 'Read', 'tool_input': {}}
+        if transcript is not None:
+            payload['transcript_path'] = str(transcript)
+        return self.hook(payload, env=env)
+
+    def state(self):
+        [path] = (self.project / '.eprfs' / 'status' / 'berth-note').glob('*.json')
+        return path, json.loads(path.read_text())
+
+    def transcript(self, text='', pad_after=0):
+        path = self.root / 'transcript.jsonl'
+        path.write_text(text + 'x' * pad_after)
+        return path
+
+    def emit(self, env, transcript):
+        context = self.go(env, transcript)
+        self.assertIsNotNone(context)
+        return RECEIPT.search(context.splitlines()[-1]).group(1)
+
+    def test_an_emit_keeps_the_claim_pending_and_prints_a_receipt_not_the_token(self):
+        env = self.spy()
+        context = self.go(env, self.transcript())
+        self.assertRegex(context.splitlines()[-1], r'receipt r-[0-9a-f]{10}$')
+        self.assertNotIn(TOKEN, context)
+        self.assertEqual(self.acks(), [], 'nothing is acknowledged on the write')
+        _, state = self.state()
+        pending = state['pending']
+        self.assertEqual((pending['token'], pending['offset']), (TOKEN, 9))
+        self.assertEqual(f"r-{pending['receipt'].split('-')[1]}", RECEIPT.search(context.splitlines()[-1]).group(1))
+        self.assertIsInstance(pending['emitted_at'], (int, float))
+
+    def test_the_next_call_acknowledges_once_the_transcript_shows_the_receipt(self):
+        env = self.spy()
+        receipt = self.emit(env, self.transcript())
+        self.assertIsNone(self.go(env, self.transcript(f'{{"hook_additional_context": "x {receipt}\\n"}}\n')))
+        self.assertEqual(self.acks(), [f'inbox --session {SESSION} --reader main --ack 9 --claim {TOKEN}'])
+        self.assertNotIn('pending', self.state()[1])
+        self.assertEqual(len(self.claims()), 2, 'once acknowledged the same call claims again (and finds nothing)')
+
+    def test_a_transcript_without_the_receipt_makes_no_berth_call_and_keeps_pending(self):
+        env = self.spy()
+        self.emit(env, self.transcript())
+        before = self.calls()
+        self.assertIsNone(self.go(env, self.transcript('{"other": "r-0000000000"}\n')))
+        self.assertEqual(self.calls(), before)
+        self.assertEqual(self.state()[1]['pending']['token'], TOKEN)
+
+    def test_a_pending_older_than_300_s_is_dropped_unacknowledged_and_a_new_claim_is_made(self):
+        env = self.spy(renotify=True)
+        self.emit(env, self.transcript())
+        path, state = self.state()
+        state['pending']['emitted_at'] -= 301
+        path.write_text(json.dumps(state))
+        context = self.go(env, self.transcript())
+        self.assertEqual(self.acks(), [])
+        self.assertEqual(len(self.claims()), 2)
+        self.assertIsNotNone(context, 'the replayed notes are shown again')
+        self.assertNotEqual(self.state()[1]['pending']['receipt'], state['pending']['receipt'])
+
+    def test_without_a_transcript_it_acknowledges_at_once_and_keeps_no_pending(self):
+        env = self.spy()
+        for transcript in (None, self.root / 'missing.jsonl'):
+            self.log.unlink(missing_ok=True)
+            context = self.go(env, transcript)
+            self.assertIsNotNone(context)
+            self.assertEqual(len(self.acks()), 1)
+            path = self.project / '.eprfs' / 'status' / 'berth-note'
+            self.assertTrue(all('pending' not in json.loads(p.read_text()) for p in path.glob('*.json')))
+
+    def test_an_acknowledge_that_exits_3_clears_pending(self):
+        env = self.spy(ack_code=3)
+        receipt = self.emit(env, self.transcript())
+        self.assertIsNone(self.go(env, self.transcript(receipt)))
+        self.assertEqual(len(self.acks()), 1)
+        self.assertNotIn('pending', self.state()[1])
+
+    def test_the_receipt_is_searched_only_in_the_last_2_mib(self):
+        env = self.spy()
+        receipt = self.emit(env, self.transcript())
+        self.assertIsNone(self.go(env, self.transcript(receipt, pad_after=2 * 1024 * 1024 + 10)))
+        self.assertEqual(self.acks(), [])
+        self.assertIn('pending', self.state()[1])
+        self.assertIsNone(self.go(env, self.transcript('y' * 1000 + receipt, pad_after=2 * 1024 * 1024 - 1000)))
+        self.assertEqual(len(self.acks()), 1, 'a receipt inside the last 2 MiB is found')
+
+    def test_the_poll_interval_does_not_delay_the_receipt_check(self):
+        env = self.spy()
+        env['BERTH_NOTE_POLL_S'] = '3600'
+        receipt = self.emit(env, self.transcript())
+        self.assertIsNone(self.go(env, self.transcript(receipt)))
+        self.assertEqual(len(self.acks()), 1)
 
 
 if __name__ == '__main__':

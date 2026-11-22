@@ -9,11 +9,20 @@ never consumes its parent's news) that never moves the session's seen offset: ev
 here still reaches `berth inbox`. Only notes ADDRESSED to the session arrive (no household
 broadcasts), never a well-formed gate-live event (gate-live-inject owns gate-red@1/gate-final@1),
 at most MAX_NOTES per call, each one line rendered by berth's single note formatter under a frame
-naming it untrusted data from a named sender. Delivery is claim, print, then acknowledge: berth
-leases the notes to this call, and only after the context is written and flushed does the hook
-`--ack` the claim, so a timeout or a failure on the way loses nothing (an unacknowledged claim
-expires and replays). berth is asked at most once per POLL_S unless a backlog or a busy reader is
-waiting; every child runs under a deadline, its output capped. Fail-open: a missing, slow or broken
+naming it untrusted data from a named sender.
+
+Delivery is claim, print with a receipt, acknowledge at the NEXT call. Writing to stdout is not
+delivery: on 2026-11-22 two notes were acknowledged here and never reached the model (backlog
+`steward-device-arrival-open-items` row 76), because the harness can drop a hook's output after the
+hook has already acknowledged. So berth leases the notes to this call, the hook prints them with a
+fresh `receipt r-<hex>` on the last line and keeps the claim pending in its state file, and at the
+next call of the same session and reader (before anything else, whatever POLL_S says) it reads the
+last 2 MiB of the session transcript: only when the receipt is there does it `--ack` the claim. A
+claim whose receipt never shows is dropped after PENDING_MAX_S without an acknowledge, and berth
+replays its notes at a later claim. A note can therefore be shown twice; this hook never loses one.
+Without a transcript to read (no `transcript_path`, or it will not open) it acknowledges right
+after the write, as before. berth is asked at most once per POLL_S unless a backlog or a busy reader
+is waiting; every child runs under a deadline, its output capped. Fail-open: a missing, slow or broken
 berth is silence, and no error ever reaches the tool call. An idle agent has no tool call: its
 Monitor form is `berth inbox --session <S> --reader main --follow`.
 """
@@ -22,6 +31,7 @@ import json
 import os
 from pathlib import Path
 import re
+import secrets
 import selectors
 import subprocess
 import sys
@@ -36,6 +46,8 @@ MAX_LINE = 1000
 OUTPUT_CAP = 64 * 1024
 BERTH_TIMEOUT_S = 0.9
 DEADLINE_S = 2.0
+PENDING_MAX_S = 300
+TRANSCRIPT_TAIL = 2 * 1024 * 1024
 # berth NOTE_ID: the only shape a session or reader id may take to reach a command line.
 ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}")
 CLAIM = re.compile(r"[0-9a-f]{8,64}")
@@ -149,17 +161,71 @@ def claim(session, reader, deadline):
 
 
 def acknowledge(session, reader, token, offset, deadline):
-    run_capped([berth_bin(), "inbox", "--session", session, "--reader", reader,
-                "--ack", str(offset), "--claim", token], min(BERTH_TIMEOUT_S, deadline - time.monotonic()))
+    """berth's exit status for the acknowledge (0 done, 3 the claim no longer holds), None on a timeout."""
+    code, _ = run_capped([berth_bin(), "inbox", "--session", session, "--reader", reader,
+                          "--ack", str(offset), "--claim", token],
+                         min(BERTH_TIMEOUT_S, deadline - time.monotonic()))
+    return code
 
 
-def deliver(session, reader, emit, now=None, started=None):
-    """Claim, render and emit this reader's unread notes, then acknowledge them. `emit` writes the
-    context and returns True once it is flushed; nothing is acknowledged before that."""
+def readable(transcript):
+    """True when the transcript file opens: only then can a receipt ever be read back from it."""
+    if not isinstance(transcript, str) or not transcript:
+        return False
+    try:
+        with open(transcript, "rb"):
+            return True
+    except OSError:
+        return False
+
+
+def receipt_shown(transcript, receipt):
+    """True when the ASCII receipt is among the last TRANSCRIPT_TAIL bytes of the transcript (JSONL,
+    searched as bytes, never parsed)."""
+    try:
+        with open(transcript, "rb") as f:
+            size = f.seek(0, os.SEEK_END)
+            f.seek(max(0, size - TRANSCRIPT_TAIL))
+            return receipt.encode("ascii") in f.read(TRANSCRIPT_TAIL)
+    except (OSError, UnicodeEncodeError, TypeError):
+        return False
+
+
+def valid_pending(pending):
+    return (isinstance(pending, dict) and isinstance(pending.get("token"), str)
+            and CLAIM.fullmatch(pending["token"]) is not None
+            and isinstance(pending.get("offset"), int) and not isinstance(pending.get("offset"), bool)
+            and pending["offset"] >= 0 and isinstance(pending.get("receipt"), str)
+            and re.fullmatch(r"r-[0-9a-f]{10}", pending["receipt"]) is not None
+            and isinstance(pending.get("emitted_at"), (int, float)))
+
+
+def deliver(session, reader, emit, now=None, started=None, transcript=None):
+    """Settle the last emit's claim, then claim, render and emit this reader's unread notes. `emit`
+    writes the context and returns True once it is flushed. A claim is acknowledged only when the
+    transcript shows its receipt (see the module docstring); with no readable transcript it is
+    acknowledged right after the write."""
     now = time.time() if now is None else now
     deadline = (time.monotonic() if started is None else started) + DEADLINE_S
     path = state_path(session, reader)
     state = read_state(path)
+    pending = state.get("pending") if valid_pending(state.get("pending")) else None
+    if pending:
+        # Before anything else, and whatever POLL_S says: did the last emit reach the transcript?
+        if receipt_shown(transcript, pending["receipt"]):
+            if deadline - time.monotonic() <= 0:
+                return  # out of budget: pending stays for the next call
+            code = acknowledge(session, reader, pending["token"], pending["offset"], deadline)
+            if code is None:
+                return  # berth was slow: pending stays for the next call
+            # Exit 3 is a claim that no longer holds the reader: the notes replay once more, and the
+            # duplicate is not suppressed.
+        elif 0 <= now - pending["emitted_at"] <= PENDING_MAX_S:
+            return  # a younger pending blocks a new claim: berth would answer busy or re-issue it
+        # else: never shown within PENDING_MAX_S; dropped unacknowledged, berth replays at a later claim.
+        pending = None
+        state = {k: v for k, v in state.items() if k != "pending"}
+        write_state(path, state)
     poll = float(os.environ.get("BERTH_NOTE_POLL_S", POLL_S))
     checked = state.get("checked_at")
     if (not state.get("again") and isinstance(checked, (int, float))
@@ -174,7 +240,8 @@ def deliver(session, reader, emit, now=None, started=None):
     token, offset = reply.get("claim"), reply.get("ack")
     more = reply.get("more") is True
     # A busy reader (its Monitor is printing) or a backlog is asked again at the next tool call.
-    write_state(path, {"checked_at": now, "again": more or reply.get("busy") is True})
+    again = more or reply.get("busy") is True
+    write_state(path, {"checked_at": now, "again": again})
     if not notes:
         return
     if not (isinstance(token, str) and CLAIM.fullmatch(token)
@@ -189,8 +256,18 @@ def deliver(session, reader, emit, now=None, started=None):
         tail.append("[berth-note] More addressed notes are waiting; the next arrive at your next tool call.")
     tail.append(f"[berth-note] Read them all: `berth inbox --session {session}`; to be woken while idle, "
                 f"arm Monitor on `berth inbox --session {session} --reader {reader} --follow`.")
+    # Without a readable transcript there is nothing to read a receipt from, and never acknowledging
+    # would replay these notes for ever: that case acknowledges right after the write, as before.
+    receipt = f"r-{secrets.token_hex(5)}" if readable(transcript) else None
+    if receipt:
+        tail[-1] += f" receipt {receipt}"
     if emit("\n".join([FRAME, *shown, *tail])):
-        acknowledge(session, reader, token, offset, deadline)
+        if receipt:
+            write_state(path, {"checked_at": now, "again": again,
+                               "pending": {"token": token, "offset": offset, "receipt": receipt,
+                                           "emitted_at": now}})
+        else:
+            acknowledge(session, reader, token, offset, deadline)
 
 
 def emit_context(text):
@@ -220,7 +297,7 @@ def main():
     reader = payload.get("agent_id") or "main"
     if not isinstance(reader, str) or not ID.fullmatch(reader):
         return
-    deliver(session, reader, emit_context, started=started)
+    deliver(session, reader, emit_context, started=started, transcript=payload.get("transcript_path"))
 
 
 if __name__ == "__main__":
