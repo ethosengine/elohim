@@ -29,6 +29,7 @@ use super::embedder::{fold_budget, Embedder, Fixture, PinnedProcedure};
 use super::surface::{self, Listing, Surface};
 use super::*;
 use cid::Cid;
+use elohim_device_runtime::flock::Flock;
 use elohim_epr_index::attest::{next_retry, record, LATEST_FILE};
 use elohim_epr_index::rank::encode as vector_blob;
 use elohim_epr_index::store::{
@@ -547,35 +548,7 @@ fn lock(dir: &Path) -> FlowResult<Option<Flock>> {
         .create(true)
         .truncate(false)
         .open(dir.join(LOCK_FILE))?;
-    match rustix::fs::flock(&file, rustix::fs::FlockOperation::NonBlockingLockExclusive) {
-        Ok(()) => Ok(Some(Flock { file })),
-        Err(errno) if errno == rustix::io::Errno::WOULDBLOCK => Ok(None),
-        Err(errno) => Err(FlowError::Io(errno.into())),
-    }
-}
-
-/// The held fold lock. Dropping it unlocks, then closes.
-///
-/// A private copy of `elohim_device_runtime::flock::Flock`, which is parked on branch
-/// `wallclock/fold-unlock` (8b6168dea) with the envelope sites that use it: CI reads any change
-/// under `device-runtime` as an Edge build input, so the shared guard lands with the next
-/// deliberate Edge roll, and this copy is then replaced by it.
-#[derive(Debug)]
-struct Flock {
-    file: File,
-}
-
-impl std::os::fd::AsFd for Flock {
-    fn as_fd(&self) -> std::os::fd::BorrowedFd<'_> {
-        self.file.as_fd()
-    }
-}
-
-impl Drop for Flock {
-    fn drop(&mut self) {
-        // A failed unlock leaves the close that follows to release it, as before this guard.
-        let _ = rustix::fs::flock(&self.file, rustix::fs::FlockOperation::Unlock);
-    }
+    Ok(Flock::try_exclusive(file)?.ok())
 }
 
 fn attest(dir: &Path, report: &mut FoldReport, state: FoldState) -> FlowResult<()> {
