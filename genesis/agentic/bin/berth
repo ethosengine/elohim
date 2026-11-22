@@ -2483,8 +2483,75 @@ def gate_impact(paths, writes):
         return {"fallback": "gate-impact unavailable"}
 
 
+def sibling_moorings(b, view=None, read_peer=True):
+    """Live sibling declarations from at most the final 64 MiB of the channel store."""
+    try:
+        if read_peer:
+            view, error = b.peer_leases()
+            if error:
+                view = None
+        root = b.channel_root or b.cached_channel_root() or REPO_ROOT
+        source = os.path.join(root, ".eprfs", "status", "flows.jsonl")
+        newest, unmoored = {}, {}
+        with open(source, "rb") as stream:
+            size = os.fstat(stream.fileno()).st_size
+            start = max(0, size - 64 * 1024 * 1024)
+            stream.seek(start)
+            if start:
+                stream.readline()  # discard the partial first row
+            for raw in stream.read(max(0, size - stream.tell())).splitlines():
+                if b"measure:dev-berth-events@1" not in raw or b"via:did:key:" not in raw:
+                    continue
+                try:
+                    tags = json.loads(raw)["record"]["classifiedAs"]
+                    if "measure:dev-berth-events@1" not in tags:
+                        continue
+                    env = dict(tag[4:].split("=", 1) for tag in tags
+                               if tag.startswith("env:") and "=" in tag)
+                    device = next(tag[4:] for tag in tags if tag.startswith("via:did:key:"))
+                    session, at = env["session"], float(env["at"])
+                    key = (device, session)
+                    if env.get("kind") == "unmoor":
+                        unmoored[key] = max(at, unmoored.get(key, float("-inf")))
+                        continue
+                    if env.get("kind") != "moor":
+                        continue
+                    bounds = json.loads(env.get("bounds", "{}"))
+                    recipient = json.loads(env.get("recipient", "{}"))
+                    ttl = float(bounds.get("ttl_s", b.mooring_ttl_s))
+                    writes = bounds.get("write_set", [])
+                    if not isinstance(writes, list) or not all(isinstance(w, str) for w in writes):
+                        continue
+                    row = dict(device=device, session=session, runtime=recipient.get("runtime", "?"),
+                               task=env.get("task", "-"), write_set=writes, at=at)
+                    if key not in newest or at >= newest[key][0]["at"]:
+                        newest[key] = (row, ttl)
+                except (ValueError, TypeError, KeyError, AttributeError, StopIteration):
+                    continue  # malformed rows do not hide valid declarations
+        live = []
+        for key, (row, ttl) in sorted(newest.items()):
+            if unmoored.get(key, float("-inf")) >= row["at"]:
+                continue
+            if row["runtime"] == "git-hook" or row["session"].startswith("pre-push-"):
+                continue
+            since = row["at"]
+            now = b.now()
+            if view is not None:
+                since = view.get("others", {}).get(row["device"], {}).get("moorings", {}).get(row["session"])
+                if since is None:
+                    continue
+                since /= 1000
+                now = b._view_now(view) / 1000
+            if 0 <= now - since < ttl:
+                live.append(row)
+        return live
+    except Exception:
+        print("berth: sibling intent unavailable", file=sys.stderr)
+        return []
+
+
 def declared_impact(b, paths, session):
-    """Local live declarations only; remote folds currently expose timestamps."""
+    """Advisory local and sibling live declarations."""
     rows = []
     moorings = b.moorings() if os.path.isdir(b.moor_dir) else {}
     for owner, m in sorted(moorings.items()):
@@ -2500,12 +2567,25 @@ def declared_impact(b, paths, session):
         result = gate_impact(paths, writes)
         if result.get("rows") or overlap or result.get("fallback"):
             rows.append(dict(kind="impact", paths=overlap, **result, **detail))
+    for m in sibling_moorings(b):
+        detail = dict(session=m["session"], device=m["device"], runtime=m["runtime"],
+                      task=m["task"], age_s=b.now() - m["at"])
+        writes = m["write_set"]
+        if not writes:
+            rows.append(dict(kind="undeclared", **detail))
+            continue
+        overlap = sorted({path for path in paths if any(paths_overlap(path, w) for w in writes)})
+        result = gate_impact(paths, writes)
+        if result.get("rows") or overlap or result.get("fallback"):
+            rows.append(dict(kind="impact", paths=overlap, **result, **detail))
     return rows
 
 
 def impact_line(row):
     detail = (f"{row['session'][:8]} ({row['runtime']}, task={row['task'][:60]}, "
               f"seen {_age(row['age_s'])})")
+    if row.get("device"):
+        detail = row["device"].removeprefix("did:key:")[:8] + "…/" + detail
     if row["kind"] == "undeclared":
         return f"{detail}: undeclared"
     groups = {}
@@ -2516,8 +2596,10 @@ def impact_line(row):
         projects = ",".join(item["project"] for item in items)
         if direction == "shared":
             seconds = [item.get("seconds") for item in items]
-            cost = (f"~{sum(seconds):g}s of gates between you" if all(s is not None for s in seconds)
-                    else "gate seconds unknown")
+            known = [s for s in seconds if s is not None]
+            cost = f"~{sum(known):g}s of gates between you" if known else "gate seconds unknown"
+            if known and len(known) < len(seconds):
+                cost += f" (+{len(seconds) - len(known)} unmeasured)"
             parts.append(f"shared {projects}; {cost}")
         elif direction == "upstream-of-me":
             parts.append(f"upstream-of-me via {projects}; their work can re-key yours")
@@ -2666,8 +2748,19 @@ def _other_devices_lines(b, view, view_line):
     """The other devices of this person, as this device has folded them (`epr peer leases --json`:
     `others` and the `held_by` verdicts, replayed in each device's own record order): each one's last
     head, its open moorings and its steward-scoped leases, lane claims among them."""
+    siblings = sibling_moorings(b, view=view, read_peer=False)
+    details = {}
+    for row in siblings:
+        details.setdefault(row["device"], []).append(row)
     if view is None:
-        return [view_line] if view_line else []
+        lines = [view_line] if view_line else (["  other devices:"] if details else [])
+        for did, rows in sorted(details.items()):
+            lines.append(f"    device {did}")
+            for row in rows:
+                lines.append(f"      moored {row['session']} task={row['task']}")
+                if row["write_set"]:
+                    lines.append("  " + writes_line(row["write_set"]))
+        return lines
     now_ms = b._view_now(view)
     others = view.get("others") if isinstance(view.get("others"), dict) else {}
     held = {}
@@ -2697,6 +2790,10 @@ def _other_devices_lines(b, view, view_line):
                              f"ttl (last {_peer_age(age)} ago)")
             else:
                 lines.append(f"      moored {session} since {_rfc3339(since)}")
+        for row in details.get(did, []):
+            lines.append(f"      {row['session']} task={row['task']}")
+            if row["write_set"]:
+                lines.append("  " + writes_line(row["write_set"]))
         for res, verdict in sorted(held.get(did, []), key=lambda item: item[0]):
             line = f"      {res}  {steward_reason(verdict, now_ms)}"
             if verdict.get("override"):

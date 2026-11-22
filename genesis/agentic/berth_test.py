@@ -40,11 +40,14 @@ CLASSES = {"mesh": {"verify": {"default_ttl_s": 1800, "max_ttl_s": 3600},
 
 _PROXY_KEYS = ("ELOHIM_SHIFT_BERTH_ADDRESS", "ELOHIM_SHIFT_BERTH_TOKEN")
 _saved_proxy_env = {}
+_sibling_scanner = _NS["sibling_moorings"]
+_sibling_patch = mock.patch.dict(_sibling_scanner.__globals__, {"sibling_moorings": lambda *a, **k: []})
 
 
 def setUpModule():
     # These fixtures exercise their own BERTH_DIR, including direct main() calls.
     # A gate worker's guardian proxy belongs to the enclosing workload instead.
+    _sibling_patch.start()  # only SiblingMoorings opts into scanning its temporary flow store
     _saved_proxy_env.clear()
     for key in _PROXY_KEYS:
         if key in os.environ:
@@ -52,6 +55,7 @@ def setUpModule():
 
 
 def tearDownModule():
+    _sibling_patch.stop()
     for key in _PROXY_KEYS:
         os.environ.pop(key, None)
     os.environ.update(_saved_proxy_env)
@@ -247,6 +251,113 @@ class AdvisoryImpact(DeclaredWrites):
     def test_holds_remains_same_advisory_alias(self):
         self.moor(["src/**"])
         self.assertEqual(super().cli("holds", "src/a"), self.cli("impact", "src/a"))
+
+
+class SiblingMoorings(DeclaredWrites):
+    def setUp(self):
+        super().setUp()
+        self.root = Path(self.directory.name) / "checkout"
+        self.flow = self.root / ".eprfs/status/flows.jsonl"
+        self.flow.parent.mkdir(parents=True)
+        self.flow.touch()
+        self.b.channel_root = str(self.root)
+        self.view = None
+        self.b.peer_leases = lambda: (self.view, None if self.view else "unavailable")
+        patch = mock.patch.dict(self.main.__globals__, {"sibling_moorings": _sibling_scanner})
+        patch.start()
+        self.addCleanup(patch.stop)
+        self.device = "did:key:z6MkgHju123456"
+
+    def event(self, session="f0b335e0-peer", kind="moor", at=None, device=True,
+              runtime="claude-code", writes=None, ttl=10800):
+        bounds = {"ttl_s": ttl}
+        if writes is not None:
+            bounds["write_set"] = writes
+        tags = ["measure:dev-berth-events@1", "steward:human:fixture",
+                f"env:kind={kind}", f"env:session={session}", "env:task=repair",
+                f"env:at={self.now - 180 if at is None else at}",
+                "env:bounds=" + json.dumps(bounds),
+                "env:recipient=" + json.dumps({"runtime": runtime})]
+        if device:
+            tags.append("via:" + self.device)
+        with self.flow.open("a") as stream:
+            stream.write(json.dumps({"cid": "fixture", "record": {"classifiedAs": tags}}) + "\n")
+
+    def test_live_sibling_impact_and_status(self):
+        self.event(writes=["src/**"])
+        code, out = self.cli("impact", "src/a")
+        self.assertEqual(code, 0)
+        self.assertIn("z6MkgHju…/f0b335e0 (claude-code, task=repair, seen 3m)", out)
+        self.assertIn("same paths src/a", out)
+        self.assertNotRegex(out.lower(), r"\b(wait|held|refused|lock)\b")
+        lines = _NS["_other_devices_lines"](self.b, None, "  other devices: unknown")
+        self.assertIn("task=repair", "\n".join(lines))
+        self.assertIn("writes: src/**", "\n".join(lines))
+
+    def test_unmoored_expired_hooks_and_own_rows_absent(self):
+        self.event(session="gone", writes=["src/**"])
+        self.event(session="gone", kind="unmoor", at=self.now)
+        self.event(session="expired", at=0, ttl=100)
+        self.event(session="hook", runtime="git-hook")
+        self.event(session="pre-push-test")
+        self.event(session="own", device=False)
+        self.assertEqual(_sibling_scanner(self.b), [])
+        self.assertEqual(self.cli("impact", "src/a"), (0, "no nearby live intent observed\n"))
+
+    def test_malformed_skipped_and_newest_selected(self):
+        self.event(at=self.now - 10, writes=["new/**"])
+        with self.flow.open("a") as stream:
+            stream.write('malformed measure:dev-berth-events@1 via:did:key:broken\n')
+        self.event(at=self.now - 100, writes=["old/**"])
+        self.event(kind="unmoor", at=self.now - 50)
+        self.assertEqual(_sibling_scanner(self.b)[0]["write_set"], ["new/**"])
+
+    def test_peer_view_controls_liveness(self):
+        self.event(at=0, ttl=100)
+        self.view = {"others": {self.device: {"moorings": {"f0b335e0-peer": (self.now - 1) * 1000}}}}
+        with mock.patch.object(self.b, "_view_now", return_value=self.now * 1000):
+            self.assertEqual(len(_sibling_scanner(self.b)), 1)
+            self.view["others"][self.device]["moorings"] = {}
+            self.assertEqual(_sibling_scanner(self.b), [])
+
+    def test_status_with_peer_view(self):
+        self.event(writes=["src/**"])
+        view = {"others": {self.device: {"moorings": {"f0b335e0-peer": self.now * 1000}}}}
+        with mock.patch.object(self.b, "_view_now", return_value=self.now * 1000):
+            out = "\n".join(_NS["_other_devices_lines"](self.b, view, None))
+        self.assertIn("task=repair", out)
+        self.assertIn("writes: src/**", out)
+
+    def test_scan_is_limited_to_tail(self):
+        self.event(session="outside")
+        with self.flow.open("ab") as stream:
+            stream.seek(0, 2)
+            stream.truncate(stream.tell() + 64 * 1024 * 1024)
+            stream.seek(0, 2)
+            stream.write(b"\n")
+        self.event(session="inside")
+        self.assertEqual([row["session"] for row in _sibling_scanner(self.b)], ["inside"])
+
+    def test_undeclared(self):
+        self.event()
+        self.assertIn("seen 3m): undeclared", self.cli("impact", "src/a")[1])
+
+    def test_missing_store_is_local_only(self):
+        self.moor(["src/**"])
+        self.flow.unlink()
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err):
+            code, out = self.cli("impact", "src/a")
+        self.assertEqual(code, 0)
+        self.assertIn("peer (codex, task=fix", out)
+        self.assertNotIn("z6MkgHju", out)
+        self.assertEqual(err.getvalue(), "berth: sibling intent unavailable\n")
+
+    def test_partial_seconds(self):
+        self.event(writes=["src/**"])
+        self.graph = {"rows": [{"project": "a", "direction": "shared", "seconds": 122},
+                               {"project": "b", "direction": "shared", "seconds": None}]}
+        self.assertIn("~122s of gates between you (+1 unmeasured)", self.cli("impact", "src/a")[1])
 
 
 class LocationResolutionTest(unittest.TestCase):
