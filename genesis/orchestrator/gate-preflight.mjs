@@ -13,7 +13,7 @@
 // The fresh-worktree checklist this replaces lived in agent memory and was re-learned on
 // 2026-10-15, -17, -19, -22, -27, -31 and 11-01. Habit `careless-reds-cost-seconds`.
 
-import { accessSync, constants, existsSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
+import { accessSync, constants, existsSync, readFileSync, readdirSync, realpathSync, statSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -148,6 +148,44 @@ export function checkTmpdir({ projects, env = process.env, exists = existsSync }
     }
     if (dirname(dir) === dir) return row('tmpdir', 'ok');
   }
+}
+
+/** Read the launcher's current head without executing it or inheriting its session pin. */
+export function checkEprBin({ env = process.env } = {}) {
+  if (!env.EPR_BIN) return row('epr-bin', 'ok');
+  let current;
+  let launcher;
+  try {
+    // Store::from_environment: explicit tool/store overrides win. Otherwise locate the
+    // installed launcher, whose bin/bin-launch path identifies this device's store.
+    let store = env.EPR_STORE || (env.BIN_STORE && join(env.BIN_STORE, 'epr'));
+    if (!store) {
+      launcher = realpathSync(join(env.HOME, '.local/bin/epr'));
+      if (!launcher.endsWith('/bin/bin-launch')) throw new Error('unknown launcher');
+      store = join(dirname(dirname(launcher)), 'epr');
+    }
+    // bin_store/mod.rs head(): current.json wins even when the symlink disagrees.
+    const head = join(store, 'current.json');
+    if (existsSync(head)) {
+      const { cid } = JSON.parse(readFileSync(head, 'utf8'));
+      if (typeof cid !== 'string' || !/^b[a-z2-7]+$/.test(cid)) throw new Error('invalid head');
+      current = realpathSync(join(store, cid, 'epr'));
+    } else {
+      current = realpathSync(join(store, 'current/epr'));
+    }
+  } catch {
+    return row('epr-bin', 'WARN',
+      `EPR_BIN is set (${env.EPR_BIN}) and this device's current epr could not be read`, 'unset EPR_BIN');
+  }
+  let inherited;
+  try { inherited = realpathSync(env.EPR_BIN); } catch { /* A missing candidate differs too. */ }
+  const storeCid = path => path?.match(/\/epr\/(b[a-z2-7]+)\/epr$/)?.[1];
+  if (inherited === current || (storeCid(inherited) && storeCid(inherited) === storeCid(current))) {
+    return row('epr-bin', 'ok');
+  }
+  return row('epr-bin', env.GATE_ALLOW_EPR_BIN === '1' ? 'WARN' : 'REFUSED',
+    `inherited EPR_BIN=${env.EPR_BIN}; device current epr=${current} — gates key on a native evaluator; an older one makes evidence unavailable, so nothing is reused`,
+    'unset EPR_BIN');
 }
 
 export function checkNodeModules({ root, projects }) {
@@ -486,6 +524,7 @@ export function runPreflight({ root = ROOT, projects, env = process.env, spawn =
     return rows;
   };
   return [
+    ...timed(() => checkEprBin({ env })),
     ...timed(() => checkSubmodules({ root, spawn })),
     ...timed(() => checkSubmodulePins({ root, projects })),
     ...timed(() => checkTmpdir({ projects, env })),
@@ -569,7 +608,13 @@ export function emitLive(rows, env = process.env, append = appendEvent) {
   }
 }
 
-function main(argv) {
+export function main(argv, env = process.env) {
+  if (argv.includes('--epr-bin')) {
+    const r = checkEprBin({ env });
+    process.stdout.write(`${formatRow(r)}\n`);
+    emitLive([r], env);
+    return r.level === 'REFUSED' ? 1 : 0;
+  }
   if (argv.includes('--on-red')) {
     process.stdout.write(`${onRedPolicy().mode}\n`);
     return 0;

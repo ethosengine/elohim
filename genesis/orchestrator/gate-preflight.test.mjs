@@ -3,12 +3,12 @@
 import { spawnSync } from 'node:child_process';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
   checkElementDists, checkEvidenceRecordable, checkNodeModules, checkReadSets, checkSophiaUmd,
-  checkArk, checkCargoDeny, checkCargoLocks, checkCBaselineOffer, checkStorageClientDist, checkWorkspaceDists, checkSubmodules, checkTmpdir, emitLive, NAMED_READ_SET_PROJECTS, PREFLIGHT_READ_SET_PROJECTS, onRedPolicy,
+  main, checkEprBin, checkArk, checkCargoDeny, checkCargoLocks, checkCBaselineOffer, checkStorageClientDist, checkWorkspaceDists, checkSubmodules, checkTmpdir, emitLive, NAMED_READ_SET_PROJECTS, PREFLIGHT_READ_SET_PROJECTS, onRedPolicy,
   fleetRollRows, docCutRows, runPreflight, checkSubmodulePins,
 } from './gate-preflight.mjs';
 import { orderByCost } from './gate-runner.mjs';
@@ -179,7 +179,7 @@ test('rows stream as each check completes', (t) => {
   const seen = [];
   const spawn = () => ({ status: 0, stdout: '' });
   runPreflight({ root, projects: [app], env: {}, spawn, registry: new Map(), changed: [], onRow: r => seen.push(r.check) });
-  assert.deepEqual(seen.slice(0, 3), ['submodules', 'tmpdir', 'node_modules']);
+  assert.deepEqual(seen.slice(0, 4), ['epr-bin', 'submodules', 'tmpdir', 'node_modules']);
 });
 
 function readSetFixture(t) {
@@ -605,4 +605,80 @@ test('submodule pins: no row unless the orchestrator project is selected', (t) =
 test('submodule pins: one declared update = none is never named, since init would skip it', (t) => {
   const { root } = pinFixture(t, { present: false, none: true });
   assert.equal(checkSubmodulePins({ root, projects: [pinGate] }).level, 'ok');
+});
+
+function eprFixture(t) {
+  const root = scratch(t);
+  const cid = 'bafyreicurrent';
+  const current = join(root, 'store/epr', cid, 'epr');
+  put(root, `store/epr/${cid}/epr`);
+  put(root, 'store/bin/bin-launch');
+  mkdirSync(join(root, '.local/bin'), { recursive: true });
+  symlinkSync(join(root, 'store/bin/bin-launch'), join(root, '.local/bin/epr'));
+  symlinkSync(cid, join(root, 'store/epr/current'));
+  return { root, current, env: { HOME: root } };
+}
+
+test('epr-bin: unset is ok without reading a device', () => {
+  assert.equal(checkEprBin({ env: {} }).level, 'ok');
+});
+
+test('epr-bin: current path, symlink and same store cid are ok', t => {
+  const { root, current, env } = eprFixture(t);
+  for (const path of [current, join(root, 'store/epr/current/epr')]) {
+    assert.equal(checkEprBin({ env: { ...env, EPR_BIN: path } }).level, 'ok');
+  }
+  const copy = join(root, 'copy/epr/bafyreicurrent/epr');
+  put(root, 'copy/epr/bafyreicurrent/epr');
+  assert.equal(checkEprBin({ env: { ...env, EPR_BIN: copy } }).level, 'ok');
+});
+
+test('epr-bin: different candidate refuses with both paths, cost and cure; override warns', t => {
+  const { root, current, env } = eprFixture(t);
+  const inherited = join(root, 'old/epr');
+  for (const override of [undefined, '1', '0']) {
+    const r = checkEprBin({ env: { ...env, EPR_BIN: inherited, GATE_ALLOW_EPR_BIN: override } });
+    assert.equal(r.level, override === '1' ? 'WARN' : 'REFUSED');
+    assert.ok(r.why.includes(inherited));
+    assert.ok(r.why.includes(current));
+    assert.match(r.why, /native evaluator; an older one makes evidence unavailable, so nothing is reused/);
+    assert.equal(r.cure, 'unset EPR_BIN');
+  }
+});
+
+test('epr-bin: unreadable current warns, including a malformed authoritative head', t => {
+  const { root, env } = eprFixture(t);
+  const candidate = { ...env, EPR_BIN: '/candidate/epr' };
+  put(root, 'store/epr/current.json', '{broken');
+  const r = checkEprBin({ env: candidate });
+  assert.equal(r.level, 'WARN');
+  assert.equal(r.why, "EPR_BIN is set (/candidate/epr) and this device's current epr could not be read");
+  assert.equal(checkEprBin({ env: { ...candidate, HOME: join(root, 'absent') } }).level, 'WARN');
+});
+
+test('epr-bin: current.json takes precedence and explicit store overrides locate it', t => {
+  const { root, env } = eprFixture(t);
+  put(root, 'store/epr/bafyreinew/epr');
+  put(root, 'store/epr/current.json', JSON.stringify({ cid: 'bafyreinew' }));
+  for (const location of [{}, { BIN_STORE: join(root, 'store') }, { EPR_STORE: join(root, 'store/epr') }]) {
+    assert.equal(checkEprBin({ env: { ...env, ...location, EPR_BIN: join(root, 'store/epr/bafyreinew/epr') } }).level, 'ok');
+  }
+});
+
+test('epr-bin: first preflight row refuses and the single-check CLI exits 1', t => {
+  const { root, env } = eprFixture(t);
+  const candidate = { ...env, EPR_BIN: '/old/epr' };
+  const rows = runPreflight({ root, projects: [], env: candidate, registry: new Map(), changed: [],
+    spawn: () => ({ status: 0, stdout: '' }) });
+  assert.equal(rows[0].check, 'epr-bin');
+  assert.equal(rows[0].level, 'REFUSED');
+  let output = '';
+  t.mock.method(process.stdout, 'write', chunk => { output += chunk; return true; });
+  for (const override of ['0', '1']) {
+    output = '';
+    const status = main(['--epr-bin'], { ...candidate, GATE_ALLOW_EPR_BIN: override });
+    assert.equal(status, override === '1' ? 0 : 1);
+    assert.match(output, /\[preflight\] (REFUSED|WARN) epr-bin:/);
+    assert.match(output, /cure: unset EPR_BIN/);
+  }
 });
