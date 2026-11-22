@@ -2580,8 +2580,10 @@ habits:
       - "a2o genesis/a2o/features/devflow/native-gate-evidence.feature reuse rule (this workspace's own green stands in; a red or an unadmitted signer never does)"
     evidence: >
       DELTA 2026-11-22 (status unchanged; the shadow's first real lines, and a cost a second device found): against a brit that has `--inputs` (the built 0.3.1 binary named by `BRIT_BIN`, not installed), the shadow says an `elohim/eprfs/Jenkinsfile` edit would not run eprfs or eprfs-live-corpus under the sources class, an `elohim/holochain/Jenkinsfile` edit would not run doorway, elohim-sdk, elohim-storage or genesis, and a `pnpm-lock.yaml` bump would wrongly skip the two parked TypeScript gates. The sibling device, running both orchestrator gates at `9dbfbac2d` with that brit, saw the shadow spend its 10 s budget on a head equal to its base; it now does no brit work unless a step's own `buildProcess` file changed in the range (`1b0f5190a`). Arrival backlog row 42, deltas 6 and 7. Not measured: any of this on an installed brit.
-    evidence-fingerprint: sha256:f52da78932f31af3
-    evidence-bytes: 33522
+
+      CORRECTION 2026-11-22 (to the heading of DELTA 2026-11-21b): that heading says two gate manifests were corrected. They were found wrong and the correction was parked for a deliberate Edge roll, as the line's own text and arrival backlog row 42 delta 5 say; on dev the five entries are still `buildProcess`, held in the contract test's exact parked list.
+    evidence-fingerprint: sha256:5870fe45ef1c8193
+    evidence-bytes: 33877
     evidence-entries: 34
     guard: >
       Regression risks: (1) reusing on a key that omits something the recipe reads — the recipe
