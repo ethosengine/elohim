@@ -93,6 +93,8 @@ struct State {
     metadata: Option<Value>,
     download: Option<PathBuf>,
     distances: BTreeMap<String, u64>,
+    /// `cargo build` runs out of its bound, as `SystemRunner` reports it.
+    build_timeout: bool,
 }
 struct Fake {
     state: Arc<Mutex<State>>,
@@ -167,6 +169,14 @@ impl Runner for Fake {
                 } else {
                     success = false;
                 }
+            } else if c.args[0] == "build" && s.build_timeout {
+                return Err(Refusal::new(
+                    "command-timeout",
+                    format!(
+                        "cargo exceeded {}ms including pipe drain",
+                        c.timeout.as_millis()
+                    ),
+                ));
             } else {
                 success = false;
             }
@@ -2536,6 +2546,38 @@ fn brit_build_tries_offline_then_anonymous_then_credentials() {
             );
         }
         assert!(attempts.iter().all(|a| !a.contains("test-secret")));
+    }
+}
+
+/// A build that runs out of its bound is not a compile error: its line says so, with the bound,
+/// and that a second follow resumes from the crates it compiled. A failed build still says failed.
+#[test]
+fn a_brit_build_that_runs_out_of_its_bound_says_so_and_that_a_second_follow_resumes() {
+    for timeout in [true, false] {
+        let f = Fixture::new("brit");
+        f.state.lock().unwrap().build_timeout = timeout;
+        let mut attempts = Vec::new();
+        assert!(f
+            .store
+            .build_release(f.tmp.path(), &f.commit(), "test", &mut attempts, &|key| {
+                (key == "CARGO_NET_OFFLINE").then(|| "true".into())
+            })
+            .is_err());
+        let line = attempts
+            .iter()
+            .find(|a| a.starts_with("brit build offline"))
+            .expect("the offline attempt has a line");
+        if timeout {
+            assert!(line.contains("ran out of its 1800 s bound"), "{line}");
+            assert!(
+                line.contains("a second `epr bin follow` resumes the build"),
+                "{line}"
+            );
+            assert!(!line.contains("failed"), "{line}");
+        } else {
+            assert!(line.starts_with("brit build offline failed"), "{line}");
+            assert!(!line.contains("bound"), "{line}");
+        }
     }
 }
 
