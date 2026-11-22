@@ -824,3 +824,14 @@ Rebase stays a declared git fallback for the monorepo and for brit: as pushed, t
 history over 1 GiB decompressed, or about 390,000 objects for a one-commit replay (the figure of
 roughly 182,000 objects earlier in this entry belongs to the round-2 preflight, which also charged
 for the retained copy), and the redesign above is not started.
+
+## Steward ruling, 2026-11-22 (human:matthew, session f0b335e0)
+
+The open decision above is ruled: **retained-manifest v2, carrying `floor = {p}`, applies to every new
+copy**, not only shallow ones. An older brit fails closed on a copy a newer one wrote; that cost is
+accepted. The redesign (selection bounded to the range, verification of only what is read or written,
+a copy of what the operation can lose with the floor recorded, a closure-free journal, a footprint-only
+witness) is folded into the brit 0.3.2 release rather than following it. Found blocking: on this
+device `brit rebase chore/brit-backlog-20261121` in a monorepo worktree refused before starting, "its
+51379 objects of 1074018639 bytes … over the 1073741824-byte scratch limit"; the landing used the
+declared git fallback.
