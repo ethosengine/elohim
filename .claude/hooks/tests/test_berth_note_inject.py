@@ -380,17 +380,41 @@ class ReceiptTest(Harness):
         self.assertEqual(self.calls(), before)
         self.assertEqual(self.state()[1]['pending']['token'], TOKEN)
 
-    def test_a_pending_older_than_300_s_is_dropped_unacknowledged_and_a_new_claim_is_made(self):
-        env = self.spy(renotify=True)
+    def test_a_pending_younger_than_the_grace_and_not_shown_makes_no_berth_call(self):
+        env = self.spy()
         self.emit(env, self.transcript())
         path, state = self.state()
-        state['pending']['emitted_at'] -= 301
+        state['pending']['emitted_at'] -= 19
+        path.write_text(json.dumps(state))
+        before = self.calls()
+        self.assertIsNone(self.go(env, self.transcript()))
+        self.assertEqual(self.calls(), before)
+        self.assertEqual(self.state()[1]['pending']['token'], TOKEN)
+
+    def test_a_pending_past_the_grace_and_not_shown_is_dropped_and_claimed_again_at_once(self):
+        env = self.spy(renotify=True)
+        env['BERTH_NOTE_POLL_S'] = '3600'
+        old = self.emit(env, self.transcript())
+        path, state = self.state()
+        state['pending']['emitted_at'] -= 21
         path.write_text(json.dumps(state))
         context = self.go(env, self.transcript())
-        self.assertEqual(self.acks(), [])
-        self.assertEqual(len(self.claims()), 2)
-        self.assertIsNotNone(context, 'the replayed notes are shown again')
-        self.assertNotEqual(self.state()[1]['pending']['receipt'], state['pending']['receipt'])
+        self.assertEqual(self.acks(), [], 'the old claim is not acknowledged')
+        self.assertEqual(len(self.claims()), 2, 'a new claim in the same call, inside POLL_S')
+        self.assertIn('«n»', context, 'the dropped notes replay now')
+        new = RECEIPT.search(context.splitlines()[-1]).group(1)
+        self.assertNotEqual(new, old)
+        self.assertEqual(self.state()[1]['pending']['receipt'], new)
+
+    def test_the_replay_after_a_dropped_output_shows_the_same_note_text(self):
+        env = self.spy(renotify=True)
+        first = self.go(env, self.transcript())
+        path, state = self.state()
+        state['pending']['emitted_at'] -= 60
+        path.write_text(json.dumps(state))
+        again = self.go(env, self.transcript())
+        self.assertEqual(notes_in(again), notes_in(first))
+        self.assertEqual(len(notes_in(again)), 1)
 
     def test_without_a_transcript_it_acknowledges_at_once_and_keeps_no_pending(self):
         env = self.spy()

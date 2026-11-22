@@ -18,8 +18,12 @@ hook has already acknowledged. So berth leases the notes to this call, the hook 
 fresh `receipt r-<hex>` on the last line and keeps the claim pending in its state file, and at the
 next call of the same session and reader (before anything else, whatever POLL_S says) it reads the
 last 2 MiB of the session transcript: only when the receipt is there does it `--ack` the claim. A
-claim whose receipt never shows is dropped after PENDING_MAX_S without an acknowledge, and berth
-replays its notes at a later claim. A note can therefore be shown twice; this hook never loses one.
+receipt not there yet is waited for PENDING_GRACE_S (a sibling hook of a parallel tool call may run
+before the harness writes the context); past that the output was dropped, so the pending claim is
+cleared without an acknowledge and the same call claims again at once, whatever POLL_S says, and the
+notes replay now. berth's lease on a hook claim is 5 s and nothing renews it, so the late acknowledge
+succeeds unless another consumer of the same reader claimed in between, in which case the notes
+replay once. A note can therefore be shown twice; this hook never loses one.
 Without a transcript to read (no `transcript_path`, or it will not open) it acknowledges right
 after the write, as before. berth is asked at most once per POLL_S unless a backlog or a busy reader
 is waiting; every child runs under a deadline, its output capped. Fail-open: a missing, slow or broken
@@ -46,7 +50,7 @@ MAX_LINE = 1000
 OUTPUT_CAP = 64 * 1024
 BERTH_TIMEOUT_S = 0.9
 DEADLINE_S = 2.0
-PENDING_MAX_S = 300
+PENDING_GRACE_S = 20
 TRANSCRIPT_TAIL = 2 * 1024 * 1024
 # berth NOTE_ID: the only shape a session or reader id may take to reach a command line.
 ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}")
@@ -210,6 +214,7 @@ def deliver(session, reader, emit, now=None, started=None, transcript=None):
     path = state_path(session, reader)
     state = read_state(path)
     pending = state.get("pending") if valid_pending(state.get("pending")) else None
+    dropped = False
     if pending:
         # Before anything else, and whatever POLL_S says: did the last emit reach the transcript?
         if receipt_shown(transcript, pending["receipt"]):
@@ -220,15 +225,16 @@ def deliver(session, reader, emit, now=None, started=None, transcript=None):
                 return  # berth was slow: pending stays for the next call
             # Exit 3 is a claim that no longer holds the reader: the notes replay once more, and the
             # duplicate is not suppressed.
-        elif 0 <= now - pending["emitted_at"] <= PENDING_MAX_S:
-            return  # a younger pending blocks a new claim: berth would answer busy or re-issue it
-        # else: never shown within PENDING_MAX_S; dropped unacknowledged, berth replays at a later claim.
+        elif 0 <= now - pending["emitted_at"] < PENDING_GRACE_S:
+            return  # within the grace: the write may still come, and a new claim would be busy or a repeat
+        else:
+            dropped = True  # past the grace and never shown: the output was lost; claim again below
         pending = None
         state = {k: v for k, v in state.items() if k != "pending"}
         write_state(path, state)
     poll = float(os.environ.get("BERTH_NOTE_POLL_S", POLL_S))
     checked = state.get("checked_at")
-    if (not state.get("again") and isinstance(checked, (int, float))
+    if (not dropped and not state.get("again") and isinstance(checked, (int, float))
             and 0 <= now - checked < poll):
         return
     # Stamped before berth is asked: a slow or failing berth is retried after POLL_S, not every call.
