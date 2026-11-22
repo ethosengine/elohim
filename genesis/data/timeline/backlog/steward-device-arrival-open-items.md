@@ -2660,3 +2660,26 @@ question for the arrival of a second principal.
 Not read for this row: whether any hook already compares a write's path with the write set. A
 search of `.claude/hooks` for the write set found it in the covenant ask
 (`participant-standing.py`) and in tests, and in `genesis/agentic/bin/berth`.
+
+## Row 80 — a teardown race in the gate-tap tests went red once in twelve, and the red replaced a green note for the same closure
+
+Found 2026-11-22 by ethosengine's second-device pass of landing `8ffc0921c..c71f584f8`
+(session 6d68315a, fresh worktree, one gate at a time). Its first pass was green on seven gates.
+A rerun of `just gate orchestrator` through ark with `GATE_SOURCE_VIEW=shadow GATE_EVIDENCE=off`
+failed in 70 s on one test in `genesis/orchestrator/gate-tap.test.mjs`, with `ENOTEMPTY` in the
+test's teardown. The same file run alone ten times at that commit was green ten times (23 tests),
+so the failure appeared once in twelve runs and only under the named suite's load. The landing
+did not touch that file.
+
+Two concerns, kept apart:
+
+1. **The race.** A teardown removes a directory something is still writing into. Not
+   reproduced on shem.
+2. **The record.** A build note is one per step and commit and is overwritten, so the red run
+   replaced ethosengine's green note for the orchestrator gate at closure `a8d119421a34`, although
+   a green for the same closure had been recorded minutes earlier. A flaky red therefore turns a
+   closure that was paid into one the next push pays again, and a sibling asking for that verdict
+   is refused by it.
+
+State: neither is cured. ethosengine was asked whether it restores the green by one plain rerun
+or holds the red until the race is fixed; its answer is not recorded here yet.

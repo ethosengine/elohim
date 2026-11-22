@@ -422,7 +422,11 @@ landing 39). F2's fetch between the two devices is its K6, K7 and K12.
 
 State: `walk_spine`, `project_view` and `derive_or_reuse` exist in eprfs-core (`walk.rs`,
 `derive.rs`). ark's `material.rs` still builds its view from the closure's field names over one
-metadata node.
+metadata node. Since `c71f584f8` (2026-11-22) `ark task source-root` projects a listed set of real source
+files, and `GATE_SOURCE_VIEW=shadow` (default off) prints that candidate beside the present key
+for the orchestrator gate. First two-device reading at that commit: the candidate root was equal
+on shem and ethosengine (812 files) and the present key was not. The gate still keys on closure
+metadata; the shadow decides nothing.
 
 Verify: the `P` vectors are green, and ark keys one task on a projected root of real source trees.
 
