@@ -289,6 +289,16 @@
     ],
     "PostToolUse": [
       {
+        "matcher": "Edit|Write|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/berth-writes-observe.py\"",
+            "timeout": 3
+          }
+        ]
+      },
+      {
         "matcher": ".*",
         "hooks": [
           {

@@ -106,6 +106,83 @@ class DeclaredWrites(unittest.TestCase):
     def moor(self, writes=None, session="peer", **fields):
         return self.b.moor(session, writes=writes, runtime="codex", task="fix", **fields)
 
+    def test_writes_add_preserves_fields_and_order(self):
+        before = self.moor(['src/a', 'src/b'])
+        self.now += 5
+        self.assertEqual(self.cli('moor', '--session', 'peer', '--writes-add', 'src/b,src/c'), (0, ''))
+        after = self.b._read_mooring('peer')
+        self.assertEqual(after['writes'], ['src/a', 'src/b', 'src/c'])
+        for key in ('task', 'recipient', 'last_seen', 'ttl_s', 'moored_at'):
+            self.assertEqual(after[key], before[key])
+        with mock.patch.object(self.b, 'moorings', side_effect=AssertionError('scan')):
+            self.b.writes_add('peer', ['src/d'])
+        snapshot = Path(self.b._moor_path('peer')).read_bytes()
+        self.b.writes_add('peer', ['src/d'])
+        self.assertEqual(Path(self.b._moor_path('peer')).read_bytes(), snapshot)
+
+    def test_cap_collapses_newest_and_covers_every_input(self):
+        merge = _NS['merge_writes']
+        paths = [f'src/p{i}' for i in range(205)]
+        self.assertEqual(merge(paths[:200], paths[200:]), ['src/**'])
+        varied = [f'p{i}/file' for i in range(205)]
+        capped = merge([], varied)
+        self.assertLessEqual(len(capped), 200)
+        for path in varied:
+            self.assertTrue(any(w == './**' or path == w or
+                (w.endswith('/**') and path.startswith(w[:-2])) for w in capped))
+        self.assertEqual(merge(['a', 'b', 'a'], ['c', 'b']), ['a', 'b', 'c'])
+
+    def test_observed_normalizes_worktrees_and_excludes_internal_paths(self):
+        normalize = _NS['observed_paths']
+        root = self.directory.name
+        paths = [root + '/src/a', root + '/.worktrees/other/src/b',
+                 '/outside/file', '../outside/file', '.git/config', 'a/.git/config',
+                 '.eprfs/status/a', 'node_modules/a', 'a/target/b',
+                 'genesis/local-dev/a', 'ignored.txt', 'src/a']
+        reply = subprocess.CompletedProcess([], 0, stdout=b'ignored.txt\0')
+        with mock.patch('subprocess.run', return_value=reply):
+            self.assertEqual(normalize(paths, root), ['src/a', 'src/b'])
+            self.assertEqual(normalize(['src/c', root + '/src/a'], root + '/.worktrees/one'),
+                             ['src/c', 'src/a'])
+
+    def test_observed_no_mooring_and_failure_are_silent(self):
+        main = _NS['main']
+        with mock.patch.dict(main.__globals__, {'Berth': lambda **kw: self.b,
+                'PROJECT_DIR': self.directory.name}), mock.patch('subprocess.run') as run:
+            self.assertEqual(main(['berth', 'observed', '--session', 'absent', 'src/a']), 0)
+            run.assert_not_called()
+            self.assertFalse(Path(self.b._moor_path('absent')).exists())
+        with mock.patch.dict(main.__globals__, {'Berth': mock.Mock(side_effect=OSError('missing'))}):
+            self.assertEqual(main(['berth', 'observed', '--session', 'peer', 'src/a']), 0)
+
+    def test_observed_cli_merges_only_new_paths(self):
+        main = _NS['main']
+        self.moor(['src/a'])
+        with mock.patch.dict(main.__globals__, {'Berth': lambda **kw: self.b,
+                'PROJECT_DIR': self.directory.name}), mock.patch('subprocess.run',
+                return_value=subprocess.CompletedProcess([], 1, stdout=b'')):
+            self.assertEqual(main(['berth', 'observed', '--session', 'peer', 'src/b']), 0)
+            with mock.patch.dict(self.b.writes_add.__globals__,
+                                 {'merge_writes': mock.Mock(side_effect=AssertionError('duplicate merge'))}):
+                self.now += 1
+                self.assertEqual(main(['berth', 'observed', '--session', 'peer', 'src/b']), 0)
+                self.assertEqual(self.b._read_mooring('peer')['writes_observed_at'], self.now)
+            self.assertEqual(self.b._read_mooring('peer')['writes'], ['src/a', 'src/b'])
+            snapshot = Path(self.b._moor_path('peer')).read_bytes()
+            self.assertEqual(main(['berth', 'observed', '--session', 'peer', '.git/config']), 0)
+            self.assertEqual(Path(self.b._moor_path('peer')).read_bytes(), snapshot)
+
+    def test_observed_status_ages_without_heartbeat_refresh(self):
+        before = self.moor(['src/a'])
+        self.now += 5
+        self.b.writes_add('peer', ['src/b'], observed=True)
+        self.now += 2
+        with mock.patch.dict(render_status.__globals__, {'_guard_state': lambda _: None}):
+            self.assertIn('(declared 7s ago, last observed write 2s ago)', render_status(self.b))
+        self.assertEqual(self.b._read_mooring('peer')['last_seen'], before['last_seen'])
+        self.b.writes_add('peer', ['src/b'], observed=True)
+        self.assertEqual(self.b._read_mooring('peer')['writes_observed_at'], self.now)
+
     def test_status_shows_writes_and_caps_long_lines(self):
         self.moor(["src/a", "src/b"])
         with mock.patch.dict(render_status.__globals__, {"_guard_state": lambda _: None}):

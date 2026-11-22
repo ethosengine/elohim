@@ -23,8 +23,9 @@ workspace. Store: $BERTH_DIR, else $CLAUDE_CONFIG_DIR/berth, else <the device la
 (`epr device layout show`; survives container restarts; never inside /tmp; never in git). Design note: genesis/docs/superpowers/specs/2026-09-03-workspace-berth-carrying-capacity-design.md
 
 Commands:
+  berth observed --session S <path>…                            silently observe writes
   berth moor    --session S [--model M] [--lab L] [--runtime R] [--principal P] [--task T]
-                [--writes a,b,c] [--pid N] [--ttl SECONDS]         register / refresh this session
+                [--writes a,b,c | --writes-add a,b,c] [--pid N] [--ttl SECONDS]         register / refresh this session
   berth unmoor  --session S                                        leave; releases every lease held
   berth verify-released --session S [--generation N]               read-only release proof (0/3/2)
   berth touch   --session S [--pid N]                              liveness heartbeat (hooks call it)
@@ -493,6 +494,65 @@ def steward_reason(verdict, now_ms, fence_after_s=None):
 
 def _safe(name):
     return "".join(c if c.isalnum() or c in "_.-" else "_" for c in str(name))
+
+
+def write_covered(path, writes):
+    return any(path == w or (w.endswith('/**') and
+               (w == './**' or path.startswith(w[:-2]))) for w in writes)
+
+
+def merge_writes(existing, additions):
+    """Ordered union, widening the newest entry until the bounded set fits."""
+    result = list(dict.fromkeys(existing))
+    for path in additions:
+        if not path or write_covered(path, result):
+            continue
+        result.append(path)
+    while len(result) > 200:
+        newest = result[-1]
+        base = newest[:-3] if newest.endswith('/**') else newest
+        parent = os.path.dirname(base)
+        broad = parent + '/**' if parent else './**'
+        result = [w for w in result[:-1] if not (broad == './**' or
+                  w == parent or w.startswith(parent + '/'))] + [broad]
+    return result
+
+
+def observed_paths(paths, root):
+    """Lexical checkout-relative names; linked checkouts mirror the main tree."""
+    root = os.path.abspath(root)
+    marker = os.sep + '.worktrees' + os.sep
+    main = root.split(marker, 1)[0]
+    found = []
+    for path in paths:
+        absolute = os.path.abspath(os.path.join(root, path))
+        if not absolute.startswith(main + os.sep):
+            continue
+        rel = os.path.relpath(absolute, main)
+        parts = rel.split(os.sep)
+        if parts[0] == '.worktrees':
+            if len(parts) < 3:
+                continue
+            rel = '/'.join(parts[2:])
+        parts = rel.split('/')
+        if any(p in ('.git', 'node_modules', 'target') for p in parts):
+            continue
+        if any(rel == p or rel.startswith(p + '/') for p in ('.eprfs/status', 'genesis/local-dev')):
+            continue
+        if rel not in found:
+            found.append(rel)
+    if found:
+        try:
+            ignored = subprocess.run(['git', '-C', root, 'check-ignore', '--stdin', '-z'],
+                input=('\0'.join(found) + '\0').encode(), stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL, timeout=0.15,
+                env={k: v for k, v in os.environ.items() if not k.startswith('GIT_')})
+            if ignored.returncode in (0, 1):
+                excluded = set(ignored.stdout.decode().split('\0'))
+                found = [p for p in found if p not in excluded]
+        except (OSError, subprocess.TimeoutExpired, UnicodeError):
+            pass
+    return found
 
 
 class Berth:
@@ -1302,6 +1362,9 @@ class Berth:
         generation = self._generation(session)
         if generation is not None:
             m["generation"] = generation
+        if fields.get("writes") is not None:
+            fields["writes"] = merge_writes([], fields["writes"])
+            fields["writes_declared_at"] = round(self.now(), 3)
         pid = fields.pop("pid", None)
         for k, v in fields.items():
             if v is not None:
@@ -1322,6 +1385,27 @@ class Berth:
         self.record("moor", session=session, recipient=m["recipient"], provider=m.get("principal"),
                     task=m.get("task"), bounds=m["bounds"], reads="nacks/1")
         return m
+
+    def writes_add(self, session, paths, observed=False):
+        # Direct mooring read: no liveness/flow-store scan, heartbeat or task refresh.
+        with self._envelope_guard(session), self._locked():
+            m = self._read_mooring(session)
+            if not m or self._predecessor(m, session):
+                return None
+            old = declared_writes(m)
+            new = [p for p in paths if p and not write_covered(p, old)]
+            merged = merge_writes(old, new) if new else old
+            changed = merged != old
+            if changed:
+                m['writes'] = merged
+                m.setdefault('bounds', {})['write_set'] = merged
+            if observed:
+                m['writes_observed_at'] = round(self.now(), 3)
+            elif changed:
+                m['writes_declared_at'] = round(self.now(), 3)
+            if changed or observed:
+                write_json_atomic(self._moor_path(session), m)
+            return m
 
     def touch(self, session, pid=None):
         """Heartbeat (and, from a hook, re-assert the runtime pid + incarnation). Serialized with every
@@ -2772,7 +2856,12 @@ def render_status(b):
         lines.append(f"  {live:5} {s:<14} {r.get('runtime', '?'):<12} {r.get('model', '?')}@{r.get('lab', '?')}"
                      f"  for {m.get('principal') or '?'}  task={m.get('task') or '-'}  seen {_age(now - m.get('last_seen', now))} ago")
         if live == "live" and declared_writes(m):
-            lines.append(writes_line(declared_writes(m)))
+            ages = []
+            if 'writes_declared_at' in m:
+                ages.append(f"declared {_age(now - m['writes_declared_at'])} ago")
+            if 'writes_observed_at' in m:
+                ages.append(f"last observed write {_age(now - m['writes_observed_at'])} ago")
+            lines.append(writes_line(declared_writes(m)) + (' (' + ', '.join(ages) + ')' if ages else ''))
     leases = b.leases()
     caps = b.capacities
     # Read the other devices once: a resource free here may be held on one of them, and the top
@@ -2994,6 +3083,20 @@ def main(argv):
     """Exit 4 when this invocation cannot open its store — e.g. the stage runner's guest (UID 65534,
     BERTH_DIR stripped) meeting the host's root-owned berth.lock: the lane proceeds unleased and says
     so, rather than dying with a traceback the wrapper would propagate."""
+    if len(argv) > 1 and argv[1] == 'observed':
+        try:
+            args = list(argv[2:])
+            session = _opt(args, '--session')
+            if session and PROJECT_DIR and not any(k in os.environ for k in
+                    ('ELOHIM_SHIFT_BERTH_ADDRESS', 'ELOHIM_SHIFT_BERTH_TOKEN')):
+                b = Berth(read_only=True)
+                if b._read_mooring(session):
+                    paths = observed_paths(args, PROJECT_DIR)
+                    if paths:
+                        b.writes_add(session, paths, observed=True)
+        except Exception:
+            pass
+        return 0
     if len(argv) > 1 and argv[1] in ("impact", "holds"):
         # A contained process cannot observe host liveness. Degrade without invoking a
         # lease operation, and keep even store/identity failures advisory.
@@ -3302,6 +3405,10 @@ def _main(argv):
             print("\n".join(lines))
         return 0
     if cmd == "moor":
+        additions = _opt(argv, '--writes-add')
+        if additions is not None:
+            b.writes_add(session, [p.strip() for p in additions.split(',') if p.strip()])
+            return 0
         writes = _opt(argv, "--writes")
         # _opt consumes the flag it reads, so each value is read exactly once.
         pid = _opt(argv, "--pid")
