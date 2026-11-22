@@ -1027,7 +1027,7 @@ fn serve_liveness() -> std::result::Result<(bool, Option<String>), String> {
 /// question before it starts a declared `epr peer serve`.
 #[cfg(feature = "peer")]
 pub(super) fn serve_lock_probe() -> std::result::Result<(std::path::PathBuf, bool), String> {
-    use rustix::fs::{flock, FlockOperation};
+    use elohim_device_runtime::flock::Flock;
     let dir = crate::peer::peer_dir().map_err(|e| e.to_string())?;
     let path = dir.join(crate::peer::ServeLock::FILE_NAME);
     let file = match fs::File::open(&path) {
@@ -1035,14 +1035,14 @@ pub(super) fn serve_lock_probe() -> std::result::Result<(std::path::PathBuf, boo
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok((path, false)),
         Err(e) => return Err(format!("{}: {e}", path.display())),
     };
-    let held = match flock(&file, FlockOperation::NonBlockingLockShared) {
+    let held = match Flock::try_shared(file) {
         // Shared and dropped at once; `ServeLock::acquire` retries a contended exclusive take,
-        // so this momentary probe does not read as a live daemon to a starting `serve`.
-        Ok(()) => false,
-        Err(errno) if errno == rustix::io::Errno::WOULDBLOCK => true,
-        Err(errno) => return Err(format!("{}: {errno}", path.display())),
+        // so this momentary probe does not read as a live daemon to a starting `serve`. The drop
+        // unlocks, so a child forked meanwhile holds no shared lock through its copy.
+        Ok(Ok(_probe)) => false,
+        Ok(Err(_)) => true,
+        Err(error) => return Err(format!("{}: {error}", path.display())),
     };
-    drop(file);
     Ok((path, held))
 }
 #[cfg(not(feature = "peer"))]

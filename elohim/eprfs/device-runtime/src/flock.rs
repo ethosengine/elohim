@@ -61,8 +61,18 @@ impl AsFd for Flock {
 
 impl Drop for Flock {
     fn drop(&mut self) {
-        // A failed unlock leaves the close that follows to release it, as before this guard.
-        let _ = flock(&self.file, FlockOperation::Unlock);
+        // On a descriptor this guard owns, `LOCK_UN` fails only for what the guard rules out (a bad
+        // descriptor, an invalid operation) or for kernel resource exhaustion: it should not
+        // happen. If it does, the release is left to the close that follows, and that release
+        // waits for the last copy of the descriptor, so a forked child's copy keeps the lock
+        // held until its `exec` or exit: the window this guard exists to close. Said on stderr,
+        // as this crate's other warnings are.
+        if let Err(errno) = flock(&self.file, FlockOperation::Unlock) {
+            eprintln!(
+                "WARNING: flock unlock failed ({errno}); the lock is released when the last copy \
+                 of its descriptor closes"
+            );
+        }
     }
 }
 

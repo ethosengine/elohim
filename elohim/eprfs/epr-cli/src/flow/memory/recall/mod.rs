@@ -42,6 +42,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode, Stdio};
 use std::time::{Duration, Instant};
 
+use elohim_device_runtime::flock::Flock;
 use eprfs_core::BlobCid;
 use serde_json::{json, Map, Value};
 use sha2::{Digest, Sha256};
@@ -501,7 +502,9 @@ pub mod tests_support {
 pub struct Execution {
     dir: PathBuf,
     path: PathBuf,
-    file: File,
+    /// The session's continuation, locked for this execution; dropping it unlocks, so a child
+    /// forked meanwhile does not keep the session busy through its copy of the descriptor.
+    lock: Flock,
     pub state: Value,
     state_limit: usize,
 }
@@ -564,12 +567,16 @@ impl Execution {
                 path: path.clone(),
                 source,
             })?;
-        rustix::fs::flock(&file, rustix::fs::FlockOperation::NonBlockingLockExclusive)
-            .map_err(|_| refused("session is executing another packet; retry after it finishes"))?;
+        // Any refusal to lock reads as a session busy with another packet, as it always has.
+        let Ok(Ok(lock)) = Flock::try_exclusive(file) else {
+            return Err(refused(
+                "session is executing another packet; retry after it finishes",
+            ));
+        };
         let mut execution = Execution {
             dir,
             path,
-            file,
+            lock,
             state: Value::Null,
             state_limit,
         };
@@ -593,10 +600,10 @@ impl Execution {
         method: &str,
         executor: Option<&str>,
     ) -> FlowResult<()> {
-        self.file.seek(SeekFrom::Start(0))?;
+        let mut file = self.lock.file();
+        file.seek(SeekFrom::Start(0))?;
         let mut raw = Vec::new();
-        (&self.file)
-            .take(self.state_limit as u64 + 1)
+        file.take(self.state_limit as u64 + 1)
             .read_to_end(&mut raw)?;
         if raw.len() > self.state_limit {
             return Err(refused(
@@ -660,11 +667,12 @@ impl Execution {
                 "continuation exceeds state budget; prior receipt preserved, start a bounded continuation",
             ));
         }
-        self.file.seek(SeekFrom::Start(0))?;
-        self.file.set_len(0)?;
-        self.file.write_all(encoded.as_bytes())?;
-        self.file.flush()?;
-        self.file.sync_all()?;
+        let mut file = self.lock.file();
+        file.seek(SeekFrom::Start(0))?;
+        file.set_len(0)?;
+        file.write_all(encoded.as_bytes())?;
+        file.flush()?;
+        file.sync_all()?;
         Ok(())
     }
 
@@ -1587,6 +1595,34 @@ fn encode(
 
 fn truncate(text: &str, limit: usize) -> String {
     text.chars().take(limit).collect()
+}
+
+#[cfg(test)]
+mod execution_lock {
+    use super::*;
+
+    /// A flock belongs to the open file description, which a child forked by another thread
+    /// shares until its `exec`. A finished execution unlocks, so the session's next packet opens
+    /// at once while such a copy of the descriptor is still open; a live one still refuses it.
+    #[test]
+    fn a_finished_execution_frees_its_session_while_a_copy_of_its_descriptor_is_open() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        let open = || Execution::open(root, "s", "why", "method", None, 4096);
+        let first = open().unwrap();
+        let refused = open().err().expect("a live execution holds its session");
+        assert!(
+            refused.to_string().contains("executing another packet"),
+            "{refused}"
+        );
+        let copy = rustix::io::dup(&first.lock).unwrap();
+        drop(first);
+        assert!(
+            open().is_ok(),
+            "a forked child's copy of a finished execution's descriptor is not another packet"
+        );
+        drop(copy);
+    }
 }
 
 #[cfg(test)]
