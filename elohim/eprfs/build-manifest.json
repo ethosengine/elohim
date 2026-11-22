@@ -65,7 +65,8 @@
         "dir": "elohim/eprfs",
         "steps": ["rust-build-test"],
         "inputs": {
-          "sources": ["elohim/ark/cli/**", "elohim/Cargo.lock"]
+          "sources": ["elohim/ark/cli/**", "elohim/Cargo.lock"],
+          "buildProcess": []
         },
         "run": {
           "kind": "root-just",
