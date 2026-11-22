@@ -66,7 +66,8 @@ Commands:
                                                                    running (the cargo guard hook's own count),
                                                                    ram-guard/io-guard levels; verdict admit|refuse
                                                                    with axis and owner; exit 0 admit · 3 refuse
-  berth holds   PATH [PATH…] [--session S] [--json]                declared overlaps; exit 3 if held
+  berth impact  PATH [PATH…] [--session S] [--json]                advisory local intent and gate impact
+  berth holds   PATH [PATH…] [--session S] [--json]                advisory alias of impact; exit 0
   berth status                                                     moorings · leases · capacity, and the
                                                                    other devices' moorings and steward
                                                                    leases, read from this device's fold
@@ -2463,8 +2464,27 @@ def paths_overlap(left, right):
     return True
 
 
-def declared_holds(b, paths, session):
-    """Read local live declarations only: the peer fold exposes timestamps, not write sets."""
+def gate_impact(paths, writes):
+    """Read-only graph query; no oracle failure changes the advisory exit status."""
+    try:
+        result = subprocess.run(
+            ["node", os.path.join(REPO_ROOT, "genesis/orchestrator/gate-impact.mjs"),
+             "--mine", ",".join(paths), "--theirs", ",".join(writes), "--json"],
+            capture_output=True, text=True, timeout=20, cwd=REPO_ROOT)
+        if result.returncode:
+            return {"fallback": f"gate-impact exited {result.returncode}"}
+        value = json.loads(result.stdout)
+        if not isinstance(value, dict) or not isinstance(value.get("rows"), list):
+            return {"fallback": "invalid gate-impact response"}
+        return value
+    except subprocess.TimeoutExpired:
+        return {"fallback": "gate-impact timeout after 20 s"}
+    except (OSError, ValueError):
+        return {"fallback": "gate-impact unavailable"}
+
+
+def declared_impact(b, paths, session):
+    """Local live declarations only; remote folds currently expose timestamps."""
     rows = []
     moorings = b.moorings() if os.path.isdir(b.moor_dir) else {}
     for owner, m in sorted(moorings.items()):
@@ -2474,12 +2494,47 @@ def declared_holds(b, paths, session):
                       task=m.get("task") or "-", age_s=b.now() - m.get("last_seen", b.now()))
         writes = declared_writes(m)
         if not writes:
-            rows.append(dict(kind="UNDECLARED", **detail))
-        for path in paths:
-            for pattern in writes:
-                if paths_overlap(path, pattern):
-                    rows.append(dict(kind="HELD", path=path, pattern=pattern, **detail))
+            rows.append(dict(kind="undeclared", **detail))
+            continue
+        overlap = sorted({path for path in paths if any(paths_overlap(path, w) for w in writes)})
+        result = gate_impact(paths, writes)
+        if result.get("rows") or overlap or result.get("fallback"):
+            rows.append(dict(kind="impact", paths=overlap, **result, **detail))
     return rows
+
+
+def impact_line(row):
+    detail = (f"{row['session'][:8]} ({row['runtime']}, task={row['task'][:60]}, "
+              f"seen {_age(row['age_s'])})")
+    if row["kind"] == "undeclared":
+        return f"{detail}: undeclared"
+    groups = {}
+    for item in row.get("rows", []):
+        groups.setdefault(item["direction"], []).append(item)
+    parts = []
+    for direction, items in groups.items():
+        projects = ",".join(item["project"] for item in items)
+        if direction == "shared":
+            seconds = [item.get("seconds") for item in items]
+            cost = (f"~{sum(seconds):g}s of gates between you" if all(s is not None for s in seconds)
+                    else "gate seconds unknown")
+            parts.append(f"shared {projects}; {cost}")
+        elif direction == "upstream-of-me":
+            parts.append(f"upstream-of-me via {projects}; their work can re-key yours")
+        elif direction == "downstream-of-me":
+            parts.append(f"downstream-of-me via {projects}; your work can re-key theirs")
+    if not parts:
+        reason = row.get("fallback") or "no mapped gate projects"
+        # Tool diagnostics are data, not instructions. Keep this surface advisory even when
+        # a subprocess diagnostic uses refusal terminology.
+        for word in ("wait", "held", "refused", "lock"):
+            reason = re.sub(r"\b" + word + r"\b", "unavailable", reason, flags=re.IGNORECASE)
+        reason = " ".join(reason.split())
+        scope = "same paths " + ",".join(row["paths"]) if row["paths"] else "no same paths"
+        parts.append(f"{scope}; gates unknown (path-fallback: {reason})")
+    if row.get("truncated"):
+        parts.append("tracked listing truncated at 2000 files")
+    return f"{detail}: " + "; ".join(parts)
 
 
 def writes_line(writes):
@@ -2705,6 +2760,18 @@ def main(argv):
     """Exit 4 when this invocation cannot open its store — e.g. the stage runner's guest (UID 65534,
     BERTH_DIR stripped) meeting the host's root-owned berth.lock: the lane proceeds unleased and says
     so, rather than dying with a traceback the wrapper would propagate."""
+    if len(argv) > 1 and argv[1] in ("impact", "holds"):
+        # A contained process cannot observe host liveness. Degrade without invoking a
+        # lease operation, and keep even store/identity failures advisory.
+        try:
+            if any(name in os.environ for name in
+                   ("ELOHIM_SHIFT_BERTH_ADDRESS", "ELOHIM_SHIFT_BERTH_TOKEN")):
+                raise OSError("local intent unavailable")
+            return _main(argv)
+        except Exception:
+            print(json.dumps({"fallback": "local intent unavailable"}) if "--json" in argv
+                  else "path-fallback: local intent unavailable")
+            return 0
     if any(name in os.environ for name in ('ELOHIM_SHIFT_BERTH_ADDRESS', 'ELOHIM_SHIFT_BERTH_TOKEN')):
         # A contained shift cannot interpret host PID incarnations through its
         # private /proc. Only its authenticated host guardian may inspect leases.
@@ -2749,7 +2816,7 @@ def _main(argv):
     if cmd == "room":
         # Read-only and store-free: capacity is this device's own lines, never a lease.
         return room_main(argv)
-    b = Berth(read_only=True) if cmd in ("verify-released", "holds") else Berth()
+    b = Berth(read_only=True) if cmd in ("verify-released", "holds", "impact") else Berth()
     session = _opt(argv, "--session")
     source = "flag" if session else None
     if cmd == "verify-released":
@@ -2761,26 +2828,24 @@ def _main(argv):
         result = b.verify_released(session, int(generation) if generation else None)
         print(json.dumps(result))
         return 0 if result["released"] else 3
-    if cmd == "holds":
+    if cmd in ("holds", "impact"):
         as_json = "--json" in argv
         paths = [p for p in argv if p != "--json"]
         if not paths or any(p.startswith(("/", "--")) or ".." in p.split("/") for p in paths):
-            print("usage: berth holds PATH [PATH…] [--session S] [--json]", file=sys.stderr)
+            print(f"usage: berth {cmd} PATH [PATH…] [--session S] [--json]", file=sys.stderr)
             return 2
-        if not session:
-            session = resolve_session_identity().get("session")
-        rows = declared_holds(b, paths, session)
-        if as_json:
-            print(json.dumps(rows))
-        else:
-            for row in rows:
-                detail = (f"{row['session']} ({row['runtime']}, task={row['task']}, "
-                          f"seen {_age(row['age_s'])})")
-                if row["kind"] == "HELD":
-                    print(f"HELD {row['path']} by {detail} writes={row['pattern']}")
-                else:
-                    print(f"UNDECLARED {detail}")
-        return 3 if any(row["kind"] == "HELD" for row in rows) else 0
+        try:
+            if not session:
+                session = resolve_session_identity().get("session")
+            rows = declared_impact(b, paths, session)
+            if as_json:
+                print(json.dumps(rows))
+            else:
+                print("\n".join(impact_line(row) for row in rows) or "no nearby live intent observed")
+        except Exception:
+            print(json.dumps({"fallback": "local intent unavailable"}) if as_json
+                  else "path-fallback: local intent unavailable")
+        return 0
     if cmd == "status":
         print(render_status(b))
         return 0

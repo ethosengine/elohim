@@ -83,11 +83,13 @@ class DeclaredWrites(unittest.TestCase):
         self.b = Berth(self.directory.name, now=lambda: self.now, policy_path=MISSING_POLICY)
         self.b.pid_alive = lambda pid: False
         self.main = _NS["_main"]
+        self.graph = {"rows": [], "fallback": None}
 
     def cli(self, *args):
         out = io.StringIO()
         with mock.patch.dict(self.main.__globals__, {"Berth": lambda **kw: self.b,
-                "resolve_session_identity": lambda: {"session": "self"}}), contextlib.redirect_stdout(out):
+                "resolve_session_identity": lambda: {"session": "self"},
+                "gate_impact": lambda paths, writes: self.graph}), contextlib.redirect_stdout(out):
             code = self.main(["berth", *args])
         return code, out.getvalue()
 
@@ -109,36 +111,36 @@ class DeclaredWrites(unittest.TestCase):
             with self.subTest(pattern=pattern, path=path):
                 self.moor([pattern])
                 code, out = self.cli("holds", path)
-                self.assertEqual(code, 3)
-                self.assertIn(f"HELD {path} by peer (codex, task=fix, seen 0s) writes={pattern}", out)
+                self.assertEqual(code, 0)
+                self.assertIn(f"peer (codex, task=fix, seen 0s): same paths {path}", out)
 
     def test_no_overlap_and_segment_boundary(self):
         self.moor(["src/a"])
-        self.assertEqual(self.cli("holds", "other/a", "src/ab"), (0, ""))
+        self.assertEqual(self.cli("holds", "other/a", "src/ab"), (0, "no nearby live intent observed\n"))
 
     def test_self_is_never_a_holder(self):
         self.moor(["src/**"], session="self")
-        self.assertEqual(self.cli("holds", "src/a"), (0, ""))
-        self.assertEqual(self.cli("holds", "src/a", "--session", "self"), (0, ""))
+        self.assertEqual(self.cli("holds", "src/a"), (0, "no nearby live intent observed\n"))
+        self.assertEqual(self.cli("holds", "src/a", "--session", "self"), (0, "no nearby live intent observed\n"))
 
     def test_undeclared_is_listed_once_without_refusing(self):
         self.moor()
         code, out = self.cli("holds", "src/a", "src/b")
         self.assertEqual(code, 0)
-        self.assertEqual(out.count("UNDECLARED peer"), 1)
+        self.assertEqual(out.count("peer (codex, task=fix, seen 0s): undeclared"), 1)
 
     def test_dead_and_expired_are_ignored(self):
         self.moor(["src/**"], session="dead", pid=99999999)
         self.moor(["src/**"], session="expired", ttl_s=1)
         self.now += 2
-        self.assertEqual(self.cli("holds", "src/a"), (0, ""))
+        self.assertEqual(self.cli("holds", "src/a"), (0, "no nearby live intent observed\n"))
 
     def test_remoor_replaces_and_can_clear_bounds(self):
         self.moor(["old/**"])
         self.cli("moor", "--session", "peer", "--writes", "new/**")
         self.assertEqual(self.b.mooring("peer")["bounds"]["write_set"], ["new/**"])
-        self.assertEqual(self.cli("holds", "old/a"), (0, ""))
-        self.assertEqual(self.cli("holds", "new/a")[0], 3)
+        self.assertEqual(self.cli("holds", "old/a"), (0, "no nearby live intent observed\n"))
+        self.assertEqual(self.cli("holds", "new/a")[0], 0)
         self.cli("moor", "--session", "peer", "--writes", "")
         self.assertEqual(self.b.mooring("peer")["bounds"]["write_set"], [])
 
@@ -149,14 +151,14 @@ class DeclaredWrites(unittest.TestCase):
                     Path(self.directory.name).rglob("*") if p.is_file()}
         before = snapshot()
         code, out = self.cli("holds", "src/a", "--json")
-        self.assertEqual(code, 3)
-        self.assertEqual(json.loads(out)[0]["pattern"], "src/**")
+        self.assertEqual(code, 0)
+        self.assertEqual(json.loads(out)[0]["paths"], ["src/a"])
         self.assertEqual(before, snapshot())
 
     def test_missing_store_is_not_created(self):
         missing = Path(self.directory.name) / "absent"
         self.b = Berth(str(missing), read_only=True, policy_path=MISSING_POLICY)
-        self.assertEqual(self.cli("holds", "src/a"), (0, ""))
+        self.assertEqual(self.cli("holds", "src/a"), (0, "no nearby live intent observed\n"))
         self.assertFalse(missing.exists())
 
     def test_session_start_guidance_only_after_successful_moor(self):
@@ -186,6 +188,65 @@ class DeclaredWrites(unittest.TestCase):
             else:
                 self.assertNotIn(monitor, out)
                 self.assertNotIn(declare, out)
+
+
+class AdvisoryImpact(DeclaredWrites):
+    def cli(self, *args):
+        args = tuple("impact" if arg == "holds" else arg for arg in args)
+        return super().cli(*args)
+
+    def test_overlap_is_advisory_and_has_no_prohibition_words(self):
+        self.moor(["src/**"])
+        code, out = self.cli("impact", "src/a")
+        self.assertEqual(code, 0)
+        self.assertNotRegex(out.lower(), r"\b(wait|held|refused|lock)\b")
+
+    def test_gate_unavailable_reports_path_fallback(self):
+        self.moor(["src/**"])
+        self.graph = {"fallback": "gate-impact unavailable"}
+        code, out = self.cli("impact", "src/a")
+        self.assertEqual(code, 0)
+        self.assertIn("same paths src/a; gates unknown (path-fallback: gate-impact unavailable)", out)
+
+    def test_directional_and_shared_results_one_line_per_sibling(self):
+        self.moor(["other/**"])
+        self.graph = {"rows": [
+            {"project": "a", "direction": "shared", "seconds": 12},
+            {"project": "b", "direction": "shared", "seconds": 8},
+            {"project": "c", "direction": "upstream-of-me", "seconds": None},
+            {"project": "d", "direction": "downstream-of-me", "seconds": None}]}
+        code, out = self.cli("impact", "src/a")
+        self.assertEqual(code, 0)
+        self.assertEqual(len(out.splitlines()), 1)
+        self.assertIn("shared a,b; ~20s of gates between you", out)
+        self.assertIn("upstream-of-me via c; their work can re-key yours", out)
+        self.assertIn("downstream-of-me via d; your work can re-key theirs", out)
+        self.assertNotRegex(out.lower(), r"\b(wait|held|refused|lock)\b")
+
+    def test_subprocess_failure_and_timeout_are_bounded(self):
+        function = _NS["gate_impact"]
+        for error in (FileNotFoundError(), subprocess.TimeoutExpired("node", 20)):
+            with mock.patch.object(subprocess, "run", side_effect=error) as run:
+                result = function(["a"], ["b"])
+                self.assertIn("fallback", result)
+                self.assertEqual(run.call_args.kwargs["timeout"], 20)
+
+    def test_entrypoint_store_failure_is_advisory(self):
+        function = _NS["main"]
+        out = io.StringIO()
+        with mock.patch.dict(function.__globals__, {"_main": mock.Mock(side_effect=PermissionError())}), \
+                contextlib.redirect_stdout(out):
+            self.assertEqual(function(["berth", "impact", "src/a"]), 0)
+        self.assertEqual(out.getvalue(), "path-fallback: local intent unavailable\n")
+
+    def test_usage_errors_still_exit_two(self):
+        with contextlib.redirect_stderr(io.StringIO()):
+            for args in [("impact",), ("impact", "../outside"), ("impact", "a", "--session")]:
+                self.assertEqual(self.cli(*args)[0], 2)
+
+    def test_holds_remains_same_advisory_alias(self):
+        self.moor(["src/**"])
+        self.assertEqual(super().cli("holds", "src/a"), self.cli("impact", "src/a"))
 
 
 class LocationResolutionTest(unittest.TestCase):
