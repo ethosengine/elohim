@@ -470,26 +470,47 @@ describe('manifest-driven local gate registry', () => {
   });
 
   test('cargo env merges the manifest with pool-policy overrides, manifest winning', () => {
-    // The rakia schema accepts run.cargo.env since 2b2cedb, and the storage cap now
-    // declares on its own manifest project. pool-policy's cargo_env_overrides remain
-    // for projects that have not moved their cap yet (eprfs, memory-ceremony). Merge
-    // rule: the manifest's own declaration always wins; the policy override only fills
-    // a gap the manifest leaves undeclared.
-    const noManifestEnv = { name: 'eprfs', run: { cargo: { targetDir: '/tmp/x' } } };
-    const filled = gateChildEnv(noManifestEnv, {});
+    // The rakia schema accepts run.cargo.env since 2b2cedb, and every capped project now
+    // declares its cap on its own manifest project (storage first; eprfs and memory-ceremony
+    // on 2026-11-22, at four test threads). pool-policy's cargo_env_overrides remain as the
+    // place a cap can be filled for a project that has not declared one, so the merge rule is
+    // proved on a fixture policy: the manifest's own declaration always wins; the policy
+    // override only fills a gap the manifest leaves undeclared.
+    const fixture = mkdtempSync(resolve(tmpdir(), 'gate-cargo-env-'));
+    mkdirSync(resolve(fixture, 'genesis/agentic'), { recursive: true });
+    writeFileSync(resolve(fixture, 'genesis/agentic/pool-policy.json'), JSON.stringify({
+      cargo_env_overrides: {
+        '*': { RUSTUP_TOOLCHAIN: '1.100.0' },
+        'still-in-policy': { CARGO_BUILD_JOBS: '1', RUST_TEST_THREADS: '1' },
+      },
+    }));
+    const noManifestEnv = { name: 'still-in-policy', run: { cargo: { targetDir: '/tmp/x' } } };
+    const filled = gateChildEnv(noManifestEnv, {}, fixture);
     assert.ok(Object.hasOwn(filled, 'GATE_CARGO_ENV'), 'pool-policy override applies when the manifest declares no cargo.env');
     assert.deepStrictEqual(JSON.parse(filled.GATE_CARGO_ENV), { CARGO_BUILD_JOBS: '1', RUST_TEST_THREADS: '1', RUSTUP_TOOLCHAIN: '1.100.0' });
 
     const withManifestEnv = {
-      name: 'eprfs',
+      name: 'still-in-policy',
       run: { cargo: { targetDir: '/tmp/x', env: { CARGO_BUILD_JOBS: '3' } } },
     };
-    const won = gateChildEnv(withManifestEnv, {});
+    const won = gateChildEnv(withManifestEnv, {}, fixture);
     assert.deepStrictEqual(
       JSON.parse(won.GATE_CARGO_ENV),
       { CARGO_BUILD_JOBS: '3', RUST_TEST_THREADS: '1', RUSTUP_TOOLCHAIN: '1.100.0' },
       'a manifest-declared cargo.env value wins over the pool-policy override; undeclared keys are still filled'
     );
+
+    // This tree: the two gates that run the eprfs workspace's tests declare the same caps on their
+    // own manifests, and the policy carries no per-project cap that could shadow or disagree.
+    for (const name of ['eprfs', 'memory-ceremony']) {
+      const env = JSON.parse(gateChildEnv(registry.get(name), {}).GATE_CARGO_ENV);
+      assert.deepStrictEqual(
+        { jobs: env.CARGO_BUILD_JOBS, threads: env.RUST_TEST_THREADS }, { jobs: '6', threads: '4' },
+        `${name} declares its build jobs and test threads on its manifest`);
+    }
+    const realOverrides = JSON.parse(readFileSync(resolve(ROOT, 'genesis/agentic/pool-policy.json'), 'utf8')).cargo_env_overrides;
+    assert.deepStrictEqual(Object.keys(realOverrides), ['*'],
+      'no per-project cap is left in pool-policy; a cap lives on the gate project it caps');
 
     const storage = registry.get('elohim-storage');
     assert.deepStrictEqual(JSON.parse(gateChildEnv(storage, {}).GATE_CARGO_ENV), { CARGO_BUILD_JOBS: '1', RUSTUP_TOOLCHAIN: '1.100.0' },
