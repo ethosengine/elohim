@@ -110,14 +110,6 @@
   "cargo_env_overrides": {
     "*": {
       "RUSTUP_TOOLCHAIN": "1.100.0"
-    },
-    "eprfs": {
-      "CARGO_BUILD_JOBS": "1",
-      "RUST_TEST_THREADS": "1"
-    },
-    "memory-ceremony": {
-      "CARGO_BUILD_JOBS": "1",
-      "RUST_TEST_THREADS": "1"
     }
   },
   "lsp": {

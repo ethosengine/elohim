@@ -323,7 +323,11 @@
           "cargo": {
             "workspace": "elohim/eprfs",
             "profile": "dev",
-            "rustflags": ""
+            "rustflags": "",
+            "env": {
+              "CARGO_BUILD_JOBS": "6",
+              "RUST_TEST_THREADS": "4"
+            }
           }
         }
       },
