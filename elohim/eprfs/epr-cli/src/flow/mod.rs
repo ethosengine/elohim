@@ -27,6 +27,7 @@ pub mod measures;
 pub mod memory;
 pub mod note;
 pub mod parity;
+pub mod participate;
 pub mod placement;
 pub mod project;
 pub mod read;
@@ -461,7 +462,7 @@ fn run_ledger(args: &[String]) -> FlowResult<ExitCode> {
 fn run_context(args: &[String]) -> FlowResult<ExitCode> {
     let Some(target) = args.first().filter(|a| !a.starts_with("--")) else {
         return Err(FlowError::InvalidArguments(
-            "usage: epr flow context <path|cid> [--notes N] [--section DOT_PATH --offset N --limit N] [--concerns --offset N --limit N --all-states] [--json] [--root DIR]".into(),
+            "usage: epr flow context <path|cid> [--notes N] [--section DOT_PATH --offset N --limit N] [--concerns --offset N --limit N --all-states] [--json] [--root DIR]\n       epr flow context <dir> --participate [--limit N] [--json] [--root DIR]".into(),
         ));
     };
     let target = target.clone();
@@ -470,7 +471,7 @@ fn run_context(args: &[String]) -> FlowResult<ExitCode> {
     while i < rest.len() {
         match rest[i].as_str() {
             "--notes" | "--offset" | "--limit" | "--section" => i += 2,
-            "--concerns" | "--all-states" => i += 1,
+            "--concerns" | "--all-states" | "--participate" => i += 1,
             other => {
                 return Err(FlowError::InvalidArguments(format!(
                     "unknown context argument `{other}`{}",
@@ -482,12 +483,51 @@ fn run_context(args: &[String]) -> FlowResult<ExitCode> {
                             "--limit",
                             "--section",
                             "--concerns",
-                            "--all-states"
+                            "--all-states",
+                            "--participate"
                         ]
                     )
                 )))
             }
         }
+    }
+    if rest.iter().any(|a| a == "--participate") {
+        // The participation read (spec 2026-11-22-participation-read-design, cut 1) is its own
+        // screen: it takes a directory and none of the plain read's windows.
+        let mut limit = participate::DEFAULT_LIMIT;
+        let mut j = 0;
+        while j < rest.len() {
+            match rest[j].as_str() {
+                "--participate" => j += 1,
+                "--limit" => {
+                    let raw = rest.get(j + 1).map(String::as_str).unwrap_or("");
+                    limit = raw
+                        .trim()
+                        .parse::<usize>()
+                        .ok()
+                        .filter(|n| (1..=participate::MAX_LIMIT).contains(n))
+                        .ok_or_else(|| {
+                            FlowError::InvalidArguments(format!(
+                                "--limit takes a count from 1 to {}, got `{raw}`",
+                                participate::MAX_LIMIT
+                            ))
+                        })?;
+                    j += 2;
+                }
+                other => {
+                    return Err(FlowError::InvalidArguments(format!(
+                        "--participate takes only --limit, --json and --root, not `{other}`"
+                    )))
+                }
+            }
+        }
+        let result = participate::participate(&opts.root, &target, limit)?;
+        if opts.json {
+            println!("{}", serde_json::to_string_pretty(&result)?);
+        } else {
+            print!("{}", result.render_text());
+        }
+        return Ok(ExitCode::SUCCESS);
     }
     if let Some(section) = take_opt(&rest, "--section")? {
         if rest
@@ -1881,6 +1921,9 @@ fn usage() -> String {
      | context <path|cid> [--notes N] [--section DOT_PATH --offset N --limit N] [--concerns --offset N --limit N --all-states] [--json] [--root DIR] \
      (identity · intents · commitments · notes · seals · habit · gate · governance on one screen; \
      a bare cid skips the path-only sections and says so)\n  \
+     | context <dir> --participate [--limit N] [--json] [--root DIR] \
+     (the participation read: open stations, commitments, habits, landing intents and notes under \
+     <dir>, from this device's own stores, opening nothing that creates)\n  \
      | ledger <path|cid> [--json] [--root DIR] \
      (the FORWARD read — claims, fulfilments and notes oldest first, rendered as markdown a \
      status section is pasted from rather than retyped)\n  \

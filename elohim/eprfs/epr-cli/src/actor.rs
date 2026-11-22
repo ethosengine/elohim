@@ -1000,6 +1000,47 @@ fn read_device_state(root: &Path, key_file: &Path, pin_missing: bool) -> DeviceS
     )
 }
 
+/// This device's standing read from captured bytes alone (participation read, P15): the actor
+/// log and each roster file are read and decoded in memory, no store opener runs, and no root pin
+/// is written. `Err` names why standing could not be read; `Ok(Unwitnessed)` is a read that found
+/// none.
+pub(crate) fn device_state_snapshot(root: &Path, key_file: &Path) -> Result<DeviceState, String> {
+    let handles = roster_handles(root);
+    if handles.is_empty() {
+        return Err(format!("no roster under {PARTICIPANTS_REL}"));
+    }
+    if !key_file.is_file() {
+        return Err(format!("no device key at {}", key_file.display()));
+    }
+    let key = DeviceKey::load(key_file)
+        .map_err(|error| format!("the device key could not be read: {error}"))?;
+    let log = root.join(ACTOR_LOG_REL);
+    let records = match std::fs::read_to_string(&log) {
+        Ok(text) => elohim_epr_rea::decode_actor_records(&text)
+            .map_err(|error| format!("{ACTOR_LOG_REL} could not be decoded: {error}"))?,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Vec::new(),
+        Err(error) => return Err(format!("{ACTOR_LOG_REL} could not be read: {error}")),
+    };
+    let snapshot_roster = |root: &Path, handle: &str| -> ActorResult<Roster> {
+        match std::fs::read_to_string(roster_file(root, handle)) {
+            Ok(text) => Ok(Roster::from_jsonl(handle, &text)?),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(Roster::new(handle)?),
+            Err(error) => Err(ActorError::InvalidArguments(format!(
+                "roster {handle} could not be read: {error}"
+            ))),
+        }
+    };
+    Ok(device_state_with(
+        root,
+        &handles,
+        &records,
+        &key.did_key(),
+        Some(key_file),
+        false,
+        &snapshot_roster,
+    ))
+}
+
 /// [`device_state`] over already-read records. `key_file` locates the device's root pins; `None`
 /// reads without pins (and writes none).
 fn device_state_for(
@@ -1009,6 +1050,28 @@ fn device_state_for(
     did: &str,
     key_file: Option<&Path>,
     pin_missing: bool,
+) -> DeviceState {
+    device_state_with(
+        root,
+        handles,
+        records,
+        did,
+        key_file,
+        pin_missing,
+        &read_roster,
+    )
+}
+
+/// [`device_state_for`] with the roster reader named: the store-backed one, or the snapshot
+/// reader [`device_state_snapshot`] passes.
+fn device_state_with(
+    root: &Path,
+    handles: &[String],
+    records: &[(Cid, ActorRecord)],
+    did: &str,
+    key_file: Option<&Path>,
+    pin_missing: bool,
+    read_roster: &dyn Fn(&Path, &str) -> ActorResult<Roster>,
 ) -> DeviceState {
     let verifier = verifier();
     let plain: Vec<ActorRecord> = records.iter().map(|(_, r)| r.clone()).collect();

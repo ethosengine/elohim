@@ -165,6 +165,18 @@ pub(crate) fn status_at(root: &Path, remember: bool) -> Vec<Check> {
         packs_check(root),
         layout_check(device_layout),
     ];
+    // Each admitted sibling that has acknowledged none (or too little) of this device's records,
+    // beside the exchange line (arrival backlog row 77, delta 2). Degraded, never refused; the
+    // first `sibling exchange` line stays the one the next step reads, so an otherwise arrived
+    // device's next step does not change.
+    if let Some(at) = checks.iter().position(|c| c.name == SIBLING_CHECK) {
+        for (offset, check) in acknowledgement_checks(root, &current)
+            .into_iter()
+            .enumerate()
+        {
+            checks.insert(at + 1 + offset, check);
+        }
+    }
     // Always last: what the person does next, read from the lines above.
     let next = next_step(&checks);
     checks.push(next);
@@ -521,6 +533,74 @@ fn exchange_check(
             )),
         ),
     }
+}
+
+/// How far an admitted sibling's acknowledgement may trail this device's own head and still read
+/// as exchanging: a gossip round or two, not a device that has stopped folding.
+const ACK_SLACK: u64 = 10;
+
+/// One `degraded sibling exchange` line per admitted sibling that has acknowledged none of this
+/// device's records, or trails this device's own head by more than [`ACK_SLACK`] seqs, read from
+/// the head table the peer daemon saved. Nothing when this device stands on no roster or no table
+/// is readable: the `sibling exchange` line above already says so.
+#[cfg(feature = "peer")]
+fn acknowledgement_checks(root: &Path, current: &actor::DeviceState) -> Vec<Check> {
+    let actor::DeviceState::Standing(standing) = current else {
+        return Vec::new();
+    };
+    let siblings = actor::roster_siblings(root, &standing.handle, &standing.device);
+    match saved_heads() {
+        Ok(Some(table)) => unacknowledged(&siblings, &standing.device, &table),
+        _ => Vec::new(),
+    }
+}
+#[cfg(not(feature = "peer"))]
+fn acknowledgement_checks(_root: &Path, _current: &actor::DeviceState) -> Vec<Check> {
+    Vec::new()
+}
+
+/// The admitted `siblings` of this device `did` that `table` shows have not acknowledged it.
+#[cfg(feature = "peer")]
+fn unacknowledged(siblings: &[String], did: &str, table: &eprfs_peer::HeadTable) -> Vec<Check> {
+    let own = table.own.as_ref().map(|own| own.seq);
+    siblings
+        .iter()
+        .filter_map(|sibling| {
+            let short = actor::short_did(sibling);
+            let what = match table.devices.get(sibling) {
+                None => format!(
+                    "{short} is admitted and has acknowledged none of this device's records \
+                     (no head from it has been folded here)"
+                ),
+                Some(head) => match (head.folded.get(did), own) {
+                    (None, _) => format!(
+                        "{short} is admitted and has acknowledged none of this device's records \
+                         (its head seq {} was folded here)",
+                        head.seq
+                    ),
+                    (Some(&acked), Some(own)) if own.saturating_sub(acked) > ACK_SLACK => {
+                        format!(
+                            "{short} is admitted and has acknowledged this device's records only \
+                             to seq {acked} of {own}"
+                        )
+                    }
+                    (Some(_), _) => return None,
+                },
+            };
+            Some(Check::new(
+                SIBLING_CHECK,
+                State::Degraded,
+                format!(
+                    "{what} — what this device sends may not have arrived there; a landing \
+                     waits for it at the lease step"
+                ),
+                Some(format!(
+                    "run `just status device` on {short}; keep epr peer serve running on both \
+                     devices"
+                )),
+            ))
+        })
+        .collect()
 }
 
 /// The device layout as a command run from `root` resolves it (the real environment and
@@ -2182,6 +2262,91 @@ mod tests {
             )
             .state,
             State::Degraded
+        );
+    }
+    #[cfg(feature = "peer")]
+    #[test]
+    fn an_admitted_device_that_never_acknowledges_is_named_and_the_next_step_holds() {
+        let ours = "did:key:z6MkThisDevice000000000000000000000";
+        let exchanging = "did:key:z6MkExchangingSibling00000000000000".to_owned();
+        let laptop = "did:key:z6MkgHjuLaptopNeverHeard000000000xMbu".to_owned();
+        let behind = "did:key:z6MkThreeSeqsBehind0000000000000000".to_owned();
+        let head = |acked: Option<u64>| eprfs_peer::DeviceHead {
+            seq: 7,
+            root: eprfs_core::BlobCid::compute_bytes(b"sibling root"),
+            at: 0,
+            folded: acked
+                .map(|seq| std::collections::BTreeMap::from([(ours.to_owned(), seq)]))
+                .unwrap_or_default(),
+            folded_at: 0,
+            events_folded: 0,
+            nack: Default::default(),
+        };
+        let mut table = eprfs_peer::HeadTable {
+            own: Some(eprfs_peer::ChannelHead {
+                device: ours.to_owned(),
+                root: eprfs_core::BlobCid::compute_bytes(b"own root"),
+                seq: 40,
+                at: 0,
+                folded: std::collections::BTreeMap::new(),
+                signature: String::new(),
+            }),
+            ..Default::default()
+        };
+        table.devices.insert(exchanging.clone(), head(Some(40)));
+        table.devices.insert(behind.clone(), head(Some(37)));
+        // The laptop is admitted (it is in the roster) and no head of it has been folded.
+        let siblings = vec![exchanging.clone(), laptop.clone(), behind.clone()];
+        let named = unacknowledged(&siblings, ours, &table);
+        assert_eq!(named.len(), 1, "{named:?}");
+        let line = named[0].to_string();
+        assert!(
+            line.starts_with(&format!(
+                "degraded sibling exchange: {} is admitted and has acknowledged none of this \
+                 device's records",
+                actor::short_did(&laptop)
+            )),
+            "{line}"
+        );
+        assert!(line.contains("did:key:z6MkgHju…xMbu"), "{line}");
+        assert!(
+            line.contains("a landing waits for it at the lease step"),
+            "{line}"
+        );
+        assert!(line.contains(&format!(
+            "run `just status device` on {}",
+            actor::short_did(&laptop)
+        )));
+        assert_eq!(named[0].state, State::Degraded, "never refused");
+        // A head that was folded but acknowledges nothing is named too, with its seq.
+        table.devices.insert(laptop.clone(), head(None));
+        let folded = unacknowledged(&siblings, ours, &table);
+        assert_eq!(folded.len(), 1);
+        assert!(folded[0].detail.contains("its head seq 7 was folded here"));
+        // Eleven seqs behind is named; three behind (above) is not.
+        table.devices.insert(laptop.clone(), head(Some(29)));
+        let trailing = unacknowledged(&siblings, ours, &table);
+        assert_eq!(trailing.len(), 1);
+        assert!(trailing[0].detail.contains("only to seq 29 of 40"));
+        table.devices.insert(laptop.clone(), head(Some(40)));
+        assert!(unacknowledged(&siblings, ours, &table).is_empty());
+
+        // An otherwise arrived device keeps its next step with the degraded line beside it.
+        let ok = |name: &str| Check::new(name, State::Ok, format!("{name} evidence"), None);
+        let arrived = vec![
+            ok("epr binary"),
+            ok("device key"),
+            ok(ROSTER_CHECK),
+            ok("peer daemon"),
+            ok(SIBLING_CHECK),
+        ];
+        let before = next_step(&arrived).to_string();
+        let mut with_line = arrived.clone();
+        with_line.extend(named);
+        assert_eq!(next_step(&with_line).to_string(), before);
+        assert_eq!(
+            before,
+            "ok next step: nothing owed; this device is arrived and exchanging"
         );
     }
 }
