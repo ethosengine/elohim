@@ -389,16 +389,20 @@ def io_guard_and_berth_lines(session):
     except Exception as e:
         out.append(f"IO-GUARD: unavailable ({e!r})")
     try:
-        subprocess.run([sys.executable, BERTH, "moor", "--session", session, "--runtime", "claude-code",
+        r = subprocess.run([sys.executable, BERTH, "moor", "--session", session, "--runtime", "claude-code",
                         "--principal", os.environ.get("USER_EMAIL") or os.environ.get("USER") or "operator",
                         "--pid", str(owner_pid())],
                        capture_output=True, text=True, timeout=6)
+        if r.returncode:
+            raise RuntimeError(f"moor exited {r.returncode}")
         r = subprocess.run([sys.executable, BERTH, "status"], capture_output=True, text=True, timeout=6)
         st = (r.stdout or "").strip().splitlines()
         held = [l.strip() for l in st if " held by " in l or "/" in l.split()[1:2]]
         out.append(f"BERTH: moored as {session} (claude-code; complete it: `berth moor --model <id> --lab <vendor> --task '<lane>'`)"
                    + (" · leases: " + "; ".join(held) if held else " · no leases held")
                    + " · claim before mesh/cargo/disk-heavy work: `berth claim <resource>`; `berth status|ledger`")
+        out.append(f"Arm Monitor before the first long wait: `berth inbox --session {session} --reader main --follow`")
+        out.append(f"Once work is named: `berth moor --session {session} --writes <globs> --task <text>`; run `berth holds <paths>` before the first write.")
     except Exception as e:
         out.append(f"BERTH: unavailable ({e!r})")
     return "\n".join(out)

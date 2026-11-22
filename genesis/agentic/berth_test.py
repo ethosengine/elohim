@@ -75,6 +75,119 @@ def guest_uid_unavailable_reason():
     return None
 
 
+class DeclaredWrites(unittest.TestCase):
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.directory.cleanup)
+        self.now = 10000
+        self.b = Berth(self.directory.name, now=lambda: self.now, policy_path=MISSING_POLICY)
+        self.b.pid_alive = lambda pid: False
+        self.main = _NS["_main"]
+
+    def cli(self, *args):
+        out = io.StringIO()
+        with mock.patch.dict(self.main.__globals__, {"Berth": lambda **kw: self.b,
+                "resolve_session_identity": lambda: {"session": "self"}}), contextlib.redirect_stdout(out):
+            code = self.main(["berth", *args])
+        return code, out.getvalue()
+
+    def moor(self, writes=None, session="peer", **fields):
+        return self.b.moor(session, writes=writes, runtime="codex", task="fix", **fields)
+
+    def test_status_shows_writes_and_caps_long_lines(self):
+        self.moor(["src/a", "src/b"])
+        with mock.patch.dict(render_status.__globals__, {"_guard_state": lambda _: None}):
+            self.assertIn("    writes: src/a,src/b", render_status(self.b))
+        line = _NS["writes_line"](["x" * 300, "src/b"])
+        self.assertLessEqual(len(line), 200)
+        self.assertIn("…+2 more", line)
+
+    def test_exact_parent_glob_and_recursive_overlap(self):
+        for pattern, path in [("src/a.py", "src/a.py"), ("src/*", "src/pkg/a.py"),
+                              ("src/**/a.py", "src/pkg/deep/a.py"),
+                              ("src/pkg/a.py", "src/*"), ("src", "src/a.py")]:
+            with self.subTest(pattern=pattern, path=path):
+                self.moor([pattern])
+                code, out = self.cli("holds", path)
+                self.assertEqual(code, 3)
+                self.assertIn(f"HELD {path} by peer (codex, task=fix, seen 0s) writes={pattern}", out)
+
+    def test_no_overlap_and_segment_boundary(self):
+        self.moor(["src/a"])
+        self.assertEqual(self.cli("holds", "other/a", "src/ab"), (0, ""))
+
+    def test_self_is_never_a_holder(self):
+        self.moor(["src/**"], session="self")
+        self.assertEqual(self.cli("holds", "src/a"), (0, ""))
+        self.assertEqual(self.cli("holds", "src/a", "--session", "self"), (0, ""))
+
+    def test_undeclared_is_listed_once_without_refusing(self):
+        self.moor()
+        code, out = self.cli("holds", "src/a", "src/b")
+        self.assertEqual(code, 0)
+        self.assertEqual(out.count("UNDECLARED peer"), 1)
+
+    def test_dead_and_expired_are_ignored(self):
+        self.moor(["src/**"], session="dead", pid=99999999)
+        self.moor(["src/**"], session="expired", ttl_s=1)
+        self.now += 2
+        self.assertEqual(self.cli("holds", "src/a"), (0, ""))
+
+    def test_remoor_replaces_and_can_clear_bounds(self):
+        self.moor(["old/**"])
+        self.cli("moor", "--session", "peer", "--writes", "new/**")
+        self.assertEqual(self.b.mooring("peer")["bounds"]["write_set"], ["new/**"])
+        self.assertEqual(self.cli("holds", "old/a"), (0, ""))
+        self.assertEqual(self.cli("holds", "new/a")[0], 3)
+        self.cli("moor", "--session", "peer", "--writes", "")
+        self.assertEqual(self.b.mooring("peer")["bounds"]["write_set"], [])
+
+    def test_json_and_reads_do_not_change_store(self):
+        self.moor(["src/**"])
+        def snapshot():
+            return {str(p): (p.read_bytes(), p.stat().st_mtime_ns) for p in
+                    Path(self.directory.name).rglob("*") if p.is_file()}
+        before = snapshot()
+        code, out = self.cli("holds", "src/a", "--json")
+        self.assertEqual(code, 3)
+        self.assertEqual(json.loads(out)[0]["pattern"], "src/**")
+        self.assertEqual(before, snapshot())
+
+    def test_missing_store_is_not_created(self):
+        missing = Path(self.directory.name) / "absent"
+        self.b = Berth(str(missing), read_only=True, policy_path=MISSING_POLICY)
+        self.assertEqual(self.cli("holds", "src/a"), (0, ""))
+        self.assertFalse(missing.exists())
+
+    def test_session_start_guidance_only_after_successful_moor(self):
+        # Keep this extension in the allowed test file; ram_guard_session_test.py is out of scope.
+        hook = runpy.run_path(str(REPO / ".claude/hooks/ram-guard.py"))
+        function = hook["io_guard_and_berth_lines"]
+        session = "12345678-1234-1234-1234-123456789012"
+        for failure in (None, 3, subprocess.TimeoutExpired("moor", 6)):
+            def run(argv, **kwargs):
+                if "moor" in argv:
+                    if isinstance(failure, Exception):
+                        raise failure
+                    return subprocess.CompletedProcess(argv, failure or 0, "", "")
+                return subprocess.CompletedProcess(argv, 0, "ok", "")
+            with self.subTest(failure=failure), mock.patch.object(subprocess, "run", side_effect=run), \
+                    mock.patch.dict(function.__globals__, {"owner_pid": lambda: 123}):
+                out = function(session)
+            monitor = f"berth inbox --session {session} --reader main --follow"
+            declare = f"berth moor --session {session} --writes <globs> --task <text>"
+            if failure is None:
+                self.assertIn(monitor, out)
+                self.assertIn(declare, out)
+                self.assertIn("berth holds <paths>", out)
+                for line in out.splitlines():
+                    if monitor in line or declare in line:
+                        self.assertLess(len(line), 200)
+            else:
+                self.assertNotIn(monitor, out)
+                self.assertNotIn(declare, out)
+
+
 class LocationResolutionTest(unittest.TestCase):
     """berth finds its store and policy through the device layout, never by a guess of its own."""
 

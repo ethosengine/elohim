@@ -66,6 +66,7 @@ Commands:
                                                                    running (the cargo guard hook's own count),
                                                                    ram-guard/io-guard levels; verdict admit|refuse
                                                                    with axis and owner; exit 0 admit · 3 refuse
+  berth holds   PATH [PATH…] [--session S] [--json]                declared overlaps; exit 3 if held
   berth status                                                     moorings · leases · capacity, and the
                                                                    other devices' moorings and steward
                                                                    leases, read from this device's fold
@@ -122,6 +123,7 @@ resolvable (or ambiguous), or the store itself cannot be opened (a guest sandbox
 the lock or dir) — the only code a wrapper may proceed past, unleased.
 """
 import contextlib
+import fnmatch
 import errno
 import fcntl
 import hashlib
@@ -1310,7 +1312,7 @@ class Berth:
                 m["recipient"][k] = m[k]
         m["recipient"]["session"] = session
         m.setdefault("bounds", {})
-        if m.get("writes"):
+        if "writes" in m:
             m["bounds"]["write_set"] = m["writes"]
         m["bounds"]["ttl_s"] = m.get("ttl_s", self.mooring_ttl_s)
         m.setdefault("ttl_s", self.mooring_ttl_s)
@@ -2442,6 +2444,53 @@ def room_main(argv, now=None, builds=None):
     return 0 if room["verdict"] == "admit" else 3
 
 
+def declared_writes(m):
+    return m.get("bounds", {}).get("write_set", m.get("writes", [])) or []
+
+
+def paths_overlap(left, right):
+    """Segment prefixes overlap; ambiguous glob/glob intersections are conservative."""
+    def parts(path):
+        return [p for p in path.split("/") if p not in ("", ".")]
+    for a, b in zip(parts(left), parts(right)):
+        if "**" in (a, b):
+            return True
+        if a == b or fnmatch.fnmatchcase(a, b) or fnmatch.fnmatchcase(b, a):
+            continue
+        if any(c in a for c in "*?[") and any(c in b for c in "*?["):
+            continue
+        return False
+    return True
+
+
+def declared_holds(b, paths, session):
+    """Read local live declarations only: the peer fold exposes timestamps, not write sets."""
+    rows = []
+    moorings = b.moorings() if os.path.isdir(b.moor_dir) else {}
+    for owner, m in sorted(moorings.items()):
+        if owner == session or not b.is_live(m):
+            continue
+        detail = dict(session=owner, runtime=m.get("recipient", {}).get("runtime", "?"),
+                      task=m.get("task") or "-", age_s=b.now() - m.get("last_seen", b.now()))
+        writes = declared_writes(m)
+        if not writes:
+            rows.append(dict(kind="UNDECLARED", **detail))
+        for path in paths:
+            for pattern in writes:
+                if paths_overlap(path, pattern):
+                    rows.append(dict(kind="HELD", path=path, pattern=pattern, **detail))
+    return rows
+
+
+def writes_line(writes):
+    prefix = "    writes: "
+    for count in range(len(writes), -1, -1):
+        suffix = f"…+{len(writes) - count} more" if count < len(writes) else ""
+        line = prefix + ",".join(writes[:count]) + ("," if count and suffix else "") + suffix
+        if len(line) <= 200:
+            return line
+
+
 def render_status(b):
     now = b.now()
     lines = ["BERTH (this workspace as one blade — moorings · leases · capacity)"]
@@ -2453,6 +2502,8 @@ def render_status(b):
         live = "live" if b.is_live(m) else "STALE"
         lines.append(f"  {live:5} {s:<14} {r.get('runtime', '?'):<12} {r.get('model', '?')}@{r.get('lab', '?')}"
                      f"  for {m.get('principal') or '?'}  task={m.get('task') or '-'}  seen {_age(now - m.get('last_seen', now))} ago")
+        if live == "live" and declared_writes(m):
+            lines.append(writes_line(declared_writes(m)))
     leases = b.leases()
     caps = b.capacities
     # Read the other devices once: a resource free here may be held on one of them, and the top
@@ -2698,7 +2749,7 @@ def _main(argv):
     if cmd == "room":
         # Read-only and store-free: capacity is this device's own lines, never a lease.
         return room_main(argv)
-    b = Berth(read_only=True) if cmd == "verify-released" else Berth()
+    b = Berth(read_only=True) if cmd in ("verify-released", "holds") else Berth()
     session = _opt(argv, "--session")
     source = "flag" if session else None
     if cmd == "verify-released":
@@ -2710,6 +2761,26 @@ def _main(argv):
         result = b.verify_released(session, int(generation) if generation else None)
         print(json.dumps(result))
         return 0 if result["released"] else 3
+    if cmd == "holds":
+        as_json = "--json" in argv
+        paths = [p for p in argv if p != "--json"]
+        if not paths or any(p.startswith(("/", "--")) or ".." in p.split("/") for p in paths):
+            print("usage: berth holds PATH [PATH…] [--session S] [--json]", file=sys.stderr)
+            return 2
+        if not session:
+            session = resolve_session_identity().get("session")
+        rows = declared_holds(b, paths, session)
+        if as_json:
+            print(json.dumps(rows))
+        else:
+            for row in rows:
+                detail = (f"{row['session']} ({row['runtime']}, task={row['task']}, "
+                          f"seen {_age(row['age_s'])})")
+                if row["kind"] == "HELD":
+                    print(f"HELD {row['path']} by {detail} writes={row['pattern']}")
+                else:
+                    print(f"UNDECLARED {detail}")
+        return 3 if any(row["kind"] == "HELD" for row in rows) else 0
     if cmd == "status":
         print(render_status(b))
         return 0
@@ -2937,7 +3008,7 @@ def _main(argv):
         ttl = _opt(argv, "--ttl")
         m = b.moor(session, model=_opt(argv, "--model"), lab=_opt(argv, "--lab"), runtime=_opt(argv, "--runtime"),
                    principal=_opt(argv, "--principal"), task=_opt(argv, "--task"),
-                   writes=[w for w in writes.split(",") if w] if writes else None,
+                   writes=[w.strip() for w in writes.split(",") if w.strip()] if writes is not None else None,
                    pid=int(pid) if pid else None,
                    ttl_s=int(ttl) if ttl else None)
         r = m["recipient"]
