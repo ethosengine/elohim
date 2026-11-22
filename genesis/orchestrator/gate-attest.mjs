@@ -101,10 +101,55 @@ export function readCheck(attestation, sha, { ghBin, spawn = spawnSync } = {}) {
     .filter(r => r.name === attestation.check)
     .sort((a, b) => String(b.started_at || '').localeCompare(String(a.started_at || '')));
   if (named.length === 0) return { read: 'ok', status: 'absent', conclusion: 'absent' };
-  return { read: 'ok', status: named[0].status, conclusion: named[0].conclusion };
+  const read = { read: 'ok', status: named[0].status, conclusion: named[0].conclusion };
+  if (read.status !== 'completed') return read;
+  return { ...read, ...newerRun(attestation, sha, named[0].check_suite?.id, { ghBin, spawn }) };
+}
+
+const startedAt = r => Date.parse(r.run_started_at || r.created_at || '') || 0;
+
+/**
+ * The newest named check is only the newest reading if no later run of its workflow is still on
+ * its way: that run's aggregate check does not exist until it concludes, so the check list cannot
+ * show it. brit 02d4654fa73d carried two runs of `ci` on 2026-11-21; the gate read the older run's
+ * green while the push-to-main run was still running, and that run ended red (backlog row 71,
+ * 2026-11-22). Returns the fields to merge into the read: a non-completed status and `waitsOn` when
+ * a newer unfinished run of the same workflow exists, `unchecked` (a reason) when this read cannot
+ * say, nothing otherwise. An unreachable read never refuses; it is named on the line instead.
+ */
+function newerRun(attestation, sha, suiteId, { ghBin, spawn }) {
+  const result = spawn(ghBin, ['api', `repos/${attestation.repo}/actions/runs?head_sha=${sha}&per_page=100`], {
+    encoding: 'utf8',
+    timeout: GH_TIMEOUT_MS,
+  });
+  if (!result || result.status !== 0) {
+    if (result?.error?.code === 'ETIMEDOUT') return { unchecked: `gh timed out after ${GH_TIMEOUT_MS / 1000}s` };
+    const stderr = (result?.stderr || '').trim().split('\n')[0];
+    return { unchecked: stderr || result?.error?.message || 'gh exited non-zero' };
+  }
+  let runs;
+  try {
+    runs = JSON.parse(result.stdout).workflow_runs;
+  } catch {
+    return { unchecked: 'unparsable workflow-runs response' };
+  }
+  if (!Array.isArray(runs)) return { unchecked: 'unparsable workflow-runs response' };
+  const judged = suiteId == null ? null : runs.find(r => r.check_suite_id === suiteId);
+  if (!judged) return { unchecked: 'the judged run is not in the workflow-run list' };
+  const waiting = runs
+    .filter(r => r.workflow_id === judged.workflow_id && r.id !== judged.id && r.status !== 'completed' && startedAt(r) > startedAt(judged))
+    .sort((a, b) => startedAt(b) - startedAt(a))[0];
+  if (!waiting) return {};
+  return { status: waiting.status || 'in_progress', conclusion: null, waitsOn: { name: waiting.name, id: waiting.id, status: waiting.status } };
 }
 
 export function judge(read, attestation, sha) {
+  const verdict = judgeRead(read, attestation, sha);
+  // The second read could not say whether a newer run is coming: the verdict stands, and the line says so.
+  return read.unchecked ? { ...verdict, line: `${verdict.line} (newer runs not checked: ${read.unchecked})` } : verdict;
+}
+
+function judgeRead(read, attestation, sha) {
   const short = sha.slice(0, 12);
   const where = `${attestation.repo}@${short} ${attestation.check}`;
   if (read.read !== 'ok') {
@@ -112,6 +157,10 @@ export function judge(read, attestation, sha) {
   }
   if (read.status === 'absent') {
     return { outcome: 'refuse', tier: 'witnessed', conclusion: 'absent', line: `attested: REFUSED — ${where} has no run at ${short} — a pin without its attestation is not a green pin` };
+  }
+  if (read.waitsOn) {
+    const { name, id, status } = read.waitsOn;
+    return { outcome: 'refuse', tier: 'witnessed', conclusion: 'pending', line: `attested: REFUSED — ${where} not yet concluded at ${short}: a newer run of the same workflow (${name}, run ${id}, ${status}) has not produced this check yet` };
   }
   if (read.status !== 'completed') {
     return { outcome: 'refuse', tier: 'witnessed', conclusion: 'pending', line: `attested: REFUSED — ${where} not yet concluded (${read.status}) at ${short}` };
