@@ -705,10 +705,15 @@ fn a_second_concurrent_fold_is_busy_and_writes_nothing() {
         .unwrap();
     rustix::fs::flock(&lock, rustix::fs::FlockOperation::NonBlockingLockExclusive).unwrap();
 
+    // Busy after a bounded wait for a fork-to-exec window (tens of milliseconds), never after
+    // waiting for the holder.
+    let started = std::time::Instant::now();
     assert!(matches!(
         index::fold(root, &options()).unwrap(),
         FoldRun::Busy
     ));
+    let waited = started.elapsed();
+    assert!(waited < std::time::Duration::from_secs(1), "{waited:?}");
     let out = Command::new(env!("CARGO_BIN_EXE_epr"))
         .args([
             "flow",

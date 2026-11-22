@@ -53,6 +53,18 @@ pub const BUSY: &str = "busy: another fold holds the store";
 
 const STORE_FILE: &str = "fold.sqlite";
 const LOCK_FILE: &str = "fold.lock";
+/// How long a fold keeps asking for a held `fold.lock` before it reports busy. A flock belongs
+/// to the open file description, so a child that another thread of this process forks holds a
+/// copy of the lock's descriptor until its `exec` closes it: for that window a fold that has
+/// already finished still holds the store. A vfork-style spawn closes the window in
+/// microseconds and a fork-based one in a few milliseconds; 50 ms adds several scheduler
+/// timeslices of a loaded host on top. A real fold holds the lock through its listing, hashing
+/// and embedding, far longer, so a genuinely busy store still reports busy and writes nothing,
+/// at most about this much later than before.
+const LOCK_PATIENCE: Duration = Duration::from_millis(50);
+/// The pause between two attempts within [`LOCK_PATIENCE`]: small enough that a released lock
+/// is taken within a couple of milliseconds, large enough that 25 attempts cost nothing.
+const LOCK_RETRY_STEP: Duration = Duration::from_millis(2);
 const ACTOR_LOG_REL: &str = ".eprfs/status/actors.jsonl";
 const CHUNK_RULE_MISMATCH: &str = "chunk rule on disk does not hash to the measure";
 
@@ -534,7 +546,9 @@ fn embedder_for(
     }
 }
 
-/// The exclusive fold lock, or `None` when another fold holds it.
+/// The exclusive fold lock, or `None` when another fold holds it. A lock still held after
+/// [`LOCK_PATIENCE`] is another fold's; one released sooner was a forked child's copy of a
+/// finished fold's descriptor, and is taken.
 fn lock(dir: &Path) -> FlowResult<Option<File>> {
     std::fs::create_dir_all(dir)?;
     let file = OpenOptions::new()
@@ -543,10 +557,18 @@ fn lock(dir: &Path) -> FlowResult<Option<File>> {
         .create(true)
         .truncate(false)
         .open(dir.join(LOCK_FILE))?;
-    match rustix::fs::flock(&file, rustix::fs::FlockOperation::NonBlockingLockExclusive) {
-        Ok(()) => Ok(Some(file)),
-        Err(errno) if errno == rustix::io::Errno::WOULDBLOCK => Ok(None),
-        Err(errno) => Err(FlowError::Io(errno.into())),
+    let deadline = Instant::now() + LOCK_PATIENCE;
+    loop {
+        match rustix::fs::flock(&file, rustix::fs::FlockOperation::NonBlockingLockExclusive) {
+            Ok(()) => return Ok(Some(file)),
+            Err(errno) if errno == rustix::io::Errno::WOULDBLOCK => {
+                if Instant::now() >= deadline {
+                    return Ok(None);
+                }
+                std::thread::sleep(LOCK_RETRY_STEP);
+            }
+            Err(errno) => return Err(FlowError::Io(errno.into())),
+        }
     }
 }
 
@@ -1285,6 +1307,85 @@ pub fn run(args: &[String]) -> FlowResult<ExitCode> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A tree a fixture fold can run in: the contract naming the fixture embedder, the measure
+    /// it pins, and one note. Returns the tree and the fold's store directory.
+    fn foldable() -> (tempfile::TempDir, PathBuf) {
+        // gate-reads: .epr-meta/elohim/algorithms/recall-semantic-index.json
+        let repo = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../..")
+            .canonicalize()
+            .unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        let mut value = crate::flow::memory::recall::tests_support::minimal_contract();
+        value["ceremony"]["providers"]["semantic"]["embedder"] = json!("fixture");
+        let measure = value["ceremony"]["providers"]["semantic"]["measure"]
+            .as_str()
+            .unwrap()
+            .to_string();
+        for (rel, bytes) in [
+            (
+                CONTRACT_REL.to_string(),
+                serde_json::to_vec(&value).unwrap(),
+            ),
+            (measure.clone(), std::fs::read(repo.join(&measure)).unwrap()),
+            (
+                "note.md".to_string(),
+                b"# Stewardship\nThe commons is tended.\n".to_vec(),
+            ),
+        ] {
+            std::fs::create_dir_all(root.join(&rel).parent().unwrap()).unwrap();
+            std::fs::write(root.join(&rel), bytes).unwrap();
+        }
+        let cid = Declared::load(root).unwrap().cid.to_string();
+        let store = store_dir(root, &cid, EmbedderChoice::Fixture);
+        (dir, store)
+    }
+
+    fn fixture_fold() -> FoldOptions {
+        FoldOptions {
+            embedder: EmbedderChoice::Fixture,
+            ..FoldOptions::default()
+        }
+    }
+
+    /// A flock belongs to the open file description, not to the `File` that took it: a copy of
+    /// the descriptor (here `dup`; in production a child forked by another thread, which holds
+    /// its copy until `exec` closes it) keeps the lock after the fold that took it has dropped
+    /// it. A fold arriving in that window waits it out instead of reporting a fold nobody runs.
+    #[test]
+    fn a_lock_outliving_its_fold_in_a_copied_descriptor_is_waited_out() {
+        let (dir, store) = foldable();
+        let root = dir.path();
+        let held = lock(&store).unwrap().expect("no fold holds the store");
+        let copy = held.try_clone().unwrap();
+        drop(held);
+
+        // The copy alone holds the lock: no fold runs, and while it stays open the fold is busy,
+        // having asked for the whole of its patience and not much longer.
+        let started = Instant::now();
+        assert!(matches!(
+            fold(root, &fixture_fold()).unwrap(),
+            FoldRun::Busy
+        ));
+        let waited = started.elapsed();
+        assert!(waited >= LOCK_PATIENCE, "{waited:?}");
+        assert!(waited < LOCK_PATIENCE * 10, "{waited:?}");
+        assert!(!store.join("attestations.jsonl").exists());
+
+        // Closed a moment later, as a forked child's copy closes at its exec.
+        let closer = std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(5));
+            drop(copy);
+        });
+        let run = fold(root, &fixture_fold()).unwrap();
+        closer.join().unwrap();
+        assert!(
+            matches!(run, FoldRun::Done(_)),
+            "a lock released within the fork-to-exec window is not another fold"
+        );
+    }
 
     /// Schema v3 (post-station-4 sprint): a store folded under v2 — rows keyed by `path` in a
     /// `files` table — is not migrated. The next fold takes the rebuild path and names why; the
