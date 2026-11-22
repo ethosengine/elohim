@@ -1028,3 +1028,42 @@ test('--recipe runs another recipe of one project in its gate slot, never throug
     assert.doesNotMatch(refused.stdout, /RAN/);
   }
 });
+
+test('a red run keeps its non-zero status when its same-device green note is kept', t => {
+  const root = mkdtempSync(resolve(tmpdir(), 'gate-kept-green-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const bin = resolve(root, 'brit');
+  writeFileSync(bin, '', { mode: 0o755 });
+  const project = { name: 'fixture', dir: 'fixture', steps: ['build'],
+    manifestPath: 'build-manifest.json', run: { kind: 'just', recipe: 'gate' } };
+  const agentId = 'ab'.repeat(32);
+  let key, puts = 0, output = '';
+  const spawn = (command, args) => {
+    const ok = stdout => ({ status: 0, stdout, stderr: '' });
+    if (args[0] === 'rev-parse') return ok('a'.repeat(40));
+    if (args[0] === 'show') return ok(JSON.stringify({ steps: { build: { inputs: { sources: ['fixture/**'] } } } }));
+    if (args[0] === 'status' || args[0] === 'ls-tree') return ok('');
+    if (args[1] === 'fingerprint') return ok(JSON.stringify({ fingerprints: [{ step: 'build', fingerprint: 'fp' }] }));
+    if (args[3] === 'find') { key = args[args.indexOf('--inputs-hash') + 1]; return ok('[]'); }
+    if (args[3] === 'get') return ok(JSON.stringify({ inputsHash: key, success: true, agentId, stepName: 'gate:fixture' }));
+    if (args[2] === 'signer') return ok(JSON.stringify({ agentId }));
+    if (args[3] === 'put') { puts++; return ok('written'); }
+    return { status: 7, stdout: '', stderr: '' };
+  };
+  const status = runProject(project, false, false, { root, spawn,
+    env: { PATH: '', BRIT_BIN: bin, BRIT_BUILD_REF_BIN: bin, GATE_TASK: 'off',
+      GATE_EVIDENCE: 'off', GATE_INPUTS: 'off', GATE_RECIPE_KEY: 'off' },
+    write: line => { output += line; }, warn: line => { output += line; } });
+  assert.equal(status, 7);
+  assert.equal(puts, 0);
+  assert.match(output, /kept green for closure .*this run was red/);
+  assert.doesNotMatch(output, /evidence: recorded/);
+});
+
+test('ark CLI and workspace lock are eprfs gate-owned inputs, not pipeline dispatch sources', () => {
+  const manifest = JSON.parse(readFileSync(resolve(ROOT, 'elohim/eprfs/build-manifest.json'), 'utf8'));
+  for (const path of ['elohim/ark/cli/**', 'elohim/Cargo.lock']) {
+    assert.ok(manifest.gate.projects.eprfs.inputs.sources.includes(path));
+    assert.ok(!manifest.steps['rust-build-test'].inputs.sources.includes(path));
+  }
+});

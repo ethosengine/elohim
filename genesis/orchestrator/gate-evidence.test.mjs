@@ -2067,3 +2067,28 @@ test('a named run is decided from its written result, through runProject', async
     if (saved === undefined) delete process.env.TMPDIR; else process.env.TMPDIR = saved;
   }
 });
+
+for (const [name, stored, success, kept] of [
+  ['same green survives red', { inputsHash: 'closure', success: true }, false, true],
+  ['different green is replaced by red', { inputsHash: 'other', success: true }, false, false],
+  ['red without green is recorded', null, false, false],
+  ['green always replaces', { inputsHash: 'closure', success: true }, true, false],
+  ['green replaces red', { inputsHash: 'closure', success: false }, true, false],
+  ['foreign green is not preserved as this device evidence', { inputsHash: 'closure', success: true, agentId: 'cd'.repeat(32) }, false, false],
+  ['existing red is replaced', { inputsHash: 'closure', success: false }, false, false],
+]) test(`recordEvidence: ${name}`, () => {
+  const warnings = [];
+  const agentId = 'ab'.repeat(32);
+  const fake = fakeSpawn([
+    [isGet, stored ? { status: 0, stdout: JSON.stringify({ agentId, ...stored, stepName: attestationStep(project) }), stderr: '' } : getMiss],
+    [isSigner, { status: 0, stdout: JSON.stringify({ agentId }) }],
+    [isPut, { status: 0, stdout: 'recorded' }],
+  ]);
+  const result = recordEvidence(project, 'closure', { success, seconds: 1, commit: 'abc',
+    buildRefBin: '/x/brit-build-ref', root: '/repo', dirty: false, spawn: fake.spawn,
+    warn: line => warnings.push(line) });
+  assert.equal(result.status, 0);
+  assert.equal(result.keptGreen === true, kept);
+  assert.equal(fake.calls.filter(c => isPut(c.bin, c.args)).length, kept ? 0 : 1);
+  if (kept) assert.deepEqual(warnings, ['[gate] elohim-storage evidence: kept green for closure closure; this run was red for the same closure (a flake: the red stays in this run log and cycle row, and the stored green stands)\n']);
+});

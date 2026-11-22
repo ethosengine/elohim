@@ -254,7 +254,10 @@ describe('gate-tap sibling notes', () => {
   // a stall in inbox discovery means say is never reached, so it tests nothing about say).
   function setup(t, { sleepS = 0, saySleepS = 0, exit = 0, notes = [SUB], withBerth = true } = {}) {
     const dir = mkdtempSync(resolve(tmpdir(), 'gate-tap-sib-'));
-    t.after(() => rmSync(dir, { recursive: true, force: true }));
+    // runTap and follow use spawnSync, so their children and pipes have closed here.
+    // The sibling sender is detached by gate-live inside that child: this process has
+    // no ChildProcess handle to await. Its bounded delivery can still append a receipt.
+    t.after(() => rmSync(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 }));
     writeFileSync(resolve(dir, 'notes.json'), JSON.stringify(notes));
     const bin = resolve(dir, 'berth-stub');
     writeFileSync(bin, `#!/bin/bash\n${sleepS ? `sleep ${sleepS}\n` : ''}if [ "$1" = say ]; then ${saySleepS ? `sleep ${saySleepS}; ` : ''}printf '%s\\n' "$*" >> "${dir}/says.log"; else cat "${dir}/notes.json"; fi\nexit ${exit}\n`, { mode: 0o755 });

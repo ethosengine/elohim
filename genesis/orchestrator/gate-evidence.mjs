@@ -759,6 +759,15 @@ export function recordEvidence(project, key, { success, seconds, cost, commit, b
   }
   const ref = attestationRef(project);
   const existing = readBuildNote(attestationStep(project), commit, { buildRefBin, root, spawn });
+  if (success === false && existing.state === 'verified'
+      && existing.node.success === true && existing.node.inputsHash === key
+      && typeof existing.node.agentId === 'string'
+      && existing.node.agentId === selfAgentId(root, spawn, { env, buildRefBin })) {
+    warn(`[gate] ${project.name} evidence: kept green for closure ${key.slice(0, 12)}; this run was red for the same closure (a flake: the red stays in this run log and cycle row, and the stored green stands)\n`);
+    // No separate observation is emitted: a measure for it is not declared. The runner still
+    // records this run's red cycle and its live verdict, which is where the flake is counted.
+    return { status: 0, stdout: '', stderr: '', keptGreen: true };
+  }
   // The warn names the commit brit read, not the caller's rev (`HEAD` under `just gate`): the
   // unverifiable line carries brit's resolved sha; the other two resolve it here.
   const sha = existing.state === 'unverifiable' ? existing.commit : resolvedCommit(root, commit, spawn);

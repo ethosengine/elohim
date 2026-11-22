@@ -879,8 +879,8 @@ export function runProject(project, printOnly, namesOnly, {
     const note = put.status === 0
       ? `recorded ${String(put.stdout || '').trim().slice(0, 16)}…`
       : `not recorded (${String(put.stderr || '').trim().split('\n').pop() || `exit ${put.status}`})`;
-    write(`[gate] ${project.name} evidence: ${note}\n`);
-    if (put.status === 0) {
+    if (!put.keptGreen) write(`[gate] ${project.name} evidence: ${note}\n`);
+    if (put.status === 0 && !put.keptGreen) {
       evidenceCid = String(put.stdout || '').trim().split('\n').pop() || null;
       emitGateVerdict(project, evidence.key, {
         success: status === 0, seconds, commit: gateCommit, put, root, env, spawn, warn,

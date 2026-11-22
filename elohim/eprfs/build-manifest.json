@@ -64,6 +64,9 @@
       "eprfs": {
         "dir": "elohim/eprfs",
         "steps": ["rust-build-test"],
+        "inputs": {
+          "sources": ["elohim/ark/cli/**", "elohim/Cargo.lock"]
+        },
         "run": {
           "kind": "root-just",
           "recipe": "_gate-eprfs",
