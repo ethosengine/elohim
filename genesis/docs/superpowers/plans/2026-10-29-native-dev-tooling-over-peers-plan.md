@@ -553,7 +553,7 @@ and a new terminal on shem starts without one.
 One station found while reading the open work against the steward's market picture (2026-11-21,
 §9):
 
-- [ ] **F4-probe — one landing where another seat or another device pays one long gate with no new wire kind, and the lander reuses its verdict** (serves sprint-lands-each-closure-once)
+- [x] **F4-probe — one landing where another seat or another device pays one long gate with no new wire kind, and the lander reuses its verdict** (serves sprint-lands-each-closure-once)
 
 This runs F4's promise once with what already crosses, before the carry is built, so that the
 next station is named by a failure and not by a plan, as F3-probe does for F3. It has two rungs.
@@ -564,9 +564,18 @@ push and says so with a `berth say` note; a device whose own guard lines admit i
 in a clean checkout at that commit; its green crosses as `gate-verdict@1`. Nobody is assigned:
 whether a device takes the gate is its own answer.
 
-State: neither rung has run. The push hook runs gates one after another and asks for a sibling's
-verdict once, when a gate starts, without waiting (`genesis/orchestrator/gate-runner.mjs`
-`decideReuse`). A push that touches a governance path refuses every sibling green. The second rung
+State, 2026-11-22: both rungs have run. First rung: landing 13 (`9dbfbac2d`) carried
+`elohim-storage` on this device's second seat beside the loop (1,384 s; thirteen gates summing
+3,653 s in a gate phase of 2,311 s; guards under their lines). Second rung: landing 15
+(`005649870`), where the sibling device ran `just gate eprfs` for the lander's commit (802 s,
+green) and the lander's log printed `eprfs reused: green in 802 s on the sibling …
+independence: sibling`; that gate cost the lander 32 s. Receipts: the sprint journal and arrival
+backlog rows 73 (delta 2) and 76. What the second rung named is the next station below: the ask
+waited 7 h 38 min behind a stalled exchange that told neither session.
+
+State before the rungs ran, kept for the record: the push hook runs gates one after another and
+asks for a sibling's verdict once, when a gate starts, without waiting
+(`genesis/orchestrator/gate-runner.mjs` `decideReuse`). A push that touches a governance path refuses every sibling green. The second rung
 travels through the forge, so it does not pass the design's §0 test. The first rung waits on
 arrival backlog row 64: the build hook admits one build where the policy offers two seats.
 
@@ -575,6 +584,63 @@ under their soft lines, and its total against the serial figure; then a landing 
 `independence: sibling` for a gate another device ran for that landing's commit. Either way the
 journal carries the seconds saved or the first blocker, and the blocker is appended here as a
 station.
+
+One station named by the second rung of F4-probe (2026-11-22):
+
+- [ ] **F4-ask — the ask to carry a gate is a record both devices read, raised before the gates, with a bound** (serves sprint-lands-each-closure-once)
+
+The second rung carried its ask as `berth say` notes. A note reaches a session, and only while
+the exchange under it moves; when that stopped for more than nine hours, the sender's line said
+"note sent" and the waiter's said nothing. Two lines now tell each side
+(`genesis/agentic/bin/berth`: a `say` to a silent device, a `--follow` when a device goes silent).
+That is a stopgap. The station is the arrival backlog's row 9, step 2: the hand-over is a landing
+intent carrying the head, the closure keys and the misses, which a device reads from its own fold
+whether or not a session is at its inbox, and which names the time after which its asker stops
+waiting and runs the gate itself.
+
+State: not started. Read in the code on 2026-11-22 (a map with its line references is kept in the
+sprint's campaign directory, `f4-ask-map.md`):
+
+| What the station needs | What exists | What is missing |
+|---|---|---|
+| A record raised before the gates | `epr flow intend`'s `raise` writes one, on the device only; the crossing `intent` event is written by `verified`, after the gates | a crossing form of the raise |
+| The head, the closure keys, the misses | the intent atom carries tree, base and closure keys; the hook's hand-over step already computes, per selected gate, whether this device holds a verdict for the head | the commit, the ref it is reachable at, and the misses, on the record |
+| A device reads it from its own fold | `epr peer intents` | it shows no misses; nothing tells a waiting session that one arrived |
+| The verdict comes back | `gate-verdict@1` crosses; the lander asks for a sibling's verdict at each gate's own start | nothing |
+| The objects reach the second device | the forge, through a `self/<name>` push | a path that is not the forge (F3's concern, not this station's) |
+
+A first slice that adds one crossing kind and no claim (my reading of what the probe asks, to be
+ruled on before it is built):
+
+1. **The hand-over posts the misses.** A push to `self/<name>` already runs only the seconds checks
+   and records, per gate, the verdicts this device holds for the head. The same step raises the
+   landing intent and writes one crossing event on it, of kind `misses`, in `dev-landing@1`:
+   the commit, the ref, and `<project>=<closure key>` for each gate with no reusable verdict. The
+   hook stays a thin caller of `epr flow intend`.
+2. **A miss settles by fold, never by a clock.** It is open until an admitted device's verdict for
+   that project and closure is folded, or the intent is landed, withdrawn, dismissed or superseded.
+   No time crosses that a second device must agree with. What a requester expects a gate to cost
+   (its own p90) rides along as a display figure, so a device can judge whether it would finish
+   in time to matter.
+3. **The requester waits for nothing.** A push to dev runs its loop as today, cheapest gate first,
+   and asks for a sibling's verdict at each gate's start, as it already does. What a sibling
+   finished by then is reused; what it did not, the lander runs. Tests 1 and 2 of §9 hold by
+   construction: the ask reserves nothing, and the requester can always run alone.
+4. **A device takes a miss by its own answer.** `epr peer intents` lists open misses; a `--follow`
+   on the inbox says when one arrives, as it now says when a device goes silent. Whether to run
+   the gate is the device's own decision from its own lines (`berth room cargo`). Nobody is
+   assigned, and at this slice a session decides, not a daemon.
+
+What this slice does not have, and the next one needs: the `carry` claim. Without it two idle
+devices can both run one miss, and the lander cannot skip a gate it has not yet seen a verdict
+for. S3a's rule (wait `confirm_wait_s` for a `carry` claim, else run alone) is that slice.
+
+Cost to land the first slice: `epr-cli` and the crossing allow-list change, both on the list of
+paths that refuse a sibling's verdict, so that landing reuses none; no crate CI reads as an Edge
+input is touched.
+
+Verify: one landing where the hand-over push posts the misses, a second device's log shows it took
+one from `epr peer intents` with no note sent, and the lander's log shows the reuse line for it.
 
 ## 9. Reconciliation 2026-11-21: the market reading
 

@@ -2481,10 +2481,10 @@ habits:
       - "node --test genesis/orchestrator/gate-attest.test.mjs genesis/orchestrator/gate-oracle.test.mjs (the four outcomes, latest-run-wins, reads-the-pin-not-the-checkout, depth one)"
       - "epr flow note observations on pin-attestation@1 exist for every pin-moving push (GATE_ORACLE and the attested dispatch are live in gate-runner.mjs)"
     evidence: >
-      DELTA 2026-11-21 (RED preserved; brit 0.3.0 pin): the gitlink moves 1db7a95519 (brit-v0.2.6) -> 4eb2e8cc0b (brit-v0.3.0: the gitoxide upstream integration, sprint 3's twelve lanes and four sprint-3 queue lanes). Upstream evidence read before the move: brit main CI run 44847379696 on 4eb2e8cc0b, `Tests pass` success and "Publish brit crates to Nexus" success (non-gating reds: advisories, size, the deferred tests@linux-arm leg); release qualification run 44839064593 success. The worktree gate before the commit read the committed pin (`attested: ethosengine/brit@1db7a955197b Tests pass success`, "worktree dirty — the committed pin is what is read"); the pre-push of the pin commit is the read of 4eb2e8cc0b. Evidence: genesis/local-dev/release-20261120/ (integrate-gate.log, push logs); backlog brit-0-3-0-release-findings-2026-11-20.
-    evidence-fingerprint: sha256:c1bd843690fdfa1f
-    evidence-bytes: 7640
-    evidence-entries: 11
+      DELTA 2026-11-22 (RED preserved; the gate no longer passes on the older of two runs): `gate-attest.mjs` makes a second read when the newest named check is complete, the commit's workflow runs, and refuses as pending while a later run of the same workflow, or a re-run of the judged run, has not completed (`54e9dbe93`, `56a5786d3`, `18f8c5514`; arrival backlog row 71 and its delta). It exists because landing 13's brit gate read `Tests pass success` from a release-branch run while the push-to-main run of the same workflow was still running, and that run ended red. An unreachable or malformed second read never refuses: the first verdict stands and the line says newer runs were not checked. Both reads share one 60 s budget under the bin store's 75 s bound. Stated limit, pinned by a test: a completed run's conclusion is not read, so a full re-run cancelled before the named check leaves an earlier green standing. `node --test genesis/orchestrator/gate-attest.test.mjs`: 51 of 51; one live read of brit `02d4654fa73d` returned `completed`, `success`.
+    evidence-fingerprint: sha256:e5b25a98426ee274
+    evidence-bytes: 8698
+    evidence-entries: 12
     guard: >
       Regression risks: (1) a matcher that special-cases gitlinks instead of the manifest
       listing the pin path — both oracles must agree by declaration, not by code;
@@ -2579,12 +2579,10 @@ habits:
       - "node --test genesis/orchestrator/suite-list.test.mjs (the orchestrator suite list holds every test file once; the named half's view holds what its key hashes and its environment is constructed)"
       - "a2o genesis/a2o/features/devflow/native-gate-evidence.feature reuse rule (this workspace's own green stands in; a red or an unadmitted signer never does)"
     evidence: >
-      DELTA 2026-11-22 (status unchanged; the shadow's first real lines, and a cost a second device found): against a brit that has `--inputs` (the built 0.3.1 binary named by `BRIT_BIN`, not installed), the shadow says an `elohim/eprfs/Jenkinsfile` edit would not run eprfs or eprfs-live-corpus under the sources class, an `elohim/holochain/Jenkinsfile` edit would not run doorway, elohim-sdk, elohim-storage or genesis, and a `pnpm-lock.yaml` bump would wrongly skip the two parked TypeScript gates. The sibling device, running both orchestrator gates at `9dbfbac2d` with that brit, saw the shadow spend its 10 s budget on a head equal to its base; it now does no brit work unless a step's own `buildProcess` file changed in the range (`1b0f5190a`). Arrival backlog row 42, deltas 6 and 7. Not measured: any of this on an installed brit.
-
-      CORRECTION 2026-11-22 (to the heading of DELTA 2026-11-21b): that heading says two gate manifests were corrected. They were found wrong and the correction was parked for a deliberate Edge roll, as the line's own text and arrival backlog row 42 delta 5 say; on dev the five entries are still `buildProcess`, held in the contract test's exact parked list.
-    evidence-fingerprint: sha256:5870fe45ef1c8193
-    evidence-bytes: 33877
-    evidence-entries: 34
+      DELTA 2026-11-22b (status unchanged; the two gates that run the eprfs workspace's tests run them at four threads): the eprfs gate in landing 15 (`005649870`), behind the lock fix a second device asked for (arrival backlog row 73); `memory-ceremony` in `5f74946ad` (row 60, delta 2). Measured: the eprfs workspace's tests about 1,620 to 1,730 s at one thread on shem (2,110 s for the whole gate in landing 12) against 578 to 669 s at four, and 802 s for the whole gate from a cold slot on the sibling; `memory-ceremony`'s two test legs 243 s at one thread in landing 15 against 81 s at four (the whole gate 588 s against 323 s, the second run with a warm build). On landing 15 itself the eprfs gate did not run on shem: the sibling's verdict was reused in 32 s. Both caps are declared on the gate projects' own manifests and `pool-policy.json` names no project. The first run on the second device had been red at four threads (a lock released by closing outlives its holder while a forked child has a copy); ten clean runs on shem had not shown it. The complete lock fix touches a crate CI reads as an Edge build input and waits for a roll (row 75).
+    evidence-fingerprint: sha256:cf2c5cb9c378b1a4
+    evidence-bytes: 35027
+    evidence-entries: 35
     guard: >
       Regression risks: (1) reusing on a key that omits something the recipe reads — the recipe
       body, the project tree, a submodule pin, a repo file a test include_str!s; the input audit
@@ -2677,10 +2675,10 @@ habits:
       - "node --test genesis/orchestrator/gate-landing-base.test.mjs (device-DID tiebreak, cap of 4: unobservable in the one-DID fixture)"
       - "over >= 10 pushes, from the device's flow store dev-landing@1 rows and berth's hold fold: hold p50/p90 vs 233/3,321 s; Σ regated_s on landed_as=moved vs Σ gate seconds saved on landed_as=ff; chain_len p90; duplicate gated closures = 0, duplicate claims = 0, >= 2 intents per Jenkins wave (unwired until S6)"
     evidence: >
-      DELTA 2026-11-22 (RED preserved, inactive; the first carried gate): landing 13 (`9dbfbac2d`) was pushed with `GATE_CARRY=on`. Of thirteen selected gates the carrier admitted one, `elohim-storage`, and ran it on this device's second seat beside the loop: 1,384 s, collected 39 s after the loop ended, so thirteen gates summing to 3,653 s finished in 2,311 s (about 1,340 s saved). Both guards stayed under their lines through the overlap (memory at most 28%, host I/O pressure at most 6.75% against 10%, no pause). One landing, a warm target, one qualifying gate: `GATE_CARRY` stays in shadow by default and each carried landing is recorded in arrival backlog row 64. A carried gate here is the same step a sibling device would carry; no intent has yet crossed before a gate ran.
-    evidence-fingerprint: sha256:db03da5a8a1c7598
-    evidence-bytes: 57796
-    evidence-entries: 43
+      DELTA 2026-11-22b (RED preserved, inactive; the probe's second rung, and what it cost): landing 15 (`005649870`) is the first landing where another device paid a long gate for the lander's commit. The commit was made reachable with a `self/` branch push (53 s, seconds checks only) and said with three notes; the sibling's own lines admitted `just gate eprfs` and it ran green in 802 s from a cold slot; the verdict crossed as `gate-verdict@1`; the lander's push printed `eprfs reused: green in 802 s on the sibling … independence: sibling` and paid 32 s for that gate of twelve (1,289 s in all). The cost that mattered was not in the ladder's design: the exchange between the devices was stalled both ways for more than nine hours, nothing told either session, and the ask waited 7 h 38 min (arrival backlog rows 73 delta 2 and 76). Changed for that (`77494ea95`, `dce9d4e5e`): `berth say` names an addressee whose device is silent, and a `--follow` says when a device with a moored session stops exchanging. Owed and named by the probe: an ask over the channel carries a bound (it becomes a landing intent raised before the gates, row 9 step 2; peers plan station F4-ask); the lander comes back for a verdict that was not there when its gate started; a carrier keeps one warm slot for carried gates. Peers plan station F4-probe is met on both rungs.
+    evidence-fingerprint: sha256:f49d95e4e61aea5c
+    evidence-bytes: 59151
+    evidence-entries: 44
     refs:
       - "spec: genesis/docs/superpowers/specs/2026-10-27-steward-space-landing-plane-design.md (§2 Arm A slices A0-A13; §3 this habit and the WIP fence)"
       - "upstream of: genesis/orchestrator/.epr-meta/push-delivers-within-budget.habit.md (active red; A9/A10 move its measured ratio)"

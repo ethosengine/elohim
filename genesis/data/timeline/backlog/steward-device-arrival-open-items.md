@@ -2248,3 +2248,235 @@ deploy step for the change, and a second fleet roll is the steward's to time.
 
 The input-class shadow cannot be turned on before the second item lands. The local branches
 named here exist on shem only; they are pushed as hand-over branches when a roll is planned.
+
+## Row 73, delta 2 (2026-11-22): the third hand-over was green on the second device, and four threads landed
+
+The split of the delta above was handed over as `self/shem-eprfs-threads4-c` (`005649870`: the
+fold and the language-server lock unlock on drop, then four threads on the eprfs device gate).
+An independent review of the lock commit said ship.
+
+On the sibling device, a genuine `just gate eprfs` at that commit in a fresh worktree with a cold
+pool slot: green, 802 s by the gate's own line (151 test binaries, 2,701 tests, none failed), no
+guard pause. Then thirty runs each at four threads of the three fast binaries nearest the lock
+sites:
+
+| Binary | Runs green | Tests per run | Seconds for the thirty |
+|---|---|---|---|
+| `device-runtime` lib | 30 of 30 | 238 | 459 |
+| `device-runtime` `tests/envelope.rs` | 30 of 30 | 20 | 60 |
+| `epr-cli` lib | 30 of 30 | 705 (1 ignored) | 109 |
+
+The two `device-runtime` binaries hold the sites this commit leaves unfixed (row 74). Ninety
+clean runs on the device that showed the first failure bound the residual there; they do not
+remove it, and the complete fix still waits for a roll (row 75).
+
+The condition set before the run was a green gate and clean `device-runtime` counts on the second
+device. It was met at 13:08Z and the push of landing 15 started at 13:09:24Z. It was on dev at
+13:32:25Z (`005649870`): twelve gates, 1,289 s in the hook.
+
+The lander's log reads `[gate] eprfs reused: green in 802 s on the sibling at 005649870 (signer
+sibling did:key:z6MkpZRh…VMZB, independence: sibling)` and `eprfs: PASSED (32s)`. That is the
+first landing here whose long gate another device paid for at the lander's own commit.
+
+What the second rung of the probe showed about the ladder (row 9), by what it cost:
+
+| Step | What happened | Seconds |
+|---|---|---|
+| Make the commit reachable | `brit push` to a `self/` branch: seconds checks, no project gate | 53 |
+| Say so | three `berth say` notes | under 5 to send; 7 h 38 min to arrive (row 76) |
+| A device admits the gate | its own answer, from its own seat and guard lines; nobody was assigned | 0 |
+| The gate runs there | fresh worktree, cold slot | 802 |
+| The verdict crosses | `gate-verdict@1`, acknowledged by the lander's device | not timed; heads were folding within 22 s |
+| The lander reads it | at its own gate's start: a miss in its own store, then the sibling's green for the same closure | 32 |
+
+The cost that mattered was the second row. An ask that travels as notes has no bound and, until
+this landing, no word to its sender when the exchange under it has stopped. The next rung of the
+ladder (the hand-over as a landing intent both devices read, raised before the gates, carrying
+head, closure keys and misses) puts the ask where a device can see it without a session reading
+its inbox; it should carry a bound when it does.
+
+Also read from that push: the longest gate was not eprfs. `memory-ceremony` took 588 s of the
+1,289 (row 60, delta 2).
+
+## Row 60, delta 2 (2026-11-22): the second gate that runs these tests takes the same caps
+
+`memory-ceremony` runs fourteen integration-test binaries of the eprfs workspace (a subset of
+what the eprfs gate runs), then a Python hook suite, a lens audit and two cucumber profiles. It
+took its caps from `pool-policy.json`: one build job, one test thread. In landing 15 it was the
+longest gate, 588 s, on a push whose eprfs gate cost 32 s:
+
+| Leg | Seconds at one thread (landing 15) | Seconds at four (one run on shem, warm build) |
+|---|---|---|
+| build of `epr` and `bin-launch`, then the test binaries | 120 | 2 (already built) |
+| two `cargo test` legs, fourteen binaries | 243 | 81 |
+| Python hook suite, 210 tests | 146 | 147 |
+| lens audit and two cucumber profiles | 66 | 58 |
+| whole gate | 588 | 323 |
+
+The build legs are not comparable: landing 15 rebuilt `epr` after a source change and the second
+run found it built. What the caps changed is the test legs, 243 s to 81 s.
+
+Changed in `5f74946ad`: the gate declares `CARGO_BUILD_JOBS=6` and `RUST_TEST_THREADS=4`
+on its own manifest project, as the eprfs gate does, and `pool-policy.json` loses both
+per-project overrides (eprfs's was shadowed by its manifest since `e432b3662`). A cap now has one
+home, the gate project it caps. The evidence for four threads on these binaries is the eprfs
+gate's (row 73, delta 2): they ran at four threads inside the whole-workspace runs on both
+devices after the fold's lock fix.
+
+What is left in this gate is not Rust. The Python hook suite runs its 210 tests one after
+another, and the gate records no verdict that could be reused (it has gate-only inputs and no
+step fingerprint), so every landing that touches the memory flow pays it whole.
+
+## Row 71, delta (2026-11-22): the pin gate waits for a newer run, and says what it does not read
+
+Changed in `54e9dbe93`, `56a5786d3` and `18f8c5514` (written by a second model
+from a brief, read twice by an independent reviewer, fixed after each reading).
+
+When the newest named check on the pinned commit is complete, the gate now makes a second read,
+the commit's workflow runs, and refuses as pending when a newer reading is on its way: another
+run of the same workflow that started later and has not completed, or the judged run itself
+being re-run. The refusal names the run. On 2026-11-21 that would have refused the brit pin
+until the push-to-main run ended, and that run ended red.
+
+What it will not do:
+
+- **Refuse on uncertainty.** A failed, timed-out or malformed second read, a run it cannot place,
+  a status word it does not know: the first read's verdict stands and the printed line says newer
+  runs were not checked and why. This is the gate's standing rule for an unreachable read.
+- **Outlast its caller.** The bin store calls the same judge with a 75 s bound, so the two reads
+  share one 60 s budget and the second gets at most 15 s of it.
+- **Second-guess a completed run.** When the judged run is complete its conclusion is not read:
+  the newest named check stays the newest reading even if it started before the run's last
+  attempt. A re-run of only the failed jobs legitimately leaves an earlier green in place, and
+  telling that from a full re-run cancelled before the check ran needs the run's job list. The
+  reviewer wanted that closed; it is left as a stated limit with a test that pins it.
+
+Not covered: a commit with more than a hundred workflow runs (the judged run may fall off the
+page, which reads as "not checked"), and the bin store's own cache of a green it read earlier.
+
+## Row 75, delta (2026-11-22): three of the five items are now written
+
+Items 3, 4 and 5 of the table above are written and parked together on the local branch
+`wallclock/fold-unlock`, head `25408ecd7` (dev `98d805381` plus four commits): the shared lock
+guard in `device-runtime`, the session envelope's holder and probe, the fold, the recall
+`Execution`, the arrival worker and the arrival probe on it, and the installer's refusal that
+says which attempt ran out of its bound and names the command that resumes. An independent
+review read it through `d68ff3e1d` and asked for two fixes; `25408ecd7` makes them and has not
+itself been re-read. At roll time: rebase onto dev, replace the fold's private guard (landed in
+`5a3dab35e`) with the shared one, re-read the last commit, then land with the roll.
+
+## Row 76 — an exchange stalled both ways for more than nine hours, and the sender read it as an idle session
+
+2026-11-22. The steward channel between shem and the sibling device stopped carrying records in
+both directions at about 03:08Z (the sibling's reading) and resumed when the steward restarted the
+peer daemon on the sibling at about 12:51Z. Nothing on either device said so while it lasted.
+
+What sat in it, from berth's own ledgers: eight notes from shem (03:30Z to 05:05Z), among them
+the second and third hand-overs of the four-thread change and the ask to gate them; two notes
+from the sibling (04:33Z and 06:04Z), each asking which commit to gate. Every `berth say` printed
+`note #N at <time> to <session>` and exited 0. Shem read the missing replies as a session with
+no tool call to deliver its notes at, said so to the steward, and waited. Landing 15 was reviewed
+and ready at 05:07Z; the sibling's gate at its commit started at 12:45Z, on a relayed message
+from the steward. The wait was 7 h 38 min, and the cause was read wrongly for all of it.
+
+What would have shown it, and was not read: `berth status` marks a device SILENT when its last
+head is older than `freshness_s` (90 s), and `just status device` carries a `sibling exchange`
+line. Neither is printed to a session that is only sending notes and waiting for an answer.
+
+Changed in this landing, on both sides of a wait:
+
+- The sender (`77494ea95`): `berth say --to <session>` prints a second line when the addressee
+  is moored on a device past that threshold, read from the view the note's own write already
+  fetches. The note is still recorded and still crosses when the exchange resumes.
+- The waiter (`dce9d4e5e`): `berth inbox --follow` reads the lease view once a minute and prints
+  `[berth] device <did> is SILENT: ...` when a device with a moored session stops exchanging,
+  and `... is exchanging again` when it resumes. A session that is only waiting hears of a
+  stalled exchange within about two and a half minutes.
+
+Not known, and owed:
+
+| Owed | Why |
+|---|---|
+| Why the exchange stalled | The sibling's daemon process was alive, and restarting it cured the stall. No cause was found. |
+| A stall in one direction | Both lines read when a sibling's head was last folded here. Whether the sibling has folded this device's head is in `epr peer status` (`acks ours to seq N`) and is not read by berth. |
+| One note that crossed and was not delivered | Shem's 03:03Z note was in the sibling's inbox, and neither its note hook nor two thirty-minute `--reader main --follow` windows printed it; the sibling found it with `berth inbox --all --peek` at 04:33Z. Reported by the sibling; not reproduced. |
+| An ask over the channel has no bound | The steering plan's second test says a claim is bounded and expires. A note that asks for a gate carries no time after which the asker stops waiting and reads the exchange. Until hand-overs are landing intents (row 9, step 2), the bound is the asker's own habit. |
+
+## Row 77 — a roster row published on dev admits nobody until each daemon's own checkout carries it
+
+2026-11-22, handed over by the steward's laptop session through the sibling device, in the
+story-graph shape it arrived in.
+
+Chain: device arrival, to sibling exchange. Between "the roster row is published on origin/dev"
+and "a sibling admits the device". Missing node: "the admitting daemon's roster source carries
+the row". Probe: on each sibling, `epr peer status` names the new device with a folded head, and
+no checkout was switched by hand to get there.
+
+Current state. The peer daemon reads admission from the roster file in its own `--root` working
+tree (`epr-cli/src/actor.rs` `roster_file`: `<root>/.eprfs/status/participants/<handle>.jsonl`;
+`epr-cli/src/peer.rs` "read from the roster in this checkout"). Read in the code on shem. So a
+row reaches a daemon only when that checkout's branch carries it:
+
+| Device | Daemon root | Carries the laptop's row |
+|---|---|---|
+| shem | the main checkout, on dev | after the row lands on dev and the checkout is fast-forwarded |
+| sibling (ethosengine) | its main checkout, on a memory-ceremony branch (as it reports) | no; the branch has four rows and not this one |
+| laptop | its own checkout, with the rows committed locally (as it reports) | yes |
+
+Not verified: whether a running daemon re-reads the roster or reads it once at start.
+
+Cure candidates, as handed over: read the roster from the published ref (origin/dev, or a
+declared roster ref) and not from whatever branch the root happens to be on; or have
+`just status device` and `epr peer status` say which branch the roster source is on and which
+device it lacks that origin/dev has. The second is the cheaper first step and makes the gap
+visible on the device that has it.
+
+## Row 77, delta (2026-11-22): what the gap cost the laptop's first landing, and what admission will cost the others
+
+Relayed by the sibling from the laptop's session, about its first push to dev (eight commits,
+gates all clear in 71 s). At the last step the hook's claim of `dev-integration` was refused,
+`unconfirmed: did:key:z6Mkm5de…bowj`: the laptop had folded no head of shem, because no daemon
+that could send it one has the laptop on its roster. The landing agent wrote its one-device
+override (`--offline-ok`) and waited for it to take effect, 649 s. During that wait the forge
+closed the push's SSH connection; that host drops an idle connection at about seven minutes. Its
+session then pushed the same gated commits again without the hook.
+
+Two things follow, and the second is not about the laptop:
+
+| Finding | Why it matters |
+|---|---|
+| The override's wait (lease ttl plus skew plus margin, up to 660 s) is longer than an idle SSH connection lives on that host | On such a host the wait cannot succeed inside one push: the gates are paid and the transfer is lost. Every landing from it will hit this while any device it lists is silent. |
+| An admitted device that is silent costs every other device's landing the same wait | Row 61 met it once, 561 s, when the sibling's sessions had closed for the night. A laptop is silent whenever its lid is closed. Once its row is in the other daemons' roster sources, a landing on shem or the sibling waits about 650 s at the lease step for as long as the laptop sleeps. |
+
+The steering plan's second test is that a claim is bounded and expires and the requester can
+always run alone. Here the bound exists and is ten minutes, paid after the gates, to guard a
+window the forge already guards (a push to dev is a fast-forward or it is refused). What the wait
+should be for a device that has gone quiet, and whether a device nobody has ever heard from
+counts at all, is a design question for the steward (the settlement fence of
+`2026-10-27-steward-space-landing-plane-design.md`). Not changed here. Shem's daemon reads its
+roster from its main checkout on dev, so the laptop's row reaches it with the next fast-forward
+of that checkout.
+
+## Row 78 — a stop test read a killed child as surviving, once, on the second device
+
+2026-11-22. The sibling ran the orchestrator gates at landing 16's code in a fresh worktree as a
+second-device check. `orchestrator` passed in 65 s. `orchestrator-tree` failed after 371 s on one
+test of `genesis/orchestrator/compute-worker-supervisor.test.mjs`, "rendered supervisor retries
+failures, releases the lock and cleans children on SIGINT": `surviving child <pid>`. Its SIGTERM
+twin passed beside it, neither file is in the landing, and the same gate had passed there twice
+at landing 13's commit. Ten reruns of the unchanged file alone on that device were ten of ten green: it showed once in eleven runs, and only under the whole tree suite's load.
+
+Read in the code: the rendered supervisor (`scripts/render-compute-worker.mjs`) ends an attempt
+with a SIGKILL to the attempt's process group and then waits only for the entrypoint it started.
+A descendant that ignored TERM and INT dies from that signal a moment later, and nothing in the
+supervisor waits to see it gone. The test read `/proc/<pid>/stat` the instant the supervisor
+exited.
+
+Changed (`77e9a64fd`): the test gives each pid up to one second to be gone. Its claim is
+unchanged: no child survives a stop.
+
+Owed, for the supervisor's owner: the supervisor confirms its group is empty (bounded) before it
+retries or exits. The script's own comment says descendants may keep the worker's lock; a retry
+that starts while a killed descendant still holds it would meet a held lock and count as a
+failed attempt. No committed manifest enables the worker today, so the script is rendered into
+nothing that is deployed.

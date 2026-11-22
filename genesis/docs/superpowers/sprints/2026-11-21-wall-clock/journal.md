@@ -927,3 +927,42 @@ This landing carries the shadow's two fixes and these records. It does not carry
 
 Not landed: four threads. It is on the handed-over branch behind the lock fix and waits for
 the sibling's gate.
+
+### 05:10Z to 14:30Z: a stalled exchange, the probe's second rung, and landings 15 and 16
+
+- **The exchange between the two devices was stalled from about 03:08Z to 12:51Z** (arrival
+  backlog row 76). Eight notes from shem and two from the sibling sat in it. Shem read the
+  silence as an idle session; the sibling was awake and asking which commit to gate. Landing 15
+  was ready at 05:07Z and its gate on the sibling started at 12:45Z, after the steward relayed
+  the night's report and restarted the sibling's peer daemon.
+- **The sibling's gate at the handed-over commit: green in 802 s** from a cold slot, and thirty
+  of thirty on each of three fast binaries at four threads (row 73, delta 2).
+- **Landing 15** (`005649870`, on dev 13:32:25Z): the fold and language-server lock fix, four
+  threads on the eprfs device gate, and the records through 05:10Z. Twelve gates, 1,289 s in the
+  hook. `eprfs` printed `reused: green in 802 s on the sibling … independence: sibling` and cost
+  32 s. The longest gate was `memory-ceremony`, 588 s at one thread.
+- **Fallback recorded:** both pushes used Git under the standing landing exception
+  (`GATE_EVIDENCE=reuse git push origin HEAD:dev`), with `GATE_CARRY=on` by hand. In landing 15
+  the carrier admitted nothing: its one candidate shares a cargo target with a gate in the loop.
+- **Jenkins on landing 14** (`98d805381`): orchestrator #2411 green, no pipeline dispatched; the
+  eprfs pipeline's last run then (#209, on landing 13's commit) green in 1,106 s.
+- **The laptop is arriving as a third device.** Its session reached shem by relay through the
+  sibling, asked which paths were in shem's write set before landing its branch, agreed an order
+  for the lane, and handed over one node for the arrival backlog (row 77): a roster row published
+  on dev admits nobody until each daemon's own checkout carries it.
+- **Landing 16** carries what the day asked for:
+  - two lines for a stalled exchange (`77494ea95`, `dce9d4e5e`): `berth say` names an
+    addressee whose device is silent, and a `--follow` says when a device with a moored session
+    stops exchanging and when it resumes;
+  - `memory-ceremony` at four threads with its caps on its own manifest, and no per-project cap
+    left in `pool-policy.json` (`5f74946ad`; row 60, delta 2): its two test legs went from 243 s to 81 s on shem, and the whole gate ran green in 291 s on the sibling;
+  - the pin gate waits for a newer run of the same workflow (`54e9dbe93`, `56a5786d3`,
+    `18f8c5514`; row 71, delta);
+  - a stop test that read a killed child as surviving, once, on the sibling's check of this
+    landing's code, gets a bounded wait (`77e9a64fd`; row 78).
+- **The laptop's first landing** met the lease step's wait for a device it had never heard from:
+  649 s, longer than its host keeps an idle SSH connection (row 77, delta). The same wait will
+  apply to every landing on the other devices once a device that sleeps is on their rosters.
+
+Not done: the brit follow-up release is with the steward's laptop session. The roll queue is
+unchanged in what it waits for (row 75, delta).
