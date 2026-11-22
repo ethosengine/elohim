@@ -2162,3 +2162,89 @@ within milliseconds (in work), then four threads again on top, handed over a sec
 
 Also seen: the ten-run bar on one device was not enough to find a failure of this rate. A gate
 change that alters concurrency wants its runs on two devices before it is called met.
+
+## Row 73, delta (2026-11-22): the cure went through two forms, and the right one cannot all land without a roll
+
+The first cure retried the fold's lock for 50 ms before reporting busy (`18b72ec48`, handed over
+a second time as `self/shem-eprfs-threads4-b`). A review (Codex astra,
+`astra-fold-lock-review.receipt.md` in the sprint's campaign directory) confirmed the mechanism
+and rejected the cure: a slow or stopped child can outlast any patience, a fold that finishes
+during the patience lets a contender in, and the new test raced a helper thread. It named the
+right one, already used by the bin store and the session envelope's lifecycle guards: an
+explicit `LOCK_UN` releases the shared description's lock at once, whatever copies remain. That
+commit will not land.
+
+The second form is an owner guard that unlocks on drop, with tests that take the lock,
+duplicate the descriptor, release, and retake while the copy is still open: red on dev's code,
+green after, with no sleep and no time ceiling. Built complete (`8b6168dea`, local branch
+`wallclock/fold-unlock`: one shared guard in `device-runtime`, the session envelope's holder
+and probe, the fold, the language-server lock), it is refused by the fleet-roll check, because
+CI reads `device-runtime` as an Edge build input.
+
+So it is split. Landing here (`cd17dec25`): the fold, through a private copy of the guard in
+its own crate, and the language-server lock. Parked for the next deliberate Edge roll: the
+shared guard and the envelope sites, after which the private copy is replaced by the shared
+one. Measured on shem at four threads on the split: the two changed crates' unit tests 20 of 20
+each, the whole workspace green in 662 s, and the two `device-runtime` test binaries that stay
+unfixed 40 of 40 each. That last figure bounds the residual on one device and does not remove
+it.
+
+Four threads is on this branch behind the fix and lands only after the sibling device's gate at
+the handed-over commit is green.
+
+## Row 74 — six lock sites answer "held" at once, and a forked child of another thread can make that answer wrong
+
+Found 2026-11-22 by the first F4 probe (row 73) and confirmed two ways on shem: a `flock` taken
+through a duplicated descriptor stays held after the original is dropped, and a child forked
+with a delayed `exec` held a finished fold's lock until its `exec`. A `flock` belongs to the
+open file description; a forked child has a copy until `exec`, close-on-exec or not.
+
+A first cure for the fold retried the lock for 50 ms before reporting busy. A review found the
+better one, already used by the bin store and the session envelope: an explicit `LOCK_UN`
+releases the shared description's lock at once, whatever copies remain, where a release by
+`close` waits for the last copy. The fold now unlocks on drop. The same shape remains at six sites in the eprfs workspace, each of which
+takes a non-blocking lock once and reports the answer as final:
+
+| Site | What it reports when the lock is held |
+|---|---|
+| `epr-lsp/src/socket.rs` `ServeLock::try_acquire` | another server is serving |
+| `epr-cli/src/flow/memory/recall/mod.rs` | another packet is executing |
+| `epr-cli/src/device/arrival_work.rs` | arrival work is in progress |
+| `epr-cli/src/session_envelope.rs` `Store::try_lock` | the store is in use |
+| `device-runtime/src/envelope.rs` (a momentary probe) | a holder is live |
+| `epr-cli/src/device/arrival.rs` (a momentary probe) | arrival is live |
+
+Five other sites already retry to a deadline, each with its own numbers (5 x 20 ms, 20 x 25 ms,
+and three more), and three block. So the workspace has eleven hand-written answers to one
+question. Owed: one lock guard that unlocks explicitly on drop, used by all of them, with a patience only
+where real contention is expected; until then, any of the six can turn a four-thread test run red at a low rate, or skip
+work in a multi-threaded process that spawns. `device-runtime` and `epr-lsp` are not published
+crates either; the change needs no version bump but does need the eprfs gate.
+
+## Row 42, delta 9 (2026-11-22): the shadow on an installed brit, and one cold answer
+
+brit 0.3.1 is installed on both devices (the sibling in 2.1 s, shem in seconds once a clean
+checkout sat on a commit published on dev; each reused the binary it had built). On shem's
+installed brit the shadow prints its selection line for a pipeline-file change as it did
+against the uninstalled binary. One observation for the list of what `on` needs: the first
+capability probe after this session switched binaries answered "unavailable" once, and every
+later probe answered correctly (0.05 s warm). The likely cause, not confirmed, is a first launch
+after a switch that outlasts the probe's two-second bound. In shadow it is one missing line. For
+`on` it is another reason a capability that changes within a push must refuse, not downgrade.
+
+## Row 75 — what is ready, or owed, and waits for a deliberate Edge roll
+
+Kept in one place because the queue grew through 2026-11-21 and 22 and each item was parked by
+the same seconds check, run by hand before any gate: CI would select an Edge build and its
+deploy step for the change, and a second fleet roll is the steward's to time.
+
+| Item | State | Where |
+|---|---|---|
+| Six Jenkinsfile guards (a build refuses before it requests a pod) | written, parked | row 63 |
+| Two gate-only manifests list a lockfile as `buildProcess` | written, parked: commit `324dcb4e6` on local branch `wallclock/process-inputs`, plus deleting `PARKED` in `pipeline-registry.test.mjs` | row 42, delta 5 |
+| One shared lock guard in `device-runtime`, and the session envelope's two sites | written, parked: commit `8b6168dea` on local branch `wallclock/fold-unlock`; then the fold's private copy is replaced | row 73, delta |
+| The installer says which build attempt ran out of time, and that a retry resumes | owed | row 70 |
+| The remaining lock sites take the shared guard | owed | row 74 |
+
+The input-class shadow cannot be turned on before the second item lands. The local branches
+named here exist on shem only; they are pushed as hand-over branches when a roll is planned.

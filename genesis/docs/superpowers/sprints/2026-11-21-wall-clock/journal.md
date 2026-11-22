@@ -909,3 +909,21 @@ runs of the workspace's tests beside a running build) is under way on the landed
 - **The shadow's cost was stated too strongly and is now bounded as stated** (row 42, delta 8).
 
 This landing carries the shadow's two fixes and these records. It does not carry four threads.
+
+### 03:00Z to 05:10Z: landing 14, brit installed, and a lock fix in three forms
+
+- **Landing 14** (03:01Z, `98d805381`): the shadow's two fixes and the night's records. Four
+  gates, 486 s. The main checkout was fast-forwarded with brit this time (no pin moved).
+- **brit 0.3.1 installed on shem** from the landing worktree once it sat on a published commit;
+  this session was switched to it. The shadow prints real lines here (arrival backlog row 42,
+  delta 9).
+- **The fold's lock**, in three forms in two hours (row 73, delta): a 50 ms retry, rejected on
+  review; an owner guard that unlocks on drop, complete and correct and refused by the
+  fleet-roll check because it touches `device-runtime`; and the split that lands here, the fold
+  and the language-server lock, with the shared guard parked for a roll.
+- **The roll queue** has five items and is now one row (row 75).
+- **The sibling device** has been silent since 02:44Z. Notes reach a session only at its next
+  tool call, and its inbox watch lasts thirty minutes; the steward has a line to wake it.
+
+Not landed: four threads. It is on the handed-over branch behind the lock fix and waits for
+the sibling's gate.
