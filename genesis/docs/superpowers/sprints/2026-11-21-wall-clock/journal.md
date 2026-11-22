@@ -966,3 +966,16 @@ the sibling's gate.
 
 Not done: the brit follow-up release is with the steward's laptop session. The roll queue is
 unchanged in what it waits for (row 75, delta).
+
+### 14:25Z to 14:50Z: landing 16, Jenkins, and a note that was marked read and never shown
+
+- **Landing 16** (`6934782dc`, on dev 14:24:45Z, on the laptop's `2b2a67c6f`): eight gates, 656 s
+  in the hook; the lease step took 7 s. Git under the standing landing exception, as before. The
+  second device had gated its code first: both orchestrator gates, memory-ceremony at four
+  threads (291 s there) and the berth suite.
+- **Jenkins:** landing 15, orchestrator #2413 green, dispatching the eprfs pipeline only (#210,
+  green in 1,102 s); the laptop's landing, #2414 green, nothing dispatched; landing 16, #2415
+  green, nothing dispatched. No Edge build in any of them.
+- **The laptop is on shem's roster and silent** (arrival backlog row 77, delta 2).
+- **A note was acknowledged and never shown,** for the second time in a day (row 76, delta). The
+  note hook now acknowledges on a receipt read from the transcript (`813a72bd7`, `b543db5ce`, `33d1cd198`, `954afb0bd`).

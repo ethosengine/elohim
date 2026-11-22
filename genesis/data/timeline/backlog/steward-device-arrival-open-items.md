@@ -2480,3 +2480,48 @@ retries or exits. The script's own comment says descendants may keep the worker'
 that starts while a killed descendant still holds it would meet a held lock and count as a
 failed attempt. No committed manifest enables the worker today, so the script is rendered into
 nothing that is deployed.
+
+## Row 76, delta (2026-11-22): the note that crossed and was not delivered happened again, and why
+
+One owed item of row 76 was a note that crossed and was not delivered, reported by the sibling
+and not reproduced. It was reproduced on shem the same day. A relay note folded at 13:38:50Z ("it holds the landing lane
+now … please hold") never reached the session it was addressed to: `berth inbox --reader main
+--peek` showed nothing unread for the hook's reader, and the session's transcript holds no hook
+record carrying it. The session learned of it fifteen minutes later by reading the whole inbox,
+after it had sent a note that contradicted it.
+
+On shem a four-thread cargo test run was loading the device at that minute (the memory-ceremony
+measurement, 13:36Z to 13:41Z). What the sibling was running when its note was dropped at about
+03:03Z is not recorded here.
+
+Read in the hook (`.claude/hooks/berth-note-inject.py`): it claims the notes, writes them to its
+standard output, and acknowledges the claim at once. Writing is not delivery. The harness stops a
+hook at three seconds and drops what it wrote, and the hook's own budget is two seconds after the
+interpreter has started, which a loaded device can stretch past three. Whether that is what
+dropped these notes is not proven. What is proven is that the hook's promise, "a timeout or a failure on
+the way loses nothing", did not hold.
+
+Changed (`813a72bd7`, `b543db5ce`, `33d1cd198`, `954afb0bd`): the hook prints a short receipt with the notes and acknowledges the claim
+at its next call, only when the session's transcript shows that receipt (a subagent's receipt is
+read from its own transcript). If the receipt is not there after a grace of 20 s, the claim is left
+to expire and the notes are shown again, marked as a repeat; each further miss doubles the grace up
+to fifteen minutes, and no count ever causes an acknowledge. Delivery with a transcript is now at
+least once: a note can be shown twice and is not lost by the hook. With no transcript to read, it
+acknowledges on the write as before and can still lose one, and its header now says so. Written
+by a second model from a brief and read twice by an independent reviewer.
+
+Still owed from row 76: why the exchange stalled; a stall in one direction; a bound on an ask.
+
+## Row 77, delta 2 (2026-11-22): the row reached shem's daemon, and the device status still reads "arrived and exchanging"
+
+After landing 16 shem's main checkout was fast-forwarded past the laptop's roster row. The
+running daemon re-read its roster without a restart: `epr peer status` listed
+`did:key:z6MkgHju…xMbu  no head folded yet` at 14:29Z, and still did at 14:33Z. So the question
+row 77 left open is answered on this device (a running daemon reads the roster again), and the
+laptop is admitted here and has never been heard from.
+
+`just status device` at the same minute: `ok sibling exchange` (it names the one device that is
+exchanging) and `next step: nothing owed; this device is arrived and exchanging`. It says nothing
+of an admitted device with no head, though every landing from this device now waits for that
+device at the lease step (delta above). Owed: the status names each admitted device it has never
+heard from, and says what that costs a landing.
