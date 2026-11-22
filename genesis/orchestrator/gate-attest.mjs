@@ -76,10 +76,11 @@ export function worktreeDirty(root, dir, { spawn = spawnSync, env = process.env 
   return result?.status === 0 && (result.stdout || '').trim().length > 0;
 }
 
-export function readCheck(attestation, sha, { ghBin, spawn = spawnSync } = {}) {
+export function readCheck(attestation, sha, { ghBin, spawn = spawnSync, now = Date.now } = {}) {
   if (!ghBin) return { read: 'failed', reason: 'gh not found' };
   // Filter by name on the server: a busy commit carries more check runs than one page holds (brit's
   // main tip had 132 on 2026-10-24), and a named run past the first page would read as absent.
+  const began = now();
   const query = `check_name=${encodeURIComponent(attestation.check)}&per_page=100`;
   const result = spawn(ghBin, ['api', `repos/${attestation.repo}/commits/${sha}/check-runs?${query}`], {
     encoding: 'utf8',
@@ -103,27 +104,42 @@ export function readCheck(attestation, sha, { ghBin, spawn = spawnSync } = {}) {
   if (named.length === 0) return { read: 'ok', status: 'absent', conclusion: 'absent' };
   const read = { read: 'ok', status: named[0].status, conclusion: named[0].conclusion };
   if (read.status !== 'completed') return read;
-  return { ...read, ...newerRun(attestation, sha, named[0].check_suite?.id, { ghBin, spawn }) };
+  // One budget for both reads (the bin store bounds this whole process at 75 s): the second gets what is left of 60 s, at most 15 s.
+  const timeout = Math.min(SECOND_READ_MAX_MS, GH_TIMEOUT_MS - (now() - began));
+  return { ...read, ...newerRun(attestation, sha, named[0].check_suite?.id, { ghBin, spawn, timeout }) };
 }
 
-const startedAt = r => Date.parse(r.run_started_at || r.created_at || '') || 0;
+/** The second read's share of the first read's budget: the bin store kills this process at 75 s, so both reads fit one 60 s. */
+export const SECOND_READ_MAX_MS = 15_000;
+
+const idOf = v => (typeof v === 'string' && v !== '') || (typeof v === 'number' && Number.isFinite(v)) ? String(v) : null;
+const startOf = r => {
+  for (const v of [r.run_started_at, r.created_at]) {
+    const t = typeof v === 'string' ? Date.parse(v) : NaN;
+    if (Number.isFinite(t)) return t;
+  }
+  return null;
+};
 
 /**
  * The newest named check is only the newest reading if no later run of its workflow is still on
  * its way: that run's aggregate check does not exist until it concludes, so the check list cannot
  * show it. brit 02d4654fa73d carried two runs of `ci` on 2026-11-21; the gate read the older run's
  * green while the push-to-main run was still running, and that run ended red (backlog row 71,
- * 2026-11-22). Returns the fields to merge into the read: a non-completed status and `waitsOn` when
- * a newer unfinished run of the same workflow exists, `unchecked` (a reason) when this read cannot
- * say, nothing otherwise. An unreachable read never refuses; it is named on the line instead.
+ * 2026-11-22). A re-run keeps its run id and suite and yields a new check only when it finishes, so
+ * the judged run itself not being completed also means the check read belongs to an older attempt.
+ * Returns the fields to merge into the read: a non-completed status and `waitsOn` when such a run
+ * exists, `unchecked` (a reason) when this read cannot say, nothing otherwise. Anything uncertain
+ * fails open: an unreachable or malformed read never refuses; it is named on the line instead.
  */
-function newerRun(attestation, sha, suiteId, { ghBin, spawn }) {
+function newerRun(attestation, sha, suiteId, { ghBin, spawn, timeout }) {
+  if (timeout <= 0) return { unchecked: 'the time budget was spent' };
   const result = spawn(ghBin, ['api', `repos/${attestation.repo}/actions/runs?head_sha=${sha}&per_page=100`], {
     encoding: 'utf8',
-    timeout: GH_TIMEOUT_MS,
+    timeout,
   });
   if (!result || result.status !== 0) {
-    if (result?.error?.code === 'ETIMEDOUT') return { unchecked: `gh timed out after ${GH_TIMEOUT_MS / 1000}s` };
+    if (result?.error?.code === 'ETIMEDOUT') return { unchecked: `gh timed out after ${timeout / 1000}s` };
     const stderr = (result?.stderr || '').trim().split('\n')[0];
     return { unchecked: stderr || result?.error?.message || 'gh exited non-zero' };
   }
@@ -133,14 +149,27 @@ function newerRun(attestation, sha, suiteId, { ghBin, spawn }) {
   } catch {
     return { unchecked: 'unparsable workflow-runs response' };
   }
-  if (!Array.isArray(runs)) return { unchecked: 'unparsable workflow-runs response' };
-  const judged = suiteId == null ? null : runs.find(r => r.check_suite_id === suiteId);
+  if (!Array.isArray(runs) || runs.some(r => !r || typeof r !== 'object')) return { unchecked: 'unparsable workflow-runs response' };
+  const suite = idOf(suiteId);
+  const judged = suite === null ? null : runs.find(r => idOf(r.check_suite_id) === suite);
   if (!judged) return { unchecked: 'the judged run is not in the workflow-run list' };
-  const waiting = runs
-    .filter(r => r.workflow_id === judged.workflow_id && r.id !== judged.id && r.status !== 'completed' && startedAt(r) > startedAt(judged))
-    .sort((a, b) => startedAt(b) - startedAt(a))[0];
-  if (!waiting) return {};
-  return { status: waiting.status || 'in_progress', conclusion: null, waitsOn: { name: waiting.name, id: waiting.id, status: waiting.status } };
+  const workflow = idOf(judged.workflow_id);
+  const judgedStart = startOf(judged);
+  if (workflow === null || judgedStart === null || typeof judged.status !== 'string') {
+    return { unchecked: 'the judged run lacks a workflow id, status or start time' };
+  }
+  const waitsOn = r => ({ status: r.status, conclusion: null, waitsOn: { name: r.name, id: r.id, status: r.status } });
+  if (judged.status !== 'completed') return { ...waitsOn(judged), waitsOn: { ...waitsOn(judged).waitsOn, rerun: true } };
+  let unreadable = false;
+  const waiting = [];
+  for (const r of runs) {
+    if (r === judged || idOf(r.workflow_id) !== workflow) continue;
+    const start = startOf(r);
+    if (typeof r.status !== 'string' || start === null) { unreadable = true; continue; }
+    if (r.status !== 'completed' && start > judgedStart) waiting.push({ r, start });
+  }
+  if (waiting.length > 0) return waitsOn(waiting.sort((a, b) => b.start - a.start)[0].r);
+  return unreadable ? { unchecked: 'a run of the same workflow could not be read, so newer runs were not fully checked' } : {};
 }
 
 export function judge(read, attestation, sha) {
@@ -159,8 +188,9 @@ function judgeRead(read, attestation, sha) {
     return { outcome: 'refuse', tier: 'witnessed', conclusion: 'absent', line: `attested: REFUSED — ${where} has no run at ${short} — a pin without its attestation is not a green pin` };
   }
   if (read.waitsOn) {
-    const { name, id, status } = read.waitsOn;
-    return { outcome: 'refuse', tier: 'witnessed', conclusion: 'pending', line: `attested: REFUSED — ${where} not yet concluded at ${short}: a newer run of the same workflow (${name}, run ${id}, ${status}) has not produced this check yet` };
+    const { name, id, status, rerun } = read.waitsOn;
+    const what = rerun ? 'a re-run of the same run' : 'a newer run of the same workflow';
+    return { outcome: 'refuse', tier: 'witnessed', conclusion: 'pending', line: `attested: REFUSED — ${where} not yet concluded at ${short}: ${what} (${name}, run ${id}, ${status}) has not produced this check yet` };
   }
   if (read.status !== 'completed') {
     return { outcome: 'refuse', tier: 'witnessed', conclusion: 'pending', line: `attested: REFUSED — ${where} not yet concluded (${read.status}) at ${short}` };
