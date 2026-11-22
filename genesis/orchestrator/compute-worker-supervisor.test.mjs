@@ -151,8 +151,22 @@ fi
         Date.now() - stoppedAt < 1500,
         "termination must not wait for backoff or child exit",
       );
+      // The supervisor's last act on an attempt is a SIGKILL to its process group, and it waits
+      // only for the entrypoint, so a killed descendant can still be read as running for a moment
+      // after the supervisor has exited. What is owed is that none survives: each gets a bounded
+      // moment to be gone. Read at once, this was one red in a second device's gate on 2026-11-22
+      // (backlog steward-device-arrival-open-items row 78, which also names what the supervisor
+      // itself does not yet confirm).
+      const gone = async (pid) => {
+        const until = Date.now() + 1000;
+        while (await running(pid)) {
+          if (Date.now() > until) return false;
+          await sleep(10);
+        }
+        return true;
+      };
       for (const pid of [...attempts, ...children])
-        assert.equal(await running(pid), false, `surviving child ${pid}`);
+        assert.equal(await gone(pid), true, `surviving child ${pid}`);
       const lock = spawn("flock", [
         "-n",
         join(repoRoot, "worker.lock"),
