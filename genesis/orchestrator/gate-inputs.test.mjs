@@ -450,15 +450,20 @@ function commitFiles(repo, files, message) {
   return git(repo, ['rev-parse', 'HEAD']);
 }
 
+// Two borrowed steps: `s` lists p/Jenkinsfile as its own buildProcess, `t` lists p/t.Jenkinsfile.
 const gateProject = {
-  name: 'fixture-gate', dir: 'p', pipeline: 'fixture', steps: ['s'], manifestPath: 'p/build-manifest.json',
+  name: 'fixture-gate', dir: 'p', pipeline: 'fixture', steps: ['s', 't'], manifestPath: 'p/build-manifest.json',
   run: { kind: 'just', recipe: 'gate' },
 };
 const manifestText = extra => JSON.stringify({
   pipeline: 'fixture',
-  steps: { s: { inputs: { sources: ['p/**'], buildProcess: ['p/Jenkinsfile'] }, depends: [], ...extra } },
-  gate: { projects: { 'fixture-gate': { dir: 'p', steps: ['s'], run: { kind: 'just', recipe: 'gate' } } } },
+  steps: {
+    s: { inputs: { sources: ['p/**'], buildProcess: ['p/Jenkinsfile'] }, depends: [], ...extra },
+    t: { inputs: { sources: ['p/t/**'], buildProcess: ['p/t.Jenkinsfile'] }, depends: [] },
+  },
+  gate: { projects: { 'fixture-gate': { dir: 'p', steps: ['s', 't'], run: { kind: 'just', recipe: 'gate' } } } },
 });
+const JENKINSFILE_CHANGE = { 'p/Jenkinsfile': 'pipeline two\n' };
 
 /**
  * dev at a base commit, HEAD on a feature branch one commit later: by default an empty commit (a
@@ -510,8 +515,9 @@ function world(t, { help = CAPABLE_HELP, refuseFingerprint = false, rows = new M
       const flag = args.includes('--inputs') ? args[args.indexOf('--inputs') + 1] : null;
       if (flag && refuseFingerprint) return { status: 2, stdout: '', stderr: CLAP_REFUSAL };
       const commit = args[args.indexOf('--commit') + 1];
-      const fingerprint = `bafy-${flag || 'legacy'}-${fingerprintAt(flag, commit)}`;
-      return { status: 0, stdout: JSON.stringify({ fingerprints: [{ step: 's', fingerprint }] }), stderr: '' };
+      const step = args[args.indexOf('--step') + 1];
+      const fingerprint = `bafy-${step}-${flag || 'legacy'}-${fingerprintAt(flag, commit)}`;
+      return { status: 0, stdout: JSON.stringify({ fingerprints: [{ step, fingerprint }] }), stderr: '' };
     }
     if (bin === brit && args[0] === 'build' && args[1] === 'affected') {
       // The planner over the fixture's one manifest, legacy or classified as asked.
@@ -564,7 +570,7 @@ const green = (commit, extra = {}) => ({ commit, attestation: { success: true, a
 
 for (const reuse of [false, true]) {
   test(`GATE_INPUTS=shadow and off decide, record and time identically (${reuse ? 'a reused green' : 'a run that records'})`, async function shadow_equals_off(t) {
-    const { repo, base, head } = gateRepo(t, { reuse });
+    const { repo, base, head } = gateRepo(t, { reuse, headFiles: JENKINSFILE_CHANGE });
     // The step's legacy fingerprint moved since the base and its sources one did not.
     const fingerprintAt = (flag, commit) => (flag ? 'same' : commit === base ? 'old' : 'new');
     const rows = new Map();
@@ -575,7 +581,8 @@ for (const reuse of [false, true]) {
         // The legacy key this world computes at HEAD holds this workspace's green from the base.
         const probe = world(t, { fingerprintAt });
         await runGate(t, probe, repo, 'off');
-        rows.set(probe.recorded.find(([kind]) => kind === 'find')[1], [green(base)]);
+        // At HEAD: a green from the base would be refused, rightly, since p/Jenkinsfile selects this gate.
+        rows.set(probe.recorded.find(([kind]) => kind === 'find')[1], [green(head)]);
       }
       const run = await runGate(t, w, repo, mode);
       outcomes[mode] = {
@@ -608,7 +615,7 @@ for (const reuse of [false, true]) {
 }
 
 test('a fingerprint call that refuses the flag in shadow ends the shadow and changes nothing', async function shadow_fingerprint_refusal(t) {
-  const { repo } = gateRepo(t, { reuse: false });
+  const { repo } = gateRepo(t, { reuse: false, headFiles: JENKINSFILE_CHANGE });
   const off = world(t);
   const refused = world(t, { refuseFingerprint: true });
   const a = await runGate(t, off, repo, 'off');
@@ -616,4 +623,70 @@ test('a fingerprint call that refuses the flag in shadow ends the shadow and cha
   assert.equal(b.status, a.status);
   assert.deepEqual(refused.recorded.filter(([kind]) => kind !== 'find'), off.recorded.filter(([kind]) => kind !== 'find'));
   assert.deepEqual(b.lines.filter(l => l.includes('inputs (shadow)')), [`[gate] inputs (shadow): brit refused --inputs (fingerprint of s failed: Usage: brit build fingerprint [OPTIONS] <MANIFEST>); no further inputs lines this run`]);
+});
+
+describe('the shadow is free unless a step\'s own buildProcess file changed', () => {
+  // Shadow's brit spawns: every brit call but the probe's `--help`, beyond the ones the off run makes.
+  const britCalls = w => w.calls.filter(c => c.startsWith(`${w.brit} `) && !c.endsWith('--help')).map(c => c.slice(w.brit.length + 1));
+  const compare = async (t, repo) => {
+    const off = world(t);
+    await runGate(t, off, repo, 'off');
+    const shadow = world(t);
+    const run = await runGate(t, shadow, repo, undefined);
+    const extra = britCalls(shadow).filter(c => !britCalls(off).includes(c));
+    return { extra, lines: run.lines.filter(l => l.includes('inputs (shadow)')), offCalls: britCalls(off), shadowCalls: britCalls(shadow) };
+  };
+
+  test('no brit spawn, no line, when the base is the gated commit', async function shadow_free_on_unchanged_head(t) {
+    const { repo } = gateRepo(t, { headFiles: JENKINSFILE_CHANGE });
+    git(repo, ['update-ref', 'refs/heads/dev', 'HEAD']);
+    const { extra, lines, offCalls, shadowCalls } = await compare(t, repo);
+    assert.deepEqual(extra, []);
+    assert.deepEqual(shadowCalls, offCalls);
+    assert.deepEqual(lines, []);
+  });
+
+  test('no brit spawn, no line, when the range changes no borrowed step\'s buildProcess file', async function shadow_free_without_process_change(t) {
+    const { repo } = gateRepo(t, { headFiles: { 'p/x.txt': 'x two\n', 'outside.txt': 'two\n' } });
+    const { extra, lines, offCalls, shadowCalls } = await compare(t, repo);
+    assert.deepEqual(extra, []);
+    assert.deepEqual(shadowCalls, offCalls);
+    assert.deepEqual(lines, []);
+  });
+
+  test('when one is changed, only the touched step is fingerprinted, three times', async function shadow_fingerprints_only_touched_steps(t) {
+    const { repo, base } = gateRepo(t, { headFiles: JENKINSFILE_CHANGE });
+    const off = world(t, { fingerprintAt: (flag, commit) => (flag ? 'same' : commit === base ? 'old' : 'new') });
+    await runGate(t, off, repo, 'off');
+    const shadow = world(t, { fingerprintAt: (flag, commit) => (flag ? 'same' : commit === base ? 'old' : 'new') });
+    const run = await runGate(t, shadow, repo, undefined);
+    const extra = britCalls(shadow).slice(britCalls(off).length);
+    assert.deepEqual(britCalls(shadow).slice(0, britCalls(off).length), britCalls(off), 'the evidence\'s own calls are today\'s');
+    assert.equal(extra.length, 3);
+    assert.ok(extra.every(c => c.includes('--step s ')), extra.join('\n'));
+    assert.deepEqual(run.lines.filter(l => l.includes('inputs (shadow)')),
+      [`[gate] fixture-gate inputs (shadow): since ${base.slice(0, 9)} the step fingerprints moved under all (s) and are unchanged under sources`]);
+  });
+
+  test('selection asks the second planner call only for a change to some step\'s buildProcess file', async function selection_free_without_process_change(t) {
+    const { projectsForChanges } = await import('./gate-runner.mjs');
+    const root = selectionRoot(t);
+    const { brit } = fakeBrit(t);
+    const ask = files => {
+      clearGateInputsCache();
+      const calls = [];
+      const lines = [];
+      projectsForChanges(root, files, { env: { BRIT_BIN: brit, PATH }, spawn: plannerSpawn(CAPABLE_HELP, {}, calls), log: () => {}, inputsLog: l => lines.push(l) });
+      return { affected: calls.filter(c => c.startsWith('build affected --repo')), lines };
+    };
+    const source = ask(['p/src/a.rs']);
+    assert.equal(source.affected.length, 1, 'only the decision\'s own call');
+    assert.ok(!source.affected[0].includes('--inputs'));
+    assert.deepEqual(source.lines, []);
+    // A step a gate does not borrow counts too: its upstream reason could reach a borrowed dependent.
+    const image = ask(['scripts/ci/image.sh']);
+    assert.equal(image.affected.length, 2);
+    const pipeline = ask(['p/Jenkinsfile']);
+    assert.deepEqual(pipeline.lines, ['[gate] inputs (shadow): all selects and sources would not: fixture:build; gates sources would not run: borrowed']);
+  });
 });

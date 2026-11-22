@@ -29,11 +29,16 @@
 //           which borrowed steps `all` selects and `sources` would not, and per gate when, since the
 //           integration base, the step fingerprints moved under all and are unchanged under sources.
 //           That line speaks of step fingerprints only: the manifest, the recipe, the project tree
-//           and the audited reads are the rest of a gate's key, and it does not compare them. Its
-//           work, the capability probe included, runs under one absolute deadline per process
-//           (SHADOW_BUDGET): every subprocess it starts gets min(remaining, per-call cap) and SIGKILL
-//           at it. A call that fails for want of the flag ends shadow's printing for the process with
-//           one line.
+//           and the audited reads are the rest of a gate's key, and it does not compare them.
+//           Both lines can only be non-empty when a changed path is a step's OWN buildProcess file
+//           (the two classes differ by exactly those files), so that is decided first, from the
+//           change set and a cached `git diff --name-only` of the range, with no brit spawn. Only a
+//           gate whose borrowed step's buildProcess file changed fingerprints, and only those steps.
+//           The work, the capability probe included, runs inside a per-process budget of the
+//           shadow's own elapsed time (SHADOW_BUDGET, summed over its calls, so a gate running
+//           between two calls spends none of it): every subprocess gets min(what remains, per-call
+//           cap) and SIGKILL at it. A call that fails for want of the flag ends shadow's printing for
+//           the process with one line.
 // Capability is `brit build affected --help` and `brit build fingerprint --help` both naming
 // `--inputs` and `sources`, probed once per resolved brit executable (realpath, device, inode, size,
 // mtime), each probe at most PROBE_TIMEOUT_MS and killed at it. Under pre-push the hook runs
@@ -43,16 +48,18 @@
 // per process when it does not. A failed or unknown probe prints `[gate] inputs: --inputs unavailable;
 // selection and keys use legacy all` (without the probe's cause) once per push or per process, and
 // shadow prints nothing else.
-// Worst case, in subprocess time a push can add for N gate processes (synchronous JS between
-// spawns is not preempted and is not counted): the resolve step's two probes, 4 s; selection's
-// shadow, one `brit build affected` of at most 5 s; each gate process at most its 10 s deadline. So
-// 9 + 10N s with the state handoff, and 13 + 10N s without it (selection then probes too, 4 s more,
-// inside its own deadline; a gate's probe falls inside its 10 s). A standalone `just gate` runs every
-// project in one process, so all of its shadow work shares one 10 s deadline.
+// Cost. A push that changes no step's buildProcess file pays the probe (two `--help`, at most 2 s
+// each, once per push with the state handoff) and per gate process at most two cheap git reads
+// (merge-base, then one cached `diff --name-only`; none when the base is the gated commit), and no
+// other brit spawn. When such a file changed, the shadow's subprocess time is bounded by its budget:
+// at most 4 s of probes, 5 s for selection's second `brit build affected`, and 10 s per gate process
+// whose borrowed step was touched, so 9 + 10M s for M such gates with the handoff, 13 + 10M s
+// without (synchronous JS between spawns is not preempted and is not counted). A standalone
+// `just gate` runs every project in one process, which shares one 10 s budget.
 //
-// The shadow is an instrument with an end. Once a capable brit is installed it costs three brit
-// fingerprint spawns per step of every gate that borrows one, and one more `brit build affected`
-// per push. It retires when `on` lands, or when enough pushes have printed its lines to decide that
+// The shadow is an instrument with an end. Once a capable brit is installed it costs, on a push that
+// changes a step's buildProcess file, three brit fingerprint spawns per touched borrowed step and one
+// more `brit build affected`. It retires when `on` lands, or when enough pushes have printed its lines to decide that
 // `on` is not wanted, whichever comes first; then the switch and the shadow path are deleted, not left.
 //
 // What `on` needs first (independent review, astra-inputs-review.receipt.md in the wall-clock
@@ -89,7 +96,7 @@ export const INPUTS_STATE_ENV = 'GATE_INPUTS_STATE';
 export const UNAVAILABLE_LINE = '[gate] inputs: --inputs unavailable; selection and keys use legacy all';
 /** Each `--help` probe is bounded and killed at it; a probe that does not answer in time is legacy. */
 export const PROBE_TIMEOUT_MS = 2_000;
-/** Shadow's one deadline per process, and the cap on any one of its subprocesses. */
+/** Shadow's own elapsed time per process, summed over its calls, and the cap on any one of its subprocesses. */
 export const SHADOW_BUDGET = Object.freeze({ totalMs: 10_000, callMs: 5_000 });
 
 const stderrLog = line => process.stderr.write(`${line}\n`);
@@ -241,13 +248,13 @@ function policyOf({ mode, capable, why, britBin }) {
 // One run's policy per process: the key is the mode and the brit's identity.
 let current = null;
 const probes = new Map();
-let budget = { ...SHADOW_BUDGET, deadline: null, exhausted: false, announced: false, ended: null };
+let budget = { ...SHADOW_BUDGET, spentMs: 0, exhausted: false, announced: false, ended: null };
 
 /** Reset the per-process policy, probe cache and shadow budget (tests; a gate process runs once). */
 export function clearGateInputsCache({ totalMs = SHADOW_BUDGET.totalMs, callMs = SHADOW_BUDGET.callMs } = {}) {
   current = null;
   probes.clear();
-  budget = { totalMs, callMs, deadline: null, exhausted: false, announced: false, ended: null };
+  budget = { totalMs, callMs, spentMs: 0, exhausted: false, announced: false, ended: null };
 }
 
 const sameIdentity = (a, b) => Boolean(a && b && a.path === b.path && a.stamp === b.stamp);
@@ -297,7 +304,7 @@ export function resolveGateInputs({ env = process.env, britBin = null, spawn = s
   else if (!identity) answer = { capable: false, why: 'no brit executable (BRIT_BIN or PATH)' };
   else if (probes.has(key)) answer = probes.get(key);
   else {
-    // The probe is shadow's work: it runs inside the process's deadline. A spent budget is not a
+    // The probe is shadow's work: it runs inside the process's shadow budget. A spent budget is not a
     // fact about this brit, so it is neither remembered nor handed to a child.
     const probed = inShadowBudget(log, bound => probeBrit(britBin, { spawn: bound(spawn) }));
     answer = probed || { capable: false, why: 'the shadow budget was spent before the probe finished', transient: true };
@@ -320,32 +327,34 @@ export function endShadow(reason, log = stderrLog) {
 }
 
 /**
- * Run one piece of shadow work under the process's one absolute deadline. `work(bound)` gets
- * `bound(spawn)`, a spawn that, before every call, refuses once the deadline has passed (an EBUDGET
- * error, as a spawn that never ran) and otherwise passes timeout = min(the caller's, the per-call cap,
- * the time remaining), with SIGKILL at it. Returns work's value, or null when shadow has ended or the
- * deadline has passed (said once). Never throws.
+ * Run one piece of shadow work inside the process's shadow budget: SHADOW_BUDGET.totalMs of the
+ * shadow's OWN elapsed time, summed over every call, so a gate that runs for minutes between two
+ * shadow calls spends none of it. `work(bound)` gets `bound(spawn)`, a spawn that, before every call,
+ * refuses once the budget is spent (an EBUDGET error, as a spawn that never ran) and otherwise passes
+ * timeout = min(the caller's, the per-call cap, what remains), with SIGKILL at it. Returns work's
+ * value, or null when shadow has ended or the budget is spent (said once). Never throws.
  */
 export function inShadowBudget(log, work, { now = Date.now } = {}) {
   if (budget.ended) return null;
-  if (budget.deadline === null) budget.deadline = now() + budget.totalMs;
   const stop = () => {
     budget.exhausted = true;
     if (budget.announced) return;
     budget.announced = true;
     log(`[gate] inputs (shadow): stopped: the shadow's ${budget.totalMs / 1000} s budget for this run is spent; no further inputs lines`);
   };
-  if (budget.exhausted || now() >= budget.deadline) {
+  if (budget.exhausted || budget.spentMs >= budget.totalMs) {
     stop();
     return null;
   }
+  const started = now();
+  const remaining = () => budget.totalMs - budget.spentMs - (now() - started);
   const bound = spawn => (bin, args, opts = {}) => {
-    const remaining = budget.deadline - now();
-    if (remaining <= 0) {
+    const left = remaining();
+    if (left <= 0) {
       budget.exhausted = true;
       return { status: null, signal: null, stdout: '', stderr: '', error: Object.assign(new Error('the shadow budget is spent'), { code: 'EBUDGET' }) };
     }
-    return spawn(bin, args, { ...opts, timeout: Math.min(opts.timeout ?? budget.callMs, budget.callMs, remaining), killSignal: 'SIGKILL' });
+    return spawn(bin, args, { ...opts, timeout: Math.min(opts.timeout ?? budget.callMs, budget.callMs, left), killSignal: 'SIGKILL' });
   };
   let value = null;
   try {
@@ -353,11 +362,28 @@ export function inShadowBudget(log, work, { now = Date.now } = {}) {
   } catch {
     value = null;
   }
-  if (budget.exhausted || now() >= budget.deadline) {
+  budget.spentMs += now() - started;
+  if (budget.exhausted) {
     stop();
     return null;
   }
   return value;
+}
+
+/**
+ * The first changed path that one of a step's OWN buildProcess entries names (suffix stripped,
+ * matched as SOURCES subtracts it), or null. Only such a change can move a step's legacy fingerprint
+ * and leave its sources one: the two classes differ by exactly those files.
+ */
+export function processFileTouched(inputs, changedFiles) {
+  const matchers = (inputs?.buildProcess || []).map(entry => picomatch(stripFunctionSuffix(entry)));
+  if (matchers.length === 0) return null;
+  return changedFiles.find(file => matchers.some(m => m(file))) ?? null;
+}
+
+/** Whether any step of any manifest has a buildProcess entry the change set touches. */
+export function anyProcessFileTouched(manifests, changedFiles) {
+  return manifests.some(({ content }) => Object.values(content.steps || {}).some(step => processFileTouched(step.inputs, changedFiles) !== null));
 }
 
 /** The steps a gate project borrows: its `steps`, or every step when it names neither steps nor inputs. */

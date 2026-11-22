@@ -11,7 +11,8 @@ import { loadManifests } from './manifest-utils.mjs';
 import { loadGateRegistry } from './pipeline-registry.mjs';
 import { projectsFromStale, staleSteps, walkGraph } from './graph-walker.mjs';
 import {
-  LEGACY_ALL, SOURCES, endShadow, inShadowBudget, resolveGateInputs, selectionShadowLine,
+  LEGACY_ALL, SOURCES, anyProcessFileTouched, endShadow, inShadowBudget, processFileTouched, resolveGateInputs,
+  selectionShadowLine,
 } from './gate-inputs.mjs';
 import { filterChanged } from './ci-ignore.mjs';
 import { COST_FIELDS, classifyFailure, recordCycle, subjectFor } from './gate-cycle.mjs';
@@ -93,9 +94,10 @@ export function withHalves(registry, projects, { env = process.env } = {}) {
  * The gate projects a change set selects. The input class of every borrowed step comes from the
  * run's one policy (gate-inputs.mjs): `opts.inputs` pins a class (reuseSelector does), `opts.policy`
  * hands one in, and otherwise it is resolved here. In shadow, with a capable brit, one line says
- * which borrowed steps the legacy class selects and sources would not, from calls bounded by
- * shadow's deadline; it changes nothing chosen (`announce: false` keeps a reuse selector quiet).
- * The policy's own lines go to stderr, apart from `log`, the oracle's diagnostics.
+ * which borrowed steps the legacy class selects and sources would not, asked only when a changed
+ * path is some step's own buildProcess file and bounded by shadow's budget; it changes nothing
+ * chosen (`announce: false` keeps a reuse selector quiet). The policy's own lines go to stderr,
+ * apart from `log`, the oracle's diagnostics.
  */
 export function projectsForChanges(root, changedFiles, opts = {}) {
   const env = opts.env || process.env;
@@ -148,7 +150,13 @@ export function projectsForChanges(root, changedFiles, opts = {}) {
   opts.onOracle?.(oracleAvailable, oracleAvailable ? null : reason);
 
   // Shadow: the same question under SOURCES, inside its budget; it changes nothing chosen above.
-  if (policy?.shadow && opts.announce !== false) {
+  // The classes differ by exactly the files a step lists as its own buildProcess. When no changed path
+  // is one, no step is directly stale under one class and not the other, and so no step's one-hop
+  // upstream reason can differ either (an upstream reason needs a directly stale step, under the
+  // same class). That holds for every step, not only borrowed ones, because a step a gate does not
+  // borrow can still select a borrowed dependent by upstream; so the check spans every manifest's
+  // steps, and when it finds nothing the second `brit build affected` is not asked.
+  if (policy?.shadow && opts.announce !== false && anyProcessFileTouched(manifests, files)) {
     inShadowBudget(inputsLog, bound => {
       const shadow = select(policy.shadow, bound(spawn));
       if (shadow.refused) {
@@ -245,31 +253,57 @@ export function reuseSelector(project, gateCommit, { root = ROOT, env = process.
   };
 }
 
+// One integration base and one changed-path list per gated commit, per process: two git reads.
+const shadowRanges = new Map();
+
 /**
- * GATE_INPUTS=shadow's per-gate line: since the integration base, the step fingerprints moved under
- * the legacy class and are unchanged under sources. It says nothing about the rest of the key
- * (manifest, recipe, project tree, audited reads). Every subprocess goes through `run`, shadow's
- * bounded spawn. `{ lines }`, or `{ refused }` when brit refused the flag after all. Changes nothing the
- * decision, the key or the record reads.
+ * The borrowed steps of `project` whose OWN buildProcess file changed between the integration base
+ * and `gateCommit` ({ base, steps }), read with git alone and no brit spawn. Only these steps can
+ * have a fingerprint that moved under the legacy class and not under sources. No base, or a base that
+ * is the gated commit, is no step.
  */
-function inputsShadow(project, evidence, { root, gateCommit, run }) {
-  if (!evidence?.key || !evidence.britBin || SUITE_READ_LISTS[project.name] || !evidence.fingerprints?.length) return { lines: [] };
-  const fingerprints = (cls, commit) => stepFingerprints(project, commit, { britBin: evidence.britBin, root, spawn: run, inputs: cls });
+export function touchedProcessSteps(project, { root, gateCommit, spawn = spawnSync }) {
+  const key = `${resolve(root)}\0${gateCommit}`;
+  if (!shadowRanges.has(key)) {
+    let range = { base: null, files: [] };
+    for (const ref of ['origin/dev', 'dev']) {
+      const r = spawn('git', ['merge-base', gateCommit, ref], { cwd: root, encoding: 'utf8', timeout: 5_000 });
+      const base = r?.status === 0 ? String(r.stdout || '').trim() : '';
+      if (!base) continue;
+      const head = spawn('git', ['rev-parse', '--verify', '--quiet', `${gateCommit}^{commit}`], { cwd: root, encoding: 'utf8', timeout: 5_000 });
+      if (head?.status === 0 && String(head.stdout || '').trim() === base) { range = { base, files: [] }; break; }
+      const diff = spawn('git', ['diff', '--name-only', base, gateCommit], { cwd: root, encoding: 'utf8', timeout: 5_000 });
+      range = { base, files: diff?.status === 0 ? String(diff.stdout || '').split('\n').filter(Boolean) : [] };
+      break;
+    }
+    shadowRanges.set(key, range);
+  }
+  const { base, files } = shadowRanges.get(key);
+  if (!base || files.length === 0 || !project.steps?.length) return { base, steps: [] };
+  let manifest;
+  try { manifest = JSON.parse(readFileSync(resolve(root, project.manifestPath), 'utf8')); } catch { return { base, steps: [] }; }
+  return { base, steps: project.steps.filter(step => processFileTouched(manifest.steps?.[step]?.inputs, files) !== null) };
+}
+
+/**
+ * GATE_INPUTS=shadow's per-gate line: since the integration base, the step fingerprints of the
+ * touched steps (touchedProcessSteps) moved under the legacy class and are unchanged under sources.
+ * It says nothing about the rest of the key (manifest, recipe, project tree, audited reads). Every
+ * subprocess goes through `run`, shadow's bounded spawn. `{ lines }`, or `{ refused }` when brit
+ * refused the flag after all. Changes nothing the decision, the key or the record reads.
+ */
+function inputsShadow(project, evidence, { root, gateCommit, base, steps, run }) {
+  const touched = { ...project, steps };
+  const fingerprints = (cls, commit) => stepFingerprints(touched, commit, { britBin: evidence.britBin, root, spawn: run, inputs: cls });
   const sourcesNow = fingerprints(SOURCES, gateCommit);
   if (sourcesNow.refusedFlag) return { refused: sourcesNow.error };
   if (sourcesNow.error) return { lines: [] };
-  let base = null;
-  for (const ref of ['origin/dev', 'dev']) {
-    const r = run('git', ['merge-base', gateCommit, ref], { cwd: root, encoding: 'utf8' });
-    if (r?.status === 0 && String(r.stdout || '').trim()) { base = String(r.stdout).trim(); break; }
-  }
-  if (!base) return { lines: [] };
   const allBase = fingerprints(LEGACY_ALL, base);
   const sourcesBase = fingerprints(SOURCES, base);
   if (sourcesBase.refusedFlag) return { refused: sourcesBase.error };
   if (allBase.error || sourcesBase.error) return { lines: [] };
   const moved = (before, after) => after.filter(row => before.find(b => b.step === row.step)?.fingerprint !== row.fingerprint).map(row => row.step);
-  const allMoved = moved(allBase.fingerprints, evidence.fingerprints);
+  const allMoved = moved(allBase.fingerprints, evidence.fingerprints.filter(row => steps.includes(row.step)));
   const sourcesMoved = moved(sourcesBase.fingerprints, sourcesNow.fingerprints);
   return allMoved.length > 0 && sourcesMoved.length === 0
     ? { lines: [`[gate] ${project.name} inputs (shadow): since ${base.slice(0, 9)} the step fingerprints moved under all (${allMoved.join(' ')}) and are unchanged under sources`] }
@@ -681,15 +715,22 @@ export function runProject(project, printOnly, namesOnly, {
   };
   // One admission decision for both run modes (decideReuse); ark is then asked only to run.
   const decision = decideReuse(project, evidence, reuseContext, { root, env, spawn });
-  // GATE_INPUTS=shadow: whether a sources key would have moved. Read only, under shadow's deadline,
-  // and its span is taken out of the gate's timed span.
-  if (inputs?.shadow) {
+  // GATE_INPUTS=shadow: whether the step fingerprints are unchanged under sources. Read only, inside
+  // shadow's budget, and its span is taken out of the gate's timed span.
+  // Free unless a borrowed step's own buildProcess file changed: that is decided from git first, and
+  // only then are the touched steps fingerprinted inside the budget.
+  if (inputs?.shadow && evidence?.key && evidence.britBin && evidence.fingerprints?.length && !SUITE_READ_LISTS[project.name]) {
     const shadowSpan = clock();
-    inShadowBudget(inputsLine, bound => {
-      const shadow = inputsShadow(project, evidence, { root, gateCommit, run: bound(spawn) });
-      if (shadow.refused) endShadow(shadow.refused, inputsLine);
-      for (const line of shadow.lines || []) write(`${line}\n`);
-    });
+    try {
+      const { base, steps } = touchedProcessSteps(project, { root, gateCommit, spawn });
+      if (steps.length > 0) {
+        inShadowBudget(inputsLine, bound => {
+          const shadow = inputsShadow(project, evidence, { root, gateCommit, base, steps, run: bound(spawn) });
+          if (shadow.refused) endShadow(shadow.refused, inputsLine);
+          for (const line of shadow.lines || []) write(`${line}\n`);
+        });
+      }
+    } catch { /* a shadow is never a red */ }
     started += clock() - shadowSpan;
   }
   if (decision.reuse) {
