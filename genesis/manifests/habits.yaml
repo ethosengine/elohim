@@ -2325,10 +2325,10 @@ habits:
       - "just gate dialogue-stasis (private sensor, keeper, policy, audit and delivery regression contracts; no model calls)"
       - "pnpm run elohim-agent:packages:verify (both runtime projections and recorded hook registrations)"
     evidence: >
-      DELTA 2026-11-03 (integration, RED retained): merged upstream runtime attribution with the session wiring; dialogue-stasis gate passes 156 coordinator/control tests, 51 sensor tests and three keeper tests. Timeout/descendant regression now measures the declared three-second hook registration (observed 2.274 seconds under concurrent checks exceeded its obsolete 2.2-second assertion); descendant-kill assertion retained. Resolver tests pass eight and package verification passes 2,372. Evidence: genesis/local-dev/integration-20261103/stasis-final.log; no new live-ladder completion claimed.
-    evidence-fingerprint: sha256:deb03ef4b798e8e4
-    evidence-bytes: 12005
-    evidence-entries: 19
+      DELTA 2026-11-21 (question dialogs, RED retained): an AskUserQuestion PermissionRequest is the steward answering, not a stall — the sensor journals nothing for it and skips the live control call, so native decide can no longer park (deny) the question itself, and no incident is left to be closed by inference. Found from this device's own journal (session f0b335e0 seq 1–7: `low/none` open, `unmatched-tool-completion`, inferred close); backlog brit-0-3-0-release-findings row 7. Red-before tests: 2 sensor, 1 control; 2 coordinator regressions pin e83d0931's closed-incident guard. `_gate-dialogue-stasis` legs: 53 sensor, 164 stasis, 3 keeper tests OK; hook, package body and three projections byte-identical. Commit 50099d168; no live-ladder completion claimed.
+    evidence-fingerprint: sha256:0aa3149192eb7060
+    evidence-bytes: 12776
+    evidence-entries: 20
     refs:
       - "spec: genesis/docs/superpowers/specs/2026-10-30-dialogue-stasis-loop-design.md (dialogue scope, presence, independent coordinator and authority boundary)"
       - "plan slices: genesis/docs/superpowers/specs/2026-10-30-dialogue-stasis-loop-design.md §Slices A.3–5 (observe-only adapter and native fold), B.6–7 (policy and keeper), C.8–9 (coordinator and control), D.10–11 (silence and audited learning)"
