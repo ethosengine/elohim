@@ -2549,10 +2549,11 @@ fn brit_build_tries_offline_then_anonymous_then_credentials() {
     }
 }
 
-/// A build that runs out of its bound is not a compile error: its line says so, with the bound,
-/// and that a second follow resumes from the crates it compiled. A failed build still says failed.
+/// A build that runs out of its bound is not a compile error: each stage's line says so, with
+/// the bound, the shared build target and the command that reuses it. A failed build still says
+/// failed.
 #[test]
-fn a_brit_build_that_runs_out_of_its_bound_says_so_and_that_a_second_follow_resumes() {
+fn a_brit_build_that_runs_out_of_its_bound_says_so_and_how_to_reuse_its_artifacts() {
     for timeout in [true, false] {
         let f = Fixture::new("brit");
         f.state.lock().unwrap().build_timeout = timeout;
@@ -2560,23 +2561,29 @@ fn a_brit_build_that_runs_out_of_its_bound_says_so_and_that_a_second_follow_resu
         assert!(f
             .store
             .build_release(f.tmp.path(), &f.commit(), "test", &mut attempts, &|key| {
-                (key == "CARGO_NET_OFFLINE").then(|| "true".into())
+                (key == "NPM_TOKEN").then(|| "test-secret".into())
             })
             .is_err());
-        let line = attempts
-            .iter()
-            .find(|a| a.starts_with("brit build offline"))
-            .expect("the offline attempt has a line");
-        if timeout {
-            assert!(line.contains("ran out of its 1800 s bound"), "{line}");
-            assert!(
-                line.contains("a second `epr bin follow` resumes the build"),
-                "{line}"
-            );
-            assert!(!line.contains("failed"), "{line}");
-        } else {
-            assert!(line.starts_with("brit build offline failed"), "{line}");
-            assert!(!line.contains("bound"), "{line}");
+        let target = format!("brit-follow/{}", &f.commit()[..12]);
+        for stage in ["offline", "anonymous", "authenticated"] {
+            let line = attempts
+                .iter()
+                .find(|a| a.starts_with(&format!("brit build {stage} ")))
+                .unwrap_or_else(|| panic!("the {stage} attempt has a line: {attempts:?}"));
+            if timeout {
+                assert!(line.contains("ran out of its 1800 s bound"), "{line}");
+                assert!(line.contains(&target), "{line}");
+                assert!(line.contains("same repository and store options"), "{line}");
+                assert!(line.contains("`epr bin follow --tool brit`"), "{line}");
+                assert!(line.contains("`epr bin bootstrap --tool brit`"), "{line}");
+                assert!(!line.contains("failed"), "{line}");
+            } else {
+                assert!(
+                    line.starts_with(&format!("brit build {stage} failed")),
+                    "{line}"
+                );
+                assert!(!line.contains("bound"), "{line}");
+            }
         }
     }
 }

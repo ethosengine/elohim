@@ -256,6 +256,14 @@ fn probe_holder(holder: &OwnerHolder) -> Option<bool> {
 /// release is an unlock, not the close, so a copy of the descriptor in a child another thread
 /// forked does not keep the lock past the owner.
 pub fn hold_owner(lock: &Path, pid: u32, start: u64, proc_root: &Path) -> Result<()> {
+    let held = acquire_owner(lock, pid, start)?;
+    release_when_gone(held, proc_root, pid, start);
+    Ok(())
+}
+
+/// [`hold_owner`]'s first step: take the owner lock and bind it to the owner incarnation it
+/// watches. Crate-private so a test can hold the guard the real code acquired.
+pub(crate) fn acquire_owner(lock: &Path, pid: u32, start: u64) -> Result<Flock> {
     use std::os::unix::fs::OpenOptionsExt;
     if lock.is_symlink() {
         return Err(Refusal::new(
@@ -290,11 +298,16 @@ pub fn hold_owner(lock: &Path, pid: u32, start: u64, proc_root: &Path) -> Result
     // Bind the lock to the owner incarnation it watches, after locking.
     held.file().set_len(0)?;
     std::io::Write::write_all(&mut held.file(), format!("{pid} {start}\n").as_bytes())?;
+    Ok(held)
+}
+
+/// [`hold_owner`]'s second step: keep `held` until the owner is provably gone under `proc_root`,
+/// then release it by unlocking.
+pub(crate) fn release_when_gone(held: Flock, proc_root: &Path, pid: u32, start: u64) {
     while !owner_gone(proc_root, pid, start) {
         std::thread::sleep(Duration::from_secs(1));
     }
     drop(held);
-    Ok(())
 }
 
 /// The holder lock's name beside the envelopes.
@@ -799,4 +812,31 @@ pub fn owner_context(proc_root: &Path) -> (Option<String>, Option<String>) {
         .map(|s| s.trim().to_owned())
         .filter(|s| !s.is_empty());
     (namespace, boot)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The holder's lock belongs to its open file description, which a child forked by another
+    /// thread shares until its `exec`. Once the owner is gone the holder unlocks, so the lock is
+    /// free at once while such a copy of the descriptor it acquired is still open.
+    #[test]
+    fn a_released_holder_frees_the_lock_while_a_copy_of_its_descriptor_is_open() {
+        let dir = tempfile::tempdir().unwrap();
+        let lock = dir.path().join("owner.lock");
+        // No `<proc root>/7`: the owner is gone, so the release step returns at once.
+        let proc_root = dir.path().join("proc");
+        fs::create_dir_all(&proc_root).unwrap();
+        let held = acquire_owner(&lock, 7, 42).unwrap();
+        let copy = rustix::io::dup(&held).unwrap();
+        let contender = || Flock::try_exclusive(fs::File::open(&lock).unwrap()).unwrap();
+        assert!(contender().is_err(), "the holder holds the lock");
+        release_when_gone(held, &proc_root, 7, 42);
+        assert!(
+            contender().is_ok(),
+            "the copy alone does not hold the lock after the holder released it"
+        );
+        drop(copy);
+    }
 }
