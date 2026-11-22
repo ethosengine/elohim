@@ -51,3 +51,20 @@ the unit-test legs are matrix legs of `run`, already needed.
 | 6 | The rust-style checker the reach hook expects was stale in the brit worktrees; lanes pushed with `BRIT_RUST_STYLE_PREFIX` pointing at a freshly installed prefix. | `genesis/local-dev/release-20261120/rust-style-prefix` | Let the hook install or locate a current checker itself. |
 | 7 | Dialogue-stasis false positive: an answered AskUserQuestion opened an incident with correlation `low/none`, a keeper consultation ran while the steward was answering, the prompt closed by inference, and further consultations ran after it closed, relaying "parked, request PushNotification" repeatedly. Same on the second question (incident :25). | `.eprfs/status/stasis/46c39d0c-…/events.jsonl` seq 1-13; `.claude/hooks/dialogue-stasis-sense.py` PermissionRequest/PostToolUse correlation | Treat an AskUserQuestion dialog as a human answering, not an authorization stall; never consult on a closed incident. |
 | 8 | The Claude process inherited `EPR_BIN` pinned to epr 0.3.2 from its launching shell, so hooks ran an epr without `feedback` and `session commit-trailers` (attribution UNMEASURED) while the store's head was 0.3.3. The legacy Python `bin_store.py` left in `/projects/.claude-config/tools/bin-store/bin/` still answers `bootstrap` and refuses two-bin registries (`debug/epr/epr`). | `genesis/local-dev/release-20261120/session-evidence.md` | Arrival should name a stale inherited `EPR_BIN`; retire the legacy Python copy from the store's `bin/`. |
+
+## 2026-11-21 fixed
+
+Row 7. An `AskUserQuestion` dialog is the steward answering, not an authorization stall.
+`.claude/hooks/dialogue-stasis-sense.py` (package `dialogue-stasis-sense`, both projections)
+no longer journals a `permission-requested` for it, so no incident opens, nothing is closed by
+inference at the next call, and the live path never sends it to native `decide`. Before the fix,
+live mode parked the question itself (deny plus a park row). The other half, never consulting on
+a closed incident, had landed in e83d0931: the ladder reads the sensor's own close record before
+a rung or a delivery. New coverage pins the inferred closes (`unknown`, `denied-inferred`) that the
+question shape produced. Tests: `test_question_dialog_is_the_steward_answering_not_a_stall`,
+`test_question_dialog_leaves_an_open_authorization_prompt_alone`,
+`test_question_dialog_is_never_parked_or_sent_to_native_decide` (all three red before the fix),
+`test_unknown_inferred_close_ends_the_ladder` and `test_denied_inferred_close_ends_the_ladder`
+(green before and after). The `dialogue-stasis` gate's three legs pass: hook suite 53 OK,
+`stasis*_test.py` 164 OK, keeper node test 3 pass. The coordinator daemon needs a restart to
+pick up the change; the sensing hook takes it on its next invocation.

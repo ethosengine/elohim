@@ -379,6 +379,20 @@ class ControlTest(unittest.TestCase):
         self.assertEqual(json.loads(result.stdout)['decision'], 'block')
         self.assertEqual(self.stop_events()[-1]['outcome'], 'stalled')
 
+    def test_question_dialog_is_never_parked_or_sent_to_native_decide(self):
+        # Backlog brit-0-3-0 row 7: a question is the steward answering, not an authorization stall.
+        result = self.invoke('PermissionRequest', tool_name='AskUserQuestion',
+                             tool_input={'questions': [{'question': 'Which?'}]})
+        self.assertEqual(result.stdout, '')
+        calls = self.repo / 'calls'
+        self.assertFalse(calls.exists() and any(json.loads(x)[2] == 'decide'
+                                                for x in calls.read_text().splitlines()))
+        self.assertEqual(self.rows('park'), [])
+        self.assertEqual(self.rows('stall-closed'), [])
+        journal = self.directory / 'events.jsonl'
+        events = [json.loads(x) for x in journal.read_text().splitlines()] if journal.exists() else []
+        self.assertEqual([e for e in events if e['kind'] == 'permission-requested'], [])
+
     def test_collaborative_unknown_and_away_use_native_presence(self):
         for disposition in ['collaborative', 'unknown', 'automated']:
             with self.subTest(disposition=disposition):

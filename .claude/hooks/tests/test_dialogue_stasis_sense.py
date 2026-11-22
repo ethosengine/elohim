@@ -193,6 +193,31 @@ class DialogueStasisSenseTest(unittest.TestCase):
         self.assertEqual(self.events('dialog-displayed')[0]['correlation']['confidence'], 'unknown')
         self.assertTrue(self.events('observation-gap'))
 
+    def test_question_dialog_is_the_steward_answering_not_a_stall(self):
+        # Backlog brit-0-3-0 row 7: the shape this session's journal recorded, an answered
+        # AskUserQuestion with no reliable PreToolUse, then an inferred close at the next call.
+        question = {'questions': [{'question': 'Which?', 'options': [{'label': 'A'}]}]}
+        self.invoke('PermissionRequest', tool_name='AskUserQuestion', tool_input=question)
+        self.invoke('Notification', notification_type='permission_prompt')
+        self.invoke('PostToolUse', tool_name='AskUserQuestion', tool_use_id='q-1', tool_input=question,
+                    tool_response={'answers': {'Which?': 'A'}}, duration_ms=90000)
+        self.pre('call-2')
+        self.assertEqual(self.events('permission-requested'), [])
+        self.assertEqual(self.events('prompt-closed'), [])
+        self.assertEqual(self.state()['openPrompts']['main'], [])
+        gaps = [e['gap']['reason'] for e in self.events('observation-gap')]
+        self.assertNotIn('ambiguous-permission-correlation', gaps)
+        self.assertNotIn('unmatched-tool-completion', gaps)
+        self.assertNotIn('unknown-close', gaps)
+
+    def test_question_dialog_leaves_an_open_authorization_prompt_alone(self):
+        self.pre()
+        self.request()
+        self.invoke('PermissionRequest', tool_name='AskUserQuestion', tool_input={'questions': []})
+        self.assertEqual(len(self.events('permission-requested')), 1)
+        self.invoke('PostToolUse', tool_use_id='call-1', duration_ms=5)
+        self.assertEqual(self.events('prompt-closed')[0]['closedBy'], 'approved')
+
     def test_matching_tool_failure_is_approved(self):
         self.pre()
         self.request()

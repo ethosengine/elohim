@@ -32,6 +32,9 @@ COMMANDS = {
     "vitest": {"run", "watch"},
     "just": {"gate", "test", "dev", "mesh", "seed", "status", "look", "codegen"},
 }
+# A question dialog is the steward answering, never an authorization stall: it opens
+# no incident, so no keeper ladder, native park or inferred close (backlog brit-0-3-0 row 7).
+QUESTION_TOOLS = {"AskUserQuestion"}
 EXECUTABLES = set(COMMANDS) | {"cd", "curl", "wget", "ssh", "scp", "bash", "sh", "python", "python3", "node", "echo", "printf", "cat", "rg", "ls", "env", "export", "true", "false"}
 
 
@@ -300,6 +303,8 @@ def map_event(j):
         s["lastPreToolUse"][key] = record
         if tool_id:
             calls[tool_id] = record
+    elif event == "PermissionRequest" and tool in QUESTION_TOOLS:
+        return {"hookEvent": event, "agentId": agent, "tool": tool, "humanAnswering": True}
     elif event == "PermissionRequest":
         candidate = s["lastPreToolUse"].get(key)
         same = [o for o in opens if o["inputDigest"] == hashed]
@@ -536,8 +541,9 @@ def main():
     # journal.lock. An inert result cannot deliver pending control context.
     try:
         action = (control.live_hook(repo, root, payload, normalized or {})
-                  if runtime == "claude-code" or payload.get("hook_event_name") in
-                  {"PostToolUse", "UserPromptSubmit"} else None)
+                  if not (normalized or {}).get("humanAnswering") and (
+                      runtime == "claude-code" or payload.get("hook_event_name") in
+                      {"PostToolUse", "UserPromptSubmit"}) else None)
         if action:
             if payload.get("hook_event_name") == "PermissionRequest":
                 iid = normalized["correlation"]["incidentId"]

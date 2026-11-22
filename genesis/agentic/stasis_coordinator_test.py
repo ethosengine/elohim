@@ -929,6 +929,24 @@ class CoordinatorTest(unittest.TestCase):
         self.assertEqual(delivery.news('main'), [])  # the rung-1 guidance is no longer injected
         self.assertEqual(delivery.pending(), [])      # no parked ask for a Stop-hook batch
 
+    def assert_inferred_close_ends_the_ladder(self, closed_by):
+        # Backlog brit-0-3-0 row 7: a dialog the sensor closed by inference at the next call
+        # is over, like an approval; no later rung, guidance or notification is relayed.
+        subject = self.live_after_rung_one(close=closed_by)
+        before = len(self.rows('guidance', 'PushNotification', 'berth-note'))
+        self.advance_live(subject)
+        self.advance_live(subject)
+        self.assertEqual([e['consultation']['rung'] for e in self.starts()], [1])
+        self.assertEqual(len(self.rows('guidance', 'PushNotification', 'berth-note')), before)
+        self.assertEqual([r['closedBy'] for r in self.rows('ladder-ended')], [closed_by])
+        self.assertEqual(coordinator.control.Delivery(self.directory).news('main'), [])
+
+    def test_unknown_inferred_close_ends_the_ladder(self):
+        self.assert_inferred_close_ends_the_ladder('unknown')
+
+    def test_denied_inferred_close_ends_the_ladder(self):
+        self.assert_inferred_close_ends_the_ladder('denied-inferred')
+
     def test_open_incident_still_gets_its_next_rung(self):
         subject = self.live_after_rung_one()
         self.advance_live(subject)
