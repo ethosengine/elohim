@@ -173,8 +173,35 @@ describe('the second read — re-runs, malformed data, one time budget (review o
     }
   });
   test('two missing workflow_ids never match each other', () => {
-    const v = line([judgedRun({ workflow_id: undefined }), wfRun(11, 'ci', 'in_progress', null, 9999, '2026-11-21T23:27:00Z', undefined)]);
+    const lacking = r => { const { workflow_id, ...rest } = r; return rest; };
+    const v = line([lacking(judgedRun()), lacking(wfRun(11, 'ci', 'in_progress', null, 9999, '2026-11-21T23:27:00Z'))]);
     assert.equal(v.outcome, 'pass'); assert.match(v.line, /newer runs not checked: /);
+  });
+  test('a judged run whose status is empty or unknown fails open instead of refusing', () => {
+    for (const status of ['', 'weird', 7]) {
+      const v = line([judgedRun({ status })]);
+      assert.equal(v.outcome, 'pass'); assert.equal(v.tier, 'witnessed'); assert.match(v.line, /newer runs not checked: /);
+    }
+  });
+  test('a same-workflow candidate with an unknown status word is skipped and named', () => {
+    const v = line([judgedRun(), wfRun(11, 'ci', 'weird', null, 9999, '2026-11-21T23:27:00Z')]);
+    assert.equal(v.outcome, 'pass'); assert.match(v.line, /newer runs not fully checked|not fully checked/);
+  });
+  test('each in-flight status on a later run of the same workflow refuses', () => {
+    for (const status of ['queued', 'in_progress', 'waiting', 'requested', 'pending']) {
+      const v = line([judgedRun(), wfRun(11, 'ci', status, null, 9999, '2026-11-21T23:27:00Z')]);
+      assert.equal(v.outcome, 'refuse', status); assert.match(v.line, new RegExp(`run 11, ${status}\\)`));
+    }
+  });
+  test('display fields that are not plain strings or ids never throw; the line uses placeholders', () => {
+    const odd = { ...wfRun(11, 'ci', 'in_progress', null, 9999, '2026-11-21T23:27:00Z'), name: { toString: null }, id: {} };
+    const v = line([judgedRun(), odd]);
+    assert.equal(v.outcome, 'refuse'); assert.equal(v.conclusion, 'pending');
+    assert.match(v.line, /\(unnamed workflow, run unknown run, in_progress\)/);
+  });
+  test('a completed judged run is not asked for its conclusion: the newest named check stands (a stated limit)', () => {
+    const v = line([judgedRun({ conclusion: 'failure', run_started_at: '2026-11-22T03:00:00Z' })]);
+    assert.equal(v.outcome, 'pass'); assert.equal(v.line, 'attested: ethosengine/brit@b86c5104d339 Tests pass success');
   });
   test('a same-workflow candidate without status, or with a bad date, is skipped and named, not pending', () => {
     for (const cand of [{ status: undefined }, { run_started_at: 'garbage', created_at: 'garbage' }]) {
