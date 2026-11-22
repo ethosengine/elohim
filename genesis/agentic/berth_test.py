@@ -1703,6 +1703,64 @@ class WorktreeIntentTest(unittest.TestCase):
         self.assertNotIn("berth say: note #", printed)
         self.assertIn("no other device will read it", printed)
 
+    def test_say_names_an_addressee_whose_device_is_silent(self):
+        # 2026-11-22: an exchange stalled both ways for more than nine hours and every note sent
+        # into it printed only its success line. The view `say` already reads names the addressee's
+        # device and when its head was last folded here.
+        main = _NS["main"]
+        g = main.__globals__
+        saved = g["Berth"]
+        g["Berth"] = lambda *a, **k: self.make()
+        self.addCleanup(g.__setitem__, "Berth", saved)
+
+        def say(others, *args):
+            out = view()
+            out["store"] = str(self.main)
+            if others is not None:
+                out["others"] = others
+            self.answer(out)
+            self.peer_run.reset_mock()
+            stdout, stderr = io.StringIO(), io.StringIO()
+            with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+                rc = main(["berth", "say", "--session", "session", *args])
+            self.assertEqual(stdout.getvalue(), "")
+            self.assertEqual(rc, 0, stderr.getvalue())
+            # One read of the view serves both the note's write and this line.
+            self.assertEqual(self.peer_run.call_count, 1)
+            return stderr.getvalue().splitlines()
+
+        peer = "6d68315a-ad85-4adc-a954-9a4235d0d965"
+        fresh = {DEVICE_A: {"seq": 9, "last_seen": NOW_MS - 12_000, "moorings": {peer: SINCE_MS}}}
+        quiet = {DEVICE_A: {"seq": 9, "last_seen": NOW_MS - 3 * 3600_000, "moorings": {peer: SINCE_MS}}}
+        never = {DEVICE_A: {"seq": None, "last_seen": None, "moorings": {peer: SINCE_MS}}}
+
+        # A device exchanging within freshness_s: the success line and nothing else.
+        lines = say(fresh, "--to", peer, "hello")
+        self.assertEqual(len(lines), 1, lines)
+        self.assertRegex(lines[0], r"^berth say: note #\d+ at ")
+        # A quiet device: the note is still recorded (exit 0, its id printed), and a second line
+        # names the device, how long ago its head was folded, and that the note has not crossed.
+        lines = say(quiet, "--to", peer, "are you there")
+        self.assertEqual(len(lines), 2, lines)
+        self.assertRegex(lines[0], r"^berth say: note #\d+ at ")
+        self.assertEqual(
+            lines[1],
+            f"berth say: {peer} is moored on device {DEVICE_A}, which is SILENT (its last head was folded "
+            f"here 3h ago; past 90s) — the note is recorded and crosses when the exchange resumes; until "
+            f"then {peer} cannot read it (`just status device` on each device names the cure)")
+        # The short id a berth line prints addresses the same session, so it gets the same line.
+        lines = say(quiet, "--to", peer[:8], "short id")
+        self.assertEqual(len(lines), 2, lines)
+        self.assertIn(f"{peer[:8]} is moored on device {DEVICE_A}, which is SILENT", lines[1])
+        # A device with no head folded yet is quiet too.
+        lines = say(never, "--to", peer, "first contact")
+        self.assertIn("SILENT (no head of it has been folded here yet; past 90s)", lines[1])
+        # Nothing is claimed about what the view does not show: a session moored on no folded
+        # device, a household note, and a view from a daemon that prints no `others`.
+        self.assertEqual(len(say(quiet, "--to", "some-local-session", "hello")), 1)
+        self.assertEqual(len(say(quiet, "to everyone")), 1)
+        self.assertEqual(len(say(None, "--to", peer, "older daemon")), 1)
+
 
 class StewardClaimTest(unittest.TestCase):
     """Steward-scoped resources (dev-integration, jenkins-dispatch, alpha-fleet, lane:<id>) are shared
