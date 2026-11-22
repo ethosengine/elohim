@@ -1,6 +1,7 @@
 //! Private device-local session binding. Facet authority stays in its original store.
 use crate::{
     bin_store::{files, Refusal, Result},
+    flock::Flock,
     session::{self, SessionIdentity, Source},
 };
 use serde::{Deserialize, Serialize};
@@ -240,16 +241,20 @@ fn probe_holder(holder: &OwnerHolder) -> Option<bool> {
     if file.metadata().ok()?.ino() != holder.inode {
         return None;
     }
-    match rustix::fs::flock(&file, rustix::fs::FlockOperation::NonBlockingLockShared) {
-        Ok(()) => Some(false),
-        Err(e) if e == rustix::io::Errno::WOULDBLOCK => Some(true),
+    // Taken and dropped at once; dropping unlocks, so no forked copy of this descriptor keeps a
+    // shared lock in a starting holder's way.
+    match Flock::try_shared(file) {
+        Ok(Ok(_probe)) => Some(false),
+        Ok(Err(_)) => Some(true),
         Err(_) => None,
     }
 }
 
 /// Hold the owner lock for `generation` until the owner is provably gone, then release it.
 /// Takes no other resource and writes nothing but the empty lock file. Refuses when the lock is
-/// already held. Death is read exactly as `owner_dead` reads it: unknown keeps holding.
+/// already held. Death is read exactly as `owner_dead` reads it: unknown keeps holding. The
+/// release is an unlock, not the close, so a copy of the descriptor in a child another thread
+/// forked does not keep the lock past the owner.
 pub fn hold_owner(lock: &Path, pid: u32, start: u64, proc_root: &Path) -> Result<()> {
     use std::os::unix::fs::OpenOptionsExt;
     if lock.is_symlink() {
@@ -258,7 +263,7 @@ pub fn hold_owner(lock: &Path, pid: u32, start: u64, proc_root: &Path) -> Result
             "holder lock must not be a symlink",
         ));
     }
-    let file = fs::OpenOptions::new()
+    let mut file = fs::OpenOptions::new()
         .create(true)
         .append(true)
         .mode(0o600)
@@ -266,28 +271,29 @@ pub fn hold_owner(lock: &Path, pid: u32, start: u64, proc_root: &Path) -> Result
         .open(lock)?;
     // A concurrent probe takes the lock shared for an instant; retry briefly before refusing.
     let mut attempts = 0;
-    loop {
-        match rustix::fs::flock(&file, rustix::fs::FlockOperation::NonBlockingLockExclusive) {
-            Ok(()) => break,
-            Err(e) if e == rustix::io::Errno::WOULDBLOCK && attempts < 20 => {
+    let held = loop {
+        match Flock::try_exclusive(file)? {
+            Ok(held) => break held,
+            Err(back) if attempts < 20 => {
                 attempts += 1;
+                file = back;
                 std::thread::sleep(Duration::from_millis(25));
             }
-            Err(e) if e == rustix::io::Errno::WOULDBLOCK => {
+            Err(_) => {
                 return Err(Refusal::new(
                     "owner-holder-held",
                     lock.display().to_string(),
                 ));
             }
-            Err(e) => return Err(std::io::Error::from(e).into()),
         }
-    }
+    };
     // Bind the lock to the owner incarnation it watches, after locking.
-    file.set_len(0)?;
-    std::io::Write::write_all(&mut &file, format!("{pid} {start}\n").as_bytes())?;
+    held.file().set_len(0)?;
+    std::io::Write::write_all(&mut held.file(), format!("{pid} {start}\n").as_bytes())?;
     while !owner_gone(proc_root, pid, start) {
         std::thread::sleep(Duration::from_secs(1));
     }
+    drop(held);
     Ok(())
 }
 

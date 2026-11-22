@@ -29,6 +29,7 @@ use super::embedder::{fold_budget, Embedder, Fixture, PinnedProcedure};
 use super::surface::{self, Listing, Surface};
 use super::*;
 use cid::Cid;
+use elohim_device_runtime::flock::Flock;
 use elohim_epr_index::attest::{next_retry, record, LATEST_FILE};
 use elohim_epr_index::rank::encode as vector_blob;
 use elohim_epr_index::store::{
@@ -534,8 +535,12 @@ fn embedder_for(
     }
 }
 
-/// The exclusive fold lock, or `None` when another fold holds it.
-fn lock(dir: &Path) -> FlowResult<Option<File>> {
+/// The exclusive fold lock, or `None` when another open file description holds it. The guard
+/// unlocks when the fold drops it, on every return path, rather than leaving the release to the
+/// close: a child that another thread of this process forks holds a copy of the descriptor until
+/// its `exec`, and a lock released by close alone would stay held through that copy. So a held
+/// lock is another fold's, and it answers busy at once.
+fn lock(dir: &Path) -> FlowResult<Option<Flock>> {
     std::fs::create_dir_all(dir)?;
     let file = OpenOptions::new()
         .read(true)
@@ -543,11 +548,7 @@ fn lock(dir: &Path) -> FlowResult<Option<File>> {
         .create(true)
         .truncate(false)
         .open(dir.join(LOCK_FILE))?;
-    match rustix::fs::flock(&file, rustix::fs::FlockOperation::NonBlockingLockExclusive) {
-        Ok(()) => Ok(Some(file)),
-        Err(errno) if errno == rustix::io::Errno::WOULDBLOCK => Ok(None),
-        Err(errno) => Err(FlowError::Io(errno.into())),
-    }
+    Ok(Flock::try_exclusive(file)?.ok())
 }
 
 fn attest(dir: &Path, report: &mut FoldReport, state: FoldState) -> FlowResult<()> {
@@ -1285,6 +1286,80 @@ pub fn run(args: &[String]) -> FlowResult<ExitCode> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A tree a fixture fold can run in: the contract naming the fixture embedder, the measure
+    /// it pins, and one note. Returns the tree and the fold's store directory.
+    fn foldable() -> (tempfile::TempDir, PathBuf) {
+        // gate-reads: .epr-meta/elohim/algorithms/recall-semantic-index.json
+        let repo = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../..")
+            .canonicalize()
+            .unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        let mut value = crate::flow::memory::recall::tests_support::minimal_contract();
+        value["ceremony"]["providers"]["semantic"]["embedder"] = json!("fixture");
+        let measure = value["ceremony"]["providers"]["semantic"]["measure"]
+            .as_str()
+            .unwrap()
+            .to_string();
+        for (rel, bytes) in [
+            (
+                CONTRACT_REL.to_string(),
+                serde_json::to_vec(&value).unwrap(),
+            ),
+            (measure.clone(), std::fs::read(repo.join(&measure)).unwrap()),
+            (
+                "note.md".to_string(),
+                b"# Stewardship\nThe commons is tended.\n".to_vec(),
+            ),
+        ] {
+            std::fs::create_dir_all(root.join(&rel).parent().unwrap()).unwrap();
+            std::fs::write(root.join(&rel), bytes).unwrap();
+        }
+        let cid = Declared::load(root).unwrap().cid.to_string();
+        let store = store_dir(root, &cid, EmbedderChoice::Fixture);
+        (dir, store)
+    }
+
+    fn fixture_fold() -> FoldOptions {
+        FoldOptions {
+            embedder: EmbedderChoice::Fixture,
+            ..FoldOptions::default()
+        }
+    }
+
+    /// A flock belongs to the open file description, so a copy of the lock's descriptor shares
+    /// it: here a `dup`; in a process that folds and spawns, the copy a child forked by another
+    /// thread holds until its `exec`. A finished fold unlocks, so the next fold runs at once
+    /// while such a copy is still open.
+    #[test]
+    fn a_finished_fold_frees_the_store_while_a_copy_of_its_descriptor_is_open() {
+        let (dir, store) = foldable();
+        let held = lock(&store).unwrap().expect("no fold holds the store");
+        let copy = rustix::io::dup(&held).unwrap();
+        drop(held);
+        assert!(
+            matches!(fold(dir.path(), &fixture_fold()).unwrap(), FoldRun::Done(_)),
+            "a forked child's copy of a finished fold's descriptor is not another fold"
+        );
+        drop(copy);
+    }
+
+    /// While another fold holds the store, a fold answers busy at once and writes nothing.
+    #[test]
+    fn a_held_store_answers_busy_and_nothing_is_written() {
+        let (dir, store) = foldable();
+        let held = lock(&store).unwrap().expect("no fold holds the store");
+        assert!(matches!(
+            fold(dir.path(), &fixture_fold()).unwrap(),
+            FoldRun::Busy
+        ));
+        assert!(!store.join("attestations.jsonl").exists());
+        assert!(!store.join(LATEST_FILE).exists());
+        assert!(!store.join(STORE_FILE).exists());
+        drop(held);
+    }
 
     /// Schema v3 (post-station-4 sprint): a store folded under v2 — rows keyed by `path` in a
     /// `files` table — is not migrated. The next fold takes the rebuild path and names why; the

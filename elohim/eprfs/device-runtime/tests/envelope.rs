@@ -652,6 +652,44 @@ fn hold_owner_keeps_the_lock_until_the_owner_is_gone() {
     assert_eq!(probe(&lock), Some(false));
 }
 
+/// The holder's lock belongs to its open file description, which a child forked by another
+/// thread shares until its `exec`. When the owner is gone the holder unlocks, so the lock is free
+/// at once even while such a copy of its descriptor is still open.
+#[test]
+fn hold_owner_frees_the_lock_while_a_copy_of_its_descriptor_is_open() {
+    use std::os::fd::BorrowedFd;
+    use std::os::unix::fs::MetadataExt;
+    let dir = resume_fixture();
+    let lock = dir.path().join("owner.lock");
+    let (l, root) = (lock.clone(), dir.path().to_owned());
+    let handle = std::thread::spawn(move || envelope::hold_owner(&l, 7, 42, &root));
+    let held = |lock: &Path| {
+        let file = std::fs::File::open(lock).ok()?;
+        Some(rustix::fs::flock(&file, rustix::fs::FlockOperation::NonBlockingLockShared).is_err())
+    };
+    while held(&lock) != Some(true) {
+        std::thread::yield_now();
+    }
+    // Copy the holder's own descriptor, as a forked child's copy of it: the descriptor in this
+    // process open on the lock's inode, duplicated, never a second open (its own description).
+    let inode = std::fs::metadata(&lock).unwrap().ino();
+    let copy = std::fs::read_dir("/proc/self/fd")
+        .unwrap()
+        .filter_map(|entry| entry.ok()?.file_name().to_str()?.parse::<i32>().ok())
+        .find_map(|fd| {
+            // SAFETY: `fd` was listed open in this process a moment ago; `dup` either copies the
+            // descriptor or fails, and the copy is checked against the lock's inode below.
+            let copy = rustix::io::dup(unsafe { BorrowedFd::borrow_raw(fd) }).ok()?;
+            let stat = rustix::fs::fstat(&copy).ok()?;
+            (stat.st_ino == inode).then_some(copy)
+        })
+        .expect("the holder's descriptor is open in this process");
+    std::fs::remove_dir_all(dir.path().join("7")).unwrap();
+    handle.join().unwrap().unwrap();
+    assert_eq!(held(&lock), Some(false), "the copy alone does not hold it");
+    drop(copy);
+}
+
 #[test]
 fn open_arms_new_generation_before_save_and_rearms_a_live_record() {
     let dir = resume_fixture();

@@ -3,6 +3,7 @@
 pub mod bin_store;
 pub mod commit_attribution;
 pub mod envelope;
+pub mod flock;
 pub mod layout;
 pub mod manifest_store;
 pub mod session;
