@@ -116,10 +116,21 @@ pub struct DaemonRecord {
     pub sock: String,
 }
 
-/// The exclusive device lock, held for the mux's life and released when dropped.
+/// The exclusive device lock, held for the mux's life and released when dropped. The release is
+/// an unlock in `Drop`, not the close: the mux spawns servers, and a child forked by another
+/// thread holds a copy of the descriptor until its `exec`, through which a lock released by close
+/// alone would stay held. (A private guard: this crate does not depend on `elohim-device-runtime`,
+/// whose `flock::Flock` is the same shape.)
 #[derive(Debug)]
 pub struct ServeLock {
-    _file: File,
+    file: File,
+}
+
+impl Drop for ServeLock {
+    fn drop(&mut self) {
+        // A failed unlock leaves the close that follows to release it, as before.
+        let _ = rustix::fs::flock(&self.file, rustix::fs::FlockOperation::Unlock);
+    }
 }
 
 impl ServeLock {
@@ -137,7 +148,7 @@ impl ServeLock {
             .append(true)
             .open(path)?;
         match rustix::fs::flock(&file, rustix::fs::FlockOperation::NonBlockingLockExclusive) {
-            Ok(()) => Ok(Some(ServeLock { _file: file })),
+            Ok(()) => Ok(Some(ServeLock { file })),
             Err(errno) if errno == rustix::io::Errno::WOULDBLOCK => Ok(None),
             Err(errno) => Err(errno.into()),
         }
@@ -326,6 +337,23 @@ mod tests {
         assert_eq!(a.len(), 12);
         assert!(a.chars().all(|c| c.is_ascii_hexdigit()));
         assert_ne!(a, b);
+    }
+
+    /// The device lock belongs to its open file description, which a child the mux forks shares
+    /// until its `exec`. A dropped lock unlocks, so the next resident takes it at once even while
+    /// such a copy of the descriptor is still open.
+    #[test]
+    fn a_dropped_device_lock_is_free_while_a_copy_of_its_descriptor_is_open() {
+        let dir = tempfile::tempdir().unwrap();
+        let lock = device_lock(dir.path());
+        let first = ServeLock::try_acquire(&lock).unwrap().expect("free");
+        let copy = rustix::io::dup(&first.file).unwrap();
+        drop(first);
+        assert!(
+            ServeLock::try_acquire(&lock).unwrap().is_some(),
+            "a forked child's copy of the descriptor is not a second resident"
+        );
+        drop(copy);
     }
 
     #[test]
