@@ -29,6 +29,7 @@
         "consultation",
         "would-have",
         "steward-ping",
+        "tool-pending-observed",
         "observation-gap",
         "shift-marker",
         "harness-exception",
@@ -170,37 +171,54 @@
       "additionalProperties": false
     },
     "source": {
-      "description": "Source hook provenance. PermissionRequest has no tool-use id of its own; precedingToolUseId records a preceding PreToolUse only when correlation supports that match.",
-      "type": "object",
-      "required": [
-        "hookEvent"
-      ],
-      "properties": {
-        "hookEvent": {
-          "type": "string"
+      "description": "Event provenance: either the session's existing hook source or an outside watcher observation.",
+      "oneOf": [
+        {
+          "type": "object",
+          "required": [
+            "hookEvent"
+          ],
+          "properties": {
+            "hookEvent": {
+              "type": "string"
+            },
+            "promptId": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "toolUseId": {
+              "description": "The source event's own tool-use id, where it has one.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "precedingToolUseId": {
+              "description": "The preceding PreToolUse id used to correlate a PermissionRequest; null when no reliable match is available.",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "additionalProperties": false
         },
-        "promptId": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "toolUseId": {
-          "description": "The source event's own tool-use id, where it has one.",
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "precedingToolUseId": {
-          "description": "The preceding PreToolUse id used to correlate a PermissionRequest; null when no reliable match is available.",
-          "type": [
-            "string",
-            "null"
-          ]
+        {
+          "type": "object",
+          "required": [
+            "observer"
+          ],
+          "properties": {
+            "observer": {
+              "type": "string",
+              "pattern": "^watcher:.+$"
+            }
+          },
+          "additionalProperties": false
         }
-      },
-      "additionalProperties": false
+      ]
     },
     "inputDigest": {
       "description": "SHA-256 of canonical tool_input JSON (sorted keys, compact separators); never raw arguments.",
@@ -217,6 +235,11 @@
     "tool": {
       "type": "string",
       "minLength": 1
+    },
+    "pendingSince": {
+      "description": "When an outside watcher first observed the tool pending; absent falls back to the event wall time.",
+      "type": "string",
+      "format": "date-time"
     },
     "effectClass": {
       "type": "string",
@@ -689,6 +712,52 @@
                 "const": "Notification"
               }
             }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "tool-pending-observed"
+          }
+        },
+        "required": [
+          "kind"
+        ]
+      },
+      "then": {
+        "required": [
+          "source",
+          "tool"
+        ],
+        "properties": {
+          "source": {
+            "required": [
+              "observer"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "source": {
+            "required": [
+              "observer"
+            ]
+          }
+        },
+        "required": [
+          "source"
+        ]
+      },
+      "then": {
+        "properties": {
+          "kind": {
+            "const": "tool-pending-observed"
           }
         }
       }

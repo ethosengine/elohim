@@ -10,7 +10,7 @@ use serde_json::Value;
 
 use crate::session::{SessionIdentity, Source};
 
-/// Every journal event kind the fold models (the schema's thirteen).
+/// Every journal event kind the fold models.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EventKind {
     /// A call reached permission handling.
@@ -31,6 +31,8 @@ pub enum EventKind {
     WouldHave,
     /// The steward asked for attention or progress.
     StewardPing,
+    /// An outside watcher observed a tool call that remains pending.
+    ToolPendingObserved,
     /// Observation was incomplete.
     ObservationGap,
     /// A skill shift opened or closed.
@@ -42,7 +44,7 @@ pub enum EventKind {
 }
 
 /// The schema's event kinds, in schema order.
-pub const SCHEMA_KINDS: [&str; 13] = [
+pub const SCHEMA_KINDS: [&str; 14] = [
     "permission-requested",
     "dialog-displayed",
     "prompt-closed",
@@ -52,6 +54,7 @@ pub const SCHEMA_KINDS: [&str; 13] = [
     "consultation",
     "would-have",
     "steward-ping",
+    "tool-pending-observed",
     "observation-gap",
     "shift-marker",
     "harness-exception",
@@ -71,6 +74,7 @@ impl EventKind {
             "consultation" => Self::Consultation,
             "would-have" => Self::WouldHave,
             "steward-ping" => Self::StewardPing,
+            "tool-pending-observed" => Self::ToolPendingObserved,
             "observation-gap" => Self::ObservationGap,
             "shift-marker" => Self::ShiftMarker,
             "harness-exception" => Self::HarnessException,
@@ -78,6 +82,21 @@ impl EventKind {
             _ => return None,
         })
     }
+}
+
+/// Provenance declared by a journal event.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum EventSource {
+    /// A hook event emitted by the session's own runtime adapter.
+    Hook {
+        /// The hook event name.
+        hook_event: String,
+    },
+    /// An observation emitted by a watcher outside the session.
+    Observer {
+        /// The `watcher:<name>` observer identity.
+        observer: String,
+    },
 }
 
 /// Presence disposition.
@@ -367,10 +386,14 @@ pub struct Event {
     pub uptime_seconds: f64,
     /// Presence at this event.
     pub presence: Presence,
+    /// Hook or outside-observer provenance, when declared.
+    pub source: Option<EventSource>,
     /// Shift marker payload.
     pub shift: Option<ShiftMarker>,
     /// Tool name.
     pub tool: Option<String>,
+    /// When the observer first saw the tool pending.
+    pub pending_since: Option<DateTime<Utc>>,
     /// Redacted shape.
     pub shape: Option<String>,
     /// Source duration in milliseconds.
@@ -418,8 +441,16 @@ impl Event {
 
     /// When the human last interacted, as far as this event can tell.
     pub fn witness_at(&self) -> Option<DateTime<Utc>> {
+        if self.is_observer() {
+            return None;
+        }
         let age = self.presence.last_witnessed_age_seconds?;
         Some(self.wall - chrono::Duration::milliseconds((age * 1000.0) as i64))
+    }
+
+    /// Whether this record came from outside the session.
+    pub fn is_observer(&self) -> bool {
+        matches!(&self.source, Some(EventSource::Observer { .. }))
     }
 }
 
@@ -661,6 +692,32 @@ impl Event {
             None => None,
             Some(c) => Some(parse_consultation(c)?),
         };
+        let source = match v.get("source") {
+            None => None,
+            Some(s) => match (
+                s.get("hookEvent").and_then(Value::as_str),
+                s.get("observer").and_then(Value::as_str),
+            ) {
+                (Some(hook_event), None) => Some(EventSource::Hook {
+                    hook_event: hook_event.to_owned(),
+                }),
+                (None, Some(observer))
+                    if observer
+                        .strip_prefix("watcher:")
+                        .is_some_and(|name| !name.is_empty()) =>
+                {
+                    Some(EventSource::Observer {
+                        observer: observer.to_owned(),
+                    })
+                }
+                _ => return Err("source must declare one hookEvent or watcher observer".into()),
+            },
+        };
+        if matches!(&source, Some(EventSource::Observer { .. }))
+            && kind != EventKind::ToolPendingObserved
+        {
+            return Err("observer source is only valid for tool-pending-observed".into());
+        }
         let event = Self {
             kind,
             session,
@@ -679,8 +736,10 @@ impl Event {
                 .and_then(Value::as_f64)
                 .ok_or("clock.uptimeSeconds is required")?,
             presence,
+            source,
             shift,
             tool: opt_str(v.get("tool")),
+            pending_since: opt_time(v.get("pendingSince"), "pendingSince")?,
             shape: opt_str(v.get("shape")),
             duration_ms: v.get("durationMs").and_then(Value::as_f64),
             correlation,
@@ -722,6 +781,10 @@ impl Event {
             EventKind::PermissionRequested | EventKind::DialogDisplayed => need(
                 event.tool.is_some() && event.correlation.is_some(),
                 "tool and correlation",
+            )?,
+            EventKind::ToolPendingObserved => need(
+                event.tool.is_some() && matches!(&event.source, Some(EventSource::Observer { .. })),
+                "tool and observer source",
             )?,
             _ => {}
         }
