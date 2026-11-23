@@ -324,13 +324,32 @@ loads it there (path read, hook, deny rule, or "deleted, enforced by X"). Rules:
   (native code names them as a contract; update `report.rs`'s comment if wording changes).
 - Keep the heading "Session discipline and commit attribution" verbatim (the Codex preamble
   cites it) or edit the preamble in the same commit.
-- A home must be visible to Codex: an AgentDocPackage with both projections, a skill, or an
-  `.epr-meta` rule. A README is not a home for a rule. ts-rs trap → `elohim/elohim-storage` and
+- A home must be visible to Codex: an AgentDocPackage with both projections, or a skill. *(An
+  `.epr-meta` rule was listed here and is not one: `.codex/hooks.json` registers no resolver for
+  those rules, so they are surfaced to Claude on Edit/Write only. Corrected 2026-11-23 from the
+  move ledger.)* A README is not a home for a rule. ts-rs trap → `elohim/elohim-storage` and
   `elohim/sdk`; contentFormat rule → the seeder / lamad manifest directory.
 - One landing per section (CI/CD, mesh reference, gate knobs, architecture, schema). Each
   carries `[doc:cut] <destination>` touching the package, `CLAUDE.md`, `AGENTS.md` and both
   fixtures; a check that the destination holds the text; updated back-references
   (`.epr-meta/manifest.md`, seam map, sync rules); a berth announcement first.
+- **The ledger (2026-11-23).** 144 rows, each checked by a second reader; raw rows in
+  `genesis/local-dev/agents-arrive-briefed/move-ledger-raw-2026-11-23.json`, and each cut's rows
+  in its commit.
+
+  | Group | Bytes reviewed | To keep in root | Rows | Corrected by the check |
+  |---|---|---|---|---|
+  | `just` and mesh forms | 15,086 | 610 (landed as 1,824, with three traps and a lease sentence) | 37 | 5 |
+  | Gate knobs, pins, traps | 12,848 | 1,734 | 33 | 6 |
+  | Brit, done, recall, workflow, the two session-start triggers | 22,359 | 6,189 | 36 | 2 |
+  | Architecture, schema, gotchas, CI/CD, code style | 21,032 | 2,780 | 38 | 1 |
+
+  Findings that bind the remaining cuts: nothing denies `kubectl` or the Jenkins trigger tools
+  today (the settings file has no deny entries), so every command-triggered rule stays in root
+  until a deny rule or hook exists; the gate-knob reference has no home yet (a "Local gate knobs"
+  reference is proposed and must be a skill or packaged doc, not a README, to reach Codex); the
+  libp2p skill contradicts the root file on `with_codec` and must be reconciled before that
+  gotcha moves.
 - **Target**: measured kept rules plus router (expected 18–22 KB), recorded as `best_observed`
   and ratcheted. Growth refuses at pre-push beside `doc-cut` (a size check on root
   `CLAUDE.md`/`AGENTS.md`). The 12,000 B constant goes to the steward as one question (step 8).

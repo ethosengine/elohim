@@ -1,6 +1,6 @@
 ---
 name: seed-workflow
-description: Validate, seed, and verify Elohim content through the safe root just workflow; includes the no-dry-run safety boundary, statistics, diagnosis, and snapshot cautions.
+description: Validate, seed, and verify Elohim content through the safe root `just seed` workflow (`just seed validate`, `just seed apply` locally, on alpha, on the household mesh or for one logical id); includes the no-dry-run safety boundary, statistics, diagnosis, and snapshot cautions. Use it ahead of every `just seed apply` and when validating, seeding or diagnosing content.
 metadata:
   runtime: antigravity
   sourceRuntime: claude
@@ -26,6 +26,16 @@ just seed stats          # inspect resulting counts
 ```
 
 For alpha, use `just seed apply alpha`. Production seeding remains CI-owned.
+
+## Household mesh and canonical content
+
+These forms were moved verbatim from the root instructions on 2026-11-23:
+
+```bash
+just seed validate            # non-writing schema validation
+just seed apply mesh content  # seed the household mesh THIS host owns (env from hc-mesh.sh mesh_seed_env)
+just seed apply mesh content '' '<logical-id>'  # target canonical content; skips deployment bindings and projections
+```
 
 ## Important safety boundary
 

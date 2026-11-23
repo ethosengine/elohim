@@ -1,6 +1,6 @@
 ---
 index: false
-carried_by: "CLAUDE.md §Build & Test Commands (act structure)"
+carried_by: "hc-dev-orchestrator skill §Household mesh and `just` command reference (act structure; moved from CLAUDE.md §Build & Test Commands on 2026-11-23)"
 name: project_tests_layered_as_acts_of_one_story
 title: Tests layered as acts of one story
 id: project-tests-layered-as-acts-of-one-story

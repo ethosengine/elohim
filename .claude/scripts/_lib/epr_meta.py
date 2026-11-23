@@ -1372,7 +1372,7 @@ def _dna_hash_neutrality(write: dict) -> bool:
 _RAISE_TOLERANCE_DEFAULT = 1.0          # memory: incompressible, no ratification exists
 _RAISE_RECURRENCE_HARD_DEFAULT = 2      # projection of the measures.yaml lens (read below)
 _RAISE_RECURRENCE_LENS = "resource-limit-raise-recurrence"
-_HOSTED_AGENT_HEAP_MI = 786             # CLAUDE.md: "each hosted human costs ~786MB of conductor heap"
+_HOSTED_AGENT_HEAP_MI = 786             # hc-dev-orchestrator skill: "each hosted human costs ~786MB of conductor heap"
 _DOORWAY_MANIFEST_DIR = "genesis/orchestrator/manifests/doorway"
 _ARC_SCALING_SPEC = ("genesis/docs/superpowers/specs/"
                      "2026-06-13-conductor-authority-arc-memory-scaling.md")
