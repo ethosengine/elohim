@@ -117,6 +117,12 @@ before investing.
     to every always-on surface. `genesis/agentic/bin/pool-preflight.sh` (~2.9KB static
     reference text) is the first trim candidate once metered.
 
+    **DELIVERED 2026-11-22** (minimal): `session-open-context-bytes@1`, the declared sum of root
+    CLAUDE.md + the private memory index as loaded + `load-project-context.py`'s own output, folded
+    once per session by that hook (detached, fail-open); hard ceiling lens
+    `session-open-context-bytes-ceiling` at 100000 (starting bound, ratchet down), not on the
+    headline. Does NOT see the other SessionStart hooks' output.
+
 **Dynamics of the agentic layer** (from [Meadows](epr:meadows-systems-dynamics-cross-pollination-2026-08-11), mint pass 2026-08-11)
 
 16. **`retire-when:` on compose-gate rules, hooks, and sentinels — the intervenor's removal

@@ -27,11 +27,11 @@
     "language": "python",
     "interpreter": "python3",
     "path": ".claude/hooks/native-seam-guidance.py",
-    "body": "#!/usr/bin/env python3\n\"\"\"Advisory native seam guidance; normalization and classification belong to epr.\"\"\"\nimport json\nfrom pathlib import Path\nimport subprocess\nimport sys\nimport time\n\nroot = Path(__file__).resolve().parents[2]\nsys.path.insert(0, str(root / \".claude/scripts\"))\nfrom _lib import epr_client  # noqa: E402\n\n\ndef main():\n    started = time.monotonic()\n    try:\n        raw = sys.stdin.buffer.read(1572865)\n        if len(raw) > 1572864:\n            raise ValueError(\"event exceeds size limit\")\n        event = json.loads(raw)\n        harness = sys.argv[1] if len(sys.argv) > 1 else \"unknown\"\n        remaining = 1.8 - (time.monotonic() - started)\n        if remaining <= 0:\n            raise TimeoutError(\"normalization deadline\")\n        binary = epr_client.resolve_binary()\n        if binary is None:\n            raise FileNotFoundError(\"epr launcher is not on PATH\")\n        result = subprocess.run(\n            [binary, \"govern\", \"seam\", \"--repo\", str(root)],\n            input=json.dumps({\"harness\": harness, \"event\": event}),\n            text=True, capture_output=True, timeout=remaining, check=True,\n        )\n        report = json.loads(result.stdout)\n        if \"packet\" not in report:\n            raise ValueError(\"native evaluator does not support seam guidance\")\n        context = report[\"packet\"]\n        if not isinstance(context, str):\n            raise ValueError(\"native packet is not text\")\n        if len(context.encode(\"utf-8\")) > 8192:\n            raise ValueError(\"native packet exceeds 8 KiB\")\n    except (OSError, ValueError, subprocess.SubprocessError, TimeoutError) as error:\n        context = \"Seam guidance coverage gap: native evaluator unavailable, failed or timed out (\" + type(error).__name__ + \"). Existing governance gates remain in effect.\"\n    if context:\n        print(json.dumps({\"hookSpecificOutput\": {\"hookEventName\": \"PreToolUse\", \"additionalContext\": context}}))\n    return 0\n\n\nif __name__ == \"__main__\":\n    sys.exit(main())\n"
+    "body": "#!/usr/bin/env python3\n\"\"\"Advisory native seam guidance; normalization and classification belong to epr.\"\"\"\nimport json\nfrom pathlib import Path\nimport subprocess\nimport sys\nimport time\n\nRETIRE_WHEN = (\n    \"when the native evaluator supports every tool the harness can register this hook for, or the harness \"\n    \"carries seam guidance natively; until then the registration matcher names only Write|Edit|MultiEdit|NotebookEdit (claude; the last two have no adapter and announce a coverage gap on purpose) \"\n    \"and apply_patch (codex)\"\n)\n\nroot = Path(__file__).resolve().parents[2]\nsys.path.insert(0, str(root / \".claude/scripts\"))\nfrom _lib import epr_client  # noqa: E402\n\n\ndef main():\n    started = time.monotonic()\n    try:\n        raw = sys.stdin.buffer.read(1572865)\n        if len(raw) > 1572864:\n            raise ValueError(\"event exceeds size limit\")\n        event = json.loads(raw)\n        harness = sys.argv[1] if len(sys.argv) > 1 else \"unknown\"\n        remaining = 1.8 - (time.monotonic() - started)\n        if remaining <= 0:\n            raise TimeoutError(\"normalization deadline\")\n        binary = epr_client.resolve_binary()\n        if binary is None:\n            raise FileNotFoundError(\"epr launcher is not on PATH\")\n        result = subprocess.run(\n            [binary, \"govern\", \"seam\", \"--repo\", str(root)],\n            input=json.dumps({\"harness\": harness, \"event\": event}),\n            text=True, capture_output=True, timeout=remaining, check=True,\n        )\n        report = json.loads(result.stdout)\n        if \"packet\" not in report:\n            raise ValueError(\"native evaluator does not support seam guidance\")\n        context = report[\"packet\"]\n        if not isinstance(context, str):\n            raise ValueError(\"native packet is not text\")\n        if len(context.encode(\"utf-8\")) > 8192:\n            raise ValueError(\"native packet exceeds 8 KiB\")\n    except (OSError, ValueError, subprocess.SubprocessError, TimeoutError) as error:\n        context = \"Seam guidance coverage gap: native evaluator unavailable, failed or timed out (\" + type(error).__name__ + \"). Existing governance gates remain in effect.\"\n    if context:\n        print(json.dumps({\"hookSpecificOutput\": {\"hookEventName\": \"PreToolUse\", \"additionalContext\": context}}))\n    return 0\n\n\nif __name__ == \"__main__\":\n    sys.exit(main())\n"
   },
   "registration": {
     "event": "PreToolUse",
-    "matcher": ".*",
+    "matcher": "Write|Edit|MultiEdit|NotebookEdit",
     "type": "command",
     "command": "f=\"$CLAUDE_PROJECT_DIR/.claude/hooks/native-seam-guidance.py\"; [ -f \"$f\" ] && python3 \"$f\" claude || exit 0",
     "timeout": 2
@@ -39,14 +39,14 @@
   "registrations": {
     "claude": {
       "event": "PreToolUse",
-      "matcher": ".*",
+      "matcher": "Write|Edit|MultiEdit|NotebookEdit",
       "type": "command",
       "command": "f=\"$CLAUDE_PROJECT_DIR/.claude/hooks/native-seam-guidance.py\"; [ -f \"$f\" ] && python3 \"$f\" claude || exit 0",
       "timeout": 2
     },
     "codex": {
       "event": "PreToolUse",
-      "matcher": ".*",
+      "matcher": "apply_patch",
       "type": "command",
       "command": "f=\"$(git rev-parse --show-toplevel 2>/dev/null)/.codex/hooks/native-seam-guidance.py\"; [ -f \"$f\" ] && python3 \"$f\" codex || exit 0",
       "timeout": 2

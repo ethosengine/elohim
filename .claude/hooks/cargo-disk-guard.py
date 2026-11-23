@@ -707,17 +707,27 @@ def main():
     if ws and "CARGO_TARGET_DIR" not in command:
         release = bool(re.search(r"\s--release\b", command))
         slot = slot_for(ws, cwd, release)
-        hint = (
-            f"CARGO_TARGET_DIR={slot} " if slot
-            else "CARGO_TARGET_DIR=<pool slot from the SessionStart preflight block> "
+        pointer = (
+            f"(Slot: `bash {PROJECT_DIR}/genesis/agentic/bin/cargo-pool key` prints this "
+            f"directory's slot; `cargo-pool status` holds the full reference. "
+            f"DNA/WASM workspaces are exempt and must keep plain cargo.)"
         )
+        if slot:
+            body = (
+                f"Re-run with the pool slot inline, e.g.:\n  CARGO_TARGET_DIR={slot} {command}\n"
+            )
+        else:
+            body = (
+                f"No pool family could be derived here (detached HEAD or no valid family). "
+                f"Run `bash {PROJECT_DIR}/genesis/agentic/bin/cargo-pool key` from the "
+                f"workspace directory to get the slot, then re-run with "
+                f"CARGO_TARGET_DIR=<that slot> {command}\n"
+            )
         deny(
             f"POOL DISCIPLINE: heavy cargo in native workspace '{ws}' without "
             f"CARGO_TARGET_DIR — in-tree target/ dirs balloon the PVC (this is "
-            f"deterministic policy, not advice). Re-run with the pool slot "
-            f"inline, e.g.:\n  {hint}{command}\n"
-            f"(Slot map: SessionStart 'ELOHIM CARGO TARGET POOL' block. "
-            f"DNA/WASM workspaces are exempt and must keep plain cargo.)"
+            f"deterministic policy, not advice). {body}"
+            f"{pointer}"
         )
 
     io_pol = read_io_policy()

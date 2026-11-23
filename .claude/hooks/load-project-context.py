@@ -19,6 +19,15 @@ import os
 
 RECALL_TIMEOUT_S = 5  # foreground recall budget within the harness's 8-second hook timeout
 
+RETIRE_WHEN = (
+    "when the session-open context is metered by the harness or by the epr runtime itself "
+    "across every SessionStart injector (not just this hook's declared three surfaces), so a "
+    "per-hook sum of CLAUDE.md + memory index + own output has no reading left to add; the "
+    "meter section (session_open_bytes / _spawn_meter) then goes, the bootstrap rendering stays."
+)
+SESSION_OPEN_MEASURE = "session-open-context-bytes@1"
+MEMORY_INDEX_LINES = 200  # the harness loads the first 200 lines of a MEMORY.md index
+
 def load_relationships(project_dir: str) -> dict:
     """Load the file relationships configuration."""
     rel_path = os.path.join(project_dir, '.claude', 'file-relationships.json')
@@ -359,6 +368,97 @@ def _cached_context(project_dir: str, identity: dict) -> str:
             "SYNC HOOKS: .claude/file-relationships.json carries schemas + sync rules.")
 
 
+def _config_dir() -> str:
+    return os.environ.get('CLAUDE_CONFIG_DIR') or os.path.expanduser('~/.claude')
+
+
+def _file_bytes(path, max_lines=None) -> int:
+    """UTF-8 bytes of a file (first `max_lines` lines when given); 0 when unreadable."""
+    try:
+        with open(path, 'rb') as fh:
+            if max_lines is None:
+                return len(fh.read())
+            return sum(len(line) for _, line in zip(range(max_lines), fh))
+    except OSError:
+        return 0
+
+
+def _memory_root(project_dir: str) -> str:
+    """The checkout whose project slug keys auto-memory: the MAIN checkout, even from a worktree.
+
+    A worktree's `.git` is a FILE (`gitdir: <main>/.git/worktrees/<name>`); that gitdir's
+    `commondir` names the common .git directory, whose parent is the main root. No subprocess.
+    """
+    real = os.path.realpath(project_dir)
+    dot_git = os.path.join(real, '.git')
+    try:
+        if os.path.isfile(dot_git):
+            with open(dot_git, encoding='utf-8') as fh:
+                line = next((l for l in fh if l.startswith('gitdir:')), '')
+            gitdir = os.path.join(real, line.split(':', 1)[1].strip())
+            with open(os.path.join(gitdir, 'commondir'), encoding='utf-8') as fh:
+                common = os.path.realpath(os.path.join(gitdir, fh.read().strip()))
+            return os.path.dirname(common)
+    except (OSError, IndexError):
+        pass
+    return real
+
+
+def session_open_bytes(project_dir: str, hook_bytes: int, config_dir=None) -> dict:
+    """The session-open context as a DECLARED SUM of three named surfaces.
+
+    root CLAUDE.md bytes + the private memory index bytes as loaded (first 200 lines, at
+    <config>/projects/<project-slug>/memory/MEMORY.md) + the bytes this hook prints.
+    It does NOT see other SessionStart hooks' output; that is stated in the measure's
+    `procedure:` and is why the number is a floor, not the whole session-open cost.
+    """
+    import re
+    slug = re.sub(r'[^A-Za-z0-9]', '-', _memory_root(project_dir))
+    memory = os.path.join(config_dir or _config_dir(), 'projects', slug, 'memory', 'MEMORY.md')
+    surfaces = {
+        'claude_md': _file_bytes(os.path.join(project_dir, 'CLAUDE.md')),
+        'memory_index': _file_bytes(memory, MEMORY_INDEX_LINES),
+        'hook_output': max(0, int(hook_bytes)),
+    }
+    return {'surfaces': surfaces, 'total': sum(surfaces.values())}
+
+
+def _spawn_meter(project_dir: str, session_id: str, hook_bytes: int) -> None:
+    """Hand the once-per-session fold to a detached process; the foreground pays one Popen.
+
+    Fails open and silent: no session id, an existing marker, or any OSError means no fold.
+    Folding needs the epr binary (0.7-1.5 s on a loaded host), so it never runs in-line.
+    """
+    import subprocess
+    import tempfile
+    if not session_id:
+        return
+    try:
+        marker = os.path.join(tempfile.gettempdir(),
+                              f"claude-session-open-meter-{os.getuid()}-{session_id[:64]}")
+        os.close(os.open(marker, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600))
+        subprocess.Popen(
+            [sys.executable, os.path.abspath(__file__), '--meter', project_dir, session_id,
+             str(hook_bytes)],
+            stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            start_new_session=True,
+        )
+    except OSError:
+        pass
+
+
+def _run_meter(project_dir: str, session_id: str, hook_bytes: int) -> None:
+    obs = _observation_module(project_dir)
+    if obs is None:
+        return
+    reading = session_open_bytes(project_dir, hook_bytes)
+    parts = reading['surfaces']
+    obs.emit(SESSION_OPEN_MEASURE, '.', reading['total'],
+             reason=(f"session-open declared sum: CLAUDE.md {parts['claude_md']} + memory index "
+                     f"{parts['memory_index']} + load-project-context output {parts['hook_output']}"),
+             env={'session': session_id[:64]}, root=project_dir)
+
+
 def main():
     try:
         data = json.load(sys.stdin)
@@ -375,6 +475,11 @@ def main():
         context += "\nBOOTSTRAP:\n" + _epr_bootstrap_block(project_dir, data)
         print(json.dumps({'hookSpecificOutput': {'hookEventName': 'SessionStart',
                                                 'additionalContext': context}}))
+        sys.stdout.flush()
+        try:
+            _spawn_meter(project_dir, identity['session'] or '', len(context.encode()))
+        except Exception:  # noqa: BLE001 — the meter is a bonus; it never changes session start's output or exit
+            pass
     except json.JSONDecodeError:
         sys.exit(0)
     except Exception as e:
@@ -386,5 +491,10 @@ if __name__ == "__main__":
     if len(sys.argv) == 4 and sys.argv[1] == '--refresh':
         from pathlib import Path
         _refresh_context(sys.argv[2], Path(sys.argv[3]))
+    elif len(sys.argv) == 5 and sys.argv[1] == '--meter':
+        try:
+            _run_meter(sys.argv[2], sys.argv[3], int(sys.argv[4]))
+        except Exception:  # noqa: BLE001 — the meter is a bonus; never loud
+            pass
     else:
         main()

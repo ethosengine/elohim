@@ -36,9 +36,14 @@ legacy_native_bytes() { echo 1073741824; }
 stale_incremental_bytes() { echo 2147483648; }
 node_modules_stale_bytes() { echo 3221225472; }
 angular_cache_stale_bytes() { echo 1073741824; }
-worktrees_newer_than_marker() { return 0; }
+worktrees_newer_than_marker() { [ -z "${NEW_WTS:-}" ] || printf '%s\\n' "$NEW_WTS"; }
+disk_budget_for_worktree() { printf '30\\t12\\t%s\\n' "${BUDGET_VERDICT:-ok}"; }
 '''
         (self.bin / 'pool-lib.sh').write_text(library)
+        df = self.bin / 'df'  # the host's real disk must never decide a test
+        df.write_text('#!/bin/sh\necho "Filesystem 1K-blocks Used Available Capacity Mounted on"\n'
+                      'echo "fake 100 ${DF_PCT:-40} $((100 - ${DF_PCT:-40})) ${DF_PCT:-40}% /"\n')
+        df.chmod(0o755)
         git = self.bin / 'git'
         git.write_text('#!/bin/sh\ncase "$*" in *rev-parse*) echo fix/fixture;; *) exit 99;; esac\n')
         git.chmod(0o755)
@@ -86,15 +91,89 @@ worktrees_newer_than_marker() { return 0; }
         finally:
             hold.unlink()
         for text in cold:
-            self.assertIn('refresh pending (no completed pass)', text)
-            self.assertNotIn('0 removed', text)
-            self.assertIn('/family/fixture/elohim__elohim-storage/dev', text)
+            self.assertNotIn('stewardship', text)
         self.wait_report()
         warm = self.invoke()
-        for line in ('last completed pass', '1 removed', '10.0G', 'Legacy target/',
-                     'Stale incremental', 'Stale node_modules', 'Old .angular caches'):
-            self.assertIn(line, warm)
-        self.assertEqual(self.log.read_text().splitlines(), ['steward:0', 'size'])
+        self.assertIn('Worktree stewardship (pass ', warm)
+        self.assertIn('1 removed (merged-clean), 0 logged orphan/dirty', warm)
+        self.assertEqual(self.log.read_text().splitlines(), ['steward:0'])
+
+    def test_brief_is_at_most_three_lines_and_prints_no_slot_table(self):
+        self.invoke()
+        self.wait_report()
+        text = self.invoke(CARGO_TARGET_POOL_ROOT=str(self.pool))
+        lines = text.splitlines()
+        self.assertLessEqual(len(lines), 4, text)  # pool line, stewardship (non-zero), pointer
+        self.assertIn('family fixture', lines[0])
+        self.assertIn('% used', lines[0])
+        self.assertIn('cargo-pool key', text)
+        self.assertIn('cargo-pool status', text)
+        for gone in ('/family/', 'CARGO_TARGET_DIR=', 'Operator commands', 'release',
+                     'DNA / WASM', 'Legacy target/', 'Pool size'):
+            self.assertNotIn(gone, text)
+
+    def test_quiet_pass_prints_no_stewardship_line(self):
+        lib = (self.bin / 'pool-lib.sh').read_text().replace(
+            "printf 'cleaned\\tremoved\\tfixture\\tbranch\\n'", "printf 'x\\tleft\\tf\\tb\\n'")
+        (self.bin / 'pool-lib.sh').write_text(lib)
+        self.invoke()
+        self.wait_report()
+        text = self.invoke()
+        self.assertNotIn('stewardship', text)
+        self.assertEqual(len(text.splitlines()), 2, text)
+
+    def test_an_old_format_cache_line_is_never_printed(self):
+        self.invoke()
+        report = self.wait_report()
+        report.write_text('Worktree stewardship: 5 removed (merged-clean), 2 logged orphan/dirty, 1 left untouched.\\n')
+        text = self.invoke()
+        self.assertNotIn('stewardship', text)
+        self.assertNotIn('5 removed', text)
+
+    def test_a_short_new_worktree_prints_one_budget_line_and_others_print_nothing(self):
+        wt = self.root / 'wt-new'
+        wt.mkdir()
+        self.invoke(NEW_WTS=str(wt), BUDGET_VERDICT='short')
+        self.wait_report()
+        text = self.invoke()
+        budget = [l for l in text.splitlines() if 'Budget SHORT' in l]
+        self.assertEqual(len(budget), 1, text)
+        for needle in ('wt-new', '~30G', 'free 12G', 'cargo-pool estimate'):
+            self.assertIn(needle, budget[0])
+        (self.root / 'again').mkdir()
+        for stale in self.pool.glob('.preflight-*.txt'):
+            os.utime(stale, (time.time() - 300,) * 2)
+        self.invoke(NEW_WTS=str(wt), BUDGET_VERDICT='tight')
+        deadline = time.monotonic() + 5
+        while 'Budget SHORT' in self.invoke() and time.monotonic() < deadline:
+            time.sleep(.1)
+        self.assertNotIn('Budget SHORT', self.invoke())
+
+    def test_a_worktree_that_is_not_short_prints_no_budget_line(self):
+        wt = self.root / 'wt-new'
+        wt.mkdir()
+        self.invoke(NEW_WTS=str(wt), BUDGET_VERDICT='tight')
+        self.wait_report()
+        self.assertNotIn('Budget', self.invoke())
+
+    def test_warn_banner_at_85_percent_names_enforce(self):
+        text = self.invoke(DF_PCT='85')
+        lines = text.splitlines()
+        self.assertIn('85% used', lines[0])
+        self.assertTrue(lines[1].startswith('!  Disk pressure'), text)
+        self.assertIn('cargo-pool enforce --yes', text)
+        self.assertNotIn('CRITICAL', text)
+
+    def test_critical_banner_at_92_percent_says_heavy_cargo_is_denied(self):
+        text = self.invoke(DF_PCT='92')
+        self.assertTrue(text.splitlines()[1].startswith('!! CRITICAL DISK PRESSURE'), text)
+        self.assertIn('heavy cargo is DENIED at the hard ceiling', text)
+        self.assertIn('cargo-pool enforce --yes', text)
+
+    def test_healthy_disk_prints_no_banner(self):
+        text = self.invoke()
+        self.assertIn('volume 40% used', text.splitlines()[0])
+        self.assertNotIn('pressure', text.lower())
 
     def test_stale_report_survives_failed_refresh_and_keeps_age(self):
         self.invoke()
@@ -103,12 +182,11 @@ worktrees_newer_than_marker() { return 0; }
         stamp = time.time() - 180
         os.utime(report, (stamp, stamp))
         text = self.invoke(FAIL_SCAN='1')
-        self.assertRegex(text, r'refresh pending \(last pass 18\d+s ago\)')
         self.assertIn('1 removed', text)
         deadline = time.monotonic() + 5
-        while self.log.read_text().count('size') < 2 and time.monotonic() < deadline:
+        while self.log.read_text().count('steward:') < 2 and time.monotonic() < deadline:
             time.sleep(.05)
-        self.assertEqual(self.log.read_text().count('size'), 2)
+        self.assertEqual(self.log.read_text().count('steward:'), 2)
         self.assertEqual(report.read_bytes(), old)
         self.assertEqual(report.stat().st_mtime, stamp)
 
@@ -119,7 +197,7 @@ worktrees_newer_than_marker() { return 0; }
                                   stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
         try:
             self.assertEqual(holder.stdout.readline().strip(), 'ready')
-            self.assertIn('refresh pending', self.invoke())
+            self.assertNotIn('stewardship', self.invoke())
             # Wait for a direct contender too; it must return without calling stewardship.
             result = subprocess.run(['bash', str(self.bin / 'pool-preflight.sh'), '--refresh'],
                                     input='', capture_output=True, text=True, env=self.env, timeout=2)
@@ -132,9 +210,10 @@ worktrees_newer_than_marker() { return 0; }
         self.invoke(CARGO_TARGET_POOL_PREFLIGHT_DRY='1')
         self.wait_report()
         text = self.invoke(CARGO_TARGET_POOL_PREFLIGHT_DRY='1')
-        self.assertIn('(dry-run plan): 1 would remove', text)
+        self.assertIn('(dry-run plan, pass ', text)
+        self.assertIn('1 would remove', text)
         self.assertNotIn('1 removed', text)
-        self.assertEqual(self.log.read_text().splitlines(), ['steward:1', 'size'])
+        self.assertEqual(self.log.read_text().splitlines(), ['steward:1'])
 
 
 

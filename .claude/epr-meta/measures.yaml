@@ -341,6 +341,16 @@ measures:
     status: active
     established_by: memory-kit-replacement-station-1-2026-09-10
 
+  - id: session-open-context-bytes
+    version: 1
+    family: session-open
+    unit: bytes
+    procedure: ".claude/hooks/load-project-context.py — DECLARED SUM at SessionStart of root CLAUDE.md bytes + the private memory index bytes as loaded (first 200 lines) + the bytes this hook itself prints; folded once per session as `epr flow note --kind observation --measure session-open-context-bytes@1 --subject .`"
+    provenance: "genesis/data/timeline/backlog/agentic-context-tooling-consolidation-queue.md item 13 (no aggregate byte budget across the SessionStart injectors). NOT included: the other SessionStart hooks' output (participant-standing, cargo pool, dialogue-stasis, delivery gate, ram guard, device arrival) — this hook cannot see it; baseline 2026-11-22 puts those at ~7KB beside this hook's ~1KB"
+    default-authority: observation
+    status: active
+    established_by: agents-arrive-briefed-slice-0-2026-11-22
+
   - id: claude-md-edit-signal
     version: 1
     family: gospel
@@ -1959,6 +1969,22 @@ lenses:
     soft: 200
     status: active
     established_by: memory-kit-replacement-station-1-2026-09-10
+
+  - id: session-open-context-bytes-ceiling
+    version: 1
+    binding: binding-local
+    class: measure
+    consumes: [session-open-context-bytes@1]
+    context: session-open-context
+    soft: 95000  # 2026-11-22: re-measured declared sum 94531 (CLAUDE.md 71564 + private index 21892 + hook 1075), main checkout and worktree agree; first ratchet step
+    hard: 100000
+    status: active
+    established_by: agents-arrive-briefed-slice-0-2026-11-22
+    why: >
+      Starting bound, to be ratcheted DOWN: the 2026-11-22 baseline measured the declared sum
+      (CLAUDE.md 71564 + private MEMORY.md 21892 + this hook's 1075) at ~94.5KB, so 100000 is
+      that rounded up modestly. Deliberately NOT on the headline (the cost line's members are a
+      hardcoded Rust list) and not an inject lens: it is read by the fold, not pushed at agents.
 
   - id: claude-md-drift-score-ceiling
     version: 1

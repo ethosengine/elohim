@@ -6,6 +6,12 @@ import subprocess
 import sys
 import time
 
+RETIRE_WHEN = (
+    "when the native evaluator supports every tool the harness can register this hook for, or the harness "
+    "carries seam guidance natively; until then the registration matcher names only Write|Edit|MultiEdit|NotebookEdit (claude; the last two have no adapter and announce a coverage gap on purpose) "
+    "and apply_patch (codex)"
+)
+
 root = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(root / ".claude/scripts"))
 from _lib import epr_client  # noqa: E402

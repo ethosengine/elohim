@@ -17,8 +17,14 @@ Events (registered in .claude/settings.json):
                     so a command that died with `signal: 15` is explained in the same turn.
 
 Why per-session cursors: three or four sessions share one workspace; the shed that killed
-session A's cargo must reach A even if B already read the ledger. Cursor = line count of
-events.jsonl seen, at <store>/seen/<session_id>.
+session A's cargo must reach A even if B already read the ledger. Cursor = the timestamp (float
+seconds) of the newest event the session has been shown, at <store>/seen/<session_id>; unseen =
+events with a greater ts. A time cursor cannot be shifted by the daemon trimming the ledger head
+(the daemon alone owns the ledger; this hook never rewrites it). At --event session with source
+"startup" (or no source and no cursor yet) the cursor is set to the ledger's newest ts, so "since
+your last look" means since this session began; resume/compact/clear leave an existing cursor
+alone, so a shed before a compaction is still shown afterwards. A legacy integer cursor (a line
+count, < 1e9) is converted on first read.
 """
 
 # Counted by _lib/intervenor_census.py. A condition, never a date.
@@ -43,6 +49,10 @@ PROJECT_DIR = os.environ.get("CLAUDE_PROJECT_DIR", "/projects/elohim")
 HOOK_DIR = os.path.dirname(os.path.abspath(__file__))
 DAEMON = os.path.join(PROJECT_DIR, "genesis", "agentic", "bin", "ram-guard")
 STALE_SECONDS = 30  # the daemon writes state every poll (2s); 30s of silence = not running
+HOOK_TIMEOUT_S = 10  # the SessionStart hook timeout registered in .claude/settings.json; keep in step
+SESSION_DEADLINE_S = 8.0  # whole SessionStart subprocess budget; must stay under HOOK_TIMEOUT_S
+STEP_TIMEOUT_S = 6  # ceiling for any one subprocess; the remaining deadline caps it further
+MIN_STEP_S = 0.2  # below this much remaining time a step is skipped, not started
 
 
 def _load(path, name):
@@ -222,39 +232,91 @@ def _cursor_path(d, session_id):
     return os.path.join(d, "seen", safe)
 
 
-def unseen_events(d, session_id):
-    """Events appended since this session last looked; advances the cursor."""
-    path = os.path.join(d, "events.jsonl")
+def _read_events(d):
+    """Parsed events in ledger order (lines that do not parse or carry no numeric ts are skipped)."""
+    out = []
     try:
-        with open(path) as f:
-            lines = f.readlines()
-    except Exception:
-        lines = []
-    cp = _cursor_path(d, session_id)
-    try:
-        with open(cp) as f:
-            seen = int(f.read().strip() or 0)
-    except Exception:
-        seen = 0
-    if seen > len(lines):  # ledger rotated
-        seen = 0
-    new = []
-    for line in lines[seen:]:
-        try:
-            new.append(json.loads(line))
-        except Exception:
-            pass
-    try:
-        os.makedirs(os.path.dirname(cp), exist_ok=True)
-        with open(cp, "w") as f:
-            f.write(str(len(lines)))
+        with open(os.path.join(d, "events.jsonl")) as f:
+            for line in f:
+                try:
+                    e = json.loads(line)
+                    float(e["ts"])
+                    out.append(e)
+                except Exception:
+                    pass
     except Exception:
         pass
+    return out
+
+
+def _newest_ts(events):
+    return max((float(e["ts"]) for e in events), default=0.0)
+
+
+def _write_cursor(cp, ts):
+    """Atomic per-session write (temp + rename); each session owns its own file."""
+    try:
+        os.makedirs(os.path.dirname(cp), exist_ok=True)
+        tmp = f"{cp}.{os.getpid()}.tmp"
+        with open(tmp, "w") as f:
+            f.write(repr(float(ts)))
+        os.replace(tmp, cp)
+    except Exception:
+        pass
+
+
+def _read_cursor(cp, events):
+    """(cursor_ts, converted). None when the file is absent. A legacy line-count cursor (an integer
+    below 1e9) becomes the ts of the newest event it had seen (line index n-1), or the newest ts when
+    it points past the end."""
+    try:
+        with open(cp) as f:
+            text = f.read().strip()
+    except Exception:
+        return None, False
+    try:
+        if text.isdigit() and int(text) < 1e9:
+            n = int(text)
+            if n <= 0:
+                return 0.0, True
+            if n <= len(events):
+                return float(events[n - 1]["ts"]), True
+            return _newest_ts(events), True
+        return float(text), False
+    except Exception:
+        return 0.0, False
+
+
+def start_session_cursor(d, session_id, source=None):
+    """SessionStart: put this session's cursor at the newest event, so only events that occur during
+    the session are 'new' -- but only on a real start. `source` is the SessionStart payload field:
+    "startup" sets it; "resume"/"compact"/"clear" leave an existing cursor untouched (same session id,
+    and a shed before a compaction must still be shown); with no existing cursor any source sets it."""
+    cp = _cursor_path(d, session_id)
+    events = _read_events(d)
+    existing, _ = _read_cursor(cp, events)
+    if source == "startup" or existing is None:
+        ts = _newest_ts(events)
+        _write_cursor(cp, ts)
+        return ts
+    return existing
+
+
+def unseen_events(d, session_id):
+    """Events newer than this session's cursor (ts greater); advances the cursor."""
+    events = _read_events(d)
+    cp = _cursor_path(d, session_id)
+    seen, converted = _read_cursor(cp, events)
+    seen = seen or 0.0
+    new = [e for e in events if float(e["ts"]) > seen]
+    top = max([seen] + [float(e["ts"]) for e in new])
+    if new or converted:
+        _write_cursor(cp, top)
     return new
 
 
 def _fmt_event(e):
-    return (f"  - {time.strftime('%H:%M:%S', time.localtime(e['ts']))} shed {e['tier']} {e['comm']} "
+    return (f"  - {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(e['ts']))} shed {e['tier']} {e['comm']} "
             f"({e.get('rss_kb', 0) // 1024}MB, age {e.get('age_s', '?')}s) at {e['pct']}% — {e['cmd'][:100]}")
 
 
@@ -287,12 +349,51 @@ def _emit(event_name, text, deny=None):
     print(json.dumps({"hookSpecificOutput": out}))
 
 
-def ensure_daemon():
+class Budget:
+    """One overall deadline handed down to every subprocess as the time that remains."""
+
+    def __init__(self, total=SESSION_DEADLINE_S, clock=None):
+        clock = clock or time.monotonic
+        self.clock = clock
+        self.total = total
+        self.t0 = clock()
+
+    def remaining(self):
+        return max(0.0, self.total - (self.clock() - self.t0))
+
+    def step_timeout(self, cap=STEP_TIMEOUT_S):
+        """Seconds this step may take, or None when too little time is left to start it."""
+        left = self.remaining()
+        return None if left < MIN_STEP_S else min(cap, left)
+
+
+class DeadlineSkipped(Exception):
+    pass
+
+
+def _run_step(budget, run, argv):
+    t = budget.step_timeout()
+    if t is None:
+        raise DeadlineSkipped()
+    return run(argv, capture_output=True, text=True, timeout=t)
+
+
+def _reason(e):
+    if isinstance(e, subprocess.TimeoutExpired):
+        return f"timed out after {float(e.timeout):.1f}s"
+    return f"{type(e).__name__}: {str(e)[:80]}"
+
+
+def ensure_daemon(budget=None, run=None):
+    run = run or subprocess.run
+    budget = budget or Budget()
     try:
-        r = subprocess.run([sys.executable, DAEMON, "start"], capture_output=True, text=True, timeout=6)
+        r = _run_step(budget, run, [sys.executable, DAEMON, "start"])
         return (r.stdout or r.stderr).strip()
+    except DeadlineSkipped:
+        return "ram-guard start skipped (session deadline spent)"
     except Exception as e:
-        return f"ram-guard start failed: {e!r}"
+        return f"ram-guard start failed: {_reason(e)}"
 
 
 IO_GUARD = os.path.join(PROJECT_DIR, "genesis", "agentic", "bin", "io-guard")
@@ -377,34 +478,53 @@ def berth_overrun_check():
         pass
 
 
-def io_guard_and_berth_lines(session):
+def io_guard_and_berth_lines(session, budget=None, run=None):
     """SessionStart: ensure io-guard (sibling daemon, write budget) and moor this session on the berth
     so the workspace knows who is here. Model/lab are unknown to a hook — the agent completes its own
-    mooring with `berth moor --model <id> --lab <vendor> --task '<lane>'`."""
+    mooring with `berth moor --model <id> --lab <vendor> --task '<lane>'`.
+
+    Every subprocess gets the time that remains of one overall `budget` (SESSION_DEADLINE_S, under
+    HOOK_TIMEOUT_S), so a slow first step shortens the later ones. A step the
+    deadline leaves no room for is skipped, and one line names what was skipped."""
+    run = run or subprocess.run
+    budget = budget or Budget()
     out = []
+    skipped = []
     try:
-        subprocess.run([sys.executable, IO_GUARD, "start"], capture_output=True, text=True, timeout=6)
-        r = subprocess.run([sys.executable, IO_GUARD, "status", "--brief"], capture_output=True, text=True, timeout=6)
+        _run_step(budget, run, [sys.executable, IO_GUARD, "start"])
+        r = _run_step(budget, run, [sys.executable, IO_GUARD, "status", "--brief"])
         out.append((r.stdout or r.stderr).strip() or "IO-GUARD: no status")
+    except DeadlineSkipped:
+        skipped.append("io-guard")
     except Exception as e:
-        out.append(f"IO-GUARD: unavailable ({e!r})")
+        out.append(f"IO-GUARD: unavailable ({_reason(e)})")
     try:
-        r = subprocess.run([sys.executable, BERTH, "moor", "--session", session, "--runtime", "claude-code",
-                        "--principal", os.environ.get("USER_EMAIL") or os.environ.get("USER") or "operator",
-                        "--pid", str(owner_pid())],
-                       capture_output=True, text=True, timeout=6)
+        r = _run_step(budget, run, [sys.executable, BERTH, "moor", "--session", session, "--runtime", "claude-code",
+                                    "--principal", os.environ.get("USER_EMAIL") or os.environ.get("USER") or "operator",
+                                    "--pid", str(owner_pid())])
         if r.returncode:
             raise RuntimeError(f"moor exited {r.returncode}")
-        r = subprocess.run([sys.executable, BERTH, "status"], capture_output=True, text=True, timeout=6)
-        st = (r.stdout or "").strip().splitlines()
-        held = [l.strip() for l in st if " held by " in l or "/" in l.split()[1:2]]
+        held = None
+        try:
+            r = _run_step(budget, run, [sys.executable, BERTH, "status"])
+            st = (r.stdout or "").strip().splitlines()
+            held = [l.strip() for l in st if " held by " in l or "/" in l.split()[1:2]]
+        except DeadlineSkipped:
+            skipped.append("berth status")
+        lease_note = (" · leases: unknown (berth status skipped)" if held is None
+                      else " · leases: " + "; ".join(held) if held else " · no leases held")
         out.append(f"BERTH: moored as {session} (claude-code; complete it: `berth moor --model <id> --lab <vendor> --task '<lane>'`)"
-                   + (" · leases: " + "; ".join(held) if held else " · no leases held")
+                   + lease_note
                    + " · claim before mesh/cargo/disk-heavy work: `berth claim <resource>`; `berth status|ledger`")
         out.append(f"Arm Monitor before the first long wait: `berth inbox --session {session} --reader main --follow`")
         out.append(f"Once work is named: `berth moor --session {session} --writes <globs> --task <text>`; run `berth holds <paths>` before the first write.")
+    except DeadlineSkipped:
+        skipped.append("berth moor/status")
     except Exception as e:
-        out.append(f"BERTH: unavailable ({e!r})")
+        out.append(f"BERTH: unavailable ({_reason(e)})")
+    if skipped:
+        out.append(f"SESSION-START: skipped {', '.join(skipped)} — the {budget.total:g}s deadline was spent "
+                   f"(hook timeout {HOOK_TIMEOUT_S}s, .claude/settings.json); run them by hand if needed")
     return "\n".join(out)
 
 
@@ -418,8 +538,10 @@ def main(argv):
     d = store_dir()
 
     if event == "session":
-        started = ensure_daemon()
-        time.sleep(0.5)
+        budget = Budget()
+        start_session_cursor(d, session, data.get("source") if isinstance(data, dict) else None)
+        started = ensure_daemon(budget)
+        time.sleep(min(0.5, budget.remaining()))
         state = read_state(d)
         if is_stale(state):
             line = f"RAM-GUARD: {started} — no fresh state yet; `genesis/agentic/bin/ram-guard status`"
@@ -427,7 +549,7 @@ def main(argv):
             line = (f"RAM-GUARD {state['level'].upper()}: {_pressure_line(state)} · memory.oom.group={state.get('oom_group')} "
                     f"memory.high={state.get('memory_high')} · sheds compile trees at high, the full ladder at hard; "
                     f"`genesis/agentic/bin/ram-guard status|plan`")
-        line += "\n" + io_guard_and_berth_lines(session)
+        line += "\n" + io_guard_and_berth_lines(session, budget)
         _emit("SessionStart", line)
         return
 
