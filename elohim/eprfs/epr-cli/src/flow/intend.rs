@@ -41,10 +41,11 @@ const CLOSURE_PREFIX: &str = "closure:";
 const SUPERSEDES_PREFIX: &str = "supersedes:";
 const VIA_PREFIX: &str = "via:";
 
-/// One of the five mutually exclusive authoring acts.
+/// One of the six mutually exclusive authoring acts.
 pub enum IntendMode<'a> {
     Raise(RaiseRequest<'a>),
     Verified(VerifiedRequest<'a>),
+    Misses(MissesRequest<'a>),
     Land(LandRequest<'a>),
     Withdraw(WithdrawRequest<'a>),
     Dismiss(DismissRequest<'a>),
@@ -65,6 +66,15 @@ pub struct RaiseRequest<'a> {
 pub struct VerifiedRequest<'a> {
     pub intent: &'a str,
     pub gate_s: Option<u64>,
+}
+
+pub struct MissesRequest<'a> {
+    pub intent: &'a str,
+    pub commit: &'a str,
+    pub git_ref: &'a str,
+    pub misses: &'a [String],
+    pub p90: &'a [String],
+    pub wait_until: Option<u64>,
 }
 
 pub struct LandRequest<'a> {
@@ -248,6 +258,7 @@ pub fn intend(root: &Path, request: &IntendRequest<'_>) -> FlowResult<IntendOutc
     match &request.mode {
         IntendMode::Raise(req) => raise(root, req, &records, &mut store, &common),
         IntendMode::Verified(req) => verified(root, req, &records, &mut store, &common),
+        IntendMode::Misses(req) => misses(root, req, &records, &mut store, &common),
         IntendMode::Land(req) => land(root, req, &records, &mut store, &common),
         IntendMode::Withdraw(req) => withdraw(root, req, &records, &mut store, &common),
         IntendMode::Dismiss(req) => dismiss(root, req, &records, &mut store, &common),
@@ -277,6 +288,19 @@ fn validate_request(mode: &IntendMode<'_>) -> FlowResult<()> {
         }
         IntendMode::Verified(request) => {
             parse_cid(request.intent)?;
+        }
+        IntendMode::Misses(request) => {
+            parse_cid(request.intent)?;
+            validate_oid(request.commit, "--commit")?;
+            validate_self_ref(request.git_ref)?;
+            let misses = parse_pairs(request.misses, "--miss", PairRule::HexValue)?;
+            if misses.is_empty() {
+                return Err(FlowError::InvalidArguments(
+                    "intend --misses needs at least one --miss <project>=<closure>".to_string(),
+                ));
+            }
+            let p90 = parse_pairs(request.p90, "--p90", PairRule::AnyValue)?;
+            validate_p90(&p90, &misses)?;
         }
         IntendMode::Land(request) => {
             parse_cid(request.intent)?;
@@ -580,6 +604,88 @@ fn verified(
     let parsed = event_as_ref(&event)?;
     let outcome = outcome_from_event(OutcomeEvent {
         mode: "verified",
+        root,
+        intent: &intent,
+        change: &data.change,
+        event: parsed,
+        appended: true,
+        superseded: data.supersedes,
+        state: None,
+    });
+    store.append(event)?;
+    Ok(IntendOutcome {
+        event: Some(event_cid.to_string()),
+        ..outcome
+    })
+}
+
+fn misses(
+    root: &Path,
+    request: &MissesRequest<'_>,
+    records: &[(Cid, FlowRecord)],
+    store: &mut impl FlowStore,
+    common: &EventCommon<'_>,
+) -> FlowResult<IntendOutcome> {
+    let intent = parse_cid(request.intent)?;
+    validate_oid(request.commit, "--commit")?;
+    validate_self_ref(request.git_ref)?;
+    let data = own_atom(records, &intent).ok_or_else(|| {
+        FlowError::UnknownResource(format!(
+            "{} (misses must name an own intent atom)",
+            request.intent
+        ))
+    })?;
+    let misses = parse_pairs(request.misses, "--miss", PairRule::HexValue)?;
+    if misses.is_empty() {
+        return Err(FlowError::InvalidArguments(
+            "intend --misses needs at least one --miss <project>=<closure>".to_string(),
+        ));
+    }
+    let p90 = parse_pairs(request.p90, "--p90", PairRule::AnyValue)?;
+    validate_p90(&p90, &misses)?;
+    if let Some(existing) =
+        matching_misses_event(records, &intent, request.commit, request.git_ref, &misses)
+    {
+        return Ok(outcome_from_event(OutcomeEvent {
+            mode: "misses",
+            root,
+            intent: &intent,
+            change: &data.change,
+            event: existing,
+            appended: false,
+            superseded: data.supersedes,
+            state: None,
+        }));
+    }
+    let raise = raise_event(records, &intent).ok_or_else(|| {
+        FlowError::InvalidArguments(format!(
+            "intent {intent} has no local raise event; re-raise the intent before posting misses"
+        ))
+    })?;
+    let raise_env = event_env(raise);
+    let mut env = BTreeMap::new();
+    for key in ["at", "dseq", "session"] {
+        if let Some(value) = raise_env.get(key) {
+            env.insert(key.to_string(), (*value).to_string());
+        }
+    }
+    env.insert("base".to_string(), data.base.clone());
+    env.insert("change".to_string(), data.change.clone());
+    env.insert("commit".to_string(), request.commit.to_string());
+    env.insert("miss".to_string(), joined_closures(&misses));
+    env.insert("ref".to_string(), request.git_ref.to_string());
+    env.insert("tree".to_string(), data.tree.clone());
+    if !p90.is_empty() {
+        env.insert("p90".to_string(), joined_closures(&p90));
+    }
+    if let Some(wait_until) = request.wait_until {
+        env.insert("wait_until".to_string(), wait_until.to_string());
+    }
+    let event = event_record("misses", ReaVerb::Cite, intent, vec![], env, common);
+    let event_cid = event.cid()?;
+    let parsed = event_as_ref(&event)?;
+    let outcome = outcome_from_event(OutcomeEvent {
+        mode: "misses",
         root,
         intent: &intent,
         change: &data.change,
@@ -924,6 +1030,35 @@ fn own_event<'a>(
     })
 }
 
+fn matching_misses_event<'a>(
+    records: &'a [(Cid, FlowRecord)],
+    intent: &Cid,
+    commit: &str,
+    git_ref: &str,
+    misses: &BTreeMap<String, String>,
+) -> Option<&'a FlowEvent> {
+    records.iter().find_map(|(_, record)| match record {
+        FlowRecord::Event(event)
+            if event.resource == *intent
+                && !event
+                    .classified_as
+                    .iter()
+                    .any(|value| value.starts_with(VIA_PREFIX))
+                && slot(&event.classified_as, MEASURE_SLOT_PREFIX) == Some(LANDING_MEASURE)
+                && slot(&event.classified_as, REASON_SLOT_PREFIX) == Some("misses") =>
+        {
+            let env = event_env(event);
+            (env.get("commit") == Some(&commit)
+                && env.get("ref") == Some(&git_ref)
+                && env
+                    .get("miss")
+                    .is_some_and(|raw| parse_joined_closures(raw) == *misses))
+            .then_some(event)
+        }
+        _ => None,
+    })
+}
+
 fn raise_event<'a>(records: &'a [(Cid, FlowRecord)], intent: &Cid) -> Option<&'a FlowEvent> {
     own_event(records, intent, "raise")
 }
@@ -1036,6 +1171,7 @@ fn slot<'a>(slots: &'a [String], prefix: &str) -> Option<&'a str> {
 
 enum PairRule {
     HexValue,
+    AnyValue,
     Capsule,
 }
 
@@ -1075,6 +1211,7 @@ fn parse_pairs(
                     "{flag} key `{key}` must match [a-z][a-z0-9_]*"
                 )))
             }
+            PairRule::AnyValue => {}
             _ => {}
         }
         if out.insert(key.to_string(), value.to_string()).is_some() {
@@ -1084,6 +1221,38 @@ fn parse_pairs(
         }
     }
     Ok(out)
+}
+
+fn validate_p90(
+    p90: &BTreeMap<String, String>,
+    misses: &BTreeMap<String, String>,
+) -> FlowResult<()> {
+    for (project, seconds) in p90 {
+        if !misses.contains_key(project) {
+            return Err(FlowError::InvalidArguments(format!(
+                "--p90 project `{project}` must also appear in --miss"
+            )));
+        }
+        seconds.parse::<u64>().map_err(|_| {
+            FlowError::InvalidArguments(format!(
+                "--p90 `{project}={seconds}` needs nonnegative integer seconds"
+            ))
+        })?;
+    }
+    Ok(())
+}
+
+fn validate_self_ref(raw: &str) -> FlowResult<()> {
+    if raw.starts_with("refs/heads/self/")
+        && raw.len() > "refs/heads/self/".len()
+        && !raw.contains(['\n', '\r'])
+    {
+        Ok(())
+    } else {
+        Err(FlowError::InvalidArguments(format!(
+            "--ref must be one refs/heads/self/<name> line, got `{raw}`"
+        )))
+    }
 }
 
 fn validate_change(raw: &str) -> FlowResult<()> {

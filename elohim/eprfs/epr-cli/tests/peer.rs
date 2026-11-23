@@ -21,8 +21,8 @@ use elohim_epr_rea::{
     ReaVerb, ResourceSpec, SidecarFlowStore, SidecarRoster,
 };
 use eprfs_peer::{
-    project_channel, via_device, CrossingAllowList, DeviceHead, HeadTable, PeerConfig, PeerDaemon,
-    PeerKey, Rules, RulesState, StorePlace,
+    fold_events, project_channel, via_device, ChannelEvent, CrossingAllowList, DeviceHead,
+    HeadTable, PeerConfig, PeerDaemon, PeerKey, Rules, RulesState, StorePlace,
 };
 use tempfile::TempDir;
 
@@ -1163,7 +1163,9 @@ fn steward_policy(dir: &Path) -> PathBuf {
               "dev-integration": {"capacity": 1, "scope": "steward"},
               "lane:": {"capacity": 1, "scope": "steward"}},
             "channel": {"confirm_wait_s": 10,
-              "crosses": {"dev-berth-events@1": ["claim", "release"]}}}}"#,
+              "crosses": {"dev-berth-events@1": ["claim", "release"],
+                "dev-landing@1": ["intent", "landed", "withdraw", "dismiss", "misses", "carry"],
+                "gate-verdict@1": ["verdict"]}}}}"#,
     )
     .unwrap();
     policy
@@ -1615,6 +1617,31 @@ fn intents_json(device: &Device, root: &Path, policy: &Path, all: bool) -> serde
     serde_json::from_slice(&output.stdout).unwrap()
 }
 
+fn intents_misses_json(device: &Device, root: &Path, policy: &Path) -> serde_json::Value {
+    let before = tree_listing(root);
+    let output = device.epr(&[
+        "peer",
+        "intents",
+        "--misses",
+        "--json",
+        "--root",
+        root.to_str().unwrap(),
+        "--policy",
+        policy.to_str().unwrap(),
+    ]);
+    assert_eq!(
+        tree_listing(root),
+        before,
+        "peer intents --misses changed the root tree"
+    );
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    serde_json::from_slice(&output.stdout).unwrap()
+}
+
 fn announcement(intent: &str, via: Option<&str>, dseq: &str) -> FlowEvent {
     landing_record(
         "intent",
@@ -1681,6 +1708,82 @@ fn peer_intents_joins_own_atoms_and_sibling_cites_by_intent_cid() {
     assert_eq!(sibling_row["announcer"], a.key.did_key());
     assert_eq!(sibling_row["deviceFoldedAt"], 1_792_769_291_000u64);
     assert!(!view.to_string().contains(&stranger_intent));
+}
+
+#[test]
+fn peer_intents_lists_a_crossed_miss_until_a_crossed_verdict_settles_it() {
+    let (keys, a, b) = household();
+    let policy = steward_policy(keys.path());
+    let allow = CrossingAllowList::from_policy_file(&policy).unwrap();
+    let intent = atom_cid(&"sibling-misses-intent".to_string()).unwrap();
+    let miss = landing_record(
+        "misses",
+        &intent.to_string(),
+        LANDING_CHANGE,
+        &[
+            ("at", "1792769289.123"),
+            ("base", LANDING_BASE),
+            ("change", LANDING_CHANGE),
+            ("commit", LANDING_TREE),
+            ("dseq", "7"),
+            ("miss", "eprfs=abcdef"),
+            ("p90", "eprfs=42"),
+            ("ref", "refs/heads/self/f4-ask"),
+            ("tree", LANDING_TREE),
+            ("wait_until", "1792769999"),
+        ],
+        None,
+    );
+    let miss_channel = ChannelEvent {
+        cid: atom_cid(&miss).unwrap(),
+        event: miss,
+    };
+    let store = SidecarFlowStore::open(b.checkout.path()).unwrap();
+    let folded = fold_events(
+        &store,
+        &a.key.did_key(),
+        std::slice::from_ref(&miss_channel),
+        &allow,
+    )
+    .unwrap();
+    assert_eq!(folded.appended, 1);
+    save_served_table(
+        &b,
+        b.checkout.path(),
+        Some((&a.key.did_key(), 1_792_769_291_000)),
+    );
+
+    let misses = intents_misses_json(&b, b.checkout.path(), &policy);
+
+    assert_eq!(misses.as_array().unwrap().len(), 1, "{misses}");
+    assert_eq!(misses[0]["intent"], intent.to_string());
+    assert_eq!(misses[0]["announcer"], a.key.did_key());
+    assert_eq!(misses[0]["project"], "eprfs");
+    assert_eq!(misses[0]["closure"], "abcdef");
+    assert_eq!(misses[0]["p90S"], 42);
+    assert_eq!(
+        intents_json(&b, b.checkout.path(), &policy, false)["misses"],
+        misses
+    );
+
+    let verdict = gate_verdict_record("eprfs", "abcdef", LANDING_TREE, false, None);
+    let verdict_channel = ChannelEvent {
+        cid: atom_cid(&verdict).unwrap(),
+        event: verdict,
+    };
+    let folded = fold_events(
+        &store,
+        &a.key.did_key(),
+        std::slice::from_ref(&verdict_channel),
+        &allow,
+    )
+    .unwrap();
+    assert_eq!(folded.appended, 1);
+
+    assert_eq!(
+        intents_misses_json(&b, b.checkout.path(), &policy),
+        serde_json::json!([])
+    );
 }
 
 #[test]

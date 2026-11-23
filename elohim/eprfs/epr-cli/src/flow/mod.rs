@@ -681,8 +681,9 @@ fn run_intend(args: &[String]) -> FlowResult<ExitCode> {
         match rest[i].as_str() {
             "--change" | "--tree" | "--base" | "--class" | "--closure" | "--predicted-base"
             | "--chain-len" | "--supersedes" | "--session" | "--verified" | "--gate-s"
-            | "--land" | "--tip" | "--commit" | "--landed-as" | "--regated-s" | "--withdraw"
-            | "--why" | "--dismiss" | "--capsule" | "--measures" | "--as" => i += 2,
+            | "--misses" | "--ref" | "--miss" | "--p90" | "--wait-until" | "--land" | "--tip"
+            | "--commit" | "--landed-as" | "--regated-s" | "--withdraw" | "--why" | "--dismiss"
+            | "--capsule" | "--measures" | "--as" => i += 2,
             other => {
                 return Err(FlowError::InvalidArguments(format!(
                     "unknown intend argument `{other}`{}",
@@ -700,6 +701,11 @@ fn run_intend(args: &[String]) -> FlowResult<ExitCode> {
                             "--session",
                             "--verified",
                             "--gate-s",
+                            "--misses",
+                            "--ref",
+                            "--miss",
+                            "--p90",
+                            "--wait-until",
                             "--land",
                             "--tip",
                             "--commit",
@@ -724,10 +730,16 @@ fn run_intend(args: &[String]) -> FlowResult<ExitCode> {
             })
         })
     };
-    let explicit_modes = ["--verified", "--land", "--withdraw", "--dismiss"]
-        .into_iter()
-        .filter(|flag| rest.iter().any(|arg| arg == flag))
-        .count();
+    let explicit_modes = [
+        "--verified",
+        "--misses",
+        "--land",
+        "--withdraw",
+        "--dismiss",
+    ]
+    .into_iter()
+    .filter(|flag| rest.iter().any(|arg| arg == flag))
+    .count();
     let raise = rest.iter().any(|arg| {
         matches!(
             arg.as_str(),
@@ -743,7 +755,7 @@ fn run_intend(args: &[String]) -> FlowResult<ExitCode> {
     });
     if explicit_modes + usize::from(raise) != 1 {
         return Err(FlowError::InvalidArguments(
-            "intend needs exactly one mode: raise flags, --verified, --land, --withdraw or --dismiss"
+            "intend needs exactly one mode: raise flags, --verified, --misses, --land, --withdraw or --dismiss"
                 .to_string(),
         ));
     }
@@ -768,6 +780,20 @@ fn run_intend(args: &[String]) -> FlowResult<ExitCode> {
         (
             "verified",
             &["--verified", "--gate-s", "--measures", "--as"],
+        )
+    } else if rest.iter().any(|arg| arg == "--misses") {
+        (
+            "misses",
+            &[
+                "--misses",
+                "--commit",
+                "--ref",
+                "--miss",
+                "--p90",
+                "--wait-until",
+                "--measures",
+                "--as",
+            ],
         )
     } else if rest.iter().any(|arg| arg == "--land") {
         (
@@ -795,6 +821,8 @@ fn run_intend(args: &[String]) -> FlowResult<ExitCode> {
         }
     }
     let closures = take_opts_all(&rest, "--closure")?;
+    let misses = take_opts_all(&rest, "--miss")?;
+    let p90 = take_opts_all(&rest, "--p90")?;
     let capsules = take_opts_all(&rest, "--capsule")?;
     let session = resolve_session(take_opt(&rest, "--session")?);
     let change = take_opt(&rest, "--change")?;
@@ -804,9 +832,11 @@ fn run_intend(args: &[String]) -> FlowResult<ExitCode> {
     let predicted_base = take_opt(&rest, "--predicted-base")?;
     let supersedes = take_opt(&rest, "--supersedes")?;
     let verified_intent = take_opt(&rest, "--verified")?;
+    let misses_intent = take_opt(&rest, "--misses")?;
     let land_intent = take_opt(&rest, "--land")?;
     let tip = take_opt(&rest, "--tip")?;
     let commit = take_opt(&rest, "--commit")?;
+    let git_ref = take_opt(&rest, "--ref")?;
     let landed_as = take_opt(&rest, "--landed-as")?;
     let withdraw_intent = take_opt(&rest, "--withdraw")?;
     let why = take_opt(&rest, "--why")?;
@@ -830,6 +860,15 @@ fn run_intend(args: &[String]) -> FlowResult<ExitCode> {
         intend::IntendMode::Verified(intend::VerifiedRequest {
             intent,
             gate_s: parse_u64("--gate-s")?,
+        })
+    } else if let Some(intent) = misses_intent.as_deref() {
+        intend::IntendMode::Misses(intend::MissesRequest {
+            intent,
+            commit: need(commit.as_deref(), "--commit")?,
+            git_ref: need(git_ref.as_deref(), "--ref")?,
+            misses: &misses,
+            p90: &p90,
+            wait_until: parse_u64("--wait-until")?,
         })
     } else if let Some(intent) = land_intent.as_deref() {
         intend::IntendMode::Land(intend::LandRequest {
@@ -1944,6 +1983,10 @@ fn usage() -> String {
      [--closure <project>=<key>]... [--predicted-base <oid>] [--chain-len N] \
      [--supersedes <cid>] [--session <id>] [--as <actor>] [--measures PATH] [--json] [--root DIR]\n  \
      | intend --verified <intent-cid> [--gate-s N] [--as <actor>] [--measures PATH] [--json] [--root DIR]\n  \
+     | intend --misses <intent-cid> --commit <oid> --ref <refs/heads/self/NAME> \
+     --miss <project>=<closure> [--miss <project>=<closure>]... \
+     [--p90 <project>=<seconds>]... [--wait-until <unix-seconds>] \
+     [--as <actor>] [--measures PATH] [--json] [--root DIR]\n  \
      | intend --land <intent-cid> --tip <sha> --commit <oid> --landed-as ff|moved \
      [--regated-s N] [--as <actor>] [--measures PATH] [--json] [--root DIR]\n  \
      | intend --withdraw <intent-cid> [--why <text>] [--as <actor>] [--measures PATH] [--json] [--root DIR]\n  \

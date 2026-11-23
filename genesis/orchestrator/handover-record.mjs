@@ -25,7 +25,9 @@ import { spawnSync } from 'node:child_process';
 import { closeSync, fstatSync, fsyncSync, ftruncateSync, mkdirSync, openSync, readFileSync, writeSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { isHandoverBranch } from './gate-cost.mjs';
+import { costOf, isHandoverBranch, readCycleUnion } from './gate-cost.mjs';
+import { changeClass } from './gate-change-class.mjs';
+import { parseChangeId } from './commit-tag-parser.mjs';
 import { deviceRoot, gateEvidence, resolveBin, selfAgentId } from './gate-evidence.mjs';
 import { gateChildEnv } from './gate-runner.mjs';
 import { loadGateRegistry } from './pipeline-registry.mjs';
@@ -121,6 +123,113 @@ export function registryLookup({ root, env = process.env, spawn = spawnSync }) {
     if (!selfId) return { error: 'no workspace signer' };
     return closureVerdict(project, head, { root, env, spawn, selfId });
   };
+}
+
+/** This device's recorded p90 for a gate, using the same union and fold as gate ordering. */
+export function registryP90({ root }) {
+  let registry = null;
+  let rows = null;
+  return name => {
+    registry ??= loadGateRegistry(root);
+    rows ??= readCycleUnion(root).rows;
+    const project = registry.get(name);
+    if (!project) return null;
+    return project.run?.kind === 'attested' ? 0 : costOf(rows, { project, subjectFallback: null }).p90;
+  };
+}
+
+function firstLine(value, fallback) {
+  return String(value || '').trim().split('\n').pop() || fallback;
+}
+
+function run(spawn, bin, args, root, timeout = 30_000) {
+  let result;
+  try {
+    result = spawn(bin, args, { cwd: root, encoding: 'utf8', timeout });
+  } catch (error) {
+    throw new Error(String(error?.message || error).split('\n')[0]);
+  }
+  if (result.status !== 0) throw new Error(firstLine(result.stderr, `${bin} exited ${result.status}`));
+  return String(result.stdout || '');
+}
+
+/**
+ * Raise the landing intent and append its open gate misses. The inventory has already been made
+ * durable when this runs; every thrown error is rendered by main as one advisory line.
+ */
+export function postMisses(record, projects, {
+  root, env = process.env, spawn = spawnSync, now = () => new Date(), err = () => {},
+  lookup = registryLookup({ root, env, spawn }), p90 = registryP90({ root }),
+  classify = changeClass, resolveBinary = resolveBin,
+} = {}) {
+  if (env.HANDOVER_MISSES === 'off' || projects.length === 0) return null;
+
+  const message = run(spawn, 'git', ['show', '-s', '--format=%B', record.head], root);
+  const parsed = parseChangeId(message);
+  if (!parsed.id) {
+    err(`[pre-push] hand-over: no Change-Id on ${record.head.slice(0, 12)}; misses not posted (git commit --amend adds one)`);
+    return null;
+  }
+
+  const judged = classify({ root, head: record.head, spawn });
+  if (!judged?.base) throw new Error(judged?.why || 'integration merge base unavailable');
+  const tree = run(spawn, 'git', ['rev-parse', `${record.head}^{tree}`], root).trim();
+  if (!OID.test(tree)) throw new Error('head tree unavailable');
+
+  const closures = new Map();
+  const misses = [];
+  const unavailable = [];
+  for (const project of [...new Set(projects)]) {
+    const green = record.verdicts.find(row => row.project === project && row.verdictOf === 'green');
+    if (green?.closure) {
+      closures.set(project, green.closure);
+      continue;
+    }
+    let found;
+    try { found = lookup(project, record.head); } catch (error) {
+      found = { error: String(error?.message || error).split('\n')[0] };
+    }
+    if (!found?.closure) {
+      unavailable.push(`${project} (${found?.error || 'no closure key'})`);
+      continue;
+    }
+    closures.set(project, found.closure);
+    misses.push({ project, closure: found.closure });
+  }
+  if (unavailable.length) {
+    err(`[pre-push] hand-over: closure unavailable; left out of misses: ${unavailable.join(', ')}`);
+  }
+  if (misses.length === 0) return null;
+
+  // Preflight has already refused a stale inherited EPR_BIN. Resolve the surviving candidate the
+  // same way gate evidence resolves its native helpers: declared executable, then PATH.
+  const epr = resolveBinary('epr', ['EPR_BIN'], env);
+  if (!epr) throw new Error('epr not on EPR_BIN or PATH');
+  const raiseArgs = [
+    'flow', 'intend', '--change', parsed.id, '--tree', tree, '--base', judged.base,
+    '--class', judged.class || 'low',
+  ];
+  for (const [project, closure] of closures) raiseArgs.push('--closure', `${project}=${closure}`);
+  raiseArgs.push('--root', root, '--json');
+  const raised = JSON.parse(run(spawn, epr, raiseArgs, root));
+  if (typeof raised?.intent !== 'string' || !raised.intent) throw new Error('epr raise returned no intent');
+
+  const ref = record.destinations[0];
+  if (!ref?.startsWith('refs/heads/self/')) throw new Error('self destination unavailable');
+  const wait = Number(env.HANDOVER_WAIT_S ?? 3600);
+  const waitUntil = Math.floor(now().getTime() / 1000) + (Number.isFinite(wait) && wait >= 0 ? Math.floor(wait) : 3600);
+  const missArgs = [
+    'flow', 'intend', '--misses', raised.intent, '--commit', record.head, '--ref', ref,
+  ];
+  for (const miss of misses) missArgs.push('--miss', `${miss.project}=${miss.closure}`);
+  for (const miss of misses) {
+    let seconds = null;
+    try { seconds = p90(miss.project); } catch { /* display evidence is optional */ }
+    if (Number.isFinite(seconds) && seconds >= 0) missArgs.push('--p90', `${miss.project}=${Math.round(seconds)}`);
+  }
+  missArgs.push('--wait-until', String(waitUntil), '--root', root, '--json');
+  run(spawn, epr, missArgs, root);
+  return `hand-over: posted ${misses.length} misses on intent ${raised.intent.slice(0, 12)}: ${misses.map(m => m.project).join(', ')}`;
 }
 
 /**
@@ -225,6 +334,8 @@ export function appendBatch(log, text, fs = { closeSync, fstatSync, fsyncSync, f
 export function main(argv, {
   stdin = () => readFileSync(0, 'utf8'), env = process.env, spawn = spawnSync,
   now = () => new Date(), out = line => process.stdout.write(`${line}\n`), err = line => process.stderr.write(`${line}\n`),
+  logOf = handoverLog, append = appendBatch, inventoryOf = inventory,
+  lookupFactory = registryLookup, p90Factory = registryP90, classify = changeClass, resolveBinary = resolveBin,
 } = {}) {
   const at = argv.indexOf('--root');
   const root = resolve(at >= 0 && argv[at + 1] ? argv[at + 1] : process.cwd());
@@ -238,8 +349,12 @@ export function main(argv, {
     out('[pre-push] hand-over: deletion only — nothing recorded');
     return 0;
   }
-  const log = handoverLog(root, spawn);
-  const buildRefBin = resolveBin('brit-build-ref', ['BRIT_BUILD_REF_BIN', 'BRIT_BUILD_REF'], env);
+  const projectAt = argv.indexOf('--projects');
+  const projects = projectAt >= 0 && argv[projectAt + 1]
+    ? argv[projectAt + 1].trim().split(/\s+/).filter(Boolean)
+    : [];
+  const log = logOf(root, spawn);
+  const buildRefBin = resolveBinary('brit-build-ref', ['BRIT_BUILD_REF_BIN', 'BRIT_BUILD_REF'], env);
   const time = now().toISOString();
   const records = heads.map(({ head, destinations }) => ({
     schema: HANDOVER_SCHEMA,
@@ -250,15 +365,26 @@ export function main(argv, {
     worktree: root,
     // Opt-in: the closure lookup recomputes each unnoted step's key (measured 75 s against 0.46 s
     // for the head-only read, 2026-11-18, on 6616ce547), which would double a hand-over push.
-    ...inventory(head, { root, buildRefBin, spawn, lookup: env.HANDOVER_CLOSURE_LOOKUP === '1' ? registryLookup({ root, env, spawn }) : null }),
+    ...inventoryOf(head, { root, buildRefBin, spawn, lookup: env.HANDOVER_CLOSURE_LOOKUP === '1' ? lookupFactory({ root, env, spawn }) : null }),
   }));
   try {
-    appendBatch(log, records.map(r => `${JSON.stringify(r)}\n`).join(''));
+    append(log, records.map(r => `${JSON.stringify(r)}\n`).join(''));
   } catch (error) {
     err(`[pre-push] handover-record: could not write ${log}: ${String(error?.message || error).split('\n')[0]}`);
     return 1;
   }
-  for (const record of records) out(summaryLine(record, log));
+  for (const record of records) {
+    out(summaryLine(record, log));
+    try {
+      const line = postMisses(record, projects, {
+        root, env, spawn, now, err, lookup: lookupFactory({ root, env, spawn }),
+        p90: p90Factory({ root }), classify, resolveBinary,
+      });
+      if (line) out(line);
+    } catch (error) {
+      err(`[pre-push] hand-over: misses not posted: ${String(error?.message || error).split('\n')[0]}`);
+    }
+  }
   return 0;
 }
 

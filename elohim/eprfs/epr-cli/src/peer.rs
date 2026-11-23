@@ -28,6 +28,7 @@ use std::process::ExitCode;
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use chrono::{SecondsFormat, Utc};
 use elohim_device_runtime::layout::DeviceLayout;
 use elohim_epr_rea::{FlowEvent, FlowRecord, FlowStore, ParticipantRow};
 use eprfs_peer::{
@@ -45,6 +46,7 @@ use crate::device_key::{self, DeviceKey};
 use crate::flow::intend::{
     own_state, parse_joined_closures, unix_slot_ms, INTENT_TAG, KINDS, LANDING_MEASURE,
 };
+use crate::flow::misses::{open_misses, OpenMiss};
 use crate::flow::via_device;
 
 /// Where the crossing allow-list is read from, under the checkout.
@@ -200,8 +202,8 @@ pub fn usage() -> String {
      | artifacts --key CID [--root DIR] [--handle H] [--json] \
      (artifact-produce@1 custody records folded from admitted sibling devices for one \
      derivation key CID: device, output, manifest, bytes, commit)\n  \
-     | intents [--all] [--root DIR] [--handle H] [--policy PATH] [--json] \
-     (landing intents from this device and admitted siblings, read from the serve-recorded store)>"
+     | intents [--all] [--misses] [--root DIR] [--handle H] [--policy PATH] [--json] \
+     (landing intents and open gate misses from this device and admitted siblings, read from the serve-recorded store)>"
         .to_string()
 }
 
@@ -258,6 +260,8 @@ pub struct Options {
     pub key: Option<String>,
     pub json: bool,
     pub all: bool,
+    /// Render only open landing-gate misses.
+    pub misses: bool,
     /// Validate the serve start floor without taking the lock, binding, or writing.
     pub check: bool,
 }
@@ -271,11 +275,13 @@ impl Options {
         let mut i = 0;
         while i < args.len() {
             let flag = args[i].as_str();
-            if matches!(flag, "--json" | "--check" | "--all") {
+            if matches!(flag, "--json" | "--check" | "--all" | "--misses") {
                 if flag == "--json" {
                     options.json = true;
                 } else if flag == "--all" {
                     options.all = true;
+                } else if flag == "--misses" {
+                    options.misses = true;
                 } else {
                     options.check = true;
                 }
@@ -2003,6 +2009,7 @@ struct LandingIntentOutput {
     device: Option<String>,
     store: Option<String>,
     intents: Vec<LandingIntent>,
+    misses: Vec<OpenMiss>,
     advisory: Vec<Advisory>,
     error: Option<String>,
     now: u64,
@@ -2074,6 +2081,7 @@ fn intents(options: &Options) -> PeerResult<ExitCode> {
                     device: me,
                     store: None,
                     intents: Vec::new(),
+                    misses: Vec::new(),
                     advisory: Vec::new(),
                     error,
                     now,
@@ -2104,6 +2112,15 @@ fn intents(options: &Options) -> PeerResult<ExitCode> {
     let records = store
         .records()
         .map_err(|error| PeerCliError::Peer(PeerError::FlowStore(error)))?;
+    let misses = open_misses(
+        &records,
+        &|writer| {
+            admission
+                .as_ref()
+                .is_some_and(|allowed| allowed.admits_device(writer))
+        },
+        me.as_deref(),
+    );
     let mut rows: std::collections::BTreeMap<(String, String), LandingIntent> =
         std::collections::BTreeMap::new();
     for (index, (cid, record)) in records.iter().enumerate() {
@@ -2245,6 +2262,7 @@ fn intents(options: &Options) -> PeerResult<ExitCode> {
                     .to_string(),
             ),
             intents,
+            misses,
             advisory,
             error: None,
             now,
@@ -2436,7 +2454,34 @@ fn announcer_key(value: Option<&str>) -> String {
 
 fn render_intents(options: &Options, output: LandingIntentOutput) -> PeerResult<ExitCode> {
     if options.json {
-        println!("{}", serde_json::to_string_pretty(&output)?);
+        if options.misses {
+            println!("{}", serde_json::to_string_pretty(&output.misses)?);
+        } else {
+            println!("{}", serde_json::to_string_pretty(&output)?);
+        }
+        return Ok(ExitCode::SUCCESS);
+    }
+    if options.misses {
+        if output.misses.is_empty() {
+            println!("no open miss");
+        } else {
+            for miss in &output.misses {
+                println!(
+                    "miss  {}  closure {}  commit {}  from {}  p90 {}  wait-until {}  carried {}",
+                    miss.project,
+                    miss.closure.chars().take(16).collect::<String>(),
+                    miss.commit.chars().take(12).collect::<String>(),
+                    miss.announcer
+                        .as_deref()
+                        .map_or_else(|| "local".to_string(), short),
+                    miss.p90_s
+                        .map_or_else(|| "-".to_string(), |value| format!("{value}s")),
+                    miss.wait_until
+                        .map_or_else(|| "-".to_string(), wait_until_iso),
+                    carried_cell(miss),
+                );
+            }
+        }
         return Ok(ExitCode::SUCCESS);
     }
     if let Some(error) = &output.error {
@@ -2476,6 +2521,20 @@ fn render_intents(options: &Options, output: LandingIntentOutput) -> PeerResult<
         }
     }
     Ok(ExitCode::SUCCESS)
+}
+
+fn wait_until_iso(seconds: u64) -> String {
+    i64::try_from(seconds)
+        .ok()
+        .and_then(|value| chrono::DateTime::<Utc>::from_timestamp(value, 0))
+        .map_or_else(
+            || seconds.to_string(),
+            |value| value.to_rfc3339_opts(SecondsFormat::Secs, true),
+        )
+}
+
+fn carried_cell(_miss: &OpenMiss) -> String {
+    "-".to_string()
 }
 
 /// How this workspace stands for the lease view.
