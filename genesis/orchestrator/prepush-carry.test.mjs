@@ -30,7 +30,10 @@ const cleanEnv = Object.fromEntries(
   Object.entries(process.env).filter(([k]) => !k.startsWith('GIT_') || k.startsWith('GIT_CONFIG_')),
 );
 
-// Records `start|end <gate> <ms>`; FAKE_GATES[<gate>] = { waitFor, until, hold, exit }.
+// Records `start|end <gate> <ms>`; FAKE_GATES[<gate>] = { waitFor, until, linger, hold, exit }.
+// `linger` keeps a gate running that many ms after its waits, so an overlap is longer than the
+// millisecond clock's resolution: without it, a gate that finds its partner already started ends
+// in the same ms it began, and an overlap that did happen measures 0 ms.
 const FAKE_RUNNER = `
 import { appendFileSync, existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { spawn } from 'node:child_process';
@@ -62,6 +65,7 @@ for (const [line, file] of [[cfg.waitFor && 'start ' + cfg.waitFor, null], [null
     await nap(20);
   }
 }
+if (cfg.linger) await nap(cfg.linger);
 mark('end');
 process.exit(cfg.exit ?? 0);
 `;
@@ -196,10 +200,11 @@ test('shadow (the default) names what it would carry and runs the gates one afte
 test('on: the carried gate runs beside the loop and both verdicts are reported', function carry_on_overlaps(t) {
   const dir = fixture(t);
   const r = runHook(dir, { GATE_CARRY: 'on', FAKE_ROOM: ADMIT,
-    FAKE_GATES: JSON.stringify({ storage: { waitFor: 'app' }, app: { waitFor: 'storage' } }) });
+    FAKE_GATES: JSON.stringify({ storage: { waitFor: 'app', linger: 30 }, app: { waitFor: 'storage', linger: 30 } }) });
   assert.equal(r.status, 0, r.stdout + r.stderr);
   const m = marks(dir);
-  // Each waited to see the other start, so the two ran at once by construction.
+  // Each waited to see the other start, then lingered, so the two ran at once by construction
+  // and the overlap is at least the linger.
   const starts = [m.at('start', 'storage'), m.at('start', 'app')];
   const ends = [m.at('end', 'storage'), m.at('end', 'app')];
   assert.ok(Math.max(...starts) <= Math.min(...ends), m.rows.join(' | '));
