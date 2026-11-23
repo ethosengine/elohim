@@ -1,7 +1,9 @@
 //! The carry claim's contract, proven over hand-built fold records so no daemon or clock runs.
 //!
-//! Devices are named `did:key:a` (this device in most cases) and `did:key:b`/`did:key:c`. A record
-//! a device wrote itself carries no `via:` slot; one folded from a sibling carries `via:<did>`.
+//! Devices are named `did:key:a` (this device in most cases), `did:key:b`, `did:key:l` (the lander
+//! that posted the misses) and `did:key:c` (admitted nowhere). A record a device wrote itself
+//! carries no `via:` slot; one folded from a sibling carries `via:<did>`. A carry is live only
+//! while the miss it answers is open, so every fixture folds the lander's misses event too.
 
 use cid::Cid;
 use elohim_epr_rea::{
@@ -14,6 +16,7 @@ use crate::flow::intend::INTENT_TAG;
 const A: &str = "did:key:a";
 const B: &str = "did:key:b";
 const C: &str = "did:key:c";
+const L: &str = "did:key:l";
 const PROJECT: &str = "eprfs";
 const CLOSURE: &str = "abcdef01";
 const CHANGE: &str = "I0123456789abcdef0123456789abcdef01234567";
@@ -26,9 +29,9 @@ fn intent() -> Cid {
     cid("intent-1")
 }
 
-/// Admits A and B; C is a device of no roster here.
+/// Admits A, B and L; C is a device of no roster here.
 fn admits(device: &str) -> bool {
-    matches!(device, A | B)
+    matches!(device, A | B | L)
 }
 
 fn event(resource: Cid, slots: Vec<String>) -> (Cid, FlowRecord) {
@@ -129,6 +132,31 @@ fn verdict(via: Option<&str>, closure: &str, success: bool) -> (Cid, FlowRecord)
     event(cid("subject"), slots)
 }
 
+/// The lander's crossing misses event on `intent`, naming `closure` for the project.
+fn misses_on(via: Option<&str>, intent: Cid, closure: &str) -> (Cid, FlowRecord) {
+    event(
+        intent,
+        landing_slots(
+            "misses",
+            &[
+                ("change", CHANGE.to_string()),
+                (
+                    "commit",
+                    "0123456789abcdef0123456789abcdef01234567".to_string(),
+                ),
+                ("ref", "refs/heads/self/carry-test".to_string()),
+                ("miss", format!("{PROJECT}={closure}")),
+            ],
+            via,
+        ),
+    )
+}
+
+/// The lander L's misses event for the default intent and closure.
+fn misses() -> (Cid, FlowRecord) {
+    misses_on(Some(L), intent(), CLOSURE)
+}
+
 fn query<'a>(
     me: Option<&'a str>,
     now: u64,
@@ -200,7 +228,7 @@ fn a_replay_written_while_the_claim_holds_never_extends_it() {
         dseq: 2,
         ..first
     };
-    let records = vec![first.record(), replay.record()];
+    let records = vec![misses(), first.record(), replay.record()];
     let live = live_carries(&records, &admits, Some(A), 1_099);
     assert_eq!(live.len(), 1);
     assert_eq!(live[0].valid_until, 1_100);
@@ -211,7 +239,7 @@ fn a_replay_written_while_the_claim_holds_never_extends_it() {
     );
 
     // Folding the same event twice is the same claim.
-    let doubled = vec![first.record(), first.record()];
+    let doubled = vec![misses(), first.record(), first.record()];
     assert_eq!(live_carries(&doubled, &admits, Some(A), 1_050).len(), 1);
 
     // A claim written after the first lapsed is a renewal: a new claim with its own bound.
@@ -222,7 +250,7 @@ fn a_replay_written_while_the_claim_holds_never_extends_it() {
         dseq: 3,
         ..first
     };
-    let records = vec![first.record(), replay.record(), renewal.record()];
+    let records = vec![misses(), first.record(), replay.record(), renewal.record()];
     let live = live_carries(&records, &admits, Some(A), 1_200);
     assert_eq!(live.len(), 1);
     assert_eq!(live[0].valid_until, 1_300);
@@ -230,7 +258,7 @@ fn a_replay_written_while_the_claim_holds_never_extends_it() {
 
 #[test]
 fn a_carry_lapses_exactly_at_its_own_valid_until() {
-    let records = vec![carry(Some(B), "c-b", 1_000, 1_100)];
+    let records = vec![misses(), carry(Some(B), "c-b", 1_000, 1_100)];
     assert_eq!(live_carries(&records, &admits, Some(A), 1_099).len(), 1);
     assert!(live_carries(&records, &admits, Some(A), 1_100).is_empty());
     assert!(matches!(
@@ -257,7 +285,7 @@ fn a_carry_lapses_exactly_at_its_own_valid_until() {
 
 #[test]
 fn a_second_idle_device_observes_the_incumbent_and_declines() {
-    let records = vec![carry(Some(B), "c-b", 1_000, 1_600)];
+    let records = vec![misses(), carry(Some(B), "c-b", 1_000, 1_600)];
     assert_eq!(
         carrier(&records, A, 1_010),
         CarryDecision::AlreadyCarried {
@@ -273,15 +301,15 @@ fn simultaneous_claims_may_both_run_then_converge_on_the_lowest_commitment() {
     // Each device claims before the exchange carries the other's claim.
     let own_a = carry(None, "c-a", 1_000, 1_600);
     let own_b = carry(None, "c-b", 1_000, 1_600);
-    let store_a = vec![own_a.clone()];
-    let store_b = vec![own_b.clone()];
+    let store_a = vec![misses(), own_a.clone()];
+    let store_b = vec![misses(), own_b.clone()];
     // Before convergence both run: a duplicate execution is possible, and harmless below.
     assert_eq!(carrier(&store_a, A, 1_001), CarryDecision::Run);
     assert_eq!(carrier(&store_b, B, 1_001), CarryDecision::Run);
 
     // After the exchange each store holds its own claim and the sibling's.
-    let store_a = vec![own_a, carry(Some(B), "c-b", 1_000, 1_600)];
-    let store_b = vec![own_b, carry(Some(A), "c-a", 1_000, 1_600)];
+    let store_a = vec![misses(), own_a, carry(Some(B), "c-b", 1_000, 1_600)];
+    let store_b = vec![misses(), own_b, carry(Some(A), "c-a", 1_000, 1_600)];
     let a = carrier(&store_a, A, 1_002);
     let b = carrier(&store_b, B, 1_002);
     let a_keeps = cid("c-a").to_bytes() < cid("c-b").to_bytes();
@@ -304,7 +332,7 @@ fn simultaneous_claims_may_both_run_then_converge_on_the_lowest_commitment() {
 
 #[test]
 fn a_silent_or_unreachable_carrier_means_run_here_and_a_fresh_one_a_wait_that_ends() {
-    let records = vec![carry(Some(B), "c-b", 1_000, 1_600)];
+    let records = vec![misses(), carry(Some(B), "c-b", 1_000, 1_600)];
     // No head ever folded from the carrier: it is unreachable from here.
     assert!(is_run_here(&lander(&records, 1_010, None, None, 600)));
     // Its last head is older than freshness_s: silent.
@@ -382,7 +410,7 @@ fn a_silent_or_unreachable_carrier_means_run_here_and_a_fresh_one_a_wait_that_en
 #[test]
 fn clock_skew_or_a_clock_jump_never_extends_the_wait() {
     // A claim far into the future: only the lander's monotonic deadline bounds the wait.
-    let records = vec![carry(Some(B), "c-b", 1_000, 1_000_000)];
+    let records = vec![misses(), carry(Some(B), "c-b", 1_000, 1_000_000)];
     assert!(matches!(
         lander(&records, 1_010, Some(1_005), None, 30),
         CarryDecision::Wait { wait_s: 30, .. }
@@ -392,16 +420,16 @@ fn clock_skew_or_a_clock_jump_never_extends_the_wait() {
     assert!(is_run_here(&lander(&records, 510, Some(1_005), None, 30)));
     // Even where the head and the claim look sane after the jump, so that the claim's own bound
     // reads ~1e6 s away, the remaining monotonic deadline still caps the wait.
-    let jumped = vec![carry(Some(B), "c-b", 500, 1_000_000)];
+    let jumped = vec![misses(), carry(Some(B), "c-b", 500, 1_000_000)];
     assert!(matches!(
         lander(&jumped, 510, Some(505), None, 20),
         CarryDecision::Wait { wait_s: 20, .. }
     ));
     // A carry written further ahead of this clock than max_skew_s is doubt.
-    let ahead = vec![carry(Some(B), "c-b", 2_000, 3_000)];
+    let ahead = vec![misses(), carry(Some(B), "c-b", 2_000, 3_000)];
     assert!(is_run_here(&lander(&ahead, 1_010, Some(1_005), None, 600)));
     // Within the skew budget it still counts.
-    let near = vec![carry(Some(B), "c-b", 1_030, 3_000)];
+    let near = vec![misses(), carry(Some(B), "c-b", 1_030, 3_000)];
     assert!(matches!(
         lander(&near, 1_010, Some(1_005), None, 600),
         CarryDecision::Wait { .. }
@@ -413,6 +441,7 @@ fn a_green_or_red_verdict_closes_a_carry() {
     for success in [true, false] {
         for via in [None, Some(B)] {
             let records = vec![
+                misses(),
                 carry(Some(B), "c-b", 1_000, 1_600),
                 verdict(via, CLOSURE, success),
             ];
@@ -425,6 +454,7 @@ fn a_green_or_red_verdict_closes_a_carry() {
     }
     // A verdict for another closure, or from an unadmitted device, does not.
     let records = vec![
+        misses(),
         carry(Some(B), "c-b", 1_000, 1_600),
         verdict(Some(B), "ffff", true),
         verdict(Some(C), CLOSURE, true),
@@ -435,7 +465,7 @@ fn a_green_or_red_verdict_closes_a_carry() {
 #[test]
 fn the_announcers_settlement_of_the_intent_closes_a_carry() {
     let carried = carry(Some(A), "c-a", 1_000, 1_600);
-    let announce = event(intent(), landing_slots("misses", &[], Some(B)));
+    let announce = misses_on(Some(B), intent(), CLOSURE);
     for kind in ["landed", "withdraw", "dismiss"] {
         let settle = event(intent(), landing_slots(kind, &[], Some(B)));
         let records = vec![announce.clone(), carried.clone(), settle];
@@ -478,9 +508,14 @@ fn the_announcers_settlement_of_the_intent_closes_a_carry() {
     }
     .record();
     let withdraw = event(own_intent, landing_slots("withdraw", &[], None));
-    let live_before = vec![(own_intent, atom.clone()), own_carry.clone()];
+    let own_misses = misses_on(None, own_intent, CLOSURE);
+    let live_before = vec![
+        (own_intent, atom.clone()),
+        own_misses.clone(),
+        own_carry.clone(),
+    ];
     assert_eq!(live_carries(&live_before, &admits, Some(A), 1_010).len(), 1);
-    let records = vec![(own_intent, atom), own_carry, withdraw];
+    let records = vec![(own_intent, atom), own_misses, own_carry, withdraw];
     assert!(live_carries(&records, &admits, Some(A), 1_010).is_empty());
 }
 
@@ -501,6 +536,8 @@ fn a_carry_for_another_closure_intent_or_from_an_unadmitted_device_is_ignored() 
         ..other_closure
     };
     let records = vec![
+        misses_on(Some(L), intent(), "ffff"),
+        misses_on(Some(L), cid("intent-other"), CLOSURE),
         other_closure.record(),
         other_intent.record(),
         carry(Some(C), "c-c", 1_000, 1_600),
@@ -526,6 +563,7 @@ fn a_carry_for_another_closure_intent_or_from_an_unadmitted_device_is_ignored() 
     doubled.classified_as.push(format!("via:{A}"));
     let doubled = FlowRecord::Event(doubled);
     let records = vec![
+        misses(),
         (doubled.cid().expect("encodes"), doubled),
         carry(Some(A), "c-a", 1_000, 1_600),
     ];
@@ -534,7 +572,7 @@ fn a_carry_for_another_closure_intent_or_from_an_unadmitted_device_is_ignored() 
 
 #[test]
 fn a_lapsed_carry_cannot_suppress_execution() {
-    let records = vec![carry(Some(B), "c-b", 1_000, 1_100)];
+    let records = vec![misses(), carry(Some(B), "c-b", 1_000, 1_100)];
     assert_eq!(carrier(&records, A, 1_500), CarryDecision::Run);
     assert!(is_run_here(&lander(
         &records,
@@ -547,7 +585,7 @@ fn a_lapsed_carry_cannot_suppress_execution() {
 
 #[test]
 fn a_lander_never_waits_on_its_own_devices_carry() {
-    let records = vec![carry(None, "c-a", 1_000, 1_600)];
+    let records = vec![misses(), carry(None, "c-a", 1_000, 1_600)];
     assert!(is_run_here(&lander(
         &records,
         1_010,

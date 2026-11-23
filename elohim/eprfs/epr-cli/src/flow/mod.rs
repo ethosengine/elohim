@@ -983,14 +983,13 @@ fn run_intend_carry(opts: &GlobalOpts, rest: &[String], mode: &str) -> FlowResul
     #[cfg(feature = "peer")]
     let fold = carry::DeviceFold::read(&opts.root);
     #[cfg(feature = "peer")]
-    let (root, me, admits): (&Path, Option<&str>, Box<dyn Fn(&str) -> bool + '_>) = (
-        fold.root.as_path(),
-        fold.me.as_deref(),
-        Box::new(|device: &str| fold.admits(device)),
-    );
+    let (root, me) = (fold.root.as_path(), fold.me.as_deref());
+    #[cfg(feature = "peer")]
+    let admits: Box<carry::Admits<'_>> = Box::new(|device: &str| fold.admits(device));
     #[cfg(not(feature = "peer"))]
-    let (root, me, admits): (&Path, Option<&str>, Box<dyn Fn(&str) -> bool>) =
-        (opts.root.as_path(), None, Box::new(|_: &str| false));
+    let (root, me): (&Path, Option<&str>) = (opts.root.as_path(), None);
+    #[cfg(not(feature = "peer"))]
+    let admits: Box<carry::Admits<'_>> = Box::new(|_: &str| false);
 
     if mode_name == "carry" {
         let session = resolve_session(take_opt(rest, "--session")?);
@@ -1053,6 +1052,11 @@ fn run_intend_carry(opts: &GlobalOpts, rest: &[String], mode: &str) -> FlowResul
     let last_seen = |device: &str| fold.last_seen_ms(device);
     #[cfg(not(feature = "peer"))]
     let last_seen = |_: &str| None;
+    let records = carry::fold_records(root)?;
+    // A lander's own stop-waiting time is the one its misses event carries, unless given here.
+    let wait_until = wait_until.or_else(|| {
+        carry::own_wait_until(&records, admits.as_ref(), me, &intent, &project, &closure)
+    });
     let role = match role.as_str() {
         "carrier" => carry::CarryRole::Carrier,
         "lander" => carry::CarryRole::Lander(carry::LanderBounds {
@@ -1069,7 +1073,6 @@ fn run_intend_carry(opts: &GlobalOpts, rest: &[String], mode: &str) -> FlowResul
             )))
         }
     };
-    let records = carry::fold_records(root)?;
     let decision = carry::decide(
         &records,
         &carry::CarryQuery {

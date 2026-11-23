@@ -6,7 +6,10 @@
 use std::path::Path;
 use std::process::{Command, Output};
 
-use elohim_epr_rea::{CommitmentState, FlowRecord, FlowStore, ReaVerb, SidecarFlowStore};
+use elohim_epr_rea::{
+    AgentRef, CommitmentState, FlowEvent, FlowRecord, FlowStore, Magnitude, ReaVerb,
+    SidecarFlowStore,
+};
 use tempfile::TempDir;
 
 const CHANGE: &str = "I0123456789abcdef0123456789abcdef01234567";
@@ -93,6 +96,39 @@ impl Fixture {
         ]))
     }
 
+    /// Post this device's own misses event on `intent` for eprfs=abcdef, as the hand-over does,
+    /// and return its CID.
+    fn post_miss(&self, intent: &str) -> String {
+        let record = FlowRecord::Event(FlowEvent {
+            action: ReaVerb::Cite,
+            provider: AgentRef("human:test".to_string()),
+            receiver: AgentRef("repo:test/landing".to_string()),
+            resource: intent.parse().unwrap(),
+            quantity: Magnitude::Count {
+                value: 1.0,
+                unit: "dev-landing".to_string(),
+            },
+            process: None,
+            in_scope_of: intent.parse().unwrap(),
+            fulfills: Vec::new(),
+            satisfies: Vec::new(),
+            occurred_at: "2026-11-23T00:00:00Z".to_string(),
+            classified_as: vec![
+                "dev-landing:misses".to_string(),
+                CHANGE.to_string(),
+                "reason:misses".to_string(),
+                "measure:dev-landing@1".to_string(),
+                "value:1".to_string(),
+                format!("env:change={CHANGE}"),
+                format!("env:commit={TREE}"),
+                "env:ref=refs/heads/self/carry-test".to_string(),
+                "env:miss=eprfs=abcdef".to_string(),
+            ],
+        });
+        let mut store = SidecarFlowStore::open(self.root.path()).unwrap();
+        store.append(record).unwrap().to_string()
+    }
+
     fn carry(&self, intent: &str, miss: &str, valid_for: &str) -> Output {
         let measures = self.measures();
         self.epr(&[
@@ -146,7 +182,7 @@ fn a_carry_writes_a_commitment_and_one_crossing_cite_on_the_intent() {
     let fixture = Fixture::new();
     let raised = fixture.raise();
     let intent = raised["intent"].as_str().unwrap().to_string();
-    let miss = raised["event"].as_str().unwrap().to_string();
+    let miss = fixture.post_miss(&intent);
     let before = fixture.records().len();
 
     let receipt = success_json(fixture.carry(&intent, &miss, "600"));
@@ -208,7 +244,7 @@ fn a_replay_of_the_same_carry_appends_nothing_and_keeps_its_bound() {
     let fixture = Fixture::new();
     let raised = fixture.raise();
     let intent = raised["intent"].as_str().unwrap().to_string();
-    let miss = raised["event"].as_str().unwrap().to_string();
+    let miss = fixture.post_miss(&intent);
     let first = success_json(fixture.carry(&intent, &miss, "600"));
     let count = fixture.records().len();
     let replay = success_json(fixture.carry(&intent, &miss, "90000"));
@@ -223,11 +259,14 @@ fn a_carry_refuses_a_zero_bound_or_a_malformed_miss_before_any_append() {
     let fixture = Fixture::new();
     let raised = fixture.raise();
     let intent = raised["intent"].as_str().unwrap().to_string();
-    let miss = raised["event"].as_str().unwrap().to_string();
+    let miss = fixture.post_miss(&intent);
     let count = fixture.records().len();
     assert!(!fixture.carry(&intent, &miss, "0").status.success());
     assert!(!fixture.carry(&intent, "not-a-cid", "60").status.success());
     assert!(!fixture.carry("not-a-cid", &miss, "60").status.success());
+    // The raise event is no misses event: no open miss is named by it.
+    let raise_event = raised["event"].as_str().unwrap().to_string();
+    assert!(!fixture.carry(&intent, &raise_event, "60").status.success());
     assert_eq!(fixture.records().len(), count);
 }
 
@@ -236,7 +275,7 @@ fn a_device_standing_alone_decides_to_run_in_both_roles() {
     let fixture = Fixture::new();
     let raised = fixture.raise();
     let intent = raised["intent"].as_str().unwrap().to_string();
-    let miss = raised["event"].as_str().unwrap().to_string();
+    let miss = fixture.post_miss(&intent);
     success_json(fixture.carry(&intent, &miss, "600"));
     let ask = |role: &str| {
         success_json(fixture.epr(&[

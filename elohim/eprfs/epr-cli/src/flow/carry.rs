@@ -23,10 +23,11 @@
 //! stop-waiting time and a monotonic local deadline its caller supplies; when anything is in
 //! doubt (an unparseable time, a clock skew, a silent device) the answer is to run here.
 //!
-//! **Settlement, by fold only.** A carry stops being live when its `valid_until` passes, when a
-//! `gate-verdict@1` for its project and closure (green or red) is folded from this device or an
-//! admitted one, or when its intent is landed, withdrawn, dismissed or superseded by the device
-//! that announced it.
+//! **Settlement, by fold only, by the misses rule.** A carry stops being live when its
+//! `valid_until` passes or when the miss it answers is no longer open in `misses::open_misses`: a
+//! `gate-verdict@1` for its project and closure (green or red) folded from this device or an
+//! admitted one, or its intent landed, withdrawn, dismissed or superseded by the device that
+//! announced it. A carry is written only on an open miss.
 //!
 //! **Two devices that claim at once** each see only their own claim until the exchange carries
 //! the other's, so both may run the gate. That is harmless: the verdicts are the same closure's.
@@ -45,10 +46,9 @@ use elohim_epr_rea::{
 };
 use serde::Serialize;
 
-use super::intend::{
-    self, own_state, EventCommon, OwnState, INTENT_TAG, LANDING_MEASURE, VIA_PREFIX,
-};
+use super::intend::{self, EventCommon, INTENT_TAG, LANDING_MEASURE, VIA_PREFIX};
 use super::measures::{self, MeasureRef, Registry};
+use super::misses;
 use super::note::{
     named_identity, resolve_attribution, NoteActor, ENV_SLOT_PREFIX, MEASURE_SLOT_PREFIX,
     REASON_SLOT_PREFIX,
@@ -61,9 +61,8 @@ pub(crate) const CARRY_KIND: &str = "carry";
 /// Slot 0 of a carry event, as every landing event's slot 0 is `dev-landing:<kind>`.
 const CARRY_TAG: &str = "dev-landing:carry";
 
-/// The crossing measure a completed gate run is recorded under, and its kind.
-const GATE_VERDICT_MEASURE: &str = "gate-verdict@1";
-const VERDICT_KIND: &str = "verdict";
+/// Whether a device stands admitted on this device's roster, as the caller reads it.
+pub type Admits<'a> = dyn Fn(&str) -> bool + 'a;
 
 /// What the caller asked to claim, already split out of argv.
 pub struct CarryRequest<'a> {
@@ -314,20 +313,7 @@ pub fn write_carry(root: &Path, request: &CarryRequest<'_>) -> FlowResult<CarryR
             request.project, request.closure
         )));
     }
-    if settled_for(
-        &records,
-        &intent,
-        request.project,
-        request.closure,
-        request.admits,
-        request.me,
-    ) {
-        return Err(FlowError::InvalidArguments(format!(
-            "{}={} of intent {intent} is already settled by the fold (a verdict for that closure, or the intent landed, withdrawn, dismissed or superseded); there is nothing to carry",
-            request.project, request.closure
-        )));
-    }
-    open_miss_seam(&records, &intent, request.project, request.closure, &miss)?;
+    require_open_miss(&records, request, &intent, &miss)?;
     let change = match request.change {
         Some(change) => change.to_string(),
         None => intent_change(&records, &intent).ok_or_else(|| {
@@ -470,7 +456,16 @@ pub fn live_carries(
         let Some(claim) = current else {
             continue;
         };
-        if now_unix_s >= claim.valid_until || settled(records, &claim, admits, me) {
+        if now_unix_s >= claim.valid_until
+            || miss_settled(
+                records,
+                admits,
+                me,
+                &claim.intent.to_string(),
+                &claim.project,
+                &claim.closure,
+            )
+        {
             continue;
         }
         live.push(LiveCarry {
@@ -586,18 +581,55 @@ fn commitment_key(carry: &LiveCarry) -> Vec<u8> {
     )
 }
 
-/// Seam for slice 1's reader. When `flow/misses.rs` lands, this calls
-/// `misses::open_misses(records, admits, me)` and refuses a carry whose (intent, project,
-/// closure, misses event) is not among the open misses it returns. Until then the miss is taken
-/// as the caller's plain arguments, already validated, and no misses record is parsed here.
-fn open_miss_seam(
-    _records: &[(Cid, FlowRecord)],
-    _intent: &Cid,
-    _project: &str,
-    _closure: &str,
-    _miss: &Cid,
+/// The open miss this carry answers: the one `open_misses` folds for (intent, project, closure),
+/// and its posting event must be the misses event the carrier named.
+fn require_open_miss(
+    records: &[(Cid, FlowRecord)],
+    request: &CarryRequest<'_>,
+    intent: &Cid,
+    miss: &Cid,
 ) -> FlowResult<()> {
+    let intent_text = intent.to_string();
+    let open = misses::open_misses(records, request.admits, request.me);
+    let Some(found) = open.iter().find(|open| {
+        open.intent == intent_text
+            && open.project == request.project
+            && open.closure == request.closure
+    }) else {
+        return Err(FlowError::InvalidArguments(format!(
+            "no open miss {}={} on intent {intent} in this device's fold: it was never posted here, or a verdict or the intent's settlement already closed it",
+            request.project, request.closure
+        )));
+    };
+    if found.event != miss.to_string() {
+        return Err(FlowError::InvalidArguments(format!(
+            "the open miss {}={} on intent {intent} was posted by event {}, not {miss}",
+            request.project, request.closure, found.event
+        )));
+    }
     Ok(())
+}
+
+/// The lander's own stop-waiting time for one of its misses, as its misses event carries it.
+#[must_use]
+pub fn own_wait_until(
+    records: &[(Cid, FlowRecord)],
+    admits: &dyn Fn(&str) -> bool,
+    me: Option<&str>,
+    intent: &Cid,
+    project: &str,
+    closure: &str,
+) -> Option<u64> {
+    let intent = intent.to_string();
+    misses::open_misses(records, admits, me)
+        .into_iter()
+        .find(|open| {
+            open.announcer.is_none()
+                && open.intent == intent
+                && open.project == project
+                && open.closure == closure
+        })?
+        .wait_until
 }
 
 struct Claim {
@@ -658,122 +690,26 @@ fn writer(event: &FlowEvent) -> Option<Option<&str>> {
     vias.next().is_none().then_some(first)
 }
 
-/// Whether the writer of `event` counts: this device, or an admitted other device.
-fn counts(event: &FlowEvent, admits: &dyn Fn(&str) -> bool) -> bool {
-    match writer(event) {
-        Some(None) => true,
-        Some(Some(device)) => admits(device),
-        None => false,
-    }
-}
-
-/// A carry is settled by a verdict for its gate and closure, or by its intent's own settlement.
-fn settled(
-    records: &[(Cid, FlowRecord)],
-    claim: &Claim,
-    admits: &dyn Fn(&str) -> bool,
-    me: Option<&str>,
-) -> bool {
-    settled_for(
-        records,
-        &claim.intent,
-        &claim.project,
-        &claim.closure,
-        admits,
-        me,
-    )
-}
-
-fn settled_for(
-    records: &[(Cid, FlowRecord)],
-    intent: &Cid,
-    project: &str,
-    closure: &str,
-    admits: &dyn Fn(&str) -> bool,
-    me: Option<&str>,
-) -> bool {
-    verdict_folded(records, project, closure, admits) || intent_settled(records, intent, admits, me)
-}
-
-/// A `gate-verdict@1` for this project and closure, green or red, from this or an admitted device.
-fn verdict_folded(
-    records: &[(Cid, FlowRecord)],
-    project: &str,
-    closure: &str,
-    admits: &dyn Fn(&str) -> bool,
-) -> bool {
-    records.iter().any(|(_, record)| {
-        let FlowRecord::Event(event) = record else {
-            return false;
-        };
-        let slots = &event.classified_as;
-        intend::slot(slots, MEASURE_SLOT_PREFIX) == Some(GATE_VERDICT_MEASURE)
-            && intend::slot(slots, REASON_SLOT_PREFIX) == Some(VERDICT_KIND)
-            && intend::slot(slots, &format!("{ENV_SLOT_PREFIX}project=")) == Some(project)
-            && intend::slot(slots, &format!("{ENV_SLOT_PREFIX}closure=")) == Some(closure)
-            && counts(event, admits)
-    })
-}
-
-/// Whether the device that announced `intent` has landed, withdrawn, dismissed or superseded it.
+/// Whether the miss `(intent, project, closure)` is settled, by exactly the rule `open_misses`
+/// folds, so a carry and a miss settle by one rule: a `gate-verdict@1` for that project and
+/// closure (green or red) from this or an admitted device, or the intent landed, withdrawn,
+/// dismissed or superseded by its announcer. A miss no event ever posted is settled too, since
+/// there is nothing open to carry.
 ///
-/// For an intent this device raised, its own fold of its own records decides. For a sibling's,
-/// the announcer is the admitted device whose crossing `intent` or `misses` event names it, and
-/// only that device's settlement counts. When `flow/misses.rs` lands its settlement rule is the
-/// same; this function is the one place to point at it.
-fn intent_settled(
+/// Slice 1 stage B (`self/ethosengine-f4-ask-1` f257df0ab) adds `misses::miss_settled` with
+/// this signature and this body, and its newer-misses rule; when it lands, this function's body
+/// becomes that call.
+fn miss_settled(
     records: &[(Cid, FlowRecord)],
-    intent: &Cid,
     admits: &dyn Fn(&str) -> bool,
     me: Option<&str>,
+    intent: &str,
+    project: &str,
+    closure: &str,
 ) -> bool {
-    let own_atom = records.iter().any(|(cid, record)| {
-        cid == intent
-            && matches!(record, FlowRecord::Intent(atom)
-                if atom.resource_spec.classified_as.first().map(String::as_str) == Some(INTENT_TAG))
-    });
-    if own_atom {
-        return own_state(records, intent) != OwnState::Live;
-    }
-    let landing_events = || {
-        records.iter().filter_map(|(_, record)| match record {
-            FlowRecord::Event(event)
-                if intend::slot(&event.classified_as, MEASURE_SLOT_PREFIX)
-                    == Some(LANDING_MEASURE) =>
-            {
-                Some(event)
-            }
-            _ => None,
-        })
-    };
-    let announcer = landing_events().find_map(|event| {
-        let kind = intend::slot(&event.classified_as, REASON_SLOT_PREFIX)?;
-        let device = writer(event)??;
-        (event.resource == *intent
-            && matches!(kind, "intent" | "misses")
-            && Some(device) != me
-            && admits(device))
-        .then_some(device)
-    });
-    let Some(announcer) = announcer else {
-        return false;
-    };
-    let intent_text = intent.to_string();
-    landing_events().any(|event| {
-        if writer(event) != Some(Some(announcer)) {
-            return false;
-        }
-        match intend::slot(&event.classified_as, REASON_SLOT_PREFIX) {
-            Some("landed" | "withdraw" | "dismiss") => event.resource == *intent,
-            Some("intent") => {
-                intend::slot(
-                    &event.classified_as,
-                    &format!("{ENV_SLOT_PREFIX}supersedes="),
-                ) == Some(intent_text.as_str())
-            }
-            _ => false,
-        }
-    })
+    !misses::open_misses(records, admits, me)
+        .iter()
+        .any(|miss| miss.intent == intent && miss.project == project && miss.closure == closure)
 }
 
 /// The change an intent is about, from its own atom or any landing event that names it.
