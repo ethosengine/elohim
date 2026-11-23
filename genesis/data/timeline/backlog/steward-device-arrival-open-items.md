@@ -2764,3 +2764,42 @@ never exited.
 
 State: not cured. Cure: wait on a PID (`kill -0 <pid>`) or on a done-file the job writes at its
 end, as the sprint's other jobs did with `*.done` files.
+
+## Row 82, delta (2026-11-23): two cures proposed for a held tool call, neither built
+
+Raised in a side conversation between the steward and a fork of the integrator session on
+2026-11-23. The steward's own words are not in this session's record, so what follows is the
+fork's account of what was agreed as worth doing, not a ruling.
+
+**A command shape an approval can read.** The call that was held was one string carrying a
+leading comment line, a `cd`, a mutating git verb and a chained log read. The repository's own
+rules push agents to that shape: the Brit-fallback reason must be the first line, a stale
+`EPR_BIN` puts `env -u EPR_BIN` on every command, and a worktree may not be entered so every
+call carries a path. Proposed rules, to be enforced where a command is written (an `.epr-meta`
+rule with a PreToolUse check) and not only documented: one operation per call; a git mutation
+outside brit is a checked-in script with fixed arguments (tonight's three shapes were pick onto
+a branch, re-run the trailer hook over local commits, and an empty tagged tip); no leading
+comment line and no heredoc carrying code; no directory change; a wait is on a PID or a
+done-file with a timeout (row 83); no prefix the session start should have supplied
+(station Terminal-env, on this landing).
+
+**Every held prompt is an incident.** The measure exists and nothing feeds it:
+`dialogue-blocked-seconds` is among the bounds the session-start `sense:` line lists as numb.
+The stasis loop runs in shadow and speaks through the agent that is stuck; on 2026-11-23 it
+asked that agent to send a push at about 05:33Z and the agent judged the request noise. A
+detector that depends on the judgment of the thing that is held cannot be the alarm. Proposed:
+a watcher outside the session sees a tool call pending past a short bound; it pushes to the
+steward, writes a berth line the sibling devices read, and `berth status` stops reading that
+session as live (row 34); the incident is an observation on `dialogue-blocked-seconds` with the
+command, the rule that held it and who was waiting; each incident closes in a style rule or
+named script that makes the shape unwritable, or in a narrowed ask rule. A habit would state
+it ("no agent waits on an approval unseen"), born red.
+
+Missing node, in mintable shape. Chain: an ask that waits (station F4-ask). Between "a
+session's own tool call is pending on an approval" and "the steward and the sibling devices
+know": a read that does not pass through the held session. Probe: with one session's call
+held for 120 s, `berth status` on a sibling device marks that session held and a push has
+reached the steward. Current state: nothing; the held session reads `live`.
+
+Neither cure is a prerequisite of this landing. Both are prerequisites of a landing with no
+coordinator session, which is the test the two F4-ask records exist to pass.
