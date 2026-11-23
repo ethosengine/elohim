@@ -30,6 +30,8 @@ import {
   emitGateVerdict,
   findEvidence,
   gateEvidence,
+  gateReuseWithheldReason,
+  noKeyLine,
   isHabitAtom,
   patternDigest,
   projectTree,
@@ -122,6 +124,30 @@ test('step fingerprints come from brit per declared step; gate-only projects are
 
   const failing = fakeSpawn([[isFingerprint, { status: 1, stdout: '', stderr: 'could not resolve commit' }]]);
   assert.match(stepFingerprints(project, 'nope', { britBin: '/x/brit', root: '/repo', env: {}, spawn: failing.spawn }).error, /fingerprint of cargo-build-storage failed: could not resolve commit/);
+});
+
+test('a withheld project reports its policy reason and a missing policy row keeps the current wording', t => {
+  const root = mkdtempSync(join(tmpdir(), 'gate-evidence-withheld-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  mkdirSync(join(root, 'genesis/agentic'), { recursive: true });
+  const reason = 'the key cannot see the moving integration baseline';
+  writeFileSync(join(root, 'genesis/agentic/pool-policy.json'), JSON.stringify({
+    gate_reuse: { projects: [], withheld: { [project.name]: reason } },
+  }));
+
+  assert.equal(gateReuseWithheldReason(project, root), reason);
+  assert.equal(noKeyLine('gate-only inputs, no step fingerprint', project, root),
+    `unavailable (gate-only inputs, no step fingerprint); not recorded — ${reason}`);
+  // Being withheld from reuse never stops a gate computing its key: the reason joins only the
+  // no-key line, so a withheld gate with brit unavailable still says why it has no key.
+  assert.match(gateEvidence(project, { root, env: { PATH: '' }, commit: 'abc123' }).line, /^unavailable \(brit/);
+
+  writeFileSync(join(root, 'genesis/agentic/pool-policy.json'), JSON.stringify({
+    gate_reuse: { projects: [], withheld: {} },
+  }));
+  assert.equal(gateReuseWithheldReason(project, root), null);
+  assert.equal(gateEvidence(project, { root, env: { PATH: '' }, commit: 'abc123' }).line,
+    'unavailable (brit not on BRIT_BIN/BRIT_BUILD_REF_BIN or PATH)');
 });
 
 test('describeEvidence prefers the newest green, names signer, age and commit, and calls a miss a miss', () => {

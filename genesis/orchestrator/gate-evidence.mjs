@@ -48,6 +48,23 @@ export function attestationRef(project) {
 const BUILD_REF_ENV = ['BRIT_BUILD_REF_BIN', 'BRIT_BUILD_REF'];
 const stderrWarn = line => process.stderr.write(line);
 
+/** A withheld gate has no reusable verdict writer; its policy row is the user-facing reason. */
+export function gateReuseWithheldReason(project, root) {
+  try {
+    const policy = JSON.parse(readFileSync(resolve(root, 'genesis/agentic/pool-policy.json'), 'utf8'));
+    const reason = policy?.gate_reuse?.withheld?.[project.name];
+    return typeof reason === 'string' && reason.trim() ? reason : null;
+  } catch {
+    return null;
+  }
+}
+
+/** No key means no verdict can be written; the line names why, from the policy when it says. */
+export function noKeyLine(error, project, root) {
+  const withheld = gateReuseWithheldReason(project, root);
+  return `unavailable (${error})${withheld ? `; not recorded — ${withheld}` : ''}`;
+}
+
 function isExecutable(path) {
   try {
     accessSync(path, constants.X_OK);
@@ -639,7 +656,7 @@ export function gateEvidence(project, { env = process.env, root, commit, cargoEn
   const nativeKey = native?.key;
   // The run's input class (gate-inputs.mjs policy `cls`; LEGACY_ALL until `on` exists).
   const fp = stepFingerprints(project, commit, { britBin, root, spawn, inputs: inputs?.cls ?? LEGACY_ALL });
-  if (fp.error) return { line: `unavailable (${fp.error})` };
+  if (fp.error) return { line: noKeyLine(fp.error, project, root) };
   const blob = manifestBlob(root, commit, project.manifestPath, spawn);
   if (!blob) return { line: `unavailable (manifest ${project.manifestPath} absent at ${String(commit).slice(0, 9)})` };
   const recipe = recipeAt(project, root, commit, spawn);
