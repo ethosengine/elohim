@@ -4106,6 +4106,9 @@ class UnackedPeer(unittest.TestCase):
         runner = mock.patch("subprocess.run")
         self.run = runner.start()
         self.addCleanup(runner.stop)
+        held = mock.patch.dict(render_status.__globals__, {"native_held": lambda *a, **k: {}})
+        held.start()
+        self.addCleanup(held.stop)
         self.answer(None)
         self.watch = _NS["_SilenceWatch"](self.b)
 

@@ -2735,21 +2735,29 @@ def room_main(argv, now=None, builds=None):
     return 0 if room["verdict"] == "admit" else 3
 
 
-def held_marker(session, now):
-    """The `held-tool-watch` marker for a session, or None: {tool, agent, sinceAt, pendingS, silent}.
-    Presence only. It never changes `is_live` (a held call is a live process). A marker whose last
-    refresh is older than twice the watcher's interval is `silent`: the watcher stopped, so its word
-    is no longer current. A pure read that creates nothing."""
-    base = os.environ.get("HELD_TOOL_WATCH_DIR") or os.path.join(
-        main_checkout(REPO_ROOT), ".eprfs", "status", "held-tool-watch")
+def _stasis_status_runner(timeout_s):
+    """stdout of `epr session stasis status --json`; injectable seam, raises on any failure."""
+    out = subprocess.run([os.environ.get("EPR_BIN") or "epr", "session", "stasis", "status", "--json"],
+                         capture_output=True, text=True, timeout=timeout_s, check=True)
+    return out.stdout
+
+
+def native_held(runner=None, timeout_s=3):
+    """{session: {incident, stallClass, pendingS}} for sessions with an open native stasis incident,
+    read from one `epr session stasis status --json` call. The record and the judgment are the native
+    fold's; berth only displays them. {} when the read is unavailable or errors (berth never depends
+    on it), and a pure read that creates nothing."""
     try:
-        with open(os.path.join(base, "held", _safe(session) + ".json")) as f:
-            row = json.load(f)
-        since, refreshed, interval = float(row["since"]), float(row["refreshedAt"]), float(row["intervalS"])
-        return dict(tool=str(row["tool"]), agent=str(row.get("agent", "main")), sinceAt=since,
-                    pendingS=int(now - since), silent=(now - refreshed) > 2 * interval)
-    except (OSError, ValueError, KeyError, TypeError):
-        return None
+        data = json.loads((runner or _stasis_status_runner)(timeout_s))
+        held = {}
+        for row in data.get("sessions", []):
+            for inc in row.get("openIncidents", []):
+                if row.get("session") not in held:
+                    held[row["session"]] = dict(incident=str(inc["id"]), stallClass=inc.get("stallClass"),
+                                                pendingS=int(inc.get("ageSeconds") or 0))
+        return held
+    except (OSError, ValueError, KeyError, TypeError, AttributeError, subprocess.SubprocessError):
+        return {}
 
 
 def declared_writes(m):
@@ -2941,6 +2949,7 @@ def writes_line(writes):
 def status_json(b, no_peer=False):
     """Presence only: never read leases, remember a channel, or advance a cursor."""
     now = b.now()
+    held_now = {} if no_peer else native_held()  # --no-peer spawns nothing
     result = dict(device=None, moorings=[], siblings=[], devices=[], unavailable=[])
     moorings = b.moorings() if os.path.isdir(b.moor_dir) else {}
     for session, m in sorted(moorings.items(), key=lambda kv: -kv[1].get("last_seen", 0)):
@@ -2953,10 +2962,10 @@ def status_json(b, no_peer=False):
             seenS=int(now - m.get("last_seen", now)),
             declaredS=int(now - m["writes_declared_at"]) if "writes_declared_at" in m else None,
             observedS=int(now - m["writes_observed_at"]) if "writes_observed_at" in m else None)
-        held = held_marker(session, now)
-        if held:  # additive, optional: absent when nothing is held
-            row["held"] = dict(tool=held["tool"], agent=held["agent"], pendingS=held["pendingS"],
-                               sinceAt=_rfc3339(held["sinceAt"] * 1000), watcherSilent=held["silent"])
+        held = held_now.get(session)
+        if held:  # additive, optional: absent when no native incident is open
+            row["held"] = dict(incident=held["incident"], stallClass=held["stallClass"],
+                               pendingS=held["pendingS"])
         result["moorings"].append(row)
     view = None
     if no_peer:
@@ -2996,6 +3005,7 @@ def status_json(b, no_peer=False):
 
 def render_status(b):
     now = b.now()
+    held_now = native_held()
     lines = ["BERTH (this workspace as one blade — moorings · leases · capacity)"]
     ms = b.moorings()
     if not ms:
@@ -3003,13 +3013,12 @@ def render_status(b):
     for s, m in sorted(ms.items(), key=lambda kv: -kv[1].get("last_seen", 0)):
         r = m.get("recipient", {})
         live = "live" if b.is_live(m) else "STALE"
-        held = held_marker(s, now) if live == "live" else None
-        shown = ("held?" if held["silent"] else "held") if held else live
+        held = held_now.get(s) if live == "live" else None
+        shown = "held" if held else live
         lines.append(f"  {shown:5} {s:<14} {r.get('runtime', '?'):<12} {r.get('model', '?')}@{r.get('lab', '?')}"
                      f"  for {m.get('principal') or '?'}  task={m.get('task') or '-'}  seen {_age(now - m.get('last_seen', now))} ago")
         if held:
-            lines.append(f"    held{'? (watcher silent)' if held['silent'] else ''}: {held['tool']} pending "
-                         f"{held['pendingS']}s since {_rfc3339(held['sinceAt'] * 1000)}")
+            lines.append(f"    held: native stasis incident {held['incident']} open {held['pendingS']}s")
         if live == "live" and declared_writes(m):
             ages = []
             if 'writes_declared_at' in m:

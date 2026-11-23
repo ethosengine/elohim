@@ -117,36 +117,97 @@ class ScanTest(Fixture):
         self.assertIn("0123abcd  main  Bash  500s  cause: unknown", out.getvalue())
 
 
-class WatchTest(Fixture):
+def status_json(*incidents):
+    """What `epr session stasis status --json` prints: incidents are (session, id) pairs."""
+    sessions = {}
+    for session, incident in incidents:
+        sessions.setdefault(session, []).append(
+            {"id": incident, "stallClass": "silence", "state": "open", "ageSeconds": 500})
+    return json.dumps({"sessions": [{"session": k, "openIncidents": v} for k, v in sessions.items()]})
+
+
+class FakeEpr:
+    """Fake runner for epr: records argv; `observe` and `status` answer as configured."""
+    def __init__(self, status="{\"sessions\": []}", observe=(0, "", "")):
+        self.calls, self.status, self.observe = [], status, observe
+
+    def __call__(self, argv):
+        self.calls.append(argv)
+        return self.observe if argv[2] == "observe" else (0, self.status, "")
+
+
+class NoStateDir(unittest.TestCase):
+    def tearDown(self):
+        self.assertFalse(Path(W["REPO_ROOT"], ".eprfs/status/held-tool-watch").exists())
+        self.assertFalse(Path(W["main_checkout"](W["REPO_ROOT"]), ".eprfs/status/held-tool-watch").exists())
+
+
+class WatchTest(Fixture, NoStateDir):
     def setUp(self):
         super().setUp()
-        self.said, self.logs = [], []
+        self.said, self.logs, self.announced = [], [], set()
 
-    def run_pass(self, now, push=None):
-        return W["run_pass"](str(self.state), [SESSION], str(self.transcripts), 120, 5, now,
-                             str(self.stasis), say=self.said.append,
+    def run_pass(self, epr, now, push=None):
+        return W["run_pass"]([SESSION], str(self.transcripts), 120, now, self.announced, str(self.stasis),
+                             runner=epr, say=self.said.append,
                              push=push or (lambda t, b: (_ for _ in ()).throw(LookupError("push: no transport configured"))),
                              log=self.logs.append)
 
-    def test_announces_once_across_passes_and_once_on_resolution(self):
+    def test_sensed_call_invokes_observe_once_per_pass_with_the_right_argv(self):
+        sub = self.transcripts / "proj" / SESSION / "subagents"
+        sub.mkdir(parents=True)
         self.write(use("t1", "Bash", T0, command="ls"))
-        self.run_pass(T0 + 200)
-        self.run_pass(T0 + 205)
-        self.assertEqual(len(self.said), 1)
-        self.assertTrue(self.said[0].startswith("HELD: session 0123abcd Bash pending 200s (cause unknown)"))
-        self.assertTrue((self.state / "held" / f"{SESSION}.json").exists())
-        self.write(use("t1", "Bash", T0, command="ls"), result("t1", T0 + 300))
-        self.run_pass(T0 + 310)
-        self.run_pass(T0 + 315)
-        self.assertEqual(len(self.said), 2)
-        self.assertEqual(self.said[1], "HELD-CLEARED: session 0123abcd Bash returned after 310s")
-        self.assertFalse((self.state / "held" / f"{SESSION}.json").exists())
+        self.write(use("s1", "Bash", T0 + 10, command="rm x"), path=sub / "agent-a1b2.jsonl")
+        epr = FakeEpr()
+        self.run_pass(epr, T0 + 200)
+        observes = [c for c in epr.calls if c[2] == "observe"]
+        self.assertEqual(observes[0], ["session", "stasis", "observe", "--session", SESSION, "--source",
+                                       "watcher:held-tool-watch", "--tool", "Bash", "--pending-since",
+                                       W["rfc3339"](T0)])
+        self.assertEqual(observes[1][-2:], ["--agent", "a1b2"])
+        self.assertEqual(len(observes), 2)
+        self.assertEqual(len([c for c in epr.calls if c[2] == "status"]), 1)
 
-    def test_missing_push_transport_logs_and_does_not_fail(self):
+    def test_a_call_under_the_sensing_threshold_calls_nothing(self):
         self.write(use("t1", "Bash", T0, command="ls"))
-        self.run_pass(T0 + 200)
-        self.assertIn("push: no transport configured", self.logs)
+        epr = FakeEpr()
+        self.run_pass(epr, T0 + 60)
+        self.assertEqual(epr.calls, [])
+
+    def test_unavailable_verb_prints_one_line_records_nothing_and_exits_4(self):
+        self.write(use("t1", "Bash", T0, command="ls"))
+        epr = FakeEpr(observe=(1, "", "epr session stasis: unknown command observe"))
+        held, unavailable = self.run_pass(epr, T0 + 200)
+        self.assertTrue(unavailable)
+        self.assertEqual(self.logs, [W["UNAVAILABLE_LINE"]])
+        self.assertEqual(self.said, [])
+        self.assertEqual([c[2] for c in epr.calls], ["observe"])
+        sessions = self.root / "s.json"
+        sessions.write_text(json.dumps({"moorings": [{"session": SESSION}]}))
+        args = ["watch", "--transcripts", str(self.transcripts), "--sessions-json", str(sessions),
+                "--stasis-root", str(self.stasis), "--max-passes", "1"]
+        clock = mock.Mock(time=lambda: T0 + 200, sleep=lambda s: None)
+        with mock.patch.dict(W["cmd_watch"].__globals__, {"time": clock}), \
+                contextlib.redirect_stdout(io.StringIO()) as out:
+            self.assertEqual(W["cmd_watch"](W["parser"]().parse_args(args), runner=epr), 4)
+        self.assertEqual(out.getvalue().strip().splitlines(), [W["UNAVAILABLE_LINE"]])
+        self.assertEqual(sorted(p.name for p in self.root.iterdir()), ["projects", "s.json"])
+
+    def test_open_incident_announces_once_across_two_passes(self):
+        self.write(use("t1", "Bash", T0, command="ls"))
+        epr = FakeEpr(status=status_json((SESSION, "inc-1")))
+        self.run_pass(epr, T0 + 200)
+        self.run_pass(epr, T0 + 205)
         self.assertEqual(len(self.said), 1)
+        self.assertIn("0123abcd", self.said[0])
+        self.assertIn("inc-1", self.said[0])
+        self.assertIn("push: no transport configured", self.logs)
+
+    def test_closed_incident_and_the_observers_own_session_are_not_announced(self):
+        self.write(use("t1", "Bash", T0, command="ls"))
+        self.run_pass(FakeEpr(status=status_json()), T0 + 200)
+        self.run_pass(FakeEpr(status=status_json(("held-tool-watch", "inc-w"))), T0 + 205)
+        self.assertEqual(self.said, [])
 
     def test_one_failing_channel_does_not_stop_the_others(self):
         pushed = []
@@ -154,20 +215,18 @@ class WatchTest(Fixture):
 
         def broken(_):
             raise OSError("exchange down")
-        W["run_pass"](str(self.state), [SESSION], str(self.transcripts), 120, 5, T0 + 200,
-                      str(self.stasis), say=broken, push=lambda t, b: pushed.append(b), log=self.logs.append)
+        W["run_pass"]([SESSION], str(self.transcripts), 120, T0 + 200, set(), str(self.stasis),
+                      runner=FakeEpr(status=status_json((SESSION, "i"))), say=broken,
+                      push=lambda t, b: pushed.append(b), log=self.logs.append)
         self.assertEqual(len(pushed), 1)
         self.assertTrue(any(line.startswith("berth: failed") for line in self.logs))
 
 
-class BerthStatusTest(unittest.TestCase):
+class BerthStatusTest(NoStateDir):
     def setUp(self):
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
         self.dir = Path(tmp.name)
-        patch = mock.patch.dict(os.environ, {"HELD_TOOL_WATCH_DIR": str(self.dir / "w")})
-        patch.start()
-        self.addCleanup(patch.stop)
         self.now = 1000
         self.b = Berth(str(self.dir / "berth"), now=lambda: self.now, policy_path="/nonexistent/pool-policy.json")
         guard = mock.patch.dict(Berth.moor.__globals__, {"envelope_guard": lambda *a: contextlib.nullcontext(1)})
@@ -176,34 +235,32 @@ class BerthStatusTest(unittest.TestCase):
         self.b.moor("live", model="m", lab="l", runtime="r")
         self.render = BERTH["render_status"]
 
-    def marker(self, refreshed):
-        path = self.dir / "w" / "held" / "live.json"
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(dict(session="live", agent="main", tool="Bash", since=self.now - 700,
-                                        refreshedAt=refreshed, intervalS=5)))
-
-    def status(self):
+    def status(self, runner):
         with mock.patch.dict(self.render.__globals__, {"_guard_state": lambda _: None,
-                                                       "_steward_view": lambda b: (None, None)}):
+                                                       "_steward_view": lambda b: (None, None),
+                                                       "_stasis_status_runner": lambda t: runner(t)}):
             return self.render(self.b)
 
-    def test_held_replaces_live_and_leaves_liveness_alone(self):
-        self.assertIn("  live  live", self.status())
-        self.marker(self.now - 3)
-        text = self.status()
+    def test_held_renders_from_the_native_status_and_leaves_liveness_alone(self):
+        calls = []
+        text = self.status(lambda t: calls.append(t) or status_json(("live", "inc-9")))
+        self.assertEqual(len(calls), 1)
         self.assertIn("  held  live", text)
-        self.assertIn("    held: Bash pending 700s since ", text)
+        self.assertIn("    held: native stasis incident inc-9 open 500s", text)
         self.assertTrue(self.b.is_live(self.b.mooring("live")))
-        row = BERTH["status_json"](self.b, no_peer=True)["moorings"][0]
-        self.assertEqual((row["held"]["tool"], row["held"]["pendingS"], row["held"]["watcherSilent"]),
-                         ("Bash", 700, False))
+        with mock.patch.dict(BERTH["status_json"].__globals__, {"_stasis_status_runner": lambda t: status_json(("live", "inc-9"))}):
+            self.b._read_peer_leases = mock.Mock(return_value=({"others": {}}, None))
+            self.b._read_peer_status = mock.Mock(return_value=({"devices": []}, None))
+            row = BERTH["status_json"](self.b)["moorings"][0]
+        self.assertEqual((row["held"]["incident"], row["held"]["pendingS"]), ("inc-9", 500))
 
-    def test_stale_marker_renders_held_question_mark(self):
-        self.marker(self.now - 11)  # older than 2 x the 5 s interval
-        text = self.status()
-        self.assertIn("  held? live", text)
-        self.assertIn("held? (watcher silent): Bash pending 700s", text)
-        self.assertTrue(BERTH["status_json"](self.b, no_peer=True)["moorings"][0]["held"]["watcherSilent"])
+    def test_unavailable_or_failing_read_renders_plain_live(self):
+        def boom(_):
+            raise OSError("no epr")
+        for runner in (boom, lambda t: "not json", lambda t: status_json()):
+            text = self.status(runner)
+            self.assertIn("  live  live", text)
+            self.assertNotIn("held", text)
 
 
 if __name__ == "__main__":

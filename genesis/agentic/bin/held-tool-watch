@@ -1,37 +1,35 @@
 #!/usr/bin/env python3
 """
-held-tool-watch — see a tool call that has been pending too long, from OUTSIDE the session that made it.
+held-tool-watch — a SENSOR for a tool call that has been pending a while, seen from OUTSIDE its session.
 
 On 2026-11-23 a coordinating session's tool call sat pending for about seven hours (very likely an
-approval prompt nobody saw). Nothing told the steward, the sibling device or `berth status`; the session
-read `live` because berth liveness is a heartbeat, not progress. The dialogue-stasis loop speaks through
-the stuck agent, so its alarm depended on the thing that was held. This watcher reads the transcripts the
-harness already writes and announces without the held session's help.
+approval prompt nobody saw). Nothing told the steward, the sibling device or `berth status`. This script
+reads the transcripts the harness already writes and hands what it senses to the native fold.
 
-  held-tool-watch scan  [--transcripts DIR] [--bound-s 120] [--now UNIX] [--json]
+  held-tool-watch scan  [--transcripts DIR] [--sense-after-s 120] [--now UNIX] [--json]
                         [--sessions-json FILE] [--stasis-root DIR] [--tail-bytes N]
-      One pass. Exit 0 when nothing is held, 3 when something is.
-  held-tool-watch watch [--interval-s 5] [--bound-s 120] [--transcripts DIR] [--sessions-json FILE]
-                        [--state-dir DIR] [--max-passes N]
-      Loop over scan. Announce each held call once and its resolution once, three independent ways:
-      a berth note (sender `held-tool-watch`), a marker file `berth status` reads, and a steward push
-      through the executable named by $HELD_TOOL_PUSH_CMD (argv: title, body; none configured = logged).
+      One pass, transcripts in, candidates out. Exit 0 when none, 3 when some. `--sense-after-s` is when
+      the sensor starts REPORTING a pending call; it is not a judgment that a session is stalled.
+  held-tool-watch watch [--interval-s 5] [--sense-after-s 120] [--transcripts DIR] [--sessions-json FILE]
+                        [--max-passes N]
+      Loop: for each candidate call `epr session stasis observe --session S --source
+      watcher:held-tool-watch --tool T --pending-since RFC3339 [--agent A]`, then read
+      `epr session stasis status --json` and announce each open incident of another session once
+      (berth broadcast, and a push through $HELD_TOOL_PUSH_CMD: argv title, body; none = logged).
+      If the installed epr lacks `observe`, one line says so, nothing is recorded, exit 4 (--max-passes).
 
-It never approves, cancels, retries or signals anything, and only reads transcripts.
+Split: this script senses (which transcript calls are pending, redacted shape, long-running exclusions)
+and calls. The native Incident (elohim/eprfs/device-runtime/src/session_stasis.rs) records the session,
+agent, rule and blocked intervals, and `elohim_epr_rea::Bound` judges the age; the fold dedupes repeats.
+The sensing threshold, the push transport and the berth wording are this device's to tune.
 
-How a held call is told from a long-running one. A transcript holds a `tool_use` block, and the harness
-writes a `tool_result` block with the same id when the call returns. A call with no result is "pending".
-Pending is NOT held when the tool is long-running by design:
-  * Agent / Task / Workflow / Monitor / TaskOutput: they run or wait for as long as their work takes;
-  * Bash with `run_in_background: true`: it returns at once with a handle (and its result is written),
-    so it only dangles if the harness is wedged, and it is still skipped;
-  * Bash with an explicit `timeout`: pending is held only past that timeout plus a 30 s grace, because
-    the harness itself kills the call at its timeout.
-Everything else is held once its age passes the bound. The cause is `approval-evidence` only when a
-`permission-requested` entry in the dialogue-stasis journal names that tool_use id as its
-`precedingToolUseId`; otherwise `cause: unknown` (a slow tool and an unanswered prompt look the same in
-a transcript). A killed subagent whose last line is a tool_use is indistinguishable from a held one and
-is reported while its parent session stays moored.
+It never approves, cancels, retries or signals anything, only reads transcripts, and keeps no record.
+
+Pending is NOT sensed when the tool is long-running by design: Agent / Task / Workflow / Monitor /
+TaskOutput; Bash with `run_in_background: true`; Bash with an explicit `timeout` until that timeout plus
+a 30 s grace. A killed subagent whose last line is a tool_use looks the same as a held one.
+`cause` is `approval-evidence` only when a `permission-requested` entry in the dialogue-stasis journal
+names the tool_use id as its `precedingToolUseId`; otherwise `unknown`.
 """
 import argparse
 import datetime
@@ -68,11 +66,6 @@ def main_checkout(root):
     except OSError:
         pass
     return root
-
-
-def state_dir():
-    return os.environ.get("HELD_TOOL_WATCH_DIR") or os.path.join(
-        main_checkout(REPO_ROOT), ".eprfs", "status", "held-tool-watch")
 
 
 def stasis_root():
@@ -188,7 +181,7 @@ def dangling_calls(path, tail_bytes=DEFAULT_TAIL_BYTES):
     return sorted((u for i, u in uses.items() if i not in results), key=lambda u: u["at"])
 
 
-def long_running_limit(tool, inputs, bound_s):
+def long_running_limit(tool, inputs, sense_after_s):
     """Seconds a pending call may age before it counts as held, or None when it is never held."""
     if tool in LONG_RUNNING_TOOLS:
         return None
@@ -198,8 +191,8 @@ def long_running_limit(tool, inputs, bound_s):
             return None
         timeout = inputs.get("timeout")
         if isinstance(timeout, (int, float)) and not isinstance(timeout, bool) and timeout > 0:
-            return max(bound_s, timeout / 1000 + TIMEOUT_GRACE_S)
-    return bound_s
+            return max(sense_after_s, timeout / 1000 + TIMEOUT_GRACE_S)
+    return sense_after_s
 
 
 def find_transcripts(root, session):
@@ -259,13 +252,13 @@ def moored_sessions(sessions_json=None):
             if (isinstance(r, dict) and isinstance(r.get("session"), str)) or isinstance(r, str)]
 
 
-def scan(sessions, transcripts, bound_s, now, stasis=None, tail_bytes=DEFAULT_TAIL_BYTES):
+def scan(sessions, transcripts, sense_after_s, now, stasis=None, tail_bytes=DEFAULT_TAIL_BYTES):
     held = []
     for session in sessions:
         evidence = approval_evidence(stasis, session) if stasis else set()
         for agent, path in find_transcripts(transcripts, session):
             for call in dangling_calls(path, tail_bytes):
-                limit = long_running_limit(call["tool"], call["input"], bound_s)
+                limit = long_running_limit(call["tool"], call["input"], sense_after_s)
                 age = now - call["at"]
                 if limit is None or age <= limit:
                     continue
@@ -281,26 +274,70 @@ def render_line(h):
             f"cause: {h['cause']}  {h['shape']}")
 
 
+# ---------------------------------------------------------------- calling the native fold
+
+UNAVAILABLE_LINE = ("observe: native verb unavailable on this epr (lands with "
+                    "stasis/tool-pending-observed); nothing recorded")
+
+
+def epr_bin():
+    return os.environ.get("EPR_BIN") or "epr"
+
+
+def run_native(argv):
+    """(returncode, stdout, stderr) of an epr call. The injectable runner's default."""
+    out = subprocess.run([epr_bin()] + argv, capture_output=True, text=True, timeout=60)
+    return out.returncode, out.stdout, out.stderr
+
+
+def rfc3339(t):
+    return datetime.datetime.fromtimestamp(t, datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def observe_argv(h):
+    argv = ["session", "stasis", "observe", "--session", h["session"], "--source",
+            "watcher:" + WATCHER_SESSION, "--tool", h["tool"], "--pending-since", rfc3339(h["calledAt"])]
+    if h["agent"] != "main":
+        argv += ["--agent", h["agent"]]
+    return argv
+
+
+def observe(held, runner=run_native):
+    """Call the native verb once per candidate. Returns (ok, unavailable)."""
+    ok, unavailable = 0, False
+    for h in held:
+        code, out, err = runner(observe_argv(h))
+        if code == 0:
+            ok += 1
+        elif "unknown" in (out + err).lower():
+            unavailable = True
+            break
+    return ok, unavailable
+
+
+def native_open_incidents(runner=run_native):
+    """[(session, incident)] open per `epr session stasis status --json`, or None when unreadable."""
+    try:
+        code, out, _ = runner(["session", "stasis", "status", "--json"])
+        if code != 0:
+            return None
+        sessions = json.loads(out).get("sessions", [])
+        return [(s["session"], i) for s in sessions if isinstance(s, dict)
+                for i in s.get("openIncidents", []) if isinstance(i, dict) and "id" in i]
+    except (OSError, ValueError, KeyError, AttributeError, subprocess.SubprocessError):
+        return None
+
+
 # ---------------------------------------------------------------- announcing
 
-def call_key(h):
-    return f"{h['session']}|{h['agent']}|{h['toolUseId']}"
-
-
-def held_text(h):
-    return (f"HELD: session {h['session'][:8]} {h['tool']} pending {h['pendingS']}s "
-            f"(cause {h['cause']}) — it cannot read notes until it returns")
-
-
-def cleared_text(entry, seconds, gone):
-    what = "no longer moored after" if gone else "returned after"
-    return f"HELD-CLEARED: session {entry['session'][:8]} {entry['tool']} {what} {seconds}s"
+def incident_text(session, incident):
+    return (f"HELD: session {session[:8]} has an open stasis incident {incident['id']} "
+            f"({incident.get('stallClass', '?')}, {incident.get('ageSeconds', '?')}s old) — "
+            f"it cannot read notes until the call returns")
 
 
 def announce_berth_note(text):
-    """A broadcast berth note (no --to) from the sender session `held-tool-watch`: it crosses to sibling
-    devices and reaches every session moored here, the held one at its next tool call. `say` needs no
-    mooring, so no berth change is required."""
+    """A broadcast berth note (no --to) from the sender session `held-tool-watch`."""
     subprocess.run([berth_bin(), "say", "--session", WATCHER_SESSION, text], capture_output=True,
                    text=True, timeout=60, check=True)
 
@@ -310,23 +347,6 @@ def announce_push(title, body):
     if not command:
         raise LookupError("push: no transport configured")
     subprocess.run([command, title, body], capture_output=True, text=True, timeout=60, check=True)
-
-
-def write_json_atomic(path, obj):
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    tmp = f"{path}.{os.getpid()}.tmp"
-    with open(tmp, "w") as f:
-        json.dump(obj, f, sort_keys=True)
-    os.replace(tmp, path)
-
-
-def read_state(directory):
-    try:
-        with open(os.path.join(directory, "state.json")) as f:
-            data = json.load(f)
-        return data if isinstance(data, dict) and isinstance(data.get("held"), dict) else {"held": {}}
-    except (OSError, ValueError):
-        return {"held": {}}
 
 
 def fan_out(text, title, say, push, log):
@@ -341,46 +361,26 @@ def fan_out(text, title, say, push, log):
             log(f"{name}: failed: {type(error).__name__}: {error}")
 
 
-def run_pass(directory, sessions, transcripts, bound_s, interval_s, now, stasis=None,
+def run_pass(sessions, transcripts, sense_after_s, now, announced, stasis=None, runner=run_native,
              say=announce_berth_note, push=announce_push, log=print, tail_bytes=DEFAULT_TAIL_BYTES):
-    """One watch pass: announce new and resolved held calls once each, and refresh the markers."""
-    state = read_state(directory)
-    known = state["held"]
-    current = {call_key(h): h for h in scan(sessions, transcripts, bound_s, now, stasis, tail_bytes)}
-    for key, h in current.items():
-        if key not in known:
-            known[key] = dict(session=h["session"], agent=h["agent"], tool=h["tool"],
-                              calledAt=h["calledAt"], announcedAt=now)
-            fan_out(held_text(h), f"Held tool call: session {h['session'][:8]}", say, push, log)
-    for key in [k for k in known if k not in current]:
-        entry = known.pop(key)
-        gone = entry["session"] not in sessions
-        seconds = int(now - entry["calledAt"])
-        fan_out(cleared_text(entry, seconds, gone), f"Held call cleared: session {entry['session'][:8]}",
-                say, push, log)
-    markers = os.path.join(directory, "held")
-    by_session = {}
-    for h in current.values():
-        by_session.setdefault(h["session"], []).append(h)
-    for session, rows in by_session.items():
-        oldest = min(rows, key=lambda r: r["calledAt"])
-        write_json_atomic(os.path.join(markers, session + ".json"),
-                          dict(session=session, agent=oldest["agent"], tool=oldest["tool"],
-                               toolUseId=oldest["toolUseId"], since=oldest["calledAt"],
-                               cause=oldest["cause"], count=len(rows), refreshedAt=now,
-                               intervalS=interval_s))
-    try:
-        names = os.listdir(markers)
-    except OSError:
-        names = []
-    for name in names:
-        if name.endswith(".json") and name[:-len(".json")] not in by_session:
-            try:
-                os.remove(os.path.join(markers, name))
-            except OSError:
-                pass
-    write_json_atomic(os.path.join(directory, "state.json"), state)
-    return list(current.values())
+    """One pass: sense, call `observe` per candidate, announce native-open incidents once each.
+    `announced` is the set of incident ids already announced, in memory for this process only: a
+    restarted watcher may announce an open incident once more, which is acceptable for an alarm.
+    Returns (candidates, unavailable)."""
+    held = scan(sessions, transcripts, sense_after_s, now, stasis, tail_bytes)
+    if not held:
+        return held, False
+    _, unavailable = observe(held, runner)
+    if unavailable:
+        log(UNAVAILABLE_LINE)
+        return held, True
+    sensed = {h["session"] for h in held}
+    for session, incident in native_open_incidents(runner) or []:
+        if session == WATCHER_SESSION or session not in sensed or incident["id"] in announced:
+            continue
+        announced.add(incident["id"])
+        fan_out(incident_text(session, incident), f"Held tool call: session {session[:8]}", say, push, log)
+    return held, False
 
 
 # ---------------------------------------------------------------- CLI
@@ -388,7 +388,7 @@ def run_pass(directory, sessions, transcripts, bound_s, interval_s, now, stasis=
 def cmd_scan(args):
     now = args.now if args.now is not None else time.time()
     sessions = moored_sessions(args.sessions_json)
-    held = scan(sessions, args.transcripts or transcripts_root(), args.bound_s, now,
+    held = scan(sessions, args.transcripts or transcripts_root(), args.sense_after_s, now,
                 args.stasis_root or stasis_root(), args.tail_bytes)
     if args.json:
         print(json.dumps(held, sort_keys=True))
@@ -398,19 +398,19 @@ def cmd_scan(args):
     return 3 if held else 0
 
 
-def cmd_watch(args):
-    directory = args.state_dir or state_dir()
-    passes = 0
+def cmd_watch(args, runner=run_native):
+    announced, passes, unavailable = set(), 0, False
     while True:
         try:
-            run_pass(directory, moored_sessions(args.sessions_json), args.transcripts or transcripts_root(),
-                     args.bound_s, args.interval_s, time.time(), args.stasis_root or stasis_root(),
-                     tail_bytes=args.tail_bytes)
+            _, unavailable = run_pass(moored_sessions(args.sessions_json), args.transcripts or transcripts_root(),
+                                      args.sense_after_s, time.time(), announced,
+                                      args.stasis_root or stasis_root(), runner=runner,
+                                      tail_bytes=args.tail_bytes)
         except (OSError, ValueError, subprocess.SubprocessError) as error:
             print(f"pass failed: {type(error).__name__}: {error}", flush=True)
         passes += 1
         if args.max_passes and passes >= args.max_passes:
-            return 0
+            return 4 if unavailable else 0
         time.sleep(args.interval_s)
 
 
@@ -420,7 +420,7 @@ def parser():
     for name in ("scan", "watch"):
         s = sub.add_parser(name)
         s.add_argument("--transcripts")
-        s.add_argument("--bound-s", type=float, default=120)
+        s.add_argument("--sense-after-s", type=float, default=120)
         s.add_argument("--sessions-json")
         s.add_argument("--stasis-root")
         s.add_argument("--tail-bytes", type=int, default=DEFAULT_TAIL_BYTES)
@@ -430,7 +430,6 @@ def parser():
             s.set_defaults(run=cmd_scan)
         else:
             s.add_argument("--interval-s", type=float, default=5)
-            s.add_argument("--state-dir")
             s.add_argument("--max-passes", type=int, default=0)
             s.set_defaults(run=cmd_watch)
     return p
