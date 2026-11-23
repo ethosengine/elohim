@@ -50,11 +50,13 @@ Feature: The landing queue — each change is checked once, against the dev it w
     on top of), the change class (below) and the key of each project. Its identity is its CONTENT
     ADDRESS (CID: a content identifier, the hash-derived name the repository's tools give every
     record), computed from those fields, so raising the same intent twice yields the same record
-    and the second raise appends nothing. The device writes it to its own flow store, and its peer daemon (below) tells the device's other
-    copies.
+    and the second raise appends nothing. The device writes it to its own flow store, and its peer daemon (below) tells matthew's other
+    devices.
   - The QUEUE is the set of live intents this device can read: its own, and those its sibling
     devices have announced. An intent is LIVE until it is landed, withdrawn, dismissed or replaced
-    by a newer intent for the same change (SUPERSEDED).
+    by a newer intent for the same change (SUPERSEDED). A new intent may also name an earlier
+    intent for the same change as its PREDECESSOR whatever state that one is in; naming a dismissed
+    intent as a predecessor does not change how it left the queue.
   - The CHAIN of a change is the line of live intents ahead of it, each checked on top of the one
     before, starting from dev. Its PREDICTED BASE is the tree dev will have once the chain ahead
     lands: the tree of the last intent in the chain, each intent's tree already holding the ones
@@ -83,7 +85,7 @@ Feature: The landing queue — each change is checked once, against the dev it w
     separate background step of the hook gives the lock back once git's transfer has finished and
     records whether the change landed; it is observed only through the lock being free and the
     landed record appearing.
-  - If dev moved after Phase V (something else landed first), the hook rebases the change onto the
+  - When Phase L finds that dev moved after Phase V (something else landed first), the hook rebases the change onto the
     new dev in place, checks it again only where a key changed, raises its new intent, and REFUSES
     the push with "candidate moved to" the rebased commit and "push again". The hook cannot change
     which commit git is sending, so this one refusal is owed. The second push finds its own intent
@@ -97,7 +99,7 @@ Feature: The landing queue — each change is checked once, against the dev it w
   - An intent leaves the queue by a WITHDRAW record (its push was interrupted or abandoned) or a
     DISMISS record (the change behind it found the chain red, see below), written by the device
     that raised it. A record about an intent written by any other device is ADVISORY: it is
-    printed, and a push does not queue behind an intent under dispute, but the intent stays live.
+    printed, and a push does not queue behind an intent another device has written such a record about, but the intent stays live.
   - DISMISS: when a check is red on top of the predicted base, the hook checks the change once more
     on dev alone, to tell "the chain ahead made it red" from "it is red by itself". If it is green
     on dev alone, the push dismisses the whole chain ahead of it, never one "culprit", lands on dev
@@ -138,6 +140,29 @@ Feature: The landing queue — each change is checked once, against the dev it w
     have taken must have lapsed: the lock's time limit, plus the skew window, plus the berth's
     FENCE MARGIN (a few seconds the berth adds for clocks that disagree), counted from the last
     time this device folded the silent device's head. This covers exactly one silent device.
+  - A HAND-OVER is a push whose every destination is a branch under "self" on the server (for
+    example the branch "self" then "a1", named in the steps as the hand-over branch "a1"). It runs
+    only the quick checks that take seconds (the hook's preflight and compose checks, no project
+    check), and records which verdicts this device already holds for the pushed commit. Because no
+    destination is dev, it does not move dev. It puts the commit on the server where matthew's
+    other device can fetch it.
+  - A VERDICT is the result of one check for one key, green or red, kept by the device that ran it.
+    A verdict crosses to matthew's other devices like any allowed record, and a push that finds a
+    sibling's green verdict for the key it needs REUSES it instead of running the check.
+  - A MISS is a check a hand-over still needs: a project selected for the pushed commit for which
+    this device holds no green verdict, named with its key. The hand-over raises the change's
+    landing intent and writes its misses on it as one record that crosses. That record also names
+    the commit, the hand-over branch, what each check usually costs this device, and the time
+    after which this device means to stop waiting and run the check itself (its STOP-WAITING TIME). The
+    stop-waiting time is for display: it binds nobody, and a miss stays open past it. A miss is
+    OPEN until some device's verdict for its project and key is folded, or its intent is landed,
+    withdrawn, dismissed or superseded, or the device that posted it lands the same change, or
+    hands the same change over again under a newer intent. Each device lists the open misses it
+    can read ("epr peer intents" with "--misses"), and a session that is only waiting on its berth
+    inbox is told when one arrives: the berth prints a line of its own when it folds the record.
+    That line is not a BERTH NOTE, which is a message one session sends another with "berth say".
+    Whether to run a miss is each device's own decision; nobody is assigned one, and nothing waits
+    on one.
 
   Tags and declared limits
 
@@ -317,7 +342,7 @@ Feature: The landing queue — each change is checked once, against the dev it w
       And wt-a's intent is no longer live in either worktree, because both speak for device A
       And wt-b's change lands, and dev on the server loses no commit
       When session "claude-1" pushes again from "wt-a"
-      Then it raises a new intent that names the dismissed one as superseded
+      Then it raises a new intent that names the dismissed one as its predecessor
       And its check of "app" fails on top of the new dev, so the conflict is now wt-a's to resolve, and nothing is reverted
 
     @wip
@@ -388,3 +413,44 @@ Feature: The landing queue — each change is checked once, against the dev it w
       When session "claude-1" on device A pushes a change to "app/a.txt" to dev
       Then device B's peer status counts A's landing record as refused
       And A's change lands
+
+    @wip
+    Scenario: A hand-over names the checks it still needs, and the other device reads them from its own records with no note sent
+      Given device A holds no verdict for "app" at the key of a change to "app/a.txt"
+      When session "claude-1" on device A pushes that change to the hand-over branch "a1"
+      Then the push prints that it posted 1 miss, for "app", on the change's landing intent
+      And no berth note is sent by either session
+      And within one fold device B lists one open miss for "app" from device A, naming the commit, the hand-over branch, the key and device A's stop-waiting time
+      And a session on device B waiting on its berth inbox is told of the miss once
+
+    @wip
+    Scenario: A device that runs a miss closes it by its verdict, and the landing reuses that verdict
+      Given device A has handed over a change to "app/a.txt" on the hand-over branch "a1" with one open miss for "app"
+      When session "codex-1" on device B fetches that commit and runs the check for "app" on it, green
+      Then within one fold neither device lists the miss as open
+      And when session "claude-1" on device A pushes the change to dev, the push prints that "app" reused device B's green verdict, from a sibling
+      And the check for "app" did not run on device A for that push
+
+    @wip
+    Scenario: The same hand-over pushed twice is one ask
+      Given device A has handed over a change to "app/a.txt" on the hand-over branch "a1" with one open miss for "app"
+      When session "claude-1" on device A pushes the same commit to the hand-over branch "a1" again
+      Then device B still lists exactly one open miss for "app" from device A
+      And a session on device B waiting on its berth inbox is not told of it a second time
+
+    @wip
+    Scenario: Nobody takes a miss, and the landing runs the check itself without waiting
+      Given device A has handed over a change to "app/a.txt" on the hand-over branch "a1" with one open miss for "app"
+      And device A's stop-waiting time for that miss has passed
+      And no device has run the check for "app" on that commit
+      Then device B still lists the miss as open, because a stop-waiting time closes nothing
+      When session "claude-1" on device A pushes the change to dev
+      Then the check for "app" runs on device A at once, with no wait for a sibling
+      And the change lands, and within one fold neither device lists the miss as open
+
+    @wip
+    Scenario: A hand-over without a Change-Id is still handed over, posts no miss, and says how to get one
+      Given session "claude-1" commits a change to "app/a.txt" with the commit-message hook skipped, so the commit has no Change-Id
+      When session "claude-1" on device A pushes that commit to the hand-over branch "a1"
+      Then the push succeeds and prints that the commit has no Change-Id, so no miss was posted, naming "git commit --amend" as the cure
+      And device B lists no open miss from device A
