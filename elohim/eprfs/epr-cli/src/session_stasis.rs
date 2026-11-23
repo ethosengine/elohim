@@ -1,4 +1,4 @@
-//! `epr session stasis {fold,decide,status,classify}`: the native dialogue-stasis fold and the
+//! `epr session stasis {fold,decide,status,classify,observe}`: the native dialogue-stasis fold and the
 //! shadow regulator (spec: Native CLI contract). The library does the work in
 //! `elohim_device_runtime::session_stasis`; this module parses flags, finds the journal root
 //! and the active permission rules, and maps outcomes to the contract's exit codes.
@@ -33,6 +33,7 @@ use serde_json::{json, Value};
 
 const USAGE: &str = "epr session stasis fold [--journal-root DIR] [--session ID] [--since RFC3339 | --shift-current] [--json] [--emit-count MEASURE@V]\n\
 epr session stasis decide --session ID --event FILE|- [--live] [--journal-root DIR]\n\
+epr session stasis observe --session ID --source watcher:NAME --tool NAME [--pending-since RFC3339] [--agent ID] [--journal-root DIR]\n\
 epr session stasis status [--session ID] [--shift-current] [--json] [--journal-root DIR]\n\
 epr session stasis classify --corpus FILE [--settings FILE]... [--main-checkout DIR] [--cwd DIR]\n\
 (fold/decide/status also take [--settings FILE]...; the default is the project's .claude/settings{,.local}.json)";
@@ -94,6 +95,10 @@ struct Flags {
     live: bool,
     emit_count: Option<String>,
     event: Option<String>,
+    source: Option<String>,
+    tool: Option<String>,
+    pending_since: Option<DateTime<Utc>>,
+    agent: Option<String>,
     corpus: Option<PathBuf>,
     settings: Vec<PathBuf>,
     main_checkout: Option<PathBuf>,
@@ -126,6 +131,17 @@ fn parse_flags(args: &[String]) -> Result<Flags, String> {
             "--live" => f.live = true,
             "--emit-count" => f.emit_count = Some(value(&mut i, "--emit-count")?),
             "--event" => f.event = Some(value(&mut i, "--event")?),
+            "--source" => f.source = Some(value(&mut i, "--source")?),
+            "--tool" => f.tool = Some(value(&mut i, "--tool")?),
+            "--pending-since" => {
+                let raw = value(&mut i, "--pending-since")?;
+                f.pending_since = Some(
+                    DateTime::parse_from_rfc3339(&raw)
+                        .map_err(|e| format!("--pending-since: {e}"))?
+                        .with_timezone(&Utc),
+                );
+            }
+            "--agent" => f.agent = Some(value(&mut i, "--agent")?),
             "--corpus" | "--classify-corpus" => f.corpus = Some(value(&mut i, "--corpus")?.into()),
             "--settings" => f.settings.push(value(&mut i, "--settings")?.into()),
             "--main-checkout" => f.main_checkout = Some(value(&mut i, "--main-checkout")?.into()),
@@ -402,6 +418,10 @@ pub fn run_with(
             return ExitCode::from(1);
         }
     };
+    if verb == "observe" {
+        let root = journal_root(&flags, ctx);
+        return observe(&flags, ctx, &root, out, err);
+    }
     let assessment = match assess_policy(ctx) {
         Ok(a) => a,
         Err(e) => return fail(err, &e),
@@ -707,6 +727,62 @@ fn inert(
     ExitCode::from(3)
 }
 
+fn observe(
+    flags: &Flags,
+    ctx: &Ctx,
+    root: &Path,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+) -> ExitCode {
+    let (Some(session), Some(source), Some(tool)) = (
+        flags.session.as_deref(),
+        flags.source.as_deref(),
+        flags.tool.as_deref(),
+    ) else {
+        let _ = writeln!(
+            err,
+            "epr session stasis: observe needs --session, --source and --tool\n{USAGE}"
+        );
+        return ExitCode::from(1);
+    };
+    if !source
+        .strip_prefix("watcher:")
+        .is_some_and(|name| !name.is_empty())
+    {
+        let _ = writeln!(
+            err,
+            "epr session stasis: observe --source must start with watcher: and name the watcher"
+        );
+        return ExitCode::from(1);
+    }
+    let agent = flags.agent.as_deref().unwrap_or("main");
+    match session_stasis::record_tool_pending_observed(
+        root,
+        session,
+        session_stasis::ToolPendingObservation {
+            agent_id: agent,
+            observer: source,
+            tool,
+            pending_since: flags.pending_since,
+        },
+        &ctx.clock,
+        ctx.segment_limit,
+    ) {
+        Ok(true) => {
+            line(
+                out,
+                &json!({"recorded": true, "session": session, "agentId": agent}).to_string(),
+            );
+            ExitCode::SUCCESS
+        }
+        Ok(false) => {
+            let _ = writeln!(err, "epr session stasis: no journal for session {session}");
+            ExitCode::from(2)
+        }
+        Err(e) => fail(err, &e),
+    }
+}
+
 /// The native side of the differential check against `stasis-probe`'s permission harness: one
 /// JSON line per corpus entry. A corpus line is `{"tool":"Bash","command":"..."}`,
 /// `{"tool":"Edit","path":"..."}`, `{"tool":"Bash","shape":"..."}` (an already redacted shape, as `decide` classifies it), or a bare command. A later run diffs `ruleMatch` against
@@ -883,6 +959,77 @@ mod tests {
         assert_eq!(v["measures"]["dialogue-blocked-seconds"]["value"], 120.0);
         assert!(v["incidents"][0]["id"] == "s1:2" && v["gaps"].is_array());
         assert!(v["measures"]["ladder-resolution"].is_array());
+    }
+
+    #[test]
+    fn observe_appends_one_valid_event() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = journal(dir.path());
+        let mut c = ctx(dir.path());
+        let (exit, out, err) = call(
+            &[
+                "observe",
+                "--session",
+                "s1",
+                "--source",
+                "watcher:process-table",
+                "--tool",
+                "Bash",
+                "--pending-since",
+                "2026-10-31T10:00:30Z",
+                "--agent",
+                "worker-1",
+                "--journal-root",
+                root.to_str().unwrap(),
+            ],
+            &mut c,
+        );
+        assert_eq!(code(exit), code(ExitCode::SUCCESS), "{err}");
+        assert_eq!(
+            serde_json::from_str::<Value>(&out).unwrap()["recorded"],
+            true
+        );
+        let replay = elohim_device_runtime::session_stasis::journal::replay(&root, "s1").unwrap();
+        let event = replay.events.last().unwrap();
+        assert_eq!(
+            event.kind,
+            elohim_device_runtime::session_stasis::event::EventKind::ToolPendingObserved
+        );
+        assert_eq!(event.agent_id, "worker-1");
+        assert_eq!(event.tool.as_deref(), Some("Bash"));
+        assert_eq!(
+            event.pending_since,
+            Some(Utc.with_ymd_and_hms(2026, 10, 31, 10, 0, 30).unwrap())
+        );
+    }
+
+    #[test]
+    fn observe_refuses_non_watcher_source() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = journal(dir.path());
+        let before = fs::read_to_string(root.join("s1/events.jsonl")).unwrap();
+        let mut c = ctx(dir.path());
+        let (exit, out, err) = call(
+            &[
+                "observe",
+                "--session",
+                "s1",
+                "--source",
+                "hook:pretender",
+                "--tool",
+                "Bash",
+                "--journal-root",
+                root.to_str().unwrap(),
+            ],
+            &mut c,
+        );
+        assert_ne!(code(exit), code(ExitCode::SUCCESS));
+        assert!(out.is_empty());
+        assert!(err.contains("must start with watcher:"));
+        assert_eq!(
+            fs::read_to_string(root.join("s1/events.jsonl")).unwrap(),
+            before
+        );
     }
 
     #[test]

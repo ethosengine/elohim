@@ -602,6 +602,7 @@ struct Folder<'a> {
     would_keys: Vec<String>,
     classifier_denied: usize,
     stops: StopCounts,
+    silence_returned_at: HashMap<String, DateTime<Utc>>,
 }
 
 /// How the session's turns ended, by the adapter's `outcome`. Stopping is meant to be the
@@ -661,6 +662,10 @@ impl Folder<'_> {
     }
 
     fn open(&mut self, e: &Event, id: String, stall: StallClass) {
+        self.open_at(e, id, stall, e.moment());
+    }
+
+    fn open_at(&mut self, e: &Event, id: String, stall: StallClass, opened_at: Moment) {
         if self.by_id.contains_key(&id) {
             return; // A duplicate opening event folds into the one incident.
         }
@@ -693,13 +698,13 @@ impl Folder<'_> {
             concern_reason: reason,
             matched_rule: rule,
             effect_class: effect,
-            opened_at: e.moment(),
+            opened_at: opened_at.clone(),
             presence_at_open: e.presence.clone(),
             state: IncidentState::Open,
             rung: 0,
             consultations: vec![],
             blocked_intervals: vec![Interval {
-                from: e.wall,
+                from: opened_at.wall,
                 to: None,
             }],
             interval_confidence: if stall == StallClass::Authorization {
@@ -744,6 +749,16 @@ impl Folder<'_> {
                 inc.closed_at.is_none() && inc.stall_class == stall && inc.agent_id == agent
             })
             .collect()
+    }
+
+    fn return_from_silence(&mut self, e: &Event) {
+        for i in self.open_where(StallClass::Silence, &e.agent_id) {
+            self.close(i, e.moment(), Some(ClosedBy::Answered));
+        }
+        self.silence_returned_at
+            .entry(e.agent_id.clone())
+            .and_modify(|at| *at = (*at).max(e.wall))
+            .or_insert(e.wall);
     }
 
     /// A question is answered when the same agent resumes after a witnessed interaction that
@@ -865,9 +880,7 @@ impl Folder<'_> {
         self.witness(e);
         match e.kind {
             EventKind::PermissionRequested => {
-                for i in self.open_where(StallClass::Silence, &e.agent_id) {
-                    self.close(i, e.moment(), Some(ClosedBy::Answered));
-                }
+                self.return_from_silence(e);
                 let id = e
                     .incident_ref()
                     .map_or_else(|| format!("{}:{}", self.session, e.seq), str::to_owned);
@@ -943,9 +956,7 @@ impl Folder<'_> {
                 for i in self.open_where(StallClass::Question, &e.agent_id) {
                     self.close(i, e.moment(), Some(ClosedBy::Withdrawn));
                 }
-                for i in self.open_where(StallClass::Silence, &e.agent_id) {
-                    self.close(i, e.moment(), Some(ClosedBy::Answered));
-                }
+                self.return_from_silence(e);
                 let id = format!("{}:{}", self.session, e.seq);
                 // An `outcome` decides; without one the question classification keeps today's
                 // behaviour exactly.
@@ -977,6 +988,24 @@ impl Folder<'_> {
                         e,
                         format!("{}:{}", self.session, e.seq),
                         StallClass::Silence,
+                    );
+                }
+            }
+            EventKind::ToolPendingObserved => {
+                let pending_since = e.pending_since.unwrap_or(e.wall);
+                let returned = self
+                    .silence_returned_at
+                    .get(&e.agent_id)
+                    .is_some_and(|returned| *returned >= pending_since);
+                if !returned && self.open_where(StallClass::Silence, &e.agent_id).is_empty() {
+                    let opened_at = e
+                        .pending_since
+                        .map_or_else(|| e.moment(), Moment::wall_only);
+                    self.open_at(
+                        e,
+                        format!("{}:{}", self.session, e.seq),
+                        StallClass::Silence,
+                        opened_at,
                     );
                 }
             }
@@ -1355,6 +1384,7 @@ pub fn fold_session(replay: &Replay, o: &FoldOptions<'_>) -> SessionFold {
         would_keys: vec![],
         classifier_denied: 0,
         stops: StopCounts::default(),
+        silence_returned_at: HashMap::new(),
     };
     for e in &replay.events {
         f.event(e);
@@ -1366,7 +1396,14 @@ pub fn fold_session(replay: &Replay, o: &FoldOptions<'_>) -> SessionFold {
         .find(|e| e.kind == EventKind::SessionEnded)
         .map(|e| e.wall);
     let last_event = replay.events.iter().map(|e| e.wall).max();
-    let live = ended.is_none() && last_event.is_some_and(|t| t + Duration::hours(24) >= o.now);
+    let last_owned_event = replay
+        .events
+        .iter()
+        .filter(|e| !e.is_observer())
+        .map(|e| e.wall)
+        .max();
+    let live =
+        ended.is_none() && last_owned_event.is_some_and(|t| t + Duration::hours(24) >= o.now);
     let (windows, chosen) =
         windows_for(o, &replay.session, &f.markers, &replay.events, ended, live);
     for inc in &mut f.incidents {
@@ -1418,7 +1455,13 @@ pub fn fold_session(replay: &Replay, o: &FoldOptions<'_>) -> SessionFold {
             let evidence = replay
                 .events
                 .iter()
-                .filter(|e| in_window(e.wall) && e.kind != EventKind::ObservationGap)
+                .filter(|e| {
+                    in_window(e.wall)
+                        && !matches!(
+                            e.kind,
+                            EventKind::ObservationGap | EventKind::ToolPendingObserved
+                        )
+                })
                 .count();
             let mut all = vec![];
             let mut by_class: BTreeMap<&str, Vec<(i64, i64)>> = BTreeMap::new();
@@ -1976,18 +2019,11 @@ pub fn decide_shadow(
     Ok(out)
 }
 
-/// Live `decide` found the regulator unable to act (policy absent, unparsable, or not pinned to
-/// the steward's latest ruling). Record why as an `observation-gap` so the inertness is visible,
-/// never silent, and execute nothing. Returns whether a record was appended: a session with no
-/// journal has nowhere to write, and a repeat of the session's last gap reason is not appended
-/// again (the adapter calls `decide` on every hook).
-pub fn record_inert(
+fn append_session_record(
     root: &std::path::Path,
     session: &str,
-    agent_id: &str,
-    reason: &str,
-    clock: &ClockReading,
     segment_limit: u64,
+    build: impl FnOnce(&journal::Replay, &Event, u64) -> Option<Value>,
 ) -> Result<bool, StasisError> {
     let dir = root.join(session);
     if !dir.is_dir() {
@@ -2002,11 +2038,6 @@ pub fn record_inert(
     let Some(last) = replay.events.last() else {
         return Ok(false);
     };
-    if last.kind == EventKind::ObservationGap
-        && last.gap.as_ref().is_some_and(|g| g.reason == reason)
-    {
-        return Ok(false);
-    }
     let seq = replay
         .events
         .iter()
@@ -2014,33 +2045,129 @@ pub fn record_inert(
         .max()
         .unwrap_or(last.seq)
         + 1;
-    let now = clock.wall.to_rfc3339_opts(SecondsFormat::Millis, true);
-    let event = json!({
-        "schemaVersion": 1,
-        "kind": "observation-gap",
-        "session": {
-            "runtime": last.session.runtime,
-            "session": session,
-            "ownerPid": last.session.owner_pid,
-            "ownerStartTime": last.session.owner_start_time.map(|t| t.to_string()),
-        },
-        "agentId": agent_id,
-        "seq": seq,
-        "clock": {
-            "wall": now,
-            "bootId": clock.boot_id,
-            "uptimeSeconds": clock.uptime_seconds,
-            "provenance": "epr-session-stasis/linux-proc",
-        },
-        // Carry the last event's disposition and away ruling: a gap record must not clear them.
-        "presence": {
-            "disposition": disposition_name(last.presence.disposition),
-            "basis": {"lastWitnessedAgeSeconds": null, "rulingRef": last.presence.ruling_ref},
-        },
-        "gap": {"reason": reason, "from": now, "to": now},
-    });
+    let Some(event) = build(&replay, last, seq) else {
+        return Ok(false);
+    };
     journal::append_locked(&dir, &event, seq, segment_limit)?;
     Ok(true)
+}
+
+/// Live `decide` found the regulator unable to act (policy absent, unparsable, or not pinned to
+/// the steward's latest ruling). Record why as an `observation-gap` so the inertness is visible,
+/// never silent, and execute nothing. Returns whether a record was appended: a session with no
+/// journal has nowhere to write, and a repeat of the session's last gap reason is not appended
+/// again (the adapter calls `decide` on every hook).
+pub fn record_inert(
+    root: &std::path::Path,
+    session: &str,
+    agent_id: &str,
+    reason: &str,
+    clock: &ClockReading,
+    segment_limit: u64,
+) -> Result<bool, StasisError> {
+    let now = clock.wall.to_rfc3339_opts(SecondsFormat::Millis, true);
+    append_session_record(root, session, segment_limit, |_, last, seq| {
+        if last.kind == EventKind::ObservationGap
+            && last.gap.as_ref().is_some_and(|g| g.reason == reason)
+        {
+            return None;
+        }
+        Some(json!({
+            "schemaVersion": 1,
+            "kind": "observation-gap",
+            "session": {
+                "runtime": last.session.runtime,
+                "session": session,
+                "ownerPid": last.session.owner_pid,
+                "ownerStartTime": last.session.owner_start_time.map(|t| t.to_string()),
+            },
+            "agentId": agent_id,
+            "seq": seq,
+            "clock": {
+                "wall": now,
+                "bootId": clock.boot_id,
+                "uptimeSeconds": clock.uptime_seconds,
+                "provenance": "epr-session-stasis/linux-proc",
+            },
+            // Carry the last event's disposition and away ruling: a gap record must not clear them.
+            "presence": {
+                "disposition": disposition_name(last.presence.disposition),
+                "basis": {"lastWitnessedAgeSeconds": null, "rulingRef": last.presence.ruling_ref},
+            },
+            "gap": {"reason": reason, "from": now, "to": now},
+        }))
+    })
+}
+
+/// One outside watcher's observation of a tool that remains pending.
+#[derive(Debug, Clone, Copy)]
+pub struct ToolPendingObservation<'a> {
+    /// The session agent whose tool call is pending.
+    pub agent_id: &'a str,
+    /// The `watcher:<name>` observer identity.
+    pub observer: &'a str,
+    /// The pending tool name.
+    pub tool: &'a str,
+    /// When the watcher first saw the call pending.
+    pub pending_since: Option<DateTime<Utc>>,
+}
+
+/// Append an outside watcher's observation of a tool that remains pending. The observer carries
+/// no presence witness or authority; the fold alone decides whether this opens a Silence stall.
+pub fn record_tool_pending_observed(
+    root: &std::path::Path,
+    session: &str,
+    observation: ToolPendingObservation<'_>,
+    clock: &ClockReading,
+    segment_limit: u64,
+) -> Result<bool, StasisError> {
+    if !observation
+        .observer
+        .strip_prefix("watcher:")
+        .is_some_and(|name| !name.is_empty())
+    {
+        return Err(StasisError::Parse(
+            "observer source must start with watcher: and name the watcher".into(),
+        ));
+    }
+    if observation.tool.is_empty() || observation.agent_id.is_empty() {
+        return Err(StasisError::Parse(
+            "tool and agent id must not be empty".into(),
+        ));
+    }
+    let wall = clock.wall.to_rfc3339_opts(SecondsFormat::Millis, true);
+    append_session_record(root, session, segment_limit, |_, last, seq| {
+        let mut event = json!({
+            "schemaVersion": 1,
+            "kind": "tool-pending-observed",
+            "session": {
+                "runtime": last.session.runtime,
+                "session": session,
+                "ownerPid": last.session.owner_pid,
+                "ownerStartTime": last.session.owner_start_time.map(|t| t.to_string()),
+            },
+            "agentId": observation.agent_id,
+            "seq": seq,
+            "clock": {
+                "wall": wall,
+                "bootId": clock.boot_id,
+                "uptimeSeconds": clock.uptime_seconds,
+                "provenance": "epr-session-stasis/linux-proc",
+            },
+            // Carry state without claiming an interaction witnessed by the session itself.
+            "presence": {
+                "disposition": disposition_name(last.presence.disposition),
+                "basis": {"lastWitnessedAgeSeconds": null, "rulingRef": last.presence.ruling_ref},
+            },
+            "source": {"observer": observation.observer},
+            "tool": observation.tool,
+        });
+        if let Some(pending_since) = observation.pending_since {
+            event["pendingSince"] =
+                json!(pending_since.to_rfc3339_opts(SecondsFormat::Millis, true));
+        }
+        Some(event)
+    })
 }
 
 /// Read-only status for one session.
