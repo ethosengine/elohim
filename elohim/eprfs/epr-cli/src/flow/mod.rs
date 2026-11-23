@@ -7,6 +7,7 @@
 //! git, and records are deduped by CID against the existing sidecar before append.
 
 pub mod acceptance;
+pub mod carry;
 pub mod cites;
 pub mod claim;
 pub mod cluster_state;
@@ -683,7 +684,8 @@ fn run_intend(args: &[String]) -> FlowResult<ExitCode> {
             | "--chain-len" | "--supersedes" | "--session" | "--verified" | "--gate-s"
             | "--misses" | "--ref" | "--miss" | "--p90" | "--wait-until" | "--land" | "--tip"
             | "--commit" | "--landed-as" | "--regated-s" | "--withdraw" | "--why" | "--dismiss"
-            | "--capsule" | "--measures" | "--as" => i += 2,
+            | "--capsule" | "--measures" | "--as" | "--carry" | "--project" | "--valid-for"
+            | "--carry-decision" | "--role" | "--freshness-s" | "--max-wait-s" => i += 2,
             other => {
                 return Err(FlowError::InvalidArguments(format!(
                     "unknown intend argument `{other}`{}",
@@ -716,7 +718,16 @@ fn run_intend(args: &[String]) -> FlowResult<ExitCode> {
                             "--dismiss",
                             "--capsule",
                             "--measures",
-                            "--as"
+                            "--as",
+                            "--carry",
+                            "--project",
+                            "--miss",
+                            "--valid-for",
+                            "--carry-decision",
+                            "--role",
+                            "--freshness-s",
+                            "--wait-until",
+                            "--max-wait-s"
                         ]
                     )
                 )))
@@ -730,6 +741,12 @@ fn run_intend(args: &[String]) -> FlowResult<ExitCode> {
             })
         })
     };
+    if let Some(carry_mode) = ["--carry", "--carry-decision"]
+        .into_iter()
+        .find(|flag| rest.iter().any(|arg| arg == flag))
+    {
+        return run_intend_carry(&opts, &rest, carry_mode);
+    }
     let explicit_modes = [
         "--verified",
         "--misses",
@@ -906,6 +923,169 @@ fn run_intend(args: &[String]) -> FlowResult<ExitCode> {
         println!("{}", serde_json::to_string_pretty(&outcome)?);
     } else {
         outcome.render();
+    }
+    Ok(ExitCode::SUCCESS)
+}
+
+/// `epr flow intend --carry …` (write a carry claim) and `--carry-decision …` (read one answer).
+///
+/// Both are their own modes: `--closure` here is one closure key for `--project`, not the
+/// raise form's `project=key` pairs, so the carry modes are dispatched before raise detection.
+fn run_intend_carry(opts: &GlobalOpts, rest: &[String], mode: &str) -> FlowResult<ExitCode> {
+    let (mode_name, mode_flags): (&str, &[&str]) = if mode == "--carry" {
+        (
+            "carry",
+            &[
+                "--carry",
+                "--project",
+                "--closure",
+                "--miss",
+                "--valid-for",
+                "--change",
+                "--session",
+                "--measures",
+                "--as",
+            ],
+        )
+    } else {
+        (
+            "carry-decision",
+            &[
+                "--carry-decision",
+                "--project",
+                "--closure",
+                "--role",
+                "--freshness-s",
+                "--wait-until",
+                "--max-wait-s",
+            ],
+        )
+    };
+    for flag in rest.iter().step_by(2) {
+        if !mode_flags.contains(&flag.as_str()) {
+            return Err(FlowError::InvalidArguments(format!(
+                "{flag} is not valid in intend {mode_name} mode"
+            )));
+        }
+    }
+    fn need(value: Option<String>, flag: &str) -> FlowResult<String> {
+        value.ok_or_else(|| FlowError::InvalidArguments(format!("intend needs {flag} <value>")))
+    }
+    let parse_u64 = |flag: &str| -> FlowResult<Option<u64>> {
+        take_opt(rest, flag)?.map_or(Ok(None), |raw| {
+            raw.parse::<u64>().map(Some).map_err(|_| {
+                FlowError::InvalidArguments(format!("{flag} needs a nonnegative integer"))
+            })
+        })
+    };
+    let project = need(take_opt(rest, "--project")?, "--project")?;
+    let closure = need(take_opt(rest, "--closure")?, "--closure")?;
+    #[cfg(feature = "peer")]
+    let fold = carry::DeviceFold::read(&opts.root);
+    #[cfg(feature = "peer")]
+    let (root, me, admits): (&Path, Option<&str>, Box<dyn Fn(&str) -> bool + '_>) = (
+        fold.root.as_path(),
+        fold.me.as_deref(),
+        Box::new(|device: &str| fold.admits(device)),
+    );
+    #[cfg(not(feature = "peer"))]
+    let (root, me, admits): (&Path, Option<&str>, Box<dyn Fn(&str) -> bool>) =
+        (opts.root.as_path(), None, Box::new(|_: &str| false));
+
+    if mode_name == "carry" {
+        let session = resolve_session(take_opt(rest, "--session")?);
+        let actor = note::NoteActor {
+            as_ref: take_opt(rest, "--as")?,
+            session,
+        };
+        let measures = take_opt(rest, "--measures")?.map(PathBuf::from);
+        let intent = need(take_opt(rest, "--carry")?, "--carry")?;
+        let miss = need(take_opt(rest, "--miss")?, "--miss")?;
+        let change = take_opt(rest, "--change")?;
+        let valid_for_s = parse_u64("--valid-for")?.ok_or_else(|| {
+            FlowError::InvalidArguments("intend needs --valid-for <seconds>".to_string())
+        })?;
+        // A write lands in the store this device's peer serves, or is refused there.
+        let receipt = carry::write_carry(
+            &opts.root,
+            &carry::CarryRequest {
+                intent: &intent,
+                project: &project,
+                closure: &closure,
+                miss: &miss,
+                valid_for_s,
+                change: change.as_deref(),
+                bound: None,
+                measures: measures.as_deref(),
+                actor: &actor,
+                me,
+                admits: admits.as_ref(),
+            },
+        )?;
+        if opts.json {
+            println!("{}", serde_json::to_string_pretty(&receipt)?);
+        } else {
+            receipt.render();
+        }
+        return Ok(ExitCode::SUCCESS);
+    }
+
+    let intent_raw = need(take_opt(rest, "--carry-decision")?, "--carry-decision")?;
+    let intent: Cid = intent_raw.parse().map_err(|_| {
+        FlowError::InvalidArguments(format!(
+            "--carry-decision `{intent_raw}` is not a content identifier"
+        ))
+    })?;
+    let role = need(take_opt(rest, "--role")?, "--role")?;
+    let now_ms = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |duration| {
+            u64::try_from(duration.as_millis()).unwrap_or(u64::MAX)
+        });
+    let freshness_flag = parse_u64("--freshness-s")?;
+    let wait_until = parse_u64("--wait-until")?;
+    let max_wait_s = parse_u64("--max-wait-s")?;
+    #[cfg(feature = "peer")]
+    let (freshness_s, max_skew_s) = (freshness_flag.or(fold.freshness_s), fold.max_skew_s);
+    #[cfg(not(feature = "peer"))]
+    let (freshness_s, max_skew_s) = (freshness_flag, None);
+    #[cfg(feature = "peer")]
+    let last_seen = |device: &str| fold.last_seen_ms(device);
+    #[cfg(not(feature = "peer"))]
+    let last_seen = |_: &str| None;
+    let role = match role.as_str() {
+        "carrier" => carry::CarryRole::Carrier,
+        "lander" => carry::CarryRole::Lander(carry::LanderBounds {
+            freshness_s,
+            max_skew_s,
+            last_seen_ms: &last_seen,
+            wait_until,
+            // Without a caller's deadline the lander waits for nothing: zero runs it here.
+            max_wait_s: max_wait_s.unwrap_or(0),
+        }),
+        other => {
+            return Err(FlowError::InvalidArguments(format!(
+                "--role needs carrier|lander, got `{other}`"
+            )))
+        }
+    };
+    let records = carry::fold_records(root)?;
+    let decision = carry::decide(
+        &records,
+        &carry::CarryQuery {
+            intent: &intent,
+            project: &project,
+            closure: &closure,
+            admits: admits.as_ref(),
+            me,
+            now_unix_s: now_ms / 1000,
+            role,
+        },
+    );
+    if opts.json {
+        println!("{}", serde_json::to_string_pretty(&decision)?);
+    } else {
+        decision.render();
     }
     Ok(ExitCode::SUCCESS)
 }

@@ -39,7 +39,7 @@ const BASE_PREFIX: &str = "base:";
 const CLASS_PREFIX: &str = "class:";
 const CLOSURE_PREFIX: &str = "closure:";
 const SUPERSEDES_PREFIX: &str = "supersedes:";
-const VIA_PREFIX: &str = "via:";
+pub(crate) const VIA_PREFIX: &str = "via:";
 
 /// One of the six mutually exclusive authoring acts.
 pub enum IntendMode<'a> {
@@ -329,13 +329,13 @@ fn validate_request(mode: &IntendMode<'_>) -> FlowResult<()> {
     Ok(())
 }
 
-struct EventCommon<'a> {
-    provider: &'a str,
-    receiver: &'a AgentRef,
-    scope: &'a Cid,
-    occurred_at: &'a str,
-    unit_slot: Option<&'a str>,
-    attribution: &'a super::note::Attribution,
+pub(crate) struct EventCommon<'a> {
+    pub(crate) provider: &'a str,
+    pub(crate) receiver: &'a AgentRef,
+    pub(crate) scope: &'a Cid,
+    pub(crate) occurred_at: &'a str,
+    pub(crate) unit_slot: Option<&'a str>,
+    pub(crate) attribution: &'a super::note::Attribution,
 }
 
 fn raise(
@@ -881,7 +881,7 @@ fn settle(
     })
 }
 
-fn event_record(
+pub(crate) fn event_record(
     kind: &str,
     action: ReaVerb,
     resource: Cid,
@@ -1063,7 +1063,7 @@ fn raise_event<'a>(records: &'a [(Cid, FlowRecord)], intent: &Cid) -> Option<&'a
     own_event(records, intent, "raise")
 }
 
-fn event_env(event: &FlowEvent) -> BTreeMap<&str, &str> {
+pub(crate) fn event_env(event: &FlowEvent) -> BTreeMap<&str, &str> {
     event
         .classified_as
         .iter()
@@ -1120,7 +1120,7 @@ impl EventCid for FlowEvent {
     }
 }
 
-fn next_dseq(records: &[(Cid, FlowRecord)]) -> u64 {
+pub(crate) fn next_dseq(records: &[(Cid, FlowRecord)]) -> u64 {
     records
         .iter()
         .filter_map(|(_, record)| match record {
@@ -1163,7 +1163,7 @@ pub(crate) fn parse_joined_closures(raw: &str) -> BTreeMap<String, String> {
         .collect()
 }
 
-fn slot<'a>(slots: &'a [String], prefix: &str) -> Option<&'a str> {
+pub(crate) fn slot<'a>(slots: &'a [String], prefix: &str) -> Option<&'a str> {
     let mut values = slots.iter().filter_map(|value| value.strip_prefix(prefix));
     let value = values.next()?;
     values.next().is_none().then_some(value)
@@ -1275,7 +1275,7 @@ fn validate_oid(raw: &str, flag: &str) -> FlowResult<()> {
     }
 }
 
-fn is_hex(raw: &str) -> bool {
+pub(crate) fn is_hex(raw: &str) -> bool {
     !raw.is_empty()
         && raw
             .bytes()
@@ -1287,14 +1287,13 @@ fn parse_cid(raw: &str) -> FlowResult<Cid> {
         .map_err(|_| FlowError::InvalidArguments(format!("`{raw}` is not a content identifier")))
 }
 
-fn unix_seconds_millis() -> String {
+pub(crate) fn unix_seconds_millis() -> String {
     let millis = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map_or(0, |duration| duration.as_millis());
     format!("{}.{:03}", millis / 1000, millis % 1000)
 }
 
-#[cfg(feature = "peer")] // read only by `epr peer` (src/peer.rs)
 pub(crate) fn unix_slot_ms(raw: &str) -> Option<u64> {
     let (seconds, fraction) = raw.split_once('.').unwrap_or((raw, "0"));
     let seconds = seconds.parse::<u64>().ok()?;
@@ -1306,7 +1305,7 @@ pub(crate) fn unix_slot_ms(raw: &str) -> Option<u64> {
     seconds.checked_mul(1000)?.checked_add(millis)
 }
 
-fn store_name(root: &Path) -> String {
+pub(crate) fn store_name(root: &Path) -> String {
     std::fs::canonicalize(root)
         .unwrap_or_else(|_| root.to_path_buf())
         .display()
@@ -1314,7 +1313,7 @@ fn store_name(root: &Path) -> String {
 }
 
 #[cfg(feature = "peer")]
-fn served_store_guard(root: &Path) -> FlowResult<()> {
+pub(crate) fn served_store_guard(root: &Path) -> FlowResult<()> {
     let dir = crate::peer::peer_dir().map_err(|error| {
         FlowError::Unavailable(format!("this device's peer directory: {error}"))
     })?;
@@ -1347,6 +1346,6 @@ fn served_store_guard(root: &Path) -> FlowResult<()> {
 }
 
 #[cfg(not(feature = "peer"))]
-fn served_store_guard(_root: &Path) -> FlowResult<()> {
+pub(crate) fn served_store_guard(_root: &Path) -> FlowResult<()> {
     Ok(())
 }
