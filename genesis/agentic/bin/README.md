@@ -269,3 +269,31 @@ bash genesis/agentic/bin/cargo-pool status
   the target pool shrinks the *materialized* `target/` footprint.
   Orthogonal mechanisms; both wanted.
 - Worktree creation: `superpowers:using-git-worktrees` skill.
+
+
+## Landing helpers
+
+Run these Bash scripts with Git installed and an existing linked worktree:
+
+```sh
+genesis/agentic/bin/landing-pick -C <worktree> <commit>...
+genesis/agentic/bin/landing-pick -C <worktree> --continue|--abort
+genesis/agentic/bin/landing-retrailer -C <worktree> <base>
+genesis/agentic/bin/landing-tagged-tip -C <worktree> --tag '[build:app]' --subject '<text>' --branch <new-local-branch>
+```
+
+`landing-pick` applies commits (or two-dot ranges) in order. Conflicts print
+paths and exit 4; stage resolutions before `--continue`, or use `--abort`.
+`landing-retrailer` rewrites local history, re-running the commit-message hook
+over `<base>..HEAD`; changed messages produce new commit IDs. It refuses
+commits reachable from remote-tracking refs. `landing-tagged-tip` creates a
+branch at an empty child commit with body `Not for merge.`, leaving HEAD in place.
+It prints the new full SHA before the final, unchanged HEAD short SHA.
+
+All three print their Git fallback reason first, unset `EPR_BIN`, and finish
+success with HEAD's short SHA. Usage errors exit 2; safety refusals exit 3.
+They refuse the main checkout, `dev`, `main`, and tracked changes, except that
+pick recovery permits the in-progress conflict or staged resolution. They do
+not switch branches. For a safety refusal, use a feature branch in a linked
+worktree and resolve tracked changes before retrying. Run the isolated tests with
+`bash genesis/agentic/landing_scripts_test.sh`.

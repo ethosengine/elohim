@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# Usage: landing-retrailer -C <worktree> <base>
+set -euo pipefail
+unset EPR_BIN
+
+bad() { printf '%s\n' "${0##*/}: $1" >&2; exit 2; }
+refuse() { printf '%s\n' "${0##*/}: $1" >&2; exit 3; }
+[[ $# -ge 3 && $1 == -C && -n $2 ]] || bad 'expected -C <worktree> first, then arguments'
+wt=$2
+shift 2
+printf '%s\n' 'Git fallback: rebase --exec — re-run the trailer hook on local unpushed commits; brit rebase has stranded repositories here'
+[[ $# == 1 && -n $1 && $1 != -* ]] || bad 'expected one base commit'
+base=$(git -C "$wt" rev-parse --verify "$1^{commit}" 2>/dev/null) || bad 'invalid base commit'
+git_dir=$(git -C "$wt" rev-parse --path-format=absolute --git-dir 2>/dev/null) || bad 'not a worktree'
+common_dir=$(git -C "$wt" rev-parse --path-format=absolute --git-common-dir)
+[[ $git_dir != "$common_dir" ]] || refuse 'main checkout is not allowed'
+branch=$(git -C "$wt" symbolic-ref --quiet --short HEAD) || refuse 'a current branch is required'
+[[ $branch != dev && $branch != main ]] || refuse 'dev and main are not allowed'
+[[ -z $(git -C "$wt" status --porcelain --untracked-files=no) ]] || refuse 'tracked files have uncommitted changes'
+commits=$(git -C "$wt" rev-list "$base..HEAD")
+for commit in $commits; do
+    remotes=$(git -C "$wt" branch -r --contains "$commit")
+    [[ -z $remotes ]] || refuse 'range contains a commit reachable from a remote-tracking ref'
+done
+git -C "$wt" rebase --exec 'git commit --amend --no-edit -q' "$base"
+git -C "$wt" rev-parse --short HEAD

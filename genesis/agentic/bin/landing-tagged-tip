@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+# Usage: landing-tagged-tip -C <worktree> --tag <tag> --subject <text> --branch <new-local-branch>
+set -euo pipefail
+unset EPR_BIN
+
+bad() { printf '%s\n' "${0##*/}: $1" >&2; exit 2; }
+refuse() { printf '%s\n' "${0##*/}: $1" >&2; exit 3; }
+[[ $# -ge 3 && $1 == -C && -n $2 ]] || bad 'expected -C <worktree> first, then arguments'
+wt=$2
+shift 2
+printf '%s\n' 'Git fallback: commit-tree — an empty tagged tip without a second checkout; brit has no commit-tree verb'
+tag= subject= new_branch=
+seen_tag=0 seen_subject=0 seen_branch=0
+while (( $# )); do
+    [[ $# -ge 2 ]] || bad 'each option requires a value'
+    case $1 in
+        --tag) (( seen_tag == 0 )) || bad 'duplicate --tag'; tag=$2; seen_tag=1 ;;
+        --subject) (( seen_subject == 0 )) || bad 'duplicate --subject'; subject=$2; seen_subject=1 ;;
+        --branch) (( seen_branch == 0 )) || bad 'duplicate --branch'; new_branch=$2; seen_branch=1 ;;
+        *) bad 'unknown option' ;;
+    esac
+    shift 2
+done
+[[ $seen_tag == 1 && $seen_subject == 1 && $seen_branch == 1 ]] || bad 'require --tag, --subject and --branch'
+[[ $tag =~ ^\[[a-z]+:[a-z-]+\]$ ]] || bad 'invalid bracket tag'
+[[ $subject != *$'\n'* && $subject != *$'\r'* && -n $subject ]] || bad 'subject must be nonempty and on one line'
+[[ -n $new_branch && $new_branch != -* ]] || bad 'invalid branch name'
+git -C "$wt" check-ref-format "refs/heads/$new_branch" >/dev/null 2>&1 || bad 'invalid branch name'
+git_dir=$(git -C "$wt" rev-parse --path-format=absolute --git-dir 2>/dev/null) || bad 'not a worktree'
+common_dir=$(git -C "$wt" rev-parse --path-format=absolute --git-common-dir)
+[[ $git_dir != "$common_dir" ]] || refuse 'main checkout is not allowed'
+branch=$(git -C "$wt" symbolic-ref --quiet --short HEAD) || refuse 'a current branch is required'
+[[ $branch != dev && $branch != main ]] || refuse 'dev and main are not allowed'
+[[ -z $(git -C "$wt" status --porcelain --untracked-files=no) ]] || refuse 'tracked files have uncommitted changes'
+if git -C "$wt" show-ref --verify --quiet "refs/heads/$new_branch"; then
+    refuse 'branch already exists'
+fi
+head=$(git -C "$wt" rev-parse HEAD)
+tree=$(git -C "$wt" rev-parse 'HEAD^{tree}')
+commit=$(printf '%s %s\n\nNot for merge.\n' "$subject" "$tag" | git -C "$wt" commit-tree "$tree" -p "$head")
+# An empty old value makes creation fail if another caller created the branch.
+git -C "$wt" update-ref "refs/heads/$new_branch" "$commit" ''
+printf '%s\n' "$commit"
+git -C "$wt" rev-parse --short HEAD
