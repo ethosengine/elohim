@@ -210,7 +210,10 @@ export function postMisses(record, projects, {
     '--class', judged.class || 'low',
   ];
   for (const [project, closure] of closures) raiseArgs.push('--closure', `${project}=${closure}`);
-  raiseArgs.push('--root', root, '--json');
+  // The intent lives in the device's channel store (the main checkout its peer serves), never a
+  // worktree's: an intent written beside a worktree is read by no sibling.
+  const store = deviceRoot(root, spawn);
+  raiseArgs.push('--root', store, '--json');
   const raised = JSON.parse(run(spawn, epr, raiseArgs, root));
   if (typeof raised?.intent !== 'string' || !raised.intent) throw new Error('epr raise returned no intent');
 
@@ -227,7 +230,7 @@ export function postMisses(record, projects, {
     try { seconds = p90(miss.project); } catch { /* display evidence is optional */ }
     if (Number.isFinite(seconds) && seconds >= 0) missArgs.push('--p90', `${miss.project}=${Math.round(seconds)}`);
   }
-  missArgs.push('--wait-until', String(waitUntil), '--root', root, '--json');
+  missArgs.push('--wait-until', String(waitUntil), '--root', store, '--json');
   run(spawn, epr, missArgs, root);
   return `hand-over: posted ${misses.length} misses on intent ${raised.intent.slice(0, 12)}: ${misses.map(m => m.project).join(', ')}`;
 }

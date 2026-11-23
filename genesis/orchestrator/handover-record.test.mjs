@@ -82,7 +82,7 @@ test('closureVerdict keys on the head and takes this device\'s newest row for th
 function postingRun({
   verdicts = [], projects = ['green', 'miss-a', 'miss-b'], message = `subject\n\nChange-Id: ${CHANGE}\n`,
   env = {}, lookup = name => ({ closure: `${name.charCodeAt(0).toString(16)}`.repeat(64).slice(0, 64), row: null }),
-  eprStatus = 0, p90 = name => ({ 'miss-a': 901, 'miss-b': 77 }[name] ?? null),
+  eprStatus = 0, p90 = name => ({ 'miss-a': 901, 'miss-b': 77 }[name] ?? null), commonDir = null,
 } = {}) {
   const calls = [];
   const written = [];
@@ -91,6 +91,9 @@ function postingRun({
   const spawn = (bin, args) => {
     calls.push([bin, [...args]]);
     if (bin === 'git' && args[0] === 'show') return { status: 0, stdout: message, stderr: '' };
+    if (bin === 'git' && args[0] === 'rev-parse' && args.includes('--git-common-dir')) {
+      return { status: 0, stdout: `${commonDir ?? TREE}\n`, stderr: '' };
+    }
     if (bin === 'git' && args[0] === 'rev-parse') return { status: 0, stdout: `${TREE}\n`, stderr: '' };
     if (bin === '/stub/epr' && eprStatus !== 0) return { status: eprStatus, stdout: '', stderr: 'native write failed\n' };
     if (bin === '/stub/epr' && args.includes('--change')) {
@@ -139,6 +142,14 @@ test('a green and two selected misses raise one intent and post exactly the miss
   assert.deepEqual(epr[1].slice(0, 3), ['flow', 'intend', '--misses']);
   assert.match(epr[1][epr[1].indexOf('--wait-until') + 1], /^\d+$/);
   assert.match(r.stdout[1], new RegExp(`hand-over: posted 2 misses on intent ${INTENT.slice(0, 12)}: miss-a, miss-b`));
+});
+
+test('a hand-over from a worktree writes its intent and misses to the device channel store', () => {
+  const r = postingRun({ commonDir: '/main/.git' });
+  assert.equal(r.code, 0);
+  const epr = r.calls.filter(([bin]) => bin === '/stub/epr').map(([, args]) => args);
+  assert.equal(epr.length, 2);
+  for (const args of epr) assert.equal(args[args.indexOf('--root') + 1], '/main');
 });
 
 test('no Change-Id records the hand-over and makes no epr call', () => {
