@@ -164,7 +164,10 @@ fn env<'a>(event: &'a FlowEvent, key: &str) -> Option<&'a str> {
 }
 
 fn landing_allow() -> CrossingAllowList {
-    CrossingAllowList::new([("dev-landing@1", ["intent", "landed", "withdraw", "dismiss"])])
+    CrossingAllowList::new([(
+        "dev-landing@1",
+        ["intent", "landed", "withdraw", "dismiss", "misses", "carry"],
+    )])
 }
 
 #[test]

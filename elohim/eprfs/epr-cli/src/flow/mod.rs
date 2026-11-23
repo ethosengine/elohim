@@ -25,6 +25,7 @@ pub mod intend;
 pub mod ledger;
 pub mod measures;
 pub mod memory;
+pub mod misses;
 pub mod note;
 pub mod parity;
 pub mod participate;
@@ -105,6 +106,14 @@ pub type FlowResult<T> = std::result::Result<T, FlowError>;
 
 /// A label index: `cid string -> repo-relative path or descriptive label`.
 pub type Labels = BTreeMap<String, String>;
+
+/// The device an event crossed from, when it carries a `via:` slot.
+pub(crate) fn via_device(event: &elohim_epr_rea::FlowEvent) -> Option<&str> {
+    event
+        .classified_as
+        .iter()
+        .find_map(|slot| slot.strip_prefix("via:"))
+}
 
 /// Options shared by the flow subcommands.
 struct GlobalOpts {

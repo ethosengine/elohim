@@ -1565,7 +1565,7 @@ fn save_served_table(device: &Device, root: &Path, sibling: Option<(&str, u64)>)
                     &SidecarFlowStore::open(root).unwrap(),
                     &CrossingAllowList::new([(
                         "dev-landing@1",
-                        ["intent", "landed", "withdraw", "dismiss"],
+                        ["intent", "landed", "withdraw", "dismiss", "misses", "carry"],
                     )]),
                 )
                 .unwrap()
