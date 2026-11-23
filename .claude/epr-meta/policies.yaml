@@ -1174,3 +1174,71 @@ policies:
     why: >
       Steward ruling 2026-10-30: never commit unlinted code. The staged index is judged, not the
       worktree; format the named file, review it, and `git add` it.
+
+  - id: record-and-judge-are-native
+    version: 1
+    contentHash: sha256:9fddff0fbe958e66d2401b0e42351641eba51355dacbb282b4f6140d56c6e629
+    title: A record other devices must read, and a judge that must answer once, live in the native crates
+    binding: persuasive
+    class: inject
+    scope:
+      write: "*.py"
+      contains-any: ["appendFileSync(", "write_json_atomic", "state.json", "deadline =",
+                     "monotonic() >=", ">= bound", "> bound", "age <= ", "age > "]
+    dedupe-of: "elohim/epr-rea/src/model.rs (Bound: breached_by / approached_by; Commitment) + elohim/eprfs/epr-cli/src/flow/{sense,report,concern,misses,carry}.rs (the fold writer, the report judge, the concern resolver, the open-miss reader, the carry decision) + elohim/eprfs/device-runtime/src/session_stasis.rs (Incident)"
+    status: active
+    retire-when: >
+      when the census of second copies, counted as unresolved duplicate records and judges and
+      never as bespoke files, reads zero for a quarter under genesis/agentic and
+      genesis/orchestrator, so the native homes are the only homes a sibling device reads
+    why: >
+      A record that another device or agent must interpret, or a judge that must give one answer
+      everywhere (a bound breached or approaching, a miss settled, a session held), belongs in
+      the native crates. A script may SENSE, ADAPT and CALL; it may not STORE or JUDGE. Call the
+      native read instead of keeping a file and comparing an age to a limit by hand: a level
+      against a limit is `elohim_epr_rea::Bound` (`breached_by` / `approached_by`) or
+      `epr flow report --bound` / `--breaches`; a finding is a fold written by `epr flow sense`;
+      an open miss is `flow::misses::open_misses` (`epr peer intents --misses`); a wait that
+      another device must agree with is `epr flow intend --carry-decision`; a held session is the
+      Incident in device-runtime `session_stasis.rs`. Operator ruling 2026-10-22: the lowest-level
+      primitives have first-class Rust support. Lived drift 2026-11-23: a watcher kept its own
+      held-state marker files and compared an age to a limit by hand, and gate-carry-claim.mjs
+      computed wait deadlines the native carry decision answers.
+      This is not a rule against bespoke code. A local sensor, a guard, a device policy, a
+      harness adapter or a push transport is an edge implementor and STAYS; the variety at the
+      edge is the point. Only a second copy of a record, or of the rule that judges it, is the
+      drift. A deliberate variation is declared with its contract difference: for a limit judge,
+      `epr flow sense rule --measure limit-models@1 --subject <file> --class intentional --why
+      <the contract difference>`; no measure id exists yet for a second record, so say the
+      contract difference in the file's own header. Advisory `inject` nudge: it never blocks and
+      names no validator.
+
+  - id: held-state-is-the-incident
+    version: 1
+    contentHash: sha256:6e419892ec875440473f165ebf1de627a4c647e1cc1be49a1d4c2d49911e4a1f
+    title: One held observation is recorded once, in the Incident
+    binding: persuasive
+    class: inject
+    scope:
+      write: "*.py"
+      contains-any: ["tool_use", "approval-evidence", "pending-approval", "held-state", "held_state",
+                     "\"held\"", "'held'", ".held"]
+    dedupe-of: "elohim/eprfs/device-runtime/src/session_stasis.rs (Incident: session, agent, matched rule, effect, blocked intervals) + the native fold `epr session stasis fold`"
+    status: active
+    retire-when: >
+      when no script under genesis/agentic or genesis/orchestrator writes its own held, stalled
+      or pending-approval state file, and berth and session views read the Incident alone
+    why: >
+      One held observation (a tool call pending too long, a prompt nobody answered, a session
+      that is quiet) is recorded once, in the Incident, and projected into the session and berth
+      views by `epr session stasis fold`. A second marker file or state file for the same
+      observation is a second record that sibling devices cannot interpret. An observer OUTSIDE
+      the stuck session is welcome: it is an edge implementor, it may sense the transcript and
+      call the native fold, and it stays. Liveness never establishes standing, and a held process
+      is not a death witness: a heartbeat says a process runs, not that it progresses, and death
+      is witnessed only by the runtime that was the child's parent (habit
+      elohim/elohim-storage/.epr-meta/runtime-death-witnessed.habit.md). Lived drift 2026-11-23: a
+      tool call sat pending about seven hours and berth read the session as live.
+      The diversity door is the same as for record-and-judge-are-native: a local sensor or
+      adapter stays; a deliberate variation names its contract difference in the file's header.
+      Advisory `inject` nudge: it never blocks and names no validator.
