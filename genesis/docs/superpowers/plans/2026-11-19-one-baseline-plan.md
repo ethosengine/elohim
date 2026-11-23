@@ -112,10 +112,20 @@ State: a family record survives a branch rename (5e47f38f0). Every `claude/<name
 still resolves to the one family `claude`; two gates removed each other's build tree on
 2026-11-18.
 
-- [ ] **Row-20 — every gate writes a verdict with a step fingerprint and a `gate_reuse` entry, or a written reason it cannot** (serves push-gate-pays-once)
+- [x] **Row-20 — every gate writes a verdict with a step fingerprint and a `gate_reuse` entry, or a written reason it cannot** (serves push-gate-pays-once)
 
 State: enrolment is held by ruling on `claude/nt-gate-verdicts` (fbbbe6234): widening the key to
 hold the ambient environment does not converge, so the declared envelope is the input.
+
+State, 2026-11-23: written on ethosengine as `b274eb426` (on `landing/f4-ask` as `dd421e0c` and
+`aa45fd2b`), not yet on dev. As reported by ethosengine session d6cfb7e1: every non-attested
+registry gate is in `gate_reuse.projects` (25) or in `gate_reuse.withheld` (36, one-line reason
+each), and `gate-reuse-coverage.test.mjs` holds exactly one of the two; a gate with no key prints
+`not recorded — <reason>`, and a withheld gate still computes its key. No reuse decision moved.
+The first version failed its own orchestrator gate, because with submodules present the registry
+held the attested brit, rakia and sophia gates; attested pins are now outside `gate_reuse`.
+Reported: gate-evidence 96 of 96, orchestrator gate green on ethosengine. It touches
+`pool-policy.json gate_reuse`, a governance path, so its landing reuses no sibling verdict.
 
 - [ ] **Row-21 — the hand-over record lists a verdict by closure, with the commit it was minted at** (serves push-gate-pays-once)
 

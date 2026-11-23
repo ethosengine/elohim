@@ -473,10 +473,20 @@ the release producer, and the gate task itself still keys on closure metadata.
 
 Verify: a `basis: Computed` sibling row with its `Use` event, from a gate that ran as an ark task.
 
-- [ ] **F3-probe — one landing is attempted with the forge unreachable from this device, and stops at the first step that needs the forge** (serves sprint-lands-each-closure-once)
+- [x] **F3-probe — one landing is attempted with the forge unreachable from this device, and stops at the first step that needs the forge** (serves sprint-lands-each-closure-once)
 
 This runs the design's own test (§0) once, before F3 is built, so that the next station is named
 by a failure and not by a plan. Whatever step fails is appended below as a station.
+
+State, 2026-11-23: run by hand on ethosengine; the results are as session d6cfb7e1 reported them
+and shem has not repeated them. Rung 1: the first forge step is git ref advertisement, before
+pre-push (`Could not resolve host`, no `[pre-push]` line). Rung 1b: a fresh worktree needs the
+forge earlier still, because pre-push refuses without submodules and `submodule update --init`
+clones each from GitHub. Rung 2: against a local bare stand-in forge, with GitHub and HTTP
+unreachable for the hook, an empty commit landed (Phase L claim, fast-forward, settle released);
+no gate was selected, so pin attestation was not exercised. Its note names a trap about git moving
+local `refs/remotes/origin/d…` and is cut off there. The two stations it named are F3-transport
+and F3-submodules, appended at the end of this section.
 
 Verify: a journal entry carrying the log line of the first forge-dependent step, or a landing
 recorded between the two workspaces while the forge was away.
@@ -547,7 +557,19 @@ outflow from the commitment stock is fulfilment (`epr flow stocks` says so), whi
 Verify: a projection from a checkout whose HEAD is not on `origin/dev` refuses or records the
 commit it read; a station removed from its document can be retired by a ruling.
 
-- [ ] **Terminal-env — no session starts with `EPR_BIN` naming a build older than the device's head** (serves workspace-device-arrival)
+- [x] **Terminal-env — no session starts with `EPR_BIN` naming a build older than the device's head** (serves workspace-device-arrival)
+
+State, 2026-11-23: built on ethosengine as `6aac6b0dd` and on `landing/f4-ask` as `7d37d74f` and
+`834ed61d`, not yet on dev. As reported by ethosengine session d6cfb7e1: `device-arrive` runs
+`gate-preflight --epr-bin`, which exits 3 when the `EPR_BIN` build's store `ingestedAt` is earlier
+than the head's; on 3 the hook unsets it for the session and says the starting terminal still
+exports it. A newer, undated or out-of-store build stays set with a WARN. One Codex review round
+found two blocking defects, that a newer or candidate build was unset too and that any exit 1
+read as a refusal; both were fixed. Reported: `device_arrive_test` 4, `gate-preflight` 47 of 47,
+orchestrator gates green on ethosengine. The first verify line (`epr device status` naming an
+`EPR_BIN` that is not the head) was not run by shem. On 2026-11-23 the integrator session itself
+inherited an `EPR_BIN` older than the head: it refused the first hand-over push at preflight and
+left commit trailers `UNMEASURED` on eight commits.
 
 State: backlog row 17 records one terminal exporting a stale `EPR_BIN`. On 2026-11-19 every
 editor terminal on shem opened since 2026-11-10 carried it, pointing at a build of 2026-11-02,
@@ -640,6 +662,18 @@ ruled on before it is built):
    the gate is the device's own decision from its own lines (`berth room cargo`). Nobody is
    assigned, and at this slice a session decides, not a daemon.
 
+State, 2026-11-23: slice 1 is written. As reported by ethosengine session d6cfb7e1, it is
+`f257df0ab` on `self/ethosengine-f4-ask-1`: a new `misses` kind under `dev-landing@1`, the reader
+`flow/misses.rs` (`open_misses`, `miss_settled`), the hand-over caller, a berth follow line and five
+`@wip` scenarios in `landing-queue.feature`; `just gate eprfs` green on ethosengine, and its
+blind-reader loop closed READY in three rounds. On `landing/f4-ask` it is `b36e4deb`, `680ffca8`,
+`2bd529ba` and `2251df15`. It is not on dev, and its Verify has not run: device B is to take a
+miss from `epr peer intents --misses` once the landing head is gated. The steward ruled on
+2026-11-23 that the carry claim is built in the same sprint; `flow/carry.rs` and the lander's
+wait (`gate-carry-claim.mjs`, `GATE_CARRY_WAIT` default `shadow`) were in work and not on the
+landing head when this was written. The sprint's record is
+`sprints/2026-11-23-f4-ask/journal.md`.
+
 What this slice does not have, and the next one needs: the `carry` claim. Without it two idle
 devices can both run one miss, and the lander cannot skip a gate it has not yet seen a verdict
 for. S3a's rule (wait `confirm_wait_s` for a `carry` claim, else run alone) is that slice.
@@ -696,7 +730,7 @@ Verify: a storage test in which three agent keys bound to one human yield one qu
 and one in which the backfill sweep leaves an attestation row unauthored; both run by
 `just gate elohim-storage`.
 
-- [ ] **F6-probe — one green gate verdict is offered for graduation with what exists today, and the journal records the first check that refuses it** (serves build-earns-reach-by-attestation)
+- [x] **F6-probe — one green gate verdict is offered for graduation with what exists today, and the journal records the first check that refuses it** (serves build-earns-reach-by-attestation)
 
 This runs F6's promise once before the verb is built, as F3-probe and F4-probe do for their
 joins, so that the order of F6's parts is set by a refusal and not by this plan. The candidate is
@@ -714,8 +748,41 @@ human. (3) No second principal's record exists. (4) The DNA's 24 attestation kin
 derivation or build kind; `attestation:gate-decision` is among them and its subject was not read,
 so whether it could be mistaken for a build gate's verdict is open.
 
+State, 2026-11-23: run by hand on ethosengine by session d6cfb7e1, whose journal is
+`genesis/local-dev/f6-probe/journal.md` on that device; shem has not read it and records its note.
+Candidate: ethosengine's own green eprfs `gate-verdict@1` at `81ea6431b09c` (landed), closure
+`be5fb09f`. (1) Signer to `agent_cid`: refused first. `epr identity standing` needs a running
+storage node (`no node of this machine answers on 8090/8095/8091-8093`), and with one, `brit-epr`
+names no `agent_cid`, so the hex signer binds to nothing; `actor current` names only the roster
+handle. (2) Standing: refused, the roster row is self-claimed. (3) Second principal: refused at
+k=1, the only other record is shem's green, the same steward. (4) Kind: reported refused, and
+the note is cut off after "no deriv…". The first refusal is named as F6-standing-local, appended
+at the end of this section. Side finding, not traced: every `gate-verdict@1` ethosengine wrote on
+2026-11-22 to 23 carries `occurredAt 2026-11-20T18:19:34Z`.
+
 Verify: a journal entry naming each of the four checks as held or refused with the command or
 file that showed it; the first refusal is appended here as a station or names an existing one.
+
+Three stations named by the probes of 2026-11-23, in the words ethosengine session d6cfb7e1
+reported (appended; the order above is unchanged):
+
+- [ ] **F3-transport — a landing's compare-and-set goes to a peer-held ref (the signed dev head), not the forge** (serves sprint-lands-each-closure-once)
+
+Today git ref advertisement is the first step of a landing and it needs the forge (F3-probe, rung 1).
+
+Verify: rung 1 of F3-probe lands, or names the next step.
+
+- [ ] **F3-submodules — a fresh worktree checks out submodules from objects this device or a sibling holds** (serves sprint-lands-each-closure-once)
+
+Pre-push refuses without submodules, and `submodule update --init` clones each from GitHub (F3-probe, rung 1b). Next unknown, named by the same session: a commit that selects an attested pin gate with the forge away.
+
+Verify: `submodule update --init` in a new worktree with GitHub unreachable succeeds from a pinned local object source.
+
+- [ ] **F6-standing-local — an agent's standing is readable on a device that runs no storage node (from its fold or a sibling's), or the refusal names the node it needs** (serves build-earns-reach-by-attestation)
+
+F6-probe's first refusal: `epr identity standing` needs a running storage node. Layer (b), the brit signer to `agent_cid` binding, is F6's existing part and is not this station.
+
+Verify: `epr identity standing` on ethosengine with no node answers or names the node.
 
 ## 9. Reconciliation 2026-11-21: the market reading
 

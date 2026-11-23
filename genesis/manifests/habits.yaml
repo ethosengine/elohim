@@ -1057,10 +1057,10 @@ habits:
       - "a2o @concern:workspace-device-arrival (genesis/a2o/features/devflow/workspace-device-arrival.feature — a keyless workspace is refused by name and nothing else blocks; a second device joins through the first with no key crossing; a missing model names its provisioner; @act:host @requires:epr-cli; all five scenarios are wired, including local candidates with degraded enhancements)"
       - "epr flow report --headline — the `index:` slot reads within the fold-lag ceiling on this device (index-fold-lag-ceiling@1; lag reached its limit once on 2026-10-16), and `participant:` names a standing human by the tracked roster"
     evidence: >
-      DELTA 2026-11-20b (still RED; the peer restarts onto a landed release with no hand on the command, on both devices): fcf1f3137 and aeada1196 make a follow or forward land run the stale-child restart when the acting session holds the device-ark lease. Each device followed aeada1196 with the release that carries it. Ethosengine, 05:55:48Z: `restarting the ark (after follow, session a222db7c…)`, `peer ready on bafyreicfbac2w4… in 5 s`; record restart.outcome ready; row trigger follow; status `serving at current (restarted by follow … in 5 s)`. Shem, 05:54:03Z: `restarting the ark (after follow, session b49f7c46…)`, then `not ready after 13 s (not ready: peer)`, the false report of the 12 s floor that aeada1196 replaces with a 60 s wait; the supervisor read the peer ready about 20 s later; follow exit 0 in 54 s with a 23.4 s draw. Owed before a flip: one ready row on shem from a follow made with the 60 s wait, and this habit's own check run. Limits recorded, not owed here: the lease condition, no revert or hold (rows 35 and 46).
-    evidence-fingerprint: sha256:1b7a3e9287587bdd
-    evidence-bytes: 25139
-    evidence-entries: 26
+      DELTA 2026-11-23 (status unchanged; reported by ethosengine d6cfb7e1; landing pending): Terminal-env (6aac6b0dd) — device-arrive unsets for the session an EPR_BIN older than the head (store ingestedAt earlier; gate-preflight --epr-bin exits 3) and says the starting terminal still exports it; a newer, undated or out-of-store build stays set with a WARN. Evidence: device_arrive_test 4, gate-preflight 47/47, orchestrator gates green.
+    evidence-fingerprint: sha256:4b5cce7b6a781f83
+    evidence-bytes: 25577
+    evidence-entries: 27
     refs:
       - "spec: elohim/lvi/docs/specs/2026-10-10-workspace-arrival-as-declared-device.md (the mapping of every init surface onto DevspaceSeed / Berth / device key / model pin; the three enrollment layers; the record-without-witness seam §6.3)"
       - "the devfile's arrival commands: devfile.base.yaml `setup-embed-model` + `setup-device-memory` (postStart); the provisioners genesis/agentic/bin/{embed-model-provision,device-memory-sync}"
@@ -2418,10 +2418,10 @@ habits:
       - "a2o @concern:measure-runs-on-a-peer (genesis/a2o/features/compute/measure-on-a-peer.feature; default profile: cd genesis/a2o && npx cucumber-js --tags '@concern:measure-runs-on-a-peer')"
       - "python3 -m unittest genesis.agentic.berth_test (the --class measure refusal case: a measure-class claim on the dev berth is refused exit 3, naming just measure as the alternative — landing in parallel under lane D1)"
     evidence: >
-      DELTA 2026-11-11 (RED preserved): S1 refines the harvest's four stations into `compute/measure-on-a-peer.feature`, `peer-executed-stage.feature` and `ci-runner-stewarded.feature`; the provider selects a variant it can run or refuses before launch, and missing compatibility evidence never becomes permission to launch. One fresh blind read per file under the steward-granted floor; the one correctness finding (a grant assertion after the submission) is fixed. Steps are unbound (@wip); P1-P2 wire them.
-    evidence-fingerprint: sha256:e2c2cb693e4ff66c
-    evidence-bytes: 13911
-    evidence-entries: 16
+      DELTA 2026-11-23 (status unchanged; reported by ethosengine d6cfb7e1; landing pending): F4-ask slice 1 — a miss names the project, closure and p90 a peer needs to run that gate for the announcer; device B Verify is pending on self/shem-f4-landing.
+    evidence-fingerprint: sha256:debf976d1efb75ac
+    evidence-bytes: 14162
+    evidence-entries: 17
     guard: >
       Regression risks: (1) a RUN_CLASSES vocabulary that drifts from `pipeline-registry.mjs:45`
       (`build|deploy|verify|measure|profile`) — the berth `--class` flag and this habit's checks
@@ -2669,10 +2669,10 @@ habits:
       - "node --test genesis/orchestrator/suite-list.test.mjs (the orchestrator suite list holds every test file once; the named half's view holds what its key hashes and its environment is constructed)"
       - "a2o genesis/a2o/features/devflow/native-gate-evidence.feature reuse rule (this workspace's own green stands in; a red or an unadmitted signer never does)"
     evidence: >
-      DELTA 2026-11-23 (no status change; landing 8293f3e6b..81ea6431b read on a second device): on shem the push reused this workspace's greens for orchestrator, orchestrator-tree, eprfs-live-corpus, jenkins-bridge and eprfs, with `[preflight] ok epr-bin`. On ethosengine, from a fresh worktree with nothing to reuse, the thirteen selected gates passed in 1,576 s, eprfs 433 s from a cold slot (3,107 tests); eprfs's evidence missed once and was recorded, so its key moved once as the manifest change intended. `gate-tap.test.mjs` passed 20 of 20 there, where it had failed once in twelve before the bounded-retry removal. Not exercised on either device: a real red for an already-green closure, so the keep-the-green rule rests on its tests.
-    evidence-fingerprint: sha256:e45a8a66a36fe24d
-    evidence-bytes: 37508
-    evidence-entries: 38
+      DELTA 2026-11-23 (status unchanged; reported by ethosengine d6cfb7e1; landing pending): Row-20 (b274eb426) — every non-attested registry gate is in gate_reuse.projects (25) or gate_reuse.withheld (36, one-line reason each), enforced by gate-reuse-coverage.test.mjs; a no-key line names the withheld reason. Evidence: gate-evidence 96/96, orchestrator gate green.
+    evidence-fingerprint: sha256:a04a9a0bc5448e20
+    evidence-bytes: 37874
+    evidence-entries: 39
     guard: >
       Regression risks: (1) reusing on a key that omits something the recipe reads — the recipe
       body, the project tree, a submodule pin, a repo file a test include_str!s; the input audit
@@ -2765,10 +2765,10 @@ habits:
       - "node --test genesis/orchestrator/gate-landing-base.test.mjs (device-DID tiebreak, cap of 4: unobservable in the one-DID fixture)"
       - "over >= 10 pushes, from the device's flow store dev-landing@1 rows and berth's hold fold: hold p50/p90 vs 233/3,321 s; Σ regated_s on landed_as=moved vs Σ gate seconds saved on landed_as=ff; chain_len p90; duplicate gated closures = 0, duplicate claims = 0, >= 2 intents per Jenkins wave (unwired until S6)"
     evidence: >
-      DELTA 2026-11-22c (RED preserved, inactive; track A's first two-device reading): `ark task source-root` and `GATE_SOURCE_VIEW=shadow` (default off) landed in `c71f584f8`. At that commit the orchestrator gate's candidate input root, a projected view of 812 real source files, was `bafyreiauqasuykwqzcftespa6pclbp7k3hfifylqd364we27karxdyxnse` on shem (8.6 s) and the same on ethosengine (2.4 s), while the closure-metadata key the gate uses today differed between them (`b080b611b151` on shem, `a8d119421a34` on ethosengine). One commit, one reading: the candidate is host-independent where the present key is not. It decides nothing, has no cache, and observes only gates that run through ark with reuse off. ethosengine's second-device pass of the landing was green on seven gates; one rerun went red once on `gate-tap.test.mjs` (arrival backlog row 80).
-    evidence-fingerprint: sha256:bf35cf093e539261
-    evidence-bytes: 60007
-    evidence-entries: 45
+      DELTA 2026-11-23 (status unchanged; reported by ethosengine d6cfb7e1; landing pending): F4-ask slice 1 (f257df0ab) — a hand-over whose selected gates have no green verdict posts a misses crossing on its intent (one closure key per project), and a sibling reads it with epr peer intents --misses. It settles only on a verdict for that closure or the announcer's landed/withdraw, never by clock. Evidence: misses 15, flow_intend 19, peer 34; eprfs gate green.
+    evidence-fingerprint: sha256:b3271dcce0f57242
+    evidence-bytes: 60468
+    evidence-entries: 46
     refs:
       - "spec: genesis/docs/superpowers/specs/2026-10-27-steward-space-landing-plane-design.md (§2 Arm A slices A0-A13; §3 this habit and the WIP fence)"
       - "upstream of: genesis/orchestrator/.epr-meta/push-delivers-within-budget.habit.md (active red; A9/A10 move its measured ratio)"

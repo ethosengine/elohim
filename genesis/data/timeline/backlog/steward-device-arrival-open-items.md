@@ -2725,3 +2725,42 @@ without changing the next step. `epr flow context --participate` prints it under
 landing from shem still waits for it at the lease step: 17 s, 15 s and 15 s on the three landings
 of 2026-11-22 and 23. Curing it needs that device's own daemon to carry shem's roster row and
 exchange; nothing sent from shem reaches it.
+
+## Row 75, delta 3 (2026-11-23): four of the five items are assembled for the roll
+
+Assembled on `landing/f4-ask` as eight commits above dev `179814d6b`, read by subject from
+`brit log`; none is on dev. Items 1, 2 and 3 of the table in row 75 (the Jenkinsfile guards, the
+gate-only manifests with the `PARKED` allowance deleted, and the shared lock guard with the fold's
+private copy replaced) are there: `7a543ee9`, `dd14d94b`, `0ba7b32a`, `aac55aa1`, `3f8cf20c`,
+`b65a7ab3`, `416e19b9`. Item 4, the installer saying which build attempt ran out of time, is
+written (`d749369c`). Item 5, row 74, is still owed. `epr-lsp` would need a new dependency and a
+lock move, and `peer.rs`, `arrival_sysroot.rs` and `supervise.rs` need a patience parameter on the
+shared guard, which is a design choice. The eprfs gate on shem was green on the assembled queue in
+1,811 s, over its 1,200 s ceiling. The landing is the one `[edge:roll]` landing the steward
+ruled for the F4-ask sprint; it had not been made when this was written.
+
+## Row 82 — a coordinator's held tool call stalled two devices for seven hours and nothing said so
+
+Found 2026-11-23, in the sprint that builds station F4-ask. The integrator session on shem stalled
+from about 05:45Z to 13:14Z on one held tool call. Seven notes from the sibling session on
+ethosengine arrived together at 13:14Z. The sibling had every hand-over green and ready and waited
+about seven hours, because it had no bound on its wait.
+
+What would have shown it: nothing. Neither device reports that a session's own tool call has been
+pending for hours, and the sender's `berth say` line reads the same whether the addressee is
+working or held. This is the subject of F4-ask itself, a request whose waiting side has a bound
+of its own, met by the people building it; row 76 and the stalled-exchange lines of row 77 cover
+the exchange under a note, and not the session above it.
+
+State: not cured. Owed: a read that names a moored session whose tool call has been pending past
+a stated bound, shown to the sender of a note, and a bound the waiting session writes down when it
+starts to wait.
+
+## Row 83 — a wait loop that greps for its own command line never ends
+
+Found 2026-11-23. A delegated agent's wait loops of the form `until ! pgrep -f "<string>"; do
+sleep …; done` matched their own command line, so `pgrep` always found a process and the loop
+never exited.
+
+State: not cured. Cure: wait on a PID (`kill -0 <pid>`) or on a done-file the job writes at its
+end, as the sprint's other jobs did with `*.done` files.
