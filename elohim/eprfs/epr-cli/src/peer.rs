@@ -32,9 +32,9 @@ use elohim_device_runtime::layout::DeviceLayout;
 use elohim_epr_rea::{FlowEvent, FlowRecord, FlowStore, ParticipantRow};
 use eprfs_peer::{
     lease_events, other_devices, peer_from_arg, relay_from_env, roster_rows_from_file, slots,
-    steward_lease_view, via_device, Admission, CrossingAllowList, HeadTable, LeaseVerdict,
-    NodeAddr, PeerConfig, PeerDaemon, PeerError, PeerKey, Rules, RulesState, StewardScope,
-    WithheldCrossing, ARTIFACT_PRODUCE_KIND, ARTIFACT_PRODUCE_MEASURE, KIND_SLOT, MEASURE_SLOT,
+    steward_lease_view, Admission, CrossingAllowList, HeadTable, LeaseVerdict, NodeAddr,
+    PeerConfig, PeerDaemon, PeerError, PeerKey, Rules, RulesState, StewardScope, WithheldCrossing,
+    ARTIFACT_PRODUCE_KIND, ARTIFACT_PRODUCE_MEASURE, KIND_SLOT, MEASURE_SLOT,
 };
 use serde::Serialize;
 
@@ -45,6 +45,7 @@ use crate::device_key::{self, DeviceKey};
 use crate::flow::intend::{
     own_state, parse_joined_closures, unix_slot_ms, INTENT_TAG, KINDS, LANDING_MEASURE,
 };
+use crate::flow::via_device;
 
 /// Where the crossing allow-list is read from, under the checkout.
 pub const POLICY_REL: &str = "genesis/agentic/pool-policy.json";

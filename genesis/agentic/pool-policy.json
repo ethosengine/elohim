@@ -167,7 +167,7 @@
       "crosses": {
         "dev-berth-events@1": ["moor", "unmoor", "claim", "renew", "release", "override", "note", "shed"],
         "gate-verdict@1": ["verdict"],
-        "dev-landing@1": ["intent", "landed", "withdraw", "dismiss"],
+        "dev-landing@1": ["intent", "landed", "withdraw", "dismiss", "misses", "carry"],
         "artifact-produce@1": ["produce"]
       }
     },

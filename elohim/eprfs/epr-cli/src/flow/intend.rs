@@ -29,7 +29,7 @@ use super::{
 pub(crate) const LANDING_MEASURE: &str = "dev-landing@1";
 pub(crate) const INTENT_TAG: &str = "dev-landing:intent";
 #[cfg(feature = "peer")] // read only by `epr peer` (src/peer.rs)
-pub(crate) const KINDS: [&str; 4] = ["intent", "landed", "withdraw", "dismiss"];
+pub(crate) const KINDS: [&str; 6] = ["intent", "landed", "withdraw", "dismiss", "misses", "carry"];
 pub(crate) const LANDING_UNIT: &str = "dev-landing";
 pub(crate) const CLASSES_LITERAL: [&str; 5] = ["0", "low", "channel", "governance", "high"];
 pub(crate) const CLASSES: [&str; 5] = CLASSES_LITERAL;
