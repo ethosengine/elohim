@@ -2,10 +2,11 @@
 # Pre-native launchers cannot call device arrive: queue the shared bootstrap first.
 root=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd) || exit 0
 if [ "${EPR_BIN+x}" = x ]; then
-  # Exit 1 is the check's REFUSED (an EPR_BIN older than the head); any other failure (no node,
-  # a crash) proves nothing about EPR_BIN, so it is left as it is.
+  # Exit 3 is the check's own refusal: EPR_BIN names a release this device's store ingested
+  # before its head. A candidate build is exit 0 and stays set; any other failure (a crash, no
+  # node) proves nothing about EPR_BIN, so it is left as it is.
   (unset GATE_LIVE_RUN; node "$root/genesis/orchestrator/gate-preflight.mjs" --epr-bin >/dev/null 2>&1)
-  if [ $? -eq 1 ]; then
+  if [ $? -eq 3 ]; then
     old_epr_bin=$EPR_BIN
     unset EPR_BIN
     if [ -n "${CLAUDE_ENV_FILE:-}" ] && [ -w "$CLAUDE_ENV_FILE" ]; then
