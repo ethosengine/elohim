@@ -2735,6 +2735,23 @@ def room_main(argv, now=None, builds=None):
     return 0 if room["verdict"] == "admit" else 3
 
 
+def held_marker(session, now):
+    """The `held-tool-watch` marker for a session, or None: {tool, agent, sinceAt, pendingS, silent}.
+    Presence only. It never changes `is_live` (a held call is a live process). A marker whose last
+    refresh is older than twice the watcher's interval is `silent`: the watcher stopped, so its word
+    is no longer current. A pure read that creates nothing."""
+    base = os.environ.get("HELD_TOOL_WATCH_DIR") or os.path.join(
+        main_checkout(REPO_ROOT), ".eprfs", "status", "held-tool-watch")
+    try:
+        with open(os.path.join(base, "held", _safe(session) + ".json")) as f:
+            row = json.load(f)
+        since, refreshed, interval = float(row["since"]), float(row["refreshedAt"]), float(row["intervalS"])
+        return dict(tool=str(row["tool"]), agent=str(row.get("agent", "main")), sinceAt=since,
+                    pendingS=int(now - since), silent=(now - refreshed) > 2 * interval)
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
+
+
 def declared_writes(m):
     return m.get("bounds", {}).get("write_set", m.get("writes", [])) or []
 
@@ -2930,12 +2947,17 @@ def status_json(b, no_peer=False):
         if not b.is_live(m):
             continue
         recipient = m.get("recipient", {})
-        result["moorings"].append(dict(
+        row = dict(
             session=session, runtime=recipient.get("runtime"), model=recipient.get("model"),
             task=m.get("task"), writes=declared_writes(m),
             seenS=int(now - m.get("last_seen", now)),
             declaredS=int(now - m["writes_declared_at"]) if "writes_declared_at" in m else None,
-            observedS=int(now - m["writes_observed_at"]) if "writes_observed_at" in m else None))
+            observedS=int(now - m["writes_observed_at"]) if "writes_observed_at" in m else None)
+        held = held_marker(session, now)
+        if held:  # additive, optional: absent when nothing is held
+            row["held"] = dict(tool=held["tool"], agent=held["agent"], pendingS=held["pendingS"],
+                               sinceAt=_rfc3339(held["sinceAt"] * 1000), watcherSilent=held["silent"])
+        result["moorings"].append(row)
     view = None
     if no_peer:
         result["unavailable"].append(dict(source="devices", reason="skipped"))
@@ -2981,8 +3003,13 @@ def render_status(b):
     for s, m in sorted(ms.items(), key=lambda kv: -kv[1].get("last_seen", 0)):
         r = m.get("recipient", {})
         live = "live" if b.is_live(m) else "STALE"
-        lines.append(f"  {live:5} {s:<14} {r.get('runtime', '?'):<12} {r.get('model', '?')}@{r.get('lab', '?')}"
+        held = held_marker(s, now) if live == "live" else None
+        shown = ("held?" if held["silent"] else "held") if held else live
+        lines.append(f"  {shown:5} {s:<14} {r.get('runtime', '?'):<12} {r.get('model', '?')}@{r.get('lab', '?')}"
                      f"  for {m.get('principal') or '?'}  task={m.get('task') or '-'}  seen {_age(now - m.get('last_seen', now))} ago")
+        if held:
+            lines.append(f"    held{'? (watcher silent)' if held['silent'] else ''}: {held['tool']} pending "
+                         f"{held['pendingS']}s since {_rfc3339(held['sinceAt'] * 1000)}")
         if live == "live" and declared_writes(m):
             ages = []
             if 'writes_declared_at' in m:

@@ -1,0 +1,451 @@
+#!/usr/bin/env python3
+"""
+held-tool-watch — see a tool call that has been pending too long, from OUTSIDE the session that made it.
+
+On 2026-11-23 a coordinating session's tool call sat pending for about seven hours (very likely an
+approval prompt nobody saw). Nothing told the steward, the sibling device or `berth status`; the session
+read `live` because berth liveness is a heartbeat, not progress. The dialogue-stasis loop speaks through
+the stuck agent, so its alarm depended on the thing that was held. This watcher reads the transcripts the
+harness already writes and announces without the held session's help.
+
+  held-tool-watch scan  [--transcripts DIR] [--bound-s 120] [--now UNIX] [--json]
+                        [--sessions-json FILE] [--stasis-root DIR] [--tail-bytes N]
+      One pass. Exit 0 when nothing is held, 3 when something is.
+  held-tool-watch watch [--interval-s 5] [--bound-s 120] [--transcripts DIR] [--sessions-json FILE]
+                        [--state-dir DIR] [--max-passes N]
+      Loop over scan. Announce each held call once and its resolution once, three independent ways:
+      a berth note (sender `held-tool-watch`), a marker file `berth status` reads, and a steward push
+      through the executable named by $HELD_TOOL_PUSH_CMD (argv: title, body; none configured = logged).
+
+It never approves, cancels, retries or signals anything, and only reads transcripts.
+
+How a held call is told from a long-running one. A transcript holds a `tool_use` block, and the harness
+writes a `tool_result` block with the same id when the call returns. A call with no result is "pending".
+Pending is NOT held when the tool is long-running by design:
+  * Agent / Task / Workflow / Monitor / TaskOutput: they run or wait for as long as their work takes;
+  * Bash with `run_in_background: true`: it returns at once with a handle (and its result is written),
+    so it only dangles if the harness is wedged, and it is still skipped;
+  * Bash with an explicit `timeout`: pending is held only past that timeout plus a 30 s grace, because
+    the harness itself kills the call at its timeout.
+Everything else is held once its age passes the bound. The cause is `approval-evidence` only when a
+`permission-requested` entry in the dialogue-stasis journal names that tool_use id as its
+`precedingToolUseId`; otherwise `cause: unknown` (a slow tool and an unanswered prompt look the same in
+a transcript). A killed subagent whose last line is a tool_use is indistinguishable from a held one and
+is reported while its parent session stays moored.
+"""
+import argparse
+import datetime
+import json
+import os
+import re
+import subprocess
+import sys
+import time
+
+WATCHER_SESSION = "held-tool-watch"
+LONG_RUNNING_TOOLS = {"Agent", "Task", "Workflow", "Monitor", "TaskOutput"}
+TIMEOUT_GRACE_S = 30
+SHAPE_CHARS = 80
+DEFAULT_TAIL_BYTES = 8 * 1024 * 1024
+HERE = os.path.dirname(os.path.realpath(__file__))
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(HERE)))
+
+
+# ---------------------------------------------------------------- locations
+
+def main_checkout(root):
+    """A linked worktree's main checkout (as berth finds it), else root."""
+    try:
+        with open(os.path.join(root, ".git")) as f:
+            marker = f.read().strip()
+        if not marker.startswith("gitdir: "):
+            return root
+        git_dir = os.path.realpath(os.path.join(root, marker[8:]))
+        with open(os.path.join(git_dir, "commondir")) as f:
+            common = os.path.realpath(os.path.join(git_dir, f.read().strip()))
+        if os.path.basename(common) == ".git" and os.path.isdir(common):
+            return os.path.dirname(common)
+    except OSError:
+        pass
+    return root
+
+
+def state_dir():
+    return os.environ.get("HELD_TOOL_WATCH_DIR") or os.path.join(
+        main_checkout(REPO_ROOT), ".eprfs", "status", "held-tool-watch")
+
+
+def stasis_root():
+    return os.path.join(main_checkout(REPO_ROOT), ".eprfs", "status", "stasis")
+
+
+def transcripts_root():
+    config = os.environ.get("CLAUDE_CONFIG_DIR")
+    if config:
+        return os.path.join(config, "projects")
+    if os.path.isdir("/projects/.claude-config/projects"):
+        return "/projects/.claude-config/projects"
+    return os.path.expanduser("~/.claude/projects")
+
+
+def berth_bin():
+    return os.environ.get("BERTH_BIN") or os.path.join(HERE, "berth")
+
+
+# ---------------------------------------------------------------- redaction
+
+_MASK = "<masked>"
+_SECRET_PATTERNS = [
+    (re.compile(r"(?i)(authorization:\s*)(bearer\s+|basic\s+|token\s+)?\S+"), r"\1" + _MASK),
+    (re.compile(r"(?i)\bbearer\s+\S+"), "bearer " + _MASK),
+    (re.compile(r"(?i)(\b[\w.-]*(?:token|key|secret|passw(?:or)?d|pwd|auth|credential)[\w.-]*\s*[=:]\s*)(\"[^\"]*\"|'[^']*'|\S+)"),
+     r"\1" + _MASK),
+    (re.compile(r"(?i)(--?[\w-]*(?:token|key|secret|passw(?:or)?d|auth)[\w-]*[ =])(\"[^\"]*\"|'[^']*'|\S+)"),
+     r"\1" + _MASK),
+    (re.compile(r"(\w+://[^\s/:@]+:)[^\s/@]+@"), r"\1" + _MASK + "@"),
+    (re.compile(r"\?[^\s'\"]+"), "?" + _MASK),
+    (re.compile(r"\b(?:ghp_|gho_|ghs_|github_pat_|sk-|xox[abpr]-|AKIA|eyJ)[A-Za-z0-9_\-.]{8,}"), _MASK),
+    (re.compile(r"[A-Za-z0-9+/_\-]{32,}={0,2}"), _MASK),
+]
+
+
+def redact(text):
+    """The first SHAPE_CHARS characters of a command, with token-, key-, password-, URL-query-like
+    strings masked FIRST (so a secret straddling the cut cannot survive half-shown)."""
+    text = " ".join(str(text).split())
+    for pattern, replacement in _SECRET_PATTERNS:
+        text = pattern.sub(replacement, text)
+    return text[:SHAPE_CHARS]
+
+
+def shape_of(tool, inputs):
+    if not isinstance(inputs, dict):
+        return "<opaque input>"
+    if tool == "Bash":
+        return redact(inputs.get("command", ""))
+    for field in ("file_path", "path", "pattern", "url", "query"):
+        if isinstance(inputs.get(field), str):
+            return redact(inputs[field])
+    return "<" + tool + ">"
+
+
+# ---------------------------------------------------------------- transcripts
+
+def parse_ts(value):
+    if not isinstance(value, str):
+        return None
+    try:
+        return datetime.datetime.fromisoformat(value.replace("Z", "+00:00")).timestamp()
+    except ValueError:
+        return None
+
+
+def read_lines(path, tail_bytes):
+    """Complete lines of the file's last tail_bytes (a seek lands mid-line: that first line is dropped).
+    A final line without a newline may be mid-write: it is returned and the parser skips it if it is
+    not whole JSON."""
+    try:
+        with open(path, "rb") as f:
+            size = f.seek(0, os.SEEK_END)
+            start = max(0, size - tail_bytes) if tail_bytes else 0
+            f.seek(start)
+            data = f.read()
+    except OSError:
+        return []
+    lines = data.split(b"\n")
+    if start:
+        lines = lines[1:]
+    return lines
+
+
+def dangling_calls(path, tail_bytes=DEFAULT_TAIL_BYTES):
+    """tool_use blocks in the transcript with no tool_result of the same id, oldest first."""
+    uses, results = {}, set()
+    for raw in read_lines(path, tail_bytes):
+        if not raw.strip():
+            continue
+        try:
+            row = json.loads(raw)
+        except (ValueError, UnicodeDecodeError):
+            continue  # a partially written (or foreign) line
+        if not isinstance(row, dict):
+            continue
+        message = row.get("message")
+        blocks = message.get("content") if isinstance(message, dict) else None
+        if not isinstance(blocks, list):
+            continue
+        for block in blocks:
+            if not isinstance(block, dict):
+                continue
+            kind = block.get("type")
+            if kind == "tool_result" and isinstance(block.get("tool_use_id"), str):
+                results.add(block["tool_use_id"])
+            elif kind == "tool_use" and isinstance(block.get("id"), str):
+                when = parse_ts(row.get("timestamp"))
+                if when is not None and block["id"] not in uses:
+                    uses[block["id"]] = dict(id=block["id"], tool=str(block.get("name", "unknown")),
+                                             input=block.get("input"), at=when)
+    return sorted((u for i, u in uses.items() if i not in results), key=lambda u: u["at"])
+
+
+def long_running_limit(tool, inputs, bound_s):
+    """Seconds a pending call may age before it counts as held, or None when it is never held."""
+    if tool in LONG_RUNNING_TOOLS:
+        return None
+    inputs = inputs if isinstance(inputs, dict) else {}
+    if tool == "Bash":
+        if inputs.get("run_in_background") is True:
+            return None
+        timeout = inputs.get("timeout")
+        if isinstance(timeout, (int, float)) and not isinstance(timeout, bool) and timeout > 0:
+            return max(bound_s, timeout / 1000 + TIMEOUT_GRACE_S)
+    return bound_s
+
+
+def find_transcripts(root, session):
+    """[(agent, path)]: the main transcript wherever a project directory holds it, and each subagent's."""
+    found = []
+    if not os.path.isdir(root):
+        return found
+    for project in sorted(os.listdir(root)):
+        main = os.path.join(root, project, session + ".jsonl")
+        if os.path.isfile(main):
+            found.append(("main", main))
+            sub = os.path.join(root, project, session, "subagents")
+            if os.path.isdir(sub):
+                for name in sorted(os.listdir(sub)):
+                    if name.startswith("agent-") and name.endswith(".jsonl"):
+                        found.append((name[len("agent-"):-len(".jsonl")], os.path.join(sub, name)))
+    return found
+
+
+def approval_evidence(root, session):
+    """tool_use ids a dialogue-stasis journal ties to a permission request."""
+    ids = set()
+    directory = os.path.join(root, session)
+    try:
+        names = sorted(n for n in os.listdir(directory) if n.startswith("events") and n.endswith(".jsonl"))
+    except OSError:
+        return ids
+    for name in names:
+        try:
+            with open(os.path.join(directory, name), "rb") as f:
+                for raw in f:
+                    try:
+                        row = json.loads(raw)
+                    except (ValueError, UnicodeDecodeError):
+                        continue
+                    if isinstance(row, dict) and row.get("kind") == "permission-requested":
+                        source = row.get("source")
+                        tool_id = source.get("precedingToolUseId") if isinstance(source, dict) else None
+                        if isinstance(tool_id, str) and tool_id:
+                            ids.add(tool_id)
+        except OSError:
+            continue
+    return ids
+
+
+def moored_sessions(sessions_json=None):
+    """Session ids moored on this device, from `berth status --json --no-peer` (or an injected file)."""
+    if sessions_json:
+        with open(sessions_json) as f:
+            data = json.load(f)
+    else:
+        out = subprocess.run([berth_bin(), "status", "--json", "--no-peer"], capture_output=True,
+                             text=True, timeout=30, check=True)
+        data = json.loads(out.stdout)
+    rows = data.get("moorings", []) if isinstance(data, dict) else data
+    return [r["session"] if isinstance(r, dict) else r for r in rows
+            if (isinstance(r, dict) and isinstance(r.get("session"), str)) or isinstance(r, str)]
+
+
+def scan(sessions, transcripts, bound_s, now, stasis=None, tail_bytes=DEFAULT_TAIL_BYTES):
+    held = []
+    for session in sessions:
+        evidence = approval_evidence(stasis, session) if stasis else set()
+        for agent, path in find_transcripts(transcripts, session):
+            for call in dangling_calls(path, tail_bytes):
+                limit = long_running_limit(call["tool"], call["input"], bound_s)
+                age = now - call["at"]
+                if limit is None or age <= limit:
+                    continue
+                held.append(dict(session=session, agent=agent, tool=call["tool"], toolUseId=call["id"],
+                                 shape=shape_of(call["tool"], call["input"]), pendingS=int(age),
+                                 calledAt=call["at"],
+                                 cause="approval-evidence" if call["id"] in evidence else "unknown"))
+    return held
+
+
+def render_line(h):
+    return (f"held  {h['session'][:8]}  {h['agent']}  {h['tool']}  {h['pendingS']}s  "
+            f"cause: {h['cause']}  {h['shape']}")
+
+
+# ---------------------------------------------------------------- announcing
+
+def call_key(h):
+    return f"{h['session']}|{h['agent']}|{h['toolUseId']}"
+
+
+def held_text(h):
+    return (f"HELD: session {h['session'][:8]} {h['tool']} pending {h['pendingS']}s "
+            f"(cause {h['cause']}) — it cannot read notes until it returns")
+
+
+def cleared_text(entry, seconds, gone):
+    what = "no longer moored after" if gone else "returned after"
+    return f"HELD-CLEARED: session {entry['session'][:8]} {entry['tool']} {what} {seconds}s"
+
+
+def announce_berth_note(text):
+    """A broadcast berth note (no --to) from the sender session `held-tool-watch`: it crosses to sibling
+    devices and reaches every session moored here, the held one at its next tool call. `say` needs no
+    mooring, so no berth change is required."""
+    subprocess.run([berth_bin(), "say", "--session", WATCHER_SESSION, text], capture_output=True,
+                   text=True, timeout=60, check=True)
+
+
+def announce_push(title, body):
+    command = os.environ.get("HELD_TOOL_PUSH_CMD")
+    if not command:
+        raise LookupError("push: no transport configured")
+    subprocess.run([command, title, body], capture_output=True, text=True, timeout=60, check=True)
+
+
+def write_json_atomic(path, obj):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    tmp = f"{path}.{os.getpid()}.tmp"
+    with open(tmp, "w") as f:
+        json.dump(obj, f, sort_keys=True)
+    os.replace(tmp, path)
+
+
+def read_state(directory):
+    try:
+        with open(os.path.join(directory, "state.json")) as f:
+            data = json.load(f)
+        return data if isinstance(data, dict) and isinstance(data.get("held"), dict) else {"held": {}}
+    except (OSError, ValueError):
+        return {"held": {}}
+
+
+def fan_out(text, title, say, push, log):
+    """Each channel independently: one failing is logged and does not stop the others."""
+    for name, send in (("berth", lambda: say(text)), ("push", lambda: push(title, text))):
+        try:
+            send()
+            log(f"{name}: sent: {text}")
+        except LookupError as error:
+            log(str(error))
+        except Exception as error:  # noqa: BLE001 — a channel failure must not stop another channel
+            log(f"{name}: failed: {type(error).__name__}: {error}")
+
+
+def run_pass(directory, sessions, transcripts, bound_s, interval_s, now, stasis=None,
+             say=announce_berth_note, push=announce_push, log=print, tail_bytes=DEFAULT_TAIL_BYTES):
+    """One watch pass: announce new and resolved held calls once each, and refresh the markers."""
+    state = read_state(directory)
+    known = state["held"]
+    current = {call_key(h): h for h in scan(sessions, transcripts, bound_s, now, stasis, tail_bytes)}
+    for key, h in current.items():
+        if key not in known:
+            known[key] = dict(session=h["session"], agent=h["agent"], tool=h["tool"],
+                              calledAt=h["calledAt"], announcedAt=now)
+            fan_out(held_text(h), f"Held tool call: session {h['session'][:8]}", say, push, log)
+    for key in [k for k in known if k not in current]:
+        entry = known.pop(key)
+        gone = entry["session"] not in sessions
+        seconds = int(now - entry["calledAt"])
+        fan_out(cleared_text(entry, seconds, gone), f"Held call cleared: session {entry['session'][:8]}",
+                say, push, log)
+    markers = os.path.join(directory, "held")
+    by_session = {}
+    for h in current.values():
+        by_session.setdefault(h["session"], []).append(h)
+    for session, rows in by_session.items():
+        oldest = min(rows, key=lambda r: r["calledAt"])
+        write_json_atomic(os.path.join(markers, session + ".json"),
+                          dict(session=session, agent=oldest["agent"], tool=oldest["tool"],
+                               toolUseId=oldest["toolUseId"], since=oldest["calledAt"],
+                               cause=oldest["cause"], count=len(rows), refreshedAt=now,
+                               intervalS=interval_s))
+    try:
+        names = os.listdir(markers)
+    except OSError:
+        names = []
+    for name in names:
+        if name.endswith(".json") and name[:-len(".json")] not in by_session:
+            try:
+                os.remove(os.path.join(markers, name))
+            except OSError:
+                pass
+    write_json_atomic(os.path.join(directory, "state.json"), state)
+    return list(current.values())
+
+
+# ---------------------------------------------------------------- CLI
+
+def cmd_scan(args):
+    now = args.now if args.now is not None else time.time()
+    sessions = moored_sessions(args.sessions_json)
+    held = scan(sessions, args.transcripts or transcripts_root(), args.bound_s, now,
+                args.stasis_root or stasis_root(), args.tail_bytes)
+    if args.json:
+        print(json.dumps(held, sort_keys=True))
+    else:
+        for h in held:
+            print(render_line(h))
+    return 3 if held else 0
+
+
+def cmd_watch(args):
+    directory = args.state_dir or state_dir()
+    passes = 0
+    while True:
+        try:
+            run_pass(directory, moored_sessions(args.sessions_json), args.transcripts or transcripts_root(),
+                     args.bound_s, args.interval_s, time.time(), args.stasis_root or stasis_root(),
+                     tail_bytes=args.tail_bytes)
+        except (OSError, ValueError, subprocess.SubprocessError) as error:
+            print(f"pass failed: {type(error).__name__}: {error}", flush=True)
+        passes += 1
+        if args.max_passes and passes >= args.max_passes:
+            return 0
+        time.sleep(args.interval_s)
+
+
+def parser():
+    p = argparse.ArgumentParser(prog="held-tool-watch", description=__doc__.split("\n\n")[0])
+    sub = p.add_subparsers(dest="cmd", required=True)
+    for name in ("scan", "watch"):
+        s = sub.add_parser(name)
+        s.add_argument("--transcripts")
+        s.add_argument("--bound-s", type=float, default=120)
+        s.add_argument("--sessions-json")
+        s.add_argument("--stasis-root")
+        s.add_argument("--tail-bytes", type=int, default=DEFAULT_TAIL_BYTES)
+        if name == "scan":
+            s.add_argument("--now", type=float)
+            s.add_argument("--json", action="store_true")
+            s.set_defaults(run=cmd_scan)
+        else:
+            s.add_argument("--interval-s", type=float, default=5)
+            s.add_argument("--state-dir")
+            s.add_argument("--max-passes", type=int, default=0)
+            s.set_defaults(run=cmd_watch)
+    return p
+
+
+def main(argv):
+    args = parser().parse_args(argv)
+    try:
+        return args.run(args)
+    except KeyboardInterrupt:
+        return 0
+    except (OSError, ValueError, subprocess.SubprocessError) as error:
+        print(f"held-tool-watch: {type(error).__name__}: {error}", file=sys.stderr)
+        return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
