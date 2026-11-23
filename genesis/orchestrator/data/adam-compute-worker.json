@@ -18,16 +18,16 @@
     "grant": {
       "recipient": "uhCAkjxGE9wOMFIuQWeXHSgSwrLH1yy7vCSfwA-OSe6Fy0LFSZNJS",
       "scope": "measure-stage",
-      "issuedAt": "2026-11-16T16:00:00Z",
-      "validFrom": "2026-11-16T16:00:00Z",
-      "validUntil": "2026-11-23T16:00:00Z",
+      "issuedAt": "2026-11-23T16:00:00Z",
+      "validFrom": "2026-11-23T16:00:00Z",
+      "validUntil": "2026-12-23T16:00:00Z",
       "bounds": {
         "epr_scope": [
           "*"
         ],
         "reach_ceiling": "commons",
         "rate_per_hour": 4,
-        "rotation_ttl_days": 7
+        "rotation_ttl_days": 30
       }
     }
   },

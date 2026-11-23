@@ -501,6 +501,16 @@ each stage has a fresh nonce/CID; the enabled Jenkins profile separately fixes t
 three-scenario `features/dataplane/peer-mesh.feature` lane. The profile remains disabled
 until CI captures the actual native grant action hash and live worker evidence.
 
+The window that followed (2026-11-16 16:00:00 UTC through 2026-11-23 16:00:00 UTC) expired
+unrenewed at its end, during a landing push, and reddened `compute-worker-clock.test.mjs` on
+every device (arrival backlog row 36). On 2026-11-23 Matthew ruled its replacement with the same
+parties, scope, reach and rate, and two changes he chose after being shown both: the window runs
+**2026-11-23 16:00:00 UTC through 2026-12-23 16:00:00 UTC**, and `bounds.rotation_ttl_days` goes
+from 7 to 30, because the bootstrap validator refuses a window longer than that bound (answers:
+"Renew 30 days", then "30 days, rotation raised to 30"). It is declared in
+`genesis/orchestrator/data/adam-compute-worker.json` and is issued natively by the Edge deploy
+of the landing that carries it; its native action hash is not yet captured.
+
 There is **no automatic renewal**. Before expiry, either disable the Jenkins profile
 and worker through a reviewed deploy-only commit, or explicitly review and replace the
 finite declaration, deploy, capture the new native action hash, then update the profile.

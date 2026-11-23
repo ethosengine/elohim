@@ -2803,3 +2803,14 @@ reached the steward. Current state: nothing; the held session reads `live`.
 
 Neither cure is a prerequisite of this landing. Both are prerequisites of a landing with no
 coordinator session, which is the test the two F4-ask records exist to pass.
+
+## Row 36, delta (2026-11-23): the deadline arrived during a landing push, and the grant was renewed
+
+The grant expired at 2026-11-23T16:00:00Z, fifteen minutes into the F4-ask landing's pre-push.
+`orchestrator-tree` had been green on both devices for that head earlier the same afternoon and
+went red at 16:27Z on `compute-worker-clock.test.mjs`. The push was stopped; the greens it had
+recorded stand. The steward ruled a replacement of 30 days with `rotation_ttl_days` raised from 7
+to 30 (`genesis/agentic/compute/operations.md` records the answers). Still owed from this row:
+the warning some days ahead. The test prints a diagnostic under 48 hours, which nobody reads in a
+green run; backlog `runner-grant-expiry-native-pre-expiry-sense` holds the native form. The next
+expiry is 2026-12-23T16:00:00Z.
