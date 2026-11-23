@@ -3,6 +3,24 @@ epr-meta-version: 1
 id: claude-hooks-governance
 covers: subtree
 rules:
+  - id: agent-shell-command-shape-stays-advisory
+    class: inject
+    when:
+      write: "command-shape.py"
+    dedupe-of: ".epr-meta/elohim/packages/hooks/command-shape.json (package-master source and runtime registrations)"
+    why: >
+      `command-shape.py` is the WARN-only agent-shell behavior reminder. It reports, through
+      `additionalContext`, exactly these six command-shape concerns: one operation per call when
+      reads and mutations would be mixed; no leading comment except one `# Brit fallback:
+      <reason>` line; no `cd`/`pushd`/`popd`; no heredoc carrying interpreter or code-file
+      content; waits name a PID or done-file and carry a timeout or explicit bound; and no
+      `env -u` prefix. It may suggest a rewrite, but it never denies, never asks, and every path
+      exits zero. Its package is authoritative; project the hook instead of editing the runtime
+      projection, and leave `.claude/settings.json` and `.codex/hooks.json` for steward review.
+    retire-when: >
+      when every supported shell tool exposes these six command-shape constraints as native,
+      measured advisory diagnostics and this package plus its runtime projections have been
+      retired
   - id: per-turn-injector-carries-its-budget
     class: inject
     when:
@@ -168,7 +186,7 @@ under `_lib/__tests__/`) or `.epr-meta/elohim/lenses/` (tested under its own `__
 so the transport can be swapped (the brit/eprfs direction) without losing the rules. None of
 those three is expressible as an enforced `.epr-meta` predicate, and none has been made one.
 
-**Five `class: inject` teaching signals** under this manifest's own admission bar ("only if a
+**The `class: inject` teaching signals** under this manifest's own admission bar ("only if a
 NEW recurring, mechanizable drift appears in this tree"), all advisory and all carrying their
 exit. Two, added 2026-08-13: `per-turn-injector-carries-its-budget` fires when a hook file
 names `UserPromptSubmit`: the per-turn path is a genuinely new shape here — before the
@@ -194,7 +212,9 @@ across `\`-newline continuations, split on operators, unwrapped through `sudo`/`
 `exec`/`xargs`/`sh -c`, and each `git <sub>` matched against the row's subcommand rules — and it
 denies on ambiguity only when the unresolvable text sits inside a destructive form (a glued
 `git${IFS}reset`, a `$VAR` flag on `reset`), never on a `${VAR}` in an ordinary commit message.
-None of the five blocks; each retires on a counted condition.
+The command-shape signal, `agent-shell-command-shape-stays-advisory`, holds the package-authored Bash reminder
+to its six declared findings and its fail-open contract: `additionalContext` only, no ask or
+deny, and exit zero. None of these signals blocks; each retires on a counted condition.
 
 Operator ruling 2026-10-25: the tier gate is unregistered from `.claude/settings.json`. It resolved
 the acting tier from `CLAUDE_MODEL`, which this harness never exports, or from a self-asserted
