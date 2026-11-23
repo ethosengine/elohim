@@ -28,7 +28,7 @@ import { fileURLToPath } from 'node:url';
 import { costOf, isHandoverBranch, readCycleUnion } from './gate-cost.mjs';
 import { changeClass } from './gate-change-class.mjs';
 import { parseChangeId } from './commit-tag-parser.mjs';
-import { deviceRoot, gateEvidence, resolveBin, selfAgentId } from './gate-evidence.mjs';
+import { deviceRoot, gateEvidence, resolveBin, selfAgentId, siblingVerdicts } from './gate-evidence.mjs';
 import { gateChildEnv } from './gate-runner.mjs';
 import { loadGateRegistry } from './pipeline-registry.mjs';
 import { readBuildNote } from './scripts/brit-attest.mjs';
@@ -97,9 +97,13 @@ export function cidString(bytes) {
  * This device's newest verdict for `project`'s closure at `head`, attested at any commit: the key
  * gate-evidence computes for `head` (what a dev landing's reuse would look up), matched against
  * every note under the project's step. `{ closure, row }`, `{ closure, row: null }` when nothing is
- * held for that closure, or `{ error }` when the key cannot be computed here.
+ * held for that closure, and `green` says whether this device or an admitted sibling has folded a
+ * green for the key. Returns `{ error }` when the key cannot be computed here.
  */
-export function closureVerdict(project, head, { root, env = process.env, spawn = spawnSync, selfId, evidenceOf = gateEvidence }) {
+export function closureVerdict(project, head, {
+  root, env = process.env, spawn = spawnSync, selfId, evidenceOf = gateEvidence,
+  siblingsOf = siblingVerdicts,
+}) {
   const childEnv = gateChildEnv(project, env, root);
   let cargoEnv = {};
   try { cargoEnv = JSON.parse(childEnv.GATE_CARGO_ENV || '{}'); } catch { /* none declared */ }
@@ -108,7 +112,10 @@ export function closureVerdict(project, head, { root, env = process.env, spawn =
   const own = (evidence.rows || [])
     .filter(row => row?.attestation?.agentId && row.attestation.agentId === selfId)
     .sort((a, b) => Date.parse(b.attestation?.builtAt || 0) - Date.parse(a.attestation?.builtAt || 0));
-  return { closure: evidence.key, row: own[0] || null };
+  const sibling = siblingsOf(project, evidence.key, { root, env, spawn }).candidates || [];
+  const green = own.some(row => row.attestation?.success === true)
+    || sibling.some(row => row.success === true);
+  return { closure: evidence.key, row: own[0] || null, green };
 }
 
 /** The default closure lookup: the gate registry's project, then {@link closureVerdict}. */
@@ -178,26 +185,32 @@ export function postMisses(record, projects, {
 
   const closures = new Map();
   const misses = [];
-  const unavailable = [];
+  const fallbacks = [];
   for (const project of [...new Set(projects)]) {
-    const green = record.verdicts.find(row => row.project === project && row.verdictOf === 'green');
-    if (green?.closure) {
-      closures.set(project, green.closure);
-      continue;
-    }
     let found;
     try { found = lookup(project, record.head); } catch (error) {
       found = { error: String(error?.message || error).split('\n')[0] };
     }
-    if (!found?.closure) {
-      unavailable.push(`${project} (${found?.error || 'no closure key'})`);
+    if (found?.closure) {
+      closures.set(project, found.closure);
+      if (found.green === true || found.row?.attestation?.success === true) continue;
+      misses.push({ project, closure: found.closure });
       continue;
     }
-    closures.set(project, found.closure);
-    misses.push({ project, closure: found.closure });
+
+    // A head note is less precise than a closure lookup: consult it only when the closure cannot
+    // be computed, and never mistake an older same-closure inventory row for a note at this head.
+    const atHead = record.verdicts.find(row => row.project === project && !row.attestedAt);
+    const outcome = atHead ? `${atHead.verdictOf} verdict at head` : 'no verdict at head';
+    if (atHead?.closure) closures.set(project, atHead.closure);
+    if (atHead?.verdictOf !== 'green' && atHead?.closure) {
+      misses.push({ project, closure: atHead.closure });
+    }
+    const omitted = atHead?.verdictOf !== 'green' && !atHead?.closure ? '; left out of misses' : '';
+    fallbacks.push(`${project} (${found?.error || 'no closure key'}; ${outcome}${omitted})`);
   }
-  if (unavailable.length) {
-    err(`[pre-push] hand-over: closure unavailable; left out of misses: ${unavailable.join(', ')}`);
+  if (fallbacks.length) {
+    err(`[pre-push] hand-over: closure key unavailable; used head lookup fallback: ${fallbacks.join(', ')}`);
   }
   if (misses.length === 0) return null;
 

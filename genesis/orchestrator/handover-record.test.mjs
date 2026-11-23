@@ -69,14 +69,39 @@ test('closureVerdict keys on the head and takes this device\'s newest row for th
       ],
     };
   };
-  const got = closureVerdict(project, HEAD, { root: REPO, env: {}, selfId: 'me', evidenceOf });
+  const got = closureVerdict(project, HEAD, {
+    root: REPO, env: {}, selfId: 'me', evidenceOf,
+    siblingsOf: () => ({ candidates: [] }),
+  });
   assert.equal(askedFor.commit, HEAD, 'the key is computed for the head');
   assert.equal(askedFor.cargoEnv.RUSTUP_TOOLCHAIN, '1.100.0', 'with the gate\'s own cargo env');
   assert.equal(got.closure, 'k-head');
   assert.equal(got.row.commit, 'c-new', 'newest of this device\'s rows, red included; a sibling\'s is not this device\'s');
-  assert.deepEqual(closureVerdict(project, HEAD, { root: REPO, env: {}, selfId: 'me', evidenceOf: () => ({ line: 'unavailable (x)' }) }),
+  assert.equal(got.green, true, 'a folded green for this device satisfies the closure');
+  assert.deepEqual(closureVerdict(project, HEAD, {
+    root: REPO, env: {}, selfId: 'me', evidenceOf: () => ({ line: 'unavailable (x)' }),
+    siblingsOf: () => { throw new Error('siblings are not read without a closure key'); },
+  }),
     { error: 'unavailable (x)' });
-  assert.equal(closureVerdict(project, HEAD, { root: REPO, env: {}, selfId: 'nobody', evidenceOf }).row, null);
+  assert.equal(closureVerdict(project, HEAD, {
+    root: REPO, env: {}, selfId: 'nobody', evidenceOf, siblingsOf: () => ({ candidates: [] }),
+  }).row, null);
+});
+
+test('closureVerdict includes an admitted sibling green for the computed closure', () => {
+  const project = { name: 'orchestrator', run: { kind: 'just' } };
+  let asked = null;
+  const got = closureVerdict(project, HEAD, {
+    root: REPO, env: {}, selfId: 'me',
+    evidenceOf: () => ({ key: 'k-shared', rows: [] }),
+    siblingsOf: (p, closure) => {
+      asked = [p.name, closure];
+      return { candidates: [{ project: p.name, closure, success: true, source: 'sibling' }] };
+    },
+  });
+  assert.deepEqual(asked, ['orchestrator', 'k-shared']);
+  assert.equal(got.row, null, 'the inventory remains this device\'s own evidence');
+  assert.equal(got.green, true);
 });
 
 function postingRun({
@@ -123,7 +148,9 @@ test('a green and two selected misses raise one intent and post exactly the miss
   const missB = '3'.repeat(64);
   const r = postingRun({
     verdicts: [{ project: 'green', closure: greenClosure, verdictOf: 'green' }],
-    lookup: name => ({ closure: name === 'miss-a' ? missA : missB, row: null }),
+    lookup: name => name === 'green'
+      ? { closure: greenClosure, row: { attestation: { success: true } }, green: true }
+      : { closure: name === 'miss-a' ? missA : missB, row: null, green: false },
   });
   assert.equal(r.code, 0);
   assert.equal(r.written.length, 1, 'the inventory is durable before misses are posted');
@@ -142,6 +169,47 @@ test('a green and two selected misses raise one intent and post exactly the miss
   assert.deepEqual(epr[1].slice(0, 3), ['flow', 'intend', '--misses']);
   assert.match(epr[1][epr[1].indexOf('--wait-until') + 1], /^\d+$/);
   assert.match(r.stdout[1], new RegExp(`hand-over: posted 2 misses on intent ${INTENT.slice(0, 12)}: miss-a, miss-b`));
+});
+
+test('a folded green for the computed closure suppresses a miss without a verdict at this head', () => {
+  const closure = '4'.repeat(64);
+  const r = postingRun({
+    projects: ['orchestrator'],
+    verdicts: [],
+    lookup: () => ({ closure, row: { commit: OLD, attestation: { success: true } }, green: true }),
+  });
+  assert.equal(r.code, 0);
+  assert.equal(r.calls.some(([bin]) => bin === '/stub/epr'), false, 'there is no open miss to post');
+  assert.deepEqual(r.stderr, []);
+});
+
+test('a changed closure without a folded verdict is posted despite a green at this head', () => {
+  const oldClosure = '5'.repeat(64);
+  const changedClosure = '6'.repeat(64);
+  const r = postingRun({
+    projects: ['orchestrator'],
+    verdicts: [{ project: 'orchestrator', closure: oldClosure, verdictOf: 'green' }],
+    lookup: () => ({ closure: changedClosure, row: null, green: false }),
+  });
+  assert.equal(r.code, 0);
+  const misses = r.calls.find(([bin, args]) => bin === '/stub/epr' && args.includes('--misses'))[1];
+  assert.deepEqual(misses.filter((arg, i) => misses[i - 1] === '--miss'), [
+    `orchestrator=${changedClosure}`,
+  ]);
+});
+
+test('an uncomputable closure falls back to the head verdict and says so', () => {
+  const closure = '7'.repeat(64);
+  const r = postingRun({
+    projects: ['orchestrator'],
+    verdicts: [{ project: 'orchestrator', closure, verdictOf: 'green' }],
+    lookup: () => ({ error: 'fingerprint unavailable' }),
+  });
+  assert.equal(r.code, 0);
+  assert.equal(r.calls.some(([bin]) => bin === '/stub/epr'), false, 'the green head fallback suppresses the miss');
+  assert.deepEqual(r.stderr, [
+    '[pre-push] hand-over: closure key unavailable; used head lookup fallback: orchestrator (fingerprint unavailable; green verdict at head)',
+  ]);
 });
 
 test('a hand-over from a worktree writes its intent and misses to the device channel store', () => {
@@ -186,6 +254,6 @@ test('a selected project without a closure is named and left out', () => {
   const misses = r.calls.find(([bin, args]) => bin === '/stub/epr' && args.includes('--misses'))[1];
   assert.deepEqual(misses.filter((arg, i) => misses[i - 1] === '--miss'), [`miss-a=${closure}`]);
   assert.deepEqual(r.stderr, [
-    '[pre-push] hand-over: closure unavailable; left out of misses: unknown (key unavailable)',
+    '[pre-push] hand-over: closure key unavailable; used head lookup fallback: unknown (key unavailable; no verdict at head; left out of misses)',
   ]);
 });
