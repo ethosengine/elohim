@@ -175,7 +175,7 @@ export function checkEprBin({ env = process.env } = {}) {
     }
   } catch {
     return row('epr-bin', 'WARN',
-      `EPR_BIN is set (${env.EPR_BIN}) and this device's current epr could not be read`, 'unset EPR_BIN');
+      `EPR_BIN is set (${env.EPR_BIN}) and this device's current epr could not be read; a new Claude session unsets it at start (device-arrive)`, 'unset EPR_BIN');
   }
   let inherited;
   try { inherited = realpathSync(env.EPR_BIN); } catch { /* A missing candidate differs too. */ }
@@ -184,7 +184,7 @@ export function checkEprBin({ env = process.env } = {}) {
     return row('epr-bin', 'ok');
   }
   return row('epr-bin', env.GATE_ALLOW_EPR_BIN === '1' ? 'WARN' : 'REFUSED',
-    `inherited EPR_BIN=${env.EPR_BIN}; device current epr=${current} — gates key on a native evaluator; an older one makes evidence unavailable, so nothing is reused`,
+    `inherited EPR_BIN=${env.EPR_BIN}; device current epr=${current} — gates key on a native evaluator; an older one makes evidence unavailable, so nothing is reused; a new Claude session unsets it at start (device-arrive)`,
     'unset EPR_BIN');
 }
 
