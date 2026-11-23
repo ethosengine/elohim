@@ -1205,7 +1205,19 @@ const PEER_RULES_CHECK: &str = "peer rules";
 fn peer_rules_check(root: &Path) -> Check {
     let running = serve_liveness().map(|(running, _)| running);
     let loaded = saved_heads().map(|table| table.and_then(|table| table.rules));
-    peer_rules_line(root, running, loaded)
+    peer_rules_line(root, running, loaded, published_rules(root))
+}
+
+/// The rules digest of `genesis/agentic/pool-policy.json` at `origin/dev` (as of the last
+/// fetch), the side that says which of the daemon and the checkout is stale. `None` when that
+/// ref or file cannot be read here.
+#[cfg(feature = "peer")]
+fn published_rules(root: &Path) -> Option<eprfs_peer::RulesDigest> {
+    let text = roster_at(root, "refs/remotes/origin/dev", crate::peer::POLICY_REL)?;
+    let value: serde_json::Value = serde_json::from_str(&text).ok()?;
+    eprfs_peer::Rules::from_policy(&value)
+        .ok()
+        .map(|rules| rules.digest())
 }
 
 #[cfg(feature = "peer")]
@@ -1213,6 +1225,7 @@ fn peer_rules_line(
     root: &Path,
     running: Result<bool, String>,
     loaded: Result<Option<eprfs_peer::RulesState>, String>,
+    published: Option<eprfs_peer::RulesDigest>,
 ) -> Check {
     match running {
         Ok(false) => return Check::new(
@@ -1265,7 +1278,24 @@ fn peer_rules_line(
             )
         }
     };
+    // origin/dev decides which side is stale: whichever differs from it is behind.
+    let dev = published.as_ref();
     if loaded.digest == checkout {
+        if let Some(dev) = dev.filter(|dev| **dev != checkout) {
+            return Check::new(
+                PEER_RULES_CHECK,
+                State::Degraded,
+                format!(
+                    "daemon and checkout both load {}, origin/dev declares {}: both are behind origin/dev",
+                    checkout.short(),
+                    dev.short()
+                ),
+                Some(
+                    "update this checkout to origin/dev, then restart the daemon on it (epr device supervise)"
+                        .into(),
+                ),
+            );
+        }
         return Check::new(
             PEER_RULES_CHECK,
             State::Ok,
@@ -1276,21 +1306,51 @@ fn peer_rules_line(
             None,
         );
     }
-    Check::new(
-        PEER_RULES_CHECK,
-        State::Degraded,
-        format!(
-            "daemon loaded {} from {}, checkout {} is {}",
-            loaded.digest.short(),
-            loaded.policy.display(),
-            crate::peer::POLICY_REL,
-            checkout.short()
+    let drift = format!(
+        "daemon loaded {} from {}, checkout {} is {}",
+        loaded.digest.short(),
+        loaded.policy.display(),
+        crate::peer::POLICY_REL,
+        checkout.short()
+    );
+    match dev {
+        Some(dev) if *dev == loaded.digest => Check::new(
+            PEER_RULES_CHECK,
+            State::Degraded,
+            format!("{drift}; origin/dev declares the daemon's rules, so the checkout is the stale side"),
+            Some(
+                "update this checkout to origin/dev; do not restart the daemon on the checkout policy, which would roll it back"
+                    .into(),
+            ),
         ),
-        Some(format!(
-            "restart the daemon on the checkout policy (epr device supervise), or refresh {} from it",
-            loaded.policy.display()
-        )),
-    )
+        Some(dev) if *dev == checkout => Check::new(
+            PEER_RULES_CHECK,
+            State::Degraded,
+            format!("{drift}; origin/dev declares the checkout's rules, so the daemon is the stale side"),
+            Some(format!(
+                "restart the daemon on the checkout policy (epr device supervise), or refresh {} from it",
+                loaded.policy.display()
+            )),
+        ),
+        Some(dev) => Check::new(
+            PEER_RULES_CHECK,
+            State::Degraded,
+            format!("{drift}; origin/dev declares {}, matching neither", dev.short()),
+            Some(format!(
+                "update this checkout to origin/dev, then restart the daemon on it (epr device supervise); refresh or drop {}",
+                loaded.policy.display()
+            )),
+        ),
+        None => Check::new(
+            PEER_RULES_CHECK,
+            State::Degraded,
+            format!("{drift}; origin/dev's policy cannot be read here, so which side is stale is unknown"),
+            Some(format!(
+                "fetch origin, then compare again; the cure is to restart the daemon on the checkout policy (epr device supervise) only if the checkout matches origin/dev, else to update the checkout; {} is the daemon's copy",
+                loaded.policy.display()
+            )),
+        ),
+    }
 }
 
 #[cfg(not(feature = "peer"))]
@@ -2277,7 +2337,7 @@ mod tests {
             loaded_at: 1,
             pending: None,
         };
-        let check = peer_rules_line(dir.path(), Ok(true), Ok(Some(loaded)));
+        let check = peer_rules_line(dir.path(), Ok(true), Ok(Some(loaded)), Some(digest.clone()));
         assert_eq!(check.state, State::Ok);
         assert_eq!(
             check.to_string(),
@@ -2300,12 +2360,17 @@ mod tests {
             loaded_at: 1,
             pending: None,
         };
-        let check = peer_rules_line(dir.path(), Ok(true), Ok(Some(loaded)));
+        let check = peer_rules_line(
+            dir.path(),
+            Ok(true),
+            Ok(Some(loaded)),
+            Some(checkout_digest.clone()),
+        );
         assert_eq!(check.state, State::Degraded);
         assert_eq!(
             check.to_string(),
             format!(
-                "degraded peer rules: daemon loaded {} from {}, checkout {} is {} — restart the daemon on the checkout policy (epr device supervise), or refresh {} from it",
+                "degraded peer rules: daemon loaded {} from {}, checkout {} is {}; origin/dev declares the checkout's rules, so the daemon is the stale side — restart the daemon on the checkout policy (epr device supervise), or refresh {} from it",
                 daemon_digest.short(),
                 daemon_policy.display(),
                 crate::peer::POLICY_REL,
@@ -2314,6 +2379,81 @@ mod tests {
             )
         );
     }
+    /// 2026-11-23 on ethosengine: the daemon ran dev's rules from a refreshed private copy while
+    /// the checkout it serves sat behind dev. Restarting on the checkout would roll it back.
+    #[test]
+    fn peer_rules_name_the_checkout_as_stale_when_the_daemon_matches_origin_dev() {
+        let dir = tempfile::tempdir().unwrap();
+        let checkout = dir.path().join(crate::peer::POLICY_REL);
+        let checkout_digest = write_rules_policy(&checkout, &["claim"]);
+        let daemon_policy = dir.path().join("private/daemon/pool-policy.json");
+        let daemon_digest = write_rules_policy(&daemon_policy, &["claim", "release"]);
+        let loaded = eprfs_peer::RulesState {
+            digest: daemon_digest.clone(),
+            policy: daemon_policy,
+            loaded_at: 1,
+            pending: None,
+        };
+        let check = peer_rules_line(dir.path(), Ok(true), Ok(Some(loaded)), Some(daemon_digest));
+        assert_eq!(check.state, State::Degraded);
+        let line = check.to_string();
+        assert!(line.contains("so the checkout is the stale side"), "{line}");
+        assert!(
+            line.contains("update this checkout to origin/dev"),
+            "{line}"
+        );
+        assert!(
+            line.contains("do not restart the daemon on the checkout policy"),
+            "{line}"
+        );
+        assert!(
+            line.contains(&checkout_digest.short().to_string()),
+            "{line}"
+        );
+    }
+    #[test]
+    fn peer_rules_say_both_are_behind_when_they_agree_but_origin_dev_moved() {
+        let dir = tempfile::tempdir().unwrap();
+        let checkout = dir.path().join(crate::peer::POLICY_REL);
+        let digest = write_rules_policy(&checkout, &["claim"]);
+        let dev_policy = dir.path().join("dev/pool-policy.json");
+        let dev_digest = write_rules_policy(&dev_policy, &["claim", "release"]);
+        let loaded = eprfs_peer::RulesState {
+            digest,
+            policy: checkout,
+            loaded_at: 1,
+            pending: None,
+        };
+        let check = peer_rules_line(
+            dir.path(),
+            Ok(true),
+            Ok(Some(loaded)),
+            Some(dev_digest.clone()),
+        );
+        assert_eq!(check.state, State::Degraded);
+        let line = check.to_string();
+        assert!(line.contains("both are behind origin/dev"), "{line}");
+        assert!(line.contains(&dev_digest.short().to_string()), "{line}");
+    }
+    #[test]
+    fn peer_rules_drift_without_origin_dev_says_the_stale_side_is_unknown() {
+        let dir = tempfile::tempdir().unwrap();
+        let checkout = dir.path().join(crate::peer::POLICY_REL);
+        write_rules_policy(&checkout, &["claim"]);
+        let daemon_policy = dir.path().join("private/daemon/pool-policy.json");
+        let daemon_digest = write_rules_policy(&daemon_policy, &["claim", "release"]);
+        let loaded = eprfs_peer::RulesState {
+            digest: daemon_digest,
+            policy: daemon_policy,
+            loaded_at: 1,
+            pending: None,
+        };
+        let check = peer_rules_line(dir.path(), Ok(true), Ok(Some(loaded)), None);
+        assert_eq!(check.state, State::Degraded);
+        let line = check.to_string();
+        assert!(line.contains("which side is stale is unknown"), "{line}");
+        assert!(line.contains("fetch origin"), "{line}");
+    }
     #[test]
     fn peer_rules_are_unknown_when_the_persisted_digest_is_unreadable() {
         let dir = tempfile::tempdir().unwrap();
@@ -2321,6 +2461,7 @@ mod tests {
             dir.path(),
             Ok(true),
             Err("heads.json rules digest is unreadable".into()),
+            None,
         );
         assert_eq!(check.state, State::Unknown);
         assert_eq!(
