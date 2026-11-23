@@ -148,6 +148,7 @@ pub(crate) fn status_at(root: &Path, remember: bool) -> Vec<Check> {
         },
         repository_check(root),
         peer_daemon_check(root),
+        peer_rules_check(root),
         sibling_check(root, &current),
         supervisor_check(root),
         // Restart-arrival facts (backlog container-restart-strands-session-envelope).
@@ -1195,6 +1196,113 @@ fn peer_daemon_line() -> Check {
     }
 }
 
+const PEER_RULES_CHECK: &str = "peer rules";
+
+/// Whether the live peer daemon loaded the rules this checkout now declares. The daemon side is
+/// the digest and policy path it persisted in the head table; the checkout side is parsed and
+/// digested by the same [`eprfs_peer::Rules`] implementation the daemon uses.
+#[cfg(feature = "peer")]
+fn peer_rules_check(root: &Path) -> Check {
+    let running = serve_liveness().map(|(running, _)| running);
+    let loaded = saved_heads().map(|table| table.and_then(|table| table.rules));
+    peer_rules_line(root, running, loaded)
+}
+
+#[cfg(feature = "peer")]
+fn peer_rules_line(
+    root: &Path,
+    running: Result<bool, String>,
+    loaded: Result<Option<eprfs_peer::RulesState>, String>,
+) -> Check {
+    match running {
+        Ok(false) => return Check::new(
+            PEER_RULES_CHECK,
+            State::Unknown,
+            "no epr peer serve holds this device's serve lock, so no loaded rules can be compared",
+            Some(peer_daemon_cure()),
+        ),
+        Err(error) => {
+            return Check::new(
+                PEER_RULES_CHECK,
+                State::Unknown,
+                error,
+                Some("restore access to the epr peer directory".into()),
+            )
+        }
+        Ok(true) => {}
+    }
+    let loaded = match loaded {
+        Ok(Some(loaded)) => loaded,
+        Ok(None) => {
+            return Check::new(
+                PEER_RULES_CHECK,
+                State::Unknown,
+                "no daemon has recorded the rules it loaded",
+                Some("restart the daemon on the checkout policy (epr device supervise)".into()),
+            )
+        }
+        Err(error) => {
+            return Check::new(
+                PEER_RULES_CHECK,
+                State::Unknown,
+                error,
+                Some("restore access to the epr peer directory".into()),
+            )
+        }
+    };
+    let checkout_path = root.join(crate::peer::POLICY_REL);
+    let checkout = match eprfs_peer::Rules::from_policy_file(&checkout_path) {
+        Ok(rules) => rules.digest(),
+        Err(error) => {
+            return Check::new(
+                PEER_RULES_CHECK,
+                State::Unknown,
+                format!(
+                    "checkout {} rules digest cannot be read: {error}",
+                    crate::peer::POLICY_REL
+                ),
+                Some(format!("restore {}", crate::peer::POLICY_REL)),
+            )
+        }
+    };
+    if loaded.digest == checkout {
+        return Check::new(
+            PEER_RULES_CHECK,
+            State::Ok,
+            format!(
+                "daemon loaded {} = checkout pool-policy.json",
+                checkout.short()
+            ),
+            None,
+        );
+    }
+    Check::new(
+        PEER_RULES_CHECK,
+        State::Degraded,
+        format!(
+            "daemon loaded {} from {}, checkout {} is {}",
+            loaded.digest.short(),
+            loaded.policy.display(),
+            crate::peer::POLICY_REL,
+            checkout.short()
+        ),
+        Some(format!(
+            "restart the daemon on the checkout policy (epr device supervise), or refresh {} from it",
+            loaded.policy.display()
+        )),
+    )
+}
+
+#[cfg(not(feature = "peer"))]
+fn peer_rules_check(_root: &Path) -> Check {
+    Check::new(
+        PEER_RULES_CHECK,
+        State::Unknown,
+        "this epr was built without the peer feature, so it cannot read the peer's rules",
+        Some("use an epr build with peer support".into()),
+    )
+}
+
 fn peer_daemon_version_check(evidence: Option<String>) -> Check {
     let evidence = evidence.map(|e| format!("; {e}")).unwrap_or_default();
     let observed = (|| {
@@ -1649,6 +1757,19 @@ mod tests {
     use super::*;
     use serde_json::json;
     use std::os::unix::fs::PermissionsExt;
+
+    fn write_rules_policy(path: &Path, kinds: &[&str]) -> eprfs_peer::RulesDigest {
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(
+            path,
+            serde_json::to_vec_pretty(&json!({
+                "berth": {"channel": {"crosses": {"dev-berth-events@1": kinds}}}
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+        eprfs_peer::Rules::from_policy_file(path).unwrap().digest()
+    }
 
     // Parity: device_preflight_test.py -> native checks below:
     // seven_ok/order -> CLI schema/order; missing epr/brit + status -> candidates_and_absence;
@@ -2144,6 +2265,68 @@ mod tests {
         let alone = next_step(&checks);
         assert_eq!(alone.state, State::Ok);
         assert!(alone.detail.contains("no sibling in the roster"), "{alone}");
+    }
+    #[test]
+    fn peer_rules_match_the_checkout_policy() {
+        let dir = tempfile::tempdir().unwrap();
+        let checkout = dir.path().join(crate::peer::POLICY_REL);
+        let digest = write_rules_policy(&checkout, &["claim"]);
+        let loaded = eprfs_peer::RulesState {
+            digest: digest.clone(),
+            policy: checkout,
+            loaded_at: 1,
+            pending: None,
+        };
+        let check = peer_rules_line(dir.path(), Ok(true), Ok(Some(loaded)));
+        assert_eq!(check.state, State::Ok);
+        assert_eq!(
+            check.to_string(),
+            format!(
+                "ok peer rules: daemon loaded {} = checkout pool-policy.json",
+                digest.short()
+            )
+        );
+    }
+    #[test]
+    fn peer_rules_drift_names_both_digests_and_the_daemon_policy_path() {
+        let dir = tempfile::tempdir().unwrap();
+        let checkout = dir.path().join(crate::peer::POLICY_REL);
+        let checkout_digest = write_rules_policy(&checkout, &["claim", "release"]);
+        let daemon_policy = dir.path().join("private/daemon/pool-policy.json");
+        let daemon_digest = write_rules_policy(&daemon_policy, &["claim"]);
+        let loaded = eprfs_peer::RulesState {
+            digest: daemon_digest.clone(),
+            policy: daemon_policy.clone(),
+            loaded_at: 1,
+            pending: None,
+        };
+        let check = peer_rules_line(dir.path(), Ok(true), Ok(Some(loaded)));
+        assert_eq!(check.state, State::Degraded);
+        assert_eq!(
+            check.to_string(),
+            format!(
+                "degraded peer rules: daemon loaded {} from {}, checkout {} is {} — restart the daemon on the checkout policy (epr device supervise), or refresh {} from it",
+                daemon_digest.short(),
+                daemon_policy.display(),
+                crate::peer::POLICY_REL,
+                checkout_digest.short(),
+                daemon_policy.display()
+            )
+        );
+    }
+    #[test]
+    fn peer_rules_are_unknown_when_the_persisted_digest_is_unreadable() {
+        let dir = tempfile::tempdir().unwrap();
+        let check = peer_rules_line(
+            dir.path(),
+            Ok(true),
+            Err("heads.json rules digest is unreadable".into()),
+        );
+        assert_eq!(check.state, State::Unknown);
+        assert_eq!(
+            check.to_string(),
+            "unknown peer rules: heads.json rules digest is unreadable — restore access to the epr peer directory"
+        );
     }
     #[test]
     fn published_refs_are_the_declared_remote_tracking_refs_only() {

@@ -120,6 +120,7 @@ fn status_keeps_dependency_order_and_does_not_mint_a_key() {
             "berth moored",
             "repository trusted",
             "peer daemon",
+            "peer rules",
             "sibling exchange",
             "device supervisor",
             "rust toolchain",
@@ -132,31 +133,32 @@ fn status_keeps_dependency_order_and_does_not_mint_a_key() {
         ]
     );
     // A status read runs no probe: with nothing recorded, the sysroot is not yet observed.
-    assert_eq!(checks[12]["state"], "unknown");
-    assert!(checks[12]["detail"]
+    assert_eq!(checks[13]["state"], "unknown");
+    assert!(checks[13]["detail"]
         .as_str()
         .unwrap()
         .starts_with("not yet observed; an arrival records it"));
-    assert_eq!(checks[12]["cure"], "epr device arrive");
+    assert_eq!(checks[13]["cure"], "epr device arrive");
     // No serve lock is held: siblings read this device as silent.
     assert_eq!(checks[8]["state"], "degraded");
     assert!(checks[8]["detail"].as_str().unwrap().contains("silent"));
+    assert_eq!(checks[9]["state"], "unknown");
     // No device stands here, so there is no sibling to exchange with; never a refusal.
-    assert_eq!(checks[9]["state"], "degraded");
-    assert!(checks[9]["detail"]
+    assert_eq!(checks[10]["state"], "degraded");
+    assert!(checks[10]["detail"]
         .as_str()
         .unwrap()
         .contains("stands on no roster"));
     // The fixture pins no toolchain and declares no governed hooks.
-    assert_eq!(checks[11]["state"], "ok");
-    assert_eq!(checks[13]["state"], "ok");
+    assert_eq!(checks[12]["state"], "ok");
+    assert_eq!(checks[14]["state"], "ok");
     assert_eq!(checks[2]["state"], "refused");
     assert_eq!(checks[4]["state"], "degraded");
     assert_eq!(checks[5]["state"], "degraded");
     assert_eq!(checks[6]["state"], "degraded");
     // The committed base declares no process: nothing to supervise is not a lack.
-    assert_eq!(checks[10]["state"], "ok");
-    assert!(checks[10]["cure"].is_null());
+    assert_eq!(checks[11]["state"], "ok");
+    assert!(checks[11]["cure"].is_null());
     // The last line repeats the first owed ceremony cure, and never refuses.
     let next = checks.last().unwrap();
     assert_ne!(next["state"], "refused");
