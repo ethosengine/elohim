@@ -2814,3 +2814,67 @@ to 30 (`genesis/agentic/compute/operations.md` records the answers). Still owed 
 the warning some days ahead. The test prints a diagnostic under 48 hours, which nobody reads in a
 green run; backlog `runner-grant-expiry-native-pre-expiry-sense` holds the native form. The next
 expiry is 2026-12-23T16:00:00Z.
+
+## Row 75, delta 4 (2026-11-23): the roll landed, and what is newly parked
+
+The `[edge:roll]` landing is on dev: `179814d6b..ac4df62d7`, about 19:20Z, after a first push
+stopped at 16:27Z (row 36, delta). The follow-up `ac4df62d7..b8f60c283` landed the lock fix and
+the lander-wait fix. The result of the Edge roll was not known when this was written
+(`elohim-edge/dev` #1922 was still building). Items 1 to 4 of row 75 rode the roll; item 5 (row 74)
+is still owed. Newly parked for the next deliberate roll, as reported by ethosengine session
+d6cfb7e1:
+
+- the blob-store owner-lock fix `0f0432bd6` (branch `blob-owner-lock`; `src/store.rs` selects Edge:
+  `REFUSED fleet-roll … elohim-edge stale steps cargo-build-storage, build-edge-image,
+  deploy-manifests`); eprfs gate green there; see row 86;
+- the native `epr session stasis observe` verb `8168a9383` on `stasis/tool-pending-observed`, not
+  pushed, which touches `device-runtime`;
+- the remaining raw lock sites: `peer.rs` `ServeLock` (daemon-lifetime, no `Drop`),
+  `device/supervise.rs` `RestartTurn`, `epr-lsp` `socket.rs` (a private copy with no patience) and
+  two in `elohim-storage`; its design moves them onto the shared guard with their own patience;
+- shem's watcher branch `agentic/held-tool-watch` (`fa87fdf5b`), now a sensor that calls that verb
+  and records nothing until it lands.
+
+## Row 84 — a device's main checkout behind dev changes what every worktree push on it does
+
+On ethosengine `core.hooksPath` names the main checkout's `.husky/_`. That checkout is on branch
+`memory/ceremony-2026-11-20` at `6b10ee05f`, which predates `bd6a23772` (the `self/` hand-over
+branch, `pre-push.bash:1638` on dev). So every worktree push there runs the old hook and selects
+the full gate set against origin/dev: two `self/` hand-overs each printed 36 gates, about 126
+minutes, before they were stopped (as reported by ethosengine). The cure per push is
+`-c core.hooksPath=<worktree>/.husky/_`; with it the next hand-overs ran six `[pre-push]` lines and
+no gates. The durable cure is to move that main checkout forward, which is the steward's call
+because it holds a memory branch. The same class has cost hours before: row 82 above records shem's
+main checkout 265 commits behind dev, and on 2026-11-19 it was 134 commits behind.
+
+## Row 85 — a receiver's allow-list drops a crossing kind without a line, and the event is not refolded
+
+The F4-ask Verify (journal `sprints/2026-11-23-f4-ask/journal.md`). (a) Ethosengine's peer daemon
+ran rules `4c917dfa` from a private copy `genesis/local-dev/one-image/daemon/pool-policy.json`
+dated 13 Nov, so its allow-list for `dev-landing@1` lacked `misses` and `carry`. Seven misses
+crossed and were dropped, with no line on either device; `epr peer intents --misses` read "no open
+miss" and `epr peer status` said the daemon CID differed from the CLI. (b) The receiver had the
+full bytes when the allow-list skipped them (the check runs after receipt), and its fold had acked
+past those sequence numbers, so refreshing the policy and restarting did not bring them back; shem
+posted again. Ethosengine's design for the loss, a proposal and not built: hold the ack (rejected,
+one stale kind would stop every later event from that device); refold from the sender on a policy
+change; or, recommended, a bounded local quarantine of dropped events, capped by count and age
+(for example 10,000 events or 7 days, oldest evicted with a counted eviction), re-run through the
+allow-list at daemon start and whenever the rules digest changes. Its cost is disk and a boundary
+question for the steward: holding events the policy did not admit, unfolded. Missing nodes, in
+mintable shape: stations `Crossing-drop-seen` and `Daemon-policy-current` in the peers plan,
+section 8.
+
+## Row 86 — three flakes the load of a landing exposed
+
+- `sysroot_unobservable_arrival_degrades_and_never_writes`: a lock released only by close outlives
+  its holder while a forked child holds a copy. Ethosengine, whole `epr-cli` library at eight
+  threads: 0 of 100 on bare dev `179814d6b`, 2 of 100 on the roll, 0 of 100 with the fix; shem's 30
+  of 30 on the 69 `device::` tests had missed it. Fixed (`lock_sysroot` on the shared guard) in the
+  follow-up.
+- The blob-store `owner.lock` (`tests/multi_process.rs:537`, `OwnerHeld`): the same class.
+  Reproduced 2 of 11 rounds under load before the fix and 30 of 30 green after (`0f0432bd6`). Fixed
+  on its branch and parked for the next roll (row 75, delta 4).
+- `discovery_uses_the_one_node_that_answers_and_never_guesses`: 1 of 100 whole-library runs at
+  eight threads, then 0 of 300; the panic text was not kept, so the cause is a judgment. The
+  diagnostic `fe619548f` landed so that the next red names its own cause.

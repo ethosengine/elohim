@@ -685,6 +685,22 @@ input is touched.
 Verify: one landing where the hand-over push posts the misses, a second device's log shows it took
 one from `epr peer intents` with no note sent, and the lander's log shows the reuse line for it.
 
+State, 2026-11-23 (after the Verify): the station stays UNTICKED. The landing is on dev
+(`179814d6b..ac4df62d7`, `[edge:roll]` declared) and so is its follow-up (`ac4df62d7..b8f60c283`).
+The Verify ran on the follow-up with the second device taking two misses. Met: a hand-over of
+`b8f60c283` posted misses on intent `bafyreieoux5`; ethosengine, after its crossing was repaired,
+listed them with `epr peer intents --misses` and took two with carries (`eprfs` and
+`orchestrator-tree`); it gated both green on that closure; the dev push of `b8f60c283` from shem
+printed `[gate] eprfs reused: green in 819 s on the sibling at b8f60c283 (… independence: sibling)`
+and the same line for `orchestrator-tree` (green in 80 s). Not met: "with no note sent" (the
+integrator sent a cue note, and nothing on a device acts on a folded miss without a session); the
+first posting was dropped by the receiver's allow-list and not refolded, so the misses were posted
+a second time; the lander's wait was stood in for by hand, because the gate runner as landed never
+passed `--max-wait-s` (fixed as `6e69008f5`); the hook counted 7 misses and the second device read
+6, the difference being `orchestrator`, whose gate the dev push did re-run, cause not established.
+The full account is in `sprints/2026-11-23-f4-ask/journal.md`. Four stations below name what is
+missing.
+
 Read against an outside pattern (2026-11-22, session 4ce727b3, at the steward's request). The
 article "Building always-on agents" (claude.com, 2026-11-13) builds an unattended agent from an
 event inbox, timers, memory, permissions and an outbox, and a practitioners' thread under it adds
@@ -783,6 +799,32 @@ Verify: `submodule update --init` in a new worktree with GitHub unreachable succ
 F6-probe's first refusal: `epr identity standing` needs a running storage node. Layer (b), the brit signer to `agent_cid` binding, is F6's existing part and is not this station.
 
 Verify: `epr identity standing` on ethosengine with no node answers or names the node.
+
+Four stations named by the F4-ask Verify of 2026-11-23 (appended; the order above is unchanged):
+
+- [ ] **F4-ask-unattended — a device takes a posted miss with no session being told** (serves sprint-lands-each-closure-once)
+
+The Verify's step "with no note sent" was not met: the integrator sent a cue note, and nothing on a device acts on a folded miss without a session at its inbox.
+
+Verify: a miss posted by a hand-over is taken, gated and answered by the second device with no note sent to it and no session cued, and the lander's log shows the reuse line.
+
+- [ ] **Crossing-drop-seen — an event a receiver's allow-list refuses is counted and shown on both ends, and is not lost** (serves devices-share-one-berth)
+
+Seven misses crossed while ethosengine's allow-list dropped both new kinds with no line on either device, and its fold had acked past them (`epr peer intents --misses` read "no open miss").
+
+Verify: with a receiver whose allow-list lacks a kind, a sender's event of that kind shows as dropped in `epr peer status` on both devices, and is folded when the allow-list is refreshed, with no re-post.
+
+- [ ] **Daemon-policy-current — a peer daemon's loaded rules are the checkout's policy, or status says they differ** (serves devices-share-one-berth)
+
+Ethosengine's daemon ran rules `4c917dfa` from a private copy dated 13 Nov, while dev's `pool-policy.json` crosses had gained `misses` and `carry`.
+
+Verify: `just status device` on a device whose daemon holds an older copy of the policy than its checkout prints the difference and its cure.
+
+- [ ] **Fence-scope — a governance-changing push refuses a sibling verdict only for gates whose own judge or recipe changed, ruled and adversarially reviewed before it is built** (serves push-gate-pays-once)
+
+Measured by ethosengine on the landing head: of 16 selected and enrolled projects, 1 had its own judge changed and 15 were refused only by the whole-push fence. This is an integrity-rule change and needs a ruling and an adversarial review first.
+
+Verify: a push that changes only a governance path reuses a sibling's green for each gate whose judge and recipe did not change, and the lander's log names each refusal's own cause.
 
 ## 9. Reconciliation 2026-11-21: the market reading
 

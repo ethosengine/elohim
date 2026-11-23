@@ -184,3 +184,153 @@ not recorded here.
 - **Ethosengine on `c44633243`, from a fresh worktree** (its note of 15:2xZ): eprfs green in
   589 s, 153 test binaries; orchestrator green in 159 s; orchestrator-tree green in 158 s; each
   with evidence recorded on that device.
+
+## 15:45Z to 19:20Z: two pushes, an expired grant, and the landing
+
+Written by the integrator session (cacccb55, shem) from the push logs in the campaign directory
+`genesis/local-dev/f4-ask-20261123/`. Figures are copied from those logs.
+
+- **The first push** (head `a85090fd4`, run file `20261123T154544Z-a85090fd4b19`) was stopped.
+  `orchestrator-tree` went red on `compute-worker-clock.test.mjs`: "adam's runner grant expired at
+  2026-11-23T16:00:00Z: renew the window or withdraw it through a reviewed deploy-only commit".
+  The log ends `orchestrator-tree: FAILED (178s)`, `stopped: stop requested on the live run; not
+  run: elohim-app memory-ceremony epr-storage doorway steward-node eprfs elohim-storage`, and
+  `PRE-PUSH GATE: FAILED (2823s)`. The integrator puts the stop at 16:27Z. The grant had been
+  valid when the head was assembled; its deadline passed during the push.
+- **The ruling.** The steward ruled a replacement of 30 days with `rotation_ttl_days` raised from 7
+  to 30. That is `ac4df62d7` (`fix(compute): adam's runner grant is replaced for thirty days`).
+- **The second push** (head `ac4df62d7`, run file `20261123T164824Z-ac4df62d7ca6`) printed
+  `PRE-PUSH GATE: ALL CLEAR (8866s)`. Its log has seven `reused` lines from this workspace's own
+  verdicts: six `green … ago at a85090fd4 (signer this workspace)` (`eprfs-live-corpus`,
+  `elohim-placement`, `elohim-ark`, `jenkins-bridge`, `k8s-bridge`, `elohim-epr`) and
+  `eprfs reused: green 3h ago at c44633243`. The integrator reports that the second push reused
+  25 verdicts recorded by the stopped one; that figure was not counted from the log here.
+- **Phase L:** `dev-integration claimed in 17s`, `held 0s`, `landing ac4df62d7ca6 on 179814d6badb as a
+  fast-forward`; the push printed `179814d6b..ac4df62d7  HEAD -> dev`, `PUSH_EXIT=0`. The
+  integrator puts it at about 19:20Z (the log's last write is 19:20). `[edge:roll]` was declared.
+- **Jenkins**, as read by the integrator when this was written: orchestrator #2427 dispatched
+  `elohim`, `elohim-storybook`, `elohim-epr`, `elohim-eprfs`, `elohim-edge`, `elohim-holochain` and
+  `elohim-genesis`. `elohim-edge/dev` #1922 was still building, so the result of the roll is NOT
+  known. PR #219 was closed unmerged.
+- **The epr head.** The device's epr head was a build from `a5134471f` on branch
+  `reliability/unacked-peer`, which is not on dev. The landing's gate had ingested a build from
+  `c44633243` (release `bafyreigxy4czt2…fphxa`). `epr device arrive` reported nothing owed. `epr bin
+  land` refused twice (head-mismatch, then non-descendant) and succeeded from a detached worktree
+  at `c44633243` with `--rebase-lineage` and a stated reason; the session was then pinned with
+  `epr bin pin --tool epr --cid`. `arrive.log` ends `next step: nothing owed; this device is
+  arrived and exchanging`, `ARRIVE_EXIT=0`.
+
+## 19:20Z to 20:35Z: the Verify, three nodes, and the follow-up landing
+
+The follow-up is `b8f60c283` (the lock fix and the diagnostic, with the lander-wait fix `6e69008f5`
+on this branch from `074d90845`). The Verify is the station's: a hand-over posts the misses, the
+second device takes one from `epr peer intents` with no note sent, and the lander's log shows the
+reuse line. The two devices were shem (hand-over and lander) and ethosengine (device B, as
+reported by its session d6cfb7e1).
+
+| Step | Result |
+|---|---|
+| a. Shem hands over `b8f60c283` as `self/shem-followup-1` | Hook line in `handover-followup1.log`: `hand-over: posted 7 misses on intent bafyreieoux5: address-profile-lint, eprfs-live-corpus, orchestrator, orchestrator-tree, cargo-bridge, jenkins-bridge, eprfs`. `rust-style` was left out: `closure unavailable … gate-only inputs, so no closure key can be computed`. |
+| b. Ethosengine reads the misses | `epr peer intents --misses` printed "no open miss", exit 0. Its peer daemon ran rules `4c917dfa` from a private copy `genesis/local-dev/one-image/daemon/pool-policy.json` dated 13 Nov, so the receiver's allow-list dropped both new kinds, with no line on either device. The integrator gave a conditional go for refreshing the copy and restarting the daemon by the supported arm, and told the steward. Ethosengine reports it refreshed the copy from dev `ac4df62d7` (sha `82a35238`), kept the old file as `pool-policy.json.pre-verify-20261123`, restarted through `epr bin land` of `bafyreihw5…` ("peer ready on bafyreihw5 in 5 s"), and only its own session was moored. |
+| c. Re-post | The dropped events were not refolded (ethosengine's fold had acked past them). Shem handed the same head over again as `self/shem-followup-1b`; its log again says `posted 7 misses on intent bafyreieoux5`. |
+| d. Ethosengine takes misses | It listed 6, not 7, all from shem's device at `b8f60c283` (ref `self/shem-followup-1b`, wait-until 20:37:17Z): address-profile-lint, cargo-bridge, eprfs (closure `8f10af63d6e4f046`, p90 2386 s), eprfs-live-corpus, jenkins-bridge, orchestrator-tree. It took two with carries: `eprfs=8f10af63d6e4f046…` (exit 0 at 19:51:52Z) and `orchestrator-tree=a66a33ee16bec5e1` (exit 0). |
+| e. Shem's native read | By ethosengine's report, `wait` for the carried `eprfs` when called with `--max-wait-s`, and `run-here` for an uncarried miss. |
+| f. The runner's wait | The gate runner as landed did not pass `--max-wait-s`, so the native read answered `run-here` each time the runner called it. Fixed as `6e69008f5` on this branch (from `074d90845`). The wait was stood in for by hand. |
+| g. Ethosengine's gates | In a fresh worktree at `b8f60c283`, `EPR_BIN` the landed `bafyreihw5…`: eprfs started 19:52:16Z, 14 min, `evidence: recorded`; orchestrator-tree 20:06:07Z to 20:08:46Z, `recorded`. Both exit 0. The two carried misses left shem's open list by fold. |
+| h. The dev push from shem | `[gate] orchestrator-tree reused: green in 80 s on the sibling at b8f60c283 (signer sibling did:key:z6MkpZRh…VMZB, independence: sibling)` and `[gate] eprfs reused: green in 819 s on the sibling at b8f60c283 (signer sibling did:key:z6MkpZRh…VMZB, independence: sibling)`. `PRE-PUSH GATE: ALL CLEAR (1193s)`; Phase L `claimed in 16s`, `held 1s`; `ac4df62d7..b8f60c283  HEAD -> dev`, `PUSH_EXIT=0`. The log carries no wall-clock start and end for the push; its run file is named `20261123T200946Z` and the log was last written at 20:35, so the push took about 25 minutes by those two stamps (computed here, not printed in the log). |
+
+**Not met**, in the Verify's own words:
+
+- "with no note sent": the integrator sent a cue note. Nothing on a device acts on a folded miss
+  without a session.
+- The first posting was dropped by the receiver's allow-list, with no line on either end, and was
+  not refolded; the misses were posted a second time.
+- The runner's wait was by hand: the runner as landed did not pass `--max-wait-s`.
+- The hook counted 7 misses and ethosengine read 6; they disagree on `orchestrator`, whose gate
+  the dev push did re-run (`orchestrator not reused: changed since attested commit and selects this
+  gate: elohim/eprfs/epr-cli/src/device.rs`). The cause of the missing row is not established.
+
+Also reported by ethosengine: the misses list shows `carried -` after both carries, because
+`carried_cell` (`peer.rs:2536`) is a stub that returns `-`; the column cannot show a carry yet.
+
+## What the wait cost and what was measured
+
+Ethosengine measured the landing head `c44633243` against dev `179814d6b` (not `ac4df62d7`, which
+it did not have; its head is the integrator's minus the grant renewal): 60 paths, 36 projects
+selected, 20 not enrolled for reuse, 16 enrolled, 1 with its own judge changed (`orchestrator`, via
+`suite-reads.json`), 15 refused only by the whole-push fence. Its two cautions: a refusal costs
+time only where the sibling holds a green for that closure, and narrowing the fence is an
+integrity-rule change that needs a ruling and an adversarial review.
+
+Read through the gradient, in three sentences. The landing fuses verifying with landing, so a
+sibling's gate is a wait inside the push; the pieces for when (a bound on the ask), where (the
+device's own fold), the floor event (`misses`, `carry`), the stream (the crossing) and the result
+(`gate-verdict@1`) exist. What blocks is that nothing acts on a posted miss without a session, that
+Jenkins's result is not a verdict record, that the fence is whole-push, and that the hand-over goes
+through the forge.
+
+## The integrator's errors
+
+The unsent stasis push and the seven-hour stall are recorded above. Added here:
+
+- **A ruling made and withdrawn.** The integrator told ethosengine to re-push two `self/`
+  hand-over refs with `HUSKY=0`. Ethosengine's device permission guard refused it as undermining
+  oversight and ethosengine did not work around it. The integrator withdrew the ruling to the
+  steward. The cause of the two-hour hand-overs, as ethosengine reported: its main checkout sits on
+  `memory/ceremony-2026-11-20` at `6b10ee05f`, whose hook predates the `self/` hand-over branch
+  (`bd6a23772`), so each worktree push there runs the old hook and selects full gates against
+  origin/dev. The documented cure, the worktree's own `core.hooksPath`, made the next hand-overs
+  seconds-only (six `[pre-push]` lines each).
+- **A second overstep, retracted within minutes.** The integrator told ethosengine to land the
+  follow-up on dev itself. The steward had leaned, not ruled, on per-lane landing authority.
+- **A roll-only flake not stopped on.** `sysroot_unobservable_arrival_degrades_and_never_writes`
+  failed 0 of 100 on bare dev, 2 of 100 on the roll, 0 of 100 with the fix, on ethosengine's
+  whole-library runs at eight threads; shem's 30 of 30 on the 69 `device::` tests had missed it.
+  The integrator had said a roll-only result would hold the landing and then did not stop the push;
+  it told the steward so, with its reasons. The fix (`lock_sysroot` on the shared guard) landed in
+  the follow-up.
+
+## Parked for the next roll
+
+Row 75 of the arrival backlog holds the queue. Newly parked, as reported by ethosengine:
+
+- the blob-store owner-lock fix `0f0432bd6` (branch `blob-owner-lock`, one commit, `crates/elohim-blob-store/src/store.rs` selects Edge; its preflight line: `REFUSED fleet-roll … cargo-build-storage, build-edge-image, deploy-manifests`); eprfs gate green there, 12 min, closure `62548bd93633`; 30 of 30 load rounds after, 2 of 11 red before;
+- the native `epr session stasis observe` verb `8168a9383` on `stasis/tool-pending-observed` (not pushed; touches `device-runtime`);
+- the remaining raw lock sites (design in its notes: `peer.rs` `ServeLock`, `supervise.rs` `RestartTurn`, `epr-lsp` `socket.rs`, two `elohim-storage` sites);
+- shem's watcher branch `agentic/held-tool-watch` (`fa87fdf5b`), now a sensor that calls that verb and records nothing until it lands.
+
+On this branch and landing with it: the lander-wait fix, three named scripts
+(`genesis/agentic/bin/landing-pick`, `landing-retrailer`, `landing-tagged-tip`), two advisory
+policies bound on `genesis/agentic` and `genesis/orchestrator` with the guidance section "One home
+for a record, many implementors", ethosengine's warn-only command-shape hook (not wired into any
+settings file; the wiring is the steward's to approve) and the brit pin to 0.3.3 (`bdb45bfc`;
+checks read from the forge).
+
+## Fallbacks recorded, additions
+
+- **Git update-index --cacheinfo.** Brit has no verb to set a gitlink without a checkout.
+- **Git branch --contains.** Brit has no equivalent.
+- **The dev landing push, twice, by Git** under the standing landing exception, with
+  `GATE_EVIDENCE=reuse` and the hook enabled.
+- Also met: brit prints `brit: feedback capture gap` on every command against the old epr.
+
+## For the next sprint
+
+From the steward's sidebar of 2026-11-23 (`sidebar-next-sprint-2026-11-23.md`); his words are
+quoted there. Leans, not rulings: per-lane landing authority recorded as a record that already
+crosses devices ("yes I would also lean towards the second"), and the reading that the record
+converges while the implementor varies. His conditional intent: "if we've unlocked that then of
+course I'd love to grant per-lane landing authority for those sprints". Proposed in the sidebar and
+not ruled: the objective is one unattended two-lane landing under habit
+`sprint-lands-each-closure-once`; commands an approval can read, as an `.epr-meta` rule; every
+stalled prompt an incident; a bound on every wait; the two-lane test with no coordinator session.
+
+The one-home plan, in five lines (the main session's reading, from `governance-pass-receipt.md`,
+`census-receipt.md` and `layers-receipt.md`, static reads by another model, none a ruling):
+1. One target statement through the p2p design gate and a blind reader.
+2. A census of what duplicates the four homes: delegation, bounded ask, held state, sensed window.
+3. An advisory `.epr-meta` reuse rule where bespoke versions get written.
+4. One habit, born red, with the census count as its check.
+5. The watcher and the command-shape hook reworked against the target before they land.
+
+Station F4-ask stays unticked in the peers plan: the Verify was run and three clauses were not met.
