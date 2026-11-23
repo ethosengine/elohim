@@ -21,7 +21,7 @@ use eprfs_core::{BlobCid, TreeEntry, TreeEntryKind, TreeLimits, TreePath, View};
 use iroh::endpoint::{Connection, VarInt};
 use iroh::{Endpoint, NodeAddr};
 
-use crate::allow::{via_device, CrossingAllowList, VIA_SLOT};
+use crate::allow::{crossing_kind, via_device, CrossingAllowList, VIA_SLOT};
 use crate::channel::{CHANNEL_EVENTS, CHANNEL_NACKS};
 use crate::error::PeerError;
 use crate::gate::SharedAdmission;
@@ -124,8 +124,18 @@ pub struct FoldOutcome {
     pub refused: u64,
     /// Refused event CIDs, for this device's nack leaf for their author.
     pub refused_cids: Vec<Cid>,
+    /// Refused events with the crossing identity their sender supplied.
+    pub refused_crossings: Vec<RefusedCrossing>,
     /// Original CIDs now held from this device, whether appended by this fold or already present.
     pub held_cids: Vec<Cid>,
+}
+
+/// One event refused by the receiving device's crossing allow-list.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RefusedCrossing {
+    pub cid: Cid,
+    pub measure: String,
+    pub kind: String,
 }
 
 /// Read the events of the channel tree at `root` on an open tier connection that `known` does not
@@ -424,13 +434,25 @@ fn fold_events_admitted(
         });
     }
     let mut outcome = FoldOutcome::default();
+    let mut received = HashSet::new();
     for ChannelEvent { cid, event } in events {
         if atom_cid(event).map_err(PeerError::FlowStore)? != *cid {
             return Err(integrity(format!("event {cid} is not at its own CID")));
         }
+        if !received.insert(*cid) {
+            outcome.already += 1;
+            continue;
+        }
         if !allow.admits(event) {
             outcome.refused += 1;
             outcome.refused_cids.push(*cid);
+            if let Some((measure, kind)) = crossing_kind(event) {
+                outcome.refused_crossings.push(RefusedCrossing {
+                    cid: *cid,
+                    measure: measure.to_owned(),
+                    kind: kind.to_owned(),
+                });
+            }
             continue;
         }
         let folded = with_via(event, device);

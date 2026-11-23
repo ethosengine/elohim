@@ -1121,6 +1121,9 @@ struct StatusOutcome {
     rules: Option<RulesStatus>,
     devices: Vec<DeviceStatus>,
     dropped: eprfs_peer::DroppedHeads,
+    /// Events this receiver refused because its loaded crossing list did not admit them.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    crossing_drops: Vec<CrossingDropStatus>,
     channel: eprfs_peer::ChannelCounters,
     /// Connections this device's daemon refused, per node id, with the device the roster names
     /// for it (a contested device's old endpoint row still names it); `None` for a stranger.
@@ -1138,6 +1141,43 @@ struct StatusOutcome {
     /// The last `epr bin follow` attempt per registered tool, from each store's private
     /// `follow.json`; `state` names never-attempted, interrupted and corrupt records apart.
     follow_outcomes: Vec<follow_status::ToolFollow>,
+}
+
+/// One persisted receiver-side crossing refusal as `status --json` reports it.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct CrossingDropStatus {
+    device: String,
+    measure: String,
+    kind: String,
+    count: u64,
+    first_seen: u64,
+    last_seen: u64,
+}
+
+fn crossing_drop_status(table: &HeadTable) -> Vec<CrossingDropStatus> {
+    table
+        .crossing_drop_entries()
+        .filter(|(_, _, _, drop)| drop.count > 0)
+        .map(|(device, measure, kind, drop)| CrossingDropStatus {
+            device: device.to_owned(),
+            measure: measure.to_owned(),
+            kind: kind.to_owned(),
+            count: drop.count,
+            first_seen: drop.first_seen,
+            last_seen: drop.last_seen,
+        })
+        .collect()
+}
+
+fn crossing_drop_line(drop: &CrossingDropStatus) -> String {
+    format!(
+        "dropped {} events of kind {}/{} from {}: not in this device's crosses",
+        drop.count,
+        drop.measure,
+        drop.kind,
+        short(&drop.device)
+    )
 }
 
 /// One node id's refused connections, as `status` reports them.
@@ -1270,6 +1310,7 @@ fn status(options: &Options) -> PeerResult<ExitCode> {
             )
         });
     let follow_outcomes = follow_status::follow_outcomes(&crate::bin::daemon_proc_root());
+    let crossing_drops = crossing_drop_status(&table);
     let outcome = StatusOutcome {
         follow_outcomes,
         artifact_gate,
@@ -1286,6 +1327,7 @@ fn status(options: &Options) -> PeerResult<ExitCode> {
         rules: rules_status(table.rules.as_ref()),
         devices,
         dropped: table.dropped,
+        crossing_drops,
         channel: table.channel,
         refused_connections,
     };
@@ -1370,6 +1412,9 @@ fn render(outcome: &StatusOutcome) {
         "dropped heads  unadmitted {}  forged {}  rollback {}  replayed {}  malformed {}",
         d.unadmitted, d.forged, d.rollback, d.replayed, d.malformed
     );
+    for drop in &outcome.crossing_drops {
+        println!("{}", crossing_drop_line(drop));
+    }
     if !outcome.refused_connections.is_empty() || outcome.refused_strangers > 0 {
         let mut refused: Vec<String> = outcome
             .refused_connections
@@ -2732,6 +2777,35 @@ pub fn fold(options: &Options, from: &str, root: &str) -> PeerResult<eprfs_peer:
 #[cfg(test)]
 mod status_contract {
     #[test]
+    fn peer_status_renders_persisted_receiver_crossing_drops() {
+        use super::*;
+        let dir = tempfile::tempdir().expect("state dir");
+        let mut table = HeadTable::default();
+        table.record_crossing_drop("did:key:zSender", "dev-landing@1", "misses", 11);
+        table.record_crossing_drop("did:key:zSender", "dev-landing@1", "misses", 19);
+        table.save(dir.path()).expect("persist counts");
+
+        let loaded = HeadTable::load(dir.path()).expect("load counts");
+        let rows = crossing_drop_status(&loaded);
+        assert_eq!(
+            serde_json::to_value(&rows).expect("json"),
+            serde_json::json!([{
+                "device": "did:key:zSender",
+                "measure": "dev-landing@1",
+                "kind": "misses",
+                "count": 2,
+                "firstSeen": 11,
+                "lastSeen": 19
+            }])
+        );
+        assert_eq!(
+            crossing_drop_line(&rows[0]),
+            "dropped 2 events of kind dev-landing@1/misses from did:key:zSender: not in this \
+             device's crosses"
+        );
+    }
+
+    #[test]
     fn peer_machine_status_contract_includes_daemon_identity() {
         use super::*;
         let cid = eprfs_core::BlobCid::compute_raw(b"daemon").to_string();
@@ -2755,6 +2829,7 @@ mod status_contract {
                 acked: None,
             }],
             dropped: Default::default(),
+            crossing_drops: Vec::new(),
             channel: Default::default(),
             refused_connections: vec![RefusedConnections {
                 node_id: "stranger".into(),

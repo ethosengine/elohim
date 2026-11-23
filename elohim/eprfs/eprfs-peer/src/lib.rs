@@ -111,7 +111,7 @@ pub use fetch::{
 pub use fold::{
     fetch_channel, fold_events, fold_root, fold_root_planned, folded_from, ChannelEvent, Fetched,
     FoldLimits, FoldOutcome, FoldPlan, FoldReader, FoldReport, FoldTarget, Quarantined,
-    MAX_EVENT_BYTES, MAX_FOLD_BYTES, MAX_FOLD_EVENTS,
+    RefusedCrossing, MAX_EVENT_BYTES, MAX_FOLD_BYTES, MAX_FOLD_EVENTS,
 };
 pub use gate::{
     serve_blob_standing, ServeScope, Served, SharedAdmission, StewardDevicesGate, WholeStoreScope,
@@ -119,8 +119,8 @@ pub use gate::{
 pub use gossip::GatedGossip;
 pub use head::{ChannelHead, HeadSigner, MAX_HEAD_BYTES};
 pub use head_table::{
-    ChannelCounters, DeviceHead, DroppedHeads, HeadTable, NackLeaf, NackState, OwnAnnounce,
-    StorePlace, HEAD_TABLE_VERSION, MAX_NACK_CIDS, OWN_LOG_LEN,
+    ChannelCounters, CrossingDrop, CrossingDrops, DeviceHead, DroppedHeads, HeadTable, NackLeaf,
+    NackState, OwnAnnounce, StorePlace, HEAD_TABLE_VERSION, MAX_NACK_CIDS, OWN_LOG_LEN,
 };
 /// The iroh address types a dialer names peers with, so a consumer needs no iroh dependency of
 /// its own.

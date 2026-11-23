@@ -120,10 +120,7 @@ impl CrossingAllowList {
         if via_device(event).is_some() {
             return false;
         }
-        let (Some(measure), Some(kind)) = (
-            single_slot(event, MEASURE_SLOT),
-            single_slot(event, KIND_SLOT),
-        ) else {
+        let Some((measure, kind)) = crossing_kind(event) else {
             return false;
         };
         self.crosses
@@ -171,6 +168,14 @@ impl CrossingAllowList {
     pub(crate) fn crosses(&self) -> &BTreeMap<String, BTreeSet<String>> {
         &self.crosses
     }
+}
+
+/// The event's single crossing measure and kind, when both are well formed.
+pub(crate) fn crossing_kind(event: &FlowEvent) -> Option<(&str, &str)> {
+    Some((
+        single_slot(event, MEASURE_SLOT)?,
+        single_slot(event, KIND_SLOT)?,
+    ))
 }
 
 /// Records of one measure and kind that this device wrote to cross and its loaded allow-list
