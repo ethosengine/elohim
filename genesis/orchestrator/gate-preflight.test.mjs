@@ -642,6 +642,7 @@ test('epr-bin: different candidate refuses with both paths, cost and cure; overr
     assert.ok(r.why.includes(inherited));
     assert.ok(r.why.includes(current));
     assert.match(r.why, /native evaluator; an older one makes evidence unavailable, so nothing is reused/);
+    assert.match(r.why, /a new Claude session unsets it at start \(device-arrive\)$/);
     assert.equal(r.cure, 'unset EPR_BIN');
   }
 });
@@ -652,7 +653,7 @@ test('epr-bin: unreadable current warns, including a malformed authoritative hea
   put(root, 'store/epr/current.json', '{broken');
   const r = checkEprBin({ env: candidate });
   assert.equal(r.level, 'WARN');
-  assert.equal(r.why, "EPR_BIN is set (/candidate/epr) and this device's current epr could not be read");
+  assert.equal(r.why, "EPR_BIN is set (/candidate/epr) and this device's current epr could not be read; a new Claude session unsets it at start (device-arrive)");
   assert.equal(checkEprBin({ env: { ...candidate, HOME: join(root, 'absent') } }).level, 'WARN');
 });
 
