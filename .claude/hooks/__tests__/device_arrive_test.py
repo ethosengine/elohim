@@ -70,7 +70,7 @@ class DeviceArriveTest(unittest.TestCase):
         env_file.write_text("KEEP=1\n")
         old = "/fixture/old/epr"
 
-        result = self.run_hook(preflight_exit=1, epr_bin=old, env_file=env_file)
+        result = self.run_hook(preflight_exit=3, epr_bin=old, env_file=env_file)
 
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(env_file.read_text(), "KEEP=1\nunset EPR_BIN\n")
@@ -104,7 +104,7 @@ class DeviceArriveTest(unittest.TestCase):
     def test_refused_without_claude_env_file_still_reports_and_succeeds(self):
         old = "/fixture/old/epr"
 
-        result = self.run_hook(preflight_exit=1, epr_bin=old, env_file=None)
+        result = self.run_hook(preflight_exit=3, epr_bin=old, env_file=None)
 
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn(f"[device] EPR_BIN={old} is older than this device's head epr", result.stdout)
@@ -114,20 +114,24 @@ class DeviceArriveTest(unittest.TestCase):
             ["<unset>"] * 3,
         )
 
-    def test_check_that_cannot_run_leaves_epr_bin_alone(self):
-        # Exit 1 is REFUSED; any other failure (node missing is 127, a crash) proves nothing.
-        env_file = self.tmp / "claude.env"
-        env_file.write_text("KEEP=1\n")
+    def test_check_that_crashes_or_cannot_run_leaves_epr_bin_alone(self):
+        # Exit 3 alone is the check's refusal; a crash (1) or a missing node (127) proves nothing.
+        for code in (1, 2, 127):
+            with self.subTest(exit=code):
+                env_file = self.tmp / f"claude-{code}.env"
+                env_file.write_text("KEEP=1\n")
+                if self.epr_log.exists():
+                    self.epr_log.unlink()
 
-        result = self.run_hook(preflight_exit=127, epr_bin=str(self.epr), env_file=env_file)
+                result = self.run_hook(preflight_exit=code, epr_bin=str(self.epr), env_file=env_file)
 
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(result.stdout, "")
-        self.assertEqual(env_file.read_text(), "KEEP=1\n")
-        self.assertEqual(
-            [line.split("|", 1)[0] for line in self.epr_log.read_text().splitlines()],
-            [str(self.epr)] * 3,
-        )
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(result.stdout, "")
+                self.assertEqual(env_file.read_text(), "KEEP=1\n")
+                self.assertEqual(
+                    [line.split("|", 1)[0] for line in self.epr_log.read_text().splitlines()],
+                    [str(self.epr)] * 3,
+                )
 
 
 if __name__ == "__main__":

@@ -633,17 +633,41 @@ test('epr-bin: current path, symlink and same store cid are ok', t => {
   assert.equal(checkEprBin({ env: { ...env, EPR_BIN: copy } }).level, 'ok');
 });
 
-test('epr-bin: different candidate refuses with both paths, cost and cure; override warns', t => {
+const release = (root, cid, ingestedAt) => {
+  put(root, `store/epr/${cid}/epr`);
+  put(root, `store/epr/${cid}/record.json`, JSON.stringify({ cid, ingestedAt }));
+  return join(root, 'store/epr', cid, 'epr');
+};
+
+test('epr-bin: a store release older than the head refuses with both paths, cost and cure; override warns', t => {
   const { root, current, env } = eprFixture(t);
-  const inherited = join(root, 'old/epr');
+  put(root, 'store/epr/bafyreicurrent/record.json', JSON.stringify({ cid: 'bafyreicurrent', ingestedAt: '2026-11-21T20:18:26Z' }));
+  const inherited = release(root, 'bafyreiolder', '2026-11-02T10:00:00Z');
   for (const override of [undefined, '1', '0']) {
     const r = checkEprBin({ env: { ...env, EPR_BIN: inherited, GATE_ALLOW_EPR_BIN: override } });
     assert.equal(r.level, override === '1' ? 'WARN' : 'REFUSED');
     assert.ok(r.why.includes(inherited));
     assert.ok(r.why.includes(current));
+    assert.match(r.why, /ingested before its head/);
     assert.match(r.why, /native evaluator; an older one makes evidence unavailable, so nothing is reused/);
     assert.match(r.why, /a new Claude session unsets it at start \(device-arrive\)$/);
     assert.equal(r.cure, 'unset EPR_BIN');
+  }
+});
+
+test('epr-bin: a candidate outside the store, a newer release, or an undated one warns and is left set', t => {
+  const { root, env } = eprFixture(t);
+  put(root, 'store/epr/bafyreicurrent/record.json', JSON.stringify({ cid: 'bafyreicurrent', ingestedAt: '2026-11-21T20:18:26Z' }));
+  const outside = join(root, 'target/debug/epr');
+  put(root, 'target/debug/epr');
+  const newer = release(root, 'bafyreinewer', '2026-11-23T05:00:00Z');
+  put(root, 'store/epr/bafyreiundated/epr');
+  const undated = join(root, 'store/epr/bafyreiundated/epr');
+  for (const candidate of [outside, newer, undated]) {
+    const r = checkEprBin({ env: { ...env, EPR_BIN: candidate } });
+    assert.equal(r.level, 'WARN', candidate);
+    assert.match(r.why, /is a candidate, not this device's head epr/);
+    assert.match(r.why, /it is left set/);
   }
 });
 
@@ -653,7 +677,7 @@ test('epr-bin: unreadable current warns, including a malformed authoritative hea
   put(root, 'store/epr/current.json', '{broken');
   const r = checkEprBin({ env: candidate });
   assert.equal(r.level, 'WARN');
-  assert.equal(r.why, "EPR_BIN is set (/candidate/epr) and this device's current epr could not be read; a new Claude session unsets it at start (device-arrive)");
+  assert.equal(r.why, "EPR_BIN is set (/candidate/epr) and this device's current epr could not be read, so it is left set");
   assert.equal(checkEprBin({ env: { ...candidate, HOME: join(root, 'absent') } }).level, 'WARN');
 });
 
@@ -666,9 +690,10 @@ test('epr-bin: current.json takes precedence and explicit store overrides locate
   }
 });
 
-test('epr-bin: first preflight row refuses and the single-check CLI exits 1', t => {
+test('epr-bin: first preflight row refuses and the single-check CLI exits 3, its own code', t => {
   const { root, env } = eprFixture(t);
-  const candidate = { ...env, EPR_BIN: '/old/epr' };
+  put(root, 'store/epr/bafyreicurrent/record.json', JSON.stringify({ cid: 'bafyreicurrent', ingestedAt: '2026-11-21T20:18:26Z' }));
+  const candidate = { ...env, EPR_BIN: release(root, 'bafyreiolder', '2026-11-02T10:00:00Z') };
   const rows = runPreflight({ root, projects: [], env: candidate, registry: new Map(), changed: [],
     spawn: () => ({ status: 0, stdout: '' }) });
   assert.equal(rows[0].check, 'epr-bin');
@@ -678,7 +703,7 @@ test('epr-bin: first preflight row refuses and the single-check CLI exits 1', t 
   for (const override of ['0', '1']) {
     output = '';
     const status = main(['--epr-bin'], { ...candidate, GATE_ALLOW_EPR_BIN: override });
-    assert.equal(status, override === '1' ? 0 : 1);
+    assert.equal(status, override === '1' ? 0 : 3);
     assert.match(output, /\[preflight\] (REFUSED|WARN) epr-bin:/);
     assert.match(output, /cure: unset EPR_BIN/);
   }

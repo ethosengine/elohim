@@ -175,7 +175,7 @@ export function checkEprBin({ env = process.env } = {}) {
     }
   } catch {
     return row('epr-bin', 'WARN',
-      `EPR_BIN is set (${env.EPR_BIN}) and this device's current epr could not be read; a new Claude session unsets it at start (device-arrive)`, 'unset EPR_BIN');
+      `EPR_BIN is set (${env.EPR_BIN}) and this device's current epr could not be read, so it is left set`, 'unset EPR_BIN');
   }
   let inherited;
   try { inherited = realpathSync(env.EPR_BIN); } catch { /* A missing candidate differs too. */ }
@@ -183,8 +183,27 @@ export function checkEprBin({ env = process.env } = {}) {
   if (inherited === current || (storeCid(inherited) && storeCid(inherited) === storeCid(current))) {
     return row('epr-bin', 'ok');
   }
+  // Older means a release this device's store ingested before its head. A build outside the
+  // store, or one ingested after the head, is a candidate someone set on purpose (bin-launch
+  // reads EPR_BIN as its candidate): it is named, never refused or unset.
+  const ingested = cid => {
+    try {
+      const at = JSON.parse(readFileSync(join(dirname(dirname(current)), cid, 'record.json'), 'utf8')).ingestedAt;
+      const ms = Date.parse(at);
+      return Number.isFinite(ms) ? ms : null;
+    } catch { return null; }
+  };
+  const inheritedAt = storeCid(inherited) ? ingested(storeCid(inherited)) : null;
+  const currentAt = storeCid(current) ? ingested(storeCid(current)) : null;
+  const older = inherited !== undefined && dirname(dirname(inherited)) === dirname(dirname(current))
+    && inheritedAt !== null && currentAt !== null && inheritedAt < currentAt;
+  if (!older) {
+    return row('epr-bin', 'WARN',
+      `EPR_BIN=${env.EPR_BIN} is a candidate, not this device's head epr (${current}); it is left set, and evidence keyed by it is not reused against the head`,
+      'unset EPR_BIN to run on the head');
+  }
   return row('epr-bin', env.GATE_ALLOW_EPR_BIN === '1' ? 'WARN' : 'REFUSED',
-    `inherited EPR_BIN=${env.EPR_BIN}; device current epr=${current} — gates key on a native evaluator; an older one makes evidence unavailable, so nothing is reused; a new Claude session unsets it at start (device-arrive)`,
+    `inherited EPR_BIN=${env.EPR_BIN} is a release this device's store ingested before its head; device current epr=${current} — gates key on a native evaluator; an older one makes evidence unavailable, so nothing is reused; a new Claude session unsets it at start (device-arrive)`,
     'unset EPR_BIN');
 }
 
@@ -613,7 +632,9 @@ export function main(argv, env = process.env) {
     const r = checkEprBin({ env });
     process.stdout.write(`${formatRow(r)}\n`);
     emitLive([r], env);
-    return r.level === 'REFUSED' ? 1 : 0;
+    // 3 is this check's own refusal (an EPR_BIN older than the head); device-arrive unsets
+    // EPR_BIN on 3 alone, so a crash (1) or a missing node (127) never unsets it.
+    return r.level === 'REFUSED' ? 3 : 0;
   }
   if (argv.includes('--on-red')) {
     process.stdout.write(`${onRedPolicy().mode}\n`);
