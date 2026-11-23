@@ -243,6 +243,10 @@ impl CarryDecision {
 /// [`FlowError::InvalidArguments`] for a malformed request or an incumbent carrier;
 /// [`FlowError::Unavailable`] when this root is not the store `epr peer serve` projects; store and
 /// measure-registry errors as `epr flow intend` reports them.
+/// The longest a single carry may claim a miss. The costliest gate measured on a device is the
+/// storage gate at 3,535 s; two hours covers it from a cold slot and no more.
+pub const MAX_VALID_FOR_S: u64 = 7_200;
+
 pub fn write_carry(root: &Path, request: &CarryRequest<'_>) -> FlowResult<CarryReceipt> {
     intend::served_store_guard(root)?;
     let intent = parse_cid(request.intent, "--carry")?;
@@ -253,6 +257,12 @@ pub fn write_carry(root: &Path, request: &CarryRequest<'_>) -> FlowResult<CarryR
         return Err(FlowError::InvalidArguments(
             "--valid-for needs a positive number of seconds: a carry is bounded".to_string(),
         ));
+    }
+    if request.valid_for_s > MAX_VALID_FOR_S {
+        return Err(FlowError::InvalidArguments(format!(
+            "--valid-for is at most {MAX_VALID_FOR_S} seconds: a longer claim would hold other \
+             carriers off a miss past any gate's measured cost; claim again when it lapses"
+        )));
     }
     if let Some(change) = request.change {
         validate_one_line(change, "--change")?;
@@ -709,9 +719,8 @@ fn writer(event: &FlowEvent) -> Option<Option<&str>> {
 /// dismissed or superseded by its announcer. A miss no event ever posted is settled too, since
 /// there is nothing open to carry.
 ///
-/// Slice 1 stage B (`self/ethosengine-f4-ask-1` f257df0ab) adds `misses::miss_settled` with
-/// this signature and this body, and its newer-misses rule; when it lands, this function's body
-/// becomes that call.
+/// The rule has one home, `misses::miss_settled`, which also settles an older intent's misses
+/// when its announcer posts newer misses or a landing for the same change.
 fn miss_settled(
     records: &[(Cid, FlowRecord)],
     admits: &dyn Fn(&str) -> bool,
@@ -720,9 +729,7 @@ fn miss_settled(
     project: &str,
     closure: &str,
 ) -> bool {
-    !misses::open_misses(records, admits, me)
-        .iter()
-        .any(|miss| miss.intent == intent && miss.project == project && miss.closure == closure)
+    misses::miss_settled(records, admits, me, intent, project, closure)
 }
 
 /// The change an intent is about, from its own atom or any landing event that names it.
