@@ -1169,15 +1169,21 @@ fi
 # Pure node (package-projections.mjs verify), no cargo — PVC-pressure-neutral,
 # never part of HEAVY_GATES. Fail-open if node is absent
 # (degraded shell) — same posture as the node-guarded blocks below.
-if echo "$CHANGED" | grep -qE "^\.epr-meta/elohim/|^\.claude/skills/|^\.claude/agents/|^\.codex/"; then
+# The projected paths are named here as well as the package tree, so a hand edit of a
+# projection alone (root CLAUDE.md or AGENTS.md, a planted nested doc, a command, a packaged
+# hook, an Antigravity skill) is checked against its package. The root-document alternative is
+# anchored: an unpackaged nested CLAUDE.md must not select this leg.
+if echo "$CHANGED" | grep -qE "^\.epr-meta/elohim/|^\.claude/skills/|^\.claude/agents/|^\.claude/commands/|^\.claude/hooks/|^\.codex/|^\.agents/|^(CLAUDE|AGENTS)\.md$|^elohim/sdk/domains/mishpat/CLAUDE\.md$|^genesis/docs/superpowers/held/CLAUDE\.md$"; then
   if command -v node >/dev/null 2>&1; then
     echo "[pre-push] Verifying elohim-agent package projections (Claude/Codex) are fresh..."
     if ! node elohim/sdk/domains/elohim-agent/scripts/package-projections.mjs verify; then
       echo ""
       echo "!!============================================================!!"
       echo "!! ELOHIM-AGENT PACKAGE PROJECTION DRIFT DETECTED"
-      echo "!! .claude/skills, .claude/agents, or .codex is stale relative to"
-      echo "!! its .epr-meta/elohim/packages source (or vice versa)."
+      echo "!! A projected file (.claude/skills, agents, commands or hooks, .codex,"
+      echo "!! .agents, a planted CLAUDE.md or AGENTS.md) is stale relative to its"
+      echo "!! .epr-meta/elohim/packages source (or vice versa). A hand edit of a"
+      echo "!! projected file does this: edit the package, then re-project."
       echo "!! Fix — regenerate the stale side, then stage it, then re-push:"
       echo "!!   pnpm run elohim-agent:packages:project   (package -> runtime projection)"
       echo "!!   pnpm run elohim-agent:packages:import    (runtime -> package import)"

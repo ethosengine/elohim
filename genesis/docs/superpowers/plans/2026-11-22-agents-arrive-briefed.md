@@ -280,6 +280,25 @@ the two other planted docs, `^\.claude/commands/`, `^\.claude/hooks/`.
   part. Seed the envelope's intent from the recorded purpose. `epr-cli` is not a published crate:
   **no version bump, no Edge roll**; confirm with the fleet-roll preflight by hand before
   assembling. The new executor digest refuses live recall sessions once; announce over berth.
+- **Two preconditions found while verifying the router (2026-11-23), both required before "every
+  invocation leaves the point richer" is true even on one device:**
+  1. *A note outlives an edit of its subject.* `epr flow context <path>` reads notes by the CID of
+     the file's current bytes (`flow/context.rs` `resolve_target`), so a correction drops out of
+     the context read as soon as the file it names is edited; only `epr flow concerns
+     --corrections`, which matches by label, still lists it. Observed: two open corrections that
+     `concerns` lists show `NOTES (0 shown)` in `context` for the same paths. `placement` and
+     `context` gather notes by subject label as `concerns` does, and mark a note whose bytes have
+     since changed as such.
+  2. *One notes store per repository on a device, not one per checkout.* The flow sidecar is
+     `<checkout>/.eprfs/status/flows.jsonl`; a worktree has its own, so a note written where the
+     work happens is invisible from the main checkout (observed: 0 corrections from the worktree,
+     5 from the main checkout) and is deleted with the worktree. Resolve the sidecar through the
+     repository's common git directory, or fold worktree sidecars into the device's store.
+  Until both land, the router tells agents to record corrections from the main checkout and to
+  read `concerns --corrections`.
+- The context read's GATE line is `ambiguous` (seven candidates) for some paths and names a
+  doubtful habit for others (observed on `genesis/agentic/bin/pool-preflight.sh`); `placement`
+  must resolve one gate and one covering habit, or say plainly that it cannot.
 - **One contract commit**: `recall-contract.json` (`guiding_context` → system stars with source
   CIDs and the layering rule; `lens_table` keyed by level; the symlink text) together with
   re-pinning `recipe` and every `in_scope_of` in `recall-questions.json` to the CID epr reports,

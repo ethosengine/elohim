@@ -93,6 +93,61 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Polyglot monorepo for the Elohim Protocol - a distributed learning platform built on Holochain, Angular, and Rust. `dev` is the integration target (not a protected default): feature branches land on `dev` via local fast-forward merge — no PR. Release-grade PR review happens at `dev → main`.
 
+## Start here: five questions
+
+Before you act, be able to answer these. Each answer is a read you run at the path you were sent
+to; prefer it to anything remembered. `epr` is this repository's flow, session and covenant
+CLI (`epr session id` prints your id in its `session=` field); `berth` is the device's mooring
+and lease tool. Say which checkout you are in: the main one, or a worktree under `.worktrees/`.
+
+| Question | Read |
+|---|---|
+| **What am I for?** | The task you were given: its target path and bounds, as its text states them. For a claimed commitment, its brief. For a session, the covenant purpose: `epr covenant show --repo . --session <id>`. |
+| **What is done?** | `epr flow context <path>` prints, for that path: ACTIONABLE and RECONCILIATION (assertions and their commitments; `--json` for the raw intents), NOTES, the covering HABIT and the GATE line. The check for the tree you touched is `just gate <project>`; the project is named under `gate.projects` in the nearest `build-manifest.json` above the path. If the GATE line reads `ambiguous` or `no gate project covers this path`, say so, name the project you ran, and do not report the gate as passed. Done is a rung (below). |
+| **Why is it this way?** | The `.epr-meta` body of the nearest directory above the path that has one (its purpose and rules). The invariant of the habit named on the HABIT line, in `<dir>/.epr-meta/<id>.habit.md` (a habit is a declared, checkable behaviour). Rulings and corrections: NOTES in `epr flow context <path>`, and `epr flow concerns --corrections`. |
+| **Who decides?** | The steward of record, named in the covenant output. Your mooring and any lease you hold: `berth status`. A covenant clause records the steward's promise; a variance clause can hold a rule at the floor that rule itself declares, and no clause bypasses a gate. |
+| **How do I run it?** | `just --list` (the eight stable verbs, and `measure`). Typical first run: `epr flow context <path>` on the task path, then your change, then `just gate <project>`. Where a concern lives: the seam map (below). What to read first for a subsystem: `genesis/docs/content/elohim-protocol/architecture/MAP.md`. What happened before: `genesis/data/timeline/chronicle/` and governed recall (below). |
+
+### Done is a rung
+
+| Kind of work | Evidence, lowest first | Acceptance |
+|---|---|---|
+| Code | the test step of `just gate <project>`; then the a2o scenario under its `@concern:` tag (`just test mesh <feature>`, under a verify lease); then a multi-peer measure (`just measure <feature>`) | the tree's `gate` and a technical-review verdict; for a valueflow commitment, then an appointed acceptance note |
+| Story, spec or document | the blind-reader loop; cites sealed | the author's judgment under the covenant floor |
+| Habit station | its `checks:` | a status flip, on evidence only |
+
+A task names the highest rung it climbs to. If it names none, stop at the lowest evidence that
+covers the change and say which rung you reached. Every rung ends with a one-line delta in the
+atom of the habit the work serves, then `.claude/scripts/habits-project.py`. A further rung is
+planned under habit `agents-arrive-briefed` and nothing records it yet: an appreciation of the
+result and of how it was reached, by a seat that did not do the work. It will be testimony under
+the steward's name and not the steward's acceptance.
+
+### When you are corrected
+
+Record the correction on the surface that misled you:
+`epr flow note --on <surface> --kind correction --reason 'STALE (<date>): "<exact claim>" →
+<current truth> (<evidence>)'`. Know what that note can and cannot do today. It is held against
+the file's current bytes, so once the file is edited it no longer shows in `epr flow context`;
+`epr flow concerns --corrections` still lists it. It lives in the flow sidecar of one checkout
+(`.eprfs/status/flows.jsonl`, untracked): a note written in a worktree is not seen from the main
+checkout and is lost with the worktree, so from a worktree pass `--root <main checkout>`. No
+flow note crosses to another device (a `berth say` note does). When the lesson will matter to
+another agent, graduate it into a tracked, governed surface: an `.epr-meta` rule, a habit, a
+skill, a check or a story.
+
+### What to save as memory
+
+Private memory is for the steward's preferences and for facts about this device. Do not save
+status, landings, or anything the repository already records. Give each entry the condition for
+its removal, or the surface it should graduate to.
+
+### Dispatching another agent
+
+Give it a goal, a target path and the checkout the path is in. Do not restate the context: it
+reads the target's own records with `epr flow context <target>` as its first act. An isolated
+seat (the blind reader, the stasis keeper) reads only what it is handed.
+
 ## Brit is the daily driver
 
 Use the installed `brit` for agent-authored repository operations in this workspace,
@@ -523,9 +578,7 @@ Both crates declare `version = "0.54"` and resolve `0.54.1` (Cargo.lock verified
 
 ## CI/CD
 
-Central orchestrator pattern: only `genesis/orchestrator/Jenkinsfile` receives GitHub webhooks, analyzes changesets, and triggers downstream pipelines. Downstream jobs use `overrideIndexTriggers(false)` and validate `UpstreamCause` or `UserIdCause`. Recurring CI/orchestrator traps (NOT_BUILT/superseded ≠ regression, host-green ≠ CI-green, baseline-rollback over-build, sccache poisoning, `#[ignore]` is a CI no-op): see the frequency-ranked museum record `genesis/docs/content/elohim-protocol/history/2026-06-02-ci-orchestrator-recurring-anti-patterns-museum.md`.
-
-> **Recurring CI/orchestrator watch-outs** (read before debugging a "regression"): `NOT_BUILT`/`ABORTED`/superseded builds read as 0-failures (lossy measure); `#[ignore]` is a CI no-op (DNA sweettests run `--run-ignored all`); webhook double-fire; baseline-rollback over-build. The frequency-ranked museum record is the canonical home: `genesis/docs/content/elohim-protocol/history/2026-06-02-ci-orchestrator-recurring-anti-patterns-museum.md` (orchestrator-specific watch-outs detailed in `genesis/orchestrator/README.md`).
+Central orchestrator pattern: only `genesis/orchestrator/Jenkinsfile` receives GitHub webhooks, analyzes changesets, and triggers downstream pipelines. Downstream jobs use `overrideIndexTriggers(false)` and validate `UpstreamCause` or `UserIdCause`. Recurring CI/orchestrator traps (NOT_BUILT/superseded ≠ regression, host-green ≠ CI-green, baseline-rollback over-build, sccache poisoning, `#[ignore]` is a CI no-op because DNA sweettests run `--run-ignored all`, webhook double-fire): see the frequency-ranked museum record `genesis/docs/content/elohim-protocol/history/2026-06-02-ci-orchestrator-recurring-anti-patterns-museum.md`. Orchestrator-specific watch-outs: `genesis/orchestrator/README.md`.
 
 Pipeline metadata is declared in per-project `build-manifest.json` files. The `genesis/orchestrator/graph-walker.mjs` + `build-graph.groovy` walk these manifests to build a dependency graph and determine which pipelines to trigger. `pipeline-registry.mjs` exposes the metadata to JavaScript consumers.
 
