@@ -2084,26 +2084,71 @@ mod tests {
 
     #[test]
     fn discovery_uses_the_one_node_that_answers_and_never_guesses() {
-        let (one, _) = stub(a_node);
-        let (two, _) = stub(a_node);
+        let (one, served_one) = stub(a_node);
+        let (two, served_two) = stub(a_node);
         // Something on a port that is not a node does not count.
-        let (other, _) = stub(|_, _, _| (404, String::new()));
+        let (other, served_other) = stub(|_, _, _| (404, String::new()));
         let none = closed_port();
-        assert_eq!(
-            find_node(None, None, None, &[none, other, one], QUICK).unwrap(),
-            format!("http://127.0.0.1:{one}")
-        );
-        let refused = find_node(None, None, None, &[one, none, two], QUICK).unwrap_err();
-        assert!(refused.contains("more than one node"), "{refused}");
-        assert!(refused.contains(&format!("127.0.0.1:{one}")), "{refused}");
-        assert!(refused.contains(&format!("127.0.0.1:{two}")), "{refused}");
-        let refused = find_node(None, None, None, &[none, other], QUICK).unwrap_err();
-        assert_eq!(
-            refused,
+        // When an assertion below fails, say what the call saw, so the red names its own cause:
+        // a stub never reached or reached late (its served list, the elapsed time against the
+        // bound), or the closed port taken by another test's listener (it accepts now).
+        let saw = |call: &str, took: Duration| {
+            let served = |port: u16, log: &std::sync::Arc<std::sync::Mutex<Vec<String>>>| {
+                format!("127.0.0.1:{port} served {:?}", log.lock().unwrap())
+            };
+            let closed = if std::net::TcpStream::connect(("127.0.0.1", none)).is_ok() {
+                "now ACCEPTS a connection"
+            } else {
+                "still refuses"
+            };
             format!(
+                "{call} took {} ms against a {} ms bound; one={}; two={}; other={}; \
+                 none=127.0.0.1:{none} {closed}",
+                took.as_millis(),
+                QUICK.as_millis(),
+                served(one, &served_one),
+                served(two, &served_two),
+                served(other, &served_other),
+            )
+        };
+        let started = std::time::Instant::now();
+        let found = find_node(None, None, None, &[none, other, one], QUICK);
+        let took = started.elapsed();
+        assert_eq!(
+            found,
+            Ok(format!("http://127.0.0.1:{one}")),
+            "{}",
+            saw("find_node([none, other, one])", took)
+        );
+        let started = std::time::Instant::now();
+        let found = find_node(None, None, None, &[one, none, two], QUICK);
+        let took = started.elapsed();
+        let refused = found
+            .clone()
+            .err()
+            .unwrap_or_else(|| panic!("{found:?}: {}", saw("find_node([one, none, two])", took)));
+        for expected in [
+            "more than one node".to_string(),
+            format!("127.0.0.1:{one}"),
+            format!("127.0.0.1:{two}"),
+        ] {
+            assert!(
+                refused.contains(&expected),
+                "{refused}: {}",
+                saw("find_node([one, none, two])", took)
+            );
+        }
+        let started = std::time::Instant::now();
+        let found = find_node(None, None, None, &[none, other], QUICK);
+        let took = started.elapsed();
+        assert_eq!(
+            found,
+            Err(format!(
                 "no node of this machine answers on {none}/{other}; start one (`just dev start`) \
                  or name it with --node"
-            )
+            )),
+            "{}",
+            saw("find_node([none, other])", took)
         );
         // Named comes before found: the flag, then the environment, then the
         // launcher's record, and nothing is probed.
