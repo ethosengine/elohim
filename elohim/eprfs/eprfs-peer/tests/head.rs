@@ -250,6 +250,61 @@ fn folding_a_newer_head_reannounces_with_updated_ack() {
 }
 
 #[test]
+fn crossing_drop_groups_evict_the_group_with_the_oldest_latest_refusal() {
+    let mut table = HeadTable::default();
+    table.record_crossing_drop("rules-a", "device", "measure", "kind", 10);
+    table.record_crossing_drop("rules-b", "device", "measure", "kind", 20);
+    table.record_crossing_drop("rules-c", "device", "measure", "kind", 30);
+    table.record_crossing_drop("rules-a", "device", "measure", "kind", 50);
+    table.record_crossing_drop("rules-d", "device", "measure", "kind", 40);
+
+    let groups: Vec<_> = table
+        .crossing_drop_rule_groups()
+        .map(|(rules, _)| rules)
+        .collect();
+    assert_eq!(groups, ["rules-a", "rules-c", "rules-d"]);
+}
+
+#[test]
+fn old_ungrouped_crossing_drops_load_as_unknown_history() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    std::fs::write(
+        dir.path().join(HeadTable::FILE_NAME),
+        r#"{
+          "version": 1,
+          "own": null,
+          "devices": {},
+          "dropped": {
+            "unadmitted": 0,
+            "forged": 0,
+            "rollback": 0,
+            "replayed": 0,
+            "malformed": 0
+          },
+          "crossing_drops": {
+            "did:key:zSender": {
+              "dev-landing@1": {
+                "misses": {"count": 2, "first_seen": 11, "last_seen": 19}
+              }
+            }
+          }
+        }"#,
+    )
+    .expect("write old head table");
+
+    let table = HeadTable::load(dir.path()).expect("old shape loads");
+    let rows: Vec<_> = table.crossing_drop_entries("unknown").collect();
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0].3.count, 2);
+    assert!(table.legacy_crossing_drops.is_empty());
+
+    table.save(dir.path()).expect("save migrated table");
+    let saved = std::fs::read_to_string(dir.path().join(HeadTable::FILE_NAME)).expect("read table");
+    assert!(saved.contains("\"crossing_drop_groups\""));
+    assert!(!saved.contains("\"crossing_drops\""));
+}
+
+#[test]
 fn a_device_no_longer_admitted_is_forgotten_and_its_ack_leaves_the_next_head() {
     let h = household();
     let mut channel = Channel::new(h.a.did.clone(), HeadTable::default());

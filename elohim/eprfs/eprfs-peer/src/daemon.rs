@@ -64,7 +64,7 @@ use crate::head::{ChannelHead, HeadSigner};
 use crate::head_table::{HeadTable, StorePlace};
 use crate::key::PeerKey;
 use crate::local_blob::LocalBlobContext;
-use crate::rules::{Rules, RulesState};
+use crate::rules::{Rules, RulesDigest, RulesState};
 use crate::tier::{TierLimits, TierProtocol, TIER_ALPN};
 
 /// How often the daemon looks at its roster and flow store and asks whether a head is due.
@@ -634,6 +634,8 @@ fn ended(reason: impl Into<String>) -> PeerError {
 /// A fold task's result, back on the loop.
 struct FoldDone {
     head: ChannelHead,
+    /// The rules used inside this fold, which may no longer be current when it finishes.
+    rules_digest: RulesDigest,
     result: Result<FoldReport, PeerError>,
 }
 
@@ -1709,6 +1711,7 @@ impl Run {
         let reader = self.config.device.clone();
         let state_dir = self.config.state_dir.clone();
         let allow = self.config.rules.allow().clone();
+        let rules_digest = self.config.rules.digest();
         let tree = self.tree;
         let done = self.folds_tx.clone();
         let known = self.held.get(&device).cloned();
@@ -1749,13 +1752,24 @@ impl Run {
                     })
                 });
             // The loop has stopped when nobody receives; nothing is left to record.
-            let _ = done.send(FoldDone { head, result });
+            let _ = done.send(FoldDone {
+                head,
+                rules_digest,
+                result,
+            });
         });
         self.in_flight.insert(device, (seq, task.abort_handle()));
     }
 
     /// Record a finished fold, then start the device's waiting head, if any.
-    fn fold_done(&mut self, FoldDone { head, result }: FoldDone) -> Result<(), PeerError> {
+    fn fold_done(
+        &mut self,
+        FoldDone {
+            head,
+            rules_digest,
+            result,
+        }: FoldDone,
+    ) -> Result<(), PeerError> {
         self.in_flight.remove(&head.device);
         if !self.admitted(&head.device) {
             // Contested while the fold ran: no head is recorded and no acknowledgement advances.
@@ -1776,6 +1790,7 @@ impl Run {
                 counters.over_budget_folds += u64::from(report.over_budget);
                 let folded_at = unix_ms();
                 let nack_changed = self.channel.nack(
+                    rules_digest.as_str(),
                     &head.device,
                     &report.outcome.refused_cids,
                     &report.outcome.refused_crossings,
