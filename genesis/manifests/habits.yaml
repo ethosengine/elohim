@@ -2571,10 +2571,10 @@ habits:
       - "node --test genesis/orchestrator/gate-attest.test.mjs genesis/orchestrator/gate-oracle.test.mjs (the four outcomes, latest-run-wins, reads-the-pin-not-the-checkout, depth one)"
       - "epr flow note observations on pin-attestation@1 exist for every pin-moving push (GATE_ORACLE and the attested dispatch are live in gate-runner.mjs)"
     evidence: >
-      DELTA 2026-11-22 (RED preserved; the gate no longer passes on the older of two runs): `gate-attest.mjs` makes a second read when the newest named check is complete, the commit's workflow runs, and refuses as pending while a later run of the same workflow, or a re-run of the judged run, has not completed (`54e9dbe93`, `56a5786d3`, `18f8c5514`; arrival backlog row 71 and its delta). It exists because landing 13's brit gate read `Tests pass success` from a release-branch run while the push-to-main run of the same workflow was still running, and that run ended red. An unreachable or malformed second read never refuses: the first verdict stands and the line says newer runs were not checked. Both reads share one 60 s budget under the bin store's 75 s bound. Stated limit, pinned by a test: a completed run's conclusion is not read, so a full re-run cancelled before the named check leaves an earlier green standing. `node --test genesis/orchestrator/gate-attest.test.mjs`: 51 of 51; one live read of brit `02d4654fa73d` returned `completed`, `success`.
-    evidence-fingerprint: sha256:e5b25a98426ee274
-    evidence-bytes: 8698
-    evidence-entries: 12
+      DELTA 2026-11-23 (RED preserved; an observation of what the second read costs, no code change): the second read waits for the whole workflow run, so a pin waits for every job that follows the named check. On brit 0.3.2 (`491db1f38510`), `Tests pass` concluded success at 02:20:22Z in run 45085586762 attempt 2 and the judge still refused with `a re-run of the same run (ci, run 45085586762, in_progress) has not produced this check yet` until the Nexus publish job in the same run completed at 02:34:30Z, about 14 minutes; it then printed `attested: ethosengine/brit@491db1f38510 Tests pass success`. Observed by ethosengine session 6d68315a from dev `81ea6431b` and relayed from elohim-34; not reproduced on shem. A narrower guard would refuse only while the newest attempt's own named check has not concluded; nothing is changed here, because the limit stated in the delta below (a completed run's conclusion is not read) has to be weighed with it.
+    evidence-fingerprint: sha256:9af133244f115d6f
+    evidence-bytes: 9650
+    evidence-entries: 13
     guard: >
       Regression risks: (1) a matcher that special-cases gitlinks instead of the manifest
       listing the pin path — both oracles must agree by declaration, not by code;
