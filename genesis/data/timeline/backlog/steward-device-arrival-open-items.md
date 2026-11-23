@@ -2701,3 +2701,27 @@ Edge build and its deploy step, so neither lands without a roll the steward choo
 Neither is started, by decision: this session's sprint stopped at anything that rolls the fleet.
 The standing design itself has had two adversarial rounds and says which parts are sound to
 build.
+
+## Row 81 — a note between devices is cut at about a thousand characters, and neither side is told
+
+Found 2026-11-23. ethosengine's session 6d68315a sent its second-device report for landing
+`81ea6431b` as one `berth say` note with five lettered results. shem's session 0e9b66d9 received
+it ending in `…` just after the third; the fourth and fifth were asked for again and arrived in a
+second note. The sender's `berth say` printed its usual `note #<n>` line and nothing about length.
+The same day the injected form of several notes ended `...(truncated)` in the reader's context,
+which is the hook's own bound (`MAX_LINE` in `.claude/hooks/berth-note-inject.py`) and is shown;
+the cut inside `berth inbox --all` is not explained anywhere this session read.
+
+State: not cured, and where the cut happens is not established: at `say`, at the crossing, or at
+the formatter. Owed: `berth say` refuses or warns past the length that survives, naming the
+number, so a long report is sent as several notes on purpose.
+
+## Row 77, delta 3 (2026-11-23): the device that has never acknowledged shem is named in four places, and is not cured
+
+Since `c71f584f8`, `8293f3e6b` and `81ea6431b`: `berth status` prints `UNACKED` under it, `berth
+say` to a session moored there says the note may not have arrived, a follow announces it once when
+it begins and once when it ends, and `just status device` lists it as `degraded sibling exchange`
+without changing the next step. `epr flow context --participate` prints it under Sources. Each
+landing from shem still waits for it at the lease step: 17 s, 15 s and 15 s on the three landings
+of 2026-11-22 and 23. Curing it needs that device's own daemon to carry shem's roster row and
+exchange; nothing sent from shem reaches it.
