@@ -19,7 +19,15 @@ test('every gate project is either reuse-enabled or withheld with one written re
 
   const enabled = new Set(projects);
   const held = new Set(Object.keys(withheld));
-  for (const name of registry.keys()) {
+  // An attested project (a submodule pin: brit, rakia, sophia) runs no local recipe and writes no
+  // local verdict; its verdict is its pin's upstream CI check (gate-attest.mjs). It is outside
+  // gate_reuse, and its manifest is present only when the submodule is checked out, so the
+  // accounting below must not depend on that.
+  for (const [name, project] of registry) {
+    if (project.run?.kind === 'attested') {
+      assert.ok(!enabled.has(name) && !held.has(name), `${name} is attested and belongs in neither gate_reuse list`);
+      continue;
+    }
     assert.notEqual(enabled.has(name), held.has(name),
       `${name} must appear in exactly one of gate_reuse.projects and gate_reuse.withheld`);
   }
