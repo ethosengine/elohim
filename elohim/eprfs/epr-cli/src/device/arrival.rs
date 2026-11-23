@@ -12,6 +12,7 @@ use elohim_device_runtime::{
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::{
+    collections::BTreeSet,
     fmt, fs,
     path::{Path, PathBuf},
     process::ExitCode,
@@ -172,6 +173,7 @@ pub(crate) fn status_at(root: &Path, remember: bool) -> Vec<Check> {
     if let Some(at) = checks.iter().position(|c| c.name == SIBLING_CHECK) {
         for (offset, check) in acknowledgement_checks(root, &current)
             .into_iter()
+            .chain(crossing_drop_checks())
             .enumerate()
         {
             checks.insert(at + 1 + offset, check);
@@ -387,6 +389,7 @@ fn publication_check(standing: &actor::Standing, publication: Publication) -> Ch
 
 const ROSTER_CHECK: &str = "roster bound";
 const SIBLING_CHECK: &str = "sibling exchange";
+const CROSSING_DROPS_CHECK: &str = "crossing drops";
 
 /// Whether a sibling device of the same person has exchanged heads with this one, read from the
 /// head table the peer daemon saved — never a dial, never a daemon start. A roster that names a
@@ -414,6 +417,51 @@ fn saved_heads() -> Result<Option<eprfs_peer::HeadTable>, String> {
     eprfs_peer::HeadTable::load(&dir)
         .map(Some)
         .map_err(|e| e.to_string())
+}
+
+#[cfg(feature = "peer")]
+fn crossing_drop_checks() -> Vec<Check> {
+    saved_heads()
+        .ok()
+        .flatten()
+        .as_ref()
+        .and_then(crossing_drop_check)
+        .into_iter()
+        .collect()
+}
+#[cfg(not(feature = "peer"))]
+fn crossing_drop_checks() -> Vec<Check> {
+    Vec::new()
+}
+
+#[cfg(feature = "peer")]
+fn crossing_drop_check(table: &eprfs_peer::HeadTable) -> Option<Check> {
+    let rows: Vec<_> = table
+        .crossing_drop_entries()
+        .filter(|(_, _, _, drop)| drop.count > 0)
+        .collect();
+    let (_, first_measure, first_kind, _) = rows.first().copied()?;
+    let total = rows.iter().fold(0u64, |total, (_, _, _, drop)| {
+        total.saturating_add(drop.count)
+    });
+    let devices = rows
+        .iter()
+        .map(|(device, _, _, _)| *device)
+        .collect::<BTreeSet<_>>()
+        .len();
+    Some(Check::new(
+        CROSSING_DROPS_CHECK,
+        State::Degraded,
+        format!(
+            "{total} events from {devices} device(s) not in this device's crosses \
+             ({first_measure}/{first_kind}…)"
+        ),
+        Some(
+            "refresh the daemon's policy from genesis/agentic/pool-policy.json and restart it \
+             by epr device supervise"
+                .into(),
+        ),
+    ))
 }
 #[cfg(not(feature = "peer"))]
 fn saved_heads() -> Result<Option<()>, String> {
@@ -2204,6 +2252,31 @@ mod tests {
             Some("fetch the integration branch")
         );
     }
+    #[cfg(feature = "peer")]
+    #[test]
+    fn receiver_crossing_drop_line_appears_only_for_nonzero_counts() {
+        let mut table = eprfs_peer::HeadTable::default();
+        assert!(crossing_drop_check(&table).is_none());
+
+        table.record_crossing_drop("did:key:zSender", "dev-landing@1", "misses", 11);
+        table.record_crossing_drop("did:key:zSender", "dev-landing@1", "misses", 19);
+        let check = crossing_drop_check(&table).expect("nonzero drop line");
+        assert_eq!(check.name, CROSSING_DROPS_CHECK);
+        assert_eq!(check.state, State::Degraded);
+        assert_eq!(
+            check.detail,
+            "2 events from 1 device(s) not in this device's crosses \
+             (dev-landing@1/misses…)"
+        );
+        assert_eq!(
+            check.cure.as_deref(),
+            Some(
+                "refresh the daemon's policy from genesis/agentic/pool-policy.json and restart \
+                 it by epr device supervise"
+            )
+        );
+    }
+
     #[cfg(feature = "peer")]
     #[test]
     fn sibling_exchange_needs_a_folded_head_that_acknowledges_ours() {

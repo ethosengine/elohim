@@ -18,10 +18,10 @@ use eprfs_core::{
 };
 use eprfs_peer::{
     bind, channel_tier_id, fetch_channel, fold_events, fold_root, fold_root_planned, folded_from,
-    project_channel, tier_call, via_device, ChannelEvent, ChannelHead, ChannelStore, ChannelTree,
-    CrossingAllowList, FoldLimits, FoldPlan, FoldReader, FoldTarget, HeadTable, NackLeaf,
-    PeerConfig, PeerDaemon, PeerError, Rules, TierAnswer, TierLimits, TierProtocol, TierRequest,
-    CHANNEL_EVENTS, TIER_ALPN,
+    project_channel, tier_call, via_device, Channel, ChannelEvent, ChannelHead, ChannelStore,
+    ChannelTree, CrossingAllowList, FoldLimits, FoldPlan, FoldReader, FoldTarget, HeadTable,
+    NackLeaf, PeerConfig, PeerDaemon, PeerError, Rules, TierAnswer, TierLimits, TierProtocol,
+    TierRequest, CHANNEL_EVENTS, TIER_ALPN,
 };
 use futures_lite::StreamExt;
 use iroh::endpoint::Connection;
@@ -356,6 +356,56 @@ fn raw_channel(events: Vec<(Cid, Vec<u8>)>) -> (BlobCid, RawTreeStore) {
 
 fn allow() -> CrossingAllowList {
     CrossingAllowList::from_policy(&policy()).expect("policy")
+}
+
+#[test]
+fn receiver_crossing_drops_count_distinct_unadmitted_events_only() {
+    let checkout = Checkout::new();
+    let allowed = berth_event("claim", "cargo", "s1", "1.0");
+    let denied = berth_event("carry", "cargo", "s1", "2.0");
+    let allowed = ChannelEvent {
+        cid: atom_cid(&allowed).expect("allowed cid"),
+        event: allowed,
+    };
+    let denied = ChannelEvent {
+        cid: atom_cid(&denied).expect("denied cid"),
+        event: denied,
+    };
+    let outcome = fold_events(
+        &checkout.store(),
+        "did:key:zSender",
+        &[allowed, denied.clone(), denied],
+        &allow(),
+    )
+    .expect("folds");
+    assert_eq!(
+        (outcome.appended, outcome.refused, outcome.already),
+        (1, 1, 1)
+    );
+
+    let mut channel = Channel::new("did:key:zReceiver".into(), HeadTable::default());
+    assert!(channel.nack(
+        "did:key:zSender",
+        &outcome.refused_cids,
+        &outcome.refused_crossings,
+        Vec::<String>::new(),
+        10,
+    ));
+    assert!(!channel.nack(
+        "did:key:zSender",
+        &outcome.refused_cids,
+        &outcome.refused_crossings,
+        Vec::<String>::new(),
+        20,
+    ));
+    let rows: Vec<_> = channel.table().crossing_drop_entries().collect();
+    assert_eq!(rows.len(), 1);
+    let (device, measure, kind, drop) = rows[0];
+    assert_eq!(
+        (device, measure, kind),
+        ("did:key:zSender", "dev-berth-events@1", "carry")
+    );
+    assert_eq!((drop.count, drop.first_seen, drop.last_seen), (1, 10, 10));
 }
 
 /// Device B serving its projected channel tree on the tier ALPN, as `epr peer serve` does.

@@ -1774,10 +1774,13 @@ impl Run {
                 let counters = self.channel.counters_mut();
                 counters.oversized_events += report.oversized;
                 counters.over_budget_folds += u64::from(report.over_budget);
+                let folded_at = unix_ms();
                 let nack_changed = self.channel.nack(
                     &head.device,
-                    report.outcome.refused_cids.iter().map(ToString::to_string),
+                    &report.outcome.refused_cids,
+                    &report.outcome.refused_crossings,
                     report.quarantined.iter().map(|entry| entry.cid.to_string()),
+                    folded_at,
                 );
                 self.reproject |= nack_changed;
                 if report.complete {
@@ -1792,7 +1795,7 @@ impl Run {
                         &head,
                         outcome.appended,
                         report.peer_nack,
-                        unix_ms(),
+                        folded_at,
                         Instant::now(),
                     );
                     if outcome.appended > 0 || outcome.refused > 0 {

@@ -16,6 +16,9 @@
 //!   },
 //!   "nacks": { "<author-did>": { "refused", "quarantined" } },
 //!   "dropped": { "unadmitted", "forged", "rollback", "replayed", "malformed" },
+//!   "crossing_drops": {
+//!     "<author-did>": { "<measure>": { "<kind>": { "count", "first_seen", "last_seen" } } }
+//!   },
 //!   "channel": { "projection_failures", "last_projection_error", "fold_failures",
 //!                "oversized_events", "over_budget_folds" }
 //! }
@@ -128,6 +131,9 @@ pub struct HeadTable {
     #[serde(default)]
     pub nacks: BTreeMap<String, NackState>,
     pub dropped: DroppedHeads,
+    /// Receiver-side event refusals, by sending device, measure and kind.
+    #[serde(default)]
+    pub crossing_drops: CrossingDrops,
     /// The daemon's own channel health: projection and fold failures.
     #[serde(default)]
     pub channel: ChannelCounters,
@@ -169,6 +175,7 @@ impl Default for HeadTable {
             devices: BTreeMap::new(),
             nacks: BTreeMap::new(),
             dropped: DroppedHeads::default(),
+            crossing_drops: BTreeMap::new(),
             channel: ChannelCounters::default(),
         }
     }
@@ -226,9 +233,52 @@ pub struct DroppedHeads {
     pub malformed: u64,
 }
 
+/// Receiver-side allow-list refusals, grouped as device -> measure -> kind -> count and times.
+pub type CrossingDrops = BTreeMap<String, BTreeMap<String, BTreeMap<String, CrossingDrop>>>;
+
+/// One receiver-side allow-list refusal counter.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CrossingDrop {
+    pub count: u64,
+    /// This device's clock at the first refusal, unix milliseconds.
+    pub first_seen: u64,
+    /// This device's clock at the latest refusal, unix milliseconds.
+    pub last_seen: u64,
+}
+
 impl HeadTable {
     /// The table's file name inside the peer state dir.
     pub const FILE_NAME: &'static str = "heads.json";
+
+    /// Count one distinct event refused by this device's crossing allow-list.
+    pub fn record_crossing_drop(&mut self, device: &str, measure: &str, kind: &str, at: u64) {
+        let drop = self
+            .crossing_drops
+            .entry(device.to_owned())
+            .or_default()
+            .entry(measure.to_owned())
+            .or_default()
+            .entry(kind.to_owned())
+            .or_insert(CrossingDrop {
+                count: 0,
+                first_seen: at,
+                last_seen: at,
+            });
+        drop.count = drop.count.saturating_add(1);
+        drop.first_seen = drop.first_seen.min(at);
+        drop.last_seen = drop.last_seen.max(at);
+    }
+
+    /// The persisted receiver-side refusal rows in deterministic order.
+    pub fn crossing_drop_entries(&self) -> impl Iterator<Item = (&str, &str, &str, &CrossingDrop)> {
+        self.crossing_drops.iter().flat_map(|(device, measures)| {
+            measures.iter().flat_map(move |(measure, kinds)| {
+                kinds.iter().map(move |(kind, drop)| {
+                    (device.as_str(), measure.as_str(), kind.as_str(), drop)
+                })
+            })
+        })
+    }
 
     /// The table persisted in `dir`, or an empty one when there is none yet.
     ///

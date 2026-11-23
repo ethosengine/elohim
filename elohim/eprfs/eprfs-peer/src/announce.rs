@@ -17,6 +17,7 @@ use iroh_gossip::proto::TopicId;
 
 use crate::admission::Admission;
 use crate::error::PeerError;
+use crate::fold::RefusedCrossing;
 use crate::head::{ChannelHead, HeadSigner};
 use crate::head_table::{
     ChannelCounters, DeviceHead, HeadTable, NackLeaf, OwnAnnounce, OWN_LOG_LEN,
@@ -100,18 +101,38 @@ impl Channel {
         &mut self.table.rules
     }
 
-    /// Add refusals for `author`. True only when the projected nack set changed.
+    /// Add refusals for `author` and count each newly refused crossing once. True only when the
+    /// projected nack set changed.
     pub fn nack(
         &mut self,
         author: &str,
-        refused: impl IntoIterator<Item = String>,
+        refused_cids: &[cid::Cid],
+        refused_crossings: &[RefusedCrossing],
         quarantined: impl IntoIterator<Item = String>,
+        at: u64,
     ) -> bool {
-        let state = self.table.nacks.entry(author.to_string()).or_default();
-        let before = state.clone();
-        state.refused.extend(refused);
-        state.quarantined.extend(quarantined);
-        *state != before
+        let mut fresh = Vec::new();
+        let changed = {
+            let state = self.table.nacks.entry(author.to_string()).or_default();
+            let mut changed = false;
+            for cid in refused_cids {
+                if state.refused.insert(cid.to_string()) {
+                    if let Some(crossing) = refused_crossings.iter().find(|row| row.cid == *cid) {
+                        fresh.push(crossing);
+                    }
+                    changed = true;
+                }
+            }
+            for cid in quarantined {
+                changed |= state.quarantined.insert(cid);
+            }
+            changed
+        };
+        for crossing in fresh {
+            self.table
+                .record_crossing_drop(author, &crossing.measure, &crossing.kind, at);
+        }
+        changed
     }
 
     /// The channel-health counters, for the daemon to record projection and fold failures in.
