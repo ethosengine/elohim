@@ -344,15 +344,29 @@ fn a_silent_or_unreachable_carrier_means_run_here_and_a_fresh_one_a_wait_that_en
         600
     )));
     // Fresh: a bounded wait, the earliest of the carry's bound, the lander's own and the deadline.
-    assert_eq!(
-        lander(&records, 1_010, Some(1_000), None, 60),
-        CarryDecision::Wait {
-            by: B.to_string(),
-            until: 1_070,
-            wait_s: 60,
-            commitment: cid("c-b").to_string(),
-        }
-    );
+    let fresh = lander(&records, 1_010, Some(1_000), None, 60);
+    assert!(matches!(
+        &fresh,
+        CarryDecision::Wait { by, until: 1_070, wait_s: 60, commitment, .. }
+            if by == B && *commitment == cid("c-b").to_string()
+    ));
+    // The wire shape the gate runner reads: decision, until, by, reason, and nothing else.
+    let wire = serde_json::to_value(&fresh).expect("a decision serializes");
+    let keys: Vec<&str> = wire
+        .as_object()
+        .unwrap()
+        .keys()
+        .map(String::as_str)
+        .collect();
+    assert_eq!(keys.len(), 4, "{wire}");
+    assert_eq!(wire["decision"], "wait");
+    assert_eq!(wire["until"], 1_070);
+    assert_eq!(wire["by"], B);
+    assert!(wire["reason"].is_string());
+    let run_here = serde_json::to_value(lander(&records, 1_010, None, None, 60)).unwrap();
+    assert_eq!(run_here.as_object().unwrap().len(), 2, "{run_here}");
+    assert_eq!(run_here["decision"], "run-here");
+    assert!(run_here["reason"].is_string());
     assert!(matches!(
         lander(&records, 1_010, Some(1_000), Some(1_040), 600),
         CarryDecision::Wait {

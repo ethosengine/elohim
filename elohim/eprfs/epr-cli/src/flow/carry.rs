@@ -190,14 +190,20 @@ pub enum CarryDecision {
         commitment: String,
     },
     /// Lander role: no carry is worth waiting for; run the gate here (`NotCarried`).
+    /// Wire: `{"decision":"run-here","reason":"…"}`.
     #[serde(rename_all = "camelCase")]
-    RunHere { why: String },
+    RunHere { reason: String },
     /// Lander role: a fresh sibling carries the miss; wait at most `wait_s`, then run here.
+    /// Wire: `{"decision":"wait","until":<unix s>,"by":"<did>","reason":"…"}`; `wait_s` and the
+    /// keeping commitment are for this process only.
     #[serde(rename_all = "camelCase")]
     Wait {
-        by: String,
         until: u64,
+        by: String,
+        reason: String,
+        #[serde(skip)]
         wait_s: u64,
+        #[serde(skip)]
         commitment: String,
     },
 }
@@ -215,7 +221,7 @@ impl CarryDecision {
                 short(by),
                 short(commitment)
             ),
-            Self::RunHere { why } => println!("carry   not carried: run here ({why})"),
+            Self::RunHere { reason } => println!("carry   not carried: run here ({reason})"),
             Self::Wait {
                 by, until, wait_s, ..
             } => println!(
@@ -521,15 +527,17 @@ fn lander_decision(
     bounds: &LanderBounds<'_>,
     now_unix_s: u64,
 ) -> CarryDecision {
-    let run_here = |why: &str| CarryDecision::RunHere {
-        why: why.to_string(),
+    let run_here = |reason: &str| CarryDecision::RunHere {
+        reason: reason.to_string(),
     };
     let siblings: Vec<&LiveCarry> = matching.iter().filter(|c| c.carrier.is_some()).collect();
     if siblings.is_empty() {
         return run_here("no admitted device carries this miss");
     }
     let (Some(freshness_s), Some(max_skew_s)) = (bounds.freshness_s, bounds.max_skew_s) else {
-        return run_here("freshness or skew budget unreadable from policy");
+        return run_here(
+            "berth.channel.freshness_s or max_skew_s is unreadable from the pool policy; no guess is made",
+        );
     };
     if bounds.wait_until.is_some_and(|until| until <= now_unix_s) {
         return run_here("this landing's own stop-waiting time has passed");
@@ -561,8 +569,13 @@ fn lander_decision(
     if wait_s == 0 {
         return run_here("the wait bound has passed");
     }
+    let by = keeper.carrier.clone().unwrap_or_default();
     CarryDecision::Wait {
-        by: keeper.carrier.clone().unwrap_or_default(),
+        reason: format!(
+            "{by} carries this miss under commitment {}; waiting at most {wait_s} s, then running here",
+            keeper.commitment
+        ),
+        by,
         until,
         wait_s,
         commitment: keeper.commitment.clone(),
