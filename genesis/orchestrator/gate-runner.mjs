@@ -22,6 +22,7 @@ import {
   selfAgentId, siblingGovernanceChange, siblingVerdicts, stepFingerprints,
 } from './gate-evidence.mjs';
 import { britAffected, resolveBritBin } from './gate-oracle.mjs';
+import { landerWait } from './gate-carry-claim.mjs';
 import { recipeKeyShadow } from './gate-recipe-key.mjs';
 import { CLAIMED_EXIT_CODE, runAttested } from './gate-attest.mjs';
 import { affectedPackages, loadMetadata } from './cargo-affected.mjs';
@@ -721,6 +722,14 @@ export function runProject(project, printOnly, namesOnly, {
     selfId: env.GATE_EVIDENCE === 'reuse' ? selfId : null,
     selectorCheck: reuseSelector(project, gateCommit, { root, env: childEnv, spawn, inputs: inputsClass }),
   };
+  landerWait({ intent: env.GATE_LANDING_INTENT, project: project.name, closure: evidence.key,
+    mode: env.GATE_CARRY_WAIT || 'shadow', ownStopAt: env.GATE_LANDING_STOP_AT, deps: {
+      exec: (args, options) => spawn(env.EPR_BIN || 'epr', args, { ...options, cwd: root, env }),
+      now: () => Date.now() / 1000, monotonic: () => Number(clock()) / 1e9,
+      sleep: seconds => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, seconds * 1000),
+      log: line => write(`[gate] ${project.name} carry: ${line}\n`),
+      verdict: () => siblingVerdicts(project, evidence.key, { root, env, spawn }).candidates,
+    } });
   // One admission decision for both run modes (decideReuse); ark is then asked only to run.
   const decision = decideReuse(project, evidence, reuseContext, { root, env, spawn });
   // GATE_INPUTS=shadow: whether the step fingerprints are unchanged under sources. Read only, inside
