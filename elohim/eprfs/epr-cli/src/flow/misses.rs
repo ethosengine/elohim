@@ -29,6 +29,7 @@ pub struct OpenMiss {
 
 type MissKey = (Option<String>, String, String, String);
 type IntentKey = (Option<String>, String);
+type ChangeKey = (Option<String>, String);
 
 /// Project every miss that remains open after folding the supplied records.
 pub fn open_misses(
@@ -40,6 +41,9 @@ pub fn open_misses(
     let mut seen_events = BTreeSet::new();
     let mut verdicts = BTreeSet::<(String, String)>::new();
     let mut settled = BTreeSet::<IntentKey>::new();
+    let mut settled_changes = BTreeSet::<ChangeKey>::new();
+    let mut changed_intents = BTreeSet::<IntentKey>::new();
+    let mut latest_misses = BTreeMap::<ChangeKey, String>::new();
     let mut intents = BTreeMap::<IntentKey, Option<String>>::new();
 
     for (cid, record) in records {
@@ -74,9 +78,25 @@ pub fn open_misses(
                 let intent = event.resource.to_string();
                 match kind {
                     Some("misses") if seen_events.insert(*cid) => {
+                        let env = event_env(event);
+                        if let Some(change) = env.get("change") {
+                            let key = (announcer.clone(), (*change).to_string());
+                            if let Some(prior) = latest_misses.insert(key, intent.clone()) {
+                                if prior != intent {
+                                    changed_intents.insert((announcer.clone(), prior));
+                                }
+                            }
+                        }
                         collect_misses(&mut misses, cid, event, announcer, &intent);
                     }
-                    Some("landed" | "withdraw" | "dismiss") => {
+                    Some("landed") => {
+                        let env = event_env(event);
+                        if let Some(change) = env.get("change") {
+                            settled_changes.insert((announcer.clone(), (*change).to_string()));
+                        }
+                        settled.insert((announcer, intent));
+                    }
+                    Some("withdraw" | "dismiss") => {
                         settled.insert((announcer, intent));
                     }
                     Some("intent") => {
@@ -94,12 +114,35 @@ pub fn open_misses(
     }
 
     let superseded = live_superseded(&intents, &settled);
-    misses.retain(|(announcer, intent, project, closure), _| {
+    misses.retain(|(announcer, intent, project, closure), miss| {
         !verdicts.contains(&(project.clone(), closure.clone()))
             && !settled.contains(&(announcer.clone(), intent.clone()))
             && !superseded.contains(&(announcer.clone(), intent.clone()))
+            && !settled_changes.contains(&(announcer.clone(), miss.change.clone()))
+            && !changed_intents.contains(&(announcer.clone(), intent.clone()))
     });
     misses.into_values().collect()
+}
+
+/// Whether the miss `(intent, project, closure)` is settled, by exactly the rule `open_misses`
+/// folds: a miss is settled when no open miss names it. A miss no event ever posted is settled
+/// too, since there is nothing open to carry. The carry claim calls this, so a carry and a miss
+/// settle by one rule.
+#[allow(
+    dead_code,
+    reason = "its one caller is the carry claim (flow/carry.rs), which lands in the integrator's roll"
+)]
+pub(crate) fn miss_settled(
+    records: &[(Cid, FlowRecord)],
+    admits: &dyn Fn(&str) -> bool,
+    me: Option<&str>,
+    intent: &str,
+    project: &str,
+    closure: &str,
+) -> bool {
+    !open_misses(records, admits, me)
+        .iter()
+        .any(|miss| miss.intent == intent && miss.project == project && miss.closure == closure)
 }
 
 fn eligible_announcer(
@@ -388,6 +431,48 @@ mod tests {
         assert_eq!(rows_with_verdict("true", "fedcba").len(), 1);
     }
 
+    #[test]
+    fn miss_settled_is_the_open_misses_rule() {
+        let intent = cid("settled-intent");
+        let posted = (
+            cid("settled-miss"),
+            misses(intent, "eprfs=abcdef", None, None, "1", None),
+        );
+        let open = [posted.clone()];
+        let intent = intent.to_string();
+        assert!(!miss_settled(
+            &open,
+            &admitted,
+            Some(ME),
+            &intent,
+            "eprfs",
+            "abcdef"
+        ));
+        let answered = [
+            posted,
+            (
+                cid("settled-verdict"),
+                verdict("eprfs", "abcdef", "true", Some(SIBLING)),
+            ),
+        ];
+        assert!(miss_settled(
+            &answered,
+            &admitted,
+            Some(ME),
+            &intent,
+            "eprfs",
+            "abcdef"
+        ));
+        assert!(miss_settled(
+            &open,
+            &admitted,
+            Some(ME),
+            &intent,
+            "eprfs",
+            "fedcba"
+        ));
+    }
+
     fn rows_with_verdict(success: &str, closure: &str) -> Vec<OpenMiss> {
         let intent = cid("verdict-intent");
         open_misses(
@@ -455,6 +540,73 @@ mod tests {
         ];
 
         assert!(open_misses(&records, &admitted, Some(ME)).is_empty());
+    }
+
+    #[test]
+    fn landed_for_the_same_change_settles_a_different_intent() {
+        let intent = cid("change-landed-intent");
+        let landed_intent = cid("change-landed-successor");
+        let records = vec![
+            (
+                cid("change-landed-miss"),
+                misses(intent, "eprfs=abcdef", None, None, "1", Some(SIBLING)),
+            ),
+            (
+                cid("change-landed-event"),
+                event(
+                    LANDING_MEASURE,
+                    "landed",
+                    landed_intent,
+                    &[("change", CHANGE)],
+                    Some(SIBLING),
+                ),
+            ),
+        ];
+
+        assert!(open_misses(&records, &admitted, Some(ME)).is_empty());
+    }
+
+    #[test]
+    fn later_misses_for_the_same_change_settle_the_prior_intent() {
+        let prior = cid("changed-prior-intent");
+        let later = cid("changed-later-intent");
+        let records = vec![
+            (
+                cid("changed-prior-event"),
+                misses(prior, "eprfs=abcdef", None, None, "1", Some(SIBLING)),
+            ),
+            (
+                cid("changed-later-event"),
+                misses(later, "eprfs=fedcba", None, None, "2", Some(SIBLING)),
+            ),
+        ];
+
+        let rows = open_misses(&records, &admitted, Some(ME));
+
+        assert!(rows.iter().all(|row| row.intent != prior.to_string()));
+    }
+
+    #[test]
+    fn earlier_misses_for_the_same_change_do_not_settle_the_later_intent() {
+        let prior = cid("ordered-prior-intent");
+        let later = cid("ordered-later-intent");
+        let later_event = cid("ordered-later-event");
+        let records = vec![
+            (
+                cid("ordered-prior-event"),
+                misses(prior, "eprfs=abcdef", None, None, "1", Some(SIBLING)),
+            ),
+            (
+                later_event,
+                misses(later, "eprfs=fedcba", None, None, "2", Some(SIBLING)),
+            ),
+        ];
+
+        let rows = open_misses(&records, &admitted, Some(ME));
+
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].intent, later.to_string());
+        assert_eq!(rows[0].event, later_event.to_string());
     }
 
     #[test]

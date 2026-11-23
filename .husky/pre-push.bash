@@ -808,7 +808,7 @@ handover_finish() {
   # The warn-only Brit integrity advisory, when forced: it never refuses.
   [ "${BRIT_ADVISORY:-}" != "always" ] || brit_advisory
   if ! printf '%s\n' "${PUSH_LINES[@]}" |
-     node "$HOOK_WORK_TREE/genesis/orchestrator/handover-record.mjs" --root "$HOOK_WORK_TREE"; then
+     node "$HOOK_WORK_TREE/genesis/orchestrator/handover-record.mjs" --root "$HOOK_WORK_TREE" --projects "$PROJECTS"; then
     echo "[pre-push] REFUSED: the hand-over record was not written (above); a hand-over is never pushed without it." >&2
     exit 1
   fi

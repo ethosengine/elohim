@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
 use elohim_epr_cli::flow::{project, walk};
-use elohim_epr_rea::{atom_cid, FlowEvent, FlowRecord, FlowStore, SidecarFlowStore};
+use elohim_epr_rea::{atom_cid, FlowEvent, FlowRecord, FlowStore, ReaVerb, SidecarFlowStore};
 use eprfs_peer::{fold_events, ChannelEvent, CrossingAllowList};
 use tempfile::TempDir;
 
@@ -12,6 +12,7 @@ const CHANGE: &str = "I0123456789abcdef0123456789abcdef01234567";
 const OTHER_CHANGE: &str = "I1123456789abcdef0123456789abcdef01234567";
 const TREE: &str = "0123456789abcdef0123456789abcdef01234567";
 const BASE: &str = "1123456789abcdef0123456789abcdef01234567";
+const SELF_REF: &str = "refs/heads/self/f4-ask";
 
 struct Fixture {
     root: TempDir,
@@ -443,6 +444,127 @@ fn verified_writes_one_crossing_intent_cite() {
     assert!(!landing_allow().admits(raised_event));
     let replay = success_json(fixture.epr(&["--verified", intent, "--gate-s", "9"]));
     assert_eq!(replay["appended"], false);
+}
+
+#[test]
+fn misses_accepts_root_and_json_writes_exact_crossing_event_and_is_idempotent() {
+    let fixture = Fixture::new();
+    let raised = fixture.raise(CHANGE);
+    let intent = raised["intent"].as_str().unwrap();
+    let args = [
+        "--misses",
+        intent,
+        "--commit",
+        TREE,
+        "--ref",
+        SELF_REF,
+        "--miss",
+        "eprfs=abcdef",
+        "--p90",
+        "eprfs=42",
+        "--wait-until",
+        "1792769289",
+    ];
+
+    let written = success_json(fixture.epr(&args));
+
+    assert_eq!(written["mode"], "misses");
+    assert_eq!(written["appended"], true);
+    let records = fixture.records();
+    assert_eq!(records.len(), 3);
+    let raised_event = event(&records[1].1);
+    let misses_event = event(&records[2].1);
+    assert_eq!(misses_event.action, ReaVerb::Cite);
+    assert_eq!(misses_event.resource.to_string(), intent);
+    assert!(misses_event.satisfies.is_empty());
+    assert_eq!(
+        misses_event.classified_as,
+        vec![
+            "dev-landing:misses".to_string(),
+            CHANGE.to_string(),
+            "reason:misses".to_string(),
+            "measure:dev-landing@1".to_string(),
+            "value:1".to_string(),
+            "unit:landings".to_string(),
+            format!("env:at={}", env(raised_event, "at").unwrap()),
+            format!("env:base={BASE}"),
+            format!("env:change={CHANGE}"),
+            format!("env:commit={TREE}"),
+            "env:dseq=1".to_string(),
+            "env:miss=eprfs=abcdef".to_string(),
+            "env:p90=eprfs=42".to_string(),
+            format!("env:ref={SELF_REF}"),
+            "env:session=landing-test".to_string(),
+            format!("env:tree={TREE}"),
+            "env:wait_until=1792769289".to_string(),
+        ]
+    );
+    assert!(landing_allow().admits(misses_event));
+
+    let replay = success_json(fixture.epr(&args));
+    assert_eq!(replay["appended"], false);
+    assert_eq!(fixture.records().len(), 3);
+
+    let changed = success_json(fixture.epr(&[
+        "--misses",
+        intent,
+        "--commit",
+        TREE,
+        "--ref",
+        SELF_REF,
+        "--miss",
+        "eprfs=fedcba",
+    ]));
+    assert_eq!(changed["appended"], true);
+    assert_eq!(fixture.records().len(), 4);
+}
+
+#[test]
+fn misses_refuses_non_own_intent_bad_ref_missing_miss_and_unmatched_p90() {
+    let fixture = Fixture::new();
+    let raised = fixture.raise(CHANGE);
+    let intent = raised["intent"].as_str().unwrap();
+    let not_own = atom_cid(&"not-own-intent".to_string()).unwrap().to_string();
+    let cases = [
+        vec![
+            "--misses",
+            not_own.as_str(),
+            "--commit",
+            TREE,
+            "--ref",
+            SELF_REF,
+            "--miss",
+            "eprfs=abcdef",
+        ],
+        vec![
+            "--misses",
+            intent,
+            "--commit",
+            TREE,
+            "--ref",
+            "refs/heads/dev",
+            "--miss",
+            "eprfs=abcdef",
+        ],
+        vec!["--misses", intent, "--commit", TREE, "--ref", SELF_REF],
+        vec![
+            "--misses",
+            intent,
+            "--commit",
+            TREE,
+            "--ref",
+            SELF_REF,
+            "--miss",
+            "eprfs=abcdef",
+            "--p90",
+            "app=42",
+        ],
+    ];
+
+    for args in cases {
+        assert!(!fixture.epr(&args).status.success(), "{args:?}");
+    }
+    assert_eq!(fixture.records().len(), 2);
 }
 
 #[test]

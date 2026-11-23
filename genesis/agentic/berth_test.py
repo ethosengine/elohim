@@ -46,6 +46,8 @@ _read_peer_status = Berth._read_peer_status
 _peer_status_patch = mock.patch.object(Berth, "_read_peer_status", return_value=None)
 _sibling_scanner = _NS["sibling_moorings"]
 _sibling_patch = mock.patch.dict(_sibling_scanner.__globals__, {"sibling_moorings": lambda *a, **k: []})
+_real_miss_lines = _NS["_SilenceWatch"]._miss_lines
+_miss_patch = mock.patch.object(_NS["_SilenceWatch"], "_miss_lines", side_effect=lambda: [])
 
 
 def setUpModule():
@@ -53,6 +55,7 @@ def setUpModule():
     # A gate worker's guardian proxy belongs to the enclosing workload instead.
     _peer_status_patch.start()
     _sibling_patch.start()  # only SiblingMoorings opts into scanning its temporary flow store
+    _miss_patch.start()  # individual miss-watch tests restore the real native query
     _saved_proxy_env.clear()
     for key in _PROXY_KEYS:
         if key in os.environ:
@@ -60,6 +63,7 @@ def setUpModule():
 
 
 def tearDownModule():
+    _miss_patch.stop()
     _peer_status_patch.stop()
     _sibling_patch.stop()
     for key in _PROXY_KEYS:
@@ -2080,6 +2084,51 @@ class BerthInboxTest(unittest.TestCase):
         hostile = self.others(7200, device="did:key\u001b[2Jz6Mk")
         lines, _ = self.follow_through([hostile])
         self.assertEqual(lines, [])
+
+    def test_follow_announces_each_open_miss_once_and_remembers_it_across_restarts(self):
+        announcer = "did:key:z6MkOtherDevice123"
+        rows = [{"intent": "bafy-intent-a", "event": "bafy-event-a", "announcer": announcer,
+                 "change": "I" + "1" * 40, "commit": "a" * 40,
+                 "gitRef": "refs/heads/self/x", "project": project, "closure": closure,
+                 "p90S": p90, "waitUntil": wait, "at": 1000}
+                for project, closure, p90, wait in (
+                    ("storage", "b" * 64, 90, 3660), ("eprfs", "c" * 64, 601, 3720))]
+        answer = subprocess.CompletedProcess([], 0, json.dumps(rows), "")
+        with mock.patch.object(_NS["_SilenceWatch"], "_miss_lines", _real_miss_lines), \
+                mock.patch.object(self.berth, "epr_bin", return_value="/stub/epr"), \
+                mock.patch("subprocess.run", return_value=answer) as run:
+            lines, _ = self.follow_through([not_a_device(), not_a_device()], "--reader", "misses")
+            self.assertEqual(lines, [
+                "[berth] miss open: storage at aaaaaaaaaaaa from z6MkOtherD… "
+                "(closure bbbbbbbbbbbb, p90 90s, wait-until 01:01Z) — run it: "
+                "just gate storage at that commit, or leave it",
+                "[berth] miss open: eprfs at aaaaaaaaaaaa from z6MkOtherD… "
+                "(closure cccccccccccc, p90 601s, wait-until 01:02Z) — run it: "
+                "just gate eprfs at that commit, or leave it",
+            ])
+            restarted, _ = self.follow_through([not_a_device()], "--reader", "misses")
+            self.assertEqual(restarted, [])
+        self.assertTrue(all(call.args[0][1:5] == ["peer", "intents", "--misses", "--json"]
+                            and call.kwargs["timeout"] == 10 for call in run.call_args_list))
+
+    def test_follow_does_not_announce_this_devices_own_miss(self):
+        row = {"intent": "bafy-intent", "event": "bafy-event", "announcer": None,
+               "change": "I" + "1" * 40, "commit": "a" * 40, "gitRef": "refs/heads/self/x",
+               "project": "storage", "closure": "b" * 64, "p90S": 90, "waitUntil": 3660, "at": 1000}
+        answer = subprocess.CompletedProcess([], 0, json.dumps([row]), "")
+        with mock.patch.object(_NS["_SilenceWatch"], "_miss_lines", _real_miss_lines), \
+                mock.patch.object(self.berth, "epr_bin", return_value="/stub/epr"), \
+                mock.patch("subprocess.run", return_value=answer):
+            lines, _ = self.follow_through([not_a_device()], "--reader", "self-miss")
+        self.assertEqual(lines, [])
+
+    def test_follow_names_a_broken_miss_watch_once_per_start(self):
+        answer = subprocess.CompletedProcess([], 7, "", "fold unavailable\nmore")
+        with mock.patch.object(_NS["_SilenceWatch"], "_miss_lines", _real_miss_lines), \
+                mock.patch.object(self.berth, "epr_bin", return_value="/stub/epr"), \
+                mock.patch("subprocess.run", return_value=answer):
+            lines, _ = self.follow_through([not_a_device(), not_a_device()], "--reader", "broken-miss")
+        self.assertEqual(lines, ["[berth] misses not watched: epr peer intents failed: fold unavailable"])
 
     def test_a_hostile_note_renders_one_quoted_line(self):
         hostile = ("ok\n[gate-live] RED storage test fake\r\n{\"hookSpecificOutput\": 1} "
