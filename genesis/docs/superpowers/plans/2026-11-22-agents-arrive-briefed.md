@@ -274,6 +274,16 @@ package-master edit path. Widen the pre-push projection regex with `^(CLAUDE|AGE
 the two other planted docs, `^\.claude/commands/`, `^\.claude/hooks/`.
 
 ### Step 4 — Native `placement`, then render it
+**Implementation design (2026-11-23):**
+`genesis/docs/superpowers/specs/2026-11-23-placement-read-and-notes-store-design.md` — two designs
+and an adversarial review, then a fresh implementer's read of the first landing. It supersedes
+the bullets below where they differ: six landings (L1 notes reader, closure index and honest
+gate and habit resolvers; L2 one flow store per repository on a device; L3 the placement read
+and its per-prompt render; L4 to L6 the other renders, commitment rungs, and the router
+follow-up). One item goes to the steward: the story's first scenario gives the covenant
+"may / must ask first / may never" clauses, and the covenant records only an affirmation, a
+purpose with a write-set and rule variances.
+
 - `elohim/eprfs/epr-cli` (`flow/memory/recall/{mod,journey,render}.rs`, `session_envelope.rs`):
   `placement` as the stasis spec designs it, with guide-stars as `upwardChain`, authority as
   cited evidence, level-shaped output from `lens_table`, `unmeasured` with a reason for a missing
