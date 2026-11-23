@@ -247,7 +247,7 @@ fn a_replay_of_the_same_carry_appends_nothing_and_keeps_its_bound() {
     let miss = fixture.post_miss(&intent);
     let first = success_json(fixture.carry(&intent, &miss, "600"));
     let count = fixture.records().len();
-    let replay = success_json(fixture.carry(&intent, &miss, "90000"));
+    let replay = success_json(fixture.carry(&intent, &miss, "7200"));
     assert_eq!(replay["appended"], false);
     assert_eq!(replay["validUntil"], first["validUntil"]);
     assert_eq!(replay["commitment"], first["commitment"]);
@@ -262,6 +262,8 @@ fn a_carry_refuses_a_zero_bound_or_a_malformed_miss_before_any_append() {
     let miss = fixture.post_miss(&intent);
     let count = fixture.records().len();
     assert!(!fixture.carry(&intent, &miss, "0").status.success());
+    // Past the ceiling a claim is refused: it would hold other carriers off for longer than any gate.
+    assert!(!fixture.carry(&intent, &miss, "90000").status.success());
     assert!(!fixture.carry(&intent, "not-a-cid", "60").status.success());
     assert!(!fixture.carry("not-a-cid", &miss, "60").status.success());
     // The raise event is no misses event: no open miss is named by it.
