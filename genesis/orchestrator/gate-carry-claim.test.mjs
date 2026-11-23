@@ -31,7 +31,7 @@ test('rule 1: off spawns nothing; shadow asks once, prints one line, and waits z
   assert.match(f.lines[0], /would have waited for did:carrier until 1100/);
   assert.deepEqual(f.sleeps, []);
   assert.deepEqual(f.calls[0], { args: ['flow', 'intend', '--carry-decision', 'intent-cid', '--project', 'p',
-    '--closure', 'k', '--role', 'lander', '--json'],
+    '--closure', 'k', '--role', 'lander', '--max-wait-s', '1800', '--json'],
   options: { encoding: 'utf8', timeout: 5000 } });
 });
 

@@ -30,8 +30,12 @@ export function landerWait({ intent, project, closure, freshnessS, mode = 'shado
     try {
       // Freshness is the policy's (berth.channel.freshness_s); the native read takes it from
       // there unless a caller names one, so no second copy of the number lives here.
+      // The native read answers run-here unless it is told how long this lander may still wait:
+      // the seconds left on the local monotonic deadline, which only ever shrinks.
+      const leftS = Math.max(0, Math.floor(deadline - monotonic()));
       const r = exec(['flow', 'intend', '--carry-decision', intent, '--project', project,
-        '--closure', closure, '--role', 'lander',
+        '--closure', closure, '--role', 'lander', '--max-wait-s', String(leftS),
+        ...(Number.isFinite(own) ? ['--wait-until', String(Math.floor(own))] : []),
         ...(freshnessS == null ? [] : ['--freshness-s', String(freshnessS)]), '--json'],
       { encoding: 'utf8', timeout: 5000 });
       if (r.error) throw r.error;
