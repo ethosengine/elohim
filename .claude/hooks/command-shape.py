@@ -1,5 +1,19 @@
 #!/usr/bin/env python3
-"""Warn when a visible shell call has a shape that can stall or conceal its effect."""
+"""Warn when a visible shell call has a shape that can stall or conceal its effect.
+
+Why: a compound command is held by review. A call that chains a read with a mutation, opens
+with a comment, changes directory, feeds code through a heredoc or waits without a bound cannot
+be judged one effect at a time, so the permission review holds it, and an agent waits on a
+question it could have avoided. The repository's own rules push agents toward that shape: a
+required "# Brit fallback:" first line, "berth claim ... && cargo ... ; berth release", and
+wait loops written from memory. The cure is one operation per call, and a named script for any
+sequence worth repeating (landing-pick, landing-retrailer, landing-tagged-tip), so review sees a
+name it can judge once.
+
+This check only advises: it adds context and never refuses or approves. It is an edge
+implementor of that rule, not the rule itself; a device may tune its findings, thresholds or
+named replacements to the review it actually runs, and absence of a finding is not approval.
+"""
 import importlib.util
 import json
 from pathlib import Path
