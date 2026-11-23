@@ -43,6 +43,7 @@ use crate::actor::{
     channel_standing, steward_lineage, ActorError, ChannelStanding, StewardLineage,
 };
 use crate::device_key::{self, DeviceKey};
+use crate::flow::carry::{live_carries, LiveCarry};
 use crate::flow::intend::{
     own_state, parse_joined_closures, unix_slot_ms, INTENT_TAG, KINDS, LANDING_MEASURE,
 };
@@ -2002,6 +2003,21 @@ struct Advisory {
     why: String,
 }
 
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct CarriedBy {
+    device: String,
+    until: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct OpenMissOutput {
+    #[serde(flatten)]
+    miss: OpenMiss,
+    carried_by: Vec<CarriedBy>,
+}
+
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct LandingIntentOutput {
@@ -2009,7 +2025,7 @@ struct LandingIntentOutput {
     device: Option<String>,
     store: Option<String>,
     intents: Vec<LandingIntent>,
-    misses: Vec<OpenMiss>,
+    misses: Vec<OpenMissOutput>,
     advisory: Vec<Advisory>,
     error: Option<String>,
     now: u64,
@@ -2112,15 +2128,19 @@ fn intents(options: &Options) -> PeerResult<ExitCode> {
     let records = store
         .records()
         .map_err(|error| PeerCliError::Peer(PeerError::FlowStore(error)))?;
-    let misses = open_misses(
-        &records,
-        &|writer| {
-            admission
-                .as_ref()
-                .is_some_and(|allowed| allowed.admits_device(writer))
-        },
-        me.as_deref(),
-    );
+    let admits = |writer: &str| {
+        admission
+            .as_ref()
+            .is_some_and(|allowed| allowed.admits_device(writer))
+    };
+    let carries = live_carries(&records, &admits, me.as_deref(), now / 1000);
+    let misses = open_misses(&records, &admits, me.as_deref())
+        .into_iter()
+        .map(|miss| OpenMissOutput {
+            carried_by: carried_by(&miss, &carries, me.as_deref()),
+            miss,
+        })
+        .collect();
     let mut rows: std::collections::BTreeMap<(String, String), LandingIntent> =
         std::collections::BTreeMap::new();
     for (index, (cid, record)) in records.iter().enumerate() {
@@ -2468,17 +2488,20 @@ fn render_intents(options: &Options, output: LandingIntentOutput) -> PeerResult<
             for miss in &output.misses {
                 println!(
                     "miss  {}  closure {}  commit {}  from {}  p90 {}  wait-until {}  carried {}",
-                    miss.project,
-                    miss.closure.chars().take(16).collect::<String>(),
-                    miss.commit.chars().take(12).collect::<String>(),
-                    miss.announcer
+                    miss.miss.project,
+                    miss.miss.closure.chars().take(16).collect::<String>(),
+                    miss.miss.commit.chars().take(12).collect::<String>(),
+                    miss.miss
+                        .announcer
                         .as_deref()
                         .map_or_else(|| "local".to_string(), short),
-                    miss.p90_s
+                    miss.miss
+                        .p90_s
                         .map_or_else(|| "-".to_string(), |value| format!("{value}s")),
-                    miss.wait_until
+                    miss.miss
+                        .wait_until
                         .map_or_else(|| "-".to_string(), wait_until_iso),
-                    carried_cell(miss),
+                    carried_cell(&miss.carried_by),
                 );
             }
         }
@@ -2533,8 +2556,35 @@ fn wait_until_iso(seconds: u64) -> String {
         )
 }
 
-fn carried_cell(_miss: &OpenMiss) -> String {
-    "-".to_string()
+fn carried_by(miss: &OpenMiss, carries: &[LiveCarry], me: Option<&str>) -> Vec<CarriedBy> {
+    carries
+        .iter()
+        .filter(|carry| {
+            carry.intent == miss.intent
+                && carry.project == miss.project
+                && carry.closure == miss.closure
+        })
+        .map(|carry| CarriedBy {
+            device: carry
+                .carrier
+                .as_deref()
+                .or(me)
+                .unwrap_or("local")
+                .to_string(),
+            until: wait_until_iso(carry.valid_until),
+        })
+        .collect()
+}
+
+fn carried_cell(carriers: &[CarriedBy]) -> String {
+    if carriers.is_empty() {
+        return "-".to_string();
+    }
+    carriers
+        .iter()
+        .map(|carry| format!("by {} until {}", short(&carry.device), carry.until))
+        .collect::<Vec<_>>()
+        .join("; ")
 }
 
 /// How this workspace stands for the lease view.

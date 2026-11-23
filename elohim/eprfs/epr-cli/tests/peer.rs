@@ -1642,6 +1642,96 @@ fn intents_misses_json(device: &Device, root: &Path, policy: &Path) -> serde_jso
     serde_json::from_slice(&output.stdout).unwrap()
 }
 
+fn intents_misses_text(device: &Device, root: &Path, policy: &Path) -> String {
+    let before = tree_listing(root);
+    let output = device.epr(&[
+        "peer",
+        "intents",
+        "--misses",
+        "--root",
+        root.to_str().unwrap(),
+        "--policy",
+        policy.to_str().unwrap(),
+    ]);
+    assert_eq!(
+        tree_listing(root),
+        before,
+        "peer intents --misses changed the root tree"
+    );
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    String::from_utf8(output.stdout).unwrap()
+}
+
+fn misses_record(intent: &str, closure: &str, dseq: &str, via: &str) -> FlowEvent {
+    let miss = format!("eprfs={closure}");
+    landing_record(
+        "misses",
+        intent,
+        LANDING_CHANGE,
+        &[
+            ("at", "1792769289.123"),
+            ("base", LANDING_BASE),
+            ("change", LANDING_CHANGE),
+            ("commit", LANDING_TREE),
+            ("dseq", dseq),
+            ("miss", &miss),
+            ("p90", "eprfs=42"),
+            ("ref", "refs/heads/self/f4-ask"),
+            ("tree", LANDING_TREE),
+            ("wait_until", "1893456000"),
+        ],
+        Some(via),
+    )
+}
+
+fn carry_record(
+    intent: &str,
+    closure: &str,
+    miss: &str,
+    valid_until: u64,
+    dseq: &str,
+    via: &str,
+) -> FlowEvent {
+    let commitment = atom_cid(&format!("commitment-{closure}-{valid_until}-{dseq}")).unwrap();
+    let valid_until = valid_until.to_string();
+    landing_record(
+        "carry",
+        intent,
+        LANDING_CHANGE,
+        &[
+            ("at", "1792769290.123"),
+            ("closure", closure),
+            ("commitment", &commitment.to_string()),
+            ("dseq", dseq),
+            ("miss", miss),
+            ("project", "eprfs"),
+            ("valid_until", &valid_until),
+        ],
+        Some(via),
+    )
+}
+
+fn now_unix_s() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs()
+}
+
+fn rfc3339(unix_s: u64) -> String {
+    chrono::DateTime::<chrono::Utc>::from_timestamp(i64::try_from(unix_s).unwrap(), 0)
+        .unwrap()
+        .to_rfc3339_opts(chrono::SecondsFormat::Secs, true)
+}
+
+fn short_device(did: &str) -> String {
+    format!("{}…{}", &did[..16], &did[did.len() - 4..])
+}
+
 fn announcement(intent: &str, via: Option<&str>, dseq: &str) -> FlowEvent {
     landing_record(
         "intent",
@@ -1784,6 +1874,128 @@ fn peer_intents_lists_a_crossed_miss_until_a_crossed_verdict_settles_it() {
         intents_misses_json(&b, b.checkout.path(), &policy),
         serde_json::json!([])
     );
+}
+
+#[test]
+fn peer_intents_misses_renders_a_live_carry_in_text_and_json() {
+    let (keys, a, b) = household();
+    let policy = steward_policy(keys.path());
+    let intent = atom_cid(&"live-carry-intent".to_string())
+        .unwrap()
+        .to_string();
+    let miss = misses_record(&intent, "abcdef", "7", &a.key.did_key());
+    let miss_cid = atom_cid(&miss).unwrap().to_string();
+    let until = now_unix_s() + 3_600;
+    append(
+        b.checkout.path(),
+        [
+            miss,
+            carry_record(&intent, "abcdef", &miss_cid, until, "8", &a.key.did_key()),
+        ],
+    );
+    save_served_table(
+        &b,
+        b.checkout.path(),
+        Some((&a.key.did_key(), 1_792_769_291_000)),
+    );
+
+    let misses = intents_misses_json(&b, b.checkout.path(), &policy);
+    assert_eq!(
+        misses[0]["carriedBy"],
+        serde_json::json!([{"device": a.key.did_key(), "until": rfc3339(until)}]),
+        "{misses}"
+    );
+    let text = intents_misses_text(&b, b.checkout.path(), &policy);
+    assert!(
+        text.contains(&format!(
+            "carried by {} until {}",
+            short_device(&a.key.did_key()),
+            rfc3339(until)
+        )),
+        "{text}"
+    );
+}
+
+#[test]
+fn peer_intents_misses_renders_an_expired_carry_as_dash() {
+    let (keys, a, b) = household();
+    let policy = steward_policy(keys.path());
+    let intent = atom_cid(&"expired-carry-intent".to_string())
+        .unwrap()
+        .to_string();
+    let miss = misses_record(&intent, "abcdef", "7", &a.key.did_key());
+    let miss_cid = atom_cid(&miss).unwrap().to_string();
+    append(
+        b.checkout.path(),
+        [
+            miss,
+            carry_record(
+                &intent,
+                "abcdef",
+                &miss_cid,
+                now_unix_s().saturating_sub(1),
+                "8",
+                &a.key.did_key(),
+            ),
+        ],
+    );
+    save_served_table(
+        &b,
+        b.checkout.path(),
+        Some((&a.key.did_key(), 1_792_769_291_000)),
+    );
+
+    let misses = intents_misses_json(&b, b.checkout.path(), &policy);
+    assert_eq!(misses[0]["carriedBy"], serde_json::json!([]), "{misses}");
+    let text = intents_misses_text(&b, b.checkout.path(), &policy);
+    assert!(text.trim_end().ends_with("carried -"), "{text}");
+}
+
+#[test]
+fn peer_intents_misses_does_not_apply_a_carry_for_another_closure() {
+    let (keys, a, b) = household();
+    let policy = steward_policy(keys.path());
+    let intent = atom_cid(&"other-closure-carry-intent".to_string())
+        .unwrap()
+        .to_string();
+    let miss = misses_record(&intent, "abcdef", "7", &a.key.did_key());
+    let other_miss = misses_record(&intent, "fedcba", "8", &a.key.did_key());
+    let other_miss_cid = atom_cid(&other_miss).unwrap().to_string();
+    append(
+        b.checkout.path(),
+        [
+            miss,
+            other_miss,
+            carry_record(
+                &intent,
+                "fedcba",
+                &other_miss_cid,
+                now_unix_s() + 3_600,
+                "9",
+                &a.key.did_key(),
+            ),
+        ],
+    );
+    save_served_table(
+        &b,
+        b.checkout.path(),
+        Some((&a.key.did_key(), 1_792_769_291_000)),
+    );
+
+    let misses = intents_misses_json(&b, b.checkout.path(), &policy);
+    let target = misses
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|miss| miss["closure"] == "abcdef")
+        .unwrap();
+    assert_eq!(target["carriedBy"], serde_json::json!([]), "{misses}");
+    let text = intents_misses_text(&b, b.checkout.path(), &policy);
+    let target = text
+        .lines()
+        .find(|line| line.contains("closure abcdef"))
+        .unwrap();
+    assert!(target.ends_with("carried -"), "{text}");
 }
 
 #[test]
