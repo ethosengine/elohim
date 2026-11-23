@@ -203,8 +203,10 @@ Written by the integrator session (cacccb55, shem) from the push logs in the cam
   `PRE-PUSH GATE: ALL CLEAR (8866s)`. Its log has seven `reused` lines from this workspace's own
   verdicts: six `green … ago at a85090fd4 (signer this workspace)` (`eprfs-live-corpus`,
   `elohim-placement`, `elohim-ark`, `jenkins-bridge`, `k8s-bridge`, `elohim-epr`) and
-  `eprfs reused: green 3h ago at c44633243`. The integrator reports that the second push reused
-  25 verdicts recorded by the stopped one; that figure was not counted from the log here.
+  `eprfs reused: green 3h ago at c44633243`. The integrator told the steward during the push that
+  it had "reused 25 verdicts". That figure was wrong: it came from a count that also matched the
+  30 `not reused:` lines. The log holds 6 `reused:` lines for that push, and the other selected
+  gates ran.
 - **Phase L:** `dev-integration claimed in 17s`, `held 0s`, `landing ac4df62d7ca6 on 179814d6badb as a
   fast-forward`; the push printed `179814d6b..ac4df62d7  HEAD -> dev`, `PUSH_EXIT=0`. The
   integrator puts it at about 19:20Z (the log's last write is 19:20). `[edge:roll]` was declared.
