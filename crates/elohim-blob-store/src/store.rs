@@ -488,6 +488,18 @@ impl Drop for Destruction<'_> {
     }
 }
 
+impl Drop for Coordination {
+    fn drop(&mut self) {
+        // Unlock before the file closes: a child forked from this process and not yet exec'd
+        // holds a duplicate of the descriptor, and a lock released only by the close would stay
+        // held until that child's exec, refusing the next owner with `OwnerHeld`.
+        if let Some(owner) = &self._owner {
+            // An unlock failure leaves the lock to be released when the file closes.
+            let _ = owner.unlock();
+        }
+    }
+}
+
 impl Coordination {
     fn unlocked() -> Self {
         Self {
