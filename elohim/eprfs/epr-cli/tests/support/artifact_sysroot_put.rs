@@ -73,7 +73,15 @@ fn sysroot_put_then_output_fetch(with_requires: bool) {
     assert_eq!(recorded["input"], verified.cid().unwrap().to_string());
     let runtime = tokio::runtime::Runtime::new().unwrap();
     let family = runtime.block_on(async {
-        let store = eprfs_peer::open_payload_store(&a.payload()).unwrap();
+        // Opened as every epr process opens it, by the directory's format marker, so a
+        // blob-store payload root (the `blob-store` feature) is never read as a flat store.
+        let store = elohim_epr_cli::payload::open_payload_store(
+            &a.payload(),
+            elohim_epr_cli::payload::Access::Shared,
+        )
+        .await
+        .unwrap()
+        .store;
         let held = store
             .fetch_blob(&verified.cid().unwrap(), eprfs_core::FetchPolicy::LocalOnly)
             .await
