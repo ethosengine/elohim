@@ -13,36 +13,42 @@ rules:
     policy: record-and-judge-are-native@1
     when:
       write: "*.py"
+      new: true
       contains-any: ["appendFileSync(", "write_json_atomic", "state.json", "deadline =",
                      "monotonic() >=", ">= bound", "> bound", "age <= ", "age > "]
   - id: agentic-record-mjs
     policy: record-and-judge-are-native@1
     when:
       write: "*.mjs"
+      new: true
       contains-any: ["appendFileSync(", "write_json_atomic", "state.json", "deadline =",
                      "monotonic() >=", ">= bound", "> bound", "age <= ", "age > "]
   - id: agentic-record-sh
     policy: record-and-judge-are-native@1
     when:
       write: "*.sh"
+      new: true
       contains-any: ["appendFileSync(", "write_json_atomic", "state.json", "deadline =",
                      "monotonic() >=", ">= bound", "> bound", "age <= ", "age > "]
   - id: agentic-held-py
     policy: held-state-is-the-incident@1
     when:
       write: "*.py"
+      new: true
       contains-any: ["tool_use", "approval-evidence", "pending-approval", "held-state", "held_state",
                      "\"held\"", "'held'", ".held"]
   - id: agentic-held-mjs
     policy: held-state-is-the-incident@1
     when:
       write: "*.mjs"
+      new: true
       contains-any: ["tool_use", "approval-evidence", "pending-approval", "held-state", "held_state",
                      "\"held\"", "'held'", ".held"]
   - id: agentic-held-sh
     policy: held-state-is-the-incident@1
     when:
       write: "*.sh"
+      new: true
       contains-any: ["tool_use", "approval-evidence", "pending-approval", "held-state", "held_state",
                      "\"held\"", "'held'", ".held"]
 ---
@@ -59,7 +65,7 @@ PreToolUse hook, so a change to its watermarks or cargo overrides changes what e
 
 ## One home for a record, many implementors
 
-Authoritative, not gate-enforced in v1, except that two advisory `inject` bindings above nudge a script that stores a record or judges a bound by hand (`record-and-judge-are-native@1`, `held-state-is-the-incident@1`). They never block.
+Authoritative, not gate-enforced in v1, except that two advisory `inject` bindings above nudge a script that stores a record or judges a bound by hand (`record-and-judge-are-native@1`, `held-state-is-the-incident@1`). They never block. Both fire at birth only (`new: true`): an existing script that already stores or judges is debt listed in the census, not something this rule nags about.
 
 **The principle.** The record converges and the implementor varies. A record that another device or agent must interpret has one native home. "Retire" applies only to a second copy of a record, or of the rule that judges it. A local sensor, guard, device policy, harness adapter or push transport is an edge implementor and stays; it senses, adapts and calls. The existing rule `durable-primitives-are-native-py` in `.claude/scripts` and `.claude/hooks` says this for `*.py`; lifting it into the policy is a follow-up.
 

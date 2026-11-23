@@ -19,36 +19,42 @@ rules:
     policy: record-and-judge-are-native@1
     when:
       write: "*.mjs"
+      new: true
       contains-any: ["appendFileSync(", "write_json_atomic", "state.json", "deadline =",
                      "monotonic() >=", ">= bound", "> bound", "age <= ", "age > "]
   - id: orch-record-sh
     policy: record-and-judge-are-native@1
     when:
       write: "*.sh"
+      new: true
       contains-any: ["appendFileSync(", "write_json_atomic", "state.json", "deadline =",
                      "monotonic() >=", ">= bound", "> bound", "age <= ", "age > "]
   - id: orch-record-py
     policy: record-and-judge-are-native@1
     when:
       write: "*.py"
+      new: true
       contains-any: ["appendFileSync(", "write_json_atomic", "state.json", "deadline =",
                      "monotonic() >=", ">= bound", "> bound", "age <= ", "age > "]
   - id: orch-held-mjs
     policy: held-state-is-the-incident@1
     when:
       write: "*.mjs"
+      new: true
       contains-any: ["tool_use", "approval-evidence", "pending-approval", "held-state", "held_state",
                      "\"held\"", "'held'", ".held"]
   - id: orch-held-sh
     policy: held-state-is-the-incident@1
     when:
       write: "*.sh"
+      new: true
       contains-any: ["tool_use", "approval-evidence", "pending-approval", "held-state", "held_state",
                      "\"held\"", "'held'", ".held"]
   - id: orch-held-py
     policy: held-state-is-the-incident@1
     when:
       write: "*.py"
+      new: true
       contains-any: ["tool_use", "approval-evidence", "pending-approval", "held-state", "held_state",
                      "\"held\"", "'held'", ".held"]
 ---
