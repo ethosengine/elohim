@@ -1,6 +1,7 @@
 //! The `sysroot` line of `epr device status`: this host's system link inputs, by the artifact
 //! key's own probe, remembered by `epr device arrive` and re-checked by a status read.
 use super::{Check, State};
+use elohim_device_runtime::flock::Flock;
 use serde::{Deserialize, Serialize};
 use std::{
     fmt, fs,
@@ -463,8 +464,10 @@ fn refuse_linked_dir(dir: &Path) -> Result<(), String> {
 
 /// Hold the arrivals' exclusive lock beside the record (the kernel lock `arrival_work` uses for
 /// its worker), waiting at most `wait` for another arrival to finish. The open never blocks (a
-/// FIFO planted at the name) and the lock must be a regular file.
-fn lock_sysroot(file: &Path, wait: std::time::Duration) -> Result<fs::File, String> {
+/// FIFO planted at the name) and the lock must be a regular file. The guard unlocks when dropped,
+/// so a child another thread forked meanwhile, whose copy of the descriptor lasts until its
+/// `exec`, does not keep a finished arrival's lock held.
+fn lock_sysroot(file: &Path, wait: std::time::Duration) -> Result<Flock, String> {
     use std::os::unix::fs::OpenOptionsExt;
     let dir = file.parent().ok_or("record has no directory")?;
     refuse_linked_dir(dir)?;
@@ -475,7 +478,7 @@ fn lock_sysroot(file: &Path, wait: std::time::Duration) -> Result<fs::File, Stri
     if fs::symlink_metadata(&path).is_ok_and(|meta| !meta.is_file()) {
         return Err(format!("{} is not a regular file", path.display()));
     }
-    let lock = fs::OpenOptions::new()
+    let mut lock = fs::OpenOptions::new()
         .create(true)
         .append(true)
         .custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK)
@@ -486,12 +489,14 @@ fn lock_sysroot(file: &Path, wait: std::time::Duration) -> Result<fs::File, Stri
     }
     let until = std::time::Instant::now() + wait;
     loop {
-        match rustix::fs::flock(&lock, rustix::fs::FlockOperation::NonBlockingLockExclusive) {
-            Ok(()) => return Ok(lock),
-            Err(_) if std::time::Instant::now() < until => {
-                std::thread::sleep(std::time::Duration::from_millis(20))
+        match Flock::try_exclusive(lock) {
+            Ok(Ok(held)) => return Ok(held),
+            Ok(Err(file)) if std::time::Instant::now() < until => {
+                lock = file;
+                std::thread::sleep(std::time::Duration::from_millis(20));
             }
-            Err(e) => return Err(format!("another arrival holds {} ({e})", path.display())),
+            Ok(Err(_)) => return Err(format!("another arrival holds {}", path.display())),
+            Err(e) => return Err(format!("{}: {e}", path.display())),
         }
     }
 }
@@ -938,8 +943,9 @@ mod tests {
         let waited = lock_sysroot(&host.record(), std::time::Duration::from_millis(50));
         assert!(waited.unwrap_err().starts_with("another arrival holds"));
         drop(held);
-        // A concurrently forked test child can hold the descriptor until its exec; allow it.
-        lock_sysroot(&host.record(), std::time::Duration::from_millis(500)).unwrap();
+        // The guard unlocks on drop, so a test child forked meanwhile, whose copy of the
+        // descriptor lasts until its exec, does not hold the lock: the next arrival needs no wait.
+        lock_sysroot(&host.record(), std::time::Duration::ZERO).unwrap();
         let lock = host.record().parent().unwrap().join(SYSROOT_LOCK);
         fs::remove_file(&lock).unwrap();
         assert!(std::process::Command::new("mkfifo")
