@@ -128,10 +128,6 @@ pub fn open_misses(
 /// folds: a miss is settled when no open miss names it. A miss no event ever posted is settled
 /// too, since there is nothing open to carry. The carry claim calls this, so a carry and a miss
 /// settle by one rule.
-#[allow(
-    dead_code,
-    reason = "its one caller is the carry claim (flow/carry.rs), which lands in the integrator's roll"
-)]
 pub(crate) fn miss_settled(
     records: &[(Cid, FlowRecord)],
     admits: &dyn Fn(&str) -> bool,

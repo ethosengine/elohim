@@ -20,6 +20,7 @@ const L: &str = "did:key:l";
 const PROJECT: &str = "eprfs";
 const CLOSURE: &str = "abcdef01";
 const CHANGE: &str = "I0123456789abcdef0123456789abcdef01234567";
+const OTHER_CHANGE: &str = "Ifedcba9876543210fedcba9876543210fedcba98";
 
 fn cid(label: &str) -> Cid {
     atom_cid(&label).expect("a string always encodes")
@@ -134,12 +135,18 @@ fn verdict(via: Option<&str>, closure: &str, success: bool) -> (Cid, FlowRecord)
 
 /// The lander's crossing misses event on `intent`, naming `closure` for the project.
 fn misses_on(via: Option<&str>, intent: Cid, closure: &str) -> (Cid, FlowRecord) {
+    misses_for(via, intent, closure, CHANGE)
+}
+
+/// A misses event for a named change. Two intents of one change from one announcer are one ask
+/// re-raised, and the newer settles the older (`misses::miss_settled`); two changes are two asks.
+fn misses_for(via: Option<&str>, intent: Cid, closure: &str, change: &str) -> (Cid, FlowRecord) {
     event(
         intent,
         landing_slots(
             "misses",
             &[
-                ("change", CHANGE.to_string()),
+                ("change", change.to_string()),
                 (
                     "commit",
                     "0123456789abcdef0123456789abcdef01234567".to_string(),
@@ -551,7 +558,7 @@ fn a_carry_for_another_closure_intent_or_from_an_unadmitted_device_is_ignored() 
     };
     let records = vec![
         misses_on(Some(L), intent(), "ffff"),
-        misses_on(Some(L), cid("intent-other"), CLOSURE),
+        misses_for(Some(L), cid("intent-other"), CLOSURE, OTHER_CHANGE),
         other_closure.record(),
         other_intent.record(),
         carry(Some(C), "c-c", 1_000, 1_600),

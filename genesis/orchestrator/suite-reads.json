@@ -57,6 +57,7 @@
       {"file": "gate-cycle.test.mjs", "reads": []},
       {"file": "file-lock.test.mjs", "reads": []},
       {"file": "gate-carry.test.mjs", "reads": []},
+      {"file": "gate-carry-claim.test.mjs", "reads": []},
       {"file": "prepush-carry.test.mjs", "reads": [".husky/pre-push.bash"]},
       {"file": "commit-tag-parser.test.mjs", "reads": ["**/build-manifest.json", "che-devworkspaces", "elohim/brit", "elohim/holochain-conductor", "elohim/rakia", "sophia"]},
       {"file": "orchestrator-integration.test.mjs", "reads": ["**/Jenkinsfile", "**/build-manifest.json", ".ci-ignore", ".husky/pre-push.bash", "che-devworkspaces", "elohim/brit", "elohim/holochain-conductor", "elohim/rakia", "sophia"]},
