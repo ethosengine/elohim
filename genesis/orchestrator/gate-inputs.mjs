@@ -82,10 +82,9 @@
 //   4. The executor-boundary contract test checking a gate's audited recipe reads, not only the
 //      filenames its justfile names: a recipe that runs a script that reads `scripts/ci/x.sh` passes
 //      it today.
-//   5. The five parked manifest entries corrected (pipeline-registry.test.mjs PARKED): two gate-only
-//      TypeScript steps list a lockfile, a workspace file and a codegen script as buildProcess, and
-//      their recipes read them. Under SOURCES a lockfile bump would not select or re-key those two
-//      gates. The correction is an Edge build input in CI's eyes and waits for a deliberate roll.
+//   5. (done) The five manifest entries that two gate-only TypeScript steps listed as buildProcess
+//      are sources, and pipeline-registry.test.mjs holds the contract with no allowance: under
+//      SOURCES a lockfile bump selects and re-keys those two gates.
 // The first run under the new key is a genuine run, and there is no bridge from legacy evidence: a
 // verdict is reusable only for an identical closure, and identical closures recur within hours (a
 // retry, a re-gate after a moved base, a stacked landing, a sibling's check), so the cost is at
