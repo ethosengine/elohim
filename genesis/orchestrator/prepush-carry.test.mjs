@@ -155,8 +155,15 @@ const runHook = (dir, extra) => runHookScript(dir, script(dir), extra);
 function marks(dir) {
   const rows = readFileSync(join(dir, 'marks.log'), 'utf8').trim().split('\n').map(l => l.split(' '));
   const at = (what, gate) => Number(rows.find(([w, g]) => w === what && g === gate)?.[2]);
+  // The row's place in marks.log. Every gate appends to the one file, so this order is the order
+  // the marks were written in, with no clock involved.
+  const index = (what, gate) => {
+    const i = rows.findIndex(([w, g]) => w === what && g === gate);
+    assert.ok(i >= 0, `no ${what} mark for ${gate}: ${rows.join(' | ')}`);
+    return i;
+  };
   assert.ok(!rows.some(([w]) => w === 'timeout'), `no fixture gate timed out waiting: ${rows.join(' | ')}`);
-  return { at, rows };
+  return { at, index, rows };
 }
 
 const serial = m => m.at('end', 'storage') <= m.at('start', 'app');
@@ -199,13 +206,21 @@ test('on: the carried gate runs beside the loop and both verdicts are reported',
     FAKE_GATES: JSON.stringify({ storage: { waitFor: 'app' }, app: { waitFor: 'storage' } }) });
   assert.equal(r.status, 0, r.stdout + r.stderr);
   const m = marks(dir);
-  // Each waited to see the other start, so the two ran at once by construction.
+  // Each gate appends its end only after it has read the other's start in the same file, so in
+  // the file's own order both starts come before either end: the two ran at once by construction.
+  const lastStart = Math.max(m.index('start', 'storage'), m.index('start', 'app'));
+  const firstEnd = Math.min(m.index('end', 'storage'), m.index('end', 'app'));
+  assert.ok(lastStart < firstEnd, `both gates started before either ended: ${m.rows.join(' | ')}`);
+  // The millisecond marks agree with that order. A gate that finds its partner already started can
+  // begin and end within one millisecond, so a real overlap can round to 0 ms: the wall clock is
+  // strictly shorter than the sum of the two runs only when the recorded overlap is above zero.
   const starts = [m.at('start', 'storage'), m.at('start', 'app')];
   const ends = [m.at('end', 'storage'), m.at('end', 'app')];
-  assert.ok(Math.max(...starts) <= Math.min(...ends), m.rows.join(' | '));
+  const overlap = Math.min(...ends) - Math.max(...starts);
+  assert.ok(overlap >= 0, `recorded overlap ${overlap} ms: ${m.rows.join(' | ')}`);
   const sum = ends[0] - starts[0] + ends[1] - starts[1];
   const wall = Math.max(...ends) - Math.min(...starts);
-  assert.ok(wall < sum, `wall ${wall} ms < sum ${sum} ms`);
+  assert.ok(overlap > 0 ? wall < sum : wall <= sum, `wall ${wall} ms, sum ${sum} ms, recorded overlap ${overlap} ms`);
   assert.match(r.stderr, /\[carry\] carried: storage on second-seat \(p90 59 min, one build job\) beside the loop/);
   assert.match(r.stdout, /──── carried: storage on second-seat .*\n[\s\S]*gate storage output[\s\S]*──── end of storage: exit 0 ────\nstorage: PASSED \(\d+s\)/);
   assert.ok(r.stdout.indexOf('app: PASSED') < r.stdout.indexOf('storage: PASSED'), 'the loop reports first, the carried step after it');
