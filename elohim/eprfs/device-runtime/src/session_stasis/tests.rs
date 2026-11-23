@@ -83,6 +83,17 @@ fn consult(seq: u64, t: i64, incident: &str, body: Value) -> Value {
     )
 }
 
+fn observed(seq: u64, t: i64, pending_since: Option<i64>) -> Value {
+    let mut extra = json!({
+        "source": {"observer": "watcher:test"},
+        "tool": "Bash",
+    });
+    if let Some(pending_since) = pending_since {
+        extra["pendingSince"] = json!(stamp(pending_since));
+    }
+    ev(seq, t, "tool-pending-observed", extra)
+}
+
 fn clk(t: i64) -> Value {
     json!({"wall": stamp(t), "bootId": "boot-1", "uptimeSeconds": 1000.0 + t as f64, "provenance": "test"})
 }
@@ -163,6 +174,7 @@ fn one_of_each() -> Vec<Value> {
             json!({"level": "C1", "binding": "claude/haiku", "decision": "Refer", "pivot": "notify", "reason": "x"}),
         ),
         ev(7, 64, "steward-ping", json!({})),
+        observed(13, 64, Some(60)),
         ev(
             8,
             65,
@@ -226,6 +238,128 @@ fn every_schema_event_kind_validates_parses_and_folds() {
             .count(),
         1
     );
+}
+
+#[test]
+fn duplicate_tool_pending_observations_fold_to_one_incident_and_interval() {
+    let dir = tempfile::tempdir().unwrap();
+    let session_dir = dir.path().join("s1");
+    fs::create_dir_all(&session_dir).unwrap();
+    write_lines(
+        &session_dir.join("events.jsonl"),
+        &[ev(
+            1,
+            0,
+            "shift-marker",
+            json!({"shift": {"id": "shift", "edge": "open"}}),
+        )],
+    );
+    for observed_at in [60, 70] {
+        assert!(record_tool_pending_observed(
+            dir.path(),
+            "s1",
+            ToolPendingObservation {
+                agent_id: "main",
+                observer: "watcher:test",
+                tool: "Bash",
+                pending_since: Some(at(10)),
+            },
+            &clock(observed_at),
+            1 << 20,
+        )
+        .unwrap());
+    }
+    let replay = journal::replay(dir.path(), "s1").unwrap();
+    assert_eq!(
+        replay
+            .events
+            .iter()
+            .filter(|event| event.kind == EventKind::ToolPendingObserved)
+            .count(),
+        2
+    );
+    let fold = run_root(dir.path(), 100);
+    assert_eq!(fold.incidents.len(), 1);
+    assert_eq!(fold.incidents[0].blocked_intervals.len(), 1);
+}
+
+#[test]
+fn stale_tool_pending_observation_does_not_reopen_after_return() {
+    let events = [
+        observed(1, 10, Some(0)),
+        ev(2, 20, "turn-ended", json!({"outcome": "accomplished"})),
+        observed(3, 30, Some(0)),
+    ];
+    let fold = run(&events, 60, Selection::All);
+    assert_eq!(fold.incidents.len(), 1);
+    assert_eq!(fold.incidents[0].closed_by, Some(ClosedBy::Answered));
+    assert_eq!(fold.incidents[0].closed_at, Some(at(20)));
+}
+
+#[test]
+fn tool_pending_observation_never_witnesses_presence_or_closes_an_incident() {
+    let mut own_activity = ev(
+        1,
+        0,
+        "shift-marker",
+        json!({"shift": {"id": "shift", "edge": "open"}}),
+    );
+    own_activity["presence"] = witnessed(0.0)["presence"].clone();
+    let question = ev(2, 10, "turn-ended", json!({"outcome": "question"}));
+    let baseline = run(
+        &[own_activity.clone(), question.clone()],
+        200,
+        Selection::All,
+    );
+    let mut outside = observed(3, 100, Some(100));
+    outside["presence"] = witnessed(0.0)["presence"].clone();
+    let fold = run(&[own_activity, question, outside], 200, Selection::All);
+    assert_eq!(fold.presence, baseline.presence);
+    let question = fold
+        .incidents
+        .iter()
+        .find(|incident| incident.stall_class == StallClass::Question)
+        .unwrap();
+    assert_eq!((question.closed_at, question.closed_by), (None, None));
+    assert!(fold
+        .incidents
+        .iter()
+        .all(|incident| incident.closed_by != Some(ClosedBy::Answered)));
+}
+
+#[test]
+fn pending_since_sets_opened_at_and_drives_the_bound() {
+    let events = [
+        ev(
+            1,
+            0,
+            "shift-marker",
+            json!({"shift": {"id": "shift", "edge": "open"}}),
+        ),
+        observed(2, 400, Some(0)),
+    ];
+    let fold = run(&events, 400, Selection::All);
+    let incident = &fold.incidents[0];
+    assert_eq!(incident.opened_at.wall, at(0));
+    assert_eq!(incident.blocked_intervals[0].from, at(0));
+    assert_eq!(incident.state, IncidentState::Breach);
+    assert_eq!(incident.budget_used.elapsed_s, 400.0);
+    assert_eq!(blocked(&fold), Some(400.0));
+}
+
+#[test]
+fn schema_accepts_observer_source_and_rejects_hook_source_without_hook_event() {
+    let schema_path = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../sdk/domains/elohim-agent/schemas/session-event.schema.json");
+    let schema: Value = serde_json::from_str(&fs::read_to_string(schema_path).unwrap()).unwrap();
+    let validator = jsonschema::validator_for(&schema).unwrap();
+    let outside = observed(1, 10, Some(0));
+    assert!(validator.is_valid(&outside));
+    assert!(Event::from_value(&outside).is_ok());
+    let mut hook = perm(2, 20, "ls");
+    hook["source"] = json!({"promptId": null});
+    assert!(!validator.is_valid(&hook));
+    assert!(Event::from_value(&hook).is_err());
 }
 
 #[test]
