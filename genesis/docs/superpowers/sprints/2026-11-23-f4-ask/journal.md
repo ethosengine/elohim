@@ -129,3 +129,58 @@ not recorded here.
 - **Git commit-tree.** Brit has no commit-tree verb.
 - **Git rebase `--exec`.** Brit rebase has stranded repositories on this device, so rebases here
   go through Git.
+
+## 13:30Z to 15:30Z: the candidate assembled, five reds found by gates, and what Jenkins paid
+
+- **The landing head** grew from `411df9207` to `c44633243`: the carry claim (three commits
+  picked from `carry/f4-ask`, one conflict in the flag list of `flow/mod.rs`, both lanes' flags
+  kept), the lander-side wait, the records commit, and four fixes named below. The publish
+  precheck passes on it with no version bump: no published eprfs crate changed. The Edge
+  selection comes from the lock guard in `device-runtime`.
+- **Five reds, each found by a gate and none by the lane that wrote it:**
+  1. `suite-list.test.mjs` refused `gate-carry-claim.test.mjs`, a new test file that was not in
+     `suite-reads.json` (orchestrator gate, shem). One line.
+  2. A carry unit test posted misses on two intents under one Change-Id and expected both open.
+     Slice 1's rule settles the older, so the test was wrong and the rule right (eprfs gate, both
+     devices, the same minute). The second intent takes its own change.
+  3. The two-hour ceiling on `--valid-for`, added in review, broke the replay integration test,
+     which passed 90,000 s. The integrator had run the library tests and not the integration
+     tests (eprfs gate, both devices). The replay uses 7,200 s and the ceiling is asserted.
+  4. `prepush-carry.test.mjs:208`, a flake already on dev: wall time equal to the sum when two
+     fake gates end in one millisecond, 7 of 30 alone. Ethosengine's fix proves the overlap from
+     the order of the marks file and uses no sleep; 100 of 100 alone (`67efbfafe`, picked).
+  5. `arrival_sysroot` `sysroot_unobservable_arrival_degrades_and_never_writes`, 1 of 30 at
+     eight threads, on a raw `flock` site that row 74 lists as owed. Not fixed on this head;
+     ethosengine is building `lock_sysroot` on the shared guard as the follow-up landing.
+     A second rare one, `discovery_uses_the_one_node_that_answers_and_never_guesses`, 1 of 100
+     at eight threads, is not yet read.
+- **Gates on `c44633243`, shem:** eprfs green (153 test binaries), orchestrator and
+  orchestrator-tree green; rust-style green at `1bdee52dc`, and the two commits after it touch
+  tests only. **Ethosengine**, from fresh worktrees: eprfs green on `411df9207` in 800 s, with
+  thirty of thirty at four threads on the three binaries nearest the lock sites (the
+  recall-session guard in `epr-cli` was not in that set); its lines for `c44633243` are in the
+  landing's own record below.
+- **Jenkins** paid the storage and doorway gates for the tree at `411df9207` through PR #219
+  (`elohim-edge/PR-219` #2, SUCCESS, 3,211 s, its log line 219: `GATE_ONLY — strict cargo
+  quality gates and local builds; publish, deploy and dataplane validation disabled`). It was
+  sent that work by a tagged pull request. It read no miss and wrote no verdict a lander can
+  reuse. On the same push the root pipeline's new guard ended before any agent
+  (`elohim/PR-219` #1, NOT_BUILT, 11 log lines); the sophia branch job took a pod before it
+  ended NOT_BUILT.
+- **The Verify moved to the next landing.** This push changes `gate-*.mjs` and
+  `pool-policy.json`, so the governance fence reuses no sibling verdict on it, and the hook that
+  posts the misses is the main checkout's old one until this lands. The follow-up landing
+  (ethosengine's `lock_sysroot` change) is handed over from shem, its misses are posted by the
+  new hook, ethosengine takes the eprfs miss with a carry, and the lander's log is read for the
+  reuse line. Station F4-ask stays unticked until then.
+- **Fleet read before the roll** (15:00Z, public reads): matthew's storage `caughtUp: true`,
+  pull `caughtUp`, projection reconcile `converged: true`, six peers connected;
+  `doorway-alpha` 200 on the landing content. The per-pod Prometheus legs were not read from
+  this device.
+- **A correction to this journal's first section:** the `brit: feedback capture gap` line was
+  attributed to the inherited `EPR_BIN`. It is not: brit 0.3.1 prints it with `EPR_BIN` unset
+  too, on the device's head epr (`bafyreibmupfq…h6ea`), which has no `feedback` verb. It is a
+  gap between brit 0.3.1 and that epr, for the brit lane.
+- **Ethosengine on `c44633243`, from a fresh worktree** (its note of 15:2xZ): eprfs green in
+  589 s, 153 test binaries; orchestrator green in 159 s; orchestrator-tree green in 158 s; each
+  with evidence recorded on that device.
