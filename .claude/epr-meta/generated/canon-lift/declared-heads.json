@@ -601,6 +601,28 @@
       ]
     },
     {
+      "id": "held-state-is-the-incident",
+      "resolutionMode": "pinned",
+      "resolutionModeSource": "registry-default",
+      "head": {
+        "registry": "policies.yaml",
+        "version": 1,
+        "cid": "bafyreih4udzkown2uxaexgqx5ceik6ahba2tv3rygkilg4ha3vcyqhvoc4",
+        "sha256Pin": "sha256:fca0f2a759baa5c04b9a17e88885780708353aee383290b370e0dd45881eae17"
+      },
+      "tipBasis": "sole-active",
+      "competing": false,
+      "versions": [
+        {
+          "registry": "policies.yaml",
+          "version": 1,
+          "status": "active",
+          "cid": "bafyreih4udzkown2uxaexgqx5ceik6ahba2tv3rygkilg4ha3vcyqhvoc4",
+          "supersededBy": null
+        }
+      ]
+    },
+    {
       "id": "memory-frontmatter-at-birth",
       "resolutionMode": "pinned",
       "resolutionModeSource": "registry-default",
@@ -668,6 +690,28 @@
           "version": 5,
           "status": "active",
           "cid": "bafyreifbtsjlrhbqbh332uq7y32errwc55ltqyvpxnfn6a7zho365ow4fm",
+          "supersededBy": null
+        }
+      ]
+    },
+    {
+      "id": "record-and-judge-are-native",
+      "resolutionMode": "pinned",
+      "resolutionModeSource": "registry-default",
+      "head": {
+        "registry": "policies.yaml",
+        "version": 1,
+        "cid": "bafyreiha2ytz5zwm43edf2bnrtpos7qpxq5q3zb4o4zinwuxzb4wtr2ep4",
+        "sha256Pin": "sha256:e0d6279ee6cce6c832e82d8cdee97e0fbc3b0de43c773286da97c87969c7447f"
+      },
+      "tipBasis": "sole-active",
+      "competing": false,
+      "versions": [
+        {
+          "registry": "policies.yaml",
+          "version": 1,
+          "status": "active",
+          "cid": "bafyreiha2ytz5zwm43edf2bnrtpos7qpxq5q3zb4o4zinwuxzb4wtr2ep4",
           "supersededBy": null
         }
       ]

@@ -2,7 +2,7 @@
 
 # Concern canon — brit lift
 
-**43 rows across both registry homes -> 43 CIDv1(dag-cbor, sha2-256) atoms** (43 pin-verified, 32 declared heads).
+**45 rows across both registry homes -> 45 CIDv1(dag-cbor, sha2-256) atoms** (45 pin-verified, 34 declared heads).
 
 The content plane (`canon-atoms.json`) and the standing plane (`precedent-standing.json`) are what the v1 YAML row deliberately conflates; `declared-heads.json` carries the brit declared-head-over-DAG primitive at resolution mode `pinned`. Every CID is a codec wrap of the exact bytes the registry's own `sha256` pin already covers — the digests below are the same 32 bytes, rendered twice.
 
@@ -38,8 +38,10 @@ The `sha256` column is the registry's own live pin; the `CID` is that same diges
 | `feedback-local-retention` | `policies.yaml@1` | `sha256:cf7b1a105d2e4bfb1e8908bf58aa6e48b769e60de8bca5a2b9652e422effd0d7` | `bafyreigppmnbaxjojp5r5ciix5mku3siw5u6mdpixss2folffzbc576q24` |
 | `governance-escalation-ladder` | `policies.yaml@1` | `sha256:97008339f53de85e02ff63222f3e521889f538a458e56d05f656cc48ecf75954` | `bafyreiexacbtt5j55bpaf73deixt4uqyrh2trjcy4vwql5swzreoz52zkq` |
 | `habit-declaration-at-birth` | `policies.yaml@1` | `sha256:528917b7b386fe63209d385c1d194b6f366c617b65e4125201db39589cb789c2` | `bafyreicsrel3pm4g7zrsbhjylqorss3pgzwgc63f4qjfeao3hfmjzn4jyi` |
+| `held-state-is-the-incident` | `policies.yaml@1` | `sha256:fca0f2a759baa5c04b9a17e88885780708353aee383290b370e0dd45881eae17` | `bafyreih4udzkown2uxaexgqx5ceik6ahba2tv3rygkilg4ha3vcyqhvoc4` |
 | `memory-frontmatter-at-birth` | `policies.yaml@1` | `sha256:a622e4d20e5aa57ab9152e48a082ff437499ad5b498516408f0cc864cce003ee` | `bafyreifgelsneds2uv5lsfjojcqif72dosm22w2jqulebdymzbsmzyad5y` |
 | `ownership-ontology-guard` | `policies.yaml@5` | `sha256:a19c92b89c3009f7bd521fc6f448c6c2ef573862afbb4adf03f93bb7eebadc2b` | `bafyreifbtsjlrhbqbh332uq7y32errwc55ltqyvpxnfn6a7zho365ow4fm` |
+| `record-and-judge-are-native` | `policies.yaml@1` | `sha256:e0d6279ee6cce6c832e82d8cdee97e0fbc3b0de43c773286da97c87969c7447f` | `bafyreiha2ytz5zwm43edf2bnrtpos7qpxq5q3zb4o4zinwuxzb4wtr2ep4` |
 | `rust-style-strict` | `policies.yaml@1` | `sha256:6de3a7df5d7b876c25de1339feb5fa67601df342f5910a20217d9c02ba26c235` | `bafyreidn4ot56xl3q5wclxqthh7ll6thmao7gqxvsefcail5tqblujwcgu` |
 | `source-file-loc-ceiling` | `policies.yaml@1` | `sha256:ba3d0c7ce8e5bdda3aa4241603a8d40706fcdc5f90072e38f38d30ef5070702d` | `bafyreif2hughz2hfxxndvjbecyb2rvaha36nyx4qa4xdr44ngdxva4dqfu` |
 | `sovereignty-ontology-guard` | `policies.yaml@5` | `sha256:0ce90c0260302824ad1abded72ca308fad32def603c0b344572ee91626c66f94` | `bafyreiam5egaeybqfask2gv55vzmumepvuzn55qdyczuivzo5elcnrtpsq` |
