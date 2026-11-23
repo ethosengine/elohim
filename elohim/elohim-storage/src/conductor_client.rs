@@ -81,8 +81,11 @@ pub struct ConductorClient {
     next_id: AtomicU64,
 }
 
-#[allow(dead_code)]
 struct PendingRequest {
+    #[expect(
+        dead_code,
+        reason = "the client numbers each call for diagnostics; the worker keys its pending map by its own request_id_counter, so this id is never read"
+    )]
     id: u64,
     payload: Vec<u8>,
     response_tx: oneshot::Sender<Result<Vec<u8>, StorageError>>,
