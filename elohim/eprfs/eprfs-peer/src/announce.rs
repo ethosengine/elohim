@@ -105,6 +105,7 @@ impl Channel {
     /// projected nack set changed.
     pub fn nack(
         &mut self,
+        rules_digest: &str,
         author: &str,
         refused_cids: &[cid::Cid],
         refused_crossings: &[RefusedCrossing],
@@ -129,8 +130,13 @@ impl Channel {
             changed
         };
         for crossing in fresh {
-            self.table
-                .record_crossing_drop(author, &crossing.measure, &crossing.kind, at);
+            self.table.record_crossing_drop(
+                rules_digest,
+                author,
+                &crossing.measure,
+                &crossing.kind,
+                at,
+            );
         }
         changed
     }

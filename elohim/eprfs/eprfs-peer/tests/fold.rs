@@ -383,8 +383,10 @@ fn receiver_crossing_drops_count_distinct_unadmitted_events_only() {
         (1, 1, 1)
     );
 
+    let rules_digest = Rules::from_policy(&policy()).expect("rules").digest();
     let mut channel = Channel::new("did:key:zReceiver".into(), HeadTable::default());
     assert!(channel.nack(
+        rules_digest.as_str(),
         "did:key:zSender",
         &outcome.refused_cids,
         &outcome.refused_crossings,
@@ -392,13 +394,17 @@ fn receiver_crossing_drops_count_distinct_unadmitted_events_only() {
         10,
     ));
     assert!(!channel.nack(
+        rules_digest.as_str(),
         "did:key:zSender",
         &outcome.refused_cids,
         &outcome.refused_crossings,
         Vec::<String>::new(),
         20,
     ));
-    let rows: Vec<_> = channel.table().crossing_drop_entries().collect();
+    let rows: Vec<_> = channel
+        .table()
+        .crossing_drop_entries(rules_digest.as_str())
+        .collect();
     assert_eq!(rows.len(), 1);
     let (device, measure, kind, drop) = rows[0];
     assert_eq!(

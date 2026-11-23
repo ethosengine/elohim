@@ -16,8 +16,10 @@
 //!   },
 //!   "nacks": { "<author-did>": { "refused", "quarantined" } },
 //!   "dropped": { "unadmitted", "forged", "rollback", "replayed", "malformed" },
-//!   "crossing_drops": {
-//!     "<author-did>": { "<measure>": { "<kind>": { "count", "first_seen", "last_seen" } } }
+//!   "crossing_drop_groups": {
+//!     "<rules-digest>": {
+//!       "<author-did>": { "<measure>": { "<kind>": { "count", "first_seen", "last_seen" } } }
+//!     }
 //!   },
 //!   "channel": { "projection_failures", "last_projection_error", "fold_failures",
 //!                "oversized_events", "over_budget_folds" }
@@ -61,6 +63,9 @@ pub const OWN_LOG_LEN: usize = 1024;
 
 /// The most refused CIDs one nack leaf lists. The total remains exact when the list overflows.
 pub const MAX_NACK_CIDS: usize = 64;
+
+/// The most rules generations whose receiver-side crossing refusals remain in the head table.
+pub const MAX_CROSSING_DROP_RULE_GROUPS: usize = 3;
 
 /// One nack leaf as it crosses at `channel/nacks/<author>`.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -131,9 +136,13 @@ pub struct HeadTable {
     #[serde(default)]
     pub nacks: BTreeMap<String, NackState>,
     pub dropped: DroppedHeads,
-    /// Receiver-side event refusals, by sending device, measure and kind.
+    /// Receiver-side event refusals, by loaded rules digest, sending device, measure and kind.
     #[serde(default)]
-    pub crossing_drops: CrossingDrops,
+    pub crossing_drop_groups: CrossingDropGroups,
+    /// The ungrouped field written before refusals carried the loaded rules digest. Loading folds
+    /// it into the `unknown` history group; saving never writes this field again.
+    #[serde(default, rename = "crossing_drops", skip_serializing)]
+    pub legacy_crossing_drops: CrossingDrops,
     /// The daemon's own channel health: projection and fold failures.
     #[serde(default)]
     pub channel: ChannelCounters,
@@ -175,7 +184,8 @@ impl Default for HeadTable {
             devices: BTreeMap::new(),
             nacks: BTreeMap::new(),
             dropped: DroppedHeads::default(),
-            crossing_drops: BTreeMap::new(),
+            crossing_drop_groups: BTreeMap::new(),
+            legacy_crossing_drops: BTreeMap::new(),
             channel: ChannelCounters::default(),
         }
     }
@@ -236,6 +246,9 @@ pub struct DroppedHeads {
 /// Receiver-side allow-list refusals, grouped as device -> measure -> kind -> count and times.
 pub type CrossingDrops = BTreeMap<String, BTreeMap<String, BTreeMap<String, CrossingDrop>>>;
 
+/// Receiver-side allow-list refusals grouped first by the digest of the rules that refused them.
+pub type CrossingDropGroups = BTreeMap<String, CrossingDrops>;
+
 /// One receiver-side allow-list refusal counter.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CrossingDrop {
@@ -251,9 +264,18 @@ impl HeadTable {
     pub const FILE_NAME: &'static str = "heads.json";
 
     /// Count one distinct event refused by this device's crossing allow-list.
-    pub fn record_crossing_drop(&mut self, device: &str, measure: &str, kind: &str, at: u64) {
+    pub fn record_crossing_drop(
+        &mut self,
+        rules_digest: &str,
+        device: &str,
+        measure: &str,
+        kind: &str,
+        at: u64,
+    ) {
         let drop = self
-            .crossing_drops
+            .crossing_drop_groups
+            .entry(rules_digest.to_owned())
+            .or_default()
             .entry(device.to_owned())
             .or_default()
             .entry(measure.to_owned())
@@ -267,17 +289,60 @@ impl HeadTable {
         drop.count = drop.count.saturating_add(1);
         drop.first_seen = drop.first_seen.min(at);
         drop.last_seen = drop.last_seen.max(at);
+        self.trim_crossing_drop_groups();
     }
 
-    /// The persisted receiver-side refusal rows in deterministic order.
-    pub fn crossing_drop_entries(&self) -> impl Iterator<Item = (&str, &str, &str, &CrossingDrop)> {
-        self.crossing_drops.iter().flat_map(|(device, measures)| {
-            measures.iter().flat_map(move |(measure, kinds)| {
-                kinds.iter().map(move |(kind, drop)| {
-                    (device.as_str(), measure.as_str(), kind.as_str(), drop)
+    /// The persisted receiver-side refusal rows for one rules digest, in deterministic order.
+    pub fn crossing_drop_entries(
+        &self,
+        rules_digest: &str,
+    ) -> impl Iterator<Item = (&str, &str, &str, &CrossingDrop)> {
+        self.crossing_drop_groups
+            .get(rules_digest)
+            .into_iter()
+            .flat_map(|rows| {
+                rows.iter().flat_map(|(device, measures)| {
+                    measures.iter().flat_map(move |(measure, kinds)| {
+                        kinds.iter().map(move |(kind, drop)| {
+                            (device.as_str(), measure.as_str(), kind.as_str(), drop)
+                        })
+                    })
                 })
             })
-        })
+    }
+
+    /// The bounded rules groups in deterministic digest order.
+    pub fn crossing_drop_rule_groups(&self) -> impl Iterator<Item = (&str, &CrossingDrops)> {
+        self.crossing_drop_groups
+            .iter()
+            .map(|(digest, rows)| (digest.as_str(), rows))
+    }
+
+    fn trim_crossing_drop_groups(&mut self) {
+        while self.crossing_drop_groups.len() > MAX_CROSSING_DROP_RULE_GROUPS {
+            let Some(oldest) = self
+                .crossing_drop_groups
+                .iter()
+                .min_by_key(|(digest, rows)| (crossing_drop_latest(rows), digest.as_str()))
+                .map(|(digest, _)| digest.clone())
+            else {
+                break;
+            };
+            self.crossing_drop_groups.remove(&oldest);
+        }
+    }
+
+    fn migrate_legacy_crossing_drops(&mut self) {
+        let legacy = std::mem::take(&mut self.legacy_crossing_drops);
+        if legacy.is_empty() {
+            return;
+        }
+        let unknown = self
+            .crossing_drop_groups
+            .entry("unknown".to_owned())
+            .or_default();
+        merge_crossing_drops(unknown, legacy);
+        self.trim_crossing_drop_groups();
     }
 
     /// The table persisted in `dir`, or an empty one when there is none yet.
@@ -294,10 +359,13 @@ impl HeadTable {
             Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(HeadTable::default()),
             Err(source) => return Err(PeerError::HeadTableIo { path, source }),
         };
-        serde_json::from_str(&text).map_err(|e| PeerError::HeadTableInvalid {
-            path,
-            reason: e.to_string(),
-        })
+        let mut table: HeadTable =
+            serde_json::from_str(&text).map_err(|e| PeerError::HeadTableInvalid {
+                path,
+                reason: e.to_string(),
+            })?;
+        table.migrate_legacy_crossing_drops();
+        Ok(table)
     }
 
     /// Persist the table in `dir`, replacing the previous one atomically (a reader sees the old
@@ -335,5 +403,37 @@ impl HeadTable {
             let _ = fs::remove_file(&tmp);
         }
         written.map_err(io_error(&path))
+    }
+}
+
+fn crossing_drop_latest(rows: &CrossingDrops) -> u64 {
+    rows.values()
+        .flat_map(BTreeMap::values)
+        .flat_map(BTreeMap::values)
+        .map(|drop| drop.last_seen)
+        .max()
+        .unwrap_or(0)
+}
+
+fn merge_crossing_drops(target: &mut CrossingDrops, source: CrossingDrops) {
+    for (device, measures) in source {
+        for (measure, kinds) in measures {
+            for (kind, incoming) in kinds {
+                let drop = target
+                    .entry(device.clone())
+                    .or_default()
+                    .entry(measure.clone())
+                    .or_default()
+                    .entry(kind)
+                    .or_insert(CrossingDrop {
+                        count: 0,
+                        first_seen: incoming.first_seen,
+                        last_seen: incoming.last_seen,
+                    });
+                drop.count = drop.count.saturating_add(incoming.count);
+                drop.first_seen = drop.first_seen.min(incoming.first_seen);
+                drop.last_seen = drop.last_seen.max(incoming.last_seen);
+            }
+        }
     }
 }

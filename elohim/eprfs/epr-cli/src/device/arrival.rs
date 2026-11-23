@@ -436,8 +436,9 @@ fn crossing_drop_checks() -> Vec<Check> {
 
 #[cfg(feature = "peer")]
 fn crossing_drop_check(table: &eprfs_peer::HeadTable) -> Option<Check> {
+    let rules_digest = table.rules.as_ref()?.digest.as_str();
     let rows: Vec<_> = table
-        .crossing_drop_entries()
+        .crossing_drop_entries(rules_digest)
         .filter(|(_, _, _, drop)| drop.count > 0)
         .collect();
     let (_, first_measure, first_kind, _) = rows.first().copied()?;
@@ -2254,12 +2255,33 @@ mod tests {
     }
     #[cfg(feature = "peer")]
     #[test]
-    fn receiver_crossing_drop_line_appears_only_for_nonzero_counts() {
+    fn receiver_crossing_drop_line_follows_only_the_current_rules_digest() {
+        let rules = |digit: char| eprfs_peer::RulesState {
+            digest: serde_json::from_value(serde_json::json!(digit.to_string().repeat(64)))
+                .expect("rules digest"),
+            policy: "pool-policy.json".into(),
+            loaded_at: 1,
+            pending: None,
+        };
         let mut table = eprfs_peer::HeadTable::default();
         assert!(crossing_drop_check(&table).is_none());
 
-        table.record_crossing_drop("did:key:zSender", "dev-landing@1", "misses", 11);
-        table.record_crossing_drop("did:key:zSender", "dev-landing@1", "misses", 19);
+        let rules_a = rules('a');
+        table.rules = Some(rules_a.clone());
+        table.record_crossing_drop(
+            rules_a.digest.as_str(),
+            "did:key:zSender",
+            "dev-landing@1",
+            "misses",
+            11,
+        );
+        table.record_crossing_drop(
+            rules_a.digest.as_str(),
+            "did:key:zSender",
+            "dev-landing@1",
+            "misses",
+            19,
+        );
         let check = crossing_drop_check(&table).expect("nonzero drop line");
         assert_eq!(check.name, CROSSING_DROPS_CHECK);
         assert_eq!(check.state, State::Degraded);
@@ -2275,6 +2297,21 @@ mod tests {
                  it by epr device supervise"
             )
         );
+
+        let rules_b = rules('b');
+        table.rules = Some(rules_b.clone());
+        assert!(crossing_drop_check(&table).is_none());
+
+        table.record_crossing_drop(
+            rules_b.digest.as_str(),
+            "did:key:zSender",
+            "dev-landing@1",
+            "misses",
+            23,
+        );
+        let check = crossing_drop_check(&table).expect("new-rules drop line");
+        assert_eq!(check.state, State::Degraded);
+        assert!(check.detail.starts_with("1 events from 1 device(s)"));
     }
 
     #[cfg(feature = "peer")]

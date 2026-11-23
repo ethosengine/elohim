@@ -1121,8 +1121,8 @@ struct StatusOutcome {
     devices: Vec<DeviceStatus>,
     dropped: eprfs_peer::DroppedHeads,
     /// Events this receiver refused because its loaded crossing list did not admit them.
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    crossing_drops: Vec<CrossingDropStatus>,
+    #[serde(skip_serializing_if = "CrossingDropStatus::is_empty")]
+    crossing_drops: CrossingDropStatus,
     channel: eprfs_peer::ChannelCounters,
     /// Connections this device's daemon refused, per node id, with the device the roster names
     /// for it (a contested device's old endpoint row still names it); `None` for a stranger.
@@ -1142,10 +1142,28 @@ struct StatusOutcome {
     follow_outcomes: Vec<follow_status::ToolFollow>,
 }
 
+const MAX_CURRENT_CROSSING_DROP_ROWS: usize = 5;
+
+/// Receiver-side crossing refusals under the current rules and bounded older-rule summaries.
+#[derive(Debug, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct CrossingDropStatus {
+    current: Vec<CrossingDropRow>,
+    history: Vec<CrossingDropHistory>,
+    #[serde(skip)]
+    current_more: usize,
+}
+
+impl CrossingDropStatus {
+    fn is_empty(&self) -> bool {
+        self.current.is_empty() && self.history.is_empty()
+    }
+}
+
 /// One persisted receiver-side crossing refusal as `status --json` reports it.
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
-struct CrossingDropStatus {
+struct CrossingDropRow {
     device: String,
     measure: String,
     kind: String,
@@ -1154,11 +1172,22 @@ struct CrossingDropStatus {
     last_seen: u64,
 }
 
-fn crossing_drop_status(table: &HeadTable) -> Vec<CrossingDropStatus> {
-    table
-        .crossing_drop_entries()
+/// One older rules generation as `status --json` reports it.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct CrossingDropHistory {
+    rules: String,
+    count: u64,
+    last_seen: u64,
+}
+
+fn crossing_drop_status(table: &HeadTable) -> CrossingDropStatus {
+    let current_rules = table.rules.as_ref().map(|state| state.digest.as_str());
+    let mut current: Vec<_> = current_rules
+        .into_iter()
+        .flat_map(|rules| table.crossing_drop_entries(rules))
         .filter(|(_, _, _, drop)| drop.count > 0)
-        .map(|(device, measure, kind, drop)| CrossingDropStatus {
+        .map(|(device, measure, kind, drop)| CrossingDropRow {
             device: device.to_owned(),
             measure: measure.to_owned(),
             kind: kind.to_owned(),
@@ -1166,10 +1195,44 @@ fn crossing_drop_status(table: &HeadTable) -> Vec<CrossingDropStatus> {
             first_seen: drop.first_seen,
             last_seen: drop.last_seen,
         })
-        .collect()
+        .collect();
+    let current_more = current.len().saturating_sub(MAX_CURRENT_CROSSING_DROP_ROWS);
+    current.truncate(MAX_CURRENT_CROSSING_DROP_ROWS);
+
+    let mut history: Vec<_> = table
+        .crossing_drop_rule_groups()
+        .filter(|(rules, _)| Some(*rules) != current_rules)
+        .filter_map(|(rules, rows)| {
+            let (count, last_seen) = crossing_drop_summary(rows);
+            (count > 0).then(|| CrossingDropHistory {
+                rules: rules.to_owned(),
+                count,
+                last_seen,
+            })
+        })
+        .collect();
+    history.sort_by(|a, b| {
+        b.last_seen
+            .cmp(&a.last_seen)
+            .then_with(|| a.rules.cmp(&b.rules))
+    });
+    CrossingDropStatus {
+        current,
+        history,
+        current_more,
+    }
 }
 
-fn crossing_drop_line(drop: &CrossingDropStatus) -> String {
+fn crossing_drop_summary(rows: &eprfs_peer::CrossingDrops) -> (u64, u64) {
+    rows.values()
+        .flat_map(std::collections::BTreeMap::values)
+        .flat_map(std::collections::BTreeMap::values)
+        .fold((0u64, 0u64), |(count, latest), drop| {
+            (count.saturating_add(drop.count), latest.max(drop.last_seen))
+        })
+}
+
+fn crossing_drop_line(drop: &CrossingDropRow) -> String {
     format!(
         "dropped {} events of kind {}/{} from {}: not in this device's crosses",
         drop.count,
@@ -1177,6 +1240,23 @@ fn crossing_drop_line(drop: &CrossingDropStatus) -> String {
         drop.kind,
         short(&drop.device)
     )
+}
+
+fn crossing_drop_history_line(history: &CrossingDropHistory) -> String {
+    let last_seen = i64::try_from(history.last_seen)
+        .ok()
+        .and_then(chrono::DateTime::<chrono::Utc>::from_timestamp_millis)
+        .map(|time| time.to_rfc3339_opts(chrono::SecondsFormat::Millis, true))
+        .unwrap_or_else(|| format!("{}ms", history.last_seen));
+    let short_rules = history.rules.get(..8).unwrap_or(&history.rules);
+    format!(
+        "{} events dropped before {last_seen} under rules {short_rules}",
+        history.count
+    )
+}
+
+fn crossing_drop_more_line(more: usize) -> Option<String> {
+    (more > 0).then(|| format!("… and {more} more"))
 }
 
 /// One node id's refused connections, as `status` reports them.
@@ -1411,8 +1491,14 @@ fn render(outcome: &StatusOutcome) {
         "dropped heads  unadmitted {}  forged {}  rollback {}  replayed {}  malformed {}",
         d.unadmitted, d.forged, d.rollback, d.replayed, d.malformed
     );
-    for drop in &outcome.crossing_drops {
+    for drop in &outcome.crossing_drops.current {
         println!("{}", crossing_drop_line(drop));
+    }
+    if let Some(line) = crossing_drop_more_line(outcome.crossing_drops.current_more) {
+        println!("{line}");
+    }
+    for history in &outcome.crossing_drops.history {
+        println!("{}", crossing_drop_history_line(history));
     }
     if !outcome.refused_connections.is_empty() || outcome.refused_strangers > 0 {
         let mut refused: Vec<String> = outcome
@@ -2726,32 +2812,95 @@ pub fn fold(options: &Options, from: &str, root: &str) -> PeerResult<eprfs_peer:
 
 #[cfg(test)]
 mod status_contract {
+    fn rules_state(digit: char) -> eprfs_peer::RulesState {
+        let digest = digit.to_string().repeat(64);
+        eprfs_peer::RulesState {
+            digest: serde_json::from_value(serde_json::json!(digest)).expect("rules digest"),
+            policy: "pool-policy.json".into(),
+            loaded_at: 1,
+            pending: None,
+        }
+    }
+
     #[test]
-    fn peer_status_renders_persisted_receiver_crossing_drops() {
+    fn peer_status_separates_current_crossing_drops_from_rules_history() {
         use super::*;
         let dir = tempfile::tempdir().expect("state dir");
         let mut table = HeadTable::default();
-        table.record_crossing_drop("did:key:zSender", "dev-landing@1", "misses", 11);
-        table.record_crossing_drop("did:key:zSender", "dev-landing@1", "misses", 19);
+        let rules_a = rules_state('a');
+        let rules_b = rules_state('b');
+        table.record_crossing_drop(
+            rules_a.digest.as_str(),
+            "did:key:zSender",
+            "dev-landing@1",
+            "misses",
+            11,
+        );
+        table.record_crossing_drop(
+            rules_a.digest.as_str(),
+            "did:key:zSender",
+            "dev-landing@1",
+            "misses",
+            19,
+        );
+        table.rules = Some(rules_b.clone());
         table.save(dir.path()).expect("persist counts");
 
         let loaded = HeadTable::load(dir.path()).expect("load counts");
-        let rows = crossing_drop_status(&loaded);
+        let status = crossing_drop_status(&loaded);
         assert_eq!(
-            serde_json::to_value(&rows).expect("json"),
-            serde_json::json!([{
-                "device": "did:key:zSender",
-                "measure": "dev-landing@1",
-                "kind": "misses",
-                "count": 2,
-                "firstSeen": 11,
-                "lastSeen": 19
-            }])
+            serde_json::to_value(&status).expect("json"),
+            serde_json::json!({
+                "current": [],
+                "history": [{
+                    "rules": rules_a.digest.as_str(),
+                    "count": 2,
+                    "lastSeen": 19
+                }]
+            })
         );
         assert_eq!(
-            crossing_drop_line(&rows[0]),
-            "dropped 2 events of kind dev-landing@1/misses from did:key:zSender: not in this \
+            crossing_drop_history_line(&status.history[0]),
+            "2 events dropped before 1970-01-01T00:00:00.019Z under rules aaaaaaaa"
+        );
+
+        table.record_crossing_drop(
+            rules_b.digest.as_str(),
+            "did:key:zSender",
+            "dev-landing@1",
+            "misses",
+            23,
+        );
+        let status = crossing_drop_status(&table);
+        assert_eq!(status.current.len(), 1);
+        assert_eq!(
+            crossing_drop_line(&status.current[0]),
+            "dropped 1 events of kind dev-landing@1/misses from did:key:zSender: not in this \
              device's crosses"
+        );
+    }
+
+    #[test]
+    fn peer_status_caps_current_crossing_drop_rows_at_five() {
+        use super::*;
+        let mut table = HeadTable::default();
+        let rules = rules_state('c');
+        table.rules = Some(rules.clone());
+        for index in 0..7 {
+            table.record_crossing_drop(
+                rules.digest.as_str(),
+                "did:key:zSender",
+                "dev-landing@1",
+                &format!("kind-{index}"),
+                index,
+            );
+        }
+
+        let status = crossing_drop_status(&table);
+        assert_eq!(status.current.len(), 5);
+        assert_eq!(
+            crossing_drop_more_line(status.current_more).as_deref(),
+            Some("… and 2 more")
         );
     }
 
@@ -2779,7 +2928,7 @@ mod status_contract {
                 acked: None,
             }],
             dropped: Default::default(),
-            crossing_drops: Vec::new(),
+            crossing_drops: CrossingDropStatus::default(),
             channel: Default::default(),
             refused_connections: vec![RefusedConnections {
                 node_id: "stranger".into(),
