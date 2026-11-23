@@ -485,6 +485,73 @@ async fn an_owner_opening_never_sweeps_a_shared_writers_staging() {
     }
 }
 
+/// Who holds `lock` open now, for a refusal's message: every process with a descriptor on it
+/// (from `/proc/*/fd`, with its state and command line) and the kernel's lock rows for its
+/// inode. A child forked by another test and not yet exec'd shows here with this binary's
+/// command line.
+#[cfg(target_os = "linux")]
+fn lock_holders(lock: &Path) -> String {
+    use std::os::unix::fs::MetadataExt;
+    let target = std::fs::canonicalize(lock).unwrap_or_else(|_| lock.to_path_buf());
+    let mut out = vec![format!("this test process is pid {}", std::process::id())];
+    for proc_dir in std::fs::read_dir("/proc").into_iter().flatten().flatten() {
+        let Ok(fds) = std::fs::read_dir(proc_dir.path().join("fd")) else {
+            continue;
+        };
+        for fd in fds.flatten() {
+            if std::fs::read_link(fd.path()).is_ok_and(|path| path == target) {
+                let field =
+                    |name: &str| std::fs::read(proc_dir.path().join(name)).unwrap_or_default();
+                let state = String::from_utf8_lossy(&field("status"))
+                    .lines()
+                    .find(|line| line.starts_with("State:"))
+                    .unwrap_or("State: ?")
+                    .to_owned();
+                out.push(format!(
+                    "pid {} fd {} ({state}) {}",
+                    proc_dir.file_name().to_string_lossy(),
+                    fd.file_name().to_string_lossy(),
+                    String::from_utf8_lossy(&field("cmdline")).replace('\0', " ")
+                ));
+            }
+        }
+    }
+    let mut children = Vec::new();
+    for task in std::fs::read_dir("/proc/self/task")
+        .into_iter()
+        .flatten()
+        .flatten()
+    {
+        let listed = std::fs::read_to_string(task.path().join("children")).unwrap_or_default();
+        for pid in listed.split_whitespace() {
+            let exe = std::fs::read_link(format!("/proc/{pid}/exe")).unwrap_or_default();
+            children.push(format!("{pid} {}", exe.display()));
+        }
+    }
+    out.push(format!(
+        "children of this process: [{}]",
+        children.join(", ")
+    ));
+    let inode = std::fs::metadata(lock)
+        .map_or(0, |meta| meta.ino())
+        .to_string();
+    let rows = std::fs::read_to_string("/proc/locks").unwrap_or_default();
+    out.extend(
+        rows.lines()
+            .filter(|row| {
+                row.split_whitespace()
+                    .any(|f| f.rsplit(':').next() == Some(&inode) && f.contains(':'))
+            })
+            .map(|row| format!("lock {row}")),
+    );
+    out.join("; ")
+}
+
+#[cfg(not(target_os = "linux"))]
+fn lock_holders(_lock: &Path) -> String {
+    "(holders are read from /proc on Linux only)".to_owned()
+}
+
 /// A record the owner stored, then damaged on disk: corrupt (same length, one bit) or
 /// unreadable (a directory where the file was). Returns the record's bytes, CID and path.
 async fn damaged_record(root: &Path, unreadable: bool) -> (Vec<u8>, cid::Cid, PathBuf) {
@@ -534,11 +601,64 @@ async fn a_shared_instance_never_replaces_a_record() {
 
         // The owner keeps today's behaviour: it rewrites the record.
         if !unreadable {
-            let owner = BlobStore::open_owner(dir.path()).await.unwrap();
+            let owner = match BlobStore::open_owner(dir.path()).await {
+                Ok(owner) => owner,
+                Err(error) => {
+                    let holders = lock_holders(&dir.path().join(elohim_blob_store::OWNER_LOCK));
+                    let refused_at = Instant::now();
+                    let mut cleared = None;
+                    while cleared.is_none() && refused_at.elapsed() < Duration::from_secs(2) {
+                        tokio::time::sleep(Duration::from_millis(5)).await;
+                        if BlobStore::open_owner(dir.path()).await.is_ok() {
+                            cleared = Some(refused_at.elapsed());
+                        }
+                    }
+                    panic!(
+                        "{error:?}; owner.lock holders when refused: {holders}; \
+                         a retry every 5 ms opened the owner after {cleared:?}"
+                    )
+                }
+            };
             owner.store_record(&canonical).await.unwrap();
             assert_eq!(&owner.get_record(&cid).await.unwrap()[..], &canonical[..]);
         }
     }
+}
+
+/// An owner's lock ends with the owner even while a child forked from this process has not yet
+/// exec'd. Such a child holds a duplicate of every descriptor until its exec closes them, so a
+/// lock released only by closing the file stays held through it. Other tests in this binary
+/// spawn children at any moment; under push load that window read as `OwnerHeld` in
+/// `a_shared_instance_never_replaces_a_record`.
+#[cfg(unix)]
+#[tokio::test]
+async fn an_owner_lock_ends_with_the_owner_despite_a_forked_child() {
+    use std::os::unix::process::CommandExt;
+    let dir = private_root();
+    let owner = BlobStore::open_owner(dir.path()).await.unwrap();
+    // Fork from another thread, as a sibling test would: `spawn` returns only after the exec.
+    let forker = std::thread::spawn(|| {
+        let mut command = Command::new("true");
+        // SAFETY: the hook only sleeps (nanosleep is async-signal-safe), holding the forked
+        // child before its exec with the descriptors it inherited.
+        unsafe {
+            command.pre_exec(|| {
+                std::thread::sleep(Duration::from_millis(1500));
+                Ok(())
+            });
+        }
+        command.status().unwrap()
+    });
+    tokio::time::sleep(Duration::from_millis(300)).await;
+    drop(owner);
+    let reopened = BlobStore::open_owner(dir.path()).await;
+    let holders = lock_holders(&dir.path().join(elohim_blob_store::OWNER_LOCK));
+    assert!(forker.join().unwrap().success());
+    assert!(
+        reopened.is_ok(),
+        "{:?}; owner.lock holders: {holders}",
+        reopened.err()
+    );
 }
 
 #[cfg(feature = "tier")]
