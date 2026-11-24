@@ -527,14 +527,18 @@ function crateShadowBudget(env, clock) {
   const declared = String(env.GATE_CRATE_SHADOW_BUDGET_MS ?? '').trim();
   const configured = declared ? Number(declared) : Number.NaN;
   const budgetMs = Number.isFinite(configured) && configured >= 0 ? Math.floor(configured) : 15_000;
-  let deadline = null;
+  // The budget is spent only inside the shadow's own spans (`span`): discovery before the recipe
+  // and the crate keys after it. The recipe between them never counts, so a long gate keeps its
+  // crate rows; only shadow work beyond the budget drops them.
+  let spent = 0;
+  let spanStart = null;
+  let depth = 0;
   let exhausted = null;
   const now = () => Number(clock()) / 1e6;
+  const used = () => spent + (spanStart === null ? 0 : now() - spanStart);
   const remaining = phase => {
     if (exhausted) throw exhausted;
-    const current = now();
-    deadline ??= current + budgetMs;
-    const left = deadline - current;
+    const left = budgetMs - used();
     if (left <= 0) {
       exhausted = new ShadowBudgetExhausted(budgetMs, phase);
       throw exhausted;
@@ -544,9 +548,21 @@ function crateShadowBudget(env, clock) {
   return {
     budgetMs,
     check: remaining,
+    begin() {
+      if (depth++ === 0) spanStart = now();
+    },
+    end() {
+      if (depth === 0) return;
+      if (--depth === 0) {
+        spent += now() - spanStart;
+        spanStart = null;
+      }
+    },
+    spentMs: used,
     spawn(run, phase, command, args, options = {}) {
       const left = remaining(phase);
-      const timeout = Math.min(options.timeout ?? Infinity, left);
+      // spawnSync rejects a fractional timeout; a whole millisecond, at least 1, is always valid.
+      const timeout = Math.max(1, Math.floor(Math.min(options.timeout ?? Infinity, left)));
       const result = run(command, args, { ...options, timeout });
       remaining(phase);
       return result;
@@ -976,12 +992,26 @@ export function runProject(project, printOnly, namesOnly, {
   const shadowBudget = crateShadowBudget(env, clock);
   const crateShadowState = { dropped: false };
   const readsCache = new Map();
+  // The repository listing every member scan reads is taken once, through the budget (its git
+  // subprocess gets the remaining time as its timeout), instead of once per member, unbounded.
+  let repositoryListing = null;
+  const listRepository = listRoot => {
+    if (repositoryListing) return repositoryListing;
+    const result = shadowBudget.spawn(spawn, 'read set', 'git',
+      ['ls-files', '-z', '--cached', '--others', '--exclude-standard', '--', '*.rs'],
+      { cwd: listRoot, encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 });
+    if (result?.status !== 0) {
+      throw new Error(result?.error?.message || String(result?.stderr || '') || 'git ls-files failed');
+    }
+    repositoryListing = [...new Set(String(result.stdout || '').split('\0').filter(Boolean))];
+    return repositoryListing;
+  };
   const memberReads = dir => {
     shadowBudget.check('read set');
     if (!readsCache.has(dir)) {
       const reads = readsOf
         ? readsOf(dir)
-        : readSet({ root, project, sources: [`${dir}/**`] }).paths;
+        : readSet({ root, project, sources: [`${dir}/**`], listFiles: listRepository }).paths;
       shadowBudget.check('read set');
       readsCache.set(dir, reads);
     }
@@ -989,6 +1019,7 @@ export function runProject(project, printOnly, namesOnly, {
   };
   let narrowMetadata = null;
   const crateShadowDiscoveryStarted = clock();
+  shadowBudget.begin();
   if (crateShadowEligible) {
     const mode = ['off', 'shadow', 'on'].includes(env.GATE_NARROW) ? env.GATE_NARROW : 'shadow';
     // `on` is refused until gate evidence keys a per-package verdict: the evidence store keys the
@@ -1044,6 +1075,7 @@ export function runProject(project, printOnly, namesOnly, {
       ? `full workspace — ${why}`
       : `${packages.join(' ')} (${packages.length} of ${narrowMetadata.workspace_members.length} members)`}\n`);
   }
+  shadowBudget.end();
   started += clock() - crateShadowDiscoveryStarted;
   // Evidence by input closure (gate-evidence.mjs): has THIS closure — the step's declared
   // input bytes at the pushed commit, the recipe, the resolved cargo env — already been
@@ -1266,6 +1298,7 @@ export function runProject(project, printOnly, namesOnly, {
     return complete(0, 'reused');
   }
   const crateShadowStarted = clock();
+  shadowBudget.begin();
   let crateContext = null;
   if (crateShadowEligible && !crateShadowState.dropped && env.GATE_READING !== 'off' && stepTimes.trim()) {
     try {
@@ -1280,6 +1313,7 @@ export function runProject(project, printOnly, namesOnly, {
   emitStepReadings(project.name, reading, stepTimes, {
     env, collector: readingCollector, crateContext, crateShadowState, write,
   });
+  shadowBudget.end();
   started += clock() - crateShadowStarted;
   // The exit status is the verdict; what the tap recognized only classifies it. For a suite's named
   // half the verdict comes from the attempt's written result, never the status alone (suiteDecision).
