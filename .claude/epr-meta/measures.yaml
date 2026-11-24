@@ -505,6 +505,27 @@ measures:
       movement; the categorical row fields remain addressable dimensions rather than numbers a
       second parser must recover from prose.
 
+  - id: sibling-miss-read-failed
+    version: 1
+    family: dev-cycle
+    unit: seconds
+    procedure: >
+      sibling-miss-inject (.claude/hooks, PostToolUse; unwired until the steward registers it)
+      reads `epr peer intents --misses --json` at most once per 30 s. When that read fails (no epr,
+      a nonzero exit, a timeout or output it cannot parse) the tool call still hears nothing, and
+      at most once per 10 minutes per agent the hook notes one observation without waiting for it:
+      subject `<session>:<agent>`, value the seconds since that agent last read misses (or since its
+      first failed read when it never has), env `failure` naming the kind, reason the detail. A
+      successful read resets the clock. The newest note per subject reads "this agent has not been
+      able to read misses for N seconds".
+    provenance: "integrator shem 2026-11-24 (lane 4 follow-up): three watchers died silently in one night; the injector's own failure must be an observation, not silence"
+    env-sensitivity: [failure]
+    default-authority: observation
+    status: active
+    established_by: f4-ask-unattended-2026-11-24
+    why: >
+      Seconds since the last good read, not a count of failures: the question a reader asks is how
+      long an agent has been blind to its siblings' misses, and a count alone cannot answer it.
   - id: pin-attestation
     version: 1
     family: dev-cycle

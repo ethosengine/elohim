@@ -43,8 +43,14 @@ class Harness(unittest.TestCase):
         self.misses = self.root / 'misses.json'
         self.calls = self.root / 'calls'
         self.epr = self.root / 'epr'
+        self.notes = self.root / 'notes'
         self.epr.write_text(
             '#!/bin/sh\n'
+            # The observation emitter probes `flow note --help` for --measure, then appends.
+            'if [ "$1 $2" = "flow note" ]; then\n'
+            '  case "$*" in *--help*) echo "usage: --measure"; exit 0 ;; esac\n'
+            f'  printf "%s\\n" "$*" >> "{self.notes}"; exit 0\n'
+            'fi\n'
             f'echo "$*" >> "{self.calls}"\n'
             '[ "$*" = "peer intents --misses --json" ] || exit 2\n'
             f'[ -n "$STUB_EXIT" ] && exit "$STUB_EXIT"\n'
@@ -54,7 +60,8 @@ class Harness(unittest.TestCase):
         self.serve([])
         clean = {k: v for k, v in os.environ.items() if not k.startswith('GIT_')}
         self.env = {**clean, 'CLAUDE_PROJECT_DIR': str(self.project), 'ELOHIM_SESSION_ID': '',
-                    'SIBLING_MISS_EPR_BIN': str(self.epr), 'SIBLING_MISS_POLL_S': '0'}
+                    'SIBLING_MISS_EPR_BIN': str(self.epr), 'SIBLING_MISS_POLL_S': '0',
+                    'EPR_BIN': str(self.epr), 'TMPDIR': str(self.root)}
         self.transcript = self.root / 'transcript.jsonl'
 
     def serve(self, rows):
@@ -174,6 +181,67 @@ class Hostile(Harness):
         self.hook(env=env)
         self.hook(env=env)
         self.assertEqual(self.epr_calls(), 1)
+
+
+class FailureIsObserved(Harness):
+    """A failed misses read is silence on the tool call, never unrecorded (lane 4 follow-up)."""
+
+    def noted(self, wait=3.0):
+        deadline = time.monotonic() + wait
+        while time.monotonic() < deadline:
+            if self.notes.exists() and self.notes.read_text().strip():
+                return self.notes.read_text().strip().splitlines()
+            time.sleep(0.05)
+        return []
+
+    def state(self):
+        return json.loads(next((self.project / '.eprfs/status/sibling-miss').glob('*.json')).read_text())
+
+    def test_a_failed_read_is_one_observation_and_the_call_hears_nothing(self):
+        failing = {**self.env, 'STUB_EXIT': '2'}
+        self.assertIsNone(self.hook(env=failing))
+        notes = self.noted()
+        self.assertEqual(len(notes), 1, notes)
+        self.assertIn('--measure sibling-miss-read-failed@1', notes[0])
+        self.assertIn(f'--subject {SESSION}:main', notes[0])
+        self.assertIn('--env failure=nonzero-exit', notes[0])
+
+    def test_failures_are_noted_at_most_once_per_ten_minutes_with_the_blind_seconds(self):
+        failing = {**self.env, 'STUB_EXIT': '2'}
+        self.hook(env=failing)
+        self.assertEqual(len(self.noted()), 1)
+        self.hook(env=failing)
+        time.sleep(0.3)
+        self.assertEqual(len(self.noted()), 1, 'a second failure inside ten minutes is not noted again')
+        data = self.state()
+        data['health']['failure_noted_at'] -= 601
+        data['health']['failing_since'] -= 900
+        (next((self.project / '.eprfs/status/sibling-miss').glob('*.json'))).write_text(json.dumps(data))
+        self.hook(env=failing)
+        notes = self.noted()
+        deadline = time.monotonic() + 3
+        while len(notes) < 2 and time.monotonic() < deadline:
+            time.sleep(0.05)
+            notes = self.noted()
+        self.assertEqual(len(notes), 2, notes)
+        value = int(notes[1].split('--value ', 1)[1].split()[0])
+        self.assertGreaterEqual(value, 900, 'the value is the seconds this agent has been blind')
+
+    def test_a_good_read_resets_the_clock_and_carries_through_cursor_writes(self):
+        self.hook(env={**self.env, 'STUB_EXIT': '2'})
+        self.assertIn('failing_since', self.state()['health'])
+        self.serve([miss()])
+        self.assertIsNotNone(self.hook())
+        health = self.state()['health']
+        self.assertIn('last_ok', health)
+        self.assertNotIn('failing_since', health)
+        self.assertNotIn('failure_noted_at', health)
+
+    def test_a_missing_epr_names_its_failure(self):
+        self.assertIsNone(self.hook(env={**self.env, 'SIBLING_MISS_EPR_BIN': str(self.root / 'absent')}))
+        notes = self.noted()
+        self.assertEqual(len(notes), 1, notes)
+        self.assertIn('--env failure=no-epr', notes[0])
 
 
 class Receipts(Harness):
