@@ -2917,3 +2917,38 @@ shem's cells is not known until the DNAs are rebuilt. Recasting a household repl
 identities and is the steward's decision. Until one household matches, a change to a storage or
 doorway serving path can get its serving receipt on neither device. Roll 2 was split for this
 reason: the half that touches no serving path goes ahead, the two storage lock sites wait.
+
+## Row 90 — a sibling that is heard but never acknowledges blocks every landing, after a futile wait
+
+On 2026-11-24 shem's landing passed its gates four times and was refused at the lease step each
+time. The laptop (did:key:z6MkgHju…xMbu) was admitted and its head folded on shem about every
+10 s, but it had acknowledged none of shem's records: its fetch of shem's channel root timed out
+(498 timeouts in its serve log, relayed by its session). So `dev-integration` was `unconfirmed`,
+and the hook waited for the `--offline-ok` override.
+
+Three things were found, in the order they stopped the push:
+
+- A renew that met `epr session: REFUSED lock-timeout: store lock remained busy for 5s` was read
+  by the hook as a refusal. Cured: a bounded retry (`.husky/pre-push.bash`,
+  `phase_l_agent_claim_patient`, with tests).
+- The override never matures. It is effective `ttl + skew + margin` after this device last
+  folded the silent device (`elohim/eprfs/…/lease_view.rs:781-791`, and the landing-plane spec of
+  2026-10-27), and a device heard every 10 s moves that time 10 s later every 10 s. Berth also
+  withdraws an override when the sibling's `last_seen` advances (`genesis/agentic/bin/berth`
+  near :2181), and "is back" means seen again, not acknowledging again
+  (`berth_test.py:3093-3110`). This is the rule as written, not a defect: the design treats
+  silent as not heard, and never decided the case of heard but not acknowledging.
+- Not cured, judged from reading and not run: the withdrawal's re-claim takes the envelope guard
+  a second time inside the first, which may be what meets the 5 s lock timeout.
+
+Unblocked for the night by the steward pausing the laptop's peer daemon, so that it is plainly
+silent. His lean for the next sprint's design, chosen from three candidates on 2026-11-24 and not
+a ruling: keep the rule and refuse at once, naming the cure ("seen but not acknowledging:
+`<device>`; repair its fold of this device"), so the 11-minute wait is not paid for a refusal that
+is already certain. The two other candidates each let both devices hold the lease in a one-way
+partition: counting the wait from the first claim and withdrawing only on acknowledgement, and
+maturing when this device's view shows no lease from the sibling.
+
+Also open: why the laptop's fetch of shem's root times out (ethosengine's fetch of the same root
+succeeds), and shem's peer daemon at about 75% of a core (row 87; the 30 s re-read of the flow
+log has a fix handed over as `self/ethosengine-reindex-skip`).
