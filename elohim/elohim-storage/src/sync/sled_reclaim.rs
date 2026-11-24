@@ -97,6 +97,7 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 
+use elohim_device_runtime::flock::Flock;
 use tracing::{info, warn};
 
 use crate::error::StorageError;
@@ -367,21 +368,20 @@ fn sync_tree(
 
 /// Take `<live>.reclaim-lock` for the whole open. Refused, not awaited, when
 /// another process holds it.
-fn lock_open(paths: &ReclaimPaths) -> Result<std::fs::File, StorageError> {
+fn lock_open(paths: &ReclaimPaths) -> Result<Flock, StorageError> {
     let file = std::fs::OpenOptions::new()
         .read(true)
         .write(true)
         .create(true)
         .truncate(false)
         .open(&paths.lock)?;
-    match file.try_lock() {
-        Ok(()) => Ok(file),
-        Err(std::fs::TryLockError::WouldBlock) => Err(StorageError::Database(format!(
+    match Flock::exclusive_within(file, Duration::ZERO, Duration::ZERO)? {
+        Ok(held) => Ok(held),
+        Err(_) => Err(StorageError::Database(format!(
             "another process is opening {} (it holds {}); not touching it",
             paths.live.display(),
             paths.lock.display()
         ))),
-        Err(std::fs::TryLockError::Error(e)) => Err(e.into()),
     }
 }
 
@@ -1415,16 +1415,8 @@ mod tests {
     }
 
     /// Hold `<live>.reclaim-lock` the way another booting process would.
-    fn hold_lock(paths: &ReclaimPaths) -> std::fs::File {
-        let file = std::fs::OpenOptions::new()
-            .read(true)
-            .write(true)
-            .create(true)
-            .truncate(false)
-            .open(&paths.lock)
-            .unwrap();
-        file.try_lock().unwrap();
-        file
+    fn hold_lock(paths: &ReclaimPaths) -> Flock {
+        lock_open(paths).unwrap()
     }
 
     #[test]
@@ -1441,6 +1433,51 @@ mod tests {
         drop(held);
         assert_eq!(served_marker(&paths.live), "original");
         only_live_remains(&paths);
+    }
+
+    /// The one-try reclaim guard unlocks when its owner ends even while a child forked by another
+    /// thread is paused before exec with its inherited descriptor copy.
+    #[cfg(unix)]
+    #[test]
+    fn a_reclaim_lock_ends_despite_a_forked_child() {
+        use std::os::unix::process::CommandExt;
+
+        const CHILD: &str = "ELOHIM_SLED_RECLAIM_FORK_LOCK_CHILD";
+        if std::env::var_os(CHILD).is_none() {
+            let status = std::process::Command::new(std::env::current_exe().unwrap())
+                .args([
+                    "sync::sled_reclaim::tests::a_reclaim_lock_ends_despite_a_forked_child",
+                    "--exact",
+                    "--nocapture",
+                    "--test-threads=1",
+                ])
+                .env(CHILD, "1")
+                .status()
+                .unwrap();
+            assert!(status.success());
+            return;
+        }
+
+        let dir = tempfile::tempdir().unwrap();
+        let paths = ReclaimPaths::new(&dir.path().join("sync.sled"));
+        let held = lock_open(&paths).unwrap();
+        let forker = std::thread::spawn(|| {
+            let mut command = std::process::Command::new("true");
+            // SAFETY: the hook only sleeps, holding the forked child before exec with the
+            // descriptors it inherited.
+            unsafe {
+                command.pre_exec(|| {
+                    std::thread::sleep(Duration::from_millis(1500));
+                    Ok(())
+                });
+            }
+            command.status().unwrap()
+        });
+        std::thread::sleep(Duration::from_millis(300));
+        drop(held);
+        let reacquired = lock_open(&paths);
+        assert!(forker.join().unwrap().success());
+        assert!(reacquired.is_ok(), "{reacquired:?}");
     }
 
     #[test]

@@ -188,7 +188,7 @@
 
 use std::cell::RefCell;
 use std::collections::HashMap;
-use std::fs::{File, OpenOptions, TryLockError};
+use std::fs::OpenOptions;
 use std::future::Future;
 use std::path::Path;
 use std::pin::Pin;
@@ -196,6 +196,7 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Duration;
 
+use elohim_device_runtime::flock::Flock;
 use holochain_client::CellId;
 use tokio::time::Instant;
 use tracing::Instrument;
@@ -1084,7 +1085,7 @@ tokio::task_local! {
 
 struct WriteLease {
     _local: tokio::sync::OwnedMutexGuard<()>,
-    _external: Option<File>,
+    _external: Option<Flock>,
 }
 
 /// A conductor call that has passed local admission, boxed. See
@@ -1597,16 +1598,16 @@ pub fn chain_key_of(cell_id: &CellId) -> String {
 }
 
 /// Optional local coordination with an independently signed ceremony process.
-/// The kernel releases this lock when its owning file/process closes. It is
-/// scheduling only: every conductor call still exercises its native capability.
-async fn external_writer_lock(chain_key: &str) -> Result<Option<File>, StorageError> {
+/// The guard unlocks this scheduling lock when dropped. Every conductor call still exercises
+/// its native capability.
+async fn external_writer_lock(chain_key: &str) -> Result<Option<Flock>, StorageError> {
     let Some(directory) = std::env::var_os("ELOHIM_CHAIN_WRITE_LOCK_DIR") else {
         return Ok(None);
     };
     Ok(Some(lock_file(Path::new(&directory), chain_key).await?))
 }
 
-async fn lock_file(directory: &Path, chain_key: &str) -> Result<File, StorageError> {
+async fn lock_file(directory: &Path, chain_key: &str) -> Result<Flock, StorageError> {
     // Keys are the conductor's public DNA/agent addresses, never caller paths.
     if chain_key.is_empty()
         || !chain_key
@@ -1618,19 +1619,19 @@ async fn lock_file(directory: &Path, chain_key: &str) -> Result<File, StorageErr
         ));
     }
     std::fs::create_dir_all(directory)?;
-    let file = OpenOptions::new()
+    let mut file = OpenOptions::new()
         .read(true)
         .write(true)
         .create(true)
         .truncate(false)
         .open(directory.join(format!("{chain_key}.lock")))?;
     loop {
-        match file.try_lock() {
-            Ok(()) => return Ok(file),
-            Err(TryLockError::WouldBlock) => {
+        match Flock::try_exclusive(file)? {
+            Ok(held) => return Ok(held),
+            Err(contended) => {
+                file = contended;
                 tokio::time::sleep(Duration::from_millis(10)).await;
             }
-            Err(TryLockError::Error(error)) => return Err(error.into()),
         }
     }
 }
@@ -1909,6 +1910,41 @@ mod tests {
         .unwrap()
         .unwrap();
         drop(acquired);
+    }
+
+    /// The async serialization guard unlocks when its owner ends even while a child forked by
+    /// another thread is paused before exec with its inherited descriptor copy.
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn an_external_writer_lock_ends_despite_a_forked_child() {
+        use std::os::unix::process::CommandExt;
+
+        let directory = tempfile::tempdir().unwrap();
+        let held = lock_file(directory.path(), "same-cell").await.unwrap();
+        let forker = std::thread::spawn(|| {
+            let mut command = std::process::Command::new("true");
+            // SAFETY: the hook only sleeps, holding the forked child before exec with the
+            // descriptors it inherited.
+            unsafe {
+                command.pre_exec(|| {
+                    std::thread::sleep(Duration::from_millis(1500));
+                    Ok(())
+                });
+            }
+            command.status().unwrap()
+        });
+        tokio::time::sleep(Duration::from_millis(300)).await;
+        drop(held);
+        let reacquired = tokio::time::timeout(
+            Duration::from_millis(200),
+            lock_file(directory.path(), "same-cell"),
+        )
+        .await;
+        assert!(forker.join().unwrap().success());
+        assert!(
+            matches!(reacquired, Ok(Ok(_))),
+            "the lock outlived its owner"
+        );
     }
 
     fn head_moved() -> StorageError {
