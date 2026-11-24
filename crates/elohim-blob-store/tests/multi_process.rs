@@ -636,20 +636,44 @@ async fn an_owner_lock_ends_with_the_owner_despite_a_forked_child() {
     use std::os::unix::process::CommandExt;
     let dir = private_root();
     let owner = BlobStore::open_owner(dir.path()).await.unwrap();
+    let mut ready = [0; 2];
+    // SAFETY: `ready` has room for the two descriptors `pipe` writes.
+    assert_eq!(unsafe { libc::pipe(ready.as_mut_ptr()) }, 0);
+    let [read_ready, write_ready] = ready;
     // Fork from another thread, as a sibling test would: `spawn` returns only after the exec.
-    let forker = std::thread::spawn(|| {
+    let forker = std::thread::spawn(move || {
         let mut command = Command::new("true");
-        // SAFETY: the hook only sleeps (nanosleep is async-signal-safe), holding the forked
-        // child before its exec with the descriptors it inherited.
+        // SAFETY: the hook uses only async-signal-safe libc calls on inherited descriptors,
+        // then holds the forked child before exec with the descriptors it inherited.
         unsafe {
-            command.pre_exec(|| {
-                std::thread::sleep(Duration::from_millis(1500));
+            command.pre_exec(move || {
+                libc::close(read_ready);
+                let byte = [1_u8];
+                if libc::write(write_ready, byte.as_ptr().cast(), byte.len()) != 1 {
+                    return Err(std::io::Error::last_os_error());
+                }
+                let pause = libc::timespec {
+                    tv_sec: 1,
+                    tv_nsec: 500_000_000,
+                };
+                libc::nanosleep(&pause, std::ptr::null_mut());
+                libc::close(write_ready);
                 Ok(())
             });
         }
         command.status().unwrap()
     });
-    tokio::time::sleep(Duration::from_millis(300)).await;
+    let mut byte = [0_u8];
+    // SAFETY: both descriptors came from `pipe`; the buffer holds the one byte requested.
+    assert_eq!(
+        unsafe { libc::read(read_ready, byte.as_mut_ptr().cast(), byte.len()) },
+        1
+    );
+    // SAFETY: the parent is finished with both of its pipe descriptors.
+    unsafe {
+        libc::close(read_ready);
+        libc::close(write_ready);
+    }
     drop(owner);
     let reopened = BlobStore::open_owner(dir.path()).await;
     let holders = lock_holders(&dir.path().join(elohim_blob_store::OWNER_LOCK));

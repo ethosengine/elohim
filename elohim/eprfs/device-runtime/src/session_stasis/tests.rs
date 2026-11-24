@@ -297,6 +297,32 @@ fn stale_tool_pending_observation_does_not_reopen_after_return() {
 }
 
 #[test]
+fn parked_pending_call_does_not_open_an_incident_per_observation() {
+    let events = [
+        observed(2, 10, Some(0)),
+        park_record(true, Some("native-decide"), Some("cid-1")),
+        observed(4, 200, Some(0)),
+        observed(5, 300, Some(0)),
+    ];
+    let fold = fold_pinned(&events, Some("cid-1"));
+    assert_eq!(fold.incidents.len(), 1);
+    assert_eq!(fold.incidents[0].closed_by, Some(ClosedBy::Parked));
+}
+
+#[test]
+fn a_new_pending_start_after_return_opens_a_new_incident() {
+    let events = [
+        observed(1, 10, Some(0)),
+        ev(2, 20, "turn-ended", json!({"outcome": "accomplished"})),
+        observed(3, 30, Some(25)),
+    ];
+    let fold = run(&events, 60, Selection::All);
+    assert_eq!(fold.incidents.len(), 2);
+    assert_eq!(fold.incidents[0].closed_by, Some(ClosedBy::Answered));
+    assert_eq!(fold.incidents[1].opened_at.wall, at(25));
+}
+
+#[test]
 fn tool_pending_observation_never_witnesses_presence_or_closes_an_incident() {
     let mut own_activity = ev(
         1,
@@ -940,6 +966,39 @@ fn an_away_ruling_and_the_collaborative_window_set_the_passive_disposition() {
         effective_presence(&[], &[], at(0), &p, &[]).disposition,
         Disposition::Unknown
     );
+}
+
+#[test]
+fn observer_presence_cannot_replace_or_clear_an_away_ruling() {
+    let mut owned = ev(1, 0, "turn-ended", json!({"outcome": "accomplished"}));
+    owned["presence"] = json!({"disposition": "automated", "basis": {
+        "lastWitnessedAgeSeconds": 0.0, "rulingRef": "away-owned"
+    }});
+    let rulings = [
+        AwayRuling {
+            id: "away-owned".into(),
+            expires_at: None,
+        },
+        AwayRuling {
+            id: "away-observer".into(),
+            expires_at: None,
+        },
+    ];
+    let policy = StasisPolicy::builtin();
+    let c = classifier();
+
+    for observer_ruling in [Some("away-observer"), None] {
+        let mut outside = observed(2, 10, Some(10));
+        outside["presence"] = json!({"disposition": "automated", "basis": {
+            "lastWitnessedAgeSeconds": null, "rulingRef": observer_ruling
+        }});
+        let fold = fold_session(
+            &replay_of(&[owned.clone(), outside]),
+            &FoldOptions::new(at(20), Selection::All, true, &policy, &c).with_rulings(&rulings),
+        );
+        assert_eq!(fold.presence.ruling_ref.as_deref(), Some("away-owned"));
+        assert_eq!(fold.presence.disposition, Disposition::Automated);
+    }
 }
 
 // --- Rungs, consultations and budgets -------------------------------------------------------
