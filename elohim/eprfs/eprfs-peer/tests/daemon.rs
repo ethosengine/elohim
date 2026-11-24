@@ -1130,6 +1130,81 @@ async fn persistent_artifact_index_read_errors_retry_once_per_backoff_window() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn a_slow_read_failure_backs_off_from_when_the_failure_finished() {
+    let b = device("DeviceB", 2);
+    let key_dir = tempfile::tempdir().expect("key dir");
+    let key = load_key(key_dir.path());
+    let rows = vec![genesis(&b), endpoint_row(&b, &b, &key)];
+    let side = Side::new(&rows);
+    let payload_dir = tempfile::tempdir().expect("payload dir");
+    let payload =
+        eprfs_peer::open_payload_store(&payload_dir.path().join("payload")).expect("payload store");
+    let start = Instant::now();
+    let clock = Arc::new(Mutex::new(start));
+    let clock_for_daemon = clock.clone();
+    let mut cfg = config(
+        &b,
+        &b.did,
+        key,
+        &side,
+        &[&b],
+        Vec::new(),
+        local(free_port()),
+    );
+    cfg.payload_store = Some(payload);
+    let daemon = PeerDaemon::start_with_clock(
+        cfg,
+        Arc::new(move || *clock_for_daemon.lock().expect("clock")),
+    )
+    .await
+    .expect("daemon starts");
+
+    eventually("the initial artifact index reads the flow log", || {
+        daemon.artifact_index_flow_reads() == 1
+    })
+    .await;
+
+    // The first failing read takes longer than the whole backoff on the daemon's clock.
+    let slow = INDEX_RETRY_FIRST + Duration::from_secs(5);
+    let failure_done = start + slow;
+    let once = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let clock_for_hook = clock.clone();
+    daemon.on_failed_artifact_index_flow_read(move || {
+        if !once.swap(true, std::sync::atomic::Ordering::SeqCst) {
+            *clock_for_hook.lock().expect("clock") = failure_done;
+        }
+    });
+    daemon.fail_artifact_index_flow_reads();
+    side.checkout
+        .append(berth_event("claim", "cargo", "sa", "1.0"));
+    eventually("the changed log read fails slowly", || {
+        daemon.artifact_index_flow_reads() == 2
+    })
+    .await;
+    assert_eq!(*clock.lock().expect("clock"), failure_done);
+
+    // Measured from the read's start, the retry would already be due; from its completion it
+    // is not, so no read follows until a full backoff has passed after the failure.
+    assert_index_reads_stay(&daemon, 2).await;
+    side.checkout.append(berth_event(
+        "claim",
+        "appended-after-slow-failure",
+        "sa",
+        "1.0",
+    ));
+    assert_index_reads_stay(&daemon, 2).await;
+
+    *clock.lock().expect("clock") = failure_done + INDEX_RETRY_FIRST + Duration::from_secs(1);
+    eventually("one retry follows a full backoff after the failure", || {
+        daemon.artifact_index_flow_reads() == 3
+    })
+    .await;
+    assert_index_reads_stay(&daemon, 3).await;
+
+    daemon.shutdown().await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn daemon_reindex_reads_flow_only_for_change_or_due_manifest_retry() {
     let b = device("DeviceB", 2);
     let key_dir = tempfile::tempdir().expect("key dir");

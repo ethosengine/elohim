@@ -207,6 +207,21 @@ struct RunStats {
     ticks: AtomicU64,
     #[cfg(feature = "testing")]
     fail_index_flow_reads: std::sync::atomic::AtomicBool,
+    #[cfg(feature = "testing")]
+    failed_index_read_hook: FailedReadHook,
+}
+
+/// A test callback run inside a forced artifact-index read failure, so a test can make that
+/// failure take time on its injected clock.
+#[cfg(feature = "testing")]
+#[derive(Default)]
+struct FailedReadHook(std::sync::Mutex<Option<Arc<dyn Fn() + Send + Sync>>>);
+
+#[cfg(feature = "testing")]
+impl std::fmt::Debug for FailedReadHook {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("FailedReadHook")
+    }
 }
 
 /// When a projection that failed is tried again. A projection re-parses the whole flow store, so a
@@ -513,6 +528,17 @@ impl PeerDaemon {
         self.stats
             .fail_index_flow_reads
             .store(true, Ordering::Relaxed);
+    }
+
+    /// Run `hook` inside each forced artifact-index read failure (a slow failure on the test clock).
+    #[cfg(feature = "testing")]
+    pub fn on_failed_artifact_index_flow_read(&self, hook: impl Fn() + Send + Sync + 'static) {
+        *self
+            .stats
+            .failed_index_read_hook
+            .0
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(Arc::new(hook));
     }
 
     /// Let artifact-index flow reads succeed again at the test seam.
@@ -1316,6 +1342,19 @@ impl Run {
         #[cfg(not(feature = "testing"))]
         let forced_read_error = false;
         let read = if forced_read_error {
+            #[cfg(feature = "testing")]
+            {
+                let hook = self
+                    .stats
+                    .failed_index_read_hook
+                    .0
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .clone();
+                if let Some(hook) = hook {
+                    hook();
+                }
+            }
             Err("forced test read error".to_string())
         } else {
             self.flow.events().map_err(|error| error.to_string())
@@ -1326,7 +1365,9 @@ impl Run {
                 self.log(&format!(
                     "artifacts not indexed: the flow store failed: {e}"
                 ));
-                self.index_retry_at = Some(rebuild_at + INDEX_RETRY_FIRST);
+                // Measured from the failure's completion: a read that took longer than the backoff
+                // must not leave its retry already due.
+                self.index_retry_at = Some((self.now)() + INDEX_RETRY_FIRST);
                 self.index_retry_stamp = Some(now);
                 self.index_retry_failed = true;
                 return;
