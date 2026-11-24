@@ -1,6 +1,17 @@
 import { createHash } from 'node:crypto';
 import { dirname } from 'node:path';
 
+// Mirrors the root justfile's `_gate-eprfs` recipe. Only Cargo workspace-wide steps can
+// honestly attribute their closure key to every member; the other steps cover different tools.
+export const EPRFS_RECIPE_STEP_COVERAGE = Object.freeze({
+  fmt: 'workspace',
+  precheck: null,
+  lint: 'workspace',
+  bins: null,
+  ark: null,
+  test: 'workspace',
+});
+
 function canonical(value) {
   if (Array.isArray(value)) return value.map(canonical);
   if (value && typeof value === 'object') {
