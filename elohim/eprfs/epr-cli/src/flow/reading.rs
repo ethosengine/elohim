@@ -85,6 +85,10 @@ struct ReadingRow {
     unit: String,
     run_id: String,
     step: String,
+    /// The step this row is a part of (a recipe step names its gate project). A child row lies
+    /// inside its parent's span, so a run's sums, gaps and finish-setter read parents alone.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    parent: Option<String>,
     key: String,
     key_changed: KeyChanged,
     #[serde(skip_serializing_if = "Option::is_none", default)]
@@ -109,6 +113,11 @@ impl ReadingRow {
         }
         if self.run_id.trim().is_empty() || self.step.trim().is_empty() {
             return Err("run_id and step must be non-empty".into());
+        }
+        if let Some(parent) = &self.parent {
+            if parent.trim().is_empty() || parent.trim() == self.step.trim() {
+                return Err("parent must be non-empty and name another step".into());
+            }
         }
         if !self.value.is_finite() || self.value < 0.0 {
             return Err("value must be a finite non-negative number".into());
@@ -146,6 +155,10 @@ impl ReadingRow {
         Some(ReadingObservation {
             run_id: self.run_id.trim().to_string(),
             step: self.step.trim().to_string(),
+            parent: self
+                .parent
+                .as_deref()
+                .map(|parent| parent.trim().to_string()),
             key: self.key.trim().to_string(),
             key_changed: self.key_changed,
             outcome: self.outcome,
@@ -163,6 +176,7 @@ impl ReadingRow {
 struct ReadingObservation {
     run_id: String,
     step: String,
+    parent: Option<String>,
     key: String,
     key_changed: KeyChanged,
     outcome: Outcome,
@@ -499,7 +513,9 @@ fn fold(mut rows: Vec<ReadingObservation>, options: &ReadingOptions) -> ReadingR
         if missing_reason {
             no_key_no_reason.insert(row.step.clone());
         }
-        if !row.synthesized {
+        // A synthesized fill sets no span, and a child row is already inside its parent's span:
+        // counting it would add its seconds twice and could name it the finish-setter.
+        if !row.synthesized && row.parent.is_none() {
             by_run.entry(row.run_id.clone()).or_default().push(row);
         }
     }
@@ -693,6 +709,7 @@ mod tests {
             unit: "seconds".into(),
             run_id: run_id.into(),
             step: step.into(),
+            parent: None,
             key: key.into(),
             key_changed: KeyChanged::Unknown,
             key_changed_writer: None,
@@ -887,6 +904,7 @@ mod tests {
         ReadingObservation {
             run_id: run_id.into(),
             step: step.into(),
+            parent: None,
             key: key.into(),
             key_changed,
             outcome,
@@ -1165,5 +1183,70 @@ mod tests {
         assert_eq!(report.runs, 10);
         assert!(report.run_folds.iter().all(|run| run.run_id != "run-00"));
         assert!(report.run_folds.iter().all(|run| run.run_id != "run-01"));
+    }
+
+    #[test]
+    fn child_rows_keep_their_step_seconds_and_never_count_twice_in_a_run() {
+        let mut fmt = row(
+            "run",
+            "eprfs:fmt",
+            "key",
+            KeyChanged::Unknown,
+            Outcome::Ran,
+            (4.0, 0.0, "2026-11-24T12:00:00Z", "2026-11-24T12:00:04Z"),
+        );
+        fmt.parent = Some("eprfs".into());
+        let mut test = row(
+            "run",
+            "eprfs:test",
+            "key",
+            KeyChanged::Unknown,
+            Outcome::Ran,
+            (5.0, 0.0, "2026-11-24T12:00:04Z", "2026-11-24T12:00:09Z"),
+        );
+        test.parent = Some("eprfs".into());
+        let project = row(
+            "run",
+            "eprfs",
+            "key",
+            KeyChanged::Unknown,
+            Outcome::Ran,
+            (10.0, 0.0, "2026-11-24T12:00:00Z", "2026-11-24T12:00:10Z"),
+        );
+        let report = fold(vec![fmt, test, project], &ReadingOptions::default());
+
+        let run = &report.run_folds[0];
+        assert_eq!(run.steps, 1, "only the parent row is a run step");
+        assert_eq!(
+            run.sum_step_seconds, 10.0,
+            "child seconds are inside the parent's"
+        );
+        assert_eq!(run.finish_setting_step, "eprfs");
+        let seconds = |name: &str| {
+            report
+                .seconds_by_step
+                .iter()
+                .find(|step| step.step == name)
+                .map(|step| step.unknown_seconds)
+        };
+        assert_eq!(seconds("eprfs:fmt"), Some(4.0));
+        assert_eq!(seconds("eprfs:test"), Some(5.0));
+        assert_eq!(seconds("eprfs"), Some(10.0));
+    }
+
+    #[test]
+    fn a_parent_must_name_another_nonempty_step() {
+        let mut child = stored_row("run", "eprfs:fmt", "key");
+        child.parent = Some("eprfs".into());
+        assert!(child.validate("seconds").is_ok());
+        for bad in ["", "  ", "eprfs:fmt"] {
+            child.parent = Some(bad.into());
+            assert!(child.validate("seconds").is_err(), "{bad:?}");
+        }
+        let absent = serde_json::to_string(&stored_row("run", "eprfs", "key")).unwrap();
+        assert!(
+            !absent.contains("parent"),
+            "a row without a parent serializes as before"
+        );
     }
 }
