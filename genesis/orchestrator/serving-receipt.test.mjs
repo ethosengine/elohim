@@ -220,7 +220,7 @@ test("actual pre-push caller propagates mandatory refusal in default and strict 
     mkdirSync(join(dir, "genesis/orchestrator/scripts"), { recursive: true });
     writeFileSync(
       join(dir, "genesis/orchestrator/scripts/t2-receipt.sh"),
-      'printf "%s" "$2" > receipt-path\nexit "$RECEIPT_STATUS"\n',
+      'printf "%s" "$2" > receipt-path\nprintf "%s" "$4" > targets-path\ncat "$4" > receipt-targets\nexit "$RECEIPT_STATUS"\n',
     );
     for (const mode of ["", "strict"]) {
       for (const status of [0, 1, 2]) {
@@ -235,6 +235,8 @@ test("actual pre-push caller propagates mandatory refusal in default and strict 
             env: {
               ...process.env,
               CHANGED: "doorway/doorway-service/src/server/http.rs",
+              GATE_PUSH_REFS:
+                "refs/heads/self/ethosengine-x aaaa bbbb\nrefs/heads/dev cccc dddd",
               T2_RECEIPT: mode,
               RECEIPT_STATUS: String(status),
               TMPDIR: dir,
@@ -252,6 +254,16 @@ test("actual pre-push caller propagates mandatory refusal in default and strict 
           existsSync(list),
           false,
           "caller cleans its temporary list on every outcome",
+        );
+        assert.equal(
+          readFileSync(join(dir, "receipt-targets"), "utf8"),
+          "refs/heads/self/ethosengine-x\nrefs/heads/dev\n",
+          "caller passes each pushed remote ref, one per line",
+        );
+        assert.equal(
+          existsSync(readFileSync(join(dir, "targets-path"), "utf8")),
+          false,
+          "caller cleans its temporary targets list on every outcome",
         );
       }
     }
@@ -353,9 +365,15 @@ function storyReport(root, story, parts = currentParts(root)) {
   };
 }
 
-function runT2(root, changedPaths, reportsDir, env = {}) {
+function runT2(root, changedPaths, reportsDir, env = {}, targets) {
   const changed = join(reportsDir, "changed.txt");
   writeFileSync(changed, changedPaths.join("\n") + "\n");
+  const targetArgs = [];
+  if (targets !== undefined) {
+    const list = join(reportsDir, "targets.txt");
+    writeFileSync(list, targets.map((ref) => ref + "\n").join(""));
+    targetArgs.push("--targets", list);
+  }
   return spawnSync(
     "bash",
     [
@@ -364,6 +382,7 @@ function runT2(root, changedPaths, reportsDir, env = {}) {
       changed,
       "--reports",
       reportsDir,
+      ...targetArgs,
     ],
     {
       cwd: root,
@@ -499,6 +518,50 @@ test("the C2 paths are refused without a receipt in default and strict modes, na
 // One refusal against THIS checkout, every landing: the scripts as they stand here, run in this
 // worktree under its own Git environment, refuse a serving path that has no receipt. The fixture
 // cases above prove the path classes; this proves the real tree's invocation still refuses.
+// Steward ruling 2026-11-24: the serving receipt refuses only a push that names dev or main.
+// Any other ref (a self/ hand-over) prints one line naming the receipt owed before dev.
+test("a self/ hand-over with no serving receipt passes and names the receipt owed before dev", () => {
+  for (const targets of [
+    ["refs/heads/self/ethosengine-roll-2b"],
+    ["refs/heads/feature/x", "refs/heads/self/ethosengine-y"],
+  ]) {
+    const dir = mkdtempSync(join(tmpdir(), "owed-before-dev-"));
+    try {
+      const result = runT2(REPO, ["scripts/ci/fleet-write-readiness.sh"], dir, {}, targets);
+      assert.equal(result.status, 0, result.stdout + result.stderr);
+      assert.doesNotMatch(result.stderr, /NO-SERVING-RECEIPT/);
+      const owed = result.stdout
+        .split("\n")
+        .filter((line) => line.includes("serving receipt owed before dev"));
+      assert.equal(owed.length, 1, result.stdout);
+      assert.match(owed[0], /just test mesh features\/dataplane\/app-delivery-refuses-fast\.feature/);
+      assert.equal(result.stderr.trim(), "", "the receipt's own lines collapse into the one owed line");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }
+});
+
+test("a push naming dev or main, or whose targets are unknown, still refuses a serving path with no receipt", () => {
+  for (const targets of [
+    ["refs/heads/dev"],
+    ["refs/heads/main"],
+    ["refs/heads/self/ethosengine-x", "refs/heads/dev"],
+    [],
+    undefined,
+  ]) {
+    const dir = mkdtempSync(join(tmpdir(), "refused-at-dev-"));
+    try {
+      const result = runT2(REPO, ["scripts/ci/fleet-write-readiness.sh"], dir, {}, targets);
+      assert.equal(result.status, 1, `${JSON.stringify(targets)}: ${result.stdout}${result.stderr}`);
+      assert.match(result.stderr, /NO-SERVING-RECEIPT/);
+      assert.doesNotMatch(result.stdout, /owed before dev/);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }
+});
+
 test("this checkout's t2-receipt.sh refuses a serving path with no receipt, naming its story", () => {
   const dir = mkdtempSync(join(tmpdir(), "live-refused-"));
   try {
