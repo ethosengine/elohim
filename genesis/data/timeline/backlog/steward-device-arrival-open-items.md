@@ -2965,3 +2965,36 @@ added a licence field to each `Cargo.toml`, which changes no wasm. So shem can r
 lane for a storage serving receipt once the mesh storage and doorway binaries are rebuilt; the
 stale-hApp refusal has to be overridden by name (`MESH_ALLOW_STALE_HAPP=1`) with this reason, or
 the rule taught to ask cargo. Ethosengine's household (cast 2026-10-26) does not match.
+
+## Row 91 — a new device can never fold a sibling with a long channel over a relay, so it never acknowledges it
+
+Why the laptop acknowledged none of shem's records (row 90), read in `eprfs-peer` at dev
+`93983b057` by the laptop's session on 2026-11-24 and checked against what each device observed.
+The integrator did not re-read the lines.
+
+- The deadline covers the whole fold: `daemon.rs:1747` wraps connect, spine check, listing and
+  every event read in `FOLD_DEADLINE`, 30 s (`daemon.rs:253`). A timeout prints
+  `tier did not answer for root … (timed out)`, the line the laptop logged 189 times.
+- A device that has never folded a sibling has no `since`, so `fold.rs` `fetch_channel_for` lists
+  the whole `events/` directory in one answer (capped at 16 MB, not paged). With a `since` it asks
+  for a diff, which is what ethosengine does for shem.
+- Each new event is then its own sequential read on the connection, up to `MAX_FOLD_EVENTS`
+  (1024). Over a relay that is about a thousand round trips inside 30 s.
+- A fold that times out keeps nothing, so each retry starts from zero.
+
+Observed: 189 attempts by the laptop against shem, none folded, across two `epr` builds; shem
+folded the laptop's 31 events in one go; shem's head was near seq 90,000; shem holds only a
+relay connection. Not measured: the round-trip time and the size of the listing. Shem's daemon
+load (row 87) was suspected first and is not needed to explain it.
+
+The cure in hand (ethosengine's lane, and the laptop's session reached the same shape): fold in
+bounded batches and keep progress, so a deadline or the cap ends a batch with `complete=false`
+and the next head continues from the last folded event. Reading several events at once is a
+speed-up on top; a longer deadline alone moves the limit to longer channels. The fix helps only
+once the reading device's daemon runs it.
+
+Three gaps made this slow to find, each on both devices: no one-shot `epr peer fetch`, no
+timestamps on the daemon's log lines, and no log line for an inbound tier request, served or
+refused. Two traps the laptop met while rebuilding: a plain `cargo build --bin epr` omits the
+`blob-store` feature and that binary refuses a blob-store-v1 payload store; and
+`epr bin follow --repo` refuses on a host with no cargo pool.
