@@ -5,7 +5,7 @@ mod support;
 
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use async_trait::async_trait;
 use bytes::Bytes;
@@ -21,7 +21,7 @@ use eprfs_peer::{
     project_channel, tier_call, via_device, Channel, ChannelEvent, ChannelHead, ChannelStore,
     ChannelTree, CrossingAllowList, FoldLimits, FoldPlan, FoldReader, FoldTarget, HeadTable,
     NackLeaf, PeerConfig, PeerDaemon, PeerError, Rules, TierAnswer, TierLimits, TierProtocol,
-    TierRequest, CHANNEL_EVENTS, TIER_ALPN,
+    TierRequest, CHANNEL_EVENTS, FOLD_BATCH_EVENTS, TIER_ALPN,
 };
 use futures_lite::StreamExt;
 use iroh::endpoint::Connection;
@@ -192,6 +192,7 @@ type StubAnswer = dyn Fn(&TierRequest) -> TierAnswer + Send + Sync;
 struct StubTier {
     answer: Arc<StubAnswer>,
     requests: Arc<Mutex<Vec<TierRequest>>>,
+    read_delay: Duration,
 }
 
 impl std::fmt::Debug for StubTier {
@@ -216,6 +217,9 @@ impl ProtocolHandler for StubTier {
                 .lock()
                 .expect("request log")
                 .push(request.clone());
+            if matches!(request, TierRequest::Read { .. }) {
+                tokio::time::sleep(self.read_delay).await;
+            }
             let answer = (self.answer)(&request);
             let body = serde_ipld_dagcbor::to_vec(&answer).expect("answer frame");
             let len = u32::try_from(body.len()).expect("small answer");
@@ -542,6 +546,208 @@ async fn fold_is_idempotent_by_event_cid() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn a_long_delayed_root_keeps_progress_across_deadlines_and_sets_since_only_when_complete() {
+    let h = household();
+    let events: Vec<_> = (0..=1024)
+        .map(|seq| berth_event("note", "-", "long", &seq.to_string()))
+        .collect();
+    let expected: HashSet<_> = events
+        .iter()
+        .map(|event| atom_cid(event).expect("event cid"))
+        .collect();
+    let tree = test_channel(events, vec![]);
+    let served = tree.clone();
+    let requests = Arc::new(Mutex::new(Vec::new()));
+    let mounted = mount_stub(
+        &h.key_b,
+        StubTier {
+            answer: Arc::new(move |request| served.answer(request)),
+            requests: requests.clone(),
+            read_delay: Duration::from_millis(2),
+        },
+    )
+    .await;
+    let a = bind(&h.key_a, None, vec![]).await.expect("bind A");
+    let checkout = Checkout::new();
+    let state = tempfile::tempdir().expect("state");
+    let mut known = HashSet::new();
+    let mut since = None;
+    let mut attempts = 0usize;
+
+    while since.is_none() {
+        attempts += 1;
+        let before = checkout.events().len();
+        let report = fold_root_planned(
+            &a,
+            mounted.addr.clone(),
+            FoldTarget {
+                device: &h.b.did,
+                since: since.as_ref(),
+                root: &tree.root,
+                admission: None,
+                reader: FoldReader {
+                    device: &h.a.did,
+                    state_dir: state.path(),
+                },
+            },
+            &checkout.store(),
+            &allow(),
+            &TreeLimits::default(),
+            FoldPlan {
+                limits: FoldLimits::default(),
+                known: Some(&known),
+                deadline: Some(Instant::now() + Duration::from_millis(100)),
+            },
+        )
+        .await
+        .expect("a deadline is an incomplete fold, not a failed fold");
+        let after = checkout.events().len();
+        assert!(after > before, "attempt {attempts} kept no progress");
+        assert!(after - before <= FOLD_BATCH_EVENTS);
+        assert_eq!(report.known.len(), after);
+        known = report.known;
+        if report.complete {
+            since = Some(tree.root.clone());
+        } else {
+            assert!(since.is_none(), "a partial root must not become the base");
+        }
+        assert!(attempts < 100, "the bounded batches did not converge");
+    }
+
+    assert!(attempts > 1, "the delayed root must span deadlines");
+    assert_eq!(known, expected);
+    assert_eq!(folded_from(&checkout.store(), &h.b.did).unwrap(), expected);
+    assert!(requests
+        .lock()
+        .expect("requests")
+        .iter()
+        .all(|request| !matches!(request, TierRequest::Diff { .. })));
+
+    a.close().await;
+    mounted.router.shutdown().await.expect("shutdown");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn stopping_mid_root_relists_and_skips_only_events_already_folded() {
+    let h = household();
+    let events: Vec<_> = (0..70)
+        .map(|seq| berth_event("note", "-", "resume", &seq.to_string()))
+        .collect();
+    let expected: HashSet<_> = events
+        .iter()
+        .map(|event| atom_cid(event).expect("event cid"))
+        .collect();
+    let tree = test_channel(events, vec![]);
+    let served = tree.clone();
+    let mounted = mount_stub(
+        &h.key_b,
+        StubTier {
+            answer: Arc::new(move |request| served.answer(request)),
+            requests: Arc::new(Mutex::new(Vec::new())),
+            read_delay: Duration::ZERO,
+        },
+    )
+    .await;
+    let a = bind(&h.key_a, None, vec![]).await.expect("bind A");
+    let checkout = Checkout::new();
+    let state = tempfile::tempdir().expect("state");
+    let target = || FoldTarget {
+        device: &h.b.did,
+        since: None,
+        root: &tree.root,
+        admission: None,
+        reader: FoldReader {
+            device: &h.a.did,
+            state_dir: state.path(),
+        },
+    };
+    let first = fold_root_planned(
+        &a,
+        mounted.addr.clone(),
+        target(),
+        &checkout.store(),
+        &allow(),
+        &TreeLimits::default(),
+        FoldPlan {
+            limits: FoldLimits {
+                max_events: FOLD_BATCH_EVENTS,
+                ..FoldLimits::default()
+            },
+            ..FoldPlan::default()
+        },
+    )
+    .await
+    .expect("first batch");
+    assert!(!first.complete);
+    assert_eq!(first.outcome.appended, FOLD_BATCH_EVENTS as u64);
+    let second = fold_root_planned(
+        &a,
+        mounted.addr.clone(),
+        target(),
+        &checkout.store(),
+        &allow(),
+        &TreeLimits::default(),
+        FoldPlan {
+            known: Some(&first.known),
+            ..FoldPlan::default()
+        },
+    )
+    .await
+    .expect("remaining batch");
+    assert!(second.complete);
+    assert_eq!(second.outcome.appended, 6);
+    assert_eq!(folded_from(&checkout.store(), &h.b.did).unwrap(), expected);
+
+    a.close().await;
+    mounted.router.shutdown().await.expect("shutdown");
+}
+
+#[test]
+fn a_bad_event_rejects_its_whole_batch_and_keeps_an_earlier_batch() {
+    let checkout = Checkout::new();
+    let device = "did:key:zBatchAuthor";
+    let first = berth_event("note", "-", "batch", "1");
+    let first_cid = atom_cid(&first).expect("first cid");
+    fold_events(
+        &checkout.store(),
+        device,
+        &[ChannelEvent {
+            cid: first_cid,
+            event: first,
+        }],
+        &allow(),
+    )
+    .expect("earlier batch folds");
+
+    let valid = berth_event("note", "-", "batch", "2");
+    let bad = berth_event("note", "-", "batch", "3");
+    // Events are covered by the signed, ordered head rather than individually signed. At the
+    // event layer, a CID/body mismatch is the batch-rejecting integrity failure.
+    let rejected = fold_events(
+        &checkout.store(),
+        device,
+        &[
+            ChannelEvent {
+                cid: atom_cid(&valid).expect("valid cid"),
+                event: valid,
+            },
+            ChannelEvent {
+                cid: first_cid,
+                event: bad,
+            },
+        ],
+        &allow(),
+    );
+    assert!(matches!(rejected, Err(PeerError::FoldIntegrity { .. })));
+    assert_eq!(
+        checkout.events().len(),
+        1,
+        "the rejected batch appended none"
+    );
+    assert_eq!(folded_from(&checkout.store(), device).unwrap().len(), 1);
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn a_second_fold_uses_the_held_cid_index_without_a_store_parse() {
     let h = household();
     let b = serve_b(&h).await;
@@ -595,6 +801,7 @@ async fn a_second_fold_uses_the_held_cid_index_without_a_store_parse() {
         FoldPlan {
             limits: FoldLimits::default(),
             known: Some(&first_report.known),
+            deadline: None,
         },
     )
     .await
@@ -997,6 +1204,7 @@ async fn a_listing_whose_cid_is_not_the_requested_root_is_refused() {
         StubTier {
             answer: Arc::new(move |request| served.answer(request)),
             requests,
+            read_delay: Duration::ZERO,
         },
     )
     .await;
@@ -1037,6 +1245,7 @@ async fn a_self_consistent_tree_other_than_the_signed_root_is_refused_and_the_he
         StubTier {
             answer: Arc::new(move |request| served.answer(request)),
             requests: Arc::new(Mutex::new(Vec::new())),
+            read_delay: Duration::ZERO,
         },
     )
     .await;
@@ -1179,6 +1388,7 @@ async fn a_diff_with_an_invalid_blob_codec_falls_back_to_the_verified_listing() 
                 },
             }),
             requests: requests.clone(),
+            read_delay: Duration::ZERO,
         },
     )
     .await;
@@ -1273,6 +1483,7 @@ async fn a_diff_adding_an_event_not_in_the_new_events_node_is_refused() {
                 },
             }),
             requests: requests.clone(),
+            read_delay: Duration::ZERO,
         },
     )
     .await;
@@ -1357,6 +1568,7 @@ async fn a_diff_that_recomputes_to_the_verified_events_cid_reads_no_full_listing
                 },
             }),
             requests: requests.clone(),
+            read_delay: Duration::ZERO,
         },
     )
     .await;
@@ -1437,6 +1649,7 @@ async fn a_nack_leaf_not_under_the_root_is_refused() {
                 _ => served.answer(request),
             }),
             requests: Arc::new(Mutex::new(Vec::new())),
+            read_delay: Duration::ZERO,
         },
     )
     .await;
@@ -1482,6 +1695,7 @@ async fn an_unmodified_v1_peer_still_folds_and_receives_no_new_request_kind() {
         StubTier {
             answer: Arc::new(move |request| served.answer(request)),
             requests: requests.clone(),
+            read_delay: Duration::ZERO,
         },
     )
     .await;

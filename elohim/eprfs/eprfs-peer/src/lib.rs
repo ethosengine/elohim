@@ -111,7 +111,7 @@ pub use fetch::{
 pub use fold::{
     fetch_channel, fold_events, fold_root, fold_root_planned, folded_from, ChannelEvent, Fetched,
     FoldLimits, FoldOutcome, FoldPlan, FoldReader, FoldReport, FoldTarget, Quarantined,
-    RefusedCrossing, MAX_EVENT_BYTES, MAX_FOLD_BYTES, MAX_FOLD_EVENTS,
+    RefusedCrossing, FOLD_BATCH_EVENTS, MAX_EVENT_BYTES, MAX_FOLD_BYTES, MAX_FOLD_EVENTS,
 };
 pub use gate::{
     serve_blob_standing, ServeScope, Served, SharedAdmission, StewardDevicesGate, WholeStoreScope,

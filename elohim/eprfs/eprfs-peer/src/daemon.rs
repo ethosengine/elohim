@@ -1842,17 +1842,12 @@ impl Run {
                     FoldPlan {
                         limits: FoldLimits::default(),
                         known: known.as_deref(),
+                        deadline: Some(Instant::now() + FOLD_DEADLINE),
                     },
                 )
                 .await
             };
-            let result = tokio::time::timeout(FOLD_DEADLINE, folding)
-                .await
-                .unwrap_or_else(|_| {
-                    Err(PeerError::FoldUnanswered {
-                        what: format!("root {} (timed out)", head.root),
-                    })
-                });
+            let result = folding.await;
             // The loop has stopped when nobody receives; nothing is left to record.
             let _ = done.send(FoldDone {
                 head,
@@ -1900,12 +1895,8 @@ impl Run {
                     folded_at,
                 );
                 self.reproject |= nack_changed;
-                if report.complete {
-                    self.held
-                        .insert(head.device.clone(), Arc::new(report.known.clone()));
-                } else {
-                    self.held.remove(&head.device);
-                }
+                self.held
+                    .insert(head.device.clone(), Arc::new(report.known.clone()));
                 let outcome = report.outcome;
                 if report.complete {
                     self.channel.folded(
@@ -1933,6 +1924,12 @@ impl Run {
                         head.seq,
                         outcome.appended,
                         report.quarantined.len()
+                    ));
+                } else if report.deadline_reached {
+                    self.log(&format!(
+                        "folded {} seq {} in part ({} appended, deadline reached); the rest \
+                         on its next head",
+                        head.device, head.seq, outcome.appended
                     ));
                 } else if report.over_budget {
                     self.log(&format!(
