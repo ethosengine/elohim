@@ -488,12 +488,15 @@ measures:
       executing seconds; rows also carry run_id, step, key (closure key or `none: <reason>`),
       key_changed (yes|no|unknown, derived against the latest green row for the step), status
       (green|red|none), outcome (ran|reused|skipped), waited_seconds, lease_waited_seconds,
-      synthesized, started_at, ended_at and at. `epr flow report reading` folds the last ten runs
-      by default from that file; synthesized EXIT-fill rows do not set run spans or finishes.
+      synthesized, started_at, ended_at and at, and optionally parent: a recipe step's row
+      (`<project>:<step>`, from the seconds gate-steps.sh writes to GATE_STEP_TIMES) names its
+      gate project as parent. `epr flow report reading` folds the last ten runs by default from
+      that file; synthesized EXIT-fill rows and child rows do not set run spans, sums or finishes
+      (a child lies inside its parent's span), and every row keeps its own line in the step view.
       Rung 1-2 rows already in flows.jsonl are not migrated. This shadow telemetry selects no
       gate, changes no closure key, refuses no reuse and never changes a gate verdict.
     provenance: "genesis/docs/superpowers/specs/2026-11-23-change-detection-one-reading-design.md section 4; station CD-reading"
-    env-sensitivity: [run_id, step, key, key_changed, status, outcome, waited_seconds, lease_waited_seconds, synthesized, started_at, ended_at]
+    env-sensitivity: [run_id, step, parent, key, key_changed, status, outcome, waited_seconds, lease_waited_seconds, synthesized, started_at, ended_at]
     default-authority: observation
     status: active
     established_by: change-detection-cd-reading-2026-11-24

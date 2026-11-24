@@ -2669,10 +2669,10 @@ habits:
       - "node --test genesis/orchestrator/suite-list.test.mjs (the orchestrator suite list holds every test file once; the named half's view holds what its key hashes and its environment is constructed)"
       - "a2o genesis/a2o/features/devflow/native-gate-evidence.feature reuse rule (this workspace's own green stands in; a red or an unadmitted signer never does)"
     evidence: >
-      DELTA 2026-11-23d (status unchanged; a design and stations, nothing built): change detection was read as one thing after two misses the same day, the Rust style scan paid by every cargo gate before its reuse decision (`genesis/orchestrator/gate-runner.mjs:615-626`, read on dev `2081b2532`) and a policy-registry change that did not select the gate whose test reads it (dev red on eprfs from `cecab9d08` to `e14abce95`). Finding: selection, closure validity and cost do not read each other. Eight stations (CD-reading first) are in the peers plan section 8; the design is `genesis/docs/superpowers/specs/2026-11-23-change-detection-one-reading-design.md`. No seconds are measured.
-    evidence-fingerprint: sha256:e88698fb8bf13240
-    evidence-bytes: 39087
-    evidence-entries: 41
+      DELTA 2026-11-24 (RED preserved; per-step seconds are recorded): no per-step gate seconds existed anywhere (table 2). gate-steps.sh now appends each step (name, exit, start, end from EPOCHREALTIME) to GATE_STEP_TIMES, a file gate-runner hands every recipe run; gate-runner turns each line into one gate-step-reading@1 row named <project>:<step> with parent <project>, through the same collector, so a push still makes one native append. The native fold leaves child rows out of a run sums, gaps and finish-setter (they lie inside the parent span) and keeps each in the step view. Telemetry only: an unwritable file changes no exit status; GATE_READING=off passes no file. Tests: gate-runner 78/78 (runner test red on the prior runner), flow::reading 20/20, clippy clean.
+    evidence-fingerprint: sha256:78567297622b9fca
+    evidence-bytes: 39859
+    evidence-entries: 42
     guard: >
       Regression risks: (1) reusing on a key that omits something the recipe reads — the recipe
       body, the project tree, a submodule pin, a repo file a test include_str!s; the input audit

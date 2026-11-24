@@ -537,6 +537,7 @@ export function gateReadingRow(row) {
     unit: 'seconds',
     run_id: oneLine(row.runId),
     step: oneLine(row.step),
+    ...(row.parent ? { parent: oneLine(row.parent) } : {}),
     key: oneLine(row.key),
     key_changed: oneLine(row.keyChanged),
     status: oneLine(row.status),
@@ -565,6 +566,43 @@ export function emitGateReading(row, {
   // Under a push without a scratch file the hook reports the drop once; this runner keeps nothing.
   if (env.GATE_READING_PUSH) return;
   collector.push(reading);
+}
+
+/**
+ * The per-step lines gate-steps.sh appends to GATE_STEP_TIMES (name, exit, start, end in epoch
+ * seconds, tab-separated) as step readings. A line of any other shape is skipped: telemetry never
+ * changes a verdict and never invents a step.
+ */
+export function parseStepTimes(text) {
+  const steps = [];
+  for (const line of String(text || '').split('\n')) {
+    const fields = line.split('\t');
+    if (fields.length !== 4 || !/^[A-Za-z0-9_-]+$/.test(fields[0]) || !/^\d{1,3}$/.test(fields[1])) continue;
+    const started = Number(fields[2]);
+    const ended = Number(fields[3]);
+    if (!Number.isFinite(started) || !Number.isFinite(ended) || started <= 0 || ended < started) continue;
+    steps.push({ name: fields[0], exit: Number(fields[1]), started, ended });
+  }
+  return steps;
+}
+
+/** One gate-step reading per recorded step of a project's recipe, named `<project>:<step>`. */
+export function emitStepReadings(project, reading, text, { env = process.env, collector } = {}) {
+  for (const step of parseStepTimes(text)) {
+    emitGateReading({
+      ...reading,
+      step: `${project}:${step.name}`,
+      parent: project,
+      outcome: 'ran',
+      status: step.exit === 0 ? 'green' : 'red',
+      synthesized: false,
+      waitedSeconds: 0,
+      leaseWaitedSeconds: 0,
+      seconds: step.ended - step.started,
+      startedAt: new Date(step.started * 1000),
+      endedAt: new Date(step.ended * 1000),
+    }, { env, collector });
+  }
 }
 
 /** Best-effort by contract: one bounded native call, one warning, no changed gate status. */
@@ -939,6 +977,23 @@ export function runProject(project, printOnly, namesOnly, {
     rmSync(dir, { recursive: true, force: true });
   };
   let resultDir = newResultDir();
+  // gate-steps.sh appends each step's seconds here (the OS temporary directory, which a Task child
+  // writes to as well); read after the run into one reading row per step, then removed.
+  let stepTimesDir = null;
+  if (env.GATE_READING !== 'off') {
+    try {
+      stepTimesDir = mkdtempSync(join(realpathSync(tmpdir()), 'gate-step-times-'));
+      childEnv.GATE_STEP_TIMES = join(stepTimesDir, 'steps.tsv');
+    } catch { stepTimesDir = null; delete childEnv.GATE_STEP_TIMES; }
+  } else delete childEnv.GATE_STEP_TIMES;
+  const readStepTimes = () => {
+    if (!stepTimesDir) return '';
+    try { return readFileSync(childEnv.GATE_STEP_TIMES, 'utf8'); } catch { return ''; }
+  };
+  const clearStepTimes = () => {
+    if (!stepTimesDir) return;
+    try { writeFileSync(childEnv.GATE_STEP_TIMES, ''); } catch { /* telemetry */ }
+  };
   let task = null;
   if (taskOn) {
     task = prepareTask(project, {
@@ -983,6 +1038,7 @@ export function runProject(project, printOnly, namesOnly, {
         // A fresh directory for the second attempt: the first attempt's result never stands in.
         suiteResult = null;
         resultDir = newResultDir();
+        clearStepTimes(); // the second attempt's steps alone are the run's steps
         ran = direct();
       }
     } else {
@@ -991,6 +1047,10 @@ export function runProject(project, printOnly, namesOnly, {
     collect(resultDir);
   } finally {
     if (resultDir) rmSync(resultDir, { recursive: true, force: true });
+  }
+  const stepTimes = readStepTimes();
+  if (stepTimesDir) {
+    try { rmSync(stepTimesDir, { recursive: true, force: true }); } catch { /* telemetry */ }
   }
   const { result, tapped } = ran;
   const cost = tapped ? Object.fromEntries(COST_FIELDS.map(k => [k, tapped[k] ?? null])) : undefined;
@@ -1002,6 +1062,7 @@ export function runProject(project, printOnly, namesOnly, {
     liveEvent(env, { kind: 'gate-verdict', project: project.name, verdict: { exit: 0, seconds: 0, reused: true }, derivation, status: 'Answered' });
     return complete(0, 'reused');
   }
+  emitStepReadings(project.name, reading, stepTimes, { env, collector: readingCollector });
   // The exit status is the verdict; what the tap recognized only classifies it. For a suite's named
   // half the verdict comes from the attempt's written result, never the status alone (suiteDecision).
   const outcome = suiteNamed

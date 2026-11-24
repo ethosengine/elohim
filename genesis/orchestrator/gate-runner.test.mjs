@@ -19,6 +19,7 @@ import {
   runProject,
   selectGateProjects,
   worktreeTargetDir,
+  parseStepTimes,
 } from './gate-runner.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
@@ -151,6 +152,69 @@ describe('gate step reading collector', () => {
       write: () => {},
     });
     assert.equal(status, 23);
+  });
+
+  test('gate-steps lines parse into steps; a line of any other shape is skipped', () => {
+    assert.deepEqual(parseStepTimes('fmt\t0\t10.5\t12\nlint\t101\t12\t20.25\n'), [
+      { name: 'fmt', exit: 0, started: 10.5, ended: 12 },
+      { name: 'lint', exit: 101, started: 12, ended: 20.25 },
+    ]);
+    for (const bad of ['', 'fmt\t0\t10', 'f m t\t0\t1\t2', 'fmt\tx\t1\t2', 'fmt\t0\t5\t4', 'fmt\t0\tNaN\t2',
+      'fmt\t0\t0\t2', 'fmt\t1234\t1\t2']) {
+      assert.deepEqual(parseStepTimes(bad), [], JSON.stringify(bad));
+    }
+  });
+
+  test('each recipe step becomes one reading row named <project>:<step>, with its own seconds and status', () => {
+    const dir = mkdtempSync(resolve(tmpdir(), 'step-readings-'));
+    const rows = resolve(dir, 'rows.jsonl');
+    const project = { name: 'fixture', dir: 'fixture', steps: ['build'], run: { kind: 'just', recipe: 'gate' } };
+    let handed = null;
+    try {
+      const status = runProject(project, false, false, {
+        root: ROOT,
+        env: { GATE_READING_ROWS: rows, GATE_READING_RUN_ID: 'push', GATE_EVIDENCE: 'off', GATE_TASK: 'off' },
+        spawn: (command, args, options) => {
+          if (command === 'bash' && String(args[0]).endsWith('/run-local-gate.sh')) {
+            handed = options.env.GATE_STEP_TIMES;
+            writeFileSync(handed, 'fmt\t0\t1795500000\t1795500002.5\ntest\t1\t1795500002.5\t1795500010\n');
+            return { status: 1, stdout: '', stderr: '' };
+          }
+          return { status: 23, stdout: '', stderr: '' };
+        },
+        write: () => {},
+      });
+      assert.equal(status, 1, 'the verdict is the recipe exit, unchanged by step telemetry');
+      assert.ok(handed, 'the recipe is handed a step-times file');
+      assert.throws(() => readFileSync(handed), 'the step-times file is removed after the run');
+      const read = readFileSync(rows, 'utf8').trim().split('\n').map(line => JSON.parse(line));
+      const steps = read.filter(row => row.step.startsWith('fixture:'));
+      assert.deepEqual(steps.map(row => [row.step, row.parent, row.status, row.outcome, row.value]), [
+        ['fixture:fmt', 'fixture', 'green', 'ran', 2.5],
+        ['fixture:test', 'fixture', 'red', 'ran', 7.5],
+      ]);
+      assert.equal(Object.hasOwn(read.find(row => row.step === 'fixture'), 'parent'), false,
+        'a project row carries no parent');
+      assert.equal(steps[0].started_at, new Date(1795500000 * 1000).toISOString());
+      assert.equal(read.filter(row => row.step === 'fixture').length, 1, 'the project row stays');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test('GATE_READING=off hands the recipe no step-times file', () => {
+    const project = { name: 'fixture', dir: 'fixture', steps: ['build'], run: { kind: 'just', recipe: 'gate' } };
+    let seen = 'unset';
+    runProject(project, false, false, {
+      root: ROOT,
+      env: { GATE_READING: 'off', GATE_STEP_TIMES: '/inherited/steps.tsv', GATE_EVIDENCE: 'off', GATE_TASK: 'off' },
+      spawn: (command, args, options) => {
+        if (command === 'bash' && String(args[0]).endsWith('/run-local-gate.sh')) seen = options.env.GATE_STEP_TIMES;
+        return { status: 0, stdout: '', stderr: '' };
+      },
+      write: () => {},
+    });
+    assert.equal(seen, undefined, 'no file, and an inherited path is not passed on');
   });
 
   test('GATE_READING=off suppresses collection and the native call', () => {
