@@ -13,7 +13,7 @@ use std::collections::HashSet;
 use std::fs::{self, OpenOptions};
 use std::io::Write;
 use std::path::Path;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use cid::Cid;
 use elohim_epr_rea::model::canonical_bytes;
@@ -44,6 +44,11 @@ pub const MAX_FOLD_EVENTS: usize = 1024;
 /// a partial batch reached by the deadline is committed too.
 pub const FOLD_BATCH_EVENTS: usize = 64;
 
+/// The longest one event read may extend a fold that reached its shared deadline without keeping
+/// any event. Ten seconds is long enough for a healthy relay round trip under transient load, but
+/// still bounds an unresponsive peer well below the daemon's next ordinary 30 second fold budget.
+pub const FOLD_FLOOR_READ: Duration = Duration::from_secs(10);
+
 /// The largest event one fold accepts, in bytes. A berth record is well under a kilobyte; a
 /// larger leaf is refused before its bytes are read past this, and leaves the fold incomplete.
 pub const MAX_EVENT_BYTES: usize = 64 * 1024;
@@ -64,6 +69,11 @@ pub struct FoldLimits {
     pub max_event_bytes: usize,
     /// Event bytes read per fold ([`MAX_FOLD_BYTES`]); the event that crosses it is the last.
     pub max_fold_bytes: usize,
+    /// Bound for the one progress-floor event read ([`FOLD_FLOOR_READ`]).
+    pub floor_read: Duration,
+    /// Event-read deadline override. Production leaves this `None` to share [`FoldPlan::deadline`];
+    /// deterministic callers may isolate the post-list deadline boundary.
+    pub read_deadline: Option<Instant>,
 }
 
 /// Per-call fold inputs that vary for the daemon but not for standalone callers.
@@ -83,6 +93,8 @@ impl Default for FoldLimits {
             max_events: MAX_FOLD_EVENTS,
             max_event_bytes: MAX_EVENT_BYTES,
             max_fold_bytes: MAX_FOLD_BYTES,
+            floor_read: FOLD_FLOOR_READ,
+            read_deadline: None,
         }
     }
 }
@@ -95,7 +107,7 @@ pub struct ChannelEvent {
     pub event: FlowEvent,
 }
 
-type BatchConsumer<'a> = &'a mut (dyn FnMut(&[ChannelEvent]) -> Result<(), PeerError> + Send);
+type BatchConsumer<'a> = &'a mut (dyn FnMut(&[ChannelEvent]) -> Result<u64, PeerError> + Send);
 
 #[derive(Default)]
 struct FetchProgress<'a> {
@@ -247,7 +259,8 @@ async fn fetch_channel_for(
         .unwrap_or(u32::MAX);
     let mut read_bytes = 0usize;
     let mut consumed = 0usize;
-    for (cid, leaf) in fresh {
+    let mut kept = 0u64;
+    'events: for (cid, leaf) in fresh {
         if read_bytes >= limits.max_fold_bytes {
             fetched.over_budget = true;
             fetched.complete = false;
@@ -258,17 +271,41 @@ async fn fetch_channel_for(
             root: root.clone(),
             path: path.clone(),
         };
-        let request = tier_request_capped(connection, &request, tree, answer_cap);
-        let answer = match progress.deadline {
-            Some(deadline) => match tokio::time::timeout_at(deadline.into(), request).await {
+        let read = || tier_request_capped(connection, &request, tree, answer_cap);
+        let mut floor_read = false;
+        let no_pending_progress = kept == 0 && fetched.events.len() == consumed;
+        let answer = match limits.read_deadline.or(progress.deadline) {
+            Some(deadline) if no_pending_progress && deadline <= Instant::now() => {
+                floor_read = true;
+                match tokio::time::timeout(limits.floor_read, read()).await {
+                    Ok(answer) => answer,
+                    Err(_) => {
+                        fetched.complete = false;
+                        fetched.deadline_reached = true;
+                        break;
+                    }
+                }
+            }
+            Some(deadline) => match tokio::time::timeout_at(deadline.into(), read()).await {
                 Ok(answer) => answer,
+                Err(_) if no_pending_progress => {
+                    floor_read = true;
+                    match tokio::time::timeout(limits.floor_read, read()).await {
+                        Ok(answer) => answer,
+                        Err(_) => {
+                            fetched.complete = false;
+                            fetched.deadline_reached = true;
+                            break;
+                        }
+                    }
+                }
                 Err(_) => {
                     fetched.complete = false;
                     fetched.deadline_reached = true;
                     break;
                 }
             },
-            None => request.await,
+            None => read().await,
         };
         let read = match answer {
             Ok(TierAnswer::Read(read)) if read.bytes.len() <= limits.max_event_bytes => read,
@@ -280,6 +317,11 @@ async fn fetch_channel_for(
                     reason: "unread-oversize".into(),
                     bytes: None,
                 });
+                if floor_read {
+                    fetched.complete = false;
+                    fetched.deadline_reached = true;
+                    break 'events;
+                }
                 continue;
             }
             Ok(other) => return Err(unanswered(format!("event {cid}"), &other)),
@@ -295,9 +337,10 @@ async fn fetch_channel_for(
         match decode_event(&cid, &read.bytes) {
             Ok(event) => {
                 fetched.events.push(ChannelEvent { cid, event });
-                if fetched.events.len().saturating_sub(consumed) == FOLD_BATCH_EVENTS {
+                if floor_read || fetched.events.len().saturating_sub(consumed) == FOLD_BATCH_EVENTS
+                {
                     if let Some(consume) = progress.consume_batch.as_mut() {
-                        consume(&fetched.events[consumed..])?;
+                        kept = kept.saturating_add(consume(&fetched.events[consumed..])?);
                         consumed = fetched.events.len();
                     }
                 }
@@ -309,10 +352,15 @@ async fn fetch_channel_for(
                 bytes: Some(read.bytes.to_vec()),
             }),
         }
+        if floor_read {
+            fetched.complete = false;
+            fetched.deadline_reached = true;
+            break;
+        }
     }
     if consumed < fetched.events.len() {
         if let Some(consume) = progress.consume_batch.as_mut() {
-            consume(&fetched.events[consumed..])?;
+            let _ = consume(&fetched.events[consumed..])?;
         }
     }
     if let Some(reader) = progress.reader.filter(|_| !fetched.deadline_reached) {
@@ -698,9 +746,10 @@ pub async fn fold_root_planned(
     let mut known_after = (*known).clone();
     let mut consume_batch = |events: &[ChannelEvent]| {
         let batch = fold_events_admitted(store, target.device, events, allow, target.admission)?;
+        let appended = batch.appended;
         known_after.extend(batch.held_cids.iter().copied());
         outcome.absorb(batch);
-        Ok(())
+        Ok(appended)
     };
     let fetched = fetch_channel_for(
         &connection,
