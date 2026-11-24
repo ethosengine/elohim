@@ -2608,10 +2608,10 @@ habits:
       - "ledger liveness (algedonic sensor, observation only): fold ci-harvest-cursor-lag@1 per job per its procedure in .claude/epr-meta/measures.yaml (Jenkins lastCompletedBuild minus .claude/data/ci-cursor.json); lens ci-harvest-cursor-lag-ceiling@1 reads red at 11 or more builds, where one harvest drops builds for good (`epr flow report --bound ci-harvest-cursor-lag-ceiling`)."
       - "a2o @concern:push-delivers-within-budget (genesis/a2o/features/dataplane/app-delivery-refuses-fast.feature — @act:i, four household stations: the not-ready window is answered in seconds; `just test mesh features/dataplane/app-delivery-refuses-fast.feature`)"
     evidence: >
-      DELTA 2026-11-21 (RED preserved; one landing read line by line): the row 43 landing on shem, 14 files (four version lines, eight lock entries, one script and its test), 05:31:42Z to 09:26:09Z. First push 13,175 s of gates across 21 projects, all green, then refused at the landing lane on a ten-minute silence from the other device (row 61); second push 561 s on the recorded verdicts. Three gates were 80% of the first push: eprfs 4,487 s, elohim-storage 3,535 s, steward-node 1,334 s. Inside eprfs: 1,892 s compiling on one job, and 1,765 s in two test binaries whose stories each paid about 33 s of debug-build hashing per ark spawn (row 52). Cut on this sprint: those two binaries to 864 s and the build to six jobs. Not cut, with their rows: thread parallelism (59, 60), the lock-reach key (51), the whole-justfile key (59, shadow only), the hashing itself (52).
-    evidence-fingerprint: sha256:90d7c2e32313b9fd
-    evidence-bytes: 45026
-    evidence-entries: 41
+      DELTA 2026-11-24 (RED preserved; the serving receipt refuses only at dev and main): steward ruling 2026-11-24 "Refuse only at dev and main". t2-receipt.sh takes --targets (the pushed remote refs, which the hook writes from GATE_PUSH_REFS) and refuses a serving path with no current household receipt only when a target is refs/heads/dev or refs/heads/main, or when the targets are unknown or empty. Any other push (a self/ hand-over) prints one line, "serving receipt owed before dev", naming the just test mesh story, and passes. Tests both ways in serving-receipt.test.mjs (self/ and feature refs pass with one owed line; dev, main, a self/+dev mix, an empty list and no list refuse); the new test is red on the old script. Orchestrator node suites 108/108 (serving-receipt, prepush-self, prepush-gate-live, gate-change-class).
+    evidence-fingerprint: sha256:6b6124b2ceaab3ac
+    evidence-bytes: 45857
+    evidence-entries: 42
     refs:
       - "genesis/data/timeline/backlog/edge-quiesce-gate-timeout-aborts.md (the budget arithmetic, one layer down then up)"
       - "genesis/data/timeline/backlog/ci-edge-a2o-steps-glob-redeploys-fleet.md (no-op fleet rolls)"

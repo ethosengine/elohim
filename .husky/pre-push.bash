@@ -1943,22 +1943,28 @@ if command -v python3 >/dev/null 2>&1 && [ -f .claude/scripts/epr-meta-git-gate.
     "$((SECONDS - READING_STARTED_S))" "$READING_STARTED_AT" "$READING_ENDED_AT"
 fi
 
-# ── T2 receipt (mandatory for serving paths) ───────────────────────
+# ── T2 receipt (mandatory for serving paths on a push to dev or main) ──
 # The receipt script owns policy: serving paths require a complete current-source
-# household proof; other dataplane paths warn unless T2_RECEIPT=strict.
-# Advisory misses already exit 0. Propagate every nonzero result so a mandatory
-# refusal or an unreadable gate can never become a successful push here.
+# household proof when a pushed ref is dev or main, and print the receipt still owed
+# otherwise (steward ruling 2026-11-24); other dataplane paths warn unless T2_RECEIPT=strict.
+# It reads the pushed remote refs from GATE_PUSH_REFS ("<remote ref> <local sha> <remote sha>");
+# an empty list leaves the receipt mandatory. Advisory misses already exit 0. Propagate every
+# nonzero result so a mandatory refusal or an unreadable gate can never become a successful push.
 T2_LIST=$(mktemp)
 printf '%s\n' "$CHANGED" > "$T2_LIST"
+T2_TARGETS=$(mktemp)
+while IFS=' ' read -r T2_REF _; do
+  [ -n "$T2_REF" ] && printf '%s\n' "$T2_REF"
+done <<<"${GATE_PUSH_REFS-}" > "$T2_TARGETS"
 T2_STATUS=0
 READING_STARTED_S=$SECONDS
 READING_STARTED_AT=$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)
 if [ "${T2_RECEIPT-}" = "strict" ]; then
-  bash genesis/orchestrator/scripts/t2-receipt.sh --changed "$T2_LIST" --strict || T2_STATUS=$?
+  bash genesis/orchestrator/scripts/t2-receipt.sh --changed "$T2_LIST" --targets "$T2_TARGETS" --strict || T2_STATUS=$?
 else
-  bash genesis/orchestrator/scripts/t2-receipt.sh --changed "$T2_LIST" || T2_STATUS=$?
+  bash genesis/orchestrator/scripts/t2-receipt.sh --changed "$T2_LIST" --targets "$T2_TARGETS" || T2_STATUS=$?
 fi
-rm -f "$T2_LIST"
+rm -f "$T2_LIST" "$T2_TARGETS"
 READING_ENDED_AT=$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)
 gate_step_reading "$T2_STATUS" t2-receipt ran \
   "$((SECONDS - READING_STARTED_S))" "$READING_STARTED_AT" "$READING_ENDED_AT"
