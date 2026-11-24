@@ -1,23 +1,30 @@
-//! `epr flow report reading` — the shadow per-gate change-detection reading.
+//! `epr flow reading append` and `epr flow report reading` — the shadow per-gate reading.
 //!
-//! `gate-runner.mjs` writes one `gate-step-reading@1` observation after a project finishes. This
-//! report puts closure movement, outcome and time beside each other without feeding any of them
-//! back into selection, reuse or the closure key. The sidecar remains the one observation store;
-//! this module is only its native fold and renderer.
+//! Gate callers collect rows and hand one JSONL file to the native append verb. This module owns
+//! the record shape, its lock and its bounded device-local retention; callers never append the
+//! durable file themselves. The report puts closure movement, outcome and time beside each other
+//! without feeding any of them back into selection, reuse or the closure key.
 
 use std::collections::{BTreeMap, BTreeSet};
-use std::path::Path;
+use std::fs::{self, OpenOptions};
+use std::io::{BufRead, BufReader, Write};
+use std::path::{Path, PathBuf};
 
 use chrono::{DateTime, Utc};
-use serde::Serialize;
+use elohim_device_runtime::flock::Flock;
+use serde::{Deserialize, Serialize};
 
-use super::report::{read_folds, Fold};
+use super::measures::{default_measures, MeasureRef, Registry};
 use super::{FlowError, FlowResult};
 
 pub const MEASURE: &str = "gate-step-reading@1";
+pub const READINGS_REL: &str = ".eprfs/status/readings/gate-step.jsonl";
+const LOCK_FILE: &str = "gate-step.lock";
 const DEFAULT_LAST_RUNS: usize = 10;
+const TRIM_ABOVE_BYTES: u64 = 2 * 1024 * 1024;
+const TRIM_TO_BYTES: usize = 1024 * 1024;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "lowercase")]
 enum KeyChanged {
     Yes,
@@ -25,17 +32,7 @@ enum KeyChanged {
     Unknown,
 }
 
-impl KeyChanged {
-    fn parse(raw: Option<&String>) -> Self {
-        match raw.map(String::as_str) {
-            Some("yes") => Self::Yes,
-            Some("no") => Self::No,
-            _ => Self::Unknown,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "lowercase")]
 enum Outcome {
     Ran,
@@ -43,14 +40,63 @@ enum Outcome {
     Skipped,
 }
 
-impl Outcome {
-    fn parse(raw: Option<&String>) -> Option<Self> {
-        match raw.map(String::as_str) {
-            Some("ran") => Some(Self::Ran),
-            Some("reused") => Some(Self::Reused),
-            Some("skipped") => Some(Self::Skipped),
-            _ => None,
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct ReadingRow {
+    measure: String,
+    value: f64,
+    unit: String,
+    run_id: String,
+    step: String,
+    key: String,
+    key_changed: KeyChanged,
+    outcome: Outcome,
+    waited_seconds: f64,
+    started_at: String,
+    ended_at: String,
+    at: String,
+}
+
+impl ReadingRow {
+    fn validate(&self, declared_unit: &str) -> Result<(), String> {
+        if self.measure != MEASURE {
+            return Err(format!("measure must be `{MEASURE}`"));
         }
+        if self.unit != declared_unit {
+            return Err(format!("unit must be `{declared_unit}`"));
+        }
+        if self.run_id.trim().is_empty() || self.step.trim().is_empty() {
+            return Err("run_id and step must be non-empty".into());
+        }
+        if !self.value.is_finite() || self.value < 0.0 {
+            return Err("value must be a finite non-negative number".into());
+        }
+        if !self.waited_seconds.is_finite() || self.waited_seconds < 0.0 {
+            return Err("waited_seconds must be a finite non-negative number".into());
+        }
+        let started =
+            parse_time(&self.started_at).ok_or_else(|| "started_at must be RFC3339".to_string())?;
+        let ended =
+            parse_time(&self.ended_at).ok_or_else(|| "ended_at must be RFC3339".to_string())?;
+        if ended < started {
+            return Err("ended_at must not precede started_at".into());
+        }
+        parse_time(&self.at).ok_or_else(|| "at must be RFC3339".to_string())?;
+        Ok(())
+    }
+
+    fn observation(&self) -> Option<ReadingObservation> {
+        Some(ReadingObservation {
+            run_id: self.run_id.trim().to_string(),
+            step: self.step.trim().to_string(),
+            key: self.key.trim().to_string(),
+            key_changed: self.key_changed,
+            outcome: self.outcome,
+            seconds: nonnegative(self.value),
+            waited_seconds: nonnegative(self.waited_seconds),
+            started_at: parse_time(&self.started_at)?,
+            ended_at: parse_time(&self.ended_at)?,
+        })
     }
 }
 
@@ -67,31 +113,144 @@ struct ReadingObservation {
     ended_at: DateTime<Utc>,
 }
 
-impl ReadingObservation {
-    fn from_fold(fold: &Fold) -> Option<Self> {
-        if fold.measure.to_string() != MEASURE {
-            return None;
-        }
-        let env = &fold.env;
-        let started_at = parse_time(env.get("started_at")?)?;
-        let ended_at = parse_time(env.get("ended_at")?)?;
-        Some(Self {
-            run_id: env.get("run_id")?.trim().to_string(),
-            step: env.get("step")?.trim().to_string(),
-            key: env
-                .get("key")
-                .map_or_else(String::new, |value| value.trim().to_string()),
-            key_changed: KeyChanged::parse(env.get("key_changed")),
-            outcome: Outcome::parse(env.get("outcome"))?,
-            seconds: nonnegative(fold.value),
-            waited_seconds: env
-                .get("waited_seconds")
-                .and_then(|raw| raw.parse::<f64>().ok())
-                .map_or(0.0, nonnegative),
-            started_at,
-            ended_at,
-        })
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AppendSummary {
+    pub accepted: usize,
+    pub rejected: usize,
+    pub trimmed: bool,
+    pub path: PathBuf,
+}
+
+fn reading_path(root: &Path) -> PathBuf {
+    root.join(READINGS_REL)
+}
+
+fn declared_unit(root: &Path) -> FlowResult<String> {
+    let path = default_measures(root);
+    let registry = Registry::open(&path)?;
+    let measure = MeasureRef::parse(MEASURE, &path)?;
+    if !registry.declares(&measure) {
+        return Err(FlowError::InvalidArguments(format!(
+            "{MEASURE} is not declared in {}",
+            path.display()
+        )));
     }
+    registry.declared_unit(&measure).ok_or_else(|| {
+        FlowError::InvalidArguments(format!("{MEASURE} declares no unit in {}", path.display()))
+    })
+}
+
+fn read_rows(path: &Path) -> FlowResult<Vec<ReadingRow>> {
+    let file = match fs::File::open(path) {
+        Ok(file) => file,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
+        Err(error) => return Err(error.into()),
+    };
+    Ok(BufReader::new(file)
+        .lines()
+        .filter_map(|line| line.ok().and_then(|text| serde_json::from_str(&text).ok()))
+        .collect())
+}
+
+fn derive_key_changed(rows: &mut [ReadingRow], previous: &[ReadingRow]) {
+    let mut latest = previous
+        .iter()
+        .map(|row| (row.step.clone(), row.key.clone()))
+        .collect::<BTreeMap<_, _>>();
+    for row in rows {
+        if row.key_changed == KeyChanged::Unknown && !row.key.starts_with("none:") {
+            row.key_changed = match latest.get(&row.step) {
+                Some(key) if key == &row.key => KeyChanged::No,
+                _ => KeyChanged::Yes,
+            };
+        }
+        latest.insert(row.step.clone(), row.key.clone());
+    }
+}
+
+fn trim(path: &Path) -> FlowResult<bool> {
+    if fs::metadata(path)?.len() <= TRIM_ABOVE_BYTES {
+        return Ok(false);
+    }
+    let bytes = fs::read(path)?;
+    let mut lines = bytes
+        .split_inclusive(|byte| *byte == b'\n')
+        .rev()
+        .scan(0usize, |held, line| {
+            if *held + line.len() > TRIM_TO_BYTES {
+                None
+            } else {
+                *held += line.len();
+                Some(line)
+            }
+        })
+        .collect::<Vec<_>>();
+    lines.reverse();
+    let dir = path.parent().ok_or_else(|| {
+        FlowError::InvalidArguments(format!("{} has no parent directory", path.display()))
+    })?;
+    let mut staged = tempfile::NamedTempFile::new_in(dir)?;
+    for line in lines {
+        staged.write_all(line)?;
+    }
+    staged.flush()?;
+    staged.as_file().sync_all()?;
+    staged.persist(path).map_err(|error| error.error)?;
+    Ok(true)
+}
+
+pub fn append(root: &Path, from: &Path) -> FlowResult<AppendSummary> {
+    let unit = declared_unit(root)?;
+    let source = fs::File::open(from).map_err(|source| FlowError::Read {
+        path: from.to_path_buf(),
+        source,
+    })?;
+    let mut accepted = Vec::new();
+    let mut rejected = 0;
+    for line in BufReader::new(source).lines() {
+        let row = line
+            .ok()
+            .and_then(|text| serde_json::from_str::<ReadingRow>(&text).ok());
+        match row {
+            Some(row) if row.validate(&unit).is_ok() => accepted.push(row),
+            _ => rejected += 1,
+        }
+    }
+
+    let path = reading_path(root);
+    let dir = path.parent().expect("the reading path has a parent");
+    fs::create_dir_all(dir)?;
+    let lock_file = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .truncate(false)
+        .open(dir.join(LOCK_FILE))?;
+    let _lock = Flock::try_exclusive(lock_file)?.map_err(|_| {
+        FlowError::Unavailable(
+            "gate-step reading append is busy under its device-local lock".into(),
+        )
+    })?;
+
+    let previous = read_rows(&path)?;
+    derive_key_changed(&mut accepted, &previous);
+    if !accepted.is_empty() {
+        let mut output = OpenOptions::new().create(true).append(true).open(&path)?;
+        for row in &accepted {
+            serde_json::to_writer(&mut output, row)?;
+            output.write_all(b"\n")?;
+        }
+        output.flush()?;
+        output.sync_all()?;
+    }
+    let trimmed = path.exists() && trim(&path)?;
+    Ok(AppendSummary {
+        accepted: accepted.len(),
+        rejected,
+        trimmed,
+        path,
+    })
 }
 
 fn parse_time(raw: &str) -> Option<DateTime<Utc>> {
@@ -178,9 +337,9 @@ pub struct ReadingReport {
 }
 
 pub fn report(root: &Path, options: &ReadingOptions) -> FlowResult<ReadingReport> {
-    let rows = read_folds(root)?
+    let rows = read_rows(&reading_path(root))?
         .iter()
-        .filter_map(ReadingObservation::from_fold)
+        .filter_map(ReadingRow::observation)
         .collect::<Vec<_>>();
     Ok(fold(rows, options))
 }
@@ -404,6 +563,107 @@ pub fn parse_since(raw: &str) -> FlowResult<DateTime<Utc>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn declared_root() -> tempfile::TempDir {
+        let root = tempfile::tempdir().unwrap();
+        let registry = root.path().join(".claude/epr-meta");
+        fs::create_dir_all(&registry).unwrap();
+        fs::write(
+            registry.join("measures.yaml"),
+            "measures-version: 1\nmeasures:\n  - id: gate-step-reading\n    version: 1\n    unit: seconds\n",
+        )
+        .unwrap();
+        root
+    }
+
+    fn stored_row(run_id: &str, step: &str, key: &str) -> ReadingRow {
+        ReadingRow {
+            measure: MEASURE.into(),
+            value: 1.0,
+            unit: "seconds".into(),
+            run_id: run_id.into(),
+            step: step.into(),
+            key: key.into(),
+            key_changed: KeyChanged::Unknown,
+            outcome: Outcome::Ran,
+            waited_seconds: 0.0,
+            started_at: "2026-11-24T12:00:00Z".into(),
+            ended_at: "2026-11-24T12:00:01Z".into(),
+            at: "2026-11-24T12:00:01Z".into(),
+        }
+    }
+
+    fn write_source(path: &Path, rows: &[ReadingRow]) {
+        let mut output = fs::File::create(path).unwrap();
+        for row in rows {
+            serde_json::to_writer(&mut output, row).unwrap();
+            output.write_all(b"\n").unwrap();
+        }
+    }
+
+    #[test]
+    fn append_validates_each_row_and_keeps_the_rest() {
+        let root = declared_root();
+        let source = root.path().join("rows.jsonl");
+        let valid =
+            serde_json::to_string(&stored_row("run", "quoted", "say \"hi\" \\ path")).unwrap();
+        let bad_outcome = valid.replace("\"outcome\":\"ran\"", "\"outcome\":\"maybe\"");
+        let bad_unit = valid.replace("\"unit\":\"seconds\"", "\"unit\":\"minutes\"");
+        fs::write(&source, format!("{valid}\n{bad_outcome}\n{bad_unit}\n")).unwrap();
+
+        let summary = append(root.path(), &source).unwrap();
+        assert_eq!(summary.accepted, 1);
+        assert_eq!(summary.rejected, 2);
+        let rows = read_rows(&reading_path(root.path())).unwrap();
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].key, "say \"hi\" \\ path");
+        assert_eq!(rows[0].key_changed, KeyChanged::Yes);
+    }
+
+    #[test]
+    fn append_refuses_a_contended_store_lock() {
+        let root = declared_root();
+        let source = root.path().join("rows.jsonl");
+        write_source(&source, &[stored_row("run", "step", "key")]);
+        let dir = reading_path(root.path()).parent().unwrap().to_path_buf();
+        fs::create_dir_all(&dir).unwrap();
+        let file = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .truncate(false)
+            .open(dir.join(LOCK_FILE))
+            .unwrap();
+        let _held = Flock::try_exclusive(file).unwrap().expect("free lock");
+
+        let error = append(root.path(), &source).unwrap_err().to_string();
+        assert!(error.contains("busy under its device-local lock"));
+        assert!(!reading_path(root.path()).exists());
+    }
+
+    #[test]
+    fn append_atomically_trims_over_two_mib_to_the_newest_one_mib() {
+        let root = declared_root();
+        let source = root.path().join("rows.jsonl");
+        let rows = (0..700)
+            .map(|index| {
+                stored_row(
+                    "trim-run",
+                    &format!("step-{index:04}"),
+                    &format!("key-{index:04}-{}", "x".repeat(4096)),
+                )
+            })
+            .collect::<Vec<_>>();
+        write_source(&source, &rows);
+
+        let summary = append(root.path(), &source).unwrap();
+        assert!(summary.trimmed);
+        let path = reading_path(root.path());
+        assert!(fs::metadata(&path).unwrap().len() <= TRIM_TO_BYTES as u64);
+        let kept = read_rows(&path).unwrap();
+        assert!(kept.iter().any(|row| row.step == "step-0699"));
+        assert!(kept.iter().all(|row| row.step != "step-0000"));
+    }
 
     fn row(
         run_id: &str,

@@ -2,7 +2,7 @@
 // One local gate path for humans and pre-push. Detection and execution both
 // come from build-manifest.json; no project-name command switch lives here.
 
-import { mkdtempSync, readFileSync, realpathSync, rmSync } from 'fs';
+import { mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { spawnSync } from 'child_process';
 import { resolve, dirname, basename, join } from 'path';
@@ -503,6 +503,7 @@ function liveEvent(env, event) {
 }
 
 export const GATE_READING_MEASURE = 'gate-step-reading@1';
+const invocationGateReadings = [];
 
 function finiteSeconds(value) {
   const number = Number(value);
@@ -529,43 +530,54 @@ export function gateReadingRunId(env = process.env) {
   return live ? basename(live).replace(/\.jsonl$/, '') : invocationReadingRunId;
 }
 
-export function gateReadingArgs(row) {
-  const fields = {
-    run_id: row.runId,
-    step: row.step,
-    key: row.key,
-    key_changed: row.keyChanged,
-    outcome: row.outcome,
+export function gateReadingRow(row) {
+  return {
+    measure: GATE_READING_MEASURE,
+    value: finiteSeconds(row.seconds),
+    unit: 'seconds',
+    run_id: oneLine(row.runId),
+    step: oneLine(row.step),
+    key: oneLine(row.key),
+    key_changed: oneLine(row.keyChanged),
+    outcome: oneLine(row.outcome),
     waited_seconds: finiteSeconds(row.waitedSeconds),
-    started_at: row.startedAt,
-    ended_at: row.endedAt,
+    started_at: rfc3339(row.startedAt),
+    ended_at: rfc3339(row.endedAt),
+    at: rfc3339(row.at || new Date()),
   };
-  const args = [
-    'flow', 'sense', 'observation',
-    '--measure', GATE_READING_MEASURE,
-    '--subject', '.',
-    '--value', String(finiteSeconds(row.seconds)),
-    '--unit', 'seconds',
-  ];
-  for (const [key, value] of Object.entries(fields)) args.push('--env', `${key}=${oneLine(value)}`);
-  return args;
 }
 
-/** Best-effort by contract: one warning, never an exception or a changed gate status. */
+/** Collect only. The native writer is called once when this runner process exits. */
 export function emitGateReading(row, {
+  env = process.env, collector = invocationGateReadings,
+} = {}) {
+  if (env.GATE_READING === 'off' || !row.runId) return;
+  collector.push(gateReadingRow(row));
+}
+
+/** Best-effort by contract: one bounded native call, one warning, no changed gate status. */
+export function appendGateReadings(rows, {
   root = ROOT, env = process.env, spawn = spawnSync,
   warn = text => process.stderr.write(text),
 } = {}) {
-  if (env.GATE_READING === 'off' || !row.runId) return;
+  if (env.GATE_READING === 'off' || rows.length === 0) return;
+  let scratch = null;
   try {
-    const result = spawn(env.EPR_BIN || 'epr', gateReadingArgs(row), {
-      cwd: root, stdio: 'ignore', timeout: 30000,
-    });
-    if (result?.status !== 0) {
-      warn(`[gate-reading] ${row.step}: observation unavailable (exit ${result?.status ?? 'unknown'})\n`);
+    scratch = mkdtempSync(join(tmpdir(), 'gate-reading-'));
+    const from = join(scratch, 'rows.jsonl');
+    writeFileSync(from, `${rows.map(row => JSON.stringify(row)).join('\n')}\n`, { mode: 0o600 });
+    const result = spawn(env.EPR_BIN || 'epr',
+      ['flow', 'reading', 'append', '--from', from, '--root', root], {
+        cwd: root, stdio: 'ignore', timeout: 5000,
+      });
+    if (result?.status !== 0 || result?.error) {
+      const why = result?.error?.message || `exit ${result?.status ?? 'unknown'}`;
+      warn(`[gate-reading] run readings unavailable (${oneLine(why)})\n`);
     }
   } catch (error) {
-    warn(`[gate-reading] ${row.step}: observation unavailable (${oneLine(error?.message || error)})\n`);
+    warn(`[gate-reading] run readings unavailable (${oneLine(error?.message || error)})\n`);
+  } finally {
+    if (scratch) rmSync(scratch, { recursive: true, force: true });
   }
 }
 
@@ -584,7 +596,7 @@ export function runProject(project, printOnly, namesOnly, {
   root = ROOT, env = process.env, spawn = spawnSync,
   write = text => process.stdout.write(text), warn = text => process.stderr.write(text),
   readsOf, recipe = null, tap = spawn === spawnSync, clock = () => process.hrtime.bigint(),
-  wallClock = () => new Date(), inputsPolicy = null,
+  wallClock = () => new Date(), inputsPolicy = null, readingCollector = invocationGateReadings,
 } = {}) {
   const cargo = project.run.cargo || {};
   const targetDir = worktreeTargetDir(cargo.targetDir || '', root);
@@ -633,7 +645,7 @@ export function runProject(project, printOnly, namesOnly, {
         outcome,
         seconds: seconds === null ? elapsed : seconds,
         endedAt: rfc3339(wallClock()),
-      }, { root, env, spawn, warn });
+      }, { env, collector: readingCollector });
     }
     return status;
   };
@@ -1062,7 +1074,7 @@ function usage() {
   console.error('  env: GATE_ORACLE=rakia|shadow|path (default rakia; without a brit binary every mode is path-only) · BRIT_BIN · GATE_ROOT (fixture repository root)');
   console.error('  env: GATE_RECIPE_KEY=shadow|off (default shadow): a root-just gate prints whether a justfile edit since the integration base left its recipe closure unchanged; it changes no key, reuse decision or record');
   console.error('  env: GATE_INPUTS=shadow|off (default shadow; no on yet): prints, once per push, the borrowed steps whose own buildProcess alone selects them, and per gate when, since the integration base, its step fingerprints moved under all and are unchanged under sources; it changes no selection, key, reuse decision or record');
-  console.error('  env: GATE_READING=off (default on): suppress the shadow gate-step-reading@1 observation emitted through `epr flow sense`; the reading never changes selection, reuse, keys or exit status');
+  console.error('  env: GATE_READING=off (default on): suppress collection and the one bounded `epr flow reading append` call; the shadow reading never changes selection, reuse, keys or exit status');
   console.error('  env: GATE_CARRY=off|shadow|on (default shadow, read by gate-carry.mjs under pre-push): carry one long one-build-job cargo gate on this device\'s second cargo seat beside the loop when `berth room cargo` admits it; shadow prints what would be carried and why and changes nothing');
 }
 
@@ -1075,6 +1087,7 @@ const invocationReadingRunId = isMain
   : null;
 
 if (isMain) {
+  process.once('exit', () => appendGateReadings(invocationGateReadings));
   const args = process.argv.slice(2);
   const printOnly = args.includes('--print');
   const namesOnly = args.includes('--names');
