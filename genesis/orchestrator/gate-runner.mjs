@@ -629,6 +629,14 @@ export function runProject(project, printOnly, namesOnly, {
   const narrowProjects = loadPoolPolicy(root).gate_narrow?.projects;
   if (Array.isArray(narrowProjects) && narrowProjects.includes(project.name)) {
     const mode = ['off', 'shadow', 'on'].includes(env.GATE_NARROW) ? env.GATE_NARROW : 'shadow';
+    // `on` is refused until gate evidence keys a per-package verdict: the evidence store keys the
+    // whole project closure, so a narrowed run's green would be recorded as the verdict of every
+    // member it never ran (table 2, 2026-11-24). Refused before any evidence lookup, recipe or
+    // record, so nothing narrowed can be reused or recorded.
+    if (mode === 'on') {
+      write(`[gate] ${project.name} REFUSED GATE_NARROW=on: gate evidence has no per-package verdict key yet, so a narrowed green would stand for the whole workspace; run with GATE_NARROW=shadow (the default) or off\n`);
+      return 2;
+    }
     let selection = { packages: null, why: 'no push base' };
     let metadata = null;
     let files = null;
@@ -657,7 +665,6 @@ export function runProject(project, printOnly, namesOnly, {
     write(`[gate] ${project.name} narrow (${mode}): ${packages === null
       ? `full workspace — ${why}`
       : `${packages.join(' ')} (${packages.length} of ${metadata.workspace_members.length} members)`}\n`);
-    if (mode === 'on' && packages !== null) childEnv.GATE_CARGO_PACKAGES = packages.join(' ');
   }
   // Evidence by input closure (gate-evidence.mjs): has THIS closure — the step's declared
   // input bytes at the pushed commit, the recipe, the resolved cargo env — already been
