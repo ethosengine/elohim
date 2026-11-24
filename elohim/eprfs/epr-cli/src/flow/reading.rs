@@ -4,6 +4,21 @@
 //! the record shape, its lock and its bounded device-local retention; callers never append the
 //! durable file themselves. The report puts closure movement, outcome and time beside each other
 //! without feeding any of them back into selection, reuse or the closure key.
+//!
+//! # Known limits
+//!
+//! The numbers are shadow telemetry, read for direction, not as accounting:
+//! - `key_changed` compares with the last *recorded* green reading of that step on this device. A
+//!   dropped batch (lock contention, a timed-out append, a stale `epr`) can make it wrong either
+//!   way, and it is `unknown` on a first run and after retention trims the last green row.
+//! - `ran` seconds exclude the cost lookup, the input shadow and final evidence recording, while
+//!   `reused` seconds include them (gate-runner.mjs), so ran and reused time are not like for like.
+//! - Pre-push leg seconds are whole seconds (bash `SECONDS`).
+//! - A torn tail (a write cut off before its newline) is joined by the next append and the joined
+//!   line fails to parse, so the next row can be lost with it.
+//! - An ordinary skipped row records near-zero time and can still be named the step that set the
+//!   finish; only rows synthesized at the hook's exit are excluded.
+//! - The on/off decision-equivalence test covers one non-reusable fixture, not every path.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs::{self, OpenOptions};
@@ -28,6 +43,15 @@ const TRIM_TO_BYTES: usize = 1024 * 1024;
 const MAX_ROW_BYTES: usize = 64 * 1024;
 const LOCK_RETRY_FOR: Duration = Duration::from_millis(250);
 const LOCK_RETRY_EVERY: Duration = Duration::from_millis(10);
+
+/// Printed above every report so nobody reads the numbers as more than they are (see the module's
+/// Known limits).
+const KNOWN_LIMITS: [&str; 4] = [
+    "shadow telemetry: direction, not accounting. key_changed is against the last RECORDED green on this device (a dropped batch can make it wrong either way; unknown on a first run).",
+    "ran seconds exclude cost lookup, input shadow and evidence recording; reused seconds include them. Hook legs are whole seconds.",
+    "a torn tail can swallow the next row; an ordinary skip can still be named the finish-setter.",
+    "decision equivalence is tested on one non-reusable fixture only.",
+];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "lowercase")]
@@ -573,6 +597,9 @@ fn fold(mut rows: Vec<ReadingObservation>, options: &ReadingOptions) -> ReadingR
 
 impl ReadingReport {
     pub fn render(&self) {
+        for line in KNOWN_LIMITS {
+            println!("{line}");
+        }
         println!(
             "reading  {} rows across {} runs ({})",
             self.rows,
