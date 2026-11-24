@@ -223,12 +223,8 @@ export function checkReports(root, reports, paths, options = {}) {
     );
   const reads = { identity, warn: (line) => warn(`[pre-push] ${line}`) };
   const probe = createSutProbe(root, {}); // Environment overrides cannot claim matching source.
-  const expected = Object.fromEntries(
-    DEFAULT_SUT_COMPONENTS.filter((c) => c.path).map((c) => [
-      c.name,
-      resolveComponent(probe, c),
-    ]),
-  );
+  // Each pushed commit (dev or main) must have been witnessed itself; without revs, the checkout.
+  const revs = options.revs?.length ? options.revs : [undefined];
   const normalized = new Map();
   const normalize = (identity) => {
     if (!normalized.has(identity))
@@ -237,61 +233,72 @@ export function checkReports(root, reports, paths, options = {}) {
   };
   let all = true;
   const said = new Set();
-  for (const alternatives of requiredReceipts(paths)) {
-    let found = null;
-    // Prefer a signed attestation from any admitting story, then a report file.
-    for (const source of attestations
-      ? ["attestation", "report"]
-      : ["report"]) {
-      for (const key of alternatives) {
-        const story = RECEIPT_STORIES[key];
-        const names = stationNames(root, story);
-        const feature = story.feature.split("/").pop();
-        if (source === "attestation") {
-          const hit = findAttestationReceipt(
-            root,
-            story,
-            expected,
-            names,
-            normalize,
-            peerStatuses,
-            reads,
-          );
-          if (hit) {
-            const peer = hit.summary.peer;
-            const ran = peer
-              ? ` stage ran on peer ${peer.provider.slice(0, 12)}… (rung ${peer.rung}), completion ${peer.completionActionHash.slice(0, 12)}… verified on the requester's task record;`
-              : "";
-            found = `brit validation attestation ${hit.node.checkName} (reach ${hit.summary.reach}; signed by workspace ${hit.node.validatorId.slice(0, 12)}…);${ran} every ${feature} station passed on current source; ${readLabel(hit.verifiedBy, hit.brit)}.`;
+  for (const rev of revs) {
+    const expected = Object.fromEntries(
+      DEFAULT_SUT_COMPONENTS.filter((c) => c.path).map((c) => [
+        c.name,
+        resolveComponent(probe, c, rev),
+      ]),
+    );
+    for (const alternatives of requiredReceipts(paths)) {
+      let found = null;
+      // Prefer a signed attestation from any admitting story, then a report file.
+      for (const source of attestations
+        ? ["attestation", "report"]
+        : ["report"]) {
+        for (const key of alternatives) {
+          const story = RECEIPT_STORIES[key];
+          const names = stationNames(root, story);
+          const feature = story.feature.split("/").pop();
+          if (source === "attestation") {
+            const hit = findAttestationReceipt(
+              root,
+              story,
+              expected,
+              names,
+              normalize,
+              peerStatuses,
+              reads,
+            );
+            if (hit) {
+              const peer = hit.summary.peer;
+              const ran = peer
+                ? ` stage ran on peer ${peer.provider.slice(0, 12)}… (rung ${peer.rung}), completion ${peer.completionActionHash.slice(0, 12)}… verified on the requester's task record;`
+                : "";
+              found = `brit validation attestation ${hit.node.checkName} (reach ${hit.summary.reach}; signed by workspace ${hit.node.validatorId.slice(0, 12)}…);${ran} every ${feature} station passed on current source; ${readLabel(hit.verifiedBy, hit.brit)}.`;
+            }
+          } else {
+            const hit = findReportReceipt(
+              reports,
+              story,
+              expected,
+              names,
+              normalize,
+            );
+            if (hit) {
+              found = `${hit}; every ${feature} station passed on current source.`;
+            }
           }
-        } else {
-          const hit = findReportReceipt(
-            reports,
-            story,
-            expected,
-            names,
-            normalize,
-          );
-          if (hit) {
-            found = `${hit}; every ${feature} station passed on current source.`;
-          }
+          if (found) break;
         }
         if (found) break;
       }
-      if (found) break;
-    }
-    if (found) {
-      if (!said.has(found)) log(`[pre-push] T2 serving receipt: ${found}`);
-      said.add(found);
-    } else {
-      all = false;
-      const run = alternatives
-        .map(
-          (key) =>
-            `just test mesh ${RECEIPT_STORIES[key].feature.replace(/^genesis\/a2o\//, "")}`,
-        )
-        .join("  OR  ");
-      warn(`[pre-push] missing household receipt — produce it: ${run}`);
+      if (found) {
+        if (!said.has(found)) log(`[pre-push] T2 serving receipt: ${found}`);
+        said.add(found);
+      } else {
+        all = false;
+        const run = alternatives
+          .map(
+            (key) =>
+              `just test mesh ${RECEIPT_STORIES[key].feature.replace(/^genesis\/a2o\//, "")}`,
+          )
+          .join("  OR  ");
+        const pushed = rev ? ` (pushed ${rev.slice(0, 12)})` : "";
+        warn(
+          `[pre-push] missing household receipt — produce it: ${run}${pushed}`,
+        );
+      }
     }
   }
   return all;
@@ -384,8 +391,13 @@ export async function prefetchPeerStatuses(
 }
 
 async function main() {
-  const [root, reports, list] = process.argv.slice(2);
+  const [root, reports, list, revList] = process.argv.slice(2);
   const paths = list ? readFileSync(list, "utf8").split("\n") : undefined;
+  const revs = revList
+    ? readFileSync(revList, "utf8")
+        .split("\n")
+        .filter((line) => line.trim())
+    : [];
   let peerStatuses = new Map();
   let identity;
   if (process.env.SERVING_RECEIPT_ATTESTATIONS !== "0") {
@@ -398,7 +410,7 @@ async function main() {
     peerStatuses = prefetched.statuses;
     if (prefetched.skipped) console.error(`[pre-push] ${prefetched.skipped}`);
   }
-  return checkReports(root, reports, paths, { peerStatuses, identity });
+  return checkReports(root, reports, paths, { peerStatuses, identity, revs });
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

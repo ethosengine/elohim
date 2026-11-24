@@ -2608,10 +2608,10 @@ habits:
       - "ledger liveness (algedonic sensor, observation only): fold ci-harvest-cursor-lag@1 per job per its procedure in .claude/epr-meta/measures.yaml (Jenkins lastCompletedBuild minus .claude/data/ci-cursor.json); lens ci-harvest-cursor-lag-ceiling@1 reads red at 11 or more builds, where one harvest drops builds for good (`epr flow report --bound ci-harvest-cursor-lag-ceiling`)."
       - "a2o @concern:push-delivers-within-budget (genesis/a2o/features/dataplane/app-delivery-refuses-fast.feature — @act:i, four household stations: the not-ready window is answered in seconds; `just test mesh features/dataplane/app-delivery-refuses-fast.feature`)"
     evidence: >
-      DELTA 2026-11-24 (RED preserved; the serving receipt refuses only at dev and main): steward ruling 2026-11-24 "Refuse only at dev and main". t2-receipt.sh takes --targets (the pushed remote refs, which the hook writes from GATE_PUSH_REFS) and refuses a serving path with no current household receipt only when a target is refs/heads/dev or refs/heads/main, or when the targets are unknown or empty. Any other push (a self/ hand-over) prints one line, "serving receipt owed before dev", naming the just test mesh story, and passes. Tests both ways in serving-receipt.test.mjs (self/ and feature refs pass with one owed line; dev, main, a self/+dev mix, an empty list and no list refuse); the new test is red on the old script. Orchestrator node suites 108/108 (serving-receipt, prepush-self, prepush-gate-live, gate-change-class).
-    evidence-fingerprint: sha256:6b6124b2ceaab3ac
-    evidence-bytes: 45857
-    evidence-entries: 42
+      DELTA 2026-11-24b (RED preserved; the receipt review closed): shem review of the receipt change. Untrusted target lists fail closed (every line a full refs/ name that git check-ref-format accepts), the hook passes every remote ref of the raw push so a delete of dev or main is integration, and the owed line names the serving paths. Review item 3, pre-existing: the receipt source was the checkout HEAD (sut.ts resolveComponent), so a receipt for the checkout could admit an explicit-sha push of an unwitnessed commit to dev. The hook now hands t2-receipt.sh --revs, the sha of each dev or main update, and serving-receipt.mjs requires a receipt for each commit own tree (resolveComponent rev, no dirty digest for a named commit); without revs the checkout as before. Each new test is red on the prior commit; orchestrator node 123/125 (2 skipped), a2o sut specs 67/67.
+    evidence-fingerprint: sha256:1a5df760ca3b1f14
+    evidence-bytes: 46728
+    evidence-entries: 43
     refs:
       - "genesis/data/timeline/backlog/edge-quiesce-gate-timeout-aborts.md (the budget arithmetic, one layer down then up)"
       - "genesis/data/timeline/backlog/ci-edge-a2o-steps-glob-redeploys-fleet.md (no-op fleet rolls)"
