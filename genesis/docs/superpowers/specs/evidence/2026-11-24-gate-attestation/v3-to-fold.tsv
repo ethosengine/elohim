@@ -1,0 +1,64 @@
+address-profile-lint	MOVED	dirTree reads(tree)	scope=tree
+agentic-shift	no-key	unavailable (gate-only inputs, no step fingerprint); not recorded — no step fingerprint: g | unavailable (gate-only inputs, no step fingerprint); not recorded — no step fingerprint: g
+app-lifecycle-contracts	SAME
+brit	attested-or-unknown
+browser-bridge	SAME
+cargo-bridge	MOVED	reads(paths:elohim/eprfs/device-runtime) steps[gate-cargo-bridge]	scope=paths
+cargo-coverage	no-key	unavailable (gate-only inputs, no step fingerprint); not recorded — no step fingerprint: g | unavailable (gate-only inputs, no step fingerprint); not recorded — no step fingerprint: g
+consent-grant	no-key	unavailable (gate-only inputs, no step fingerprint) | unavailable (gate-only inputs, no step fingerprint)
+constants-sync	MOVED	dirTree reads(tree)	scope=tree
+dialogue-stasis	no-key	unavailable (gate-only inputs, no step fingerprint); not recorded — no step fingerprint: g | unavailable (gate-only inputs, no step fingerprint); not recorded — no step fingerprint: g
+dna-extern-lints	MOVED	dirTree reads(tree)	scope=tree
+domain-types	no-key	unavailable (gate-only inputs, no step fingerprint); not recorded — no step fingerprint: g | unavailable (gate-only inputs, no step fingerprint); not recorded — no step fingerprint: g
+doorway	SAME
+doorway-app	MOVED	reads(tree)	scope=tree
+elements-codegen	no-key	unavailable (gate-only inputs, no step fingerprint); not recorded — no step fingerprint: g | unavailable (gate-only inputs, no step fingerprint); not recorded — no step fingerprint: g
+elohim-address	no-key	unavailable (gate-only inputs, no step fingerprint); not recorded — no step fingerprint: g | unavailable (gate-only inputs, no step fingerprint); not recorded — no step fingerprint: g
+elohim-app	MOVED	reads(tree)	scope=tree
+elohim-ark	MOVED	reads(paths:elohim/eprfs/device-runtime) steps[gate-ark]	scope=paths
+elohim-blob-store	no-key	unavailable (gate-only inputs, no step fingerprint); not recorded — no step fingerprint: g | unavailable (gate-only inputs, no step fingerprint); not recorded — no step fingerprint: g
+elohim-compute	SAME
+elohim-epr	SAME
+elohim-error	no-key	unavailable (gate-only inputs, no step fingerprint) | unavailable (gate-only inputs, no step fingerprint)
+elohim-library	MOVED	reads(tree)	scope=tree
+elohim-live-session	SAME
+elohim-placement	SAME
+elohim-sdk	SAME
+elohim-settings	no-key	unavailable (gate-only inputs, no step fingerprint) | unavailable (gate-only inputs, no step fingerprint)
+elohim-storage	MOVED	reads(paths:elohim/eprfs/device-runtime) steps[cargo-build-storage]	scope=paths
+elohim-storage-client	no-key	unavailable (gate-only inputs, no step fingerprint); not recorded — no step fingerprint: g | unavailable (gate-only inputs, no step fingerprint); not recorded — no step fingerprint: g
+elohim-storybook	MOVED	reads(tree)	scope=tree
+epr-app-package	no-key	unavailable (gate-only inputs, no step fingerprint); not recorded — no step fingerprint: g | unavailable (gate-only inputs, no step fingerprint); not recorded — no step fingerprint: g
+epr-storage	no-key	unavailable (gate-only inputs, no step fingerprint); not recorded — no step fingerprint: g | unavailable (gate-only inputs, no step fingerprint); not recorded — no step fingerprint: g
+epr-ts	MOVED	reads(tree)	scope=tree
+eprfs	no-key	unavailable (no toolchain declared) | unavailable (no toolchain declared)
+eprfs-live-corpus	no-key	unavailable (no toolchain declared) | unavailable (no toolchain declared)
+eprfs-ts	MOVED	reads(tree)	scope=tree
+genesis	MOVED	reads(tree)	scope=tree
+genesis-a2o	MOVED	reads(tree)	scope=tree
+gherkin-prepush-lint	MOVED	reads(tree)	scope=tree
+hc-dbtool	SAME
+host-contract	SAME
+jenkins-bridge	MOVED	reads(paths:elohim/eprfs/device-runtime) steps[gate-jenkins-bridge]	scope=paths
+k8s-bridge	SAME
+manifest-hygiene	MOVED	dirTree	scope=paths
+memory-ceremony	no-key	unavailable (no toolchain declared) | unavailable (no toolchain declared)
+orchestrator	SAME
+orchestrator-tree	no-key	unavailable (no toolchain declared) | unavailable (no toolchain declared)
+pipeline-list-fresh	no-key	unavailable (gate-only inputs, no step fingerprint); not recorded — no step fingerprint: g | unavailable (gate-only inputs, no step fingerprint); not recorded — no step fingerprint: g
+rakia	attested-or-unknown
+rakia-codegen	no-key	unavailable (gate-only inputs, no step fingerprint); not recorded — no step fingerprint: g | unavailable (gate-only inputs, no step fingerprint); not recorded — no step fingerprint: g
+rakia-validate	no-key	unavailable (gate-only inputs, no step fingerprint); not recorded — no step fingerprint: g | unavailable (gate-only inputs, no step fingerprint); not recorded — no step fingerprint: g
+reach-drift	no-key	unavailable (gate-only inputs, no step fingerprint); not recorded — no step fingerprint: g | unavailable (gate-only inputs, no step fingerprint); not recorded — no step fingerprint: g
+rust-style	no-key	unavailable (gate-only inputs, no step fingerprint); not recorded — no step fingerprint: g | unavailable (gate-only inputs, no step fingerprint); not recorded — no step fingerprint: g
+rust-style-checker	SAME
+schema-codegen	MOVED	dirTree reads(tree)	scope=tree
+schema-dna	MOVED	dirTree reads(tree)	scope=tree
+schema-validate	MOVED	dirTree reads(tree)	scope=tree
+seam-contracts	no-key	unavailable (gate-only inputs, no step fingerprint) | unavailable (gate-only inputs, no step fingerprint)
+seam-guidance-contracts	no-key	unavailable (gate-only inputs, no step fingerprint); not recorded — no step fingerprint: g | unavailable (gate-only inputs, no step fingerprint); not recorded — no step fingerprint: g
+sophia	attested-or-unknown
+steward-node	MOVED	reads(paths:elohim/eprfs/device-runtime) steps[cargo-build-steward]	scope=paths
+storage-client-ts	MOVED	reads(tree)	scope=tree
+sweettest-check	MOVED	dirTree reads(tree)	scope=tree
+workspace-bridge	SAME
