@@ -1100,6 +1100,10 @@ async fn persistent_artifact_index_read_errors_retry_once_per_backoff_window() {
     .await;
     assert_index_reads_stay(&daemon, 2).await;
 
+    side.checkout
+        .append(berth_event("claim", "appended-during-backoff", "sa", "1.0"));
+    assert_index_reads_stay(&daemon, 2).await;
+
     *clock.lock().expect("clock") = start + INDEX_RETRY_FIRST + Duration::from_secs(1);
     eventually("the first backoff window permits one retry", || {
         daemon.artifact_index_flow_reads() == 3
@@ -1108,10 +1112,16 @@ async fn persistent_artifact_index_read_errors_retry_once_per_backoff_window() {
     assert_eq!(daemon.artifact_index_flow_reads(), 3);
     assert_index_reads_stay(&daemon, 3).await;
 
+    side.checkout
+        .append(berth_event("claim", "still-appending", "sa", "1.0"));
+    assert_index_reads_stay(&daemon, 3).await;
+
+    daemon.resume_artifact_index_flow_reads();
     *clock.lock().expect("clock") = start + 2 * INDEX_RETRY_FIRST + Duration::from_secs(2);
-    eventually("the second backoff window permits one retry", || {
-        daemon.artifact_index_flow_reads() == 4
-    })
+    eventually(
+        "the cleared error is read after the second backoff expires",
+        || daemon.artifact_index_flow_reads() == 4,
+    )
     .await;
     assert_eq!(daemon.artifact_index_flow_reads(), 4);
     assert_index_reads_stay(&daemon, 4).await;

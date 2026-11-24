@@ -1540,6 +1540,41 @@ fn shadow_decide_journals_would_have_and_executes_nothing() {
     );
 }
 
+#[test]
+fn shadow_decide_carries_presence_from_the_last_own_event() {
+    for observer_ruling in [Some("away-observer"), None] {
+        let dir = tempfile::tempdir().unwrap();
+        let session = dir.path().join("s1");
+        fs::create_dir_all(&session).unwrap();
+        let mut owned = perm(1, 0, "git -C <path> rebase main");
+        owned["presence"] = json!({"disposition": "automated", "basis": {
+            "lastWitnessedAgeSeconds": 0.0, "rulingRef": "away-owned"
+        }});
+        let mut outside = observed(2, 10, Some(0));
+        outside["presence"] = json!({"disposition": "collaborative", "basis": {
+            "lastWitnessedAgeSeconds": null, "rulingRef": observer_ruling
+        }});
+        write_lines(&session.join("events.jsonl"), &[owned, outside]);
+
+        decide_shadow(
+            dir.path(),
+            "s1",
+            &request(),
+            &classifier(),
+            &StasisPolicy::builtin(),
+            &clock(20),
+            5 << 20,
+        )
+        .unwrap();
+
+        let replay = journal::replay(dir.path(), "s1").unwrap();
+        let written = replay.events.last().unwrap();
+        assert_eq!(written.kind, EventKind::WouldHave);
+        assert_eq!(written.presence.disposition, Disposition::Automated);
+        assert_eq!(written.presence.ruling_ref.as_deref(), Some("away-owned"));
+    }
+}
+
 fn run_root(root: &Path, now: i64) -> SessionFold {
     let policy = StasisPolicy::builtin();
     fold_session(

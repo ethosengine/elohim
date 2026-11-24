@@ -458,6 +458,7 @@ impl PeerDaemon {
             index_task: None,
             index_retry_at: None,
             index_retry_stamp: None,
+            index_retry_failed: false,
             now,
             serves,
             fetch_task: None,
@@ -512,6 +513,14 @@ impl PeerDaemon {
         self.stats
             .fail_index_flow_reads
             .store(true, Ordering::Relaxed);
+    }
+
+    /// Let artifact-index flow reads succeed again at the test seam.
+    #[cfg(feature = "testing")]
+    pub fn resume_artifact_index_flow_reads(&self) {
+        self.stats
+            .fail_index_flow_reads
+            .store(false, Ordering::Relaxed);
     }
 
     /// Run until the loop ends. It ends on its own only for a reason worth a non-zero exit.
@@ -658,10 +667,11 @@ fn index_rebuild_due(
     stamp_unchanged: bool,
     retry_at: Option<Instant>,
     retry_stamp_unchanged: bool,
+    retry_failed: bool,
     now: Instant,
 ) -> bool {
     match retry_at {
-        Some(at) if retry_stamp_unchanged => now >= at,
+        Some(at) if retry_failed || retry_stamp_unchanged => now >= at,
         Some(_) => true,
         None => !indexed_once || !stamp_unchanged,
     }
@@ -764,6 +774,9 @@ struct Run {
     /// The uncommitted log stamp whose retry deadline is in `index_retry_at`. A later log change
     /// bypasses that deadline; a failed read never becomes `index_stamp`.
     index_retry_stamp: Option<Stamp>,
+    /// Whether `index_retry_at` follows a failed read or rebuild. Failure backoff remains binding
+    /// across later appends; a manifest retry may still be bypassed by a changed log stamp.
+    index_retry_failed: bool,
     /// Clock shared by the artifact rebuild and its retry-due decision.
     now: Arc<dyn Fn() -> Instant + Send + Sync>,
     /// The serve policy the tier's scope reads; replaced when the rules reload, `None` while the
@@ -1277,6 +1290,7 @@ impl Run {
                 self.index_retry_at =
                     index_retry_after_rebuild(failed, (self.now)(), mount.next_retry_due());
                 self.index_retry_stamp = self.index_retry_at.map(|_| self.index_stamp);
+                self.index_retry_failed = failed;
             }
         }
         if self.index_task.is_some() {
@@ -1290,6 +1304,7 @@ impl Run {
             now == self.index_stamp,
             self.index_retry_at,
             self.index_retry_stamp.as_ref() == Some(&now),
+            self.index_retry_failed,
             rebuild_at,
         ) {
             return;
@@ -1313,6 +1328,7 @@ impl Run {
                 ));
                 self.index_retry_at = Some(rebuild_at + INDEX_RETRY_FIRST);
                 self.index_retry_stamp = Some(now);
+                self.index_retry_failed = true;
                 return;
             }
         };
@@ -1322,6 +1338,7 @@ impl Run {
         self.indexed_once = true;
         self.index_retry_at = None;
         self.index_retry_stamp = None;
+        self.index_retry_failed = false;
         self.index_task = Some(tokio::spawn(async move {
             mount.rebuild_from_flow_at(&events, rebuild_at).await
         }));
@@ -1989,13 +2006,45 @@ mod tests {
     #[test]
     fn unchanged_index_without_a_manifest_retry_never_becomes_due() {
         let now = Instant::now();
-        assert!(!index_rebuild_due(true, true, None, false, now));
+        assert!(!index_rebuild_due(true, true, None, false, false, now));
         assert!(!index_rebuild_due(
             true,
             true,
             None,
             false,
+            false,
             now + Duration::from_secs(24 * 60 * 60)
+        ));
+    }
+
+    #[test]
+    fn failed_index_retry_backoff_wins_over_a_changed_stamp() {
+        let now = Instant::now();
+        let retry_at = now + INDEX_RETRY_FIRST;
+
+        assert!(!index_rebuild_due(
+            true,
+            false,
+            Some(retry_at),
+            false,
+            true,
+            now
+        ));
+        assert!(index_rebuild_due(
+            true,
+            false,
+            Some(retry_at),
+            false,
+            true,
+            retry_at
+        ));
+        assert!(index_rebuild_due(
+            true,
+            false,
+            Some(retry_at),
+            false,
+            false,
+            now
         ));
     }
 
