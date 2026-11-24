@@ -1900,7 +1900,7 @@ impl Run {
                     FoldPlan {
                         limits: FoldLimits::default(),
                         known: known.as_deref(),
-                        deadline: Some(Instant::now() + FOLD_DEADLINE),
+                        deadline: Some(tokio::time::Instant::now() + FOLD_DEADLINE),
                     },
                 )
                 .await
