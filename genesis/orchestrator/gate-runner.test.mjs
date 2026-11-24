@@ -66,20 +66,29 @@ describe('gate step reading collector', () => {
     const collector = [];
     emitGateReading({ ...base, outcome: 'ran', at: base.endedAt }, { collector, env: {} });
     emitGateReading({ ...base, step: 'second', outcome: 'skipped', at: base.endedAt }, { collector, env: {} });
-    let call;
+    const calls = [];
+    let rendered = '';
     appendGateReadings(collector, {
       root: ROOT,
       env: { EPR_BIN: 'fixture-epr' },
       spawn: (command, args, options) => {
-        call = { command, args, options, rows: readFileSync(args[args.indexOf('--from') + 1], 'utf8') };
-        return { status: 0 };
+        const call = { command, args, options };
+        if (args.includes('append')) call.rows = readFileSync(args[args.indexOf('--from') + 1], 'utf8');
+        calls.push(call);
+        return { status: 0, stdout: args.includes('--crate-shadow') ? '[crate-shadow] fixture\n' : '' };
       },
+      write: text => { rendered += text; },
     });
+    const call = calls[0];
     assert.equal(call.command, 'timeout');
     assert.deepEqual(call.args.slice(0, 7), ['-k', '1', '5', 'fixture-epr', 'flow', 'reading', 'append']);
     const rows = call.rows.trim().split('\n').map(line => JSON.parse(line));
     assert.equal(rows.length, 2);
     assert.equal(rows[0].key, 'reason says "quoted" and \\ escaped');
+    assert.deepEqual(calls[1].args.slice(3), [
+      'fixture-epr', 'flow', 'report', 'reading', '--crate-shadow', '--run', base.runId, '--root', ROOT,
+    ]);
+    assert.equal(rendered, '[crate-shadow] fixture\n');
   });
 
   test('a failed native append is one warning and never throws', () => {
@@ -199,6 +208,111 @@ describe('gate step reading collector', () => {
       assert.equal(read.filter(row => row.step === 'fixture').length, 1, 'the project row stays');
     } finally {
       rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test('an eprfs recipe emits apportioned crate rows; reused and reading-off runs emit none', () => {
+    const root = mkdtempSync(resolve(tmpdir(), 'crate-step-readings-'));
+    const rows = resolve(root, 'rows.jsonl');
+    mkdirSync(resolve(root, 'genesis/agentic'), { recursive: true });
+    writeFileSync(resolve(root, 'genesis/agentic/pool-policy.json'), JSON.stringify({
+      gate_narrow: { projects: ['eprfs'] },
+      gate_reuse: { projects: ['eprfs'] },
+    }));
+    const names = ['leaf', 'mid', 'top', 'unrelated'];
+    const deps = { leaf: [], mid: ['leaf'], top: ['mid'], unrelated: [] };
+    const metadata = {
+      packages: names.map(name => ({
+        id: name, name, manifest_path: resolve(root, 'ws', name, 'Cargo.toml'),
+      })),
+      workspace_members: [...names],
+      resolve: { nodes: names.map(name => ({
+        id: name, features: [], deps: deps[name].map(pkg => ({ pkg })),
+      })) },
+    };
+    const project = {
+      name: 'eprfs', dir: 'ws', steps: ['build'],
+      run: { kind: 'root-just', recipe: '_gate-eprfs', cargo: { workspace: 'ws', rustflags: '' } },
+    };
+    let recipeStatus = 1;
+    let cargoCalls = 0;
+    let dirty = '';
+    const spawn = (command, args, options = {}) => {
+      if (command === 'rustc') return { status: 0, stdout: 'rustc fixture\nhost: fixture-host\n' };
+      if (command === 'cargo') {
+        cargoCalls += 1;
+        return { status: 0, stdout: JSON.stringify(metadata) };
+      }
+      if (command === 'git') {
+        const target = String(args.at(-1));
+        if (args[0] === 'status') return { status: 0, stdout: dirty };
+        if (target.endsWith('^{commit}')) return { status: 0, stdout: `${'a'.repeat(40)}\n` };
+        if (args[0] === 'show') return { status: 0, stdout: 'fixture lock bytes' };
+        return { status: 0, stdout: `${'b'.repeat(40)}\n` };
+      }
+      if (command === 'bash' && String(args[0]).endsWith('/rust-style.sh')) return { status: 0 };
+      if (command === 'bash' && String(args[0]).endsWith('/run-local-gate.sh')) {
+        if (options.env.GATE_STEP_TIMES) {
+          writeFileSync(options.env.GATE_STEP_TIMES,
+            'fmt\t0\t1795500000\t1795500002\ntest\t1\t1795500002\t1795500010\n');
+        }
+        return { status: recipeStatus, stdout: '', stderr: '' };
+      }
+      return { status: 0, stdout: '', stderr: '' };
+    };
+    const baseEnv = {
+      PATH: '', EPR_BIN: 'fixture-epr', GATE_READING_ROWS: rows,
+      GATE_READING_RUN_ID: 'crate-run', GATE_EVIDENCE: 'off', GATE_TASK: 'off',
+    };
+    try {
+      const status = runProject(project, false, false, {
+        root, env: baseEnv, spawn, write: () => {}, readsOf: () => ['fixtures/shared.json'],
+      });
+      assert.equal(status, 1);
+      assert.equal(cargoCalls, 1, 'the narrowing graph is loaded once for selection and crate keys');
+      const read = readFileSync(rows, 'utf8').trim().split('\n').map(line => JSON.parse(line));
+      const crateRows = read.filter(row => /^eprfs:(fmt|test):/.test(row.step));
+      assert.equal(crateRows.length, 8);
+      assert.ok(crateRows.filter(row => row.parent === 'eprfs:fmt').every(row =>
+        row.status === 'green' && row.value === 0.5));
+      assert.ok(crateRows.filter(row => row.parent === 'eprfs:test').every(row =>
+        row.status === 'red' && row.value === 2));
+      assert.notEqual(
+        crateRows.find(row => row.step === 'eprfs:fmt:leaf').key,
+        crateRows.find(row => row.step === 'eprfs:test:leaf').key,
+        'the step is part of every crate key',
+      );
+
+      // A reused run returns before any step or crate row is emitted, so it records none by
+      // construction. A dirty crate tree records none either: its keys would name code that never ran.
+      writeFileSync(rows, '');
+      recipeStatus = 0;
+      dirty = ' M ws/leaf/src/lib.rs\n';
+      assert.equal(runProject(project, false, false, {
+        root, env: { ...baseEnv, GATE_READING_RUN_ID: 'dirty' }, spawn, write: () => {},
+        readsOf: () => ['fixtures/shared.json'],
+      }), 0);
+      assert.equal(
+        readFileSync(rows, 'utf8').trim().split('\n').filter(Boolean)
+          .map(line => JSON.parse(line)).filter(row => /^eprfs:.+:.+/.test(row.step)).length,
+        0,
+        'a dirty crate tree records no crate rows',
+      );
+      dirty = '';
+
+      writeFileSync(rows, '');
+      const beforeOff = cargoCalls;
+      assert.equal(runProject(project, false, false, {
+        root,
+        env: { ...baseEnv, GATE_READING: 'off', GATE_READING_RUN_ID: 'off' },
+        spawn,
+        write: () => {},
+        readsOf: () => ['fixtures/shared.json'],
+      }), 0);
+      assert.equal(cargoCalls, beforeOff, 'reading off does not load metadata for crate telemetry');
+      assert.equal(readFileSync(rows, 'utf8'), '');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
     }
   });
 

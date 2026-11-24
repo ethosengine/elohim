@@ -1405,7 +1405,7 @@ fn run_report(args: &[String]) -> FlowResult<ExitCode> {
     Ok(ExitCode::SUCCESS)
 }
 
-/// `epr flow report reading [--since RFC3339] [--last N] [--json]`.
+/// `epr flow report reading [--since RFC3339] [--last N] [--crate-shadow [--run ID]] [--json]`.
 ///
 /// A shadow reading over `gate-step-reading@1` observations. It always exits successfully: the
 /// report names duplicated verification and missing key reasons, but deciding what either costs
@@ -1414,14 +1414,17 @@ fn run_report_reading(args: &[String]) -> FlowResult<ExitCode> {
     let (opts, rest) = parse_global(args)?;
     if wants_help(&rest) {
         println!(
-            "usage: epr flow report reading [--since RFC3339] [--last N] [--json] [--root DIR]\n  \
+            "usage: epr flow report reading [--since RFC3339] [--last N] [--crate-shadow [--run ID]] [--json] [--root DIR]\n  \
              Folds gate-step-reading@1 observations. Default: the last 10 runs; --since reads all \
-             rows ending at or after the instant unless --last also caps the run count."
+             rows ending at or after the instant unless --last also caps the run count. \
+             --crate-shadow prints only the newest (or --run ID) per-crate advisory."
         );
         return Ok(ExitCode::SUCCESS);
     }
     let mut options = reading::ReadingOptions::default();
     let mut explicit_last = false;
+    let mut crate_shadow = false;
+    let mut run_id = None;
     let mut i = 0;
     while i < rest.len() {
         match rest[i].as_str() {
@@ -1449,13 +1452,38 @@ fn run_report_reading(args: &[String]) -> FlowResult<ExitCode> {
                 explicit_last = true;
                 i += 2;
             }
+            "--crate-shadow" => {
+                crate_shadow = true;
+                i += 1;
+            }
+            "--run" => {
+                let run = rest
+                    .get(i + 1)
+                    .filter(|value| !value.trim().is_empty())
+                    .ok_or_else(|| {
+                        FlowError::InvalidArguments("--run needs a non-empty run id".into())
+                    })?;
+                run_id = Some(run.clone());
+                i += 2;
+            }
             other => {
                 return Err(FlowError::InvalidArguments(format!(
                     "unknown report reading argument `{other}`{}",
-                    flag_hint(other, &["--since", "--last"])
+                    flag_hint(other, &["--since", "--last", "--crate-shadow", "--run"])
                 )))
             }
         }
+    }
+    if run_id.is_some() && !crate_shadow {
+        return Err(FlowError::InvalidArguments(
+            "--run is only valid with --crate-shadow".into(),
+        ));
+    }
+    if crate_shadow {
+        for line in reading::crate_shadow(&opts.root, run_id.as_deref())? {
+            println!("{line}");
+        }
+        return Ok(ExitCode::SUCCESS);
     }
     if options.since.is_some() && !explicit_last {
         options.last_runs = None;
