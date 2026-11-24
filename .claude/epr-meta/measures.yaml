@@ -477,12 +477,18 @@ measures:
     family: dev-cycle
     unit: seconds
     procedure: >
-      genesis/orchestrator/gate-runner.mjs emits one observation after each gate project finishes
-      through `epr flow sense observation --measure gate-step-reading@1`. The value is executing
-      seconds; env slots carry run_id, step, key (the closure key or `none: <reason>`), key_changed
-      (yes|no|unknown), outcome (ran|reused|skipped), waited_seconds, started_at and ended_at.
-      `epr flow report reading` folds the last ten runs by default. This is shadow telemetry: it
-      selects no gate, changes no closure key, refuses no reuse and never changes a gate verdict.
+      gate-runner.mjs collects project rows in memory; the pre-push gate_step_reading helper
+      collects leg rows as JSONL in one per-run scratch directory. Each caller makes exactly one
+      bounded `epr flow reading append --from <file>` call at run end (including pre-push early
+      exit); failure or timeout drops the batch with one line and never changes a verdict.
+      The native verb validates the declared gate-step-reading@1 shape/unit/vocabularies, appends
+      valid rows under a lock to device-local `.eprfs/status/readings/gate-step.jsonl`, and when
+      that file exceeds 2 MiB atomically retains its newest rows fitting in 1 MiB. The value is
+      executing seconds; rows also carry run_id, step, key (closure key or `none: <reason>`),
+      key_changed (yes|no|unknown), outcome (ran|reused|skipped), waited_seconds, started_at,
+      ended_at and at. `epr flow report reading` folds the last ten runs by default from that file.
+      Rung 1-2 rows already in flows.jsonl are not migrated. This shadow telemetry selects no
+      gate, changes no closure key, refuses no reuse and never changes a gate verdict.
     provenance: "genesis/docs/superpowers/specs/2026-11-23-change-detection-one-reading-design.md section 4; station CD-reading"
     env-sensitivity: [run_id, step, key, key_changed, outcome, waited_seconds, started_at, ended_at]
     default-authority: observation

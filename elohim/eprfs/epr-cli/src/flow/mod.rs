@@ -132,10 +132,10 @@ fn flag_hint(word: &str, own: &[&str]) -> String {
 }
 
 /// Every flow subcommand, as a person types it.
-const SUBCOMMANDS: [&str; 20] = [
+const SUBCOMMANDS: [&str; 21] = [
     "project", "walk", "status", "seal", "reseal", "hold", "claim", "context", "ledger", "fulfill",
     "intend", "note", "report", "stocks", "concerns", "memory", "cites", "retract", "sense",
-    "habit",
+    "habit", "reading",
 ];
 
 /// Entry point invoked by `main` for `epr flow …`.
@@ -266,6 +266,7 @@ pub fn run(args: &[String]) -> FlowResult<ExitCode> {
         "fulfill" => run_fulfill(&args[1..]),
         "note" => run_note(&args[1..]),
         "report" => run_report(&args[1..]),
+        "reading" => run_reading(&args[1..]),
         "stocks" => run_stocks(&args[1..]),
         "concerns" => run_concerns(&args[1..]),
         "memory" => memory::run(&args[1..]),
@@ -1468,6 +1469,49 @@ fn run_report_reading(args: &[String]) -> FlowResult<ExitCode> {
     Ok(ExitCode::SUCCESS)
 }
 
+/// `epr flow reading append --from <jsonl>` — the one native reading-store writer.
+fn run_reading(args: &[String]) -> FlowResult<ExitCode> {
+    let Some("append") = args.first().map(String::as_str) else {
+        return Err(FlowError::InvalidArguments(
+            "usage: epr flow reading append --from <jsonl> [--json] [--root DIR]".into(),
+        ));
+    };
+    let (opts, rest) = parse_global(&args[1..])?;
+    if wants_help(&rest) {
+        println!("usage: epr flow reading append --from <jsonl> [--json] [--root DIR]");
+        return Ok(ExitCode::SUCCESS);
+    }
+    let from = take_opt(&rest, "--from")?.ok_or_else(|| {
+        FlowError::InvalidArguments("flow reading append needs --from <jsonl>".into())
+    })?;
+    let mut i = 0;
+    while i < rest.len() {
+        if rest[i] == "--from" {
+            i += 2;
+        } else {
+            let other = &rest[i];
+            return Err(FlowError::InvalidArguments(format!(
+                "unknown reading append argument `{other}`{}",
+                flag_hint(other, &["--from"])
+            )));
+        }
+    }
+    let from = resolve_under(&opts.root, &from);
+    let summary = reading::append(&opts.root, &from)?;
+    if opts.json {
+        println!("{}", serde_json::to_string_pretty(&summary)?);
+    } else {
+        println!(
+            "reading append: accepted={} rejected={} trimmed={} path={}",
+            summary.accepted,
+            summary.rejected,
+            summary.trimmed,
+            summary.path.display()
+        );
+    }
+    Ok(ExitCode::SUCCESS)
+}
+
 /// `epr flow fold` in a build without the steward channel (the bridges' library build).
 #[cfg(not(feature = "peer"))]
 fn run_fold(_args: &[String]) -> FlowResult<ExitCode> {
@@ -2347,6 +2391,9 @@ fn usage() -> String {
      (the shadow per-gate reading: seconds split by key movement, ran-with-unchanged-key, per-run \
      wall clock versus summed steps, waiting versus executing, and steps with no key reason; \
      defaults to the last ten runs and never decides selection, reuse or a gate verdict)\n  \
+     | reading append --from <jsonl> [--json] [--root DIR] \
+     (validates gate-step-reading@1 rows and appends them once under the device-local reading \
+     store's lock; malformed rows are counted and dropped, and bounded retention is native)\n  \
      | report placement [--ledger] [--coverage] [--stasis [--fold]] \
      [--focus [<subject>] [--brief]] [--json] [--root DIR] [--cluster-state PATH] \
      (every file's placement state derived from the surfaces, frontmatter status, .claude/memory \
