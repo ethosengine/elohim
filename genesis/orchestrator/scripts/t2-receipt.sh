@@ -13,13 +13,18 @@
 # Other dataplane changes retain the advisory recency receipt unless --strict.
 #
 # usage: t2-receipt.sh --changed <file: one repo-relative path per line> [--reports <dir>]
-#                      [--targets <file: one pushed remote ref per line>] [--strict]
+#                      [--targets <file: one pushed remote ref per line>]
+#                      [--revs <file: the local sha of each pushed dev or main update>] [--strict]
+# With --revs, a mandatory receipt must have witnessed each of those commits' own source trees,
+# not the checkout's: a push of an explicit sha that differs from HEAD is held to what it pushes.
+# Without it (or with an empty file) the checkout's HEAD, dirt included, is the source.
 set -u
-CHANGED_FILE=""; REPORTS_DIR=""; TARGETS_FILE=""; STRICT="${T2_RECEIPT:-}"
+CHANGED_FILE=""; REPORTS_DIR=""; TARGETS_FILE=""; REVS_FILE=""; STRICT="${T2_RECEIPT:-}"
 while [ $# -gt 0 ]; do
   case "$1" in
     --changed) CHANGED_FILE="$2"; shift 2 ;;
     --targets) TARGETS_FILE="$2"; shift 2 ;;
+    --revs) REVS_FILE="$2"; shift 2 ;;
     --reports) REPORTS_DIR="$2"; shift 2 ;;
     --strict) STRICT=strict; shift ;;
     *) echo "t2-receipt: unknown arg $1" >&2; exit 2 ;;
@@ -78,7 +83,7 @@ if [ -n "$serving_touched" ]; then
     echo "[pre-push] serving receipt owed before dev (this push does not reach dev or main, so it is not refused): $owed; for $(printf '%s\n' "$serving_touched" | paste -sd ',' - | sed 's/,/, /g')"
     exit 0
   fi
-  node "$REPO_ROOT/genesis/orchestrator/scripts/serving-receipt.mjs" "$REPO_ROOT" "$REPORTS_DIR" "$serving_list"
+  node "$REPO_ROOT/genesis/orchestrator/scripts/serving-receipt.mjs" "$REPO_ROOT" "$REPORTS_DIR" "$serving_list" ${REVS_FILE:+"$REVS_FILE"}
   receipt_rc=$?
   rm -f "$serving_list"
   [ "$receipt_rc" -eq 0 ] && exit 0

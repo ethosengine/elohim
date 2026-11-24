@@ -220,7 +220,7 @@ test("actual pre-push caller propagates mandatory refusal in default and strict 
     mkdirSync(join(dir, "genesis/orchestrator/scripts"), { recursive: true });
     writeFileSync(
       join(dir, "genesis/orchestrator/scripts/t2-receipt.sh"),
-      'printf "%s" "$2" > receipt-path\nprintf "%s" "$4" > targets-path\ncat "$4" > receipt-targets\nexit "$RECEIPT_STATUS"\n',
+      'printf "%s" "$2" > receipt-path\nprintf "%s" "$4" > targets-path\ncat "$4" > receipt-targets\ncat "$6" > receipt-revs\nexit "$RECEIPT_STATUS"\n',
     );
     for (const mode of ["", "strict"]) {
       for (const status of [0, 1, 2]) {
@@ -230,8 +230,8 @@ test("actual pre-push caller propagates mandatory refusal in default and strict 
           // the propagation this test pins (under continue the hook refuses at its end instead).
           [
             "-c",
-            "leg_red() { exit 1; }\n" +
-              'PUSH_LINES=("refs/heads/x aaaa refs/heads/self/ethosengine-x bbbb" "(delete) 0000000000000000000000000000000000000000 refs/heads/dev cccc" "refs/notes/n dddd refs/notes/n eeee")\n' +
+            "leg_red() { exit 1; }\nZERO_SHA=0000000000000000000000000000000000000000\n" +
+              'PUSH_LINES=("refs/heads/x aaaa refs/heads/self/ethosengine-x bbbb" "(delete) 0000000000000000000000000000000000000000 refs/heads/dev cccc" "refs/notes/n dddd refs/notes/n eeee" "refs/heads/m ffff refs/heads/main 9999")\n' +
               `${block}printf caller-continued`,
           ],
           {
@@ -260,8 +260,13 @@ test("actual pre-push caller propagates mandatory refusal in default and strict 
         );
         assert.equal(
           readFileSync(join(dir, "receipt-targets"), "utf8"),
-          "refs/heads/self/ethosengine-x\nrefs/heads/dev\nrefs/notes/n\n",
+          "refs/heads/self/ethosengine-x\nrefs/heads/dev\nrefs/notes/n\nrefs/heads/main\n",
           "caller passes every remote ref of the raw push, a delete of dev included",
+        );
+        assert.equal(
+          readFileSync(join(dir, "receipt-revs"), "utf8"),
+          "ffff\n",
+          "caller passes the sha of each dev or main update, and no sha for a delete",
         );
         assert.equal(
           existsSync(readFileSync(join(dir, "targets-path"), "utf8")),
@@ -843,6 +848,39 @@ function check(root, reports, paths, peerStatuses, env) {
   });
   return { ok, out: out.join("\n") };
 }
+
+// Review item (3), 2026-11-24: the receipt's source was the checkout's HEAD, so a receipt for
+// the checkout could admit an explicit-sha push to dev of a commit nobody witnessed.
+test("a receipt binds to each pushed commit, not the checkout, when the push names its revs", () => {
+  withFixture((root, reports) => {
+    const witnessed = git(root, ["rev-parse", "HEAD"]).stdout.trim();
+    writeFileSync(
+      join(reports, "sprint-report-household-a.json"),
+      JSON.stringify(storyReport(root, RECEIPT_STORIES.refusesFast)),
+    );
+    const component = DEFAULT_SUT_COMPONENTS.find((c) => c.path && !/\.(ya?ml|sh)$/.test(c.path));
+    writeFileSync(join(root, component.path, "marker"), "changed after the run\n");
+    git(root, ["-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qam", "unwitnessed"]);
+    const unwitnessed = git(root, ["rev-parse", "HEAD"]).stdout.trim();
+    git(root, ["reset", "-q", "--hard", witnessed]); // the checkout stays on the witnessed commit
+    const run = (revs) => {
+      const out = [];
+      const ok = checkReports(root, reports, [REFUSES_FAST_PATHS[0]], {
+        attestations: false,
+        revs,
+        log: (l) => out.push(l),
+        warn: (l) => out.push(l),
+      });
+      return { ok, out: out.join("\n") };
+    };
+    assert.equal(run(undefined).ok, true, "no revs: the checkout, which was witnessed");
+    assert.equal(run([witnessed]).ok, true, "the witnessed commit pushed explicitly");
+    const refused = run([unwitnessed]);
+    assert.equal(refused.ok, false, "an unwitnessed commit pushed while the checkout was witnessed");
+    assert.match(refused.out, new RegExp(`pushed ${unwitnessed.slice(0, 12)}`));
+    assert.equal(run([witnessed, unwitnessed]).ok, false, "every pushed commit must be witnessed");
+  });
+});
 
 test("a signed current-source attestation is admitted as the receipt, and preferred over a report", () => {
   withFixture((root, reports) => {
