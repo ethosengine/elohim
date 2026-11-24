@@ -26,7 +26,8 @@ function digest(value) {
 
 /**
  * One shadow verdict key per Cargo workspace member. Workspace dependency keys compose
- * recursively, so a changed crate moves exactly itself and its reverse dependencies.
+ * recursively, so a changed crate moves exactly itself and its reverse dependencies, including
+ * the members that reach it only as a dev-dependency.
  */
 export function crateKeys({
   metadata,
@@ -43,9 +44,16 @@ export function crateKeys({
   const nodes = new Map(metadata.resolve.nodes.map(node => [node.id, node]));
   if (packages.size !== members.size) return {};
 
+  // Cargo forbids cycles among normal and build dependencies, but a dev-dependency may close one
+  // (eprfs-serve dev-depends on itself with its `testing` feature). So each member has a library
+  // key over its own tree, its features and its normal/build workspace dependencies' library keys
+  // (acyclic, recursive), and its step key adds the library keys of its dev-only workspace
+  // dependencies, minus itself, whose tree the library key already holds.
+  const devOnly = dep => Array.isArray(dep.dep_kinds) && dep.dep_kinds.length > 0
+    && dep.dep_kinds.every(kind => kind?.kind === 'dev');
   const held = new Map();
   const visiting = new Set();
-  const keyOf = id => {
+  const libraryKeyOf = id => {
     if (held.has(id)) return held.get(id);
     if (visiting.has(id)) throw new Error(`workspace dependency cycle at ${id}`);
     const pkg = packages.get(id);
@@ -53,25 +61,35 @@ export function crateKeys({
     visiting.add(id);
     const node = nodes.get(id) || { deps: [], features: [] };
     const dependencies = (node.deps || [])
-      .map(dep => dep.pkg)
-      .filter(dep => members.has(dep))
-      .map(keyOf)
+      .filter(dep => members.has(dep.pkg) && !devOnly(dep))
+      .map(dep => libraryKeyOf(dep.pkg))
       .sort();
     const tree = treeOf(dirname(pkg.manifest_path));
     if (!tree) throw new Error(`tree absent for ${pkg.name}`);
     const key = digest({
-      step,
-      toolchain,
-      cargoEnv: cargoEnv || {},
       tree,
-      lockDigest,
-      outsideReadsDigest,
       features: [...(node.features || [])].sort(),
       dependencies,
     });
     visiting.delete(id);
     held.set(id, key);
     return key;
+  };
+  const keyOf = id => {
+    const node = nodes.get(id) || { deps: [] };
+    const devDependencies = (node.deps || [])
+      .filter(dep => members.has(dep.pkg) && dep.pkg !== id && devOnly(dep))
+      .map(dep => libraryKeyOf(dep.pkg))
+      .sort();
+    return digest({
+      step,
+      toolchain,
+      cargoEnv: cargoEnv || {},
+      lockDigest,
+      outsideReadsDigest,
+      library: libraryKeyOf(id),
+      devDependencies,
+    });
   };
 
   return Object.fromEntries([...packages.values()]

@@ -63,6 +63,49 @@ describe('per-crate verdict keys', () => {
     }
   });
 
+  function devMetadata() {
+    // `serve` dev-depends on itself (a Cargo-legal self cycle, like eprfs-serve's `testing`
+    // feature) and `peer` reaches `serve` only as a dev-dependency.
+    const dev = [{ kind: 'dev', target: null }];
+    const normal = [{ kind: null, target: null }];
+    return {
+      packages: ['serve', 'peer', 'leaf'].map(name => ({ id: name, name, manifest_path: `/repo/ws/${name}/Cargo.toml` })),
+      workspace_members: ['serve', 'peer', 'leaf'],
+      resolve: {
+        nodes: [
+          { id: 'serve', features: [], deps: [{ pkg: 'serve', dep_kinds: dev }, { pkg: 'leaf', dep_kinds: normal }] },
+          { id: 'peer', features: [], deps: [{ pkg: 'serve', dep_kinds: dev }] },
+          { id: 'leaf', features: [], deps: [] },
+        ],
+      },
+    };
+  }
+
+  function devKeys(trees) {
+    return crateKeys({
+      metadata: devMetadata(),
+      treeOf: dir => ({ serve: 'serve-a', peer: 'peer-a', leaf: 'leaf-a', ...trees })[dir.split('/').at(-1)],
+      toolchain: 'rustc fixture', lockDigest: 'lock-a', outsideReadsDigest: 'reads-a',
+      cargoEnv: {}, step: 'eprfs:test',
+    });
+  }
+
+  test('a self dev-dependency keys without a cycle', () => {
+    const before = devKeys({});
+    assert.deepEqual(Object.keys(before).sort(), ['leaf', 'peer', 'serve']);
+    assert.deepEqual(devKeys({}), before, 'stable');
+  });
+
+  test('a crate reached only as a dev-dependency still moves the crate that tests with it', () => {
+    const before = devKeys({});
+    const afterServe = devKeys({ serve: 'serve-b' });
+    assert.notEqual(afterServe.serve, before.serve);
+    assert.notEqual(afterServe.peer, before.peer, 'peer tests compile serve');
+    assert.equal(afterServe.leaf, before.leaf);
+    const afterLeaf = devKeys({ leaf: 'leaf-b' });
+    assert.notEqual(afterLeaf.peer, before.peer, 'through serve\'s normal dependency on leaf');
+  });
+
   test('keys are stable across runs and independent of member order', () => {
     const before = keys();
     assert.deepEqual(keys(), before);
