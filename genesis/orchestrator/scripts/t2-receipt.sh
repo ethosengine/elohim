@@ -29,13 +29,22 @@ done
 REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 REPORTS_DIR="${REPORTS_DIR:-$REPO_ROOT/genesis/a2o/reports}"
 
-# Integration push: one of the pushed refs is dev or main, or the targets are unknown.
+# Integration push: one of the pushed refs (deletes included) is dev or main, or the targets
+# cannot be trusted. Every line must be a full, well-formed refs/ name (git check-ref-format:
+# no whitespace, no abbreviation such as a bare "dev"); one line that is not, an empty list or
+# an unreadable file leaves the push an integration push. A last line without a newline counts.
 INTEGRATION=1
-if [ -n "$TARGETS_FILE" ] && [ -r "$TARGETS_FILE" ] && grep -q '[^[:space:]]' "$TARGETS_FILE"; then
-  INTEGRATION=0
-  while IFS= read -r target_ref; do
-    case "$target_ref" in refs/heads/dev | refs/heads/main) INTEGRATION=1 ;; esac
+if [ -n "$TARGETS_FILE" ] && [ -r "$TARGETS_FILE" ]; then
+  targets_seen=0; targets_trusted=1
+  while IFS= read -r target_ref || [ -n "$target_ref" ]; do
+    targets_seen=$((targets_seen + 1))
+    case "$target_ref" in
+      refs/heads/dev | refs/heads/main) targets_trusted=0 ;;
+      refs/?*) git check-ref-format "$target_ref" 2>/dev/null || targets_trusted=0 ;;
+      *) targets_trusted=0 ;;
+    esac
   done < "$TARGETS_FILE"
+  [ "$targets_seen" -gt 0 ] && [ "$targets_trusted" -eq 1 ] && INTEGRATION=0
 fi
 
 # The paths whose behaviour only the household mesh can witness (T2 in the ladder).
@@ -66,7 +75,7 @@ if [ -n "$serving_touched" ]; then
     [ "$receipt_rc" -eq 0 ] && exit 0
     owed=$(printf '%s\n' "$receipt_err" | sed -n 's/^\[pre-push\] missing household receipt — produce it: //p' | paste -sd ';' - | sed 's/;/; /g')
     [ -n "$owed" ] || owed="the serving receipt could not be read ($(printf '%s\n' "$receipt_err" | grep -m1 . | sed 's/^\[pre-push\] //'))"
-    echo "[pre-push] serving receipt owed before dev (this push does not reach dev or main, so it is not refused): $owed"
+    echo "[pre-push] serving receipt owed before dev (this push does not reach dev or main, so it is not refused): $owed; for $(printf '%s\n' "$serving_touched" | paste -sd ',' - | sed 's/,/, /g')"
     exit 0
   fi
   node "$REPO_ROOT/genesis/orchestrator/scripts/serving-receipt.mjs" "$REPO_ROOT" "$REPORTS_DIR" "$serving_list"
