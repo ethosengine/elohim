@@ -9,7 +9,7 @@
 //! whose canonical encoding they are. Appending is idempotent by event CID: a replay or duplicate
 //! announce appends nothing.
 
-use std::collections::HashSet;
+use std::collections::{BTreeMap, HashSet};
 use std::fs::{self, OpenOptions};
 use std::io::Write;
 use std::path::Path;
@@ -21,6 +21,7 @@ use elohim_epr_rea::{atom_cid, FlowEvent, FlowRecord, FlowStore, SidecarFlowStor
 use eprfs_core::{BlobCid, TreeEntry, TreeEntryKind, TreeLimits, TreePath, View};
 use iroh::endpoint::{Connection, VarInt};
 use iroh::{Endpoint, NodeAddr};
+use tokio::task::JoinSet;
 
 use crate::allow::{crossing_kind, via_device, CrossingAllowList, VIA_SLOT};
 use crate::channel::{CHANNEL_EVENTS, CHANNEL_NACKS};
@@ -43,6 +44,14 @@ pub const MAX_FOLD_EVENTS: usize = 1024;
 /// leaves about 468 ms per sequential relay round trip before a full batch reaches the deadline;
 /// a partial batch reached by the deadline is committed too.
 pub const FOLD_BATCH_EVENTS: usize = 64;
+
+/// Event reads kept in flight by default. This equals the server's
+/// [`crate::tier::MAX_CONCURRENT_STREAMS`] per connection.
+pub const FOLD_READ_WINDOW: usize = 8;
+
+/// How many times one event read is re-issued after a BUSY reset before the fold gives up on it
+/// with that error: a peer that sheds every stream must end the fold, not spin it.
+const MAX_BUSY_RETRIES_PER_EVENT: u32 = 3;
 
 /// The longest one event read may extend a fold that reached its shared deadline without keeping
 /// any event. Ten seconds is long enough for a healthy relay round trip under transient load, but
@@ -69,6 +78,8 @@ pub struct FoldLimits {
     pub max_event_bytes: usize,
     /// Event bytes read per fold ([`MAX_FOLD_BYTES`]); the event that crosses it is the last.
     pub max_fold_bytes: usize,
+    /// Event reads kept in flight ([`FOLD_READ_WINDOW`]); values below one act as one.
+    pub read_window: usize,
     /// Bound for the one progress-floor event read ([`FOLD_FLOOR_READ`]).
     pub floor_read: Duration,
     /// Event-read deadline override. Production leaves this `None` to share [`FoldPlan::deadline`];
@@ -93,6 +104,7 @@ impl Default for FoldLimits {
             max_events: MAX_FOLD_EVENTS,
             max_event_bytes: MAX_EVENT_BYTES,
             max_fold_bytes: MAX_FOLD_BYTES,
+            read_window: FOLD_READ_WINDOW,
             floor_read: FOLD_FLOOR_READ,
             read_deadline: None,
         }
@@ -126,7 +138,7 @@ pub struct Quarantined {
 }
 
 /// What [`fetch_channel`] read.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct Fetched {
     pub events: Vec<ChannelEvent>,
     /// False when the fold stopped short of every new event: past the event count, at an event
@@ -138,10 +150,71 @@ pub struct Fetched {
     pub over_budget: bool,
     /// Whether the fold stopped at its wall-clock deadline.
     pub deadline_reached: bool,
+    /// Event streams the peer shed with its exact BUSY reset and this fold re-issued.
+    pub shed: u64,
     /// Leaves skipped without stopping the rest of the fold.
     pub quarantined: Vec<Quarantined>,
     /// The peer's nack leaf for this device, from the root being folded.
     pub peer_nack: NackLeaf,
+}
+
+type EventRead = Result<TierAnswer, PeerError>;
+
+fn spawn_event_read(
+    reads: &mut JoinSet<(usize, EventRead)>,
+    connection: &Connection,
+    index: usize,
+    root: &BlobCid,
+    cid: &Cid,
+    tree: TreeLimits,
+    answer_cap: u32,
+) {
+    let connection = connection.clone();
+    let root = root.clone();
+    let cid = *cid;
+    reads.spawn(async move {
+        let path = TreePath::from_slash_bytes(CHANNEL_EVENTS.as_bytes())
+            .expect("the static events path is valid")
+            .join(cid.to_string().as_bytes());
+        let request = TierRequest::Read { root, path };
+        let answer = tier_request_capped(&connection, &request, &tree, answer_cap).await;
+        (index, answer)
+    });
+}
+
+fn joined_read(
+    joined: Result<(usize, EventRead), tokio::task::JoinError>,
+) -> Result<(usize, EventRead), PeerError> {
+    joined.map_err(|error| PeerError::TierStream(Box::new(error)))
+}
+
+fn drain_completed(
+    reads: &mut JoinSet<(usize, EventRead)>,
+    ready: &mut BTreeMap<usize, EventRead>,
+) -> Result<(), PeerError> {
+    while let Some(joined) = reads.try_join_next() {
+        let (index, answer) = joined_read(joined)?;
+        ready.insert(index, answer);
+    }
+    Ok(())
+}
+
+async fn next_ordered_answer(
+    reads: &mut JoinSet<(usize, EventRead)>,
+    ready: &mut BTreeMap<usize, EventRead>,
+    index: usize,
+) -> Result<Option<EventRead>, PeerError> {
+    if let Some(answer) = ready.remove(&index) {
+        return Ok(Some(answer));
+    }
+    while let Some(joined) = reads.join_next().await {
+        let (completed, answer) = joined_read(joined)?;
+        if completed == index {
+            return Ok(Some(answer));
+        }
+        ready.insert(completed, answer);
+    }
+    Ok(None)
 }
 
 /// What [`fold_events`] did.
@@ -260,53 +333,164 @@ async fn fetch_channel_for(
     let mut read_bytes = 0usize;
     let mut consumed = 0usize;
     let mut kept = 0u64;
-    'events: for (cid, leaf) in fresh {
+    let mut reads = JoinSet::new();
+    let mut ready = BTreeMap::new();
+    let mut next_issue = 0usize;
+    let mut next_consume = 0usize;
+    let mut read_window = limits.read_window.max(1);
+    let deadline = limits.read_deadline.or(progress.deadline);
+    let mut deadline_expired = false;
+    // (listing index, BUSY retries) of the event at the head; reset when the head moves on.
+    let mut head_busy = (usize::MAX, 0u32);
+    let event_result = 'events: loop {
+        if next_consume == fresh.len() {
+            break Ok(());
+        }
         if read_bytes >= limits.max_fold_bytes {
             fetched.over_budget = true;
             fetched.complete = false;
-            break;
+            break Ok(());
         }
-        let path = events_dir.join(cid.to_string().as_bytes());
-        let request = TierRequest::Read {
-            root: root.clone(),
-            path: path.clone(),
-        };
-        let read = || tier_request_capped(connection, &request, tree, answer_cap);
+        if let Err(error) = drain_completed(&mut reads, &mut ready) {
+            break Err(error);
+        }
+        if !deadline_expired {
+            // Past the deadline only the head may still be read (the progress floor): a window
+            // opened after the deadline would make how much one fold keeps depend on response
+            // timing. Reads issued before the deadline keep their in-order answers as above.
+            let window = if deadline.is_some_and(|deadline| deadline <= Instant::now()) {
+                1
+            } else {
+                read_window
+            };
+            while next_issue < fresh.len() && next_issue.saturating_sub(next_consume) < window {
+                spawn_event_read(
+                    &mut reads,
+                    connection,
+                    next_issue,
+                    root,
+                    &fresh[next_issue].0,
+                    *tree,
+                    answer_cap,
+                );
+                next_issue += 1;
+            }
+        }
+
         let mut floor_read = false;
         let no_pending_progress = kept == 0 && fetched.events.len() == consumed;
-        let answer = match limits.read_deadline.or(progress.deadline) {
-            Some(deadline) if no_pending_progress && deadline <= Instant::now() => {
-                floor_read = true;
-                match tokio::time::timeout(limits.floor_read, read()).await {
+        let answer = if let Some(answer) = ready.remove(&next_consume) {
+            answer
+        } else if deadline_expired {
+            // A completed answer behind an unfinished head is dropped: that is the price of
+            // keeping the partial fold independent of response timing.
+            fetched.complete = false;
+            fetched.deadline_reached = true;
+            break Ok(());
+        } else {
+            let next = next_ordered_answer(&mut reads, &mut ready, next_consume);
+            let awaited = match deadline {
+                Some(deadline) => match tokio::time::timeout_at(deadline.into(), next).await {
                     Ok(answer) => answer,
                     Err(_) => {
-                        fetched.complete = false;
-                        fetched.deadline_reached = true;
-                        break;
-                    }
-                }
-            }
-            Some(deadline) => match tokio::time::timeout_at(deadline.into(), read()).await {
-                Ok(answer) => answer,
-                Err(_) if no_pending_progress => {
-                    floor_read = true;
-                    match tokio::time::timeout(limits.floor_read, read()).await {
-                        Ok(answer) => answer,
-                        Err(_) => {
+                        deadline_expired = true;
+                        if let Err(error) = drain_completed(&mut reads, &mut ready) {
+                            break Err(error);
+                        }
+                        if let Some(answer) = ready.remove(&next_consume) {
+                            Ok(Some(answer))
+                        } else if no_pending_progress {
+                            floor_read = true;
+                            match tokio::time::timeout(
+                                limits.floor_read,
+                                next_ordered_answer(&mut reads, &mut ready, next_consume),
+                            )
+                            .await
+                            {
+                                Ok(answer) => answer,
+                                Err(_) => {
+                                    fetched.complete = false;
+                                    fetched.deadline_reached = true;
+                                    break Ok(());
+                                }
+                            }
+                        } else {
                             fetched.complete = false;
                             fetched.deadline_reached = true;
-                            break;
+                            break Ok(());
                         }
                     }
-                }
-                Err(_) => {
+                },
+                None => next.await,
+            };
+            match awaited {
+                Ok(Some(answer)) => answer,
+                Ok(None) => {
                     fetched.complete = false;
-                    fetched.deadline_reached = true;
-                    break;
+                    break Ok(());
                 }
-            },
-            None => read().await,
+                Err(error) => break Err(error),
+            }
         };
+
+        if answer.as_ref().is_err_and(crate::tier::is_busy) {
+            head_busy = if head_busy.0 == next_consume {
+                (next_consume, head_busy.1.saturating_add(1))
+            } else {
+                (next_consume, 1)
+            };
+            if head_busy.1 > MAX_BUSY_RETRIES_PER_EVENT {
+                if let Err(error) = answer {
+                    break Err(error);
+                }
+            }
+            fetched.shed = fetched.shed.saturating_add(1);
+            read_window = (read_window / 2).max(1);
+            if deadline_expired {
+                fetched.complete = false;
+                fetched.deadline_reached = true;
+                break Ok(());
+            }
+            while reads.len() >= read_window {
+                let joined = match deadline {
+                    Some(deadline) => {
+                        match tokio::time::timeout_at(deadline.into(), reads.join_next()).await {
+                            Ok(joined) => joined,
+                            Err(_) => {
+                                fetched.complete = false;
+                                fetched.deadline_reached = true;
+                                break 'events Ok(());
+                            }
+                        }
+                    }
+                    None => reads.join_next().await,
+                };
+                let Some(joined) = joined else {
+                    break;
+                };
+                match joined_read(joined) {
+                    Ok((index, answer)) => {
+                        ready.insert(index, answer);
+                    }
+                    Err(error) => break 'events Err(error),
+                }
+            }
+            spawn_event_read(
+                &mut reads,
+                connection,
+                next_consume,
+                root,
+                &fresh[next_consume].0,
+                *tree,
+                answer_cap,
+            );
+            continue;
+        }
+
+        let (cid, leaf) = &fresh[next_consume];
+        let cid = *cid;
+        let path = events_dir.join(cid.to_string().as_bytes());
+        next_consume += 1;
         let read = match answer {
             Ok(TierAnswer::Read(read)) if read.bytes.len() <= limits.max_event_bytes => read,
             Ok(TierAnswer::Read(_)) | Err(PeerError::TierFrameTooLarge { .. }) => {
@@ -320,18 +504,18 @@ async fn fetch_channel_for(
                 if floor_read {
                     fetched.complete = false;
                     fetched.deadline_reached = true;
-                    break 'events;
+                    break 'events Ok(());
                 }
                 continue;
             }
-            Ok(other) => return Err(unanswered(format!("event {cid}"), &other)),
-            Err(e) => return Err(e),
+            Ok(other) => break Err(unanswered(format!("event {cid}"), &other)),
+            Err(error) => break Err(error),
         };
-        if read.cid != leaf {
-            return Err(integrity(format!("event {cid} was served as {}", read.cid)));
+        if read.cid != *leaf {
+            break Err(integrity(format!("event {cid} was served as {}", read.cid)));
         }
         if BlobCid::compute_raw(&read.bytes) != read.cid {
-            return Err(integrity(format!("event {cid} bytes fail {}", read.cid)));
+            break Err(integrity(format!("event {cid} bytes fail {}", read.cid)));
         }
         read_bytes = read_bytes.saturating_add(read.bytes.len());
         match decode_event(&cid, &read.bytes) {
@@ -340,8 +524,13 @@ async fn fetch_channel_for(
                 if floor_read || fetched.events.len().saturating_sub(consumed) == FOLD_BATCH_EVENTS
                 {
                     if let Some(consume) = progress.consume_batch.as_mut() {
-                        kept = kept.saturating_add(consume(&fetched.events[consumed..])?);
-                        consumed = fetched.events.len();
+                        match consume(&fetched.events[consumed..]) {
+                            Ok(count) => {
+                                kept = kept.saturating_add(count);
+                                consumed = fetched.events.len();
+                            }
+                            Err(error) => break Err(error),
+                        }
                     }
                 }
             }
@@ -355,9 +544,11 @@ async fn fetch_channel_for(
         if floor_read {
             fetched.complete = false;
             fetched.deadline_reached = true;
-            break;
+            break Ok(());
         }
-    }
+    };
+    reads.abort_all();
+    event_result?;
     if consumed < fetched.events.len() {
         if let Some(consume) = progress.consume_batch.as_mut() {
             let _ = consume(&fetched.events[consumed..])?;
