@@ -440,6 +440,39 @@ impl Selection {
     }
 }
 
+/// One caller-supplied measurement routed through the sensing verb.
+///
+/// The fields are the existing native observation contract, collected so adding a second CLI
+/// adapter does not need another writer or a `too_many_arguments` suppression.
+pub struct ObservationRequest<'a> {
+    pub measure: &'a str,
+    pub subject: &'a str,
+    pub value: f64,
+    pub unit: Option<&'a str>,
+    pub env: &'a BTreeMap<String, String>,
+    pub reason: Option<&'a str>,
+    pub actor: &'a NoteActor,
+}
+
+pub fn observe(
+    root: &Path,
+    measures_path: &Path,
+    request: &ObservationRequest<'_>,
+) -> FlowResult<note::NoteOutcome> {
+    note::observe(
+        root,
+        "observation",
+        request.measure,
+        request.subject,
+        request.value,
+        request.unit,
+        request.env,
+        request.reason,
+        request.actor,
+        measures_path,
+    )
+}
+
 /// Run every selected probe and fold what each reports.
 pub fn sense(
     root: &Path,
@@ -896,6 +929,71 @@ fn run_probe(root: &Path, declared: &DeclaredProbe) -> Result<ProbeOutput, Strin
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn committed_fixture() -> tempfile::TempDir {
+        let target = std::env::var_os("CARGO_TARGET_DIR")
+            .map(std::path::PathBuf::from)
+            .expect("the eprfs test contract supplies CARGO_TARGET_DIR");
+        let dir = tempfile::tempdir_in(target).unwrap();
+        std::fs::create_dir_all(dir.path().join(".epr-meta")).unwrap();
+        std::fs::write(
+            dir.path().join(".epr-meta/repository.yaml"),
+            "version: 1\nagent: repo:fixture/sense\n",
+        )
+        .unwrap();
+        std::fs::write(dir.path().join("README.md"), "fixture\n").unwrap();
+        for args in [
+            vec!["init", "-q"],
+            vec!["add", "README.md", ".epr-meta/repository.yaml"],
+            vec!["commit", "-qm", "fixture"],
+        ] {
+            let result = crate::process::build_command("git", &args, dir.path(), &[])
+                .env("GIT_AUTHOR_NAME", "Fixture")
+                .env("GIT_COMMITTER_NAME", "Fixture")
+                .env("GIT_AUTHOR_EMAIL", "fixture@example.test")
+                .env("GIT_COMMITTER_EMAIL", "fixture@example.test")
+                .output()
+                .unwrap();
+            assert!(result.status.success());
+        }
+        dir
+    }
+
+    #[test]
+    fn direct_observation_uses_the_declared_native_writer() {
+        let dir = committed_fixture();
+        let measures = dir.path().join("measures.yaml");
+        std::fs::write(
+            &measures,
+            "measures-version: 1\nmeasures:\n  - id: gate-step-reading\n    version: 1\n    family: gate\n    unit: seconds\n    procedure: fixture\n    default-authority: observation\n    status: active\n    established_by: fixture\nlenses: []\n",
+        )
+        .unwrap();
+        let env = BTreeMap::from([
+            ("run_id".into(), "run-1".into()),
+            ("step".into(), "fixture".into()),
+            ("outcome".into(), "ran".into()),
+        ]);
+        let outcome = observe(
+            dir.path(),
+            &measures,
+            &ObservationRequest {
+                measure: "gate-step-reading@1",
+                subject: ".",
+                value: 4.5,
+                unit: None,
+                env: &env,
+                reason: None,
+                actor: &NoteActor::default(),
+            },
+        )
+        .unwrap();
+        assert!(outcome.appended);
+        let folds = read_folds(dir.path()).unwrap();
+        assert_eq!(folds.len(), 1);
+        assert_eq!(folds[0].measure.to_string(), "gate-step-reading@1");
+        assert_eq!(folds[0].value, 4.5);
+        assert_eq!(folds[0].env, env);
+    }
 
     #[test]
     fn a_ruling_reason_round_trips() {

@@ -8,9 +8,75 @@ import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { loadGateRegistry } from './pipeline-registry.mjs';
 import { discoverManifests, loadManifests } from './manifest-utils.mjs';
-import { costLineAndDefer, gateChildEnv, oracleMode, projectsForChanges, runProject, selectGateProjects, worktreeTargetDir } from './gate-runner.mjs';
+import {
+  costLineAndDefer,
+  emitGateReading,
+  gateChildEnv,
+  gateReadingArgs,
+  oracleMode,
+  projectsForChanges,
+  runProject,
+  selectGateProjects,
+  worktreeTargetDir,
+} from './gate-runner.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
+
+describe('gate step reading emitter', () => {
+  const base = {
+    runId: '20261124T120000Z-deadbeef-123abc',
+    step: 'fixture',
+    key: 'abc123',
+    keyChanged: 'no',
+    seconds: 4.25,
+    waitedSeconds: 1.5,
+    startedAt: '2026-11-24T12:00:00.000Z',
+    endedAt: '2026-11-24T12:00:06.000Z',
+  };
+
+  for (const [outcome, seconds] of [['ran', 4.25], ['reused', 0], ['skipped', 0]]) {
+    test(`builds the native ${outcome} observation row`, () => {
+      const args = gateReadingArgs({ ...base, outcome, seconds });
+      assert.deepEqual(args.slice(0, 7), [
+        'flow', 'sense', 'observation', '--measure', 'gate-step-reading@1', '--subject', '.',
+      ]);
+      assert.equal(args[args.indexOf('--value') + 1], String(seconds));
+      const env = args.filter((arg, index) => args[index - 1] === '--env');
+      assert.ok(env.includes(`run_id=${base.runId}`));
+      assert.ok(env.includes('step=fixture'));
+      assert.ok(env.includes('key=abc123'));
+      assert.ok(env.includes('key_changed=no'));
+      assert.ok(env.includes(`outcome=${outcome}`));
+      assert.ok(env.includes('waited_seconds=1.5'));
+      assert.ok(env.includes(`started_at=${base.startedAt}`));
+      assert.ok(env.includes(`ended_at=${base.endedAt}`));
+    });
+  }
+
+  test('a failed native emission is one warning and never throws', () => {
+    const warnings = [];
+    assert.doesNotThrow(() => emitGateReading({ ...base, outcome: 'ran' }, {
+      root: ROOT,
+      env: { EPR_BIN: 'fixture-epr' },
+      spawn: () => ({ status: 9 }),
+      warn: line => warnings.push(line),
+    }));
+    assert.deepEqual(warnings, ['[gate-reading] fixture: observation unavailable (exit 9)\n']);
+  });
+
+  test('GATE_READING=off is silent and spawns nothing', () => {
+    let spawned = false;
+    const warnings = [];
+    emitGateReading({ ...base, outcome: 'ran' }, {
+      root: ROOT,
+      env: { GATE_READING: 'off' },
+      spawn: () => { spawned = true; },
+      warn: line => warnings.push(line),
+    });
+    assert.equal(spawned, false);
+    assert.deepEqual(warnings, []);
+  });
+});
 
 // projectsForChanges re-walks the whole tree for build-manifest.json on every call (~1 s here,
 // dozens of calls). A selection that asks no oracle of the tree (path mode, or an injected rakia)
@@ -41,7 +107,7 @@ describe('gate expectations and feature-branch CI deferral', () => {
   };
   const expected = '[gate] fixture: expect ~11 min (p90 11 min, max 11 min; 10 runs) · failed locally 0 of last 10';
 
-  function fixture(t, { samples = rows, projects = [project] } = {}) {
+  function fixture(t, { samples = rows, projects = [project], eprStatus = 0 } = {}) {
     const root = mkdtempSync(resolve(tmpdir(), 'gate-cost-runner-'));
     t.after(() => rmSync(root, { recursive: true, force: true }));
     for (const p of projects) {
@@ -71,7 +137,7 @@ describe('gate expectations and feature-branch CI deferral', () => {
           write: text => { output += text; },
           spawn: (command, args) => {
             calls.push({ command, args });
-            return { status: command === 'fixture-epr' ? 0 : 7, stdout: '', stderr: '' };
+            return { status: command === 'fixture-epr' ? eprStatus : 7, stdout: '', stderr: '' };
           },
         });
         return { status, output, calls };
@@ -99,6 +165,19 @@ describe('gate expectations and feature-branch CI deferral', () => {
     assert.ok(result.calls[0].args.includes('project=fixture'));
     assert.ok(!result.calls[0].args.some(arg => /^(cpu_s|throttled_s|rss_peak_bytes|memory_high_events|io_full_pct_max)=/.test(arg)),
       'a deferred run has no measured cost');
+  });
+
+  test('a failed reading emission cannot change a skipped project status', t => {
+    const result = fixture(t, { eprStatus: 9 }).run(project, {
+      ...pushEnv,
+      GATE_READING_RUN_ID: 'fixture-run',
+    });
+    assert.equal(result.status, 0);
+    assert.equal(
+      result.calls.filter(call => call.command === 'fixture-epr'
+        && call.args.slice(0, 3).join(' ') === 'flow sense observation').length,
+      1,
+    );
   });
 
   for (const [name, gate, env, reason] of [
