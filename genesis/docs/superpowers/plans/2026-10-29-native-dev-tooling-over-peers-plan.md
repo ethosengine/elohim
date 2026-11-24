@@ -826,6 +826,64 @@ Measured by ethosengine on the landing head: of 16 selected and enrolled project
 
 Verify: a push that changes only a governance path reuses a sibling's green for each gate whose judge and recipe did not change, and the lander's log names each refusal's own cause.
 
+Eight stations from the change-detection reading of 2026-11-23. The steward asked that day for
+"the right designs" on change detection to be taken "to our plans and specs so we pickup those
+atomic wins to harvest more re-use over our artifacts". The design, its evidence and each
+station's full State are in
+`genesis/docs/superpowers/specs/2026-11-23-change-detection-one-reading-design.md` (section 6);
+the lines here make them claimable. No seconds are measured yet, so the order is by structure:
+the reading first, then the miss that left dev red, then repeated work, then soundness. A station
+marked integrity-class changes selection, a key or which work is skipped: its shadow may be built,
+and turning it on needs the steward's ruling and an adversarial review.
+
+- [ ] **CD-reading — every gate and pre-push leg writes one row per run (its key or the written reason it has none, whether the key changed since its last green, ran, reused or skipped, and its seconds), and a native report reads them** (serves push-gate-pays-once)
+
+State: not built. Selection, closure validity and cost are three instruments that do not read each other; nothing reports a step that ran with an unchanged key or a step with no key and no reason. It decides nothing.
+
+Verify: the report has been read for ten dev landings on shem and on ethosengine, and it names every step that ran with an unchanged key and every step with neither a key nor a reason.
+
+- [ ] **CD-read-selects — a file a gate declares it reads selects that gate** (serves push-gate-pays-once)
+
+State: not built; integrity-class. Landing `cecab9d08` changed `.claude/epr-meta/policies.yaml`; the eprfs gate's canon parity test declares that read and the read audit recognizes it, but the registry is in no selector and `.claude/` is filtered from selection, so eprfs was not selected and dev was red on that test until `e14abce95`.
+
+Verify: in shadow, replayed against the diff of `cecab9d08`, the line names eprfs among the gates the read-set would add.
+
+- [ ] **CD-rust-style-once — within one gate run the Rust style comparison for one baseline and one tree is computed once and read by every cargo gate** (serves push-gate-pays-once)
+
+State: not built; changes no key. The scoped style call runs for every cargo gate other than rust-style at `genesis/orchestrator/gate-runner.mjs:615-626`, before the reuse decision at about `:734` (read on dev `2081b2532`), so a gate whose verdict is reused still pays the scan. Keyed reuse of the gate itself is a separate, integrity-class shadow plan in the design.
+
+Verify: one landing's log shows one comparison per baseline and tree, and the same verdicts as a run with the dedupe off.
+
+- [ ] **CD-always-run — every leg that runs with no change test in front of it has a written reason, an owner and a retire-when, and a test fails for a leg with neither a key nor a reason** (serves push-gate-pays-once)
+
+State: not built. The census lists the pre-push legs with no changed-path selector and the CI stages with no condition; the pattern exists for gates as `gate_reuse.withheld` in `genesis/agentic/pool-policy.json`.
+
+Verify: the test fails on a fixture leg that has neither, and passes on dev with every such leg listed.
+
+- [ ] **CD-no-fingerprint — a gate that declares inputs and no steps gets a fingerprint over its declared inputs, so the gates withheld only for "no fingerprint" can be judged for reuse** (serves push-gate-pays-once)
+
+State: not built; `on` is integrity-class. Of 36 gates withheld from reuse, 17 name "no fingerprint" and 14 name nothing else (counted from the policy's reasons). Its first step is to sort those 14 by cause; the fingerprint applies only to those that share rust-style's.
+
+Verify: in shadow, each such gate prints a key that moves when a declared input is changed and holds when nothing it declares is.
+
+- [ ] **CD-ci-stage-selection — the orchestrator's Rust style stage and the other unconditional stages select on their whole comparison closure, and run when evidence is missing** (serves push-gate-pays-once)
+
+State: not built; `on` is integrity-class. `stage('Rust Style Gate')` at `genesis/orchestrator/Jenkinsfile:2746` has no condition. Selecting on `*.rs` alone is unsound: a Cargo, lint-configuration or governance-only change can require a paydown or weaken strictness.
+
+Verify: each orchestrator run's console prints a shadow line per stage saying whether it would have run, and for ten runs no stage it would have skipped differs in result from the run that was paid.
+
+- [ ] **CD-key-moves — for each enrolled gate a test mutates one declared input and one declared read and the key moves, and one reused verdict per dev landing is re-executed afterwards and compared** (serves push-gate-pays-once)
+
+State: not built. The industry research found no source for either as a named practice; they are this plan's own soundness checks. The sample is the reused verdict whose last real execution is oldest, run after the landing, so the landing does not wait on it.
+
+Verify: the mutation test fails for a gate whose key ignores a declared read; a re-execution that disagrees with its reused verdict is a red finding on that gate's key.
+
+- [ ] **CD-jenkins-shadow — beside a gate's real reuse decision the runner prints whether Jenkins holds a green for that exact closure, and admits nothing** (serves push-gate-pays-once)
+
+State: not built; adds no durable record. The Jenkins bridge emits unattested observations and its offer claims and settles nothing. Before anything decides, the steward would rule: which sponsored service agent may carry which gates under whose grant; whether a verified under-grant verdict may stand in for local computation while counting as zero independent witnesses; and the wording `carrier: Jenkins; basis: under-grant; independence: none`.
+
+Verify: on one landing the line prints for a closure Jenkins built in gate-only mode, and the landing's decisions are byte-identical with the shadow on and off.
+
 ## 9. Reconciliation 2026-11-21: the market reading
 
 The steward's picture, given on 2026-11-21: the integration pipeline should work like a market on
