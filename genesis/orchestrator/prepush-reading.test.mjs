@@ -32,6 +32,10 @@ function fixture(exit = 0) {
   const epr = join(dir, 'epr');
   writeFileSync(epr, `#!/usr/bin/env bash
 printf '%s\\n' "$@" >>"$CAPTURE"
+if [ "$2" = report ]; then
+  [ -z "\${REPORT_LINE:-}" ] || printf '%s\\n' "$REPORT_LINE"
+  exit "\${REPORT_EXIT:-0}"
+fi
 while [ "$#" -gt 0 ]; do
   if [ "$1" = --from ]; then cp "$2" "$ROWS_CAPTURE"; break; fi
   shift
@@ -74,7 +78,10 @@ gate_step_reading
   const argv = readFileSync(fx.capture, 'utf8').trim().split('\n');
   assert.deepEqual(argv.slice(0, 4), ['flow', 'reading', 'append', '--from']);
   assert.match(argv[4], /\/rows\.jsonl$/);
-  assert.deepEqual(argv.slice(5), ['--root', ROOT]);
+  assert.deepEqual(argv.slice(5, 7), ['--root', ROOT]);
+  assert.deepEqual(argv.slice(7), [
+    'flow', 'report', 'reading', '--crate-shadow', '--run', 'fixture-run', '--root', ROOT,
+  ]);
   const rows = readFileSync(fx.rows, 'utf8').trim().split('\n').map(line => JSON.parse(line));
   assert.equal(rows.length, 1);
   assert.equal(rows[0].key, 'none: reason says "quoted" and \\ escaped');
@@ -130,7 +137,7 @@ gate_step_reading
 
   assert.equal(result.status, 0, result.stderr);
   const argv = readFileSync(fx.capture, 'utf8').trim().split('\n');
-  assert.equal(argv.filter(arg => arg === 'flow').length, 1);
+  assert.equal(argv.filter(arg => arg === 'flow').length, 2);
   const rows = readFileSync(fx.rows, 'utf8').trim().split('\n').map(line => JSON.parse(line));
   const steps = rows.map(row => row.step);
   const outcomes = rows.map(row => row.outcome);
@@ -206,4 +213,39 @@ gate_step_reading
     '[gate-reading] pre-push readings dropped (exit 3: reading append dropped 2 row(s): the device-local reading lock stayed busy)\n',
   );
   assert.equal(readFileSync(fx.capture, 'utf8').trim().split('\n').filter(arg => arg === 'append').length, 1);
+});
+
+test('the EXIT finalizer prints the crate shadow once after append and preserves the hook exit', () => {
+  const fx = fixture();
+  const line = '[crate-shadow] eprfs:test: 2 of 3 crates unchanged; decides nothing';
+  const result = run(fx, `
+GATE_READING_SEEN=""
+GATE_READING_LEGS=$'fixture\\tnone\\treason'
+trap 'gate_step_reading' EXIT
+gate_step_reading 0 fixture ran 1 \
+  2026-11-24T12:00:00.000Z 2026-11-24T12:00:01.000Z
+exit 37
+`, { REPORT_LINE: line });
+
+  assert.equal(result.status, 37);
+  assert.equal(result.stdout, `${line}\n`);
+  const argv = readFileSync(fx.capture, 'utf8').trim().split('\n');
+  assert.equal(argv.filter(arg => arg === 'append').length, 1);
+  assert.equal(argv.filter(arg => arg === '--crate-shadow').length, 1);
+});
+
+test('a failed crate shadow report is silent and preserves the hook exit', () => {
+  const fx = fixture();
+  const result = run(fx, `
+GATE_READING_SEEN=""
+GATE_READING_LEGS=$'fixture\\tnone\\treason'
+trap 'gate_step_reading' EXIT
+gate_step_reading 0 fixture ran 1 \
+  2026-11-24T12:00:00.000Z 2026-11-24T12:00:01.000Z
+exit 41
+`, { REPORT_LINE: 'must not print', REPORT_EXIT: '9' });
+
+  assert.equal(result.status, 41);
+  assert.equal(result.stdout, '');
+  assert.equal(result.stderr, '');
 });

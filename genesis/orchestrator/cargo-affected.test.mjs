@@ -5,7 +5,7 @@ import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
-import { affectedPackages, loadMetadata } from './cargo-affected.mjs';
+import { affectedPackages, loadMetadata, metadataToolchain } from './cargo-affected.mjs';
 import { runProject } from './gate-runner.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
@@ -131,6 +131,7 @@ describe('metadata discovery without building', () => {
       return { status: 0, stdout: command === 'rustc' ? 'rustc 1.96.1\nhost: x86_64-unknown-linux-gnu\n' : JSON.stringify(metadata) };
     } });
     assert.deepEqual(result, metadata);
+    assert.equal(metadataToolchain(result), 'rustc 1.96.1\nhost: x86_64-unknown-linux-gnu\n');
     assert.deepEqual(calls, [
       { command: 'rustc', args: ['-vV'] },
       { command: 'cargo', args: ['metadata', '--format-version', '1', '--locked', '--filter-platform',

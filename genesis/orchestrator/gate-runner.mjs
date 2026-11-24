@@ -5,7 +5,8 @@
 import { appendFileSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { spawnSync } from 'child_process';
-import { resolve, dirname, basename, join } from 'path';
+import { createHash } from 'crypto';
+import { resolve, dirname, basename, join, relative } from 'path';
 import { fileURLToPath } from 'url';
 import { loadManifests } from './manifest-utils.mjs';
 import { loadGateRegistry } from './pipeline-registry.mjs';
@@ -18,15 +19,16 @@ import { filterChanged } from './ci-ignore.mjs';
 import { COST_FIELDS, classifyFailure, recordCycle, subjectFor } from './gate-cycle.mjs';
 import { CI_BRANCH_PATTERN, costOf, deferDecision, formatExpectation, readCycleUnion } from './gate-cost.mjs';
 import {
-  ageOf, attestedOutputParses, emitGateVerdict, findEvidence, gateEvidence, isHabitAtom, recordEvidence, resolveBin, reusableHit,
+  ageOf, attestedOutputParses, emitGateVerdict, findEvidence, gateEvidence, isHabitAtom, patternDigest, recordEvidence, resolveBin, reusableHit,
   selfAgentId, siblingGovernanceChange, siblingVerdicts, stepFingerprints,
 } from './gate-evidence.mjs';
 import { britAffected, resolveBritBin } from './gate-oracle.mjs';
 import { landerWait } from './gate-carry-claim.mjs';
 import { recipeKeyShadow } from './gate-recipe-key.mjs';
 import { CLAIMED_EXIT_CODE, runAttested } from './gate-attest.mjs';
-import { affectedPackages, loadMetadata } from './cargo-affected.mjs';
-import { SUITE_READ_LISTS, readSet } from './gate-input-audit.mjs';
+import { affectedPackages, loadMetadata, metadataToolchain } from './cargo-affected.mjs';
+import { isReadPattern, SUITE_READ_LISTS, readSet } from './gate-input-audit.mjs';
+import { crateKeys } from './crate-keys.mjs';
 import { appendEvent, closeRun, formatHarvest, harvest, openRun, outlook, resolveSession, stopRequested } from './gate-live.mjs';
 import { emitLive, formatRow, onRedPolicy, runPreflight } from './gate-preflight.mjs';
 import { prepareTask, readTaskStatus, taskAnswer, taskEnabled } from './gate-task.mjs';
@@ -586,22 +588,49 @@ export function parseStepTimes(text) {
   return steps;
 }
 
-/** One gate-step reading per recorded step of a project's recipe, named `<project>:<step>`. */
-export function emitStepReadings(project, reading, text, { env = process.env, collector } = {}) {
+/** One gate-step reading per recorded step, plus apportioned per-crate shadow rows when present. */
+export function emitStepReadings(project, reading, text, {
+  env = process.env, collector, crateContext = null,
+} = {}) {
   for (const step of parseStepTimes(text)) {
+    const parent = `${project}:${step.name}`;
+    const seconds = step.ended - step.started;
     emitGateReading({
       ...reading,
-      step: `${project}:${step.name}`,
+      step: parent,
       parent: project,
       outcome: 'ran',
       status: step.exit === 0 ? 'green' : 'red',
       synthesized: false,
       waitedSeconds: 0,
       leaseWaitedSeconds: 0,
-      seconds: step.ended - step.started,
+      seconds,
       startedAt: new Date(step.started * 1000),
       endedAt: new Date(step.ended * 1000),
     }, { env, collector });
+    if (!crateContext) continue;
+    try {
+      const keys = crateKeys({ ...crateContext, step: parent });
+      const crates = Object.entries(keys);
+      if (crates.length === 0) continue;
+      for (const [crate, key] of crates) {
+        emitGateReading({
+          ...reading,
+          step: `${parent}:${crate}`,
+          parent,
+          key,
+          keyChanged: 'unknown',
+          outcome: 'ran',
+          status: step.exit === 0 ? 'green' : 'red',
+          synthesized: false,
+          waitedSeconds: 0,
+          leaseWaitedSeconds: 0,
+          seconds: seconds / crates.length,
+          startedAt: new Date(step.started * 1000),
+          endedAt: new Date(step.ended * 1000),
+        }, { env, collector });
+      }
+    } catch { /* per-crate shadow telemetry never changes a gate verdict */ }
   }
 }
 
@@ -609,6 +638,7 @@ export function emitStepReadings(project, reading, text, { env = process.env, co
 export function appendGateReadings(rows, {
   root = ROOT, env = process.env, spawn = spawnSync,
   warn = text => process.stderr.write(text),
+  write = text => process.stdout.write(text),
   makeScratch = prefix => mkdtempSync(prefix),
   writeRows = (path, bytes) => writeFileSync(path, bytes, { mode: 0o600 }),
   removeScratch = path => rmSync(path, { recursive: true, force: true }),
@@ -627,6 +657,15 @@ export function appendGateReadings(rows, {
       const reason = oneLine(String(result?.stderr || '').split('\n')[0] || '');
       const why = result?.error?.message || `exit ${result?.status ?? 'unknown'}${reason ? `: ${reason}` : ''}`;
       warn(`[gate-reading] run readings dropped (${oneLine(why)})\n`);
+    } else {
+      const runId = oneLine(rows.at(-1)?.run_id);
+      if (runId) {
+        const report = spawn(env.TIMEOUT_BIN || 'timeout',
+          ['-k', '1', '5', env.EPR_BIN || 'epr', 'flow', 'report', 'reading', '--crate-shadow', '--run', runId, '--root', root], {
+            cwd: root, stdio: ['ignore', 'pipe', 'ignore'], encoding: 'utf8',
+          });
+        if (report?.status === 0 && report.stdout) write(String(report.stdout));
+      }
     }
   } catch (error) {
     warn(`[gate-reading] run readings dropped (${oneLine(error?.message || error)})\n`);
@@ -636,6 +675,61 @@ export function appendGateReadings(rows, {
       catch { /* cleanup is telemetry too and cannot change the runner verdict */ }
     }
   }
+}
+
+function crateKeyContext({ root, project, cargo, metadata, commit, childEnv, readsOf, spawn }) {
+  if (!metadata || !metadataToolchain(metadata)) return null;
+  // The keys read the gated commit's trees; the recipe ran on this checkout. They describe what ran
+  // only when the checkout is that commit and the crates' trees are clean: otherwise a green would
+  // be recorded under a key for code that never ran, so no crate row is written at all.
+  const head = spawn('git', ['rev-parse', '--verify', '--quiet', 'HEAD^{commit}'], { cwd: root, encoding: 'utf8' });
+  if (head?.status !== 0 || String(head.stdout || '').trim() !== commit) return null;
+  const repoPath = path => relative(root, resolve(path)).split('\\').join('/') || '.';
+  const memberIds = new Set(metadata.workspace_members || []);
+  const members = (metadata.packages || [])
+    .filter(pkg => memberIds.has(pkg.id))
+    .map(pkg => repoPath(dirname(pkg.manifest_path)));
+  if (members.length !== memberIds.size) return null;
+  const workspaceDir = (cargo.workspace || project.dir).replace(/\/$/, '');
+  const status = spawn('git', ['status', '--porcelain', '--untracked-files=all', '--', workspaceDir, ...members], {
+    cwd: root, encoding: 'utf8',
+  });
+  if (status?.status !== 0 || String(status.stdout || '').trim()) return null;
+  const objectAt = path => {
+    const result = spawn('git', ['rev-parse', '--verify', '--quiet', `${commit}:${path}`], {
+      cwd: root, encoding: 'utf8',
+    });
+    return result?.status === 0 ? String(result.stdout || '').trim() || null : null;
+  };
+  const workspace = cargo.workspace || project.dir;
+  const lockPath = `${workspace.replace(/\/$/, '')}/Cargo.lock`;
+  const lock = spawn('git', ['show', `${commit}:${lockPath}`], { cwd: root, encoding: 'utf8' });
+  if (lock?.status !== 0) return null;
+  const lockDigest = createHash('sha256').update(String(lock.stdout || '')).digest('hex');
+  const readPaths = new Set();
+  for (const member of members) {
+    const reads = readsOf
+      ? readsOf(member)
+      : readSet({ root, project, sources: [`${member}/**`] }).paths;
+    for (const path of reads || []) {
+      const normalized = String(path).replace(/^\.\//, '').replace(/\\/g, '/');
+      if (!members.some(dir => normalized === dir || normalized.startsWith(`${dir}/`))) readPaths.add(normalized);
+    }
+  }
+  const outside = [...readPaths].sort().map(path => ({
+    path,
+    oid: isReadPattern(path) ? patternDigest(root, commit, path, spawn) : objectAt(path),
+  }));
+  const outsideReadsDigest = createHash('sha256').update(JSON.stringify(outside)).digest('hex');
+  const rustflags = Object.hasOwn(cargo, 'rustflags') ? cargo.rustflags : (childEnv.RUSTFLAGS ?? null);
+  return {
+    metadata,
+    treeOf: dir => objectAt(repoPath(dir)),
+    toolchain: metadataToolchain(metadata),
+    lockDigest,
+    outsideReadsDigest,
+    cargoEnv: { ...cargoEnvOf(childEnv), RUSTFLAGS: rustflags },
+  };
 }
 
 function keyReading(evidence) {
@@ -810,7 +904,9 @@ export function runProject(project, printOnly, namesOnly, {
   // A selection belongs to this project and this push, never to the caller's environment.
   delete childEnv.GATE_CARGO_PACKAGES;
   const narrowProjects = loadPoolPolicy(root).gate_narrow?.projects;
-  if (Array.isArray(narrowProjects) && narrowProjects.includes(project.name)) {
+  const crateShadowEligible = Array.isArray(narrowProjects) && narrowProjects.includes(project.name);
+  let narrowMetadata = null;
+  if (crateShadowEligible) {
     const mode = ['off', 'shadow', 'on'].includes(env.GATE_NARROW) ? env.GATE_NARROW : 'shadow';
     // `on` is refused until gate evidence keys a per-package verdict: the evidence store keys the
     // whole project closure, so a narrowed run's green would be recorded as the verdict of every
@@ -821,23 +917,26 @@ export function runProject(project, printOnly, namesOnly, {
       return 2;
     }
     let selection = { packages: null, why: 'no push base' };
-    let metadata = null;
     let files = null;
     if (env.GATE_NARROW_BASE === 'ok' && env.GATE_CHANGED_FILES) {
       try { files = readFileSync(env.GATE_CHANGED_FILES, 'utf8').split('\n').filter(Boolean); }
       catch { /* An unreadable push range must keep the full workspace. */ }
     }
-    if (files && mode === 'off') selection.why = 'narrowing disabled';
-    else if (files) {
+    const workspaceDir = cargo.workspace || project.dir;
+    if ((files && mode !== 'off') || env.GATE_READING !== 'off') {
       try {
-        const workspaceDir = cargo.workspace || project.dir;
         const metadataEnv = { ...childEnv, ...cargoEnvOf(childEnv), RUSTC_WRAPPER: '' };
         delete metadataEnv.CARGO_TARGET_DIR;
         if (Object.hasOwn(cargo, 'rustflags')) metadataEnv.RUSTFLAGS = cargo.rustflags;
-        metadata = loadMetadata({ root, workspaceDir,
+        narrowMetadata = loadMetadata({ root, workspaceDir,
           spawn: (command, argv, options) => spawn(command, argv, { ...options, env: metadataEnv }),
         });
-        selection = affectedPackages({ root, workspaceDir, files, metadata,
+      } catch { /* A telemetry discovery miss keeps the full workspace and emits no crate rows. */ }
+    }
+    if (files && mode === 'off') selection.why = 'narrowing disabled';
+    else if (files) {
+      try {
+        selection = affectedPackages({ root, workspaceDir, files, metadata: narrowMetadata,
           readsOf: readsOf || (dir => readSet({ root, sources: [`${dir}/**`] }).paths),
         });
       } catch (error) {
@@ -847,7 +946,7 @@ export function runProject(project, printOnly, namesOnly, {
     const { packages, why } = selection;
     write(`[gate] ${project.name} narrow (${mode}): ${packages === null
       ? `full workspace — ${why}`
-      : `${packages.join(' ')} (${packages.length} of ${metadata.workspace_members.length} members)`}\n`);
+      : `${packages.join(' ')} (${packages.length} of ${narrowMetadata.workspace_members.length} members)`}\n`);
   }
   // Evidence by input closure (gate-evidence.mjs): has THIS closure — the step's declared
   // input bytes at the pushed commit, the recipe, the resolved cargo env — already been
@@ -1069,7 +1168,17 @@ export function runProject(project, printOnly, namesOnly, {
     liveEvent(env, { kind: 'gate-verdict', project: project.name, verdict: { exit: 0, seconds: 0, reused: true }, derivation, status: 'Answered' });
     return complete(0, 'reused');
   }
-  emitStepReadings(project.name, reading, stepTimes, { env, collector: readingCollector });
+  const crateShadowStarted = clock();
+  let crateContext = null;
+  if (crateShadowEligible && env.GATE_READING !== 'off' && stepTimes.trim()) {
+    try {
+      crateContext = crateKeyContext({
+        root, project, cargo, metadata: narrowMetadata, commit: gateCommit, childEnv, readsOf, spawn,
+      });
+    } catch { /* per-crate shadow telemetry never changes a gate verdict */ }
+  }
+  emitStepReadings(project.name, reading, stepTimes, { env, collector: readingCollector, crateContext });
+  started += clock() - crateShadowStarted;
   // The exit status is the verdict; what the tap recognized only classifies it. For a suite's named
   // half the verdict comes from the attempt's written result, never the status alone (suiteDecision).
   const outcome = suiteNamed
