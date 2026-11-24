@@ -39,6 +39,21 @@ fn git(root: &Path, args: &[&str]) {
     assert!(out.status.success(), "git {args:?} failed");
 }
 
+fn git_stdout(root: &Path, args: &[&str]) -> String {
+    let out = elohim_epr_cli::process::build_command("git", args, root, &[])
+        .output()
+        .expect("git runs");
+    assert!(
+        out.status.success(),
+        "git {args:?} failed: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    String::from_utf8(out.stdout)
+        .expect("git stdout is UTF-8")
+        .trim()
+        .to_string()
+}
+
 fn checkout() -> TempDir {
     let dir = TempDir::new().unwrap();
     std::fs::create_dir_all(dir.path().join(".epr-meta")).unwrap();
@@ -1721,7 +1736,7 @@ fn misses_record(intent: &str, closure: &str, dseq: &str, via: &str) -> FlowEven
             ("p90", "eprfs=42"),
             ("ref", "refs/heads/self/f4-ask"),
             ("tree", LANDING_TREE),
-            ("wait_until", "1893456000"),
+            ("wait_until", "4102444800"),
         ],
         Some(via),
     )
@@ -1859,7 +1874,7 @@ fn peer_intents_lists_a_crossed_miss_until_a_crossed_verdict_settles_it() {
             ("p90", "eprfs=42"),
             ("ref", "refs/heads/self/f4-ask"),
             ("tree", LANDING_TREE),
-            ("wait_until", "1792769999"),
+            ("wait_until", "4102444800"),
         ],
         None,
     );
@@ -1912,6 +1927,55 @@ fn peer_intents_lists_a_crossed_miss_until_a_crossed_verdict_settles_it() {
     assert_eq!(
         intents_misses_json(&b, b.checkout.path(), &policy),
         serde_json::json!([])
+    );
+}
+
+#[test]
+fn peer_intents_does_not_offer_a_miss_whose_commit_landed_on_origin_dev() {
+    let (keys, _a, b) = household();
+    let policy = steward_policy(keys.path());
+    let commit = git_stdout(b.checkout.path(), &["rev-parse", "HEAD"]);
+    git(
+        b.checkout.path(),
+        &["update-ref", "refs/remotes/origin/dev", &commit],
+    );
+    let intent = atom_cid(&"landed-miss-intent".to_string()).unwrap();
+    append(
+        b.checkout.path(),
+        [landing_record(
+            "misses",
+            &intent.to_string(),
+            LANDING_CHANGE,
+            &[
+                ("at", "1792769289.123"),
+                ("base", LANDING_BASE),
+                ("change", LANDING_CHANGE),
+                ("commit", &commit),
+                ("dseq", "7"),
+                ("miss", "eprfs=abcdef"),
+                ("p90", "eprfs=42"),
+                ("ref", "refs/heads/dev"),
+                ("tree", &commit),
+                ("wait_until", "4102444800"),
+            ],
+            None,
+        )],
+    );
+
+    let view = intents_json(&b, b.checkout.path(), &policy, false);
+
+    assert_eq!(view["misses"], serde_json::json!([]), "{view}");
+    assert_eq!(view["settledMisses"].as_array().unwrap().len(), 1, "{view}");
+    assert_eq!(view["settledMisses"][0]["by"], "landing", "{view}");
+    assert_eq!(view["settledMisses"][0]["miss"]["commit"], commit, "{view}");
+    assert_eq!(
+        intents_misses_json(&b, b.checkout.path(), &policy),
+        serde_json::json!([])
+    );
+    let text = intents_misses_text(&b, b.checkout.path(), &policy);
+    assert!(
+        text.contains("1 settled by landing on origin/dev, 0 past their wait-until (not offered)"),
+        "{text}"
     );
 }
 
