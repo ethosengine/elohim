@@ -1996,7 +1996,7 @@ pub fn decide_shadow(
         .max()
         .unwrap_or(last.seq)
         + 1;
-    let presence = fold.presence.clone();
+    let presence = &last.presence;
     let event = json!({
         "schemaVersion": 1,
         "kind": "would-have",
