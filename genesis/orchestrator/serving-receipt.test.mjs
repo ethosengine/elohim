@@ -231,6 +231,9 @@ test("actual pre-push caller propagates mandatory refusal in default and strict 
           [
             "-c",
             "leg_red() { exit 1; }\n" +
+              // The reading recorder passes its first argument (the leg's status) through; the
+              // block is run outside the hook, so it is stood in for here.
+              'gate_step_reading() { return "$1"; }\n' +
               'PUSH_LINES=("refs/heads/x aaaa refs/heads/self/ethosengine-x bbbb" "(delete) 0000000000000000000000000000000000000000 refs/heads/dev cccc" "refs/notes/n dddd refs/notes/n eeee")\n' +
               `${block}printf caller-continued`,
           ],
