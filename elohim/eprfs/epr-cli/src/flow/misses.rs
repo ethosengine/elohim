@@ -1,4 +1,8 @@
-//! Read open landing-gate misses from local and admitted crossing flow records.
+//! Read open landing-gate misses from local and admitted crossing flow records, then decide which
+//! ones are still offerable. Settling by landing requires the miss commit and its fetched
+//! `refs/remotes/origin/*` integration ref to exist in the local Git repository. A device that has
+//! not fetched the ref, does not have the commit, or cannot run the Git probe keeps offering the
+//! miss until that ancestry can be established (or its wait expires).
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -25,6 +29,28 @@ pub struct OpenMiss {
     pub p90_s: Option<u64>,
     pub wait_until: Option<u64>,
     pub at: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum Landing {
+    Landed,
+    NotLanded,
+    Unknown,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SettledMiss {
+    pub miss: OpenMiss,
+    pub by: SettledBy,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum SettledBy {
+    Landing,
+    WaitUntil,
 }
 
 type MissKey = (Option<String>, String, String, String);
@@ -122,6 +148,42 @@ pub fn open_misses(
             && !changed_intents.contains(&(announcer.clone(), intent.clone()))
     });
     misses.into_values().collect()
+}
+
+/// Partition open misses into offers and settlements visible only to this read.
+///
+/// `landed` must establish ancestry from repository-local Git state. In normal use that means
+/// `git merge-base --is-ancestor <commit> refs/remotes/origin/<branch>` after the device has
+/// fetched. [`Landing::Unknown`] deliberately leaves the miss offered: an absent fetched ref, an
+/// unknown commit, or a Git failure is uncertainty rather than evidence that the miss landed.
+/// A stale fetch can likewise leave an already-landed miss offered until the device fetches again.
+/// Landing takes precedence when both landing and `wait_until` settle a miss.
+pub fn offerable_misses(
+    misses: Vec<OpenMiss>,
+    landed: &dyn Fn(&OpenMiss) -> Landing,
+    now_s: u64,
+) -> (Vec<OpenMiss>, Vec<SettledMiss>) {
+    let mut offered = Vec::new();
+    let mut settled = Vec::new();
+    for miss in misses {
+        let by = match landed(&miss) {
+            Landing::Landed => Some(SettledBy::Landing),
+            Landing::NotLanded | Landing::Unknown
+                if miss
+                    .wait_until
+                    .is_some_and(|wait_until| now_s >= wait_until) =>
+            {
+                Some(SettledBy::WaitUntil)
+            }
+            Landing::NotLanded | Landing::Unknown => None,
+        };
+        if let Some(by) = by {
+            settled.push(SettledMiss { miss, by });
+        } else {
+            offered.push(miss);
+        }
+    }
+    (offered, settled)
 }
 
 /// Whether the miss `(intent, project, closure)` is settled, by exactly the rule `open_misses`
@@ -338,6 +400,69 @@ mod tests {
 
     fn admitted(_: &str) -> bool {
         true
+    }
+
+    fn open_miss(wait_until: Option<u64>) -> OpenMiss {
+        OpenMiss {
+            intent: "intent".to_string(),
+            event: "event".to_string(),
+            announcer: None,
+            change: CHANGE.to_string(),
+            commit: COMMIT.to_string(),
+            git_ref: GIT_REF.to_string(),
+            project: "eprfs".to_string(),
+            closure: "abcdef".to_string(),
+            p90_s: None,
+            wait_until,
+            at: None,
+        }
+    }
+
+    #[test]
+    fn offer_filter_settles_a_landed_miss_by_landing() {
+        let (offered, settled) = offerable_misses(vec![open_miss(None)], &|_| Landing::Landed, 10);
+
+        assert!(offered.is_empty());
+        assert_eq!(settled.len(), 1);
+        assert_eq!(settled[0].by, SettledBy::Landing);
+    }
+
+    #[test]
+    fn offer_filter_settles_a_past_wait_until() {
+        let (offered, settled) =
+            offerable_misses(vec![open_miss(Some(10))], &|_| Landing::NotLanded, 10);
+
+        assert!(offered.is_empty());
+        assert_eq!(settled.len(), 1);
+        assert_eq!(settled[0].by, SettledBy::WaitUntil);
+    }
+
+    #[test]
+    fn offer_filter_prefers_landing_when_wait_until_also_passed() {
+        let (offered, settled) =
+            offerable_misses(vec![open_miss(Some(10))], &|_| Landing::Landed, 10);
+
+        assert!(offered.is_empty());
+        assert_eq!(settled.len(), 1);
+        assert_eq!(settled[0].by, SettledBy::Landing);
+    }
+
+    #[test]
+    fn offer_filter_keeps_unknown_landing_with_future_wait_offerable() {
+        let miss = open_miss(Some(11));
+        let (offered, settled) = offerable_misses(vec![miss.clone()], &|_| Landing::Unknown, 10);
+
+        assert_eq!(offered, vec![miss]);
+        assert!(settled.is_empty());
+    }
+
+    #[test]
+    fn offer_filter_keeps_not_landed_miss_without_wait_offerable() {
+        let miss = open_miss(None);
+        let (offered, settled) = offerable_misses(vec![miss.clone()], &|_| Landing::NotLanded, 10);
+
+        assert_eq!(offered, vec![miss]);
+        assert!(settled.is_empty());
     }
 
     #[test]

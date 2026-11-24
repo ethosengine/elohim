@@ -21,6 +21,8 @@
 //! The iroh key lives at `$XDG_CONFIG_HOME/epr/peer/iroh.key` (mode 0600). Neither it nor the
 //! device key is ever printed, logged or copied: the device key is reached only as a signer.
 
+use std::cell::RefCell;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 use std::net::SocketAddrV4;
 use std::path::{Path, PathBuf};
@@ -47,7 +49,9 @@ use crate::flow::carry::{live_carries, LiveCarry};
 use crate::flow::intend::{
     own_state, parse_joined_closures, unix_slot_ms, INTENT_TAG, KINDS, LANDING_MEASURE,
 };
-use crate::flow::misses::{open_misses, OpenMiss};
+use crate::flow::misses::{
+    offerable_misses, open_misses, Landing, OpenMiss, SettledBy, SettledMiss,
+};
 use crate::flow::via_device;
 
 /// Where the crossing allow-list is read from, under the checkout.
@@ -2222,6 +2226,9 @@ struct LandingIntentOutput {
     store: Option<String>,
     intents: Vec<LandingIntent>,
     misses: Vec<OpenMissOutput>,
+    settled_misses: Vec<SettledMiss>,
+    #[serde(skip)]
+    landing_not_checked: Vec<String>,
     advisory: Vec<Advisory>,
     error: Option<String>,
     now: u64,
@@ -2294,6 +2301,8 @@ fn intents(options: &Options) -> PeerResult<ExitCode> {
                     store: None,
                     intents: Vec::new(),
                     misses: Vec::new(),
+                    settled_misses: Vec::new(),
+                    landing_not_checked: Vec::new(),
                     advisory: Vec::new(),
                     error,
                     now,
@@ -2330,13 +2339,36 @@ fn intents(options: &Options) -> PeerResult<ExitCode> {
             .is_some_and(|allowed| allowed.admits_device(writer))
     };
     let carries = live_carries(&records, &admits, me.as_deref(), now / 1000);
-    let misses = open_misses(&records, &admits, me.as_deref())
+    let landing_cache = RefCell::new(BTreeMap::<(String, String), Landing>::new());
+    let missing_remote_refs = RefCell::new(BTreeSet::<String>::new());
+    let landing = |miss: &OpenMiss| {
+        let Some(remote_ref) = remote_integration_ref(&miss.git_ref) else {
+            return Landing::Unknown;
+        };
+        let key = (miss.commit.clone(), remote_ref.clone());
+        if let Some(cached) = landing_cache.borrow().get(&key).copied() {
+            return cached;
+        }
+        let status = git_landing_status(&root, &miss.commit, &remote_ref);
+        if status == Landing::Unknown && git_ref_is_absent(&root, &remote_ref) {
+            missing_remote_refs.borrow_mut().insert(remote_ref);
+        }
+        landing_cache.borrow_mut().insert(key, status);
+        status
+    };
+    let (misses, settled_misses) = offerable_misses(
+        open_misses(&records, &admits, me.as_deref()),
+        &landing,
+        now / 1000,
+    );
+    let misses = misses
         .into_iter()
         .map(|miss| OpenMissOutput {
             carried_by: carried_by(&miss, &carries, me.as_deref()),
             miss,
         })
         .collect();
+    let landing_not_checked = missing_remote_refs.into_inner().into_iter().collect();
     let mut rows: std::collections::BTreeMap<(String, String), LandingIntent> =
         std::collections::BTreeMap::new();
     for (index, (cid, record)) in records.iter().enumerate() {
@@ -2479,6 +2511,8 @@ fn intents(options: &Options) -> PeerResult<ExitCode> {
             ),
             intents,
             misses,
+            settled_misses,
+            landing_not_checked,
             advisory,
             error: None,
             now,
@@ -2678,6 +2712,36 @@ fn render_intents(options: &Options, output: LandingIntentOutput) -> PeerResult<
         return Ok(ExitCode::SUCCESS);
     }
     if options.misses {
+        for reference in &output.landing_not_checked {
+            println!("landing not checked: {reference} not fetched on this device");
+        }
+        if !output.settled_misses.is_empty() {
+            let landing_count = output
+                .settled_misses
+                .iter()
+                .filter(|settled| settled.by == SettledBy::Landing)
+                .count();
+            let wait_count = output.settled_misses.len() - landing_count;
+            let landed_on: BTreeSet<_> = output
+                .settled_misses
+                .iter()
+                .filter(|settled| settled.by == SettledBy::Landing)
+                .filter_map(|settled| remote_integration_ref(&settled.miss.git_ref))
+                .filter_map(|reference| reference.strip_prefix("refs/remotes/").map(str::to_string))
+                .collect();
+            let landing_target = if landed_on.is_empty() {
+                String::new()
+            } else {
+                format!(
+                    " on {}",
+                    landed_on.into_iter().collect::<Vec<_>>().join(", ")
+                )
+            };
+            println!(
+                "{landing_count} settled by landing{landing_target}, {wait_count} past their \
+                 wait-until (not offered)"
+            );
+        }
         if output.misses.is_empty() {
             println!("no open miss");
         } else {
@@ -2740,6 +2804,39 @@ fn render_intents(options: &Options, output: LandingIntentOutput) -> PeerResult<
         }
     }
     Ok(ExitCode::SUCCESS)
+}
+
+fn remote_integration_ref(git_ref: &str) -> Option<String> {
+    let branch = git_ref.strip_prefix("refs/heads/")?;
+    (!branch.is_empty()).then(|| format!("refs/remotes/origin/{branch}"))
+}
+
+fn git_landing_status(root: &Path, commit: &str, remote_ref: &str) -> Landing {
+    let output = crate::process::build_command(
+        "git",
+        &["merge-base", "--is-ancestor", commit, remote_ref],
+        root,
+        &[],
+    )
+    .output();
+    match output.ok().and_then(|output| output.status.code()) {
+        Some(0) => Landing::Landed,
+        Some(1) => Landing::NotLanded,
+        _ => Landing::Unknown,
+    }
+}
+
+fn git_ref_is_absent(root: &Path, reference: &str) -> bool {
+    crate::process::build_command(
+        "git",
+        &["show-ref", "--verify", "--quiet", reference],
+        root,
+        &[],
+    )
+    .status()
+    .ok()
+    .and_then(|status| status.code())
+        == Some(1)
 }
 
 fn wait_until_iso(seconds: u64) -> String {
@@ -3446,3 +3543,65 @@ mod serve_lock_tests {
 mod custody_slot_tests;
 #[cfg(test)]
 mod serve_check_seam_tests;
+
+#[cfg(test)]
+mod landing_probe_tests {
+    use std::path::Path;
+
+    use super::{git_landing_status, Landing};
+
+    fn git(root: &Path, args: &[&str]) -> String {
+        let output = crate::process::build_command(
+            "git",
+            args,
+            root,
+            &[
+                ("GIT_AUTHOR_NAME", "Fixture Author"),
+                ("GIT_AUTHOR_EMAIL", "author@example.test"),
+                ("GIT_COMMITTER_NAME", "Fixture Author"),
+                ("GIT_COMMITTER_EMAIL", "author@example.test"),
+            ],
+        )
+        .output()
+        .expect("git runs");
+        assert!(
+            output.status.success(),
+            "git {args:?} failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        String::from_utf8(output.stdout)
+            .expect("git stdout is UTF-8")
+            .trim()
+            .to_string()
+    }
+
+    #[test]
+    fn git_landing_probe_distinguishes_ancestor_descendant_and_missing_ref() {
+        let repo = tempfile::tempdir().expect("repo");
+        git(repo.path(), &["init", "-q"]);
+        std::fs::write(repo.path().join("one"), "one\n").expect("first file");
+        git(repo.path(), &["add", "one"]);
+        git(repo.path(), &["commit", "-q", "-m", "first"]);
+        let first = git(repo.path(), &["rev-parse", "HEAD"]);
+
+        std::fs::write(repo.path().join("two"), "two\n").expect("second file");
+        git(repo.path(), &["add", "two"]);
+        git(repo.path(), &["commit", "-q", "-m", "second"]);
+        let second = git(repo.path(), &["rev-parse", "HEAD"]);
+        let integration_ref = "refs/remotes/origin/dev";
+        git(repo.path(), &["update-ref", integration_ref, &first]);
+
+        assert_eq!(
+            git_landing_status(repo.path(), &first, integration_ref),
+            Landing::Landed
+        );
+        assert_eq!(
+            git_landing_status(repo.path(), &second, integration_ref),
+            Landing::NotLanded
+        );
+        assert_eq!(
+            git_landing_status(repo.path(), &first, "refs/remotes/origin/absent"),
+            Landing::Unknown
+        );
+    }
+}
