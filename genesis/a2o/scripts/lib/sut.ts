@@ -233,8 +233,16 @@ export function dirtyDigest(probe: SutProbe, path: string): string | null {
   return sha256Short([porcelain, diff, untracked, untrackedHashes].join('\n'));
 }
 
-/** One component's identity, or null when nothing could be obtained. */
-export function resolveComponent(probe: SutProbe, component: SutComponent): string | null {
+/**
+ * One component's identity, or null when nothing could be obtained. With `rev`, the source is
+ * that commit's tree (a pushed commit the receipt must have witnessed): a named commit is clean
+ * by definition, so it carries no dirty digest. Without it, the checkout's HEAD and its dirt.
+ */
+export function resolveComponent(
+  probe: SutProbe,
+  component: SutComponent,
+  rev?: string
+): string | null {
   for (const key of [envVarName('A2O_SUT_', component.name), ...(component.declaredBy ?? [])]) {
     const declared = probe.env[key]?.trim();
     if (declared) return `declared:${declared}`;
@@ -251,10 +259,10 @@ export function resolveComponent(probe: SutProbe, component: SutComponent): stri
   }
 
   if (component.path) {
-    const raw = probe.git(['rev-parse', `HEAD:${component.path}`])?.trim();
+    const raw = probe.git(['rev-parse', `${rev ?? 'HEAD'}:${component.path}`])?.trim();
     if (raw) {
       const tree = governanceFreeTree(probe, raw);
-      const dirty = dirtyDigest(probe, component.path);
+      const dirty = rev ? null : dirtyDigest(probe, component.path);
       return dirty ? `tree:${tree}+dirty:${dirty}` : `tree:${tree}`;
     }
   }

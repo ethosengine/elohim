@@ -1954,19 +1954,24 @@ fi
 T2_LIST=$(mktemp)
 printf '%s\n' "$CHANGED" > "$T2_LIST"
 T2_TARGETS=$(mktemp)
+T2_REVS=$(mktemp)
 for T2_LINE in "${PUSH_LINES[@]}"; do
-  read -r _ _ T2_REF _ <<<"$T2_LINE"
-  printf '%s\n' "$T2_REF"
-done > "$T2_TARGETS"
+  read -r _ T2_SHA T2_REF _ <<<"$T2_LINE"
+  printf '%s\n' "$T2_REF" >> "$T2_TARGETS"
+  # The receipt must have witnessed each commit pushed to dev or main, not the checkout.
+  case "$T2_REF" in
+    refs/heads/dev | refs/heads/main) [ "$T2_SHA" = "$ZERO_SHA" ] || printf '%s\n' "$T2_SHA" >> "$T2_REVS" ;;
+  esac
+done
 T2_STATUS=0
 READING_STARTED_S=$SECONDS
 READING_STARTED_AT=$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)
 if [ "${T2_RECEIPT-}" = "strict" ]; then
-  bash genesis/orchestrator/scripts/t2-receipt.sh --changed "$T2_LIST" --targets "$T2_TARGETS" --strict || T2_STATUS=$?
+  bash genesis/orchestrator/scripts/t2-receipt.sh --changed "$T2_LIST" --targets "$T2_TARGETS" --revs "$T2_REVS" --strict || T2_STATUS=$?
 else
-  bash genesis/orchestrator/scripts/t2-receipt.sh --changed "$T2_LIST" --targets "$T2_TARGETS" || T2_STATUS=$?
+  bash genesis/orchestrator/scripts/t2-receipt.sh --changed "$T2_LIST" --targets "$T2_TARGETS" --revs "$T2_REVS" || T2_STATUS=$?
 fi
-rm -f "$T2_LIST" "$T2_TARGETS"
+rm -f "$T2_LIST" "$T2_TARGETS" "$T2_REVS"
 READING_ENDED_AT=$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)
 gate_step_reading "$T2_STATUS" t2-receipt ran \
   "$((SECONDS - READING_STARTED_S))" "$READING_STARTED_AT" "$READING_ENDED_AT"
