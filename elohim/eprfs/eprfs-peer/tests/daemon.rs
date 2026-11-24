@@ -6,11 +6,12 @@ mod support;
 
 use std::path::Path;
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use elohim_epr_rea::{ParticipantRow, SidecarRoster};
 use eprfs_peer::{
     via_device, CrossingAllowList, HeadTable, PeerConfig, PeerDaemon, PeerKey, Rules,
+    INDEX_RETRY_FIRST, TICK,
 };
 use futures_lite::StreamExt;
 use support::{
@@ -984,6 +985,17 @@ async fn put_artifact(
     method: &str,
     bytes: &[u8],
 ) -> (eprfs_core::BlobCid, eprfs_core::BlobCid) {
+    put_artifact_with_method(side, payload, method, bytes, true).await
+}
+
+/// Put an artifact while optionally withholding its method descriptor from the payload store.
+async fn put_artifact_with_method(
+    side: &Side,
+    payload: &dyn eprfs_core::EprfsStorage,
+    method: &str,
+    bytes: &[u8],
+    store_method: bool,
+) -> (eprfs_core::BlobCid, eprfs_core::BlobCid) {
     let descriptor = eprfs_core::MethodDescriptor {
         name: method.to_string(),
         tools: Default::default(),
@@ -997,15 +1009,17 @@ async fn put_artifact(
         deterministic: true,
     };
     let method_cid = descriptor.cid().expect("method cid");
-    payload
-        .put_blob_verified(
-            &method_cid,
-            serde_ipld_dagcbor::to_vec(&descriptor)
-                .expect("descriptor")
-                .into(),
-        )
-        .await
-        .expect("method record");
+    if store_method {
+        payload
+            .put_blob_verified(
+                &method_cid,
+                serde_ipld_dagcbor::to_vec(&descriptor)
+                    .expect("descriptor")
+                    .into(),
+            )
+            .await
+            .expect("method record");
+    }
     let record = eprfs_core::DerivationRecord {
         key: eprfs_core::DerivationKey {
             method: method_cid,
@@ -1035,6 +1049,103 @@ async fn put_artifact(
     .await
     .expect("put");
     (put.manifest.record.output, put.manifest_cid)
+}
+
+async fn assert_index_reads_stay(daemon: &PeerDaemon, expected: u64) {
+    for _ in 0..4 {
+        tokio::time::sleep(TICK).await;
+        assert_eq!(daemon.artifact_index_flow_reads(), expected);
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn daemon_reindex_reads_flow_only_for_change_or_due_manifest_retry() {
+    let b = device("DeviceB", 2);
+    let key_dir = tempfile::tempdir().expect("key dir");
+    let key = load_key(key_dir.path());
+    let rows = vec![genesis(&b), endpoint_row(&b, &b, &key)];
+    let side = Side::new(&rows);
+    let payload_dir = tempfile::tempdir().expect("payload dir");
+    let payload =
+        eprfs_peer::open_payload_store(&payload_dir.path().join("payload")).expect("payload store");
+    let start = Instant::now();
+    let clock = Arc::new(Mutex::new(start));
+    let clock_for_daemon = clock.clone();
+    let logs = Arc::new(Mutex::new(Vec::<String>::new()));
+    let captured_logs = logs.clone();
+    let mut cfg = config(
+        &b,
+        &b.did,
+        key,
+        &side,
+        &[&b],
+        Vec::new(),
+        local(free_port()),
+    );
+    cfg.payload_store = Some(payload.clone());
+    cfg.log = Arc::new(move |line| {
+        captured_logs.lock().expect("logs").push(line.to_string());
+    });
+    let daemon = PeerDaemon::start_with_clock(
+        cfg,
+        Arc::new(move || *clock_for_daemon.lock().expect("clock")),
+    )
+    .await
+    .expect("daemon starts");
+
+    eventually("the initial artifact index reads the flow log", || {
+        daemon.artifact_index_flow_reads() == 1
+    })
+    .await;
+    assert_index_reads_stay(&daemon, 1).await;
+
+    // More than the first retry interval is still quiet when no manifest is waiting.
+    *clock.lock().expect("clock") = start + INDEX_RETRY_FIRST + Duration::from_secs(1);
+    assert_index_reads_stay(&daemon, 1).await;
+
+    // A custody append is read once. With its method descriptor withheld, that rebuild leaves
+    // MethodUnknown pending at the first retry deadline.
+    put_artifact_with_method(
+        &side,
+        payload.as_ref(),
+        "method-arrives-later",
+        b"output awaiting its method",
+        false,
+    )
+    .await;
+    eventually("the custody append is indexed", || {
+        daemon.artifact_index_flow_reads() == 2
+    })
+    .await;
+    assert_index_reads_stay(&daemon, 2).await;
+    assert!(logs
+        .lock()
+        .expect("logs")
+        .iter()
+        .any(|line| line.contains("its method record is not held here")));
+
+    // The first due retry reads exactly once and schedules the doubled wait.
+    *clock.lock().expect("clock") = start + 2 * INDEX_RETRY_FIRST + Duration::from_secs(1);
+    eventually("the first manifest retry reads the flow log", || {
+        daemon.artifact_index_flow_reads() == 3
+    })
+    .await;
+    assert_index_reads_stay(&daemon, 3).await;
+
+    // One second before the doubled retry, the unchanged log remains unread.
+    *clock.lock().expect("clock") = start + 4 * INDEX_RETRY_FIRST;
+    assert_index_reads_stay(&daemon, 3).await;
+
+    // An append overrides the pending retry wait and is read on the next tick, once.
+    side.checkout
+        .append(berth_event("claim", "cargo", "sa", "1.0"));
+    eventually("the changed flow log is read immediately", || {
+        daemon.artifact_index_flow_reads() == 4
+    })
+    .await;
+    assert_index_reads_stay(&daemon, 4).await;
+
+    daemon.shutdown().await;
 }
 
 /// Amended by the artifact mount (artifact-store design F0.2): a started daemon serves its
