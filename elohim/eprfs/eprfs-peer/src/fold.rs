@@ -13,6 +13,7 @@ use std::collections::HashSet;
 use std::fs::{self, OpenOptions};
 use std::io::Write;
 use std::path::Path;
+use std::time::Instant;
 
 use cid::Cid;
 use elohim_epr_rea::model::canonical_bytes;
@@ -37,6 +38,11 @@ use crate::tier::{tier_request, tier_request_capped, TierAnswer, TierRequest, TI
 /// reports itself incomplete and the head is not recorded, so the next one resumes from the same
 /// base and skips what was already folded.
 pub const MAX_FOLD_EVENTS: usize = 1024;
+
+/// The most events committed as one progress unit. At the daemon's 30 second fold deadline this
+/// leaves about 468 ms per sequential relay round trip before a full batch reaches the deadline;
+/// a partial batch reached by the deadline is committed too.
+pub const FOLD_BATCH_EVENTS: usize = 64;
 
 /// The largest event one fold accepts, in bytes. A berth record is well under a kilobyte; a
 /// larger leaf is refused before its bytes are read past this, and leaves the fold incomplete.
@@ -67,6 +73,8 @@ pub struct FoldPlan<'a> {
     pub limits: FoldLimits,
     /// Original event CIDs already held from the target device; `None` rebuilds from the store.
     pub known: Option<&'a HashSet<Cid>>,
+    /// Stop network reads at this instant, retaining every event verified before it.
+    pub deadline: Option<Instant>,
 }
 
 impl Default for FoldLimits {
@@ -85,6 +93,15 @@ pub struct ChannelEvent {
     /// The event's own atom CID: its name in the tree (its leaf is the same digest, raw codec).
     pub cid: Cid,
     pub event: FlowEvent,
+}
+
+type BatchConsumer<'a> = &'a mut (dyn FnMut(&[ChannelEvent]) -> Result<(), PeerError> + Send);
+
+#[derive(Default)]
+struct FetchProgress<'a> {
+    reader: Option<&'a str>,
+    deadline: Option<Instant>,
+    consume_batch: Option<BatchConsumer<'a>>,
 }
 
 /// One channel leaf this device could address but would not fold.
@@ -107,6 +124,8 @@ pub struct Fetched {
     pub oversized: u64,
     /// Whether the fold stopped at the byte budget.
     pub over_budget: bool,
+    /// Whether the fold stopped at its wall-clock deadline.
+    pub deadline_reached: bool,
     /// Leaves skipped without stopping the rest of the fold.
     pub quarantined: Vec<Quarantined>,
     /// The peer's nack leaf for this device, from the root being folded.
@@ -128,6 +147,17 @@ pub struct FoldOutcome {
     pub refused_crossings: Vec<RefusedCrossing>,
     /// Original CIDs now held from this device, whether appended by this fold or already present.
     pub held_cids: Vec<Cid>,
+}
+
+impl FoldOutcome {
+    fn absorb(&mut self, batch: FoldOutcome) {
+        self.appended = self.appended.saturating_add(batch.appended);
+        self.already = self.already.saturating_add(batch.already);
+        self.refused = self.refused.saturating_add(batch.refused);
+        self.refused_cids.extend(batch.refused_cids);
+        self.refused_crossings.extend(batch.refused_crossings);
+        self.held_cids.extend(batch.held_cids);
+    }
 }
 
 /// One event refused by the receiving device's crossing allow-list.
@@ -154,7 +184,16 @@ pub async fn fetch_channel(
     tree: &TreeLimits,
     limits: &FoldLimits,
 ) -> Result<Fetched, PeerError> {
-    fetch_channel_for(connection, since, root, known, tree, limits, None).await
+    fetch_channel_for(
+        connection,
+        since,
+        root,
+        known,
+        tree,
+        limits,
+        FetchProgress::default(),
+    )
+    .await
 }
 
 async fn fetch_channel_for(
@@ -164,18 +203,33 @@ async fn fetch_channel_for(
     known: &HashSet<Cid>,
     tree: &TreeLimits,
     limits: &FoldLimits,
-    reader: Option<&str>,
+    mut progress: FetchProgress<'_>,
 ) -> Result<Fetched, PeerError> {
     let events_dir = TreePath::from_slash_bytes(CHANNEL_EVENTS.as_bytes())
         .map_err(|e| integrity(e.to_string()))?;
-    let events_cid = verify_spine(connection, root, &events_dir, tree).await?;
-    let offered = match since {
-        Some(old) if old == root => Vec::new(),
-        Some(old) => match diff(connection, old, root, &events_cid, &events_dir, tree).await? {
-            Some(added) => added,
-            None => list(connection, root, &events_cid, &events_dir, tree).await?,
+    let listing = async {
+        let events_cid = verify_spine(connection, root, &events_dir, tree).await?;
+        match since {
+            Some(old) if old == root => Ok(Vec::new()),
+            Some(old) => match diff(connection, old, root, &events_cid, &events_dir, tree).await? {
+                Some(added) => Ok(added),
+                None => list(connection, root, &events_cid, &events_dir, tree).await,
+            },
+            None => list(connection, root, &events_cid, &events_dir, tree).await,
+        }
+    };
+    let offered = match progress.deadline {
+        Some(deadline) => match tokio::time::timeout_at(deadline.into(), listing).await {
+            Ok(offered) => offered?,
+            Err(_) => {
+                return Ok(Fetched {
+                    complete: false,
+                    deadline_reached: true,
+                    ..Fetched::default()
+                });
+            }
         },
-        None => list(connection, root, &events_cid, &events_dir, tree).await?,
+        None => listing.await?,
     };
     let mut fresh = Vec::new();
     for (cid, leaf) in offered {
@@ -192,6 +246,7 @@ async fn fetch_channel_for(
     let answer_cap = u32::try_from(limits.max_event_bytes.saturating_add(READ_ANSWER_OVERHEAD))
         .unwrap_or(u32::MAX);
     let mut read_bytes = 0usize;
+    let mut consumed = 0usize;
     for (cid, leaf) in fresh {
         if read_bytes >= limits.max_fold_bytes {
             fetched.over_budget = true;
@@ -203,7 +258,19 @@ async fn fetch_channel_for(
             root: root.clone(),
             path: path.clone(),
         };
-        let read = match tier_request_capped(connection, &request, tree, answer_cap).await {
+        let request = tier_request_capped(connection, &request, tree, answer_cap);
+        let answer = match progress.deadline {
+            Some(deadline) => match tokio::time::timeout_at(deadline.into(), request).await {
+                Ok(answer) => answer,
+                Err(_) => {
+                    fetched.complete = false;
+                    fetched.deadline_reached = true;
+                    break;
+                }
+            },
+            None => request.await,
+        };
+        let read = match answer {
             Ok(TierAnswer::Read(read)) if read.bytes.len() <= limits.max_event_bytes => read,
             Ok(TierAnswer::Read(_)) | Err(PeerError::TierFrameTooLarge { .. }) => {
                 fetched.oversized += 1;
@@ -226,7 +293,15 @@ async fn fetch_channel_for(
         }
         read_bytes = read_bytes.saturating_add(read.bytes.len());
         match decode_event(&cid, &read.bytes) {
-            Ok(event) => fetched.events.push(ChannelEvent { cid, event }),
+            Ok(event) => {
+                fetched.events.push(ChannelEvent { cid, event });
+                if fetched.events.len().saturating_sub(consumed) == FOLD_BATCH_EVENTS {
+                    if let Some(consume) = progress.consume_batch.as_mut() {
+                        consume(&fetched.events[consumed..])?;
+                        consumed = fetched.events.len();
+                    }
+                }
+            }
             Err(reason) => fetched.quarantined.push(Quarantined {
                 cid,
                 path: path.to_string(),
@@ -235,8 +310,23 @@ async fn fetch_channel_for(
             }),
         }
     }
-    if let Some(reader) = reader {
-        fetched.peer_nack = read_nack(connection, root, reader, tree).await?;
+    if consumed < fetched.events.len() {
+        if let Some(consume) = progress.consume_batch.as_mut() {
+            consume(&fetched.events[consumed..])?;
+        }
+    }
+    if let Some(reader) = progress.reader.filter(|_| !fetched.deadline_reached) {
+        let nack = read_nack(connection, root, reader, tree);
+        match progress.deadline {
+            Some(deadline) => match tokio::time::timeout_at(deadline.into(), nack).await {
+                Ok(peer_nack) => fetched.peer_nack = peer_nack?,
+                Err(_) => {
+                    fetched.complete = false;
+                    fetched.deadline_reached = true;
+                }
+            },
+            None => fetched.peer_nack = nack.await?,
+        }
     }
     Ok(fetched)
 }
@@ -416,6 +506,14 @@ fn fold_events_admitted(
     allow: &CrossingAllowList,
     admission: Option<&SharedAdmission>,
 ) -> Result<FoldOutcome, PeerError> {
+    // Sidecar appends are individually synced and cannot be rolled back. Check the whole batch's
+    // logical fallible conditions before its first append, so a bad event rejects the batch.
+    for ChannelEvent { cid, event } in events {
+        if atom_cid(event).map_err(PeerError::FlowStore)? != *cid {
+            return Err(integrity(format!("event {cid} is not at its own CID")));
+        }
+        atom_cid(&with_via(event, device)).map_err(PeerError::FlowStore)?;
+    }
     let mut tx = store.transaction().map_err(PeerError::FlowStore)?;
     let mut held: HashSet<Cid> = tx
         .records()
@@ -436,9 +534,6 @@ fn fold_events_admitted(
     let mut outcome = FoldOutcome::default();
     let mut received = HashSet::new();
     for ChannelEvent { cid, event } in events {
-        if atom_cid(event).map_err(PeerError::FlowStore)? != *cid {
-            return Err(integrity(format!("event {cid} is not at its own CID")));
-        }
         if !received.insert(*cid) {
             outcome.already += 1;
             continue;
@@ -520,6 +615,8 @@ pub struct FoldReport {
     pub oversized: u64,
     /// Whether the fold stopped at its byte budget.
     pub over_budget: bool,
+    /// Whether the fold stopped at its wall-clock deadline.
+    pub deadline_reached: bool,
     /// Leaves skipped by this fold.
     pub quarantined: Vec<Quarantined>,
     /// The author's nack leaf for this device at the folded root.
@@ -558,6 +655,7 @@ pub async fn fold_root(
         FoldPlan {
             limits: *fold_limits,
             known: None,
+            deadline: None,
         },
     )
     .await
@@ -586,10 +684,24 @@ pub async fn fold_root_planned(
             (&rebuilt, 1)
         }
     };
-    let connection = endpoint
-        .connect(peer, TIER_ALPN)
-        .await
-        .map_err(|e| PeerError::TierConnect(Box::new(e)))?;
+    let connecting = endpoint.connect(peer, TIER_ALPN);
+    let connection = match plan.deadline {
+        Some(deadline) => tokio::time::timeout_at(deadline.into(), connecting)
+            .await
+            .map_err(|_| PeerError::FoldUnanswered {
+                what: format!("root {} (timed out connecting)", target.root),
+            })?,
+        None => connecting.await,
+    }
+    .map_err(|e| PeerError::TierConnect(Box::new(e)))?;
+    let mut outcome = FoldOutcome::default();
+    let mut known_after = (*known).clone();
+    let mut consume_batch = |events: &[ChannelEvent]| {
+        let batch = fold_events_admitted(store, target.device, events, allow, target.admission)?;
+        known_after.extend(batch.held_cids.iter().copied());
+        outcome.absorb(batch);
+        Ok(())
+    };
     let fetched = fetch_channel_for(
         &connection,
         target.since,
@@ -597,29 +709,25 @@ pub async fn fold_root_planned(
         known,
         tree,
         &plan.limits,
-        Some(target.reader.device),
+        FetchProgress {
+            reader: Some(target.reader.device),
+            deadline: plan.deadline,
+            consume_batch: Some(&mut consume_batch),
+        },
     )
     .await;
     connection.close(VarInt::from_u32(0), b"");
     let fetched = fetched?;
     write_quarantine(target.reader.state_dir, target.device, &fetched.quarantined)?;
-    let outcome = fold_events_admitted(
-        store,
-        target.device,
-        &fetched.events,
-        allow,
-        target.admission,
-    )?;
     let quarantine_blocks =
         !fetched.quarantined.is_empty() && !author_reads_nacks(store, target.device)?;
     let complete = fetched.complete && !quarantine_blocks;
-    let mut known_after = (*known).clone();
-    known_after.extend(outcome.held_cids.iter().copied());
     Ok(FoldReport {
         outcome,
         complete,
         oversized: fetched.oversized,
         over_budget: fetched.over_budget,
+        deadline_reached: fetched.deadline_reached,
         quarantined: fetched.quarantined,
         peer_nack: fetched.peer_nack,
         store_parses,
