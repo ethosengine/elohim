@@ -443,20 +443,22 @@ fn crossing_drop_check(table: &eprfs_peer::HeadTable) -> Option<Check> {
         .filter(|(_, _, _, drop)| drop.count > 0)
         .collect();
     let (_, first_measure, first_kind, _) = rows.first().copied()?;
+    let overflow = table.crossing_drop_overflow(rules_digest);
     let total = rows.iter().fold(0u64, |total, (_, _, _, drop)| {
         total.saturating_add(drop.count)
     });
-    let devices = rows
-        .iter()
-        .map(|(device, _, _, _)| *device)
-        .collect::<BTreeSet<_>>()
-        .len();
+    let total = total.saturating_add(overflow.map_or(0, |overflow| overflow.count));
+    let mut devices: BTreeSet<_> = rows.iter().map(|(device, _, _, _)| *device).collect();
+    if let Some(overflow) = overflow {
+        devices.extend(overflow.devices.keys().map(String::as_str));
+    }
     Some(Check::new(
         CROSSING_DROPS_CHECK,
         State::Degraded,
         format!(
-            "{total} events from {devices} device(s) not in this device's crosses \
-             ({first_measure}/{first_kind}…)"
+            "{total} events from {} device(s) not in this device's crosses \
+             ({first_measure}/{first_kind}…)",
+            devices.len()
         ),
         Some(
             "refresh the daemon's policy from genesis/agentic/pool-policy.json and restart it \
@@ -2626,16 +2628,37 @@ mod tests {
         table.rules = Some(rules_b.clone());
         assert!(crossing_drop_check(&table).is_none());
 
+        table.record_crossing_drop("rules-c", "device-c", "measure", "kind", 30);
+        table.record_crossing_drop("rules-d", "device-d", "measure", "kind", 40);
+        table.record_crossing_drop("rules-e", "device-e", "measure", "kind", 50);
+        assert_eq!(table.evicted_totals["did:key:zSender"].count, 2);
+        assert!(
+            crossing_drop_check(&table).is_none(),
+            "evicted rules are history, never an arrival degradation"
+        );
+
         table.record_crossing_drop(
             rules_b.digest.as_str(),
             "did:key:zSender",
             "dev-landing@1",
             "misses",
-            23,
+            60,
         );
         let check = crossing_drop_check(&table).expect("new-rules drop line");
         assert_eq!(check.state, State::Degraded);
         assert!(check.detail.starts_with("1 events from 1 device(s)"));
+
+        for index in 0..eprfs_peer::MAX_CROSSING_DROP_ROWS_PER_RULE_GROUP + 1 {
+            table.record_crossing_drop(
+                rules_b.digest.as_str(),
+                "did:key:zSender",
+                "dev-landing@1",
+                &format!("kind-{index:02}"),
+                100 + u64::try_from(index).unwrap(),
+            );
+        }
+        let check = crossing_drop_check(&table).expect("current overflow remains actionable");
+        assert!(check.detail.starts_with("34 events from 1 device(s)"));
     }
 
     #[cfg(feature = "peer")]

@@ -119,8 +119,9 @@ pub use gate::{
 pub use gossip::GatedGossip;
 pub use head::{ChannelHead, HeadSigner, MAX_HEAD_BYTES};
 pub use head_table::{
-    ChannelCounters, CrossingDrop, CrossingDropGroups, CrossingDrops, DeviceHead, DroppedHeads,
-    HeadTable, NackLeaf, NackState, OwnAnnounce, StorePlace, HEAD_TABLE_VERSION,
+    ChannelCounters, CrossingDrop, CrossingDropGroups, CrossingDropOverflow, CrossingDrops,
+    DeviceHead, DroppedHeads, EvictedCrossingDropTotal, HeadTable, NackLeaf, NackState,
+    OwnAnnounce, StorePlace, HEAD_TABLE_VERSION, MAX_CROSSING_DROP_ROWS_PER_RULE_GROUP,
     MAX_CROSSING_DROP_RULE_GROUPS, MAX_NACK_CIDS, OWN_LOG_LEN,
 };
 /// The iroh address types a dialer names peers with, so a consumer needs no iroh dependency of

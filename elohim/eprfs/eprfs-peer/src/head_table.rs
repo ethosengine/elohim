@@ -21,6 +21,10 @@
 //!       "<author-did>": { "<measure>": { "<kind>": { "count", "first_seen", "last_seen" } } }
 //!     }
 //!   },
+//!   "crossing_drop_overflows": {
+//!     "<rules-digest>": { "count", "first_seen", "last_seen", "devices": { "<author-did>": { "count", "first_seen", "last_seen" } } }
+//!   },
+//!   "evicted_totals": { "<author-did>": { "count", "last_seen" } },
 //!   "channel": { "projection_failures", "last_projection_error", "fold_failures",
 //!                "oversized_events", "over_budget_folds" }
 //! }
@@ -66,6 +70,9 @@ pub const MAX_NACK_CIDS: usize = 64;
 
 /// The most rules generations whose receiver-side crossing refusals remain in the head table.
 pub const MAX_CROSSING_DROP_RULE_GROUPS: usize = 3;
+
+/// The most distinct device/measure/kind refusal rows persisted for one rules digest.
+pub const MAX_CROSSING_DROP_ROWS_PER_RULE_GROUP: usize = 32;
 
 /// One nack leaf as it crosses at `channel/nacks/<author>`.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -139,6 +146,13 @@ pub struct HeadTable {
     /// Receiver-side event refusals, by loaded rules digest, sending device, measure and kind.
     #[serde(default)]
     pub crossing_drop_groups: CrossingDropGroups,
+    /// Refusals whose distinct row would exceed the per-rules row bound. The aggregate feeds
+    /// status; the per-device counters preserve exact attribution if the rules group is evicted.
+    #[serde(default)]
+    pub crossing_drop_overflows: BTreeMap<String, CrossingDropOverflow>,
+    /// Running refusal totals from rules groups no longer retained, by sending device.
+    #[serde(default)]
+    pub evicted_totals: BTreeMap<String, EvictedCrossingDropTotal>,
     /// The ungrouped field written before refusals carried the loaded rules digest. Loading folds
     /// it into the `unknown` history group; saving never writes this field again.
     #[serde(default, rename = "crossing_drops", skip_serializing)]
@@ -185,6 +199,8 @@ impl Default for HeadTable {
             nacks: BTreeMap::new(),
             dropped: DroppedHeads::default(),
             crossing_drop_groups: BTreeMap::new(),
+            crossing_drop_overflows: BTreeMap::new(),
+            evicted_totals: BTreeMap::new(),
             legacy_crossing_drops: BTreeMap::new(),
             channel: ChannelCounters::default(),
         }
@@ -259,6 +275,26 @@ pub struct CrossingDrop {
     pub last_seen: u64,
 }
 
+/// Refusals that could not receive their own persisted row in one rules-digest group.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CrossingDropOverflow {
+    pub count: u64,
+    /// This device's clock at the first overflowed refusal, unix milliseconds.
+    pub first_seen: u64,
+    /// This device's clock at the latest overflowed refusal, unix milliseconds.
+    pub last_seen: u64,
+    /// Exact sender accounting retained without persisting another measure/kind row.
+    pub devices: BTreeMap<String, CrossingDrop>,
+}
+
+/// Refusals retained after their rules-digest group has been evicted.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct EvictedCrossingDropTotal {
+    pub count: u64,
+    /// This device's clock at the latest refusal in an evicted group, unix milliseconds.
+    pub last_seen: u64,
+}
+
 impl HeadTable {
     /// The table's file name inside the peer state dir.
     pub const FILE_NAME: &'static str = "heads.json";
@@ -272,23 +308,36 @@ impl HeadTable {
         kind: &str,
         at: u64,
     ) {
-        let drop = self
+        let rows = self
             .crossing_drop_groups
             .entry(rules_digest.to_owned())
-            .or_default()
-            .entry(device.to_owned())
-            .or_default()
-            .entry(measure.to_owned())
-            .or_default()
-            .entry(kind.to_owned())
-            .or_insert(CrossingDrop {
-                count: 0,
-                first_seen: at,
-                last_seen: at,
-            });
-        drop.count = drop.count.saturating_add(1);
-        drop.first_seen = drop.first_seen.min(at);
-        drop.last_seen = drop.last_seen.max(at);
+            .or_default();
+        if let Some(drop) = rows
+            .get_mut(device)
+            .and_then(|measures| measures.get_mut(measure))
+            .and_then(|kinds| kinds.get_mut(kind))
+        {
+            count_crossing_drop(drop, 1, at, at);
+        } else if crossing_drop_row_count(rows) < MAX_CROSSING_DROP_ROWS_PER_RULE_GROUP {
+            rows.entry(device.to_owned())
+                .or_default()
+                .entry(measure.to_owned())
+                .or_default()
+                .insert(
+                    kind.to_owned(),
+                    CrossingDrop {
+                        count: 1,
+                        first_seen: at,
+                        last_seen: at,
+                    },
+                );
+        } else {
+            let overflow = self
+                .crossing_drop_overflows
+                .entry(rules_digest.to_owned())
+                .or_default();
+            count_overflow(overflow, device, 1, at, at);
+        }
         self.trim_crossing_drop_groups();
     }
 
@@ -318,18 +367,93 @@ impl HeadTable {
             .map(|(digest, rows)| (digest.as_str(), rows))
     }
 
+    /// The aggregate for distinct rows suppressed by one rules digest's persisted-row bound.
+    pub fn crossing_drop_overflow(&self, rules_digest: &str) -> Option<&CrossingDropOverflow> {
+        self.crossing_drop_overflows.get(rules_digest)
+    }
+
+    /// Running refusal totals from evicted rules generations, in sending-device order.
+    pub fn evicted_crossing_drop_totals(
+        &self,
+    ) -> impl Iterator<Item = (&str, &EvictedCrossingDropTotal)> {
+        self.evicted_totals
+            .iter()
+            .map(|(device, total)| (device.as_str(), total))
+    }
+
     fn trim_crossing_drop_groups(&mut self) {
         while self.crossing_drop_groups.len() > MAX_CROSSING_DROP_RULE_GROUPS {
             let Some(oldest) = self
                 .crossing_drop_groups
                 .iter()
-                .min_by_key(|(digest, rows)| (crossing_drop_latest(rows), digest.as_str()))
+                .min_by_key(|(digest, rows)| {
+                    (
+                        crossing_drop_latest(rows).max(
+                            self.crossing_drop_overflows
+                                .get(*digest)
+                                .map_or(0, |overflow| overflow.last_seen),
+                        ),
+                        digest.as_str(),
+                    )
+                })
                 .map(|(digest, _)| digest.clone())
             else {
                 break;
             };
-            self.crossing_drop_groups.remove(&oldest);
+            if let Some(rows) = self.crossing_drop_groups.remove(&oldest) {
+                self.remember_evicted_rows(rows);
+            }
+            if let Some(overflow) = self.crossing_drop_overflows.remove(&oldest) {
+                self.remember_evicted_overflow(overflow);
+            }
         }
+    }
+
+    fn normalize_crossing_drop_rows(&mut self) {
+        for (digest, rows) in &mut self.crossing_drop_groups {
+            let overflow = self
+                .crossing_drop_overflows
+                .entry(digest.clone())
+                .or_default();
+            while crossing_drop_row_count(rows) > MAX_CROSSING_DROP_ROWS_PER_RULE_GROUP {
+                let Some((device, measure, kind, drop)) = pop_last_crossing_drop(rows) else {
+                    break;
+                };
+                count_overflow(
+                    overflow,
+                    &device,
+                    drop.count,
+                    drop.first_seen,
+                    drop.last_seen,
+                );
+                remove_empty_crossing_drop_maps(rows, &device, &measure, &kind);
+            }
+        }
+        self.crossing_drop_overflows.retain(|digest, overflow| {
+            self.crossing_drop_groups.contains_key(digest) && overflow.count > 0
+        });
+    }
+
+    fn remember_evicted_rows(&mut self, rows: CrossingDrops) {
+        for (device, measures) in rows {
+            for kinds in measures.into_values() {
+                for drop in kinds.into_values() {
+                    self.remember_evicted(&device, drop.count, drop.last_seen);
+                }
+            }
+        }
+    }
+
+    fn remember_evicted_overflow(&mut self, overflow: CrossingDropOverflow) {
+        for (device, drop) in overflow.devices {
+            self.remember_evicted(&device, drop.count, drop.last_seen);
+        }
+    }
+
+    fn remember_evicted(&mut self, device: &str, count: u64, last_seen: u64) {
+        let total = self.evicted_totals.entry(device.to_owned()).or_default();
+        total.count = total.count.saturating_add(count);
+        total.last_seen = total.last_seen.max(last_seen);
     }
 
     fn migrate_legacy_crossing_drops(&mut self) {
@@ -342,6 +466,7 @@ impl HeadTable {
             .entry("unknown".to_owned())
             .or_default();
         merge_crossing_drops(unknown, legacy);
+        self.normalize_crossing_drop_rows();
         self.trim_crossing_drop_groups();
     }
 
@@ -365,6 +490,8 @@ impl HeadTable {
                 reason: e.to_string(),
             })?;
         table.migrate_legacy_crossing_drops();
+        table.normalize_crossing_drop_rows();
+        table.trim_crossing_drop_groups();
         Ok(table)
     }
 
@@ -381,10 +508,14 @@ impl HeadTable {
             move |source| PeerError::HeadTableIo { path, source }
         };
         fs::create_dir_all(dir).map_err(io_error(dir))?;
-        let text = serde_json::to_string_pretty(self).map_err(|e| PeerError::HeadTableInvalid {
-            path: path.clone(),
-            reason: e.to_string(),
-        })?;
+        let mut persisted = self.clone();
+        persisted.normalize_crossing_drop_rows();
+        persisted.trim_crossing_drop_groups();
+        let text =
+            serde_json::to_string_pretty(&persisted).map_err(|e| PeerError::HeadTableInvalid {
+                path: path.clone(),
+                reason: e.to_string(),
+            })?;
         let tmp = dir.join(format!(".{}.{}.tmp", Self::FILE_NAME, std::process::id()));
         let written = OpenOptions::new()
             .write(true)
@@ -403,6 +534,79 @@ impl HeadTable {
             let _ = fs::remove_file(&tmp);
         }
         written.map_err(io_error(&path))
+    }
+}
+
+fn crossing_drop_row_count(rows: &CrossingDrops) -> usize {
+    rows.values()
+        .flat_map(BTreeMap::values)
+        .map(BTreeMap::len)
+        .sum()
+}
+
+fn count_crossing_drop(drop: &mut CrossingDrop, count: u64, first_seen: u64, last_seen: u64) {
+    drop.count = drop.count.saturating_add(count);
+    drop.first_seen = drop.first_seen.min(first_seen);
+    drop.last_seen = drop.last_seen.max(last_seen);
+}
+
+fn count_overflow(
+    overflow: &mut CrossingDropOverflow,
+    device: &str,
+    count: u64,
+    first_seen: u64,
+    last_seen: u64,
+) {
+    if overflow.count == 0 {
+        overflow.first_seen = first_seen;
+    } else {
+        overflow.first_seen = overflow.first_seen.min(first_seen);
+    }
+    overflow.count = overflow.count.saturating_add(count);
+    overflow.last_seen = overflow.last_seen.max(last_seen);
+    let device_total = overflow
+        .devices
+        .entry(device.to_owned())
+        .or_insert(CrossingDrop {
+            count: 0,
+            first_seen,
+            last_seen,
+        });
+    count_crossing_drop(device_total, count, first_seen, last_seen);
+}
+
+fn pop_last_crossing_drop(
+    rows: &mut CrossingDrops,
+) -> Option<(String, String, String, CrossingDrop)> {
+    let (device, measures) = rows.last_key_value()?;
+    let (measure, kinds) = measures.last_key_value()?;
+    let (kind, drop) = kinds.last_key_value()?;
+    Some((device.clone(), measure.clone(), kind.clone(), *drop))
+}
+
+fn remove_empty_crossing_drop_maps(
+    rows: &mut CrossingDrops,
+    device: &str,
+    measure: &str,
+    kind: &str,
+) {
+    let remove_measure = rows
+        .get_mut(device)
+        .and_then(|measures| measures.get_mut(measure))
+        .is_some_and(|kinds| {
+            kinds.remove(kind);
+            kinds.is_empty()
+        });
+    let remove_device = if remove_measure {
+        rows.get_mut(device).is_some_and(|measures| {
+            measures.remove(measure);
+            measures.is_empty()
+        })
+    } else {
+        false
+    };
+    if remove_device {
+        rows.remove(device);
     }
 }
 

@@ -1150,14 +1150,21 @@ const MAX_CURRENT_CROSSING_DROP_ROWS: usize = 5;
 #[serde(rename_all = "camelCase")]
 struct CrossingDropStatus {
     current: Vec<CrossingDropRow>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    overflow: Option<CrossingDropOverflowStatus>,
     history: Vec<CrossingDropHistory>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    evicted: Vec<EvictedCrossingDropHistory>,
     #[serde(skip)]
     current_more: usize,
 }
 
 impl CrossingDropStatus {
     fn is_empty(&self) -> bool {
-        self.current.is_empty() && self.history.is_empty()
+        self.current.is_empty()
+            && self.overflow.is_none()
+            && self.history.is_empty()
+            && self.evicted.is_empty()
     }
 }
 
@@ -1173,11 +1180,29 @@ struct CrossingDropRow {
     last_seen: u64,
 }
 
+/// The aggregate beyond the persisted row bound for the current rules digest.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct CrossingDropOverflowStatus {
+    count: u64,
+    first_seen: u64,
+    last_seen: u64,
+}
+
 /// One older rules generation as `status --json` reports it.
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct CrossingDropHistory {
     rules: String,
+    count: u64,
+    last_seen: u64,
+}
+
+/// Refusals retained after their rules-digest groups were evicted.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct EvictedCrossingDropHistory {
+    device: String,
     count: u64,
     last_seen: u64,
 }
@@ -1199,12 +1224,24 @@ fn crossing_drop_status(table: &HeadTable) -> CrossingDropStatus {
         .collect();
     let current_more = current.len().saturating_sub(MAX_CURRENT_CROSSING_DROP_ROWS);
     current.truncate(MAX_CURRENT_CROSSING_DROP_ROWS);
+    let overflow = current_rules
+        .and_then(|rules| table.crossing_drop_overflow(rules))
+        .filter(|overflow| overflow.count > 0)
+        .map(|overflow| CrossingDropOverflowStatus {
+            count: overflow.count,
+            first_seen: overflow.first_seen,
+            last_seen: overflow.last_seen,
+        });
 
     let mut history: Vec<_> = table
         .crossing_drop_rule_groups()
         .filter(|(rules, _)| Some(*rules) != current_rules)
         .filter_map(|(rules, rows)| {
-            let (count, last_seen) = crossing_drop_summary(rows);
+            let (mut count, mut last_seen) = crossing_drop_summary(rows);
+            if let Some(overflow) = table.crossing_drop_overflow(rules) {
+                count = count.saturating_add(overflow.count);
+                last_seen = last_seen.max(overflow.last_seen);
+            }
             (count > 0).then(|| CrossingDropHistory {
                 rules: rules.to_owned(),
                 count,
@@ -1217,9 +1254,20 @@ fn crossing_drop_status(table: &HeadTable) -> CrossingDropStatus {
             .cmp(&a.last_seen)
             .then_with(|| a.rules.cmp(&b.rules))
     });
+    let evicted = table
+        .evicted_crossing_drop_totals()
+        .filter(|(_, total)| total.count > 0)
+        .map(|(device, total)| EvictedCrossingDropHistory {
+            device: device.to_owned(),
+            count: total.count,
+            last_seen: total.last_seen,
+        })
+        .collect();
     CrossingDropStatus {
         current,
+        overflow,
         history,
+        evicted,
         current_more,
     }
 }
@@ -1243,6 +1291,14 @@ fn crossing_drop_line(drop: &CrossingDropRow) -> String {
     )
 }
 
+fn crossing_drop_overflow_line(overflow: &CrossingDropOverflowStatus) -> String {
+    format!(
+        "dropped {} additional events beyond the {} persisted crossing-drop rows for these rules",
+        overflow.count,
+        eprfs_peer::MAX_CROSSING_DROP_ROWS_PER_RULE_GROUP
+    )
+}
+
 fn crossing_drop_history_line(history: &CrossingDropHistory) -> String {
     let last_seen = i64::try_from(history.last_seen)
         .ok()
@@ -1253,6 +1309,14 @@ fn crossing_drop_history_line(history: &CrossingDropHistory) -> String {
     format!(
         "{} events dropped before {last_seen} under rules {short_rules}",
         history.count
+    )
+}
+
+fn evicted_crossing_drop_history_line(history: &EvictedCrossingDropHistory) -> String {
+    format!(
+        "{} earlier events from {} under evicted rules",
+        history.count,
+        short(&history.device)
     )
 }
 
@@ -1498,8 +1562,14 @@ fn render(outcome: &StatusOutcome) {
     if let Some(line) = crossing_drop_more_line(outcome.crossing_drops.current_more) {
         println!("{line}");
     }
+    if let Some(overflow) = &outcome.crossing_drops.overflow {
+        println!("{}", crossing_drop_overflow_line(overflow));
+    }
     for history in &outcome.crossing_drops.history {
         println!("{}", crossing_drop_history_line(history));
+    }
+    for history in &outcome.crossing_drops.evicted {
+        println!("{}", evicted_crossing_drop_history_line(history));
     }
     if !outcome.refused_connections.is_empty() || outcome.refused_strangers > 0 {
         let mut refused: Vec<String> = outcome
@@ -2936,13 +3006,13 @@ mod status_contract {
         let mut table = HeadTable::default();
         let rules = rules_state('c');
         table.rules = Some(rules.clone());
-        for index in 0..7 {
+        for index in 0..eprfs_peer::MAX_CROSSING_DROP_ROWS_PER_RULE_GROUP + 2 {
             table.record_crossing_drop(
                 rules.digest.as_str(),
                 "did:key:zSender",
                 "dev-landing@1",
                 &format!("kind-{index}"),
-                index,
+                u64::try_from(index).unwrap(),
             );
         }
 
@@ -2950,7 +3020,47 @@ mod status_contract {
         assert_eq!(status.current.len(), 5);
         assert_eq!(
             crossing_drop_more_line(status.current_more).as_deref(),
-            Some("… and 2 more")
+            Some("… and 27 more")
+        );
+        let overflow = status.overflow.as_ref().expect("overflow line");
+        assert_eq!(
+            serde_json::to_value(overflow).expect("json"),
+            serde_json::json!({
+                "count": 2,
+                "firstSeen": 32,
+                "lastSeen": 33
+            })
+        );
+        assert_eq!(
+            crossing_drop_overflow_line(overflow),
+            "dropped 2 additional events beyond the 32 persisted crossing-drop rows for these \
+             rules"
+        );
+    }
+
+    #[test]
+    fn peer_status_carries_evicted_crossing_drop_totals_as_history() {
+        use super::*;
+        let mut table = HeadTable::default();
+        table.record_crossing_drop("rules-a", "did:key:zSender", "measure", "kind", 10);
+        table.record_crossing_drop("rules-a", "did:key:zSender", "measure", "kind", 11);
+        table.record_crossing_drop("rules-b", "device-b", "measure", "kind", 20);
+        table.record_crossing_drop("rules-c", "device-c", "measure", "kind", 30);
+        table.record_crossing_drop("rules-d", "device-d", "measure", "kind", 40);
+
+        let status = crossing_drop_status(&table);
+        assert_eq!(status.evicted.len(), 1);
+        assert_eq!(
+            serde_json::to_value(&status.evicted[0]).expect("json"),
+            serde_json::json!({
+                "device": "did:key:zSender",
+                "count": 2,
+                "lastSeen": 11
+            })
+        );
+        assert_eq!(
+            evicted_crossing_drop_history_line(&status.evicted[0]),
+            "2 earlier events from did:key:zSender under evicted rules"
         );
     }
 
