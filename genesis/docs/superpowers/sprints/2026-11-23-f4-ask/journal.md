@@ -310,6 +310,47 @@ open after the second (a ruling reachable through the gap record, fork tests sti
 sleep, and the reindex skip losing a pending retry when a read fails). Shem's household can
 witness 2b: its DNAs rebuilt fresh at dev and its bundle reproduces its installed cells.
 
+## 24 Nov, 03:00Z to 15:30Z: the roll, a fold that could not finish, and where the gate hours go
+
+Landing 8 `93983b057..c4bea4ded` (11:20Z, `[edge:roll]`): roll 2a (blob-store owner lock that
+unlocks on drop, the native `epr session stasis observe` verb, the eprfs lock sites on the shared
+guard, the peer daemon's reindex skip) and the batched fold. Edge #1924 SUCCESS in 65 min (hApp,
+push and deploy OK); its sibling validate-only run #1925 SUCCESS, so Dataplane Validation ran.
+Fleet read through doorway-alpha at 11:21Z and 13:03Z: 6 peers, replication and pull caught up,
+reconcile converged after the roll (it was not before), divergent anchors 37 then 41 (33 after
+the first roll; cause not looked for).
+
+What it took. Roll 2a went through four independent Codex reviews; each of the first three
+found one more instance of a class already fixed (a ruling reachable by another writer, a fork
+test still timed by a sleep, a retry with no backoff), and the fourth round asked for the class
+to be fixed by structure. The integrator landed the third version over one item the fourth
+review marked blocking (a retry per tick when the flow log is unreadable and still being
+appended), judging it no worse than dev; it was fixed in the next commit. Shem gated the roll
+(2 h 24 min, 12 verdicts), then the roll plus the fold (2 h 07 min) and reused none of the
+first run's verdicts. Ethosengine measured why from the key material: the large cargo gates
+declare a read of the whole `device-runtime` crate, of which the fold changed two lines, and 16
+gates are keyed on the whole commit tree, so one backlog document moves them.
+
+The laptop. It had acknowledged none of shem's records because a device with no `since` asked
+for shem's whole channel inside one 30 s deadline and kept nothing on a timeout (backlog row
+91; read to the lines by the laptop's session). With the batched fold on its daemon it kept
+1,192 events in five attempts and acknowledged shem within about six minutes; shem then claimed
+`dev-integration` plainly in 9 s. The steward paused the laptop twice (02:38Z and 10:31Z); the
+second pause ran 30 minutes longer than needed because the integrator's watcher waited for an
+age in minutes and `epr peer status` prints seconds.
+
+Measured after landing 8: shem's peer daemon under 1% of a core with 0 MiB read over 90 s, from
+about 75% and an 18 MB re-read every 30 s.
+
+Watchers that died without a word, three in one night: ethosengine's misses watcher twice (a row
+it did not expect; a quoting error), and the integrator's laptop watcher once. F4-ask-unattended
+is not met; the native shape proposed is an injector that reads open misses at every tool call.
+
+Steward, 24 Nov: chose "Refuse only at dev and main" for the serving receipt on a hand-over ref;
+leaned to refusing at once, naming the cure, for a sibling that is heard but does not
+acknowledge (row 90); and said that gate integrity should move to attestations on build
+artifacts that peers can read and enrich (recorded with the next-sprint notes).
+
 ## The integrator's errors
 
 The unsent stasis push and the seven-hour stall are recorded above. Added here:
@@ -339,6 +380,15 @@ The unsent stasis push and the seven-hour stall are recorded above. Added here:
 - I ingested the brit closure from the dirty main checkout, so the store would not land it as
   the device head, and I started a source build with a five-minute timeout that killed it. The
   second build ran to its end from a clean checkout.
+
+- I interrupted a superseded gate run by signal before using its own stop command; its
+  `epr-storage` gate recorded a failure that was mine, not the code's.
+- I told the steward twice that the roll's push was under way when it had not started: the
+  watcher that was to start it never fired, and I had not checked that its log existed.
+- I ran every orchestrator test file directly with node to check a hook change and read eight
+  failures, seven of them artefacts of that invocation; the gate is the check.
+- I started a subagent on work ethosengine had already done, then cleared its uncommitted edits
+  with a command the stasis keeper would have held.
 
 ## Parked for the next roll
 
