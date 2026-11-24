@@ -5,6 +5,13 @@ import { spawnSync } from 'child_process';
 import { basename, dirname, relative, resolve } from 'path';
 import { isReadPattern, readCovers } from './gate-input-audit.mjs';
 
+const metadataToolchains = new WeakMap();
+
+/** Exact `rustc -vV` bytes resolved by the metadata discovery that produced this graph. */
+export function metadataToolchain(metadata) {
+  return metadataToolchains.get(metadata) || null;
+}
+
 /** Metadata resolves dependencies but never builds; failed discovery cannot narrow a gate. */
 export function loadMetadata({ root, workspaceDir, spawn = spawnSync }) {
   const env = { ...process.env };
@@ -20,7 +27,9 @@ export function loadMetadata({ root, workspaceDir, spawn = spawnSync }) {
       '--manifest-path', resolve(root, workspaceDir, 'Cargo.toml'),
     ], options);
     if (result.status !== 0) return null;
-    return JSON.parse(result.stdout);
+    const metadata = JSON.parse(result.stdout);
+    metadataToolchains.set(metadata, rustc.stdout);
+    return metadata;
   } catch {
     return null;
   }

@@ -493,6 +493,77 @@ pub fn report(root: &Path, options: &ReadingOptions) -> FlowResult<ReadingReport
     Ok(fold(rows, options))
 }
 
+/// Render the advisory per-crate verdict for one run. Empty means that run has no crate rows.
+pub fn crate_shadow(root: &Path, run_id: Option<&str>) -> FlowResult<Vec<String>> {
+    let rows = read_rows(&reading_path(root))?
+        .iter()
+        .filter_map(ReadingRow::observation)
+        .collect::<Vec<_>>();
+    Ok(crate_shadow_lines(&rows, run_id))
+}
+
+fn crate_shadow_lines(rows: &[ReadingObservation], run_id: Option<&str>) -> Vec<String> {
+    let selected = run_id.map(str::to_owned).or_else(|| {
+        rows.iter()
+            .map(|row| (&row.run_id, row.ended_at))
+            .max_by(|a, b| a.1.cmp(&b.1).then_with(|| a.0.cmp(b.0)))
+            .map(|(run, _)| run.clone())
+    });
+    let Some(selected) = selected else {
+        return Vec::new();
+    };
+    let run_rows = rows
+        .iter()
+        .filter(|row| row.run_id == selected)
+        .collect::<Vec<_>>();
+    let nested_parents = run_rows
+        .iter()
+        .filter(|row| row.parent.is_some())
+        .map(|row| row.step.as_str())
+        .collect::<BTreeSet<_>>();
+    let mut grouped = BTreeMap::<&str, Vec<(&str, &ReadingObservation)>>::new();
+    for row in &run_rows {
+        let Some(parent) = row.parent.as_deref() else {
+            continue;
+        };
+        if !nested_parents.contains(parent) {
+            continue;
+        }
+        let Some(crate_name) = row.step.strip_prefix(&format!("{parent}:")) else {
+            continue;
+        };
+        if !crate_name.is_empty() {
+            grouped.entry(parent).or_default().push((crate_name, row));
+        }
+    }
+    grouped
+        .into_iter()
+        .map(|(parent, mut crates)| {
+            crates.sort_by(|a, b| a.0.cmp(b.0));
+            let unchanged = crates
+                .iter()
+                .filter(|(_, row)| row.key_changed == KeyChanged::No)
+                .collect::<Vec<_>>();
+            let names = if unchanged.is_empty() {
+                "none".to_string()
+            } else {
+                unchanged
+                    .iter()
+                    .map(|(name, _)| *name)
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            };
+            let saved = nonnegative(unchanged.iter().map(|(_, row)| row.seconds).sum::<f64>());
+            let total = nonnegative(crates.iter().map(|(_, row)| row.seconds).sum::<f64>());
+            format!(
+                "[crate-shadow] {parent}: {} of {} crates unchanged since their last green ({names}); ≈{saved:.3} s of {total:.3} s would have been saved (apportioned), decides nothing",
+                unchanged.len(),
+                crates.len()
+            )
+        })
+        .collect()
+}
+
 fn fold(mut rows: Vec<ReadingObservation>, options: &ReadingOptions) -> ReadingReport {
     if let Some(since) = options.since {
         rows.retain(|row| row.ended_at >= since);
@@ -1270,6 +1341,71 @@ mod tests {
         assert_eq!(seconds("eprfs:fmt"), Some(4.0));
         assert_eq!(seconds("eprfs:test"), Some(5.0));
         assert_eq!(seconds("eprfs"), Some(10.0));
+    }
+
+    #[test]
+    fn crate_shadow_counts_only_unchanged_keys_and_sums_apportioned_shares() {
+        let root = declared_root();
+        let crate_row = |run: &str, parent: &str, name: &str, key: &str, seconds: f64| {
+            let mut row = stored_row(run, &format!("{parent}:{name}"), key);
+            row.parent = Some(parent.into());
+            row.value = seconds;
+            row
+        };
+        let step_row = |run: &str, step: &str| {
+            let mut row = stored_row(run, step, "step-key");
+            row.parent = Some("eprfs".into());
+            row
+        };
+        append_rows(
+            &root,
+            &[
+                step_row("baseline", "eprfs:fmt"),
+                crate_row("baseline", "eprfs:fmt", "alpha", "alpha-a", 2.0),
+                crate_row("baseline", "eprfs:fmt", "beta", "beta-a", 2.0),
+                step_row("baseline", "eprfs:test"),
+                crate_row("baseline", "eprfs:test", "delta", "delta-a", 3.0),
+            ],
+        );
+        let mut current = vec![
+            step_row("current", "eprfs:fmt"),
+            crate_row("current", "eprfs:fmt", "alpha", "alpha-a", 2.0),
+            crate_row("current", "eprfs:fmt", "beta", "beta-b", 2.0),
+            crate_row("current", "eprfs:fmt", "gamma", "gamma-a", 2.0),
+            step_row("current", "eprfs:test"),
+            crate_row("current", "eprfs:test", "delta", "delta-a", 3.0),
+        ];
+        for row in &mut current {
+            row.started_at = "2026-11-24T13:00:00Z".into();
+            row.ended_at = "2026-11-24T13:00:06Z".into();
+            row.at = row.ended_at.clone();
+        }
+        append_rows(&root, &current);
+
+        assert_eq!(
+            crate_shadow(root.path(), None).unwrap(),
+            [
+                "[crate-shadow] eprfs:fmt: 1 of 3 crates unchanged since their last green (alpha); ≈2.000 s of 6.000 s would have been saved (apportioned), decides nothing",
+                "[crate-shadow] eprfs:test: 1 of 1 crates unchanged since their last green (delta); ≈3.000 s of 3.000 s would have been saved (apportioned), decides nothing",
+            ]
+        );
+        assert_eq!(
+            crate_shadow(root.path(), Some("baseline")).unwrap(),
+            [
+                "[crate-shadow] eprfs:fmt: 0 of 2 crates unchanged since their last green (none); ≈0.000 s of 4.000 s would have been saved (apportioned), decides nothing",
+                "[crate-shadow] eprfs:test: 0 of 1 crates unchanged since their last green (none); ≈0.000 s of 3.000 s would have been saved (apportioned), decides nothing",
+            ]
+        );
+    }
+
+    #[test]
+    fn crate_shadow_prints_nothing_when_the_selected_run_has_no_crate_rows() {
+        let root = declared_root();
+        append_rows(&root, &[stored_row("project-only", "eprfs", "key")]);
+        assert!(crate_shadow(root.path(), None).unwrap().is_empty());
+        assert!(crate_shadow(root.path(), Some("project-only"))
+            .unwrap()
+            .is_empty());
     }
 
     #[test]
