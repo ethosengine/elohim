@@ -2998,3 +2998,54 @@ timestamps on the daemon's log lines, and no log line for an inbound tier reques
 refused. Two traps the laptop met while rebuilding: a plain `cargo build --bin epr` omits the
 `blob-store` feature and that binary refuses a blob-store-v1 payload store; and
 `epr bin follow --repo` refuses on a host with no cargo pool.
+
+## Row 92 — frictions met on the release, upgrade and comms paths, 23 to 24 November
+
+The steward asked on 2026-11-24 that frictions on these paths be noted as they are met, so they
+are sensed, planned and resolved in flight. Each line below was observed on shem or reported by
+a sibling session that day; none is cured unless it says so.
+
+Taking a release:
+- brit 0.3.4's verified closure was refused by the store until the checkout's pin matched
+  (`source-mismatch`), then refused as a head because it had been ingested from a dirty checkout
+  (`dirty-build`). The path that worked rebuilt it from source, about 30 minutes, though verified
+  binaries existed. A proposal for accepting a verified closure without a rebuild is in
+  `genesis/docs/superpowers/specs/evidence/2026-11-24-gate-attestation/release-acceptance-design-note.md`.
+- `epr bin follow --repo` refuses on a host with no cargo pool (the laptop). The manual path
+  needs `--features blob-store`, and `epr bin land --commit` must repeat the ingest's sha string
+  exactly: a short sha fails both ways.
+- The security paydown check named `cargo update -p hickory-resolver --precise 0.26.2` for four
+  alerts in `elohim/eprfs/Cargo.lock`. Cargo refuses it: `iroh =0.92` requires hickory 0.25. The
+  alerts wait on the iroh pin; the check names a cure that cannot apply.
+
+Upgrading in place:
+- An epr head move restarts the peer daemon; a sibling in the middle of a fold loses its
+  connection (two attempts kept nothing at 11:24Z). Nothing tells the sibling a restart is coming
+  or over.
+- A session keeps its pinned epr across a landing. A hook that needs a new verb drops its work
+  (the first step readings, 15:59Z, and again for the device-level store at 20:07Z), and an older
+  epr refuses a new event kind.
+- A device reads its roster, its berth and its hooks from its main checkout. Ethosengine's sat on
+  a branch from 20 November: it dropped the laptop as unadmitted, ran a berth about 1,270 lines
+  behind dev, and had no note injector registered. The steward ruled on 2026-11-24 that the
+  ceremony there be parked (`self/ethosengine-memory-ceremony-2026-11-20-parked`) and the
+  checkout moved to dev; the move stopped at a local dev that cannot fast-forward, and is with
+  the steward in ethosengine's session.
+
+Comms while it happens:
+- Berth notes cut at about 700 characters lost half of two instructions; a note that arrives
+  between a session's reads is lost unless it re-reads its whole inbox.
+- Cross-session messages report "delivery not confirmed".
+- A sleeping laptop reads the same as a gone one; three session-owned watchers died without a
+  word in one night. The inventory of what each liveness check can and cannot tell apart is
+  `genesis/docs/superpowers/specs/evidence/2026-11-24-device-liveness/inventory.md`.
+- Codex with a workspace-write sandbox cannot commit in a git worktree (the worktree's git
+  metadata is outside its writable root).
+
+Rollback was not exercised. `epr bin land --revert` exists; nothing here shows it across two
+devices.
+
+Also found: the device notes publisher's refspec is unfiltered, so harvested `ci:*` notes reach
+the forge though the code that writes them says they stay on the device (shem has held
+`just dev notes publish` since 17:50Z pending the steward's word); and a manifest with no
+rustflags inherits ambient `RUSTFLAGS` outside the gate key.
