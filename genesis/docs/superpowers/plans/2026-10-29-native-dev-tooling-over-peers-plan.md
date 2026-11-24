@@ -866,6 +866,8 @@ Verify: the test fails on a fixture leg that has neither, and passes on dev with
 
 State: not built; `on` is integrity-class. Of 36 gates withheld from reuse, 17 name "no fingerprint" and 14 name nothing else (counted from the policy's reasons). Its first step is to sort those 14 by cause; the fingerprint applies only to those that share rust-style's.
 
+First step done, 2026-11-24 (sorted by ethosengine on the registry at `2081b2532`; a static read, reported by note and not re-counted by the integrator): 21 gate projects have no manifest steps, so no key is computed for them (`genesis/orchestrator/gate-evidence.mjs:658`). 17 are withheld for that reason, 13 for it alone (the 14 above was the integrator's count from the policy's reasons; the two counts are not yet reconciled). Four more are enrolled in `gate_reuse.projects` and can never reuse, because they have no key: seam-contracts, consent-grant, elohim-error, elohim-settings. Five would get a key that moves on almost every push, so a fingerprint buys them little as their inputs are declared: rakia-validate, cargo-coverage, pipeline-list-fresh, domain-types and rust-style, whose comparison also reads the moving `origin/dev` baseline. Others read generated or built state outside their sources, so a fingerprint over declared inputs alone would key them wrongly; they need their reads declared first.
+
 Verify: in shadow, each such gate prints a key that moves when a declared input is changed and holds when nothing it declares is.
 
 - [ ] **CD-ci-stage-selection — the orchestrator's Rust style stage and the other unconditional stages select on their whole comparison closure, and run when evidence is missing** (serves push-gate-pays-once)
