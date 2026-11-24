@@ -27,6 +27,7 @@ here is built or decided; each table states its own base commit and method.
 | [tree-scope-table.md](tree-scope-table.md) | The gates whose closure key covers the whole commit tree, the reads the input audit cannot name, and what a declaration would narrow (ranked by recorded seconds) | dev at the roll-2a review |
 | [split-units-table.md](split-units-table.md) | Table 2: which native gates could be split into finer artifacts first, whether `epr artifact key` already keys the unit, and what blocks consuming it (ranked by recorded seconds) | dev c4bea4ded |
 | [release-acceptance-design-note.md](release-acceptance-design-note.md) | An unreviewed proposal: what the store checks today when it accepts a release closure from a sibling, and what acceptance without a source rebuild would require of an attestation | dev 9f272d343 |
+| [key-closure-gaps.md](key-closure-gaps.md) | The seven ways a per-crate shadow key can stay unchanged while what a crate compiles or reads changes, each with a counterexample and the test that would close it; the checklist before any per-crate key decides reuse | branch cd/crate-shadow on dev 9f272d343 |
 | [v3-to-fold.tsv](v3-to-fold.tsv) | Raw key moves between two adjacent commits (roll-2a v3 and the batched fold): per gate project, whether its key moved and which material field moved it | roll-2a-v2 vs fold-on-v3 |
 
 Seconds are this device's gate-cost ledger (`genesis/orchestrator/gate-cost.mjs`), mean and p90 over
