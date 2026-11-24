@@ -228,15 +228,18 @@ test("actual pre-push caller propagates mandatory refusal in default and strict 
           "bash",
           // leg_red is the hook's red recorder; under GATE_ON_RED=stop it ends the push, which is
           // the propagation this test pins (under continue the hook refuses at its end instead).
-          ["-c", `leg_red() { exit 1; }\n${block}printf caller-continued`],
+          [
+            "-c",
+            "leg_red() { exit 1; }\n" +
+              'PUSH_LINES=("refs/heads/x aaaa refs/heads/self/ethosengine-x bbbb" "(delete) 0000000000000000000000000000000000000000 refs/heads/dev cccc" "refs/notes/n dddd refs/notes/n eeee")\n' +
+              `${block}printf caller-continued`,
+          ],
           {
             cwd: dir,
             encoding: "utf8",
             env: {
               ...process.env,
               CHANGED: "doorway/doorway-service/src/server/http.rs",
-              GATE_PUSH_REFS:
-                "refs/heads/self/ethosengine-x aaaa bbbb\nrefs/heads/dev cccc dddd",
               T2_RECEIPT: mode,
               RECEIPT_STATUS: String(status),
               TMPDIR: dir,
@@ -257,8 +260,8 @@ test("actual pre-push caller propagates mandatory refusal in default and strict 
         );
         assert.equal(
           readFileSync(join(dir, "receipt-targets"), "utf8"),
-          "refs/heads/self/ethosengine-x\nrefs/heads/dev\n",
-          "caller passes each pushed remote ref, one per line",
+          "refs/heads/self/ethosengine-x\nrefs/heads/dev\nrefs/notes/n\n",
+          "caller passes every remote ref of the raw push, a delete of dev included",
         );
         assert.equal(
           existsSync(readFileSync(join(dir, "targets-path"), "utf8")),
@@ -371,7 +374,13 @@ function runT2(root, changedPaths, reportsDir, env = {}, targets) {
   const targetArgs = [];
   if (targets !== undefined) {
     const list = join(reportsDir, "targets.txt");
-    writeFileSync(list, targets.map((ref) => ref + "\n").join(""));
+    // An array is written one ref per line; a string is written exactly as given.
+    writeFileSync(
+      list,
+      typeof targets === "string"
+        ? targets
+        : targets.map((ref) => ref + "\n").join(""),
+    );
     targetArgs.push("--targets", list);
   }
   return spawnSync(
@@ -535,6 +544,7 @@ test("a self/ hand-over with no serving receipt passes and names the receipt owe
         .filter((line) => line.includes("serving receipt owed before dev"));
       assert.equal(owed.length, 1, result.stdout);
       assert.match(owed[0], /just test mesh features\/dataplane\/app-delivery-refuses-fast\.feature/);
+      assert.match(owed[0], /; for scripts\/ci\/fleet-write-readiness\.sh$/, "the line names the serving paths too");
       assert.equal(result.stderr.trim(), "", "the receipt's own lines collapse into the one owed line");
     } finally {
       rmSync(dir, { recursive: true, force: true });
@@ -549,6 +559,14 @@ test("a push naming dev or main, or whose targets are unknown, still refuses a s
     ["refs/heads/self/ethosengine-x", "refs/heads/dev"],
     [],
     undefined,
+    // Untrusted lists fail closed: an abbreviation, trailing whitespace, a malformed ref, a
+    // blank line, and dev as a last line with no newline.
+    ["dev"],
+    ["refs/heads/dev "],
+    ["refs/heads/self/ethosengine-x", "garbage"],
+    ["refs/heads//dev"],
+    ["refs/heads/self/ethosengine-x", ""],
+    "refs/heads/self/ethosengine-x\nrefs/heads/dev",
   ]) {
     const dir = mkdtempSync(join(tmpdir(), "refused-at-dev-"));
     try {
