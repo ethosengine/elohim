@@ -15,7 +15,7 @@ pub mod journal;
 pub mod live;
 pub mod policy;
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 use chrono::{DateTime, Duration, SecondsFormat, Utc};
 use elohim_epr::algedonic::{Hysteresis, LatchConfig, LatchSense};
@@ -603,6 +603,8 @@ struct Folder<'a> {
     classifier_denied: usize,
     stops: StopCounts,
     silence_returned_at: HashMap<String, DateTime<Utc>>,
+    /// Pending-call identities already represented by a Silence incident.
+    observed_pending: HashSet<(String, String, String, DateTime<Utc>)>,
 }
 
 /// How the session's turns ended, by the adapter's `outcome`. Stopping is meant to be the
@@ -993,20 +995,29 @@ impl Folder<'_> {
             }
             EventKind::ToolPendingObserved => {
                 let pending_since = e.pending_since.unwrap_or(e.wall);
+                let key = (
+                    self.session.clone(),
+                    e.agent_id.clone(),
+                    e.tool.as_deref().unwrap_or("unknown").to_owned(),
+                    pending_since,
+                );
                 let returned = self
                     .silence_returned_at
                     .get(&e.agent_id)
                     .is_some_and(|returned| *returned >= pending_since);
-                if !returned && self.open_where(StallClass::Silence, &e.agent_id).is_empty() {
-                    let opened_at = e
-                        .pending_since
-                        .map_or_else(|| e.moment(), Moment::wall_only);
-                    self.open_at(
-                        e,
-                        format!("{}:{}", self.session, e.seq),
-                        StallClass::Silence,
-                        opened_at,
-                    );
+                if !returned && !self.observed_pending.contains(&key) {
+                    if self.open_where(StallClass::Silence, &e.agent_id).is_empty() {
+                        let opened_at = e
+                            .pending_since
+                            .map_or_else(|| e.moment(), Moment::wall_only);
+                        self.open_at(
+                            e,
+                            format!("{}:{}", self.session, e.seq),
+                            StallClass::Silence,
+                            opened_at,
+                        );
+                    }
+                    self.observed_pending.insert(key);
                 }
             }
             EventKind::Consultation => {
@@ -1110,7 +1121,9 @@ pub fn effective_presence(
     let last_witness = events.iter().filter_map(Event::witness_at).max();
     let age = last_witness.map(|w| secs(w, now).max(0.0));
     let ruling = events
-        .last()
+        .iter()
+        .rev()
+        .find(|e| !e.is_observer())
         .and_then(|e| e.presence.ruling_ref.clone())
         .filter(|id| {
             rulings
@@ -1385,6 +1398,7 @@ pub fn fold_session(replay: &Replay, o: &FoldOptions<'_>) -> SessionFold {
         classifier_denied: 0,
         stops: StopCounts::default(),
         silence_returned_at: HashMap::new(),
+        observed_pending: HashSet::new(),
     };
     for e in &replay.events {
         f.event(e);

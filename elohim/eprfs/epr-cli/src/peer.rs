@@ -3053,23 +3053,46 @@ mod serve_lock_tests {
     #[test]
     fn a_serve_lock_ends_despite_a_forked_child() {
         use std::os::unix::process::CommandExt;
-        use std::time::Duration;
 
         let dir = tempfile::tempdir().unwrap();
         let lock = ServeLock::acquire(dir.path()).unwrap();
-        let forker = std::thread::spawn(|| {
+        let mut ready = [0; 2];
+        // SAFETY: `ready` has room for the two descriptors `pipe` writes.
+        assert_eq!(unsafe { libc::pipe(ready.as_mut_ptr()) }, 0);
+        let [read_ready, write_ready] = ready;
+        let forker = std::thread::spawn(move || {
             let mut command = std::process::Command::new("true");
-            // SAFETY: the hook only sleeps, holding the forked child before exec with the
-            // descriptors it inherited.
+            // SAFETY: the hook uses only async-signal-safe libc calls on inherited descriptors,
+            // then holds the forked child before exec with the descriptors it inherited.
             unsafe {
-                command.pre_exec(|| {
-                    std::thread::sleep(Duration::from_millis(1500));
+                command.pre_exec(move || {
+                    libc::close(read_ready);
+                    let byte = [1_u8];
+                    if libc::write(write_ready, byte.as_ptr().cast(), byte.len()) != 1 {
+                        return Err(std::io::Error::last_os_error());
+                    }
+                    let pause = libc::timespec {
+                        tv_sec: 1,
+                        tv_nsec: 500_000_000,
+                    };
+                    libc::nanosleep(&pause, std::ptr::null_mut());
+                    libc::close(write_ready);
                     Ok(())
                 });
             }
             command.status().unwrap()
         });
-        std::thread::sleep(Duration::from_millis(300));
+        let mut byte = [0_u8];
+        // SAFETY: both descriptors came from `pipe`; the buffer holds the one byte requested.
+        assert_eq!(
+            unsafe { libc::read(read_ready, byte.as_mut_ptr().cast(), byte.len()) },
+            1
+        );
+        // SAFETY: the parent is finished with both of its pipe descriptors.
+        unsafe {
+            libc::close(read_ready);
+            libc::close(write_ready);
+        }
         drop(lock);
         let reacquired = ServeLock::acquire(dir.path());
         assert!(forker.join().unwrap().success());
