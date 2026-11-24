@@ -4,6 +4,8 @@ pub mod bin_store;
 pub mod commit_attribution;
 pub mod envelope;
 pub mod flock;
+#[cfg(all(test, unix))]
+mod fork_test;
 pub mod layout;
 pub mod manifest_store;
 pub mod session;

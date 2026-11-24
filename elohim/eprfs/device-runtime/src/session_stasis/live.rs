@@ -67,9 +67,9 @@ const REGULATOR_AGENT: &str = "stasis-regulator";
 struct Writer<'a> {
     dir: &'a std::path::Path,
     session: &'a str,
-    /// The presence of the journal's last event, carried onto every record this writer appends:
-    /// the away ruling and disposition are read from the LAST event, so a regulator record must
-    /// not clear them. The witness age is not carried (this record witnesses nothing).
+    /// The presence of the journal's last session-owned event, carried onto every record this
+    /// writer appends. An observer cannot supply or clear the away ruling or disposition. The
+    /// witness age is not carried (this record witnesses nothing).
     presence: Value,
     /// The pinned policy CID these records are decided under.
     policy_cid: String,
@@ -196,7 +196,7 @@ pub fn decide_live(
         Err(StasisError::NoJournal(_)) => return Ok(LiveDecision::Acted(out)),
         Err(e) => return Err(e),
     };
-    let Some(last) = replay.events.last() else {
+    let Some(last) = replay.last_own_event() else {
         return Ok(LiveDecision::Acted(out));
     };
     let fold = fold_session(

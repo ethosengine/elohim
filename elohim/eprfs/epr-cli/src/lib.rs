@@ -20,6 +20,8 @@ pub mod exercise;
 pub mod explain;
 pub mod feedback;
 pub mod flow;
+#[cfg(all(test, unix))]
+pub(crate) mod fork_test;
 pub mod frames;
 pub mod git;
 pub mod govern;

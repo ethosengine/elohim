@@ -665,63 +665,135 @@ impl Drop for ChildRelease {
 }
 
 #[cfg(unix)]
-#[tokio::test]
-async fn an_owner_lock_ends_with_the_owner_despite_a_forked_child() {
-    use std::os::unix::process::CommandExt;
-    let dir = private_root();
-    let owner = BlobStore::open_owner(dir.path()).await.unwrap();
+struct ForkedChild {
+    done: std::sync::mpsc::Receiver<Result<(), String>>,
+    thread: Option<std::thread::JoinHandle<()>>,
+}
+
+#[cfg(unix)]
+impl ForkedChild {
+    fn join(mut self) {
+        let result = self
+            .done
+            .recv_timeout(Duration::from_secs(30))
+            .expect("forked child did not exit within 30 seconds");
+        self.thread
+            .take()
+            .expect("fork thread")
+            .join()
+            .expect("fork thread panicked");
+        result.expect("forked child failed");
+    }
+}
+
+/// Fork on another thread and park the child before exec with bounded readiness and completion.
+#[cfg(unix)]
+fn park_child_before_exec() -> (ChildRelease, ForkedChild) {
     let mut ready = [0; 2];
-    // SAFETY: `ready` has room for the two descriptors `pipe` writes.
+    // SAFETY: `ready` has room for both descriptors.
     assert_eq!(unsafe { libc::pipe(ready.as_mut_ptr()) }, 0);
     let [read_ready, write_ready] = ready;
     let mut release = [0; 2];
-    // SAFETY: `release` has room for the two descriptors `pipe` writes.
+    // SAFETY: `release` has room for both descriptors.
     assert_eq!(unsafe { libc::pipe(release.as_mut_ptr()) }, 0);
     let [read_release, write_release] = release;
-    // Fork from another thread, as a sibling test would: `spawn` returns only after the exec.
-    let forker = std::thread::spawn(move || {
-        let mut command = Command::new("true");
-        // SAFETY: the hook uses only async-signal-safe libc calls on inherited descriptors,
-        // then blocks on `read_release` until the parent closes the other pipe end.
-        unsafe {
-            command.pre_exec(move || {
+    let mut release_guard = ChildRelease(write_release);
+    let (forked_tx, forked_rx) = std::sync::mpsc::sync_channel(0);
+    let (done_tx, done_rx) = std::sync::mpsc::sync_channel(0);
+    let thread = std::thread::spawn(move || {
+        // SAFETY: the child calls only async-signal-safe libc operations before exec.
+        let pid = unsafe { libc::fork() };
+        if pid == 0 {
+            // SAFETY: every descriptor belongs to the child; failures terminate with `_exit`.
+            unsafe {
                 libc::close(read_ready);
                 libc::close(write_release);
-                let mut byte = [1_u8];
+                let byte = [1_u8];
                 if libc::write(write_ready, byte.as_ptr().cast(), byte.len()) != 1 {
-                    return Err(std::io::Error::last_os_error());
+                    libc::_exit(126);
                 }
                 libc::close(write_ready);
-                if libc::read(read_release, byte.as_mut_ptr().cast(), byte.len()) < 0 {
-                    return Err(std::io::Error::last_os_error());
+                let mut byte = [0_u8];
+                if libc::read(read_release, byte.as_mut_ptr().cast(), byte.len()) != 1 {
+                    libc::_exit(126);
                 }
                 libc::close(read_release);
-                Ok(())
-            });
+                let path = c"/bin/true";
+                libc::execl(
+                    path.as_ptr(),
+                    path.as_ptr(),
+                    std::ptr::null::<libc::c_char>(),
+                );
+                libc::_exit(127);
+            }
         }
-        let status = command.status();
-        if status.is_err() {
-            // SAFETY: a pre-fork failure leaves this thread's ready-pipe write end open.
-            unsafe { libc::close(write_ready) };
-        }
-        status
-    });
-    let mut byte = [0_u8];
-    // SAFETY: both descriptors came from `pipe`; the buffer holds the one byte requested.
-    let ready = unsafe { libc::read(read_ready, byte.as_mut_ptr().cast(), byte.len()) };
-    // SAFETY: after the child's signal, the parent is finished with these three pipe ends.
-    unsafe {
-        libc::close(read_ready);
-        if ready == 1 {
+        // SAFETY: after `fork`, these are the parent's copies. Closing the writer makes an early
+        // child death readable as EOF.
+        unsafe {
             libc::close(write_ready);
+            libc::close(read_release);
         }
-        libc::close(read_release);
+        if pid < 0 {
+            let error = std::io::Error::last_os_error().to_string();
+            let _ = forked_tx.send(Err(error.clone()));
+            let _ = done_tx.send(Err(error));
+            return;
+        }
+        if forked_tx.send(Ok(())).is_err() {
+            return;
+        }
+        let mut status = 0;
+        // SAFETY: `pid` is the positive child pid and `status` is writable.
+        let waited = unsafe { libc::waitpid(pid, &mut status, 0) };
+        let result = if waited != pid {
+            Err(std::io::Error::last_os_error().to_string())
+        } else if libc::WIFEXITED(status) && libc::WEXITSTATUS(status) == 0 {
+            Ok(())
+        } else {
+            Err(format!("child wait status {status}"))
+        };
+        let _ = done_tx.send(result);
+    });
+    match forked_rx.recv_timeout(Duration::from_secs(30)) {
+        Ok(Ok(())) => {}
+        Ok(Err(error)) => {
+            release_guard.discard();
+            panic!("fork failed: {error}");
+        }
+        Err(error) => panic!("fork did not complete within 30 seconds: {error}"),
     }
-    let mut release = ChildRelease(write_release);
-    if ready != 1 {
-        release.discard();
-        panic!("fork failed: {:?}", forker.join().unwrap());
+    let mut poll = libc::pollfd {
+        fd: read_ready,
+        events: libc::POLLIN | libc::POLLHUP,
+        revents: 0,
+    };
+    // SAFETY: `poll` names one initialized descriptor and has a bounded timeout.
+    assert_eq!(unsafe { libc::poll(&mut poll, 1, 30_000) }, 1);
+    let mut byte = [0_u8];
+    // SAFETY: the buffer holds the one requested byte.
+    let read = unsafe { libc::read(read_ready, byte.as_mut_ptr().cast(), byte.len()) };
+    // SAFETY: readiness has resolved, so the parent no longer needs this reader.
+    unsafe { libc::close(read_ready) };
+    if read != 1 {
+        release_guard.discard();
+        panic!("child died before signalling readiness: read returned {read}");
     }
+    assert_eq!(byte[0], 1);
+    (
+        release_guard,
+        ForkedChild {
+            done: done_rx,
+            thread: Some(thread),
+        },
+    )
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn an_owner_lock_ends_with_the_owner_despite_a_forked_child() {
+    let dir = private_root();
+    let owner = BlobStore::open_owner(dir.path()).await.unwrap();
+    let (mut release, child) = park_child_before_exec();
     drop(owner);
     let reopened = BlobStore::open_owner(dir.path()).await;
     let holders = lock_holders(&dir.path().join(elohim_blob_store::OWNER_LOCK));
@@ -731,7 +803,7 @@ async fn an_owner_lock_ends_with_the_owner_despite_a_forked_child() {
         reopened.err()
     );
     release.release();
-    assert!(forker.join().unwrap().unwrap().success());
+    child.join();
 }
 
 #[cfg(feature = "tier")]
