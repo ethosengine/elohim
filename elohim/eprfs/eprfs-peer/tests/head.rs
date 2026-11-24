@@ -9,7 +9,7 @@ use std::time::{Duration, Instant};
 use eprfs_core::BlobCid;
 use eprfs_peer::{
     topic_for, Channel, ChannelHead, HeadTable, HeadVerdict, PeerError, ANNOUNCE_DEBOUNCE,
-    OWN_LOG_LEN, REANNOUNCE_EVERY,
+    MAX_CROSSING_DROP_ROWS_PER_RULE_GROUP, OWN_LOG_LEN, REANNOUNCE_EVERY,
 };
 use support::{device, household, Household};
 
@@ -252,17 +252,125 @@ fn folding_a_newer_head_reannounces_with_updated_ack() {
 #[test]
 fn crossing_drop_groups_evict_the_group_with_the_oldest_latest_refusal() {
     let mut table = HeadTable::default();
-    table.record_crossing_drop("rules-a", "device", "measure", "kind", 10);
+    table.record_crossing_drop("rules-a", "device-a", "measure", "kind", 10);
+    table.record_crossing_drop("rules-a", "device-a", "measure", "kind", 11);
+    table.record_crossing_drop("rules-a", "device-b", "measure", "kind", 12);
     table.record_crossing_drop("rules-b", "device", "measure", "kind", 20);
     table.record_crossing_drop("rules-c", "device", "measure", "kind", 30);
-    table.record_crossing_drop("rules-a", "device", "measure", "kind", 50);
     table.record_crossing_drop("rules-d", "device", "measure", "kind", 40);
 
     let groups: Vec<_> = table
         .crossing_drop_rule_groups()
         .map(|(rules, _)| rules)
         .collect();
-    assert_eq!(groups, ["rules-a", "rules-c", "rules-d"]);
+    assert_eq!(groups, ["rules-b", "rules-c", "rules-d"]);
+    assert_eq!(table.evicted_totals["device-a"].count, 2);
+    assert_eq!(table.evicted_totals["device-a"].last_seen, 11);
+    assert_eq!(table.evicted_totals["device-b"].count, 1);
+    assert_eq!(table.evicted_totals["device-b"].last_seen, 12);
+}
+
+#[test]
+fn crossing_drop_rows_over_the_group_cap_are_counted_in_overflow() {
+    let mut table = HeadTable::default();
+    for index in 0..MAX_CROSSING_DROP_ROWS_PER_RULE_GROUP + 2 {
+        table.record_crossing_drop(
+            "rules",
+            "device",
+            "measure",
+            &format!("kind-{index:02}"),
+            u64::try_from(index).expect("test index fits u64"),
+        );
+    }
+
+    assert_eq!(
+        table.crossing_drop_entries("rules").count(),
+        MAX_CROSSING_DROP_ROWS_PER_RULE_GROUP
+    );
+    let overflow = table
+        .crossing_drop_overflow("rules")
+        .expect("overflow counter");
+    assert_eq!(overflow.count, 2);
+    assert_eq!(
+        (overflow.first_seen, overflow.last_seen),
+        (
+            u64::try_from(MAX_CROSSING_DROP_ROWS_PER_RULE_GROUP).unwrap(),
+            u64::try_from(MAX_CROSSING_DROP_ROWS_PER_RULE_GROUP + 1).unwrap()
+        )
+    );
+    assert_eq!(overflow.devices["device"].count, 2);
+
+    let dir = tempfile::tempdir().expect("tempdir");
+    table.save(dir.path()).expect("persist bounded table");
+    let persisted = HeadTable::load(dir.path()).expect("reload bounded table");
+    assert_eq!(
+        persisted.crossing_drop_entries("rules").count(),
+        MAX_CROSSING_DROP_ROWS_PER_RULE_GROUP
+    );
+    assert_eq!(persisted.crossing_drop_overflow("rules").unwrap().count, 2);
+}
+
+#[test]
+fn evicting_a_crossing_drop_group_carries_its_overflow_into_sender_totals() {
+    let mut table = HeadTable::default();
+    for index in 0..MAX_CROSSING_DROP_ROWS_PER_RULE_GROUP + 2 {
+        table.record_crossing_drop(
+            "rules-a",
+            "device-a",
+            "measure",
+            &format!("kind-{index:02}"),
+            u64::try_from(index).unwrap(),
+        );
+    }
+    table.record_crossing_drop("rules-b", "device-b", "measure", "kind", 100);
+    table.record_crossing_drop("rules-c", "device-c", "measure", "kind", 200);
+    table.record_crossing_drop("rules-d", "device-d", "measure", "kind", 300);
+
+    assert!(table.crossing_drop_entries("rules-a").next().is_none());
+    assert!(table.crossing_drop_overflow("rules-a").is_none());
+    assert_eq!(
+        table.evicted_totals["device-a"].count,
+        u64::try_from(MAX_CROSSING_DROP_ROWS_PER_RULE_GROUP + 2).unwrap()
+    );
+    assert_eq!(
+        table.evicted_totals["device-a"].last_seen,
+        u64::try_from(MAX_CROSSING_DROP_ROWS_PER_RULE_GROUP + 1).unwrap()
+    );
+}
+
+#[test]
+fn grouped_crossing_drops_without_bounded_history_fields_still_load() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    std::fs::write(
+        dir.path().join(HeadTable::FILE_NAME),
+        r#"{
+          "version": 1,
+          "own": null,
+          "devices": {},
+          "dropped": {
+            "unadmitted": 0,
+            "forged": 0,
+            "rollback": 0,
+            "replayed": 0,
+            "malformed": 0
+          },
+          "crossing_drop_groups": {
+            "rules-a": {
+              "did:key:zSender": {
+                "dev-landing@1": {
+                  "misses": {"count": 2, "first_seen": 11, "last_seen": 19}
+                }
+              }
+            }
+          }
+        }"#,
+    )
+    .expect("write c1e016dec head table");
+
+    let table = HeadTable::load(dir.path()).expect("c1e016dec shape loads");
+    assert_eq!(table.crossing_drop_entries("rules-a").count(), 1);
+    assert!(table.crossing_drop_overflows.is_empty());
+    assert!(table.evicted_totals.is_empty());
 }
 
 #[test]

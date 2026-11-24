@@ -323,6 +323,27 @@ async fn flow_fold_folds_a_devices_channel_root_once_and_status_reads_it() {
         root: a.checkout.path().to_path_buf(),
         log: a.checkout.path().join(".eprfs/status/flows.jsonl"),
     });
+    let status_rules = Rules::from_policy_file(&policy).unwrap();
+    let status_digest = status_rules.digest();
+    table.rules = Some(RulesState {
+        digest: status_digest.clone(),
+        policy: policy.clone(),
+        loaded_at: 1,
+        pending: None,
+    });
+    for index in 0..eprfs_peer::MAX_CROSSING_DROP_ROWS_PER_RULE_GROUP + 2 {
+        table.record_crossing_drop(
+            status_digest.as_str(),
+            &b_did,
+            "dev-landing@1",
+            &format!("kind-{index:02}"),
+            100 + u64::try_from(index).unwrap(),
+        );
+    }
+    table.record_crossing_drop("rules-old-a", &b_did, "measure", "kind", 10);
+    table.record_crossing_drop("rules-old-a", &b_did, "measure", "kind", 11);
+    table.record_crossing_drop("rules-old-b", "device-b", "measure", "kind", 20);
+    table.record_crossing_drop("rules-old-c", "device-c", "measure", "kind", 30);
     table.save(&a.peer_dir()).unwrap();
     let status = a.epr(&["peer", "status", "--root", a.root(), "--json"]);
     assert!(
@@ -343,6 +364,12 @@ async fn flow_fold_folds_a_devices_channel_root_once_and_status_reads_it() {
         "{json}"
     );
     assert_eq!(json["refusedStrangers"], 2, "{json}");
+    assert_eq!(json["crossingDrops"]["overflow"]["count"], 2, "{json}");
+    assert_eq!(
+        json["crossingDrops"]["evicted"],
+        serde_json::json!([{"device": b_did, "count": 2, "lastSeen": 11}]),
+        "{json}"
+    );
     // No artifact was served or put in custody here (K12 design §4 exit counts).
     let gate = &json["artifactGate"];
     assert_eq!(gate["reachDraws"], 0, "{json}");
@@ -356,6 +383,18 @@ async fn flow_fold_folds_a_devices_channel_root_once_and_status_reads_it() {
     assert!(text.contains("refused connections"), "{text}");
     assert!(text.contains(": 3"), "{text}");
     assert!(text.contains("strangers: 2"), "{text}");
+    assert!(
+        text.contains("2 additional events beyond the 32 persisted crossing-drop rows"),
+        "{text}"
+    );
+    assert!(
+        text.contains(&format!(
+            "2 earlier events from {}…{} under evicted rules",
+            &b_did[..16],
+            &b_did[b_did.len() - 4..]
+        )),
+        "{text}"
+    );
 
     // Nothing printed carries the peer key.
     let secret = std::fs::read(a.peer_dir().join(PeerKey::FILE_NAME)).unwrap();
