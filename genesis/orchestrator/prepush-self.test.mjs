@@ -132,6 +132,7 @@ function push(fx, lines, env = {}) {
       BRIT_BUILD_REF_BIN: join(fx.dir, "bin/brit-build-ref"),
       ELOHIM_DEVICE_KEY_FILE: join(fx.dir, "no-device-key"),
       EPR_BIN: "/nonexistent/epr",
+      GATE_READING: "off",
       BERTH_PREPUSH_TTL_S: "30",
       ...env,
     },
@@ -408,7 +409,7 @@ for (const [name, launcher] of [["with its launcher", true], ["without its launc
     if (launcher) exe(join(fx.dir, ".husky/_/pre-push"), "#!/usr/bin/env sh\n");
     const r = spawnSync("bash", [other, "origin", "u"], {
       cwd: fx.dir, input: "", encoding: "utf8", timeout: 60000,
-      env: { ...cleanEnv, PATH: `${join(fx.dir, "bin")}:${cleanEnv.PATH}`, EPR_BIN: "/nonexistent/epr" },
+      env: { ...cleanEnv, PATH: `${join(fx.dir, "bin")}:${cleanEnv.PATH}`, EPR_BIN: "/nonexistent/epr", GATE_READING: "off" },
     });
     assert.equal(r.status, 0, r.stdout + r.stderr);
     assert.match(r.stderr, /note: running .*elsewhere\/pre-push\.bash, which differs/);
