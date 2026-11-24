@@ -478,7 +478,7 @@ fn lock_sysroot(file: &Path, wait: std::time::Duration) -> Result<Flock, String>
     if fs::symlink_metadata(&path).is_ok_and(|meta| !meta.is_file()) {
         return Err(format!("{} is not a regular file", path.display()));
     }
-    let mut lock = fs::OpenOptions::new()
+    let lock = fs::OpenOptions::new()
         .create(true)
         .append(true)
         .custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK)
@@ -487,17 +487,10 @@ fn lock_sysroot(file: &Path, wait: std::time::Duration) -> Result<Flock, String>
     if !lock.metadata().is_ok_and(|meta| meta.is_file()) {
         return Err(format!("{} is not a regular file", path.display()));
     }
-    let until = std::time::Instant::now() + wait;
-    loop {
-        match Flock::try_exclusive(lock) {
-            Ok(Ok(held)) => return Ok(held),
-            Ok(Err(file)) if std::time::Instant::now() < until => {
-                lock = file;
-                std::thread::sleep(std::time::Duration::from_millis(20));
-            }
-            Ok(Err(_)) => return Err(format!("another arrival holds {}", path.display())),
-            Err(e) => return Err(format!("{}: {e}", path.display())),
-        }
+    match Flock::exclusive_within(lock, wait, std::time::Duration::from_millis(20)) {
+        Ok(Ok(held)) => Ok(held),
+        Ok(Err(_)) => Err(format!("another arrival holds {}", path.display())),
+        Err(e) => Err(format!("{}: {e}", path.display())),
     }
 }
 

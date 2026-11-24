@@ -17,6 +17,7 @@
 use ark_core::{declaration, ArtifactRef, Berth, Passport, RuntimeManifest};
 use elohim_device_runtime::{
     bin_store::{file_cid, Store},
+    flock::Flock,
     manifest_store,
 };
 use serde::{Deserialize, Serialize};
@@ -1503,37 +1504,26 @@ fn tell_holder(berth: &Path, holder: &str, trigger: &str, stale: Option<&StaleCh
 /// This act's turn to restart the device's ark: an exclusive flock on `<data root>/restart.lock`,
 /// held only around the stop and start, never during the readiness wait.
 struct RestartTurn {
-    /// Closing it releases the turn.
-    _held: fs::File,
+    /// Dropping it unlocks and releases the turn.
+    _held: Flock,
 }
 
 impl RestartTurn {
     fn take(data_root: &Path) -> Outcome<RestartTurn> {
-        use std::os::fd::AsRawFd;
         let path = data_root.join("restart.lock");
         let file = fs::OpenOptions::new()
             .create(true)
             .append(true)
             .open(&path)
             .map_err(|e| format!("{}: {e}", path.display()))?;
-        let deadline = Instant::now() + RESTART_TURN;
-        loop {
-            // SAFETY: the fd is open and owned by `file` for this call; flock keeps no pointer.
-            if unsafe { libc::flock(file.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) } == 0 {
-                return Ok(RestartTurn { _held: file });
-            }
-            let error = std::io::Error::last_os_error();
-            if error.kind() != std::io::ErrorKind::WouldBlock {
-                return Err(format!("{}: {error}", path.display()));
-            }
-            if Instant::now() >= deadline {
-                return Err(format!(
-                    "another restart of this ark held {} for {}s",
-                    path.display(),
-                    RESTART_TURN.as_secs()
-                ));
-            }
-            thread::sleep(Duration::from_millis(100));
+        match Flock::exclusive_within(file, RESTART_TURN, Duration::from_millis(100)) {
+            Ok(Ok(held)) => Ok(RestartTurn { _held: held }),
+            Ok(Err(_)) => Err(format!(
+                "another restart of this ark held {} for {}s",
+                path.display(),
+                RESTART_TURN.as_secs()
+            )),
+            Err(error) => Err(format!("{}: {error}", path.display())),
         }
     }
 }
@@ -2258,6 +2248,42 @@ fn tail(path: &Path, lines: usize) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Dropping a restart turn unlocks it even while a child forked by another thread is paused
+    /// before exec with its inherited descriptor copy.
+    #[cfg(unix)]
+    #[test]
+    fn a_restart_turn_ends_despite_a_forked_child() {
+        let dir = tempfile::tempdir().unwrap();
+        let turn = RestartTurn::take(dir.path()).unwrap();
+        let forker = std::thread::spawn(|| {
+            let mut command = Command::new("true");
+            // SAFETY: the hook only sleeps, holding the forked child before exec with the
+            // descriptors it inherited.
+            unsafe {
+                command.pre_exec(|| {
+                    std::thread::sleep(Duration::from_millis(1500));
+                    Ok(())
+                });
+            }
+            command.status().unwrap()
+        });
+        std::thread::sleep(Duration::from_millis(300));
+        drop(turn);
+        // RestartTurn::take waits up to RESTART_TURN, which outlasts the child's pause, so a
+        // close-only release would still be taken eventually: the time to take it is the proof.
+        let asked = std::time::Instant::now();
+        let reacquired = RestartTurn::take(dir.path());
+        let took = asked.elapsed();
+        assert!(forker.join().unwrap().success());
+        if let Err(error) = reacquired {
+            panic!("{error}");
+        }
+        assert!(
+            took < Duration::from_millis(500),
+            "the turn was held {took:?} after its owner dropped it: released only when the forked child exec'd"
+        );
+    }
 
     #[test]
     fn proc_stat_reads_this_process_and_survives_a_spaced_name() {
