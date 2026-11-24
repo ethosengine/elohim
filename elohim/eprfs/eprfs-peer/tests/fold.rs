@@ -6,7 +6,7 @@ mod support;
 use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use async_trait::async_trait;
 use bytes::Bytes;
@@ -29,6 +29,7 @@ use iroh::endpoint::{Connection, VarInt};
 use iroh::protocol::{AcceptError, ProtocolHandler, Router};
 use iroh::{Endpoint, NodeAddr};
 use support::{berth_event, household, loopback, policy, Checkout, Household, HANDLE};
+use tokio::time::Instant;
 
 const WITHIN: Duration = Duration::from_secs(20);
 
@@ -1068,64 +1069,128 @@ async fn read_window_eight_matches_window_one_in_listing_order() {
     mounted.router.shutdown().await.expect("shutdown");
 }
 
-#[tokio::test(flavor = "multi_thread")]
-async fn read_window_eight_keeps_more_events_by_the_same_deadline() {
+async fn folds_to_convergence(
+    household: &Household,
+    tree: &TestChannel,
+    expected: &HashSet<Cid>,
+    read_window: usize,
+    read_delay: Duration,
+) -> usize {
+    let checkout = Checkout::new();
+    let state = tempfile::tempdir().expect("state");
+    let store = checkout.store();
+    let crossing_allow = allow();
+    let tree_limits = TreeLimits::default();
+    let mut known = HashSet::new();
+
+    for attempt in 1..=expected.len() {
+        let before = known.len();
+        let (tier, active_reads, _) = scripted_stub(
+            tree.clone(),
+            Arc::new(move |request| {
+                if matches!(request, TierRequest::Read { .. }) {
+                    read_delay
+                } else {
+                    Duration::ZERO
+                }
+            }),
+            0,
+        );
+        let mounted = mount_scripted_stub(&household.key_b, tier).await;
+        let endpoint = bind(&household.key_a, None, vec![]).await.expect("bind A");
+        let report = {
+            let folding = fold_root_planned(
+                &endpoint,
+                mounted.addr.clone(),
+                FoldTarget {
+                    device: &household.b.did,
+                    since: None,
+                    root: &tree.root,
+                    admission: None,
+                    reader: FoldReader {
+                        device: &household.a.did,
+                        state_dir: state.path(),
+                    },
+                },
+                &store,
+                &crossing_allow,
+                &tree_limits,
+                FoldPlan {
+                    limits: FoldLimits {
+                        read_window,
+                        floor_read: read_delay,
+                        ..FoldLimits::default()
+                    },
+                    known: Some(&known),
+                    deadline: Some(Instant::now() + read_delay.mul_f32(3.5)),
+                },
+            );
+            tokio::pin!(folding);
+            loop {
+                if active_reads.load(Ordering::SeqCst) != 0 {
+                    break folding.await;
+                }
+                tokio::select! {
+                    biased;
+                    report = &mut folding => break report,
+                    () = tokio::task::yield_now() => {}
+                }
+            }
+        }
+        .expect("a deadline-bounded fold converges");
+        tokio::time::resume();
+        wait_for_idle(&active_reads).await;
+        endpoint.close().await;
+        mounted.router.shutdown().await.expect("shutdown");
+        tokio::time::pause();
+
+        assert!(
+            report.known.is_superset(&known),
+            "attempt {attempt} regressed"
+        );
+        assert!(
+            report.known.len() > before,
+            "attempt {attempt} restarted without keeping an event"
+        );
+        known = report.known;
+        if known == *expected {
+            assert_eq!(&folded_from(&store, &household.b.did).unwrap(), expected);
+            return attempt;
+        }
+        assert!(!report.complete, "a partial fold reported completion");
+        assert!(
+            report.deadline_reached,
+            "a partial fold missed its deadline"
+        );
+    }
+
+    panic!("channel did not converge within one progress-floor fold per event");
+}
+
+#[tokio::test]
+async fn read_window_eight_converges_in_fewer_deadline_bounded_folds() {
+    const EVENT_COUNT: usize = 48;
+    const READ_DELAY: Duration = Duration::from_millis(8);
+
     let h = household();
-    let events: Vec<_> = (0..48)
+    let events: Vec<_> = (0..EVENT_COUNT)
         .map(|seq| berth_event("note", "-", "window-speed", &seq.to_string()))
         .collect();
+    let expected = events
+        .iter()
+        .map(|event| atom_cid(event).expect("event cid"))
+        .collect();
     let tree = test_channel(events, vec![]);
-    let (tier, active, _) = scripted_stub(
-        tree.clone(),
-        Arc::new(|request| {
-            if matches!(request, TierRequest::Read { .. }) {
-                Duration::from_millis(8)
-            } else {
-                Duration::ZERO
-            }
-        }),
-        0,
-    );
-    let mounted = mount_scripted_stub(&h.key_b, tier).await;
-    let (endpoint, connection) = connect_stub(&h, &mounted).await;
-    let limits = |read_window| FoldLimits {
-        read_window,
-        read_deadline: Some(Instant::now() + Duration::from_millis(90)),
-        floor_read: Duration::ZERO,
-        ..FoldLimits::default()
-    };
 
-    let one = fetch_channel(
-        &connection,
-        None,
-        &tree.root,
-        &HashSet::new(),
-        &TreeLimits::default(),
-        &limits(1),
-    )
-    .await
-    .expect("window one");
-    wait_for_idle(&active).await;
-    let eight = fetch_channel(
-        &connection,
-        None,
-        &tree.root,
-        &HashSet::new(),
-        &TreeLimits::default(),
-        &limits(8),
-    )
-    .await
-    .expect("window eight");
+    tokio::time::pause();
+    let one = folds_to_convergence(&h, &tree, &expected, 1, READ_DELAY).await;
+    let eight = folds_to_convergence(&h, &tree, &expected, 8, READ_DELAY).await;
+    tokio::time::resume();
+
     assert!(
-        eight.events.len() > one.events.len(),
-        "window one kept {}, window eight kept {}",
-        one.events.len(),
-        eight.events.len()
+        eight < one,
+        "window one needed {one} folds, window eight needed {eight}"
     );
-
-    drop(connection);
-    endpoint.close().await;
-    mounted.router.shutdown().await.expect("shutdown");
 }
 
 #[tokio::test(flavor = "multi_thread")]

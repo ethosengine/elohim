@@ -56,4 +56,4 @@ eprfs-peer = { path = ".", features = ["testing"] }
 elohim-epr = { path = "../../epr" }
 eprfs-serve = { path = "../eprfs-serve", features = ["testing"] }
 tempfile = "3"
-tokio = { workspace = true, features = ["sync", "time"] }
+tokio = { workspace = true, features = ["sync", "test-util", "time"] }

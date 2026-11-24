@@ -13,7 +13,7 @@ use std::collections::{BTreeMap, HashSet};
 use std::fs::{self, OpenOptions};
 use std::io::Write;
 use std::path::Path;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use cid::Cid;
 use elohim_epr_rea::model::canonical_bytes;
@@ -22,6 +22,7 @@ use eprfs_core::{BlobCid, TreeEntry, TreeEntryKind, TreeLimits, TreePath, View};
 use iroh::endpoint::{Connection, VarInt};
 use iroh::{Endpoint, NodeAddr};
 use tokio::task::JoinSet;
+use tokio::time::Instant;
 
 use crate::allow::{crossing_kind, via_device, CrossingAllowList, VIA_SLOT};
 use crate::channel::{CHANNEL_EVENTS, CHANNEL_NACKS};
@@ -304,7 +305,7 @@ async fn fetch_channel_for(
         }
     };
     let offered = match progress.deadline {
-        Some(deadline) => match tokio::time::timeout_at(deadline.into(), listing).await {
+        Some(deadline) => match tokio::time::timeout_at(deadline, listing).await {
             Ok(offered) => offered?,
             Err(_) => {
                 return Ok(Fetched {
@@ -390,7 +391,7 @@ async fn fetch_channel_for(
         } else {
             let next = next_ordered_answer(&mut reads, &mut ready, next_consume);
             let awaited = match deadline {
-                Some(deadline) => match tokio::time::timeout_at(deadline.into(), next).await {
+                Some(deadline) => match tokio::time::timeout_at(deadline, next).await {
                     Ok(answer) => answer,
                     Err(_) => {
                         deadline_expired = true;
@@ -454,7 +455,7 @@ async fn fetch_channel_for(
             while reads.len() >= read_window {
                 let joined = match deadline {
                     Some(deadline) => {
-                        match tokio::time::timeout_at(deadline.into(), reads.join_next()).await {
+                        match tokio::time::timeout_at(deadline, reads.join_next()).await {
                             Ok(joined) => joined,
                             Err(_) => {
                                 fetched.complete = false;
@@ -557,7 +558,7 @@ async fn fetch_channel_for(
     if let Some(reader) = progress.reader.filter(|_| !fetched.deadline_reached) {
         let nack = read_nack(connection, root, reader, tree);
         match progress.deadline {
-            Some(deadline) => match tokio::time::timeout_at(deadline.into(), nack).await {
+            Some(deadline) => match tokio::time::timeout_at(deadline, nack).await {
                 Ok(peer_nack) => fetched.peer_nack = peer_nack?,
                 Err(_) => {
                     fetched.complete = false;
@@ -925,7 +926,7 @@ pub async fn fold_root_planned(
     };
     let connecting = endpoint.connect(peer, TIER_ALPN);
     let connection = match plan.deadline {
-        Some(deadline) => tokio::time::timeout_at(deadline.into(), connecting)
+        Some(deadline) => tokio::time::timeout_at(deadline, connecting)
             .await
             .map_err(|_| PeerError::FoldUnanswered {
                 what: format!("root {} (timed out connecting)", target.root),
