@@ -117,7 +117,16 @@ echo "no build ref found for step=$step commit=$commit" >&2
 `);
   // Never pause a real rust-analyzer of the workspace running this test.
   exe(join(dir, "bin/pgrep"), "#!/usr/bin/env bash\nexit 1\n");
-  return { dir, base, one, two, verdictCid: cidString(verdictBytes) };
+  const readingEpr = join(dir, "bin/epr-reading");
+  exe(readingEpr, `#!/usr/bin/env bash
+printf '%s\\n' "$*" >> "${dir}/reading-calls.log"
+while [ "$#" -gt 0 ]; do
+  if [ "$1" = --from ]; then cp "$2" "${dir}/reading-rows.jsonl"; break; fi
+  shift
+done
+exit "\${STUB_READING_RC:-0}"
+`);
+  return { dir, base, one, two, readingEpr, verdictCid: cidString(verdictBytes) };
 }
 
 function push(fx, lines, env = {}) {
@@ -148,7 +157,7 @@ function push(fx, lines, env = {}) {
 const gatesRun = log => (log.match(/^GATE --target (\S+)/gm) || []).map(l => l.split(" ").at(-1));
 
 function assertHandOver(r) {
-  assert.equal(r.status, 0, r.out);
+  assert.equal(r.status, 0, `signal=${r.signal} error=${r.error?.message || "none"}\n${r.out}`);
   assert.deepEqual(gatesRun(r.log), [], `no project gate runs on a hand-over\n${r.log}`);
   assert.match(r.log, /^PREFLIGHT --projects alpha beta$/m, "the selected projects' preflight runs");
   assert.match(r.log, /^STYLE /m, "per-commit style runs");
@@ -172,6 +181,32 @@ const line = (local, sha, remote, remoteSha = ZERO) => `${local} ${sha} ${remote
 if (spawnSync("python3", ["-c", ""]).status !== 0) {
   throw new Error("prepush-self needs a python3 that runs `python3 -c ''` (the hook's paydown leg runs it): install one on PATH");
 }
+
+test("whole hook appends readings once when on and preserves its exit status", t => {
+  const fx = fixture(t);
+  const r = push(fx, [line("refs/heads/topic", fx.one, "refs/heads/self/topic")], {
+    GATE_READING: "on",
+    EPR_BIN: fx.readingEpr,
+  });
+  assert.equal(r.status, 0, `signal=${r.signal} error=${r.error?.message || "none"}\n${r.out}`);
+  const calls = readFileSync(join(fx.dir, "reading-calls.log"), "utf8").trim().split("\n");
+  assert.equal(calls.length, 1);
+  assert.match(calls[0], /^flow reading append --from .*\/rows\.jsonl --root /);
+  const rows = readFileSync(join(fx.dir, "reading-rows.jsonl"), "utf8")
+    .trim().split("\n").map(row => JSON.parse(row));
+  assert.ok(rows.length > 1);
+  assert.equal(rows.filter(row => row.synthesized).length > 0, true);
+});
+
+test("whole hook makes no reading append when off", t => {
+  const fx = fixture(t);
+  const r = push(fx, [line("refs/heads/topic", fx.one, "refs/heads/self/topic")], {
+    GATE_READING: "off",
+    EPR_BIN: fx.readingEpr,
+  });
+  assert.equal(r.status, 0, r.out);
+  assert.equal(existsSync(join(fx.dir, "reading-calls.log")), false);
+});
 
 test("a self-only push runs the seconds checks, no project gate, and records the pushed head", t => {
   const fx = fixture(t);

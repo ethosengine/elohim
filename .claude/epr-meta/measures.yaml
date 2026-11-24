@@ -477,20 +477,23 @@ measures:
     family: dev-cycle
     unit: seconds
     procedure: >
-      gate-runner.mjs collects project rows in memory; the pre-push gate_step_reading helper
-      collects leg rows as JSONL in one per-run scratch directory. Each caller makes exactly one
-      bounded `epr flow reading append --from <file>` call at run end (including pre-push early
-      exit); failure or timeout drops the batch with one line and never changes a verdict.
+      A standalone gate-runner.mjs collects project rows in memory and makes one hard-killed native
+      append at exit. Under pre-push every project runner adds its row to the hook's exported
+      per-push JSONL scratch file; the hook alone makes exactly one hard-killed
+      `epr flow reading append --from <file>` call from its EXIT finalizer. Failure, timeout or
+      telemetry filesystem cleanup drops the batch with at most one line and never changes a verdict.
       The native verb validates the declared gate-step-reading@1 shape/unit/vocabularies, appends
       valid rows under a lock to device-local `.eprfs/status/readings/gate-step.jsonl`, and when
       that file exceeds 2 MiB atomically retains its newest rows fitting in 1 MiB. The value is
       executing seconds; rows also carry run_id, step, key (closure key or `none: <reason>`),
-      key_changed (yes|no|unknown), outcome (ran|reused|skipped), waited_seconds, started_at,
-      ended_at and at. `epr flow report reading` folds the last ten runs by default from that file.
+      key_changed (yes|no|unknown, derived against the latest green row for the step), status
+      (green|red|none), outcome (ran|reused|skipped), waited_seconds, lease_waited_seconds,
+      synthesized, started_at, ended_at and at. `epr flow report reading` folds the last ten runs
+      by default from that file; synthesized EXIT-fill rows do not set run spans or finishes.
       Rung 1-2 rows already in flows.jsonl are not migrated. This shadow telemetry selects no
       gate, changes no closure key, refuses no reuse and never changes a gate verdict.
     provenance: "genesis/docs/superpowers/specs/2026-11-23-change-detection-one-reading-design.md section 4; station CD-reading"
-    env-sensitivity: [run_id, step, key, key_changed, outcome, waited_seconds, started_at, ended_at]
+    env-sensitivity: [run_id, step, key, key_changed, status, outcome, waited_seconds, lease_waited_seconds, synthesized, started_at, ended_at]
     default-authority: observation
     status: active
     established_by: change-detection-cd-reading-2026-11-24
