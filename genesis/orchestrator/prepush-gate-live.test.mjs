@@ -64,8 +64,10 @@ const env = () => ({
   GATE_PUSH_TARGETS: TARGET,
 });
 
+// Hook slices end their legs by recording a step reading; outside the hook the recorder is stood
+// in for (it passes its first argument, the leg's status, through).
 const script = (...parts) =>
-  `set -o pipefail\nGATE_COMMIT=${SHA}\nGATE_PUSH_TARGETS=${TARGET}\nLIVE_SHA=${SHA}\nLIVE_TARGETS=${TARGET}\n${parts.join("\n")}\n`;
+  `set -o pipefail\ngate_step_reading() { return "$1"; }\nGATE_COMMIT=${SHA}\nGATE_PUSH_TARGETS=${TARGET}\nLIVE_SHA=${SHA}\nLIVE_TARGETS=${TARGET}\n${parts.join("\n")}\n`;
 
 function runsOf(dir) {
   const runs = join(dir, ".eprfs/status/gate-live/runs");
@@ -351,7 +353,7 @@ function realPush(t, message) {
   const body = [`HOOK_WORK_TREE='${ROOT}'`, PRELUDE, "GATE_LIVE_RUN=''", RED_BLOCK, "hook_pass() { exit 0; }", `ZERO_SHA=${"0".repeat(40)}`,
     'is_notes_ref() { case "$1" in refs/notes/*) return 0 ;; esac; return 1; }', "PUSH_LINES=(", ...lines.map((l) => `  "${l}"`), ")",
     "export GATE_PUSH_TARGETS=refs/heads/dev", fleetBlock(), "pass_or_refuse"].join("\n");
-  return spawnSync("bash", ["-c", `set -o pipefail\n${body}\n`],
+  return spawnSync("bash", ["-c", `set -o pipefail\ngate_step_reading() { return "$1"; }\n${body}\n`],
     { cwd: ROOT, env: { ...cleanEnv, GIT_DIR: gd, GIT_WORK_TREE: ROOT, EPR_BIN: "/nonexistent/epr" }, encoding: "utf8", timeout: 60000 });
 }
 
