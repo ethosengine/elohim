@@ -43,6 +43,54 @@ export GIT_WORK_TREE="$HOOK_WORK_TREE"
 export GIT_DIR="$HOOK_GIT_DIR"
 # ── Git context anchored ────────────────────────────────────────
 
+# ── Gate step reading helper ────────────────────────────────────
+# One native observation per non-project hook leg. Every leg below either records itself when it
+# runs or is filled as skipped by this same function from the EXIT chain. The reasons are the
+# honest closure judgement: none of these legs reads only one committed blob or the pushed refs.
+GATE_READING_RUN_ID="${GATE_READING_RUN_ID:-pre-push-$(date -u +%Y%m%dT%H%M%S%NZ)-$BASHPID}"
+export GATE_READING_RUN_ID
+GATE_READING_SEEN=""
+GATE_READING_WARNED=""
+GATE_READING_LEGS=$'submodules\treads checked-out submodule worktrees as well as gitlinks\nsecurity-paydown\treads the pushed trees, a moving baseline, policy and the working-tree checker\nrust-style\treads the pushed trees, a moving baseline, policy and Rust ownership state\ninput-policy\treads the Brit executable, policy and device capability state\nfleet-roll\treads every ref in the push, destination history, manifests and fleet policy\ndoc-cut\treads every ref in the push, destination documents and commit messages\npackage-projections\treads the package tree and every generated runtime projection\nhook-boundary-tests\treads the hook tree, its test suite and host Python\nhabit-register\treads every habit atom, manifests, projector and generated register\nagentic-library-harnesses\treads the governance library tree, harnesses and host tools\nci-ignore\treads the changed-path union and working-tree .ci-ignore\nelohim-agent-test\treads the agent manifest/schema workspace and Node dependencies\nproject-selection\treads every build manifest, changed paths, gitlinks and oracle state\npreflight\treads selected project prerequisites, closures and device state\nhumans-presences\treads source directories, generated JSON and seeder dependencies\ncid-artifacts\treads content source directories, generated twins and seeder dependencies\ndevice-archetypes\treads the device source directory, generated JSON and seeder dependencies\ndeployments-conformance\treads deployments, human manifests, budgets and validator dependencies\nruntime-manifest-pins\treads runtime manifests, Cargo sources, toolchain and generated resources\naccount-packages\treads account packages, human sources and seeder dependencies\nci-ignore-freshness\treads every compose manifest, the projector and generated .ci-ignore\nepr-meta-compose\treads the push range against the moving origin/dev baseline and compose policy\nt2-receipt\treads changed paths, working-tree mtimes, reports and device validation refs\nsweettest\treads selected projects, every push destination and operator overrides\nresource-check\treads device volume pressure, pool policy and live cargo state\nepr-landing\treads the pushed dev head, gate selection and device bin-store state\nbrit-advisory\treads the moving origin/dev baseline, repository integrity and Brit device state\nhandover-record\treads every ref in the push, gate verdicts and native hand-over state'
+
+gate_step_reading() {
+  # No arguments means EXIT-time fill: every leg not reached before an early exit is skipped.
+  if [ "$#" -eq 0 ]; then
+    local reading_name reading_reason reading_now
+    reading_now=$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)
+    while IFS=$'\t' read -r reading_name reading_reason; do
+      [ -n "$reading_name" ] || continue
+      case $'\n'"$GATE_READING_SEEN"$'\n' in *$'\n'"$reading_name"$'\n'*) continue ;; esac
+      gate_step_reading 0 "$reading_name" skipped "none: $reading_reason" unknown 0 "$reading_now" "$reading_now"
+    done <<<"$GATE_READING_LEGS"
+    return 0
+  fi
+
+  local reading_status=$1 reading_name=$2 reading_outcome=$3 reading_key=$4
+  local reading_changed=$5 reading_seconds=$6 reading_started=$7 reading_ended=$8
+  local reading_epr reading_emit_status
+  case $'\n'"$GATE_READING_SEEN"$'\n' in
+    *$'\n'"$reading_name"$'\n'*) return "$reading_status" ;;
+  esac
+  GATE_READING_SEEN="${GATE_READING_SEEN:+$GATE_READING_SEEN$'\n'}$reading_name"
+  [ "${GATE_READING-}" != off ] || return "$reading_status"
+  reading_epr="${EPR_BIN:-epr}"
+  "$reading_epr" flow sense observation --measure gate-step-reading@1 --subject . \
+    --value "$reading_seconds" --unit seconds \
+    --env "run_id=$GATE_READING_RUN_ID" --env "step=leg:$reading_name" \
+    --env "key=$reading_key" --env "key_changed=$reading_changed" \
+    --env "outcome=$reading_outcome" --env waited_seconds=0 \
+    --env "started_at=$reading_started" --env "ended_at=$reading_ended" \
+    >/dev/null 2>&1
+  reading_emit_status=$?
+  if [ "$reading_emit_status" -ne 0 ] && [ -z "$GATE_READING_WARNED" ]; then
+    echo "[gate-reading] pre-push leg observations unavailable (exit $reading_emit_status)" >&2
+    GATE_READING_WARNED=1
+  fi
+  return "$reading_status"
+}
+# ── Gate step reading helper end ────────────────────────────────
+
 # ── Attested submodules checked out ─────────────────────────────
 # brit, rakia and sophia declare their attested gate projects in manifests that
 # live inside each submodule. A tree without them runs every gate, then the
@@ -51,9 +99,18 @@ export GIT_DIR="$HOOK_GIT_DIR"
 attested_submodules_missing() {
   git submodule status -- elohim/brit elohim/rakia sophia 2>/dev/null | awk '/^-/ { print $2 }'
 }
+READING_STARTED_S=$SECONDS
+READING_STARTED_AT=$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)
 MISSING_SUBMODULES=$(attested_submodules_missing | xargs)
+READING_STATUS=0
+[ -z "$MISSING_SUBMODULES" ] || READING_STATUS=1
+READING_ENDED_AT=$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)
+gate_step_reading "$READING_STATUS" submodules ran \
+  "none: reads checked-out submodule worktrees as well as gitlinks" unknown \
+  "$((SECONDS - READING_STARTED_S))" "$READING_STARTED_AT" "$READING_ENDED_AT"
 if [ -n "$MISSING_SUBMODULES" ]; then
   echo "[pre-push] REFUSED: not checked out: $MISSING_SUBMODULES. Run: git submodule update --init $MISSING_SUBMODULES" >&2
+  gate_step_reading
   exit 1
 fi
 # ── Attested submodules present ─────────────────────────────────
@@ -220,6 +277,7 @@ trap hook_on_exit EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 trap 'exit 129' HUP
+HOOK_ON_EXIT="$HOOK_ON_EXIT gate_step_reading"
 
 BERTH_BIN="$HOOK_WORK_TREE/genesis/agentic/bin/berth"
 BERTH_TTL_S="${BERTH_PREPUSH_TTL_S:-600}"
@@ -780,6 +838,7 @@ phase_l_handoff() {
 # changes. The helper itself defaults its own ${REPO_ROOT:-/projects/elohim}
 # fallback when invoked without it being exported.
 brit_advisory() {
+  BRIT_ADVISORY_RAN=""
   REPO_TOPLEVEL="$(git rev-parse --show-toplevel 2>/dev/null)"
   if [ -z "$REPO_TOPLEVEL" ]; then
     return 0  # not in a git repo (shouldn't happen for pre-push); silent skip
@@ -803,6 +862,7 @@ brit_advisory() {
       return 0
     fi
   fi
+  BRIT_ADVISORY_RAN=1
   echo ""
   echo "── brit advisory (Stage 1a — warn-only; each call bounded by BRIT_ADVISORY_TIMEOUT_S, default 60s) ─────────────────────"
   REPO_ROOT="$REPO_TOPLEVEL" "$HELPER" verify
@@ -825,9 +885,32 @@ handover_finish() {
     exit 1
   fi
   # The warn-only Brit integrity advisory, when forced: it never refuses.
-  [ "${BRIT_ADVISORY:-}" != "always" ] || brit_advisory
-  if ! printf '%s\n' "${PUSH_LINES[@]}" |
-     node "$HOOK_WORK_TREE/genesis/orchestrator/handover-record.mjs" --root "$HOOK_WORK_TREE" --projects "$PROJECTS"; then
+  if [ "${BRIT_ADVISORY:-}" = "always" ]; then
+    READING_STARTED_S=$SECONDS
+    READING_STARTED_AT=$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)
+    brit_advisory
+    READING_ENDED_AT=$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)
+    if [ -n "$BRIT_ADVISORY_RAN" ]; then
+      gate_step_reading 0 brit-advisory ran \
+        "none: reads the moving origin/dev baseline, repository integrity and Brit device state" unknown \
+        "$((SECONDS - READING_STARTED_S))" "$READING_STARTED_AT" "$READING_ENDED_AT"
+    else
+      gate_step_reading 0 brit-advisory skipped \
+        "none: reads the moving origin/dev baseline, repository integrity and Brit device state" unknown \
+        0 "$READING_STARTED_AT" "$READING_ENDED_AT"
+    fi
+  fi
+  READING_STARTED_S=$SECONDS
+  READING_STARTED_AT=$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)
+  printf '%s\n' "${PUSH_LINES[@]}" |
+    node "$HOOK_WORK_TREE/genesis/orchestrator/handover-record.mjs" --root "$HOOK_WORK_TREE" --projects "$PROJECTS"
+  READING_STATUS=$?
+  READING_ENDED_AT=$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)
+  gate_step_reading "$READING_STATUS" handover-record ran \
+    "none: reads every ref in the push, gate verdicts and native hand-over state" unknown \
+    "$((SECONDS - READING_STARTED_S))" "$READING_STARTED_AT" "$READING_ENDED_AT"
+  READING_STATUS=$?
+  if [ "$READING_STATUS" -ne 0 ]; then
     echo "[pre-push] REFUSED: the hand-over record was not written (above); a hand-over is never pushed without it." >&2
     exit 1
   fi
@@ -980,6 +1063,12 @@ GATE_NARROW_BASE=ok
 PUSH_TARGETS=""
 LAST_LOCAL_SHA=""
 DEV_LOCAL_SHA=""
+SECURITY_READING_SECONDS=0
+SECURITY_READING_STATUS=0
+SECURITY_READING_STARTED_AT=""
+STYLE_READING_SECONDS=0
+STYLE_READING_STATUS=0
+STYLE_READING_STARTED_AT=""
 for PUSH_LINE in "${PUSH_LINES[@]}"; do
   read -r LOCAL_REF LOCAL_SHA REMOTE_REF REMOTE_SHA <<<"$PUSH_LINE"
   if is_notes_ref "$REMOTE_REF"; then
@@ -1007,13 +1096,23 @@ for PUSH_LINE in "${PUSH_LINES[@]}"; do
   fi
   # Cheap, offline security paydown runs before Rust compilation/expensive gates.
   # Warn by default; SECURITY_PAYDOWN=strict makes a refusal bind this push.
+  READING_CALL_STARTED_S=$SECONDS
+  [ -n "$SECURITY_READING_STARTED_AT" ] || SECURITY_READING_STARTED_AT=$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)
   if ! python3 "$(git rev-parse --show-toplevel)/.claude/scripts/dependabot-paydown.py" --base "$STYLE_BASE" --head "$LOCAL_SHA"; then
+    SECURITY_READING_STATUS=1
     leg_red security-paydown "the security paydown ratchet refused $REMOTE_REF (above)"
   fi
+  SECURITY_READING_SECONDS=$((SECURITY_READING_SECONDS + SECONDS - READING_CALL_STARTED_S))
+  SECURITY_READING_ENDED_AT=$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)
+  READING_CALL_STARTED_S=$SECONDS
+  [ -n "$STYLE_READING_STARTED_AT" ] || STYLE_READING_STARTED_AT=$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)
   if ! bash "$(git rev-parse --show-toplevel)/genesis/orchestrator/rust-style.sh" --base "$STYLE_BASE" --head "$LOCAL_SHA"; then
+    STYLE_READING_STATUS=1
     echo "Rust style reach gate refused this ref; fix findings or restore measurable inputs."
     leg_red rust-style "the style reach gate refused $REMOTE_REF (above)"
   fi
+  STYLE_READING_SECONDS=$((STYLE_READING_SECONDS + SECONDS - READING_CALL_STARTED_S))
+  STYLE_READING_ENDED_AT=$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)
 
   # Determine what changed. A new branch, or a remote tip this clone has never fetched, is read
   # against its merge base with origin/dev: the whole branch, of the object being pushed. A range
@@ -1040,6 +1139,16 @@ for PUSH_LINE in "${PUSH_LINES[@]}"; do
     UNFILTERED_CHANGED=$(printf '%s\n%s' "$UNFILTERED_CHANGED" "$NEW_CHANGED")
   fi
 done
+if [ -n "$SECURITY_READING_STARTED_AT" ]; then
+  gate_step_reading "$SECURITY_READING_STATUS" security-paydown ran \
+    "none: reads the pushed trees, a moving baseline, policy and the working-tree checker" unknown \
+    "$SECURITY_READING_SECONDS" "$SECURITY_READING_STARTED_AT" "$SECURITY_READING_ENDED_AT"
+fi
+if [ -n "$STYLE_READING_STARTED_AT" ]; then
+  gate_step_reading "$STYLE_READING_STATUS" rust-style ran \
+    "none: reads the pushed trees, a moving baseline, policy and Rust ownership state" unknown \
+    "$STYLE_READING_SECONDS" "$STYLE_READING_STARTED_AT" "$STYLE_READING_ENDED_AT"
+fi
 
 # Keep the unfiltered union for package selection after .ci-ignore changes CHANGED.
 GATE_CHANGED_FILES=$(mktemp)
@@ -1063,7 +1172,13 @@ gate_remove_inputs_state() {
 HOOK_ON_EXIT="$HOOK_ON_EXIT gate_remove_inputs_state"
 export GATE_INPUTS_STATE
 if [ -f genesis/orchestrator/gate-inputs.mjs ]; then
+  READING_STARTED_S=$SECONDS
+  READING_STARTED_AT=$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)
   node genesis/orchestrator/gate-inputs.mjs resolve || true
+  READING_ENDED_AT=$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)
+  gate_step_reading 0 input-policy ran \
+    "none: reads the Brit executable, policy and device capability state" unknown \
+    "$((SECONDS - READING_STARTED_S))" "$READING_STARTED_AT" "$READING_ENDED_AT"
 fi
 
 # Gate evidence and household landing follow the exact object destined for dev. For pushes that
@@ -1115,7 +1230,14 @@ gate_remove_fleet_mark() { [ -z "$GATE_FLEET_ROLL_MARK" ] || rm -f -- "$GATE_FLE
 HOOK_ON_EXIT="$HOOK_ON_EXIT gate_remove_fleet_mark"
 export GATE_FLEET_ROLL_MARK
 if [ -n "$GATE_PUSH_REFS" ]; then
+  READING_STARTED_S=$SECONDS
+  READING_STARTED_AT=$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)
   node genesis/orchestrator/gate-preflight.mjs --fleet-roll
+  FR_STATUS=$?
+  READING_ENDED_AT=$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)
+  gate_step_reading "$FR_STATUS" fleet-roll ran \
+    "none: reads every ref in the push, destination history, manifests and fleet policy" unknown \
+    "$((SECONDS - READING_STARTED_S))" "$READING_STARTED_AT" "$READING_ENDED_AT"
   FR_STATUS=$?
   if [ "$FR_STATUS" -eq 3 ]; then
     leg_red fleet-roll "the fleet-roll check is red (above); its cure is printed beside it"
@@ -1142,7 +1264,14 @@ gate_remove_doc_cut_mark() { [ -z "$GATE_DOC_CUT_MARK" ] || rm -f -- "$GATE_DOC_
 HOOK_ON_EXIT="$HOOK_ON_EXIT gate_remove_doc_cut_mark"
 export GATE_DOC_CUT_MARK
 if [ -n "$GATE_PUSH_REFS" ]; then
+  READING_STARTED_S=$SECONDS
+  READING_STARTED_AT=$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)
   node genesis/orchestrator/gate-preflight.mjs --doc-cut
+  DC_STATUS=$?
+  READING_ENDED_AT=$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)
+  gate_step_reading "$DC_STATUS" doc-cut ran \
+    "none: reads every ref in the push, destination documents and commit messages" unknown \
+    "$((SECONDS - READING_STARTED_S))" "$READING_STARTED_AT" "$READING_ENDED_AT"
   DC_STATUS=$?
   if [ "$DC_STATUS" -eq 3 ]; then
     leg_red doc-cut "the doc-cut check is red (above); its cure is printed beside it"
@@ -1195,7 +1324,11 @@ fi
 if echo "$CHANGED" | grep -qE "^\.epr-meta/elohim/|^\.claude/skills/|^\.claude/agents/|^\.claude/commands/|^\.claude/hooks/|^\.codex/|^\.agents/|^(CLAUDE|AGENTS)\.md$|^elohim/sdk/domains/mishpat/CLAUDE\.md$|^genesis/docs/superpowers/held/CLAUDE\.md$"; then
   if command -v node >/dev/null 2>&1; then
     echo "[pre-push] Verifying elohim-agent package projections (Claude/Codex) are fresh..."
+    READING_STARTED_S=$SECONDS
+    READING_STARTED_AT=$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)
+    READING_STATUS=0
     if ! node elohim/sdk/domains/elohim-agent/scripts/package-projections.mjs verify; then
+      READING_STATUS=1
       echo ""
       echo "!!============================================================!!"
       echo "!! ELOHIM-AGENT PACKAGE PROJECTION DRIFT DETECTED"
@@ -1212,6 +1345,10 @@ if echo "$CHANGED" | grep -qE "^\.epr-meta/elohim/|^\.claude/skills/|^\.claude/a
     else
       echo "[pre-push] elohim-agent package projections ✓"
     fi
+    READING_ENDED_AT=$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)
+    gate_step_reading "$READING_STATUS" package-projections ran \
+      "none: reads the package tree and every generated runtime projection" unknown \
+      "$((SECONDS - READING_STARTED_S))" "$READING_STARTED_AT" "$READING_ENDED_AT"
   fi
 fi
 
@@ -1234,6 +1371,8 @@ fi
 # deferrable. Fail-open if python3 is absent (degraded shell), same posture as above.
 if echo "$CHANGED" | grep -qE "^\.claude/hooks/"; then
   if command -v python3 >/dev/null 2>&1; then
+    READING_STARTED_S=$SECONDS
+    READING_STARTED_AT=$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)
     hook_tests_ran=0
     hook_tests_red=0
     for hook_test in .claude/hooks/tests/test_*.py; do
@@ -1265,6 +1404,10 @@ if echo "$CHANGED" | grep -qE "^\.claude/hooks/"; then
     elif [ "$hook_tests_red" -eq 0 ]; then
       echo "[pre-push] Claude hook boundary tests ✓"
     fi
+    READING_ENDED_AT=$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)
+    gate_step_reading "$hook_tests_red" hook-boundary-tests ran \
+      "none: reads the hook tree, its test suite and host Python" unknown \
+      "$((SECONDS - READING_STARTED_S))" "$READING_STARTED_AT" "$READING_ENDED_AT"
   fi
 fi
 
@@ -1289,13 +1432,21 @@ fi
 if echo "$CHANGED" | grep -qE "\.habit\.md$|(^|/)\.epr-meta(/|$)|^genesis/manifests/habits\.yaml$|^\.claude/scripts/habits-project\.py$|^\.claude/scripts/_lib/epr_habits\.py$"; then
   if command -v python3 >/dev/null 2>&1 && [ -f .claude/scripts/habits-project.py ]; then
     echo "[pre-push] Verifying the habit register projection is fresh..."
+    READING_STARTED_S=$SECONDS
+    READING_STARTED_AT=$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)
+    READING_STATUS=0
     if ! python3 .claude/scripts/habits-project.py --check; then
+      READING_STATUS=1
       echo "[pre-push] ERROR: genesis/manifests/habits.yaml is stale, or the habit census is invalid."
       echo "  Run: python3 .claude/scripts/habits-project.py && git add genesis/manifests/habits.yaml"
       leg_red habit-register "habits.yaml stale or census invalid; python3 .claude/scripts/habits-project.py"
     else
       echo "[pre-push] habit register freshness ✓"
     fi
+    READING_ENDED_AT=$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)
+    gate_step_reading "$READING_STATUS" habit-register ran \
+      "none: reads every habit atom, manifests, projector and generated register" unknown \
+      "$((SECONDS - READING_STARTED_S))" "$READING_STARTED_AT" "$READING_ENDED_AT"
   fi
 fi
 
@@ -1315,12 +1466,18 @@ fi
 # Fail-open if python3 is absent (degraded shell), same posture as the legs above.
 if echo "$CHANGED" | grep -qE "^\.claude/scripts/"; then
   if command -v python3 >/dev/null 2>&1 && [ -d .claude/scripts/_lib/__tests__ ]; then
+    READING_STARTED_S=$SECONDS
+    READING_STARTED_AT=$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)
     lib_tests_ran=0
     lib_failed=""
     lib_parallel_tests=()
     lib_serial_tests=()
     if [[ ! "${HARNESS_JOBS:-4}" =~ ^[1-9][0-9]*$ ]]; then
       echo "[pre-push] ERROR: HARNESS_JOBS must be a positive integer."
+      READING_ENDED_AT=$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)
+      gate_step_reading 1 agentic-library-harnesses ran \
+        "none: reads the governance library tree, harnesses and host tools" unknown \
+        "$((SECONDS - READING_STARTED_S))" "$READING_STARTED_AT" "$READING_ENDED_AT"
       exit 1
     fi
     echo "[pre-push] Running agentic-library harnesses (.claude/scripts/_lib/__tests__)..."
@@ -1348,6 +1505,10 @@ if echo "$CHANGED" | grep -qE "^\.claude/scripts/"; then
           fi
         ' _); then
         echo "[pre-push] ERROR: agentic-library harness workers could not complete."
+        READING_ENDED_AT=$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)
+        gate_step_reading 1 agentic-library-harnesses ran \
+          "none: reads the governance library tree, harnesses and host tools" unknown \
+          "$((SECONDS - READING_STARTED_S))" "$READING_STARTED_AT" "$READING_ENDED_AT"
         exit 1
       fi
     fi
@@ -1379,6 +1540,12 @@ if echo "$CHANGED" | grep -qE "^\.claude/scripts/"; then
     else
       echo "[pre-push] agentic-library harnesses ✓ ($lib_tests_ran green)"
     fi
+    READING_STATUS=0
+    [ -z "$lib_failed" ] && [ "$lib_tests_ran" -ne 0 ] || READING_STATUS=1
+    READING_ENDED_AT=$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)
+    gate_step_reading "$READING_STATUS" agentic-library-harnesses ran \
+      "none: reads the governance library tree, harnesses and host tools" unknown \
+      "$((SECONDS - READING_STARTED_S))" "$READING_STARTED_AT" "$READING_ENDED_AT"
   fi
 fi
 
@@ -1392,8 +1559,16 @@ fi
 # If node isn't on PATH (degraded shell), skip filtering — fail-open is
 # safer than refusing to push.
 if command -v node >/dev/null 2>&1 && [ -f genesis/orchestrator/ci-ignore.mjs ]; then
+  READING_STARTED_S=$SECONDS
+  READING_STARTED_AT=$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)
   FILTERED=$(printf '%s\n' "$CHANGED" | node genesis/orchestrator/ci-ignore.mjs 2>/dev/null)
-  if [ $? -eq 0 ]; then
+  CI_IGNORE_STATUS=$?
+  READING_ENDED_AT=$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)
+  gate_step_reading "$CI_IGNORE_STATUS" ci-ignore ran \
+    "none: reads the changed-path union and working-tree .ci-ignore" unknown \
+    "$((SECONDS - READING_STARTED_S))" "$READING_STARTED_AT" "$READING_ENDED_AT"
+  CI_IGNORE_STATUS=$?
+  if [ "$CI_IGNORE_STATUS" -eq 0 ]; then
     CHANGED="$FILTERED"
   fi
   if [ -z "$CHANGED" ]; then
@@ -1421,7 +1596,16 @@ AGENT_MANIFEST_SCOPE_REMAINDER=$(
 if [ -z "$AGENT_MANIFEST_SCOPE_REMAINDER" ] &&
    printf '%s\n' "$CHANGED" | grep -qE '^elohim/sdk/domains/elohim-agent/|^elohim/sdk/schemas/scripts/test-elohim-agent-manifest\.mjs$'; then
   echo "[pre-push] elohim-agent manifest/schema-only changes — running focused gate."
-  pnpm run elohim-agent:test || leg_red elohim-agent-test "pnpm run elohim-agent:test failed"
+  READING_STARTED_S=$SECONDS
+  READING_STARTED_AT=$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)
+  pnpm run elohim-agent:test
+  READING_STATUS=$?
+  READING_ENDED_AT=$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)
+  gate_step_reading "$READING_STATUS" elohim-agent-test ran \
+    "none: reads the agent manifest/schema workspace and Node dependencies" unknown \
+    "$((SECONDS - READING_STARTED_S))" "$READING_STARTED_AT" "$READING_ENDED_AT"
+  READING_STATUS=$?
+  [ "$READING_STATUS" -eq 0 ] || leg_red elohim-agent-test "pnpm run elohim-agent:test failed"
   pass_or_refuse
 fi
 
@@ -1441,8 +1625,16 @@ if command -v node >/dev/null 2>&1; then
   # visible. Swallowing it would trade the old "Unknown project" abort for a
   # silent one.
   # Cheapest first (recorded p90): a red that takes seconds to find never waits behind an hour.
+  READING_STARTED_S=$SECONDS
+  READING_STARTED_AT=$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)
   PROJECTS=$(echo "$CHANGED" | node genesis/orchestrator/gate-runner.mjs --changed-file-list --names --order cost | tr '\n' ' ')
-  [ $? -eq 0 ] || { echo "[pre-push] manifest gate selection failed (see error above)"; exit 1; }
+  READING_STATUS=$?
+  READING_ENDED_AT=$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)
+  gate_step_reading "$READING_STATUS" project-selection ran \
+    "none: reads every build manifest, changed paths, gitlinks and oracle state" unknown \
+    "$((SECONDS - READING_STARTED_S))" "$READING_STARTED_AT" "$READING_ENDED_AT"
+  READING_STATUS=$?
+  [ "$READING_STATUS" -eq 0 ] || { echo "[pre-push] manifest gate selection failed (see error above)"; exit 1; }
 else
   echo "[pre-push] node unavailable — manifest gate selection skipped (CI backstop)."
 fi
@@ -1461,7 +1653,16 @@ PROJECTS=$(echo "$PROJECTS" | sed 's/^ //')
 # optional: there is no switch that skips this block.
 if [ -n "$PROJECTS" ]; then
   # shellcheck disable=SC2086 # PROJECTS is a word list of manifest keys
-  if ! node genesis/orchestrator/gate-preflight.mjs --projects $PROJECTS; then
+  READING_STARTED_S=$SECONDS
+  READING_STARTED_AT=$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)
+  node genesis/orchestrator/gate-preflight.mjs --projects $PROJECTS
+  READING_STATUS=$?
+  READING_ENDED_AT=$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)
+  gate_step_reading "$READING_STATUS" preflight ran \
+    "none: reads selected project prerequisites, closures and device state" unknown \
+    "$((SECONDS - READING_STARTED_S))" "$READING_STARTED_AT" "$READING_ENDED_AT"
+  READING_STATUS=$?
+  if [ "$READING_STATUS" -ne 0 ]; then
     leg_red preflight "a seconds check refused (above); its cure is printed beside it"
   fi
 fi
@@ -1473,6 +1674,8 @@ export GATE_PREFLIGHT_DONE=1
 # validate schemas and ensure the generated humans.json / presences.json
 # artifacts are fresh relative to their markdown sources.
 if echo "$CHANGED" | grep -qE "genesis/data/humans/|genesis/data/presences/"; then
+  READING_STARTED_S=$SECONDS
+  READING_STARTED_AT=$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)
   echo "[pre-push] Validating humans and presences schemas..."
   humans_red=""
   (cd genesis/seeder && pnpm run validate:humans) || humans_red="validate:humans"
@@ -1491,6 +1694,12 @@ if echo "$CHANGED" | grep -qE "genesis/data/humans/|genesis/data/presences/"; th
   else
     echo "[pre-push] humans/presences validation ✓"
   fi
+  READING_STATUS=0
+  [ -z "$humans_red" ] || READING_STATUS=1
+  READING_ENDED_AT=$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)
+  gate_step_reading "$READING_STATUS" humans-presences ran \
+    "none: reads source directories, generated JSON and seeder dependencies" unknown \
+    "$((SECONDS - READING_STARTED_S))" "$READING_STARTED_AT" "$READING_ENDED_AT"
 fi
 
 # ── CID-addressed artifact freshness (source .md ↔ generated CID twin) ──
@@ -1502,14 +1711,22 @@ fi
 # dangled while seven manifesto.md commits shipped. Key the freshness check to the SOURCE
 # side, not the generator's directory. Pure node+tsx (~0.6s) → PVC-EXEMPT BY OMISSION.
 if echo "$CHANGED" | grep -qE "^genesis/docs/content/elohim-protocol/|^genesis/data/lamad/content/"; then
+  READING_STARTED_S=$SECONDS
+  READING_STARTED_AT=$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)
+  READING_STATUS=0
   echo "[pre-push] Verifying CID-addressed artifacts are fresh relative to their source .md..."
   if ! (cd genesis/seeder && pnpm run sync:cid-artifacts:check); then
+    READING_STATUS=1
     echo "[pre-push] ERROR: a CID-addressed artifact drifted from its source .md — /blob/<hash> would 404."
     echo "  Run: (cd genesis/seeder && pnpm run sync:cid-artifacts) and stage the regenerated JSON."
     leg_red cid-artifacts "a CID twin drifted from its source .md; (cd genesis/seeder && pnpm run sync:cid-artifacts)"
   else
     echo "[pre-push] CID-artifact freshness ✓"
   fi
+  READING_ENDED_AT=$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)
+  gate_step_reading "$READING_STATUS" cid-artifacts ran \
+    "none: reads content source directories, generated twins and seeder dependencies" unknown \
+    "$((SECONDS - READING_STARTED_S))" "$READING_STARTED_AT" "$READING_ENDED_AT"
 fi
 
 # ── Device Archetype Validation ──────────────────────────────────
@@ -1517,6 +1734,8 @@ fi
 # When device archetype markdown files change, validate frontmatter
 # against devices.schema.json and regenerate devices.json.
 if echo "$CHANGED" | grep -qE "genesis/data/devices/"; then
+  READING_STARTED_S=$SECONDS
+  READING_STARTED_AT=$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)
   echo "[pre-push] Validating device archetypes..."
   devices_red=""
   (cd genesis/seeder && pnpm run validate:devices) || devices_red="validate:devices"
@@ -1534,6 +1753,12 @@ if echo "$CHANGED" | grep -qE "genesis/data/devices/"; then
   else
     echo "[pre-push] device archetype validation ✓"
   fi
+  READING_STATUS=0
+  [ -z "$devices_red" ] || READING_STATUS=1
+  READING_ENDED_AT=$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)
+  gate_step_reading "$READING_STATUS" device-archetypes ran \
+    "none: reads the device source directory, generated JSON and seeder dependencies" unknown \
+    "$((SECONDS - READING_STARTED_S))" "$READING_STARTED_AT" "$READING_ENDED_AT"
 fi
 
 # ── Deployment ↔ Archetype Resource-Conformance Validation ───────
@@ -1547,12 +1772,20 @@ fi
 # archetype-mate (backlog archetype-resource-conformance-validation-gap) — the
 # validator existed but was never gated (seeder-validate-deployments-stale-validator).
 if echo "$CHANGED" | grep -qE "genesis/orchestrator/data/deployments\.json|genesis/orchestrator/manifests/humans/|genesis/data/devices/archetype-resource-budgets\.json|genesis/seeder/src/validate-deployments\.ts"; then
+  READING_STARTED_S=$SECONDS
+  READING_STARTED_AT=$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)
   echo "[pre-push] Validating deployments ↔ archetype resource conformance..."
   if (cd genesis/seeder && pnpm run validate:deployments); then
+    READING_STATUS=0
     echo "[pre-push] deployments resource-conformance ✓"
   else
+    READING_STATUS=1
     leg_red deployments-conformance "pnpm run validate:deployments failed"
   fi
+  READING_ENDED_AT=$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)
+  gate_step_reading "$READING_STATUS" deployments-conformance ran \
+    "none: reads deployments, human manifests, budgets and validator dependencies" unknown \
+    "$((SECONDS - READING_STARTED_S))" "$READING_STARTED_AT" "$READING_ENDED_AT"
 fi
 
 # Runtime-manifest pin/render conformance. 2026-09-05: every active human is
@@ -1564,6 +1797,8 @@ if [ -n "$PUSH_IS_HANDOVER" ] && echo "$CHANGED" | grep -qE "$RUNTIME_PINS_PATHS
   echo "[pre-push] hand-over: runtime manifest pin/render conformance not run (cargo run k8s-bridge); the dev landing runs it."
 fi
 if [ -z "$PUSH_IS_HANDOVER" ] && echo "$CHANGED" | grep -qE "$RUNTIME_PINS_PATHS"; then
+  READING_STARTED_S=$SECONDS
+  READING_STARTED_AT=$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)
   echo "[pre-push] Verifying runtime manifest pins and rendered resources..."
   if (
     k8s_repo_root="$(git rev-parse --show-toplevel)"
@@ -1573,10 +1808,16 @@ if [ -z "$PUSH_IS_HANDOVER" ] && echo "$CHANGED" | grep -qE "$RUNTIME_PINS_PATHS
     export CARGO_BUILD_JOBS=2 RUSTFLAGS="" RUSTC_WRAPPER=""
     cargo run -q --manifest-path bridges/k8s/Cargo.toml --bin k8s-bridge -- verify --deployments genesis/orchestrator/data/deployments.json --manifests-dir genesis/orchestrator/manifests/runtime
   ); then
+    READING_STATUS=0
     echo "[pre-push] runtime manifest pin/render conformance ✓"
   else
+    READING_STATUS=1
     leg_red runtime-manifest-pins "k8s-bridge verify refused (above)"
   fi
+  READING_ENDED_AT=$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)
+  gate_step_reading "$READING_STATUS" runtime-manifest-pins ran \
+    "none: reads runtime manifests, Cargo sources, toolchain and generated resources" unknown \
+    "$((SECONDS - READING_STARTED_S))" "$READING_STARTED_AT" "$READING_ENDED_AT"
 fi
 
 
@@ -1586,12 +1827,20 @@ fi
 # generated JSON against account-package.schema.json. Catches field
 # drift (e.g. missing relationshipType) before it reaches CI/deploy.
 if echo "$CHANGED" | grep -qE "genesis/data/account-packages/|genesis/data/humans/|genesis/seeder/src/account-package\.ts"; then
+  READING_STARTED_S=$SECONDS
+  READING_STARTED_AT=$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)
   echo "[pre-push] Validating account packages against schema..."
   if (cd genesis/seeder && pnpm run validate:account-packages); then
+    READING_STATUS=0
     echo "[pre-push] account-packages validation ✓"
   else
+    READING_STATUS=1
     leg_red account-packages "pnpm run validate:account-packages failed"
   fi
+  READING_ENDED_AT=$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)
+  gate_step_reading "$READING_STATUS" account-packages ran \
+    "none: reads account packages, human sources and seeder dependencies" unknown \
+    "$((SECONDS - READING_STARTED_S))" "$READING_STARTED_AT" "$READING_ENDED_AT"
 fi
 
 # ── .ci-ignore freshness (projected from the .epr-meta manifest ci-trigger cascade) ──
@@ -1601,14 +1850,22 @@ fi
 # absent (degraded shell) — same posture as the node-guarded blocks above.
 if echo "$CHANGED" | grep -qE "(^|/)\.epr-meta(/|$)|^\.ci-ignore$"; then
   if command -v python3 >/dev/null 2>&1; then
+    READING_STARTED_S=$SECONDS
+    READING_STARTED_AT=$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)
+    READING_STATUS=0
     echo "[pre-push] Verifying .ci-ignore is fresh relative to the .epr-meta manifest ci-trigger leg..."
     if ! python3 .claude/scripts/ci-ignore-projector.py --verify; then
+      READING_STATUS=1
       echo "[pre-push] ERROR: .ci-ignore is stale relative to the root .epr-meta manifest."
       echo "  Run: python3 .claude/scripts/ci-ignore-projector.py && git add .ci-ignore"
       leg_red ci-ignore-freshness ".ci-ignore stale; python3 .claude/scripts/ci-ignore-projector.py"
     else
       echo "[pre-push] .ci-ignore freshness ✓"
     fi
+    READING_ENDED_AT=$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)
+    gate_step_reading "$READING_STATUS" ci-ignore-freshness ran \
+      "none: reads every compose manifest, the projector and generated .ci-ignore" unknown \
+      "$((SECONDS - READING_STARTED_S))" "$READING_STARTED_AT" "$READING_ENDED_AT"
   fi
 fi
 
@@ -1620,16 +1877,24 @@ fi
 # HEAVY_GATES and never deferrable. Fail-open if python3 OR
 # the gate script is absent (a branch predating the gate must never be blocked).
 if command -v python3 >/dev/null 2>&1 && [ -f .claude/scripts/epr-meta-git-gate.py ]; then
+  READING_STARTED_S=$SECONDS
+  READING_STARTED_AT=$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)
+  READING_STATUS=0
   # The pushed object, not the checkout's HEAD: HEAD can differ (an explicit sha push) or move mid-push.
   RANGE_HEAD="${GATE_COMMIT:-HEAD}"
   RANGE_BASE=$(git merge-base origin/dev "$RANGE_HEAD" 2>/dev/null || echo "$RANGE_HEAD~1")
   if ! python3 .claude/scripts/epr-meta-git-gate.py --range "${RANGE_BASE}..${RANGE_HEAD}"; then
+    READING_STATUS=1
     echo "[pre-push] ERROR: .epr-meta compose-gate rejected a change in this push range."
     echo "  Acknowledge (ask-class): EPR_META_ACK=1 git push   |   bypass all: git push --no-verify"
     leg_red epr-meta-compose "the compose-gate rejected a change in this push range"
   else
     echo "[pre-push] .epr-meta compose-gate ✓"
   fi
+  READING_ENDED_AT=$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)
+  gate_step_reading "$READING_STATUS" epr-meta-compose ran \
+    "none: reads the push range against the moving origin/dev baseline and compose policy" unknown \
+    "$((SECONDS - READING_STARTED_S))" "$READING_STARTED_AT" "$READING_ENDED_AT"
 fi
 
 # ── T2 receipt (mandatory for serving paths) ───────────────────────
@@ -1640,12 +1905,19 @@ fi
 T2_LIST=$(mktemp)
 printf '%s\n' "$CHANGED" > "$T2_LIST"
 T2_STATUS=0
+READING_STARTED_S=$SECONDS
+READING_STARTED_AT=$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)
 if [ "${T2_RECEIPT-}" = "strict" ]; then
   bash genesis/orchestrator/scripts/t2-receipt.sh --changed "$T2_LIST" --strict || T2_STATUS=$?
 else
   bash genesis/orchestrator/scripts/t2-receipt.sh --changed "$T2_LIST" || T2_STATUS=$?
 fi
 rm -f "$T2_LIST"
+READING_ENDED_AT=$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)
+gate_step_reading "$T2_STATUS" t2-receipt ran \
+  "none: reads changed paths, working-tree mtimes, reports and device validation refs" unknown \
+  "$((SECONDS - READING_STARTED_S))" "$READING_STARTED_AT" "$READING_ENDED_AT"
+T2_STATUS=$?
 [ "$T2_STATUS" -eq 0 ] || leg_red t2-receipt "household serving receipt refused (exit $T2_STATUS, above)"
 
 # ── Hand-over lane: every seconds check above has run ────────────
@@ -1674,6 +1946,8 @@ drop_project() {
 # Drop ONLY the sweettest compile-check while keeping every other gate.
 # CI still runs sweettest as a backstop, so this trades a local pre-CI
 # catch for push speed — narrower than the all-or-nothing HUSKY=0.
+READING_STARTED_S=$SECONDS
+READING_STARTED_AT=$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)
 if [ "${SKIP_SWEETTEST-}" = "1" ] && echo "$PROJECTS" | grep -qw "sweettest-check"; then
   drop_project "sweettest-check"
   echo "[pre-push] SKIP_SWEETTEST=1 — skipping sweettest compile-check (CI still runs it)."
@@ -1696,6 +1970,10 @@ if echo "$PROJECTS" | grep -qw "sweettest-check" && [ "${RUN_SWEETTEST-}" != "1"
     echo "           It runs on the dev push; CI DNA pipeline is the backstop. Force now: RUN_SWEETTEST=1 git push"
   fi
 fi
+READING_ENDED_AT=$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)
+gate_step_reading 0 sweettest ran \
+  "none: reads selected projects, every push destination and operator overrides" unknown \
+  "$((SECONDS - READING_STARTED_S))" "$READING_STARTED_AT" "$READING_ENDED_AT"
 
 # No project source changes — let it through
 if [ -z "$PROJECTS" ]; then
@@ -1708,6 +1986,8 @@ fi
 # touches this push's family or any slot a live cargo holds). At the hard
 # ceiling: defer heavy Rust gates with a loud banner instead of cold-building
 # tens of GB mid-push. FORCE_HEAVY_GATES=1 overrides the deferral.
+READING_STARTED_S=$SECONDS
+READING_STARTED_AT=$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)
 REPO_TOP="$(git rev-parse --show-toplevel 2>/dev/null || true)"
 POOL_POLICY="$REPO_TOP/genesis/agentic/pool-policy.json"
 SOFT_PCT=88; HARD_PCT=92
@@ -1766,6 +2046,11 @@ if [ -n "${DISK_PCT:-}" ] && [ "$DISK_PCT" -ge "$HARD_PCT" ] && [ "${FORCE_HEAVY
     echo ""
   fi
 fi
+
+READING_ENDED_AT=$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)
+gate_step_reading 0 resource-check ran \
+  "none: reads device volume pressure, pool policy and live cargo state" unknown \
+  "$((SECONDS - READING_STARTED_S))" "$READING_STARTED_AT" "$READING_ENDED_AT"
 
 # Re-check: pressure deferral may have emptied the project list.
 if [ -z "$PROJECTS" ]; then
@@ -2020,6 +2305,9 @@ echo ""
 # The eprfs gate ingests what it tested (`_gate-eprfs`). When pre-push reused gate evidence
 # instead (GATE_EVIDENCE=reuse), the evidence proved this closure was tested but built nothing, so
 # `_eprfs-deliver` builds and ingests the pushed commit in the gate's own slot before landing.
+READING_STARTED_S=$SECONDS
+READING_STARTED_AT=$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)
+EPR_LAND_RAN=""
 BIN_STORE_CLI="${EPR_BIN:-$(command -v epr || true)}"
 EPR_LAND_REASON=""
 if [ -z "$DEV_LOCAL_SHA" ]; then
@@ -2039,6 +2327,7 @@ fi
 # Capture the committed head once, before preparing a candidate. A failed or malformed status
 # never means an absent head; a concurrent promotion must refuse without rereading/retrying.
 if [ -z "$EPR_LAND_REASON" ]; then
+  EPR_LAND_RAN=1
   if ! EPR_HEAD_STATUS=$("$BIN_STORE_CLI" bin --tool epr status --json 2>/dev/null); then
     EPR_LAND_REASON="could not read the committed epr head for compare-and-swap"
   elif ! EPR_EXPECT=$(printf '%s' "$EPR_HEAD_STATUS" | python3 -c '
@@ -2101,10 +2390,32 @@ fi
 if [ -n "$EPR_LAND_REASON" ]; then
   echo "[pre-push] epr household head not landed: $EPR_LAND_REASON"
 fi
+READING_ENDED_AT=$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)
+if [ -n "$EPR_LAND_RAN" ]; then
+  gate_step_reading 0 epr-landing ran \
+    "none: reads the pushed dev head, gate selection and device bin-store state" unknown \
+    "$((SECONDS - READING_STARTED_S))" "$READING_STARTED_AT" "$READING_ENDED_AT"
+else
+  gate_step_reading 0 epr-landing skipped \
+    "none: reads the pushed dev head, gate selection and device bin-store state" unknown \
+    0 "$READING_STARTED_AT" "$READING_ENDED_AT"
+fi
 # ── Household head: end ────────────────────────────────────────────
 
 # Stage 1a: advisory brit checks (never fail the push).
+READING_STARTED_S=$SECONDS
+READING_STARTED_AT=$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)
 brit_advisory
+READING_ENDED_AT=$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)
+if [ -n "$BRIT_ADVISORY_RAN" ]; then
+  gate_step_reading 0 brit-advisory ran \
+    "none: reads the moving origin/dev baseline, repository integrity and Brit device state" unknown \
+    "$((SECONDS - READING_STARTED_S))" "$READING_STARTED_AT" "$READING_ENDED_AT"
+else
+  gate_step_reading 0 brit-advisory skipped \
+    "none: reads the moving origin/dev baseline, repository integrity and Brit device state" unknown \
+    0 "$READING_STARTED_AT" "$READING_ENDED_AT"
+fi
 
 hook_pass
 }
