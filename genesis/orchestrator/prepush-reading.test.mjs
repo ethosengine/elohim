@@ -116,7 +116,7 @@ gate_step_reading
 
   assert.equal(result.status, 0);
   assert.equal(result.stdout, 'first=17\nsecond=19\n');
-  assert.equal(result.stderr, '[gate-reading] pre-push readings unavailable (exit 9)\n');
+  assert.equal(result.stderr, '[gate-reading] pre-push readings dropped (exit 9)\n');
 });
 
 test('pre-push leg helper fills each unreached leg exactly once as skipped', () => {
@@ -160,5 +160,50 @@ gate_step_reading
 `);
   assert.equal(result.status, 0);
   assert.ok(Date.now() - started < 8000, `append took ${Date.now() - started}ms`);
-  assert.match(result.stderr, /pre-push readings unavailable \(exit (124|137)\)/);
+  assert.match(result.stderr, /pre-push readings dropped \(exit (124|137)\)/);
+});
+
+test('a push whose scratch dir cannot be made exports the push marker and prints one drop line', () => {
+  const fx = fixture();
+  const result = run(fx, `
+printf 'push=%s rows=[%s]\\n' "$GATE_READING_PUSH" "$GATE_READING_ROWS"
+GATE_READING_SEEN=""
+GATE_READING_LEGS=$'first\\tnone\\tfirst reason\\nsecond\\tnone\\tsecond reason'
+gate_step_reading 0 first ran 1 \
+  2026-11-24T12:00:00.000Z 2026-11-24T12:00:01.000Z
+gate_step_reading
+`, { TMPDIR: '/nonexistent/gate-reading-scratch' });
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stdout, 'push=1 rows=[]\n');
+  assert.equal(result.stderr, '[gate-reading] pre-push readings dropped (scratch file was not created)\n');
+  assert.equal(existsSync(fx.capture), false, 'no append is attempted without rows');
+});
+
+test('a contended reading lock is one drop line carrying the native reason', () => {
+  const fx = fixture();
+  writeFileSync(fx.epr, `#!/usr/bin/env bash
+printf '%s\\n' "$@" >>"$CAPTURE"
+echo 'reading append: accepted=0 rejected=0 dropped=2 trimmed=false path=x'
+echo 'reading append dropped 2 row(s): the device-local reading lock stayed busy' >&2
+exit 3
+`);
+  chmodSync(fx.epr, 0o755);
+  const result = run(fx, `
+GATE_READING_SEEN=""
+GATE_READING_LEGS=$'first\\tnone\\tfirst reason\\nsecond\\tnone\\tsecond reason'
+gate_step_reading 0 first ran 1 \
+  2026-11-24T12:00:00.000Z 2026-11-24T12:00:01.000Z
+gate_step_reading 0 second ran 1 \
+  2026-11-24T12:00:01.000Z 2026-11-24T12:00:02.000Z
+gate_step_reading
+`);
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stdout, '');
+  assert.equal(
+    result.stderr,
+    '[gate-reading] pre-push readings dropped (exit 3: reading append dropped 2 row(s): the device-local reading lock stayed busy)\n',
+  );
+  assert.equal(readFileSync(fx.capture, 'utf8').trim().split('\n').filter(arg => arg === 'append').length, 1);
 });

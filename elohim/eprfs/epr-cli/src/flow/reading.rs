@@ -179,6 +179,8 @@ struct ReadingObservation {
 pub struct AppendSummary {
     pub accepted: usize,
     pub rejected: usize,
+    /// Valid rows not written because the device-local store lock stayed busy past its retry.
+    pub dropped: usize,
     pub trimmed: bool,
     pub path: PathBuf,
 }
@@ -316,13 +318,11 @@ pub fn append(root: &Path, from: &Path) -> FlowResult<AppendSummary> {
         }
     }
     let Some(_lock) = held else {
-        eprintln!(
-            "gate-step reading append dropped {} row(s): device-local lock remained busy",
-            accepted.len()
-        );
+        // The verb reports this drop once and exits non-zero; the library never prints.
         return Ok(AppendSummary {
             accepted: 0,
             rejected,
+            dropped: accepted.len(),
             trimmed: false,
             path,
         });
@@ -343,6 +343,7 @@ pub fn append(root: &Path, from: &Path) -> FlowResult<AppendSummary> {
     Ok(AppendSummary {
         accepted: accepted.len(),
         rejected,
+        dropped: 0,
         trimmed,
         path,
     })
@@ -832,6 +833,10 @@ mod tests {
         let summary = append(root.path(), &source).unwrap();
         assert!(started.elapsed() >= LOCK_RETRY_FOR);
         assert_eq!(summary.accepted, 0);
+        assert_eq!(
+            summary.dropped, 1,
+            "the contended batch is counted as dropped"
+        );
         assert!(!reading_path(root.path()).exists());
     }
 

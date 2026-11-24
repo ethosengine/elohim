@@ -1469,6 +1469,9 @@ fn run_report_reading(args: &[String]) -> FlowResult<ExitCode> {
     Ok(ExitCode::SUCCESS)
 }
 
+/// Exit status of `epr flow reading append` when a valid batch was dropped (store lock busy).
+const READING_APPEND_DROPPED: u8 = 3;
+
 /// `epr flow reading append --from <jsonl>` — the one native reading-store writer.
 fn run_reading(args: &[String]) -> FlowResult<ExitCode> {
     let Some("append") = args.first().map(String::as_str) else {
@@ -1502,12 +1505,21 @@ fn run_reading(args: &[String]) -> FlowResult<ExitCode> {
         println!("{}", serde_json::to_string_pretty(&summary)?);
     } else {
         println!(
-            "reading append: accepted={} rejected={} trimmed={} path={}",
+            "reading append: accepted={} rejected={} dropped={} trimmed={} path={}",
             summary.accepted,
             summary.rejected,
+            summary.dropped,
             summary.trimmed,
             summary.path.display()
         );
+    }
+    if summary.dropped > 0 {
+        // One line, and a distinct exit, so a caller that discards stdout still reports the drop.
+        eprintln!(
+            "reading append dropped {} row(s): the device-local reading lock stayed busy",
+            summary.dropped
+        );
+        return Ok(ExitCode::from(READING_APPEND_DROPPED));
     }
     Ok(ExitCode::SUCCESS)
 }
