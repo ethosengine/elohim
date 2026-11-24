@@ -335,6 +335,25 @@ phase_l_agent_claim() {
     --note "pre-push to${BERTH_TARGETS} for $PHASE_L_FOR" 2>&1)
 }
 
+# A claim that retries while berth's store lock is busy. 2026-11-24, reproduced three times:
+# "berth: epr session: REFUSED lock-timeout: store lock remained busy for 5s" on a renew (or on
+# the re-claim when an override took effect) stopped a push whose gates had all passed. A busy lock
+# is not a refusal: try again 3 more times, BERTH_PREPUSH_RENEW_RETRY_S (default 2) apart. Any
+# other answer, or a fourth lock-timeout, is returned as before. Sets PHASE_L_OUT; returns berth's rc.
+phase_l_agent_claim_patient() {
+  local rc tries=0
+  phase_l_agent_claim
+  rc=$?
+  while [ "$rc" -ne 0 ] && [[ "$PHASE_L_OUT" == *lock-timeout* ]] && [ "$tries" -lt 3 ]; do
+    tries=$((tries + 1))
+    phase_l_agent_say say "[pre-push] Phase L: the store lock was busy on renew; retrying ($tries of 3)"
+    sleep "${BERTH_PREPUSH_RENEW_RETRY_S:-2}" </dev/null
+    phase_l_agent_claim
+    rc=$?
+  done
+  return "$rc"
+}
+
 phase_l_agent_token() {
   if [[ "$PHASE_L_OUT" =~ claimed_at=([0-9]+([.][0-9]+)?) ]]; then
     PHASE_L_CA="${BASH_REMATCH[1]}"
@@ -348,7 +367,7 @@ phase_l_agent_overridden() {
 # One renew. 0 = still held (a new generation is recorded), 1 = refused outright.
 phase_l_agent_renew() {
   local rc
-  phase_l_agent_claim
+  phase_l_agent_claim_patient
   rc=$?
   if [ "$rc" -eq 0 ]; then
     phase_l_agent_token
@@ -410,7 +429,7 @@ phase_l_agent_override_wait() {
         PHASE_L_OUT="[pre-push] REFUSED: the override did not take effect within $((now - start))s (one silent sibling is covered; two are not). Nothing was pushed."
         return 3
       fi
-      phase_l_agent_claim
+      phase_l_agent_claim_patient
       rc=$?
       if [ "$rc" -eq 0 ]; then
         phase_l_agent_token

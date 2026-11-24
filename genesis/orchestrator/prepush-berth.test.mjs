@@ -65,6 +65,8 @@ case "$1" in
    3) echo "$2: REFUSED — held by did:key:z6MkDeviceA/claude-1" >&2; exit 3;;
    F) if [ "$n" -le 1 ]; then echo "$2: REFUSED — self-demoted: no head from did:key:z6MkDeviceA within 570s" >&2; exit 3; fi;;
    U) echo "$2: renewed here, but the renew record did not reach this device's channel store" >&2; exit 1;;
+   L) if [ "$n" -eq 2 ]; then echo "berth: epr session: REFUSED lock-timeout: store lock remained busy for 5s" >&2; exit 1; fi;;
+   K) if [ "$n" -ge 2 ]; then echo "berth: epr session: REFUSED lock-timeout: store lock remained busy for 5s" >&2; exit 1; fi;;
    E) echo Traceback >&2; exit 1;;
    W|D)
     f="$here/override-at"; [ -f "$f" ] || printf %s "$(( $(date +%s%3N) + \${STUB_OVERRIDE_IN_MS:-1500} ))" > "$f"; at=$(cat "$f")
@@ -407,6 +409,39 @@ test("the_renewer_records_a_new_generation", async (t) => {
   await stop(s);
   const c = await pollCalls(fx, (x) => !!release(x));
   assert.match(argv(release(c)), /1009\.500$/);
+});
+// The landing waits (3 s) before it hands over, so the agent renews at least once first.
+const slowHandoff = `eval "$(declare -f phase_l_handoff | sed '1s/.*/phase_l_handoff_orig ()/')"
+phase_l_handoff() { sleep 3.5; sed 's/^/STATUS: /' "$PHASE_L_DIR/status"; phase_l_handoff_orig; }
+echo GATES-RAN; hook_pass`;
+const lockEnv = (mode) => ({
+  BERTH_PREPUSH_TTL_S: "3",
+  BERTH_PREPUSH_RENEW_RETRY_S: "0.05",
+  BERTH_MODES: `{"dev-integration":"${mode}"}`,
+});
+test("a_busy_store_lock_on_renew_is_retried_not_a_refusal", async (t) => {
+  const fx = fixture(t),
+    s = spawn("sleep", ["30"]);
+  t.after(() => s.kill("SIGKILL"));
+  const r = runBlock(fx, {
+    after: slowHandoff,
+    env: { PHASE_L_PUSH_PID: String(s.pid), ...lockEnv("L") },
+  });
+  assert.equal(r.status, 0, r.out);
+  assert.match(r.out, /STATUS: say .*store lock was busy on renew; retrying \(1 of 3\)/);
+  assert.doesNotMatch(r.out, /REFUSED|lost renew refused/);
+  await stop(s);
+});
+test("a_store_lock_that_stays_busy_on_renew_still_stops_the_push", (t) => {
+  const fx = fixture(t),
+    r = runBlock(fx, { after: slowHandoff, env: lockEnv("K") });
+  assert.equal(r.status, 1, r.out);
+  assert.match(r.out, /retrying \(3 of 3\)/);
+  assert.doesNotMatch(r.out, /retrying \(4 of 3\)/);
+  assert.match(
+    r.out,
+    /REFUSED: renewing dev-integration while it waited to land was refused \(above\)\. The push stops\./,
+  );
 });
 test("a_device_without_epr_refuses_before_any_gate", (t) => {
   const fx = fixture(t),
