@@ -123,6 +123,9 @@ function runBlock(fx, { sha = fx.head, projects = "orchestrator eprfs rust-style
     `DEV_LOCAL_SHA='${sha}'`,
     `PROJECTS='${projects}'`,
     `HOOK_WORK_TREE='${fx.dir}'`,
+    // The block ends by recording its step reading; outside the hook the recorder is stood in
+    // for. It passes its first argument, the leg's status, through.
+    'gate_step_reading() { return "$1"; }',
     "",
   ].join("\n");
   const result = spawnSync("bash", ["-c", `${preamble}${hookBlock()}`], {
