@@ -2669,10 +2669,10 @@ habits:
       - "node --test genesis/orchestrator/suite-list.test.mjs (the orchestrator suite list holds every test file once; the named half's view holds what its key hashes and its environment is constructed)"
       - "a2o genesis/a2o/features/devflow/native-gate-evidence.feature reuse rule (this workspace's own green stands in; a red or an unadmitted signer never does)"
     evidence: >
-      DELTA 2026-11-23c (status unchanged; measured by ethosengine d6cfb7e1 on the F4-ask landing head c44633243 against dev 179814d6b): 60 paths, 36 projects selected, 20 not enrolled for reuse, 16 enrolled, 1 with its own judge changed (orchestrator, via suite-reads.json), 15 refused only by the whole-push fence. Cautions as reported: a refusal costs time only where the sibling holds a green for that closure, and narrowing the fence is an integrity-rule change that needs a ruling and an adversarial review (station Fence-scope).
-    evidence-fingerprint: sha256:a67ef7c034ca6507
-    evidence-bytes: 38405
-    evidence-entries: 40
+      DELTA 2026-11-23d (status unchanged; a design and stations, nothing built): change detection was read as one thing after two misses the same day, the Rust style scan paid by every cargo gate before its reuse decision (`genesis/orchestrator/gate-runner.mjs:615-626`, read on dev `2081b2532`) and a policy-registry change that did not select the gate whose test reads it (dev red on eprfs from `cecab9d08` to `e14abce95`). Finding: selection, closure validity and cost do not read each other. Eight stations (CD-reading first) are in the peers plan section 8; the design is `genesis/docs/superpowers/specs/2026-11-23-change-detection-one-reading-design.md`. No seconds are measured.
+    evidence-fingerprint: sha256:e88698fb8bf13240
+    evidence-bytes: 39087
+    evidence-entries: 41
     guard: >
       Regression risks: (1) reusing on a key that omits something the recipe reads — the recipe
       body, the project tree, a submodule pin, a repo file a test include_str!s; the input audit
