@@ -199,8 +199,46 @@ pub struct AppendSummary {
     pub path: PathBuf,
 }
 
+/// The device's one reading store: under the main checkout, so every linked worktree a push or
+/// gate runs from appends to, and is read from, the same file. A worktree's `.git` file names its
+/// private git directory, whose `commondir` names the shared one; the main checkout is that
+/// directory's parent. Anything unreadable keeps `root` itself.
 fn reading_path(root: &Path) -> PathBuf {
-    root.join(READINGS_REL)
+    device_root(root).join(READINGS_REL)
+}
+
+fn device_root(root: &Path) -> PathBuf {
+    let dot_git = root.join(".git");
+    if !dot_git.is_file() {
+        return root.to_path_buf();
+    }
+    let Some(gitdir) = fs::read_to_string(&dot_git).ok().and_then(|text| {
+        text.trim()
+            .strip_prefix("gitdir:")
+            .map(|path| PathBuf::from(path.trim()))
+    }) else {
+        return root.to_path_buf();
+    };
+    let gitdir = if gitdir.is_absolute() {
+        gitdir
+    } else {
+        root.join(gitdir)
+    };
+    let Ok(common) = fs::read_to_string(gitdir.join("commondir")) else {
+        return root.to_path_buf();
+    };
+    let common = PathBuf::from(common.trim());
+    let common = if common.is_absolute() {
+        common
+    } else {
+        gitdir.join(common)
+    };
+    match common.canonicalize() {
+        Ok(common) if common.file_name().is_some_and(|name| name == ".git") => common
+            .parent()
+            .map_or_else(|| root.to_path_buf(), Path::to_path_buf),
+        _ => root.to_path_buf(),
+    }
 }
 
 fn declared_unit(root: &Path) -> FlowResult<String> {
@@ -1248,5 +1286,65 @@ mod tests {
             !absent.contains("parent"),
             "a row without a parent serializes as before"
         );
+    }
+
+    /// A main checkout and one linked worktree, laid out as git lays them out.
+    fn main_and_worktree() -> (tempfile::TempDir, PathBuf, PathBuf) {
+        let base = tempfile::tempdir().unwrap();
+        let main = base.path().join("main");
+        let private = main.join(".git/worktrees/wt");
+        fs::create_dir_all(&private).unwrap();
+        fs::write(private.join("commondir"), "../..\n").unwrap();
+        let worktree = base.path().join("wt");
+        fs::create_dir_all(&worktree).unwrap();
+        fs::write(
+            worktree.join(".git"),
+            format!("gitdir: {}\n", private.display()),
+        )
+        .unwrap();
+        for root in [&main, &worktree] {
+            let registry = root.join(".claude/epr-meta");
+            fs::create_dir_all(&registry).unwrap();
+            fs::write(
+                registry.join("measures.yaml"),
+                "measures-version: 1\nmeasures:\n  - id: gate-step-reading\n    version: 1\n    unit: seconds\n",
+            )
+            .unwrap();
+        }
+        (base, main, worktree)
+    }
+
+    #[test]
+    fn pushes_from_two_checkouts_fold_into_one_device_report() {
+        let (base, main, worktree) = main_and_worktree();
+        for (root, run) in [(&main, "push-main"), (&worktree, "push-worktree")] {
+            let source = base.path().join(format!("{run}.jsonl"));
+            write_source(&source, &[stored_row(run, "eprfs", "key")]);
+            assert_eq!(append(root, &source).unwrap().accepted, 1);
+        }
+        assert!(
+            !worktree.join(READINGS_REL).exists(),
+            "a linked worktree keeps no store of its own"
+        );
+        for root in [&main, &worktree] {
+            let report = report(root, &ReadingOptions::default()).unwrap();
+            assert_eq!(
+                report.runs, 2,
+                "one device report, read from either checkout"
+            );
+        }
+    }
+
+    #[test]
+    fn a_checkout_whose_git_file_cannot_be_followed_keeps_its_own_store() {
+        let root = tempfile::tempdir().unwrap();
+        fs::write(
+            root.path().join(".git"),
+            "gitdir: /nonexistent/.git/worktrees/x\n",
+        )
+        .unwrap();
+        assert_eq!(reading_path(root.path()), root.path().join(READINGS_REL));
+        let plain = tempfile::tempdir().unwrap();
+        assert_eq!(reading_path(plain.path()), plain.path().join(READINGS_REL));
     }
 }
