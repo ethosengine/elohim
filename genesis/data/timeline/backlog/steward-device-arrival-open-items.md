@@ -2952,3 +2952,16 @@ maturing when this device's view shows no lease from the sibling.
 Also open: why the laptop's fetch of shem's root times out (ethosengine's fetch of the same root
 succeeds), and shem's peer daemon at about 75% of a core (row 87; the 30 s re-read of the flow
 log has a fix handed over as `self/ethosengine-reindex-skip`).
+
+## Row 89, delta (2026-11-24): shem's household matches current DNA; the preflight refusal was a false alarm
+
+All five DNAs were rebuilt at dev `93983b057` and cargo found every wasm fresh; the integrity
+wasms have not been rewritten since 2026-11-06. Preflight reads `ok hApp bundle identity` for
+shem's household against that bundle. That fresh means the DNA hashes are unchanged is a
+judgment from cargo's answer; the hashes were not compared directly. Preflight still prints
+`coordinator wasm … is STALE` for each DNA, because its rule compares the wasm's build time with
+the date of the last commit that touched the zome's directory, and that commit (`a8d2af4d1`)
+added a licence field to each `Cargo.toml`, which changes no wasm. So shem can run the household
+lane for a storage serving receipt once the mesh storage and doorway binaries are rebuilt; the
+stale-hApp refusal has to be overridden by name (`MESH_ALLOW_STALE_HAPP=1`) with this reason, or
+the rule taught to ask cargo. Ethosengine's household (cast 2026-10-26) does not match.

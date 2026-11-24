@@ -271,6 +271,45 @@ device's own fold), the floor event (`misses`, `carry`), the stream (the crossin
 Jenkins's result is not a verdict record, that the fence is whole-push, and that the hand-over goes
 through the forge.
 
+## 22:13Z to 03:01Z (24 Nov): landings 4 to 7, a stopped daemon and a lease that could not mature
+
+Landings on dev after the Verify: 4 `..e14abce95` (22:13Z, the canon projection for the two
+advisory policies; it ended about 70 minutes of red on eprfs that landing 3 had left), 5
+`..2081b2532` (23:19Z), 6 `2081b2532..a7dfa8b12` (02:49Z on the 24th: the change-detection design
+and its eight stations, ethosengine's crossing-drop count, the arrival hook's 20 s bound, the
+lease-renew retry, rows 87 to 89), 7 `a7dfa8b12..93983b057` (02:54Z: brit 0.3.4 pin, row 90).
+Brit 0.3.4 became shem's device head by `epr bin follow` from a clean checkout at dev (a source
+build). Fallbacks, each stated in its command: the dev pushes (standing exception), fetch and
+detach inside worktree submodules, `update-index --cacheinfo` for the gitlink, `merge --ff-only`
+in the main checkout after a pin move.
+
+Landing 6 took five pushes. Its gates were all clear every time (2583 s the first time, about
+200 s after that on recorded verdicts). What refused it, in order:
+
+1. shem's device supervisor had stopped, so no peer daemon served and ethosengine read shem as
+   silent. Restarted with `epr device supervise`; cause not found (row 87).
+2. The laptop, admitted and heard about every 10 s, acknowledged none of shem's records, so the
+   landing lease was unconfirmed and the hook waited about 11 minutes for an override, renewing
+   every 200 s. A renew met `store lock remained busy for 5s` and the hook read it as a refusal.
+   Three pushes ended there. Cured by a bounded retry in the hook, landed by running the pushed
+   tree's own hook (`-c core.hooksPath=<worktree>/.husky/_`).
+3. With the retry in, the override still did not mature: it counts from when the silent device
+   was last heard, and the laptop was heard throughout. This is the rule as written (row 90).
+   The steward paused the laptop's peer daemon at 02:38Z; the lease was then claimed in 145 s,
+   and in 16 s for landing 7. He leans to refusing at once and naming the cure.
+
+Measured on the way: a `berth` call on shem took about 4 s and a claim 16 s (0.8 s for status on
+ethosengine); shem's peer daemon ran at about 75% of a core, re-reading its 18 MB flow log every
+30 s whether or not it had changed (a fix is handed over by ethosengine, not landed).
+
+Roll 2 did not land. Its serving receipt stopped at preflight on ethosengine, whose household
+was cast on 26 October and does not match current DNA. It was split: 2a (blob owner lock, the
+stasis observe verb, the lock sites outside storage) and 2b (the two storage lock sites). Two
+Codex reviews of 2a each said fix first; four items were fixed after the first, and three were
+open after the second (a ruling reachable through the gap record, fork tests still timed by a
+sleep, and the reindex skip losing a pending retry when a read fails). Shem's household can
+witness 2b: its DNAs rebuilt fresh at dev and its bundle reproduces its installed cells.
+
 ## The integrator's errors
 
 The unsent stasis push and the seven-hour stall are recorded above. Added here:
@@ -291,6 +330,15 @@ The unsent stasis push and the seven-hour stall are recorded above. Added here:
   The integrator had said a roll-only result would hold the landing and then did not stop the push;
   it told the steward so, with its reasons. The fix (`lock_sysroot` on the shared guard) landed in
   the follow-up.
+
+- I reported that brit 0.3.4 was not on its remote. I had run `ls-remote` inside a worktree's
+  submodule, whose origin is shem's local copy of brit and not GitHub. The release was there. I
+  corrected it with ethosengine an hour later, after the brit session answered.
+- I guessed that my own commands were holding the store lock during the lease wait and stopped
+  the inbox watch for a push. The next push failed the same way; the guess cost one attempt.
+- I ingested the brit closure from the dirty main checkout, so the store would not land it as
+  the device head, and I started a source build with a five-minute timeout that killed it. The
+  second build ran to its end from a clean checkout.
 
 ## Parked for the next roll
 

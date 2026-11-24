@@ -561,6 +561,19 @@ closure, the station stays open and says how many landings it has seen; it is no
 These are design positions for the steward to ratify; nothing enforces them but this text and the
 reviews of the stations.
 
+### A third miss, found on 2026-11-24
+
+The household mesh's preflight refuses a DNA's wasm as stale when the wasm's build time is older
+than the date of the last commit that touched the zome's directory
+(`app/elohim-app/scripts/hc-mesh.sh`, the stale-hApp check). On dev `93983b057` it refused all
+five DNAs, and a rebuild found every wasm fresh: the commit it compared against added a licence
+field to each `Cargo.toml`. It is the Rust style miss in mirror image: there a step ran with
+nothing changed and nobody saw the cost; here a change test fired on a change that was not one,
+and the cost was a household lane judged unavailable for most of a night. It belongs to the
+census as a change test with no closure behind it, and to CD-reading as a step whose refusal
+should name the input that moved. Integrator's first-hand read; the script's lines were not
+re-read for this note.
+
 ## 8. Open questions for the steward
 
 1. Start CD-reading and the three shadows (read-selects, no-fingerprint, CI stages) before any `on`?
