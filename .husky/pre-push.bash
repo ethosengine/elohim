@@ -56,7 +56,8 @@ GATE_READING_DIR=""
 GATE_READING_ROWS=""
 [ "${GATE_READING-}" = off ] || GATE_READING_DIR=$(mktemp -d 2>/dev/null || true)
 [ -z "$GATE_READING_DIR" ] || GATE_READING_ROWS="$GATE_READING_DIR/rows.jsonl"
-GATE_READING_LEGS=$'submodules\tnone\tchecked-out submodule worktrees and gitlink state\nsecurity-paydown\tnone\tpushed commit trees, origin/dev when used as fallback, working-tree policy/checker bytes, SECURITY_PAYDOWN and host Python\nrust-style\tnone\tpushed commit trees, origin/dev when used as fallback, working-tree policy bytes, Rust ownership state and host tools\ninput-policy\tnone\tthe Brit executable/capabilities, input policy, mode and device state\nfleet-roll\tnone\tpushed ref ranges/commit messages, destination objects, committed manifests/fleet policy and Node version\ndoc-cut\tnone\tpushed ref ranges, destination/pushed document blobs and commit messages, committed guard bytes and Node version\npackage-projections\tnone\tthe committed package tree, generated runtime projections, projector bytes and Node version\nhook-boundary-tests\tnone\tthe working-tree hook/tests, host Python/Git behavior and temporary-repository state\nhabit-register\tnone\tcommitted habit atoms/manifests, projector/library, generated register and Python version\nagentic-library-harnesses\tnone\tthe working-tree governance library/harnesses, HARNESS_JOBS, host tools and temporary-repository state\nci-ignore\tnone\tthe pushed changed-path union, committed .ci-ignore/parser bytes and Node version\nelohim-agent-test\tnone\tthe working-tree agent manifest/schema workspace, pnpm/Node and installed dependencies\nproject-selection\tnone\tworking-tree build manifests, pushed changed paths/gitlinks, Brit oracle/capability and device gate-cost state\npreflight\tnone\tselected project closures/prerequisites, working-tree policy, device/pool state and installed tools\nhumans-presences\tnone\tworking-tree human/presence sources and generated JSON, pnpm/Node and installed seeder dependencies\ncid-artifacts\tnone\tworking-tree content sources/generated twins, pnpm/Node and installed seeder dependencies\ndevice-archetypes\tnone\tworking-tree device sources/generated JSON, pnpm/Node and installed seeder dependencies\ndeployments-conformance\tnone\tworking-tree deployments/human manifests/budgets/validator, pnpm/Node and installed dependencies\nruntime-manifest-pins\tnone\tworking-tree runtime manifests/generated resources/Cargo sources, pool state and installed Rust toolchain/dependencies\naccount-packages\tnone\tworking-tree account packages/human sources/schema, pnpm/Node and installed seeder dependencies\nci-ignore-freshness\tnone\tcommitted root compose manifest, projector/generated .ci-ignore and Python version\nepr-meta-compose\tnone\tthe pushed range, moving origin/dev, working-tree compose policy/scripts, EPR_META_ACK and host Python/Git\nt2-receipt\tnone\tpushed changed paths, working-tree mtimes/reports, device validation refs and T2_RECEIPT\nsweettest\tnone\tselected projects, push destinations and SKIP_SWEETTEST/RUN_SWEETTEST overrides\nresource-check\tnone\tdevice volume pressure, working-tree pool policy/tools, live cargo state and resource overrides\nepr-landing\tnone\tthe pushed dev head, gate selection, working-tree binaries and mutable device bin-store/head state\nbrit-advisory\tnone\tmoving origin/dev, repository object/integrity state, Brit executable/device state and BRIT_ADVISORY\nhandover-record\tnone\tall pushed refs, gate verdicts and mutable native hand-over/device state'
+export GATE_READING_ROWS
+GATE_READING_LEGS=$'submodules\tnone\tchecked-out submodule worktrees and gitlink state\nsecurity-paydown\tnone\tpushed commit trees, origin/dev when used as fallback, working-tree policy/checker bytes, SECURITY_PAYDOWN and host Python\nrust-style\tnone\tpushed commit trees, origin/dev when used as fallback, working-tree policy bytes, Rust ownership state and host tools\ninput-policy\tnone\tthe Brit executable/capabilities, input policy, mode and device state\nfleet-roll\tnone\tpushed ref ranges/commit messages, destination objects, committed manifests/fleet policy and Node version\ndoc-cut\tnone\tpushed ref ranges, destination/pushed document blobs and commit messages, committed guard bytes and Node version\npackage-projections\tnone\tthe committed package tree, generated runtime projections, projector bytes and Node version\nhook-boundary-tests\tnone\tthe working-tree hook/tests, host Python/Git behavior and temporary-repository state\nhabit-register\tnone\tcommitted habit atoms/manifests, projector/library, generated register and Python version\nagentic-library-harnesses\tnone\tthe working-tree governance library/harnesses, HARNESS_JOBS, host tools and temporary-repository state\nci-ignore\tnone\tthe pushed changed-path union, committed .ci-ignore/parser bytes and Node version\nelohim-agent-test\tnone\tthe working-tree agent manifest/schema workspace, pnpm/Node and installed dependencies\nproject-selection\tnone\tworking-tree build manifests, pushed changed paths/gitlinks, Brit oracle/capability and device gate-cost state\npreflight\tnone\tselected project closures/prerequisites, working-tree policy, device/pool state and installed tools\nhumans-presences\tnone\tworking-tree human/presence sources and generated JSON, pnpm/Node and installed seeder dependencies\ncid-artifacts\tnone\tworking-tree content sources/generated twins, pnpm/Node and installed seeder dependencies\ndevice-archetypes\tnone\tworking-tree device sources/generated JSON, pnpm/Node and installed seeder dependencies\ndeployments-conformance\tnone\tworking-tree deployments/human manifests/budgets/validator, pnpm/Node and installed dependencies\nruntime-manifest-pins\tnone\tworking-tree runtime manifests/generated resources/Cargo sources, pool state and installed Rust toolchain/dependencies\naccount-packages\tnone\tworking-tree account packages/human sources/schema, pnpm/Node and installed seeder dependencies\nci-ignore-freshness\tnone\tworking-tree root compose manifest, projector/generated .ci-ignore and Python version\nepr-meta-compose\tnone\tthe pushed range, moving origin/dev, working-tree compose policy/scripts, EPR_META_ACK and host Python/Git\nt2-receipt\tnone\tpushed changed paths, working-tree mtimes/reports, device validation refs and T2_RECEIPT\nsweettest\tnone\tselected projects, push destinations and SKIP_SWEETTEST/RUN_SWEETTEST overrides\nresource-check\tnone\tdevice volume pressure, working-tree pool policy/tools, live cargo state and resource overrides\nepr-landing\tnone\tthe pushed dev head, gate selection, working-tree binaries and mutable device bin-store/head state\nbrit-advisory\tnone\tmoving origin/dev, repository object/integrity state, Brit executable/device state and BRIT_ADVISORY\nhandover-record\tnone\tall pushed refs, gate verdicts and mutable native hand-over/device state'
 
 gate_reading_lookup() {
   local wanted=$1 row_name row_policy row_reason
@@ -98,17 +99,18 @@ gate_step_reading() {
     while IFS=$'\t' read -r reading_name reading_policy reading_reason; do
       [ -n "$reading_name" ] || continue
       case $'\n'"$GATE_READING_SEEN"$'\n' in *$'\n'"$reading_name"$'\n'*) continue ;; esac
-      gate_step_reading 0 "$reading_name" skipped 0 "$reading_now" "$reading_now"
+      gate_step_reading 0 "$reading_name" skipped 0 "$reading_now" "$reading_now" true
     done <<<"$GATE_READING_LEGS"
     GATE_READING_FINALIZED=1
     [ "${GATE_READING-}" != off ] || return 0
     if [ -z "$GATE_READING_ROWS" ] || [ ! -s "$GATE_READING_ROWS" ]; then
       echo "[gate-reading] pre-push readings unavailable (scratch file was not created)" >&2
+      [ -z "$GATE_READING_DIR" ] || rm -rf -- "$GATE_READING_DIR" 2>/dev/null || true
       return 0
     fi
     reading_epr="${EPR_BIN:-epr}"
     if command -v timeout >/dev/null 2>&1; then
-      timeout 5s "$reading_epr" flow reading append --from "$GATE_READING_ROWS" --root "$HOOK_WORK_TREE" >/dev/null 2>&1
+      timeout -k 1s 5s "$reading_epr" flow reading append --from "$GATE_READING_ROWS" --root "$HOOK_WORK_TREE" >/dev/null 2>&1
       reading_emit_status=$?
     else
       reading_emit_status=127
@@ -116,12 +118,12 @@ gate_step_reading() {
     if [ "$reading_emit_status" -ne 0 ]; then
       echo "[gate-reading] pre-push readings unavailable (exit $reading_emit_status)" >&2
     fi
-    rm -rf -- "$GATE_READING_DIR"
+    [ -z "$GATE_READING_DIR" ] || rm -rf -- "$GATE_READING_DIR" 2>/dev/null || true
     return 0
   fi
 
   local reading_status=$1 reading_name=$2 reading_outcome=$3
-  local reading_seconds=$4 reading_started=$5 reading_ended=$6 reading_at
+  local reading_seconds=$4 reading_started=$5 reading_ended=$6 reading_synthesized=${7:-false} reading_at reading_verdict
   local escaped_run escaped_step escaped_key escaped_started escaped_ended escaped_at
   case $'\n'"$GATE_READING_SEEN"$'\n' in
     *$'\n'"$reading_name"$'\n'*) return "$reading_status" ;;
@@ -135,15 +137,22 @@ gate_step_reading() {
   fi
   # The leg's end instant is the observation instant; do not spawn `date` again for shadow data.
   reading_at=$reading_ended
+  if [ "$reading_outcome" = skipped ]; then
+    reading_verdict=none
+  elif [ "$reading_status" -eq 0 ]; then
+    reading_verdict=green
+  else
+    reading_verdict=red
+  fi
   gate_reading_json_escape_into escaped_run "$GATE_READING_RUN_ID"
   gate_reading_json_escape_into escaped_step "leg:$reading_name"
   gate_reading_json_escape_into escaped_key "$GATE_READING_KEY"
   gate_reading_json_escape_into escaped_started "$reading_started"
   gate_reading_json_escape_into escaped_ended "$reading_ended"
   gate_reading_json_escape_into escaped_at "$reading_at"
-  printf '{"measure":"gate-step-reading@1","value":%s,"unit":"seconds","run_id":"%s","step":"%s","key":"%s","key_changed":"%s","outcome":"%s","waited_seconds":0,"started_at":"%s","ended_at":"%s","at":"%s"}\n' \
+  printf '{"measure":"gate-step-reading@1","value":%s,"unit":"seconds","run_id":"%s","step":"%s","key":"%s","key_changed":"%s","status":"%s","outcome":"%s","waited_seconds":0,"lease_waited_seconds":0,"synthesized":%s,"started_at":"%s","ended_at":"%s","at":"%s"}\n' \
     "$reading_seconds" "$escaped_run" "$escaped_step" "$escaped_key" "$GATE_READING_KEY_CHANGED" \
-    "$reading_outcome" "$escaped_started" "$escaped_ended" "$escaped_at" >>"$GATE_READING_ROWS"
+    "$reading_verdict" "$reading_outcome" "$reading_synthesized" "$escaped_started" "$escaped_ended" "$escaped_at" >>"$GATE_READING_ROWS" 2>/dev/null || true
   return "$reading_status"
 }
 # ── Gate step reading helper end ────────────────────────────────

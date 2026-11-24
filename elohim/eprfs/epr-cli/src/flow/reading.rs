@@ -9,6 +9,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fs::{self, OpenOptions};
 use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
+use std::thread;
+use std::time::{Duration, Instant};
 
 use chrono::{DateTime, Utc};
 use elohim_device_runtime::flock::Flock;
@@ -23,6 +25,9 @@ const LOCK_FILE: &str = "gate-step.lock";
 const DEFAULT_LAST_RUNS: usize = 10;
 const TRIM_ABOVE_BYTES: u64 = 2 * 1024 * 1024;
 const TRIM_TO_BYTES: usize = 1024 * 1024;
+const MAX_ROW_BYTES: usize = 64 * 1024;
+const LOCK_RETRY_FOR: Duration = Duration::from_millis(250);
+const LOCK_RETRY_EVERY: Duration = Duration::from_millis(10);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "lowercase")]
@@ -40,6 +45,14 @@ enum Outcome {
     Skipped,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "lowercase")]
+enum Status {
+    Green,
+    Red,
+    None,
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct ReadingRow {
@@ -50,8 +63,13 @@ struct ReadingRow {
     step: String,
     key: String,
     key_changed: KeyChanged,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    key_changed_writer: Option<KeyChanged>,
+    status: Status,
     outcome: Outcome,
     waited_seconds: f64,
+    lease_waited_seconds: f64,
+    synthesized: bool,
     started_at: String,
     ended_at: String,
     at: String,
@@ -74,6 +92,21 @@ impl ReadingRow {
         if !self.waited_seconds.is_finite() || self.waited_seconds < 0.0 {
             return Err("waited_seconds must be a finite non-negative number".into());
         }
+        if !self.lease_waited_seconds.is_finite() || self.lease_waited_seconds < 0.0 {
+            return Err("lease_waited_seconds must be a finite non-negative number".into());
+        }
+        let status_matches = matches!(
+            (self.outcome, self.status),
+            (Outcome::Ran, Status::Green | Status::Red)
+                | (Outcome::Reused, Status::Green)
+                | (Outcome::Skipped, Status::None)
+        );
+        if !status_matches {
+            return Err("status must match the row outcome".into());
+        }
+        if self.synthesized && self.outcome != Outcome::Skipped {
+            return Err("only a skipped row may be synthesized".into());
+        }
         let started =
             parse_time(&self.started_at).ok_or_else(|| "started_at must be RFC3339".to_string())?;
         let ended =
@@ -94,6 +127,8 @@ impl ReadingRow {
             outcome: self.outcome,
             seconds: nonnegative(self.value),
             waited_seconds: nonnegative(self.waited_seconds),
+            lease_waited_seconds: nonnegative(self.lease_waited_seconds),
+            synthesized: self.synthesized,
             started_at: parse_time(&self.started_at)?,
             ended_at: parse_time(&self.ended_at)?,
         })
@@ -109,6 +144,8 @@ struct ReadingObservation {
     outcome: Outcome,
     seconds: f64,
     waited_seconds: f64,
+    lease_waited_seconds: f64,
+    synthesized: bool,
     started_at: DateTime<Utc>,
     ended_at: DateTime<Utc>,
 }
@@ -153,19 +190,30 @@ fn read_rows(path: &Path) -> FlowResult<Vec<ReadingRow>> {
         .collect())
 }
 
-fn derive_key_changed(rows: &mut [ReadingRow], previous: &[ReadingRow]) {
-    let mut latest = previous
-        .iter()
-        .map(|row| (row.step.clone(), row.key.clone()))
-        .collect::<BTreeMap<_, _>>();
+fn derive_key_changed(rows: &mut [ReadingRow], previous: Option<&[ReadingRow]>) {
+    let mut latest_green = previous.map(|stored| {
+        stored
+            .iter()
+            .filter(|row| row.status == Status::Green && !row.key.starts_with("none:"))
+            .map(|row| (row.step.clone(), row.key.clone()))
+            .collect::<BTreeMap<_, _>>()
+    });
     for row in rows {
-        if row.key_changed == KeyChanged::Unknown && !row.key.starts_with("none:") {
-            row.key_changed = match latest.get(&row.step) {
+        row.key_changed_writer = Some(row.key_changed);
+        row.key_changed = if row.key.starts_with("none:") || latest_green.is_none() {
+            KeyChanged::Unknown
+        } else {
+            match latest_green.as_ref().and_then(|green| green.get(&row.step)) {
                 Some(key) if key == &row.key => KeyChanged::No,
-                _ => KeyChanged::Yes,
-            };
+                Some(_) => KeyChanged::Yes,
+                None => KeyChanged::Unknown,
+            }
+        };
+        if row.status == Status::Green && !row.key.starts_with("none:") {
+            if let Some(green) = latest_green.as_mut() {
+                green.insert(row.step.clone(), row.key.clone());
+            }
         }
-        latest.insert(row.step.clone(), row.key.clone());
     }
 }
 
@@ -174,18 +222,19 @@ fn trim(path: &Path) -> FlowResult<bool> {
         return Ok(false);
     }
     let bytes = fs::read(path)?;
-    let mut lines = bytes
+    let mut held = 0usize;
+    let mut lines = Vec::new();
+    for (index, line) in bytes
         .split_inclusive(|byte| *byte == b'\n')
         .rev()
-        .scan(0usize, |held, line| {
-            if *held + line.len() > TRIM_TO_BYTES {
-                None
-            } else {
-                *held += line.len();
-                Some(line)
-            }
-        })
-        .collect::<Vec<_>>();
+        .enumerate()
+    {
+        if index > 0 && held + line.len() > TRIM_TO_BYTES {
+            break;
+        }
+        held += line.len();
+        lines.push(line);
+    }
     lines.reverse();
     let dir = path.parent().ok_or_else(|| {
         FlowError::InvalidArguments(format!("{} has no parent directory", path.display()))
@@ -209,9 +258,11 @@ pub fn append(root: &Path, from: &Path) -> FlowResult<AppendSummary> {
     let mut accepted = Vec::new();
     let mut rejected = 0;
     for line in BufReader::new(source).lines() {
-        let row = line
-            .ok()
-            .and_then(|text| serde_json::from_str::<ReadingRow>(&text).ok());
+        let row = line.ok().and_then(|text| {
+            (text.len() <= MAX_ROW_BYTES)
+                .then(|| serde_json::from_str::<ReadingRow>(&text).ok())
+                .flatten()
+        });
         match row {
             Some(row) if row.validate(&unit).is_ok() => accepted.push(row),
             _ => rejected += 1,
@@ -227,14 +278,34 @@ pub fn append(root: &Path, from: &Path) -> FlowResult<AppendSummary> {
         .create(true)
         .truncate(false)
         .open(dir.join(LOCK_FILE))?;
-    let _lock = Flock::try_exclusive(lock_file)?.map_err(|_| {
-        FlowError::Unavailable(
-            "gate-step reading append is busy under its device-local lock".into(),
-        )
-    })?;
+    let deadline = Instant::now() + LOCK_RETRY_FOR;
+    let mut available = Some(lock_file);
+    let mut held = None;
+    while let Some(file) = available.take() {
+        match Flock::try_exclusive(file)? {
+            Ok(lock) => held = Some(lock),
+            Err(file) if Instant::now() < deadline => {
+                available = Some(file);
+                thread::sleep(LOCK_RETRY_EVERY);
+            }
+            Err(_) => break,
+        }
+    }
+    let Some(_lock) = held else {
+        eprintln!(
+            "gate-step reading append dropped {} row(s): device-local lock remained busy",
+            accepted.len()
+        );
+        return Ok(AppendSummary {
+            accepted: 0,
+            rejected,
+            trimmed: false,
+            path,
+        });
+    };
 
-    let previous = read_rows(&path)?;
-    derive_key_changed(&mut accepted, &previous);
+    let previous = read_rows(&path).ok();
+    derive_key_changed(&mut accepted, previous.as_deref());
     if !accepted.is_empty() {
         let mut output = OpenOptions::new().create(true).append(true).open(&path)?;
         for row in &accepted {
@@ -314,7 +385,8 @@ pub struct RunFold {
     pub sum_step_seconds: f64,
     pub executing_seconds: f64,
     pub observed_waited_seconds: f64,
-    pub gap_seconds: f64,
+    pub lease_waited_seconds: f64,
+    pub unaccounted_seconds: f64,
     pub waiting_seconds: f64,
     pub finish_setting_step: String,
     pub started_at: String,
@@ -402,7 +474,9 @@ fn fold(mut rows: Vec<ReadingObservation>, options: &ReadingOptions) -> ReadingR
         if missing_reason {
             no_key_no_reason.insert(row.step.clone());
         }
-        by_run.entry(row.run_id.clone()).or_default().push(row);
+        if !row.synthesized {
+            by_run.entry(row.run_id.clone()).or_default().push(row);
+        }
     }
 
     for (name, runs) in step_runs {
@@ -435,11 +509,15 @@ fn fold(mut rows: Vec<ReadingObservation>, options: &ReadingOptions) -> ReadingR
             let executing_seconds = run_rows.iter().map(|row| row.seconds).sum::<f64>();
             let observed_waited_seconds =
                 run_rows.iter().map(|row| row.waited_seconds).sum::<f64>();
+            let lease_waited_seconds = run_rows
+                .iter()
+                .map(|row| row.lease_waited_seconds)
+                .sum::<f64>();
             let mut execution_frontier = run_rows[0].ended_at;
-            let mut gap_seconds = 0.0;
+            let mut unaccounted_seconds = 0.0;
             for row in run_rows.iter().skip(1) {
                 if row.started_at >= execution_frontier {
-                    gap_seconds += elapsed_seconds(execution_frontier, row.started_at);
+                    unaccounted_seconds += elapsed_seconds(execution_frontier, row.started_at);
                 }
                 execution_frontier = execution_frontier.max(row.ended_at);
             }
@@ -461,8 +539,9 @@ fn fold(mut rows: Vec<ReadingObservation>, options: &ReadingOptions) -> ReadingR
                 sum_step_seconds: executing_seconds,
                 executing_seconds,
                 observed_waited_seconds,
-                gap_seconds,
-                waiting_seconds: observed_waited_seconds + gap_seconds,
+                lease_waited_seconds,
+                unaccounted_seconds,
+                waiting_seconds: observed_waited_seconds + lease_waited_seconds,
                 finish_setting_step,
                 started_at: started_at.to_rfc3339(),
                 ended_at: ended_at.to_rfc3339(),
@@ -487,7 +566,7 @@ fn fold(mut rows: Vec<ReadingObservation>, options: &ReadingOptions) -> ReadingR
         seconds_by_step,
         ran_with_unchanged_key: ran_unchanged.into_iter().collect(),
         run_folds,
-        gap_accounting: "gaps count only between sequential, non-overlapping steps; an overlapping step extends the execution frontier and contributes no gap".into(),
+        gap_accounting: "gaps between sequential, non-overlapping steps are unaccounted, never inferred as waiting; an overlapping step extends the execution frontier and contributes no gap".into(),
         no_key_no_reason: no_key_no_reason.into_iter().collect(),
     }
 }
@@ -519,18 +598,21 @@ impl ReadingReport {
             self.ran_with_unchanged_key.len(),
             list_or_none(&self.ran_with_unchanged_key)
         );
-        println!("runs — wall vs summed steps; finish-setting step; waiting vs executing:");
+        println!(
+            "runs — wall vs summed steps; finish-setting step; waiting, unaccounted and executing:"
+        );
         println!("  gap accounting: {}", self.gap_accounting);
         for run in &self.run_folds {
             println!(
-                "  {}  wall={:.3}  steps={:.3}  finish={}  waiting={:.3} (observed={:.3}, gaps={:.3})  executing={:.3}",
+                "  {}  wall={:.3}  steps={:.3}  finish={}  waiting={:.3} (observed={:.3}, lease={:.3})  unaccounted={:.3}  executing={:.3}",
                 run.run_id,
                 run.wall_clock_seconds,
                 run.sum_step_seconds,
                 run.finish_setting_step,
                 run.waiting_seconds,
                 run.observed_waited_seconds,
-                run.gap_seconds,
+                run.lease_waited_seconds,
+                run.unaccounted_seconds,
                 run.executing_seconds
             );
         }
@@ -585,8 +667,12 @@ mod tests {
             step: step.into(),
             key: key.into(),
             key_changed: KeyChanged::Unknown,
+            key_changed_writer: None,
+            status: Status::Green,
             outcome: Outcome::Ran,
             waited_seconds: 0.0,
+            lease_waited_seconds: 0.0,
+            synthesized: false,
             started_at: "2026-11-24T12:00:00Z".into(),
             ended_at: "2026-11-24T12:00:01Z".into(),
             at: "2026-11-24T12:00:01Z".into(),
@@ -617,11 +703,90 @@ mod tests {
         let rows = read_rows(&reading_path(root.path())).unwrap();
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0].key, "say \"hi\" \\ path");
-        assert_eq!(rows[0].key_changed, KeyChanged::Yes);
+        assert_eq!(rows[0].key_changed, KeyChanged::Unknown);
+        assert_eq!(rows[0].key_changed_writer, Some(KeyChanged::Unknown));
+    }
+
+    fn append_rows(root: &tempfile::TempDir, rows: &[ReadingRow]) -> Vec<ReadingRow> {
+        let source = root.path().join("rows.jsonl");
+        write_source(&source, rows);
+        append(root.path(), &source).unwrap();
+        read_rows(&reading_path(root.path())).unwrap()
     }
 
     #[test]
-    fn append_refuses_a_contended_store_lock() {
+    fn key_changed_is_changed_from_the_latest_green_key() {
+        let root = declared_root();
+        append_rows(&root, &[stored_row("green-a", "step", "key-a")]);
+        let mut changed = stored_row("green-b", "step", "key-b");
+        changed.key_changed = KeyChanged::No;
+        let rows = append_rows(&root, &[changed]);
+        assert_eq!(rows[1].key_changed, KeyChanged::Yes);
+        assert_eq!(rows[1].key_changed_writer, Some(KeyChanged::No));
+    }
+
+    #[test]
+    fn key_changed_is_unchanged_from_the_latest_green_key() {
+        let root = declared_root();
+        append_rows(&root, &[stored_row("green-a", "step", "key-a")]);
+        let rows = append_rows(&root, &[stored_row("green-a-2", "step", "key-a")]);
+        assert_eq!(rows[1].key_changed, KeyChanged::No);
+    }
+
+    #[test]
+    fn red_in_between_does_not_become_the_key_changed_baseline() {
+        let root = declared_root();
+        append_rows(&root, &[stored_row("green-a", "step", "key-a")]);
+        let mut red = stored_row("red-b", "step", "key-b");
+        red.status = Status::Red;
+        append_rows(&root, &[red]);
+        let rows = append_rows(&root, &[stored_row("green-a-2", "step", "key-a")]);
+        assert_eq!(rows[1].key_changed, KeyChanged::Yes);
+        assert_eq!(rows[2].key_changed, KeyChanged::No);
+    }
+
+    #[test]
+    fn first_run_has_unknown_key_changed() {
+        let root = declared_root();
+        let rows = append_rows(&root, &[stored_row("first", "step", "key-a")]);
+        assert_eq!(rows[0].key_changed, KeyChanged::Unknown);
+    }
+
+    #[test]
+    fn none_key_always_has_unknown_key_changed() {
+        let root = declared_root();
+        append_rows(&root, &[stored_row("green", "step", "key-a")]);
+        let rows = append_rows(
+            &root,
+            &[stored_row("none", "step", "none: closure unavailable")],
+        );
+        assert_eq!(rows[1].key_changed, KeyChanged::Unknown);
+    }
+
+    #[test]
+    fn failed_green_lookup_overrides_writer_with_unknown_key_changed() {
+        let mut current = stored_row("current", "step", "key-a");
+        current.key_changed = KeyChanged::No;
+        derive_key_changed(std::slice::from_mut(&mut current), None);
+        assert_eq!(current.key_changed, KeyChanged::Unknown);
+        assert_eq!(current.key_changed_writer, Some(KeyChanged::No));
+    }
+
+    #[test]
+    fn append_rejects_a_row_above_the_size_bound() {
+        let root = declared_root();
+        let source = root.path().join("rows.jsonl");
+        write_source(
+            &source,
+            &[stored_row("large", "step", &"x".repeat(MAX_ROW_BYTES))],
+        );
+        let summary = append(root.path(), &source).unwrap();
+        assert_eq!(summary.accepted, 0);
+        assert_eq!(summary.rejected, 1);
+    }
+
+    #[test]
+    fn append_retries_then_drops_a_contended_store_lock() {
         let root = declared_root();
         let source = root.path().join("rows.jsonl");
         write_source(&source, &[stored_row("run", "step", "key")]);
@@ -636,8 +801,10 @@ mod tests {
             .unwrap();
         let _held = Flock::try_exclusive(file).unwrap().expect("free lock");
 
-        let error = append(root.path(), &source).unwrap_err().to_string();
-        assert!(error.contains("busy under its device-local lock"));
+        let started = Instant::now();
+        let summary = append(root.path(), &source).unwrap();
+        assert!(started.elapsed() >= LOCK_RETRY_FOR);
+        assert_eq!(summary.accepted, 0);
         assert!(!reading_path(root.path()).exists());
     }
 
@@ -665,6 +832,17 @@ mod tests {
         assert!(kept.iter().all(|row| row.step != "step-0000"));
     }
 
+    #[test]
+    fn trim_never_removes_the_newest_row() {
+        let root = declared_root();
+        let path = reading_path(root.path());
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        let newest = format!("{}\n", "x".repeat(TRIM_ABOVE_BYTES as usize + 1));
+        fs::write(&path, &newest).unwrap();
+        assert!(trim(&path).unwrap());
+        assert_eq!(fs::read_to_string(&path).unwrap(), newest);
+    }
+
     fn row(
         run_id: &str,
         step: &str,
@@ -682,6 +860,8 @@ mod tests {
             outcome,
             seconds,
             waited_seconds,
+            lease_waited_seconds: 0.0,
+            synthesized: false,
             started_at: parse_time(started_at).unwrap(),
             ended_at: parse_time(ended_at).unwrap(),
         }
@@ -745,8 +925,8 @@ mod tests {
         assert_eq!(run.wall_clock_seconds, 12.0);
         assert_eq!(run.sum_step_seconds, 7.0);
         assert_eq!(run.observed_waited_seconds, 3.0);
-        assert_eq!(run.gap_seconds, 2.0);
-        assert_eq!(run.waiting_seconds, 5.0);
+        assert_eq!(run.unaccounted_seconds, 2.0);
+        assert_eq!(run.waiting_seconds, 3.0);
         assert_eq!(run.executing_seconds, 7.0);
         assert_eq!(run.finish_setting_step, "broken");
     }
@@ -876,9 +1056,61 @@ mod tests {
 
         let run = &report.run_folds[0];
         assert_eq!(run.observed_waited_seconds, 3.0);
-        assert_eq!(run.gap_seconds, 2.0);
-        assert_eq!(run.waiting_seconds, 5.0);
+        assert_eq!(run.unaccounted_seconds, 2.0);
+        assert_eq!(run.waiting_seconds, 3.0);
         assert!(report.gap_accounting.contains("non-overlapping"));
+    }
+
+    #[test]
+    fn lease_wait_and_unaccounted_gaps_are_reported_separately() {
+        let first = row(
+            "run",
+            "first",
+            "key-a",
+            KeyChanged::Yes,
+            Outcome::Ran,
+            (2.0, 1.0, "2026-11-24T10:00:00Z", "2026-11-24T10:00:02Z"),
+        );
+        let mut second = row(
+            "run",
+            "second",
+            "key-b",
+            KeyChanged::Yes,
+            Outcome::Ran,
+            (2.0, 0.0, "2026-11-24T10:00:05Z", "2026-11-24T10:00:07Z"),
+        );
+        second.lease_waited_seconds = 2.0;
+        let report = fold(vec![first, second], &ReadingOptions::default());
+        let run = &report.run_folds[0];
+        assert_eq!(run.waiting_seconds, 3.0);
+        assert_eq!(run.observed_waited_seconds, 1.0);
+        assert_eq!(run.lease_waited_seconds, 2.0);
+        assert_eq!(run.unaccounted_seconds, 3.0);
+    }
+
+    #[test]
+    fn synthesized_skips_do_not_set_run_span_or_finish() {
+        let real = row(
+            "run",
+            "real",
+            "key-a",
+            KeyChanged::Yes,
+            Outcome::Ran,
+            (2.0, 0.0, "2026-11-24T10:00:00Z", "2026-11-24T10:00:02Z"),
+        );
+        let mut synthesized = row(
+            "run",
+            "filled-at-exit",
+            "none: not reached",
+            KeyChanged::Unknown,
+            Outcome::Skipped,
+            (0.0, 0.0, "2026-11-24T10:00:10Z", "2026-11-24T10:00:10Z"),
+        );
+        synthesized.synthesized = true;
+        let report = fold(vec![real, synthesized], &ReadingOptions::default());
+        let run = &report.run_folds[0];
+        assert_eq!(run.wall_clock_seconds, 2.0);
+        assert_eq!(run.finish_setting_step, "real");
     }
 
     #[test]

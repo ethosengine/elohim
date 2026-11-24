@@ -2,7 +2,7 @@
 // One local gate path for humans and pre-push. Detection and execution both
 // come from build-manifest.json; no project-name command switch lives here.
 
-import { mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'fs';
+import { appendFileSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { spawnSync } from 'child_process';
 import { resolve, dirname, basename, join } from 'path';
@@ -539,8 +539,11 @@ export function gateReadingRow(row) {
     step: oneLine(row.step),
     key: oneLine(row.key),
     key_changed: oneLine(row.keyChanged),
+    status: oneLine(row.status),
     outcome: oneLine(row.outcome),
     waited_seconds: finiteSeconds(row.waitedSeconds),
+    lease_waited_seconds: finiteSeconds(row.leaseWaitedSeconds),
+    synthesized: row.synthesized === true,
     started_at: rfc3339(row.startedAt),
     ended_at: rfc3339(row.endedAt),
     at: rfc3339(row.at || new Date()),
@@ -550,25 +553,35 @@ export function gateReadingRow(row) {
 /** Collect only. The native writer is called once when this runner process exits. */
 export function emitGateReading(row, {
   env = process.env, collector = invocationGateReadings,
+  append = appendFileSync,
 } = {}) {
   if (env.GATE_READING === 'off' || !row.runId) return;
-  collector.push(gateReadingRow(row));
+  const reading = gateReadingRow(row);
+  if (env.GATE_READING_ROWS) {
+    try { append(env.GATE_READING_ROWS, `${JSON.stringify(reading)}\n`, { mode: 0o600 }); }
+    catch { /* shadow telemetry never changes a gate verdict */ }
+    return;
+  }
+  collector.push(reading);
 }
 
 /** Best-effort by contract: one bounded native call, one warning, no changed gate status. */
 export function appendGateReadings(rows, {
   root = ROOT, env = process.env, spawn = spawnSync,
   warn = text => process.stderr.write(text),
+  makeScratch = prefix => mkdtempSync(prefix),
+  writeRows = (path, bytes) => writeFileSync(path, bytes, { mode: 0o600 }),
+  removeScratch = path => rmSync(path, { recursive: true, force: true }),
 } = {}) {
-  if (env.GATE_READING === 'off' || rows.length === 0) return;
+  if (env.GATE_READING === 'off' || env.GATE_READING_ROWS || rows.length === 0) return;
   let scratch = null;
   try {
-    scratch = mkdtempSync(join(tmpdir(), 'gate-reading-'));
+    scratch = makeScratch(join(tmpdir(), 'gate-reading-'));
     const from = join(scratch, 'rows.jsonl');
-    writeFileSync(from, `${rows.map(row => JSON.stringify(row)).join('\n')}\n`, { mode: 0o600 });
-    const result = spawn(env.EPR_BIN || 'epr',
-      ['flow', 'reading', 'append', '--from', from, '--root', root], {
-        cwd: root, stdio: 'ignore', timeout: 5000,
+    writeRows(from, `${rows.map(row => JSON.stringify(row)).join('\n')}\n`);
+    const result = spawn(env.TIMEOUT_BIN || 'timeout',
+      ['-k', '1', '5', env.EPR_BIN || 'epr', 'flow', 'reading', 'append', '--from', from, '--root', root], {
+        cwd: root, stdio: 'ignore',
       });
     if (result?.status !== 0 || result?.error) {
       const why = result?.error?.message || `exit ${result?.status ?? 'unknown'}`;
@@ -577,7 +590,10 @@ export function appendGateReadings(rows, {
   } catch (error) {
     warn(`[gate-reading] run readings unavailable (${oneLine(error?.message || error)})\n`);
   } finally {
-    if (scratch) rmSync(scratch, { recursive: true, force: true });
+    if (scratch) {
+      try { removeScratch(scratch); }
+      catch { /* cleanup is telemetry too and cannot change the runner verdict */ }
+    }
   }
 }
 
@@ -588,8 +604,7 @@ function keyReading(evidence) {
       keyChanged: 'unknown',
     };
   }
-  const unchanged = (evidence.rows || []).some(row => row.attestation?.success === true);
-  return { key: evidence.key, keyChanged: unchanged ? 'no' : 'yes' };
+  return { key: evidence.key, keyChanged: 'unknown' };
 }
 
 export function runProject(project, printOnly, namesOnly, {
@@ -633,6 +648,7 @@ export function runProject(project, printOnly, namesOnly, {
     key: 'none: closure evidence not reached',
     keyChanged: 'unknown',
     waitedSeconds: 0,
+    leaseWaitedSeconds: 0,
     startedAt: rfc3339(wallClock()),
   };
   let readingComplete = false;
@@ -640,10 +656,15 @@ export function runProject(project, printOnly, namesOnly, {
     if (!readingComplete) {
       readingComplete = true;
       const elapsed = Number(clock() - readingStarted) / 1e9;
+      const executing = seconds === null
+        ? Math.max(0, elapsed - finiteSeconds(reading.leaseWaitedSeconds))
+        : seconds;
       emitGateReading({
         ...reading,
         outcome,
-        seconds: seconds === null ? elapsed : seconds,
+        status: outcome === 'skipped' ? 'none' : (status === 0 ? 'green' : 'red'),
+        synthesized: false,
+        seconds: executing,
         endedAt: rfc3339(wallClock()),
       }, { env, collector: readingCollector });
     }
@@ -654,7 +675,7 @@ export function runProject(project, printOnly, namesOnly, {
     if (project.run.kind === 'attested') {
       process.stderr.write(`gate ${project.name}: an attested project has no local recipe to run\n`);
       reading.key = 'none: an attested project has no alternate local recipe';
-      return complete(2, 'skipped', 0);
+      return complete(2, 'skipped');
     }
     reading.key = `none: alternate recipe ${recipe} has no gate closure key`;
     write(`\n[gate] ${project.name} (${project.dir}) — recipe ${recipe}\n`);
@@ -727,7 +748,7 @@ export function runProject(project, printOnly, namesOnly, {
     const seconds = Number(clock() - started) / 1e9;
     recordCycle(project, seconds, 0, { ...cycleEnv, GATE_RUN_KIND: 'deferred' }, cycleDeps);
     liveEvent(env, { kind: 'gate-verdict', project: project.name, verdict: { exit: 0, seconds: 0, deferred: true } });
-    return complete(0, 'skipped', 0);
+    return complete(0, 'skipped');
   }
 
   // Explicit crate gates carry the same style floor as changed-project selection.
@@ -852,7 +873,7 @@ export function runProject(project, printOnly, namesOnly, {
       log: line => write(`[gate] ${project.name} carry: ${line}\n`),
       verdict: () => siblingVerdicts(project, evidence.key, { root, env, spawn }).candidates,
     } });
-  reading.waitedSeconds = carry.waitedS;
+  reading.leaseWaitedSeconds = carry.waitedS;
   // One admission decision for both run modes (decideReuse); ark is then asked only to run.
   const decision = decideReuse(project, evidence, reuseContext, { root, env, spawn });
   // GATE_INPUTS=shadow: whether the step fingerprints are unchanged under sources. Read only, inside
@@ -873,7 +894,6 @@ export function runProject(project, printOnly, namesOnly, {
     started += clock() - shadowSpan;
   }
   if (decision.reuse) {
-    reading.keyChanged = 'no';
     const row = decision.row;
     const sibling = decision.independence === 'sibling';
     const signer = sibling
@@ -891,7 +911,7 @@ export function runProject(project, printOnly, namesOnly, {
       ...cycleEnv, GATE_RUN_KIND: sibling ? 'sibling-reused' : 'reused',
     }, cycleDeps);
     liveEvent(env, { kind: 'gate-verdict', project: project.name, verdict: { exit: 0, seconds: 0, reused: true } });
-    return complete(0, 'reused', 0);
+    return complete(0, 'reused');
   }
   if (env.GATE_EVIDENCE === 'reuse') write(`[gate] ${project.name} not reused: ${decision.why}\n`);
   // A suite's named half is handed what its key expects (the gated sha and the inventory, package
@@ -973,12 +993,11 @@ export function runProject(project, printOnly, namesOnly, {
   const cost = tapped ? Object.fromEntries(COST_FIELDS.map(k => [k, tapped[k] ?? null])) : undefined;
   const derivation = task ? { ...task.derivation, hit: answer.answered?.hit === true } : undefined;
   if (answer?.answered?.hit) {
-    reading.keyChanged = 'no';
     write(`[gate] ${project.name} reused: derivation hit (method ${derivation.method}, input ${derivation.input})\n`);
     const seconds = Number(clock() - started) / 1e9;
     recordCycle(project, seconds, 0, { ...cycleEnv, GATE_RUN_KIND: 'reused' }, cycleDeps);
     liveEvent(env, { kind: 'gate-verdict', project: project.name, verdict: { exit: 0, seconds: 0, reused: true }, derivation, status: 'Answered' });
-    return complete(0, 'reused', 0);
+    return complete(0, 'reused');
   }
   // The exit status is the verdict; what the tap recognized only classifies it. For a suite's named
   // half the verdict comes from the attempt's written result, never the status alone (suiteDecision).
@@ -1034,7 +1053,7 @@ export function runProject(project, printOnly, namesOnly, {
     status: answer.unanswered ? 'Unanswered' : 'Answered',
     ...(answer.unanswered ? { unanswered: answer.unanswered } : {}),
   } : {}) });
-  return complete(status, 'ran', Math.max(0, seconds - finiteSeconds(reading.waitedSeconds)));
+  return complete(status, 'ran', Math.max(0, seconds - finiteSeconds(reading.leaseWaitedSeconds)));
 }
 
 // The per-project cargo cap travels as one serialized variable; the jobs count
