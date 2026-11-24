@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihdh5j5y4mkjijuekeknoyspyjgv2u23e5ecmso67b3f5ehpbmtai"
+  },
+  "author": "human:matthew",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "formation-cloud-imagodei-mapping",
+  "claim": "Personalized learning needs a deep content cloud mapped against the cloud that formed a person (imported watch/like/post history); author atoms as join points",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_formation_cloud_imagodei_mapping.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_formation_cloud_imagodei_mapping.md",
+        "cid": "bafkreih44g5e7xqpflqnx26aqntqklmfb24ngocy2eef7givlk726pazby"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Formation cloud: map content to a person's imagodei",
+    "file": "project_formation_cloud_imagodei_mapping.md",
+    "scopePath": ".claude/memory/project_formation_cloud_imagodei_mapping.md",
+    "gitName": "(untracked: no commit carries these bytes)",
+    "entryType": "project",
+    "indexed": false
+  }
+}

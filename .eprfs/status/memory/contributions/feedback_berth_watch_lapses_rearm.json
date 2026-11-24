@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihdh5j5y4mkjijuekeknoyspyjgv2u23e5ecmso67b3f5ehpbmtai"
+  },
+  "author": "human:matthew",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "feedback_berth_watch_lapses_rearm",
+  "claim": "Berth inbox Monitor watches expire every 30 min; one not re-armed cost 3.5 h of a coordinator's notes unanswered (2026-11-20).",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/feedback_berth_watch_lapses_rearm.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/feedback_berth_watch_lapses_rearm.md",
+        "cid": "bafkreigcjpre5hmywlcawr7tsvl3m3j3clbzvsmmj6tac7qaxbblvg577y"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "A lapsed berth inbox watch reads as silence",
+    "file": "feedback_berth_watch_lapses_rearm.md",
+    "scopePath": ".claude/memory/feedback_berth_watch_lapses_rearm.md",
+    "gitName": "(untracked: no commit carries these bytes)",
+    "entryType": "feedback",
+    "indexed": true
+  }
+}

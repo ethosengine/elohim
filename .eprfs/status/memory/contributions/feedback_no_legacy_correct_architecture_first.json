@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihdh5j5y4mkjijuekeknoyspyjgv2u23e5ecmso67b3f5ehpbmtai"
+  },
+  "author": "human:matthew",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "feedback-no-legacy-correct-architecture-first",
+  "claim": "Operator 2026-10-04 — do not preserve legacy paths, interim bridges or compatibility arms; replace the wrong design outright",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/feedback_no_legacy_correct_architecture_first.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/feedback_no_legacy_correct_architecture_first.md",
+        "cid": "bafkreiddtqaf2e6kri4l3bddgde5n6zlxgrg65zlt6pkhoxgbcdsqu6qym"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "feedback-no-legacy-correct-architecture-first",
+    "file": "feedback_no_legacy_correct_architecture_first.md",
+    "scopePath": ".claude/memory/feedback_no_legacy_correct_architecture_first.md",
+    "gitName": "(untracked: no commit carries these bytes)",
+    "entryType": "feedback",
+    "indexed": true
+  }
+}

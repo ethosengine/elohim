@@ -6,17 +6,20 @@ contentFormat: "markdown"
 title: "elohim.host's breaker to adam storage :8090 sits Open for hours because the Adam compute-worker sidecar crash-loops inside the storage pod: one NotReady container makes the whole pod NotReady, the ClusterIP Service drops adam's only endpoint, and the doorway sees connection failures from a storage process that is itself Ready"
 slug: "self-heal-adam-storage-breaker-compute-worker-readiness-coupling"
 written: "2026-10-22"
+updated: "2026-10-23"
 author: "runtime-triage"
 status: "backlog"
 priority: "high"
 self_heal_status: blocked
 severity: high
-fingerprints: [ccce437a2ecf]
+fingerprints: [ccce437a2ecf, afc100835f7c]
 nodes: [alpha-b, elohim-adam-alpha, shem]
 relatedNodeIds: []
-tags: [self-heal, circuit, upstream-breaker, adam, compute-worker, pod-readiness, sidecar-coupling, faithful-messenger, elevate-arm]
+tags: [self-heal, circuit, upstream-breaker, render-degenerate, ssr, pool-free-client, adam, compute-worker, pod-readiness, sidecar-coupling, faithful-messenger, elevate-arm]
 cites:
   - https://elohim.host/admin/self-healing
+  - https://elohim.host/admin/render-stats
+  - https://elohim.host/version
   - https://elohim.host/health
   - https://elohim.host/p2p/status
   - https://doorway-alpha.elohim.host/p2p/status
@@ -27,6 +30,9 @@ cites:
   - genesis/orchestrator/data/adam-compute-worker.json
   - genesis/orchestrator/manifests/humans/_edgenode-consolidated.template.yaml
   - doorway/doorway-service/src/routes/upstream_health.rs
+  - doorway/doorway-service/src/server/http.rs
+  - doorway/doorway-service/src/ssr.rs
+  - genesis/data/timeline/backlog/self-heal-alpha-ssr-post-bundle-swap-cold-fetch-stall.md
   - genesis/agentic/.epr-meta/measure-runs-on-a-peer.habit.md
   - genesis/data/timeline/backlog/self-heal-adam-projection-catchup-exhaustion-full-arc.md
   - .claude/data/runtime-findings.jsonl
@@ -193,6 +199,120 @@ The ledger line will close when the poller stops seeing it. Nothing has fixed th
 underlying coupling. Re-check after the next worker change: with the worker
 deliberately failing, `elohim-adam-alpha-0` must stay `Ready`, and the elohim.host
 upstream to adam must stay `closed`.
+
+# 2026-10-23: the same coupling, seen through the render path (`afc100835f7c`)
+
+## What is exhausted
+
+Ledger line (fp `afc100835f7c`, node **alpha-b**, poll 215, `2026-10-23T13:18:39+00:00`):
+
+```
+render degenerate 13/45 of NEW renders = 0.29 over 5 of the last 8 polls (SSR stalled/timedOut saturation)
+```
+
+Re-fetch at triage, `GET https://elohim.host/admin/render-stats` (14:18:16Z, HTTP 200):
+
+```json
+{"total": 15, "rendered": 1, "renderedEmpty": 0, "stalled": 13, "timedOut": 0,
+ "errored": 1, "avgWallMs": 1656, "maxWallMs": 5724, "degenerateRate": 0.867}
+```
+
+`/admin/self-healing` the same second: upstream `elohim-adam-alpha:8090` `circuit: closed`,
+`errorStreak: 0`; `admission.shedTotal: 0`; `warmup.lastError: "Failed to connect to
+http://elohim-adam-alpha.elohim-alpha.svc.cluster.local:8090/api/v1/cache/stream: error sending
+request …"`; `projector.caughtUp: false`. `/version`: image `04ef84c` (built 2026-10-21T23:30:13Z).
+`/health` uptime was 34134 s, so the process started at about 04:49Z. In the poller window the
+previous B-side process had stalled 1 of 114 renders. This process stalled 13 of its first 15.
+
+## The breaker is closed, and the render path still loses adam
+
+The mechanism from the 2026-10-22 section is back. This time the breaker does not show it.
+
+- Prometheus (kube-state-metrics, 30 s samples), 04:40Z → 14:23Z:
+  `kube_pod_status_ready{pod="elohim-adam-alpha-0",condition="true"}` averages **0.184**. The pod is
+  NotReady **82%** of the time and Ready for 60-90 s out of every ~390 s. Per container,
+  `compute-worker` averages 0.182 Ready and `elohim-node` 1.0. For compute-worker, `restarts_total` is
+  108, `waiting_reason` is CrashLoopBackOff and `last_terminated_reason` is Error. The control,
+  `elohim-matthew-alpha-0`, is Ready throughout.
+- EndpointSlice `elohim-adam-alpha-78kss` is the only slice (address 10.1.79.20). It carries
+  `ready="true"` only at the samples where the pod is Ready (checked 04:40-05:10Z and at 12:40Z).
+- All 12 B-side stall bursts (04:57:29, 05:13:19, 05:23:22, 06:24:29, 08:36:12, 08:36:30-35, 09:02:55,
+  09:32:13-17, 10:45:38, 11:08:45, 12:03:29, 12:30:17) fall on NotReady samples.
+- The B-side degenerate rate (87%) matches the NotReady fraction (82%).
+
+Twelve hits in 12 against a base rate of 0.82 is weak evidence on its own (p ≈ 0.09). The reading
+rests on the mechanism and on the rate match:
+
+1. `doorway/doorway-service/src/server/http.rs:646-664` (`init_ssr_render_client`): the render client
+   is pool-free (`pool_max_idle_per_host(0)`, line 657). **Every render fetch opens a new TCP
+   connection to the Service ClusterIP**, so every fetch needs a ready endpoint behind the Service at
+   that moment.
+2. The proxy and warm-stream clients are pooled, and their established connections to 10.1.79.20
+   survive endpoint removal. Proxied reads keep working: at triage
+   `/db/content/elohim-host-landing/head` answered through elohim.host in 0.059 s. The breaker stays
+   `closed` with `errorStreak: 0`, because it sees only new-connection failures and pooled traffic
+   makes few of them.
+3. New connections do fail. Loki on the B-side pod over the same range has 357 `cache_refresh` and
+   27 `warm_stream` "error sending request" lines. At startup it logged `tcp connect error: Connection
+   refused (os error 111)` to `elohim-adam-alpha…:8090` (04:49:46Z).
+4. The render's own lines agree. `doorway::ssr::fetch` has 339 "abandoned before it answered" lines on
+   pod `elohim-doorway-alpha-b-b757ccb6-rnqzw`. Every one has `phase="sending"`, `elapsed_ms`
+   1200-1213, `max_wake_to_poll_ms` 0-37 and `woken_unpolled_ms` None: the render thread polled them
+   promptly, and they were waiting on the network. The `degenerate_fetches` lines mix fetches
+   `stalled 1200ms` with fetches that `errored` in 20-135 ms, which is how refused and unanswered
+   connects look together.
+5. Only 2 of the 12 bursts (09:02:55 and 10:45:38) have `doorway::ssr::dns` lines. Those two are the
+   name-lookup mechanism of `self-heal-alpha-ssr-post-bundle-swap-cold-fetch-stall.md` (the A-side
+   concern), and the address cache built there removes them. The other ten have no lookup line: the
+   lookup answered, and the connect had no ready endpoint to reach.
+
+So this fingerprint is this record's concern, seen through a second seam. A crashing compute worker
+takes adam's endpoint away about 82% of the time. The pooled paths ride established connections and
+hide the outage; the pool-free render path shows it. The 2026-10-22 rule that "a recurrence is this
+concern" holds. The breaker alone does not witness this condition; the render path does.
+
+## Root-cause inventory (this pass)
+
+Unchanged from the 2026-10-22 section:
+
+- `genesis/orchestrator/scripts/render-compute-worker.mjs:308`: the worker command runs in the storage
+  pod with no supervisor and no readinessProbe.
+- `genesis/orchestrator/manifests/humans/_edgenode-consolidated.template.yaml:644`: a `ClusterIP`
+  Service without `publishNotReadyAddresses`.
+- `genesis/orchestrator/data/adam-compute-worker.json`: `enabled: true`.
+
+New: `doorway/doorway-service/src/server/http.rs:657`, the pool-free render client, is the seam where
+the outage shows. The client is pool-free by design, so nothing changes there.
+
+## Current decision (the 2026-10-22 decision stands)
+
+**BLOCKED until the compute-worker campaign takes fix path A (or C).** The campaign is still changing
+the render and its activation (594d0ba4a, 2026-10-23T03:17Z, `[deploy-only] [build:edge]`), so the
+2026-10-22 reason not to edit the render from a sibling branch still applies. Considered and refused
+here:
+
+- Re-pooling the render client so it rides the stale connections. That would hide the outage, and
+  pool-free is the 2026-06-13 freeze containment.
+- Widening the soft budget.
+- `publishNotReadyAddresses` (option B, rejected above).
+
+The poller cites this record on re-encounter. A `render-degenerate` on alpha-b while
+`elohim-adam-alpha-0`'s compute-worker crash-loops is this concern. Check
+`kube_pod_container_status_ready{pod="elohim-adam-alpha-0",container="compute-worker"}` first. The
+finding will not close by disappearance until the worker stops making the pod NotReady.
+
+## Verification
+
+- 2026-10-23 14:18:16Z: `/admin/render-stats`, `/admin/self-healing`, `/health` and `/version`
+  re-fetched on both doorways, all HTTP 200, quoted above. **The condition is live.** Nothing is
+  claimed fixed.
+- The Loki and Prometheus readings quoted above were taken about 14:20-14:25Z through the
+  observability datasource, by read-only analysts.
+- Proxied timings at triage: elohim.host `/db/content/elohim-host-landing/head` 0.059 s and
+  `/api/v1/resilience/concept-path-forward-communities` 0.032 s. No cache-busted render probes were
+  made, so this pass added nothing to the render counters.
+- After the worker change, re-check that `elohim-adam-alpha-0` stays Ready while the worker fails, and
+  that elohim.host `/admin/render-stats` `stalled` stays near alpha's rate over a day.
 
 Deployment regression still to measure (proposed station in
 `genesis/a2o/features/compute/measure-on-a-peer.feature`):

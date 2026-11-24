@@ -2,7 +2,7 @@
   "version": 1,
   "collective": {
     "path": ".epr-meta/collective.json",
-    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+    "cid": "bafkreihdh5j5y4mkjijuekeknoyspyjgv2u23e5ecmso67b3f5ehpbmtai"
   },
   "author": "human:matthew",
   "steward": "repo:ethosengine/elohim",
@@ -11,14 +11,13 @@
   "concern": "feedback_private_thought_governed_fruit",
   "claim": "Ruling 2026-09-10 — thoughts private (humans and agents); only said/done is judged; private stores never imported.",
   "uncertainty": [
-    "Imported verbatim from .claude/memory/feedback_private_thought_governed_fruit.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here.",
-    "authorship: steward-of-record — human:matthew stands for this entry; no agent author was witnessed writing it, and this record does not say human:matthew wrote it. Origin session: 85bcf57b-1e97-4899-aebd-1c6ce00178e1."
+    "Imported verbatim from .claude/memory/feedback_private_thought_governed_fruit.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
   ],
   "sources": [
     {
       "resource": {
         "path": ".claude/memory/feedback_private_thought_governed_fruit.md",
-        "cid": "bafkreig4wcu5phzij6nac7l7hsejdpn3b3k6gfarwv735efkyboopavdhi"
+        "cid": "bafkreia2hc4l2fnzup6cpf7dsl45lapzw6usqe2zm7fvybi7s75lhsjdj4"
       },
       "reach": "repository"
     }

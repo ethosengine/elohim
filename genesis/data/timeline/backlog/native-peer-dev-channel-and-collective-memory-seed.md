@@ -200,6 +200,147 @@ counts as a soak attestation on a candidate. If R2 turns out to need its own not
 head, the gate runs before R2 instead. The conversation, jobs and collective-memory half serves no
 declared habit yet and waits for one.
 
+**P2P design gate, first pass: the room (2026-11-18).** Run on the operator's approved plan, with
+the `p2p-design-gate` skill, before any design. It proposes no table, route, entry type or zome
+change. The `gradient-reading` and `local-first` companions were not loaded in full; their headline
+questions are answered under Design constraints and a full pass is owed before a spec.
+
+*The first social consumer (operator, 2026-11-18).* Another developer's onboarding is an act of
+collective sensemaking: what do their sessions inherit when they initialise the workspace? The
+scenarios are in `genesis/a2o/features/devflow/collective-memory.feature` (a second developer can
+tell whose each inherited memory is; a newcomer's correction is declared as theirs when written;
+graduation by another steward's verdict; two stewards' directions disagreeing; no inherited private
+picture of another person).
+
+Entity: **a memory entry that was said and crosses between one person's devices**
+- Classification: Private (B). It belongs to one person and no peer validates it. It is held today
+  as a file in the repository and would be held as a leaf in the authoring device's channel tree,
+  which is eprfs and not a Holochain private source chain; the gate's category fits by its test
+  and not by its storage.
+- Head-plane cost: none. It is never a head, a Kad record or an election candidate.
+- Network stakes: behaves the same at every stage. Floor-protected: a correction reaches the agent
+  it corrects and is not filtered by any stage (the CounterEvidence floor).
+- Address: content-derived. The channel already names each leaf by the CID of its canonical
+  dag-cbor bytes.
+- Transport affinity: iroh, the tier the device peer already serves.
+- Source of truth: the entry as its author wrote it. The index and the semantic fold are
+  projections rebuilt on each device.
+- Integrity zome and DNA-hash class: none; DNA-hash-neutral. Coordinator function: none.
+- Projections: the `MEMORY.md` index and the per-device semantic fold. No SQLite table, no
+  Automerge document. HTTP route: none.
+- SDO/RWA test: the worst holder is whoever holds one device's channel tree. They see the
+  person's direction to their agents. Boundary 1 bounds it (transcripts and recall receipts do not
+  cross), with boundary 5 (a device is bound to a person by an enrolment act, never inferred).
+
+Entity: **the room** (a shared session; its roster is its participants)
+- Classification: no class fits cleanly, and that is a finding. Each thing said belongs to its
+  author (Private, B) and is jointly held by the roster. Nothing in the room is witnessed by the
+  community. What leaves the room is Attested-Private (B2) in shape: the room's record stays
+  private and a graduated entry is the outcome others may judge. Whether a room is a membrane or a
+  namespace is the reach brief's tension 6 and is not settled here.
+- Head-plane cost: none for a room or its record. If graduated entries were ever notarized, a
+  collective holds on the order of a thousand within a year, which is past the bundling line: one
+  composite root per collective, never a head per entry.
+- Network stakes: every stage. Floor-protected: constitutional records of who assented to a
+  graduation.
+- Address: content-derived, the CID of the room's opening declaration (roster, purpose, opened
+  at), as a session envelope already has. No slug.
+- Source of truth: the participants' own copies. No server holds the room.
+- Integrity zome, coordinator function, route: none proposed.
+- SDO/RWA test: the worst holder is an outside observer of the channel or a doorway a hosted
+  participant sits behind. Boundary 6 is the one at risk: that a room exists, who is in it and
+  when they speak. Removal needs a key epoch (confidentiality cluster row 14). A design that lets
+  membership be read from outside is refused.
+
+Entity: **the graduation** (an entry leaves a room or a steward's pile for the collective)
+- Classification: the verbs exist locally (`contribute`, `feedback`, `graduate`, a Steward's
+  verdict in the flow plane). Its network form is unbound (unified memory loop C13) and no type is
+  proposed here. It is the one act in this set a community witnesses.
+
+Back-fill check: no coordinator function returns anything and no route accepts an id, because
+nothing here creates a DHT entry. No integrity zome is touched and no DNA hash moves. At one year:
+about a thousand entries per collective and an unbounded count of things said in rooms, neither of
+which may become a per-item head.
+
+Concern canon, preliminary (the canon rows were not read; no code exists, so no registry row was
+made): plane location, answered (the device channel; never the DHT). Anti-self-election, partial
+(at the first rung the author's own act suffices; from the second person on, a Steward who is not
+the author). Monotonic authority, unbound (which of two devices' versions of an entry applies).
+Liveness, partial (a silent sibling must not delay a session's start). Honest absence, partial (an
+entry that has not arrived must read as not yet folded, never as absent). Evidence-not-authority,
+answered (a folded entry is the sibling's custody, not local acceptance). Bounded work and
+idempotent effect, partial (fold by CID is idempotent; volume is unpriced). Advertise and serve
+symmetry, unbound. Observability per decision, unbound (the join record has no home). Identity
+lineage, partial (device revocation exists; a re-keyed device's past entries are unaddressed).
+Contract evolution, partial (the crossing list is versioned by measure). Backpressure, unbound.
+Consent, partial (roster admission; per-room assent is not built). Graduated authority, partial.
+Witnessed residual, unbound.
+
+Design constraints discovered:
+- A room is the general case and a person's two devices are a room of one. Design the crossing
+  kind for the room and let the first rung be its simplest instance.
+- Alone on one device, memory works whole: write, recall, index. A sibling adds and is never
+  required. Memory crossing must not make a session wait, unlike a steward-scoped lease.
+- The reach of the bytes, of the index and of the join differ: text may cross, the index is
+  rebuilt per device, the join stays with the person.
+- Before a spec: decide which version of an entry applies when two devices hold different ones,
+  and where the record of a join lives.
+
+**The memory half gets a first-rung shape (2026-11-18).** Minted from the [Memorilla and dreaming survey](epr:memorilla-claude-dreaming-cross-pollination-2026-11-18), §4.5, with the
+operator's direction of that day. Nothing here is designed; the P2P design gate still runs first.
+
+*The first rung already exists.* The steward channel has the four parts every rung needs: admission
+by roster, a default-deny crossing list, folding a sibling's records as the sibling's with an
+acknowledgement vector, and the rule that thoughts stay. Memory is not on it yet.
+
+*What crosses.* An entry says what it applies to: the device (stays), the steward (crosses the
+channel, device to device) or the repository (git, as now). Transcripts never cross; each device
+notices over its own and only the resulting entry crosses. A sibling's entries fold as the
+sibling's, shown with their origin. Text crosses and each device rebuilds its own index with the
+pinned model; vectors never cross. This answers open question 4 in part: between one person's
+devices the author's own deliberate act is the whole of the assent, and the charter's "a Steward
+who is not its author" begins at the first rung that holds a second person.
+
+*Graduation with intention and care (operator, 2026-11-18).* When one peer works with another, a
+conversation that should be shared or a memory that should be kept collectively graduates
+deliberately, with care at its creation and at its graduation. Requirements to carry into the
+design: an entry declares its audience when it is written; each party may graduate what they
+themselves said, and a joint record needs every participant's assent; a graduating act says why,
+for whom, what context is stripped, which memory class the result takes and how it would be
+withdrawn; a scheduled dream may propose a graduation and never performs one.
+
+*A shared session is a room (operator, 2026-11-18).* A chat or session that several parties are in
+has a rough analogue in the old "private chat room". Read on this ground, a room is a small rung of
+its own: its roster is the participants, what is said in it is said to that roster, and its reach
+is the room. That sharpens the rule above. A solo session's transcript is thought and stays; a
+shared session's transcript is already said, at the room's reach, and is jointly made. Taking
+anything out of the room is the graduation that needs every participant's assent. What a room adds
+to the six things a rung supplies: what a late joiner may see of earlier history, and what happens
+to keys and holdings when someone leaves or is removed. The confidentiality cluster's row 14 (key
+epochs on removal, membership unobservable from relays) and the reach brief's tension 6 (holons
+versus spaces) are where those two are already being asked. The difference from the web 2.0 room
+is the holder: there a server held the room and its log; here the participants do.
+
+*A candidate habit, not yet declared.* "A correction given on one device is in force on the sibling
+before that sibling's next session." It is observable with two devices and one entry and no git
+pull. Declaring it would give this half the habit it has been waiting for. The WIP fence holds two
+active habits already, so it would be declared inactive.
+
+*Composition: what earlier deliveries should leave open.* Whatever ships first on this channel, on
+the artifact store or in the memory tooling should not close these:
+
+- The crossing list stays `{measure: [kinds]}`, default deny, so a memory kind is one added row.
+- Every folded record keeps its origin device, so an entry can fold as theirs.
+- Memory frontmatter grows by adding fields, and the index projection tolerates and can print them.
+- A payload held for a sibling is treated as opaque bytes. Nothing assumes the holder can read it,
+  so encrypted custody can begin at the household rung without a rewrite.
+- A session covenant can grow a declaration of the joins a session may make, beside its write set.
+- Recall receipts stay private. Where the record of a join lives is undecided.
+- None of this enters the DHT.
+
+*What a rung supplies.* Roster, crossing list, fold, graduation, custody and join: the survey's §4.5
+table gives the first rung's answers and the household rung's expected ones.
+
 **The landing plane, closure-keyed (2026-10-29).** The jobs half of this seed now has a design that
 names its rungs: [the closure-keyed landing-plane design](epr:closure-keyed-landing-plane-design)
 turns the steward space's A8 (sibling verdict = the build cache), A9 (the landing intent as a

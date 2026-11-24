@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihdh5j5y4mkjijuekeknoyspyjgv2u23e5ecmso67b3f5ehpbmtai"
+  },
+  "author": "human:matthew",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "feedback_sprints_fulfil_in_the_ledgers_unit",
+  "claim": "Operator 2026-10-18: a 55 h marathon read 0 mints / 0 discharges on the commitment ledger; a granted sprint must name ≤3 commitments, write `fulfills:` on landing, and project at close so its window is dated.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/feedback_sprints_fulfil_in_the_ledgers_unit.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/feedback_sprints_fulfil_in_the_ledgers_unit.md",
+        "cid": "bafkreiavdwiscgzwtoqylfp4nrfzq2s3madhdef2jiteip6egvylwcgg6u"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Sprints fulfil in the ledger's own unit",
+    "file": "feedback_sprints_fulfil_in_the_ledgers_unit.md",
+    "scopePath": ".claude/memory/feedback_sprints_fulfil_in_the_ledgers_unit.md",
+    "gitName": "(untracked: no commit carries these bytes)",
+    "entryType": "feedback",
+    "indexed": true
+  }
+}

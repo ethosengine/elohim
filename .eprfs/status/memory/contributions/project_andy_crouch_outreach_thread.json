@@ -2,7 +2,7 @@
   "version": 1,
   "collective": {
     "path": ".epr-meta/collective.json",
-    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+    "cid": "bafkreihdh5j5y4mkjijuekeknoyspyjgv2u23e5ecmso67b3f5ehpbmtai"
   },
   "author": "human:matthew",
   "steward": "repo:ethosengine/elohim",
@@ -11,14 +11,13 @@
   "concern": "project_andy_crouch_outreach_thread",
   "claim": "Confessional faith-register cold email to Andy Crouch (Praxis) after his talk; Elohim Protocol as commons owned-by-no-one; sent 2026-07-14.",
   "uncertainty": [
-    "Imported verbatim from .claude/memory/project_andy_crouch_outreach_thread.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here.",
-    "authorship: steward-of-record — human:matthew stands for this entry; no agent author was witnessed writing it, and this record does not say human:matthew wrote it. Origin session: dd92ea53-45bb-4dba-bf69-b4b5b86362dd."
+    "Imported verbatim from .claude/memory/project_andy_crouch_outreach_thread.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
   ],
   "sources": [
     {
       "resource": {
         "path": ".claude/memory/project_andy_crouch_outreach_thread.md",
-        "cid": "bafkreibrir2ycllv3r72xqezw5nvmuh53h3ood2u7336p7s5hfgby7akze"
+        "cid": "bafkreic4ei5jmvrtwdf3rryrsd2wwj6cvmawqrtrgl4fse5conpoi3h6jy"
       },
       "reach": "repository"
     }

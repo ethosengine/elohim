@@ -1,7 +1,10 @@
 ---
 id: placement-interfaces-report
 title: The composed interfaces of the placement contract — report
-status: DONE_WITH_CONCERNS
+status: landed
+landed_commit: 5e7612aa7
+verified_by: "spec edits present in the landed spec text at 5e7612aa7; a spec edit has no runnable check of its own; its downstream proof is the interfaces spec §6 'Interface implementation reconciliation (2026-10-21)', where C1-C6 compiled each seam"
+concerns: "was: DONE_WITH_CONCERNS; open residue is present-as-pointer in .eprfs/status/gap-items/plans__task-placement-interfaces-report.json"
 class: architecture
 gap: plans__2026-10-20-placement-contract-architecture-plan#3
 actor: agent:architect@claude-opus-5-5

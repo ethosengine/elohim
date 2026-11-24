@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihdh5j5y4mkjijuekeknoyspyjgv2u23e5ecmso67b3f5ehpbmtai"
+  },
+  "author": "human:matthew",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "project_rust_test_stub_etxtbsy_race",
+  "claim": "Rust tests that write an executable stub and exec it race sibling tests' forks (ETXTBSY) under load — probe the stub before use",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_rust_test_stub_etxtbsy_race.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_rust_test_stub_etxtbsy_race.md",
+        "cid": "bafkreihlige7cvelvsoiopdfm3bkxfledmkommmcepa5lemlv5q5cwnhkm"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "project_rust_test_stub_etxtbsy_race",
+    "file": "project_rust_test_stub_etxtbsy_race.md",
+    "scopePath": ".claude/memory/project_rust_test_stub_etxtbsy_race.md",
+    "gitName": "(untracked: no commit carries these bytes)",
+    "entryType": "project",
+    "indexed": true
+  }
+}

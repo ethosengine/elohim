@@ -6,7 +6,7 @@ contentFormat: "markdown"
 title: "Re-keyed dead anchors need a heal under the current key — dead_remaining survives a pod restart (mechanism corrected 2026-09-11: the rows are SETTLED-not-skipped, and nothing clears the dead verdict on a settled row)"
 slug: "dataplane-reanchor-dead-remaining-rekeyed-peer"
 written: "2026-09-06"
-updated: "2026-10-23"
+updated: "2026-10-29"
 author: "story-harvest; mechanism corrected 2026-09-11 (runtime-triage, endpoint-confirmed)"
 status: "backlog"
 priority: "high"
@@ -1007,3 +1007,108 @@ three new tests, the schema contract case and the `elohim-storage` gate. Fleet r
 roll: `elohim.host/p2p/status .provideLoop` shows `reanchorDeadHeldNotAuthor` (8 today), and
 `reanchorHeldUnanswered` equals the stuck residue (`reanchorDeadRemaining −
 deadSettledByDeclaration − reanchorDeadHeldNotAuthor`). The condition was live at 11:10Z.
+
+## 2026-10-29 — re-filed at poll 257: the stuck residue is exactly the four unanswered own rows, and the received dead population grew 8 → 46
+
+`2b4761b2eaf6` re-filed as a NEW ledger line (`seen 1, first_poll 257`, 2026-10-29T20:31Z). Same
+concern, same file; nothing forked.
+
+### What is exhausted
+
+Ledger line (node `alpha-b`, provenance `p2p-status:provide-loop`):
+`provideLoop.deadRemainingStuck reanchorDeadRemaining=50 reanchorPending=60 stuckSweeps=9 deadHeldNotAuthor=46 heldUnanswered=4 heldUnbacked=0 settledByDeclaration=0 sweepsAbandoned=2 (snapshot stale)`.
+
+`https://elohim.host/p2p/status .provideLoop`, re-fetched 20:32Z:
+
+```json
+{"reanchorPending":60,"reanchorCompleted":17,"reanchorFailed":0,"reanchorCaughtUp":false,
+ "reanchorDeadRemaining":50,"stuckSweeps":10,"deadRemainingStuck":true,
+ "reanchorSkippedReach":0,"reanchorSkippedContentType":0,"reanchorAdopted":0,"reanchorHeld":1,
+ "reanchorHeldBackoff":3,"reanchorHeldUnbacked":0,"reanchorHeldUnanswered":4,
+ "deadSettledByDeclaration":0,"reanchorAwaitingChannel":0,"reanchorDeadHeldNotAuthor":46,
+ "reanchorSweepsAbandoned":0}
+```
+
+`reanchorSweepsAbandoned` read 0 and `stuckSweeps` advanced 9 → 10, so the verdict is current; the
+poller's "(snapshot stale)" suffix was transient. `/health`: `uptime 4201` (storage restarted about
+19:22Z), `p2p.caughtUp false`, `divergentAnchor 152`. `/admin/self-healing`: admission `shedTotal 0`,
+the one upstream (adam storage) `circuit closed`, `errorStreak 0`, conductor connected 4/4 workers,
+conductor-4 and conductor-6 `Degraded`.
+
+### Reading
+
+- **The 2026-10-23 sensing fix is live on the fleet and its prediction holds exactly.**
+  `reanchorDeadHeldNotAuthor` is published, and the stuck residue
+  (`reanchorDeadRemaining − deadSettledByDeclaration − reanchorDeadHeldNotAuthor` = 50 − 0 − 46)
+  is 4, equal to `reanchorHeldUnanswered 4`. The verdict now measures only adam's own rows.
+- **They are the same four rows as 2026-10-23**, still `dead` on the public list
+  (`GET https://elohim.host/db/content?limit=500`: 227 rows, 123 live, 83 unverified, 21 dead):
+  `fct-bible-leviticus-19-9-10`, `fct-bible-deuteronomy-11-18-21`,
+  `fct-module-15-retrospective-manifesto-line`,
+  `fct-module-15-retrospective-follow-up-the-covenant-holds`. All four were created 2026-10-08, all
+  carry well-formed `uhCkk…` action-hash anchors, and each `updatedAt` falls within the last 15
+  minutes of the read (20:17Z–20:31Z). The held pre-flight still writes the row each time it runs;
+  that missing node from 2026-10-23 remains untraced.
+- **The received dead population is not flat; it is growing.** 8 (2026-10-23) → 46. The 17 visible
+  received dead rows are all `e2e-*` ids with `updatedAt` on 2026-10-25, 2026-10-26 and
+  2026-10-29 18:01Z, which matches the a2o lanes run against alpha. This is the probe the
+  2026-10-23 "Exit for a received dead row" node named: a received row that
+  `witness_ghost_anchors` (`p2p/projection_reconcile.rs:3348`) stamps dead has no exit. It no
+  longer drives `deadRemainingStuck`, but it keeps `reanchorPending` and `caughtUp=false` growing
+  with every E2E lane. The node is now evidenced; it is still not built.
+- **The network the unanswered reads cross is worse than on 2026-10-19.**
+  `https://elohim.host/db/p2p/conductor-diagnostics .transportStats`: 5 of adam's 7 iroh
+  connections have `recv_message_count 0` against 66 to 16.8M messages sent (3 of 5 on 2026-10-19).
+  `blocked_message_counts` shows outgoing-only blocked counts across all five DNA spaces for
+  six relay URLs (for example 4.6k per space toward `…/3e3979cee8bf…` and about 1.1k toward
+  `…/982679ee9edf…`), with incoming 0. The cause of the kitsune2 blocking is not read here.
+
+### Cause hypothesis (unchanged in kind, sharpened in mechanism)
+
+The F5 backing fold (`elohim/elohim-storage/src/services/head_adoption.rs:1720`,
+`declaration_backing`) lets a declared head read `Absent`, and so release the row to re-author
+(`Unbacked`), only after a NETWORK-strategy record read answers
+(`network_record_answer`, `:1775`, calling `content_store::get_content` with
+`GetOptions::default()`). Any error from that call is `Unreachable` (`:1798-1804`), and any
+`Unreachable` folds to `Unanswered` (`:1729-1734`), which holds. The zome documents the cost of
+that read for a ghost hash
+(`elohim/holochain/dna/elohim/zomes/content_store/src/lib.rs`, the `get_record_for_action`
+comment): a network get for a hash nobody holds searches the fleet until the kitsune timeout.
+With 5 of 7 conductor connections one-way, that read cannot return an answered absence, so these
+four rows hold every attempt. Each re-attempt waits `REANCHOR_HELD_BACKOFF_SECONDS`
+(`services/reanchor_backoff.rs:29`); none succeeds. The detector
+(`services/provide_loop_status.rs:109,198`) is correct in reporting it. The rule is
+conservative by operator ruling (F5, 2026-10-07): an unanswered absence never releases a
+declared row. So the rule has no terminal state on a fleet that does not answer. That is by
+design, not a defect to patch here.
+
+Not proven: which read position (head resolve, election, local record or network record) goes
+unanswered for each row. That needs Loki on `elohim-adam-alpha-0`
+(`elohim_storage::services::head_adoption`, debug level), which this lane did not have. The
+2026-10-19 missing node (a capped residue list with `HoldBasis` and read position on an HTTP
+surface) would answer it without Loki.
+
+### Current decision — still BLOCKED (2026-10-29)
+
+No bounded storage-code fix fits this lane. The residue of four needs one of two things:
+1. Fleet transport health: adam's one-way iroh connections and the outgoing-blocked kitsune2
+   spaces. That is operator or fleet work; this lane runs no kubectl.
+2. A ruled change to F5 terminality, for example a bounded count of consecutive unanswered
+   network reads after which the row is treated as `Unbacked`. That reverses a 2026-10-07
+   operator ruling and belongs to whoever owns the dataplane-convergence habit, not to a
+   background triage.
+
+The received-dead growth (8 → 46) is a separate, bounded code task that this lane did not build
+(no cargo under the current RAM-guard pressure): let `p2p::anchor_verify` re-ask received
+`dead` rows on its existing ladder (`confirm_anchor_live` already requires the exact hash and an
+own-conductor canonical answer). It does not move the stuck verdict.
+
+Ledger `2b4761b2eaf6` (`first_poll 257`) is set to `status: blocked`,
+`backlog: dataplane-reanchor-dead-remaining-rekeyed-peer`.
+
+### Verification (what would close this)
+
+`elohim.host/p2p/status .provideLoop` reads `reanchorHeldUnanswered 0` and `deadRemainingStuck
+false`, and the four `fct-*` rows read `live` on `/db/content`. Not verified at 20:32Z: the
+condition is live (`stuckSweeps 10`). For the received arm: `reanchorDeadHeldNotAuthor` falls
+after an a2o lane instead of rising.

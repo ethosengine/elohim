@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihdh5j5y4mkjijuekeknoyspyjgv2u23e5ecmso67b3f5ehpbmtai"
+  },
+  "author": "human:matthew",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "feedback-trust-and-affirm-later-never-blocking",
+  "claim": "Extra signers/witnesses in identity ceremonies are optional and affirm later; a required quorum is an opt-in; no provisioning path needs a doorway.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/feedback_trust_and_affirm_later_never_blocking.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/feedback_trust_and_affirm_later_never_blocking.md",
+        "cid": "bafkreiewour4ke6k3d4fc5orzsvamq7ptb4b5a5vz67zip5pyrnoerg3my"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Trust and affirm later, never blocking",
+    "file": "feedback_trust_and_affirm_later_never_blocking.md",
+    "scopePath": ".claude/memory/feedback_trust_and_affirm_later_never_blocking.md",
+    "gitName": "(untracked: no commit carries these bytes)",
+    "entryType": "feedback",
+    "indexed": true
+  }
+}

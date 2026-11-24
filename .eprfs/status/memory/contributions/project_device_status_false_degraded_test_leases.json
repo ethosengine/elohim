@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihdh5j5y4mkjijuekeknoyspyjgv2u23e5ecmso67b3f5ehpbmtai"
+  },
+  "author": "human:matthew",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "project_device_status_false_degraded_test_leases",
+  "claim": "A test daemon's lease in the HOST bin store made `epr device status` read degraded for days (2026-11-17..20); check lease owners before restarting the real peer.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_device_status_false_degraded_test_leases.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_device_status_false_degraded_test_leases.md",
+        "cid": "bafkreibxwpshiipus7hdmwtkdcjfypj7ojankwbuza7v5puvtnqmuatxxm"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "False 'degraded peer daemon' from a leaked test lease",
+    "file": "project_device_status_false_degraded_test_leases.md",
+    "scopePath": ".claude/memory/project_device_status_false_degraded_test_leases.md",
+    "gitName": "(untracked: no commit carries these bytes)",
+    "entryType": "project",
+    "indexed": true
+  }
+}

@@ -2,7 +2,7 @@
   "version": 1,
   "collective": {
     "path": ".epr-meta/collective.json",
-    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+    "cid": "bafkreihdh5j5y4mkjijuekeknoyspyjgv2u23e5ecmso67b3f5ehpbmtai"
   },
   "author": "human:matthew",
   "steward": "repo:ethosengine/elohim",
@@ -11,14 +11,13 @@
   "concern": "project_ci_build_infra",
   "claim": "ci-playwright on ci-builder; cache PVCs node-pinned; devspace node22 vs CI24 structural; pull Always; Nexus read token.",
   "uncertainty": [
-    "Imported verbatim from .claude/memory/project_ci_build_infra.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here.",
-    "authorship: steward-of-record — human:matthew stands for this entry; no agent author was witnessed writing it, and this record does not say human:matthew wrote it. Origin session: none recorded."
+    "Imported verbatim from .claude/memory/project_ci_build_infra.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
   ],
   "sources": [
     {
       "resource": {
         "path": ".claude/memory/project_ci_build_infra.md",
-        "cid": "bafkreiemh3ncwhw743pr5lj5xcchczdn7qlz5k5fiefysbngm44w56io3m"
+        "cid": "bafkreigcsuuzsyim5g3wqvyt7ydezhmxvac7az3vny5d4a2suimcpe45d4"
       },
       "reach": "repository"
     }

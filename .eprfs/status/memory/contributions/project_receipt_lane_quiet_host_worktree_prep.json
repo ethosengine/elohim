@@ -2,23 +2,22 @@
   "version": 1,
   "collective": {
     "path": ".epr-meta/collective.json",
-    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+    "cid": "bafkreihdh5j5y4mkjijuekeknoyspyjgv2u23e5ecmso67b3f5ehpbmtai"
   },
   "author": "human:matthew",
   "steward": "repo:ethosengine/elohim",
   "scope": "repository",
   "reach": "repository",
   "concern": "project_receipt_lane_quiet_host_worktree_prep",
-  "claim": "Household receipt lanes miss under another session's cargo (2 dated misses 2026-09-23); fresh worktrees need element/client builds + rakia; mint after every commit",
+  "claim": "Receipt lanes miss under another session's cargo (2 misses 2026-09-23); fresh worktrees need pnpm install, element/client builds and rakia/brit/sophia BEFORE the first push; mint after every commit.",
   "uncertainty": [
-    "Imported verbatim from .claude/memory/project_receipt_lane_quiet_host_worktree_prep.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here.",
-    "authorship: steward-of-record — human:matthew stands for this entry; no agent author was witnessed writing it, and this record does not say human:matthew wrote it. Origin session: 3a11e1a8-7c12-4116-80f9-fcf59b56702c."
+    "Imported verbatim from .claude/memory/project_receipt_lane_quiet_host_worktree_prep.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
   ],
   "sources": [
     {
       "resource": {
         "path": ".claude/memory/project_receipt_lane_quiet_host_worktree_prep.md",
-        "cid": "bafkreig3fjjtkihjqg6vjn6mi7autgcagt3of6ijtw5lhqs6j7ui7el67y"
+        "cid": "bafkreihqgdhxhdeuostgbvjp7u4wflbkyuumapjr53xjj7id7uqdbcelwa"
       },
       "reach": "repository"
     }
@@ -29,8 +28,8 @@
     "display": "project_receipt_lane_quiet_host_worktree_prep",
     "file": "project_receipt_lane_quiet_host_worktree_prep.md",
     "scopePath": ".claude/memory/project_receipt_lane_quiet_host_worktree_prep.md",
-    "gitName": "(untracked: no commit carries these bytes)",
+    "gitName": "Matthew Dowell",
     "entryType": "project",
-    "indexed": true
+    "indexed": false
   }
 }

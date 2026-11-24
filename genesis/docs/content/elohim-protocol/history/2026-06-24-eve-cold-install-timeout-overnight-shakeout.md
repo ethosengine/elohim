@@ -12,6 +12,8 @@ topic: [eve, conductor, install-timeout, happ-install, deploy-lag, alpha, shakeo
 # (machine-ledger law).
 derived_from:
   - .claude/data/overnight-shakeout-2026-06-24.md  # original home; routed 2026-07-02
+canonical:
+  - genesis/orchestrator/README.md
 ---
 
 # Overnight shakeout — 2026-06-24
@@ -151,3 +153,13 @@ it sees the same stale-seed state. Failure clusters:
 (redirects to `/identity/login`, `401 /auth/me`) — a deeper look.ts session-injection fix.
 `test:browser` uses the full fixture-login path which DOES carry the session, so genesis browser
 scenarios authenticate fine.
+
+## Bidirectional links
+
+- **This record → canonical:** the [orchestrator README](../../../../orchestrator/README.md)
+  Troubleshooting section. This record's lesson is about reading the live fleet: a red alpha surface
+  right after a push is usually deploy lag or stale seed state, not a code bug, and a push made
+  while a wave runs can abort it (here #1197) or over-build edge. The CI parts of this night are
+  museum classes #2 and #21 in the
+  [CI anti-patterns museum](2026-06-02-ci-orchestrator-recurring-anti-patterns-museum.md).
+- **Canonical → this record:** the README's Troubleshooting section links here.

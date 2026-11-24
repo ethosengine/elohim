@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihdh5j5y4mkjijuekeknoyspyjgv2u23e5ecmso67b3f5ehpbmtai"
+  },
+  "author": "human:matthew",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "feedback_memory_index_is_projected_never_hand_edited",
+  "claim": "The repo's .claude/memory/MEMORY.md is projector output and a hand-added line fails the pre-push parity gate; a workspace restart also removes user-site pytest, which a pre-push harness imports.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/feedback_memory_index_is_projected_never_hand_edited.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/feedback_memory_index_is_projected_never_hand_edited.md",
+        "cid": "bafkreihysqnre6ji4sqvofrpjryzeezlqfyobxhmlkqp7b5kulzaxz65h4"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "MEMORY.md is projected; pytest lives in the wiped home",
+    "file": "feedback_memory_index_is_projected_never_hand_edited.md",
+    "scopePath": ".claude/memory/feedback_memory_index_is_projected_never_hand_edited.md",
+    "gitName": "(untracked: no commit carries these bytes)",
+    "entryType": "feedback",
+    "indexed": true
+  }
+}

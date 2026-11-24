@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihdh5j5y4mkjijuekeknoyspyjgv2u23e5ecmso67b3f5ehpbmtai"
+  },
+  "author": "human:matthew",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "feedback-governed-writes-through-edit-write",
+  "claim": "Compose gates match Edit|Write only; python/sed in Bash on backlog, research, specs or memory writes around every edit-time governance rule.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/feedback_governed_writes_through_edit_write.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/feedback_governed_writes_through_edit_write.md",
+        "cid": "bafkreibh3lsuwjdf64rzqiz5fyr4tzyzebg4pllol42qodprqbs2g5lxxu"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Governed writes go through Edit/Write",
+    "file": "feedback_governed_writes_through_edit_write.md",
+    "scopePath": ".claude/memory/feedback_governed_writes_through_edit_write.md",
+    "gitName": "Matthew Dowell",
+    "entryType": "feedback",
+    "indexed": true
+  }
+}

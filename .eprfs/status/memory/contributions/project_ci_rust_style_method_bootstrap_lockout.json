@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihdh5j5y4mkjijuekeknoyspyjgv2u23e5ecmso67b3f5ehpbmtai"
+  },
+  "author": "human:matthew",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "project_ci_rust_style_method_bootstrap_lockout",
+  "claim": "elohim-orchestrator/dev #2220+ (2026-11-05/06): a discipline-method re-pin makes every CI run refuse 'discipline method differs from this installed checker' because the baseline (GIT_PREVIOUS_SUCCESSFUL_COMMIT) only advances on SUCCESS; cure = move the baseline to the bootstrap commit in genesis/orchestrator/rust-style-ci.sh (landed).",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_ci_rust_style_method_bootstrap_lockout.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_ci_rust_style_method_bootstrap_lockout.md",
+        "cid": "bafkreic675y73rpyxbmsiqsvrzpbme6voyxc5vois2dqzr7224p56r42ta"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Rust-style method bootstrap locks the orchestrator until the baseline moves",
+    "file": "project_ci_rust_style_method_bootstrap_lockout.md",
+    "scopePath": ".claude/memory/project_ci_rust_style_method_bootstrap_lockout.md",
+    "gitName": "(untracked: no commit carries these bytes)",
+    "entryType": "project",
+    "indexed": true
+  }
+}

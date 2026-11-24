@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihdh5j5y4mkjijuekeknoyspyjgv2u23e5ecmso67b3f5ehpbmtai"
+  },
+  "author": "human:matthew",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "feedback-integrity-calls-stay-with-claude-models",
+  "claim": "Operator 2026-10-29: Codex/other families add diversity, but an integrity-class design contention is ruled by a Claude model.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/feedback_integrity_calls_stay_with_claude_models.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/feedback_integrity_calls_stay_with_claude_models.md",
+        "cid": "bafkreihhizxtbzbwwsqtxxi5dfw75agop5qebu2pdtjp2lqbcicu3zd5ea"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Integrity calls stay with Claude models",
+    "file": "feedback_integrity_calls_stay_with_claude_models.md",
+    "scopePath": ".claude/memory/feedback_integrity_calls_stay_with_claude_models.md",
+    "gitName": "(untracked: no commit carries these bytes)",
+    "entryType": "feedback",
+    "indexed": true
+  }
+}

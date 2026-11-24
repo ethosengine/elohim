@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihdh5j5y4mkjijuekeknoyspyjgv2u23e5ecmso67b3f5ehpbmtai"
+  },
+  "author": "human:matthew",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "feedback_cross_device_berth_notes_need_follow",
+  "claim": "Cross-device berth notes raise nothing: watch your inbox by polling `berth inbox --peek --all --json` by CID (wait-notes.py), NEVER a `--follow` Monitor (it dropped live notes on 11-09 and again 11-14). Standby briefs must say the same.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/feedback_cross_device_berth_notes_need_follow.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/feedback_cross_device_berth_notes_need_follow.md",
+        "cid": "bafkreidlvbr7knztc6o65gteafaj7qvnzegsnwpzets5bhjgni5j7ban4i"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "A standby session on another device must follow its berth inbox; a note nobody polls costs hours",
+    "file": "feedback_cross_device_berth_notes_need_follow.md",
+    "scopePath": ".claude/memory/feedback_cross_device_berth_notes_need_follow.md",
+    "gitName": "(untracked: no commit carries these bytes)",
+    "entryType": "feedback",
+    "indexed": true
+  }
+}

@@ -11,14 +11,13 @@
   "concern": "project_post_station_4_sprint_2026_09_25",
   "claim": "Landed on dev 2026-09-25 (plan 73a351fd5), not pushed (rides the next batch); artifact + rulings under genesis/a2o/reports/post-station-4-2026-09-25/; open backlog and the operator's one remaining decision.",
   "uncertainty": [
-    "Imported verbatim from .claude/memory/project_post_station_4_sprint_2026_09_25.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here.",
-    "authorship: steward-of-record — human:matthew stands for this entry; no agent author was witnessed writing it, and this record does not say human:matthew wrote it. Origin session: 8e88ae01-a389-45ee-a961-31b36b2c793a."
+    "Imported verbatim from .claude/memory/project_post_station_4_sprint_2026_09_25.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
   ],
   "sources": [
     {
       "resource": {
         "path": ".claude/memory/project_post_station_4_sprint_2026_09_25.md",
-        "cid": "bafkreifkwlc2zmaunolmvpb45fitp4nuutoyz5kft7wlco2je27v2yekzq"
+        "cid": "bafkreiax62c75qtk6qpmczjbfne6lzra3baypvh2pxnawvojjuh76u36oq"
       },
       "reach": "repository"
     }
@@ -26,11 +25,11 @@
   "supersedes": [],
   "contradicts": [],
   "imported": {
-    "display": "project_post_station_4_sprint_2026_09_25",
+    "display": "Post-station-4 sprint (participant, classifier, search, att…",
     "file": "project_post_station_4_sprint_2026_09_25.md",
     "scopePath": ".claude/memory/project_post_station_4_sprint_2026_09_25.md",
-    "gitName": "(untracked: no commit carries these bytes)",
+    "gitName": "Matthew Dowell",
     "entryType": "project",
-    "indexed": false
+    "indexed": true
   }
 }

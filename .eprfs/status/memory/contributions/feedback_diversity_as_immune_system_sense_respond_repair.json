@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihdh5j5y4mkjijuekeknoyspyjgv2u23e5ecmso67b3f5ehpbmtai"
+  },
+  "author": "human:matthew",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "feedback-diversity-as-immune-system-sense-respond-repair",
+  "claim": "Operator 2026-11-10 — peer diversity is the strength; design cheap sense-respond-repair at the edges, not a central firewall or a flattening VM",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/feedback_diversity_as_immune_system_sense_respond_repair.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/feedback_diversity_as_immune_system_sense_respond_repair.md",
+        "cid": "bafkreiejcjf774vtd4gbtvoniejq7xepmeyszztbh4g4n4uujvxp23dmza"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Diversity is the immune system",
+    "file": "feedback_diversity_as_immune_system_sense_respond_repair.md",
+    "scopePath": ".claude/memory/feedback_diversity_as_immune_system_sense_respond_repair.md",
+    "gitName": "(untracked: no commit carries these bytes)",
+    "entryType": "feedback",
+    "indexed": true
+  }
+}

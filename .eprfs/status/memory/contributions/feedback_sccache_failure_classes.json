@@ -2,7 +2,7 @@
   "version": 1,
   "collective": {
     "path": ".epr-meta/collective.json",
-    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+    "cid": "bafkreihdh5j5y4mkjijuekeknoyspyjgv2u23e5ecmso67b3f5ehpbmtai"
   },
   "author": "human:matthew",
   "steward": "repo:ethosengine/elohim",
@@ -11,14 +11,13 @@
   "concern": "feedback_sccache_failure_classes",
   "claim": "Three sccache failures: cache-corruption null-byte/unclosed-delimiter, spawn ENOENT, AccessDenied on dead Garage key (DNA red ~85s).",
   "uncertainty": [
-    "Imported verbatim from .claude/memory/feedback_sccache_failure_classes.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here.",
-    "authorship: steward-of-record — human:matthew stands for this entry; no agent author was witnessed writing it, and this record does not say human:matthew wrote it. Origin session: fd355744-897d-4e84-ba71-b1962e798f4c."
+    "Imported verbatim from .claude/memory/feedback_sccache_failure_classes.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
   ],
   "sources": [
     {
       "resource": {
         "path": ".claude/memory/feedback_sccache_failure_classes.md",
-        "cid": "bafkreid7cglaew7j5qbpt325sr2wrduazzuvbytpfwnbhbqaadgf6iqane"
+        "cid": "bafkreib55iucmjuvznxsccfz5e4dcllrhhxubt6crvs7km5bifppdb3dva"
       },
       "reach": "repository"
     }
@@ -26,7 +25,7 @@
   "supersedes": [],
   "contradicts": [],
   "imported": {
-    "display": "feedback_sccache_failure_classes",
+    "display": "sccache failure classes (umbrella)",
     "file": "feedback_sccache_failure_classes.md",
     "scopePath": ".claude/memory/feedback_sccache_failure_classes.md",
     "gitName": "Matthew Dowell",

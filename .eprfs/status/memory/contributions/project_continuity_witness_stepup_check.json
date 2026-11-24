@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihdh5j5y4mkjijuekeknoyspyjgv2u23e5ecmso67b3f5ehpbmtai"
+  },
+  "author": "human:matthew",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "project-continuity-witness-stepup-check",
+  "claim": "Operator 2026-10-29: a private behavioural fingerprint (trustful-pool custody; device-keyed only at bootstrap) notices when someone else acts as the steward of record and triggers a p2p 2FA check that accelerates elohim intercession.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_continuity_witness_stepup_check.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_continuity_witness_stepup_check.md",
+        "cid": "bafkreicnubc4z3yv6vvw6romqe67njyq2ef5t5t3m5mplbawq6o4fik5wu"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Continuity witness triggers a p2p step-up check",
+    "file": "project_continuity_witness_stepup_check.md",
+    "scopePath": ".claude/memory/project_continuity_witness_stepup_check.md",
+    "gitName": "(untracked: no commit carries these bytes)",
+    "entryType": "project",
+    "indexed": true
+  }
+}

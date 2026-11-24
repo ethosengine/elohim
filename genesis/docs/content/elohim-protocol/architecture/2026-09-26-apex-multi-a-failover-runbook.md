@@ -3,7 +3,7 @@ title: Apex multi-A failover — the operator's runbook for two doorways behind 
 id: apex-multi-a-failover-runbook
 date: 2026-09-26
 tier: architecture
-status: Living — operator runbook (staged; not yet applied)
+status: Living runbook — operator-applied; its APEX-MULTI-A blocks stay commented in both coturn manifests until an operator runs the drill
 author: serving-edge campaign story 2.3 (one-head-delivered sprint, task F4)
 cites:
   - "serving-edge-failover-balance-stream-campaign-plan | story 2.3 this runbook discharges: two doorways behind one name, a real shed, the name keeps serving | sha256:a63d475974424ace | path: genesis/docs/superpowers/plans/2026-09-19-serving-edge-failover-balance-stream-campaign-plan.md"

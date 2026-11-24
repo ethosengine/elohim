@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihdh5j5y4mkjijuekeknoyspyjgv2u23e5ecmso67b3f5ehpbmtai"
+  },
+  "author": "human:matthew",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "project-lamad-course-composition",
+  "claim": "Paths are walks over the EPR graph; FCT v2 is recomposed into atoms (whole course 2026-10-08); a quiz is a shadow of any object; content graph is native Rust; seed-link seal deferred.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_lamad_course_composition.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_lamad_course_composition.md",
+        "cid": "bafkreicajaqghxyz2v6piuz6gzstrqnkxleabiyyskb6r3ovhwsxm46q6u"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Lamad course composition (umbrella)",
+    "file": "project_lamad_course_composition.md",
+    "scopePath": ".claude/memory/project_lamad_course_composition.md",
+    "gitName": "(untracked: no commit carries these bytes)",
+    "entryType": "project",
+    "indexed": true
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihdh5j5y4mkjijuekeknoyspyjgv2u23e5ecmso67b3f5ehpbmtai"
+  },
+  "author": "human:matthew",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "project-peer-daemon-policy-and-restart-traps",
+  "claim": "epr peer daemon reads crossing policy from its checkout; a stale main checkout silently denies artifact-produce crossing. Restart traps too.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_peer_daemon_policy_and_restart_traps.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_peer_daemon_policy_and_restart_traps.md",
+        "cid": "bafkreietg24yo33gxae7bmfzdodlovkbq5s2z3eysohjbafnnqqccohyjy"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Peer daemon policy + restart traps",
+    "file": "project_peer_daemon_policy_and_restart_traps.md",
+    "scopePath": ".claude/memory/project_peer_daemon_policy_and_restart_traps.md",
+    "gitName": "(untracked: no commit carries these bytes)",
+    "entryType": "project",
+    "indexed": true
+  }
+}

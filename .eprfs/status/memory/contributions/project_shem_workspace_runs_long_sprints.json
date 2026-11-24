@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihdh5j5y4mkjijuekeknoyspyjgv2u23e5ecmso67b3f5ehpbmtai"
+  },
+  "author": "human:matthew",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "project_shem_workspace_runs_long_sprints",
+  "claim": "The shem workspace runs the 40 h orchestrated sprints and this Che workspace lags origin/dev by days; pull first, resolve toward shem, back up local hook ledgers.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_shem_workspace_runs_long_sprints.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_shem_workspace_runs_long_sprints.md",
+        "cid": "bafkreiclqhcikflgcbdohcb6rwwcii4dir2nisumemyl5mqlfhknz7mwqq"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Shem runs the long sprints; this workspace lags — pull first",
+    "file": "project_shem_workspace_runs_long_sprints.md",
+    "scopePath": ".claude/memory/project_shem_workspace_runs_long_sprints.md",
+    "gitName": "(untracked: no commit carries these bytes)",
+    "entryType": "project",
+    "indexed": true
+  }
+}

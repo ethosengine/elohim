@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihdh5j5y4mkjijuekeknoyspyjgv2u23e5ecmso67b3f5ehpbmtai"
+  },
+  "author": "human:matthew",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "feedback_big_crossing_working_code_first_verify_after_dust_settles",
+  "claim": "Operator 2026-11-05 (re-genesis 1): on a whole-repo crossing the goal is working code across every track; gates/habits measure ONCE after all dev and integration dust settles.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/feedback_big_crossing_working_code_first_verify_after_dust_settles.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/feedback_big_crossing_working_code_first_verify_after_dust_settles.md",
+        "cid": "bafkreibtpwvav6zvbny5u7ckc47vegq7smmas75hgxjs4yjn4hfi4hbtba"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Big crossing — working code first, verify after the dust se…",
+    "file": "feedback_big_crossing_working_code_first_verify_after_dust_settles.md",
+    "scopePath": ".claude/memory/feedback_big_crossing_working_code_first_verify_after_dust_settles.md",
+    "gitName": "(untracked: no commit carries these bytes)",
+    "entryType": "feedback",
+    "indexed": true
+  }
+}

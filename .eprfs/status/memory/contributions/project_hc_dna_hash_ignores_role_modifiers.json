@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihdh5j5y4mkjijuekeknoyspyjgv2u23e5ecmso67b3f5ehpbmtai"
+  },
+  "author": "human:matthew",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "hc-dna-hash-ignores-role-modifiers",
+  "claim": "A bundled .dna's hc dna hash never matches an installed cell under role properties; repack with the role's modifiers before calling a bundle lost.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_hc_dna_hash_ignores_role_modifiers.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_hc_dna_hash_ignores_role_modifiers.md",
+        "cid": "bafkreiejkqa42kqa7at5ujwr5uzoq3bvgvse34fu3cydv67bnwwnkgiusu"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "hc dna hash ignores hApp role modifiers",
+    "file": "project_hc_dna_hash_ignores_role_modifiers.md",
+    "scopePath": ".claude/memory/project_hc_dna_hash_ignores_role_modifiers.md",
+    "gitName": "(untracked: no commit carries these bytes)",
+    "entryType": "project",
+    "indexed": true
+  }
+}

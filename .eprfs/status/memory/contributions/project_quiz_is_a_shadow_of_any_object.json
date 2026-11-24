@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihdh5j5y4mkjijuekeknoyspyjgv2u23e5ecmso67b3f5ehpbmtai"
+  },
+  "author": "human:matthew",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "project-quiz-is-a-shadow-of-any-object",
+  "claim": "Operator 2026-10-08: a quiz is not a separate module or step; every piece of content can carry one as its shadow — model and surface assessments as an attribute of the object",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_quiz_is_a_shadow_of_any_object.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_quiz_is_a_shadow_of_any_object.md",
+        "cid": "bafkreibbivaulmftq4cpweaqr7ksu7bw7jboqilw4t3c4gskgqequecb5q"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Quiz is a shadow of any object",
+    "file": "project_quiz_is_a_shadow_of_any_object.md",
+    "scopePath": ".claude/memory/project_quiz_is_a_shadow_of_any_object.md",
+    "gitName": "(untracked: no commit carries these bytes)",
+    "entryType": "project",
+    "indexed": false
+  }
+}

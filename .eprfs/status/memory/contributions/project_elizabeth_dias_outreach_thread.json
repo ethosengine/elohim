@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihdh5j5y4mkjijuekeknoyspyjgv2u23e5ecmso67b3f5ehpbmtai"
+  },
+  "author": "human:matthew",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "project_elizabeth_dias_outreach_thread",
+  "claim": "2026-10-09 cold email to Elizabeth Dias (NYT; Hard Fork guest) after her Chris Olah/Anthropic piece — \"a pole of power in the wilderness\".",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_elizabeth_dias_outreach_thread.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_elizabeth_dias_outreach_thread.md",
+        "cid": "bafkreihlijqv5ekfk3pkt37zaomd5ezuf5afpq3yzmypgu3c4ewx3gvsum"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "project_elizabeth_dias_outreach_thread",
+    "file": "project_elizabeth_dias_outreach_thread.md",
+    "scopePath": ".claude/memory/project_elizabeth_dias_outreach_thread.md",
+    "gitName": "(untracked: no commit carries these bytes)",
+    "entryType": "project",
+    "indexed": true
+  }
+}

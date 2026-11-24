@@ -1,7 +1,10 @@
 ---
 id: placement-stories-t2-report
 title: "T2 report: placement-contract section 16 stories under the blind-reader loop"
-status: DONE_WITH_CONCERNS
+status: landed
+landed_commit: 5e7612aa7
+verified_by: "all 41 .feature files landed at 5e7612aa7 parse under @cucumber/gherkin (229 scenarios, every file @wip, no step definitions), checked 2026-10-28 by the librarian; parsing is the only runnable check a @wip story has"
+concerns: "was: DONE_WITH_CONCERNS; open residue is present-as-pointer in .eprfs/status/gap-items/plans__task-placement-stories-t2-report.json"
 class: architecture
 gap: plans__2026-10-20-placement-contract-architecture-plan#16
 actor: agent:author@claude-opus-5-5

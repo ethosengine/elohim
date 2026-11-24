@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihdh5j5y4mkjijuekeknoyspyjgv2u23e5ecmso67b3f5ehpbmtai"
+  },
+  "author": "human:matthew",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "feedback_no_backticks_in_double_quoted_shell_strings",
+  "claim": "2026-11-05: a `berth say \"… \\\\`just gate elohim-storage\\\\` …\"` ran the storage gate in the main checkout; messages/prompts built in Bash must be single-quoted or written via a heredoc/file.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/feedback_no_backticks_in_double_quoted_shell_strings.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/feedback_no_backticks_in_double_quoted_shell_strings.md",
+        "cid": "bafkreielmqnlzmlpgftksqvyvjqxcmyxo6jzpxskiyyj7xx6v7fhfy4g54"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Backticks in double-quoted shell strings execute commands",
+    "file": "feedback_no_backticks_in_double_quoted_shell_strings.md",
+    "scopePath": ".claude/memory/feedback_no_backticks_in_double_quoted_shell_strings.md",
+    "gitName": "(untracked: no commit carries these bytes)",
+    "entryType": "feedback",
+    "indexed": true
+  }
+}

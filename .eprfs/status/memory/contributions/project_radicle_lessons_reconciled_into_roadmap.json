@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihdh5j5y4mkjijuekeknoyspyjgv2u23e5ecmso67b3f5ehpbmtai"
+  },
+  "author": "human:matthew",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "project_radicle_lessons_reconciled_into_roadmap",
+  "claim": "2026-11-05: Radicle/Heartwood survey sorted by reach into plan §7; §7.3 is the artifact-store sprint handoff; bites when planning Track E or F2.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_radicle_lessons_reconciled_into_roadmap.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_radicle_lessons_reconciled_into_roadmap.md",
+        "cid": "bafkreievymhnl66lxy4w7awkit7buyx53ifsw6lwrqnvqezjvyesvxj3ki"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Radicle lessons reconciled into the roadmap",
+    "file": "project_radicle_lessons_reconciled_into_roadmap.md",
+    "scopePath": ".claude/memory/project_radicle_lessons_reconciled_into_roadmap.md",
+    "gitName": "(untracked: no commit carries these bytes)",
+    "entryType": "project",
+    "indexed": true
+  }
+}

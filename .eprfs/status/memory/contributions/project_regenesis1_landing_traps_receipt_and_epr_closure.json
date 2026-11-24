@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihdh5j5y4mkjijuekeknoyspyjgv2u23e5ecmso67b3f5ehpbmtai"
+  },
+  "author": "human:matthew",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "project_regenesis1_landing_traps_receipt_and_epr_closure",
+  "claim": "2026-11-06 overnight: two pre-push legs that a whole-repo crossing trips — the serving-receipt rule (deliverability story must pass on the final tree) and gate-source-state demanding a bafkr4i closureCid from an epr binary built pre-crossing; cures and the device re-ingest path.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_regenesis1_landing_traps_receipt_and_epr_closure.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_regenesis1_landing_traps_receipt_and_epr_closure.md",
+        "cid": "bafkreihqqnuig73ffruheslpextpgnsyhduwts53ppslaesnmr62nmxyca"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Re-genesis 1 landing traps: serving receipt and the epr closure-CID flip",
+    "file": "project_regenesis1_landing_traps_receipt_and_epr_closure.md",
+    "scopePath": ".claude/memory/project_regenesis1_landing_traps_receipt_and_epr_closure.md",
+    "gitName": "(untracked: no commit carries these bytes)",
+    "entryType": "project",
+    "indexed": true
+  }
+}

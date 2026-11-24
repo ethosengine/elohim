@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihdh5j5y4mkjijuekeknoyspyjgv2u23e5ecmso67b3f5ehpbmtai"
+  },
+  "author": "human:matthew",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "feedback_dayjob_feedback_flows_through_matthew_only",
+  "claim": "Operator 2026-11-06 — the dayjob never submits MRs or feedback; Matthew carries the pain of using his own stewardship back in; cures built upstream on his own time",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/feedback_dayjob_feedback_flows_through_matthew_only.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/feedback_dayjob_feedback_flows_through_matthew_only.md",
+        "cid": "bafkreibqoawdbzqs5x4rw2tgrgbaova4zgvqjmd7kqmrcqk6xzmo6fl7yy"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Dayjob feedback flows through Matthew only",
+    "file": "feedback_dayjob_feedback_flows_through_matthew_only.md",
+    "scopePath": ".claude/memory/feedback_dayjob_feedback_flows_through_matthew_only.md",
+    "gitName": "Matthew Dowell",
+    "entryType": "feedback",
+    "indexed": true
+  }
+}

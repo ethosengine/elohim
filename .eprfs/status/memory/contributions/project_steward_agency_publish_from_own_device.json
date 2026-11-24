@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihdh5j5y4mkjijuekeknoyspyjgv2u23e5ecmso67b3f5ehpbmtai"
+  },
+  "author": "human:matthew",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "project-steward-agency-publish-from-own-device",
+  "claim": "Operator 2026-09-29 — master the steward's own agency: publish content from his own device via root-author delegation; pipeline grading is interim",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_steward_agency_publish_from_own_device.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_steward_agency_publish_from_own_device.md",
+        "cid": "bafkreiefpsj5bjw4ghlxojb54pn6ndeccmk5ruvnmvgzwypwlvsxnn5rae"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Steward agency: publish from own device",
+    "file": "project_steward_agency_publish_from_own_device.md",
+    "scopePath": ".claude/memory/project_steward_agency_publish_from_own_device.md",
+    "gitName": "(untracked: no commit carries these bytes)",
+    "entryType": "project",
+    "indexed": false
+  }
+}

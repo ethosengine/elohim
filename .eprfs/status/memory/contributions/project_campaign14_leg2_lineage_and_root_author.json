@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihdh5j5y4mkjijuekeknoyspyjgv2u23e5ecmso67b3f5ehpbmtai"
+  },
+  "author": "human:matthew",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "project_campaign14_leg2_lineage_and_root_author",
+  "claim": "2026-10-02: Che = live alpha lineage; CI pack and worktree pack differ; no alpha root authored by a non-Che Matthew key, so the delegation has no grantor",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_campaign14_leg2_lineage_and_root_author.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_campaign14_leg2_lineage_and_root_author.md",
+        "cid": "bafkreib53jig62cyz6ayuosgsauxukb6cyo2yo7tsdiljdj4fshnwi4ixi"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Campaign 1.4 leg 2 — DNA lineages and the missing grantor",
+    "file": "project_campaign14_leg2_lineage_and_root_author.md",
+    "scopePath": ".claude/memory/project_campaign14_leg2_lineage_and_root_author.md",
+    "gitName": "(untracked: no commit carries these bytes)",
+    "entryType": "project",
+    "indexed": false
+  }
+}

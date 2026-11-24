@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihdh5j5y4mkjijuekeknoyspyjgv2u23e5ecmso67b3f5ehpbmtai"
+  },
+  "author": "human:matthew",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "storage-and-artifact-store-are-mutual",
+  "claim": "elohim-storage and the artifact store hold and shape each other; send gaps to storage as its own work, never re-invent its primitives",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/feedback_storage_and_artifact_store_are_mutual.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/feedback_storage_and_artifact_store_are_mutual.md",
+        "cid": "bafkreieajgojsbta7rw43xlgxyuu65aape4xfv6cdtuq52at7yayl4leji"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Storage and artifact store are mutual",
+    "file": "feedback_storage_and_artifact_store_are_mutual.md",
+    "scopePath": ".claude/memory/feedback_storage_and_artifact_store_are_mutual.md",
+    "gitName": "(untracked: no commit carries these bytes)",
+    "entryType": "feedback",
+    "indexed": true
+  }
+}

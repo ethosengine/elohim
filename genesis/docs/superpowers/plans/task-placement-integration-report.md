@@ -1,7 +1,10 @@
 ---
 id: placement-integration-report
 title: Placement interfaces — Codex recovery and integration evidence
-status: DONE_WITH_CONCERNS
+status: landed
+landed_commit: 5e7612aa7
+verified_by: "integration gates on final sources EXIT=0 (seam-contracts, eprfs 1,326, elohim-placement, elohim-ark, elohim-compute, elohim-epr, elohim-storage 5,728, k8s-bridge, doorway, epr-ts, eprfs-ts, storage-client-ts, elohim-app 4,717, schema codegen+contracts) per task-placement-integration-report.md; materialize-what-is-read DELTA 2026-10-21 (H1). The per-gate receipt logs were workspace-local (genesis/local-dev/placement-codex-handoff/) and are no longer on disk; not re-run 2026-10-28"
+concerns: "was: DONE_WITH_CONCERNS; open residue is present-as-pointer in .eprfs/status/gap-items/plans__task-placement-integration-report.json"
 class: architecture
 gap: plans__2026-10-20-placement-contract-architecture-plan#22
 actor: agent:implementer@codex

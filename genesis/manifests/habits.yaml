@@ -114,9 +114,9 @@ habits:
       - "a2o @device-declared-target (genesis/a2o/features/devflow/device-declared-target.feature, @concern:dataplane-convergence) — offline private declaration, projection replay, pinned-session notice and committed-base recovery; slice M"
     evidence: >
       DELTA 2026-11-08 (re-genesis 1 alpha, orchestrator 184beb01, RED preserved — the habit's other checks are not this measure): alpha re-genesised on the address-crossing DNA (live cells = the five bundle hashes, seven conductors on fork 993cf597a); both doorways serve `/` and `/lamad/` and resolve the landing head to one CID (bafyreif4j…aehu); Dataplane Validation green on edge #1839 (validate-only, 10 passed / 0 failed, after #1838 rolled the late-bind storage image). Convergence defect found and cured: storage snapshotted its conductor client at boot, so a peer whose storage beat its conductor never adopted a release nor minted a binding (fix 9faf54076; three tests; live cold-boot log proof owed). Open: doorway /health/serving is blind to a conductor restart (backlog doorway-readiness-blind-to-conductor-restart; station 2 of app-delivery-refuses-fast red twice). Evidence: genesis/docs/superpowers/sprints/2026-11-05-regenesis-1/{STATE.md,RESULT.md,regression-classes.md}.
-    evidence-fingerprint: sha256:47f4ab55a85468fa
-    evidence-bytes: 281601
-    evidence-entries: 183
+    evidence-fingerprint: sha256:2651255abd31b7a6
+    evidence-bytes: 282981
+    evidence-entries: 184
     guard: >
       Regression risk = the fleet-safety invariants in sync/projector.rs
       (empty-never-projects, reconcile-offers/events-assert, broadcast-tier reach

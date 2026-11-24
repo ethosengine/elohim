@@ -2,7 +2,7 @@
   "version": 1,
   "collective": {
     "path": ".epr-meta/collective.json",
-    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+    "cid": "bafkreihdh5j5y4mkjijuekeknoyspyjgv2u23e5ecmso67b3f5ehpbmtai"
   },
   "author": "human:matthew",
   "steward": "repo:ethosengine/elohim",
@@ -11,14 +11,13 @@
   "concern": "feedback-human-loop-not-terminal-authority",
   "claim": "Human-must-decide as a guaranteed floor is a capture vector; neither species is terminal — the method is.",
   "uncertainty": [
-    "Imported verbatim from .claude/memory/feedback_human_loop_not_terminal_authority.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here.",
-    "authorship: steward-of-record — human:matthew stands for this entry; no agent author was witnessed writing it, and this record does not say human:matthew wrote it. Origin session: a7c9725e-26d1-43a1-a859-fe672ef9fea2."
+    "Imported verbatim from .claude/memory/feedback_human_loop_not_terminal_authority.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
   ],
   "sources": [
     {
       "resource": {
         "path": ".claude/memory/feedback_human_loop_not_terminal_authority.md",
-        "cid": "bafkreieoqa6b3vsa4lha6rx7fkdprvk3spikkbret6mof5flubdhv5xoai"
+        "cid": "bafkreih3ztuzfusjfg2x2e4lgkffvfmdp7wwviqa2ymly44wgwlfvcfob4"
       },
       "reach": "repository"
     }

@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihdh5j5y4mkjijuekeknoyspyjgv2u23e5ecmso67b3f5ehpbmtai"
+  },
+  "author": "human:matthew",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "project-real-network-is-one-human",
+  "claim": "Real network = matthew + delegated agents + devices; every other human is a genesis fixture. Principal-attribution to matthew is correct; mature network tested in Simulacra.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project-real-network-is-one-human.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project-real-network-is-one-human.md",
+        "cid": "bafkreidbmblxbsccdnmuqzcmcoin6mgkldg3qpnwdgtigaryr4pslkvw2q"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Real network = one human; test the mature one in Simulacra",
+    "file": "project-real-network-is-one-human.md",
+    "scopePath": ".claude/memory/project-real-network-is-one-human.md",
+    "gitName": "(untracked: no commit carries these bytes)",
+    "entryType": "project",
+    "indexed": true
+  }
+}

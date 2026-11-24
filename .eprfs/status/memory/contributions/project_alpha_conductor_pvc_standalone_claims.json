@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihdh5j5y4mkjijuekeknoyspyjgv2u23e5ecmso67b3f5ehpbmtai"
+  },
+  "author": "human:matthew",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "project-alpha-conductor-pvc-standalone-claims",
+  "claim": "holochain-data-elohim-<human>-alpha-0 is created by hand and used by name (adam Retain, matthew Delete) — never recommend deleting it; empty it in place",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_alpha_conductor_pvc_standalone_claims.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_alpha_conductor_pvc_standalone_claims.md",
+        "cid": "bafkreieyprderje54lszhh4gwdstmvaahiu7ysnwzjzgzjiv4rh7yucsui"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Alpha conductor data PVCs are standalone claims",
+    "file": "project_alpha_conductor_pvc_standalone_claims.md",
+    "scopePath": ".claude/memory/project_alpha_conductor_pvc_standalone_claims.md",
+    "gitName": "(untracked: no commit carries these bytes)",
+    "entryType": "project",
+    "indexed": true
+  }
+}

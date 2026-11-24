@@ -2,7 +2,7 @@
   "version": 1,
   "collective": {
     "path": ".epr-meta/collective.json",
-    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+    "cid": "bafkreihdh5j5y4mkjijuekeknoyspyjgv2u23e5ecmso67b3f5ehpbmtai"
   },
   "author": "human:matthew",
   "steward": "repo:ethosengine/elohim",
@@ -11,14 +11,13 @@
   "concern": "project_storage_metrics_surface_and_leak_verdict",
   "claim": "Conductor OOM = native glibc-malloc leak in holochain child (go-pion exonerated); CURED 2026-06-19 by jemalloc swap. /metrics + smaps localizer live on alpha.",
   "uncertainty": [
-    "Imported verbatim from .claude/memory/project_storage_metrics_surface_and_leak_verdict.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here.",
-    "authorship: steward-of-record — human:matthew stands for this entry; no agent author was witnessed writing it, and this record does not say human:matthew wrote it. Origin session: 78b2961c-1c56-4ebb-9ef7-ba3641a14acf."
+    "Imported verbatim from .claude/memory/project_storage_metrics_surface_and_leak_verdict.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
   ],
   "sources": [
     {
       "resource": {
         "path": ".claude/memory/project_storage_metrics_surface_and_leak_verdict.md",
-        "cid": "bafkreihlrlr2xlsdd3iwmr7ovhz3nkruqwufwtois6eoal36d2gyndcbqi"
+        "cid": "bafkreigqikltqbufy7tu36irecibhw2fwnfx2fuzi6f7scbbfctio4qztq"
       },
       "reach": "repository"
     }

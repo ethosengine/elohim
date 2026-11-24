@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihdh5j5y4mkjijuekeknoyspyjgv2u23e5ecmso67b3f5ehpbmtai"
+  },
+  "author": "human:matthew",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "feedback-haiku-wraps-codex-in-workflows",
+  "claim": "Operator 2026-10-28: in workflows a Haiku agent runs codex exec for reading/implementation legs and returns its result file; it never runs git.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/feedback_haiku_wraps_codex_in_workflows.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/feedback_haiku_wraps_codex_in_workflows.md",
+        "cid": "bafkreidbrwb3xhechkeaxc4s3xm3zxxfx2ypnl7v3lebwlqiz5vsp5eosq"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Haiku wraps Codex in workflows",
+    "file": "feedback_haiku_wraps_codex_in_workflows.md",
+    "scopePath": ".claude/memory/feedback_haiku_wraps_codex_in_workflows.md",
+    "gitName": "(untracked: no commit carries these bytes)",
+    "entryType": "feedback",
+    "indexed": true
+  }
+}

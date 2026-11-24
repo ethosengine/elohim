@@ -2,23 +2,22 @@
   "version": 1,
   "collective": {
     "path": ".epr-meta/collective.json",
-    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+    "cid": "bafkreihdh5j5y4mkjijuekeknoyspyjgv2u23e5ecmso67b3f5ehpbmtai"
   },
   "author": "human:matthew",
   "steward": "repo:ethosengine/elohim",
   "scope": "repository",
   "reach": "repository",
   "concern": "project_outreach_threads",
-  "claim": "Lewis (canteen), Richardson (Polity/Ethelo), Monty Lynn, AI-future-of-work, Audrey Tang, Andy Crouch, Brynjolfsson.",
+  "claim": "Lewis (canteen), Richardson (Polity/Ethelo), Monty Lynn, AI-future-of-work, Audrey Tang, Andy Crouch, Brynjolfsson, Chris Olah, Nørgaard (OpenHaven), sgnlfr3 (Lu).",
   "uncertainty": [
-    "Imported verbatim from .claude/memory/project_outreach_threads.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here.",
-    "authorship: steward-of-record — human:matthew stands for this entry; no agent author was witnessed writing it, and this record does not say human:matthew wrote it. Origin session: dd92ea53-45bb-4dba-bf69-b4b5b86362dd."
+    "Imported verbatim from .claude/memory/project_outreach_threads.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
   ],
   "sources": [
     {
       "resource": {
         "path": ".claude/memory/project_outreach_threads.md",
-        "cid": "bafkreih6chs7of3lvlvyq635b5qrg4bvmhwwaqbf7rueedjiagvr5abhbe"
+        "cid": "bafkreib5j36ly66tnrfyhw5muaz6efdadfvy3phzc47ramrvdnphzdxmti"
       },
       "reach": "repository"
     }

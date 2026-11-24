@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihdh5j5y4mkjijuekeknoyspyjgv2u23e5ecmso67b3f5ehpbmtai"
+  },
+  "author": "human:matthew",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "project-steward-publishing-and-device-ceremony",
+  "claim": "Publish from the steward's own device via root-author delegation; Che = live alpha lineage, pipeline packs differ; device-join proof recipe (i1006 approves, sandbox asks); reach widening is a steward act.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_steward_publishing_and_device_ceremony.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_steward_publishing_and_device_ceremony.md",
+        "cid": "bafkreihzv2zsk7uoicv7skcbs3jpqqiu2mpdyyyrkkymmha2our4tdegim"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Steward publishing & device ceremony (umbrella)",
+    "file": "project_steward_publishing_and_device_ceremony.md",
+    "scopePath": ".claude/memory/project_steward_publishing_and_device_ceremony.md",
+    "gitName": "(untracked: no commit carries these bytes)",
+    "entryType": "project",
+    "indexed": true
+  }
+}

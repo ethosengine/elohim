@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihdh5j5y4mkjijuekeknoyspyjgv2u23e5ecmso67b3f5ehpbmtai"
+  },
+  "author": "human:matthew",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "project-elohim-native-devspace-runtime",
+  "claim": "lvi = the P2P devspace peer-runtime; brit epr-meta parity is read-side only; the Che op-gate offline spine landed fail-closed with live-mesh legs held.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_elohim_native_devspace_runtime.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_elohim_native_devspace_runtime.md",
+        "cid": "bafkreig72f4skpkmjsc6bttebp63hragu3yvvzmrsdrmb5ds5tzlf44zxu"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Elohim-native devspace runtime (umbrella)",
+    "file": "project_elohim_native_devspace_runtime.md",
+    "scopePath": ".claude/memory/project_elohim_native_devspace_runtime.md",
+    "gitName": "(untracked: no commit carries these bytes)",
+    "entryType": "project",
+    "indexed": true
+  }
+}

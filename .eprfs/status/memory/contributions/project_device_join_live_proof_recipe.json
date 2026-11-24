@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihdh5j5y4mkjijuekeknoyspyjgv2u23e5ecmso67b3f5ehpbmtai"
+  },
+  "author": "human:matthew",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "project-device-join-live-proof-recipe",
+  "claim": "How the one-command device join was proven live 2026-10-07 — i1006 workspace approves, a generated sandbox asks; what each failure meant. Bites on any device-ceremony proof.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_device_join_live_proof_recipe.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_device_join_live_proof_recipe.md",
+        "cid": "bafkreigopc4yd3zlxt5ypgipdzjmblmitelgrbcxwkx6osesizcvsw7ina"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Device-join live proof recipe (i1006 approver, generated as…",
+    "file": "project_device_join_live_proof_recipe.md",
+    "scopePath": ".claude/memory/project_device_join_live_proof_recipe.md",
+    "gitName": "(untracked: no commit carries these bytes)",
+    "entryType": "project",
+    "indexed": false
+  }
+}

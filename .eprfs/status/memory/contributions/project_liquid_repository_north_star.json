@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihdh5j5y4mkjijuekeknoyspyjgv2u23e5ecmso67b3f5ehpbmtai"
+  },
+  "author": "human:matthew",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "project_liquid_repository_north_star",
+  "claim": "Operator 2026-11-04: every .epr-meta root carries living stewards, compute needs and an lvi button to dev there at self reach; identity is the subtree, not a repo URL.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_liquid_repository_north_star.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_liquid_repository_north_star.md",
+        "cid": "bafkreidtzetzents5dsq3nsues6pns7ruzoqhtdxx6p6b5o2rny7im7nn4"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Liquid repository north star",
+    "file": "project_liquid_repository_north_star.md",
+    "scopePath": ".claude/memory/project_liquid_repository_north_star.md",
+    "gitName": "(untracked: no commit carries these bytes)",
+    "entryType": "project",
+    "indexed": true
+  }
+}

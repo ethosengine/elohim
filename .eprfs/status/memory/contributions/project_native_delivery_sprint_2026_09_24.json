@@ -11,14 +11,13 @@
   "concern": "project_native_delivery_sprint_2026_09_24",
   "claim": "Plan path, the surprise-auditor routine id, the conductor pin HELD at 25dd2d0be, and the push blocker — bites when resuming the sprint or moving any pin.",
   "uncertainty": [
-    "Imported verbatim from .claude/memory/project_native_delivery_sprint_2026_09_24.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here.",
-    "authorship: steward-of-record — human:matthew stands for this entry; no agent author was witnessed writing it, and this record does not say human:matthew wrote it. Origin session: 9adf9f01-3f4d-4b27-8758-d78fda7cada3."
+    "Imported verbatim from .claude/memory/project_native_delivery_sprint_2026_09_24.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
   ],
   "sources": [
     {
       "resource": {
         "path": ".claude/memory/project_native_delivery_sprint_2026_09_24.md",
-        "cid": "bafkreig6dxpoh4pnpqeopgffli3hoyfdl6kf3otokkxplbx2n4qryocrxa"
+        "cid": "bafkreih2yagg4k6mexx5ibctgs23g2njq6tzk2zmsp4oqelobuuctejida"
       },
       "reach": "repository"
     }
@@ -26,10 +25,10 @@
   "supersedes": [],
   "contradicts": [],
   "imported": {
-    "display": "project_native_delivery_sprint_2026_09_24",
+    "display": "Native-delivery sprint 2026-09-24 — pointers and holds",
     "file": "project_native_delivery_sprint_2026_09_24.md",
     "scopePath": ".claude/memory/project_native_delivery_sprint_2026_09_24.md",
-    "gitName": "(untracked: no commit carries these bytes)",
+    "gitName": "Matthew Dowell",
     "entryType": "project",
     "indexed": true
   }

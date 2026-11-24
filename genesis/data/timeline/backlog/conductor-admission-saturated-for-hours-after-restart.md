@@ -174,7 +174,7 @@ Whether a timed-out HTTP handler continues its remaining work is unmeasured.
 
 ## 2026-09-27 — still standing on matthew-alpha; same 503 face, App #1731-#1733
 
-`.claude/shifts/notarize-503-diagnosis-2026-09-27.md` (read-only, code at dev tip 580adbd64):
+`.claude/shifts/notarize-503-diagnosis-2026-09-27.md` (archived 2026-10-28 in `/projects/.claude-config/archive/shifts-stale-2026-10-28.tar.gz`) (read-only, code at dev tip 580adbd64):
 admission capacity 5, `in_flight` 5/5 for 5+ hours on matthew-alpha; mean permit hold 50-60 s
 across infrastructure/mishpat/content_store, the same websocket-deadline shape as above. About
 790 conductor call timeouts in 3 h, led by `get_latest_peer_status_for_agent`,

@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihdh5j5y4mkjijuekeknoyspyjgv2u23e5ecmso67b3f5ehpbmtai"
+  },
+  "author": "human:matthew",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "project-workspace-runs-as-root-tests-skip",
+  "claim": "The Che workspace runs as uid 0, so permission tests skip or pass vacuously; run built test binaries as nobody with setpriv before trusting a green.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_workspace_runs_as_root_tests_skip.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_workspace_runs_as_root_tests_skip.md",
+        "cid": "bafkreid36cmy7erkbu6nf7ff3mfqbxavq7ovkfggi6v2j25233pwjyibnu"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Workspace runs as root; permission tests skip here",
+    "file": "project_workspace_runs_as_root_tests_skip.md",
+    "scopePath": ".claude/memory/project_workspace_runs_as_root_tests_skip.md",
+    "gitName": "(untracked: no commit carries these bytes)",
+    "entryType": "project",
+    "indexed": true
+  }
+}

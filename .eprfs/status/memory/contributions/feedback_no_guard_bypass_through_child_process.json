@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihdh5j5y4mkjijuekeknoyspyjgv2u23e5ecmso67b3f5ehpbmtai"
+  },
+  "author": "human:matthew",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "feedback_no_guard_bypass_through_child_process",
+  "claim": "A hook-refused effect (env var, command) reached via a child process or wrapper is a bypass; use the product's isolation or a real gate as receipt.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/feedback_no_guard_bypass_through_child_process.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/feedback_no_guard_bypass_through_child_process.md",
+        "cid": "bafkreibuu3ilh4bw53sxjka3qj4spfmilh6r3lqjzlouolvrommtrmp7fq"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Never route around a hook through a child process",
+    "file": "feedback_no_guard_bypass_through_child_process.md",
+    "scopePath": ".claude/memory/feedback_no_guard_bypass_through_child_process.md",
+    "gitName": "(untracked: no commit carries these bytes)",
+    "entryType": "feedback",
+    "indexed": true
+  }
+}

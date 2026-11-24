@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihdh5j5y4mkjijuekeknoyspyjgv2u23e5ecmso67b3f5ehpbmtai"
+  },
+  "author": "human:matthew",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "paths-are-walks-over-epr-graph",
+  "claim": "A lamad path is one walk over the EPR graph — meaning lives on atom relationships so elohim can compose personalized paths like love maps",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_paths_are_walks_over_epr_graph.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_paths_are_walks_over_epr_graph.md",
+        "cid": "bafkreics3k4wiu5krjj3t7h2jvz5lxm3sdb3dzrw4ozbff6wod3uyy4xie"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Paths are walks over the EPR graph",
+    "file": "project_paths_are_walks_over_epr_graph.md",
+    "scopePath": ".claude/memory/project_paths_are_walks_over_epr_graph.md",
+    "gitName": "(untracked: no commit carries these bytes)",
+    "entryType": "project",
+    "indexed": false
+  }
+}

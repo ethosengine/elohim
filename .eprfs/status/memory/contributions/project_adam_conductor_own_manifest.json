@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihdh5j5y4mkjijuekeknoyspyjgv2u23e5ecmso67b3f5ehpbmtai"
+  },
+  "author": "human:matthew",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "project-adam-conductor-own-manifest",
+  "claim": "adam-firstman-conductor.yaml, not the shared template, renders adam's conductor — template-only edits never reach adam",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_adam_conductor_own_manifest.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_adam_conductor_own_manifest.md",
+        "cid": "bafkreifzkqpkwaox3u7lqxe2wcjfcmdl2tak5pvldgyffuncmen46mzauu"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Adam's alpha conductor has its own manifest",
+    "file": "project_adam_conductor_own_manifest.md",
+    "scopePath": ".claude/memory/project_adam_conductor_own_manifest.md",
+    "gitName": "(untracked: no commit carries these bytes)",
+    "entryType": "project",
+    "indexed": true
+  }
+}

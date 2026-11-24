@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihdh5j5y4mkjijuekeknoyspyjgv2u23e5ecmso67b3f5ehpbmtai"
+  },
+  "author": "human:matthew",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "project_brit_worktree_gaps_2026_11",
+  "claim": "brit 0.1.12–0.2.6: commit refuses worktree hooksPath, status panics, pull refuses shallow, push closed-channel, fetch fails on dubious ownership, worktree add fails on large blobs; declared git fallbacks.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_brit_worktree_gaps_2026_11.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_brit_worktree_gaps_2026_11.md",
+        "cid": "bafkreie267ukgo66kht3tmgjo3okzis42nx5ppxrnfxd556lm6ayiiedrm"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Brit gaps observed in the re-genesis 1 sprint (worktrees, shallow repo, push)",
+    "file": "project_brit_worktree_gaps_2026_11.md",
+    "scopePath": ".claude/memory/project_brit_worktree_gaps_2026_11.md",
+    "gitName": "Matthew Dowell",
+    "entryType": "project",
+    "indexed": true
+  }
+}

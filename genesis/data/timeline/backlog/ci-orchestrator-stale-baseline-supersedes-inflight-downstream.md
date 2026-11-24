@@ -39,4 +39,4 @@ orchestrator never abandons a downstream it dispatched.
 **Evidence.** Jenkins: elohim-orchestrator/dev #1894 (FAILURE, 244 m, Execute Builds 239 m),
 #1895 (TimerTrigger, empty changeset); elohim/dev #1722 (ABORTED after 79 m in Publish
 and Verify App Delivery), #1723 (started 09:01). Shift journal
-`.claude/shifts/2026-09-23T04-10-land-serving-edge-batch.journal.md` iterations 7–9.
+`.claude/shifts/2026-09-23T04-10-land-serving-edge-batch.journal.md` iterations 7–9 (archived 2026-10-28 in `/projects/.claude-config/archive/shifts-stale-2026-10-28.tar.gz`).

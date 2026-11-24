@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihdh5j5y4mkjijuekeknoyspyjgv2u23e5ecmso67b3f5ehpbmtai"
+  },
+  "author": "human:matthew",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "feedback-fix-what-you-find-no-leaving-defects",
+  "claim": "Operator 2026-10-07: a defect found in flight is fixed in flight, not canonicalized and left for later — bites whenever a lane surfaces a side-defect.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/feedback_fix_what_you_find_no_leaving_defects.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/feedback_fix_what_you_find_no_leaving_defects.md",
+        "cid": "bafkreig3aar4wzvvbzdfc6v6to3noaol5nppnmixzmq3c3vum6ej7gjb3y"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Fix what you find; never leave a defect recorded-but-open",
+    "file": "feedback_fix_what_you_find_no_leaving_defects.md",
+    "scopePath": ".claude/memory/feedback_fix_what_you_find_no_leaving_defects.md",
+    "gitName": "(untracked: no commit carries these bytes)",
+    "entryType": "feedback",
+    "indexed": true
+  }
+}

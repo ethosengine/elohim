@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihdh5j5y4mkjijuekeknoyspyjgv2u23e5ecmso67b3f5ehpbmtai"
+  },
+  "author": "human:matthew",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "feedback-push-needs-grant-and-tip-receipt",
+  "claim": "Auto mode denies pushes to dev until granted; pre-push wants the deliverability receipt on the tip sha; rebase is tier-gated, merge is not.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/feedback_push_needs_grant_and_tip_receipt.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/feedback_push_needs_grant_and_tip_receipt.md",
+        "cid": "bafkreig2a2gtnr7awrajl6ssdb3l5kkptgd5y2cxiewqhhsqmrny6q2yyu"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Push needs a grant; receipt on the tip",
+    "file": "feedback_push_needs_grant_and_tip_receipt.md",
+    "scopePath": ".claude/memory/feedback_push_needs_grant_and_tip_receipt.md",
+    "gitName": "(untracked: no commit carries these bytes)",
+    "entryType": "feedback",
+    "indexed": false
+  }
+}

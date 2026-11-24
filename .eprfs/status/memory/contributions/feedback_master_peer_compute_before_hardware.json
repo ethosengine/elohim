@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihdh5j5y4mkjijuekeknoyspyjgv2u23e5ecmso67b3f5ehpbmtai"
+  },
+  "author": "human:matthew",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "feedback-master-peer-compute-before-hardware",
+  "claim": "Operator 2026-10-29: elegant peer utilization (brit/lvi/peer/rakia subsuming GitHub, Nexus, Harbor, Jenkins) before any new node; bites when a capacity gap tempts a purchase.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/feedback_master_peer_compute_before_hardware.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/feedback_master_peer_compute_before_hardware.md",
+        "cid": "bafkreigqpcudopjmgzc3njbl54dqgavwhigjxy67xh4bsvqsojqqoluvci"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Master peer compute before hardware",
+    "file": "feedback_master_peer_compute_before_hardware.md",
+    "scopePath": ".claude/memory/feedback_master_peer_compute_before_hardware.md",
+    "gitName": "(untracked: no commit carries these bytes)",
+    "entryType": "feedback",
+    "indexed": true
+  }
+}

@@ -4,7 +4,7 @@
     "path": ".epr-meta/collective.json",
     "cid": "bafkreihdh5j5y4mkjijuekeknoyspyjgv2u23e5ecmso67b3f5ehpbmtai"
   },
-  "author": "agent:orchestrator@claude-opus-5-5",
+  "author": "human:matthew",
   "steward": "repo:ethosengine/elohim",
   "scope": "repository",
   "reach": "repository",
@@ -25,11 +25,11 @@
   "supersedes": [
     {
       "path": ".eprfs/status/memory/contributions/feedback_local_mesh_first_cadence.json",
-      "cid": "bafkreigxodchx7oulz4j2k5qlbgk7udbhixmi26cniavraftmsxmetojxa"
+      "cid": "bafkreidn2lys4ohw45el6ymtyzlrqxzonc5g6it5lpqhnryzi3qotoxhhy"
     },
     {
       "path": ".eprfs/status/memory/contributions/feedback_measure_class_runs_off_dev_berth.json",
-      "cid": "bafkreibvjj25pccfrgfwntinnthcodgq63vofmsp54gtuo53wk3cuh52ye"
+      "cid": "bafkreiepsbcna7shki3nxwuz2cpf63bwddtusvcidacxu4jbeoj2zd7kga"
     }
   ],
   "contradicts": [],
@@ -37,7 +37,7 @@
     "display": "Local-mesh-first cadence, verification & offload (umbrella)",
     "file": "feedback_local_mesh_first_cadence_and_measure_offload.md",
     "scopePath": ".claude/memory/feedback_local_mesh_first_cadence_and_measure_offload.md",
-    "gitName": "(untracked: no commit carries these bytes)",
+    "gitName": "Matthew Dowell",
     "entryType": "feedback",
     "indexed": true
   }

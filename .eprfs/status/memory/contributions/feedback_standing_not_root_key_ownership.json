@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihdh5j5y4mkjijuekeknoyspyjgv2u23e5ecmso67b3f5ehpbmtai"
+  },
+  "author": "human:matthew",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "feedback-standing-not-root-key-ownership",
+  "claim": "Operator 2026-10-04 — authority over content comes from governance-recognized standing, never from the key that authored the root; keep provenance, recognition, standing and reach as separate planes",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/feedback_standing_not_root_key_ownership.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/feedback_standing_not_root_key_ownership.md",
+        "cid": "bafkreifig72gna2hzwi3ua3troritxihmgijmxe6zfccdh5kjf5ykpuwbm"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "feedback-standing-not-root-key-ownership",
+    "file": "feedback_standing_not_root_key_ownership.md",
+    "scopePath": ".claude/memory/feedback_standing_not_root_key_ownership.md",
+    "gitName": "(untracked: no commit carries these bytes)",
+    "entryType": "feedback",
+    "indexed": true
+  }
+}

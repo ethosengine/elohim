@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihdh5j5y4mkjijuekeknoyspyjgv2u23e5ecmso67b3f5ehpbmtai"
+  },
+  "author": "human:matthew",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "feedback-holon-diversity-makes-root-inviolable",
+  "claim": "Operator 2026-10-29: imago-dei inviolability comes from the diversity of a socially-derived holon's members, which makes the core improbable to capture — never from keys or signer counts.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/feedback_holon_diversity_makes_root_inviolable.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/feedback_holon_diversity_makes_root_inviolable.md",
+        "cid": "bafkreigltlazsmskpnbswti3atnaturccw2wnndo3m6o3rp45lulwp6fsu"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Holon diversity makes the root inviolable",
+    "file": "feedback_holon_diversity_makes_root_inviolable.md",
+    "scopePath": ".claude/memory/feedback_holon_diversity_makes_root_inviolable.md",
+    "gitName": "(untracked: no commit carries these bytes)",
+    "entryType": "feedback",
+    "indexed": true
+  }
+}

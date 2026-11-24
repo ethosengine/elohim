@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihdh5j5y4mkjijuekeknoyspyjgv2u23e5ecmso67b3f5ehpbmtai"
+  },
+  "author": "human:matthew",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "project_household_gossipsub_silent_on_ethosengine",
+  "claim": "2026-11-06: custody announcements never reached iroh and gossipsub logged InsufficientPeers; cured by SignedCustodyAnnouncement via fan-out (settled 2026-11-07 both households); open: uploader self-copy only when PeerSelection picks itself, striped shard_index > 6 refused by node-registry.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_household_gossipsub_silent_on_ethosengine.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_household_gossipsub_silent_on_ethosengine.md",
+        "cid": "bafkreiajmru4du3c6acz2sbt5bmdw4oj6prwmwd3qdmskwa3ziyt5xqxze"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Household custody gossip silent on ethosengine (resolved R1)",
+    "file": "project_household_gossipsub_silent_on_ethosengine.md",
+    "scopePath": ".claude/memory/project_household_gossipsub_silent_on_ethosengine.md",
+    "gitName": "(untracked: no commit carries these bytes)",
+    "entryType": "project",
+    "indexed": true
+  }
+}

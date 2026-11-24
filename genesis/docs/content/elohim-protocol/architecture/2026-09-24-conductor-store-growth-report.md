@@ -3,7 +3,7 @@ title: What grows in a conductor store — the 2.3 GB matthew inspection, its dr
 id: conductor-store-growth-report
 date: 2026-09-24
 tier: architecture
-status: Living — measured report; household mesh; fleet numbers not yet taken
+status: complete — measured on the household mesh; the fleet figures in §5 are inference, not measurement
 author: Fable session 2026-09-24, from an offline read of the stopped Dowell household conductors
 cites:
   - genesis/data/timeline/backlog/conductor-publish-livelock-fk787.md

@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihdh5j5y4mkjijuekeknoyspyjgv2u23e5ecmso67b3f5ehpbmtai"
+  },
+  "author": "human:matthew",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "project-brit-signer-key-custody-settled-d5",
+  "claim": "Steward-space decision D5 (2026-10-27): brit keeps its own per-device signing key; deriving it from the device key was rejected. Do not reopen.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_brit_signer_key_custody_settled_d5.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_brit_signer_key_custody_settled_d5.md",
+        "cid": "bafkreigf4k2fteza2jnulctte3v7xuopkhytxueg6atayhb3u6lgzsph34"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "brit signer key custody is settled (D5)",
+    "file": "project_brit_signer_key_custody_settled_d5.md",
+    "scopePath": ".claude/memory/project_brit_signer_key_custody_settled_d5.md",
+    "gitName": "(untracked: no commit carries these bytes)",
+    "entryType": "project",
+    "indexed": true
+  }
+}
