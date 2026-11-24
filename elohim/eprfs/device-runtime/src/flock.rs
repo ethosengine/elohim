@@ -9,6 +9,7 @@
 
 use std::fs::File;
 use std::os::fd::{AsFd, BorrowedFd};
+use std::time::{Duration, Instant};
 
 use rustix::fs::{flock, FlockOperation};
 
@@ -43,6 +44,59 @@ impl Flock {
     /// The lock call failed for a reason other than contention.
     pub fn try_shared(file: File) -> std::io::Result<Result<Flock, File>> {
         Self::try_take(file, FlockOperation::NonBlockingLockShared)
+    }
+
+    /// Take the exclusive lock within `patience`, trying immediately and then every `poll`.
+    /// Zero patience makes exactly one attempt.
+    ///
+    /// # Errors
+    ///
+    /// A lock call failed for a reason other than contention.
+    pub fn exclusive_within(
+        file: File,
+        patience: Duration,
+        poll: Duration,
+    ) -> std::io::Result<Result<Flock, File>> {
+        Self::take_within(
+            file,
+            patience,
+            poll,
+            FlockOperation::NonBlockingLockExclusive,
+        )
+    }
+
+    /// Take the shared lock within `patience`, trying immediately and then every `poll`.
+    /// Zero patience makes exactly one attempt.
+    ///
+    /// # Errors
+    ///
+    /// A lock call failed for a reason other than contention.
+    pub fn shared_within(
+        file: File,
+        patience: Duration,
+        poll: Duration,
+    ) -> std::io::Result<Result<Flock, File>> {
+        Self::take_within(file, patience, poll, FlockOperation::NonBlockingLockShared)
+    }
+
+    fn take_within(
+        mut file: File,
+        patience: Duration,
+        poll: Duration,
+        operation: FlockOperation,
+    ) -> std::io::Result<Result<Flock, File>> {
+        let started = Instant::now();
+        loop {
+            match Self::try_take(file, operation)? {
+                Ok(held) => return Ok(Ok(held)),
+                Err(contended) => file = contended,
+            }
+            let elapsed = started.elapsed();
+            if elapsed >= patience {
+                return Ok(Err(file));
+            }
+            std::thread::sleep(poll.min(patience - elapsed));
+        }
     }
 
     fn try_take(file: File, operation: FlockOperation) -> std::io::Result<Result<Flock, File>> {
@@ -139,5 +193,71 @@ mod tests {
         assert!(Flock::try_shared(open(&path)).unwrap().is_ok());
         assert!(Flock::try_exclusive(open(&path)).unwrap().is_err());
         drop(shared);
+    }
+
+    #[test]
+    fn zero_patience_refuses_a_held_lock_at_once() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("x.lock");
+        let held = Flock::try_exclusive(open(&path)).unwrap().expect("free");
+        let started = Instant::now();
+        assert!(
+            Flock::exclusive_within(open(&path), Duration::ZERO, Duration::from_secs(1))
+                .unwrap()
+                .is_err()
+        );
+        assert!(started.elapsed() < Duration::from_millis(500));
+        drop(held);
+    }
+
+    #[test]
+    fn a_lock_released_within_patience_is_taken() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("x.lock");
+        let held = Flock::try_exclusive(open(&path)).unwrap().expect("free");
+        let releaser = std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(50));
+            drop(held);
+        });
+        let acquired = Flock::exclusive_within(
+            open(&path),
+            Duration::from_secs(1),
+            Duration::from_millis(10),
+        )
+        .unwrap();
+        releaser.join().unwrap();
+        assert!(acquired.is_ok());
+    }
+
+    /// A child forked by another thread holds the descriptor through its pre-exec pause, but
+    /// dropping the guard unlocks the shared open file description immediately.
+    #[cfg(unix)]
+    #[test]
+    fn a_guard_release_is_not_delayed_by_a_forked_child() {
+        use std::os::unix::process::CommandExt;
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("x.lock");
+        let held = Flock::try_exclusive(open(&path)).unwrap().expect("free");
+        let forker = std::thread::spawn(|| {
+            let mut command = std::process::Command::new("true");
+            // SAFETY: the hook only sleeps, holding the forked child before exec with the
+            // descriptors it inherited.
+            unsafe {
+                command.pre_exec(|| {
+                    std::thread::sleep(Duration::from_millis(1500));
+                    Ok(())
+                });
+            }
+            command.status().unwrap()
+        });
+        std::thread::sleep(Duration::from_millis(300));
+        drop(held);
+        let reacquired = Flock::exclusive_within(
+            open(&path),
+            Duration::from_millis(100),
+            Duration::from_millis(10),
+        );
+        assert!(forker.join().unwrap().success());
+        assert!(reacquired.unwrap().is_ok());
     }
 }

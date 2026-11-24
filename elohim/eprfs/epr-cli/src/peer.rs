@@ -343,14 +343,14 @@ pub fn peer_dir() -> PeerResult<PathBuf> {
 /// ends, however it ends).
 #[derive(Debug)]
 pub struct ServeLock {
-    file: std::fs::File,
+    held: elohim_device_runtime::flock::Flock,
 }
 
 impl ServeLock {
     /// The lock file's name inside the peer directory.
     pub const FILE_NAME: &'static str = "serve.lock";
 
-    /// Take the lock without waiting.
+    /// Take the lock after briefly allowing a momentary status probe to finish.
     ///
     /// # Errors
     ///
@@ -363,27 +363,18 @@ impl ServeLock {
             .create(true)
             .append(true)
             .open(&path)?;
-        // A status read (`epr device status`) probes this lock with a momentary shared flock. A
-        // few short retries keep that probe from reading as a live daemon to a starting `serve`;
-        // a real daemon holds it for its whole life, so the retries end in `Serving`.
-        let mut attempts = Self::CONTENDED_RETRIES;
-        loop {
-            match rustix::fs::flock(&file, rustix::fs::FlockOperation::NonBlockingLockExclusive) {
-                Ok(()) => return Ok(ServeLock { file }),
-                Err(errno) if errno == rustix::io::Errno::WOULDBLOCK && attempts > 0 => {
-                    attempts -= 1;
-                    std::thread::sleep(std::time::Duration::from_millis(20));
-                }
-                Err(errno) if errno == rustix::io::Errno::WOULDBLOCK => {
-                    return Err(PeerCliError::Serving(path))
-                }
-                Err(errno) => return Err(PeerCliError::Io(errno.into())),
-            }
+        // A status read (`epr device status`) probes this lock with a momentary shared flock.
+        // Brief patience keeps that probe from reading as a live daemon to a starting `serve`;
+        // a real daemon holds it for its whole life, so the wait ends in `Serving`.
+        match elohim_device_runtime::flock::Flock::exclusive_within(
+            file,
+            std::time::Duration::from_millis(5 * 20),
+            std::time::Duration::from_millis(20),
+        )? {
+            Ok(held) => Ok(ServeLock { held }),
+            Err(_) => Err(PeerCliError::Serving(path)),
         }
     }
-
-    /// Retries of a contended exclusive take before reporting `Serving` (20 ms apart).
-    const CONTENDED_RETRIES: u32 = 5;
 
     /// Record this process as the lock's holder (`<pid> <start time>`), so a second `serve`
     /// can name it. Written into the held file itself, which only the holder may rewrite.
@@ -398,8 +389,8 @@ impl ServeLock {
             &elohim_device_runtime::session::proc_root(),
             pid,
         );
-        self.file.set_len(0)?;
-        let mut file = &self.file;
+        self.held.file().set_len(0)?;
+        let mut file = self.held.file();
         match start {
             Some(start) => writeln!(file, "{pid} {start}")?,
             None => writeln!(file, "{pid}")?,
@@ -3388,6 +3379,35 @@ mod serve_lock_tests {
         lock.record_holder().unwrap();
         let text = std::fs::read_to_string(dir.path().join(ServeLock::FILE_NAME)).unwrap();
         assert_eq!(text, format!("{} {}\n", std::process::id(), own_start()));
+    }
+
+    /// Dropping the serving guard ends ownership even while a child forked by another thread is
+    /// paused before exec with its inherited descriptor copy.
+    #[cfg(unix)]
+    #[test]
+    fn a_serve_lock_ends_despite_a_forked_child() {
+        use std::os::unix::process::CommandExt;
+        use std::time::Duration;
+
+        let dir = tempfile::tempdir().unwrap();
+        let lock = ServeLock::acquire(dir.path()).unwrap();
+        let forker = std::thread::spawn(|| {
+            let mut command = std::process::Command::new("true");
+            // SAFETY: the hook only sleeps, holding the forked child before exec with the
+            // descriptors it inherited.
+            unsafe {
+                command.pre_exec(|| {
+                    std::thread::sleep(Duration::from_millis(1500));
+                    Ok(())
+                });
+            }
+            command.status().unwrap()
+        });
+        std::thread::sleep(Duration::from_millis(300));
+        drop(lock);
+        let reacquired = ServeLock::acquire(dir.path());
+        assert!(forker.join().unwrap().success());
+        assert!(reacquired.is_ok(), "{reacquired:?}");
     }
 
     #[test]
