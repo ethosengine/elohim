@@ -79,6 +79,9 @@ gate_step_reading
   assert.equal(rows.length, 1);
   assert.equal(rows[0].key, 'none: reason says "quoted" and \\ escaped');
   assert.equal(rows[0].value, 4);
+  assert.equal(rows[0].status, 'green');
+  assert.equal(rows[0].lease_waited_seconds, 0);
+  assert.equal(rows[0].synthesized, false);
 });
 
 test('pre-push leg helper is silent when GATE_READING=off', () => {
@@ -136,4 +139,26 @@ gate_step_reading
   assert.equal(steps.filter(step => step === 'leg:submodules').length, 1);
   assert.equal(outcomes.filter(outcome => outcome === 'ran').length, 1);
   assert.equal(outcomes.filter(outcome => outcome === 'skipped').length, 27);
+  assert.equal(rows.filter(row => row.synthesized).length, 27);
+  assert.equal(rows.find(row => row.step === 'leg:submodules').synthesized, false);
+});
+
+test('pre-push native append is hard-killed after its five-second budget', () => {
+  const fx = fixture();
+  writeFileSync(fx.epr, `#!/usr/bin/env bash
+trap '' TERM
+sleep 30
+`);
+  chmodSync(fx.epr, 0o755);
+  const started = Date.now();
+  const result = run(fx, `
+GATE_READING_SEEN=""
+GATE_READING_LEGS=$'fixture\\tnone\\treason'
+gate_step_reading 0 fixture ran 1 \
+  2026-11-24T12:00:00.000Z 2026-11-24T12:00:01.000Z
+gate_step_reading
+`);
+  assert.equal(result.status, 0);
+  assert.ok(Date.now() - started < 8000, `append took ${Date.now() - started}ms`);
+  assert.match(result.stderr, /pre-push readings unavailable \(exit (124|137)\)/);
 });

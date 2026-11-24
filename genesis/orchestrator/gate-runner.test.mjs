@@ -29,15 +29,18 @@ describe('gate step reading collector', () => {
     step: 'fixture',
     key: 'reason says \"quoted\" and \\ escaped',
     keyChanged: 'no',
+    status: 'green',
     seconds: 4.25,
     waitedSeconds: 1.5,
+    leaseWaitedSeconds: 0.75,
+    synthesized: false,
     startedAt: '2026-11-24T12:00:00.000Z',
     endedAt: '2026-11-24T12:00:06.000Z',
   };
 
-  for (const [outcome, seconds] of [['ran', 4.25], ['reused', 0], ['skipped', 0]]) {
+  for (const [outcome, seconds, status] of [['ran', 4.25, 'green'], ['reused', 0.125, 'green'], ['skipped', 0.05, 'none']]) {
     test(`builds the native ${outcome} JSON row`, () => {
-      const row = gateReadingRow({ ...base, outcome, seconds, at: base.endedAt });
+      const row = gateReadingRow({ ...base, outcome, seconds, status, at: base.endedAt });
       assert.deepEqual(row, {
         measure: 'gate-step-reading@1',
         value: seconds,
@@ -46,8 +49,11 @@ describe('gate step reading collector', () => {
         step: 'fixture',
         key: base.key,
         key_changed: 'no',
+        status,
         outcome,
         waited_seconds: 1.5,
+        lease_waited_seconds: 0.75,
+        synthesized: false,
         started_at: base.startedAt,
         ended_at: base.endedAt,
         at: base.endedAt,
@@ -68,9 +74,8 @@ describe('gate step reading collector', () => {
         return { status: 0 };
       },
     });
-    assert.equal(call.command, 'fixture-epr');
-    assert.deepEqual(call.args.slice(0, 3), ['flow', 'reading', 'append']);
-    assert.equal(call.options.timeout, 5000);
+    assert.equal(call.command, 'timeout');
+    assert.deepEqual(call.args.slice(0, 7), ['-k', '1', '5', 'fixture-epr', 'flow', 'reading', 'append']);
     const rows = call.rows.trim().split('\n').map(line => JSON.parse(line));
     assert.equal(rows.length, 2);
     assert.equal(rows[0].key, 'reason says "quoted" and \\ escaped');
@@ -85,6 +90,34 @@ describe('gate step reading collector', () => {
       warn: line => warnings.push(line),
     }));
     assert.deepEqual(warnings, ['[gate-reading] run readings unavailable (exit 9)\n']);
+  });
+
+  test('unwritable and unremovable telemetry scratch never throws', () => {
+    const row = gateReadingRow({ ...base, outcome: 'ran' });
+    for (const overrides of [
+      { makeScratch: () => { throw new Error('cannot create'); } },
+      { writeRows: () => { throw new Error('cannot write'); } },
+      { removeScratch: () => { throw new Error('cannot remove'); } },
+    ]) {
+      assert.doesNotThrow(() => appendGateReadings([row], {
+        root: ROOT,
+        env: { EPR_BIN: 'fixture-epr' },
+        spawn: () => ({ status: 0 }),
+        warn: () => {},
+        ...overrides,
+      }));
+    }
+  });
+
+  test('an unwritable pre-push scratch file cannot change the project verdict', () => {
+    const project = { name: 'fixture', dir: 'fixture', steps: ['build'], run: { kind: 'just', recipe: 'gate' } };
+    const status = runProject(project, false, false, {
+      root: ROOT,
+      env: { GATE_READING_ROWS: '/unwritable/rows.jsonl', GATE_READING_RUN_ID: 'push' },
+      spawn: () => ({ status: 23, stdout: '', stderr: '' }),
+      write: () => {},
+    });
+    assert.equal(status, 23);
   });
 
   test('GATE_READING=off suppresses collection and the native call', () => {
@@ -209,6 +242,30 @@ describe('gate expectations and feature-branch CI deferral', () => {
     assert.equal(result.readings[0].outcome, 'skipped');
     assert.equal(result.calls.filter(call => call.command === 'fixture-epr').length, 1,
       'only the existing cycle observation is spawned by runProject');
+  });
+
+  test('readings on and off leave selection, reuse decision, verdict and exit identical', t => {
+    const fx = fixture(t, { samples: [] });
+    const selected = selectGateProjects(loadGateRegistry(fx.root), 'fixture');
+    const run = reading => fx.run(selected[0], {
+      ...pushEnv,
+      GATE_DEFER: 'off',
+      GATE_EVIDENCE: 'reuse',
+      GATE_READING: reading,
+      GATE_READING_RUN_ID: 'equivalence',
+    });
+    const on = run('on');
+    const off = run('off');
+    assert.deepEqual(selected.map(project => project.name), ['fixture']);
+    assert.equal(on.status, off.status);
+    assert.equal(on.output, off.output);
+    assert.deepEqual(
+      on.calls.map(call => [call.command, call.args]),
+      off.calls.map(call => [call.command, call.args]),
+    );
+    assert.equal(on.readings.length, 1);
+    assert.equal(off.readings.length, 0);
+    assert.match(on.output, /not reused: project not enabled for reuse/);
   });
 
   for (const [name, gate, env, reason] of [
