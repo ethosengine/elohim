@@ -45,7 +45,9 @@ use url::Url;
 
 use crate::admission::{roster_rows_from_file, Admission};
 use crate::announce::{topic_for, Channel, HeadVerdict, REANNOUNCE_EVERY};
-use crate::blob_mount::{rfc3339_utc, BlobMount, DeviceScope, ServedDraw, SharedServePolicy};
+use crate::blob_mount::{
+    rfc3339_utc, BlobMount, DeviceScope, ServedDraw, SharedServePolicy, INDEX_RETRY_FIRST,
+};
 use crate::channel::{channel_tier_id, project_channel_with_nacks, ChannelStore};
 use crate::connections::ConnectionBook;
 use crate::endpoint::bind_on;
@@ -201,6 +203,10 @@ struct RunStats {
     store_parses: AtomicU64,
     #[cfg(feature = "testing")]
     index_flow_reads: AtomicU64,
+    #[cfg(feature = "testing")]
+    ticks: AtomicU64,
+    #[cfg(feature = "testing")]
+    fail_next_index_flow_read: std::sync::atomic::AtomicBool,
 }
 
 /// When a projection that failed is tried again. A projection re-parses the whole flow store, so a
@@ -451,6 +457,7 @@ impl PeerDaemon {
             indexed_once: false,
             index_task: None,
             index_retry_at: None,
+            index_retry_stamp: None,
             now,
             serves,
             fetch_task: None,
@@ -491,6 +498,20 @@ impl PeerDaemon {
     #[cfg(feature = "testing")]
     pub fn artifact_index_flow_reads(&self) -> u64 {
         self.stats.index_flow_reads.load(Ordering::Relaxed)
+    }
+
+    /// Completed daemon timer ticks in this run.
+    #[cfg(feature = "testing")]
+    pub fn ticks(&self) -> u64 {
+        self.stats.ticks.load(Ordering::Relaxed)
+    }
+
+    /// Make the next artifact-index flow read fail at its test seam.
+    #[cfg(feature = "testing")]
+    pub fn fail_next_artifact_index_flow_read(&self) {
+        self.stats
+            .fail_next_index_flow_read
+            .store(true, Ordering::Relaxed);
     }
 
     /// Run until the loop ends. It ends on its own only for a reason worth a non-zero exit.
@@ -636,9 +657,29 @@ fn index_rebuild_due(
     indexed_once: bool,
     stamp_unchanged: bool,
     retry_at: Option<Instant>,
+    retry_stamp_unchanged: bool,
     now: Instant,
 ) -> bool {
-    !indexed_once || !stamp_unchanged || retry_at.is_some_and(|at| now >= at)
+    match retry_at {
+        Some(at) if retry_stamp_unchanged => now >= at,
+        Some(_) => true,
+        None => !indexed_once || !stamp_unchanged,
+    }
+}
+
+fn index_retry_due(now: Instant, mount_retry_due: Option<Instant>) -> Instant {
+    let first = now + INDEX_RETRY_FIRST;
+    mount_retry_due.map_or(first, |due| due.min(first))
+}
+
+fn index_retry_after_rebuild(
+    failed: bool,
+    now: Instant,
+    mount_retry_due: Option<Instant>,
+) -> Option<Instant> {
+    failed
+        .then(|| index_retry_due(now, mount_retry_due))
+        .or(mount_retry_due)
 }
 
 /// Where the channel store is, by canonical path (as given when a path cannot be resolved).
@@ -727,6 +768,9 @@ struct Run {
     /// When a rebuild next falls due with no change to the log, so a manifest whose backoff has
     /// run out is tried again.
     index_retry_at: Option<Instant>,
+    /// The uncommitted log stamp whose retry deadline is in `index_retry_at`. A later log change
+    /// bypasses that deadline; a failed read never becomes `index_stamp`.
+    index_retry_stamp: Option<Stamp>,
     /// Clock shared by the artifact rebuild and its retry-due decision.
     now: Arc<dyn Fn() -> Instant + Send + Sync>,
     /// The serve policy the tier's scope reads; replaced when the rules reload, `None` while the
@@ -758,6 +802,8 @@ impl Run {
             tokio::select! {
                 _ = &mut stopped => break Ok(()),
                 _ = tick.tick() => {
+                    #[cfg(feature = "testing")]
+                    self.stats.ticks.fetch_add(1, Ordering::Relaxed);
                     let now = Instant::now();
                     if receiver.is_none() && stream_retry.due(now) {
                         match self.resubscribe().await {
@@ -1224,7 +1270,9 @@ impl Run {
             .is_some_and(JoinHandle::is_finished)
         {
             if let Some(task) = self.index_task.take() {
-                match task.await {
+                let result = task.await;
+                let failed = result.is_err();
+                match result {
                     Ok(unindexed) => {
                         for error in unindexed {
                             self.log(&error.to_string());
@@ -1232,7 +1280,9 @@ impl Run {
                     }
                     Err(e) => self.log(&format!("artifact index rebuild failed: {e}")),
                 }
-                self.index_retry_at = mount.next_retry_due();
+                self.index_retry_at =
+                    index_retry_after_rebuild(failed, (self.now)(), mount.next_retry_due());
+                self.index_retry_stamp = self.index_retry_at.map(|_| self.index_stamp);
             }
         }
         if self.index_task.is_some() {
@@ -1245,25 +1295,42 @@ impl Run {
             self.indexed_once,
             now == self.index_stamp,
             self.index_retry_at,
+            self.index_retry_stamp.as_ref() == Some(&now),
             rebuild_at,
         ) {
             return;
         }
-        // Settled per state of the log, failed or not: the next append is the next try.
-        self.index_stamp = now;
-        self.indexed_once = true;
-        self.index_retry_at = None;
         #[cfg(feature = "testing")]
         self.stats.index_flow_reads.fetch_add(1, Ordering::Relaxed);
-        let events = match self.flow.events() {
+        #[cfg(feature = "testing")]
+        let forced_read_error = self
+            .stats
+            .fail_next_index_flow_read
+            .swap(false, Ordering::Relaxed);
+        #[cfg(not(feature = "testing"))]
+        let forced_read_error = false;
+        let read = if forced_read_error {
+            Err("forced test read error".to_string())
+        } else {
+            self.flow.events().map_err(|error| error.to_string())
+        };
+        let events = match read {
             Ok(events) => events,
             Err(e) => {
                 self.log(&format!(
                     "artifacts not indexed: the flow store failed: {e}"
                 ));
+                self.index_retry_at = Some(index_retry_due(rebuild_at, mount.next_retry_due()));
+                self.index_retry_stamp = Some(now);
                 return;
             }
         };
+        // The stamp describes a flow state that was actually read. A failed read remains due even
+        // when the log does not move again.
+        self.index_stamp = now;
+        self.indexed_once = true;
+        self.index_retry_at = None;
+        self.index_retry_stamp = None;
         self.index_task = Some(tokio::spawn(async move {
             mount.rebuild_from_flow_at(&events, rebuild_at).await
         }));
@@ -1934,11 +2001,12 @@ mod tests {
     #[test]
     fn unchanged_index_without_a_manifest_retry_never_becomes_due() {
         let now = Instant::now();
-        assert!(!index_rebuild_due(true, true, None, now));
+        assert!(!index_rebuild_due(true, true, None, false, now));
         assert!(!index_rebuild_due(
             true,
             true,
             None,
+            false,
             now + Duration::from_secs(24 * 60 * 60)
         ));
     }
@@ -1962,6 +2030,28 @@ mod tests {
         release.send(()).expect("release daemon task");
         wait_for_task(&mut task).await.expect("join daemon task");
         assert!(task.is_none(), "a completed wait consumes the join handle");
+    }
+
+    #[tokio::test]
+    async fn a_panicked_or_cancelled_index_rebuild_schedules_a_retry() {
+        let panicked = tokio::spawn(async { panic!("forced index panic") }).await;
+        let cancelled = tokio::spawn(std::future::pending::<()>());
+        cancelled.abort();
+        let cancelled = cancelled.await;
+        let now = Instant::now();
+        let earlier = now + INDEX_RETRY_FIRST / 2;
+
+        for result in [panicked, cancelled] {
+            assert!(result.is_err());
+            assert_eq!(
+                index_retry_after_rebuild(result.is_err(), now, None),
+                Some(now + INDEX_RETRY_FIRST)
+            );
+            assert_eq!(
+                index_retry_after_rebuild(result.is_err(), now, Some(earlier)),
+                Some(earlier)
+            );
+        }
     }
 
     fn delays(first: Duration) -> Vec<Duration> {

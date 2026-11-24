@@ -1001,6 +1001,59 @@ fn observer_presence_cannot_replace_or_clear_an_away_ruling() {
     }
 }
 
+#[test]
+fn a_recorded_gap_carries_presence_from_the_last_non_observer_event() {
+    let rulings = [
+        AwayRuling {
+            id: "away-owned".into(),
+            expires_at: None,
+        },
+        AwayRuling {
+            id: "away-observer".into(),
+            expires_at: None,
+        },
+    ];
+
+    for observer_ruling in [Some("away-observer"), None] {
+        let dir = tempfile::tempdir().unwrap();
+        let session_dir = dir.path().join("s1");
+        fs::create_dir_all(&session_dir).unwrap();
+        let mut owned = ev(1, 0, "turn-ended", json!({"outcome": "accomplished"}));
+        owned["presence"] = json!({"disposition": "automated", "basis": {
+            "lastWitnessedAgeSeconds": 0.0, "rulingRef": "away-owned"
+        }});
+        let mut outside = observed(2, 10, Some(10));
+        outside["presence"] = json!({"disposition": "collaborative", "basis": {
+            "lastWitnessedAgeSeconds": null, "rulingRef": observer_ruling
+        }});
+        write_lines(&session_dir.join("events.jsonl"), &[owned, outside]);
+
+        assert!(record_inert(
+            dir.path(),
+            "s1",
+            "main",
+            "policy-unpinned",
+            &clock(20),
+            1 << 20,
+        )
+        .unwrap());
+        let replay = journal::replay(dir.path(), "s1").unwrap();
+        let gap = replay.events.last().unwrap();
+        assert_eq!(gap.kind, EventKind::ObservationGap);
+        assert_eq!(gap.presence.disposition, Disposition::Automated);
+        assert_eq!(gap.presence.ruling_ref.as_deref(), Some("away-owned"));
+
+        let policy = StasisPolicy::builtin();
+        let c = classifier();
+        let fold = fold_session(
+            &replay,
+            &FoldOptions::new(at(20), Selection::All, true, &policy, &c).with_rulings(&rulings),
+        );
+        assert_eq!(fold.presence.disposition, Disposition::Automated);
+        assert_eq!(fold.presence.ruling_ref.as_deref(), Some("away-owned"));
+    }
+}
+
 // --- Rungs, consultations and budgets -------------------------------------------------------
 
 #[test]

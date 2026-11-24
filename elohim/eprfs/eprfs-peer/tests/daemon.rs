@@ -11,7 +11,7 @@ use std::time::{Duration, Instant};
 use elohim_epr_rea::{ParticipantRow, SidecarRoster};
 use eprfs_peer::{
     via_device, CrossingAllowList, HeadTable, PeerConfig, PeerDaemon, PeerKey, Rules,
-    INDEX_RETRY_FIRST, TICK,
+    INDEX_RETRY_FIRST,
 };
 use futures_lite::StreamExt;
 use support::{
@@ -1052,10 +1052,60 @@ async fn put_artifact_with_method(
 }
 
 async fn assert_index_reads_stay(daemon: &PeerDaemon, expected: u64) {
-    for _ in 0..4 {
-        tokio::time::sleep(TICK).await;
-        assert_eq!(daemon.artifact_index_flow_reads(), expected);
-    }
+    let until = daemon.ticks() + 4;
+    eventually("four artifact-index ticks pass", || daemon.ticks() >= until).await;
+    assert_eq!(daemon.artifact_index_flow_reads(), expected);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn daemon_retries_an_artifact_index_flow_read_error_without_a_log_change() {
+    let b = device("DeviceB", 2);
+    let key_dir = tempfile::tempdir().expect("key dir");
+    let key = load_key(key_dir.path());
+    let rows = vec![genesis(&b), endpoint_row(&b, &b, &key)];
+    let side = Side::new(&rows);
+    let payload_dir = tempfile::tempdir().expect("payload dir");
+    let payload =
+        eprfs_peer::open_payload_store(&payload_dir.path().join("payload")).expect("payload store");
+    let start = Instant::now();
+    let clock = Arc::new(Mutex::new(start));
+    let clock_for_daemon = clock.clone();
+    let mut cfg = config(
+        &b,
+        &b.did,
+        key,
+        &side,
+        &[&b],
+        Vec::new(),
+        local(free_port()),
+    );
+    cfg.payload_store = Some(payload);
+    let daemon = PeerDaemon::start_with_clock(
+        cfg,
+        Arc::new(move || *clock_for_daemon.lock().expect("clock")),
+    )
+    .await
+    .expect("daemon starts");
+
+    eventually("the initial artifact index reads the flow log", || {
+        daemon.artifact_index_flow_reads() == 1
+    })
+    .await;
+    daemon.fail_next_artifact_index_flow_read();
+    side.checkout
+        .append(berth_event("claim", "cargo", "sa", "1.0"));
+    eventually("the changed log read fails", || {
+        daemon.artifact_index_flow_reads() == 2
+    })
+    .await;
+    assert_index_reads_stay(&daemon, 2).await;
+
+    *clock.lock().expect("clock") = start + INDEX_RETRY_FIRST + Duration::from_secs(1);
+    let until = daemon.ticks() + 4;
+    eventually("four retry-due ticks pass", || daemon.ticks() >= until).await;
+    assert_eq!(daemon.artifact_index_flow_reads(), 3);
+
+    daemon.shutdown().await;
 }
 
 #[tokio::test(flavor = "multi_thread")]
