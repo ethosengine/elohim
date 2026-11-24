@@ -28,7 +28,7 @@ import { recipeKeyShadow } from './gate-recipe-key.mjs';
 import { CLAIMED_EXIT_CODE, runAttested } from './gate-attest.mjs';
 import { affectedPackages, loadMetadata, metadataToolchain } from './cargo-affected.mjs';
 import { isReadPattern, SUITE_READ_LISTS, readSet } from './gate-input-audit.mjs';
-import { crateKeys } from './crate-keys.mjs';
+import { crateKeys, EPRFS_RECIPE_STEP_COVERAGE } from './crate-keys.mjs';
 import { appendEvent, closeRun, formatHarvest, harvest, openRun, outlook, resolveSession, stopRequested } from './gate-live.mjs';
 import { emitLive, formatRow, onRedPolicy, runPreflight } from './gate-preflight.mjs';
 import { prepareTask, readTaskStatus, taskAnswer, taskEnabled } from './gate-task.mjs';
@@ -516,6 +516,50 @@ function oneLine(value) {
   return String(value ?? '').replace(/[\r\n]+/g, ' ').trim();
 }
 
+class ShadowBudgetExhausted extends Error {
+  constructor(budgetMs, phase) {
+    super(`budget ${budgetMs} ms exhausted in ${phase}`);
+    this.name = 'ShadowBudgetExhausted';
+  }
+}
+
+function crateShadowBudget(env, clock) {
+  const declared = String(env.GATE_CRATE_SHADOW_BUDGET_MS ?? '').trim();
+  const configured = declared ? Number(declared) : Number.NaN;
+  const budgetMs = Number.isFinite(configured) && configured >= 0 ? Math.floor(configured) : 15_000;
+  let deadline = null;
+  let exhausted = null;
+  const now = () => Number(clock()) / 1e6;
+  const remaining = phase => {
+    if (exhausted) throw exhausted;
+    const current = now();
+    deadline ??= current + budgetMs;
+    const left = deadline - current;
+    if (left <= 0) {
+      exhausted = new ShadowBudgetExhausted(budgetMs, phase);
+      throw exhausted;
+    }
+    return left;
+  };
+  return {
+    budgetMs,
+    check: remaining,
+    spawn(run, phase, command, args, options = {}) {
+      const left = remaining(phase);
+      const timeout = Math.min(options.timeout ?? Infinity, left);
+      const result = run(command, args, { ...options, timeout });
+      remaining(phase);
+      return result;
+    },
+  };
+}
+
+function dropCrateShadow(project, error, state, write) {
+  if (state.dropped) return;
+  state.dropped = true;
+  write(`[gate] ${project} crate-shadow: dropped (${oneLine(error?.message || error)}); no crate rows\n`);
+}
+
 function rfc3339(value) {
   try {
     const date = new Date(value);
@@ -588,11 +632,13 @@ export function parseStepTimes(text) {
   return steps;
 }
 
-/** One gate-step reading per recorded step, plus apportioned per-crate shadow rows when present. */
+/** One gate-step reading per recorded step, plus all-or-nothing per-crate shadow rows when present. */
 export function emitStepReadings(project, reading, text, {
   env = process.env, collector, crateContext = null,
+  crateShadowState = { dropped: false }, write = line => process.stdout.write(line),
 } = {}) {
-  for (const step of parseStepTimes(text)) {
+  const steps = parseStepTimes(text);
+  for (const step of steps) {
     const parent = `${project}:${step.name}`;
     const seconds = step.ended - step.started;
     emitGateReading({
@@ -608,13 +654,21 @@ export function emitStepReadings(project, reading, text, {
       startedAt: new Date(step.started * 1000),
       endedAt: new Date(step.ended * 1000),
     }, { env, collector });
-    if (!crateContext) continue;
-    try {
+  }
+  if (!crateContext || crateShadowState.dropped) return;
+
+  const crateRows = [];
+  try {
+    for (const step of steps) {
+      if (project !== 'eprfs' || EPRFS_RECIPE_STEP_COVERAGE[step.name] !== 'workspace') continue;
+      const parent = `${project}:${step.name}`;
+      crateContext.budget?.check('crate keys');
       const keys = crateKeys({ ...crateContext, step: parent });
+      crateContext.budget?.check('crate keys');
       const crates = Object.entries(keys);
       if (crates.length === 0) continue;
       for (const [crate, key] of crates) {
-        emitGateReading({
+        crateRows.push({
           ...reading,
           step: `${parent}:${crate}`,
           parent,
@@ -625,12 +679,18 @@ export function emitStepReadings(project, reading, text, {
           synthesized: false,
           waitedSeconds: 0,
           leaseWaitedSeconds: 0,
-          seconds: seconds / crates.length,
+          seconds: 0,
           startedAt: new Date(step.started * 1000),
           endedAt: new Date(step.ended * 1000),
-        }, { env, collector });
+        });
       }
-    } catch { /* per-crate shadow telemetry never changes a gate verdict */ }
+    }
+  } catch (error) {
+    dropCrateShadow(project, error, crateShadowState, write);
+    return;
+  }
+  for (const row of crateRows) {
+    emitGateReading(row, { env, collector });
   }
 }
 
@@ -677,12 +737,14 @@ export function appendGateReadings(rows, {
   }
 }
 
-function crateKeyContext({ root, project, cargo, metadata, commit, childEnv, readsOf, spawn }) {
+function crateKeyContext({ root, project, cargo, metadata, commit, childEnv, readsOf, spawn, budget }) {
   if (!metadata || !metadataToolchain(metadata)) return null;
+  budget.check('crate context');
+  const run = (phase, command, args, options) => budget.spawn(spawn, phase, command, args, options);
   // The keys read the gated commit's trees; the recipe ran on this checkout. They describe what ran
   // only when the checkout is that commit and the crates' trees are clean: otherwise a green would
   // be recorded under a key for code that never ran, so no crate row is written at all.
-  const head = spawn('git', ['rev-parse', '--verify', '--quiet', 'HEAD^{commit}'], { cwd: root, encoding: 'utf8' });
+  const head = run('crate context', 'git', ['rev-parse', '--verify', '--quiet', 'HEAD^{commit}'], { cwd: root, encoding: 'utf8' });
   if (head?.status !== 0 || String(head.stdout || '').trim() !== commit) return null;
   const repoPath = path => relative(root, resolve(path)).split('\\').join('/') || '.';
   const memberIds = new Set(metadata.workspace_members || []);
@@ -691,23 +753,24 @@ function crateKeyContext({ root, project, cargo, metadata, commit, childEnv, rea
     .map(pkg => repoPath(dirname(pkg.manifest_path)));
   if (members.length !== memberIds.size) return null;
   const workspaceDir = (cargo.workspace || project.dir).replace(/\/$/, '');
-  const status = spawn('git', ['status', '--porcelain', '--untracked-files=all', '--', workspaceDir, ...members], {
+  const status = run('crate context', 'git', ['status', '--porcelain', '--untracked-files=all', '--', workspaceDir, ...members], {
     cwd: root, encoding: 'utf8',
   });
   if (status?.status !== 0 || String(status.stdout || '').trim()) return null;
-  const objectAt = path => {
-    const result = spawn('git', ['rev-parse', '--verify', '--quiet', `${commit}:${path}`], {
+  const objectAt = (path, phase = 'crate context') => {
+    const result = run(phase, 'git', ['rev-parse', '--verify', '--quiet', `${commit}:${path}`], {
       cwd: root, encoding: 'utf8',
     });
     return result?.status === 0 ? String(result.stdout || '').trim() || null : null;
   };
   const workspace = cargo.workspace || project.dir;
   const lockPath = `${workspace.replace(/\/$/, '')}/Cargo.lock`;
-  const lock = spawn('git', ['show', `${commit}:${lockPath}`], { cwd: root, encoding: 'utf8' });
+  const lock = run('crate context', 'git', ['show', `${commit}:${lockPath}`], { cwd: root, encoding: 'utf8' });
   if (lock?.status !== 0) return null;
   const lockDigest = createHash('sha256').update(String(lock.stdout || '')).digest('hex');
   const readPaths = new Set();
   for (const member of members) {
+    budget.check('read set');
     const reads = readsOf
       ? readsOf(member)
       : readSet({ root, project, sources: [`${member}/**`] }).paths;
@@ -718,17 +781,22 @@ function crateKeyContext({ root, project, cargo, metadata, commit, childEnv, rea
   }
   const outside = [...readPaths].sort().map(path => ({
     path,
-    oid: isReadPattern(path) ? patternDigest(root, commit, path, spawn) : objectAt(path),
+    oid: isReadPattern(path)
+      ? patternDigest(root, commit, path,
+        (command, args, options) => run('crate context', command, args, options))
+      : objectAt(path),
   }));
   const outsideReadsDigest = createHash('sha256').update(JSON.stringify(outside)).digest('hex');
+  budget.check('crate context');
   const rustflags = Object.hasOwn(cargo, 'rustflags') ? cargo.rustflags : (childEnv.RUSTFLAGS ?? null);
   return {
     metadata,
-    treeOf: dir => objectAt(repoPath(dir)),
+    treeOf: dir => objectAt(repoPath(dir), 'crate keys'),
     toolchain: metadataToolchain(metadata),
     lockDigest,
     outsideReadsDigest,
     cargoEnv: { ...cargoEnvOf(childEnv), RUSTFLAGS: rustflags },
+    budget,
   };
 }
 
@@ -905,7 +973,22 @@ export function runProject(project, printOnly, namesOnly, {
   delete childEnv.GATE_CARGO_PACKAGES;
   const narrowProjects = loadPoolPolicy(root).gate_narrow?.projects;
   const crateShadowEligible = Array.isArray(narrowProjects) && narrowProjects.includes(project.name);
+  const shadowBudget = crateShadowBudget(env, clock);
+  const crateShadowState = { dropped: false };
+  const readsCache = new Map();
+  const memberReads = dir => {
+    shadowBudget.check('read set');
+    if (!readsCache.has(dir)) {
+      const reads = readsOf
+        ? readsOf(dir)
+        : readSet({ root, project, sources: [`${dir}/**`] }).paths;
+      shadowBudget.check('read set');
+      readsCache.set(dir, reads);
+    }
+    return readsCache.get(dir);
+  };
   let narrowMetadata = null;
+  const crateShadowDiscoveryStarted = clock();
   if (crateShadowEligible) {
     const mode = ['off', 'shadow', 'on'].includes(env.GATE_NARROW) ? env.GATE_NARROW : 'shadow';
     // `on` is refused until gate evidence keys a per-package verdict: the evidence store keys the
@@ -929,17 +1012,30 @@ export function runProject(project, printOnly, namesOnly, {
         delete metadataEnv.CARGO_TARGET_DIR;
         if (Object.hasOwn(cargo, 'rustflags')) metadataEnv.RUSTFLAGS = cargo.rustflags;
         narrowMetadata = loadMetadata({ root, workspaceDir,
-          spawn: (command, argv, options) => spawn(command, argv, { ...options, env: metadataEnv }),
+          spawn: (command, argv, options) => shadowBudget.spawn(
+            spawn, 'metadata', command, argv, { ...options, env: metadataEnv },
+          ),
         });
-      } catch { /* A telemetry discovery miss keeps the full workspace and emits no crate rows. */ }
+        shadowBudget.check('metadata');
+      } catch (error) {
+        if (error instanceof ShadowBudgetExhausted) {
+          dropCrateShadow(project.name, error, crateShadowState, write);
+        }
+        // A telemetry discovery miss keeps the full workspace and emits no crate rows.
+      }
     }
     if (files && mode === 'off') selection.why = 'narrowing disabled';
     else if (files) {
       try {
+        if (narrowMetadata) shadowBudget.check('affected packages');
         selection = affectedPackages({ root, workspaceDir, files, metadata: narrowMetadata,
-          readsOf: readsOf || (dir => readSet({ root, sources: [`${dir}/**`] }).paths),
+          readsOf: memberReads,
         });
+        if (narrowMetadata) shadowBudget.check('affected packages');
       } catch (error) {
+        if (error instanceof ShadowBudgetExhausted) {
+          dropCrateShadow(project.name, error, crateShadowState, write);
+        }
         selection = { packages: null, why: `narrowing unavailable (${String(error?.message || error).split('\n')[0]})` };
       }
     }
@@ -948,6 +1044,7 @@ export function runProject(project, printOnly, namesOnly, {
       ? `full workspace — ${why}`
       : `${packages.join(' ')} (${packages.length} of ${narrowMetadata.workspace_members.length} members)`}\n`);
   }
+  started += clock() - crateShadowDiscoveryStarted;
   // Evidence by input closure (gate-evidence.mjs): has THIS closure — the step's declared
   // input bytes at the pushed commit, the recipe, the resolved cargo env — already been
   // gated, by whom, and when? Reuse requires an audited project and either this workspace's
@@ -1170,14 +1267,19 @@ export function runProject(project, printOnly, namesOnly, {
   }
   const crateShadowStarted = clock();
   let crateContext = null;
-  if (crateShadowEligible && env.GATE_READING !== 'off' && stepTimes.trim()) {
+  if (crateShadowEligible && !crateShadowState.dropped && env.GATE_READING !== 'off' && stepTimes.trim()) {
     try {
       crateContext = crateKeyContext({
-        root, project, cargo, metadata: narrowMetadata, commit: gateCommit, childEnv, readsOf, spawn,
+        root, project, cargo, metadata: narrowMetadata, commit: gateCommit, childEnv,
+        readsOf: memberReads, spawn, budget: shadowBudget,
       });
-    } catch { /* per-crate shadow telemetry never changes a gate verdict */ }
+    } catch (error) {
+      dropCrateShadow(project.name, error, crateShadowState, write);
+    }
   }
-  emitStepReadings(project.name, reading, stepTimes, { env, collector: readingCollector, crateContext });
+  emitStepReadings(project.name, reading, stepTimes, {
+    env, collector: readingCollector, crateContext, crateShadowState, write,
+  });
   started += clock() - crateShadowStarted;
   // The exit status is the verdict; what the tap recognized only classifies it. For a suite's named
   // half the verdict comes from the attempt's written result, never the status alone (suiteDecision).

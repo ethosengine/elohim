@@ -1,6 +1,6 @@
 import { describe, test } from 'node:test';
 import { strict as assert } from 'node:assert';
-import { crateKeys } from './crate-keys.mjs';
+import { crateKeys, EPRFS_RECIPE_STEP_COVERAGE } from './crate-keys.mjs';
 
 function metadata(order = ['leaf', 'mid', 'top', 'unrelated']) {
   const deps = { leaf: [], mid: ['leaf'], top: ['mid'], unrelated: [] };
@@ -31,6 +31,13 @@ function keys(overrides = {}) {
 }
 
 describe('per-crate verdict keys', () => {
+  test('the eprfs recipe coverage attributes only workspace-wide steps', () => {
+    assert.deepEqual(EPRFS_RECIPE_STEP_COVERAGE, {
+      fmt: 'workspace', precheck: null, lint: 'workspace', bins: null, ark: null, test: 'workspace',
+    });
+    assert.equal(EPRFS_RECIPE_STEP_COVERAGE.unknown, undefined);
+  });
+
   test('changing a leaf moves it and its reverse dependencies, but not an unrelated crate', () => {
     const before = keys();
     const after = keys({ trees: { leaf: 'leaf-b' } });

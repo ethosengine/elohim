@@ -14,6 +14,8 @@
 //! - `ran` seconds exclude the cost lookup, the input shadow and final evidence recording, while
 //!   `reused` seconds include them (gate-runner.mjs), so ran and reused time are not like for like.
 //! - Pre-push leg seconds are whole seconds (bash `SECONDS`).
+//! - A crate row's seconds are `0` by construction. The crate-shadow report evenly apportions
+//!   its parent step's measured seconds; no per-crate duration is measured or stored.
 //! - A torn tail (a write cut off before its newline) is joined by the next append and the joined
 //!   line fails to parse, so the next row can be lost with it.
 //! - An ordinary skipped row records near-zero time and can still be named the step that set the
@@ -161,6 +163,7 @@ impl ReadingRow {
                 .map(|parent| parent.trim().to_string()),
             key: self.key.trim().to_string(),
             key_changed: self.key_changed,
+            status: self.status,
             outcome: self.outcome,
             seconds: nonnegative(self.value),
             waited_seconds: nonnegative(self.waited_seconds),
@@ -179,6 +182,7 @@ struct ReadingObservation {
     parent: Option<String>,
     key: String,
     key_changed: KeyChanged,
+    status: Status,
     outcome: Outcome,
     seconds: f64,
     waited_seconds: f64,
@@ -538,7 +542,8 @@ fn crate_shadow_lines(rows: &[ReadingObservation], run_id: Option<&str>) -> Vec<
     }
     grouped
         .into_iter()
-        .map(|(parent, mut crates)| {
+        .filter_map(|(parent, mut crates)| {
+            let parent_row = run_rows.iter().find(|row| row.step == parent)?;
             crates.sort_by(|a, b| a.0.cmp(b.0));
             let unchanged = crates
                 .iter()
@@ -553,13 +558,22 @@ fn crate_shadow_lines(rows: &[ReadingObservation], run_id: Option<&str>) -> Vec<
                     .collect::<Vec<_>>()
                     .join(", ")
             };
-            let saved = nonnegative(unchanged.iter().map(|(_, row)| row.seconds).sum::<f64>());
-            let total = nonnegative(crates.iter().map(|(_, row)| row.seconds).sum::<f64>());
-            format!(
-                "[crate-shadow] {parent}: {} of {} crates unchanged since their last green ({names}); ≈{saved:.3} s of {total:.3} s would have been saved (apportioned), decides nothing",
+            let total = nonnegative(parent_row.seconds);
+            let all_green = parent_row.status == Status::Green
+                && crates.iter().all(|(_, row)| row.status == Status::Green);
+            if !all_green {
+                return Some(format!(
+                    "[crate-shadow] {parent}: {} of {} crates unchanged against the newest retained green row of the same step name ({names}); step red, nothing would have been saved, decides nothing",
+                    unchanged.len(),
+                    crates.len()
+                ));
+            }
+            let saved = total * unchanged.len() as f64 / crates.len() as f64;
+            Some(format!(
+                "[crate-shadow] {parent}: {} of {} crates unchanged against the newest retained green row of the same step name ({names}); ≈{saved:.3} s of the step's {total:.3} s, an even apportionment not measured per crate, decides nothing",
                 unchanged.len(),
                 crates.len()
-            )
+            ))
         })
         .collect()
 }
@@ -1016,6 +1030,7 @@ mod tests {
             parent: None,
             key: key.into(),
             key_changed,
+            status: Status::Green,
             outcome,
             seconds,
             waited_seconds,
@@ -1344,36 +1359,37 @@ mod tests {
     }
 
     #[test]
-    fn crate_shadow_counts_only_unchanged_keys_and_sums_apportioned_shares() {
+    fn crate_shadow_apportions_parent_seconds_across_unchanged_green_crates() {
         let root = declared_root();
-        let crate_row = |run: &str, parent: &str, name: &str, key: &str, seconds: f64| {
+        let crate_row = |run: &str, parent: &str, name: &str, key: &str| {
             let mut row = stored_row(run, &format!("{parent}:{name}"), key);
             row.parent = Some(parent.into());
-            row.value = seconds;
+            row.value = 0.0;
             row
         };
-        let step_row = |run: &str, step: &str| {
+        let step_row = |run: &str, step: &str, seconds: f64| {
             let mut row = stored_row(run, step, "step-key");
             row.parent = Some("eprfs".into());
+            row.value = seconds;
             row
         };
         append_rows(
             &root,
             &[
-                step_row("baseline", "eprfs:fmt"),
-                crate_row("baseline", "eprfs:fmt", "alpha", "alpha-a", 2.0),
-                crate_row("baseline", "eprfs:fmt", "beta", "beta-a", 2.0),
-                step_row("baseline", "eprfs:test"),
-                crate_row("baseline", "eprfs:test", "delta", "delta-a", 3.0),
+                step_row("baseline", "eprfs:fmt", 4.0),
+                crate_row("baseline", "eprfs:fmt", "alpha", "alpha-a"),
+                crate_row("baseline", "eprfs:fmt", "beta", "beta-a"),
+                step_row("baseline", "eprfs:test", 3.0),
+                crate_row("baseline", "eprfs:test", "delta", "delta-a"),
             ],
         );
         let mut current = vec![
-            step_row("current", "eprfs:fmt"),
-            crate_row("current", "eprfs:fmt", "alpha", "alpha-a", 2.0),
-            crate_row("current", "eprfs:fmt", "beta", "beta-b", 2.0),
-            crate_row("current", "eprfs:fmt", "gamma", "gamma-a", 2.0),
-            step_row("current", "eprfs:test"),
-            crate_row("current", "eprfs:test", "delta", "delta-a", 3.0),
+            step_row("current", "eprfs:fmt", 6.0),
+            crate_row("current", "eprfs:fmt", "alpha", "alpha-a"),
+            crate_row("current", "eprfs:fmt", "beta", "beta-b"),
+            crate_row("current", "eprfs:fmt", "gamma", "gamma-a"),
+            step_row("current", "eprfs:test", 3.0),
+            crate_row("current", "eprfs:test", "delta", "delta-a"),
         ];
         for row in &mut current {
             row.started_at = "2026-11-24T13:00:00Z".into();
@@ -1385,16 +1401,42 @@ mod tests {
         assert_eq!(
             crate_shadow(root.path(), None).unwrap(),
             [
-                "[crate-shadow] eprfs:fmt: 1 of 3 crates unchanged since their last green (alpha); ≈2.000 s of 6.000 s would have been saved (apportioned), decides nothing",
-                "[crate-shadow] eprfs:test: 1 of 1 crates unchanged since their last green (delta); ≈3.000 s of 3.000 s would have been saved (apportioned), decides nothing",
+                "[crate-shadow] eprfs:fmt: 1 of 3 crates unchanged against the newest retained green row of the same step name (alpha); ≈2.000 s of the step's 6.000 s, an even apportionment not measured per crate, decides nothing",
+                "[crate-shadow] eprfs:test: 1 of 1 crates unchanged against the newest retained green row of the same step name (delta); ≈3.000 s of the step's 3.000 s, an even apportionment not measured per crate, decides nothing",
             ]
         );
         assert_eq!(
             crate_shadow(root.path(), Some("baseline")).unwrap(),
             [
-                "[crate-shadow] eprfs:fmt: 0 of 2 crates unchanged since their last green (none); ≈0.000 s of 4.000 s would have been saved (apportioned), decides nothing",
-                "[crate-shadow] eprfs:test: 0 of 1 crates unchanged since their last green (none); ≈0.000 s of 3.000 s would have been saved (apportioned), decides nothing",
+                "[crate-shadow] eprfs:fmt: 0 of 2 crates unchanged against the newest retained green row of the same step name (none); ≈0.000 s of the step's 4.000 s, an even apportionment not measured per crate, decides nothing",
+                "[crate-shadow] eprfs:test: 0 of 1 crates unchanged against the newest retained green row of the same step name (none); ≈0.000 s of the step's 3.000 s, an even apportionment not measured per crate, decides nothing",
             ]
+        );
+    }
+
+    #[test]
+    fn crate_shadow_reports_no_savings_for_a_red_step() {
+        let root = declared_root();
+        let mut baseline_parent = stored_row("baseline", "eprfs:fmt", "step-key");
+        baseline_parent.parent = Some("eprfs".into());
+        let mut baseline_crate = stored_row("baseline", "eprfs:fmt:alpha", "alpha-key");
+        baseline_crate.parent = Some("eprfs:fmt".into());
+        baseline_crate.value = 0.0;
+        append_rows(&root, &[baseline_parent, baseline_crate]);
+
+        let mut red_parent = stored_row("red", "eprfs:fmt", "step-key");
+        red_parent.parent = Some("eprfs".into());
+        red_parent.status = Status::Red;
+        red_parent.value = 8.0;
+        let mut red_crate = stored_row("red", "eprfs:fmt:alpha", "alpha-key");
+        red_crate.parent = Some("eprfs:fmt".into());
+        red_crate.status = Status::Red;
+        red_crate.value = 0.0;
+        append_rows(&root, &[red_parent, red_crate]);
+
+        assert_eq!(
+            crate_shadow(root.path(), Some("red")).unwrap(),
+            ["[crate-shadow] eprfs:fmt: 1 of 1 crates unchanged against the newest retained green row of the same step name (alpha); step red, nothing would have been saved, decides nothing"]
         );
     }
 
