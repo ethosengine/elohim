@@ -45,9 +45,7 @@ use url::Url;
 
 use crate::admission::{roster_rows_from_file, Admission};
 use crate::announce::{topic_for, Channel, HeadVerdict, REANNOUNCE_EVERY};
-use crate::blob_mount::{
-    rfc3339_utc, BlobMount, DeviceScope, ServedDraw, SharedServePolicy, INDEX_RETRY_FIRST,
-};
+use crate::blob_mount::{rfc3339_utc, BlobMount, DeviceScope, ServedDraw, SharedServePolicy};
 use crate::channel::{channel_tier_id, project_channel_with_nacks, ChannelStore};
 use crate::connections::ConnectionBook;
 use crate::endpoint::bind_on;
@@ -605,6 +603,15 @@ type Stamp = Option<(u64, SystemTime)>;
 fn stamp(path: &std::path::Path) -> Stamp {
     let meta = std::fs::metadata(path).ok()?;
     Some((meta.len(), meta.modified().ok()?))
+}
+
+fn index_rebuild_due(
+    indexed_once: bool,
+    stamp_unchanged: bool,
+    retry_at: Option<Instant>,
+    now: Instant,
+) -> bool {
+    !indexed_once || !stamp_unchanged || retry_at.is_some_and(|at| now >= at)
 }
 
 /// Where the channel store is, by canonical path (as given when a path cannot be resolved).
@@ -1194,6 +1201,7 @@ impl Run {
                     }
                     Err(e) => self.log(&format!("artifact index rebuild failed: {e}")),
                 }
+                self.index_retry_at = mount.next_retry_due();
             }
         }
         if self.index_task.is_some() {
@@ -1201,14 +1209,18 @@ impl Run {
         }
         let now = stamp(self.flow.log_path());
         // A rebuild also falls due when a failed manifest's backoff may have run out.
-        let retry_due = self.index_retry_at.is_some_and(|at| Instant::now() >= at);
-        if self.indexed_once && now == self.index_stamp && !retry_due {
+        if !index_rebuild_due(
+            self.indexed_once,
+            now == self.index_stamp,
+            self.index_retry_at,
+            Instant::now(),
+        ) {
             return;
         }
         // Settled per state of the log, failed or not: the next append is the next try.
         self.index_stamp = now;
         self.indexed_once = true;
-        self.index_retry_at = Some(Instant::now() + INDEX_RETRY_FIRST);
+        self.index_retry_at = None;
         let events = match self.flow.events() {
             Ok(events) => events,
             Err(e) => {
@@ -1868,6 +1880,18 @@ fn roster_named_nodes(rows: &[ParticipantRow], chain_root: &str) -> Vec<String> 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn unchanged_index_without_a_manifest_retry_never_becomes_due() {
+        let now = Instant::now();
+        assert!(!index_rebuild_due(true, true, None, now));
+        assert!(!index_rebuild_due(
+            true,
+            true,
+            None,
+            now + Duration::from_secs(24 * 60 * 60)
+        ));
+    }
 
     #[tokio::test]
     async fn cancelling_wait_keeps_the_daemon_task_joinable() {
