@@ -57,6 +57,10 @@ GATE_READING_ROWS=""
 [ "${GATE_READING-}" = off ] || GATE_READING_DIR=$(mktemp -d 2>/dev/null || true)
 [ -z "$GATE_READING_DIR" ] || GATE_READING_ROWS="$GATE_READING_DIR/rows.jsonl"
 export GATE_READING_ROWS
+# Under a push the hook owns the one append, even when its scratch file could not be made: a runner
+# that sees GATE_READING_PUSH never appends on its own, and the hook reports the drop once.
+GATE_READING_PUSH=1
+export GATE_READING_PUSH
 GATE_READING_LEGS=$'submodules\tnone\tchecked-out submodule worktrees and gitlink state\nsecurity-paydown\tnone\tpushed commit trees, origin/dev when used as fallback, working-tree policy/checker bytes, SECURITY_PAYDOWN and host Python\nrust-style\tnone\tpushed commit trees, origin/dev when used as fallback, working-tree policy bytes, Rust ownership state and host tools\ninput-policy\tnone\tthe Brit executable/capabilities, input policy, mode and device state\nfleet-roll\tnone\tpushed ref ranges/commit messages, destination objects, committed manifests/fleet policy and Node version\ndoc-cut\tnone\tpushed ref ranges, destination/pushed document blobs and commit messages, committed guard bytes and Node version\npackage-projections\tnone\tthe committed package tree, generated runtime projections, projector bytes and Node version\nhook-boundary-tests\tnone\tthe working-tree hook/tests, host Python/Git behavior and temporary-repository state\nhabit-register\tnone\tcommitted habit atoms/manifests, projector/library, generated register and Python version\nagentic-library-harnesses\tnone\tthe working-tree governance library/harnesses, HARNESS_JOBS, host tools and temporary-repository state\nci-ignore\tnone\tthe pushed changed-path union, committed .ci-ignore/parser bytes and Node version\nelohim-agent-test\tnone\tthe working-tree agent manifest/schema workspace, pnpm/Node and installed dependencies\nproject-selection\tnone\tworking-tree build manifests, pushed changed paths/gitlinks, Brit oracle/capability and device gate-cost state\npreflight\tnone\tselected project closures/prerequisites, working-tree policy, device/pool state and installed tools\nhumans-presences\tnone\tworking-tree human/presence sources and generated JSON, pnpm/Node and installed seeder dependencies\ncid-artifacts\tnone\tworking-tree content sources/generated twins, pnpm/Node and installed seeder dependencies\ndevice-archetypes\tnone\tworking-tree device sources/generated JSON, pnpm/Node and installed seeder dependencies\ndeployments-conformance\tnone\tworking-tree deployments/human manifests/budgets/validator, pnpm/Node and installed dependencies\nruntime-manifest-pins\tnone\tworking-tree runtime manifests/generated resources/Cargo sources, pool state and installed Rust toolchain/dependencies\naccount-packages\tnone\tworking-tree account packages/human sources/schema, pnpm/Node and installed seeder dependencies\nci-ignore-freshness\tnone\tworking-tree root compose manifest, projector/generated .ci-ignore and Python version\nepr-meta-compose\tnone\tthe pushed range, moving origin/dev, working-tree compose policy/scripts, EPR_META_ACK and host Python/Git\nt2-receipt\tnone\tpushed changed paths, working-tree mtimes/reports, device validation refs and T2_RECEIPT\nsweettest\tnone\tselected projects, push destinations and SKIP_SWEETTEST/RUN_SWEETTEST overrides\nresource-check\tnone\tdevice volume pressure, working-tree pool policy/tools, live cargo state and resource overrides\nepr-landing\tnone\tthe pushed dev head, gate selection, working-tree binaries and mutable device bin-store/head state\nbrit-advisory\tnone\tmoving origin/dev, repository object/integrity state, Brit executable/device state and BRIT_ADVISORY\nhandover-record\tnone\tall pushed refs, gate verdicts and mutable native hand-over/device state'
 
 gate_reading_lookup() {
@@ -104,19 +108,22 @@ gate_step_reading() {
     GATE_READING_FINALIZED=1
     [ "${GATE_READING-}" != off ] || return 0
     if [ -z "$GATE_READING_ROWS" ] || [ ! -s "$GATE_READING_ROWS" ]; then
-      echo "[gate-reading] pre-push readings unavailable (scratch file was not created)" >&2
+      echo "[gate-reading] pre-push readings dropped (scratch file was not created)" >&2
       [ -z "$GATE_READING_DIR" ] || rm -rf -- "$GATE_READING_DIR" 2>/dev/null || true
       return 0
     fi
     reading_epr="${EPR_BIN:-epr}"
+    local reading_emit_err=""
     if command -v timeout >/dev/null 2>&1; then
-      timeout -k 1s 5s "$reading_epr" flow reading append --from "$GATE_READING_ROWS" --root "$HOOK_WORK_TREE" >/dev/null 2>&1
+      # stdout is the verb's summary; stderr carries its one-line reason, kept for the drop line.
+      reading_emit_err=$(timeout -k 1s 5s "$reading_epr" flow reading append --from "$GATE_READING_ROWS" --root "$HOOK_WORK_TREE" 2>&1 >/dev/null)
       reading_emit_status=$?
     else
       reading_emit_status=127
     fi
     if [ "$reading_emit_status" -ne 0 ]; then
-      echo "[gate-reading] pre-push readings unavailable (exit $reading_emit_status)" >&2
+      reading_emit_err=${reading_emit_err%%$'\n'*}
+      echo "[gate-reading] pre-push readings dropped (exit $reading_emit_status${reading_emit_err:+: $reading_emit_err})" >&2
     fi
     [ -z "$GATE_READING_DIR" ] || rm -rf -- "$GATE_READING_DIR" 2>/dev/null || true
     return 0
