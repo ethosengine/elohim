@@ -173,7 +173,7 @@ describe('gate-runner package environment', () => {
     rmSync(dirname(live), { recursive: true, force: true });
     assert.equal(leaked, false, 'a fixture gate appended to the inherited live run');
   });
-  test('shadow clears inherited packages; on passes the selected packages to the probe recipe', () => {
+  test('shadow and off clear inherited packages; on is refused before anything runs or records', () => {
     const root = mkdtempSync(resolve(tmpdir(), 'cargo-affected-'));
     mkdirSync(resolve(root, 'genesis/agentic'), { recursive: true });
     writeFileSync(resolve(root, 'genesis/agentic/pool-policy.json'), JSON.stringify({ gate_narrow: { projects: ['eprfs'] } }));
@@ -184,7 +184,7 @@ describe('gate-runner package environment', () => {
     writeFileSync(resolve(root, 'justfile'), '_gate-selftest-env:\n    @echo "GATE_CARGO_PACKAGES=[${GATE_CARGO_PACKAGES-<unset>}]"\n');
     const project = { name: 'eprfs', dir: 'ws', run: { kind: 'root-just', recipe: '_gate-selftest-env' } };
     try {
-      for (const mode of ['shadow', 'on', 'off', undefined, 'unknown']) {
+      for (const mode of ['shadow', 'off', undefined, 'unknown']) {
         let output = '';
         let probe;
         let childEnv;
@@ -209,31 +209,30 @@ describe('gate-runner package environment', () => {
           },
         });
         assert.equal(status, 0, probe?.stderr || output);
-        if (mode === 'on') {
-          assert.equal(childEnv.GATE_CARGO_PACKAGES, 'leaf mid');
-          assert.match(probe.stdout, /GATE_CARGO_PACKAGES=\[leaf mid\]/);
-        } else {
-          assert.equal(Object.hasOwn(childEnv, 'GATE_CARGO_PACKAGES'), false);
-          assert.match(probe.stdout, /GATE_CARGO_PACKAGES=\[<unset>\]/);
-        }
+        assert.equal(Object.hasOwn(childEnv, 'GATE_CARGO_PACKAGES'), false);
+        assert.match(probe.stdout, /GATE_CARGO_PACKAGES=\[<unset>\]/);
         assert.match(output, mode === 'off' ? /narrow \(off\): full workspace — narrowing disabled/
-          : /narrow \((?:shadow|on)\): leaf mid \(2 of 4 members\)/);
+          : /narrow \(shadow\): leaf mid \(2 of 4 members\)/);
       }
+      // `on` is refused whatever the push base: no metadata, no recipe, no evidence lookup or record.
       for (const inputs of [
+        { GATE_NARROW_BASE: 'ok', GATE_CHANGED_FILES: changed },
         {}, { GATE_NARROW_BASE: 'none', GATE_CHANGED_FILES: changed },
         { GATE_NARROW_BASE: 'ok' }, { GATE_NARROW_BASE: 'ok', GATE_CHANGED_FILES: resolve(root, 'missing') },
       ]) {
         let output = '';
+        const spawned = [];
         assert.equal(runProject(project, false, false, {
-          root, env: { ...inputs, GATE_NARROW: 'on', GATE_CARGO_PACKAGES: 'stale' },
+          root, readsOf: () => [],
+          env: { ...process.env, GATE_LIVE_RUN: '', ...inputs, GATE_NARROW: 'on', GATE_CARGO_PACKAGES: 'stale' },
           write: text => { output += text; },
-          spawn: (command, args, options) => {
-            assert.notEqual(command, 'cargo', 'no metadata without a real base');
-            if (command === 'bash') assert.equal(Object.hasOwn(options.env, 'GATE_CARGO_PACKAGES'), false);
-            return { status: 0, stdout: '' };
-          },
-        }), 0);
-        assert.match(output, /narrow \(on\): full workspace — no push base/);
+          spawn: (command, args) => { spawned.push([command, ...args].join(' ')); return { status: 0, stdout: '' }; },
+        }), 2);
+        assert.deepEqual(spawned, [], 'a refused narrowing spawns nothing');
+        const lines = output.split('\n').filter(Boolean);
+        assert.equal(lines.filter(line => /REFUSED/.test(line)).length, 1, output);
+        assert.match(lines.at(-1), /^\[gate\] eprfs REFUSED GATE_NARROW=on: .*per-package verdict key.*GATE_NARROW=shadow/,
+          'the refusal is one line and the last thing the gate says');
       }
     } finally {
       rmSync(root, { recursive: true, force: true });
