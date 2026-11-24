@@ -5,6 +5,7 @@ Run: python3 -m unittest discover -s .claude/hooks/tests -p test_sibling_miss_in
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -35,9 +36,8 @@ class Harness(unittest.TestCase):
     """The real hook against a stub epr that serves `misses.json` and counts its calls."""
 
     def setUp(self):
-        tmp = tempfile.TemporaryDirectory()
-        self.addCleanup(tmp.cleanup)
-        self.root = Path(tmp.name)
+        self.root = Path(tempfile.mkdtemp())
+        self.addCleanup(self._remove_root)
         self.project = self.root / 'project'
         self.project.mkdir()
         self.misses = self.root / 'misses.json'
@@ -63,6 +63,19 @@ class Harness(unittest.TestCase):
                     'SIBLING_MISS_EPR_BIN': str(self.epr), 'SIBLING_MISS_POLL_S': '0',
                     'EPR_BIN': str(self.epr), 'TMPDIR': str(self.root)}
         self.transcript = self.root / 'transcript.jsonl'
+
+    def _remove_root(self):
+        """A failed read starts its observation detached (it never delays the tool call), so a
+        stub note may still be writing here when a test ends: retry until the writer is done."""
+        for _ in range(50):
+            try:
+                shutil.rmtree(self.root)
+                return
+            except FileNotFoundError:
+                return
+            except OSError:
+                time.sleep(0.1)
+        shutil.rmtree(self.root, ignore_errors=True)
 
     def serve(self, rows):
         self.misses.write_text(json.dumps(rows))
