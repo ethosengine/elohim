@@ -4,15 +4,22 @@
 # "ascend-only": a dataplane change is pushed only after the household mesh has seen it).
 #
 # Serving changes require every station of the household story that witnesses them, on the
-# current source (a signed validation attestation, else a sprint-report file).
+# current source (a signed validation attestation, else a sprint-report file), when the push
+# names refs/heads/dev or refs/heads/main (steward ruling 2026-11-24: refuse only at dev and main).
+# A push to any other ref (a self/ hand-over, a feature branch) prints one line naming the
+# receipt still owed before dev and passes. Without --targets, or with an empty or unreadable
+# list, the receipt is mandatory: a caller that cannot say where the push goes is refused as if
+# it went to dev.
 # Other dataplane changes retain the advisory recency receipt unless --strict.
 #
-# usage: t2-receipt.sh --changed <file: one repo-relative path per line> [--reports <dir>] [--strict]
+# usage: t2-receipt.sh --changed <file: one repo-relative path per line> [--reports <dir>]
+#                      [--targets <file: one pushed remote ref per line>] [--strict]
 set -u
-CHANGED_FILE=""; REPORTS_DIR=""; STRICT="${T2_RECEIPT:-}"
+CHANGED_FILE=""; REPORTS_DIR=""; TARGETS_FILE=""; STRICT="${T2_RECEIPT:-}"
 while [ $# -gt 0 ]; do
   case "$1" in
     --changed) CHANGED_FILE="$2"; shift 2 ;;
+    --targets) TARGETS_FILE="$2"; shift 2 ;;
     --reports) REPORTS_DIR="$2"; shift 2 ;;
     --strict) STRICT=strict; shift ;;
     *) echo "t2-receipt: unknown arg $1" >&2; exit 2 ;;
@@ -21,6 +28,15 @@ done
 [ -n "$CHANGED_FILE" ] && [ -r "$CHANGED_FILE" ] || { echo "t2-receipt: --changed <file> required" >&2; exit 2; }
 REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 REPORTS_DIR="${REPORTS_DIR:-$REPO_ROOT/genesis/a2o/reports}"
+
+# Integration push: one of the pushed refs is dev or main, or the targets are unknown.
+INTEGRATION=1
+if [ -n "$TARGETS_FILE" ] && [ -r "$TARGETS_FILE" ] && grep -q '[^[:space:]]' "$TARGETS_FILE"; then
+  INTEGRATION=0
+  while IFS= read -r target_ref; do
+    case "$target_ref" in refs/heads/dev | refs/heads/main) INTEGRATION=1 ;; esac
+  done < "$TARGETS_FILE"
+fi
 
 # The paths whose behaviour only the household mesh can witness (T2 in the ladder).
 # SERVING_RE paths are mandatory whatever T2_RECEIPT says. serving-receipt.mjs owns which household
@@ -42,6 +58,17 @@ serving_touched=$(printf '%s\n' "$candidates" | grep -E "$SERVING_RE" || true)
 if [ -n "$serving_touched" ]; then
   serving_list=$(mktemp)
   printf '%s\n' "$serving_touched" > "$serving_list"
+  if [ "$INTEGRATION" -eq 0 ]; then
+    # Not dev or main: the receipt is owed, not refused. Its own lines collapse into one.
+    # stdout (the receipt it found) passes through; stderr is read for the stories still owed.
+    { receipt_err=$(node "$REPO_ROOT/genesis/orchestrator/scripts/serving-receipt.mjs" "$REPO_ROOT" "$REPORTS_DIR" "$serving_list" 2>&1 1>&3 3>&-); receipt_rc=$?; } 3>&1
+    rm -f "$serving_list"
+    [ "$receipt_rc" -eq 0 ] && exit 0
+    owed=$(printf '%s\n' "$receipt_err" | sed -n 's/^\[pre-push\] missing household receipt — produce it: //p' | paste -sd ';' - | sed 's/;/; /g')
+    [ -n "$owed" ] || owed="the serving receipt could not be read ($(printf '%s\n' "$receipt_err" | grep -m1 . | sed 's/^\[pre-push\] //'))"
+    echo "[pre-push] serving receipt owed before dev (this push does not reach dev or main, so it is not refused): $owed"
+    exit 0
+  fi
   node "$REPO_ROOT/genesis/orchestrator/scripts/serving-receipt.mjs" "$REPO_ROOT" "$REPORTS_DIR" "$serving_list"
   receipt_rc=$?
   rm -f "$serving_list"
