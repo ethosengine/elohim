@@ -365,7 +365,7 @@ describe('gate step reading collector', () => {
     ]);
   });
 
-  function timedCrateRun({ budgetMs, cargoAdvanceNs }) {
+  function timedCrateRun({ budgetMs, cargoAdvanceNs, rustcAdvanceNs = 0n, recipeAdvanceNs = 0n, injectReads = true }) {
     const root = mkdtempSync(resolve(tmpdir(), 'crate-shadow-budget-'));
     const rows = resolve(root, 'rows.jsonl');
     const changed = resolve(root, 'changed.txt');
@@ -389,7 +389,10 @@ describe('gate step reading collector', () => {
     const output = [];
     const spawn = (command, args, options = {}) => {
       calls.push({ command, args, options });
-      if (command === 'rustc') return { status: 0, stdout: 'rustc fixture\nhost: fixture-host\n' };
+      if (command === 'rustc') {
+        now += rustcAdvanceNs;
+        return { status: 0, stdout: 'rustc fixture\nhost: fixture-host\n' };
+      }
       if (command === 'cargo') {
         now += cargoAdvanceNs;
         return { status: 0, stdout: JSON.stringify(metadata) };
@@ -403,6 +406,7 @@ describe('gate step reading collector', () => {
       if (command === 'bash' && String(args[0]).endsWith('/rust-style.sh')) return { status: 0 };
       if (command === 'bash' && String(args[0]).endsWith('/run-local-gate.sh')) {
         writeFileSync(options.env.GATE_STEP_TIMES, 'fmt\t0\t1795500000\t1795500002\n');
+        now += recipeAdvanceNs;
         return { status: 7, stdout: '', stderr: '' };
       }
       return { status: 0, stdout: '', stderr: '' };
@@ -416,7 +420,7 @@ describe('gate step reading collector', () => {
         GATE_CRATE_SHADOW_BUDGET_MS: String(budgetMs),
       },
       spawn, clock: () => now, write: line => output.push(line),
-      readsOf: () => { readScans += 1; return ['fixtures/shared.json']; },
+      readsOf: injectReads ? () => { readScans += 1; return ['fixtures/shared.json']; } : undefined,
     });
     const readings = readFileSync(rows, 'utf8').trim().split('\n').filter(Boolean).map(line => JSON.parse(line));
     return { root, rows, status, calls, output, readings, readScans };
@@ -451,6 +455,45 @@ describe('gate step reading collector', () => {
         'parent rows still emit');
       assert.equal(result.calls.find(call => call.command === 'cargo').options.timeout, 10,
         'the shared remainder caps the metadata spawn timeout');
+    } finally {
+      rmSync(result.root, { recursive: true, force: true });
+    }
+  });
+
+  test('the recipe between the shadow spans spends none of the shadow budget', () => {
+    // Ten minutes of recipe against a one-second budget: only shadow work counts, so the crate
+    // rows written after the recipe survive (review of v3: the deadline ran through the gate).
+    const result = timedCrateRun({ budgetMs: 1000, cargoAdvanceNs: 0n, recipeAdvanceNs: 600_000_000_000n });
+    try {
+      assert.equal(result.status, 7);
+      assert.deepEqual(result.output.filter(line => line.includes('crate-shadow: dropped')), []);
+      assert.equal(result.readings.filter(row => row.step === 'eprfs:fmt:member').length, 1);
+    } finally {
+      rmSync(result.root, { recursive: true, force: true });
+    }
+  });
+
+  test('a fractional remainder reaches spawnSync as a whole millisecond', () => {
+    // 2.5 ms spent in rustc leaves 7.5 ms of a 10 ms budget; Node rejects a fractional timeout.
+    const result = timedCrateRun({ budgetMs: 10, cargoAdvanceNs: 0n, rustcAdvanceNs: 2_500_000n });
+    try {
+      const timeouts = result.calls.filter(call => Number.isFinite(call.options?.timeout))
+        .map(call => call.options.timeout);
+      assert.ok(timeouts.length > 0);
+      assert.ok(timeouts.every(value => Number.isInteger(value) && value >= 1), String(timeouts));
+      assert.equal(result.calls.find(call => call.command === 'cargo').options.timeout, 7);
+    } finally {
+      rmSync(result.root, { recursive: true, force: true });
+    }
+  });
+
+  test('member scans list the repository once, under the shadow budget', () => {
+    const result = timedCrateRun({ budgetMs: 60_000, cargoAdvanceNs: 0n, injectReads: false });
+    try {
+      const listings = result.calls.filter(call => call.command === 'git' && call.args[0] === 'ls-files');
+      assert.equal(listings.length, 1, 'one listing serves selection and the crate context');
+      assert.ok(Number.isInteger(listings[0].options.timeout) && listings[0].options.timeout <= 60_000,
+        'the listing subprocess carries the remaining budget as its timeout');
     } finally {
       rmSync(result.root, { recursive: true, force: true });
     }
