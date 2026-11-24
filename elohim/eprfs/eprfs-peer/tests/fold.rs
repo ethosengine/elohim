@@ -4,6 +4,7 @@
 mod support;
 
 use std::collections::{HashMap, HashSet};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
@@ -24,7 +25,7 @@ use eprfs_peer::{
     TierRequest, CHANNEL_EVENTS, FOLD_BATCH_EVENTS, TIER_ALPN,
 };
 use futures_lite::StreamExt;
-use iroh::endpoint::Connection;
+use iroh::endpoint::{Connection, VarInt};
 use iroh::protocol::{AcceptError, ProtocolHandler, Router};
 use iroh::{Endpoint, NodeAddr};
 use support::{berth_event, household, loopback, policy, Checkout, Household, HANDLE};
@@ -186,6 +187,17 @@ fn test_channel(events: Vec<FlowEvent>, nacks: Vec<(String, NackLeaf)>) -> TestC
     }
 }
 
+fn ordered_event_cids(tree: &TestChannel) -> Vec<Cid> {
+    tree.listing(CHANNEL_EVENTS)
+        .entries
+        .into_iter()
+        .map(|entry| {
+            let name = String::from_utf8(entry.name).expect("event name");
+            Cid::try_from(name.as_str()).expect("event cid")
+        })
+        .collect()
+}
+
 type StubAnswer = dyn Fn(&TierRequest) -> TierAnswer + Send + Sync;
 
 #[derive(Clone)]
@@ -203,34 +215,121 @@ impl std::fmt::Debug for StubTier {
 
 impl ProtocolHandler for StubTier {
     async fn accept(&self, connection: Connection) -> Result<(), AcceptError> {
+        let mut streams = tokio::task::JoinSet::new();
         while let Ok((mut send, mut recv)) = connection.accept_bi().await {
-            let Ok(frame) = recv.read_to_end(16 * 1024 * 1024).await else {
-                continue;
-            };
-            if frame.len() < 4 {
-                continue;
-            }
-            let Ok(request) = serde_ipld_dagcbor::from_slice::<TierRequest>(&frame[4..]) else {
-                continue;
-            };
-            self.requests
-                .lock()
-                .expect("request log")
-                .push(request.clone());
-            if matches!(request, TierRequest::Read { .. }) {
-                match self.read_delay {
-                    Some(delay) => tokio::time::sleep(delay).await,
-                    None => std::future::pending().await,
+            let tier = self.clone();
+            streams.spawn(async move {
+                let Ok(frame) = recv.read_to_end(16 * 1024 * 1024).await else {
+                    return;
+                };
+                if frame.len() < 4 {
+                    return;
                 }
-            }
-            let answer = (self.answer)(&request);
-            let body = serde_ipld_dagcbor::to_vec(&answer).expect("answer frame");
-            let len = u32::try_from(body.len()).expect("small answer");
-            let mut frame = len.to_be_bytes().to_vec();
-            frame.extend_from_slice(&body);
-            let _ = send.write_all(&frame).await;
-            let _ = send.finish();
+                let Ok(request) = serde_ipld_dagcbor::from_slice::<TierRequest>(&frame[4..]) else {
+                    return;
+                };
+                tier.requests
+                    .lock()
+                    .expect("request log")
+                    .push(request.clone());
+                if matches!(request, TierRequest::Read { .. }) {
+                    match tier.read_delay {
+                        Some(delay) => tokio::time::sleep(delay).await,
+                        None => std::future::pending().await,
+                    }
+                }
+                let answer = (tier.answer)(&request);
+                let body = serde_ipld_dagcbor::to_vec(&answer).expect("answer frame");
+                let len = u32::try_from(body.len()).expect("small answer");
+                let mut frame = len.to_be_bytes().to_vec();
+                frame.extend_from_slice(&body);
+                let _ = send.write_all(&frame).await;
+                let _ = send.finish();
+            });
+            while streams.try_join_next().is_some() {}
         }
+        while streams.join_next().await.is_some() {}
+        Ok(())
+    }
+}
+
+type StubDelay = dyn Fn(&TierRequest) -> Duration + Send + Sync;
+
+#[derive(Clone)]
+struct ScriptedStubTier {
+    answer: Arc<StubAnswer>,
+    delay: Arc<StubDelay>,
+    busy_remaining: Arc<AtomicUsize>,
+    active_reads: Arc<AtomicUsize>,
+    peak_reads: Arc<AtomicUsize>,
+}
+
+impl std::fmt::Debug for ScriptedStubTier {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ScriptedStubTier").finish_non_exhaustive()
+    }
+}
+
+struct ActiveRead(Arc<AtomicUsize>);
+
+impl Drop for ActiveRead {
+    fn drop(&mut self) {
+        self.0.fetch_sub(1, Ordering::SeqCst);
+    }
+}
+
+impl ProtocolHandler for ScriptedStubTier {
+    async fn accept(&self, connection: Connection) -> Result<(), AcceptError> {
+        let mut streams = tokio::task::JoinSet::new();
+        while let Ok((mut send, mut recv)) = connection.accept_bi().await {
+            let tier = self.clone();
+            streams.spawn(async move {
+                let Ok(frame) = recv.read_to_end(16 * 1024 * 1024).await else {
+                    return;
+                };
+                if frame.len() < 4 {
+                    return;
+                }
+                let Ok(request) = serde_ipld_dagcbor::from_slice::<TierRequest>(&frame[4..]) else {
+                    return;
+                };
+                if matches!(request, TierRequest::Read { .. })
+                    && tier
+                        .busy_remaining
+                        .try_update(Ordering::SeqCst, Ordering::SeqCst, |remaining| {
+                            remaining.checked_sub(1)
+                        })
+                        .is_ok()
+                {
+                    let busy = VarInt::from_u32(2);
+                    let _ = recv.stop(busy);
+                    let _ = send.reset(busy);
+                    return;
+                }
+                let active = matches!(request, TierRequest::Read { .. }).then(|| {
+                    let active = tier.active_reads.fetch_add(1, Ordering::SeqCst) + 1;
+                    tier.peak_reads.fetch_max(active, Ordering::SeqCst);
+                    ActiveRead(Arc::clone(&tier.active_reads))
+                });
+                let delay = (tier.delay)(&request);
+                if !delay.is_zero() {
+                    tokio::select! {
+                        () = tokio::time::sleep(delay) => {}
+                        _ = send.stopped() => return,
+                    }
+                }
+                let answer = (tier.answer)(&request);
+                let body = serde_ipld_dagcbor::to_vec(&answer).expect("answer frame");
+                let len = u32::try_from(body.len()).expect("small answer");
+                let mut frame = len.to_be_bytes().to_vec();
+                frame.extend_from_slice(&body);
+                let _ = send.write_all(&frame).await;
+                let _ = send.finish();
+                drop(active);
+            });
+            while streams.try_join_next().is_some() {}
+        }
+        while streams.join_next().await.is_some() {}
         Ok(())
     }
 }
@@ -254,6 +353,56 @@ async fn mount_stub(key: &eprfs_peer::PeerKey, tier: StubTier) -> MountedStub {
     let addr = loopback(&endpoint);
     let router = Router::builder(endpoint).accept(TIER_ALPN, tier).spawn();
     MountedStub { router, addr }
+}
+
+async fn mount_scripted_stub(key: &eprfs_peer::PeerKey, tier: ScriptedStubTier) -> MountedStub {
+    let endpoint = bind(key, None, vec![TIER_ALPN.to_vec()])
+        .await
+        .expect("bind scripted stub");
+    let addr = loopback(&endpoint);
+    let router = Router::builder(endpoint).accept(TIER_ALPN, tier).spawn();
+    MountedStub { router, addr }
+}
+
+fn scripted_stub(
+    tree: TestChannel,
+    delay: Arc<StubDelay>,
+    busy: usize,
+) -> (ScriptedStubTier, Arc<AtomicUsize>, Arc<AtomicUsize>) {
+    let active_reads = Arc::new(AtomicUsize::new(0));
+    let peak_reads = Arc::new(AtomicUsize::new(0));
+    (
+        ScriptedStubTier {
+            answer: Arc::new(move |request| tree.answer(request)),
+            delay,
+            busy_remaining: Arc::new(AtomicUsize::new(busy)),
+            active_reads: Arc::clone(&active_reads),
+            peak_reads: Arc::clone(&peak_reads),
+        },
+        active_reads,
+        peak_reads,
+    )
+}
+
+async fn connect_stub(h: &Household, mounted: &MountedStub) -> (Endpoint, Connection) {
+    let endpoint = bind(&h.key_a, None, vec![]).await.expect("bind A");
+    let connection =
+        tokio::time::timeout(WITHIN, endpoint.connect(mounted.addr.clone(), TIER_ALPN))
+            .await
+            .expect("connects in time")
+            .expect("connects");
+    (endpoint, connection)
+}
+
+async fn wait_for_idle(active: &AtomicUsize) {
+    tokio::time::timeout(Duration::from_secs(1), async {
+        while active.load(Ordering::SeqCst) != 0 {
+            tokio::task::yield_now().await;
+            tokio::time::sleep(Duration::from_millis(1)).await;
+        }
+    })
+    .await
+    .expect("stub returns to idle");
 }
 
 async fn mount_gossip_stub(key: &eprfs_peer::PeerKey, tier: StubTier) -> MountedGossipStub {
@@ -793,6 +942,441 @@ async fn a_generous_deadline_keeps_a_full_batch_then_relists_only_unheld_events(
     assert_eq!(folded_from(&checkout.store(), &h.b.did).unwrap(), expected);
 
     a.close().await;
+    mounted.router.shutdown().await.expect("shutdown");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn read_window_one_preserves_the_sequential_long_channel_result() {
+    let h = household();
+    let events: Vec<_> = (0..70)
+        .map(|seq| berth_event("note", "-", "window-one", &seq.to_string()))
+        .collect();
+    let by_cid: HashMap<_, _> = events
+        .iter()
+        .cloned()
+        .map(|event| (atom_cid(&event).expect("event cid"), event))
+        .collect();
+    let tree = test_channel(events, vec![]);
+    let expected: Vec<_> = ordered_event_cids(&tree)
+        .into_iter()
+        .map(|cid| ChannelEvent {
+            cid,
+            event: by_cid[&cid].clone(),
+        })
+        .collect();
+    let served = tree.clone();
+    let mounted = mount_stub(
+        &h.key_b,
+        StubTier {
+            answer: Arc::new(move |request| served.answer(request)),
+            requests: Arc::new(Mutex::new(Vec::new())),
+            read_delay: Some(Duration::ZERO),
+        },
+    )
+    .await;
+    let (endpoint, connection) = connect_stub(&h, &mounted).await;
+
+    let fetched = fetch_channel(
+        &connection,
+        None,
+        &tree.root,
+        &HashSet::new(),
+        &TreeLimits::default(),
+        &FoldLimits {
+            read_window: 1,
+            ..FoldLimits::default()
+        },
+    )
+    .await
+    .expect("window one fetches");
+    assert_eq!(
+        fetched,
+        eprfs_peer::Fetched {
+            events: expected,
+            complete: true,
+            ..eprfs_peer::Fetched::default()
+        }
+    );
+
+    drop(connection);
+    endpoint.close().await;
+    mounted.router.shutdown().await.expect("shutdown");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn read_window_eight_matches_window_one_in_listing_order() {
+    let h = household();
+    let events: Vec<_> = (0..70)
+        .map(|seq| berth_event("note", "-", "window-equal", &seq.to_string()))
+        .collect();
+    let tree = test_channel(events, vec![]);
+    let expected = ordered_event_cids(&tree);
+    let served = tree.clone();
+    let mounted = mount_stub(
+        &h.key_b,
+        StubTier {
+            answer: Arc::new(move |request| served.answer(request)),
+            requests: Arc::new(Mutex::new(Vec::new())),
+            read_delay: Some(Duration::ZERO),
+        },
+    )
+    .await;
+    let (endpoint, connection) = connect_stub(&h, &mounted).await;
+    let known = HashSet::new();
+    let tree_limits = TreeLimits::default();
+    let one_limits = FoldLimits {
+        read_window: 1,
+        ..FoldLimits::default()
+    };
+    let eight_limits = FoldLimits {
+        read_window: 8,
+        ..FoldLimits::default()
+    };
+
+    let one = fetch_channel(
+        &connection,
+        None,
+        &tree.root,
+        &known,
+        &tree_limits,
+        &one_limits,
+    )
+    .await
+    .expect("window one");
+    let eight = fetch_channel(
+        &connection,
+        None,
+        &tree.root,
+        &known,
+        &tree_limits,
+        &eight_limits,
+    )
+    .await
+    .expect("window eight");
+    assert_eq!(one, eight);
+    assert_eq!(
+        eight
+            .events
+            .iter()
+            .map(|event| event.cid)
+            .collect::<Vec<_>>(),
+        expected
+    );
+
+    drop(connection);
+    endpoint.close().await;
+    mounted.router.shutdown().await.expect("shutdown");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn read_window_eight_keeps_more_events_by_the_same_deadline() {
+    let h = household();
+    let events: Vec<_> = (0..48)
+        .map(|seq| berth_event("note", "-", "window-speed", &seq.to_string()))
+        .collect();
+    let tree = test_channel(events, vec![]);
+    let (tier, active, _) = scripted_stub(
+        tree.clone(),
+        Arc::new(|request| {
+            if matches!(request, TierRequest::Read { .. }) {
+                Duration::from_millis(8)
+            } else {
+                Duration::ZERO
+            }
+        }),
+        0,
+    );
+    let mounted = mount_scripted_stub(&h.key_b, tier).await;
+    let (endpoint, connection) = connect_stub(&h, &mounted).await;
+    let limits = |read_window| FoldLimits {
+        read_window,
+        read_deadline: Some(Instant::now() + Duration::from_millis(90)),
+        floor_read: Duration::ZERO,
+        ..FoldLimits::default()
+    };
+
+    let one = fetch_channel(
+        &connection,
+        None,
+        &tree.root,
+        &HashSet::new(),
+        &TreeLimits::default(),
+        &limits(1),
+    )
+    .await
+    .expect("window one");
+    wait_for_idle(&active).await;
+    let eight = fetch_channel(
+        &connection,
+        None,
+        &tree.root,
+        &HashSet::new(),
+        &TreeLimits::default(),
+        &limits(8),
+    )
+    .await
+    .expect("window eight");
+    assert!(
+        eight.events.len() > one.events.len(),
+        "window one kept {}, window eight kept {}",
+        one.events.len(),
+        eight.events.len()
+    );
+
+    drop(connection);
+    endpoint.close().await;
+    mounted.router.shutdown().await.expect("shutdown");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn byte_budget_crossing_discards_the_rest_of_the_window() {
+    let h = household();
+    let events: Vec<_> = (0..12)
+        .map(|seq| berth_event("note", "-", "window-budget", &seq.to_string()))
+        .collect();
+    let tree = test_channel(events, vec![]);
+    let ordered = ordered_event_cids(&tree);
+    let first_two_bytes: usize = ordered[..2]
+        .iter()
+        .map(|cid| tree.read(&format!("{CHANNEL_EVENTS}/{cid}")).bytes.len())
+        .sum();
+    let served = tree.clone();
+    let mounted = mount_stub(
+        &h.key_b,
+        StubTier {
+            answer: Arc::new(move |request| served.answer(request)),
+            requests: Arc::new(Mutex::new(Vec::new())),
+            read_delay: Some(Duration::ZERO),
+        },
+    )
+    .await;
+    let (endpoint, connection) = connect_stub(&h, &mounted).await;
+
+    let fetched = fetch_channel(
+        &connection,
+        None,
+        &tree.root,
+        &HashSet::new(),
+        &TreeLimits::default(),
+        &FoldLimits {
+            read_window: 8,
+            max_fold_bytes: first_two_bytes + 1,
+            ..FoldLimits::default()
+        },
+    )
+    .await
+    .expect("budgeted fetch");
+    assert!(fetched.over_budget);
+    assert!(!fetched.complete);
+    assert_eq!(
+        fetched
+            .events
+            .iter()
+            .map(|event| event.cid)
+            .collect::<Vec<_>>(),
+        ordered[..3]
+    );
+
+    drop(connection);
+    endpoint.close().await;
+    mounted.router.shutdown().await.expect("shutdown");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn deadline_drops_completed_answers_behind_a_slow_head() {
+    let h = household();
+    let events: Vec<_> = (0..12)
+        .map(|seq| berth_event("note", "-", "window-order", &seq.to_string()))
+        .collect();
+    let tree = test_channel(events, vec![]);
+    let ordered = ordered_event_cids(&tree);
+    let head = format!("{CHANNEL_EVENTS}/{}", ordered[0]);
+    let (tier, active, _) = scripted_stub(
+        tree.clone(),
+        Arc::new(move |request| match request {
+            TierRequest::Read { path, .. } if path.to_string() == head => {
+                Duration::from_millis(100)
+            }
+            TierRequest::Read { .. } => Duration::from_millis(2),
+            _ => Duration::ZERO,
+        }),
+        0,
+    );
+    let mounted = mount_scripted_stub(&h.key_b, tier).await;
+    let (endpoint, connection) = connect_stub(&h, &mounted).await;
+
+    let short = fetch_channel(
+        &connection,
+        None,
+        &tree.root,
+        &HashSet::new(),
+        &TreeLimits::default(),
+        &FoldLimits {
+            read_window: 8,
+            read_deadline: Some(Instant::now() + Duration::from_millis(30)),
+            floor_read: Duration::ZERO,
+            ..FoldLimits::default()
+        },
+    )
+    .await
+    .expect("deadline is an incomplete fetch");
+    assert!(short.deadline_reached);
+    assert!(
+        short.events.is_empty(),
+        "answers behind the head are dropped"
+    );
+    wait_for_idle(&active).await;
+
+    let complete = fetch_channel(
+        &connection,
+        None,
+        &tree.root,
+        &HashSet::new(),
+        &TreeLimits::default(),
+        &FoldLimits {
+            read_window: 8,
+            read_deadline: Some(Instant::now() + Duration::from_millis(300)),
+            ..FoldLimits::default()
+        },
+    )
+    .await
+    .expect("the head eventually completes");
+    assert_eq!(
+        complete
+            .events
+            .iter()
+            .map(|event| event.cid)
+            .collect::<Vec<_>>(),
+        ordered
+    );
+
+    drop(connection);
+    endpoint.close().await;
+    mounted.router.shutdown().await.expect("shutdown");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn busy_event_streams_are_reissued_in_order_and_counted() {
+    let h = household();
+    let events: Vec<_> = (0..16)
+        .map(|seq| berth_event("note", "-", "window-busy", &seq.to_string()))
+        .collect();
+    let tree = test_channel(events, vec![]);
+    let ordered = ordered_event_cids(&tree);
+    let (tier, _, _) = scripted_stub(tree.clone(), Arc::new(|_| Duration::ZERO), 3);
+    let mounted = mount_scripted_stub(&h.key_b, tier).await;
+    let (endpoint, connection) = connect_stub(&h, &mounted).await;
+
+    let fetched = fetch_channel(
+        &connection,
+        None,
+        &tree.root,
+        &HashSet::new(),
+        &TreeLimits::default(),
+        &FoldLimits {
+            read_window: 8,
+            ..FoldLimits::default()
+        },
+    )
+    .await
+    .expect("BUSY is retried");
+    assert_eq!(fetched.shed, 3);
+    assert!(fetched.complete);
+    assert_eq!(
+        fetched
+            .events
+            .iter()
+            .map(|event| event.cid)
+            .collect::<Vec<_>>(),
+        ordered
+    );
+
+    drop(connection);
+    endpoint.close().await;
+    mounted.router.shutdown().await.expect("shutdown");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_peer_that_sheds_every_stream_ends_the_fold_with_busy_instead_of_spinning() {
+    let h = household();
+    let events: Vec<_> = (0..4)
+        .map(|seq| berth_event("note", "-", "always-busy", &seq.to_string()))
+        .collect();
+    let tree = test_channel(events, vec![]);
+    let (tier, _, _) = scripted_stub(tree.clone(), Arc::new(|_| Duration::ZERO), usize::MAX);
+    let mounted = mount_scripted_stub(&h.key_b, tier).await;
+    let (endpoint, connection) = connect_stub(&h, &mounted).await;
+
+    // No deadline: only the per-event retry bound can end this fold.
+    let result = tokio::time::timeout(
+        Duration::from_secs(20),
+        fetch_channel(
+            &connection,
+            None,
+            &tree.root,
+            &HashSet::new(),
+            &TreeLimits::default(),
+            &FoldLimits::default(),
+        ),
+    )
+    .await
+    .expect("a fold against a peer that always sheds must end on its own");
+    assert!(
+        result.is_err(),
+        "the fold ends with the BUSY error, not a silent partial"
+    );
+
+    drop(connection);
+    endpoint.close().await;
+    mounted.router.shutdown().await.expect("shutdown");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn deadline_aborts_all_eight_in_flight_reads() {
+    let h = household();
+    let events: Vec<_> = (0..16)
+        .map(|seq| berth_event("note", "-", "window-abort", &seq.to_string()))
+        .collect();
+    let tree = test_channel(events, vec![]);
+    let (tier, active, peak) = scripted_stub(
+        tree.clone(),
+        Arc::new(|request| {
+            if matches!(request, TierRequest::Read { .. }) {
+                Duration::from_secs(5)
+            } else {
+                Duration::ZERO
+            }
+        }),
+        0,
+    );
+    let mounted = mount_scripted_stub(&h.key_b, tier).await;
+    let (endpoint, connection) = connect_stub(&h, &mounted).await;
+
+    let fetched = fetch_channel(
+        &connection,
+        None,
+        &tree.root,
+        &HashSet::new(),
+        &TreeLimits::default(),
+        &FoldLimits {
+            read_window: 8,
+            read_deadline: Some(Instant::now() + Duration::from_millis(50)),
+            floor_read: Duration::ZERO,
+            ..FoldLimits::default()
+        },
+    )
+    .await
+    .expect("deadline is an incomplete fetch");
+    assert!(fetched.deadline_reached);
+    assert!(
+        peak.load(Ordering::SeqCst) >= 8,
+        "eight reads reached the server"
+    );
+    wait_for_idle(&active).await;
+    assert_eq!(active.load(Ordering::SeqCst), 0);
+
+    drop(connection);
+    endpoint.close().await;
     mounted.router.shutdown().await.expect("shutdown");
 }
 

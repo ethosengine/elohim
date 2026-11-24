@@ -76,6 +76,29 @@ const REFUSED_FRAME: u32 = 1;
 /// The QUIC error code a stream shed at the in-flight bound is reset with.
 const BUSY: u32 = 2;
 
+/// Whether a tier stream error is the server's exact [`BUSY`] stream reset: the server sheds a
+/// stream at its in-flight bound and leaves the connection up (see the accept loop). A
+/// connection-level close is never BUSY, whatever its code: re-issuing reads on a closed
+/// connection could only fail again.
+pub(crate) fn is_busy(error: &PeerError) -> bool {
+    let PeerError::TierStream(source) = error else {
+        return false;
+    };
+    let busy = VarInt::from_u32(BUSY);
+    matches!(
+        source.downcast_ref::<iroh::endpoint::ReadError>(),
+        Some(iroh::endpoint::ReadError::Reset(code)) if *code == busy
+    ) || matches!(
+        source.downcast_ref::<iroh::endpoint::ReadExactError>(),
+        Some(iroh::endpoint::ReadExactError::ReadError(
+            iroh::endpoint::ReadError::Reset(code)
+        )) if *code == busy
+    ) || matches!(
+        source.downcast_ref::<iroh::endpoint::WriteError>(),
+        Some(iroh::endpoint::WriteError::Stopped(code)) if *code == busy
+    )
+}
+
 /// How a [`TierProtocol`] bounds its work. `Clone` shares the two in-flight pools: every protocol
 /// cloned from one set of limits draws on the same bounds.
 #[derive(Debug, Clone)]
