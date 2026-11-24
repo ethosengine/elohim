@@ -33,6 +33,7 @@ pub mod participate;
 pub mod placement;
 pub mod project;
 pub mod read;
+pub mod reading;
 pub mod reconciliation;
 pub mod registers;
 pub mod repository;
@@ -1345,6 +1346,7 @@ fn run_report(args: &[String]) -> FlowResult<ExitCode> {
         Some("placement") => return run_report_placement(&args[1..]),
         Some("scope") => return run_report_scope(&args[1..]),
         Some("parity") => return run_report_parity(&args[1..]),
+        Some("reading") => return run_report_reading(&args[1..]),
         _ => {}
     }
     let (opts, rest) = parse_global(args)?;
@@ -1398,6 +1400,70 @@ fn run_report(args: &[String]) -> FlowResult<ExitCode> {
         payload.render_headline();
     } else {
         payload.render();
+    }
+    Ok(ExitCode::SUCCESS)
+}
+
+/// `epr flow report reading [--since RFC3339] [--last N] [--json]`.
+///
+/// A shadow reading over `gate-step-reading@1` observations. It always exits successfully: the
+/// report names duplicated verification and missing key reasons, but deciding what either costs
+/// belongs to a later declared policy, never to this read.
+fn run_report_reading(args: &[String]) -> FlowResult<ExitCode> {
+    let (opts, rest) = parse_global(args)?;
+    if wants_help(&rest) {
+        println!(
+            "usage: epr flow report reading [--since RFC3339] [--last N] [--json] [--root DIR]\n  \
+             Folds gate-step-reading@1 observations. Default: the last 10 runs; --since reads all \
+             rows ending at or after the instant unless --last also caps the run count."
+        );
+        return Ok(ExitCode::SUCCESS);
+    }
+    let mut options = reading::ReadingOptions::default();
+    let mut explicit_last = false;
+    let mut i = 0;
+    while i < rest.len() {
+        match rest[i].as_str() {
+            "--since" => {
+                let raw = rest.get(i + 1).ok_or_else(|| {
+                    FlowError::InvalidArguments("--since needs an RFC3339 instant".into())
+                })?;
+                options.since = Some(reading::parse_since(raw)?);
+                i += 2;
+            }
+            "--last" => {
+                let raw = rest.get(i + 1).ok_or_else(|| {
+                    FlowError::InvalidArguments("--last needs a positive run count".into())
+                })?;
+                let last = raw
+                    .parse::<usize>()
+                    .ok()
+                    .filter(|value| *value > 0)
+                    .ok_or_else(|| {
+                        FlowError::InvalidArguments(format!(
+                            "--last `{raw}` is not a positive run count"
+                        ))
+                    })?;
+                options.last_runs = Some(last);
+                explicit_last = true;
+                i += 2;
+            }
+            other => {
+                return Err(FlowError::InvalidArguments(format!(
+                    "unknown report reading argument `{other}`{}",
+                    flag_hint(other, &["--since", "--last"])
+                )))
+            }
+        }
+    }
+    if options.since.is_some() && !explicit_last {
+        options.last_runs = None;
+    }
+    let report = reading::report(&opts.root, &options)?;
+    if opts.json {
+        println!("{}", serde_json::to_string_pretty(&report)?);
+    } else {
+        report.render();
     }
     Ok(ExitCode::SUCCESS)
 }
@@ -1510,6 +1576,17 @@ fn run_sense(args: &[String]) -> FlowResult<ExitCode> {
         session: resolve_session(take_opt(&rest, "--session")?),
     };
 
+    if rest.first().map(String::as_str) == Some("observation") {
+        let observation = &rest[1..];
+        let measure = take_opt(observation, "--measure")?.ok_or_else(|| {
+            FlowError::InvalidArguments(format!(
+                "sense observation needs --measure <id@version>\n{}",
+                sense_usage()
+            ))
+        })?;
+        return run_observation(&opts, observation, &measure, ObservationWriter::Sense);
+    }
+
     if rest.first().map(String::as_str) == Some("rule") {
         let need = |key: &str| -> FlowResult<String> {
             take_opt(&rest, key)?.ok_or_else(|| {
@@ -1577,7 +1654,12 @@ pub fn sense_usage() -> String {
      [--as …] [--session <id>] [--json] [--root DIR]\n  \
      Records a contract inspection's answer as a `ruling` note on the candidate's own file. \
      intentional, canonical and false-positive EXCEPT the subject (closed, counted, named); \
-     duplication and unresolved keep it open.\n"
+     duplication and unresolved keep it open.\n\n\
+     usage: epr flow sense observation --measure <id@version> --subject <path-or-cid> \
+     --value <number> [--unit <u>] [--env k=v]... [--json] [--root DIR]\n  \
+     Appends one caller-supplied structured observation through the same declared-measure writer \
+     used by probes. This is the thin adapter for native emitters such as gate-runner; it creates \
+     no second observation format or store.\n"
         .to_string()
 }
 
@@ -1834,7 +1916,7 @@ fn run_note(args: &[String]) -> FlowResult<ExitCode> {
                 "actor binding cannot be combined with a measurement".into(),
             ));
         }
-        return run_observation(&opts, &rest, &measure);
+        return run_observation(&opts, &rest, &measure, ObservationWriter::Note);
     }
     let on = take_opt(&rest, "--on")?.ok_or_else(|| {
         FlowError::InvalidArguments("note needs --on <commitment-cid-or-path>".into())
@@ -1890,7 +1972,18 @@ fn run_note(args: &[String]) -> FlowResult<ExitCode> {
 /// `--subject` IS the target here, so `--on` is REFUSED alongside `--measure` rather than
 /// silently preferred: a measurement of one thing recorded against another is a fold that lies
 /// about its own key, and the key is the only thing the report indexes by.
-fn run_observation(opts: &GlobalOpts, rest: &[String], measure: &str) -> FlowResult<ExitCode> {
+#[derive(Clone, Copy)]
+enum ObservationWriter {
+    Note,
+    Sense,
+}
+
+fn run_observation(
+    opts: &GlobalOpts,
+    rest: &[String],
+    measure: &str,
+    writer: ObservationWriter,
+) -> FlowResult<ExitCode> {
     if take_opt(rest, "--on")?.is_some() {
         return Err(FlowError::InvalidArguments(
             "--measure takes --subject, not --on — a structured observation's subject IS its target"
@@ -1938,18 +2031,41 @@ fn run_observation(opts: &GlobalOpts, rest: &[String], measure: &str) -> FlowRes
         session: resolve_session(take_opt(rest, "--session")?),
     };
 
-    let outcome = note::observe(
-        &opts.root,
-        &kind,
-        measure,
-        &subject,
-        value,
-        unit.as_deref(),
-        &env,
-        take_opt(rest, "--reason")?.as_deref(),
-        &actor,
-        &measures,
-    )?;
+    let reason = take_opt(rest, "--reason")?;
+    let outcome = match writer {
+        ObservationWriter::Note => note::observe(
+            &opts.root,
+            &kind,
+            measure,
+            &subject,
+            value,
+            unit.as_deref(),
+            &env,
+            reason.as_deref(),
+            &actor,
+            &measures,
+        )?,
+        ObservationWriter::Sense => {
+            if kind != "observation" {
+                return Err(FlowError::InvalidArguments(
+                    "sense observation has exactly one kind: observation".into(),
+                ));
+            }
+            sense::observe(
+                &opts.root,
+                &measures,
+                &sense::ObservationRequest {
+                    measure,
+                    subject: &subject,
+                    value,
+                    unit: unit.as_deref(),
+                    env: &env,
+                    reason: reason.as_deref(),
+                    actor: &actor,
+                },
+            )?
+        }
+    };
     if opts.json {
         println!("{}", serde_json::to_string_pretty(&outcome)?);
     } else {
@@ -2213,6 +2329,7 @@ fn usage() -> String {
      newer head. --root here is the channel root; the checkout is --repo, default .)\n  \
      | sense [--measure <id@version>]... [--family <f>] [--due <d>] [--dry-run] [--json] \
      [--root DIR] | sense rule --measure <id@version> --subject <path> --class <c> --why <text> \
+     | sense observation --measure <id@version> --subject <path-or-cid> --value <n> [--env k=v]... \
      (runs the declared `probe:` on each measure row and folds what it reports; `epr flow sense \
      --help` prints the contract)\n  \
      | report [--headline] [--breaches] [--bound <id>] [--recipe DIR]... [--measures PATH]... \
@@ -2226,6 +2343,10 @@ fn usage() -> String {
      recall:/index:/cleanup:/scope:/memory-budget: lines, a trailing recipe: <name>@<short-cid>, \
      then one alt: count line per extra recipe. \
      Never exits non-zero — enforcement class lives on the row, not on this process)\n  \
+     | report reading [--since RFC3339] [--last N] [--json] [--root DIR] \
+     (the shadow per-gate reading: seconds split by key movement, ran-with-unchanged-key, per-run \
+     wall clock versus summed steps, waiting versus executing, and steps with no key reason; \
+     defaults to the last ten runs and never decides selection, reuse or a gate verdict)\n  \
      | report placement [--ledger] [--coverage] [--stasis [--fold]] \
      [--focus [<subject>] [--brief]] [--json] [--root DIR] [--cluster-state PATH] \
      (every file's placement state derived from the surfaces, frontmatter status, .claude/memory \

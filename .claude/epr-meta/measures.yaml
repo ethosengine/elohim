@@ -472,6 +472,27 @@ measures:
     status: active
     established_by: operator-requested-2026-09-19
 
+  - id: gate-step-reading
+    version: 1
+    family: dev-cycle
+    unit: seconds
+    procedure: >
+      genesis/orchestrator/gate-runner.mjs emits one observation after each gate project finishes
+      through `epr flow sense observation --measure gate-step-reading@1`. The value is executing
+      seconds; env slots carry run_id, step, key (the closure key or `none: <reason>`), key_changed
+      (yes|no|unknown), outcome (ran|reused|skipped), waited_seconds, started_at and ended_at.
+      `epr flow report reading` folds the last ten runs by default. This is shadow telemetry: it
+      selects no gate, changes no closure key, refuses no reuse and never changes a gate verdict.
+    provenance: "genesis/docs/superpowers/specs/2026-11-23-change-detection-one-reading-design.md section 4; station CD-reading"
+    env-sensitivity: [run_id, step, key, key_changed, outcome, waited_seconds, started_at, ended_at]
+    default-authority: observation
+    status: active
+    established_by: change-detection-cd-reading-2026-11-24
+    why: >
+      Seconds is the arithmetic unit because the reading sums execution cost by step and key
+      movement; the categorical row fields remain addressable dimensions rather than numbers a
+      second parser must recover from prose.
+
   - id: pin-attestation
     version: 1
     family: dev-cycle
