@@ -199,6 +199,8 @@ pub struct FoldStats {
 struct RunStats {
     tasks: AtomicU64,
     store_parses: AtomicU64,
+    #[cfg(feature = "testing")]
+    index_flow_reads: AtomicU64,
 }
 
 /// When a projection that failed is tried again. A projection re-parses the whole flow store, so a
@@ -307,6 +309,24 @@ impl PeerDaemon {
     /// The roster, head table, flow store and bind errors, and [`PeerError::Gossip`] when the
     /// topic cannot be joined.
     pub async fn start(config: PeerConfig) -> Result<PeerDaemon, PeerError> {
+        Self::start_with_now(config, Arc::new(Instant::now)).await
+    }
+
+    /// Start the daemon with the clock used by artifact-index retry decisions.
+    ///
+    /// This is a deterministic test seam; production always uses [`Instant::now`].
+    #[cfg(feature = "testing")]
+    pub async fn start_with_clock(
+        config: PeerConfig,
+        now: Arc<dyn Fn() -> Instant + Send + Sync>,
+    ) -> Result<PeerDaemon, PeerError> {
+        Self::start_with_now(config, now).await
+    }
+
+    async fn start_with_now(
+        config: PeerConfig,
+        now: Arc<dyn Fn() -> Instant + Send + Sync>,
+    ) -> Result<PeerDaemon, PeerError> {
         let rows = roster_rows_from_file(&config.roster)?;
         let admission: SharedAdmission = Arc::new(RwLock::new(Admission::from_roster(
             &rows,
@@ -431,6 +451,7 @@ impl PeerDaemon {
             indexed_once: false,
             index_task: None,
             index_retry_at: None,
+            now,
             serves,
             fetch_task: None,
             queue_pruned: None,
@@ -464,6 +485,12 @@ impl PeerDaemon {
             tasks: self.stats.tasks.load(Ordering::Relaxed),
             store_parses: self.stats.store_parses.load(Ordering::Relaxed),
         }
+    }
+
+    /// Full flow-log reads made by the artifact reindex path in this run.
+    #[cfg(feature = "testing")]
+    pub fn artifact_index_flow_reads(&self) -> u64 {
+        self.stats.index_flow_reads.load(Ordering::Relaxed)
     }
 
     /// Run until the loop ends. It ends on its own only for a reason worth a non-zero exit.
@@ -700,6 +727,8 @@ struct Run {
     /// When a rebuild next falls due with no change to the log, so a manifest whose backoff has
     /// run out is tried again.
     index_retry_at: Option<Instant>,
+    /// Clock shared by the artifact rebuild and its retry-due decision.
+    now: Arc<dyn Fn() -> Instant + Send + Sync>,
     /// The serve policy the tier's scope reads; replaced when the rules reload, `None` while the
     /// policy file does not read.
     serves: SharedServePolicy,
@@ -1211,11 +1240,12 @@ impl Run {
         }
         let now = stamp(self.flow.log_path());
         // A rebuild also falls due when a failed manifest's backoff may have run out.
+        let rebuild_at = (self.now)();
         if !index_rebuild_due(
             self.indexed_once,
             now == self.index_stamp,
             self.index_retry_at,
-            Instant::now(),
+            rebuild_at,
         ) {
             return;
         }
@@ -1223,6 +1253,8 @@ impl Run {
         self.index_stamp = now;
         self.indexed_once = true;
         self.index_retry_at = None;
+        #[cfg(feature = "testing")]
+        self.stats.index_flow_reads.fetch_add(1, Ordering::Relaxed);
         let events = match self.flow.events() {
             Ok(events) => events,
             Err(e) => {
@@ -1233,7 +1265,7 @@ impl Run {
             }
         };
         self.index_task = Some(tokio::spawn(async move {
-            mount.rebuild_from_flow(&events).await
+            mount.rebuild_from_flow_at(&events, rebuild_at).await
         }));
     }
 
