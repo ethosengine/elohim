@@ -190,8 +190,9 @@ test("whole hook appends readings once when on and preserves its exit status", t
   });
   assert.equal(r.status, 0, `signal=${r.signal} error=${r.error?.message || "none"}\n${r.out}`);
   const calls = readFileSync(join(fx.dir, "reading-calls.log"), "utf8").trim().split("\n");
-  assert.equal(calls.length, 1);
+  assert.equal(calls.length, 2);
   assert.match(calls[0], /^flow reading append --from .*\/rows\.jsonl --root /);
+  assert.match(calls[1], /^flow report reading --crate-shadow --run \S+ --root /);
   const rows = readFileSync(join(fx.dir, "reading-rows.jsonl"), "utf8")
     .trim().split("\n").map(row => JSON.parse(row));
   assert.ok(rows.length > 1);

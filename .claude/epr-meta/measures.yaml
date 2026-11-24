@@ -490,7 +490,10 @@ measures:
       (green|red|none), outcome (ran|reused|skipped), waited_seconds, lease_waited_seconds,
       synthesized, started_at, ended_at and at, and optionally parent: a recipe step's row
       (`<project>:<step>`, from the seconds gate-steps.sh writes to GATE_STEP_TIMES) names its
-      gate project as parent. `epr flow report reading` folds the last ten runs by default from
+      gate project as parent. For gate_narrow projects, each recipe-step row also parents one row
+      per workspace crate; each crate row carries that crate's recursive verdict key and an equal,
+      apportioned share of the step's seconds (the shares are attribution, not measured crate time).
+      `epr flow report reading` folds the last ten runs by default from
       that file; synthesized EXIT-fill rows and child rows do not set run spans, sums or finishes
       (a child lies inside its parent's span), and every row keeps its own line in the step view.
       Rung 1-2 rows already in flows.jsonl are not migrated. This shadow telemetry selects no

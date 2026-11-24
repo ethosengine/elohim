@@ -124,6 +124,14 @@ gate_step_reading() {
     if [ "$reading_emit_status" -ne 0 ]; then
       reading_emit_err=${reading_emit_err%%$'\n'*}
       echo "[gate-reading] pre-push readings dropped (exit $reading_emit_status${reading_emit_err:+: $reading_emit_err})" >&2
+    else
+      local reading_shadow="" reading_shadow_status
+      reading_shadow=$(timeout -k 1s 5s "$reading_epr" flow report reading --crate-shadow \
+        --run "$GATE_READING_RUN_ID" --root "$HOOK_WORK_TREE" 2>/dev/null)
+      reading_shadow_status=$?
+      if [ "$reading_shadow_status" -eq 0 ] && [ -n "$reading_shadow" ]; then
+        printf '%s\n' "$reading_shadow"
+      fi
     fi
     [ -z "$GATE_READING_DIR" ] || rm -rf -- "$GATE_READING_DIR" 2>/dev/null || true
     return 0
