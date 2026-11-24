@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 # Sequential checks; argv arrays preserve quoting. No eval and no event store.
 # Usage: gate-steps.sh fmt -- cargo fmt --check ::: lint -- node cargo-lint.mjs ...
+# When GATE_STEP_TIMES names a file, each step appends one line to it: name, exit status, start
+# and end in epoch seconds, tab-separated. gate-runner turns those lines into one gate-step reading
+# row per step. Telemetry only: a write that fails is ignored and never changes the exit status.
 set -uo pipefail
 steps=("$@")
 # Validate the entire plan before running any command.
@@ -26,10 +29,15 @@ while (( $# )); do
   while (( $# )) && [[ "$1" != ::: ]]; do command+=("$1"); shift; done
   (( $# )) && shift
   echo "gate-steps: running $name"
+  step_started=${EPOCHREALTIME:-$(date +%s.%N)}
   if "${command[@]}"; then
     result=0
   else
     result=$?
+  fi
+  if [[ -n "${GATE_STEP_TIMES:-}" ]]; then
+    step_ended=${EPOCHREALTIME:-$(date +%s.%N)}
+    { printf '%s\t%s\t%s\t%s\n' "$name" "$result" "${step_started/,/.}" "${step_ended/,/.}" >> "$GATE_STEP_TIMES"; } 2>/dev/null || true
   fi
   if (( result )); then
     echo "gate-steps: $name failed with exit code $result" >&2

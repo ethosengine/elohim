@@ -2669,10 +2669,10 @@ habits:
       - "node --test genesis/orchestrator/suite-list.test.mjs (the orchestrator suite list holds every test file once; the named half's view holds what its key hashes and its environment is constructed)"
       - "a2o genesis/a2o/features/devflow/native-gate-evidence.feature reuse rule (this workspace's own green stands in; a red or an unadmitted signer never does)"
     evidence: >
-      DELTA 2026-11-24 (RED preserved; GATE_NARROW=on refused): gate-evidence keys a verdict on the whole project closure, so under GATE_NARROW=on a narrowed eprfs run would have recorded its green as the verdict of every member it never ran (table 2, read from code). gate-runner now refuses `on` with one line and exit 2, before any metadata, evidence lookup, recipe or record; shadow and off are unchanged. Returns when gate evidence keys a per-package verdict. cargo-affected.test.mjs: on is refused under every push base and spawns nothing (red on the prior gate-runner).
-    evidence-fingerprint: sha256:20ea2eec6fb4aea2
-    evidence-bytes: 39659
-    evidence-entries: 42
+      DELTA 2026-11-24 (RED preserved; per-step seconds are recorded): no per-step gate seconds existed anywhere (table 2). gate-steps.sh now appends each step (name, exit, start, end from EPOCHREALTIME) to GATE_STEP_TIMES, a file gate-runner hands every recipe run; gate-runner turns each line into one gate-step-reading@1 row named <project>:<step> with parent <project>, through the same collector, so a push still makes one native append. The native fold leaves child rows out of a run sums, gaps and finish-setter (they lie inside the parent span) and keeps each in the step view. Telemetry only: an unwritable file changes no exit status; GATE_READING=off passes no file. Tests: gate-runner 78/78 (runner test red on the prior runner), flow::reading 20/20, clippy clean.
+    evidence-fingerprint: sha256:ba74ba35ca8375f1
+    evidence-bytes: 40430
+    evidence-entries: 43
     guard: >
       Regression risks: (1) reusing on a key that omits something the recipe reads — the recipe
       body, the project tree, a submodule pin, a repo file a test include_str!s; the input audit
