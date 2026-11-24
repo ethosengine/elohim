@@ -139,40 +139,8 @@ impl Drop for Flock {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[cfg(unix)]
-    struct ChildRelease(libc::c_int);
-
-    #[cfg(unix)]
-    impl ChildRelease {
-        fn release(&mut self) {
-            if self.0 >= 0 {
-                let byte = [1_u8];
-                // SAFETY: this guard owns the parent's release-pipe write end, and the parked
-                // child is reading one byte from the other end.
-                unsafe {
-                    libc::write(self.0, byte.as_ptr().cast(), byte.len());
-                    libc::close(self.0);
-                }
-                self.0 = -1;
-            }
-        }
-
-        fn discard(&mut self) {
-            if self.0 >= 0 {
-                // SAFETY: no child reported ready, so close the owned pipe end without writing.
-                unsafe { libc::close(self.0) };
-                self.0 = -1;
-            }
-        }
-    }
-
-    #[cfg(unix)]
-    impl Drop for ChildRelease {
-        fn drop(&mut self) {
-            self.release();
-        }
-    }
+    use crate::fork_test::park_child_before_exec;
 
     fn open(path: &std::path::Path) -> File {
         std::fs::OpenOptions::new()
@@ -268,66 +236,15 @@ mod tests {
     #[cfg(unix)]
     #[test]
     fn a_guard_release_is_not_delayed_by_a_forked_child() {
-        use std::os::unix::process::CommandExt;
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("x.lock");
         let held = Flock::try_exclusive(open(&path)).unwrap().expect("free");
-        let mut ready = [0; 2];
-        // SAFETY: `ready` has room for the two descriptors `pipe` writes.
-        assert_eq!(unsafe { libc::pipe(ready.as_mut_ptr()) }, 0);
-        let [read_ready, write_ready] = ready;
-        let mut release = [0; 2];
-        // SAFETY: `release` has room for the two descriptors `pipe` writes.
-        assert_eq!(unsafe { libc::pipe(release.as_mut_ptr()) }, 0);
-        let [read_release, write_release] = release;
-        let forker = std::thread::spawn(move || {
-            let mut command = std::process::Command::new("true");
-            // SAFETY: the hook uses only async-signal-safe libc calls on inherited descriptors,
-            // then blocks on `read_release` until the parent closes the other pipe end.
-            unsafe {
-                command.pre_exec(move || {
-                    libc::close(read_ready);
-                    libc::close(write_release);
-                    let mut byte = [1_u8];
-                    if libc::write(write_ready, byte.as_ptr().cast(), byte.len()) != 1 {
-                        return Err(std::io::Error::last_os_error());
-                    }
-                    libc::close(write_ready);
-                    if libc::read(read_release, byte.as_mut_ptr().cast(), byte.len()) < 0 {
-                        return Err(std::io::Error::last_os_error());
-                    }
-                    libc::close(read_release);
-                    Ok(())
-                });
-            }
-            let status = command.status();
-            if status.is_err() {
-                // SAFETY: a pre-fork failure leaves this thread's ready-pipe write end open.
-                unsafe { libc::close(write_ready) };
-            }
-            status
-        });
-        let mut byte = [0_u8];
-        // SAFETY: both descriptors came from `pipe`; the buffer holds the one byte requested.
-        let ready = unsafe { libc::read(read_ready, byte.as_mut_ptr().cast(), byte.len()) };
-        // SAFETY: after the child's signal, the parent is finished with these three pipe ends.
-        unsafe {
-            libc::close(read_ready);
-            if ready == 1 {
-                libc::close(write_ready);
-            }
-            libc::close(read_release);
-        }
-        let mut release = ChildRelease(write_release);
-        if ready != 1 {
-            release.discard();
-            panic!("fork failed: {:?}", forker.join().unwrap());
-        }
+        let (mut release, child) = park_child_before_exec();
         drop(held);
         let reacquired =
             Flock::exclusive_within(open(&path), Duration::ZERO, Duration::from_millis(10));
         assert!(reacquired.unwrap().is_ok());
         release.release();
-        assert!(forker.join().unwrap().unwrap().success());
+        child.join();
     }
 }

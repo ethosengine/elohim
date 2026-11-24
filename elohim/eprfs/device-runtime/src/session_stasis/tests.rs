@@ -1002,7 +1002,7 @@ fn observer_presence_cannot_replace_or_clear_an_away_ruling() {
 }
 
 #[test]
-fn a_recorded_gap_carries_presence_from_the_last_non_observer_event() {
+fn session_record_writers_carry_presence_from_the_last_own_event() {
     let rulings = [
         AwayRuling {
             id: "away-owned".into(),
@@ -1016,8 +1016,6 @@ fn a_recorded_gap_carries_presence_from_the_last_non_observer_event() {
 
     for observer_ruling in [Some("away-observer"), None] {
         let dir = tempfile::tempdir().unwrap();
-        let session_dir = dir.path().join("s1");
-        fs::create_dir_all(&session_dir).unwrap();
         let mut owned = ev(1, 0, "turn-ended", json!({"outcome": "accomplished"}));
         owned["presence"] = json!({"disposition": "automated", "basis": {
             "lastWitnessedAgeSeconds": 0.0, "rulingRef": "away-owned"
@@ -1026,27 +1024,53 @@ fn a_recorded_gap_carries_presence_from_the_last_non_observer_event() {
         outside["presence"] = json!({"disposition": "collaborative", "basis": {
             "lastWitnessedAgeSeconds": null, "rulingRef": observer_ruling
         }});
-        write_lines(&session_dir.join("events.jsonl"), &[owned, outside]);
+        for session in ["gap", "pending"] {
+            let session_dir = dir.path().join(session);
+            fs::create_dir_all(&session_dir).unwrap();
+            write_lines(
+                &session_dir.join("events.jsonl"),
+                &[owned.clone(), outside.clone()],
+            );
+        }
 
         assert!(record_inert(
             dir.path(),
-            "s1",
+            "gap",
             "main",
             "policy-unpinned",
             &clock(20),
             1 << 20,
         )
         .unwrap());
-        let replay = journal::replay(dir.path(), "s1").unwrap();
+        let replay = journal::replay(dir.path(), "gap").unwrap();
         let gap = replay.events.last().unwrap();
         assert_eq!(gap.kind, EventKind::ObservationGap);
         assert_eq!(gap.presence.disposition, Disposition::Automated);
         assert_eq!(gap.presence.ruling_ref.as_deref(), Some("away-owned"));
 
+        assert!(record_tool_pending_observed(
+            dir.path(),
+            "pending",
+            ToolPendingObservation {
+                agent_id: "main",
+                observer: "watcher:test",
+                tool: "Bash",
+                pending_since: Some(at(10)),
+            },
+            &clock(20),
+            1 << 20,
+        )
+        .unwrap());
+        let replay = journal::replay(dir.path(), "pending").unwrap();
+        let pending = replay.events.last().unwrap();
+        assert_eq!(pending.kind, EventKind::ToolPendingObserved);
+        assert_eq!(pending.presence.disposition, Disposition::Automated);
+        assert_eq!(pending.presence.ruling_ref.as_deref(), Some("away-owned"));
+
         let policy = StasisPolicy::builtin();
         let c = classifier();
         let fold = fold_session(
-            &replay,
+            &journal::replay(dir.path(), "gap").unwrap(),
             &FoldOptions::new(at(20), Selection::All, true, &policy, &c).with_rulings(&rulings),
         );
         assert_eq!(fold.presence.disposition, Disposition::Automated);
@@ -2242,7 +2266,15 @@ fn live_regulator_records_validate_against_the_event_schema() {
         json!({"shift": {"id": "x", "edge": "open"}}),
     );
     witnessed_open["presence"] = witnessed(0.0)["presence"].clone();
-    let lines = [witnessed_open, perm(2, 10, "cd <path> && ls")];
+    let mut owned_request = perm(2, 10, "cd <path> && ls");
+    owned_request["presence"] = json!({"disposition": "automated", "basis": {
+        "lastWitnessedAgeSeconds": 0.0, "rulingRef": "r"
+    }});
+    let mut outside = observed(3, 20, Some(10));
+    outside["presence"] = json!({"disposition": "collaborative", "basis": {
+        "lastWitnessedAgeSeconds": null, "rulingRef": null
+    }});
+    let lines = [witnessed_open, owned_request, outside];
     fs::write(
         s.join("events.jsonl"),
         lines.iter().map(|l| format!("{l}\n")).collect::<String>(),
@@ -2301,11 +2333,13 @@ fn live_regulator_records_validate_against_the_event_schema() {
         .lines()
         .map(|l| serde_json::from_str(l).unwrap())
         .collect();
-    assert_eq!(written.len(), 3);
+    assert_eq!(written.len(), 4);
     for v in &written {
         assert!(validator.is_valid(v), "schema-valid: {v}");
         Event::from_value(v).unwrap();
     }
+    assert_eq!(written[3]["presence"]["disposition"], "automated");
+    assert_eq!(written[3]["presence"]["basis"]["rulingRef"], "r");
     // A Refer record is schema-valid too (null pivot).
     let refer = json!({"schemaVersion": 1, "kind": "consultation",
         "session": {"runtime": "claude-code", "session": "s1"}, "agentId": "main", "seq": 9,

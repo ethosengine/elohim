@@ -63,6 +63,16 @@ pub struct Replay {
     pub segments: usize,
 }
 
+impl Replay {
+    /// The newest event authored by the session rather than an outside observer.
+    ///
+    /// Writers use this boundary when carrying session-owned state forward: an observer may
+    /// report a fact, but cannot supply or clear the session's presence or away ruling.
+    pub fn last_own_event(&self) -> Option<&Event> {
+        self.events.iter().rev().find(|event| !event.is_observer())
+    }
+}
+
 /// The numbered segments (`events.<n>.jsonl`) in increasing `n`.
 pub fn segments(dir: &Path) -> Vec<(u64, PathBuf)> {
     let mut out: Vec<(u64, PathBuf)> = fs::read_dir(dir)

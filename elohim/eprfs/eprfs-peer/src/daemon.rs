@@ -206,7 +206,7 @@ struct RunStats {
     #[cfg(feature = "testing")]
     ticks: AtomicU64,
     #[cfg(feature = "testing")]
-    fail_next_index_flow_read: std::sync::atomic::AtomicBool,
+    fail_index_flow_reads: std::sync::atomic::AtomicBool,
 }
 
 /// When a projection that failed is tried again. A projection re-parses the whole flow store, so a
@@ -506,11 +506,11 @@ impl PeerDaemon {
         self.stats.ticks.load(Ordering::Relaxed)
     }
 
-    /// Make the next artifact-index flow read fail at its test seam.
+    /// Make artifact-index flow reads fail persistently at the test seam.
     #[cfg(feature = "testing")]
-    pub fn fail_next_artifact_index_flow_read(&self) {
+    pub fn fail_artifact_index_flow_reads(&self) {
         self.stats
-            .fail_next_index_flow_read
+            .fail_index_flow_reads
             .store(true, Ordering::Relaxed);
     }
 
@@ -667,19 +667,12 @@ fn index_rebuild_due(
     }
 }
 
-fn index_retry_due(now: Instant, mount_retry_due: Option<Instant>) -> Instant {
-    let first = now + INDEX_RETRY_FIRST;
-    mount_retry_due.map_or(first, |due| due.min(first))
-}
-
 fn index_retry_after_rebuild(
     failed: bool,
     now: Instant,
     mount_retry_due: Option<Instant>,
 ) -> Option<Instant> {
-    failed
-        .then(|| index_retry_due(now, mount_retry_due))
-        .or(mount_retry_due)
+    failed.then(|| now + INDEX_RETRY_FIRST).or(mount_retry_due)
 }
 
 /// Where the channel store is, by canonical path (as given when a path cannot be resolved).
@@ -802,8 +795,6 @@ impl Run {
             tokio::select! {
                 _ = &mut stopped => break Ok(()),
                 _ = tick.tick() => {
-                    #[cfg(feature = "testing")]
-                    self.stats.ticks.fetch_add(1, Ordering::Relaxed);
                     let now = Instant::now();
                     if receiver.is_none() && stream_retry.due(now) {
                         match self.resubscribe().await {
@@ -827,7 +818,10 @@ impl Run {
                             }
                         }
                     }
-                    if let Err(e) = self.tick().await {
+                    let tick_result = self.tick().await;
+                    #[cfg(feature = "testing")]
+                    self.stats.ticks.fetch_add(1, Ordering::Relaxed);
+                    if let Err(e) = tick_result {
                         break Err(e);
                     }
                 }
@@ -1303,10 +1297,7 @@ impl Run {
         #[cfg(feature = "testing")]
         self.stats.index_flow_reads.fetch_add(1, Ordering::Relaxed);
         #[cfg(feature = "testing")]
-        let forced_read_error = self
-            .stats
-            .fail_next_index_flow_read
-            .swap(false, Ordering::Relaxed);
+        let forced_read_error = self.stats.fail_index_flow_reads.load(Ordering::Relaxed);
         #[cfg(not(feature = "testing"))]
         let forced_read_error = false;
         let read = if forced_read_error {
@@ -1320,7 +1311,7 @@ impl Run {
                 self.log(&format!(
                     "artifacts not indexed: the flow store failed: {e}"
                 ));
-                self.index_retry_at = Some(index_retry_due(rebuild_at, mount.next_retry_due()));
+                self.index_retry_at = Some(rebuild_at + INDEX_RETRY_FIRST);
                 self.index_retry_stamp = Some(now);
                 return;
             }
@@ -2049,7 +2040,7 @@ mod tests {
             );
             assert_eq!(
                 index_retry_after_rebuild(result.is_err(), now, Some(earlier)),
-                Some(earlier)
+                Some(now + INDEX_RETRY_FIRST)
             );
         }
     }

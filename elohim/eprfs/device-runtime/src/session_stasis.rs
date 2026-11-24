@@ -1946,7 +1946,7 @@ pub fn decide_shadow(
         Err(StasisError::NoJournal(_)) => return Ok(out),
         Err(e) => return Err(e),
     };
-    let Some(last) = replay.events.last() else {
+    let Some(last) = replay.last_own_event() else {
         return Ok(out);
     };
     let fold = fold_session(
@@ -2049,7 +2049,7 @@ fn append_session_record(
         Err(StasisError::NoJournal(_)) => return Ok(false),
         Err(e) => return Err(e),
     };
-    let Some(last) = replay.events.last() else {
+    let Some(last) = replay.last_own_event() else {
         return Ok(false);
     };
     let seq = replay
@@ -2086,12 +2086,7 @@ pub fn record_inert(
         {
             return None;
         }
-        let presence = replay
-            .events
-            .iter()
-            .rev()
-            .find(|event| !event.is_observer())
-            .map(|event| &event.presence);
+        let presence = replay.last_own_event().map(|event| &event.presence);
         Some(json!({
             "schemaVersion": 1,
             "kind": "observation-gap",

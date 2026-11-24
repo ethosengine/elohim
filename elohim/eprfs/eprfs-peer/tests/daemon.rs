@@ -1058,7 +1058,7 @@ async fn assert_index_reads_stay(daemon: &PeerDaemon, expected: u64) {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn daemon_retries_an_artifact_index_flow_read_error_without_a_log_change() {
+async fn persistent_artifact_index_read_errors_retry_once_per_backoff_window() {
     let b = device("DeviceB", 2);
     let key_dir = tempfile::tempdir().expect("key dir");
     let key = load_key(key_dir.path());
@@ -1091,7 +1091,7 @@ async fn daemon_retries_an_artifact_index_flow_read_error_without_a_log_change()
         daemon.artifact_index_flow_reads() == 1
     })
     .await;
-    daemon.fail_next_artifact_index_flow_read();
+    daemon.fail_artifact_index_flow_reads();
     side.checkout
         .append(berth_event("claim", "cargo", "sa", "1.0"));
     eventually("the changed log read fails", || {
@@ -1101,9 +1101,20 @@ async fn daemon_retries_an_artifact_index_flow_read_error_without_a_log_change()
     assert_index_reads_stay(&daemon, 2).await;
 
     *clock.lock().expect("clock") = start + INDEX_RETRY_FIRST + Duration::from_secs(1);
-    let until = daemon.ticks() + 4;
-    eventually("four retry-due ticks pass", || daemon.ticks() >= until).await;
+    eventually("the first backoff window permits one retry", || {
+        daemon.artifact_index_flow_reads() == 3
+    })
+    .await;
     assert_eq!(daemon.artifact_index_flow_reads(), 3);
+    assert_index_reads_stay(&daemon, 3).await;
+
+    *clock.lock().expect("clock") = start + 2 * INDEX_RETRY_FIRST + Duration::from_secs(2);
+    eventually("the second backoff window permits one retry", || {
+        daemon.artifact_index_flow_reads() == 4
+    })
+    .await;
+    assert_eq!(daemon.artifact_index_flow_reads(), 4);
+    assert_index_reads_stay(&daemon, 4).await;
 
     daemon.shutdown().await;
 }
