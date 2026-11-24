@@ -562,6 +562,8 @@ export function emitGateReading(row, {
     catch { /* shadow telemetry never changes a gate verdict */ }
     return;
   }
+  // Under a push without a scratch file the hook reports the drop once; this runner keeps nothing.
+  if (env.GATE_READING_PUSH) return;
   collector.push(reading);
 }
 
@@ -573,7 +575,7 @@ export function appendGateReadings(rows, {
   writeRows = (path, bytes) => writeFileSync(path, bytes, { mode: 0o600 }),
   removeScratch = path => rmSync(path, { recursive: true, force: true }),
 } = {}) {
-  if (env.GATE_READING === 'off' || env.GATE_READING_ROWS || rows.length === 0) return;
+  if (env.GATE_READING === 'off' || env.GATE_READING_ROWS || env.GATE_READING_PUSH || rows.length === 0) return;
   let scratch = null;
   try {
     scratch = makeScratch(join(tmpdir(), 'gate-reading-'));
@@ -581,14 +583,15 @@ export function appendGateReadings(rows, {
     writeRows(from, `${rows.map(row => JSON.stringify(row)).join('\n')}\n`);
     const result = spawn(env.TIMEOUT_BIN || 'timeout',
       ['-k', '1', '5', env.EPR_BIN || 'epr', 'flow', 'reading', 'append', '--from', from, '--root', root], {
-        cwd: root, stdio: 'ignore',
+        cwd: root, stdio: ['ignore', 'ignore', 'pipe'], encoding: 'utf8',
       });
     if (result?.status !== 0 || result?.error) {
-      const why = result?.error?.message || `exit ${result?.status ?? 'unknown'}`;
-      warn(`[gate-reading] run readings unavailable (${oneLine(why)})\n`);
+      const reason = oneLine(String(result?.stderr || '').split('\n')[0] || '');
+      const why = result?.error?.message || `exit ${result?.status ?? 'unknown'}${reason ? `: ${reason}` : ''}`;
+      warn(`[gate-reading] run readings dropped (${oneLine(why)})\n`);
     }
   } catch (error) {
-    warn(`[gate-reading] run readings unavailable (${oneLine(error?.message || error)})\n`);
+    warn(`[gate-reading] run readings dropped (${oneLine(error?.message || error)})\n`);
   } finally {
     if (scratch) {
       try { removeScratch(scratch); }

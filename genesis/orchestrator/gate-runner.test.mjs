@@ -89,7 +89,40 @@ describe('gate step reading collector', () => {
       spawn: () => ({ status: 9 }),
       warn: line => warnings.push(line),
     }));
-    assert.deepEqual(warnings, ['[gate-reading] run readings unavailable (exit 9)\n']);
+    assert.deepEqual(warnings, ['[gate-reading] run readings dropped (exit 9)\n']);
+  });
+
+  test('a contended native append is one drop line carrying its reason', () => {
+    const warnings = [];
+    appendGateReadings([gateReadingRow({ ...base, outcome: 'ran' })], {
+      root: ROOT,
+      env: { EPR_BIN: 'fixture-epr' },
+      spawn: () => ({
+        status: 3,
+        stderr: 'reading append dropped 1 row(s): the device-local reading lock stayed busy\n',
+      }),
+      warn: line => warnings.push(line),
+    });
+    assert.deepEqual(warnings, [
+      '[gate-reading] run readings dropped (exit 3: reading append dropped 1 row(s): the device-local reading lock stayed busy)\n',
+    ]);
+  });
+
+  test('under a push with no scratch file, runners collect nothing and never append', () => {
+    const collector = [];
+    const env = { GATE_READING_PUSH: '1', GATE_READING_RUN_ID: 'push' };
+    emitGateReading({ ...base, outcome: 'ran', at: base.endedAt }, { collector, env });
+    assert.deepEqual(collector, []);
+    let spawned = 0;
+    const warnings = [];
+    appendGateReadings([gateReadingRow({ ...base, outcome: 'ran' })], {
+      root: ROOT,
+      env,
+      spawn: () => { spawned += 1; return { status: 0 }; },
+      warn: line => warnings.push(line),
+    });
+    assert.equal(spawned, 0, 'the hook owns the one append under a push');
+    assert.deepEqual(warnings, [], 'the hook, not each runner, reports the drop');
   });
 
   test('unwritable and unremovable telemetry scratch never throws', () => {
