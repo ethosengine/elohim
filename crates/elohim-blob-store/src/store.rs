@@ -442,6 +442,16 @@ struct OpsLock {
     publications: Mutex<usize>,
 }
 
+/// `owner.lock`, explicitly unlocked before its descriptor closes.
+struct OwnerLock(File);
+
+impl Drop for OwnerLock {
+    fn drop(&mut self) {
+        // An unlock failure leaves the lock to be released when the file closes.
+        let _ = self.0.unlock();
+    }
+}
+
 /// Who may do what on the root (see the module docs).
 struct Coordination {
     mode: Mode,
@@ -450,7 +460,7 @@ struct Coordination {
     /// `ops.lock` (owner and shared instances).
     ops: Option<OpsLock>,
     /// `owner.lock`, locked exclusively for the owner's life.
-    _owner: Option<File>,
+    _owner: Option<OwnerLock>,
 }
 
 /// One publication in flight: the in-process read lock, and (owner/shared) a share of the
@@ -484,18 +494,6 @@ impl Drop for Destruction<'_> {
     fn drop(&mut self) {
         if let Some(ops) = self.ops {
             let _ = ops.file.unlock();
-        }
-    }
-}
-
-impl Drop for Coordination {
-    fn drop(&mut self) {
-        // Unlock before the file closes: a child forked from this process and not yet exec'd
-        // holds a duplicate of the descriptor, and a lock released only by the close would stay
-        // held until that child's exec, refusing the next owner with `OwnerHeld`.
-        if let Some(owner) = &self._owner {
-            // An unlock failure leaves the lock to be released when the file closes.
-            let _ = owner.unlock();
         }
     }
 }
@@ -1179,6 +1177,17 @@ static UNLOCKED_ADMISSION_GAPS: Mutex<Vec<(PathBuf, Arc<tests::DamageGate>)>> =
     Mutex::new(Vec::new());
 
 #[cfg(test)]
+static OWNER_LOCK_DUPLICATES: Mutex<Vec<(PathBuf, Option<File>)>> = Mutex::new(Vec::new());
+
+#[cfg(test)]
+fn duplicate_owner_lock(root: &Path, file: &File) {
+    let mut duplicates = guard(&OWNER_LOCK_DUPLICATES);
+    if let Some((_, duplicate)) = duplicates.iter_mut().find(|(at, _)| at == root) {
+        *duplicate = Some(file.try_clone().expect("duplicate owner lock descriptor"));
+    }
+}
+
+#[cfg(test)]
 fn unlocked_admission_gap(root: &Path) {
     let gate = guard(&UNLOCKED_ADMISSION_GAPS)
         .iter()
@@ -1224,7 +1233,12 @@ impl Inner {
                 let owner = if mode == Mode::Owner {
                     let file = open_lock_file(&root.join(OWNER_LOCK))?;
                     match file.try_lock() {
-                        Ok(()) => Some(file),
+                        Ok(()) => {
+                            let owner = OwnerLock(file);
+                            #[cfg(test)]
+                            duplicate_owner_lock(&root, &owner.0);
+                            Some(owner)
+                        }
                         Err(fs::TryLockError::WouldBlock) => {
                             return Err(BlobStoreError::OwnerHeld { root });
                         }
@@ -3970,6 +3984,35 @@ mod tests {
             fs::set_permissions(dir.path(), fs::Permissions::from_mode(0o700)).unwrap();
         }
         dir
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn a_failed_owner_open_unlocks_before_its_descriptor_closes() {
+        let dir = private_dir();
+        drop(BlobStore::open_owner(dir.path()).await.unwrap());
+        fs::remove_file(dir.path().join(OPS_LOCK)).unwrap();
+        fs::create_dir(dir.path().join(OPS_LOCK)).unwrap();
+        guard(&OWNER_LOCK_DUPLICATES).push((dir.path().to_path_buf(), None));
+
+        let failed = BlobStore::open_owner(dir.path()).await;
+        assert!(failed.is_err(), "an ops.lock directory must refuse open");
+        fs::remove_dir(dir.path().join(OPS_LOCK)).unwrap();
+        let reopened = BlobStore::open_owner(dir.path()).await;
+        let duplicate = {
+            let mut duplicates = guard(&OWNER_LOCK_DUPLICATES);
+            let at = duplicates
+                .iter()
+                .position(|(at, _)| at == dir.path())
+                .unwrap();
+            duplicates.remove(at).1.unwrap()
+        };
+        assert!(
+            reopened.is_ok(),
+            "the failed open left owner.lock held: {:?}",
+            reopened.err()
+        );
+        drop(duplicate);
     }
 
     /// A multi-chunk payload and its first chunk.
