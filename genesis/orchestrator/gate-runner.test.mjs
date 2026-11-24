@@ -12,6 +12,7 @@ import {
   appendGateReadings,
   costLineAndDefer,
   emitGateReading,
+  emitStepReadings,
   gateChildEnv,
   gateReadingRow,
   oracleMode,
@@ -274,9 +275,9 @@ describe('gate step reading collector', () => {
       const crateRows = read.filter(row => /^eprfs:(fmt|test):/.test(row.step));
       assert.equal(crateRows.length, 8);
       assert.ok(crateRows.filter(row => row.parent === 'eprfs:fmt').every(row =>
-        row.status === 'green' && row.value === 0.5));
+        row.status === 'green' && row.value === 0));
       assert.ok(crateRows.filter(row => row.parent === 'eprfs:test').every(row =>
-        row.status === 'red' && row.value === 2));
+        row.status === 'red' && row.value === 0));
       assert.notEqual(
         crateRows.find(row => row.step === 'eprfs:fmt:leaf').key,
         crateRows.find(row => row.step === 'eprfs:test:leaf').key,
@@ -313,6 +314,145 @@ describe('gate step reading collector', () => {
       assert.equal(readFileSync(rows, 'utf8'), '');
     } finally {
       rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test('only workspace-wide eprfs steps emit zero-second crate rows', () => {
+    const collector = [];
+    const metadata = {
+      packages: [{ id: 'member', name: 'member', manifest_path: '/repo/member/Cargo.toml' }],
+      workspace_members: ['member'],
+      resolve: { nodes: [{ id: 'member', features: [], deps: [] }] },
+    };
+    emitStepReadings('eprfs', base,
+      'fmt\t0\t1\t2\nprecheck\t0\t2\t3\nbins\t0\t3\t4\nark\t0\t4\t5\nunknown\t0\t5\t6\n', {
+        env: {}, collector,
+        crateContext: {
+          metadata, treeOf: () => 'tree', toolchain: 'toolchain', lockDigest: 'lock',
+          outsideReadsDigest: 'reads', cargoEnv: {},
+        },
+      });
+    const crateRows = collector.filter(row => row.parent?.split(':').length === 2);
+    assert.deepEqual(crateRows.map(row => [row.step, row.value]), [['eprfs:fmt:member', 0]]);
+    assert.equal(collector.length, 6, 'five parent rows and one eligible crate row');
+  });
+
+  test('a crate-key failure on the second step emits no crate rows from either step', () => {
+    const collector = [];
+    const lines = [];
+    let trees = 0;
+    const metadata = {
+      packages: [{ id: 'member', name: 'member', manifest_path: '/repo/member/Cargo.toml' }],
+      workspace_members: ['member'],
+      resolve: { nodes: [{ id: 'member', features: [], deps: [] }] },
+    };
+    emitStepReadings('eprfs', base, 'fmt\t0\t1\t2\nlint\t0\t2\t3\n', {
+      env: {}, collector, write: line => lines.push(line),
+      crateContext: {
+        metadata,
+        treeOf: () => {
+          trees += 1;
+          if (trees === 2) throw new Error('second-step tree failed');
+          return 'tree';
+        },
+        toolchain: 'toolchain', lockDigest: 'lock', outsideReadsDigest: 'reads', cargoEnv: {},
+      },
+    });
+    assert.equal(collector.filter(row => row.parent?.split(':').length === 2).length, 0);
+    assert.equal(collector.length, 2, 'parent step rows remain unconditional');
+    assert.deepEqual(lines, [
+      '[gate] eprfs crate-shadow: dropped (second-step tree failed); no crate rows\n',
+    ]);
+  });
+
+  function timedCrateRun({ budgetMs, cargoAdvanceNs }) {
+    const root = mkdtempSync(resolve(tmpdir(), 'crate-shadow-budget-'));
+    const rows = resolve(root, 'rows.jsonl');
+    const changed = resolve(root, 'changed.txt');
+    mkdirSync(resolve(root, 'genesis/agentic'), { recursive: true });
+    writeFileSync(resolve(root, 'genesis/agentic/pool-policy.json'), JSON.stringify({
+      gate_narrow: { projects: ['eprfs'] }, gate_reuse: { projects: [] },
+    }));
+    writeFileSync(changed, 'ws/member/src/lib.rs\n');
+    const metadata = {
+      packages: [{ id: 'member', name: 'member', manifest_path: resolve(root, 'ws/member/Cargo.toml') }],
+      workspace_members: ['member'],
+      resolve: { nodes: [{ id: 'member', features: [], deps: [] }] },
+    };
+    const project = {
+      name: 'eprfs', dir: 'ws', steps: ['build'],
+      run: { kind: 'root-just', recipe: '_gate-eprfs', cargo: { workspace: 'ws', rustflags: '' } },
+    };
+    let now = 0n;
+    let readScans = 0;
+    const calls = [];
+    const output = [];
+    const spawn = (command, args, options = {}) => {
+      calls.push({ command, args, options });
+      if (command === 'rustc') return { status: 0, stdout: 'rustc fixture\nhost: fixture-host\n' };
+      if (command === 'cargo') {
+        now += cargoAdvanceNs;
+        return { status: 0, stdout: JSON.stringify(metadata) };
+      }
+      if (command === 'git') {
+        if (args[0] === 'status') return { status: 0, stdout: '' };
+        if (args[0] === 'show') return { status: 0, stdout: 'lock' };
+        if (String(args.at(-1)).endsWith('^{commit}')) return { status: 0, stdout: `${'a'.repeat(40)}\n` };
+        return { status: 0, stdout: `${'b'.repeat(40)}\n` };
+      }
+      if (command === 'bash' && String(args[0]).endsWith('/rust-style.sh')) return { status: 0 };
+      if (command === 'bash' && String(args[0]).endsWith('/run-local-gate.sh')) {
+        writeFileSync(options.env.GATE_STEP_TIMES, 'fmt\t0\t1795500000\t1795500002\n');
+        return { status: 7, stdout: '', stderr: '' };
+      }
+      return { status: 0, stdout: '', stderr: '' };
+    };
+    const status = runProject(project, false, false, {
+      root,
+      env: {
+        PATH: '', EPR_BIN: 'fixture-epr', GATE_READING_ROWS: rows,
+        GATE_READING_RUN_ID: 'budget-run', GATE_EVIDENCE: 'off', GATE_TASK: 'off',
+        GATE_NARROW_BASE: 'ok', GATE_CHANGED_FILES: changed,
+        GATE_CRATE_SHADOW_BUDGET_MS: String(budgetMs),
+      },
+      spawn, clock: () => now, write: line => output.push(line),
+      readsOf: () => { readScans += 1; return ['fixtures/shared.json']; },
+    });
+    const readings = readFileSync(rows, 'utf8').trim().split('\n').filter(Boolean).map(line => JSON.parse(line));
+    return { root, rows, status, calls, output, readings, readScans };
+  }
+
+  test('metadata shadow time is excluded from the recorded gate duration', () => {
+    const result = timedCrateRun({ budgetMs: 60_000, cargoAdvanceNs: 5_000_000_000n });
+    try {
+      assert.equal(result.status, 7);
+      const cycle = result.calls.find(call =>
+        call.command === 'fixture-epr' && call.args.includes('gate-cycle-seconds@1'));
+      assert.ok(cycle, 'recordCycle writes its native observation');
+      assert.equal(cycle.args[cycle.args.indexOf('--value') + 1], '0');
+      assert.equal(result.readScans, 1, 'selection and crate context share the member read-set cache');
+    } finally {
+      rmSync(result.root, { recursive: true, force: true });
+    }
+  });
+
+  test('one exhausted shadow budget line drops every crate row without changing the exit', () => {
+    const result = timedCrateRun({ budgetMs: 10, cargoAdvanceNs: 10_000_000n });
+    try {
+      assert.equal(result.status, 7);
+      assert.deepEqual(result.output.filter(line => line.includes('crate-shadow: dropped')), [
+        '[gate] eprfs crate-shadow: dropped (budget 10 ms exhausted in metadata); no crate rows\n',
+      ]);
+      assert.ok(result.output.includes(
+        '[gate] eprfs narrow (shadow): full workspace — metadata unavailable\n',
+      ));
+      assert.equal(result.readings.filter(row => /^eprfs:[^:]+:[^:]+$/.test(row.step)).length, 0);
+      assert.equal(result.readings.filter(row => row.step === 'eprfs:fmt').length, 1,
+        'parent rows still emit');
+      assert.equal(result.calls.find(call => call.command === 'cargo').options.timeout, 10,
+        'the shared remainder caps the metadata spawn timeout');
+    } finally {
+      rmSync(result.root, { recursive: true, force: true });
     }
   });
 
