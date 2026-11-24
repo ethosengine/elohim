@@ -483,7 +483,7 @@ measures:
       `epr flow reading append --from <file>` call from its EXIT finalizer. Failure, timeout or
       telemetry filesystem cleanup drops the batch with at most one line and never changes a verdict.
       The native verb validates the declared gate-step-reading@1 shape/unit/vocabularies, appends
-      valid rows under a lock to device-local `.eprfs/status/readings/gate-step.jsonl`, and when
+      valid rows under a lock to the device's one `.eprfs/status/readings/gate-step.jsonl` under the main checkout (a linked worktree appends to and reads the same file), and when
       that file exceeds 2 MiB atomically retains its newest rows fitting in 1 MiB. The value is
       executing seconds; rows also carry run_id, step, key (closure key or `none: <reason>`),
       key_changed (yes|no|unknown, derived against the latest green row for the step), status
