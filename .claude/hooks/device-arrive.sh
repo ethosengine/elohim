@@ -16,7 +16,11 @@ if [ "${EPR_BIN+x}" = x ]; then
   fi
 fi
 if "${EPR_BIN:-epr}" bin status --tool epr --json >/dev/null 2>&1; then
-  "${EPR_BIN:-epr}" device arrive && "${EPR_BIN:-epr}" session open
+  # Bounded below the harness's 30 s kill: arrival measured 14 s on a quiet device and 30 s under
+  # a push gate's load (2026-11-24), where the harness killed it without a word. A bound of our own
+  # fails open and says so.
+  timeout 20 sh -c '"$0" device arrive && "$0" session open' "${EPR_BIN:-epr}"
+  [ $? -eq 124 ] && printf '%s\n' '[device] arrive exceeded 20s and was stopped; run "epr device arrive && epr session open" when the device is quieter.'
   true
 else
   node "$root/genesis/agentic/native-epr-bootstrap.mjs" "$root" || true

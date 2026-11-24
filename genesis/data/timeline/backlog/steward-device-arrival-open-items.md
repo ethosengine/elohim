@@ -2878,3 +2878,42 @@ section 8.
 - `discovery_uses_the_one_node_that_answers_and_never_guesses`: 1 of 100 whole-library runs at
   eight threads, then 0 of 300; the panic text was not kept, so the cause is a judgment. The
   diagnostic `fe619548f` landed so that the next red names its own cause.
+
+## Row 87 — shem's peer daemon stopped and nothing on shem restarted it
+
+On 2026-11-24 at about 00:45Z ethosengine's follow line printed that shem's sibling had gone
+silent. `just status device` on shem read `no epr peer serve holds this device's serve lock`
+and `device ark: stopped`: the device supervisor that keeps the peer daemon alive was not
+running. `epr device supervise` restarted it (incarnation 16) and the sibling's head folded
+within seconds. Why the supervisor stopped was not found. Ethosengine has a watchdog for a
+silent exchange (`genesis/local-dev/peer/daemon-liveness.sh`); shem has none, so on shem a
+stopped supervisor is noticed only when a session reads the follow line or a landing waits at
+its lease step.
+
+Next: the supervisor's own death should leave a witness naming its cause, and shem should have
+the same watch ethosengine has, or the device supervisor should be started by the devfile and
+restarted by it.
+
+## Row 88 — the device-arrival hook had no time bound of its own
+
+A session-start run on 2026-11-24 was killed by the harness at its 30 s limit (30016 ms) while a
+landing's gates were running. Measured afterwards on shem at a load average of about 8:
+`device-arrive.sh` 14.2 s, `load-project-context.py` 5.0 s, `ram-guard.py` 4.7 s, the rest under
+1.2 s each; the hooks of the group run in parallel, so the slowest sets the wall clock. That the
+arrival doubled under gate load is inferred, not reproduced. The hook now stops its own arrival
+at 20 s and prints one line saying so. The 14 s floor is not explained: `epr device arrive` and
+`epr session open` were not timed apart because both write state.
+
+Next: time the two verbs apart on a quiet device and find what the 14 s is spent on.
+
+## Row 89 — neither device's household is known to match the current DNA
+
+Roll 2's serving receipt stopped at preflight on ethosengine on 2026-11-24: its household was
+cast on 2026-10-26 and three installed integrity DNAs differ from the bundle built at
+`8098b939f` (imagodei, infrastructure, lamad). Shem's household reproduces the bundle on its
+disk, but that bundle was built on 2026-11-06 and preflight refuses it as stale, as it does the
+mesh storage and doorway binaries (built 2026-11-15). Whether a bundle built from dev reproduces
+shem's cells is not known until the DNAs are rebuilt. Recasting a household replaces its
+identities and is the steward's decision. Until one household matches, a change to a storage or
+doorway serving path can get its serving receipt on neither device. Roll 2 was split for this
+reason: the half that touches no serving path goes ahead, the two storage lock sites wait.

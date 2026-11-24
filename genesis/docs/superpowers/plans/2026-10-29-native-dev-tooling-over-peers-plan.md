@@ -840,6 +840,8 @@ and turning it on needs the steward's ruling and an adversarial review.
 
 State: not built. Selection, closure validity and cost are three instruments that do not read each other; nothing reports a step that ran with an unchanged key or a step with no key and no reason. It decides nothing.
 
+The steward asked on 2026-11-24 whether wall clock, already counted per CI stage (`stage-wallclock@1`) and per local gate (`genesis/orchestrator/gate-cost.mjs`, read only to order and defer gates), could be aggregated to show where time can be recovered. Neither count is joined to whether the step's inputs had changed, and the pre-push legs that are not gates are in neither. The report therefore folds the rows three ways: (1) cumulative seconds per step over a window, split into runs whose key had changed and runs whose key had not, ranked by the unchanged total; (2) per landing, its wall clock beside the sum of its steps' seconds, and the step that set its finish time; (3) per landing, seconds spent waiting (for a lease, a carrier or a sibling's verdict) apart from seconds executing. These are folds over the rows, not a second ledger.
+
 Verify: the report has been read for ten dev landings on shem and on ethosengine, and it names every step that ran with an unchanged key and every step with neither a key nor a reason.
 
 - [ ] **CD-read-selects — a file a gate declares it reads selects that gate** (serves push-gate-pays-once)
