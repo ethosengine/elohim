@@ -1510,18 +1510,22 @@ struct RestartTurn {
 
 impl RestartTurn {
     fn take(data_root: &Path) -> Outcome<RestartTurn> {
+        Self::take_within(data_root, RESTART_TURN)
+    }
+
+    fn take_within(data_root: &Path, patience: Duration) -> Outcome<RestartTurn> {
         let path = data_root.join("restart.lock");
         let file = fs::OpenOptions::new()
             .create(true)
             .append(true)
             .open(&path)
             .map_err(|e| format!("{}: {e}", path.display()))?;
-        match Flock::exclusive_within(file, RESTART_TURN, Duration::from_millis(100)) {
+        match Flock::exclusive_within(file, patience, Duration::from_millis(100)) {
             Ok(Ok(held)) => Ok(RestartTurn { _held: held }),
             Ok(Err(_)) => Err(format!(
                 "another restart of this ark held {} for {}s",
                 path.display(),
-                RESTART_TURN.as_secs()
+                patience.as_secs()
             )),
             Err(error) => Err(format!("{}: {error}", path.display())),
         }
@@ -2249,6 +2253,40 @@ fn tail(path: &Path, lines: usize) -> String {
 mod tests {
     use super::*;
 
+    #[cfg(unix)]
+    struct ChildRelease(libc::c_int);
+
+    #[cfg(unix)]
+    impl ChildRelease {
+        fn release(&mut self) {
+            if self.0 >= 0 {
+                let byte = [1_u8];
+                // SAFETY: this guard owns the parent's release-pipe write end, and the parked
+                // child is reading one byte from the other end.
+                unsafe {
+                    libc::write(self.0, byte.as_ptr().cast(), byte.len());
+                    libc::close(self.0);
+                }
+                self.0 = -1;
+            }
+        }
+
+        fn discard(&mut self) {
+            if self.0 >= 0 {
+                // SAFETY: no child reported ready, so close the owned pipe end without writing.
+                unsafe { libc::close(self.0) };
+                self.0 = -1;
+            }
+        }
+    }
+
+    #[cfg(unix)]
+    impl Drop for ChildRelease {
+        fn drop(&mut self) {
+            self.release();
+        }
+    }
+
     /// Dropping a restart turn unlocks it even while a child forked by another thread is paused
     /// before exec with its inherited descriptor copy.
     #[cfg(unix)]
@@ -2260,53 +2298,60 @@ mod tests {
         // SAFETY: `ready` has room for the two descriptors `pipe` writes.
         assert_eq!(unsafe { libc::pipe(ready.as_mut_ptr()) }, 0);
         let [read_ready, write_ready] = ready;
+        let mut release = [0; 2];
+        // SAFETY: `release` has room for the two descriptors `pipe` writes.
+        assert_eq!(unsafe { libc::pipe(release.as_mut_ptr()) }, 0);
+        let [read_release, write_release] = release;
         let forker = std::thread::spawn(move || {
             let mut command = Command::new("true");
             // SAFETY: the hook uses only async-signal-safe libc calls on inherited descriptors,
-            // then holds the forked child before exec with the descriptors it inherited.
+            // then blocks on `read_release` until the parent closes the other pipe end.
             unsafe {
                 command.pre_exec(move || {
                     libc::close(read_ready);
-                    let byte = [1_u8];
+                    libc::close(write_release);
+                    let mut byte = [1_u8];
                     if libc::write(write_ready, byte.as_ptr().cast(), byte.len()) != 1 {
                         return Err(std::io::Error::last_os_error());
                     }
-                    let pause = libc::timespec {
-                        tv_sec: 1,
-                        tv_nsec: 500_000_000,
-                    };
-                    libc::nanosleep(&pause, std::ptr::null_mut());
                     libc::close(write_ready);
+                    if libc::read(read_release, byte.as_mut_ptr().cast(), byte.len()) < 0 {
+                        return Err(std::io::Error::last_os_error());
+                    }
+                    libc::close(read_release);
                     Ok(())
                 });
             }
-            command.status().unwrap()
+            let status = command.status();
+            if status.is_err() {
+                // SAFETY: a pre-fork failure leaves this thread's ready-pipe write end open.
+                unsafe { libc::close(write_ready) };
+            }
+            status
         });
         let mut byte = [0_u8];
         // SAFETY: both descriptors came from `pipe`; the buffer holds the one byte requested.
-        assert_eq!(
-            unsafe { libc::read(read_ready, byte.as_mut_ptr().cast(), byte.len()) },
-            1
-        );
-        // SAFETY: the parent is finished with both of its pipe descriptors.
+        let ready = unsafe { libc::read(read_ready, byte.as_mut_ptr().cast(), byte.len()) };
+        // SAFETY: after the child's signal, the parent is finished with these three pipe ends.
         unsafe {
             libc::close(read_ready);
-            libc::close(write_ready);
+            if ready == 1 {
+                libc::close(write_ready);
+            }
+            libc::close(read_release);
+        }
+        let mut release = ChildRelease(write_release);
+        if ready != 1 {
+            release.discard();
+            panic!("fork failed: {:?}", forker.join().unwrap());
         }
         drop(turn);
-        // RestartTurn::take waits up to RESTART_TURN, which outlasts the child's pause, so a
-        // close-only release would still be taken eventually: the time to take it is the proof.
-        let asked = std::time::Instant::now();
-        let reacquired = RestartTurn::take(dir.path());
-        let took = asked.elapsed();
-        assert!(forker.join().unwrap().success());
+        let reacquired = RestartTurn::take_within(dir.path(), Duration::ZERO);
         if let Err(error) = reacquired {
             panic!("{error}");
         }
-        assert!(
-            took < Duration::from_millis(500),
-            "the turn was held {took:?} after its owner dropped it: released only when the forked child exec'd"
-        );
+        release.release();
+        assert!(forker.join().unwrap().unwrap().success());
     }
 
     #[test]

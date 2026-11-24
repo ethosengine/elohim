@@ -2080,12 +2080,18 @@ pub fn record_inert(
     segment_limit: u64,
 ) -> Result<bool, StasisError> {
     let now = clock.wall.to_rfc3339_opts(SecondsFormat::Millis, true);
-    append_session_record(root, session, segment_limit, |_, last, seq| {
+    append_session_record(root, session, segment_limit, |replay, last, seq| {
         if last.kind == EventKind::ObservationGap
             && last.gap.as_ref().is_some_and(|g| g.reason == reason)
         {
             return None;
         }
+        let presence = replay
+            .events
+            .iter()
+            .rev()
+            .find(|event| !event.is_observer())
+            .map(|event| &event.presence);
         Some(json!({
             "schemaVersion": 1,
             "kind": "observation-gap",
@@ -2103,10 +2109,13 @@ pub fn record_inert(
                 "uptimeSeconds": clock.uptime_seconds,
                 "provenance": "epr-session-stasis/linux-proc",
             },
-            // Carry the last event's disposition and away ruling: a gap record must not clear them.
+            // An observation gap is not an observer record. Carry the last session-owned
+            // disposition and away ruling so an intervening observer cannot supply or clear them.
             "presence": {
-                "disposition": disposition_name(last.presence.disposition),
-                "basis": {"lastWitnessedAgeSeconds": null, "rulingRef": last.presence.ruling_ref},
+                "disposition": disposition_name(
+                    presence.map_or(Disposition::Unknown, |presence| presence.disposition)
+                ),
+                "basis": {"lastWitnessedAgeSeconds": null, "rulingRef": presence.and_then(|presence| presence.ruling_ref.as_deref())},
             },
             "gap": {"reason": reason, "from": now, "to": now},
         }))

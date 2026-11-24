@@ -140,6 +140,40 @@ impl Drop for Flock {
 mod tests {
     use super::*;
 
+    #[cfg(unix)]
+    struct ChildRelease(libc::c_int);
+
+    #[cfg(unix)]
+    impl ChildRelease {
+        fn release(&mut self) {
+            if self.0 >= 0 {
+                let byte = [1_u8];
+                // SAFETY: this guard owns the parent's release-pipe write end, and the parked
+                // child is reading one byte from the other end.
+                unsafe {
+                    libc::write(self.0, byte.as_ptr().cast(), byte.len());
+                    libc::close(self.0);
+                }
+                self.0 = -1;
+            }
+        }
+
+        fn discard(&mut self) {
+            if self.0 >= 0 {
+                // SAFETY: no child reported ready, so close the owned pipe end without writing.
+                unsafe { libc::close(self.0) };
+                self.0 = -1;
+            }
+        }
+    }
+
+    #[cfg(unix)]
+    impl Drop for ChildRelease {
+        fn drop(&mut self) {
+            self.release();
+        }
+    }
+
     fn open(path: &std::path::Path) -> File {
         std::fs::OpenOptions::new()
             .read(true)
@@ -229,7 +263,7 @@ mod tests {
         assert!(acquired.is_ok());
     }
 
-    /// A child forked by another thread holds the descriptor through its pre-exec pause, but
+    /// A child forked by another thread holds the descriptor while parked before exec, but
     /// dropping the guard unlocks the shared open file description immediately.
     #[cfg(unix)]
     #[test]
@@ -242,46 +276,58 @@ mod tests {
         // SAFETY: `ready` has room for the two descriptors `pipe` writes.
         assert_eq!(unsafe { libc::pipe(ready.as_mut_ptr()) }, 0);
         let [read_ready, write_ready] = ready;
+        let mut release = [0; 2];
+        // SAFETY: `release` has room for the two descriptors `pipe` writes.
+        assert_eq!(unsafe { libc::pipe(release.as_mut_ptr()) }, 0);
+        let [read_release, write_release] = release;
         let forker = std::thread::spawn(move || {
             let mut command = std::process::Command::new("true");
             // SAFETY: the hook uses only async-signal-safe libc calls on inherited descriptors,
-            // then holds the forked child before exec with the descriptors it inherited.
+            // then blocks on `read_release` until the parent closes the other pipe end.
             unsafe {
                 command.pre_exec(move || {
                     libc::close(read_ready);
-                    let byte = [1_u8];
+                    libc::close(write_release);
+                    let mut byte = [1_u8];
                     if libc::write(write_ready, byte.as_ptr().cast(), byte.len()) != 1 {
                         return Err(std::io::Error::last_os_error());
                     }
-                    let pause = libc::timespec {
-                        tv_sec: 1,
-                        tv_nsec: 500_000_000,
-                    };
-                    libc::nanosleep(&pause, std::ptr::null_mut());
                     libc::close(write_ready);
+                    if libc::read(read_release, byte.as_mut_ptr().cast(), byte.len()) < 0 {
+                        return Err(std::io::Error::last_os_error());
+                    }
+                    libc::close(read_release);
                     Ok(())
                 });
             }
-            command.status().unwrap()
+            let status = command.status();
+            if status.is_err() {
+                // SAFETY: a pre-fork failure leaves this thread's ready-pipe write end open.
+                unsafe { libc::close(write_ready) };
+            }
+            status
         });
         let mut byte = [0_u8];
         // SAFETY: both descriptors came from `pipe`; the buffer holds the one byte requested.
-        assert_eq!(
-            unsafe { libc::read(read_ready, byte.as_mut_ptr().cast(), byte.len()) },
-            1
-        );
-        // SAFETY: the parent is finished with both of its pipe descriptors.
+        let ready = unsafe { libc::read(read_ready, byte.as_mut_ptr().cast(), byte.len()) };
+        // SAFETY: after the child's signal, the parent is finished with these three pipe ends.
         unsafe {
             libc::close(read_ready);
-            libc::close(write_ready);
+            if ready == 1 {
+                libc::close(write_ready);
+            }
+            libc::close(read_release);
+        }
+        let mut release = ChildRelease(write_release);
+        if ready != 1 {
+            release.discard();
+            panic!("fork failed: {:?}", forker.join().unwrap());
         }
         drop(held);
-        let reacquired = Flock::exclusive_within(
-            open(&path),
-            Duration::from_millis(100),
-            Duration::from_millis(10),
-        );
-        assert!(forker.join().unwrap().success());
+        let reacquired =
+            Flock::exclusive_within(open(&path), Duration::ZERO, Duration::from_millis(10));
         assert!(reacquired.unwrap().is_ok());
+        release.release();
+        assert!(forker.join().unwrap().unwrap().success());
     }
 }
