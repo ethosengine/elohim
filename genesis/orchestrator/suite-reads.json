@@ -124,6 +124,7 @@
       {"file": "gate-landing-markers.test.mjs", "reads": []},
       {"file": "eprfs-produce.test.mjs", "tree": "the hand-over trace saw unfenced child in the repository: just --justfile /projects/elohim/.worktrees/nt-e11/justfile; not yet retried in the view"},
       {"file": "prepush-self.test.mjs", "reads": [".ci-ignore", ".husky/pre-push.bash"]},
+      {"file": "prepush-reading.test.mjs", "reads": [".husky/pre-push.bash"]},
       {"file": "handover-record.test.mjs", "reads": [".ci-ignore", "genesis/agentic/pool-policy.json"]},
       {"file": "suite-list.test.mjs", "reads": [".gitmodules"]}
     ] },
