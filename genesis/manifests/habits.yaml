@@ -2765,10 +2765,10 @@ habits:
       - "node --test genesis/orchestrator/gate-landing-base.test.mjs (device-DID tiebreak, cap of 4: unobservable in the one-DID fixture)"
       - "over >= 10 pushes, from the device's flow store dev-landing@1 rows and berth's hold fold: hold p50/p90 vs 233/3,321 s; Σ regated_s on landed_as=moved vs Σ gate seconds saved on landed_as=ff; chain_len p90; duplicate gated closures = 0, duplicate claims = 0, >= 2 intents per Jenkins wave (unwired until S6)"
     evidence: >
-      DELTA 2026-11-24 (RED preserved; F4-ask-unattended, native shape, UNWIRED): .claude/hooks/sibling-miss-inject.py, planted as package sibling-miss-inject (master package, registration null). On a PostToolUse it reads `epr peer intents --misses --json` at most once per 30 s, keeps only misses another device announced whose lander still waits, and shows at most 3 per call with the carry command (`epr flow intend --carry ... --valid-for 2xp90 within 600..7200`) and the worktree gate; every printed field passes a strict shape check, under an untrusted-data frame. The cursor is one per agent (a seen set pruned to the open misses), and a delivery is confirmed by a receipt read back from the transcript, as berth-note-inject does. Replaces the watcher script that crashed silently for six hours. 17 tests; a live read against the landed epr shows the 4 open shem misses well-formed and correctly silent (all lapsed). Wiring is the steward call.
-    evidence-fingerprint: sha256:b86442cc9d0d13aa
-    evidence-bytes: 62355
-    evidence-entries: 48
+      DELTA 2026-11-24b (RED preserved; the misses injector cannot fail silently): when sibling-miss-inject cannot read misses (no epr, a nonzero exit, a timeout, unparseable output) the tool call still hears nothing, but at most once per 10 minutes per agent it starts one native observation sibling-miss-read-failed@1 (declared in .claude/epr-meta/measures.yaml; subject <session>:<agent>, value the seconds since that agent last read misses, env failure the kind) without waiting for it; a good read resets the clock, and the health rides along in every cursor write. 21 hook tests (4 new, red on the prior hook); package verify 2418/2418 after the replant; settings.json untouched.
+    evidence-fingerprint: sha256:c9945dc3ebe0fd30
+    evidence-bytes: 63036
+    evidence-entries: 49
     refs:
       - "spec: genesis/docs/superpowers/specs/2026-10-27-steward-space-landing-plane-design.md (§2 Arm A slices A0-A13; §3 this habit and the WIP fence)"
       - "upstream of: genesis/orchestrator/.epr-meta/push-delivers-within-budget.habit.md (active red; A9/A10 move its measured ratio)"

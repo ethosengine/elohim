@@ -32,7 +32,11 @@ sibling-miss-inject.py"`, timeout 3. The epr it runs is SIBLING_MISS_EPR_BIN, el
 `epr` on PATH. An epr without `peer intents --misses` exits nonzero, and that is silence.
 
 Fail-open: a missing, slow or broken epr, an unreadable state file or a malformed payload is
-silence, and no error ever reaches the tool call.
+silence, and no error ever reaches the tool call. Silence is not left unrecorded: when the misses
+read fails, at most once per FAILURE_NOTE_S per agent the hook starts one native observation,
+`sibling-miss-read-failed@1` (subject `<session>:<agent>`, value the seconds since that agent last
+read misses, env `failure` the kind), without waiting for it, so a fold can say how long an agent
+has been unable to read its siblings' misses. A successful read resets that clock.
 """
 import hashlib
 import json
@@ -55,6 +59,8 @@ DEADLINE_S = 2.4
 PENDING_GRACE_S = 20
 PENDING_GRACE_CAP_S = 900
 TRANSCRIPT_TAIL = 2 * 1024 * 1024
+FAILURE_NOTE_S = 600
+FAILURE_MEASURE = "sibling-miss-read-failed@1"
 MAX_VALID_FOR_S = 7200  # flow/carry.rs MAX_VALID_FOR_S
 # The shapes a field must have to reach a printed command line.
 ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}")
@@ -155,16 +161,40 @@ def run_capped(argv, timeout, cap=OUTPUT_CAP):
 
 
 def read_misses(deadline):
-    """The open misses as a list of dicts, or None when epr could not answer."""
-    code, out = run_capped([epr_bin(), "peer", "intents", "--misses", "--json"],
+    """(the open misses as a list of dicts, None) or (None, (failure kind, detail))."""
+    binary = epr_bin()
+    if os.sep in binary and not os.access(binary, os.X_OK):
+        return None, ("no-epr", f"{binary} is not an executable")
+    code, out = run_capped([binary, "peer", "intents", "--misses", "--json"],
                            min(EPR_TIMEOUT_S, deadline - time.monotonic()))
+    if code is None:
+        return None, ("timeout-or-unstartable", f"{binary} did not answer within {EPR_TIMEOUT_S} s or could not start")
     if code != 0:
-        return None
+        return None, ("nonzero-exit", f"{binary} peer intents --misses exited {code}")
     try:
         rows = json.loads(out.decode("utf-8"))
     except (UnicodeDecodeError, ValueError, RecursionError):
-        return None
-    return rows if isinstance(rows, list) else None
+        return None, ("unparseable", "the misses read was not JSON")
+    if not isinstance(rows, list):
+        return None, ("unparseable", "the misses read was not a list")
+    return rows, None
+
+
+def note_failure(session, reader, seconds_blind, failure):
+    """Start one sibling-miss-read-failed@1 observation without waiting; never raises."""
+    kind, detail = failure
+    try:
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        import _observation  # noqa: PLC0415 — loaded only on the rare failure path
+        _observation.emit_many([{
+            "measure": FAILURE_MEASURE,
+            "subject": f"{session}:{reader}",
+            "value": int(seconds_blind),
+            "reason": f"sibling-miss-inject could not read misses: {detail}",
+            "env": {"failure": kind},
+        }], wait=False)
+    except Exception:  # noqa: BLE001 — telemetry about a failure must never become one
+        pass
 
 
 def _int(value):
@@ -269,6 +299,9 @@ def deliver(session, reader, emit, now=None, started=None, transcripts=None):
     count = state.get("unreceipted")
     unreceipted = _int(count) or 0
     checked = state.get("checked_at")
+    # The misses read's own health (last good read, when failing began, when last noted) rides
+    # along in every state write, so the cursor's writes never erase it.
+    health = state.get("health") if isinstance(state.get("health"), dict) else {}
     dropped = False
 
     if pending:
@@ -282,16 +315,29 @@ def deliver(session, reader, emit, now=None, started=None, transcripts=None):
             dropped = True  # past the grace and never shown: show the same misses again now
             unreceipted += 1
         pending = None
-        write_state(path, {"seen": sorted(seen), "unreceipted": unreceipted, "checked_at": checked})
+        write_state(path, {"health": health, "seen": sorted(seen), "unreceipted": unreceipted, "checked_at": checked})
 
     poll = float(os.environ.get("SIBLING_MISS_POLL_S", POLL_S))
     if not dropped and isinstance(checked, (int, float)) and 0 <= now - checked < poll:
         return
     # Stamped before epr is asked: a slow or failing epr is retried after POLL_S, not every call.
-    write_state(path, {"seen": sorted(seen), "unreceipted": unreceipted, "checked_at": now})
-    rows = read_misses(deadline)
+    write_state(path, {"health": health, "seen": sorted(seen), "unreceipted": unreceipted, "checked_at": now})
+    rows, failure = read_misses(deadline)
     if rows is None:
+        # Silence on the tool call, but not unrecorded: at most once per FAILURE_NOTE_S.
+        last_ok = health.get("last_ok")
+        since = health.get("failing_since")
+        since = since if isinstance(since, (int, float)) else now
+        noted = health.get("failure_noted_at")
+        due = not isinstance(noted, (int, float)) or not (0 <= now - noted < FAILURE_NOTE_S)
+        blind_from = last_ok if isinstance(last_ok, (int, float)) else since
+        if due:
+            note_failure(session, reader, max(0, now - blind_from), failure)
+        health = {**health, "failing_since": since, "failure_noted_at": now if due else noted}
+        write_state(path, {"health": health, "seen": sorted(seen), "unreceipted": unreceipted,
+                           "checked_at": now})
         return
+    health = {"last_ok": now}
     malformed = 0
     open_rows = []
     for row in rows:
@@ -308,7 +354,7 @@ def deliver(session, reader, emit, now=None, started=None, transcripts=None):
     seen &= open_keys  # a settled miss leaves the cursor with the open set
     fresh = sorted((row for row in open_rows if miss_key(row) not in seen),
                    key=lambda row: str(row.get("at") or ""))
-    write_state(path, {"seen": sorted(seen), "unreceipted": unreceipted if fresh else 0, "checked_at": now})
+    write_state(path, {"health": health, "seen": sorted(seen), "unreceipted": unreceipted if fresh else 0, "checked_at": now})
     if not fresh and not malformed:
         return
     shown = fresh[:MAX_MISSES]
@@ -332,10 +378,10 @@ def deliver(session, reader, emit, now=None, started=None, transcripts=None):
     if not emit("\n".join(lines)):
         return
     if receipt:
-        write_state(path, {"seen": sorted(seen), "unreceipted": unreceipted, "checked_at": now,
+        write_state(path, {"health": health, "seen": sorted(seen), "unreceipted": unreceipted, "checked_at": now,
                            "pending": {"keys": keys, "receipt": receipt, "emitted_at": now}})
     else:
-        write_state(path, {"seen": sorted(seen | set(keys)), "unreceipted": 0, "checked_at": now})
+        write_state(path, {"health": health, "seen": sorted(seen | set(keys)), "unreceipted": 0, "checked_at": now})
 
 
 def emit_context(text):
