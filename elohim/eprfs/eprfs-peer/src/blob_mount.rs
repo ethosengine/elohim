@@ -689,6 +689,17 @@ impl BlobMount {
         self.reconstructions.load(Ordering::Relaxed)
     }
 
+    /// The earliest pending retry of a manifest that failed to index.
+    pub fn next_retry_due(&self) -> Option<Instant> {
+        self.index
+            .read()
+            .ok()?
+            .retry
+            .values()
+            .filter_map(|retry| retry.next)
+            .min()
+    }
+
     /// How many manifests the index tracks, served, unindexed or waiting to retry: bounded by
     /// the distinct outputs of this device's custody events. Excludes the bounded on-demand cache.
     pub fn tracked_manifests(&self) -> usize {

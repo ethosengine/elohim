@@ -1717,6 +1717,44 @@ async fn a_late_indexable_older_derivation_never_evicts_a_newer_one() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn next_retry_due_is_none_without_failures_and_earliest_with_many() {
+    let h = household();
+    let mut holder = holder(&h).await;
+    let t0 = Instant::now();
+
+    holder
+        .put(GRANTED, artifact_bytes(119, 400 * 1024), true)
+        .await;
+    assert!(holder.reindex_at(t0).await.is_empty());
+    assert_eq!(holder.mount.next_retry_due(), None);
+
+    let first = holder
+        .put(GRANTED, artifact_bytes(120, 3 * 1024 * 1024), true)
+        .await;
+    let first_last = chunks(&first).last().cloned().expect("a chunk");
+    std::fs::remove_file(holder.object_path(&first_last)).expect("remove first chunk");
+    assert_eq!(holder.reindex_at(t0).await.len(), 1);
+    assert_eq!(holder.mount.next_retry_due(), Some(t0 + INDEX_RETRY_FIRST));
+
+    let second = holder
+        .put(GRANTED, artifact_bytes(123, 3 * 1024 * 1024), true)
+        .await;
+    let second_last = chunks(&second).last().cloned().expect("a chunk");
+    std::fs::remove_file(holder.object_path(&second_last)).expect("remove second chunk");
+    assert_eq!(
+        holder.reindex_at(t0 + Duration::from_secs(1)).await.len(),
+        1
+    );
+    assert_eq!(
+        holder.mount.next_retry_due(),
+        Some(t0 + INDEX_RETRY_FIRST),
+        "the earlier of two pending manifest retries"
+    );
+
+    holder.router.shutdown().await.expect("shutdown");
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn failed_reconstruction_is_retried_with_backoff() {
     let h = household();
     let mut holder = holder(&h).await;
@@ -1731,11 +1769,16 @@ async fn failed_reconstruction_is_retried_with_backoff() {
     std::fs::remove_file(holder.object_path(&last)).expect("remove chunk");
     assert_eq!(holder.reindex_at(t0).await.len(), 1);
     assert_eq!(holder.mount.reconstructions(), 1);
-    for (at, attempts) in [
-        (t0 + Duration::from_secs(1), 1),
-        (t0 + INDEX_RETRY_FIRST, 2),
-        (t0 + INDEX_RETRY_FIRST + Duration::from_secs(45), 2),
-        (t0 + 3 * INDEX_RETRY_FIRST, 3),
+    assert_eq!(holder.mount.next_retry_due(), Some(t0 + INDEX_RETRY_FIRST));
+    for (at, attempts, next) in [
+        (t0 + Duration::from_secs(1), 1, t0 + INDEX_RETRY_FIRST),
+        (t0 + INDEX_RETRY_FIRST, 2, t0 + 3 * INDEX_RETRY_FIRST),
+        (
+            t0 + INDEX_RETRY_FIRST + Duration::from_secs(45),
+            2,
+            t0 + 3 * INDEX_RETRY_FIRST,
+        ),
+        (t0 + 3 * INDEX_RETRY_FIRST, 3, t0 + 7 * INDEX_RETRY_FIRST),
     ] {
         holder.reindex_at(at).await;
         assert_eq!(
@@ -1744,6 +1787,7 @@ async fn failed_reconstruction_is_retried_with_backoff() {
             "at +{:?}",
             at - t0
         );
+        assert_eq!(holder.mount.next_retry_due(), Some(next));
     }
     write_object(&holder.object_path(&last), &kept);
     // The next try is a doubled wait (120 s) after the last one.
@@ -1754,6 +1798,7 @@ async fn failed_reconstruction_is_retried_with_backoff() {
         .await
         .is_empty());
     assert!(holder.mount.held(&output(&deferred)).is_some());
+    assert_eq!(holder.mount.next_retry_due(), None);
     let attempts = holder.mount.reconstructions();
 
     // A corrupt chunk: never retried for the same custody event, however long it waits.
@@ -1767,8 +1812,10 @@ async fn failed_reconstruction_is_retried_with_backoff() {
         holder.mount.unindexed(&corrupt.manifest_cid),
         Some(Unindexed::ManifestInvalid { .. })
     ));
+    assert_eq!(holder.mount.next_retry_due(), None);
     assert_eq!(holder.mount.reconstructions(), attempts + 1);
     holder.reindex_at(t0 + 3 * INDEX_RETRY_MAX).await;
+    assert_eq!(holder.mount.next_retry_due(), None);
     assert_eq!(holder.mount.reconstructions(), attempts + 1, "not retried");
     // A re-put is a new custody event: tried at once, and the repaired chunk verifies.
     std::fs::remove_file(holder.object_path(&chunk)).expect("remove corrupt chunk");
