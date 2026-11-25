@@ -688,8 +688,10 @@ fn run_intend(args: &[String]) -> FlowResult<ExitCode> {
             | "--chain-len" | "--supersedes" | "--session" | "--verified" | "--gate-s"
             | "--misses" | "--ref" | "--miss" | "--p90" | "--wait-until" | "--land" | "--tip"
             | "--commit" | "--landed-as" | "--regated-s" | "--withdraw" | "--why" | "--dismiss"
-            | "--capsule" | "--measures" | "--as" | "--carry" | "--project" | "--valid-for"
-            | "--carry-decision" | "--role" | "--freshness-s" | "--max-wait-s" => i += 2,
+            | "--capsule" | "--measures" | "--as" | "--carry" | "--release-carry" | "--project"
+            | "--valid-for" | "--carry-decision" | "--role" | "--freshness-s" | "--max-wait-s" => {
+                i += 2
+            }
             other => {
                 return Err(FlowError::InvalidArguments(format!(
                     "unknown intend argument `{other}`{}",
@@ -724,6 +726,7 @@ fn run_intend(args: &[String]) -> FlowResult<ExitCode> {
                             "--measures",
                             "--as",
                             "--carry",
+                            "--release-carry",
                             "--project",
                             "--miss",
                             "--valid-for",
@@ -745,7 +748,7 @@ fn run_intend(args: &[String]) -> FlowResult<ExitCode> {
             })
         })
     };
-    if let Some(carry_mode) = ["--carry", "--carry-decision"]
+    if let Some(carry_mode) = ["--carry", "--release-carry", "--carry-decision"]
         .into_iter()
         .find(|flag| rest.iter().any(|arg| arg == flag))
     {
@@ -931,13 +934,14 @@ fn run_intend(args: &[String]) -> FlowResult<ExitCode> {
     Ok(ExitCode::SUCCESS)
 }
 
-/// `epr flow intend --carry …` (write a carry claim) and `--carry-decision …` (read one answer).
+/// `epr flow intend --carry …` (write), `--release-carry …` (end it), and
+/// `--carry-decision …` (read one answer).
 ///
 /// Both are their own modes: `--closure` here is one closure key for `--project`, not the
 /// raise form's `project=key` pairs, so the carry modes are dispatched before raise detection.
 fn run_intend_carry(opts: &GlobalOpts, rest: &[String], mode: &str) -> FlowResult<ExitCode> {
-    let (mode_name, mode_flags): (&str, &[&str]) = if mode == "--carry" {
-        (
+    let (mode_name, mode_flags): (&str, &[&str]) = match mode {
+        "--carry" => (
             "carry",
             &[
                 "--carry",
@@ -950,9 +954,12 @@ fn run_intend_carry(opts: &GlobalOpts, rest: &[String], mode: &str) -> FlowResul
                 "--measures",
                 "--as",
             ],
-        )
-    } else {
-        (
+        ),
+        "--release-carry" => (
+            "release-carry",
+            &["--release-carry", "--session", "--measures", "--as"],
+        ),
+        _ => (
             "carry-decision",
             &[
                 "--carry-decision",
@@ -963,7 +970,7 @@ fn run_intend_carry(opts: &GlobalOpts, rest: &[String], mode: &str) -> FlowResul
                 "--wait-until",
                 "--max-wait-s",
             ],
-        )
+        ),
     };
     for flag in rest.iter().step_by(2) {
         if !mode_flags.contains(&flag.as_str()) {
@@ -982,8 +989,6 @@ fn run_intend_carry(opts: &GlobalOpts, rest: &[String], mode: &str) -> FlowResul
             })
         })
     };
-    let project = need(take_opt(rest, "--project")?, "--project")?;
-    let closure = need(take_opt(rest, "--closure")?, "--closure")?;
     #[cfg(feature = "peer")]
     let fold = carry::DeviceFold::read(&opts.root);
     #[cfg(feature = "peer")]
@@ -995,6 +1000,36 @@ fn run_intend_carry(opts: &GlobalOpts, rest: &[String], mode: &str) -> FlowResul
     #[cfg(not(feature = "peer"))]
     let admits: Box<carry::Admits<'_>> = Box::new(|_: &str| false);
     let landing = misses::landing_probe(root);
+
+    if mode_name == "release-carry" {
+        let session = resolve_session(take_opt(rest, "--session")?);
+        let actor = note::NoteActor {
+            as_ref: take_opt(rest, "--as")?,
+            session,
+        };
+        let measures = take_opt(rest, "--measures")?.map(PathBuf::from);
+        let commitment = need(take_opt(rest, "--release-carry")?, "--release-carry")?;
+        let receipt = carry::write_release(
+            &opts.root,
+            &carry::ReleaseRequest {
+                commitment: &commitment,
+                measures: measures.as_deref(),
+                actor: &actor,
+                me,
+                admits: admits.as_ref(),
+                landing: &landing,
+            },
+        )?;
+        if opts.json {
+            println!("{}", serde_json::to_string_pretty(&receipt)?);
+        } else {
+            receipt.render();
+        }
+        return Ok(ExitCode::SUCCESS);
+    }
+
+    let project = need(take_opt(rest, "--project")?, "--project")?;
+    let closure = need(take_opt(rest, "--closure")?, "--closure")?;
 
     if mode_name == "carry" {
         let session = resolve_session(take_opt(rest, "--session")?);
