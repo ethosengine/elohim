@@ -9,11 +9,12 @@ mod support;
 
 use std::collections::BTreeMap;
 
-use elohim_epr_rea::{atom_cid, FlowEvent};
+use elohim_epr_rea::{atom_cid, FlowEvent, FlowRecord};
 use eprfs_core::BlobCid;
 use eprfs_peer::{
-    other_devices, steward_lease_view, Admission, DeviceHead, HeadTable, LeaseStore, LeaseVerdict,
-    NackLeaf, OwnAnnounce, PeerError, Settlement, StewardScope, VIA_SLOT,
+    other_devices, steward_lease_view, Admission, DeviceHead, FoldCoverage, FoldCoverageState,
+    HeadTable, LeaseStore, LeaseVerdict, NackLeaf, OwnAnnounce, PeerError, Settlement,
+    StewardScope, VIA_SLOT,
 };
 use support::{
     binding, contest, device, endpoint_row, event_with, genesis, household, peer_key, verifier,
@@ -134,7 +135,11 @@ fn from(device: &str, event: FlowEvent) -> At {
 
 /// A device's flow store, in append order.
 fn store(entries: Vec<At>) -> LeaseStore {
-    LeaseStore::from_events(entries.into_iter().map(|entry| {
+    LeaseStore::from_events(stored_events(entries))
+}
+
+fn stored_events(entries: Vec<At>) -> impl Iterator<Item = (cid::Cid, FlowEvent)> {
+    entries.into_iter().map(|entry| {
         let event = match entry {
             At::Own(event) => event,
             At::From(device, mut event) => {
@@ -143,7 +148,23 @@ fn store(entries: Vec<At>) -> LeaseStore {
             }
         };
         (atom_cid(&event).expect("cid"), event)
-    }))
+    })
+}
+
+/// A captured JSONL prefix with one synthetic 100-byte line per event.
+fn store_with_offsets(entries: Vec<At>) -> LeaseStore {
+    let records: Vec<_> = stored_events(entries)
+        .enumerate()
+        .map(|(index, (cid, event))| {
+            (
+                u64::try_from(index).unwrap().saturating_mul(100),
+                cid,
+                FlowRecord::Event(event),
+            )
+        })
+        .collect();
+    let end = u64::try_from(records.len()).unwrap().saturating_mul(100);
+    LeaseStore::from_records_with_offsets(end, records)
 }
 
 /// A head table on `me`'s side: its own announces (`(seq, events covered)`, each naming the store
@@ -184,6 +205,7 @@ fn table(
                 folded_at,
                 events_folded: 1,
                 nack: Default::default(),
+                coverage: None,
             },
         );
     }
@@ -643,6 +665,86 @@ fn counted(event: FlowEvent, dseq: u64) -> FlowEvent {
     let mut event = event;
     event.classified_as.push(format!("env:dseq={dseq}"));
     event
+}
+
+#[test]
+fn a_later_claim_fetched_first_waits_for_the_senders_complete_fold_coverage() {
+    let h = household();
+    let s = store_with_offsets(vec![
+        from(&h.a.did, counted(claim("session-a", T0), 1)),
+        // The truncated CID-ordered fetch found B before A's earlier release.
+        from(&h.a.did, counted(claim("session-b", T0 + 20.0), 3)),
+        from(
+            &h.a.did,
+            counted(record("release", "session-a", T0 + 10.0, &[]), 2),
+        ),
+    ]);
+    let mut heads = table(&h.b.did, &[], &s, &[(&h.a.did, 0, ms(T0) + 21_000)]);
+    let sender = heads.devices.get_mut(&h.a.did).unwrap();
+    sender.coverage = Some(FoldCoverage {
+        events: 1,
+        log_offset: 100,
+    });
+    assert_eq!(
+        s.fold_coverage(&h.a.did, sender),
+        FoldCoverageState::Incomplete
+    );
+    assert_eq!(
+        verdict(&h.b.did, &s, &heads, &h.admission(), ms(T0) + 22_000,),
+        Some(held(&h.a.did, "session-a", T0, false)),
+        "B and the missing release stay invisible beyond the last complete head"
+    );
+
+    let sender = heads.devices.get_mut(&h.a.did).unwrap();
+    sender.seq += 1;
+    sender.root = BlobCid::compute(b"complete-root");
+    sender.coverage = Some(FoldCoverage {
+        events: 3,
+        log_offset: 300,
+    });
+    assert_eq!(
+        s.fold_coverage(&h.a.did, sender),
+        FoldCoverageState::Complete
+    );
+    assert_eq!(
+        verdict(&h.b.did, &s, &heads, &h.admission(), ms(T0) + 22_000,),
+        Some(held(&h.a.did, "session-b", T0 + 20.0, false)),
+        "the later complete prefix includes B from the earlier incomplete append and A's release"
+    );
+}
+
+#[test]
+fn absent_and_unreadable_coverage_preserve_legacy_unbounded_replay() {
+    let h = household();
+    let s = store_with_offsets(vec![
+        from(&h.a.did, counted(claim("session-a", T0), 1)),
+        from(&h.a.did, counted(claim("session-b", T0 + 20.0), 3)),
+        from(
+            &h.a.did,
+            counted(record("release", "session-a", T0 + 10.0, &[]), 2),
+        ),
+    ]);
+    let legacy = table(&h.b.did, &[], &s, &[(&h.a.did, 0, ms(T0) + 21_000)]);
+    let expected = verdict(&h.b.did, &s, &legacy, &h.admission(), ms(T0) + 22_000);
+    assert_eq!(
+        expected,
+        Some(held(&h.a.did, "session-b", T0 + 20.0, false))
+    );
+
+    let dir = tempfile::tempdir().unwrap();
+    let mut value = serde_json::to_value(&legacy).unwrap();
+    value["devices"][&h.a.did]["coverage"] = serde_json::json!("not a coverage record");
+    std::fs::write(
+        dir.path().join(HeadTable::FILE_NAME),
+        serde_json::to_vec(&value).unwrap(),
+    )
+    .unwrap();
+    let unreadable = HeadTable::load(dir.path()).expect("bad coverage does not reject the heads");
+    assert!(unreadable.devices[&h.a.did].coverage.is_none());
+    assert_eq!(
+        verdict(&h.b.did, &s, &unreadable, &h.admission(), ms(T0) + 22_000,),
+        expected
+    );
 }
 
 #[test]
