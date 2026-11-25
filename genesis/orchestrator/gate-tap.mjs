@@ -19,7 +19,11 @@
 // for the gate. A signal the tap itself receives is forwarded to the group, not only the leader.
 
 import { spawn } from 'child_process';
-import { existsSync, readFileSync, readdirSync, statSync, writeSync } from 'fs';
+import {
+  existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, statSync,
+  writeFileSync, writeSync,
+} from 'fs';
+import { tmpdir } from 'os';
 import { dirname, isAbsolute, join, resolve } from 'path';
 import { createRecognizer } from './gate-failure-lines.mjs';
 import { GATE_ATTRIBUTION_WINDOW_MS, attribute, readEdits } from './gate-attribution.mjs';
@@ -29,6 +33,117 @@ import { endTree, gateTree, outputTargets, processesHolding, readStat, signalTre
 
 // After the gate's tree is ended, how long the tap still waits for its output pipes to close.
 const ESCAPED_WAIT_MS = 2000;
+const SLOT_BUSY_EXIT = 73;
+const SLOT_CONFLICT_EXIT = 200;
+
+function oneLine(value) {
+  return String(value ?? '').replace(/[\r\n]+/g, ' ').trim();
+}
+
+function currentHolder(path) {
+  try { return oneLine(readFileSync(path, 'utf8')) || 'holder details unavailable'; }
+  catch { return 'holder details unavailable'; }
+}
+
+function slotWaitLimit(env) {
+  const value = Number(env.GATE_SLOT_LOCK_WAIT_S ?? 3600);
+  return Number.isFinite(value) && value >= 0 ? value : 3600;
+}
+
+function slotHeartbeatMs(env) {
+  const value = Number(env.GATE_SLOT_WAIT_HEARTBEAT_S ?? 180);
+  return Number.isFinite(value) && value > 0 ? Math.max(10, value * 1000) : 180_000;
+}
+
+function writeSlotWait(path, seconds, holder) {
+  if (!path) return;
+  try { writeFileSync(path, `${seconds.toFixed(6)}\t${holder}\n`, 'utf8'); } catch { /* telemetry */ }
+}
+
+function publishHolder(path, project, lockPid, run) {
+  if (!path) return;
+  try {
+    mkdirSync(dirname(path), { recursive: true });
+    const temporary = `${path}.${process.pid}`;
+    writeFileSync(temporary,
+      `project=${project} worktree=${process.cwd()} pid=${lockPid} run=${run || 'unset'} started=${new Date().toISOString().replace(/\.\d{3}Z$/, 'Z')}\n`);
+    renameSync(temporary, path);
+  } catch { /* a missing holder line never weakens the lock */ }
+}
+
+async function startSlotHolder(lock, mode, waitSeconds, scratch) {
+  const acquired = join(scratch, `acquired-${mode}`);
+  const args = ['--close', '--conflict-exit-code', String(SLOT_CONFLICT_EXIT)];
+  if (mode === 'try') args.push('-n');
+  else args.push('-w', String(waitSeconds));
+  args.push(lock, 'bash', '-c', 'printf acquired > "$1"; while IFS= read -r line; do [ "$line" = release ] && exit 0; done', '_', acquired);
+  const child = spawn('flock', args, { detached: true, stdio: ['pipe', 'ignore', 'inherit'] });
+  let closed = null;
+  const done = new Promise(resolveDone => {
+    const finish = result => {
+      if (closed) return;
+      closed = result;
+      resolveDone(closed);
+    };
+    child.once('error', error => finish({ code: 127, signal: null, error }));
+    child.once('close', (code, signal) => finish({ code, signal }));
+  });
+  while (!existsSync(acquired) && !closed) await delay(10);
+  return {
+    child, done, acquired: existsSync(acquired), closed,
+    async release() {
+      if (child.exitCode === null && child.signalCode === null) child.stdin.end('release\n');
+      await done;
+    },
+  };
+}
+
+async function acquireSlot(project, run, env) {
+  const lock = env.GATE_SLOT_LOCK_PATH;
+  if (!lock) return { busy: false, release: async () => {} };
+  mkdirSync(dirname(lock), { recursive: true });
+  const scratch = mkdtempSync(join(tmpdir(), 'gate-slot-holder-'));
+  const cleanup = () => { try { rmSync(scratch, { recursive: true, force: true }); } catch { /* scratch */ } };
+  const first = await startSlotHolder(lock, 'try', 0, scratch);
+  if (first.acquired) {
+    publishHolder(env.GATE_SLOT_HOLDER_PATH, project, first.child.pid, run);
+    return { busy: false, release: async () => { await first.release(); cleanup(); } };
+  }
+  await first.done;
+  const limit = slotWaitLimit(env);
+  const started = performance.now();
+  const heartbeat = () => {
+    const holder = currentHolder(env.GATE_SLOT_HOLDER_PATH);
+    const waited = (performance.now() - started) / 1000;
+    process.stderr.write(`[gate-tap] ${project}: cargo slot still busy after ${waited.toFixed(1)}s; holder: ${holder}\n`);
+    if (run) appendEvent(run, { kind: 'wait', project, resource: 'cargo-slot', holder });
+  };
+  heartbeat();
+  const timer = setInterval(heartbeat, slotHeartbeatMs(env));
+  const blocked = await startSlotHolder(lock, 'wait', limit, scratch);
+  clearInterval(timer);
+  const waited = (performance.now() - started) / 1000;
+  const holder = currentHolder(env.GATE_SLOT_HOLDER_PATH);
+  writeSlotWait(env.GATE_SLOT_WAIT_RESULT, waited, holder);
+  if (!blocked.acquired) {
+    await blocked.done;
+    cleanup();
+    process.stderr.write(`gate ${project}: REFUSED cargo slot stayed busy for ${limit}s; holder: ${holder}\n`);
+    return { busy: true, release: async () => {} };
+  }
+  publishHolder(env.GATE_SLOT_HOLDER_PATH, project, blocked.child.pid, run);
+  return { busy: false, release: async () => { await blocked.release(); cleanup(); } };
+}
+
+async function waitForGateGroupGone(leaderPid) {
+  if (!Number.isInteger(leaderPid)) return;
+  for (;;) {
+    const live = [...snapshot().values()].some(stat =>
+      stat.sid === leaderPid && stat.state !== 'Z' && stat.state !== 'X');
+    if (!live) return;
+    await delay(50);
+  }
+}
 
 function parseArgs(argv) {
   const split = argv.indexOf('--');
@@ -177,7 +292,7 @@ export function createCostSampler(pid, { readFile = readFileSync, listDir = read
   return { sample };
 }
 
-function main() {
+async function main() {
   const parsed = parseArgs(process.argv.slice(2));
   if (!parsed) {
     process.stderr.write('usage: gate-tap.mjs --project <name> [--run <path>] [--dir <project dir>] -- <command> [args…]\n');
@@ -221,6 +336,16 @@ function main() {
     // berth, and an unsendable note is a sibling-delivery line in the run log.
     if (written && event.kind === 'failure') emitRedDetached(run, written);
   }
+  // A detached flock process owns the slot outside the gate's group. --close keeps its descriptor
+  // out of the holder command and every gate child; the control pipe releases it after this tap has
+  // reaped the gate. If the tap itself dies, pipe EOF releases the holder too.
+  const slot = await acquireSlot(project, run, process.env);
+  if (slot.busy) {
+    try { writeSync(3, `${JSON.stringify({ signals: recognizer.signals(), ...recognizer.summary(), slotBusy: true })}\n`); }
+    catch { /* no fd 3: run by hand */ }
+    process.exit(SLOT_BUSY_EXIT);
+  }
+
   // Its own session and group (detached), so the gate's whole tree can be signalled as one and no
   // signal meant for it reaches the tap, gate-runner or the hook. The leader is read now, while
   // this process holds it unreaped: that pid and start time are the first link of gate-stop's custody.
@@ -348,6 +473,11 @@ function main() {
     // The child's status decides whether an unrecognized red step stands in as a failure (E6 #2).
     // A stopped gate has no such step: its end is the stop (the emit above holds it, then drops it).
     recognizer.end(signal ? 1 : code);
+    // `close` proves the leader and its output are reaped; a background member with redirected
+    // output can still remain in the session. Linux retains the session leader's numeric id until
+    // its last member is gone, so this read-only scan keeps the outside holder through all work.
+    await waitForGateGroupGone(child.pid);
+    await slot.release();
     try {
       writeSync(3, `${JSON.stringify({ signals: recognizer.signals(), ...recognizer.summary(), ...cost,
         ...(stopped ? { stopped } : {}), ...(truncated ? { outputTruncated: true } : {}) })}\n`);
@@ -372,4 +502,7 @@ function main() {
 
 const isMain = import.meta.url === `file://${process.argv[1]}` ||
   import.meta.url === `file://${resolve(process.argv[1])}`;
-if (isMain) main();
+if (isMain) main().catch(error => {
+  process.stderr.write(`gate-tap: ${error?.stack || error}\n`);
+  process.exit(2);
+});

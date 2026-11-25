@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import {
   chmodSync,
   copyFileSync,
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -16,6 +17,7 @@ import test from "node:test";
 import { openRun, readRun } from "./gate-live.mjs";
 
 const SCRIPT = join(import.meta.dirname, "run-local-gate.sh");
+const TAP = join(import.meta.dirname, "gate-tap.mjs");
 const BASE_PATH = "/usr/local/bin:/usr/bin:/bin";
 
 function executable(path, body = "#!/bin/sh\nexit 0\n") {
@@ -94,7 +96,7 @@ set -euo pipefail
 now() { date +%s%N; }
 printf 'enter\\t%s\\t%s\\n' "$GATE_TEST_LABEL" "$(now)" >> "$GATE_TEST_EVENTS"
 if [[ "\${GATE_TEST_PROBE_LOCK:-0}" == 1 ]]; then
-  if flock -n "$CARGO_TARGET_DIR/.gate.lock" -c true; then
+  if flock -n "\${CARGO_TARGET_DIR}.gate.lock" -c true; then
     echo LOCK_NOT_HELD
     exit 97
   fi
@@ -105,7 +107,7 @@ if [[ -n "\${GATE_TEST_READY:-}" ]]; then
   while [[ ! -e "$GATE_TEST_RELEASE" ]]; do read -r -t 0.02 _ || true; done
 fi
 if [[ -n "\${GATE_TEST_DAEMON_PID:-}" ]]; then
-  setsid sleep 30 &
+  setsid sleep 30 </dev/null >/dev/null 2>&1 &
   printf '%s\n' "$!" > "$GATE_TEST_DAEMON_PID"
 fi
 printf 'exit\\t%s\\t%s\\n' "$GATE_TEST_LABEL" "$(now)" >> "$GATE_TEST_EVENTS"
@@ -119,10 +121,15 @@ function startSlotGate(t, fx, {
   label = projectName,
   env = {},
 } = {}) {
-  const child = spawn("bash", [
+  const slot = join(fx.slotRoot, `family__${workspace.replaceAll("/", "_")}__dev`);
+  const lock = `${slot}.gate.lock`;
+  const waitResult = join(fx.dir, `${label}.slot-wait.tsv`);
+  const live = env.GATE_LIVE_RUN ? ["--run", env.GATE_LIVE_RUN] : [];
+  const child = spawn(process.execPath, [TAP, "--project", projectName, ...live, "--", "bash",
     SCRIPT, fx.root, projectName, fx.projectDir, "root-just", "gate",
-    workspace, "", "dev", "",
+    workspace, "", "dev", "", waitResult, lock,
   ], {
+    cwd: fx.root,
     env: {
       ...process.env,
       PATH: `${fx.bin}:${BASE_PATH}`,
@@ -130,6 +137,9 @@ function startSlotGate(t, fx, {
       GATE_TEST_SLOT_ROOT: fx.slotRoot,
       GATE_TEST_EVENTS: fx.events,
       GATE_TEST_LABEL: label,
+      GATE_SLOT_LOCK_PATH: lock,
+      GATE_SLOT_HOLDER_PATH: join(slot, ".gate.holder"),
+      GATE_SLOT_WAIT_RESULT: waitResult,
       ...env,
     },
     detached: true,
@@ -149,7 +159,7 @@ function startSlotGate(t, fx, {
       try { process.kill(-child.pid, "SIGKILL"); } catch { /* already exited */ }
     }
   });
-  return { child, closed, stdout: () => stdout, stderr: () => stderr };
+  return { child, closed, stdout: () => stdout, stderr: () => stderr, slot, lock, waitResult };
 }
 
 async function waitUntil(predicate, message, timeoutMs = 3000) {
@@ -180,10 +190,10 @@ test("two gates on one cargo slot never overlap and the waiter names the holder"
   }, "first gate never entered its recipe");
 
   const second = startSlotGate(t, fx, { projectName: "second" });
-  await waitUntil(() => second.stdout().includes("cargo slot busy"), "second gate never reported the holder");
-  assert.match(second.stdout(), new RegExp(
-    `^  \\[second\\] cargo slot busy; holder: project=first worktree=${fx.root.replaceAll("/", "\\/")} `
-      + "pid=[0-9]+ run=run-first started=[^ ]+; waiting up to 3600s$", "m",
+  await waitUntil(() => second.stderr().includes("cargo slot still busy"), "second gate never reported the holder");
+  assert.match(second.stderr(), new RegExp(
+    `^\\[gate-tap\\] second: cargo slot still busy after [0-9.]+s; holder: project=first worktree=${fx.root.replaceAll("/", "\\/")} `
+      + "pid=[0-9]+ run=run-first started=[^ ]+$", "m",
   ));
   writeFileSync(release, "release\n");
 
@@ -197,7 +207,7 @@ test("two gates on one cargo slot never overlap and the waiter names the holder"
   assert.ok(events[1].at <= events[2].at, "the second recipe entered before the first exited");
 });
 
-test("killing a cargo slot holder releases the lock immediately", async (t) => {
+test("ending a gate tap releases its outside-the-group slot holder", async (t) => {
   const fx = slotFixture(t);
   const ready = join(fx.dir, "holder.ready");
   const release = join(fx.dir, "never.release");
@@ -209,10 +219,10 @@ test("killing a cargo slot holder releases the lock immediately", async (t) => {
     try { return readFileSync(ready, "utf8").trim() === "ready"; } catch { return false; }
   }, "holder never entered its recipe");
   const waiter = startSlotGate(t, fx, { projectName: "waiter" });
-  await waitUntil(() => waiter.stdout().includes("cargo slot busy"), "waiter never observed contention");
+  await waitUntil(() => waiter.stderr().includes("cargo slot still busy"), "waiter never observed contention");
 
   const killedAt = Date.now();
-  process.kill(-holder.child.pid, "SIGKILL");
+  holder.child.kill("SIGTERM");
   const waited = await Promise.race([
     waiter.closed,
     delay(1500).then(() => ({ timeout: true })),
@@ -222,7 +232,7 @@ test("killing a cargo slot holder releases the lock immediately", async (t) => {
   assert.ok(Date.now() - killedAt < 1500);
   writeFileSync(release, "release\n");
   const killed = await holder.closed;
-  assert.equal(killed.signal, "SIGKILL");
+  assert.equal(killed.signal, "SIGTERM");
 });
 
 test("different workspace slots never wait on each other", async (t) => {
@@ -269,7 +279,7 @@ test("a cargo slot timeout refuses with the dedicated did-not-run status", async
   });
   const result = await waiter.closed;
   assert.equal(result.status, 73, result.stderr);
-  assert.match(result.stdout, /^  \[timeout-waiter\] cargo slot busy; holder: project=timeout-holder .*; waiting up to 0\.1s$/m);
+  assert.match(result.stderr, /^\[gate-tap\] timeout-waiter: cargo slot still busy after [0-9.]+s; holder: project=timeout-holder .*$/m);
   assert.match(result.stderr, /^gate timeout-waiter: REFUSED cargo slot stayed busy for 0\.1s; holder: project=timeout-holder .*$/m);
   const wait = readRun(live.path).events.find(event => event.kind === "wait");
   assert.equal(wait.project, "timeout-waiter");
@@ -280,14 +290,42 @@ test("a cargo slot timeout refuses with the dedicated did-not-run status", async
 
 test("flock owns the cargo slot lock while the descriptor stays out of the recipe", async (t) => {
   const fx = slotFixture(t);
+  const live = openRun({ root: fx.root, sha: "b".repeat(40), target: "just gate", session: "uncontended" });
   const gate = startSlotGate(t, fx, {
     projectName: "lock-probe",
-    env: { GATE_TEST_PROBE_LOCK: "1" },
+    env: { GATE_TEST_PROBE_LOCK: "1", GATE_LIVE_RUN: live.path },
   });
   const result = await gate.closed;
   assert.equal(result.status, 0, result.stderr);
-  assert.match(result.stdout, /^LOCK_HELD$/m);
+  assert.match(result.stdout, /^LOCK_HELD$/m, JSON.stringify(result));
   assert.doesNotMatch(result.stdout, /LOCK_NOT_HELD/);
+  assert.equal(spawnSync("test", ["-e", gate.waitResult]).status, 1,
+    "an uncontended admission records no slot-wait measurement");
+  assert.equal(readRun(live.path).events.some(event => event.kind === "wait"), false,
+    "an uncontended admission emits no phantom wait event");
+});
+
+test("a waiting gate refreshes its holder heartbeat on stderr and the live run", async (t) => {
+  const fx = slotFixture(t);
+  const ready = join(fx.dir, "heartbeat-holder.ready");
+  const release = join(fx.dir, "heartbeat-holder.release");
+  const holder = startSlotGate(t, fx, {
+    projectName: "heartbeat-holder",
+    env: { GATE_TEST_READY: ready, GATE_TEST_RELEASE: release },
+  });
+  await waitUntil(() => existsSync(ready), "heartbeat holder never entered");
+  const live = openRun({ root: fx.root, sha: "c".repeat(40), target: "just gate", session: "heartbeat" });
+  const waiter = startSlotGate(t, fx, {
+    projectName: "heartbeat-waiter",
+    env: { GATE_LIVE_RUN: live.path, GATE_SLOT_WAIT_HEARTBEAT_S: "0.02" },
+  });
+  await waitUntil(() => (waiter.stderr().match(/cargo slot still busy/g) || []).length >= 2,
+    "waiting gate did not refresh its stderr heartbeat");
+  assert.ok(readRun(live.path).events.filter(event => event.kind === "wait").length >= 2,
+    "waiting gate did not refresh its live wait event");
+  writeFileSync(release, "release\n");
+  assert.equal((await holder.closed).status, 0);
+  assert.equal((await waiter.closed).status, 0);
 });
 
 test("a_callers_ceiling_is_appended_and_honoured", (t) => {
@@ -351,34 +389,22 @@ test("a_malformed_cargo_env_key_still_refuses", (t) => {
   }
 });
 
-test("a daemon keeping every inherited descriptor cannot retain the cargo slot lock", async (t) => {
+test("a daemon keeping inherited recipe descriptors cannot retain the tap-owned cargo slot lock", async (t) => {
   const fx = slotFixture(t);
   const daemonPid = join(fx.dir, "daemon.pid");
-  const child = spawn("bash", [
-    SCRIPT, fx.root, "daemon", fx.projectDir, "root-just", "gate",
-    "workspace-a", "", "dev", "",
-  ], {
-    env: {
-      ...process.env,
-      PATH: `${fx.bin}:${BASE_PATH}`,
-      RUSTUP_TOOLCHAIN: "",
-      GATE_TEST_SLOT_ROOT: fx.slotRoot,
-      GATE_TEST_EVENTS: fx.events,
-      GATE_TEST_LABEL: "daemon",
-      GATE_TEST_DAEMON_PID: daemonPid,
-    },
-    stdio: ["ignore", "ignore", "ignore"],
+  const gate = startSlotGate(t, fx, {
+    projectName: "daemon",
+    env: { GATE_TEST_DAEMON_PID: daemonPid },
   });
-  const status = await new Promise(resolve => child.once("exit", resolve));
-  assert.equal(status, 0);
+  const result = await gate.closed;
+  assert.equal(result.status, 0, result.stderr);
   await waitUntil(() => {
     try { return readFileSync(daemonPid, "utf8").trim().length > 0; } catch { return false; }
   }, "the detached child did not publish its pid");
   const pid = Number(readFileSync(daemonPid, "utf8").trim());
   t.after(() => { try { process.kill(pid, "SIGKILL"); } catch { /* already exited */ } });
   assert.equal(spawnSync("kill", ["-0", String(pid)]).status, 0, "the detached child still lives");
-  const slot = join(fx.slotRoot, "family__workspace-a__dev");
-  assert.equal(spawnSync("flock", ["-n", join(slot, ".gate.lock"), "true"]).status, 0,
+  assert.equal(spawnSync("flock", ["-n", gate.lock, "true"]).status, 0,
     "the detached child inherited no descriptor that can retain the lock");
   process.kill(pid, "SIGKILL");
 });

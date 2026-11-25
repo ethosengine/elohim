@@ -411,7 +411,7 @@ describe('gate step reading collector', () => {
       if (command === 'bash' && String(args[0]).endsWith('/rust-style.sh')) return { status: 0 };
       if (command === 'bash' && String(args[0]).endsWith('/run-local-gate.sh')) {
         writeFileSync(options.env.GATE_STEP_TIMES, 'fmt\t0\t1795500000\t1795500002\n');
-        if (slotWaitSeconds !== null) writeFileSync(args.at(-1), `${slotWaitSeconds}\tproject=incumbent pid=42\n`);
+        if (slotWaitSeconds !== null) writeFileSync(args.at(-2), `${slotWaitSeconds}\tproject=incumbent pid=42\n`);
         now += recipeAdvanceNs;
         return { status: 7, stdout: '', stderr: '' };
       }
@@ -463,6 +463,21 @@ describe('gate step reading collector', () => {
       const wait = result.readings.find(row => row.step === 'eprfs:slot-wait');
       assert.deepEqual({ seconds: wait.value, status: wait.status, outcome: wait.outcome },
         { seconds: 2, status: 'none', outcome: 'ran' });
+    } finally {
+      rmSync(result.root, { recursive: true, force: true });
+    }
+  });
+
+  test('an uncontended slot records no wait reading and subtracts no phantom wait', () => {
+    const result = timedCrateRun({
+      budgetMs: 60_000,
+      cargoAdvanceNs: 0n,
+      recipeAdvanceNs: 5_000_000_000n,
+    });
+    try {
+      const main = result.readings.find(row => row.step === 'eprfs');
+      assert.deepEqual({ seconds: main.value, waited: main.waited_seconds }, { seconds: 5, waited: 0 });
+      assert.equal(result.readings.some(row => row.step === 'eprfs:slot-wait'), false);
     } finally {
       rmSync(result.root, { recursive: true, force: true });
     }
@@ -1497,10 +1512,11 @@ describe('a shared cargo slot never serves another checkout its compiled crates'
     mkdirSync(resolve(fp, 'elohim-epr-0123abcd'), { recursive: true });
     mkdirSync(resolve(fp, 'serde-89ef4567'), { recursive: true });
     writeFileSync(resolve(target, '.gate-owner'), '/projects/elohim/.claude/worktrees/some-other-checkout');
+    const lock = `${target}.gate.lock`;
     const run = () => spawnSync(
-      'bash',
-      [resolve(ROOT, 'genesis/orchestrator/run-local-gate.sh'),
-        ROOT, 'selftest', 'elohim/epr', 'root-just', '_gate-selftest-env', '', target, 'dev', ''],
+      'flock',
+      ['--close', lock, 'bash', resolve(ROOT, 'genesis/orchestrator/run-local-gate.sh'),
+        ROOT, 'selftest', 'elohim/epr', 'root-just', '_gate-selftest-env', '', target, 'dev', '', '', lock],
       { encoding: 'utf8', env: { ...process.env, GATE_CARGO_ENV: undefined } }
     );
     try {
@@ -1692,7 +1708,7 @@ test('recorded evidence duration excludes a simulated cargo slot wait', t => {
     const ok = stdout => ({ status: 0, stdout, stderr: '' });
     if (command === 'bash' && String(args[0]).endsWith('/rust-style.sh')) return ok('');
     if (command === 'bash' && String(args[0]).endsWith('/run-local-gate.sh')) {
-      writeFileSync(args.at(-1), '2\tproject=incumbent pid=42\n');
+      writeFileSync(args.at(-2), '2\tproject=incumbent pid=42\n');
       now += 5_000_000_000n;
       return ok('');
     }
@@ -1739,7 +1755,7 @@ test('a cargo slot timeout records only its not-run slot-wait reading and live e
     const ok = stdout => ({ status: 0, stdout, stderr: '' });
     if (command === 'bash' && String(args[0]).endsWith('/rust-style.sh')) return ok('');
     if (command === 'bash' && String(args[0]).endsWith('/run-local-gate.sh')) {
-      writeFileSync(args.at(-1), '0.5\tproject=incumbent pid=42\n');
+      writeFileSync(args.at(-2), '0.5\tproject=incumbent pid=42\n');
       return { status: GATE_SLOT_BUSY_EXIT, stdout: '', stderr: '' };
     }
     if (args[0] === 'rev-parse') return ok('a'.repeat(40));
