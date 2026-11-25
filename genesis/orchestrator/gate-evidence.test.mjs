@@ -30,6 +30,7 @@ import {
   emitGateVerdict,
   findEvidence,
   gateEvidence,
+  gateKeyMaterial,
   gateReuseWithheldReason,
   noKeyLine,
   isHabitAtom,
@@ -208,6 +209,21 @@ test('gateEvidence resolves the closure, asks brit-build-ref once with the key, 
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test('the real read variant computes the exact key gateEvidence uses', () => {
+  const env = { BRIT_BIN: process.execPath, BRIT_BUILD_REF_BIN: process.execPath, PATH: '' };
+  const { spawn } = fakeSpawn([
+    [isFingerprint, fingerprintReply('bafy-real')],
+    ...closureReplies,
+    [isStatus, { status: 0, stdout: '', stderr: '' }],
+    [isFind, { status: 0, stdout: '[]', stderr: '' }],
+  ]);
+  const options = { env, root: '/repo', commit: 'abc123', cargoEnv: { RUSTUP_TOOLCHAIN: '1.96.1' }, spawn };
+  const real = gateKeyMaterial(project, { ...options, variant: {} });
+  const evidence = gateEvidence(project, options);
+  assert.equal(real.key, evidence.key);
+  assert.equal(real.material, evidence.material);
 });
 
 test('a dirty working tree under the project is named on the line and blocks the record', () => {

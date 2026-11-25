@@ -221,7 +221,7 @@ function stepSources(project, root, commit, spawn) {
 // results, partitioned by repository, project and commit (and tree for moving refs).
 const readSets = new Map();
 
-function readSetAt(project, root, commit, sources, tree, spawn) {
+function readSetAt(project, root, commit, sources, tree, spawn, variant = {}) {
   // A suite that declares its reads, and runs where only those bytes exist, keys on its list at the commit.
   const list = SUITE_READ_LISTS[project.name];
   if (list) {
@@ -229,7 +229,8 @@ function readSetAt(project, root, commit, sources, tree, spawn) {
     return text === null ? null : suiteReadSet(text, list);
   }
   if (!project.run.cargo || !sources || UNAUDITED_RECIPE_PROJECTS.includes(project.name)) return null;
-  const key = JSON.stringify([resolve(root), project.name, commit, tree]);
+  const key = JSON.stringify([resolve(root), project.name, commit, tree,
+    variant.excludeDependencyTests === true, variant.resolveFormatJoin === true]);
   if (readSets.has(key)) return readSets.get(key);
   try {
     const names = gitRead(root, ['ls-tree', '-r', '--name-only', '-z', commit], spawn);
@@ -238,7 +239,7 @@ function readSetAt(project, root, commit, sources, tree, spawn) {
     if (![...files].some(file => file.endsWith('.rs') && sources.some(source => globCovers(source, file)))) return null;
     const contents = new Map();
     const reads = readSet({
-      root, project, sources, listFiles: () => [...files],
+      root, project, sources, variant, listFiles: () => [...files],
       readFile: path => {
         const rel = relative(root, path).split('\\').join('/');
         if (!files.has(rel)) throw Object.assign(new Error(`absent at ${commit}: ${rel}`), { code: 'ENOENT' });
@@ -640,16 +641,15 @@ export function describeEvidence(rows, now = Date.now()) {
 }
 
 /**
- * Resolve the closure and look for evidence. Returns `{ key, rows, line }` on a resolved
- * closure (rows may be empty) or `{ line }` alone when the closure is unavailable.
+ * Compute the canonical closure material without reading or writing the evidence store. `variant`
+ * changes only the audited Rust read set; omitted, this is the exact material gateEvidence keys.
  */
-export function gateEvidence(project, { env = process.env, root, commit, cargoEnv, spawn = spawnSync, now = Date.now(), warn = stderrWarn, inputs = null } = {}) {
+export function gateKeyMaterial(project, {
+  env = process.env, root, commit, cargoEnv, spawn = spawnSync, inputs = null, variant = {},
+  britBin = resolveBin('brit', ['BRIT_BIN'], env),
+} = {}) {
   if (project.run?.kind === 'attested') return { line: 'unavailable (attested project, no local recipe)' };
-  const britBin = resolveBin('brit', ['BRIT_BIN'], env);
-  const buildRefBin = resolveBin('brit-build-ref', BUILD_REF_ENV, env);
-  if (!britBin || !buildRefBin) {
-    return { line: `unavailable (${!britBin ? 'brit' : 'brit-build-ref'} not on BRIT_BIN/BRIT_BUILD_REF_BIN or PATH)` };
-  }
+  if (!britBin) return { line: 'unavailable (brit not on BRIT_BIN/BRIT_BUILD_REF_BIN or PATH)' };
   const native = usesNativeClosure(project)
     ? nativeGateState(project, { root, env, run: spawn, toolchain: cargoEnv?.RUSTUP_TOOLCHAIN, commit }) : undefined;
   if (native?.miss) return { line: `unavailable (${native.miss})`, dirty: true };
@@ -671,7 +671,7 @@ export function gateEvidence(project, { env = process.env, root, commit, cargoEn
   const sources = stepSources(project, root, commit, spawn);
   const tree = gitRead(root, ['rev-parse', `${commit}^{tree}`], spawn)?.trim() || null;
   if (!tree) return { line: `unavailable (read tree absent at ${String(commit).slice(0, 9)})` };
-  const read = readSetAt(project, root, commit, sources, tree, spawn);
+  const read = readSetAt(project, root, commit, sources, tree, spawn, variant);
   // Deliberately conservative tier for gates whose reads cannot be named: eprfs
   // walks the repository and JS gates read many manifests. Require identical
   // repository trees and check all checkout dirt, including hook-written ledgers.
@@ -723,12 +723,42 @@ export function gateEvidence(project, { env = process.env, root, commit, cargoEn
     suite: suite && { inventory: suite.inventory, packages: suite.packages, node: suite.node },
   });
   const key = createHash('sha256').update(material).digest('hex');
+  return {
+    project: project.name,
+    key,
+    material,
+    britBin,
+    fingerprints: suiteNamed ? [] : fp.fingerprints,
+    nativeKey,
+    sources,
+    recipePath: recipe.path,
+    reads,
+    scope,
+    ...(suite ? { suite: { inventory: suite.inventory, packages: suite.packages, node: suite.node,
+      commit: suite.commit, matcher: suite.matcher } } : {}),
+  };
+}
+
+/**
+ * Resolve the closure and look for evidence. Returns `{ key, rows, line }` on a resolved
+ * closure (rows may be empty) or `{ line }` alone when the closure is unavailable.
+ */
+export function gateEvidence(project, { env = process.env, root, commit, cargoEnv, spawn = spawnSync, now = Date.now(), warn = stderrWarn, inputs = null } = {}) {
+  if (project.run?.kind === 'attested') return { line: 'unavailable (attested project, no local recipe)' };
+  const britBin = resolveBin('brit', ['BRIT_BIN'], env);
+  const buildRefBin = resolveBin('brit-build-ref', BUILD_REF_ENV, env);
+  if (!britBin || !buildRefBin) {
+    return { line: `unavailable (${!britBin ? 'brit' : 'brit-build-ref'} not on BRIT_BIN/BRIT_BUILD_REF_BIN or PATH)` };
+  }
+  const closure = gateKeyMaterial(project, { env, root, commit, cargoEnv, spawn, inputs, britBin });
+  if (!closure.key) return { line: closure.line, ...(closure.dirty === true ? { dirty: true } : {}) };
+  const { key, material, fingerprints, nativeKey, sources, recipePath, reads, scope, suite } = closure;
   const found = findEvidence(project, key, { buildRefBin, root, spawn, warn });
   if (found.error) return { key, material, line: `unavailable (${found.error}); closure scope ${scope}` };
   // The suite's recording decision asks the builder's own status call, with its flags.
   let dirty;
   try {
-    dirty = suite ? dirtyInView(suite.matcher, { cwd: root }) : dirtyPaths(project, { root, spawn, sources, recipePath: recipe.path, reads });
+    dirty = suite ? dirtyInView(suite.matcher, { cwd: root }) : dirtyPaths(project, { root, spawn, sources, recipePath, reads });
   } catch { dirty = null; }
   let line = `${describeEvidence(found.rows, now)}; closure scope ${scope}`;
   const ignored = found.unverifiable.length;
@@ -743,7 +773,7 @@ export function gateEvidence(project, { env = process.env, root, commit, cargoEn
     material,
     // What gate-inputs' shadow compares with: the brit that keyed this and the step fingerprints.
     britBin,
-    fingerprints: suiteNamed ? [] : fp.fingerprints,
+    fingerprints,
     rows: found.rows,
     unverifiable: found.unverifiable,
     line,
