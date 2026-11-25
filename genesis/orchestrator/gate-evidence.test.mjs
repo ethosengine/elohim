@@ -1332,6 +1332,52 @@ test('runProject reuses without executing or attesting and observes run-kind=reu
     'reuse does not measure a new cost vector');
 });
 
+test('GATE_RECORD=off executes the closure while verdict notes and crossing events stay byte-identical', async t => {
+  const { runProject } = await import('./gate-runner.mjs');
+  const { root, env } = evidenceFixture(t);
+  const notePath = join(root, 'verdict-note.fixture');
+  const crossingPath = join(root, 'gate-verdict.fixture');
+  writeFileSync(notePath, 'original build note\n');
+  writeFileSync(crossingPath, 'original gate-verdict@1 crossing\n');
+  const beforeNote = readFileSync(notePath);
+  const beforeCrossing = readFileSync(crossingPath);
+  const fake = fakeSpawn([
+    [isFingerprint, fingerprintReply('bafy-a')],
+    [(bin, args) => isRevParse(bin, args) && args[1] === '--git-common-dir', { status: 0, stdout: '.git\n' }],
+    ...closureReplies,
+    [isStatus, { status: 0, stdout: '' }],
+    [isFind, { status: 0, stdout: '[]' }],
+    [(bin) => bin === 'bash', { status: 0, stdout: '', stderr: '' }],
+  ]);
+  let recordingSpawns = 0;
+  const spawn = (bin, args, options) => {
+    const records = isPut(bin, args)
+      || (bin === 'epr' && (args.includes('gate-verdict@1') || args.includes('gate-cycle-seconds@1')
+        || args.includes('reading') || args.includes('carry')))
+      || (String(bin).endsWith('ark') && args[0] === 'task');
+    if (records) recordingSpawns += 1;
+    return fake.spawn(bin, args, options);
+  };
+  const status = runProject({ ...project, run: { kind: 'just', recipe: 'gate' } }, false, false, {
+    root,
+    env: {
+      ...env,
+      GATE_RECORD: 'off',
+      GATE_EVIDENCE: 'off',
+      GATE_TASK: 'on',
+      GATE_LIVE_RUN: crossingPath,
+    },
+    spawn,
+    write: () => {},
+  });
+  assert.equal(status, 0);
+  assert.equal(recordingSpawns, 0, 'no build put, gate-verdict, cycle, reading, carry or ark spawn');
+  assert.deepEqual(readFileSync(notePath), beforeNote);
+  assert.deepEqual(readFileSync(crossingPath), beforeCrossing);
+  const recipe = fake.calls.find(call => call.bin === 'bash');
+  assert.equal(recipe.opts.env.GATE_RECORD, 'off', 'the no-record contract reaches the recipe');
+});
+
 test('runProject reuses a sibling green, labels it sibling, and records sibling reuse', async t => {
   const { runProject } = await import('./gate-runner.mjs');
   const { root, env } = evidenceFixture(t);
