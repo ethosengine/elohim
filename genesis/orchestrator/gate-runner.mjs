@@ -552,7 +552,17 @@ function gitDirs(root) {
 
 /** The stable lock sits beside the slot, so deleting the slot cannot replace the locked inode. */
 export function slotGateLockPath(slot) {
-  return slot ? `${slot}.gate.lock` : '';
+  if (!slot) return '';
+  let backing;
+  try {
+    backing = realpathSync(slot);
+  } catch {
+    const result = spawnSync('readlink', ['-m', '--', slot], { encoding: 'utf8' });
+    backing = result.status === 0 && String(result.stdout || '').trim()
+      ? String(result.stdout).trim()
+      : resolve(slot);
+  }
+  return `${backing}.gate.lock`;
 }
 
 function cargoSlotPath(cargo, targetDir, root, env) {

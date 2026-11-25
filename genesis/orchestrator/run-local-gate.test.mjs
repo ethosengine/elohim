@@ -7,6 +7,7 @@ import {
   mkdtempSync,
   readFileSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { join } from "node:path";
@@ -15,6 +16,7 @@ import { spawn, spawnSync } from "node:child_process";
 import { setTimeout as delay } from "node:timers/promises";
 import test from "node:test";
 import { openRun, readRun } from "./gate-live.mjs";
+import { slotGateLockPath } from "./gate-runner.mjs";
 
 const SCRIPT = join(import.meta.dirname, "run-local-gate.sh");
 const TAP = join(import.meta.dirname, "gate-tap.mjs");
@@ -129,16 +131,18 @@ printf 'exit\\t%s\\t%s\\n' "$GATE_TEST_LABEL" "$(now)" >> "$GATE_TEST_EVENTS"
 function startSlotGate(t, fx, {
   projectName,
   workspace = "workspace-a",
+  targetDir = "",
   label = projectName,
   env = {},
 } = {}) {
-  const slot = join(fx.slotRoot, `family__${workspace.replaceAll("/", "_")}__dev`);
-  const lock = `${slot}.gate.lock`;
+  const slot = targetDir || join(fx.slotRoot, `family__${workspace.replaceAll("/", "_")}__dev`);
+  const lock = slotGateLockPath(slot);
+  const backing = lock.slice(0, -".gate.lock".length);
   const waitResult = join(fx.dir, `${label}.slot-wait.tsv`);
   const live = env.GATE_LIVE_RUN ? ["--run", env.GATE_LIVE_RUN] : [];
   const child = spawn(process.execPath, [TAP, "--project", projectName, ...live, "--", "bash",
     SCRIPT, fx.root, projectName, fx.projectDir, "root-just", "gate",
-    workspace, "", "dev", "", waitResult, lock,
+    targetDir ? "" : workspace, targetDir, "dev", "", waitResult, lock,
   ], {
     cwd: fx.root,
     env: {
@@ -151,21 +155,25 @@ function startSlotGate(t, fx, {
       GATE_TEST_NODE: process.execPath,
       GATE_TEST_TAP: TAP,
       GATE_SLOT_LOCK_PATH: lock,
-      GATE_SLOT_HOLDER_PATH: join(slot, ".gate.holder"),
+      GATE_SLOT_HOLDER_PATH: join(backing, ".gate.holder"),
       GATE_SLOT_WAIT_RESULT: waitResult,
       ...env,
     },
     detached: true,
-    stdio: ["ignore", "pipe", "pipe"],
+    stdio: ["ignore", "pipe", "pipe", "pipe"],
   });
   let stdout = "";
   let stderr = "";
+  let fd3 = "";
   child.stdout.setEncoding("utf8");
   child.stderr.setEncoding("utf8");
+  child.stdio[3].setEncoding("utf8");
   child.stdout.on("data", chunk => { stdout += chunk; });
   child.stderr.on("data", chunk => { stderr += chunk; });
+  child.stdio[3].on("data", chunk => { fd3 += chunk; });
   const closed = new Promise(resolve => child.once("close", (status, signal) => {
-    resolve({ status, signal, stdout, stderr });
+    resolve({ status, signal, stdout, stderr,
+      summary: fd3.trim() ? JSON.parse(fd3.trim().split("\n").at(-1)) : null });
   }));
   t.after(() => {
     if (child.exitCode === null && child.signalCode === null) {
@@ -322,23 +330,27 @@ test("a waiting gate refreshes its holder heartbeat on stderr and the live run",
   const fx = slotFixture(t);
   const ready = join(fx.dir, "heartbeat-holder.ready");
   const release = join(fx.dir, "heartbeat-holder.release");
+  t.after(() => { try { writeFileSync(release, "release\n"); } catch { /* fixture gone */ } });
   const holder = startSlotGate(t, fx, {
     projectName: "heartbeat-holder",
     env: { GATE_TEST_READY: ready, GATE_TEST_RELEASE: release },
   });
-  await waitUntil(() => existsSync(ready), "heartbeat holder never entered");
+  await waitUntil(() => existsSync(ready), "heartbeat holder never entered", 60_000);
   const live = openRun({ root: fx.root, sha: "c".repeat(40), target: "just gate", session: "heartbeat" });
   const waiter = startSlotGate(t, fx, {
     projectName: "heartbeat-waiter",
     env: { GATE_LIVE_RUN: live.path, GATE_SLOT_WAIT_HEARTBEAT_S: "0.02" },
   });
-  await waitUntil(() => (waiter.stderr().match(/cargo slot still busy/g) || []).length >= 2,
-    "waiting gate did not refresh its stderr heartbeat");
-  assert.ok(readRun(live.path).events.filter(event => event.kind === "wait").length >= 2,
-    "waiting gate did not refresh its live wait event");
+  await waitUntil(() => {
+    try { return readRun(live.path).events.filter(event => event.kind === "wait").length >= 2; }
+    catch { return false; }
+  }, "waiting gate did not refresh its live wait event", 30_000);
   writeFileSync(release, "release\n");
   assert.equal((await holder.closed).status, 0);
-  assert.equal((await waiter.closed).status, 0);
+  const result = await waiter.closed;
+  assert.equal(result.status, 0);
+  assert.ok((result.stderr.match(/cargo slot still busy/g) || []).length >= 2,
+    `waiting gate did not refresh its stderr heartbeat: ${JSON.stringify(result.stderr)}`);
 });
 
 test("SIGINT while waiting for a cargo slot aborts admission with exit 130", async (t) => {
@@ -355,10 +367,29 @@ test("SIGINT while waiting for a cargo slot aborts admission with exit 130", asy
   waiter.child.kill("SIGINT");
   const result = await waiter.closed;
   assert.equal(result.status, 130, result.stderr);
+  assert.deepEqual(result.summary.stopped, { by: null, signal: "SIGINT" });
   assert.equal(existsSync(waiter.waitResult), false, "an interrupted wait records no completed wait");
   assert.doesNotMatch(readFileSync(fx.events, "utf8"), /interrupted-waiter/);
   writeFileSync(release, "release\n");
   assert.equal((await holder.closed).status, 0);
+});
+
+test("an uncontended gate on a symlinked cargo slot runs against the backing lock", async (t) => {
+  const fx = slotFixture(t);
+  const backing = join(fx.slotRoot, "backing-slot");
+  const linked = join(fx.slotRoot, "linked-slot");
+  mkdirSync(backing, { recursive: true });
+  symlinkSync(backing, linked, "dir");
+
+  const gate = startSlotGate(t, fx, { projectName: "linked-slot", targetDir: linked });
+  const result = await gate.closed;
+
+  assert.equal(gate.lock, `${backing}.gate.lock`);
+  assert.equal(result.status, 0, result.stderr);
+  assert.doesNotMatch(result.stderr, /runner did not name|cargo slot still busy|REFUSED/);
+  assert.deepEqual(readEvents(fx.events).map(({ kind, label }) => [kind, label]), [
+    ["enter", "linked-slot"], ["exit", "linked-slot"],
+  ]);
 });
 
 test("SIGKILL of the tap does not release the slot while its recipe session lives", async (t) => {

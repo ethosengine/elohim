@@ -16,6 +16,7 @@ import {
   emitStepReadings,
   gateChildEnv,
   gateReadingRow,
+  GATE_STOPPED_EXIT,
   GATE_SLOT_BUSY_EXIT,
   oracleMode,
   projectsForChanges,
@@ -2212,6 +2213,53 @@ test('a cargo slot timeout records only its not-run slot-wait reading and live e
   const notRun = readRun(live.path).events.find(event => event.kind === 'not-run');
   assert.deepEqual({ project: notRun.project, holder: notRun.holder, waited: notRun.waited_seconds },
     { project: 'fixture', holder: 'project=incumbent pid=42', waited: 0.5 });
+});
+
+test('a signal during slot wait records no evidence, cycle reading, crossing, or live verdict', t => {
+  const root = mkdtempSync(resolve(tmpdir(), 'gate-slot-interrupted-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const bin = resolve(root, 'brit');
+  writeFileSync(bin, '', { mode: 0o755 });
+  const slot = resolve(root, 'slot');
+  const project = { name: 'fixture', dir: 'fixture', steps: ['build'],
+    manifestPath: 'build-manifest.json', run: {
+      kind: 'just', recipe: 'gate', cargo: { targetDir: slot, rustflags: '' },
+    } };
+  const calls = [];
+  const readings = [];
+  const live = openRun({ root, sha: 'a'.repeat(40), target: 'just gate', session: 'test' });
+  let puts = 0;
+  let output = '';
+  const spawn = (command, args) => {
+    calls.push({ command, args });
+    const ok = stdout => ({ status: 0, stdout, stderr: '' });
+    if (command === 'bash' && String(args[0]).endsWith('/rust-style.sh')) return ok('');
+    if (command === process.execPath && String(args[0]).endsWith('/gate-tap.mjs')) {
+      return { status: 130, signal: null, output: [null, null, null,
+        JSON.stringify({ stopped: { by: null, signal: 'SIGINT' } })] };
+    }
+    if (args[0] === 'rev-parse') return ok('a'.repeat(40));
+    if (args[0] === 'show') return ok(JSON.stringify({ steps: { build: { inputs: { sources: ['fixture/**'] } } } }));
+    if (args[0] === 'status' || args[0] === 'ls-tree') return ok('');
+    if (args[1] === 'fingerprint') return ok(JSON.stringify({ fingerprints: [{ step: 'build', fingerprint: 'fp' }] }));
+    if (args[3] === 'find') return ok('[]');
+    if (args[2] === 'signer') return ok(JSON.stringify({ agentId: 'ab'.repeat(32) }));
+    if (args[3] === 'put') { puts += 1; return ok('written'); }
+    return { status: 0, stdout: '', stderr: '' };
+  };
+  const status = runProject(project, false, false, { root, spawn, tap: true, readingCollector: readings,
+    env: { PATH: '', BRIT_BIN: bin, BRIT_BUILD_REF_BIN: bin, EPR_BIN: 'fixture-epr',
+      GATE_LIVE_RUN: live.path, GATE_TASK: 'off', GATE_EVIDENCE: 'off', GATE_INPUTS: 'off', GATE_RECIPE_KEY: 'off' },
+    write: line => { output += line; }, warn: line => { output += line; } });
+
+  assert.equal(status, GATE_STOPPED_EXIT);
+  assert.equal(puts, 0, 'no closure evidence is written');
+  assert.deepEqual(readings, [], 'no gate, step, or slot-wait reading is written');
+  assert.equal(calls.some(call => call.args.includes('gate-verdict@1')), false, 'no crossing is written');
+  assert.equal(calls.some(call => call.args.includes('gate-cycle-seconds@1')), false, 'no cycle is written');
+  assert.equal(readRun(live.path).events.some(event => event.kind === 'gate-verdict'), false, 'no live verdict is written');
+  assert.equal(readRun(live.path).events.filter(event => event.kind === 'gate-stopped').length, 1);
+  assert.doesNotMatch(output, /evidence: recorded/);
 });
 
 test('ark CLI and workspace lock are eprfs gate-owned inputs, not pipeline dispatch sources', () => {
