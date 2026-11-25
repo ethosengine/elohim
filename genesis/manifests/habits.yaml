@@ -2695,10 +2695,10 @@ habits:
       - "node --test genesis/orchestrator/suite-list.test.mjs (the orchestrator suite list holds every test file once; the named half's view holds what its key hashes and its environment is constructed)"
       - "a2o genesis/a2o/features/devflow/native-gate-evidence.feature reuse rule (this workspace's own green stands in; a red or an unadmitted signer never does)"
     evidence: >
-      DELTA 2026-11-24c (RED preserved; eprfs per-crate verdicts in shadow): after an eprfs recipe run, each workspace crate gets a key per step (crate-keys.mjs: its tree at the gated commit, its workspace dependencies keys recursively, Cargo.lock, toolchain, cargo env and features, audited reads outside every member) and one gate-step-reading row named eprfs:<step>:<crate> with parent eprfs:<step> and an apportioned share of the step seconds; the native append derives key_changed against that crate last green, and `epr flow report reading --crate-shadow` prints one line per step after the append (K of N crates unchanged, about S s would have been saved). Decides nothing; no rows on a dirty crate tree or when the gated commit is not HEAD. Built by Codex, reviewed: decideReuse restored to a direct call, the clean-HEAD guard added. Node 180/180, flow::reading 24/24, clippy clean.
-    evidence-fingerprint: sha256:5602227802b5bd0a
-    evidence-bytes: 41316
-    evidence-entries: 44
+      DELTA 2026-11-25 (GREEN preserved; station Attest-grade in shadow): beside each gate's reuse-or-run decision, after its seconds, evidence and cycle are recorded, gate-runner prints one `grade (shadow, proposed table)` line and collects one `<project>:grade:<class>:n<count>:<yes|no|na>` reading row (gate-grade.mjs): the admitted devices holding a green for this closure, each counted once, from the brit-verified rows and the sibling verdicts the reuse decision already read (no added `epr` process when reuse asked; one bounded `epr peer verdicts` otherwise); a harvested `ci:<pipeline>` note listed apart as a carrier's result and counted zero; another closure, an unverifiable note, an unresolved signer and an unsigned enrichment listed and not counted; any red shown; the class of the change from the paths the push touches, `undetermined` with no reading when a path fits no row. `GATE_GRADE=off` adds no read, spawn or write; it shares the read-shadow budget and ledger; it decides nothing and the table is unruled. Evidence: gate-grade.test.mjs 10/10 and five `grade shadow:` tests in gate-runner.test.mjs (on/off equivalence over evidence arguments, cycle arguments, exit and recorded seconds, on a ran, a reused and a vetoed gate).
+    evidence-fingerprint: sha256:436fb8352222c5e1
+    evidence-bytes: 42559
+    evidence-entries: 45
     guard: >
       Regression risks: (1) reusing on a key that omits something the recipe reads — the recipe
       body, the project tree, a submodule pin, a repo file a test include_str!s; the input audit

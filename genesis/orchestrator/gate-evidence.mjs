@@ -525,7 +525,7 @@ export const SIBLING_REUSE_GOVERNANCE_PATHS = Object.freeze([
   '.claude/epr-meta/measures.yaml',
 ]);
 
-function isSiblingGovernancePath(path) {
+export function isSiblingGovernancePath(path) {
   return SIBLING_REUSE_GOVERNANCE_PATHS.some(rule => {
     if (rule.endsWith('/**')) return path.startsWith(rule.slice(0, -2));
     if (rule.includes('*')) {

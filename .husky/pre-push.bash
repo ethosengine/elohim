@@ -407,10 +407,11 @@ trap 'exit 129' HUP
 HOOK_ON_EXIT="$HOOK_ON_EXIT gate_step_reading"
 
 # ── Read-shadow push ledger ─────────────────────────────────────
-# One append-only read-shadow budget ledger belongs to this push when the shadow is on. Every
-# gate-runner child inherits the same path; an unavailable scratch path is left unreadable so
-# runners fail closed instead of silently restoring one budget per process.
-if [ "${GATE_READ_SHADOW:-on}" != "off" ]; then
+# One append-only shadow budget ledger belongs to this push when the read-shadow or the grade
+# shadow (GATE_GRADE) is on; both draw on it. Every gate-runner child inherits the same path; an
+# unavailable scratch path is left unreadable so runners fail closed instead of silently restoring
+# one budget per process. With both knobs off no ledger is made.
+if [ "${GATE_READ_SHADOW:-on}" != "off" ] || [ "${GATE_GRADE:-shadow}" != "off" ]; then
   GATE_READ_SHADOW_SCRATCH=$(mktemp -d 2>/dev/null || true)
   if [ -n "$GATE_READ_SHADOW_SCRATCH" ]; then
     GATE_READ_SHADOW_LEDGER="$GATE_READ_SHADOW_SCRATCH/spent-ms"

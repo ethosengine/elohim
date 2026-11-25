@@ -234,7 +234,7 @@ test('read-shadow on and off keep the same verdict, run decision, and evidence-s
       env: {
         PATH: '', BRIT_BIN: brit, BRIT_BUILD_REF_BIN: buildRef, GATE_TASK: 'off',
         GATE_EVIDENCE: 'off', GATE_INPUTS: 'off', GATE_RECIPE_KEY: 'off',
-        GATE_READ_SHADOW: mode, GATE_READING_RUN_ID: `shadow-${mode}`,
+        GATE_READ_SHADOW: mode, GATE_GRADE: 'off', GATE_READING_RUN_ID: `shadow-${mode}`,
         ...(budget === null ? {} : { GATE_READ_SHADOW_BUDGET_MS: budget }),
       },
       inputsPolicy: { cls: { britArgs: [] } },
@@ -337,7 +337,7 @@ test('read-shadow shares its budget across runners and a failed ledger append ma
   const env = {
     PATH: '', BRIT_BIN: brit, BRIT_BUILD_REF_BIN: buildRef, GATE_TASK: 'off',
     GATE_EVIDENCE: 'off', GATE_INPUTS: 'off', GATE_RECIPE_KEY: 'off',
-    GATE_READ_SHADOW: 'on', GATE_READ_SHADOW_BUDGET_MS: '10',
+    GATE_READ_SHADOW: 'on', GATE_GRADE: 'off', GATE_READ_SHADOW_BUDGET_MS: '10',
   };
   const budget = readShadowPushBudget(env, () => clockNs);
   const run = (name, readBudget = budget) => {
@@ -438,7 +438,7 @@ test('read-shadow knob off performs no ledger I/O', () => {
   let ledgerReads = 0;
   let ledgerWrites = 0;
   const off = readShadowPushBudget({
-    GATE_READ_SHADOW: 'off', GATE_READ_SHADOW_LEDGER: 'fixture',
+    GATE_READ_SHADOW: 'off', GATE_GRADE: 'off', GATE_READ_SHADOW_LEDGER: 'fixture',
   }, () => 0n, {
     readFile: () => { ledgerReads++; return ''; },
     appendFile: () => { ledgerWrites++; },
@@ -2075,4 +2075,248 @@ test('ark CLI and workspace lock are eprfs gate-owned inputs, not pipeline dispa
     assert.ok(manifest.gate.projects.eprfs.inputs.sources.includes(path));
     assert.ok(!manifest.steps['rust-build-test'].inputs.sources.includes(path));
   }
+});
+
+// ── GATE_GRADE (gate-grade.mjs): the Attest-grade shadow ─────────────────────────────────────
+// One fixture gate driven through runProject with every subprocess stood in, so each test reads
+// the calls the runner really made: evidence arguments, cycle arguments, recorded seconds.
+function gradeFixture(t) {
+  const root = mkdtempSync(resolve(tmpdir(), 'gate-grade-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  mkdirSync(resolve(root, 'fixture'), { recursive: true });
+  mkdirSync(resolve(root, 'genesis/orchestrator'), { recursive: true });
+  mkdirSync(resolve(root, 'genesis/agentic'), { recursive: true });
+  writeFileSync(resolve(root, 'fixture/justfile'), 'gate:\n    true\n');
+  writeFileSync(resolve(root, 'genesis/orchestrator/run-local-gate.sh'), '#!/bin/sh\nexit 0\n');
+  writeFileSync(resolve(root, 'genesis/agentic/pool-policy.json'), JSON.stringify({ gate_reuse: { projects: ['fixture'] } }));
+  writeFileSync(resolve(root, 'build-manifest.json'), JSON.stringify({ pipeline: 'fixture-pipeline', steps: {
+    build: { inputs: { sources: ['fixture/**'] } },
+  } }));
+  const brit = resolve(root, 'brit');
+  const buildRef = resolve(root, 'brit-build-ref');
+  writeFileSync(brit, '', { mode: 0o755 });
+  writeFileSync(buildRef, '', { mode: 0o755 });
+  const project = {
+    name: 'fixture', dir: 'fixture', manifestPath: 'build-manifest.json', steps: ['build'],
+    run: { kind: 'just', recipe: 'gate' },
+  };
+  const self = 'a'.repeat(64);
+  const current = 'a'.repeat(40);
+  const base = 'b'.repeat(40);
+  const sibling = 'did:key:z6MkpZRhMwSiblingDeviceKeyOfTheSteward0001';
+  const outputCid = [0x12, 0x20, ...Array(32).fill(7)];
+  const run = ({
+    grade = 'shadow', evidence = 'off', budget = null, changed = ['fixture/test.rs'],
+    local = [], siblings = [], ci = null, flowLog = '', flowError = null, gateExit = 0,
+  } = {}) => {
+    const calls = [];
+    const rows = [];
+    const logReads = [];
+    let output = '';
+    let clockNs = 0n;
+    const ok = stdout => ({ status: 0, stdout, stderr: '' });
+    const spawn = (command, args) => {
+      calls.push({ command, args });
+      if (command === brit && args[1] === 'fingerprint') {
+        return ok(JSON.stringify({ fingerprints: [{ step: 'build', fingerprint: 'fixed' }] }));
+      }
+      if (command === buildRef && args[2] === 'signer') return ok(JSON.stringify({ agentId: self }));
+      if (command === buildRef && args[3] === 'find') {
+        const key = args[args.indexOf('--inputs-hash') + 1];
+        return ok(JSON.stringify(local.map(row => ({
+          commit: current,
+          attestation: { agentId: self, inputsHash: key, builtAt: '2026-11-25T00:00:00Z', outputCid, ...row },
+        }))));
+      }
+      if (command === buildRef && args[3] === 'get') {
+        const step = args[args.indexOf('--step') + 1];
+        return ok(step.startsWith('ci:') && ci ? JSON.stringify(ci) : '');
+      }
+      if (command === buildRef && args[3] === 'put') return { status: 1, stdout: '', stderr: 'fixture refuses writes' };
+      if (command === 'epr' && args[0] === 'peer' && args[1] === 'verdicts') {
+        const key = args[args.indexOf('--closure') + 1];
+        return ok(JSON.stringify(siblings.map(row => ({
+          device: sibling, project: 'fixture', closure: key, commit: current, seconds: 9, at: 'x', ...row,
+        }))));
+      }
+      if (command === 'git' && args[0] === 'merge-base') return ok(`${base}\n`);
+      if (command === 'git' && args[0] === 'diff' && args.includes('-z')) return ok(changed.map(path => `${path}\0`).join(''));
+      if (command === 'git' && args[0] === 'diff') return ok('');
+      if (command === 'git' && args[0] === 'show') {
+        return ok(JSON.stringify({ steps: { build: { inputs: { sources: ['fixture/**'] } } } }));
+      }
+      if (command === 'git' && args[0] === 'ls-tree') return ok('');
+      if (command === 'git' && args[0] === 'status') return ok('');
+      if (command === 'git' && args[0] === 'rev-parse' && args.includes('--verify')) return ok(`${current}\n`);
+      if (command === 'git' && args[0] === 'rev-parse' && args.includes('--git-common-dir')) return ok(`${root}/.git\n`);
+      if (command === 'git' && args[0] === 'rev-parse') return ok('blob1\n');
+      if (command === 'rustc') return ok('rustc fixture');
+      if (command === 'bash') { clockNs += 5_000_000_000n; return { status: gateExit, stdout: '', stderr: '' }; }
+      return ok('');
+    };
+    const status = runProject(project, false, false, {
+      root,
+      env: {
+        PATH: '', BRIT_BIN: brit, BRIT_BUILD_REF_BIN: buildRef, GATE_TASK: 'off',
+        GATE_EVIDENCE: evidence, GATE_INPUTS: 'off', GATE_RECIPE_KEY: 'off', GATE_READ_SHADOW: 'off',
+        GATE_GRADE: grade, GATE_READING_RUN_ID: 'grade-fixture',
+        ...(budget === null ? {} : { GATE_READ_SHADOW_BUDGET_MS: budget }),
+      },
+      inputsPolicy: { cls: { britArgs: [] } },
+      spawn, tap: false, clock: () => clockNs,
+      write: text => { output += text; }, warn: text => { output += text; },
+      readingCollector: rows,
+      gradeDeps: {
+        statFile: path => { logReads.push(['stat', path]); return { size: flowLog.length, mtimeMs: calls.length }; },
+        readFile: path => { logReads.push(['read', path]); if (flowError) throw new Error(flowError); return flowLog; },
+      },
+    });
+    const of = command => calls.filter(call => call.command === command).map(call => call.args);
+    const gradeBuildRef = args => args[2] === 'signer' || (args[3] === 'get' && String(args[args.indexOf('--step') + 1]).startsWith('ci:'));
+    return {
+      status, calls, rows, output, logReads,
+      // What the gate itself hands the evidence store and the cycle recorder.
+      // (The ci: read is the shadow's alone; so is the signer read, unless reuse already asked it.)
+      evidenceArgs: of(buildRef).filter(args => !gradeBuildRef(args) || (evidence === 'reuse' && args[2] === 'signer')),
+      cycleArgs: of('epr').filter(args => args[0] !== 'peer'),
+      gradeSpawns: [
+        ...of(buildRef).filter(args => gradeBuildRef(args) && !(evidence === 'reuse' && args[2] === 'signer')).map(args => `brit-build-ref ${args[2] === 'signer' ? 'signer' : 'get ci'}`),
+        ...of('epr').filter(args => args[0] === 'peer').map(() => 'epr peer verdicts'),
+      ],
+      eprPeerReads: of('epr').filter(args => args[0] === 'peer').length,
+      gateRuns: of('bash').length,
+      gateSeconds: rows.find(row => row.step === 'fixture')?.value,
+      gradeRows: rows.filter(row => String(row.step).startsWith('fixture:grade:')),
+      gradeLines: output.split('\n').filter(line => / grade \(shadow/.test(line)),
+    };
+  };
+  return { run, self, sibling, root };
+}
+
+test('grade shadow: on, off, failing and over budget keep the same decision, evidence arguments, cycle arguments, exit and recorded seconds', t => {
+  const { run } = gradeFixture(t);
+  const same = (on, off, what) => {
+    assert.equal(on.status, off.status, `${what}: exit status`);
+    assert.equal(on.gateRuns, off.gateRuns, `${what}: whether the recipe ran`);
+    assert.deepEqual(on.evidenceArgs, off.evidenceArgs, `${what}: evidence arguments, the recorded duration included`);
+    assert.deepEqual(on.cycleArgs, off.cycleArgs, `${what}: cycle arguments`);
+    assert.equal(on.gateSeconds, off.gateSeconds, `${what}: the gate's recorded seconds`);
+    assert.deepEqual(on.rows.filter(row => !String(row.step).startsWith('fixture:grade:')).map(row => ({ ...row, at: null, started_at: null, ended_at: null })),
+      off.rows.map(row => ({ ...row, at: null, started_at: null, ended_at: null })), `${what}: every other reading row`);
+  };
+
+  // A gate that runs (no reuse asked), green and red.
+  for (const gateExit of [0, 1]) {
+    const scene = { gateExit, siblings: [{ success: true }], ci: { success: true, inputsHash: 't'.repeat(40) } };
+    const off = run({ ...scene, grade: 'off' });
+    const on = run(scene);
+    same(on, off, `ran exit ${gateExit}`);
+    assert.equal(on.status, gateExit);
+    assert.equal(on.gateRuns, 1);
+    assert.equal(on.gradeLines.length, 1);
+    assert.match(on.gradeLines[0], new RegExp(`\\| today: ran ${gateExit === 0 ? 'green' : 'red'}$`));
+    assert.equal(on.gradeRows.length, 1);
+    assert.equal(off.gradeLines.length, 0);
+    assert.equal(off.gradeRows.length, 0);
+  }
+
+  // A gate that is reused from this workspace's own green: the real reusable path.
+  const reusable = { evidence: 'reuse', local: [{ success: true }] };
+  const reusedOff = run({ ...reusable, grade: 'off' });
+  const reusedOn = run(reusable);
+  same(reusedOn, reusedOff, 'reused');
+  assert.equal(reusedOff.gateRuns, 0, 'the fixture really is reused');
+  assert.match(reusedOff.output, /fixture reused: green/);
+  assert.match(reusedOn.gradeLines[0], /1 independent \(this device green\).*\| today: reuse own$/);
+  assert.deepEqual(reusedOn.gradeRows.map(row => [row.outcome, row.status]), [['reused', 'green']]);
+
+  // A sibling red refuses reuse today; the shadow shows it and changes nothing about that.
+  const vetoed = { evidence: 'reuse', local: [{ success: true }], siblings: [{ success: false }] };
+  const vetoedOff = run({ ...vetoed, grade: 'off' });
+  const vetoedOn = run(vetoed);
+  same(vetoedOn, vetoedOff, 'sibling red');
+  assert.equal(vetoedOff.gateRuns, 1);
+  assert.match(vetoedOn.gradeLines[0], /disagreements: sibling z6MkpZRhMw…0001 red; would suffice: no/);
+
+  // The shadow failing, and the shadow out of budget: one line, no row, nothing else moves.
+  const off = run({ grade: 'off' });
+  const failing = run({ flowLog: 'x', flowError: 'fixture flow log unreadable' });
+  same(failing, off, 'shadow failing');
+  assert.deepEqual(failing.gradeLines, ['[gate] fixture grade (shadow): dropped (fixture flow log unreadable)']);
+  assert.equal(failing.gradeRows.length, 0);
+  const starved = run({ budget: '0' });
+  same(starved, off, 'shadow over budget');
+  assert.equal(starved.gradeRows.length, 0);
+});
+
+test('grade shadow: knob off adds no read, spawn or write', t => {
+  const { run } = gradeFixture(t);
+  const scene = { siblings: [{ success: true }], ci: { success: true, inputsHash: 't'.repeat(40) }, flowLog: 'x' };
+  const on = run(scene);
+  assert.deepEqual(on.gradeSpawns, ['brit-build-ref signer', 'brit-build-ref get ci', 'epr peer verdicts'],
+    'with the knob on these are the subprocesses the shadow adds when no reuse was asked');
+  assert.equal(on.logReads.length, 2, 'and it stats and reads the flow log once');
+  const off = run({ ...scene, grade: 'off' });
+  assert.deepEqual(off.gradeSpawns, []);
+  assert.deepEqual(off.logReads, []);
+  assert.equal(off.gradeLines.length, 0);
+  assert.equal(off.gradeRows.length, 0);
+  assert.equal(off.calls.length, on.calls.length - on.gradeSpawns.length - on.calls.filter(call =>
+    call.command === 'git' && (call.args[0] === 'merge-base' || (call.args[0] === 'diff' && call.args.includes('-z')) || call.args.includes('--git-common-dir'))).length,
+  'every call the knob adds is accounted for: off makes none of them');
+  // With both post-record shadows off there is no budget object and so no ledger I/O at all.
+  let ledgerIo = 0;
+  assert.equal(readShadowPushBudget({ GATE_READ_SHADOW: 'off', GATE_GRADE: 'off', GATE_READ_SHADOW_LEDGER: 'fixture' }, () => 0n, {
+    readFile: () => { ledgerIo++; return ''; }, appendFile: () => { ledgerIo++; }, removeFile: () => { ledgerIo++; },
+  }), null);
+  assert.equal(ledgerIo, 0);
+});
+
+test('grade shadow: it reuses the sibling read the reuse decision made and adds no epr process there', t => {
+  const { run } = gradeFixture(t);
+  const scene = { evidence: 'reuse', local: [{ success: true }], siblings: [{ success: true }] };
+  const off = run({ ...scene, grade: 'off' });
+  const on = run(scene);
+  assert.equal(off.eprPeerReads, 1, 'the reuse decision reads the sibling verdicts once');
+  assert.equal(on.eprPeerReads, 1, 'the shadow adds no second flow-store reader');
+  assert.match(on.gradeLines[0], /2 independent \(this device green, sibling z6MkpZRhMw…0001 green\)/);
+  const reportOnly = run({ siblings: [{ success: true }] });
+  assert.equal(reportOnly.eprPeerReads, 1, 'with no reuse asked the shadow makes the one bounded read itself');
+});
+
+test('grade shadow: the runner counts devices once, a carrier zero, and ignores another closure', t => {
+  const { run } = gradeFixture(t);
+  const twice = run({ evidence: 'reuse', local: [{ success: true }, { success: true, builtAt: '2026-11-24T00:00:00Z' }],
+    siblings: [{ success: true }, { success: true }], ci: { success: true, inputsHash: 't'.repeat(40), agentId: 'a'.repeat(64) } });
+  assert.match(twice.gradeLines[0], /class a library crate; executions for this closure: 2 independent \(this device green, sibling z6MkpZRhMw…0001 green\), carrier: jenkins green at this commit \(keyed on the commit tree, not this closure\)/);
+  assert.match(twice.gradeLines[0], /disagreements: none; would suffice: yes \(row needs 1 at the crate's own key; this is the project key\)/);
+  assert.equal(twice.gradeRows[0].step, 'fixture:grade:library-crate:n2:yes');
+  assert.equal(twice.gradeRows[0].parent, 'fixture');
+
+  const carrierOnly = run({ ci: { success: true, inputsHash: 't'.repeat(40) } });
+  assert.match(carrierOnly.gradeLines[0], /0 independent, carrier: jenkins green/);
+  assert.match(carrierOnly.gradeLines[0], /would suffice: no/);
+
+  const elsewhere = run({ siblings: [{ success: true, closure: 'o'.repeat(64) }, { success: false, project: 'other' }] });
+  assert.match(elsewhere.gradeLines[0], /0 independent, carrier: none; not counted: a sibling verdict for another closure or project/);
+  assert.match(elsewhere.gradeLines[0], /disagreements: none/);
+
+  // The push range is read once per gated commit per process, so another change is another fixture.
+  const undetermined = gradeFixture(t).run({ changed: ['app/elohim-app/src/main.ts'], siblings: [{ success: true }] });
+  assert.match(undetermined.gradeLines[0], /class: undetermined \(no row places app\/elohim-app\/src\/main\.ts\); executions for this closure: 1 independent/);
+  assert.doesNotMatch(undetermined.gradeLines[0], /would suffice/);
+  assert.equal(undetermined.gradeRows[0].step, 'fixture:grade:undetermined:n1:na');
+});
+
+test('grade shadow: over budget drops with one line, no row and no subprocess', t => {
+  const { run } = gradeFixture(t);
+  const starved = run({ budget: '0', siblings: [{ success: true }], ci: { success: true, inputsHash: 't'.repeat(40) }, flowLog: 'x' });
+  assert.equal(starved.status, 0);
+  assert.deepEqual(starved.gradeLines, ['[gate] fixture grade (shadow): skipped for budget (budget 0 ms exhausted in grade)']);
+  assert.equal(starved.gradeRows.length, 0);
+  assert.deepEqual(starved.gradeSpawns, []);
+  assert.deepEqual(starved.logReads, []);
+  const roomy = run({ budget: '15000', siblings: [{ success: true }] });
+  assert.equal(roomy.gradeRows.length, 1, 'with budget the same scene yields its row');
+  assert.doesNotMatch(roomy.output, /skipped for budget/);
 });

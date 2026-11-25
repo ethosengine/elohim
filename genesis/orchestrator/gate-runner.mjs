@@ -2,7 +2,7 @@
 // One local gate path for humans and pre-push. Detection and execution both
 // come from build-manifest.json; no project-name command switch lives here.
 
-import { appendFileSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'fs';
+import { appendFileSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { spawnSync } from 'child_process';
 import { createHash } from 'crypto';
@@ -19,13 +19,15 @@ import { filterChanged } from './ci-ignore.mjs';
 import { COST_FIELDS, classifyFailure, recordCycle, subjectFor } from './gate-cycle.mjs';
 import { CI_BRANCH_PATTERN, costOf, deferDecision, formatExpectation, readCycleUnion } from './gate-cost.mjs';
 import {
-  ageOf, attestedOutputParses, emitGateVerdict, findEvidence, gateEvidence, gateKeyMaterial, gateKeyMaterials, isHabitAtom, patternDigest, recordEvidence, resolveBin, reusableHit,
+  ageOf, attestedOutputParses, deviceRoot, emitGateVerdict, findEvidence, gateEvidence, gateKeyMaterial, gateKeyMaterials, isHabitAtom, isSiblingGovernancePath, patternDigest, recordEvidence, resolveBin, reusableHit,
   selfAgentId, siblingGovernanceChange, siblingVerdicts, stepFingerprints,
 } from './gate-evidence.mjs';
 import { britAffected, resolveBritBin } from './gate-oracle.mjs';
 import { landerWait } from './gate-carry-claim.mjs';
 import { deviceEpr } from './device-epr.mjs';
 import { recipeKeyShadow } from './gate-recipe-key.mjs';
+import { enrichmentsIn, gradeLine, gradeMode, gradeOf, gradeStep } from './gate-grade.mjs';
+import { readBuildNote } from './scripts/brit-attest.mjs';
 import { CLAIMED_EXIT_CODE, runAttested } from './gate-attest.mjs';
 import { affectedPackages, loadMetadata, metadataToolchain } from './cargo-affected.mjs';
 import { isReadPattern, SUITE_READ_LISTS, readSet } from './gate-input-audit.mjs';
@@ -189,11 +191,17 @@ export function projectsForChanges(root, changedFiles, opts = {}) {
  * workspace's own green is accepted; a sibling green stands in only when the push leaves the
  * sibling-reuse governance paths alone.
  */
-export function decideReuse(project, evidence, reuseContext, { root = ROOT, env = process.env, spawn = spawnSync } = {}) {
+export function decideReuse(project, evidence, reuseContext, { root = ROOT, env = process.env, spawn = spawnSync, observe = null } = {}) {
   let candidates = [];
   let governance = { changed: false };
   if (reuseContext.mode === 'reuse' && reuseContext.enabled && reuseContext.selfId && evidence.key) {
-    candidates = siblingVerdicts(project, evidence.key, { root, env, spawn }).candidates;
+    const read = siblingVerdicts(project, evidence.key, { root, env, spawn });
+    candidates = read.candidates;
+    // GATE_GRADE's shadow reads the same answer instead of asking the flow store a second time.
+    // The observer is handed a copy after the read and can change nothing decided below.
+    if (observe) {
+      try { observe({ candidates: [...candidates], error: read.error || null }); } catch { /* a shadow is never a red */ }
+    }
     if (candidates.some(candidate => candidate.success === true)) governance = siblingGovernanceChange({ root, spawn });
   }
   const decision = reusableHit(evidence, {
@@ -271,7 +279,7 @@ const shadowRanges = new Map();
  * name and no path is quoted. No base, or a base that is the gated commit, is no step. A read the
  * budget refused is not remembered.
  */
-export function touchedProcessSteps(project, { root, gateCommit, spawn = spawnSync }) {
+export function pushRange({ root, gateCommit, spawn = spawnSync }) {
   const key = `${resolve(root)}\0${gateCommit}`;
   if (!shadowRanges.has(key)) {
     let range = { base: null, files: [] };
@@ -287,10 +295,16 @@ export function touchedProcessSteps(project, { root, gateCommit, spawn = spawnSy
       range = { base, files: diff?.status === 0 ? String(diff.stdout || '').split('\0').filter(Boolean) : [] };
       break;
     }
-    if (refused) return { base: null, steps: [] };
+    if (refused) return null;
     shadowRanges.set(key, range);
   }
-  const { base, files } = shadowRanges.get(key);
+  return shadowRanges.get(key);
+}
+
+export function touchedProcessSteps(project, { root, gateCommit, spawn = spawnSync }) {
+  const range = pushRange({ root, gateCommit, spawn });
+  if (!range) return { base: null, steps: [] };
+  const { base, files } = range;
   if (!base || files.length === 0 || !project.steps?.length) return { base, steps: [] };
   let manifest;
   try { manifest = JSON.parse(readFileSync(resolve(root, project.manifestPath), 'utf8')); } catch { return { base, steps: [] }; }
@@ -680,11 +694,15 @@ function readShadowLedgerSpent(path, budgetMs, readFile = readFileSync) {
   }
 }
 
-/** One read-shadow budget shared by this process, and by a hook push when its ledger is set. */
+/**
+ * One budget for the shadows that run after a gate is recorded (the read-shadow and GATE_GRADE),
+ * shared by this process, and by a hook push when its ledger is set. With both knobs off there is
+ * no budget and no ledger I/O.
+ */
 export function readShadowPushBudget(env, clock, {
   readFile = readFileSync, appendFile = appendFileSync, removeFile = rmSync,
 } = {}) {
-  if (env.GATE_READ_SHADOW === 'off') return null;
+  if (env.GATE_READ_SHADOW === 'off' && gradeMode(env) === 'off') return null;
   const budgetMs = shadowBudgetMs(env.GATE_READ_SHADOW_BUDGET_MS);
   const hasLedger = Object.hasOwn(env, 'GATE_READ_SHADOW_LEDGER');
   const ledger = hasLedger ? String(env.GATE_READ_SHADOW_LEDGER) : null;
@@ -742,6 +760,33 @@ function dropCrateShadow(project, error, state, write) {
   if (state.dropped) return;
   state.dropped = true;
   write(`[gate] ${project} crate-shadow: dropped (${oneLine(error?.message || error)}); no crate rows\n`);
+}
+
+function dropGrade(project, error, state, write) {
+  if (state.dropped) return;
+  state.dropped = true;
+  if (error instanceof ShadowBudgetExhausted) {
+    write(`[gate] ${project} grade (shadow): skipped for budget (${oneLine(error.message)})\n`);
+  } else {
+    write(`[gate] ${project} grade (shadow): dropped (${oneLine(error?.message || error)})\n`);
+  }
+}
+
+// The flow log's enrichment rows, read once per log state per process. A plain read: no `epr`
+// process, and no flow-store lock is taken or held. A log over the cap is not read.
+const GRADE_FLOW_LOG_CAP_BYTES = 64 * 1024 * 1024;
+const gradeEnrichmentCache = new Map();
+function gradeEnrichments(device, { readFile = readFileSync, statFile = statSync } = {}) {
+  const log = resolve(device, '.eprfs/status/flows.jsonl');
+  let stat;
+  try { stat = statFile(log); } catch { return { rows: [], unread: null }; }
+  if (stat.size > GRADE_FLOW_LOG_CAP_BYTES) return { rows: [], unread: 'enrichments (flow log over the read cap)' };
+  const stamp = `${stat.size}:${stat.mtimeMs}`;
+  const held = gradeEnrichmentCache.get(log);
+  if (held?.stamp === stamp) return { rows: held.rows, unread: null };
+  const rows = enrichmentsIn(readFile(log, 'utf8'));
+  gradeEnrichmentCache.set(log, { stamp, rows });
+  return { rows, unread: null };
 }
 
 function dropReadShadow(project, error, state, write) {
@@ -1043,7 +1088,7 @@ export function runProject(project, printOnly, namesOnly, {
   write = text => process.stdout.write(text), warn = text => process.stderr.write(text),
   readsOf, recipe = null, tap = spawn === spawnSync, clock = () => process.hrtime.bigint(),
   wallClock = () => new Date(), inputsPolicy = null, readingCollector = invocationGateReadings,
-  readShadowOf = readShadowComparison, readShadowBudget = null,
+  readShadowOf = readShadowComparison, readShadowBudget = null, gradeDeps = {},
 } = {}) {
   const cargo = project.run.cargo || {};
   const targetDir = worktreeTargetDir(cargo.targetDir || '', root);
@@ -1470,7 +1515,84 @@ export function runProject(project, printOnly, namesOnly, {
     } });
   reading.leaseWaitedSeconds = carry.waitedS;
   // One admission decision for both run modes (decideReuse); ark is then asked only to run.
-  const decision = decideReuse(project, evidence, reuseContext, { root, env, spawn });
+  const gradeOn = gradeMode(env) !== 'off' && Boolean(evidence.key);
+  let observedSiblings = null;
+  const decision = decideReuse(project, evidence, reuseContext, {
+    root, env, spawn, ...(gradeOn ? { observe: read => { observedSiblings = read; } } : {}),
+  });
+  // GATE_GRADE=shadow (default; `off` adds no read, spawn or write; there is no `on`): after this
+  // gate's seconds, evidence and cycle are recorded, say what evidence this device holds for the
+  // closure and how it would read under the PROPOSED graded table (gate-grade.mjs). It draws on the
+  // shadow budget shared with the read-shadow, every subprocess it starts receives the remaining
+  // bound, and an overrun or any failure is one line and no row. It is called only after
+  // `complete`, so nothing it does reaches a decision, a record or the exit status.
+  const runGrade = gradeOn ? (outcome, status, today) => {
+    const gradeState = { dropped: false };
+    let gradeStarted = false;
+    let spentBefore = 0;
+    try {
+      sharedReadShadowBudget ||= readShadowPushBudget(env, clock);
+      sharedReadShadowBudget.check('grade');
+      spentBefore = sharedReadShadowBudget.spentMs();
+      sharedReadShadowBudget.begin();
+      gradeStarted = true;
+      const bounded = (command, args, options) => sharedReadShadowBudget.spawn(spawn, 'grade', command, args, options);
+      const check = () => sharedReadShadowBudget.check('grade');
+      const unread = [];
+      const range = pushRange({ root, gateCommit, spawn: bounded });
+      check();
+      // This workspace's key: the one the reuse decision read, else one bounded brit-build-ref call.
+      const gradeSelf = selfId ?? selfAgentId(root, bounded, signerOptions);
+      check();
+      // Sibling verdicts: what the reuse decision read, else one bounded `epr peer verdicts`.
+      const siblingRead = observedSiblings
+        ?? siblingVerdicts(project, evidence.key, { root, env, spawn: bounded });
+      check();
+      if (siblingRead.error) unread.push(`sibling verdicts (${siblingRead.error})`);
+      const device = deviceRoot(root, bounded);
+      check();
+      const enriched = gradeEnrichments(device, gradeDeps);
+      check();
+      if (enriched.unread) unread.push(enriched.unread);
+      // A sponsored runner's result: the harvested `ci:<pipeline>` note at the gated commit.
+      const carriers = [];
+      let pipeline = null;
+      try { pipeline = JSON.parse(readFileSync(resolve(root, project.manifestPath), 'utf8')).pipeline || null; } catch { pipeline = null; }
+      if (pipeline && evidence.buildRefBin) {
+        const note = readBuildNote(`ci:${pipeline}`, gateCommit, { buildRefBin: evidence.buildRefBin, root, spawn: bounded });
+        check();
+        carriers.push({
+          name: 'jenkins', state: note.state, reason: note.reason,
+          success: note.node?.success, closure: note.node?.inputsHash,
+        });
+      }
+      const grade = gradeOf({
+        range, isGovernance: isSiblingGovernancePath, project: project.name, key: evidence.key,
+        selfId: gradeSelf, local: evidence.rows || [], unverifiable: evidence.unverifiable || [],
+        siblings: siblingRead.candidates || [], enrichments: enriched.rows, carriers, unread,
+      });
+      write(`${gradeLine(project.name, grade, today)}\n`);
+      const at = wallClock();
+      const seconds = Math.max(0, (sharedReadShadowBudget.spentMs() - spentBefore) / 1000);
+      // gate-step-reading@1 refuses unknown fields, so the grade is a sibling row kind, as the
+      // crate and read shadows are: its class, count and reading ride in the step name.
+      emitGateReading({
+        ...reading, step: gradeStep(project.name, grade), parent: project.name, key: evidence.key,
+        keyChanged: 'unknown', outcome, status, synthesized: false, waitedSeconds: 0,
+        leaseWaitedSeconds: 0, seconds, startedAt: new Date(new Date(at).getTime() - seconds * 1000),
+        endedAt: at,
+      }, { env, collector: readingCollector });
+    } catch (error) {
+      dropGrade(project.name, error, gradeState, write);
+    } finally {
+      if (gradeStarted) {
+        try {
+          sharedReadShadowBudget.end();
+          sharedReadShadowBudget.recordSpent(sharedReadShadowBudget.spentMs() - spentBefore);
+        } catch { /* a shadow is never a red */ }
+      }
+    }
+  } : () => {};
   // GATE_INPUTS=shadow: whether the step fingerprints are unchanged under sources. Read only, inside
   // shadow's budget, and its span is taken out of the gate's timed span.
   // No brit spawn unless a borrowed step's own buildProcess file changed: that is decided from git
@@ -1508,6 +1630,7 @@ export function runProject(project, printOnly, namesOnly, {
     liveEvent(env, { kind: 'gate-verdict', project: project.name, verdict: { exit: 0, seconds: 0, reused: true } });
     const completed = complete(0, 'reused', Math.max(0, seconds - finiteSeconds(reading.leaseWaitedSeconds)));
     runReadShadow('reused', 'green');
+    runGrade('reused', 'green', sibling ? 'reuse sibling' : 'reuse own');
     return completed;
   }
   if (env.GATE_EVIDENCE === 'reuse') write(`[gate] ${project.name} not reused: ${decision.why}\n`);
@@ -1621,6 +1744,7 @@ export function runProject(project, printOnly, namesOnly, {
     liveEvent(env, { kind: 'gate-verdict', project: project.name, verdict: { exit: 0, seconds: 0, reused: true }, derivation, status: 'Answered' });
     const completed = complete(0, 'reused', Math.max(0, seconds - finiteSeconds(reading.leaseWaitedSeconds)));
     runReadShadow('reused', 'green');
+    runGrade('reused', 'green', 'reuse derivation');
     return completed;
   }
   const crateShadowStarted = clock();
@@ -1704,6 +1828,7 @@ export function runProject(project, printOnly, namesOnly, {
   } : {}) });
   const completed = complete(status, 'ran', Math.max(0, seconds - finiteSeconds(reading.leaseWaitedSeconds)));
   runReadShadow('ran', status === 0 ? 'green' : 'red');
+  runGrade('ran', status === 0 ? 'green' : 'red', `ran ${status === 0 ? 'green' : 'red'}`);
   return completed;
 }
 
@@ -1745,6 +1870,7 @@ function usage() {
   console.error('  env: GATE_RECIPE_KEY=shadow|off (default shadow): a root-just gate prints whether a justfile edit since the integration base left its recipe closure unchanged; it changes no key, reuse decision or record');
   console.error('  env: GATE_INPUTS=shadow|off (default shadow; no on yet): prints, once per push, the borrowed steps whose own buildProcess alone selects them, and per gate when, since the integration base, its step fingerprints moved under all and are unchanged under sources; it changes no selection, key, reuse decision or record');
   console.error('  env: GATE_READ_SHADOW=off (default on) · GATE_READ_SHADOW_BUDGET_MS (default 15000 once per push with GATE_READ_SHADOW_LEDGER, otherwise per invocation): after recorded timing, compares closure movement under two read-audit fixes; it decides nothing, and enablement requires proof for #[path]-included tests/** support, format! joins with variable suffixes, absent paths, and eprfs running and blocking on the same push');
+  console.error('  env: GATE_GRADE=off|shadow (default shadow; there is no on): after a gate is recorded, one line says what evidence this device holds for its closure (independent executions by admitted devices, a carrier\'s result apart, what was not counted, any disagreement) and what the PROPOSED graded table would say for the class of the change; it shares the read-shadow budget and decides nothing');
   console.error('  env: GATE_READING=off (default on): suppress collection and the one bounded `epr flow reading append` call; the shadow reading never changes selection, reuse, keys or exit status');
   console.error('  env: GATE_CARRY=off|shadow|on (default shadow, read by gate-carry.mjs under pre-push): carry one long one-build-job cargo gate on this device\'s second cargo seat beside the loop when `berth room cargo` admits it; shadow prints what would be carried and why and changes nothing');
 }
