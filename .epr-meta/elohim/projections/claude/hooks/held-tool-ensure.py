@@ -17,11 +17,14 @@ supervised by the device's ark (`epr device run` declares bin-store tools only).
 Never in the way: a few milliseconds, exit 0 always; its own failure is one line on stderr. The
 registration runs it only when python3 and this file exist, and is exit 0 and silent otherwise.
 Off switch, device-wide: a session with HELD_TOOL_WATCH=off writes the stop file beside the lock, and
-the runner exits at its next pass; HELD_TOOL_WATCH=on removes it. The runner's state changes (one line
+the runner exits at its next pass; HELD_TOOL_WATCH=on removes it. While it stands, every session start
+prints one stderr line naming it (`just status device` is the Rust `epr device status`, so a station
+line there is a native change, not made here). The runner's state changes (one line
 each) go to `held-tool-watch.log` there. Runs from Claude Code (`$CLAUDE_PROJECT_DIR/.claude/hooks/`)
 and Codex (`.codex/hooks/`); the checkout is the one this file sits in.
 """
 import fcntl
+import json
 import os
 from pathlib import Path
 import subprocess
@@ -91,9 +94,25 @@ def ensure(code=CODE, start=spawn):
     return "started"
 
 
+def off_line(code=CODE):
+    """The one line a session hears at its start while this device's watcher is switched off, or None.
+    A stop file nobody remembers would otherwise disable the watcher here silently and for good."""
+    stop = lock_path(code).with_name(STOP_NAME)
+    if stop.exists():
+        return f"held-tool watch is off on this device: remove {stop} or set HELD_TOOL_WATCH=on"
+    return None
+
+
 def main():
     try:
+        try:
+            payload = json.loads(sys.stdin.read(1 << 20) or "{}")
+        except (ValueError, OSError):
+            payload = {}
         ensure()
+        line = off_line() if isinstance(payload, dict) and payload.get("hook_event_name") == "SessionStart" else None
+        if line:
+            print(line, file=sys.stderr)
     except Exception as error:  # noqa: BLE001 — a hook on every tool call must never break the call
         try:
             print(f"held-tool-ensure: {type(error).__name__}: {error}", file=sys.stderr)

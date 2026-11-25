@@ -3,6 +3,7 @@
 Run: python3 -m unittest discover -s .claude/hooks/tests -p test_held_tool_ensure.py
 """
 import fcntl
+import json
 import os
 from pathlib import Path
 import runpy
@@ -69,8 +70,27 @@ class EnsureTest(unittest.TestCase):
         self.assertEqual(H['ensure'](self.code, self.start), 'started')
         self.assertFalse(stop.exists())
 
+    def test_a_standing_stop_file_is_named_at_every_session_start(self):
+        hooks = self.code / '.claude/hooks'
+        hooks.mkdir(parents=True)
+        (hooks / 'held-tool-ensure.py').write_bytes(HOOK.read_bytes())
+        stop = self.code / '.eprfs/status' / H['STOP_NAME']
+        stop.parent.mkdir(parents=True)
+        stop.touch()
+
+        def run(event):
+            return subprocess.run([sys.executable, str(hooks / 'held-tool-ensure.py')],
+                                  input=json.dumps({'hook_event_name': event}), capture_output=True,
+                                  text=True, timeout=10, env={**os.environ, 'HELD_TOOL_WATCH': ''})
+        start = run('SessionStart')
+        self.assertEqual((start.returncode, start.stdout), (0, ''))
+        self.assertEqual(start.stderr.splitlines(),
+                         [f'held-tool watch is off on this device: remove {stop} or set HELD_TOOL_WATCH=on'])
+        self.assertEqual(run('PostToolUse').stderr, '')  # once per session, not per tool call
+        stop.unlink()
+        self.assertEqual(run('SessionStart').stderr, '')
+
     def test_the_registered_commands_are_silent_and_exit_0_without_python_or_the_file(self):
-        import json
         settings = json.loads((REPO / '.claude/settings.json').read_text())
         codex = json.loads((REPO / '.codex/hooks.json').read_text())
         commands = [h['command'] for config in (settings, codex) for groups in config['hooks'].values()

@@ -2455,10 +2455,10 @@ habits:
       - "python3 -m unittest genesis/agentic/berth_test.py (status text and status-json@1 unchanged when nothing is held; `berth said` reads only this device's own notes)"
       - "python3 -m unittest discover -s .claude/hooks/tests -p test_held_tool_ensure.py (the hook starts the device runner only when none holds its lock; its own error is one line and exit 0)"
     evidence: >
-      DELTA 2026-11-25 (review fixes, still red): a line carries only device, session, agent, tool and pending-since; "once" holds for the incident's life (no expiry) and `berth said` rebuilds a lost or torn note stream from the source; at most eight sessions per incident, then the household once; every subprocess has its own timeout and a timed-out one is killed with its descendants; a failing runner backs off to 15 min with one line per change of state; HELD_TOOL_WATCH=off stops a running loop; the registration is silent exit 0 without python3. A scan reads only transcripts modified in 24 h, from a 256 KiB tail, within 64 MiB a pass: every session on this device 11.05 s / 827 MiB before, 0.14 s / 3.4 MiB after. held_tool_watch_test 39 OK, berth_test 286 OK, test_held_tool_ensure 6 OK.
-    evidence-fingerprint: sha256:c73fccff6c8144a0
-    evidence-bytes: 3826
-    evidence-entries: 5
+      DELTA 2026-11-25 (re-review, still red): a pass runs in its own process group and the group is TERM-then-KILLed when the pass ends or times out, before the pass is reaped, so no pid is enumerated or reused (a descendant that calls setsid escapes); a standing stop file is named at every session start. Known limit: a session held longer than 24 h with an untouched transcript is no longer seen by the scan (it was announced long before). A tail starts at a record boundary, a torn last record is unknown for that pass, and resumed is said only from a tail that reaches the call. held_tool_watch_test 41 OK, berth_test 286 OK, test_held_tool_ensure 7 OK.
+    evidence-fingerprint: sha256:a75d69f4553a713c
+    evidence-bytes: 4480
+    evidence-entries: 6
     refs:
       - "watcher: genesis/agentic/bin/held-tool-watch (scan | observe | announce | run); runner kept alive by hook held-tool-ensure (.claude/settings.json, .codex/hooks.json)"
       - "backlog: genesis/data/timeline/backlog/steward-device-arrival-open-items.md rows 34, 82, 83"

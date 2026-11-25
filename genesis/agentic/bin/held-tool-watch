@@ -31,13 +31,18 @@ already writes and hands what it senses to the native fold.
   held-tool-watch run [same flags] [--bin-store DIR] [--every 60] [--passes N]
       The device runner: one per device (a lock beside the stasis root), an `announce` pass in a fresh
       process every --every seconds, the last pass's output in `held-tool-watch.last-pass.txt` there.
-      A failing pass doubles the wait to 15 min; one stderr line per change of state. A pass past its
-      timeout is killed with every process it started. It exits when the device's off switch is set
+      A failing pass doubles the wait to 15 min; one stderr line per change of state. Each pass runs
+      in its own process group, and the group is killed when the pass ends or times out (no pid is
+      enumerated; a descendant that calls setsid itself escapes). It exits when the device's off switch is set
       (`held-tool-watch.off` there, or HELD_TOOL_WATCH=off) or its script is gone.
 
 Cost. Only transcripts modified within --recent-s (default 24 h) are read, newest first, each from a
 256 KiB tail that grows (to --tail-bytes) only while it holds no complete record, all within
---max-pass-bytes (default 64 MiB) per pass; one line says when that budget is spent. Measured on
+--max-pass-bytes (default 64 MiB) per pass; one line says when that budget is spent. So a session
+held longer than --recent-s whose transcript nobody has touched is no longer seen (it was announced
+long before, and its resumed line still comes: that read ignores the window). A tail starts at the
+first record boundary after its cut; a torn last record makes that file unknown for the pass, never
+pending, and a resumed line is said only from a tail that reaches back to the call. Measured on
 this device (409 sessions with transcripts, 2026-11-25): every session scanned took 11.05 s and read
 827 MiB before these bounds, 0.14 s and 3.4 MiB after.
 
@@ -101,6 +106,7 @@ import re
 import signal
 import subprocess
 import sys
+import tempfile
 import time
 
 LONG_RUNNING_TOOLS = {"Agent", "Task", "Workflow", "Monitor", "TaskOutput"}
@@ -220,16 +226,16 @@ class Budget:
         self.read += n
 
 
-def read_lines(path, tail_bytes, budget=None):
-    """Complete lines of the file's tail (a seek lands mid-line: that first line is dropped). The tail
-    starts at FIRST_TAIL_BYTES and doubles, up to tail_bytes, only while it holds no complete record
-    (one huge last line); an unresolved tool_use is near the end, so most files cost one small read.
-    A final line without a newline may be mid-write: it is returned and the parser skips it if it is
-    not whole JSON; any other line that is not a JSON object makes the transcript malformed."""
+def read_tail(path, tail_bytes, budget=None, first=FIRST_TAIL_BYTES):
+    """(lines, whole) of the file's tail. A cut lands mid-record, so the tail starts at the first
+    record boundary after it: the partial first line is dropped, never parsed. The tail starts at
+    `first` and doubles, up to tail_bytes, only while it holds no complete record (one huge last
+    line); an unresolved tool_use is near the end, so most files cost one small read. `whole` says the
+    tail reached the start of the file. The final element is whatever follows the last newline."""
     try:
         with open(path, "rb") as f:
             size = f.seek(0, os.SEEK_END)
-            want = min(FIRST_TAIL_BYTES, tail_bytes) if tail_bytes else size
+            want = min(first, tail_bytes) if tail_bytes else size
             while True:
                 start = max(0, size - want)
                 if budget is not None:
@@ -239,17 +245,23 @@ def read_lines(path, tail_bytes, budget=None):
                 if start:
                     lines = lines[1:]
                 if start == 0 or want >= tail_bytes or any(line.strip() for line in lines[:-1]):
-                    return lines
+                    return lines, start == 0
                 want = min(want * 2, tail_bytes)
     except OSError:
-        return []
+        return [], True
 
 
-def dangling_calls(path, tail_bytes=DEFAULT_TAIL_BYTES, budget=None):
-    """tool_use blocks in the transcript with no tool_result of the same id, oldest first. A line that
-    is not a JSON object anywhere but last raises ValueError: the sensor cannot say what it missed."""
-    uses, results = {}, set()
-    lines = read_lines(path, tail_bytes, budget)
+def read_lines(path, tail_bytes, budget=None):
+    return read_tail(path, tail_bytes, budget)[0]
+
+
+def transcript_calls(path, tail_bytes=DEFAULT_TAIL_BYTES, budget=None, first=FIRST_TAIL_BYTES):
+    """{uses: {id: call}, results: {id}, whole, torn} from the transcript's tail. `torn` is a trailing
+    record still being written (no newline, not whole JSON): a result may be inside it, so the file
+    says nothing this pass. A line that is not a JSON object anywhere else raises ValueError: the
+    sensor cannot say what it missed."""
+    uses, results, torn = {}, set(), False
+    lines, whole = read_tail(path, tail_bytes, budget, first)
     for number, raw in enumerate(lines):
         if not raw.strip():
             continue
@@ -259,7 +271,8 @@ def dangling_calls(path, tail_bytes=DEFAULT_TAIL_BYTES, budget=None):
             row = None
         if not isinstance(row, dict):
             if number == len(lines) - 1:
-                continue  # the last line may be mid-write
+                torn = True  # the last record is mid-write: unknown this pass
+                continue
             raise ValueError(f"malformed transcript {path}: a non-final line is not a JSON object")
         message = row.get("message")
         blocks = message.get("content") if isinstance(message, dict) else None
@@ -276,7 +289,16 @@ def dangling_calls(path, tail_bytes=DEFAULT_TAIL_BYTES, budget=None):
                 if when is not None and block["id"] not in uses:
                     uses[block["id"]] = dict(id=block["id"], tool=str(block.get("name", "unknown")),
                                              input=block.get("input"), at=when)
-    return sorted((u for i, u in uses.items() if i not in results), key=lambda u: u["at"])
+    return dict(uses=uses, results=results, whole=whole, torn=torn)
+
+
+def dangling_calls(path, tail_bytes=DEFAULT_TAIL_BYTES, budget=None):
+    """tool_use blocks in the transcript's tail with no tool_result of the same id, oldest first; none
+    while the last record is torn (unknown this pass)."""
+    t = transcript_calls(path, tail_bytes, budget)
+    if t["torn"]:
+        return []
+    return sorted((u for i, u in t["uses"].items() if i not in t["results"]), key=lambda u: u["at"])
 
 
 def long_running_limit(tool, inputs, sense_after_s):
@@ -403,47 +425,57 @@ NO_JOURNAL_LINE = "held-tool-watch: session {session} has no stasis journal; not
 _CID = re.compile(r"^baf[a-z2-7]{20,}$")
 
 
-def kill_tree(pid):
-    """SIGKILL a process and every descendant, read from /proc before any is killed, whatever process
-    group or session a descendant joined, so nothing it started outlives it."""
-    children = {}
-    for entry in os.listdir("/proc"):
-        if entry.isdigit():
-            try:
-                with open(f"/proc/{entry}/stat") as f:
-                    ppid = int(f.read().rsplit(")", 1)[1].split()[1])
-            except (OSError, ValueError, IndexError):
-                continue
-            children.setdefault(ppid, []).append(int(entry))
-    doomed, stack = [], [pid]
-    while stack:
-        current = stack.pop()
-        doomed.append(current)
-        stack += children.get(current, [])
-    for victim in doomed:
-        try:
-            os.kill(victim, signal.SIGKILL)
-        except OSError:
-            pass
+PASS_GRACE_S = 0.5
 
 
 def run_command(argv, timeout=60):
-    """(returncode, stdout, stderr). EPR_BIN is dropped so the named binary is the one that runs. Every
-    call has its own timeout; on it the child and all its descendants are killed and TimeoutExpired
-    is raised. The injectable runner's default."""
+    """(returncode, stdout, stderr) of one call inside a pass. EPR_BIN is dropped so the named binary is
+    the one that runs. The child stays in the pass's process group; on its own timeout only that
+    child is killed, through its unreaped Popen (its pid cannot have been reused), and TimeoutExpired
+    is raised. Anything it started is in the pass's group and ends with the pass (run_pass). The
+    injectable runner's default."""
     env = {k: v for k, v in os.environ.items() if k != "EPR_BIN"}
     proc = subprocess.Popen(argv, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                            text=True, env=env, start_new_session=True)
+                            text=True, env=env)
     try:
         out, err = proc.communicate(timeout=timeout)
     except subprocess.TimeoutExpired:
-        kill_tree(proc.pid)
-        try:
-            proc.communicate(timeout=5)
-        except subprocess.TimeoutExpired:
-            pass
+        proc.kill()
+        proc.wait()
         raise
     return proc.returncode, out, err
+
+
+def _exited(pid):
+    """True once the child has exited, WITHOUT reaping it: while it is a zombie its pid, and so the
+    process group named after it, cannot be reused."""
+    return os.waitid(os.P_PID, pid, os.WEXITED | os.WNOHANG | os.WNOWAIT) is not None
+
+
+def run_pass(argv, timeout):
+    """(returncode or None on timeout, stdout, stderr) of one pass, run in its own session and process
+    group. When the pass has exited (or its timeout has come), and before it is reaped, its whole group
+    is sent TERM, then KILL after PASS_GRACE_S: every process the pass started, forked before or after
+    any snapshot, ends with it. No pid is enumerated. A descendant that calls setsid itself leaves the
+    group and escapes; berth and epr do not."""
+    with tempfile.TemporaryFile() as out, tempfile.TemporaryFile() as err:
+        proc = subprocess.Popen(argv, stdin=subprocess.DEVNULL, stdout=out, stderr=err, start_new_session=True)
+        end = time.monotonic() + timeout
+        while not _exited(proc.pid) and time.monotonic() < end:
+            time.sleep(0.05)
+        timed_out = not _exited(proc.pid)
+        for sig in (signal.SIGTERM, signal.SIGKILL):
+            try:
+                os.killpg(proc.pid, sig)
+            except ProcessLookupError:
+                break
+            if sig == signal.SIGTERM:
+                time.sleep(PASS_GRACE_S)
+        code = proc.wait()
+        out.seek(0)
+        err.seek(0)
+        return (None if timed_out else code, out.read().decode("utf-8", "replace"),
+                err.read().decode("utf-8", "replace"))
 
 
 def pin_name(session):
@@ -640,15 +672,29 @@ def addressees(status, held_session):
 
 
 def still_pending(transcripts, session, agent, tool, since, tail_bytes=DEFAULT_TAIL_BYTES, budget=None):
-    """True while a call of that tool begun at `since` has no result in its transcript, False once it
-    has one or the transcript is gone, None when the transcript cannot be read."""
+    """True while a call of that tool begun at `since` has no result in its transcript; False once it
+    has one, or once the whole transcript is read and holds no such call, or the transcript is gone;
+    None (unknown: never say resumed on it) while the tail is torn, unreadable, or has not reached
+    back to the call. The tail grows for this file until it holds the call or the file's start."""
     for name, path in find_transcripts(transcripts, session):
-        if name == agent:
+        if name != agent:
+            continue
+        size = FIRST_TAIL_BYTES
+        while True:
             try:
-                return any(c["tool"] == tool and rfc3339(c["at"]) == since
-                           for c in dangling_calls(path, tail_bytes, budget))
+                t = transcript_calls(path, size, budget, first=size)
             except (ValueError, BudgetExceeded):
                 return None
+            if t["torn"]:
+                return None
+            calls = [u for u in t["uses"].values() if u["tool"] == tool and rfc3339(u["at"]) == since]
+            if calls:
+                return any(u["id"] not in t["results"] for u in calls)
+            if t["whole"]:
+                return False
+            if size >= tail_bytes:
+                return None
+            size = min(size * 2, tail_bytes)
     return False
 
 
@@ -843,11 +889,10 @@ def cmd_run(args, runner=run_command):
             if stopped(status_dir):
                 line("switched off (HELD_TOOL_WATCH=off); exiting")
                 break
-            try:
-                code, out, err = runner([sys.executable, script, "announce", *passthrough],
-                                        timeout=max(60, 3 * args.every))
-            except subprocess.TimeoutExpired:
-                code, out, err = None, "", "held-tool-watch: announce pass timed out; it and its children killed\n"
+            code, out, err = run_pass([sys.executable, script, "announce", *passthrough],
+                                      timeout=max(60, 3 * args.every))
+            if code is None:
+                err += "held-tool-watch: announce pass timed out; its process group was killed\n"
             try:  # a diagnostic for a reader at the terminal, overwritten each pass; nothing decides on it
                 with open(os.path.join(status_dir, LAST_PASS), "w") as f:
                     f.write(f"{rfc3339(time.time())} exit {code}\n{out[-4096:]}{err[-4096:]}")

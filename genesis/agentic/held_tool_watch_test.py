@@ -81,9 +81,25 @@ class ScanTest(Fixture):
         held = self.scan(T0 + 500)
         self.assertEqual([(h["agent"], h["toolUseId"]) for h in held], [("a1b2", "s1")])
 
-    def test_partial_last_line_does_not_crash(self):
-        self.write(use("t1", "Bash", T0, command="ls"), tail='{"type": "assistant", "timestamp": "20')
+    def test_a_torn_last_record_is_unknown_this_pass_not_pending(self):
+        # The torn record may be the very result that resolves t1.
+        self.write(use("t1", "Bash", T0, command="ls"), tail='{"type": "user", "message": {"content": [{"ty')
+        self.assertEqual(self.scan(T0 + 500), [])
+        self.write(use("t1", "Bash", T0, command="ls"))
         self.assertEqual(len(self.scan(T0 + 500)), 1)
+
+    def test_resumption_is_never_read_from_a_tail_that_does_not_reach_the_call(self):
+        since = W["rfc3339"](T0)
+        self.write(use("held", "Bash", T0, command="ls"),
+                   *[use(f"f{i}", "Read", T0 + 1 + i, file_path="/x" * 200) for i in range(600)],
+                   *[result(f"f{i}", T0 + 1000 + i) for i in range(600)])
+        # Reaching back, the tail grows for this file until it holds the call: still pending.
+        self.assertIs(W["still_pending"](str(self.transcripts), SESSION, "main", "Bash", since), True)
+        # Capped short of it: unknown, never "resumed".
+        self.assertIsNone(W["still_pending"](str(self.transcripts), SESSION, "main", "Bash", since,
+                                             tail_bytes=W["FIRST_TAIL_BYTES"]))
+        self.write(use("held", "Bash", T0, command="ls"), result("held", T0 + 50))
+        self.assertIs(W["still_pending"](str(self.transcripts), SESSION, "main", "Bash", since), False)
 
     def test_cause_is_approval_evidence_only_with_a_journal_entry(self):
         self.write(use("t1", "Bash", T0, command="ls"))
@@ -585,23 +601,41 @@ sys.exit(9)
         lines = err.getvalue().splitlines()
         self.assertEqual(len(lines), 1, lines)
         self.assertIn("failing (exit 1), next pass in 1 s", lines[0])
-        self.assertEqual(sleeps, [1.0])
+        self.assertEqual([t for t in sleeps if t >= 1], [1.0])  # the pass's own polls are shorter
 
-    def test_a_timed_out_call_takes_every_process_it_started_with_it(self):
-        pidfile = self.root / "grandchild.pid"
-        with self.assertRaises(W["subprocess"].TimeoutExpired):
-            W["run_command"](["sh", "-c", f"sleep 60 & echo $! > {pidfile}; sleep 60"], timeout=0.5)
-        pid = int(pidfile.read_text())
+    def dead(self, pid):
         import time as _time
-        for _ in range(50):
+        for _ in range(60):
             try:
                 state = Path(f"/proc/{pid}/stat").read_text().rsplit(")", 1)[1].split()[0]
             except OSError:
-                state = "gone"
-            if state in ("gone", "Z", "X"):
-                break
+                return True
+            if state in ("Z", "X"):
+                return True
             _time.sleep(0.05)
-        self.assertIn(state, ("gone", "Z", "X"))
+        return False
+
+    def test_a_pass_takes_its_whole_process_group_with_it_and_nothing_else(self):
+        import subprocess as sp
+        decoy = sp.Popen(["sleep", "60"])  # outside the pass's group
+        self.addCleanup(decoy.wait)
+        self.addCleanup(decoy.kill)
+        orphan, stuck, hung = (self.root / n for n in ("orphan.pid", "stuck.pid", "hung.pid"))
+        # A child that forks a grandchild and exits: the grandchild ends with the pass.
+        code, _, _ = W["run_pass"](["sh", "-c", f"sleep 60 & echo $! > {orphan}; exit 0"], timeout=10)
+        self.assertEqual(code, 0)
+        self.assertTrue(self.dead(int(orphan.read_text())))
+        # A child that forks a grandchild and hangs past the timeout: both end, code None.
+        code, _, _ = W["run_pass"](["sh", "-c", f"sleep 60 & echo $! > {stuck}; echo $$ > {hung}; sleep 60"],
+                                   timeout=0.5)
+        self.assertIsNone(code)
+        self.assertTrue(self.dead(int(stuck.read_text())))
+        self.assertTrue(self.dead(int(hung.read_text())))
+        self.assertIsNone(decoy.poll())  # the decoy outside the group is untouched
+
+    def test_a_call_inside_a_pass_has_its_own_timeout(self):
+        with self.assertRaises(W["subprocess"].TimeoutExpired):
+            W["run_command"](["sleep", "60"], timeout=0.3)
 
     def test_the_device_runner_is_one_per_device_and_announces_through_fresh_passes(self):
         import time as _time
