@@ -332,8 +332,6 @@ async fn fetch_channel_for(
     let answer_cap = u32::try_from(limits.max_event_bytes.saturating_add(READ_ANSWER_OVERHEAD))
         .unwrap_or(u32::MAX);
     let mut read_bytes = 0usize;
-    let mut consumed = 0usize;
-    let mut kept = 0u64;
     let mut reads = JoinSet::new();
     let mut ready = BTreeMap::new();
     let mut next_issue = 0usize;
@@ -379,7 +377,7 @@ async fn fetch_channel_for(
         }
 
         let mut floor_read = false;
-        let no_pending_progress = kept == 0 && fetched.events.len() == consumed;
+        let no_pending_progress = fetched.events.is_empty();
         let answer = if let Some(answer) = ready.remove(&next_consume) {
             answer
         } else if deadline_expired {
@@ -522,18 +520,6 @@ async fn fetch_channel_for(
         match decode_event(&cid, &read.bytes) {
             Ok(event) => {
                 fetched.events.push(ChannelEvent { cid, event });
-                if floor_read || fetched.events.len().saturating_sub(consumed) == FOLD_BATCH_EVENTS
-                {
-                    if let Some(consume) = progress.consume_batch.as_mut() {
-                        match consume(&fetched.events[consumed..]) {
-                            Ok(count) => {
-                                kept = kept.saturating_add(count);
-                                consumed = fetched.events.len();
-                            }
-                            Err(error) => break Err(error),
-                        }
-                    }
-                }
             }
             Err(reason) => fetched.quarantined.push(Quarantined {
                 cid,
@@ -550,9 +536,11 @@ async fn fetch_channel_for(
     };
     reads.abort_all();
     event_result?;
-    if consumed < fetched.events.len() {
-        if let Some(consume) = progress.consume_batch.as_mut() {
-            let _ = consume(&fetched.events[consumed..])?;
+    if let Some(consume) = progress.consume_batch.as_mut() {
+        let mut ordered = fetched.events.clone();
+        order_sender_events(&mut ordered);
+        for batch in ordered.chunks(FOLD_BATCH_EVENTS) {
+            let _ = consume(batch)?;
         }
     }
     if let Some(reader) = progress.reader.filter(|_| !fetched.deadline_reached) {
@@ -718,6 +706,26 @@ fn decode_event(cid: &Cid, bytes: &[u8]) -> Result<FlowEvent, String> {
     Ok(event)
 }
 
+/// One sender's record order. Current writers stamp every crossing record with a strictly
+/// increasing `env:dseq`; legacy records precede counted records and retain their timestamp/CID
+/// order. Sorting before chunking makes every appended prefix a state the sender really held.
+fn order_sender_events(events: &mut [ChannelEvent]) {
+    events.sort_by(|left, right| sender_event_order(left).cmp(&sender_event_order(right)));
+}
+
+fn sender_event_order(event: &ChannelEvent) -> (bool, Option<u64>, &str, Cid) {
+    let dseq = event.event.classified_as.iter().find_map(|slot| {
+        slot.strip_prefix("env:dseq=")
+            .and_then(|raw| raw.parse().ok())
+    });
+    (
+        dseq.is_some(),
+        dseq,
+        event.event.occurred_at.as_str(),
+        event.cid,
+    )
+}
+
 /// Append `events`, read from `device`'s channel, to this device's flow store, each with a
 /// `via:<device>` slot, under one transaction ([`SidecarFlowStore::transaction`]). An event this
 /// device's own `allow` does not admit is refused; an event already folded via `device` is not
@@ -771,10 +779,12 @@ fn fold_events_admitted(
             device: device.to_string(),
         });
     }
+    let mut ordered = events.to_vec();
+    order_sender_events(&mut ordered);
     let mut outcome = FoldOutcome::default();
     let mut received = HashSet::new();
     let mut to_append = Vec::new();
-    for ChannelEvent { cid, event } in events {
+    for ChannelEvent { cid, event } in &ordered {
         if !received.insert(*cid) {
             outcome.already += 1;
             continue;
@@ -1091,6 +1101,74 @@ fn unanswered(what: String, answer: &TierAnswer) -> PeerError {
 mod compatibility_tests {
     use super::*;
     use elohim_epr_rea::{AgentRef, Magnitude, ReaVerb};
+
+    fn sequenced(kind: &str, dseq: u64) -> ChannelEvent {
+        let event = FlowEvent {
+            action: ReaVerb::Cite,
+            provider: AgentRef("did:key:sender".into()),
+            receiver: AgentRef("human:steward".into()),
+            resource: atom_cid(&"lease-resource").unwrap(),
+            quantity: Magnitude::Count {
+                value: 1.0,
+                unit: "lease-events".into(),
+            },
+            process: None,
+            in_scope_of: atom_cid(&"scope").unwrap(),
+            fulfills: Vec::new(),
+            satisfies: Vec::new(),
+            occurred_at: "2026-11-25T00:00:00Z".into(),
+            classified_as: vec![
+                format!("dev-berth-events:{kind}"),
+                "lease-resource".into(),
+                format!("reason:{kind}"),
+                "measure:dev-berth-events@1".into(),
+                format!("env:dseq={dseq}"),
+            ],
+        };
+        ChannelEvent {
+            cid: atom_cid(&event).unwrap(),
+            event,
+        }
+    }
+
+    fn dseq(event: &ChannelEvent) -> u64 {
+        event
+            .event
+            .classified_as
+            .iter()
+            .find_map(|slot| slot.strip_prefix("env:dseq="))
+            .unwrap()
+            .parse()
+            .unwrap()
+    }
+
+    #[test]
+    fn release_then_reclaim_keeps_sender_order_at_full_and_deadline_chunk_boundaries() {
+        let mut events: Vec<_> = (1..=130)
+            .map(|sequence| {
+                let kind = match sequence {
+                    64 | 97 => "release",
+                    65 | 98 => "claim",
+                    _ => "moor",
+                };
+                sequenced(kind, sequence)
+            })
+            .collect();
+        events.sort_by_key(|event| event.cid);
+
+        order_sender_events(&mut events);
+
+        assert_eq!(
+            events.iter().map(dseq).collect::<Vec<_>>(),
+            (1..=130).collect::<Vec<_>>()
+        );
+        let full_chunks: Vec<_> = events.chunks(FOLD_BATCH_EVENTS).collect();
+        assert_eq!(dseq(full_chunks[0].last().unwrap()), 64);
+        assert_eq!(dseq(full_chunks[1].first().unwrap()), 65);
+        let deadline_prefix = &events[..97];
+        assert_eq!(dseq(deadline_prefix.last().unwrap()), 97);
+        assert_eq!(dseq(&events[deadline_prefix.len()]), 98);
+    }
 
     #[test]
     fn old_reader_decodes_and_folds_produce_with_additive_family_requires_tags() {
