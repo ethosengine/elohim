@@ -563,6 +563,95 @@ test('a linked worktree emits and reads verdicts at the main checkout the daemon
   }
 });
 
+function siblingReadSpawn(replies) {
+  const calls = [];
+  const spawn = (bin, args, opts) => {
+    if (bin === 'git') return { status: 128, stdout: '', stderr: '' };
+    calls.push({ bin, args, opts });
+    const reply = replies[calls.length - 1];
+    return typeof reply === 'function' ? reply() : reply;
+  };
+  return { calls, spawn };
+}
+
+const timedOut = signal => ({
+  status: null,
+  signal,
+  stdout: '',
+  stderr: '',
+  error: Object.assign(new Error('spawnSync epr ETIMEDOUT'), { code: 'ETIMEDOUT' }),
+});
+
+test('siblingVerdicts retries one timeout with a longer bound and keeps the first reason', () => {
+  const read = siblingReadSpawn([
+    timedOut('SIGTERM'),
+    { status: 0, stdout: '[{"device":"sibling-a"}]', stderr: '' },
+  ]);
+  assert.deepEqual(siblingVerdicts(project, 'closure', {
+    root: '/repo', env: { GATE_SIBLING_READ_TIMEOUT_MS: '1000' }, spawn: read.spawn,
+  }), {
+    candidates: [{ source: 'sibling', device: 'sibling-a' }],
+    retried: true,
+    firstAttempt: 'sibling read failed: timeout after 1 s',
+  });
+  assert.deepEqual(read.calls.map(call => call.opts.timeout), [1_000, 4_000]);
+});
+
+test('siblingVerdicts reports both timeout bounds after its one retry', () => {
+  const read = siblingReadSpawn([
+    timedOut('SIGKILL'),
+    { status: null, signal: 'SIGTERM', stdout: '', stderr: '' },
+  ]);
+  const result = siblingVerdicts(project, 'closure', {
+    root: '/repo', env: { GATE_SIBLING_READ_TIMEOUT_MS: '8000' }, spawn: read.spawn,
+  });
+  assert.deepEqual(result.candidates, []);
+  assert.equal(result.error.kind, 'timeout');
+  assert.match(result.error.detail, /30 s/);
+  assert.match(result.why, /8 s.*30 s/);
+  assert.deepEqual(read.calls.map(call => call.opts.timeout), [8_000, 30_000]);
+});
+
+test('siblingVerdicts reports a non-zero exit and does not retry it', () => {
+  const read = siblingReadSpawn([{ status: 23, stdout: '', stderr: 'peer unavailable\nlater detail\n' }]);
+  assert.deepEqual(siblingVerdicts(project, 'closure', { root: '/repo', env: {}, spawn: read.spawn }), {
+    candidates: [],
+    error: { kind: 'exit', detail: 'exit 23: peer unavailable' },
+    why: 'sibling read failed: exit 23: peer unavailable',
+  });
+  assert.equal(read.calls.length, 1);
+});
+
+test('siblingVerdicts reports invalid JSON and non-array JSON as parse failures', () => {
+  for (const [stdout, detail] of [['{', /.+/], ['{}', /not an array/]]) {
+    const read = siblingReadSpawn([{ status: 0, stdout, stderr: '' }]);
+    const result = siblingVerdicts(project, 'closure', { root: '/repo', env: {}, spawn: read.spawn });
+    assert.deepEqual(result.candidates, []);
+    assert.equal(result.error.kind, 'parse');
+    assert.match(result.error.detail, detail);
+    assert.equal(read.calls.length, 1);
+  }
+});
+
+test('siblingVerdicts reports a thrown spawn error', () => {
+  const read = siblingReadSpawn([() => { throw new Error('epr could not spawn\nsecond line'); }]);
+  assert.deepEqual(siblingVerdicts(project, 'closure', { root: '/repo', env: {}, spawn: read.spawn }), {
+    candidates: [],
+    error: { kind: 'spawn', detail: 'epr could not spawn' },
+    why: 'sibling read failed: epr could not spawn',
+  });
+  assert.equal(read.calls.length, 1);
+});
+
+test('siblingVerdicts keeps the successful first-read object unchanged', () => {
+  const read = siblingReadSpawn([{ status: 0, stdout: '[{"device":"sibling-a"}]', stderr: '' }]);
+  assert.deepEqual(siblingVerdicts(project, 'closure', { root: '/repo', env: {}, spawn: read.spawn }), {
+    candidates: [{ source: 'sibling', device: 'sibling-a' }],
+  });
+  assert.equal(read.calls.length, 1);
+  assert.equal(read.calls[0].opts.timeout, 5_000);
+});
+
 const seed = '9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60';
 const publicKey = 'd75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a';
 
