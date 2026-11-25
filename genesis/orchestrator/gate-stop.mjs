@@ -113,33 +113,40 @@ export function signalTree(leaderPid, members, signal, { kill = process.kill, st
 /**
  * Ends the gate whose leader is `leader` ({ pid, start }, read at spawn): TERM to its tree, a wait
  * of up to `graceMs` for every member to go, then KILL to whatever is left and a short wait.
- * Resolves to { custody, delivered, signal, survivors }: `delivered` lists the signals the gate's
- * group actually received (a kill that found the group), `signal` the last one, `survivors` the
- * pids of its tree still alive after the KILL wait. Nothing here says whether the gate was
- * stopped: only the leader's own exit does (gate-tap.mjs stoppedBy), since a gate can end on its own
- * at the instant it is signalled.
+ * Each signal goes FIRST to the leader's own pid, only when a fresh read shows it alive (same start
+ * time, not a zombie), and that delivery is recorded with a monotonic time; then to the group, and
+ * to members that left it. Resolves to { custody, toLeader, signal, survivors }: `toLeader` lists
+ * { signal, at } for each signal the leader itself was sent, `signal` the last one sent at all,
+ * `survivors` the pids of its tree still alive after the KILL wait. Nothing here says whether the
+ * gate was stopped: only the leader's own exit, read against `toLeader` (stoppedBy), does.
  */
 export async function endTree(leader, {
   graceMs = STOP_GRACE_MS, kill = process.kill, scan = () => snapshot(), stat = readStat,
-  sleep = delay, pollMs = POLL_MS, clock = () => Date.now(),
+  sleep = delay, pollMs = POLL_MS, clock = () => Date.now(), mono = () => performance.now(),
 } = {}) {
-  const none = { custody: false, delivered: [], signal: null, survivors: [] };
+  const none = { custody: false, toLeader: [], signal: null, survivors: [] };
   if (!leader || !Number.isInteger(leader.pid) || !leader.start) return none;
   const known = new Set([identity(leader)]);
   let tree = gateTree(leader.pid, known, scan());
-  const leaderNow = tree.members.find((member) => member.pid === leader.pid && member.start === leader.start);
-  if (!tree.custody || !leaderNow || living([leaderNow]).length === 0) return { ...none, custody: tree.custody };
-  const delivered = [];
+  if (!tree.custody) return none;
+  const toLeader = [];
+  let last = null;
   const send = (signal) => {
-    if (signalTree(leader.pid, tree.members, signal, { kill, stat }).group) delivered.push(signal);
+    const now = stat(leader.pid);
+    if (now && now.start === leader.start && living([now]).length) {
+      try { kill(leader.pid, signal); toLeader.push({ signal, at: mono() }); } catch { /* it ended meanwhile */ }
+    }
+    signalTree(leader.pid, tree.members, signal, { kill, stat });
+    last = signal;
   };
+  if (living(tree.members).length === 0) return { ...none, custody: true };
 
   send('SIGTERM');
   const termDeadline = clock() + graceMs;
   while (clock() < termDeadline) {
     await sleep(pollMs);
     tree = gateTree(leader.pid, known, scan());
-    if (!tree.custody || living(tree.members).length === 0) return { custody: true, delivered, signal: 'SIGTERM', survivors: [] };
+    if (!tree.custody || living(tree.members).length === 0) return { custody: true, toLeader, signal: last, survivors: [] };
   }
 
   send('SIGKILL');
@@ -147,22 +154,28 @@ export async function endTree(leader, {
   while (clock() < killDeadline) {
     await sleep(pollMs);
     tree = gateTree(leader.pid, known, scan());
-    if (!tree.custody || living(tree.members).length === 0) return { custody: true, delivered, signal: 'SIGKILL', survivors: [] };
+    if (!tree.custody || living(tree.members).length === 0) return { custody: true, toLeader, signal: last, survivors: [] };
   }
-  return { custody: true, delivered, signal: 'SIGKILL', survivors: living(tree.members).map((member) => member.pid) };
+  return { custody: true, toLeader, signal: last, survivors: living(tree.members).map((member) => member.pid) };
 }
 
 /**
- * Whether a gate's leader died of a stop: it was killed by a signal, or it reported one as
- * 128 + N (just and bash do, "recipe terminated by signal 15" exits 143), where N is a signal
- * the stop delivered to the group. A leader that exited with any other code ran to its own
- * verdict, whatever was signalled afterwards, and that verdict is recorded as without a stop.
+ * Whether a gate's leader died of the stop: it died of a signal the stop sent to the leader itself,
+ * or exited 128 + that signal's number (just and bash report a child's death so: "recipe
+ * terminated by signal 15" exits 143), and that delivery came before its exit was observed
+ * (`exitAt`, the same monotonic clock). Anything else, a code of its own, a signal the stop never
+ * sent the leader (a SIGKILL when only TERM was sent), or an exit before the delivery, is the
+ * gate's own verdict and is recorded as without a stop. Accepted residual (integrator's ruling,
+ * 2026-11-25): an independent kill of the leader with the same signal inside the instant after our
+ * delivery reads as stopped; its only outcomes are no verdict and a refused push, never a green.
  */
-export function stoppedBy({ code, signal }, delivered) {
-  if (!delivered.length) return null;
-  if (signal) return signal;
-  const numbers = new Map(delivered.map((name) => [osSignals[name], name]));
-  return Number.isInteger(code) && code > 128 && numbers.has(code - 128) ? numbers.get(code - 128) : null;
+export function stoppedBy({ code, signal, exitAt }, toLeader) {
+  for (const sent of toLeader ?? []) {
+    if (!Number.isFinite(exitAt) || !(sent.at < exitAt)) continue;
+    if (signal === sent.signal) return sent.signal;
+    if (signal === null && Number.isInteger(code) && code === 128 + osSignals[sent.signal]) return sent.signal;
+  }
+  return null;
 }
 
 /**

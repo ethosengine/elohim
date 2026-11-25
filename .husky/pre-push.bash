@@ -1144,9 +1144,17 @@ refuse_if_stopped() {
   fi
 }
 stop_point() {
-  [ -z "$GATE_LIVE_RUN" ] || node genesis/orchestrator/gate-live.mjs boundary --run "$GATE_LIVE_RUN" >/dev/null 2>&1 || true
+  local marked=""
+  if [ -n "$GATE_LIVE_RUN" ]; then
+    if node genesis/orchestrator/gate-live.mjs boundary --run "$GATE_LIVE_RUN" >/dev/null 2>&1; then
+      marked=1
+    else
+      # No mark, no boundary: every stop in the log keeps counting, and the run stays open for more.
+      echo "[pre-push] the run's last stop point could not be marked in $GATE_LIVE_RUN; stops stay honoured on it" >&2
+    fi
+  fi
   refuse_if_stopped
-  [ -z "$GATE_LIVE_RUN" ] || node genesis/orchestrator/gate-live.mjs close --run "$GATE_LIVE_RUN" \
+  [ -z "$marked" ] || node genesis/orchestrator/gate-live.mjs close --run "$GATE_LIVE_RUN" \
     --outcome "${GATE_LOOP_OUTCOME:-passed}" --deferred-from-log >/dev/null 2>&1 || true
 }
 # Every early pass below goes through here: a red an earlier check recorded still refuses.

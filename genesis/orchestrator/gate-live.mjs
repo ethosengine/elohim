@@ -589,19 +589,27 @@ export function requestStop(path, { reason = '', now, by = null, immediate = fal
   }, now ? { now } : {});
 }
 
+// The stop requests that still count: those before the run's last stop point (the hook's
+// stop-boundary mark), in the log's own order. A stop appended after the mark is told the push is
+// proceeding (the stop verb) and refuses nothing.
+function liveStops(events) {
+  const boundary = events.find((event) => event.kind === 'stop-boundary');
+  return events.filter((event) => event.kind === 'stop-request'
+    && (!boundary || (Number.isInteger(event.seq) && event.seq < boundary.seq)));
+}
+
 export function stopRequested(path) {
   try {
-    return parseEvents(readFileSync(path, 'utf8')).some((event) => event.kind === 'stop-request');
+    return liveStops(parseEvents(readFileSync(path, 'utf8'))).length > 0;
   } catch {
     return false;
   }
 }
 
-/** The first stop-now request of a run, or null: the tap's probe. */
+/** The first stop-now request of a run that still counts, or null: the tap's probe. */
 export function stopNowRequest(path) {
   try {
-    return parseEvents(readFileSync(path, 'utf8'))
-      .find((event) => event.kind === 'stop-request' && event.immediate === true) ?? null;
+    return liveStops(parseEvents(readFileSync(path, 'utf8'))).find((event) => event.immediate === true) ?? null;
   } catch {
     return null;
   }
@@ -1434,7 +1442,12 @@ const USAGE = `Usage:
   node gate-live.mjs stop [--run PATH | --session S | --latest] [--reason R] [--now]
         A stop refuses the push until the run's last stop point (the hook's stop_point, just before
         a hand-over or non-landing push passes and before a dev landing claims dev-integration);
-        after it the push proceeds, and stop says so and exits 1.
+        after it the push proceeds, and stop says so and exits 1. If the hook cannot mark that point
+        it says so, and stops stay honoured.
+        A gate counts as stopped only when its leader died of a signal the stop sent it, after the
+        stop sent it (or exited 128 + that signal); any other end is its own verdict. An independent
+        kill with the same signal in that instant reads as stopped: accepted, since the only
+        outcomes are no verdict and a refused push, never a green.
         --now also ends a gate whose recipe is still running (TERM, KILL after GATE_STOP_GRACE_MS);
         that gate records no verdict, though what it already wrote or put is not undone. A gate
         whose recipe already ended on its own keeps its verdict, red or green: the stop refuses

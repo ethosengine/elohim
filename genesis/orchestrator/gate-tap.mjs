@@ -267,7 +267,7 @@ function main() {
   let probedSize = -1;
   let closed = false;
   let escapeTimer = null;
-  const nothing = { custody: false, delivered: [], signal: null, survivors: [] };
+  const nothing = { custody: false, toLeader: [], signal: null, survivors: [] };
   const stopWaitingOnOutput = (survivors = []) => {
     if (closed || escapeTimer) return;
     escapeTimer = setTimeout(() => {
@@ -279,11 +279,14 @@ function main() {
           : ' (none found holding its output)')
         + `${survivors.length ? `; still alive in its tree after KILL: ${survivors.join(' ')}` : ''}`
         + '; the tap stops waiting for it\n');
+      truncated = true;
       child.stdout.destroy();
       child.stderr.destroy();
     }, ESCAPED_WAIT_MS);
   };
   let stray = null;
+  // Set when the tap stopped reading the gate's output before its writers closed it.
+  let truncated = false;
   const probeStop = () => {
     if (!run || stopping) return;
     let size;
@@ -306,6 +309,9 @@ function main() {
   const stopProbe = run ? setInterval(probeStop, 250) : null;
   probeStop();
 
+  // When the leader's exit was observed, on the clock endTree stamps its deliveries with.
+  let exitAt = null;
+  child.on('exit', () => { exitAt = performance.now(); });
   child.on('error', error => {
     process.stderr.write(`gate-tap: ${command}: ${error.message}\n`);
     process.exitCode = 127;
@@ -320,7 +326,7 @@ function main() {
       const asked = stopping;
       const ended = await asked.ended;
       if (escapeTimer) clearTimeout(escapeTimer);
-      const by = stoppedBy({ code, signal }, ended.delivered);
+      const by = stoppedBy({ code, signal, exitAt }, ended.toLeader);
       if (by) {
         stopped = { by: asked.by, ...(asked.reason ? { reason: asked.reason } : {}), signal: ended.signal,
           ...(ended.survivors.length ? { survivors: ended.survivors } : {}),
@@ -343,7 +349,8 @@ function main() {
     // A stopped gate has no such step: its end is the stop (the emit above holds it, then drops it).
     recognizer.end(signal ? 1 : code);
     try {
-      writeSync(3, `${JSON.stringify({ signals: recognizer.signals(), ...recognizer.summary(), ...cost, ...(stopped ? { stopped } : {}) })}\n`);
+      writeSync(3, `${JSON.stringify({ signals: recognizer.signals(), ...recognizer.summary(), ...cost,
+        ...(stopped ? { stopped } : {}), ...(truncated ? { outputTruncated: true } : {}) })}\n`);
     } catch { /* no fd 3: run by hand */ }
     // Exit only after forwarded bytes drain, then carry the child's status or signal.
     const finish = () => {

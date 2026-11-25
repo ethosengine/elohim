@@ -280,6 +280,43 @@ test("a stop after the last stop point is told the push is proceeding, and exits
   assert.equal(eventsOf(runsOf(dir)[0]).filter((e) => e.kind === "stop-request").length, 0, "nothing appended");
 });
 
+test("a stop appended after the stop-point mark refuses nothing", (t) => {
+  const dir = fixture(t);
+  writeFileSync(join(dir, "genesis/orchestrator/gate-preflight.mjs"), "process.stdout.write('continue\\n');\n");
+  const r = spawnSync("bash", ["-c", script(`HOOK_WORK_TREE='${dir}'`, PRELUDE, OPEN_BLOCK, RED_BLOCK,
+    'node genesis/orchestrator/gate-live.mjs boundary --run "$GATE_LIVE_RUN"',
+    // Appended past the mark while the run is still open (the CLI's own race): it does not count.
+    'node genesis/orchestrator/gate-live.mjs event --run "$GATE_LIVE_RUN" --json \'{"kind":"stop-request","immediate":true}\'',
+    'gate_stop_requested && echo COUNTS || echo IGNORED')],
+    { cwd: dir, env: env(), encoding: "utf8", timeout: 15000 });
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.ok(r.stdout.includes("IGNORED"), r.stdout);
+});
+
+test("a stop point that cannot be marked says so and keeps stops honoured", (t) => {
+  const dir = fixture(t);
+  writeFileSync(join(dir, "genesis/orchestrator/gate-preflight.mjs"), "process.stdout.write('continue\\n');\n");
+  // The CLI refuses only the mark; every other verb is the real one.
+  const orch = join(dir, "genesis/orchestrator");
+  copyFileSync(join(orch, "gate-live.mjs"), join(orch, "gate-live-real.mjs"));
+  writeFileSync(join(orch, "gate-live.mjs"), [
+    "import { spawnSync } from 'node:child_process';",
+    "if (process.argv[2] === 'boundary') process.exit(1);",
+    "const r = spawnSync(process.execPath, [new URL('./gate-live-real.mjs', import.meta.url).pathname, ...process.argv.slice(2)], { stdio: 'inherit' });",
+    "process.exit(r.status ?? 1);",
+  ].join("\n"));
+  const r = spawnSync("bash", ["-c", script(`HOOK_WORK_TREE='${dir}'`, PRELUDE, OPEN_BLOCK, RED_BLOCK,
+    'GATE_LOOP_OUTCOME=gates-passed', 'stop_point', 'echo PASSED-THROUGH',
+    'node genesis/orchestrator/gate-live.mjs stop --run "$GATE_LIVE_RUN"; echo "STOP-EXIT=$?"',
+    'gate_stop_requested && echo HONOURED || echo DROPPED', 'exit 1')],
+    { cwd: dir, env: env(), encoding: "utf8", timeout: 15000 });
+  assert.match(r.stderr, /last stop point could not be marked .*stops stay honoured on it/);
+  assert.ok(r.stdout.includes("PASSED-THROUGH"));
+  assert.match(r.stdout, /STOP-EXIT=0/, "the stop is taken, not told the push is proceeding");
+  assert.ok(r.stdout.includes("HONOURED"), r.stdout);
+  assert.ok(!eventsOf(runsOf(dir)[0]).slice(0, -1).some((e) => e.kind === "run-close"), "not closed at the unmarked point");
+});
+
 test("the stop point is the last act before each pass: hand-over, non-landing and dev landing", () => {
   const handover = slice("handover_finish() {\n", "\n}\n");
   assert.match(handover, /stop_point\n  echo "\[pre-push\] hand-over: seconds checks green[^\n]*\n  exit 0\n?$/, "hand-over: stop_point, then exit 0");

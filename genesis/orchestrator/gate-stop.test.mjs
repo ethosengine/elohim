@@ -105,7 +105,7 @@ describe('stop --now ends the running gate', () => {
     const { done } = startTap(run, fakeGate(dir, { stubborn: true }), { GATE_STOP_GRACE_MS: '600' });
     assert.ok(await waitFor(() => existsSync(resolve(dir, 'grandchild'))));
     const grandchild = readPid(resolve(dir, 'grandchild'));
-    await waitFor(() => readFileSync(`/proc/${grandchild}/cmdline`, 'utf8').startsWith('sleep'));
+    await waitFor(() => { try { return readFileSync(`/proc/${grandchild}/cmdline`, 'utf8').startsWith('sleep'); } catch { return false; } });
     requestStop(run, { immediate: true, by: 'session-stopper' });
     const result = await done;
     assert.equal(alive(grandchild), false);
@@ -331,29 +331,98 @@ describe('the stop is decided from the leader\'s own exit', () => {
     assert.equal(events.filter(event => event.kind === 'gate-verdict').at(-1).verdict.exit, 1);
   });
 
-  test('endTree on a leader that already exited signals nothing and delivers nothing', async () => {
+  test('endTree on a leader that already exited sends the leader nothing', async () => {
     const gone = spawn('sleep', ['0.1'], { detached: true, stdio: 'ignore' });
     await waitFor(() => readStat(gone.pid));
     const recorded = readStat(gone.pid);
     await new Promise(res => gone.on('exit', res));
     const sent = [];
     const result = await endTree(recorded, { graceMs: 100, kill: (pid, signal) => sent.push([pid, signal]) });
-    assert.deepEqual(result.delivered, []);
-    assert.deepEqual(sent, []);
+    assert.deepEqual(result.toLeader, []);
+    assert.deepEqual(sent.filter(([pid]) => pid === recorded.pid), [], 'never the leader pid');
   });
 
-  test('stoppedBy reads only a signal death the stop delivered', () => {
-    assert.equal(stoppedBy({ code: null, signal: 'SIGTERM' }, ['SIGTERM']), 'SIGTERM');
-    assert.equal(stoppedBy({ code: 143, signal: null }, ['SIGTERM']), 'SIGTERM', 'just reports a TERM death as 143');
-    assert.equal(stoppedBy({ code: 137, signal: null }, ['SIGTERM', 'SIGKILL']), 'SIGKILL');
-    assert.equal(stoppedBy({ code: 1, signal: null }, ['SIGTERM']), null, 'an exit code is the gate\'s own verdict');
-    assert.equal(stoppedBy({ code: 0, signal: null }, ['SIGTERM']), null);
-    assert.equal(stoppedBy({ code: 137, signal: null }, ['SIGTERM']), null, 'a KILL the stop never sent is not the stop');
-    assert.equal(stoppedBy({ code: null, signal: 'SIGTERM' }, []), null, 'nothing delivered, nothing stopped');
+  test('stoppedBy matches the signal sent to the leader, and only when it came before the exit', () => {
+    const term = [{ signal: 'SIGTERM', at: 10 }];
+    assert.equal(stoppedBy({ code: null, signal: 'SIGTERM', exitAt: 11 }, term), 'SIGTERM');
+    assert.equal(stoppedBy({ code: 143, signal: null, exitAt: 11 }, term), 'SIGTERM', 'just reports a TERM death as 143');
+    assert.equal(stoppedBy({ code: null, signal: 'SIGKILL', exitAt: 11 }, term), null, 'SIGKILL when only TERM was sent');
+    assert.equal(stoppedBy({ code: 137, signal: null, exitAt: 11 }, term), null, '137 when only TERM was sent');
+    assert.equal(stoppedBy({ code: 143, signal: null, exitAt: 9 }, term), null, '143 before the delivery');
+    assert.equal(stoppedBy({ code: null, signal: 'SIGTERM', exitAt: 9 }, term), null, 'a TERM death before the delivery');
+    assert.equal(stoppedBy({ code: 1, signal: null, exitAt: 11 }, term), null, 'an exit code is the gate\'s own verdict');
+    assert.equal(stoppedBy({ code: 0, signal: null, exitAt: 11 }, term), null);
+    assert.equal(stoppedBy({ code: 137, signal: null, exitAt: 30 }, [...term, { signal: 'SIGKILL', at: 20 }]), 'SIGKILL');
+    assert.equal(stoppedBy({ code: null, signal: 'SIGTERM', exitAt: 11 }, []), null, 'nothing sent to the leader, nothing stopped');
   });
 });
 
+// The runner matrix: no stop / a stop while the recipe runs / a stop after it ended on its own,
+// times exit 0, 1, 143, SIGTERM and SIGKILL. Evidence is withheld only where the recipe's leader
+// died of the signal the stop sent it (a TERM death, or 143 after the TERM); everything else
+// records what an unstopped run records.
+const OUTCOMES = {
+  'exit 0': { end: 'exit 0', status: 0 },
+  'exit 1': { end: 'exit 1', status: 1 },
+  'exit 143': { end: 'exit 143', status: 143 },
+  SIGTERM: { end: 'kill -TERM $$', status: 1 },
+  SIGKILL: { end: 'kill -KILL $$', status: 1 },
+};
+const MATRIX = [];
+for (const when of ['no stop', 'stop before', 'stop after']) {
+  for (const [outcome, { end, status }] of Object.entries(OUTCOMES)) {
+    const stopped = when === 'stop before' && (outcome === 'exit 143' || outcome === 'SIGTERM');
+    MATRIX.push({ when, outcome, end, status: stopped ? GATE_STOPPED_EXIT : status, evidence: !stopped });
+  }
+}
+const matrixRecipe = ({ when, outcome, end }) => pids => {
+  if (when === 'no stop') return ['#!/usr/bin/env bash', end].join('\n');
+  if (when === 'stop after') return ['#!/usr/bin/env bash', 'sleep 1.5 &', `touch "${pids}/marker"`, end].join('\n');
+  // A stop while it runs: the recipe meets the stop's TERM with the outcome (SIGTERM: it simply dies of it).
+  return ['#!/usr/bin/env bash', ...(outcome === 'SIGTERM' ? [] : [`trap '${end}' TERM`]),
+    `touch "${pids}/marker"`, 'sleep 300 &', 'wait'].join('\n');
+};
+
+describe('runner matrix: a verdict is withheld only for a leader the stop itself ended', () => {
+  for (const cell of MATRIX) {
+    test(`${cell.when} × ${cell.outcome}: evidence ${cell.evidence ? 'written' : 'withheld'}`, async t => {
+      const fx = evidenceFixture(t, 'gate-stop-matrix-', { recipe: matrixRecipe(cell) });
+      if (cell.when !== 'no stop') {
+        const stopper = stopperFor(fx.run, fx.pids, { immediate: true, marker: 'marker', afterMs: cell.when === 'stop after' ? 300 : 100 });
+        t.after(() => stopper.kill());
+      }
+      let output = '';
+      const status = runProject(fx.project, false, false, { root: fx.root, spawn: fx.spawnFake, tap: true, env: fx.env,
+        readingCollector: [], write: line => { output += line; }, warn: line => { output += line; } });
+      assert.equal(fx.calls.puts, cell.evidence ? 1 : 0, output);
+      assert.equal(status, cell.status, output);
+      const stoppedEvents = readRun(fx.run).events.filter(event => event.kind === 'gate-stopped');
+      assert.equal(stoppedEvents.length, cell.evidence ? 0 : 1);
+    });
+  }
+  test('the matrix has fifteen cells', () => assert.equal(MATRIX.length, 15));
+});
+
 describe('an escaped child does not hang the run', () => {
+  test('a green whose output was cut after its exit is recorded, and says its output was cut', async t => {
+    const fx = evidenceFixture(t, 'gate-stop-cut-', { recipe: pids => [
+      '#!/usr/bin/env bash',
+      `( setsid bash -c 'echo $$ > "${pids}/escaped"; exec sleep 30' & )`,
+      `while [ ! -s "${pids}/escaped" ]; do sleep 0.05; done`,
+      `touch "${pids}/marker"`,
+      'exit 0',
+    ].join('\n') });
+    t.after(() => { try { process.kill(readPid(resolve(fx.pids, 'escaped')), 'SIGKILL'); } catch { /* gone */ } });
+    const stopper = stopperFor(fx.run, fx.pids, { immediate: true, marker: 'marker', afterMs: 300 });
+    t.after(() => stopper.kill());
+    let output = '';
+    const status = runProject(fx.project, false, false, { root: fx.root, spawn: fx.spawnFake, tap: true, env: fx.env,
+      readingCollector: [], write: line => { output += line; }, warn: line => { output += line; } });
+    assert.equal(status, 0, output);
+    assert.equal(fx.calls.puts, 1, 'the green stands');
+    assert.match(output, /its output was cut after the recipe exited .*the verdict is the recipe's own exit/);
+  });
+
   test('the leader ended on its own and a stray holds its output: the verdict stands and the wait is bounded', async t => {
     const dir = scratch(t, 'gate-stop-stray-');
     const script = resolve(dir, 'gate.sh');
@@ -423,7 +492,7 @@ describe('Ctrl-C still reaches the detached gate', () => {
     const { child, done } = startTap(run, script);
     assert.ok(await waitFor(() => existsSync(resolve(dir, 'grandchild'))));
     const pids = ['leader', 'child', 'grandchild'].map(name => readPid(resolve(dir, name)));
-    await waitFor(() => readFileSync(`/proc/${pids[2]}/cmdline`, 'utf8').startsWith('sleep'));
+    await waitFor(() => { try { return readFileSync(`/proc/${pids[2]}/cmdline`, 'utf8').startsWith('sleep'); } catch { return false; } });
     child.kill('SIGINT');
     const result = await done;
     for (const pid of pids) assert.equal(alive(pid), false, `pid ${pid} is gone`);

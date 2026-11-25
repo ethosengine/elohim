@@ -1393,12 +1393,14 @@ export function runProject(project, printOnly, namesOnly, {
   // recorded only on its own bytes, with HEAD and the view's paths unchanged since the start.
   const suiteCheck = outcome;
   if (!suiteCheck.record) write(`[gate] ${project.name} evidence: not recorded (${suiteCheck.why})\n`);
-  // A gate ended by a signal after a stop was requested on this run (the push being stopped while
-  // the tap forwards a signal) has no verdict either. Any other signal death (an OOM kill, the RAM
-  // guard's shed) records the red it reached, as it always did, so it is never silently lost.
-  const signalled = Boolean(result.signal) && Boolean(env.GATE_LIVE_RUN) && stopRequested(env.GATE_LIVE_RUN);
-  if (signalled && evidence.key) write(`[gate] ${project.name} evidence: not recorded (ended by ${result.signal} after a stop was requested on this run)\n`);
-  if (evidence.key && evidence.buildRefBin && !answer?.unanswered && suiteCheck.record && !signalled) {
+  // Whether a gate was stopped is the tap's call alone (its `stopped`, read from the leader's own exit
+  // against the signals the stop sent it; returned above). Any other end, a signal death included
+  // (an OOM kill, the RAM guard's shed), records what it reached, as it always did.
+  if (tapped?.outputTruncated) {
+    write(`[gate] ${project.name}: its output was cut after the recipe exited (a process outside its tree held it open); `
+      + 'the verdict is the recipe\'s own exit\n');
+  }
+  if (evidence.key && evidence.buildRefBin && !answer?.unanswered && suiteCheck.record) {
     const put = recordEvidence(project, evidence.key, {
       success: status === 0,
       seconds,
