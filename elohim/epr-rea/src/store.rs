@@ -50,6 +50,15 @@ pub trait FlowStore {
     /// Append a record; returns the record's atom CID.
     fn append(&mut self, record: FlowRecord) -> Result<Cid>;
 
+    /// Append one logical batch. Stores without batch mechanics preserve the call order; the
+    /// sidecar override additionally makes the whole batch one reader-visible prefix transition.
+    fn append_batch(&mut self, records: Vec<FlowRecord>) -> Result<Vec<Cid>> {
+        records
+            .into_iter()
+            .map(|record| self.append(record))
+            .collect()
+    }
+
     /// All records in append order, with their CIDs.
     fn records(&self) -> Result<Vec<(Cid, FlowRecord)>>;
 
@@ -226,8 +235,8 @@ impl SidecarFlowStore {
     }
 
     /// Retain feedback coordination and reference-admission state across an operation.
-    /// Flow-log locks are deliberately per read or append: a reader captures a whole prefix, and
-    /// each append validates the tail and syncs one record before releasing its exclusive lock.
+    /// Flow-log locks are deliberately per read or append batch: a reader captures a whole prefix,
+    /// and each batch validates the tail once and syncs once before releasing its exclusive lock.
     /// Appends are not rolled back if a subsequent append or check fails. No recovery rewrites
     /// damaged bytes.
     pub fn transaction(&self) -> Result<SidecarFlowTransaction> {
@@ -296,7 +305,17 @@ impl FlowStore for SidecarFlowStore {
 #[cfg(feature = "sidecar")]
 impl FlowStore for SidecarFlowTransaction {
     fn append(&mut self, record: FlowRecord) -> Result<Cid> {
-        if let FlowRecord::Intent(intent) = &record {
+        self.append_batch(vec![record]).map(|mut cids| {
+            cids.pop()
+                .expect("a one-record sidecar batch returns one CID")
+        })
+    }
+
+    fn append_batch(&mut self, records: Vec<FlowRecord>) -> Result<Vec<Cid>> {
+        for record in &records {
+            let FlowRecord::Intent(intent) = record else {
+                continue;
+            };
             if intent
                 .resource_spec
                 .classified_as
@@ -311,20 +330,29 @@ impl FlowStore for SidecarFlowTransaction {
                     "feedback reference admission requires retained evidence read in this transaction".into()));
             }
         }
-        let cid = record.cid()?;
-        let line = serde_json::to_string(&SidecarLine {
-            cid: cid.to_string(),
-            record,
-        })
-        .map_err(|e| FabricError::Encode(e.to_string()))?;
+        let encoded: Vec<(Cid, String)> = records
+            .into_iter()
+            .map(|record| {
+                let cid = record.cid()?;
+                let line = serde_json::to_string(&SidecarLine {
+                    cid: cid.to_string(),
+                    record,
+                })
+                .map_err(|e| FabricError::Encode(e.to_string()))?;
+                Ok((cid, line))
+            })
+            .collect::<Result<_>>()?;
+        if encoded.is_empty() {
+            return Ok(Vec::new());
+        }
         // Only the tail can be adjacent to this append. Verify it under the same exclusive lock;
         // older records are still fully verified by readers after they release their brief lock.
         let mut log = crate::sidecar::LockedLog::exclusive(&self.log_path)?;
         if let Some(tail) = log.tail_record()? {
             decode_flow_records(&(tail + "\n"))?;
         }
-        log.append(line)?;
-        Ok(cid)
+        log.append_batch(encoded.iter().map(|(_, line)| line.clone()))?;
+        Ok(encoded.into_iter().map(|(cid, _)| cid).collect())
     }
 
     fn records(&self) -> Result<Vec<(Cid, FlowRecord)>> {
