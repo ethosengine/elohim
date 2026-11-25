@@ -411,6 +411,7 @@ fn raise(
             records,
             store,
             common,
+            None,
             *cid,
             data.supersedes.clone(),
         );
@@ -494,13 +495,13 @@ fn raise(
         raised_by: AgentRef(common.provider.to_string()),
     });
     let intent = atom.cid()?;
-    store.append(atom)?;
     append_raise_event(
         root,
         request,
         records,
         store,
         common,
+        Some(atom),
         intent,
         predecessor.map(|cid| cid.to_string()),
     )
@@ -512,6 +513,7 @@ fn append_raise_event(
     records: &[(Cid, FlowRecord)],
     store: &mut impl FlowStore,
     common: &EventCommon<'_>,
+    intent_record: Option<FlowRecord>,
     intent: Cid,
     predecessor: Option<String>,
 ) -> FlowResult<IntendOutcome> {
@@ -534,7 +536,10 @@ fn append_raise_event(
     }
     let event = event_record("raise", ReaVerb::Cite, intent, vec![], env, common);
     let event_cid = event.cid()?;
-    store.append(event)?;
+    let mut batch = Vec::with_capacity(2);
+    batch.extend(intent_record);
+    batch.push(event);
+    store.append_batch(batch)?;
     Ok(IntendOutcome {
         mode: "raise",
         intent: intent.to_string(),
