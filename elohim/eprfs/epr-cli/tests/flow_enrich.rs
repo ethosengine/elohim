@@ -86,6 +86,26 @@ impl Fixture {
         self.enrich_with(&selector, &["--outcome", "green"])
     }
 
+    fn resolve_selector(&self, project: &str, closure: &str) -> Output {
+        Command::new(env!("CARGO_BIN_EXE_epr"))
+            .args([
+                "flow",
+                "enrich",
+                "--root",
+                self.root.path().to_str().unwrap(),
+                "--project",
+                project,
+                "--closure",
+                closure,
+                "--resolve-only",
+                "--json",
+            ])
+            .env("XDG_CONFIG_HOME", self.keys.path())
+            .env_remove("ELOHIM_DEVICE_KEY_FILE")
+            .output()
+            .unwrap()
+    }
+
     fn enrich_with(&self, target: &[&str], extra: &[&str]) -> Output {
         let mut command = Command::new(env!("CARGO_BIN_EXE_epr"));
         command
@@ -284,6 +304,48 @@ fn identical_enrichment_is_idempotent() {
     assert_eq!(replay["appended"], false);
     assert_eq!(fixture.records().len(), count);
     assert_eq!(enrichment_events(&fixture.records()).len(), 1);
+}
+
+#[test]
+fn resolve_only_names_the_verdict_and_appends_nothing() {
+    let fixture = Fixture::new();
+    let verdict = fixture.verdict();
+    let bytes = fixture.log();
+
+    let resolved = success_json(fixture.resolve_selector(PROJECT, CLOSURE));
+
+    assert_eq!(resolved["verdict"], verdict.to_string());
+    assert_eq!(resolved["project"], PROJECT);
+    assert_eq!(resolved["closure"], CLOSURE);
+    assert_eq!(resolved["commit"], COMMIT);
+    assert_eq!(fixture.log(), bytes);
+    assert!(enrichment_events(&fixture.records()).is_empty());
+}
+
+#[test]
+fn not_comparable_requires_and_records_one_line_reason() {
+    let fixture = Fixture::new();
+    let verdict = fixture.verdict().to_string();
+    let count = fixture.records().len();
+
+    let missing = fixture.enrich(&verdict, "not-comparable", &[]);
+    assert!(!missing.status.success());
+    assert!(String::from_utf8_lossy(&missing.stderr)
+        .contains("--outcome not-comparable needs --reason <one-line reason>"));
+    assert_eq!(fixture.records().len(), count);
+
+    let written =
+        success_json(fixture.enrich(&verdict, "not-comparable", &["--reason", "closure differs"]));
+    assert_eq!(written["outcome"], "not-comparable");
+    let records = fixture.records();
+    let (_, event) = enrichment_events(&records).pop().unwrap();
+    assert_eq!(env(event, "outcome"), Some("not-comparable"));
+    assert_eq!(env(event, "reason"), Some("closure differs"));
+
+    let misplaced = fixture.enrich(&verdict, "green", &["--reason", "not allowed"]);
+    assert!(!misplaced.status.success());
+    assert!(String::from_utf8_lossy(&misplaced.stderr)
+        .contains("--reason is only valid with --outcome not-comparable"));
 }
 
 #[test]
