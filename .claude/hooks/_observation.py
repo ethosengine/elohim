@@ -26,7 +26,10 @@ producer, so bridging a kit reading would double a value that is already derived
 fails now costs the fold, not just a duplicate — which is why `emit` is still fail-open and
 silent, and why a hook must never depend on its return value to do its own job.
 
-Nothing is printed on either path: these hooks are best-effort and must never block or narrate.
+Nothing is printed on either path: ordinary hooks are best-effort and must never narrate. A timed
+out append is retried twice with bounded backoff because the killed writer has an uncertain result;
+callers that carry crossing records (notably berth notes and steward leases) turn the final False
+into a non-zero command exit instead of reporting success and forgetting the record.
 
 Probe cost discipline: the hooks run on EVERY Edit|Write under a tight budget, so the probe
 result is cached in-process AND on disk, keyed by the resolved executable CID. A different pin
@@ -42,6 +45,7 @@ import re
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 __all__ = ["resolve", "resolve_bin", "resolved_cid", "available", "emit", "emit_many", "reset_cache",
@@ -54,6 +58,7 @@ from _lib import epr_client  # noqa: E402
 
 _PROBE_TIMEOUT = 4  # seconds; a slow/hung binary must degrade to the JSON fallback
 _EMIT_TIMEOUT = 5
+_EMIT_TIMEOUT_BACKOFFS = (0.05, 0.15)
 
 _probe_memo: dict | None = None  # in-process cache: {"bin":…, "key":…, "available":bool}
 
@@ -166,17 +171,24 @@ def emit(measure: str, subject: str, value, *, reason: str,
          env: dict | None = None, root: str | None = None) -> bool:
     """Append one structured observation. Returns True only when it landed.
 
-    Fail-open by construction: a missing binary, an absent verb, a non-zero exit or a
-    timeout all return False so the caller keeps its JSON fallback. Never prints.
+    A timeout is an uncertain write, so retry it twice with bounded backoff. A missing binary,
+    absent verb, non-zero exit, exhausted timeout retry, or operating-system error returns False;
+    the caller decides whether its record is best-effort or must make the command fail. Never prints.
     """
     argv = _emit_argv(measure, subject, value, reason=reason, env=env, root=root)
     if argv is None:
         return False
-    try:
-        r = subprocess.run(argv, capture_output=True, text=True, timeout=_EMIT_TIMEOUT)
-        return r.returncode == 0
-    except (OSError, subprocess.SubprocessError):
-        return False
+    for attempt in range(len(_EMIT_TIMEOUT_BACKOFFS) + 1):
+        try:
+            r = subprocess.run(argv, capture_output=True, text=True, timeout=_EMIT_TIMEOUT)
+            return r.returncode == 0
+        except subprocess.TimeoutExpired:
+            if attempt == len(_EMIT_TIMEOUT_BACKOFFS):
+                return False
+            time.sleep(_EMIT_TIMEOUT_BACKOFFS[attempt])
+        except (OSError, subprocess.SubprocessError):
+            return False
+    return False
 
 
 def emit_many(notes: list[dict], *, wait: bool = True) -> list[bool]:
@@ -195,8 +207,6 @@ def emit_many(notes: list[dict], *, wait: bool = True) -> list[bool]:
     appends, so they run side by side and the hook pays roughly one. Same fail-open contract
     as `emit`: one shared `_EMIT_TIMEOUT` deadline, and a note that cannot land is False.
     """
-    import time
-
     procs: list = []
     for note in notes:
         argv = _emit_argv(note["measure"], note["subject"], note["value"],
