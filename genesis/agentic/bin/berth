@@ -2232,10 +2232,15 @@ class Berth:
         """The notes `session` said on THIS device, as folded in its channel store (the record that
         crosses), oldest first; a sibling's note is never one. A sender that must say a thing once
         reads its own record here instead of keeping a marker. Raises when the store cannot be read:
-        "unknown" is not "never said". The store read is the one a note of this device folds into."""
-        root, unreachable = self._fold_root({"kind": "note"})
-        if unreachable:
-            raise OSError(unreachable)
+        "unknown" is not "never said". The store read is the one this device's notes last folded into:
+        the channel store berth remembers (every `say` refreshes it from the peer view), so a read
+        spawns no `epr` and takes no lock on the store; only with nothing remembered is the peer
+        view asked, as a note's own fold asks it."""
+        root = self.channel_root or self.cached_channel_root()
+        if not root:
+            root, unreachable = self._fold_root({"kind": "note"})
+            if unreachable:
+                raise OSError(unreachable)
         with self._locked("inbox"):
             os.makedirs(self._inbox_dir(), exist_ok=True)
             self._scan_inbox(root)

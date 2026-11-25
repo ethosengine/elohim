@@ -1783,6 +1783,15 @@ class BerthInboxTest(unittest.TestCase):
         with self.assertRaises(OSError):
             self.berth.said("watcher")
 
+    def test_said_reads_the_remembered_channel_store_without_asking_epr(self):
+        # A read that spawned `epr peer leases` held the flow store's shared lock for seconds each
+        # pass, and a writer waits for every such reader.
+        self.append(self.folded("own-1", 990, sender="watcher", text="one", via=None))
+        Path(self.berth._channel_cache_path()).write_text(f"{self.checkout}\n")
+        self.berth.channel_root = None
+        with mock.patch.object(Berth, "peer_leases", side_effect=AssertionError("asked epr")):
+            self.assertEqual([n["cid"] for n in self.berth.said("watcher")], ["own-1"])
+
     def test_a_lost_or_malformed_note_stream_is_rebuilt_never_read_as_nothing_said(self):
         self.append(self.folded("own-1", 990, sender="watcher", text="one", via=None),
                     self.folded("own-2", 991, sender="watcher", to=self.SESSION, text="two", via=None))

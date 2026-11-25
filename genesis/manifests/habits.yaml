@@ -2455,10 +2455,10 @@ habits:
       - "python3 -m unittest genesis/agentic/berth_test.py (status text and status-json@1 unchanged when nothing is held; `berth said` reads only this device's own notes)"
       - "python3 -m unittest discover -s .claude/hooks/tests -p test_held_tool_ensure.py (the hook starts the device runner only when none holds its lock; its own error is one line and exit 0)"
     evidence: >
-      DELTA 2026-11-25 (re-review, still red): a pass runs in its own process group and the group is TERM-then-KILLed when the pass ends or times out, before the pass is reaped, so no pid is enumerated or reused (a descendant that calls setsid escapes); a standing stop file is named at every session start. Known limit: a session held longer than 24 h with an untouched transcript is no longer seen by the scan (it was announced long before). A tail starts at a record boundary, a torn last record is unknown for that pass, and resumed is said only from a tail that reaches the call. held_tool_watch_test 41 OK, berth_test 286 OK, test_held_tool_ensure 7 OK.
-    evidence-fingerprint: sha256:a75d69f4553a713c
-    evidence-bytes: 4480
-    evidence-entries: 6
+      DELTA 2026-11-25 (live cost on shem, still red): the loop's announce pass took 7–11 s, not the scan's 0.14 s: `berth said` asked `epr peer leases` and every pass read the full `berth status --json` (peer leases, peer status, all-journal stasis status), about 10 s of shared lock on the flow store per minute, which delays `epr flow note` past berth's 5 s emit timeout. Now a quiet pass spawns no flow-store reader (moorings and siblings from `--no-peer`, `berth said` at the remembered channel root, the full status only for a first line): 0.9–2.1 s. The `--tail-bytes 8388608` in its argv was the growth cap passed verbatim; only non-default flags are passed now. held_tool_watch_test 43 OK, berth_test 287 OK.
+    evidence-fingerprint: sha256:0a8c390fe582ccd2
+    evidence-bytes: 5196
+    evidence-entries: 7
     refs:
       - "watcher: genesis/agentic/bin/held-tool-watch (scan | observe | announce | run); runner kept alive by hook held-tool-ensure (.claude/settings.json, .codex/hooks.json)"
       - "backlog: genesis/data/timeline/backlog/steward-device-arrival-open-items.md rows 34, 82, 83"

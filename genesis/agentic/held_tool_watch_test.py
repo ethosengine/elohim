@@ -465,7 +465,9 @@ sys.exit(9)
         self.addCleanup(env.stop)
 
     def status(self, data):
+        """The full status (device id) and the --no-peer status the pass reads moorings and siblings from."""
         self.status_file.write_text(json.dumps(data))
+        self.sessions.write_text(json.dumps({k: v for k, v in data.items() if k != "device"}))
 
     def hold_open(self, *ids):
         (self.root / "open-incidents.json").write_text(json.dumps({SESSION: list(ids)}))
@@ -527,6 +529,40 @@ sys.exit(9)
         self.announce(T0 + 400)
         targets = [n["to"] for n in self.said()]
         self.assertEqual(targets, many[:8] + [None])
+
+    def berth_calls(self):
+        if not self.berth_log.exists():
+            return []
+        return [json.loads(line)[0] for line in self.berth_log.read_text().splitlines()]
+
+    def test_only_a_first_line_reads_the_full_status_and_a_quiet_pass_reads_none(self):
+        self.pin()
+        self.hold_open(f"{SESSION}:7")
+        self.announce(T0 + 200)  # nothing held yet: no store reader at all
+        self.assertEqual(self.berth_calls(), ["said"])
+        self.write(use("t1", "Bash", T0, command="ls"))
+        self.announce(T0 + 300)  # first line: one full status, for the device id
+        self.assertEqual(self.berth_calls()[1:], ["said", "status", "say", "say"])
+        native = [c for c in self.calls() if c["argv"][:3] == ["session", "stasis", "status"]]
+        for now in (T0 + 360, T0 + 420):  # held and told: neither the full status nor the native one
+            self.announce(now)
+        self.assertEqual(self.berth_calls()[5:], ["said", "said"])
+        self.assertEqual(len([c for c in self.calls() if c["argv"][:3] == ["session", "stasis", "status"]]),
+                         len(native))
+
+    def test_a_session_that_moors_later_is_told_with_the_first_lines_device_id(self):
+        self.pin()
+        self.hold_open(f"{SESSION}:7")
+        self.status({"device": DID, "moorings": [{"session": SESSION}, {"session": LOCAL}], "siblings": []})
+        self.write(use("t1", "Bash", T0, command="ls"))
+        self.announce(T0 + 200)
+        self.status({"device": "did:key:z6MkOTHERwrongwrongwrongwrong", "moorings": [{"session": SESSION},
+                     {"session": LOCAL}], "siblings": [{"device": "did:key:z6MkSIB", "session": SIBLING}]})
+        self.announce(T0 + 300)
+        said = self.said()
+        self.assertEqual([n["to"] for n in said], [LOCAL, SIBLING])
+        self.assertEqual({W["parse_mark"](n["text"])[1]["device"] for n in said}, {DID})
+        self.assertEqual(self.berth_calls().count("status"), 1)
 
     def test_resolution_says_resumed_once_then_nothing_more(self):
         self.pin()
