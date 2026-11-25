@@ -29,6 +29,18 @@ fn flow(worker: &str) -> FlowRecord {
     FlowRecord::Event(event)
 }
 
+const WRITER_COUNT: usize = 8;
+const RECORDS_PER_WRITER: usize = 16;
+const READER_COUNT: usize = 4;
+const SYNTHETIC_LOG_BYTES: usize = 20 * 1024 * 1024;
+
+fn encoded_line(record: FlowRecord) -> Vec<u8> {
+    let dir = tempfile::tempdir().unwrap();
+    let mut store = SidecarFlowStore::open(dir.path()).unwrap();
+    store.append(record).unwrap();
+    fs::read(store.log_path()).unwrap()
+}
+
 fn wait_for(path: &Path) {
     let until = Instant::now() + Duration::from_secs(15);
     while !path.exists() {
@@ -88,6 +100,12 @@ fn subprocess() {
                 flows.append(flow(&key)).unwrap();
             }
         }
+        "append-flow" => {
+            let mut flows = SidecarFlowStore::open(root).unwrap();
+            for n in 0..RECORDS_PER_WRITER {
+                flows.append(flow(&format!("{id}-{n}"))).unwrap();
+            }
+        }
         "hold-flow" => {
             let mut tx = SidecarFlowStore::open(root).unwrap().transaction().unwrap();
             tx.append(flow("before-pause")).unwrap();
@@ -98,8 +116,31 @@ fn subprocess() {
         "read-flow" => {
             fs::write(root.join("reading"), "reading").unwrap();
             let records = SidecarFlowStore::open(root).unwrap().records().unwrap();
-            assert_eq!(records.len(), 2);
+            fs::write(root.join("read-count"), records.len().to_string()).unwrap();
             fs::write(root.join("read-complete"), "complete").unwrap();
+        }
+        "read-flow-loop" => {
+            let store = SidecarFlowStore::open(root).unwrap();
+            let mut completed = 0_u64;
+            while !root.join("stop-readers").exists() {
+                assert!(!store.records().unwrap().is_empty());
+                completed += 1;
+                fs::write(root.join(format!("completed-{id}")), completed.to_string()).unwrap();
+            }
+        }
+        "partial-flow" => {
+            let path = root.join(".eprfs/status/flows.jsonl");
+            let line = fs::read(root.join("partial-line")).unwrap();
+            let split = line.len() / 2;
+            let mut file = OpenOptions::new().append(true).open(path).unwrap();
+            file.lock().unwrap();
+            file.write_all(&line[..split]).unwrap();
+            file.sync_all().unwrap();
+            fs::write(root.join("held"), "partial bytes synced").unwrap();
+            wait_for(&root.join("release"));
+            file.write_all(&line[split..]).unwrap();
+            file.sync_all().unwrap();
+            file.unlock().unwrap();
         }
         "crash-flow" | "crash-actor" => {
             let name = if mode == "crash-flow" {
@@ -116,6 +157,31 @@ fn subprocess() {
             wait_for(&root.join("never-release"));
         }
         other => panic!("unknown child mode {other}"),
+    }
+}
+
+#[test]
+fn eight_process_writers_preserve_every_complete_flow_record() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    let children: Vec<_> = (0..WRITER_COUNT)
+        .map(|n| spawn(root, "append-flow", &n.to_string()))
+        .collect();
+    for n in 0..WRITER_COUNT {
+        wait_for(&root.join(format!("ready-{n}")));
+    }
+    fs::write(root.join("start"), "start").unwrap();
+    for child in children {
+        finish(child);
+    }
+
+    let records = SidecarFlowStore::open(root).unwrap().records().unwrap();
+    assert_eq!(records.len(), WRITER_COUNT * RECORDS_PER_WRITER);
+    for writer in 0..WRITER_COUNT {
+        for item in 0..RECORDS_PER_WRITER {
+            let expected = flow(&format!("{writer}-{item}"));
+            assert!(records.contains(&(expected.cid().unwrap(), expected)));
+        }
     }
 }
 
@@ -151,7 +217,7 @@ fn independent_processes_first_open_and_append_preserve_every_record() {
 }
 
 #[test]
-fn flow_reader_observes_a_complete_transaction() {
+fn flow_reader_observes_a_complete_prefix_between_transaction_appends() {
     let dir = tempfile::tempdir().unwrap();
     let root = dir.path();
     fs::write(root.join("start"), "start").unwrap();
@@ -159,12 +225,71 @@ fn flow_reader_observes_a_complete_transaction() {
     wait_for(&root.join("held"));
     let reader = spawn(root, "read-flow", "reader");
     wait_for(&root.join("reading"));
-    // The writer has deliberately stopped between appends. Reader cannot accept the prefix.
+    wait_for(&root.join("read-complete"));
+    assert_eq!(fs::read_to_string(root.join("read-count")).unwrap(), "1");
+    fs::write(root.join("release"), "release").unwrap();
+    finish(writer);
+    finish(reader);
+}
+
+#[test]
+fn reader_starting_mid_append_sees_a_whole_prefix_never_a_torn_record() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    let mut store = SidecarFlowStore::open(root).unwrap();
+    store.append(flow("accepted")).unwrap();
+    fs::write(root.join("partial-line"), encoded_line(flow("in-flight"))).unwrap();
+    fs::write(root.join("start"), "start").unwrap();
+
+    let writer = spawn(root, "partial-flow", "writer");
+    wait_for(&root.join("held"));
+    let reader = spawn(root, "read-flow", "reader");
+    wait_for(&root.join("reading"));
     std::thread::sleep(Duration::from_millis(50));
     assert!(!root.join("read-complete").exists());
     fs::write(root.join("release"), "release").unwrap();
     finish(writer);
     finish(reader);
+    assert_eq!(fs::read_to_string(root.join("read-count")).unwrap(), "2");
+}
+
+#[test]
+fn writer_finishes_within_one_second_while_four_readers_decode_twenty_megabytes() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    let mut store = SidecarFlowStore::open(root).unwrap();
+    store.append(flow("seed")).unwrap();
+    let line = fs::read(store.log_path()).unwrap();
+    let repeats = SYNTHETIC_LOG_BYTES.div_ceil(line.len());
+    fs::write(store.log_path(), line.repeat(repeats)).unwrap();
+    assert!(fs::metadata(store.log_path()).unwrap().len() >= SYNTHETIC_LOG_BYTES as u64);
+
+    let readers: Vec<_> = (0..READER_COUNT)
+        .map(|n| spawn(root, "read-flow-loop", &format!("reader-{n}")))
+        .collect();
+    for n in 0..READER_COUNT {
+        wait_for(&root.join(format!("ready-reader-{n}")));
+    }
+    fs::write(root.join("start"), "start").unwrap();
+    for n in 0..READER_COUNT {
+        wait_for(&root.join(format!("completed-reader-{n}")));
+    }
+
+    let started = Instant::now();
+    store.append(flow("writer-under-read-load")).unwrap();
+    let elapsed = started.elapsed();
+    fs::write(root.join("stop-readers"), "stop").unwrap();
+    for reader in readers {
+        finish(reader);
+    }
+    eprintln!(
+        "FLOWSTORE_CONTENTION bytes={} readers={READER_COUNT} append={elapsed:?}",
+        fs::metadata(store.log_path()).unwrap().len()
+    );
+    assert!(
+        elapsed < Duration::from_secs(1),
+        "append took {elapsed:?} while readers decoded the synthetic log"
+    );
 }
 
 #[test]
@@ -216,6 +341,19 @@ fn complete_json_without_terminator_is_not_accepted_as_a_record() {
     fs::write(store.log_path(), &bytes).unwrap();
     assert!(store.records().is_err());
     assert!(store.append(actor("retry")).is_err());
+    assert_eq!(fs::read(store.log_path()).unwrap(), bytes);
+}
+
+#[test]
+fn flow_append_refuses_a_genuinely_broken_tail_without_changing_it() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut store = SidecarFlowStore::open(dir.path()).unwrap();
+    store.append(flow("accepted")).unwrap();
+    let mut bytes = fs::read(store.log_path()).unwrap();
+    assert_eq!(bytes.pop(), Some(b'\n'));
+    fs::write(store.log_path(), &bytes).unwrap();
+
+    assert!(store.append(flow("must-refuse")).is_err());
     assert_eq!(fs::read(store.log_path()).unwrap(), bytes);
 }
 
