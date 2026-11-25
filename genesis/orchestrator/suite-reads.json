@@ -26,6 +26,7 @@
       {"file": "../../.husky/hooks-path.test.mjs", "tree": "the hand-over trace saw node child without the read fence: /usr/local/bin/node /projects/elohim/.worktrees/nt-e11/.husky/hooks-path.mjs; not yet retried in the view"},
       {"file": "prepush-landing.test.mjs", "reads": [".husky/pre-push.bash"]},
       {"file": "prepush-read-shadow.test.mjs", "reads": [".husky/pre-push.bash"]},
+      {"file": "push-changed-files.test.mjs", "reads": ["genesis/orchestrator/push-changed-files.sh"]},
       {"file": "run-local-gate.test.mjs", "tree": "the hand-over trace saw static program, unseen by the read fence: /usr/local/bin/just; not yet retried in the view"},
       {"file": "../../.husky/commit-msg.test.mjs", "tree": "copies the husky shim from .husky/_, ignored install state no commit key covers (E11 skeptic)"},
       {"file": "brit-helper.test.mjs", "tree": "the hand-over trace saw unfenced child in the repository: sh /projects/elohim/.worktrees/nt-e11/genesis/orchestrator/scripts/brit-helper.sh plan; not yet retried in the view"},
