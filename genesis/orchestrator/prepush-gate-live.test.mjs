@@ -75,6 +75,19 @@ function runsOf(dir) {
 }
 const eventsOf = (file) =>
   readFileSync(file, "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l));
+// A pre-gate red starts a detached sibling worker (gate-live.mjs emitRedDetached) that appends its
+// own `sibling-delivery` line whenever its berth and epr reads end: before the close or after it.
+// So after a red the close is asserted as the run's one close, with nothing but delivery lines
+// behind it, and a failure prints the whole log and the hook's stderr.
+function assertClosedOnce(dir, outcome, r) {
+  const events = eventsOf(runsOf(dir)[0]);
+  const shown = `${events.map((e) => `${e.seq}:${e.kind}${e.outcome ? `=${e.outcome}` : ""}${e.why ? ` (${e.why})` : ""}`).join(" | ")}\n${r.stderr}`;
+  const closes = events.filter((e) => e.kind === "run-close");
+  assert.equal(closes.length, 1, `one run-close: ${shown}`);
+  assert.equal(closes[0].outcome, outcome, shown);
+  const after = events.slice(events.indexOf(closes[0]) + 1);
+  assert.deepEqual(after.filter((e) => e.kind !== "sibling-delivery"), [], `only delivery lines follow the close: ${shown}`);
+}
 
 for (const [label, failed, outcome] of [["gates_passed", '""', "gates-passed"], ["failed", '" storage"', "failed"]]) {
   test(`live_run_opens_and_closes_${label}`, (t) => {
@@ -213,7 +226,7 @@ test("a pre-gate red is live at once, the push continues, and an early pass stil
   const red = events.find((e) => e.kind === "failure");
   assert.equal(red.project, "habit-register");
   assert.equal(red.failure.excerpt[0], "habits.yaml stale");
-  assert.equal(events.at(-1).outcome, "failed");
+  assertClosedOnce(dir, "failed", r);
 });
 
 test("GATE_ON_RED=stop ends the push at its first pre-gate red", (t) => {
@@ -224,7 +237,7 @@ test("GATE_ON_RED=stop ends the push at its first pre-gate red", (t) => {
     { cwd: dir, env: env(), encoding: "utf8", timeout: 15000 });
   assert.equal(r.status, 1, r.stdout + r.stderr);
   assert.ok(!r.stdout.includes("AFTER-RED"));
-  assert.equal(eventsOf(runsOf(dir)[0]).at(-1).outcome, "failed");
+  assertClosedOnce(dir, "failed", r);
 });
 
 test("a stop requested on the live run is seen by the hook's probe", (t) => {
