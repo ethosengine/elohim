@@ -66,6 +66,9 @@ function fixture(t, { hook = readFileSync(HOOK_PATH, "utf8") } = {}) {
 
   mkdirSync(join(dir, ".husky"), { recursive: true });
   writeFileSync(join(dir, ".husky/pre-push.bash"), hook);
+  mkdirSync(join(dir, "genesis/orchestrator"), { recursive: true });
+  // The hook reads the attested list from this file; the fixture has no submodules checked out.
+  writeFileSync(join(dir, "genesis/orchestrator/attested-submodules.txt"), readFileSync(join(ROOT, "genesis/orchestrator/attested-submodules.txt")));
   const log = `echo "$*" >> "$(git rev-parse --show-toplevel)/stub.log"`;
   exe(join(dir, ".claude/scripts/dependabot-paydown.py"),
     `import os, subprocess, sys\nroot = subprocess.check_output(["git", "rev-parse", "--show-toplevel"], text=True).strip()\nopen(os.path.join(root, "stub.log"), "a").write("PAYDOWN " + " ".join(sys.argv[1:]) + "\\n")\n`);
