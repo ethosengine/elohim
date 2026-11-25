@@ -1,4 +1,4 @@
-import { gateEvidence, gateKeyMaterial, recordEvidence } from './gate-evidence.mjs';
+import { gateEvidence, gateKeyMaterial, gateKeyMaterials, recordEvidence } from './gate-evidence.mjs';
 import { after, describe, test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import { chmodSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -70,7 +70,9 @@ function readShadowKeyFixture(t, changed) {
     name: 'fixture', dir: 'apps/gate', manifestPath: 'build-manifest.json', steps: ['build'],
     run: { kind: 'root-just', recipe: 'gate', cargo: { workspace: 'apps/gate' } },
   };
+  const calls = [];
   const spawn = (command, args, options) => {
+    calls.push({ command, args });
     if (command === 'brit') {
       const rev = args[args.indexOf('--commit') + 1];
       const fingerprint = changed === 'module' ? rev : 'unchanged';
@@ -79,7 +81,7 @@ function readShadowKeyFixture(t, changed) {
     if (command === 'rustc') return { status: 0, stdout: 'rustc fixture', stderr: '' };
     return spawnSync(command, args, options);
   };
-  return { root, base, commit, project, spawn };
+  return { root, base, commit, project, spawn, calls };
 }
 
 test('read-shadow: a dependency test-only change moves real and leaves fix 1 unchanged', t => {
@@ -123,6 +125,50 @@ test('read-shadow: a used dependency module moves real and fix 1, so no line is 
   const evidence = gateKeyMaterial(fixture.project, { ...options, commit: fixture.commit });
   assert.ok(evidence.key, evidence.line);
   assert.equal(readShadowComparison(fixture.project, evidence, options), null);
+});
+
+test('read-shadow computes shared key material once per compared commit', t => {
+  const fixture = readShadowKeyFixture(t, 'test');
+  let clockNs = 0n;
+  const spawn = (...args) => {
+    clockNs += 1_000_000n;
+    return fixture.spawn(...args);
+  };
+  const options = { ...fixture, spawn, env: {}, cargoEnv: {}, britBin: 'brit' };
+  const evidence = gateKeyMaterial(fixture.project, { ...options, commit: fixture.commit });
+  fixture.calls.length = 0;
+  const shadow = readShadowComparison(fixture.project, evidence, { ...options, clock: () => clockNs });
+  assert.ok(shadow);
+  assert.equal(fixture.calls.filter(call => call.command === 'brit' && call.args[1] === 'fingerprint').length, 2,
+    'step fingerprints run once for the base and once for the gated commit');
+  assert.equal(fixture.calls.filter(call => call.command === 'rustc').length, 1,
+    'rustc identity is shared by both commit snapshots');
+  assert.equal(fixture.calls.filter(call => call.command === 'git'
+    && call.args.join(' ') === 'ls-tree -r --name-only -z ' + fixture.base).length, 1,
+    'the base audit lists the repository once for all variants');
+  assert.equal(fixture.calls.filter(call => call.command === 'git'
+    && call.args.join(' ') === 'ls-tree -r --name-only -z ' + fixture.commit).length, 1,
+    'the gated-commit audit lists the repository once for all variants');
+  assert.match(shadow.line,
+    /timing \d+ ms \(read-set audit real \d+, fix 1 \d+, fix 2 \d+, both \d+, shared \d+; fingerprinting \d+; suite inventory \d+; key composition \d+\)/);
+  assert.ok(shadow.rows.every(row => row.timing.totalMs > 0 && row.timing.fingerprintingMs > 0));
+});
+
+test('read-shadow variant key moves exactly when its shared read fingerprint moves', t => {
+  const fixture = readShadowKeyFixture(t, 'test');
+  const variants = [
+    { name: 'real', variant: {} },
+    { name: 'fix1', variant: { excludeDependencyTests: true } },
+  ];
+  const options = { ...fixture, env: {}, cargoEnv: {}, britBin: 'brit', variants, shared: {} };
+  const before = gateKeyMaterials(fixture.project, { ...options, commit: fixture.base });
+  const after = gateKeyMaterials(fixture.project, { ...options, commit: fixture.commit });
+  for (let index = 0; index < variants.length; index++) {
+    const beforeClosure = before.results[index].closure;
+    const afterClosure = after.results[index].closure;
+    const readFingerprintMoved = JSON.stringify(beforeClosure.reads) !== JSON.stringify(afterClosure.reads);
+    assert.equal(beforeClosure.key !== afterClosure.key, readFingerprintMoved, variants[index].name);
+  }
 });
 
 test('read-shadow on and off keep the same verdict, run decision, and evidence-store calls', t => {
