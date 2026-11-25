@@ -997,6 +997,7 @@ handover_finish() {
 
 hook_pass() {
   [ -z "$PUSH_IS_HANDOVER" ] || handover_finish
+  refuse_if_stopped
   [ -n "$BERTH_TARGETS" ] || exit 0
   local line local_sha remote_ref remote_sha target rc
   PHASE_L_STARTED=1
@@ -1123,6 +1124,14 @@ leg_red() {
 }
 gate_stop_requested() {
   [ -n "$GATE_LIVE_RUN" ] && node genesis/orchestrator/gate-live.mjs stopped --run "$GATE_LIVE_RUN" >/dev/null 2>&1
+}
+# Every stop refuses the push, whenever it came: checked once more at the last point before the
+# hook passes (hook_pass, before the landing claims dev-integration). Verdicts already reached stand.
+refuse_if_stopped() {
+  if gate_stop_requested; then
+    echo "[pre-push] REFUSED: a stop was requested on the live run (gate-live.mjs stop); nothing is landed or pushed. Verdicts already reached stand." >&2
+    exit 1
+  fi
 }
 # Every early pass below goes through here: a red an earlier check recorded still refuses.
 pass_or_refuse() {
@@ -2344,6 +2353,11 @@ if [ -n "$GATE_CARRY_USED" ]; then
 fi
 if [ -n "$NOT_RUN" ]; then
   echo "[pre-push] stopped: $STOP_REASON; not run:$NOT_RUN"
+  FAILED="$FAILED${FAILED:+ }stopped"
+elif gate_stop_requested; then
+  # Every gate had started (a carried one included) when the stop came: their verdicts stand, and a
+  # carried gate collected green never turns a stopped run green.
+  echo "[pre-push] stopped: a stop was requested on the live run; no gate was left to start, and the push is refused"
   FAILED="$FAILED${FAILED:+ }stopped"
 fi
 FAILED="$FAILED$PREGATE_FAILED"

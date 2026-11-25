@@ -31,6 +31,19 @@
       "items": { "type": "integer", "minimum": 1 },
       "description": "Pids of the gate still alive after the KILL wait, when any."
     },
-    "evidence": { "const": "none" }
+    "escaped": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["pid"],
+        "properties": {
+          "pid": { "type": "integer", "minimum": 1 },
+          "cmd": { "type": "string", "maxLength": 120 }
+        }
+      },
+      "description": "Present when the tap stopped waiting on the gate's output pipes after its tree was ended: the processes outside the tree still holding them (they may still run; never signalled, since they are no longer provably the gate's). Empty when none was found."
+    },
+    "evidence": { "const": "none", "description": "No verdict is recorded for the gate. What it already wrote (step scratch, build products) or put (a producer offer) is not undone." }
   }
 }

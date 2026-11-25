@@ -915,11 +915,18 @@ export function runProject(project, printOnly, namesOnly, {
   const stoppedGate = (stopped, step = null) => {
     readingComplete = true;
     const by = stopped.by || 'a caller with no session';
+    // "No verdict" is the claim, and no more: scratch the gate already wrote (step times, a slot's
+    // build products) and a producer put it already made (eprfs-produce.sh) are not undone.
     write(`[gate] ${project.name}${step ? ` (${step})` : ''} stopped on request by ${by}: its process group was ended `
-      + `(${stopped.signal || 'nothing left to signal'}); no evidence recorded\n`);
+      + `(${stopped.signal || 'nothing left to signal'}); no verdict recorded (what it already wrote or put is not undone)\n`);
+    if (stopped.escaped) {
+      write(`[gate] ${project.name}: a process outside the gate's tree may still be running: `
+        + `${stopped.escaped.length ? stopped.escaped.map(h => `pid ${h.pid}${h.cmd ? ` (${h.cmd})` : ''}`).join(', ') : 'none found carrying its environment'}\n`);
+    }
     liveEvent(env, {
       kind: 'gate-stopped', project: project.name, ...(step ? { step } : {}), by: stopped.by || null,
       signal: stopped.signal || null, ...(stopped.survivors?.length ? { survivors: stopped.survivors } : {}),
+      ...(stopped.escaped ? { escaped: stopped.escaped.map(h => ({ pid: h.pid, ...(h.cmd ? { cmd: h.cmd.slice(0, 120) } : {}) })) } : {}),
       evidence: 'none',
     });
     return GATE_STOPPED_EXIT;
@@ -1386,10 +1393,11 @@ export function runProject(project, printOnly, namesOnly, {
   // recorded only on its own bytes, with HEAD and the view's paths unchanged since the start.
   const suiteCheck = outcome;
   if (!suiteCheck.record) write(`[gate] ${project.name} evidence: not recorded (${suiteCheck.why})\n`);
-  // A gate ended by a signal (an interrupt from outside: the push killed, a hand on the process)
-  // has no verdict either: a red recorded for it would read as this closure failing its tests.
-  const signalled = Boolean(result.signal);
-  if (signalled && evidence.key) write(`[gate] ${project.name} evidence: not recorded (ended by ${result.signal}: an interrupt, not a verdict)\n`);
+  // A gate ended by a signal after a stop was requested on this run (the push being stopped while
+  // the tap forwards a signal) has no verdict either. Any other signal death (an OOM kill, the RAM
+  // guard's shed) records the red it reached, as it always did, so it is never silently lost.
+  const signalled = Boolean(result.signal) && Boolean(env.GATE_LIVE_RUN) && stopRequested(env.GATE_LIVE_RUN);
+  if (signalled && evidence.key) write(`[gate] ${project.name} evidence: not recorded (ended by ${result.signal} after a stop was requested on this run)\n`);
   if (evidence.key && evidence.buildRefBin && !answer?.unanswered && suiteCheck.record && !signalled) {
     const put = recordEvidence(project, evidence.key, {
       success: status === 0,
@@ -1581,6 +1589,10 @@ if (isMain) {
   // A gate that did not run is not a pass: a stopped run never exits 0.
   if (notRun.length) {
     process.stdout.write(`[gate] stopped: ${stopping}; not run: ${notRun.join(' ')}\n`);
+    failed = 1;
+  } else if (process.env.GATE_LIVE_RUN && stopRequested(process.env.GATE_LIVE_RUN)) {
+    // A stop that came after the last gate started still refuses: every verdict reached stands.
+    process.stdout.write('[gate] stopped: a stop was requested on the live run after the last gate started; the run is refused\n');
     failed = 1;
   }
   if (ownRun) {

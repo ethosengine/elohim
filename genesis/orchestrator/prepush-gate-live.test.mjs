@@ -239,6 +239,51 @@ test("a stop requested on the live run is seen by the hook's probe", (t) => {
   assert.ok(r.stdout.includes("NO-STOP-BEFORE") && r.stdout.includes("STOP-AFTER"), r.stdout);
 });
 
+// Every stop refuses the push, whenever it came (gate-stop review, BLOCKING 2): a stop after the
+// last gate's tap closed is read once more before the hook passes and before the landing claims.
+test("a stop requested after the last gate refuses at the hook's last check", (t) => {
+  for (const stop of [false, true]) {
+    const dir = fixture(t);
+    writeFileSync(join(dir, "genesis/orchestrator/gate-preflight.mjs"), "process.stdout.write('continue\\n');\n");
+    const r = spawnSync("bash", ["-c", script(`HOOK_WORK_TREE='${dir}'`, PRELUDE, OPEN_BLOCK, RED_BLOCK,
+      stop ? 'node genesis/orchestrator/gate-live.mjs stop --run "$GATE_LIVE_RUN" --reason "late" >/dev/null' : 'true',
+      'refuse_if_stopped', 'echo PASSED-THROUGH')],
+      { cwd: dir, env: env(), encoding: "utf8", timeout: 15000 });
+    if (stop) {
+      assert.equal(r.status, 1, r.stdout + r.stderr);
+      assert.match(r.stderr, /REFUSED: a stop was requested on the live run .*nothing is landed or pushed/);
+      assert.ok(!r.stdout.includes("PASSED-THROUGH"));
+    } else {
+      assert.equal(r.status, 0, r.stdout + r.stderr);
+      assert.ok(r.stdout.includes("PASSED-THROUGH"));
+    }
+  }
+});
+
+test("hook_pass reads the stop before the landing claims dev-integration", () => {
+  const body = slice("hook_pass() {\n", "\n}\n");
+  const check = body.indexOf("refuse_if_stopped");
+  assert.ok(check > 0, "hook_pass checks the stop");
+  assert.ok(check < body.indexOf("phase_l_claim"), "before the landing claim");
+  assert.ok(check < body.indexOf('[ -n "$BERTH_TARGETS" ] || exit 0'), "before the non-landing pass");
+});
+
+test("a stop after every gate started, a carried one included, leaves the run failed", (t) => {
+  const dir = fixture(t);
+  writeFileSync(join(dir, "genesis/orchestrator/gate-preflight.mjs"), "process.stdout.write('continue\\n');\n");
+  const after = slice('if [ -n "$NOT_RUN" ]; then\n  echo "[pre-push] stopped: $STOP_REASON', 'FAILED="$FAILED$PREGATE_FAILED"');
+  for (const stop of [false, true]) {
+    const r = spawnSync("bash", ["-c", script(`HOOK_WORK_TREE='${dir}'`, PRELUDE, OPEN_BLOCK, RED_BLOCK,
+      // Every gate ran and a carried gate was collected green: nothing failed, nothing was left unrun.
+      'FAILED=""; NOT_RUN=""; STOP_REASON=""',
+      stop ? 'node genesis/orchestrator/gate-live.mjs stop --run "$GATE_LIVE_RUN" >/dev/null' : 'true',
+      after, 'echo "FAILED=[$FAILED]"')],
+      { cwd: dir, env: env(), encoding: "utf8", timeout: 15000 });
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.ok(r.stdout.includes(stop ? "FAILED=[stopped]" : "FAILED=[]"), r.stdout);
+  }
+});
+
 // The fleet-roll block: it hands each pushed ref over as "<remote ref> <pushed sha> <destination
 // sha>" with the hook's remote and a mark file, runs `--fleet-roll` before the hook's early
 // passes, records exit 3 as a pre-gate red, and records a node that could not run as a red only

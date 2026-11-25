@@ -94,7 +94,7 @@ describe('stop --now ends the running gate', () => {
     for (const pid of pids) assert.equal(alive(pid), false, `pid ${pid} is gone`);
     assert.deepEqual(result.summary.stopped, { by: 'session-stopper', reason: 'pre-gate red', signal: 'SIGTERM' });
     assert.ok(result.code !== 0 || result.signal !== null, 'the tap does not exit 0');
-    assert.match(result.stderr, /stop requested now by session-stopper; ending the gate's process group/);
+    assert.match(result.stderr, /stopped on request by session-stopper: its process group was ended \(SIGTERM\); no verdict is recorded for it/);
     // The gate's own death throes are the stop, not reds: nothing was appended as a failure.
     assert.equal(readRun(run).events.filter(event => event.kind === 'failure').length, 0);
   });
@@ -174,14 +174,15 @@ describe('only the gate is ever signalled', () => {
 
 // runProject with its evidence path live: a fake brit answers the closure lookups and counts every
 // put, so a stopped gate that recorded anything would show here.
-function evidenceFixture(t, prefix, { seconds }) {
+function evidenceFixture(t, prefix, { seconds, recipe = null }) {
   const root = scratch(t, prefix);
   const pids = resolve(root, 'pids');
   mkdirSync(pids);
   mkdirSync(resolve(root, 'genesis/orchestrator'), { recursive: true });
-  // The recipe the tap runs is this fixture's run-local-gate.sh: a long gate with a child and a grandchild.
+  // The recipe the tap runs is this fixture's run-local-gate.sh: by default a long gate with a child
+  // and a grandchild; `recipe(pids)` supplies another.
   writeFileSync(resolve(root, 'genesis/orchestrator/run-local-gate.sh'),
-    readFileSync(fakeGate(pids, { seconds }), 'utf8'));
+    recipe ? recipe(pids) : readFileSync(fakeGate(pids, { seconds }), 'utf8'));
   const bin = resolve(root, 'brit');
   writeFileSync(bin, '', { mode: 0o755 });
   const { path: run } = openRun({ root, sha: 'd'.repeat(40), target: 'test' });
@@ -208,12 +209,13 @@ function evidenceFixture(t, prefix, { seconds }) {
 }
 
 // The stop comes from another process, as the integrator's does: runProject blocks this one.
-function stopperFor(run, pids, { immediate }) {
+function stopperFor(run, pids, { immediate, marker = 'grandchild', afterMs = 0 }) {
   const code = `
     import { existsSync } from 'node:fs';
     import { requestStop } from ${JSON.stringify(LIVE)};
     const until = Date.now() + 15000;
-    while (!existsSync(${JSON.stringify(resolve(pids, 'grandchild'))}) && Date.now() < until) await new Promise(r => setTimeout(r, 50));
+    while (!existsSync(${JSON.stringify(resolve(pids, marker))}) && Date.now() < until) await new Promise(r => setTimeout(r, 50));
+    await new Promise(r => setTimeout(r, ${afterMs}));
     requestStop(${JSON.stringify(run)}, { immediate: ${immediate}, by: 'session-integrator' });`;
   return spawn(process.execPath, ['--input-type=module', '-e', code], { stdio: 'ignore' });
 }
@@ -238,7 +240,7 @@ describe('a stopped gate records no evidence', () => {
     assert.equal(fx.calls.puts, 0, 'no closure evidence put');
     assert.deepEqual(fx.calls.epr, [], 'no gate-verdict@1 note and no cycle observation');
     assert.deepEqual(readings, [], 'no gate or step reading row');
-    assert.match(output, /\[gate\] fixture stopped on request by session-integrator: its process group was ended \(SIGTERM\); no evidence recorded/);
+    assert.match(output, /\[gate\] fixture stopped on request by session-integrator: its process group was ended \(SIGTERM\); no verdict recorded \(what it already wrote or put is not undone\)/);
     assert.doesNotMatch(output, /evidence: recorded/);
 
     const events = readRun(fx.run).events;
@@ -255,7 +257,7 @@ describe('a stopped gate records no evidence', () => {
     assert.equal(last.kind, 'run-close');
     assert.equal(last.outcome, 'interrupted');
     assert.equal(formatEvent(last),
-      '[gate-live] run interrupted: fixture was stopped on request by session-integrator; no evidence was recorded for it, and the push is refused');
+      '[gate-live] run interrupted: fixture was stopped on request by session-integrator; no verdict was recorded for it, and the push is refused');
     const cli = spawnSync(process.execPath, [LIVE, 'stopped', '--run', fx.run, '--gate', 'fixture'], { encoding: 'utf8' });
     assert.equal(cli.status, 0, 'the hook reads the gate as stopped');
   });
@@ -274,6 +276,91 @@ describe('a stopped gate records no evidence', () => {
   });
 });
 
+// A recipe that ends on its own with `status` while a background sleep keeps its output open for
+// a while: the stop arrives in that teardown, after the leader exited and before the tap closes.
+const endsOnItsOwn = status => pids => [
+  '#!/usr/bin/env bash',
+  'sleep 1.5 &',
+  'echo "test long_gate ... started"',
+  `touch "${pids}/leader-done"`,
+  `exit ${status}`,
+].join('\n');
+
+describe('a verdict the gate reached on its own survives a stop', () => {
+  for (const [status, name] of [[1, 'red'], [0, 'green']]) {
+    test(`the gate exits ${status} on its own, a stop arrives in its teardown: the ${name} is recorded`, async t => {
+      const fx = evidenceFixture(t, `gate-stop-own-${name}-`, { recipe: endsOnItsOwn(status) });
+      const stopper = stopperFor(fx.run, fx.pids, { immediate: true, marker: 'leader-done', afterMs: 300 });
+      t.after(() => stopper.kill());
+      let output = '';
+      const result = runProject(fx.project, false, false, { root: fx.root, spawn: fx.spawnFake, tap: true, env: fx.env,
+        readingCollector: [], write: line => { output += line; }, warn: line => { output += line; } });
+      assert.equal(result, status, output);
+      assert.equal(fx.calls.puts, 1, `the ${name} verdict is recorded`);
+      const events = readRun(fx.run).events;
+      assert.ok(events.some(event => event.kind === 'stop-request' && event.immediate), 'the stop was asked in the teardown');
+      assert.equal(events.filter(event => event.kind === 'gate-stopped').length, 0, 'nothing reads as stopped');
+      assert.equal(events.filter(event => event.kind === 'gate-verdict').at(-1).verdict.exit, status);
+      assert.doesNotMatch(output, /stopped on request/);
+      // The stop still refuses the push: the hook's last check reads it (prepush-gate-live.test.mjs).
+      const cli = spawnSync(process.execPath, [LIVE, 'stopped', '--run', fx.run], { encoding: 'utf8' });
+      assert.equal(cli.status, 0);
+    });
+  }
+});
+
+describe('an escaped child does not hang the run', () => {
+  test('a double-forked holder of the output is named, and the tap stops waiting for it', async t => {
+    const dir = scratch(t, 'gate-stop-escaped-');
+    const script = resolve(dir, 'gate.sh');
+    writeFileSync(script, [
+      '#!/usr/bin/env bash',
+      `( setsid bash -c 'echo $$ > "${dir}/escaped"; exec sleep 30' & )`,
+      `echo $$ > "${dir}/leader"`,
+      'sleep 300',
+    ].join('\n'), { mode: 0o755 });
+    t.after(() => { try { process.kill(readPid(resolve(dir, 'escaped')), 'SIGKILL'); } catch { /* gone */ } });
+    const { path: run } = openRun({ root: dir, sha: '2'.repeat(40), target: 'test' });
+    const { done } = startTap(run, script, { GATE_STOP_GRACE_MS: '500' });
+    assert.ok(await waitFor(() => existsSync(resolve(dir, 'escaped')) && existsSync(resolve(dir, 'leader'))));
+    const escaped = readPid(resolve(dir, 'escaped'));
+    await waitFor(() => readStat(escaped)?.sid === escaped); // its own session: outside the gate's
+    const asked = Date.now();
+    requestStop(run, { immediate: true, by: 'session-stopper' });
+    const result = await done;
+    const tookMs = Date.now() - asked;
+    assert.ok(tookMs < 500 + 2000 + 2000 + 1500, `the tap ended in ${tookMs} ms although pid ${escaped} still holds its output`);
+    assert.equal(alive(escaped), true, 'the escaped process is outside the tree and never signalled');
+    assert.match(result.stderr, new RegExp(`a process outside the gate's tree may still be running and may hold its output: pid ${escaped} \\(sleep 30\\)`));
+    assert.equal(result.summary.stopped.signal, 'SIGTERM');
+    assert.deepEqual(result.summary.stopped.escaped.map(holder => holder.pid), [escaped]);
+  });
+});
+
+describe('Ctrl-C still reaches the detached gate', () => {
+  test('SIGINT to the tap ends the gate group, and no stop is reported', async t => {
+    const dir = scratch(t, 'gate-stop-int-');
+    const script = resolve(dir, 'gate.sh');
+    // Foreground generations, as a recipe runs cargo: SIGINT reaches each through the group.
+    writeFileSync(script, [
+      '#!/usr/bin/env bash',
+      `echo $$ > "${dir}/leader"`,
+      `bash -c 'echo $$ > "${dir}/child"; bash -c "echo \\$\\$ > ${dir}/grandchild; exec sleep 300"; true'`,
+      'true',
+    ].join('\n'), { mode: 0o755 });
+    const { path: run } = openRun({ root: dir, sha: '3'.repeat(40), target: 'test' });
+    const { child, done } = startTap(run, script);
+    assert.ok(await waitFor(() => existsSync(resolve(dir, 'grandchild'))));
+    const pids = ['leader', 'child', 'grandchild'].map(name => readPid(resolve(dir, name)));
+    await waitFor(() => readFileSync(`/proc/${pids[2]}/cmdline`, 'utf8').startsWith('sleep'));
+    child.kill('SIGINT');
+    const result = await done;
+    for (const pid of pids) assert.equal(alive(pid), false, `pid ${pid} is gone`);
+    assert.ok(result.code !== 0 || result.signal !== null);
+    assert.equal(result.summary?.stopped, undefined);
+  });
+});
+
 describe('the stop CLI', () => {
   test('a stop for a run that already ended is a no-op with a clear line', t => {
     const root = scratch(t, 'gate-stop-ended-');
@@ -283,7 +370,7 @@ describe('the stop CLI', () => {
     for (const args of [['stop', '--now', '--run', run], ['stop', '--run', run]]) {
       const result = spawnSync(process.execPath, [LIVE, ...args], { encoding: 'utf8', env: { ...process.env, EPR_BIN: '/nonexistent/epr' } });
       assert.equal(result.status, 0, result.stderr);
-      assert.match(result.stdout, /already ended \(passed\); nothing to stop, nothing appended/);
+      assert.match(result.stdout, /already ended \(passed\); nothing was stopped, nothing appended/);
     }
     assert.equal(readFileSync(run, 'utf8'), before, 'nothing was appended to the closed run');
   });
@@ -298,6 +385,6 @@ describe('the stop CLI', () => {
     const request = readRun(run).events.find(event => event.kind === 'stop-request');
     assert.equal(request.immediate, true);
     assert.equal(request.by, 'session-cli');
-    assert.match(formatEvent(request), /stop requested now by session-cli — the running gate is being ended and records no evidence/);
+    assert.match(formatEvent(request), /stop requested now by session-cli — a gate still running is ended and records no verdict; .* the push is refused/);
   });
 });

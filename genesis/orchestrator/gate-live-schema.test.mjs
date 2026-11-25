@@ -149,6 +149,7 @@ const corpus = [
   ['withheld-offer notice', notice],
   ['gate stopped by TERM', event('gate-stopped', { project: 'elohim-storage', by: 'session-1', signal: 'SIGTERM', evidence: 'none' })],
   ['gate stopped by KILL with a survivor', event('gate-stopped', { project: 'elohim-storage', step: 'rust-style', by: null, signal: 'SIGKILL', survivors: [4242], evidence: 'none' })],
+  ['gate stopped with an escaped holder named', event('gate-stopped', { project: 'eprfs', by: 'session-1', signal: 'SIGTERM', escaped: [{ pid: 77, cmd: 'sleep 30' }], evidence: 'none' })],
   ['gate stopped with nothing left', event('gate-stopped', { project: 'orchestrator', by: 'session-1', signal: null, evidence: 'none' })],
   ['run closed by a stop', event('run-close', { outcome: 'interrupted', unanswered: stoppedAnswer({ project: 'elohim-storage', by: 'session-1' }) })],
   ['preflight notice', { ...notice, project: 'preflight' }],

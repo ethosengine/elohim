@@ -108,24 +108,29 @@ export function signalTree(leaderPid, members, signal, { kill = process.kill, st
 /**
  * Ends the gate whose leader is `leader` ({ pid, start }, read at spawn): TERM to its tree, a wait
  * of up to `graceMs` for every member to go, then KILL to whatever is left and a short wait.
- * Resolves to { custody, signal, survivors }: `signal` is the last one sent (null when nothing of
- * the gate was alive), `survivors` the pids still alive after the KILL wait.
+ * Resolves to { applied, custody, signal, survivors }. `applied` is false, and nothing is
+ * signalled, when the leader had already exited on its own: a gate whose recipe ended keeps the
+ * verdict it reached, and a stop only refuses the push. `signal` is the last one sent,
+ * `survivors` the pids of the gate's tree still alive after the KILL wait. The first scan, the
+ * leader check and the TERM run synchronously, before this function first yields.
  */
 export async function endTree(leader, {
   graceMs = STOP_GRACE_MS, kill = process.kill, scan = () => snapshot(), stat = readStat,
   sleep = delay, pollMs = POLL_MS, clock = () => Date.now(),
 } = {}) {
-  if (!leader || !Number.isInteger(leader.pid) || !leader.start) return { custody: false, signal: null, survivors: [] };
+  const notApplied = { applied: false, custody: false, signal: null, survivors: [] };
+  if (!leader || !Number.isInteger(leader.pid) || !leader.start) return notApplied;
   const known = new Set([identity(leader)]);
   let tree = gateTree(leader.pid, known, scan());
-  if (!tree.custody || living(tree.members).length === 0) return { custody: tree.custody, signal: null, survivors: [] };
+  const leaderNow = tree.members.find((stat) => stat.pid === leader.pid && stat.start === leader.start);
+  if (!tree.custody || !leaderNow || living([leaderNow]).length === 0) return { ...notApplied, custody: tree.custody };
 
   signalTree(leader.pid, tree.members, 'SIGTERM', { kill, stat });
   const termDeadline = clock() + graceMs;
   while (clock() < termDeadline) {
     await sleep(pollMs);
     tree = gateTree(leader.pid, known, scan());
-    if (!tree.custody || living(tree.members).length === 0) return { custody: true, signal: 'SIGTERM', survivors: [] };
+    if (!tree.custody || living(tree.members).length === 0) return { applied: true, custody: true, signal: 'SIGTERM', survivors: [] };
   }
 
   signalTree(leader.pid, tree.members, 'SIGKILL', { kill, stat });
@@ -133,7 +138,32 @@ export async function endTree(leader, {
   while (clock() < killDeadline) {
     await sleep(pollMs);
     tree = gateTree(leader.pid, known, scan());
-    if (!tree.custody || living(tree.members).length === 0) return { custody: true, signal: 'SIGKILL', survivors: [] };
+    if (!tree.custody || living(tree.members).length === 0) return { applied: true, custody: true, signal: 'SIGKILL', survivors: [] };
   }
-  return { custody: true, signal: 'SIGKILL', survivors: living(tree.members).map((member) => member.pid) };
+  return { applied: true, custody: true, signal: 'SIGKILL', survivors: living(tree.members).map((member) => member.pid) };
+}
+
+/**
+ * Every other process that carries `marker` (a `NAME=1` entry the tap put in the gate's
+ * environment, inherited by everything the gate started unless it cleared its environment):
+ * once the gate's tree is ended, such a process left the tree (a double fork, a daemon) and can
+ * keep the gate's output open. Read-only: each is named ({ pid, cmd }) and never signalled, since
+ * it is no longer provably the gate's. Node's stdio pipes are socket pairs, whose far end has
+ * another inode, so the inherited environment, not the descriptor, is what can be matched.
+ */
+export function markedProcesses(marker, { proc = '/proc', listDir = readdirSync, readFile = readFileSync,
+  self = process.pid } = {}) {
+  const found = [];
+  let entries = [];
+  try { entries = listDir(proc); } catch { return found; }
+  for (const entry of entries) {
+    if (!/^\d+$/.test(entry) || Number(entry) === self) continue;
+    let environ;
+    try { environ = String(readFile(`${proc}/${entry}/environ`, 'latin1')); } catch { continue; }
+    if (!environ.split('\0').includes(marker)) continue;
+    let cmd = '';
+    try { cmd = String(readFile(`${proc}/${entry}/cmdline`, 'utf8')).split('\0').filter(Boolean).join(' ').slice(0, 120); } catch { /* gone */ }
+    found.push({ pid: Number(entry), cmd });
+  }
+  return found;
 }

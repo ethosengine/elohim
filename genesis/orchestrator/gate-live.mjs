@@ -336,7 +336,7 @@ export function closeRun(path, outcome, {
  */
 export function stoppedAnswer(stopped) {
   return {
-    why: { stopped: 'on-request', gate: stopped.project ?? null, by: stopped.by ?? null, evidence: 'none recorded' },
+    why: { stopped: 'on-request', gate: stopped.project ?? null, by: stopped.by ?? null, evidence: 'no verdict recorded' },
     comeBack: { when: 'on-event', event: 'push-retried' },
     meanwhile: { local: 'run-here' },
     escalation: null,
@@ -430,15 +430,15 @@ export function formatEvent(raw) {
     }
     case 'stop-request':
       if (event.immediate === true) {
-        return `[gate-live] stop requested now${event.by ? ` by ${event.by}` : ''}${event.reason ? ` (${event.reason})` : ''} — the running gate is being ended and records no evidence; gates not yet started will not run`;
+        return `[gate-live] stop requested now${event.by ? ` by ${event.by}` : ''}${event.reason ? ` (${event.reason})` : ''} — a gate still running is ended and records no verdict; gates not yet started will not run, and the push is refused`;
       }
-      return `[gate-live] stop requested${event.reason ? ` (${event.reason})` : ''} — gates not yet started will not run`;
+      return `[gate-live] stop requested${event.reason ? ` (${event.reason})` : ''} — gates not yet started will not run, and the push is refused`;
     case 'gate-stopped':
-      return `[gate-live] ${event.project} STOPPED on request by ${event.by ?? 'a caller with no session'}: its process group was ended (${event.signal ?? 'nothing left to signal'}); no evidence recorded`;
+      return `[gate-live] ${event.project} STOPPED on request by ${event.by ?? 'a caller with no session'}: its process group was ended (${event.signal ?? 'nothing left to signal'}); no verdict recorded${Array.isArray(event.escaped) ? `; a process outside its tree may still run${event.escaped.length ? ` (pid ${event.escaped.map((h) => h.pid).join(', ')})` : ''}` : ''}`;
     case 'run-close': {
       const why = event.unanswered?.why;
       if (why && typeof why === 'object' && why.stopped === 'on-request') {
-        return `[gate-live] run ${event.outcome}: ${why.gate ?? 'a gate'} was stopped on request by ${why.by ?? 'a caller with no session'}; no evidence was recorded for it, and the push is refused`;
+        return `[gate-live] run ${event.outcome}: ${why.gate ?? 'a gate'} was stopped on request by ${why.by ?? 'a caller with no session'}; no verdict was recorded for it, and the push is refused`;
       }
       return `[gate-live] run ${event.outcome}${event.deferred > 0 ? ` (${event.deferred} deferred)` : ''}`;
     }
@@ -639,6 +639,8 @@ async function awaitStopNow(path, seq, { timeoutMs, pollMs = 200, sleep = delay 
     if (stopped) return { state: 'stopped', event: stopped };
     const close = events.find((event) => event.kind === 'run-close' && event.seq > seq);
     if (close) return { state: 'closed', outcome: close.outcome };
+    const finished = events.find((event) => event.kind === 'gate-verdict' && event.seq > seq);
+    if (finished) return { state: 'finished', event: finished };
     if (first && runningGate(events) === null) return { state: 'idle' };
     first = false;
     if (Date.now() >= deadline) return { state: 'unanswered', gate: runningGate(events) };
@@ -1428,7 +1430,11 @@ const USAGE = `Usage:
   node gate-live.mjs unseen --session S [--reader R]
   node gate-live.mjs red --run PATH --project P --message M     (a pre-gate leg's red, live at once)
   node gate-live.mjs stop [--run PATH | --session S | --latest] [--reason R] [--now]
-                                         (--now also ends the running gate; it records no evidence)
+        Every stop refuses the push: no gate after it starts, and the hook refuses before landing.
+        --now also ends a gate whose recipe is still running (TERM, KILL after GATE_STOP_GRACE_MS);
+        that gate records no verdict, though what it already wrote or put is not undone. A gate
+        whose recipe already ended on its own keeps its verdict, red or green: the stop refuses
+        the push, it never unmakes a verdict.
   node gate-live.mjs stopped --run PATH [--gate P]              (exit 0 when a stop was requested; with --gate, when P was stopped)
   node gate-live.mjs outlook --run PATH --remaining "a b c"     (once per run: what continuing costs)
   node gate-live.mjs harvest [--last N]
@@ -1648,7 +1654,7 @@ async function main(argv) {
         const state = readRun(path).outcome;
         if (state !== 'running') {
           // Nothing is left to stop, so nothing is appended: a closed run's log keeps its last line.
-          process.stdout.write(`[gate-live] stop: ${path} already ended (${state}); nothing to stop, nothing appended\n`);
+          process.stdout.write(`[gate-live] stop: ${path} already ended (${state}); nothing was stopped, nothing appended\n`);
           return 0;
         }
         // Who asked, for the stopped line: this caller's session (`epr session id`), when it has one.
@@ -1662,7 +1668,10 @@ async function main(argv) {
         const answer = await awaitStopNow(path, requested.seq, { timeoutMs: waitS * 1000 });
         switch (answer.state) {
           case 'stopped':
-            process.stdout.write(`[gate-live] ${answer.event.project} stopped (${answer.event.signal ?? 'nothing left to signal'}); no evidence recorded; the push is refused\n`);
+            process.stdout.write(`[gate-live] ${answer.event.project} stopped (${answer.event.signal ?? 'nothing left to signal'}); no verdict recorded; the push is refused\n`);
+            return 0;
+          case 'finished':
+            process.stdout.write(`[gate-live] ${answer.event.project} had already ended on its own; its verdict stands, and the push is refused\n`);
             return 0;
           case 'closed':
             process.stdout.write(`[gate-live] the run closed (${answer.outcome}) before a running gate answered the stop\n`);
