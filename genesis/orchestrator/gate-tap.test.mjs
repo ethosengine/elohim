@@ -5,7 +5,7 @@ import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { attributor, createCostSampler, lineSplitter, tapChildEnv } from './gate-tap.mjs';
+import { attributor, createCostSampler, drainSlotSession, lineSplitter, tapChildEnv } from './gate-tap.mjs';
 
 const TAP = resolve(dirname(fileURLToPath(import.meta.url)), 'gate-tap.mjs');
 
@@ -231,6 +231,60 @@ test('missing kernel files are unknown, and disappearing processes do not break 
   });
   assert.deepEqual(sampler.sample(), { cpu_s: null, throttled_s: null, rss_peak_bytes: null,
     memory_high_events: null, io_full_pct_max: null });
+});
+
+test('slot holder releases non-zero and names members that survive the post-KILL wait', async () => {
+  const member = { pid: 42, sid: 7, start: '200', state: 'S' };
+  const sent = [];
+  let output = '';
+  const status = await drainSlotSession(7, '100', {
+    scan: () => new Map([[member.pid, member]]),
+    now: () => 0,
+    sleep: async () => {},
+    send: (sid, members, signal) => sent.push([sid, members.map(item => item.pid), signal]),
+    write: line => { output += line; },
+    drainMs: 0,
+    termMs: 0,
+    killMs: 0,
+    heartbeatMs: 10,
+    leaderObserved: true,
+  });
+
+  assert.equal(status, 1);
+  assert.deepEqual(sent, [[7, [42], 'SIGTERM'], [7, [42], 'SIGKILL']]);
+  assert.match(output, /^\[gate-slot\] session 7 still alive 0 ms after SIGKILL; releasing slot with surviving pids: 42$/m);
+});
+
+test('slot holder observes its leader before accepting an empty session', async () => {
+  const leader = { pid: 7, sid: 7, start: '100', state: 'S' };
+  const scans = [new Map(), new Map([[leader.pid, leader]]), new Map()];
+  let sleeps = 0;
+  const status = await drainSlotSession(7, '100', {
+    scan: () => scans.shift(),
+    sleep: async () => { sleeps += 1; },
+    emptyConfirmMs: 0,
+  });
+
+  assert.equal(status, 0);
+  assert.equal(sleeps, 2);
+  assert.equal(scans.length, 0);
+});
+
+test('slot holder releases without signalling when the sid belongs to a new leader start', async () => {
+  const reused = { pid: 7, sid: 7, start: '101', state: 'S' };
+  const member = { pid: 42, sid: 7, start: '200', state: 'S' };
+  const sent = [];
+  let output = '';
+  const status = await drainSlotSession(7, '100', {
+    scan: () => new Map([[reused.pid, reused], [member.pid, member]]),
+    sleep: async () => assert.fail('a reused sid must release immediately'),
+    send: (...args) => sent.push(args),
+    write: line => { output += line; },
+  });
+
+  assert.equal(status, 0);
+  assert.deepEqual(sent, []);
+  assert.equal(output, '');
 });
 
 test('fd 3 carries all five cost axes beside the failure signals', t => {
