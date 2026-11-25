@@ -3049,3 +3049,26 @@ Also found: the device notes publisher's refspec is unfiltered, so harvested `ci
 the forge though the code that writes them says they stay on the device (shem has held
 `just dev notes publish` since 17:50Z pending the steward's word); and a manifest with no
 rustflags inherits ambient `RUSTFLAGS` outside the gate key.
+
+## Row 93 — two daemons stay connected to the relay and exchange nothing, and nothing notices
+
+Second occurrence. On 2026-11-24 from about 17:05Z to 02:12Z the next day, shem and the laptop
+exchanged nothing in either direction for about nine hours while both peer daemons were up and
+connected to the relay; neither log carried an error. Shem last folded the laptop's head at seq
+21503; the laptop's newest head of shem stayed at seq 91662 while shem passed 92,800. Shem's
+daemon was restarted twice in that time (its epr head moved) without effect, and ethosengine
+exchanged with shem within seconds throughout. Restarting the laptop's daemon (same build, same
+relay) healed it at once: within about 30 s it folded shem's seq 92883, and it folded
+ethosengine for the first time. The first occurrence was 2026-11-05, about twelve hours, healed
+by restarting one side. Reported by the laptop's session, which kept its pre-restart log.
+
+What made it invisible: `connected` and `exchanging` are not told apart anywhere, and the SILENT
+line reads the same for a sleeping device, a gone one and this (the liveness inventory,
+`genesis/docs/superpowers/specs/evidence/2026-11-24-device-liveness/inventory.md`). Landings were
+not blocked, because a silent sibling is covered by the lease override; a session that needed
+the laptop's acknowledgement would have waited without knowing why.
+
+Not known: the cause, and why only one side's restart heals it. Proposed by the laptop's
+session, not built: a watch that fires when the newest head from a sibling is older than N
+minutes while that sibling is seen exchanging with a third device. Ethosengine has such a watch
+for its own exchange (`genesis/local-dev/peer/daemon-liveness.sh`); shem and the laptop do not.
