@@ -318,8 +318,9 @@ fi
 # The lease is claimed by a LANDING AGENT (phase_l_agent), forked at the landing in its own process
 # group with its own hook session (class verify, ttl 600 s, renewed every ttl/3, always
 # `--offline-ok`). It is that session's envelope owner from birth until it releases: the release
-# comes after `git push` has transmitted, when this hook has exited, and a session envelope honours
-# only its own live owner (berth facets never transfer), so no other process could release it. The
+# comes after the push (`git push` or `brit push`) has transmitted, when this hook has exited, and a
+# session envelope honours only its own live owner (berth facets never transfer), so no other
+# process could release it. The
 # pushing session's own lease is never taken: when that session already holds `dev-integration`,
 # the hook renews it as that session and leaves it held.
 #
@@ -412,10 +413,11 @@ fi
 #   3. fetches the remote's tip and lands only as a fast-forward of it, judged on commit ancestry.
 #      A moved tip releases the lease, rebases the candidate in place, re-gates it and refuses
 #      "push again": one round, never a loop;
-#   4. hands the landing to the agent, which waits for the real `git push` to finish, reads the
+#   4. hands the landing to the agent, which waits for the real push (git or brit) to finish, reads the
 #      remote back, releases by generation token and appends one line to
 #      <git-common-dir>/landing/settle.log.
-# The parent talks to the agent through a FIFO (`land <sha> <push pid> <target>` or
+# The parent talks to the agent through a FIFO (`land <sha> <push pid|-> <target> <git|brit|unknown>
+# <push start time|->` or
 # `release <why>`; EOF before `land` means release now) and reads a status file the agent appends
 # (`say`/`berth` lines to print, then `held <claimed_at> <claim s>` or `refused <rc>`).
 PHASE_L_REMOTE="${1:-origin}"
