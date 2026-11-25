@@ -7,6 +7,14 @@ from pathlib import Path
 import subprocess
 from typing import Mapping
 
+try:
+    from _lib import deadline as _deadline
+except ImportError:  # imported as a top-level module (the fixtures' path) or by filename
+    import importlib.util as _util
+    _spec = _util.spec_from_file_location("session_deadline", Path(__file__).with_name("deadline.py"))
+    _deadline = _util.module_from_spec(_spec)
+    _spec.loader.exec_module(_deadline)
+
 
 def load_registry(env: Mapping[str, str], cwd: Path | None = None) -> dict:
     explicit = env.get("EPR_AGENT_RUNTIMES", "").strip()
@@ -108,12 +116,15 @@ def resolve(*, environ: Mapping[str, str] | None = None, proc_root: Path | None 
         try:
             result = subprocess.run([env.get("EPR_BIN") or "epr", "session", "id", "--json"],
                                     env={**env, "EPR_SESSION_RESOLVING": "1"},
-                                    capture_output=True, text=True, timeout=2, check=True)
+                                    capture_output=True, text=True,
+                                    timeout=_deadline.cap(2, "epr session id"), check=True)
             identity = json.loads(result.stdout)
             if (isinstance(identity, dict) and set(identity) == set(_identity())
                     and identity.get("source") in ("declared", "runtimeAncestor", "ttyLeader", "none")):
                 return identity
-        except (OSError, ValueError, subprocess.SubprocessError):
+        except subprocess.TimeoutExpired:
+            _deadline.note_expired("epr session id")
+        except (OSError, ValueError, TimeoutError, subprocess.SubprocessError):
             pass
     return resolve_fallback(environ=env, proc_root=proc_root, start_pid=start_pid)
 

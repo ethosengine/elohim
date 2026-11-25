@@ -42,6 +42,14 @@ import shutil
 import subprocess
 from pathlib import Path
 
+try:
+    from _lib import deadline
+except ImportError:  # loaded by filename (stasis_control.worker) with no `_lib` on sys.path
+    import importlib.util as _util
+    _spec = _util.spec_from_file_location("epr_client_deadline", Path(__file__).with_name("deadline.py"))
+    deadline = _util.module_from_spec(_spec)
+    _spec.loader.exec_module(deadline)
+
 
 # A hung evaluator must never hang an author's keystroke.
 _TIMEOUT_SECONDS = 10
@@ -155,11 +163,15 @@ def resolve(env: dict[str, str] | None = None) -> tuple[str | None, str | None]:
             cached = _cached_resolution()
             if cached:
                 return cached
-        result = subprocess.run(
-            ["epr", "bin", "status", "--tool", "epr", "--json"],
-            env=dict(environment), capture_output=True, text=True, timeout=_TIMEOUT_SECONDS,
-            check=False,
-        )
+        try:
+            result = subprocess.run(
+                ["epr", "bin", "status", "--tool", "epr", "--json"],
+                env=dict(environment), capture_output=True, text=True,
+                timeout=deadline.cap(_TIMEOUT_SECONDS, "epr bin status"), check=False,
+            )
+        except subprocess.TimeoutExpired:
+            deadline.note_expired("epr bin status")
+            raise
         if result.returncode != 0:
             if _arrival_owed(result.returncode, environment):
                 bootstrap(environment)
@@ -329,8 +341,11 @@ def govern(root: Path, path: str, content, is_new: bool, is_new_subdir: bool, *,
             input=content if content is not None else "",
             capture_output=True,
             text=True,
-            timeout=_TIMEOUT_SECONDS,
+            timeout=deadline.cap(_TIMEOUT_SECONDS, "epr govern"),
         )
+    except subprocess.TimeoutExpired:
+        deadline.note_expired("epr govern")
+        return None
     except Exception:  # noqa: BLE001 — timeout / spawn failure is an absence, not a verdict
         return None
     if proc.returncode != 0:
@@ -379,7 +394,10 @@ def covenant(root: Path, verb: str, session: str | None, *args: str) -> dict:
     argv = [binary, "covenant", verb, "--repo", str(root), "--session", session, *args, "--json"]
     try:
         proc = subprocess.run(argv, capture_output=True, text=True,
-                              timeout=_COVENANT_TIMEOUT_SECONDS)
+                              timeout=deadline.cap(_COVENANT_TIMEOUT_SECONDS, "epr covenant " + verb))
+    except subprocess.TimeoutExpired as e:
+        deadline.note_expired("epr covenant " + verb)
+        return {"status": "unavailable", "reason": type(e).__name__}
     except Exception as e:  # noqa: BLE001 — timeout / spawn failure is an absence
         return {"status": "unavailable", "reason": type(e).__name__}
     if proc.returncode != 0:

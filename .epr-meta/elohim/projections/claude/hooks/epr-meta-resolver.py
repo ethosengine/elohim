@@ -12,6 +12,8 @@ RETIRE_WHEN = (
     "manifest at once, which is the fail-open direction this hook already guards against "
     "internally."
 )
+import time as _time
+_T0 = _time.monotonic()  # the 3 s harness clock starts here, before any import below
 import hashlib
 import json
 import sys
@@ -34,6 +36,7 @@ for _ in range(8):
     _here = _here.parent
 
 from _lib import concern_routes  # noqa: E402
+from _lib import deadline as hook_deadline  # noqa: E402
 from _lib import epr_client  # noqa: E402
 from _lib import epr_meta  # noqa: E402
 from _lib import store  # noqa: E402
@@ -62,13 +65,25 @@ _EVALUATOR: dict | None = None
 _ACTOR: dict | None = None
 
 
+def _expired(what: str) -> bool:
+    """True (and recorded for the one stderr line) once the hook's internal deadline has passed."""
+    left = hook_deadline.remaining()
+    if left is not None and left <= 0:
+        hook_deadline.note_expired(what)
+        return True
+    return False
+
+
 def _witness(root: Path, *, subject, decision: str, cls: str | None, rule_id: str | None = None,
              policy_ref: str | None = None, refer: dict | None = None,
              checks: list | None = None) -> None:
     """Thin wrapper over the shared _lib.epr_meta.witness ledger-append (runtime='claude',
     gate='pre-tool-use') — the SAME helper the git-gate CLI drives, so both runtimes write the
     identical governance-findings.jsonl shape. Best-effort; never raises (witnessing must never
-    break the gate — epr_meta.witness already wraps its body in try/except)."""
+    break the gate — epr_meta.witness already wraps its body in try/except). Skipped once the hook's
+    deadline has passed: the decision is already made, and ledger work must not carry it past 3 s."""
+    if _expired("governance witness"):
+        return
     epr_meta.witness(root, runtime="claude", gate="pre-tool-use", subject=subject,
                       decision=decision, cls=cls, rule_id=rule_id, policy_ref=policy_ref,
                       refer=refer, checks=checks, evaluator=_EVALUATOR, actor=_ACTOR)
@@ -78,7 +93,10 @@ def _advice_debounced(root: Path, key: str) -> bool:
     """True if `key` was advised within _ADVICE_WINDOW; records the advice time otherwise.
     Shares the coverage-nudge store so all epr-meta debounce state lives in one place.
     Read-check-write runs under store.locked_update so concurrent sessions can't lose each
-    other's debounce keys (worst case on lock timeout: one extra advisory, never a suppression)."""
+    other's debounce keys (worst case on lock timeout: one extra advisory, never a suppression).
+    Past the hook's deadline the store is not touched: the advice is shown, never suppressed."""
+    if _expired("advice debounce"):
+        return False
     try:
         state_p = root / ".claude/data/epr-meta-advice.json"
         now = time.time()
@@ -310,7 +328,24 @@ def _coverage_nudge(target: Path):
         return None
 
 
+# The harness cancels this hook at 3 s (a visible exception). Every `epr` call it makes is capped by
+# one 2.5 s deadline; a call that cannot finish is skipped (an absence, as when `epr` is missing) and
+# one stderr line says what was skipped. Measured idle: ~1.4 s, so the margin is the loaded-device case.
+_DEADLINE_SECONDS = 2.5
+
+
 def main():
+    # Imports and file reads already spent `_T0`..now of the budget; every call after this one consults it.
+    hook_deadline.set(_DEADLINE_SECONDS - (time.monotonic() - _T0))
+    try:
+        _main()
+    finally:
+        note = hook_deadline.line("epr-meta-resolver")
+        if note:
+            print(note, file=sys.stderr)
+
+
+def _main():
     raw = sys.stdin.read()
     try:
         data = json.loads(raw)
@@ -499,7 +534,7 @@ def main():
     # fingerprinted architecture findings + a dispatch directive, sentinel-style. Independent of
     # the overall decision (fires even when a deny/ask elsewhere wins) — mirrors pre-slice
     # behavior. Each fired measure is witnessed regardless of the overall winning class.
-    if result["measures"]:
+    if result["measures"] and not _expired("measure handling"):
         advisories += _handle_measures(result["measures"], merged, root, fp)
         for v in result["measures"]:
             rule = merged["rules"].get(v.rule_id, {}) if merged else {}
