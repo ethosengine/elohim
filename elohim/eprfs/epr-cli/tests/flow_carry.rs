@@ -294,8 +294,9 @@ fn a_carry_refuses_a_landed_miss_before_appending_any_record() {
 
     assert!(!refused.status.success());
     assert!(
-        String::from_utf8_lossy(&refused.stderr)
-            .contains("the miss is settled: its commit landed on refs/remotes/origin/dev"),
+        String::from_utf8_lossy(&refused.stderr).contains(
+            "the miss is settled: its commit is on the fetched origin/dev or origin/main"
+        ),
         "{}",
         String::from_utf8_lossy(&refused.stderr)
     );
