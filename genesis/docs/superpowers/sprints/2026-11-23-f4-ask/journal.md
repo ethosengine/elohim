@@ -351,6 +351,71 @@ leaned to refusing at once, naming the cure, for a sibling that is heard but doe
 acknowledge (row 90); and said that gate integrity should move to attestations on build
 artifacts that peers can read and enrich (recorded with the next-sprint notes).
 
+## 24 Nov, 15:30Z to 25 Nov, 10:05Z: attestation direction, the first consume-not-build install, and brit's sprint
+
+Integrator's record, shem. Times are UTC. Each landing names its dev range.
+
+**Landed on dev in this period.** `f74e8fadd` (the attestation design and its evidence),
+`6029ac4cb` (per-crate shadow keys), `487f212a9` and `dc7a86bf5` (settled misses), `1cab87179`
+(key-closure rows narrowed), `6365a4922` (the steward's four answers, quoted), `558772618`
+(harvested CI notes are published; 30 days retention declared, not enforced), `bccc344c7` (the
+held-tool sensor, unwired), `4498b9394` (the enrichment verb; epr built, tested and published
+with `blob-store`; the eprfs pipeline takes the same feature), `044a0fdbb` (the brit friction
+register, the `brit-first` hook that names the brit form, backlog row 94), `ecce7c796`
+(`gate-live.mjs stop --now` ends the running gate, backlog row 95).
+
+**The steward's directions, in order.** Shift integrity cost onto attestations on build artifacts
+(24 Nov). One producer suffices for a release now, rising with reach; a sponsored runner's green
+may stand alone for deterministic things; notarization is a later enrichment; CI notes should
+reach the forge and be held for a while (25 Nov, quoted in the design's section 9a). The laptop
+installs epr from a sibling's artifact and does not build. Before bed on 25 Nov: aggregate the
+friction with brit, own brit working reliably in this repository, have the ThinkPad plan and run
+the next brit sprint; keep driving lanes with ethosengine toward native CI/CD. His words are in
+the campaign sidebar file on shem.
+
+**Consume, not build.** `epr bin follow` already draws a release from a sibling when a host has
+no cargo pool, and the eprfs gate already publishes its tested bytes. One gap blocked the laptop:
+the published epr was built without `blob-store`, the laptop's payload store is `blob-store-v1`,
+and nothing in a release states the payload format. The build half landed at `4498b9394`; shem's
+gate crossed release `bafyreif47wpi6i…` there. The laptop fetched ethosengine's earlier build of
+the same sources over the peer runtime (101 chunks, 34 s), ran it on glibc 2.43, and its land
+refused the unpublished commit, as it should. Whether the laptop landed the dev release is not
+known here: the ThinkPad session did not report back. The refusal half (a release states its
+payload formats; the shared draw refuses a mismatch, including on the `epr device arrive` path
+that a session start runs) is committed on ethosengine and not handed over. Until it lands, the
+laptop's main checkout stays off dev.
+Found on the way: ethosengine's and shem's builds of the same epr sources have different output
+CIDs, so two producers cannot agree on one output by rebuilding today.
+
+**The carry, used for the first time across devices.** A hand-over push from shem posted a miss
+for `eprfs-live-corpus`; ethosengine claimed it, ran the gate at that commit, and shem read the
+green from its own fold for the same closure. The verdict's time read about 8 h 30 min behind;
+not explained.
+
+**Brit.** 3,111 stated fallbacks in shem's transcripts, 2,403 real: landing push 624, read forms
+368, ls-remote 207, submodule forms 195, cherry-pick 150. At least 562 were for verbs brit 0.3.4
+has. The ThinkPad drafted brit sprint 5 from the register (seven items; the first is a `brit
+push` that completes a gated dev landing) and took the elohim-side review into it. `brit push`
+did carry a hand-over ref through a green hook on shem; the hour-long dev landing is unproven.
+
+**Reviews that changed an outcome.** The enrichment sampler would have rewritten the verdicts it
+sampled (not landed). The read-shadow wrote its own time into gate durations and presented
+unproven fixes as savings (not landed). The gate-stop change could lose a real red and could
+acknowledge a stop that did not happen; it landed after six rounds.
+
+**Where the hours went.** The docs-and-hook landing was refused by `fleet-roll` and then ran a
+storage gate for about 100 minutes, because one test file sat under `elohim/sdk/**` (row 94); the
+same content with that file moved landed in 3 minutes. The blob-store fix cost a second eprfs
+gate because the CI parity test was not run before hand-over.
+
+**Stalls.** ethosengine sat on a held prompt for 45 minutes on 25 Nov until the steward approved
+it, and has been silent again since 05:19Z with no new events folded here. Nothing on shem can
+see or clear that. The held-tool sensor is on dev and wired nowhere.
+
+**Open for the steward.** Wire the held-tool sensor and the sibling-miss injector, or not. The
+retention number. The graded policy table. Rulings the integrator made alone on the gate-stop
+change (row 95). The household mesh still runs on shem and slows the storage gate.
+
 ## The integrator's errors
 
 The unsent stasis push and the seven-hour stall are recorded above. Added here:
@@ -389,6 +454,16 @@ The unsent stasis push and the seven-hour stall are recorded above. Added here:
   failures, seven of them artefacts of that invocation; the gate is the check.
 - I started a subagent on work ethosengine had already done, then cleared its uncommitted edits
   with a command the stasis keeper would have held.
+
+25 Nov:
+- Deferred a build-descriptor defect as cosmetic; it made the publish of `bin-launch` refuse, and
+  cost one eprfs gate on ethosengine.
+- Started a long landing without running `just gate orchestrator` on the assembled candidate;
+  the CI parity test went red 35 minutes in.
+- Told the ThinkPad the automatic follow was the peer daemon's; it is `epr device arrive`.
+- Committed a moved test without reading its result; the next commit corrected it.
+- Predicted two to three hours for the gate-stop landing; it took two minutes.
+- Did not use the carry for any landing until the steward's direction made the bottleneck plain.
 
 ## Parked for the next roll
 
