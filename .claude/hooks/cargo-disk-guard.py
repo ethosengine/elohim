@@ -645,6 +645,21 @@ def slot_for(ws: str, cwd: str, release: bool):
     slot = f"{family_root}/{fam}/{flat}/{profile}"
     if os.path.dirname(os.path.dirname(os.path.dirname(os.path.normpath(slot)))) != os.path.normpath(family_root):
         return None
+    wt = worktree_root(cwd)
+    try:
+        git_dir = subprocess.run(
+            ["git", "-C", wt, "rev-parse", "--path-format=absolute", "--git-dir"],
+            capture_output=True, text=True, timeout=2,
+        )
+        common_dir = subprocess.run(
+            ["git", "-C", wt, "rev-parse", "--path-format=absolute", "--git-common-dir"],
+            capture_output=True, text=True, timeout=2,
+        )
+        if (git_dir.returncode == 0 and common_dir.returncode == 0
+                and git_dir.stdout.strip() != common_dir.stdout.strip()):
+            slot += f"-wt-{os.path.basename(wt)}"
+    except Exception:
+        pass
     return slot
 
 

@@ -20,7 +20,7 @@ if [[ -x $launcher ]]; then
   exec "$launcher" epr lsp attach "$lang" "$@"
 fi
 root="$(find_worktree_root "$SCRIPT_DIR")"
-candidate="$(slot_path "$(detect_family "$root")" elohim/eprfs dev)/debug/epr"
+candidate="$(worktree_slot_path "$(detect_family "$root")" elohim/eprfs dev "$root")/debug/epr"
 if [[ -x $candidate ]]; then
   exec "$candidate" lsp attach "$lang" "$@"
 fi

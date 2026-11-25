@@ -94,6 +94,12 @@ cmd_status() {
   echo "Pool root:    $POOL_ROOT"
   echo "Pool size:    $(human_bytes "$(pool_disk_bytes)")"
   echo "Volume:       $(disk_human_summary) (${pct}% used, status=$status)"
+  local current_wt
+  if current_wt="$(find_worktree_root "$PWD")"; then
+    echo "Slot rule:    $(worktree_slot_rule "$current_wt")"
+  else
+    echo "Slot rule:    unavailable outside a git worktree"
+  fi
   case "$status" in
     critical) echo "              !! CRITICAL — see preflight banner or run: cargo-pool prune --stale-incrementals --yes" ;;
     warn)     echo "              !  Disk above 80%; consider cargo-pool prune --stale-incrementals" ;;
@@ -317,7 +323,7 @@ cmd_key() {
   if ! wt="$(find_worktree_root "$PWD")"; then
     echo "cargo-pool key: $PWD is not inside a git worktree" >&2; return 1
   fi
-  local family ws_rel slot
+  local family ws_rel slot rule
   family="$(detect_family "$wt")"
   # Walk up to find the workspace's Cargo.toml, then express path relative
   # to worktree root. For a given native cargo build, the workspace dir is
@@ -334,13 +340,15 @@ cmd_key() {
   if [ -z "${ws_rel:-}" ]; then
     echo "cargo-pool key: no Cargo.toml found from $PWD" >&2; return 1
   fi
-  slot="$(slot_path "$family" "$ws_rel" dev)"
-  local slot_release; slot_release="$(slot_path "$family" "$ws_rel" release)"
+  slot="$(worktree_slot_path "$family" "$ws_rel" dev "$wt")"
+  local slot_release; slot_release="$(worktree_slot_path "$family" "$ws_rel" release "$wt")"
+  rule="$(worktree_slot_rule "$wt")"
   local wm_dev wm_rel
   wm_dev="$(read_slot_watermark "$slot")"
   wm_rel="$(read_slot_watermark "$slot_release")"
   echo "family=$family"
   echo "workspace=$ws_rel"
+  echo "rule=$rule"
   echo "slot_dev=$slot"
   if [ "${wm_dev:-0}" -gt 0 ]; then
     echo "  hwm_dev=$(human_bytes "$wm_dev") (observed peak — used by estimate)"
@@ -498,7 +506,7 @@ cmd_watermark() {
       local fam ws_dir prof slot wm cur
       for fam in $(list_families); do
         while IFS= read -r slot; do
-          case "$slot" in */dev|*/release) ;; *) continue ;; esac
+          case "$slot" in */dev|*/release|*/dev-wt-*|*/release-wt-*) ;; *) continue ;; esac
           prof="${slot##*/}"
           ws_dir="$(dirname "$slot")"
           local ws_flat; ws_flat="${ws_dir##*/}"
@@ -630,7 +638,7 @@ cmd_estimate() {
   local ws slot wm sib
   for ws in "${NATIVE_WORKSPACES[@]}"; do
     [ -d "$wt/$ws" ] || continue
-    slot="$(slot_path "$family" "$ws" dev)"
+    slot="$(worktree_slot_path "$family" "$ws" dev "$wt")"
     if [ -d "$slot" ]; then
       wm="$(read_slot_watermark "$slot")"
       if [ "${wm:-0}" -gt 0 ]; then
