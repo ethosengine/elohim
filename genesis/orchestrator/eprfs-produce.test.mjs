@@ -188,6 +188,7 @@ function assertOffered(f, r, target = null) {
     const d = r.calls[describe];
     assert.equal(flag(d, "--sources"), SOURCES);
     assert.equal(flag(d, "--project"), "eprfs");
+    assert.equal(flag(d, "--features"), "blob-store");
     assert.equal(flag(d, "--rustflags"), "");
     assert.equal(flag(d, "--crate"), bin === "epr" ? "elohim/eprfs/epr-cli" : "elohim/eprfs/device-runtime");
     // The environment the build ran under is recorded as it is, with no scrub and no second build.
@@ -219,6 +220,9 @@ function assertOffered(f, r, target = null) {
   const replay = (c) => c.includes("--message-format=json");
   const builds = r.calls.filter((c) => c[0] === "cargo" && c[1] === "build");
   assert.equal(builds.filter((c) => !replay(c)).length, 1, "one build; the producer adds none");
+  for (const build of builds) {
+    assert.equal(flag(build, "--features"), "elohim-epr-cli/blob-store");
+  }
   // Under a declared target the build is replayed once, with the build's own package arguments and
   // --message-format=json, after the ingest and before any put, and every put is handed those
   // messages (E12 L2a rework, ruling 1); with none declared there is no replay and no messages.
@@ -247,7 +251,9 @@ test("build_mode_offers_the_gate_bytes_of_both_bins_with_release_and_cross", (t)
 test("test_mode_builds_both_bins_after_the_tests_and_offers_them", (t) => {
   const f = fixture(t);
   const r = run(f, "test");
-  assert.ok(verb(r.calls, "cargo", "test") >= 0 && verb(r.calls, "cargo", "test") < verb(r.calls, "cargo", "build"));
+  const testCall = r.calls[verb(r.calls, "cargo", "test")];
+  assert.ok(testCall && r.calls.indexOf(testCall) < verb(r.calls, "cargo", "build"));
+  assert.equal(flag(testCall, "--features"), "elohim-epr-cli/blob-store");
   assertOffered(f, r);
 });
 
