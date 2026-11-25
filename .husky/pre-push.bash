@@ -41,9 +41,10 @@ HOOK_WORK_TREE=$(git rev-parse --show-toplevel) || exit 1
 
 # ── Device epr: the resolver's shell caller ─────────────────────────
 # The epr a DEVICE act runs (the steward lease view berth reads, the household head landing): this
-# device's head, through the one resolver (genesis/orchestrator/device-epr.mjs). It prints nothing
-# when the act stays on the session's launcher, having said why on stderr; a checkout without the
-# resolver, or no node, says so here. Either way the old resolution stands and nothing is refused.
+# device's landed head, through the one resolver (genesis/orchestrator/device-epr.mjs), whatever
+# EPR_BIN or the session's pin names. It prints nothing when the head is unreadable, having said
+# why on stderr; a checkout without the resolver, or no node, says so here. Then the old
+# resolution stands, and nothing is refused.
 # Session acts (readings) keep ${EPR_BIN:-epr}.
 device_epr() {
   local resolved="" resolver="$HOOK_WORK_TREE/genesis/orchestrator/device-epr.mjs"

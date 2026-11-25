@@ -219,7 +219,7 @@ export function postMisses(record, projects, {
   // them (device-epr.mjs). When the head cannot be established the resolver has said so in one
   // line, and the candidate is resolved as before: declared executable, then PATH.
   const device = resolveDevice({ env, warn: err });
-  const epr = device.source === 'head' || device.source === 'override'
+  const epr = device.source === 'head'
     ? device.command
     : resolveBinary('epr', ['EPR_BIN'], env);
   if (!epr) throw new Error('epr not on EPR_BIN or PATH');

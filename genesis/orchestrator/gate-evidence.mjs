@@ -1025,7 +1025,13 @@ export function emitGateVerdict(project, key, {
   args.push('--root', device);
   try {
     const emitted = spawn(epr, args, { cwd: device, encoding: 'utf8', timeout: 5_000 });
-    return emitted.status === 0 || failed((emitted.stderr || '').trim().split('\n').pop() || `exit ${emitted.status}`);
+    if (emitted.status === 0) return true;
+    // A call the bound killed has no exit status. Whether its append reached the store is not
+    // known, and it is not retried: say both, so the line is not read as a refusal.
+    if (emitted.status == null && (emitted.signal || emitted.error?.code === 'ETIMEDOUT')) {
+      return failed(`killed by the 5 s bound${emitted.signal ? ` (${emitted.signal})` : ''}; the append is unconfirmed`);
+    }
+    return failed((emitted.stderr || '').trim().split('\n').pop() || `exit ${emitted.status}`);
   } catch (error) {
     return failed(String(error?.message || error).split('\n')[0]);
   }

@@ -4244,5 +4244,75 @@ class UnackedPeer(unittest.TestCase):
             self.assertIsNone(_NS["unacked"](own, row, 1000, 90))
 
 
+
+class DeviceEprResolverTest(unittest.TestCase):
+    """berth's device reads ask the one resolver (genesis/orchestrator/device-epr.mjs) for the
+    device's landed head. Enabled here with BERTH_DEVICE_EPR; every other test keeps it off."""
+
+    def setUp(self):
+        if not shutil.which("node"):
+            self.skipTest("node is not on PATH")
+        self.directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.directory.cleanup)
+        root = Path(self.directory.name)
+        self.store = root / "store" / "epr"
+        self.releases = {}
+        for cid in ("bafyold", "bafyhead", "bafynewer"):
+            release = self.store / cid
+            release.mkdir(parents=True)
+            (release / "epr").write_text("#!/bin/sh\nexit 0\n")
+            (release / "epr").chmod(0o755)
+            self.releases[cid] = str((release / "epr").resolve())
+        self.promote("bafyhead")
+        repo = str(Path(__file__).resolve().parents[2])
+        patcher = mock.patch.dict(Berth.epr_bin.__globals__, {"REPO_ROOT": repo})
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        env = mock.patch.dict(os.environ, {"BERTH_DEVICE_EPR": "1", "BIN_STORE": str(root / "store")})
+        env.start()
+        self.addCleanup(env.stop)
+        os.environ.pop("EPR_STORE", None)
+
+    def promote(self, cid):
+        (self.store / "current.json").write_text(json.dumps({"cid": cid}))
+
+    def berth(self):
+        b = Berth(str(Path(self.directory.name) / "berth"))
+        b.epr = None
+        return b
+
+    def test_the_head_is_used_whether_the_sessions_epr_is_older_or_newer(self):
+        for session in ("bafyold", "bafynewer"):
+            with self.subTest(session=session), mock.patch.dict(os.environ, {"EPR_BIN": self.releases[session]}):
+                self.assertEqual(self.berth().epr_bin(), self.releases["bafyhead"])
+        with mock.patch.dict(os.environ, {"EPR_BIN": "/bin/true"}):
+            self.assertEqual(self.berth().epr_bin(), self.releases["bafyhead"])
+
+    def test_an_unreadable_head_keeps_the_old_resolution_and_says_so_once(self):
+        (self.store / "current.json").unlink()
+        b = self.berth()
+        err = io.StringIO()
+        with mock.patch.dict(os.environ, {"EPR_BIN": self.releases["bafyold"]}), contextlib.redirect_stderr(err):
+            self.assertEqual(b.epr_bin(), self.releases["bafyold"])
+            b._device_epr_at = None  # past the freshness window: asked again, said once
+            self.assertEqual(b.epr_bin(), self.releases["bafyold"])
+        lines = [line for line in err.getvalue().splitlines() if line.startswith("[device-epr]")]
+        self.assertEqual(len(lines), 1, err.getvalue())
+        self.assertIn("could not be read", lines[0])
+
+    def test_a_promotion_is_seen_once_the_freshness_window_has_passed(self):
+        b = self.berth()
+        self.assertEqual(b.epr_bin(), self.releases["bafyhead"])
+        self.promote("bafynewer")
+        self.assertEqual(b.epr_bin(), self.releases["bafyhead"])  # within the window: one ask per command
+        b._device_epr_at -= 60
+        self.assertEqual(b.epr_bin(), self.releases["bafynewer"])
+
+    def test_an_injected_epr_is_never_overridden(self):
+        b = self.berth()
+        b.epr = self.releases["bafyold"]
+        self.assertEqual(b.epr_bin(), self.releases["bafyold"])
+
+
 if __name__ == "__main__":
     unittest.main()

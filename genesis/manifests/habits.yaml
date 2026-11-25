@@ -2486,9 +2486,9 @@ habits:
     active: false
     checks: []
     evidence: >
-      DELTA 2026-11-25 (still UNWIRED, inactive; no check added to this habit): the acts a device performs for its other devices (a gate verdict crossing and the sibling verdict read, a hand-over's intent and misses, the lander's carry read, the household head landing, berth's steward lease view) now run the device's head epr through one resolver, `genesis/orchestrator/device-epr.mjs`, whatever release the invoking session is pinned to; readings, cycle timing and session identity keep the session's pin. It never selects an epr older than the session's own, and an unreadable head keeps the PATH launcher with one line. Evidence: `device-epr.test.mjs` 9/9 against a fake bin store; resolve measured 22 ms uncached, 0.02 ms cached on shem. Not shown: a crossing on two real devices.
-    evidence-fingerprint: sha256:d54e9b59d0379fc9
-    evidence-bytes: 2348
+      DELTA 2026-11-25 (still UNWIRED, inactive; no check added to this habit): the acts a device performs for its other devices (a gate verdict crossing and the sibling verdict read, a hand-over's intent and misses, the lander's carry read, the household head landing, berth's steward lease view) now run the device's head epr through one resolver, `genesis/orchestrator/device-epr.mjs`, whatever release the invoking session is pinned to; readings, cycle timing and session identity keep the session's pin. After review the rule is the landed head, full stop: neither `EPR_BIN` nor the session's pin is consulted and no age is compared (a rolled-back head is the device's decision); the head is admitted only as a regular executable file inside the bin store, is re-read on every resolution, and an unreadable head keeps the old resolution with one line. Evidence: `device-epr.test.mjs` 11/11 against a fake bin store, berth's enabled-resolver tests 4/4. Not shown: a crossing on two real devices.
+    evidence-fingerprint: sha256:2050f4f94ec04f84
+    evidence-bytes: 2561
     evidence-entries: 3
     first_move: >-
       Two things are observable before a second principal exists. First, the standing read: redraft

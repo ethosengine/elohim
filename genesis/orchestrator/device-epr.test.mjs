@@ -6,13 +6,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import {
-  compareToHead, deviceEpr, deviceEprResolution, deviceHead, resetDeviceEprCache, resolveDeviceEpr,
+  deviceEpr, deviceEprResolution, deviceHead, resetDeviceEprCache, resolveDeviceEpr,
 } from './device-epr.mjs';
 import { emitGateVerdict, siblingVerdicts } from './gate-evidence.mjs';
 import { postMisses } from './handover-record.mjs';
@@ -104,7 +104,7 @@ const emit = fx => emitGateVerdict(project, 'closure', {
 });
 const ran = (fx, which, text) => fx.log().filter(line => line.startsWith(`${which} `) && line.includes(text));
 
-test('harm (i)/(v): a hand-over raises its intent and posts its misses through the head, not the pin', t => {
+test('a hand-over raises its intent and posts its misses through the head, not the pin', t => {
   resetDeviceEprCache();
   const fx = fixture(t);
   const line = handOver(fx);
@@ -125,7 +125,7 @@ test('a verdict emit and the sibling verdict read run the head', t => {
   assert.deepEqual(fx.log().filter(line => line.startsWith('pin ')), []);
 });
 
-test('harm (v): a reading append is a session act and runs the pin, beside a device act on the head', t => {
+test('a reading append is a session act and runs the pin, beside a device act on the head', t => {
   resetDeviceEprCache();
   const fx = fixture(t);
   assert.equal(emit(fx), true);
@@ -135,7 +135,7 @@ test('harm (v): a reading append is a session act and runs the pin, beside a dev
   assert.deepEqual(ran(fx, 'head', 'reading'), []);
 });
 
-test('harm (v): the session-act call sites still name the session epr and import no resolver', () => {
+test('the session-act call sites still name the session epr and import no resolver', () => {
   const runner = readFileSync(join(HERE, 'gate-runner.mjs'), 'utf8');
   // reading append, reading report, the attested pin-check observation, the cycle observation.
   assert.equal(runner.split("env.EPR_BIN || 'epr'").length - 1, 4);
@@ -143,55 +143,81 @@ test('harm (v): the session-act call sites still name the session epr and import
   const live = readFileSync(join(HERE, 'gate-live.mjs'), 'utf8');
   assert.ok(!live.includes('device-epr'), 'gate-live resolves session identity and is left alone');
   for (const file of ['gate-evidence.mjs', 'handover-record.mjs', 'gate-runner.mjs', 'gate-preflight.mjs']) {
-    assert.ok(!/function\s+(deviceHead|compareToHead|resolveDeviceEpr)\b/.test(readFileSync(join(HERE, file), 'utf8')), `${file} holds no second resolver`);
+    assert.ok(!/function\s+(deviceHead|resolveDeviceEpr)\b/.test(readFileSync(join(HERE, file), 'utf8')), `${file} holds no second resolver`);
   }
 });
 
-test('harm (ii): an EPR_BIN older than the head is ignored with one line, and the act runs the head', t => {
+const promote = (fx, cid) => writeFileSync(join(fx.store, 'epr', 'current.json'), JSON.stringify({ cid }));
+
+test('ruling: EPR_BIN is not consulted: /bin/true, an older release and a later one all leave the head in use', t => {
   resetDeviceEprCache();
   const fx = fixture(t);
+  for (const candidate of ['/bin/true', fx.pin, fx.newer]) {
+    const lines = [];
+    const resolution = deviceEprResolution({ env: { ...fx.env, EPR_BIN: candidate }, warn: line => lines.push(line) });
+    assert.deepEqual(resolution, { command: fx.head, source: 'head', why: null }, candidate);
+    assert.deepEqual(lines, []);
+  }
   fx.env.EPR_BIN = fx.pin;
-  const lines = [];
-  const resolution = deviceEprResolution({ env: fx.env, warn: line => lines.push(line) });
-  assert.equal(resolution.command, fx.head);
-  assert.equal(lines.length, 1);
-  assert.match(lines[0], /^\[device-epr\] EPR_BIN=.*bafyold\/epr is older than this device's head epr; ignored/);
   assert.equal(emit(fx), true);
   assert.equal(ran(fx, 'head', 'flow note').length, 1);
   assert.deepEqual(fx.log().filter(line => line.startsWith('pin ')), []);
-  assert.equal(lines.length, 1, 'the line is printed once per process');
-  // The CLI the shell and Python call sites run says the same and prints the head.
-  const cli = spawnSync(process.execPath, [join(HERE, 'device-epr.mjs')], { env: fx.env, encoding: 'utf8' });
-  assert.equal(cli.status, 0);
-  assert.equal(cli.stdout, `${fx.head}\n`);
-  assert.equal(cli.stderr.trim().split('\n').length, 1);
-  assert.match(cli.stderr, /is older than this device's head epr; ignored/);
+  // The CLI the shell and Python call sites run prints the head, whatever EPR_BIN names.
+  const cli = spawnSync(process.execPath, [join(HERE, 'device-epr.mjs')], { env: { ...fx.env, EPR_BIN: '/bin/true' }, encoding: 'utf8' });
+  assert.deepEqual([cli.status, cli.stdout, cli.stderr], [0, `${fx.head}\n`, '']);
 });
 
-test('harm (ii): never older: a newer EPR_BIN candidate is used, and a session epr newer than the head keeps the launcher', t => {
+test('ruling: no downgrade judgment: a re-ingested older head is used though the session epr is newer, and the session is never asked', t => {
+  resetDeviceEprCache();
+  // The device rolled back to OLD and re-ingested it, so its record is dated after the session's.
+  const fx = fixture(t, { current: OLD, sessionSays: 'newer' });
+  writeFileSync(join(fx.store, 'epr', OLD, 'record.json'), JSON.stringify({ cid: OLD, ingestedAt: '2026-11-27T00:00:00Z' }));
+  assert.equal(deviceEpr({ env: fx.env }), fx.pin);
+  assert.equal(emit(fx), true);
+  // The OLD release's stub logs as "pin": it is the head here, and it ran the crossing.
+  assert.equal(ran(fx, 'pin', 'flow note').length, 1);
+  assert.deepEqual(fx.log().filter(line => line.startsWith('newer ') || line.startsWith('launcher ')), []);
+  // And the other direction: the same store with the record dated before the session's.
+  writeFileSync(join(fx.store, 'epr', OLD, 'record.json'), JSON.stringify({ cid: OLD, ingestedAt: '2026-11-01T00:00:00Z' }));
+  assert.equal(deviceEpr({ env: fx.env }), fx.pin);
+});
+
+test('containment: a head that resolves outside the bin store, or is no regular executable file, is an unreadable head', t => {
   const fx = fixture(t);
-  assert.deepEqual(resolveDeviceEpr({ env: { ...fx.env, EPR_BIN: fx.newer } }), { command: fx.newer, source: 'override', why: null });
-  const outside = join(fx.root, 'built', 'epr');
+  const outside = join(fx.root, 'outside', 'epr');
   script(outside, 'exit 0');
-  assert.equal(resolveDeviceEpr({ env: { ...fx.env, EPR_BIN: outside } }).source, 'override');
-  assert.equal(compareToHead(fx.pin, fx.head), 'older');
-  assert.equal(compareToHead(fx.newer, fx.head), 'candidate');
-  assert.equal(compareToHead(fx.head, fx.head), 'same');
-
-  const rolledBack = fixture(t, { sessionSays: 'newer' });
-  const stays = resolveDeviceEpr({ env: rolledBack.env });
-  assert.equal(stays.source, 'session');
-  assert.equal(stays.command, 'epr');
-  assert.match(stays.why, /^\[device-epr\] this session's epr \(bafynewer\) is not older than this device's head \(bafyhead\)/);
-
-  const unreadable = fixture(t, { sessionSays: 'none' });
-  const unknown = resolveDeviceEpr({ env: unreadable.env });
-  assert.equal(unknown.source, 'path');
-  assert.equal(unknown.command, 'epr');
-  assert.match(unknown.why, /this session's own epr could not be read \(epr bin resolve exited 1\)/);
+  const refused = (cid, make) => {
+    mkdirSync(join(fx.store, 'epr', cid), { recursive: true });
+    make(join(fx.store, 'epr', cid, 'epr'));
+    promote(fx, cid);
+    const resolution = resolveDeviceEpr({ env: fx.env });
+    assert.deepEqual([resolution.command, resolution.source], ['epr', 'path'], cid);
+    assert.throws(() => deviceHead({ env: fx.env }));
+    return resolution.why;
+  };
+  assert.match(refused('bafylinkout', path => symlinkSync(outside, path)), /resolves outside the bin store/);
+  assert.match(refused('bafylinktrue', path => symlinkSync('/bin/true', path)), /resolves outside the bin store/);
+  assert.match(refused('bafydir', path => mkdirSync(path)), /is not a regular file/);
+  refused('bafynoexec', path => writeFileSync(path, '#!/bin/sh\n', { mode: 0o644 }));
+  refused('bafyabsent', () => {});
+  // A cid that climbs out of the store is no cid.
+  writeFileSync(join(fx.store, 'epr', 'current.json'), JSON.stringify({ cid: '../../outside' }));
+  assert.match(resolveDeviceEpr({ env: fx.env }).why, /invalid head/);
+  // A symlink that stays inside the store is the store's own business and is followed.
+  mkdirSync(join(fx.store, 'epr', 'bafyalias'), { recursive: true });
+  symlinkSync(fx.head, join(fx.store, 'epr', 'bafyalias', 'epr'));
+  promote(fx, 'bafyalias');
+  assert.deepEqual(resolveDeviceEpr({ env: fx.env }), { command: fx.head, source: 'head', why: null });
+  // With no current.json the `current` symlink names the head, under the same containment.
+  rmSync(join(fx.store, 'epr', 'current.json'));
+  symlinkSync(join(fx.store, 'epr', NEWER), join(fx.store, 'epr', 'current'));
+  assert.equal(resolveDeviceEpr({ env: fx.env }).command, fx.newer);
+  rmSync(join(fx.store, 'epr', 'current'));
+  symlinkSync(dirname(outside), join(fx.store, 'epr', 'current'));
+  assert.equal(resolveDeviceEpr({ env: fx.env }).source, 'path');
 });
 
-test('harm (iii): an unreadable head falls back to the PATH launcher with one line, and the acts answer as before', t => {
+test('an unreadable head falls back with one line, and the acts answer as before', t => {
   resetDeviceEprCache();
   const good = fixture(t);
   const withHead = { verdict: emit(good), line: handOver(good) };
@@ -200,45 +226,62 @@ test('harm (iii): an unreadable head falls back to the PATH launcher with one li
   const fx = fixture(t, { current: null });
   assert.throws(() => deviceHead({ env: fx.env }));
   const lines = [];
-  const resolution = deviceEprResolution({ env: fx.env, warn: line => lines.push(line) });
+  const warn = line => lines.push(line);
+  const resolution = deviceEprResolution({ env: fx.env, warn });
   assert.deepEqual([resolution.command, resolution.source], ['epr', 'path']);
-  assert.equal(lines.length, 1);
+  deviceEprResolution({ env: fx.env, warn });
+  assert.equal(lines.length, 1, 'the line is printed once per process');
   assert.match(lines[0], /^\[device-epr\] this device's head epr could not be read \(.*\); device acts use the PATH launcher \(the session pin applies\)$/);
   // Same answers as with a head: nothing is failed for this reason alone.
   assert.deepEqual({ verdict: emit(fx), line: handOver(fx) }, withHead);
   assert.equal(ran(fx, 'pin', 'flow note').length, 1);
   assert.equal(ran(fx, 'pin', 'flow intend --misses').length, 1);
   assert.deepEqual(fx.log().filter(line => line.startsWith('head ')), []);
-  // The CLI exits 0 and prints nothing, so a shell caller keeps its own PATH resolution.
+  // The CLI exits 0 and prints nothing, so a shell caller keeps its own resolution.
   const cli = spawnSync(process.execPath, [join(HERE, 'device-epr.mjs')], { env: fx.env, encoding: 'utf8' });
   assert.deepEqual([cli.status, cli.stdout], [0, '']);
-  assert.match(cli.stderr, /could not be read/);
-  // With EPR_BIN set and no head, EPR_BIN is used exactly as before.
-  assert.equal(resolveDeviceEpr({ env: { ...fx.env, EPR_BIN: fx.pin } }).command, fx.pin);
+  assert.equal(cli.stderr.trim().split('\n').length, 1);
+  // The fallback is the expression the call sites used before, EPR_BIN included, and says so.
+  const before = resolveDeviceEpr({ env: { ...fx.env, EPR_BIN: fx.pin } });
+  assert.equal(before.command, fx.pin);
+  assert.match(before.why, /device acts use EPR_BIN=/);
 });
 
-test('harm (iv)/(vi): the resolver asks once per process, however many device acts run', t => {
+test('a head promoted mid-process is used by the next device act', t => {
   resetDeviceEprCache();
   const fx = fixture(t);
-  emit(fx);
-  siblingVerdicts(project, 'closure', { root: fx.root, env: fx.env, spawn: spawnIn(fx) });
-  handOver(fx);
-  assert.equal(deviceEpr({ env: fx.env }), fx.head);
-  assert.equal(fx.log().filter(line => line.startsWith('launcher bin resolve')).length, 1);
-  // A different environment is a different question.
-  assert.equal(deviceEpr({ env: { ...fx.env, EPR_BIN: fx.newer } }), fx.newer);
-  // Without the cache every act asks again: the count above can fail.
-  resetDeviceEprCache();
-  deviceEpr({ env: fx.env });
-  assert.equal(fx.log().filter(line => line.startsWith('launcher bin resolve')).length, 2);
+  assert.equal(emit(fx), true);
+  assert.equal(ran(fx, 'head', 'flow note').length, 1);
+  promote(fx, NEWER);
+  assert.equal(deviceEpr({ env: fx.env }), fx.newer);
+  assert.equal(emit(fx), true);
+  assert.equal(ran(fx, 'newer', 'flow note').length, 1);
+  assert.equal(ran(fx, 'head', 'flow note').length, 1, 'the previous head ran nothing more');
+  // Same bytes under a new name: the pointer, not the file, is what moved.
+  mkdirSync(join(fx.store, 'epr', 'bafycopy'), { recursive: true });
+  copyFileSync(fx.newer, join(fx.store, 'epr', 'bafycopy', 'epr'));
+  promote(fx, 'bafycopy');
+  assert.equal(deviceEpr({ env: fx.env }), join(fx.store, 'epr', 'bafycopy', 'epr'));
 });
 
-test('harm (iv): a resolution is bounded: a launcher that never answers costs the bound, then the PATH fallback', t => {
-  const fx = fixture(t, { launcher: false });
-  script(join(fx.root, 'bin', 'epr'), 'sleep 30');
-  const started = Date.now();
-  const hung = (command, args, options) => spawnSync(command, args, { ...options, timeout: 200 });
-  const resolution = resolveDeviceEpr({ env: fx.env, spawn: hung });
-  assert.ok(Date.now() - started < 2000, 'the session question is killed at its timeout');
-  assert.deepEqual([resolution.command, resolution.source], ['epr', 'path']);
+test('cost: a resolution runs no subprocess and many of them stay cheap', t => {
+  const fx = fixture(t);
+  const started = process.hrtime.bigint();
+  for (let i = 0; i < 200; i += 1) assert.equal(deviceEpr({ env: fx.env }), fx.head);
+  const each = Number(process.hrtime.bigint() - started) / 1e6 / 200;
+  assert.ok(each < 20, `${each.toFixed(2)} ms per resolution`);
+  assert.deepEqual(fx.log(), [], 'no launcher and no release was executed to resolve');
+});
+
+test('a verdict crossing the bound killed says so, and that the append is unconfirmed', t => {
+  resetDeviceEprCache();
+  const fx = fixture(t);
+  const lines = [];
+  const killed = (command, args, options) => (args.includes('gate-verdict@1')
+    ? { status: null, signal: 'SIGTERM', error: Object.assign(new Error('spawnSync epr ETIMEDOUT'), { code: 'ETIMEDOUT' }), stdout: '', stderr: '' }
+    : spawnIn(fx)(command, args, options));
+  assert.equal(emitGateVerdict(project, 'closure', {
+    success: true, seconds: 1, commit: SHA, put: {}, root: fx.root, env: fx.env, spawn: killed, warn: line => lines.push(line),
+  }), false);
+  assert.deepEqual(lines, ['[gate] orchestrator verdict crossing: not emitted (killed by the 5 s bound (SIGTERM); the append is unconfirmed)\n']);
 });
