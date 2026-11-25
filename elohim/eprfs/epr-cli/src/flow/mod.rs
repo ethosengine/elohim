@@ -2057,7 +2057,8 @@ fn run_note(args: &[String]) -> FlowResult<ExitCode> {
 
 /// `epr flow enrich` — record a re-execution against an immutable gate verdict.
 fn run_enrich(args: &[String]) -> FlowResult<ExitCode> {
-    const USAGE: &str = "usage: epr flow enrich --verdict <cid> --kind re-executed \
+    const USAGE: &str = "usage: epr flow enrich (--verdict <cid> | --project <p> --closure <key> \
+        [--from-device <did>]) --kind re-executed \
         --outcome green|red --method <text> [--run <cid>] [--seconds <n>] \
         [--json] [--root DIR]";
     let (opts, rest) = parse_global(args)?;
@@ -2068,7 +2069,8 @@ fn run_enrich(args: &[String]) -> FlowResult<ExitCode> {
     let mut i = 0;
     while i < rest.len() {
         match rest[i].as_str() {
-            "--verdict" | "--kind" | "--outcome" | "--method" | "--run" | "--seconds" => {
+            "--verdict" | "--project" | "--closure" | "--from-device" | "--kind" | "--outcome"
+            | "--method" | "--run" | "--seconds" => {
                 if rest.get(i + 1).is_none() {
                     return Err(FlowError::InvalidArguments(format!(
                         "{} needs a value\n{USAGE}",
@@ -2084,6 +2086,9 @@ fn run_enrich(args: &[String]) -> FlowResult<ExitCode> {
                         other,
                         &[
                             "--verdict",
+                            "--project",
+                            "--closure",
+                            "--from-device",
                             "--kind",
                             "--outcome",
                             "--method",
@@ -2100,7 +2105,10 @@ fn run_enrich(args: &[String]) -> FlowResult<ExitCode> {
             FlowError::InvalidArguments(format!("enrich needs {flag} <value>\n{USAGE}"))
         })
     };
-    let verdict = required("--verdict")?;
+    let verdict = take_opt(&rest, "--verdict")?;
+    let project = take_opt(&rest, "--project")?;
+    let closure = take_opt(&rest, "--closure")?;
+    let from_device = take_opt(&rest, "--from-device")?;
     let kind = required("--kind")?;
     let outcome = required("--outcome")?;
     let method = required("--method")?;
@@ -2115,7 +2123,10 @@ fn run_enrich(args: &[String]) -> FlowResult<ExitCode> {
     let receipt = enrich::enrich(
         &opts.root,
         &enrich::EnrichmentRequest {
-            verdict: &verdict,
+            verdict: verdict.as_deref(),
+            project: project.as_deref(),
+            closure: closure.as_deref(),
+            from_device: from_device.as_deref(),
             kind: &kind,
             outcome: &outcome,
             method: &method,
@@ -2479,7 +2490,8 @@ fn usage() -> String {
      .claude/epr-meta/measures.yaml or it is refused naming that file; --subject IS the target, \
      so --on is refused alongside --measure; --subject . names the repository itself for a \
      repository-wide bound. `epr flow note --help` prints the full per-flag contract)\n  \
-     | enrich --verdict <cid> --kind re-executed --outcome green|red --method <text> \
+     | enrich (--verdict <cid> | --project <p> --closure <key> [--from-device <did>]) \
+     --kind re-executed --outcome green|red --method <text> \
      [--run <cid>] [--seconds <n>] [--json] [--root DIR] \
      (append a local attestation-enrichment@1 Cite without changing the verdict)\n  \
      | cites seal|assign-id|describe|verify|refresh|stamp|migrate [<doc>…] [--json] [--root DIR] \
