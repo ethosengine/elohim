@@ -621,7 +621,7 @@ function realPush(t, message) {
   const idx = { env: { GIT_INDEX_FILE: join(dir, "index") } };
   git(["--git-dir", gd, "read-tree", head], idx);
   const base = git(["--git-dir", gd, "commit-tree", `${head}^{tree}`, "-p", head, "-m", "base"]);
-  const schema = "elohim/sdk/schemas/v1/gate-live-event.schema.json";
+  const schema = "elohim/sdk/schemas/v1/views/bin-status.schema.json"; // a storage build source
   const edited = git(["--git-dir", gd, "hash-object", "-w", "--stdin"], { input: `${git(["--git-dir", gd, "show", `${head}:${schema}`])}\n\n` });
   git(["--git-dir", gd, "update-index", "--cacheinfo", `100644,${edited},${schema}`], idx);
   const tip = git(["--git-dir", gd, "commit-tree", git(["--git-dir", gd, "write-tree"], idx), "-p", base, "-m", message]);

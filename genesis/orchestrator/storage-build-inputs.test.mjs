@@ -108,6 +108,82 @@ test('SDK validation helpers stay in the isolated check stage, outside runtime d
   }
 });
 
+/** stage name -> { parent, sdk: [[source, dest]] } for every build-context COPY of elohim/sdk. */
+function sdkCopiesByStage() {
+  const text = readFileSync(join(root, STORAGE, 'Dockerfile'), 'utf8').replace(/\\\r?\n/g, ' ');
+  const stages = new Map();
+  let current = null;
+  for (const line of text.split('\n')) {
+    const from = line.match(/^FROM\s+(\S+)(?:\s+AS\s+(\S+))?/i);
+    if (from) {
+      current = from[2] ?? `stage${stages.size}`;
+      stages.set(current, { parent: from[1], sdk: [] });
+      continue;
+    }
+    const m = current && line.match(/^COPY\s+(?!--from)(.+)$/i);
+    if (!m) continue;
+    const parts = m[1].trim().split(/\s+/).filter(p => !p.startsWith('--'));
+    for (const src of parts.slice(0, -1)) {
+      if (src === 'elohim/sdk' || src.startsWith('elohim/sdk/')) stages.get(current).sdk.push([src.replace(/\/$/, ''), parts.at(-1).replace(/\/$/, '')]);
+    }
+  }
+  return stages;
+}
+
+/** The elohim/sdk COPY sources reaching `stage` through its FROM chain, as manifest-glob spellings. */
+function sdkCopyChain(stages, stage) {
+  const out = [];
+  for (let name = stage, seen = new Set(); stages.has(name) && !seen.has(name); name = stages.get(name).parent) {
+    seen.add(name);
+    out.push(...stages.get(name).sdk);
+  }
+  return out;
+}
+
+// Evidence 2026-11-25-edge-sdk-reads: the manifest's elohim/sdk sources are what selects an Edge
+// build and the storage gate; the Dockerfile's sdk COPYs are what the image closure key hashes
+// (closure-input-digest.sh adds every COPY source). One set, or a change selects nothing yet moves
+// the image, or ships a stale binary.
+test('the storage image copies exactly the elohim/sdk subtrees cargo-build-storage declares', () => {
+  const declared = manifestSources().filter(g => g.startsWith('elohim/sdk/'));
+  assert.ok(!declared.includes('elohim/sdk/**'), 'elohim/sdk/** is back: name the subtrees the build reads');
+  const stages = sdkCopiesByStage();
+  const spell = ([src]) => (/\.[a-z]+$/.test(src.split('/').at(-1)) ? src : `${src}/**`);
+  for (const stage of ['check', 'builder']) {
+    const chain = sdkCopyChain(stages, stage);
+    for (const [src, dest] of chain) {
+      assert.equal(dest, src.replace(/^elohim\//, '/'), `${stage}: ${src} must land at the same path under /sdk`);
+    }
+    assert.deepEqual([...new Set(chain.map(spell))].sort(), [...declared].sort(),
+      `${stage}: the Dockerfile's elohim/sdk COPYs and cargo-build-storage's elohim/sdk sources differ`);
+  }
+});
+
+test('an agent script, test, adapter or package fixture under elohim-agent selects no storage input', () => {
+  const declared = manifestSources();
+  const copies = [...dockerCopySources()];
+  const content = JSON.parse(readFileSync(join(root, 'elohim/holochain/build-manifest.json'), 'utf8'));
+  for (const glob of ['elohim/sdk/**', 'elohim/sdk/domains/**', 'elohim/sdk/domains/elohim-agent/**']) {
+    assert.ok(!declared.includes(glob), `cargo-build-storage declares ${glob}`);
+  }
+  // manifest.json alone is read: the observation-kind registry walks every pillar's manifest
+  // (observation_kinds.rs embedded_set_matches_the_pillar_manifests_on_disk).
+  for (const path of [
+    'elohim/sdk/domains/elohim-agent/scripts/x.py',
+    'elohim/sdk/domains/elohim-agent/scripts/brit-first.test.py',
+    'elohim/sdk/domains/elohim-agent/tests/fixtures/package.json',
+    'elohim/sdk/domains/elohim-agent/adapter/src/lib.rs',
+    'elohim/sdk/domains/elohim-agent/schemas/session-event.schema.json',
+    'elohim/sdk/domains/elohim-agent/manifest/content-types/skill.json',
+    'elohim/sdk/domains/elohim-agent/CLAUDE.md',
+  ]) {
+    assert.ok(!covered(path, declared), `${path} matches a cargo-build-storage source`);
+    assert.ok(!copies.some(c => path === c || path.startsWith(`${c}/`)), `${path} is copied into the storage image`);
+    const { pipelines } = walkGraph([{ content }], [path]);
+    assert.ok(!pipelines.some(p => p.name === 'elohim-edge'), `${path} selects an Edge build`);
+  }
+});
+
 // The Dockerfile builds storage from /app with every sibling crate COPY'd flat beside it, so each
 // of storage's own relative path deps is re-rooted by a `sed 's|path = "<rel>"|…|'` line. A COPY
 // without its rewrite still fails the image: cargo looks for /<crate>/Cargo.toml (edge #1484,
