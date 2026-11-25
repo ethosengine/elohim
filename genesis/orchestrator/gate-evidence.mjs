@@ -48,6 +48,7 @@ export function attestationRef(project) {
 
 const BUILD_REF_ENV = ['BRIT_BUILD_REF_BIN', 'BRIT_BUILD_REF'];
 const stderrWarn = line => process.stderr.write(line);
+const gateVerdictCapabilities = new Map();
 
 /** A withheld gate has no reusable verdict writer; its policy row is the user-facing reason. */
 export function gateReuseWithheldReason(project, root) {
@@ -995,7 +996,7 @@ function buildPutIdentity(stdout) {
 /** Append one completed gate verdict to this device's crossing flow. Best effort, never a gate. */
 export function emitGateVerdict(project, key, {
   success, seconds, commit, put, root, env = process.env, spawn = spawnSync,
-  warn = line => process.stderr.write(line),
+  warn = line => process.stderr.write(line), capabilityCache = gateVerdictCapabilities,
 }) {
   // A device act: the standing read and the crossing verdict run the device's head epr.
   const epr = deviceEpr({ env });
@@ -1005,6 +1006,7 @@ export function emitGateVerdict(project, key, {
   };
   // The verdict is written where the daemon crosses from, never to the pushing worktree's store.
   const device = deviceRoot(root, spawn);
+  const capabilityKey = `${epr}\0${device}`;
   let standing;
   try {
     const leases = spawn(epr, ['peer', 'leases', '--json', '--root', device], {
@@ -1058,8 +1060,12 @@ export function emitGateVerdict(project, key, {
         return { ok: false };
       }
     };
-    let capability = probe();
-    if (!capability.ok) capability = probe();
+    let capability = capabilityCache.get(capabilityKey);
+    if (!capability) {
+      capability = probe();
+      if (!capability.ok) capability = probe();
+      capabilityCache.set(capabilityKey, capability);
+    }
     const dated = capability.ok && capability.dated;
     if (capability.ok && !dated) {
       warn(`[gate] ${project.name} verdict crossing: this epr predates --dated-by; written in the legacy form (observed unknown)\n`);

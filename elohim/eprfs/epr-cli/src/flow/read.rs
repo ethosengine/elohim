@@ -22,6 +22,7 @@
 //! need to see it.
 
 use std::cmp::Ordering;
+use std::collections::HashMap;
 use std::path::Path;
 
 use chrono::DateTime;
@@ -214,6 +215,16 @@ pub struct NoteSource {
     pub via: Option<String>,
 }
 
+/// Commit author dates already resolved during one context or ledger read.
+///
+/// Resolving one date starts two git processes, so every read owns one of these and pays that
+/// pair at most once for all verdict rows naming the same commit. Failures are cached too: one
+/// malformed or unavailable commit must not start the same pair again for every matching row.
+#[derive(Default)]
+pub(crate) struct CommitDateCache {
+    dates: HashMap<String, Option<String>>,
+}
+
 /// The notes standing on one atom: `Cite` events whose `resource` is `resource_cid` and whose
 /// quantity unit is the note unit, NEWEST FIRST, truncated to `limit`.
 ///
@@ -249,6 +260,7 @@ fn collect_notes(
     limit: usize,
 ) -> Vec<NoteView> {
     let mut matched: Vec<(HistoryOrderKey, usize, NoteView)> = Vec::new();
+    let mut commit_dates = CommitDateCache::default();
     for (index, (cid, record)) in records.iter().enumerate() {
         let FlowRecord::Event(event) = record else {
             continue;
@@ -265,7 +277,7 @@ fn collect_notes(
         let mut view = note_view(cid, event);
         view.via.clone_from(&source.via);
         let order = root
-            .map(|root| note_history_order(root, &view))
+            .map(|root| note_history_order(root, &view, &mut commit_dates))
             .unwrap_or_else(|| HistoryOrderKey::dated(&event.occurred_at));
         view.date_unknown = order.date_unknown();
         matched.push((order, index, view));
@@ -346,7 +358,21 @@ fn is_gate_verdict(view: &NoteView) -> bool {
 
 /// A note's history order. Gate verdicts use the judged commit's author date on both legacy and
 /// current records; an unresolvable commit is explicitly unknown rather than inheriting HEAD.
-pub fn note_history_order(root: &Path, view: &NoteView) -> HistoryOrderKey {
+pub(crate) fn note_history_order(
+    root: &Path,
+    view: &NoteView,
+    commit_dates: &mut CommitDateCache,
+) -> HistoryOrderKey {
+    note_history_order_with(view, commit_dates, &mut |commit| {
+        super::commit_author_date(root, commit)
+    })
+}
+
+fn note_history_order_with(
+    view: &NoteView,
+    commit_dates: &mut CommitDateCache,
+    resolve: &mut impl FnMut(&str) -> Option<String>,
+) -> HistoryOrderKey {
     if !is_gate_verdict(view) {
         return HistoryOrderKey::dated(&view.occurred_at);
     }
@@ -356,9 +382,14 @@ pub fn note_history_order(root: &Path, view: &NoteView) -> HistoryOrderKey {
         .filter_map(|slot| slot.strip_prefix("env:commit="));
     let commit = commits.next();
     if commits.next().is_none() {
-        if let Some(occurred_at) = commit.and_then(|commit| super::commit_author_date(root, commit))
-        {
-            return HistoryOrderKey::dated(&occurred_at);
+        if let Some(commit) = commit {
+            let occurred_at = commit_dates
+                .dates
+                .entry(commit.to_string())
+                .or_insert_with(|| resolve(commit));
+            if let Some(occurred_at) = occurred_at {
+                return HistoryOrderKey::dated(occurred_at);
+            }
         }
     }
     HistoryOrderKey::GateDateUnknown
@@ -574,6 +605,46 @@ mod tests {
             view.extra,
             vec!["future-slot:not yet invented".to_string()],
             "an unrecognised slot is carried through, never dropped"
+        );
+    }
+
+    #[test]
+    fn repeated_gate_verdict_commit_dates_are_resolved_once_per_read() {
+        let atom = cid_of("atom");
+        let record = event(
+            ReaVerb::Cite,
+            atom,
+            NOTE_UNIT,
+            Vec::new(),
+            &[
+                "run:observation",
+                ".",
+                "reason:verdict",
+                "measure:gate-verdict@1",
+                "env:commit=abc123",
+            ],
+            "2026-11-25T00:00:00Z",
+        );
+        let FlowRecord::Event(event) = record else {
+            unreachable!("the fixture builds an event")
+        };
+        let view = note_view(&cid_of("verdict"), &event);
+        let mut commit_dates = CommitDateCache::default();
+        let mut resolutions = 0;
+        let mut resolve = |commit: &str| {
+            resolutions += 1;
+            assert_eq!(commit, "abc123");
+            Some("2026-11-24T12:34:56Z".to_string())
+        };
+
+        let first = note_history_order_with(&view, &mut commit_dates, &mut resolve);
+        let second = note_history_order_with(&view, &mut commit_dates, &mut resolve);
+
+        assert_eq!(first, HistoryOrderKey::dated("2026-11-24T12:34:56Z"));
+        assert_eq!(second, first);
+        assert_eq!(
+            resolutions, 1,
+            "one commit starts one resolver call per read"
         );
     }
 }
