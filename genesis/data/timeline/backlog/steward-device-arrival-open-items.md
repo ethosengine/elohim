@@ -3156,10 +3156,17 @@ shem). `epr flow note` dates every note by the author date of the HEAD commit at
 under the ruled choice that dates are history-derived and never the wall clock. Since verdicts
 are written from the device's main checkout, a `gate-verdict@1` carries the date of whatever
 commit that checkout sits on: unrelated to the commit judged and to the run. A verdict recorded
-on ethosengine on 2026-11-25 at about 05:19Z read `2026-11-24T20:56:01Z` on shem. Freshness
-windows, a carry's valid-for and "newest green" read that field. Not cured; an evidence note of
-every reader and what each needs (an order, or a wall-clock age) is asked of ethosengine before
-any change.
+on ethosengine on 2026-11-25 at about 05:19Z read `2026-11-24T20:56:01Z` on shem.
+
+Corrected the same day: this row first said that freshness windows, a carry's valid-for and
+"newest green" read that field. They do not. ethosengine's evidence note
+(`genesis/docs/superpowers/specs/evidence/2026-11-25-gate-verdict-time-readers/README.md`) traces
+every reader: no decision reads a verdict's time (reuse, the carry's poll, miss settling, live
+carries, enrichment, crossing, retention), and "newest green" orders by the attestation's own
+build time. What is wrong today is display and ordering: `epr peer verdicts`, note and context
+ordering, the ledger, participation. It becomes a decision defect only if a freshness bound on
+gate verdicts is ever declared. Not cured; which commit should date a verdict, and whether a
+separate observed-at is added, is for the steward to rule.
 
 ## Row 98 — brit's quieter capture notice will fail epr's qualification probe
 
