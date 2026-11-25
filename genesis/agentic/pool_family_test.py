@@ -14,6 +14,7 @@ import os
 from pathlib import Path
 import subprocess
 import tempfile
+import time
 import unittest
 from unittest import mock
 
@@ -221,6 +222,54 @@ class PoolFamilyTest(unittest.TestCase):
         self.assertEqual(self.py_family(self.wt), 'steward')
         self.git(self.wt, 'branch', '-m', 'claude/x')
         self.assertEqual(self.bash_family(self.wt), 'claude')
+
+    def locked_pool_slot(self, family='evictable'):
+        slot = self.root / 'pool' / 'family' / family / 'workspace' / 'dev'
+        slot.mkdir(parents=True)
+        (slot / 'artifact').write_text('built')
+        lock = Path(f'{slot}.gate.lock')
+        locker = subprocess.Popen(['flock', '-x', str(lock), 'sleep', '30'])
+        self.addCleanup(lambda: locker.poll() is None and locker.kill())
+        deadline = time.monotonic() + 3
+        while time.monotonic() < deadline:
+            probe = subprocess.run(['flock', '-n', str(lock), 'true'])
+            if probe.returncode != 0:
+                break
+            time.sleep(0.01)
+        self.assertNotEqual(probe.returncode, 0, 'fixture did not acquire the slot lock')
+        return slot, lock
+
+    def assert_busy_slot_delete_is_skipped(self, label):
+        slot, lock = self.locked_pool_slot(label)
+        out = self.bash_run('delete_slot_with_gate_lock "$1"; echo status=$?', str(slot))
+        self.assertEqual(out.returncode, 0, out.stderr)
+        self.assertIn('status=75', out.stdout)
+        self.assertTrue(slot.is_dir())
+        self.assertTrue(lock.exists(), 'a held stable lock inode is never unlinked')
+
+    def assert_busy_family_delete_is_skipped(self, label):
+        slot, lock = self.locked_pool_slot(label)
+        out = self.bash_run('delete_family_with_gate_locks "$1"; echo status=$?', label)
+        self.assertEqual(out.returncode, 0, out.stderr)
+        self.assertIn('status=75', out.stdout)
+        self.assertTrue(slot.is_dir())
+        self.assertTrue(lock.exists(), 'family eviction never unlinks a held slot lock')
+
+    def test_evict_on_merge_path_skips_a_busy_slot_and_preserves_its_lock_inode(self):
+        self.assert_busy_family_delete_is_skipped('evict-on-merge')
+        self.assertGreaterEqual(POOL_LIB.read_text().count('delete_family_with_gate_locks "$fam"'), 2)
+
+    def test_ttl_path_skips_a_busy_slot_and_preserves_its_lock_inode(self):
+        self.assert_busy_family_delete_is_skipped('ttl')
+        self.assertIn('enforce_log ttl-evict', POOL_LIB.read_text())
+
+    def test_lru_path_skips_a_busy_slot(self):
+        self.assert_busy_slot_delete_is_skipped('lru')
+        self.assertIn('delete_slot_with_gate_lock "$victim"', POOL_LIB.read_text())
+
+    def test_keep_warm_trim_path_skips_a_busy_slot(self):
+        self.assert_busy_slot_delete_is_skipped('keep-warm')
+        self.assertIn('delete_slot_with_gate_lock "$slot"', POOL_LIB.read_text())
 
 
 if __name__ == '__main__':

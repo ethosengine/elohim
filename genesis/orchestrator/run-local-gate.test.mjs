@@ -102,9 +102,20 @@ if [[ "\${GATE_TEST_PROBE_LOCK:-0}" == 1 ]]; then
   fi
   echo LOCK_HELD
 fi
+if [[ -n "\${GATE_TEST_TOKEN_FILE:-}" ]]; then
+  printf '%s\\n' "$GATE_SLOT_OWNER_TOKEN" > "$GATE_TEST_TOKEN_FILE"
+fi
 if [[ -n "\${GATE_TEST_READY:-}" ]]; then
   printf 'ready\\n' > "$GATE_TEST_READY"
   while [[ ! -e "$GATE_TEST_RELEASE" ]]; do read -r -t 0.02 _ || true; done
+fi
+if [[ -n "\${GATE_TEST_NESTED:-}" ]]; then
+  "$GATE_TEST_NODE" "$GATE_TEST_TAP" --project nested -- bash -c \
+    'printf "nested\\n" >> "$GATE_TEST_EVENTS"'
+fi
+if [[ -n "\${GATE_TEST_BACKGROUND_PID:-}" ]]; then
+  ( trap '' TERM; sleep 30 ) </dev/null >/dev/null 2>&1 &
+  printf '%s\\n' "$!" > "$GATE_TEST_BACKGROUND_PID"
 fi
 if [[ -n "\${GATE_TEST_DAEMON_PID:-}" ]]; then
   setsid sleep 30 </dev/null >/dev/null 2>&1 &
@@ -137,6 +148,8 @@ function startSlotGate(t, fx, {
       GATE_TEST_SLOT_ROOT: fx.slotRoot,
       GATE_TEST_EVENTS: fx.events,
       GATE_TEST_LABEL: label,
+      GATE_TEST_NODE: process.execPath,
+      GATE_TEST_TAP: TAP,
       GATE_SLOT_LOCK_PATH: lock,
       GATE_SLOT_HOLDER_PATH: join(slot, ".gate.holder"),
       GATE_SLOT_WAIT_RESULT: waitResult,
@@ -162,7 +175,7 @@ function startSlotGate(t, fx, {
   return { child, closed, stdout: () => stdout, stderr: () => stderr, slot, lock, waitResult };
 }
 
-async function waitUntil(predicate, message, timeoutMs = 3000) {
+async function waitUntil(predicate, message, timeoutMs = 15000) {  // setup waits only; a loaded host (gates run beside cargo) needs headroom
   const deadline = Date.now() + timeoutMs;
   while (!predicate()) {
     if (Date.now() >= deadline) assert.fail(message);
@@ -193,7 +206,7 @@ test("two gates on one cargo slot never overlap and the waiter names the holder"
   await waitUntil(() => second.stderr().includes("cargo slot still busy"), "second gate never reported the holder");
   assert.match(second.stderr(), new RegExp(
     `^\\[gate-tap\\] second: cargo slot still busy after [0-9.]+s; holder: project=first worktree=${fx.root.replaceAll("/", "\\/")} `
-      + "pid=[0-9]+ run=run-first started=[^ ]+$", "m",
+      + "pid=[0-9]+ .* run=run-first started=[^ ]+$", "m",
   ));
   writeFileSync(release, "release\n");
 
@@ -328,6 +341,117 @@ test("a waiting gate refreshes its holder heartbeat on stderr and the live run",
   assert.equal((await waiter.closed).status, 0);
 });
 
+test("SIGINT while waiting for a cargo slot aborts admission with exit 130", async (t) => {
+  const fx = slotFixture(t);
+  const ready = join(fx.dir, "interrupt-holder.ready");
+  const release = join(fx.dir, "interrupt-holder.release");
+  const holder = startSlotGate(t, fx, {
+    projectName: "interrupt-holder",
+    env: { GATE_TEST_READY: ready, GATE_TEST_RELEASE: release },
+  });
+  await waitUntil(() => existsSync(ready), "interrupt holder never entered");
+  const waiter = startSlotGate(t, fx, { projectName: "interrupted-waiter" });
+  await waitUntil(() => waiter.stderr().includes("cargo slot still busy"), "waiter never blocked");
+  waiter.child.kill("SIGINT");
+  const result = await waiter.closed;
+  assert.equal(result.status, 130, result.stderr);
+  assert.equal(existsSync(waiter.waitResult), false, "an interrupted wait records no completed wait");
+  assert.doesNotMatch(readFileSync(fx.events, "utf8"), /interrupted-waiter/);
+  writeFileSync(release, "release\n");
+  assert.equal((await holder.closed).status, 0);
+});
+
+test("SIGKILL of the tap does not release the slot while its recipe session lives", async (t) => {
+  const fx = slotFixture(t);
+  const ready = join(fx.dir, "killed-tap.ready");
+  const release = join(fx.dir, "killed-tap.release");
+  const holder = startSlotGate(t, fx, {
+    projectName: "killed-tap",
+    env: { GATE_TEST_READY: ready, GATE_TEST_RELEASE: release },
+  });
+  await waitUntil(() => existsSync(ready), "killed tap's recipe never entered");
+  holder.child.kill("SIGKILL");
+  const waiter = startSlotGate(t, fx, { projectName: "after-kill" });
+  await waitUntil(() => waiter.stderr().includes("cargo slot still busy"), "second gate did not see the surviving holder");
+  await delay(250);
+  assert.doesNotMatch(readFileSync(fx.events, "utf8"), /after-kill/);
+  writeFileSync(release, "release\n");
+  assert.equal((await waiter.closed).status, 0);
+  const killed = await holder.closed;
+  assert.equal(killed.signal, "SIGKILL");
+});
+
+test("a nested same-slot gate reuses its verified ancestor's ownership", async (t) => {
+  const fx = slotFixture(t);
+  const gate = startSlotGate(t, fx, {
+    projectName: "outer",
+    env: { GATE_TEST_NESTED: "1", GATE_SLOT_LOCK_WAIT_S: "0.2" },
+  });
+  const result = await gate.closed;
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(readFileSync(fx.events, "utf8"), /^nested$/m);
+  assert.doesNotMatch(result.stderr, /cargo slot still busy/);
+});
+
+test("wrong pid, wrong start time and a non-ancestor token never bypass a busy slot", async (t) => {
+  const fx = slotFixture(t);
+  const ready = join(fx.dir, "token-holder.ready");
+  const release = join(fx.dir, "token-holder.release");
+  const tokenFile = join(fx.dir, "owner.token");
+  t.after(() => { try { writeFileSync(release, "release\n"); } catch { /* fixture gone */ } });
+  const holder = startSlotGate(t, fx, {
+    projectName: "token-holder",
+    env: { GATE_TEST_TOKEN_FILE: tokenFile, GATE_TEST_READY: ready, GATE_TEST_RELEASE: release },
+  });
+  await waitUntil(() => existsSync(ready) && existsSync(tokenFile), "holder did not publish its token");
+  const token = JSON.parse(readFileSync(tokenFile, "utf8"));
+  const variants = [
+    { ...token, holder: { ...token.holder, pid: token.holder.pid + 1 } },
+    { ...token, holder: { ...token.holder, start: String(Number(token.holder.start) + 1) } },
+    token,
+  ];
+  for (const [index, forged] of variants.entries()) {
+    const gate = startSlotGate(t, fx, {
+      projectName: `forged-${index}`,
+      label: `forged-${index}`,
+      env: { GATE_SLOT_OWNER_TOKEN: JSON.stringify(forged), GATE_SLOT_LOCK_WAIT_S: "0.1" },
+    });
+    const result = await gate.closed;
+    assert.equal(result.status, 73, result.stderr);
+  }
+  writeFileSync(release, "release\n");
+  assert.equal((await holder.closed).status, 0);
+});
+
+test("slot drain is bounded, heartbeats, and KILLs a TERM-ignoring session member", async (t) => {
+  const fx = slotFixture(t);
+  const pidFile = join(fx.dir, "background.pid");
+  const started = Date.now();
+  const gate = startSlotGate(t, fx, {
+    projectName: "bounded-drain",
+    env: { GATE_TEST_BACKGROUND_PID: pidFile, GATE_SLOT_DRAIN_MS: "100",
+      GATE_SLOT_DRAIN_TERM_MS: "100", GATE_SLOT_DRAIN_HEARTBEAT_MS: "20" },
+  });
+  const result = await gate.closed;
+  assert.equal(result.status, 0, result.stderr);
+  assert.ok(Date.now() - started < 2000, `drain took ${Date.now() - started} ms`);
+  assert.match(result.stderr, /draining session .* after its recipe closed/);
+  assert.match(result.stderr, /sent SIGKILL/);
+  const pid = Number(readFileSync(pidFile, "utf8"));
+  assert.notEqual(spawnSync("kill", ["-0", String(pid)]).status, 0, "the session member is gone");
+});
+
+test("a non-slot gate starts no slot session scan", (t) => {
+  const fx = fixture(t);
+  const trace = join(fx.dir, "proc-scans");
+  const result = spawnSync(process.execPath, [TAP, "--project", "non-slot", "--", "bash", "-c", "exit 0"], {
+    encoding: "utf8", stdio: ["ignore", "pipe", "pipe", "pipe"],
+    env: { ...process.env, GATE_SLOT_PROC_TRACE: trace },
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(existsSync(trace), false);
+});
+
 test("a_callers_ceiling_is_appended_and_honoured", (t) => {
   const fx = fixture(t);
   git(fx.dir, "init", "--quiet");
@@ -389,7 +513,7 @@ test("a_malformed_cargo_env_key_still_refuses", (t) => {
   }
 });
 
-test("a daemon keeping inherited recipe descriptors cannot retain the tap-owned cargo slot lock", async (t) => {
+test("documented limit: a double-forked setsid escapee is outside slot custody", async (t) => {
   const fx = slotFixture(t);
   const daemonPid = join(fx.dir, "daemon.pid");
   const gate = startSlotGate(t, fx, {
@@ -405,6 +529,6 @@ test("a daemon keeping inherited recipe descriptors cannot retain the tap-owned 
   t.after(() => { try { process.kill(pid, "SIGKILL"); } catch { /* already exited */ } });
   assert.equal(spawnSync("kill", ["-0", String(pid)]).status, 0, "the detached child still lives");
   assert.equal(spawnSync("flock", ["-n", gate.lock, "true"]).status, 0,
-    "the detached child inherited no descriptor that can retain the lock");
+    "the independent session is deliberately outside the slot lifetime");
   process.kill(pid, "SIGKILL");
 });

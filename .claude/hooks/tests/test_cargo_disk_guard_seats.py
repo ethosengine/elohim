@@ -40,11 +40,14 @@ class SeatsTest(unittest.TestCase):
             patch.start()
             self.addCleanup(patch.stop)
 
-    def process(self, pid, argv, parent=1, marked=False, comm='test'):
+    def process(self, pid, argv, parent=1, marked=False, comm='test', env=None):
         d = self.proc / str(pid)
         d.mkdir(exist_ok=True)
         (d / 'cmdline').write_bytes(b'\0'.join(a.encode() for a in argv) + b'\0')
-        (d / 'environ').write_bytes(b'ELOHIM_LSP_FLYCHECK=1\0' if marked else b'PATH=/bin\0')
+        values = {'PATH': '/bin', **(env or {})}
+        if marked:
+            values['ELOHIM_LSP_FLYCHECK'] = '1'
+        (d / 'environ').write_bytes(b'\0'.join(f'{k}={v}'.encode() for k, v in values.items()) + b'\0')
         (d / 'stat').write_text(f'{pid} ({comm}) S {parent} ' + '0 ' * 17 + f'{pid * 100}\n')
 
     def gate(self, base):
@@ -179,6 +182,27 @@ class SeatsTest(unittest.TestCase):
         self.assertEqual(self.builds(), [(3400, 'gate-runner.mjs', 3400, 'gate-runner.mjs')])
         self.limit = 1
         self.assertEqual(self.run_hook()['permissionDecision'], 'deny')
+
+    def test_a_gate_waiting_for_its_slot_is_not_a_cargo_seat(self):
+        holder = self.proc / 'incumbent.holder'
+        holder.write_text('project=incumbent pid=999 run=x\n')
+        lock = str(self.proc / 'slot.gate.lock')
+        self.process(3450, ['node', '/repo/genesis/orchestrator/gate-runner.mjs', 'x'])
+        self.process(3451, ['node', '/repo/genesis/orchestrator/gate-tap.mjs', '--project', 'x'], 3450,
+                     env={'GATE_SLOT_LOCK_PATH': lock, 'GATE_SLOT_HOLDER_PATH': str(holder)})
+        self.process(3452, ['flock', '--close', '-w', '3600', lock, 'node', 'gate-tap.mjs'], 3451)
+        self.assertEqual(guard.running_heavy(), [])
+        self.assertEqual(self.run_hook(), {})
+
+    def test_an_admitted_gate_between_steps_still_owns_one_seat(self):
+        holder = self.proc / 'mine.holder'
+        holder.write_text('project=mine pid=3462 run=x\n')
+        lock = str(self.proc / 'slot.gate.lock')
+        self.process(3460, ['node', '/repo/genesis/orchestrator/gate-runner.mjs', 'x'])
+        self.process(3461, ['node', '/repo/genesis/orchestrator/gate-tap.mjs', '--project', 'x'], 3460,
+                     env={'GATE_SLOT_LOCK_PATH': lock, 'GATE_SLOT_HOLDER_PATH': str(holder)})
+        self.process(3462, ['flock', '--close', lock, 'node', 'gate-tap.mjs'], 3461)
+        self.assertEqual([row[0] for row in guard.running_heavy()], [3460])
 
     def test_a_zombie_and_a_nonpositive_parent_change_nothing(self):
         self.process(3500, ['cargo', 'build'], parent=0)

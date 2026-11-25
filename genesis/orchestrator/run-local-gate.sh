@@ -39,10 +39,14 @@ if [[ -n "$target_dir" ]]; then
     echo "gate $project_name: runner did not name the cargo slot lock $expected_slot_lock" >&2
     exit 2
   fi
-  # The runner's detached flock holder lives outside the recipe's signalled process group. Probing
-  # must fail: a successful probe means no holder exists, so the recipe refuses before touching the slot.
-  if flock -n "$expected_slot_lock" true 2>/dev/null; then
-    echo "gate $project_name: runner did not hold the cargo slot lock $expected_slot_lock" >&2
+  # A busy inode proves only that somebody owns it. The tap's token additionally proves, from
+  # /proc, the holder pid/start, its open descriptor and its supervised ancestry to this recipe.
+  gate_tap="$repo_root/genesis/orchestrator/gate-tap.mjs"
+  if [[ ! -f "$gate_tap" ]]; then
+    gate_tap="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/gate-tap.mjs"
+  fi
+  if ! node "$gate_tap" --verify-slot-owner "$expected_slot_lock" "$backing/.gate.holder"; then
+    echo "gate $project_name: runner did not prove ownership of cargo slot lock $expected_slot_lock" >&2
     exit 2
   fi
   mkdir -p "$backing"
