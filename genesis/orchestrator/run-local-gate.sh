@@ -2,6 +2,8 @@
 # Typed local gate executor. Arguments come only from validated build manifests.
 set -euo pipefail
 
+readonly GATE_SLOT_BUSY_EXIT=73  # not 75: gate-task.mjs EXIT_NOT_CARRIED=75 means "ark did not carry it, run direct"
+
 repo_root="$1"
 project_name="$2"
 project_dir="$3"
@@ -34,6 +36,29 @@ if [[ -n "$target_dir" ]]; then
   [[ "$target_dir" = /* ]] || target_dir="$repo_root/$target_dir"
   backing="$(readlink -m "$target_dir")"
   mkdir -p "$backing"
+  # Family slots are shared deliberately so a fresh landing worktree stays warm. Serialize the
+  # whole recipe, not only Cargo: a gate may build a binary and then execute it during ingest or
+  # produce, and another checkout must not replace that binary between those phases. The open fd
+  # survives the final exec, so the kernel releases the lock on every recipe exit and process-group
+  # kill without a cleanup trap.
+  slot_lock="$backing/.gate.lock"
+  slot_holder="$backing/.gate.holder"
+  slot_lock_wait_s="${GATE_SLOT_LOCK_WAIT_S:-3600}"
+  exec {gate_slot_lock_fd}>"$slot_lock"
+  if ! flock -n "$gate_slot_lock_fd"; then
+    holder="$(cat "$slot_holder" 2>/dev/null || echo 'holder details unavailable')"
+    echo "  [$project_name] cargo slot busy; holder: $holder; waiting up to ${slot_lock_wait_s}s"
+    if ! flock -w "$slot_lock_wait_s" "$gate_slot_lock_fd"; then
+      holder="$(cat "$slot_holder" 2>/dev/null || echo 'holder details unavailable')"
+      echo "gate $project_name: REFUSED cargo slot stayed busy for ${slot_lock_wait_s}s; holder: $holder" >&2
+      exit "$GATE_SLOT_BUSY_EXIT"
+    fi
+  fi
+  holder_tmp="$slot_holder.$$"
+  printf 'project=%s worktree=%s pid=%s run=%s started=%s\n' \
+    "$project_name" "$(readlink -m "$repo_root")" "$$" "${GATE_LIVE_RUN:-unset}" \
+    "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$holder_tmp"
+  mv -f "$holder_tmp" "$slot_holder"
   export CARGO_TARGET_DIR="$target_dir"
   echo "  [$project_name] cargo target: $CARGO_TARGET_DIR"
   # One slot, many checkouts: cargo keys workspace members by their path RELATIVE to the
