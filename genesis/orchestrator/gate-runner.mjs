@@ -19,7 +19,7 @@ import { filterChanged } from './ci-ignore.mjs';
 import { COST_FIELDS, classifyFailure, recordCycle, subjectFor } from './gate-cycle.mjs';
 import { CI_BRANCH_PATTERN, costOf, deferDecision, formatExpectation, readCycleUnion } from './gate-cost.mjs';
 import {
-  ageOf, attestedOutputParses, emitGateVerdict, findEvidence, gateEvidence, gateKeyMaterial, isHabitAtom, patternDigest, recordEvidence, resolveBin, reusableHit,
+  ageOf, attestedOutputParses, emitGateVerdict, findEvidence, gateEvidence, gateKeyMaterial, gateKeyMaterials, isHabitAtom, patternDigest, recordEvidence, resolveBin, reusableHit,
   selfAgentId, siblingGovernanceChange, siblingVerdicts, stepFingerprints,
 } from './gate-evidence.mjs';
 import { britAffected, resolveBritBin } from './gate-oracle.mjs';
@@ -336,14 +336,18 @@ const READ_SHADOW_VARIANTS = Object.freeze([
  */
 export function readShadowComparison(project, evidence, {
   root, base, commit, env, cargoEnv, spawn, inputs = null,
+  clock = () => process.hrtime.bigint(), reportTimings = false,
 } = {}) {
-  const results = READ_SHADOW_VARIANTS.map(entry => {
-    const options = {
-      root, env, cargoEnv, spawn, inputs, britBin: evidence.britBin, variant: entry.variant,
-      boundedSuite: true,
-    };
-    const before = gateKeyMaterial(project, { ...options, commit: base });
-    const after = gateKeyMaterial(project, { ...options, commit });
+  const shared = {};
+  const options = {
+    root, env, cargoEnv, spawn, inputs, britBin: evidence.britBin,
+    boundedSuite: true, variants: READ_SHADOW_VARIANTS, clock, shared,
+  };
+  const beforeBatch = gateKeyMaterials(project, { ...options, commit: base });
+  const afterBatch = gateKeyMaterials(project, { ...options, commit });
+  const results = READ_SHADOW_VARIANTS.map((entry, index) => {
+    const before = beforeBatch.results[index].closure;
+    const after = afterBatch.results[index].closure;
     if (!before.key || !after.key) {
       throw new Error(oneLine(after.line || before.line || `${entry.label} key unavailable`));
     }
@@ -351,21 +355,43 @@ export function readShadowComparison(project, evidence, {
   });
   const real = results[0];
   if (real.key !== evidence.key) throw new Error('real variant differs from the gate evidence key');
-  if (!results.slice(1).some(result => result.moved !== real.moved)) return null;
-  const movement = results.map(result => {
+  const differs = results.slice(1).some(result => result.moved !== real.moved);
+  if (!differs && !reportTimings) return null;
+  const movement = differs ? results.map(result => {
     if (result.moved) return `${result.label} moved`;
     if (result.name === 'real') return 'real held';
     const proof = result.name === 'both' ? 'fixes 1 and 2 were sound' : `${result.label} were sound`;
     return `${result.label} would have held IF ${proof}`;
-  }).join('; ');
+  }).join('; ') : `real and all variants ${real.moved ? 'moved' : 'held'} alike`;
+  const sum = (field, name = null) => beforeBatch.timing[field][name] + afterBatch.timing[field][name];
+  const timing = {
+    totalMs: beforeBatch.timing.totalMs + afterBatch.timing.totalMs,
+    readSetAuditSharedMs: beforeBatch.timing.readSetAuditSharedMs + afterBatch.timing.readSetAuditSharedMs,
+    readSetAuditMs: Object.fromEntries(READ_SHADOW_VARIANTS.map(({ name }) => [name, sum('readSetAuditMs', name)])),
+    fingerprintingMs: beforeBatch.timing.fingerprintingMs + afterBatch.timing.fingerprintingMs,
+    suiteInventoryMs: beforeBatch.timing.suiteInventoryMs + afterBatch.timing.suiteInventoryMs,
+    keyCompositionMs: Object.fromEntries(READ_SHADOW_VARIANTS.map(({ name }) => [name, sum('keyCompositionMs', name)])),
+  };
+  const ms = value => Math.max(0, Math.round(value));
+  const audits = READ_SHADOW_VARIANTS.map(({ name, label }) => `${label} ${ms(timing.readSetAuditMs[name])}`).join(', ');
+  const compositions = Object.values(timing.keyCompositionMs).reduce((a, b) => a + b, 0);
+  const timingLine = `timing ${ms(timing.totalMs)} ms (read-set audit ${audits}, shared ${ms(timing.readSetAuditSharedMs)}; fingerprinting ${ms(timing.fingerprintingMs)}; suite inventory ${ms(timing.suiteInventoryMs)}; key composition ${ms(compositions)})`;
   return {
-    line: `[gate] ${project.name} read-shadow: ${movement} — decides nothing; enablement requires proof for #[path]-included tests/** support, format! joins with variable suffixes, absent paths, and eprfs running and blocking on this same push`,
+    line: `[gate] ${project.name} read-shadow: ${movement}; ${timingLine} — decides nothing; enablement requires proof for #[path]-included tests/** support, format! joins with variable suffixes, absent paths, and eprfs running and blocking on this same push`,
     rows: results.slice(1).map(result => ({
       name: result.name,
       key: result.key,
       keyChanged: result.moved
         ? 'moved'
         : `would have held IF ${result.name === 'both' ? 'fixes 1 and 2 were sound' : `${result.label} were sound`}`,
+      timing: {
+        totalMs: timing.totalMs,
+        readSetAuditMs: timing.readSetAuditMs[result.name],
+        readSetAuditSharedMs: timing.readSetAuditSharedMs,
+        fingerprintingMs: timing.fingerprintingMs,
+        suiteInventoryMs: timing.suiteInventoryMs,
+        keyCompositionMs: timing.keyCompositionMs[result.name],
+      },
     })),
   };
 }
@@ -1016,6 +1042,7 @@ export function runProject(project, printOnly, namesOnly, {
     readShadowRowsEmitted = true;
     const at = wallClock();
     for (const row of readShadow.rows) {
+      const seconds = Number.isFinite(row.timing?.totalMs) ? row.timing.totalMs / 1000 : 0;
       emitGateReading({
         ...reading,
         step: `${project.name}:read-shadow:${row.name}`,
@@ -1027,8 +1054,8 @@ export function runProject(project, printOnly, namesOnly, {
         synthesized: false,
         waitedSeconds: 0,
         leaseWaitedSeconds: 0,
-        seconds: 0,
-        startedAt: at,
+        seconds,
+        startedAt: new Date(new Date(at).getTime() - seconds * 1000),
         endedAt: at,
       }, { env, collector: readingCollector });
     }
@@ -1332,7 +1359,7 @@ export function runProject(project, printOnly, namesOnly, {
             sharedReadShadowBudget.check('read-shadow');
             readShadow = readShadowOf(project, evidence, {
               root, base, commit: gateCommit, env: childEnv, cargoEnv: cargoEnvOf(childEnv),
-              spawn: bounded, inputs,
+              spawn: bounded, inputs, clock, reportTimings: true,
             });
             sharedReadShadowBudget.check('read-shadow');
             if (readShadow) {

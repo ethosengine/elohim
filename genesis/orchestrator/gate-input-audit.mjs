@@ -500,44 +500,61 @@ function auditFile(root, file, text, crate, projectName = null, variant = {}) {
  * Mutation/ancestor searches and other data-derived paths require declarations or review of the printed
  * unresolved roots; this audit is not a proof of an arbitrary Rust read closure.
  */
-export function scan({ root, sources, project = null, readFile = readFileSync, listFiles = repositoryFiles, variant = {} }) {
+function scanVariants({
+  root, sources, project = null, readFile = readFileSync, listFiles = repositoryFiles,
+}, variants, measureVariant = (_name, run) => run()) {
   root = resolve(root);
-  const found = new Map();
   const files = [...new Set(listFiles(root))].sort();
+  const contents = new Map();
+  const cachedRead = (path, encoding = 'utf8') => {
+    if (!contents.has(path)) contents.set(path, readFile(path, encoding));
+    return contents.get(path);
+  };
   const pathExists = target => {
     const rel = relative(root, target).split('\\').join('/');
     return rel !== '..' && !rel.startsWith('../')
       && files.some(file => file === rel || file.startsWith(`${rel}/`));
   };
+  const sourceFiles = files.filter(file => file.endsWith('.rs') && sources.some(glob => globCovers(glob, file)));
+  const prepared = sourceFiles.map(file => ({
+    file,
+    crate: nearestCrate(root, file, cachedRead),
+    text: cachedRead(resolve(root, file), 'utf8'),
+  }));
   const includedDependencyTests = new Set();
-  if (variant.excludeDependencyTests && project) {
-    for (const file of files) {
-      if (!file.endsWith('.rs') || !sources.some(glob => globCovers(glob, file))) continue;
-      const crate = nearestCrate(root, file, readFile);
+  if (variants.some(({ variant }) => variant.excludeDependencyTests) && project) {
+    for (const { file, crate, text } of prepared) {
       if (!crate) continue;
       const inCrate = relative(crate, resolve(root, file)).split('\\').join('/');
       if (inCrate.startsWith('tests/')) continue;
-      for (const path of pathIncludedModules(readFile(resolve(root, file), 'utf8'))) {
+      for (const path of pathIncludedModules(text)) {
         const included = relative(root, resolve(dirname(resolve(root, file)), path)).split('\\').join('/');
         if (included !== '..' && !included.startsWith('../')) includedDependencyTests.add(included);
       }
     }
   }
-  for (const file of files) {
-    if (!file.endsWith('.rs') || !sources.some(glob => globCovers(glob, file))) continue;
-    const crate = nearestCrate(root, file, readFile);
-    if (variant.excludeDependencyTests && project && crate) {
-      const projectDir = resolve(root, project.dir);
-      const fromProject = relative(projectDir, crate).split('\\').join('/');
-      const crateInProject = fromProject === '' || (fromProject !== '..' && !fromProject.startsWith('../'));
-      const inCrate = relative(crate, resolve(root, file)).split('\\').join('/');
-      if (!crateInProject && inCrate.startsWith('tests/') && !includedDependencyTests.has(file)) continue;
+  const found = new Map(variants.map(({ name }) => [name, new Map()]));
+  for (const { file, crate, text } of prepared) {
+    for (const { name, variant } of variants) {
+      measureVariant(name, () => {
+        if (variant.excludeDependencyTests && project && crate) {
+          const projectDir = resolve(root, project.dir);
+          const fromProject = relative(projectDir, crate).split('\\').join('/');
+          const crateInProject = fromProject === '' || (fromProject !== '..' && !fromProject.startsWith('../'));
+          const inCrate = relative(crate, resolve(root, file)).split('\\').join('/');
+          if (!crateInProject && inCrate.startsWith('tests/') && !includedDependencyTests.has(file)) return;
+        }
+        const rows = auditFile(root, file, text, crate, project?.name ?? null,
+          { ...variant, root, pathExists });
+        for (const row of rows) found.get(name).set(JSON.stringify(row), row);
+      });
     }
-    const rows = auditFile(root, file, readFile(resolve(root, file), 'utf8'), crate, project?.name ?? null,
-      { ...variant, root, pathExists });
-    for (const row of rows) found.set(JSON.stringify(row), row);
   }
-  return [...found.values()];
+  return new Map([...found].map(([name, rows]) => [name, [...rows.values()]]));
+}
+
+export function scan({ root, sources, project = null, readFile = readFileSync, listFiles = repositoryFiles, variant = {} }) {
+  return scanVariants({ root, sources, project, readFile, listFiles }, [{ name: 'only', variant }]).get('only');
 }
 
 /** Every named repository read, including declared files and directory prefixes. */
@@ -547,6 +564,30 @@ export function readSet(options) {
     paths: [...new Set(rows.filter(row => row.how !== 'unresolved').map(row => row.path))].sort(),
     unresolved: rows.filter(row => row.how === 'unresolved').map(({ file, line, path }) => ({ file, line, expr: path })),
   };
+}
+
+/** Derive several audit variants from one repository listing and one shared source-file cache. */
+export function readSetVariants(options, variants) {
+  const clock = options.clock || (() => process.hrtime.bigint());
+  const elapsedMs = started => {
+    const elapsed = clock() - started;
+    return typeof elapsed === 'bigint' ? Number(elapsed) / 1_000_000 : Number(elapsed);
+  };
+  const variantMs = Object.fromEntries(variants.map(({ name }) => [name, 0]));
+  const started = clock();
+  const rows = scanVariants(options, variants, (name, run) => {
+    const at = clock();
+    const result = run();
+    variantMs[name] += elapsedMs(at);
+    return result;
+  });
+  const totalMs = elapsedMs(started);
+  const sets = new Map([...rows].map(([name, found]) => [name, {
+    paths: [...new Set(found.filter(row => row.how !== 'unresolved').map(row => row.path))].sort(),
+    unresolved: found.filter(row => row.how === 'unresolved')
+      .map(({ file, line, path }) => ({ file, line, expr: path })),
+  }]));
+  return { sets, timing: { sharedMs: Math.max(0, totalMs - Object.values(variantMs).reduce((a, b) => a + b, 0)), variantMs } };
 }
 
 export function auditProject(options) {

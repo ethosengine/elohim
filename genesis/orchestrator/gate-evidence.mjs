@@ -30,7 +30,7 @@ import { spawnSync } from 'child_process';
 import { createHash, createPrivateKey, createPublicKey } from 'crypto';
 import { accessSync, constants, readFileSync } from 'fs';
 import { basename, delimiter, dirname, isAbsolute, join, relative, resolve } from 'path';
-import { SUITE_READ_LISTS, UNAUDITED_RECIPE_PROJECTS, globCovers, isReadPattern, readSet, suiteReadSet } from './gate-input-audit.mjs';
+import { SUITE_READ_LISTS, UNAUDITED_RECIPE_PROJECTS, globCovers, isReadPattern, readSetVariants, suiteReadSet } from './gate-input-audit.mjs';
 import { closureDigest, dirtyInView, gitEnv, packageClosure, suiteInventory } from './suite-inventory.mjs';
 import { buildNotesRef, expectedRefusal, heldNotes, noteEpoch, readBuildNote, unverifiableNotes } from './scripts/brit-attest.mjs';
 import { LEGACY_ALL, refusesInputsFlag } from './gate-inputs.mjs';
@@ -221,25 +221,52 @@ function stepSources(project, root, commit, spawn) {
 // results, partitioned by repository, project and commit (and tree for moving refs).
 const readSets = new Map();
 
-function readSetAt(project, root, commit, sources, tree, spawn, variant = {}) {
+const defaultClock = () => process.hrtime.bigint();
+
+function elapsedMs(clock, started) {
+  const elapsed = clock() - started;
+  return typeof elapsed === 'bigint' ? Number(elapsed) / 1_000_000 : Number(elapsed);
+}
+
+function readSetsAt(project, root, commit, sources, tree, spawn, variants, clock) {
+  const emptyTiming = () => ({ sharedMs: 0, variantMs: Object.fromEntries(variants.map(({ name }) => [name, 0])) });
   // A suite that declares its reads, and runs where only those bytes exist, keys on its list at the commit.
   const list = SUITE_READ_LISTS[project.name];
   if (list) {
+    const started = clock();
     const text = gitRead(root, ['show', `${commit}:${list}`], spawn);
-    return text === null ? null : suiteReadSet(text, list);
+    const read = text === null ? null : suiteReadSet(text, list);
+    return {
+      sets: new Map(variants.map(({ name }) => [name, read])),
+      timing: { ...emptyTiming(), sharedMs: elapsedMs(clock, started) },
+    };
   }
-  if (!project.run.cargo || !sources || UNAUDITED_RECIPE_PROJECTS.includes(project.name)) return null;
-  const key = JSON.stringify([resolve(root), project.name, commit, tree,
+  if (!project.run.cargo || !sources || UNAUDITED_RECIPE_PROJECTS.includes(project.name)) {
+    return { sets: new Map(variants.map(({ name }) => [name, null])), timing: emptyTiming() };
+  }
+  const keyOf = variant => JSON.stringify([resolve(root), project.name, commit, tree,
     variant.excludeDependencyTests === true, variant.resolveFormatJoin === true]);
-  if (readSets.has(key)) return readSets.get(key);
+  const missing = variants.filter(({ variant }) => !readSets.has(keyOf(variant)));
+  let timing = emptyTiming();
+  if (missing.length === 0) {
+    return { sets: new Map(variants.map(({ name, variant }) => [name, readSets.get(keyOf(variant))])), timing };
+  }
   try {
+    const sharedStarted = clock();
     const names = gitRead(root, ['ls-tree', '-r', '--name-only', '-z', commit], spawn);
-    if (names === null) return null;
+    if (names === null) {
+      for (const { variant } of missing) readSets.set(keyOf(variant), null);
+      return { sets: new Map(variants.map(({ name, variant }) => [name, readSets.get(keyOf(variant)) ?? null])), timing };
+    }
     const files = new Set(names.split('\0').filter(Boolean));
-    if (![...files].some(file => file.endsWith('.rs') && sources.some(source => globCovers(source, file)))) return null;
+    if (![...files].some(file => file.endsWith('.rs') && sources.some(source => globCovers(source, file)))) {
+      for (const { variant } of missing) readSets.set(keyOf(variant), null);
+      timing.sharedMs = elapsedMs(clock, sharedStarted);
+      return { sets: new Map(variants.map(({ name, variant }) => [name, readSets.get(keyOf(variant)) ?? null])), timing };
+    }
     const contents = new Map();
-    const reads = readSet({
-      root, project, sources, variant, listFiles: () => [...files],
+    const audited = readSetVariants({
+      root, project, sources, listFiles: () => [...files], clock,
       readFile: path => {
         const rel = relative(root, path).split('\\').join('/');
         if (!files.has(rel)) throw Object.assign(new Error(`absent at ${commit}: ${rel}`), { code: 'ENOENT' });
@@ -250,11 +277,15 @@ function readSetAt(project, root, commit, sources, tree, spawn, variant = {}) {
         }
         return contents.get(rel);
       },
-    });
-    readSets.set(key, reads);
-    return reads;
+    }, missing);
+    for (const { name, variant } of missing) readSets.set(keyOf(variant), audited.sets.get(name));
+    timing = audited.timing;
+    timing.sharedMs += elapsedMs(clock, sharedStarted) - audited.timing.sharedMs
+      - Object.values(audited.timing.variantMs).reduce((a, b) => a + b, 0);
+    return { sets: new Map(variants.map(({ name, variant }) => [name, readSets.get(keyOf(variant))])), timing };
   } catch {
-    return null;
+    for (const { variant } of missing) readSets.set(keyOf(variant), null);
+    return { sets: new Map(variants.map(({ name, variant }) => [name, readSets.get(keyOf(variant)) ?? null])), timing };
   }
 }
 
@@ -641,106 +672,177 @@ export function describeEvidence(rows, now = Date.now()) {
 }
 
 /**
- * Compute the canonical closure material without reading or writing the evidence store. `variant`
- * changes only the audited Rust read set; omitted, this is the exact material gateEvidence keys.
+ * Compute several canonical closure variants from one commit snapshot. Everything except the
+ * audited read set is collected once; overlapping read sets share their object fingerprints.
  */
-export function gateKeyMaterial(project, {
-  env = process.env, root, commit, cargoEnv, spawn = spawnSync, inputs = null, variant = {},
-  boundedSuite = false,
-  britBin = resolveBin('brit', ['BRIT_BIN'], env),
+export function gateKeyMaterials(project, {
+  env = process.env, root, commit, cargoEnv, spawn = spawnSync, inputs = null,
+  variants = [{ name: 'real', variant: {} }], boundedSuite = false,
+  britBin = resolveBin('brit', ['BRIT_BIN'], env), clock = defaultClock, shared = {},
 } = {}) {
-  if (project.run?.kind === 'attested') return { line: 'unavailable (attested project, no local recipe)' };
-  if (!britBin) return { line: 'unavailable (brit not on BRIT_BIN/BRIT_BUILD_REF_BIN or PATH)' };
-  const native = usesNativeClosure(project)
-    ? nativeGateState(project, { root, env, run: spawn, toolchain: cargoEnv?.RUSTUP_TOOLCHAIN, commit }) : undefined;
-  if (native?.miss) return { line: `unavailable (${native.miss})`, dirty: true };
-  const nativeKey = native?.key;
-  // The run's input class (gate-inputs.mjs policy `cls`; LEGACY_ALL until `on` exists).
-  const fp = stepFingerprints(project, commit, { britBin, root, spawn, inputs: inputs?.cls ?? LEGACY_ALL });
-  if (fp.error) return { line: noKeyLine(fp.error, project, root) };
-  const blob = manifestBlob(root, commit, project.manifestPath, spawn);
-  if (!blob) return { line: `unavailable (manifest ${project.manifestPath} absent at ${String(commit).slice(0, 9)})` };
-  const recipe = recipeAt(project, root, commit, spawn);
-  const runner = manifestBlob(root, commit, 'genesis/orchestrator/run-local-gate.sh', spawn);
-  const compilerTools = COMPILER_GATE_INPUTS.map(path => ({ path, oid: manifestBlob(root, commit, path, spawn) }));
-  const dirTree = project.dir === '.'
-    ? gitRead(root, ['rev-parse', `${commit}^{tree}`], spawn)?.trim() || null
-    : projectTree(root, commit, project.dir, spawn);
-  for (const [piece, oid] of Object.entries({ recipeFile: recipe.blob, runner, dirTree })) {
-    if (!oid) return { line: `unavailable (${piece} absent at ${String(commit).slice(0, 9)})` };
-  }
-  const sources = stepSources(project, root, commit, spawn);
-  const tree = gitRead(root, ['rev-parse', `${commit}^{tree}`], spawn)?.trim() || null;
-  if (!tree) return { line: `unavailable (read tree absent at ${String(commit).slice(0, 9)})` };
-  const read = readSetAt(project, root, commit, sources, tree, spawn, variant);
-  // Deliberately conservative tier for gates whose reads cannot be named: eprfs
-  // walks the repository and JS gates read many manifests. Require identical
-  // repository trees and check all checkout dirt, including hook-written ledgers.
-  // A basename read keys on every tracked match at the commit (path + blob), so adding, removing
-  // or editing any one of them moves the key; an unreadable listing falls back to tree scope.
-  const readOid = path => (isReadPattern(path) ? patternDigest(root, commit, path, spawn) : manifestBlob(root, commit, path, spawn));
-  const named = read && read.unresolved.length === 0
-    ? read.paths.map(path => ({ path, oid: readOid(path) })) : null;
-  const reads = named && !named.some(row => isReadPattern(row.path) && row.oid === null)
-    ? { scope: 'paths', oids: named }
-    : { scope: 'tree', oid: tree };
-  const scope = reads.scope === 'paths' ? `paths (${read.paths.length} reads)`
-    : `tree (${read ? 'unresolved' : 'unknown'} reads)`;
-  // The step fingerprint hashes every step source (genesis/orchestrator/**, elohim/eprfs/**, ...),
-  // habit atoms included. A suite whose named half runs in a view of its declared reads cannot read
-  // those bytes, so in paths scope its key leaves the fingerprint out; dirTree, reads, the manifest,
-  // the recipe and the runner name everything the view holds. Tree scope keeps it.
-  // The named half never falls back to the tree: an unreadable listing makes this run neither
-  // recordable nor reusable, with its cause.
-  if (SUITE_READ_LISTS[project.name] && reads.scope !== 'paths') {
-    const cause = read ? 'a declared **/<name> walk could not be listed' : `${SUITE_READ_LISTS[project.name]} is unreadable or not a suite list`;
-    return { line: `unavailable (the named listing at ${String(commit).slice(0, 9)}: ${cause}; nothing is reused or recorded)` };
-  }
+  const started = clock();
+  const timing = {
+    totalMs: 0,
+    readSetAuditSharedMs: 0,
+    readSetAuditMs: Object.fromEntries(variants.map(({ name }) => [name, 0])),
+    fingerprintingMs: 0,
+    suiteInventoryMs: 0,
+    keyCompositionMs: Object.fromEntries(variants.map(({ name }) => [name, 0])),
+  };
+  const timed = (field, run) => {
+    const at = clock();
+    const value = run();
+    timing[field] += elapsedMs(clock, at);
+    return value;
+  };
+  const finish = entries => {
+    timing.totalMs = elapsedMs(clock, started);
+    return { results: entries, timing };
+  };
+  const unavailable = (line, dirty = false) => finish(variants.map(entry => ({
+    ...entry, closure: { line, ...(dirty ? { dirty: true } : {}) },
+  })));
+
+  if (project.run?.kind === 'attested') return unavailable('unavailable (attested project, no local recipe)');
+  if (!britBin) return unavailable('unavailable (brit not on BRIT_BIN/BRIT_BUILD_REF_BIN or PATH)');
+  const common = timed('fingerprintingMs', () => {
+    const native = usesNativeClosure(project)
+      ? nativeGateState(project, { root, env, run: spawn, toolchain: cargoEnv?.RUSTUP_TOOLCHAIN, commit }) : undefined;
+    if (native?.miss) return { error: `unavailable (${native.miss})`, dirty: true };
+    const fp = stepFingerprints(project, commit, { britBin, root, spawn, inputs: inputs?.cls ?? LEGACY_ALL });
+    if (fp.error) return { error: noKeyLine(fp.error, project, root) };
+    const blob = manifestBlob(root, commit, project.manifestPath, spawn);
+    if (!blob) return { error: `unavailable (manifest ${project.manifestPath} absent at ${String(commit).slice(0, 9)})` };
+    const recipe = recipeAt(project, root, commit, spawn);
+    const runner = manifestBlob(root, commit, 'genesis/orchestrator/run-local-gate.sh', spawn);
+    const compilerTools = COMPILER_GATE_INPUTS.map(path => ({ path, oid: manifestBlob(root, commit, path, spawn) }));
+    const dirTree = project.dir === '.'
+      ? gitRead(root, ['rev-parse', `${commit}^{tree}`], spawn)?.trim() || null
+      : projectTree(root, commit, project.dir, spawn);
+    for (const [piece, oid] of Object.entries({ recipeFile: recipe.blob, runner, dirTree })) {
+      if (!oid) return { error: `unavailable (${piece} absent at ${String(commit).slice(0, 9)})` };
+    }
+    const sources = stepSources(project, root, commit, spawn);
+    const tree = gitRead(root, ['rev-parse', `${commit}^{tree}`], spawn)?.trim() || null;
+    if (!tree) return { error: `unavailable (read tree absent at ${String(commit).slice(0, 9)})` };
+    shared.rustc ||= new Map();
+    const rustcCacheKey = JSON.stringify([resolve(root), project.dir, cargoEnv || {}, env.RUSTUP_TOOLCHAIN || null]);
+    if (!shared.rustc.has(rustcCacheKey)) {
+      shared.rustc.set(rustcCacheKey, rustcHash(project, root, env, cargoEnv, spawn));
+    }
+    return {
+      nativeKey: native?.key, fp, blob, recipe, runner, compilerTools, dirTree, sources, tree,
+      cargoConfig: manifestBlob(root, commit, '.cargo/config.toml', spawn),
+      rustc: shared.rustc.get(rustcCacheKey),
+      gitlinks: gitlinksAt(root, commit, sources, spawn),
+      packages: (env.GATE_CARGO_PACKAGES || '').trim().split(/\s+/).filter(Boolean).sort(),
+    };
+  });
+  if (common.error) return unavailable(common.error, common.dirty);
+
+  const audited = readSetsAt(project, root, commit, common.sources, common.tree, spawn, variants, clock);
+  timing.readSetAuditSharedMs += audited.timing.sharedMs;
+  for (const [name, ms] of Object.entries(audited.timing.variantMs)) timing.readSetAuditMs[name] += ms;
+
+  // Deliberately conservative tier for gates whose reads cannot be named: eprfs walks the
+  // repository and JS gates read many manifests. A basename read keys every tracked match.
+  const pathOids = new Map();
+  const fingerprintedReads = new Map();
+  const readsFor = entry => timed('fingerprintingMs', () => {
+    const read = audited.sets.get(entry.name);
+    const signature = JSON.stringify(read);
+    if (fingerprintedReads.has(signature)) return fingerprintedReads.get(signature);
+    const readOid = path => {
+      if (!pathOids.has(path)) {
+        pathOids.set(path, isReadPattern(path)
+          ? patternDigest(root, commit, path, spawn)
+          : manifestBlob(root, commit, path, spawn));
+      }
+      return pathOids.get(path);
+    };
+    const named = read && read.unresolved.length === 0
+      ? read.paths.map(path => ({ path, oid: readOid(path) })) : null;
+    const reads = named && !named.some(row => isReadPattern(row.path) && row.oid === null)
+      ? { scope: 'paths', oids: named }
+      : { scope: 'tree', oid: common.tree };
+    const scope = reads.scope === 'paths' ? `paths (${read.paths.length} reads)`
+      : `tree (${read ? 'unresolved' : 'unknown'} reads)`;
+    const result = { read, reads, scope };
+    fingerprintedReads.set(signature, result);
+    return result;
+  });
+  const byVariant = new Map(variants.map(entry => [entry.name, readsFor(entry)]));
   const suiteNamed = Boolean(SUITE_READ_LISTS[project.name]);
-  // The suite's named half keys on its resolved inventory (every path, mode, type and object id the
-  // view holds, and each pin with its entries), its package closure's file digest and node's
-  // version: the same value suite-run.mjs builds the view from and reports in its result.
+  for (const { name } of variants) {
+    const { read, reads } = byVariant.get(name);
+    if (suiteNamed && reads.scope !== 'paths') {
+      const cause = read ? 'a declared **/<name> walk could not be listed' : `${SUITE_READ_LISTS[project.name]} is unreadable or not a suite list`;
+      return unavailable(`unavailable (the named listing at ${String(commit).slice(0, 9)}: ${cause}; nothing is reused or recorded)`);
+    }
+  }
+
+  // The suite inventory and package closure do not vary with an audit variant.
   let suite = null;
   if (suiteNamed) {
     try {
-      const list = SUITE_READ_LISTS[project.name];
-      const listText = gitRead(root, ['show', `${commit}:${list}`], spawn);
-      const inventory = suiteInventory({
-        root, commit: resolvedCommit(root, commit, spawn), listText, env: gitEnv(),
-        ...(boundedSuite ? { spawn } : {}),
+      suite = timed('suiteInventoryMs', () => {
+        const list = SUITE_READ_LISTS[project.name];
+        const listText = gitRead(root, ['show', `${commit}:${list}`], spawn);
+        const inventory = suiteInventory({
+          root, commit: resolvedCommit(root, commit, spawn), listText, env: gitEnv(),
+          ...(boundedSuite ? { spawn } : {}),
+        });
+        const modules = JSON.parse(listText).modules || {};
+        shared.packageClosures ||= new Map();
+        const packageKey = JSON.stringify(modules);
+        if (!shared.packageClosures.has(packageKey)) {
+          shared.packageClosures.set(packageKey, closureDigest(packageClosure(root, modules), root));
+        }
+        return { inventory: inventory.digest, packages: shared.packageClosures.get(packageKey), node: process.version,
+          commit: inventory.commit, matcher: inventory.matcher };
       });
-      const closure = packageClosure(root, JSON.parse(listText).modules || {});
-      suite = { inventory: inventory.digest, packages: closureDigest(closure, root), node: process.version,
-        commit: inventory.commit, matcher: inventory.matcher };
     } catch (error) {
-      return { line: `unavailable (${String(error?.message || error).split('\n')[0]})` };
+      return unavailable(`unavailable (${String(error?.message || error).split('\n')[0]})`);
     }
   }
-  const material = closureMaterial({
-    project, fingerprints: suiteNamed ? [] : fp.fingerprints, manifestBlob: blob, cargoEnv, nativeKey,
-    recipeFile: recipe.blob, compilerTools, runner, dirTree,
-    cargoConfig: manifestBlob(root, commit, '.cargo/config.toml', spawn),
-    rustc: rustcHash(project, root, env, cargoEnv, spawn),
-    gitlinks: gitlinksAt(root, commit, sources, spawn),
-    packages: (env.GATE_CARGO_PACKAGES || '').trim().split(/\s+/).filter(Boolean).sort(),
-    reads,
-    suite: suite && { inventory: suite.inventory, packages: suite.packages, node: suite.node },
+
+  const results = variants.map(entry => {
+    const { reads, scope } = byVariant.get(entry.name);
+    const at = clock();
+    const material = closureMaterial({
+      project, fingerprints: suiteNamed ? [] : common.fp.fingerprints,
+      manifestBlob: common.blob, cargoEnv, nativeKey: common.nativeKey,
+      recipeFile: common.recipe.blob, compilerTools: common.compilerTools,
+      runner: common.runner, dirTree: common.dirTree, cargoConfig: common.cargoConfig,
+      rustc: common.rustc, gitlinks: common.gitlinks, packages: common.packages, reads,
+      suite: suite && { inventory: suite.inventory, packages: suite.packages, node: suite.node },
+    });
+    const key = createHash('sha256').update(material).digest('hex');
+    timing.keyCompositionMs[entry.name] += elapsedMs(clock, at);
+    return {
+      ...entry,
+      closure: {
+        project: project.name, key, material, britBin,
+        fingerprints: suiteNamed ? [] : common.fp.fingerprints,
+        nativeKey: common.nativeKey, sources: common.sources, recipePath: common.recipe.path,
+        reads, scope,
+        ...(suite ? { suite: { inventory: suite.inventory, packages: suite.packages, node: suite.node,
+          commit: suite.commit, matcher: suite.matcher } } : {}),
+      },
+    };
   });
-  const key = createHash('sha256').update(material).digest('hex');
-  return {
-    project: project.name,
-    key,
-    material,
-    britBin,
-    fingerprints: suiteNamed ? [] : fp.fingerprints,
-    nativeKey,
-    sources,
-    recipePath: recipe.path,
-    reads,
-    scope,
-    ...(suite ? { suite: { inventory: suite.inventory, packages: suite.packages, node: suite.node,
-      commit: suite.commit, matcher: suite.matcher } } : {}),
-  };
+  return finish(results);
+}
+
+/**
+ * Compute the canonical closure material without reading or writing the evidence store. `variant`
+ * changes only the audited Rust read set; omitted, this is the exact material gateEvidence keys.
+ */
+export function gateKeyMaterial(project, options = {}) {
+  const { variant = {}, ...sharedOptions } = options;
+  return gateKeyMaterials(project, {
+    ...sharedOptions, variants: [{ name: 'real', variant }],
+  }).results[0].closure;
 }
 
 /**
