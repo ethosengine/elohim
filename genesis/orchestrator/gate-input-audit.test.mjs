@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, readdirSync } from 'fs';
 import { dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
@@ -375,6 +376,61 @@ test('the nearest Cargo.toml wins inside a nested workspace', () => {
   assert.deepEqual(rows, [{ file: nested, line: 1, path: 'shared/data.json', how: 'include_str' }]);
 });
 
+test('fix 1 excludes dependency crate tests and keeps the gate own crate tests', () => {
+  const files = {
+    'apps/gate/Cargo.toml': '[package]',
+    'apps/gate/tests/own.rs': 'include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/../../shared/own.json"));',
+    'crates/dependency/Cargo.toml': '[package]',
+    'crates/dependency/tests/dependency.rs': 'include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/../../shared/dependency.json"));',
+  };
+  const options = {
+    root,
+    project: { name: 'gate', dir: 'apps/gate' },
+    sources: ['apps/gate/**', 'crates/dependency/**'],
+    listFiles: () => Object.keys(files),
+    readFile: path => {
+      const rel = path.slice(root.length + 1);
+      if (Object.hasOwn(files, rel)) return files[rel];
+      throw Object.assign(new Error(`missing ${path}`), { code: 'ENOENT' });
+    },
+  };
+  assert.deepEqual(readSet(options).paths, ['shared/dependency.json', 'shared/own.json']);
+  assert.deepEqual(readSet({ ...options, variant: { excludeDependencyTests: true } }), {
+    paths: ['shared/own.json'], unresolved: [],
+  });
+});
+
+test('fix 2 resolves a manifest_store-style format join to its literal directory', () => {
+  const manifestStore = 'elohim/eprfs/device-runtime/tests/manifest_store.rs';
+  const files = {
+    'elohim/eprfs/device-runtime/Cargo.toml': '[package]',
+    [manifestStore]: 'std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join(format!("../../sdk/schemas/v1/views/{name}.schema.json")));',
+  };
+  const options = {
+    root, project: { name: 'gate', dir: 'elsewhere' }, sources: ['elohim/eprfs/**'],
+    listFiles: () => Object.keys(files),
+    readFile: path => {
+      const rel = path.slice(root.length + 1);
+      if (Object.hasOwn(files, rel)) return files[rel];
+      throw Object.assign(new Error(`missing ${path}`), { code: 'ENOENT' });
+    },
+  };
+  assert.deepEqual(readSet(options), { paths: ['elohim/eprfs/device-runtime'], unresolved: [] });
+  assert.deepEqual(readSet({ ...options, variant: { resolveFormatJoin: true } }), {
+    paths: ['elohim/sdk/schemas/v1/views'], unresolved: [],
+  });
+  for (const unchanged of [
+    'Path::new(env!("CARGO_MANIFEST_DIR")).join(format!("{name}.json"));',
+    'Path::new(env!("CARGO_MANIFEST_DIR")).join(format!("../../../../outside/{name}.json"));',
+  ]) {
+    files[manifestStore] = unchanged;
+    assert.deepEqual(
+      readSet({ ...options, variant: { resolveFormatJoin: true } }),
+      readSet(options),
+    );
+  }
+});
+
 test('comments and embedded source strings are not scanned as code', () => {
   assert.deepEqual(audit(`// include_str!("../../../missing")
 /* nested /* include_bytes!("missing") */ comment */
@@ -463,6 +519,20 @@ function realReadSet(name) {
     sources: [...new Set(project.steps.flatMap(step => manifest.steps[step].inputs.sources))],
   });
 }
+
+test('default read-set options preserve the five device-runtime gate outputs byte for byte', () => {
+  const expected = new Map([
+    ['elohim-storage', '1d3493b06b9424cb5bf49c60aeec457f5fcabea8ae32c0f85eac04f0b23ca0be'],
+    ['steward-node', '0f30099c6fc559d0d97cc5cad214e0bf7387298882ae63335867f20bd213cae2'],
+    ['elohim-ark', '71d683c1c9c4e64a855d0372e743e96776a30642c8f49b30120a192e516fa190'],
+    ['cargo-bridge', '5a3fefca8e5a73b1e59602927b5fdfab69dc76055ab51d1f98359fd2295ed848'],
+    ['jenkins-bridge', 'cdffd3ffdf8e6976abdf6e95b3c0b6d869596d016341d27498a9d2e64eff53fd'],
+  ]);
+  for (const [name, digest] of expected) {
+    const bytes = JSON.stringify(realReadSet(name));
+    assert.equal(createHash('sha256').update(bytes).digest('hex'), digest, name);
+  }
+});
 
 test('REAL eprfs names its governance walk as the .epr-meta file kind, not the whole repository', () => {
   const result = realReadSet('eprfs');
