@@ -20,7 +20,7 @@ use crate::error::PeerError;
 use crate::fold::RefusedCrossing;
 use crate::head::{ChannelHead, HeadSigner};
 use crate::head_table::{
-    ChannelCounters, DeviceHead, HeadTable, NackLeaf, OwnAnnounce, OWN_LOG_LEN,
+    ChannelCounters, DeviceHead, FoldCoverage, HeadTable, NackLeaf, OwnAnnounce, OWN_LOG_LEN,
 };
 
 /// How long a change waits for others before it is announced.
@@ -227,6 +227,7 @@ impl Channel {
         &mut self,
         head: &ChannelHead,
         appended: u64,
+        coverage: Option<FoldCoverage>,
         nack: NackLeaf,
         folded_at: u64,
         now: Instant,
@@ -234,6 +235,13 @@ impl Channel {
         let previous = self.table.devices.get(&head.device);
         let moved = previous.is_none_or(|previous| previous.root != head.root);
         let events_folded = previous.map_or(0, |previous| previous.events_folded) + appended;
+        // An unchanged-root announcement names the same complete event set, so retain its prefix.
+        // A moved root receives coverage only from the successful fold that verified it.
+        let coverage = coverage.or_else(|| {
+            previous
+                .filter(|previous| previous.root == head.root)
+                .and_then(|previous| previous.coverage)
+        });
         self.table.devices.insert(
             head.device.clone(),
             DeviceHead {
@@ -244,6 +252,7 @@ impl Channel {
                 folded_at,
                 events_folded,
                 nack,
+                coverage,
             },
         );
         if moved {

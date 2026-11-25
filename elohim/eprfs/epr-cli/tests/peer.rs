@@ -22,7 +22,7 @@ use elohim_epr_rea::{
 };
 use eprfs_peer::{
     fold_events, project_channel, via_device, ChannelEvent, CrossingAllowList, DeviceHead,
-    HeadTable, PeerConfig, PeerDaemon, PeerKey, Rules, RulesState, StorePlace,
+    FoldCoverage, HeadTable, PeerConfig, PeerDaemon, PeerKey, Rules, RulesState, StorePlace,
 };
 use tempfile::TempDir;
 
@@ -328,6 +328,7 @@ async fn flow_fold_folds_a_devices_channel_root_once_and_status_reads_it() {
             folded_at: 1,
             events_folded: 1,
             nack: Default::default(),
+            coverage: None,
         },
     );
     // Connections A refused: three of B's (say after a Contest), and strangers' in one total.
@@ -395,6 +396,10 @@ async fn flow_fold_folds_a_devices_channel_root_once_and_status_reads_it() {
     let text = String::from_utf8_lossy(&text.stdout).to_string();
     assert!(text.contains("artifact gate since"), "{text}");
     assert!(text.contains("head seq 4"), "{text}");
+    assert!(
+        text.contains("fold coverage unavailable; sibling events use legacy unbounded replay"),
+        "{text}"
+    );
     assert!(text.contains("refused connections"), "{text}");
     assert!(text.contains(": 3"), "{text}");
     assert!(text.contains("strangers: 2"), "{text}");
@@ -409,6 +414,20 @@ async fn flow_fold_folds_a_devices_channel_root_once_and_status_reads_it() {
             &b_did[b_did.len() - 4..]
         )),
         "{text}"
+    );
+
+    // The one B event starts at offset 0. A valid zero-length completed prefix leaves it beyond
+    // head 4, and status names that incomplete fold instead of counting the event in readers.
+    table.devices.get_mut(&b_did).unwrap().coverage = Some(FoldCoverage {
+        events: 0,
+        log_offset: 0,
+    });
+    table.save(&a.peer_dir()).unwrap();
+    let incomplete = a.epr(&["peer", "status", "--root", a.root()]);
+    let incomplete = String::from_utf8_lossy(&incomplete.stdout);
+    assert!(
+        incomplete.contains("events beyond head 4 not counted: fold incomplete"),
+        "{incomplete}"
     );
 
     // Nothing printed carries the peer key.
@@ -1769,6 +1788,7 @@ fn save_served_table(device: &Device, root: &Path, sibling: Option<(&str, u64)>)
                 folded_at,
                 events_folded: 1,
                 nack: Default::default(),
+                coverage: None,
             },
         );
     }

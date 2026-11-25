@@ -15,6 +15,12 @@
 //! generation it ends. A lease with a ttl stops binding `ttl_s` after it was claimed or last
 //! renewed. Leases folded from a device the roster no longer admits are ignored entirely (spec
 //! §3.1): a revoked device cannot keep a resource pinned, and it is not a device to wait for.
+//! For an admitted sibling, only records whose JSONL line starts inside that sender's last
+//! complete-fold coverage in [`HeadTable`] are replayed. An earlier incomplete fold's records
+//! become covered when a later complete fold advances the prefix. Own-device records are always
+//! covered. Missing, malformed, or inapplicable coverage preserves the former behavior exactly:
+//! every locally present sibling record is replayed; `epr peer status` names that legacy fallback.
+//! Older epr builds ignore the additive head-table field and therefore keep that former behavior.
 //!
 //! Per resource, this device's own live lease is held unless another device's live lease
 //! precedes it. A claim *saw* another lease when it was written with that lease already known:
@@ -66,13 +72,13 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use cid::Cid;
-use elohim_epr_rea::{FlowEvent, FlowStore};
+use elohim_epr_rea::{FlowEvent, FlowRecord, SidecarFlowStore};
 use serde::Serialize;
 
 use crate::admission::Admission;
 use crate::allow::{single_slot, slots, via_device, KIND_SLOT, MEASURE_SLOT};
 use crate::error::PeerError;
-use crate::head_table::{HeadTable, OwnAnnounce};
+use crate::head_table::{DeviceHead, HeadTable, OwnAnnounce};
 use crate::steward_scope::Settlement;
 
 /// The measure berth records are folded under (T1).
@@ -255,6 +261,10 @@ pub struct LeaseStore {
     pub own: Vec<LeaseEvent>,
     pub folded: Vec<LeaseEvent>,
     pub events: Vec<Cid>,
+    event_offsets: Vec<Option<u64>>,
+    record_offsets: BTreeSet<u64>,
+    via_offsets: BTreeMap<String, Vec<u64>>,
+    log_end: Option<u64>,
 }
 
 impl LeaseStore {
@@ -262,16 +272,49 @@ impl LeaseStore {
     pub fn from_events(events: impl IntoIterator<Item = (Cid, FlowEvent)>) -> LeaseStore {
         let mut store = LeaseStore::default();
         for (written, (cid, event)) in (1u64..).zip(events) {
-            store.events.push(cid);
-            if let Some(lease) = LeaseEvent::from_event(&event, written) {
-                if lease.via.is_some() {
-                    store.folded.push(lease);
-                } else {
-                    store.own.push(lease);
-                }
-            }
+            store.push_event(written, None, cid, event);
         }
         store
+    }
+
+    /// One captured sidecar prefix. Each tuple's offset is the start of that record's JSONL line;
+    /// `log_end` is immediately after the prefix.
+    pub fn from_records_with_offsets(
+        log_end: u64,
+        records: impl IntoIterator<Item = (u64, Cid, FlowRecord)>,
+    ) -> LeaseStore {
+        let mut store = LeaseStore {
+            log_end: Some(log_end),
+            ..LeaseStore::default()
+        };
+        let mut written = 0_u64;
+        for (offset, cid, record) in records {
+            store.record_offsets.insert(offset);
+            let FlowRecord::Event(event) = record else {
+                continue;
+            };
+            written = written.saturating_add(1);
+            store.push_event(written, Some(offset), cid, event);
+        }
+        store
+    }
+
+    fn push_event(&mut self, written: u64, offset: Option<u64>, cid: Cid, event: FlowEvent) {
+        if let (Some(offset), Some(device)) = (offset, via_device(&event)) {
+            self.via_offsets
+                .entry(device.to_string())
+                .or_default()
+                .push(offset);
+        }
+        self.events.push(cid);
+        self.event_offsets.push(offset);
+        if let Some(lease) = LeaseEvent::from_event(&event, written) {
+            if lease.via.is_some() {
+                self.folded.push(lease);
+            } else {
+                self.own.push(lease);
+            }
+        }
     }
 
     /// Whether `logged` counted this store: the store holds the event it names at the position
@@ -286,6 +329,65 @@ impl LeaseStore {
             (_, None) => false,
         }
     }
+
+    fn valid_coverage_offset(&self, device: &str, head: &DeviceHead) -> Option<u64> {
+        let coverage = head.coverage?;
+        let log_end = self.log_end?;
+        let boundary = coverage.log_offset;
+        if boundary > log_end || (boundary != log_end && !self.record_offsets.contains(&boundary)) {
+            return None;
+        }
+        let offsets = self.via_offsets.get(device).map_or(&[][..], Vec::as_slice);
+        let covered = offsets.partition_point(|offset| *offset < boundary);
+        (u64::try_from(covered).ok() == Some(coverage.events)).then_some(boundary)
+    }
+
+    fn folded_event_is_covered(&self, event: &LeaseEvent, heads: &HeadTable) -> bool {
+        let Some(device) = event.via.as_deref() else {
+            return true;
+        };
+        let Some(boundary) = heads
+            .devices
+            .get(device)
+            .and_then(|head| self.valid_coverage_offset(device, head))
+        else {
+            // No usable coverage is the compatibility mode: replay exactly as older readers did.
+            return true;
+        };
+        usize::try_from(event.written.saturating_sub(1))
+            .ok()
+            .and_then(|index| self.event_offsets.get(index))
+            .and_then(|offset| *offset)
+            .is_some_and(|offset| offset < boundary)
+    }
+
+    /// Whether locally present events from `device` are all inside its recorded complete fold.
+    pub fn fold_coverage(&self, device: &str, head: &DeviceHead) -> FoldCoverageState {
+        let Some(boundary) = self.valid_coverage_offset(device, head) else {
+            return FoldCoverageState::Legacy;
+        };
+        if self
+            .via_offsets
+            .get(device)
+            .is_some_and(|offsets| offsets.iter().any(|offset| *offset >= boundary))
+        {
+            FoldCoverageState::Incomplete
+        } else {
+            FoldCoverageState::Complete
+        }
+    }
+}
+
+/// How a reader can use one sibling's locally present events.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum FoldCoverageState {
+    /// Every locally present event is inside the recorded complete fold.
+    Complete,
+    /// Later events exist but are ignored until a fold completes.
+    Incomplete,
+    /// Coverage is absent or unreadable; preserve the former unbounded replay behavior.
+    Legacy,
 }
 
 /// `store`'s lease records and event CIDs.
@@ -293,12 +395,11 @@ impl LeaseStore {
 /// # Errors
 ///
 /// [`PeerError::FlowStore`] when the store cannot be read.
-pub fn lease_events<S>(store: &S) -> Result<LeaseStore, PeerError>
-where
-    S: FlowStore + ?Sized,
-{
-    Ok(LeaseStore::from_events(
-        store.events().map_err(PeerError::FlowStore)?,
+pub fn lease_events(store: &SidecarFlowStore) -> Result<LeaseStore, PeerError> {
+    let prefix = store.records_with_offsets().map_err(PeerError::FlowStore)?;
+    Ok(LeaseStore::from_records_with_offsets(
+        prefix.end_offset,
+        prefix.records,
     ))
 }
 
@@ -548,7 +649,12 @@ pub fn steward_lease_view(
     let mut by_device: BTreeMap<&str, Vec<&LeaseEvent>> = BTreeMap::new();
     for event in &store.folded {
         // A contested or unknown device's leases are ignored entirely.
-        if let Some(device) = event.via.as_deref().filter(|d| others.contains(d)) {
+        if let Some(device) = event
+            .via
+            .as_deref()
+            .filter(|d| others.contains(d))
+            .filter(|_| store.folded_event_is_covered(event, heads))
+        {
             by_device.entry(device).or_default().push(event);
         }
     }
@@ -687,7 +793,12 @@ pub fn other_devices(
         .collect();
     let mut by_device: BTreeMap<&str, Vec<&LeaseEvent>> = BTreeMap::new();
     for event in &store.folded {
-        if let Some(device) = event.via.as_deref().filter(|d| others.contains_key(*d)) {
+        if let Some(device) = event
+            .via
+            .as_deref()
+            .filter(|d| others.contains_key(*d))
+            .filter(|_| store.folded_event_is_covered(event, heads))
+        {
             by_device.entry(device).or_default().push(event);
         }
     }
