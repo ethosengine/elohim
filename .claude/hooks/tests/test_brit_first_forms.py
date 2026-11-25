@@ -59,4 +59,5 @@ class BritHook(unittest.TestCase):
  def test_fallback_still_passes(self):
   event={'tool_name':'Bash','tool_input':{'command':'# Brit fallback: installed Brit lacks stash\ngit stash'}}
   self.assertNotIn('permissionDecision',hook.evaluate(event))
-unittest.main()
+if __name__=='__main__':
+ unittest.main()
