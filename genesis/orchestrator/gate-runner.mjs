@@ -762,7 +762,7 @@ function crateKeyContext({ root, project, cargo, metadata, commit, childEnv, rea
   // be recorded under a key for code that never ran, so no crate row is written at all.
   const head = run('crate context', 'git', ['rev-parse', '--verify', '--quiet', 'HEAD^{commit}'], { cwd: root, encoding: 'utf8' });
   if (head?.status !== 0 || String(head.stdout || '').trim() !== commit) return null;
-  const repoPath = path => relative(root, resolve(path)).split('\\').join('/') || '.';
+  const repoPath = path => relative(root, resolve(root, path)).split('\\').join('/') || '.';
   const memberIds = new Set(metadata.workspace_members || []);
   const members = (metadata.packages || [])
     .filter(pkg => memberIds.has(pkg.id))
@@ -777,13 +777,45 @@ function crateKeyContext({ root, project, cargo, metadata, commit, childEnv, rea
     const result = run(phase, 'git', ['rev-parse', '--verify', '--quiet', `${commit}:${path}`], {
       cwd: root, encoding: 'utf8',
     });
-    return result?.status === 0 ? String(result.stdout || '').trim() || null : null;
+    if (result?.status === 1) return null;
+    if (result?.status !== 0) throw new Error(`git object read failed for ${path}`);
+    const oid = String(result.stdout || '').trim();
+    if (!oid) throw new Error(`git object read returned no oid for ${path}`);
+    return oid;
   };
   const workspace = cargo.workspace || project.dir;
-  const lockPath = `${workspace.replace(/\/$/, '')}/Cargo.lock`;
+  const workspaceRepoDir = repoPath(workspace.replace(/\/$/, ''));
+  const repoFile = (dir, path) => dir === '.' ? path : `${dir}/${path}`;
+  const lockPath = repoFile(workspaceRepoDir, 'Cargo.lock');
   const lock = run('crate context', 'git', ['show', `${commit}:${lockPath}`], { cwd: root, encoding: 'utf8' });
   if (lock?.status !== 0) return null;
   const lockDigest = createHash('sha256').update(String(lock.stdout || '')).digest('hex');
+  const configNames = [
+    '.cargo/config.toml', '.cargo/config', 'clippy.toml', '.clippy.toml',
+    'rustfmt.toml', '.rustfmt.toml', 'rust-toolchain', 'rust-toolchain.toml',
+  ];
+  const configDirs = [];
+  for (let dir = workspaceRepoDir; ; dir = dirname(dir)) {
+    if (dir.startsWith('..')) throw new Error(`workspace is outside the repository: ${workspace}`);
+    configDirs.push(dir);
+    if (dir === '.') break;
+  }
+  const digestObjects = paths => createHash('sha256').update(JSON.stringify(paths.map(path => ({
+    path,
+    oid: objectAt(path),
+  })))).digest('hex');
+  const workspaceConfigDigest = digestObjects([
+    repoFile(workspaceRepoDir, 'Cargo.toml'),
+    ...configDirs.flatMap(dir => configNames.map(path => repoFile(dir, path))),
+  ]);
+  // Deliberately coarse: the project key already treats any root justfile edit as recipe identity,
+  // so every crate step does too rather than attempting to parse one recipe's command body.
+  const recipeDigest = digestObjects([
+    'justfile',
+    'genesis/orchestrator/gate-steps.sh',
+    'genesis/orchestrator/cargo-lint.mjs',
+    'genesis/orchestrator/run-local-gate.sh',
+  ]);
   const readPaths = new Set();
   for (const member of members) {
     budget.check('read set');
@@ -811,6 +843,8 @@ function crateKeyContext({ root, project, cargo, metadata, commit, childEnv, rea
     toolchain: metadataToolchain(metadata),
     lockDigest,
     outsideReadsDigest,
+    workspaceConfigDigest,
+    recipeDigest,
     cargoEnv: { ...cargoEnvOf(childEnv), RUSTFLAGS: rustflags },
     budget,
   };

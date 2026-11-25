@@ -329,7 +329,8 @@ describe('gate step reading collector', () => {
         env: {}, collector,
         crateContext: {
           metadata, treeOf: () => 'tree', toolchain: 'toolchain', lockDigest: 'lock',
-          outsideReadsDigest: 'reads', cargoEnv: {},
+          outsideReadsDigest: 'reads', workspaceConfigDigest: 'workspace-config',
+          recipeDigest: 'recipe', cargoEnv: {},
         },
       });
     const crateRows = collector.filter(row => row.parent?.split(':').length === 2);
@@ -355,7 +356,8 @@ describe('gate step reading collector', () => {
           if (trees === 2) throw new Error('second-step tree failed');
           return 'tree';
         },
-        toolchain: 'toolchain', lockDigest: 'lock', outsideReadsDigest: 'reads', cargoEnv: {},
+        toolchain: 'toolchain', lockDigest: 'lock', outsideReadsDigest: 'reads',
+        workspaceConfigDigest: 'workspace-config', recipeDigest: 'recipe', cargoEnv: {},
       },
     });
     assert.equal(collector.filter(row => row.parent?.split(':').length === 2).length, 0);
@@ -494,6 +496,27 @@ describe('gate step reading collector', () => {
       assert.equal(listings.length, 1, 'one listing serves selection and the crate context');
       assert.ok(Number.isInteger(listings[0].options.timeout) && listings[0].options.timeout <= 60_000,
         'the listing subprocess carries the remaining budget as its timeout');
+    } finally {
+      rmSync(result.root, { recursive: true, force: true });
+    }
+  });
+
+  test('crate context reads workspace and recipe configuration through budgeted git calls', () => {
+    const result = timedCrateRun({ budgetMs: 60_000, cargoAdvanceNs: 0n });
+    try {
+      const commit = 'a'.repeat(40);
+      const objectCalls = result.calls.filter(call =>
+        call.command === 'git' && call.args[0] === 'rev-parse' && String(call.args.at(-1)).startsWith(`${commit}:`));
+      const objects = objectCalls.map(call => call.args.at(-1));
+      for (const path of [
+        'ws/Cargo.toml', 'ws/.cargo/config.toml', '.cargo/config.toml',
+        'justfile', 'genesis/orchestrator/gate-steps.sh',
+        'genesis/orchestrator/cargo-lint.mjs', 'genesis/orchestrator/run-local-gate.sh',
+      ]) {
+        assert.ok(objects.includes(`${commit}:${path}`), path);
+      }
+      assert.ok(objectCalls.every(call => Number.isInteger(call.options.timeout) && call.options.timeout > 0),
+        'every object read uses the shared shadow budget');
     } finally {
       rmSync(result.root, { recursive: true, force: true });
     }
