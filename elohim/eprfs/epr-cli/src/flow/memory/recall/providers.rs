@@ -241,8 +241,9 @@ pub fn bounded_command(
         if began.elapsed().as_secs_f64() >= seconds {
             reason = Some("provider timed out".to_string());
             #[cfg(unix)]
-            // SAFETY: this child was spawned in its own process group above. Killing the
-            // group also closes inherited pipes held by descendants after the child exits.
+            // SAFETY: this child was spawned in its own process group above. This kills that
+            // group; a descendant that created another session may survive, so the pipe readers
+            // below must also be abandoned rather than joined past the deadline.
             unsafe {
                 libc::kill(-(child.id() as i32), libc::SIGKILL);
             }
@@ -253,10 +254,20 @@ pub fn bounded_command(
         std::thread::sleep(Duration::from_millis(10));
     }
     if let Some(handle) = in_handle {
-        let _ = handle.join();
+        if reason.is_none() || handle.is_finished() {
+            let _ = handle.join();
+        }
     }
-    let stdout = out_handle.join().unwrap_or_default();
-    let stderr = err_handle.join().unwrap_or_default();
+    let stdout = if reason.is_some() && !out_handle.is_finished() {
+        Vec::new()
+    } else {
+        out_handle.join().unwrap_or_default()
+    };
+    let stderr = if reason.is_some() && !err_handle.is_finished() {
+        Vec::new()
+    } else {
+        err_handle.join().unwrap_or_default()
+    };
     if reason.is_none() && stdout.len() + stderr.len() > output_limit {
         reason = Some("provider output exceeds budget; results withheld".into());
     }

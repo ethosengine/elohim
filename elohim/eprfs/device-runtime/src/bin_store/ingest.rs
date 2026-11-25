@@ -11,6 +11,18 @@ impl Store {
     /// Copy to private staging, verify those exact bytes, then atomically publish a candidate.
     /// Ingest never moves current, even if the candidate passed a gate.
     pub fn ingest(&self, source: &Path, options: &IngestOptions) -> Result<Release> {
+        self.ingest_with_payload_formats(source, options, |_| None)
+    }
+
+    /// Ingest, then derive a payload-format statement from the primary executable held beneath
+    /// its release CID. The callback may copy and execute those bytes elsewhere, but never sees
+    /// the mutable source pathname. Explicit producer statements bypass the callback.
+    pub fn ingest_with_payload_formats(
+        &self,
+        source: &Path,
+        options: &IngestOptions,
+        probe: impl FnOnce(&Path) -> Option<String>,
+    ) -> Result<Release> {
         // Closure provenance travels with the bytes; caller overrides never relabel it.
         let closure_options;
         let options = if options.closure {
@@ -152,6 +164,14 @@ impl Store {
                     0o444,
                 )?;
             }
+            let probed_payload_formats = if options.payload_formats.is_none() {
+                self.config
+                    .bins
+                    .first()
+                    .and_then(|name| probe(&artifact.join(name)))
+            } else {
+                None
+            };
             let provenance = Provenance {
                 source_commit: commit,
                 tree_clean: clean,
@@ -192,7 +212,11 @@ impl Store {
             ) {
                 release.ring = "dev-context".into();
             }
-            if let Some(statement) = options.payload_formats.as_deref() {
+            if let Some(statement) = options
+                .payload_formats
+                .as_deref()
+                .or(probed_payload_formats.as_deref())
+            {
                 parse_payload_formats(Some(statement))
                     .map_err(|detail| Refusal::new("payload-format-statement-invalid", detail))?;
                 if let Some(held) = release
