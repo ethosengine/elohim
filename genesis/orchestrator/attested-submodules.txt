@@ -1,0 +1,6 @@
+# One path per line. The submodules whose manifests declare attested gate projects.
+# Read by .husky/pre-push.bash (must be checked out before any gate) and by
+# genesis/orchestrator/gate-preflight.mjs ATTESTED_SUBMODULES (and so by worktree-prep.mjs).
+elohim/brit
+elohim/rakia
+sophia

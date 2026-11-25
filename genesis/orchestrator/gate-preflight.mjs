@@ -39,7 +39,10 @@ const ROOT = process.env.GATE_ROOT
   : resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
 /** Submodules whose manifests declare attested gate projects; without them the registry is short. */
-export const ATTESTED_SUBMODULES = ['elohim/brit', 'elohim/rakia', 'sophia'];
+// gate-reads: genesis/orchestrator/attested-submodules.txt
+// The list is a file so the pre-push hook (bash) and this module cannot drift apart.
+export const ATTESTED_SUBMODULES = readFileSync(new URL('./attested-submodules.txt', import.meta.url), 'utf8')
+  .split('\n').map(line => line.trim()).filter(line => line && !line.startsWith('#'));
 
 /**
  * Projects whose Rust read set must be fully named (gate-input-audit.test.mjs `REAL … read set`).

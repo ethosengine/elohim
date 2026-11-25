@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Execute the preflight's setup cures; the preflight remains the readiness authority.
 import { spawnSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { projectsForChanges } from './gate-runner.mjs';
@@ -99,6 +99,24 @@ export function pinSource(module, pin, { candidates, spawn = spawnSync, exists =
   return null;
 }
 
+/**
+ * Whether the work in this worktree needs `module`. The attested submodules (the list the pre-push
+ * hook refuses without) always; any other only when a selected project reads it: the orchestrator
+ * gate's suite view reads every declared pin, and a project's manifest may name a submodule as a
+ * step source. Null `projects` (selection unavailable) means needed, as before.
+ */
+export function neededSubmodule(module, projects, { read = readFileSync, root = ROOT } = {}) {
+  if (ATTESTED_SUBMODULES.includes(module) || !projects) return true;
+  if (projects.some(project => project.name === 'orchestrator')) return true;
+  return projects.some(project => {
+    try {
+      const manifest = JSON.parse(String(read(join(root, project.dir, 'build-manifest.json'), 'utf8')));
+      return Object.values(manifest.steps || {}).some(step =>
+        (step?.inputs?.sources || []).some(source => source === module || source.startsWith(`${module}/`)));
+    } catch { return false; }
+  });
+}
+
 function noSource(module, pin, candidates) {
   return new Error(`${module}: no local checkout holds the pinned commit ${pin.slice(0, 12)} ` +
     `(tried ${candidates.length ? candidates.join(', ') : 'none'}); fetch it from the remote with ` +
@@ -150,8 +168,20 @@ export function prep({ root = ROOT, spawn = spawnSync, exists = existsSync,
     // The orchestrator gate's view also reads the submodules its read list declares. Bring each into
     // an object store unless its pinned commit is already readable (brit's store is several GB: never
     // clone what is there). The attested three are handled above and by the moved-pin step below.
+    // Selection is read here only to learn which declared submodules the work needs; it is
+    // computed once and the later log line reuses it. A failure leaves every one needed.
+    let early = null;
+    try { early = select(root, currentChanges({ root, spawn })); } catch { early = null; }
     for (const { path: module, oid, store } of declaredPins({ root })) {
       if (store || ATTESTED_SUBMODULES.includes(module)) continue;
+      if (!neededSubmodule(module, early, { root })) {
+        // Not needed and held by no local checkout: never fetch; leave it uninitialised.
+        const holders = [main, ...others()].filter(Boolean);
+        if (!pinSource(module, oid, { candidates: holders, spawn, exists })) {
+          log(`[prep] ${module}: not needed for this worktree and not present locally; left uninitialised`);
+          continue;
+        }
+      }
       log(`[prep] ${module}: pin ${oid.slice(0, 12)} is in no object store here; initializing it`);
       initModule(module);
     }
@@ -198,7 +228,7 @@ export function prep({ root = ROOT, spawn = spawnSync, exists = existsSync,
 
     // Load the registry only after the submodules exist: they own attested manifests.
     const changed = currentChanges({ root, spawn });
-    const projects = select(root, changed);
+    const projects = early ?? select(root, changed);
     log(`[prep] selected projects: ${projects.map(project => project.name).join(' ') || '(none)'}`);
     for (const check of distChecks) {
       // Re-evaluate after each cure: one library build can satisfy another prerequisite.

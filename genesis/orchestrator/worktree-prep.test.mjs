@@ -4,7 +4,7 @@ import { spawnSync } from 'node:child_process';
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { currentChanges, mainCheckout, prep, submoduleCommand } from './worktree-prep.mjs';
+import { currentChanges, mainCheckout, neededSubmodule, prep, submoduleCommand } from './worktree-prep.mjs';
 import { ATTESTED_SUBMODULES, runPreflight, WORKSPACE_INSTALL } from './gate-preflight.mjs';
 
 const ok = stdout => ({ status: 0, stdout: stdout || '' });
@@ -323,4 +323,67 @@ test('declared submodules: prep initializes one whose pin is in no store and ski
   const clones = f.calls.filter(([cmd, arg]) => cmd === 'git' && arg === '-c').map(call => call.at(-1));
   assert.deepEqual(clones, [...ATTESTED_SUBMODULES, 'elohim/holochain-conductor'], 'the attested three as before, then the absent declared one');
   assert.match(f.logs.join('\n'), /elohim\/holochain-conductor: pin aaaaaaaaaaaa is in no object store here/);
+});
+
+// Needed vs not needed: a declared pin whose objects no local checkout holds.
+const CHE = 'che-devworkspaces', COND = 'elohim/holochain-conductor';
+function neededFixture(t, { selected, heldBy = {}, failModules = [] }) {
+  const f = fixture(t);
+  f.options.select = () => selected;
+  f.options.declaredPins = () => [CHE, COND].map(path => ({ path, oid: 'b'.repeat(40), store: null }));
+  const inner = f.options.spawn;
+  f.options.spawn = (command, args, options) => {
+    if (command === 'git' && args.includes('cat-file')) {
+      // `git -C <checkout>/<module> cat-file -e <pin>^{commit}`: held only where the fixture says.
+      const dir = args[args.indexOf('-C') + 1];
+      return { status: Object.keys(heldBy).some(module => dir.endsWith(`/${module}`) && heldBy[module]) ? 0 : 1 };
+    }
+    if (command === 'git' && args.includes('ls-tree')) return ok(`160000 commit ${'b'.repeat(40)}\t${args.at(-1)}\n`);
+    if (command === 'git' && args[0] === '-c' && failModules.includes(args.at(-1))) return { status: 1, stderr: 'unable to read tree' };
+    return inner(command, args, options);
+  };
+  return f;
+}
+const cloned = f => f.calls.filter(([cmd, arg]) => cmd === 'git' && arg === '-c').map(call => call.at(-1));
+
+test('not needed and held by no local checkout: one line, no clone, no fetch, install and hook check still run', t => {
+  const f = neededFixture(t, { selected: [] });
+  assert.equal(prep(f.options), 0, f.logs.join('\n'));
+  const out = f.logs.join('\n');
+  assert.match(out, new RegExp(`\\[prep\\] ${CHE}: not needed for this worktree and not present locally; left uninitialised`));
+  assert.match(out, new RegExp(`\\[prep\\] ${COND}: not needed for this worktree and not present locally; left uninitialised`));
+  assert.deepEqual(cloned(f), [...ATTESTED_SUBMODULES]);
+  assert.ok(f.calls.some(([cmd, arg]) => cmd === 'pnpm' && arg === 'install'), 'pnpm install ran');
+  assert.ok(f.calls.some(([cmd]) => cmd === 'test'), 'hook check ran');
+  assert.ok(!f.calls.some(call => call.includes('fetch')), 'nothing fetched');
+});
+
+test('needed (a selected project names it) and held by no local checkout: REFUSED as before', t => {
+  const f = neededFixture(t, { selected: [{ name: 'orchestrator', dir: 'genesis/orchestrator' }], failModules: [CHE] });
+  assert.equal(prep(f.options), 1);
+  assert.match(f.logs.join('\n'), new RegExp(`REFUSED: ${CHE}: no local checkout holds the pinned commit bbbbbbbbbbbb`));
+  assert.doesNotMatch(f.logs.join('\n'), /not needed for this worktree/);
+});
+
+test('not needed but available locally is initialised as today', t => {
+  const f = neededFixture(t, { selected: [], heldBy: { [CHE]: true, [COND]: true } });
+  assert.equal(prep(f.options), 0, f.logs.join('\n'));
+  assert.deepEqual(cloned(f), [...ATTESTED_SUBMODULES, CHE, COND]);
+  assert.doesNotMatch(f.logs.join('\n'), /left uninitialised/);
+});
+
+test('neededSubmodule: attested always; a manifest step source names it; otherwise not', () => {
+  const read = () => JSON.stringify({ steps: { build: { inputs: { sources: [COND] } } } });
+  assert.equal(neededSubmodule('sophia', [], { read }), true);
+  assert.equal(neededSubmodule(COND, [{ name: 'conductor-image', dir: 'elohim/conductor-image' }], { read }), true);
+  assert.equal(neededSubmodule(CHE, [{ name: 'conductor-image', dir: 'elohim/conductor-image' }], { read }), false);
+  assert.equal(neededSubmodule(CHE, [], { read }), false);
+  assert.equal(neededSubmodule(CHE, null, { read }), true, 'selection unavailable: every submodule stays needed');
+});
+
+test('the pre-push hook and prep read one attested list file', () => {
+  const hook = readFileSync(new URL('../../.husky/pre-push.bash', import.meta.url), 'utf8');
+  assert.match(hook, /genesis\/orchestrator\/attested-submodules\.txt/);
+  assert.doesNotMatch(hook, /submodule status -- elohim\/brit/);
+  assert.deepEqual(ATTESTED_SUBMODULES, ['elohim/brit', 'elohim/rakia', 'sophia']);
 });

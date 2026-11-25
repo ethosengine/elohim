@@ -178,7 +178,13 @@ gate_step_reading() {
 # orchestrator gate's registry and oracle tests fail (2026-10-27: refused at
 # 104 s, after eprfs had spent 5231 s). Refuse before any gate starts.
 attested_submodules_missing() {
-  git submodule status -- elohim/brit elohim/rakia sophia 2>/dev/null | awk '/^-/ { print $2 }'
+  # The list is genesis/orchestrator/attested-submodules.txt, shared with gate-preflight.mjs and prep.
+  local list
+  list=$(grep -v '^#' "${HOOK_WORK_TREE:-.}/genesis/orchestrator/attested-submodules.txt" | xargs)
+  # An unreadable list must refuse, never pass: name the file as the missing item.
+  [ -n "$list" ] || { echo "genesis/orchestrator/attested-submodules.txt"; return 0; }
+  # shellcheck disable=SC2086
+  git submodule status -- $list 2>/dev/null | awk '/^-/ { print $2 }'
 }
 READING_STARTED_S=$SECONDS
 READING_STARTED_AT=$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)
