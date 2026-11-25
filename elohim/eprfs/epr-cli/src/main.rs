@@ -33,6 +33,24 @@ fn main() -> ExitCode {
         println!("{}", usage());
         return ExitCode::SUCCESS;
     }
+    // A producer asks the binary being published what its bytes link. This answers before
+    // checkout discovery or session setup so staging an epr cannot mutate or depend on this
+    // device's state.
+    #[cfg(feature = "peer")]
+    if raw.first().map(String::as_str) == Some("payload") {
+        if raw.get(1).map(String::as_str) == Some("formats")
+            && raw.get(2).map(String::as_str) == Some("--json")
+            && raw.len() == 3
+        {
+            println!(
+                "{}",
+                elohim_epr_cli::payload::PayloadFormat::supported_json()
+            );
+            return ExitCode::SUCCESS;
+        }
+        eprintln!("usage: epr payload formats --json");
+        return ExitCode::from(2);
+    }
     // Identity must be answerable outside a worktree: launchers and artifact stores use this
     // before deciding whether the binary may become a committed head.
     if raw.first().map(String::as_str) == Some("bin") {
@@ -332,7 +350,7 @@ fn run() -> Result<(Report, bool)> {
 }
 
 /// Every top-level command, as a person types it.
-const COMMANDS: [&str; 15] = [
+const COMMANDS: [&str; 16] = [
     "setup",
     "doctor",
     "explain",
@@ -347,6 +365,7 @@ const COMMANDS: [&str; 15] = [
     "covenant",
     "peer",
     "artifact",
+    "payload",
     "lsp",
 ];
 
@@ -442,5 +461,5 @@ fn print_human(report: &Report) {
 }
 
 fn usage() -> &'static str {
-    "epr session id|open [--model MODEL]|show|close|gc [--json]\n\nusage: epr [--repo PATH] [--json] <setup|doctor [--exercise]|explain PATH|check [PATH...]|govern --path REL ...|ready [--target REF] [--deep]|integrate --acceptance CID [--root DIR]|view <declaration> --root DIR [--save STORE] [--json]|feedback <qualify|capacity|measure|reclaim|migrate|policy|record|capture|list|show|group|evidence|triage|propose|link|repair|ingest-genesis> ...|flow ...|actor <claim --as agent:<role>@<model> [--session ID]|current [--session ID]>|canon-lift [--check|--write]|device <ask|redeem|approve> ...|identity <begin|standing> ...|covenant <offer|show|check|record> [--session ID] ...|peer <id|serve|status> ...|artifact <describe|key|put|fetch> ...|lsp <attach|serve|show> ...>"
+    "epr session id|open [--model MODEL]|show|close|gc [--json]\n\nusage: epr [--repo PATH] [--json] <setup|doctor [--exercise]|payload formats --json|explain PATH|check [PATH...]|govern --path REL ...|ready [--target REF] [--deep]|integrate --acceptance CID [--root DIR]|view <declaration> --root DIR [--save STORE] [--json]|feedback <qualify|capacity|measure|reclaim|migrate|policy|record|capture|list|show|group|evidence|triage|propose|link|repair|ingest-genesis> ...|flow ...|actor <claim --as agent:<role>@<model> [--session ID]|current [--session ID]>|canon-lift [--check|--write]|device <ask|redeem|approve> ...|identity <begin|standing> ...|covenant <offer|show|check|record> [--session ID] ...|peer <id|serve|status> ...|artifact <describe|key|put|fetch> ...|lsp <attach|serve|show> ...>"
 }

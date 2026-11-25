@@ -1376,12 +1376,21 @@ fn release_slots(options: &Options) -> ArtifactResult<Vec<String>> {
     }
 }
 
-/// The epr release's payload-format statement, derived from the method descriptor's own Cargo
-/// feature selection. Other release bins carry no statement: their descriptors say nothing about
-/// which payload backends epr links.
+/// The epr release's payload-format statement, asked of the exact executable being published.
+/// Other release bins carry no statement.
 fn payload_formats_slot(
     options: &Options,
     descriptor: &MethodDescriptor,
+) -> ArtifactResult<Option<String>> {
+    payload_formats_slot_with(options, descriptor, |binary| {
+        crate::payload::PayloadFormat::probe_supported(binary, &options.repo)
+    })
+}
+
+fn payload_formats_slot_with(
+    options: &Options,
+    descriptor: &MethodDescriptor,
+    probe: impl FnOnce(&Path) -> Result<Vec<crate::payload::PayloadFormat>, String>,
 ) -> ArtifactResult<Option<String>> {
     if options.release_bin.as_deref() != Some("epr") {
         return Ok(None);
@@ -1391,17 +1400,12 @@ fn payload_formats_slot(
             "--release-bin epr requires a method descriptor for --bin=epr",
         ));
     }
-    let mut features = descriptor
-        .flags
-        .iter()
-        .filter_map(|flag| flag.strip_prefix("--features="));
-    let selected = features.next();
-    if features.next().is_some() {
-        return Err(unrecorded(
-            "the method descriptor records --features more than once",
-        ));
-    }
-    let formats = crate::payload::PayloadFormat::supported_for_cargo_features(selected)
+    let binary = options
+        .bytes
+        .as_deref()
+        .ok_or_else(|| unrecorded("--release-bin epr requires --bytes"))?;
+    let formats = probe(binary)
+        .map_err(|why| unrecorded(format!("the epr bytes cannot state payload formats: {why}")))?
         .into_iter()
         .map(|format| format.to_string())
         .collect::<Vec<_>>()
@@ -1467,6 +1471,9 @@ fn record_artifact(
 ) -> ArtifactResult<ExitCode> {
     let basis = key.basis;
     check_payload_method(&descriptor.name, sysroot_manifest.is_some())?;
+    // Ask the exact epr executable before any attestation, payload-store write or flow append.
+    // Non-epr releases and sysroot archives have no payload-format statement.
+    let payload_formats = payload_formats_slot(options, descriptor)?;
     if let Some(lines) = &key.input_lines {
         if BlobCid::compute_bytes(lines.as_bytes()) != key.input {
             return Err(unrecorded(
@@ -1627,7 +1634,7 @@ fn record_artifact(
             ),
         }
     }
-    if let Some(slot) = payload_formats_slot(options, descriptor)? {
+    if let Some(slot) = payload_formats {
         extra.push(slot);
     }
     extra.extend(release_slots(options)?);
@@ -1962,6 +1969,60 @@ fn fetch(options: &Options) -> ArtifactResult<ExitCode> {
         FetchDone::InputDocument { .. } => Err(ArtifactError::Gap(
             "unexpected input document answer".into(),
         )),
+    }
+}
+
+#[cfg(test)]
+mod payload_format_statement_tests {
+    use super::*;
+
+    fn epr_descriptor() -> MethodDescriptor {
+        MethodDescriptor {
+            name: "mesh-build".into(),
+            tools: Default::default(),
+            flags: vec!["--bin=epr".into(), "--features=blob-store".into()],
+            params: None,
+            exec: None,
+            step: None,
+            embedder: None,
+            view: Vec::new(),
+            non_path_inputs: Default::default(),
+            deterministic: false,
+        }
+    }
+
+    fn epr_options() -> Options {
+        Options {
+            bytes: Some(PathBuf::from("built-epr")),
+            release_bin: Some("epr".into()),
+            ..Options::default()
+        }
+    }
+
+    #[test]
+    fn descriptor_blob_store_text_cannot_override_the_built_binary_answer() {
+        let slot = payload_formats_slot_with(&epr_options(), &epr_descriptor(), |_| {
+            Ok(vec![crate::payload::PayloadFormat::DirectoryV1])
+        })
+        .unwrap();
+        assert_eq!(slot.as_deref(), Some("env:payload-formats=directory-v1"));
+    }
+
+    #[test]
+    fn an_epr_binary_that_cannot_answer_refuses_the_put_statement() {
+        for why in ["exit status: 2", "payload formats answer is not JSON"] {
+            let error = payload_formats_slot_with(&epr_options(), &epr_descriptor(), |_| {
+                Err(why.to_string())
+            })
+            .unwrap_err();
+            let said = error.to_string();
+            assert!(
+                said.contains("the epr bytes cannot state payload formats"),
+                "{said}"
+            );
+            assert!(said.contains(why), "{said}");
+            assert_eq!(said.lines().count(), 1, "{said}");
+        }
     }
 }
 

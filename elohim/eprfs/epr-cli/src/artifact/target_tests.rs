@@ -16,25 +16,21 @@ fn release_descriptor(flags: &[&str]) -> MethodDescriptor {
 }
 
 #[test]
-fn epr_release_payload_formats_come_from_its_descriptor_features() {
+fn epr_release_payload_formats_come_from_the_built_binary_not_descriptor_features() {
     let options = Options {
         release: Some("release".into()),
         release_bin: Some("epr".into()),
+        bytes: Some("built-epr".into()),
         ..Options::default()
     };
     assert_eq!(
-        payload_formats_slot(
+        payload_formats_slot_with(
             &options,
-            &release_descriptor(&["--bin=epr", "--features=blob-store"])
+            &release_descriptor(&["--bin=epr", "--features=blob-store"]),
+            |_| Ok(vec![crate::payload::PayloadFormat::DirectoryV1])
         )
         .unwrap()
         .as_deref(),
-        Some("env:payload-formats=blob-store-v1,directory-v1")
-    );
-    assert_eq!(
-        payload_formats_slot(&options, &release_descriptor(&["--bin=epr"]))
-            .unwrap()
-            .as_deref(),
         Some("env:payload-formats=directory-v1")
     );
 }
