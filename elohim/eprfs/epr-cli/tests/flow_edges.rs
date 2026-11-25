@@ -30,6 +30,30 @@ fn git(root: &Path, args: &[&str]) {
     assert!(status.status.success(), "git {args:?} failed");
 }
 
+fn git_stdout(root: &Path, args: &[&str]) -> String {
+    let output = elohim_epr_cli::process::build_command("git", args, root, &[])
+        .output()
+        .expect("git runs");
+    assert!(output.status.success(), "git {args:?} failed");
+    String::from_utf8(output.stdout).unwrap().trim().to_string()
+}
+
+fn commit_at(root: &Path, message: &str, date: &str) -> String {
+    git(root, &["add", "-A"]);
+    let output =
+        elohim_epr_cli::process::build_command("git", &["commit", "-q", "-m", message], root, &[])
+            .env("GIT_AUTHOR_NAME", "Fixture Author")
+            .env("GIT_AUTHOR_EMAIL", "author@example.test")
+            .env("GIT_COMMITTER_NAME", "Fixture Author")
+            .env("GIT_COMMITTER_EMAIL", "author@example.test")
+            .env("GIT_AUTHOR_DATE", date)
+            .env("GIT_COMMITTER_DATE", date)
+            .output()
+            .expect("dated git commit runs");
+    assert!(output.status.success(), "dated git commit failed");
+    git_stdout(root, &["rev-parse", "HEAD"])
+}
+
 fn write(root: &Path, rel: &str, contents: &str) {
     let path = root.join(rel);
     std::fs::create_dir_all(path.parent().unwrap()).unwrap();
@@ -1563,6 +1587,101 @@ fn gate_verdict_ledger_rows_carry_observed_time_or_unknown() {
     assert!(verdicts
         .iter()
         .all(|entry| entry.occurred_at == "2026-11-25T05:07:09Z"));
+}
+
+#[test]
+fn verdict_order_uses_the_judged_commit_and_keeps_unknown_dates_last() {
+    let dir = valueflow_fixture();
+    let root = dir.path();
+    let resource = elohim_epr_cli::flow::body_cid_of_file(&root.join("plans/epic.md")).unwrap();
+    let mut commits = Vec::new();
+    for day in 19..=24 {
+        write(
+            root,
+            &format!("history/{day}.txt"),
+            &format!("judged on November {day}\n"),
+        );
+        commits.push(commit_at(
+            root,
+            &format!("history {day}"),
+            &format!("2026-11-{day:02}T12:00:00Z"),
+        ));
+    }
+
+    let mut store = SidecarFlowStore::open(root).unwrap();
+    let mut append = |closure: &str, commit: &str, occurred_at: &str| {
+        store
+            .append(FlowRecord::Event(FlowEvent {
+                action: ReaVerb::Cite,
+                provider: AgentRef("agent:gate@fixture".into()),
+                receiver: AgentRef("repo:ethosengine/elohim".into()),
+                resource,
+                quantity: Magnitude::Count {
+                    value: 1.0,
+                    unit: "run-note".into(),
+                },
+                process: None,
+                in_scope_of: resource,
+                fulfills: Vec::new(),
+                satisfies: Vec::new(),
+                classified_as: vec![
+                    "run:observation".into(),
+                    "plans/epic.md".into(),
+                    "reason:verdict".into(),
+                    "measure:gate-verdict@1".into(),
+                    format!("env:closure={closure}"),
+                    format!("env:commit={commit}"),
+                ],
+                occurred_at: occurred_at.into(),
+            }))
+            .unwrap();
+    };
+    for (index, commit) in commits[..5].iter().enumerate() {
+        append(&format!("legacy-{index}"), commit, "2026-11-25T12:00:00Z");
+    }
+    append("new-dated", &commits[5], "2026-11-24T12:00:00Z");
+    append(
+        "unknown-date",
+        "commit-that-is-not-in-this-repository",
+        "2039-01-01T00:00:00Z",
+    );
+    drop(append);
+    drop(store);
+
+    let context = context::context_with(root, "plans/epic.md", 5).expect("context runs");
+    assert!(
+        context.notes.iter().any(|note| {
+            note.extra
+                .iter()
+                .any(|slot| slot == "env:closure=new-dated")
+        }),
+        "the November 24 verdict is not hidden by five legacy HEAD dates"
+    );
+    assert!(!context.notes.iter().any(|note| note.date_unknown));
+
+    let all = context::context_with(root, "plans/epic.md", 10).expect("context runs");
+    let last = all
+        .notes
+        .last()
+        .expect("the unknown verdict remains visible");
+    assert!(last.date_unknown, "the unresolvable commit sorts last");
+    assert!(last
+        .extra
+        .iter()
+        .any(|slot| slot == "env:closure=unknown-date"));
+
+    let ledger = ledger::ledger(root, "plans/epic.md").expect("ledger runs");
+    let last_verdict = ledger
+        .entries
+        .iter()
+        .rfind(|entry| {
+            entry
+                .extra
+                .iter()
+                .any(|slot| slot == "measure:gate-verdict@1")
+        })
+        .expect("ledger verdict");
+    assert!(last_verdict.date_unknown, "the ledger uses the same key");
 }
 
 #[test]

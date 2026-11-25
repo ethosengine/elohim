@@ -922,7 +922,7 @@ fn note_with_claim_guard(
     }
     // Resolve an explicit historical clock before opening the sidecar. An unresolvable commit is
     // a one-line refusal and can neither create a store nor silently inherit HEAD's date.
-    let dated_occurred_at = dated_by
+    let dated_commit = dated_by
         .map(|raw| {
             let commit = raw.trim();
             if commit.is_empty() {
@@ -930,14 +930,34 @@ fn note_with_claim_guard(
                     "--dated-by needs a commit oid or ref".into(),
                 ));
             }
-            commit_author_date(root, commit).ok_or_else(|| {
+            let occurred_at = commit_author_date(root, commit).ok_or_else(|| {
                 FlowError::InvalidArguments(format!(
                     "cannot date note: --dated-by `{commit}` does not resolve to a commit in `{}`",
                     root.display()
                 ))
-            })
+            })?;
+            let oid = resolve_commit_oid(root, commit).ok_or_else(|| {
+                FlowError::InvalidArguments(format!(
+                    "cannot date note: --dated-by `{commit}` does not resolve to a commit in `{}`",
+                    root.display()
+                ))
+            })?;
+            Ok((oid, occurred_at))
         })
         .transpose()?;
+    if let (Some((dated_oid, _)), Some(env_commit)) = (
+        dated_commit.as_ref(),
+        observation.and_then(|value| value.env.get("commit")),
+    ) {
+        let env_oid = resolve_commit_oid(root, env_commit);
+        if env_oid.as_deref() != Some(dated_oid) {
+            return Err(FlowError::InvalidArguments(format!(
+                "cannot date note: --dated-by `{}` must name the same commit as env:commit `{env_commit}`",
+                dated_by.unwrap_or_default().trim()
+            )));
+        }
+    }
+    let dated_occurred_at = dated_commit.map(|(_, occurred_at)| occurred_at);
 
     // Closure locks sessions before appending its flow witness. Keep that order here,
     // and retain the generation through attribution and append.
@@ -1119,6 +1139,31 @@ fn note_with_claim_guard(
         store.append(record)?;
     }
     Ok(outcome)
+}
+
+fn resolve_commit_oid(root: &Path, commit: &str) -> Option<String> {
+    let commit = commit.trim();
+    if commit.is_empty() || commit.starts_with('-') {
+        return None;
+    }
+    let commit_spec = format!("{commit}^{{commit}}");
+    let output = crate::process::build_command(
+        "git",
+        &["rev-parse", "--verify", "--quiet", &commit_spec],
+        root,
+        &[],
+    )
+    .output()
+    .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let oid = String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .next()?
+        .trim()
+        .to_string();
+    (!oid.is_empty()).then_some(oid)
 }
 
 /// Append one `run:retraction` note against an already-checked sidecar record.
