@@ -120,8 +120,8 @@ pub use gossip::GatedGossip;
 pub use head::{ChannelHead, HeadSigner, MAX_HEAD_BYTES};
 pub use head_table::{
     ChannelCounters, CrossingDrop, CrossingDropGroups, CrossingDropOverflow, CrossingDrops,
-    DeviceHead, DroppedHeads, EvictedCrossingDropTotal, HeadTable, NackLeaf, NackState,
-    OwnAnnounce, StorePlace, HEAD_TABLE_VERSION, MAX_CROSSING_DROP_ROWS_PER_RULE_GROUP,
+    DeviceHead, DroppedHeads, EvictedCrossingDropTotal, FoldCoverage, HeadTable, NackLeaf,
+    NackState, OwnAnnounce, StorePlace, HEAD_TABLE_VERSION, MAX_CROSSING_DROP_ROWS_PER_RULE_GROUP,
     MAX_CROSSING_DROP_RULE_GROUPS, MAX_NACK_CIDS, OWN_LOG_LEN,
 };
 /// The iroh address types a dialer names peers with, so a consumer needs no iroh dependency of
@@ -129,8 +129,8 @@ pub use head_table::{
 pub use iroh::{NodeAddr, NodeId};
 pub use key::PeerKey;
 pub use lease_view::{
-    lease_events, other_devices, steward_lease_view, LeaseEvent, LeaseKind, LeaseStore,
-    LeaseVerdict, OtherDevice, Resource, BERTH_EVENTS_MEASURE,
+    lease_events, other_devices, steward_lease_view, FoldCoverageState, LeaseEvent, LeaseKind,
+    LeaseStore, LeaseVerdict, OtherDevice, Resource, BERTH_EVENTS_MEASURE,
 };
 pub use local_blob::{
     put_local_blob, put_local_blob_with, read_local_blob, stream_local_blob,

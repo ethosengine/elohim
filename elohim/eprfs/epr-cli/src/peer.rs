@@ -34,9 +34,9 @@ use elohim_device_runtime::layout::DeviceLayout;
 use elohim_epr_rea::{FlowEvent, FlowRecord, FlowStore, ParticipantRow};
 use eprfs_peer::{
     lease_events, other_devices, peer_from_arg, relay_from_env, roster_rows_from_file, slots,
-    steward_lease_view, Admission, CrossingAllowList, HeadTable, LeaseVerdict, NodeAddr,
-    PeerConfig, PeerDaemon, PeerError, PeerKey, Rules, RulesState, StewardScope, WithheldCrossing,
-    ARTIFACT_PRODUCE_KIND, ARTIFACT_PRODUCE_MEASURE, KIND_SLOT, MEASURE_SLOT,
+    steward_lease_view, Admission, CrossingAllowList, FoldCoverageState, HeadTable, LeaseVerdict,
+    NodeAddr, PeerConfig, PeerDaemon, PeerError, PeerKey, Rules, RulesState, StewardScope,
+    WithheldCrossing, ARTIFACT_PRODUCE_KIND, ARTIFACT_PRODUCE_MEASURE, KIND_SLOT, MEASURE_SLOT,
 };
 use serde::Serialize;
 
@@ -1104,6 +1104,9 @@ struct DeviceStatus {
     events_folded: u64,
     /// The highest seq of this device's own heads that device has acknowledged folding.
     acked: Option<u64>,
+    /// Whether this head's sender events have a usable complete-fold boundary.
+    #[serde(skip)]
+    coverage: Option<FoldCoverageState>,
 }
 
 #[derive(Debug, Serialize)]
@@ -1381,6 +1384,12 @@ fn status(options: &Options) -> PeerResult<ExitCode> {
     let table = HeadTable::load(&device.peer_dir)?;
     let did = device.key.did_key();
     let now = unix_ms();
+    let coverage_store = table
+        .store
+        .as_ref()
+        .filter(|place| place.log.is_file())
+        .and_then(|place| elohim_epr_rea::SidecarFlowStore::open(&place.root).ok())
+        .and_then(|store| lease_events(&store).ok());
     let mut devices = Vec::new();
     let mut node_id = None;
     for node in admission.nodes() {
@@ -1400,6 +1409,13 @@ fn status(options: &Options) -> PeerResult<ExitCode> {
             age_s: head.map(|h| now.saturating_sub(h.folded_at) / 1000),
             events_folded: head.map_or(0, |h| h.events_folded),
             acked: head.and_then(|h| h.folded.get(&did).copied()),
+            coverage: head.map(|head| {
+                coverage_store
+                    .as_ref()
+                    .map_or(FoldCoverageState::Legacy, |store| {
+                        store.fold_coverage(member, head)
+                    })
+            }),
         });
     }
     let rows = roster_rows_from_file(&device.lineage.roster)?;
@@ -1549,6 +1565,9 @@ fn render(outcome: &StatusOutcome) {
             ),
             _ => println!("device  {}  no head folded yet", short(&device.device)),
         }
+        if let Some(line) = fold_coverage_line(device) {
+            println!("{line}");
+        }
     }
     let d = outcome.dropped;
     println!(
@@ -1599,6 +1618,20 @@ fn render(outcome: &StatusOutcome) {
             "folds  failed {}  oversized events {}  over budget {}",
             c.fold_failures, c.oversized_events, c.over_budget_folds
         );
+    }
+}
+
+fn fold_coverage_line(device: &DeviceStatus) -> Option<String> {
+    match (device.seq, device.coverage) {
+        (Some(seq), Some(FoldCoverageState::Incomplete)) => Some(format!(
+            "{}: events beyond head {seq} not counted: fold incomplete",
+            short(&device.device)
+        )),
+        (Some(_), Some(FoldCoverageState::Legacy)) => Some(format!(
+            "{}: fold coverage unavailable; sibling events use legacy unbounded replay",
+            short(&device.device)
+        )),
+        _ => None,
     }
 }
 
@@ -3129,6 +3162,7 @@ mod status_contract {
                 age_s: None,
                 events_folded: 0,
                 acked: None,
+                coverage: None,
             }],
             dropped: Default::default(),
             crossing_drops: CrossingDropStatus::default(),
