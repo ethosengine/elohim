@@ -1,4 +1,7 @@
-use super::{files, source::CommandSpec, Refusal, Release, Result, Store};
+use super::{
+    files, parse_payload_formats, source::CommandSpec, Refusal, Release, Result, Store,
+    PAYLOAD_FORMATS_FIELD,
+};
 use serde_json::{json, Value};
 use std::{path::Path, time::Duration};
 
@@ -133,6 +136,44 @@ impl Transition {
 }
 
 impl Store {
+    fn require_payload_store_compatible(&self, release: &Release) -> Result<()> {
+        let Some(device_format) = self
+            .payload_store_format
+            .as_deref()
+            .filter(|_| self.tool == "epr")
+        else {
+            return Ok(());
+        };
+        let statement = match release.extra.get(PAYLOAD_FORMATS_FIELD) {
+            Some(Value::String(statement)) => Some(statement.as_str()),
+            Some(_) => {
+                return Err(Refusal::new(
+                    "payload-format-statement-invalid",
+                    format!(
+                        "release states a non-text payload format; this device's payload store is {device_format}"
+                    ),
+                ))
+            }
+            None => None,
+        };
+        let formats = parse_payload_formats(statement).map_err(|detail| {
+            Refusal::new(
+                "payload-format-statement-invalid",
+                format!("{detail}; this device's payload store is {device_format}"),
+            )
+        })?;
+        if formats.contains(&device_format) {
+            return Ok(());
+        }
+        Err(Refusal::new(
+            "payload-format-incompatible",
+            format!(
+                "refused: release opens {}; this device's payload store is {device_format}",
+                formats.join(", ")
+            ),
+        ))
+    }
+
     fn validate_land(
         &self,
         cid: &str,
@@ -151,6 +192,7 @@ impl Store {
                     format!("{cid} is not a verified candidate"),
                 )
             })?;
+        self.require_payload_store_compatible(&record)?;
         let source = record.source(commit).ok_or_else(|| {
             Refusal::new(
                 "commit-mismatch",

@@ -1381,16 +1381,18 @@ fn release_slots(options: &Options) -> ArtifactResult<Vec<String>> {
 fn payload_formats_slot(
     options: &Options,
     descriptor: &MethodDescriptor,
+    bytes: &[u8],
 ) -> ArtifactResult<Option<String>> {
-    payload_formats_slot_with(options, descriptor, |binary| {
-        crate::payload::PayloadFormat::probe_supported(binary, &options.repo)
+    payload_formats_slot_with(options, descriptor, bytes, |bytes| {
+        crate::payload::PayloadFormat::probe_supported_bytes(bytes)
     })
 }
 
 fn payload_formats_slot_with(
     options: &Options,
     descriptor: &MethodDescriptor,
-    probe: impl FnOnce(&Path) -> Result<Vec<crate::payload::PayloadFormat>, String>,
+    bytes: &[u8],
+    probe: impl FnOnce(&[u8]) -> Result<Vec<crate::payload::PayloadFormat>, String>,
 ) -> ArtifactResult<Option<String>> {
     if options.release_bin.as_deref() != Some("epr") {
         return Ok(None);
@@ -1400,11 +1402,11 @@ fn payload_formats_slot_with(
             "--release-bin epr requires a method descriptor for --bin=epr",
         ));
     }
-    let binary = options
+    options
         .bytes
         .as_deref()
         .ok_or_else(|| unrecorded("--release-bin epr requires --bytes"))?;
-    let formats = probe(binary)
+    let formats = probe(bytes)
         .map_err(|why| unrecorded(format!("the epr bytes cannot state payload formats: {why}")))?
         .into_iter()
         .map(|format| format.to_string())
@@ -1473,7 +1475,7 @@ fn record_artifact(
     check_payload_method(&descriptor.name, sysroot_manifest.is_some())?;
     // Ask the exact epr executable before any attestation, payload-store write or flow append.
     // Non-epr releases and sysroot archives have no payload-format statement.
-    let payload_formats = payload_formats_slot(options, descriptor)?;
+    let payload_formats = payload_formats_slot(options, descriptor, &bytes)?;
     if let Some(lines) = &key.input_lines {
         if BlobCid::compute_bytes(lines.as_bytes()) != key.input {
             return Err(unrecorded(
@@ -2001,19 +2003,23 @@ mod payload_format_statement_tests {
 
     #[test]
     fn descriptor_blob_store_text_cannot_override_the_built_binary_answer() {
-        let slot = payload_formats_slot_with(&epr_options(), &epr_descriptor(), |_| {
-            Ok(vec![crate::payload::PayloadFormat::DirectoryV1])
-        })
-        .unwrap();
+        let slot =
+            payload_formats_slot_with(&epr_options(), &epr_descriptor(), b"exact bytes", |_| {
+                Ok(vec![crate::payload::PayloadFormat::DirectoryV1])
+            })
+            .unwrap();
         assert_eq!(slot.as_deref(), Some("env:payload-formats=directory-v1"));
     }
 
     #[test]
     fn an_epr_binary_that_cannot_answer_refuses_the_put_statement() {
         for why in ["exit status: 2", "payload formats answer is not JSON"] {
-            let error = payload_formats_slot_with(&epr_options(), &epr_descriptor(), |_| {
-                Err(why.to_string())
-            })
+            let error = payload_formats_slot_with(
+                &epr_options(),
+                &epr_descriptor(),
+                b"exact bytes",
+                |_| Err(why.to_string()),
+            )
             .unwrap_err();
             let said = error.to_string();
             assert!(

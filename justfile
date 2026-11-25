@@ -759,7 +759,7 @@ _gate-eprfs-live-corpus:
     log="$(mktemp)"
     trap 'rm -f "$log"' EXIT
     for target in flow_cites flow_scope live_manifest_integrity; do
-      cargo test --workspace --test "$target" -- live_corpus_ 2>&1 | tee "$log"
+      cargo test --workspace --features elohim-epr-cli/blob-store --test "$target" -- live_corpus_ 2>&1 | tee "$log"
       status=${PIPESTATUS[0]}
       [ "$status" -eq 0 ] || exit "$status"
       ran=$(grep -cE '^test live_corpus_[A-Za-z0-9_]+ \.\.\. ok$' "$log" || true)

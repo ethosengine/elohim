@@ -1,7 +1,7 @@
 use super::{
-    files,
+    files, parse_payload_formats,
     source::{copy_executable, CommandSpec},
-    IngestOptions, Provenance, Refusal, Release, Result, Store,
+    IngestOptions, Provenance, Refusal, Release, Result, Store, PAYLOAD_FORMATS_FIELD,
 };
 use eprfs_core::{BlobCid, ByteCid};
 use serde_json::Value;
@@ -58,6 +58,7 @@ impl Store {
                 tree_clean: Some(clean),
                 gate_run: Some(gate.into()),
                 closure: true,
+                payload_formats: value[PAYLOAD_FORMATS_FIELD].as_str().map(str::to_owned),
             };
             &closure_options
         } else {
@@ -190,6 +191,28 @@ impl Store {
                 "landed" | "reverted" | "lineage-rebased"
             ) {
                 release.ring = "dev-context".into();
+            }
+            if let Some(statement) = options.payload_formats.as_deref() {
+                parse_payload_formats(Some(statement))
+                    .map_err(|detail| Refusal::new("payload-format-statement-invalid", detail))?;
+                if let Some(held) = release
+                    .extra
+                    .get(PAYLOAD_FORMATS_FIELD)
+                    .and_then(Value::as_str)
+                {
+                    if held != statement {
+                        return Err(Refusal::new(
+                            "payload-format-statement-mismatch",
+                            format!(
+                                "identical release bytes were already held with {held}, not {statement}"
+                            ),
+                        ));
+                    }
+                }
+                release.extra.insert(
+                    PAYLOAD_FORMATS_FIELD.into(),
+                    Value::String(statement.to_owned()),
+                );
             }
             self.save(&release)?;
             Ok(release)

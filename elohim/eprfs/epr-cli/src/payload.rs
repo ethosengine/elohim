@@ -137,42 +137,73 @@ impl PayloadFormat {
         Ok(formats)
     }
 
-    /// Ask the executable at `binary` which payload formats its own bytes link.
-    pub fn probe_supported(binary: &Path, cwd: &Path) -> Result<Vec<Self>, String> {
-        // The published binary is asked, never trusted to return: a probe that cannot answer in
-        // PROBE_DEADLINE is killed and the put refused.
-        const PROBE_DEADLINE: std::time::Duration = std::time::Duration::from_secs(30);
-        let mut child = std::process::Command::new(binary)
+    /// Ask a private executable copy made from `bytes` which payload formats those exact bytes
+    /// link. The copy and its empty environment/cwd directories are removed on every return.
+    pub fn probe_supported_bytes(bytes: &[u8]) -> Result<Vec<Self>, String> {
+        Self::probe_supported_bytes_with_deadline(bytes, std::time::Duration::from_secs(30))
+    }
+
+    fn probe_supported_bytes_with_deadline(
+        bytes: &[u8],
+        deadline: std::time::Duration,
+    ) -> Result<Vec<Self>, String> {
+        use std::io::Write;
+        use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt, PermissionsExt};
+
+        const OUTPUT_LIMIT: usize = 64 * 1024;
+        let private = tempfile::Builder::new()
+            .prefix("epr-payload-formats-")
+            .tempdir()
+            .map_err(|error| format!("cannot create private payload-formats probe: {error}"))?;
+        std::fs::set_permissions(private.path(), std::fs::Permissions::from_mode(0o700))
+            .map_err(|error| format!("cannot protect payload-formats probe: {error}"))?;
+        let make_dir = |name: &str| -> Result<PathBuf, String> {
+            let path = private.path().join(name);
+            let mut builder = std::fs::DirBuilder::new();
+            builder.mode(0o700);
+            builder
+                .create(&path)
+                .map_err(|error| format!("cannot create empty probe {name}: {error}"))?;
+            Ok(path)
+        };
+        let environment = make_dir("environment")?;
+        let cwd = make_dir("cwd")?;
+        let binary = private.path().join("epr");
+        let mut file = std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .mode(0o700)
+            .open(&binary)
+            .map_err(|error| format!("cannot create private epr probe: {error}"))?;
+        file.write_all(bytes)
+            .map_err(|error| format!("cannot write private epr probe: {error}"))?;
+        file.sync_all()
+            .map_err(|error| format!("cannot sync private epr probe: {error}"))?;
+        drop(file);
+
+        let mut command = std::process::Command::new(&binary);
+        command
             .args(["payload", "formats", "--json"])
-            .current_dir(cwd)
-            .stdin(std::process::Stdio::null())
-            .stdout(std::process::Stdio::piped())
-            .stderr(std::process::Stdio::piped())
-            .spawn()
-            .map_err(|error| format!("cannot run {}: {error}", binary.display()))?;
-        let started = std::time::Instant::now();
-        loop {
-            match child.try_wait() {
-                Ok(Some(_)) => break,
-                Ok(None) if started.elapsed() < PROBE_DEADLINE => {
-                    std::thread::sleep(std::time::Duration::from_millis(20));
-                }
-                Ok(None) => {
-                    let _ = child.kill();
-                    let _ = child.wait();
-                    return Err(format!(
-                        "{} did not answer payload formats within {}s",
-                        binary.display(),
-                        PROBE_DEADLINE.as_secs()
-                    ));
-                }
-                Err(error) => return Err(format!("cannot wait for {}: {error}", binary.display())),
-            }
+            .current_dir(&cwd)
+            .env_clear()
+            .env("HOME", &environment)
+            .env("XDG_CONFIG_HOME", &environment)
+            .env("XDG_CACHE_HOME", &environment)
+            .env("XDG_DATA_HOME", &environment);
+        let output = crate::flow::memory::recall::bounded_command(
+            command,
+            OUTPUT_LIMIT,
+            deadline.as_secs_f64(),
+            None,
+        )
+        .map_err(|error| format!("cannot run private epr probe: {error}"))?;
+        if let Some(error) = output.error {
+            return Err(format!(
+                "private epr probe did not answer payload formats within {}s: {error}",
+                deadline.as_secs_f64()
+            ));
         }
-        let output = child
-            .wait_with_output()
-            .map_err(|error| format!("cannot read {}: {error}", binary.display()))?;
-        if !output.status.success() {
+        if output.status != Some(0) {
             let stderr = String::from_utf8_lossy(&output.stderr);
             let stdout = String::from_utf8_lossy(&output.stdout);
             let detail = stderr
@@ -181,7 +212,12 @@ impl PayloadFormat {
                 .or_else(|| stdout.lines().find(|line| !line.trim().is_empty()))
                 .unwrap_or("no diagnostic")
                 .trim();
-            return Err(format!("exited {}: {detail}", output.status));
+            return Err(format!(
+                "private epr probe exited {}: {detail}",
+                output
+                    .status
+                    .map_or_else(|| "by signal".into(), |code| code.to_string())
+            ));
         }
         let answer = std::str::from_utf8(&output.stdout)
             .map_err(|error| format!("payload formats answer is not UTF-8: {error}"))?;
@@ -525,6 +561,10 @@ async fn open_backend(
 mod tests {
     use super::*;
 
+    fn script(body: &str) -> Vec<u8> {
+        format!("#!/bin/sh\n{body}\n").into_bytes()
+    }
+
     #[test]
     fn markers_round_trip_and_only_linked_formats_are_supported() {
         for format in [PayloadFormat::BlobStoreV1, PayloadFormat::DirectoryV1] {
@@ -551,6 +591,52 @@ mod tests {
             PayloadFormat::parse_supported_json(expected).unwrap(),
             PayloadFormat::supported()
         );
+    }
+
+    #[test]
+    fn payload_format_probe_executes_the_bytes_read_before_the_source_path_is_replaced() {
+        let temp = tempfile::tempdir().unwrap();
+        let source = temp.path().join("published-epr");
+        std::fs::write(&source, script("printf '[\"directory-v1\"]'")).unwrap();
+        let held = std::fs::read(&source).unwrap();
+        std::fs::write(&source, script("printf '[\"blob-store-v1\"]'")).unwrap();
+
+        assert_eq!(
+            PayloadFormat::probe_supported_bytes(&held).unwrap(),
+            vec![PayloadFormat::DirectoryV1]
+        );
+    }
+
+    #[test]
+    fn payload_format_probe_clears_inherited_epr_environment() {
+        static ENVIRONMENT: std::sync::Mutex<()> = std::sync::Mutex::new(());
+        let _guard = ENVIRONMENT.lock().unwrap();
+        let before = std::env::var_os("EPR_PAYLOAD_STORE");
+        std::env::set_var("EPR_PAYLOAD_STORE", "/must-not-cross");
+        let bytes = script(
+            "if [ -n \"${EPR_PAYLOAD_STORE+x}\" ]; then\n  printf '[\"blob-store-v1\"]'\nelse\n  printf '[\"directory-v1\"]'\nfi",
+        );
+        let probed = PayloadFormat::probe_supported_bytes(&bytes);
+        match before {
+            Some(value) => std::env::set_var("EPR_PAYLOAD_STORE", value),
+            None => std::env::remove_var("EPR_PAYLOAD_STORE"),
+        }
+
+        assert_eq!(probed.unwrap(), vec![PayloadFormat::DirectoryV1]);
+    }
+
+    #[test]
+    fn payload_format_probe_deadline_includes_pipes_held_by_descendants() {
+        let bytes = script("(/bin/sleep 5) &\nprintf '[\"directory-v1\"]'");
+        let started = std::time::Instant::now();
+        let error = PayloadFormat::probe_supported_bytes_with_deadline(
+            &bytes,
+            std::time::Duration::from_millis(150),
+        )
+        .unwrap_err();
+
+        assert!(started.elapsed() < std::time::Duration::from_secs(2));
+        assert!(error.contains("did not answer payload formats"), "{error}");
     }
 
     #[test]

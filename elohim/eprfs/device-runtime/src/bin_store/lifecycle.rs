@@ -274,6 +274,7 @@ impl Store {
                     gate_run: Some(gate.into()),
                     tree_clean: Some(true),
                     closure: true,
+                    ..Default::default()
                 },
             ) {
                 Ok(record) => return self.finish_declared(record, commit, repo, &options),
@@ -406,7 +407,16 @@ impl Store {
             for offline in [true, false] {
                 let mut spec = CommandSpec::new(
                     "cargo",
-                    ["build", "--locked", "--bin", "epr", "--bin", "bin-launch"],
+                    [
+                        "build",
+                        "--locked",
+                        "--bin",
+                        "epr",
+                        "--bin",
+                        "bin-launch",
+                        "--features",
+                        "elohim-epr-cli/blob-store",
+                    ],
                 );
                 if offline {
                     spec.args.push("--offline".into());
@@ -415,7 +425,7 @@ impl Store {
                 spec.timeout = Duration::from_secs(1800);
                 spec.env = self.build_environment(repo, &target);
                 if !offline && env("CARGO_NET_OFFLINE").as_deref() == Some("true") {
-                    attempts.push("network build disabled by CARGO_NET_OFFLINE=true (CARGO_NET_OFFLINE=false cargo build --locked --bin epr)".into());
+                    attempts.push("network build disabled by CARGO_NET_OFFLINE=true (CARGO_NET_OFFLINE=false cargo build --locked --bin epr --features elohim-epr-cli/blob-store)".into());
                     continue;
                 }
                 if self.run(&spec).is_ok_and(|o| o.success) {
@@ -425,12 +435,13 @@ impl Store {
                             source_commit: Some(commit.into()),
                             tree_clean: Some(true),
                             gate_run: Some(gate.into()),
+                            payload_formats: Some("blob-store-v1,directory-v1".into()),
                             ..Default::default()
                         },
                     );
                 }
                 attempts.push(format!(
-                    "cargo build {}--locked --bin epr failed",
+                    "cargo build {}--locked --bin epr --features elohim-epr-cli/blob-store failed",
                     if offline { "--offline " } else { "" }
                 ));
             }

@@ -50,13 +50,15 @@ fn each_tool(root: &Path, long: bool) -> Result<()> {
         };
         let before = current();
         let result = (|| {
-            let store = Store::from_environment(tool, &registry)?.with_peer_serving(
-                if crate::bin::declares_peer_serve(&manifest, tool) {
-                    PeerServing::Required
-                } else {
-                    PeerServing::Tolerated
-                },
-            );
+            let store = crate::bin::payload_store_configured(
+                Store::from_environment(tool, &registry)?,
+                tool,
+            )?
+            .with_peer_serving(if crate::bin::declares_peer_serve(&manifest, tool) {
+                PeerServing::Required
+            } else {
+                PeerServing::Tolerated
+            });
             if follow.mode == ark_core::declaration::FollowMode::Observe {
                 if long {
                     store.follow_declared(root, None, follow)?;
