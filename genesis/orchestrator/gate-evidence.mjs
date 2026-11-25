@@ -592,11 +592,14 @@ function readSiblingVerdicts(project, key, { device, env, spawn, timeout }) {
     const r = spawn(deviceEpr({ env }), [
       'peer', 'verdicts', '--project', project.name, '--closure', key, '--json', '--root', device,
     ], { cwd: device, encoding: 'utf8', timeout });
-    if (r?.error?.code === 'ETIMEDOUT' || (r?.status === null && r?.signal)) {
+    // Only spawnSync's own timeout is a timeout. A signal kill without it (an OOM kill, a segfault)
+    // is an exit: retrying it would mislabel the failure and spend the longer bound for nothing.
+    if (r?.error?.code === 'ETIMEDOUT') {
       return siblingReadFailure('timeout', `timeout after ${seconds(timeout)}`);
     }
     if (!r || typeof r !== 'object') return siblingReadFailure('spawn', 'spawn returned no result');
     if (r.error) return siblingReadFailure('spawn', shortLine(r.error.message ?? r.error.code ?? r.error, 'spawn error'));
+    if (r.status === null && r.signal) return siblingReadFailure('exit', `killed by ${r.signal}`);
     if (r.status !== 0) {
       const code = r.status ?? 'unknown';
       const stderr = shortLine(r.stderr, '');
