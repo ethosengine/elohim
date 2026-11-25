@@ -77,6 +77,9 @@ pub const MESH_BUILD: &str = "mesh-build";
 /// projected eprfs root.
 pub const BASIS_KEY_SLOT: &str = "basis-key:git-tree";
 
+/// The payload formats an epr release opens, carried on the epr bin's Produce.
+pub(crate) const PAYLOAD_FORMATS_SLOT: &str = "env:payload-formats";
+
 /// The exit code of a typed refusal: an unrecorded put, a fetch gap, a closure with no key. The
 /// caller proceeds (the build succeeds unrecorded; the build runs locally).
 pub const EXIT_GAP: u8 = 3;
@@ -1373,6 +1376,39 @@ fn release_slots(options: &Options) -> ArtifactResult<Vec<String>> {
     }
 }
 
+/// The epr release's payload-format statement, derived from the method descriptor's own Cargo
+/// feature selection. Other release bins carry no statement: their descriptors say nothing about
+/// which payload backends epr links.
+fn payload_formats_slot(
+    options: &Options,
+    descriptor: &MethodDescriptor,
+) -> ArtifactResult<Option<String>> {
+    if options.release_bin.as_deref() != Some("epr") {
+        return Ok(None);
+    }
+    if !descriptor.flags.iter().any(|flag| flag == "--bin=epr") {
+        return Err(unrecorded(
+            "--release-bin epr requires a method descriptor for --bin=epr",
+        ));
+    }
+    let mut features = descriptor
+        .flags
+        .iter()
+        .filter_map(|flag| flag.strip_prefix("--features="));
+    let selected = features.next();
+    if features.next().is_some() {
+        return Err(unrecorded(
+            "the method descriptor records --features more than once",
+        ));
+    }
+    let formats = crate::payload::PayloadFormat::supported_for_cargo_features(selected)
+        .into_iter()
+        .map(|format| format.to_string())
+        .collect::<Vec<_>>()
+        .join(",");
+    Ok(Some(format!("{PAYLOAD_FORMATS_SLOT}={formats}")))
+}
+
 /// Draw the exact output `output` from admitted siblings into `dest` through this device's
 /// `epr peer serve`, as `epr artifact fetch --output CID --dest PATH` does. `epr bin follow`
 /// uses it to take a sibling's landed release instead of compiling.
@@ -1590,6 +1626,9 @@ fn record_artifact(
                 requires::INLINE_MAX
             ),
         }
+    }
+    if let Some(slot) = payload_formats_slot(options, descriptor)? {
+        extra.push(slot);
     }
     extra.extend(release_slots(options)?);
     if let Some((cid, _)) = &requires_evidence {

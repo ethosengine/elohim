@@ -1,5 +1,57 @@
 use super::*;
 
+fn release_descriptor(flags: &[&str]) -> MethodDescriptor {
+    MethodDescriptor {
+        name: MESH_BUILD.into(),
+        tools: BTreeMap::new(),
+        flags: flags.iter().map(|flag| (*flag).to_owned()).collect(),
+        params: None,
+        exec: None,
+        step: None,
+        embedder: None,
+        view: Vec::new(),
+        non_path_inputs: BTreeMap::new(),
+        deterministic: false,
+    }
+}
+
+#[test]
+fn epr_release_payload_formats_come_from_its_descriptor_features() {
+    let options = Options {
+        release: Some("release".into()),
+        release_bin: Some("epr".into()),
+        ..Options::default()
+    };
+    assert_eq!(
+        payload_formats_slot(
+            &options,
+            &release_descriptor(&["--bin=epr", "--features=blob-store"])
+        )
+        .unwrap()
+        .as_deref(),
+        Some("env:payload-formats=blob-store-v1,directory-v1")
+    );
+    assert_eq!(
+        payload_formats_slot(&options, &release_descriptor(&["--bin=epr"]))
+            .unwrap()
+            .as_deref(),
+        Some("env:payload-formats=directory-v1")
+    );
+}
+
+#[test]
+fn bin_launch_release_carries_no_epr_payload_format_statement() {
+    let options = Options {
+        release: Some("release".into()),
+        release_bin: Some("bin-launch".into()),
+        ..Options::default()
+    };
+    assert_eq!(
+        payload_formats_slot(&options, &release_descriptor(&["--bin=bin-launch"])).unwrap(),
+        None
+    );
+}
+
 #[test]
 fn artifact_every_recorded_build_variable_has_exactly_one_class() {
     let mut names = std::collections::BTreeSet::new();

@@ -1548,6 +1548,160 @@ fn a_follow_under_the_knob_draws_a_siblings_release_for_head_before_building() {
     );
 }
 
+/// Arrival runs the same bootstrap/follow draw as an explicit follow. The fixture has no
+/// buildable epr workspace; the knob selects the sibling-first path even on a CI host whose
+/// device layout supplies a cargo pool, making the physical-device no-pool path deterministic.
+#[test]
+#[cfg(feature = "blob-store")]
+fn arrival_refuses_a_directory_only_release_for_a_blob_store_and_lands_nothing() {
+    use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
+    use host_contract::{names::axis, AxisId, Clause, ClauseSource, Predicate, Requires};
+
+    let (_keys, a, b) = household();
+    let head = String::from_utf8(
+        elohim_epr_cli::process::build_command("git", &["rev-parse", "HEAD"], b.root(), &[])
+            .output()
+            .unwrap()
+            .stdout,
+    )
+    .unwrap()
+    .trim()
+    .to_string();
+    let published = elohim_epr_cli::process::build_command(
+        "git",
+        &["update-ref", "refs/remotes/origin/dev", &head],
+        b.root(),
+        &[],
+    )
+    .output()
+    .unwrap();
+    assert!(published.status.success(), "{}", text(&published));
+
+    let bins = b.config.path().join("bins");
+    let declared = b
+        .command()
+        .args(["device", "follow", "bin:epr", "--mode", "apply"])
+        .env("BIN_STORE", &bins)
+        .output()
+        .unwrap();
+    assert!(declared.status.success(), "{}", text(&declared));
+    elohim_epr_cli::payload::select_format(
+        &b.payload(),
+        elohim_epr_cli::payload::PayloadFormat::BlobStoreV1,
+    )
+    .unwrap();
+
+    let mut requires = Requires::default();
+    for (name, predicate) in [
+        (axis::ARCH, Predicate::Equal(std::env::consts::ARCH.into())),
+        (axis::OS, Predicate::Equal("linux".into())),
+        (
+            axis::ABI_LIBC,
+            Predicate::AtLeast(host_contract::Version {
+                line: "glibc".into(),
+                components: vec![2, 0],
+            }),
+        ),
+    ] {
+        requires
+            .insert(Clause {
+                axis: AxisId(name.into()),
+                predicate,
+                source: ClauseSource::Extracted,
+                narrowing: None,
+            })
+            .unwrap();
+    }
+    let requirement = serde_json::to_vec(&requires).unwrap();
+    let requirement_slots = [
+        format!("env:requires={}", BlobCid::compute_bytes(&requirement)),
+        format!("env:requires-doc={}", URL_SAFE_NO_PAD.encode(&requirement)),
+        "env:isa-c=x86-64".to_owned(),
+    ];
+    let release = "bafyreiaww7ivxkoouk2ojpwpqtm4pm7hxlvlzl3u7bqhrgnxcdhbg7mwmu";
+    let key = "bafyreigq2n5xqgbtzbb6ce2ebobfqvqtjqdmmqkn3mmdyx5n6k4hgemrzu";
+    let manifest = BlobCid::compute(b"\xa0").to_string();
+    let mut store = SidecarFlowStore::open(b.root()).unwrap();
+    for bin in ["epr", "bin-launch"] {
+        let output = BlobCid::compute_bytes(format!("{head} {bin}").as_bytes());
+        let mut event = produce_record(key, &output, &manifest, Some(&a.key.did_key()));
+        event
+            .classified_as
+            .retain(|slot| !slot.starts_with("env:commit="));
+        event.classified_as.extend([
+            format!("env:commit={head}"),
+            format!("env:release={release}"),
+            format!("env:release-bin={bin}"),
+        ]);
+        event
+            .classified_as
+            .extend(requirement_slots.iter().cloned());
+        if bin == "epr" {
+            event
+                .classified_as
+                .push("env:payload-formats=directory-v1".into());
+        }
+        store.append(FlowRecord::Event(event)).unwrap();
+    }
+
+    let registry = b.config.path().join("bin-tools.json");
+    std::fs::write(
+        &registry,
+        serde_json::json!({
+            "version": 1,
+            "tools": {
+                "epr": {
+                    "bins": ["epr", "bin-launch"],
+                    "candidateEnv": {},
+                    "source": {
+                        "kind": "repository",
+                        "publishedRef": ["refs/remotes/origin/dev"]
+                    }
+                }
+            }
+        })
+        .to_string(),
+    )
+    .unwrap();
+    let arrived = b
+        .command()
+        .current_dir(b.root())
+        .args([
+            "device",
+            "arrive",
+            "--worker",
+            "--root",
+            b.root().to_str().unwrap(),
+        ])
+        .env("BIN_STORE", &bins)
+        .env("BIN_STORE_SKIP_TOOLS", "")
+        .env("EPR_BIN_TOOLS", &registry)
+        .env("EPR_FOLLOW_SIBLING", "1")
+        .env("ELOHIM_STATE_DIR", b.config.path().join("state"))
+        .env("ELOHIM_SESSION_ID", "arrival-payload-format")
+        .output()
+        .unwrap();
+    let said = text(&arrived);
+    assert!(arrived.status.success(), "{said}");
+    assert!(
+        said.contains(
+            "refused: release opens directory-v1; this device's payload store is blob-store-v1"
+        ),
+        "{said}"
+    );
+    assert!(
+        !bins.join("epr/current").exists(),
+        "arrival must not land an incompatible release"
+    );
+    assert!(
+        !bins
+            .join("incoming")
+            .read_dir()
+            .is_ok_and(|mut entries| entries.next().is_some()),
+        "arrival must not stage incompatible release bytes"
+    );
+}
+
 #[test]
 fn put_takes_a_release_only_with_the_bin_it_names() {
     let keys = TempDir::new().unwrap();

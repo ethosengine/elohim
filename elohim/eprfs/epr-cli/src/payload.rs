@@ -61,6 +61,8 @@ pub enum PayloadFormat {
 }
 
 impl PayloadFormat {
+    const ALL: [Self; 2] = [Self::BlobStoreV1, Self::DirectoryV1];
+
     /// The marker spelling.
     pub const fn marker(self) -> &'static str {
         match self {
@@ -71,24 +73,48 @@ impl PayloadFormat {
 
     /// The format a marker names, if it names one this source knows.
     pub fn parse(marker: &str) -> Option<Self> {
-        [Self::BlobStoreV1, Self::DirectoryV1]
+        Self::ALL
             .into_iter()
             .find(|format| format.marker() == marker)
     }
 
     /// Whether this binary links the format's backend.
     pub const fn linked(self) -> bool {
+        self.linked_with_blob_store(cfg!(feature = "blob-store"))
+    }
+
+    /// Whether a build with `blob_store` enabled links this format's backend.
+    const fn linked_with_blob_store(self, blob_store: bool) -> bool {
         match self {
-            Self::BlobStoreV1 => cfg!(feature = "blob-store"),
+            Self::BlobStoreV1 => blob_store,
             Self::DirectoryV1 => true,
         }
     }
 
     /// Every format this binary opens.
     pub fn supported() -> Vec<Self> {
-        [Self::BlobStoreV1, Self::DirectoryV1]
+        Self::ALL
             .into_iter()
             .filter(|format| format.linked())
+            .collect()
+    }
+
+    /// Every format an epr Cargo selection opens, from its recorded `--features` value.
+    ///
+    /// Cargo accepts comma- or whitespace-separated features; a qualified workspace feature
+    /// (`elohim-epr-cli/blob-store`) and the package-local spelling (`blob-store`) select the
+    /// same backend. This is the descriptor-facing form of [`Self::supported`], sharing the one
+    /// format/linkage table rather than teaching the producer another payload-format list.
+    pub fn supported_for_cargo_features(features: Option<&str>) -> Vec<Self> {
+        let blob_store = features.is_some_and(|features| {
+            features
+                .split(|c: char| c == ',' || c.is_ascii_whitespace())
+                .filter(|feature| !feature.is_empty())
+                .any(|feature| feature == "blob-store" || feature.ends_with("/blob-store"))
+        });
+        Self::ALL
+            .into_iter()
+            .filter(|format| format.linked_with_blob_store(blob_store))
             .collect()
     }
 
@@ -287,10 +313,23 @@ fn create_private_dir(root: &Path) -> Result<(), PayloadStoreError> {
 ///
 /// As [`detect`], and [`PayloadStoreError::Format`] for a marker this binary cannot open.
 pub fn format_of(root: &Path) -> Result<PayloadFormat, PayloadStoreError> {
+    existing_format(root).map(|format| format.unwrap_or_else(PayloadFormat::for_new_store))
+}
+
+/// The format an existing payload directory holds, or `None` when no store exists yet.
+///
+/// Unlike [`format_of`], this never turns an absent or empty directory into the format this
+/// binary would choose for a new store. Release admission uses that distinction: without a store
+/// to preserve, either release can choose the format it supports. Reads only; never claims a root.
+///
+/// # Errors
+///
+/// As [`detect`], and [`PayloadStoreError::Format`] for a marker this binary cannot open.
+pub fn existing_format(root: &Path) -> Result<Option<PayloadFormat>, PayloadStoreError> {
     match detect(root)? {
-        Detected::Marked(marker) => linked_format(root, &marker),
-        Detected::UnmarkedDirectory => Ok(PayloadFormat::DirectoryV1),
-        Detected::New => Ok(PayloadFormat::for_new_store()),
+        Detected::Marked(marker) => linked_format(root, &marker).map(Some),
+        Detected::UnmarkedDirectory => Ok(Some(PayloadFormat::DirectoryV1)),
+        Detected::New => Ok(None),
     }
 }
 
@@ -419,6 +458,33 @@ mod tests {
             cfg!(feature = "blob-store")
         );
         assert!(PayloadFormat::for_new_store().linked());
+    }
+
+    #[test]
+    fn descriptor_features_use_the_same_payload_format_linkage_table() {
+        assert_eq!(
+            PayloadFormat::supported_for_cargo_features(Some("blob-store")),
+            vec![PayloadFormat::BlobStoreV1, PayloadFormat::DirectoryV1]
+        );
+        assert_eq!(
+            PayloadFormat::supported_for_cargo_features(Some("peer, elohim-epr-cli/blob-store")),
+            vec![PayloadFormat::BlobStoreV1, PayloadFormat::DirectoryV1]
+        );
+        assert_eq!(
+            PayloadFormat::supported_for_cargo_features(None),
+            vec![PayloadFormat::DirectoryV1]
+        );
+    }
+
+    #[test]
+    fn reading_an_absent_store_format_neither_claims_nor_creates_it() {
+        let temp = tempfile::tempdir().unwrap();
+        let root = temp.path().join("payload");
+        assert_eq!(existing_format(&root).unwrap(), None);
+        assert!(!root.exists());
+        std::fs::create_dir(&root).unwrap();
+        assert_eq!(existing_format(&root).unwrap(), None);
+        assert_eq!(std::fs::read_dir(&root).unwrap().count(), 0);
     }
 
     #[cfg(feature = "blob-store")]
