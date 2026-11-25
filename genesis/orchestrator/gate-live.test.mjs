@@ -71,6 +71,7 @@ function cli(root, args) {
 test('exports only the public run-log functions', () => {
   assert.deepEqual(Object.keys(live).sort(), [
     'appendEvent',
+    'awaitStopAnswer',
     'closeRun',
     'emitFinal',
     'emitRed',
@@ -95,6 +96,7 @@ test('exports only the public run-log functions', () => {
     'requestStop',
     'resolveSession',
     'sendNote',
+    'stopCounts',
     'stopNowRequest',
     'stopRequested',
     'stoppedAnswer',

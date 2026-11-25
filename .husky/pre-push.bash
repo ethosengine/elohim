@@ -961,6 +961,7 @@ handover_finish() {
   fi
   # A live stop request ends a hand-over as it ends the ordinary gate loop: refused, nothing recorded.
   if gate_stop_requested; then
+    honour_stop hand-over
     echo "[pre-push] stopped: stop requested on the live run; the hand-over is not recorded." >&2
     exit 1
   fi
@@ -1009,7 +1010,7 @@ hook_pass() {
     phase_l_refuse "[pre-push] REFUSED: cannot create $(dirname "$PHASE_L_LOG"). Your gates are recorded."
   read -r _ _ PHASE_L_CW <<<"$(phase_l_channel)"
   # The run's last stop point: after it a stop no longer refuses this push.
-  stop_point
+  stop_point landing-claim
   echo "[pre-push] Phase L: claiming dev-integration (ttl ${BERTH_TTL_S}s)"
   phase_l_claim
   phase_l_owner_checks
@@ -1033,6 +1034,8 @@ hook_pass() {
     rc=$?
     [ "$rc" -ne 1 ] || phase_l_moved "$target" "$local_sha" "$remote_sha"
   done
+  # An unmarked stop point is not passed: read the stop once more before the push is handed off.
+  stop_point landing-handoff
   phase_l_handoff
   exit 0
 }
@@ -1136,25 +1139,37 @@ gate_stop_requested() {
 # so a stop appended before the mark refuses here, and `gate-live.mjs stop` tells a stop appended
 # after it that the push is proceeding. The run is closed only after the check. Verdicts already
 # reached stand either way.
+# The run's own record that it took a stop: what `gate-live.mjs stop` waits for before it says so.
+honour_stop() {
+  [ -z "$GATE_LIVE_RUN" ] || node genesis/orchestrator/gate-live.mjs honour --run "$GATE_LIVE_RUN" --where "$1" >/dev/null 2>&1 || true
+}
 refuse_if_stopped() {
   if gate_stop_requested; then
+    honour_stop "${1:-stop-point}"
     GATE_LOOP_OUTCOME=failed
     echo "[pre-push] REFUSED: a stop was requested on the live run (gate-live.mjs stop); nothing is landed or pushed. Verdicts already reached stand." >&2
     exit 1
   fi
 }
+# STOP_POINT_MARKED is set once the mark is written. Until then the stop point is not passed: every
+# later point where the push would proceed (after the dev-integration claim, before the hand-off)
+# calls stop_point again, and when the mark still cannot be written the push proceeds while
+# `gate-live.mjs stop` keeps its answer truthful by waiting for the run's own record.
+STOP_POINT_MARKED=""
 stop_point() {
-  local marked=""
+  [ -z "$STOP_POINT_MARKED" ] || return 0
   if [ -n "$GATE_LIVE_RUN" ]; then
     if node genesis/orchestrator/gate-live.mjs boundary --run "$GATE_LIVE_RUN" >/dev/null 2>&1; then
-      marked=1
+      STOP_POINT_MARKED=1
     else
       # No mark, no boundary: every stop in the log keeps counting, and the run stays open for more.
       echo "[pre-push] the run's last stop point could not be marked in $GATE_LIVE_RUN; stops stay honoured on it" >&2
     fi
+  else
+    STOP_POINT_MARKED=1
   fi
-  refuse_if_stopped
-  [ -z "$marked" ] || node genesis/orchestrator/gate-live.mjs close --run "$GATE_LIVE_RUN" \
+  refuse_if_stopped "${1:-stop-point}"
+  [ -z "$STOP_POINT_MARKED" ] || [ -z "$GATE_LIVE_RUN" ] || node genesis/orchestrator/gate-live.mjs close --run "$GATE_LIVE_RUN" \
     --outcome "${GATE_LOOP_OUTCOME:-passed}" --deferred-from-log >/dev/null 2>&1 || true
 }
 # Every early pass below goes through here: a red an earlier check recorded still refuses.
@@ -2282,6 +2297,7 @@ for PROJECT in $GATE_INLINE; do
   INDEX=$((INDEX + 1))
   if [ -z "$STOP_REASON" ] && gate_stop_requested; then
     STOP_REASON="stop requested on the live run"
+    honour_stop between-gates
   fi
   if [ -z "$STOP_REASON" ] && [ "$GATE_ON_RED_MODE" = stop ] && { [ -n "$FAILED$PREGATE_FAILED" ] || gate_carry_red; }; then
     STOP_REASON="GATE_ON_RED=stop after a red"
@@ -2379,6 +2395,7 @@ if [ -n "$NOT_RUN" ]; then
   echo "[pre-push] stopped: $STOP_REASON; not run:$NOT_RUN"
   FAILED="$FAILED${FAILED:+ }stopped"
 elif gate_stop_requested; then
+  honour_stop after-gates
   # Every gate had started (a carried one included) when the stop came: their verdicts stand, and a
   # carried gate collected green never turns a stopped run green.
   echo "[pre-push] stopped: a stop was requested on the live run; no gate was left to start, and the push is refused"

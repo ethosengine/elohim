@@ -433,6 +433,8 @@ export function formatEvent(raw) {
         return `[gate-live] stop requested now${event.by ? ` by ${event.by}` : ''}${event.reason ? ` (${event.reason})` : ''} — a gate still running is ended and records no verdict; gates not yet started will not run, and the push is refused`;
       }
       return `[gate-live] stop requested${event.reason ? ` (${event.reason})` : ''} — gates not yet started will not run, and the push is refused`;
+    case 'stop-honoured':
+      return `[gate-live] the run took the stop${event.where ? ` (${event.where})` : ''}: no gate after this starts, and the push is refused`;
     case 'stop-boundary':
       return '[gate-live] the push passed its last stop point; a stop from here on cannot refuse it';
     case 'gate-stopped':
@@ -522,7 +524,7 @@ export async function follow({
 // What an agent hears without asking: every red, every notice, a failed verdict, and the close.
 function noteworthy(event) {
   if (event.kind !== 'gate-verdict') {
-    return ['failure', 'notice', 'detail', 'step-failed', 'outlook', 'stop-request', 'gate-stopped', 'run-close'].includes(event.kind);
+    return ['failure', 'notice', 'detail', 'step-failed', 'outlook', 'stop-request', 'stop-honoured', 'gate-stopped', 'run-close'].includes(event.kind);
   }
   const verdict = event.verdict && typeof event.verdict === 'object' ? event.verdict : null;
   return verdict
@@ -594,9 +596,22 @@ export function requestStop(path, { reason = '', now, by = null, immediate = fal
 // proceeding (the stop verb) and refuses nothing.
 function liveStops(events) {
   const boundary = events.find((event) => event.kind === 'stop-boundary');
-  return events.filter((event) => event.kind === 'stop-request'
-    && (!boundary || (Number.isInteger(event.seq) && event.seq < boundary.seq)));
+  return events.filter((event) => event.kind === 'stop-request' && stopCounts(event, boundary));
 }
+
+/**
+ * The one comparison the hook's reader and the stop verb share: a stop counts only when it is
+ * strictly before the run's stop-point mark in the log. A tie (an unlocked append can give two
+ * events one sequence number) is after the mark.
+ */
+export function stopCounts(stop, boundary) {
+  if (!boundary) return true;
+  return Number.isInteger(stop?.seq) && Number.isInteger(boundary.seq) && stop.seq < boundary.seq;
+}
+
+// The run's own records that it took a stop: the hook or a runner refusing or starting no further
+// gate on it (stop-honoured), or a gate it ended (gate-stopped).
+const STOPPED_RECORDS = new Set(['stop-honoured', 'gate-stopped']);
 
 export function stopRequested(path) {
   try {
@@ -636,25 +651,26 @@ function runningGate(events) {
 }
 
 /**
- * After a stop-now request at `seq`: waits until the running gate's stop is recorded, the run
- * closes, or `timeoutMs` passes. Resolves to { state: 'stopped' | 'closed' | 'idle' | 'unanswered', ... }.
+ * After this caller's stop request (`requested`, the appended event): waits, at most `timeoutMs`,
+ * for the run's own answer in its log, and reports what happened, never what was asked:
+ * - 'confirmed': the run recorded that it took a stop (stop-honoured or gate-stopped); with `now`,
+ *   also its close. The push is refused.
+ * - 'proceeding': the request is at or after the stop-point mark, or the run closed without a
+ *   stopped record. The push goes on (or was refused for another reason: `outcome` says which).
+ * - 'unconfirmed': neither within the bound; `gate` names a gate still running.
  */
-async function awaitStopNow(path, seq, { timeoutMs, pollMs = 200, sleep = delay } = {}) {
+export async function awaitStopAnswer(path, requested, { timeoutMs, now = false, pollMs = 200, sleep = delay } = {}) {
   const deadline = Date.now() + timeoutMs;
-  let first = true;
   for (;;) {
     let events = [];
-    try { events = parseEvents(readFileSync(path, 'utf8')); } catch { return { state: 'closed', outcome: 'unknown' }; }
-    const stopped = events.find((event) => event.kind === 'gate-stopped' && event.seq > seq);
-    if (stopped) return { state: 'stopped', event: stopped };
-    const close = events.find((event) => event.kind === 'run-close' && event.seq > seq);
-    if (close) return { state: 'closed', outcome: close.outcome };
-    const finished = events.find((event) => event.kind === 'gate-verdict' && event.seq > seq);
-    if (finished) return { state: 'finished', event: finished };
-    if (first && runningGate(events) === null) return { state: 'idle' };
-    first = false;
-    if (Date.now() >= deadline) return { state: 'unanswered', gate: runningGate(events) };
-    await sleep(pollMs);
+    try { events = parseEvents(readFileSync(path, 'utf8')); } catch { return { state: 'unconfirmed', gate: null }; }
+    const boundary = events.find((event) => event.kind === 'stop-boundary');
+    const record = events.find((event) => STOPPED_RECORDS.has(event.kind));
+    const close = events.find((event) => event.kind === 'run-close');
+    if (record && (!now || close)) return { state: 'confirmed', record, close: close ?? null };
+    if (!record && (!stopCounts(requested, boundary) || close)) return { state: 'proceeding', outcome: close?.outcome ?? null };
+    if (Date.now() >= deadline) return { state: 'unconfirmed', gate: runningGate(events) };
+    await sleep(Math.min(pollMs, Math.max(1, deadline - Date.now())));
   }
 }
 
@@ -1439,7 +1455,13 @@ const USAGE = `Usage:
   node gate-live.mjs show (--run R | --session S | --latest) [--seq N]
   node gate-live.mjs unseen --session S [--reader R]
   node gate-live.mjs red --run PATH --project P --message M     (a pre-gate leg's red, live at once)
-  node gate-live.mjs stop [--run PATH | --session S | --latest] [--reason R] [--now]
+  node gate-live.mjs stop [--run PATH | --session S | --latest] [--reason R] [--now] [--wait S]
+        stop reports what the RUN did, never what was asked. It appends the request, then waits
+        (--wait S; default 30 s, plus the stop grace with --now) for the run's own answer:
+        exit 0 once the run recorded that it took the stop (with --now, once it also closed),
+        exit 1 when the run passed its last stop point or closed without taking it,
+        exit 2 when the run did not answer in time ("the push may be proceeding"). A plain stop
+        is taken at the run's next check between gates, so a long running gate can mean exit 2.
         A stop refuses the push until the run's last stop point (the hook's stop_point, just before
         a hand-over or non-landing push passes and before a dev landing claims dev-integration);
         after it the push proceeds, and stop says so and exits 1. If the hook cannot mark that point
@@ -1454,6 +1476,7 @@ const USAGE = `Usage:
         the push, it never unmakes a verdict.
   node gate-live.mjs stopped --run PATH [--gate P]              (exit 0 when a stop was requested; with --gate, when P was stopped)
   node gate-live.mjs boundary --run PATH                        (internal: the hook's last stop point)
+  node gate-live.mjs honour --run PATH [--where W]              (internal: the run took a stop)
   node gate-live.mjs outlook --run PATH --remaining "a b c"     (once per run: what continuing costs)
   node gate-live.mjs harvest [--last N]
   node gate-live.mjs subscribe --session S --device DID|any [--ref GLOB] [--every | --nth N] [--until RFC3339]
@@ -1472,9 +1495,10 @@ function parseArguments(argv) {
     show: ['session', 'run', 'latest', 'seq'],
     unseen: ['session', 'reader'],
     red: ['run', 'project', 'message'],
-    stop: ['run', 'session', 'latest', 'reason', 'now'],
+    stop: ['run', 'session', 'latest', 'reason', 'now', 'wait'],
     stopped: ['run', 'gate'],
     boundary: ['run'],
+    honour: ['run', 'where'],
     harvest: ['last'],
     outlook: ['run', 'remaining'],
     subscribe: ['session', 'device', 'ref', 'every', 'nth', 'until'],
@@ -1510,6 +1534,7 @@ function parseArguments(argv) {
     stop: [],
     stopped: ['run'],
     boundary: ['run'],
+    honour: ['run'],
     harvest: [],
     outlook: ['run'],
     subscribe: ['session', 'device'],
@@ -1537,7 +1562,7 @@ function parseArguments(argv) {
     if (options.nth !== undefined && !/^[1-9]\d*$/.test(options.nth)) throw new Error('nth must be a positive integer');
     options.ref ??= '*';
   }
-  for (const name of ['seq', 'timeout-ms', 'deferred', 'last']) {
+  for (const name of ['seq', 'timeout-ms', 'deferred', 'last', 'wait']) {
     if (Object.hasOwn(options, name)) {
       if (!/^\d+$/.test(options[name]) || !Number.isSafeInteger(Number(options[name]))) {
         throw new Error('expected a non-negative integer');
@@ -1687,39 +1712,40 @@ async function main(argv) {
         const by = resolveSession();
         const requested = requestStop(path, { reason: options.reason, by, immediate: options.now === true });
         if (requested === null) throw new Error(`could not request a stop on ${path}`);
-        // The log's order decides against the hook's stop point: a mark before this request means the
-        // hook read the stop before it existed, and the push goes on.
-        if (parseEvents(readFileSync(path, 'utf8')).some((event) => event.kind === 'stop-boundary' && event.seq < requested.seq)) {
-          process.stdout.write(`[gate-live] stop: this run has passed its last stop point; the push is proceeding (${path})\n`);
+        process.stdout.write(`stop requested: ${path}\n`);
+        // The answer is the run's own record, never this request: exit 0 only once the run took it.
+        let waitS = options.wait;
+        if (waitS === undefined) {
+          const { stopGraceMs } = await import('./gate-stop.mjs');
+          waitS = options.now === true ? 30 + Math.ceil(stopGraceMs() / 1000) : 30;
+        }
+        const answer = await awaitStopAnswer(path, requested, { timeoutMs: waitS * 1000, now: options.now === true });
+        if (answer.state === 'confirmed') {
+          const { record, close } = answer;
+          process.stdout.write(record.kind === 'gate-stopped'
+            ? `[gate-live] ${record.project} stopped (${record.signal ?? 'nothing left to signal'}); no verdict recorded; the run closed ${close?.outcome ?? 'later'} and the push is refused\n`
+            : `[gate-live] the run took the stop (${record.where ?? 'stop'}): no gate after this starts, and the push is refused\n`);
+          return 0;
+        }
+        if (answer.state === 'proceeding') {
+          process.stdout.write(answer.outcome && answer.outcome !== 'passed' && answer.outcome !== 'gates-passed'
+            ? `[gate-live] stop: the run ended (${answer.outcome}) before taking this stop; the push is refused by its own result, not by this stop\n`
+            : `[gate-live] stop: this run has passed its last stop point; the push is proceeding (${path})\n`);
           return 1;
         }
-        process.stdout.write(`stop requested: ${path}\n`);
-        if (options.now !== true) return 0;
-        const { stopGraceMs } = await import('./gate-stop.mjs');
-        const waitS = Math.ceil((stopGraceMs() + 15_000) / 1000);
-        const answer = await awaitStopNow(path, requested.seq, { timeoutMs: waitS * 1000 });
-        switch (answer.state) {
-          case 'stopped':
-            process.stdout.write(`[gate-live] ${answer.event.project} stopped (${answer.event.signal ?? 'nothing left to signal'}); no verdict recorded; the push is refused\n`);
-            return 0;
-          case 'finished':
-            process.stdout.write(`[gate-live] ${answer.event.project} had already ended on its own; its verdict stands, and the push is refused\n`);
-            return 0;
-          case 'closed':
-            process.stdout.write(`[gate-live] the run closed (${answer.outcome}) before a running gate answered the stop\n`);
-            return 0;
-          case 'idle':
-            process.stdout.write('[gate-live] no gate is running now: no gate after this starts, and the push is refused\n');
-            return 0;
-          default:
-            process.stdout.write(`[gate-live] ${answer.gate ?? 'the running gate'} did not answer the stop within ${waitS}s `
-              + '(an untapped gate, GATE_TAP=off, cannot be ended); no gate after it starts\n');
-            return 1;
-        }
+        process.stdout.write(`[gate-live] stop requested but not confirmed by the run within ${waitS} s; the push may be proceeding`
+          + `${answer.gate ? ` (${answer.gate} is running; a plain stop lets it finish first${options.now === true ? ', and an untapped gate cannot be ended' : ''})` : ''}\n`);
+        return 2;
       }
       case 'outlook':
         if (await outlook(resolve(root, options.run), String(options.remaining ?? '').split(/\s+/).filter(Boolean), { root }) === null) {
           throw new Error(`could not append an outlook to ${options.run}`);
+        }
+        return 0;
+      case 'honour':
+        // The hook or a runner taking a stop: the run's own record, which `stop` waits for.
+        if (appendEvent(resolve(root, options.run), { kind: 'stop-honoured', ...(options.where ? { where: options.where } : {}) }) === null) {
+          throw new Error(`could not record the stop on ${options.run}`);
         }
         return 0;
       case 'boundary':

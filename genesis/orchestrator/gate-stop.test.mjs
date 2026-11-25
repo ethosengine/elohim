@@ -4,13 +4,13 @@
 import { describe, test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import { spawn, spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { setTimeout as delay } from 'node:timers/promises';
 
-import { closeRun, formatEvent, openRun, readRun, requestStop } from './gate-live.mjs';
+import { appendEvent, awaitStopAnswer, closeRun, formatEvent, openRun, readRun, requestStop, stopCounts, stopRequested } from './gate-live.mjs';
 import { GATE_STOPPED_EXIT, runProject } from './gate-runner.mjs';
 import { endTree, gateTree, readStat, snapshot, stopGraceMs, stoppedBy } from './gate-stop.mjs';
 
@@ -526,16 +526,47 @@ describe('the stop CLI', () => {
     assert.equal(readFileSync(run, 'utf8'), before, 'nothing was appended to the closed run');
   });
 
-  test('stop --now with no gate running says so at once and leaves the plain stop in force', t => {
+  test('a stop the run never answers is unconfirmed: exit 2, and the push may be proceeding', t => {
     const root = scratch(t, 'gate-stop-idle-');
     const { path: run } = openRun({ root, sha: '1'.repeat(40), target: 'test' });
-    const result = spawnSync(process.execPath, [LIVE, 'stop', '--now', '--run', run],
+    const result = spawnSync(process.execPath, [LIVE, 'stop', '--now', '--wait', '1', '--run', run],
       { encoding: 'utf8', env: { ...process.env, EPR_BIN: '/nonexistent/epr', ELOHIM_SESSION_ID: 'session-cli' }, timeout: 10_000 });
-    assert.equal(result.status, 0, result.stderr);
-    assert.match(result.stdout, /no gate is running now: no gate after this starts/);
+    assert.equal(result.status, 2, result.stdout + result.stderr);
+    assert.match(result.stdout, /stop requested but not confirmed by the run within 1 s; the push may be proceeding/);
     const request = readRun(run).events.find(event => event.kind === 'stop-request');
     assert.equal(request.immediate, true);
     assert.equal(request.by, 'session-cli');
     assert.match(formatEvent(request), /stop requested now by session-cli — a gate still running is ended and records no verdict; .* the push is refused/);
+  });
+
+  test('stop --now on a running gate exits 0 only once the run\'s stopped close exists', async t => {
+    const fx = evidenceFixture(t, 'gate-stop-cli-now-', { seconds: 300 });
+    const exitFile = resolve(fx.pids, 'cli-exit');
+    const cli = spawn('bash', ['-c', `until [ -f "${resolve(fx.pids, 'grandchild')}" ]; do sleep 0.05; done; `
+      + `"${process.execPath}" "${LIVE}" stop --now --wait 20 --run "${fx.run}" > "${resolve(fx.pids, 'cli-out')}"; echo $? > "${exitFile}"`],
+      { stdio: 'ignore', env: { ...process.env, EPR_BIN: '/nonexistent/epr', ELOHIM_SESSION_ID: 'session-cli' } });
+    t.after(() => cli.kill());
+    const status = runProject(fx.project, false, false, { root: fx.root, spawn: fx.spawnFake, tap: true, env: fx.env,
+      readingCollector: [], write: () => {}, warn: () => {} });
+    assert.equal(status, GATE_STOPPED_EXIT);
+    assert.ok(readRun(fx.run).events.some(event => event.kind === 'gate-stopped'));
+    await delay(600);
+    assert.equal(existsSync(exitFile), false, 'no answer yet: the gate is stopped, but the run has not closed');
+    closeRun(fx.run, 'failed');
+    assert.ok(await waitFor(() => existsSync(exitFile) && readFileSync(exitFile, 'utf8').trim() !== ''));
+    assert.equal(readFileSync(exitFile, 'utf8').trim(), '0');
+    assert.match(readFileSync(resolve(fx.pids, 'cli-out'), 'utf8'), /fixture stopped \(SIGTERM\); no verdict recorded; the run closed interrupted and the push is refused/);
+  });
+
+  test('a stop that ties the stop-point mark is after it, for the reader and the stop verb alike', async t => {
+    const root = scratch(t, 'gate-stop-tie-');
+    const { path: run } = openRun({ root, sha: '5'.repeat(40), target: 'refs/heads/dev' });
+    const mark = appendEvent(run, { kind: 'stop-boundary' });
+    const tie = { kind: 'stop-request', immediate: true, v: 1, run: 'x', seq: mark.seq, at: mark.at };
+    appendFileSync(run, `${JSON.stringify(tie)}\n`);
+    assert.equal(stopCounts(tie, mark), false);
+    assert.equal(stopRequested(run), false, 'the hook\'s reader does not count it');
+    const answer = await awaitStopAnswer(run, tie, { timeoutMs: 500 });
+    assert.equal(answer.state, 'proceeding', 'the stop verb reports the push proceeding');
   });
 });

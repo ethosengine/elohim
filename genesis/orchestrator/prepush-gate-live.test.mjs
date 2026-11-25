@@ -232,7 +232,7 @@ test("a stop requested on the live run is seen by the hook's probe", (t) => {
   writeFileSync(join(dir, "genesis/orchestrator/gate-preflight.mjs"), "process.stdout.write('continue\\n');\n");
   const r = spawnSync("bash", ["-c", script(`HOOK_WORK_TREE='${dir}'`, PRELUDE, OPEN_BLOCK, RED_BLOCK,
     'gate_stop_requested && echo STOP-BEFORE || echo NO-STOP-BEFORE',
-    'node genesis/orchestrator/gate-live.mjs stop --run "$GATE_LIVE_RUN" --reason "integrator" >/dev/null',
+    'node genesis/orchestrator/gate-live.mjs stop --wait 0 --run "$GATE_LIVE_RUN" --reason "integrator" >/dev/null',
     'gate_stop_requested && echo STOP-AFTER || echo NO-STOP-AFTER')],
     { cwd: dir, env: env(), encoding: "utf8", timeout: 15000 });
   assert.equal(r.status, 0, r.stdout + r.stderr);
@@ -247,7 +247,7 @@ test("a stop before the last stop point refuses; the run stays open for it until
     writeFileSync(join(dir, "genesis/orchestrator/gate-preflight.mjs"), "process.stdout.write('continue\\n');\n");
     const r = spawnSync("bash", ["-c", script(`HOOK_WORK_TREE='${dir}'`, PRELUDE, OPEN_BLOCK, RED_BLOCK,
       'GATE_LOOP_OUTCOME=gates-passed',
-      stop ? 'node genesis/orchestrator/gate-live.mjs stop --run "$GATE_LIVE_RUN" --reason "late" >/dev/null' : 'true',
+      stop ? 'node genesis/orchestrator/gate-live.mjs stop --wait 0 --run "$GATE_LIVE_RUN" --reason "late" >/dev/null' : 'true',
       'stop_point', 'echo PASSED-THROUGH')],
       { cwd: dir, env: env(), encoding: "utf8", timeout: 15000 });
     const events = eventsOf(runsOf(dir)[0]);
@@ -293,10 +293,15 @@ test("a stop appended after the stop-point mark refuses nothing", (t) => {
   assert.ok(r.stdout.includes("IGNORED"), r.stdout);
 });
 
-test("a stop point that cannot be marked says so and keeps stops honoured", (t) => {
-  const dir = fixture(t);
-  writeFileSync(join(dir, "genesis/orchestrator/gate-preflight.mjs"), "process.stdout.write('continue\\n');\n");
-  // The CLI refuses only the mark; every other verb is the real one.
+// The real hook_pass, its landing machinery stood in for: the stop point, the claim, the hand-off.
+const HOOK_PASS = slice("hook_pass() {\n", "\nphase_l_on_exit() {");
+const LANDING_STUBS = [
+  "phase_l_channel() { echo 'a b c'; }", "phase_l_owner_checks() { :; }",
+  "phase_l_handoff() { echo HANDED-OFF; }", "phase_l_refuse() { echo \"$1\" >&2; exit 1; }",
+  "PUSH_LINES=()", "BERTH_TARGETS=' dev'", "BERTH_TTL_S=600",
+];
+// A gate-live CLI whose stop-point mark cannot be written; every other verb is the real one.
+function failingMark(dir) {
   const orch = join(dir, "genesis/orchestrator");
   copyFileSync(join(orch, "gate-live.mjs"), join(orch, "gate-live-real.mjs"));
   writeFileSync(join(orch, "gate-live.mjs"), [
@@ -305,16 +310,57 @@ test("a stop point that cannot be marked says so and keeps stops honoured", (t) 
     "const r = spawnSync(process.execPath, [new URL('./gate-live-real.mjs', import.meta.url).pathname, ...process.argv.slice(2)], { stdio: 'inherit' });",
     "process.exit(r.status ?? 1);",
   ].join("\n"));
-  const r = spawnSync("bash", ["-c", script(`HOOK_WORK_TREE='${dir}'`, PRELUDE, OPEN_BLOCK, RED_BLOCK,
-    'GATE_LOOP_OUTCOME=gates-passed', 'stop_point', 'echo PASSED-THROUGH',
-    'node genesis/orchestrator/gate-live.mjs stop --run "$GATE_LIVE_RUN"; echo "STOP-EXIT=$?"',
-    'gate_stop_requested && echo HONOURED || echo DROPPED', 'exit 1')],
+}
+
+test("an unmarked stop point is read again after the landing claim; a stop there refuses, and stop says so with exit 0", (t) => {
+  const dir = fixture(t);
+  writeFileSync(join(dir, "genesis/orchestrator/gate-preflight.mjs"), "process.stdout.write('continue\\n');\n");
+  failingMark(dir);
+  // The stop arrives while the landing claims dev-integration, after the first (unmarked) stop point.
+  const claim = 'phase_l_claim() { { node genesis/orchestrator/gate-live.mjs stop --wait 10 --run "$GATE_LIVE_RUN" > stop.out; echo "STOP-EXIT=$?" >> stop.out; } & ' +
+    'until grep -q "\\"stop-request\\"" "$GATE_LIVE_RUN"; do sleep 0.05; done; }';
+  const r = spawnSync("bash", ["-c", script(`HOOK_WORK_TREE='${dir}'`, PRELUDE, OPEN_BLOCK, RED_BLOCK, ...LANDING_STUBS, claim,
+    HOOK_PASS, 'GATE_LOOP_OUTCOME=gates-passed', 'hook_pass')],
+    { cwd: dir, env: env(), encoding: "utf8", timeout: 20000 });
+  assert.equal(r.status, 1, r.stdout + r.stderr);
+  assert.match(r.stderr, /last stop point could not be marked/);
+  assert.match(r.stderr, /REFUSED: a stop was requested on the live run/);
+  assert.ok(!r.stdout.includes("HANDED-OFF"), "the push is not handed off");
+  const until = Date.now() + 10000;
+  while (!/STOP-EXIT=/.test(existsSync(join(dir, "stop.out")) ? readFileSync(join(dir, "stop.out"), "utf8") : "") && Date.now() < until) spawnSync("sleep", ["0.1"]);
+  const out = readFileSync(join(dir, "stop.out"), "utf8");
+  assert.match(out, /STOP-EXIT=0/, out);
+  assert.match(out, /the run took the stop \(landing-handoff\)/, out);
+});
+
+test("an unmarked stop point that the push passes: a later stop never gets exit 0", (t) => {
+  const dir = fixture(t);
+  writeFileSync(join(dir, "genesis/orchestrator/gate-preflight.mjs"), "process.stdout.write('continue\\n');\n");
+  failingMark(dir);
+  // A non-landing push passes its (unmarked) stop point and exits 0; the exit trap closes the run.
+  const r = spawnSync("bash", ["-c", script(`HOOK_WORK_TREE='${dir}'`, PRELUDE, OPEN_BLOCK, RED_BLOCK, ...LANDING_STUBS,
+    "BERTH_TARGETS=''", HOOK_PASS, 'echo "RUN=$GATE_LIVE_RUN"', 'hook_pass')],
+    { cwd: dir, env: env(), encoding: "utf8", timeout: 20000 });
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  const run = runsOf(dir)[0];
+  const stop = spawnSync(process.execPath, [join(dir, "genesis/orchestrator/gate-live-real.mjs"), "stop", "--wait", "2", "--run", run],
     { cwd: dir, env: env(), encoding: "utf8", timeout: 15000 });
-  assert.match(r.stderr, /last stop point could not be marked .*stops stay honoured on it/);
-  assert.ok(r.stdout.includes("PASSED-THROUGH"));
-  assert.match(r.stdout, /STOP-EXIT=0/, "the stop is taken, not told the push is proceeding");
-  assert.ok(r.stdout.includes("HONOURED"), r.stdout);
-  assert.ok(!eventsOf(runsOf(dir)[0]).slice(0, -1).some((e) => e.kind === "run-close"), "not closed at the unmarked point");
+  assert.notEqual(stop.status, 0, stop.stdout + stop.stderr);
+  assert.match(stop.stdout, /passed its last stop point; the push is proceeding/);
+});
+
+test("a boundary and a stop with one sequence number: the stop counts for nothing, and the push proceeds", (t) => {
+  const dir = fixture(t);
+  writeFileSync(join(dir, "genesis/orchestrator/gate-preflight.mjs"), "process.stdout.write('continue\\n');\n");
+  // An unlocked append's tie, written as it would land: the mark, then a stop with the mark's seq.
+  const tie = 'node genesis/orchestrator/gate-live.mjs boundary --run "$GATE_LIVE_RUN"; ' +
+    'seq=$(node -e "const l=require(\'fs\').readFileSync(process.argv[1],\'utf8\').trim().split(\'\\n\').map(JSON.parse); process.stdout.write(String(l.find(e=>e.kind===\'stop-boundary\').seq))" "$GATE_LIVE_RUN"); ' +
+    'printf \'{"v":1,"run":"x","seq":%s,"at":"2026-11-25T00:00:00.000Z","kind":"stop-request","immediate":true}\\n\' "$seq" >> "$GATE_LIVE_RUN"';
+  const r = spawnSync("bash", ["-c", script(`HOOK_WORK_TREE='${dir}'`, PRELUDE, OPEN_BLOCK, RED_BLOCK, ...LANDING_STUBS,
+    tie, 'refuse_if_stopped', 'echo PROCEEDS')],
+    { cwd: dir, env: env(), encoding: "utf8", timeout: 20000 });
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.ok(r.stdout.includes("PROCEEDS"), "the hook does not count the tie");
 });
 
 test("the stop point is the last act before each pass: hand-over, non-landing and dev landing", () => {
@@ -322,8 +368,10 @@ test("the stop point is the last act before each pass: hand-over, non-landing an
   assert.match(handover, /stop_point\n  echo "\[pre-push\] hand-over: seconds checks green[^\n]*\n  exit 0\n?$/, "hand-over: stop_point, then exit 0");
   const pass = slice("hook_pass() {\n", "\n}\n");
   assert.ok(pass.includes('[ -n "$BERTH_TARGETS" ] || { stop_point; exit 0; }'), "non-landing pass");
-  const point = pass.indexOf("  stop_point\n");
+  const point = pass.indexOf("  stop_point landing-claim\n");
   assert.ok(point > 0 && point < pass.indexOf("phase_l_claim"), "dev landing: before the dev-integration claim");
+  const again = pass.indexOf("  stop_point landing-handoff\n");
+  assert.ok(again > pass.indexOf("phase_l_claim") && again < pass.indexOf("phase_l_handoff"), "and again before the hand-off, for an unmarked point");
   assert.ok(!/close --run "\$GATE_LIVE_RUN" \\\n    --outcome "\$\(\[ -n "\$FAILED" \]/.test(HOOK), "a passed gate loop no longer closes the run early");
 });
 
@@ -335,7 +383,7 @@ test("a stop after every gate started, a carried one included, leaves the run fa
     const r = spawnSync("bash", ["-c", script(`HOOK_WORK_TREE='${dir}'`, PRELUDE, OPEN_BLOCK, RED_BLOCK,
       // Every gate ran and a carried gate was collected green: nothing failed, nothing was left unrun.
       'FAILED=""; NOT_RUN=""; STOP_REASON=""',
-      stop ? 'node genesis/orchestrator/gate-live.mjs stop --run "$GATE_LIVE_RUN" >/dev/null' : 'true',
+      stop ? 'node genesis/orchestrator/gate-live.mjs stop --wait 0 --run "$GATE_LIVE_RUN" >/dev/null' : 'true',
       after, 'echo "FAILED=[$FAILED]"')],
       { cwd: dir, env: env(), encoding: "utf8", timeout: 15000 });
     assert.equal(r.status, 0, r.stdout + r.stderr);

@@ -1575,7 +1575,11 @@ if (isMain) {
   const ordered = orderByCost(projects);
   if (failed && process.env.GATE_LIVE_RUN) await outlook(process.env.GATE_LIVE_RUN, ordered.map(p => p.name), { root: ROOT });
   for (const [index, project] of ordered.entries()) {
-    if (!stopping && process.env.GATE_LIVE_RUN && stopRequested(process.env.GATE_LIVE_RUN)) stopping = 'stop requested on the live run';
+    if (!stopping && process.env.GATE_LIVE_RUN && stopRequested(process.env.GATE_LIVE_RUN)) {
+      stopping = 'stop requested on the live run';
+      // The run's own record that it took the stop, which `gate-live.mjs stop` waits for.
+      if (ownRun) appendEvent(ownRun, { kind: 'stop-honoured', where: 'between-gates' });
+    }
     if (stopping) { notRun.push(project.name); continue; }
     // Unless pre-push already set it, the gates after this one, for the tap's mid-gate outlook.
     if (ownRun || process.env.GATE_PREFLIGHT_DONE !== '1') {
@@ -1594,6 +1598,7 @@ if (isMain) {
     failed = 1;
   } else if (process.env.GATE_LIVE_RUN && stopRequested(process.env.GATE_LIVE_RUN)) {
     // A stop that came after the last gate started still refuses: every verdict reached stands.
+    if (ownRun) appendEvent(ownRun, { kind: 'stop-honoured', where: 'after-gates' });
     process.stdout.write('[gate] stopped: a stop was requested on the live run after the last gate started; the run is refused\n');
     failed = 1;
   }
