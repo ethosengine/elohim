@@ -103,17 +103,17 @@ export function pinSource(module, pin, { candidates, spawn = spawnSync, exists =
  * Whether the work in this worktree needs `module`. The attested submodules (the list the pre-push
  * hook refuses without) always; any other only when a selected project reads it: the orchestrator
  * gate's suite view reads every declared pin, and a project's manifest may name a submodule as a
- * step source. Null `projects` (selection unavailable) means needed, as before.
+ * step source. Null `projects` (selection unavailable) and an unreadable manifest mean needed.
  */
 export function neededSubmodule(module, projects, { read = readFileSync, root = ROOT } = {}) {
   if (ATTESTED_SUBMODULES.includes(module) || !projects) return true;
   if (projects.some(project => project.name === 'orchestrator')) return true;
   return projects.some(project => {
     try {
-      const manifest = JSON.parse(String(read(join(root, project.dir, 'build-manifest.json'), 'utf8')));
+      const manifest = JSON.parse(String(read(resolve(root, project.manifestPath), 'utf8')));
       return Object.values(manifest.steps || {}).some(step =>
         (step?.inputs?.sources || []).some(source => source === module || source.startsWith(`${module}/`)));
-    } catch { return false; }
+    } catch { return true; } // an unreadable manifest answers the wider way: needed
   });
 }
 

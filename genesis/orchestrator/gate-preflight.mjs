@@ -13,6 +13,7 @@
 // The fresh-worktree checklist this replaces lived in agent memory and was re-learned on
 // 2026-10-15, -17, -19, -22, -27, -31 and 11-01. Habit `careless-reds-cost-seconds`.
 
+import { attestedSubmodules } from './attested-list.mjs';
 import { accessSync, constants, existsSync, readFileSync, readdirSync, realpathSync, statSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
@@ -40,9 +41,8 @@ const ROOT = process.env.GATE_ROOT
 
 /** Submodules whose manifests declare attested gate projects; without them the registry is short. */
 // gate-reads: genesis/orchestrator/attested-submodules.txt
-// The list is a file so the pre-push hook (bash) and this module cannot drift apart.
-export const ATTESTED_SUBMODULES = readFileSync(new URL('./attested-submodules.txt', import.meta.url), 'utf8')
-  .split('\n').map(line => line.trim()).filter(line => line && !line.startsWith('#'));
+// The list is resolved by attested-list.mjs, which the pre-push hook and prep share, so none can drift.
+export const ATTESTED_SUBMODULES = attestedSubmodules();
 
 /**
  * Projects whose Rust read set must be fully named (gate-input-audit.test.mjs `REAL … read set`).

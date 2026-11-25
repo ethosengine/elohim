@@ -375,15 +375,17 @@ test('not needed but available locally is initialised as today', t => {
 test('neededSubmodule: attested always; a manifest step source names it; otherwise not', () => {
   const read = () => JSON.stringify({ steps: { build: { inputs: { sources: [COND] } } } });
   assert.equal(neededSubmodule('sophia', [], { read }), true);
-  assert.equal(neededSubmodule(COND, [{ name: 'conductor-image', dir: 'elohim/conductor-image' }], { read }), true);
-  assert.equal(neededSubmodule(CHE, [{ name: 'conductor-image', dir: 'elohim/conductor-image' }], { read }), false);
+  assert.equal(neededSubmodule(COND, [{ name: 'conductor-image', manifestPath: 'elohim/conductor-image/build-manifest.json' }], { read }), true);
+  assert.equal(neededSubmodule(CHE, [{ name: 'conductor-image', manifestPath: 'elohim/conductor-image/build-manifest.json' }], { read }), false);
   assert.equal(neededSubmodule(CHE, [], { read }), false);
   assert.equal(neededSubmodule(CHE, null, { read }), true, 'selection unavailable: every submodule stays needed');
+  const unreadable = () => { throw new Error('ENOENT'); };
+  assert.equal(neededSubmodule(CHE, [{ name: 'x', manifestPath: 'x/build-manifest.json' }], { read: unreadable }), true, 'unreadable manifest: needed');
 });
 
 test('the pre-push hook and prep read one attested list file', () => {
   const hook = readFileSync(new URL('../../.husky/pre-push.bash', import.meta.url), 'utf8');
-  assert.match(hook, /genesis\/orchestrator\/attested-submodules\.txt/);
+  assert.match(hook, /attested-list\.mjs/);
   assert.doesNotMatch(hook, /submodule status -- elohim\/brit/);
   assert.deepEqual(ATTESTED_SUBMODULES, ['elohim/brit', 'elohim/rakia', 'sophia']);
 });

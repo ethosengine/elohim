@@ -177,23 +177,44 @@ gate_step_reading() {
 # live inside each submodule. A tree without them runs every gate, then the
 # orchestrator gate's registry and oracle tests fail (2026-10-27: refused at
 # 104 s, after eprfs had spent 5231 s). Refuse before any gate starts.
+# The list: attested-list.mjs reads the destination's landed list and the pushed tip's, validated
+# against .gitmodules, and requires the union. Prints one path per line; any failure is one line on
+# stderr and a refusal, never a pass.
+attested_submodules_list() {
+  printf '%s\n' "${PUSH_LINES[@]}" |
+    node "${HOOK_WORK_TREE:-.}/genesis/orchestrator/attested-list.mjs" --push-stdin --root "${HOOK_WORK_TREE:-.}"
+}
 attested_submodules_missing() {
-  # The list is genesis/orchestrator/attested-submodules.txt, shared with gate-preflight.mjs and prep.
-  local list
-  list=$(grep -v '^#' "${HOOK_WORK_TREE:-.}/genesis/orchestrator/attested-submodules.txt" | xargs)
-  # An unreadable list must refuse, never pass: name the file as the missing item.
-  [ -n "$list" ] || { echo "genesis/orchestrator/attested-submodules.txt"; return 0; }
-  # shellcheck disable=SC2086
-  git submodule status -- $list 2>/dev/null | awk '/^-/ { print $2 }'
+  local out
+  out=$(git submodule status -- "$@" 2>&1) || {
+    echo "attested submodules: git submodule status failed: ${out%%$'\n'*}" >&2
+    return 2
+  }
+  printf '%s\n' "$out" | awk '/^-/ { print $2 }'
 }
 READING_STARTED_S=$SECONDS
 READING_STARTED_AT=$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)
-MISSING_SUBMODULES=$(attested_submodules_missing | xargs)
+ATTESTED_LIST_OUT=$(attested_submodules_list); ATTESTED_LIST_RC=$?
+ATTESTED_LIST=()
+[ "$ATTESTED_LIST_RC" -ne 0 ] || mapfile -t ATTESTED_LIST <<<"$ATTESTED_LIST_OUT"
+MISSING_SUBMODULES=""; ATTESTED_REFUSAL=""
+if [ "$ATTESTED_LIST_RC" -ne 0 ]; then
+  ATTESTED_REFUSAL="the attested list could not be resolved (see the line above)"
+else
+  MISSING_SUBMODULES=$(attested_submodules_missing "${ATTESTED_LIST[@]}"); ATTESTED_MISSING_RC=$?
+  [ "$ATTESTED_MISSING_RC" -eq 0 ] || ATTESTED_REFUSAL="git could not read the submodule state (see the line above)"
+  MISSING_SUBMODULES=$(printf '%s' "$MISSING_SUBMODULES" | xargs)
+fi
 READING_STATUS=0
-[ -z "$MISSING_SUBMODULES" ] || READING_STATUS=1
+{ [ -z "$MISSING_SUBMODULES" ] && [ -z "$ATTESTED_REFUSAL" ]; } || READING_STATUS=1
 READING_ENDED_AT=$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)
 gate_step_reading "$READING_STATUS" submodules ran \
   "$((SECONDS - READING_STARTED_S))" "$READING_STARTED_AT" "$READING_ENDED_AT"
+if [ -n "$ATTESTED_REFUSAL" ]; then
+  echo "[pre-push] REFUSED: $ATTESTED_REFUSAL" >&2
+  gate_step_reading
+  exit 1
+fi
 if [ -n "$MISSING_SUBMODULES" ]; then
   echo "[pre-push] REFUSED: not checked out: $MISSING_SUBMODULES. Run: git submodule update --init $MISSING_SUBMODULES" >&2
   gate_step_reading
