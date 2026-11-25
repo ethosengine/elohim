@@ -36,12 +36,33 @@
 // Exit: 0 published, up to date, or dry run; 1 an error (no device, git failed); 2 refused.
 
 import { spawnSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { resolveBin } from './gate-evidence.mjs';
 import { encodeRefSegment } from './scripts/brit-attest.mjs';
 
 export const LOCAL_PREFIX = 'refs/notes/brit/build/';
+
+/**
+ * The declared retention for published notes (pool-policy `ci_note_retention_days`): how long a node
+ * keeps and serves a note nobody has asked for. Declared, not yet enforced: publish prints it and no
+ * note expires. Null when the policy is unreadable or the value is not a positive integer.
+ */
+export function noteRetentionDays(root, { read = path => readFileSync(path, 'utf8') } = {}) {
+  try {
+    const days = JSON.parse(read(resolve(root, 'genesis/agentic/pool-policy.json'))).ci_note_retention_days;
+    return Number.isInteger(days) && days > 0 ? days : null;
+  } catch {
+    return null;
+  }
+}
+
+export function retentionLine(days) {
+  return days === null
+    ? 'device-notes: retention undeclared (pool-policy ci_note_retention_days missing or not a positive integer)'
+    : `device-notes: retention ${days} days declared (pool-policy ci_note_retention_days), not yet enforced: no note expires`;
+}
 export const LEGACY_PREFIX = LOCAL_PREFIX;
 export const DEVICES_PREFIX = 'refs/notes/brit/devices/';
 // DID core syntax (did:<method>:<method-specific-id>), without the path, query and fragment parts
@@ -169,6 +190,7 @@ export function publish({ root, remote = 'origin', did: explicit, dryRun = false
   const locals = localNotes(root, opts);
   log(`device-notes: device ${who.did} (via ${who.via}) → ${prefix}*`);
   log(`device-notes: legacy ${LEGACY_PREFIX}* on the forge is frozen; this publish never writes it`);
+  log(retentionLine(noteRetentionDays(root)));
   if (locals.length === 0) { log('device-notes: no local build notes; nothing to publish'); return 0; }
 
   if (dryRun) {

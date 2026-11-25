@@ -8,6 +8,8 @@
   "artifact_min_mb": 64,
   "artifact_min_age_hours": 6,
   "keep_warm_slot_days": 7,
+  "ci_note_retention_days": 30,
+  "_ci_note_retention_days": "How long a node keeps and serves a published build or ci:<pipeline> note that nobody has asked for (steward, 2026-11-25, verdict-as-attestation design section 9a: every node holds some of its own results for others to use, at least for a while). Provisional: the steward named no number. Declared, not yet enforced: genesis/orchestrator/device-notes-publish.mjs prints it on every run; nothing expires a note yet.",
   "_keep_warm_slot_days": "keep-warm trim survivors: the freshest slot per crate (workspace key) built within this many days is always kept; colder keys become candidates oldest-first. Per-slot operator pin: `touch <slot>/.pin` (e.g. the fork conductor — ~3G, ~45 min rebuild).",
   "_evidence_2026_08_28": "The pool is a cluster-stability control, not only disk hygiene: the workspace PV lives on the root fs of the host that runs the only k8s control plane; a netconsole trace (2026-08-28 23:00Z) showed kswapd soft-locked in ext4_es_scan/__es_shrink (extent-status shrinker, cost ∝ inode count + fragmentation) — 14 CPUs followed, cluster API down for hours, 17th freeze. The pool held 341K of the PV's ~1.02M inodes (126G) and its churn fragments the extent tree. Two enforcement gaps let it grow: hash-gc and the keep-warm cap both skipped the ACTIVE family (dev sat at 96G under a 60G cap). Both now apply slot-granularly with in-use/pin guards.",
   "families": {

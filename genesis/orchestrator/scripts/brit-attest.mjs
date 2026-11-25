@@ -5,7 +5,10 @@
 // CID and the exact sha256:-prefixed closure key. A closure hit produces no new step note.
 // hardware identifies service:jenkins as performer and the downstream URL as provenance;
 // writer identifies this device. brit's agentId remains this device's signing key.
-// Notes stay on this device: no remote fetch/push, runner key, or roster entry.
+// This script writes notes on this device only: no remote fetch or push, runner key, or roster entry.
+// They are published with the device's other build notes to its own forge destination by
+// device-notes-publish.mjs (`just dev notes publish`), so other nodes can use them for a while
+// (steward, 2026-11-25; retention declared as pool-policy ci_note_retention_days, not yet enforced).
 //
 // A writer reads before it writes. `build get` is brit's verified read of the note already on
 // the commit, and it only NAMES what the put replaces: an existing note with the same inputsHash
