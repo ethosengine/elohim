@@ -1479,6 +1479,76 @@ pass_or_refuse() {
 }
 # ── Red recorder end
 
+# ── Rust style: which pushed ranges can change its verdict ──────
+# The checker compares two snapshots, merge-base(--base, --head) and --head, and reads nothing else
+# from the pushed history (genesis/orchestrator/rust-style/src/main.rs, repository.rs evaluate). So
+# a range none of whose commits changes one of the paths below gets the answer the base already
+# had, on every device: the leg says so and does not build or run the checker. The set, and where
+# each element comes from:
+#  - repository.rs `relevant()`, the only paths Snapshot::load reads from a revision, which compare()
+#    also counts as touches: every *.rs (all cfg branches: the scanner parses text, never compiles),
+#    *clippy.toml, *rustfmt.toml, *.cargo/config.toml, Cargo.toml at any depth, a legacy `.epr-meta`
+#    file, every */.epr-meta/manifest.md (rust-style-strict@1 resolves through the whole cascade, and
+#    a changed manifest marks the crates below it touched), the policy .epr-meta/rust-style-policy.json
+#    and .claude/epr-meta/policies.yaml. Suffix forms are kept as the checker writes them (ends_with).
+#  - the discipline objects that policy names (Snapshot::load, `discipline.objects()`: policy, guide,
+#    method), read from the policy at both ends; an intermediate change to them changes the policy.
+#  - the checker itself: the rust-style-checker step sources in genesis/orchestrator/build-manifest.json
+#    (genesis/orchestrator/rust-style/**, rust-style.sh, rust-style-build-env.sh) and the CI wrapper
+#    rust-style-ci.sh. Its eprfs-meta resolver is a registry crate pinned by that Cargo.toml/Cargo.lock.
+# The toolchain pin (genesis/agentic/pool-policy.json) is not here: it decides whether the checker
+# compiles, never what it measures. prepush-self.test.mjs holds this list to `relevant()`.
+RUST_STYLE_DISCIPLINE=""
+rust_style_input() {
+  case "$1" in
+    *.rs | *clippy.toml | *rustfmt.toml | *.cargo/config.toml | Cargo.toml | */Cargo.toml) return 0 ;;
+    .epr-meta | */.epr-meta | *.epr-meta/manifest.md) return 0 ;;
+    .epr-meta/rust-style-policy.json | .claude/epr-meta/policies.yaml) return 0 ;;
+    genesis/orchestrator/rust-style/* | genesis/orchestrator/rust-style.sh) return 0 ;;
+    genesis/orchestrator/rust-style-build-env.sh | genesis/orchestrator/rust-style-ci.sh) return 0 ;;
+  esac
+  [[ -n "$RUST_STYLE_DISCIPLINE" && $'\n'"$RUST_STYLE_DISCIPLINE"$'\n' == *$'\n'"$1"$'\n'* ]]
+}
+rust_style_discipline_paths() {
+  git show "$1:.epr-meta/rust-style-policy.json" 2>/dev/null | python3 -c 'import json, sys
+try:
+    d = json.load(sys.stdin).get("discipline") or {}
+    for k in ("policy", "guide", "method"):
+        print(d[k]["path"])
+except Exception:
+    pass' 2>/dev/null
+}
+# Succeeds only when it read the whole range merge-base(BASE, TIP)..TIP and no commit in it (each
+# against each of its parents, so a change made and later reverted still counts), nor the range as
+# a whole, changed an input. Anything it cannot read runs the checker. Sets RUST_STYLE_RANGE_BASE,
+# or RUST_STYLE_TOUCHED to the first input it met.
+rust_style_range_untouched() {
+  local base=$1 tip=$2 path names
+  RUST_STYLE_RANGE_BASE=""
+  RUST_STYLE_TOUCHED=""
+  base=$(git merge-base "$base" "$tip" 2>/dev/null) && [ -n "$base" ] || return 1
+  RUST_STYLE_DISCIPLINE="$(rust_style_discipline_paths "$base")"$'\n'"$(rust_style_discipline_paths "$tip")"
+  names=$(mktemp) || return 1
+  if ! git log -m --no-renames -z --name-only --format= "$base..$tip" >"$names" 2>/dev/null ||
+    ! git diff --no-renames -z --name-only "$base" "$tip" >>"$names" 2>/dev/null; then
+    rm -f -- "$names"
+    return 1
+  fi
+  while IFS= read -r -d '' path; do
+    path=${path#$'\n'}
+    [ -n "$path" ] || continue
+    if rust_style_input "$path"; then
+      RUST_STYLE_TOUCHED=$path
+      rm -f -- "$names"
+      return 1
+    fi
+  done <"$names"
+  rm -f -- "$names"
+  RUST_STYLE_RANGE_BASE=$base
+  return 0
+}
+# ── Rust style range end
+
 CHANGED=""
 UNFILTERED_CHANGED=""
 CHANGE_UNREADABLE=""
@@ -1491,6 +1561,7 @@ SECURITY_READING_STATUS=0
 SECURITY_READING_STARTED_AT=""
 STYLE_READING_SECONDS=0
 STYLE_READING_STATUS=0
+STYLE_READING_RAN=""
 STYLE_READING_STARTED_AT=""
 for PUSH_LINE in "${PUSH_LINES[@]}"; do
   read -r LOCAL_REF LOCAL_SHA REMOTE_REF REMOTE_SHA <<<"$PUSH_LINE"
@@ -1529,10 +1600,28 @@ for PUSH_LINE in "${PUSH_LINES[@]}"; do
   SECURITY_READING_ENDED_AT=$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)
   READING_CALL_STARTED_S=$SECONDS
   [ -n "$STYLE_READING_STARTED_AT" ] || STYLE_READING_STARTED_AT=$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)
-  if ! bash "$(git rev-parse --show-toplevel)/genesis/orchestrator/rust-style.sh" --base "$STYLE_BASE" --head "$LOCAL_SHA"; then
-    STYLE_READING_STATUS=1
-    echo "Rust style reach gate refused this ref; fix findings or restore measurable inputs."
-    leg_red rust-style "the style reach gate refused $REMOTE_REF (above)"
+  if rust_style_range_untouched "$STYLE_BASE" "$LOCAL_SHA"; then
+    # Same inputs, same answer, whatever this device can build: not applicable, never a pass.
+    echo "[pre-push] rust-style: no input of the style check changed in ${RUST_STYLE_RANGE_BASE:0:12}..${LOCAL_SHA:0:12}; not run"
+  else
+    STYLE_READING_RAN=1
+    STYLE_RC=0
+    if command -v cargo >/dev/null 2>&1; then
+      bash "$(git rev-parse --show-toplevel)/genesis/orchestrator/rust-style.sh" --base "$STYLE_BASE" --head "$LOCAL_SHA" || STYLE_RC=$?
+    else
+      STYLE_RC=127
+    fi
+    if [ "$STYLE_RC" -eq 127 ]; then
+      STYLE_READING_STATUS=1
+      STYLE_WHY="its range could not be read"
+      [ -z "$RUST_STYLE_TOUCHED" ] || STYLE_WHY="it changes $RUST_STYLE_TOUCHED"
+      echo "[pre-push] rust-style: $REMOTE_REF needs the style check ($STYLE_WHY), and this device cannot build or run the checker (no cargo, exit 127). Cure: push it from a device with the pinned Rust toolchain. A hand-over from here is refused too: no device can carry this check for another yet." >&2
+      leg_red rust-style "this device cannot run the Rust style check that $REMOTE_REF needs (no cargo)"
+    elif [ "$STYLE_RC" -ne 0 ]; then
+      STYLE_READING_STATUS=1
+      echo "Rust style reach gate refused this ref; fix findings or restore measurable inputs."
+      leg_red rust-style "the style reach gate refused $REMOTE_REF (above)"
+    fi
   fi
   STYLE_READING_SECONDS=$((STYLE_READING_SECONDS + SECONDS - READING_CALL_STARTED_S))
   STYLE_READING_ENDED_AT=$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)
@@ -1567,7 +1656,11 @@ if [ -n "$SECURITY_READING_STARTED_AT" ]; then
     "$SECURITY_READING_SECONDS" "$SECURITY_READING_STARTED_AT" "$SECURITY_READING_ENDED_AT"
 fi
 if [ -n "$STYLE_READING_STARTED_AT" ]; then
-  gate_step_reading "$STYLE_READING_STATUS" rust-style ran \
+  # No ref whose range touched a style input: the leg was not applicable, so its reading is a
+  # skipped row the hook wrote itself (synthesized false), never a green run.
+  STYLE_READING_OUTCOME=skipped
+  [ -z "$STYLE_READING_RAN" ] || STYLE_READING_OUTCOME=ran
+  gate_step_reading "$STYLE_READING_STATUS" rust-style "$STYLE_READING_OUTCOME" \
     "$STYLE_READING_SECONDS" "$STYLE_READING_STARTED_AT" "$STYLE_READING_ENDED_AT"
 fi
 
