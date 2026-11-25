@@ -15,6 +15,7 @@ import {
   emitStepReadings,
   gateChildEnv,
   gateReadingRow,
+  GATE_SLOT_BUSY_EXIT,
   oracleMode,
   projectsForChanges,
   readShadowPushBudget,
@@ -2066,6 +2067,47 @@ test('a red run keeps its non-zero status when its same-device green note is kep
   assert.equal(status, 7);
   assert.equal(puts, 0);
   assert.match(output, /kept green for closure .*this run was red/);
+  assert.doesNotMatch(output, /evidence: recorded/);
+});
+
+test('a cargo slot timeout records no evidence, verdict, cycle row, or gate reading', t => {
+  const root = mkdtempSync(resolve(tmpdir(), 'gate-slot-busy-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const bin = resolve(root, 'brit');
+  writeFileSync(bin, '', { mode: 0o755 });
+  const project = { name: 'fixture', dir: 'fixture', steps: ['build'],
+    manifestPath: 'build-manifest.json', run: { kind: 'just', recipe: 'gate' } };
+  const agentId = 'ab'.repeat(32);
+  const calls = [];
+  const readings = [];
+  let key, puts = 0, output = '';
+  const spawn = (command, args) => {
+    calls.push({ command, args });
+    const ok = stdout => ({ status: 0, stdout, stderr: '' });
+    if (command === 'bash' && String(args[0]).endsWith('/run-local-gate.sh')) {
+      return { status: GATE_SLOT_BUSY_EXIT, stdout: '', stderr: '' };
+    }
+    if (args[0] === 'rev-parse') return ok('a'.repeat(40));
+    if (args[0] === 'show') return ok(JSON.stringify({ steps: { build: { inputs: { sources: ['fixture/**'] } } } }));
+    if (args[0] === 'status' || args[0] === 'ls-tree') return ok('');
+    if (args[1] === 'fingerprint') return ok(JSON.stringify({ fingerprints: [{ step: 'build', fingerprint: 'fp' }] }));
+    if (args[3] === 'find') { key = args[args.indexOf('--inputs-hash') + 1]; return ok('[]'); }
+    if (args[3] === 'get') return ok(JSON.stringify({ inputsHash: key, success: true, agentId, stepName: 'gate:fixture' }));
+    if (args[2] === 'signer') return ok(JSON.stringify({ agentId }));
+    if (args[3] === 'put') { puts += 1; return ok('written'); }
+    return { status: 7, stdout: '', stderr: '' };
+  };
+  const status = runProject(project, false, false, { root, spawn, readingCollector: readings,
+    env: { PATH: '', BRIT_BIN: bin, BRIT_BUILD_REF_BIN: bin, EPR_BIN: 'fixture-epr',
+      GATE_TASK: 'off', GATE_EVIDENCE: 'off', GATE_INPUTS: 'off', GATE_RECIPE_KEY: 'off' },
+    write: line => { output += line; }, warn: line => { output += line; } });
+
+  assert.equal(status, GATE_SLOT_BUSY_EXIT);
+  assert.equal(puts, 0, 'no closure evidence is written');
+  assert.equal(readings.length, 0, 'a did-not-run gate has no reading outcome');
+  assert.equal(calls.some(call => call.args.includes('gate-verdict@1')), false);
+  assert.equal(calls.some(call => call.args.includes('gate-cycle-seconds@1')), false);
+  assert.match(output, /^\[gate\] fixture slot busy: did not run \(unanswered\); no evidence, verdict, or cycle recorded$/m);
   assert.doesNotMatch(output, /evidence: recorded/);
 });
 
