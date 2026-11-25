@@ -817,6 +817,13 @@ test('formatEvent renders compact failure, detail, step, verdict, and close line
       seconds: 2,
       failure_class: 'none',
     }, '[gate-live] app PASSED 2s failure_class=none'],
+    [{
+      kind: 'wait', project: 'eprfs', resource: 'cargo-slot', holder: 'project=other pid=42',
+    }, '[gate-live] eprfs WAITING: cargo slot held by project=other pid=42'],
+    [{
+      kind: 'not-run', project: 'eprfs', reason: 'slot-held', resource: 'cargo-slot',
+      holder: 'project=other pid=42', waited_seconds: 30,
+    }, '[gate-live] eprfs NOT RUN: slot held by project=other pid=42 after 30s'],
     [{ kind: 'run-close', outcome: 'interrupted' }, '[gate-live] run interrupted'],
     [{ kind: 'run-open' }, null],
     [{ kind: 'unrecognized' }, null],

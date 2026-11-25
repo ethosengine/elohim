@@ -421,6 +421,10 @@ export function formatEvent(raw) {
       const text = String(notice.text ?? '').split(/\r?\n/)[0].slice(0, 240);
       return `[gate-live] NOTICE ${event.project} ${notice.class ?? 'notice'}: ${text}`;
     }
+    case 'wait':
+      return `[gate-live] ${event.project} WAITING: cargo slot held by ${event.holder}`;
+    case 'not-run':
+      return `[gate-live] ${event.project} NOT RUN: slot held by ${event.holder} after ${event.waited_seconds}s`;
     case 'step-failed':
       return `[gate-live] step ${event.project}/${event.step} exit ${event.exit}`;
     case 'gate-verdict': {
@@ -524,7 +528,7 @@ export async function follow({
 // What an agent hears without asking: every red, every notice, a failed verdict, and the close.
 function noteworthy(event) {
   if (event.kind !== 'gate-verdict') {
-    return ['failure', 'notice', 'detail', 'step-failed', 'outlook', 'stop-request', 'stop-honoured', 'gate-stopped', 'run-close'].includes(event.kind);
+    return ['failure', 'notice', 'wait', 'not-run', 'detail', 'step-failed', 'outlook', 'stop-request', 'stop-honoured', 'gate-stopped', 'run-close'].includes(event.kind);
   }
   const verdict = event.verdict && typeof event.verdict === 'object' ? event.verdict : null;
   return verdict
@@ -654,12 +658,12 @@ function gateStopped(path, project = null) {
   }
 }
 
-// A gate is running when its last gate-start has no gate-verdict or gate-stopped after it.
+// A gate is running when its last gate-start has no verdict, stop or not-run answer after it.
 function runningGate(events) {
   let running = null;
   for (const event of events) {
     if (event.kind === 'gate-start') running = event.project ?? null;
-    else if ((event.kind === 'gate-verdict' || event.kind === 'gate-stopped') && event.project === running) running = null;
+    else if ((event.kind === 'gate-verdict' || event.kind === 'gate-stopped' || event.kind === 'not-run') && event.project === running) running = null;
   }
   return running;
 }

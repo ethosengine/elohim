@@ -342,7 +342,7 @@ steward_gone_worktree_slots() {
         printf '%s\t%s\t%s\t%s\n' "stale-worktree-slot" "left-pinned" "$slot" "$name"
         continue
       fi
-      if slot_in_use "$slot"; then
+      if slot_in_use "$slot" || slot_target_busy "$slot" || slot_gate_locked "$slot"; then
         printf '%s\t%s\t%s\t%s\n' "stale-worktree-slot" "left-busy" "$slot" "$name"
         continue
       fi
@@ -1271,6 +1271,24 @@ slot_exec_busy() {
     case "$exe" in "$slot"/*) return 0 ;; esac
   done
   return 1
+}
+
+# A gate serializes the whole recipe, including its post-build tests, with this lock. It is
+# separate from Cargo's profile lock and must remain a hard reclamation guard.
+slot_gate_locked() {
+  local slot="${1:-}" lock
+  [ -n "$slot" ] || return 1
+  lock="$slot/.gate.lock"
+  [ -e "$lock" ] || return 1
+  ! flock -n "$lock" true 2>/dev/null
+}
+
+# Cargo releases its build lock before test binaries and doctests finish. Their inherited
+# CARGO_TARGET_DIR is the exact slot-level proof that orphan reclamation must still preserve it.
+slot_target_busy() {
+  local slot="${1:-}"
+  [ -n "$slot" ] || return 1
+  grep -qzFx "CARGO_TARGET_DIR=$slot" /proc/[0-9]*/environ 2>/dev/null
 }
 
 # Operator-manual per-slot pin: `touch <slot>/.pin` exempts ONE slot from every

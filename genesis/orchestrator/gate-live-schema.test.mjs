@@ -32,8 +32,12 @@ const validateNotice = ajv.compile(noticeSchema);
 // the notice addendum's reason.
 const stoppedSchema = JSON.parse(readFileSync(new URL('./gate-live-stopped.schema.json', import.meta.url), 'utf8'));
 const validateStopped = ajv.compile(stoppedSchema);
+const slotSchema = JSON.parse(readFileSync(new URL('./gate-live-slot.schema.json', import.meta.url), 'utf8'));
+const validateSlot = ajv.compile(slotSchema);
 const validate = value => {
-  const check = value?.kind === 'notice' ? validateNotice : value?.kind === 'gate-stopped' ? validateStopped : validateV1;
+  const check = value?.kind === 'notice' ? validateNotice
+    : value?.kind === 'gate-stopped' ? validateStopped
+      : ['wait', 'not-run'].includes(value?.kind) ? validateSlot : validateV1;
   const ok = check(value);
   validate.errors = check.errors;
   return ok;
@@ -51,6 +55,10 @@ const verdict = event('gate-verdict', { project: 'orchestrator', verdict: { exit
 const notice = event('notice', { project: 'eprfs', notice: {
   class: 'offer-withheld', text: 'epr producer put withheld (CFLAGS is set; gate remains green)',
 } });
+const wait = event('wait', { project: 'eprfs', resource: 'cargo-slot', holder: 'project=other pid=42' });
+const notRun = event('not-run', {
+  project: 'eprfs', reason: 'slot-held', resource: 'cargo-slot', holder: 'project=other pid=42', waited_seconds: 30,
+});
 const derivation = { method: `bafyrei${'a'.repeat(52)}`, input: `bafyrei${'b'.repeat(52)}`, hit: false };
 const unanswered = {
   why: 'interrupted', comeBack: { when: 'on-event', event: 'gate-restarted' },
@@ -59,19 +67,19 @@ const unanswered = {
 
 function accepts(value) {
   assert.equal(validate(value), true, JSON.stringify(validate.errors, null, 2));
-  // The split between the v1 file and the notice addendum is a partition: an event the writers
-  // emit validates against exactly one of the two, never neither and never both.
-  const both = [validateV1(value), validateNotice(value), validateStopped(value)].filter(Boolean).length;
-  assert.equal(both, 1, `${value.kind}: validated by ${both} of the three event schemas`);
+  // The v1 file and its device-local addenda partition the writer vocabulary: every event
+  // validates against exactly one schema, never neither and never more than one.
+  const both = [validateV1(value), validateNotice(value), validateStopped(value), validateSlot(value)].filter(Boolean).length;
+  assert.equal(both, 1, `${value.kind}: validated by ${both} event schemas`);
 }
 
-test('the v1 event kinds and the notice addendum kinds are disjoint, and every kind belongs to one', () => {
+test('the v1 event kinds and the orchestrator addendum kinds are disjoint, and every kind belongs to one', () => {
   const v1Kinds = schema.properties.kind.enum;
-  const addendumKinds = [noticeSchema.properties.kind.const, stoppedSchema.properties.kind.const];
+  const addendumKinds = [noticeSchema.properties.kind.const, stoppedSchema.properties.kind.const, 'wait', 'not-run'];
   assert.deepEqual(v1Kinds.filter(kind => addendumKinds.includes(kind)), [], 'a kind in both schemas');
   assert.ok(addendumKinds.every(Boolean), 'the addendum names its kind');
   // A kind added to neither file fails here: the writers' kinds are the union.
-  for (const kind of ['run-open', 'gate-start', 'failure', 'detail', 'step-failed', 'gate-verdict', 'run-close', 'notice', 'gate-stopped']) {
+  for (const kind of ['run-open', 'gate-start', 'failure', 'detail', 'step-failed', 'gate-verdict', 'run-close', 'notice', 'gate-stopped', 'wait', 'not-run']) {
     assert.equal([v1Kinds.includes(kind), addendumKinds.includes(kind)].filter(Boolean).length, 1, kind);
   }
   assert.match(noticeSchema.description, /merged with the v1 file into one orchestrator-local schema at the next deliberate Edge roll/);
@@ -147,6 +155,8 @@ const corpus = [
   ['gate loop with deferrals', event('run-close', { outcome: 'gates-passed', deferred: 2, unanswered })],
   ['interrupted run answer', event('run-close', { outcome: 'interrupted', unanswered })],
   ['withheld-offer notice', notice],
+  ['cargo-slot wait', wait],
+  ['cargo-slot not-run', notRun],
   ['gate stopped by TERM', event('gate-stopped', { project: 'elohim-storage', by: 'session-1', signal: 'SIGTERM', evidence: 'none' })],
   ['gate stopped by KILL with a survivor', event('gate-stopped', { project: 'elohim-storage', step: 'rust-style', by: null, signal: 'SIGKILL', survivors: [4242], evidence: 'none' })],
   ['gate stopped with an escaped holder named', event('gate-stopped', { project: 'eprfs', by: 'session-1', signal: 'SIGTERM', escaped: [{ pid: 77, cmd: 'sleep 30' }], evidence: 'none' })],
@@ -225,6 +235,9 @@ const negatives = [
   ['unknown notice field', { ...notice, notice: { ...notice.notice, excerpt: 'x' } }],
   ['a notice carrying a failure', { ...notice, failure: diagnostic }],
   ['a failure carrying a notice', { ...failure, notice: notice.notice }],
+  ['wait without a holder', without(wait, 'holder')],
+  ['not-run with a negative wait', { ...notRun, waited_seconds: -1 }],
+  ['not-run claiming a different reason', { ...notRun, reason: 'failed' }],
 ];
 for (const [name, value] of negatives) test(`rejects ${name}`, () => assert.equal(validate(value), false));
 

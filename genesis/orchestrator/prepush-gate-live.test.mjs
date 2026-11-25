@@ -35,6 +35,7 @@ const CLOSE_BLOCK = slice(
   "# The run describes the gate loop",
   'if [ -n "$FAILED" ]; then\n  echo "====',
 );
+const GATE_LOOP = slice('NOT_RUN=""\n', '# ── Household head: land the pushed epr');
 
 const cleanEnv = Object.fromEntries(
   Object.entries(process.env).filter(([k]) => !k.startsWith("GIT_") || k.startsWith("GIT_CONFIG_")),
@@ -402,6 +403,31 @@ test("a stop after every gate started, a carried one included, leaves the run fa
     assert.equal(r.status, 0, r.stdout + r.stderr);
     assert.ok(r.stdout.includes(stop ? "FAILED=[stopped]" : "FAILED=[]"), r.stdout);
   }
+});
+
+test("a held cargo slot is reported as NOT RUN and never as FAILED", (t) => {
+  const dir = fixture(t);
+  writeFileSync(join(dir, "genesis/orchestrator/gate-runner.mjs"), `
+import { appendFileSync } from "node:fs";
+const project = process.argv.at(-1);
+appendFileSync(process.env.GATE_LIVE_RUN, JSON.stringify({
+  v: 1, run: "fixture", seq: 1, at: new Date().toISOString(), kind: "not-run",
+  project, reason: "slot-held", resource: "cargo-slot", holder: "project=incumbent pid=42", waited_seconds: 30
+}) + "\\n");
+process.exit(73);
+`);
+  const r = spawnSync("bash", ["-c", script(
+    `HOOK_WORK_TREE='${dir}'`, PRELUDE, OPEN_BLOCK,
+    'FAILED=""', 'PREGATE_FAILED=""', 'PROJECTS="fixture"', 'GATE_INLINE="fixture"',
+    'GATE_CARRIED=""', 'GATE_CARRY_USED=""', 'GATE_ON_RED_MODE=continue',
+    'INDEX=0', 'RESULTS=""', 'TOTAL_START=$(date +%s)',
+    'gate_stop_requested() { return 1; }', 'gate_carry_red() { return 1; }',
+    'honour_stop() { :; }', GATE_LOOP,
+  )], { cwd: dir, env: env(), encoding: "utf8", timeout: 15000 });
+  assert.equal(r.status, 1, r.stdout + r.stderr);
+  assert.match(r.stdout, /fixture: NOT RUN: slot held by project=incumbent pid=42/);
+  assert.match(r.stdout, /PRE-PUSH GATE: NOT RUN/);
+  assert.doesNotMatch(r.stdout + r.stderr, /FAILED/);
 });
 
 // The fleet-roll block: it hands each pushed ref over as "<remote ref> <pushed sha> <destination
