@@ -726,9 +726,9 @@ _gate-epr-ts:
 # The bins are built from this checkout before the tests: `bin_build_view` reads the dep-info
 # (`debug/epr.d`) beside the epr bin, which `cargo test` never rewrites, and the slot is shared by
 # every claude/* worktree, so without this the test judged whichever checkout last built the bin.
-# The ingest's build after the tests stays: `cargo test` uplifts its own feature-set epr over
-# `debug/epr`, and that second build, a fresh no-op (well under a second), puts back the bytes
-# the ingest delivers.
+# The ingest's build after the tests stays: `cargo test` runs with the published blob-store
+# feature and uplifts its test-profile epr over `debug/epr`; that second build, a fresh no-op
+# (well under a second), puts back the bytes the ingest delivers.
 _gate-eprfs:
     @before="$("$CARGO_TARGET_DIR/debug/epr" bin --tool epr source-state 2>/dev/null || "${EPR_BIN:-epr}" bin --tool epr source-state 2>/dev/null || echo none)"; \
       tested_head="$(git rev-parse HEAD)"; \
@@ -739,9 +739,9 @@ _gate-eprfs:
         fmt -- cargo fmt --check \
         ::: precheck -- python3 "{{justfile_directory()}}/scripts/ci/publish_eprfs.py" --precheck \
         ::: lint -- node "{{justfile_directory()}}/genesis/orchestrator/cargo-lint.mjs" "$@" --all-targets -- -D warnings \
-        ::: bins -- cargo build -p elohim-epr-cli --bin epr -p elohim-device-runtime --bin bin-launch \
+        ::: bins -- cargo build -p elohim-epr-cli --bin epr -p elohim-device-runtime --bin bin-launch --features elohim-epr-cli/blob-store \
         ::: ark -- cargo build --manifest-path ../Cargo.toml -p elohim-ark --bin ark \
-        ::: test -- cargo test "$@" -- --skip live_corpus_) || exit $?; \
+        ::: test -- cargo test "$@" --features elohim-epr-cli/blob-store -- --skip live_corpus_) || exit $?; \
       EPRFS_SOURCE_BEFORE="$before" EPRFS_TESTED_HEAD="$tested_head" just _eprfs-ingest-around build
 
 # The eprfs live-corpus legs (backlog steward-device-arrival-open-items row 7): the `live_corpus_*`
@@ -798,9 +798,9 @@ _eprfs-ingest-around mode:
       if [[ "{{mode}}" == test ]]; then \
         set -- --workspace; \
         if [ -n "${GATE_CARGO_PACKAGES:-}" ]; then set --; for package in $GATE_CARGO_PACKAGES; do set -- "$@" -p "$package"; done; fi; \
-        (cd elohim/eprfs && cargo test "$@") || exit $?; \
+        (cd elohim/eprfs && cargo test "$@" --features elohim-epr-cli/blob-store) || exit $?; \
       fi; \
-      (cd elohim/eprfs && cargo build -p elohim-epr-cli --bin epr -p elohim-device-runtime --bin bin-launch) || exit $?; \
+      (cd elohim/eprfs && cargo build -p elohim-epr-cli --bin epr -p elohim-device-runtime --bin bin-launch --features elohim-epr-cli/blob-store) || exit $?; \
       after="$("$CARGO_TARGET_DIR/debug/epr" bin --tool epr source-state 2>/dev/null || echo none)"; \
       tree_clean=false; \
       if [[ "$before" == "$after" && "$before" == *'"clean":true'* ]]; then tree_clean=true; fi; \
@@ -829,7 +829,7 @@ _gate-memory-ceremony:
     # recompiled the workspace and its test binaries after the eprfs gate had just built them
     # (measured 2026-11-17: about 790 s of this gate's 1152 s).
     # The hooks suite's session-envelope fixture copies bin-launch from beside debug/epr.
-    cargo build --manifest-path elohim/eprfs/Cargo.toml -p elohim-epr-cli --bin epr -p elohim-device-runtime --bin bin-launch
+    cargo build --manifest-path elohim/eprfs/Cargo.toml -p elohim-epr-cli --bin epr -p elohim-device-runtime --bin bin-launch --features elohim-epr-cli/blob-store
     # Station five (2026-09-10): the recall executor and the identity-closed corrections view are
     # native. These two binaries carry the 60 Python recall cases (54 counterparts + 6 retired as
     # out-of-process artefacts); the Python suite and its scripts are gone.

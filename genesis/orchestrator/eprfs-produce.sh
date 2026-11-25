@@ -164,7 +164,7 @@ done
 # binds the messages to the bytes by the executable and judges every compile command in them, and
 # stamps env:isa-c only on that evidence. A replay that fails withholds: these bytes have no
 # evidence then.
-build_args=(-p elohim-epr-cli --bin epr -p elohim-device-runtime --bin bin-launch)
+build_args=(-p elohim-epr-cli --bin epr -p elohim-device-runtime --bin bin-launch --features elohim-epr-cli/blob-store)
 evidence=()
 if ((${#declared[@]})); then
   messages="$out/build-messages.json"
@@ -177,7 +177,7 @@ fi
 declare -A input
 for bin in "${bins[@]}"; do
   method="$out/method-$bin.json"
-  said="$("$epr" artifact describe --project eprfs --bin "$bin" --rustflags "${RUSTFLAGS-}" \
+  said="$("$epr" artifact describe --project eprfs --bin "$bin" --features blob-store --rustflags "${RUSTFLAGS-}" \
     --sources "$sources" --crate "${crate[$bin]}" --repo "$repo" --out "$method" \
     "${declared[@]}" "${recorded[@]}" 2>&1)" || skip "describe $bin refused: $(reason_of "$said")"
   said="$("$epr" artifact key --method "$method" --repo "$repo" --print input 2>"$out/key-$bin.err")" \

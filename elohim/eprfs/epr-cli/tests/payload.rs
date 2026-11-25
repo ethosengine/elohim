@@ -117,6 +117,81 @@ fn an_unmarked_directory_opens_as_directory_v1_unchanged() {
     assert_eq!(snapshot(&residue), before);
 }
 
+#[cfg(feature = "blob-store")]
+#[test]
+fn a_blob_store_build_preserves_existing_directory_v1_stores() {
+    let rt = runtime();
+    let (_dir, root) = layout();
+    let existing = Bytes::from_static(b"held by an unmarked directory-v1 store");
+    let existing_cid = rt.block_on(async {
+        let legacy = eprfs_peer::open_payload_store(&root).unwrap();
+        legacy.put_blob(existing.clone()).await.unwrap()
+    });
+    assert!(root.join(existing_cid.to_string()).is_file());
+
+    let opened = rt
+        .block_on(open_payload_store(&root, Access::Shared))
+        .unwrap();
+    assert_eq!(opened.format, PayloadFormat::DirectoryV1);
+    let got = rt
+        .block_on(
+            opened
+                .store
+                .fetch_blob(&existing_cid, FetchPolicy::LocalOnly),
+        )
+        .unwrap();
+    assert_eq!(got.bytes, existing);
+    let added = Bytes::from_static(b"added by the blob-store-enabled epr");
+    let added_cid = rt.block_on(opened.store.put_blob(added.clone())).unwrap();
+    drop(opened);
+
+    assert!(!root.join(MARKER_FILE).exists());
+    for name in [
+        "blobs",
+        "chunks",
+        "index",
+        "records",
+        "quarantine",
+        "tmp",
+        "owner.lock",
+        "ops.lock",
+    ] {
+        assert!(
+            !root.join(name).exists(),
+            "blob-store path appeared: {name}"
+        );
+    }
+    let reopened = rt
+        .block_on(open_payload_store(&root, Access::Shared))
+        .unwrap();
+    assert_eq!(reopened.format, PayloadFormat::DirectoryV1);
+    for (cid, bytes) in [(&existing_cid, &existing), (&added_cid, &added)] {
+        let got = rt
+            .block_on(reopened.store.fetch_blob(cid, FetchPolicy::LocalOnly))
+            .unwrap();
+        assert_eq!(&got.bytes, bytes);
+    }
+
+    let (_dir, marked_root) = layout();
+    let marked_bytes = Bytes::from_static(b"held by a marked directory-v1 store");
+    let marked_cid = rt.block_on(async {
+        let legacy = eprfs_peer::open_payload_store(&marked_root).unwrap();
+        legacy.put_blob(marked_bytes.clone()).await.unwrap()
+    });
+    assert_eq!(
+        select_format(&marked_root, PayloadFormat::DirectoryV1).unwrap(),
+        PayloadFormat::DirectoryV1.marker()
+    );
+    let marked = rt
+        .block_on(open_payload_store(&marked_root, Access::Shared))
+        .unwrap();
+    assert_eq!(marked.format, PayloadFormat::DirectoryV1);
+    let got = rt
+        .block_on(marked.store.fetch_blob(&marked_cid, FetchPolicy::LocalOnly))
+        .unwrap();
+    assert_eq!(got.bytes, marked_bytes);
+}
+
 #[test]
 fn a_payload_store_of_another_format_is_refused_not_duplicated() {
     let rt = runtime();
