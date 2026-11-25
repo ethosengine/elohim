@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 import os
 import sys
+import time
+# The harness cancels this hook at 3 s. The clock starts here, before any other import.
+START = time.monotonic()
 if os.environ.get("STASIS_KEEPER") == "1" or os.environ.get("STASIS_SENSE") == "off":
     sys.exit(0)
 
@@ -21,7 +24,12 @@ import math
 from pathlib import Path
 import re
 import shlex
-import time
+
+# The transcript scan is the only phase that grows with the session (measured 2.4-3.5 s for a first
+# scan of 64 MB at load 18; every other phase is under 0.1 s). It stops at SCAN_UNTIL seconds after
+# process start and resumes from its cursor on the next call. Waiting for the journal lock is
+# unchanged: if the lock alone exceeds the budget the harness times the hook out, as before.
+SCAN_UNTIL = float(os.environ.get("STASIS_SCAN_UNTIL_S", 2.2))
 
 RETIRE_WHEN = "Native session runtimes provide private observation and exception context."
 OPERATORS = ";&|()<>\n"
@@ -414,11 +422,19 @@ def transcript(j):
                 if cursor is not None or j.state.get("transcriptHistoryLost"):
                     j.gap("transcript-cursor-lost")
                 # Preserve historical evidence without replaying it into context.
-                cursor = {"offset": 0, "identity": identity, "partial": False}
+                # `baselineEnd` persists with the cursor: a scan stopped by its budget resumes with
+                # everything before it still historical, so old exceptions never alert as new.
+                cursor = {"offset": 0, "identity": identity, "partial": False, "baselineEnd": stat.st_size}
                 cursors[key] = cursor
+            baseline_end = cursor.get("baselineEnd", 0)
             stream.seek(cursor["offset"])
             batch = {}
-            for raw in stream:
+            for count, raw in enumerate(stream):
+                if count % 64 == 63 and time.monotonic() - START > SCAN_UNTIL:
+                    print("dialogue-stasis-sense: skipped the rest of the transcript scan — internal budget reached; it resumes next call",
+                          file=sys.stderr)
+                    break
+                at = cursor["offset"]
                 cursor["offset"] += len(raw)
                 partial = not raw.endswith(b"\n")
                 if cursor["partial"] or partial:
@@ -434,11 +450,12 @@ def transcript(j):
                     continue
                 if item:
                     item_key, exc = item
-                    if item_key in batch:
-                        exc["count"] += batch[item_key]["count"]
-                    batch[item_key] = exc
-            for item_key, exc in batch.items():
-                if baseline:
+                    historical = at < baseline_end
+                    if (item_key, historical) in batch:
+                        exc["count"] += batch[(item_key, historical)]["count"]
+                    batch[(item_key, historical)] = exc
+            for (item_key, historical), exc in batch.items():
+                if historical:
                     exc["baseline"] = True
                 j.append("harness-exception", exception=exc)
                 if exc["source"] in {"hook_error", "stop_failure"}:
@@ -446,7 +463,7 @@ def transcript(j):
                 entry = j.state["exceptions"].setdefault(item_key, {"count": 0, "notifiedCount": 0, "noticeAt": 0})
                 entry["count"] += exc["count"]
                 entry["exception"] = exc
-                if baseline:
+                if historical:
                     entry.update(baselineCount=entry["count"], notifiedCount=entry["count"], noticeAt=0)
     except OSError:
         j.gap("transcript-unreadable")
