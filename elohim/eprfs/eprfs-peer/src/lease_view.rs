@@ -4,7 +4,8 @@
 //!
 //! A lease is replayed from berth's `dev-berth-events@1` records (T1), each device's in the order
 //! that device wrote them: by the record counter berth stamps on each (`dseq`; older records by
-//! record time, first). The fold preserves that order across its append batches, and the view
+//! record time, first). The fold appends each sender's events in that order within one fetch (a
+//! truncated fetch can still deliver a later event before an earlier one), and the view
 //! orders defensively too because two berth processes on this device can reach its store in the
 //! other order from the one they recorded in: a `claim` opens it, a
 //! `renew` extends it, a generation-matching `release` (its own, or a forced one naming it) and an
