@@ -992,6 +992,7 @@ fn run_intend_carry(opts: &GlobalOpts, rest: &[String], mode: &str) -> FlowResul
     let (root, me): (&Path, Option<&str>) = (opts.root.as_path(), None);
     #[cfg(not(feature = "peer"))]
     let admits: Box<carry::Admits<'_>> = Box::new(|_: &str| false);
+    let landing = misses::landing_probe(root);
 
     if mode_name == "carry" {
         let session = resolve_session(take_opt(rest, "--session")?);
@@ -1021,6 +1022,7 @@ fn run_intend_carry(opts: &GlobalOpts, rest: &[String], mode: &str) -> FlowResul
                 actor: &actor,
                 me,
                 admits: admits.as_ref(),
+                landing: &landing,
             },
         )?;
         if opts.json {
@@ -1085,6 +1087,7 @@ fn run_intend_carry(opts: &GlobalOpts, rest: &[String], mode: &str) -> FlowResul
             me,
             now_unix_s: now_ms / 1000,
             role,
+            landing: &landing,
         },
     );
     if opts.json {

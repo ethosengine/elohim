@@ -12,6 +12,7 @@ use elohim_epr_rea::{
 
 use super::{decide, live_carries, CarryDecision, CarryQuery, CarryRole, LanderBounds};
 use crate::flow::intend::INTENT_TAG;
+use crate::flow::misses::{Landing, OpenMiss, SettledBy};
 
 const A: &str = "did:key:a";
 const B: &str = "did:key:b";
@@ -141,22 +142,29 @@ fn misses_on(via: Option<&str>, intent: Cid, closure: &str) -> (Cid, FlowRecord)
 /// A misses event for a named change. Two intents of one change from one announcer are one ask
 /// re-raised, and the newer settles the older (`misses::miss_settled`); two changes are two asks.
 fn misses_for(via: Option<&str>, intent: Cid, closure: &str, change: &str) -> (Cid, FlowRecord) {
-    event(
-        intent,
-        landing_slots(
-            "misses",
-            &[
-                ("change", change.to_string()),
-                (
-                    "commit",
-                    "0123456789abcdef0123456789abcdef01234567".to_string(),
-                ),
-                ("ref", "refs/heads/self/carry-test".to_string()),
-                ("miss", format!("{PROJECT}={closure}")),
-            ],
-            via,
+    misses_with_wait(via, intent, closure, change, None)
+}
+
+fn misses_with_wait(
+    via: Option<&str>,
+    intent: Cid,
+    closure: &str,
+    change: &str,
+    wait_until: Option<u64>,
+) -> (Cid, FlowRecord) {
+    let mut env = vec![
+        ("change", change.to_string()),
+        (
+            "commit",
+            "0123456789abcdef0123456789abcdef01234567".to_string(),
         ),
-    )
+        ("ref", "refs/heads/self/carry-test".to_string()),
+        ("miss", format!("{PROJECT}={closure}")),
+    ];
+    if let Some(wait_until) = wait_until {
+        env.push(("wait_until", wait_until.to_string()));
+    }
+    event(intent, landing_slots("misses", &env, via))
 }
 
 /// The lander L's misses event for the default intent and closure.
@@ -178,7 +186,12 @@ fn query<'a>(
         me,
         now_unix_s: now,
         role,
+        landing: &unknown_landing,
     }
+}
+
+fn unknown_landing(_: &OpenMiss) -> Landing {
+    Landing::Unknown
 }
 
 fn carrier(records: &[(Cid, FlowRecord)], me: &str, now: u64) -> CarryDecision {
@@ -215,6 +228,128 @@ fn lander(
 
 fn is_run_here(decision: &CarryDecision) -> bool {
     matches!(decision, CarryDecision::RunHere { .. })
+}
+
+#[test]
+fn a_settled_miss_tells_the_lander_to_run_here_with_the_settlement_reason() {
+    let intent = intent();
+    let records = vec![misses()];
+    let last_seen = |_: &str| None;
+    let landed = |_: &OpenMiss| Landing::Landed;
+    let decision = decide(
+        &records,
+        &CarryQuery {
+            intent: &intent,
+            project: PROJECT,
+            closure: CLOSURE,
+            admits: &admits,
+            me: Some(A),
+            now_unix_s: 1_010,
+            role: CarryRole::Lander(LanderBounds {
+                freshness_s: Some(90),
+                max_skew_s: Some(30),
+                last_seen_ms: &last_seen,
+                wait_until: None,
+                max_wait_s: 600,
+            }),
+            landing: &landed,
+        },
+    );
+    assert_eq!(
+        decision,
+        CarryDecision::RunHere {
+            reason: "the miss is settled: its commit landed on refs/remotes/origin/self/carry-test"
+                .to_string(),
+        }
+    );
+
+    let records = vec![misses_with_wait(
+        Some(L),
+        intent,
+        CLOSURE,
+        CHANGE,
+        Some(1_000),
+    )];
+    let decision = decide(
+        &records,
+        &CarryQuery {
+            intent: &intent,
+            project: PROJECT,
+            closure: CLOSURE,
+            admits: &admits,
+            me: Some(A),
+            now_unix_s: 1_010,
+            role: CarryRole::Lander(LanderBounds {
+                freshness_s: Some(90),
+                max_skew_s: Some(30),
+                last_seen_ms: &last_seen,
+                wait_until: Some(1_000),
+                max_wait_s: 600,
+            }),
+            landing: &unknown_landing,
+        },
+    );
+    assert_eq!(
+        decision,
+        CarryDecision::RunHere {
+            reason: "the miss is settled: its wait-until 1000 has passed".to_string(),
+        }
+    );
+}
+
+#[test]
+fn a_settled_miss_tells_a_carrier_nothing_needs_to_run() {
+    let intent = intent();
+    let records = vec![misses()];
+    let landed = |_: &OpenMiss| Landing::Landed;
+    let decision = decide(
+        &records,
+        &CarryQuery {
+            intent: &intent,
+            project: PROJECT,
+            closure: CLOSURE,
+            admits: &admits,
+            me: Some(A),
+            now_unix_s: 1_010,
+            role: CarryRole::Carrier,
+            landing: &landed,
+        },
+    );
+    assert_eq!(
+        decision,
+        CarryDecision::Settled {
+            by: SettledBy::Landing,
+            reason: "the miss is settled: its commit landed on refs/remotes/origin/self/carry-test"
+                .to_string(),
+        }
+    );
+    assert_eq!(
+        serde_json::to_value(&decision).unwrap(),
+        serde_json::json!({
+            "decision": "settled",
+            "by": "landing",
+            "reason": "the miss is settled: its commit landed on refs/remotes/origin/self/carry-test"
+        })
+    );
+}
+
+#[test]
+fn unknown_landing_and_a_future_wait_keep_the_carrier_decision_unchanged() {
+    let intent = intent();
+    let mut records = vec![misses_with_wait(
+        Some(L),
+        intent,
+        CLOSURE,
+        CHANGE,
+        Some(2_000),
+    )];
+    assert_eq!(carrier(&records, A, 1_010), CarryDecision::Run);
+
+    records.push(carry(Some(B), "c-b", 1_000, 1_600));
+    assert!(matches!(
+        carrier(&records, A, 1_010),
+        CarryDecision::AlreadyCarried { by, .. } if by == B
+    ));
 }
 
 #[test]

@@ -85,6 +85,8 @@ pub struct CarryRequest<'a> {
     /// This device's did (`None` when it stands on no roster) and the admission it reads.
     pub me: Option<&'a str>,
     pub admits: &'a dyn Fn(&str) -> bool,
+    /// Repository-local evidence that the open miss's commit reached its integration ref.
+    pub landing: &'a dyn Fn(&misses::OpenMiss) -> misses::Landing,
 }
 
 /// The machine-facing result of one carry write (`--json` consumers read this).
@@ -174,6 +176,8 @@ pub struct CarryQuery<'a> {
     pub me: Option<&'a str>,
     pub now_unix_s: u64,
     pub role: CarryRole<'a>,
+    /// Repository-local evidence that the open miss's commit reached its integration ref.
+    pub landing: &'a dyn Fn(&misses::OpenMiss) -> misses::Landing,
 }
 
 /// The answer to "should this device run the gate for this miss?"
@@ -188,6 +192,12 @@ pub enum CarryDecision {
         by: String,
         until: u64,
         commitment: String,
+    },
+    /// Carrier role: the miss no longer needs a carry because its landing or wait bound settled it.
+    #[serde(rename_all = "camelCase")]
+    Settled {
+        by: misses::SettledBy,
+        reason: String,
     },
     /// Lander role: no carry is worth waiting for; run the gate here (`NotCarried`).
     /// Wire: `{"decision":"run-here","reason":"…"}`.
@@ -221,6 +231,9 @@ impl CarryDecision {
                 short(by),
                 short(commitment)
             ),
+            Self::Settled { reason, .. } => {
+                println!("carry   settled: {reason}; nothing to run")
+            }
             Self::RunHere { reason } => println!("carry   not carried: run here ({reason})"),
             Self::Wait {
                 by, until, wait_s, ..
@@ -298,6 +311,8 @@ pub fn write_carry(root: &Path, request: &CarryRequest<'_>) -> FlowResult<CarryR
     let now_ms = unix_ms();
     let now_s = now_ms / 1000;
 
+    require_open_miss(&records, request, &intent, &miss, now_s)?;
+
     // A replay first: this device's own live claim on the same miss is the answer, unchanged.
     let live = live_carries(&records, request.admits, request.me, now_s);
     if let Some(own) = live.iter().find(|carry| {
@@ -322,6 +337,7 @@ pub fn write_carry(root: &Path, request: &CarryRequest<'_>) -> FlowResult<CarryR
             me: request.me,
             now_unix_s: now_s,
             role: CarryRole::Carrier,
+            landing: request.landing,
         },
     ) {
         return Err(FlowError::InvalidArguments(format!(
@@ -329,7 +345,6 @@ pub fn write_carry(root: &Path, request: &CarryRequest<'_>) -> FlowResult<CarryR
             request.project, request.closure
         )));
     }
-    require_open_miss(&records, request, &intent, &miss)?;
     let change = match request.change {
         Some(change) => change.to_string(),
         None => intent_change(&records, &intent).ok_or_else(|| {
@@ -503,6 +518,27 @@ pub fn live_carries(
 #[must_use]
 pub fn decide(records: &[(Cid, FlowRecord)], query: &CarryQuery<'_>) -> CarryDecision {
     let intent = query.intent.to_string();
+    if let Some(miss) = matching_open_miss(
+        records,
+        query.admits,
+        query.me,
+        &intent,
+        query.project,
+        query.closure,
+    ) {
+        let (_, mut settled) =
+            misses::offerable_misses(vec![miss], query.landing, query.now_unix_s);
+        if let Some(settled) = settled.pop() {
+            let reason = settled_reason(&settled.miss, settled.by);
+            return match &query.role {
+                CarryRole::Carrier => CarryDecision::Settled {
+                    by: settled.by,
+                    reason,
+                },
+                CarryRole::Lander(_) => CarryDecision::RunHere { reason },
+            };
+        }
+    }
     let matching: Vec<LiveCarry> = live_carries(records, query.admits, query.me, query.now_unix_s)
         .into_iter()
         .filter(|carry| {
@@ -611,14 +647,17 @@ fn require_open_miss(
     request: &CarryRequest<'_>,
     intent: &Cid,
     miss: &Cid,
+    now_s: u64,
 ) -> FlowResult<()> {
     let intent_text = intent.to_string();
-    let open = misses::open_misses(records, request.admits, request.me);
-    let Some(found) = open.iter().find(|open| {
-        open.intent == intent_text
-            && open.project == request.project
-            && open.closure == request.closure
-    }) else {
+    let Some(found) = matching_open_miss(
+        records,
+        request.admits,
+        request.me,
+        &intent_text,
+        request.project,
+        request.closure,
+    ) else {
         return Err(FlowError::InvalidArguments(format!(
             "no open miss {}={} on intent {intent} in this device's fold: it was never posted here, or a verdict or the intent's settlement already closed it",
             request.project, request.closure
@@ -630,7 +669,40 @@ fn require_open_miss(
             request.project, request.closure, found.event
         )));
     }
+    let (_, mut settled) = misses::offerable_misses(vec![found], request.landing, now_s);
+    if let Some(settled) = settled.pop() {
+        return Err(FlowError::InvalidArguments(settled_reason(
+            &settled.miss,
+            settled.by,
+        )));
+    }
     Ok(())
+}
+
+fn matching_open_miss(
+    records: &[(Cid, FlowRecord)],
+    admits: &dyn Fn(&str) -> bool,
+    me: Option<&str>,
+    intent: &str,
+    project: &str,
+    closure: &str,
+) -> Option<misses::OpenMiss> {
+    misses::open_misses(records, admits, me)
+        .into_iter()
+        .find(|open| open.intent == intent && open.project == project && open.closure == closure)
+}
+
+fn settled_reason(miss: &misses::OpenMiss, by: misses::SettledBy) -> String {
+    match by {
+        misses::SettledBy::Landing => {
+            "the miss is settled: its commit is on the fetched origin/dev or origin/main"
+                .to_string()
+        }
+        misses::SettledBy::WaitUntil => format!(
+            "the miss is settled: its wait-until {} has passed",
+            miss.wait_until.unwrap_or_default()
+        ),
+    }
 }
 
 /// The lander's own stop-waiting time for one of its misses, as its misses event carries it.
