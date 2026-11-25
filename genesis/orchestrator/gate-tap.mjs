@@ -25,6 +25,10 @@
 // The ownership token proves an open descriptor, not flock ownership, so an ancestor could forge
 // it; this lock exists to stop accidents between honest gates, not a process deliberately lying to
 // its own device.
+// Stated limits: the holder's non-zero exit when members survive KILL is not propagated, so a recipe
+// that passed keeps its green (the verdict is true; the survivor line is printed; the risk is to the
+// next gate of that slot, as before this lock). If the holder is killed after the launcher verified
+// it, the recipe runs on without the lock: an external kill gives today's unlocked behaviour, not worse.
 
 import { spawn } from 'child_process';
 import {
@@ -189,7 +193,9 @@ export async function drainSlotSession(sid, leaderStart, {
     const members = [...table.values()].filter(stat => stat.sid === sid && stat.state !== 'Z' && stat.state !== 'X');
     const currentLeader = table.get(sid);
     const leaderLive = currentLeader && currentLeader.state !== 'Z' && currentLeader.state !== 'X';
-    if (leaderLive && currentLeader.start !== leaderStart) return 0;
+    // A leader entry whose start time is not the gate's, in any state (live, zombie or exited but
+    // still listed), means the sid was reused: the gate session is gone. Release, signal nothing.
+    if (currentLeader && currentLeader.start !== leaderStart) return 0;
     if (leaderLive) {
       sawLeader = true;
       emptyAt = null;

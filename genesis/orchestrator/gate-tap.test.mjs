@@ -287,6 +287,24 @@ test('slot holder releases without signalling when the sid belongs to a new lead
   assert.equal(output, '');
 });
 
+test('slot holder signals nothing when a reused sid has a zombie leader and a live member', async () => {
+  const zombie = { pid: 7, sid: 7, start: '101', state: 'Z' };
+  const member = { pid: 42, sid: 7, start: '200', state: 'S' };
+  const sent = [];
+  let output = '';
+  const status = await drainSlotSession(7, '100', {
+    leaderObserved: true,
+    scan: () => new Map([[zombie.pid, zombie], [member.pid, member]]),
+    sleep: async () => assert.fail('a reused sid must release immediately, whatever its leader state'),
+    send: (...args) => sent.push(args),
+    write: line => { output += line; },
+  });
+
+  assert.equal(status, 0);
+  assert.deepEqual(sent, []);
+  assert.equal(output, '');
+});
+
 test('fd 3 carries all five cost axes beside the failure signals', t => {
   const { summary, result } = tap(t, 'sleep 0.05');
   assert.equal(result.status, 0);
