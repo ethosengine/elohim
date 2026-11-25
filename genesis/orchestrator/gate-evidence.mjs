@@ -646,6 +646,7 @@ export function describeEvidence(rows, now = Date.now()) {
  */
 export function gateKeyMaterial(project, {
   env = process.env, root, commit, cargoEnv, spawn = spawnSync, inputs = null, variant = {},
+  boundedSuite = false,
   britBin = resolveBin('brit', ['BRIT_BIN'], env),
 } = {}) {
   if (project.run?.kind === 'attested') return { line: 'unavailable (attested project, no local recipe)' };
@@ -704,7 +705,10 @@ export function gateKeyMaterial(project, {
     try {
       const list = SUITE_READ_LISTS[project.name];
       const listText = gitRead(root, ['show', `${commit}:${list}`], spawn);
-      const inventory = suiteInventory({ root, commit: resolvedCommit(root, commit, spawn), listText, env: gitEnv() });
+      const inventory = suiteInventory({
+        root, commit: resolvedCommit(root, commit, spawn), listText, env: gitEnv(),
+        ...(boundedSuite ? { spawn } : {}),
+      });
       const closure = packageClosure(root, JSON.parse(listText).modules || {});
       suite = { inventory: inventory.digest, packages: closureDigest(closure, root), node: process.version,
         commit: inventory.commit, matcher: inventory.matcher };

@@ -376,12 +376,14 @@ test('the nearest Cargo.toml wins inside a nested workspace', () => {
   assert.deepEqual(rows, [{ file: nested, line: 1, path: 'shared/data.json', how: 'include_str' }]);
 });
 
-test('fix 1 excludes dependency crate tests and keeps the gate own crate tests', () => {
+test('fix 1 excludes dependency test roots but keeps #[path]-included tests support', () => {
   const files = {
     'apps/gate/Cargo.toml': '[package]',
     'apps/gate/tests/own.rs': 'include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/../../shared/own.json"));',
     'crates/dependency/Cargo.toml': '[package]',
+    'crates/dependency/src/lib.rs': '#[path = "../tests/support.rs"]\nmod support;',
     'crates/dependency/tests/dependency.rs': 'include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/../../shared/dependency.json"));',
+    'crates/dependency/tests/support.rs': 'include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/../../shared/support.json"));',
   };
   const options = {
     root,
@@ -394,9 +396,9 @@ test('fix 1 excludes dependency crate tests and keeps the gate own crate tests',
       throw Object.assign(new Error(`missing ${path}`), { code: 'ENOENT' });
     },
   };
-  assert.deepEqual(readSet(options).paths, ['shared/dependency.json', 'shared/own.json']);
+  assert.deepEqual(readSet(options).paths, ['shared/dependency.json', 'shared/own.json', 'shared/support.json']);
   assert.deepEqual(readSet({ ...options, variant: { excludeDependencyTests: true } }), {
-    paths: ['shared/own.json'], unresolved: [],
+    paths: ['shared/own.json', 'shared/support.json'], unresolved: [],
   });
 });
 
@@ -405,6 +407,7 @@ test('fix 2 resolves a manifest_store-style format join to its literal directory
   const files = {
     'elohim/eprfs/device-runtime/Cargo.toml': '[package]',
     [manifestStore]: 'std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join(format!("../../sdk/schemas/v1/views/{name}.schema.json")));',
+    'elohim/sdk/schemas/v1/views/example.schema.json': '{}',
   };
   const options = {
     root, project: { name: 'gate', dir: 'elsewhere' }, sources: ['elohim/eprfs/**'],
@@ -419,9 +422,14 @@ test('fix 2 resolves a manifest_store-style format join to its literal directory
   assert.deepEqual(readSet({ ...options, variant: { resolveFormatJoin: true } }), {
     paths: ['elohim/sdk/schemas/v1/views'], unresolved: [],
   });
+  delete files['elohim/sdk/schemas/v1/views/example.schema.json'];
+  assert.deepEqual(readSet({ ...options, variant: { resolveFormatJoin: true } }), {
+    paths: ['elohim/eprfs/device-runtime'], unresolved: [],
+  });
   for (const unchanged of [
     'Path::new(env!("CARGO_MANIFEST_DIR")).join(format!("{name}.json"));',
     'Path::new(env!("CARGO_MANIFEST_DIR")).join(format!("../../../../outside/{name}.json"));',
+    'Path::new(env!("CARGO_MANIFEST_DIR")).join(format!("../../sdk/schemas/{name}/../../outside.json"));',
   ]) {
     files[manifestStore] = unchanged;
     assert.deepEqual(
