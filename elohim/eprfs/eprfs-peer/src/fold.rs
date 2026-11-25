@@ -773,6 +773,7 @@ fn fold_events_admitted(
     }
     let mut outcome = FoldOutcome::default();
     let mut received = HashSet::new();
+    let mut to_append = Vec::new();
     for ChannelEvent { cid, event } in events {
         if !received.insert(*cid) {
             outcome.already += 1;
@@ -797,11 +798,11 @@ fn fold_events_admitted(
             outcome.held_cids.push(*cid);
             continue;
         }
-        tx.append(FlowRecord::Event(folded))
-            .map_err(PeerError::FlowStore)?;
+        to_append.push(FlowRecord::Event(folded));
         outcome.appended += 1;
         outcome.held_cids.push(*cid);
     }
+    tx.append_batch(to_append).map_err(PeerError::FlowStore)?;
     Ok(outcome)
 }
 
