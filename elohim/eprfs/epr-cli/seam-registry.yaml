@@ -2089,6 +2089,95 @@ decisionPoints:
   - path: elohim/eprfs/epr-cli/tests/peer.rs
     testName: peer_verdicts_reads_only_matching_folded_admitted_siblings
     kind: integration
+- name: flow::enrich::enrich
+  kind: state-transition
+  sourceLocation:
+    file: src/flow/enrich.rs
+    modulePath: elohim_epr_cli::flow::enrich::enrich
+  summary: Append one attestation-enrichment@1 Cite for a re-execution of an existing local or
+    roster-admitted folded gate verdict. The target verdict remains byte-identical; project, closure
+    and commit come only from it. The closed kind vocabulary and the executor device's DID form an
+    append-only, tuple-idempotent local shadow record that no current decision reads.
+  concernIds:
+  - id: C0
+    status: answered
+    justification: Attested-Private B2 evidence in one steward device channel; no DHT entry, head,
+      coordinator call or HTTP route is added.
+  - id: C1
+    status: answered
+    justification: Only the explicit re-execution verb writes a record, and only against an exact
+      gate-verdict@1 event CID already in the local fold.
+  - id: C2
+    status: answered
+    justification: The immutable verdict event CID is the resource; enrichments are independent
+      append-only atoms and no timestamp or latest-row rule selects among them.
+  - id: C3
+    status: answered
+    justification: One transaction scans the device's bounded local fold and appends at most one event;
+      there is no network wait or retry loop.
+  - id: C4
+    status: answered
+    justification: Absence means not re-executed. Unknown, malformed, unadmitted and reserved targets or
+      kinds refuse without an append; no absence is interpreted as agreement.
+  - id: C5
+    status: answered
+    justification: The row carries evidence only. It stores no count, grade, reuse decision or authority;
+      any future reader must compute its own result.
+  - id: C6a
+    status: answered
+    justification: Work is one linear scan of the existing flow fold under its append lock and one
+      constant-size event; no per-item head or second ledger is created.
+  - id: C6b
+    status: answered
+    justification: Repeating the same device/verdict/kind/outcome/method/run tuple returns the existing
+      CID with appended false; a different outcome is a distinct record and changes nothing existing.
+  - id: C7
+    status: answered
+    justification: attestation-enrichment@1 is absent from berth.channel.crosses, whose allow-list is
+      default-deny, so the record is neither advertised nor folded in shadow.
+  - id: C8
+    status: answered
+    justification: The verb prints one bounded line per invocation, or one JSON receipt naming appended,
+      both CIDs, kind, outcome, project, closure and device.
+  - id: C9
+    status: answered
+    justification: Verdict and run are content identifiers and the executor is the existing device key's DID;
+      project, closure and commit are copied from the typed verdict rather than joined from caller text.
+  - id: C10
+    status: answered
+    justification: This is a new additive measure and CLI verb using the existing FlowEvent::Cite format;
+      no existing record format or content address changes.
+  - id: C11
+    status: n-a
+    justification: The writer performs no network request, broadcast, queue insertion or fan-out.
+  - id: C12
+    status: answered
+    justification: The record remains in this device's private flow store; crossed target verdicts are
+      eligible only when their via DID is in this device's signed steward roster.
+  - id: C13
+    status: answered
+    justification: An enrichment is explicitly evidence, never acceptance, quorum or a new authority tier;
+      accepted and household-witnessed remain reserved and unimplemented.
+  - id: C14
+    status: answered
+    justification: Every invalid kind, outcome, CID, method, duration, verdict shape or crossing provenance
+      is a named refusal before append; disagreement remains visible as its own record.
+  contractTests:
+  - path: elohim/eprfs/epr-cli/tests/flow_enrich.rs
+    testName: enrichment_appends_without_mutating_records_or_gate_decisions
+    kind: integration
+  - path: elohim/eprfs/epr-cli/tests/flow_enrich.rs
+    testName: identical_enrichment_is_idempotent
+    kind: integration
+  - path: elohim/eprfs/epr-cli/tests/flow_enrich.rs
+    testName: disagreement_is_a_second_record_and_preserves_verdict
+    kind: integration
+  - path: elohim/eprfs/epr-cli/tests/flow_enrich.rs
+    testName: reserved_unknown_kinds_and_unknown_verdict_append_nothing
+    kind: integration
+  - path: elohim/eprfs/epr-cli/tests/flow_enrich.rs
+    testName: enrichment_derives_project_closure_and_commit_from_verdict
+    kind: integration
 - name: view::project / view::save / view::reopen
   kind: pure-decision-predicate
   sourceLocation:

@@ -1119,6 +1119,29 @@ fn gate_verdict_record(
     event
 }
 
+fn attestation_enrichment_record(device: &str) -> FlowEvent {
+    let mut event = claim("enrichment");
+    event.resource = atom_cid(&"enriched-verdict".to_string()).unwrap();
+    event.provider = AgentRef(device.to_string());
+    event.classified_as = vec![
+        "run:observation".into(),
+        ".".into(),
+        "reason:re-executed".into(),
+        "measure:attestation-enrichment@1".into(),
+        "value:1".into(),
+        "unit:enrichments".into(),
+        "env:closure=closure-a".into(),
+        "env:commit=commit-a".into(),
+        format!("env:device={device}"),
+        "env:kind=re-executed".into(),
+        "env:method=gate-v3/judge-v1".into(),
+        "env:outcome=green".into(),
+        "env:project=eprfs".into(),
+        "env:verdict=bafyverdict".into(),
+    ];
+    event
+}
+
 fn landing_record(
     kind: &str,
     intent: &str,
@@ -1365,6 +1388,32 @@ fn peer_verdicts_reads_only_matching_folded_admitted_siblings() {
             "agentId": "agent-key",
             "at": "2026-10-23T15:28:09Z"
         }])
+    );
+
+    // A local enrichment is a separate measure and cannot alter the sibling-verdict projection.
+    append(
+        b.checkout.path(),
+        [attestation_enrichment_record(&b.key.did_key())],
+    );
+    let after = b.epr(&[
+        "peer",
+        "verdicts",
+        "--project",
+        "eprfs",
+        "--closure",
+        "closure-a",
+        "--json",
+        "--root",
+        b.root(),
+    ]);
+    assert!(
+        after.status.success(),
+        "{}",
+        String::from_utf8_lossy(&after.stderr)
+    );
+    assert_eq!(
+        serde_json::from_slice::<serde_json::Value>(&after.stdout).unwrap(),
+        rows
     );
 }
 
