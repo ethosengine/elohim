@@ -1946,25 +1946,15 @@ pub(super) fn run(args: &[String], arrive: bool) -> Result<ExitCode, crate::erro
         }
     }
     let checks = status_at(&root, arrive);
-    let would_lines = would
-        .map(|commit| {
-            let capacity = checks
-                .iter()
-                .find_map(|check| check.capacity.as_ref())
-                .ok_or_else(|| {
-                    crate::error::Error::InvalidArguments(
-                        "device capacity could not be read for --would".into(),
-                    )
-                })?;
-            super::capacity::would_run(
-                &root,
-                commit,
-                target.map(String::as_str).unwrap_or("origin/dev"),
-                capacity,
-            )
-            .map_err(crate::error::Error::InvalidArguments)
-        })
-        .transpose()?;
+    let would_lines = would.map(|commit| {
+        let capacity = checks.iter().find_map(|check| check.capacity.as_ref());
+        super::capacity::would_run(
+            &root,
+            commit,
+            target.map(String::as_str).unwrap_or("origin/dev"),
+            capacity,
+        )
+    });
     if json {
         println!("{}", serde_json::to_string(&checks)?);
     } else {
