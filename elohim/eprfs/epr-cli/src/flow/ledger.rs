@@ -30,7 +30,8 @@ use elohim_epr_rea::{FlowRecord, FlowStore, SidecarFlowStore};
 use serde::Serialize;
 
 use super::read::{
-    gate_verdict_observed_at, is_note, note_history_order, note_view, HistoryOrderKey,
+    gate_verdict_observed_at, is_note, note_history_order, note_view, CommitDateCache,
+    HistoryOrderKey,
 };
 use super::{body_cid_of_file, confine_under, rel_to_root, short_cid, FlowError, FlowResult};
 
@@ -103,6 +104,7 @@ pub fn ledger(root: &Path, target: &str) -> FlowResult<LedgerResult> {
     // story, and each is also an ADDRESS later records may have been made against.
     let mut vias: BTreeMap<Cid, String> = BTreeMap::new();
     let mut staged: Vec<(HistoryOrderKey, usize, LedgerEntry)> = Vec::new();
+    let mut commit_dates = CommitDateCache::default();
     for (index, (record_cid, record)) in records.iter().enumerate() {
         let FlowRecord::Commitment(commitment) = record else {
             continue;
@@ -163,7 +165,7 @@ pub fn ledger(root: &Path, target: &str) -> FlowResult<LedgerResult> {
             };
             let mut view = note_view(record_cid, event);
             view.via = via;
-            let order = note_history_order(root, &view);
+            let order = note_history_order(root, &view, &mut commit_dates);
             view.date_unknown = order.date_unknown();
             let observed_at =
                 gate_verdict_observed_at(&view).map(|value| value.unwrap_or("unknown").to_string());

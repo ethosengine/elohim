@@ -481,6 +481,7 @@ test('recordEvidence names REFUSED concurrent update and refusing-to-write as ex
 });
 
 test('a completed brit record emits a commit-dated verdict with a separate observed time and failures stay advisory', () => {
+  const capabilityCache = new Map();
   const isLeases = (bin, args) => bin === 'epr' && args[0] === 'peer' && args[1] === 'leases';
   const isHelp = (bin, args) => bin === 'epr' && args[0] === 'flow' && args[1] === 'note' && args.includes('--help');
   const isNote = (bin, args) => bin === 'epr' && args[0] === 'flow' && args[1] === 'note' && !args.includes('--help');
@@ -496,7 +497,7 @@ test('a completed brit record emits a commit-dated verdict with a separate obser
   assert.equal(emitGateVerdict(project, 'closure', {
     success: false, seconds: 12.6, commit: 'abc',
     put: { stdout: '{"attestationId":"bafyatt","agentId":"agent"}', builtAt: '2026-11-25T05:15:42.987Z' },
-    root: '/repo', env: {}, spawn: landed.spawn,
+    root: '/repo', env: {}, spawn: landed.spawn, capabilityCache,
   }), true);
   const note = landed.calls.find(call => isNote(call.bin, call.args));
   assert.ok(note);
@@ -519,7 +520,7 @@ test('a completed brit record emits a commit-dated verdict with a separate obser
   const skewWarnings = [];
   assert.equal(emitGateVerdict(project, 'closure', {
     success: true, seconds: 3, commit: 'abc', put: {}, root: '/repo', env: {}, spawn: skewed.spawn,
-    warn: line => skewWarnings.push(line),
+    warn: line => skewWarnings.push(line), capabilityCache: new Map(),
   }), true);
   const legacy = skewed.calls.filter(call => legacyNote(call.bin, call.args));
   assert.equal(legacy.length, 1, 'the legacy form is written once');
@@ -537,6 +538,7 @@ test('a completed brit record emits a commit-dated verdict with a separate obser
   ]);
   assert.equal(emitGateVerdict(project, 'closure', {
     success: true, seconds: 3, commit: 'abc', put: {}, root: '/repo', env: {}, spawn: noRecordedTime.spawn,
+    capabilityCache: new Map(),
   }), true);
   const undatedObservation = noRecordedTime.calls.find(call => isNote(call.bin, call.args));
   assert.ok(undatedObservation.args.includes('--dated-by'));
@@ -547,7 +549,7 @@ test('a completed brit record emits a commit-dated verdict with a separate obser
   const warnings = [];
   assert.equal(emitGateVerdict(project, 'closure', {
     success: true, seconds: 1, commit: 'abc', put: {}, root: '/repo', env: {}, spawn: skipped.spawn,
-    warn: line => warnings.push(line),
+    warn: line => warnings.push(line), capabilityCache: new Map(),
   }), true);
   assert.equal(skipped.calls.filter(call => call.bin === 'epr').length, 1);
   assert.deepEqual(warnings, []);
@@ -559,7 +561,7 @@ test('a completed brit record emits a commit-dated verdict with a separate obser
   ]);
   assert.equal(emitGateVerdict(project, 'closure', {
     success: true, seconds: 1, commit: 'HEAD', put: {}, root: '/repo', env: {}, spawn: unresolved.spawn,
-    warn: line => warnings.push(line),
+    warn: line => warnings.push(line), capabilityCache: new Map(),
   }), false);
   assert.ok(!unresolved.calls.some(call => isNote(call.bin, call.args)));
   assert.match(warnings.pop(), /commit HEAD does not resolve/);
@@ -572,16 +574,16 @@ test('a completed brit record emits a commit-dated verdict with a separate obser
   ]);
   assert.equal(emitGateVerdict(project, 'closure', {
     success: true, seconds: 1, commit: 'abc', put: {}, root: '/repo', env: {}, spawn: failed.spawn,
-    warn: line => warnings.push(line),
+    warn: line => warnings.push(line), capabilityCache: new Map(),
   }), false);
   assert.equal(warnings.length, 1);
   assert.match(warnings[0], /not emitted \(refused\)/);
 });
 
-test('re-emitting one recorded run produces byte-identical note arguments', () => {
-  const isLeases = (bin, args) => bin === 'epr' && args[0] === 'peer' && args[1] === 'leases';
-  const isHelp = (bin, args) => bin === 'epr' && args[0] === 'flow' && args[1] === 'note' && args.includes('--help');
-  const isNote = (bin, args) => bin === 'epr' && args[0] === 'flow' && args[1] === 'note' && !args.includes('--help');
+test('re-emitting one recorded run probes each EPR binary once and produces byte-identical note arguments', () => {
+  const isLeases = (_bin, args) => args[0] === 'peer' && args[1] === 'leases';
+  const isHelp = (_bin, args) => args[0] === 'flow' && args[1] === 'note' && args.includes('--help');
+  const isNote = (_bin, args) => args[0] === 'flow' && args[1] === 'note' && !args.includes('--help');
   const sha = 'abc0000000000000000000000000000000000000';
   const run = { stdout: 'bafyatt', builtAt: '2026-11-25T05:15:42.987Z' };
   const fake = fakeSpawn([
@@ -591,13 +593,23 @@ test('re-emitting one recorded run produces byte-identical note arguments', () =
     [isNote, { status: 0, stdout: '' }],
   ]);
   const emit = () => emitGateVerdict(project, 'closure', {
-    success: true, seconds: 3, commit: 'abc', put: run, root: '/repo', env: {}, spawn: fake.spawn,
+    success: true, seconds: 3, commit: 'abc', put: run, root: '/repo',
+    env: { EPR_BIN: '/cache/epr-one' }, spawn: fake.spawn,
   });
   assert.equal(emit(), true);
   assert.equal(emit(), true);
   const notes = fake.calls.filter(call => isNote(call.bin, call.args));
   assert.equal(notes.length, 2);
   assert.deepEqual(notes[0].args, notes[1].args);
+  assert.equal(fake.calls.filter(call => call.bin === '/cache/epr-one' && isHelp(call.bin, call.args)).length, 1,
+    'two emissions in one process share one capability probe');
+
+  assert.equal(emitGateVerdict(project, 'closure', {
+    success: true, seconds: 3, commit: 'abc', put: run, root: '/repo',
+    env: { EPR_BIN: '/cache/epr-two' }, spawn: fake.spawn,
+  }), true);
+  assert.equal(fake.calls.filter(call => call.bin === '/cache/epr-two' && isHelp(call.bin, call.args)).length, 1,
+    'a different EPR_BIN has its own capability probe');
 });
 
 for (const [name, helpReply] of [
@@ -617,7 +629,7 @@ for (const [name, helpReply] of [
   assert.equal(emitGateVerdict(project, 'closure', {
     success: true, seconds: 1, commit: 'abc',
     put: { builtAt: '2026-11-25T05:15:42Z' }, root: '/repo', env: {}, spawn: fake.spawn,
-    warn: line => warnings.push(line),
+    warn: line => warnings.push(line), capabilityCache: new Map(),
   }), true);
   assert.equal(fake.calls.filter(call => isHelp(call.bin, call.args)).length, 2);
   const note = fake.calls.find(call => isNote(call.bin, call.args));
@@ -646,6 +658,7 @@ test('a linked worktree emits and reads verdicts at the main checkout the daemon
   assert.equal(deviceRoot(worktree, linked.spawn), '/main');
   assert.equal(emitGateVerdict(project, 'closure', {
     success: true, seconds: 1, commit: 'HEAD', put: {}, root: worktree, env: {}, spawn: linked.spawn,
+    capabilityCache: new Map(),
   }), true);
   assert.deepEqual(siblingVerdicts(project, 'closure', { root: worktree, env: {}, spawn: linked.spawn }), { candidates: [] });
   const epr = linked.calls.filter(call => isEpr(call.bin));
