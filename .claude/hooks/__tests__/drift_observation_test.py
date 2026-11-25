@@ -575,6 +575,39 @@ class DriftObservationCase(unittest.TestCase):
 
 
 class ObservationHelperCase(unittest.TestCase):
+    def test_timed_out_emit_retries_with_bounded_backoff(self):
+        mod = load_module("observation_timeout_retry", HOOKS / "_observation.py")
+        completed = subprocess.CompletedProcess(["epr"], 0, "", "")
+        with (
+            mock.patch.object(mod, "_emit_argv", return_value=["epr", "flow", "note"]),
+            mock.patch.object(
+                mod.subprocess,
+                "run",
+                side_effect=[subprocess.TimeoutExpired(["epr"], 5), completed],
+            ) as run,
+            mock.patch.object(mod.time, "sleep") as sleep,
+        ):
+            self.assertTrue(mod.emit("x@1", ".", 1, reason="retry fixture"))
+
+        self.assertEqual(run.call_count, 2)
+        sleep.assert_called_once_with(mod._EMIT_TIMEOUT_BACKOFFS[0])
+
+    def test_exhausted_timeout_retries_return_false(self):
+        mod = load_module("observation_timeout_exhausted", HOOKS / "_observation.py")
+        timeout = subprocess.TimeoutExpired(["epr"], 5)
+        with (
+            mock.patch.object(mod, "_emit_argv", return_value=["epr", "flow", "note"]),
+            mock.patch.object(mod.subprocess, "run", side_effect=timeout) as run,
+            mock.patch.object(mod.time, "sleep") as sleep,
+        ):
+            self.assertFalse(mod.emit("x@1", ".", 1, reason="retry fixture"))
+
+        self.assertEqual(run.call_count, len(mod._EMIT_TIMEOUT_BACKOFFS) + 1)
+        self.assertEqual(
+            [call.args[0] for call in sleep.call_args_list],
+            list(mod._EMIT_TIMEOUT_BACKOFFS),
+        )
+
     def test_probe_uses_one_coherent_path_cid_resolution(self):
         mod = load_module("observation_single_resolution", HOOKS / "_observation.py")
         with (
