@@ -600,7 +600,7 @@ test('siblingVerdicts retries one timeout with a longer bound and keeps the firs
 test('siblingVerdicts reports both timeout bounds after its one retry', () => {
   const read = siblingReadSpawn([
     timedOut('SIGKILL'),
-    { status: null, signal: 'SIGTERM', stdout: '', stderr: '' },
+    timedOut('SIGTERM'),
   ]);
   const result = siblingVerdicts(project, 'closure', {
     root: '/repo', env: { GATE_SIBLING_READ_TIMEOUT_MS: '8000' }, spawn: read.spawn,
@@ -618,6 +618,16 @@ test('siblingVerdicts reports a non-zero exit and does not retry it', () => {
     candidates: [],
     error: { kind: 'exit', detail: 'exit 23: peer unavailable' },
     why: 'sibling read failed: exit 23: peer unavailable',
+  });
+  assert.equal(read.calls.length, 1);
+});
+
+test('siblingVerdicts treats a signal kill without ETIMEDOUT as an exit and does not retry it', () => {
+  const read = siblingReadSpawn([{ status: null, signal: 'SIGKILL', stdout: '', stderr: '' }]);
+  assert.deepEqual(siblingVerdicts(project, 'closure', { root: '/repo', env: {}, spawn: read.spawn }), {
+    candidates: [],
+    error: { kind: 'exit', detail: 'killed by SIGKILL' },
+    why: 'sibling read failed: killed by SIGKILL',
   });
   assert.equal(read.calls.length, 1);
 });
