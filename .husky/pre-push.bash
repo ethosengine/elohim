@@ -1496,11 +1496,16 @@ pass_or_refuse() {
 #  - the checker itself: the rust-style-checker step sources in genesis/orchestrator/build-manifest.json
 #    (genesis/orchestrator/rust-style/**, rust-style.sh, rust-style-build-env.sh) and the CI wrapper
 #    rust-style-ci.sh. Its eprfs-meta resolver is a registry crate pinned by that Cargo.toml/Cargo.lock.
+#  - the build context rust-style-build-env.sh refuses: it walks from the checker up to the repository
+#    root and refuses a legacy extensionless `.cargo/config` at any level (and a nested config.toml),
+#    so adding one turns the leg red on every device. `*.cargo/config` covers every level of that walk.
 # The toolchain pin (genesis/agentic/pool-policy.json) is not here: it decides whether the checker
-# compiles, never what it measures. prepush-self.test.mjs holds this list to `relevant()`.
+# compiles, never what it measures. prepush-self.test.mjs holds this list to `relevant()` and to the
+# paths rust-style-build-env.sh's walk checks.
 RUST_STYLE_DISCIPLINE=""
 rust_style_input() {
   case "$1" in
+    *.cargo/config) return 0 ;;
     *.rs | *clippy.toml | *rustfmt.toml | *.cargo/config.toml | Cargo.toml | */Cargo.toml) return 0 ;;
     .epr-meta | */.epr-meta | *.epr-meta/manifest.md) return 0 ;;
     .epr-meta/rust-style-policy.json | .claude/epr-meta/policies.yaml) return 0 ;;
@@ -1586,6 +1591,9 @@ for PUSH_LINE in "${PUSH_LINES[@]}"; do
   if [[ "$REMOTE_REF" =~ ^refs/heads/(dev|main)$ && "$REMOTE_SHA" != "$ZERO_SHA" ]]; then
     STYLE_BASE="$REMOTE_SHA"
   else
+    # A new branch (destination all-zero), such as a thin client's hand-over ref, which is always new,
+    # is read as origin/dev..tip: a well-defined range, so the rust-style leg may find it untouched
+    # and skip. With no origin/dev no base can be established and the leg runs (fails closed).
     STYLE_BASE="origin/dev"
   fi
   # Cheap, offline security paydown runs before Rust compilation/expensive gates.

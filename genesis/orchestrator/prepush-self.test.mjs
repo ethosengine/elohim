@@ -548,6 +548,7 @@ for (const [name, files, touched] of [
   ["the checker's build environment", { "genesis/orchestrator/rust-style-build-env.sh": "# changed\n" },
     "genesis/orchestrator/rust-style-build-env.sh"],
   ["a Cargo manifest", { "crates/x/Cargo.toml": "[package]\nname = \"x\"\n" }, "crates/x/Cargo.toml"],
+  ["a legacy extensionless .cargo/config the build environment refuses", { ".cargo/config": "[build]\n" }, ".cargo/config"],
 ]) {
   test(`a range touching only ${name} is an input, never skipped`, t => {
     const fx = fixture(t);
@@ -597,7 +598,8 @@ test("deleting an .rs file is an input", t => {
   assertStyleNeeded(push(fx, [line("refs/heads/a", head, "refs/heads/self/a")], NO_CARGO), "crates/x/src/old.rs");
 });
 
-test("an unreadable range is never read as untouched", t => {
+// A new branch is read as origin/dev..tip (the hook's ruling); with no origin/dev there is no base.
+test("a new branch with origin/dev missing is never read as untouched", t => {
   const fx = fixture(t);
   thinClient(fx);
   fx.git("update-ref", "-d", "refs/remotes/origin/dev");
@@ -635,4 +637,26 @@ test("the hook's style input set holds every path predicate of the checker's rel
   for (const literal of [...literals, policy]) {
     assert.ok(fn.includes(literal), `rust_style_input() omits ${literal}, which the checker reads`);
   }
+});
+
+test("the hook's style input set holds every build-context path rust-style-build-env.sh's walk refuses", () => {
+  const env = readFileSync(join(ROOT, "genesis/orchestrator/rust-style-build-env.sh"), "utf8");
+  const checker = env.match(/style_checker_root="\$style_repo_root\/([^"]+)"/)?.[1];
+  const names = [...env.matchAll(/="\$style_config_root\/([^"]+)"/g)].map(m => m[1]);
+  assert.ok(checker && names.includes(".cargo/config") && names.includes(".cargo/config.toml"),
+    `the walk is where this test expects it: checker=${checker} names=${names}`);
+  const dirs = [];
+  for (let d = checker; d && d !== "."; d = d.includes("/") ? d.slice(0, d.lastIndexOf("/")) : "") dirs.push(d);
+  dirs.push("");
+  const paths = dirs.flatMap(d => names.map(n => (d ? `${d}/${n}` : n)));
+  const hook = readFileSync(HOOK_PATH, "utf8");
+  const start = hook.indexOf("rust_style_input() {");
+  const fn = hook.slice(start, hook.indexOf("\n}\n", start) + 3);
+  const script = `RUST_STYLE_DISCIPLINE=""\n${fn}\nfor p in "$@"; do rust_style_input "$p" || echo "MISSING $p"; done\n`;
+  const r = spawnSync("bash", ["-c", script, "_", ...paths], { encoding: "utf8" });
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(r.stdout, "", `rust_style_input() omits paths the build environment refuses:\n${r.stdout}`);
+  // And it is not vacuous: an unrelated path is not an input.
+  const neg = spawnSync("bash", ["-c", script, "_", "genesis/docs/notes.md"], { encoding: "utf8" });
+  assert.equal(neg.stdout, "MISSING genesis/docs/notes.md\n");
 });
