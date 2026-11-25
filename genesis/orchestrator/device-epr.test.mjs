@@ -285,3 +285,45 @@ test('a verdict crossing the bound killed says so, and that the append is unconf
   }), false);
   assert.deepEqual(lines, ['[gate] orchestrator verdict crossing: not emitted (killed by the 5 s bound (SIGTERM); the append is unconfirmed)\n']);
 });
+
+// The store is found beside the launcher a shell would run, wherever it was installed. Every test
+// above sets BIN_STORE, so this lookup had no test: on 2026-11-25 a device whose launcher is
+// ~/.cargo/bin/epr was read as having no head, and its hand-over's misses were dropped.
+function launcherStore(t) {
+  const root = mkdtempSync(join(tmpdir(), 'device-epr-launcher-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const binStore = join(root, 'share/elohim/bin-store');
+  script(join(binStore, 'bin/bin-launch'), 'exit 0');
+  script(join(binStore, 'epr', HEAD, 'epr'), 'exit 0');
+  writeFileSync(join(binStore, 'epr/current.json'), JSON.stringify({ cid: HEAD }));
+  return { root, binStore, head: join(binStore, 'epr', HEAD, 'epr') };
+}
+
+test('launcher: the store is found beside an epr launcher on PATH that is not at ~/.local/bin', t => {
+  const fx = launcherStore(t);
+  mkdirSync(join(fx.root, '.cargo/bin'), { recursive: true });
+  symlinkSync(join(fx.binStore, 'bin/bin-launch'), join(fx.root, '.cargo/bin/epr'));
+  const env = { PATH: `${join(fx.root, 'empty')}:${join(fx.root, '.cargo/bin')}:/usr/bin`, HOME: fx.root };
+  assert.equal(deviceHead({ env }).path, fx.head);
+  assert.equal(resolveDeviceEpr({ env }).source, 'head');
+});
+
+test('launcher: an epr on PATH that is not a bin-store launcher is passed over for ~/.local/bin/epr', t => {
+  const fx = launcherStore(t);
+  script(join(fx.root, 'plain/epr'), 'exit 0');
+  mkdirSync(join(fx.root, '.local/bin'), { recursive: true });
+  symlinkSync(join(fx.binStore, 'bin/bin-launch'), join(fx.root, '.local/bin/epr'));
+  const env = { PATH: `${join(fx.root, 'plain')}:/usr/bin`, HOME: fx.root };
+  assert.equal(deviceHead({ env }).path, fx.head);
+});
+
+test('launcher: no launcher anywhere is an unreadable head, said in one line, and falls back', t => {
+  const fx = launcherStore(t);
+  script(join(fx.root, 'plain/epr'), 'exit 0');
+  const env = { PATH: `${join(fx.root, 'plain')}:/usr/bin`, HOME: fx.root };
+  assert.throws(() => deviceHead({ env }), /no epr launcher/);
+  const r = resolveDeviceEpr({ env });
+  assert.equal(r.source, 'path');
+  assert.equal(r.command, 'epr');
+  assert.match(r.why, /no epr launcher/);
+});

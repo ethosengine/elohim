@@ -25,8 +25,11 @@
  * is seen by the next device act. Only the diagnostic line is remembered, to print it once.
  *
  * The store is located as bin-launch locates it (Store::from_environment): EPR_STORE, else
- * BIN_STORE/epr, else the store beside the launcher installed at ~/.local/bin/epr. There is no
- * other override.
+ * BIN_STORE/epr, else the store beside the launcher itself. bin-launch reads its own location
+ * (current_exe), so the mirror is the launcher a shell would run: the first `epr` on PATH that
+ * resolves to `<store>/bin/bin-launch`, then ~/.local/bin/epr. A device whose launcher was
+ * installed elsewhere (the laptop's is ~/.cargo/bin/epr) has a landed head all the same; looking
+ * only at ~/.local/bin lost its hand-over's misses on 2026-11-25. There is no other override.
  *
  * CLI: `node device-epr.mjs` prints the absolute path of the head epr and exits 0. With an
  * unreadable head it prints nothing on stdout, so the caller runs its own resolution unchanged;
@@ -37,6 +40,22 @@ import { dirname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 /**
+ * The installed launcher, as a real path ending in `/bin/bin-launch`: the first `epr` on PATH that
+ * resolves to one, else ~/.local/bin/epr. An `epr` on PATH that is something else (a plain binary,
+ * a wrapper) is passed over, never trusted as a store location. Throws when none is found.
+ */
+function launcherPath(env) {
+  const candidates = String(env.PATH || '').split(':').filter(Boolean).map(dir => join(dir, 'epr'));
+  if (env.HOME) candidates.push(join(env.HOME, '.local/bin/epr'));
+  for (const candidate of candidates) {
+    let real;
+    try { real = realpathSync(candidate); } catch { continue; }
+    if (real.endsWith('/bin/bin-launch')) return real;
+  }
+  throw new Error('no epr launcher on PATH or at ~/.local/bin/epr resolves to a bin store');
+}
+
+/**
  * This device's landed head epr, read from the bin store without executing anything:
  * `{ path, cid, store }`. Throws when it cannot be read or is not a regular executable file
  * inside the store. Mirrors bin_store head(): current.json wins over the symlink.
@@ -44,9 +63,7 @@ import { fileURLToPath } from 'node:url';
 export function deviceHead({ env = process.env } = {}) {
   let store = env.EPR_STORE || (env.BIN_STORE && join(env.BIN_STORE, 'epr'));
   if (!store) {
-    const launcher = realpathSync(join(env.HOME, '.local/bin/epr'));
-    if (!launcher.endsWith('/bin/bin-launch')) throw new Error('unknown launcher');
-    store = join(dirname(dirname(launcher)), 'epr');
+    store = join(dirname(dirname(launcherPath(env))), 'epr');
   }
   const root = realpathSync(store);
   const pointer = join(root, 'current.json');
