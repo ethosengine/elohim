@@ -1684,19 +1684,15 @@ for PUSH_LINE in "${PUSH_LINES[@]}"; do
   # Determine what changed. A new branch, or a remote tip this clone has never fetched, is read
   # against its merge base with origin/dev: the whole branch, of the object being pushed. A range
   # that cannot be read at all refuses below; an unreadable diff never reads as "nothing changed".
-  if [ "$REMOTE_SHA" = "$ZERO_SHA" ]; then
+  if NEW_CHANGED=$(bash "$HOOK_WORK_TREE/genesis/orchestrator/push-changed-files.sh" \
+    "$REMOTE_SHA" "$LOCAL_SHA" origin/dev); then
+    :
+  else
+    RANGE_STATUS=$?
     GATE_NARROW_BASE=none
-    if ! NEW_CHANGED=$(git diff --name-only "origin/dev...$LOCAL_SHA" 2>/dev/null); then
+    if [ "$RANGE_STATUS" -ne 3 ]; then
       CHANGE_UNREADABLE="$CHANGE_UNREADABLE $REMOTE_REF"
       NEW_CHANGED=""
-    fi
-  else
-    if ! NEW_CHANGED=$(git diff --name-only "$REMOTE_SHA" "$LOCAL_SHA" 2>/dev/null); then
-      GATE_NARROW_BASE=none
-      if ! NEW_CHANGED=$(git diff --name-only "origin/dev...$LOCAL_SHA" 2>/dev/null); then
-        CHANGE_UNREADABLE="$CHANGE_UNREADABLE $REMOTE_REF"
-        NEW_CHANGED=""
-      fi
     fi
   fi
 
