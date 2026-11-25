@@ -2172,7 +2172,10 @@ function gradeFixture(t) {
       },
     });
     const of = command => calls.filter(call => call.command === command).map(call => call.args);
-    const gradeBuildRef = args => args[2] === 'signer' || (args[3] === 'get' && String(args[args.indexOf('--step') + 1]).startsWith('ci:'));
+    // The gate never reads this closure's rows after its recipe ran; a find after that is the shadow's.
+    const ranAt = calls.findIndex(call => call.command === 'bash');
+    const lateFinds = new Set(ranAt < 0 ? [] : calls.slice(ranAt).filter(call => call.command === buildRef && call.args[3] === 'find').map(call => call.args));
+    const gradeBuildRef = args => args[2] === 'signer' || lateFinds.has(args) || (args[3] === 'get' && String(args[args.indexOf('--step') + 1]).startsWith('ci:'));
     return {
       status, calls, rows, output, logReads,
       // What the gate itself hands the evidence store and the cycle recorder.
@@ -2180,7 +2183,7 @@ function gradeFixture(t) {
       evidenceArgs: of(buildRef).filter(args => !gradeBuildRef(args) || (evidence === 'reuse' && args[2] === 'signer')),
       cycleArgs: of('epr').filter(args => args[0] !== 'peer'),
       gradeSpawns: [
-        ...of(buildRef).filter(args => gradeBuildRef(args) && !(evidence === 'reuse' && args[2] === 'signer')).map(args => `brit-build-ref ${args[2] === 'signer' ? 'signer' : 'get ci'}`),
+        ...of(buildRef).filter(args => gradeBuildRef(args) && !(evidence === 'reuse' && args[2] === 'signer')).map(args => `brit-build-ref ${args[2] === 'signer' ? 'signer' : args[3] === 'find' ? 'find' : 'get ci'}`),
         ...of('epr').filter(args => args[0] === 'peer').map(() => 'epr peer verdicts'),
       ],
       eprPeerReads: of('epr').filter(args => args[0] === 'peer').length,
@@ -2253,7 +2256,7 @@ test('grade shadow: knob off adds no read, spawn or write', t => {
   const { run } = gradeFixture(t);
   const scene = { siblings: [{ success: true }], ci: { success: true, inputsHash: 't'.repeat(40) }, flowLog: 'x' };
   const on = run(scene);
-  assert.deepEqual(on.gradeSpawns, ['brit-build-ref signer', 'brit-build-ref get ci', 'epr peer verdicts'],
+  assert.deepEqual(on.gradeSpawns, ['brit-build-ref signer', 'brit-build-ref get ci', 'brit-build-ref find', 'epr peer verdicts'],
     'with the knob on these are the subprocesses the shadow adds when no reuse was asked');
   assert.equal(on.logReads.length, 2, 'and it stats and reads the flow log once');
   const off = run({ ...scene, grade: 'off' });
@@ -2319,4 +2322,14 @@ test('grade shadow: over budget drops with one line, no row and no subprocess', 
   const roomy = run({ budget: '15000', siblings: [{ success: true }] });
   assert.equal(roomy.gradeRows.length, 1, 'with budget the same scene yields its row');
   assert.doesNotMatch(roomy.output, /skipped for budget/);
+});
+
+test('grade shadow: a green this run recorded is counted from its re-read record, not from the rows read before the run', t => {
+  const { run } = gradeFixture(t);
+  // The fixture's store answers every find with the same rows, so the row is there at the re-read.
+  const ran = run({ local: [{ success: true }] });
+  assert.equal(ran.gateRuns, 1);
+  assert.match(ran.gradeLines[0], /1 independent \(this device green\).*\| today: ran green$/);
+  const nothingHeld = run({});
+  assert.match(nothingHeld.gradeLines[0], /0 independent, carrier: none/, 'a run whose record is not there counts nothing for this device');
 });

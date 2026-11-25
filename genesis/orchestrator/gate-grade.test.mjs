@@ -149,6 +149,9 @@ test('the class comes from the paths the push touches, strictest row first', () 
   assert.equal(cls(['doorway/doorway-service/src/server/http.rs', 'genesis/orchestrator/gate-runner.mjs']), 'governance');
   assert.equal(cls(['elohim/eprfs/justfile']), 'governance', 'a recipe is the gate\'s own judge');
   assert.equal(cls(['elohim/eprfs/build-manifest.json']), 'governance');
+  assert.equal(cls(['.epr-meta/elohim/packages/agentdocs/elohim-root-gospel.json', 'CLAUDE.md', 'genesis/manifests/habits.yaml']), 'tooling');
+  assert.equal(cls(['genesis/manifests/habits.yaml', 'genesis/orchestrator/.epr-meta/push-gate-pays-once.habit.md']), 'documentation');
+  assert.equal(cls(['genesis/manifests/cluster-state.yaml']), null, 'a manifest no row names is not guessed');
 });
 
 test('class undetermined prints no would-suffice', () => {

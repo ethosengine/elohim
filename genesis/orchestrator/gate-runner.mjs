@@ -1566,9 +1566,20 @@ export function runProject(project, printOnly, namesOnly, {
           success: note.node?.success, closure: note.node?.inputsHash,
         });
       }
+      // After a run, the rows read before it no longer say what this device holds: one bounded,
+      // brit-verified re-read of this closure's rows, so the verdict just recorded is counted from
+      // its record and never from this process's own word. A reuse already read them fresh.
+      let localRows = evidence.rows || [];
+      let localUnverifiable = evidence.unverifiable || [];
+      if (outcome === 'ran' && evidence.buildRefBin) {
+        const fresh = findEvidence(project, evidence.key, { buildRefBin: evidence.buildRefBin, root, spawn: bounded, warn: () => {} });
+        check();
+        if (fresh.error) unread.push(`this closure's rows after the run (${fresh.error})`);
+        else { localRows = fresh.rows; localUnverifiable = fresh.unverifiable; }
+      }
       const grade = gradeOf({
         range, isGovernance: isSiblingGovernancePath, project: project.name, key: evidence.key,
-        selfId: gradeSelf, local: evidence.rows || [], unverifiable: evidence.unverifiable || [],
+        selfId: gradeSelf, local: localRows, unverifiable: localUnverifiable,
         siblings: siblingRead.candidates || [], enrichments: enriched.rows, carriers, unread,
       });
       write(`${gradeLine(project.name, grade, today)}\n`);

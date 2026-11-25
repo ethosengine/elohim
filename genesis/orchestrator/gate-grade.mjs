@@ -50,9 +50,11 @@ const SERVING_PREFIXES = Object.freeze([
 // Test and tooling trees: scripts, hooks, harnesses and their fixtures; never a crate's sources.
 const TOOLING_PREFIXES = Object.freeze([
   'genesis/orchestrator/', 'genesis/agentic/', 'genesis/a2o/', 'scripts/', '.claude/', '.codex/',
-  '.agents/', '.husky/',
+  '.agents/', '.husky/', '.epr-meta/',
 ]);
-const TOOLING_EXTENSIONS = /\.(mjs|cjs|js|ts|py|sh|bash|feature)$/;
+const TOOLING_EXTENSIONS = /\.(mjs|cjs|js|ts|py|sh|bash|feature|json|jsonl|yaml|yml)$/;
+// Generated ledgers no recipe judges by: the habit register's projection.
+const LEDGER_PATHS = Object.freeze(['genesis/manifests/habits.yaml']);
 
 // A recipe is part of a gate's own judge: the manifest that declares it and the justfile that runs it.
 const isRecipePath = path => /(^|\/)(build-manifest\.json|justfile|[^/]+\.just)$/.test(path);
@@ -61,7 +63,7 @@ function classOfPath(path, isGovernance) {
   if (isGovernance(path) || isRecipePath(path)) return 'governance';
   if (SERVING_PREFIXES.some(prefix => path.startsWith(prefix))) return 'serving-path';
   if (/\.rs$/.test(path) || /(^|\/)Cargo\.(toml|lock)$/.test(path)) return 'library-crate';
-  if (/\.md$/.test(path)) return 'documentation';
+  if (/\.md$/.test(path) || LEDGER_PATHS.includes(path)) return 'documentation';
   if (TOOLING_PREFIXES.some(prefix => path.startsWith(prefix)) && TOOLING_EXTENSIONS.test(path)) return 'tooling';
   return null;
 }
