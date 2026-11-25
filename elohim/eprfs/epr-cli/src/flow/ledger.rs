@@ -29,7 +29,9 @@ use cid::Cid;
 use elohim_epr_rea::{FlowRecord, FlowStore, SidecarFlowStore};
 use serde::Serialize;
 
-use super::read::{gate_verdict_observed_at, is_note, note_view, OccurredAtKey};
+use super::read::{
+    gate_verdict_observed_at, is_note, note_history_order, note_view, HistoryOrderKey,
+};
 use super::{body_cid_of_file, confine_under, rel_to_root, short_cid, FlowError, FlowResult};
 
 /// One record, as a story reads it.
@@ -42,6 +44,9 @@ pub struct LedgerEntry {
     /// Who acted: the commitment's provider, the event's provider.
     pub actor: String,
     pub occurred_at: String,
+    /// The gate verdict's judged commit could not be dated in this repository.
+    #[serde(skip_serializing_if = "is_false")]
+    pub date_unknown: bool,
     /// Run wall-clock time for a gate verdict. Legacy verdicts carry `"unknown"`; non-verdict
     /// rows omit the field.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -97,7 +102,7 @@ pub fn ledger(root: &Path, target: &str) -> FlowResult<LedgerResult> {
     // Pass 1: the commitments scoped by this atom, in append order. Each is a claim in the
     // story, and each is also an ADDRESS later records may have been made against.
     let mut vias: BTreeMap<Cid, String> = BTreeMap::new();
-    let mut staged: Vec<(OccurredAtKey, usize, LedgerEntry)> = Vec::new();
+    let mut staged: Vec<(HistoryOrderKey, usize, LedgerEntry)> = Vec::new();
     for (index, (record_cid, record)) in records.iter().enumerate() {
         let FlowRecord::Commitment(commitment) = record else {
             continue;
@@ -118,13 +123,14 @@ pub fn ledger(root: &Path, target: &str) -> FlowResult<LedgerResult> {
             (None, _) => format!("claimed {}", short_cid(record_cid)),
         };
         staged.push((
-            OccurredAtKey::parse(&occurred_at),
+            HistoryOrderKey::dated(&occurred_at),
             index,
             LedgerEntry {
                 cid: record_cid.to_string(),
                 kind: "claim".to_string(),
                 actor: commitment.provider.0.clone(),
                 occurred_at,
+                date_unknown: false,
                 observed_at: None,
                 via: None,
                 text,
@@ -147,7 +153,7 @@ pub fn ledger(root: &Path, target: &str) -> FlowResult<LedgerResult> {
         let FlowRecord::Event(event) = record else {
             continue;
         };
-        let entry = if is_note(event) {
+        let (entry, order) = if is_note(event) {
             let via = if event.resource == cid {
                 None
             } else if let Some(via) = vias.get(&event.resource) {
@@ -157,6 +163,8 @@ pub fn ledger(root: &Path, target: &str) -> FlowResult<LedgerResult> {
             };
             let mut view = note_view(record_cid, event);
             view.via = via;
+            let order = note_history_order(root, &view);
+            view.date_unknown = order.date_unknown();
             let observed_at =
                 gate_verdict_observed_at(&view).map(|value| value.unwrap_or("unknown").to_string());
             let text = match (&view.reason, &view.verdict) {
@@ -165,31 +173,35 @@ pub fn ledger(root: &Path, target: &str) -> FlowResult<LedgerResult> {
                 (None, Some(verdict)) => format!("[{verdict}]"),
                 (None, None) => String::new(),
             };
-            LedgerEntry {
-                cid: view.cid,
-                // `run:ruling` reads as `ruling` in a story; the tag's prefix is a namespace for
-                // machines, and a ledger line is for a person.
-                kind: view
-                    .kind
-                    .strip_prefix("run:")
-                    .unwrap_or(&view.kind)
-                    .to_string(),
-                actor: view.actor,
-                occurred_at: view.occurred_at,
-                observed_at,
-                via: view.via,
-                text,
-                gap_id: None,
-                brief: None,
-                status: None,
-                report: None,
-                commits: Vec::new(),
-                reason: view.reason,
-                switched_to: view.switched_to,
-                verdict: view.verdict,
-                steward: view.steward,
-                extra: view.extra,
-            }
+            (
+                LedgerEntry {
+                    cid: view.cid,
+                    // `run:ruling` reads as `ruling` in a story; the tag's prefix is a namespace for
+                    // machines, and a ledger line is for a person.
+                    kind: view
+                        .kind
+                        .strip_prefix("run:")
+                        .unwrap_or(&view.kind)
+                        .to_string(),
+                    actor: view.actor,
+                    occurred_at: view.occurred_at,
+                    date_unknown: view.date_unknown,
+                    observed_at,
+                    via: view.via,
+                    text,
+                    gap_id: None,
+                    brief: None,
+                    status: None,
+                    report: None,
+                    commits: Vec::new(),
+                    reason: view.reason,
+                    switched_to: view.switched_to,
+                    verdict: view.verdict,
+                    steward: view.steward,
+                    extra: view.extra,
+                },
+                order,
+            )
         } else if let Some(via) = event
             .fulfills
             .iter()
@@ -214,29 +226,33 @@ pub fn ledger(root: &Path, target: &str) -> FlowResult<LedgerResult> {
                 // which is a CI observation and not an authored delivery.
                 (None, _) => "discharged".to_string(),
             };
-            LedgerEntry {
-                cid: record_cid.to_string(),
-                kind: "fulfilment".to_string(),
-                actor: event.provider.0.clone(),
-                occurred_at: event.occurred_at.clone(),
-                observed_at: None,
-                via: Some(via.clone()),
-                text,
-                gap_id: slots.get(1).cloned(),
-                brief: None,
-                status,
-                report,
-                commits,
-                reason: None,
-                switched_to: None,
-                verdict: None,
-                steward: slot(slots, "steward:"),
-                extra: Vec::new(),
-            }
+            (
+                LedgerEntry {
+                    cid: record_cid.to_string(),
+                    kind: "fulfilment".to_string(),
+                    actor: event.provider.0.clone(),
+                    occurred_at: event.occurred_at.clone(),
+                    date_unknown: false,
+                    observed_at: None,
+                    via: Some(via.clone()),
+                    text,
+                    gap_id: slots.get(1).cloned(),
+                    brief: None,
+                    status,
+                    report,
+                    commits,
+                    reason: None,
+                    switched_to: None,
+                    verdict: None,
+                    steward: slot(slots, "steward:"),
+                    extra: Vec::new(),
+                },
+                HistoryOrderKey::dated(&event.occurred_at),
+            )
         } else {
             continue;
         };
-        staged.push((OccurredAtKey::parse(&entry.occurred_at), index, entry));
+        staged.push((order, index, entry));
     }
 
     // ONE sort, ASCENDING — the same key `read` uses, read the other way round.
@@ -253,6 +269,10 @@ fn slot(slots: &[String], prefix: &str) -> Option<String> {
     slots
         .iter()
         .find_map(|s| s.strip_prefix(prefix).map(str::to_string))
+}
+
+fn is_false(value: &bool) -> bool {
+    !*value
 }
 
 /// A content address shortened for a prose line, left alone if it is not one.
@@ -317,7 +337,11 @@ impl LedgerResult {
             return;
         }
         for entry in &self.entries {
-            let date = entry.occurred_at.get(..10).unwrap_or("unknown");
+            let date = if entry.date_unknown {
+                "unknown (date unknown)"
+            } else {
+                entry.occurred_at.get(..10).unwrap_or("unknown")
+            };
             let via = entry
                 .via
                 .as_ref()

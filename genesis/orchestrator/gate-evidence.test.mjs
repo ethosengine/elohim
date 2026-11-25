@@ -310,9 +310,18 @@ test('gateEvidence is fail-open: no brit, an attested project, or a refused read
 });
 
 test('recordEvidence puts the verdict against the closure with the manifest file and a stored verdict, red included', () => {
-  const { spawn, calls } = fakeSpawn([[isPut, { status: 0, stdout: 'bafyrei…\n', stderr: '' }], [isGet, getMiss]]);
+  let gets = 0;
+  const recorded = {
+    inputsHash: 'k'.repeat(64), success: false, builtAt: '2026-11-25T05:15:42.987Z',
+  };
+  const { spawn, calls } = fakeSpawn([
+    [isPut, { status: 0, stdout: 'bafyrei…\n', stderr: '' }],
+    [isGet, () => gets++ === 0 ? { status: 0, stdout: '', stderr: 'no build ref found\n' }
+      : { status: 0, stdout: `${JSON.stringify(recorded)}\n`, stderr: '' }],
+  ]);
   const r = recordEvidence(project, 'k'.repeat(64), { success: false, seconds: 1875.4, commit: 'abc123', buildRefBin: '/x/brit-build-ref', root: '/repo', jobs: 1, dirty: false, spawn, warn: () => {} });
   assert.equal(r.status, 0);
+  assert.equal(r.builtAt, recorded.builtAt, 'the run carries the signed evidence time');
   assert.ok(isGet(calls[0].bin, calls[0].args), 'the note is read before it is written');
   assert.deepEqual(calls[0].args, ['--repo', '/repo', 'build', 'get', '--step', 'gate:elohim-storage', '--commit', 'abc123']);
   const args = calls.find(c => isPut(c.bin, c.args)).args;
@@ -323,6 +332,7 @@ test('recordEvidence puts the verdict against the closure with the manifest file
   assert.equal(args[args.indexOf('--success') + 1], 'false');
   assert.equal(args[args.indexOf('--duration-ms') + 1], '1875400');
   assert.equal(args[args.indexOf('--commit') + 1], 'abc123');
+  assert.equal(calls.filter(c => isGet(c.bin, c.args)).length, 2, 'the signed run record is read back after put');
   assert.equal(findEvidence(project, 'k', { buildRefBin: '/x/brit-build-ref', root: '/repo', env: {}, spawn: () => ({ status: 0, stdout: 'nope', stderr: '' }) }).error, 'build find: not JSON');
 });
 
@@ -413,7 +423,7 @@ test('recordEvidence reads the note first: an unverifiable or foreign note is na
   const unverifiable = fakeSpawn([[isGet, { status: 0, stdout: '', stderr: `no build ref found for step=gate:elohim-storage commit=abc\nunverifiable: ${UNVERIFIABLE_SHA} ${UNVERIFIABLE_REASON}\n` }], put]);
   let r = recordEvidence(project, 'closure-2', { success: true, seconds: 1, commit: 'abc', buildRefBin: '/x/brit-build-ref', root: '/repo', dirty: false, spawn: unverifiable.spawn, warn });
   assert.equal(r.status, 0);
-  assert.deepEqual(unverifiable.calls.map(c => c.args[3]), ['get', 'put']);
+  assert.deepEqual(unverifiable.calls.map(c => c.args[3]), ['get', 'put', 'get']);
   assert.deepEqual(warnings, [`[gate] elohim-storage evidence: unverifiable note on ${BUILD_REF} at ${UNVERIFIABLE_SHA}: ${UNVERIFIABLE_REASON}; replacing it\n`]);
 
   warnings.length = 0;
@@ -485,9 +495,8 @@ test('a completed brit record emits a commit-dated verdict with a separate obser
   ]);
   assert.equal(emitGateVerdict(project, 'closure', {
     success: false, seconds: 12.6, commit: 'abc',
-    put: { stdout: '{"attestationId":"bafyatt","agentId":"agent"}' },
+    put: { stdout: '{"attestationId":"bafyatt","agentId":"agent"}', builtAt: '2026-11-25T05:15:42.987Z' },
     root: '/repo', env: {}, spawn: landed.spawn,
-    now: () => new Date('2026-11-25T05:15:42.987Z'),
   }), true);
   const note = landed.calls.find(call => isNote(call.bin, call.args));
   assert.ok(note);
@@ -510,7 +519,7 @@ test('a completed brit record emits a commit-dated verdict with a separate obser
   const skewWarnings = [];
   assert.equal(emitGateVerdict(project, 'closure', {
     success: true, seconds: 3, commit: 'abc', put: {}, root: '/repo', env: {}, spawn: skewed.spawn,
-    now: () => new Date('2026-11-25T05:15:42.987Z'), warn: line => skewWarnings.push(line),
+    warn: line => skewWarnings.push(line),
   }), true);
   const legacy = skewed.calls.filter(call => legacyNote(call.bin, call.args));
   assert.equal(legacy.length, 1, 'the legacy form is written once');
@@ -519,6 +528,20 @@ test('a completed brit record emits a commit-dated verdict with a separate obser
   assert.ok(!legacy[0].args.some(arg => arg.startsWith('observedAt=')), 'no observed time over a HEAD date');
   assert.ok(legacy[0].args.includes(`commit=${sha}`));
   assert.match(skewWarnings.join(''), /predates --dated-by; written in the legacy form/);
+
+  const noRecordedTime = fakeSpawn([
+    [isLeases, { status: 0, stdout: '{"standing":"device"}' }],
+    [isRevParse, { status: 0, stdout: `${sha}\n` }],
+    [isHelp, newHelp],
+    [isNote, { status: 0, stdout: '' }],
+  ]);
+  assert.equal(emitGateVerdict(project, 'closure', {
+    success: true, seconds: 3, commit: 'abc', put: {}, root: '/repo', env: {}, spawn: noRecordedTime.spawn,
+  }), true);
+  const undatedObservation = noRecordedTime.calls.find(call => isNote(call.bin, call.args));
+  assert.ok(undatedObservation.args.includes('--dated-by'));
+  assert.ok(!undatedObservation.args.some(arg => arg.startsWith('observedAt=')),
+    'an unavailable evidence time is unknown, never the emit clock');
 
   const skipped = fakeSpawn([[isLeases, { status: 0, stdout: '{"standing":"not_a_device"}' }]]);
   const warnings = [];
@@ -553,6 +576,54 @@ test('a completed brit record emits a commit-dated verdict with a separate obser
   }), false);
   assert.equal(warnings.length, 1);
   assert.match(warnings[0], /not emitted \(refused\)/);
+});
+
+test('re-emitting one recorded run produces byte-identical note arguments', () => {
+  const isLeases = (bin, args) => bin === 'epr' && args[0] === 'peer' && args[1] === 'leases';
+  const isHelp = (bin, args) => bin === 'epr' && args[0] === 'flow' && args[1] === 'note' && args.includes('--help');
+  const isNote = (bin, args) => bin === 'epr' && args[0] === 'flow' && args[1] === 'note' && !args.includes('--help');
+  const sha = 'abc0000000000000000000000000000000000000';
+  const run = { stdout: 'bafyatt', builtAt: '2026-11-25T05:15:42.987Z' };
+  const fake = fakeSpawn([
+    [isLeases, { status: 0, stdout: '{"standing":"device"}' }],
+    [isRevParse, { status: 0, stdout: `${sha}\n` }],
+    [isHelp, { status: 0, stdout: 'usage: epr flow note [--dated-by <commit>]\n' }],
+    [isNote, { status: 0, stdout: '' }],
+  ]);
+  const emit = () => emitGateVerdict(project, 'closure', {
+    success: true, seconds: 3, commit: 'abc', put: run, root: '/repo', env: {}, spawn: fake.spawn,
+  });
+  assert.equal(emit(), true);
+  assert.equal(emit(), true);
+  const notes = fake.calls.filter(call => isNote(call.bin, call.args));
+  assert.equal(notes.length, 2);
+  assert.deepEqual(notes[0].args, notes[1].args);
+});
+
+for (const [name, helpReply] of [
+  ['timeout', () => { const error = new Error('timed out'); error.code = 'ETIMEDOUT'; throw error; }],
+  ['empty output', { status: 0, stdout: '', stderr: '' }],
+]) test(`a failed --dated-by probe retries once and emits timelessly after ${name}`, () => {
+  const isLeases = (bin, args) => bin === 'epr' && args[0] === 'peer' && args[1] === 'leases';
+  const isHelp = (bin, args) => bin === 'epr' && args[0] === 'flow' && args[1] === 'note' && args.includes('--help');
+  const isNote = (bin, args) => bin === 'epr' && args[0] === 'flow' && args[1] === 'note' && !args.includes('--help');
+  const fake = fakeSpawn([
+    [isLeases, { status: 0, stdout: '{"standing":"device"}' }],
+    [isRevParse, { status: 0, stdout: `${'a'.repeat(40)}\n` }],
+    [isHelp, helpReply],
+    [isNote, { status: 0, stdout: '' }],
+  ]);
+  const warnings = [];
+  assert.equal(emitGateVerdict(project, 'closure', {
+    success: true, seconds: 1, commit: 'abc',
+    put: { builtAt: '2026-11-25T05:15:42Z' }, root: '/repo', env: {}, spawn: fake.spawn,
+    warn: line => warnings.push(line),
+  }), true);
+  assert.equal(fake.calls.filter(call => isHelp(call.bin, call.args)).length, 2);
+  const note = fake.calls.find(call => isNote(call.bin, call.args));
+  assert.ok(!note.args.includes('--dated-by'));
+  assert.ok(!note.args.some(arg => arg.startsWith('observedAt=')));
+  assert.match(warnings.join(''), /capability probe failed twice; written without --dated-by or observedAt/);
 });
 
 test('a linked worktree emits and reads verdicts at the main checkout the daemon crosses', () => {
