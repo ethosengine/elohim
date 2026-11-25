@@ -4,17 +4,19 @@
 //! reopen it while holding a transaction. Drop explicitly unlocks before closing; otherwise
 //! a descriptor inherited by a concurrently spawned child can extend the lock past our scope.
 //! After a crash the OS releases the lock when the last inherited handle closes.
-//! Each accepted append has completed `sync_all`; directory creation and multi-record
-//! transactions are NOT power-loss atomic. A failed sync is an uncertain write, not success.
+//! Each accepted append or batch has completed `sync_all`; multi-record transactions are NOT
+//! power-loss atomic. First creation syncs each new directory entry and the directory holding the
+//! new log. A failed sync is an uncertain write, not success.
 //! Interrupted/tampered bytes remain in place; readers refuse any invalid record and writers
-//! refuse an invalid tail. This layer never guesses a repair or silently truncates evidence.
+//! refuse an invalid tail. Writers do not notice corruption before a healthy tail; full readers
+//! still refuse it. This layer never guesses a repair or silently truncates evidence.
 //!
 //! Flow-log readers hold a shared lock only long enough to capture the file length, then read
 //! exactly that immutable prefix and decode after unlocking. Cooperating writers only append, so
 //! bytes below that length cannot change and an append beyond it is deferred to the next read.
 //! Flow writers serialize first, then hold the exclusive lock only while they re-read and verify
-//! the final non-empty record (including its newline and CID), append one whole line, and sync it.
-//! The cost of admitting an append therefore follows the tail record, not the log history.
+//! the final non-empty record (including its newline and CID), append one whole batch, and sync it
+//! once. The cost of admitting an append therefore follows the tail record, not the log history.
 //! `SidecarFlowTransaction` separately retains the feedback coordination lock: `feedback_seen`
 //! remains a snapshot of evidence that no feedback writer can replace before reference admission,
 //! without making readers or unrelated flow writers wait for a whole-log decode.
@@ -30,12 +32,47 @@ use crate::error::{FabricError, Result};
 const TAIL_WINDOW_BYTES: u64 = 8 * 1024;
 
 pub(crate) fn open_log(root: &Path, name: &str) -> Result<PathBuf> {
+    open_log_with_directory_sync(root, name, sync_directory)
+}
+
+fn sync_directory(path: &Path) -> std::io::Result<()> {
+    File::open(path)?.sync_all()
+}
+
+fn open_log_with_directory_sync(
+    root: &Path,
+    name: &str,
+    mut sync_directory: impl FnMut(&Path) -> std::io::Result<()>,
+) -> Result<PathBuf> {
     let dir = root.join(".eprfs").join("status");
+    let mut missing = Vec::new();
+    let mut ancestor = dir.as_path();
+    while !ancestor.exists() {
+        missing.push(ancestor.to_path_buf());
+        ancestor = ancestor.parent().ok_or_else(|| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "sidecar directory has no existing ancestor",
+            )
+        })?;
+    }
     fs::create_dir_all(&dir)?;
+    for created in missing.iter().rev() {
+        let parent = created.parent().ok_or_else(|| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "created sidecar directory has no parent",
+            )
+        })?;
+        sync_directory(parent)?;
+    }
     let path = dir.join(name);
     // Atomic create-if-absent. In particular, no exists() / truncating create race.
     match OpenOptions::new().create_new(true).write(true).open(&path) {
-        Ok(_) => {}
+        Ok(file) => {
+            file.sync_all()?;
+            sync_directory(&dir)?;
+        }
         Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {}
         Err(error) => return Err(error.into()),
     }
@@ -164,12 +201,18 @@ impl LockedLog {
         self.validated.set(true);
     }
 
-    pub(crate) fn append(&mut self, mut line: String) -> Result<()> {
+    pub(crate) fn append(&mut self, line: String) -> Result<()> {
+        self.append_batch([line])
+    }
+
+    pub(crate) fn append_batch(&mut self, lines: impl IntoIterator<Item = String>) -> Result<()> {
         // Validation is transaction-local: no cooperating writer can change these bytes
         // while we hold the exclusive lock. A failed/uncertain write invalidates it.
         self.validated.set(false);
-        line.push('\n');
-        self.file.write_all(line.as_bytes())?;
+        for mut line in lines {
+            line.push('\n');
+            self.file.write_all(line.as_bytes())?;
+        }
         self.file.sync_all()?;
         self.validated.set(true);
         Ok(())
@@ -247,5 +290,26 @@ mod tests {
         let path = open_log(dir.path(), "flows.jsonl").unwrap();
         assert!(crate::store::SidecarFlowStore::probe(dir.path()).unwrap());
         assert_eq!(std::fs::read(path).unwrap(), Vec::<u8>::new());
+    }
+
+    #[test]
+    fn first_log_creation_syncs_new_directory_entries_and_log_directory() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut synced = Vec::new();
+        let path = open_log_with_directory_sync(dir.path(), "flows.jsonl", |path| {
+            synced.push(path.to_path_buf());
+            Ok(())
+        })
+        .unwrap();
+
+        assert_eq!(
+            synced,
+            vec![
+                dir.path().to_path_buf(),
+                dir.path().join(".eprfs"),
+                dir.path().join(".eprfs/status"),
+            ]
+        );
+        assert!(path.is_file());
     }
 }

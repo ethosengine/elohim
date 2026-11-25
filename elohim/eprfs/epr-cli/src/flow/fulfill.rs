@@ -400,9 +400,7 @@ pub fn fulfill(
     }
 
     if !opts.dry_run {
-        for record in to_append {
-            store.append(record)?;
-        }
+        store.append_batch(to_append)?;
     }
 
     Ok(summary)
