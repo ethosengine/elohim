@@ -443,6 +443,10 @@ class CarryFixture(Fixture, NoStateDir):
         self.gate_code = 0
         self.gate_timeout = False
         self.gate_stop = None
+        self.gate_settled = True
+        self.gate_verdict = True
+        self.capacity = {"ram": "ok", "room": "admit", "pool": "ok"}
+        self.release_failures = 0
         self.make_slot = False
         self.commitment = "bafyreiaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         self.misses = [self.miss()]
@@ -475,6 +479,9 @@ class CarryFixture(Fixture, NoStateDir):
             return 0, json.dumps({"device": "did:key:z6MkLOCAL", "misses": self.misses}), ""
         if "claim" in argv and "cargo" in argv:
             return (0 if self.room.get("verdict") == "admit" else 3), json.dumps(self.room), ""
+        if "room" in argv and "cargo" in argv:
+            room = {"verdict": self.capacity["room"], "reason": "capacity fixture"}
+            return 0, json.dumps(room), ""
         if "release" in argv and "cargo" in argv:
             return 0, "released", ""
         if "say" in argv:
@@ -483,6 +490,10 @@ class CarryFixture(Fixture, NoStateDir):
             return 0, json.dumps(self.holder), ""
         if argv[:4] == ["git", "-C", str(self.repo), "fetch"]:
             return self.fetch, "", "fetch refused" if self.fetch else ""
+        if argv[0].endswith("ram-guard"):
+            return (0, "RAM-GUARD  OK\n", "") if self.capacity["ram"] == "ok" else (3, "RAM-GUARD  HARD\n", "")
+        if argv[0].endswith("cargo-pool"):
+            return (0, "Volume: fixture (status=ok)\n", "") if self.capacity["pool"] == "ok" else (3, "Volume: fixture (status=hard)\n", "")
         if "cat-file" in argv:
             return 0, "", ""
         if "worktree" in argv and "add" in argv:
@@ -493,6 +504,9 @@ class CarryFixture(Fixture, NoStateDir):
         if argv[:3] == ["node", "--input-type=module", "--eval"]:
             return 0, json.dumps({"key": self.computed, "line": "miss"}), ""
         if argv[:3] == [str(self.head), "flow", "intend"]:
+            if "--release-carry" in argv and self.release_failures:
+                self.release_failures -= 1
+                return 7, "", "release refused"
             return 0, json.dumps({"commitment": self.commitment}), ""
         if "worktree" in argv and "remove" in argv:
             import shutil
@@ -513,8 +527,18 @@ class CarryFixture(Fixture, NoStateDir):
             if self.gate_stop == "expired":
                 Path(self.root, W["CARRY_ON_FILE"]).write_text(W["rfc3339"](W["time"].time() - 1) + "\n")
             stopped = stop_reason()
-            return 17, "", "stopped", stopped
-        return self.gate_code, "", "infra red" if self.gate_code else "", None
+        else:
+            stopped = None
+        run_log = self.root / "gate.run"
+        events = [{"kind": "run-open"}]
+        if self.gate_verdict and not stopped:
+            events.append({"kind": "gate-verdict", "project": project})
+        if self.gate_settled:
+            events.append({"kind": "run-close", "outcome": "interrupted" if stopped else "passed"})
+        run_log.write_text("".join(json.dumps(event) + "\n" for event in events))
+        code = 17 if stopped else self.gate_code
+        error = "stopped" if stopped else ("infra red" if self.gate_code else "")
+        return code, "", error, stopped, str(run_log), self.gate_settled, self.gate_verdict and not stopped
 
     def run_carry(self, **changes):
         out = io.StringIO()
@@ -648,6 +672,23 @@ class CarryTest(CarryFixture):
         self.assertEqual(call["cwd"], trusted)
         self.assertIn("`${trusted}/${p}`", call["argv"][3])
         self.assertNotIn("`${candidate}/genesis/orchestrator", call["argv"][3])
+        self.assertIn("loadGateRegistry(trusted)", call["argv"][3])
+        self.assertIn("HELD_TOOL_CARRY_EXECUTION_ROOT", call["argv"][3])
+        self.assertTrue(Path(call["env"]["HELD_TOOL_CARRY_EXECUTION_ROOT"]).name.startswith("held-tool-closure-"))
+        self.assertFalse(str(call["env"]["HELD_TOOL_CARRY_EXECUTION_ROOT"]).startswith(candidate + os.sep))
+        self.assertNotEqual(call["env"]["HELD_TOOL_CARRY_CARGO_HOME"], candidate)
+
+    def test_candidate_checkout_disables_hooks_lfs_and_attributes_filters(self):
+        code, _ = self.run_carry()
+        self.assertEqual(code, 0)
+        [checkout] = [c for c in self.calls if "worktree" in c["argv"] and "add" in c["argv"]]
+        argv = checkout["argv"]
+        for setting in ("core.hooksPath=/dev/null", "core.attributesFile=/dev/null",
+                        "filter.lfs.smudge=", "filter.lfs.clean=", "filter.lfs.process=",
+                        "filter.lfs.required=false"):
+            self.assertIn(setting, argv)
+        self.assertEqual(checkout["env"]["GIT_LFS_SKIP_SMUDGE"], "1")
+        self.assertEqual(checkout["env"]["GIT_ATTR_NOSYSTEM"], "1")
 
     def test_closure_mismatch_and_unfetchable_commit_make_no_claim(self):
         for mode in ("mismatch", "unfetchable"):
@@ -673,7 +714,7 @@ class CarryTest(CarryFixture):
                 self.assertEqual(self.claims(), [])
                 self.assertIn("cargo seat" if mode == "seat" else "local dev-integration", lines[-1])
 
-    def test_failed_gate_releases_the_carry_and_releases_the_cargo_seat(self):
+    def test_failed_gate_verdict_settles_the_claim_and_releases_the_cargo_seat(self):
         self.gate_code = 7
         code, lines = self.run_carry()
         self.assertEqual(code, 1)
@@ -681,9 +722,31 @@ class CarryTest(CarryFixture):
         valid = claim["argv"][claim["argv"].index("--valid-for") + 1]
         self.assertEqual(valid, "600")  # p90*3 floors to ten minutes
         self.assertEqual(len(self.claims()), 1)
-        self.assertIn("carry released", lines[-1])
-        self.assertEqual(len(self.releases()), 1)
+        self.assertIn("only the gate's verdict stands", lines[-1])
+        self.assertEqual(len(self.releases()), 0)
         self.assertTrue(any("release" in c["argv"] and "cargo" in c["argv"] for c in self.calls))
+
+    def test_green_without_a_verdict_releases_the_claim_and_retries_release_once(self):
+        self.gate_verdict = False
+        self.release_failures = 1
+        code, lines = self.run_carry()
+        self.assertEqual(code, 1)
+        self.assertIn("emitted no gate verdict", lines[-1])
+        self.assertEqual(len(self.releases()), 2)
+
+    def test_capacity_is_rechecked_immediately_before_gate_and_each_refusal_declines(self):
+        for axis, refused in (("ram", "hard"), ("room", "refuse"), ("pool", "hard")):
+            with self.subTest(axis=axis):
+                self.calls.clear()
+                self.capacity = {"ram": "ok", "room": "admit", "pool": "ok"}
+                self.capacity[axis] = refused
+                self.misses = [self.miss(intent=f"bafyreiintentintentintentintentintentintentintent{axis}")]
+                code, lines = self.run_carry()
+                self.assertEqual(code, 0)
+                self.assertEqual(self.gates(), [])
+                self.assertEqual(len(self.releases()), 1)
+                self.assertIn("refused", lines[-1])
+                self.assertEqual(len([c for c in self.calls if "say" in c["argv"]]), 1)
 
     def test_gate_gets_head_epr_and_no_gate_evidence(self):
         with mock.patch.dict(os.environ, {"GATE_EVIDENCE": "reuse"}):
@@ -703,6 +766,30 @@ class CarryTest(CarryFixture):
         self.assertNotIn("--land", words)
         self.assertFalse(any((self.repo / ".worktrees").iterdir()))
         self.assertEqual(list((self.pool / "family").rglob(f"*-wt-carry-{self.commit[:12]}-eprfs")), [])
+
+    def test_unconfirmed_gate_stop_retains_claim_worktree_slot_and_cargo_seat(self):
+        self.gate_stop = "off"
+        self.gate_settled = False
+        self.make_slot = True
+        code, lines = self.run_carry()
+        self.assertEqual(code, 1)
+        self.assertIn("claim, worktree, target slot and cargo seat retained", lines[-1])
+        self.assertEqual(self.releases(), [])
+        self.assertFalse(any("release" in c["argv"] and "cargo" in c["argv"] for c in self.calls))
+        self.assertTrue((self.repo / ".worktrees" / f"carry-{self.commit[:12]}-eprfs").exists())
+
+    def test_gate_runner_exception_after_start_retains_every_claimed_asset(self):
+        def gate_raises(*_args, **_kwargs):
+            raise RuntimeError("gate runner transport broke")
+
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            code = W["cmd_carry"](self.args(), runner=self.runner, gate_runner=gate_raises)
+        self.assertEqual(code, 1)
+        self.assertIn("gate state unconfirmed", out.getvalue())
+        self.assertEqual(self.releases(), [])
+        self.assertFalse(any("release" in c["argv"] and "cargo" in c["argv"] for c in self.calls))
+        self.assertTrue((self.repo / ".worktrees" / f"carry-{self.commit[:12]}-eprfs").exists())
 
     def test_both_off_files_win_over_the_on_marker_without_reading_misses(self):
         for stop in (W["STOP_FILE"], W["CARRY_STOP_FILE"]):
@@ -761,34 +848,38 @@ class CarryTest(CarryFixture):
         self.assertEqual(self.gates(), [])
 
     def test_gate_stop_uses_gate_live_now_instead_of_killing_the_wrapper_group(self):
-        popens = []
+        popens, stop_calls = [], []
+        run_log = self.root / "gate.run"
 
         class GateProcess:
             def __init__(self):
-                self.polls = 0
+                self.done = False
 
             def poll(self):
-                self.polls += 1
-                return None if self.polls == 1 else 17
-
-            def wait(self):
-                return 17
-
-        class StopProcess:
-            def poll(self):
-                return 0
+                return 17 if self.done else None
 
             def wait(self, timeout=None):
-                return 0
+                self.done = True
+                return 17
+
+        gate_process = GateProcess()
 
         def popen(argv, **kwargs):
             popens.append(list(argv))
-            return GateProcess() if argv[:2] == ["just", "gate"] else StopProcess()
+            return gate_process
 
         def runner(argv, timeout=60, cwd=None, env=None):
             self.calls.append({"argv": list(argv), "timeout": timeout, "cwd": str(cwd), "env": env})
             if "open" in argv:
-                return 0, json.dumps({"path": str(self.root / "gate.run")}), ""
+                run_log.write_text(json.dumps({"kind": "run-open"}) + "\n")
+                return 0, json.dumps({"path": str(run_log)}), ""
+            if "stop" in argv:
+                stop_calls.append(list(argv))
+                gate_process.done = True
+                with run_log.open("a") as stream:
+                    stream.write(json.dumps({"kind": "gate-stopped", "project": "eprfs"}) + "\n")
+                    stream.write(json.dumps({"kind": "run-close", "outcome": "interrupted"}) + "\n")
+                return 0, "confirmed", ""
             if "close" in argv:
                 return 0, "", ""
             raise AssertionError(argv)
@@ -797,13 +888,81 @@ class CarryTest(CarryFixture):
         with mock.patch.object(globals_["subprocess"], "Popen", side_effect=popen), \
                 mock.patch.object(globals_["time"], "sleep", return_value=None), \
                 mock.patch.object(globals_["os"], "killpg", side_effect=AssertionError("killpg")):
-            code, _, _, stopped = W["run_carried_gate"](
+            code, _, _, stopped, returned_log, settled, verdict = W["run_carried_gate"](
                 W["REPO_ROOT"], self.repo, self.commit, "eprfs", {}, W["time"].monotonic() + 10,
                 lambda: "carry switched off", runner=runner)
-        self.assertEqual((code, stopped), (17, "carry switched off"))
-        [stop] = [argv for argv in popens if "stop" in argv]
+        self.assertEqual((code, stopped, returned_log, settled, verdict),
+                         (17, "carry switched off", str(run_log), True, False))
+        [stop] = stop_calls
         self.assertIn("--now", stop)
-        self.assertEqual(stop[stop.index("--run") + 1], str(self.root / "gate.run"))
+        self.assertEqual(stop[stop.index("--run") + 1], str(run_log))
+        self.assertEqual(popens, [["just", "gate", "eprfs"]])
+
+    def test_failed_berth_who_check_stops_the_gate_and_failed_stop_retries_three_times(self):
+        run_log = self.root / "gate-retry.run"
+
+        class GateProcess:
+            def poll(self):
+                return None
+
+        attempts = []
+
+        def runner(argv, timeout=60, cwd=None, env=None):
+            if "open" in argv:
+                run_log.write_text(json.dumps({"kind": "run-open"}) + "\n")
+                return 0, json.dumps({"path": str(run_log)}), ""
+            if "stop" in argv:
+                attempts.append(list(argv))
+                return 9, "", "stop transport failed"
+            raise AssertionError(argv)
+
+        globals_ = W["run_carried_gate"].__globals__
+        with mock.patch.object(globals_["subprocess"], "Popen", return_value=GateProcess()):
+            result = W["run_carried_gate"](
+                W["REPO_ROOT"], self.repo, self.commit, "eprfs", {}, W["time"].monotonic() + 10,
+                mock.Mock(side_effect=RuntimeError("berth who failed")), runner=runner)
+        self.assertEqual(len(attempts), 3)
+        self.assertFalse(result[5])
+        self.assertIn("stop unconfirmed after 3 attempts", result[2])
+
+    def test_stale_sweep_requires_a_closed_run_and_no_process_path(self):
+        worktree = self.repo / ".worktrees" / "carry-aaaaaaaaaaaa-eprfs"
+        worktree.mkdir(parents=True, exist_ok=True)
+        os.utime(worktree, (self.now - 1000, self.now - 1000))
+        said = []
+        globals_ = W["sweep_carry_worktrees"].__globals__
+        with mock.patch.dict(globals_, {"_closed_carry_run": lambda *_: None,
+                                        "_carry_paths_in_use": lambda *_: False}):
+            W["sweep_carry_worktrees"](str(self.repo), 10, self.runner, self.now, said.append,
+                                       str(self.pool))
+        self.assertTrue(worktree.exists())
+        self.assertIn("no closed gate-live run", said[-1])
+
+        said.clear()
+        with mock.patch.dict(globals_, {"_closed_carry_run": lambda *_: "closed.run",
+                                        "_carry_paths_in_use": lambda *_: True}):
+            W["sweep_carry_worktrees"](str(self.repo), 10, self.runner, self.now, said.append,
+                                       str(self.pool))
+        self.assertTrue(worktree.exists())
+        self.assertIn("process still names its assets", said[-1])
+
+    def test_process_scan_sees_worktree_cwd_and_cargo_target_dir(self):
+        worktree = self.repo / ".worktrees" / "carry-aaaaaaaaaaaa-eprfs"
+        worktree.mkdir(parents=True, exist_ok=True)
+        slot = self.pool / "family" / "cd" / f"eprfs-wt-{worktree.name}"
+        slot.mkdir(parents=True)
+        proc = self.root / "proc"
+        pid = proc / "123"
+        pid.mkdir(parents=True)
+        os.symlink(worktree, pid / "cwd")
+        (pid / "environ").write_bytes(b"PATH=/bin\0")
+        self.assertTrue(W["_carry_paths_in_use"](str(worktree), str(self.pool), str(proc)))
+        (pid / "cwd").unlink()
+        os.symlink(self.root, pid / "cwd")
+        (pid / "environ").write_bytes(f"CARGO_TARGET_DIR={slot}\0".encode())
+        self.assertTrue(W["_carry_paths_in_use"](str(worktree), str(self.pool), str(proc)))
+        (pid / "environ").write_bytes(b"PATH=/bin\0")
+        self.assertFalse(W["_carry_paths_in_use"](str(worktree), str(self.pool), str(proc)))
 
     def test_slow_carry_does_not_stop_announce_cadence(self):
         announce_calls, carry_calls = [], []
