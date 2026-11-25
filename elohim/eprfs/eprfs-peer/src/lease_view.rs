@@ -18,9 +18,15 @@
 //! For an admitted sibling, only records whose JSONL line starts inside that sender's last
 //! complete-fold coverage in [`HeadTable`] are replayed. An earlier incomplete fold's records
 //! become covered when a later complete fold advances the prefix. Own-device records are always
-//! covered. Missing, malformed, or inapplicable coverage preserves the former behavior exactly:
-//! every locally present sibling record is replayed; `epr peer status` names that legacy fallback.
-//! Older epr builds ignore the additive head-table field and therefore keep that former behavior.
+//! covered. A sender with no recorded head yet (a new sibling, or a head table written before
+//! coverage existed) stays on full replay until its first complete fold. Coverage therefore cannot
+//! prevent the two-leases case for that sender: claim A, release A not fetched, then claim B can all
+//! be replayed from the locally present records. A duplicate `via:<sender>` record also makes the
+//! locally counted prefix disagree with the head forever; that sender stays on full replay until
+//! the log or head is repaired. `epr peer status` distinguishes that count mismatch from plain
+//! legacy/no-coverage fallback. Other missing, malformed, or inapplicable coverage preserves the
+//! former behavior exactly: every locally present sibling record is replayed. Older epr builds
+//! ignore the additive head-table field and therefore keep that former behavior.
 //!
 //! Per resource, this device's own live lease is held unless another device's live lease
 //! precedes it. A claim *saw* another lease when it was written with that lease already known:
@@ -330,26 +336,42 @@ impl LeaseStore {
         }
     }
 
-    fn valid_coverage_offset(&self, device: &str, head: &DeviceHead) -> Option<u64> {
-        let coverage = head.coverage?;
-        let log_end = self.log_end?;
+    fn coverage_offset(&self, device: &str, head: &DeviceHead) -> CoverageOffset {
+        let Some(coverage) = head.coverage else {
+            return CoverageOffset::Legacy;
+        };
+        let Some(log_end) = self.log_end else {
+            return CoverageOffset::Legacy;
+        };
         let boundary = coverage.log_offset;
         if boundary > log_end || (boundary != log_end && !self.record_offsets.contains(&boundary)) {
-            return None;
+            return CoverageOffset::Legacy;
         }
         let offsets = self.via_offsets.get(device).map_or(&[][..], Vec::as_slice);
         let covered = offsets.partition_point(|offset| *offset < boundary);
-        (u64::try_from(covered).ok() == Some(coverage.events)).then_some(boundary)
+        let Ok(record_count) = u64::try_from(covered) else {
+            return CoverageOffset::Legacy;
+        };
+        if record_count == coverage.events {
+            CoverageOffset::Valid(boundary)
+        } else {
+            CoverageOffset::CountMismatch {
+                record_count,
+                covered: coverage.events,
+            }
+        }
     }
 
     fn folded_event_is_covered(&self, event: &LeaseEvent, heads: &HeadTable) -> bool {
         let Some(device) = event.via.as_deref() else {
             return true;
         };
-        let Some(boundary) = heads
+        let CoverageOffset::Valid(boundary) = heads
             .devices
             .get(device)
-            .and_then(|head| self.valid_coverage_offset(device, head))
+            .map_or(CoverageOffset::Legacy, |head| {
+                self.coverage_offset(device, head)
+            })
         else {
             // No usable coverage is the compatibility mode: replay exactly as older readers did.
             return true;
@@ -363,8 +385,18 @@ impl LeaseStore {
 
     /// Whether locally present events from `device` are all inside its recorded complete fold.
     pub fn fold_coverage(&self, device: &str, head: &DeviceHead) -> FoldCoverageState {
-        let Some(boundary) = self.valid_coverage_offset(device, head) else {
-            return FoldCoverageState::Legacy;
+        let boundary = match self.coverage_offset(device, head) {
+            CoverageOffset::Valid(boundary) => boundary,
+            CoverageOffset::Legacy => return FoldCoverageState::Legacy,
+            CoverageOffset::CountMismatch {
+                record_count,
+                covered,
+            } => {
+                return FoldCoverageState::Inapplicable {
+                    record_count,
+                    covered,
+                };
+            }
         };
         if self
             .via_offsets
@@ -378,6 +410,13 @@ impl LeaseStore {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum CoverageOffset {
+    Valid(u64),
+    Legacy,
+    CountMismatch { record_count: u64, covered: u64 },
+}
+
 /// How a reader can use one sibling's locally present events.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -388,6 +427,8 @@ pub enum FoldCoverageState {
     Incomplete,
     /// Coverage is absent or unreadable; preserve the former unbounded replay behavior.
     Legacy,
+    /// The local sender-record count disagrees with the complete fold; use full replay.
+    Inapplicable { record_count: u64, covered: u64 },
 }
 
 /// `store`'s lease records and event CIDs.
