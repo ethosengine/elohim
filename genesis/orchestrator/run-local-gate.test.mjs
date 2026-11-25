@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import {
   chmodSync,
+  copyFileSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -12,6 +13,7 @@ import { tmpdir } from "node:os";
 import { spawn, spawnSync } from "node:child_process";
 import { setTimeout as delay } from "node:timers/promises";
 import test from "node:test";
+import { openRun, readRun } from "./gate-live.mjs";
 
 const SCRIPT = join(import.meta.dirname, "run-local-gate.sh");
 const BASE_PATH = "/usr/local/bin:/usr/bin:/bin";
@@ -77,6 +79,9 @@ function slotFixture(t) {
   const bin = join(fx.dir, "bin");
   const slotRoot = join(fx.dir, "slots");
   mkdirSync(join(fx.root, "genesis/agentic/bin"), { recursive: true });
+  mkdirSync(join(fx.root, "genesis/orchestrator"), { recursive: true });
+  copyFileSync(join(import.meta.dirname, "gate-live.mjs"), join(fx.root, "genesis/orchestrator/gate-live.mjs"));
+  copyFileSync(join(import.meta.dirname, "file-lock.mjs"), join(fx.root, "genesis/orchestrator/file-lock.mjs"));
   writeFileSync(join(fx.root, "genesis/agentic/bin/pool-lib.sh"), `
 detect_family() { printf '%s\n' "\${GATE_TEST_FAMILY:-family}"; }
 slot_path() {
@@ -97,7 +102,11 @@ if [[ "\${GATE_TEST_PROBE_LOCK:-0}" == 1 ]]; then
 fi
 if [[ -n "\${GATE_TEST_READY:-}" ]]; then
   printf 'ready\\n' > "$GATE_TEST_READY"
-  while [[ ! -e "$GATE_TEST_RELEASE" ]]; do sleep 0.02; done
+  while [[ ! -e "$GATE_TEST_RELEASE" ]]; do read -r -t 0.02 _ || true; done
+fi
+if [[ -n "\${GATE_TEST_DAEMON_PID:-}" ]]; then
+  setsid sleep 30 &
+  printf '%s\n' "$!" > "$GATE_TEST_DAEMON_PID"
 fi
 printf 'exit\\t%s\\t%s\\n' "$GATE_TEST_LABEL" "$(now)" >> "$GATE_TEST_EVENTS"
 `);
@@ -123,6 +132,7 @@ function startSlotGate(t, fx, {
       GATE_TEST_LABEL: label,
       ...env,
     },
+    detached: true,
     stdio: ["ignore", "pipe", "pipe"],
   });
   let stdout = "";
@@ -135,7 +145,9 @@ function startSlotGate(t, fx, {
     resolve({ status, signal, stdout, stderr });
   }));
   t.after(() => {
-    if (child.exitCode === null && child.signalCode === null) child.kill("SIGKILL");
+    if (child.exitCode === null && child.signalCode === null) {
+      try { process.kill(-child.pid, "SIGKILL"); } catch { /* already exited */ }
+    }
   });
   return { child, closed, stdout: () => stdout, stderr: () => stderr };
 }
@@ -200,7 +212,7 @@ test("killing a cargo slot holder releases the lock immediately", async (t) => {
   await waitUntil(() => waiter.stdout().includes("cargo slot busy"), "waiter never observed contention");
 
   const killedAt = Date.now();
-  holder.child.kill("SIGKILL");
+  process.kill(-holder.child.pid, "SIGKILL");
   const waited = await Promise.race([
     waiter.closed,
     delay(1500).then(() => ({ timeout: true })),
@@ -208,6 +220,7 @@ test("killing a cargo slot holder releases the lock immediately", async (t) => {
   assert.equal(waited.timeout, undefined, "waiter did not proceed when the killed holder released the lock");
   assert.equal(waited.status, 0, waited.stderr);
   assert.ok(Date.now() - killedAt < 1500);
+  writeFileSync(release, "release\n");
   const killed = await holder.closed;
   assert.equal(killed.signal, "SIGKILL");
 });
@@ -249,19 +262,23 @@ test("a cargo slot timeout refuses with the dedicated did-not-run status", async
     try { return readFileSync(ready, "utf8").trim() === "ready"; } catch { return false; }
   }, "timeout holder never entered its recipe");
 
+  const live = openRun({ root: fx.root, sha: "a".repeat(40), target: "just gate", session: "test" });
   const waiter = startSlotGate(t, fx, {
     projectName: "timeout-waiter",
-    env: { GATE_SLOT_LOCK_WAIT_S: "0.1" },
+    env: { GATE_SLOT_LOCK_WAIT_S: "0.1", GATE_LIVE_RUN: live.path },
   });
   const result = await waiter.closed;
   assert.equal(result.status, 73, result.stderr);
   assert.match(result.stdout, /^  \[timeout-waiter\] cargo slot busy; holder: project=timeout-holder .*; waiting up to 0\.1s$/m);
   assert.match(result.stderr, /^gate timeout-waiter: REFUSED cargo slot stayed busy for 0\.1s; holder: project=timeout-holder .*$/m);
+  const wait = readRun(live.path).events.find(event => event.kind === "wait");
+  assert.equal(wait.project, "timeout-waiter");
+  assert.match(wait.holder, /^project=timeout-holder /);
   writeFileSync(release, "release\n");
   assert.equal((await holder.closed).status, 0);
 });
 
-test("the cargo slot lock file descriptor reaches the recipe", async (t) => {
+test("flock owns the cargo slot lock while the descriptor stays out of the recipe", async (t) => {
   const fx = slotFixture(t);
   const gate = startSlotGate(t, fx, {
     projectName: "lock-probe",
@@ -332,4 +349,36 @@ test("a_malformed_cargo_env_key_still_refuses", (t) => {
     assert.match(result.stderr, /refusing malformed cargo\.env key/);
     assert.doesNotMatch(result.stdout, /RAN/);
   }
+});
+
+test("a daemon keeping every inherited descriptor cannot retain the cargo slot lock", async (t) => {
+  const fx = slotFixture(t);
+  const daemonPid = join(fx.dir, "daemon.pid");
+  const child = spawn("bash", [
+    SCRIPT, fx.root, "daemon", fx.projectDir, "root-just", "gate",
+    "workspace-a", "", "dev", "",
+  ], {
+    env: {
+      ...process.env,
+      PATH: `${fx.bin}:${BASE_PATH}`,
+      RUSTUP_TOOLCHAIN: "",
+      GATE_TEST_SLOT_ROOT: fx.slotRoot,
+      GATE_TEST_EVENTS: fx.events,
+      GATE_TEST_LABEL: "daemon",
+      GATE_TEST_DAEMON_PID: daemonPid,
+    },
+    stdio: ["ignore", "ignore", "ignore"],
+  });
+  const status = await new Promise(resolve => child.once("exit", resolve));
+  assert.equal(status, 0);
+  await waitUntil(() => {
+    try { return readFileSync(daemonPid, "utf8").trim().length > 0; } catch { return false; }
+  }, "the detached child did not publish its pid");
+  const pid = Number(readFileSync(daemonPid, "utf8").trim());
+  t.after(() => { try { process.kill(pid, "SIGKILL"); } catch { /* already exited */ } });
+  assert.equal(spawnSync("kill", ["-0", String(pid)]).status, 0, "the detached child still lives");
+  const slot = join(fx.slotRoot, "family__workspace-a__dev");
+  assert.equal(spawnSync("flock", ["-n", join(slot, ".gate.lock"), "true"]).status, 0,
+    "the detached child inherited no descriptor that can retain the lock");
+  process.kill(pid, "SIGKILL");
 });
