@@ -40,6 +40,11 @@ const ROOT = process.env.GATE_ROOT
   : resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const invocationEnrichSamples = new Set();
 
+/** A sampled re-execution may compute and run a closure, but may not publish gate evidence. */
+export function gateRecordingEnabled(env = process.env) {
+  return env.GATE_RECORD !== 'off';
+}
+
 /**
  * 'rakia' since 2026-09-23: the shadow run over the pin-moving commit 691b28cdf printed
  * `[gate] oracle-diff: +elohim-storage +elohim-app` — exactly the depth-one consumers of the
@@ -504,6 +509,7 @@ function gateSpawn(project, command, argv, options, { spawn, env, tap }) {
 
 /** Lifecycle events for the live run; fail-open, and absent when no run is open. */
 function liveEvent(env, event) {
+  if (!gateRecordingEnabled(env)) return;
   if (env.GATE_LIVE_RUN) appendEvent(env.GATE_LIVE_RUN, event);
 }
 
@@ -517,6 +523,16 @@ function finiteSeconds(value) {
 
 function oneLine(value) {
   return String(value ?? '').replace(/[\r\n]+/g, ' ').trim();
+}
+
+/** Non-authoritative scratch returned only to the detached sampler that requested it. */
+function writeSampleResult(env, row) {
+  const path = oneLine(env.GATE_SAMPLE_RESULT);
+  if (!path) return;
+  try {
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, `${JSON.stringify({ v: 1, ...row })}\n`, { mode: 0o600 });
+  } catch { /* a missing scratch result becomes not-comparable in the sampler */ }
 }
 
 class ShadowBudgetExhausted extends Error {
@@ -614,8 +630,17 @@ export function startEnrichSample({ project, gateCommit, closure, decision, root
     if (decision.independence === 'sibling') args.push('--from-device', decision.row.device);
     args.push('--root', mainRoot);
     const child = spawn(process.execPath, args, { detached: true, stdio: 'ignore' });
+    if (typeof child.once === 'function') {
+      child.once('error', error => {
+        write(`[gate] ${project.name} enrich-sample: not started (${oneLine(error?.message || error)})\n`);
+      });
+      child.once('spawn', () => {
+        write(`[gate] ${project.name} enrich-sample: started (pid ${child.pid})\n`);
+      });
+    } else {
+      write(`[gate] ${project.name} enrich-sample: started (pid ${child.pid})\n`);
+    }
     child.unref();
-    write(`[gate] ${project.name} enrich-sample: started (pid ${child.pid})\n`);
     return true;
   } catch (error) {
     write(`[gate] ${project.name} enrich-sample: not started (${oneLine(error?.message || error)})\n`);
@@ -649,7 +674,7 @@ export function emitGateReading(row, {
   env = process.env, collector = invocationGateReadings,
   append = appendFileSync,
 } = {}) {
-  if (env.GATE_READING === 'off' || !row.runId) return;
+  if (!gateRecordingEnabled(env) || env.GATE_READING === 'off' || !row.runId) return;
   const reading = gateReadingRow(row);
   if (env.GATE_READING_ROWS) {
     try { append(env.GATE_READING_ROWS, `${JSON.stringify(reading)}\n`, { mode: 0o600 }); }
@@ -750,7 +775,7 @@ export function appendGateReadings(rows, {
   writeRows = (path, bytes) => writeFileSync(path, bytes, { mode: 0o600 }),
   removeScratch = path => rmSync(path, { recursive: true, force: true }),
 } = {}) {
-  if (env.GATE_READING === 'off' || env.GATE_READING_ROWS || env.GATE_READING_PUSH || rows.length === 0) return;
+  if (!gateRecordingEnabled(env) || env.GATE_READING === 'off' || env.GATE_READING_ROWS || env.GATE_READING_PUSH || rows.length === 0) return;
   let scratch = null;
   try {
     scratch = makeScratch(join(tmpdir(), 'gate-reading-'));
@@ -898,6 +923,13 @@ export function runProject(project, printOnly, namesOnly, {
   readsOf, recipe = null, tap = spawn === spawnSync, clock = () => process.hrtime.bigint(),
   wallClock = () => new Date(), inputsPolicy = null, readingCollector = invocationGateReadings,
 } = {}) {
+  const recording = gateRecordingEnabled(env);
+  if (!recording) {
+    env = { ...env };
+    delete env.GATE_LIVE_RUN;
+    delete env.GATE_READING_PUSH;
+    delete env.GATE_READING_ROWS;
+  }
   const cargo = project.run.cargo || {};
   const targetDir = worktreeTargetDir(cargo.targetDir || '', root);
   const args = [
@@ -1057,7 +1089,9 @@ export function runProject(project, printOnly, namesOnly, {
     write(`[gate] ${project.name} deferred to CI: ${costDecision.why}\n`);
     reading.key = `none: deferred before closure evidence — ${oneLine(costDecision.why)}`;
     const seconds = Number(clock() - started) / 1e9;
-    recordCycle(project, seconds, 0, { ...cycleEnv, GATE_RUN_KIND: 'deferred' }, cycleDeps);
+    writeSampleResult(env, { project: project.name, commit: null, closure: null,
+      executed: false, status: 0, reason: `deferred: ${oneLine(costDecision.why)}` });
+    if (recording) recordCycle(project, seconds, 0, { ...cycleEnv, GATE_RUN_KIND: 'deferred' }, cycleDeps);
     liveEvent(env, { kind: 'gate-verdict', project: project.name, verdict: { exit: 0, seconds: 0, deferred: true } });
     return complete(0, 'skipped');
   }
@@ -1074,6 +1108,8 @@ export function runProject(project, printOnly, namesOnly, {
     if (style.status !== 0) {
       liveEvent(env, { kind: 'gate-verdict', project: project.name, step: 'rust-style', verdict: { exit: style.status || 2, seconds: 0 } });
       reading.key = 'none: rust-style preflight failed before closure evidence';
+      writeSampleResult(env, { project: project.name, commit: null, closure: null,
+        executed: false, status: style.status || 2, reason: 'rust-style preflight failed' });
       return complete(style.status || 2, 'ran');
     }
   }
@@ -1226,7 +1262,7 @@ export function runProject(project, printOnly, namesOnly, {
   const enabled = loadPoolPolicy(root).gate_reuse?.projects;
   // The signer is asked of the binary gateEvidence resolved from childEnv, never one from process.env.
   const signerOptions = { env: childEnv, buildRefBin: evidence.buildRefBin };
-  const taskOn = taskEnabled(project, env);
+  const taskOn = recording && taskEnabled(project, env);
   const selfId = (taskOn || env.GATE_EVIDENCE === 'reuse') ? selfAgentId(root, spawn, signerOptions) : null;
   const reuseContext = {
     mode: env.GATE_EVIDENCE,
@@ -1234,14 +1270,16 @@ export function runProject(project, printOnly, namesOnly, {
     selfId: env.GATE_EVIDENCE === 'reuse' ? selfId : null,
     selectorCheck: reuseSelector(project, gateCommit, { root, env: childEnv, spawn, inputs: inputsClass }),
   };
-  const carry = landerWait({ intent: env.GATE_LANDING_INTENT, project: project.name, closure: evidence.key,
-    mode: env.GATE_CARRY_WAIT || 'shadow', ownStopAt: env.GATE_LANDING_STOP_AT, deps: {
-      exec: (args, options) => spawn(env.EPR_BIN || 'epr', args, { ...options, cwd: root, env }),
-      now: () => Date.now() / 1000, monotonic: () => Number(clock()) / 1e9,
-      sleep: seconds => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, seconds * 1000),
-      log: line => write(`[gate] ${project.name} carry: ${line}\n`),
-      verdict: () => siblingVerdicts(project, evidence.key, { root, env, spawn }).candidates,
-    } });
+  const carry = recording
+    ? landerWait({ intent: env.GATE_LANDING_INTENT, project: project.name, closure: evidence.key,
+      mode: env.GATE_CARRY_WAIT || 'shadow', ownStopAt: env.GATE_LANDING_STOP_AT, deps: {
+        exec: (args, options) => spawn(env.EPR_BIN || 'epr', args, { ...options, cwd: root, env }),
+        now: () => Date.now() / 1000, monotonic: () => Number(clock()) / 1e9,
+        sleep: seconds => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, seconds * 1000),
+        log: line => write(`[gate] ${project.name} carry: ${line}\n`),
+        verdict: () => siblingVerdicts(project, evidence.key, { root, env, spawn }).candidates,
+      } })
+    : { waitedS: 0 };
   reading.leaseWaitedSeconds = carry.waitedS;
   // One admission decision for both run modes (decideReuse); ark is then asked only to run.
   const decision = decideReuse(project, evidence, reuseContext, { root, env, spawn });
@@ -1275,16 +1313,19 @@ export function runProject(project, printOnly, namesOnly, {
       ? `in ${Math.round(Number(row.seconds) || 0)} s on the sibling`
       : ageOf(row.attestation.builtAt);
     write(`[gate] ${project.name} reused: green ${when} at ${String(row.commit).slice(0, 9)} (${signer})\n`);
+    const seconds = Number(clock() - started) / 1e9;
+    if (recording) recordCycle(project, seconds, 0, {
+      ...cycleEnv, GATE_RUN_KIND: sibling ? 'sibling-reused' : 'reused',
+    }, cycleDeps);
+    liveEvent(env, { kind: 'gate-verdict', project: project.name, verdict: { exit: 0, seconds: 0, reused: true } });
+    const completed = complete(0, 'reused');
+    // Sampling begins only after the reuse verdict, cycle observation and reading are complete.
+    // In particular, detached process creation is outside every recorded gate timer.
     startEnrichSample({ project, gateCommit, closure: evidence.key, decision, root, env, write }, {
       spawn: detachedSpawn, markers: enrichSampleMarkers,
       resolveRoot: value => deviceRoot(value, spawn),
     });
-    const seconds = Number(clock() - started) / 1e9;
-    recordCycle(project, seconds, 0, {
-      ...cycleEnv, GATE_RUN_KIND: sibling ? 'sibling-reused' : 'reused',
-    }, cycleDeps);
-    liveEvent(env, { kind: 'gate-verdict', project: project.name, verdict: { exit: 0, seconds: 0, reused: true } });
-    return complete(0, 'reused');
+    return completed;
   }
   if (env.GATE_EVIDENCE === 'reuse') write(`[gate] ${project.name} not reused: ${decision.why}\n`);
   // A suite's named half is handed what its key expects (the gated sha and the inventory, package
@@ -1393,7 +1434,7 @@ export function runProject(project, printOnly, namesOnly, {
   if (answer?.answered?.hit) {
     write(`[gate] ${project.name} reused: derivation hit (method ${derivation.method}, input ${derivation.input})\n`);
     const seconds = Number(clock() - started) / 1e9;
-    recordCycle(project, seconds, 0, { ...cycleEnv, GATE_RUN_KIND: 'reused' }, cycleDeps);
+    if (recording) recordCycle(project, seconds, 0, { ...cycleEnv, GATE_RUN_KIND: 'reused' }, cycleDeps);
     liveEvent(env, { kind: 'gate-verdict', project: project.name, verdict: { exit: 0, seconds: 0, reused: true }, derivation, status: 'Answered' });
     return complete(0, 'reused');
   }
@@ -1423,11 +1464,24 @@ export function runProject(project, printOnly, namesOnly, {
     : { status: result.status ?? 1, record: true };
   const status = outcome.status;
   const seconds = Number(clock() - started) / 1e9;
+  // A suite's named half is recordable only on its own bytes, with HEAD and view unchanged.
+  const suiteCheck = outcome;
+  writeSampleResult(env, {
+    project: project.name,
+    commit: gateCommit,
+    closure: evidence.key || null,
+    executed: true,
+    status,
+    signal: result.signal || null,
+    recordable: suiteCheck.record && evidence.dirty === false && !answer?.unanswered,
+    reason: suiteCheck.record
+      ? (evidence.dirty === false ? null : 'working tree was dirty or unreadable before execution')
+      : suiteCheck.why,
+  });
   let evidenceCid = null;
   // The verdict is recorded against the closure — red too; a known-red closure is information.
   // An interrupted Task has no verdict, so nothing is recorded for it. A suite's named half is
   // recorded only on its own bytes, with HEAD and the view's paths unchanged since the start.
-  const suiteCheck = outcome;
   if (!suiteCheck.record) write(`[gate] ${project.name} evidence: not recorded (${suiteCheck.why})\n`);
   // Whether a gate was stopped is the tap's call alone (its `stopped`, read from the leader's own exit
   // against the signals the stop sent it; returned above). Any other end, a signal death included
@@ -1436,7 +1490,7 @@ export function runProject(project, printOnly, namesOnly, {
     write(`[gate] ${project.name}: its output was cut after the recipe exited (a process outside its tree held it open); `
       + 'the verdict is the recipe\'s own exit\n');
   }
-  if (evidence.key && evidence.buildRefBin && !answer?.unanswered && suiteCheck.record) {
+  if (recording && evidence.key && evidence.buildRefBin && !answer?.unanswered && suiteCheck.record) {
     const put = recordEvidence(project, evidence.key, {
       success: status === 0,
       seconds,
@@ -1467,7 +1521,7 @@ export function runProject(project, printOnly, namesOnly, {
   // The ceiling, the reviewer and its charter are declared in measures.yaml.
   // Untapped output is unavailable, not evidence that no tests ran.
   const signals = { ...(tapped?.signals || {}), signal: result.signal, firstRedSeconds: tapped?.firstRedSeconds ?? undefined, cost };
-  recordCycle(project, seconds, status, cycleEnv, cycleDeps, signals);
+  if (recording) recordCycle(project, seconds, status, cycleEnv, cycleDeps, signals);
   liveEvent(env, { kind: 'gate-verdict', project: project.name, verdict: {
     exit: status, seconds: Math.round(seconds), failure_class: classifyFailure(status, signals) ?? null,
     failures: tapped?.failures ?? null, overflow: tapped?.overflow || undefined, evidence: evidenceCid || undefined,
@@ -1517,6 +1571,7 @@ function usage() {
   console.error('  env: GATE_RECIPE_KEY=shadow|off (default shadow): a root-just gate prints whether a justfile edit since the integration base left its recipe closure unchanged; it changes no key, reuse decision or record');
   console.error('  env: GATE_INPUTS=shadow|off (default shadow; no on yet): prints, once per push, the borrowed steps whose own buildProcess alone selects them, and per gate when, since the integration base, its step fingerprints moved under all and are unchanged under sources; it changes no selection, key, reuse decision or record');
   console.error('  env: GATE_READING=off (default on): suppress collection and the one bounded `epr flow reading append` call; the shadow reading never changes selection, reuse, keys or exit status');
+  console.error('  env: GATE_RECORD=off (default on): execute without build notes, verdict/cycle/readings, carry/handover, live-run or ark derivation records');
   console.error('  env: GATE_CARRY=off|shadow|on (default shadow, read by gate-carry.mjs under pre-push): carry one long one-build-job cargo gate on this device\'s second cargo seat beside the loop when `berth room cargo` admits it; shadow prints what would be carried and why and changes nothing');
 }
 
@@ -1530,6 +1585,11 @@ const invocationReadingRunId = isMain
 
 if (isMain) {
   process.once('exit', () => appendGateReadings(invocationGateReadings));
+  if (!gateRecordingEnabled(process.env)) {
+    delete process.env.GATE_LIVE_RUN;
+    delete process.env.GATE_READING_PUSH;
+    delete process.env.GATE_READING_ROWS;
+  }
   const args = process.argv.slice(2);
   const printOnly = args.includes('--print');
   const namesOnly = args.includes('--names');
@@ -1580,7 +1640,7 @@ if (isMain) {
   // A standalone `just gate` opens its own live run so its reds reach the session the way a
   // push's do; under pre-push the hook's run is inherited.
   let ownRun = null;
-  if (!process.env.GATE_LIVE_RUN) {
+  if (gateRecordingEnabled(process.env) && !process.env.GATE_LIVE_RUN) {
     try {
       const head = spawnSync('git', ['-C', ROOT, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).stdout.trim() || null;
       ownRun = openRun({ root: ROOT, sha: head, target: 'just gate', session: resolveSession() }).path;
@@ -1600,7 +1660,7 @@ if (isMain) {
   if (process.env.GATE_PREFLIGHT !== 'off' && process.env.GATE_PREFLIGHT_DONE !== '1') {
     const rows = runPreflight({ root: ROOT, projects, registry, changed: changedFiles, onRow: row => {
       process.stdout.write(`${formatRow(row)}\n`);
-      emitLive([row]);
+      if (gateRecordingEnabled(process.env)) emitLive([row]);
     } });
     if (rows.some(row => row.level === 'REFUSED')) {
       failed = 1;

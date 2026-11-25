@@ -804,7 +804,9 @@ _eprfs-ingest-around mode:
       after="$("$CARGO_TARGET_DIR/debug/epr" bin --tool epr source-state 2>/dev/null || echo none)"; \
       tree_clean=false; \
       if [[ "$before" == "$after" && "$before" == *'"clean":true'* ]]; then tree_clean=true; fi; \
-      if [[ -x "$CARGO_TARGET_DIR/debug/epr" ]]; then \
+      if [[ "${GATE_RECORD:-on}" == off ]]; then \
+        echo "[gate] epr dev-context ingest and producer put skipped (GATE_RECORD=off: a re-execution records nothing)"; \
+      elif [[ -x "$CARGO_TARGET_DIR/debug/epr" ]]; then \
         if ingested="$("$CARGO_TARGET_DIR/debug/epr" bin --tool epr ingest "$CARGO_TARGET_DIR/debug/epr" \
           --source-commit "$tested_head" --tree-clean "$tree_clean" \
           --gate-run "${GATE_RUN_KIND:-local-gate}")"; then \

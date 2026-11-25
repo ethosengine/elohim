@@ -2058,8 +2058,9 @@ fn run_note(args: &[String]) -> FlowResult<ExitCode> {
 /// `epr flow enrich` — record a re-execution against an immutable gate verdict.
 fn run_enrich(args: &[String]) -> FlowResult<ExitCode> {
     const USAGE: &str = "usage: epr flow enrich (--verdict <cid> | --project <p> --closure <key> \
-        [--from-device <did>]) --kind re-executed \
-        --outcome green|red --method <text> [--run <cid>] [--seconds <n>] \
+        [--from-device <did>]) [--resolve-only | --kind re-executed \
+        --outcome green|red|not-comparable --method <text> [--reason <text>] \
+        [--run <cid>] [--seconds <n>]] \
         [--json] [--root DIR]";
     let (opts, rest) = parse_global(args)?;
     if wants_help(&rest) {
@@ -2070,7 +2071,7 @@ fn run_enrich(args: &[String]) -> FlowResult<ExitCode> {
     while i < rest.len() {
         match rest[i].as_str() {
             "--verdict" | "--project" | "--closure" | "--from-device" | "--kind" | "--outcome"
-            | "--method" | "--run" | "--seconds" => {
+            | "--method" | "--reason" | "--run" | "--seconds" => {
                 if rest.get(i + 1).is_none() {
                     return Err(FlowError::InvalidArguments(format!(
                         "{} needs a value\n{USAGE}",
@@ -2079,6 +2080,7 @@ fn run_enrich(args: &[String]) -> FlowResult<ExitCode> {
                 }
                 i += 2;
             }
+            "--resolve-only" => i += 1,
             other => {
                 return Err(FlowError::InvalidArguments(format!(
                     "unknown enrich argument `{other}`{}\n{USAGE}",
@@ -2092,8 +2094,10 @@ fn run_enrich(args: &[String]) -> FlowResult<ExitCode> {
                             "--kind",
                             "--outcome",
                             "--method",
+                            "--reason",
                             "--run",
-                            "--seconds"
+                            "--seconds",
+                            "--resolve-only"
                         ]
                     )
                 )))
@@ -2109,9 +2113,42 @@ fn run_enrich(args: &[String]) -> FlowResult<ExitCode> {
     let project = take_opt(&rest, "--project")?;
     let closure = take_opt(&rest, "--closure")?;
     let from_device = take_opt(&rest, "--from-device")?;
+    let resolve_only = rest.iter().any(|arg| arg == "--resolve-only");
+    if resolve_only {
+        for flag in [
+            "--kind",
+            "--outcome",
+            "--method",
+            "--reason",
+            "--run",
+            "--seconds",
+        ] {
+            if take_opt(&rest, flag)?.is_some() {
+                return Err(FlowError::InvalidArguments(format!(
+                    "--resolve-only cannot be combined with {flag}\n{USAGE}"
+                )));
+            }
+        }
+        let receipt = enrich::resolve_target(
+            &opts.root,
+            &enrich::EnrichmentTargetRequest {
+                verdict: verdict.as_deref(),
+                project: project.as_deref(),
+                closure: closure.as_deref(),
+                from_device: from_device.as_deref(),
+            },
+        )?;
+        if opts.json {
+            println!("{}", serde_json::to_string_pretty(&receipt)?);
+        } else {
+            receipt.render();
+        }
+        return Ok(ExitCode::SUCCESS);
+    }
     let kind = required("--kind")?;
     let outcome = required("--outcome")?;
     let method = required("--method")?;
+    let reason = take_opt(&rest, "--reason")?;
     let run = take_opt(&rest, "--run")?;
     let seconds = take_opt(&rest, "--seconds")?
         .map(|raw| {
@@ -2130,6 +2167,7 @@ fn run_enrich(args: &[String]) -> FlowResult<ExitCode> {
             kind: &kind,
             outcome: &outcome,
             method: &method,
+            reason: reason.as_deref(),
             run: run.as_deref(),
             seconds,
         },
@@ -2491,8 +2529,8 @@ fn usage() -> String {
      so --on is refused alongside --measure; --subject . names the repository itself for a \
      repository-wide bound. `epr flow note --help` prints the full per-flag contract)\n  \
      | enrich (--verdict <cid> | --project <p> --closure <key> [--from-device <did>]) \
-     --kind re-executed --outcome green|red --method <text> \
-     [--run <cid>] [--seconds <n>] [--json] [--root DIR] \
+     [--resolve-only | --kind re-executed --outcome green|red|not-comparable --method <text> \
+     [--reason <text>] [--run <cid>] [--seconds <n>]] [--json] [--root DIR] \
      (append a local attestation-enrichment@1 Cite without changing the verdict)\n  \
      | cites seal|assign-id|describe|verify|refresh|stamp|migrate [<doc>…] [--json] [--root DIR] \
      (the native cite WRITER: `seal <doc>` assigns id:, converts legacy doc path-cites to \
