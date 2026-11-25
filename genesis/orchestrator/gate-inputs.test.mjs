@@ -560,7 +560,7 @@ async function runGate(t, w, repo, mode, extraEnv = {}) {
     root: repo, spawn: w.spawn, tap: false, write: text => lines.push(text), warn: () => {}, clock: w.clock,
     env: {
       PATH, BRIT_BIN: w.brit, BRIT_BUILD_REF_BIN: w.buildRef, GATE_TASK: 'off', GATE_EVIDENCE: 'reuse',
-      GATE_RUN_KIND: 'full-gate', GATE_RECIPE_KEY: 'off', ...(mode ? { GATE_INPUTS: mode } : {}), ...extraEnv,
+      GATE_RUN_KIND: 'full-gate', GATE_RECIPE_KEY: 'off', GATE_READ_SHADOW: 'off', ...(mode ? { GATE_INPUTS: mode } : {}), ...extraEnv,
     },
   });
   const text = lines.join('');

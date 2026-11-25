@@ -1238,34 +1238,37 @@ export function runProject(project, printOnly, namesOnly, {
   write(`[gate] ${project.name} evidence: ${evidence.line}\n`);
   // GATE_READ_SHADOW (default on): compare this gate's canonical closure at the integration base
   // and gated commit under two proposed audit fixes. It reads the same key material but neither the
-  // reuse decision nor the evidence store reads these results. All work shares crate-shadow's bounded
-  // span, and its elapsed time is removed from the gate duration.
+  // reuse decision nor the evidence store reads these results. It has its own budget
+  // (GATE_READ_SHADOW_BUDGET_MS, default 15000), so it never spends the crate shadow's, and its
+  // elapsed time is removed from the gate duration.
   if (env.GATE_READ_SHADOW !== 'off' && evidence.key && evidence.material) {
     let scopeKnown = false;
     try { scopeKnown = ['paths', 'tree'].includes(JSON.parse(evidence.material).reads?.scope); } catch { /* no shadow */ }
     if (scopeKnown) {
       const readShadowStarted = clock();
       const readShadowState = { dropped: false };
-      shadowBudget.begin();
+      const readShadowBudget = crateShadowBudget(
+        { GATE_CRATE_SHADOW_BUDGET_MS: env.GATE_READ_SHADOW_BUDGET_MS }, clock);
+      readShadowBudget.begin();
       try {
-        const bounded = (command, args, options) => shadowBudget.spawn(
+        const bounded = (command, args, options) => readShadowBudget.spawn(
           spawn, 'read-shadow', command, args, options,
         );
         const { base } = touchedProcessSteps(project, { root, gateCommit, spawn: bounded });
         if (base) {
-          shadowBudget.check('read-shadow');
+          readShadowBudget.check('read-shadow');
           readShadow = readShadowOf(project, evidence, {
             root, base, commit: gateCommit, env: childEnv, cargoEnv: cargoEnvOf(childEnv),
             spawn: bounded, inputs,
           });
-          shadowBudget.check('read-shadow');
+          readShadowBudget.check('read-shadow');
           if (readShadow) write(`${readShadow.line}\n`);
         }
       } catch (error) {
         dropReadShadow(project.name, error, readShadowState, write);
         readShadow = null;
       } finally {
-        shadowBudget.end();
+        readShadowBudget.end();
       }
       started += clock() - readShadowStarted;
     }
