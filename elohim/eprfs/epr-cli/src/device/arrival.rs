@@ -1079,7 +1079,8 @@ fn safe_directory_grants(test_dir: &Path, values: &[String]) -> bool {
 /// (`gix/src/open/repository.rs`): the git directory and the worktree are both owned by this
 /// user, or the effective global/system `safe.directory` list grants the worktree. This device's
 /// own declaration (`epr device trust`) reaches only git, never brit. At reduced trust brit
-/// ignores `core.hooksPath` (its commits run no hooks) and caps object index slots at 32.
+/// ignores `core.hooksPath` (its commits run no hooks) and sizes object index slots from disk up
+/// to a ceiling of 512.
 fn brit_trust(root: &Path) -> Option<(bool, String)> {
     use std::os::unix::fs::MetadataExt;
     // SAFETY: geteuid takes no arguments, touches no memory and cannot fail (POSIX).
@@ -1131,7 +1132,7 @@ fn brit_trust_check(root: &Path) -> Check {
         Some((false, detail)) => Check::new(
             "brit trust",
             State::Degraded,
-            format!("{detail}; brit runs at reduced trust (no hooks, 32 index slots)"),
+            format!("{detail}; brit runs at reduced trust (no hooks, at most 512 index slots)"),
             Some("git config --global --add safe.directory '*' (devfile setup-git)".into()),
         ),
         None => Check::new(
@@ -1143,9 +1144,11 @@ fn brit_trust_check(root: &Path) -> Check {
     }
 }
 
-/// gix's object-index slot cap at reduced trust (`gix/src/open/options.rs`,
-/// `resolve_object_store_slots`). Full trust sizes slots from disk.
-const REDUCED_TRUST_SLOTS: usize = 32;
+/// gix's object-index slot ceiling at reduced trust (`gix::open::REDUCED_TRUST_MAX_PACK_INDEXES`).
+/// Since brit 0.3.0 reduced trust sizes slots from what is on disk, floor 32, ceiling 512; full
+/// trust sizes from disk without the ceiling. The fixed cap of 32 this check held until
+/// 2026-11-25 warned on stores brit opens (51 and 79 packs observed open on 0.3.4).
+const REDUCED_TRUST_SLOTS: usize = 512;
 
 /// Pack count against the reduced-trust slot cap. Over it, every brit read fails ("too few index
 /// slots") whenever trust falls to reduced, as it does on each restart before setup-git runs.
@@ -1174,7 +1177,7 @@ fn packs_check(root: &Path) -> Check {
         None => "trust unknown",
     };
     let detail =
-        format!("{packs} pack index(es); reduced-trust cap {REDUCED_TRUST_SLOTS} ({trust})");
+        format!("{packs} pack index(es); reduced-trust ceiling {REDUCED_TRUST_SLOTS} ({trust})");
     if packs < REDUCED_TRUST_SLOTS {
         Check::new("object packs", State::Ok, detail, None)
     } else {
