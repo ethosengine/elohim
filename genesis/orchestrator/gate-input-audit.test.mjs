@@ -654,12 +654,14 @@ function realReadSet(name) {
 }
 
 test('default read-set options preserve the five device-runtime gate outputs byte for byte', () => {
+  // Re-pinned 2026-11-25 with device-runtime/tests/manifest_store.rs: its four view-schema joins
+  // became literals, so these five no longer read the whole device-runtime crate through it.
   const expected = new Map([
-    ['elohim-storage', '1d3493b06b9424cb5bf49c60aeec457f5fcabea8ae32c0f85eac04f0b23ca0be'],
-    ['steward-node', '0f30099c6fc559d0d97cc5cad214e0bf7387298882ae63335867f20bd213cae2'],
-    ['elohim-ark', '71d683c1c9c4e64a855d0372e743e96776a30642c8f49b30120a192e516fa190'],
-    ['cargo-bridge', '5a3fefca8e5a73b1e59602927b5fdfab69dc76055ab51d1f98359fd2295ed848'],
-    ['jenkins-bridge', 'cdffd3ffdf8e6976abdf6e95b3c0b6d869596d016341d27498a9d2e64eff53fd'],
+    ['elohim-storage', '4d2d5f75af2a9f271cfba6ec820f1006614035babddef540811a72a5d3baf2a1'],
+    ['steward-node', '4d21a3786a2e1370491c277b1b6f1fcd77c1748ddefe460b3511be1d3a14a340'],
+    ['elohim-ark', '454aead69e85db1814b2c469913534c5f2bb2c37bee8d816116546bf61024f29'],
+    ['cargo-bridge', 'f777e83c743853fc4453ae7fbc27e94d7033a285b458bbd3c0d97c5b87df6505'],
+    ['jenkins-bridge', '719dfcb283364fd3c38405daec86e03b40d44616f3d8342f393d627117357fda'],
   ]);
   for (const [name, digest] of expected) {
     const bytes = JSON.stringify(realReadSet(name));

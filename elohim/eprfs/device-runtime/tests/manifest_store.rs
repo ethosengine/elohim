@@ -81,27 +81,46 @@ fn config_release_is_replayable_and_neighbour_settings_survive_follow() {
 fn new_outputs_match_view_schemas() {
     let (dir, store) = fixture();
     let head = store.read().unwrap();
+    // Each schema path is written out as a literal so the gate input audit keys every reader of
+    // this file on these four schemas and not on the whole crate directory.
     let views = [
         (
             "runtime-declaration",
+            concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/../../sdk/schemas/v1/views/runtime-declaration.schema.json"
+            ),
             serde_json::to_value(manifest_store::view(&head).unwrap()).unwrap(),
         ),
         (
             "bin-tools",
+            concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/../../sdk/schemas/v1/views/bin-tools.schema.json"
+            ),
             serde_json::to_value(manifest_store::registry(&head).unwrap()).unwrap(),
         ),
-        ("runtime-manifest", serde_json::to_value(&head).unwrap()),
+        (
+            "runtime-manifest",
+            concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/../../sdk/schemas/v1/views/runtime-manifest.schema.json"
+            ),
+            serde_json::to_value(&head).unwrap(),
+        ),
         (
             "runtime-observation",
+            concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/../../sdk/schemas/v1/views/runtime-observation.schema.json"
+            ),
             serde_json::to_value(
                 manifest_store::observe(&head, dir.path(), &Default::default()).unwrap(),
             )
             .unwrap(),
         ),
     ];
-    for (name, value) in views {
-        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join(format!("../../sdk/schemas/v1/views/{name}.schema.json"));
+    for (name, path, value) in views {
         let schema: serde_json::Value =
             serde_json::from_str(&fs::read_to_string(path).unwrap()).unwrap();
         let validator = jsonschema::validator_for(&schema).unwrap();
