@@ -1474,6 +1474,21 @@ measures:
     default-authority: observation
     established_by: steward-space-a8-2026-10-27
     why: "a sibling gate can be paid once per identical closure without turning sibling evidence into quorum"
+  - id: attestation-enrichment
+    version: 1
+    family: gate
+    unit: enrichments
+    procedure: >
+      Written by a re-execution of a reused verdict. Names the verdict it re-executed against by
+      CID and the closure it enriches; never rewrites or deletes the verdict. A disagreement is a
+      record like an agreement. Read by nothing in shadow and does not cross until the steward
+      rules. Kind is a closed set.
+    provenance: verdict-is-an-attestation design section 4a; station Attest-enrichment
+    status: active
+    env-sensitivity: [kind, outcome, verdict, project, closure, device, method, commit, seconds, run]
+    default-authority: observation
+    established_by: attestation-enrichment-2026-11-25
+    why: "a later execution can add evidence to an immutable verdict without replacing it"
   - id: dev-landing
     version: 1
     family: landing
