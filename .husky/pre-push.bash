@@ -39,6 +39,7 @@ set -o pipefail
 # With an explicit GIT_DIR, Git otherwise treats each gate's cwd as its worktree.
 HOOK_WORK_TREE=$(git rev-parse --show-toplevel) || exit 1
 
+# ── Device epr: the resolver's shell caller ─────────────────────────
 # The epr a DEVICE act runs (the steward lease view berth reads, the household head landing): this
 # device's head, through the one resolver (genesis/orchestrator/device-epr.mjs). It prints nothing
 # when the act stays on the session's launcher, having said why on stderr; a checkout without the
@@ -54,6 +55,7 @@ device_epr() {
   [ -n "$resolved" ] || resolved="${EPR_BIN:-$(command -v epr || true)}"
   printf '%s\n' "$resolved"
 }
+# ── Device epr: end ─────────────────────────────────────────────────
 HOOK_GIT_DIR=$(git rev-parse --absolute-git-dir) || exit 1
 export GIT_WORK_TREE="$HOOK_WORK_TREE"
 export GIT_DIR="$HOOK_GIT_DIR"

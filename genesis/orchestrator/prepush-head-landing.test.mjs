@@ -21,7 +21,11 @@ function hookBlock() {
   const start = hook.indexOf("# ── Household head: land the pushed epr");
   const end = hook.indexOf("# ── Household head: end", start);
   assert.ok(start >= 0 && end > start, "exercise the actual hook's landing block");
-  return hook.slice(start, end);
+  // The block resolves its epr with the hook's own device_epr (defined at the top of the hook).
+  const fnStart = hook.indexOf("# ── Device epr: the resolver's shell caller");
+  const fnEnd = hook.indexOf("# ── Device epr: end", fnStart);
+  assert.ok(fnStart >= 0 && fnEnd > fnStart, "exercise the actual hook's device_epr");
+  return `${hook.slice(fnStart, fnEnd)}\n${hook.slice(start, end)}`;
 }
 
 // A stub epr: logs `<args>` per call. `candidate` (a file) holds the CID ingested at the pushed
@@ -118,7 +122,7 @@ function fixture(t, { candidate = "", deliver = CID, slotLauncher = null, instal
   return { dir, head, bin };
 }
 
-function runBlock(fx, { sha = fx.head, projects = "orchestrator eprfs rust-style" } = {}) {
+function runBlock(fx, { sha = fx.head, projects = "orchestrator eprfs rust-style", eprBin = join(fx.bin, "epr") } = {}) {
   const preamble = [
     `DEV_LOCAL_SHA='${sha}'`,
     `PROJECTS='${projects}'`,
@@ -132,7 +136,7 @@ function runBlock(fx, { sha = fx.head, projects = "orchestrator eprfs rust-style
     cwd: fx.dir,
     timeout: 15000,
     encoding: "utf8",
-    env: { ...cleanEnv, EPR_BIN: join(fx.bin, "epr") },
+    env: { ...cleanEnv, EPR_BIN: eprBin },
   });
   let calls = [];
   try {
@@ -253,3 +257,25 @@ for (const [label, options] of [
     assert.equal(readFileSync(join(fx.bin, "store/bin/bin-launch"), "utf8"), "old launcher");
   });
 }
+
+test("the_landing_runs_the_device_head_epr_the_resolver_names_not_the_session_epr", (t) => {
+  // The session's epr (EPR_BIN here) is a decoy that only records that it ran; the hook's
+  // device_epr asks the resolver, which names the device head (the fixture's stub).
+  const fx = fixture(t);
+  const decoy = join(fx.dir, "session-epr");
+  writeFileSync(decoy, `#!/bin/sh\necho "$*" >> "${fx.dir}/session-ran.log"\nexit 1\n`);
+  chmodSync(decoy, 0o755);
+  writeFileSync(join(fx.dir, "genesis/orchestrator/device-epr.mjs"), `process.stdout.write(${JSON.stringify(`${join(fx.bin, "epr")}\n`)});\n`);
+  const r = runBlock(fx, { eprBin: decoy });
+  assert.equal(r.status, 0, r.out);
+  assert.ok(r.out.includes(`[pre-push] epr household head landed: ${CID}`), r.out);
+  assert.ok(r.calls.some((c) => c.startsWith("bin --tool epr land")), r.calls.join("\n"));
+  assert.throws(() => readFileSync(join(fx.dir, "session-ran.log")), "the session's epr ran no landing step");
+
+  // No resolver in the checkout: one line says so and the session's epr is used, as before.
+  const old = fixture(t);
+  const fallback = runBlock(old);
+  assert.equal(fallback.status, 0, fallback.out);
+  assert.equal(fallback.out.split("\n").filter((line) => line.startsWith("[device-epr] resolver unavailable")).length, 1, fallback.out);
+  assert.ok(fallback.out.includes(`[pre-push] epr household head landed: ${CID}`), fallback.out);
+});
