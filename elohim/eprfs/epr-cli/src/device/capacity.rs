@@ -483,21 +483,19 @@ fn command_until(command: &mut Command, deadline: Instant) -> Result<CommandAnsw
     }
 }
 
-fn pre_push_changed_files(
+fn push_changed_files(
     root: &Path,
     target: &str,
     tip: &str,
     deadline: Instant,
 ) -> Result<CommandAnswer, String> {
-    let run = |args: &[&str]| {
-        let mut command = crate::process::build_command("git", args, root, &[]);
-        command_until(&mut command, deadline)
-    };
-    match run(&["diff", "--name-only", target, tip])? {
-        CommandAnswer::Done(output) if output.status.success() => Ok(CommandAnswer::Done(output)),
-        CommandAnswer::TimedOut => Ok(CommandAnswer::TimedOut),
-        CommandAnswer::Done(_) => run(&["diff", "--name-only", &format!("origin/dev...{tip}")]),
-    }
+    let script = root.join("genesis/orchestrator/push-changed-files.sh");
+    let script = script
+        .to_str()
+        .ok_or_else(|| format!("{} is not UTF-8", script.display()))?;
+    let mut command = crate::process::build_command("bash", &[script, target, tip], root, &[]);
+    command.envs(crate::git::trust_env(root));
+    command_until(&mut command, deadline)
 }
 
 /// Forecast the gate names selected by the same changed-file range shape the pre-push hook uses:
@@ -506,41 +504,84 @@ pub(super) fn would_run(
     root: &Path,
     tip: &str,
     target: &str,
-    capacity: &Capacity,
-) -> Result<Vec<String>, String> {
+    capacity: Option<&Capacity>,
+) -> Vec<String> {
     let deadline = Instant::now() + would_budget();
     let mut lines = vec![
         "FORECAST".into(),
         "selection only; reuse, attestation and hand-over can change what runs".into(),
-        format!("capacity: {}", capacity.line()),
+        capacity.map_or_else(
+            || "capacity: unavailable".into(),
+            |capacity| format!("capacity: {}", capacity.line()),
+        ),
     ];
-    let changed = match pre_push_changed_files(root, target, tip, deadline)? {
-        CommandAnswer::TimedOut => {
-            lines.push("timed out after 10s while reading the push changed-file range".into());
-            return Ok(lines);
+    if capacity.is_none() {
+        lines.push("forecast error: device capacity could not be read".into());
+        return lines;
+    }
+    let changed = match push_changed_files(root, target, tip, deadline) {
+        Err(error) => {
+            lines.push(format!(
+                "forecast error while reading changed files: {error}"
+            ));
+            return lines;
         }
-        CommandAnswer::Done(output) if output.status.success() => output.stdout,
-        CommandAnswer::Done(output) => {
-            return Err(format!(
-                "changed-file range unreadable: {}",
-                String::from_utf8_lossy(&output.stderr).trim()
-            ))
+        Ok(CommandAnswer::TimedOut) => {
+            lines.push("timed out after 10s while reading the push changed-file range".into());
+            return lines;
+        }
+        Ok(CommandAnswer::Done(output))
+            if output.status.success() || output.status.code() == Some(3) =>
+        {
+            output.stdout
+        }
+        Ok(CommandAnswer::Done(output)) => {
+            let detail = String::from_utf8_lossy(&output.stderr);
+            let detail = detail.trim();
+            lines.push(if detail.is_empty() {
+                format!(
+                    "changed-file range unreadable (exit {})",
+                    output
+                        .status
+                        .code()
+                        .map_or_else(|| "signal".into(), |code| code.to_string())
+                )
+            } else {
+                format!("changed-file range unreadable: {detail}")
+            });
+            return lines;
         }
     };
 
     let runner = root.join("genesis/orchestrator/gate-runner.mjs");
-    let mut input = tempfile::NamedTempFile::new()
-        .map_err(|error| format!("create changed-file input: {error}"))?;
-    input
-        .write_all(&changed)
-        .and_then(|()| input.flush())
-        .map_err(|error| format!("write changed-file input: {error}"))?;
-    let stdin = input
-        .reopen()
-        .map_err(|error| format!("reopen changed-file input: {error}"))?;
-    let runner_text = runner
-        .to_str()
-        .ok_or_else(|| format!("{} is not UTF-8", runner.display()))?;
+    let mut input = match tempfile::NamedTempFile::new() {
+        Ok(input) => input,
+        Err(error) => {
+            lines.push(format!(
+                "forecast error creating changed-file input: {error}"
+            ));
+            return lines;
+        }
+    };
+    if let Err(error) = input.write_all(&changed).and_then(|()| input.flush()) {
+        lines.push(format!(
+            "forecast error writing changed-file input: {error}"
+        ));
+        return lines;
+    }
+    let stdin = match input.reopen() {
+        Ok(stdin) => stdin,
+        Err(error) => {
+            lines.push(format!(
+                "forecast error reopening changed-file input: {error}"
+            ));
+            return lines;
+        }
+    };
+    let Some(runner_text) = runner.to_str() else {
+        lines.push(format!("forecast error: {} is not UTF-8", runner.display()));
+        return lines;
+    };
     let mut command = crate::process::build_command(
         "node",
         &[
@@ -558,11 +599,16 @@ pub(super) fn would_run(
         .stdin(Stdio::from(stdin))
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
-    match command_until(&mut command, deadline)? {
-        CommandAnswer::TimedOut => {
+    match command_until(&mut command, deadline) {
+        Err(error) => {
+            lines.push(format!(
+                "forecast error while running gate selection: {error}"
+            ));
+        }
+        Ok(CommandAnswer::TimedOut) => {
             lines.push("timed out after 10s while running gate selection".into());
         }
-        CommandAnswer::Done(output) if output.status.success() => {
+        Ok(CommandAnswer::Done(output)) if output.status.success() => {
             lines.push("selected gates:".into());
             let gates: Vec<_> = String::from_utf8_lossy(&output.stdout)
                 .lines()
@@ -575,14 +621,23 @@ pub(super) fn would_run(
                 lines.extend(gates);
             }
         }
-        CommandAnswer::Done(output) => {
-            return Err(format!(
-                "gate selection failed: {}",
-                String::from_utf8_lossy(&output.stderr).trim()
-            ))
+        Ok(CommandAnswer::Done(output)) => {
+            let detail = String::from_utf8_lossy(&output.stderr);
+            let detail = detail.trim();
+            lines.push(if detail.is_empty() {
+                format!(
+                    "gate selection failed (exit {})",
+                    output
+                        .status
+                        .code()
+                        .map_or_else(|| "signal".into(), |code| code.to_string())
+                )
+            } else {
+                format!("gate selection failed: {detail}")
+            });
         }
     }
-    Ok(lines)
+    lines
 }
 
 #[cfg(test)]

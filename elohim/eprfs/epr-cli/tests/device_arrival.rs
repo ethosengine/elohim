@@ -7,7 +7,12 @@ use std::{
 };
 
 fn epr(base: &Path, args: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_epr"))
+    epr_with_env(base, args, &[])
+}
+
+fn epr_with_env(base: &Path, args: &[&str], extra_env: &[(&str, &str)]) -> Output {
+    let mut command = Command::new(env!("CARGO_BIN_EXE_epr"));
+    command
         .args(args)
         .current_dir(base.join("repo"))
         .env("HOME", base)
@@ -17,7 +22,7 @@ fn epr(base: &Path, args: &[&str]) -> Output {
         .env("BIN_STORE", base.join("store"))
         .env("CARGO_TARGET_POOL_ROOT", base.join("cargo-pool"))
         .env("EPR_UNDER_TEST", "1")
-        .env("EPR_WOULD_TIMEOUT_MS", "100")
+        .env_remove("EPR_WOULD_TIMEOUT_MS")
         .env("EPR_PROC_ROOT", base.join("proc"))
         .env_remove("ELOHIM_SESSION_OWNER_PID")
         .env_remove("EPR_SESSION_LAZY")
@@ -36,9 +41,24 @@ fn epr(base: &Path, args: &[&str]) -> Output {
         .env("GIT_CONFIG_COUNT", "0")
         // `git -c safe.directory=*` reaches children through this; the fixture owns its trust.
         .env_remove("GIT_CONFIG_PARAMETERS")
-        .env("GIT_TEST_ASSUME_DIFFERENT_OWNER", "1")
-        .output()
-        .unwrap()
+        .env("GIT_TEST_ASSUME_DIFFERENT_OWNER", "1");
+    for (name, value) in extra_env {
+        command.env(name, value);
+    }
+    command.output().unwrap()
+}
+
+const PUSH_CHANGED_FILES: &str =
+    include_str!("../../../../genesis/orchestrator/push-changed-files.sh");
+
+fn install_push_changed_files(base: &Path) {
+    let orchestrator = base.join("repo/genesis/orchestrator");
+    fs::create_dir_all(&orchestrator).unwrap();
+    fs::write(
+        orchestrator.join("push-changed-files.sh"),
+        PUSH_CHANGED_FILES,
+    )
+    .unwrap();
 }
 fn fixture() -> tempfile::TempDir {
     let temp = tempfile::tempdir().unwrap();
@@ -261,7 +281,7 @@ fn would_uses_the_pre_push_range_and_reports_selection_only() {
     let base = temp.path();
     first_device(base);
     let orchestrator = base.join("repo/genesis/orchestrator");
-    fs::create_dir_all(&orchestrator).unwrap();
+    install_push_changed_files(base);
     fs::write(
         orchestrator.join("gate-runner.mjs"),
         "process.stdin.resume(); process.stdin.on('end', () => { console.log('alpha'); console.log('beta'); });\n",
@@ -270,7 +290,12 @@ fn would_uses_the_pre_push_range_and_reports_selection_only() {
     fs::write(base.join("repo/changed.txt"), "selected\n").unwrap();
     fixture_git(
         base,
-        &["add", "genesis/orchestrator/gate-runner.mjs", "changed.txt"],
+        &[
+            "add",
+            "genesis/orchestrator/gate-runner.mjs",
+            "genesis/orchestrator/push-changed-files.sh",
+            "changed.txt",
+        ],
     );
     fixture_git(base, &["commit", "-q", "-m", "fixture gate selection"]);
     let commit = Command::new("git")
@@ -366,7 +391,7 @@ fn would_timeout_is_reported_without_changing_status_exit() {
     let base = temp.path();
     first_device(base);
     let orchestrator = base.join("repo/genesis/orchestrator");
-    fs::create_dir_all(&orchestrator).unwrap();
+    install_push_changed_files(base);
     fs::write(
         orchestrator.join("gate-runner.mjs"),
         "setTimeout(() => console.log('too-late'), 10000);\n",
@@ -375,17 +400,51 @@ fn would_timeout_is_reported_without_changing_status_exit() {
     fs::write(base.join("repo/changed.txt"), "selected\n").unwrap();
     fixture_git(
         base,
-        &["add", "genesis/orchestrator/gate-runner.mjs", "changed.txt"],
+        &[
+            "add",
+            "genesis/orchestrator/gate-runner.mjs",
+            "genesis/orchestrator/push-changed-files.sh",
+            "changed.txt",
+        ],
     );
     fixture_git(base, &["commit", "-q", "-m", "fixture slow selection"]);
     let ordinary = epr(base, &["device", "status"]);
-    let forecast = epr(
+    let forecast = epr_with_env(
         base,
         &["device", "status", "--would", "HEAD", "--target", "HEAD~1"],
+        &[("EPR_WOULD_TIMEOUT_MS", "100")],
     );
     assert_eq!(forecast.status.code(), ordinary.status.code());
     assert!(String::from_utf8_lossy(&forecast.stdout)
         .contains("timed out after 10s while running gate selection"));
+}
+
+#[test]
+fn would_range_error_is_reported_on_stdout_without_changing_status_exit() {
+    let temp = fixture();
+    let base = temp.path();
+    first_device(base);
+    install_push_changed_files(base);
+    let ordinary = epr(base, &["device", "status"]);
+    let forecast = epr(
+        base,
+        &[
+            "device",
+            "status",
+            "--would",
+            "missing-tip",
+            "--target",
+            "missing-destination",
+        ],
+    );
+    assert_eq!(forecast.status.code(), ordinary.status.code());
+    let text = String::from_utf8_lossy(&forecast.stdout);
+    assert!(text.contains("FORECAST"), "{text}");
+    assert!(text.contains("capacity:"), "{text}");
+    assert!(
+        text.contains("changed-file range unreadable (exit 4)"),
+        "{text}"
+    );
 }
 #[test]
 fn arrive_bad_registry_fails_open_but_strict_refuses() {
