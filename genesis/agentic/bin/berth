@@ -153,6 +153,7 @@ import unicodedata
 CHE_CONFIG_DIR = "/projects/.claude-config"
 CHE_PROJECT_DIR = "/projects/elohim"
 LAYOUT_TIMEOUT_S = 3
+DEVICE_EPR_TIMEOUT_S = 3
 
 
 def _layout_from_epr(env, run):
@@ -578,6 +579,8 @@ class Berth:
          self.confirm_wait_s, self.freshness_s, self.fence_margin_s,
          self.max_skew_s, self.policy_error) = load_steward(policy_path)
         self.epr = None  # injectable: the `epr` a steward claim asks; else resolved like the fold emitter
+        self._device_epr_read = False  # the device head epr is asked of the resolver once per process
+        self._device_epr_path = None
         # The device's channel store (`epr peer leases` names it): steward records are written there,
         # so they cross. None until the view was read, or when this workspace is not a device.
         self.channel_root = None
@@ -1936,12 +1939,44 @@ class Berth:
     def epr_bin(self):
         """The `epr` a steward claim asks, found the way `just status device` finds it ($EPR_BIN,
         PATH through the native bin store), or None when there is no executable one."""
-        path = self.epr or os.environ.get("EPR_BIN")
+        path = self.epr
+        if path is None:
+            # A device read (the steward lease view, peer status, open misses): this device's head
+            # epr, through the one resolver. It answers nothing when the act stays on the session's
+            # launcher, and has said why on stderr; then the old resolution below stands.
+            path = self._device_epr()
+        if path is None:
+            path = os.environ.get("EPR_BIN")
         if path is None:
             sys.path.insert(0, os.path.join(REPO_ROOT, ".claude", "scripts"))
             from _lib import epr_client
             path = epr_client.resolve_binary(dict(os.environ))
         return path if path and os.path.isfile(path) and os.access(path, os.X_OK) else None
+
+    def _device_epr(self):
+        """The device head epr from genesis/orchestrator/device-epr.mjs, asked once per process and
+        bounded; None when the resolver is absent, fails, or leaves the act on the session's epr."""
+        if self._device_epr_read:
+            return self._device_epr_path
+        self._device_epr_read = True
+        resolver = os.path.join(REPO_ROOT, "genesis", "orchestrator", "device-epr.mjs")
+        node = shutil.which("node")
+        if os.environ.get(UNDER_TEST_ENV) == "1" and not os.environ.get("BERTH_DEVICE_EPR"):
+            return None  # a test's berth resolves as it always did unless the test asks for the resolver
+        if not node or not os.path.isfile(resolver):
+            print("[device-epr] resolver unavailable (node or genesis/orchestrator/device-epr.mjs); "
+                  "device acts use the PATH launcher (the session pin applies)", file=sys.stderr)
+            return None
+        try:
+            result = subprocess.run([node, resolver], stdout=subprocess.PIPE, text=True,
+                                    stdin=subprocess.DEVNULL, timeout=DEVICE_EPR_TIMEOUT_S)
+            path = result.stdout.strip() if result.returncode == 0 else ""
+        except (OSError, subprocess.SubprocessError) as error:
+            print(f"[device-epr] resolver did not answer ({_one_line(str(error))[:120]}); "
+                  "device acts use the PATH launcher (the session pin applies)", file=sys.stderr)
+            return None
+        self._device_epr_path = path or None
+        return self._device_epr_path
 
     @staticmethod
     def device_key_path():

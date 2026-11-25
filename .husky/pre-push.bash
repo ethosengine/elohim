@@ -38,6 +38,22 @@ set -o pipefail
 # Git exports GIT_DIR to hooks without necessarily exporting GIT_WORK_TREE.
 # With an explicit GIT_DIR, Git otherwise treats each gate's cwd as its worktree.
 HOOK_WORK_TREE=$(git rev-parse --show-toplevel) || exit 1
+
+# The epr a DEVICE act runs (the steward lease view berth reads, the household head landing): this
+# device's head, through the one resolver (genesis/orchestrator/device-epr.mjs). It prints nothing
+# when the act stays on the session's launcher, having said why on stderr; a checkout without the
+# resolver, or no node, says so here. Either way the old resolution stands and nothing is refused.
+# Session acts (readings) keep ${EPR_BIN:-epr}.
+device_epr() {
+  local resolved="" resolver="$HOOK_WORK_TREE/genesis/orchestrator/device-epr.mjs"
+  if [ -f "$resolver" ] && command -v node >/dev/null 2>&1; then
+    resolved=$(node "$resolver") || resolved=""
+  else
+    echo "[device-epr] resolver unavailable ($resolver or node); device acts use the PATH launcher (the session pin applies)" >&2
+  fi
+  [ -n "$resolved" ] || resolved="${EPR_BIN:-$(command -v epr || true)}"
+  printf '%s\n' "$resolved"
+}
 HOOK_GIT_DIR=$(git rev-parse --absolute-git-dir) || exit 1
 export GIT_WORK_TREE="$HOOK_WORK_TREE"
 export GIT_DIR="$HOOK_GIT_DIR"
@@ -438,7 +454,7 @@ if [ -n "$BERTH_TARGETS" ]; then
   fi
   # berth's own `no epr` rule, before any gate: a device's lease view is read through epr.
   BERTH_DEVICE_KEY="${ELOHIM_DEVICE_KEY_FILE:-${XDG_CONFIG_HOME:-$HOME/.config}/elohim/device/ed25519.seed}"
-  BERTH_EPR="${EPR_BIN:-$(command -v epr || true)}"
+  BERTH_EPR="$(device_epr)"
   if [ -f "$BERTH_DEVICE_KEY" ] && [ ! -x "$BERTH_EPR" ]; then
     echo "[pre-push] REFUSED: epr is required before any gate — run: epr device arrive, or set EPR_BIN=<path>"
     exit 1
@@ -2865,7 +2881,9 @@ echo ""
 READING_STARTED_S=$SECONDS
 READING_STARTED_AT=$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)
 EPR_LAND_RAN=""
-BIN_STORE_CLI="${EPR_BIN:-$(command -v epr || true)}"
+# A device act: the household head is read and landed by the device's head epr, whatever release
+# this session is pinned to.
+BIN_STORE_CLI="$(device_epr)"
 EPR_LAND_REASON=""
 if [ -z "$DEV_LOCAL_SHA" ]; then
   EPR_LAND_REASON="push does not target refs/heads/dev"

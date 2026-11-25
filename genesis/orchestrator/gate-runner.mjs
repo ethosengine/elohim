@@ -24,6 +24,7 @@ import {
 } from './gate-evidence.mjs';
 import { britAffected, resolveBritBin } from './gate-oracle.mjs';
 import { landerWait } from './gate-carry-claim.mjs';
+import { deviceEpr } from './device-epr.mjs';
 import { recipeKeyShadow } from './gate-recipe-key.mjs';
 import { CLAIMED_EXIT_CODE, runAttested } from './gate-attest.mjs';
 import { affectedPackages, loadMetadata, metadataToolchain } from './cargo-affected.mjs';
@@ -1460,7 +1461,8 @@ export function runProject(project, printOnly, namesOnly, {
   };
   const carry = landerWait({ intent: env.GATE_LANDING_INTENT, project: project.name, closure: evidence.key,
     mode: env.GATE_CARRY_WAIT || 'shadow', ownStopAt: env.GATE_LANDING_STOP_AT, deps: {
-      exec: (args, options) => spawn(env.EPR_BIN || 'epr', args, { ...options, cwd: root, env }),
+      // A device read (sibling carries); readings, cycle timing and pin checks above stay on the session's epr.
+      exec: (args, options) => spawn(deviceEpr({ env }), args, { ...options, cwd: root, env }),
       now: () => Date.now() / 1000, monotonic: () => Number(clock()) / 1e9,
       sleep: seconds => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, seconds * 1000),
       log: line => write(`[gate] ${project.name} carry: ${line}\n`),

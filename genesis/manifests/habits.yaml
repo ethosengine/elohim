@@ -2486,10 +2486,10 @@ habits:
     active: false
     checks: []
     evidence: >
-      DELTA 2026-11-22b (UNWIRED, inactive; the standing read has had two adversarial rounds, and its code waits for a roll): round two found three more ways a count could exceed the people counted, all cured in the design: the witnessing body is named by a prior policy with a quorum independent of the acting steward and the builder, the witness certifies the overlap between a person and the collectives they belong to, and the builder's own identity and every principal they represent are excluded, so `count` takes the builder. The participation read is its second consumer and today reports native standing only. Its two first code items change `elohim-storage` and the published `epr-rea`; both select the Edge build and its deploy, so neither was started (arrival backlog row 75, delta 2).
-    evidence-fingerprint: sha256:86678015eb8a824e
-    evidence-bytes: 1566
-    evidence-entries: 2
+      DELTA 2026-11-25 (still UNWIRED, inactive; no check added to this habit): the acts a device performs for its other devices (a gate verdict crossing and the sibling verdict read, a hand-over's intent and misses, the lander's carry read, the household head landing, berth's steward lease view) now run the device's head epr through one resolver, `genesis/orchestrator/device-epr.mjs`, whatever release the invoking session is pinned to; readings, cycle timing and session identity keep the session's pin. It never selects an epr older than the session's own, and an unreadable head keeps the PATH launcher with one line. Evidence: `device-epr.test.mjs` 9/9 against a fake bin store; resolve measured 22 ms uncached, 0.02 ms cached on shem. Not shown: a crossing on two real devices.
+    evidence-fingerprint: sha256:d54e9b59d0379fc9
+    evidence-bytes: 2348
+    evidence-entries: 3
     first_move: >-
       Two things are observable before a second principal exists. First, the standing read: redraft
       the standing record and council roster (station F6-standing) so a signer resolves to a principal;

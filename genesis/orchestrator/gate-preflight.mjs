@@ -25,6 +25,7 @@ import { declaredPinStores } from './suite-inventory.mjs';
 import { dirtyPaths } from './gate-evidence.mjs';
 import { appendEvent } from './gate-live.mjs';
 import { applicableTargets, checkCBaseline, hostTripleOf, readDeclaredTargets } from './c-baseline.mjs';
+import { compareToHead, deviceHead } from './device-epr.mjs';
 // gate-runner imports this module too; the cycle is safe because neither calls the other while loading.
 import { gateChildEnv } from './gate-runner.mjs';
 // Loaded so that a module that fails to load still gives a row, not a stack trace (fleetRollRows).
@@ -153,54 +154,25 @@ export function checkTmpdir({ projects, env = process.env, exists = existsSync }
   }
 }
 
-/** Read the launcher's current head without executing it or inheriting its session pin. */
+/**
+ * Read the launcher's current head without executing it or inheriting its session pin. The head
+ * read and the "older" judgment are device-epr.mjs's (the one resolver device acts use).
+ */
 export function checkEprBin({ env = process.env } = {}) {
   if (!env.EPR_BIN) return row('epr-bin', 'ok');
   let current;
-  let launcher;
   try {
-    // Store::from_environment: explicit tool/store overrides win. Otherwise locate the
-    // installed launcher, whose bin/bin-launch path identifies this device's store.
-    let store = env.EPR_STORE || (env.BIN_STORE && join(env.BIN_STORE, 'epr'));
-    if (!store) {
-      launcher = realpathSync(join(env.HOME, '.local/bin/epr'));
-      if (!launcher.endsWith('/bin/bin-launch')) throw new Error('unknown launcher');
-      store = join(dirname(dirname(launcher)), 'epr');
-    }
-    // bin_store/mod.rs head(): current.json wins even when the symlink disagrees.
-    const head = join(store, 'current.json');
-    if (existsSync(head)) {
-      const { cid } = JSON.parse(readFileSync(head, 'utf8'));
-      if (typeof cid !== 'string' || !/^b[a-z2-7]+$/.test(cid)) throw new Error('invalid head');
-      current = realpathSync(join(store, cid, 'epr'));
-    } else {
-      current = realpathSync(join(store, 'current/epr'));
-    }
+    current = deviceHead({ env }).path;
   } catch {
     return row('epr-bin', 'WARN',
       `EPR_BIN is set (${env.EPR_BIN}) and this device's current epr could not be read, so it is left set`, 'unset EPR_BIN');
   }
-  let inherited;
-  try { inherited = realpathSync(env.EPR_BIN); } catch { /* A missing candidate differs too. */ }
-  const storeCid = path => path?.match(/\/epr\/(b[a-z2-7]+)\/epr$/)?.[1];
-  if (inherited === current || (storeCid(inherited) && storeCid(inherited) === storeCid(current))) {
-    return row('epr-bin', 'ok');
-  }
   // Older means a release this device's store ingested before its head. A build outside the
   // store, or one ingested after the head, is a candidate someone set on purpose (bin-launch
   // reads EPR_BIN as its candidate): it is named, never refused or unset.
-  const ingested = cid => {
-    try {
-      const at = JSON.parse(readFileSync(join(dirname(dirname(current)), cid, 'record.json'), 'utf8')).ingestedAt;
-      const ms = Date.parse(at);
-      return Number.isFinite(ms) ? ms : null;
-    } catch { return null; }
-  };
-  const inheritedAt = storeCid(inherited) ? ingested(storeCid(inherited)) : null;
-  const currentAt = storeCid(current) ? ingested(storeCid(current)) : null;
-  const older = inherited !== undefined && dirname(dirname(inherited)) === dirname(dirname(current))
-    && inheritedAt !== null && currentAt !== null && inheritedAt < currentAt;
-  if (!older) {
+  const standing = compareToHead(env.EPR_BIN, current);
+  if (standing === 'same') return row('epr-bin', 'ok');
+  if (standing !== 'older') {
     return row('epr-bin', 'WARN',
       `EPR_BIN=${env.EPR_BIN} is a candidate, not this device's head epr (${current}); it is left set, and evidence keyed by it is not reused against the head`,
       'unset EPR_BIN to run on the head');

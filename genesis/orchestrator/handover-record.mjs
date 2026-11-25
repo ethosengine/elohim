@@ -28,6 +28,7 @@ import { fileURLToPath } from 'node:url';
 import { costOf, isHandoverBranch, readCycleUnion } from './gate-cost.mjs';
 import { changeClass } from './gate-change-class.mjs';
 import { parseChangeId } from './commit-tag-parser.mjs';
+import { deviceEprResolution } from './device-epr.mjs';
 import { deviceRoot, gateEvidence, resolveBin, selfAgentId, siblingVerdicts } from './gate-evidence.mjs';
 import { gateChildEnv } from './gate-runner.mjs';
 import { loadGateRegistry } from './pipeline-registry.mjs';
@@ -167,7 +168,7 @@ function run(spawn, bin, args, root, timeout = 30_000) {
 export function postMisses(record, projects, {
   root, env = process.env, spawn = spawnSync, now = () => new Date(), err = () => {},
   lookup = registryLookup({ root, env, spawn }), p90 = registryP90({ root }),
-  classify = changeClass, resolveBinary = resolveBin,
+  classify = changeClass, resolveBinary = resolveBin, resolveDevice = deviceEprResolution,
 } = {}) {
   if (env.HANDOVER_MISSES === 'off' || projects.length === 0) return null;
 
@@ -214,9 +215,13 @@ export function postMisses(record, projects, {
   }
   if (misses.length === 0) return null;
 
-  // Preflight has already refused a stale inherited EPR_BIN. Resolve the surviving candidate the
-  // same way gate evidence resolves its native helpers: declared executable, then PATH.
-  const epr = resolveBinary('epr', ['EPR_BIN'], env);
+  // A device act: the intent and its misses are read by siblings, so the device's head epr posts
+  // them (device-epr.mjs). When the head cannot be established the resolver has said so in one
+  // line, and the candidate is resolved as before: declared executable, then PATH.
+  const device = resolveDevice({ env, warn: err });
+  const epr = device.source === 'head' || device.source === 'override'
+    ? device.command
+    : resolveBinary('epr', ['EPR_BIN'], env);
   if (!epr) throw new Error('epr not on EPR_BIN or PATH');
   const raiseArgs = [
     'flow', 'intend', '--change', parsed.id, '--tree', tree, '--base', judged.base,

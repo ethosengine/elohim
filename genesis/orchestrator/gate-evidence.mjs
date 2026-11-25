@@ -34,6 +34,7 @@ import { SUITE_READ_LISTS, UNAUDITED_RECIPE_PROJECTS, globCovers, isReadPattern,
 import { closureDigest, dirtyInView, gitEnv, packageClosure, suiteInventory } from './suite-inventory.mjs';
 import { buildNotesRef, expectedRefusal, heldNotes, noteEpoch, readBuildNote, unverifiableNotes } from './scripts/brit-attest.mjs';
 import { LEGACY_ALL, refusesInputsFlag } from './gate-inputs.mjs';
+import { deviceEpr } from './device-epr.mjs';
 
 /** The attestation step name a gate PROJECT writes under: one closure per project, not per manifest step. */
 export function attestationStep(project) {
@@ -565,7 +566,8 @@ export function deviceRoot(root, spawn = spawnSync) {
 export function siblingVerdicts(project, key, { root, env = process.env, spawn = spawnSync }) {
   const device = deviceRoot(root, spawn);
   try {
-    const r = spawn(env.EPR_BIN || 'epr', [
+    // A device read: sibling verdicts are read by the device's head epr, not the session's pin.
+    const r = spawn(deviceEpr({ env }), [
       'peer', 'verdicts', '--project', project.name, '--closure', key, '--json', '--root', device,
     ], { cwd: device, encoding: 'utf8', timeout: 5_000 });
     if (r.status !== 0) return { candidates: [], error: 'epr peer verdicts failed' };
@@ -984,7 +986,8 @@ export function emitGateVerdict(project, key, {
   success, seconds, commit, put, root, env = process.env, spawn = spawnSync,
   warn = line => process.stderr.write(line),
 }) {
-  const epr = env.EPR_BIN || 'epr';
+  // A device act: the standing read and the crossing verdict run the device's head epr.
+  const epr = deviceEpr({ env });
   const failed = reason => {
     warn(`[gate] ${project.name} verdict crossing: not emitted (${reason})\n`);
     return false;
