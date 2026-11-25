@@ -8,7 +8,9 @@ use std::process::{Command, Output};
 
 use elohim_epr_cli::{device_key::DeviceKey, flow::misses::open_misses};
 use elohim_epr_rea::{
-    atom_cid, AgentRef, FlowEvent, FlowRecord, FlowStore, Magnitude, ReaVerb, SidecarFlowStore,
+    atom_cid, record_signing_message, ActorRecord, ActorStore, ActorWitness, AgentRef, FlowEvent,
+    FlowRecord, FlowStore, Magnitude, ParticipantRow, ReaVerb, RecordSignature, SidecarActorStore,
+    SidecarFlowStore, SidecarRoster,
 };
 use tempfile::TempDir;
 
@@ -69,10 +71,22 @@ impl Fixture {
     }
 
     fn verdict(&self) -> cid::Cid {
-        self.append(gate_verdict(PROJECT, CLOSURE, COMMIT))
+        self.append(gate_verdict(PROJECT, CLOSURE, COMMIT, true, None))
     }
 
     fn enrich(&self, verdict: &str, outcome: &str, extra: &[&str]) -> Output {
+        self.enrich_with(&["--verdict", verdict, "--outcome", outcome], extra)
+    }
+
+    fn enrich_selector(&self, project: &str, closure: &str, from_device: Option<&str>) -> Output {
+        let mut selector = vec!["--project", project, "--closure", closure];
+        if let Some(device) = from_device {
+            selector.extend(["--from-device", device]);
+        }
+        self.enrich_with(&selector, &["--outcome", "green"])
+    }
+
+    fn enrich_with(&self, target: &[&str], extra: &[&str]) -> Output {
         let mut command = Command::new(env!("CARGO_BIN_EXE_epr"));
         command
             .args([
@@ -81,15 +95,12 @@ impl Fixture {
                 "--root",
                 self.root.path().to_str().unwrap(),
                 "--json",
-                "--verdict",
-                verdict,
                 "--kind",
                 "re-executed",
-                "--outcome",
-                outcome,
                 "--method",
                 "gate-v3/judge-v1",
             ])
+            .args(target)
             .args(extra)
             .env("XDG_CONFIG_HOME", self.keys.path())
             .env_remove("ELOHIM_DEVICE_KEY_FILE")
@@ -126,8 +137,14 @@ fn success_json(output: Output) -> serde_json::Value {
     serde_json::from_slice(&output.stdout).unwrap()
 }
 
-fn gate_verdict(project: &str, closure: &str, commit: &str) -> FlowRecord {
-    FlowRecord::Event(FlowEvent {
+fn gate_verdict(
+    project: &str,
+    closure: &str,
+    commit: &str,
+    success: bool,
+    via: Option<&str>,
+) -> FlowRecord {
+    let mut event = FlowEvent {
         action: ReaVerb::Cite,
         provider: AgentRef("human:fixture".into()),
         receiver: AgentRef("repo:test/enrichment".into()),
@@ -150,10 +167,14 @@ fn gate_verdict(project: &str, closure: &str, commit: &str) -> FlowRecord {
             format!("env:project={project}"),
             format!("env:closure={closure}"),
             format!("env:commit={commit}"),
-            "env:success=true".into(),
+            format!("env:success={success}"),
             "env:seconds=12".into(),
         ],
-    })
+    };
+    if let Some(device) = via {
+        event.classified_as.push(format!("via:{device}"));
+    }
+    FlowRecord::Event(event)
 }
 
 fn miss() -> FlowRecord {
@@ -208,6 +229,10 @@ fn env<'a>(event: &'a FlowEvent, name: &str) -> Option<&'a str> {
         .classified_as
         .iter()
         .find_map(|slot| slot.strip_prefix(&prefix))
+}
+
+fn signature_hex(bytes: &[u8]) -> String {
+    bytes.iter().map(|byte| format!("{byte:02x}")).collect()
 }
 
 #[test]
@@ -340,7 +365,8 @@ fn enrichment_derives_project_closure_and_commit_from_verdict() {
         &["--project", "forged-project"],
     );
     assert!(!forged.status.success());
-    assert!(String::from_utf8_lossy(&forged.stderr).contains("unknown enrich argument `--project`"));
+    assert!(String::from_utf8_lossy(&forged.stderr)
+        .contains("--verdict cannot be combined with --project, --closure, or --from-device"));
 
     let result = success_json(fixture.enrich(
         &verdict.to_string(),
@@ -360,4 +386,149 @@ fn enrichment_derives_project_closure_and_commit_from_verdict() {
     assert_eq!(env(event, "verdict"), Some(verdict.to_string().as_str()));
     assert_eq!(env(event, "run"), Some(run.to_string().as_str()));
     assert_eq!(env(event, "seconds"), Some("19"));
+}
+
+#[test]
+fn selector_resolves_own_newest_green_in_store_order() {
+    let fixture = Fixture::new();
+    let older = fixture.append(gate_verdict(
+        PROJECT,
+        CLOSURE,
+        "1111111111111111111111111111111111111111",
+        true,
+        None,
+    ));
+    let newer = fixture.append(gate_verdict(
+        PROJECT,
+        CLOSURE,
+        "2222222222222222222222222222222222222222",
+        true,
+        None,
+    ));
+    fixture.append(gate_verdict(
+        PROJECT,
+        CLOSURE,
+        "3333333333333333333333333333333333333333",
+        false,
+        None,
+    ));
+
+    let result = success_json(fixture.enrich_selector(PROJECT, CLOSURE, None));
+    assert_eq!(result["verdict"], newer.to_string());
+    assert_ne!(result["verdict"], older.to_string());
+    let records = fixture.records();
+    let (_, event) = enrichment_events(&records).pop().unwrap();
+    assert_eq!(event.resource, newer);
+    assert_eq!(env(event, "verdict"), Some(newer.to_string().as_str()));
+}
+
+#[test]
+fn selector_resolves_an_admitted_siblings_green_by_device() {
+    let fixture = Fixture::new();
+    let own_key = DeviceKey::load(&fixture.keys.path().join("elohim/device/ed25519.seed")).unwrap();
+    let sibling_key =
+        DeviceKey::load_or_generate(&fixture.keys.path().join("sibling.seed")).unwrap();
+    let witness = ActorRecord::Witness(
+        ActorWitness::new(
+            "human:fixture",
+            "agent:test@fixture-model",
+            "flow-enrich-test",
+            "operator present for the enrichment fixture",
+            "2026-11-25T00:00:00Z",
+        )
+        .unwrap(),
+    );
+    let witness_cid = witness.cid().unwrap();
+    let signed = ActorRecord::Signed(
+        RecordSignature::new(
+            &witness_cid,
+            &own_key.did_key(),
+            &own_key.sign(&record_signing_message(&witness_cid.to_string())),
+        )
+        .unwrap(),
+    );
+    let mut actor_store = SidecarActorStore::open(fixture.root.path()).unwrap();
+    actor_store.append(witness).unwrap();
+    actor_store.append(signed).unwrap();
+
+    let own = own_key.did_key();
+    let sibling = sibling_key.did_key();
+    let mut genesis = ParticipantRow::Genesis {
+        handle: "fixture".into(),
+        chain_root: own.clone(),
+        record_cid: witness_cid.to_string(),
+        signer: own.clone(),
+        signature: String::new(),
+    };
+    let genesis_signature = signature_hex(&own_key.sign(&genesis.signing_message().unwrap()));
+    let ParticipantRow::Genesis { signature, .. } = &mut genesis else {
+        unreachable!()
+    };
+    *signature = genesis_signature;
+    let roster = SidecarRoster::open(fixture.root.path(), "fixture").unwrap();
+    roster.append(genesis).unwrap();
+
+    let mut binding = ParticipantRow::Binding {
+        handle: "fixture".into(),
+        chain_root: own.clone(),
+        controller: sibling.clone(),
+        authorized_by: own,
+        sig_a: String::new(),
+        sig_b: String::new(),
+        nonce: "flow-enrich-sibling".into(),
+    };
+    let binding_message = binding.signing_message().unwrap();
+    let sig_a = signature_hex(&own_key.sign(&binding_message));
+    let sig_b = signature_hex(&sibling_key.sign(&binding_message));
+    let ParticipantRow::Binding {
+        sig_a: row_sig_a,
+        sig_b: row_sig_b,
+        ..
+    } = &mut binding
+    else {
+        unreachable!()
+    };
+    *row_sig_a = sig_a;
+    *row_sig_b = sig_b;
+    roster.append(binding).unwrap();
+    let verdict = fixture.append(gate_verdict(PROJECT, CLOSURE, COMMIT, true, Some(&sibling)));
+
+    let result = success_json(fixture.enrich_selector(PROJECT, CLOSURE, Some(&sibling)));
+    assert_eq!(result["verdict"], verdict.to_string());
+    let records = fixture.records();
+    let (_, event) = enrichment_events(&records).pop().unwrap();
+    assert_eq!(event.resource, verdict);
+    assert_eq!(env(event, "verdict"), Some(verdict.to_string().as_str()));
+}
+
+#[test]
+fn selector_refuses_when_no_green_matches_and_appends_nothing() {
+    let fixture = Fixture::new();
+    fixture.append(gate_verdict(PROJECT, CLOSURE, COMMIT, false, None));
+    let count = fixture.records().len();
+
+    let output = fixture.enrich_selector(PROJECT, CLOSURE, None);
+    assert!(!output.status.success());
+    assert!(String::from_utf8_lossy(&output.stderr).contains(&format!(
+        "no green gate-verdict@1 for {PROJECT} {CLOSURE} from {} in this device's fold",
+        fixture.did
+    )));
+    assert_eq!(fixture.records().len(), count);
+}
+
+#[test]
+fn verdict_and_project_selector_are_mutually_exclusive() {
+    let fixture = Fixture::new();
+    let verdict = fixture.verdict();
+    let count = fixture.records().len();
+
+    let output = fixture.enrich(
+        &verdict.to_string(),
+        "green",
+        &["--project", PROJECT, "--closure", CLOSURE],
+    );
+    assert!(!output.status.success());
+    assert!(String::from_utf8_lossy(&output.stderr)
+        .contains("--verdict cannot be combined with --project, --closure, or --from-device"));
+    assert_eq!(fixture.records().len(), count);
 }
