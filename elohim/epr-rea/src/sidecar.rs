@@ -6,8 +6,18 @@
 //! After a crash the OS releases the lock when the last inherited handle closes.
 //! Each accepted append has completed `sync_all`; directory creation and multi-record
 //! transactions are NOT power-loss atomic. A failed sync is an uncertain write, not success.
-//! Interrupted/tampered bytes remain in place and refuse both reads and further appends;
-//! this layer never guesses a repair or silently truncates evidence.
+//! Interrupted/tampered bytes remain in place; readers refuse any invalid record and writers
+//! refuse an invalid tail. This layer never guesses a repair or silently truncates evidence.
+//!
+//! Flow-log readers hold a shared lock only long enough to capture the file length, then read
+//! exactly that immutable prefix and decode after unlocking. Cooperating writers only append, so
+//! bytes below that length cannot change and an append beyond it is deferred to the next read.
+//! Flow writers serialize first, then hold the exclusive lock only while they re-read and verify
+//! the final non-empty record (including its newline and CID), append one whole line, and sync it.
+//! The cost of admitting an append therefore follows the tail record, not the log history.
+//! `SidecarFlowTransaction` separately retains the feedback coordination lock: `feedback_seen`
+//! remains a snapshot of evidence that no feedback writer can replace before reference admission,
+//! without making readers or unrelated flow writers wait for a whole-log decode.
 //! Uses standard-library file locks (Rust 1.89+); no lock-file registry or dependency.
 
 use std::cell::Cell;
@@ -16,6 +26,8 @@ use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 
 use crate::error::{FabricError, Result};
+
+const TAIL_WINDOW_BYTES: u64 = 8 * 1024;
 
 pub(crate) fn open_log(root: &Path, name: &str) -> Result<PathBuf> {
     let dir = root.join(".eprfs").join("status");
@@ -37,16 +49,40 @@ impl crate::store::SidecarFlowStore {
     /// log, so health checks cannot turn an empty checkout into a flow store.
     pub fn probe(root: &Path) -> Result<bool> {
         let path = root.join(".eprfs").join("status").join("flows.jsonl");
-        let log = match LockedLog::shared(&path) {
-            Ok(log) => log,
+        let contents = match flow_contents(&path) {
+            Ok(contents) => contents,
             Err(FabricError::Io(error)) if error.kind() == std::io::ErrorKind::NotFound => {
                 return Ok(false)
             }
             Err(error) => return Err(error),
         };
-        log.contents()?;
+        if !contents.is_empty() && !contents.ends_with('\n') {
+            return Err(FabricError::Decode(
+                "sidecar has an unterminated record; bytes preserved, repair requires review"
+                    .into(),
+            ));
+        }
         Ok(true)
     }
+}
+
+/// Capture one append-only flow-log prefix without retaining a lock during UTF-8 or JSON decode.
+pub(crate) fn flow_contents(path: &Path) -> Result<String> {
+    let file = File::open(path)?;
+    file.lock_shared()?;
+    let length = file.metadata()?.len();
+    file.unlock()?;
+
+    let capacity = usize::try_from(length)
+        .map_err(|_| FabricError::Decode("flow log is too large for this reader".into()))?;
+    let mut bytes = Vec::with_capacity(capacity);
+    let read = (&file).take(length).read_to_end(&mut bytes)?;
+    if read as u64 != length {
+        return Err(FabricError::Decode(
+            "flow log shrank while reading an append-only prefix".into(),
+        ));
+    }
+    String::from_utf8(bytes).map_err(|error| FabricError::Decode(error.to_string()))
 }
 
 #[derive(Debug)]
@@ -137,6 +173,49 @@ impl LockedLog {
         self.file.sync_all()?;
         self.validated.set(true);
         Ok(())
+    }
+
+    /// The final non-empty, newline-terminated record under this handle's exclusive lock.
+    pub(crate) fn tail_record(&self) -> Result<Option<String>> {
+        let length = self.file.metadata()?.len();
+        if length == 0 {
+            return Ok(None);
+        }
+
+        let mut final_byte = [0_u8; 1];
+        let mut file = &self.file;
+        file.seek(SeekFrom::End(-1))?;
+        file.read_exact(&mut final_byte)?;
+        if final_byte[0] != b'\n' {
+            return Err(FabricError::Decode(
+                "sidecar has an unterminated record; bytes preserved, repair requires review"
+                    .into(),
+            ));
+        }
+
+        let mut window = TAIL_WINDOW_BYTES.min(length);
+        loop {
+            let start = length - window;
+            file.seek(SeekFrom::Start(start))?;
+            let mut bytes = vec![0_u8; window as usize];
+            file.read_exact(&mut bytes)?;
+            let skip_first = usize::from(start > 0);
+            let lines: Vec<_> = bytes.split(|byte| *byte == b'\n').collect();
+            if let Some(line) = lines[skip_first..]
+                .iter()
+                .rev()
+                .copied()
+                .find(|line| !line.iter().all(u8::is_ascii_whitespace))
+            {
+                return String::from_utf8(line.to_vec())
+                    .map(Some)
+                    .map_err(|error| FabricError::Decode(error.to_string()));
+            }
+            if start == 0 {
+                return Ok(None);
+            }
+            window = window.saturating_mul(2).min(length);
+        }
     }
 }
 

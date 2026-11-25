@@ -225,10 +225,11 @@ impl SidecarFlowStore {
         &self.log_path
     }
 
-    /// Serialize read/check/append against other cooperating processes. Use the returned
-    /// store for every read and append in this operation; reopening this log would deadlock.
-    /// The lock lasts until this handle drops. Appends are individually synced, not rolled
-    /// back if a subsequent append or check fails. No recovery rewrites damaged bytes.
+    /// Retain feedback coordination and reference-admission state across an operation.
+    /// Flow-log locks are deliberately per read or append: a reader captures a whole prefix, and
+    /// each append validates the tail and syncs one record before releasing its exclusive lock.
+    /// Appends are not rolled back if a subsequent append or check fails. No recovery rewrites
+    /// damaged bytes.
     pub fn transaction(&self) -> Result<SidecarFlowTransaction> {
         let root = self
             .log_path
@@ -241,7 +242,7 @@ impl SidecarFlowStore {
             feedback_guard: Some(guard),
             feedback_seen: None,
             root: root.to_path_buf(),
-            log: crate::sidecar::LockedLog::exclusive(&self.log_path)?,
+            log_path: self.log_path.clone(),
         })
     }
 }
@@ -252,7 +253,7 @@ pub struct SidecarFlowTransaction {
     feedback_guard: Option<crate::sidecar::LockedLog>,
     feedback_seen: Option<HashSet<Cid>>,
     root: PathBuf,
-    log: crate::sidecar::LockedLog,
+    log_path: PathBuf,
 }
 
 #[cfg(feature = "sidecar")]
@@ -288,13 +289,7 @@ impl FlowStore for SidecarFlowStore {
     }
 
     fn records(&self) -> Result<Vec<(Cid, FlowRecord)>> {
-        SidecarFlowTransaction {
-            feedback_guard: None,
-            feedback_seen: None,
-            root: PathBuf::new(),
-            log: crate::sidecar::LockedLog::shared(&self.log_path)?,
-        }
-        .records()
+        decode_flow_records(&crate::sidecar::flow_contents(&self.log_path)?)
     }
 }
 
@@ -316,26 +311,24 @@ impl FlowStore for SidecarFlowTransaction {
                     "feedback reference admission requires retained evidence read in this transaction".into()));
             }
         }
-        // Refuse to append behind broken evidence, including a valid JSON tail lacking its
-        // record terminator. Verification is under the same lock as the append.
-        if !self.log.validated() {
-            self.records()?;
-        }
         let cid = record.cid()?;
         let line = serde_json::to_string(&SidecarLine {
             cid: cid.to_string(),
             record,
         })
         .map_err(|e| FabricError::Encode(e.to_string()))?;
-        self.log.append(line)?;
+        // Only the tail can be adjacent to this append. Verify it under the same exclusive lock;
+        // older records are still fully verified by readers after they release their brief lock.
+        let mut log = crate::sidecar::LockedLog::exclusive(&self.log_path)?;
+        if let Some(tail) = log.tail_record()? {
+            decode_flow_records(&(tail + "\n"))?;
+        }
+        log.append(line)?;
         Ok(cid)
     }
 
     fn records(&self) -> Result<Vec<(Cid, FlowRecord)>> {
-        let contents = self.log.contents()?;
-        let records = decode_flow_records(&contents)?;
-        self.log.mark_validated();
-        Ok(records)
+        decode_flow_records(&crate::sidecar::flow_contents(&self.log_path)?)
     }
 }
 

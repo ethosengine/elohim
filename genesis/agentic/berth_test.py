@@ -2565,6 +2565,22 @@ class WorktreeIntentTest(unittest.TestCase):
         self.assertIn("no other device will read it", err)
         self.assertEqual([r["text"] for r in self.berth.ledger(10) if r["kind"] == "note"], ["hello", "unheard"])
 
+    def test_say_exits_nonzero_when_the_observation_writer_times_out(self):
+        out = view()
+        out["store"] = str(self.main)
+        self.answer(out)
+        self.obs.emit = mock.Mock(side_effect=subprocess.TimeoutExpired(["epr", "flow", "note"], 5))
+        main = _NS["main"]
+        with (
+            mock.patch.dict(main.__globals__, {"Berth": lambda *a, **k: self.berth}),
+            contextlib.redirect_stderr(io.StringIO()) as stderr,
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
+            rc = main(["berth", "say", "--session", "session", "--to", "peer-2", "unheard"])
+
+        self.assertEqual(rc, 1)
+        self.assertIn("no other device will read it", stderr.getvalue())
+
     def test_say_prints_the_recipient_and_the_note_id(self):
         out = view()
         out["store"] = str(self.main)
