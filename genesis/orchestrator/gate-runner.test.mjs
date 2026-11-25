@@ -1,7 +1,7 @@
 import { gateEvidence, gateKeyMaterial, gateKeyMaterials, recordEvidence } from './gate-evidence.mjs';
 import { after, describe, test } from 'node:test';
 import { strict as assert } from 'node:assert';
-import { chmodSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { resolve, dirname } from 'path';
@@ -125,6 +125,17 @@ test('read-shadow: a used dependency module moves real and fix 1, so no line is 
   const evidence = gateKeyMaterial(fixture.project, { ...options, commit: fixture.commit });
   assert.ok(evidence.key, evidence.line);
   assert.equal(readShadowComparison(fixture.project, evidence, options), null);
+});
+
+test('read-shadow gives a plain no-reading reason for a tree-keyed native gate', () => {
+  const shadow = readShadowComparison(
+    { name: 'orchestrator-tree' },
+    { key: 'unused', material: JSON.stringify({ native: { closureCid: 'fixture' }, reads: { scope: 'tree' } }) },
+  );
+  assert.deepEqual(shadow, {
+    line: '[gate] orchestrator-tree read-shadow: no reading (tree-keyed gate: its closure is the checkout, not a commit)',
+    rows: [],
+  });
 });
 
 test('read-shadow computes shared key material once per compared commit', t => {
@@ -279,7 +290,7 @@ test('read-shadow on and off keep the same verdict, run decision, and evidence-s
   assert.match(mismatch.output, /read-shadow: dropped \(real variant differs from the gate evidence key\)/);
 });
 
-test('read-shadow keeps its in-process budget without a ledger and shares a ledger across runner invocations', t => {
+test('read-shadow shares its budget across runners and a failed ledger append makes the next runner skip', t => {
   const root = mkdtempSync(resolve(tmpdir(), 'read-shadow-push-budget-'));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   mkdirSync(resolve(root, 'fixture'), { recursive: true });
@@ -390,6 +401,51 @@ test('read-shadow keeps its in-process budget without a ledger and shares a ledg
     /malformed-ledger read-shadow: skipped for budget \(budget 5 ms exhausted in read-shadow\)/);
   assert.equal(readFileSync(ledger, 'utf8'), 'not-an-integer\n',
     'a malformed ledger is fail-closed and receives no row');
+
+  writeFileSync(ledger, '');
+  clockNs = 0n;
+  const failedAppend = run('append-failed', readShadowPushBudget(ledgerEnv, () => clockNs, {
+    appendFile: () => { throw new Error('fixture append failure'); },
+  }));
+  assert.equal(failedAppend.status, 0);
+  assert.equal(existsSync(ledger), false, 'a failed append leaves a fail-closed missing ledger');
+  const afterAppendFailure = run('after-append-failure', readShadowPushBudget(ledgerEnv, () => clockNs));
+  assert.match(afterAppendFailure.output,
+    /after-append-failure read-shadow: skipped for budget \(budget 5 ms exhausted in read-shadow\)/);
+
+});
+
+test('read-shadow ledger records the whole span from ledger read to append', () => {
+  let clockNs = 0n;
+  let appended = null;
+  const budget = readShadowPushBudget({
+    GATE_READ_SHADOW: 'on', GATE_READ_SHADOW_BUDGET_MS: '20', GATE_READ_SHADOW_LEDGER: 'fixture',
+  }, () => clockNs, {
+    readFile: () => { clockNs += 2_000_000n; return ''; },
+    appendFile: (_path, text) => { appended = text; },
+  });
+  budget.check('read-shadow');
+  const spentBefore = budget.spentMs();
+  budget.begin();
+  clockNs += 1_000_000n;
+  budget.end();
+  clockNs += 4_000_000n;
+  budget.recordSpent(budget.spentMs() - spentBefore);
+  assert.equal(appended, '7\n');
+});
+
+test('read-shadow knob off performs no ledger I/O', () => {
+  let ledgerReads = 0;
+  let ledgerWrites = 0;
+  const off = readShadowPushBudget({
+    GATE_READ_SHADOW: 'off', GATE_READ_SHADOW_LEDGER: 'fixture',
+  }, () => 0n, {
+    readFile: () => { ledgerReads++; return ''; },
+    appendFile: () => { ledgerWrites++; },
+  });
+  assert.equal(off, null);
+  assert.equal(ledgerReads, 0);
+  assert.equal(ledgerWrites, 0);
 });
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');

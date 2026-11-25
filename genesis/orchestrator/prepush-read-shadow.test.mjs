@@ -51,3 +51,20 @@ if [ -e "$GATE_READ_SHADOW_LEDGER" ]; then echo cleaned=no; else echo cleaned=ye
   assert.ok(rows.every(([, ledger, exists]) => ledger === rows[0][1] && exists === 'yes'));
   assert.equal(result.stdout, `ledger=${rows[0][1]}\ncleaned=yes\n`);
 });
+
+test('the pre-push hook exports no read-shadow ledger when the knob is off', t => {
+  const dir = mkdtempSync(join(tmpdir(), 'prepush-read-shadow-off-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const result = spawnSync('bash', ['-c', `
+HOOK_ON_EXIT=""
+HOOK_WORK_TREE=${JSON.stringify(dir)}
+GATE_READ_SHADOW=off
+unset GATE_READ_SHADOW_LEDGER GATE_READ_SHADOW_SCRATCH
+${LEDGER}
+if [ "\${GATE_READ_SHADOW_LEDGER+x}" = x ]; then echo ledger=exported; else echo ledger=absent; fi
+printf 'handlers=%s\n' "$HOOK_ON_EXIT"
+`], { cwd: ROOT, encoding: 'utf8', env: process.env });
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stdout, 'ledger=absent\nhandlers=\n');
+});

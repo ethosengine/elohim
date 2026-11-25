@@ -336,12 +336,21 @@ const READ_SHADOW_VARIANTS = Object.freeze([
  */
 export function readShadowComparison(project, evidence, {
   root, base, commit, env, cargoEnv, spawn, inputs = null,
-  clock = () => process.hrtime.bigint(), reportTimings = false,
+  clock = () => process.hrtime.bigint(), reportTimings = false, check = null,
 } = {}) {
+  try {
+    const material = JSON.parse(evidence.material);
+    if (material.reads?.scope === 'tree' && Object.hasOwn(material, 'native')) {
+      return {
+        line: `[gate] ${project.name} read-shadow: no reading (tree-keyed gate: its closure is the checkout, not a commit)`,
+        rows: [],
+      };
+    }
+  } catch { /* canonical material validation below names malformed evidence */ }
   const shared = {};
   const options = {
     root, env, cargoEnv, spawn, inputs, britBin: evidence.britBin,
-    boundedSuite: true, variants: READ_SHADOW_VARIANTS, clock, shared,
+    boundedSuite: true, variants: READ_SHADOW_VARIANTS, clock, shared, suiteCheck: check,
   };
   const beforeBatch = gateKeyMaterials(project, { ...options, commit: base });
   const afterBatch = gateKeyMaterials(project, { ...options, commit });
@@ -641,6 +650,10 @@ function crateShadowBudget(env, clock, initialSpent = 0) {
       }
     },
     spentMs: used,
+    exhaust(phase) {
+      spent = Math.max(spent, budgetMs);
+      exhausted ||= new ShadowBudgetExhausted(budgetMs, phase);
+    },
     spawn(run, phase, command, args, options = {}) {
       const left = remaining(phase);
       // spawnSync rejects a fractional timeout; a whole millisecond, at least 1, is always valid.
@@ -652,9 +665,9 @@ function crateShadowBudget(env, clock, initialSpent = 0) {
   };
 }
 
-function readShadowLedgerSpent(path, budgetMs) {
+function readShadowLedgerSpent(path, budgetMs, readFile = readFileSync) {
   try {
-    const text = readFileSync(path, 'utf8');
+    const text = readFile(path, 'utf8');
     if (text === '') return 0;
     const body = text.endsWith('\n') ? text.slice(0, -1) : text;
     const rows = body.split('\n');
@@ -667,23 +680,59 @@ function readShadowLedgerSpent(path, budgetMs) {
 }
 
 /** One read-shadow budget shared by this process, and by a hook push when its ledger is set. */
-export function readShadowPushBudget(env, clock) {
+export function readShadowPushBudget(env, clock, {
+  readFile = readFileSync, appendFile = appendFileSync, removeFile = rmSync,
+} = {}) {
+  if (env.GATE_READ_SHADOW === 'off') return null;
   const budgetMs = shadowBudgetMs(env.GATE_READ_SHADOW_BUDGET_MS);
   const hasLedger = Object.hasOwn(env, 'GATE_READ_SHADOW_LEDGER');
   const ledger = hasLedger ? String(env.GATE_READ_SHADOW_LEDGER) : null;
-  const budget = crateShadowBudget(
-    { GATE_CRATE_SHADOW_BUDGET_MS: budgetMs }, clock,
-    hasLedger ? readShadowLedgerSpent(ledger, budgetMs) : 0,
-  );
+  const now = () => Number(clock()) / 1e6;
+  let budget = null;
+  let accountingStarted = null;
+  const startAccounting = () => { accountingStarted ??= now(); };
+  const current = () => {
+    if (budget) return budget;
+    startAccounting();
+    const prior = hasLedger ? readShadowLedgerSpent(ledger, budgetMs, readFile) : 0;
+    const ledgerReadMs = hasLedger ? Math.max(0, now() - accountingStarted) : 0;
+    budget = crateShadowBudget(
+      { GATE_CRATE_SHADOW_BUDGET_MS: budgetMs }, clock, prior + ledgerReadMs,
+    );
+    return budget;
+  };
   return {
-    ...budget,
+    budgetMs,
+    check(phase) {
+      startAccounting();
+      return current().check(phase);
+    },
+    begin() {
+      startAccounting();
+      current().begin();
+    },
+    end() { current().end(); },
+    spentMs() { return current().spentMs(); },
+    spawn(run, phase, command, args, options = {}) {
+      return current().spawn(run, phase, command, args, options);
+    },
     recordSpent(spentMs) {
-      if (!hasLedger) return;
-      const row = Math.max(0, Math.ceil(spentMs));
+      if (!hasLedger) {
+        accountingStarted = null;
+        return;
+      }
+      const wholeSpan = accountingStarted === null ? spentMs : now() - accountingStarted;
+      const row = Math.max(0, Math.ceil(Math.max(spentMs, wholeSpan)));
       try {
         // Node's `a` flag opens with O_APPEND: concurrent runner rows cannot overwrite each other.
-        appendFileSync(ledger, `${row}\n`, { encoding: 'utf8', flag: 'a' });
-      } catch { /* telemetry never changes a gate verdict */ }
+        appendFile(ledger, `${row}\n`, { encoding: 'utf8', flag: 'a' });
+      } catch {
+        // Absence is a fail-closed ledger state for the next runner. Exhaust this process too.
+        current().exhaust('read-shadow ledger append');
+        try { removeFile(ledger, { force: true }); } catch { /* an unreadable ledger still fails closed */ }
+      } finally {
+        accountingStarted = null;
+      }
     },
   };
 }
@@ -1360,6 +1409,7 @@ export function runProject(project, printOnly, namesOnly, {
             readShadow = readShadowOf(project, evidence, {
               root, base, commit: gateCommit, env: childEnv, cargoEnv: cargoEnvOf(childEnv),
               spawn: bounded, inputs, clock, reportTimings: true,
+              check: phase => sharedReadShadowBudget.check(phase || 'read-shadow traversal'),
             });
             sharedReadShadowBudget.check('read-shadow');
             if (readShadow) {

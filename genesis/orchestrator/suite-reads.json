@@ -39,6 +39,7 @@
       {"file": "record-pipeline-verdicts.test.mjs", "reads": []},
       {"file": "reconcile-build-graph.test.mjs", "reads": []},
       {"file": "gate-runner.test.mjs", "tree": "the hand-over trace saw repository object store read: <git-dir>/worktrees/nt-e11/HEAD; not yet retried in the view"},
+      {"file": "suite-inventory.test.mjs", "reads": []},
       {"file": "gate-evidence.test.mjs", "reads": ["**/build-manifest.json", ".cargo/config.toml", ".ci-ignore", ".husky/pre-push.bash", "che-devworkspaces", "elohim/brit", "elohim/holochain-conductor", "elohim/rakia", "genesis/agentic/bin/pool-lib.sh", "genesis/agentic/pool-policy.json", "justfile", "sophia"]},
       {"file": "gate-reuse-coverage.test.mjs", "reads": ["**/build-manifest.json", "genesis/agentic/pool-policy.json"]},
       {"file": "gate-input-audit.test.mjs", "tree": "its REAL tests run the audit over the repository: git ls-files of every .rs, and the files it names"},

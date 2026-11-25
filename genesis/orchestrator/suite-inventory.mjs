@@ -311,7 +311,7 @@ function listDeps(modules) {
  * node_modules holds) in this checkout's pnpm install: `packages`, the store directories copied
  * whole, and `links`, every link to recreate with its text. Paths are relative to `root`.
  */
-export function packageClosure(root, modules = {}) {
+export function packageClosure(root, modules = {}, { check = () => {} } = {}) {
   const store = join(root, 'node_modules', '.pnpm');
   const packages = new Set();
   const links = new Map();
@@ -319,6 +319,7 @@ export function packageClosure(root, modules = {}) {
   const enqueue = real => { const rel = relative(root, real); if (!packages.has(rel)) { packages.add(rel); queue.push(real); } };
   for (const [dir, names] of Object.entries(modules)) {
     for (const name of names) {
+      check();
       let real;
       try { real = realpathSync(join(root, dir, 'node_modules', name)); }
       catch { throw new Error(`suite-run: module ${name} is not installed in ${dir}; run: just dev prep`); }
@@ -329,10 +330,12 @@ export function packageClosure(root, modules = {}) {
     }
   }
   while (queue.length) {
+    check();
     const real = queue.shift();
     // .pnpm/<entry>/node_modules holds the package and a link to each of its dependencies.
     const entryModules = real.slice(0, real.lastIndexOf(`${sep}node_modules${sep}`) + `${sep}node_modules`.length);
     for (const dep of listDeps(entryModules)) {
+      check();
       const from = join(entryModules, dep);
       if (!isLink(from)) continue;
       links.set(relative(root, from), readlinkSync(from));
@@ -354,22 +357,27 @@ export function copyClosure(closure, dest, { root }) {
   }
 }
 
-function listing(dir, prefix = '') {
+function listing(dir, prefix = '', { check = () => {}, readFile = readFileSync } = {}) {
   const rows = [];
   for (const entry of readdirSync(join(dir, prefix), { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
+    check();
     const rel = prefix ? `${prefix}/${entry.name}` : entry.name;
     const path = join(dir, rel);
     if (entry.isSymbolicLink()) rows.push([rel, 'link', readlinkSync(path)]);
-    else if (entry.isDirectory()) rows.push(...listing(dir, rel));
-    else if (entry.isFile()) rows.push([rel, (lstatSync(path).mode & 0o111) ? 'exec' : 'file', sha256(readFileSync(path))]);
+    else if (entry.isDirectory()) rows.push(...listing(dir, rel, { check, readFile }));
+    else if (entry.isFile()) rows.push([rel, (lstatSync(path).mode & 0o111) ? 'exec' : 'file', sha256(readFile(path))]);
   }
   return rows;
 }
 
 /** One digest over every file, mode and link of a package closure as it lies under `base`. */
-export function closureDigest(closure, base) {
+export function closureDigest(closure, base, { check = () => {}, readFile = readFileSync } = {}) {
   return sha256(JSON.stringify({
-    v: 1, links: closure.links, packages: closure.packages.map(pkg => [pkg, listing(join(base, pkg))]),
+    v: 1, links: closure.links,
+    packages: closure.packages.map(pkg => {
+      check();
+      return [pkg, listing(join(base, pkg), '', { check, readFile })];
+    }),
   }));
 }
 

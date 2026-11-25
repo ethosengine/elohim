@@ -678,7 +678,7 @@ export function describeEvidence(rows, now = Date.now()) {
 export function gateKeyMaterials(project, {
   env = process.env, root, commit, cargoEnv, spawn = spawnSync, inputs = null,
   variants = [{ name: 'real', variant: {} }], boundedSuite = false,
-  britBin = resolveBin('brit', ['BRIT_BIN'], env), clock = defaultClock, shared = {},
+  britBin = resolveBin('brit', ['BRIT_BIN'], env), clock = defaultClock, shared = {}, suiteCheck = null,
 } = {}) {
   const started = clock();
   const timing = {
@@ -796,7 +796,9 @@ export function gateKeyMaterials(project, {
         shared.packageClosures ||= new Map();
         const packageKey = JSON.stringify(modules);
         if (!shared.packageClosures.has(packageKey)) {
-          shared.packageClosures.set(packageKey, closureDigest(packageClosure(root, modules), root));
+          const traversal = boundedSuite && suiteCheck ? { check: suiteCheck } : {};
+          shared.packageClosures.set(packageKey,
+            closureDigest(packageClosure(root, modules, traversal), root, traversal));
         }
         return { inventory: inventory.digest, packages: shared.packageClosures.get(packageKey), node: process.version,
           commit: inventory.commit, matcher: inventory.matcher };
