@@ -449,7 +449,7 @@ phase_l_nap() {
 
 # max_skew_s fence_margin_s confirm_wait_s from the steward channel policy (berth's own defaults).
 phase_l_channel() {
-  node -e '
+  timeout -k 5 10 node -e '
     let c = {};
     try { c = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")).berth.channel || {}; } catch {}
     const n = (v, d) => (Number.isInteger(v) && v >= 0 ? v : d);
@@ -470,8 +470,21 @@ phase_l_agent_say() { # kind, text (one status line per text line)
   done <<<"$2"
 }
 
+# Every subprocess the agent runs is bounded and killed if it ignores TERM (`timeout -k`): berth calls
+# take at most BERTH_PREPUSH_CALL_S (60) and, after the hand-over, never past the agent's deadline;
+# the release always gets its own 60 s and the unmoor 10 s, each plus PHASE_L_KILL_S (5) to KILL.
+phase_l_agent_bound() { # seconds → that, or less so the call ends by the agent's deadline (min 1)
+  local s=$1 left
+  if [ -n "${PHASE_L_DEADLINE-}" ]; then
+    left=$((PHASE_L_DEADLINE - $(date +%s)))
+    [ "$left" -ge 1 ] || left=1
+    [ "$left" -ge "$s" ] || s=$left
+  fi
+  echo "$s"
+}
+
 phase_l_agent_claim() {
-  PHASE_L_OUT=$("$BERTH_BIN" claim dev-integration --class verify --ttl "$BERTH_TTL_S" --offline-ok \
+  PHASE_L_OUT=$(timeout -k "$PHASE_L_KILL_S" "$(phase_l_agent_bound "$PHASE_L_CALL_S")" "$BERTH_BIN" claim dev-integration --class verify --ttl "$BERTH_TTL_S" --offline-ok \
     --note "pre-push to${BERTH_TARGETS} for $PHASE_L_FOR" 2>&1)
 }
 
@@ -596,10 +609,10 @@ phase_l_agent_override_wait() {
 phase_l_agent_end() { # what happened (the settle line's middle)
   local out released=ok
   if [ -n "$PHASE_L_CA" ]; then
-    out=$("$BERTH_BIN" release dev-integration --session "$ELOHIM_SESSION_ID" \
+    out=$(timeout -k "$PHASE_L_KILL_S" 60 "$BERTH_BIN" release dev-integration --session "$ELOHIM_SESSION_ID" \
       --expected-claimed-at "$PHASE_L_CA" 2>&1) || released="failed:${out//$'\n'/ }"
   fi
-  "$BERTH_BIN" unmoor --session "$ELOHIM_SESSION_ID" >/dev/null 2>&1
+  timeout -k "$PHASE_L_KILL_S" 10 "$BERTH_BIN" unmoor --session "$ELOHIM_SESSION_ID" >/dev/null 2>&1
   printf '%s %s held=%ss released=%s\n' "$(phase_l_rfc3339 "$(date +%s)")" "$1" \
     "$(($(date +%s) - ${PHASE_L_HELD_FROM:-$(date +%s)}))" "$released"
   # Before a hand-over the hook still reads the verdict from this directory and removes it itself.
@@ -618,6 +631,9 @@ phase_l_agent() { # dir, session, for whom
   PHASE_L_PUSH_AT=""
   PHASE_L_RENEWED_AT=""
   PHASE_L_HELD_FROM=""
+  PHASE_L_DEADLINE=""
+  PHASE_L_KILL_S=${PHASE_L_KILL_S:-5}
+  PHASE_L_CALL_S=${BERTH_PREPUSH_CALL_S:-60}
   trap - EXIT
   trap '' INT HUP
   trap 'PHASE_L_WHY=terminated' TERM
@@ -630,9 +646,9 @@ phase_l_agent() { # dir, session, for whom
   PHASE_L_MAX="${BERTH_PREPUSH_OVERRIDE_MAX_S:-$((BERTH_TTL_S + PHASE_L_SKEW + PHASE_L_MARGIN))}"
   PHASE_L_INTERVAL=$((BERTH_TTL_S / 3))
   [ "$PHASE_L_INTERVAL" -ge 1 ] || PHASE_L_INTERVAL=1
-  principal=$(git config user.email || git config user.name || id -un)
+  principal=$(timeout -k 5 10 git config user.email || timeout -k 5 10 git config user.name || id -un)
   # $BASHPID inside $(…) would name the substitution's subshell, not this agent.
-  if ! out=$("$BERTH_BIN" moor --session "$2" --pid "$ELOHIM_SESSION_OWNER_PID" --runtime git-hook \
+  if ! out=$(timeout -k "$PHASE_L_KILL_S" "$PHASE_L_CALL_S" "$BERTH_BIN" moor --session "$2" --pid "$ELOHIM_SESSION_OWNER_PID" --runtime git-hook \
       --principal "$principal" --task "landing for $3" 2>&1); then
     phase_l_agent_say berth "$out"
     printf 'refused 4\n' >>"$PHASE_L_STATUS"
@@ -678,64 +694,115 @@ phase_l_agent() { # dir, session, for whom
   fi
   PHASE_L_TOOL=${PHASE_L_TOOL:-unknown}
   [[ "$PHASE_L_PUSH" =~ ^[0-9]+$ ]] || PHASE_L_TOOL=unknown
+  # One limit on waiting for the transfer, known pusher or not: PHASE_L_LIMIT_S (3600 s) from the
+  # hand-over, renewing every ttl/3. Then one deadline, PHASE_L_SETTLE_S (120 s) later, by which the
+  # remote reads end; the release (60 s) and unmoor (10 s), each plus 5 s to KILL, follow it. So the
+  # agent exits at most 3600 + 120 + 65 + 15 = 3800 s after the hand-over, having attempted the release.
+  local limit
+  limit=$(($(date +%s) + ${PHASE_L_LIMIT_S:-3600}))
+  PHASE_L_DEADLINE=$((limit + ${PHASE_L_SETTLE_S:-120}))
   if [ "$PHASE_L_TOOL" = unknown ]; then
-    phase_l_agent_observe
+    phase_l_agent_observe "$limit"
     return
   fi
   # Handed over: wait for the real push (`git push` or `brit push`, pid AND start time, so a reused
-  # pid is never waited on) to finish (bounded at an hour), still renewing.
-  local stop=$(($(date +%s) + 3600))
-  while phase_l_alive "$PHASE_L_PUSH" "$PHASE_L_PUSH_AT" && [ "$(date +%s)" -lt "$stop" ] && [ -z "$PHASE_L_WHY" ]; do
+  # pid is never waited on) to finish, still renewing. Accepted, inherited from the git path: a push
+  # that outlives the limit (or a refused renew) is released without proof that its transfer stopped;
+  # it is then recorded as unconfirmed, never as did-not-land.
+  local why=""
+  while phase_l_alive "$PHASE_L_PUSH" "$PHASE_L_PUSH_AT"; do
+    [ -z "$PHASE_L_WHY" ] || { why=$PHASE_L_WHY; break; }
+    [ "$(date +%s)" -lt "$limit" ] || { why=limit; break; }
     sleep 0.5
     if [ "$(date +%s)" -ge "$next" ]; then
-      phase_l_agent_renew || break
+      phase_l_agent_renew || { why=renew-refused; break; }
       next=$(($(date +%s) + PHASE_L_INTERVAL))
     fi
   done
-  remote=$(phase_l_agent_remote 30)
-  if phase_l_agent_landed "$remote"; then
-    result=landed
+  if [ -z "$why" ] || ! phase_l_alive "$PHASE_L_PUSH" "$PHASE_L_PUSH_AT"; then
+    phase_l_agent_settle "tool=$PHASE_L_TOOL" exited
   else
-    result=did-not-land
+    if [ "$why" = limit ]; then
+      phase_l_agent_settle "tool=$PHASE_L_TOOL wait=limit" push-still-running
+    else
+      phase_l_agent_settle "tool=$PHASE_L_TOOL" "push-still-running:$why"
+    fi
   fi
-  phase_l_agent_end "settle $PHASE_L_SHA $result $PHASE_L_TARGET=${remote:0:12} tool=$PHASE_L_TOOL"
 }
 
-phase_l_agent_remote() { # bound s → the target's sha on the remote, or nothing
-  timeout "$1" git ls-remote "$PHASE_L_REMOTE" "refs/heads/$PHASE_L_TARGET" 2>/dev/null | cut -f1
+# Read the target on the remote: 0 and PHASE_L_REMOTE_SHA (empty = no such ref) when the remote
+# answered; 1 when it did not, after <tries> reads PHASE_L_READ_RETRY_S (2 s) apart, each bounded at
+# PHASE_L_READ_S (30 s) and by the deadline, killed PHASE_L_KILL_S after TERM. A failed read is no
+# answer: its empty output never stands for "no such ref".
+phase_l_agent_read_remote() { # tries
+  local try out rc
+  PHASE_L_REMOTE_SHA=""
+  for ((try = 1; try <= $1; try++)); do
+    out=$(timeout -k "$PHASE_L_KILL_S" "$(phase_l_agent_bound "${PHASE_L_READ_S:-30}")" \
+      git ls-remote "$PHASE_L_REMOTE" "refs/heads/$PHASE_L_TARGET" 2>/dev/null)
+    rc=$?
+    if [ "$rc" -eq 0 ]; then
+      PHASE_L_REMOTE_SHA=${out%%$'\t'*}
+      return 0
+    fi
+    [ "$try" -lt "$1" ] && [ "$(date +%s)" -lt "$PHASE_L_DEADLINE" ] || break
+    sleep "${PHASE_L_READ_RETRY_S:-2}"
+  done
+  return 1
 }
 
-phase_l_agent_landed() { # remote sha
+phase_l_agent_landed() { # remote sha (from a read that answered)
   { [ "$PHASE_L_SHA" = none ] && [ -z "$1" ]; } || [ "$1" = "$PHASE_L_SHA" ]
 }
 
-# No pushing process was identified, so its exit cannot say when the transfer ended. Never settle on
-# a guess: read the remote every BERTH_PREPUSH_OBSERVE_S (default 2) until the target reads the
-# landing sha (wait=observed, landed) or until the lease is PHASE_L_TTL_MARGIN_S (default 30) from
-# expiry (wait=ttl, unconfirmed). No renewal happens here, so that bound is the lease's own expiry
-# less the margin: at most BERTH_TTL_S - margin (570 s at the defaults) after the last claim or
-# renewal, which was at most BERTH_TTL_S/3 before the hand-over. "did-not-land" is never written
-# here: at the bound the push may still be transferring.
-phase_l_agent_observe() {
-  local deadline now left remote="" wait=ttl result=unconfirmed
-  deadline=$((PHASE_L_RENEWED_AT + BERTH_TTL_S - ${PHASE_L_TTL_MARGIN_S:-30}))
-  while [ -z "$PHASE_L_WHY" ]; do
+# The settle line. landed only on an answer that holds the landing sha; did-not-land only on an
+# answer that holds another sha after the pusher is known to have exited; anything else is
+# unconfirmed with its reason (remote-unreadable, push-still-running[:why], …).
+phase_l_agent_settle() { # "tool=… [wait=…]", exited | reason-when-not-landed
+  local result reason=""
+  if phase_l_agent_read_remote "${PHASE_L_READ_TRIES:-3}"; then
+    if phase_l_agent_landed "$PHASE_L_REMOTE_SHA"; then
+      result=landed
+    elif [ "$2" = exited ]; then
+      result=did-not-land
+    else
+      result=unconfirmed reason=$2
+    fi
+  else
+    result=unconfirmed reason=remote-unreadable
+  fi
+  phase_l_agent_end "settle $PHASE_L_SHA $result $PHASE_L_TARGET=${PHASE_L_REMOTE_SHA:0:12} $1${reason:+ reason=$reason}"
+}
+
+# No pushing process was identified, so no exit can say when the transfer ended. Read the remote every
+# BERTH_PREPUSH_OBSERVE_S (2 s), renewing the lease every ttl/3 as the known-pusher path does, until
+# it answers with the landing sha (landed … wait=observed) or the same limit (unconfirmed … wait=limit).
+# did-not-land is never written here: the push may still be transferring.
+phase_l_agent_observe() { # limit
+  local now left why=""
+  while :; do
+    [ -z "$PHASE_L_WHY" ] || { why=$PHASE_L_WHY; break; }
     now=$(date +%s)
-    left=$((deadline - now))
-    [ "$left" -gt 0 ] || break
-    [ "$left" -le 30 ] || left=30
-    remote=$(phase_l_agent_remote "$left")
-    if phase_l_agent_landed "$remote"; then
-      wait=observed result=landed
-      break
+    [ "$now" -lt "$1" ] || break
+    if phase_l_agent_read_remote 1 && phase_l_agent_landed "$PHASE_L_REMOTE_SHA"; then
+      phase_l_agent_end "settle $PHASE_L_SHA landed $PHASE_L_TARGET=${PHASE_L_REMOTE_SHA:0:12} tool=unknown wait=observed"
+      return
     fi
     now=$(date +%s)
-    [ "$now" -lt "$deadline" ] || break
-    left=$((deadline - now))
+    left=$(($1 - now))
+    [ "$left" -gt 0 ] || break
     [ "$left" -le "${BERTH_PREPUSH_OBSERVE_S:-2}" ] || left=${BERTH_PREPUSH_OBSERVE_S:-2}
     sleep "$left"
+    if [ "$(date +%s)" -ge "$next" ]; then
+      phase_l_agent_renew || { why=renew-refused; break; }
+      next=$(($(date +%s) + PHASE_L_INTERVAL))
+    fi
   done
-  phase_l_agent_end "settle $PHASE_L_SHA $result $PHASE_L_TARGET=${remote:0:12} tool=unknown wait=$wait"
+  if [ -z "$why" ]; then
+    phase_l_agent_settle "tool=unknown wait=limit" no-pusher-identified
+  else
+    phase_l_agent_settle "tool=unknown wait=stopped" "$why"
+  fi
 }
 
 # ---- the hook's side ----
@@ -941,12 +1008,14 @@ phase_l_moved() { # target, pushed sha, the base git sent
 # brit 0.3.4 also exports BRIT_GUARD_HELD_BY="v1 <brit pid> <its start time> n:…" to every hook it runs
 # (start time in clock ticks, /proc/<pid>/stat field 22; absent under git).
 #
-# The nearest ancestor that is one of these is the pusher:
+# The nearest ancestor that is one of these is the pusher, so a nearer `git` wins over an outer brit:
 #   git:  comm `git` (unchanged from before: git runs pre-push only from a push);
-#   brit: the process BRIT_GUARD_HELD_BY names, with that start time; or an executable named `brit`
-#         (the exe's real basename, or comm when the exe is unreadable/renamed, so a forking launcher
-#         or wrapper named brit also matches) whose first non-option argument is `push`, skipping
-#         brit's global options (-C/-r/-c/-f/--threads/--object-hash take a value).
+#   brit: an executable named `brit` (the exe's real basename, or comm when the exe is unreadable or
+#         renamed, so a forking launcher or wrapper named brit also matches) whose first non-option
+#         argument is `push`, skipping brit's global options (-C/-r/-c/-f/--threads/--object-hash
+#         take a value). The marker alone identifies nothing: an inherited or forged one could name
+#         any ancestor (the hook's own shell, a `brit status`), so it is only reported when it names
+#         the process these checks already chose, with that start time.
 # Sets PHASE_L_PUSH_PID / PHASE_L_PUSH_START (stat field 22, so a reused pid is never waited on) /
 # PHASE_L_PUSH_TOOL (git|brit|unknown). PHASE_L_PROC (default /proc) lets the tests build a fake chain.
 phase_l_proc_stat() { # pid → "<ppid> <start time>"
@@ -990,7 +1059,7 @@ phase_l_brit_verb() { # cmdline file → brit's subcommand
 }
 
 phase_l_pusher() {
-  local pid=$PPID i comm exe st held_pid="" held_start="" v
+  local pid=$PPID i comm exe st held_pid="" held_start="" v via=""
   PHASE_L_PUSH_TOOL=unknown PHASE_L_PUSH_START=""
   if [ -n "${PHASE_L_PUSH_PID-}" ]; then # a test names the push process directly
     PHASE_L_PUSH_TOOL=${PHASE_L_PUSH_TOOL_AS:-git}
@@ -1007,23 +1076,22 @@ phase_l_pusher() {
     exe=${exe##*/}
     if [ "$comm" = git ]; then
       PHASE_L_PUSH_TOOL=git
-    elif [ -n "$held_pid" ] && [ "$pid" = "$held_pid" ] && [ "${st#* }" = "$held_start" ]; then
-      PHASE_L_PUSH_TOOL=brit
     elif { [ "$exe" = brit ] || [ "$comm" = brit ]; } &&
          [ "$(phase_l_brit_verb "${PHASE_L_PROC:-/proc}/$pid/cmdline")" = push ]; then
       PHASE_L_PUSH_TOOL=brit
+      [ "$pid" != "$held_pid" ] || [ "${st#* }" != "$held_start" ] || via=", as BRIT_GUARD_HELD_BY names it"
     fi
     if [ "$PHASE_L_PUSH_TOOL" != unknown ]; then
       PHASE_L_PUSH_PID=$pid PHASE_L_PUSH_START=${st#* }
       [ "$PHASE_L_PUSH_TOOL" = git ] ||
-        echo "[pre-push] Phase L: the push is $PHASE_L_PUSH_TOOL pid $pid; the landing agent waits for it to exit" >&2
+        echo "[pre-push] Phase L: the push is $PHASE_L_PUSH_TOOL pid $pid$via; the landing agent waits for it to exit" >&2
       return 0
     fi
     pid=${st%% *}
     [ "$pid" != 0 ] || break
   done
   PHASE_L_PUSH_PID=""
-  echo "[pre-push] Phase L: no git or brit push found among this hook's ancestors; the landing agent waits until $PHASE_L_REMOTE's ${PHASE_L_LAND_TARGET:-dev} reads ${PHASE_L_LAND_SHA:0:12}, at most until the lease's ttl is ${PHASE_L_TTL_MARGIN_S:-30}s from expiry, and never records did-not-land" >&2
+  echo "[pre-push] Phase L: no git or brit push found among this hook's ancestors; the landing agent renews the lease and waits until $PHASE_L_REMOTE's ${PHASE_L_LAND_TARGET:-dev} reads ${PHASE_L_LAND_SHA:0:12}, at most ${PHASE_L_LIMIT_S:-3600}s, and never records did-not-land" >&2
 }
 
 phase_l_handoff() {

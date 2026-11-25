@@ -43,7 +43,7 @@ case "$1" in
  config) echo fixture@example.test;; cat-file) exit 0;; log) cat "$here/message";;
  fetch) [ -z "\${FETCH_SLEEP-}" ] || sleep "$FETCH_SLEEP"; exit 0;;
  merge-base) exit "\${MOVED:-0}";;
- ls-remote) if [ -f "$here/remote-sha" ]; then printf '%s\\trefs/heads/dev\\n' "$(cat "$here/remote-sha")"; else [ -z "\${REMOTE_SHA+x}" ] || printf '%s\\trefs/heads/dev\\n' "$REMOTE_SHA"; fi;;
+ ls-remote) echo x >> "$here/ls-remote.log"; [ -z "\${LS_REMOTE_HANG-}" ] || { trap '' TERM; sleep 30; }; [ -z "\${LS_REMOTE_RC-}" ] || exit "$LS_REMOTE_RC"; if [ -f "$here/remote-sha" ]; then printf '%s\\trefs/heads/dev\\n' "$(cat "$here/remote-sha")"; else [ -z "\${REMOTE_SHA+x}" ] || printf '%s\\trefs/heads/dev\\n' "$REMOTE_SHA"; fi;;
  rev-parse) case "$*" in *--git-common-dir*) echo "$HOOK_WORK_TREE/common";; *FETCH_HEAD*) echo "\${FETCH_HEAD_SHA:-${BASE}}";; *) echo "\${HEAD_SHA:-${HEAD}}";; esac;;
  diff|rebase) exit 0;; *) echo "unexpected git: $*" >&2; exit 99;;
 esac
@@ -577,53 +577,103 @@ test("a_brit_push_reached_through_the_bin_store_launcher_is_waited_on", async (t
   assert.match(r.out, /the push is brit pid 90038;/);
   await waitsWhileAliveThenSettles(t, fx, r, 90038, "brit");
 });
-test("brit_guard_held_by_names_the_pusher_only_with_its_start_time", async (t) => {
+test("brit_guard_held_by_is_reported_only_when_it_names_the_brit_push_already_chosen", async (t) => {
   // brit 0.3.4 exports BRIT_GUARD_HELD_BY="v1 <its pid> <its start time> n:…" to every hook it runs.
-  const chain = [
-    { pid: 90041, comm: "sh", argv: ["sh", "-e", ".husky/pre-push"] },
-    { pid: 90042, comm: "gix", exe: "/opt/gix", argv: ["gix", "x"], start: 555 },
-  ];
-  let fx = fixture(t),
-    r = runBlock(fx, { env: chainEnv(fx, chain, { BRIT_GUARD_HELD_BY: "v1 90042 555 n:2f:2f" }) });
-  assert.match(r.out, /the push is brit pid 90042;/);
+  const fx = fixture(t),
+    r = runBlock(fx, {
+      env: chainEnv(
+        fx,
+        [
+          { pid: 90041, comm: "sh", argv: ["sh", "-e", ".husky/pre-push"] },
+          { pid: 90042, comm: "brit", exe: BRIT_EXE, argv: ["brit", "push", "origin"], start: 555 },
+        ],
+        { BRIT_GUARD_HELD_BY: "v1 90042 555 n:2f:2f" },
+      ),
+    });
+  assert.match(r.out, /the push is brit pid 90042, as BRIT_GUARD_HELD_BY names it;/);
   await waitsWhileAliveThenSettles(t, fx, r, 90042, "brit");
-  fx = fixture(t);
-  r = runBlock(fx, {
-    env: chainEnv(fx, chain, {
-      BRIT_GUARD_HELD_BY: "v1 90042 554 n:2f:2f",
-      BERTH_PREPUSH_TTL_S: "3",
-      PHASE_L_TTL_MARGIN_S: "1",
-    }),
-  });
+});
+test("a_marker_naming_the_hooks_own_shell_is_ignored_and_git_still_found", async (t) => {
+  const fx = fixture(t),
+    r = runBlock(fx, {
+      env: chainEnv(
+        fx,
+        [
+          { pid: 90044, comm: "sh", argv: ["sh", "-e", ".husky/pre-push"], start: 444 },
+          { pid: 90045, comm: "git", exe: "/usr/bin/git", argv: ["git", "push", "origin", "HEAD:dev"] },
+        ],
+        { BRIT_GUARD_HELD_BY: "v1 90044 444 n:2f:2f" },
+      ),
+    });
+  assert.doesNotMatch(r.out, /the push is brit/);
+  await waitsWhileAliveThenSettles(t, fx, r, 90045, "git");
+});
+test("a_marker_naming_a_brit_that_is_not_pushing_is_ignored", (t) => {
+  const fx = fixture(t),
+    r = runBlock(fx, {
+      env: chainEnv(
+        fx,
+        [
+          { pid: 90046, comm: "sh", argv: ["sh", "-e", ".husky/pre-push"] },
+          { pid: 90047, comm: "brit", exe: BRIT_EXE, argv: ["brit", "-c", "a=push", "status"], start: 777 },
+        ],
+        { BRIT_GUARD_HELD_BY: "v1 90047 777 n:2f:2f", PHASE_L_LIMIT_S: "1" },
+      ),
+    });
+  assert.equal(r.status, 0, r.out);
   assert.match(r.out, /no git or brit push found among this hook's ancestors/);
 });
-test("an_unknown_pusher_neither_settles_early_nor_waits_past_the_ttl_bound", async (t) => {
+test("an_outer_brit_running_a_script_that_runs_git_push_records_git", async (t) => {
+  const fx = fixture(t),
+    r = runBlock(fx, {
+      env: chainEnv(
+        fx,
+        [
+          { pid: 90048, comm: "sh", argv: ["sh", "-e", ".husky/pre-push"] },
+          { pid: 90049, comm: "git", exe: "/usr/bin/git", argv: ["git", "push", "origin", "HEAD:dev"] },
+          { pid: 90050, comm: "land.sh", exe: "/usr/bin/bash", argv: ["bash", "land.sh"] },
+          { pid: 90051, comm: "brit", exe: BRIT_EXE, argv: ["brit", "push", "origin", "HEAD:dev"], start: 888 },
+        ],
+        { BRIT_GUARD_HELD_BY: "v1 90051 888 n:2f:2f" },
+      ),
+    });
+  assert.doesNotMatch(r.out, /the push is brit/);
+  await waitsWhileAliveThenSettles(t, fx, r, 90049, "git");
+});
+test("an_unknown_pusher_renews_while_it_observes_and_stops_at_the_limit_unconfirmed", async (t) => {
   // brit with a verb other than push, a value that reads "push", and nothing else that pushes.
   const fx = fixture(t),
     chain = [
-      { pid: 90051, comm: "sh", argv: ["sh", "-e", ".husky/pre-push"] },
-      { pid: 90052, comm: "brit", exe: BRIT_EXE, argv: ["brit", "-c", "push", "rebase", "--exec", "x"] },
-      { pid: 90053, comm: "bash", exe: "/usr/bin/bash", argv: ["bash"] },
+      { pid: 90052, comm: "sh", argv: ["sh", "-e", ".husky/pre-push"] },
+      { pid: 90053, comm: "brit", exe: BRIT_EXE, argv: ["brit", "-c", "push", "rebase", "--exec", "x"] },
+      { pid: 90054, comm: "bash", exe: "/usr/bin/bash", argv: ["bash"] },
     ],
     started = Date.now(),
     r = runBlock(fx, {
       env: chainEnv(fx, chain, {
         REMOTE_SHA: BASE,
-        BERTH_PREPUSH_TTL_S: "4",
-        PHASE_L_TTL_MARGIN_S: "1",
+        BERTH_PREPUSH_TTL_S: "3",
+        PHASE_L_LIMIT_S: "4",
         BERTH_PREPUSH_OBSERVE_S: "0.2",
       }),
     });
   assert.equal(r.status, 0, r.out);
-  assert.match(r.out, /no git or brit push found among this hook's ancestors; the landing agent waits until origin's dev reads 222222222222, at most until the lease's ttl is 1s from expiry, and never records did-not-land/);
-  // The bound: the last claim/renewal + ttl - margin, so at most 3 s after the hand-over here.
-  await new Promise((x) => setTimeout(x, 1000));
-  assert.equal(release(calls(fx)), undefined, "settled before the bound");
+  assert.match(r.out, /no git or brit push found among this hook's ancestors/);
+  const claimsAtHandoff = calls(fx).filter((l) => argv(l).startsWith("claim ")).length;
+  await new Promise((x) => setTimeout(x, 2000));
+  assert.equal(release(calls(fx)), undefined, "settled before the limit");
   const s = await pollSettle(fx, / settle /, 6000),
     ended = Date.now();
-  assert.match(settleLine(s), new RegExp(`settle ${HEAD} unconfirmed dev=111111111111 tool=unknown wait=ttl held=\\d+s released=ok`));
+  assert.match(
+    settleLine(s),
+    new RegExp(`settle ${HEAD} unconfirmed dev=111111111111 tool=unknown wait=limit reason=no-pusher-identified held=\\d+s released=ok`),
+  );
   assert.doesNotMatch(s, /did-not-land/);
-  assert.ok(ended - started < 4000 + 3000, `settled ${ended - started} ms after the push began`);
+  assert.ok(
+    calls(fx).filter((l) => argv(l).startsWith("claim ")).length > claimsAtHandoff,
+    "the lease was renewed while observing",
+  );
+  assert.ok(ended - started < 4000 + 4000, `settled ${ended - started} ms after the push began`);
 });
 test("an_unknown_pusher_settles_landed_once_the_remote_reads_the_landing_sha", async (t) => {
   const fx = fixture(t),
@@ -631,7 +681,6 @@ test("an_unknown_pusher_settles_landed_once_the_remote_reads_the_landing_sha", a
       env: chainEnv(fx, [{ pid: 90061, comm: "bash", argv: ["bash"] }], {
         REMOTE_SHA: BASE,
         BERTH_PREPUSH_TTL_S: "30",
-        PHASE_L_TTL_MARGIN_S: "1",
         BERTH_PREPUSH_OBSERVE_S: "0.2",
       }),
     });
@@ -659,4 +708,57 @@ test("a_reused_push_pid_is_not_waited_on", async (t) => {
   const s = await pollSettle(fx, / settle /, 3000);
   assert.match(settleLine(s), new RegExp(`settle ${HEAD} landed dev=\\S+ tool=brit held=`));
   assert.ok(existsSync(join(fx.dir, "proc/90072/stat")));
+});
+
+test("a_remote_that_cannot_be_read_is_unconfirmed_never_did_not_land", async (t) => {
+  const fx = fixture(t),
+    r = runBlock(fx, {
+      env: {
+        LS_REMOTE_RC: "128",
+        PHASE_L_READ_TRIES: "3",
+        PHASE_L_READ_RETRY_S: "0.1",
+      },
+    });
+  assert.equal(r.status, 0, r.out);
+  const s = await pollSettle(fx, / settle /, 4000);
+  assert.match(settleLine(s), new RegExp(`settle ${HEAD} unconfirmed dev= tool=git reason=remote-unreadable held=`));
+  assert.equal(readFileSync(join(fx.bin, "ls-remote.log"), "utf8").trim().split("\n").length, 3);
+});
+test("a_deletion_whose_remote_read_fails_is_not_landed", async (t) => {
+  const fx = fixture(t),
+    r = runBlock(fx, { local: ZERO, env: { REMOTE_SHA: "", LS_REMOTE_RC: "2", PHASE_L_READ_RETRY_S: "0.1" } });
+  assert.equal(r.status, 0, r.out);
+  const s = await pollSettle(fx, / settle /, 4000);
+  assert.match(settleLine(s), /settle none unconfirmed dev= tool=git reason=remote-unreadable/);
+});
+test("a_remote_read_that_ignores_term_is_killed_within_its_bound", async (t) => {
+  const fx = fixture(t),
+    started = Date.now(),
+    r = runBlock(fx, {
+      env: { LS_REMOTE_HANG: "1", PHASE_L_READ_S: "1", PHASE_L_KILL_S: "1", PHASE_L_READ_TRIES: "1" },
+    });
+  assert.equal(r.status, 0, r.out);
+  const s = await pollSettle(fx, / settle /, 8000);
+  assert.match(settleLine(s), /unconfirmed dev= tool=git reason=remote-unreadable/);
+  assert.ok(Date.now() - started < 7000, `settled ${Date.now() - started} ms after the push began`);
+});
+test("a_known_pusher_alive_at_the_limit_is_released_unconfirmed", async (t) => {
+  const fx = fixture(t),
+    r = runBlock(fx, {
+      env: chainEnv(
+        fx,
+        [
+          { pid: 90081, comm: "sh", argv: ["sh", "-e", ".husky/pre-push"] },
+          { pid: 90082, comm: "brit", exe: BRIT_EXE, argv: ["brit", "push", "origin", "HEAD:dev"] },
+        ],
+        { REMOTE_SHA: BASE, PHASE_L_LIMIT_S: "2" },
+      ),
+    });
+  assert.equal(r.status, 0, r.out);
+  const s = await pollSettle(fx, / settle /, 6000);
+  assert.match(
+    settleLine(s),
+    new RegExp(`settle ${HEAD} unconfirmed dev=111111111111 tool=brit wait=limit reason=push-still-running held=`),
+  );
+  assert.ok(existsSync(join(fx.dir, "proc/90082/stat")));
 });
