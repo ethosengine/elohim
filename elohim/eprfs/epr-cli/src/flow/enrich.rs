@@ -56,6 +56,7 @@ impl EnrichmentKind {
 pub enum EnrichmentOutcome {
     Green,
     Red,
+    NotComparable,
 }
 
 impl EnrichmentOutcome {
@@ -63,8 +64,9 @@ impl EnrichmentOutcome {
         match raw.trim() {
             "green" => Ok(Self::Green),
             "red" => Ok(Self::Red),
+            "not-comparable" => Ok(Self::NotComparable),
             other => Err(FlowError::InvalidArguments(format!(
-                "unknown outcome `{other}`; expected green|red"
+                "unknown outcome `{other}`; expected green|red|not-comparable"
             ))),
         }
     }
@@ -73,8 +75,16 @@ impl EnrichmentOutcome {
         match self {
             Self::Green => "green",
             Self::Red => "red",
+            Self::NotComparable => "not-comparable",
         }
     }
+}
+
+pub struct EnrichmentTargetRequest<'a> {
+    pub verdict: Option<&'a str>,
+    pub project: Option<&'a str>,
+    pub closure: Option<&'a str>,
+    pub from_device: Option<&'a str>,
 }
 
 pub struct EnrichmentRequest<'a> {
@@ -85,6 +95,7 @@ pub struct EnrichmentRequest<'a> {
     pub kind: &'a str,
     pub outcome: &'a str,
     pub method: &'a str,
+    pub reason: Option<&'a str>,
     pub run: Option<&'a str>,
     pub seconds: Option<f64>,
 }
@@ -102,12 +113,33 @@ pub struct EnrichmentReceipt {
     pub device: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EnrichmentTargetReceipt {
+    pub verdict: String,
+    pub project: String,
+    pub closure: String,
+    pub commit: String,
+    pub device: String,
+}
+
 impl EnrichmentReceipt {
     pub fn render(&self) {
         println!(
             "enrich   {} {} of verdict {} ({} {})",
             self.kind,
             self.outcome,
+            short(&self.verdict),
+            self.project,
+            short(&self.closure)
+        );
+    }
+}
+
+impl EnrichmentTargetReceipt {
+    pub fn render(&self) {
+        println!(
+            "enrich target {} ({} {})",
             short(&self.verdict),
             self.project,
             short(&self.closure)
@@ -127,7 +159,23 @@ pub fn enrich(root: &Path, request: &EnrichmentRequest<'_>) -> FlowResult<Enrich
     let kind = EnrichmentKind::parse(request.kind)?;
     let outcome = EnrichmentOutcome::parse(request.outcome)?;
     let method = one_line(request.method, "--method")?;
-    let selector = enrichment_target(request)?;
+    let reason = request
+        .reason
+        .map(|value| one_line(value, "--reason"))
+        .transpose()?;
+    match (outcome, reason) {
+        (EnrichmentOutcome::NotComparable, None) => {
+            return Err(FlowError::InvalidArguments(
+                "--outcome not-comparable needs --reason <one-line reason>".into(),
+            ));
+        }
+        (EnrichmentOutcome::Green | EnrichmentOutcome::Red, Some(_)) => {
+            return Err(FlowError::InvalidArguments(
+                "--reason is only valid with --outcome not-comparable".into(),
+            ));
+        }
+        _ => {}
+    }
     let run = request
         .run
         .map(|raw| {
@@ -149,18 +197,6 @@ pub fn enrich(root: &Path, request: &EnrichmentRequest<'_>) -> FlowResult<Enrich
         })
         .transpose()?;
 
-    let key_path = crate::device_key::resolve_path().map_err(|error| {
-        FlowError::InvalidArguments(format!(
-            "flow enrich cannot resolve this device's key: {error}"
-        ))
-    })?;
-    let device_key = crate::device_key::DeviceKey::load(&key_path).map_err(|error| {
-        FlowError::InvalidArguments(format!(
-            "flow enrich cannot read this device's key: {error}"
-        ))
-    })?;
-    let device = device_key.did_key();
-
     let measures_path = measures::default_measures(root);
     let measure = MeasureRef::parse(ENRICHMENT_MEASURE, &measures_path)?;
     let registry = Registry::open(&measures_path)?;
@@ -177,15 +213,22 @@ pub fn enrich(root: &Path, request: &EnrichmentRequest<'_>) -> FlowResult<Enrich
         ))
     })?;
 
-    let mut store = SidecarFlowStore::open(root)?.transaction()?;
-    let records = store.records()?;
-    let admits = |writer: &str| {
-        crate::actor::standing_here(root).is_some_and(|standing| {
-            standing.device == device
-                && crate::actor::device_enrolled(root, &standing.handle, writer)
-        })
+    let target = EnrichmentTargetRequest {
+        verdict: request.verdict,
+        project: request.project,
+        closure: request.closure,
+        from_device: request.from_device,
     };
-    let (verdict, fields) = resolve_verdict(&records, selector, &device, admits)?;
+    let (records, resolved) = resolve_target_with_records(root, &target)?;
+    let verdict: Cid = resolved.verdict.parse().map_err(|_| {
+        FlowError::InvalidArguments("resolved gate verdict is not a content identifier".into())
+    })?;
+    let fields = VerdictFields {
+        project: resolved.project,
+        closure: resolved.closure,
+        commit: resolved.commit,
+    };
+    let device = resolved.device;
 
     if let Some((cid, _)) = records.iter().find(|(_, record)| {
         same_enrichment(
@@ -225,6 +268,9 @@ pub fn enrich(root: &Path, request: &EnrichmentRequest<'_>) -> FlowResult<Enrich
     if let Some(seconds) = seconds {
         env.insert("seconds", seconds);
     }
+    if let Some(reason) = reason {
+        env.insert("reason", reason.to_string());
+    }
     let mut classified_as = vec![
         "run:observation".to_string(),
         ".".to_string(),
@@ -254,8 +300,56 @@ pub fn enrich(root: &Path, request: &EnrichmentRequest<'_>) -> FlowResult<Enrich
         classified_as,
     });
     let cid = record.cid()?;
+    // Target selection and tuple lookup use the store's shared read. The exclusive transaction is
+    // acquired only for the append, so a large fold never blocks unrelated readers while it is
+    // being scanned.
+    let mut store = SidecarFlowStore::open(root)?.transaction()?;
     store.append(record)?;
     Ok(receipt(true, cid, verdict, kind, outcome, &fields, device))
+}
+
+/// Resolve the immutable gate verdict a sampler will re-execute without appending anything.
+pub fn resolve_target(
+    root: &Path,
+    request: &EnrichmentTargetRequest<'_>,
+) -> FlowResult<EnrichmentTargetReceipt> {
+    let (_, receipt) = resolve_target_with_records(root, request)?;
+    Ok(receipt)
+}
+
+fn resolve_target_with_records(
+    root: &Path,
+    request: &EnrichmentTargetRequest<'_>,
+) -> FlowResult<(Vec<(Cid, FlowRecord)>, EnrichmentTargetReceipt)> {
+    let selector = enrichment_target(request)?;
+    let key_path = crate::device_key::resolve_path().map_err(|error| {
+        FlowError::InvalidArguments(format!(
+            "flow enrich cannot resolve this device's key: {error}"
+        ))
+    })?;
+    let device_key = crate::device_key::DeviceKey::load(&key_path).map_err(|error| {
+        FlowError::InvalidArguments(format!(
+            "flow enrich cannot read this device's key: {error}"
+        ))
+    })?;
+    let device = device_key.did_key();
+    let store = SidecarFlowStore::open(root)?;
+    let records = store.records()?;
+    let admits = |writer: &str| {
+        crate::actor::standing_here(root).is_some_and(|standing| {
+            standing.device == device
+                && crate::actor::device_enrolled(root, &standing.handle, writer)
+        })
+    };
+    let (verdict, fields) = resolve_verdict(&records, selector, &device, admits)?;
+    let receipt = EnrichmentTargetReceipt {
+        verdict: verdict.to_string(),
+        project: fields.project,
+        closure: fields.closure,
+        commit: fields.commit,
+        device,
+    };
+    Ok((records, receipt))
 }
 
 enum EnrichmentTarget<'a> {
@@ -267,7 +361,9 @@ enum EnrichmentTarget<'a> {
     },
 }
 
-fn enrichment_target<'a>(request: &'a EnrichmentRequest<'_>) -> FlowResult<EnrichmentTarget<'a>> {
+fn enrichment_target<'a>(
+    request: &'a EnrichmentTargetRequest<'_>,
+) -> FlowResult<EnrichmentTarget<'a>> {
     match (
         request.verdict,
         request.project,
