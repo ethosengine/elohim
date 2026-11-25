@@ -151,6 +151,11 @@ impl Fixture {
         ])
     }
 
+    fn release(&self, commitment: &str) -> Output {
+        let measures = self.measures();
+        self.epr(&["--measures", &measures, "--release-carry", commitment])
+    }
+
     fn records(&self) -> Vec<(cid::Cid, FlowRecord)> {
         SidecarFlowStore::open(self.root.path())
             .unwrap()
@@ -257,6 +262,90 @@ fn a_replay_of_the_same_carry_appends_nothing_and_keeps_its_bound() {
     assert_eq!(replay["validUntil"], first["validUntil"]);
     assert_eq!(replay["commitment"], first["commitment"]);
     assert_eq!(fixture.records().len(), count);
+}
+
+#[test]
+fn a_release_ends_the_carry_at_once_and_a_second_release_is_refused() {
+    let fixture = Fixture::new();
+    let raised = fixture.raise();
+    let intent = raised["intent"].as_str().unwrap().to_string();
+    let miss = fixture.post_miss(&intent);
+    let carry = success_json(fixture.carry(&intent, &miss, "600"));
+    let before = fixture.records().len();
+
+    let released = success_json(fixture.release(carry["commitment"].as_str().unwrap()));
+    assert_eq!(released["commitment"], carry["commitment"]);
+    assert_eq!(fixture.records().len(), before + 1, "one release event");
+    let decision = success_json(fixture.epr(&[
+        "--carry-decision",
+        &intent,
+        "--project",
+        "eprfs",
+        "--closure",
+        "abcdef",
+        "--role",
+        "lander",
+        "--max-wait-s",
+        "600",
+    ]));
+    assert_eq!(decision["decision"], "run-here");
+
+    let second = fixture.release(carry["commitment"].as_str().unwrap());
+    assert!(!second.status.success());
+    assert!(
+        String::from_utf8_lossy(&second.stderr).contains("already released, settled, or lapsed")
+    );
+    assert_eq!(fixture.records().len(), before + 1);
+}
+
+#[test]
+fn releasing_a_claim_this_device_did_not_make_is_refused() {
+    let fixture = Fixture::new();
+    let raised = fixture.raise();
+    let intent = raised["intent"].as_str().unwrap().to_string();
+    let miss = fixture.post_miss(&intent);
+    let commitment = elohim_epr_rea::atom_cid(&"sibling-carry").unwrap();
+    let record = FlowRecord::Event(FlowEvent {
+        action: ReaVerb::Cite,
+        provider: AgentRef("human:test".to_string()),
+        receiver: AgentRef("repo:test/landing".to_string()),
+        resource: intent.parse().unwrap(),
+        quantity: Magnitude::Count {
+            value: 1.0,
+            unit: "dev-landing".to_string(),
+        },
+        process: None,
+        in_scope_of: intent.parse().unwrap(),
+        fulfills: Vec::new(),
+        satisfies: Vec::new(),
+        occurred_at: "2026-11-23T00:00:00Z".to_string(),
+        classified_as: vec![
+            "dev-landing:carry".to_string(),
+            CHANGE.to_string(),
+            "reason:carry".to_string(),
+            "measure:dev-landing@1".to_string(),
+            "value:1".to_string(),
+            "env:at=1900000000.000".to_string(),
+            "env:change=change".to_string(),
+            "env:closure=abcdef".to_string(),
+            format!("env:commitment={commitment}"),
+            "env:dseq=1".to_string(),
+            format!("env:miss={miss}"),
+            "env:project=eprfs".to_string(),
+            "env:valid_until=4102444800".to_string(),
+            "via:did:key:z6MkSIBLING".to_string(),
+        ],
+    });
+    SidecarFlowStore::open(fixture.root.path())
+        .unwrap()
+        .append(record)
+        .unwrap();
+    let before = fixture.records().len();
+
+    let refused = fixture.release(&commitment.to_string());
+    assert!(!refused.status.success());
+    assert!(String::from_utf8_lossy(&refused.stderr).contains("was not made by this device"));
+    assert_eq!(fixture.records().len(), before);
 }
 
 #[test]

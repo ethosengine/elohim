@@ -118,6 +118,31 @@ fn carry(via: Option<&str>, commitment: &str, at_s: u64, valid_until: u64) -> (C
     .record()
 }
 
+fn release(
+    via: Option<&str>,
+    intent: Cid,
+    commitment: &str,
+    at_s: u64,
+    dseq: u64,
+) -> (Cid, FlowRecord) {
+    event(
+        intent,
+        landing_slots(
+            "carry",
+            &[
+                ("at", format!("{at_s}.000")),
+                ("change", CHANGE.to_string()),
+                ("closure", CLOSURE.to_string()),
+                ("commitment", cid(commitment).to_string()),
+                ("dseq", dseq.to_string()),
+                ("project", PROJECT.to_string()),
+                ("release", "1".to_string()),
+            ],
+            via,
+        ),
+    )
+}
+
 fn verdict(via: Option<&str>, closure: &str, success: bool) -> (Cid, FlowRecord) {
     let mut slots = vec![
         "observation".to_string(),
@@ -423,6 +448,29 @@ fn a_carry_lapses_exactly_at_its_own_valid_until() {
         None,
         600
     )));
+}
+
+#[test]
+fn a_release_from_the_claiming_device_ends_the_landers_wait_immediately() {
+    let records = vec![
+        misses(),
+        carry(Some(B), "c-b", 1_000, 1_600),
+        release(Some(B), intent(), "c-b", 1_010, 2),
+    ];
+    assert!(live_carries(&records, &admits, Some(A), 1_011).is_empty());
+    assert_eq!(
+        lander(&records, 1_011, Some(1_010), None, 600),
+        CarryDecision::RunHere {
+            reason: "no admitted device carries this miss".to_string(),
+        }
+    );
+
+    let forged = vec![
+        misses(),
+        carry(Some(B), "c-b", 1_000, 1_600),
+        release(Some(A), intent(), "c-b", 1_010, 2),
+    ];
+    assert_eq!(live_carries(&forged, &admits, Some(A), 1_011).len(), 1);
 }
 
 #[test]

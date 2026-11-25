@@ -81,8 +81,8 @@ test('rule 3: a shorter re-read bound and a forward clock jump end waiting', () 
   assert.equal(g.run({ ownStopAt: 1050 }).outcome, 'own-bound-passed');
 });
 
-test('rule 4: every poll re-asks; a lapsed, settled, or silent carry runs here', () => {
-  for (const reason of ['carry lapsed', 'settled', 'carrier silent']) {
+test('rule 4: every poll re-asks; a released, lapsed, settled, or silent carry runs here', () => {
+  for (const reason of ['carry released', 'carry lapsed', 'settled', 'carrier silent']) {
     const f = fixture();
     const sleep = f.deps.sleep;
     f.deps.sleep = seconds => { sleep(seconds); Object.assign(f.wait, { decision: 'run-here', reason }); };

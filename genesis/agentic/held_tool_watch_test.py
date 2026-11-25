@@ -424,6 +424,8 @@ class CarryFixture(Fixture, NoStateDir):
         super().setUp()
         self.repo = self.root / "repo"
         (self.repo / ".worktrees").mkdir(parents=True)
+        self.pool = self.root / "cargo-pool"
+        (self.pool / "family").mkdir(parents=True)
         self.store = self.root / "bin-store"
         self.head = self.store / "epr" / CID_NEW / "epr"
         self.head.parent.mkdir(parents=True)
@@ -440,7 +442,14 @@ class CarryFixture(Fixture, NoStateDir):
         self.computed = self.closure
         self.gate_code = 0
         self.gate_timeout = False
+        self.gate_stop = None
+        self.make_slot = False
+        self.commitment = "bafyreiaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         self.misses = [self.miss()]
+        Path(self.root, W["CARRY_ON_FILE"]).write_text(W["rfc3339"](self.now + 7 * 86400) + "\n")
+        self.pool_env = mock.patch.dict(os.environ, {"CARGO_TARGET_POOL_ROOT": str(self.pool)})
+        self.pool_env.start()
+        self.addCleanup(self.pool_env.stop)
 
     def miss(self, **changes):
         row = {"intent": "bafyreiintentintentintentintentintentintentintentintentintent",
@@ -453,7 +462,8 @@ class CarryFixture(Fixture, NoStateDir):
 
     def args(self, **changes):
         values = dict(repo_root=str(self.repo), stasis_root=str(self.stasis), bin_store=str(self.store),
-                      now=self.now, carry_deadline_s=None)
+                      now=self.now, carry_deadline_s=None, carry_seat_wait_s=0, parent_pid=None,
+                      state="pass", until=None)
         values.update(changes)
         return SimpleNamespace(**values)
 
@@ -463,8 +473,12 @@ class CarryFixture(Fixture, NoStateDir):
                                env=dict(env) if env is not None else None))
         if argv[:2] == [str(self.head), "peer"]:
             return 0, json.dumps({"device": "did:key:z6MkLOCAL", "misses": self.misses}), ""
-        if "room" in argv and "cargo" in argv:
+        if "claim" in argv and "cargo" in argv:
             return (0 if self.room.get("verdict") == "admit" else 3), json.dumps(self.room), ""
+        if "release" in argv and "cargo" in argv:
+            return 0, "released", ""
+        if "say" in argv:
+            return 0, "", ""
         if "who" in argv and "dev-integration" in argv:
             return 0, json.dumps(self.holder), ""
         if argv[:4] == ["git", "-C", str(self.repo), "fetch"]:
@@ -479,32 +493,137 @@ class CarryFixture(Fixture, NoStateDir):
         if argv[:3] == ["node", "--input-type=module", "--eval"]:
             return 0, json.dumps({"key": self.computed, "line": "miss"}), ""
         if argv[:3] == [str(self.head), "flow", "intend"]:
-            return 0, "{}", ""
-        if argv[:2] == ["just", "gate"]:
-            if self.gate_timeout:
-                raise W["subprocess"].TimeoutExpired(argv, timeout)
-            return self.gate_code, "", "infra red" if self.gate_code else ""
+            return 0, json.dumps({"commitment": self.commitment}), ""
         if "worktree" in argv and "remove" in argv:
             import shutil
             shutil.rmtree(argv[-1], ignore_errors=True)
             return 0, "", ""
         raise AssertionError(f"unexpected call: {argv}")
 
-    def run_carry(self):
+    def gate(self, trusted, worktree, commit, project, env, deadline, stop_reason, runner=None):
+        self.calls.append({"argv": ["just", "gate", project], "timeout": deadline,
+                           "cwd": str(worktree), "env": dict(env)})
+        if self.make_slot:
+            slot = self.pool / "family" / "cd" / f"eprfs-wt-{Path(worktree).name}"
+            slot.mkdir(parents=True)
+        if self.gate_stop:
+            self.holder = {"holder": "local-lander"} if self.gate_stop == "landing" else self.holder
+            if self.gate_stop == "off":
+                Path(self.root, W["CARRY_ON_FILE"]).unlink()
+            if self.gate_stop == "expired":
+                Path(self.root, W["CARRY_ON_FILE"]).write_text(W["rfc3339"](W["time"].time() - 1) + "\n")
+            stopped = stop_reason()
+            return 17, "", "stopped", stopped
+        return self.gate_code, "", "infra red" if self.gate_code else "", None
+
+    def run_carry(self, **changes):
         out = io.StringIO()
         with contextlib.redirect_stdout(out):
-            code = W["cmd_carry"](self.args(), runner=self.runner)
+            code = W["cmd_carry"](self.args(**changes), runner=self.runner, gate_runner=self.gate)
         return code, out.getvalue().splitlines()
 
     def claims(self):
-        return [c for c in self.calls if c["argv"][:3] == [str(self.head), "flow", "intend"]]
+        return [c for c in self.calls if "--carry" in c["argv"]]
+
+    def releases(self):
+        return [c for c in self.calls if "--release-carry" in c["argv"]]
 
     def gates(self):
         return [c for c in self.calls if c["argv"][:2] == ["just", "gate"]]
 
 
 class CarryTest(CarryFixture):
-    def test_rule_1_uses_device_head_and_ignores_own_device_misses(self):
+    def test_default_off_reads_no_misses_and_starts_no_subprocess(self):
+        Path(self.root, W["CARRY_ON_FILE"]).unlink()
+        code, lines = self.run_carry()
+        self.assertEqual((code, lines, self.calls), (0, [], []))
+
+    def test_carry_on_defaults_to_seven_days_and_records_the_until_time(self):
+        Path(self.root, W["CARRY_ON_FILE"]).unlink()
+        with mock.patch.dict(os.environ, {"ELOHIM_SESSION_ID": SESSION}):
+            code, lines = self.run_carry(state="on")
+        self.assertEqual(code, 0)
+        until = W["rfc3339"](self.now + 7 * 86400)
+        self.assertEqual(lines, [f"carry on until {until}; last: no carry pass recorded"])
+        self.assertTrue(Path(self.root, W["CARRY_ON_FILE"]).is_file())
+        self.assertEqual(Path(self.root, W["CARRY_ON_FILE"]).read_text(), until + "\n")
+        self.assertFalse((self.repo / W["CARRY_ON_FILE"]).exists())
+        self.assertIn("/.eprfs/status/*", Path(W["REPO_ROOT"], ".gitignore").read_text())
+        log = Path(self.root, W["WATCH_LOG"]).read_text()
+        self.assertIn(f"carry=on until={until} action=opt-in by={SESSION}", log)
+        self.assertEqual(self.calls, [])
+
+    def test_until_accepts_a_duration_and_an_iso_8601_utc_date(self):
+        Path(self.root, W["CARRY_ON_FILE"]).unlink()
+        code, lines = self.run_carry(state="on", until="12h")
+        duration_until = W["rfc3339"](self.now + 12 * 3600)
+        self.assertEqual((code, lines),
+                         (0, [f"carry on until {duration_until}; last: no carry pass recorded"]))
+        absolute = "2032-04-05T06:07:08Z"
+        code, lines = self.run_carry(state="on", until=absolute)
+        self.assertEqual((code, lines),
+                         (0, [f"carry on until {absolute}; last: no carry pass recorded"]))
+        self.assertEqual(Path(self.root, W["CARRY_ON_FILE"]).read_text(), absolute + "\n")
+
+    def test_status_shows_on_until_and_expired_at(self):
+        until = W["rfc3339"](self.now + 3600)
+        Path(self.root, W["CARRY_ON_FILE"]).write_text(until + "\n")
+        Path(self.root, W["LAST_CARRY"]).write_text("most recent carry state\n")
+        code, lines = self.run_carry(state="status")
+        self.assertEqual((code, lines),
+                         (0, [f"carry on until {until}; last: most recent carry state"]))
+        expired = W["rfc3339"](self.now - 1)
+        Path(self.root, W["CARRY_ON_FILE"]).write_text(expired + "\n")
+        Path(self.root, W["CARRY_EXPIRY_SAID_FILE"]).unlink(missing_ok=True)
+        code, lines = self.run_carry(state="status")
+        self.assertEqual((code, lines), (0, [
+            f"carry opt-in expired at {expired}; run held-tool-watch carry on to renew",
+            f"carry expired at {expired}; last: most recent carry state",
+        ]))
+
+    def test_expiry_turns_several_passes_off_and_is_said_once(self):
+        expired = W["rfc3339"](self.now - 1)
+        Path(self.root, W["CARRY_ON_FILE"]).write_text(expired + "\n")
+        all_lines = []
+        for _ in range(4):
+            code, lines = self.run_carry()
+            self.assertEqual(code, 0)
+            all_lines.extend(lines)
+        self.assertEqual(all_lines, [
+            f"carry opt-in expired at {expired}; run held-tool-watch carry on to renew"
+        ])
+        self.assertEqual(self.calls, [])
+        self.assertEqual(Path(self.root, W["CARRY_EXPIRY_SAID_FILE"]).read_text(), expired + "\n")
+
+    def test_renewal_replaces_the_until_time_and_is_logged_as_a_renewal(self):
+        old_until = Path(self.root, W["CARRY_ON_FILE"]).read_text()
+        code, lines = self.run_carry(state="on", until="3d")
+        renewed = W["rfc3339"](self.now + 3 * 86400)
+        self.assertEqual((code, lines),
+                         (0, [f"carry on until {renewed}; last: no carry pass recorded"]))
+        self.assertNotEqual(Path(self.root, W["CARRY_ON_FILE"]).read_text(), old_until)
+        self.assertEqual(Path(self.root, W["CARRY_ON_FILE"]).read_text(), renewed + "\n")
+        self.assertIn(f"carry=on until={renewed} action=renewal",
+                      Path(self.root, W["WATCH_LOG"]).read_text())
+
+    def test_a_legacy_switch_without_an_until_time_reads_expired(self):
+        switch = Path(self.root, W["CARRY_ON_FILE"])
+        switch.write_text("")
+        os.utime(switch, (self.now - 60, self.now - 60))
+        expired = W["rfc3339"](self.now - 60)
+        code, lines = self.run_carry(state="status")
+        self.assertEqual((code, lines), (0, [
+            f"carry opt-in expired at {expired}; run held-tool-watch carry on to renew",
+            f"carry expired at {expired}; last: no carry pass recorded",
+        ]))
+        self.assertFalse(W["carry_enabled"](str(self.root), self.now))
+
+    def test_carry_off_removes_the_switch(self):
+        code, lines = self.run_carry(state="off")
+        self.assertEqual((code, lines), (0, ["carry off; last: no carry pass recorded"]))
+        self.assertFalse(Path(self.root, W["CARRY_ON_FILE"]).exists())
+
+    def test_uses_device_head_exact_sha_and_ignores_own_device_misses(self):
         own = self.miss(announcer="did:key:z6MkLOCAL", project="own")
         self.misses.insert(0, own)
         code, _ = self.run_carry()
@@ -513,8 +632,24 @@ class CarryTest(CarryFixture):
         self.assertEqual(len(self.claims()), 1)
         self.assertIn("eprfs", self.claims()[0]["argv"])
         self.assertNotIn("own", self.claims()[0]["argv"])
+        fetches = [c["argv"] for c in self.calls if c["argv"][:3] == ["git", "-C", str(self.repo)]
+                   and "fetch" in c["argv"]]
+        self.assertEqual(fetches, [["git", "-C", str(self.repo), "fetch", "--no-tags", "origin",
+                                    self.commit]])
 
-    def test_rule_2_closure_mismatch_and_unfetchable_commit_make_no_claim(self):
+    def test_closure_recomputation_imports_only_the_runners_orchestrator(self):
+        code, _ = self.run_carry()
+        self.assertEqual(code, 0)
+        [call] = [c for c in self.calls if c["argv"][:3] == ["node", "--input-type=module", "--eval"]]
+        candidate = call["env"]["HELD_TOOL_CARRY_CANDIDATE_ROOT"]
+        trusted = call["env"]["HELD_TOOL_CARRY_TRUSTED_ROOT"]
+        self.assertEqual(trusted, W["REPO_ROOT"])
+        self.assertNotEqual(candidate, trusted)
+        self.assertEqual(call["cwd"], trusted)
+        self.assertIn("`${trusted}/${p}`", call["argv"][3])
+        self.assertNotIn("`${candidate}/genesis/orchestrator", call["argv"][3])
+
+    def test_closure_mismatch_and_unfetchable_commit_make_no_claim(self):
         for mode in ("mismatch", "unfetchable"):
             with self.subTest(mode=mode):
                 self.calls.clear()
@@ -526,7 +661,7 @@ class CarryTest(CarryFixture):
                 self.assertEqual(len(lines), 1)
                 self.assertIn("closure mismatch" if mode == "mismatch" else "not fetchable", lines[0])
 
-    def test_rule_3_no_free_seat_or_local_landing_holder_makes_no_claim_or_lease(self):
+    def test_no_free_seat_or_local_landing_holder_makes_no_carry_claim(self):
         for mode in ("seat", "landing"):
             with self.subTest(mode=mode):
                 self.calls.clear()
@@ -536,10 +671,9 @@ class CarryTest(CarryFixture):
                 code, lines = self.run_carry()
                 self.assertEqual(code, 0)
                 self.assertEqual(self.claims(), [])
-                self.assertFalse(any("claim" in c["argv"] for c in self.calls))
                 self.assertIn("cargo seat" if mode == "seat" else "local dev-integration", lines[-1])
 
-    def test_rule_4_valid_for_is_bounded_and_failed_gate_only_lets_claim_lapse(self):
+    def test_failed_gate_releases_the_carry_and_releases_the_cargo_seat(self):
         self.gate_code = 7
         code, lines = self.run_carry()
         self.assertEqual(code, 1)
@@ -547,10 +681,11 @@ class CarryTest(CarryFixture):
         valid = claim["argv"][claim["argv"].index("--valid-for") + 1]
         self.assertEqual(valid, "600")  # p90*3 floors to ten minutes
         self.assertEqual(len(self.claims()), 1)
-        self.assertIn("claim will lapse", lines[-1])
-        self.assertFalse(any("--withdraw" in c["argv"] or "--dismiss" in c["argv"] for c in self.calls))
+        self.assertIn("carry released", lines[-1])
+        self.assertEqual(len(self.releases()), 1)
+        self.assertTrue(any("release" in c["argv"] and "cargo" in c["argv"] for c in self.calls))
 
-    def test_rule_5_gate_gets_head_epr_and_no_gate_evidence(self):
+    def test_gate_gets_head_epr_and_no_gate_evidence(self):
         with mock.patch.dict(os.environ, {"GATE_EVIDENCE": "reuse"}):
             code, _ = self.run_carry()
         self.assertEqual(code, 0)
@@ -559,66 +694,143 @@ class CarryTest(CarryFixture):
         self.assertEqual(gate["env"]["EPR_BIN"], str(self.head))
         self.assertNotIn("GATE_EVIDENCE", gate["env"])
 
-    def test_rule_6_never_pushes_or_lands_and_removes_its_worktree(self):
+    def test_never_pushes_or_lands_and_removes_its_worktree_and_target_slot(self):
+        self.make_slot = True
         code, _ = self.run_carry()
         self.assertEqual(code, 0)
         words = [word for call in self.calls for word in call["argv"]]
         self.assertNotIn("push", words)
         self.assertNotIn("--land", words)
         self.assertFalse(any((self.repo / ".worktrees").iterdir()))
+        self.assertEqual(list((self.pool / "family").rglob(f"*-wt-carry-{self.commit[:12]}-eprfs")), [])
 
-    def test_rule_7_both_stop_files_skip_and_cancel_a_running_carry_group(self):
+    def test_both_off_files_win_over_the_on_marker_without_reading_misses(self):
         for stop in (W["STOP_FILE"], W["CARRY_STOP_FILE"]):
             with self.subTest(stop=stop):
                 Path(self.root, stop).touch()
                 code, lines = self.run_carry()
-                self.assertEqual((code, len(self.calls)), (0, 0))
-                self.assertIn("switched off", lines[0])
+                self.assertEqual((code, lines, self.calls), (0, [], []))
                 Path(self.root, stop).unlink()
-        started = W["time"].monotonic()
-        code, _, _ = W["run_pass"](["sleep", "60"], timeout=10,
-                                     cancelled=lambda: W["time"].monotonic() - started > 0.2)
-        self.assertIsNone(code)
 
-    def test_rule_8_pass_deadline_kills_the_whole_group(self):
-        child = self.root / "carry-child.pid"
-        code, _, _ = W["run_pass"](["sh", "-c", f"sleep 60 & echo $! > {child}; sleep 60"], timeout=0.2)
-        self.assertIsNone(code)
-        pid = int(child.read_text())
-        for _ in range(60):
-            try:
-                state = Path(f"/proc/{pid}/stat").read_text().rsplit(")", 1)[1].split()[0]
-            except OSError:
-                break
-            if state in ("Z", "X"):
-                break
-            W["time"].sleep(0.05)
-        else:
-            self.fail("carry descendant survived its pass deadline")
+    def test_local_landing_yields_the_gate_and_releases_the_carry(self):
+        self.gate_stop = "landing"
+        code, lines = self.run_carry()
+        self.assertEqual(code, 1)
+        self.assertIn("yielded: local landing started", lines[-1])
+        self.assertEqual(len(self.releases()), 1)
 
-    def test_rule_9_last_carry_state_is_separate_and_announce_argv_is_unchanged(self):
-        calls = []
+    def test_switching_off_during_the_gate_stops_and_releases(self):
+        self.gate_stop = "off"
+        code, lines = self.run_carry()
+        self.assertEqual(code, 1)
+        self.assertIn("yielded: carry switched off", lines[-1])
+        self.assertEqual(len(self.releases()), 1)
+
+    def test_expiring_during_the_gate_stops_and_releases(self):
+        self.gate_stop = "expired"
+        code, lines = self.run_carry()
+        self.assertEqual(code, 1)
+        self.assertIn("carry opt-in expired at", lines[-2])
+        self.assertIn("yielded: carry switched off", lines[-1])
+        self.assertEqual(len(self.releases()), 1)
+
+    def test_dead_runner_parent_stops_the_gate_and_releases(self):
+        self.gate_stop = "parent"
+        alive = mock.Mock(side_effect=[True, True, False])
+        with mock.patch.dict(W["cmd_carry"].__globals__, {"_parent_alive": alive}):
+            code, lines = self.run_carry(parent_pid=12345)
+        self.assertEqual(code, 1)
+        self.assertIn("runner parent exited", lines[-1])
+        self.assertEqual(len(self.releases()), 1)
+
+    def test_decline_is_said_only_once_for_the_same_miss(self):
+        self.computed = "c" * 64
+        self.run_carry()
+        self.run_carry()
+        notes = [c for c in self.calls if "say" in c["argv"]]
+        self.assertEqual(len(notes), 1)
+
+    def test_no_cargo_pool_declines_once_without_fetch_claim_or_gate(self):
+        with mock.patch.dict(W["cmd_carry"].__globals__, {"cargo_pool_root": lambda: None}):
+            code, lines = self.run_carry()
+        self.assertEqual(code, 0)
+        self.assertIn("no cargo pool", lines[-1])
+        words = [word for call in self.calls for word in call["argv"]]
+        self.assertNotIn("fetch", words)
+        self.assertEqual(self.claims(), [])
+        self.assertEqual(self.gates(), [])
+
+    def test_gate_stop_uses_gate_live_now_instead_of_killing_the_wrapper_group(self):
+        popens = []
+
+        class GateProcess:
+            def __init__(self):
+                self.polls = 0
+
+            def poll(self):
+                self.polls += 1
+                return None if self.polls == 1 else 17
+
+            def wait(self):
+                return 17
+
+        class StopProcess:
+            def poll(self):
+                return 0
+
+            def wait(self, timeout=None):
+                return 0
+
+        def popen(argv, **kwargs):
+            popens.append(list(argv))
+            return GateProcess() if argv[:2] == ["just", "gate"] else StopProcess()
+
+        def runner(argv, timeout=60, cwd=None, env=None):
+            self.calls.append({"argv": list(argv), "timeout": timeout, "cwd": str(cwd), "env": env})
+            if "open" in argv:
+                return 0, json.dumps({"path": str(self.root / "gate.run")}), ""
+            if "close" in argv:
+                return 0, "", ""
+            raise AssertionError(argv)
+
+        globals_ = W["run_carried_gate"].__globals__
+        with mock.patch.object(globals_["subprocess"], "Popen", side_effect=popen), \
+                mock.patch.object(globals_["time"], "sleep", return_value=None), \
+                mock.patch.object(globals_["os"], "killpg", side_effect=AssertionError("killpg")):
+            code, _, _, stopped = W["run_carried_gate"](
+                W["REPO_ROOT"], self.repo, self.commit, "eprfs", {}, W["time"].monotonic() + 10,
+                lambda: "carry switched off", runner=runner)
+        self.assertEqual((code, stopped), (17, "carry switched off"))
+        [stop] = [argv for argv in popens if "stop" in argv]
+        self.assertIn("--now", stop)
+        self.assertEqual(stop[stop.index("--run") + 1], str(self.root / "gate.run"))
+
+    def test_slow_carry_does_not_stop_announce_cadence(self):
+        announce_calls, carry_calls = [], []
         clock = [0.0]
 
         def run_pass(argv, timeout, cancelled=None):
-            calls.append(list(argv))
-            return 0, "carry state\n" if "carry" in argv else "", ""
+            announce_calls.append(list(argv))
+            return 0, "", ""
+
+        def start(argv):
+            carry_calls.append(list(argv))
+            return {"still": "running"}
 
         def sleep(seconds):
             clock[0] += seconds
 
         args = ["run", "--stasis-root", str(self.stasis), "--bin-store", str(self.store),
-                "--repo-root", str(self.repo), "--every", "60", "--carry-every", "60", "--passes", "2"]
+                "--repo-root", str(self.repo), "--every", "60", "--carry-every", "60", "--passes", "3"]
         globals_ = W["cmd_run"].__globals__
-        with mock.patch.dict(os.environ, {"HELD_TOOL_CARRY": "on"}), \
-                mock.patch.dict(globals_["time"].__dict__, {"monotonic": lambda: clock[0], "sleep": sleep}), \
-                mock.patch.dict(globals_, {"run_pass": run_pass}), contextlib.redirect_stderr(io.StringIO()):
+        with mock.patch.dict(globals_["time"].__dict__, {"monotonic": lambda: clock[0], "sleep": sleep}), \
+                mock.patch.dict(globals_, {"run_pass": run_pass, "start_async_pass": start,
+                                           "poll_async_pass": lambda job: None}), \
+                contextlib.redirect_stderr(io.StringIO()):
             self.assertEqual(W["main"](args), 0)
-        kinds = [argv[2] for argv in calls]
-        self.assertEqual(kinds, ["announce", "carry", "announce"])
-        self.assertEqual(calls[0], calls[2])
-        self.assertTrue(Path(self.root, W["LAST_CARRY"]).is_file())
-        self.assertIn("carry state", Path(self.root, W["LAST_CARRY"]).read_text())
+        self.assertEqual(len(announce_calls), 3)
+        self.assertEqual(len(carry_calls), 1)
+        self.assertEqual({argv[2] for argv in announce_calls}, {"announce"})
 
 
 LOCAL = "0123abcd-aaaa-bbbb-cccc-0000000000aa"   # another session moored on this device
@@ -820,7 +1032,8 @@ sys.exit(9)
         lines = err.getvalue().splitlines()
         self.assertEqual(len(lines), 1, lines)
         self.assertIn("failing (exit 1), next pass in 1 s", lines[0])
-        self.assertEqual(sleeps, [1.0])
+        self.assertAlmostEqual(sum(sleeps), 1.0, delta=0.02)
+        self.assertTrue(all(wait <= 0.1 for wait in sleeps))
 
     def dead(self, pid):
         import time as _time
