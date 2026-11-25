@@ -99,6 +99,10 @@ impl Fixture {
     /// Post this device's own misses event on `intent` for eprfs=abcdef, as the hand-over does,
     /// and return its CID.
     fn post_miss(&self, intent: &str) -> String {
+        self.post_miss_for(intent, TREE, "refs/heads/self/carry-test")
+    }
+
+    fn post_miss_for(&self, intent: &str, commit: &str, git_ref: &str) -> String {
         let record = FlowRecord::Event(FlowEvent {
             action: ReaVerb::Cite,
             provider: AgentRef("human:test".to_string()),
@@ -120,8 +124,8 @@ impl Fixture {
                 "measure:dev-landing@1".to_string(),
                 "value:1".to_string(),
                 format!("env:change={CHANGE}"),
-                format!("env:commit={TREE}"),
-                "env:ref=refs/heads/self/carry-test".to_string(),
+                format!("env:commit={commit}"),
+                format!("env:ref={git_ref}"),
                 "env:miss=eprfs=abcdef".to_string(),
             ],
         });
@@ -155,7 +159,7 @@ impl Fixture {
     }
 }
 
-fn run_git(root: &Path, args: &[&str]) {
+fn run_git(root: &Path, args: &[&str]) -> String {
     let output = Command::new("git")
         .args(args)
         .current_dir(root)
@@ -166,6 +170,7 @@ fn run_git(root: &Path, args: &[&str]) {
         "{}",
         String::from_utf8_lossy(&output.stderr)
     );
+    String::from_utf8(output.stdout).unwrap().trim().to_string()
 }
 
 fn success_json(output: Output) -> serde_json::Value {
@@ -270,6 +275,45 @@ fn a_carry_refuses_a_zero_bound_or_a_malformed_miss_before_any_append() {
     let raise_event = raised["event"].as_str().unwrap().to_string();
     assert!(!fixture.carry(&intent, &raise_event, "60").status.success());
     assert_eq!(fixture.records().len(), count);
+}
+
+#[test]
+fn a_carry_refuses_a_landed_miss_before_appending_any_record() {
+    let fixture = Fixture::new();
+    let raised = fixture.raise();
+    let intent = raised["intent"].as_str().unwrap().to_string();
+    let commit = run_git(fixture.root.path(), &["rev-parse", "HEAD"]);
+    run_git(
+        fixture.root.path(),
+        &["update-ref", "refs/remotes/origin/dev", &commit],
+    );
+    let miss = fixture.post_miss_for(&intent, &commit, "refs/heads/dev");
+    let count = fixture.records().len();
+
+    let refused = fixture.carry(&intent, &miss, "600");
+
+    assert!(!refused.status.success());
+    assert!(
+        String::from_utf8_lossy(&refused.stderr)
+            .contains("the miss is settled: its commit landed on refs/remotes/origin/dev"),
+        "{}",
+        String::from_utf8_lossy(&refused.stderr)
+    );
+    assert_eq!(fixture.records().len(), count);
+}
+
+#[test]
+fn a_carry_on_an_unknown_landing_still_appends_as_before() {
+    let fixture = Fixture::new();
+    let raised = fixture.raise();
+    let intent = raised["intent"].as_str().unwrap().to_string();
+    let miss = fixture.post_miss(&intent);
+    let count = fixture.records().len();
+
+    let receipt = success_json(fixture.carry(&intent, &miss, "600"));
+
+    assert_eq!(receipt["appended"], true);
+    assert_eq!(fixture.records().len(), count + 2);
 }
 
 #[test]

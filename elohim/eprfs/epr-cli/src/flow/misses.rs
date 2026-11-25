@@ -4,7 +4,9 @@
 //! not fetched the ref, does not have the commit, or cannot run the Git probe keeps offering the
 //! miss until that ancestry can be established (or its wait expires).
 
+use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet};
+use std::path::Path;
 
 use cid::Cid;
 use elohim_epr_rea::{FlowEvent, FlowRecord};
@@ -51,6 +53,77 @@ pub struct SettledMiss {
 pub enum SettledBy {
     Landing,
     WaitUntil,
+}
+
+/// The fetched integration refs a miss's commit lands on. A miss's own `git_ref` is never one: a
+/// hand-over pushes its commit to a `self/` ref at once, which is exactly when the lander wants it
+/// carried, so landing there would settle every hand-over miss the moment it is posted.
+pub(crate) const INTEGRATION_REFS: [&str; 2] =
+    ["refs/remotes/origin/dev", "refs/remotes/origin/main"];
+
+/// The integration refs this repository has not fetched.
+pub(crate) fn absent_integration_refs(root: &Path) -> Vec<&'static str> {
+    INTEGRATION_REFS
+        .into_iter()
+        .filter(|reference| git_ref_is_absent(root, reference))
+        .collect()
+}
+
+pub(crate) fn git_landing_status(root: &Path, commit: &str, remote_ref: &str) -> Landing {
+    let output = crate::process::build_command(
+        "git",
+        &["merge-base", "--is-ancestor", commit, remote_ref],
+        root,
+        &[],
+    )
+    .output();
+    match output.ok().and_then(|output| output.status.code()) {
+        Some(0) => Landing::Landed,
+        Some(1) => Landing::NotLanded,
+        _ => Landing::Unknown,
+    }
+}
+
+pub(crate) fn git_ref_is_absent(root: &Path, reference: &str) -> bool {
+    crate::process::build_command(
+        "git",
+        &["show-ref", "--verify", "--quiet", reference],
+        root,
+        &[],
+    )
+    .status()
+    .ok()
+    .and_then(|status| status.code())
+        == Some(1)
+}
+
+/// Probe whether a miss's commit is an ancestor of a fetched integration ref (`INTEGRATION_REFS`),
+/// caching one answer per commit. Landed on either ref is `Landed`; not an ancestor of any fetched
+/// one is `NotLanded`; neither ref fetched, or every probe failing, is `Unknown`.
+pub(crate) fn landing_probe(root: &Path) -> impl Fn(&OpenMiss) -> Landing + '_ {
+    let cache = RefCell::new(BTreeMap::<String, Landing>::new());
+    let absent = absent_integration_refs(root);
+    move |miss: &OpenMiss| {
+        if let Some(cached) = cache.borrow().get(&miss.commit).copied() {
+            return cached;
+        }
+        let mut status = Landing::Unknown;
+        for reference in INTEGRATION_REFS
+            .iter()
+            .filter(|reference| !absent.contains(reference))
+        {
+            match git_landing_status(root, &miss.commit, reference) {
+                Landing::Landed => {
+                    status = Landing::Landed;
+                    break;
+                }
+                Landing::NotLanded => status = Landing::NotLanded,
+                Landing::Unknown => {}
+            }
+        }
+        cache.borrow_mut().insert(miss.commit.clone(), status);
+        status
+    }
 }
 
 type MissKey = (Option<String>, String, String, String);
@@ -312,6 +385,8 @@ fn joined_pairs(raw: &str) -> BTreeMap<String, String> {
 
 #[cfg(test)]
 mod tests {
+    use std::path::Path;
+
     use elohim_epr_rea::{atom_cid, AgentRef, FlowEvent, Magnitude, ReaVerb};
 
     use super::*;
@@ -324,6 +399,31 @@ mod tests {
 
     fn cid(seed: &str) -> Cid {
         atom_cid(&seed.to_string()).unwrap()
+    }
+
+    fn git(root: &Path, args: &[&str]) -> String {
+        let output = crate::process::build_command(
+            "git",
+            args,
+            root,
+            &[
+                ("GIT_AUTHOR_NAME", "Fixture Author"),
+                ("GIT_AUTHOR_EMAIL", "author@example.test"),
+                ("GIT_COMMITTER_NAME", "Fixture Author"),
+                ("GIT_COMMITTER_EMAIL", "author@example.test"),
+            ],
+        )
+        .output()
+        .expect("git runs");
+        assert!(
+            output.status.success(),
+            "git {args:?} failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        String::from_utf8(output.stdout)
+            .expect("git stdout is UTF-8")
+            .trim()
+            .to_string()
     }
 
     fn event(
@@ -781,5 +881,96 @@ mod tests {
         )];
 
         assert!(open_misses(&records, &admitted, Some(ME)).is_empty());
+    }
+
+    #[test]
+    fn git_landing_probe_distinguishes_ancestor_descendant_and_missing_ref() {
+        let repo = tempfile::tempdir().expect("repo");
+        git(repo.path(), &["init", "-q"]);
+        std::fs::write(repo.path().join("one"), "one\n").expect("first file");
+        git(repo.path(), &["add", "one"]);
+        git(repo.path(), &["commit", "-q", "-m", "first"]);
+        let first = git(repo.path(), &["rev-parse", "HEAD"]);
+
+        std::fs::write(repo.path().join("two"), "two\n").expect("second file");
+        git(repo.path(), &["add", "two"]);
+        git(repo.path(), &["commit", "-q", "-m", "second"]);
+        let second = git(repo.path(), &["rev-parse", "HEAD"]);
+        let integration_ref = "refs/remotes/origin/dev";
+        git(repo.path(), &["update-ref", integration_ref, &first]);
+
+        assert_eq!(
+            git_landing_status(repo.path(), &first, integration_ref),
+            Landing::Landed
+        );
+        assert_eq!(
+            git_landing_status(repo.path(), &second, integration_ref),
+            Landing::NotLanded
+        );
+        assert_eq!(
+            git_landing_status(repo.path(), &first, "refs/remotes/origin/absent"),
+            Landing::Unknown
+        );
+    }
+
+    #[test]
+    fn a_hand_over_miss_stays_offered_until_its_commit_reaches_an_integration_ref() {
+        // Integrator review, 2026-11-25: a hand-over pushes its commit to a self/ ref at once, so
+        // landing on the miss's own ref settled every hand-over miss the moment it was posted.
+        let repo = tempfile::tempdir().expect("repo");
+        git(repo.path(), &["init", "-q"]);
+        std::fs::write(repo.path().join("one"), "one\n").expect("first file");
+        git(repo.path(), &["add", "one"]);
+        git(repo.path(), &["commit", "-q", "-m", "first"]);
+        let first = git(repo.path(), &["rev-parse", "HEAD"]);
+        std::fs::write(repo.path().join("two"), "two\n").expect("second file");
+        git(repo.path(), &["add", "two"]);
+        git(repo.path(), &["commit", "-q", "-m", "second"]);
+        let second = git(repo.path(), &["rev-parse", "HEAD"]);
+
+        let mut miss = open_miss(None);
+        miss.commit = second.clone();
+        miss.git_ref = "refs/heads/self/ethosengine-lane".to_string();
+
+        // Neither integration ref fetched: landing is unknown, so the miss stays offered.
+        assert_eq!(landing_probe(repo.path())(&miss), Landing::Unknown);
+
+        // The hand-over ref exists on origin and points at the commit; dev holds only the first.
+        git(
+            repo.path(),
+            &[
+                "update-ref",
+                "refs/remotes/origin/self/ethosengine-lane",
+                &second,
+            ],
+        );
+        git(
+            repo.path(),
+            &["update-ref", "refs/remotes/origin/dev", &first],
+        );
+        let landing = landing_probe(repo.path());
+        assert_eq!(landing(&miss), Landing::NotLanded);
+        let (offered, settled) = offerable_misses(vec![miss.clone()], &landing, 10);
+        assert_eq!(offered, vec![miss.clone()]);
+        assert!(settled.is_empty());
+
+        // Once dev reaches the commit, the miss is settled by landing.
+        git(
+            repo.path(),
+            &["update-ref", "refs/remotes/origin/dev", &second],
+        );
+        assert_eq!(landing_probe(repo.path())(&miss), Landing::Landed);
+
+        // main alone counts as an integration ref too.
+        git(
+            repo.path(),
+            &["update-ref", "-d", "refs/remotes/origin/dev"],
+        );
+        git(
+            repo.path(),
+            &["update-ref", "refs/remotes/origin/main", &second],
+        );
+        assert_eq!(landing_probe(repo.path())(&miss), Landing::Landed);
+        let _ = first;
     }
 }
