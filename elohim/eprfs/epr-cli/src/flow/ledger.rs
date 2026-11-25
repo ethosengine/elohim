@@ -29,7 +29,7 @@ use cid::Cid;
 use elohim_epr_rea::{FlowRecord, FlowStore, SidecarFlowStore};
 use serde::Serialize;
 
-use super::read::{is_note, note_view, OccurredAtKey};
+use super::read::{gate_verdict_observed_at, is_note, note_view, OccurredAtKey};
 use super::{body_cid_of_file, confine_under, rel_to_root, short_cid, FlowError, FlowResult};
 
 /// One record, as a story reads it.
@@ -42,6 +42,10 @@ pub struct LedgerEntry {
     /// Who acted: the commitment's provider, the event's provider.
     pub actor: String,
     pub occurred_at: String,
+    /// Run wall-clock time for a gate verdict. Legacy verdicts carry `"unknown"`; non-verdict
+    /// rows omit the field.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub observed_at: Option<String>,
     /// The commitment this record was made ON, when it was not the atom itself.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub via: Option<String>,
@@ -121,6 +125,7 @@ pub fn ledger(root: &Path, target: &str) -> FlowResult<LedgerResult> {
                 kind: "claim".to_string(),
                 actor: commitment.provider.0.clone(),
                 occurred_at,
+                observed_at: None,
                 via: None,
                 text,
                 gap_id,
@@ -152,6 +157,8 @@ pub fn ledger(root: &Path, target: &str) -> FlowResult<LedgerResult> {
             };
             let mut view = note_view(record_cid, event);
             view.via = via;
+            let observed_at =
+                gate_verdict_observed_at(&view).map(|value| value.unwrap_or("unknown").to_string());
             let text = match (&view.reason, &view.verdict) {
                 (Some(reason), Some(verdict)) => format!("[{verdict}] {reason}"),
                 (Some(reason), None) => reason.clone(),
@@ -169,6 +176,7 @@ pub fn ledger(root: &Path, target: &str) -> FlowResult<LedgerResult> {
                     .to_string(),
                 actor: view.actor,
                 occurred_at: view.occurred_at,
+                observed_at,
                 via: view.via,
                 text,
                 gap_id: None,
@@ -211,6 +219,7 @@ pub fn ledger(root: &Path, target: &str) -> FlowResult<LedgerResult> {
                 kind: "fulfilment".to_string(),
                 actor: event.provider.0.clone(),
                 occurred_at: event.occurred_at.clone(),
+                observed_at: None,
                 via: Some(via.clone()),
                 text,
                 gap_id: slots.get(1).cloned(),
@@ -314,9 +323,14 @@ impl LedgerResult {
                 .as_ref()
                 .map(|v| format!("via {v} · "))
                 .unwrap_or_default();
+            let observed = entry
+                .observed_at
+                .as_ref()
+                .map(|value| format!(" · observed: {value}"))
+                .unwrap_or_default();
             println!(
-                "- {date} · {} · {} · {via}{}",
-                entry.kind, entry.actor, entry.text
+                "- {date} · {} · {} · {via}{}{observed}",
+                entry.kind, entry.actor, entry.text,
             );
         }
     }

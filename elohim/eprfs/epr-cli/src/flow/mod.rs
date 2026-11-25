@@ -1899,7 +1899,10 @@ pub fn note_usage() -> String {
      --measures <path>       override the registry location\n\n    \
      --subject IS the target on this arm, so --on is refused alongside --measure. Two identical\n    \
      observations mint one CID and one row.\n\n  \
-     Shared: [--as agent:<role>@<model>] [--session <id>] [--json] [--root DIR]\n"
+     Shared:\n    \
+     --dated-by <commit-oid> date occurredAt by that commit's author date; the commit must\n                            \
+     resolve in --root, and author attribution remains HEAD's\n    \
+     [--as agent:<role>@<model>] [--session <id>] [--json] [--root DIR]\n"
         .to_string()
 }
 
@@ -2022,6 +2025,7 @@ fn run_note(args: &[String]) -> FlowResult<ExitCode> {
     // reads it by identity rather than inferring resolution from a later date.
     let closes = take_opt(&rest, "--closes")?;
     let verdict = take_opt(&rest, "--verdict")?;
+    let dated_by = take_opt(&rest, "--dated-by")?;
     let actor = note::NoteActor {
         as_ref: take_opt(&rest, "--as")?,
         session: resolve_session(explicit_session),
@@ -2036,7 +2040,7 @@ fn run_note(args: &[String]) -> FlowResult<ExitCode> {
         report: take_opt(&rest, "--report")?,
         supersedes: take_opt(&rest, "--supersedes")?,
     };
-    let outcome = note::note_with_options_closing(
+    let outcome = note::note_with_options_closing_dated(
         &opts.root,
         &on,
         &kind,
@@ -2046,6 +2050,7 @@ fn run_note(args: &[String]) -> FlowResult<ExitCode> {
         verdict.as_deref(),
         &actor,
         &acceptance,
+        dated_by.as_deref(),
     )?;
     if opts.json {
         println!("{}", serde_json::to_string_pretty(&outcome)?);
@@ -2247,7 +2252,7 @@ fn run_observation(
 
     let reason = take_opt(rest, "--reason")?;
     let outcome = match writer {
-        ObservationWriter::Note => note::observe(
+        ObservationWriter::Note => note::observe_dated(
             &opts.root,
             &kind,
             measure,
@@ -2258,6 +2263,7 @@ fn run_observation(
             reason.as_deref(),
             &actor,
             &measures,
+            take_opt(rest, "--dated-by")?.as_deref(),
         )?,
         ObservationWriter::Sense => {
             if kind != "observation" {
@@ -2516,13 +2522,14 @@ fn usage() -> String {
      [--bind-actor <actor-claim-cid> --session <id> (attribution ruling only)] \
      [--purpose acceptance --appointment <ruling-cid> --fulfillment <event-cid> \
      --review <technical-verdict-cid> --report <json-path> [--supersedes <acceptance-cid>]] \
+     [--dated-by <commit-oid>] \
      [--as agent:<role>@<model>] [--session <id>] [--json] [--root DIR] \
      (omit --session to use the native session identity, \
      stamped source:session-env; an agent-attributed note carries steward:<standing human or \
      collective> as its last slot, never an email)\n  \
      | note --on <target> --kind <kind> \
      [--measure <id@version> --subject <path> --value <n> [--unit <u>] [--env k=v]...] \
-     [--reason <text>] [--measures PATH] \
+     [--reason <text>] [--measures PATH] [--dated-by <commit-oid>] \
      [--as agent:<role>@<model>] [--session <id>] [--json] [--root DIR] \
      (the STRUCTURED-OBSERVATION arm — the measure pin must be declared in \
      .claude/epr-meta/measures.yaml or it is refused naming that file; --subject IS the target, \
@@ -2909,6 +2916,52 @@ pub fn head_commit_provenance(root: &Path) -> Option<(String, String)> {
         return None;
     }
     Some((email.to_string(), normalize_git_timestamp(ts)))
+}
+
+/// The canonical RFC3339 author date of a named commit in `root`'s repository.
+///
+/// The revision must resolve specifically to a commit. A missing, ambiguous, option-shaped, or
+/// non-commit revision is `None`; callers that request this clock must refuse rather than fall
+/// back to HEAD or wall time. Resolution happens in `root`, so linked worktrees naturally share
+/// the same object store while retaining their own checkout state.
+pub(crate) fn commit_author_date(root: &Path, commit: &str) -> Option<String> {
+    let commit = commit.trim();
+    if commit.is_empty() || commit.starts_with('-') {
+        return None;
+    }
+    let commit_spec = format!("{commit}^{{commit}}");
+    let resolved = crate::process::build_command(
+        "git",
+        &["rev-parse", "--verify", "--quiet", &commit_spec],
+        root,
+        &[],
+    )
+    .output()
+    .ok()?;
+    if !resolved.status.success() {
+        return None;
+    }
+    let oid = String::from_utf8_lossy(&resolved.stdout)
+        .lines()
+        .next()?
+        .trim()
+        .to_string();
+    if oid.is_empty() {
+        return None;
+    }
+    let out =
+        crate::process::build_command("git", &["show", "-s", "--format=%aI", &oid], root, &[])
+            .output()
+            .ok()?;
+    if !out.status.success() {
+        return None;
+    }
+    let timestamp = String::from_utf8_lossy(&out.stdout)
+        .lines()
+        .next()?
+        .trim()
+        .to_string();
+    (!timestamp.is_empty()).then(|| normalize_git_timestamp(&timestamp))
 }
 
 /// Field separator inside one commit's line; record separator between trailer values.
