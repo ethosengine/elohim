@@ -48,6 +48,11 @@ _sibling_scanner = _NS["sibling_moorings"]
 _sibling_patch = mock.patch.dict(_sibling_scanner.__globals__, {"sibling_moorings": lambda *a, **k: []})
 _real_miss_lines = _NS["_SilenceWatch"]._miss_lines
 _miss_patch = mock.patch.object(_NS["_SilenceWatch"], "_miss_lines", side_effect=lambda: [])
+# The presence reading reads the main checkout's stasis journals and gate-live runs: never this
+# workspace's from a test. PresenceReading points the seam at its own temporary directories.
+_NO_RECORDS = {"stasis": "/nonexistent-berth-test/stasis", "gate_live": "/nonexistent-berth-test/gate-live",
+               "watch_pass": "/nonexistent-berth-test/last-pass", "bin_store": "/nonexistent-berth-test/bin-store"}
+_presence_patch = mock.patch.dict(_sibling_scanner.__globals__, {"presence_sources": lambda: dict(_NO_RECORDS)})
 
 
 def setUpModule():
@@ -56,6 +61,7 @@ def setUpModule():
     _peer_status_patch.start()
     _sibling_patch.start()  # only SiblingMoorings opts into scanning its temporary flow store
     _miss_patch.start()  # individual miss-watch tests restore the real native query
+    _presence_patch.start()
     _saved_proxy_env.clear()
     for key in _PROXY_KEYS:
         if key in os.environ:
@@ -63,6 +69,7 @@ def setUpModule():
 
 
 def tearDownModule():
+    _presence_patch.stop()
     _miss_patch.stop()
     _peer_status_patch.stop()
     _sibling_patch.stop()
@@ -516,9 +523,13 @@ class StatusJson(unittest.TestCase):
         self.assertEqual(result, {
             "device": "did:key:local",
             "moorings": [{"session": "live", "runtime": None, "model": None, "task": "fix",
-                          "writes": ["local/**"], "seenS": 10, "declaredS": 20, "observedS": 15}],
+                          "writes": ["local/**"], "seenS": 10, "declaredS": 20, "observedS": 15,
+                          "presence": {"state": "working", "since": None, "ageS": 10,
+                                       "evidence": "recent-record"}}],
             "siblings": [{"device": "did:key:sibling", "session": "remote", "runtime": "codex",
-                          "task": "repair", "writes": ["src/**"], "seenS": 10}],
+                          "task": "repair", "writes": ["src/**"], "seenS": 10,
+                          "presence": {"state": "unknown", "since": None, "ageS": 10, "evidence": "held-note",
+                                       "why": "no pending call announced; working or idle does not cross devices"}}],
             "devices": [{"device": "did:key:sibling", "headAgeS": 10, "silent": False,
                          "unacked": {"reason": "never", "gap": None}}],
             "unavailable": []})
@@ -564,6 +575,7 @@ class StatusJson(unittest.TestCase):
             before = (
                 "BERTH (this workspace as one blade — moorings · leases · capacity)\n"
                 "  live  live           ?            ?@?  for ?  task=-  seen 10s ago\n"
+                "    presence: working (its mooring or a subagent of it wrote a record 10s ago)\n"
                 "  leases:\n"
                 "    cargo       free\n"
                 "    disk-heavy  free\n"
@@ -4312,6 +4324,333 @@ class DeviceEprResolverTest(unittest.TestCase):
         b = self.berth()
         b.epr = self.releases["bafyold"]
         self.assertEqual(b.epr_bin(), self.releases["bafyold"])
+
+
+FAKE_EPR = """#!/usr/bin/env python3
+import json, os, sys
+here = os.path.dirname(os.path.realpath(__file__))
+with open(os.path.join(here, "calls.log"), "a") as f:
+    f.write(json.dumps(sys.argv[1:]) + "\\n")
+if os.path.exists(os.path.join(here, "old")):
+    sys.stderr.write("epr session: unknown command stasis\\n")
+    sys.exit(2)
+print(open(os.path.join(here, "status.json")).read())
+"""
+PIN_CID = "bafyreib" + "a" * 40
+
+
+class PresenceReading(unittest.TestCase):
+    """working / waiting / idle / unknown, each derived from records that already exist: temporary
+    berth stores, temporary stasis journals and a fake pinned epr; never a real journal."""
+
+    S = "sess-0001-presence"
+    SIB = "did:key:z6Sibling"
+
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.root = Path(tmp.name)
+        self.now = time.time()
+        self.b = Berth(str(self.root / "berth"), now=lambda: self.now, policy_path=MISSING_POLICY)
+        self.b.pid_alive = lambda pid: True
+        self.sources = {"stasis": str(self.root / "stasis"), "gate_live": str(self.root / "gate-live"),
+                        "watch_pass": str(self.root / "last-pass.txt"), "bin_store": str(self.root / "bin-store")}
+        self.g = render_status.__globals__
+        for patch in (mock.patch.dict(self.g, {"presence_sources": lambda: dict(self.sources),
+                                                "_guard_state": lambda _: None,
+                                                "_steward_view": lambda b: (None, None),
+                                                "native_held": lambda *a, **k: {}}),):
+            patch.start()
+            self.addCleanup(patch.stop)
+        self.epr_dir = self.root / "bin-store/epr" / PIN_CID
+        self.epr_dir.mkdir(parents=True)
+        (self.epr_dir / "epr").write_text(FAKE_EPR)
+        (self.epr_dir / "epr").chmod(0o755)
+        (self.root / "bin-store/epr/sessions").mkdir()
+        (self.root / "bin-store/epr/sessions" / self.S).write_text(json.dumps({"cid": PIN_CID, "session": self.S}))
+        self.incidents()
+        self.seq = 0
+        self.moor()
+
+    # ---- fixtures
+    def moor(self, **fields):
+        Path(self.b.moor_dir).mkdir(parents=True, exist_ok=True)
+        row = {"session": self.S, "last_seen": self.now - 3000, "ttl_s": 10800, "recipient": {}, **fields}
+        Path(self.b._moor_path(self.S)).write_text(json.dumps(row))
+
+    def stamp(self, age):
+        t = self.now - age
+        return time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime(t)) + f".{int((t % 1) * 1000):03d}Z"
+
+    def event(self, kind, age, agent="main", **extra):
+        self.seq += 1
+        row = {"schemaVersion": 1, "kind": kind, "agentId": agent, "seq": self.seq,
+               "clock": {"wall": self.stamp(age)}, "source": {"hookEvent": "x"},
+               "shape": "rm -rf /secret/path --token hunter2", **extra}
+        path = self.root / "stasis" / self.S / "events.jsonl"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("a") as f:
+            f.write(json.dumps(row) + "\n")
+        return self.seq
+
+    def incidents(self, *seqs):
+        (self.epr_dir / "status.json").write_text(json.dumps({"sessions": [{"session": self.S, "openIncidents": [
+            {"id": f"{self.S}:{seq}", "stallClass": "silence", "ageSeconds": 1} for seq in seqs]}]}))
+
+    def calls(self):
+        log = self.epr_dir / "calls.log"
+        return [json.loads(line) for line in log.read_text().splitlines()] if log.exists() else []
+
+    def note(self, kind, device=None, session=None, agent="main", tool="Bash", since_age=600, at_age=500):
+        watch = _NS["_held_watch"]()
+        fields = dict(device="d", session=session or self.S, agent=agent, tool=tool,
+                      since=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(self.now - since_age)))
+        text = watch["open_line"](fields) if kind == "open" else watch["resumed_line"](fields)
+        inbox = Path(self.b._inbox_dir())
+        inbox.mkdir(parents=True, exist_ok=True)
+        with (inbox / "notes.jsonl").open("a") as f:
+            f.write(json.dumps({"cid": f"c{os.urandom(4).hex()}", "at": self.now - at_age, "from_device": device,
+                                "session": "held-tool-watch", "to": None, "text": text}) + "\n")
+        (inbox / "offset.json").write_text("{}")
+        return fields["since"]
+
+    def reading(self, native=True):
+        live = {s: m for s, m in self.b.moorings().items()}
+        return _NS["presence_readings"](self.b, live, native=native)[(None, self.S)]
+
+    def line(self):
+        [line] = [l for l in render_status(self.b).splitlines() if "presence:" in l]
+        return line
+
+    def snapshot(self):
+        return {str(p.relative_to(self.root)): p.read_bytes() for p in sorted(self.root.rglob("*")) if p.is_file()}
+
+    # ---- working
+    def test_an_open_gate_run_reads_working_and_a_closed_one_does_not(self):
+        self.event("turn-ended", 900)
+        runs = self.root / "gate-live/runs"
+        runs.mkdir(parents=True)
+        run = runs / "r1.jsonl"
+        run.write_text(json.dumps({"kind": "run-open", "session": self.S}) + "\n")
+        (self.root / "gate-live/by-session").mkdir()
+        (self.root / "gate-live/by-session" / self.S).write_text(str(run))
+        r = self.reading()
+        self.assertEqual((r["state"], r["evidence"]), ("working", "gate-live-run"))
+        self.assertIn("presence: working (a gate run of it is open, newest event ", self.line())
+        with run.open("a") as f:
+            f.write(json.dumps({"kind": "run-close", "outcome": "passed"}) + "\n")
+        self.assertEqual(self.reading()["state"], "idle")
+        self.assertEqual(self.calls(), [])  # nothing pending on record: no native read is spent
+
+    def test_a_recent_tool_result_record_reads_working(self):
+        self.event("turn-ended", 900)
+        self.moor(writes_observed_at=self.now - 20)
+        r = self.reading()
+        self.assertEqual((r["state"], r["evidence"], r["ageS"]), ("working", "recent-record", 20))
+        self.moor(writes_observed_at=self.now - 1000)  # older than the turn end's successor bound
+        self.assertEqual(self.reading()["state"], "idle")
+
+    def test_an_open_turn_reads_working_with_the_age_of_its_newest_record(self):
+        self.event("turn-ended", 900)
+        self.event("steward-ping", 300)
+        r = self.reading()
+        self.assertEqual((r["state"], r["evidence"], r["ageS"]), ("working", "open-turn", 300))
+
+    # ---- waiting
+    def test_an_open_incident_on_a_pending_call_reads_waiting_since_its_time(self):
+        self.event("steward-ping", 700)
+        seq = self.event("permission-requested", 600, tool="Bash")
+        self.event("dialog-displayed", 590, tool="Bash")
+        self.event("idle-prompt", 500)
+        self.incidents(seq)
+        r = self.reading()
+        since = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(self.now - 600))
+        self.assertEqual((r["state"], r["since"], r["tool"], r["evidence"]),
+                         ("waiting", since, "Bash", "stasis-incident"))
+        line = self.line()
+        self.assertEqual(line, f"    presence: waiting on a person since {since}: a Bash call has been pending since "
+                               "then and no result is recorded (its own epr holds the incident open, read now)")
+        # The read went to the session's OWN pinned epr, as a status read and nothing else.
+        self.assertEqual(self.calls()[0][:5], ["session", "stasis", "status", "--session", self.S])
+        self.assertTrue(all(call[2] == "status" for call in self.calls()))
+        # A line never asserts a person, and never carries a command, a path or prompt text.
+        for text in (line, json.dumps(r)):
+            for word in ("absent", "away", "present ", "nobody", "secret", "hunter2", "rm -rf"):
+                self.assertNotIn(word, text)
+
+    def test_no_open_incident_means_not_waiting(self):
+        self.event("steward-ping", 700)
+        self.event("permission-requested", 600, tool="Bash")
+        self.incidents()
+        self.assertEqual(self.reading()["state"], "working")
+
+    def test_a_result_on_record_clears_waiting_whatever_the_fold_still_holds(self):
+        self.event("steward-ping", 700)
+        seq = self.event("permission-requested", 600, tool="Bash")
+        self.incidents(seq)
+        self.assertEqual(self.reading()["state"], "waiting")
+        self.event("prompt-closed", 30)
+        r = self.reading()
+        self.assertEqual((r["state"], r["evidence"], r["ageS"]), ("working", "open-turn", 30))
+        self.event("turn-ended", 10)
+        self.assertEqual(self.reading()["state"], "idle")
+
+    def test_a_watchers_observation_feeds_waiting_and_its_resumed_note_clears_it(self):
+        self.event("turn-ended", 2000)
+        seq = self.event("tool-pending-observed", 600, agent="sub1", tool="Edit", pendingSince=self.stamp(800),
+                         source={"observer": "watcher:held-tool"})
+        self.event("tool-pending-observed", 30, agent="sub1", tool="Edit", pendingSince=self.stamp(800),
+                   source={"observer": "watcher:held-tool"})
+        self.incidents(seq)
+        r = self.reading()
+        self.assertEqual((r["state"], r["tool"]), ("waiting", "Edit"))
+        self.assertEqual(r["since"], time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(self.now - 800)))
+        self.note("open", agent="sub1", tool="Edit", since_age=800)
+        self.assertEqual(self.reading()["state"], "waiting")
+        self.note("resumed", agent="sub1", tool="Edit", since_age=800)
+        self.assertEqual(self.reading()["state"], "idle")
+
+    def test_an_observation_the_watcher_stopped_renewing_is_cleared_or_unknown_never_waiting(self):
+        self.event("turn-ended", 2000)
+        seq = self.event("tool-pending-observed", 600, agent="sub1", tool="Edit", pendingSince=self.stamp(800),
+                         source={"observer": "watcher:held-tool"})
+        self.incidents(seq)  # the fold never closes a subagent's observed call
+        r = self.reading()   # no pass of the watcher is on record since: not known either way
+        self.assertEqual((r["state"], r["ageS"]), ("unknown", 600))
+        self.assertEqual(self.line(), "    presence: unknown since 10m (a pending call was last observed then and "
+                                      "this device's watcher has not passed since)")
+        Path(self.sources["watch_pass"]).write_text("pass")  # it passed again, now, and renewed nothing
+        self.assertEqual(self.reading()["state"], "idle")
+        self.assertEqual(self.calls(), [])
+
+    # ---- idle, stale
+    def test_a_turn_end_with_nothing_newer_reads_idle_since_it(self):
+        self.event("steward-ping", 500)
+        self.event("turn-ended", 400)
+        self.event("idle-prompt", 340)
+        r = self.reading()
+        since = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(self.now - 400))
+        self.assertEqual((r["state"], r["since"], r["ageS"]), ("idle", since, 400))
+        self.assertEqual(self.line(), f"    presence: idle since {since} (its last turn ended 6m ago; nothing newer on record)")
+
+    def test_past_the_bound_the_line_reads_unknown_since_not_the_last_known_state(self):
+        self.event("turn-ended", 5000)
+        self.event("steward-ping", _NS["PRESENCE_STALE_S"] + 300)
+        r = self.reading()
+        self.assertEqual((r["state"], r["ageS"]), ("unknown", _NS["PRESENCE_STALE_S"] + 300))
+        self.assertEqual(self.line(), "    presence: unknown since 20m (a turn is open and nothing has been recorded since)")
+        self.assertNotIn("working", self.line())
+
+    def test_a_session_with_no_journal_says_what_is_known(self):
+        self.assertEqual(self.line(), "    presence: unknown since 50m (no turn of this session is on record)")
+
+    # ---- the session's own epr
+    def test_an_old_pinned_epr_yields_the_unknown_line_and_nothing_is_written(self):
+        self.event("steward-ping", 700)
+        self.event("permission-requested", 600, tool="Bash")
+        (self.epr_dir / "old").write_text("")
+        before = self.snapshot()
+        r = self.reading()
+        self.assertEqual((r["state"], r["why"]), ("unknown", "session's epr predates the reading"))
+        self.assertEqual(self.line(), "    presence: unknown (session's epr predates the reading)")
+        after = self.snapshot()
+        after.pop(f"bin-store/epr/{PIN_CID}/calls.log")  # the fake's own call log
+        self.assertEqual(before, after)
+
+    def test_an_undeterminable_pin_and_a_skipped_native_read_are_unknown_not_a_guess(self):
+        self.event("steward-ping", 700)
+        self.event("permission-requested", 600, tool="Bash")
+        self.assertIn("native read was skipped", self.reading(native=False)["why"])
+        (self.root / "bin-store/epr/sessions" / self.S).unlink()
+        r = self.reading()
+        self.assertEqual((r["state"], r["why"]), ("unknown", "session's epr pin could not be determined (no pin file)"))
+        self.assertEqual(self.calls(), [])
+
+    def test_the_reading_writes_nothing_and_status_json_carries_the_same_fields(self):
+        self.event("steward-ping", 500)
+        self.event("turn-ended", 400)
+        self.note("open", device=self.SIB, session="remote", since_age=900)
+        before = self.snapshot()
+        with mock.patch.dict(self.g, {"sibling_moorings": lambda *a, **k: []}):
+            row = _NS["status_json"](self.b, no_peer=True)["moorings"][0]
+        self.assertEqual(row["presence"], self.reading())
+        self.assertEqual(set(row["presence"]), {"state", "since", "ageS", "evidence"})
+        render_status(self.b)
+        self.assertEqual(before, self.snapshot())
+
+    # ---- a sibling device's session
+    def sibling_view(self, head_age=12):
+        return {"standing": "device", "now": round(self.now * 1000),
+                "others": {self.SIB: {"seq": 5, "last_seen": round((self.now - head_age) * 1000),
+                                      "moorings": {"remote": round((self.now - 60) * 1000)}}}}
+
+    def sibling(self, view):
+        rows = [dict(device=self.SIB, session="remote", runtime="claude-code", task="t", write_set=[], at=self.now - 60)]
+        return _NS["presence_readings"](self.b, {}, rows, view)[(self.SIB, "remote")], rows
+
+    def test_a_siblings_waiting_comes_from_a_heard_held_note_and_clears_on_its_resumed_note(self):
+        r, rows = self.sibling(self.sibling_view())
+        self.assertEqual((r["state"], r["evidence"]), ("unknown", "held-note"))
+        self.assertIn("working or idle does not cross devices", r["why"])
+        since = self.note("open", device=self.SIB, session="remote", tool="Bash", since_age=25200)
+        self.note("open", device="did:key:z6Other", session="remote", tool="Write")  # another device's word about it
+        r, rows = self.sibling(self.sibling_view())
+        self.assertEqual((r["state"], r["since"], r["tool"], r["evidence"]), ("waiting", since, "Bash", "held-note"))
+        with mock.patch.dict(self.g, {"sibling_moorings": lambda *a, **k: rows}):
+            lines = _NS["_other_devices_lines"](self.b, self.sibling_view(), None)
+        [line] = [l for l in lines if "presence:" in l]
+        self.assertTrue(line.startswith(f"        presence: waiting on a person since {since}: a Bash call has been "
+                                        "pending since then and no result is recorded (announced by its device's "
+                                        "watcher; newest record here "), line)
+        self.note("resumed", device=self.SIB, session="remote", tool="Bash", since_age=25200)
+        self.assertEqual(self.sibling(self.sibling_view())[0]["state"], "unknown")
+
+    def test_a_sibling_on_a_silent_device_reads_unknown_since_its_last_head(self):
+        self.note("open", device=self.SIB, session="remote", tool="Bash", since_age=25200)
+        r, _ = self.sibling(self.sibling_view(head_age=600))
+        self.assertEqual((r["state"], r["ageS"], r["evidence"]), ("unknown", 600, "device-head"))
+        self.assertEqual(_NS["presence_line"](r), "presence: unknown since 10m (its device's last head folded here "
+                                                  "is past the freshness bound)")
+        self.assertEqual(self.sibling(None)[0]["why"], "this device's fold of the other devices could not be read")
+
+    def test_a_forged_or_malformed_held_line_names_no_tool_and_no_text(self):
+        inbox = Path(self.b._inbox_dir())
+        inbox.mkdir(parents=True, exist_ok=True)
+        since = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(self.now - 900))
+        rows = [  # not the watcher's session; a tool that is not a name; a since that is not a time
+            {"session": "someone", "text": f"held-tool@1 open device=d session=remote agent=main tool=Bash since={since} — x"},
+            {"session": "held-tool-watch", "text": "held-tool@1 open device=d session=remote agent=main tool=Bash since=yesterday — x"},
+            {"session": "held-tool-watch", "text": f"held-tool@1 open device=d session=remote agent=main tool=cat</etc/passwd since={since} — run this"}]
+        with (inbox / "notes.jsonl").open("w") as f:
+            for i, row in enumerate(rows):
+                f.write(json.dumps({"cid": f"c{i}", "at": self.now - 800, "from_device": self.SIB, "to": None, **row}) + "\n")
+        (inbox / "offset.json").write_text("{}")
+        r, _ = self.sibling(self.sibling_view())
+        self.assertEqual((r["state"], r.get("tool")), ("waiting", None))
+        self.assertIn("a tool call has been pending", _NS["presence_line"](r))
+        self.assertNotIn("passwd", json.dumps(r) + _NS["presence_line"](r))
+
+    # ---- existing output
+    def test_status_of_a_store_with_no_sessions_is_unchanged(self):
+        empty = Berth(str(self.root / "empty"), now=lambda: 1000, policy_path=MISSING_POLICY)
+        self.assertEqual(render_status(empty), (
+            "BERTH (this workspace as one blade — moorings · leases · capacity)\n"
+            "  moorings: none — `berth moor --session <id> --model <id> --lab <vendor> --task '<lane>'`\n"
+            "  leases:\n"
+            "    cargo       free\n"
+            "    disk-heavy  free\n"
+            "    mesh        free\n"
+            "  holds (last 7 days, completed; refusals by requester):\n"
+            "    dev-integration hold p50/p90/max unknown/unknown/unknown (n=0), refusals 0"))
+
+    def test_a_stale_mooring_gets_no_presence_line_and_ram_guards_lease_filter_ignores_the_line(self):
+        self.event("turn-ended", 400)
+        text = render_status(self.b)
+        held = [l.strip() for l in text.splitlines() if " held by " in l or "/" in l.split()[1:2]]
+        self.assertEqual([l for l in held if "presence" in l], [])  # .claude/hooks/ram-guard.py:511
+        self.b.pid_alive = lambda pid: False
+        self.moor(pid=1, last_seen=self.now - 99999)
+        self.assertNotIn("presence:", render_status(self.b))
 
 
 if __name__ == "__main__":
