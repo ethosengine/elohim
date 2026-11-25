@@ -11,6 +11,10 @@ import { fileURLToPath } from "node:url";
 
 const ROOT = fileURLToPath(new URL("../../", import.meta.url));
 const HOOK = readFileSync(join(ROOT, ".husky/pre-push.bash"), "utf8");
+const PUSH_CHANGED_FILES = readFileSync(
+  join(ROOT, "genesis/orchestrator/push-changed-files.sh"),
+  "utf8",
+);
 
 function slice(from, to) {
   const a = HOOK.indexOf(from);
@@ -52,12 +56,16 @@ test("notes_ref_is_skipped_and_branch_ref_still_gated_by_the_pushed_ref_loop", (
     git(undefined, "update-ref", "refs/notes/brit/validation", notes);
 
     mkdirSync(join(dir, "genesis/orchestrator"), { recursive: true });
+    writeFileSync(join(dir, "genesis/orchestrator/push-changed-files.sh"), PUSH_CHANGED_FILES);
+    mkdirSync(join(dir, ".claude/scripts"), { recursive: true });
+    writeFileSync(join(dir, ".claude/scripts/dependabot-paydown.py"), "raise SystemExit(0)\n");
     const stub = join(dir, "genesis/orchestrator/rust-style.sh");
     writeFileSync(stub, '#!/usr/bin/env bash\necho "STYLE $*"\n');
     chmodSync(stub, 0o755);
 
     const zero = "0".repeat(40);
     const script = [
+      `HOOK_WORK_TREE=${dir}`,
       `ZERO_SHA=${zero}`,
       NOTES_FN,
       'leg_red() { echo "LEG_RED $*"; }',
