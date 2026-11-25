@@ -902,7 +902,9 @@ export function gateEvidence(project, { env = process.env, root, commit, cargoEn
  * `warn` before the write replaces it; the same closure and verdict is refreshed silently.
  * brit's expected refusals come back as `status` 1 with `refused` naming the class and a
  * one-line `stderr` that says so; any other failure passes through. Returns the spawn result
- * shape; never throws.
+ * shape; never throws. A successful put is read back so its signed `builtAt` can date the
+ * crossing observation; an unavailable read-back leaves `builtAt` absent rather than inventing
+ * a second clock.
  */
 export function recordEvidence(project, key, { success, seconds, cost, commit, buildRefBin, root, jobs, dirty, nativeKey, env = process.env, cargoEnv, spawn = spawnSync, warn = stderrWarn }) {
   if (dirty !== false) {
@@ -960,7 +962,16 @@ export function recordEvidence(project, key, { success, seconds, cost, commit, b
   } catch (error) {
     return { status: 1, stdout: '', stderr: String(error) };
   }
-  if (r.status === 0) return r;
+  if (r.status === 0) {
+    const recorded = readBuildNote(attestationStep(project), commit, { buildRefBin, root, spawn });
+    const builtAt = recorded.state === 'verified'
+      && recorded.node.inputsHash === key
+      && recorded.node.success === success
+      && typeof recorded.node.builtAt === 'string'
+      && Number.isFinite(Date.parse(recorded.node.builtAt))
+      ? recorded.node.builtAt : null;
+    return builtAt ? { ...r, builtAt } : r;
+  }
   const refusal = expectedRefusal(r.stderr);
   return refusal
     ? { ...r, status: 1, refused: refusal.kind, stderr: `expected refusal (${refusal.kind}), not a failure: ${refusal.line}` }
@@ -984,7 +995,6 @@ function buildPutIdentity(stdout) {
 /** Append one completed gate verdict to this device's crossing flow. Best effort, never a gate. */
 export function emitGateVerdict(project, key, {
   success, seconds, commit, put, root, env = process.env, spawn = spawnSync,
-  now = () => new Date(),
   warn = line => process.stderr.write(line),
 }) {
   // A device act: the standing read and the crossing verdict run the device's head epr.
@@ -1018,28 +1028,43 @@ export function emitGateVerdict(project, key, {
     seconds: String(Math.round(seconds)),
     ...identity,
   };
-  // A verdict is dated by the commit it judged (--dated-by) and carries the run's wall-clock time
-  // as observedAt. An epr older than --dated-by does not refuse the flag: its structured-note arm
+  // A verdict is dated by the commit it judged (--dated-by) and carries the recorded run's
+  // `builtAt` as observedAt. An epr older than --dated-by does not refuse the flag: its structured-note arm
   // reads only the flags it knows and would silently date by HEAD while carrying observedAt, a new
   // field over the old date's meaning. So the epr is asked first (its note help names the flag);
   // one that does not know it writes the exact legacy form (HEAD-dated, no observedAt), which
   // every reader shows as observed unknown.
+  const observedAt = Number.isFinite(Date.parse(put?.builtAt))
+    ? new Date(put.builtAt).toISOString().replace(/\.\d{3}Z$/, 'Z') : null;
   const noteArgs = dated => {
     const args = [
       'flow', 'note', '--kind', 'observation', '--measure', 'gate-verdict@1', '--subject', '.',
       '--value', '1', '--reason', 'verdict', ...(dated ? ['--dated-by', sha] : []),
     ];
-    const slots = dated
-      ? { ...fields, observedAt: now().toISOString().replace(/\.\d{3}Z$/, 'Z') } : fields;
+    const slots = dated && observedAt ? { ...fields, observedAt } : fields;
     for (const [name, value] of Object.entries(slots)) args.push('--env', `${name}=${value}`);
     args.push('--root', device);
     return args;
   };
   try {
-    const help = spawn(epr, ['flow', 'note', '--help', '--root', device], { cwd: device, encoding: 'utf8', timeout: 5_000 });
-    const dated = /--dated-by/.test(`${help.stdout || ''}${help.stderr || ''}`);
-    if (!dated) {
+    const probe = () => {
+      try {
+        const help = spawn(epr, ['flow', 'note', '--help', '--root', device], { cwd: device, encoding: 'utf8', timeout: 5_000 });
+        const output = `${help.stdout || ''}${help.stderr || ''}`;
+        return help.status === 0 && output.trim()
+          ? { ok: true, dated: /--dated-by/.test(output) }
+          : { ok: false };
+      } catch {
+        return { ok: false };
+      }
+    };
+    let capability = probe();
+    if (!capability.ok) capability = probe();
+    const dated = capability.ok && capability.dated;
+    if (capability.ok && !dated) {
       warn(`[gate] ${project.name} verdict crossing: this epr predates --dated-by; written in the legacy form (observed unknown)\n`);
+    } else if (!capability.ok) {
+      warn(`[gate] ${project.name} verdict crossing: --dated-by capability probe failed twice; written without --dated-by or observedAt\n`);
     }
     const emitted = spawn(epr, noteArgs(dated), { cwd: device, encoding: 'utf8', timeout: 5_000 });
     if (emitted.status === 0) return true;
