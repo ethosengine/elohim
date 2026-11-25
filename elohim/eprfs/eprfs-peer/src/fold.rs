@@ -708,7 +708,11 @@ fn decode_event(cid: &Cid, bytes: &[u8]) -> Result<FlowEvent, String> {
 
 /// One sender's record order. Current writers stamp every crossing record with a strictly
 /// increasing `env:dseq`; legacy records precede counted records and retain their timestamp/CID
-/// order. Sorting before chunking makes every appended prefix a state the sender really held.
+/// order. Sorting before chunking appends each sender's events in its own order WITHIN what one
+/// fetch returned. It does not make every prefix a state the sender held: the fetch itself is
+/// truncated in CID order (count, bytes, deadline) before this sort, so a later event can be fetched
+/// and appended before an earlier one that has not arrived yet (claim A, release A, claim B can be
+/// seen as A and B both held). Reading a sender only up to its gap-free coverage is LANE L's work.
 fn order_sender_events(events: &mut [ChannelEvent]) {
     events.sort_by(|left, right| sender_event_order(left).cmp(&sender_event_order(right)));
 }
