@@ -498,6 +498,70 @@ fn push_changed_files(
     command_until(&mut command, deadline)
 }
 
+fn gate_selection(
+    root: &Path,
+    changed: Vec<u8>,
+    deadline: Instant,
+) -> Result<CommandAnswer, String> {
+    let root = root.to_owned();
+    let stall_input = std::env::var_os("EPR_UNDER_TEST").is_some()
+        && std::env::var_os("EPR_WOULD_STALL_INPUT").is_some();
+    let (send, receive) = mpsc::channel();
+    std::thread::Builder::new()
+        .name("device-would-selection".into())
+        .spawn(move || {
+            let answer = (|| {
+                if stall_input {
+                    std::thread::sleep(WOULD_BUDGET);
+                }
+                let runner = root.join("genesis/orchestrator/gate-runner.mjs");
+                let mut input = tempfile::NamedTempFile::new().map_err(|error| {
+                    format!("forecast error creating changed-file input: {error}")
+                })?;
+                input
+                    .write_all(&changed)
+                    .and_then(|()| input.flush())
+                    .map_err(|error| {
+                        format!("forecast error writing changed-file input: {error}")
+                    })?;
+                let stdin = input.reopen().map_err(|error| {
+                    format!("forecast error reopening changed-file input: {error}")
+                })?;
+                let runner_text = runner
+                    .to_str()
+                    .ok_or_else(|| format!("forecast error: {} is not UTF-8", runner.display()))?;
+                let mut command = crate::process::build_command(
+                    "node",
+                    &[
+                        runner_text,
+                        "--changed-file-list",
+                        "--names",
+                        "--order",
+                        "cost",
+                    ],
+                    &root,
+                    &[],
+                );
+                command
+                    .env("GATE_ROOT", &root)
+                    .stdin(Stdio::from(stdin))
+                    .stdout(Stdio::piped())
+                    .stderr(Stdio::piped());
+                command_until(&mut command, deadline)
+            })();
+            let _ = send.send(answer);
+        })
+        .map_err(|error| format!("forecast error starting gate selection worker: {error}"))?;
+
+    match receive.recv_timeout(deadline.saturating_duration_since(Instant::now())) {
+        Ok(answer) => answer,
+        Err(mpsc::RecvTimeoutError::Timeout) => Ok(CommandAnswer::TimedOut),
+        Err(mpsc::RecvTimeoutError::Disconnected) => {
+            Err("forecast error: gate selection worker stopped without an answer".into())
+        }
+    }
+}
+
 /// Forecast the gate names selected by the same changed-file range shape the pre-push hook uses:
 /// destination-to-tip, with the merge-base form against origin/dev only when that cannot be read.
 pub(super) fn would_run(
@@ -553,53 +617,7 @@ pub(super) fn would_run(
         }
     };
 
-    let runner = root.join("genesis/orchestrator/gate-runner.mjs");
-    let mut input = match tempfile::NamedTempFile::new() {
-        Ok(input) => input,
-        Err(error) => {
-            lines.push(format!(
-                "forecast error creating changed-file input: {error}"
-            ));
-            return lines;
-        }
-    };
-    if let Err(error) = input.write_all(&changed).and_then(|()| input.flush()) {
-        lines.push(format!(
-            "forecast error writing changed-file input: {error}"
-        ));
-        return lines;
-    }
-    let stdin = match input.reopen() {
-        Ok(stdin) => stdin,
-        Err(error) => {
-            lines.push(format!(
-                "forecast error reopening changed-file input: {error}"
-            ));
-            return lines;
-        }
-    };
-    let Some(runner_text) = runner.to_str() else {
-        lines.push(format!("forecast error: {} is not UTF-8", runner.display()));
-        return lines;
-    };
-    let mut command = crate::process::build_command(
-        "node",
-        &[
-            runner_text,
-            "--changed-file-list",
-            "--names",
-            "--order",
-            "cost",
-        ],
-        root,
-        &[],
-    );
-    command
-        .env("GATE_ROOT", root)
-        .stdin(Stdio::from(stdin))
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
-    match command_until(&mut command, deadline) {
+    match gate_selection(root, changed, deadline) {
         Err(error) => {
             lines.push(format!(
                 "forecast error while running gate selection: {error}"
