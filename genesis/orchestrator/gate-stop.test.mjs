@@ -126,11 +126,12 @@ describe('stop --now ends the running gate', () => {
     const entered = resolve(dir, 'second-entered');
     const secondScript = resolve(dir, 'second.sh');
     writeFileSync(secondScript, `#!/usr/bin/env bash\nprintf entered > ${JSON.stringify(entered)}\n`, { mode: 0o755 });
-    const second = startTap(run, secondScript, {
+    const { path: secondRun } = openRun({ root: dir, sha: 'e'.repeat(40), target: 'second-slot-test' });
+    const second = startTap(secondRun, secondScript, {
       GATE_SLOT_LOCK_PATH: lock, GATE_SLOT_HOLDER_PATH: holder,
       GATE_SLOT_WAIT_RESULT: resolve(dir, 'second-wait.tsv'), GATE_SLOT_LOCK_WAIT_S: '5',
     });
-    assert.ok(await waitFor(() => readRun(run).events.some(event => event.kind === 'wait')),
+    assert.ok(await waitFor(() => readRun(secondRun).events.some(event => event.kind === 'wait')),
       'the second gate never waited on the first holder');
 
     requestStop(run, { immediate: true, by: 'session-stopper' });

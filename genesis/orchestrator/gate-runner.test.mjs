@@ -1938,11 +1938,13 @@ describe('a shared cargo slot never serves another checkout its compiled crates'
     mkdirSync(resolve(fp, 'serde-89ef4567'), { recursive: true });
     writeFileSync(resolve(target, '.gate-owner'), '/projects/elohim/.claude/worktrees/some-other-checkout');
     const lock = `${target}.gate.lock`;
-    const run = () => spawnSync(
-      'flock',
-      ['--close', lock, 'bash', resolve(ROOT, 'genesis/orchestrator/run-local-gate.sh'),
-        ROOT, 'selftest', 'elohim/epr', 'root-just', '_gate-selftest-env', '', target, 'dev', '', '', lock],
-      { encoding: 'utf8', env: { ...process.env, GATE_CARGO_ENV: undefined } }
+    const run = () => spawnSync(process.execPath,
+      [resolve(ROOT, 'genesis/orchestrator/gate-tap.mjs'), '--project', 'selftest', '--',
+        'bash', resolve(ROOT, 'genesis/orchestrator/run-local-gate.sh'), ROOT, 'selftest', 'elohim/epr',
+        'root-just', '_gate-selftest-env', '', target, 'dev', '', '', lock],
+      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe', 'pipe'], env: { ...process.env,
+        GATE_CARGO_ENV: undefined, GATE_SLOT_LOCK_PATH: lock,
+        GATE_SLOT_HOLDER_PATH: resolve(target, '.gate.holder') } }
     );
     try {
       const first = run();
