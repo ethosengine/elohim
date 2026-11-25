@@ -18,12 +18,84 @@ import {
   oracleMode,
   projectsForChanges,
   runProject,
+  startEnrichSample,
   selectGateProjects,
   worktreeTargetDir,
   parseStepTimes,
 } from './gate-runner.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
+
+describe('reused gate enrichment sampling', () => {
+  // The trigger is exercised directly: runProject's evidence lookup and reuse decision are not
+  // injectable, so a test can never stand in for decideReuse. runProject calls startEnrichSample only
+  // inside its `decision.reuse` branch, after the reuse line and before `complete(0, 'reused')`.
+  const commit = 'a'.repeat(40);
+  const project = { name: 'fixture', dir: '.', run: { kind: 'just', recipe: 'gate' } };
+  const localDecision = { reuse: true, row: { commit, attestation: { builtAt: '2026-11-25T00:00:00Z' } } };
+  function sample({ knob, decision = localDecision, markers = new Set(), name = 'fixture', runId = 'enrich-run' } = {}) {
+    const detached = [];
+    let output = '';
+    const started = startEnrichSample({
+      project: { ...project, name }, gateCommit: commit, closure: 'closure-a', decision, root: '/repo',
+      env: { GATE_READING_RUN_ID: runId, ...(knob === undefined ? {} : { GATE_ENRICH_SAMPLE: knob }) },
+      write: text => { output += text; },
+    }, {
+      spawn: (command, args, options) => { detached.push({ command, args, options }); return { pid: 4242, unref() {} }; },
+      markers,
+    });
+    return { started, output, detached };
+  }
+
+  test('enrich knob unset or off spawns nothing and writes nothing', () => {
+    for (const knob of [undefined, 'off']) {
+      const result = sample({ knob });
+      assert.equal(result.started, false);
+      assert.equal(result.detached.length, 0);
+      assert.equal(result.output, '');
+    }
+  });
+
+  test('enrich knob on starts one detached sample with selector args', () => {
+    const result = sample({ knob: 'on' });
+    assert.equal(result.started, true);
+    assert.equal(result.detached.length, 1);
+    const call = result.detached[0];
+    assert.equal(call.command, process.execPath);
+    assert.deepEqual(call.args, [
+      resolve('/repo', 'genesis/orchestrator/enrich-sample.mjs'),
+      '--project', 'fixture', '--commit', commit, '--closure', 'closure-a', '--root', '/repo',
+    ]);
+    assert.deepEqual(call.options, { detached: true, stdio: 'ignore' });
+    assert.match(result.output, /\[gate\] fixture enrich-sample: started \(pid 4242\)/);
+  });
+
+  test('enrich samples only the first of two reused projects in one reading run', () => {
+    const markers = new Set();
+    const first = sample({ knob: 'on', markers });
+    const second = sample({ knob: 'on', markers, name: 'second' });
+    assert.equal(first.detached.length, 1);
+    assert.equal(second.detached.length, 0);
+    assert.equal(second.output, '');
+  });
+
+  test('enrich sibling reuse carries the admitted source device', () => {
+    const decision = { reuse: true, independence: 'sibling', row: { commit, seconds: 12, device: 'did:key:sibling' } };
+    const args = sample({ knob: 'on', decision }).detached[0].args;
+    assert.equal(args[args.indexOf('--from-device') + 1], 'did:key:sibling');
+    assert.ok(!args.includes('--verdict'));
+  });
+
+  test('a failed spawn writes one not-started line and starts nothing', () => {
+    let output = '';
+    const started = startEnrichSample({
+      project, gateCommit: commit, closure: 'closure-a', decision: localDecision, root: '/repo',
+      env: { GATE_ENRICH_SAMPLE: 'on', GATE_READING_RUN_ID: 'fail-run' }, write: text => { output += text; },
+    }, { spawn: () => { throw new Error('no node'); }, markers: new Set() });
+    assert.equal(started, false);
+    assert.equal(output, '[gate] fixture enrich-sample: not started (no node)\n');
+  });
+});
 
 describe('gate step reading collector', () => {
   const base = {

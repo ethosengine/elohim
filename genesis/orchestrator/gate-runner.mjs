@@ -4,7 +4,7 @@
 
 import { appendFileSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
-import { spawnSync } from 'child_process';
+import { spawn as spawnProcess, spawnSync } from 'child_process';
 import { createHash } from 'crypto';
 import { resolve, dirname, basename, join, relative } from 'path';
 import { fileURLToPath } from 'url';
@@ -19,7 +19,7 @@ import { filterChanged } from './ci-ignore.mjs';
 import { COST_FIELDS, classifyFailure, recordCycle, subjectFor } from './gate-cycle.mjs';
 import { CI_BRANCH_PATTERN, costOf, deferDecision, formatExpectation, readCycleUnion } from './gate-cost.mjs';
 import {
-  ageOf, attestedOutputParses, emitGateVerdict, findEvidence, gateEvidence, isHabitAtom, patternDigest, recordEvidence, resolveBin, reusableHit,
+  ageOf, attestedOutputParses, deviceRoot, emitGateVerdict, findEvidence, gateEvidence, isHabitAtom, patternDigest, recordEvidence, resolveBin, reusableHit,
   selfAgentId, siblingGovernanceChange, siblingVerdicts, stepFingerprints,
 } from './gate-evidence.mjs';
 import { britAffected, resolveBritBin } from './gate-oracle.mjs';
@@ -38,6 +38,7 @@ import { SUITE_EXPECT_ENV, SUITE_RESULT_ENV, dirtyAfterRun, encodeExpectation, r
 const ROOT = process.env.GATE_ROOT
   ? resolve(process.env.GATE_ROOT)
   : resolve(dirname(fileURLToPath(import.meta.url)), '../..');
+const invocationEnrichSamples = new Set();
 
 /**
  * 'rakia' since 2026-09-23: the shadow run over the pin-moving commit 691b28cdf printed
@@ -592,6 +593,34 @@ export function gateReadingRunId(env = process.env) {
   return live ? basename(live).replace(/\.jsonl$/, '') : invocationReadingRunId;
 }
 
+/** Start at most one detached enrichment sample for a gate-runner invocation. */
+export function startEnrichSample({ project, gateCommit, closure, decision, root, env, write }, {
+  spawn = spawnProcess, markers = invocationEnrichSamples, resolveRoot = value => value,
+} = {}) {
+  if (env.GATE_ENRICH_SAMPLE !== 'on') return false;
+  const runId = gateReadingRunId(env) || invocationReadingRunId || `gate-runner-process-${process.pid}`;
+  if (markers.has(runId)) return false;
+  markers.add(runId);
+  try {
+    const mainRoot = resolveRoot(root);
+    const args = [
+      resolve(mainRoot, 'genesis/orchestrator/enrich-sample.mjs'),
+      '--project', project.name,
+      '--commit', gateCommit,
+      '--closure', closure,
+    ];
+    if (decision.independence === 'sibling') args.push('--from-device', decision.row.device);
+    args.push('--root', mainRoot);
+    const child = spawn(process.execPath, args, { detached: true, stdio: 'ignore' });
+    child.unref();
+    write(`[gate] ${project.name} enrich-sample: started (pid ${child.pid})\n`);
+    return true;
+  } catch (error) {
+    write(`[gate] ${project.name} enrich-sample: not started (${oneLine(error?.message || error)})\n`);
+    return false;
+  }
+}
+
 export function gateReadingRow(row) {
   return {
     measure: GATE_READING_MEASURE,
@@ -828,6 +857,7 @@ function keyReading(evidence) {
 
 export function runProject(project, printOnly, namesOnly, {
   root = ROOT, env = process.env, spawn = spawnSync,
+  detachedSpawn = spawnProcess, enrichSampleMarkers = invocationEnrichSamples,
   write = text => process.stdout.write(text), warn = text => process.stderr.write(text),
   readsOf, recipe = null, tap = spawn === spawnSync, clock = () => process.hrtime.bigint(),
   wallClock = () => new Date(), inputsPolicy = null, readingCollector = invocationGateReadings,
@@ -1182,6 +1212,10 @@ export function runProject(project, printOnly, namesOnly, {
       ? `in ${Math.round(Number(row.seconds) || 0)} s on the sibling`
       : ageOf(row.attestation.builtAt);
     write(`[gate] ${project.name} reused: green ${when} at ${String(row.commit).slice(0, 9)} (${signer})\n`);
+    startEnrichSample({ project, gateCommit, closure: evidence.key, decision, root, env, write }, {
+      spawn: detachedSpawn, markers: enrichSampleMarkers,
+      resolveRoot: value => deviceRoot(value, spawn),
+    });
     const seconds = Number(clock() - started) / 1e9;
     recordCycle(project, seconds, 0, {
       ...cycleEnv, GATE_RUN_KIND: sibling ? 'sibling-reused' : 'reused',

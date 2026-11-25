@@ -71,7 +71,10 @@ impl EnrichmentOutcome {
 }
 
 pub struct EnrichmentRequest<'a> {
-    pub verdict: &'a str,
+    pub verdict: Option<&'a str>,
+    pub project: Option<&'a str>,
+    pub closure: Option<&'a str>,
+    pub from_device: Option<&'a str>,
     pub kind: &'a str,
     pub outcome: &'a str,
     pub method: &'a str,
@@ -117,12 +120,7 @@ pub fn enrich(root: &Path, request: &EnrichmentRequest<'_>) -> FlowResult<Enrich
     let kind = EnrichmentKind::parse(request.kind)?;
     let outcome = EnrichmentOutcome::parse(request.outcome)?;
     let method = one_line(request.method, "--method")?;
-    let verdict: Cid = request.verdict.parse().map_err(|_| {
-        FlowError::InvalidArguments(format!(
-            "--verdict `{}` is not a content identifier",
-            request.verdict
-        ))
-    })?;
+    let selector = enrichment_target(request)?;
     let run = request
         .run
         .map(|raw| {
@@ -174,23 +172,13 @@ pub fn enrich(root: &Path, request: &EnrichmentRequest<'_>) -> FlowResult<Enrich
 
     let mut store = SidecarFlowStore::open(root)?.transaction()?;
     let records = store.records()?;
-    let fields = records
-        .iter()
-        .find_map(|(cid, record)| {
-            (cid == &verdict).then_some(record).and_then(|record| {
-                gate_verdict_fields(record, &device, |writer| {
-                    crate::actor::standing_here(root).is_some_and(|standing| {
-                        standing.device == device
-                            && crate::actor::device_enrolled(root, &standing.handle, writer)
-                    })
-                })
-            })
+    let admits = |writer: &str| {
+        crate::actor::standing_here(root).is_some_and(|standing| {
+            standing.device == device
+                && crate::actor::device_enrolled(root, &standing.handle, writer)
         })
-        .ok_or_else(|| {
-            FlowError::InvalidArguments(format!(
-                "no gate-verdict@1 with CID {verdict} is in this device's fold"
-            ))
-        })?;
+    };
+    let (verdict, fields) = resolve_verdict(&records, selector, &device, admits)?;
 
     if let Some((cid, _)) = records.iter().find(|(_, record)| {
         same_enrichment(
@@ -261,6 +249,101 @@ pub fn enrich(root: &Path, request: &EnrichmentRequest<'_>) -> FlowResult<Enrich
     let cid = record.cid()?;
     store.append(record)?;
     Ok(receipt(true, cid, verdict, kind, outcome, &fields, device))
+}
+
+enum EnrichmentTarget<'a> {
+    Verdict(Cid),
+    Selector {
+        project: &'a str,
+        closure: &'a str,
+        from_device: Option<&'a str>,
+    },
+}
+
+fn enrichment_target<'a>(request: &'a EnrichmentRequest<'_>) -> FlowResult<EnrichmentTarget<'a>> {
+    match (
+        request.verdict,
+        request.project,
+        request.closure,
+        request.from_device,
+    ) {
+        (Some(verdict), None, None, None) => {
+            verdict.parse().map(EnrichmentTarget::Verdict).map_err(|_| {
+                FlowError::InvalidArguments(format!(
+                    "--verdict `{verdict}` is not a content identifier"
+                ))
+            })
+        }
+        (Some(_), _, _, _) => Err(FlowError::InvalidArguments(
+            "--verdict cannot be combined with --project, --closure, or --from-device".into(),
+        )),
+        (None, Some(project), Some(closure), from_device) => Ok(EnrichmentTarget::Selector {
+            project: one_line(project, "--project")?,
+            closure: one_line(closure, "--closure")?,
+            from_device: from_device
+                .map(|value| one_line(value, "--from-device"))
+                .transpose()?,
+        }),
+        (None, _, _, _) => Err(FlowError::InvalidArguments(
+            "enrich needs either --verdict <cid> or --project <p> --closure <key>".into(),
+        )),
+    }
+}
+
+/// Resolve a selector from the latest matching green in store order.
+///
+/// `FlowStore::records` preserves fold order. Walking it backwards deliberately defines newest as
+/// latest in that order, not by clocks written on different devices.
+fn resolve_verdict(
+    records: &[(Cid, FlowRecord)],
+    target: EnrichmentTarget<'_>,
+    device: &str,
+    admits: impl Fn(&str) -> bool,
+) -> FlowResult<(Cid, VerdictFields)> {
+    match target {
+        EnrichmentTarget::Verdict(verdict) => records
+            .iter()
+            .find_map(|(cid, record)| {
+                (cid == &verdict)
+                    .then(|| gate_verdict_fields(record, device, &admits))
+                    .flatten()
+            })
+            .map(|fields| (verdict, fields))
+            .ok_or_else(|| {
+                FlowError::InvalidArguments(format!(
+                    "no gate-verdict@1 with CID {verdict} is in this device's fold"
+                ))
+            }),
+        EnrichmentTarget::Selector {
+            project,
+            closure,
+            from_device,
+        } => records
+            .iter()
+            .rev()
+            .find_map(|(cid, record)| {
+                let fields = gate_verdict_fields(record, device, &admits)?;
+                let FlowRecord::Event(event) = record else {
+                    return None;
+                };
+                let source_matches = match (from_device, slots(event, "via:").as_slice()) {
+                    (None, []) => true,
+                    (Some(expected), [writer]) => expected == *writer,
+                    _ => false,
+                };
+                (fields.project == project
+                    && fields.closure == closure
+                    && one_slot(event, "env:success=") == Some("true")
+                    && source_matches)
+                    .then_some((*cid, fields))
+            })
+            .ok_or_else(|| {
+                let source = from_device.unwrap_or(device);
+                FlowError::InvalidArguments(format!(
+                    "no green gate-verdict@1 for {project} {closure} from {source} in this device's fold"
+                ))
+            }),
+    }
 }
 
 fn gate_verdict_fields(
