@@ -172,7 +172,7 @@ COPY genesis/a2o/scripts/__tests__/fixtures /genesis/a2o/scripts/__tests__/fixtu
 # Substrate-rea-replication-fix (2026-05-26): elohim-storage's
 # conductor_writes facade depends on `shefa-types` and `lamad-types` as
 # `path = "../sdk/domains/<dna>/types"`. From /app/Cargo.toml's perspective
-# that's `/sdk/...`. The full elohim/sdk tree is COPYd to /sdk further
+# that's `/sdk/...`. The read elohim/sdk subtrees are COPYd to /sdk further
 # down for the bootstrap_manifests include_str! paths, but cargo
 # resolves Cargo.toml path-deps at the dep-cache stage above — so the
 # two type crates MUST be present BEFORE line 130's first `cargo build`.
@@ -518,7 +518,34 @@ COPY elohim/elohim-storage/config ./config
 # so the release path never needed it but cargo test --lib does (mirrors
 # doorway/doorway-service/Dockerfile). Kept UNSTABLE since the Wave C1 DID work.
 COPY bridges/did/schemas /bridges/did/schemas
-COPY elohim/sdk /sdk
+# elohim/sdk: only the subtrees this crate reads, at the same /sdk paths (the two types crates
+# arrive from dep-sources above). The list equals cargo-build-storage's elohim/sdk sources in
+# elohim/holochain/build-manifest.json, so the image closure keys only what the build and its
+# tests open; genesis/orchestrator/storage-build-inputs.test.mjs refuses a drift between them.
+# Evidence: genesis/docs/superpowers/specs/evidence/2026-11-25-edge-sdk-reads/README.md.
+COPY elohim/sdk/domains/avodah/manifest.json /sdk/domains/avodah/manifest.json
+COPY elohim/sdk/domains/elohim/manifest.json /sdk/domains/elohim/manifest.json
+COPY elohim/sdk/domains/elohim-agent/manifest.json /sdk/domains/elohim-agent/manifest.json
+COPY elohim/sdk/domains/imagodei/manifest.json /sdk/domains/imagodei/manifest.json
+COPY elohim/sdk/domains/infrastructure/manifest.json /sdk/domains/infrastructure/manifest.json
+COPY elohim/sdk/domains/lamad/manifest.json /sdk/domains/lamad/manifest.json
+COPY elohim/sdk/domains/lamad/manifest /sdk/domains/lamad/manifest
+COPY elohim/sdk/domains/mishpat/manifest.json /sdk/domains/mishpat/manifest.json
+COPY elohim/sdk/domains/qahal/manifest.json /sdk/domains/qahal/manifest.json
+COPY elohim/sdk/domains/shefa/manifest.json /sdk/domains/shefa/manifest.json
+COPY elohim/sdk/fixtures /sdk/fixtures
+COPY elohim/sdk/schemas/v1/attestation /sdk/schemas/v1/attestation
+COPY elohim/sdk/schemas/v1/commitments /sdk/schemas/v1/commitments
+COPY elohim/sdk/schemas/v1/enums /sdk/schemas/v1/enums
+COPY elohim/sdk/schemas/v1/feedback-signals /sdk/schemas/v1/feedback-signals
+COPY elohim/sdk/schemas/v1/inputs /sdk/schemas/v1/inputs
+COPY elohim/sdk/schemas/v1/intents /sdk/schemas/v1/intents
+COPY elohim/sdk/schemas/v1/manifest /sdk/schemas/v1/manifest
+COPY elohim/sdk/schemas/v1/manifest-payloads /sdk/schemas/v1/manifest-payloads
+COPY elohim/sdk/schemas/v1/manifests /sdk/schemas/v1/manifests
+COPY elohim/sdk/schemas/v1/objects /sdk/schemas/v1/objects
+COPY elohim/sdk/schemas/v1/p2p /sdk/schemas/v1/p2p
+COPY elohim/sdk/schemas/v1/views /sdk/schemas/v1/views
 # holochain/dna/mishpat: same cfg(test) include_str! class — services/commitment_record.rs pins
 # the Commitment entry index against the INTEGRITY zome source and dna.yaml
 # ("../../../holochain/dna/mishpat/…" clamps to /holochain/dna/mishpat from /app/src/services).
@@ -605,10 +632,37 @@ COPY elohim/elohim-storage/config ./config
 
 # bootstrap_manifests.rs uses include_str!("../../../sdk/schemas/v1/manifests/...")
 # which resolves to /sdk/... in this WORKDIR /app layout (../../.. from
-# /app/src/services/ lands at /). Copying elohim/sdk to /sdk satisfies that
+# /app/src/services/ lands at /). Copying the read elohim/sdk subtrees to /sdk satisfies that
 # compile-time path. Without this, cargo build fails with "couldn't read
 # bootstrap-{standing,tending}-policy.json: No such file or directory".
-COPY elohim/sdk /sdk
+# elohim/sdk: only the subtrees this crate reads, at the same /sdk paths (the two types crates
+# arrive from dep-sources above). The list equals cargo-build-storage's elohim/sdk sources in
+# elohim/holochain/build-manifest.json, so the image closure keys only what the build and its
+# tests open; genesis/orchestrator/storage-build-inputs.test.mjs refuses a drift between them.
+# Evidence: genesis/docs/superpowers/specs/evidence/2026-11-25-edge-sdk-reads/README.md.
+COPY elohim/sdk/domains/avodah/manifest.json /sdk/domains/avodah/manifest.json
+COPY elohim/sdk/domains/elohim/manifest.json /sdk/domains/elohim/manifest.json
+COPY elohim/sdk/domains/elohim-agent/manifest.json /sdk/domains/elohim-agent/manifest.json
+COPY elohim/sdk/domains/imagodei/manifest.json /sdk/domains/imagodei/manifest.json
+COPY elohim/sdk/domains/infrastructure/manifest.json /sdk/domains/infrastructure/manifest.json
+COPY elohim/sdk/domains/lamad/manifest.json /sdk/domains/lamad/manifest.json
+COPY elohim/sdk/domains/lamad/manifest /sdk/domains/lamad/manifest
+COPY elohim/sdk/domains/mishpat/manifest.json /sdk/domains/mishpat/manifest.json
+COPY elohim/sdk/domains/qahal/manifest.json /sdk/domains/qahal/manifest.json
+COPY elohim/sdk/domains/shefa/manifest.json /sdk/domains/shefa/manifest.json
+COPY elohim/sdk/fixtures /sdk/fixtures
+COPY elohim/sdk/schemas/v1/attestation /sdk/schemas/v1/attestation
+COPY elohim/sdk/schemas/v1/commitments /sdk/schemas/v1/commitments
+COPY elohim/sdk/schemas/v1/enums /sdk/schemas/v1/enums
+COPY elohim/sdk/schemas/v1/feedback-signals /sdk/schemas/v1/feedback-signals
+COPY elohim/sdk/schemas/v1/inputs /sdk/schemas/v1/inputs
+COPY elohim/sdk/schemas/v1/intents /sdk/schemas/v1/intents
+COPY elohim/sdk/schemas/v1/manifest /sdk/schemas/v1/manifest
+COPY elohim/sdk/schemas/v1/manifest-payloads /sdk/schemas/v1/manifest-payloads
+COPY elohim/sdk/schemas/v1/manifests /sdk/schemas/v1/manifests
+COPY elohim/sdk/schemas/v1/objects /sdk/schemas/v1/objects
+COPY elohim/sdk/schemas/v1/p2p /sdk/schemas/v1/p2p
+COPY elohim/sdk/schemas/v1/views /sdk/schemas/v1/views
 
 # Build the release binary.
 # CACHE_BUST is interpolated into the command so BuildKit treats it as a new layer

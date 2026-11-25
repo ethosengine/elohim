@@ -557,7 +557,7 @@ test('GATE_PUSH_REFS lines parse into ref, pushed sha, destination sha and branc
 test('an ambient GATE_ROOT does not make the CLI judge another checkout', (t) => {
   const dir = mkdtempSync(join(tmpdir(), 'fleet-roll-root-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
-  writeFileSync(join(dir, 'changed.txt'), 'elohim/sdk/schemas/v1/gate-live-event.schema.json\n');
+  writeFileSync(join(dir, 'changed.txt'), 'elohim/sdk/schemas/v1/views/bin-status.schema.json\n');
   const env = { ...cleanEnv, GATE_ROOT: dir, GATE_CHANGED_FILES: join(dir, 'changed.txt'), GATE_LIVE_RUN: '' };
   delete env.GATE_PUSH_TARGETS; delete env.GATE_PUSH_REFS;
   const r = spawnSync('node', [join(ROOT, 'genesis/orchestrator/gate-preflight.mjs'), '--fleet-roll'], { cwd: ROOT, env, encoding: 'utf8' });
@@ -571,10 +571,16 @@ const probe = path => evaluatePaths({ root: ROOT, sha: 'HEAD', changed: [path], 
 const verdict = rows => (rows.find(r => r.level === 'REFUSED') ? 'REFUSED' : rows.find(r => r.level === 'WARN') ? 'WARN' : 'no row');
 
 test('real manifests: the incident witnesses select an Edge build', () => {
-  for (const path of ['elohim/holochain-conductor', 'elohim/sdk/schemas/.gitignore', 'elohim/sdk/schemas/v1/gate-live-event.schema.json', 'elohim/eprfs/device-runtime/src/lib.rs', 'elohim/Cargo.lock']) {
+  // The two sdk witnesses of the original incidents (elohim/sdk/schemas/.gitignore and the top-level
+  // v1 gate-live-event schema) no longer select storage since its sources name the sdk subtrees it
+  // reads (evidence 2026-11-25-edge-sdk-reads); a read subtree stands in for them.
+  for (const path of ['elohim/holochain-conductor', 'elohim/sdk/schemas/v1/views/bin-status.schema.json', 'elohim/eprfs/device-runtime/src/lib.rs', 'elohim/Cargo.lock']) {
     const rows = probe(path);
     assert.equal(verdict(rows), 'REFUSED', path);
     assert.ok(rows[0].why.includes('cargo-build-storage') || rows[0].why.includes('cargo-build-doorway'), path);
+  }
+  for (const path of ['elohim/sdk/schemas/.gitignore', 'elohim/sdk/schemas/v1/gate-live-event.schema.json', 'elohim/sdk/domains/elohim-agent/scripts/brit-first.test.py']) {
+    assert.equal(verdict(probe(path)), 'no row', path);
   }
   assert.ok(probe('elohim/holochain-conductor')[0].why.includes('elohim-conductor:build-conductor-image'));
 });
