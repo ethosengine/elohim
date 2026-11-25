@@ -10,6 +10,7 @@ import runpy
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 from unittest import mock
 
 HERE = Path(__file__).resolve().parent
@@ -416,6 +417,210 @@ class ObserveTest(ObserveFixture):
                 self.assertEqual(len(err.getvalue().strip().splitlines()), 1)
 
 
+class CarryFixture(Fixture, NoStateDir):
+    """`carry` with fake epr/berth/git/node/just calls; no real repository effect is possible."""
+
+    def setUp(self):
+        super().setUp()
+        self.repo = self.root / "repo"
+        (self.repo / ".worktrees").mkdir(parents=True)
+        self.store = self.root / "bin-store"
+        self.head = self.store / "epr" / CID_NEW / "epr"
+        self.head.parent.mkdir(parents=True)
+        self.head.write_text("#!/bin/sh\nexit 99\n")
+        self.head.chmod(0o755)
+        (self.store / "epr" / "current.json").write_text(json.dumps({"cid": CID_NEW}))
+        self.commit = "a" * 40
+        self.closure = "b" * 64
+        self.now = 1_900_000_000
+        self.calls = []
+        self.room = {"verdict": "admit", "reason": "two seats free"}
+        self.holder = None
+        self.fetch = 0
+        self.computed = self.closure
+        self.gate_code = 0
+        self.gate_timeout = False
+        self.misses = [self.miss()]
+
+    def miss(self, **changes):
+        row = {"intent": "bafyreiintentintentintentintentintentintentintentintentintent",
+               "event": "bafyreieventeventeventeventeventeventeventeventeventevent",
+               "announcer": "did:key:z6MkSIBLING", "change": "change", "commit": self.commit,
+               "gitRef": "refs/heads/self/integration", "project": "eprfs", "closure": self.closure,
+               "p90S": 100, "waitUntil": self.now + 2000, "carriedBy": []}
+        row.update(changes)
+        return row
+
+    def args(self, **changes):
+        values = dict(repo_root=str(self.repo), stasis_root=str(self.stasis), bin_store=str(self.store),
+                      now=self.now, carry_deadline_s=None)
+        values.update(changes)
+        return SimpleNamespace(**values)
+
+    def runner(self, argv, timeout=60, cwd=None, env=None):
+        argv = [str(v) for v in argv]
+        self.calls.append(dict(argv=argv, timeout=timeout, cwd=str(cwd) if cwd else None,
+                               env=dict(env) if env is not None else None))
+        if argv[:2] == [str(self.head), "peer"]:
+            return 0, json.dumps({"device": "did:key:z6MkLOCAL", "misses": self.misses}), ""
+        if "room" in argv and "cargo" in argv:
+            return (0 if self.room.get("verdict") == "admit" else 3), json.dumps(self.room), ""
+        if "who" in argv and "dev-integration" in argv:
+            return 0, json.dumps(self.holder), ""
+        if argv[:4] == ["git", "-C", str(self.repo), "fetch"]:
+            return self.fetch, "", "fetch refused" if self.fetch else ""
+        if "cat-file" in argv:
+            return 0, "", ""
+        if "worktree" in argv and "add" in argv:
+            Path(argv[-2]).mkdir(parents=True)
+            return 0, "", ""
+        if "status" in argv and argv[0] == "git":
+            return 0, "", ""
+        if argv[:3] == ["node", "--input-type=module", "--eval"]:
+            return 0, json.dumps({"key": self.computed, "line": "miss"}), ""
+        if argv[:3] == [str(self.head), "flow", "intend"]:
+            return 0, "{}", ""
+        if argv[:2] == ["just", "gate"]:
+            if self.gate_timeout:
+                raise W["subprocess"].TimeoutExpired(argv, timeout)
+            return self.gate_code, "", "infra red" if self.gate_code else ""
+        if "worktree" in argv and "remove" in argv:
+            import shutil
+            shutil.rmtree(argv[-1], ignore_errors=True)
+            return 0, "", ""
+        raise AssertionError(f"unexpected call: {argv}")
+
+    def run_carry(self):
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            code = W["cmd_carry"](self.args(), runner=self.runner)
+        return code, out.getvalue().splitlines()
+
+    def claims(self):
+        return [c for c in self.calls if c["argv"][:3] == [str(self.head), "flow", "intend"]]
+
+    def gates(self):
+        return [c for c in self.calls if c["argv"][:2] == ["just", "gate"]]
+
+
+class CarryTest(CarryFixture):
+    def test_rule_1_uses_device_head_and_ignores_own_device_misses(self):
+        own = self.miss(announcer="did:key:z6MkLOCAL", project="own")
+        self.misses.insert(0, own)
+        code, _ = self.run_carry()
+        self.assertEqual(code, 0)
+        self.assertEqual(self.calls[0]["argv"][0], str(self.head))
+        self.assertEqual(len(self.claims()), 1)
+        self.assertIn("eprfs", self.claims()[0]["argv"])
+        self.assertNotIn("own", self.claims()[0]["argv"])
+
+    def test_rule_2_closure_mismatch_and_unfetchable_commit_make_no_claim(self):
+        for mode in ("mismatch", "unfetchable"):
+            with self.subTest(mode=mode):
+                self.calls.clear()
+                self.computed = "c" * 64 if mode == "mismatch" else self.closure
+                self.fetch = 1 if mode == "unfetchable" else 0
+                code, lines = self.run_carry()
+                self.assertEqual(code, 0)
+                self.assertEqual(self.claims(), [])
+                self.assertEqual(len(lines), 1)
+                self.assertIn("closure mismatch" if mode == "mismatch" else "not fetchable", lines[0])
+
+    def test_rule_3_no_free_seat_or_local_landing_holder_makes_no_claim_or_lease(self):
+        for mode in ("seat", "landing"):
+            with self.subTest(mode=mode):
+                self.calls.clear()
+                self.room = ({"verdict": "refuse", "axis": "seats:cargo", "reason": "full"}
+                             if mode == "seat" else {"verdict": "admit", "reason": "free"})
+                self.holder = {"holder": "local-lander"} if mode == "landing" else None
+                code, lines = self.run_carry()
+                self.assertEqual(code, 0)
+                self.assertEqual(self.claims(), [])
+                self.assertFalse(any("claim" in c["argv"] for c in self.calls))
+                self.assertIn("cargo seat" if mode == "seat" else "local dev-integration", lines[-1])
+
+    def test_rule_4_valid_for_is_bounded_and_failed_gate_only_lets_claim_lapse(self):
+        self.gate_code = 7
+        code, lines = self.run_carry()
+        self.assertEqual(code, 1)
+        [claim] = self.claims()
+        valid = claim["argv"][claim["argv"].index("--valid-for") + 1]
+        self.assertEqual(valid, "600")  # p90*3 floors to ten minutes
+        self.assertEqual(len(self.claims()), 1)
+        self.assertIn("claim will lapse", lines[-1])
+        self.assertFalse(any("--withdraw" in c["argv"] or "--dismiss" in c["argv"] for c in self.calls))
+
+    def test_rule_5_gate_gets_head_epr_and_no_gate_evidence(self):
+        with mock.patch.dict(os.environ, {"GATE_EVIDENCE": "reuse"}):
+            code, _ = self.run_carry()
+        self.assertEqual(code, 0)
+        [gate] = self.gates()
+        self.assertEqual(gate["argv"], ["just", "gate", "eprfs"])
+        self.assertEqual(gate["env"]["EPR_BIN"], str(self.head))
+        self.assertNotIn("GATE_EVIDENCE", gate["env"])
+
+    def test_rule_6_never_pushes_or_lands_and_removes_its_worktree(self):
+        code, _ = self.run_carry()
+        self.assertEqual(code, 0)
+        words = [word for call in self.calls for word in call["argv"]]
+        self.assertNotIn("push", words)
+        self.assertNotIn("--land", words)
+        self.assertFalse(any((self.repo / ".worktrees").iterdir()))
+
+    def test_rule_7_both_stop_files_skip_and_cancel_a_running_carry_group(self):
+        for stop in (W["STOP_FILE"], W["CARRY_STOP_FILE"]):
+            with self.subTest(stop=stop):
+                Path(self.root, stop).touch()
+                code, lines = self.run_carry()
+                self.assertEqual((code, len(self.calls)), (0, 0))
+                self.assertIn("switched off", lines[0])
+                Path(self.root, stop).unlink()
+        started = W["time"].monotonic()
+        code, _, _ = W["run_pass"](["sleep", "60"], timeout=10,
+                                     cancelled=lambda: W["time"].monotonic() - started > 0.2)
+        self.assertIsNone(code)
+
+    def test_rule_8_pass_deadline_kills_the_whole_group(self):
+        child = self.root / "carry-child.pid"
+        code, _, _ = W["run_pass"](["sh", "-c", f"sleep 60 & echo $! > {child}; sleep 60"], timeout=0.2)
+        self.assertIsNone(code)
+        pid = int(child.read_text())
+        for _ in range(60):
+            try:
+                state = Path(f"/proc/{pid}/stat").read_text().rsplit(")", 1)[1].split()[0]
+            except OSError:
+                break
+            if state in ("Z", "X"):
+                break
+            W["time"].sleep(0.05)
+        else:
+            self.fail("carry descendant survived its pass deadline")
+
+    def test_rule_9_last_carry_state_is_separate_and_announce_argv_is_unchanged(self):
+        calls = []
+        clock = [0.0]
+
+        def run_pass(argv, timeout, cancelled=None):
+            calls.append(list(argv))
+            return 0, "carry state\n" if "carry" in argv else "", ""
+
+        def sleep(seconds):
+            clock[0] += seconds
+
+        args = ["run", "--stasis-root", str(self.stasis), "--bin-store", str(self.store),
+                "--repo-root", str(self.repo), "--every", "60", "--carry-every", "60", "--passes", "2"]
+        globals_ = W["cmd_run"].__globals__
+        with mock.patch.dict(os.environ, {"HELD_TOOL_CARRY": "on"}), \
+                mock.patch.dict(globals_["time"].__dict__, {"monotonic": lambda: clock[0], "sleep": sleep}), \
+                mock.patch.dict(globals_, {"run_pass": run_pass}), contextlib.redirect_stderr(io.StringIO()):
+            self.assertEqual(W["main"](args), 0)
+        kinds = [argv[2] for argv in calls]
+        self.assertEqual(kinds, ["announce", "carry", "announce"])
+        self.assertEqual(calls[0], calls[2])
+        self.assertTrue(Path(self.root, W["LAST_CARRY"]).is_file())
+        self.assertIn("carry state", Path(self.root, W["LAST_CARRY"]).read_text())
+
+
 LOCAL = "0123abcd-aaaa-bbbb-cccc-0000000000aa"   # another session moored on this device
 SIBLING = "0123abcd-aaaa-bbbb-cccc-0000000000bb"  # a session moored on a sibling device
 DID = "did:key:z6MkTESTdeviceTESTdeviceTESTdeviceTESTdevice"
@@ -463,6 +668,9 @@ sys.exit(9)
         env = mock.patch.dict(os.environ, {"BERTH_BIN": str(fake)})
         env.start()
         self.addCleanup(env.stop)
+        carry = mock.patch.dict(os.environ, {"HELD_TOOL_CARRY": "off"})
+        carry.start()
+        self.addCleanup(carry.stop)
 
     def status(self, data):
         self.status_file.write_text(json.dumps(data))
@@ -595,13 +803,24 @@ sys.exit(9)
                 "--stasis-root", str(self.stasis), "--bin-store", str(self.store), "--every", "0",
                 "--passes", "2"]
         sleeps = []
+        clock = [0.0]
+
+        def sleep(seconds):
+            sleeps.append(seconds)
+            clock[0] += seconds
+
+        def failed_pass(argv, timeout, cancelled=None):
+            return 1, "", "berth unavailable"
+
+        globals_ = W["cmd_run"].__globals__
         with contextlib.redirect_stderr(io.StringIO()) as err, \
-                mock.patch.dict(W["cmd_run"].__globals__["time"].__dict__, {"sleep": sleeps.append}):
+                mock.patch.dict(globals_["time"].__dict__, {"sleep": sleep, "monotonic": lambda: clock[0]}), \
+                mock.patch.dict(globals_, {"run_pass": failed_pass}):
             self.assertEqual(W["main"](args), 0)
         lines = err.getvalue().splitlines()
         self.assertEqual(len(lines), 1, lines)
         self.assertIn("failing (exit 1), next pass in 1 s", lines[0])
-        self.assertEqual([t for t in sleeps if t >= 1], [1.0])  # the pass's own polls are shorter
+        self.assertEqual(sleeps, [1.0])
 
     def dead(self, pid):
         import time as _time
