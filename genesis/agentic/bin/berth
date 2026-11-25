@@ -25,7 +25,12 @@ workspace. Store: $BERTH_DIR, else $CLAUDE_CONFIG_DIR/berth, else <the device la
 Commands:
   berth observed --session S <path>…                            silently observe writes
   berth status [--json [--no-peer]]                              who is moored here and on sibling devices; --json is a
-                                                                   pure read that creates nothing (contract status-json@1)
+                                                                   pure read that creates nothing (contract status-json@1).
+                                                                   Each live session carries one `presence:` line (JSON:
+                                                                   `presence`): working, waiting on a person since T (a
+                                                                   tool call pending since T with no result recorded, and
+                                                                   nothing more), idle, or unknown since <age>; derived at
+                                                                   read time from existing records, each named with its age
   berth moor    --session S [--model M] [--lab L] [--runtime R] [--principal P] [--task T]
                 [--writes a,b,c | --writes-add a,b,c] [--pid N] [--ttl SECONDS]         register / refresh this session
   berth unmoor  --session S                                        leave; releases every lease held
@@ -130,6 +135,7 @@ this berth does not run, a ttl past the class's cap, a class transition, an owne
 resolvable (or ambiguous), or the store itself cannot be opened (a guest sandbox: EACCES/ENOENT on
 the lock or dir) — the only code a wrapper may proceed past, unleased.
 """
+import calendar
 import contextlib
 import fnmatch
 import errno
@@ -2798,6 +2804,382 @@ def native_held(runner=None, timeout_s=3):
         return {}
 
 
+# ---- presence: what each live session's own records say it is doing (read-only, derived) --------
+#
+# A READING, never a record: nothing here writes, moors, scans the flow store or takes a lock. Each
+# call derives one row per session from records that already exist, and every row names the record
+# it rests on and that record's age. Four states:
+#   working  an open gate-live run of the session, or a turn its journal shows begun and not ended,
+#            or a write/heartbeat of its mooring, or a subagent's record, newer than its last turn end
+#   waiting  "waiting on a person since T" means exactly: a tool call of that session has been
+#            pending since T and no result has been recorded. It says nothing about any person
+#            being there or not. Locally: the native stasis fold (read through the session's OWN
+#            pinned epr) holds an incident open whose opening record is a permission request or a
+#            watcher's pending-tool observation, and the journal holds no later turn end, dialog
+#            close or prompt of that agent, and this device said no `held-tool@1 resumed` for it.
+#            A watcher's observation counts while it is renewed (each pass appends one): one the
+#            watcher has passed again without renewing is cleared, and one no pass has followed
+#            reads "unknown since".
+#            For a sibling: its device said `held-tool@1 open` for it and no `resumed` since.
+#   idle     the session's newest own record is its main agent's turn end
+#   unknown  the newest record a state would rest on is older than its bound (the line reads
+#            "unknown since <age>", never the last known state), or a record could not be read
+# A line carries device, session, state, since/age and a tool NAME; never a command, path or text.
+PRESENCE_WORKING_S = 120  # a mooring write or heartbeat this recent reads working (held-tool-watch senses after the same 120 s)
+PRESENCE_STALE_S = 900  # an open turn with no record of its own for this long is "unknown since"
+PRESENCE_GATE_STALE_S = 6 * 3600  # gate-live.mjs STALE_MS: an unclosed run this quiet is not read as running
+PRESENCE_OBSERVED_S = 180  # the watcher renews a pending call's observation each pass (60 s); older is not current
+PRESENCE_READ_S = 8  # every native read of one status call together; past it the row says so
+PRESENCE_TAIL_BYTES = 1024 * 1024  # of one session's stasis journal
+PRESENCE_NOTES_BYTES = 16 * 1024 * 1024  # of berth's own cached note stream
+PRESENCE_OLD_EPR = "session's epr predates the reading"
+_PRESENCE_OPENERS = ("permission-requested", "tool-pending-observed")
+_PRESENCE_RESUMES = ("turn-ended", "prompt-closed", "steward-ping")
+_PRESENCE_TOOL = re.compile(r"[A-Za-z][A-Za-z0-9_.:-]{0,63}")
+_PRESENCE_SINCE = re.compile(r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d+)?Z")
+HELD_WATCH = os.path.join(os.path.dirname(os.path.realpath(__file__)), "held-tool-watch")
+_held_watch_ns = []
+
+
+def _held_watch():
+    """held-tool-watch's own functions (the pin layout and the `held-tool@1` line grammar have one
+    home), loaded once; None when it cannot be loaded."""
+    if not _held_watch_ns:
+        try:
+            _held_watch_ns.append(runpy.run_path(HELD_WATCH))
+        except Exception:  # noqa: BLE001 — a reading degrades to unknown, it never fails status
+            _held_watch_ns.append(None)
+    return _held_watch_ns[0]
+
+
+def presence_sources():
+    """Where the existing records are: the main checkout's stasis journals and gate-live runs, and
+    the native bin store. One seam, so tests point it at temporary directories."""
+    status = os.path.join(main_checkout(REPO_ROOT), ".eprfs", "status")
+    return {"stasis": os.path.join(status, "stasis"), "gate_live": os.path.join(status, "gate-live"),
+            "watch_pass": os.path.join(status, "held-tool-watch.last-pass.txt"),
+            "bin_store": os.environ.get("BERTH_BIN_STORE") or None}
+
+
+def _presence_bin_store(sources, b):
+    """The bin-store root: declared, else read off the resolved epr's own path (<root>/epr/<cid>/epr),
+    else asked of the native resolver as held-tool-watch asks it."""
+    if sources.get("bin_store"):
+        return sources["bin_store"]
+    try:
+        path = os.path.realpath(b.epr_bin() or "")
+        tool_dir = os.path.dirname(os.path.dirname(path))
+        if os.path.basename(tool_dir) == "epr" and os.path.isdir(os.path.join(tool_dir, "sessions")):
+            return os.path.dirname(tool_dir)
+        watch = _held_watch()
+        return watch["native_bin_store"]() if watch else None
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _parse_wall(value):
+    """Unix seconds of an RFC3339 UTC stamp, else None."""
+    if not isinstance(value, str) or not _PRESENCE_SINCE.fullmatch(value):
+        return None
+    try:
+        whole, _, frac = value[:-1].partition(".")
+        return calendar.timegm(time.strptime(whole, "%Y-%m-%dT%H:%M:%S")) + (float("0." + frac) if frac else 0.0)
+    except ValueError:
+        return None
+
+
+def _journal_tail(stasis_root, session):
+    """The session's own stasis journal, newest PRESENCE_TAIL_BYTES: [{seq, kind, agent, at, observer,
+    tool, pending}] oldest first, or None when it has none. Only those seven fields are kept; a
+    record's shape, digest or text is never read out. A torn or foreign line is passed."""
+    path = os.path.join(stasis_root, _safe(session), "events.jsonl")
+    try:
+        with open(path, "rb") as f:
+            size = f.seek(0, os.SEEK_END)
+            start = max(0, size - PRESENCE_TAIL_BYTES)
+            f.seek(start)
+            lines = f.read(size - start).split(b"\n")
+    except OSError:
+        return None
+    events = []
+    for raw in lines[1:] if start else lines:
+        try:
+            row = json.loads(raw)
+            source = row.get("source") if isinstance(row.get("source"), dict) else {}
+            at = _parse_wall((row.get("clock") or {}).get("wall"))
+            if not isinstance(row.get("seq"), int) or at is None:
+                continue
+            tool = row.get("tool")
+            events.append({"seq": row["seq"], "kind": str(row.get("kind")), "agent": str(row.get("agentId") or "main"),
+                           "at": at, "observer": bool(source.get("observer")),
+                           "tool": tool if isinstance(tool, str) and _PRESENCE_TOOL.fullmatch(tool) else None,
+                           "pending": _parse_wall(row.get("pendingSince"))})
+        except (ValueError, TypeError, AttributeError):
+            continue
+    return events
+
+
+def _gate_run_open(gate_live, session):
+    """Seconds since the newest event of the session's unclosed gate-live run, else None."""
+    try:
+        with open(os.path.join(gate_live, "by-session", re.sub(r"[^A-Za-z0-9._-]", "_", session))) as f:
+            path = f.read().strip()
+        if not path or os.path.dirname(os.path.realpath(path)) != os.path.realpath(os.path.join(gate_live, "runs")):
+            return None
+        with open(path, "rb") as f:
+            size = f.seek(0, os.SEEK_END)
+            f.seek(max(0, size - 65536))
+            last = [line for line in f.read().split(b"\n") if line.strip()][-1]
+        if json.loads(last).get("kind") == "run-close":
+            return None
+        return max(0.0, time.time() - os.stat(path).st_mtime)
+    except (OSError, ValueError, IndexError, AttributeError):
+        return None
+
+
+def held_notes(b):
+    """({(device or None, session): [open note fields + said-at]}, the cleared keys, cache age in
+    seconds or None) from berth's own cached note stream, read as it stands: no scan of the flow store, no lock, nothing
+    written. Only `held-tool@1` lines the watcher session said count; an `open` whose key (session,
+    agent, tool, since) has a later `resumed` from the same device is cleared. device None is this
+    device. The cache is as old as the last `berth inbox`/`said` on this device (every tool call's
+    note hook, and the watcher's own pass each minute)."""
+    watch = _held_watch()
+    opened, resumed, age = {}, set(), None
+    try:
+        age = max(0.0, time.time() - os.stat(b._inbox_offset_path()).st_mtime)
+        with open(b._inbox_notes_path(), "rb") as f:
+            size = f.seek(0, os.SEEK_END)
+            start = max(0, size - PRESENCE_NOTES_BYTES)
+            f.seek(start)
+            lines = f.read(size - start).split(b"\n")
+    except OSError:
+        return {}, set(), age
+    for raw in lines[1:] if start else lines:
+        if b"held-tool@1 " not in raw or watch is None:
+            continue
+        try:
+            note = json.loads(raw)
+            parsed = watch["parse_mark"](note.get("text"))
+            if not parsed or note.get("session") != watch["ANNOUNCER"]:
+                continue
+            kind, f = parsed
+            if (not all(isinstance(f.get(k), str) for k in ("session", "agent", "tool", "since"))
+                    or _parse_wall(f["since"]) is None or not NOTE_ID.fullmatch(f["session"])):
+                continue
+            key = (note.get("from_device"), f["session"], f["agent"], f["tool"], f["since"])
+            if kind == "open":
+                opened.setdefault(key, float(note.get("at") or 0))
+            elif kind == "resumed":
+                resumed.add(key)
+        except (ValueError, TypeError, AttributeError):
+            continue
+    by_session = {}
+    for key, at in opened.items():
+        if key in resumed:
+            continue
+        device, session, agent, tool, since = key
+        by_session.setdefault((device, session), []).append({
+            "agent": agent, "tool": tool if _PRESENCE_TOOL.fullmatch(tool) else None,
+            "since": _parse_wall(since), "saidAt": at})
+    cleared = {(device, session, agent, tool, int(_parse_wall(since)))
+               for device, session, agent, tool, since in opened if (device, session, agent, tool, since) in resumed}
+    return by_session, cleared, age
+
+
+def _native_open(binary, session, stasis_root, timeout_s):
+    """(seqs of the incidents the session's own pinned epr holds open, None) or (None, why). A pure
+    read of that session's journal by the reader it was written for; an epr without the verb names
+    itself so. Injectable seam."""
+    try:
+        r = subprocess.run([binary, "session", "stasis", "status", "--session", session, "--json",
+                            "--journal-root", stasis_root], capture_output=True, text=True,
+                           stdin=subprocess.DEVNULL, timeout=max(0.1, timeout_s),
+                           env={k: v for k, v in os.environ.items() if k != "EPR_BIN"})
+    except subprocess.TimeoutExpired:
+        return None, f"native stasis read did not answer within {PRESENCE_READ_S}s"
+    except OSError:
+        return None, "native stasis read could not start"
+    if r.returncode != 0:
+        first = (r.stderr.strip().splitlines() or [""])[0].lower()
+        if "unknown" in first or "usage" in first or "unrecognized" in first:
+            return None, PRESENCE_OLD_EPR
+        return None, f"native stasis read exited {r.returncode}"
+    try:
+        seqs = set()
+        for row in json.loads(r.stdout).get("sessions", []):
+            if row.get("session") != session:
+                continue
+            for inc in row.get("openIncidents") or []:
+                tail = str(inc.get("id", "")).rsplit(":", 1)[-1]
+                if tail.isdigit():
+                    seqs.add(int(tail))
+        return seqs, None
+    except (ValueError, TypeError, AttributeError):
+        return None, "native stasis read was not the expected JSON"
+
+
+def _reading(state, age_s, evidence, since=None, tool=None, why=None):
+    row = {"state": state, "ageS": None if age_s is None else int(max(0, age_s)), "evidence": evidence,
+           "since": _rfc3339(since * 1000) if since is not None else None}
+    if tool:
+        row["tool"] = tool
+    if why:
+        row["why"] = why
+    return row
+
+
+def presence_local(b, session, mooring, now, sources, cleared=(), native=True, deadline=None, bin_store=None):
+    """The reading for one live session of this device. Order: a pending call the native fold holds
+    open; an open gate run; an open turn or a recent mooring record; a turn end. Each answer names
+    the record it rests on and its age."""
+    events = _journal_tail(sources["stasis"], session)
+    own = [e for e in events or [] if not e["observer"]]
+    resumed_seq = {}
+    for e in own:
+        if e["kind"] in _PRESENCE_RESUMES:
+            resumed_seq[e["agent"]] = max(resumed_seq.get(e["agent"], -1), e["seq"])
+    try:  # when this device's watcher last finished a pass (it overwrites this file each pass)
+        passed = os.stat(sources.get("watch_pass") or "").st_mtime
+    except OSError:
+        passed = None
+    calls = {}  # one pending call, however often observed: its newest record
+    for e in events or []:
+        if e["kind"] not in _PRESENCE_OPENERS or e["seq"] <= resumed_seq.get(e["agent"], -1):
+            continue
+        since = e["pending"] if e["pending"] is not None else e["at"]
+        calls[(e["kind"], e["agent"], e["tool"], int(since))] = (e, since)
+    candidates, unrenewed = [], None
+    for (kind, agent, tool, key_since), (e, since) in calls.items():
+        if kind == "tool-pending-observed":
+            # Said `resumed` by this device's watcher: cleared before the session's own turn end says so.
+            if (None, session, agent, tool, key_since) in cleared:
+                continue
+            if now - e["at"] > PRESENCE_OBSERVED_S:
+                if passed is not None and passed > e["at"] + 1:
+                    continue  # the watcher passed again and did not renew it: no longer pending
+                unrenewed = e["at"] if unrenewed is None else max(unrenewed, e["at"])
+                continue
+        candidates.append((e, since))
+    if candidates:
+        if not native:
+            return _reading("unknown", None, "stasis-journal", why="a pending call is on record; the native read was skipped")
+        watch = _held_watch()
+        binary, why = (watch["pinned_epr"](session, bin_store) if watch else (None, "held-tool-watch not loadable"))
+        if binary is None:
+            return _reading("unknown", None, "epr-pin", why=f"session's epr pin could not be determined ({why})")
+        left = PRESENCE_READ_S if deadline is None else deadline - time.monotonic()
+        seqs, why = (None, f"native stasis read did not answer within {PRESENCE_READ_S}s") if left <= 0 else \
+            _native_open(binary, session, sources["stasis"], left)
+        if seqs is None:
+            return _reading("unknown", None, "stasis-incident", why=why)
+        # The fold folds a repeat, or a call met while an earlier incident stands open, into that
+        # incident: its id names the record that opened it, at or before this one.
+        held = [(e, since) for e, since in candidates if any(seq <= e["seq"] for seq in seqs)]
+        if held:
+            e, since = min(held, key=lambda pair: pair[1])
+            return _reading("waiting", 0, "stasis-incident", since=since, tool=e["tool"])
+    if unrenewed is not None:
+        return _reading("unknown", now - unrenewed, "stasis-journal",
+                        why="a pending call was last observed then and this device's watcher has not passed since")
+    gate_age = _gate_run_open(sources["gate_live"], session)
+    if gate_age is not None:
+        if gate_age > PRESENCE_GATE_STALE_S:
+            return _reading("unknown", gate_age, "gate-live-run", why="its gate run never closed")
+        return _reading("working", gate_age, "gate-live-run")
+    main = [e for e in own if e["agent"] == "main"]
+    ended = max((e["at"] for e in main if e["kind"] == "turn-ended"), default=None)
+    begun = max((e["at"] for e in main if e["kind"] == "steward-ping"), default=None)
+    marks = [mooring.get(k) for k in ("writes_observed_at", "last_seen")
+             if isinstance(mooring.get(k), (int, float))]
+    marks += [e["at"] for e in own if e["agent"] != "main"][-1:]  # a subagent's newest own record
+    newest = max([e["at"] for e in own] + marks, default=None)
+    if begun is not None and (ended is None or begun > ended):
+        age = now - newest
+        if age > PRESENCE_STALE_S:
+            return _reading("unknown", age, "stasis-journal", why="a turn is open and nothing has been recorded since")
+        return _reading("working", age, "open-turn", since=begun)
+    recent = max((m for m in marks if ended is None or m > ended), default=None)
+    if recent is not None and now - recent <= PRESENCE_WORKING_S:
+        return _reading("working", now - recent, "recent-record")
+    if ended is not None:
+        return _reading("idle", now - ended, "turn-ended", since=ended)
+    if newest is None:
+        return _reading("unknown", None, "mooring", why="no record of this session's turns on this device")
+    return _reading("unknown", now - newest, "mooring", why="no turn of this session is on record")
+
+
+def presence_readings(b, moorings, siblings=(), view=None, native=True):
+    """THE reading: {(device or None, session): {state, since, ageS, evidence[, tool][, why]}} for the
+    live local moorings given ({session: mooring}) and the sibling rows given (`sibling_moorings`).
+    Derived at call time from the stasis journal and its native fold, gate-live runs, the mooring,
+    and the held/resumed notes in berth's note cache; nothing is written. A sibling's row holds
+    only what crosses: a pending call its device's watcher announced and has not cleared, read
+    against the age of that device's last folded head; working and idle do not cross."""
+    now = b.now()
+    try:
+        notes, cleared, cache_age = held_notes(b)
+        sources = presence_sources()
+    except Exception:  # noqa: BLE001
+        notes, cleared, cache_age = {}, set(), None
+        sources = {"stasis": "", "gate_live": "", "watch_pass": "", "bin_store": None}
+    out, deadline, bin_store = {}, time.monotonic() + PRESENCE_READ_S, None
+    for session, mooring in moorings.items():
+        try:
+            if native and bin_store is None:
+                bin_store = _presence_bin_store(sources, b) or ""
+            out[(None, session)] = presence_local(b, session, mooring, now, sources, cleared, native=native,
+                                                  deadline=deadline, bin_store=bin_store)
+        except Exception:  # noqa: BLE001 — one session's unreadable records never cost the status
+            out[(None, session)] = _reading("unknown", None, "none", why="its records could not be read")
+    others = view.get("others") if isinstance(view, dict) and isinstance(view.get("others"), dict) else {}
+    for row in siblings:
+        device, session = row["device"], row["session"]
+        info = others.get(device) if isinstance(others.get(device), dict) else {}
+        seen = info.get("last_seen")
+        head_age = (b._view_now(view) - seen) / 1000 if isinstance(seen, (int, float)) else None
+        if head_age is None or head_age > b.freshness_s:
+            out[(device, session)] = _reading("unknown", head_age, "device-head",
+                                              why="this device's fold of the other devices could not be read"
+                                              if not isinstance(view, dict)
+                                              else "no head of its device has been folded here" if head_age is None
+                                              else "its device's last head folded here is past the freshness bound")
+            continue
+        age = max(head_age, cache_age if cache_age is not None else head_age)
+        pending = notes.get((device, session))
+        if pending:
+            first = min(pending, key=lambda n: n["since"])
+            out[(device, session)] = _reading("waiting", age, "held-note", since=first["since"], tool=first["tool"])
+        else:
+            out[(device, session)] = _reading("unknown", age, "held-note",
+                                              why="no pending call announced; working or idle does not cross devices")
+    return out
+
+
+def presence_line(p):
+    """One line for one reading. Fixed words, a state, ages, a time and a tool name; nothing else."""
+    age = f"{_age(p['ageS'])} ago" if p.get("ageS") is not None else "at an unknown time"
+    state = p["state"]
+    if state == "waiting":
+        tool = f"a {p['tool']} call" if p.get("tool") else "a tool call"
+        rest = ("its own epr holds the incident open, read now" if p["evidence"] == "stasis-incident"
+                else f"announced by its device's watcher; newest record here {age}")
+        return (f"presence: waiting on a person since {p['since']}: {tool} has been pending since then "
+                f"and no result is recorded ({rest})")
+    if state == "working":
+        what = {"gate-live-run": f"a gate run of it is open, newest event {age}",
+                "open-turn": f"a turn begun {p.get('since')} has not ended, newest record {age}",
+                "recent-record": f"its mooring or a subagent of it wrote a record {age}"}[p["evidence"]]
+        return f"presence: working ({what})"
+    if state == "idle":
+        return f"presence: idle since {p['since']} (its last turn ended {age}; nothing newer on record)"
+    if p.get("ageS") is not None and p["evidence"] != "held-note":
+        return f"presence: unknown since {_age(p['ageS'])} ({p.get('why')})"
+    if p["evidence"] == "held-note":
+        return f"presence: unknown ({p.get('why')}; newest record here {age})"
+    return f"presence: unknown ({p.get('why')})"
+
+
 def declared_writes(m):
     return m.get("bounds", {}).get("write_set", m.get("writes", [])) or []
 
@@ -3005,6 +3387,10 @@ def status_json(b, no_peer=False):
             row["held"] = dict(incident=held["incident"], stallClass=held["stallClass"],
                                pendingS=held["pendingS"])
         result["moorings"].append(row)
+    live = {row["session"]: moorings[row["session"]] for row in result["moorings"]}
+    readings = presence_readings(b, live, native=not no_peer)  # --no-peer spawns nothing
+    for row in result["moorings"]:
+        row["presence"] = readings[(None, row["session"])]
     view = None
     if no_peer:
         result["unavailable"].append(dict(source="devices", reason="skipped"))
@@ -3032,12 +3418,15 @@ def status_json(b, no_peer=False):
                             device=did, headAgeS=int(age) if age is not None else None,
                             silent=age is None or age > b.freshness_s,
                             unacked=dict(reason=reason["reason"], gap=reason.get("gap")) if reason else None))
-    for row in sibling_moorings(b, view=view, read_peer=False, unavailable=result["unavailable"]):
+    siblings = sibling_moorings(b, view=view, read_peer=False, unavailable=result["unavailable"])
+    readings = presence_readings(b, {}, siblings, view)
+    for row in siblings:
         result["siblings"].append(dict(
             device=row["device"], session=row["session"],
             runtime=None if row["runtime"] == "?" else row["runtime"],
             task=None if row["task"] == "-" else row["task"],
-            writes=row["write_set"], seenS=int(now - row["at"])))
+            writes=row["write_set"], seenS=int(now - row["at"]),
+            presence=readings[(row["device"], row["session"])]))
     return result
 
 
@@ -3048,9 +3437,11 @@ def render_status(b):
     ms = b.moorings()
     if not ms:
         lines.append("  moorings: none — `berth moor --session <id> --model <id> --lab <vendor> --task '<lane>'`")
+    alive = {s: b.is_live(m) for s, m in ms.items()}
+    presence = presence_readings(b, {s: m for s, m in ms.items() if alive[s]})
     for s, m in sorted(ms.items(), key=lambda kv: -kv[1].get("last_seen", 0)):
         r = m.get("recipient", {})
-        live = "live" if b.is_live(m) else "STALE"
+        live = "live" if alive[s] else "STALE"
         held = held_now.get(s) if live == "live" else None
         shown = "held" if held else live
         lines.append(f"  {shown:5} {s:<14} {r.get('runtime', '?'):<12} {r.get('model', '?')}@{r.get('lab', '?')}"
@@ -3064,6 +3455,8 @@ def render_status(b):
             if 'writes_observed_at' in m:
                 ages.append(f"last observed write {_age(now - m['writes_observed_at'])} ago")
             lines.append(writes_line(declared_writes(m)) + (' (' + ', '.join(ages) + ')' if ages else ''))
+        if live == "live":
+            lines.append("    " + presence_line(presence[(None, s)]))
     leases = b.leases()
     caps = b.capacities
     # Read the other devices once: a resource free here may be held on one of them, and the top
@@ -3172,6 +3565,7 @@ def _other_devices_lines(b, view, view_line):
     `others` and the `held_by` verdicts, replayed in each device's own record order): each one's last
     head, its open moorings and its steward-scoped leases, lane claims among them."""
     siblings = sibling_moorings(b, view=view, read_peer=False)
+    presence = presence_readings(b, {}, siblings, view)
     details = {}
     for row in siblings:
         details.setdefault(row["device"], []).append(row)
@@ -3183,6 +3577,7 @@ def _other_devices_lines(b, view, view_line):
                 lines.append(f"      moored {row['session']} task={row['task']}")
                 if row["write_set"]:
                     lines.append("  " + writes_line(row["write_set"]))
+                lines.append("        " + presence_line(presence[(did, row["session"])]))
         return lines
     now_ms = b._view_now(view)
     others = view.get("others") if isinstance(view.get("others"), dict) else {}
@@ -3222,6 +3617,7 @@ def _other_devices_lines(b, view, view_line):
             lines.append(f"      {row['session']} task={row['task']}")
             if row["write_set"]:
                 lines.append("  " + writes_line(row["write_set"]))
+            lines.append("        " + presence_line(presence[(did, row["session"])]))
         for res, verdict in sorted(held.get(did, []), key=lambda item: item[0]):
             line = f"      {res}  {steward_reason(verdict, now_ms)}"
             if verdict.get("override"):
