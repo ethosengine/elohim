@@ -65,8 +65,7 @@ pkg="${fields[1]}"
 manifest="${fields[2]}"
 root="${fields[3]}"
 workspace="${fields[4]}"
-dev_slot="$(slot_path "$(detect_family "$root")" "$workspace" dev)"
-export CARGO_TARGET_DIR="${dev_slot%/dev}/lsp"
+export CARGO_TARGET_DIR="$(worktree_slot_path "$(detect_family "$root")" "$workspace" lsp "$root")"
 export CARGO_BUILD_JOBS=1
 case "$workspace/" in
   elohim/holochain/dna/*) unset RUSTUP_TOOLCHAIN ;;

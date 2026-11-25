@@ -211,7 +211,7 @@ class PoolFamilyTest(unittest.TestCase):
         with mock.patch.object(self.guard, 'family_for', return_value='steward'):
             self.assertIsNone(self.guard.slot_for('..', str(self.wt), False))
             slot = self.guard.slot_for('elohim/elohim-storage', str(self.wt), False)
-            self.assertTrue(slot.endswith('/family/steward/elohim__elohim-storage/dev'), slot)
+            self.assertTrue(slot.endswith('/family/steward/elohim__elohim-storage/dev-wt-wt'), slot)
 
     def test_unwritable_record_still_derives(self):
         # A directory in the record's place can be neither read nor written as a
