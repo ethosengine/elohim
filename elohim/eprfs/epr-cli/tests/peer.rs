@@ -437,6 +437,62 @@ async fn flow_fold_folds_a_devices_channel_root_once_and_status_reads_it() {
 }
 
 #[test]
+fn peer_status_names_duplicate_sender_records_that_disable_coverage() {
+    let (_keys, a, b) = household();
+    let b_did = b.key.did_key();
+    let mut duplicate = claim("sb");
+    duplicate
+        .classified_as
+        .push(format!("{}{}", eprfs_peer::VIA_SLOT, b_did));
+    let mut store = SidecarFlowStore::open(a.checkout.path()).unwrap();
+    store.append(FlowRecord::Event(duplicate.clone())).unwrap();
+    store.append(FlowRecord::Event(duplicate)).unwrap();
+    let log = a.checkout.path().join(".eprfs/status/flows.jsonl");
+
+    let mut table = HeadTable::default();
+    table.devices.insert(
+        b_did.clone(),
+        DeviceHead {
+            seq: 1,
+            root: eprfs_core::BlobCid::compute(b"duplicate-covered-root"),
+            at: 1,
+            folded: Default::default(),
+            folded_at: 1,
+            events_folded: 1,
+            nack: Default::default(),
+            coverage: Some(FoldCoverage {
+                events: 1,
+                log_offset: std::fs::metadata(&log).unwrap().len(),
+            }),
+        },
+    );
+    table.store = Some(StorePlace {
+        root: a.checkout.path().to_path_buf(),
+        log,
+    });
+    table.save(&a.peer_dir()).unwrap();
+
+    let status = a.epr(&["peer", "status", "--root", a.root()]);
+    assert!(
+        status.status.success(),
+        "{}",
+        String::from_utf8_lossy(&status.stderr)
+    );
+    let text = String::from_utf8_lossy(&status.stdout);
+    assert!(
+        text.contains(
+            "coverage does not apply (record count 2 != covered 1 below offset; duplicate or \
+             rewritten records): full replay"
+        ),
+        "{text}"
+    );
+    assert!(
+        !text.contains("fold coverage unavailable; sibling events use legacy unbounded replay"),
+        "{text}"
+    );
+}
+
+#[test]
 fn flow_fold_refuses_without_its_arguments_or_from_a_stranger() {
     let (keys, a, _b) = household();
     let out = a.epr(&[

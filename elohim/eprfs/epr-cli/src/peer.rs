@@ -1631,6 +1631,17 @@ fn fold_coverage_line(device: &DeviceStatus) -> Option<String> {
             "{}: fold coverage unavailable; sibling events use legacy unbounded replay",
             short(&device.device)
         )),
+        (
+            Some(_),
+            Some(FoldCoverageState::Inapplicable {
+                record_count,
+                covered,
+            }),
+        ) => Some(format!(
+            "{}: coverage does not apply (record count {record_count} != covered {covered} below \
+             offset; duplicate or rewritten records): full replay",
+            short(&device.device)
+        )),
         _ => None,
     }
 }
