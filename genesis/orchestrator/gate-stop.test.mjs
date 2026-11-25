@@ -112,6 +112,38 @@ describe('stop --now ends the running gate', () => {
     assert.equal(result.summary.stopped.signal, 'SIGKILL');
   });
 
+  test('a TERM-ignoring gate keeps its cargo slot until the stopped group is gone', async t => {
+    const dir = scratch(t, 'gate-stop-slot-lock-');
+    const { path: run } = openRun({ root: dir, sha: 'd'.repeat(40), target: 'test' });
+    const lock = resolve(dir, 'slot.gate.lock');
+    const holder = resolve(dir, 'slot/.gate.holder');
+    const first = startTap(run, fakeGate(dir, { stubborn: true }), {
+      GATE_STOP_GRACE_MS: '600', GATE_SLOT_LOCK_PATH: lock, GATE_SLOT_HOLDER_PATH: holder,
+      GATE_SLOT_WAIT_RESULT: resolve(dir, 'first-wait.tsv'),
+    });
+    assert.ok(await waitFor(() => existsSync(resolve(dir, 'grandchild'))));
+
+    const entered = resolve(dir, 'second-entered');
+    const secondScript = resolve(dir, 'second.sh');
+    writeFileSync(secondScript, `#!/usr/bin/env bash\nprintf entered > ${JSON.stringify(entered)}\n`, { mode: 0o755 });
+    const second = startTap(run, secondScript, {
+      GATE_SLOT_LOCK_PATH: lock, GATE_SLOT_HOLDER_PATH: holder,
+      GATE_SLOT_WAIT_RESULT: resolve(dir, 'second-wait.tsv'), GATE_SLOT_LOCK_WAIT_S: '5',
+    });
+    assert.ok(await waitFor(() => readRun(run).events.some(event => event.kind === 'wait')),
+      'the second gate never waited on the first holder');
+
+    requestStop(run, { immediate: true, by: 'session-stopper' });
+    await delay(200);
+    assert.equal(existsSync(entered), false, 'the second gate entered during the TERM grace');
+    assert.ok(alive(readPid(resolve(dir, 'grandchild'))), 'the TERM-ignoring recipe still lives during grace');
+
+    const stopped = await first.done;
+    assert.equal(stopped.summary.stopped.signal, 'SIGKILL');
+    assert.equal((await second.done).code, 0);
+    assert.ok(existsSync(entered), 'the second gate enters after the first group is gone');
+  });
+
   test('a plain stop leaves the running gate to finish', async t => {
     const dir = scratch(t, 'gate-stop-plain-');
     const { path: run } = openRun({ root: dir, sha: 'c'.repeat(40), target: 'test' });
