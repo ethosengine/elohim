@@ -29,6 +29,7 @@
 
 mod arrival;
 mod arrival_work;
+mod capacity;
 pub(crate) mod declaration;
 mod layout;
 pub(crate) mod supervise;
@@ -88,7 +89,10 @@ pub fn usage() -> &'static str {
      epr device pending [--node <this node URL>]\n  \
      epr device approve '<link | number | key fingerprint>' [--only <act>]... [--yes] [--node <this node URL>]\n  \
      epr device approve <number | key fingerprint> --decline\n  \
-     epr device status [--json] [--root <path>]\n  epr device arrive [--strict]\n  \
+     epr device status [--json] [--root <path>] [--would <commit>]\n  epr device arrive [--strict]\n  \
+     epr device build-role builder --until <RFC3339> | carrier | neither\n    \
+     (builder is a standing commitment; carrier eligibility is activated separately by the \
+     expiring carry switch; neither declares that this device does not build)\n  \
      epr device follow <channel> [--mode observe|canary|apply] [--pin <cid>] | --unfollow \
      [--base <manifest.json> [--replace-processes]]\n  \
      epr device run <tool> [--name <process>] [--env KEY=VALUE]... [--ready-line <text>] \
@@ -123,13 +127,14 @@ const FLAGS: [&str; 7] = [
 ];
 
 /// The device commands, as a person types them.
-const COMMANDS: [&str; 11] = [
+const COMMANDS: [&str; 12] = [
     "join",
     "ask",
     "redeem",
     "pending",
     "approve",
     "status",
+    "build-role",
     "arrive",
     "trust",
     "approvals",
@@ -161,7 +166,7 @@ fn unknown_command(word: &str) -> String {
 
 pub fn run(args: &[String]) -> Outcome<ExitCode> {
     match args.first().map(String::as_str) {
-        Some("follow" | "run" | "show" | "apply") => declaration::run(args),
+        Some("follow" | "run" | "show" | "apply" | "build-role") => declaration::run(args),
         Some("supervise") => supervise::run(&args[1..]),
         Some("layout") => layout::run(&args[1..]),
         Some("join") => join(&args[1..]),

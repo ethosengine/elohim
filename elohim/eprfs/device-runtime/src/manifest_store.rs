@@ -38,6 +38,31 @@ struct Head {
     cid: String,
     base: String,
 }
+
+fn head_at(chain: &Path) -> Result<Option<Head>> {
+    match fs::read(chain.join("head")) {
+        Ok(bytes) => {
+            let head: Head = serde_json::from_slice(&bytes).map_err(invalid)?;
+            files::require_cid(&head.cid)?;
+            files::require_cid(&head.base)?;
+            Ok(Some(head))
+        }
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(error) => Err(error.into()),
+    }
+}
+
+fn version_at(chain: &Path, cid: &str) -> Result<RuntimeManifest> {
+    let bytes = fs::read(chain.join(format!("{cid}.cbor")))?;
+    let manifest: RuntimeManifest = RuntimeManifest::from_cbor(&bytes).map_err(invalid)?;
+    manifest.validate().map_err(invalid)?;
+    validate_secrets(&manifest)?;
+    if manifest.cid().map_err(invalid)? != cid {
+        return Err(Refusal::new("manifest-cid-mismatch", cid));
+    }
+    Ok(manifest)
+}
+
 /// One steward device's declaration store.
 #[derive(Debug, Clone)]
 pub struct ManifestStore {
@@ -125,26 +150,19 @@ impl ManifestStore {
         self.version(&head.cid)
     }
     fn version(&self, cid: &str) -> Result<RuntimeManifest> {
-        let bytes = fs::read(self.chain().join(format!("{cid}.cbor")))?;
-        let manifest: RuntimeManifest = RuntimeManifest::from_cbor(&bytes).map_err(invalid)?;
-        manifest.validate().map_err(invalid)?;
-        validate_secrets(&manifest)?;
-        if manifest.cid().map_err(invalid)? != cid {
-            return Err(Refusal::new("manifest-cid-mismatch", cid));
-        }
-        Ok(manifest)
+        version_at(&self.chain(), cid)
     }
     fn head(&self) -> Result<Option<Head>> {
-        match fs::read(self.chain().join("head")) {
-            Ok(bytes) => {
-                let head: Head = serde_json::from_slice(&bytes).map_err(invalid)?;
-                files::require_cid(&head.cid)?;
-                files::require_cid(&head.base)?;
-                Ok(Some(head))
-            }
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
-            Err(e) => Err(e.into()),
-        }
+        head_at(&self.chain())
+    }
+    /// Read only this device's locally authored build declaration. This follows the immutable
+    /// head without opening the deployment base or taking the manifest writer's lock.
+    pub fn read_build_role(root: &Path) -> Result<Option<ark_core::BuildRoleDeclaration>> {
+        let chain = root.join("manifest");
+        let Some(head) = head_at(&chain)? else {
+            return Ok(None);
+        };
+        Ok(version_at(&chain, &head.cid)?.build_role)
     }
     /// Serialize an act and its projections under the same chain lock.
     pub fn act(&self, act: ManifestAct) -> Result<RuntimeManifest> {
@@ -242,6 +260,8 @@ impl ManifestStore {
             carried: Vec::new(),
             conflicts: Vec::new(),
         };
+        // Build participation is authored by this device, never supplied by a deployment base.
+        adoption.manifest.build_role = current.build_role.clone();
         if !self.replace_processes {
             let prior = self
                 .version(&head.base)

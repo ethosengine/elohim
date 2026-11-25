@@ -7,6 +7,10 @@
 export interface RuntimeDeclaration {
   manifestCid: string;
   supersedes: string | null;
+  buildRole: null | {
+    role: 'builder' | 'carrier' | 'neither';
+    until?: string;
+  };
   follows: {
     channel: string;
     mode: 'observe' | 'canary' | 'apply';

@@ -27,7 +27,10 @@ pub use elohim_compute::{LimitOwner, Refusal};
 pub use exit::{classify_readiness_outcome, ExitClass, ReadinessOutcome};
 pub use intent::{Intent, IntentAction};
 pub use lifecycle::{step, Action, ChildState, Event, IncidentCloseKind};
-pub use manifest::{ArtifactRef, ChildPolicy, ChildSpec, Probe, ProcessKind, RuntimeManifest};
+pub use manifest::{
+    ArtifactRef, BuildRole, BuildRoleDeclaration, ChildPolicy, ChildSpec, Probe, ProcessKind,
+    RuntimeManifest,
+};
 pub use passport::{EffectiveTier, Passport, ProcessPassport, PASSPORT_KIND};
 pub use rea::{
     ReaProjectionError, RuntimeScope, INCIDENT_SPEC_ID, INCIDENT_SPEC_VERSION,

@@ -31,6 +31,44 @@ fn value(output: Output) -> serde_json::Value {
     );
     serde_json::from_slice(&output.stdout).unwrap()
 }
+
+#[test]
+fn build_role_uses_the_private_manifest_and_names_carrier_switch_authority() {
+    let root = tempfile::tempdir().unwrap();
+    let missing_until = epr(root.path(), &["build-role", "builder"]);
+    assert!(!missing_until.status.success());
+    assert!(String::from_utf8_lossy(&missing_until.stderr).contains("needs an until"));
+    assert!(!root.path().join("device/manifest/head").exists());
+
+    let builder = value(epr(
+        root.path(),
+        &["build-role", "builder", "--until", "2099-01-01T00:00:00Z"],
+    ));
+    assert_eq!(builder["buildRole"]["role"], "builder");
+    assert_eq!(builder["buildRole"]["until"], "2099-01-01T00:00:00Z");
+
+    let duplicate_carrier_expiry = epr(
+        root.path(),
+        &["build-role", "carrier", "--until", "2099-01-01T00:00:00Z"],
+    );
+    assert!(!duplicate_carrier_expiry.status.success());
+    assert!(String::from_utf8_lossy(&duplicate_carrier_expiry.stderr).contains("carry switch"));
+    assert_eq!(value(epr(root.path(), &["show"])), builder);
+
+    let neither = value(epr(root.path(), &["build-role", "neither"]));
+    assert_eq!(neither["buildRole"]["role"], "neither");
+    assert!(neither["buildRole"]["until"].is_null());
+    let manifest: serde_json::Value =
+        serde_json::from_slice(&epr(root.path(), &["show", "--render", "manifest"]).stdout)
+            .unwrap();
+    assert_eq!(manifest["build_role"]["role"], "neither");
+    assert!(root.path().join("device/manifest/head").is_file());
+    assert!(root
+        .path()
+        .read_dir()
+        .unwrap()
+        .all(|entry| entry.unwrap().file_name() == "device"));
+}
 #[test]
 fn explicit_root_retains_its_base_and_refused_options_never_mutate() {
     let root = tempfile::tempdir().unwrap();

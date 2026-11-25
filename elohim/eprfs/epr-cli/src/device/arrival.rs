@@ -43,6 +43,9 @@ pub struct Check {
     pub detail: String,
     /// Command or action that restores the condition.
     pub cure: Option<String>,
+    /// Structured local capacity, present only on the one capacity line.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub capacity: Option<super::capacity::Capacity>,
 }
 impl Check {
     fn new(name: &str, state: State, detail: impl Into<String>, cure: Option<String>) -> Self {
@@ -51,7 +54,12 @@ impl Check {
             state,
             detail: detail.into(),
             cure,
+            capacity: None,
         }
+    }
+    fn with_capacity(mut self, capacity: super::capacity::Capacity) -> Self {
+        self.capacity = Some(capacity);
+        self
     }
 }
 impl fmt::Display for Check {
@@ -125,6 +133,8 @@ pub(crate) fn status_at(root: &Path, remember: bool) -> Vec<Check> {
             actor::device_state_read_only(root, key)
         });
     let published = published_refs(registry.as_ref().ok());
+    let toolchain = toolchain_fact(root, &env);
+    let capacity = super::capacity::observe(device_layout.as_ref().ok(), &toolchain, &env);
     let mut checks = vec![
         binary("epr"),
         binary("brit"),
@@ -153,7 +163,7 @@ pub(crate) fn status_at(root: &Path, remember: bool) -> Vec<Check> {
         sibling_check(root, &current),
         supervisor_check(root),
         // Restart-arrival facts (backlog container-restart-strands-session-envelope).
-        toolchain_check(root, &env),
+        toolchain_check(&toolchain, capacity.does_not_build),
         sysroot::line(
             &env,
             device_layout
@@ -166,6 +176,7 @@ pub(crate) fn status_at(root: &Path, remember: bool) -> Vec<Check> {
         brit_trust_check(root),
         packs_check(root),
         layout_check(device_layout),
+        Check::new("device capacity", State::Ok, capacity.line(), None).with_capacity(capacity),
     ];
     // Each admitted sibling that has acknowledged none (or too little) of this device's records,
     // beside the exchange line (arrival backlog row 77, delta 2). Degraded, never refused; the
@@ -771,11 +782,77 @@ fn gate_toolchain(root: &Path) -> Option<String> {
 #[path = "arrival_sysroot.rs"]
 mod sysroot;
 
+/// One local reading shared by the arrival line and the capacity declaration.
+#[derive(Debug, Clone)]
+pub(super) struct ToolchainFact {
+    pub(super) pin: Option<String>,
+    pub(super) installed: Option<bool>,
+    pub(super) location: Option<PathBuf>,
+    pub(super) why_unknown: Option<String>,
+}
+
 /// The Rust toolchain the local gate pins (`pool-policy.json` `cargo_env_overrides["*"]`),
 /// looked up in rustup's home. `$HOME` is wiped on a workspace restart, and a rustup home under
 /// it loses the pin; the gate then refuses every cargo project. A read: never installs.
-fn toolchain_check(root: &Path, env: &dyn Fn(&str) -> Option<String>) -> Check {
-    let Some(pin) = gate_toolchain(root) else {
+fn toolchain_fact(root: &Path, env: &dyn Fn(&str) -> Option<String>) -> ToolchainFact {
+    let pin = gate_toolchain(root);
+    let Some(pin_value) = pin.as_deref() else {
+        return ToolchainFact {
+            pin,
+            installed: None,
+            location: None,
+            why_unknown: None,
+        };
+    };
+    let home = env("RUSTUP_HOME")
+        .filter(|v| !v.is_empty())
+        .map(PathBuf::from)
+        .or_else(|| env("HOME").map(|home| PathBuf::from(home).join(".rustup")));
+    let Some(home) = home else {
+        return ToolchainFact {
+            pin,
+            installed: None,
+            location: None,
+            why_unknown: Some("neither RUSTUP_HOME nor HOME is set".into()),
+        };
+    };
+    let toolchains = home.join("toolchains");
+    let entries = match fs::read_dir(&toolchains) {
+        Ok(entries) => entries,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            return ToolchainFact {
+                pin,
+                installed: Some(false),
+                location: Some(toolchains),
+                why_unknown: None,
+            }
+        }
+        Err(error) => {
+            return ToolchainFact {
+                pin,
+                installed: None,
+                location: Some(toolchains.clone()),
+                why_unknown: Some(format!("{}: {error}", toolchains.display())),
+            }
+        }
+    };
+    let prefix = format!("{pin_value}-");
+    let installed = entries.filter_map(Result::ok).find(|entry| {
+        let name = entry.file_name();
+        let name = name.to_string_lossy();
+        (*name == *pin_value || name.starts_with(&prefix))
+            && entry.path().join("bin/cargo").is_file()
+    });
+    ToolchainFact {
+        pin,
+        installed: Some(installed.is_some()),
+        location: installed.map(|entry| entry.path()).or(Some(toolchains)),
+        why_unknown: None,
+    }
+}
+
+fn toolchain_check(fact: &ToolchainFact, does_not_build: bool) -> Check {
+    let Some(pin) = fact.pin.as_deref() else {
         return Check::new(
             "rust toolchain",
             State::Ok,
@@ -783,47 +860,47 @@ fn toolchain_check(root: &Path, env: &dyn Fn(&str) -> Option<String>) -> Check {
             None,
         );
     };
-    let home = env("RUSTUP_HOME")
-        .filter(|v| !v.is_empty())
-        .map(PathBuf::from)
-        .or_else(|| env("HOME").map(|home| PathBuf::from(home).join(".rustup")));
-    let Some(home) = home else {
+    if fact.installed == Some(true) {
         return Check::new(
             "rust toolchain",
-            State::Unknown,
-            format!("pin {pin}; neither RUSTUP_HOME nor HOME is set"),
-            Some("set RUSTUP_HOME to rustup's home".into()),
+            State::Ok,
+            format!(
+                "pin {pin} at {}",
+                fact.location.as_deref().map_or_else(
+                    || "an installed toolchain".into(),
+                    |path| path.display().to_string()
+                )
+            ),
+            None,
         );
-    };
-    let toolchains = home.join("toolchains");
-    let entries = match fs::read_dir(&toolchains) {
-        Ok(entries) => entries,
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-            return toolchain_missing(&pin, &toolchains)
-        }
-        Err(e) => {
-            return Check::new(
-                "rust toolchain",
-                State::Unknown,
-                format!("pin {pin}; {}: {e}", toolchains.display()),
-                None,
-            )
-        }
-    };
-    let prefix = format!("{pin}-");
-    let installed = entries.filter_map(Result::ok).find(|entry| {
-        let name = entry.file_name();
-        let name = name.to_string_lossy();
-        (*name == *pin || name.starts_with(&prefix)) && entry.path().join("bin/cargo").is_file()
-    });
-    match installed {
-        Some(entry) => Check::new(
+    }
+    if does_not_build {
+        return Check::new(
             "rust toolchain",
             State::Ok,
-            format!("pin {pin} at {}", entry.path().display()),
+            format!("pin {pin} is not required; this device declares does not build"),
             None,
+        );
+    }
+    match fact.installed {
+        Some(false) => toolchain_missing(
+            pin,
+            fact.location
+                .as_deref()
+                .unwrap_or_else(|| Path::new("<rustup>")),
         ),
-        None => toolchain_missing(&pin, &toolchains),
+        None => Check::new(
+            "rust toolchain",
+            State::Unknown,
+            format!(
+                "pin {pin}; {}",
+                fact.why_unknown
+                    .as_deref()
+                    .unwrap_or("installation unreadable")
+            ),
+            Some("set RUSTUP_HOME to rustup's home".into()),
+        ),
+        Some(true) => unreachable!("handled above"),
     }
 }
 fn toolchain_missing(pin: &str, toolchains: &Path) -> Check {
@@ -1810,6 +1887,7 @@ pub(super) fn run(args: &[String], arrive: bool) -> Result<ExitCode, crate::erro
     let mut json = false;
     let mut strict = false;
     let mut worker = false;
+    let mut would = None;
     let mut iter = args.iter();
     while let Some(arg) = iter.next() {
         match arg.as_str() {
@@ -1819,6 +1897,11 @@ pub(super) fn run(args: &[String], arrive: bool) -> Result<ExitCode, crate::erro
                 })?))
             }
             "--json" => json = true,
+            "--would" if !arrive => {
+                would = Some(iter.next().ok_or_else(|| {
+                    crate::error::Error::InvalidArguments("--would needs a commit".into())
+                })?)
+            }
             "--strict" if arrive => strict = true,
             "--worker" if arrive => worker = true,
             _ => {
@@ -1833,6 +1916,11 @@ pub(super) fn run(args: &[String], arrive: bool) -> Result<ExitCode, crate::erro
         source,
     })?;
     let root = root.unwrap_or_else(|| git::checkout(&here).unwrap_or(here));
+    if json && would.is_some() {
+        return Err(crate::error::Error::InvalidArguments(
+            "--would is a human dry-run report; omit --json".into(),
+        ));
+    }
     if arrive {
         let result = if worker {
             super::arrival_work::work(&root)
@@ -1847,11 +1935,28 @@ pub(super) fn run(args: &[String], arrive: bool) -> Result<ExitCode, crate::erro
         }
     }
     let checks = status_at(&root, arrive);
+    let would_lines = would
+        .map(|commit| {
+            let capacity = checks
+                .iter()
+                .find_map(|check| check.capacity.as_ref())
+                .ok_or_else(|| {
+                    crate::error::Error::InvalidArguments(
+                        "device capacity could not be read for --would".into(),
+                    )
+                })?;
+            super::capacity::would_run(&root, commit, capacity)
+                .map_err(crate::error::Error::InvalidArguments)
+        })
+        .transpose()?;
     if json {
         println!("{}", serde_json::to_string(&checks)?);
     } else {
         for check in &checks {
             println!("{check}");
+        }
+        for line in would_lines.into_iter().flatten() {
+            println!("{line}");
         }
     }
     Ok(
@@ -2139,7 +2244,7 @@ mod tests {
         let rustup = dir.path().join("rustup");
         let env = |k: &str| (k == "RUSTUP_HOME").then(|| rustup.display().to_string());
         assert_eq!(
-            toolchain_check(&root, &env).state,
+            toolchain_check(&toolchain_fact(&root, &env), false).state,
             State::Ok,
             "no pin declared"
         );
@@ -2149,21 +2254,31 @@ mod tests {
             r#"{"cargo_env_overrides":{"*":{"RUSTUP_TOOLCHAIN":"1.96.1"}}}"#,
         )
         .unwrap();
-        let missing = toolchain_check(&root, &env);
+        let missing_fact = toolchain_fact(&root, &env);
+        let missing = toolchain_check(&missing_fact, false);
         assert_eq!(missing.state, State::Degraded);
         assert!(missing
             .cure
             .unwrap()
             .contains("rustup toolchain install 1.96.1"));
+        let non_builder = toolchain_check(&missing_fact, true);
+        assert_eq!(non_builder.state, State::Ok);
+        assert!(non_builder.detail.contains("declares does not build"));
         // Another version's toolchain does not satisfy the pin.
         let other = rustup.join("toolchains/1.96.10-x86_64-unknown-linux-gnu/bin");
         fs::create_dir_all(&other).unwrap();
         fs::write(other.join("cargo"), "").unwrap();
-        assert_eq!(toolchain_check(&root, &env).state, State::Degraded);
+        assert_eq!(
+            toolchain_check(&toolchain_fact(&root, &env), false).state,
+            State::Degraded
+        );
         let pinned = rustup.join("toolchains/1.96.1-x86_64-unknown-linux-gnu/bin");
         fs::create_dir_all(&pinned).unwrap();
         fs::write(pinned.join("cargo"), "").unwrap();
-        assert_eq!(toolchain_check(&root, &env).state, State::Ok);
+        assert_eq!(
+            toolchain_check(&toolchain_fact(&root, &env), false).state,
+            State::Ok
+        );
     }
     #[test]
     fn governed_hooks_need_an_absolute_hooks_path_holding_every_shim() {

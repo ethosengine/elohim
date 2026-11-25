@@ -15,6 +15,34 @@
         "null"
       ]
     },
+    "buildRole": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "role": {
+              "type": "string",
+              "enum": [
+                "builder",
+                "carrier",
+                "neither"
+              ]
+            },
+            "until": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          "required": [
+            "role"
+          ]
+        }
+      ]
+    },
     "follows": {
       "type": "array",
       "items": {
@@ -189,6 +217,7 @@
   "required": [
     "manifestCid",
     "supersedes",
+    "buildRole",
     "follows",
     "tools",
     "processes"

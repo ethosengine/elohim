@@ -15,6 +15,7 @@ fn epr(base: &Path, args: &[&str]) -> Output {
         .env("ELOHIM_DEVICE_KEY_FILE", base.join("device/seed"))
         .env("EPR_BIN_TOOLS", base.join("registry.json"))
         .env("BIN_STORE", base.join("store"))
+        .env("CARGO_TARGET_POOL_ROOT", base.join("cargo-pool"))
         .env("EPR_UNDER_TEST", "1")
         .env("EPR_PROC_ROOT", base.join("proc"))
         .env_remove("ELOHIM_SESSION_OWNER_PID")
@@ -28,7 +29,7 @@ fn epr(base: &Path, args: &[&str]) -> Output {
         .env("ELOHIM_STATE_DIR", base.join("state"))
         .env("BIN_STORE_SKIP_TOOLS", "epr,brit")
         .env("ELOHIM_SESSION_ID", "arrival-test")
-        .env("PATH", "/usr/bin:/bin")
+        .env("PATH", "/usr/local/bin:/usr/bin:/bin")
         .env("GIT_CONFIG_GLOBAL", "/dev/null")
         .env("GIT_CONFIG_NOSYSTEM", "1")
         .env("GIT_CONFIG_COUNT", "0")
@@ -41,6 +42,14 @@ fn epr(base: &Path, args: &[&str]) -> Output {
 fn fixture() -> tempfile::TempDir {
     let temp = tempfile::tempdir().unwrap();
     fs::create_dir(temp.path().join("repo")).unwrap();
+    fs::create_dir(temp.path().join("cargo-pool")).unwrap();
+    fs::create_dir(temp.path().join("proc")).unwrap();
+    fs::write(
+        temp.path().join("proc/cpuinfo"),
+        "processor: 0\nprocessor: 1\n",
+    )
+    .unwrap();
+    fs::write(temp.path().join("proc/meminfo"), "MemTotal: 4096 kB\n").unwrap();
     assert!(Command::new("git")
         .args(["init", "-q"])
         .current_dir(temp.path().join("repo"))
@@ -129,6 +138,7 @@ fn status_keeps_dependency_order_and_does_not_mint_a_key() {
             "brit trust",
             "object packs",
             "device layout",
+            "device capacity",
             "next step"
         ]
     );
@@ -159,6 +169,16 @@ fn status_keeps_dependency_order_and_does_not_mint_a_key() {
     // The committed base declares no process: nothing to supervise is not a lack.
     assert_eq!(checks[11]["state"], "ok");
     assert!(checks[11]["cure"].is_null());
+    let capacity = &checks[18];
+    assert_eq!(capacity["state"], "ok");
+    assert_eq!(capacity["capacity"]["cargoPoolPresent"], true);
+    assert!(capacity["capacity"]["cargoPoolFreeBytes"].is_u64());
+    assert!(capacity["capacity"]["cores"].is_u64());
+    assert!(capacity["capacity"]["memoryBytes"].is_u64());
+    assert!(capacity["detail"]
+        .as_str()
+        .unwrap()
+        .contains("pool present"));
     // The last line repeats the first owed ceremony cure, and never refuses.
     let next = checks.last().unwrap();
     assert_ne!(next["state"], "refused");
@@ -176,6 +196,131 @@ fn status_keeps_dependency_order_and_does_not_mint_a_key() {
     assert_eq!(next["detail"], owed["name"]);
     assert_eq!(next["cure"], owed["cure"]);
     assert!(!temp.path().join("device/seed").exists());
+}
+
+#[test]
+fn only_an_explicit_non_builder_makes_a_missing_pin_ok() {
+    let temp = fixture();
+    let base = temp.path();
+    let policy = base.join("repo/genesis/agentic/pool-policy.json");
+    fs::create_dir_all(policy.parent().unwrap()).unwrap();
+    fs::write(
+        policy,
+        r#"{"cargo_env_overrides":{"*":{"RUSTUP_TOOLCHAIN":"99.0.0"}}}"#,
+    )
+    .unwrap();
+    let rust = |base: &Path| {
+        checks(base)
+            .1
+            .into_iter()
+            .find(|check| check["name"] == "rust toolchain")
+            .unwrap()
+    };
+    assert_eq!(rust(base)["state"], "degraded", "undeclared stays degraded");
+    let device = base.join("device");
+    let builder = epr(
+        base,
+        &[
+            "device",
+            "build-role",
+            "builder",
+            "--until",
+            "2099-01-01T00:00:00Z",
+            "--root",
+            device.to_str().unwrap(),
+        ],
+    );
+    assert!(
+        builder.status.success(),
+        "{}",
+        String::from_utf8_lossy(&builder.stderr)
+    );
+    assert_eq!(
+        rust(base)["state"],
+        "degraded",
+        "builder still needs the pin"
+    );
+    let neither = epr(
+        base,
+        &[
+            "device",
+            "build-role",
+            "neither",
+            "--root",
+            device.to_str().unwrap(),
+        ],
+    );
+    assert!(
+        neither.status.success(),
+        "{}",
+        String::from_utf8_lossy(&neither.stderr)
+    );
+    let rust = rust(base);
+    assert_eq!(rust["state"], "ok");
+    assert!(rust["detail"].as_str().unwrap().contains("does not build"));
+}
+
+#[test]
+fn would_uses_gate_runner_selection_and_never_runs_a_gate() {
+    let temp = fixture();
+    let base = temp.path();
+    assert!(epr(base, &["device", "trust", "."]).status.success());
+    let orchestrator = base.join("repo/genesis/orchestrator");
+    fs::create_dir_all(&orchestrator).unwrap();
+    fs::write(
+        orchestrator.join("gate-runner.mjs"),
+        "process.stdin.resume(); process.stdin.on('end', () => { console.log('alpha'); console.log('beta'); });\n",
+    )
+    .unwrap();
+    fs::write(base.join("repo/changed.txt"), "selected\n").unwrap();
+    fixture_git(
+        base,
+        &["add", "genesis/orchestrator/gate-runner.mjs", "changed.txt"],
+    );
+    fixture_git(base, &["commit", "-q", "-m", "fixture gate selection"]);
+    let commit = Command::new("git")
+        .args(["rev-parse", "HEAD"])
+        .current_dir(base.join("repo"))
+        .env("GIT_CONFIG_GLOBAL", "/dev/null")
+        .env("GIT_CONFIG_NOSYSTEM", "1")
+        .output()
+        .unwrap();
+    assert!(commit.status.success());
+    let commit = String::from_utf8(commit.stdout).unwrap();
+    let report = epr(base, &["device", "status", "--would", commit.trim()]);
+    let text = String::from_utf8(report.stdout).unwrap();
+    assert!(
+        text.contains("alpha: leave as miss (build role undeclared)"),
+        "{text}"
+    );
+    assert!(
+        text.contains("beta: leave as miss (build role undeclared)"),
+        "{text}"
+    );
+    assert!(
+        !text.contains("gate ran"),
+        "the selector output is classification only"
+    );
+
+    let device = base.join("device");
+    assert!(epr(
+        base,
+        &[
+            "device",
+            "build-role",
+            "builder",
+            "--until",
+            "2099-01-01T00:00:00Z",
+            "--root",
+            device.to_str().unwrap(),
+        ],
+    )
+    .status
+    .success());
+    let report = epr(base, &["device", "status", "--would", commit.trim()]);
+    let text = String::from_utf8(report.stdout).unwrap();
+    assert!(text.contains("alpha: run here"), "{text}");
+    assert!(text.contains("beta: run here"), "{text}");
 }
 #[test]
 fn arrive_bad_registry_fails_open_but_strict_refuses() {
