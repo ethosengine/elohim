@@ -547,6 +547,54 @@ paths, not tree, and a documentation-only commit outside its reads leaves its ke
    library row says suffices, so it takes the miss.
 6. Is section 8's order the one to build in?
 
+## 9a. The steward's answers, 2026-11-25
+
+Given in the integrator's session on shem at about 01:45Z, to four of the questions above. His
+words are quoted exactly. The reading under each is the integrator's and is what the stations
+will build to unless he corrects it. These are rulings on the questions; no switch is turned on
+by them, and every station still ships in shadow first.
+
+**How many agreeing producers a release needs.** "let's start with one for now.. an elohim
+decision can stand in for a broader consensus, it's a reach ladder concern if that release
+becomes more broadly used.. it should be expected to start getting more agreeing produces as
+reach grows."
+Reading: N is 1 at the reach the release has today (the steward's own devices). N is a function
+of reach and rises as a release is used more broadly; the number at each higher reach is not
+set here. The release row of section 5 takes N = 1, and Attest-release records the reach at
+which an acceptance was made so that a later, broader use can ask for more.
+
+**Whether a sponsored runner's green may ever stand alone.** "for deterministic things.. like
+architecture (v2/v3/arm) for passed tests, proofs, change detection,.. ecetera.. that another
+machine build could reuse."
+Reading: yes, for results that are deterministic for their key: a build for a named
+architecture, a test pass, a proof, a change-detection answer, anything another machine would
+reproduce from the same inputs. This is wider than the documentation-only exception proposed in
+section 5 and replaces it. It does not change what such a green counts for toward reach: it is
+a reused execution and still counts as zero independent witnesses (section 4a). The condition
+it rests on is the integrator's, and is the open work: a result is only known to be
+deterministic for its key when the key is shown to cover what the invocation reads, which the
+evidence file `evidence/2026-11-24-gate-attestation/key-closure-gaps.md` says is not yet true
+for any per-crate key. So each class of gate becomes eligible when its key passes that check and
+its shadow has agreed with local runs, not before.
+
+**Whether DHT notarization is a later enrichment.** "yes trust can be a lagging indicator and
+other peers (such as us devs, or our devices under my stewardship grant), trust can be a lagging
+indicator.. for say downstream devs that rely on those same artifacts as stable dependencies."
+Reading: a notarization is a later enrichment of the same artifact record, not a separate,
+stronger record. Trust accumulates after the fact: the steward's devices and the developers
+under his grant attest first, and a notarization follows when an artifact has become something
+others depend on. The enrichment record's closed set of kinds reserves a place for it; nothing
+notarizes in this design's stations.
+
+**Whether harvested CI notes should reach the forge.** "I would think so.. every \"node\"
+should be able to hold some of it's own results for others to use, at least for a while, don't
+you think?"
+Reading: yes. A node publishes the results it holds so others can use them, for a bounded
+time. Shem resumed `just dev notes publish` at 01:47Z. Two things follow that are not done: the
+comment in `brit-attest.mjs` that says these notes stay on the device is now wrong and should
+say they are published; and "for a while" needs a retention rule (how long a node keeps and
+serves a result nobody has asked for), which no station yet names.
+
 ## 10. What was not established
 
 **Readings and proposals in this document.**
