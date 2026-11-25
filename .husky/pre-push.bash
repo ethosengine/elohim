@@ -509,10 +509,12 @@ phase_l_agent_renew() {
   rc=$?
   if [ "$rc" -eq 0 ]; then
     phase_l_agent_token
+    PHASE_L_RENEWED_AT=$(date +%s)
     return 0
   fi
   if { [ "$rc" -eq 3 ] && phase_l_agent_overridden; } ||
      { [ "$rc" -eq 1 ] && [[ "$PHASE_L_OUT" == "dev-integration: renewed here, but "* ]]; }; then
+    PHASE_L_RENEWED_AT=$(date +%s)
     return 0
   fi
   phase_l_agent_say berth "$PHASE_L_OUT"
@@ -527,7 +529,7 @@ phase_l_agent_listen() {
   read -r -t "$1" -u "$PHASE_L_IN" line || rc=$?
   if [ "$rc" -eq 0 ]; then
     case "$line" in
-      land\ *) read -r _ PHASE_L_SHA PHASE_L_PUSH PHASE_L_TARGET <<<"$line"; return 2 ;;
+      land\ *) read -r _ PHASE_L_SHA PHASE_L_PUSH PHASE_L_TARGET PHASE_L_TOOL PHASE_L_PUSH_AT <<<"$line"; return 2 ;;
       release\ *) PHASE_L_WHY="${line#release }"; return 2 ;;
     esac
     return 0
@@ -610,6 +612,9 @@ phase_l_agent() { # dir, session, for whom
   PHASE_L_CA=""
   PHASE_L_WHY=""
   PHASE_L_SHA=""
+  PHASE_L_TOOL=""
+  PHASE_L_PUSH_AT=""
+  PHASE_L_RENEWED_AT=""
   PHASE_L_HELD_FROM=""
   trap - EXIT
   trap '' INT HUP
@@ -653,6 +658,7 @@ phase_l_agent() { # dir, session, for whom
   phase_l_agent_token
   phase_l_agent_say berth "$PHASE_L_OUT"
   PHASE_L_HELD_FROM=$(date +%s)
+  PHASE_L_RENEWED_AT=$PHASE_L_HELD_FROM
   printf 'held %s %s\n' "$PHASE_L_CA" "$((PHASE_L_HELD_FROM - now))" >>"$PHASE_L_STATUS"
   # Held: renew while the parent checks, until it hands the landing over or lets go.
   local next=$((PHASE_L_HELD_FROM + PHASE_L_INTERVAL))
@@ -668,22 +674,66 @@ phase_l_agent() { # dir, session, for whom
     phase_l_agent_end "release ${PHASE_L_WHY}"
     return
   fi
-  # Handed over: wait for the real `git push` to finish (bounded at an hour), still renewing.
+  PHASE_L_TOOL=${PHASE_L_TOOL:-unknown}
+  [[ "$PHASE_L_PUSH" =~ ^[0-9]+$ ]] || PHASE_L_TOOL=unknown
+  if [ "$PHASE_L_TOOL" = unknown ]; then
+    phase_l_agent_observe
+    return
+  fi
+  # Handed over: wait for the real push (`git push` or `brit push`, pid AND start time, so a reused
+  # pid is never waited on) to finish (bounded at an hour), still renewing.
   local stop=$(($(date +%s) + 3600))
-  while kill -0 "$PHASE_L_PUSH" 2>/dev/null && [ "$(date +%s)" -lt "$stop" ] && [ -z "$PHASE_L_WHY" ]; do
+  while phase_l_alive "$PHASE_L_PUSH" "$PHASE_L_PUSH_AT" && [ "$(date +%s)" -lt "$stop" ] && [ -z "$PHASE_L_WHY" ]; do
     sleep 0.5
     if [ "$(date +%s)" -ge "$next" ]; then
       phase_l_agent_renew || break
       next=$(($(date +%s) + PHASE_L_INTERVAL))
     fi
   done
-  remote=$(timeout 30 git ls-remote "$PHASE_L_REMOTE" "refs/heads/$PHASE_L_TARGET" 2>/dev/null | cut -f1)
-  if { [ "$PHASE_L_SHA" = none ] && [ -z "$remote" ]; } || [ "$remote" = "$PHASE_L_SHA" ]; then
+  remote=$(phase_l_agent_remote 30)
+  if phase_l_agent_landed "$remote"; then
     result=landed
   else
     result=did-not-land
   fi
-  phase_l_agent_end "settle $PHASE_L_SHA $result $PHASE_L_TARGET=${remote:0:12}"
+  phase_l_agent_end "settle $PHASE_L_SHA $result $PHASE_L_TARGET=${remote:0:12} tool=$PHASE_L_TOOL"
+}
+
+phase_l_agent_remote() { # bound s → the target's sha on the remote, or nothing
+  timeout "$1" git ls-remote "$PHASE_L_REMOTE" "refs/heads/$PHASE_L_TARGET" 2>/dev/null | cut -f1
+}
+
+phase_l_agent_landed() { # remote sha
+  { [ "$PHASE_L_SHA" = none ] && [ -z "$1" ]; } || [ "$1" = "$PHASE_L_SHA" ]
+}
+
+# No pushing process was identified, so its exit cannot say when the transfer ended. Never settle on
+# a guess: read the remote every BERTH_PREPUSH_OBSERVE_S (default 2) until the target reads the
+# landing sha (wait=observed, landed) or until the lease is PHASE_L_TTL_MARGIN_S (default 30) from
+# expiry (wait=ttl, unconfirmed). No renewal happens here, so that bound is the lease's own expiry
+# less the margin: at most BERTH_TTL_S - margin (570 s at the defaults) after the last claim or
+# renewal, which was at most BERTH_TTL_S/3 before the hand-over. "did-not-land" is never written
+# here: at the bound the push may still be transferring.
+phase_l_agent_observe() {
+  local deadline now left remote="" wait=ttl result=unconfirmed
+  deadline=$((PHASE_L_RENEWED_AT + BERTH_TTL_S - ${PHASE_L_TTL_MARGIN_S:-30}))
+  while [ -z "$PHASE_L_WHY" ]; do
+    now=$(date +%s)
+    left=$((deadline - now))
+    [ "$left" -gt 0 ] || break
+    [ "$left" -le 30 ] || left=30
+    remote=$(phase_l_agent_remote "$left")
+    if phase_l_agent_landed "$remote"; then
+      wait=observed result=landed
+      break
+    fi
+    now=$(date +%s)
+    [ "$now" -lt "$deadline" ] || break
+    left=$((deadline - now))
+    [ "$left" -le "${BERTH_PREPUSH_OBSERVE_S:-2}" ] || left=${BERTH_PREPUSH_OBSERVE_S:-2}
+    sleep "$left"
+  done
+  phase_l_agent_end "settle $PHASE_L_SHA $result $PHASE_L_TARGET=${remote:0:12} tool=unknown wait=$wait"
 }
 
 # ---- the hook's side ----
@@ -871,24 +921,107 @@ phase_l_moved() { # target, pushed sha, the base git sent
   exit 1
 }
 
-phase_l_push_pid() {
-  if [ -n "${PHASE_L_PUSH_PID-}" ]; then
-    echo "$PHASE_L_PUSH_PID"
-    return
-  fi
-  # git → husky's `_/pre-push` sh → `sh -e .husky/pre-push` → exec bash: $PPID exits with the hook.
-  local pid=$PPID i
-  for ((i = 0; i < 8; i++)); do
-    [ -r "/proc/$pid/comm" ] || break
-    if [ "$(cat "/proc/$pid/comm")" = git ]; then
-      echo "$pid"
-      return
-    fi
-    pid=$(awk '/^PPid:/ {print $2}' "/proc/$pid/status" 2>/dev/null)
-    [ -n "$pid" ] && [ "$pid" != 0 ] || break
+# Which process is doing the push, so the landing agent waits for the transfer and not for the hook.
+#
+# The hook's ancestry, observed on this device 2026-11-25 (ps -o pid,ppid,comm,args from a probe hook
+# pushing to a local bare remote):
+#   git push:   git -c core.hooksPath=… push origin …   (comm git, exe /usr/bin/git)
+#                 → husky `_/pre-push` sh → `sh -e .husky/pre-push` → exec bash pre-push.bash
+#   brit push:  brit -c core.hooksPath=… push origin …  (comm brit, exe
+#                 …/tools/bin-store/brit/<cid>/brit; ~/.local/bin/brit is a symlink to the bin-store's
+#                 bin-launch, which EXECs the real brit, so the launcher leaves no process of its own)
+#                 → `sh -c 'exec "$@"'` (execs) → the same husky chain.
+# Both tools run the transfer in that same process after the hook returns (brit 0.3.4: its pid lived
+# through a 2 s remote pre-receive and exited after the remote ref moved), while $PPID is husky's sh,
+# which exits with the hook: waiting on it settled a brit landing before its transfer (settle.log
+# 2026-11-25T12:56:49Z, "did-not-land" for c1035eebc, which landed).
+#
+# brit 0.3.4 also exports BRIT_GUARD_HELD_BY="v1 <brit pid> <its start time> n:…" to every hook it runs
+# (start time in clock ticks, /proc/<pid>/stat field 22; absent under git).
+#
+# The nearest ancestor that is one of these is the pusher:
+#   git:  comm `git` (unchanged from before: git runs pre-push only from a push);
+#   brit: the process BRIT_GUARD_HELD_BY names, with that start time; or an executable named `brit`
+#         (the exe's real basename, or comm when the exe is unreadable/renamed, so a forking launcher
+#         or wrapper named brit also matches) whose first non-option argument is `push`, skipping
+#         brit's global options (-C/-r/-c/-f/--threads/--object-hash take a value).
+# Sets PHASE_L_PUSH_PID / PHASE_L_PUSH_START (stat field 22, so a reused pid is never waited on) /
+# PHASE_L_PUSH_TOOL (git|brit|unknown). PHASE_L_PROC (default /proc) lets the tests build a fake chain.
+phase_l_proc_stat() { # pid → "<ppid> <start time>"
+  local s ppid start
+  s=$(cat "${PHASE_L_PROC:-/proc}/$1/stat" 2>/dev/null) || return 1
+  s=${s##*) } # comm may hold spaces and parens; fields resume after its last ')'
+  read -r _ ppid _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ start _ <<<"$s"
+  [[ "$ppid" =~ ^[0-9]+$ ]] && [[ "$start" =~ ^[0-9]+$ ]] || return 1
+  echo "$ppid $start"
+}
+
+phase_l_proc_start() { # pid → its start time, or nothing when it is gone
+  local st
+  st=$(phase_l_proc_stat "$1") || return 1
+  echo "${st#* }"
+}
+
+# 0 when pid is still the very process that was identified (same start time).
+phase_l_alive() { # pid start
+  [[ "${1-}" =~ ^[0-9]+$ ]] || return 1
+  [ "$(phase_l_proc_start "$1")" = "${2-}" ]
+}
+
+phase_l_brit_verb() { # cmdline file → brit's subcommand
+  local -a argv
+  local i a
+  mapfile -d '' -t argv <"$1" 2>/dev/null || return 1
+  i=1
+  # A wrapper script named brit runs as `<interpreter> <path>/brit <args>`: its args start after it.
+  [ "${argv[0]##*/}" = brit ] || [ "${argv[1]-}" = "" ] || [ "${argv[1]##*/}" != brit ] || i=2
+  for (( ; i < ${#argv[@]}; i++)); do
+    a=${argv[i]}
+    case "$a" in
+      -C | -r | --repository | -c | --config | -f | --format | --threads | --object-hash) i=$((i + 1)) ;;
+      --) echo "${argv[i + 1]-}"; return 0 ;;
+      -*) ;; # a flag, a joined value (-cfoo, --config=foo) or --wait[=S]
+      *) echo "$a"; return 0 ;;
+    esac
   done
-  echo "[pre-push] Phase L: no git ancestor found; the landing agent waits on $PPID" >&2
-  echo "$PPID"
+  return 1
+}
+
+phase_l_pusher() {
+  local pid=$PPID i comm exe st held_pid="" held_start="" v
+  PHASE_L_PUSH_TOOL=unknown PHASE_L_PUSH_START=""
+  if [ -n "${PHASE_L_PUSH_PID-}" ]; then # a test names the push process directly
+    PHASE_L_PUSH_TOOL=${PHASE_L_PUSH_TOOL_AS:-git}
+    PHASE_L_PUSH_START=$(phase_l_proc_start "$PHASE_L_PUSH_PID") || PHASE_L_PUSH_START=gone
+    return 0
+  fi
+  read -r v held_pid held_start _ <<<"${BRIT_GUARD_HELD_BY-}"
+  [ "$v" = v1 ] || held_pid=""
+  for ((i = 0; i < 12; i++)); do
+    st=$(phase_l_proc_stat "$pid") || break
+    comm=$(cat "${PHASE_L_PROC:-/proc}/$pid/comm" 2>/dev/null)
+    exe=$(readlink "${PHASE_L_PROC:-/proc}/$pid/exe" 2>/dev/null)
+    exe=${exe% (deleted)}
+    exe=${exe##*/}
+    if [ "$comm" = git ]; then
+      PHASE_L_PUSH_TOOL=git
+    elif [ -n "$held_pid" ] && [ "$pid" = "$held_pid" ] && [ "${st#* }" = "$held_start" ]; then
+      PHASE_L_PUSH_TOOL=brit
+    elif { [ "$exe" = brit ] || [ "$comm" = brit ]; } &&
+         [ "$(phase_l_brit_verb "${PHASE_L_PROC:-/proc}/$pid/cmdline")" = push ]; then
+      PHASE_L_PUSH_TOOL=brit
+    fi
+    if [ "$PHASE_L_PUSH_TOOL" != unknown ]; then
+      PHASE_L_PUSH_PID=$pid PHASE_L_PUSH_START=${st#* }
+      [ "$PHASE_L_PUSH_TOOL" = git ] ||
+        echo "[pre-push] Phase L: the push is $PHASE_L_PUSH_TOOL pid $pid; the landing agent waits for it to exit" >&2
+      return 0
+    fi
+    pid=${st%% *}
+    [ "$pid" != 0 ] || break
+  done
+  PHASE_L_PUSH_PID=""
+  echo "[pre-push] Phase L: no git or brit push found among this hook's ancestors; the landing agent waits until $PHASE_L_REMOTE's ${PHASE_L_LAND_TARGET:-dev} reads ${PHASE_L_LAND_SHA:0:12}, at most until the lease's ttl is ${PHASE_L_TTL_MARGIN_S:-30}s from expiry, and never records did-not-land" >&2
 }
 
 phase_l_handoff() {
@@ -901,7 +1034,9 @@ phase_l_handoff() {
     phase_l_await
     phase_l_refuse "[pre-push] REFUSED: dev-integration was lost while this push waited to land (above). Your gates are recorded; push again."
   fi
-  printf 'land %s %s %s\n' "${PHASE_L_LAND_SHA:-none}" "$(phase_l_push_pid)" "$PHASE_L_LAND_TARGET" >&"$PHASE_L_FD"
+  phase_l_pusher
+  printf 'land %s %s %s %s %s\n' "${PHASE_L_LAND_SHA:-none}" "${PHASE_L_PUSH_PID:--}" "$PHASE_L_LAND_TARGET" \
+    "$PHASE_L_PUSH_TOOL" "${PHASE_L_PUSH_START:--}" >&"$PHASE_L_FD"
   PHASE_L_DONE=handed
   echo "[pre-push] Phase L: dev-integration held $(($(date +%s) - PHASE_L_HELD_AT))s"
   echo "[pre-push] Phase L: landing ${PHASE_L_LAND_SHA:0:12} on ${PHASE_L_BASE:0:12} as a fast-forward; the landing agent releases dev-integration after the transfer (log: $PHASE_L_LOG)"

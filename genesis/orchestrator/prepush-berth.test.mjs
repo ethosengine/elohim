@@ -43,7 +43,7 @@ case "$1" in
  config) echo fixture@example.test;; cat-file) exit 0;; log) cat "$here/message";;
  fetch) [ -z "\${FETCH_SLEEP-}" ] || sleep "$FETCH_SLEEP"; exit 0;;
  merge-base) exit "\${MOVED:-0}";;
- ls-remote) [ -z "\${REMOTE_SHA+x}" ] || printf '%s\\trefs/heads/dev\\n' "$REMOTE_SHA";;
+ ls-remote) if [ -f "$here/remote-sha" ]; then printf '%s\\trefs/heads/dev\\n' "$(cat "$here/remote-sha")"; else [ -z "\${REMOTE_SHA+x}" ] || printf '%s\\trefs/heads/dev\\n' "$REMOTE_SHA"; fi;;
  rev-parse) case "$*" in *--git-common-dir*) echo "$HOOK_WORK_TREE/common";; *FETCH_HEAD*) echo "\${FETCH_HEAD_SHA:-${BASE}}";; *) echo "\${HEAD_SHA:-${HEAD}}";; esac;;
  diff|rebase) exit 0;; *) echo "unexpected git: $*" >&2; exit 99;;
 esac
@@ -223,7 +223,7 @@ test("prepush_passing_push_releases_only_after_the_push_exits", async (t) => {
   assert.match(argv(release(c)), /--expected-claimed-at 1001\.125$/);
   await pollSettle(
     fx,
-    /settle \S+ (landed|did-not-land) dev=\S* held=\d+s released=ok/,
+    /settle \S+ (landed|did-not-land) dev=\S* tool=git held=\d+s released=ok/,
   );
 });
 test("prepush_agent_owns_its_session", async (t) => {
@@ -477,4 +477,186 @@ test("a_deletion_push_to_dev_claims_and_settles", async (t) => {
   assert.ok(r.calls.some((l) => argv(l).startsWith("claim ")));
   await pollCalls(fx, (c) => !!release(c));
   await pollSettle(fx, /settle none landed dev=/);
+});
+
+// ── Which process the landing agent waits on (git push or brit push) ──
+// A fake /proc (PHASE_L_PROC) stands in for the hook's ancestry. Its root entry is this test
+// runner's own pid, because the hook's $PPID is the node process that spawned `bash -c`. The shapes
+// mirror what a probe hook printed on this device (ps -o pid,ppid,comm,args, 2026-11-25): git push
+// and brit push are each the hook's nearest pushing ancestor and run the transfer after the hook.
+function fakeProc(fx, chain) {
+  const root = join(fx.dir, "proc"),
+    all = [{ pid: process.pid, comm: "sh", argv: ["sh", ".husky/_/pre-push"] }, ...chain];
+  all.forEach((p, i) => {
+    const d = join(root, String(p.pid)),
+      ppid = all[i + 1]?.pid ?? 1;
+    mkdirSync(d, { recursive: true });
+    writeFileSync(join(d, "comm"), `${p.comm}\n`);
+    writeFileSync(join(d, "cmdline"), `${p.argv.join("\0")}\0`);
+    writeProcStat(fx, p.pid, p.comm, ppid, p.start ?? 1000 + i);
+    if (p.exe) spawnSync("ln", ["-s", p.exe, join(d, "exe")]);
+  });
+  return root;
+}
+function writeProcStat(fx, pid, comm, ppid, start) {
+  writeFileSync(
+    join(fx.dir, "proc", String(pid), "stat"),
+    `${pid} (${comm}) S ${ppid} 0 0 0 -1 0 0 0 0 0 0 0 0 0 20 0 1 0 ${start} 1 1\n`,
+  );
+}
+const exitProc = (fx, pid) =>
+  rmSync(join(fx.dir, "proc", String(pid)), { recursive: true, force: true });
+const chainEnv = (fx, chain, e = {}) => ({
+  PHASE_L_PUSH_PID: "",
+  BRIT_GUARD_HELD_BY: "",
+  PHASE_L_PROC: fakeProc(fx, chain),
+  ...e,
+});
+const settleLine = (s) => s.split("\n").find((l) => / settle /.test(l));
+async function waitsWhileAliveThenSettles(t, fx, r, pid, tool) {
+  assert.equal(r.status, 0, r.out);
+  await new Promise((x) => setTimeout(x, 1100));
+  assert.equal(release(calls(fx)), undefined, "released while the push was alive");
+  exitProc(fx, pid);
+  const s = await pollSettle(fx, new RegExp(`settle ${HEAD} landed dev=\\S+ tool=${tool} held=\\d+s released=ok`));
+  return settleLine(s);
+}
+const BRIT_EXE =
+  "/projects/.claude-config/tools/bin-store/brit/bafyreiee75hqw3d3dcdelaxetz6c7cydw4cm3l4bw4nherbcyeldopikmu/brit";
+
+test("a_git_push_ancestor_is_waited_on_and_recorded_as_git", async (t) => {
+  const fx = fixture(t),
+    chain = [
+      { pid: 90011, comm: "sh", argv: ["sh", "-e", ".husky/pre-push"] },
+      { pid: 90012, comm: "git", exe: "/usr/bin/git", argv: ["git", "-c", "core.hooksPath=/w/.husky/_", "push", "origin", "HEAD:dev"] },
+      { pid: 90013, comm: "bash", exe: "/usr/bin/bash", argv: ["bash"] },
+    ],
+    r = runBlock(fx, { env: chainEnv(fx, chain) });
+  // Unchanged for git: no new line on the hook's output.
+  assert.doesNotMatch(r.out, /the push is|no git or brit push/);
+  await waitsWhileAliveThenSettles(t, fx, r, 90012, "git");
+});
+test("a_brit_push_with_global_options_before_the_verb_is_waited_on", async (t) => {
+  const fx = fixture(t),
+    chain = [
+      { pid: 90021, comm: "sh", argv: ["sh", "-e", ".husky/pre-push"] },
+      {
+        pid: 90022,
+        comm: "brit",
+        exe: BRIT_EXE,
+        argv: ["brit", "-c", "core.hooksPath=/w/.husky/_", "-C", "/w", "-r", ".", "--threads", "2", "-v", "--config=x=push", "push", "origin", "HEAD:dev"],
+      },
+      { pid: 90023, comm: "bash", exe: "/usr/bin/bash", argv: ["bash"] },
+    ],
+    r = runBlock(fx, { env: chainEnv(fx, chain) });
+  assert.match(r.out, /Phase L: the push is brit pid 90022; the landing agent waits for it to exit/);
+  await waitsWhileAliveThenSettles(t, fx, r, 90022, "brit");
+});
+test("a_brit_push_reached_through_the_bin_store_launcher_is_waited_on", async (t) => {
+  // On this device ~/.local/bin/brit -> bin-store's bin-launch, which execs the real brit: one
+  // process, comm brit, exe inside the bin-store. A forking launcher or a wrapper script named brit
+  // leaves a parent too; the nearest pushing ancestor is still the one waited on.
+  let fx = fixture(t),
+    r = runBlock(fx, {
+      env: chainEnv(fx, [
+        { pid: 90031, comm: "sh", argv: ["sh", "-e", ".husky/pre-push"] },
+        { pid: 90032, comm: "brit", exe: BRIT_EXE, argv: ["/home/user/.local/bin/brit", "-c", "a=b", "push", "origin", "HEAD:dev"] },
+        { pid: 90033, comm: "brit", exe: "/projects/.claude-config/tools/bin-store/bin/bin-launch", argv: ["brit", "-c", "a=b", "push", "origin", "HEAD:dev"] },
+      ]),
+    });
+  assert.match(r.out, /the push is brit pid 90032;/);
+  await waitsWhileAliveThenSettles(t, fx, r, 90032, "brit");
+  fx = fixture(t);
+  r = runBlock(fx, {
+    env: chainEnv(fx, [
+      { pid: 90036, comm: "sh", argv: ["sh", "-e", ".husky/pre-push"] },
+      { pid: 90037, comm: "brit-0.3.4", exe: "/opt/brit/brit-0.3.4", argv: ["brit-0.3.4", "-c", "a=b", "push", "origin"] },
+      { pid: 90038, comm: "brit", exe: "/usr/bin/bash", argv: ["/bin/sh", "/opt/bin/brit", "-c", "a=b", "push", "origin"] },
+    ]),
+  });
+  assert.match(r.out, /the push is brit pid 90038;/);
+  await waitsWhileAliveThenSettles(t, fx, r, 90038, "brit");
+});
+test("brit_guard_held_by_names_the_pusher_only_with_its_start_time", async (t) => {
+  // brit 0.3.4 exports BRIT_GUARD_HELD_BY="v1 <its pid> <its start time> n:…" to every hook it runs.
+  const chain = [
+    { pid: 90041, comm: "sh", argv: ["sh", "-e", ".husky/pre-push"] },
+    { pid: 90042, comm: "gix", exe: "/opt/gix", argv: ["gix", "x"], start: 555 },
+  ];
+  let fx = fixture(t),
+    r = runBlock(fx, { env: chainEnv(fx, chain, { BRIT_GUARD_HELD_BY: "v1 90042 555 n:2f:2f" }) });
+  assert.match(r.out, /the push is brit pid 90042;/);
+  await waitsWhileAliveThenSettles(t, fx, r, 90042, "brit");
+  fx = fixture(t);
+  r = runBlock(fx, {
+    env: chainEnv(fx, chain, {
+      BRIT_GUARD_HELD_BY: "v1 90042 554 n:2f:2f",
+      BERTH_PREPUSH_TTL_S: "3",
+      PHASE_L_TTL_MARGIN_S: "1",
+    }),
+  });
+  assert.match(r.out, /no git or brit push found among this hook's ancestors/);
+});
+test("an_unknown_pusher_neither_settles_early_nor_waits_past_the_ttl_bound", async (t) => {
+  // brit with a verb other than push, a value that reads "push", and nothing else that pushes.
+  const fx = fixture(t),
+    chain = [
+      { pid: 90051, comm: "sh", argv: ["sh", "-e", ".husky/pre-push"] },
+      { pid: 90052, comm: "brit", exe: BRIT_EXE, argv: ["brit", "-c", "push", "rebase", "--exec", "x"] },
+      { pid: 90053, comm: "bash", exe: "/usr/bin/bash", argv: ["bash"] },
+    ],
+    started = Date.now(),
+    r = runBlock(fx, {
+      env: chainEnv(fx, chain, {
+        REMOTE_SHA: BASE,
+        BERTH_PREPUSH_TTL_S: "4",
+        PHASE_L_TTL_MARGIN_S: "1",
+        BERTH_PREPUSH_OBSERVE_S: "0.2",
+      }),
+    });
+  assert.equal(r.status, 0, r.out);
+  assert.match(r.out, /no git or brit push found among this hook's ancestors; the landing agent waits until origin's dev reads 222222222222, at most until the lease's ttl is 1s from expiry, and never records did-not-land/);
+  // The bound: the last claim/renewal + ttl - margin, so at most 3 s after the hand-over here.
+  await new Promise((x) => setTimeout(x, 1000));
+  assert.equal(release(calls(fx)), undefined, "settled before the bound");
+  const s = await pollSettle(fx, / settle /, 6000),
+    ended = Date.now();
+  assert.match(settleLine(s), new RegExp(`settle ${HEAD} unconfirmed dev=111111111111 tool=unknown wait=ttl held=\\d+s released=ok`));
+  assert.doesNotMatch(s, /did-not-land/);
+  assert.ok(ended - started < 4000 + 3000, `settled ${ended - started} ms after the push began`);
+});
+test("an_unknown_pusher_settles_landed_once_the_remote_reads_the_landing_sha", async (t) => {
+  const fx = fixture(t),
+    r = runBlock(fx, {
+      env: chainEnv(fx, [{ pid: 90061, comm: "bash", argv: ["bash"] }], {
+        REMOTE_SHA: BASE,
+        BERTH_PREPUSH_TTL_S: "30",
+        PHASE_L_TTL_MARGIN_S: "1",
+        BERTH_PREPUSH_OBSERVE_S: "0.2",
+      }),
+    });
+  assert.equal(r.status, 0, r.out);
+  await new Promise((x) => setTimeout(x, 600));
+  assert.equal(release(calls(fx)), undefined);
+  writeFileSync(join(fx.bin, "remote-sha"), HEAD);
+  const s = await pollSettle(fx, / settle /, 4000);
+  assert.match(settleLine(s), new RegExp(`settle ${HEAD} landed dev=222222222222 tool=unknown wait=observed held=\\d+s released=ok`));
+});
+test("a_reused_push_pid_is_not_waited_on", async (t) => {
+  const fx = fixture(t),
+    r = runBlock(fx, {
+      env: chainEnv(fx, [
+        { pid: 90071, comm: "sh", argv: ["sh", "-e", ".husky/pre-push"] },
+        { pid: 90072, comm: "brit", exe: BRIT_EXE, argv: ["brit", "push", "origin", "HEAD:dev"], start: 7000 },
+      ]),
+    });
+  assert.equal(r.status, 0, r.out);
+  assert.match(r.out, /the push is brit pid 90072;/);
+  await new Promise((x) => setTimeout(x, 700));
+  assert.equal(release(calls(fx)), undefined);
+  // The brit exits and an unrelated process takes its pid: same pid, another start time.
+  writeProcStat(fx, 90072, "sleep", 1, 7999);
+  const s = await pollSettle(fx, / settle /, 3000);
+  assert.match(settleLine(s), new RegExp(`settle ${HEAD} landed dev=\\S+ tool=brit held=`));
+  assert.ok(existsSync(join(fx.dir, "proc/90072/stat")));
 });
