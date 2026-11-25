@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, readdirSync } from 'fs';
 import { dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
-import { SUITE_READ_LISTS, UNAUDITED_RECIPE_PROJECTS, auditProject, declarationScopes, declarationsIn, exhaustInputs, globCovers, isReadPattern, readCovers, readSet, repositoryFiles, suiteReadSet } from './gate-input-audit.mjs';
+import { SUITE_READ_LISTS, UNAUDITED_RECIPE_PROJECTS, auditProject, declarationScopes, declarationsIn, exhaustInputs, globCovers, isReadPattern, manifestJoins, narrowJoin, readCovers, readSet, repositoryFiles, suiteReadSet } from './gate-input-audit.mjs';
 import { GATE_EXHAUST } from './gate-evidence.mjs';
 import { NAMED_READ_SET_PROJECTS } from './gate-preflight.mjs';
 import { loadGateRegistry } from './pipeline-registry.mjs';
@@ -376,67 +376,192 @@ test('the nearest Cargo.toml wins inside a nested workspace', () => {
   assert.deepEqual(rows, [{ file: nested, line: 1, path: 'shared/data.json', how: 'include_str' }]);
 });
 
-test('fix 1 excludes dependency test roots but keeps #[path]-included tests support', () => {
-  const files = {
-    'apps/gate/Cargo.toml': '[package]',
-    'apps/gate/tests/own.rs': 'include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/../../shared/own.json"));',
-    'crates/dependency/Cargo.toml': '[package]',
-    'crates/dependency/src/lib.rs': '#[path = "../tests/support.rs"]\nmod support;',
-    'crates/dependency/tests/dependency.rs': 'include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/../../shared/dependency.json"));',
-    'crates/dependency/tests/support.rs': 'include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/../../shared/support.json"));',
-  };
-  const options = {
-    root,
-    project: { name: 'gate', dir: 'apps/gate' },
-    sources: ['apps/gate/**', 'crates/dependency/**'],
+// ── GATE_READ_NARROW: the narrowing rule (narrowJoin) ───────────────────────────────────────────
+// One fixture repository: the crate under audit, a sibling file beside each target, a directory
+// target, and a tracked symbolic link. `M` stands for env!("CARGO_MANIFEST_DIR").
+const NARROW_TRACKED = {
+  'crates/example/Cargo.toml': '[package]',
+  'crates/example/fixtures/a.json': '{}',
+  'crates/example/fixtures/b.json': '{}',
+  'crates/example/link': 'fixtures',
+  'crates/example/alias.json': 'fixtures/a.json',
+  'shared/data.json': '{}',
+  'shared/dir/one.json': '{}',
+};
+const NARROW_LINKS = ['crates/example/link', 'crates/example/alias.json'];
+const M = 'env!("CARGO_MANIFEST_DIR")';
+
+function narrowFixture(text, { links = NARROW_LINKS } = {}) {
+  const files = { ...NARROW_TRACKED, [file]: text };
+  return {
+    root, project, sources: ['crates/example/**'],
     listFiles: () => Object.keys(files),
+    listSymlinks: () => links,
     readFile: path => {
       const rel = path.slice(root.length + 1);
       if (Object.hasOwn(files, rel)) return files[rel];
       throw Object.assign(new Error(`missing ${path}`), { code: 'ENOENT' });
     },
   };
-  assert.deepEqual(readSet(options).paths, ['shared/dependency.json', 'shared/own.json', 'shared/support.json']);
-  assert.deepEqual(readSet({ ...options, variant: { excludeDependencyTests: true } }), {
-    paths: ['shared/own.json', 'shared/support.json'], unresolved: [],
+}
+
+// kind · source · the rule's verdict · what GATE_READ_NARROW=on keys · what today's audit keys.
+// `wide` is a pattern for the reason; `on` equal to `today` is harm (ii): a join kept wide keeps
+// exactly today's audited read.
+const NARROW_TABLE = [
+  { kind: 'literal concat!',
+    text: `include_str!(concat!(${M}, "/../../shared/data.json"));`,
+    narrowed: ['shared/data.json'], on: ['shared/data.json'], today: ['shared/data.json'] },
+  { kind: 'Path::new with literal joins',
+    text: `std::fs::read(Path::new(${M}).join("fixtures").join("a.json"));`,
+    narrowed: ['crates/example/fixtures/a.json'], on: ['crates/example/fixtures/a.json'], today: ['crates/example/fixtures/a.json'] },
+  { kind: 'PathBuf::from with a literal join that climbs out of the crate',
+    text: `std::fs::read(PathBuf::from(${M}).join("../../shared/data.json"));`,
+    narrowed: ['shared/data.json'], on: ['shared/data.json'], today: ['shared/data.json'] },
+  { kind: 'immutable local alias',
+    text: `fn t() { let base = Path::new(${M}).join("fixtures"); std::fs::read(base.join("a.json")); }`,
+    narrowed: ['crates/example/fixtures/a.json'], on: ['crates/example/fixtures/a.json'], today: ['crates/example/fixtures/a.json'] },
+  { kind: 'zero-argument helper whose body is entirely recognised',
+    text: `fn fixtures() -> PathBuf { Path::new(${M}).join("fixtures") }\nfn t() { std::fs::read(fixtures().join("b.json")); }`,
+    narrowed: ['crates/example/fixtures/b.json'], on: ['crates/example/fixtures/b.json'], today: ['crates/example/fixtures/b.json'] },
+  { kind: 'a constant declared once',
+    text: `const REL: &str = "../../shared/data.json";\nfn t() { std::fs::read(Path::new(${M}).join(REL)); }`,
+    narrowed: ['shared/data.json'], on: ['shared/data.json'], today: ['shared/data.json'] },
+  { kind: 'a constant declared twice',
+    text: `const REL: &str = "fixtures/a.json";\nmod other { const REL: &str = "../../shared/data.json"; }\nfn t() { std::fs::read(Path::new(${M}).join(REL)); }`,
+    wide: /constant REL is declared more than once/, on: ['shared/data.json'], today: ['shared/data.json'] },
+  { kind: 'format! filled only by literals (the one form today cannot read)',
+    text: `fn t() { let path = format!("{}/../../shared/data.json", ${M}); std::fs::read(&path); }`,
+    narrowed: ['shared/data.json'], on: ['shared/data.json'], today: ['crates/example'] },
+  { kind: 'a join extended by a variable',
+    text: `fn t(name: &str) { std::fs::read(Path::new(${M}).join("fixtures").join(name)); }`,
+    wide: /joined with the variable name/, on: ['crates/example/fixtures'], today: ['crates/example/fixtures'] },
+  { kind: 'a format placeholder',
+    text: `fn t(name: &str) { std::fs::read(Path::new(${M}).join(format!("../../shared/{name}.json"))); }`,
+    wide: /format! placeholder/, on: ['crates/example'], today: ['crates/example'] },
+  { kind: 'a format! with a named capture beside the manifest directory',
+    text: `fn t(name: &str) { std::fs::read(format!("{}/../../shared/{name}.json", ${M})); }`,
+    wide: /bare manifest string/, on: ['crates/example'], today: ['crates/example'] },
+  { kind: 'a loop value',
+    text: `fn t() { for name in ["a.json", "b.json"] { std::fs::read(Path::new(${M}).join("fixtures").join(name)); } }`,
+    wide: /joined with the variable name/, on: ['crates/example/fixtures'], today: ['crates/example/fixtures'] },
+  { kind: 'a `..` escape from the repository',
+    text: `std::fs::read(Path::new(${M}).join("../../../outside.json"));`,
+    wide: /leaves the repository/, on: null, today: null },
+  { kind: 'a literal format! that escapes the repository',
+    text: `fn t() { std::fs::read(format!("{}/../../../outside.json", ${M})); }`,
+    wide: /leaves the repository/, on: ['crates/example'], today: ['crates/example'] },
+  { kind: 'a missing target',
+    text: `std::fs::read(Path::new(${M}).join("fixtures/absent.json"));`,
+    wide: /fixtures\/absent\.json is absent at the audited commit/, on: ['crates/example/fixtures/absent.json'], today: ['crates/example/fixtures/absent.json'] },
+  { kind: 'a literal format! naming a missing target',
+    text: `fn t() { std::fs::read(format!("{}/fixtures/absent.json", ${M})); }`,
+    wide: /absent at the audited commit/, on: ['crates/example'], today: ['crates/example'] },
+  { kind: 'a directory target',
+    text: `std::fs::read_dir(Path::new(${M}).join("fixtures"));`,
+    narrowed: ['crates/example/fixtures'], on: ['crates/example/fixtures'], today: ['crates/example/fixtures'] },
+  { kind: 'a directory target reached by a literal format!',
+    text: `fn t() { std::fs::read_dir(format!("{}/../../shared/dir", ${M})); }`,
+    narrowed: ['shared/dir'], on: ['shared/dir'], today: ['crates/example'] },
+  { kind: 'a mut binding',
+    text: `fn t() { let mut dir = Path::new(${M}).join("fixtures"); dir.pop(); std::fs::read_dir(&dir); }`,
+    wide: /mut binding/, on: null, today: null },
+  { kind: 'a method the rule does not read',
+    text: `std::fs::read(Path::new(${M}).join("fixtures/a.json").with_extension("toml"));`,
+    wide: /\.with_extension\(\) is not one the rule reads/, on: null, today: null },
+  { kind: 'a macro parameter in concat!',
+    text: `include_str!(concat!(${M}, "/fixtures/", $name));`,
+    wide: /concat! argument is not a literal/, on: ['crates/example/fixtures'], today: ['crates/example/fixtures'] },
+  { kind: 'a symbolic link target',
+    text: `fn t() { std::fs::read(format!("{}/alias.json", ${M})); }`,
+    wide: /symbolic link/, on: ['crates/example'], today: ['crates/example'] },
+  { kind: 'a `..` across a symbolic link',
+    text: `fn t() { std::fs::read(format!("{}/link/../fixtures/a.json", ${M})); }`,
+    wide: /`\.\.` crosses crates\/example\/link, which is not a tracked directory/, on: ['crates/example'], today: ['crates/example'] },
+  { kind: 'the repository root',
+    text: `fn t() { std::fs::read_dir(format!("{}/../..", ${M})); }`,
+    wide: /repository root/, on: ['crates/example'], today: ['crates/example'] },
+];
+
+for (const row of NARROW_TABLE) {
+  test(`narrowing rule: ${row.kind}`, () => {
+    const options = narrowFixture(row.text);
+    const joins = manifestJoins(options);
+    assert.equal(joins.length, 1, JSON.stringify(joins));
+    const [join] = joins;
+    if (row.narrowed) assert.deepEqual(join.narrowed, row.narrowed, JSON.stringify(join));
+    else {
+      assert.equal(join.narrowed, undefined, JSON.stringify(join));
+      assert.match(join.wide, row.wide);
+    }
+    const today = readSet(options);
+    const on = readSet({ ...options, variant: { narrow: true } });
+    // `null` marks a join today's audit leaves unresolved: the whole commit tree keys it.
+    if (row.today === null) assert.ok(today.unresolved.length >= 1 && today.paths.length === 0, JSON.stringify(today));
+    else assert.deepEqual(today, { paths: row.today, unresolved: [] });
+    if (row.on === null) assert.deepEqual(on, today, 'an unresolved join stays unresolved');
+    else assert.deepEqual(on, { paths: row.on, unresolved: [] });
+    // Harm (ii): whatever the rule does not narrow keeps exactly today's audited read.
+    if (!row.narrowed) assert.deepEqual(on, today);
+    if (!row.narrowed) assert.deepEqual(join.keeps, row.today === null ? ['the whole tree (unresolved)'] : row.today);
   });
+}
+
+test('narrowJoin walks `..` as the filesystem does and refuses what it cannot key', () => {
+  const kinds = { 'a': 'dir', 'a/b': 'dir', 'a/b/file.json': 'file', 'a/link': 'symlink', 'a/odd': 'unknown' };
+  const facts = { root: '/repo', kindOf: rel => kinds[rel] ?? null };
+  const judge = raw => narrowJoin({ why: null, raw }, facts);
+  assert.deepEqual(judge('/repo/a/b/file.json'), { narrowed: 'a/b/file.json', kind: 'file' });
+  assert.deepEqual(judge('/repo/a/b/../b/./file.json'), { narrowed: 'a/b/file.json', kind: 'file' });
+  assert.deepEqual(judge('/repo/a/b'), { narrowed: 'a/b', kind: 'dir' });
+  assert.match(judge('/repo/a/link/../b/file.json').wide, /crosses a\/link/);
+  assert.match(judge('/repo/a/gone/../b/file.json').wide, /crosses a\/gone/);
+  assert.match(judge('/repo/a/../../etc/passwd').wide, /leaves the repository/);
+  assert.match(judge('/etc/passwd').wide, /outside the repository/);
+  assert.match(judge('/repository/a/b').wide, /outside the repository/, 'a sibling whose name only starts like the root');
+  assert.match(judge('/repo').wide, /repository root/);
+  assert.match(judge('/repo/a/..').wide, /repository root/);
+  assert.match(judge('/repo/a/link').wide, /symbolic link/);
+  assert.match(judge('/repo/a/odd').wide, /unknown kind/);
+  assert.match(judge('/repo/a/absent').wide, /absent/);
+  assert.deepEqual(narrowJoin({ why: 'joined with the variable x', raw: '/repo/a/b' }, facts), { wide: 'joined with the variable x' });
+  assert.deepEqual(narrowJoin({ why: null, path: '/repo/a/b/file.json' }, facts), { narrowed: 'a/b/file.json', kind: 'file' });
 });
 
-test('fix 2 resolves a manifest_store-style format join to its literal directory', () => {
-  const manifestStore = 'elohim/eprfs/device-runtime/tests/manifest_store.rs';
-  const files = {
-    'elohim/eprfs/device-runtime/Cargo.toml': '[package]',
-    [manifestStore]: 'std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join(format!("../../sdk/schemas/v1/views/{name}.schema.json")));',
-    'elohim/sdk/schemas/v1/views/example.schema.json': '{}',
-  };
-  const options = {
-    root, project: { name: 'gate', dir: 'elsewhere' }, sources: ['elohim/eprfs/**'],
-    listFiles: () => Object.keys(files),
-    readFile: path => {
-      const rel = path.slice(root.length + 1);
-      if (Object.hasOwn(files, rel)) return files[rel];
-      throw Object.assign(new Error(`missing ${path}`), { code: 'ENOENT' });
-    },
-  };
-  assert.deepEqual(readSet(options), { paths: ['elohim/eprfs/device-runtime'], unresolved: [] });
-  assert.deepEqual(readSet({ ...options, variant: { resolveFormatJoin: true } }), {
-    paths: ['elohim/sdk/schemas/v1/views'], unresolved: [],
-  });
-  delete files['elohim/sdk/schemas/v1/views/example.schema.json'];
-  assert.deepEqual(readSet({ ...options, variant: { resolveFormatJoin: true } }), {
-    paths: ['elohim/eprfs/device-runtime'], unresolved: [],
-  });
-  for (const unchanged of [
-    'Path::new(env!("CARGO_MANIFEST_DIR")).join(format!("{name}.json"));',
-    'Path::new(env!("CARGO_MANIFEST_DIR")).join(format!("../../../../outside/{name}.json"));',
-    'Path::new(env!("CARGO_MANIFEST_DIR")).join(format!("../../sdk/schemas/{name}/../../outside.json"));',
+test('the narrowing rule keeps a join wide when the symbolic-link listing cannot be read', () => {
+  const options = narrowFixture(`fn t() { std::fs::read(format!("{}/../../shared/data.json", ${M})); }`);
+  const unreadable = { ...options, listSymlinks: () => { throw new Error('no listing'); } };
+  assert.match(manifestJoins(unreadable)[0].wide, /unknown kind/);
+  assert.deepEqual(readSet({ ...unreadable, variant: { narrow: true } }), readSet(options));
+});
+
+test('an audit that does not narrow never consults the rule: no listing of links, and the rows of today', () => {
+  let asked = 0;
+  const options = narrowFixture(`fn t() { std::fs::read(format!("{}/../../shared/data.json", ${M})); }`);
+  const counting = { ...options, listSymlinks: () => { asked++; return []; } };
+  assert.deepEqual(readSet(counting), { paths: ['crates/example'], unresolved: [] });
+  assert.deepEqual(readSet({ ...counting, variant: {} }), { paths: ['crates/example'], unresolved: [] });
+  assert.equal(asked, 0);
+  assert.deepEqual(readSet({ ...counting, variant: { narrow: true } }), { paths: ['shared/data.json'], unresolved: [] });
+  assert.equal(asked, 1);
+});
+
+test('a literal format! is not narrowed when a placeholder is anything but a bare {} filled by a literal', () => {
+  for (const expression of [
+    `format!("{0}/../../shared/data.json", ${M})`,
+    `format!("{:?}/../../shared/data.json", ${M})`,
+    `format!("{}/../../shared/{}", ${M}, name)`,
+    `format!("{}/../../shared/{}", ${M})`,
+    `format!("{}/../../shared/data.json", ${M}, "extra")`,
+    `format!("{dir}/../../shared/data.json", dir = ${M})`,
   ]) {
-    files[manifestStore] = unchanged;
-    assert.deepEqual(
-      readSet({ ...options, variant: { resolveFormatJoin: true } }),
-      readSet(options),
-    );
+    const options = narrowFixture(`fn t(name: &str) { std::fs::read(${expression}); }`);
+    assert.deepEqual(readSet({ ...options, variant: { narrow: true } }), readSet(options), expression);
+    assert.ok(manifestJoins(options).every(join => join.wide), expression);
   }
+  // Escaped braces and a second literal argument are still literal.
+  const literal = narrowFixture(`fn t() { std::fs::read(format!("{}/../../{}/data.json", ${M}, "shared")); }`);
+  assert.deepEqual(readSet({ ...literal, variant: { narrow: true } }), { paths: ['shared/data.json'], unresolved: [] });
 });
 
 test('comments and embedded source strings are not scanned as code', () => {

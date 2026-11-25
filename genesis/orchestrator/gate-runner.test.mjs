@@ -1,11 +1,12 @@
 import { gateEvidence, gateKeyMaterial, gateKeyMaterials, recordEvidence } from './gate-evidence.mjs';
 import { after, describe, test } from 'node:test';
 import { strict as assert } from 'node:assert';
-import { chmodSync, existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
+import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { resolve, dirname } from 'path';
-import { fileURLToPath } from 'url';
+import { fileURLToPath, pathToFileURL } from 'url';
 import { loadGateRegistry } from './pipeline-registry.mjs';
 import { discoverManifests, loadManifests } from './manifest-utils.mjs';
 import {
@@ -84,47 +85,273 @@ function readShadowKeyFixture(t, changed) {
   return { root, base, commit, project, spawn, calls };
 }
 
-test('read-shadow: a dependency test-only change moves real and leaves fix 1 unchanged', t => {
-  const fixture = readShadowKeyFixture(t, 'test');
-  const options = { ...fixture, env: {}, cargoEnv: {}, britBin: 'brit' };
-  const evidence = gateKeyMaterial(fixture.project, { ...options, commit: fixture.commit });
-  assert.ok(evidence.key, evidence.line);
-  const shadow = readShadowComparison(fixture.project, evidence, options);
-  assert.match(shadow.line, /read-shadow: real moved; fix 1 would have held IF fix 1 were sound;/);
-  assert.equal(shadow.rows.find(row => row.name === 'fix1').keyChanged,
-    'would have held IF fix 1 were sound');
+// The read-shadow fixture's one join is a format! placeholder, which the narrowing rule keeps
+// wide: real and fix 2 key the same crate directory, so the shadow has nothing to say.
+test('read-shadow: a join the rule keeps wide moves real and fix 2 alike, so no line is produced', t => {
+  for (const changed of ['test', 'format', 'module']) {
+    const fixture = readShadowKeyFixture(t, changed);
+    const options = { ...fixture, env: {}, cargoEnv: {}, britBin: 'brit' };
+    const evidence = gateKeyMaterial(fixture.project, { ...options, commit: fixture.commit });
+    assert.ok(evidence.key, evidence.line);
+    assert.equal(readShadowComparison(fixture.project, evidence, options), null, changed);
+    const narrowed = gateKeyMaterial(fixture.project, { ...options, commit: fixture.commit, variant: { narrow: true } });
+    assert.equal(narrowed.material, evidence.material, 'the format placeholder keeps exactly today\'s read');
+    assert.deepEqual(narrowed.narrow, { narrowed: 0, wide: 1 });
+  }
 });
 
-test('read-shadow fix 2 key moves with its resolved directory contents', t => {
+test('read-shadow: the unsound prefix approximation is gone, so a format placeholder never keys its literal directory', t => {
   const fixture = readShadowKeyFixture(t, 'format');
-  const options = { ...fixture, env: {}, cargoEnv: {}, britBin: 'brit', variant: { resolveFormatJoin: true } };
+  const options = { ...fixture, env: {}, cargoEnv: {}, britBin: 'brit', variant: { narrow: true } };
   const before = gateKeyMaterial(fixture.project, { ...options, commit: fixture.base });
   const after = gateKeyMaterial(fixture.project, { ...options, commit: fixture.commit });
-  assert.ok(before.key, before.line);
-  assert.ok(after.key, after.line);
-  assert.notEqual(after.key, before.key);
-  assert.equal(JSON.parse(after.material).reads.scope, 'paths');
-  assert.ok(JSON.parse(after.material).reads.oids.some(row => row.path === 'sdk/schemas/v1/views'));
+  assert.ok(before.key && after.key, before.line || after.line);
+  const reads = JSON.parse(after.material).reads;
+  assert.deepEqual(reads.oids.map(row => row.path), ['crates/dependency']);
+  assert.ok(!reads.oids.some(row => row.oid === null));
 });
 
-test('read-shadow fix 2 falls an absent resolved path back to the whole crate', t => {
-  const fixture = readShadowKeyFixture(t, 'absent');
-  const options = { ...fixture, env: {}, cargoEnv: {}, britBin: 'brit', variant: { resolveFormatJoin: true } };
-  const before = gateKeyMaterial(fixture.project, { ...options, commit: fixture.base });
-  const after = gateKeyMaterial(fixture.project, { ...options, commit: fixture.commit });
-  assert.ok(before.key, before.line);
-  assert.ok(after.key, after.line);
-  assert.notEqual(after.key, before.key, 'a mutation anywhere in the fallback crate moves the key');
-  assert.ok(JSON.parse(after.material).reads.oids.some(row => row.path === 'crates/dependency'));
-  assert.ok(!JSON.parse(after.material).reads.oids.some(row => row.oid === null));
+// ── GATE_READ_NARROW=on: what moves the key ─────────────────────────────────────────────────────
+// A gate (apps/gate) whose sources reach one dependency crate holding one CARGO_MANIFEST_DIR join.
+// The fake brit returns one fingerprint for every commit, so only the audited reads (and the
+// gate's own directory) can move the key: each test mutates one file and reads the key again.
+const NARROW_M = 'env!("CARGO_MANIFEST_DIR")';
+function narrowKeyFixture(t, source, { absent = [] } = {}) {
+  const root = mkdtempSync(resolve(tmpdir(), 'read-narrow-key-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const put = (path, text) => {
+    mkdirSync(dirname(resolve(root, path)), { recursive: true });
+    writeFileSync(resolve(root, path), text);
+  };
+  const git = (...args) => {
+    const result = spawnSync('git', ['-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.test', ...args], {
+      cwd: root, encoding: 'utf8',
+    });
+    assert.equal(result.status, 0, result.stderr);
+    return result.stdout.trim();
+  };
+  git('init', '-q');
+  put('build-manifest.json', JSON.stringify({ steps: { build: { inputs: {
+    sources: ['apps/gate/**', 'crates/dependency/**'],
+  } } } }));
+  put('justfile', 'gate:\n    true\n');
+  put('genesis/orchestrator/run-local-gate.sh', '#!/bin/sh\nexit 0\n');
+  put('apps/gate/Cargo.toml', '[package]\nname="gate"\nversion="0.1.0"\n');
+  put('apps/gate/src/lib.rs', 'pub fn gate() {}\n');
+  put('crates/dependency/Cargo.toml', '[package]\nname="dependency"\nversion="0.1.0"\n');
+  put('crates/dependency/src/lib.rs', 'pub fn dependency() {}\n');
+  put('crates/dependency/tests/read.rs', source);
+  for (const [path, text] of Object.entries({
+    'crates/dependency/fixtures/named.json': '{"v":1}\n',
+    'crates/dependency/fixtures/sibling.json': '{"v":1}\n',
+    'crates/dependency/notes.txt': 'sibling in the same crate\n',
+    'sdk/views/named.schema.json': '{"v":1}\n',
+    'sdk/views/other.schema.json': '{"v":1}\n',
+    'sdk/unrelated.json': '{"v":1}\n',
+    'README.md': 'outside every crate\n',
+  })) if (!absent.includes(path)) put(path, text);
+  git('add', '.');
+  git('commit', '-qm', 'base');
+  const base = git('rev-parse', 'HEAD');
+  const project = {
+    name: 'fixture', dir: 'apps/gate', manifestPath: 'build-manifest.json', steps: ['build'],
+    run: { kind: 'root-just', recipe: 'gate', cargo: { workspace: 'apps/gate' } },
+  };
+  const spawn = (command, args, options) => {
+    if (command === 'brit') return { status: 0, stdout: JSON.stringify({ fingerprints: [{ step: 'build', fingerprint: 'unchanged' }] }), stderr: '' };
+    if (command === 'rustc') return { status: 0, stdout: 'rustc fixture', stderr: '' };
+    return spawnSync(command, args, options);
+  };
+  const closure = (mode, commit) => {
+    const made = gateKeyMaterial(project, {
+      root, commit, spawn, cargoEnv: {}, britBin: 'brit',
+      env: mode === null ? {} : { GATE_READ_NARROW: mode },
+    });
+    assert.ok(made.key, made.line);
+    return made;
+  };
+  // One commit on top of base that changes exactly `path`; returns whether the key moved, per mode.
+  const moves = path => {
+    git('checkout', '-q', base);
+    put(path, `changed ${path}\n`);
+    git('add', '.');
+    git('commit', '-qm', `change ${path}`);
+    const commit = git('rev-parse', 'HEAD');
+    return Object.fromEntries(['on', 'shadow', 'off'].map(mode => [mode, closure(mode, base).key !== closure(mode, commit).key]));
+  };
+  const reads = mode => {
+    const made = closure(mode, base);
+    const material = JSON.parse(made.material).reads;
+    return { scope: material.scope, paths: material.oids?.map(row => row.path), oids: material.oids, narrow: made.narrow, material: made.material };
+  };
+  return { root, base, project, closure, moves, reads };
+}
+
+test('read-narrow on, a literal file join: the named file moves the key, a sibling in the crate does not', t => {
+  for (const source of [
+    `fn t() { std::fs::read(std::path::Path::new(${NARROW_M}).join("fixtures").join("named.json")); }\n`,
+    `const NAMED: &str = include_str!(concat!(${NARROW_M}, "/fixtures/named.json"));\n`,
+  ]) {
+    const fixture = narrowKeyFixture(t, source);
+    assert.deepEqual(fixture.reads('on').paths, ['crates/dependency/fixtures/named.json']);
+    assert.deepEqual(fixture.reads('on').narrow, { narrowed: 1, wide: 0 });
+    assert.deepEqual(fixture.moves('crates/dependency/fixtures/named.json'), { on: true, shadow: true, off: true });
+    assert.deepEqual(fixture.moves('crates/dependency/fixtures/sibling.json'), { on: false, shadow: false, off: false });
+    assert.deepEqual(fixture.moves('crates/dependency/notes.txt'), { on: false, shadow: false, off: false });
+  }
 });
 
-test('read-shadow: a used dependency module moves real and fix 1, so no line is produced', t => {
-  const fixture = readShadowKeyFixture(t, 'module');
-  const options = { ...fixture, env: {}, cargoEnv: {}, britBin: 'brit' };
-  const evidence = gateKeyMaterial(fixture.project, { ...options, commit: fixture.commit });
-  assert.ok(evidence.key, evidence.line);
-  assert.equal(readShadowComparison(fixture.project, evidence, options), null);
+test('read-narrow on, a literal format! join: the named file moves the key and a sibling in the crate stops moving it', t => {
+  const fixture = narrowKeyFixture(t,
+    `fn t() { std::fs::read(format!("{}/../../sdk/views/named.schema.json", ${NARROW_M})); }\n`);
+  assert.deepEqual(fixture.reads('on').paths, ['sdk/views/named.schema.json']);
+  assert.deepEqual(fixture.reads('on').narrow, { narrowed: 1, wide: 0 });
+  assert.deepEqual(fixture.reads('shadow').paths, ['crates/dependency'], 'today keys the whole crate for it');
+  // Today's audit does not key the file the join names at all; the narrowed one does.
+  assert.deepEqual(fixture.moves('sdk/views/named.schema.json'), { on: true, shadow: false, off: false });
+  assert.deepEqual(fixture.moves('crates/dependency/notes.txt'), { on: false, shadow: true, off: true });
+  assert.deepEqual(fixture.moves('sdk/views/other.schema.json'), { on: false, shadow: false, off: false });
+});
+
+test('read-narrow on, a directory target: a file under it moves the key, a file beside it does not', t => {
+  for (const source of [
+    `fn t() { std::fs::read_dir(std::path::Path::new(${NARROW_M}).join("../../sdk/views")); }\n`,
+    `fn t() { std::fs::read_dir(format!("{}/../../sdk/views", ${NARROW_M})); }\n`,
+    // (iv): a directory later extended by a non-literal keeps the whole directory.
+    `fn t(name: &str) { let base = std::path::Path::new(${NARROW_M}).join("../../sdk/views"); std::fs::read(base.join(name)); }\n`,
+  ]) {
+    const fixture = narrowKeyFixture(t, source);
+    assert.deepEqual(fixture.reads('on').paths, ['sdk/views'], source);
+    assert.equal(fixture.moves('sdk/views/named.schema.json').on, true, source);
+    assert.equal(fixture.moves('sdk/views/other.schema.json').on, true, source);
+    assert.equal(fixture.moves('sdk/unrelated.json').on, false, source);
+  }
+});
+
+test('read-narrow on, an unresolvable join: every file its present audit covers still moves the key', t => {
+  // A format placeholder: today's audit records the whole crate, and so does on, byte for byte.
+  const fixture = narrowKeyFixture(t,
+    `fn t(name: &str) { std::fs::read(std::path::Path::new(${NARROW_M}).join(format!("../../sdk/views/{name}.schema.json"))); }\n`);
+  assert.equal(fixture.reads('on').material, fixture.reads('off').material);
+  assert.equal(fixture.reads('on').material, fixture.reads('shadow').material);
+  assert.deepEqual(fixture.reads('on').paths, ['crates/dependency']);
+  assert.deepEqual(fixture.reads('on').narrow, { narrowed: 0, wide: 1 });
+  for (const path of ['crates/dependency/notes.txt', 'crates/dependency/fixtures/named.json',
+    'crates/dependency/fixtures/sibling.json', 'crates/dependency/src/lib.rs', 'crates/dependency/Cargo.toml']) {
+    assert.deepEqual(fixture.moves(path), { on: true, shadow: true, off: true }, path);
+  }
+});
+
+test('read-narrow on, a `..` escape: the join stays unresolved and the whole tree keys the gate', t => {
+  for (const source of [
+    `fn t() { std::fs::read(std::path::Path::new(${NARROW_M}).join("../../../outside.json")); }\n`,
+    `fn t() { std::fs::read(std::path::Path::new(${NARROW_M}).join("../..")); }\n`,
+  ]) {
+    const fixture = narrowKeyFixture(t, source);
+    assert.equal(fixture.reads('on').scope, 'tree', source);
+    assert.equal(fixture.reads('on').material, fixture.reads('off').material, source);
+    assert.deepEqual(fixture.moves('README.md'), { on: true, shadow: true, off: true }, source);
+    assert.deepEqual(fixture.moves('sdk/unrelated.json'), { on: true, shadow: true, off: true }, source);
+  }
+  // A literal format! that escapes is judged by the rule itself: it keeps today's crate read.
+  const escaping = narrowKeyFixture(t, `fn t() { std::fs::read(format!("{}/../../../outside.json", ${NARROW_M})); }\n`);
+  assert.equal(escaping.reads('on').material, escaping.reads('off').material);
+  assert.deepEqual(escaping.reads('on').paths, ['crates/dependency']);
+  assert.deepEqual(escaping.moves('crates/dependency/notes.txt'), { on: true, shadow: true, off: true });
+});
+
+test('read-narrow on, a missing target: never "no read", always today\'s read', t => {
+  // The one form only the rule reads: an absent target keeps today's whole-crate read.
+  const format = narrowKeyFixture(t,
+    `fn t() { std::fs::read(format!("{}/../../sdk/views/named.schema.json", ${NARROW_M})); }\n`,
+    { absent: ['sdk/views/named.schema.json'] });
+  assert.equal(format.reads('on').material, format.reads('off').material);
+  assert.deepEqual(format.reads('on').paths, ['crates/dependency']);
+  assert.ok(!format.reads('on').oids.some(row => row.oid === null), 'an absent file is not keyed as empty');
+  assert.deepEqual(format.reads('on').narrow, { narrowed: 0, wide: 1 });
+  assert.deepEqual(format.moves('crates/dependency/notes.txt'), { on: true, shadow: true, off: true });
+  // A chain today's audit already reads: its record for an absent target is kept exactly.
+  const chain = narrowKeyFixture(t,
+    `fn t() { std::fs::read(std::path::Path::new(${NARROW_M}).join("fixtures/named.json")); }\n`,
+    { absent: ['crates/dependency/fixtures/named.json'] });
+  assert.equal(chain.reads('on').material, chain.reads('off').material);
+  assert.deepEqual(chain.reads('on').narrow, { narrowed: 0, wide: 1 });
+  // Creating the file is a change the key sees, in every mode.
+  assert.deepEqual(chain.moves('crates/dependency/fixtures/named.json'), { on: true, shadow: true, off: true });
+});
+
+test('read-narrow off, shadow, unset and an unknown value all key on today\'s audit', t => {
+  const fixture = narrowKeyFixture(t,
+    `fn t() { std::fs::read(format!("{}/../../sdk/views/named.schema.json", ${NARROW_M})); }\n`);
+  const today = fixture.closure(null, fixture.base);
+  assert.equal(today.narrow, undefined);
+  for (const mode of ['off', 'shadow', '', 'ON', 'yes', '1']) {
+    const made = fixture.closure(mode, fixture.base);
+    assert.equal(made.material, today.material, JSON.stringify(mode));
+    assert.equal(made.key, today.key, JSON.stringify(mode));
+    assert.equal(made.narrow, undefined, JSON.stringify(mode));
+  }
+  assert.notEqual(fixture.closure('on', fixture.base).key, today.key);
+});
+
+// Harm (iii), over the real repository: with GATE_READ_NARROW unset, shadow or off, every gate
+// project's REAL key material is byte-identical to what origin/dev's own code computes for the
+// same commit. The baseline is origin/dev's genesis/orchestrator, extracted and imported in this
+// run; both sides read the same commit through one memoising spawn, so every git, brit and rustc
+// answer is the same answer. After this branch lands, origin/dev IS this code and the comparison
+// is a tautology: the durable guards are the fixture tests above (off, shadow and unknown values
+// key today's audit) and the auditor's own (an audit that does not narrow never consults the rule).
+test('REAL read-narrow: off, shadow and unset keep every gate project\'s real key byte-identical to origin/dev\'s', async t => {
+  const repo = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
+  const git = (...args) => spawnSync('git', args, { cwd: repo, encoding: 'utf8', maxBuffer: 256 * 1024 * 1024 });
+  const baselineRef = git('rev-parse', '--verify', '--quiet', 'origin/dev^{commit}');
+  assert.equal(baselineRef.status, 0, 'origin/dev is not a known ref here: fetch it, this test compares against its code');
+  const baselineCommit = baselineRef.stdout.trim();
+  const commit = git('rev-parse', 'HEAD').stdout.trim();
+  const dir = mkdtempSync(resolve(tmpdir(), 'read-narrow-baseline-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const archive = spawnSync('bash', ['-c', 'git archive "$1" genesis/orchestrator | tar -x -C "$2"', 'bash', baselineCommit, dir],
+    { cwd: repo, encoding: 'utf8' });
+  assert.equal(archive.status, 0, archive.stderr);
+  // The baseline's one bare import resolves to the package this checkout has installed.
+  mkdirSync(resolve(dir, 'node_modules'));
+  for (const name of ['picomatch']) {
+    symlinkSync(dirname(createRequire(import.meta.url).resolve(`${name}/package.json`)), resolve(dir, 'node_modules', name));
+  }
+  const baseline = await import(pathToFileURL(resolve(dir, 'genesis/orchestrator/gate-evidence.mjs')).href);
+  assert.notEqual(baseline.gateKeyMaterial, gateKeyMaterial, 'the baseline is a separate module instance');
+
+  const memo = new Map();
+  const spawn = (command, args, options = {}) => {
+    const key = JSON.stringify([command, args, options.cwd || null, options.input || null]);
+    if (!memo.has(key)) memo.set(key, spawnSync(command, args, options));
+    return memo.get(key);
+  };
+  const env = { ...process.env };
+  delete env.GATE_READ_NARROW;
+  const projects = [...loadGateRegistry(repo).values()];
+  assert.ok(projects.length > 30, `the registry holds ${projects.length} gate projects`);
+  let keyed = 0;
+  let audited = 0;
+  for (const project of projects) {
+    const before = baseline.gateKeyMaterial(project, { root: repo, commit, env, cargoEnv: {}, spawn });
+    for (const mode of [null, 'shadow', 'off']) {
+      const after = gateKeyMaterial(project, {
+        root: repo, commit, cargoEnv: {}, spawn,
+        env: mode === null ? env : { ...env, GATE_READ_NARROW: mode },
+      });
+      const label = `${project.name} under GATE_READ_NARROW=${mode ?? '(unset)'}`;
+      assert.equal(after.line, before.line, label);
+      assert.equal(after.material, before.material, label);
+      assert.equal(after.key, before.key, label);
+      assert.equal(after.narrow, undefined, label);
+    }
+    if (before.key) keyed++;
+    if (before.key && JSON.parse(before.material).reads?.scope === 'paths' && project.run?.cargo) audited++;
+  }
+  t.diagnostic(`${projects.length} gate projects compared at ${commit.slice(0, 9)} against origin/dev ${baselineCommit.slice(0, 9)}: ${keyed} keyed, ${audited} cargo gates keyed on audited paths`);
+  // Without brit no project has a key and the comparison proves nothing: say so by failing.
+  assert.ok(keyed > 20 && audited > 10, `only ${keyed} projects were keyed and ${audited} audited: is brit on PATH?`);
 });
 
 test('read-shadow gives a plain no-reading reason for a tree-keyed native gate', () => {
@@ -148,7 +375,7 @@ test('read-shadow computes shared key material once per compared commit', t => {
   const options = { ...fixture, spawn, env: {}, cargoEnv: {}, britBin: 'brit' };
   const evidence = gateKeyMaterial(fixture.project, { ...options, commit: fixture.commit });
   fixture.calls.length = 0;
-  const shadow = readShadowComparison(fixture.project, evidence, { ...options, clock: () => clockNs });
+  const shadow = readShadowComparison(fixture.project, evidence, { ...options, clock: () => clockNs, reportTimings: true });
   assert.ok(shadow);
   assert.equal(fixture.calls.filter(call => call.command === 'brit' && call.args[1] === 'fingerprint').length, 2,
     'step fingerprints run once for the base and once for the gated commit');
@@ -161,7 +388,8 @@ test('read-shadow computes shared key material once per compared commit', t => {
     && call.args.join(' ') === 'ls-tree -r --name-only -z ' + fixture.commit).length, 1,
     'the gated-commit audit lists the repository once for all variants');
   assert.match(shadow.line,
-    /timing \d+ ms \(read-set audit real \d+, fix 1 \d+, fix 2 \d+, both \d+, shared \d+; fingerprinting \d+; suite inventory \d+; key composition \d+\)/);
+    /timing \d+ ms \(read-set audit real \d+, fix 2 \d+, shared \d+; fingerprinting \d+; suite inventory \d+; key composition \d+\)/);
+  assert.match(shadow.line, /decides nothing; fix 1 \(excluding a dependency's tests\/\*\*\) was found unsound and is not shadowed: genesis\/docs\/superpowers\/specs\/evidence\/2026-11-25-manifest-dir-joins\/README\.md$/);
   assert.ok(shadow.rows.every(row => row.timing.totalMs > 0 && row.timing.fingerprintingMs > 0));
 });
 
@@ -169,7 +397,7 @@ test('read-shadow variant key moves exactly when its shared read fingerprint mov
   const fixture = readShadowKeyFixture(t, 'test');
   const variants = [
     { name: 'real', variant: {} },
-    { name: 'fix1', variant: { excludeDependencyTests: true } },
+    { name: 'fix2', variant: { narrow: true } },
   ];
   const options = { ...fixture, env: {}, cargoEnv: {}, britBin: 'brit', variants, shared: {} };
   const before = gateKeyMaterials(fixture.project, { ...options, commit: fixture.base });
@@ -202,8 +430,9 @@ test('read-shadow on and off keep the same verdict, run decision, and evidence-s
   };
   const current = 'a'.repeat(40);
   const base = 'b'.repeat(40);
-  const run = (mode, budget = null, shadowError = null) => {
+  const run = (mode, budget = null, shadowError = null, narrow = null) => {
     const calls = [];
+    let shadowCalls = 0;
     const rows = [];
     let output = '';
     let clockNs = 0n;
@@ -235,6 +464,7 @@ test('read-shadow on and off keep the same verdict, run decision, and evidence-s
         PATH: '', BRIT_BIN: brit, BRIT_BUILD_REF_BIN: buildRef, GATE_TASK: 'off',
         GATE_EVIDENCE: 'off', GATE_INPUTS: 'off', GATE_RECIPE_KEY: 'off',
         GATE_READ_SHADOW: mode, GATE_READING_RUN_ID: `shadow-${mode}`,
+        ...(narrow === null ? {} : { GATE_READ_NARROW: narrow }),
         ...(budget === null ? {} : { GATE_READ_SHADOW_BUDGET_MS: budget }),
       },
       inputsPolicy: { cls: { britArgs: [] } },
@@ -245,15 +475,16 @@ test('read-shadow on and off keep the same verdict, run decision, and evidence-s
       readingCollector: rows,
       clock: () => clockNs,
       readShadowOf: () => {
+        shadowCalls++;
         if (shadowError) throw new Error(shadowError);
         clockNs += 7_000_000_000n;
         return {
-          line: '[gate] fixture read-shadow: real moved; fix 1 would have held IF fix 1 were sound; fix 2 moved; both would have held IF fixes 1 and 2 were sound — decides nothing',
-          rows: ['fix1', 'fix2', 'both'].map((name, index) => ({ name, key: `shadow-${index}`, keyChanged: index === 1 ? 'moved' : 'would have held' })),
+          line: '[gate] fixture read-shadow: real moved; fix 2 would have held under GATE_READ_NARROW=on — decides nothing',
+          rows: [{ name: 'fix2', key: 'shadow-0', keyChanged: 'would have held under GATE_READ_NARROW=on' }],
         };
       },
     });
-    return { status, calls, rows, output };
+    return { status, calls, rows, output, shadowCalls };
   };
   const off = run('off');
   const on = run('on');
@@ -272,14 +503,32 @@ test('read-shadow on and off keep the same verdict, run decision, and evidence-s
   assert.equal(on.rows.find(row => row.step === 'fixture').value,
     off.rows.find(row => row.step === 'fixture').value,
     'the recorded gate reading excludes post-record shadow time');
-  assert.equal(on.rows.length, off.rows.length + 3);
-  assert.deepEqual(on.rows.filter(row => row.parent === 'fixture').map(row => row.step), [
-    'fixture:read-shadow:fix1', 'fixture:read-shadow:fix2', 'fixture:read-shadow:both',
-  ]);
+  assert.equal(on.rows.length, off.rows.length + 1);
+  assert.deepEqual(on.rows.filter(row => row.parent === 'fixture').map(row => row.step), ['fixture:read-shadow:fix2']);
   assert.ok(on.rows.filter(row => row.parent === 'fixture')
     .every(row => row.outcome === 'ran' && row.status === 'green' && row.value === 0));
-  assert.match(on.output, /read-shadow: real moved; fix 1 would have held IF fix 1 were sound;/);
+  assert.match(on.output, /read-shadow: real moved; fix 2 would have held under GATE_READ_NARROW=on/);
   assert.doesNotMatch(off.output, /read-shadow/);
+  assert.equal(off.shadowCalls, 0);
+  assert.equal(on.shadowCalls, 1);
+  // GATE_READ_NARROW: shadow is the default; off and on leave the shadow nothing to compare, so it
+  // does not run, and neither changes the verdict, the run decision or the evidence-store calls.
+  const explicit = run('on', null, null, 'shadow');
+  assert.equal(explicit.shadowCalls, 1);
+  assert.equal(explicit.output, on.output);
+  for (const narrow of ['off', 'on']) {
+    const quiet = run('on', null, null, narrow);
+    assert.equal(quiet.shadowCalls, 0, narrow);
+    assert.doesNotMatch(quiet.output, /read-shadow/, narrow);
+    assert.equal(quiet.status, off.status, narrow);
+    assert.equal(gateRuns(quiet), gateRuns(off), narrow);
+    assert.deepEqual(evidenceCalls(quiet), evidenceCalls(off), narrow);
+    assert.equal(quiet.rows.length, off.rows.length, narrow);
+  }
+  // on says once per gate what it narrowed; this fixture gate has no Rust audit.
+  assert.equal(run('on', null, null, 'on').output.match(/\[gate\] fixture read-narrow \(on\): [^\n]*0 joins narrowed, 0 kept wide\n/g)?.length, 1);
+  assert.doesNotMatch(on.output, /read-narrow/);
+  assert.doesNotMatch(run('on', null, null, 'off').output, /read-narrow/);
   const dropped = run('on', '0');
   assert.equal(dropped.status, off.status);
   assert.equal(dropped.rows.filter(row => row.parent === 'fixture').length, 0);
@@ -444,6 +693,15 @@ test('read-shadow knob off performs no ledger I/O', () => {
     appendFile: () => { ledgerWrites++; },
   });
   assert.equal(off, null);
+  // GATE_READ_NARROW off or on leaves the shadow nothing to compare: no budget, no ledger I/O.
+  for (const narrow of ['off', 'on']) {
+    assert.equal(readShadowPushBudget({
+      GATE_READ_SHADOW: 'on', GATE_READ_NARROW: narrow, GATE_READ_SHADOW_LEDGER: 'fixture',
+    }, () => 0n, {
+      readFile: () => { ledgerReads++; return ''; },
+      appendFile: () => { ledgerWrites++; },
+    }), null, narrow);
+  }
   assert.equal(ledgerReads, 0);
   assert.equal(ledgerWrites, 0);
 });

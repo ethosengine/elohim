@@ -220,6 +220,17 @@ function stepSources(project, root, commit, spawn) {
 // These scans exceed two seconds on the larger Rust gates. Retain only process-local
 // results, partitioned by repository, project and commit (and tree for moving refs).
 const readSets = new Map();
+// Beside them, for a narrowing variant only: how many joins the rule narrowed and kept wide.
+const readJoins = new Map();
+
+/**
+ * GATE_READ_NARROW=off|shadow|on (default shadow). Only `on` changes a gate's key: the audit then
+ * records each all-literal CARGO_MANIFEST_DIR join as the path it names (narrowJoin in
+ * gate-input-audit.mjs). `shadow` and `off` key on today's audit, byte for byte.
+ */
+export function readNarrowMode(env = process.env) {
+  return ['off', 'on'].includes(env.GATE_READ_NARROW) ? env.GATE_READ_NARROW : 'shadow';
+}
 
 const defaultClock = () => process.hrtime.bigint();
 
@@ -237,36 +248,45 @@ function readSetsAt(project, root, commit, sources, tree, spawn, variants, clock
     const text = gitRead(root, ['show', `${commit}:${list}`], spawn);
     const read = text === null ? null : suiteReadSet(text, list);
     return {
-      sets: new Map(variants.map(({ name }) => [name, read])),
+      sets: new Map(variants.map(({ name }) => [name, read])), joins: new Map(),
       timing: { ...emptyTiming(), sharedMs: elapsedMs(clock, started) },
     };
   }
   if (!project.run.cargo || !sources || UNAUDITED_RECIPE_PROJECTS.includes(project.name)) {
-    return { sets: new Map(variants.map(({ name }) => [name, null])), timing: emptyTiming() };
+    return { sets: new Map(variants.map(({ name }) => [name, null])), joins: new Map(), timing: emptyTiming() };
   }
-  const keyOf = variant => JSON.stringify([resolve(root), project.name, commit, tree,
-    variant.excludeDependencyTests === true, variant.resolveFormatJoin === true]);
+  const keyOf = variant => JSON.stringify([resolve(root), project.name, commit, tree, variant.narrow === true]);
   const missing = variants.filter(({ variant }) => !readSets.has(keyOf(variant)));
   let timing = emptyTiming();
-  if (missing.length === 0) {
-    return { sets: new Map(variants.map(({ name, variant }) => [name, readSets.get(keyOf(variant))])), timing };
-  }
+  const answer = () => ({
+    sets: new Map(variants.map(({ name, variant }) => [name, readSets.get(keyOf(variant)) ?? null])),
+    joins: new Map(variants.filter(({ variant }) => readJoins.has(keyOf(variant)))
+      .map(({ name, variant }) => [name, readJoins.get(keyOf(variant))])),
+    timing,
+  });
+  if (missing.length === 0) return answer();
   try {
     const sharedStarted = clock();
     const names = gitRead(root, ['ls-tree', '-r', '--name-only', '-z', commit], spawn);
     if (names === null) {
       for (const { variant } of missing) readSets.set(keyOf(variant), null);
-      return { sets: new Map(variants.map(({ name, variant }) => [name, readSets.get(keyOf(variant)) ?? null])), timing };
+      return answer();
     }
     const files = new Set(names.split('\0').filter(Boolean));
     if (![...files].some(file => file.endsWith('.rs') && sources.some(source => globCovers(source, file)))) {
       for (const { variant } of missing) readSets.set(keyOf(variant), null);
       timing.sharedMs = elapsedMs(clock, sharedStarted);
-      return { sets: new Map(variants.map(({ name, variant }) => [name, readSets.get(keyOf(variant)) ?? null])), timing };
+      return answer();
     }
     const contents = new Map();
     const audited = readSetVariants({
       root, project, sources, listFiles: () => [...files], clock,
+      // Asked only when the narrowing rule first judges a target; a failed listing keeps it wide.
+      listSymlinks: () => {
+        const listing = gitRead(root, ['ls-tree', '-r', '-z', commit], spawn);
+        if (listing === null) throw new Error(`unlistable at ${commit}`);
+        return listing.split('\0').filter(row => row.startsWith('120000 ')).map(row => row.slice(row.indexOf('\t') + 1));
+      },
       readFile: path => {
         const rel = relative(root, path).split('\\').join('/');
         if (!files.has(rel)) throw Object.assign(new Error(`absent at ${commit}: ${rel}`), { code: 'ENOENT' });
@@ -278,14 +298,17 @@ function readSetsAt(project, root, commit, sources, tree, spawn, variants, clock
         return contents.get(rel);
       },
     }, missing);
-    for (const { name, variant } of missing) readSets.set(keyOf(variant), audited.sets.get(name));
+    for (const { name, variant } of missing) {
+      readSets.set(keyOf(variant), audited.sets.get(name));
+      if (audited.joins.has(name)) readJoins.set(keyOf(variant), audited.joins.get(name));
+    }
     timing = audited.timing;
     timing.sharedMs += elapsedMs(clock, sharedStarted) - audited.timing.sharedMs
       - Object.values(audited.timing.variantMs).reduce((a, b) => a + b, 0);
-    return { sets: new Map(variants.map(({ name, variant }) => [name, readSets.get(keyOf(variant))])), timing };
+    return answer();
   } catch {
     for (const { variant } of missing) readSets.set(keyOf(variant), null);
-    return { sets: new Map(variants.map(({ name, variant }) => [name, readSets.get(keyOf(variant)) ?? null])), timing };
+    return answer();
   }
 }
 
@@ -828,6 +851,9 @@ export function gateKeyMaterials(project, {
         fingerprints: suiteNamed ? [] : common.fp.fingerprints,
         nativeKey: common.nativeKey, sources: common.sources, recipePath: common.recipe.path,
         reads, scope,
+        // Present only when this variant narrowed its audit (GATE_READ_NARROW=on, or the shadow's
+        // variant): counts for the runner's line. Never part of the key material.
+        ...(audited.joins.has(entry.name) ? { narrow: audited.joins.get(entry.name) } : {}),
         ...(suite ? { suite: { inventory: suite.inventory, packages: suite.packages, node: suite.node,
           commit: suite.commit, matcher: suite.matcher } } : {}),
       },
@@ -838,10 +864,11 @@ export function gateKeyMaterials(project, {
 
 /**
  * Compute the canonical closure material without reading or writing the evidence store. `variant`
- * changes only the audited Rust read set; omitted, this is the exact material gateEvidence keys.
+ * changes only the audited Rust read set; omitted, this is the exact material gateEvidence keys:
+ * today's audit, or the narrowed one when the caller's env says GATE_READ_NARROW=on.
  */
 export function gateKeyMaterial(project, options = {}) {
-  const { variant = {}, ...sharedOptions } = options;
+  const { variant = readNarrowMode(options.env) === 'on' ? { narrow: true } : {}, ...sharedOptions } = options;
   return gateKeyMaterials(project, {
     ...sharedOptions, variants: [{ name: 'real', variant }],
   }).results[0].closure;
@@ -860,7 +887,7 @@ export function gateEvidence(project, { env = process.env, root, commit, cargoEn
   }
   const closure = gateKeyMaterial(project, { env, root, commit, cargoEnv, spawn, inputs, britBin });
   if (!closure.key) return { line: closure.line, ...(closure.dirty === true ? { dirty: true } : {}) };
-  const { key, material, fingerprints, nativeKey, sources, recipePath, reads, scope, suite } = closure;
+  const { key, material, fingerprints, nativeKey, sources, recipePath, reads, scope, suite, narrow } = closure;
   const found = findEvidence(project, key, { buildRefBin, root, spawn, warn });
   if (found.error) return { key, material, line: `unavailable (${found.error}); closure scope ${scope}` };
   // The suite's recording decision asks the builder's own status call, with its flags.
@@ -887,6 +914,7 @@ export function gateEvidence(project, { env = process.env, root, commit, cargoEn
     line,
     buildRefBin,
     nativeKey,
+    ...(narrow ? { narrow } : {}),
     ...(suite ? { suite: { inventory: suite.inventory, packages: suite.packages, node: suite.node, commit: suite.commit } } : {}),
     dirty: checkoutMismatch ? true : dirty === null ? null : dirty.length > 0,
   };

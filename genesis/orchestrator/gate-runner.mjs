@@ -19,7 +19,7 @@ import { filterChanged } from './ci-ignore.mjs';
 import { COST_FIELDS, classifyFailure, recordCycle, subjectFor } from './gate-cycle.mjs';
 import { CI_BRANCH_PATTERN, costOf, deferDecision, formatExpectation, readCycleUnion } from './gate-cost.mjs';
 import {
-  ageOf, attestedOutputParses, emitGateVerdict, findEvidence, gateEvidence, gateKeyMaterial, gateKeyMaterials, isHabitAtom, patternDigest, recordEvidence, resolveBin, reusableHit,
+  ageOf, attestedOutputParses, emitGateVerdict, findEvidence, gateEvidence, gateKeyMaterial, gateKeyMaterials, isHabitAtom, patternDigest, readNarrowMode, recordEvidence, resolveBin, reusableHit,
   selfAgentId, siblingGovernanceChange, siblingVerdicts, stepFingerprints,
 } from './gate-evidence.mjs';
 import { britAffected, resolveBritBin } from './gate-oracle.mjs';
@@ -321,18 +321,19 @@ function inputsShadow(project, evidence, { root, gateCommit, base, steps, run })
     : { lines: [] };
 }
 
+// "real" is today's audit; "fix 2" is the narrowing rule (narrowJoin in gate-input-audit.mjs),
+// which is what GATE_READ_NARROW=on would key. Fix 1 (dropping a dependency's tests/**) is gone.
 const READ_SHADOW_VARIANTS = Object.freeze([
   { name: 'real', label: 'real', variant: {} },
-  { name: 'fix1', label: 'fix 1', variant: { excludeDependencyTests: true } },
-  { name: 'fix2', label: 'fix 2', variant: { resolveFormatJoin: true } },
-  { name: 'both', label: 'both', variant: { excludeDependencyTests: true, resolveFormatJoin: true } },
+  { name: 'fix2', label: 'fix 2', variant: { narrow: true } },
 ]);
 
+export const READ_SHADOW_FIX1_NOTE = 'fix 1 (excluding a dependency\'s tests/**) was found unsound and is not shadowed: genesis/docs/superpowers/specs/evidence/2026-11-25-manifest-dir-joins/README.md';
+
 /**
- * Compare closure movement under the two proposed read-set fixes. This returns telemetry only.
- * Neither fix may decide a gate until the proof covers: dependency tests/** support reached through
- * #[path], format! joins with variable suffixes, absent resolved paths, and eprfs actually running
- * and blocking on the same push whose closure the shadow compares.
+ * Compare closure movement under today's audit and under the narrowing rule (fix 2). This returns
+ * telemetry only: it runs in GATE_READ_NARROW=shadow, where the real key is today's, and a held
+ * row is worded as what GATE_READ_NARROW=on would have done, never as a saving that happened.
  */
 export function readShadowComparison(project, evidence, {
   root, base, commit, env, cargoEnv, spawn, inputs = null,
@@ -366,12 +367,12 @@ export function readShadowComparison(project, evidence, {
   if (real.key !== evidence.key) throw new Error('real variant differs from the gate evidence key');
   const differs = results.slice(1).some(result => result.moved !== real.moved);
   if (!differs && !reportTimings) return null;
+  const heldUnder = 'would have held under GATE_READ_NARROW=on';
   const movement = differs ? results.map(result => {
     if (result.moved) return `${result.label} moved`;
     if (result.name === 'real') return 'real held';
-    const proof = result.name === 'both' ? 'fixes 1 and 2 were sound' : `${result.label} were sound`;
-    return `${result.label} would have held IF ${proof}`;
-  }).join('; ') : `real and all variants ${real.moved ? 'moved' : 'held'} alike`;
+    return `${result.label} ${heldUnder}`;
+  }).join('; ') : `real and fix 2 ${real.moved ? 'moved' : 'held'} alike`;
   const sum = (field, name = null) => beforeBatch.timing[field][name] + afterBatch.timing[field][name];
   const timing = {
     totalMs: beforeBatch.timing.totalMs + afterBatch.timing.totalMs,
@@ -386,13 +387,11 @@ export function readShadowComparison(project, evidence, {
   const compositions = Object.values(timing.keyCompositionMs).reduce((a, b) => a + b, 0);
   const timingLine = `timing ${ms(timing.totalMs)} ms (read-set audit ${audits}, shared ${ms(timing.readSetAuditSharedMs)}; fingerprinting ${ms(timing.fingerprintingMs)}; suite inventory ${ms(timing.suiteInventoryMs)}; key composition ${ms(compositions)})`;
   return {
-    line: `[gate] ${project.name} read-shadow: ${movement}; ${timingLine} — decides nothing; enablement requires proof for #[path]-included tests/** support, format! joins with variable suffixes, absent paths, and eprfs running and blocking on this same push`,
+    line: `[gate] ${project.name} read-shadow: ${movement}; ${timingLine} — decides nothing; ${READ_SHADOW_FIX1_NOTE}`,
     rows: results.slice(1).map(result => ({
       name: result.name,
       key: result.key,
-      keyChanged: result.moved
-        ? 'moved'
-        : `would have held IF ${result.name === 'both' ? 'fixes 1 and 2 were sound' : `${result.label} were sound`}`,
+      keyChanged: result.moved ? 'moved' : heldUnder,
       timing: {
         totalMs: timing.totalMs,
         readSetAuditMs: timing.readSetAuditMs[result.name],
@@ -683,7 +682,7 @@ function readShadowLedgerSpent(path, budgetMs, readFile = readFileSync) {
 export function readShadowPushBudget(env, clock, {
   readFile = readFileSync, appendFile = appendFileSync, removeFile = rmSync,
 } = {}) {
-  if (env.GATE_READ_SHADOW === 'off') return null;
+  if (env.GATE_READ_SHADOW === 'off' || readNarrowMode(env) !== 'shadow') return null;
   const budgetMs = shadowBudgetMs(env.GATE_READ_SHADOW_BUDGET_MS);
   const hasLedger = Object.hasOwn(env, 'GATE_READ_SHADOW_LEDGER');
   const ledger = hasLedger ? String(env.GATE_READ_SHADOW_LEDGER) : null;
@@ -1378,15 +1377,21 @@ export function runProject(project, printOnly, namesOnly, {
   Object.assign(reading, keyReading(evidence));
   const inputsClass = inputs?.cls ?? LEGACY_ALL;
   write(`[gate] ${project.name} evidence: ${evidence.line}\n`);
-  // GATE_READ_SHADOW (default on): after this gate's seconds, evidence and cycle are recorded,
-  // compare its canonical closure at the integration base and gated commit under two proposed
-  // audit fixes. One GATE_READ_SHADOW_BUDGET_MS budget (default 15000) belongs to the hook push
-  // when its ledger is set, otherwise to this runner invocation; every subprocess, including suite
-  // inventory recomputation, receives the remaining bound. The comparison decides nothing. Neither
-  // fix may decide until proof covers
-  // #[path]-included dependency tests/** support, format! joins with variable suffixes, absent
-  // paths, and eprfs running and blocking on this same push.
-  if (env.GATE_READ_SHADOW !== 'off' && evidence.key && evidence.material) {
+  // GATE_READ_NARROW=on: the key above was computed from the narrowed audit. Say so once per gate,
+  // with how many CARGO_MANIFEST_DIR joins the rule narrowed and how many it kept wide.
+  if (readNarrowMode(env) === 'on') {
+    write(evidence.narrow
+      ? `[gate] ${project.name} read-narrow (on): ${evidence.narrow.narrowed} joins narrowed, ${evidence.narrow.wide} kept wide\n`
+      : `[gate] ${project.name} read-narrow (on): no Rust read audit keys this gate, 0 joins narrowed, 0 kept wide\n`);
+  }
+  // GATE_READ_NARROW=shadow (the default) with GATE_READ_SHADOW not off: after this gate's seconds,
+  // evidence and cycle are recorded, compare its canonical closure at the integration base and
+  // gated commit under today's audit and under the narrowing rule. One GATE_READ_SHADOW_BUDGET_MS
+  // budget (default 15000) belongs to the hook push when its ledger is set, otherwise to this
+  // runner invocation; every subprocess, including suite inventory recomputation, receives the
+  // remaining bound. The comparison decides nothing. With GATE_READ_NARROW off or on there is
+  // nothing to compare and it does not run.
+  if (env.GATE_READ_SHADOW !== 'off' && readNarrowMode(env) === 'shadow' && evidence.key && evidence.material) {
     let scopeKnown = false;
     try { scopeKnown = ['paths', 'tree'].includes(JSON.parse(evidence.material).reads?.scope); } catch { /* no shadow */ }
     if (scopeKnown) {
@@ -1742,7 +1747,8 @@ function usage() {
   console.error('  env: GATE_ORACLE=rakia|shadow|path (default rakia; without a brit binary every mode is path-only) · BRIT_BIN · GATE_ROOT (fixture repository root)');
   console.error('  env: GATE_RECIPE_KEY=shadow|off (default shadow): a root-just gate prints whether a justfile edit since the integration base left its recipe closure unchanged; it changes no key, reuse decision or record');
   console.error('  env: GATE_INPUTS=shadow|off (default shadow; no on yet): prints, once per push, the borrowed steps whose own buildProcess alone selects them, and per gate when, since the integration base, its step fingerprints moved under all and are unchanged under sources; it changes no selection, key, reuse decision or record');
-  console.error('  env: GATE_READ_SHADOW=off (default on) · GATE_READ_SHADOW_BUDGET_MS (default 15000 once per push with GATE_READ_SHADOW_LEDGER, otherwise per invocation): after recorded timing, compares closure movement under two read-audit fixes; it decides nothing, and enablement requires proof for #[path]-included tests/** support, format! joins with variable suffixes, absent paths, and eprfs running and blocking on the same push');
+  console.error('  env: GATE_READ_NARROW=off|shadow|on (default shadow): on keys each all-literal CARGO_MANIFEST_DIR join as the path it names and prints the narrowed and kept-wide counts per gate; shadow and off key on today\'s audit (`node genesis/orchestrator/gate-input-audit.mjs --narrow-report` lists every join)');
+  console.error('  env: GATE_READ_SHADOW=off (default on) · GATE_READ_SHADOW_BUDGET_MS (default 15000 once per push with GATE_READ_SHADOW_LEDGER, otherwise per invocation): under GATE_READ_NARROW=shadow, after recorded timing, compares closure movement under today\'s audit and the narrowing rule; it decides nothing');
   console.error('  env: GATE_READING=off (default on): suppress collection and the one bounded `epr flow reading append` call; the shadow reading never changes selection, reuse, keys or exit status');
   console.error('  env: GATE_CARRY=off|shadow|on (default shadow, read by gate-carry.mjs under pre-push): carry one long one-build-job cargo gate on this device\'s second cargo seat beside the loop when `berth room cargo` admits it; shadow prints what would be carried and why and changes nothing');
 }

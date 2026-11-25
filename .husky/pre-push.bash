@@ -363,8 +363,9 @@ HOOK_ON_EXIT="$HOOK_ON_EXIT gate_step_reading"
 # ── Read-shadow push ledger ─────────────────────────────────────
 # One append-only read-shadow budget ledger belongs to this push when the shadow is on. Every
 # gate-runner child inherits the same path; an unavailable scratch path is left unreadable so
-# runners fail closed instead of silently restoring one budget per process.
-if [ "${GATE_READ_SHADOW:-on}" != "off" ]; then
+# runners fail closed instead of silently restoring one budget per process. The shadow runs only
+# while GATE_READ_NARROW is shadow (its default): off and on have nothing to compare.
+if [ "${GATE_READ_SHADOW:-on}" != "off" ] && [ "${GATE_READ_NARROW:-shadow}" != "off" ] && [ "${GATE_READ_NARROW:-shadow}" != "on" ]; then
   GATE_READ_SHADOW_SCRATCH=$(mktemp -d 2>/dev/null || true)
   if [ -n "$GATE_READ_SHADOW_SCRATCH" ]; then
     GATE_READ_SHADOW_LEDGER="$GATE_READ_SHADOW_SCRATCH/spent-ms"
