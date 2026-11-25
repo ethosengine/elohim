@@ -154,13 +154,13 @@ spec:
                 # only when the bin is built as a top-level target. This is the bins step of the
                 # device gate recipe (_gate-eprfs in the root justfile);
                 # genesis/orchestrator/eprfs-ci-parity.test.mjs holds the two together.
-                cargo build -p elohim-epr-cli --bin epr -p elohim-device-runtime --bin bin-launch
+                cargo build -p elohim-epr-cli --bin epr -p elohim-device-runtime --bin bin-launch --features elohim-epr-cli/blob-store
                 # The device_supervise stories (row 35) run a real ark and fail naming its build
                 # command when none is found. This is the ark step of the device gate recipe; the
                 # ark lives in the elohim workspace, whose target directory is ../target here.
                 cargo build --manifest-path ../Cargo.toml -p elohim-ark --bin ark
                 export ARK_BIN="${CARGO_TARGET_DIR:-$PWD/../target}/debug/ark"
-                cargo nextest run --workspace --all-targets --no-fail-fast
+                cargo nextest run --workspace --all-targets --no-fail-fast --features elohim-epr-cli/blob-store
               '
             '''
           }
