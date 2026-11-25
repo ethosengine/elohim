@@ -1343,10 +1343,15 @@ fn peer_verdicts_reads_only_matching_folded_admitted_siblings() {
     let mut twice = gate_verdict_record("eprfs", "closure-x", "twice", true, Some(&a_did));
     twice.classified_as.push("env:closure=closure-a".into());
     append(b.checkout.path(), [twice]);
+    let mut observed = gate_verdict_record("eprfs", "closure-a", "commit-a", true, Some(&a_did));
+    observed
+        .classified_as
+        .push("env:observedAt=2026-10-23T16:30:45Z".into());
     append(
         b.checkout.path(),
         [
-            gate_verdict_record("eprfs", "closure-a", "commit-a", true, Some(&a_did)),
+            observed,
+            gate_verdict_record("eprfs", "closure-a", "commit-legacy", true, Some(&a_did)),
             gate_verdict_record("eprfs", "closure-b", "commit-b", false, Some(&a_did)),
             gate_verdict_record("eprfs", "closure-a", "own", false, None),
             gate_verdict_record(
@@ -1377,18 +1382,52 @@ fn peer_verdicts_reads_only_matching_folded_admitted_siblings() {
     let rows: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
     assert_eq!(
         rows,
-        serde_json::json!([{
-            "device": a_did,
-            "project": "eprfs",
-            "closure": "closure-a",
-            "commit": "commit-a",
-            "success": true,
-            "seconds": 12.0,
-            "attestationId": "bafyattestation",
-            "agentId": "agent-key",
-            "at": "2026-10-23T15:28:09Z"
-        }])
+        serde_json::json!([
+            {
+                "device": a_did.clone(),
+                "project": "eprfs",
+                "closure": "closure-a",
+                "commit": "commit-a",
+                "success": true,
+                "seconds": 12.0,
+                "attestationId": "bafyattestation",
+                "agentId": "agent-key",
+                "at": "2026-10-23T15:28:09Z",
+                "observedAt": "2026-10-23T16:30:45Z"
+            },
+            {
+                "device": a_did,
+                "project": "eprfs",
+                "closure": "closure-a",
+                "commit": "commit-legacy",
+                "success": true,
+                "seconds": 12.0,
+                "attestationId": "bafyattestation",
+                "agentId": "agent-key",
+                "at": "2026-10-23T15:28:09Z",
+                "observedAt": null
+            }
+        ])
     );
+
+    let human = b.epr(&[
+        "peer",
+        "verdicts",
+        "--project",
+        "eprfs",
+        "--closure",
+        "closure-a",
+        "--root",
+        b.root(),
+    ]);
+    assert!(human.status.success());
+    let text = String::from_utf8_lossy(&human.stdout);
+    assert!(
+        text.contains("judged commit date: 2026-10-23T15:28:09Z"),
+        "{text}"
+    );
+    assert!(text.contains("observed: 2026-10-23T16:30:45Z"), "{text}");
+    assert!(text.contains("observed: unknown"), "{text}");
 
     // A local enrichment is a separate measure and cannot alter the sibling-verdict projection.
     append(
