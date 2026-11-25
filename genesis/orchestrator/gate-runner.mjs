@@ -484,6 +484,10 @@ export function costLineAndDefer(project, { rows, subjectFallback = null, env = 
 const TAP = resolve(dirname(fileURLToPath(import.meta.url)), 'gate-tap.mjs');
 /** A gate stopped on request exits non-zero, so whatever runs it (the hook, `just gate`) refuses. */
 export const GATE_STOPPED_EXIT = 1;
+/** A gate that could not acquire its shared Cargo slot did not run and has no verdict. */
+// Not 75: gate-task.mjs EXIT_NOT_CARRIED=75 means ark did not carry the Task and the gate runs direct; a
+// slot-busy recipe under ark must not read as that and be re-run.
+export const GATE_SLOT_BUSY_EXIT = 73;
 
 /**
  * Run a gate command through gate-tap.mjs, which forwards its bytes unchanged, keeps its
@@ -933,6 +937,11 @@ export function runProject(project, printOnly, namesOnly, {
     });
     return GATE_STOPPED_EXIT;
   };
+  const slotBusyGate = () => {
+    readingComplete = true;
+    write(`[gate] ${project.name} slot busy: did not run (unanswered); no evidence, verdict, or cycle recorded\n`);
+    return GATE_SLOT_BUSY_EXIT;
+  };
   const complete = (status, outcome, seconds = null) => {
     if (!readingComplete) {
       readingComplete = true;
@@ -965,6 +974,7 @@ export function runProject(project, printOnly, namesOnly, {
       stdio: 'inherit',
       env: gateChildEnv(project, env, root),
     }).status ?? 1;
+    if (status === GATE_SLOT_BUSY_EXIT) return slotBusyGate();
     return complete(status, 'ran');
   }
 
@@ -1354,6 +1364,7 @@ export function runProject(project, printOnly, namesOnly, {
   }
   const { result, tapped } = ran;
   if (tapped?.stopped) return stoppedGate(tapped.stopped);
+  if (result.status === GATE_SLOT_BUSY_EXIT) return slotBusyGate();
   const cost = tapped ? Object.fromEntries(COST_FIELDS.map(k => [k, tapped[k] ?? null])) : undefined;
   const derivation = task ? { ...task.derivation, hit: answer.answered?.hit === true } : undefined;
   if (answer?.answered?.hit) {
@@ -1563,6 +1574,7 @@ if (isMain) {
   const policy = onRedPolicy({ root: ROOT });
   let failed = 0;
   let stopping = null;
+  let refused = false;
   if (process.env.GATE_PREFLIGHT !== 'off' && process.env.GATE_PREFLIGHT_DONE !== '1') {
     const rows = runPreflight({ root: ROOT, projects, registry, changed: changedFiles, onRow: row => {
       process.stdout.write(`${formatRow(row)}\n`);
@@ -1588,6 +1600,12 @@ if (isMain) {
       process.env.GATE_REMAINING = ordered.slice(index + 1).map(p => p.name).join(' ');
     }
     const status = runProject(project, false, false, {});
+    if (status === GATE_SLOT_BUSY_EXIT) {
+      failed = 1;
+      refused = true;
+      stopping = `${project.name} slot busy (gate did not run)`;
+      continue;
+    }
     failed |= status;
     if (status !== 0 && process.env.GATE_LIVE_RUN) {
       await outlook(process.env.GATE_LIVE_RUN, ordered.slice(index + 1).map(p => p.name), { root: ROOT });
@@ -1605,7 +1623,7 @@ if (isMain) {
     failed = 1;
   }
   if (ownRun) {
-    closeRun(ownRun, failed ? 'failed' : 'passed');
+    closeRun(ownRun, refused ? 'interrupted' : (failed ? 'failed' : 'passed'));
     for (const line of formatHarvest(harvest({ root: ROOT, last: 10 }))) process.stdout.write(`${line}\n`);
   }
   process.exit(failed ? 1 : 0);
