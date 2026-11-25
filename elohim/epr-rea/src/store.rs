@@ -214,6 +214,14 @@ pub struct SidecarFlowStore {
     log_path: PathBuf,
 }
 
+/// One immutable flow-log prefix with each decoded record's JSONL line-start offset.
+#[cfg(feature = "sidecar")]
+#[derive(Debug)]
+pub struct FlowRecordPrefix {
+    pub end_offset: u64,
+    pub records: Vec<(u64, Cid, FlowRecord)>,
+}
+
 #[cfg(feature = "sidecar")]
 impl SidecarFlowStore {
     /// Open (creating directories/log as needed) the sidecar under `root`.
@@ -232,6 +240,24 @@ impl SidecarFlowStore {
 
     pub fn log_path(&self) -> &Path {
         &self.log_path
+    }
+
+    /// The byte offset immediately after a complete, immutable prefix, captured under the log's
+    /// shared lock. Every record in that prefix starts below this offset.
+    pub fn end_offset(&self) -> Result<u64> {
+        crate::sidecar::flow_length(&self.log_path)
+    }
+
+    /// Every record in one captured prefix, with its byte offset at the start of its JSONL line,
+    /// and the offset immediately after the prefix.
+    pub fn records_with_offsets(&self) -> Result<FlowRecordPrefix> {
+        let contents = crate::sidecar::flow_contents(&self.log_path)?;
+        let end_offset = u64::try_from(contents.len())
+            .map_err(|_| FabricError::Decode("flow log is too large for offsets".into()))?;
+        Ok(FlowRecordPrefix {
+            end_offset,
+            records: decode_flow_records_with_offsets(&contents)?,
+        })
     }
 
     /// Retain feedback coordination and reference-admission state across an operation.
@@ -360,11 +386,26 @@ impl FlowStore for SidecarFlowTransaction {
 /// Decode and verify an already captured append-order log without filesystem access.
 #[cfg(feature = "sidecar")]
 pub fn decode_flow_records(contents: &str) -> Result<Vec<(Cid, FlowRecord)>> {
+    Ok(decode_flow_records_with_offsets(contents)?
+        .into_iter()
+        .map(|(_, cid, record)| (cid, record))
+        .collect())
+}
+
+#[cfg(feature = "sidecar")]
+fn decode_flow_records_with_offsets(contents: &str) -> Result<Vec<(u64, Cid, FlowRecord)>> {
     if !contents.is_empty() && !contents.ends_with('\n') {
         return Err(FabricError::Decode("unterminated record log".into()));
     }
     let mut records = Vec::new();
-    for line in contents.lines().filter(|l| !l.trim().is_empty()) {
+    let mut offset = 0_u64;
+    for terminated in contents.split_inclusive('\n') {
+        let line = terminated.strip_suffix('\n').unwrap_or(terminated);
+        let line = line.strip_suffix('\r').unwrap_or(line);
+        if line.trim().is_empty() {
+            offset = offset.saturating_add(u64::try_from(terminated.len()).unwrap_or(u64::MAX));
+            continue;
+        }
         let parsed: SidecarLine =
             serde_json::from_str(line).map_err(|e| FabricError::Decode(e.to_string()))?;
         let computed = parsed.record.cid()?;
@@ -385,7 +426,8 @@ pub fn decode_flow_records(contents: &str) -> Result<Vec<(Cid, FlowRecord)>> {
                 computed: computed.to_string(),
             });
         }
-        records.push((computed, parsed.record));
+        records.push((offset, computed, parsed.record));
+        offset = offset.saturating_add(u64::try_from(terminated.len()).unwrap_or(u64::MAX));
     }
     Ok(records)
 }
@@ -511,6 +553,26 @@ mod tests {
 
         assert!(matches!(error, FabricError::Decode(_)), "{error:?}");
         assert_eq!(std::fs::read(store.log_path()).unwrap(), before);
+    }
+
+    #[cfg(feature = "sidecar")]
+    #[test]
+    fn indexed_records_name_line_starts_and_the_captured_prefix_end() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut store = SidecarFlowStore::open(dir.path()).unwrap();
+        let first = FlowRecord::Edge(edge("a", "b", 1, "first"));
+        let second = FlowRecord::Edge(edge("b", "c", 2, "second"));
+        store.append_batch(vec![first, second]).unwrap();
+
+        let bytes = std::fs::read(store.log_path()).unwrap();
+        let first_end = bytes.iter().position(|byte| *byte == b'\n').unwrap() + 1;
+        let prefix = store.records_with_offsets().unwrap();
+
+        assert_eq!(prefix.records.len(), 2);
+        assert_eq!(prefix.records[0].0, 0);
+        assert_eq!(prefix.records[1].0, u64::try_from(first_end).unwrap());
+        assert_eq!(prefix.end_offset, u64::try_from(bytes.len()).unwrap());
+        assert_eq!(store.end_offset().unwrap(), prefix.end_offset);
     }
 
     #[test]

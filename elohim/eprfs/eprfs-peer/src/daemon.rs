@@ -61,7 +61,7 @@ use crate::fold::{fold_root_planned, FoldLimits, FoldPlan, FoldReader, FoldRepor
 use crate::gate::SharedAdmission;
 use crate::gossip::GatedGossip;
 use crate::head::{ChannelHead, HeadSigner};
-use crate::head_table::{HeadTable, StorePlace};
+use crate::head_table::{FoldCoverage, HeadTable, StorePlace};
 use crate::key::PeerKey;
 use crate::local_blob::LocalBlobContext;
 use crate::rules::{Rules, RulesDigest, RulesState};
@@ -1841,7 +1841,7 @@ impl Run {
                 .cloned()
                 .unwrap_or_default();
             self.channel
-                .folded(&head, 0, nack, unix_ms(), Instant::now());
+                .folded(&head, 0, None, nack, unix_ms(), Instant::now());
             return;
         }
         let node = self
@@ -1955,11 +1955,22 @@ impl Run {
                 self.reproject |= nack_changed;
                 self.held
                     .insert(head.device.clone(), Arc::new(report.known.clone()));
+                let coverage = if report.complete {
+                    Some(FoldCoverage {
+                        events: u64::try_from(report.known.len()).unwrap_or(u64::MAX),
+                        log_offset: report.coverage_offset.ok_or_else(|| {
+                            ended("a complete fold did not capture its flow-log coverage")
+                        })?,
+                    })
+                } else {
+                    None
+                };
                 let outcome = report.outcome;
                 if report.complete {
                     self.channel.folded(
                         &head,
                         outcome.appended,
+                        coverage,
                         report.peer_nack,
                         folded_at,
                         Instant::now(),
