@@ -38,7 +38,7 @@ BRIT_TABLE = {
     "switch": ("PARTIAL", "brit switch <existing branch>", "switch -c (use brit branch create <n> [start], then brit switch)"),
     "checkout": ("PARTIAL", "brit switch <branch>; brit restore -- <paths>", "checkout -b, <ref> -- <path>, detaching (unverified: read blobs with brit show <ref>:<path>)"),
     "pull": ("PARTIAL", "brit pull --ff-only <remote> <branch>", "a merging or rebasing pull"),
-    "push": ("PARTIAL", "brit push [<remote> <refspec>] [-f|--force-with-lease|-u|-d|-n]", "the dev landing push: GATE_EVIDENCE=reuse git push origin HEAD:dev (standing exception)"),
+    "push": ("HAS", "brit push [<remote> <refspec>] [-f|--force-with-lease|-u|-d|-n]; dev landing: GATE_EVIDENCE=reuse brit -c core.hooksPath=<worktree>/.husky/_ push origin HEAD:dev"),
     "merge": ("PARTIAL", "brit merge file|tree|commit (object-database plumbing only; fast-forward: brit pull --ff-only)", "merging into the worktree (unverified)"),
     "rev-list": ("PARTIAL", "brit rev-list --count [--left-right] A...B; listing is brit log --oneline", "other rev-list output"),
     "ls-files": ("PARTIAL", "brit index entries [pathspec]", "git's exact output format (unverified)"),
@@ -120,8 +120,7 @@ def steer(command):
             subs.append(sub)
     if not subs:
         return None
-    tail = (" Else retry with a first-line '# Brit fallback: <reason>' comment."
-            " A dev landing push (git push origin HEAD:dev) is an expected fallback.")
+    tail = " Else retry with a first-line '# Brit fallback: <reason>' comment."
     head = "Brit %s table. " % BRIT_TABLE_VERSION
     parts = []
     for sub in subs:

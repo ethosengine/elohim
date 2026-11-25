@@ -3176,3 +3176,11 @@ shem. `elohim/eprfs/epr-cli/src/feedback/qualify.rs` runs brit twice in one sess
 times. Item 7 prints that notice once per session. When the sprint's release moves the brit pin,
 the second check fails with "Recorder failure was not visible." Not cured: the probe must change
 before the pin moves, in the same landing or an earlier one.
+
+## Row 99 — the git landing exception is retired on brit 0.3.4; what was proven and what was not
+
+The "Temporary landing exception" (dev landings made with `git push` instead of `brit push`) is retired in the root guidance and in the `brit-first` hook's message. A dev landing is now `GATE_EVIDENCE=reuse brit -c core.hooksPath=<worktree>/.husky/_ push origin HEAD:dev` from a prepared worktree; `git push` for a landing is a fallback like any other, stated with its reason and recorded in the sprint journal. This was the integrator's decision (shem, 2026-11-25), taken under the steward's direction of the same day that decisions inside the sprint not wait on him.
+
+Evidence: four dev landings were made with brit 0.3.4 and no git. c1035eebc ran its hook in about 65 s. 40418e53b and d6bf967da followed (d6bf967da about 8 min), and a3632f54 took 1543 s (about 26 min) for hook and push, with the eprfs gate run in the hook. `.git/landing/settle.log` reads `landed … tool=brit … released=ok` for the last three; the first read did-not-land because the landing agent then looked only for a git ancestor, which 40418e53b fixed. The brit team's CI and these landings confirm on 0.3.4 that the `-c core.hooksPath=<worktree>/.husky/_` form runs the worktree's own hook; that the environment (`GATE_EVIDENCE` and the rest) reaches the hook and its output streams; that HEAD is resolved once before the hook and that commit is what is sent, so a commit made during the hook does not go out in that push (a later separate push is not prevented); and that brit connects for the transfer after the hook returns.
+
+Not proven: a hook that runs a full hour (the longest so far is 26 minutes), and a missing hooks directory under brit on this repository. The brit team's journey test says brit refuses with nothing sent there; it was not re-run here, so the `test -x <worktree>/.husky/_/pre-push` precaution stays.

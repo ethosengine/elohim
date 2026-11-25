@@ -176,11 +176,7 @@ that an instruction proves adoption. This rule is instruction-level friction; co
 reminders require a supported shell invocation adapter and must not be claimed from the
 edit-only `.epr-meta` resolver. All existing staging, hook, gate and history safeguards apply.
 
-Temporary landing exception (cycle-time harvest, 2026-11-06): the re-genesis landing
-logs record brit 0.1.12 closing send-pack after a green hook. Until a corrected Brit
-push is verified, use Git for that landing with `GATE_EVIDENCE=reuse git push origin HEAD:dev`,
-keeping the hook enabled and recording the fallback in the sprint journal. `HEAD:dev` alone
-omits the validation receipts. Each device publishes them to its OWN forge destination,
+A dev landing is `GATE_EVIDENCE=reuse brit -c core.hooksPath=<worktree>/.husky/_ push origin HEAD:dev`, run from a prepared worktree, with the hook enabled. Confirmed on brit 0.3.4 by the brit team's CI and by four dev landings made without git (c1035eebc, 40418e53b, d6bf967da, a3632f54): that form runs the worktree's own hook; the environment (`GATE_EVIDENCE` and the rest) reaches the hook and its output streams; HEAD is resolved once before the hook and that commit is what is sent, so a commit made during the hook does not go out in that push (a later separate push is not prevented); and brit connects for the transfer after the hook returns. Afterwards check that the push log carries `[pre-push]` lines and that the last line of `.git/landing/settle.log` reads `landed … tool=brit … released=ok`. `git push` for a landing is now a fallback like any other: state it with its reason, record it in the sprint journal, and expect it only when `brit push` fails, after you preserve the error and inspect repository state (do not replay a potentially partial write). Not proven: a hook that runs a full hour (the longest so far ran to 26 minutes), and a missing hooks directory under brit on this repository (the brit team's journey test says brit refuses with nothing sent; it was not re-run here), so the `test -x` check below stays. `HEAD:dev` alone omits the validation receipts. Each device publishes them to its OWN forge destination,
 `refs/notes/brit/devices/<did>/build/*`, fast-forward only, with `just dev notes publish`
 (`just dev notes` is the dry run; `genesis/orchestrator/device-notes-publish.mjs`, ruling R4 of
 the native-throughput sprint). Never push the shared `refs/notes/brit/build/*` refs on origin:
@@ -188,12 +184,12 @@ they are frozen, the devices' signed copies diverged there (backlog
 `steward-device-arrival-open-items` row 3), and nothing merges over signed records. The pre-push hook skips
 `refs/notes/*` since 2bba47154 (verified 2026-11-08, artifact-store push-notes-build.log).
 `core.hooksPath` names the main checkout's `.husky/_`, so a worktree push runs the main
-checkout's hook; when that checkout predates 2bba47154, add `-c core.hooksPath=<worktree>/.husky/_`. Git treats a missing
-hooks directory as no hook and pushes ungated without a word (landing 21, 2026-11-13): refuse the
+checkout's hook; when that checkout predates 2bba47154, add `-c core.hooksPath=<worktree>/.husky/_`. A missing
+hooks directory means no hook, and Git pushes ungated without a word (landing 21, 2026-11-13): refuse the
 push unless `test -x <worktree>/.husky/_/pre-push` (`pnpm install` creates it), and confirm the
 push log carries `[pre-push]` lines afterwards.
 Covenant notes (`refs/notes/brit/covenant/*`) stay local until the steward rules on publishing
-them. Keep Brit for other operations; recheck the exception when the push fix lands. Coordinate the landing lane before pushing; an occupied lane is not permission to race
+them. Keep Brit for other operations. Coordinate the landing lane before pushing; an occupied lane is not permission to race
 its head.
 
 ## What to work on, and how you know it's done

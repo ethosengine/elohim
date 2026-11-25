@@ -36,7 +36,9 @@ class BritHook(unittest.TestCase):
  def test_partial_names_both(self):
   r=self.reason('git switch -c x')
   self.assertIn('brit switch <existing branch>',r); self.assertIn('fallback only for switch -c',r)
-  self.assertIn('GATE_EVIDENCE=reuse git push origin HEAD:dev',self.reason('git push origin HEAD:dev'))
+  r=self.reason('git push origin HEAD:dev')
+  self.assertIn('brit has this',r); self.assertIn('GATE_EVIDENCE=reuse brit -c core.hooksPath=<worktree>/.husky/_ push origin HEAD:dev',r)
+  self.assertNotIn('expected fallback',r)
  def test_absent_expects_fallback(self):
   r=self.reason('git stash')
   self.assertIn('no brit form in '+hook.BRIT_TABLE_VERSION,r); self.assertIn('a fallback is expected',r)
