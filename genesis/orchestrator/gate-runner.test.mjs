@@ -1,4 +1,4 @@
-import { gateEvidence, recordEvidence } from './gate-evidence.mjs';
+import { gateEvidence, gateKeyMaterial, recordEvidence } from './gate-evidence.mjs';
 import { after, describe, test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import { chmodSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -17,11 +17,173 @@ import {
   gateReadingRow,
   oracleMode,
   projectsForChanges,
+  readShadowComparison,
   runProject,
   selectGateProjects,
   worktreeTargetDir,
   parseStepTimes,
 } from './gate-runner.mjs';
+
+function readShadowKeyFixture(t, changed) {
+  const root = mkdtempSync(resolve(tmpdir(), 'read-shadow-key-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const put = (path, text) => {
+    mkdirSync(dirname(resolve(root, path)), { recursive: true });
+    writeFileSync(resolve(root, path), text);
+  };
+  const git = (...args) => {
+    const result = spawnSync('git', ['-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.test', ...args], {
+      cwd: root, encoding: 'utf8',
+    });
+    assert.equal(result.status, 0, result.stderr);
+    return result.stdout.trim();
+  };
+  git('init', '-q');
+  put('build-manifest.json', JSON.stringify({ steps: { build: { inputs: {
+    sources: ['apps/gate/**', 'crates/dependency/**'],
+  } } } }));
+  put('justfile', 'gate:\n    true\n');
+  put('genesis/orchestrator/run-local-gate.sh', '#!/bin/sh\nexit 0\n');
+  put('apps/gate/Cargo.toml', '[package]\nname="gate"\nversion="0.1.0"\n');
+  put('apps/gate/src/lib.rs', 'pub fn gate() {}\n');
+  put('crates/dependency/Cargo.toml', '[package]\nname="dependency"\nversion="0.1.0"\n');
+  put('crates/dependency/src/lib.rs', 'pub fn dependency() {}\n');
+  put('crates/dependency/tests/read.rs', `fn schema(name: &str) {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+      .join(format!("fixtures/{name}.json"));
+    let _ = std::fs::read_to_string(path);
+  }
+`);
+  git('add', '.');
+  git('commit', '-qm', 'base');
+  const base = git('rev-parse', 'HEAD');
+  if (changed === 'test') put('crates/dependency/tests/read.rs', `${readFileSync(resolve(root, 'crates/dependency/tests/read.rs'), 'utf8')}\n// edit\n`);
+  else put('crates/dependency/src/lib.rs', 'pub fn dependency() -> u8 { 1 }\n');
+  git('add', '.');
+  git('commit', '-qm', changed);
+  const commit = git('rev-parse', 'HEAD');
+  const project = {
+    name: 'fixture', dir: 'apps/gate', manifestPath: 'build-manifest.json', steps: ['build'],
+    run: { kind: 'root-just', recipe: 'gate', cargo: { workspace: 'apps/gate' } },
+  };
+  const spawn = (command, args, options) => {
+    if (command === 'brit') {
+      const rev = args[args.indexOf('--commit') + 1];
+      const fingerprint = changed === 'module' ? rev : 'unchanged';
+      return { status: 0, stdout: JSON.stringify({ fingerprints: [{ step: 'build', fingerprint }] }), stderr: '' };
+    }
+    if (command === 'rustc') return { status: 0, stdout: 'rustc fixture', stderr: '' };
+    return spawnSync(command, args, options);
+  };
+  return { root, base, commit, project, spawn };
+}
+
+test('read-shadow: a dependency test-only change moves real and leaves fix 1 unchanged', t => {
+  const fixture = readShadowKeyFixture(t, 'test');
+  const options = { ...fixture, env: {}, cargoEnv: {}, britBin: 'brit' };
+  const evidence = gateKeyMaterial(fixture.project, { ...options, commit: fixture.commit });
+  assert.ok(evidence.key, evidence.line);
+  const shadow = readShadowComparison(fixture.project, evidence, options);
+  assert.match(shadow.line, /read-shadow: real moved; fix 1 unchanged;/);
+  assert.equal(shadow.rows.find(row => row.name === 'fix1').keyChanged, 'no');
+});
+
+test('read-shadow: a used dependency module moves real and fix 1, so no line is produced', t => {
+  const fixture = readShadowKeyFixture(t, 'module');
+  const options = { ...fixture, env: {}, cargoEnv: {}, britBin: 'brit' };
+  const evidence = gateKeyMaterial(fixture.project, { ...options, commit: fixture.commit });
+  assert.ok(evidence.key, evidence.line);
+  assert.equal(readShadowComparison(fixture.project, evidence, options), null);
+});
+
+test('read-shadow on and off keep the same verdict, run decision, and evidence-store calls', t => {
+  const root = mkdtempSync(resolve(tmpdir(), 'read-shadow-equivalence-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  mkdirSync(resolve(root, 'fixture'), { recursive: true });
+  mkdirSync(resolve(root, 'genesis/orchestrator'), { recursive: true });
+  writeFileSync(resolve(root, 'fixture/justfile'), 'gate:\n    true\n');
+  writeFileSync(resolve(root, 'genesis/orchestrator/run-local-gate.sh'), '#!/bin/sh\nexit 0\n');
+  writeFileSync(resolve(root, 'build-manifest.json'), JSON.stringify({ steps: {
+    build: { inputs: { sources: ['fixture/**'] } },
+  } }));
+  const brit = resolve(root, 'brit');
+  const buildRef = resolve(root, 'brit-build-ref');
+  writeFileSync(brit, '', { mode: 0o755 });
+  writeFileSync(buildRef, '', { mode: 0o755 });
+  const project = {
+    name: 'fixture', dir: 'fixture', manifestPath: 'build-manifest.json', steps: ['build'],
+    run: { kind: 'just', recipe: 'gate' },
+  };
+  const current = 'a'.repeat(40);
+  const base = 'b'.repeat(40);
+  const run = (mode, budget = null) => {
+    const calls = [];
+    const rows = [];
+    let output = '';
+    const spawn = (command, args) => {
+      calls.push({ command, args });
+      const ok = stdout => ({ status: 0, stdout, stderr: '' });
+      if (command === brit && args[1] === 'fingerprint') {
+        return ok(JSON.stringify({ fingerprints: [{ step: 'build', fingerprint: 'fixed' }] }));
+      }
+      if (command === buildRef && args[3] === 'find') return ok('[]');
+      if (command === buildRef && args[3] === 'get') return ok('');
+      if (command === buildRef && args[3] === 'put') return { status: 1, stdout: '', stderr: 'fixture refuses writes' };
+      if (command === 'git' && args[0] === 'merge-base') return ok(`${base}\n`);
+      if (command === 'git' && args[0] === 'diff') return ok('fixture/test.rs\0');
+      if (command === 'git' && args[0] === 'show') {
+        return ok(JSON.stringify({ steps: { build: { inputs: { sources: ['fixture/**'] } } } }));
+      }
+      if (command === 'git' && args[0] === 'ls-tree') return ok('');
+      if (command === 'git' && args[0] === 'status') return ok('');
+      if (command === 'git' && args[0] === 'rev-parse' && args.includes('--verify')) return ok(`${current}\n`);
+      if (command === 'git' && args[0] === 'rev-parse') return ok('blob1\n');
+      if (command === 'rustc') return ok('rustc fixture');
+      if (command === 'bash') return ok('');
+      return ok('');
+    };
+    const status = runProject(project, false, false, {
+      root,
+      env: {
+        PATH: '', BRIT_BIN: brit, BRIT_BUILD_REF_BIN: buildRef, GATE_TASK: 'off',
+        GATE_EVIDENCE: 'off', GATE_INPUTS: 'off', GATE_RECIPE_KEY: 'off',
+        GATE_READ_SHADOW: mode, GATE_READING_RUN_ID: `shadow-${mode}`,
+        ...(budget === null ? {} : { GATE_CRATE_SHADOW_BUDGET_MS: budget }),
+      },
+      inputsPolicy: { cls: { britArgs: [] } },
+      spawn,
+      tap: false,
+      write: text => { output += text; },
+      warn: text => { output += text; },
+      readingCollector: rows,
+      readShadowOf: () => ({
+        line: '[gate] fixture read-shadow: real moved; fix 1 unchanged; fix 2 moved; both unchanged — a narrowed read is sound only while eprfs runs and blocks on the same push; decides nothing',
+        rows: ['fix1', 'fix2', 'both'].map((name, index) => ({ name, key: `shadow-${index}`, keyChanged: index === 1 ? 'yes' : 'no' })),
+      }),
+    });
+    return { status, calls, rows, output };
+  };
+  const off = run('off');
+  const on = run('on');
+  const evidenceCalls = result => result.calls.filter(call => call.command === buildRef)
+    .map(call => call.args[3]);
+  const gateRuns = result => result.calls.filter(call => call.command === 'bash').length;
+  assert.equal(on.status, off.status);
+  assert.equal(gateRuns(on), gateRuns(off));
+  assert.deepEqual(evidenceCalls(on), evidenceCalls(off));
+  assert.equal(on.rows.length, off.rows.length + 3);
+  assert.deepEqual(on.rows.filter(row => row.parent === 'fixture').map(row => row.step), [
+    'fixture:read-shadow:fix1', 'fixture:read-shadow:fix2', 'fixture:read-shadow:both',
+  ]);
+  assert.ok(on.rows.filter(row => row.parent === 'fixture')
+    .every(row => row.outcome === 'ran' && row.status === 'green' && row.value === 0));
+  assert.match(on.output, /read-shadow: real moved; fix 1 unchanged;/);
+  assert.doesNotMatch(off.output, /read-shadow/);
+  const dropped = run('on', '0');
+  assert.equal(dropped.status, off.status);
+  assert.equal(dropped.rows.filter(row => row.parent === 'fixture').length, 0);
+  assert.equal(dropped.output.match(/read-shadow: dropped \([^\n]+\)/g)?.length, 1);
+});
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 

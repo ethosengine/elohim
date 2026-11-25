@@ -19,7 +19,7 @@ import { filterChanged } from './ci-ignore.mjs';
 import { COST_FIELDS, classifyFailure, recordCycle, subjectFor } from './gate-cycle.mjs';
 import { CI_BRANCH_PATTERN, costOf, deferDecision, formatExpectation, readCycleUnion } from './gate-cost.mjs';
 import {
-  ageOf, attestedOutputParses, emitGateVerdict, findEvidence, gateEvidence, isHabitAtom, patternDigest, recordEvidence, resolveBin, reusableHit,
+  ageOf, attestedOutputParses, emitGateVerdict, findEvidence, gateEvidence, gateKeyMaterial, isHabitAtom, patternDigest, recordEvidence, resolveBin, reusableHit,
   selfAgentId, siblingGovernanceChange, siblingVerdicts, stepFingerprints,
 } from './gate-evidence.mjs';
 import { britAffected, resolveBritBin } from './gate-oracle.mjs';
@@ -321,6 +321,36 @@ function inputsShadow(project, evidence, { root, gateCommit, base, steps, run })
     : { lines: [] };
 }
 
+const READ_SHADOW_VARIANTS = Object.freeze([
+  { name: 'real', label: 'real', variant: {} },
+  { name: 'fix1', label: 'fix 1', variant: { excludeDependencyTests: true } },
+  { name: 'fix2', label: 'fix 2', variant: { resolveFormatJoin: true } },
+  { name: 'both', label: 'both', variant: { excludeDependencyTests: true, resolveFormatJoin: true } },
+]);
+
+/** Compare closure movement under the two proposed read-set fixes. This returns telemetry only. */
+export function readShadowComparison(project, evidence, {
+  root, base, commit, env, cargoEnv, spawn, inputs = null,
+} = {}) {
+  const results = READ_SHADOW_VARIANTS.map(entry => {
+    const options = { root, env, cargoEnv, spawn, inputs, britBin: evidence.britBin, variant: entry.variant };
+    const before = gateKeyMaterial(project, { ...options, commit: base });
+    const after = gateKeyMaterial(project, { ...options, commit });
+    if (!before.key || !after.key) {
+      throw new Error(oneLine(after.line || before.line || `${entry.label} key unavailable`));
+    }
+    return { ...entry, key: after.key, moved: before.key !== after.key };
+  });
+  const real = results[0];
+  if (real.key !== evidence.key) throw new Error('real variant differs from the gate evidence key');
+  if (!results.slice(1).some(result => result.moved !== real.moved)) return null;
+  const movement = results.map(result => `${result.label} ${result.moved ? 'moved' : 'unchanged'}`).join('; ');
+  return {
+    line: `[gate] ${project.name} read-shadow: ${movement} — a narrowed read is sound only while eprfs runs and blocks on the same push; decides nothing`,
+    rows: results.slice(1).map(result => ({ name: result.name, key: result.key, keyChanged: result.moved ? 'yes' : 'no' })),
+  };
+}
+
 // The rakia-validated manifest schema accepts `run.cargo.env` since rakia 2b2cedb
 // (2026-09-23); a project's cap declares on its own manifest (elohim-storage does).
 // genesis/agentic/pool-policy.json's `cargo_env_overrides` remains for projects that
@@ -574,6 +604,12 @@ function dropCrateShadow(project, error, state, write) {
   if (state.dropped) return;
   state.dropped = true;
   write(`[gate] ${project} crate-shadow: dropped (${oneLine(error?.message || error)}); no crate rows\n`);
+}
+
+function dropReadShadow(project, error, state, write) {
+  if (state.dropped) return;
+  state.dropped = true;
+  write(`[gate] ${project} read-shadow: dropped (${oneLine(error?.message || error)})\n`);
 }
 
 function rfc3339(value) {
@@ -865,6 +901,7 @@ export function runProject(project, printOnly, namesOnly, {
   write = text => process.stdout.write(text), warn = text => process.stderr.write(text),
   readsOf, recipe = null, tap = spawn === spawnSync, clock = () => process.hrtime.bigint(),
   wallClock = () => new Date(), inputsPolicy = null, readingCollector = invocationGateReadings,
+  readShadowOf = readShadowComparison,
 } = {}) {
   const cargo = project.run.cargo || {};
   const targetDir = worktreeTargetDir(cargo.targetDir || '', root);
@@ -903,6 +940,30 @@ export function runProject(project, printOnly, namesOnly, {
     waitedSeconds: 0,
     leaseWaitedSeconds: 0,
     startedAt: rfc3339(wallClock()),
+  };
+  let readShadow = null;
+  let readShadowRowsEmitted = false;
+  const emitReadShadowRows = (outcome, status) => {
+    if (!readShadow || readShadowRowsEmitted) return;
+    readShadowRowsEmitted = true;
+    const at = wallClock();
+    for (const row of readShadow.rows) {
+      emitGateReading({
+        ...reading,
+        step: `${project.name}:read-shadow:${row.name}`,
+        parent: project.name,
+        key: row.key,
+        keyChanged: row.keyChanged,
+        outcome,
+        status,
+        synthesized: false,
+        waitedSeconds: 0,
+        leaseWaitedSeconds: 0,
+        seconds: 0,
+        startedAt: at,
+        endedAt: at,
+      }, { env, collector: readingCollector });
+    }
   };
   let readingComplete = false;
   const complete = (status, outcome, seconds = null) => {
@@ -1146,6 +1207,40 @@ export function runProject(project, printOnly, namesOnly, {
   Object.assign(reading, keyReading(evidence));
   const inputsClass = inputs?.cls ?? LEGACY_ALL;
   write(`[gate] ${project.name} evidence: ${evidence.line}\n`);
+  // GATE_READ_SHADOW (default on): compare this gate's canonical closure at the integration base
+  // and gated commit under two proposed audit fixes. It reads the same key material but neither the
+  // reuse decision nor the evidence store reads these results. All work shares crate-shadow's bounded
+  // span, and its elapsed time is removed from the gate duration.
+  if (env.GATE_READ_SHADOW !== 'off' && evidence.key && evidence.material) {
+    let scopeKnown = false;
+    try { scopeKnown = ['paths', 'tree'].includes(JSON.parse(evidence.material).reads?.scope); } catch { /* no shadow */ }
+    if (scopeKnown) {
+      const readShadowStarted = clock();
+      const readShadowState = { dropped: false };
+      shadowBudget.begin();
+      try {
+        const bounded = (command, args, options) => shadowBudget.spawn(
+          spawn, 'read-shadow', command, args, options,
+        );
+        const { base } = touchedProcessSteps(project, { root, gateCommit, spawn: bounded });
+        if (base) {
+          shadowBudget.check('read-shadow');
+          readShadow = readShadowOf(project, evidence, {
+            root, base, commit: gateCommit, env: childEnv, cargoEnv: cargoEnvOf(childEnv),
+            spawn: bounded, inputs,
+          });
+          shadowBudget.check('read-shadow');
+          if (readShadow) write(`${readShadow.line}\n`);
+        }
+      } catch (error) {
+        dropReadShadow(project.name, error, readShadowState, write);
+        readShadow = null;
+      } finally {
+        shadowBudget.end();
+      }
+      started += clock() - readShadowStarted;
+    }
+  }
   // Shadow only (gate-recipe-key.mjs): whether a justfile edit since the integration base left this
   // root-just gate's recipe closure unchanged. It reads `evidence.material` and changes nothing the
   // reuse decision, the key or the record below reads; GATE_RECIPE_KEY=off silences it.
@@ -1217,6 +1312,7 @@ export function runProject(project, printOnly, namesOnly, {
       : ageOf(row.attestation.builtAt);
     write(`[gate] ${project.name} reused: green ${when} at ${String(row.commit).slice(0, 9)} (${signer})\n`);
     const seconds = Number(clock() - started) / 1e9;
+    emitReadShadowRows('reused', 'green');
     recordCycle(project, seconds, 0, {
       ...cycleEnv, GATE_RUN_KIND: sibling ? 'sibling-reused' : 'reused',
     }, cycleDeps);
@@ -1327,6 +1423,7 @@ export function runProject(project, printOnly, namesOnly, {
   if (answer?.answered?.hit) {
     write(`[gate] ${project.name} reused: derivation hit (method ${derivation.method}, input ${derivation.input})\n`);
     const seconds = Number(clock() - started) / 1e9;
+    emitReadShadowRows('reused', 'green');
     recordCycle(project, seconds, 0, { ...cycleEnv, GATE_RUN_KIND: 'reused' }, cycleDeps);
     liveEvent(env, { kind: 'gate-verdict', project: project.name, verdict: { exit: 0, seconds: 0, reused: true }, derivation, status: 'Answered' });
     return complete(0, 'reused');
@@ -1356,6 +1453,7 @@ export function runProject(project, printOnly, namesOnly, {
       gateSha: gateCommit, headAfter: revParse('HEAD'), dirtyAfter: dirtyAfterRun(root, gateCommit) })
     : { status: result.status ?? 1, record: true };
   const status = outcome.status;
+  emitReadShadowRows('ran', status === 0 ? 'green' : 'red');
   const seconds = Number(clock() - started) / 1e9;
   let evidenceCid = null;
   // The verdict is recorded against the closure — red too; a known-red closure is information.
@@ -1443,6 +1541,7 @@ function usage() {
   console.error('  env: GATE_ORACLE=rakia|shadow|path (default rakia; without a brit binary every mode is path-only) · BRIT_BIN · GATE_ROOT (fixture repository root)');
   console.error('  env: GATE_RECIPE_KEY=shadow|off (default shadow): a root-just gate prints whether a justfile edit since the integration base left its recipe closure unchanged; it changes no key, reuse decision or record');
   console.error('  env: GATE_INPUTS=shadow|off (default shadow; no on yet): prints, once per push, the borrowed steps whose own buildProcess alone selects them, and per gate when, since the integration base, its step fingerprints moved under all and are unchanged under sources; it changes no selection, key, reuse decision or record');
+  console.error('  env: GATE_READ_SHADOW=off (default on): compares closure movement under two read-audit fixes; it changes no selection, key, reuse decision, evidence record or exit status');
   console.error('  env: GATE_READING=off (default on): suppress collection and the one bounded `epr flow reading append` call; the shadow reading never changes selection, reuse, keys or exit status');
   console.error('  env: GATE_CARRY=off|shadow|on (default shadow, read by gate-carry.mjs under pre-push): carry one long one-build-job cargo gate on this device\'s second cargo seat beside the loop when `berth room cargo` admits it; shadow prints what would be carried and why and changes nothing');
 }

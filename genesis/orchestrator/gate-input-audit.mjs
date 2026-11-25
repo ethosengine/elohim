@@ -247,7 +247,23 @@ function stringValue(ts, start, end, crate, constants) {
   return { value: parts.map(p => p.value).join(''), manifest: parts.some(p => p.manifest) };
 }
 
-function pathExpression(ts, start, crate, constants, bindings, helpers = new Map()) {
+function formatJoinDirectory(ts, start, end) {
+  const call = callAt(ts, start);
+  if (!call || call.name !== 'format!' || call.end !== end) return null;
+  const args = argumentsOf(ts, call);
+  if (args.length === 0 || args[0][1] !== args[0][0] + 1) return null;
+  const template = ts[args[0][0]]?.value;
+  if (typeof template !== 'string') return null;
+  const dynamic = template.indexOf('{');
+  if (dynamic < 0) return null;
+  const prefix = template.slice(0, dynamic);
+  if (!prefix) return null;
+  if (prefix.endsWith('/')) return prefix.replace(/\/+$/, '');
+  const slash = prefix.lastIndexOf('/');
+  return slash < 0 ? null : prefix.slice(0, slash);
+}
+
+function pathExpression(ts, start, crate, constants, bindings, helpers = new Map(), variant = {}) {
   while (ts[start]?.text === '&') start++;
   const call = callAt(ts, start);
   let result;
@@ -277,8 +293,16 @@ function pathExpression(ts, start, crate, constants, bindings, helpers = new Map
     const args = argumentsOf(ts, method);
     if (method.name === 'join') {
       const str = args.length === 1 && stringValue(ts, ...args[0], crate, constants);
+      const formatDir = !str && variant.resolveFormatJoin && args.length === 1
+        ? formatJoinDirectory(ts, ...args[0]) : null;
       if (args.length !== 1 || result.prefix) result.dynamic = true;
-      else if (!str) result.prefix = true;
+      else if (formatDir) {
+        const candidate = !result.dynamic && resolve(result.path, formatDir);
+        const rel = candidate && variant.root
+          ? relative(variant.root, candidate).split('\\').join('/') : null;
+        if (candidate && (!rel || (rel !== '..' && !rel.startsWith('../')))) result.path = candidate;
+        result.prefix = true;
+      } else if (!str) result.prefix = true;
       else if (!result.dynamic) {
         result.path = resolve(result.path, str.value);
         result.prefix = str.prefix;
@@ -312,7 +336,7 @@ function nearestCrate(root, file, readFile) {
   }
 }
 
-function auditFile(root, file, text, crate, projectName = null) {
+function auditFile(root, file, text, crate, projectName = null, variant = {}) {
   const { ts, declarations } = tokens(text);
   const functions = functionsIn(ts);
   const constants = new Map();
@@ -328,7 +352,7 @@ function auditFile(root, file, text, crate, projectName = null) {
   for (const fn of functions) {
     if (functions.filter(other => other.name === fn.name).length !== 1 ||
         ts[fn.start + 2]?.text !== '(' || ts[fn.start + 2].close !== fn.start + 3) continue;
-    const path = pathExpression(ts, fn.body + 1, crate, constants, new Map()) ?? boundTail(fn);
+    const path = pathExpression(ts, fn.body + 1, crate, constants, new Map(), new Map(), variant) ?? boundTail(fn);
     if (path && path.end === fn.end && !path.dynamic && !path.prefix) helpers.set(fn.name, path);
   }
   // Review of E7 (doorway's schema_dir): one `let NAME = <manifest chain>;` then a tail chain on
@@ -336,9 +360,10 @@ function auditFile(root, file, text, crate, projectName = null) {
   function boundTail(fn) {
     const name = ts[fn.body + 2]?.text;
     if (ts[fn.body + 1]?.text !== 'let' || !/^[a-z_]\w*$/.test(name || '') || name === 'mut' || ts[fn.body + 3]?.text !== '=') return null;
-    const bound = pathExpression(ts, fn.body + 4, crate, constants, new Map());
+    const bound = pathExpression(ts, fn.body + 4, crate, constants, new Map(), new Map(), variant);
     if (!bound || bound.dynamic || bound.prefix || ts[bound.end]?.text !== ';') return null;
-    return pathExpression(ts, bound.end + 1, crate, constants, new Map([[name, { path: bound.path, dynamic: false, origin: bound.origin }]]));
+    return pathExpression(ts, bound.end + 1, crate, constants,
+      new Map([[name, { path: bound.path, dynamic: false, origin: bound.origin }]]), new Map(), variant);
   }
   const usedHelpers = new Set();
   const candidates = [];
@@ -362,7 +387,7 @@ function auditFile(root, file, text, crate, projectName = null) {
       const name = i + (ts[i + 1]?.text === 'mut' ? 2 : 1);
       let eq = name + 1;
       while (eq < ts.length && !['=', ';', '{'].includes(ts[eq].text)) eq++;
-      const value = ts[eq]?.text === '=' && pathExpression(ts, eq + 1, crate, constants, bindings, helpers);
+      const value = ts[eq]?.text === '=' && pathExpression(ts, eq + 1, crate, constants, bindings, helpers, variant);
       bindings.set(ts[name]?.text, null); // shadowed fixture roots/callables must not inherit a live path
       if (value) {
         if (ts[i + 1]?.text === 'mut') {
@@ -387,10 +412,10 @@ function auditFile(root, file, text, crate, projectName = null) {
     }
     if (/(?:^|::)(?:fs::read\w*|File::open|read_to_string|read_dir)$/.test(call.name)) {
       const args = argumentsOf(ts, call);
-      const value = args.length && pathExpression(ts, args[0][0], crate, constants, bindings, helpers);
+      const value = args.length && pathExpression(ts, args[0][0], crate, constants, bindings, helpers, variant);
       if (value) { addPath(i, { ...value, end: call.end }, 'read'); i = call.end - 1; continue; }
     }
-    const path = pathExpression(ts, i, crate, constants, new Map(), bindings.has(call.name) ? new Map() : helpers);
+    const path = pathExpression(ts, i, crate, constants, new Map(), bindings.has(call.name) ? new Map() : helpers, variant);
     if (path) {
       if (mutableSeeds.has(i)) path.dynamic = true;
       addPath(i, path);
@@ -456,12 +481,21 @@ function auditFile(root, file, text, crate, projectName = null) {
  * Mutation/ancestor searches and other data-derived paths require declarations or review of the printed
  * unresolved roots; this audit is not a proof of an arbitrary Rust read closure.
  */
-function scan({ root, sources, project = null, readFile = readFileSync, listFiles = repositoryFiles }) {
+export function scan({ root, sources, project = null, readFile = readFileSync, listFiles = repositoryFiles, variant = {} }) {
   root = resolve(root);
   const found = new Map();
   for (const file of [...new Set(listFiles(root))].sort()) {
     if (!file.endsWith('.rs') || !sources.some(glob => globCovers(glob, file))) continue;
-    const rows = auditFile(root, file, readFile(resolve(root, file), 'utf8'), nearestCrate(root, file, readFile), project?.name ?? null);
+    const crate = nearestCrate(root, file, readFile);
+    if (variant.excludeDependencyTests && project && crate) {
+      const projectDir = resolve(root, project.dir);
+      const fromProject = relative(projectDir, crate).split('\\').join('/');
+      const crateInProject = fromProject === '' || (fromProject !== '..' && !fromProject.startsWith('../'));
+      const inCrate = relative(crate, resolve(root, file)).split('\\').join('/');
+      if (!crateInProject && inCrate.startsWith('tests/')) continue;
+    }
+    const rows = auditFile(root, file, readFile(resolve(root, file), 'utf8'), crate, project?.name ?? null,
+      { ...variant, root });
     for (const row of rows) found.set(JSON.stringify(row), row);
   }
   return [...found.values()];
