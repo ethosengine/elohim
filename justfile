@@ -741,7 +741,8 @@ _gate-eprfs:
         ::: lint -- node "{{justfile_directory()}}/genesis/orchestrator/cargo-lint.mjs" "$@" --all-targets -- -D warnings \
         ::: bins -- cargo build -p elohim-epr-cli --bin epr -p elohim-device-runtime --bin bin-launch --features elohim-epr-cli/blob-store \
         ::: ark -- cargo build --manifest-path ../Cargo.toml -p elohim-ark --bin ark \
-        ::: test -- cargo test "$@" --features elohim-epr-cli/blob-store -- --skip live_corpus_) || exit $?; \
+        ::: test -- cargo test "$@" --features elohim-epr-cli/blob-store -- --skip live_corpus_ \
+        ::: nofeature -- cargo test -p elohim-epr-cli --features peer --lib -- no_blob_store_build_) || exit $?; \
       EPRFS_SOURCE_BEFORE="$before" EPRFS_TESTED_HEAD="$tested_head" just _eprfs-ingest-around build
 
 # The eprfs live-corpus legs (backlog steward-device-arrival-open-items row 7): the `live_corpus_*`

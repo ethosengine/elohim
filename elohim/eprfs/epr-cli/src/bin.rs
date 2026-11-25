@@ -16,6 +16,62 @@ fn argument(detail: impl Into<String>) -> Refusal {
         detail: detail.into(),
     }
 }
+
+#[cfg(feature = "peer")]
+fn payload_formats_admit(
+    formats: &[crate::payload::PayloadFormat],
+    device_format: crate::payload::PayloadFormat,
+) -> Result<(), String> {
+    if formats.contains(&device_format) {
+        return Ok(());
+    }
+    Err(format!(
+        "refused: release opens {}; this device's payload store is {device_format}",
+        formats
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>()
+            .join(", ")
+    ))
+}
+
+#[cfg(feature = "peer")]
+fn land_payload_store_admits_with(
+    binary: &Path,
+    device_format: crate::payload::PayloadFormat,
+    probe: impl FnOnce(&Path) -> Result<Vec<crate::payload::PayloadFormat>, String>,
+) -> Result<(), Refusal> {
+    // A release from before `payload formats` is the historical directory-only release. A new
+    // release is required to answer at put time, so the same fallback safely covers old bytes.
+    let formats =
+        probe(binary).unwrap_or_else(|_| vec![crate::payload::PayloadFormat::DirectoryV1]);
+    payload_formats_admit(&formats, device_format).map_err(|detail| Refusal {
+        kind: "payload-format-incompatible".into(),
+        detail: format!(
+            "{detail}; a by-hand fetch/ingest is an operator act and does not make an incompatible release landable"
+        ),
+    })
+}
+
+#[cfg(feature = "peer")]
+fn land_payload_store_admits(store: &Store, cid: &str, payload_dir: &Path) -> Result<(), Refusal> {
+    if !store.verified(cid) {
+        return Ok(());
+    }
+    let Some(device_format) =
+        crate::payload::existing_format(payload_dir).map_err(|error| Refusal {
+            kind: "payload-store".into(),
+            detail: error.to_string(),
+        })?
+    else {
+        return Ok(());
+    };
+    let binary = store.root().join(cid).join("epr");
+    land_payload_store_admits_with(&binary, device_format, |path| {
+        crate::payload::PayloadFormat::probe_supported(path, store.root())
+    })
+}
+
 fn land_transition(
     flags: &BTreeSet<&str>,
     options: &BTreeMap<&str, &str>,
@@ -167,6 +223,18 @@ fn execute_with(args: &[String], restart: bool) -> Result<String, Refusal> {
                 .ok_or_else(|| argument("land requires cid"))?;
             judge_held(&store, cid)?;
             let repo = repo()?;
+            #[cfg(feature = "peer")]
+            if *tool == "epr" {
+                let payload_dir = crate::peer::payload_store_dir(&crate::peer::Options {
+                    root: repo.clone(),
+                    ..crate::peer::Options::default()
+                })
+                .map_err(|error| Refusal {
+                    kind: "payload-store".into(),
+                    detail: error.to_string(),
+                })?;
+                land_payload_store_admits(&store, cid, &payload_dir)?;
+            }
             // Only a forward landing restarts the device; a revert or a lineage rebase never.
             let restarts = restart && transition == Transition::Forward;
             let before = current_cid(&store);
@@ -539,16 +607,12 @@ pub(crate) mod sibling {
     pub(crate) struct Drawn {
         /// The draw, reported on the follow's result as `sibling`.
         pub record: Option<Value>,
-        /// Why nothing was drawn, appended to a follow that then could not build.
-        pub gap: Option<String>,
     }
 
     impl Drawn {
-        /// `refusal`, with why nothing was drawn when that is part of why it could not land.
-        pub(crate) fn explain(self, mut refusal: Refusal) -> Refusal {
-            if let Some(gap) = self.gap {
-                refusal.detail = format!("{}; sibling: {gap}", refusal.detail);
-            }
+        /// Return the follow's refusal. Draw gaps have already been printed at the fallback
+        /// decision, so appending one here would print the same reason twice.
+        pub(crate) fn explain(self, refusal: Refusal) -> Refusal {
             refusal
         }
     }
@@ -753,10 +817,7 @@ pub(crate) mod sibling {
             Err(detail) => {
                 let gap = format!("unpublished: {detail}");
                 eprintln!("follow: nothing drawn from a sibling ({gap})");
-                return Ok(Drawn {
-                    record: None,
-                    gap: Some(gap),
-                });
+                return Ok(Drawn { record: None });
             }
         };
         // Finding 5: say which ref made HEAD published, and when it is only a local branch.
@@ -779,7 +840,6 @@ pub(crate) mod sibling {
         match draw(store, repo, &commit, &incoming) {
             Ok(record) => Ok(Drawn {
                 record: Some(record),
-                gap: None,
             }),
             Err(Draw::Gap(gap)) => {
                 eprintln!(
@@ -790,10 +850,7 @@ pub(crate) mod sibling {
                         "trying a local build"
                     }
                 );
-                Ok(Drawn {
-                    record: None,
-                    gap: Some(gap),
-                })
+                Ok(Drawn { record: None })
             }
             Err(Draw::Refused(refusal)) => Err(refusal),
         }
@@ -1004,17 +1061,7 @@ pub(crate) mod sibling {
             }
             formats.push(format);
         }
-        if formats.contains(&device_format) {
-            return Ok(());
-        }
-        Err(format!(
-            "refused: release opens {}; this device's payload store is {device_format}",
-            formats
-                .iter()
-                .map(ToString::to_string)
-                .collect::<Vec<_>>()
-                .join(", ")
-        ))
+        super::payload_formats_admit(&formats, device_format)
     }
 
     /// Row 12: whether this device can run every bin of `offer`, judged from what each bin's
@@ -1636,6 +1683,82 @@ mod tests {
                 )
             );
         }
+    }
+
+    #[cfg(all(feature = "peer", not(feature = "blob-store")))]
+    #[test]
+    // The eprfs gate's `nofeature` step runs every `no_blob_store_build_` test in a build without
+    // blob-store; its main test step builds with the feature, where this case cannot arise.
+    fn no_blob_store_build_reads_a_blob_store_marker_for_release_admission() {
+        let temp = tempfile::tempdir().unwrap();
+        let root = temp.path().join("payload");
+        crate::payload::select_format(&root, crate::payload::PayloadFormat::BlobStoreV1).unwrap();
+        let device_format = crate::payload::existing_format(&root).unwrap();
+        assert_eq!(
+            device_format,
+            Some(crate::payload::PayloadFormat::BlobStoreV1),
+            "reading the marker name must not require linking its backend"
+        );
+
+        let blob_release = opening(
+            stating(offer_for("R1"), &glibc_at_least(&[2, 17])),
+            Some("blob-store-v1"),
+        );
+        assert_eq!(
+            sibling::payload_store_admits(&blob_release, device_format),
+            Ok(())
+        );
+
+        let directory_release = opening(
+            stating(offer_for("R2"), &glibc_at_least(&[2, 17])),
+            Some("directory-v1"),
+        );
+        assert_eq!(
+            sibling::payload_store_admits(&directory_release, device_format),
+            Err(
+                "refused: release opens directory-v1; this device's payload store is blob-store-v1"
+                    .into()
+            )
+        );
+    }
+
+    #[cfg(feature = "peer")]
+    #[test]
+    fn blob_store_only_release_refuses_a_directory_store_and_names_both() {
+        let offer = opening(
+            stating(offer_for("R1"), &glibc_at_least(&[2, 17])),
+            Some("blob-store-v1"),
+        );
+        assert_eq!(
+            sibling::payload_store_admits(&offer, Some(crate::payload::PayloadFormat::DirectoryV1)),
+            Err(
+                "refused: release opens blob-store-v1; this device's payload store is directory-v1"
+                    .into()
+            )
+        );
+    }
+
+    #[cfg(feature = "peer")]
+    #[test]
+    fn by_hand_land_refuses_an_incompatible_self_report_with_operator_help() {
+        let refusal = land_payload_store_admits_with(
+            Path::new("held/epr"),
+            crate::payload::PayloadFormat::BlobStoreV1,
+            |_| Ok(vec![crate::payload::PayloadFormat::DirectoryV1]),
+        )
+        .unwrap_err();
+        assert_eq!(refusal.kind, "payload-format-incompatible");
+        assert!(
+            refusal.detail.starts_with(
+                "refused: release opens directory-v1; this device's payload store is blob-store-v1"
+            ),
+            "{}",
+            refusal.detail
+        );
+        assert!(refusal
+            .detail
+            .contains("by-hand fetch/ingest is an operator act"));
+        assert_eq!(refusal.detail.lines().count(), 1);
     }
 
     #[cfg(feature = "peer")]

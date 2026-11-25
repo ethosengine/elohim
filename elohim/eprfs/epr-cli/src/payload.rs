@@ -99,23 +99,93 @@ impl PayloadFormat {
             .collect()
     }
 
-    /// Every format an epr Cargo selection opens, from its recorded `--features` value.
-    ///
-    /// Cargo accepts comma- or whitespace-separated features; a qualified workspace feature
-    /// (`elohim-epr-cli/blob-store`) and the package-local spelling (`blob-store`) select the
-    /// same backend. This is the descriptor-facing form of [`Self::supported`], sharing the one
-    /// format/linkage table rather than teaching the producer another payload-format list.
-    pub fn supported_for_cargo_features(features: Option<&str>) -> Vec<Self> {
-        let blob_store = features.is_some_and(|features| {
-            features
-                .split(|c: char| c == ',' || c.is_ascii_whitespace())
-                .filter(|feature| !feature.is_empty())
-                .any(|feature| feature == "blob-store" || feature.ends_with("/blob-store"))
-        });
-        Self::ALL
+    /// This binary's linked formats as the stable JSON answer to `epr payload formats --json`.
+    pub fn supported_json() -> String {
+        serde_json::to_string(
+            &Self::supported()
+                .into_iter()
+                .map(Self::marker)
+                .collect::<Vec<_>>(),
+        )
+        .expect("payload format names always serialize")
+    }
+
+    /// Parse and validate another epr binary's `payload formats --json` answer.
+    pub fn parse_supported_json(answer: &str) -> Result<Vec<Self>, String> {
+        let names: Vec<String> = serde_json::from_str(answer).map_err(|error| {
+            format!("payload formats answer is not a JSON string array: {error}")
+        })?;
+        if names.is_empty() {
+            return Err("payload formats answer is empty".into());
+        }
+        let mut formats = Vec::with_capacity(names.len());
+        for name in names {
+            let format = Self::parse(&name)
+                .ok_or_else(|| format!("payload formats answer names unknown format {name:?}"))?;
+            if formats.contains(&format) {
+                return Err(format!("payload formats answer repeats {name}"));
+            }
+            formats.push(format);
+        }
+        let canonical: Vec<Self> = Self::ALL
             .into_iter()
-            .filter(|format| format.linked_with_blob_store(blob_store))
-            .collect()
+            .filter(|format| formats.contains(format))
+            .collect();
+        if formats != canonical {
+            return Err("payload formats answer is not in stable order".into());
+        }
+        Ok(formats)
+    }
+
+    /// Ask the executable at `binary` which payload formats its own bytes link.
+    pub fn probe_supported(binary: &Path, cwd: &Path) -> Result<Vec<Self>, String> {
+        // The published binary is asked, never trusted to return: a probe that cannot answer in
+        // PROBE_DEADLINE is killed and the put refused.
+        const PROBE_DEADLINE: std::time::Duration = std::time::Duration::from_secs(30);
+        let mut child = std::process::Command::new(binary)
+            .args(["payload", "formats", "--json"])
+            .current_dir(cwd)
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
+            .spawn()
+            .map_err(|error| format!("cannot run {}: {error}", binary.display()))?;
+        let started = std::time::Instant::now();
+        loop {
+            match child.try_wait() {
+                Ok(Some(_)) => break,
+                Ok(None) if started.elapsed() < PROBE_DEADLINE => {
+                    std::thread::sleep(std::time::Duration::from_millis(20));
+                }
+                Ok(None) => {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    return Err(format!(
+                        "{} did not answer payload formats within {}s",
+                        binary.display(),
+                        PROBE_DEADLINE.as_secs()
+                    ));
+                }
+                Err(error) => return Err(format!("cannot wait for {}: {error}", binary.display())),
+            }
+        }
+        let output = child
+            .wait_with_output()
+            .map_err(|error| format!("cannot read {}: {error}", binary.display()))?;
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            let detail = stderr
+                .lines()
+                .find(|line| !line.trim().is_empty())
+                .or_else(|| stdout.lines().find(|line| !line.trim().is_empty()))
+                .unwrap_or("no diagnostic")
+                .trim();
+            return Err(format!("exited {}: {detail}", output.status));
+        }
+        let answer = std::str::from_utf8(&output.stdout)
+            .map_err(|error| format!("payload formats answer is not UTF-8: {error}"))?;
+        Self::parse_supported_json(answer.trim())
     }
 
     /// The format a new payload directory is created in.
@@ -311,7 +381,7 @@ fn create_private_dir(root: &Path) -> Result<(), PayloadStoreError> {
 ///
 /// # Errors
 ///
-/// As [`detect`], and [`PayloadStoreError::Format`] for a marker this binary cannot open.
+/// As [`detect`], and [`PayloadStoreError::Format`] for an unknown marker name.
 pub fn format_of(root: &Path) -> Result<PayloadFormat, PayloadStoreError> {
     existing_format(root).map(|format| format.unwrap_or_else(PayloadFormat::for_new_store))
 }
@@ -324,13 +394,22 @@ pub fn format_of(root: &Path) -> Result<PayloadFormat, PayloadStoreError> {
 ///
 /// # Errors
 ///
-/// As [`detect`], and [`PayloadStoreError::Format`] for a marker this binary cannot open.
+/// As [`detect`], and [`PayloadStoreError::Format`] for an unknown marker name. Recognizing the
+/// name does not claim that this binary links its backend; only opening performs that check.
 pub fn existing_format(root: &Path) -> Result<Option<PayloadFormat>, PayloadStoreError> {
     match detect(root)? {
-        Detected::Marked(marker) => linked_format(root, &marker).map(Some),
+        Detected::Marked(marker) => named_format(root, &marker).map(Some),
         Detected::UnmarkedDirectory => Ok(Some(PayloadFormat::DirectoryV1)),
         Detected::New => Ok(None),
     }
+}
+
+fn named_format(root: &Path, marker: &str) -> Result<PayloadFormat, PayloadStoreError> {
+    PayloadFormat::parse(marker).ok_or_else(|| PayloadStoreError::Format {
+        root: root.to_path_buf(),
+        found: marker.to_string(),
+        supported: PayloadFormat::ALL.to_vec(),
+    })
 }
 
 fn linked_format(root: &Path, marker: &str) -> Result<PayloadFormat, PayloadStoreError> {
@@ -461,18 +540,16 @@ mod tests {
     }
 
     #[test]
-    fn descriptor_features_use_the_same_payload_format_linkage_table() {
+    fn linked_formats_json_is_stable_and_round_trips() {
+        let expected = if cfg!(feature = "blob-store") {
+            r#"["blob-store-v1","directory-v1"]"#
+        } else {
+            r#"["directory-v1"]"#
+        };
+        assert_eq!(PayloadFormat::supported_json(), expected);
         assert_eq!(
-            PayloadFormat::supported_for_cargo_features(Some("blob-store")),
-            vec![PayloadFormat::BlobStoreV1, PayloadFormat::DirectoryV1]
-        );
-        assert_eq!(
-            PayloadFormat::supported_for_cargo_features(Some("peer, elohim-epr-cli/blob-store")),
-            vec![PayloadFormat::BlobStoreV1, PayloadFormat::DirectoryV1]
-        );
-        assert_eq!(
-            PayloadFormat::supported_for_cargo_features(None),
-            vec![PayloadFormat::DirectoryV1]
+            PayloadFormat::parse_supported_json(expected).unwrap(),
+            PayloadFormat::supported()
         );
     }
 
