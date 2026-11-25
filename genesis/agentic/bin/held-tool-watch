@@ -1,35 +1,62 @@
 #!/usr/bin/env python3
 """
-held-tool-watch — a SENSOR for a tool call that has been pending a while, seen from OUTSIDE its session.
+held-tool-watch — a one-shot SENSOR for a tool call that has been pending a while, seen from OUTSIDE
+its session. It senses and calls; it never records, judges, approves, cancels, retries or signals.
 
 On 2026-11-23 a coordinating session's tool call sat pending for about seven hours (very likely an
-approval prompt nobody saw). Nothing told the steward, the sibling device or `berth status`. This script
-reads the transcripts the harness already writes and hands what it senses to the native fold.
+approval prompt nobody saw), and another for 45 minutes, while the device kept exchanging. Nothing
+told the steward, the sibling device or `berth status`. This script reads the transcripts the harness
+already writes and hands what it senses to the native fold.
 
-  held-tool-watch scan  [--transcripts DIR] [--sense-after-s 120] [--now UNIX] [--json]
-                        [--sessions-json FILE] [--stasis-root DIR] [--tail-bytes N]
-      One pass, transcripts in, candidates out. Exit 0 when none, 3 when some. `--sense-after-s` is when
-      the sensor starts REPORTING a pending call; it is not a judgment that a session is stalled.
-  held-tool-watch watch [--interval-s 5] [--sense-after-s 120] [--transcripts DIR] [--sessions-json FILE]
-                        [--max-passes N]
-      Loop: for each candidate call `epr session stasis observe --session S --source
-      watcher:held-tool-watch --tool T --pending-since RFC3339 [--agent A]`, then read
-      `epr session stasis status --json` and announce each open incident of another session once
-      (berth broadcast, and a push through $HELD_TOOL_PUSH_CMD: argv title, body; none = logged).
-      If the installed epr lacks `observe`, one line says so, nothing is recorded, exit 4 (--max-passes).
+  held-tool-watch scan    [--transcripts DIR] [--sense-after-s 120] [--now UNIX] [--json]
+                          [--sessions-json FILE] [--stasis-root DIR] [--tail-bytes N]
+      Read only. Candidates out; exit 0 when none, 3 when some.
+  held-tool-watch observe [same flags] [--bin-store DIR]
+      One pass, then exit. For each candidate, call
+        <the TARGET session's pinned epr> session stasis observe --session S --source watcher:held-tool
+            --tool T --pending-since <RFC3339 of the pending tool_use> [--agent A] --journal-root R
+      Exit 0 when the pass ran (whether it observed, skipped or found nothing); 1 on any internal
+      error or a failed observe call, with one line on stderr each. Never 2: a hook exit 2 blocks the
+      tool call it runs beside, and this script must never raise into one.
 
-Split: this script senses (which transcript calls are pending, redacted shape, long-running exclusions)
-and calls. The native Incident (elohim/eprfs/device-runtime/src/session_stasis.rs) records the session,
-agent, rule and blocked intervals, and `elohim_epr_rea::Bound` judges the age; the fold dedupes repeats.
-The sensing threshold, the push transport and the berth wording are this device's to tune.
+Thresholds. `--sense-after-s` (default 120) is the only one: the sensor reports a call pending longer
+than that. It judges nothing else; the native Incident records the interval and `elohim_epr_rea::Bound`
+judges its age. Pending is NOT sensed when the tool is long-running by design: Agent / Task /
+Workflow / Monitor / TaskOutput; Bash with `run_in_background: true`; Bash with an explicit
+`timeout` until that timeout plus a 30 s grace. A killed subagent whose last line is a tool_use looks
+the same as a held one. `cause` (scan only) is `approval-evidence` when a `permission-requested` entry
+in the dialogue-stasis journal names the tool_use id as its `precedingToolUseId`; otherwise `unknown`.
 
-It never approves, cancels, retries or signals anything, only reads transcripts, and keeps no record.
+No state. `--pending-since` is the pending tool_use's own transcript timestamp, so observing the same
+call on every run names the same (session, agent, tool, pending-since), and the native side folds those
+repeats into one incident. The script keeps no marker, state file or announce-once record. For that
+reason it announces nothing either: an announce-once needs memory this script refuses to keep. The
+reading surfaces are the native ones: `epr session stasis status` and `berth status` (which renders
+`held` from that same native read).
 
-Pending is NOT sensed when the tool is long-running by design: Agent / Task / Workflow / Monitor /
-TaskOutput; Bash with `run_in_background: true`; Bash with an explicit `timeout` until that timeout plus
-a 30 s grace. A killed subagent whose last line is a tool_use looks the same as a held one.
-`cause` is `approval-evidence` only when a `permission-requested` entry in the dialogue-stasis journal
-names the tool_use id as its `precedingToolUseId`; otherwise `unknown`.
+Compatibility (the hazard this design answers). A session keeps the epr build it was pinned to when
+it started, and an epr older than `observe` rejects the unknown event kind `tool-pending-observed`
+and aborts replay of that session's stasis journal. This script writes into ANOTHER session's
+journal, so it writes ONLY through the TARGET session's own pinned epr: the writer is then never newer
+than that session's reader. On this device a session's pin is the JSON file
+`<bin-store>/epr/sessions/<session id>` ({"cid", "session", ...}, the key encoded as
+device-runtime's `Store::pin_path` encodes it) and its binary is `<bin-store>/epr/<cid>/epr`; the
+bin-store root comes from `--bin-store`, else from the path the native `epr bin resolve --tool epr
+--json` prints (`<root>/epr/<cid>/epr`), so the native layout decides it, not this script. Before
+writing, the pinned binary's `session stasis --help` must list `stasis observe`.
+  - pinned epr lacks the verb: nothing written; one line
+    `held-tool-watch: session <id> runs an epr without stasis observe; not observed`.
+  - pin cannot be determined (no store, no pin file, a pin naming another session or a malformed
+    CID, a missing binary): nothing written; one line saying why.
+  - the session has no stasis journal (observe exits 2): nothing was written; one line.
+A residual this does not cover: a reader of ALL sessions' journals (`epr session stasis status`
+with no `--session`, as `berth status` runs it) under an older epr still meets the new kind in the
+observed session's journal. That reader is the observer's device tooling, not the held session.
+
+Intended registration (NOT wired; wiring is the steward's decision): a device-supervised timer that
+runs `held-tool-watch observe` once a minute from the main checkout. A Claude Code hook works too
+(any session's PostToolUse, matcher ".*", `timeout` 15, run detached so it adds no latency) because a
+held session fires no hooks of its own while its siblings do; exit 1 there is a non-blocking error.
 """
 import argparse
 import datetime
@@ -40,7 +67,6 @@ import subprocess
 import sys
 import time
 
-WATCHER_SESSION = "held-tool-watch"
 LONG_RUNNING_TOOLS = {"Agent", "Task", "Workflow", "Monitor", "TaskOutput"}
 TIMEOUT_GRACE_S = 30
 SHAPE_CHARS = 80
@@ -136,7 +162,7 @@ def parse_ts(value):
 def read_lines(path, tail_bytes):
     """Complete lines of the file's last tail_bytes (a seek lands mid-line: that first line is dropped).
     A final line without a newline may be mid-write: it is returned and the parser skips it if it is
-    not whole JSON."""
+    not whole JSON; any other line that is not a JSON object makes the transcript malformed."""
     try:
         with open(path, "rb") as f:
             size = f.seek(0, os.SEEK_END)
@@ -152,17 +178,21 @@ def read_lines(path, tail_bytes):
 
 
 def dangling_calls(path, tail_bytes=DEFAULT_TAIL_BYTES):
-    """tool_use blocks in the transcript with no tool_result of the same id, oldest first."""
+    """tool_use blocks in the transcript with no tool_result of the same id, oldest first. A line that
+    is not a JSON object anywhere but last raises ValueError: the sensor cannot say what it missed."""
     uses, results = {}, set()
-    for raw in read_lines(path, tail_bytes):
+    lines = read_lines(path, tail_bytes)
+    for number, raw in enumerate(lines):
         if not raw.strip():
             continue
         try:
             row = json.loads(raw)
         except (ValueError, UnicodeDecodeError):
-            continue  # a partially written (or foreign) line
+            row = None
         if not isinstance(row, dict):
-            continue
+            if number == len(lines) - 1:
+                continue  # the last line may be mid-write
+            raise ValueError(f"malformed transcript {path}: a non-final line is not a JSON object")
         message = row.get("message")
         blocks = message.get("content") if isinstance(message, dict) else None
         if not isinstance(blocks, list):
@@ -274,122 +304,125 @@ def render_line(h):
             f"cause: {h['cause']}  {h['shape']}")
 
 
-# ---------------------------------------------------------------- calling the native fold
+# ---------------------------------------------------------------- the target session's own epr
 
-UNAVAILABLE_LINE = ("observe: native verb unavailable on this epr (lands with "
-                    "stasis/tool-pending-observed); nothing recorded")
+WATCHER_SOURCE = "watcher:held-tool"
+NO_VERB_LINE = "held-tool-watch: session {session} runs an epr without stasis observe; not observed"
+NO_PIN_LINE = "held-tool-watch: session {session} has no determinable epr pin ({why}); not observed"
+NO_JOURNAL_LINE = "held-tool-watch: session {session} has no stasis journal; not observed"
+_CID = re.compile(r"^baf[a-z2-7]{20,}$")
 
 
-def epr_bin():
-    return os.environ.get("EPR_BIN") or "epr"
-
-
-def run_native(argv):
-    """(returncode, stdout, stderr) of an epr call. The injectable runner's default."""
-    out = subprocess.run([epr_bin()] + argv, capture_output=True, text=True, timeout=60)
+def run_command(argv, timeout=60):
+    """(returncode, stdout, stderr). EPR_BIN is dropped so the named binary is the one that runs.
+    The injectable runner's default."""
+    env = {k: v for k, v in os.environ.items() if k != "EPR_BIN"}
+    out = subprocess.run(argv, capture_output=True, text=True, timeout=timeout, env=env)
     return out.returncode, out.stdout, out.stderr
+
+
+def pin_name(session):
+    """device-runtime `Store::pin_path`'s file name for a session key, or None when it would hash."""
+    name = "".join(chr(b) if (chr(b).isascii() and chr(b).isalnum()) or chr(b) in "_.-" else f"%{b:02x}"
+                   for b in session.encode())
+    if not name or len(name) > 200:
+        return None
+    return name.replace(".", "%2e") if name in (".", "..") else name
+
+
+def native_bin_store(runner=run_command):
+    """The bin-store root, from the path the native `epr bin resolve --tool epr --json` prints."""
+    code, out, _ = runner(["epr", "bin", "resolve", "--tool", "epr", "--json"])
+    if code != 0:
+        return None
+    path = json.loads(out).get("path")
+    if not isinstance(path, str):
+        return None
+    tool_dir = os.path.dirname(os.path.dirname(path))  # <root>/epr/<cid>/epr -> <root>/epr
+    return os.path.dirname(tool_dir) if os.path.basename(tool_dir) == "epr" else None
+
+
+def pinned_epr(session, bin_store):
+    """(path to the session's pinned epr, None) or (None, why)."""
+    if not bin_store:
+        return None, "no bin-store"
+    name = pin_name(session)
+    if name is None:
+        return None, "session key not encodable here"
+    tool_dir = os.path.join(bin_store, "epr")
+    try:
+        with open(os.path.join(tool_dir, "sessions", name)) as f:
+            pin = json.load(f)
+    except FileNotFoundError:
+        return None, "no pin file"
+    except (OSError, ValueError) as error:
+        return None, f"unreadable pin: {type(error).__name__}"
+    if not isinstance(pin, dict) or pin.get("session") != session:
+        return None, "pin names another session"
+    cid = pin.get("cid")
+    if not isinstance(cid, str) or not _CID.match(cid):
+        return None, "pin has no valid cid"
+    binary = os.path.join(tool_dir, cid, "epr")
+    if not os.access(binary, os.X_OK):
+        return None, f"pinned binary {cid[:16]}… absent"
+    return binary, None
+
+
+def has_observe(binary, runner=run_command):
+    code, out, err = runner([binary, "session", "stasis", "--help"], timeout=20)
+    return code == 0 and "stasis observe" in out + err
+
+
+def observe_argv(h, journal_root):
+    argv = ["session", "stasis", "observe", "--session", h["session"], "--source", WATCHER_SOURCE,
+            "--tool", h["tool"], "--pending-since", rfc3339(h["calledAt"])]
+    if h["agent"] != "main":
+        argv += ["--agent", h["agent"]]
+    return argv + ["--journal-root", journal_root]
 
 
 def rfc3339(t):
     return datetime.datetime.fromtimestamp(t, datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def observe_argv(h):
-    argv = ["session", "stasis", "observe", "--session", h["session"], "--source",
-            "watcher:" + WATCHER_SESSION, "--tool", h["tool"], "--pending-since", rfc3339(h["calledAt"])]
-    if h["agent"] != "main":
-        argv += ["--agent", h["agent"]]
-    return argv
-
-
-def observe(held, runner=run_native):
-    """Call the native verb once per candidate. Returns (ok, unavailable)."""
-    ok, unavailable = 0, False
+def observe_pass(held, journal_root, bin_store, runner=run_command, say=print, warn=None):
+    """Call each candidate's own session's pinned epr. Returns the number of failed calls."""
+    warn = warn or (lambda line: print(line, file=sys.stderr))
+    failed, verbs = 0, {}
     for h in held:
-        code, out, err = runner(observe_argv(h))
-        if code == 0:
-            ok += 1
-        elif "unknown" in (out + err).lower():
-            unavailable = True
-            break
-    return ok, unavailable
-
-
-def native_open_incidents(runner=run_native):
-    """[(session, incident)] open per `epr session stasis status --json`, or None when unreadable."""
-    try:
-        code, out, _ = runner(["session", "stasis", "status", "--json"])
-        if code != 0:
-            return None
-        sessions = json.loads(out).get("sessions", [])
-        return [(s["session"], i) for s in sessions if isinstance(s, dict)
-                for i in s.get("openIncidents", []) if isinstance(i, dict) and "id" in i]
-    except (OSError, ValueError, KeyError, AttributeError, subprocess.SubprocessError):
-        return None
-
-
-# ---------------------------------------------------------------- announcing
-
-def incident_text(session, incident):
-    return (f"HELD: session {session[:8]} has an open stasis incident {incident['id']} "
-            f"({incident.get('stallClass', '?')}, {incident.get('ageSeconds', '?')}s old) — "
-            f"it cannot read notes until the call returns")
-
-
-def announce_berth_note(text):
-    """A broadcast berth note (no --to) from the sender session `held-tool-watch`."""
-    subprocess.run([berth_bin(), "say", "--session", WATCHER_SESSION, text], capture_output=True,
-                   text=True, timeout=60, check=True)
-
-
-def announce_push(title, body):
-    command = os.environ.get("HELD_TOOL_PUSH_CMD")
-    if not command:
-        raise LookupError("push: no transport configured")
-    subprocess.run([command, title, body], capture_output=True, text=True, timeout=60, check=True)
-
-
-def fan_out(text, title, say, push, log):
-    """Each channel independently: one failing is logged and does not stop the others."""
-    for name, send in (("berth", lambda: say(text)), ("push", lambda: push(title, text))):
-        try:
-            send()
-            log(f"{name}: sent: {text}")
-        except LookupError as error:
-            log(str(error))
-        except Exception as error:  # noqa: BLE001 — a channel failure must not stop another channel
-            log(f"{name}: failed: {type(error).__name__}: {error}")
-
-
-def run_pass(sessions, transcripts, sense_after_s, now, announced, stasis=None, runner=run_native,
-             say=announce_berth_note, push=announce_push, log=print, tail_bytes=DEFAULT_TAIL_BYTES):
-    """One pass: sense, call `observe` per candidate, announce native-open incidents once each.
-    `announced` is the set of incident ids already announced, in memory for this process only: a
-    restarted watcher may announce an open incident once more, which is acceptable for an alarm.
-    Returns (candidates, unavailable)."""
-    held = scan(sessions, transcripts, sense_after_s, now, stasis, tail_bytes)
-    if not held:
-        return held, False
-    _, unavailable = observe(held, runner)
-    if unavailable:
-        log(UNAVAILABLE_LINE)
-        return held, True
-    sensed = {h["session"] for h in held}
-    for session, incident in native_open_incidents(runner) or []:
-        if session == WATCHER_SESSION or session not in sensed or incident["id"] in announced:
+        session = h["session"]
+        binary, why = pinned_epr(session, bin_store)
+        if binary is None:
+            say(NO_PIN_LINE.format(session=session, why=why))
             continue
-        announced.add(incident["id"])
-        fan_out(incident_text(session, incident), f"Held tool call: session {session[:8]}", say, push, log)
-    return held, False
+        if binary not in verbs:
+            verbs[binary] = has_observe(binary, runner)
+        if not verbs[binary]:
+            say(NO_VERB_LINE.format(session=session))
+            continue
+        code, _, err = runner([binary] + observe_argv(h, journal_root))
+        if code == 0:
+            continue
+        if code == 2 and "no journal" in err:
+            say(NO_JOURNAL_LINE.format(session=session))
+            continue
+        failed += 1
+        detail = " ".join(err.split())[:160] or "no output"
+        warn(f"held-tool-watch: observe for session {session} failed (exit {code}): {detail}")
+    return failed
 
 
 # ---------------------------------------------------------------- CLI
 
-def cmd_scan(args):
+def sensed(args):
     now = args.now if args.now is not None else time.time()
     sessions = moored_sessions(args.sessions_json)
-    held = scan(sessions, args.transcripts or transcripts_root(), args.sense_after_s, now,
+    return scan(sessions, args.transcripts or transcripts_root(), args.sense_after_s, now,
                 args.stasis_root or stasis_root(), args.tail_bytes)
+
+
+def cmd_scan(args, runner=run_command):
+    held = sensed(args)
     if args.json:
         print(json.dumps(held, sort_keys=True))
     else:
@@ -398,52 +431,51 @@ def cmd_scan(args):
     return 3 if held else 0
 
 
-def cmd_watch(args, runner=run_native):
-    announced, passes, unavailable = set(), 0, False
-    while True:
-        try:
-            _, unavailable = run_pass(moored_sessions(args.sessions_json), args.transcripts or transcripts_root(),
-                                      args.sense_after_s, time.time(), announced,
-                                      args.stasis_root or stasis_root(), runner=runner,
-                                      tail_bytes=args.tail_bytes)
-        except (OSError, ValueError, subprocess.SubprocessError) as error:
-            print(f"pass failed: {type(error).__name__}: {error}", flush=True)
-        passes += 1
-        if args.max_passes and passes >= args.max_passes:
-            return 4 if unavailable else 0
-        time.sleep(args.interval_s)
+def cmd_observe(args, runner=run_command):
+    held = sensed(args)
+    if not held:
+        return 0
+    bin_store = args.bin_store or native_bin_store(runner)
+    return 1 if observe_pass(held, args.stasis_root or stasis_root(), bin_store, runner) else 0
+
+
+class _Parser(argparse.ArgumentParser):
+    """A usage error is an internal error like any other: one line, exit 1 (argparse would exit 2)."""
+    def error(self, message):
+        raise ValueError(f"usage: {message}")
 
 
 def parser():
-    p = argparse.ArgumentParser(prog="held-tool-watch", description=__doc__.split("\n\n")[0])
-    sub = p.add_subparsers(dest="cmd", required=True)
-    for name in ("scan", "watch"):
+    p = _Parser(prog="held-tool-watch", description=__doc__.strip().split("\n\n")[0])
+    sub = p.add_subparsers(dest="cmd", required=True, parser_class=_Parser)
+    for name, run in (("scan", cmd_scan), ("observe", cmd_observe)):
         s = sub.add_parser(name)
         s.add_argument("--transcripts")
         s.add_argument("--sense-after-s", type=float, default=120)
         s.add_argument("--sessions-json")
         s.add_argument("--stasis-root")
         s.add_argument("--tail-bytes", type=int, default=DEFAULT_TAIL_BYTES)
+        s.add_argument("--now", type=float)
         if name == "scan":
-            s.add_argument("--now", type=float)
             s.add_argument("--json", action="store_true")
-            s.set_defaults(run=cmd_scan)
         else:
-            s.add_argument("--interval-s", type=float, default=5)
-            s.add_argument("--max-passes", type=int, default=0)
-            s.set_defaults(run=cmd_watch)
+            s.add_argument("--bin-store")
+        s.set_defaults(run=run)
     return p
 
 
-def main(argv):
-    args = parser().parse_args(argv)
+def main(argv, runner=run_command):
+    """Never raises: every failure is one stderr line and exit 1 (never 2, which a hook reads as a
+    block). KeyboardInterrupt is a failure too."""
     try:
-        return args.run(args)
-    except KeyboardInterrupt:
-        return 0
-    except (OSError, ValueError, subprocess.SubprocessError) as error:
+        p = parser()
+        args = p.parse_args(argv)
+        return args.run(args, runner=runner)
+    except SystemExit as stop:  # --help
+        return 0 if stop.code in (0, None) else 1
+    except BaseException as error:  # noqa: BLE001 — the sensor's own failure must be a line, never silence
         print(f"held-tool-watch: {type(error).__name__}: {error}", file=sys.stderr)
-        return 2
+        return 1
 
 
 if __name__ == "__main__":

@@ -9,10 +9,10 @@ invariant: >
 status: red
 active: false
 checks:
-  - "python3 -m unittest genesis/agentic/held_tool_watch_test.py (from the repository root; scan, one announcement per held call and one on resolution, redaction, push-transport absence, berth status held and held?)"
+  - "python3 -m unittest genesis/agentic/held_tool_watch_test.py (from the repository root; scan, redaction, one observe through the target session's own pinned epr, no write to a session pinned to an epr without the verb or with no determinable pin, failure as one line and exit 1, berth status held)"
   - "python3 -m unittest genesis/agentic/berth_test.py (status text and status-json@1 unchanged when nothing is held)"
 refs:
-  - "watcher: genesis/agentic/bin/held-tool-watch (scan | watch)"
+  - "watcher: genesis/agentic/bin/held-tool-watch (scan | observe, one-shot, unwired)"
   - "backlog: genesis/data/timeline/backlog/steward-device-arrival-open-items.md rows 34, 82, 83"
   - "measure: .claude/epr-meta/measures.yaml dialogue-blocked-seconds@1"
 retire-when: >
@@ -21,3 +21,4 @@ retire-when: >
 ---
 DELTA 2026-11-23 (BORN red): exists: `held-tool-watch scan` reports any transcript tool_use with no result past 120 s (subagents under their own id; background Bash, Agent, Task, Monitor and a Bash within its own timeout excluded), `watch` announces each held call once and its resolution once by a berth broadcast from sender `held-tool-watch`, a marker file and an optional `HELD_TOOL_PUSH_CMD`, and `berth status` (text and an additive `held` field of `status-json@1`) shows `held`, or `held?` when the marker is stale; held_tool_watch_test 13 OK, berth_test 284 OK. Does not exist: no supervised process runs it (not in the device manifest), no steward push transport is configured, and `dialogue-blocked-seconds@1` is not yet fed by it.
 DELTA 2026-11-23 (refactor, still red): the watcher is now a sensor over the native Incident: `held-tool-watch watch` calls `epr session stasis observe --source watcher:held-tool-watch` per sensed call and announces open incidents read from `epr session stasis status --json`; `berth status` renders `held` from that same read; the watcher keeps no marker, state file or dedupe record. The `observe` verb is on a parked branch (stasis/tool-pending-observed) awaiting a fleet roll, so until then the watcher records nothing and `watch --max-passes 1` exits 4; held_tool_watch_test 16 OK, berth_test 284 OK.
+DELTA 2026-11-25 (one-shot, still red): `held-tool-watch observe` runs once and exits; it writes `epr session stasis observe --source watcher:held-tool --pending-since <the tool_use's own timestamp>` only through the TARGET session's pinned epr (`<bin-store>/epr/sessions/<id>` → `<bin-store>/epr/<cid>/epr`, whose `session stasis --help` must list `observe`), so the writer is never newer than that session's reader; an older pin or an undeterminable one writes nothing and prints one line; any internal error is one stderr line and exit 1. It announces nothing (an announce-once needs state it refuses to keep). held_tool_watch_test 24 OK, berth_test 284 OK. Not wired: no timer or hook runs it.

@@ -1,6 +1,6 @@
 """held-tool-watch: a tool call pending past a bound is seen from outside its session.
 
-Run: python3 -m unittest genesis/agentic/held_tool_watch_test.py
+Run (from the repository root): python3 -m unittest genesis/agentic/held_tool_watch_test.py
 """
 import contextlib
 import io
@@ -126,100 +126,231 @@ def status_json(*incidents):
     return json.dumps({"sessions": [{"session": k, "openIncidents": v} for k, v in sessions.items()]})
 
 
-class FakeEpr:
-    """Fake runner for epr: records argv; `observe` and `status` answer as configured."""
-    def __init__(self, status="{\"sessions\": []}", observe=(0, "", "")):
-        self.calls, self.status, self.observe = [], status, observe
-
-    def __call__(self, argv):
-        self.calls.append(argv)
-        return self.observe if argv[2] == "observe" else (0, self.status, "")
-
-
 class NoStateDir(unittest.TestCase):
     def tearDown(self):
         self.assertFalse(Path(W["REPO_ROOT"], ".eprfs/status/held-tool-watch").exists())
         self.assertFalse(Path(W["main_checkout"](W["REPO_ROOT"]), ".eprfs/status/held-tool-watch").exists())
 
 
-class WatchTest(Fixture, NoStateDir):
+CID_NEW = "bafyreinewnewnewnewnewnewnewnewnewnewnewnewnewnewnewnewnew"
+CID_OLD = "bafyreioldoldoldoldoldoldoldoldoldoldoldoldoldoldoldoldold"
+HELP_NEW = ("epr session stasis fold ...\nepr session stasis observe --session ID --source watcher:NAME "
+            "--tool NAME [--pending-since RFC3339] [--agent ID] [--journal-root DIR]\n")
+HELP_OLD = "epr session stasis fold ...\nepr session stasis status ...\n"
+
+
+class ObserveTest(Fixture, NoStateDir):
+    """`observe`: one pass through the TARGET session's own pinned epr, faked as executables in a
+    temporary bin-store; the real journals and the real store are never touched."""
+
     def setUp(self):
         super().setUp()
-        self.said, self.logs, self.announced = [], [], set()
+        self.store = self.root / "bin-store"
+        self.log = self.root / "calls.jsonl"
+        for cid, help_text in ((CID_NEW, HELP_NEW), (CID_OLD, HELP_OLD)):
+            self.fake_epr(cid, help_text)
+        self.sessions = self.root / "s.json"
+        self.sessions.write_text(json.dumps({"moorings": [{"session": SESSION}]}))
+        self.lines = []
 
-    def run_pass(self, epr, now, push=None):
-        return W["run_pass"]([SESSION], str(self.transcripts), 120, now, self.announced, str(self.stasis),
-                             runner=epr, say=self.said.append,
-                             push=push or (lambda t, b: (_ for _ in ()).throw(LookupError("push: no transport configured"))),
-                             log=self.logs.append)
+    def fake_epr(self, cid, help_text):
+        """An executable that logs its argv and answers `--help` with help_text; an old one (no
+        `stasis observe` in its help) refuses `observe` the way the real pre-observe epr does."""
+        binary = self.store / "epr" / cid / "epr"
+        binary.parent.mkdir(parents=True)
+        knows = "stasis observe" in help_text
+        binary.write_text(f"""#!/usr/bin/env python3
+import json, sys
+with open({str(self.log)!r}, "a") as f:
+    f.write(json.dumps({{"cid": {cid!r}, "argv": sys.argv[1:]}}) + "\\n")
+if "--help" in sys.argv:
+    sys.stdout.write({help_text!r}); sys.exit(0)
+if sys.argv[1:4] == ["session", "stasis", "observe"]:
+    if not {knows!r}:
+        sys.stderr.write("epr session stasis: unexpected stasis argument --source\\n"); sys.exit(1)
+    print(json.dumps({{"recorded": True}})); sys.exit(0)
+sys.exit(9)
+""")
+        binary.chmod(0o755)
 
-    def test_sensed_call_invokes_observe_once_per_pass_with_the_right_argv(self):
+    def pin(self, session=SESSION, cid=CID_NEW, raw=None):
+        sessions = self.store / "epr" / "sessions"
+        sessions.mkdir(parents=True, exist_ok=True)
+        (sessions / session).write_text(raw if raw is not None else json.dumps(
+            {"cid": cid, "session": session, "pinnedAt": "2026-11-25T00:00:00Z", "provisional": False}))
+
+    def calls(self):
+        if not self.log.exists():
+            return []
+        return [json.loads(line) for line in self.log.read_text().splitlines()]
+
+    def observes(self):
+        return [c for c in self.calls() if c["argv"][:3] == ["session", "stasis", "observe"]]
+
+    def run_main(self, now, extra=()):
+        args = ["observe", "--transcripts", str(self.transcripts), "--sessions-json", str(self.sessions),
+                "--stasis-root", str(self.stasis), "--bin-store", str(self.store), "--now", str(now),
+                *extra]
+        out, err = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            code = W["main"](args)
+        return code, out.getvalue().splitlines(), err.getvalue().splitlines()
+
+    def test_pending_past_the_threshold_makes_exactly_one_observe_with_the_right_argv(self):
+        self.pin()
+        self.write(use("t1", "Bash", T0, command="ls"))
+        code, out, err = self.run_main(T0 + 200)
+        self.assertEqual((code, out, err), (0, [], []))
+        observes = self.observes()
+        self.assertEqual(len(observes), 1)
+        self.assertEqual(observes[0]["cid"], CID_NEW)
+        self.assertEqual(observes[0]["argv"], [
+            "session", "stasis", "observe", "--session", SESSION, "--source", "watcher:held-tool",
+            "--tool", "Bash", "--pending-since", W["rfc3339"](T0), "--journal-root", str(self.stasis)])
+
+    def test_a_repeat_run_names_the_same_pending_since_so_the_native_side_folds_one_incident(self):
+        self.pin()
+        self.write(use("t1", "Bash", T0, command="ls"))
+        self.run_main(T0 + 200)
+        self.run_main(T0 + 900)
+        since = {tuple(c["argv"][c["argv"].index("--pending-since") + 1:][:1]) for c in self.observes()}
+        self.assertEqual(since, {(W["rfc3339"](T0),)})
+
+    def test_a_subagent_call_carries_its_agent_id(self):
+        self.pin()
         sub = self.transcripts / "proj" / SESSION / "subagents"
         sub.mkdir(parents=True)
-        self.write(use("t1", "Bash", T0, command="ls"))
-        self.write(use("s1", "Bash", T0 + 10, command="rm x"), path=sub / "agent-a1b2.jsonl")
-        epr = FakeEpr()
-        self.run_pass(epr, T0 + 200)
-        observes = [c for c in epr.calls if c[2] == "observe"]
-        self.assertEqual(observes[0], ["session", "stasis", "observe", "--session", SESSION, "--source",
-                                       "watcher:held-tool-watch", "--tool", "Bash", "--pending-since",
-                                       W["rfc3339"](T0)])
-        self.assertEqual(observes[1][-2:], ["--agent", "a1b2"])
-        self.assertEqual(len(observes), 2)
-        self.assertEqual(len([c for c in epr.calls if c[2] == "status"]), 1)
+        self.write(use("m", "Bash", T0, command="ls"), result("m", T0 + 1))
+        self.write(use("s1", "Read", T0 + 10, file_path="/x"), path=sub / "agent-a1b2.jsonl")
+        self.run_main(T0 + 500)
+        [only] = self.observes()
+        self.assertEqual(only["argv"][only["argv"].index("--agent") + 1], "a1b2")
+        self.assertEqual(only["argv"][only["argv"].index("--tool") + 1], "Read")
 
-    def test_a_call_under_the_sensing_threshold_calls_nothing(self):
+    def test_pending_under_the_threshold_makes_no_call(self):
+        self.pin()
         self.write(use("t1", "Bash", T0, command="ls"))
-        epr = FakeEpr()
-        self.run_pass(epr, T0 + 60)
-        self.assertEqual(epr.calls, [])
+        self.assertEqual(self.run_main(T0 + 60), (0, [], []))
+        self.assertEqual(self.calls(), [])
 
-    def test_unavailable_verb_prints_one_line_records_nothing_and_exits_4(self):
+    def test_a_resolved_call_makes_no_call(self):
+        self.pin()
+        self.write(use("t1", "Bash", T0, command="ls"), result("t1", T0 + 1))
+        self.assertEqual(self.run_main(T0 + 7000), (0, [], []))
+        self.assertEqual(self.calls(), [])
+
+    def test_a_session_pinned_to_an_epr_without_the_verb_is_not_written_and_one_line_says_so(self):
+        self.pin(cid=CID_OLD)
         self.write(use("t1", "Bash", T0, command="ls"))
-        epr = FakeEpr(observe=(1, "", "epr session stasis: unknown command observe"))
-        held, unavailable = self.run_pass(epr, T0 + 200)
-        self.assertTrue(unavailable)
-        self.assertEqual(self.logs, [W["UNAVAILABLE_LINE"]])
-        self.assertEqual(self.said, [])
-        self.assertEqual([c[2] for c in epr.calls], ["observe"])
-        sessions = self.root / "s.json"
-        sessions.write_text(json.dumps({"moorings": [{"session": SESSION}]}))
-        args = ["watch", "--transcripts", str(self.transcripts), "--sessions-json", str(sessions),
-                "--stasis-root", str(self.stasis), "--max-passes", "1"]
-        clock = mock.Mock(time=lambda: T0 + 200, sleep=lambda s: None)
-        with mock.patch.dict(W["cmd_watch"].__globals__, {"time": clock}), \
-                contextlib.redirect_stdout(io.StringIO()) as out:
-            self.assertEqual(W["cmd_watch"](W["parser"]().parse_args(args), runner=epr), 4)
-        self.assertEqual(out.getvalue().strip().splitlines(), [W["UNAVAILABLE_LINE"]])
-        self.assertEqual(sorted(p.name for p in self.root.iterdir()), ["projects", "s.json"])
+        code, out, err = self.run_main(T0 + 200)
+        self.assertEqual(code, 0)
+        self.assertEqual(out, [f"held-tool-watch: session {SESSION} runs an epr without stasis observe; "
+                               "not observed"])
+        self.assertEqual(err, [])
+        self.assertEqual(self.observes(), [])
+        self.assertEqual([c["argv"] for c in self.calls()], [["session", "stasis", "--help"]])
+        self.assertFalse(self.stasis.exists())
 
-    def test_open_incident_announces_once_across_two_passes(self):
+    def test_the_writer_is_the_target_sessions_pin_not_the_newest_epr(self):
+        other = "0123abcd-aaaa-bbbb-cccc-000000000002"
+        self.sessions.write_text(json.dumps({"moorings": [{"session": SESSION}, {"session": other}]}))
+        self.pin(cid=CID_OLD)
+        self.pin(session=other, cid=CID_NEW)
         self.write(use("t1", "Bash", T0, command="ls"))
-        epr = FakeEpr(status=status_json((SESSION, "inc-1")))
-        self.run_pass(epr, T0 + 200)
-        self.run_pass(epr, T0 + 205)
-        self.assertEqual(len(self.said), 1)
-        self.assertIn("0123abcd", self.said[0])
-        self.assertIn("inc-1", self.said[0])
-        self.assertIn("push: no transport configured", self.logs)
+        self.write(use("t2", "Bash", T0, command="ls"), path=self.transcripts / "proj" / f"{other}.jsonl")
+        code, out, _ = self.run_main(T0 + 200)
+        self.assertEqual(code, 0)
+        self.assertEqual([(c["cid"], c["argv"][4]) for c in self.observes()], [(CID_NEW, other)])
+        self.assertEqual(len(out), 1)
+        self.assertIn(SESSION, out[0])
 
-    def test_closed_incident_and_the_observers_own_session_are_not_announced(self):
+    def test_an_undeterminable_pin_is_not_written_and_one_line_says_so(self):
         self.write(use("t1", "Bash", T0, command="ls"))
-        self.run_pass(FakeEpr(status=status_json()), T0 + 200)
-        self.run_pass(FakeEpr(status=status_json(("held-tool-watch", "inc-w"))), T0 + 205)
-        self.assertEqual(self.said, [])
+        cases = {
+            "no pin file": None,
+            "pin names another session": json.dumps({"cid": CID_NEW, "session": "someone-else"}),
+            "pin has no valid cid": json.dumps({"cid": "../../bin/sh", "session": SESSION}),
+            "unreadable pin": "{not json",
+            "absent": json.dumps({"cid": "bafyreiabsentabsentabsentabsentabsent", "session": SESSION}),
+        }
+        for why, raw in cases.items():
+            with self.subTest(why):
+                pin = self.store / "epr" / "sessions" / SESSION
+                if raw is None:
+                    pin.unlink(missing_ok=True)
+                else:
+                    self.pin(raw=raw)
+                code, out, err = self.run_main(T0 + 200)
+                self.assertEqual((code, err), (0, []))
+                self.assertEqual(len(out), 1)
+                self.assertTrue(out[0].startswith(f"held-tool-watch: session {SESSION} has no determinable "
+                                                  "epr pin ("), out[0])
+                self.assertIn(why, out[0])
+                self.assertTrue(out[0].endswith("; not observed"))
+        self.assertEqual(self.calls(), [])
 
-    def test_one_failing_channel_does_not_stop_the_others(self):
-        pushed = []
+    def test_no_bin_store_at_all_writes_nothing(self):
+        self.write(use("t1", "Bash", T0, command="ls"))
+        resolve = []
+
+        def runner(argv, timeout=60):
+            resolve.append(argv)
+            return 1, "", "epr: no bin-store"
+        args = ["observe", "--transcripts", str(self.transcripts), "--sessions-json", str(self.sessions),
+                "--stasis-root", str(self.stasis), "--now", str(T0 + 200)]
+        with contextlib.redirect_stdout(io.StringIO()) as out:
+            self.assertEqual(W["main"](args, runner=runner), 0)
+        self.assertEqual(resolve, [["epr", "bin", "resolve", "--tool", "epr", "--json"]])
+        self.assertIn("(no bin-store); not observed", out.getvalue())
+
+    def test_the_bin_store_comes_from_the_native_resolve_path(self):
+        path = str(self.store / "epr" / CID_NEW / "epr")
+        root = W["native_bin_store"](lambda argv, timeout=60: (0, json.dumps({"path": path}), ""))
+        self.assertEqual(root, str(self.store))
+
+    def test_a_malformed_transcript_exits_non_zero_with_one_line_and_no_call(self):
+        self.pin()
+        self.write(use("t1", "Bash", T0, command="ls"), "this is not json", use("t2", "Bash", T0, command="ls"))
+        code, out, err = self.run_main(T0 + 200)
+        self.assertEqual(code, 1)
+        self.assertEqual(out, [])
+        self.assertEqual(len(err), 1)
+        self.assertTrue(err[0].startswith("held-tool-watch: ValueError: malformed transcript"), err[0])
+        self.assertEqual(self.calls(), [])
+
+    def test_a_failing_observe_is_one_stderr_line_and_exit_1_never_2(self):
+        self.pin()
         self.write(use("t1", "Bash", T0, command="ls"))
 
-        def broken(_):
-            raise OSError("exchange down")
-        W["run_pass"]([SESSION], str(self.transcripts), 120, T0 + 200, set(), str(self.stasis),
-                      runner=FakeEpr(status=status_json((SESSION, "i"))), say=broken,
-                      push=lambda t, b: pushed.append(b), log=self.logs.append)
-        self.assertEqual(len(pushed), 1)
-        self.assertTrue(any(line.startswith("berth: failed") for line in self.logs))
+        def runner(argv, timeout=60):
+            if "--help" in argv:
+                return 0, HELP_NEW, ""
+            return 101, "", "thread main panicked\nat journal.rs"
+        code = W["observe_pass"](W["scan"]([SESSION], str(self.transcripts), 120, T0 + 200), str(self.stasis),
+                                 str(self.store), runner=runner, say=self.fail, warn=self.lines.append)
+        self.assertEqual(code, 1)
+        self.assertEqual(self.lines, [f"held-tool-watch: observe for session {SESSION} failed (exit 101): "
+                                      "thread main panicked at journal.rs"])
+
+    def test_a_session_without_a_journal_is_one_line_not_a_failure(self):
+        self.pin()
+        self.write(use("t1", "Bash", T0, command="ls"))
+
+        def runner(argv, timeout=60):
+            if "--help" in argv:
+                return 0, HELP_NEW, ""
+            return 2, "", f"epr session stasis: no journal for session {SESSION}\n"
+        said = []
+        failed = W["observe_pass"](W["scan"]([SESSION], str(self.transcripts), 120, T0 + 200), str(self.stasis),
+                                   str(self.store), runner=runner, say=said.append, warn=self.fail)
+        self.assertEqual((failed, said), (0, [W["NO_JOURNAL_LINE"].format(session=SESSION)]))
+
+    def test_any_internal_error_is_one_line_and_exit_1(self):
+        for argv in (["bogus"], ["observe", "--sessions-json", str(self.root / "missing.json")]):
+            with self.subTest(argv=argv), contextlib.redirect_stderr(io.StringIO()) as err:
+                self.assertEqual(W["main"](argv), 1)
+                self.assertEqual(len(err.getvalue().strip().splitlines()), 1)
+
 
 
 class BerthStatusTest(NoStateDir):
