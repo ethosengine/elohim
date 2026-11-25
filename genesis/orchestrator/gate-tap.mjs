@@ -11,14 +11,21 @@
 // first-red time are written there as one JSON object for the caller's cycle row.
 // Nothing here decides a verdict. The tap is the emitter adapter a CI stage or
 // rakia-executor can also wrap: genesis/docs/superpowers/specs/2026-10-26-gate-live-failure-channel-design.md
+//
+// The command runs as the leader of its own session and process group, so a stop can end the whole
+// gate: when the live run carries a stop-now request (`gate-live.mjs stop --now`), the tap ends that
+// group (gate-stop.mjs: TERM, then KILL after GATE_STOP_GRACE_MS, default 10 s), drops every
+// failure line printed while it ends, and reports `stopped` on fd 3 so gate-runner records nothing
+// for the gate. A signal the tap itself receives is forwarded to the group, not only the leader.
 
 import { spawn } from 'child_process';
-import { existsSync, readFileSync, readdirSync, writeSync } from 'fs';
+import { existsSync, readFileSync, readdirSync, statSync, writeSync } from 'fs';
 import { dirname, isAbsolute, join, resolve } from 'path';
 import { createRecognizer } from './gate-failure-lines.mjs';
 import { GATE_ATTRIBUTION_WINDOW_MS, attribute, readEdits } from './gate-attribution.mjs';
 import { setTimeout as delay } from 'timers/promises';
-import { appendEvent, emitRedDetached, liveRoot, noteUnsentReds, outlook } from './gate-live.mjs';
+import { appendEvent, emitRedDetached, liveRoot, noteUnsentReds, outlook, stopNowRequest } from './gate-live.mjs';
+import { endTree, gateTree, readStat, signalTree, snapshot, stopGraceMs } from './gate-stop.mjs';
 
 function parseArgs(argv) {
   const split = argv.indexOf('--');
@@ -180,6 +187,8 @@ function main() {
   // outlook() is once per run, so a run whose first red came earlier adds nothing here.
   let outlooked = false;
   let firstOutlook;
+  // Set once a stop-now request is seen: { by, reason, ended } where `ended` resolves to endTree's answer.
+  let stopping = null;
   // The first red's outlook is written to the run log before its sibling note is sent, so the
   // detached sender reads it there; the tap waits for that write only (bounded, below).
   const pending = new Set();
@@ -187,7 +196,9 @@ function main() {
   const recognizer = createRecognizer({
     project,
     emit: event => {
-      if (!run) return;
+      // A gate being stopped prints its own death (cargo's `signal: 15`, a test runner's abort):
+      // those lines are the stop, not reds, and none is appended, sent or counted as a failure.
+      if (!run || stopping) return;
       const written = appendEvent(run, label(event));
       if (!outlooked && event.kind === 'failure' && process.env.GATE_REMAINING !== undefined) {
         outlooked = true;
@@ -200,10 +211,27 @@ function main() {
       if (written && event.kind === 'failure') emitRedDetached(run, written);
     },
   });
+  // Its own session and group (detached), so the gate's whole tree can be signalled as one and no
+  // signal meant for it reaches the tap, gate-runner or the hook. The leader is read now, while
+  // this process holds it unreaped: that pid and start time are the first link of gate-stop's custody.
   const child = spawn(command, args, {
     stdio: ['inherit', 'pipe', 'pipe'],
     env: tapChildEnv(process.env, Boolean(process.stdout.isTTY)),
+    detached: true,
   });
+  const leader = Number.isInteger(child.pid) ? readStat(child.pid) : null;
+  const leaderHeld = () => child.exitCode === null && child.signalCode === null;
+  const signalGate = signal => {
+    if (!Number.isInteger(child.pid)) return;
+    // While the leader is unreaped its pid, and so its group, cannot be anyone else's.
+    if (leaderHeld()) {
+      try { process.kill(-child.pid, signal); } catch { try { child.kill(signal); } catch { /* gone */ } }
+      return;
+    }
+    if (!leader) return;
+    const tree = gateTree(child.pid, new Set([`${leader.pid}:${leader.start}`]), snapshot());
+    if (tree.custody) signalTree(child.pid, tree.members, signal);
+  };
   const sampler = createCostSampler(child.pid);
   sampler.sample();
   const sampling = setInterval(() => sampler.sample(), 5000);
@@ -213,22 +241,56 @@ function main() {
   child.stdout.on('data', chunk => { process.stdout.write(chunk); out.write(chunk); });
   child.stderr.on('data', chunk => { process.stderr.write(chunk); err.write(chunk); });
 
-  const forward = signal => () => { try { child.kill(signal); } catch { /* already gone */ } };
+  const forward = signal => () => signalGate(signal);
   for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.on(signal, forward(signal));
+
+  // The stop-now probe: the run log is re-read only when it grew, so an idle check is one stat.
+  let probedSize = -1;
+  const probeStop = () => {
+    if (!run || stopping) return;
+    let size;
+    try { size = statSync(run).size; } catch { return; }
+    if (size === probedSize) return;
+    probedSize = size;
+    const request = stopNowRequest(run);
+    if (!request) return;
+    const graceMs = stopGraceMs(process.env);
+    stopping = { by: request.by ?? null, reason: request.reason ?? null };
+    process.stderr.write(`[gate-tap] ${project}: stop requested now${stopping.by ? ` by ${stopping.by}` : ''}; `
+      + `ending the gate's process group (TERM, then KILL after ${Math.round(graceMs / 100) / 10}s); nothing it ran is recorded\n`);
+    stopping.ended = endTree(leader, { graceMs }).catch(() => ({ custody: false, signal: null, survivors: [] }));
+    stopping.ended.then(result => {
+      // A survivor out of reach (it left the tree) must not hold the gate's pipes open for ever.
+      if (result.survivors.length) {
+        process.stderr.write(`[gate-tap] ${project}: still alive after KILL: ${result.survivors.join(' ')}\n`);
+        setTimeout(() => { child.stdout.destroy(); child.stderr.destroy(); }, 1000).unref();
+      }
+    });
+  };
+  const stopProbe = run ? setInterval(probeStop, 250) : null;
+  probeStop();
 
   child.on('error', error => {
     process.stderr.write(`gate-tap: ${command}: ${error.message}\n`);
     process.exitCode = 127;
   });
-  child.on('close', (code, signal) => {
+  child.on('close', async (code, signal) => {
     clearInterval(sampling);
+    if (stopProbe) clearInterval(stopProbe);
     const cost = sampler.sample();
     out.end();
     err.end();
     // The child's status decides whether an unrecognized red step stands in as a failure (E6 #2).
+    // A stopped gate has no such step: its end is the stop (the emit above drops it).
     recognizer.end(signal ? 1 : code);
+    let stopped;
+    if (stopping) {
+      const ended = await stopping.ended;
+      stopped = { by: stopping.by, ...(stopping.reason ? { reason: stopping.reason } : {}), signal: ended.signal,
+        ...(ended.survivors.length ? { survivors: ended.survivors } : {}) };
+    }
     try {
-      writeSync(3, `${JSON.stringify({ signals: recognizer.signals(), ...recognizer.summary(), ...cost })}\n`);
+      writeSync(3, `${JSON.stringify({ signals: recognizer.signals(), ...recognizer.summary(), ...cost, ...(stopped ? { stopped } : {}) })}\n`);
     } catch { /* no fd 3: run by hand */ }
     // Exit only after forwarded bytes drain, then carry the child's status or signal.
     const finish = () => {

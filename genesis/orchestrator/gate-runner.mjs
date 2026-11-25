@@ -482,6 +482,8 @@ export function costLineAndDefer(project, { rows, subjectFallback = null, env = 
 // evidence or cycle record: evidence carries a test verdict across commits, never the bytes, so
 // pre-push uses this to build what it lands (eprfs's `_eprfs-deliver`).
 const TAP = resolve(dirname(fileURLToPath(import.meta.url)), 'gate-tap.mjs');
+/** A gate stopped on request exits non-zero, so whatever runs it (the hook, `just gate`) refuses. */
+export const GATE_STOPPED_EXIT = 1;
 
 /**
  * Run a gate command through gate-tap.mjs, which forwards its bytes unchanged, keeps its
@@ -905,6 +907,23 @@ export function runProject(project, printOnly, namesOnly, {
     startedAt: rfc3339(wallClock()),
   };
   let readingComplete = false;
+  // A gate stopped on request (`gate-live.mjs stop --now`; its tap ended the gate's process group)
+  // has no verdict, so this records nothing for it: no closure evidence, no gate-verdict@1, no
+  // cycle observation, no step or gate reading (the reading vocabulary is ran|reused|skipped, and
+  // none of those is true of it), and no live gate-verdict. Its one live event is gate-stopped,
+  // which closes the run interrupted. The exit status is non-zero, so the push is refused.
+  const stoppedGate = (stopped, step = null) => {
+    readingComplete = true;
+    const by = stopped.by || 'a caller with no session';
+    write(`[gate] ${project.name}${step ? ` (${step})` : ''} stopped on request by ${by}: its process group was ended `
+      + `(${stopped.signal || 'nothing left to signal'}); no evidence recorded\n`);
+    liveEvent(env, {
+      kind: 'gate-stopped', project: project.name, ...(step ? { step } : {}), by: stopped.by || null,
+      signal: stopped.signal || null, ...(stopped.survivors?.length ? { survivors: stopped.survivors } : {}),
+      evidence: 'none',
+    });
+    return GATE_STOPPED_EXIT;
+  };
   const complete = (status, outcome, seconds = null) => {
     if (!readingComplete) {
       readingComplete = true;
@@ -1009,9 +1028,10 @@ export function runProject(project, printOnly, namesOnly, {
   if (project.run.cargo && project.name !== 'rust-style') {
     const styleArgs = [resolve(root, 'genesis/orchestrator/rust-style.sh'), '--scope', project.dir];
     if (env.GATE_COMMIT) styleArgs.push('--head', env.GATE_COMMIT);
-    const { result: style } = gateSpawn(project, 'bash', styleArgs, {
+    const { result: style, tapped: styleTapped } = gateSpawn(project, 'bash', styleArgs, {
       cwd: root, stdio: 'inherit', env: gateChildEnv(project, env, root),
     }, { spawn, env, tap });
+    if (styleTapped?.stopped) return stoppedGate(styleTapped.stopped, 'rust-style');
     if (style.status !== 0) {
       liveEvent(env, { kind: 'gate-verdict', project: project.name, step: 'rust-style', verdict: { exit: style.status || 2, seconds: 0 } });
       reading.key = 'none: rust-style preflight failed before closure evidence';
@@ -1291,7 +1311,9 @@ export function runProject(project, printOnly, namesOnly, {
   try {
     if (task) {
       ran = gateSpawn(project, task.bin, task.argv, { cwd: root, stdio: 'inherit', env: childEnv }, { spawn, env, tap });
-      answer = taskAnswer(readTaskStatus(task.status), ran.result.status);
+      // A stopped Task never falls back to the direct path: the stop ends the gate, not one attempt
+      // (it is reported below, once the step-times scratch is cleared).
+      answer = ran.tapped?.stopped ? {} : taskAnswer(readTaskStatus(task.status), ran.result.status);
       collect(resultDir);
       resultDir = null;
       // A Task whose builder reported is decided from that result; the direct path runs only when
@@ -1322,6 +1344,7 @@ export function runProject(project, printOnly, namesOnly, {
     try { rmSync(stepTimesDir, { recursive: true, force: true }); } catch { /* telemetry */ }
   }
   const { result, tapped } = ran;
+  if (tapped?.stopped) return stoppedGate(tapped.stopped);
   const cost = tapped ? Object.fromEntries(COST_FIELDS.map(k => [k, tapped[k] ?? null])) : undefined;
   const derivation = task ? { ...task.derivation, hit: answer.answered?.hit === true } : undefined;
   if (answer?.answered?.hit) {
@@ -1363,7 +1386,11 @@ export function runProject(project, printOnly, namesOnly, {
   // recorded only on its own bytes, with HEAD and the view's paths unchanged since the start.
   const suiteCheck = outcome;
   if (!suiteCheck.record) write(`[gate] ${project.name} evidence: not recorded (${suiteCheck.why})\n`);
-  if (evidence.key && evidence.buildRefBin && !answer?.unanswered && suiteCheck.record) {
+  // A gate ended by a signal (an interrupt from outside: the push killed, a hand on the process)
+  // has no verdict either: a red recorded for it would read as this closure failing its tests.
+  const signalled = Boolean(result.signal);
+  if (signalled && evidence.key) write(`[gate] ${project.name} evidence: not recorded (ended by ${result.signal}: an interrupt, not a verdict)\n`);
+  if (evidence.key && evidence.buildRefBin && !answer?.unanswered && suiteCheck.record && !signalled) {
     const put = recordEvidence(project, evidence.key, {
       success: status === 0,
       seconds,

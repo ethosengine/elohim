@@ -310,8 +310,11 @@ export function closeRun(path, outcome, {
     }
     if (deferred !== undefined && (!Number.isSafeInteger(deferred) || deferred < 0)) return null;
     // An interrupted Task gave no verdict, so the run is interrupted whatever its loop concluded,
-    // and carries that Task's three-part answer.
-    const interrupted = events.find((event) => event.kind === 'gate-verdict'
+    // and carries that Task's three-part answer. A gate stopped on request is the same: the run
+    // closes interrupted, and its close is the one line that says who stopped which gate and that
+    // nothing was recorded for it (the v1 run-close shape, its answer in `unanswered`).
+    const stopped = events.find((event) => event.kind === 'gate-stopped');
+    const interrupted = stopped ? { unanswered: stoppedAnswer(stopped) } : events.find((event) => event.kind === 'gate-verdict'
       && event.status === 'Unanswered' && event.verdict?.deferred !== true && event.unanswered);
     const closed = appendEvent(path, {
       kind: 'run-close',
@@ -324,6 +327,20 @@ export function closeRun(path, outcome, {
   } catch {
     return null;
   }
+}
+
+/**
+ * The three-part answer (objects/unanswered.schema.json) a run closed by a stop carries: why (which
+ * gate, stopped by whom, and that it recorded no evidence), when the answer can change (the push is
+ * made again) and what can be done meanwhile (run that gate here).
+ */
+export function stoppedAnswer(stopped) {
+  return {
+    why: { stopped: 'on-request', gate: stopped.project ?? null, by: stopped.by ?? null, evidence: 'none recorded' },
+    comeBack: { when: 'on-event', event: 'push-retried' },
+    meanwhile: { local: 'run-here' },
+    escalation: null,
+  };
 }
 
 export function readRun(path, { staleMs = STALE_MS, now = () => new Date() } = {}) {
@@ -412,9 +429,19 @@ export function formatEvent(raw) {
       return `[gate-live] ${event.project} ${verdict} ${event.seconds}s failure_class=${failureClass}`;
     }
     case 'stop-request':
+      if (event.immediate === true) {
+        return `[gate-live] stop requested now${event.by ? ` by ${event.by}` : ''}${event.reason ? ` (${event.reason})` : ''} — the running gate is being ended and records no evidence; gates not yet started will not run`;
+      }
       return `[gate-live] stop requested${event.reason ? ` (${event.reason})` : ''} — gates not yet started will not run`;
-    case 'run-close':
+    case 'gate-stopped':
+      return `[gate-live] ${event.project} STOPPED on request by ${event.by ?? 'a caller with no session'}: its process group was ended (${event.signal ?? 'nothing left to signal'}); no evidence recorded`;
+    case 'run-close': {
+      const why = event.unanswered?.why;
+      if (why && typeof why === 'object' && why.stopped === 'on-request') {
+        return `[gate-live] run ${event.outcome}: ${why.gate ?? 'a gate'} was stopped on request by ${why.by ?? 'a caller with no session'}; no evidence was recorded for it, and the push is refused`;
+      }
       return `[gate-live] run ${event.outcome}${event.deferred > 0 ? ` (${event.deferred} deferred)` : ''}`;
+    }
     default:
       return null;
   }
@@ -493,7 +520,7 @@ export async function follow({
 // What an agent hears without asking: every red, every notice, a failed verdict, and the close.
 function noteworthy(event) {
   if (event.kind !== 'gate-verdict') {
-    return ['failure', 'notice', 'detail', 'step-failed', 'outlook', 'stop-request', 'run-close'].includes(event.kind);
+    return ['failure', 'notice', 'detail', 'step-failed', 'outlook', 'stop-request', 'gate-stopped', 'run-close'].includes(event.kind);
   }
   const verdict = event.verdict && typeof event.verdict === 'object' ? event.verdict : null;
   return verdict
@@ -546,10 +573,18 @@ function closedBefore(path, instant) {
 
 /**
  * The developer's or integrator's stop: the hook and gate-runner read it before each gate, so the
- * gate already running finishes and nothing after it starts. Kill the push for an immediate stop.
+ * gate already running finishes and nothing after it starts. With `immediate` (`stop --now`) the
+ * gate already running is ended too: its tap ends the gate's process group (gate-stop.mjs) and
+ * gate-runner records no evidence for it. Never a signal to the push by hand: a signal to the
+ * wrong process leaves cargo running and can leave a half-written verdict.
  */
-export function requestStop(path, { reason = '', now } = {}) {
-  return appendEvent(path, { kind: 'stop-request', ...(reason ? { reason } : {}) }, now ? { now } : {});
+export function requestStop(path, { reason = '', now, by = null, immediate = false } = {}) {
+  return appendEvent(path, {
+    kind: 'stop-request',
+    ...(reason ? { reason } : {}),
+    ...(by ? { by } : {}),
+    ...(immediate ? { immediate: true } : {}),
+  }, now ? { now } : {});
 }
 
 export function stopRequested(path) {
@@ -557,6 +592,57 @@ export function stopRequested(path) {
     return parseEvents(readFileSync(path, 'utf8')).some((event) => event.kind === 'stop-request');
   } catch {
     return false;
+  }
+}
+
+/** The first stop-now request of a run, or null: the tap's probe. */
+export function stopNowRequest(path) {
+  try {
+    return parseEvents(readFileSync(path, 'utf8'))
+      .find((event) => event.kind === 'stop-request' && event.immediate === true) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** Whether `project` was stopped on request in this run (any project when none is named). */
+function gateStopped(path, project = null) {
+  try {
+    return parseEvents(readFileSync(path, 'utf8'))
+      .some((event) => event.kind === 'gate-stopped' && (project === null || event.project === project));
+  } catch {
+    return false;
+  }
+}
+
+// A gate is running when its last gate-start has no gate-verdict or gate-stopped after it.
+function runningGate(events) {
+  let running = null;
+  for (const event of events) {
+    if (event.kind === 'gate-start') running = event.project ?? null;
+    else if ((event.kind === 'gate-verdict' || event.kind === 'gate-stopped') && event.project === running) running = null;
+  }
+  return running;
+}
+
+/**
+ * After a stop-now request at `seq`: waits until the running gate's stop is recorded, the run
+ * closes, or `timeoutMs` passes. Resolves to { state: 'stopped' | 'closed' | 'idle' | 'unanswered', ... }.
+ */
+async function awaitStopNow(path, seq, { timeoutMs, pollMs = 200, sleep = delay } = {}) {
+  const deadline = Date.now() + timeoutMs;
+  let first = true;
+  for (;;) {
+    let events = [];
+    try { events = parseEvents(readFileSync(path, 'utf8')); } catch { return { state: 'closed', outcome: 'unknown' }; }
+    const stopped = events.find((event) => event.kind === 'gate-stopped' && event.seq > seq);
+    if (stopped) return { state: 'stopped', event: stopped };
+    const close = events.find((event) => event.kind === 'run-close' && event.seq > seq);
+    if (close) return { state: 'closed', outcome: close.outcome };
+    if (first && runningGate(events) === null) return { state: 'idle' };
+    first = false;
+    if (Date.now() >= deadline) return { state: 'unanswered', gate: runningGate(events) };
+    await sleep(pollMs);
   }
 }
 
@@ -1341,8 +1427,9 @@ const USAGE = `Usage:
   node gate-live.mjs show (--run R | --session S | --latest) [--seq N]
   node gate-live.mjs unseen --session S [--reader R]
   node gate-live.mjs red --run PATH --project P --message M     (a pre-gate leg's red, live at once)
-  node gate-live.mjs stop [--run PATH | --session S | --latest] [--reason R]
-  node gate-live.mjs stopped --run PATH                         (exit 0 when a stop was requested)
+  node gate-live.mjs stop [--run PATH | --session S | --latest] [--reason R] [--now]
+                                         (--now also ends the running gate; it records no evidence)
+  node gate-live.mjs stopped --run PATH [--gate P]              (exit 0 when a stop was requested; with --gate, when P was stopped)
   node gate-live.mjs outlook --run PATH --remaining "a b c"     (once per run: what continuing costs)
   node gate-live.mjs harvest [--last N]
   node gate-live.mjs subscribe --session S --device DID|any [--ref GLOB] [--every | --nth N] [--until RFC3339]
@@ -1361,8 +1448,8 @@ function parseArguments(argv) {
     show: ['session', 'run', 'latest', 'seq'],
     unseen: ['session', 'reader'],
     red: ['run', 'project', 'message'],
-    stop: ['run', 'session', 'latest', 'reason'],
-    stopped: ['run'],
+    stop: ['run', 'session', 'latest', 'reason', 'now'],
+    stopped: ['run', 'gate'],
     harvest: ['last'],
     outlook: ['run', 'remaining'],
     subscribe: ['session', 'device', 'ref', 'every', 'nth', 'until'],
@@ -1378,7 +1465,7 @@ function parseArguments(argv) {
     if (!allowed[verb].includes(name) || Object.hasOwn(options, name)) {
       throw new Error('unknown or repeated option');
     }
-    if (name === 'latest' || name === 'deferred-from-log' || name === 'sibling' || name === 'every' || name === 'until-final') {
+    if (name === 'latest' || name === 'deferred-from-log' || name === 'sibling' || name === 'every' || name === 'until-final' || name === 'now') {
       options[name] = true;
     } else {
       const value = args[++index];
@@ -1557,10 +1644,37 @@ async function main(argv) {
           latest = session === null;
         }
         const path = options.run ? resolve(root, options.run) : findRun({ root, session, latest });
-        if (!path || readRun(path).outcome !== 'running') throw new Error('no running gate run to stop');
-        if (requestStop(path, { reason: options.reason }) === null) throw new Error(`could not request a stop on ${path}`);
+        if (!path || !isFile(path)) throw new Error('no running gate run to stop');
+        const state = readRun(path).outcome;
+        if (state !== 'running') {
+          // Nothing is left to stop, so nothing is appended: a closed run's log keeps its last line.
+          process.stdout.write(`[gate-live] stop: ${path} already ended (${state}); nothing to stop, nothing appended\n`);
+          return 0;
+        }
+        // Who asked, for the stopped line: this caller's session (`epr session id`), when it has one.
+        const by = resolveSession();
+        const requested = requestStop(path, { reason: options.reason, by, immediate: options.now === true });
+        if (requested === null) throw new Error(`could not request a stop on ${path}`);
         process.stdout.write(`stop requested: ${path}\n`);
-        return 0;
+        if (options.now !== true) return 0;
+        const { stopGraceMs } = await import('./gate-stop.mjs');
+        const waitS = Math.ceil((stopGraceMs() + 15_000) / 1000);
+        const answer = await awaitStopNow(path, requested.seq, { timeoutMs: waitS * 1000 });
+        switch (answer.state) {
+          case 'stopped':
+            process.stdout.write(`[gate-live] ${answer.event.project} stopped (${answer.event.signal ?? 'nothing left to signal'}); no evidence recorded; the push is refused\n`);
+            return 0;
+          case 'closed':
+            process.stdout.write(`[gate-live] the run closed (${answer.outcome}) before a running gate answered the stop\n`);
+            return 0;
+          case 'idle':
+            process.stdout.write('[gate-live] no gate is running now: no gate after this starts, and the push is refused\n');
+            return 0;
+          default:
+            process.stdout.write(`[gate-live] ${answer.gate ?? 'the running gate'} did not answer the stop within ${waitS}s `
+              + '(an untapped gate, GATE_TAP=off, cannot be ended); no gate after it starts\n');
+            return 1;
+        }
       }
       case 'outlook':
         if (await outlook(resolve(root, options.run), String(options.remaining ?? '').split(/\s+/).filter(Boolean), { root }) === null) {
@@ -1568,6 +1682,7 @@ async function main(argv) {
         }
         return 0;
       case 'stopped':
+        if (options.gate !== undefined) return gateStopped(resolve(root, options.run), options.gate) ? 0 : 1;
         return stopRequested(resolve(root, options.run)) ? 0 : 1;
       case 'harvest':
         for (const line of formatHarvest(harvest({ root, last: options.last ?? 10 }))) {

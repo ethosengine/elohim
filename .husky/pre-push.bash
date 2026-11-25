@@ -1094,6 +1094,7 @@ if [ -n "$GATE_LIVE_RUN" ]; then
   export GATE_LIVE_RUN
   echo "  Live failures: node genesis/orchestrator/gate-live.mjs follow --run $GATE_LIVE_RUN"
   echo "  Stop after the running gate: node genesis/orchestrator/gate-live.mjs stop --run $GATE_LIVE_RUN"
+  echo "  End the running gate now (it records no evidence): node genesis/orchestrator/gate-live.mjs stop --now --run $GATE_LIVE_RUN"
   echo ""
 fi
 # ── Live run open
@@ -2268,6 +2269,17 @@ for PROJECT in $GATE_INLINE; do
   PROJECT_ELAPSED=$((PROJECT_END - PROJECT_START))
   GATE_SECONDS_SUM=$((GATE_SECONDS_SUM + PROJECT_ELAPSED))
 
+  # A gate ended by `gate-live.mjs stop --now` (its tap ended the gate's process group; gate-runner
+  # recorded nothing for it) is STOPPED, not FAILED, and still refuses the push; nothing after it starts.
+  if [ $GATE_EXIT -ne 0 ] && [ -n "$GATE_LIVE_RUN" ] &&
+    node genesis/orchestrator/gate-live.mjs stopped --run "$GATE_LIVE_RUN" --gate "$PROJECT" >/dev/null 2>&1; then
+    echo "$PROJECT: STOPPED on request (${PROJECT_ELAPSED}s; no evidence recorded)"
+    FAILED="$FAILED $PROJECT"
+    STOP_REASON="${STOP_REASON:-$PROJECT stopped on request on the live run}"
+    RESULTS="$RESULTS  $PROJECT: STOPPED (${PROJECT_ELAPSED}s)\n"
+    echo ""
+    continue
+  fi
   if [ $GATE_EXIT -ne 0 ]; then
     echo "$PROJECT: FAILED (${PROJECT_ELAPSED}s)"
     FAILED="$FAILED $PROJECT"

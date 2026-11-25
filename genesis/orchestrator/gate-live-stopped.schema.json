@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://elohim.host/schemas/orchestrator/gate-live-stopped.schema.json",
+  "title": "gate-live gate-stopped event",
+  "description": "A gate ended on request (`gate-live.mjs stop --now`): its tap ended the gate's process group and gate-runner recorded nothing for it. Never a verdict: no closure evidence, no gate-verdict, no reading and no red stands for the stopped gate, and a run that carries one closes `interrupted` with the three-part answer in its v1 run-close. It lives here, beside its only consumer (gate-live-schema.test.mjs), and not in elohim/sdk/schemas/v1/gate-live-event.schema.json, for the notice addendum's reason: that directory is a storage build source, and editing it would roll Edge for a device-local vocabulary. Its end: it is merged with the v1 file into one orchestrator-local schema at the next deliberate Edge roll, with the notice addendum. Until then the three files partition the kinds, held by gate-live-schema.test.mjs.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["v", "run", "seq", "at", "kind", "project", "by", "signal", "evidence"],
+  "properties": {
+    "v": { "$ref": "https://elohim.host/schemas/v1/gate-live-event.schema.json#/properties/v" },
+    "run": { "$ref": "https://elohim.host/schemas/v1/gate-live-event.schema.json#/properties/run" },
+    "seq": { "$ref": "https://elohim.host/schemas/v1/gate-live-event.schema.json#/properties/seq" },
+    "at": { "$ref": "https://elohim.host/schemas/v1/gate-live-event.schema.json#/properties/at" },
+    "kind": { "const": "gate-stopped" },
+    "project": { "$ref": "https://elohim.host/schemas/v1/gate-live-event.schema.json#/$defs/name" },
+    "step": {
+      "$ref": "https://elohim.host/schemas/v1/gate-live-event.schema.json#/$defs/name",
+      "description": "The gate's step that was running when it was stopped, when it was not the recipe itself (rust-style)."
+    },
+    "by": {
+      "type": ["string", "null"],
+      "minLength": 1,
+      "description": "The stopping caller's session (`epr session id`), or null when it had none."
+    },
+    "signal": {
+      "enum": ["SIGTERM", "SIGKILL", null],
+      "description": "The last signal sent to the gate's process group: SIGTERM when every member ended within the grace, SIGKILL when the grace ran out, null when nothing of the gate was left to signal."
+    },
+    "survivors": {
+      "type": "array",
+      "items": { "type": "integer", "minimum": 1 },
+      "description": "Pids of the gate still alive after the KILL wait, when any."
+    },
+    "evidence": { "const": "none" }
+  }
+}

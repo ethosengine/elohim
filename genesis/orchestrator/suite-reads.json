@@ -110,6 +110,7 @@
       {"file": "gate-steps.test.mjs", "reads": []},
       {"file": "gate-failure-lines.test.mjs", "reads": []},
       {"file": "gate-tap.test.mjs", "reads": []},
+      {"file": "gate-stop.test.mjs", "reads": []},
       {"file": "gate-live.test.mjs", "reads": []},
       {"file": "gate-live-schema.test.mjs", "reads": ["elohim/sdk/schemas/v1/gate-live-event.schema.json", "elohim/sdk/schemas/v1/objects/unanswered.schema.json"]},
       {"file": "gate-attribution.test.mjs", "reads": []},
