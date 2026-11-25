@@ -342,13 +342,10 @@ impl FlowStore for SidecarFlowTransaction {
                 Ok((cid, line))
             })
             .collect::<Result<_>>()?;
-        if encoded.is_empty() {
-            return Ok(Vec::new());
-        }
         // Only the tail can be adjacent to this append. Verify it under the same exclusive lock;
         // older records are still fully verified by readers after they release their brief lock.
         let mut log = crate::sidecar::LockedLog::exclusive(&self.log_path)?;
-        if let Some(tail) = log.tail_record()? {
+        if let Some(tail) = log.prepare_append(&self.root, &self.log_path)? {
             decode_flow_records(&(tail + "\n"))?;
         }
         log.append_batch(encoded.iter().map(|(_, line)| line.clone()))?;
@@ -496,6 +493,24 @@ mod tests {
                 assert!(matches!(err, FabricError::Integrity { .. }), "{err:?}");
             }
         }
+    }
+
+    #[cfg(feature = "sidecar")]
+    #[test]
+    fn an_empty_retry_batch_checks_the_visible_tail_before_acknowledging() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = SidecarFlowStore::open(dir.path()).unwrap();
+        std::fs::write(store.log_path(), b"visible-but-not-complete").unwrap();
+        let before = std::fs::read(store.log_path()).unwrap();
+
+        let error = store
+            .transaction()
+            .unwrap()
+            .append_batch(Vec::new())
+            .expect_err("a dedup retry cannot acknowledge a tail that was never synced whole");
+
+        assert!(matches!(error, FabricError::Decode(_)), "{error:?}");
+        assert_eq!(std::fs::read(store.log_path()).unwrap(), before);
     }
 
     #[test]
