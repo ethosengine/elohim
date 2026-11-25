@@ -299,7 +299,17 @@ impl Probe<'_> {
         capture_root: &Path,
     ) -> Checked<ProcessOutcome> {
         let mut command = self.command(brit, args);
+        // Brit prints its capture-gap notice once per session, claimed by a file under
+        // $XDG_CACHE_HOME/brit/feedback-notices keyed by the inherited session id (or the UTC
+        // day). The probe's own session may already have claimed it, so each invocation gets a
+        // cache of its own and no inherited BRIT_QUIET: the notice this probe asserts is then
+        // printed by every invocation, under a Brit that claims once and one that does not.
         command
+            .env_remove("BRIT_QUIET")
+            .env(
+                "XDG_CACHE_HOME",
+                self.root.join(".brit-notice-cache").join(id),
+            )
             .env("EPR_FEEDBACK_INVOCATION", id)
             .env("EPR_FEEDBACK_ROOT", capture_root);
         let output = self.invoke(command)?;

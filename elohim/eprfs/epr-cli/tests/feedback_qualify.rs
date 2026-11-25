@@ -94,6 +94,59 @@ fn pair_qualification_exercises_capture_proposal_and_recorder_failure() {
     assert!(!root.path().join(".eprfs").exists());
 }
 
+/// A Brit that prints its capture-gap notice once per session, the way brit sprint 5 item 7 does:
+/// silent under BRIT_QUIET=1, and otherwise only when it can claim the notice file under
+/// $XDG_CACHE_HOME/brit/feedback-notices.
+fn once_per_session_producer(root: &Path) -> std::path::PathBuf {
+    let script = root.join("fixture-brit-once");
+    std::fs::write(&script, r#"#!/bin/sh
+case "$1" in --version) code=0; outcome=passed;; *) code=2; outcome=refused;; esac
+if ! epr feedback capture --producer brit --operation log --outcome "$outcome" --invocation "$EPR_FEEDBACK_INVOCATION" --root "$EPR_FEEDBACK_ROOT" --json >/dev/null 2>&1; then
+  if [ "$BRIT_QUIET" != 1 ]; then
+    notices="$XDG_CACHE_HOME/brit/feedback-notices"
+    mkdir -p "$notices" && ( set -C; : > "$notices/session-fixture" ) 2>/dev/null && echo 'feedback capture gap' >&2
+  fi
+fi
+exit "$code"
+"#).expect("producer");
+    std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o700)).expect("executable");
+    script
+}
+
+#[test]
+fn a_brit_that_notices_once_per_session_still_qualifies_from_a_session_that_already_claimed_it() {
+    let root = fixture();
+    let brit = once_per_session_producer(root.path());
+    // The calling session already claimed the notice and asked Brit to be quiet: the probe must
+    // not inherit either, or the recorder failure it checks would be invisible.
+    let claimed = tempfile::tempdir().expect("claimed cache");
+    let notices = claimed.path().join("brit/feedback-notices");
+    std::fs::create_dir_all(&notices).expect("notice directory");
+    std::fs::write(notices.join("session-fixture"), "").expect("claimed notice");
+    let output = Command::new(env!("CARGO_BIN_EXE_epr"))
+        .args([
+            "feedback",
+            "qualify",
+            "--brit",
+            brit.to_str().expect("path"),
+        ])
+        .arg("--root")
+        .arg(root.path())
+        .arg("--json")
+        .env("EPR_BIN", "/wrong-epr")
+        .env("BRIT_BIN", "/wrong-brit")
+        .env("EPR_PIN_CID", "wrong-pin")
+        .env("BRIT_PIN_CID", "wrong-pin")
+        .env("XDG_CACHE_HOME", claimed.path())
+        .env("BRIT_QUIET", "1")
+        .output()
+        .expect("qualification");
+    let witness: Value = serde_json::from_slice(&output.stdout).expect("structured witness");
+    assert!(output.status.success(), "{witness}");
+    assert_eq!(witness["observed"]["pairQualified"], true);
+    assert_eq!(witness["observed"]["recorderFailurePreservesExit"], true);
+}
+
 #[test]
 fn unavailable_prerequisites_are_unmeasured_and_never_green() {
     let empty = tempfile::tempdir().expect("fixture");
