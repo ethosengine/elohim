@@ -33,6 +33,7 @@ const WRITER_COUNT: usize = 8;
 const RECORDS_PER_WRITER: usize = 16;
 const READER_COUNT: usize = 4;
 const SYNTHETIC_LOG_BYTES: usize = 20 * 1024 * 1024;
+const BATCH_RECORDS: usize = 32;
 
 fn encoded_line(record: FlowRecord) -> Vec<u8> {
     let dir = tempfile::tempdir().unwrap();
@@ -106,12 +107,13 @@ fn subprocess() {
                 flows.append(flow(&format!("{id}-{n}"))).unwrap();
             }
         }
-        "hold-flow" => {
+        "append-flow-batch" => {
             let mut tx = SidecarFlowStore::open(root).unwrap().transaction().unwrap();
-            tx.append(flow("before-pause")).unwrap();
-            fs::write(root.join("held"), "held").unwrap();
-            wait_for(&root.join("release"));
-            tx.append(flow("after-pause")).unwrap();
+            let records = (0..BATCH_RECORDS)
+                .map(|n| flow(&format!("batch-{n}")))
+                .collect();
+            tx.append_batch(records).unwrap();
+            fs::write(root.join("batch-complete"), "complete").unwrap();
         }
         "read-flow" => {
             fs::write(root.join("reading"), "reading").unwrap();
@@ -126,6 +128,22 @@ fn subprocess() {
                 assert!(!store.records().unwrap().is_empty());
                 completed += 1;
                 fs::write(root.join(format!("completed-{id}")), completed.to_string()).unwrap();
+            }
+        }
+        "read-batch-loop" => {
+            let store = SidecarFlowStore::open(root).unwrap();
+            while !root.join("stop-reader").exists() {
+                let count = store.records().unwrap().len();
+                assert!(
+                    count == 0 || count == BATCH_RECORDS,
+                    "reader observed {count} records from a {BATCH_RECORDS}-record batch"
+                );
+                let marker = if count == 0 {
+                    "observed-none"
+                } else {
+                    "observed-all"
+                };
+                fs::write(root.join(marker), count.to_string()).unwrap();
             }
         }
         "partial-flow" => {
@@ -217,17 +235,16 @@ fn independent_processes_first_open_and_append_preserve_every_record() {
 }
 
 #[test]
-fn flow_reader_observes_a_complete_prefix_between_transaction_appends() {
+fn flow_reader_observes_none_or_all_of_a_multi_record_batch() {
     let dir = tempfile::tempdir().unwrap();
     let root = dir.path();
     fs::write(root.join("start"), "start").unwrap();
-    let writer = spawn(root, "hold-flow", "writer");
-    wait_for(&root.join("held"));
-    let reader = spawn(root, "read-flow", "reader");
-    wait_for(&root.join("reading"));
-    wait_for(&root.join("read-complete"));
-    assert_eq!(fs::read_to_string(root.join("read-count")).unwrap(), "1");
-    fs::write(root.join("release"), "release").unwrap();
+    let reader = spawn(root, "read-batch-loop", "reader");
+    wait_for(&root.join("observed-none"));
+    let writer = spawn(root, "append-flow-batch", "writer");
+    wait_for(&root.join("batch-complete"));
+    wait_for(&root.join("observed-all"));
+    fs::write(root.join("stop-reader"), "stop").unwrap();
     finish(writer);
     finish(reader);
 }

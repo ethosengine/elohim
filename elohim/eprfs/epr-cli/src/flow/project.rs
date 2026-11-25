@@ -158,6 +158,7 @@ pub fn project(root: &Path, recipes: &Path) -> FlowResult<ProjectSummary> {
         .collect();
     let mut seen: HashSet<Cid> = HashSet::new();
     let mut counts: BTreeMap<String, KindCount> = BTreeMap::new();
+    let mut to_append = Vec::new();
 
     for staged in deriv.staged {
         let cid = staged.record.cid()?;
@@ -173,7 +174,7 @@ pub fn project(root: &Path, recipes: &Path) -> FlowResult<ProjectSummary> {
         if already_present {
             entry.present += 1;
         } else {
-            store.append(staged.record)?;
+            to_append.push(staged.record);
             seen.insert(cid);
             entry.new += 1;
         }
@@ -181,6 +182,7 @@ pub fn project(root: &Path, recipes: &Path) -> FlowResult<ProjectSummary> {
             deriv.labels.insert(k, v);
         }
     }
+    store.append_batch(to_append)?;
 
     // labels.json is an operational index — overwritten whole each run.
     let labels_path = root.join(".eprfs").join("status").join("labels.json");
