@@ -318,7 +318,7 @@ steward_all_worktrees() {
 # live cargo lock or executable still wins: stale registration never proves
 # that a running build is safe to interrupt.
 steward_gone_worktree_slots() {
-  local dry_run="${1:-0}" live_names="" path name fam slot action
+  local dry_run="${1:-0}" live_names="" path name fam slot action gate_fd
   live_names="$(git -C "$POOL_PARENT_REPO" worktree list --porcelain 2>/dev/null \
     | sed -n 's/^worktree //p' \
     | while IFS= read -r path; do basename "$path"; done)" || return 0
@@ -342,13 +342,26 @@ steward_gone_worktree_slots() {
         printf '%s\t%s\t%s\t%s\n' "stale-worktree-slot" "left-pinned" "$slot" "$name"
         continue
       fi
-      if slot_in_use "$slot" || slot_target_busy "$slot" || slot_gate_locked "$slot"; then
+      if slot_in_use "$slot" || slot_target_busy "$slot"; then
         printf '%s\t%s\t%s\t%s\n' "stale-worktree-slot" "left-busy" "$slot" "$name"
         continue
       fi
       action=reclaimable
-      if [ "$dry_run" != "1" ]; then
-        if rm -rf -- "$slot"; then action=removed; else action=left; fi
+      if [ "$dry_run" = "1" ]; then
+        if slot_gate_locked "$slot"; then action=left-busy; fi
+      elif ! slot_gate_lock_acquire "$slot" gate_fd; then
+        action=left-busy
+      else
+        # The same stable lock the gate tap uses stays held until rm has returned. Recheck the
+        # non-gate guards after admission, because their probes are not serialized by this lock.
+        if slot_in_use "$slot" || slot_target_busy "$slot"; then
+          action=left-busy
+        elif rm -rf -- "$slot"; then
+          action=removed
+        else
+          action=left
+        fi
+        slot_gate_lock_release "$gate_fd"
       fi
       printf '%s\t%s\t%s\t%s\n' "stale-worktree-slot" "$action" "$slot" "$name"
     done < <(list_slots_for_family "$fam")
@@ -1274,13 +1287,39 @@ slot_exec_busy() {
 }
 
 # A gate serializes the whole recipe, including its post-build tests, with this lock. It is
-# separate from Cargo's profile lock and must remain a hard reclamation guard.
+# separate from Cargo's profile lock and must remain a hard reclamation guard. The lock file is
+# beside the slot: reclaim can delete the slot while retaining the exact locked inode until rm ends.
+slot_gate_lock_path() {
+  local slot="${1:-}"
+  [ -n "$slot" ] || return 1
+  printf '%s.gate.lock\n' "$slot"
+}
+
 slot_gate_locked() {
   local slot="${1:-}" lock
   [ -n "$slot" ] || return 1
-  lock="$slot/.gate.lock"
+  lock="$(slot_gate_lock_path "$slot")" || return 1
   [ -e "$lock" ] || return 1
   ! flock -n "$lock" true 2>/dev/null
+}
+
+slot_gate_lock_acquire() {
+  local slot="${1:-}" result_var="${2:-}" lock fd
+  [ -n "$slot" ] && [ -n "$result_var" ] || return 1
+  lock="$(slot_gate_lock_path "$slot")" || return 1
+  mkdir -p "$(dirname "$lock")" || return 1
+  exec {fd}>>"$lock" || return 1
+  if ! flock -n "$fd" 2>/dev/null; then
+    exec {fd}>&-
+    return 1
+  fi
+  printf -v "$result_var" '%s' "$fd"
+}
+
+slot_gate_lock_release() {
+  local fd="${1:-}"
+  [ -n "$fd" ] || return 0
+  exec {fd}>&-
 }
 
 # Cargo releases its build lock before test binaries and doctests finish. Their inherited
