@@ -22,6 +22,9 @@
 // closes it drains that session for at most 60 s, then TERM for 10 s, then KILL. A double-forked
 // `setsid` escapee is outside this custody and outside the slot lifetime; it can only be reported by
 // the separately bounded inherited-output check. Non-slot gates never start this session scanner.
+// The ownership token proves an open descriptor, not flock ownership, so an ancestor could forge
+// it; this lock exists to stop accidents between honest gates, not a process deliberately lying to
+// its own device.
 
 import { spawn } from 'child_process';
 import {
@@ -43,6 +46,10 @@ const SLOT_CONFLICT_EXIT = 200;
 const SLOT_OWNER_ENV = 'GATE_SLOT_OWNER_TOKEN';
 const SLOT_DRAIN_MS = 60_000;
 const SLOT_DRAIN_TERM_MS = 10_000;
+const SLOT_DRAIN_KILL_MS = 10_000;
+const SLOT_OWNER_READY_MS = positiveMs(process.env.GATE_SLOT_OWNER_READY_MS, 60_000);
+const SLOT_EMPTY_CONFIRM_MS = positiveMs(process.env.GATE_SLOT_EMPTY_CONFIRM_MS, 100);
+const SLOT_SUPERVISOR_GONE_MS = positiveMs(process.env.GATE_SLOT_SUPERVISOR_GONE_MS, 1_000);
 
 function oneLine(value) {
   return String(value ?? '').replace(/[\r\n]+/g, ' ').trim();
@@ -126,17 +133,24 @@ function tokenFromHolder(path, lock) {
 }
 
 /** A nested gate may reuse only the live holder supervised by one of its verified ancestors. */
-export function verifySlotOwnerToken(lock, token = process.env[SLOT_OWNER_ENV], pid = process.pid, holderPath = null) {
+export function verifySlotOwnerToken(lock, token = process.env[SLOT_OWNER_ENV], pid = process.pid,
+  holderPath = null, report = () => {}) {
+  const refuse = reason => { report(reason); return false; };
   let parsed;
-  try { parsed = JSON.parse(token || tokenFromHolder(holderPath, lock)); } catch { return false; }
-  if (parsed?.v !== 1 || resolve(parsed.lock ?? '') !== resolve(lock)) return false;
+  try { parsed = JSON.parse(token || tokenFromHolder(holderPath, lock)); }
+  catch { return refuse('token is absent or malformed'); }
+  if (parsed?.v !== 1 || resolve(parsed.lock ?? '') !== resolve(lock)) return refuse('token names a different lock');
   const holder = readStat(Number(parsed.holder?.pid));
   const supervisor = readStat(Number(parsed.supervisor?.pid));
-  if (!holder || holder.start !== parsed.holder?.start || !supervisor
-      || supervisor.start !== parsed.supervisor?.start || holder.ppid !== supervisor.pid) return false;
-  if (!processHoldsFile(holder.pid, lock)) return false;
+  if (!holder || holder.start !== parsed.holder?.start) return refuse('holder pid/start is not live');
+  if (!supervisor || supervisor.start !== parsed.supervisor?.start) return refuse('supervisor pid/start is not live');
+  if (holder.ppid !== supervisor.pid) return refuse('holder is not parented to its supervisor');
+  if (!processHoldsFile(holder.pid, lock)) return refuse('holder descriptor is not visible');
   const ancestors = processAncestors(pid);
-  return ancestors.has(`${holder.pid}:${holder.start}`) || ancestors.has(`${supervisor.pid}:${supervisor.start}`);
+  if (!ancestors.has(`${holder.pid}:${holder.start}`) && !ancestors.has(`${supervisor.pid}:${supervisor.start}`)) {
+    return refuse('holder and supervisor are not ancestors of the gate');
+  }
+  return true;
 }
 
 function positiveMs(value, fallback) {
@@ -144,72 +158,150 @@ function positiveMs(value, fallback) {
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
 }
 
-async function slotHolderMain(acquired, controlPath, supervisorPid, supervisorStart) {
-  writeFileSync(acquired, 'acquired');
-  let control = null;
-  while (control === null) {
-    try { control = readFileSync(controlPath, 'utf8'); } catch { /* not handed over yet */ }
-    if (control !== null) break;
-    const supervisor = readStat(Number(supervisorPid));
-    if (!supervisor || supervisor.start !== supervisorStart) return;
-    await delay(10);
-  }
-  const match = control.match(/^session\t(\d+)\t(\d+)\n/);
-  if (!match) return; // The tap died before any recipe was placed in the slot.
-  const sid = Number(match[1]);
-  const leaderStart = match[2];
-  const proc = process.env.GATE_SLOT_PROC_ROOT || '/proc';
-  const trace = process.env.GATE_SLOT_PROC_TRACE;
-  const drainMs = positiveMs(process.env.GATE_SLOT_DRAIN_MS, SLOT_DRAIN_MS);
-  const termMs = positiveMs(process.env.GATE_SLOT_DRAIN_TERM_MS, SLOT_DRAIN_TERM_MS);
-  const heartbeatMs = Math.max(10, positiveMs(process.env.GATE_SLOT_DRAIN_HEARTBEAT_MS, 5000));
+function writeHandoff(path, content) {
+  const temporary = `${path}.${process.pid}.tmp`;
+  writeFileSync(temporary, content);
+  renameSync(temporary, path);
+}
+
+export async function drainSlotSession(sid, leaderStart, {
+  proc = process.env.GATE_SLOT_PROC_ROOT || '/proc',
+  scan = () => snapshot({ proc }),
+  now = () => performance.now(),
+  sleep = delay,
+  send = signalTree,
+  write = line => writeSync(2, line),
+  drainMs = positiveMs(process.env.GATE_SLOT_DRAIN_MS, SLOT_DRAIN_MS),
+  termMs = positiveMs(process.env.GATE_SLOT_DRAIN_TERM_MS, SLOT_DRAIN_TERM_MS),
+  killMs = positiveMs(process.env.GATE_SLOT_DRAIN_KILL_MS, SLOT_DRAIN_KILL_MS),
+  heartbeatMs = Math.max(10, positiveMs(process.env.GATE_SLOT_DRAIN_HEARTBEAT_MS, 5000)),
+  leaderObserved = false,
+  emptyConfirmMs = SLOT_EMPTY_CONFIRM_MS,
+} = {}) {
   let drainAt = null;
   let termAt = null;
-  let killed = false;
+  let killAt = null;
   let lastHeartbeat = 0;
+  let sawLeader = leaderObserved;
+  let emptyAt = null;
   for (;;) {
-    if (trace) { try { writeFileSync(trace, `${Date.now()}\n`, { flag: 'a' }); } catch { /* test trace */ } }
-    const table = snapshot({ proc });
+    const table = scan();
     const members = [...table.values()].filter(stat => stat.sid === sid && stat.state !== 'Z' && stat.state !== 'X');
-    if (members.length === 0) return;
-    const leader = table.get(sid);
-    if (leader && leader.start === leaderStart && leader.state !== 'Z' && leader.state !== 'X') {
+    const currentLeader = table.get(sid);
+    const leaderLive = currentLeader && currentLeader.state !== 'Z' && currentLeader.state !== 'X';
+    if (leaderLive && currentLeader.start !== leaderStart) return 0;
+    if (leaderLive) {
+      sawLeader = true;
+      emptyAt = null;
       drainAt = null;
-      await delay(50);
+      await sleep(50);
       continue;
     }
-    const now = performance.now();
-    if (drainAt === null) drainAt = now;
-    if (now - lastHeartbeat >= heartbeatMs) {
-      process.stderr.write(`[gate-slot] draining session ${sid} after its recipe closed; members: ${members.map(p => p.pid).join(' ')}\n`);
-      lastHeartbeat = now;
+    if (!sawLeader) {
+      await sleep(50);
+      continue;
     }
-    if (termAt === null && now - drainAt >= drainMs) {
-      signalTree(sid, members, 'SIGTERM');
-      termAt = now;
-    } else if (termAt !== null && !killed && now - termAt >= termMs) {
-      signalTree(sid, members, 'SIGKILL');
-      killed = true;
-      process.stderr.write(`[gate-slot] session ${sid} exceeded the ${drainMs} ms drain and ${termMs} ms TERM grace; sent SIGKILL\n`);
-    }
-    await delay(50);
-    if (termAt !== null) {
-      const remaining = [...snapshot({ proc }).values()].filter(stat => stat.sid === sid && stat.state !== 'Z' && stat.state !== 'X');
-      if (remaining.length === 0) {
-        if (killed) return;
-        process.stderr.write(`[gate-slot] session ${sid} exceeded the ${drainMs} ms drain; sent SIGTERM\n`);
-        return;
+    if (members.length === 0) {
+      const at = now();
+      if (emptyAt === null) emptyAt = at;
+      if (at - emptyAt < emptyConfirmMs) {
+        await sleep(50);
+        continue;
       }
+      if (termAt !== null && killAt === null) write(`[gate-slot] session ${sid} exceeded the ${drainMs} ms drain; sent SIGTERM\n`);
+      return 0;
     }
+    emptyAt = null;
+    const at = now();
+    if (drainAt === null) drainAt = at;
+    if (at - lastHeartbeat >= heartbeatMs) {
+      write(`[gate-slot] draining session ${sid} after its recipe closed; members: ${members.map(p => p.pid).join(' ')}\n`);
+      lastHeartbeat = at;
+    }
+    if (termAt === null && at - drainAt >= drainMs) {
+      send(sid, members, 'SIGTERM');
+      termAt = at;
+    } else if (termAt !== null && killAt === null && at - termAt >= termMs) {
+      send(sid, members, 'SIGKILL');
+      killAt = at;
+      write(`[gate-slot] session ${sid} exceeded the ${drainMs} ms drain and ${termMs} ms TERM grace; sent SIGKILL\n`);
+    } else if (killAt !== null && at - killAt >= killMs) {
+      write(`[gate-slot] session ${sid} still alive ${killMs} ms after SIGKILL; releasing slot with surviving pids: ${members.map(p => p.pid).join(' ')}\n`);
+      return 1;
+    }
+    await sleep(50);
   }
 }
 
-async function slotLaunchMain(startPath, supervisorPid, supervisorStart, command, args) {
+async function readHandoff(path, supervisorPid, supervisorStart) {
+  let missingAt = null;
+  for (;;) {
+    try { return readFileSync(path, 'utf8'); } catch { /* handoff not written yet */ }
+    const supervisor = readStat(Number(supervisorPid));
+    if (supervisor?.start === supervisorStart) missingAt = null;
+    else {
+      missingAt ??= performance.now();
+      if (performance.now() - missingAt >= SLOT_SUPERVISOR_GONE_MS) return null;
+    }
+    await delay(10);
+  }
+}
+
+async function slotHolderMain(lock, acquired, controlPath, admissionPath, supervisorPid, supervisorStart) {
+  const holder = readStat(process.ppid);
+  const supervisor = readStat(Number(supervisorPid));
+  if (!holder || holder.ppid !== Number(supervisorPid) || !supervisor
+      || supervisor.start !== supervisorStart || !processHoldsFile(holder.pid, lock)) {
+    throw new Error(`slot holder ${process.ppid} cannot prove its descriptor for ${lock}`);
+  }
+  // flock starts this helper only after acquisition. Publish the exact parent pid/start only after
+  // its descriptor and supervisor ancestry are visible to the same /proc checks the gate will use.
+  writeHandoff(acquired, `${holder.pid}\t${holder.start}\n`);
+  const control = await readHandoff(controlPath, supervisorPid, supervisorStart);
+  if (control === null) return 0;
+  const match = control.match(/^session\t(\d+)\t(\d+)\n/);
+  if (!match) return 0; // The tap died before any recipe was placed in the slot.
+  const sid = Number(match[1]);
+  const leaderStart = match[2];
+  const admission = await readHandoff(admissionPath, supervisorPid, supervisorStart);
+  if (admission === null) return 0;
+  if (admission !== 'admitted\n') return 0;
+  const proc = process.env.GATE_SLOT_PROC_ROOT || '/proc';
+  const trace = process.env.GATE_SLOT_PROC_TRACE;
+  return drainSlotSession(sid, leaderStart, {
+    // The session leader itself wrote the admission marker after proving this holder. That is a
+    // stronger observation than a racy /proc snapshot and closes holder-ready -> gate-start.
+    leaderObserved: true,
+    proc,
+    scan: () => {
+      if (trace) { try { writeFileSync(trace, `${Date.now()}\n`, { flag: 'a' }); } catch { /* test trace */ } }
+      return snapshot({ proc });
+    },
+  });
+}
+
+async function slotLaunchMain(startPath, admissionPath, supervisorPid, supervisorStart, command, args) {
   while (!existsSync(startPath)) {
     const supervisor = readStat(Number(supervisorPid));
     if (!supervisor || supervisor.start !== supervisorStart) process.exit(125);
     await delay(10);
   }
+  const lock = process.env.GATE_SLOT_LOCK_PATH;
+  const ownershipDeadline = performance.now() + SLOT_OWNER_READY_MS;
+  let ownershipFailure = 'ownership was not checked';
+  while (lock && !verifySlotOwnerToken(lock, process.env[SLOT_OWNER_ENV], process.pid, null,
+    reason => { ownershipFailure = reason; })) {
+    const supervisor = readStat(Number(supervisorPid));
+    if (!supervisor || supervisor.start !== supervisorStart) process.exit(125);
+    if (performance.now() >= ownershipDeadline) {
+      writeSync(2, `gate-slot-launch: holder ownership was not verifiable after ${SLOT_OWNER_READY_MS} ms: ${ownershipFailure}\n`);
+      process.exit(125);
+    }
+    await delay(10);
+  }
+  // The detached holder does not begin session drain until this exact leader has verified the
+  // token. It therefore cannot release the descriptor between token export and gate spawn.
+  writeHandoff(admissionPath, 'admitted\n');
   const child = spawn(command, args, { stdio: 'inherit', env: process.env });
   child.once('error', () => process.exit(127));
   child.once('close', (code, signal) => {
@@ -221,11 +313,12 @@ async function slotLaunchMain(startPath, supervisorPid, supervisorStart, command
 async function startSlotHolder(lock, mode, waitSeconds, scratch, interrupt) {
   const acquired = join(scratch, `acquired-${mode}`);
   const control = join(scratch, `session-${mode}`);
+  const admission = join(scratch, `admission-${mode}`);
   const supervisor = readStat(process.pid);
   const args = ['--close', '--conflict-exit-code', String(SLOT_CONFLICT_EXIT)];
   if (mode === 'try') args.push('-n');
   else args.push('-w', String(waitSeconds));
-  args.push(lock, process.execPath, resolve(process.argv[1]), '--slot-holder', acquired, control,
+  args.push(lock, process.execPath, resolve(process.argv[1]), '--slot-holder', lock, acquired, control, admission,
     String(supervisor.pid), supervisor.start);
   const child = spawn('flock', args, { detached: true, stdio: ['ignore', 'ignore', 'inherit'] });
   let closed = null;
@@ -238,16 +331,32 @@ async function startSlotHolder(lock, mode, waitSeconds, scratch, interrupt) {
     child.once('error', error => finish({ code: 127, signal: null, error }));
     child.once('close', (code, signal) => finish({ code, signal }));
   });
-  while (!existsSync(acquired) && !closed && !interrupt.signal) await delay(10);
+  let holder = null;
+  while (!holder && !closed && !interrupt.signal) {
+    // The helper's marker proves flock returned from acquisition. Admission additionally waits
+    // until /proc exposes the descriptor on the exact flock pid named by the ownership token.
+    if (existsSync(acquired) && Number.isInteger(child.pid)) {
+      try {
+        const [pidText, start] = readFileSync(acquired, 'utf8').trim().split('\t');
+        const pid = Number(pidText);
+        const stat = readStat(pid);
+        if (pid === child.pid && stat?.start === start && stat.ppid === supervisor.pid
+            && processHoldsFile(pid, lock)) holder = stat;
+      } catch { /* holder has not published verifiable readiness yet */ }
+    }
+    if (!holder) await delay(10);
+  }
   if (interrupt.signal && !closed) {
     try { process.kill(-child.pid, 'SIGKILL'); } catch { /* already gone */ }
     await done;
   }
-  const holder = Number.isInteger(child.pid) ? readStat(child.pid) : null;
   return {
-    child, done, acquired: existsSync(acquired) && !interrupt.signal, closed, holder,
+    child, done, acquired: Boolean(holder) && !interrupt.signal, closed, holder, admission,
     interrupted: interrupt.signal,
-    holdSession(pid, start) { writeFileSync(control, `session\t${pid}\t${start}\n`); },
+    holdSession(pid, start) { writeHandoff(control, `session\t${pid}\t${start}\n`); },
+    cancelGate() {
+      if (!existsSync(admission)) writeHandoff(admission, 'cancelled\n');
+    },
     async release() {
       await done;
     },
@@ -256,9 +365,9 @@ async function startSlotHolder(lock, mode, waitSeconds, scratch, interrupt) {
 
 async function acquireSlot(project, run, env, interrupt) {
   const lock = env.GATE_SLOT_LOCK_PATH;
-  if (!lock) return { busy: false, holdSession() {}, startGate() {}, release: async () => {} };
+  if (!lock) return { busy: false, holdSession() {}, startGate() {}, cancelGate() {}, release: async () => {} };
   if (verifySlotOwnerToken(lock, env[SLOT_OWNER_ENV])) {
-    return { busy: false, nested: true, ownerToken: env[SLOT_OWNER_ENV], holdSession() {}, startGate() {}, release: async () => {} };
+    return { busy: false, nested: true, ownerToken: env[SLOT_OWNER_ENV], holdSession() {}, startGate() {}, cancelGate() {}, release: async () => {} };
   }
   mkdirSync(dirname(lock), { recursive: true });
   const scratch = mkdtempSync(join(tmpdir(), 'gate-slot-holder-'));
@@ -269,8 +378,9 @@ async function acquireSlot(project, run, env, interrupt) {
     publishHolder(env.GATE_SLOT_HOLDER_PATH, project, first.child.pid, run);
     const supervisor = readStat(process.pid);
     const startPath = join(scratch, 'gate-start');
-    return { busy: false, holdSession: first.holdSession, startPath,
-      startGate() { writeFileSync(startPath, 'start'); },
+    return { busy: false, holdSession: first.holdSession, startPath, admissionPath: first.admission,
+      startGate() { writeHandoff(startPath, 'start\n'); },
+      cancelGate: first.cancelGate,
       ownerToken: holderToken(lock, { pid: first.holder.pid, start: first.holder.start }, { pid: supervisor.pid, start: supervisor.start }),
       release: async () => { await first.release(); cleanup(); } };
   }
@@ -280,7 +390,7 @@ async function acquireSlot(project, run, env, interrupt) {
   const heartbeat = () => {
     const holder = currentHolder(env.GATE_SLOT_HOLDER_PATH);
     const waited = (performance.now() - started) / 1000;
-    process.stderr.write(`[gate-tap] ${project}: cargo slot still busy after ${waited.toFixed(1)}s; holder: ${holder}\n`);
+    writeSync(2, `[gate-tap] ${project}: cargo slot still busy after ${waited.toFixed(1)}s; holder: ${holder}\n`);
     if (run) appendEvent(run, { kind: 'wait', project, resource: 'cargo-slot', holder });
   };
   heartbeat();
@@ -300,8 +410,9 @@ async function acquireSlot(project, run, env, interrupt) {
   publishHolder(env.GATE_SLOT_HOLDER_PATH, project, blocked.child.pid, run);
   const supervisor = readStat(process.pid);
   const startPath = join(scratch, 'gate-start');
-  return { busy: false, holdSession: blocked.holdSession, startPath,
-    startGate() { writeFileSync(startPath, 'start'); },
+  return { busy: false, holdSession: blocked.holdSession, startPath, admissionPath: blocked.admission,
+    startGate() { writeHandoff(startPath, 'start\n'); },
+    cancelGate: blocked.cancelGate,
     ownerToken: holderToken(lock, { pid: blocked.holder.pid, start: blocked.holder.start }, { pid: supervisor.pid, start: supervisor.start }),
     release: async () => { await blocked.release(); cleanup(); } };
 }
@@ -513,12 +624,18 @@ async function main() {
   };
   for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.on(signal, forward(signal));
 
-  // A detached flock process owns the slot outside the gate's group. Once told the gate's session,
+  // A detached holder process owns the slot outside the gate's group. Once told the gate's session,
   // it ignores tap-pipe EOF and holds the lock until that session is empty. Before that message,
   // EOF releases it because no recipe has run. This is why SIGKILL of the tap cannot free a live
   // recipe's lock, while an interrupt during admission releases the waiter and records no verdict.
   const slot = await acquireSlot(project, run, process.env, slotInterrupt);
-  if (slot.interrupted) process.exit(signalExit(slot.interrupted));
+  if (slot.interrupted) {
+    try {
+      writeSync(3, `${JSON.stringify({ signals: recognizer.signals(), ...recognizer.summary(),
+        stopped: { by: null, signal: slot.interrupted } })}\n`);
+    } catch { /* no fd 3: run by hand */ }
+    process.exit(signalExit(slot.interrupted));
+  }
   if (slot.busy) {
     try { writeSync(3, `${JSON.stringify({ signals: recognizer.signals(), ...recognizer.summary(), slotBusy: true })}\n`); }
     catch { /* no fd 3: run by hand */ }
@@ -532,7 +649,7 @@ async function main() {
   if (slot.ownerToken) gateEnv[SLOT_OWNER_ENV] = slot.ownerToken;
   const launched = slot.startPath
     ? { command: process.execPath, args: [resolve(process.argv[1]), '--slot-launch', slot.startPath,
-      String(process.pid), readStat(process.pid).start, '--', command, ...args] }
+      slot.admissionPath, String(process.pid), readStat(process.pid).start, '--', command, ...args] }
     : { command, args };
   child = spawn(launched.command, launched.args, {
     stdio: ['inherit', 'pipe', 'pipe'],
@@ -663,6 +780,7 @@ async function main() {
     recognizer.end(signal ? 1 : code);
     // For a slot gate the detached holder owns the bounded session drain. For every other gate this
     // close path performs no session scan.
+    slot.cancelGate();
     await slot.release();
     try {
       writeSync(3, `${JSON.stringify({ signals: recognizer.signals(), ...recognizer.summary(), ...cost,
@@ -688,13 +806,15 @@ async function main() {
 
 const isMain = import.meta.url === `file://${process.argv[1]}` ||
   import.meta.url === `file://${resolve(process.argv[1])}`;
-if (isMain && process.argv[2] === '--slot-holder') slotHolderMain(...process.argv.slice(3, 7)).catch(error => {
-  process.stderr.write(`gate-slot-holder: ${error?.stack || error}\n`);
-  process.exit(2);
-});
+if (isMain && process.argv[2] === '--slot-holder') {
+  slotHolderMain(...process.argv.slice(3, 9)).then(status => { process.exitCode = status; }).catch(error => {
+    process.stderr.write(`gate-slot-holder: ${error?.stack || error}\n`);
+    process.exitCode = 2;
+  });
+}
 else if (isMain && process.argv[2] === '--slot-launch') {
   const split = process.argv.indexOf('--', 3);
-  slotLaunchMain(process.argv[3], process.argv[4], process.argv[5], process.argv[split + 1], process.argv.slice(split + 2))
+  slotLaunchMain(process.argv[3], process.argv[4], process.argv[5], process.argv[6], process.argv[split + 1], process.argv.slice(split + 2))
     .catch(() => process.exit(127));
 }
 else if (isMain && process.argv[2] === '--verify-slot-owner') {
