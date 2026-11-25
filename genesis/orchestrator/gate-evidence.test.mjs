@@ -470,27 +470,55 @@ test('recordEvidence names REFUSED concurrent update and refusing-to-write as ex
   assert.equal(r.stderr, 'boom\n', 'any other failure passes through unchanged');
 });
 
-test('a completed brit record emits one device-gated crossing verdict and failures stay advisory', () => {
+test('a completed brit record emits a commit-dated verdict with a separate observed time and failures stay advisory', () => {
   const isLeases = (bin, args) => bin === 'epr' && args[0] === 'peer' && args[1] === 'leases';
-  const isNote = (bin, args) => bin === 'epr' && args[0] === 'flow' && args[1] === 'note';
+  const isHelp = (bin, args) => bin === 'epr' && args[0] === 'flow' && args[1] === 'note' && args.includes('--help');
+  const isNote = (bin, args) => bin === 'epr' && args[0] === 'flow' && args[1] === 'note' && !args.includes('--help');
   const isRevParse = (bin, args) => bin === 'git' && args.includes('rev-parse');
   const sha = 'abc0000000000000000000000000000000000000';
+  const newHelp = { status: 0, stdout: 'usage: epr flow note ... [--dated-by <commit-oid>] ...\n' };
   const landed = fakeSpawn([
     [isLeases, { status: 0, stdout: '{"standing":"device"}' }],
     [isRevParse, { status: 0, stdout: `${sha}\n` }],
+    [isHelp, newHelp],
     [isNote, { status: 0, stdout: '' }],
   ]);
   assert.equal(emitGateVerdict(project, 'closure', {
     success: false, seconds: 12.6, commit: 'abc',
     put: { stdout: '{"attestationId":"bafyatt","agentId":"agent"}' },
     root: '/repo', env: {}, spawn: landed.spawn,
+    now: () => new Date('2026-11-25T05:15:42.987Z'),
   }), true);
   const note = landed.calls.find(call => isNote(call.bin, call.args));
   assert.ok(note);
   for (const slot of [
     'project=elohim-storage', 'closure=closure', `commit=${sha}`, 'success=false', 'seconds=13',
-    'attestationId=bafyatt', 'agentId=agent',
+    'observedAt=2026-11-25T05:15:42Z', 'attestationId=bafyatt', 'agentId=agent',
   ]) assert.ok(note.args.includes(slot), slot);
+  assert.equal(note.args[note.args.indexOf('--dated-by') + 1], sha);
+
+  // An epr older than --dated-by does not refuse the flag (its structured arm ignores flags it
+  // does not know), so it is asked first: one whose note help does not name the flag gets the
+  // exact legacy form (no --dated-by, no observedAt), which readers show as observed unknown.
+  const legacyNote = (bin, args) => isNote(bin, args) && !args.includes('--dated-by');
+  const skewed = fakeSpawn([
+    [isLeases, { status: 0, stdout: '{"standing":"device"}' }],
+    [isRevParse, { status: 0, stdout: `${sha}\n` }],
+    [isHelp, { status: 0, stdout: 'usage: epr flow note ... [--measures PATH] ...\n' }],
+    [legacyNote, { status: 0, stdout: '' }],
+  ]);
+  const skewWarnings = [];
+  assert.equal(emitGateVerdict(project, 'closure', {
+    success: true, seconds: 3, commit: 'abc', put: {}, root: '/repo', env: {}, spawn: skewed.spawn,
+    now: () => new Date('2026-11-25T05:15:42.987Z'), warn: line => skewWarnings.push(line),
+  }), true);
+  const legacy = skewed.calls.filter(call => legacyNote(call.bin, call.args));
+  assert.equal(legacy.length, 1, 'the legacy form is written once');
+  assert.ok(!skewed.calls.some(call => isNote(call.bin, call.args) && call.args.includes('--dated-by')),
+    'an epr that does not know --dated-by is never handed it');
+  assert.ok(!legacy[0].args.some(arg => arg.startsWith('observedAt=')), 'no observed time over a HEAD date');
+  assert.ok(legacy[0].args.includes(`commit=${sha}`));
+  assert.match(skewWarnings.join(''), /predates --dated-by; written in the legacy form/);
 
   const skipped = fakeSpawn([[isLeases, { status: 0, stdout: '{"standing":"not_a_device"}' }]]);
   const warnings = [];
@@ -516,6 +544,7 @@ test('a completed brit record emits one device-gated crossing verdict and failur
   const failed = fakeSpawn([
     [isLeases, { status: 0, stdout: '{"standing":"device"}' }],
     [isRevParse, { status: 0, stdout: `${sha}\n` }],
+    [isHelp, newHelp],
     [isNote, { status: 2, stdout: '', stderr: 'refused\n' }],
   ]);
   assert.equal(emitGateVerdict(project, 'closure', {
@@ -538,6 +567,8 @@ test('a linked worktree emits and reads verdicts at the main checkout the daemon
     [isCommonDir, { status: 0, stdout: '/main/.git\n' }],
     [isCommit, { status: 0, stdout: `${sha}\n` }],
     [(bin, args) => isEpr(bin) && args[1] === 'leases', { status: 0, stdout: '{"standing":"device"}' }],
+    [(bin, args) => isEpr(bin) && args[1] === 'note' && args.includes('--help'),
+      { status: 0, stdout: 'usage: epr flow note ... [--dated-by <commit-oid>]\n' }],
     [(bin, args) => isEpr(bin) && args[1] === 'note', { status: 0, stdout: '' }],
     [(bin, args) => isEpr(bin) && args[1] === 'verdicts', { status: 0, stdout: '[]' }],
   ]);
@@ -547,14 +578,15 @@ test('a linked worktree emits and reads verdicts at the main checkout the daemon
   }), true);
   assert.deepEqual(siblingVerdicts(project, 'closure', { root: worktree, env: {}, spawn: linked.spawn }), { candidates: [] });
   const epr = linked.calls.filter(call => isEpr(call.bin));
-  assert.deepEqual(epr.map(call => call.args[1]), ['leases', 'note', 'verdicts']);
+  // leases, the --dated-by capability probe (note --help), the note itself, then the read.
+  assert.deepEqual(epr.map(call => call.args[1]), ['leases', 'note', 'note', 'verdicts']);
   for (const call of epr) {
     assert.equal(call.args[call.args.indexOf('--root') + 1], '/main', call.args.join(' '));
     assert.equal(call.opts.cwd, '/main');
   }
   // The commit that crosses is still resolved in the pushing worktree, where HEAD is.
   assert.equal(linked.calls.find(call => isCommit(call.bin, call.args)).opts.cwd, worktree);
-  assert.ok(epr[1].args.includes(`commit=${sha}`));
+  assert.ok(epr[2].args.includes(`commit=${sha}`));
 
   // A submodule, a bare repository or no answer keeps the root it was given.
   for (const [stdout, status] of [['/main/.git/modules/brit\n', 0], ['/srv/repo.git\n', 0], ['', 128], ['.git\n', 0]]) {

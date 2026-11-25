@@ -230,8 +230,10 @@ pub fn notes_across(
         view.via.clone_from(&source.via);
         matched.push((OccurredAtKey::parse(&event.occurred_at), index, view));
     }
-    // Ascending by (time, append order), then reversed: newest first with the LAST-appended
-    // note of an exact timestamp tie leading, which is the order a session authored them in.
+    // Ascending by (history time, append order), then reversed: newest first with the
+    // LAST-appended note of an exact timestamp tie leading, which is the order a session authored
+    // them in. For gate-verdict@1, occurred_at is the judged commit's author date; the separate
+    // env:observedAt slot is display/freshness data and deliberately does not participate here.
     matched.sort_by(|a, b| a.0.cmp(&b.0).then_with(|| a.1.cmp(&b.1)));
     matched
         .into_iter()
@@ -282,6 +284,32 @@ pub fn note_view(cid: &Cid, event: &elohim_epr_rea::FlowEvent) -> NoteView {
         }
     }
     view
+}
+
+/// A gate verdict's run observation time.
+///
+/// The outer option distinguishes a gate verdict from every other note. The inner option is
+/// absent for a legacy gate verdict (or a malformed duplicate slot), which readers render as
+/// unknown rather than falling back to the verdict's historical `occurred_at`.
+pub fn gate_verdict_observed_at(view: &NoteView) -> Option<Option<&str>> {
+    if view.reason.as_deref() != Some("verdict")
+        || !view
+            .extra
+            .iter()
+            .any(|slot| slot == "measure:gate-verdict@1")
+    {
+        return None;
+    }
+    let mut values = view
+        .extra
+        .iter()
+        .filter_map(|slot| slot.strip_prefix("env:observedAt="));
+    let observed = values.next();
+    Some(if values.next().is_none() {
+        observed
+    } else {
+        None
+    })
 }
 
 #[cfg(test)]

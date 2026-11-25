@@ -11,7 +11,9 @@ use std::path::Path;
 
 use elohim_epr_cli::flow::note::NoteActor;
 use elohim_epr_cli::flow::{claim, context, fulfill, ledger, note, project, seal, stocks, walk};
-use elohim_epr_rea::{FlowRecord, FlowStore, SidecarFlowStore};
+use elohim_epr_rea::{
+    AgentRef, FlowEvent, FlowRecord, FlowStore, Magnitude, ReaVerb, SidecarFlowStore,
+};
 use tempfile::TempDir;
 
 fn git(root: &Path, args: &[&str]) {
@@ -1502,6 +1504,65 @@ fn the_ledger_lists_claim_fulfilment_and_notes_in_order_with_the_via_marker() {
         .entries
         .iter()
         .all(|e| e.occurred_at.len() >= 10 && e.occurred_at.starts_with("20")));
+}
+
+#[test]
+fn gate_verdict_ledger_rows_carry_observed_time_or_unknown() {
+    let dir = valueflow_fixture();
+    let root = dir.path();
+    let resource = elohim_epr_cli::flow::body_cid_of_file(&root.join("plans/epic.md")).unwrap();
+    let mut store = SidecarFlowStore::open(root).unwrap();
+    for observed in [Some("2026-11-25T05:15:42Z"), None] {
+        let mut classified_as = vec![
+            "run:observation".to_string(),
+            "plans/epic.md".to_string(),
+            "reason:verdict".to_string(),
+            "measure:gate-verdict@1".to_string(),
+            "env:commit=abc123".to_string(),
+        ];
+        if let Some(observed) = observed {
+            classified_as.push(format!("env:observedAt={observed}"));
+        }
+        store
+            .append(FlowRecord::Event(FlowEvent {
+                action: ReaVerb::Cite,
+                provider: AgentRef("agent:gate@fixture".into()),
+                receiver: AgentRef("repo:ethosengine/elohim".into()),
+                resource,
+                quantity: Magnitude::Count {
+                    value: 1.0,
+                    unit: "run-note".into(),
+                },
+                process: None,
+                in_scope_of: resource,
+                fulfills: Vec::new(),
+                satisfies: Vec::new(),
+                classified_as,
+                occurred_at: "2026-11-25T05:07:09Z".into(),
+            }))
+            .unwrap();
+    }
+
+    let result = ledger::ledger(root, "plans/epic.md").expect("ledger runs");
+    let verdicts: Vec<_> = result
+        .entries
+        .iter()
+        .filter(|entry| {
+            entry
+                .extra
+                .iter()
+                .any(|slot| slot == "measure:gate-verdict@1")
+        })
+        .collect();
+    assert_eq!(verdicts.len(), 2);
+    assert_eq!(
+        verdicts[0].observed_at.as_deref(),
+        Some("2026-11-25T05:15:42Z")
+    );
+    assert_eq!(verdicts[1].observed_at.as_deref(), Some("unknown"));
+    assert!(verdicts
+        .iter()
+        .all(|entry| entry.occurred_at == "2026-11-25T05:07:09Z"));
 }
 
 #[test]
