@@ -31,6 +31,11 @@
       "items": { "type": "integer", "minimum": 1 },
       "description": "Pids of the gate still alive after the KILL wait, when any."
     },
+    "requests": {
+      "type": "array",
+      "items": { "type": "string", "pattern": "^[0-9a-f]{16}$" },
+      "description": "The id of each stop request this stop answers (the request's own `id`), so the stop verb confirms only its own request."
+    },
     "escaped": {
       "type": "array",
       "items": {

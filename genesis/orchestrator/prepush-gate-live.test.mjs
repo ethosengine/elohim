@@ -330,7 +330,7 @@ test("an unmarked stop point is read again after the landing claim; a stop there
   while (!/STOP-EXIT=/.test(existsSync(join(dir, "stop.out")) ? readFileSync(join(dir, "stop.out"), "utf8") : "") && Date.now() < until) spawnSync("sleep", ["0.1"]);
   const out = readFileSync(join(dir, "stop.out"), "utf8");
   assert.match(out, /STOP-EXIT=0/, out);
-  assert.match(out, /the run took the stop \(landing-handoff\)/, out);
+  assert.match(out, /the run took this stop \(landing-handoff\)/, out);
 });
 
 test("an unmarked stop point that the push passes: a later stop never gets exit 0", (t) => {

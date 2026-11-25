@@ -295,7 +295,7 @@ function main() {
     probedSize = size;
     const request = stopNowRequest(run);
     if (!request) return;
-    stopping = { by: request.by ?? null, reason: request.reason ?? null };
+    stopping = { by: request.by ?? null, reason: request.reason ?? null, id: request.id ?? null };
     if (!leaderHeld()) {
       // The recipe already ended on its own; only its output can still be open.
       stopping.ended = Promise.resolve(nothing);
@@ -328,7 +328,7 @@ function main() {
       if (escapeTimer) clearTimeout(escapeTimer);
       const by = stoppedBy({ code, signal, exitAt }, ended.toLeader);
       if (by) {
-        stopped = { by: asked.by, ...(asked.reason ? { reason: asked.reason } : {}), signal: ended.signal,
+        stopped = { by: asked.by, ...(asked.reason ? { reason: asked.reason } : {}), ...(asked.id ? { request: asked.id } : {}), signal: ended.signal,
           ...(ended.survivors.length ? { survivors: ended.survivors } : {}),
           ...(stray ? { escaped: stray } : {}) };
         process.stderr.write(`[gate-tap] ${project}: stopped on request${asked.by ? ` by ${asked.by}` : ''}: `

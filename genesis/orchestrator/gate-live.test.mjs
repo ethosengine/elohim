@@ -86,6 +86,7 @@ test('exports only the public run-log functions', () => {
     'hearsRed',
     'isDeviceId',
     'liveRoot',
+    'liveStopIds',
     'matchSubscriptions',
     'meantForDevice',
     'noteUnsentReds',

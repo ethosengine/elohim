@@ -585,6 +585,9 @@ function closedBefore(path, instant) {
 export function requestStop(path, { reason = '', now, by = null, immediate = false } = {}) {
   return appendEvent(path, {
     kind: 'stop-request',
+    // The request's own id: the run's stopped records name the requests they honoured, and the
+    // stop verb answers 0 only on a record naming its id.
+    id: randomBytes(8).toString('hex'),
     ...(reason ? { reason } : {}),
     ...(by ? { by } : {}),
     ...(immediate ? { immediate: true } : {}),
@@ -612,6 +615,17 @@ export function stopCounts(stop, boundary) {
 // The run's own records that it took a stop: the hook or a runner refusing or starting no further
 // gate on it (stop-honoured), or a gate it ended (gate-stopped).
 const STOPPED_RECORDS = new Set(['stop-honoured', 'gate-stopped']);
+
+/** The ids of the stop requests that still count: what a stopped record names as honoured. */
+export function liveStopIds(path) {
+  try {
+    return liveStops(parseEvents(readFileSync(path, 'utf8'))).map((event) => event.id).filter((id) => typeof id === 'string');
+  } catch {
+    return [];
+  }
+}
+
+const names = (record, id) => Array.isArray(record?.requests) && record.requests.includes(id);
 
 export function stopRequested(path) {
   try {
@@ -651,26 +665,38 @@ function runningGate(events) {
 }
 
 /**
- * After this caller's stop request (`requested`, the appended event): waits, at most `timeoutMs`,
- * for the run's own answer in its log, and reports what happened, never what was asked:
- * - 'confirmed': the run recorded that it took a stop (stop-honoured or gate-stopped); with `now`,
- *   also its close. The push is refused.
- * - 'proceeding': the request is at or after the stop-point mark, or the run closed without a
- *   stopped record. The push goes on (or was refused for another reason: `outcome` says which).
- * - 'unconfirmed': neither within the bound; `gate` names a gate still running.
+ * After this caller's stop request (`requested`, the appended event, with its `id`): waits, at most
+ * `timeoutMs` on a monotonic clock, for the run's own answer, and reports what happened to THIS
+ * request, never what was asked:
+ * - 'confirmed': a stopped record (stop-honoured or gate-stopped) names this request's id; with
+ *   `now`, the run has also closed. This request stopped this run.
+ * - 'already-stopped': this request came after the stop-point mark (a tie included), or the run
+ *   closed without naming it, while another request's stop was honoured: the push is refused,
+ *   but not by this request.
+ * - 'proceeding': it came after the mark, or the run closed without naming it, and no stop was
+ *   honoured; `outcome` is the close's, when the run closed.
+ * - 'unconfirmed': none of these within the bound (a mark that this request precedes is not an
+ *   answer: the hook reads the stops before its mark and honours them); `gate` names a gate running.
  */
-export async function awaitStopAnswer(path, requested, { timeoutMs, now = false, pollMs = 200, sleep = delay } = {}) {
-  const deadline = Date.now() + timeoutMs;
+export async function awaitStopAnswer(path, requested, { timeoutMs, now = false, pollMs = 200, sleep = delay,
+  clock = () => performance.now() } = {}) {
+  const deadline = clock() + timeoutMs;
   for (;;) {
     let events = [];
     try { events = parseEvents(readFileSync(path, 'utf8')); } catch { return { state: 'unconfirmed', gate: null }; }
     const boundary = events.find((event) => event.kind === 'stop-boundary');
-    const record = events.find((event) => STOPPED_RECORDS.has(event.kind));
+    const mine = events.find((event) => STOPPED_RECORDS.has(event.kind) && names(event, requested.id));
+    const other = events.find((event) => STOPPED_RECORDS.has(event.kind));
     const close = events.find((event) => event.kind === 'run-close');
-    if (record && (!now || close)) return { state: 'confirmed', record, close: close ?? null };
-    if (!record && (!stopCounts(requested, boundary) || close)) return { state: 'proceeding', outcome: close?.outcome ?? null };
-    if (Date.now() >= deadline) return { state: 'unconfirmed', gate: runningGate(events) };
-    await sleep(Math.min(pollMs, Math.max(1, deadline - Date.now())));
+    if (mine && (!now || close)) return { state: 'confirmed', record: mine, close: close ?? null };
+    if (!mine && (close || !stopCounts(requested, boundary))) {
+      if (other) return { state: 'already-stopped', outcome: close?.outcome ?? null };
+      // After the mark, a stop the hook read before it may still be honoured: wait for its record.
+      const pending = liveStops(events).length > 0;
+      if (close || !pending) return { state: 'proceeding', outcome: close?.outcome ?? null };
+    }
+    if (clock() >= deadline) return { state: 'unconfirmed', gate: runningGate(events) };
+    await sleep(Math.min(pollMs, Math.max(1, deadline - clock())));
   }
 }
 
@@ -1458,10 +1484,12 @@ const USAGE = `Usage:
   node gate-live.mjs stop [--run PATH | --session S | --latest] [--reason R] [--now] [--wait S]
         stop reports what the RUN did, never what was asked. It appends the request, then waits
         (--wait S; default 30 s, plus the stop grace with --now) for the run's own answer:
-        exit 0 once the run recorded that it took the stop (with --now, once it also closed),
-        exit 1 when the run passed its last stop point or closed without taking it,
-        exit 2 when the run did not answer in time ("the push may be proceeding"). A plain stop
-        is taken at the run's next check between gates, so a long running gate can mean exit 2.
+        exit 0 only on a record naming THIS request's id (with --now, once the run also closed):
+        this request stopped this run; exit 1 when nothing was stopped by it (the run already
+        ended or looks abandoned, came after the last stop point, or another request's stop was
+        honoured), each said; exit 2 when the run did not answer in time ("the push may be
+        proceeding"). A plain stop is taken at the run's next check between gates, so a long
+        running gate can mean exit 2.
         A stop refuses the push until the run's last stop point (the hook's stop_point, just before
         a hand-over or non-landing push passes and before a dev landing claims dev-integration);
         after it the push proceeds, and stop says so and exits 1. If the hook cannot mark that point
@@ -1698,44 +1726,55 @@ async function main(argv) {
         if (!path || !isFile(path)) throw new Error('no running gate run to stop');
         const { events: before, outcome: state } = readRun(path);
         const pushRun = before.find((event) => event.kind === 'run-open')?.candidate?.target !== 'just gate';
-        // Past its last stop point a push proceeds, and no stop can refuse it any more: said, and non-zero.
-        if (pushRun && (before.some((event) => event.kind === 'stop-boundary') || state === 'passed' || state === 'gates-passed')) {
-          process.stdout.write(`[gate-live] stop: this run has passed its last stop point; the push is proceeding (${path})\n`);
+        const closed = before.find((event) => event.kind === 'run-close');
+        const otherStopped = before.some((event) => STOPPED_RECORDS.has(event.kind));
+        // Exit 0 means "this request stopped this run": with no request made, never.
+        if (closed) {
+          process.stdout.write(otherStopped
+            ? `[gate-live] stop: nothing was stopped by this request: the run already ended (${state}), stopped by another request (${path})\n`
+            : pushRun && (state === 'passed' || state === 'gates-passed')
+              ? `[gate-live] stop: this run has passed its last stop point; the push is proceeding (${path})\n`
+              : `[gate-live] stop: nothing was stopped: the run already ended (${state}); nothing appended (${path})\n`);
           return 1;
         }
         if (state !== 'running') {
-          // Nothing is left to stop, so nothing is appended: a closed run's log keeps its last line.
-          process.stdout.write(`[gate-live] stop: ${path} already ended (${state}); nothing was stopped, nothing appended\n`);
-          return 0;
+          const hours = Math.round((Date.now() - statSync(path).mtimeMs) / 3_600_000);
+          process.stdout.write(`[gate-live] stop: nothing was stopped: the run looks abandoned (no record for ${hours} hours, never closed); nothing appended (${path})\n`);
+          return 1;
         }
         // Who asked, for the stopped line: this caller's session (`epr session id`), when it has one.
         const by = resolveSession();
         const requested = requestStop(path, { reason: options.reason, by, immediate: options.now === true });
         if (requested === null) throw new Error(`could not request a stop on ${path}`);
-        process.stdout.write(`stop requested: ${path}\n`);
-        // The answer is the run's own record, never this request: exit 0 only once the run took it.
+        process.stdout.write(`stop requested: ${path} (request ${requested.id})\n`);
+        // The answer is the run's own record naming this request, never this request itself.
         let waitS = options.wait;
         if (waitS === undefined) {
           const { stopGraceMs } = await import('./gate-stop.mjs');
           waitS = options.now === true ? 30 + Math.ceil(stopGraceMs() / 1000) : 30;
         }
         const answer = await awaitStopAnswer(path, requested, { timeoutMs: waitS * 1000, now: options.now === true });
-        if (answer.state === 'confirmed') {
-          const { record, close } = answer;
-          process.stdout.write(record.kind === 'gate-stopped'
-            ? `[gate-live] ${record.project} stopped (${record.signal ?? 'nothing left to signal'}); no verdict recorded; the run closed ${close?.outcome ?? 'later'} and the push is refused\n`
-            : `[gate-live] the run took the stop (${record.where ?? 'stop'}): no gate after this starts, and the push is refused\n`);
-          return 0;
+        switch (answer.state) {
+          case 'confirmed': {
+            const { record, close } = answer;
+            process.stdout.write(record.kind === 'gate-stopped'
+              ? `[gate-live] ${record.project} stopped by this request (${record.signal ?? 'nothing left to signal'}); no verdict recorded; the run closed ${close?.outcome ?? 'later'} and the push is refused\n`
+              : `[gate-live] the run took this stop (${record.where ?? 'stop'}): no gate after this starts, and the push is refused\n`);
+            return 0;
+          }
+          case 'already-stopped':
+            process.stdout.write('[gate-live] stop: this run has passed its last stop point; it was already stopped by another request\n');
+            return 1;
+          case 'proceeding':
+            process.stdout.write(answer.outcome && answer.outcome !== 'passed' && answer.outcome !== 'gates-passed'
+              ? `[gate-live] stop: the run ended (${answer.outcome}) before taking this stop; the push is refused by its own result, not by this stop\n`
+              : `[gate-live] stop: this run has passed its last stop point; the push is proceeding (${path})\n`);
+            return 1;
+          default:
+            process.stdout.write(`[gate-live] stop requested but not confirmed by the run within ${waitS} s; the push may be proceeding`
+              + `${answer.gate ? ` (${answer.gate} is running; a plain stop lets it finish first${options.now === true ? ', and an untapped gate cannot be ended' : ''})` : ''}\n`);
+            return 2;
         }
-        if (answer.state === 'proceeding') {
-          process.stdout.write(answer.outcome && answer.outcome !== 'passed' && answer.outcome !== 'gates-passed'
-            ? `[gate-live] stop: the run ended (${answer.outcome}) before taking this stop; the push is refused by its own result, not by this stop\n`
-            : `[gate-live] stop: this run has passed its last stop point; the push is proceeding (${path})\n`);
-          return 1;
-        }
-        process.stdout.write(`[gate-live] stop requested but not confirmed by the run within ${waitS} s; the push may be proceeding`
-          + `${answer.gate ? ` (${answer.gate} is running; a plain stop lets it finish first${options.now === true ? ', and an untapped gate cannot be ended' : ''})` : ''}\n`);
-        return 2;
       }
       case 'outlook':
         if (await outlook(resolve(root, options.run), String(options.remaining ?? '').split(/\s+/).filter(Boolean), { root }) === null) {
@@ -1744,7 +1783,9 @@ async function main(argv) {
         return 0;
       case 'honour':
         // The hook or a runner taking a stop: the run's own record, which `stop` waits for.
-        if (appendEvent(resolve(root, options.run), { kind: 'stop-honoured', ...(options.where ? { where: options.where } : {}) }) === null) {
+        // It names the requests it honours: those that still count now, read by the same rule as the hook.
+        if (appendEvent(resolve(root, options.run), { kind: 'stop-honoured', ...(options.where ? { where: options.where } : {}),
+          requests: liveStopIds(resolve(root, options.run)) }) === null) {
           throw new Error(`could not record the stop on ${options.run}`);
         }
         return 0;

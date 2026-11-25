@@ -29,7 +29,7 @@ import { CLAIMED_EXIT_CODE, runAttested } from './gate-attest.mjs';
 import { affectedPackages, loadMetadata, metadataToolchain } from './cargo-affected.mjs';
 import { isReadPattern, SUITE_READ_LISTS, readSet } from './gate-input-audit.mjs';
 import { crateKeys, EPRFS_RECIPE_STEP_COVERAGE } from './crate-keys.mjs';
-import { appendEvent, closeRun, formatHarvest, harvest, openRun, outlook, resolveSession, stopRequested } from './gate-live.mjs';
+import { appendEvent, closeRun, formatHarvest, harvest, liveStopIds, openRun, outlook, resolveSession, stopRequested } from './gate-live.mjs';
 import { emitLive, formatRow, onRedPolicy, runPreflight } from './gate-preflight.mjs';
 import { prepareTask, readTaskStatus, taskAnswer, taskEnabled } from './gate-task.mjs';
 import { SUITE_EXPECT_ENV, SUITE_RESULT_ENV, dirtyAfterRun, encodeExpectation, readResult, suiteDecision } from './suite-inventory.mjs';
@@ -925,6 +925,8 @@ export function runProject(project, printOnly, namesOnly, {
     }
     liveEvent(env, {
       kind: 'gate-stopped', project: project.name, ...(step ? { step } : {}), by: stopped.by || null,
+      // The request this stop answers, so `gate-live.mjs stop` confirms only its own.
+      requests: stopped.request ? [stopped.request] : [],
       signal: stopped.signal || null, ...(stopped.survivors?.length ? { survivors: stopped.survivors } : {}),
       ...(stopped.escaped ? { escaped: stopped.escaped.map(h => ({ pid: h.pid, ...(h.cmd ? { cmd: h.cmd.slice(0, 120) } : {}) })) } : {}),
       evidence: 'none',
@@ -1578,7 +1580,7 @@ if (isMain) {
     if (!stopping && process.env.GATE_LIVE_RUN && stopRequested(process.env.GATE_LIVE_RUN)) {
       stopping = 'stop requested on the live run';
       // The run's own record that it took the stop, which `gate-live.mjs stop` waits for.
-      if (ownRun) appendEvent(ownRun, { kind: 'stop-honoured', where: 'between-gates' });
+      if (ownRun) appendEvent(ownRun, { kind: 'stop-honoured', where: 'between-gates', requests: liveStopIds(ownRun) });
     }
     if (stopping) { notRun.push(project.name); continue; }
     // Unless pre-push already set it, the gates after this one, for the tap's mid-gate outlook.
@@ -1598,7 +1600,7 @@ if (isMain) {
     failed = 1;
   } else if (process.env.GATE_LIVE_RUN && stopRequested(process.env.GATE_LIVE_RUN)) {
     // A stop that came after the last gate started still refuses: every verdict reached stands.
-    if (ownRun) appendEvent(ownRun, { kind: 'stop-honoured', where: 'after-gates' });
+    if (ownRun) appendEvent(ownRun, { kind: 'stop-honoured', where: 'after-gates', requests: liveStopIds(ownRun) });
     process.stdout.write('[gate] stopped: a stop was requested on the live run after the last gate started; the run is refused\n');
     failed = 1;
   }
