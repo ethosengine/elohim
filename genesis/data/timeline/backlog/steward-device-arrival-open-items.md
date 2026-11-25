@@ -3093,3 +3093,35 @@ build reads (schemas and generated types are likely; agent scripts and package f
 not). Narrowing it edits the Edge manifest, which is itself an Edge input, so it belongs with the
 next deliberate roll. A stop request that cannot interrupt a running gate is a second cost here
 and has no row of its own yet.
+
+## Row 95 — a requested stop now ends the running gate; what six reviews left open
+
+Landed 2026-11-25 from shem (`gate-live.mjs stop --run <file> --now`). On the same day a refused
+push had spent about 100 minutes finishing an `elohim-storage` gate for a closure that could not
+land, because a stop only prevented gates that had not started. The change went through six
+independent read-only reviews (receipts `review-gate-stop*-receipt.md` in the f4-ask campaign
+directory on shem). What they settled: a gate is "stopped" only when a signal sent to its own
+verified leader precedes the leader's death by that same signal or its 128+N exit code; every
+other exit records what it recorded before; the stop command exits 0 only on a run record naming
+its own request.
+
+Rulings made by the integrator, not by the steward, and open to being overruled:
+- An independent kill of the gate by the same signal inside the window after a requested stop
+  cannot be told apart from the stop and is treated as stopped. No green can result; a real red
+  in that window is not recorded.
+- The last review marked one item blocking under the criterion "a push with no stop request must
+  not be delayed": the stop point adds one more append to the run log, and an append can wait up
+  to 10 s on a live lock holder. It was landed as it is, because every event the hook already
+  writes takes the same lock with the same bound, so this is one more of an existing bounded
+  wait and not a new kind.
+
+Not cured:
+- Any local process that can write a run log can stop another session's landing, or forge the
+  record that acknowledges a stop. There is no authentication.
+- A stop after the last stop point does not stop the landing; the command says so.
+- An untapped gate (`GATE_TAP=off`) cannot be ended; a process that leaves the gate's tree is
+  named, not ended.
+- Nothing was exercised against a real cargo gate dying mid-build, nor on the `ark task run`
+  path. Every gate now runs in its own session; no recipe is known to need a controlling
+  terminal, and none was tested for it.
+- No second device has run it. Under the standing rule a gate change is not met until one has.
