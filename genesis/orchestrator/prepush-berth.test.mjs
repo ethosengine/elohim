@@ -59,6 +59,8 @@ case "$1" in
  owner-check) m=$(mode "owner:$2"); [ "$m" = 0 ] && exit 0; echo "$2: REFUSED — held by a watcher" >&2; exit "$m";;
  release) m=$(mode "release:$2"); [ "$m" = 0 ] || { echo "$2: release failed" >&2; exit 1; }; echo "$2: released"; exit 0;;
  claim)
+  [ ! -f "$here/hang" ] || { trap '' TERM; sleep 300; }
+  [ ! -f "$here/refuse" ] || { echo "$2: REFUSED — held by did:key:z6MkOther/claude-2" >&2; exit 3; }
   n=$(grep -c "|claim $2 " "$here/calls.log" 2>/dev/null || true); m=$(mode "$2"); token=1001.125
   [ "$m" != N ] || [ "$n" -lt 2 ] || token=1009.500
   case "$m" in
@@ -761,4 +763,69 @@ test("a_known_pusher_alive_at_the_limit_is_released_unconfirmed", async (t) => {
     new RegExp(`settle ${HEAD} unconfirmed dev=111111111111 tool=brit wait=limit reason=push-still-running held=`),
   );
   assert.ok(existsSync(join(fx.dir, "proc/90082/stat")));
+});
+
+const agentPid = (fx) =>
+  Number(argv(calls(fx).find((l) => argv(l).startsWith("moor --session pre-push-"))).match(/ --pid (\d+) /)[1]);
+const alive = (pid) => {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+};
+const releases = (fx) => calls(fx).filter((l) => argv(l).startsWith("release dev-integration ")).length;
+const liveBrit = (fx, pid) => [
+  { pid: pid - 1, comm: "sh", argv: ["sh", "-e", ".husky/pre-push"] },
+  { pid, comm: "brit", exe: BRIT_EXE, argv: ["brit", "push", "origin", "HEAD:dev"] },
+];
+test("a_renewal_that_hangs_forever_still_ends_the_agent_by_its_deadline_releasing_once", async (t) => {
+  const fx = fixture(t),
+    r = runBlock(fx, {
+      env: chainEnv(fx, liveBrit(fx, 90092), {
+        REMOTE_SHA: BASE,
+        BERTH_PREPUSH_TTL_S: "3",
+        PHASE_L_LIMIT_S: "3",
+        PHASE_L_SETTLE_S: "3",
+        PHASE_L_KILL_S: "1",
+        PHASE_L_GRACE_S: "5",
+      }),
+    }),
+    handed = Date.now();
+  assert.equal(r.status, 0, r.out);
+  writeFileSync(join(fx.bin, "hang"), "");
+  // Deadline: the hand-over + 3 + 3 s; the hung renewal is cut to end by it, then the release runs.
+  const s = await pollSettle(fx, / settle /, 20000),
+    pid = agentPid(fx);
+  assert.match(settleLine(s), new RegExp(`settle ${HEAD} unconfirmed dev= tool=brit reason=`));
+  assert.ok(Date.now() - handed < 6000 + 8000, `settled ${Date.now() - handed} ms after the hand-over`);
+  await pollCalls(fx, () => !alive(pid), 10000);
+  assert.equal(releases(fx), 1, calls(fx).join("\n"));
+});
+test("a_refused_renewal_records_renewal_refused_and_releases_nothing_it_does_not_hold", async (t) => {
+  const fx = fixture(t),
+    r = runBlock(fx, {
+      env: chainEnv(fx, liveBrit(fx, 90094), { REMOTE_SHA: BASE, BERTH_PREPUSH_TTL_S: "3" }),
+    });
+  assert.equal(r.status, 0, r.out);
+  writeFileSync(join(fx.bin, "refuse"), "");
+  const s = await pollSettle(fx, / settle /, 6000);
+  assert.match(
+    settleLine(s),
+    new RegExp(`settle ${HEAD} unconfirmed dev=111111111111 tool=brit reason=renewal-refused held=\\d+s released=not-held`),
+  );
+  assert.equal(releases(fx), 0, calls(fx).join("\n"));
+});
+test("a_terminated_agent_releases_once_and_records_why", async (t) => {
+  const fx = fixture(t),
+    r = runBlock(fx, { env: chainEnv(fx, liveBrit(fx, 90096), { REMOTE_SHA: BASE }) });
+  assert.equal(r.status, 0, r.out);
+  const pid = agentPid(fx);
+  await new Promise((x) => setTimeout(x, 600));
+  process.kill(pid, "SIGTERM");
+  const s = await pollSettle(fx, / settle /, 4000);
+  assert.match(settleLine(s), new RegExp(`settle ${HEAD} unconfirmed dev= tool=brit reason=terminated:TERM held=\\d+s released=ok`));
+  await pollCalls(fx, () => !alive(pid), 4000);
+  assert.equal(releases(fx), 1, calls(fx).join("\n"));
 });

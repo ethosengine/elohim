@@ -470,22 +470,63 @@ phase_l_agent_say() { # kind, text (one status line per text line)
   done <<<"$2"
 }
 
-# Every subprocess the agent runs is bounded and killed if it ignores TERM (`timeout -k`): berth calls
-# take at most BERTH_PREPUSH_CALL_S (60) and, after the hand-over, never past the agent's deadline;
-# the release always gets its own 60 s and the unmoor 10 s, each plus PHASE_L_KILL_S (5) to KILL.
-phase_l_agent_bound() { # seconds → that, or less so the call ends by the agent's deadline (min 1)
+# Every subprocess the agent runs is bounded and killed if it ignores TERM (`timeout -k`). Berth calls
+# take at most BERTH_PREPUSH_CALL_S (60) and reads PHASE_L_READ_S (30), and none STARTS unless it
+# and its PHASE_L_KILL_S (5) KILL escalation end by the agent's deadline (PHASE_L_DEADLINE); the
+# release (60 s) and unmoor (10 s), each plus the 5 s KILL, run after it, once (phase_l_agent_end).
+phase_l_agent_bound() { # seconds → that, cut so call + KILL end by the deadline; 1 = no time left
   local s=$1 left
   if [ -n "${PHASE_L_DEADLINE-}" ]; then
-    left=$((PHASE_L_DEADLINE - $(date +%s)))
-    [ "$left" -ge 1 ] || left=1
+    left=$((PHASE_L_DEADLINE - $(date +%s) - PHASE_L_KILL_S))
+    [ "$left" -ge 1 ] || return 1
     [ "$left" -ge "$s" ] || s=$left
   fi
   echo "$s"
 }
 
 phase_l_agent_claim() {
-  PHASE_L_OUT=$(timeout -k "$PHASE_L_KILL_S" "$(phase_l_agent_bound "$PHASE_L_CALL_S")" "$BERTH_BIN" claim dev-integration --class verify --ttl "$BERTH_TTL_S" --offline-ok \
+  local b
+  b=$(phase_l_agent_bound "$PHASE_L_CALL_S") || {
+    PHASE_L_OUT="dev-integration: not renewed: the landing agent's deadline has passed"
+    return 124
+  }
+  PHASE_L_OUT=$(timeout -k "$PHASE_L_KILL_S" "$b" "$BERTH_BIN" claim dev-integration --class verify --ttl "$BERTH_TTL_S" --offline-ok \
     --note "pre-push to${BERTH_TARGETS} for $PHASE_L_FOR" 2>&1)
+}
+
+# The hard deadline, enforced from outside: TERM the agent when it is passed (its trap then releases
+# once), and KILL it PHASE_L_GRACE_S (100) later. Restarted with the new deadline at the hand-over.
+phase_l_agent_watchdog() { # agent pid, deadline (unix s)
+  local agent=$1 at=$2 sig=TERM
+  trap - EXIT TERM INT HUP
+  exec {PHASE_L_IN}<&- </dev/null >/dev/null 2>&1
+  while kill -0 "$agent" 2>/dev/null; do
+    if [ "$(date +%s)" -ge "$at" ]; then
+      kill -"$sig" "$agent" 2>/dev/null
+      [ "$sig" = TERM ] || exit 0
+      sig=KILL at=$(($(date +%s) + ${PHASE_L_GRACE_S:-100}))
+    fi
+    sleep 1
+  done
+}
+
+phase_l_agent_watch() { # deadline: (re)start the watchdog on this agent
+  [ -z "$PHASE_L_WATCHDOG" ] || kill "$PHASE_L_WATCHDOG" 2>/dev/null
+  PHASE_L_DEADLINE=$1
+  phase_l_agent_watchdog "$BASHPID" "$1" &
+  PHASE_L_WATCHDOG=$!
+}
+
+# TERM, INT, HUP or EXIT before the agent has ended: release (and unmoor) exactly once, then exit.
+# A signal that arrives while the release is under way lets it finish.
+phase_l_agent_on_signal() { # name
+  [ -z "$PHASE_L_ENDED" ] || return 0
+  if [ -n "$PHASE_L_SHA" ]; then
+    phase_l_agent_end "settle $PHASE_L_SHA unconfirmed $PHASE_L_TARGET= tool=${PHASE_L_TOOL:-unknown} reason=terminated:$1"
+  else
+    phase_l_agent_end "release terminated:$1"
+  fi
+  exit 0
 }
 
 # A claim that retries while berth's store lock is busy. 2026-11-24, reproduced three times:
@@ -497,7 +538,8 @@ phase_l_agent_claim_patient() {
   local rc tries=0
   phase_l_agent_claim
   rc=$?
-  while [ "$rc" -ne 0 ] && [[ "$PHASE_L_OUT" == *lock-timeout* ]] && [ "$tries" -lt 3 ]; do
+  while [ "$rc" -ne 0 ] && [[ "$PHASE_L_OUT" == *lock-timeout* ]] && [ "$tries" -lt 3 ] &&
+        phase_l_agent_bound "${BERTH_PREPUSH_RENEW_RETRY_S:-2}" >/dev/null; do
     tries=$((tries + 1))
     phase_l_agent_say say "[pre-push] Phase L: the store lock was busy on renew; retrying ($tries of 3)"
     sleep "${BERTH_PREPUSH_RENEW_RETRY_S:-2}" </dev/null
@@ -531,6 +573,11 @@ phase_l_agent_renew() {
      { [ "$rc" -eq 1 ] && [[ "$PHASE_L_OUT" == "dev-integration: renewed here, but "* ]]; }; then
     PHASE_L_RENEWED_AT=$(date +%s)
     return 0
+  fi
+  # berth answered no: this session no longer holds the lease, so nothing is released for it. A
+  # timeout, a passed deadline or a busy store lock is no answer: the lease may still be ours.
+  if [ "$rc" -ne 124 ] && [ "$rc" -ne 137 ] && [[ "$PHASE_L_OUT" != *lock-timeout* ]]; then
+    PHASE_L_NOT_HELD=1
   fi
   phase_l_agent_say berth "$PHASE_L_OUT"
   phase_l_agent_say say "[pre-push] REFUSED: renewing dev-integration while it waited to land was refused (above). The push stops."
@@ -606,9 +653,13 @@ phase_l_agent_override_wait() {
   done
 }
 
-phase_l_agent_end() { # what happened (the settle line's middle)
+phase_l_agent_end() { # what happened (the settle line's middle); runs once
   local out released=ok
-  if [ -n "$PHASE_L_CA" ]; then
+  [ -z "$PHASE_L_ENDED" ] || return 0
+  PHASE_L_ENDED=1
+  if [ -n "$PHASE_L_NOT_HELD" ]; then
+    released=not-held
+  elif [ -n "$PHASE_L_CA" ]; then
     out=$(timeout -k "$PHASE_L_KILL_S" 60 "$BERTH_BIN" release dev-integration --session "$ELOHIM_SESSION_ID" \
       --expected-claimed-at "$PHASE_L_CA" 2>&1) || released="failed:${out//$'\n'/ }"
   fi
@@ -617,10 +668,12 @@ phase_l_agent_end() { # what happened (the settle line's middle)
     "$(($(date +%s) - ${PHASE_L_HELD_FROM:-$(date +%s)}))" "$released"
   # Before a hand-over the hook still reads the verdict from this directory and removes it itself.
   [ -z "$PHASE_L_SHA" ] || rm -rf "$PHASE_L_AGENT_DIR"
+  [ -z "$PHASE_L_WATCHDOG" ] || kill "$PHASE_L_WATCHDOG" 2>/dev/null
 }
 
 phase_l_agent() { # dir, session, for whom
   local rc principal out now remote result
+  set +m # the hook forked this agent under job control; its own children need none
   PHASE_L_AGENT_DIR=$1
   PHASE_L_STATUS="$1/status"
   PHASE_L_FOR=$3
@@ -632,11 +685,15 @@ phase_l_agent() { # dir, session, for whom
   PHASE_L_RENEWED_AT=""
   PHASE_L_HELD_FROM=""
   PHASE_L_DEADLINE=""
+  PHASE_L_WATCHDOG=""
+  PHASE_L_ENDED=""
+  PHASE_L_NOT_HELD=""
   PHASE_L_KILL_S=${PHASE_L_KILL_S:-5}
   PHASE_L_CALL_S=${BERTH_PREPUSH_CALL_S:-60}
-  trap - EXIT
-  trap '' INT HUP
-  trap 'PHASE_L_WHY=terminated' TERM
+  trap 'phase_l_agent_on_signal EXIT' EXIT
+  trap 'phase_l_agent_on_signal TERM' TERM
+  trap 'phase_l_agent_on_signal INT' INT
+  trap 'phase_l_agent_on_signal HUP' HUP
   # The parent's own end of the FIFO is not ours to hold: EOF must mean the parent is gone.
   exec {PHASE_L_FD}>&-
   exec {PHASE_L_IN}<"$1/fifo"
@@ -646,6 +703,8 @@ phase_l_agent() { # dir, session, for whom
   PHASE_L_MAX="${BERTH_PREPUSH_OVERRIDE_MAX_S:-$((BERTH_TTL_S + PHASE_L_SKEW + PHASE_L_MARGIN))}"
   PHASE_L_INTERVAL=$((BERTH_TTL_S / 3))
   [ "$PHASE_L_INTERVAL" -ge 1 ] || PHASE_L_INTERVAL=1
+  # Before the hand-over: the override wait's own bound plus PHASE_L_PRE_S (600) for the hook's checks.
+  phase_l_agent_watch $(($(date +%s) + PHASE_L_MAX + 2 * (PHASE_L_CW + 1) + 2 + ${PHASE_L_PRE_S:-600}))
   principal=$(timeout -k 5 10 git config user.email || timeout -k 5 10 git config user.name || id -un)
   # $BASHPID inside $(…) would name the substitution's subshell, not this agent.
   if ! out=$(timeout -k "$PHASE_L_KILL_S" "$PHASE_L_CALL_S" "$BERTH_BIN" moor --session "$2" --pid "$ELOHIM_SESSION_OWNER_PID" --runtime git-hook \
@@ -696,11 +755,13 @@ phase_l_agent() { # dir, session, for whom
   [[ "$PHASE_L_PUSH" =~ ^[0-9]+$ ]] || PHASE_L_TOOL=unknown
   # One limit on waiting for the transfer, known pusher or not: PHASE_L_LIMIT_S (3600 s) from the
   # hand-over, renewing every ttl/3. Then one deadline, PHASE_L_SETTLE_S (120 s) later, by which the
-  # remote reads end; the release (60 s) and unmoor (10 s), each plus 5 s to KILL, follow it. So the
-  # agent exits at most 3600 + 120 + 65 + 15 = 3800 s after the hand-over, having attempted the release.
+  # remote reads end and no call starts after it. The watchdog TERMs the agent at that deadline if it
+  # is still running; its trap releases (60 s) and unmoors (10 s), each plus 5 s to KILL, and the
+  # watchdog KILLs it 100 s after the TERM. Worst case: the agent is gone 3600 + 120 + 100 = 3820 s
+  # after the hand-over, having attempted the release by about 3720 + 2 + 65 s.
   local limit
   limit=$(($(date +%s) + ${PHASE_L_LIMIT_S:-3600}))
-  PHASE_L_DEADLINE=$((limit + ${PHASE_L_SETTLE_S:-120}))
+  phase_l_agent_watch $((limit + ${PHASE_L_SETTLE_S:-120}))
   if [ "$PHASE_L_TOOL" = unknown ]; then
     phase_l_agent_observe "$limit"
     return
@@ -715,18 +776,18 @@ phase_l_agent() { # dir, session, for whom
     [ "$(date +%s)" -lt "$limit" ] || { why=limit; break; }
     sleep 0.5
     if [ "$(date +%s)" -ge "$next" ]; then
-      phase_l_agent_renew || { why=renew-refused; break; }
+      phase_l_agent_renew || { why=$(phase_l_agent_renew_why); break; }
       next=$(($(date +%s) + PHASE_L_INTERVAL))
     fi
   done
   if [ -z "$why" ] || ! phase_l_alive "$PHASE_L_PUSH" "$PHASE_L_PUSH_AT"; then
     phase_l_agent_settle "tool=$PHASE_L_TOOL" exited
   else
-    if [ "$why" = limit ]; then
-      phase_l_agent_settle "tool=$PHASE_L_TOOL wait=limit" push-still-running
-    else
-      phase_l_agent_settle "tool=$PHASE_L_TOOL" "push-still-running:$why"
-    fi
+    case "$why" in
+      limit) phase_l_agent_settle "tool=$PHASE_L_TOOL wait=limit" push-still-running ;;
+      renewal-*) phase_l_agent_settle "tool=$PHASE_L_TOOL" "$why" ;;
+      *) phase_l_agent_settle "tool=$PHASE_L_TOOL" "push-still-running:$why" ;;
+    esac
   fi
 }
 
@@ -737,15 +798,17 @@ phase_l_agent() { # dir, session, for whom
 phase_l_agent_read_remote() { # tries
   local try out rc
   PHASE_L_REMOTE_SHA=""
+  local b
   for ((try = 1; try <= $1; try++)); do
-    out=$(timeout -k "$PHASE_L_KILL_S" "$(phase_l_agent_bound "${PHASE_L_READ_S:-30}")" \
+    b=$(phase_l_agent_bound "${PHASE_L_READ_S:-30}") || break
+    out=$(timeout -k "$PHASE_L_KILL_S" "$b" \
       git ls-remote "$PHASE_L_REMOTE" "refs/heads/$PHASE_L_TARGET" 2>/dev/null)
     rc=$?
     if [ "$rc" -eq 0 ]; then
       PHASE_L_REMOTE_SHA=${out%%$'\t'*}
       return 0
     fi
-    [ "$try" -lt "$1" ] && [ "$(date +%s)" -lt "$PHASE_L_DEADLINE" ] || break
+    [ "$try" -lt "$1" ] || break
     sleep "${PHASE_L_READ_RETRY_S:-2}"
   done
   return 1
@@ -753,6 +816,11 @@ phase_l_agent_read_remote() { # tries
 
 phase_l_agent_landed() { # remote sha (from a read that answered)
   { [ "$PHASE_L_SHA" = none ] && [ -z "$1" ]; } || [ "$1" = "$PHASE_L_SHA" ]
+}
+
+# Why a renewal failed: refused by berth (this session no longer holds the lease), or unanswered.
+phase_l_agent_renew_why() {
+  if [ -n "$PHASE_L_NOT_HELD" ]; then echo renewal-refused; else echo renewal-unanswered; fi
 }
 
 # The settle line. landed only on an answer that holds the landing sha; did-not-land only on an
@@ -770,6 +838,7 @@ phase_l_agent_settle() { # "tool=… [wait=…]", exited | reason-when-not-lande
     fi
   else
     result=unconfirmed reason=remote-unreadable
+    [ "$2" = exited ] || reason="$2,remote-unreadable"
   fi
   phase_l_agent_end "settle $PHASE_L_SHA $result $PHASE_L_TARGET=${PHASE_L_REMOTE_SHA:0:12} $1${reason:+ reason=$reason}"
 }
@@ -794,7 +863,7 @@ phase_l_agent_observe() { # limit
     [ "$left" -le "${BERTH_PREPUSH_OBSERVE_S:-2}" ] || left=${BERTH_PREPUSH_OBSERVE_S:-2}
     sleep "$left"
     if [ "$(date +%s)" -ge "$next" ]; then
-      phase_l_agent_renew || { why=renew-refused; break; }
+      phase_l_agent_renew || { why=$(phase_l_agent_renew_why); break; }
       next=$(($(date +%s) + PHASE_L_INTERVAL))
     fi
   done
