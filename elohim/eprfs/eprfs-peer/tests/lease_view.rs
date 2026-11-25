@@ -714,6 +714,40 @@ fn a_later_claim_fetched_first_waits_for_the_senders_complete_fold_coverage() {
 }
 
 #[test]
+fn duplicate_sender_records_make_coverage_inapplicable_and_replay_the_full_store() {
+    let h = household();
+    let first_claim = counted(claim("session-a", T0), 1);
+    let s = store_with_offsets(vec![
+        from(&h.a.did, first_claim.clone()),
+        from(&h.a.did, first_claim),
+        from(
+            &h.a.did,
+            counted(record("release", "session-a", T0 + 10.0, &[]), 2),
+        ),
+        from(&h.a.did, counted(claim("session-b", T0 + 20.0), 3)),
+    ]);
+    let mut heads = table(&h.b.did, &[], &s, &[(&h.a.did, 0, ms(T0) + 21_000)]);
+    let sender = heads.devices.get_mut(&h.a.did).unwrap();
+    sender.coverage = Some(FoldCoverage {
+        events: 2,
+        log_offset: 300,
+    });
+
+    assert_eq!(
+        s.fold_coverage(&h.a.did, sender),
+        FoldCoverageState::Inapplicable {
+            record_count: 3,
+            covered: 2,
+        }
+    );
+    assert_eq!(
+        verdict(&h.b.did, &s, &heads, &h.admission(), ms(T0) + 22_000),
+        Some(held(&h.a.did, "session-b", T0 + 20.0, false)),
+        "an inapplicable boundary falls back to replaying the later locally present claim"
+    );
+}
+
+#[test]
 fn absent_and_unreadable_coverage_preserve_legacy_unbounded_replay() {
     let h = household();
     let s = store_with_offsets(vec![
