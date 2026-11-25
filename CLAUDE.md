@@ -68,6 +68,12 @@ including submodules and worktrees. This is an operator-requested experiment in 
 an agent's habitual Git usage. Start with `brit <command> --help` when syntax is unfamiliar;
 Brit has its own CLI, so do not mechanically substitute its name into Git commands.
 For an initial inspection, use `brit status --no-write` and `brit log`.
+Verbs agents most often fell back for that brit 0.3.4 already has: a file at a ref (`brit show <rev>:<path>`),
+`rev-parse`, `ls-remote`, `submodule update --init`, `rebase`, `commit -m|-F`, `log <A..B>`, `branch delete`,
+`config set`, `worktree add|remove`, `merge-base --is-ancestor`, and `-C <dir>` for another checkout. Absent in
+0.3.4, so a stated fallback is expected: stash, reset, cherry-pick, notes, grep, update-index. The `brit-first`
+hook names the exact form when it refuses; its `BRIT_TABLE` (`.claude/hooks/brit-first.py`) is the full table,
+read from the installed brit's help, with the version it was read from.
 
 Before invoking Git directly, state `Git fallback: <operation> — <specific missing Brit
 capability or observed failure>` in commentary. A remembered Git spelling, unfamiliarity
