@@ -398,10 +398,7 @@ pub fn write_carry(root: &Path, request: &CarryRequest<'_>) -> FlowResult<CarryR
     let event = intend::event_record(CARRY_KIND, ReaVerb::Cite, intent, vec![], env, &common);
     let event_cid = event.cid()?;
 
-    if !records.iter().any(|(cid, _)| *cid == commitment_cid) {
-        store.append(commitment)?;
-    }
-    store.append(event)?;
+    append_carry_records(&mut store, &records, commitment_cid, commitment, event)?;
     Ok(CarryReceipt {
         intent: intent.to_string(),
         project: request.project.to_string(),
@@ -415,6 +412,22 @@ pub fn write_carry(root: &Path, request: &CarryRequest<'_>) -> FlowResult<CarryR
         store: intend::store_name(root),
         appended: true,
     })
+}
+
+fn append_carry_records(
+    store: &mut impl FlowStore,
+    records: &[(Cid, FlowRecord)],
+    commitment_cid: Cid,
+    commitment: FlowRecord,
+    event: FlowRecord,
+) -> FlowResult<()> {
+    let mut batch = Vec::with_capacity(2);
+    if !records.iter().any(|(cid, _)| *cid == commitment_cid) {
+        batch.push(commitment);
+    }
+    batch.push(event);
+    store.append_batch(batch)?;
+    Ok(())
 }
 
 /// The records of the flow store at `root`, or none when it has no store yet.

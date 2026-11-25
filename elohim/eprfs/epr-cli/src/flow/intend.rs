@@ -411,8 +411,10 @@ fn raise(
             records,
             store,
             common,
-            None,
-            *cid,
+            RaisedIntent {
+                cid: *cid,
+                record: None,
+            },
             data.supersedes.clone(),
         );
     }
@@ -501,10 +503,19 @@ fn raise(
         records,
         store,
         common,
-        Some(atom),
-        intent,
+        RaisedIntent {
+            cid: intent,
+            record: Some(atom),
+        },
         predecessor.map(|cid| cid.to_string()),
     )
+}
+
+/// The intent a raise event cites, with the intent record itself when this raise mints it: both are
+/// appended in one batch, so a reader never sees the intent without its raise event.
+struct RaisedIntent {
+    cid: Cid,
+    record: Option<FlowRecord>,
 }
 
 fn append_raise_event(
@@ -513,10 +524,13 @@ fn append_raise_event(
     records: &[(Cid, FlowRecord)],
     store: &mut impl FlowStore,
     common: &EventCommon<'_>,
-    intent_record: Option<FlowRecord>,
-    intent: Cid,
+    raised: RaisedIntent,
     predecessor: Option<String>,
 ) -> FlowResult<IntendOutcome> {
+    let RaisedIntent {
+        cid: intent,
+        record: intent_record,
+    } = raised;
     let dseq = next_dseq(records);
     let at = unix_seconds_millis();
     let predicted_base = request.predicted_base.unwrap_or("dev");
