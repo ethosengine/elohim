@@ -49,8 +49,8 @@ use crate::flow::intend::{
     own_state, parse_joined_closures, unix_slot_ms, INTENT_TAG, KINDS, LANDING_MEASURE,
 };
 use crate::flow::misses::{
-    absent_integration_refs, landing_probe, offerable_misses, open_misses, Landing, OpenMiss,
-    SettledBy, SettledMiss, INTEGRATION_REFS,
+    absent_integration_refs, landing_probe, offerable_misses, open_misses, OpenMiss, SettledBy,
+    SettledMiss, INTEGRATION_REFS,
 };
 use crate::flow::via_device;
 

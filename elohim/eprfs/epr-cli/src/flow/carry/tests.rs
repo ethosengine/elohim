@@ -258,7 +258,7 @@ fn a_settled_miss_tells_the_lander_to_run_here_with_the_settlement_reason() {
     assert_eq!(
         decision,
         CarryDecision::RunHere {
-            reason: "the miss is settled: its commit landed on refs/remotes/origin/self/carry-test"
+            reason: "the miss is settled: its commit is on the fetched origin/dev or origin/main"
                 .to_string(),
         }
     );
@@ -319,7 +319,7 @@ fn a_settled_miss_tells_a_carrier_nothing_needs_to_run() {
         decision,
         CarryDecision::Settled {
             by: SettledBy::Landing,
-            reason: "the miss is settled: its commit landed on refs/remotes/origin/self/carry-test"
+            reason: "the miss is settled: its commit is on the fetched origin/dev or origin/main"
                 .to_string(),
         }
     );
@@ -328,7 +328,7 @@ fn a_settled_miss_tells_a_carrier_nothing_needs_to_run() {
         serde_json::json!({
             "decision": "settled",
             "by": "landing",
-            "reason": "the miss is settled: its commit landed on refs/remotes/origin/self/carry-test"
+            "reason": "the miss is settled: its commit is on the fetched origin/dev or origin/main"
         })
     );
 }
