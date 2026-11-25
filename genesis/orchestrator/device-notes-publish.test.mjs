@@ -10,7 +10,7 @@ import { join } from 'node:path';
 import { after, test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { destinationOf, devicePrefix, patternRefspec, plan, publish } from './device-notes-publish.mjs';
+import { destinationOf, devicePrefix, noteRetentionDays, patternRefspec, plan, publish, retentionLine } from './device-notes-publish.mjs';
 
 const SHEM = 'did:key:z6Mkm5deEA87WrC3PDDGjkZwnWhUGhwHS43UinXhy5N6bowj';
 const OTHER = 'did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK';
@@ -215,4 +215,15 @@ test('DEVICE_NOTES_PUSH=brit publishes through brit push', { skip: brit.status !
   assert.equal(r.code, 0, r.text);
   assert.equal(refAt(forge, destinationOf(STEP_REF, SHEM)), refAt(a, STEP_REF));
   assert.equal(refAt(forge, STEP_REF), legacy);
+});
+
+test('the note retention is a declared positive integer, printed as declared and not enforced', () => {
+  const repo = join(import.meta.dirname, '..', '..');
+  const days = noteRetentionDays(repo);
+  assert.ok(Number.isInteger(days) && days > 0, `pool-policy ci_note_retention_days is ${days}`);
+  assert.equal(retentionLine(days),
+    `device-notes: retention ${days} days declared (pool-policy ci_note_retention_days), not yet enforced: no note expires`);
+  assert.equal(noteRetentionDays(repo, { read: () => '{"ci_note_retention_days": 0}' }), null);
+  assert.equal(noteRetentionDays(repo, { read: () => 'not json' }), null);
+  assert.match(retentionLine(null), /retention undeclared/);
 });
