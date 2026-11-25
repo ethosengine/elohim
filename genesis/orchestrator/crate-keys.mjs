@@ -35,14 +35,19 @@ export function crateKeys({
   toolchain,
   lockDigest,
   outsideReadsDigest,
+  workspaceConfigDigest,
+  recipeDigest,
   cargoEnv,
   step,
 }) {
   if (!metadata?.workspace_members || !metadata?.packages || !metadata?.resolve?.nodes) return {};
   const members = new Set(metadata.workspace_members);
+  const allPackages = new Map(metadata.packages.map(pkg => [pkg.id, pkg]));
   const packages = new Map(metadata.packages.filter(pkg => members.has(pkg.id)).map(pkg => [pkg.id, pkg]));
   const nodes = new Map(metadata.resolve.nodes.map(node => [node.id, node]));
   if (packages.size !== members.size) return {};
+  if (!workspaceConfigDigest) throw new Error('workspace configuration digest absent');
+  if (!recipeDigest) throw new Error('recipe digest absent');
 
   // Cargo forbids cycles among normal and build dependencies, but a dev-dependency may close one
   // (eprfs-serve dev-depends on itself with its `testing` feature). So each member has a library
@@ -75,6 +80,33 @@ export function crateKeys({
     held.set(id, key);
     return key;
   };
+  const nonMemberClosureDigest = id => {
+    const reached = [];
+    const visited = new Set();
+    const walk = dependencyId => {
+      if (visited.has(dependencyId)) return;
+      visited.add(dependencyId);
+      const node = nodes.get(dependencyId);
+      if (!node) throw new Error(`resolved dependency metadata absent for ${dependencyId}`);
+      if (!members.has(dependencyId)) {
+        const pkg = allPackages.get(dependencyId);
+        if (!pkg) throw new Error(`package metadata absent for ${dependencyId}`);
+        const dependency = {
+          id: dependencyId,
+          features: [...(node.features || [])].sort(),
+        };
+        if (pkg.source == null) {
+          const tree = treeOf(dirname(pkg.manifest_path));
+          if (!tree) throw new Error(`tree absent for non-member path dependency ${pkg.name}`);
+          dependency.tree = tree;
+        }
+        reached.push(dependency);
+      }
+      for (const dep of node.deps || []) walk(dep.pkg);
+    };
+    walk(id);
+    return digest(reached.sort((a, b) => a.id.localeCompare(b.id)));
+  };
   const keyOf = id => {
     const node = nodes.get(id) || { deps: [] };
     const devDependencies = (node.deps || [])
@@ -87,8 +119,11 @@ export function crateKeys({
       cargoEnv: cargoEnv || {},
       lockDigest,
       outsideReadsDigest,
+      workspaceConfigDigest,
+      recipeDigest,
       library: libraryKeyOf(id),
       devDependencies,
+      nonMemberClosure: nonMemberClosureDigest(id),
     });
   };
 

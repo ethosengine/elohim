@@ -25,6 +25,8 @@ function keys(overrides = {}) {
     toolchain: overrides.toolchain || 'rustc fixture\nhost: fixture',
     lockDigest: overrides.lockDigest || 'lock-a',
     outsideReadsDigest: 'reads-a',
+    workspaceConfigDigest: overrides.workspaceConfigDigest || 'workspace-config-a',
+    recipeDigest: overrides.recipeDigest || 'recipe-a',
     cargoEnv: { RUSTFLAGS: '', CARGO_BUILD_JOBS: '6' },
     step: overrides.step || 'eprfs:test',
   });
@@ -86,6 +88,7 @@ describe('per-crate verdict keys', () => {
       metadata: devMetadata(),
       treeOf: dir => ({ serve: 'serve-a', peer: 'peer-a', leaf: 'leaf-a', ...trees })[dir.split('/').at(-1)],
       toolchain: 'rustc fixture', lockDigest: 'lock-a', outsideReadsDigest: 'reads-a',
+      workspaceConfigDigest: 'workspace-config-a', recipeDigest: 'recipe-a',
       cargoEnv: {}, step: 'eprfs:test',
     });
   }
@@ -114,5 +117,66 @@ describe('per-crate verdict keys', () => {
     shuffled.resolve.nodes.reverse();
     for (const node of shuffled.resolve.nodes) node.deps.reverse();
     assert.deepEqual(keys({ metadata: shuffled }), before);
+  });
+
+  function nonMemberMetadata({ features = [], path = false } = {}) {
+    const normal = [{ kind: null, target: null }];
+    return {
+      packages: [
+        ...['left', 'right', 'other'].map(name => ({
+          id: name, name, manifest_path: `/repo/ws/${name}/Cargo.toml`,
+        })),
+        {
+          id: 'shared@1', name: 'shared',
+          manifest_path: path ? '/repo/vendor/shared/Cargo.toml' : '/registry/shared/Cargo.toml',
+          source: path ? null : 'registry+https://example.invalid/index',
+        },
+      ],
+      workspace_members: ['left', 'right', 'other'],
+      resolve: { nodes: [
+        { id: 'left', features: [], deps: [{ pkg: 'shared@1', dep_kinds: normal }] },
+        { id: 'right', features: [], deps: [{ pkg: 'shared@1', dep_kinds: normal }] },
+        { id: 'other', features: [], deps: [] },
+        { id: 'shared@1', features, deps: [] },
+      ] },
+    };
+  }
+
+  function nonMemberKeys({ features = [], path = false, vendorTree = 'vendor-a' } = {}) {
+    return crateKeys({
+      metadata: nonMemberMetadata({ features, path }),
+      treeOf: dir => ({ left: 'left-a', right: 'right-a', other: 'other-a', shared: vendorTree })[
+        dir.split('/').at(-1)
+      ],
+      toolchain: 'rustc fixture', lockDigest: 'lock-a', outsideReadsDigest: 'reads-a',
+      workspaceConfigDigest: 'workspace-config-a', recipeDigest: 'recipe-a',
+      cargoEnv: {}, step: 'eprfs:test',
+    });
+  }
+
+  test('external feature unification moves every member reaching the package', () => {
+    const before = nonMemberKeys();
+    const after = nonMemberKeys({ features: ['test-util'] });
+    for (const name of ['left', 'right']) assert.notEqual(after[name], before[name], name);
+    assert.equal(after.other, before.other);
+  });
+
+  test('a non-member path dependency tree moves every member reaching it', () => {
+    const before = nonMemberKeys({ path: true });
+    const after = nonMemberKeys({ path: true, vendorTree: 'vendor-b' });
+    for (const name of ['left', 'right']) assert.notEqual(after[name], before[name], name);
+    assert.equal(after.other, before.other);
+  });
+
+  test('workspace configuration digest moves every step key', () => {
+    const before = keys();
+    const after = keys({ workspaceConfigDigest: 'workspace-config-b' });
+    for (const name of Object.keys(before)) assert.notEqual(after[name], before[name], name);
+  });
+
+  test('recipe command digest moves every step key', () => {
+    const before = keys();
+    const after = keys({ recipeDigest: 'recipe-b' });
+    for (const name of Object.keys(before)) assert.notEqual(after[name], before[name], name);
   });
 });
