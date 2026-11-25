@@ -52,6 +52,16 @@ class EnsureTest(unittest.TestCase):
             self.assertEqual(H['ensure'](self.code, self.start), 'running')
         self.assertEqual(len(self.started), 1)
 
+    def test_rule_9_the_next_hook_restarts_a_runner_after_its_lock_dies(self):
+        lock = H['lock_path'](self.code)
+        lock.parent.mkdir(parents=True)
+        fd = os.open(lock, os.O_RDWR | os.O_CREAT, 0o644)
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        self.assertEqual(H['ensure'](self.code, self.start), 'running')
+        os.close(fd)  # the runner died: its process-owned lock is released
+        self.assertEqual(H['ensure'](self.code, self.start), 'started')
+        self.assertEqual(len(self.started), 1)
+
     def test_a_checkout_without_the_watcher_starts_nothing(self):
         (self.code / 'genesis/agentic/bin/held-tool-watch').unlink()
         self.assertEqual(H['ensure'](self.code, self.start), 'absent')
@@ -96,8 +106,14 @@ class EnsureTest(unittest.TestCase):
         commands = [h['command'] for config in (settings, codex) for groups in config['hooks'].values()
                     for group in groups for h in group['hooks'] if 'held-tool-ensure' in h['command']]
         self.assertEqual(len(commands), 4)
+        tools = self.code / 'tools'
+        tools.mkdir()
+        (tools / 'python3').symlink_to(sys.executable)
+        git = tools / 'git'
+        git.write_text('#!/bin/sh\nexit 1\n')  # this scratch checkout deliberately has no repository
+        git.chmod(0o755)
         for command in commands:
-            for path in ('/nonexistent', os.environ['PATH']):  # no interpreter; an absent file
+            for path in ('/nonexistent', str(tools)):  # no interpreter; interpreter but an absent hook file
                 with self.subTest(command=command[:40], path=path[:12]):
                     out = subprocess.run(['/bin/sh', '-c', command], capture_output=True, text=True,
                                          cwd=str(self.code), timeout=10,
