@@ -46,14 +46,18 @@ already writes and hands what it senses to the native fold.
   held-tool-watch carry [--bin-store DIR] [--stasis-root DIR] [--repo-root DIR]
       One opted-in unattended pass. The only authority to execute a candidate is an admitted
       device's signed miss naming its exact SHA. Fetch that SHA, make a detached worktree, and use
-      THIS runner checkout's orchestrator modules to recompute the candidate tree's closure as data;
+      THIS runner checkout's orchestrator modules to recompute the candidate tree's closure as data.
+      Cargo and rustc run from a private directory outside the candidate, with this device's Cargo
+      home and trusted toolchain/env; checkout hooks, LFS and attributes filters are disabled, so
       candidate code first executes when its vouched-for gate recipe starts. Hold a berth cargo seat
       for that gate's life, and yield through `gate-live stop --now` if local dev integration begins,
       the switch turns off, the parent runner exits, or the deadline arrives. Release the carry claim
-      on every stop or failure, remove its worktree and exact `-wt-<worktree>` cargo slot, and release
-      the seat. The carry lock proves the cleanup sweep has no live carry and bounds retained assets
-      to at most one carry worktree plus one gate target slot. The wrapper never pushes, lands, or
-      writes a gate verdict; on success the candidate gate's device-head verdict is the only verdict.
+      when no verdict was recorded, remove its worktree and exact `-wt-<worktree>` cargo slot only
+      after gate-live records the run closed and `/proc` names no user, and release the seat. A stop
+      that cannot be confirmed preserves the claim and assets. If a released carry's verdict arrives
+      later, both verdicts stand and a red from either vetoes reuse. An older epr carry reader ignores
+      `env:release=1` and waits until settlement or expiry. The carry lock serializes cleanup but does
+      not prove descendants are gone. The wrapper never pushes, lands, or writes a gate verdict.
 
 The flow store. A pass in which nothing is new spawns no `epr` that reads `.eprfs/status/flows.jsonl`:
 moorings and siblings come from `berth status --json --no-peer`, `berth said` reads berth's unlocked
@@ -653,14 +657,20 @@ const commit = process.env.HELD_TOOL_CARRY_COMMIT;
 const load = async p => import(pathToFileURL(`${trusted}/${p}`).href);
 const { loadGateRegistry } = await load('genesis/orchestrator/pipeline-registry.mjs');
 const { gateChildEnv } = await load('genesis/orchestrator/gate-runner.mjs');
-const { gateEvidence } = await load('genesis/orchestrator/gate-evidence.mjs');
+const { carryExecutionEnv, gateEvidence } = await load('genesis/orchestrator/gate-evidence.mjs');
 const project = loadGateRegistry(candidate).get(process.env.HELD_TOOL_CARRY_PROJECT);
+const trustedProject = loadGateRegistry(trusted).get(process.env.HELD_TOOL_CARRY_PROJECT);
 if (!project) throw new Error('gate project absent at commit');
-const env = gateChildEnv(project, process.env, candidate, { warn: () => {} });
+if (!trustedProject) throw new Error('gate project absent from trusted runner');
+// Candidate manifest/env is key material, never process authority. The device checkout supplies
+// the gate policy and cargo environment used to evaluate it.
+const env = gateChildEnv(trustedProject, process.env, trusted, { warn: () => {} });
 delete env.GATE_EVIDENCE;
 let cargoEnv = {};
 try { cargoEnv = JSON.parse(env.GATE_CARGO_ENV || '{}'); } catch {}
-const evidence = gateEvidence(project, { env, root: candidate, commit, cargoEnv, warn: () => {} });
+const executionEnv = carryExecutionEnv(env, cargoEnv, process.env.HELD_TOOL_CARRY_CARGO_HOME);
+const execution = { cwd: process.env.HELD_TOOL_CARRY_EXECUTION_ROOT, env: executionEnv };
+const evidence = gateEvidence(project, { env, root: candidate, commit, cargoEnv, execution, warn: () => {} });
 process.stdout.write(JSON.stringify({ key: evidence.key || null, line: evidence.line || '' }));
 """
 
@@ -904,8 +914,89 @@ def _remove_carry_worktree(repo, path, runner=run_command, pool=None):
             shutil.rmtree(slot)
 
 
+def _gate_events(path):
+    try:
+        with open(path) as stream:
+            return [json.loads(line) for line in stream if line.strip()]
+    except (OSError, ValueError):
+        return []
+
+
+def _gate_run_closed(path):
+    return bool(path and any(event.get("kind") == "run-close" for event in _gate_events(path)))
+
+
+def _gate_verdict_recorded(path, project):
+    return bool(path and any(event.get("kind") == "gate-verdict" and event.get("project") == project
+                             for event in _gate_events(path)))
+
+
+def _closed_carry_run(repo, worktree):
+    """The closed gate-live run for a stale carry worktree, if the local record proves one."""
+    match = re.fullmatch(r"carry-([0-9a-f]{12})-(.+)", os.path.basename(worktree))
+    if not match:
+        return None
+    short, project = match.groups()
+    runs = os.path.join(main_checkout(repo), ".eprfs", "status", "gate-live", "runs")
+    try:
+        names = sorted(os.listdir(runs), reverse=True)
+    except OSError:
+        return None
+    for name in names:
+        path = os.path.join(runs, name)
+        events = _gate_events(path)
+        opened = next((event for event in events if event.get("kind") == "run-open"), None)
+        candidate = opened.get("candidate", {}) if isinstance(opened, dict) else {}
+        if (str(candidate.get("sha", "")).startswith(short)
+                and candidate.get("target") == f"held-tool-carry:{project}"
+                and any(event.get("kind") == "run-close" for event in events)):
+            return path
+    return None
+
+
+def _path_is_within(path, parent):
+    path, parent = os.path.realpath(path), os.path.realpath(parent)
+    return path == parent or path.startswith(parent + os.sep)
+
+
+def _carry_paths_in_use(worktree, pool=None, proc_root="/proc"):
+    """Whether a process cwd or CARGO_TARGET_DIR names this carry's retained assets."""
+    targets = [os.path.realpath(worktree)]
+    if pool:
+        targets.extend(_carry_slots(pool, worktree))
+    try:
+        pids = [name for name in os.listdir(proc_root) if name.isdigit()]
+    except OSError:
+        return True
+    for pid in pids:
+        proc = os.path.join(proc_root, pid)
+        try:
+            cwd = os.path.realpath(os.readlink(os.path.join(proc, "cwd")))
+            if any(_path_is_within(cwd, target) for target in targets):
+                return True
+        except FileNotFoundError:
+            continue
+        except (OSError, PermissionError):
+            return True
+        try:
+            with open(os.path.join(proc, "environ"), "rb") as stream:
+                entries = stream.read().split(b"\0")
+        except FileNotFoundError:
+            continue
+        except (OSError, PermissionError):
+            return True
+        for entry in entries:
+            if entry.startswith(b"CARGO_TARGET_DIR="):
+                value = os.fsdecode(entry.split(b"=", 1)[1])
+                if value and not os.path.isabs(value):
+                    value = os.path.join(cwd, value)
+                if value and any(_path_is_within(value, target) for target in targets):
+                    return True
+    return False
+
+
 def sweep_carry_worktrees(repo, older_than_s, runner=run_command, now=None, say=print, pool=None):
-    """With the carry lock held (therefore no carry process alive), remove stale carry assets."""
+    """Remove only stale assets whose run is closed and whose paths no process still names."""
     now = time.time() if now is None else now
     parent = os.path.join(repo, ".worktrees")
     try:
@@ -922,22 +1013,70 @@ def sweep_carry_worktrees(repo, older_than_s, runner=run_command, now=None, say=
             continue
         if stale:
             try:
+                if not _closed_carry_run(repo, path):
+                    say(f"held-tool-watch carry: stale {name} retained — no closed gate-live run")
+                    continue
+                if _carry_paths_in_use(path, pool):
+                    say(f"held-tool-watch carry: stale {name} retained — process still names its assets")
+                    continue
                 _remove_carry_worktree(repo, path, runner, pool)
                 say(f"held-tool-watch carry: swept stale {name}")
             except (OSError, ValueError, RuntimeError) as error:
                 say(f"held-tool-watch carry: stale {name} not removed — {_one_line(error)}")
 
 
+@contextlib.contextmanager
+def _closure_execution_root():
+    """A private writable directory whose ancestry has no Cargo or rustup discovery files."""
+    candidates = [os.environ.get("TMPDIR"), "/tmp", "/projects/.cargo-target-pool/family/cd"]
+    last = None
+    for parent in dict.fromkeys(path for path in candidates if path):
+        try:
+            execution_root = tempfile.mkdtemp(prefix="held-tool-closure-", dir=parent)
+            os.chmod(execution_root, 0o700)
+        except OSError as error:
+            last = error
+            continue
+        cursor = os.path.realpath(execution_root)
+        unsafe = None
+        while True:
+            if (os.path.exists(os.path.join(cursor, ".cargo"))
+                    or os.path.exists(os.path.join(cursor, "rust-toolchain"))
+                    or os.path.exists(os.path.join(cursor, "rust-toolchain.toml"))):
+                unsafe = cursor
+                break
+            ancestor = os.path.dirname(cursor)
+            if ancestor == cursor:
+                break
+            cursor = ancestor
+        if unsafe:
+            shutil.rmtree(execution_root, ignore_errors=True)
+            last = RuntimeError(f"closure execution ancestor carries cargo/rustup config: {unsafe}")
+            continue
+        try:
+            yield execution_root
+        finally:
+            shutil.rmtree(execution_root, ignore_errors=True)
+        return
+    raise RuntimeError(f"no safe writable closure execution root: {_one_line(last)}")
+
+
 def recompute_closure(trusted_root, worktree, commit, project, runner=run_command, timeout=300):
-    """Use only this runner checkout's JS; the candidate checkout is manifest/tree data."""
+    """Use runner JS and a private non-candidate cwd; the candidate is manifest/tree data."""
     env = dict(os.environ)
     env["HELD_TOOL_CARRY_PROJECT"] = project
     env["HELD_TOOL_CARRY_TRUSTED_ROOT"] = trusted_root
     env["HELD_TOOL_CARRY_CANDIDATE_ROOT"] = worktree
     env["HELD_TOOL_CARRY_COMMIT"] = commit
     env.pop("GATE_EVIDENCE", None)
-    data = _json_call(runner, ["node", "--input-type=module", "--eval", _CLOSURE_PROGRAM],
-                      timeout=timeout, cwd=trusted_root, env=env)
+    cargo_home = os.path.realpath(env.get("CARGO_HOME") or os.path.join(os.path.expanduser("~"), ".cargo"))
+    if _path_is_within(cargo_home, worktree):
+        raise RuntimeError("device cargo home is inside the candidate")
+    with _closure_execution_root() as execution_root:
+        env["HELD_TOOL_CARRY_CARGO_HOME"] = cargo_home
+        env["HELD_TOOL_CARRY_EXECUTION_ROOT"] = execution_root
+        data = _json_call(runner, ["node", "--input-type=module", "--eval", _CLOSURE_PROGRAM],
+                          timeout=timeout, cwd=trusted_root, env=env)
     key = data.get("key") if isinstance(data, dict) else None
     if not isinstance(key, str) or not _CLOSURE.match(key):
         why = data.get("line") if isinstance(data, dict) else ""
@@ -958,6 +1097,38 @@ def _release_cargo(repo, session, runner):
     runner([berth_bin(), "release", "cargo", "--session", session], timeout=30, cwd=repo)
 
 
+def _release_carry(head, repo, commitment, runner):
+    argv = [head, "flow", "intend", "--release-carry", commitment, "--json", "--root", repo]
+    last = ""
+    for _ in range(2):
+        code, out, err = runner(argv, timeout=30, cwd=repo)
+        if code == 0:
+            return True, _one_line(out)
+        last = _one_line(err or out) or f"exit {code}"
+    return False, last
+
+
+def _capacity_refusal(repo, pool, runner):
+    ram = os.path.join(repo, "genesis", "agentic", "bin", "ram-guard")
+    code, out, err = runner([ram, "status", "--brief"], timeout=30, cwd=repo)
+    if code != 0 or not re.search(r"\bRAM-GUARD\s+OK\b", out):
+        return f"RAM guard refused: {_one_line(err or out) or f'exit {code}'}"
+    code, out, err = runner([berth_bin(), "room", "cargo", "--json"], timeout=30, cwd=repo)
+    try:
+        room = json.loads(out) if code == 0 else {}
+    except ValueError:
+        room = {}
+    if room.get("verdict") != "admit":
+        return f"cargo seats refused: {_one_line(room.get('reason') or err or out) or f'exit {code}'}"
+    cargo_pool = os.path.join(repo, "genesis", "agentic", "bin", "cargo-pool")
+    env = dict(os.environ)
+    env["CARGO_TARGET_POOL_ROOT"] = pool
+    code, out, err = runner([cargo_pool, "status"], timeout=30, cwd=repo, env=env)
+    if code != 0 or not re.search(r"\bstatus=ok\b", out):
+        return f"cargo pool pressure refused: {_one_line(err or out) or f'exit {code}'}"
+    return None
+
+
 def _dev_integration_holder(repo, runner):
     holder = _json_call(runner, [berth_bin(), "who", "dev-integration"], cwd=repo)
     return holder.get("holder") if isinstance(holder, dict) else None
@@ -973,9 +1144,24 @@ def _parent_alive(pid):
         return False
 
 
+def _stop_carried_gate(gate_live, trusted_root, run_log, reason, runner):
+    """Ask gate-live at most three times; exit zero or an already-closed record confirms stop."""
+    argv = ["node", gate_live, "stop", "--run", run_log, "--now", "--reason", reason]
+    last = ""
+    for _ in range(3):
+        try:
+            code, out, err = runner(argv, timeout=45, cwd=trusted_root)
+        except (OSError, RuntimeError, subprocess.SubprocessError) as error:
+            code, out, err = 1, "", str(error)
+        if code == 0 or _gate_run_closed(run_log):
+            return True, ""
+        last = _one_line(err or out) or f"exit {code}"
+    return _gate_run_closed(run_log), last
+
+
 def run_carried_gate(trusted_root, worktree, commit, project, env, deadline, stop_reason,
                      runner=run_command):
-    """Run the authorized candidate gate. Stop only through gate-live's detached gate group."""
+    """Run the authorized gate; return only after its gate-live record proves it closed."""
     gate_live = os.path.join(trusted_root, "genesis", "orchestrator", "gate-live.mjs")
     opened = _json_call(
         runner,
@@ -989,30 +1175,53 @@ def run_carried_gate(trusted_root, worktree, commit, project, env, deadline, sto
     gate_env = dict(env)
     gate_env["GATE_LIVE_RUN"] = run_log
     with tempfile.TemporaryFile() as out, tempfile.TemporaryFile() as err:
-        proc = subprocess.Popen(["just", "gate", project], cwd=worktree, env=gate_env,
-                                stdin=subprocess.DEVNULL, stdout=out, stderr=err)
-        stop_proc = None
+        try:
+            proc = subprocess.Popen(["just", "gate", project], cwd=worktree, env=gate_env,
+                                    stdin=subprocess.DEVNULL, stdout=out, stderr=err)
+        except OSError as error:
+            try:
+                code, _, _ = runner(["node", gate_live, "close", "--run", run_log,
+                                     "--outcome", "failed"], timeout=30, cwd=trusted_root)
+            except (OSError, RuntimeError, subprocess.SubprocessError):
+                code = 1
+            settled = code == 0 and _gate_run_closed(run_log)
+            return 1, "", _one_line(error), None, run_log, settled, False
         stopped = None
-        while proc.poll() is None:
-            stopped = stop_reason()
+        stop_error = ""
+        while proc.poll() is None and stopped is None:
+            try:
+                stopped = stop_reason()
+            except (OSError, RuntimeError, subprocess.SubprocessError) as error:
+                stopped = f"gate supervision failed: {_one_line(error)}"
             if stopped is None and time.monotonic() >= deadline:
                 stopped = "carry deadline reached"
-            if stopped is not None and stop_proc is None:
-                stop_proc = subprocess.Popen(
-                    ["node", gate_live, "stop", "--run", run_log, "--now", "--reason", stopped],
-                    cwd=trusted_root, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
-                )
-            time.sleep(0.2)
+            if stopped is None:
+                time.sleep(0.2)
+        if stopped is not None and proc.poll() is None:
+            confirmed, stop_error = _stop_carried_gate(
+                gate_live, trusted_root, run_log, stopped, runner)
+            if not confirmed:
+                return 1, "", f"gate stop unconfirmed after 3 attempts: {stop_error}", stopped, run_log, False, False
+            try:
+                proc.wait(timeout=45)
+            except subprocess.TimeoutExpired:
+                return 1, "", "gate stop was recorded but its process still runs", stopped, run_log, False, False
         code = proc.wait()
         outcome = "interrupted" if stopped is not None else ("passed" if code == 0 else "failed")
-        runner(["node", gate_live, "close", "--run", run_log, "--outcome", outcome],
-               timeout=30, cwd=trusted_root)
-        if stop_proc is not None:
-            stop_proc.wait(timeout=45)
+        try:
+            close_code, _, close_err = runner(
+                ["node", gate_live, "close", "--run", run_log, "--outcome", outcome],
+                timeout=30, cwd=trusted_root)
+        except (OSError, RuntimeError, subprocess.SubprocessError) as error:
+            close_code, close_err = 1, str(error)
+        settled = _gate_run_closed(run_log)
+        if not settled:
+            detail = _one_line(close_err) or f"exit {close_code}"
+            return code, "", f"gate-live close unconfirmed: {detail}", stopped, run_log, False, False
         out.seek(0)
         err.seek(0)
-        return code, out.read().decode(errors="replace"), err.read().decode(errors="replace"), stopped
+        return (code, out.read().decode(errors="replace"), err.read().decode(errors="replace"),
+                stopped, run_log, True, _gate_verdict_recorded(run_log, project))
 
 
 def _eligible_misses(data, now):
@@ -1096,6 +1305,10 @@ def _cmd_carry_locked(args, repo, status_dir, runner, gate_runner):
         seat = False
         commitment = None
         failure = None
+        gate_started = False
+        gate_settled = True
+        run_log = None
+        verdict_recorded = False
         try:
             seat_deadline = time.monotonic() + max(0, args.carry_seat_wait_s)
             while True:
@@ -1123,12 +1336,22 @@ def _cmd_carry_locked(args, repo, status_dir, runner, gate_runner):
                 say(carry_line(miss, reason))
                 continue
             os.makedirs(os.path.dirname(worktree), exist_ok=True)
-            code, _, err = runner(["git", "-C", repo, "worktree", "add", "--detach", worktree, commit], timeout=120)
+            checkout_env = dict(os.environ)
+            checkout_env.update({"GIT_LFS_SKIP_SMUDGE": "1", "GIT_ATTR_NOSYSTEM": "1"})
+            checkout = [
+                "git", "-c", "core.hooksPath=/dev/null", "-c", "core.attributesFile=/dev/null",
+                "-c", "core.fsmonitor=false", "-c", "filter.lfs.smudge=",
+                "-c", "filter.lfs.clean=", "-c", "filter.lfs.process=",
+                "-c", "filter.lfs.required=false", "-C", repo, "worktree", "add", "--detach",
+                worktree, commit,
+            ]
+            code, _, err = runner(checkout, timeout=120, env=checkout_env)
             if code != 0:
                 say(carry_line(miss, f"detached worktree setup failed: {_one_line(err) or f'exit {code}'}"))
                 continue
-            code, out, err = runner(["git", "-C", worktree, "status", "--porcelain", "--untracked-files=all"],
-                                    timeout=30)
+            code, out, err = runner(
+                ["git", "-c", "core.fsmonitor=false", "-C", worktree, "status", "--porcelain",
+                 "--untracked-files=all"], timeout=30, env=checkout_env)
             if code != 0 or out.strip():
                 say(carry_line(miss, f"exact-commit worktree is not clean: {_one_line(err or out)}"))
                 continue
@@ -1169,6 +1392,12 @@ def _cmd_carry_locked(args, repo, status_dir, runner, gate_runner):
             except (ValueError, KeyError, TypeError):
                 say(carry_line(miss, "claim returned no commitment; gate not started"))
                 return 1
+            capacity = _capacity_refusal(repo, pool, runner)
+            if capacity:
+                failure = capacity
+                decline_once(status_dir, repo, miss, capacity, runner)
+                say(carry_line(miss, f"{capacity}; gate not started"))
+                return 0
             gate_env = dict(os.environ)
             gate_env.update({"EPR_BIN": head, "GATE_DEFER": "off", "GATE_CARRY": "off",
                              "GATE_CARRY_WAIT": "off"})
@@ -1188,32 +1417,52 @@ def _cmd_carry_locked(args, repo, status_dir, runner, gate_runner):
                         return f"local landing started ({holder_now})"
                 return None
 
-            code, _, err, stopped_reason = gate_runner(
+            gate_started = True
+            gate_settled = False
+            result = gate_runner(
                 REPO_ROOT, worktree, commit, project, gate_env, deadline, stop_reason, runner=runner)
+            (code, _, err, stopped_reason, run_log, gate_settled,
+             verdict_recorded) = result
+            if not gate_settled:
+                failure = f"gate stop/close unconfirmed: {_one_line(err)}"
+                say(carry_line(miss, f"{failure}; claim, worktree, target slot and cargo seat retained"))
+                return 1
             if stopped_reason:
                 failure = stopped_reason
-                say(carry_line(miss, f"yielded: {stopped_reason}; gate stopped, carry released"))
+                say(carry_line(miss, f"yielded: {stopped_reason}; gate stopped and unrecorded claim released"))
                 return 1
             if code != 0:
                 failure = f"gate exited {code}: {_one_line(err)}"
-                say(carry_line(miss, f"{failure}; carry released; only the gate's verdict stands"))
+                suffix = "only the gate's verdict stands" if verdict_recorded else "unrecorded claim released"
+                say(carry_line(miss, f"{failure}; {suffix}"))
+                return 1
+            if not verdict_recorded:
+                failure = "gate exited green but emitted no gate verdict"
+                say(carry_line(miss, f"{failure}; unrecorded claim released"))
                 return 1
             say(carry_line(miss, "gate green; its device-head verdict is the only verdict written"))
             return 0
         except (OSError, RuntimeError, subprocess.SubprocessError) as error:
             failure = f"setup failed: {_one_line(error)}"
-            say(carry_line(miss, f"{failure}; carry released if claimed, no runner verdict written"))
+            suffix = ("gate state unconfirmed; claim, worktree, target slot and cargo seat retained"
+                      if gate_started else "carry released if claimed, no runner verdict written")
+            say(carry_line(miss, f"{failure}; {suffix}"))
             return 1
         finally:
-            if commitment and failure:
-                runner([head, "flow", "intend", "--release-carry", commitment, "--json", "--root", repo],
-                       timeout=30, cwd=repo)
-            if os.path.exists(worktree):
+            safe_after_gate = not gate_started or gate_settled
+            if commitment and not verdict_recorded and safe_after_gate:
+                released, why = _release_carry(head, repo, commitment, runner)
+                if not released:
+                    say(carry_line(miss, f"carry claim release failed after retry: {why}"))
+            if os.path.exists(worktree) and safe_after_gate:
                 try:
-                    _remove_carry_worktree(repo, worktree, runner, pool)
+                    if _carry_paths_in_use(worktree, pool):
+                        say(carry_line(miss, "carry assets retained — process still names worktree or target slot"))
+                    else:
+                        _remove_carry_worktree(repo, worktree, runner, pool)
                 except (OSError, ValueError, RuntimeError) as error:
                     say(carry_line(miss, f"carry asset cleanup failed: {_one_line(error)}"))
-            if seat:
+            if seat and safe_after_gate:
                 _release_cargo(repo, carry_session, runner)
     return 0
 

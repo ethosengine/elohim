@@ -22,6 +22,7 @@ import {
   COMPILER_GATE_INPUTS,
   attestationStep,
   attestedOutputParses,
+  carryExecutionEnv,
   closureKey,
   describeEvidence,
   deviceRoot,
@@ -224,6 +225,89 @@ test('the real read variant computes the exact key gateEvidence uses', () => {
   const evidence = gateEvidence(project, options);
   assert.equal(real.key, evidence.key);
   assert.equal(real.material, evidence.material);
+});
+
+test('carry-only native evaluation ignores candidate Cargo/rustup config and preserves the honest key', t => {
+  const root = mkdtempSync(join(tmpdir(), 'gate-evidence-carry-'));
+  const fence = mkdtempSync(join(tmpdir(), 'gate-evidence-fence-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  t.after(() => rmSync(fence, { recursive: true, force: true }));
+  for (const dir of ['elohim/eprfs/src', 'genesis/orchestrator', 'genesis/agentic', '.cargo']) {
+    mkdirSync(join(root, dir), { recursive: true });
+  }
+  const nativeProject = {
+    name: 'eprfs', dir: 'elohim/eprfs', manifestPath: 'elohim/eprfs/build-manifest.json',
+    steps: ['cargo-build'],
+    run: { kind: 'just', recipe: 'gate', cargo: { workspace: 'elohim/eprfs' } },
+  };
+  const manifest = JSON.stringify({
+    steps: { 'cargo-build': { inputs: { sources: ['elohim/eprfs/**'] } } },
+  });
+  writeFileSync(join(root, nativeProject.manifestPath), manifest);
+  writeFileSync(join(root, 'elohim/eprfs/Cargo.toml'),
+    '[package]\nname="fixture"\nversion="0.1.0"\nedition="2021"\n');
+  writeFileSync(join(root, 'elohim/eprfs/src/lib.rs'), 'pub fn fixture() {}\n');
+  writeFileSync(join(root, 'elohim/eprfs/justfile'), 'gate:\n  true\n');
+  writeFileSync(join(root, 'genesis/orchestrator/run-local-gate.sh'), '#!/bin/sh\n');
+  writeFileSync(join(root, 'genesis/agentic/pool-policy.json'), '{}\n');
+  const marker = join(root, 'candidate-rustc-wrapper-ran');
+  const wrapper = join(root, 'marker-wrapper');
+  writeFileSync(wrapper, `#!/bin/sh\nprintf ran > ${JSON.stringify(marker)}\nexec rustc "$@"\n`);
+  chmodSync(wrapper, 0o755);
+  const evaluator = join(root, 'fake-epr');
+  const sourceState = JSON.stringify({
+    head: 'blob1', clean: true, status: '', closure: [{ path: 'elohim/eprfs', tree: 'blob1' }],
+    closureCid: `bafkr4i${'a'.repeat(52)}`,
+  });
+  writeFileSync(evaluator, `#!/bin/sh\ncargo metadata --format-version 1 --offline --manifest-path ${JSON.stringify(join(root, 'elohim/eprfs/Cargo.toml'))} >/dev/null || exit $?\nprintf %s ${JSON.stringify(sourceState)}\n`);
+  chmodSync(evaluator, 0o755);
+  for (const name of ['brit', 'brit-build-ref']) {
+    writeFileSync(join(root, name), '#!/bin/sh\nexit 0\n');
+    chmodSync(join(root, name), 0o755);
+  }
+  const toolchain = process.env.RUSTUP_TOOLCHAIN || '1.100.0';
+  const cargoHome = process.env.CARGO_HOME || join(process.env.HOME, '.cargo');
+  const env = {
+    EPR_BIN: evaluator, BRIT_BIN: join(root, 'brit'), BRIT_BUILD_REF_BIN: join(root, 'brit-build-ref'),
+    PATH: process.env.PATH || '', RUSTUP_TOOLCHAIN: toolchain, CARGO_HOME: cargoHome, RUSTFLAGS: '',
+  };
+  const cargoEnv = { RUSTUP_TOOLCHAIN: toolchain };
+  const simulated = fakeSpawn([
+    [isFingerprint, fingerprintReply('native-fixture')],
+    [isRevParse, { status: 0, stdout: 'blob1\n', stderr: '' }],
+    [isShow, { status: 0, stdout: manifest, stderr: '' }],
+    [isTree, { status: 0, stdout: '', stderr: '' }],
+    [isStatus, { status: 0, stdout: '', stderr: '' }],
+    [isFind, { status: 0, stdout: '[]', stderr: '' }],
+  ]);
+  const spawn = (bin, args, options) => (bin === evaluator || bin === 'rustc'
+    ? spawnSync(bin, args, options)
+    : simulated.spawn(bin, args, options));
+  const honest = gateEvidence(nativeProject, { env, root, commit: 'HEAD', cargoEnv, spawn });
+  assert.match(honest.key, /^[0-9a-f]{64}$/, honest.line);
+
+  writeFileSync(join(root, '.cargo/config.toml'),
+    `[build]\nrustc-wrapper = ${JSON.stringify(wrapper)}\n`);
+  writeFileSync(join(root, 'rust-toolchain.toml'), '[toolchain]\nchannel = "bogus-candidate-toolchain"\n');
+  const executionEnv = carryExecutionEnv({
+    ...env,
+    RUSTC: wrapper,
+    RUSTC_WRAPPER: wrapper,
+    RUSTC_WORKSPACE_WRAPPER: wrapper,
+    CARGO_BUILD_RUSTC: wrapper,
+    CARGO_BUILD_RUSTC_WRAPPER: wrapper,
+    CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER: wrapper,
+  }, cargoEnv, cargoHome);
+  const fenced = gateEvidence(nativeProject, {
+    env, root, commit: 'HEAD', cargoEnv, spawn, execution: { cwd: fence, env: executionEnv },
+  });
+  assert.match(fenced.key, /^[0-9a-f]{64}$/, fenced.line);
+  assert.equal(fenced.key, honest.key, 'the fence changes no cargo-derived key data for an honest candidate');
+  assert.equal(existsSync(marker), false, 'candidate rustc-wrapper never executes');
+  for (const key of ['RUSTC', 'RUSTC_WRAPPER', 'RUSTC_WORKSPACE_WRAPPER', 'CARGO_BUILD_RUSTC',
+    'CARGO_BUILD_RUSTC_WRAPPER', 'CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER']) {
+    assert.equal(Object.hasOwn(executionEnv, key), false, `${key} is cleared`);
+  }
 });
 
 test('a dirty working tree under the project is named on the line and blocks the record', () => {
@@ -1267,6 +1351,18 @@ test('a sibling red forces a local run without ordering device clocks', function
     { rows: [], key: 'closure', project: project.name, dirty: false },
     { ...reuseContext, candidates: [siblingGreen, red], admitCandidate: () => true, selectorCheck: unexpectedSelector },
   ), { reuse: false, why: 'sibling verdict is red' });
+});
+
+test('a released carry admits its late green alone, but a later red from either carrier vetoes reuse', () => {
+  const evidence = { rows: [], key: 'closure', project: project.name, dirty: false };
+  assert.deepEqual(reusableHit(evidence, {
+    ...reuseContext, candidates: [siblingGreen], admitCandidate: () => true,
+  }), { reuse: true, row: siblingGreen, independence: 'sibling' });
+  const lateRed = { ...siblingGreen, commit: 'released-red', success: false };
+  assert.deepEqual(reusableHit(evidence, {
+    ...reuseContext, candidates: [siblingGreen, lateRed], admitCandidate: () => true,
+    selectorCheck: unexpectedSelector,
+  }), { reuse: false, why: 'sibling verdict is red' });
 });
 
 test('a local red and sibling green force a local run', () => {
