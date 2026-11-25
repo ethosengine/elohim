@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "epr://schema/device-build-role/v1",
+  "title": "Device Build Role",
+  "description": "A device-local operational declaration. It is not a runtime manifest field, placement authority, or peer-visible identity claim.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "role"],
+  "properties": {
+    "version": {
+      "const": 1
+    },
+    "role": {
+      "enum": ["builder", "carrier", "neither"]
+    },
+    "until": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "role": {
+            "const": "builder"
+          }
+        },
+        "required": ["role"]
+      },
+      "then": {
+        "required": ["until"]
+      },
+      "else": {
+        "not": {
+          "required": ["until"]
+        }
+      }
+    }
+  ]
+}
