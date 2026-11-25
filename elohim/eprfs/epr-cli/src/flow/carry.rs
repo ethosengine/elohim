@@ -1,5 +1,6 @@
-//! `epr flow intend --carry` — a device that takes one miss of a landing intent says so with a
-//! bounded carry claim, and every device reads the claims from its own fold.
+//! `epr flow intend --carry` / `--release-carry` — a device that takes one miss of a landing
+//! intent says so with a bounded carry claim, may release it early, and every device reads both
+//! acts from its own fold.
 //!
 //! Station F4-ask, slice 2 (plan `2026-10-29-native-dev-tooling-over-peers-plan.md` §8, the five
 //! tests of §9). The first slice posts a landing intent's misses: the gate projects and closure
@@ -23,8 +24,9 @@
 //! stop-waiting time and a monotonic local deadline its caller supplies; when anything is in
 //! doubt (an unparseable time, a clock skew, a silent device) the answer is to run here.
 //!
-//! **Settlement, by fold only, by the misses rule.** A carry stops being live when its
-//! `valid_until` passes or when the miss it answers is no longer open in `misses::open_misses`: a
+//! **Settlement, by fold only, by the misses rule.** A carry stops being live when its carrier
+//! appends a release naming its commitment, its `valid_until` passes, or when the miss it answers
+//! is no longer open in `misses::open_misses`: a
 //! `gate-verdict@1` for its project and closure (green or red) folded from this device or an
 //! admitted one, or its intent landed, withdrawn, dismissed or superseded by the device that
 //! announced it. A carry is written only on an open miss.
@@ -58,8 +60,15 @@ use super::{head_commit_provenance, repository_agent, repository_scope, FlowErro
 /// The `dev-landing@1` kind of the crossing carry event (its `reason:` slot).
 pub(crate) const CARRY_KIND: &str = "carry";
 
+/// A release crosses under the existing `carry` kind so devices that admit carry events already
+/// fold it; `env:release=1` distinguishes the release shape from the claim shape.
+pub(crate) const RELEASE_KIND: &str = CARRY_KIND;
+
 /// Slot 0 of a carry event, as every landing event's slot 0 is `dev-landing:<kind>`.
 const CARRY_TAG: &str = "dev-landing:carry";
+
+/// Slot 0 of a carry release event (the existing crossing policy's carry kind).
+const RELEASE_TAG: &str = CARRY_TAG;
 
 /// Whether a device stands admitted on this device's roster, as the caller reads it.
 pub type Admits<'a> = dyn Fn(&str) -> bool + 'a;
@@ -86,6 +95,17 @@ pub struct CarryRequest<'a> {
     pub me: Option<&'a str>,
     pub admits: &'a dyn Fn(&str) -> bool,
     /// Repository-local evidence that the open miss's commit reached its integration ref.
+    pub landing: &'a dyn Fn(&misses::OpenMiss) -> misses::Landing,
+}
+
+/// What this device asks to release. The commitment identifies the claim without repeating its
+/// project or closure on the command line.
+pub struct ReleaseRequest<'a> {
+    pub commitment: &'a str,
+    pub measures: Option<&'a Path>,
+    pub actor: &'a NoteActor,
+    pub me: Option<&'a str>,
+    pub admits: &'a dyn Fn(&str) -> bool,
     pub landing: &'a dyn Fn(&misses::OpenMiss) -> misses::Landing,
 }
 
@@ -120,6 +140,31 @@ impl CarryReceipt {
             if self.appended { "" } else { "  (replay)" }
         );
         println!("        commitment: {}", short(&self.commitment));
+        println!("        event: {}", short(&self.event));
+    }
+}
+
+/// The machine-facing result of one early release.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReleaseReceipt {
+    pub intent: String,
+    pub commitment: String,
+    pub event: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub at: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub dseq: Option<u64>,
+    pub store: String,
+}
+
+impl ReleaseReceipt {
+    pub fn render(&self) {
+        println!(
+            "intend  release-carry  {}  ({})",
+            short(&self.commitment),
+            short(&self.intent)
+        );
         println!("        event: {}", short(&self.event));
     }
 }
@@ -430,6 +475,127 @@ fn append_carry_records(
     Ok(())
 }
 
+/// Append this device's early release of one live carry. A release is an event on the intent atom
+/// and names the commitment it ends; no mutable commitment state is introduced.
+///
+/// # Errors
+///
+/// [`FlowError::InvalidArguments`] when the commitment is not this device's live claim (including
+/// a sibling's, a lapsed/settled claim, or one already released); store and registry errors as
+/// `epr flow intend` reports them.
+pub fn write_release(root: &Path, request: &ReleaseRequest<'_>) -> FlowResult<ReleaseReceipt> {
+    intend::served_store_guard(root)?;
+    let commitment = parse_cid(request.commitment, "--release-carry")?;
+    let registry_path = request
+        .measures
+        .map(Path::to_path_buf)
+        .unwrap_or_else(|| measures::default_measures(root));
+    let measure = MeasureRef::parse(LANDING_MEASURE, &registry_path)?;
+    let registry = Registry::open(&registry_path)?;
+    if !registry.declares(&measure) {
+        return Err(FlowError::InvalidArguments(format!(
+            "unknown measure `{LANDING_MEASURE}` — declare it in {} before releasing a carry",
+            registry_path.display()
+        )));
+    }
+    let unit_slot = registry.declared_unit(&measure);
+    let named = named_identity(request.actor.as_ref.as_deref())?;
+    let (author, occurred_at) = head_commit_provenance(root).unwrap_or_else(|| {
+        (
+            repository_agent(root).map_or_else(|_| "unknown".to_string(), |agent| agent.0),
+            Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true),
+        )
+    });
+    let attribution = resolve_attribution(root, named, request.actor.session.as_deref(), &author);
+    let provider = attribution.provider(&author);
+    let receiver = repository_agent(root)?;
+    let scope = repository_scope(root)?;
+
+    let mut store = SidecarFlowStore::open(root)?.transaction()?;
+    let records = store.records()?;
+    let claims: Vec<Claim> = records
+        .iter()
+        .filter_map(|(cid, record)| match record {
+            FlowRecord::Event(event) => claim_from_event(*cid, event, request.admits, request.me),
+            _ => None,
+        })
+        .filter(|claim| claim.commitment == commitment)
+        .collect();
+    if claims.iter().all(|claim| claim.carrier.is_some()) {
+        let owner = claims
+            .first()
+            .and_then(|claim| claim.carrier.as_deref())
+            .unwrap_or("no device in this fold");
+        return Err(FlowError::InvalidArguments(format!(
+            "carry commitment {commitment} was not made by this device (owner: {owner})"
+        )));
+    }
+    let now_s = unix_ms() / 1000;
+    let live = live_carries(&records, request.admits, request.me, now_s);
+    let Some(claim) = live
+        .iter()
+        .find(|claim| claim.carrier.is_none() && claim.commitment == commitment.to_string())
+    else {
+        return Err(FlowError::InvalidArguments(format!(
+            "carry commitment {commitment} is already released, settled, or lapsed"
+        )));
+    };
+    // The local landing probe is part of the same liveness reading as a carry decision. Calling it
+    // here makes a release refuse if the miss settled between the live fold above and this append.
+    if let CarryDecision::Settled { reason, .. } = decide(
+        &records,
+        &CarryQuery {
+            intent: &claim.intent.parse().map_err(|_| {
+                FlowError::InvalidArguments("the carry's intent is not a content identifier".into())
+            })?,
+            project: &claim.project,
+            closure: &claim.closure,
+            admits: request.admits,
+            me: request.me,
+            now_unix_s: now_s,
+            role: CarryRole::Carrier,
+            landing: request.landing,
+        },
+    ) {
+        return Err(FlowError::InvalidArguments(reason));
+    }
+
+    let intent: Cid = claim.intent.parse().map_err(|_| {
+        FlowError::InvalidArguments("the carry's intent is not a content identifier".into())
+    })?;
+    let change = intent_change(&records, &intent).unwrap_or_default();
+    let dseq = intend::next_dseq(&records);
+    let at = intend::unix_seconds_millis();
+    let env = BTreeMap::from([
+        ("at".to_string(), at.clone()),
+        ("change".to_string(), change),
+        ("closure".to_string(), claim.closure.clone()),
+        ("commitment".to_string(), commitment.to_string()),
+        ("dseq".to_string(), dseq.to_string()),
+        ("project".to_string(), claim.project.clone()),
+        ("release".to_string(), "1".to_string()),
+    ]);
+    let common = EventCommon {
+        provider: &provider,
+        receiver: &receiver,
+        scope: &scope,
+        occurred_at: &occurred_at,
+        unit_slot: unit_slot.as_deref(),
+        attribution: &attribution,
+    };
+    let event = intend::event_record(RELEASE_KIND, ReaVerb::Cite, intent, vec![], env, &common);
+    let event_cid = event.cid()?;
+    store.append(event)?;
+    Ok(ReleaseReceipt {
+        intent: intent.to_string(),
+        commitment: commitment.to_string(),
+        event: event_cid.to_string(),
+        at: Some(at),
+        dseq: Some(dseq),
+        store: intend::store_name(root),
+    })
+}
+
 /// The records of the flow store at `root`, or none when it has no store yet.
 ///
 /// # Errors
@@ -458,6 +624,13 @@ pub fn live_carries(
     me: Option<&str>,
     now_unix_s: u64,
 ) -> Vec<LiveCarry> {
+    let releases: Vec<Release> = records
+        .iter()
+        .filter_map(|(cid, record)| match record {
+            FlowRecord::Event(event) => release_from_event(*cid, event, admits, me),
+            _ => None,
+        })
+        .collect();
     let mut chains: BTreeMap<(Option<String>, String, String, String), Vec<Claim>> =
         BTreeMap::new();
     for (cid, record) in records {
@@ -491,7 +664,13 @@ pub fn live_carries(
         for claim in claims {
             let renews = match &current {
                 None => true,
-                Some(held) => claim.at_ms.is_some_and(|at| at / 1000 >= held.valid_until),
+                Some(held) => {
+                    claim.at_ms.is_some_and(|at| at / 1000 >= held.valid_until)
+                        || releases.iter().any(|release| {
+                            release_matches_claim(release, held)
+                                && release_order(release) < claim_order(&claim)
+                        })
+                }
             };
             if renews {
                 current = Some(claim);
@@ -501,6 +680,9 @@ pub fn live_carries(
             continue;
         };
         if now_unix_s >= claim.valid_until
+            || releases
+                .iter()
+                .any(|release| release_matches_claim(release, &claim))
             || miss_settled(
                 records,
                 admits,
@@ -753,6 +935,15 @@ struct Claim {
     dseq: Option<u64>,
 }
 
+struct Release {
+    event: Cid,
+    carrier: Option<String>,
+    intent: Cid,
+    commitment: Cid,
+    at_ms: Option<u64>,
+    dseq: Option<u64>,
+}
+
 /// One crossing carry event read as a claim, or `None` when it is not one, names a field twice,
 /// or comes from a device that is not admitted.
 fn claim_from_event(
@@ -785,6 +976,53 @@ fn claim_from_event(
         at_ms: env("at").and_then(intend::unix_slot_ms),
         dseq: env("dseq").and_then(|raw| raw.parse().ok()),
     })
+}
+
+/// One crossing release event, admitted under the same writer rule as its claim.
+fn release_from_event(
+    cid: Cid,
+    event: &FlowEvent,
+    admits: &dyn Fn(&str) -> bool,
+    me: Option<&str>,
+) -> Option<Release> {
+    let slots = &event.classified_as;
+    if slots.first().map(String::as_str) != Some(RELEASE_TAG)
+        || intend::slot(slots, MEASURE_SLOT_PREFIX) != Some(LANDING_MEASURE)
+        || intend::slot(slots, REASON_SLOT_PREFIX) != Some(RELEASE_KIND)
+    {
+        return None;
+    }
+    let carrier = match writer(event)? {
+        Some(device) if Some(device) == me || !admits(device) => return None,
+        other => other.map(str::to_string),
+    };
+    let env = |key: &str| intend::slot(slots, &format!("{ENV_SLOT_PREFIX}{key}="));
+    if env("release") != Some("1") {
+        return None;
+    }
+    Some(Release {
+        event: cid,
+        carrier,
+        intent: event.resource,
+        commitment: env("commitment")?.parse().ok()?,
+        at_ms: env("at").and_then(intend::unix_slot_ms),
+        dseq: env("dseq").and_then(|raw| raw.parse().ok()),
+    })
+}
+
+fn release_matches_claim(release: &Release, claim: &Claim) -> bool {
+    release.carrier == claim.carrier
+        && release.intent == claim.intent
+        && release.commitment == claim.commitment
+        && release_order(release) > claim_order(claim)
+}
+
+fn claim_order(claim: &Claim) -> (Option<u64>, Option<u64>, Vec<u8>) {
+    (claim.dseq, claim.at_ms, claim.event.to_bytes())
+}
+
+fn release_order(release: &Release) -> (Option<u64>, Option<u64>, Vec<u8>) {
+    (release.dseq, release.at_ms, release.event.to_bytes())
 }
 
 /// The device that wrote a folded event (`Some(Some(did))`), this device (`Some(None)`), or
