@@ -1,5 +1,4 @@
 use ark_core::declaration::{FollowMode, ManifestAct};
-use ark_core::{BuildRole, BuildRoleDeclaration};
 use elohim_device_runtime::manifest_store::{self, ManifestStore, Projections};
 use std::fs;
 
@@ -681,26 +680,6 @@ fn adopting_a_base_carries_the_processes_this_device_declared() {
         next,
         "the chain head is the carried CID"
     );
-}
-
-#[test]
-fn adopting_a_base_keeps_this_devices_build_role() {
-    let (dir, store) = fixture();
-    store.apply().unwrap();
-    let head = store
-        .act(ManifestAct::BuildRole(BuildRoleDeclaration {
-            role: BuildRole::Neither,
-            until: None,
-        }))
-        .unwrap();
-    let mut base = canary_base();
-    base.build_role = Some(BuildRoleDeclaration {
-        role: BuildRole::Builder,
-        until: Some("2099-01-01T00:00:00Z".into()),
-    });
-    let next = deployed(dir.path(), base).apply().unwrap();
-    assert_eq!(next.build_role, head.build_role);
-    assert_eq!(next.build_role.unwrap().role, BuildRole::Neither);
 }
 
 #[test]

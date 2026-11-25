@@ -1,7 +1,6 @@
 //! Pure device declarations, acts and projections. No filesystem or runtime authority.
 use crate::manifest::{
-    ArtifactRef, BuildRole, BuildRoleDeclaration, ChildPolicy, ChildSpec, ManifestError, Probe,
-    Restart, RuntimeManifest,
+    ArtifactRef, ChildPolicy, ChildSpec, ManifestError, Probe, Restart, RuntimeManifest,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
@@ -230,30 +229,6 @@ pub fn validate(manifest: &RuntimeManifest) -> Result<(), ManifestError> {
             return Err(invalid(format!("invalid tool declaration: {name}")));
         }
     }
-    if let Some(declaration) = &manifest.build_role {
-        match (declaration.role, declaration.until.as_deref()) {
-            (BuildRole::Builder, Some(until)) => {
-                chrono::DateTime::parse_from_rfc3339(until).map_err(|error| {
-                    invalid(format!("build role until must be RFC3339: {error}"))
-                })?;
-            }
-            (BuildRole::Builder, None) => {
-                return Err(invalid(
-                    "builder is a standing commitment and needs an until time".into(),
-                ));
-            }
-            (BuildRole::Carrier, Some(_)) => {
-                return Err(invalid(
-                    "carrier expiry belongs to the held-tool-watch carry switch, not the manifest"
-                        .into(),
-                ));
-            }
-            (BuildRole::Neither, Some(_)) => {
-                return Err(invalid("neither carries no standing commitment".into()));
-            }
-            (BuildRole::Carrier | BuildRole::Neither, None) => {}
-        }
-    }
     Ok(())
 }
 /// How long a declared ready line may take to appear. A cold `epr` that opens its stores
@@ -419,8 +394,6 @@ pub fn parse_restart(raw: &str) -> Result<Restart, String> {
 /// An explicit private declaration act. Apply itself only repairs projections.
 #[derive(Debug, Clone)]
 pub enum ManifestAct {
-    /// Replace the device's private build participation declaration.
-    BuildRole(BuildRoleDeclaration),
     /// Set or remove one channel.
     Follow {
         channel: String,
@@ -446,7 +419,6 @@ pub fn supersede(
     let mut next = head.clone();
     next.supersedes = Some(head.cid()?);
     match act {
-        ManifestAct::BuildRole(declaration) => next.build_role = Some(declaration),
         ManifestAct::Follow { channel, mode, pin } => {
             validate_channel(&channel).map_err(ManifestError::Invalid)?;
             let pos = next.follows.iter().position(|f| f.channel == channel);
@@ -557,8 +529,6 @@ pub struct ManifestView {
     pub manifest_cid: String,
     /// Previous version, or null for a base.
     pub supersedes: Option<String>,
-    /// This device's declared build participation.
-    pub build_role: Option<BuildRoleDeclaration>,
     /// Channels this device declares.
     pub follows: Vec<Follow>,
     /// Executable registry.
@@ -586,7 +556,6 @@ pub fn view(manifest: &RuntimeManifest) -> Result<ManifestView, ManifestError> {
     Ok(ManifestView {
         manifest_cid: manifest.cid()?,
         supersedes: manifest.supersedes.clone(),
-        build_role: manifest.build_role.clone(),
         follows: manifest.follows.clone(),
         tools: manifest.tools.clone(),
         processes: manifest

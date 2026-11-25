@@ -134,7 +134,7 @@ pub(crate) fn status_at(root: &Path, remember: bool) -> Vec<Check> {
         });
     let published = published_refs(registry.as_ref().ok());
     let toolchain = toolchain_fact(root, &env);
-    let capacity = super::capacity::observe(device_layout.as_ref().ok(), &toolchain, &env);
+    let capacity = super::capacity::observe_bounded(device_layout.as_ref().ok(), &toolchain);
     let mut checks = vec![
         binary("epr"),
         binary("brit"),
@@ -1888,6 +1888,7 @@ pub(super) fn run(args: &[String], arrive: bool) -> Result<ExitCode, crate::erro
     let mut strict = false;
     let mut worker = false;
     let mut would = None;
+    let mut target = None;
     let mut iter = args.iter();
     while let Some(arg) = iter.next() {
         match arg.as_str() {
@@ -1900,6 +1901,11 @@ pub(super) fn run(args: &[String], arrive: bool) -> Result<ExitCode, crate::erro
             "--would" if !arrive => {
                 would = Some(iter.next().ok_or_else(|| {
                     crate::error::Error::InvalidArguments("--would needs a commit".into())
+                })?)
+            }
+            "--target" if !arrive => {
+                target = Some(iter.next().ok_or_else(|| {
+                    crate::error::Error::InvalidArguments("--target needs a ref".into())
                 })?)
             }
             "--strict" if arrive => strict = true,
@@ -1919,6 +1925,11 @@ pub(super) fn run(args: &[String], arrive: bool) -> Result<ExitCode, crate::erro
     if json && would.is_some() {
         return Err(crate::error::Error::InvalidArguments(
             "--would is a human dry-run report; omit --json".into(),
+        ));
+    }
+    if target.is_some() && would.is_none() {
+        return Err(crate::error::Error::InvalidArguments(
+            "--target belongs to --would".into(),
         ));
     }
     if arrive {
@@ -1945,8 +1956,13 @@ pub(super) fn run(args: &[String], arrive: bool) -> Result<ExitCode, crate::erro
                         "device capacity could not be read for --would".into(),
                     )
                 })?;
-            super::capacity::would_run(&root, commit, capacity)
-                .map_err(crate::error::Error::InvalidArguments)
+            super::capacity::would_run(
+                &root,
+                commit,
+                target.map(String::as_str).unwrap_or("origin/dev"),
+                capacity,
+            )
+            .map_err(crate::error::Error::InvalidArguments)
         })
         .transpose()?;
     if json {

@@ -17,6 +17,7 @@ fn epr(base: &Path, args: &[&str]) -> Output {
         .env("BIN_STORE", base.join("store"))
         .env("CARGO_TARGET_POOL_ROOT", base.join("cargo-pool"))
         .env("EPR_UNDER_TEST", "1")
+        .env("EPR_WOULD_TIMEOUT_MS", "100")
         .env("EPR_PROC_ROOT", base.join("proc"))
         .env_remove("ELOHIM_SESSION_OWNER_PID")
         .env_remove("EPR_SESSION_LAZY")
@@ -202,6 +203,7 @@ fn status_keeps_dependency_order_and_does_not_mint_a_key() {
 fn only_an_explicit_non_builder_makes_a_missing_pin_ok() {
     let temp = fixture();
     let base = temp.path();
+    first_device(base);
     let policy = base.join("repo/genesis/agentic/pool-policy.json");
     fs::create_dir_all(policy.parent().unwrap()).unwrap();
     fs::write(
@@ -217,7 +219,6 @@ fn only_an_explicit_non_builder_makes_a_missing_pin_ok() {
             .unwrap()
     };
     assert_eq!(rust(base)["state"], "degraded", "undeclared stays degraded");
-    let device = base.join("device");
     let builder = epr(
         base,
         &[
@@ -226,8 +227,6 @@ fn only_an_explicit_non_builder_makes_a_missing_pin_ok() {
             "builder",
             "--until",
             "2099-01-01T00:00:00Z",
-            "--root",
-            device.to_str().unwrap(),
         ],
     );
     assert!(
@@ -240,16 +239,7 @@ fn only_an_explicit_non_builder_makes_a_missing_pin_ok() {
         "degraded",
         "builder still needs the pin"
     );
-    let neither = epr(
-        base,
-        &[
-            "device",
-            "build-role",
-            "neither",
-            "--root",
-            device.to_str().unwrap(),
-        ],
-    );
+    let neither = epr(base, &["device", "build-role", "neither"]);
     assert!(
         neither.status.success(),
         "{}",
@@ -258,13 +248,18 @@ fn only_an_explicit_non_builder_makes_a_missing_pin_ok() {
     let rust = rust(base);
     assert_eq!(rust["state"], "ok");
     assert!(rust["detail"].as_str().unwrap().contains("does not build"));
+    assert!(base.join("device/build-role.json").is_file());
+    assert!(
+        !base.join("device/manifest/head").exists(),
+        "a build role never enters the runtime manifest chain"
+    );
 }
 
 #[test]
-fn would_uses_gate_runner_selection_and_never_runs_a_gate() {
+fn would_uses_the_pre_push_range_and_reports_selection_only() {
     let temp = fixture();
     let base = temp.path();
-    assert!(epr(base, &["device", "trust", "."]).status.success());
+    first_device(base);
     let orchestrator = base.join("repo/genesis/orchestrator");
     fs::create_dir_all(&orchestrator).unwrap();
     fs::write(
@@ -287,40 +282,110 @@ fn would_uses_gate_runner_selection_and_never_runs_a_gate() {
         .unwrap();
     assert!(commit.status.success());
     let commit = String::from_utf8(commit.stdout).unwrap();
-    let report = epr(base, &["device", "status", "--would", commit.trim()]);
+    let report = epr(
+        base,
+        &[
+            "device",
+            "status",
+            "--would",
+            commit.trim(),
+            "--target",
+            "HEAD~1",
+        ],
+    );
     let text = String::from_utf8(report.stdout).unwrap();
+    assert!(text.contains("FORECAST"), "{text}");
     assert!(
-        text.contains("alpha: leave as miss (build role undeclared)"),
+        text.contains("selection only; reuse, attestation and hand-over can change what runs"),
         "{text}"
     );
+    assert!(text.contains("selected gates:\n  alpha\n  beta"), "{text}");
     assert!(
-        text.contains("beta: leave as miss (build role undeclared)"),
-        "{text}"
-    );
-    assert!(
-        !text.contains("gate ran"),
-        "the selector output is classification only"
+        !text.contains("run here") && !text.contains("leave as miss"),
+        "the runner provides selection, not role-based execution placement"
     );
 
-    let device = base.join("device");
-    assert!(epr(
+    assert!(epr(base, &["device", "build-role", "neither"])
+        .status
+        .success());
+    let report = epr(
+        base,
+        &[
+            "device",
+            "status",
+            "--would",
+            commit.trim(),
+            "--target",
+            "HEAD~1",
+        ],
+    );
+    let text = String::from_utf8(report.stdout).unwrap();
+    assert!(text.contains("selected gates:\n  alpha\n  beta"), "{text}");
+}
+
+#[test]
+fn build_role_refuses_an_arbitrary_root_and_reads_expiry_at_status_time() {
+    let temp = fixture();
+    let base = temp.path();
+    first_device(base);
+    let foreign = tempfile::tempdir().unwrap();
+    let refused = epr(
+        base,
+        &[
+            "device",
+            "build-role",
+            "neither",
+            "--root",
+            foreign.path().to_str().unwrap(),
+        ],
+    );
+    assert!(!refused.status.success());
+    assert!(!foreign.path().join("build-role.json").exists());
+
+    let expired = epr(
         base,
         &[
             "device",
             "build-role",
             "builder",
             "--until",
-            "2099-01-01T00:00:00Z",
-            "--root",
-            device.to_str().unwrap(),
+            "2000-01-01T00:00:00Z",
         ],
+    );
+    assert!(expired.status.success());
+    let capacity = line(base, "device capacity");
+    assert!(capacity["detail"]
+        .as_str()
+        .unwrap()
+        .contains("role builder, expired 2000-01-01T00:00:00Z: declare again"));
+}
+
+#[test]
+fn would_timeout_is_reported_without_changing_status_exit() {
+    let temp = fixture();
+    let base = temp.path();
+    first_device(base);
+    let orchestrator = base.join("repo/genesis/orchestrator");
+    fs::create_dir_all(&orchestrator).unwrap();
+    fs::write(
+        orchestrator.join("gate-runner.mjs"),
+        "setTimeout(() => console.log('too-late'), 10000);\n",
     )
-    .status
-    .success());
-    let report = epr(base, &["device", "status", "--would", commit.trim()]);
-    let text = String::from_utf8(report.stdout).unwrap();
-    assert!(text.contains("alpha: run here"), "{text}");
-    assert!(text.contains("beta: run here"), "{text}");
+    .unwrap();
+    fs::write(base.join("repo/changed.txt"), "selected\n").unwrap();
+    fixture_git(
+        base,
+        &["add", "genesis/orchestrator/gate-runner.mjs", "changed.txt"],
+    );
+    fixture_git(base, &["commit", "-q", "-m", "fixture slow selection"]);
+    let ordinary = epr(base, &["device", "status"]);
+    let forecast = epr(
+        base,
+        &["device", "status", "--would", "HEAD", "--target", "HEAD~1"],
+    );
+    assert_eq!(forecast.status.code(), ordinary.status.code());
+    assert!(String::from_utf8_lossy(&forecast.stdout)
+        .contains("timed out after 10s while running gate selection"));
 }
 #[test]
 fn arrive_bad_registry_fails_open_but_strict_refuses() {

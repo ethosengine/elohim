@@ -39,10 +39,6 @@ pub struct RuntimeManifest {
     /// Device archetype selecting the outward renderer's request floor.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub archetype: Option<String>,
-    /// This device's private build participation declaration. It is descriptive capacity,
-    /// never a rank, placement verdict, or permission to run work.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub build_role: Option<BuildRoleDeclaration>,
     /// Device-private channel declarations; absent on historical manifests.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub follows: Vec<crate::declaration::Follow>,
@@ -61,34 +57,10 @@ impl Default for RuntimeManifest {
             processes: Vec::new(),
             envelope: None,
             archetype: None,
-            build_role: None,
             follows: Vec::new(),
             tools: BTreeMap::new(),
         }
     }
-}
-
-/// How this device says it participates in build work.
-#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
-#[serde(rename_all = "lowercase")]
-pub enum BuildRole {
-    /// Runs the gates selected for its own commits while the declaration is current.
-    Builder,
-    /// Is eligible to carry work only while the separate, expiring carry switch opts in.
-    Carrier,
-    /// Explicitly does not build on this device.
-    Neither,
-}
-
-/// One device-private build-role declaration.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
-pub struct BuildRoleDeclaration {
-    /// Declared participation role.
-    pub role: BuildRole,
-    /// End of a standing builder commitment, as an RFC3339 timestamp.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub until: Option<String>,
 }
 
 /// Declaration of one child process.
@@ -707,52 +679,6 @@ fn default_tail_lines() -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn previous_manifest_reader_ignores_the_additive_build_role() {
-        #[derive(Deserialize)]
-        struct PreviousRuntimeManifest {
-            schema: u32,
-            kind: String,
-            processes: Vec<ChildSpec>,
-        }
-
-        let mut manifest = RuntimeManifest::from_json(&minimal_manifest_json()).unwrap();
-        manifest.build_role = Some(BuildRoleDeclaration {
-            role: BuildRole::Neither,
-            until: None,
-        });
-        let encoded = serde_json::to_string(&manifest).unwrap();
-        let previous: PreviousRuntimeManifest = serde_json::from_str(&encoded).unwrap();
-        assert_eq!(previous.schema, MANIFEST_SCHEMA);
-        assert_eq!(previous.kind, MANIFEST_KIND);
-        assert_eq!(previous.processes, manifest.processes);
-    }
-
-    #[test]
-    fn build_role_commitments_validate_expiry_without_duplicating_carrier_state() {
-        let mut manifest = RuntimeManifest::from_json(&minimal_manifest_json()).unwrap();
-        manifest.build_role = Some(BuildRoleDeclaration {
-            role: BuildRole::Builder,
-            until: None,
-        });
-        assert!(manifest
-            .validate()
-            .unwrap_err()
-            .to_string()
-            .contains("needs an until"));
-        manifest.build_role.as_mut().unwrap().until = Some("2030-01-01T00:00:00Z".into());
-        assert!(manifest.validate().is_ok());
-        manifest.build_role = Some(BuildRoleDeclaration {
-            role: BuildRole::Carrier,
-            until: Some("2030-01-01T00:00:00Z".into()),
-        });
-        assert!(manifest
-            .validate()
-            .unwrap_err()
-            .to_string()
-            .contains("carry switch"));
-    }
 
     #[test]
     fn live_manifest_cid_is_unmoved_by_absent_envelope() {

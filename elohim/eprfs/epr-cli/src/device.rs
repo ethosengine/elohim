@@ -89,7 +89,8 @@ pub fn usage() -> &'static str {
      epr device pending [--node <this node URL>]\n  \
      epr device approve '<link | number | key fingerprint>' [--only <act>]... [--yes] [--node <this node URL>]\n  \
      epr device approve <number | key fingerprint> --decline\n  \
-     epr device status [--json] [--root <path>] [--would <commit>]\n  epr device arrive [--strict]\n  \
+     epr device status [--json] [--root <path>] [--would <commit> [--target <ref>]]\n  \
+     epr device arrive [--strict]\n  \
      epr device build-role builder --until <RFC3339> | carrier | neither\n    \
      (builder is a standing commitment; carrier eligibility is activated separately by the \
      expiring carry switch; neither declares that this device does not build)\n  \
@@ -166,7 +167,8 @@ fn unknown_command(word: &str) -> String {
 
 pub fn run(args: &[String]) -> Outcome<ExitCode> {
     match args.first().map(String::as_str) {
-        Some("follow" | "run" | "show" | "apply" | "build-role") => declaration::run(args),
+        Some("follow" | "run" | "show" | "apply") => declaration::run(args),
+        Some("build-role") => capacity::run_build_role(&args[1..]),
         Some("supervise") => supervise::run(&args[1..]),
         Some("layout") => layout::run(&args[1..]),
         Some("join") => join(&args[1..]),

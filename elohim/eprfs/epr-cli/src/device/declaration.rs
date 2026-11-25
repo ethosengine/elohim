@@ -1,18 +1,7 @@
 //! Thin adapters for the device-private manifest chain.
-use ark_core::{
-    declaration::{self, FollowMode, ManifestAct, RunLaunch},
-    BuildRole, BuildRoleDeclaration,
-};
+use ark_core::declaration::{self, FollowMode, ManifestAct, RunLaunch};
 use elohim_device_runtime::manifest_store::{self, ManifestStore, Projections};
 use std::{path::PathBuf, process::ExitCode};
-
-pub(super) fn local_root() -> Result<PathBuf, String> {
-    crate::device_key::resolve_path()
-        .map_err(|error| error.to_string())?
-        .parent()
-        .ok_or_else(|| "device key has no parent".into())
-        .map(std::path::Path::to_owned)
-}
 
 pub(crate) fn store(
     root: Option<PathBuf>,
@@ -30,7 +19,11 @@ pub(crate) fn store_with_bins(
     let explicit_root = root.is_some();
     let root = match root {
         Some(p) => p,
-        None => local_root()?,
+        None => crate::device_key::resolve_path()
+            .map_err(|e| e.to_string())?
+            .parent()
+            .ok_or("device key has no parent")?
+            .to_owned(),
     };
     let bins = if explicit_root {
         root.join("bin/bin-tools.json")
@@ -82,9 +75,7 @@ pub(super) fn apply_at_arrival() -> Result<(), String> {
 }
 
 pub(super) fn run(args: &[String]) -> Result<ExitCode, String> {
-    let verb = args
-        .first()
-        .ok_or("expected follow, run, show, apply or build-role")?;
+    let verb = args.first().ok_or("expected follow, run, show or apply")?;
     let mut root = None;
     let mut runtime = None;
     let mut base = None;
@@ -101,7 +92,6 @@ pub(super) fn run(args: &[String]) -> Result<ExitCode, String> {
     let mut json = false;
     let mut preview = false;
     let mut replace_processes = false;
-    let mut until = None;
     let mut i = 1;
     while i < args.len() {
         match args[i].as_str() {
@@ -117,7 +107,7 @@ pub(super) fn run(args: &[String]) -> Result<ExitCode, String> {
             "--preview" => preview = true,
             "--replace-processes" => replace_processes = true,
             "--channels" | "--root" | "--runtime-config" | "--base" | "--mode" | "--pin"
-            | "--render" | "--ready-line" | "--restart" | "--name" | "--env" | "--until" => {
+            | "--render" | "--ready-line" | "--restart" | "--name" | "--env" => {
                 let flag = &args[i];
                 i += 1;
                 let value = args.get(i).ok_or_else(|| format!("{flag} needs a value"))?;
@@ -138,7 +128,6 @@ pub(super) fn run(args: &[String]) -> Result<ExitCode, String> {
                         return Err("--name is declared twice".into())
                     }
                     "--name" => launch.name = Some(value.clone()),
-                    "--until" => until = Some(value.clone()),
                     "--env" => {
                         let (key, val) = value.split_once('=').ok_or("--env needs KEY=VALUE")?;
                         if launch.env.insert(key.to_owned(), val.to_owned()).is_some() {
@@ -155,9 +144,6 @@ pub(super) fn run(args: &[String]) -> Result<ExitCode, String> {
     }
     if verb != "run" && launch != RunLaunch::default() {
         return Err("--name, --env, --ready-line, --restart and `-- <args>` belong to run".into());
-    }
-    if until.is_some() && verb != "build-role" {
-        return Err("--until belongs to build-role".into());
     }
     let act_flags = stop || unfollow || channels.is_some() || mode_given || pin.is_some();
     if preview && (verb != "apply" || observed || render.is_some() || act_flags) {
@@ -229,20 +215,6 @@ pub(super) fn run(args: &[String]) -> Result<ExitCode, String> {
             }
             store.act(ManifestAct::Run { tool, stop, launch })
         }
-        "build-role" => {
-            let role = match name.as_deref() {
-                Some("builder") => BuildRole::Builder,
-                Some("carrier") => BuildRole::Carrier,
-                Some("neither") => BuildRole::Neither,
-                Some(other) => {
-                    return Err(format!(
-                        "unknown build role {other}; expected builder, carrier or neither"
-                    ))
-                }
-                None => return Err("build-role needs builder, carrier or neither".into()),
-            };
-            store.act(ManifestAct::BuildRole(BuildRoleDeclaration { role, until }))
-        }
         "show" => store.read(),
         "apply" => store.apply_carrying().map(|applied| {
             if !applied.carried.is_empty() {
@@ -253,7 +225,7 @@ pub(super) fn run(args: &[String]) -> Result<ExitCode, String> {
             }
             applied.manifest
         }),
-        _ => return Err("expected follow, run, show, apply or build-role".into()),
+        _ => return Err("expected follow, run, show or apply".into()),
     }
     .map_err(|e| e.to_string())?;
     if observed {
