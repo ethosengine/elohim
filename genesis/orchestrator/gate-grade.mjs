@@ -4,11 +4,15 @@
 // device holds for the gate's closure and how that evidence would read under the PROPOSED graded
 // table. The table is a proposal the steward has not ruled; nothing here is read by a decision.
 //
-// What is counted, and from what. An independent execution is one admitted device holding a green
-// for THIS project and THIS closure, in a record this device read through a verifying reader:
-//   - this device: a note `brit-build-ref build find` verified, signed by this workspace's key;
-//   - a sibling: a `gate-verdict@1` row from `epr peer verdicts`, which admits by the roster and
-//     reads only what arrived inside that device's own signed channel head.
+// What is said, and from what, for THIS project and THIS closure:
+//   - own: this device's execution, from a note `brit-build-ref build find` verified and this
+//     workspace's key signed. It is printed apart. It is not an independent execution.
+//   - independent, signature-checked: another admitted device's green whose own signature this
+//     device checked. No reader checks a sibling verdict's brit signature today, so this is 0,
+//     and the line says so. Nothing here invents that check.
+//   - sibling claims, signature unchecked: a `gate-verdict@1` row from `epr peer verdicts`, which
+//     admits the sending device by the roster. It is a claim: counted on its own, one per device,
+//     and it never contributes to sufficiency.
 // Standing is assigned by the reader a record came through, never by a field inside the record.
 // A device counts once however many records it holds. A sponsored runner's result (a harvested
 // `ci:<pipeline>` note, whatever key signed it) is a carrier's result: it counts zero and is listed
@@ -16,8 +20,19 @@
 // brit could not verify, a signer that resolves to no admitted device, and an unsigned enrichment
 // are each listed and count for nothing. A red of any provenance is shown and never netted out.
 //
-// The words on the line are "would suffice under the proposed table" or "would not". A grade is a
+// The words on the line are "would suffice under the proposed table", "would not", or
+// `unexamined: <what>` when the row asks for evidence this reader did not examine. A grade is a
 // reading, not a verdict, and a count of executions is not a count of witnesses.
+//
+// The class of a change: a governance path is anything that selects, runs, keys, records or
+// enforces a gate. The set is gate-evidence.mjs's SIBLING_REUSE_GOVERNANCE_PATHS (handed in as
+// `isGovernance`; the gate-input audit names no governance set of its own) plus GRADE_GOVERNANCE
+// below for what that list does not name. A path is read with its git mode: a gitlink is
+// governance, a symlink is undetermined, and neither is classified by its filename.
+//
+// MUST-FIX-BEFORE-ANY-on (not built): the shadow budget is accounting, not a hard bound. A
+// subprocess receives the remaining time as its timeout, but the synchronous flow-log read and
+// its parsing, and this module's own work, are only checked after they return.
 
 export const GRADE_ENRICHMENT_MEASURE = 'attestation-enrichment@1';
 
@@ -56,10 +71,31 @@ const TOOLING_EXTENSIONS = /\.(mjs|cjs|js|ts|py|sh|bash|feature|json|jsonl|yaml|
 // Generated ledgers no recipe judges by: the habit register's projection.
 const LEDGER_PATHS = Object.freeze(['genesis/manifests/habits.yaml']);
 
-// A recipe is part of a gate's own judge: the manifest that declares it and the justfile that runs it.
-const isRecipePath = path => /(^|\/)(build-manifest\.json|justfile|[^/]+\.just)$/.test(path);
+// Governance beyond SIBLING_REUSE_GOVERNANCE_PATHS: the hook that enforces, the runner scripts, the
+// hand-over, device-notes and attestation legs, the preflight guards, the recipes and manifests
+// that declare a gate, the toolchain pins, and this reader with its table.
+export const GRADE_GOVERNANCE = Object.freeze([
+  /^\.husky\//,
+  /^genesis\/orchestrator\/(gate-[^/]*|run-local-gate\.sh|gate-steps\.sh|cargo-lint\.mjs|handover-[^/]*|device-[^/]*|attested-[^/]*|doc-cut-guard\.mjs|suite-[^/]*|pipeline-registry\.mjs|graph-walker\.mjs|manifest-utils\.mjs)$/,
+  /^genesis\/orchestrator\/scripts\/brit-attest\.mjs$/,
+  /^genesis\/agentic\/(pool-policy\.json|bin\/pool-lib\.sh)$/,
+  /(^|\/)build-manifest\.json$/,
+  /(^|\/)(justfile|[^/]+\.just)$/,
+  /(^|\/)rust-toolchain(\.toml)?$/,
+  /^\.claude\/epr-meta\/measures\.yaml$/,
+  /^genesis\/docs\/superpowers\/specs\/2026-11-24-verdict-is-an-attestation-on-an-artifact-design\.md$/,
+]);
+const isRecipePath = path => GRADE_GOVERNANCE.some(rule => rule.test(path));
 
-function classOfPath(path, isGovernance) {
+const GITLINK = '160000';
+const SYMLINK = '120000';
+
+function classOfPath(path, isGovernance, modes) {
+  const held = modes?.[path];
+  // Without a mode the path is not classified: a name alone cannot tell a file from a link.
+  if (!Array.isArray(held)) return { why: `the git mode of ${path} was not read` };
+  if (held.includes(GITLINK)) return 'governance';
+  if (held.includes(SYMLINK)) return { why: `${path} is a symlink, never classified by its name` };
   if (isGovernance(path) || isRecipePath(path)) return 'governance';
   if (SERVING_PREFIXES.some(prefix => path.startsWith(prefix))) return 'serving-path';
   if (/\.rs$/.test(path) || /(^|\/)Cargo\.(toml|lock)$/.test(path)) return 'library-crate';
@@ -72,6 +108,7 @@ function classOfPath(path, isGovernance) {
  * The class of a change, from the paths the push touches since its integration base. The strictest
  * row any path falls in is the class. A range that could not be read, an empty range, or any path
  * no row's definition places is `undetermined`, with the reason: a class is never guessed.
+ * `range.modes` maps each path to its git modes on both sides of the range (rawModes).
  */
 export function classifyChange(range, { isGovernance = () => false } = {}) {
   if (!range || !range.base) return { cls: null, why: 'no integration base was read' };
@@ -79,7 +116,8 @@ export function classifyChange(range, { isGovernance = () => false } = {}) {
   if (files.length === 0) return { cls: null, why: 'the push touches no path since its integration base' };
   let strictest = -1;
   for (const path of files) {
-    const cls = classOfPath(String(path), isGovernance);
+    const cls = classOfPath(String(path), isGovernance, range.modes);
+    if (cls && typeof cls === 'object') return { cls: null, why: cls.why };
     if (!cls) return { cls: null, why: `no row places ${path}` };
     strictest = Math.max(strictest, GRADE_CLASSES.indexOf(cls));
   }
@@ -104,7 +142,7 @@ export function countExecutions({
   project, key, selfId = null, local = [], unverifiable = [], siblings = [], enrichments = [], carriers = [],
   unread = [],
 }) {
-  const devices = new Map(); // device id -> { who, green, red }
+  const devices = new Map(); // device id -> { who, green, red, own }
   const ignored = [];
   const disagreements = [];
   const carried = [];
@@ -132,7 +170,7 @@ export function countExecutions({
       if (!a.success) disagreements.push(`signer ${short(a.agentId || 'unsigned')} red (local note, not an admitted device)`);
       continue;
     }
-    verdict(device('self', 'this device'), a.success, null);
+    verdict(Object.assign(device('self', 'this device'), { own: true }), a.success, null);
   }
   for (const note of unverifiable) {
     ignored.push(`an unverifiable note at ${String(note?.commit || '').slice(0, 9) || 'an unknown commit'} (${String(note?.reason || 'brit could not verify it').split('\n')[0]})`);
@@ -167,10 +205,17 @@ export function countExecutions({
     if (!row.success) disagreements.push(`carrier ${name} red`);
   }
 
-  const greens = [...devices.values()].filter(entry => entry.green);
+  const own = devices.get('self') || null;
+  const claims = [...devices.values()].filter(entry => entry.green && !entry.own);
   return {
-    independent: greens.length,
-    by: greens.map(entry => `${entry.who} green`),
+    // This device's own execution: said apart, never an independent execution.
+    own: own ? (own.red ? (own.green ? 'green and red' : 'red') : 'green') : 'none',
+    ownGreen: Boolean(own?.green),
+    // Another device's green whose signature this device checked. No such check exists today.
+    independent: 0,
+    // Roster-admitted sibling greens whose brit signature was not checked: claims.
+    claims: claims.length,
+    by: claims.map(entry => `${entry.who} green`),
     carried,
     ignored: [...new Set(ignored)],
     disagreements: [...new Set(disagreements)],
@@ -192,33 +237,36 @@ export function wouldSuffice(cls, tally) {
   if (cls === 'governance') {
     return no('governance row: never skipped for a gate whose own judge or recipe changed, and which gates those are is not computed here, so every gate reads as changed');
   }
-  if (tally.independent < 1) {
-    return no(tally.carried.length > 0
-      ? 'row needs 1; a carrier\'s result counts 0 executions and is not yet eligible to stand alone'
-      : 'row needs 1; no admitted device holds a green for this closure');
-  }
-  const note = cls === 'library-crate' ? ' at the crate\'s own key; this is the project key'
-    : cls === 'serving-path' ? ' for the gate; the household witness the row requires at dev and main is not read here'
-      : '';
-  return { suffice: 'yes', why: `row needs 1${note}` };
+  // The row asks for evidence this reader did not examine: the answer is neither yes nor no.
+  if (cls === 'library-crate') return { suffice: 'unexamined', why: 'the crate\'s own key (the row reads a green at that key; only the project key was read)' };
+  if (cls === 'serving-path') return { suffice: 'unexamined', why: 'the household witness the row requires at dev and main' };
+  if (tally.ownGreen) return { suffice: 'yes', why: 'row: this device\'s own green for this key' };
+  if (tally.claims > 0) return no('a sibling\'s claim is signature-unchecked and does not count; no signature-checked independent execution and no own green');
+  return no(tally.carried.length > 0
+    ? 'a carrier\'s result counts 0 executions and is not yet eligible to stand alone'
+    : 'no own green and no signature-checked independent execution for this closure');
 }
 
 /** The one line. `today` is the real decision, already made and recorded: `reuse own`, `ran green`, … */
 export function gradeLine(project, { change, tally, would }, today) {
   const parts = [];
   parts.push(change.cls ? `class ${change.label}` : `class: undetermined (${change.why})`);
-  parts.push(`executions for this closure: ${tally.independent} independent${tally.by.length ? ` (${tally.by.join(', ')})` : ''}`
-    + `, carrier: ${tally.carried.length ? tally.carried.join(', ') : 'none'}`);
+  parts.push(`executions for this closure: own: ${tally.own}`
+    + `; independent, signature-checked: ${tally.independent} (no reader checks a sibling's signature yet)`
+    + `; sibling claims, signature unchecked: ${tally.claims}${tally.by.length ? ` (${tally.by.join(', ')})` : ''}`
+    + `; carrier: ${tally.carried.length ? tally.carried.join(', ') : 'none'}`);
   if (tally.ignored.length) parts.push(`not counted: ${tally.ignored.join(', ')}`);
   if (tally.unread.length) parts.push(`unread: ${tally.unread.join(', ')}`);
   parts.push(`disagreements: ${tally.disagreements.length ? tally.disagreements.join(', ') : 'none'}`);
-  if (would) parts.push(`would suffice: ${would.suffice} (${would.why})`);
+  if (would) parts.push(would.suffice === 'unexamined' ? `would suffice: unexamined: ${would.why}` : `would suffice: ${would.suffice} (${would.why})`);
   return `[gate] ${project} grade (shadow, proposed table): ${parts.join('; ')} | today: ${today}`;
 }
 
-/** The reading row's step: the class, the count and the reading ride in the name (see gate-runner). */
+/** The reading row's step: class, checked count (n), sibling claims (c) and reading ride in the name. */
 export function gradeStep(project, { change, tally, would }) {
-  return `${project}:grade:${change.cls || 'undetermined'}:n${tally.independent}:${would ? would.suffice : 'na'}`;
+  // `na` covers both no reading (class undetermined) and unexamined: neither is a yes or a no.
+  const reading = would && (would.suffice === 'yes' || would.suffice === 'no') ? would.suffice : 'na';
+  return `${project}:grade:${change.cls || 'undetermined'}:n${tally.independent}c${tally.claims}:${reading}`;
 }
 
 /** Compose class, tally and reading. Pure. */
@@ -248,4 +296,19 @@ export function enrichmentsIn(text) {
     out.push({ kind: env('kind'), outcome: env('outcome'), project: env('project'), closure: env('closure'), device: env('device') });
   }
   return out;
+}
+
+/**
+ * `git diff --raw --no-abbrev --no-renames -z <base> <commit>` as `{ path: [oldMode, newMode] }`,
+ * or null when the text is not that shape. A mode is read from git, never from a name.
+ */
+export function rawModes(text) {
+  const fields = String(text ?? '').split('\0');
+  const modes = {};
+  for (let i = 0; i + 1 < fields.length; i += 2) {
+    const head = /^:([0-7]{6}) ([0-7]{6}) [0-9a-f]+ [0-9a-f]+ [A-Z]\d*$/.exec(fields[i]);
+    if (!head || !fields[i + 1]) return null;
+    modes[fields[i + 1]] = [head[1], head[2]];
+  }
+  return modes;
 }

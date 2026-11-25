@@ -26,7 +26,7 @@ import { britAffected, resolveBritBin } from './gate-oracle.mjs';
 import { landerWait } from './gate-carry-claim.mjs';
 import { deviceEpr } from './device-epr.mjs';
 import { recipeKeyShadow } from './gate-recipe-key.mjs';
-import { enrichmentsIn, gradeLine, gradeMode, gradeOf, gradeStep } from './gate-grade.mjs';
+import { enrichmentsIn, gradeLine, gradeMode, gradeOf, gradeStep, rawModes } from './gate-grade.mjs';
 import { readBuildNote } from './scripts/brit-attest.mjs';
 import { CLAIMED_EXIT_CODE, runAttested } from './gate-attest.mjs';
 import { affectedPackages, loadMetadata, metadataToolchain } from './cargo-affected.mjs';
@@ -1539,8 +1539,14 @@ export function runProject(project, printOnly, namesOnly, {
       const bounded = (command, args, options) => sharedReadShadowBudget.spawn(spawn, 'grade', command, args, options);
       const check = () => sharedReadShadowBudget.check('grade');
       const unread = [];
-      const range = pushRange({ root, gateCommit, spawn: bounded });
+      let range = pushRange({ root, gateCommit, spawn: bounded });
       check();
+      // Each changed path's git mode, from git: a gitlink or a symlink is never read by its name.
+      if (range?.base && range.files.length > 0) {
+        const raw = bounded('git', ['diff', '--raw', '--no-abbrev', '--no-renames', '-z', range.base, gateCommit], { cwd: root, encoding: 'utf8' });
+        check();
+        range = { ...range, modes: raw?.status === 0 ? rawModes(raw.stdout) : null };
+      }
       // This workspace's key: the one the reuse decision read, else one bounded brit-build-ref call.
       const gradeSelf = selfId ?? selfAgentId(root, bounded, signerOptions);
       check();
@@ -1881,7 +1887,7 @@ function usage() {
   console.error('  env: GATE_RECIPE_KEY=shadow|off (default shadow): a root-just gate prints whether a justfile edit since the integration base left its recipe closure unchanged; it changes no key, reuse decision or record');
   console.error('  env: GATE_INPUTS=shadow|off (default shadow; no on yet): prints, once per push, the borrowed steps whose own buildProcess alone selects them, and per gate when, since the integration base, its step fingerprints moved under all and are unchanged under sources; it changes no selection, key, reuse decision or record');
   console.error('  env: GATE_READ_SHADOW=off (default on) · GATE_READ_SHADOW_BUDGET_MS (default 15000 once per push with GATE_READ_SHADOW_LEDGER, otherwise per invocation): after recorded timing, compares closure movement under two read-audit fixes; it decides nothing, and enablement requires proof for #[path]-included tests/** support, format! joins with variable suffixes, absent paths, and eprfs running and blocking on the same push');
-  console.error('  env: GATE_GRADE=off|shadow (default shadow; there is no on): after a gate is recorded, one line says what evidence this device holds for its closure (independent executions by admitted devices, a carrier\'s result apart, what was not counted, any disagreement) and what the PROPOSED graded table would say for the class of the change; it shares the read-shadow budget and decides nothing');
+  console.error('  env: GATE_GRADE=off|shadow (default shadow; there is no on): after a gate is recorded, one line says what evidence this device holds for its closure (its own execution apart, signature-checked independent executions, sibling claims with the signature unchecked, a carrier\'s result apart, what was not counted, any disagreement) and what the PROPOSED graded table would say for the class of the change (yes, no, or unexamined: <what>); it shares the read-shadow budget and decides nothing');
   console.error('  env: GATE_READING=off (default on): suppress collection and the one bounded `epr flow reading append` call; the shadow reading never changes selection, reuse, keys or exit status');
   console.error('  env: GATE_CARRY=off|shadow|on (default shadow, read by gate-carry.mjs under pre-push): carry one long one-build-job cargo gate on this device\'s second cargo seat beside the loop when `berth room cargo` admits it; shadow prints what would be carried and why and changes nothing');
 }

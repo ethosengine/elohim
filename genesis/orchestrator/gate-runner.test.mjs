@@ -2107,7 +2107,7 @@ function gradeFixture(t) {
   const outputCid = [0x12, 0x20, ...Array(32).fill(7)];
   const run = ({
     grade = 'shadow', evidence = 'off', budget = null, changed = ['fixture/test.rs'],
-    local = [], siblings = [], ci = null, flowLog = '', flowError = null, gateExit = 0,
+    local = [], siblings = [], ci = null, flowLog = '', flowError = null, gateExit = 0, modes = {},
   } = {}) => {
     const calls = [];
     const rows = [];
@@ -2140,6 +2140,9 @@ function gradeFixture(t) {
         }))));
       }
       if (command === 'git' && args[0] === 'merge-base') return ok(`${base}\n`);
+      if (command === 'git' && args[0] === 'diff' && args.includes('--raw')) {
+        return ok(changed.map(path => `:${(modes[path] || ['100644', '100644']).join(' ')} ${'1'.repeat(40)} ${'2'.repeat(40)} M\0${path}\0`).join(''));
+      }
       if (command === 'git' && args[0] === 'diff' && args.includes('-z')) return ok(changed.map(path => `${path}\0`).join(''));
       if (command === 'git' && args[0] === 'diff') return ok('');
       if (command === 'git' && args[0] === 'show') {
@@ -2230,7 +2233,7 @@ test('grade shadow: on, off, failing and over budget keep the same decision, evi
   same(reusedOn, reusedOff, 'reused');
   assert.equal(reusedOff.gateRuns, 0, 'the fixture really is reused');
   assert.match(reusedOff.output, /fixture reused: green/);
-  assert.match(reusedOn.gradeLines[0], /1 independent \(this device green\).*\| today: reuse own$/);
+  assert.match(reusedOn.gradeLines[0], /own: green; independent, signature-checked: 0 .*\| today: reuse own$/);
   assert.deepEqual(reusedOn.gradeRows.map(row => [row.outcome, row.status]), [['reused', 'green']]);
 
   // A sibling red refuses reuse today; the shadow shows it and changes nothing about that.
@@ -2239,7 +2242,7 @@ test('grade shadow: on, off, failing and over budget keep the same decision, evi
   const vetoedOn = run(vetoed);
   same(vetoedOn, vetoedOff, 'sibling red');
   assert.equal(vetoedOff.gateRuns, 1);
-  assert.match(vetoedOn.gradeLines[0], /disagreements: sibling z6MkpZRhMw…0001 red; would suffice: no/);
+  assert.match(vetoedOn.gradeLines[0], /disagreements: sibling z6MkpZRhMw…0001 red/);
 
   // The shadow failing, and the shadow out of budget: one line, no row, nothing else moves.
   const off = run({ grade: 'off' });
@@ -2282,33 +2285,50 @@ test('grade shadow: it reuses the sibling read the reuse decision made and adds 
   const on = run(scene);
   assert.equal(off.eprPeerReads, 1, 'the reuse decision reads the sibling verdicts once');
   assert.equal(on.eprPeerReads, 1, 'the shadow adds no second flow-store reader');
-  assert.match(on.gradeLines[0], /2 independent \(this device green, sibling z6MkpZRhMw…0001 green\)/);
+  assert.match(on.gradeLines[0], /own: green; independent, signature-checked: 0 \(no reader checks a sibling's signature yet\); sibling claims, signature unchecked: 1 \(sibling z6MkpZRhMw…0001 green\)/);
   const reportOnly = run({ siblings: [{ success: true }] });
   assert.equal(reportOnly.eprPeerReads, 1, 'with no reuse asked the shadow makes the one bounded read itself');
 });
 
-test('grade shadow: the runner counts devices once, a carrier zero, and ignores another closure', t => {
+test('grade shadow: the runner says own apart, siblings as unchecked claims, a carrier zero, and reads git modes', t => {
   const { run } = gradeFixture(t);
   const twice = run({ evidence: 'reuse', local: [{ success: true }, { success: true, builtAt: '2026-11-24T00:00:00Z' }],
     siblings: [{ success: true }, { success: true }], ci: { success: true, inputsHash: 't'.repeat(40), agentId: 'a'.repeat(64) } });
-  assert.match(twice.gradeLines[0], /class a library crate; executions for this closure: 2 independent \(this device green, sibling z6MkpZRhMw…0001 green\), carrier: jenkins green at this commit \(keyed on the commit tree, not this closure\)/);
-  assert.match(twice.gradeLines[0], /disagreements: none; would suffice: yes \(row needs 1 at the crate's own key; this is the project key\)/);
-  assert.equal(twice.gradeRows[0].step, 'fixture:grade:library-crate:n2:yes');
+  assert.match(twice.gradeLines[0], /class a library crate; executions for this closure: own: green; independent, signature-checked: 0 \(no reader checks a sibling's signature yet\); sibling claims, signature unchecked: 1 \(sibling z6MkpZRhMw…0001 green\); carrier: jenkins green at this commit \(keyed on the commit tree, not this closure\)/);
+  assert.match(twice.gradeLines[0], /disagreements: none; would suffice: unexamined: the crate's own key/);
+  assert.doesNotMatch(twice.gradeLines[0], /would suffice: yes/);
+  assert.equal(twice.gradeRows[0].step, 'fixture:grade:library-crate:n0c1:na');
   assert.equal(twice.gradeRows[0].parent, 'fixture');
 
+  // A sibling claim alone, on a tooling change: never sufficient.
+  const claimOnly = gradeFixture(t).run({ changed: ['genesis/a2o/scripts/look.ts'], siblings: [{ success: true }] });
+  assert.match(claimOnly.gradeLines[0], /class test or tooling code; executions for this closure: own: none; .*sibling claims, signature unchecked: 1/);
+  assert.match(claimOnly.gradeLines[0], /would suffice: no \(a sibling's claim is signature-unchecked and does not count/);
+  assert.equal(claimOnly.gradeRows[0].step, 'fixture:grade:tooling:n0c1:no');
+
   const carrierOnly = run({ ci: { success: true, inputsHash: 't'.repeat(40) } });
-  assert.match(carrierOnly.gradeLines[0], /0 independent, carrier: jenkins green/);
-  assert.match(carrierOnly.gradeLines[0], /would suffice: no/);
+  assert.match(carrierOnly.gradeLines[0], /own: none; .*sibling claims, signature unchecked: 0; carrier: jenkins green/);
 
   const elsewhere = run({ siblings: [{ success: true, closure: 'o'.repeat(64) }, { success: false, project: 'other' }] });
-  assert.match(elsewhere.gradeLines[0], /0 independent, carrier: none; not counted: a sibling verdict for another closure or project/);
+  assert.match(elsewhere.gradeLines[0], /sibling claims, signature unchecked: 0; carrier: none; not counted: a sibling verdict for another closure or project/);
   assert.match(elsewhere.gradeLines[0], /disagreements: none/);
 
   // The push range is read once per gated commit per process, so another change is another fixture.
   const undetermined = gradeFixture(t).run({ changed: ['app/elohim-app/src/main.ts'], siblings: [{ success: true }] });
-  assert.match(undetermined.gradeLines[0], /class: undetermined \(no row places app\/elohim-app\/src\/main\.ts\); executions for this closure: 1 independent/);
+  assert.match(undetermined.gradeLines[0], /class: undetermined \(no row places app\/elohim-app\/src\/main\.ts\); executions for this closure: own: none/);
   assert.doesNotMatch(undetermined.gradeLines[0], /would suffice/);
-  assert.equal(undetermined.gradeRows[0].step, 'fixture:grade:undetermined:n1:na');
+  assert.equal(undetermined.gradeRows[0].step, 'fixture:grade:undetermined:n0c1:na');
+
+  // Modes come from git: a hook is governance, a gitlink is governance, a symlink named like a document is not placed.
+  const hook = gradeFixture(t).run({ changed: ['.husky/pre-push.bash', 'genesis/orchestrator/run-local-gate.sh'], local: [{ success: true }] });
+  assert.match(hook.gradeLines[0], /class a gate's own judge or recipe; .*would suffice: no \(governance row/);
+  const gitlink = gradeFixture(t).run({ changed: ['notes.md'], modes: { 'notes.md': ['100644', '160000'] }, local: [{ success: true }] });
+  assert.match(gitlink.gradeLines[0], /class a gate's own judge or recipe; /);
+  const symlink = gradeFixture(t).run({ changed: ['notes.md'], modes: { 'notes.md': ['000000', '120000'] }, local: [{ success: true }] });
+  assert.match(symlink.gradeLines[0], /class: undetermined \(notes\.md is a symlink, never classified by its name\)/);
+  assert.doesNotMatch(symlink.gradeLines[0], /would suffice/);
+  const plain = gradeFixture(t).run({ changed: ['notes.md'], local: [{ success: true }] });
+  assert.match(plain.gradeLines[0], /class documentation only; .*would suffice: yes \(row: this device's own green for this key\)/);
 });
 
 test('grade shadow: over budget drops with one line, no row and no subprocess', t => {
@@ -2329,7 +2349,7 @@ test('grade shadow: a green this run recorded is counted from its re-read record
   // The fixture's store answers every find with the same rows, so the row is there at the re-read.
   const ran = run({ local: [{ success: true }] });
   assert.equal(ran.gateRuns, 1);
-  assert.match(ran.gradeLines[0], /1 independent \(this device green\).*\| today: ran green$/);
+  assert.match(ran.gradeLines[0], /own: green; .*\| today: ran green$/);
   const nothingHeld = run({});
-  assert.match(nothingHeld.gradeLines[0], /0 independent, carrier: none/, 'a run whose record is not there counts nothing for this device');
+  assert.match(nothingHeld.gradeLines[0], /own: none; /, 'a run whose record is not there says nothing for this device');
 });
