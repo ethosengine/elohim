@@ -7,10 +7,12 @@
 
 use cid::Cid;
 use elohim_epr_rea::{
-    atom_cid, AgentRef, FlowEvent, FlowRecord, Intent, Magnitude, ReaVerb, ResourceSpec,
+    atom_cid, AgentRef, FlowEvent, FlowRecord, FlowStore, Intent, Magnitude, ReaVerb, ResourceSpec,
 };
 
-use super::{decide, live_carries, CarryDecision, CarryQuery, CarryRole, LanderBounds};
+use super::{
+    append_carry_records, decide, live_carries, CarryDecision, CarryQuery, CarryRole, LanderBounds,
+};
 use crate::flow::intend::INTENT_TAG;
 use crate::flow::misses::{Landing, OpenMiss, SettledBy};
 
@@ -228,6 +230,43 @@ fn lander(
 
 fn is_run_here(decision: &CarryDecision) -> bool {
     matches!(decision, CarryDecision::RunHere { .. })
+}
+
+#[derive(Default)]
+struct BatchSpy {
+    batches: Vec<Vec<FlowRecord>>,
+}
+
+impl FlowStore for BatchSpy {
+    fn append(&mut self, _: FlowRecord) -> elohim_epr_rea::Result<Cid> {
+        panic!("a carry must use append_batch")
+    }
+
+    fn append_batch(&mut self, records: Vec<FlowRecord>) -> elohim_epr_rea::Result<Vec<Cid>> {
+        let cids = records
+            .iter()
+            .map(FlowRecord::cid)
+            .collect::<elohim_epr_rea::Result<Vec<_>>>()?;
+        self.batches.push(records);
+        Ok(cids)
+    }
+
+    fn records(&self) -> elohim_epr_rea::Result<Vec<(Cid, FlowRecord)>> {
+        Ok(Vec::new())
+    }
+}
+
+#[test]
+fn a_carry_appends_its_commitment_and_event_as_one_reader_visible_batch() {
+    let (_, commitment) = event(cid("commitment"), vec!["commitment".into()]);
+    let commitment_cid = commitment.cid().unwrap();
+    let (_, carry) = carry(None, "commitment", 1_000, 1_600);
+    let mut store = BatchSpy::default();
+
+    append_carry_records(&mut store, &[], commitment_cid, commitment, carry).unwrap();
+
+    assert_eq!(store.batches.len(), 1);
+    assert_eq!(store.batches[0].len(), 2);
 }
 
 #[test]

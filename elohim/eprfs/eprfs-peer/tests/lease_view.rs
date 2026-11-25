@@ -15,7 +15,10 @@ use eprfs_peer::{
     other_devices, steward_lease_view, Admission, DeviceHead, HeadTable, LeaseStore, LeaseVerdict,
     NackLeaf, OwnAnnounce, PeerError, Settlement, StewardScope, VIA_SLOT,
 };
-use support::{binding, contest, endpoint_row, event_with, genesis, household, Household, MEASURE};
+use support::{
+    binding, contest, device, endpoint_row, event_with, genesis, household, peer_key, verifier,
+    Household, MEASURE,
+};
 
 const RESOURCE: &str = "dev-integration";
 /// 2026-10-23T15:28:09Z, in unix seconds as berth stamps it.
@@ -37,10 +40,20 @@ fn ms(seconds: f64) -> u64 {
 /// A berth record of `kind` on `resource` by `session`, written at `at` (unix seconds), with
 /// extra `env:` fields.
 fn record(kind: &str, session: &str, at: f64, extra: &[(&str, String)]) -> FlowEvent {
+    record_on(RESOURCE, kind, session, at, extra)
+}
+
+fn record_on(
+    resource: &str,
+    kind: &str,
+    session: &str,
+    at: f64,
+    extra: &[(&str, String)],
+) -> FlowEvent {
     let mut env = vec![
         format!("env:at={at:.3}"),
         format!("env:kind={kind}"),
-        format!("env:resource={RESOURCE}"),
+        format!("env:resource={resource}"),
         format!("env:session={session}"),
     ];
     env.extend(extra.iter().map(|(k, v)| format!("env:{k}={v}")));
@@ -630,6 +643,163 @@ fn counted(event: FlowEvent, dseq: u64) -> FlowEvent {
     let mut event = event;
     event.classified_as.push(format!("env:dseq={dseq}"));
     event
+}
+
+#[test]
+fn every_randomly_interleaved_prefix_is_a_real_prefix_of_each_senders_history() {
+    let me = device("PrefixRoot", 31);
+    let senders = [
+        device("PrefixA", 32),
+        device("PrefixB", 33),
+        device("PrefixC", 34),
+    ];
+    let (me_dir, me_key) = peer_key();
+    let mut peer_dirs = vec![me_dir];
+    let mut peer_keys = Vec::new();
+    let mut rows = vec![genesis(&me), endpoint_row(&me, &me, &me_key)];
+    for sender in &senders {
+        let (dir, key) = peer_key();
+        rows.push(binding(&me, sender));
+        rows.push(endpoint_row(&me, sender, &key));
+        peer_dirs.push(dir);
+        peer_keys.push(key);
+    }
+    let mut devices = vec![&me];
+    devices.extend(senders.iter());
+    let verify = verifier(&devices);
+    let admission = Admission::from_roster(&rows, &me.did, &*verify);
+    let heads = HeadTable::default();
+    let resources = ["lane:prefix-a", "lane:prefix-b", "lane:prefix-c"];
+    let histories: Vec<Vec<FlowEvent>> = resources
+        .iter()
+        .enumerate()
+        .map(|(index, resource)| {
+            let first = T0 + index as f64 * 10.0;
+            vec![
+                counted(
+                    record_on(
+                        resource,
+                        "claim",
+                        "session-1",
+                        first,
+                        &[("claimed_at", format!("{first:.3}"))],
+                    ),
+                    1,
+                ),
+                counted(
+                    record_on(
+                        resource,
+                        "release",
+                        "session-1",
+                        first + 1.0,
+                        &[("claimed_at", format!("{first:.3}"))],
+                    ),
+                    2,
+                ),
+                counted(
+                    record_on(
+                        resource,
+                        "claim",
+                        "session-2",
+                        first + 2.0,
+                        &[("claimed_at", format!("{:.3}", first + 2.0))],
+                    ),
+                    3,
+                ),
+                counted(
+                    record_on(
+                        resource,
+                        "release",
+                        "session-2",
+                        first + 3.0,
+                        &[("claimed_at", format!("{:.3}", first + 2.0))],
+                    ),
+                    4,
+                ),
+            ]
+        })
+        .collect();
+
+    let expected: Vec<Vec<Option<LeaseVerdict>>> = histories
+        .iter()
+        .enumerate()
+        .map(|(sender, history)| {
+            (0..=history.len())
+                .map(|cut| {
+                    let isolated = store(
+                        history[..cut]
+                            .iter()
+                            .cloned()
+                            .map(|event| from(&senders[sender].did, event))
+                            .collect(),
+                    );
+                    steward_lease_view(
+                        &me.did,
+                        &isolated,
+                        &heads,
+                        &admission,
+                        ms(T0) + 60_000,
+                        SETTLEMENT,
+                    )
+                    .unwrap()
+                    .remove(resources[sender])
+                })
+                .collect()
+        })
+        .collect();
+
+    for seed in 1..=64_u64 {
+        let mut random = seed;
+        let mut next = [0_usize; 3];
+        let mut interleaved = Vec::new();
+        while next
+            .iter()
+            .zip(&histories)
+            .any(|(index, history)| *index < history.len())
+        {
+            random = random
+                .wrapping_mul(6_364_136_223_846_793_005)
+                .wrapping_add(1);
+            let available: Vec<_> = (0..histories.len())
+                .filter(|sender| next[*sender] < histories[*sender].len())
+                .collect();
+            let sender = available[(random as usize) % available.len()];
+            interleaved.push((sender, histories[sender][next[sender]].clone()));
+            next[sender] += 1;
+        }
+
+        for cut in 0..=interleaved.len() {
+            let prefix = &interleaved[..cut];
+            let folded = store(
+                prefix
+                    .iter()
+                    .map(|(sender, event)| from(&senders[*sender].did, event.clone()))
+                    .collect(),
+            );
+            let mut view = steward_lease_view(
+                &me.did,
+                &folded,
+                &heads,
+                &admission,
+                ms(T0) + 60_000,
+                SETTLEMENT,
+            )
+            .unwrap();
+            for sender in 0..histories.len() {
+                let own_cut = prefix
+                    .iter()
+                    .filter(|(origin, _)| *origin == sender)
+                    .count();
+                assert_eq!(
+                    view.remove(resources[sender]),
+                    expected[sender][own_cut],
+                    "seed {seed}, global cut {cut}, sender {sender}, own cut {own_cut}"
+                );
+            }
+        }
+    }
+
+    drop((peer_dirs, peer_keys));
 }
 
 #[test]

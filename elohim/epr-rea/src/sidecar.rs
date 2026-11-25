@@ -218,6 +218,51 @@ impl LockedLog {
         Ok(())
     }
 
+    /// Prepare an empty log for its first append while this writer owns the exclusive lock.
+    ///
+    /// A process that lost the create race can reach this point before the creator has synced the
+    /// new names. Sync the empty file and every directory entry the creator may have made before
+    /// any bytes become visible. Non-empty logs were already admitted by an earlier synced write.
+    pub(crate) fn prepare_append(&self, root: &Path, path: &Path) -> Result<Option<String>> {
+        self.prepare_append_with_directory_sync(root, path, sync_directory)
+    }
+
+    fn prepare_append_with_directory_sync(
+        &self,
+        root: &Path,
+        path: &Path,
+        mut sync_directory: impl FnMut(&Path) -> std::io::Result<()>,
+    ) -> Result<Option<String>> {
+        let tail = self.tail_record()?;
+        if tail.is_some() {
+            return Ok(tail);
+        }
+        self.file.sync_all()?;
+        for directory in [
+            root.to_path_buf(),
+            root.join(".eprfs"),
+            root.join(".eprfs/status"),
+        ] {
+            sync_directory(&directory)?;
+        }
+        let expected = root
+            .join(".eprfs/status")
+            .join(path.file_name().ok_or_else(|| {
+                std::io::Error::new(
+                    std::io::ErrorKind::InvalidInput,
+                    "sidecar log path has no file name",
+                )
+            })?);
+        if path != expected {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "sidecar log is outside its root status directory",
+            )
+            .into());
+        }
+        Ok(None)
+    }
+
     /// The final non-empty, newline-terminated record under this handle's exclusive lock.
     pub(crate) fn tail_record(&self) -> Result<Option<String>> {
         let length = self.file.metadata()?.len();
@@ -311,5 +356,44 @@ mod tests {
             ]
         );
         assert!(path.is_file());
+    }
+
+    #[test]
+    fn empty_log_writer_syncs_the_file_and_directory_chain_before_first_append() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = open_log(dir.path(), "flows.jsonl").unwrap();
+        let log = LockedLog::exclusive(&path).unwrap();
+        let mut synced = Vec::new();
+
+        assert_eq!(
+            log.prepare_append_with_directory_sync(dir.path(), &path, |directory| {
+                synced.push(directory.to_path_buf());
+                Ok(())
+            })
+            .unwrap(),
+            None
+        );
+        assert_eq!(
+            synced,
+            vec![
+                dir.path().to_path_buf(),
+                dir.path().join(".eprfs"),
+                dir.path().join(".eprfs/status"),
+            ]
+        );
+    }
+
+    #[test]
+    fn an_empty_retry_batch_syncs_before_it_is_acknowledged() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = open_log(dir.path(), "flows.jsonl").unwrap();
+        let mut log = LockedLog::exclusive(&path).unwrap();
+
+        log.append_batch(std::iter::empty()).unwrap();
+
+        assert!(
+            log.validated(),
+            "validated is set only after sync_all succeeds"
+        );
     }
 }

@@ -4,9 +4,9 @@
 //!
 //! A lease is replayed from berth's `dev-berth-events@1` records (T1), each device's in the order
 //! that device wrote them: by the record counter berth stamps on each (`dseq`; older records by
-//! record time, first) — since a fold appends a head's events in its tree's (CID) order, and two
-//! berth processes on one device can reach its store in the other order from the one they
-//! recorded in: a `claim` opens it, a
+//! record time, first). The fold preserves that order across its append batches, and the view
+//! orders defensively too because two berth processes on this device can reach its store in the
+//! other order from the one they recorded in: a `claim` opens it, a
 //! `renew` extends it, a generation-matching `release` (its own, or a forced one naming it) and an
 //! `unmoor` close it, and a claim that took over from another session closes that session's lease.
 //! An own legacy release without a generation remains authoritative. A folded legacy release
@@ -626,10 +626,10 @@ pub fn steward_lease_view(
     Ok(view)
 }
 
-/// The order a device wrote its records in. A fold appends a head's events in its channel
-/// tree's order (by CID), not the order its device wrote them: replay them by the device's record
-/// counter, which a clock step cannot reorder; records from before the counter by record time,
-/// first.
+/// The order a device wrote its records in: its counter cannot be reordered by a clock step;
+/// records from before the counter sort first by record time. The fold already preserves this
+/// order for sibling records; the view applies it again for local concurrent writers and as a
+/// compatibility guard for older folds.
 fn device_order(event: &LeaseEvent) -> (bool, Option<u64>, u64, u8, u64) {
     (
         event.dseq.is_some(),
