@@ -2695,6 +2695,7 @@ mod tests {
             folded_at: now.saturating_sub(90_000),
             events_folded: 0,
             nack: Default::default(),
+            coverage: None,
         };
         table.devices.insert(sibling.clone(), head.clone());
         let unacked = exchange_check(&siblings, ours, Ok(Some(table.clone())));
@@ -2738,6 +2739,7 @@ mod tests {
             folded_at: 0,
             events_folded: 0,
             nack: Default::default(),
+            coverage: None,
         };
         let mut table = eprfs_peer::HeadTable {
             own: Some(eprfs_peer::ChannelHead {

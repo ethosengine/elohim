@@ -122,6 +122,15 @@ pub(crate) fn flow_contents(path: &Path) -> Result<String> {
     String::from_utf8(bytes).map_err(|error| FabricError::Decode(error.to_string()))
 }
 
+/// The end of one append-only flow-log prefix, captured under its shared lock.
+pub(crate) fn flow_length(path: &Path) -> Result<u64> {
+    let file = File::open(path)?;
+    file.lock_shared()?;
+    let length = file.metadata()?.len();
+    file.unlock()?;
+    Ok(length)
+}
+
 #[derive(Debug)]
 pub(crate) struct LockedLog {
     file: File,

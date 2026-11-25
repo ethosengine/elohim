@@ -8,8 +8,8 @@ use std::time::{Duration, Instant};
 
 use eprfs_core::BlobCid;
 use eprfs_peer::{
-    topic_for, Channel, ChannelHead, HeadTable, HeadVerdict, PeerError, ANNOUNCE_DEBOUNCE,
-    MAX_CROSSING_DROP_ROWS_PER_RULE_GROUP, OWN_LOG_LEN, REANNOUNCE_EVERY,
+    topic_for, Channel, ChannelHead, FoldCoverage, HeadTable, HeadVerdict, PeerError,
+    ANNOUNCE_DEBOUNCE, MAX_CROSSING_DROP_ROWS_PER_RULE_GROUP, OWN_LOG_LEN, REANNOUNCE_EVERY,
 };
 use support::{device, household, Household};
 
@@ -150,7 +150,7 @@ fn lower_seq_head_refused_as_rollback() {
         channel.judge(&five, &admission, &*h.verify),
         HeadVerdict::Fold
     );
-    channel.folded(&five, 2, Default::default(), 10_000, now);
+    channel.folded(&five, 2, None, Default::default(), 10_000, now);
     assert_eq!(channel.last_folded(&h.b.did), Some((5, &root("r5"))));
 
     let three = head_of(&h, true, 3, "r3");
@@ -178,6 +178,41 @@ fn lower_seq_head_refused_as_rollback() {
         HeadTable::load(empty.path()).expect("loads"),
         HeadTable::default()
     );
+}
+
+#[test]
+fn a_completed_head_and_its_coverage_share_one_atomic_table_write() {
+    let h = household();
+    let mut channel = Channel::new(h.a.did.clone(), HeadTable::default());
+    let head = head_of(&h, true, 5, "covered-root");
+    channel.folded(
+        &head,
+        2,
+        Some(FoldCoverage {
+            events: 7,
+            log_offset: 4_096,
+        }),
+        Default::default(),
+        10_000,
+        Instant::now(),
+    );
+    let dir = tempfile::tempdir().expect("tempdir");
+    channel.table().save(dir.path()).expect("one table save");
+
+    let files: Vec<_> = std::fs::read_dir(dir.path())
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name())
+        .collect();
+    assert_eq!(files, [HeadTable::FILE_NAME]);
+    let value: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(dir.path().join(HeadTable::FILE_NAME)).unwrap())
+            .unwrap();
+    let saved = &value["devices"][&h.b.did];
+    assert_eq!(saved["seq"], 5);
+    assert_eq!(saved["root"], head.root.to_string());
+    assert_eq!(saved["coverage"]["events"], 7);
+    assert_eq!(saved["coverage"]["log_offset"], 4_096);
+    assert_eq!(HeadTable::load(dir.path()).unwrap(), *channel.table());
 }
 
 #[test]
@@ -210,7 +245,7 @@ fn folding_a_newer_head_reannounces_with_updated_ack() {
     let s = 7;
     let from_b = head_of(&h, true, s, "b1");
     let t2 = t1 + Duration::from_secs(3);
-    channel.folded(&from_b, 1, Default::default(), 3, t2);
+    channel.folded(&from_b, 1, None, Default::default(), 3, t2);
     assert!(!channel.due(t2));
     let t3 = t2 + ANNOUNCE_DEBOUNCE;
     assert!(
@@ -228,7 +263,7 @@ fn folding_a_newer_head_reannounces_with_updated_ack() {
     // A newer head with the same root (B acknowledging us) is recorded, but acknowledging an
     // acknowledgement would ping-pong forever: no re-announce is scheduled for it.
     let echo = head_of(&h, true, s + 1, "b1");
-    channel.folded(&echo, 0, Default::default(), 5, t3);
+    channel.folded(&echo, 0, None, Default::default(), 5, t3);
     assert!(!channel.due(t3 + ANNOUNCE_DEBOUNCE));
     // The periodic re-announce still carries it.
     let t4 = t3 + REANNOUNCE_EVERY;
@@ -419,7 +454,14 @@ fn a_device_no_longer_admitted_is_forgotten_and_its_ack_leaves_the_next_head() {
     let signer = h.a.signer();
     let t0 = Instant::now();
     channel.changed(root("a1"), t0);
-    channel.folded(&head_of(&h, true, 7, "b1"), 1, Default::default(), 3, t0);
+    channel.folded(
+        &head_of(&h, true, 7, "b1"),
+        1,
+        None,
+        Default::default(),
+        3,
+        t0,
+    );
     // Still admitted: nothing is forgotten.
     assert!(channel.forget_unadmitted(|_| true).is_empty());
     assert!(channel.table().devices.contains_key(&h.b.did));

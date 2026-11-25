@@ -44,6 +44,10 @@
 //! `devices` holds, per other device, the last head folded: its `seq`, `root`, `at` (that
 //! device's clock, display only) and `folded` (its acknowledgement vector), with `folded_at`
 //! (this device's clock, unix milliseconds) and the running count of events appended from it.
+//! A device's optional `coverage` is in that SAME JSON object and atomic file replacement as its
+//! head. It names the complete fold's flow-log prefix: a sender event whose JSONL line starts below
+//! `log_offset` is covered. Older epr builds ignore this unknown head-table field; no new flow
+//! record or field is written to `flows.jsonl`.
 //! `dropped` counts heads refused: from a device not admitted, failing their signature, with a
 //! lower `seq` than the last folded (rollback), the same `seq` again (replay), or not decoding.
 
@@ -247,6 +251,32 @@ pub struct DeviceHead {
     /// This peer's nack leaf for this device, read from the same signed channel root.
     #[serde(default)]
     pub nack: NackLeaf,
+    /// The complete prefix this head covered. Missing or malformed coverage deliberately reads as
+    /// `None`, preserving the pre-coverage reader behavior instead of refusing the head table.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "deserialize_coverage"
+    )]
+    pub coverage: Option<FoldCoverage>,
+}
+
+/// The sender events covered by one completed [`DeviceHead`] fold.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FoldCoverage {
+    /// Accepted events from this sender below [`Self::log_offset`].
+    pub events: u64,
+    /// The byte offset immediately after the captured `flows.jsonl` prefix. A record belongs to
+    /// the prefix when its line-start offset is strictly less than this value.
+    pub log_offset: u64,
+}
+
+fn deserialize_coverage<'de, D>(deserializer: D) -> Result<Option<FoldCoverage>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let value = serde_json::Value::deserialize(deserializer)?;
+    Ok(serde_json::from_value(value).ok())
 }
 
 /// Heads refused, by reason. Refused heads are never folded and never re-announced.

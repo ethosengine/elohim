@@ -882,6 +882,9 @@ pub struct FoldReport {
     pub quarantine_blocks: bool,
     /// The held-CID index after this successful fold, for the daemon's next fold from the device.
     pub known: HashSet<Cid>,
+    /// The end of the flow-log prefix captured after a complete fold. `None` for an incomplete
+    /// fold, whose appended events remain beyond the last recorded head's coverage.
+    pub coverage_offset: Option<u64>,
 }
 
 /// Fold `target` from the device whose tier answers at `peer`: dial it, fetch what this device has
@@ -978,6 +981,14 @@ pub async fn fold_root_planned(
     let quarantine_blocks =
         !fetched.quarantined.is_empty() && !author_reads_nacks(store, target.device)?;
     let complete = fetched.complete && !quarantine_blocks;
+    // A daemon serializes folds from one sender and excludes one-shot folds with its serve lock.
+    // Other writers may append own or other-sender records before this shared-lock snapshot; that
+    // is harmless because coverage membership also joins on `via:<sender>`.
+    let coverage_offset = if complete {
+        Some(store.end_offset().map_err(PeerError::FlowStore)?)
+    } else {
+        None
+    };
     Ok(FoldReport {
         outcome,
         complete,
@@ -989,6 +1000,7 @@ pub async fn fold_root_planned(
         store_parses,
         quarantine_blocks,
         known: known_after,
+        coverage_offset,
     })
 }
 
