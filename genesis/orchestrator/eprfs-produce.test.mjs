@@ -188,7 +188,10 @@ function assertOffered(f, r, target = null) {
     const d = r.calls[describe];
     assert.equal(flag(d, "--sources"), SOURCES);
     assert.equal(flag(d, "--project"), "eprfs");
-    assert.equal(flag(d, "--features"), "blob-store");
+    // A descriptor states only what is true of its binary: epr is built with blob-store, bin-launch
+    // (elohim-device-runtime) declares no such feature, so its describe names none.
+    if (bin === "epr") assert.equal(flag(d, "--features"), "blob-store");
+    else assert.ok(!d.includes("--features"), d.join(" "));
     assert.equal(flag(d, "--rustflags"), "");
     assert.equal(flag(d, "--crate"), bin === "epr" ? "elohim/eprfs/epr-cli" : "elohim/eprfs/device-runtime");
     // The environment the build ran under is recorded as it is, with no scrub and no second build.

@@ -40,6 +40,10 @@ epr="${EPR_PRODUCER_BIN:-$target/debug/epr}"
 sources="elohim/eprfs/bin-build-view.json#bin-build"
 bins=(epr bin-launch)
 declare -A crate=([epr]=elohim/eprfs/epr-cli [bin-launch]=elohim/eprfs/device-runtime)
+# The features each bin's own crate is built with. A descriptor states only what is true of that
+# binary: bin-launch's crate (elohim-device-runtime) has no blob-store feature, and the put's
+# `cargo tree -p <crate> --features ...` refuses a feature its crate does not declare.
+declare -A features=([epr]=blob-store [bin-launch]=)
 
 skip() {
   echo "[gate] epr producer put skipped ($1; gate remains green)"
@@ -177,7 +181,9 @@ fi
 declare -A input
 for bin in "${bins[@]}"; do
   method="$out/method-$bin.json"
-  said="$("$epr" artifact describe --project eprfs --bin "$bin" --features blob-store --rustflags "${RUSTFLAGS-}" \
+  bin_features=()
+  [[ -n "${features[$bin]}" ]] && bin_features=(--features "${features[$bin]}")
+  said="$("$epr" artifact describe --project eprfs --bin "$bin" "${bin_features[@]}" --rustflags "${RUSTFLAGS-}" \
     --sources "$sources" --crate "${crate[$bin]}" --repo "$repo" --out "$method" \
     "${declared[@]}" "${recorded[@]}" 2>&1)" || skip "describe $bin refused: $(reason_of "$said")"
   said="$("$epr" artifact key --method "$method" --repo "$repo" --print input 2>"$out/key-$bin.err")" \
