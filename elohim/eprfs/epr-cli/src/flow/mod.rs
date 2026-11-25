@@ -16,6 +16,7 @@ pub mod concerns;
 pub mod context;
 pub mod context_sections;
 pub mod edges;
+pub mod enrich;
 pub mod env_scope;
 pub mod fulfill;
 pub mod gaps;
@@ -132,10 +133,10 @@ fn flag_hint(word: &str, own: &[&str]) -> String {
 }
 
 /// Every flow subcommand, as a person types it.
-const SUBCOMMANDS: [&str; 21] = [
+const SUBCOMMANDS: [&str; 22] = [
     "project", "walk", "status", "seal", "reseal", "hold", "claim", "context", "ledger", "fulfill",
-    "intend", "note", "report", "stocks", "concerns", "memory", "cites", "retract", "sense",
-    "habit", "reading",
+    "intend", "note", "enrich", "report", "stocks", "concerns", "memory", "cites", "retract",
+    "sense", "habit", "reading",
 ];
 
 /// Entry point invoked by `main` for `epr flow …`.
@@ -265,6 +266,7 @@ pub fn run(args: &[String]) -> FlowResult<ExitCode> {
         "ledger" => run_ledger(&args[1..]),
         "fulfill" => run_fulfill(&args[1..]),
         "note" => run_note(&args[1..]),
+        "enrich" => run_enrich(&args[1..]),
         "report" => run_report(&args[1..]),
         "reading" => run_reading(&args[1..]),
         "stocks" => run_stocks(&args[1..]),
@@ -2053,6 +2055,82 @@ fn run_note(args: &[String]) -> FlowResult<ExitCode> {
     Ok(ExitCode::SUCCESS)
 }
 
+/// `epr flow enrich` — record a re-execution against an immutable gate verdict.
+fn run_enrich(args: &[String]) -> FlowResult<ExitCode> {
+    const USAGE: &str = "usage: epr flow enrich --verdict <cid> --kind re-executed \
+        --outcome green|red --method <text> [--run <cid>] [--seconds <n>] \
+        [--json] [--root DIR]";
+    let (opts, rest) = parse_global(args)?;
+    if wants_help(&rest) {
+        println!("{USAGE}");
+        return Ok(ExitCode::SUCCESS);
+    }
+    let mut i = 0;
+    while i < rest.len() {
+        match rest[i].as_str() {
+            "--verdict" | "--kind" | "--outcome" | "--method" | "--run" | "--seconds" => {
+                if rest.get(i + 1).is_none() {
+                    return Err(FlowError::InvalidArguments(format!(
+                        "{} needs a value\n{USAGE}",
+                        rest[i]
+                    )));
+                }
+                i += 2;
+            }
+            other => {
+                return Err(FlowError::InvalidArguments(format!(
+                    "unknown enrich argument `{other}`{}\n{USAGE}",
+                    flag_hint(
+                        other,
+                        &[
+                            "--verdict",
+                            "--kind",
+                            "--outcome",
+                            "--method",
+                            "--run",
+                            "--seconds"
+                        ]
+                    )
+                )))
+            }
+        }
+    }
+    let required = |flag: &str| -> FlowResult<String> {
+        take_opt(&rest, flag)?.ok_or_else(|| {
+            FlowError::InvalidArguments(format!("enrich needs {flag} <value>\n{USAGE}"))
+        })
+    };
+    let verdict = required("--verdict")?;
+    let kind = required("--kind")?;
+    let outcome = required("--outcome")?;
+    let method = required("--method")?;
+    let run = take_opt(&rest, "--run")?;
+    let seconds = take_opt(&rest, "--seconds")?
+        .map(|raw| {
+            raw.parse::<f64>().map_err(|_| {
+                FlowError::InvalidArguments(format!("--seconds `{raw}` is not a number"))
+            })
+        })
+        .transpose()?;
+    let receipt = enrich::enrich(
+        &opts.root,
+        &enrich::EnrichmentRequest {
+            verdict: &verdict,
+            kind: &kind,
+            outcome: &outcome,
+            method: &method,
+            run: run.as_deref(),
+            seconds,
+        },
+    )?;
+    if opts.json {
+        println!("{}", serde_json::to_string_pretty(&receipt)?);
+    } else {
+        receipt.render();
+    }
+    Ok(ExitCode::SUCCESS)
+}
+
 /// The structured-observation arm of `note`: `--measure <id@version> --subject <path-or-cid>
 /// --value <n> [--unit <u>] [--env k=v]…`.
 ///
@@ -2401,6 +2479,9 @@ fn usage() -> String {
      .claude/epr-meta/measures.yaml or it is refused naming that file; --subject IS the target, \
      so --on is refused alongside --measure; --subject . names the repository itself for a \
      repository-wide bound. `epr flow note --help` prints the full per-flag contract)\n  \
+     | enrich --verdict <cid> --kind re-executed --outcome green|red --method <text> \
+     [--run <cid>] [--seconds <n>] [--json] [--root DIR] \
+     (append a local attestation-enrichment@1 Cite without changing the verdict)\n  \
      | cites seal|assign-id|describe|verify|refresh|stamp|migrate [<doc>…] [--json] [--root DIR] \
      (the native cite WRITER: `seal <doc>` assigns id:, converts legacy doc path-cites to \
      slug|desc|fingerprint envelopes and refreshes the path: locator cache, then gates on \
