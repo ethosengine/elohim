@@ -13,6 +13,7 @@
 //! in `note::tests::note_event_cid_is_stable`.
 
 use std::path::Path;
+use std::process::{Command, Output};
 
 use elohim_epr_cli::flow::note::{note, NoteActor};
 use elohim_epr_cli::flow::{project, walk, FlowError};
@@ -30,6 +31,45 @@ fn git(root: &Path, args: &[&str]) {
         .output()
         .expect("git runs");
     assert!(status.status.success(), "git {args:?} failed");
+}
+
+fn git_stdout(root: &Path, args: &[&str]) -> String {
+    let output = elohim_epr_cli::process::build_command("git", args, root, &[])
+        .output()
+        .expect("git runs");
+    assert!(output.status.success(), "git {args:?} failed");
+    String::from_utf8(output.stdout).unwrap().trim().to_string()
+}
+
+fn commit_at(root: &Path, message: &str, date: &str) {
+    git(root, &["add", "-A"]);
+    let output =
+        elohim_epr_cli::process::build_command("git", &["commit", "-q", "-m", message], root, &[])
+            .env("GIT_AUTHOR_NAME", "Head Author")
+            .env("GIT_AUTHOR_EMAIL", "head@example.test")
+            .env("GIT_COMMITTER_NAME", "Head Author")
+            .env("GIT_COMMITTER_EMAIL", "head@example.test")
+            .env("GIT_AUTHOR_DATE", date)
+            .env("GIT_COMMITTER_DATE", date)
+            .output()
+            .expect("git commit runs");
+    assert!(output.status.success(), "dated git commit failed");
+}
+
+fn epr_note(root: &Path, args: &[&str]) -> Output {
+    Command::new(env!("CARGO_BIN_EXE_epr"))
+        .args(["flow", "note"])
+        .args(args)
+        .arg("--root")
+        .arg(root)
+        .current_dir(root)
+        .env_remove("EPR_SESSION_LAZY")
+        .env_remove("EPR_SESSION_ID")
+        .env_remove("CODEX_SESSION_ID")
+        .env_remove("CODEX_THREAD_ID")
+        .env("EPR_PROC_ROOT", root.join("no-proc"))
+        .output()
+        .expect("epr runs")
 }
 
 fn write(root: &Path, rel: &str, contents: &str) {
@@ -89,6 +129,72 @@ fn sidecar_lines(root: &Path) -> usize {
     std::fs::read_to_string(root.join(".eprfs/status/flows.jsonl"))
         .map(|t| t.lines().filter(|l| !l.trim().is_empty()).count())
         .unwrap_or(0)
+}
+
+#[test]
+fn dated_by_uses_the_named_commits_author_date_not_heads() {
+    let dir = projected();
+    let root = dir.path();
+    let judged = git_stdout(root, &["rev-parse", "HEAD"]);
+    let judged_at = git_stdout(root, &["show", "-s", "--format=%aI", &judged]);
+    write(root, "new-head.txt", "a later checkout head\n");
+    commit_at(root, "later head", "2037-04-05T06:07:08Z");
+    let head_at = git_stdout(root, &["show", "-s", "--format=%aI", "HEAD"]);
+    assert_ne!(
+        judged_at, head_at,
+        "the fixture must distinguish the clocks"
+    );
+
+    let output = epr_note(
+        root,
+        &[
+            "--on",
+            FEATURE,
+            "--kind",
+            "observation",
+            "--reason",
+            "judged the earlier commit",
+            "--dated-by",
+            &judged,
+        ],
+    );
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let event = note_events(root).pop().expect("dated note");
+    assert_eq!(event.occurred_at, judged_at.replace("+00:00", "Z"));
+    assert_ne!(event.occurred_at, head_at.replace("+00:00", "Z"));
+    assert_eq!(
+        event.provider.0, "head@example.test",
+        "dating changes no author attribution"
+    );
+}
+
+#[test]
+fn dated_by_an_unresolvable_commit_refuses_on_one_line_and_appends_nothing() {
+    let dir = projected();
+    let root = dir.path();
+    let before = sidecar_lines(root);
+    let output = epr_note(
+        root,
+        &[
+            "--on",
+            FEATURE,
+            "--kind",
+            "observation",
+            "--reason",
+            "must not fall back",
+            "--dated-by",
+            "not-a-commit",
+        ],
+    );
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert_eq!(stderr.lines().count(), 1, "{stderr}");
+    assert!(stderr.contains("does not resolve to a commit"), "{stderr}");
+    assert_eq!(sidecar_lines(root), before, "nothing appended");
 }
 
 fn note_events(root: &Path) -> Vec<elohim_epr_rea::FlowEvent> {

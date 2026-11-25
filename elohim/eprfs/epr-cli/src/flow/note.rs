@@ -21,11 +21,15 @@
 //! its address, so appending a byte-identical note twice is a true no-op — one record, not two
 //! rows — while two notes differing only in their reason text are two distinct records.
 //!
-//! **Dating** resolves spec open question Q1 for v1: `occurred_at` is the **git HEAD commit's
-//! author date**, the way every other timestamp on this path is history-derived and never
-//! `now()`. A note is dated by the tree it was authored against. The accepted coarseness is that
-//! notes authored against the same head share a timestamp; intra-session ordering is carried by
-//! sidecar append order, and CID dedup is unaffected because distinct reasons give distinct CIDs.
+//! **Dating** resolves spec open question Q1 for v1: `occurred_at` is a **git commit's author
+//! date**, the way every other timestamp on this path is history-derived and never `now()`.
+//! Ordinarily that commit is HEAD, so a note is dated by the tree it was authored against.
+//! `--dated-by <commit>` instead names the historical commit whose author date dates the note;
+//! this is for observations about a specific commit, such as a gate verdict, and changes only the
+//! date — author attribution still comes from HEAD. The named commit must resolve in `--root`'s
+//! repository or the note refuses without falling back to HEAD. The accepted coarseness is that
+//! notes dated by the same commit share a timestamp; intra-session ordering is carried by sidecar
+//! append order, and CID dedup is unaffected because distinct reasons give distinct CIDs.
 //! Unlike `project` — which derives thousands of records and treats one unreadable history as
 //! honest absence for that record — this leg **refuses** rather than emitting an empty
 //! `occurred_at`: a single deliberate authored act dated with an empty string is invisible to
@@ -60,8 +64,8 @@ use serde::Serialize;
 
 use super::measures::{MeasureRef, Registry};
 use super::{
-    body_cid_of_file, confine_under, head_commit_provenance, rel_to_root, short_cid, FlowError,
-    FlowResult,
+    body_cid_of_file, commit_author_date, confine_under, head_commit_provenance, rel_to_root,
+    short_cid, FlowError, FlowResult,
 };
 use std::collections::BTreeMap;
 
@@ -521,7 +525,7 @@ pub struct NoteOutcome {
     /// The environment the measurement was taken under.
     #[serde(skip_serializing_if = "BTreeMap::is_empty")]
     pub env: BTreeMap<String, String>,
-    /// Git HEAD's author date (RFC3339) — the tree the note was authored against.
+    /// The dating commit's author date (RFC3339): HEAD unless `--dated-by` named another commit.
     pub occurred_at: String,
     /// The atom CID of the `FlowRecord::Event`.
     pub record_cid: String,
@@ -654,6 +658,37 @@ pub fn note_with_options_closing(
     actor: &NoteActor,
     options: &super::acceptance::AcceptanceOptions,
 ) -> FlowResult<NoteOutcome> {
+    note_with_options_closing_dated(
+        root,
+        on,
+        kind,
+        reason,
+        switched_to,
+        closes,
+        verdict,
+        actor,
+        options,
+        None,
+    )
+}
+
+/// [`note_with_options_closing`] dated by a named commit rather than HEAD.
+#[allow(
+    clippy::too_many_arguments,
+    reason = "The dated CLI entry point mirrors the persisted note fields and adds only the explicit history-derived clock source"
+)]
+pub fn note_with_options_closing_dated(
+    root: &Path,
+    on: &str,
+    kind: &str,
+    reason: &str,
+    switched_to: Option<&str>,
+    closes: Option<&str>,
+    verdict: Option<&str>,
+    actor: &NoteActor,
+    options: &super::acceptance::AcceptanceOptions,
+    dated_by: Option<&str>,
+) -> FlowResult<NoteOutcome> {
     note_with_options_guard(
         root,
         on,
@@ -665,6 +700,7 @@ pub fn note_with_options_closing(
         actor,
         options,
         None,
+        dated_by,
         |_| Ok(()),
     )
 }
@@ -696,6 +732,39 @@ pub fn observe(
     reason: Option<&str>,
     actor: &NoteActor,
     measures_path: &Path,
+) -> FlowResult<NoteOutcome> {
+    observe_dated(
+        root,
+        kind,
+        measure_raw,
+        subject,
+        value,
+        unit,
+        env,
+        reason,
+        actor,
+        measures_path,
+        None,
+    )
+}
+
+/// [`observe`] dated by a named commit rather than HEAD.
+#[allow(
+    clippy::too_many_arguments,
+    reason = "The dated CLI observation preserves the independent wire fields and adds only the explicit history-derived clock source"
+)]
+pub fn observe_dated(
+    root: &Path,
+    kind: &str,
+    measure_raw: &str,
+    subject: &str,
+    value: f64,
+    unit: Option<&str>,
+    env: &BTreeMap<String, String>,
+    reason: Option<&str>,
+    actor: &NoteActor,
+    measures_path: &Path,
+    dated_by: Option<&str>,
 ) -> FlowResult<NoteOutcome> {
     // Argument shape first, before the registry is read and long before the store is opened.
     let kind_parsed = NoteKind::parse(kind)?;
@@ -766,6 +835,7 @@ pub fn observe(
         actor,
         &super::acceptance::AcceptanceOptions::default(),
         Some(&observation),
+        dated_by,
         |_| Ok(()),
     )
 }
@@ -787,6 +857,7 @@ fn note_with_options_guard(
     actor: &NoteActor,
     options: &super::acceptance::AcceptanceOptions,
     observation: Option<&Observation>,
+    dated_by: Option<&str>,
     guard: impl FnOnce(&Attribution) -> FlowResult<()>,
 ) -> FlowResult<NoteOutcome> {
     note_with_claim_guard(
@@ -800,6 +871,7 @@ fn note_with_options_guard(
         actor,
         options,
         observation,
+        dated_by,
         None,
         guard,
     )
@@ -824,6 +896,7 @@ fn note_with_claim_guard(
     actor: &NoteActor,
     options: &super::acceptance::AcceptanceOptions,
     observation: Option<&Observation>,
+    dated_by: Option<&str>,
     as_of: Option<(Cid, String)>,
     guard: impl FnOnce(&Attribution) -> FlowResult<()>,
 ) -> FlowResult<NoteOutcome> {
@@ -847,6 +920,24 @@ fn note_with_claim_guard(
                 .into(),
         ));
     }
+    // Resolve an explicit historical clock before opening the sidecar. An unresolvable commit is
+    // a one-line refusal and can neither create a store nor silently inherit HEAD's date.
+    let dated_occurred_at = dated_by
+        .map(|raw| {
+            let commit = raw.trim();
+            if commit.is_empty() {
+                return Err(FlowError::InvalidArguments(
+                    "--dated-by needs a commit oid or ref".into(),
+                ));
+            }
+            commit_author_date(root, commit).ok_or_else(|| {
+                FlowError::InvalidArguments(format!(
+                    "cannot date note: --dated-by `{commit}` does not resolve to a commit in `{}`",
+                    root.display()
+                ))
+            })
+        })
+        .transpose()?;
 
     // Closure locks sessions before appending its flow witness. Keep that order here,
     // and retain the generation through attribution and append.
@@ -878,13 +969,14 @@ fn note_with_claim_guard(
 
     // Provenance and clock come from the same single `git log -1`, and an unattributable note is
     // refused rather than dated with a placeholder (module doc).
-    let (author, occurred_at) = head_commit_provenance(root).ok_or_else(|| {
+    let (author, head_occurred_at) = head_commit_provenance(root).ok_or_else(|| {
         FlowError::InvalidArguments(format!(
             "cannot date a note in `{}`: git has no HEAD commit to author it against — \
              a note is dated by the tree it was written against, never by wall clock",
             root.display()
         ))
     })?;
+    let occurred_at = dated_occurred_at.unwrap_or(head_occurred_at);
 
     let current_session = as_of
         .is_none()
@@ -1057,6 +1149,7 @@ pub(crate) fn retraction(
         actor,
         &super::acceptance::AcceptanceOptions::default(),
         None,
+        None,
         |_| Ok(()),
     )
 }
@@ -1084,6 +1177,7 @@ pub(crate) fn note_for_session(
             session: Some(session.into()),
         },
         &super::acceptance::AcceptanceOptions::default(),
+        None,
         None,
         |attribution| {
             if attribution.claim_cid.is_none() {
@@ -1128,6 +1222,7 @@ pub(crate) fn note_for_session_as_of(
             session: Some(session.into()),
         },
         &super::acceptance::AcceptanceOptions::default(),
+        None,
         None,
         Some(as_of),
         |attribution| {
@@ -1976,6 +2071,7 @@ mod tests {
                 session: Some("switching".into()),
             },
             &super::super::acceptance::AcceptanceOptions::default(),
+            None,
             None,
             |resolved| {
                 assert_eq!(

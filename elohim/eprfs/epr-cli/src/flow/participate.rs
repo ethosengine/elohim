@@ -152,6 +152,10 @@ pub struct Testimony {
     #[serde(rename = "ref")]
     pub reference: String,
     pub at: String,
+    /// Run wall-clock time for gate-verdict testimony. Legacy gate verdicts say `unknown`;
+    /// testimony of every other kind omits this field.
+    #[serde(rename = "observedAt", skip_serializing_if = "Option::is_none")]
+    pub observed_at: Option<String>,
     pub kind: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub says: Option<String>,
@@ -735,10 +739,13 @@ impl FlowCtx<'_> {
 
 fn testimony(cid: &Cid, event: &FlowEvent) -> Testimony {
     let view = note_view(cid, event);
+    let observed_at = super::read::gate_verdict_observed_at(&view)
+        .map(|value| value.unwrap_or("unknown").to_string());
     Testimony {
         author: view.actor,
         reference: cid.to_string(),
         at: view.occurred_at,
+        observed_at,
         kind: view.kind,
         says: view.reason.or(view.verdict),
     }
@@ -1365,7 +1372,15 @@ impl ParticipationResult {
                         item.testimony
                             .iter()
                             .map(|t| {
-                                format!("{} {} at {} ({})", t.author, t.reference, t.at, t.kind)
+                                let observed = t
+                                    .observed_at
+                                    .as_ref()
+                                    .map(|value| format!(", observed {value}"))
+                                    .unwrap_or_default();
+                                format!(
+                                    "{} {} at {}{} ({})",
+                                    t.author, t.reference, t.at, observed, t.kind
+                                )
                             })
                             .collect::<Vec<_>>()
                             .join("; ")

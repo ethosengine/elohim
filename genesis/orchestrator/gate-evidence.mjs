@@ -984,6 +984,7 @@ function buildPutIdentity(stdout) {
 /** Append one completed gate verdict to this device's crossing flow. Best effort, never a gate. */
 export function emitGateVerdict(project, key, {
   success, seconds, commit, put, root, env = process.env, spawn = spawnSync,
+  now = () => new Date(),
   warn = line => process.stderr.write(line),
 }) {
   // A device act: the standing read and the crossing verdict run the device's head epr.
@@ -1017,14 +1018,30 @@ export function emitGateVerdict(project, key, {
     seconds: String(Math.round(seconds)),
     ...identity,
   };
-  const args = [
-    'flow', 'note', '--kind', 'observation', '--measure', 'gate-verdict@1', '--subject', '.',
-    '--value', '1', '--reason', 'verdict',
-  ];
-  for (const [name, value] of Object.entries(fields)) args.push('--env', `${name}=${value}`);
-  args.push('--root', device);
+  // A verdict is dated by the commit it judged (--dated-by) and carries the run's wall-clock time
+  // as observedAt. An epr older than --dated-by does not refuse the flag: its structured-note arm
+  // reads only the flags it knows and would silently date by HEAD while carrying observedAt, a new
+  // field over the old date's meaning. So the epr is asked first (its note help names the flag);
+  // one that does not know it writes the exact legacy form (HEAD-dated, no observedAt), which
+  // every reader shows as observed unknown.
+  const noteArgs = dated => {
+    const args = [
+      'flow', 'note', '--kind', 'observation', '--measure', 'gate-verdict@1', '--subject', '.',
+      '--value', '1', '--reason', 'verdict', ...(dated ? ['--dated-by', sha] : []),
+    ];
+    const slots = dated
+      ? { ...fields, observedAt: now().toISOString().replace(/\.\d{3}Z$/, 'Z') } : fields;
+    for (const [name, value] of Object.entries(slots)) args.push('--env', `${name}=${value}`);
+    args.push('--root', device);
+    return args;
+  };
   try {
-    const emitted = spawn(epr, args, { cwd: device, encoding: 'utf8', timeout: 5_000 });
+    const help = spawn(epr, ['flow', 'note', '--help', '--root', device], { cwd: device, encoding: 'utf8', timeout: 5_000 });
+    const dated = /--dated-by/.test(`${help.stdout || ''}${help.stderr || ''}`);
+    if (!dated) {
+      warn(`[gate] ${project.name} verdict crossing: this epr predates --dated-by; written in the legacy form (observed unknown)\n`);
+    }
+    const emitted = spawn(epr, noteArgs(dated), { cwd: device, encoding: 'utf8', timeout: 5_000 });
     if (emitted.status === 0) return true;
     // A call the bound killed has no exit status. Whether its append reached the store is not
     // known, and it is not retried: say both, so the line is not read as a refusal.

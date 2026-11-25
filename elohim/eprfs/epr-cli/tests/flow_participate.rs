@@ -537,6 +537,48 @@ fn each_source_keeps_its_own_meaning_of_open() {
     assert!(group(&as_json(&plans), "landing intents").is_empty());
 }
 
+#[test]
+fn gate_verdict_participation_testimony_carries_observed_time_or_unknown() {
+    let dir = fixture(false);
+    let root = dir.path();
+    let epic = elohim_epr_cli::flow::body_cid_of_file(&root.join("plans/epic.md")).unwrap();
+    let mut store = SidecarFlowStore::open(root).unwrap();
+    for observed in [Some("2026-11-25T05:15:42Z"), None] {
+        let mut slots = vec![
+            "run:observation",
+            "plans/epic.md",
+            "reason:verdict",
+            "measure:gate-verdict@1",
+        ];
+        let observed_slot = observed.map(|value| format!("env:observedAt={value}"));
+        if let Some(slot) = observed_slot.as_deref() {
+            slots.push(slot);
+        }
+        store
+            .append(event(epic, epic, "run-note", &slots, Vec::new()))
+            .unwrap();
+    }
+
+    let result = participate::participate_with(root, "plans", LIMIT, &probes(root)).unwrap();
+    let json = as_json(&result);
+    let verdicts: Vec<_> = group(&json, "notes")
+        .iter()
+        .filter(|item| item["state"] == "testimony (run:observation) — not claimable")
+        .collect();
+    assert_eq!(verdicts.len(), 2, "{json:#}");
+    assert_eq!(
+        verdicts[0]["testimony"][0]["observedAt"],
+        "2026-11-25T05:15:42Z"
+    );
+    assert_eq!(verdicts[1]["testimony"][0]["observedAt"], "unknown");
+    assert!(verdicts
+        .iter()
+        .all(|item| item["testimony"][0]["at"] == "2026-11-22T12:00:00Z"));
+    let text = result.render_text();
+    assert!(text.contains("observed 2026-11-25T05:15:42Z"), "{text}");
+    assert!(text.contains("observed unknown"), "{text}");
+}
+
 // ── P7 / P8: a bound is never worth; source order; no score ─────────────────────────────────
 
 fn numbers(value: &Value, found: &mut Vec<String>, at: &str) {
