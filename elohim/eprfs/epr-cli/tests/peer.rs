@@ -1974,7 +1974,7 @@ fn peer_intents_does_not_offer_a_miss_whose_commit_landed_on_origin_dev() {
     );
     let text = intents_misses_text(&b, b.checkout.path(), &policy);
     assert!(
-        text.contains("1 settled by landing on origin/dev, 0 past their wait-until (not offered)"),
+        text.contains("1 settled by landing on origin/dev or origin/main, 0 past their wait-until (not offered)"),
         "{text}"
     );
 }
