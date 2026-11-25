@@ -333,6 +333,7 @@ impl Store {
                         tree_clean: Some(false),
                         gate_run: Some("adopted-from-path".into()),
                         closure: false,
+                        ..Default::default()
                     },
                 ) {
                     Ok(release) => release,

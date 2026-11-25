@@ -59,6 +59,34 @@ impl From<serde_json::Error> for Refusal {
 }
 pub(crate) type Result<T> = std::result::Result<T, Refusal>;
 
+const PAYLOAD_FORMATS_FIELD: &str = "payloadFormats";
+const LEGACY_PAYLOAD_FORMAT: &str = "directory-v1";
+const PAYLOAD_FORMAT_ORDER: [&str; 2] = ["blob-store-v1", LEGACY_PAYLOAD_FORMAT];
+
+fn parse_payload_formats(statement: Option<&str>) -> std::result::Result<Vec<&str>, String> {
+    let statement = statement.unwrap_or(LEGACY_PAYLOAD_FORMAT);
+    let mut formats = Vec::new();
+    for name in statement.split(',') {
+        if !PAYLOAD_FORMAT_ORDER.contains(&name) {
+            return Err(format!("release states invalid payload format {name:?}"));
+        }
+        if formats.contains(&name) {
+            return Err(format!(
+                "release states payload format {name} more than once"
+            ));
+        }
+        formats.push(name);
+    }
+    let canonical: Vec<&str> = PAYLOAD_FORMAT_ORDER
+        .into_iter()
+        .filter(|name| formats.contains(name))
+        .collect();
+    if formats != canonical {
+        return Err("release states payload formats out of stable order".into());
+    }
+    Ok(formats)
+}
+
 /// Registry of followed tools. Invalid unrelated entries do not prevent name resolution.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Registry {
@@ -315,6 +343,9 @@ pub struct IngestOptions {
     pub tree_clean: Option<bool>,
     /// Require a sums manifest even for a single file (local media import).
     pub closure: bool,
+    /// The epr Produce's comma-separated payload formats. Absent means a legacy
+    /// `directory-v1` release.
+    pub payload_formats: Option<String>,
 }
 /// A device-local store for one registered tool.
 #[derive(Clone)]
@@ -325,6 +356,7 @@ pub struct Store {
     registry: Registry,
     runner: Arc<dyn Runner>,
     peer_serving: PeerServing,
+    payload_store_format: Option<String>,
 }
 impl Store {
     /// Open a store description without mutating it.
@@ -336,6 +368,7 @@ impl Store {
             registry: registry.clone(),
             runner: Arc::new(SystemRunner),
             peer_serving: PeerServing::default(),
+            payload_store_format: None,
         })
     }
     /// Select TOOL_STORE, else `<bin_store>/tool` from the device layout
@@ -356,6 +389,12 @@ impl Store {
     /// The caller derives it from the device's manifest; the store never reads that format.
     pub fn with_peer_serving(mut self, peer_serving: PeerServing) -> Self {
         self.peer_serving = peer_serving;
+        self
+    }
+    /// Supply the linkage-free marker name of this device's existing payload store. `None`
+    /// means no store exists yet, so the landed epr may choose a format it supports.
+    pub fn with_payload_store_format(mut self, format: Option<&str>) -> Self {
+        self.payload_store_format = format.map(str::to_owned);
         self
     }
     /// Name a running stored executable by its verified release; standalone candidates

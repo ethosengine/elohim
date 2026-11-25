@@ -36,40 +36,54 @@ fn payload_formats_admit(
 }
 
 #[cfg(feature = "peer")]
-fn land_payload_store_admits_with(
-    binary: &Path,
-    device_format: crate::payload::PayloadFormat,
-    probe: impl FnOnce(&Path) -> Result<Vec<crate::payload::PayloadFormat>, String>,
-) -> Result<(), Refusal> {
-    // A release from before `payload formats` is the historical directory-only release. A new
-    // release is required to answer at put time, so the same fallback safely covers old bytes.
-    let formats =
-        probe(binary).unwrap_or_else(|_| vec![crate::payload::PayloadFormat::DirectoryV1]);
-    payload_formats_admit(&formats, device_format).map_err(|detail| Refusal {
-        kind: "payload-format-incompatible".into(),
-        detail: format!(
-            "{detail}; a by-hand fetch/ingest is an operator act and does not make an incompatible release landable"
-        ),
-    })
+pub(crate) fn payload_store_configured(store: Store, tool: &str) -> Result<Store, Refusal> {
+    if tool != "epr" {
+        return Ok(store);
+    }
+    let payload_dir =
+        crate::peer::payload_store_dir(&crate::peer::Options::default()).map_err(|error| {
+            Refusal {
+                kind: "payload-store".into(),
+                detail: error.to_string(),
+            }
+        })?;
+    let format = crate::payload::existing_format(&payload_dir).map_err(|error| Refusal {
+        kind: "payload-store".into(),
+        detail: error.to_string(),
+    })?;
+    Ok(store.with_payload_store_format(format.map(|format| format.marker())))
+}
+
+#[cfg(not(feature = "peer"))]
+pub(crate) fn payload_store_configured(store: Store, _tool: &str) -> Result<Store, Refusal> {
+    Ok(store)
 }
 
 #[cfg(feature = "peer")]
-fn land_payload_store_admits(store: &Store, cid: &str, payload_dir: &Path) -> Result<(), Refusal> {
-    if !store.verified(cid) {
-        return Ok(());
+fn held_payload_formats(tool: &str, source: &Path, closure: bool) -> Option<String> {
+    if tool != "epr" || closure {
+        return None;
     }
-    let Some(device_format) =
-        crate::payload::existing_format(payload_dir).map_err(|error| Refusal {
-            kind: "payload-store".into(),
-            detail: error.to_string(),
-        })?
-    else {
-        return Ok(());
+    let binary = if source.is_dir() {
+        source.join("epr")
+    } else {
+        source.to_owned()
     };
-    let binary = store.root().join(cid).join("epr");
-    land_payload_store_admits_with(&binary, device_format, |path| {
-        crate::payload::PayloadFormat::probe_supported(path, store.root())
-    })
+    let bytes = std::fs::read(binary).ok()?;
+    crate::payload::PayloadFormat::probe_supported_bytes(&bytes)
+        .ok()
+        .map(|formats| {
+            formats
+                .into_iter()
+                .map(|format| format.marker())
+                .collect::<Vec<_>>()
+                .join(",")
+        })
+}
+
+#[cfg(not(feature = "peer"))]
+fn held_payload_formats(_tool: &str, _source: &Path, _closure: bool) -> Option<String> {
+    None
 }
 
 fn land_transition(
@@ -177,7 +191,7 @@ fn execute_with(args: &[String], restart: bool) -> Result<String, Refusal> {
     let store = store.with_runner(std::sync::Arc::new(crate::git::DeviceRunner));
     // Only the verbs that land read the device manifest for the landing policy.
     let store = if matches!(verb, "land" | "follow" | "bootstrap") {
-        store.with_peer_serving(peer_serving_policy(
+        payload_store_configured(store, tool)?.with_peer_serving(peer_serving_policy(
             crate::device::declaration::store(None, None, None),
             tool,
         ))
@@ -207,7 +221,8 @@ fn execute_with(args: &[String], restart: bool) -> Result<String, Refusal> {
                     source_commit: options.get("--source-commit").map(|s| s.to_string()),
                     gate_run: options.get("--gate-run").map(|s| s.to_string()),
                     tree_clean: clean,
-                    closure: closure.is_some()
+                    closure: closure.is_some(),
+                    payload_formats: held_payload_formats(tool, source, closure.is_some()),
                 }
             )?)
         }
@@ -223,18 +238,6 @@ fn execute_with(args: &[String], restart: bool) -> Result<String, Refusal> {
                 .ok_or_else(|| argument("land requires cid"))?;
             judge_held(&store, cid)?;
             let repo = repo()?;
-            #[cfg(feature = "peer")]
-            if *tool == "epr" {
-                let payload_dir = crate::peer::payload_store_dir(&crate::peer::Options {
-                    root: repo.clone(),
-                    ..crate::peer::Options::default()
-                })
-                .map_err(|error| Refusal {
-                    kind: "payload-store".into(),
-                    detail: error.to_string(),
-                })?;
-                land_payload_store_admits(&store, cid, &payload_dir)?;
-            }
             // Only a forward landing restarts the device; a revert or a lineage rebase never.
             let restarts = restart && transition == Transition::Forward;
             let before = current_cid(&store);
@@ -1234,6 +1237,10 @@ pub(crate) mod sibling {
                         gate_run: Some(format!("sibling:{}", offer.device)),
                         tree_clean: Some(true),
                         closure: false,
+                        payload_formats: offer
+                            .requires
+                            .get("epr")
+                            .and_then(|statement| statement.payload_formats.clone()),
                     },
                 )
                 // The bytes made the release the sibling named and this device's store still
@@ -1736,29 +1743,6 @@ mod tests {
                     .into()
             )
         );
-    }
-
-    #[cfg(feature = "peer")]
-    #[test]
-    fn by_hand_land_refuses_an_incompatible_self_report_with_operator_help() {
-        let refusal = land_payload_store_admits_with(
-            Path::new("held/epr"),
-            crate::payload::PayloadFormat::BlobStoreV1,
-            |_| Ok(vec![crate::payload::PayloadFormat::DirectoryV1]),
-        )
-        .unwrap_err();
-        assert_eq!(refusal.kind, "payload-format-incompatible");
-        assert!(
-            refusal.detail.starts_with(
-                "refused: release opens directory-v1; this device's payload store is blob-store-v1"
-            ),
-            "{}",
-            refusal.detail
-        );
-        assert!(refusal
-            .detail
-            .contains("by-hand fetch/ingest is an operator act"));
-        assert_eq!(refusal.detail.lines().count(), 1);
     }
 
     #[cfg(feature = "peer")]
@@ -2483,6 +2467,7 @@ mod tests {
                     gate_run: Some(gate_run.into()),
                     tree_clean: Some(true),
                     closure: false,
+                    ..Default::default()
                 },
             )
             .unwrap();

@@ -27,6 +27,7 @@ fn epr_release_payload_formats_come_from_the_built_binary_not_descriptor_feature
         payload_formats_slot_with(
             &options,
             &release_descriptor(&["--bin=epr", "--features=blob-store"]),
+            b"exact bytes",
             |_| Ok(vec![crate::payload::PayloadFormat::DirectoryV1])
         )
         .unwrap()
@@ -43,7 +44,12 @@ fn bin_launch_release_carries_no_epr_payload_format_statement() {
         ..Options::default()
     };
     assert_eq!(
-        payload_formats_slot(&options, &release_descriptor(&["--bin=bin-launch"])).unwrap(),
+        payload_formats_slot(
+            &options,
+            &release_descriptor(&["--bin=bin-launch"]),
+            b"bin-launch bytes"
+        )
+        .unwrap(),
         None
     );
 }

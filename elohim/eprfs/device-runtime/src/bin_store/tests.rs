@@ -3172,6 +3172,129 @@ fn f2_bootstrap_recovers_a_legacy_first_landing_without_metadata() {
     f.land(&release).unwrap();
 }
 
+fn release_opening(f: &Fixture, label: &str, statement: &str) -> Release {
+    f.release(label);
+    f.store
+        .ingest(
+            &f.path(label),
+            &IngestOptions {
+                source_commit: Some(f.commit()),
+                tree_clean: Some(true),
+                gate_run: Some("payload-format-statement-test".into()),
+                payload_formats: Some(statement.into()),
+                ..Default::default()
+            },
+        )
+        .unwrap()
+}
+
+#[test]
+fn land_refuses_a_held_incompatible_payload_format_and_keeps_the_installed_head() {
+    let mut f = Fixture::new("epr");
+    let old = f.release("installed-directory-release");
+    f.land(&old).unwrap();
+    f.state.lock().unwrap().head = "b".repeat(40);
+    let candidate = release_opening(&f, "held-directory-candidate", "directory-v1");
+    f.store = f
+        .store
+        .clone()
+        .with_payload_store_format(Some("blob-store-v1"));
+
+    let refusal = f.land(&candidate).unwrap_err();
+
+    assert_eq!(refusal.kind, "payload-format-incompatible");
+    assert_eq!(
+        refusal.detail,
+        "refused: release opens directory-v1; this device's payload store is blob-store-v1"
+    );
+    assert_eq!(f.store.head("current"), Some(old.cid));
+}
+
+#[test]
+fn declared_follow_and_arrival_keep_the_installed_head_for_a_held_incompatible_candidate() {
+    use ark_core::declaration::{Follow, FollowMode};
+    let mut f = Fixture::new("epr");
+    let old = f.release("arrival-installed");
+    f.land(&old).unwrap();
+    f.state.lock().unwrap().head = "b".repeat(40);
+    release_opening(&f, "arrival-held-incompatible", "directory-v1");
+    f.store = f
+        .store
+        .clone()
+        .with_payload_store_format(Some("blob-store-v1"));
+    let follow = Follow {
+        channel: "bin:epr".into(),
+        mode: FollowMode::Apply,
+        pin: None,
+    };
+
+    let refusal = f
+        .store
+        .follow_declared(f.tmp.path(), None, &follow)
+        .unwrap_err();
+
+    assert_eq!(refusal.kind, "payload-format-incompatible");
+    assert_eq!(f.store.head("current"), Some(old.cid));
+}
+
+#[test]
+fn pinned_arrival_keeps_the_installed_head_for_a_held_incompatible_candidate() {
+    use ark_core::declaration::{Follow, FollowMode};
+    let mut f = Fixture::new("epr");
+    let old = f.release("pinned-arrival-installed");
+    f.land(&old).unwrap();
+    f.state.lock().unwrap().head = "b".repeat(40);
+    let candidate = release_opening(&f, "pinned-arrival-held-incompatible", "directory-v1");
+    f.store = f
+        .store
+        .clone()
+        .with_payload_store_format(Some("blob-store-v1"));
+
+    let refusal = f
+        .store
+        .follow_declared(
+            f.tmp.path(),
+            None,
+            &Follow {
+                channel: "bin:epr".into(),
+                mode: FollowMode::Apply,
+                pin: Some(candidate.cid.clone()),
+            },
+        )
+        .unwrap_err();
+
+    assert_eq!(refusal.kind, "payload-format-incompatible");
+    assert_eq!(f.store.head("current"), Some(old.cid));
+}
+
+#[test]
+fn compatible_held_candidate_still_lands_through_declared_follow() {
+    use ark_core::declaration::{Follow, FollowMode};
+    let mut f = Fixture::new("epr");
+    let old = f.release("compatible-installed");
+    f.land(&old).unwrap();
+    f.state.lock().unwrap().head = "b".repeat(40);
+    let candidate = release_opening(&f, "compatible-held", "blob-store-v1,directory-v1");
+    f.store = f
+        .store
+        .clone()
+        .with_payload_store_format(Some("blob-store-v1"));
+
+    f.store
+        .follow_declared(
+            f.tmp.path(),
+            None,
+            &Follow {
+                channel: "bin:epr".into(),
+                mode: FollowMode::Apply,
+                pin: Some(candidate.cid.clone()),
+            },
+        )
+        .unwrap();
+
+    assert_eq!(f.store.head("current"), Some(candidate.cid));
+}
+
 #[test]
 fn following_a_paired_declaration_upgrades_same_commit_legacy_custody() {
     use ark_core::declaration::{Follow, FollowMode};
