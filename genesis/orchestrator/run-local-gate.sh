@@ -2,9 +2,6 @@
 # Typed local gate executor. Arguments come only from validated build manifests.
 set -euo pipefail
 
-readonly GATE_SLOT_BUSY_EXIT=73  # not 75: gate-task.mjs EXIT_NOT_CARRIED=75 means "ark did not carry it, run direct"
-readonly GATE_SLOT_LOCK_CONFLICT_EXIT=200
-
 repo_root="$1"
 project_name="$2"
 project_dir="$3"
@@ -19,30 +16,7 @@ profile="${8:-dev}"
 # string collapsed to __inherit__, RUSTFLAGS was left alone, and every native gate
 # died at link time with `undefined symbol: __getrandom_v03_custom`.
 rustflags="${9-__inherit__}"
-slot_wait_result="${10:-${GATE_SLOT_WAIT_RESULT:-}}"
-
-write_slot_wait_result() {
-  local waited="$1" holder="$2"
-  [[ -n "$slot_wait_result" ]] || return 0
-  printf '%s\t%s\n' "$waited" "$holder" > "$slot_wait_result" 2>/dev/null || true
-}
-
-slot_wait_seconds_since() {
-  local started_ns="$1" now_ns
-  now_ns="$(date +%s%N)"
-  awk -v start="$started_ns" -v now="$now_ns" 'BEGIN { printf "%.6f", (now - start) / 1000000000 }'
-}
-
-emit_slot_wait_event() {
-  local holder="$1" event
-  [[ -n "${GATE_LIVE_RUN:-}" ]] || return 0
-  event="$(node -e '
-const [project, holder] = process.argv.slice(1);
-process.stdout.write(JSON.stringify({ kind: "wait", project, resource: "cargo-slot", holder }));
-' "$project_name" "$holder" 2>/dev/null)" || return 0
-  node "$repo_root/genesis/orchestrator/gate-live.mjs" event \
-    --run "$GATE_LIVE_RUN" --json "$event" >/dev/null 2>&1 || true
-}
+runner_slot_lock="${11:-${GATE_SLOT_LOCK_PATH:-}}"
 
 if [[ -n "$workspace" && -n "$target_dir" ]]; then
   echo "gate $project_name: cargo workspace and targetDir are mutually exclusive" >&2
@@ -60,46 +34,18 @@ fi
 if [[ -n "$target_dir" ]]; then
   [[ "$target_dir" = /* ]] || target_dir="$repo_root/$target_dir"
   backing="$(readlink -m "$target_dir")"
-  mkdir -p "$backing"
-  # Family slots are shared deliberately so a fresh landing worktree stays warm. Serialize the
-  # whole recipe, not only Cargo: a gate may build a binary and then execute it during ingest or
-  # produce, and another checkout must not replace that binary between those phases. flock is the
-  # ONE process that owns the lock. --close removes its descriptor from the re-exec'd executor, so
-  # neither the recipe nor a detached descendant can keep the slot locked after flock exits.
-  slot_lock="$backing/.gate.lock"
-  slot_holder="$backing/.gate.holder"
-  slot_lock_wait_s="${GATE_SLOT_LOCK_WAIT_S:-3600}"
-  if [[ "${GATE_SLOT_LOCKED:-0}" != 1 ]]; then
-    holder="$(cat "$slot_holder" 2>/dev/null || echo 'holder details unavailable')"
-    started_ns="$(date +%s%N)"
-    if ! flock -n "$slot_lock" true 2>/dev/null; then
-      echo "  [$project_name] cargo slot busy; holder: $holder; waiting up to ${slot_lock_wait_s}s"
-      emit_slot_wait_event "$holder"
-    fi
-    if GATE_SLOT_LOCKED=1 GATE_SLOT_WAIT_STARTED_NS="$started_ns" \
-      GATE_SLOT_WAIT_HOLDER="$holder" \
-      flock --close --conflict-exit-code "$GATE_SLOT_LOCK_CONFLICT_EXIT" -w "$slot_lock_wait_s" \
-        "$slot_lock" bash "$0" "$@"; then
-      exit 0
-    else
-      status=$?
-    fi
-    if [[ "$status" -eq "$GATE_SLOT_LOCK_CONFLICT_EXIT" ]]; then
-      holder="$(cat "$slot_holder" 2>/dev/null || echo 'holder details unavailable')"
-      write_slot_wait_result "$(slot_wait_seconds_since "$started_ns")" "$holder"
-      echo "gate $project_name: REFUSED cargo slot stayed busy for ${slot_lock_wait_s}s; holder: $holder" >&2
-      exit "$GATE_SLOT_BUSY_EXIT"
-    fi
-    exit "$status"
+  expected_slot_lock="${backing}.gate.lock"
+  if [[ -z "$runner_slot_lock" || "$(readlink -m "$runner_slot_lock")" != "$expected_slot_lock" ]]; then
+    echo "gate $project_name: runner did not name the cargo slot lock $expected_slot_lock" >&2
+    exit 2
   fi
-
-  waited_seconds="$(slot_wait_seconds_since "${GATE_SLOT_WAIT_STARTED_NS:-$(date +%s%N)}")"
-  write_slot_wait_result "$waited_seconds" "${GATE_SLOT_WAIT_HOLDER:-holder details unavailable}"
-  holder_tmp="$slot_holder.$$"
-  printf 'project=%s worktree=%s pid=%s run=%s started=%s\n' \
-    "$project_name" "$(readlink -m "$repo_root")" "$$" "${GATE_LIVE_RUN:-unset}" \
-    "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$holder_tmp"
-  mv -f "$holder_tmp" "$slot_holder"
+  # The runner's detached flock holder lives outside the recipe's signalled process group. Probing
+  # must fail: a successful probe means no holder exists, so the recipe refuses before touching the slot.
+  if flock -n "$expected_slot_lock" true 2>/dev/null; then
+    echo "gate $project_name: runner did not hold the cargo slot lock $expected_slot_lock" >&2
+    exit 2
+  fi
+  mkdir -p "$backing"
   export CARGO_TARGET_DIR="$target_dir"
   echo "  [$project_name] cargo target: $CARGO_TARGET_DIR"
   # One slot, many checkouts: cargo keys workspace members by their path RELATIVE to the
