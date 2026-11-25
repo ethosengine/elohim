@@ -1815,7 +1815,12 @@ struct GateVerdict {
     attestation_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     agent_id: Option<String>,
+    /// The judged commit's author date. Kept as `at` for existing consumers; it is history order,
+    /// not the gate run's wall-clock observation time.
     at: String,
+    /// The gate run's wall-clock observation time. `None` is a legacy verdict and serializes as
+    /// null so freshness readers cannot mistake the historical `at` for a run time.
+    observed_at: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     head_seq: Option<u64>,
 }
@@ -1867,6 +1872,7 @@ fn verdict_from_event(
         attestation_id: once("attestationId").map(str::to_string),
         agent_id: once("agentId").map(str::to_string),
         at: event.occurred_at.clone(),
+        observed_at: once("observedAt").map(str::to_string),
         head_seq: heads.devices.get(device).map(|head| head.seq),
     })
 }
@@ -1937,11 +1943,13 @@ fn verdicts(options: &Options) -> PeerResult<ExitCode> {
         println!("no sibling verdict for {project} closure {closure}");
     } else {
         for row in rows {
+            let observed = row.observed_at.as_deref().unwrap_or("unknown");
             println!(
-                "{}  {}  {}  {}s  commit {}",
+                "{}  {}  judged commit date: {}  observed: {}  {}s  commit {}",
                 short(&row.device),
                 if row.success { "green" } else { "red" },
                 row.at,
+                observed,
                 row.seconds,
                 row.commit
             );
