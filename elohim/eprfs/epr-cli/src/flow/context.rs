@@ -231,7 +231,7 @@ pub fn context_with(root: &Path, target: &str, notes: usize) -> FlowResult<Conte
             }
         }
     }
-    let notes = notes_across(&records, &sources, notes);
+    let notes = notes_across(root, &records, &sources, notes);
 
     let seals = walked.as_ref().map(|result| Seals {
         edges: result.edges.outgoing.clone(),
@@ -641,11 +641,17 @@ impl ContextResult {
                 .as_ref()
                 .map(|v| format!(" via {v}"))
                 .unwrap_or_default();
+            let date_unknown = if note.date_unknown {
+                " (date unknown)"
+            } else {
+                ""
+            };
             println!(
-                "    • {}{}{} — {}",
+                "    • {}{}{}{} — {}",
                 note.kind,
                 verdict,
                 via,
+                date_unknown,
                 note.reason.as_deref().unwrap_or("")
             );
         }
