@@ -1953,6 +1953,10 @@ pub struct SiblingArtifact {
     /// when a record carries the slot more than once.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub isa_c: Option<String>,
+    /// `env:payload-formats`: the comma-separated formats this release's epr opens. Releases
+    /// predating the slot are interpreted by the consumer as `directory-v1` only.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub payload_formats: Option<String>,
     pub at: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub head_seq: Option<u64>,
@@ -2031,6 +2035,7 @@ fn artifact_from_event(
         agent_id: optional("env:agentId=")?,
         gaps,
         isa_c: one_slot(event, "env:isa-c=").map(str::to_string),
+        payload_formats: optional("env:payload-formats=")?,
         at: event.occurred_at.clone(),
         head_seq: heads.devices.get(device).map(|head| head.seq),
     })

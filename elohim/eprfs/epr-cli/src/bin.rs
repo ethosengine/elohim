@@ -610,6 +610,9 @@ pub(crate) mod sibling {
         pub gaps: Vec<String>,
         /// The Produce's `env:isa-c`: the C baseline its producer checked the build against.
         pub isa_c: Option<String>,
+        /// The epr Produce's `env:payload-formats`: formats that release opens. `None` is the
+        /// historical statement made by every release before the slot existed: directory-v1.
+        pub payload_formats: Option<String>,
     }
 
     /// The requirement axes a recorder's gap can leave unmeasured: a gap named `<axis>` or
@@ -702,6 +705,7 @@ pub(crate) mod sibling {
                     doc: row.requires_doc.clone(),
                     gaps: row.gaps.clone(),
                     isa_c: row.isa_c.clone(),
+                    payload_formats: row.payload_formats.clone(),
                 },
             );
             if row.at > offer.at {
@@ -823,6 +827,10 @@ pub(crate) mod sibling {
                  stamped with a release for {commit}"
             )));
         }
+        let payload_dir = crate::peer::payload_store_dir(&crate::peer::Options::default())
+            .map_err(|e| Draw::Gap(format!("payload-store: {e}")))?;
+        let payload_format = crate::payload::existing_format(&payload_dir)
+            .map_err(|e| Draw::Gap(format!("payload-store: {e}")))?;
         let host = ark_supervisor::host::observe_host();
         draw_first(
             store,
@@ -831,6 +839,7 @@ pub(crate) mod sibling {
             incoming,
             &offers,
             &Judges {
+                payload_format,
                 admit: &|_bin, document| admit_on(&host, document),
                 fetch: &|output, dest| {
                     crate::artifact::fetch_output(repo, output, dest).map_err(|e| e.to_string())
@@ -845,6 +854,8 @@ pub(crate) mod sibling {
     /// `staged` judges what the fetched bytes themselves require before either is executed.
     #[cfg(feature = "peer")]
     pub(crate) struct Judges<'a> {
+        /// This device's existing payload-store format; `None` means no store exists yet.
+        pub payload_format: Option<crate::payload::PayloadFormat>,
         pub admit: &'a Admit<'a>,
         pub fetch: &'a dyn Fn(&str, &Path) -> Result<(), String>,
         pub staged: &'a Admit<'a>,
@@ -881,7 +892,7 @@ pub(crate) mod sibling {
     ) -> Result<Value, Draw> {
         let mut gaps = Vec::new();
         for offer in offers {
-            match admissible(offer, judges.admit) {
+            match admissible(offer, judges.payload_format, judges.admit) {
                 Ok(()) => {
                     return take(
                         store,
@@ -961,13 +972,63 @@ pub(crate) mod sibling {
     #[cfg(feature = "peer")]
     pub(crate) type Admit<'a> = dyn Fn(&str, &[u8]) -> Result<(), String> + 'a;
 
+    /// Whether the release opens this device's existing payload store. The missing slot on every
+    /// older release means directory-v1 only. With no store yet there is no format to preserve,
+    /// and the landed binary may create the new store in whichever format it chooses.
+    #[cfg(feature = "peer")]
+    pub(crate) fn payload_store_admits(
+        offer: &Offer,
+        device_format: Option<crate::payload::PayloadFormat>,
+    ) -> Result<(), String> {
+        let Some(device_format) = device_format else {
+            return Ok(());
+        };
+        let stated = offer
+            .requires
+            .get("epr")
+            .and_then(|statement| statement.payload_formats.as_deref())
+            .unwrap_or("directory-v1");
+        let mut formats = Vec::new();
+        for name in stated.split(',') {
+            let Some(format) = crate::payload::PayloadFormat::parse(name) else {
+                return Err(format!(
+                    "refused: release states invalid payload format {name:?}; this device's \
+                     payload store is {device_format}"
+                ));
+            };
+            if formats.contains(&format) {
+                return Err(format!(
+                    "refused: release states payload format {name} more than once; this device's \
+                     payload store is {device_format}"
+                ));
+            }
+            formats.push(format);
+        }
+        if formats.contains(&device_format) {
+            return Ok(());
+        }
+        Err(format!(
+            "refused: release opens {}; this device's payload store is {device_format}",
+            formats
+                .iter()
+                .map(ToString::to_string)
+                .collect::<Vec<_>>()
+                .join(", ")
+        ))
+    }
+
     /// Row 12: whether this device can run every bin of `offer`, judged from what each bin's
     /// Produce stated, before a byte is fetched. `admit` judges one verified document on this
     /// host. A bin that stated nothing, whose statement did not cross, or whose statement does
     /// not make the CID its Produce named is not drawn: an honest draw never pays for bytes on
     /// an unread statement. Every answer here is a gap, so the follow may still build.
     #[cfg(feature = "peer")]
-    pub(crate) fn admissible(offer: &Offer, admit: &Admit<'_>) -> Result<(), String> {
+    pub(crate) fn admissible(
+        offer: &Offer,
+        payload_format: Option<crate::payload::PayloadFormat>,
+        admit: &Admit<'_>,
+    ) -> Result<(), String> {
+        payload_store_admits(offer, payload_format)?;
         for bin in BINS {
             let stated = offer.requires.get(bin).cloned().unwrap_or_default();
             let Some(cid) = stated.cid else {
@@ -1039,6 +1100,7 @@ pub(crate) mod sibling {
             incoming,
             std::slice::from_ref(offer),
             &Judges {
+                payload_format: None,
                 admit,
                 fetch,
                 staged: &|_, _| Ok(()),
@@ -1382,6 +1444,7 @@ mod tests {
             agent_id: None,
             gaps: Vec::new(),
             isa_c: None,
+            payload_formats: None,
             at: at.into(),
             head_seq: None,
         }
@@ -1482,6 +1545,7 @@ mod tests {
             gaps: Vec::new(),
             // As a producer that checked its C at the x86_64 baseline records it.
             isa_c: Some("x86-64".into()),
+            payload_formats: None,
         }
     }
 
@@ -1521,6 +1585,67 @@ mod tests {
             .map(|bin| ((*bin).to_owned(), stated.clone()))
             .collect();
         offer
+    }
+
+    #[cfg(feature = "peer")]
+    fn opening(mut offer: sibling::Offer, formats: Option<&str>) -> sibling::Offer {
+        offer
+            .requires
+            .get_mut("epr")
+            .expect("the fixture states epr requirements")
+            .payload_formats = formats.map(str::to_owned);
+        offer
+    }
+
+    #[cfg(feature = "peer")]
+    #[test]
+    fn a_release_opening_both_payload_formats_admits_each_existing_store() {
+        let offer = opening(
+            stating(offer_for("R1"), &glibc_at_least(&[2, 17])),
+            Some("blob-store-v1,directory-v1"),
+        );
+        for format in [
+            crate::payload::PayloadFormat::BlobStoreV1,
+            crate::payload::PayloadFormat::DirectoryV1,
+        ] {
+            assert_eq!(sibling::payload_store_admits(&offer, Some(format)), Ok(()));
+        }
+    }
+
+    #[cfg(feature = "peer")]
+    #[test]
+    fn directory_only_and_legacy_releases_refuse_a_blob_store_but_admit_directory() {
+        for stated in [Some("directory-v1"), None] {
+            let offer = opening(stating(offer_for("R1"), &glibc_at_least(&[2, 17])), stated);
+            assert_eq!(
+                sibling::payload_store_admits(
+                    &offer,
+                    Some(crate::payload::PayloadFormat::DirectoryV1)
+                ),
+                Ok(())
+            );
+            assert_eq!(
+                sibling::payload_store_admits(
+                    &offer,
+                    Some(crate::payload::PayloadFormat::BlobStoreV1)
+                ),
+                Err(
+                    "refused: release opens directory-v1; this device's payload store is \
+                     blob-store-v1"
+                        .into()
+                )
+            );
+        }
+    }
+
+    #[cfg(feature = "peer")]
+    #[test]
+    fn a_device_with_no_payload_store_admits_any_release_format_statement() {
+        let offer = opening(
+            stating(offer_for("R1"), &glibc_at_least(&[2, 17])),
+            Some("directory-v1"),
+        );
+        assert_eq!(sibling::payload_store_admits(&offer, None), Ok(()));
     }
 
     #[cfg(feature = "peer")]
@@ -1610,6 +1735,7 @@ mod tests {
                     doc: None,
                     gaps: Vec::new(),
                     isa_c: good.isa_c.clone(),
+                    payload_formats: good.payload_formats.clone(),
                 },
                 "unmeasured-requirement: ",
                 "offer predates requires-doc",
@@ -1621,6 +1747,7 @@ mod tests {
                     doc: other.doc.clone(),
                     gaps: Vec::new(),
                     isa_c: good.isa_c.clone(),
+                    payload_formats: good.payload_formats.clone(),
                 },
                 "unverifiable-requirement: ",
                 "not the env:requires",
@@ -1631,6 +1758,7 @@ mod tests {
                     doc: Some("not base64!".into()),
                     gaps: Vec::new(),
                     isa_c: good.isa_c.clone(),
+                    payload_formats: good.payload_formats.clone(),
                 },
                 "unverifiable-requirement: ",
                 "base64url",
@@ -1665,13 +1793,14 @@ mod tests {
         // One bin stating its need is not enough: every bin must.
         let mut half = stating(offer_for("R1"), &good);
         half.requires.remove("bin-launch");
-        let gap = sibling::admissible(&half, &|_, d| sibling::admit_on(&host, d)).unwrap_err();
+        let gap =
+            sibling::admissible(&half, None, &|_, d| sibling::admit_on(&host, d)).unwrap_err();
         assert!(
             gap.contains("bin-launch") && gap.contains("records no env:requires"),
             "{gap}"
         );
         assert_eq!(
-            sibling::admissible(&stating(offer_for("R1"), &good), &|_, d| {
+            sibling::admissible(&stating(offer_for("R1"), &good), None, &|_, d| {
                 sibling::admit_on(&host, d)
             }),
             Ok(())
@@ -1839,6 +1968,7 @@ mod tests {
                 doc: Some("req-doc".into()),
                 gaps: Vec::new(),
                 isa_c: None,
+                payload_formats: None,
             }
         );
         assert_eq!(offer.requires["bin-launch"], sibling::Stated::default());
@@ -1906,7 +2036,7 @@ mod tests {
         let mut reach_only = glibc_at_least(&[2, 17]);
         reach_only.gaps = vec!["build-inputs.build-scripts".into()];
         assert_eq!(
-            sibling::admissible(&stating(offer_for("R1"), &reach_only), &|_, d| {
+            sibling::admissible(&stating(offer_for("R1"), &reach_only), None, &|_, d| {
                 sibling::admit_on(&host, d)
             }),
             Ok(())
@@ -1969,6 +2099,7 @@ mod tests {
             &tmp.path().join("incoming"),
             &offers,
             &sibling::Judges {
+                payload_format: None,
                 admit: &|_, document| sibling::admit_on(&host, document),
                 fetch: &|output, dest| {
                     fetched.borrow_mut().push(output.to_string());
@@ -1999,6 +2130,7 @@ mod tests {
             &tmp.path().join("incoming"),
             &offers,
             &sibling::Judges {
+                payload_format: None,
                 admit: &|_, document| sibling::admit_on(&ancient, document),
                 fetch: &|_, _| Err("must not fetch".into()),
                 staged: &|_, _| panic!("nothing is staged"),
@@ -2135,7 +2267,8 @@ mod tests {
         // Every bin must carry it: a marked epr beside an unmarked launcher is not drawn.
         let mut half = stating(offer_for("R1"), &glibc_at_least(&[2, 17]));
         half.requires.get_mut("bin-launch").unwrap().isa_c = None;
-        let gap = sibling::admissible(&half, &|_, d| sibling::admit_on(&host, d)).unwrap_err();
+        let gap =
+            sibling::admissible(&half, None, &|_, d| sibling::admit_on(&host, d)).unwrap_err();
         assert!(gap.contains("bin-launch of release R1"), "{gap}");
         assert!(gap.contains("records no env:isa-c"), "{gap}");
     }
