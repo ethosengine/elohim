@@ -1334,6 +1334,94 @@ fn peer_leases_prints_the_steward_view_while_serve_holds_its_lock() {
 }
 
 #[test]
+fn peer_leases_never_observes_release_without_replacement_claim_batch() {
+    let (keys, a, b) = household();
+    let policy = steward_policy(keys.path());
+    let a_did = a.key.did_key();
+    let mut moored = berth_record("moor", "", "claude-1", "1792769288.000", Some(&a_did));
+    moored
+        .classified_as
+        .retain(|slot| !slot.starts_with("env:resource=") && !slot.starts_with("env:claimed_at="));
+    append(
+        b.checkout.path(),
+        [
+            moored,
+            berth_record(
+                "claim",
+                "dev-integration",
+                "claude-1",
+                "1792769289.000",
+                Some(&a_did),
+            ),
+        ],
+    );
+
+    let initial = leases_json(&b, b.root(), &policy);
+    assert_eq!(initial["dev-integration"]["session"], "claude-1");
+
+    let root = b.checkout.path().to_path_buf();
+    let (ready_tx, ready_rx) = std::sync::mpsc::channel();
+    let (go_tx, go_rx) = std::sync::mpsc::channel();
+    let writer = std::thread::spawn(move || {
+        let padding = "x".repeat(8 * 1024 * 1024);
+        let mut release = berth_record(
+            "release",
+            "dev-integration",
+            "claude-1",
+            "1792769290.000",
+            Some(&a_did),
+        );
+        release
+            .classified_as
+            .retain(|slot| !slot.starts_with("env:claimed_at="));
+        release
+            .classified_as
+            .push("env:claimed_at=1792769289.000".into());
+        release
+            .classified_as
+            .push(format!("test-padding:{padding}"));
+        let mut replacement = berth_record(
+            "claim",
+            "dev-integration",
+            "claude-2",
+            "1792769291.000",
+            Some(&a_did),
+        );
+        replacement
+            .classified_as
+            .push(format!("test-padding:{padding}"));
+        ready_tx.send(()).unwrap();
+        go_rx.recv().unwrap();
+        SidecarFlowStore::open(&root)
+            .unwrap()
+            .transaction()
+            .unwrap()
+            .append_batch(vec![
+                FlowRecord::Event(release),
+                FlowRecord::Event(replacement),
+            ])
+            .unwrap();
+    });
+    ready_rx.recv().unwrap();
+    go_tx.send(()).unwrap();
+
+    let mut samples = 0;
+    while !writer.is_finished() {
+        let view = leases_json(&b, b.root(), &policy);
+        let session = view["dev-integration"]["session"].as_str();
+        assert!(
+            matches!(session, Some("claude-1" | "claude-2")),
+            "lease reader observed a released-but-not-reclaimed batch prefix: {view}"
+        );
+        samples += 1;
+    }
+    writer.join().unwrap();
+    assert!(samples > 0, "reader process must overlap the writer");
+    let final_view = leases_json(&b, b.root(), &policy);
+    assert_eq!(final_view["dev-integration"]["session"], "claude-2");
+}
+
+#[test]
 fn peer_verdicts_reads_only_matching_folded_admitted_siblings() {
     let (keys, a, b) = household();
     let a_did = a.key.did_key();
