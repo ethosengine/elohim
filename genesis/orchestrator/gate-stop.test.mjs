@@ -499,6 +499,27 @@ describe('Ctrl-C still reaches the detached gate', () => {
     assert.ok(result.code !== 0 || result.signal !== null);
     assert.equal(result.summary?.stopped, undefined);
   });
+
+  test('SIGINT at the gate\'s first line, before the tap has settled, still ends the gate', async t => {
+    // The tap used to install its signal handlers after spawning (and after a full /proc scan for
+    // its cost sampler): an interrupt in that window killed the tap and orphaned the detached gate.
+    for (let round = 0; round < 5; round += 1) {
+      const dir = scratch(t, 'gate-stop-int-early-');
+      const script = resolve(dir, 'gate.sh');
+      writeFileSync(script, ['#!/usr/bin/env bash', `echo $$ > "${dir}/leader"`, 'sleep 300', 'true'].join('\n'), { mode: 0o755 });
+      const { path: run } = openRun({ root: dir, sha: '9'.repeat(40), target: 'test' });
+      const { child, done } = startTap(run, script);
+      // As soon as the gate's first line ran: polled every millisecond, inside the tap's start-up.
+      const until = Date.now() + 10_000;
+      while (!(existsSync(resolve(dir, 'leader')) && readFileSync(resolve(dir, 'leader'), 'utf8').trim()) && Date.now() < until) await delay(1);
+      child.kill('SIGINT');
+      await done;
+      const leader = readPid(resolve(dir, 'leader'));
+      const orphaned = await waitFor(() => !alive(leader), 3000) ? null : readStat(leader);
+      if (orphaned) { try { process.kill(-leader, 'SIGKILL'); } catch { /* gone */ } }
+      assert.equal(orphaned, null, `round ${round}: the gate's leader survived the tap: ${JSON.stringify(orphaned)}`);
+    }
+  });
 });
 
 // The real stop verb, run asynchronously so the test can act on the run while it waits.

@@ -221,10 +221,21 @@ function main() {
     // berth, and an unsendable note is a sibling-delivery line in the run log.
     if (written && event.kind === 'failure') emitRedDetached(run, written);
   }
+  // An interrupt to the tap is the gate's: its handlers are installed BEFORE the gate starts. The
+  // gate runs in its own session, so nothing else carries a Ctrl-C to it; a SIGINT arriving between
+  // the spawn and a later registration took the tap's default action, killed the tap and orphaned
+  // the whole gate (pid 1 adopted it; 30 of 30 runs when signalled at the gate's first line). A
+  // signal JavaScript sees before the gate exists (none can, spawn below is in the same tick) is
+  // held and forwarded once it does.
+  let child = null;
+  let signalGate = null;
+  const earlySignals = [];
+  const forward = signal => () => { if (signalGate) signalGate(signal); else earlySignals.push(signal); };
+  for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.on(signal, forward(signal));
   // Its own session and group (detached), so the gate's whole tree can be signalled as one and no
   // signal meant for it reaches the tap, gate-runner or the hook. The leader is read now, while
   // this process holds it unreaped: that pid and start time are the first link of gate-stop's custody.
-  const child = spawn(command, args, {
+  child = spawn(command, args, {
     stdio: ['inherit', 'pipe', 'pipe'],
     env: tapChildEnv(process.env, Boolean(process.stdout.isTTY)),
     detached: true,
@@ -234,7 +245,7 @@ function main() {
   // leader ended can be named (gate-stop.mjs processesHolding); nothing is added to its environment.
   const targets = Number.isInteger(child.pid) ? outputTargets(child.pid) : [];
   const leaderHeld = () => child.exitCode === null && child.signalCode === null;
-  const signalGate = signal => {
+  signalGate = signal => {
     if (!Number.isInteger(child.pid)) return;
     // While the leader is unreaped its pid, and so its group, cannot be anyone else's.
     if (leaderHeld()) {
@@ -254,8 +265,7 @@ function main() {
   child.stdout.on('data', chunk => { process.stdout.write(chunk); out.write(chunk); });
   child.stderr.on('data', chunk => { process.stderr.write(chunk); err.write(chunk); });
 
-  const forward = signal => () => signalGate(signal);
-  for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.on(signal, forward(signal));
+  for (const signal of earlySignals.splice(0)) signalGate(signal);
 
   // The stop-now probe: the run log is re-read only when it grew, so an idle check is one stat.
   // A stop-now request ends the gate's tree while its leader runs (gate-stop.mjs endTree). Whether
