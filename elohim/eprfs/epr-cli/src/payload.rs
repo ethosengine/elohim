@@ -627,13 +627,24 @@ mod tests {
 
     #[test]
     fn payload_format_probe_deadline_includes_pipes_held_by_descendants() {
-        let bytes = script("(/bin/sleep 5) &\nprintf '[\"directory-v1\"]'");
+        let temp = tempfile::tempdir().unwrap();
+        let pid_file = temp.path().join("escaped.pid");
+        let bytes = script(&format!(
+            "setsid sh -c 'sleep 600' &\nprintf '%s' \"$!\" > '{}'\nprintf '[\"directory-v1\"]'",
+            pid_file.display()
+        ));
         let started = std::time::Instant::now();
         let error = PayloadFormat::probe_supported_bytes_with_deadline(
             &bytes,
             std::time::Duration::from_millis(150),
         )
         .unwrap_err();
+        let escaped: i32 = std::fs::read_to_string(&pid_file).unwrap().parse().unwrap();
+        // SAFETY: the fixture created this process as a new session whose process-group id is
+        // the recorded pid; killing that group only cleans up this test's escaped descendant.
+        unsafe {
+            libc::kill(-escaped, libc::SIGKILL);
+        }
 
         assert!(started.elapsed() < std::time::Duration::from_secs(2));
         assert!(error.contains("did not answer payload formats"), "{error}");

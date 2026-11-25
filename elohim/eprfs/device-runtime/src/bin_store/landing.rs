@@ -136,7 +136,11 @@ impl Transition {
 }
 
 impl Store {
-    fn require_payload_store_compatible(&self, release: &Release) -> Result<()> {
+    fn require_payload_store_compatible(
+        &self,
+        release: &mut Release,
+        transition: &Transition,
+    ) -> Result<()> {
         let Some(device_format) = self
             .payload_store_format
             .as_deref()
@@ -156,6 +160,20 @@ impl Store {
             }
             None => None,
         };
+        if statement.is_none()
+            && matches!(transition, Transition::Revert)
+            && matches!(
+                release.ring.as_str(),
+                "landed" | "reverted" | "lineage-rebased"
+            )
+        {
+            Self::add_note(
+                release,
+                "payload-format-unstated-revert",
+                "payload format is unstated; this release ran on this device before",
+            );
+            return Ok(());
+        }
         let formats = parse_payload_formats(statement).map_err(|detail| {
             Refusal::new(
                 "payload-format-statement-invalid",
@@ -183,7 +201,7 @@ impl Store {
         cached: bool,
     ) -> Result<(Release, Option<String>, Value)> {
         self.require_migrated()?;
-        let record = self
+        let mut record = self
             .record(cid)
             .filter(|_| self.admissible(cid))
             .ok_or_else(|| {
@@ -192,7 +210,7 @@ impl Store {
                     format!("{cid} is not a verified candidate"),
                 )
             })?;
-        self.require_payload_store_compatible(&record)?;
+        self.require_payload_store_compatible(&mut record, transition)?;
         let source = record.source(commit).ok_or_else(|| {
             Refusal::new(
                 "commit-mismatch",

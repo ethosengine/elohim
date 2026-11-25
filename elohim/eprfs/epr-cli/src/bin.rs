@@ -60,16 +60,11 @@ pub(crate) fn payload_store_configured(store: Store, _tool: &str) -> Result<Stor
 }
 
 #[cfg(feature = "peer")]
-fn held_payload_formats(tool: &str, source: &Path, closure: bool) -> Option<String> {
-    if tool != "epr" || closure {
+fn held_payload_formats(tool: &str, stored: &Path) -> Option<String> {
+    if tool != "epr" {
         return None;
     }
-    let binary = if source.is_dir() {
-        source.join("epr")
-    } else {
-        source.to_owned()
-    };
-    let bytes = std::fs::read(binary).ok()?;
+    let bytes = std::fs::read(stored).ok()?;
     crate::payload::PayloadFormat::probe_supported_bytes(&bytes)
         .ok()
         .map(|formats| {
@@ -82,7 +77,7 @@ fn held_payload_formats(tool: &str, source: &Path, closure: bool) -> Option<Stri
 }
 
 #[cfg(not(feature = "peer"))]
-fn held_payload_formats(_tool: &str, _source: &Path, _closure: bool) -> Option<String> {
+fn held_payload_formats(_tool: &str, _stored: &Path) -> Option<String> {
     None
 }
 
@@ -214,17 +209,22 @@ fn execute_with(args: &[String], restart: bool) -> Result<String, Refusal> {
                     _ => Err(argument("--tree-clean expects true or false")),
                 })
                 .transpose()?;
-            json!(store.ingest(
-                source,
-                &IngestOptions {
-                    repo: options.get("--repo").map(PathBuf::from),
-                    source_commit: options.get("--source-commit").map(|s| s.to_string()),
-                    gate_run: options.get("--gate-run").map(|s| s.to_string()),
-                    tree_clean: clean,
-                    closure: closure.is_some(),
-                    payload_formats: held_payload_formats(tool, source, closure.is_some()),
-                }
-            )?)
+            let ingest_options = IngestOptions {
+                repo: options.get("--repo").map(PathBuf::from),
+                source_commit: options.get("--source-commit").map(|s| s.to_string()),
+                gate_run: options.get("--gate-run").map(|s| s.to_string()),
+                tree_clean: clean,
+                closure: closure.is_some(),
+                payload_formats: None,
+            };
+            let release = if closure.is_some() {
+                store.ingest(source, &ingest_options)
+            } else {
+                store.ingest_with_payload_formats(source, &ingest_options, |stored| {
+                    held_payload_formats(tool, stored)
+                })
+            }?;
+            json!(release)
         }
         "land" => {
             let expected = options
@@ -1520,6 +1520,48 @@ mod tests {
                 stderr: String::new(),
             })
         }
+    }
+
+    #[cfg(feature = "peer")]
+    #[test]
+    fn ingest_records_formats_from_stored_cid_when_the_source_path_is_replaced() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let temp = tempfile::tempdir().unwrap();
+        let registry: Registry = serde_json::from_value(json!({"version":1,"tools":{"epr":{
+            "bins":["epr"],"aliases":{},"longRunning":[],
+            "candidateEnv":{"epr":["EPR_BIN"]}}}}))
+        .unwrap();
+        let store = Store::new(temp.path().join("store/epr"), "epr", &registry)
+            .unwrap()
+            .with_runner(std::sync::Arc::new(Identity));
+        let source = temp.path().join("published-epr");
+        std::fs::write(&source, "#!/bin/sh\nprintf '[\"directory-v1\"]'\n").unwrap();
+        std::fs::set_permissions(&source, std::fs::Permissions::from_mode(0o755)).unwrap();
+        let copied_cid = bin_store::file_cid(&source).unwrap();
+
+        let release = store
+            .ingest_with_payload_formats(
+                &source,
+                &IngestOptions {
+                    source_commit: Some("a".repeat(40)),
+                    tree_clean: Some(true),
+                    gate_run: Some("stored-payload-probe-test".into()),
+                    ..Default::default()
+                },
+                |stored| {
+                    std::fs::write(&source, "#!/bin/sh\nprintf '[\"blob-store-v1\"]'\n").unwrap();
+                    std::fs::set_permissions(&source, std::fs::Permissions::from_mode(0o755))
+                        .unwrap();
+                    assert_eq!(bin_store::file_cid(stored).unwrap(), copied_cid);
+                    held_payload_formats("epr", stored)
+                },
+            )
+            .unwrap();
+
+        assert_eq!(release.cid, copied_cid);
+        assert_eq!(release.extra["payloadFormats"], "directory-v1");
+        assert_ne!(bin_store::file_cid(&source).unwrap(), copied_cid);
     }
 
     #[cfg(feature = "peer")]

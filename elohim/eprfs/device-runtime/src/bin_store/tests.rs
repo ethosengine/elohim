@@ -3211,6 +3211,95 @@ fn land_refuses_a_held_incompatible_payload_format_and_keeps_the_installed_head(
 }
 
 #[test]
+fn revert_admits_a_previously_landed_statementless_release_with_a_note() {
+    let mut f = Fixture::new("epr");
+    let old = f.release("previously-landed-unstated");
+    f.land(&old).unwrap();
+    f.state.lock().unwrap().head = "b".repeat(40);
+    let current = release_opening(&f, "blob-current", "blob-store-v1");
+    f.store = f
+        .store
+        .clone()
+        .with_payload_store_format(Some("blob-store-v1"));
+    f.land(&current).unwrap();
+    f.state.lock().unwrap().head = old.provenance.source_commit.clone();
+
+    let reverted = f
+        .store
+        .land(
+            &old.cid,
+            &old.provenance.source_commit,
+            f.tmp.path(),
+            Transition::Revert,
+        )
+        .unwrap();
+
+    assert_eq!(f.store.head("current"), Some(old.cid));
+    assert!(reverted.extra["notes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|row| row["kind"] == "payload-format-unstated-revert"
+            && row["detail"]
+                == "payload format is unstated; this release ran on this device before"));
+}
+
+#[test]
+fn revert_refuses_a_previously_landed_statement_that_excludes_the_store_format() {
+    let mut f = Fixture::new("epr");
+    let old = release_opening(&f, "previously-landed-directory", "directory-v1");
+    f.land(&old).unwrap();
+    f.state.lock().unwrap().head = "b".repeat(40);
+    let current = release_opening(&f, "blob-current", "blob-store-v1");
+    f.store = f
+        .store
+        .clone()
+        .with_payload_store_format(Some("blob-store-v1"));
+    f.land(&current).unwrap();
+    f.state.lock().unwrap().head = old.provenance.source_commit.clone();
+
+    let refusal = f
+        .store
+        .land(
+            &old.cid,
+            &old.provenance.source_commit,
+            f.tmp.path(),
+            Transition::Revert,
+        )
+        .unwrap_err();
+
+    assert_eq!(refusal.kind, "payload-format-incompatible");
+    assert_eq!(f.store.head("current"), Some(current.cid));
+}
+
+#[test]
+fn revert_refuses_a_statementless_release_never_landed_on_this_device() {
+    let mut f = Fixture::new("epr");
+    let never_landed = f.release("never-landed-unstated");
+    f.state.lock().unwrap().head = "b".repeat(40);
+    let current = release_opening(&f, "blob-current", "blob-store-v1");
+    f.store = f
+        .store
+        .clone()
+        .with_payload_store_format(Some("blob-store-v1"));
+    f.land(&current).unwrap();
+    f.state.lock().unwrap().head = never_landed.provenance.source_commit.clone();
+
+    let refusal = f
+        .store
+        .land(
+            &never_landed.cid,
+            &never_landed.provenance.source_commit,
+            f.tmp.path(),
+            Transition::Revert,
+        )
+        .unwrap_err();
+
+    assert_eq!(refusal.kind, "payload-format-incompatible");
+    assert_eq!(f.store.head("current"), Some(current.cid));
+}
+
+#[test]
 fn declared_follow_and_arrival_keep_the_installed_head_for_a_held_incompatible_candidate() {
     use ark_core::declaration::{Follow, FollowMode};
     let mut f = Fixture::new("epr");
