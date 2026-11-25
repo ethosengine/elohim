@@ -64,6 +64,12 @@ ordered DNA → edge → app → Genesis. Step dependencies can make downstream 
 stale in Jenkins; the pipeline-level `cascades` field is retained as registry
 metadata and does not itself expand the selected set.
 
+### Local gate knobs
+
+- `GATE_ENRICH_SAMPLE=on|off` (default `off`) starts one detached re-execution of
+  the first reused project in a gate-runner invocation and records its result as
+  verdict enrichment. The sample never delays a push and changes no gate decision.
+
 ## Pipeline configuration
 
 Each project declares steps and pipeline metadata in `build-manifest.json`.
