@@ -884,7 +884,9 @@ class Berth:
     def _scan_inbox(self, root=None):
         """Copy only new folded notes into the berth's small, stable stream. The source offset is
         device-wide; a shorter or different store is read again from zero, with CIDs keeping the
-        normalized stream append-only so session cursors remain valid."""
+        normalized stream append-only so session cursors remain valid. A missing or malformed stream
+        is REBUILT from the source from offset zero, never read as "no notes": a sender that says a
+        thing once (`said`) reads its record here."""
         root = root or self.channel_root or self.cached_channel_root() or REPO_ROOT
         source = os.path.join(root, ".eprfs", "status", "flows.jsonl")
         size = os.stat(source).st_size
@@ -892,17 +894,24 @@ class Berth:
         offset = state.get("offset", 0) if state.get("source") == source else 0
         if not isinstance(offset, int) or offset < 0 or size < offset:
             offset = 0
-        if size == offset:
-            return
-
-        os.makedirs(self._inbox_dir(), exist_ok=True)
-        notes = []
+        notes, rebuild = [], False
         notes_path = self._inbox_notes_path()
         try:
             with open(notes_path, encoding="utf-8") as f:
-                notes = [json.loads(line) for line in f if line.strip()]
-        except (OSError, ValueError, TypeError):
-            notes = []
+                for line in f:
+                    if line.strip():
+                        note = json.loads(line)
+                        if not isinstance(note, dict) or not note.get("cid"):
+                            raise ValueError("not a note")
+                        notes.append(note)
+        except FileNotFoundError:
+            notes, rebuild, offset = [], True, 0
+        except (OSError, ValueError, TypeError, UnicodeDecodeError):
+            notes, rebuild, offset = [], True, 0
+        if size == offset and not rebuild:
+            return
+
+        os.makedirs(self._inbox_dir(), exist_ok=True)
         known = {note.get("cid") for note in notes}
         added = []
         with open(source, "rb") as f:
@@ -921,7 +930,7 @@ class Berth:
                 if note and note["cid"] not in known:
                     known.add(note["cid"])
                     added.append(note)
-        if added:
+        if added or rebuild:
             tmp = f"{notes_path}.{os.getpid()}.tmp"
             with open(tmp, "w") as f:
                 for note in notes + added:

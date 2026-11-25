@@ -1783,6 +1783,19 @@ class BerthInboxTest(unittest.TestCase):
         with self.assertRaises(OSError):
             self.berth.said("watcher")
 
+    def test_a_lost_or_malformed_note_stream_is_rebuilt_never_read_as_nothing_said(self):
+        self.append(self.folded("own-1", 990, sender="watcher", text="one", via=None),
+                    self.folded("own-2", 991, sender="watcher", to=self.SESSION, text="two", via=None))
+        self.assertEqual(len(self.berth.said("watcher")), 2)
+        notes = Path(self.berth._inbox_notes_path())
+        notes.unlink()  # the source offset still stands at the end of the store
+        self.assertEqual([n["cid"] for n in self.berth.said("watcher")], ["own-1", "own-2"])
+        notes.write_text('{"cid": "own-1", "session": "watcher"}\n{torn\n')
+        self.assertEqual([n["cid"] for n in self.berth.said("watcher")], ["own-1", "own-2"])
+        # A rebuilt stream keeps working incrementally.
+        self.append(self.folded("own-3", 992, sender="watcher", text="three", via=None))
+        self.assertEqual([n["cid"] for n in self.berth.said("watcher")], ["own-1", "own-2", "own-3"])
+
     def test_inbox_lines_is_empty_when_channel_store_is_missing(self):
         self.flow.unlink()
         self.assertEqual(self.berth.inbox_lines(self.SESSION), "")

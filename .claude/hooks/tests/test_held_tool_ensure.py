@@ -51,12 +51,38 @@ class EnsureTest(unittest.TestCase):
             self.assertEqual(H['ensure'](self.code, self.start), 'running')
         self.assertEqual(len(self.started), 1)
 
-    def test_a_checkout_without_the_watcher_or_with_the_switch_off_starts_nothing(self):
+    def test_a_checkout_without_the_watcher_starts_nothing(self):
         (self.code / 'genesis/agentic/bin/held-tool-watch').unlink()
         self.assertEqual(H['ensure'](self.code, self.start), 'absent')
+        self.assertEqual(self.started, [])
+
+    def test_the_off_switch_is_device_wide_until_a_session_turns_it_on(self):
+        stop = H['lock_path'](self.code).with_name(H['STOP_NAME'])
+        self.assertEqual(H['STOP_NAME'], runpy.run_path(str(WATCHER))['STOP_FILE'])
         os.environ['HELD_TOOL_WATCH'] = 'off'
         self.assertEqual(H['ensure'](self.code, self.start), 'off')
+        self.assertTrue(stop.exists())  # the running loop reads this at its next pass and exits
+        os.environ['HELD_TOOL_WATCH'] = ''
+        self.assertEqual(H['ensure'](self.code, self.start), 'off')
         self.assertEqual(self.started, [])
+        os.environ['HELD_TOOL_WATCH'] = 'on'
+        self.assertEqual(H['ensure'](self.code, self.start), 'started')
+        self.assertFalse(stop.exists())
+
+    def test_the_registered_commands_are_silent_and_exit_0_without_python_or_the_file(self):
+        import json
+        settings = json.loads((REPO / '.claude/settings.json').read_text())
+        codex = json.loads((REPO / '.codex/hooks.json').read_text())
+        commands = [h['command'] for config in (settings, codex) for groups in config['hooks'].values()
+                    for group in groups for h in group['hooks'] if 'held-tool-ensure' in h['command']]
+        self.assertEqual(len(commands), 4)
+        for command in commands:
+            for path in ('/nonexistent', os.environ['PATH']):  # no interpreter; an absent file
+                with self.subTest(command=command[:40], path=path[:12]):
+                    out = subprocess.run(['/bin/sh', '-c', command], capture_output=True, text=True,
+                                         cwd=str(self.code), timeout=10,
+                                         env={'PATH': path, 'CLAUDE_PROJECT_DIR': str(self.code)})
+                    self.assertEqual((out.returncode, out.stdout, out.stderr), (0, '', ''))
 
     def test_its_own_error_is_one_stderr_line_and_exit_0(self):
         # A copy of the hook in a checkout whose status dir cannot be made: ensure raises inside.

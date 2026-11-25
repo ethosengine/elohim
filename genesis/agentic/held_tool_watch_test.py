@@ -104,6 +104,42 @@ class ScanTest(Fixture):
             self.assertNotIn(leaked, shape)
         self.assertLessEqual(len(W["redact"]("x" * 500)), 80)
 
+    def test_a_long_transcript_costs_a_small_tail_and_an_old_one_nothing(self):
+        filler = [use(f"f{i}", "Read", T0 - 5000 + i, file_path="/x" * 200) for i in range(3000)]
+        filler += [result(f"f{i}", T0 - 4000 + i) for i in range(3000)]
+        self.write(*filler, use("held", "Bash", T0, command="ls"))
+        size = self.main.stat().st_size
+        self.assertGreater(size, 2 * 1024 * 1024)
+        budget = W["Budget"]()
+        held = W["scan"]([SESSION], str(self.transcripts), 120, T0 + 500, str(self.stasis), budget=budget)
+        self.assertEqual([h["toolUseId"] for h in held], ["held"])
+        self.assertEqual(budget.read, W["FIRST_TAIL_BYTES"])
+        old = T0 - 3 * 86400
+        os.utime(self.main, (old, old))
+        budget = W["Budget"]()
+        with mock.patch.dict(W["scan"].__globals__["time"].__dict__, {"time": lambda: T0}):
+            self.assertEqual(W["scan"]([SESSION], str(self.transcripts), 120, T0 + 500, budget=budget), [])
+        self.assertEqual(budget.read, 0)
+
+    def test_one_huge_last_record_grows_the_tail_for_that_file_only(self):
+        self.write(use("held", "Bash", T0, command="x" * (600 * 1024)))
+        budget = W["Budget"]()
+        held = W["scan"]([SESSION], str(self.transcripts), 120, T0 + 500, budget=budget)
+        self.assertEqual([h["toolUseId"] for h in held], ["held"])
+        self.assertLess(budget.read, 4 * self.main.stat().st_size)
+
+    def test_the_pass_budget_stops_reading_with_one_line(self):
+        other = "0123abcd-aaaa-bbbb-cccc-000000000002"
+        self.write(use("t1", "Bash", T0, command="ls"))
+        self.write(use("t2", "Bash", T0, command="ls"), path=self.transcripts / "proj" / f"{other}.jsonl")
+        lines = []
+        budget = W["Budget"](self.main.stat().st_size)
+        held = W["scan"]([SESSION, other], str(self.transcripts), 120, T0 + 500, budget=budget,
+                         warn=lines.append)
+        self.assertEqual(len(held), 1)
+        self.assertEqual(len(lines), 1)
+        self.assertIn("read budget", lines[0])
+
     def test_cli_exit_codes(self):
         sessions = self.root / "s.json"
         sessions.write_text(json.dumps({"moorings": [{"session": SESSION}]}))
@@ -432,23 +468,49 @@ sys.exit(9)
             code = W["main"](args)
         return code, out.getvalue().splitlines(), err.getvalue().splitlines()
 
-    def test_one_held_call_is_said_once_to_each_addressee_across_many_passes(self):
+    def test_one_held_call_is_said_once_to_each_addressee_for_the_life_of_the_incident(self):
         self.pin()
         self.hold_open(f"{SESSION}:7")
         self.write(use("t1", "Bash", T0, command="git rebase -i main"))
-        for now in (T0 + 200, T0 + 260, T0 + 320, T0 + 900, T0 + 7000):
+        # Minutes apart, then eight days on with the call still pending: no expiry, no repeat.
+        for now in (T0 + 200, T0 + 260, T0 + 320, T0 + 900, T0 + 7000, T0 + 8 * 86400):
             self.assertEqual(self.announce(now), (0, [], []))
         said = self.said()
         self.assertEqual(sorted(n["to"] for n in said), sorted([LOCAL, SIBLING]))
         self.assertEqual({n["session"] for n in said}, {"held-tool-watch"})
         [text] = {n["text"] for n in said}
         kind, fields = W["parse_mark"](text)
-        self.assertEqual((kind, fields["session"], fields["agent"], fields["tool"], fields["since"],
-                          fields["device"], fields["incident"], fields["call"]),
-                         ("open", SESSION, "main", "Bash", W["rfc3339"](T0), DID, f"{SESSION}:7", "t1"))
-        self.assertIn("pending 3 min", text)
+        self.assertEqual((kind, fields), ("open", {"device": DID, "session": SESSION, "agent": "main",
+                                                   "tool": "Bash", "since": W["rfc3339"](T0)}))
         self.assertIn("Nothing here approves, cancels or retries it", text)
-        self.assertEqual(len(self.observes()), 5)  # the native side is told every pass; it folds them
+        self.assertEqual(len(self.observes()), 6)  # the native side is told every pass; it folds them
+
+    def test_nothing_of_the_call_itself_crosses_the_device(self):
+        self.pin()
+        self.hold_open(f"{SESSION}:7")
+        marker = "SECRETMARKER-9f3a"
+        self.write(use("toolu_MARKERID", "Bash", T0, command=f"curl https://x.io/{marker} -d {marker}"))
+        self.announce(T0 + 200)
+        self.write(use("toolu_MARKERID", "Bash", T0, command=marker), result("toolu_MARKERID", T0 + 300))
+        self.announce(T0 + 400)
+        sent = self.berth_log.read_text() + self.notes.read_text()
+        self.assertEqual(len(self.said()), 4)  # open and resumed, to two sessions
+        for leaked in (marker, "toolu_MARKERID", "curl", "x.io", "cause", f"{SESSION}:7"):
+            self.assertNotIn(leaked, sent)
+
+    def test_recipients_are_capped_for_the_life_of_an_incident_then_the_household_once(self):
+        self.pin()
+        self.hold_open(f"{SESSION}:7")
+        many = [f"0123abcd-aaaa-bbbb-cccc-0000000001{i:02d}" for i in range(12)]
+        self.status({"device": DID, "moorings": [{"session": SESSION}] + [{"session": s} for s in many[:10]],
+                     "siblings": []})
+        self.write(use("t1", "Bash", T0, command="ls"))
+        self.announce(T0 + 200)
+        self.status({"device": DID, "moorings": [{"session": s} for s in many[10:]], "siblings": []})
+        self.announce(T0 + 300)
+        self.announce(T0 + 400)
+        targets = [n["to"] for n in self.said()]
+        self.assertEqual(targets, many[:8] + [None])
 
     def test_resolution_says_resumed_once_then_nothing_more(self):
         self.pin()
@@ -499,6 +561,47 @@ sys.exit(9)
         self.assertEqual((code, out, len(err)), (1, [], 1))
         self.assertTrue(err[0].startswith("held-tool-watch: cannot read what was already said"), err[0])
         self.assertEqual(self.said(), [])
+
+    def test_the_off_switch_stops_a_running_loop_at_its_next_pass(self):
+        args = ["run", "--transcripts", str(self.transcripts), "--sessions-json", str(self.sessions),
+                "--stasis-root", str(self.stasis), "--bin-store", str(self.store), "--every", "0",
+                "--passes", "3"]
+        (self.root / W["STOP_FILE"]).touch()
+        with contextlib.redirect_stderr(io.StringIO()) as err:
+            self.assertEqual(W["main"](args), 0)
+        self.assertIn("switched off", err.getvalue())
+        self.assertFalse((self.root / W["LAST_PASS"]).exists())
+
+    def test_a_failing_pass_backs_off_and_says_so_once_per_change_of_state(self):
+        (self.root / "berth-broken").touch()
+        self.write(use("t1", "Bash", 0, command="ls"))
+        args = ["run", "--transcripts", str(self.transcripts), "--sessions-json", str(self.sessions),
+                "--stasis-root", str(self.stasis), "--bin-store", str(self.store), "--every", "0",
+                "--passes", "2"]
+        sleeps = []
+        with contextlib.redirect_stderr(io.StringIO()) as err, \
+                mock.patch.dict(W["cmd_run"].__globals__["time"].__dict__, {"sleep": sleeps.append}):
+            self.assertEqual(W["main"](args), 0)
+        lines = err.getvalue().splitlines()
+        self.assertEqual(len(lines), 1, lines)
+        self.assertIn("failing (exit 1), next pass in 1 s", lines[0])
+        self.assertEqual(sleeps, [1.0])
+
+    def test_a_timed_out_call_takes_every_process_it_started_with_it(self):
+        pidfile = self.root / "grandchild.pid"
+        with self.assertRaises(W["subprocess"].TimeoutExpired):
+            W["run_command"](["sh", "-c", f"sleep 60 & echo $! > {pidfile}; sleep 60"], timeout=0.5)
+        pid = int(pidfile.read_text())
+        import time as _time
+        for _ in range(50):
+            try:
+                state = Path(f"/proc/{pid}/stat").read_text().rsplit(")", 1)[1].split()[0]
+            except OSError:
+                state = "gone"
+            if state in ("gone", "Z", "X"):
+                break
+            _time.sleep(0.05)
+        self.assertIn(state, ("gone", "Z", "X"))
 
     def test_the_device_runner_is_one_per_device_and_announces_through_fresh_passes(self):
         import time as _time

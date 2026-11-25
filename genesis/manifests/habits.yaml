@@ -2455,10 +2455,10 @@ habits:
       - "python3 -m unittest genesis/agentic/berth_test.py (status text and status-json@1 unchanged when nothing is held; `berth said` reads only this device's own notes)"
       - "python3 -m unittest discover -s .claude/hooks/tests -p test_held_tool_ensure.py (the hook starts the device runner only when none holds its lock; its own error is one line and exit 0)"
     evidence: >
-      DELTA 2026-11-25 (wired, still red): hook `held-tool-ensure` (Claude Code and Codex, PostToolUse and SessionStart) starts `held-tool-watch run` detached when no runner holds the device lock; the runner makes an `announce` pass a minute: observe through the target's pinned epr, then, only while that epr's `stasis status --session` shows an open incident, one `berth say` line `held-tool@1 open k=<hash of session, agent, tool, pending-since>` to each live session moored here or on a sibling (the household when none), and one `held-tool@1 resumed` line once the transcript holds the call's result; "once" is read from the notes already folded in the channel store (`berth said`, new). held_tool_watch_test 31 OK, berth_test 285 OK, test_held_tool_ensure 4 OK. Not yet: no live run on two devices; the steward is reached only through a coordinating agent; the native incident closes only at the agent's next turn end; Codex transcripts are not sensed; the runner is not ark-supervised.
-    evidence-fingerprint: sha256:1206fa3a7f6ab974
-    evidence-bytes: 3034
-    evidence-entries: 4
+      DELTA 2026-11-25 (review fixes, still red): a line carries only device, session, agent, tool and pending-since; "once" holds for the incident's life (no expiry) and `berth said` rebuilds a lost or torn note stream from the source; at most eight sessions per incident, then the household once; every subprocess has its own timeout and a timed-out one is killed with its descendants; a failing runner backs off to 15 min with one line per change of state; HELD_TOOL_WATCH=off stops a running loop; the registration is silent exit 0 without python3. A scan reads only transcripts modified in 24 h, from a 256 KiB tail, within 64 MiB a pass: every session on this device 11.05 s / 827 MiB before, 0.14 s / 3.4 MiB after. held_tool_watch_test 39 OK, berth_test 286 OK, test_held_tool_ensure 6 OK.
+    evidence-fingerprint: sha256:c73fccff6c8144a0
+    evidence-bytes: 3826
+    evidence-entries: 5
     refs:
       - "watcher: genesis/agentic/bin/held-tool-watch (scan | observe | announce | run); runner kept alive by hook held-tool-ensure (.claude/settings.json, .codex/hooks.json)"
       - "backlog: genesis/data/timeline/backlog/steward-device-arrival-open-items.md rows 34, 82, 83"

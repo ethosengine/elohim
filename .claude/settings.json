@@ -93,7 +93,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/held-tool-ensure.py\"",
+            "command": "f=\"$CLAUDE_PROJECT_DIR/.claude/hooks/held-tool-ensure.py\"; command -v python3 >/dev/null 2>&1 && [ -f \"$f\" ] && python3 \"$f\" claude || exit 0",
             "timeout": 3
           }
         ]
@@ -332,7 +332,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/held-tool-ensure.py\"",
+            "command": "f=\"$CLAUDE_PROJECT_DIR/.claude/hooks/held-tool-ensure.py\"; command -v python3 >/dev/null 2>&1 && [ -f \"$f\" ] && python3 \"$f\" claude || exit 0",
             "timeout": 3
           }
         ]

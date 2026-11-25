@@ -55,7 +55,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "f=\"$(git rev-parse --show-toplevel 2>/dev/null)/.codex/hooks/held-tool-ensure.py\"; [ -f \"$f\" ] && python3 \"$f\" codex || exit 0",
+            "command": "f=\"$(git rev-parse --show-toplevel 2>/dev/null)/.codex/hooks/held-tool-ensure.py\"; command -v python3 >/dev/null 2>&1 && [ -f \"$f\" ] && python3 \"$f\" codex || exit 0",
             "timeout": 3
           }
         ]
@@ -86,7 +86,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "f=\"$(git rev-parse --show-toplevel 2>/dev/null)/.codex/hooks/held-tool-ensure.py\"; [ -f \"$f\" ] && python3 \"$f\" codex || exit 0",
+            "command": "f=\"$(git rev-parse --show-toplevel 2>/dev/null)/.codex/hooks/held-tool-ensure.py\"; command -v python3 >/dev/null 2>&1 && [ -f \"$f\" ] && python3 \"$f\" codex || exit 0",
             "timeout": 3
           }
         ]
