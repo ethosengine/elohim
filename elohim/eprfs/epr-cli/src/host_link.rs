@@ -96,7 +96,7 @@ fn probe_until(
 /// dump, the largest answer the sysroot probe asks for, is a few tens of KiB.
 const PROBE_OUTPUT_LIMIT: u64 = 4 * 1024 * 1024;
 
-enum Bounded {
+pub(crate) enum Bounded {
     Done(Output),
     Expired,
     TooLarge,
@@ -122,7 +122,7 @@ fn kill_group(child: &mut std::process::Child) {
 /// readers are never joined, only received from until the deadline. Each pipe's capture is capped
 /// at [`PROBE_OUTPUT_LIMIT`]. The child leads its own process group, and on every exit path the
 /// group is killed, so neither a stuck nor a lingering descendant outlives the probe.
-fn bounded_output(command: &mut Command, deadline: Instant) -> std::io::Result<Bounded> {
+pub(crate) fn bounded_output(command: &mut Command, deadline: Instant) -> std::io::Result<Bounded> {
     use std::os::unix::process::CommandExt;
     use std::sync::mpsc;
     let mut child = command
