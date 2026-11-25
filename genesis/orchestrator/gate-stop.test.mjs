@@ -12,7 +12,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 
 import { closeRun, formatEvent, openRun, readRun, requestStop } from './gate-live.mjs';
 import { GATE_STOPPED_EXIT, runProject } from './gate-runner.mjs';
-import { endTree, gateTree, readStat, snapshot, stopGraceMs } from './gate-stop.mjs';
+import { endTree, gateTree, readStat, snapshot, stopGraceMs, stoppedBy } from './gate-stop.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const TAP = resolve(HERE, 'gate-tap.mjs');
@@ -94,7 +94,7 @@ describe('stop --now ends the running gate', () => {
     for (const pid of pids) assert.equal(alive(pid), false, `pid ${pid} is gone`);
     assert.deepEqual(result.summary.stopped, { by: 'session-stopper', reason: 'pre-gate red', signal: 'SIGTERM' });
     assert.ok(result.code !== 0 || result.signal !== null, 'the tap does not exit 0');
-    assert.match(result.stderr, /stopped on request by session-stopper: its process group was ended \(SIGTERM\); no verdict is recorded for it/);
+    assert.match(result.stderr, /stopped on request by session-stopper: its leader died of SIGTERM and its process group was ended \(SIGTERM\); no verdict is recorded for it/);
     // The gate's own death throes are the stop, not reds: nothing was appended as a failure.
     assert.equal(readRun(run).events.filter(event => event.kind === 'failure').length, 0);
   });
@@ -309,7 +309,78 @@ describe('a verdict the gate reached on its own survives a stop', () => {
   }
 });
 
+describe('the stop is decided from the leader\'s own exit', () => {
+  test('a gate that exits 1 from its own TERM handler keeps its red', async t => {
+    const fx = evidenceFixture(t, 'gate-stop-race-trap-', { recipe: pids => [
+      '#!/usr/bin/env bash',
+      "trap 'exit 1' TERM",
+      `touch "${pids}/ready"`,
+      'sleep 300 &',
+      'wait',
+    ].join('\n') });
+    const stopper = stopperFor(fx.run, fx.pids, { immediate: true, marker: 'ready', afterMs: 200 });
+    t.after(() => stopper.kill());
+    let output = '';
+    const status = runProject(fx.project, false, false, { root: fx.root, spawn: fx.spawnFake, tap: true, env: fx.env,
+      readingCollector: [], write: line => { output += line; }, warn: line => { output += line; } });
+    assert.equal(status, 1, output);
+    assert.equal(fx.calls.puts, 1, 'the red the gate reached is recorded');
+    const events = readRun(fx.run).events;
+    assert.ok(events.some(event => event.kind === 'stop-request' && event.immediate));
+    assert.equal(events.filter(event => event.kind === 'gate-stopped').length, 0);
+    assert.equal(events.filter(event => event.kind === 'gate-verdict').at(-1).verdict.exit, 1);
+  });
+
+  test('endTree on a leader that already exited signals nothing and delivers nothing', async () => {
+    const gone = spawn('sleep', ['0.1'], { detached: true, stdio: 'ignore' });
+    await waitFor(() => readStat(gone.pid));
+    const recorded = readStat(gone.pid);
+    await new Promise(res => gone.on('exit', res));
+    const sent = [];
+    const result = await endTree(recorded, { graceMs: 100, kill: (pid, signal) => sent.push([pid, signal]) });
+    assert.deepEqual(result.delivered, []);
+    assert.deepEqual(sent, []);
+  });
+
+  test('stoppedBy reads only a signal death the stop delivered', () => {
+    assert.equal(stoppedBy({ code: null, signal: 'SIGTERM' }, ['SIGTERM']), 'SIGTERM');
+    assert.equal(stoppedBy({ code: 143, signal: null }, ['SIGTERM']), 'SIGTERM', 'just reports a TERM death as 143');
+    assert.equal(stoppedBy({ code: 137, signal: null }, ['SIGTERM', 'SIGKILL']), 'SIGKILL');
+    assert.equal(stoppedBy({ code: 1, signal: null }, ['SIGTERM']), null, 'an exit code is the gate\'s own verdict');
+    assert.equal(stoppedBy({ code: 0, signal: null }, ['SIGTERM']), null);
+    assert.equal(stoppedBy({ code: 137, signal: null }, ['SIGTERM']), null, 'a KILL the stop never sent is not the stop');
+    assert.equal(stoppedBy({ code: null, signal: 'SIGTERM' }, []), null, 'nothing delivered, nothing stopped');
+  });
+});
+
 describe('an escaped child does not hang the run', () => {
+  test('the leader ended on its own and a stray holds its output: the verdict stands and the wait is bounded', async t => {
+    const dir = scratch(t, 'gate-stop-stray-');
+    const script = resolve(dir, 'gate.sh');
+    writeFileSync(script, [
+      '#!/usr/bin/env bash',
+      `( setsid bash -c 'echo $$ > "${dir}/escaped"; exec sleep 30' & )`,
+      `while [ ! -s "${dir}/escaped" ]; do sleep 0.05; done`,
+      `touch "${dir}/leader-done"`,
+      'exit 1',
+    ].join('\n'), { mode: 0o755 });
+    t.after(() => { try { process.kill(readPid(resolve(dir, 'escaped')), 'SIGKILL'); } catch { /* gone */ } });
+    const { path: run } = openRun({ root: dir, sha: '4'.repeat(40), target: 'test' });
+    const { done } = startTap(run, script);
+    assert.ok(await waitFor(() => existsSync(resolve(dir, 'leader-done'))));
+    await delay(300);
+    const escaped = readPid(resolve(dir, 'escaped'));
+    const asked = Date.now();
+    requestStop(run, { immediate: true, by: 'session-stopper' });
+    const result = await done;
+    assert.ok(Date.now() - asked < 2000 + 1500, 'the wait for the stray is bounded');
+    assert.equal(result.code, 1, 'the leader\'s own red is the tap\'s exit');
+    assert.equal(result.summary.stopped, undefined, 'not stopped: the recipe ended on its own');
+    assert.match(result.stderr, new RegExp(`holds its output: pid ${escaped} \\(sleep 30\\)`));
+    assert.match(result.stderr, /the recipe ended on its own \(exit 1\); its verdict stands, and the push is refused/);
+    assert.equal(alive(escaped), true, 'never signalled');
+  });
+
   test('a double-forked holder of the output is named, and the tap stops waiting for it', async t => {
     const dir = scratch(t, 'gate-stop-escaped-');
     const script = resolve(dir, 'gate.sh');
@@ -331,7 +402,7 @@ describe('an escaped child does not hang the run', () => {
     const tookMs = Date.now() - asked;
     assert.ok(tookMs < 500 + 2000 + 2000 + 1500, `the tap ended in ${tookMs} ms although pid ${escaped} still holds its output`);
     assert.equal(alive(escaped), true, 'the escaped process is outside the tree and never signalled');
-    assert.match(result.stderr, new RegExp(`a process outside the gate's tree may still be running and may hold its output: pid ${escaped} \\(sleep 30\\)`));
+    assert.match(result.stderr, new RegExp(`a process outside the gate's tree may still be running and holds its output: pid ${escaped} \\(sleep 30\\)`));
     assert.equal(result.summary.stopped.signal, 'SIGTERM');
     assert.deepEqual(result.summary.stopped.escaped.map(holder => holder.pid), [escaped]);
   });
@@ -362,15 +433,26 @@ describe('Ctrl-C still reaches the detached gate', () => {
 });
 
 describe('the stop CLI', () => {
+  test('a stop for a push run that already passed says the push is proceeding, and exits 1', t => {
+    const root = scratch(t, 'gate-stop-passed-');
+    const { path: run } = openRun({ root, sha: 'e'.repeat(40), target: 'refs/heads/dev' });
+    closeRun(run, 'gates-passed');
+    const before = readFileSync(run, 'utf8');
+    const result = spawnSync(process.execPath, [LIVE, 'stop', '--now', '--run', run], { encoding: 'utf8', env: { ...process.env, EPR_BIN: '/nonexistent/epr' } });
+    assert.equal(result.status, 1);
+    assert.match(result.stdout, /this run has passed its last stop point; the push is proceeding/);
+    assert.equal(readFileSync(run, 'utf8'), before, 'nothing appended');
+  });
+
   test('a stop for a run that already ended is a no-op with a clear line', t => {
     const root = scratch(t, 'gate-stop-ended-');
     const { path: run } = openRun({ root, sha: 'f'.repeat(40), target: 'test' });
-    closeRun(run, 'passed');
+    closeRun(run, 'failed');
     const before = readFileSync(run, 'utf8');
     for (const args of [['stop', '--now', '--run', run], ['stop', '--run', run]]) {
       const result = spawnSync(process.execPath, [LIVE, ...args], { encoding: 'utf8', env: { ...process.env, EPR_BIN: '/nonexistent/epr' } });
       assert.equal(result.status, 0, result.stderr);
-      assert.match(result.stdout, /already ended \(passed\); nothing was stopped, nothing appended/);
+      assert.match(result.stdout, /already ended \(failed\); nothing was stopped, nothing appended/);
     }
     assert.equal(readFileSync(run, 'utf8'), before, 'nothing was appended to the closed run');
   });

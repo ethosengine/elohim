@@ -991,14 +991,14 @@ handover_finish() {
     echo "[pre-push] REFUSED: the hand-over record was not written (above); a hand-over is never pushed without it." >&2
     exit 1
   fi
+  stop_point
   echo "[pre-push] hand-over: seconds checks green, no project gate ran here; landing this head on dev demands every gate."
   exit 0
 }
 
 hook_pass() {
   [ -z "$PUSH_IS_HANDOVER" ] || handover_finish
-  refuse_if_stopped
-  [ -n "$BERTH_TARGETS" ] || exit 0
+  [ -n "$BERTH_TARGETS" ] || { stop_point; exit 0; }
   local line local_sha remote_ref remote_sha target rc
   PHASE_L_STARTED=1
   trap 'PHASE_L_SIGNAL=INT; exit 130' INT
@@ -1008,6 +1008,8 @@ hook_pass() {
   mkdir -p "$(dirname "$PHASE_L_LOG")" ||
     phase_l_refuse "[pre-push] REFUSED: cannot create $(dirname "$PHASE_L_LOG"). Your gates are recorded."
   read -r _ _ PHASE_L_CW <<<"$(phase_l_channel)"
+  # The run's last stop point: after it a stop no longer refuses this push.
+  stop_point
   echo "[pre-push] Phase L: claiming dev-integration (ttl ${BERTH_TTL_S}s)"
   phase_l_claim
   phase_l_owner_checks
@@ -1077,14 +1079,17 @@ LIVE_SHA="${LIVE_DEV_SHA:-$LIVE_SHA}"
 # The close handler is registered before the run opens, so a signal during `open` cannot leave
 # a run with no close; it does nothing while no run is open.
 GATE_LIVE_RUN=""
+GATE_LOOP_OUTCOME=""
 gate_live_close_on_exit() {
   [ -n "$GATE_LIVE_RUN" ] || return 0
-  local outcome=failed
+  # A gate loop that passed stays open for stops until stop_point; its close still says gates-passed
+  # when a later step refuses the push (GATE_LOOP_OUTCOME, set after the loop).
+  local outcome="${GATE_LOOP_OUTCOME:-failed}"
   case "${HOOK_EXIT_RC:-1}" in
-    0) outcome=passed ;;
+    0) outcome="${GATE_LOOP_OUTCOME:-passed}" ;;
     129 | 130 | 143) outcome=interrupted ;;
   esac
-  node genesis/orchestrator/gate-live.mjs close --run "$GATE_LIVE_RUN" --outcome "$outcome" >/dev/null 2>&1
+  node genesis/orchestrator/gate-live.mjs close --run "$GATE_LIVE_RUN" --outcome "$outcome" --deferred-from-log >/dev/null 2>&1
   # The integrator's harvest: recurring and late cheap reds across this device's recent runs.
   [ "$outcome" = interrupted ] || node genesis/orchestrator/gate-live.mjs harvest --last 10 2>/dev/null
   return 0
@@ -1125,13 +1130,24 @@ leg_red() {
 gate_stop_requested() {
   [ -n "$GATE_LIVE_RUN" ] && node genesis/orchestrator/gate-live.mjs stopped --run "$GATE_LIVE_RUN" >/dev/null 2>&1
 }
-# Every stop refuses the push, whenever it came: checked once more at the last point before the
-# hook passes (hook_pass, before the landing claims dev-integration). Verdicts already reached stand.
+# A stop refuses the push until the run's last stop point: stop_point, called immediately before
+# every pass (the hand-over's exit 0, a non-landing exit 0, and a dev landing's dev-integration
+# claim). It marks the point in the run log FIRST, then reads the stop: the log's sequence decides,
+# so a stop appended before the mark refuses here, and `gate-live.mjs stop` tells a stop appended
+# after it that the push is proceeding. The run is closed only after the check. Verdicts already
+# reached stand either way.
 refuse_if_stopped() {
   if gate_stop_requested; then
+    GATE_LOOP_OUTCOME=failed
     echo "[pre-push] REFUSED: a stop was requested on the live run (gate-live.mjs stop); nothing is landed or pushed. Verdicts already reached stand." >&2
     exit 1
   fi
+}
+stop_point() {
+  [ -z "$GATE_LIVE_RUN" ] || node genesis/orchestrator/gate-live.mjs boundary --run "$GATE_LIVE_RUN" >/dev/null 2>&1 || true
+  refuse_if_stopped
+  [ -z "$GATE_LIVE_RUN" ] || node genesis/orchestrator/gate-live.mjs close --run "$GATE_LIVE_RUN" \
+    --outcome "${GATE_LOOP_OUTCOME:-passed}" --deferred-from-log >/dev/null 2>&1 || true
 }
 # Every early pass below goes through here: a red an earlier check recorded still refuses.
 pass_or_refuse() {
@@ -2365,12 +2381,13 @@ FAILED="$FAILED$PREGATE_FAILED"
 # Trim leading space from FAILED
 FAILED=$(echo "$FAILED" | sed 's/^ //')
 
-# The run describes the gate loop; later steps (cargo-deny, landing) can still refuse the push.
-if [ -n "$GATE_LIVE_RUN" ]; then
-  node genesis/orchestrator/gate-live.mjs close --run "$GATE_LIVE_RUN" \
-    --outcome "$([ -n "$FAILED" ] && echo failed || echo gates-passed)" \
+# The run describes the gate loop; later steps (cargo-deny, landing) can still refuse the push. A
+# failed loop closes now; a passed one stays open for stops until stop_point closes it gates-passed.
+if [ -n "$FAILED" ] && [ -n "$GATE_LIVE_RUN" ]; then
+  node genesis/orchestrator/gate-live.mjs close --run "$GATE_LIVE_RUN" --outcome failed \
     --deferred-from-log >/dev/null 2>&1 || true
 fi
+[ -n "$FAILED" ] || GATE_LOOP_OUTCOME=gates-passed
 
 if [ -n "$FAILED" ]; then
   echo "============================================"

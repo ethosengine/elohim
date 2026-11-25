@@ -239,33 +239,55 @@ test("a stop requested on the live run is seen by the hook's probe", (t) => {
   assert.ok(r.stdout.includes("NO-STOP-BEFORE") && r.stdout.includes("STOP-AFTER"), r.stdout);
 });
 
-// Every stop refuses the push, whenever it came (gate-stop review, BLOCKING 2): a stop after the
-// last gate's tap closed is read once more before the hook passes and before the landing claims.
-test("a stop requested after the last gate refuses at the hook's last check", (t) => {
+// A stop refuses the push until the run's last stop point, and is told so after it (gate-stop
+// review, BLOCKING 2): stop_point marks the point in the run log first, then reads the stop.
+test("a stop before the last stop point refuses; the run stays open for it until then", (t) => {
   for (const stop of [false, true]) {
     const dir = fixture(t);
     writeFileSync(join(dir, "genesis/orchestrator/gate-preflight.mjs"), "process.stdout.write('continue\\n');\n");
     const r = spawnSync("bash", ["-c", script(`HOOK_WORK_TREE='${dir}'`, PRELUDE, OPEN_BLOCK, RED_BLOCK,
+      'GATE_LOOP_OUTCOME=gates-passed',
       stop ? 'node genesis/orchestrator/gate-live.mjs stop --run "$GATE_LIVE_RUN" --reason "late" >/dev/null' : 'true',
-      'refuse_if_stopped', 'echo PASSED-THROUGH')],
+      'stop_point', 'echo PASSED-THROUGH')],
       { cwd: dir, env: env(), encoding: "utf8", timeout: 15000 });
+    const events = eventsOf(runsOf(dir)[0]);
     if (stop) {
       assert.equal(r.status, 1, r.stdout + r.stderr);
       assert.match(r.stderr, /REFUSED: a stop was requested on the live run .*nothing is landed or pushed/);
       assert.ok(!r.stdout.includes("PASSED-THROUGH"));
+      assert.equal(events.at(-1).outcome, "failed");
     } else {
       assert.equal(r.status, 0, r.stdout + r.stderr);
       assert.ok(r.stdout.includes("PASSED-THROUGH"));
+      assert.ok(events.some((e) => e.kind === "stop-boundary"), "the stop point is marked");
+      assert.equal(events.at(-1).kind, "run-close", "closed only at the stop point");
+      assert.equal(events.at(-1).outcome, "gates-passed");
     }
   }
 });
 
-test("hook_pass reads the stop before the landing claims dev-integration", () => {
-  const body = slice("hook_pass() {\n", "\n}\n");
-  const check = body.indexOf("refuse_if_stopped");
-  assert.ok(check > 0, "hook_pass checks the stop");
-  assert.ok(check < body.indexOf("phase_l_claim"), "before the landing claim");
-  assert.ok(check < body.indexOf('[ -n "$BERTH_TARGETS" ] || exit 0'), "before the non-landing pass");
+test("a stop after the last stop point is told the push is proceeding, and exits non-zero", (t) => {
+  const dir = fixture(t);
+  writeFileSync(join(dir, "genesis/orchestrator/gate-preflight.mjs"), "process.stdout.write('continue\\n');\n");
+  const r = spawnSync("bash", ["-c", script(`HOOK_WORK_TREE='${dir}'`, PRELUDE, OPEN_BLOCK, RED_BLOCK,
+    'GATE_LOOP_OUTCOME=gates-passed', 'stop_point', 'echo PASSED-THROUGH',
+    'node genesis/orchestrator/gate-live.mjs stop --now --run "$GATE_LIVE_RUN"; echo "STOP-EXIT=$?"')],
+    { cwd: dir, env: env(), encoding: "utf8", timeout: 15000 });
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.ok(r.stdout.includes("PASSED-THROUGH"));
+  assert.match(r.stdout, /this run has passed its last stop point; the push is proceeding/);
+  assert.match(r.stdout, /STOP-EXIT=1/);
+  assert.equal(eventsOf(runsOf(dir)[0]).filter((e) => e.kind === "stop-request").length, 0, "nothing appended");
+});
+
+test("the stop point is the last act before each pass: hand-over, non-landing and dev landing", () => {
+  const handover = slice("handover_finish() {\n", "\n}\n");
+  assert.match(handover, /stop_point\n  echo "\[pre-push\] hand-over: seconds checks green[^\n]*\n  exit 0\n?$/, "hand-over: stop_point, then exit 0");
+  const pass = slice("hook_pass() {\n", "\n}\n");
+  assert.ok(pass.includes('[ -n "$BERTH_TARGETS" ] || { stop_point; exit 0; }'), "non-landing pass");
+  const point = pass.indexOf("  stop_point\n");
+  assert.ok(point > 0 && point < pass.indexOf("phase_l_claim"), "dev landing: before the dev-integration claim");
+  assert.ok(!/close --run "\$GATE_LIVE_RUN" \\\n    --outcome "\$\(\[ -n "\$FAILED" \]/.test(HOOK), "a passed gate loop no longer closes the run early");
 });
 
 test("a stop after every gate started, a carried one included, leaves the run failed", (t) => {
@@ -424,6 +446,6 @@ test("the hook is one brace group that exits inside it, so an edit during a push
   // path, so the group still exits inside itself.
   assert.deepEqual(body.slice(-2), ["hook_pass", "}"], "the group ends with the landing inside it");
   const pass = HOOK.slice(HOOK.indexOf("\nhook_pass() {"), HOOK.indexOf("\n}\n", HOOK.indexOf("\nhook_pass() {")));
-  assert.match(pass, /\[ -n "\$BERTH_TARGETS" \] \|\| exit 0/, "a push with no dev/main ref exits at once");
+  assert.match(pass, /\[ -n "\$BERTH_TARGETS" \] \|\| \{ stop_point; exit 0; \}/, "a push with no dev/main ref exits at once, after its last stop point");
   assert.match(pass, /\n  exit 0$/, "hook_pass ends in exit");
 });

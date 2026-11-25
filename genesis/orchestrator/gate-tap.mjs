@@ -19,14 +19,13 @@
 // for the gate. A signal the tap itself receives is forwarded to the group, not only the leader.
 
 import { spawn } from 'child_process';
-import { randomBytes } from 'crypto';
 import { existsSync, readFileSync, readdirSync, statSync, writeSync } from 'fs';
 import { dirname, isAbsolute, join, resolve } from 'path';
 import { createRecognizer } from './gate-failure-lines.mjs';
 import { GATE_ATTRIBUTION_WINDOW_MS, attribute, readEdits } from './gate-attribution.mjs';
 import { setTimeout as delay } from 'timers/promises';
 import { appendEvent, emitRedDetached, liveRoot, noteUnsentReds, outlook, stopNowRequest } from './gate-live.mjs';
-import { endTree, gateTree, markedProcesses, readStat, signalTree, snapshot, stopGraceMs } from './gate-stop.mjs';
+import { endTree, gateTree, outputTargets, processesHolding, readStat, signalTree, snapshot, stopGraceMs, stoppedBy } from './gate-stop.mjs';
 
 // After the gate's tree is ended, how long the tap still waits for its output pipes to close.
 const ESCAPED_WAIT_MS = 2000;
@@ -225,15 +224,15 @@ function main() {
   // Its own session and group (detached), so the gate's whole tree can be signalled as one and no
   // signal meant for it reaches the tap, gate-runner or the hook. The leader is read now, while
   // this process holds it unreaped: that pid and start time are the first link of gate-stop's custody.
-  // One marker per tap in the gate's environment, so a process that escapes the gate's tree can
-  // still be named when it holds the gate's output (gate-stop.mjs markedProcesses).
-  const marker = `GATE_TAP_${randomBytes(6).toString('hex')}`;
   const child = spawn(command, args, {
     stdio: ['inherit', 'pipe', 'pipe'],
-    env: { ...tapChildEnv(process.env, Boolean(process.stdout.isTTY)), [marker]: '1' },
+    env: tapChildEnv(process.env, Boolean(process.stdout.isTTY)),
     detached: true,
   });
   const leader = Number.isInteger(child.pid) ? readStat(child.pid) : null;
+  // What the gate's side of its output points at, so a process that keeps the output open after the
+  // leader ended can be named (gate-stop.mjs processesHolding); nothing is added to its environment.
+  const targets = Number.isInteger(child.pid) ? outputTargets(child.pid) : [];
   const leaderHeld = () => child.exitCode === null && child.signalCode === null;
   const signalGate = signal => {
     if (!Number.isInteger(child.pid)) return;
@@ -259,12 +258,32 @@ function main() {
   for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.on(signal, forward(signal));
 
   // The stop-now probe: the run log is re-read only when it grew, so an idle check is one stat.
-  // A stop applies only to a gate whose leader is still running when the TERM is sent (endTree
-  // checks it in the same synchronous step): a recipe that already ended on its own keeps the
-  // verdict it reached, red or green, and the stop then only refuses the push (the hook's check).
+  // A stop-now request ends the gate's tree while its leader runs (gate-stop.mjs endTree). Whether
+  // the gate WAS stopped is decided only at close, from the leader's own exit (stoppedBy): death
+  // by a signal the stop delivered. A leader that exited with a code, before or at the instant of
+  // the signal, ran to its own verdict, and that red or green is recorded as without a stop; the
+  // stop then only refuses the push. Either way, once a stop is asked the tap waits for the gate's
+  // output to close for a bounded time only, then stops waiting and names what still holds it.
   let probedSize = -1;
   let closed = false;
   let escapeTimer = null;
+  const nothing = { custody: false, delivered: [], signal: null, survivors: [] };
+  const stopWaitingOnOutput = (survivors = []) => {
+    if (closed || escapeTimer) return;
+    escapeTimer = setTimeout(() => {
+      if (closed) return;
+      const holders = processesHolding(targets);
+      stray = holders;
+      process.stderr.write(`[gate-tap] ${project}: a process outside the gate's tree may still be running`
+        + (holders.length ? ` and holds its output: ${holders.map(h => `pid ${h.pid}${h.cmd ? ` (${h.cmd})` : ''}`).join(', ')}`
+          : ' (none found holding its output)')
+        + `${survivors.length ? `; still alive in its tree after KILL: ${survivors.join(' ')}` : ''}`
+        + '; the tap stops waiting for it\n');
+      child.stdout.destroy();
+      child.stderr.destroy();
+    }, ESCAPED_WAIT_MS);
+  };
+  let stray = null;
   const probeStop = () => {
     if (!run || stopping) return;
     let size;
@@ -273,40 +292,16 @@ function main() {
     probedSize = size;
     const request = stopNowRequest(run);
     if (!request) return;
-    if (!leaderHeld()) return; // ended on its own: its verdict stands
-    const graceMs = stopGraceMs(process.env);
     stopping = { by: request.by ?? null, reason: request.reason ?? null };
-    stopping.ended = endTree(leader, { graceMs })
-      .catch(() => ({ applied: false, custody: false, signal: null, survivors: [] }))
-      .then(result => {
-        if (!result.applied) {
-          // The leader ended on its own just before the TERM: nothing was signalled.
-          const keep = held;
-          stopping = null;
-          held = [];
-          for (const event of keep) deliver(event);
-          return result;
-        }
-        process.stderr.write(`[gate-tap] ${project}: stopped on request${request.by ? ` by ${request.by}` : ''}: `
-          + `its process group was ended (${result.signal}); no verdict is recorded for it\n`);
-        // A process that left the tree (a double fork, a daemon) can hold the gate's output pipes
-        // open for ever: after a bounded wait the tap stops waiting on them and names what holds them.
-        if (!closed) {
-          escapeTimer = setTimeout(() => {
-            if (closed) return;
-            const holders = markedProcesses(`${marker}=1`);
-            result.escaped = holders;
-            process.stderr.write(`[gate-tap] ${project}: a process outside the gate's tree may still be running`
-              + (holders.length ? ` and may hold its output: ${holders.map(h => `pid ${h.pid}${h.cmd ? ` (${h.cmd})` : ''}`).join(', ')}`
-                : ' (none found carrying the gate\'s environment)')
-              + `${result.survivors.length ? `; still alive in its tree after KILL: ${result.survivors.join(' ')}` : ''}`
-              + '; the tap stops waiting for it\n');
-            child.stdout.destroy();
-            child.stderr.destroy();
-          }, ESCAPED_WAIT_MS);
-        }
-        return result;
-      });
+    if (!leaderHeld()) {
+      // The recipe already ended on its own; only its output can still be open.
+      stopping.ended = Promise.resolve(nothing);
+      stopWaitingOnOutput();
+      return;
+    }
+    stopping.ended = endTree(leader, { graceMs: stopGraceMs(process.env) })
+      .catch(() => nothing)
+      .then(result => { stopWaitingOnOutput(result.survivors); return result; });
   };
   const stopProbe = run ? setInterval(probeStop, 250) : null;
   probeStop();
@@ -320,22 +315,33 @@ function main() {
     clearInterval(sampling);
     if (stopProbe) clearInterval(stopProbe);
     const cost = sampler.sample();
-    out.end();
-    err.end();
-    // The child's status decides whether an unrecognized red step stands in as a failure (E6 #2).
-    // A stopped gate has no such step: its end is the stop (the emit above drops it).
-    recognizer.end(signal ? 1 : code);
     let stopped;
     if (stopping) {
       const asked = stopping;
       const ended = await asked.ended;
       if (escapeTimer) clearTimeout(escapeTimer);
-      if (ended.applied) {
+      const by = stoppedBy({ code, signal }, ended.delivered);
+      if (by) {
         stopped = { by: asked.by, ...(asked.reason ? { reason: asked.reason } : {}), signal: ended.signal,
           ...(ended.survivors.length ? { survivors: ended.survivors } : {}),
-          ...(ended.escaped ? { escaped: ended.escaped } : {}) };
+          ...(stray ? { escaped: stray } : {}) };
+        process.stderr.write(`[gate-tap] ${project}: stopped on request${asked.by ? ` by ${asked.by}` : ''}: `
+          + `its leader died of ${by} and its process group was ended (${ended.signal}); no verdict is recorded for it\n`);
+      } else {
+        // It ran to its own verdict: the lines held while the stop was pending are its own.
+        stopping = null;
+        const keep = held;
+        held = [];
+        for (const event of keep) deliver(event);
+        if (asked) process.stderr.write(`[gate-tap] ${project}: a stop was requested, but the recipe ended on its own `
+          + `(${signal ?? `exit ${code}`}); its verdict stands, and the push is refused\n`);
       }
     }
+    out.end();
+    err.end();
+    // The child's status decides whether an unrecognized red step stands in as a failure (E6 #2).
+    // A stopped gate has no such step: its end is the stop (the emit above holds it, then drops it).
+    recognizer.end(signal ? 1 : code);
     try {
       writeSync(3, `${JSON.stringify({ signals: recognizer.signals(), ...recognizer.summary(), ...cost, ...(stopped ? { stopped } : {}) })}\n`);
     } catch { /* no fd 3: run by hand */ }

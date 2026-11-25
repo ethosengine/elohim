@@ -433,6 +433,8 @@ export function formatEvent(raw) {
         return `[gate-live] stop requested now${event.by ? ` by ${event.by}` : ''}${event.reason ? ` (${event.reason})` : ''} — a gate still running is ended and records no verdict; gates not yet started will not run, and the push is refused`;
       }
       return `[gate-live] stop requested${event.reason ? ` (${event.reason})` : ''} — gates not yet started will not run, and the push is refused`;
+    case 'stop-boundary':
+      return '[gate-live] the push passed its last stop point; a stop from here on cannot refuse it';
     case 'gate-stopped':
       return `[gate-live] ${event.project} STOPPED on request by ${event.by ?? 'a caller with no session'}: its process group was ended (${event.signal ?? 'nothing left to signal'}); no verdict recorded${Array.isArray(event.escaped) ? `; a process outside its tree may still run${event.escaped.length ? ` (pid ${event.escaped.map((h) => h.pid).join(', ')})` : ''}` : ''}`;
     case 'run-close': {
@@ -1430,12 +1432,15 @@ const USAGE = `Usage:
   node gate-live.mjs unseen --session S [--reader R]
   node gate-live.mjs red --run PATH --project P --message M     (a pre-gate leg's red, live at once)
   node gate-live.mjs stop [--run PATH | --session S | --latest] [--reason R] [--now]
-        Every stop refuses the push: no gate after it starts, and the hook refuses before landing.
+        A stop refuses the push until the run's last stop point (the hook's stop_point, just before
+        a hand-over or non-landing push passes and before a dev landing claims dev-integration);
+        after it the push proceeds, and stop says so and exits 1.
         --now also ends a gate whose recipe is still running (TERM, KILL after GATE_STOP_GRACE_MS);
         that gate records no verdict, though what it already wrote or put is not undone. A gate
         whose recipe already ended on its own keeps its verdict, red or green: the stop refuses
         the push, it never unmakes a verdict.
   node gate-live.mjs stopped --run PATH [--gate P]              (exit 0 when a stop was requested; with --gate, when P was stopped)
+  node gate-live.mjs boundary --run PATH                        (internal: the hook's last stop point)
   node gate-live.mjs outlook --run PATH --remaining "a b c"     (once per run: what continuing costs)
   node gate-live.mjs harvest [--last N]
   node gate-live.mjs subscribe --session S --device DID|any [--ref GLOB] [--every | --nth N] [--until RFC3339]
@@ -1456,6 +1461,7 @@ function parseArguments(argv) {
     red: ['run', 'project', 'message'],
     stop: ['run', 'session', 'latest', 'reason', 'now'],
     stopped: ['run', 'gate'],
+    boundary: ['run'],
     harvest: ['last'],
     outlook: ['run', 'remaining'],
     subscribe: ['session', 'device', 'ref', 'every', 'nth', 'until'],
@@ -1490,6 +1496,7 @@ function parseArguments(argv) {
     red: ['run', 'project', 'message'],
     stop: [],
     stopped: ['run'],
+    boundary: ['run'],
     harvest: [],
     outlook: ['run'],
     subscribe: ['session', 'device'],
@@ -1651,7 +1658,13 @@ async function main(argv) {
         }
         const path = options.run ? resolve(root, options.run) : findRun({ root, session, latest });
         if (!path || !isFile(path)) throw new Error('no running gate run to stop');
-        const state = readRun(path).outcome;
+        const { events: before, outcome: state } = readRun(path);
+        const pushRun = before.find((event) => event.kind === 'run-open')?.candidate?.target !== 'just gate';
+        // Past its last stop point a push proceeds, and no stop can refuse it any more: said, and non-zero.
+        if (pushRun && (before.some((event) => event.kind === 'stop-boundary') || state === 'passed' || state === 'gates-passed')) {
+          process.stdout.write(`[gate-live] stop: this run has passed its last stop point; the push is proceeding (${path})\n`);
+          return 1;
+        }
         if (state !== 'running') {
           // Nothing is left to stop, so nothing is appended: a closed run's log keeps its last line.
           process.stdout.write(`[gate-live] stop: ${path} already ended (${state}); nothing was stopped, nothing appended\n`);
@@ -1661,6 +1674,12 @@ async function main(argv) {
         const by = resolveSession();
         const requested = requestStop(path, { reason: options.reason, by, immediate: options.now === true });
         if (requested === null) throw new Error(`could not request a stop on ${path}`);
+        // The log's order decides against the hook's stop point: a mark before this request means the
+        // hook read the stop before it existed, and the push goes on.
+        if (parseEvents(readFileSync(path, 'utf8')).some((event) => event.kind === 'stop-boundary' && event.seq < requested.seq)) {
+          process.stdout.write(`[gate-live] stop: this run has passed its last stop point; the push is proceeding (${path})\n`);
+          return 1;
+        }
         process.stdout.write(`stop requested: ${path}\n`);
         if (options.now !== true) return 0;
         const { stopGraceMs } = await import('./gate-stop.mjs');
@@ -1688,6 +1707,12 @@ async function main(argv) {
       case 'outlook':
         if (await outlook(resolve(root, options.run), String(options.remaining ?? '').split(/\s+/).filter(Boolean), { root }) === null) {
           throw new Error(`could not append an outlook to ${options.run}`);
+        }
+        return 0;
+      case 'boundary':
+        // The hook's last stop point (pre-push.bash stop_point), marked before it reads the stop.
+        if (appendEvent(resolve(root, options.run), { kind: 'stop-boundary' }) === null) {
+          throw new Error(`could not mark the stop point on ${options.run}`);
         }
         return 0;
       case 'stopped':
