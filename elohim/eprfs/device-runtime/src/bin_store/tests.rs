@@ -3300,6 +3300,38 @@ fn revert_refuses_a_statementless_release_never_landed_on_this_device() {
 }
 
 #[test]
+fn a_landing_that_failed_before_the_head_was_written_does_not_make_a_revert_eligible() {
+    let mut f = Fixture::new("epr");
+    let orphan = f.release("ring-set-head-never-written");
+    // A landing sets the ring and saves the record before current.json is written; a failure in
+    // between leaves exactly this record: ring `landed`, no head publication.
+    let mut record = f.store.record(&orphan.cid).unwrap();
+    record.ring = "landed".into();
+    f.store.save(&record).unwrap();
+    f.state.lock().unwrap().head = "b".repeat(40);
+    let current = release_opening(&f, "blob-current", "blob-store-v1");
+    f.store = f
+        .store
+        .clone()
+        .with_payload_store_format(Some("blob-store-v1"));
+    f.land(&current).unwrap();
+    f.state.lock().unwrap().head = orphan.provenance.source_commit.clone();
+
+    let refusal = f
+        .store
+        .land(
+            &orphan.cid,
+            &orphan.provenance.source_commit,
+            f.tmp.path(),
+            Transition::Revert,
+        )
+        .unwrap_err();
+
+    assert_eq!(refusal.kind, "payload-format-incompatible");
+    assert_eq!(f.store.head("current"), Some(current.cid));
+}
+
+#[test]
 fn declared_follow_and_arrival_keep_the_installed_head_for_a_held_incompatible_candidate() {
     use ark_core::declaration::{Follow, FollowMode};
     let mut f = Fixture::new("epr");

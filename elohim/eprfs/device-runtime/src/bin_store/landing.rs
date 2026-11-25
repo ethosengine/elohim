@@ -135,7 +135,25 @@ impl Transition {
     }
 }
 
+/// Written on a release record only after its landing published the head (current.json).
+const HEAD_PUBLISHED_FIELD: &str = "headPublishedAt";
+
 impl Store {
+    /// Whether this release was ever this device's PUBLISHED head: current.json (committed by one
+    /// atomic rename) names it as current or as the head it replaced, or the release carries the
+    /// `headPublishedAt` mark written only after that rename succeeded. The ring is not evidence:
+    /// a landing sets it and saves the record before current.json is written, and a refused or
+    /// failed landing keeps it, so a release whose landing never completed would read as landed.
+    fn head_was_published(&self, release: &Release) -> bool {
+        if release.extra.contains_key(HEAD_PUBLISHED_FIELD) {
+            return true;
+        }
+        let current: Value =
+            files::read_json(&self.root.join("current.json")).unwrap_or(Value::Null);
+        let named = |slot: &str| current[slot].as_str() == Some(release.cid.as_str());
+        named("cid") || named("previous")
+    }
+
     fn require_payload_store_compatible(
         &self,
         release: &mut Release,
@@ -162,10 +180,7 @@ impl Store {
         };
         if statement.is_none()
             && matches!(transition, Transition::Revert)
-            && matches!(
-                release.ring.as_str(),
-                "landed" | "reverted" | "lineage-rebased"
-            )
+            && self.head_was_published(release)
         {
             Self::add_note(
                 release,
@@ -428,6 +443,10 @@ impl Store {
                 &self.root.join("current.json"),
                 &json!({"cid":cid,"commit":commit,"subject":subject.trim(),"landedAt":at,"previous":previous}),
             )?;
+            // Only now, after the one rename that commits the head, is this release evidence that it
+            // ran here (head_was_published).
+            latest.extra.insert(HEAD_PUBLISHED_FIELD.into(), json!(at));
+            self.save(&latest)?;
             self.repair_heads_locked()?;
             Ok(latest)
         })();
