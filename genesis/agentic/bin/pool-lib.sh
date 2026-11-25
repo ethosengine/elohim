@@ -1322,6 +1322,56 @@ slot_gate_lock_release() {
   exec {fd}>&-
 }
 
+# Delete a whole family without ever unlinking its stable sibling lock inodes. Every slot lock is
+# acquired first and held through every rm; one busy slot makes the family eviction a no-op.
+delete_family_with_gate_locks() {
+  local fam="${1:-}" fd slot gate_fd gate_fds="" slots="" status=0
+  [ -n "$fam" ] || return 1
+  fd="$POOL_ROOT/family/$fam"
+  [ -d "$fd" ] || return 0
+  while IFS= read -r slot; do
+    [ -n "$slot" ] || continue
+    slots="${slots}${slot}
+"
+    if ! slot_gate_lock_acquire "$slot" gate_fd; then
+      while IFS= read -r gate_fd; do slot_gate_lock_release "$gate_fd"; done <<< "$gate_fds"
+      return 75
+    fi
+    gate_fds="${gate_fds}${gate_fd}
+"
+  done < <(list_slots_for_family "$fam")
+  while IFS= read -r slot; do
+    [ -n "$slot" ] || continue
+    if slot_in_use "$slot" || slot_target_busy "$slot"; then
+      while IFS= read -r gate_fd; do slot_gate_lock_release "$gate_fd"; done <<< "$gate_fds"
+      return 75
+    fi
+  done <<< "$slots"
+  while IFS= read -r slot; do
+    if [ -n "$slot" ]; then rm -rf -- "$slot" || status=$?; fi
+  done <<< "$slots"
+  # Lock files remain beside the removed slots. Empty directories without locks may go; directories
+  # containing a lock inode deliberately remain as the stable namespace for future acquisitions.
+  find "$fd" -depth -mindepth 1 -type d -empty -delete 2>/dev/null || true
+  while IFS= read -r gate_fd; do slot_gate_lock_release "$gate_fd"; done <<< "$gate_fds"
+  return "$status"
+}
+
+# Return 75 when a gate or late process owns the slot, 0 only after rm completed under the lock.
+delete_slot_with_gate_lock() {
+  local slot="${1:-}" gate_fd
+  [ -n "$slot" ] || return 1
+  slot_gate_lock_acquire "$slot" gate_fd || return 75
+  if slot_in_use "$slot" || slot_target_busy "$slot"; then
+    slot_gate_lock_release "$gate_fd"
+    return 75
+  fi
+  local status=0
+  rm -rf -- "$slot" || status=$?
+  slot_gate_lock_release "$gate_fd"
+  return "$status"
+}
+
 # Cargo releases its build lock before test binaries and doctests finish. Their inherited
 # CARGO_TARGET_DIR is the exact slot-level proof that orphan reclamation must still preserve it.
 slot_target_busy() {
@@ -1354,7 +1404,7 @@ family_busy() {
   local slot
   while IFS= read -r slot; do
     [ -n "$slot" ] || continue
-    if slot_locked "$slot"; then return 0; fi
+    if slot_locked "$slot" || slot_gate_locked "$slot"; then return 0; fi
   done < <(list_slots_for_family "$fam")
   local pid_dir cwd
   for pid_dir in /proc/[0-9]*; do
@@ -1676,7 +1726,11 @@ enforce_pool() {
           fb="$(dir_disk_bytes "$fd")"
           say "4 $fam: evict-on-merge — all $fam/* branches merged ($(human_bytes "$fb"))"
           if [ "$apply" = 1 ]; then
-            rm -rf "$fd" && { freed=$((freed + fb)); enforce_log evict-on-merge "$fam" "$fb"; }
+            if delete_family_with_gate_locks "$fam"; then
+              freed=$((freed + fb)); enforce_log evict-on-merge "$fam" "$fb"
+            else
+              say "4 $fam: skipped (slot gate lock became busy)"
+            fi
           fi
         fi
         ;;
@@ -1687,7 +1741,11 @@ enforce_pool() {
           fb="$(dir_disk_bytes "$fd")"
           say "4 $fam: ttl — idle >${ttl}d ($(human_bytes "$fb"))"
           if [ "$apply" = 1 ]; then
-            rm -rf "$fd" && { freed=$((freed + fb)); enforce_log ttl-evict "$fam" "$fb"; }
+            if delete_family_with_gate_locks "$fam"; then
+              freed=$((freed + fb)); enforce_log ttl-evict "$fam" "$fb"
+            else
+              say "4 $fam: skipped (slot gate lock became busy)"
+            fi
           fi
         fi
         ;;
@@ -1740,13 +1798,18 @@ enforce_pool() {
 $victim"
     # TOCTOU recheck (review D3): a cargo may have taken the slot between
     # pick and now (the du above can take seconds on a big slot).
-    if slot_locked "$victim"; then
+    if slot_locked "$victim" || slot_gate_locked "$victim"; then
       say "5 lru-evict: $victim — became locked, skipping"
       continue
     fi
     say "5 lru-evict: $victim ($(human_bytes "$vb"))"
     if [ "$apply" = 1 ]; then
-      rm -rf "$victim" && { freed=$((freed + vb)); pool_b=$((pool_b - vb)); enforce_log lru-evict "$victim" "$vb"; }
+      if delete_slot_with_gate_lock "$victim"; then
+        freed=$((freed + vb)); pool_b=$((pool_b - vb)); enforce_log lru-evict "$victim" "$vb"
+      else
+        say "5 lru-evict: $victim — gate lock or process became busy, skipping"
+        continue
+      fi
     else
       pool_b=$((pool_b - vb)); sim_freed=$((sim_freed + vb))
     fi
@@ -1812,11 +1875,16 @@ trim_family_to_gb() {
     [ -L "$slot" ] && continue
     if printf '%s' "$keep" | grep -qxF -- "$slot"; then continue; fi
     if slot_pinned "$slot"; then continue; fi
-    if slot_in_use "$slot"; then say "4 $fam: keep $slot (in use)"; continue; fi
+    if slot_in_use "$slot" || slot_gate_locked "$slot"; then say "4 $fam: keep $slot (in use)"; continue; fi
     sb="$(dir_disk_bytes "$slot")"
     say "4 $fam: trim $slot ($(human_bytes "$sb"), last built $(date -u -d @"$(slot_age_epoch "$slot")" +%F))"
     if [ "$apply" = 1 ]; then
-      rm -rf "$slot" && { size=$((size - sb)); ENFORCE_TRIM_FREED_B=$((ENFORCE_TRIM_FREED_B + sb)); enforce_log keep-warm-trim "$slot" "$sb"; }
+      if delete_slot_with_gate_lock "$slot"; then
+        size=$((size - sb)); ENFORCE_TRIM_FREED_B=$((ENFORCE_TRIM_FREED_B + sb)); enforce_log keep-warm-trim "$slot" "$sb"
+      else
+        say "4 $fam: keep $slot (gate lock or process became busy)"
+        continue
+      fi
     else
       size=$((size - sb))
     fi
@@ -1850,7 +1918,7 @@ pick_lru_slot() {
       [ -n "$slot" ] || continue
       case "$skip" in *"$slot"*) continue ;; esac
       [ -L "$slot" ] && continue
-      if slot_pinned "$slot" || slot_in_use "$slot"; then continue; fi
+      if slot_pinned "$slot" || slot_in_use "$slot" || slot_gate_locked "$slot"; then continue; fi
       t="$(slot_age_epoch "$slot")"
       case "$slot" in */release|*/release-wt-*) t=$((t - 2592000)) ;; esac
       if [ "${t:-0}" -lt "$best_t" ]; then best_t="$t"; best="$slot"; fi
