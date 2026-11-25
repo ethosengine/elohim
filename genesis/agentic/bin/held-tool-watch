@@ -30,27 +30,30 @@ already writes and hands what it senses to the native fold.
       as `observe`.
   held-tool-watch run [same flags] [--bin-store DIR] [--every 60] [--passes N]
       The device runner: one per device (a lock beside the stasis root), an `announce` pass in a fresh
-      process every --every seconds, and a `carry` pass on its own cadence (default 60 s), never two
-      passes at once. The last pass outputs are `held-tool-watch.last-pass.txt` and
+      process every --every seconds, and, only after a recorded device opt-in, a `carry` child on its
+      own cadence (default 60 s). The child never delays announce sensing. The last pass outputs are
+      `held-tool-watch.last-pass.txt` and
       `held-tool-watch.last-carry.txt` there.
       A failing pass doubles the wait to 15 min; one stderr line per change of state. Each pass runs
       in its own process group, and the group is killed when the pass ends or times out (no pid is
       enumerated; a descendant that calls setsid itself escapes). It exits when the device's off switch is set
       (`held-tool-watch.off` there, or HELD_TOOL_WATCH=off) or its script is gone.
+  held-tool-watch carry on [--until <duration|ISO-8601-UTC>]|off|status
+      Create/remove/read the untracked device-local opt-in beside the runner lock, and append the
+      actor, act time and until-time to `held-tool-watch.log`. Durations use h/d/w (default 7d).
+      The default is OFF; the legacy carry.off file and HELD_TOOL_CARRY=off always win. An expired
+      opt-in is OFF and says so once. A status read starts no subprocess and reads no misses.
   held-tool-watch carry [--bin-store DIR] [--stasis-root DIR] [--repo-root DIR]
-      One unattended carry pass, with these tested rules: (1) use the DEVICE HEAD epr and consider
-      only another admitted device's still-open miss whose waitUntil is future; (2) claim only after
-      its gitRef is fetchable and its exact commit recomputes the announced gate closure in a clean
-      detached worktree; (3) take one miss only with a free cargo seat and no LOCAL dev-integration
-      holder, never claiming a lease; (4) bound the claim to p90*3, floored at 10 min and capped by
-      waitUntil (and the native two-hour ceiling), then let it lapse on every failure; (5) run
-      `just gate P` with EPR_BIN=device-head and GATE_EVIDENCE absent, leaving the gate as the only
-      verdict writer; (6) never land or push, never edit the main checkout, and remove only detached
-      `/projects/elohim/.worktrees/carry-*` worktrees (including stale ones); (7) obey the runner stop
-      and `held-tool-watch.carry.off`/HELD_TOOL_CARRY=off, killing a running carry group at the next
-      runner check; (8) bound every pass to p90*3+10 min, capped at 90 min (or the configured bound),
-      with the whole process group killed; (9) rely on the next hook to restart a dead runner and
-      leave its last carry state beside the announce state (berth status does not project it today).
+      One opted-in unattended pass. The only authority to execute a candidate is an admitted
+      device's signed miss naming its exact SHA. Fetch that SHA, make a detached worktree, and use
+      THIS runner checkout's orchestrator modules to recompute the candidate tree's closure as data;
+      candidate code first executes when its vouched-for gate recipe starts. Hold a berth cargo seat
+      for that gate's life, and yield through `gate-live stop --now` if local dev integration begins,
+      the switch turns off, the parent runner exits, or the deadline arrives. Release the carry claim
+      on every stop or failure, remove its worktree and exact `-wt-<worktree>` cargo slot, and release
+      the seat. The carry lock proves the cleanup sweep has no live carry and bounds retained assets
+      to at most one carry worktree plus one gate target slot. The wrapper never pushes, lands, or
+      writes a gate verdict; on success the candidate gate's device-head verdict is the only verdict.
 
 The flow store. A pass in which nothing is new spawns no `epr` that reads `.eprfs/status/flows.jsonl`:
 moorings and siblings come from `berth status --json --no-peer`, `berth said` reads berth's unlocked
@@ -142,6 +145,7 @@ EVIDENCE_TAIL_BYTES = 1024 * 1024  # of each dialogue-stasis journal segment, re
 DEFAULT_RECENT_S = 24 * 3600  # a transcript untouched longer than this is not read
 DEFAULT_PASS_BYTES = 64 * 1024 * 1024  # the most one pass reads, all files together
 DEFAULT_CARRY_EVERY_S = 60
+DEFAULT_CARRY_OPT_IN_S = 7 * 24 * 60 * 60
 MAX_CARRY_PASS_S = 90 * 60
 MAX_CARRY_VALID_S = 2 * 60 * 60  # epr flow intend --carry's native ceiling
 HERE = os.path.dirname(os.path.realpath(__file__))
@@ -512,6 +516,28 @@ def run_pass(argv, timeout, cancelled=None):
                 err.read().decode("utf-8", "replace"))
 
 
+def start_async_pass(argv):
+    """Start the carry as its own child/session while the announce scheduler keeps running."""
+    out, err = tempfile.TemporaryFile(), tempfile.TemporaryFile()
+    proc = subprocess.Popen(argv, stdin=subprocess.DEVNULL, stdout=out, stderr=err,
+                            start_new_session=True)
+    return {"proc": proc, "out": out, "err": err}
+
+
+def poll_async_pass(job):
+    """None while running, else `(code, stdout, stderr)` and close its scratch files."""
+    code = job["proc"].poll()
+    if code is None:
+        return None
+    job["out"].seek(0)
+    job["err"].seek(0)
+    answer = (code, job["out"].read().decode("utf-8", "replace"),
+              job["err"].read().decode("utf-8", "replace"))
+    job["out"].close()
+    job["err"].close()
+    return answer
+
+
 def pin_name(session):
     """device-runtime `Store::pin_path`'s file name for a session key, or None when it would hash."""
     name = "".join(chr(b) if (chr(b).isascii() and chr(b).isalnum()) or chr(b) in "_.-" else f"%{b:02x}"
@@ -609,25 +635,32 @@ def observe_pass(held, journal_root, bin_store, runner=run_command, say=print, w
 # ---------------------------------------------------------------- unattended gate carry
 
 CARRY_STOP_FILE = "held-tool-watch.carry.off"
+CARRY_ON_FILE = "held-tool-watch.carry.on"
+CARRY_EXPIRY_SAID_FILE = "held-tool-watch.carry.expired.said"
+CARRY_LOCK = "held-tool-watch.carry.lock"
 LAST_CARRY = "held-tool-watch.last-carry.txt"
+DECLINE_LEDGER = "held-tool-watch.carry-declines.jsonl"
+WATCH_LOG = "held-tool-watch.log"
 _PROJECT = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$")
 _OID = re.compile(r"^[0-9a-f]{40,64}$")
 _CLOSURE = re.compile(r"^[0-9a-f]{64}$")
 
 _CLOSURE_PROGRAM = r"""
 import { pathToFileURL } from 'url';
-const root = process.cwd();
-const load = async p => import(pathToFileURL(`${root}/${p}`).href);
+const trusted = process.env.HELD_TOOL_CARRY_TRUSTED_ROOT;
+const candidate = process.env.HELD_TOOL_CARRY_CANDIDATE_ROOT;
+const commit = process.env.HELD_TOOL_CARRY_COMMIT;
+const load = async p => import(pathToFileURL(`${trusted}/${p}`).href);
 const { loadGateRegistry } = await load('genesis/orchestrator/pipeline-registry.mjs');
 const { gateChildEnv } = await load('genesis/orchestrator/gate-runner.mjs');
 const { gateEvidence } = await load('genesis/orchestrator/gate-evidence.mjs');
-const project = loadGateRegistry(root).get(process.env.HELD_TOOL_CARRY_PROJECT);
+const project = loadGateRegistry(candidate).get(process.env.HELD_TOOL_CARRY_PROJECT);
 if (!project) throw new Error('gate project absent at commit');
-const env = gateChildEnv(project, process.env, root, { warn: () => {} });
+const env = gateChildEnv(project, process.env, candidate, { warn: () => {} });
 delete env.GATE_EVIDENCE;
 let cargoEnv = {};
 try { cargoEnv = JSON.parse(env.GATE_CARGO_ENV || '{}'); } catch {}
-const evidence = gateEvidence(project, { env, root, commit: 'HEAD', cargoEnv, warn: () => {} });
+const evidence = gateEvidence(project, { env, root: candidate, commit, cargoEnv, warn: () => {} });
 process.stdout.write(JSON.stringify({ key: evidence.key || null, line: evidence.line || '' }));
 """
 
@@ -661,9 +694,190 @@ def carry_line(miss, reason):
     return f"held-tool-watch carry: {project} {str(event)[:16]}… — {_one_line(reason)}"
 
 
+def _carry_actor():
+    for name in ("ELOHIM_SESSION_ID", "CODEX_SESSION_ID", "CLAUDE_CODE_SESSION_ID", "CLAUDE_SESSION_ID"):
+        if os.environ.get(name):
+            return os.environ[name]
+    return os.environ.get("USER") or os.environ.get("LOGNAME") or "unknown-user"
+
+
+def parse_carry_until(value, now):
+    """An h/d/w duration from now, or an absolute ISO 8601 instant explicitly in UTC."""
+    if value is None:
+        return now + DEFAULT_CARRY_OPT_IN_S
+    duration = re.fullmatch(r"([1-9][0-9]*)([hdw])", value)
+    if duration:
+        unit_s = {"h": 3600, "d": 86400, "w": 7 * 86400}[duration.group(2)]
+        return now + int(duration.group(1)) * unit_s
+    try:
+        instant = datetime.datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError as error:
+        raise ValueError("--until must be a duration like 12h, 3d, 1w or an ISO 8601 UTC date") from error
+    if instant.tzinfo is None or instant.utcoffset() != datetime.timedelta(0):
+        raise ValueError("--until date must name UTC with Z or +00:00")
+    return instant.timestamp()
+
+
+def _write_carry_until(path, until):
+    """Replace the switch atomically, so a concurrent pass never mistakes a renewal for legacy."""
+    directory = os.path.dirname(path)
+    fd, pending = tempfile.mkstemp(prefix=f".{CARRY_ON_FILE}.", dir=directory, text=True)
+    try:
+        with os.fdopen(fd, "w") as f:
+            f.write(rfc3339(until) + "\n")
+        os.replace(pending, path)
+    finally:
+        try:
+            os.unlink(pending)
+        except FileNotFoundError:
+            pass
+
+
+def _carry_until(status_dir):
+    """(until timestamp, rendered UTC). A legacy/malformed switch expires at its own mtime."""
+    path = os.path.join(status_dir, CARRY_ON_FILE)
+    try:
+        stat = os.stat(path)
+        with open(path) as f:
+            value = f.readline().strip()
+    except FileNotFoundError:
+        return None
+    try:
+        instant = datetime.datetime.fromisoformat(value.replace("Z", "+00:00"))
+        if instant.tzinfo is None or instant.utcoffset() != datetime.timedelta(0):
+            raise ValueError("not UTC")
+        until = instant.timestamp()
+    except ValueError:
+        until = stat.st_mtime
+    return until, rfc3339(until)
+
+
+def _say_carry_expired_once(status_dir, until_text, say):
+    marker = os.path.join(status_dir, CARRY_EXPIRY_SAID_FILE)
+    try:
+        fd = os.open(marker, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    except FileExistsError:
+        return
+    with os.fdopen(fd, "w") as f:
+        f.write(until_text + "\n")
+    say(f"carry opt-in expired at {until_text}; run held-tool-watch carry on to renew")
+
+
+def carry_state(status_dir, now=None, say=print):
+    """(off|on|expired, until text). This is the one read used by every pass and poll."""
+    if (stopped(status_dir) or os.environ.get("HELD_TOOL_CARRY") == "off"
+            or os.path.exists(os.path.join(status_dir, CARRY_STOP_FILE))):
+        return "off", None
+    switch = _carry_until(status_dir)
+    if switch is None:
+        return "off", None
+    until, until_text = switch
+    if (time.time() if now is None else now) < until:
+        return "on", until_text
+    _say_carry_expired_once(status_dir, until_text, say)
+    return "expired", until_text
+
+
+def carry_switch(args):
+    """Record or read the device-local opt-in. No miss or subprocess is touched here."""
+    status_dir = os.path.dirname(args.stasis_root or stasis_root())
+    on_file = os.path.join(status_dir, CARRY_ON_FILE)
+    os.makedirs(status_dir, exist_ok=True)
+    if args.until is not None and args.state != "on":
+        raise ValueError("--until is valid only with carry on")
+    if args.state in ("on", "off"):
+        if args.state == "on":
+            renewal = os.path.isfile(on_file)
+            now = time.time() if args.now is None else args.now
+            until = parse_carry_until(args.until, now)
+            until_text = rfc3339(until)
+            _write_carry_until(on_file, until)
+            try:
+                os.unlink(os.path.join(status_dir, CARRY_EXPIRY_SAID_FILE))
+            except FileNotFoundError:
+                pass
+        else:
+            renewal = False
+            until_text = None
+            try:
+                os.unlink(on_file)
+            except FileNotFoundError:
+                pass
+        act = "renewal" if renewal else ("opt-in" if args.state == "on" else "off")
+        line = (f"{rfc3339(time.time() if args.now is None else args.now)} carry={args.state} "
+                + (f"until={until_text} " if until_text else "")
+                + f"action={act} by={_carry_actor()}")
+        with open(os.path.join(status_dir, WATCH_LOG), "a") as log:
+            log.write(line + "\n")
+    state, until_text = carry_state(status_dir, args.now)
+    shown = f"on until {until_text}" if state == "on" else (
+        f"expired at {until_text}" if state == "expired" else "off")
+    last = "no carry pass recorded"
+    try:
+        with open(os.path.join(status_dir, LAST_CARRY)) as f:
+            last = " ".join(f.readline().split()) or last
+    except OSError:
+        pass
+    print(f"carry {shown}; last: {last}")
+    return 0
+
+
+def _decline_key(miss):
+    raw = "\0".join(str(miss.get(k, "")) for k in ("intent", "project", "closure"))
+    return hashlib.sha256(raw.encode()).hexdigest()
+
+
+def decline_once(status_dir, repo, miss, reason, runner=run_command):
+    """Tell the household once per miss identity, then append the local untracked receipt."""
+    key = _decline_key(miss)
+    ledger = os.path.join(status_dir, DECLINE_LEDGER)
+    try:
+        with open(ledger) as f:
+            if any(json.loads(line).get("key") == key for line in f if line.strip()):
+                return
+    except (OSError, ValueError):
+        pass
+    text = (f"carry-decline@1 miss={str(miss.get('event', '?'))[:24]} "
+            f"announcer={_one_line(miss.get('announcer'), 80)} project={_one_line(miss.get('project'), 80)} "
+            f"closure={str(miss.get('closure', '?'))[:16]} reason={_one_line(reason, 160)}")
+    code, _, _ = runner([berth_bin(), "say", "--session", ANNOUNCER, text], timeout=30, cwd=repo)
+    if code != 0:
+        return
+    os.makedirs(status_dir, exist_ok=True)
+    with open(ledger, "a") as f:
+        f.write(json.dumps({"key": key, "at": rfc3339(time.time()), "reason": _one_line(reason)},
+                           sort_keys=True) + "\n")
+
+
+def cargo_pool_root():
+    declared = os.environ.get("CARGO_TARGET_POOL_ROOT")
+    if declared and os.path.isdir(declared):
+        return os.path.realpath(declared)
+    default = "/projects/.cargo-target-pool"
+    return os.path.realpath(default) if os.path.isdir(default) else None
+
+
+def _carry_slots(pool, worktree):
+    """The gate's linked-worktree suffix has one exact basename; return contained matches only."""
+    suffix = f"-wt-{os.path.basename(worktree)}"
+    family = os.path.join(pool, "family")
+    found = []
+    for root, dirs, _ in os.walk(family):
+        for name in list(dirs):
+            path = os.path.realpath(os.path.join(root, name))
+            if name.endswith(suffix) and (path == pool or path.startswith(pool + os.sep)):
+                found.append(path)
+                dirs.remove(name)
+    return found
+
+
+def carry_enabled(status_dir, now=None, say=print):
+    """The bounded recorded device opt-in, with explicit off controls winning over it."""
+    return carry_state(status_dir, now, say)[0] == "on"
+
+
 def carry_stopped(status_dir):
-    return (stopped(status_dir) or os.environ.get("HELD_TOOL_CARRY") == "off"
-            or os.path.exists(os.path.join(status_dir, CARRY_STOP_FILE)))
+    return not carry_enabled(status_dir)
 
 
 def _json_call(runner, argv, *, timeout=30, cwd=None, env=None):
@@ -676,8 +890,8 @@ def _json_call(runner, argv, *, timeout=30, cwd=None, env=None):
         raise RuntimeError("invalid JSON") from error
 
 
-def _remove_carry_worktree(repo, path, runner=run_command):
-    """Remove one validated carry worktree, and nothing broader."""
+def _remove_carry_worktree(repo, path, runner=run_command, pool=None):
+    """Remove one validated carry worktree and only its exact linked-worktree cargo slots."""
     parent = os.path.realpath(os.path.join(repo, ".worktrees"))
     target = os.path.realpath(path)
     if os.path.dirname(target) != parent or not os.path.basename(target).startswith("carry-"):
@@ -685,10 +899,13 @@ def _remove_carry_worktree(repo, path, runner=run_command):
     runner(["git", "-C", repo, "worktree", "remove", "--force", target], timeout=60)
     if os.path.exists(target):
         shutil.rmtree(target)
+    if pool:
+        for slot in _carry_slots(pool, target):
+            shutil.rmtree(slot)
 
 
-def sweep_carry_worktrees(repo, older_than_s, runner=run_command, now=None, say=print):
-    """Remove carry-* worktrees whose directory mtime is older than this pass's maximum bound."""
+def sweep_carry_worktrees(repo, older_than_s, runner=run_command, now=None, say=print, pool=None):
+    """With the carry lock held (therefore no carry process alive), remove stale carry assets."""
     now = time.time() if now is None else now
     parent = os.path.join(repo, ".worktrees")
     try:
@@ -705,18 +922,22 @@ def sweep_carry_worktrees(repo, older_than_s, runner=run_command, now=None, say=
             continue
         if stale:
             try:
-                _remove_carry_worktree(repo, path, runner)
+                _remove_carry_worktree(repo, path, runner, pool)
                 say(f"held-tool-watch carry: swept stale {name}")
             except (OSError, ValueError, RuntimeError) as error:
                 say(f"held-tool-watch carry: stale {name} not removed — {_one_line(error)}")
 
 
-def recompute_closure(worktree, project, runner=run_command, timeout=300):
+def recompute_closure(trusted_root, worktree, commit, project, runner=run_command, timeout=300):
+    """Use only this runner checkout's JS; the candidate checkout is manifest/tree data."""
     env = dict(os.environ)
     env["HELD_TOOL_CARRY_PROJECT"] = project
+    env["HELD_TOOL_CARRY_TRUSTED_ROOT"] = trusted_root
+    env["HELD_TOOL_CARRY_CANDIDATE_ROOT"] = worktree
+    env["HELD_TOOL_CARRY_COMMIT"] = commit
     env.pop("GATE_EVIDENCE", None)
     data = _json_call(runner, ["node", "--input-type=module", "--eval", _CLOSURE_PROGRAM],
-                      timeout=timeout, cwd=worktree, env=env)
+                      timeout=timeout, cwd=trusted_root, env=env)
     key = data.get("key") if isinstance(data, dict) else None
     if not isinstance(key, str) or not _CLOSURE.match(key):
         why = data.get("line") if isinstance(data, dict) else ""
@@ -724,22 +945,74 @@ def recompute_closure(worktree, project, runner=run_command, timeout=300):
     return key
 
 
-def _capacity_allows_carry(repo, runner):
-    code, out, err = runner([berth_bin(), "room", "cargo", "--json", "--want", "1"],
-                            timeout=30, cwd=repo, env=None)
-    try:
-        room = json.loads(out)
-    except ValueError as error:
-        raise RuntimeError(f"berth room unreadable (exit {code}): {_one_line(err)}") from error
-    if code not in (0, 3):
-        raise RuntimeError(f"berth room exited {code}: {_one_line(err) or 'no output'}")
-    if room.get("verdict") != "admit":
-        return False, f"no free cargo seat: {room.get('axis') or '?'}: {room.get('reason') or 'refused'}"
+def _claim_cargo(repo, session, ttl_s, runner):
+    code, out, err = runner(
+        [berth_bin(), "claim", "cargo", "--session", session, "--class", "verify", "--ttl",
+         str(max(1, int(ttl_s))), "--note", "held-tool carry gate"],
+        timeout=60, cwd=repo,
+    )
+    return code == 0, _one_line(out or err) or f"exit {code}"
+
+
+def _release_cargo(repo, session, runner):
+    runner([berth_bin(), "release", "cargo", "--session", session], timeout=30, cwd=repo)
+
+
+def _dev_integration_holder(repo, runner):
     holder = _json_call(runner, [berth_bin(), "who", "dev-integration"], cwd=repo)
-    if holder:
-        name = holder.get("holder", "unknown") if isinstance(holder, dict) else "unknown"
-        return False, f"local dev-integration is held by {name}"
-    return True, room.get("reason") or "cargo seat free"
+    return holder.get("holder") if isinstance(holder, dict) else None
+
+
+def _parent_alive(pid):
+    if not pid:
+        return True
+    try:
+        os.kill(pid, 0)
+        return True
+    except OSError:
+        return False
+
+
+def run_carried_gate(trusted_root, worktree, commit, project, env, deadline, stop_reason,
+                     runner=run_command):
+    """Run the authorized candidate gate. Stop only through gate-live's detached gate group."""
+    gate_live = os.path.join(trusted_root, "genesis", "orchestrator", "gate-live.mjs")
+    opened = _json_call(
+        runner,
+        ["node", gate_live, "open", "--sha", commit, "--target", f"held-tool-carry:{project}"],
+        timeout=30,
+        cwd=trusted_root,
+    )
+    run_log = opened.get("path") if isinstance(opened, dict) else None
+    if not isinstance(run_log, str) or not run_log:
+        raise RuntimeError("gate-live open returned no run path")
+    gate_env = dict(env)
+    gate_env["GATE_LIVE_RUN"] = run_log
+    with tempfile.TemporaryFile() as out, tempfile.TemporaryFile() as err:
+        proc = subprocess.Popen(["just", "gate", project], cwd=worktree, env=gate_env,
+                                stdin=subprocess.DEVNULL, stdout=out, stderr=err)
+        stop_proc = None
+        stopped = None
+        while proc.poll() is None:
+            stopped = stop_reason()
+            if stopped is None and time.monotonic() >= deadline:
+                stopped = "carry deadline reached"
+            if stopped is not None and stop_proc is None:
+                stop_proc = subprocess.Popen(
+                    ["node", gate_live, "stop", "--run", run_log, "--now", "--reason", stopped],
+                    cwd=trusted_root, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
+            time.sleep(0.2)
+        code = proc.wait()
+        outcome = "interrupted" if stopped is not None else ("passed" if code == 0 else "failed")
+        runner(["node", gate_live, "close", "--run", run_log, "--outcome", outcome],
+               timeout=30, cwd=trusted_root)
+        if stop_proc is not None:
+            stop_proc.wait(timeout=45)
+        out.seek(0)
+        err.seek(0)
+        return code, out.read().decode(errors="replace"), err.read().decode(errors="replace"), stopped
 
 
 def _eligible_misses(data, now):
@@ -760,15 +1033,24 @@ def _eligible_misses(data, now):
                                           row.get("project", "")))
 
 
-def cmd_carry(args, runner=run_command):
-    """One pass implementing the nine carry rules stated in the module docstring."""
-    say = print
+def cmd_carry(args, runner=run_command, gate_runner=None):
+    """One opt-in pass. The carry lock proves the one-worktree/one-slot bound and safe sweep."""
+    if args.state in ("on", "off", "status"):
+        return carry_switch(args)
     repo = os.path.realpath(args.repo_root or main_checkout(REPO_ROOT))
     root = args.stasis_root or stasis_root()
     status_dir = os.path.dirname(root)
-    if carry_stopped(status_dir):
-        say("held-tool-watch carry: switched off; no miss claimed")
+    # Default off is deliberately before the device-head read: no misses and no subprocess.
+    if not carry_enabled(status_dir, args.now):
         return 0
+    with file_lock(os.path.join(status_dir, CARRY_LOCK), 0) as mine:
+        if not mine:
+            return 0
+        return _cmd_carry_locked(args, repo, status_dir, runner, gate_runner or run_carried_gate)
+
+
+def _cmd_carry_locked(args, repo, status_dir, runner, gate_runner):
+    say = print
     store = args.bin_store or native_bin_store(runner)
     head, why = device_head_epr(store)
     if head is None:
@@ -779,44 +1061,66 @@ def cmd_carry(args, runner=run_command):
                           cwd=repo)
         now = time.time() if args.now is None else args.now
         misses = _eligible_misses(data, now)
-        sweep_carry_worktrees(repo, args.carry_deadline_s or MAX_CARRY_PASS_S, runner, now, say)
         if not misses:
             say("held-tool-watch carry: no open sibling miss with a future waitUntil")
-            return 0
-        allowed, reason = _capacity_allows_carry(repo, runner)
-        if not allowed:
-            say(carry_line(misses[0], reason))
             return 0
     except (OSError, RuntimeError, subprocess.SubprocessError) as error:
         say(f"held-tool-watch carry: setup failed — {_one_line(error)}; no miss claimed")
         return 1
+    pool = cargo_pool_root()
+    if pool is None:
+        reason = "no cargo pool (set CARGO_TARGET_POOL_ROOT or provide /projects/.cargo-target-pool)"
+        decline_once(status_dir, repo, misses[0], reason, runner)
+        say(carry_line(misses[0], reason))
+        return 0
+    sweep_carry_worktrees(repo, args.carry_deadline_s or MAX_CARRY_PASS_S, runner, now, say, pool)
 
     started = time.monotonic()
     for miss in misses:
-        if carry_stopped(status_dir):
-            say(carry_line(miss, "switched off before claim"))
-            return 0
-        project, commit, git_ref = miss.get("project"), miss.get("commit"), miss.get("gitRef")
-        announced = miss.get("closure")
-        p90 = miss.get("p90S")
+        project, commit = miss.get("project"), miss.get("commit")
+        announced, p90 = miss.get("closure"), miss.get("p90S")
         if (not isinstance(project, str) or not _PROJECT.match(project)
                 or not isinstance(commit, str) or not _OID.match(commit)
-                or not isinstance(git_ref, str) or not git_ref.startswith("refs/heads/self/")
                 or not isinstance(announced, str) or not _CLOSURE.match(announced)
                 or not isinstance(p90, int) or isinstance(p90, bool) or p90 < 0):
-            say(carry_line(miss, "miss lacks a valid project, commit, gitRef, closure, or p90"))
+            say(carry_line(miss, "admitted miss lacks a valid project, commit, closure, or p90"))
             continue
-        short = commit[:12]
-        worktree = os.path.join(repo, ".worktrees", f"carry-{short}-{project}")
+        if carry_stopped(status_dir) or not _parent_alive(args.parent_pid):
+            reason = "switched off before claim" if carry_stopped(status_dir) else "runner parent exited"
+            decline_once(status_dir, repo, miss, reason, runner)
+            say(carry_line(miss, reason))
+            return 0
+        worktree = os.path.join(repo, ".worktrees", f"carry-{commit[:12]}-{project}")
         pass_s = args.carry_deadline_s or min(MAX_CARRY_PASS_S, p90 * 3 + 600)
+        carry_session = f"held-tool-carry-{os.getpid()}"
+        seat = False
+        commitment = None
+        failure = None
         try:
-            code, _, err = runner(["git", "-C", repo, "fetch", "--no-tags", "origin", git_ref], timeout=120)
+            seat_deadline = time.monotonic() + max(0, args.carry_seat_wait_s)
+            while True:
+                seat, seat_reason = _claim_cargo(repo, carry_session, pass_s, runner)
+                if seat or time.monotonic() >= seat_deadline or carry_stopped(status_dir):
+                    break
+                time.sleep(min(2, max(0, seat_deadline - time.monotonic())))
+            if not seat:
+                reason = f"no cargo seat after waiting: {seat_reason}"
+                decline_once(status_dir, repo, miss, reason, runner)
+                say(carry_line(miss, reason))
+                return 0
+            # The admitted signed miss's exact SHA is the authority. A self ref is neither fetched
+            # nor accepted as authority; the candidate's JS remains data until the gate begins.
+            code, _, err = runner(["git", "-C", repo, "fetch", "--no-tags", "origin", commit], timeout=120)
             if code != 0:
-                say(carry_line(miss, f"gitRef not fetchable: {_one_line(err) or f'exit {code}'}"))
+                reason = f"commit SHA not fetchable: {_one_line(err) or f'exit {code}'}"
+                decline_once(status_dir, repo, miss, reason, runner)
+                say(carry_line(miss, reason))
                 continue
             code, _, _ = runner(["git", "-C", repo, "cat-file", "-e", f"{commit}^{{commit}}"], timeout=30)
             if code != 0:
-                say(carry_line(miss, "fetched gitRef does not contain the announced commit object"))
+                reason = "fetched object is not the admitted miss's commit"
+                decline_once(status_dir, repo, miss, reason, runner)
+                say(carry_line(miss, reason))
                 continue
             os.makedirs(os.path.dirname(worktree), exist_ok=True)
             code, _, err = runner(["git", "-C", repo, "worktree", "add", "--detach", worktree, commit], timeout=120)
@@ -829,10 +1133,25 @@ def cmd_carry(args, runner=run_command):
                 say(carry_line(miss, f"exact-commit worktree is not clean: {_one_line(err or out)}"))
                 continue
             remaining = max(1, pass_s - (time.monotonic() - started))
-            computed = recompute_closure(worktree, project, runner, timeout=remaining)
+            computed = recompute_closure(REPO_ROOT, worktree, commit, project, runner, timeout=remaining)
             if computed != announced:
-                say(carry_line(miss, f"closure mismatch: announced {announced[:12]}, computed {computed[:12]}"))
+                reason = f"closure mismatch: announced {announced[:12]}, computed {computed[:12]}"
+                decline_once(status_dir, repo, miss, reason, runner)
+                say(carry_line(miss, reason))
                 continue
+            # Capacity and local integration are read again at the last safe point before candidate
+            # code is authorized to run.
+            if carry_stopped(status_dir) or not _parent_alive(args.parent_pid):
+                reason = "switched off before gate" if carry_stopped(status_dir) else "runner parent exited"
+                decline_once(status_dir, repo, miss, reason, runner)
+                say(carry_line(miss, reason))
+                return 0
+            holder = _dev_integration_holder(repo, runner)
+            if holder:
+                reason = f"local dev-integration is held by {holder}"
+                decline_once(status_dir, repo, miss, reason, runner)
+                say(carry_line(miss, reason))
+                return 0
             remaining_wait = int(miss["waitUntil"] - now)
             valid_for = min(MAX_CARRY_VALID_S, max(600, p90 * 3), remaining_wait)
             if valid_for <= 0:
@@ -841,39 +1160,61 @@ def cmd_carry(args, runner=run_command):
             claim = [head, "flow", "intend", "--carry", miss["intent"], "--project", project,
                      "--closure", announced, "--miss", miss["event"], "--valid-for", str(valid_for),
                      "--json", "--root", repo]
-            code, _, err = runner(claim, timeout=30, cwd=repo)
+            code, claim_out, err = runner(claim, timeout=30, cwd=repo)
             if code != 0:
                 say(carry_line(miss, f"claim failed: {_one_line(err) or f'exit {code}'}; no claim to release"))
                 return 1
-            gate_env = dict(os.environ)
-            gate_env["EPR_BIN"] = head
-            gate_env["GATE_DEFER"] = "off"
-            gate_env["GATE_CARRY"] = "off"
-            gate_env["GATE_CARRY_WAIT"] = "off"
-            gate_env.pop("GATE_EVIDENCE", None)
-            remaining = pass_s - (time.monotonic() - started)
-            if remaining <= 0:
-                say(carry_line(miss, "pass deadline reached after claim; claim will lapse, no runner verdict written"))
-                return 1
             try:
-                code, _, err = runner(["just", "gate", project], timeout=remaining, cwd=worktree, env=gate_env)
-            except subprocess.TimeoutExpired:
-                say(carry_line(miss, "gate timed out; claim will lapse, no runner verdict written"))
+                commitment = json.loads(claim_out)["commitment"]
+            except (ValueError, KeyError, TypeError):
+                say(carry_line(miss, "claim returned no commitment; gate not started"))
+                return 1
+            gate_env = dict(os.environ)
+            gate_env.update({"EPR_BIN": head, "GATE_DEFER": "off", "GATE_CARRY": "off",
+                             "GATE_CARRY_WAIT": "off"})
+            gate_env.pop("GATE_EVIDENCE", None)
+            deadline = started + pass_s
+            holder_check = [0.0]
+
+            def stop_reason():
+                if carry_stopped(status_dir):
+                    return "carry switched off"
+                if not _parent_alive(args.parent_pid):
+                    return "runner parent exited"
+                if time.monotonic() - holder_check[0] >= 1:
+                    holder_check[0] = time.monotonic()
+                    holder_now = _dev_integration_holder(repo, runner)
+                    if holder_now:
+                        return f"local landing started ({holder_now})"
+                return None
+
+            code, _, err, stopped_reason = gate_runner(
+                REPO_ROOT, worktree, commit, project, gate_env, deadline, stop_reason, runner=runner)
+            if stopped_reason:
+                failure = stopped_reason
+                say(carry_line(miss, f"yielded: {stopped_reason}; gate stopped, carry released"))
                 return 1
             if code != 0:
-                say(carry_line(miss, f"gate exited {code}: {_one_line(err)}; claim will lapse; only the gate's verdict stands"))
+                failure = f"gate exited {code}: {_one_line(err)}"
+                say(carry_line(miss, f"{failure}; carry released; only the gate's verdict stands"))
                 return 1
             say(carry_line(miss, "gate green; its device-head verdict is the only verdict written"))
             return 0
         except (OSError, RuntimeError, subprocess.SubprocessError) as error:
-            say(carry_line(miss, f"setup failed: {_one_line(error)}; any claim will lapse, no runner verdict written"))
+            failure = f"setup failed: {_one_line(error)}"
+            say(carry_line(miss, f"{failure}; carry released if claimed, no runner verdict written"))
             return 1
         finally:
+            if commitment and failure:
+                runner([head, "flow", "intend", "--release-carry", commitment, "--json", "--root", repo],
+                       timeout=30, cwd=repo)
             if os.path.exists(worktree):
                 try:
-                    _remove_carry_worktree(repo, worktree, runner)
+                    _remove_carry_worktree(repo, worktree, runner, pool)
                 except (OSError, ValueError, RuntimeError) as error:
-                    say(carry_line(miss, f"carry worktree cleanup failed: {_one_line(error)}"))
+                    say(carry_line(miss, f"carry asset cleanup failed: {_one_line(error)}"))
+            if seat:
+                _release_cargo(repo, carry_session, runner)
     return 0
 
 
@@ -1181,7 +1522,7 @@ def stopped(status_dir):
 
 
 def cmd_run(args, runner=run_command):
-    """The one device runner, scheduling fresh announce and carry processes without overlap."""
+    """The one device runner; announce keeps cadence while at most one carry child runs."""
     root = args.stasis_root or stasis_root()
     script = os.path.realpath(__file__)
     # Only what differs from the defaults is passed on: `--tail-bytes` is the most one tail may GROW
@@ -1202,6 +1543,7 @@ def cmd_run(args, runner=run_command):
                         ("--repo-root", args.repo_root), ("--carry-deadline-s", args.carry_deadline_s)):
         if value is not None:
             carry_args += [flag, str(value)]
+    carry_args += ["--parent-pid", str(os.getpid()), "--carry-seat-wait-s", str(args.carry_seat_wait_s)]
     status_dir = os.path.dirname(root)
 
     def line(text):
@@ -1210,11 +1552,11 @@ def cmd_run(args, runner=run_command):
     with file_lock(os.path.join(status_dir, LOOP_LOCK), 0) as mine:
         if not mine:
             return 0  # this device already has its runner
-        passes = 0
+        passes, carry_job = 0, None
         state = {"announce": None, "carry": None}
-        waits = {"announce": args.every, "carry": args.carry_every}
+        announce_wait, carry_wait = args.every, args.carry_every
         now = time.monotonic()
-        due = {"announce": now, "carry": now}
+        announce_due = carry_due = now
         while True:
             if not os.path.isfile(script):
                 line("script gone; exiting")
@@ -1222,48 +1564,58 @@ def cmd_run(args, runner=run_command):
             if stopped(status_dir):
                 line("switched off (HELD_TOOL_WATCH=off); exiting")
                 break
+            # Poll the same bounded switch even while a carry child is live. The child cooperatively
+            # observes the same state in its gate stop callback and owns stop + release cleanup.
+            carry_on = carry_enabled(
+                status_dir, say=lambda text: print(text, file=sys.stderr, flush=True))
             now = time.monotonic()
-            ready = [kind for kind in ("announce", "carry") if due[kind] <= now]
-            if not ready:
-                time.sleep(max(0, min(due.values()) - now))
-                continue
-            kind = ready[0]
-            if kind == "carry" and carry_stopped(status_dir):
-                due[kind] = now + args.carry_every
-                continue
-            argv = ([sys.executable, script, "announce", *announce_args] if kind == "announce"
-                    else [sys.executable, script, "carry", *carry_args])
-            timeout = (max(60, 3 * args.every) if kind == "announce"
-                       else (args.carry_deadline_s or MAX_CARRY_PASS_S))
-            cancel = (lambda: carry_stopped(status_dir)) if kind == "carry" else None
-            code, out, err = run_pass(argv, timeout=timeout, cancelled=cancel)
-            cancelled = kind == "carry" and carry_stopped(status_dir)
-            if code is None:
-                err += ("held-tool-watch: carry pass stopped; its process group was killed\n" if cancelled
-                        else f"held-tool-watch: {kind} pass timed out; its process group was killed\n")
-            try:  # a diagnostic for a reader at the terminal, overwritten each pass; nothing decides on it
-                last = LAST_PASS if kind == "announce" else LAST_CARRY
-                with open(os.path.join(status_dir, last), "w") as f:
-                    f.write(f"{rfc3339(time.time())} exit {code}\n{out[-4096:]}{err[-4096:]}")
-            except OSError:
-                pass
-            if cancelled:
-                now_state = "switched off"
-            else:
+            if carry_job is not None:
+                finished = poll_async_pass(carry_job)
+                if finished is not None:
+                    code, out, err = finished
+                    carry_job = None
+                    try:
+                        with open(os.path.join(status_dir, LAST_CARRY), "w") as f:
+                            f.write(f"{rfc3339(time.time())} exit {code}\n{out[-4096:]}{err[-4096:]}")
+                    except OSError:
+                        pass
+                    now_state = "passing" if code == 0 else f"failing (exit {code})"
+                    carry_wait = (args.carry_every if code == 0 else
+                                  min(BACKOFF_CAP_S, max(1.0, carry_wait * 2)))
+                    carry_due = time.monotonic() + carry_wait
+                    if now_state != state["carry"]:
+                        tail = " ".join((err or "").split())[-200:]
+                        line("carry " + now_state +
+                             (f", next pass in {int(carry_wait)} s: {tail}" if code != 0 else ""))
+                        state["carry"] = now_state
+            if carry_job is None and now >= carry_due:
+                if carry_on:
+                    carry_job = start_async_pass([sys.executable, script, "carry", *carry_args])
+                else:
+                    carry_due = now + args.carry_every
+            if now >= announce_due:
+                code, out, err = run_pass([sys.executable, script, "announce", *announce_args],
+                                          timeout=max(60, 3 * args.every))
+                if code is None:
+                    err += "held-tool-watch: announce pass timed out; its process group was killed\n"
+                try:
+                    with open(os.path.join(status_dir, LAST_PASS), "w") as f:
+                        f.write(f"{rfc3339(time.time())} exit {code}\n{out[-4096:]}{err[-4096:]}")
+                except OSError:
+                    pass
                 now_state = "passing" if code == 0 else ("timing out" if code is None else f"failing (exit {code})")
-            base_wait = args.every if kind == "announce" else args.carry_every
-            waits[kind] = base_wait if code == 0 else min(BACKOFF_CAP_S, max(1.0, waits[kind] * 2))
-            due[kind] = time.monotonic() + waits[kind]
-            if now_state != state[kind]:
-                tail = " ".join((err or "").split())[-200:]
-                prefix = "" if kind == "announce" else "carry "
-                line(prefix + now_state + (f", next pass in {int(waits[kind])} s: {tail}"
-                                            if code != 0 and not cancelled else ""))
-                state[kind] = now_state
-            if kind == "announce":
+                announce_wait = (args.every if code == 0 else
+                                 min(BACKOFF_CAP_S, max(1.0, announce_wait * 2)))
+                announce_due = time.monotonic() + announce_wait
+                if now_state != state["announce"]:
+                    tail = " ".join((err or "").split())[-200:]
+                    line(now_state + (f", next pass in {int(announce_wait)} s: {tail}" if code != 0 else ""))
+                    state["announce"] = now_state
                 passes += 1
                 if args.passes and passes >= args.passes:
                     break
+            next_due = min(announce_due, carry_due if carry_job is None else now + 0.1)
+            time.sleep(max(0.01, min(0.1, next_due - time.monotonic())))
     return 0
 
 
@@ -1295,10 +1647,16 @@ def parser():
             s.add_argument("--carry-deadline-s", type=float,
                            default=float(os.environ["HELD_TOOL_CARRY_DEADLINE_S"])
                            if os.environ.get("HELD_TOOL_CARRY_DEADLINE_S") else None)
+            s.add_argument("--carry-seat-wait-s", type=float,
+                           default=float(os.environ.get("HELD_TOOL_CARRY_SEAT_WAIT_S", "60")))
         if name not in ("run",):
             s.add_argument("--now", type=float)
         if name == "scan":
             s.add_argument("--json", action="store_true")
+        if name == "carry":
+            s.add_argument("state", nargs="?", choices=("pass", "on", "off", "status"), default="pass")
+            s.add_argument("--until")
+            s.add_argument("--parent-pid", type=int)
         if name == "run":
             s.add_argument("--every", type=float, default=60)
             s.add_argument("--carry-every", type=float,
