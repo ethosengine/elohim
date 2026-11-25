@@ -174,6 +174,15 @@ def proc_argv(pid):
         return []
 
 
+def proc_environ(pid):
+    try:
+        with open(os.path.join(PROC_DIR, str(pid), "environ"), "rb") as f:
+            return dict(item.decode("utf-8", "replace").split("=", 1)
+                        for item in f.read().split(b"\0") if b"=" in item)
+    except OSError:
+        return {}
+
+
 def flycheck_marked(pid):
     try:
         with open(os.path.join(PROC_DIR, str(pid), "environ"), "rb") as f:
@@ -293,15 +302,68 @@ def running_heavy():
                 verb = cargo_verb(argv)
                 if verb in HEAVY_VERBS:
                     found.append((int(name), " ".join(argv[:4]), flycheck_marked(name)))
-            elif head in COMPILER_HEADS or head == "gate-runner.mjs":
+            elif head in COMPILER_HEADS or (head == "gate-runner.mjs" and not gate_runner_waiting(int(name))):
                 found.append((int(name), head, flycheck_marked(name)))
             elif head in ("node", "nodejs"):
                 script = next((a for a in argv[1:] if not a.startswith("-")), "")
-                if os.path.basename(script) == "gate-runner.mjs":
+                if os.path.basename(script) == "gate-runner.mjs" and not gate_runner_waiting(int(name)):
                     found.append((int(name), "gate-runner.mjs", flycheck_marked(name)))
     except Exception:
         return []
     return found
+
+
+def gate_runner_waiting(pid):
+    """True only for a runner whose descendant tap is blocked on another slot holder.
+
+    The holder line is published only after this runner's flock owns the lock. A descendant flock
+    beside a holder line naming some other pid is therefore admission wait, not a cargo seat. Any
+    unreadable or incomplete state counts the runner, preserving the guard's fail-safe direction.
+    """
+    try:
+        parents = {}
+        for name in os.listdir(PROC_DIR):
+            if name.isdigit() and (stat := proc_stat(name)) is not None:
+                parents[int(name)] = stat[1]
+        descendants = set()
+        changed = True
+        while changed:
+            changed = False
+            for child, parent in parents.items():
+                if child not in descendants and (parent == pid or parent in descendants):
+                    descendants.add(child)
+                    changed = True
+        taps = []
+        flocks = {}
+        for child in descendants:
+            argv = proc_argv(child)
+            if not argv:
+                continue
+            head = os.path.basename(argv[0])
+            if head in ("node", "nodejs") and any(os.path.basename(arg) == "gate-tap.mjs" for arg in argv[1:]):
+                taps.append(child)
+            elif head == "flock":
+                flocks[child] = argv
+        for tap in taps:
+            env = proc_environ(tap)
+            lock = env.get("GATE_SLOT_LOCK_PATH")
+            holder_path = env.get("GATE_SLOT_HOLDER_PATH")
+            if not lock or not holder_path:
+                continue
+            waiters = {child for child, argv in flocks.items() if lock in argv}
+            if not waiters:
+                continue
+            try:
+                with open(holder_path) as f:
+                    match = re.search(r"(?:^| )pid=(\d+)(?: |$)", f.read())
+                holder = int(match.group(1)) if match else None
+            except (OSError, ValueError):
+                holder = None
+            if holder not in waiters:
+                return True
+        return False
+    except Exception:
+        return False
 
 
 MAX_ANCESTRY_DEPTH = 64
