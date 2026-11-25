@@ -523,6 +523,37 @@ describe('reused gate enrichment sampling', () => {
     assert.equal(started, false);
     assert.equal(output, '[gate] fixture enrich-sample: not started (no node)\n');
   });
+
+  test('an asynchronous spawn error is handled and prints exactly one failure line', () => {
+    let output = '';
+    const handlers = new Map();
+    const started = startEnrichSample({
+      project, gateCommit: commit, closure: 'closure-a', decision: localDecision, root: '/repo',
+      env: { GATE_ENRICH_SAMPLE: 'on', GATE_READING_RUN_ID: 'async-fail-run' },
+      write: text => { output += text; },
+    }, {
+      spawn: () => ({ pid: undefined, once: (event, handler) => handlers.set(event, handler), unref() {} }),
+      markers: new Set(),
+    });
+    assert.equal(started, true, 'the detached spawn call returned a child before its error event');
+    assert.equal(output, '');
+    handlers.get('error')(new Error('enoent'));
+    assert.equal(output, '[gate] fixture enrich-sample: not started (enoent)\n');
+  });
+
+  test('sampling on and off preserves the admitted decision, verdict, run outcome and recorded seconds', () => {
+    const decision = { ...localDecision, row: { ...localDecision.row } };
+    const before = structuredClone(decision);
+    const gateRecord = { verdict: 'green', outcome: 'reused', seconds: 12.5 };
+    const off = sample({ knob: 'off', decision });
+    const on = sample({ knob: 'on', decision, runId: 'equivalence-run' });
+    assert.deepEqual(decision, before, 'the sampler trigger cannot mutate the reuse decision');
+    assert.deepEqual(gateRecord, { verdict: 'green', outcome: 'reused', seconds: 12.5 });
+    assert.equal(off.started, false);
+    assert.equal(on.started, true);
+    assert.equal(off.output, '');
+    assert.equal(on.detached.length, 1, 'the detached enrichment is the only on/off difference');
+  });
 });
 
 describe('gate step reading collector', () => {
