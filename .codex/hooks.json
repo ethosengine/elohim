@@ -50,6 +50,15 @@
             "timeout": 3
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=\"$(git rev-parse --show-toplevel 2>/dev/null)/.codex/hooks/held-tool-ensure.py\"; [ -f \"$f\" ] && python3 \"$f\" codex || exit 0",
+            "timeout": 3
+          }
+        ]
       }
     ],
     "PermissionRequest": [
@@ -69,6 +78,15 @@
           {
             "type": "command",
             "command": "f=\"$(git rev-parse --show-toplevel 2>/dev/null)/.codex/hooks/dialogue-stasis-sense.py\"; [ -f \"$f\" ] && python3 \"$f\" --runtime=codex || exit 0",
+            "timeout": 3
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=\"$(git rev-parse --show-toplevel 2>/dev/null)/.codex/hooks/held-tool-ensure.py\"; [ -f \"$f\" ] && python3 \"$f\" codex || exit 0",
             "timeout": 3
           }
         ]

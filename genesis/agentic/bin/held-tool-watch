@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-held-tool-watch — a one-shot SENSOR for a tool call that has been pending a while, seen from OUTSIDE
-its session. It senses and calls; it never records, judges, approves, cancels, retries or signals.
+held-tool-watch — a SENSOR for a tool call that has been pending a while, seen from OUTSIDE its
+session. It senses, calls and says; it never judges, approves, cancels, retries or signals a session.
 
 On 2026-11-23 a coordinating session's tool call sat pending for about seven hours (very likely an
 approval prompt nobody saw), and another for 45 minutes, while the device kept exchanging. Nothing
@@ -18,6 +18,16 @@ already writes and hands what it senses to the native fold.
       Exit 0 when the pass ran (whether it observed, skipped or found nothing); 1 on any internal
       error or a failed observe call, with one line on stderr each. Never 2: a hook exit 2 blocks the
       tool call it runs beside, and this script must never raise into one.
+  held-tool-watch announce [same flags] [--bin-store DIR]
+      `observe`, then make it visible, once: for each observed call whose session's native status
+      (read through the same pinned epr) has an open incident, `berth say --session held-tool-watch
+      --to <each live session moored here or on a sibling device, the held one excepted>` one line
+      `held-tool@1 open k=<key> ...` (the household when no session is listed); for each call announced
+      earlier whose transcript now holds its result (or is gone), one line `held-tool@1 resumed k=...`
+      to the same addressees. Same exit contract as `observe`.
+  held-tool-watch run [same flags] [--bin-store DIR] [--every 60] [--passes N]
+      The device runner: one per device (a lock beside the stasis root), an `announce` pass in a fresh
+      process every --every seconds, the last pass's output in `held-tool-watch.last-pass.txt` there.
 
 Thresholds. `--sense-after-s` (default 120) is the only one: the sensor reports a call pending longer
 than that. It judges nothing else; the native Incident records the interval and `elohim_epr_rea::Bound`
@@ -27,12 +37,18 @@ Workflow / Monitor / TaskOutput; Bash with `run_in_background: true`; Bash with 
 the same as a held one. `cause` (scan only) is `approval-evidence` when a `permission-requested` entry
 in the dialogue-stasis journal names the tool_use id as its `precedingToolUseId`; otherwise `unknown`.
 
-No state. `--pending-since` is the pending tool_use's own transcript timestamp, so observing the same
-call on every run names the same (session, agent, tool, pending-since), and the native side folds those
-repeats into one incident. The script keeps no marker, state file or announce-once record. For that
-reason it announces nothing either: an announce-once needs memory this script refuses to keep. The
-reading surfaces are the native ones: `epr session stasis status` and `berth status` (which renders
-`held` from that same native read).
+No state of its own. `--pending-since` is the pending tool_use's own transcript timestamp, so observing
+the same call on every run names the same (session, agent, tool, pending-since), and the native side
+folds those repeats into one incident. `announce` hashes that same key into `k=`, and "once" is read
+from the record the saying makes: the notes this watcher said, as folded in this device's channel
+store (`berth said --session held-tool-watch`), which is also what crosses to the siblings. A line is
+said to an addressee only when no line of that kind and key to that addressee is in the record; if the
+record cannot be read, nothing is said that pass. A note that did not reach the store (`berth say`
+exit 1) is said again next pass. The script keeps no marker or announce-once file; the two lock files
+order writers and record nothing. Held state is the native Incident: nothing is announced unless the
+target's own epr shows an open incident, and `berth status` renders `held` from that same read.
+Resumption is read from the transcript (the call's result appears), because no native verb lets an
+outside observer record it: the native Silence incident closes at that agent's next turn end.
 
 Compatibility (the hazard this design answers). A session keeps the epr build it was pinned to when
 it started, and an epr older than `observe` rejects the unknown event kind `tool-pending-observed`
@@ -53,13 +69,20 @@ A residual this does not cover: a reader of ALL sessions' journals (`epr session
 with no `--session`, as `berth status` runs it) under an older epr still meets the new kind in the
 observed session's journal. That reader is the observer's device tooling, not the held session.
 
-Intended registration (NOT wired; wiring is the steward's decision): a device-supervised timer that
-runs `held-tool-watch observe` once a minute from the main checkout. A Claude Code hook works too
-(any session's PostToolUse, matcher ".*", `timeout` 15, run detached so it adds no latency) because a
-held session fires no hooks of its own while its siblings do; exit 1 there is a non-blocking error.
+Registration (2026-11-25, the steward's direction "stop waiting and work on it"): the hook
+`held-tool-ensure` (PostToolUse and SessionStart in Claude Code, PostToolUse and SessionStart in Codex)
+starts `held-tool-watch run` detached when this device has no runner, in a few milliseconds and never
+more. A held session fires no hooks, so the runner, not any hook, does the sensing: a device with one
+session is covered from that session's first tool call, until the workspace restarts. Not covered: a
+device where no session has started since its last restart; Codex sessions (their transcripts are
+not read, only Claude Code's). The runner is not supervised by the device's ark: `epr device run`
+declares only bin-store tools, and this script is not one.
 """
 import argparse
+import contextlib
 import datetime
+import fcntl
+import hashlib
 import json
 import os
 import re
@@ -385,8 +408,9 @@ def rfc3339(t):
     return datetime.datetime.fromtimestamp(t, datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def observe_pass(held, journal_root, bin_store, runner=run_command, say=print, warn=None):
-    """Call each candidate's own session's pinned epr. Returns the number of failed calls."""
+def observe_pass(held, journal_root, bin_store, runner=run_command, say=print, warn=None, observed=None):
+    """Call each candidate's own session's pinned epr. Returns the number of failed calls; each
+    candidate the native side recorded is appended to `observed` as (candidate, pinned binary)."""
     warn = warn or (lambda line: print(line, file=sys.stderr))
     failed, verbs = 0, {}
     for h in held:
@@ -402,6 +426,8 @@ def observe_pass(held, journal_root, bin_store, runner=run_command, say=print, w
             continue
         code, _, err = runner([binary] + observe_argv(h, journal_root))
         if code == 0:
+            if observed is not None:
+                observed.append((h, binary))
             continue
         if code == 2 and "no journal" in err:
             say(NO_JOURNAL_LINE.format(session=session))
@@ -410,6 +436,216 @@ def observe_pass(held, journal_root, bin_store, runner=run_command, say=print, w
         detail = " ".join(err.split())[:160] or "no output"
         warn(f"held-tool-watch: observe for session {session} failed (exit {code}): {detail}")
     return failed
+
+
+# ---------------------------------------------------------------- announcing, once, from the record
+
+ANNOUNCER = "held-tool-watch"  # the berth sender of every line this watcher says
+MARK = "held-tool@1"
+ANNOUNCE_LOOKBACK_S = 7 * 86400  # an open line older than this is never followed by a resumed one
+MAX_ADDRESSEES = 8
+LOOP_LOCK = "held-tool-watch.run.lock"  # .claude/hooks/held-tool-ensure.py LOCK_NAME
+ANNOUNCE_LOCK = "held-tool-watch.announce.lock"
+LAST_PASS = "held-tool-watch.last-pass.txt"
+_TOKEN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:@+-]{0,199}$")
+_FIELD = re.compile(r"(\w+)=(\S+)")
+
+
+def berth_run(argv, runner):
+    return runner([berth_bin()] + argv, timeout=60)
+
+
+def token(value):
+    """A value for the machine half of a line: shaped, or `?`."""
+    value = str(value)
+    return value if _TOKEN.match(value) else "?"
+
+
+def announce_key(h):
+    """The native incident key (session, agent, tool, pending-since), hashed. It names one held call on
+    every pass, so the record of a line said for it is what makes the line once."""
+    material = "\0".join([h["session"], h["agent"], h["tool"], rfc3339(h["calledAt"])])
+    return hashlib.sha256(material.encode()).hexdigest()[:16]
+
+
+def short_device(device):
+    return f"{device[:16]}…{device[-4:]}" if device and len(device) > 24 else (device or "this device")
+
+
+def clock(t):
+    return datetime.datetime.fromtimestamp(t, datetime.timezone.utc).strftime("%H:%M")
+
+
+def open_line(key, h, device, incident, now):
+    minutes = max(1, int((now - h["calledAt"]) // 60))
+    return (f"{MARK} open k={key} device={token(device or 'local')} session={token(h['session'])} "
+            f"agent={token(h['agent'])} tool={token(h['tool'])} since={rfc3339(h['calledAt'])} "
+            f"call={token(h['toolUseId'])} incident={token(incident)} — on {short_device(device)}, session "
+            f"{h['session'][:8]} ({h['agent']}) has had a {h['tool']} call pending {minutes} min, since "
+            f"{clock(h['calledAt'])}Z (cause: {h['cause']}; {h['shape']}): very likely a prompt nobody has "
+            f"seen, and its terminal needs the steward. Nothing here approves, cancels or retries it; one "
+            f"more line follows when it resumes.")
+
+
+def resumed_line(key, f, now):
+    since = parse_ts(f.get("since"))
+    took = f"about {max(1, int((now - since) // 60))} min after it began" if since else "time unknown"
+    return (f"{MARK} resumed k={key} device={f.get('device', '?')} session={f.get('session', '?')} "
+            f"agent={f.get('agent', '?')} tool={f.get('tool', '?')} since={f.get('since', '?')} — the "
+            f"{f.get('tool', '?')} call of session {f.get('session', '?')[:8]} ({f.get('agent', '?')}) on "
+            f"{short_device(f.get('device'))} is no longer pending (answered, or its session ended), "
+            f"{took}.")
+
+
+def parse_mark(text):
+    """(kind, fields) of a line this watcher said, else None."""
+    if not isinstance(text, str) or not text.startswith(MARK + " "):
+        return None
+    head = text.split(" — ", 1)[0].split()
+    if len(head) < 2:
+        return None
+    return head[1], dict(_FIELD.findall(" ".join(head[2:])))
+
+
+def native_open_incidents(binary, session, journal_root, runner):
+    """The ids of the session's open native incidents, read through ITS OWN pinned epr (so the reader is
+    never older than what the writer wrote), or None when that read fails."""
+    code, out, _ = runner([binary, "session", "stasis", "status", "--session", session, "--json",
+                           "--journal-root", journal_root], timeout=30)
+    if code != 0:
+        return None
+    try:
+        data = json.loads(out)
+    except ValueError:
+        return None
+    ids = []
+    for row in data.get("sessions", []) if isinstance(data, dict) else []:
+        if isinstance(row, dict) and row.get("session") == session:
+            ids += [i["id"] for i in row.get("openIncidents") or []
+                    if isinstance(i, dict) and isinstance(i.get("id"), str)]
+    return ids
+
+
+def addressees(status, held_session):
+    """Every live session moored here or on a sibling device, other than the held one: the sessions
+    whose next tool call (berth-note-inject) or Monitor shows an addressed note. None means the
+    household, when no session is listed."""
+    found = []
+    for section in ("moorings", "siblings"):
+        for row in status.get(section) or []:
+            session = row.get("session") if isinstance(row, dict) else None
+            if (isinstance(session, str) and _TOKEN.match(session) and session not in (held_session, ANNOUNCER)
+                    and session not in found):
+                found.append(session)
+    return found[:MAX_ADDRESSEES] or [None]
+
+
+def still_pending(transcripts, session, agent, call, tail_bytes=DEFAULT_TAIL_BYTES):
+    """True while the call has no result in its transcript, False once it has one or the transcript is
+    gone, None when the transcript cannot be read."""
+    for name, path in find_transcripts(transcripts, session):
+        if name == agent:
+            try:
+                return any(c["id"] == call for c in dangling_calls(path, tail_bytes))
+            except ValueError:
+                return None
+    return False
+
+
+def berth_json(argv, runner):
+    code, out, err = berth_run(argv, runner)
+    if code != 0:
+        raise RuntimeError(f"berth {argv[0]} exited {code}: {' '.join(err.split())[:120] or 'no output'}")
+    return json.loads(out)
+
+
+def announce_pass(observed, journal_root, transcripts, now, runner=run_command, warn=None,
+                  tail_bytes=DEFAULT_TAIL_BYTES):
+    """Say each call the native side holds open once to every addressee, and once more when it has
+    resumed. "Once" is read from the record the saying makes: the notes this watcher said, as folded
+    in this device's channel store (`berth said`). Returns the number of failures."""
+    warn = warn or (lambda line: print(line, file=sys.stderr))
+    try:
+        notes = berth_json(["said", "--session", ANNOUNCER, "--json"], runner)
+    except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as error:
+        warn(f"held-tool-watch: cannot read what was already said ({error}); nothing said this pass")
+        return 1
+    try:
+        status = berth_json(["status", "--json"], runner)
+    except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as error:
+        warn(f"held-tool-watch: berth status unreadable ({error}); new lines go to the household")
+        status = None
+    device = status.get("device") if isinstance(status, dict) else None
+    opened, resumed, fields = set(), set(), {}
+    for note in notes if isinstance(notes, list) else []:
+        parsed = parse_mark(note.get("text")) if isinstance(note, dict) else None
+        if not parsed or not parsed[1].get("k"):
+            continue
+        kind, f = parsed
+        target = (f["k"], note.get("to"))
+        if kind == "open" and isinstance(note.get("at"), (int, float)) and note["at"] >= now - ANNOUNCE_LOOKBACK_S:
+            opened.add(target)
+            fields.setdefault(f["k"], f)
+        elif kind == "resumed":
+            resumed.add(target)
+
+    def say(line, to):
+        code, _, err = berth_run(["say", "--session", ANNOUNCER] + (["--to", to] if to else []) + [line],
+                                 runner)
+        if code != 0:
+            warn(f"held-tool-watch: berth say failed (exit {code}): {' '.join(err.split())[:160] or 'no output'}")
+            return 1
+        return 0
+
+    failed, current = 0, set()
+    for h, binary in observed:
+        key = announce_key(h)
+        current.add(key)
+        incidents = native_open_incidents(binary, h["session"], journal_root, runner)
+        if incidents is None:
+            warn(f"held-tool-watch: native status of session {h['session']} unreadable; not announced")
+            failed += 1
+            continue
+        if not incidents:
+            continue  # the native side holds nothing open: held state is the Incident, not this script
+        if status is None and any(k == key for k, _ in opened):
+            continue  # said already; whom else to tell is unknown this pass
+        line = open_line(key, h, device, incidents[0], now)
+        for to in addressees(status or {}, h["session"]):
+            if (key, to) not in opened:
+                failed += say(line, to)
+    for key, f in sorted(fields.items()):
+        if key in current or not all(f.get(x) for x in ("session", "agent", "call")):
+            continue
+        if still_pending(transcripts, f["session"], f["agent"], f["call"], tail_bytes) is not False:
+            continue  # still pending, or unknown: never say resumed on a guess
+        line = resumed_line(key, f, now)
+        for k, to in sorted(opened, key=lambda kt: (kt[0], kt[1] or "")):
+            if k == key and (k, to) not in resumed:
+                failed += say(line, to)
+    return failed
+
+
+@contextlib.contextmanager
+def file_lock(path, wait_s):
+    """True once this process holds an exclusive lock on `path`, False when another holds it past
+    wait_s (0 = one try). The lock orders writers; it records nothing."""
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    fd = os.open(path, os.O_RDWR | os.O_CREAT, 0o644)
+    try:
+        end = time.monotonic() + wait_s
+        while True:
+            try:
+                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except BlockingIOError:
+                if time.monotonic() >= end:
+                    yield False
+                    return
+                time.sleep(0.2)
+        yield True
+    finally:
+        os.close(fd)
 
 
 # ---------------------------------------------------------------- CLI
@@ -439,6 +675,57 @@ def cmd_observe(args, runner=run_command):
     return 1 if observe_pass(held, args.stasis_root or stasis_root(), bin_store, runner) else 0
 
 
+def cmd_announce(args, runner=run_command):
+    now = args.now if args.now is not None else time.time()
+    held = sensed(args)
+    root = args.stasis_root or stasis_root()
+    observed, failed = [], 0
+    if held:
+        failed = observe_pass(held, root, args.bin_store or native_bin_store(runner), runner, observed=observed)
+    with file_lock(os.path.join(os.path.dirname(root), ANNOUNCE_LOCK), 30) as mine:
+        if not mine:
+            print("held-tool-watch: another announce pass holds the lock; this one said nothing",
+                  file=sys.stderr)
+            return 1
+        failed += announce_pass(observed, root, args.transcripts or transcripts_root(), now, runner,
+                                tail_bytes=args.tail_bytes)
+    return 1 if failed else 0
+
+
+def cmd_run(args, runner=run_command):
+    """The device runner: one per device (a lock beside the stasis root), one `announce` pass in a
+    fresh process every --every seconds, so each pass runs the script's current bytes. It exits when
+    its script is gone; the next hook in any session starts another."""
+    root = args.stasis_root or stasis_root()
+    script = os.path.realpath(__file__)
+    passthrough = ["--sense-after-s", str(args.sense_after_s), "--tail-bytes", str(args.tail_bytes)]
+    for flag, value in (("--transcripts", args.transcripts), ("--sessions-json", args.sessions_json),
+                        ("--stasis-root", args.stasis_root), ("--bin-store", args.bin_store)):
+        if value:
+            passthrough += [flag, value]
+    status_dir = os.path.dirname(root)
+    with file_lock(os.path.join(status_dir, LOOP_LOCK), 0) as mine:
+        if not mine:
+            return 0  # this device already has its runner
+        passes = 0
+        while os.path.isfile(script):
+            try:
+                code, out, err = runner([sys.executable, script, "announce", *passthrough],
+                                        timeout=max(60, 3 * args.every))
+            except subprocess.TimeoutExpired:
+                code, out, err = None, "", "held-tool-watch: announce pass timed out\n"
+            try:  # a diagnostic for a reader at the terminal, overwritten each pass; nothing decides on it
+                with open(os.path.join(status_dir, LAST_PASS), "w") as f:
+                    f.write(f"{rfc3339(time.time())} exit {code}\n{out[-4096:]}{err[-4096:]}")
+            except OSError:
+                pass
+            passes += 1
+            if args.passes and passes >= args.passes:
+                break
+            time.sleep(args.every)
+    return 0
+
+
 class _Parser(argparse.ArgumentParser):
     """A usage error is an internal error like any other: one line, exit 1 (argparse would exit 2)."""
     def error(self, message):
@@ -448,18 +735,23 @@ class _Parser(argparse.ArgumentParser):
 def parser():
     p = _Parser(prog="held-tool-watch", description=__doc__.strip().split("\n\n")[0])
     sub = p.add_subparsers(dest="cmd", required=True, parser_class=_Parser)
-    for name, run in (("scan", cmd_scan), ("observe", cmd_observe)):
+    for name, run in (("scan", cmd_scan), ("observe", cmd_observe), ("announce", cmd_announce),
+                      ("run", cmd_run)):
         s = sub.add_parser(name)
         s.add_argument("--transcripts")
         s.add_argument("--sense-after-s", type=float, default=120)
         s.add_argument("--sessions-json")
         s.add_argument("--stasis-root")
         s.add_argument("--tail-bytes", type=int, default=DEFAULT_TAIL_BYTES)
-        s.add_argument("--now", type=float)
+        if name != "run":
+            s.add_argument("--now", type=float)
         if name == "scan":
             s.add_argument("--json", action="store_true")
         else:
             s.add_argument("--bin-store")
+        if name == "run":
+            s.add_argument("--every", type=float, default=60)
+            s.add_argument("--passes", type=int, default=0)
         s.set_defaults(run=run)
     return p
 

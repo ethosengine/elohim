@@ -139,7 +139,7 @@ HELP_NEW = ("epr session stasis fold ...\nepr session stasis observe --session I
 HELP_OLD = "epr session stasis fold ...\nepr session stasis status ...\n"
 
 
-class ObserveTest(Fixture, NoStateDir):
+class ObserveFixture(Fixture, NoStateDir):
     """`observe`: one pass through the TARGET session's own pinned epr, faked as executables in a
     temporary bin-store; the real journals and the real store are never touched."""
 
@@ -165,6 +165,16 @@ with open({str(self.log)!r}, "a") as f:
     f.write(json.dumps({{"cid": {cid!r}, "argv": sys.argv[1:]}}) + "\\n")
 if "--help" in sys.argv:
     sys.stdout.write({help_text!r}); sys.exit(0)
+if sys.argv[1:4] == ["session", "stasis", "status"]:
+    session = sys.argv[sys.argv.index("--session") + 1]
+    try:
+        with open({str(self.root / "open-incidents.json")!r}) as f:
+            ids = json.load(f).get(session, [])
+    except FileNotFoundError:
+        ids = []
+    print(json.dumps({{"sessions": [{{"session": session, "openIncidents": [
+        {{"id": i, "stallClass": "silence", "state": "open", "ageSeconds": 1}} for i in ids]}}]}}))
+    sys.exit(0)
 if sys.argv[1:4] == ["session", "stasis", "observe"]:
     if not {knows!r}:
         sys.stderr.write("epr session stasis: unexpected stasis argument --source\\n"); sys.exit(1)
@@ -196,6 +206,8 @@ sys.exit(9)
             code = W["main"](args)
         return code, out.getvalue().splitlines(), err.getvalue().splitlines()
 
+
+class ObserveTest(ObserveFixture):
     def test_pending_past_the_threshold_makes_exactly_one_observe_with_the_right_argv(self):
         self.pin()
         self.write(use("t1", "Bash", T0, command="ls"))
@@ -351,6 +363,159 @@ sys.exit(9)
                 self.assertEqual(W["main"](argv), 1)
                 self.assertEqual(len(err.getvalue().strip().splitlines()), 1)
 
+
+LOCAL = "0123abcd-aaaa-bbbb-cccc-0000000000aa"   # another session moored on this device
+SIBLING = "0123abcd-aaaa-bbbb-cccc-0000000000bb"  # a session moored on a sibling device
+DID = "did:key:z6MkTESTdeviceTESTdeviceTESTdeviceTESTdevice"
+
+
+class AnnounceTest(ObserveFixture):
+    """`announce`: the observe pass, then one line per held call per addressee, read for once-ness
+    from what a FAKE berth (on BERTH_BIN) recorded. No real journal, berth store or channel is touched."""
+
+    def setUp(self):
+        super().setUp()
+        self.notes = self.root / "notes.jsonl"
+        self.berth_log = self.root / "berth-calls.jsonl"
+        self.status_file = self.root / "berth-status.json"
+        self.status({"device": DID, "moorings": [{"session": SESSION}, {"session": LOCAL}],
+                     "siblings": [{"device": "did:key:z6MkSIBLING", "session": SIBLING}]})
+        fake = self.root / "fake-berth"
+        fake.write_text(f"""#!/usr/bin/env python3
+import json, os, sys, time
+args = sys.argv[1:]
+with open({str(self.berth_log)!r}, "a") as f:
+    f.write(json.dumps(args) + "\\n")
+def opt(name):
+    if name in args:
+        i = args.index(name); value = args[i + 1]; del args[i:i + 2]; return value
+    return None
+cmd = args.pop(0)
+if os.path.exists({str(self.root / "berth-broken")!r}):
+    sys.stderr.write("berth: store unavailable\\n"); sys.exit(4)
+if cmd == "status":
+    print(open({str(self.status_file)!r}).read()); sys.exit(0)
+if cmd == "said":
+    session = opt("--session")
+    rows = [json.loads(l) for l in open({str(self.notes)!r})] if os.path.exists({str(self.notes)!r}) else []
+    print(json.dumps([r for r in rows if r["session"] == session])); sys.exit(0)
+if cmd == "say":
+    session, to = opt("--session"), opt("--to")
+    with open({str(self.notes)!r}, "a") as f:
+        f.write(json.dumps({{"session": session, "to": to, "text": " ".join(args), "at": float(os.environ.get("FAKE_BERTH_NOW") or time.time()),
+                            "from_device": None}}) + "\\n")
+    sys.exit(0)
+sys.exit(9)
+""")
+        fake.chmod(0o755)
+        env = mock.patch.dict(os.environ, {"BERTH_BIN": str(fake)})
+        env.start()
+        self.addCleanup(env.stop)
+
+    def status(self, data):
+        self.status_file.write_text(json.dumps(data))
+
+    def hold_open(self, *ids):
+        (self.root / "open-incidents.json").write_text(json.dumps({SESSION: list(ids)}))
+
+    def said(self):
+        if not self.notes.exists():
+            return []
+        return [json.loads(line) for line in self.notes.read_text().splitlines()]
+
+    def announce(self, now):
+        args = ["announce", "--transcripts", str(self.transcripts), "--sessions-json", str(self.sessions),
+                "--stasis-root", str(self.stasis), "--bin-store", str(self.store), "--now", str(now)]
+        out, err = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err), \
+                mock.patch.dict(os.environ, {"FAKE_BERTH_NOW": str(now)}):
+            code = W["main"](args)
+        return code, out.getvalue().splitlines(), err.getvalue().splitlines()
+
+    def test_one_held_call_is_said_once_to_each_addressee_across_many_passes(self):
+        self.pin()
+        self.hold_open(f"{SESSION}:7")
+        self.write(use("t1", "Bash", T0, command="git rebase -i main"))
+        for now in (T0 + 200, T0 + 260, T0 + 320, T0 + 900, T0 + 7000):
+            self.assertEqual(self.announce(now), (0, [], []))
+        said = self.said()
+        self.assertEqual(sorted(n["to"] for n in said), sorted([LOCAL, SIBLING]))
+        self.assertEqual({n["session"] for n in said}, {"held-tool-watch"})
+        [text] = {n["text"] for n in said}
+        kind, fields = W["parse_mark"](text)
+        self.assertEqual((kind, fields["session"], fields["agent"], fields["tool"], fields["since"],
+                          fields["device"], fields["incident"], fields["call"]),
+                         ("open", SESSION, "main", "Bash", W["rfc3339"](T0), DID, f"{SESSION}:7", "t1"))
+        self.assertIn("pending 3 min", text)
+        self.assertIn("Nothing here approves, cancels or retries it", text)
+        self.assertEqual(len(self.observes()), 5)  # the native side is told every pass; it folds them
+
+    def test_resolution_says_resumed_once_then_nothing_more(self):
+        self.pin()
+        self.hold_open(f"{SESSION}:7")
+        self.write(use("t1", "Bash", T0, command="ls"))
+        self.announce(T0 + 200)
+        # Answered: the result is in the transcript. The native incident stays open until the agent's
+        # turn ends, so the transcript, not the incident, says resumed.
+        self.write(use("t1", "Bash", T0, command="ls"), result("t1", T0 + 2400))
+        for now in (T0 + 2460, T0 + 2520, T0 + 9000):
+            self.assertEqual(self.announce(now), (0, [], []))
+        kinds = [(W["parse_mark"](n["text"])[0], n["to"]) for n in self.said()]
+        self.assertEqual(sorted(kinds), sorted([("open", LOCAL), ("open", SIBLING),
+                                                ("resumed", LOCAL), ("resumed", SIBLING)]))
+        resumed = [n["text"] for n in self.said() if W["parse_mark"](n["text"])[0] == "resumed"]
+        self.assertIn("is no longer pending", resumed[0])
+
+    def test_a_pin_without_the_verb_gives_the_not_observed_line_and_no_note(self):
+        self.pin(cid=CID_OLD)
+        self.hold_open(f"{SESSION}:7")
+        self.write(use("t1", "Bash", T0, command="ls"))
+        code, out, err = self.announce(T0 + 200)
+        self.assertEqual((code, err), (0, []))
+        self.assertEqual(out, [W["NO_VERB_LINE"].format(session=SESSION)])
+        self.assertEqual(self.said(), [])
+
+    def test_nothing_is_said_while_the_native_side_holds_no_open_incident(self):
+        self.pin()
+        self.write(use("t1", "Bash", T0, command="ls"))
+        self.assertEqual(self.announce(T0 + 200), (0, [], []))
+        self.assertEqual(self.said(), [])
+
+    def test_with_no_other_session_listed_the_line_goes_to_the_household(self):
+        self.pin()
+        self.hold_open(f"{SESSION}:7")
+        self.status({"device": DID, "moorings": [{"session": SESSION}], "siblings": []})
+        self.write(use("t1", "Bash", T0, command="ls"))
+        self.announce(T0 + 200)
+        self.announce(T0 + 300)
+        self.assertEqual([n["to"] for n in self.said()], [None])
+
+    def test_an_unreadable_record_says_nothing_with_one_line_and_exit_1(self):
+        self.pin()
+        self.hold_open(f"{SESSION}:7")
+        self.write(use("t1", "Bash", T0, command="ls"))
+        (self.root / "berth-broken").touch()
+        code, out, err = self.announce(T0 + 200)
+        self.assertEqual((code, out, len(err)), (1, [], 1))
+        self.assertTrue(err[0].startswith("held-tool-watch: cannot read what was already said"), err[0])
+        self.assertEqual(self.said(), [])
+
+    def test_the_device_runner_is_one_per_device_and_announces_through_fresh_passes(self):
+        import time as _time
+        self.pin()
+        self.hold_open(f"{SESSION}:7")
+        start = _time.time() - 600
+        self.write(use("t1", "Bash", start, command="ls"))
+        args = ["run", "--transcripts", str(self.transcripts), "--sessions-json", str(self.sessions),
+                "--stasis-root", str(self.stasis), "--bin-store", str(self.store), "--every", "0"]
+        lock = self.root / W["LOOP_LOCK"]
+        with W["file_lock"](str(lock), 0) as mine:
+            self.assertTrue(mine)
+            self.assertEqual(W["main"](args + ["--passes", "2"]), 0)  # another runner holds it: no pass
+        self.assertEqual(self.said(), [])
+        self.assertEqual(W["main"](args + ["--passes", "2"]), 0)
+        self.assertEqual(sorted(n["to"] for n in self.said()), sorted([LOCAL, SIBLING]))
+        self.assertIn("exit 0", (self.root / W["LAST_PASS"]).read_text())
 
 
 class BerthStatusTest(NoStateDir):

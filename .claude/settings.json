@@ -88,6 +88,15 @@
             "timeout": 3
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/held-tool-ensure.py\"",
+            "timeout": 3
+          }
+        ]
       }
     ],
     "Stop": [
@@ -314,6 +323,16 @@
           {
             "type": "command",
             "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/berth-note-inject.py\"",
+            "timeout": 3
+          }
+        ]
+      },
+      {
+        "matcher": ".*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/held-tool-ensure.py\"",
             "timeout": 3
           }
         ]

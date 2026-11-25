@@ -44,6 +44,9 @@ Commands:
                                                                    `berth say: note #<dseq> at <time> to <who>`
                                                                    on stderr, and a second line when the
                                                                    addressee is moored on a SILENT device
+  berth said    --session S [--json]                             read-only: the notes S said on this device,
+                                                                   as folded in its channel store (a sender
+                                                                   that says a thing once reads this record)
   berth inbox   --session S [--peek] [--all] [--follow] [--json]  read notes said to this session
   berth inbox   --session S --reader R [--limit N] [--peek] [--json]
   berth inbox   --session S --reader R --follow
@@ -878,11 +881,11 @@ class Berth:
         except (OSError, ValueError, TypeError):
             return default
 
-    def _scan_inbox(self):
+    def _scan_inbox(self, root=None):
         """Copy only new folded notes into the berth's small, stable stream. The source offset is
         device-wide; a shorter or different store is read again from zero, with CIDs keeping the
         normalized stream append-only so session cursors remain valid."""
-        root = self.channel_root or self.cached_channel_root() or REPO_ROOT
+        root = root or self.channel_root or self.cached_channel_root() or REPO_ROOT
         source = os.path.join(root, ".eprfs", "status", "flows.jsonl")
         size = os.stat(source).st_size
         state = self._read_json(self._inbox_offset_path(), {})
@@ -2215,6 +2218,32 @@ class Berth:
     # ------------------------------------------------------------ notes
     def say(self, session, text, to=None):
         return self.record("note", session=session, to=to, text=text)
+
+    def said(self, session):
+        """The notes `session` said on THIS device, as folded in its channel store (the record that
+        crosses), oldest first; a sibling's note is never one. A sender that must say a thing once
+        reads its own record here instead of keeping a marker. Raises when the store cannot be read:
+        "unknown" is not "never said". The store read is the one a note of this device folds into."""
+        root, unreachable = self._fold_root({"kind": "note"})
+        if unreachable:
+            raise OSError(unreachable)
+        with self._locked("inbox"):
+            os.makedirs(self._inbox_dir(), exist_ok=True)
+            self._scan_inbox(root)
+            notes = []
+            try:
+                with open(self._inbox_notes_path(), encoding="utf-8") as f:
+                    for line in f:
+                        try:
+                            note = json.loads(line)
+                        except ValueError:
+                            continue
+                        if (isinstance(note, dict) and note.get("session") == session
+                                and note.get("from_device") is None):
+                            notes.append(note)
+            except FileNotFoundError:
+                pass
+            return notes
 
 
 # ---------------------------------------------------------------- rendering
@@ -3660,6 +3689,19 @@ def _main(argv):
             print(f"{argv[0]}: released here, but {failed[0]} — the other devices still see it held",
                   file=sys.stderr)
             return 1
+        return 0
+    if cmd == "said":
+        as_json = "--json" in argv
+        if not session or [a for a in argv if a != "--json"]:
+            print("usage: berth said --session S [--json]", file=sys.stderr)
+            return 2
+        notes = b.said(session)
+        if as_json:
+            print(json.dumps(notes))
+        else:
+            for note in notes:
+                print(f"#{note.get('dseq', '?')} {_rfc3339(note.get('at', 0) * 1000)} to "
+                      f"{note.get('to') or 'the household'}: {_one_line(note.get('text', ''))}")
         return 0
     if cmd == "say":
         to = _opt(argv, "--to")

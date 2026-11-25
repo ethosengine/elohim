@@ -1768,6 +1768,21 @@ class BerthInboxTest(unittest.TestCase):
                     self.folded("short-3", 1001, to=self.SESSION[1:9]))
         self.assertEqual(self.berth.inbox(self.SESSION, mark=False), [])
 
+    def test_said_lists_only_this_devices_notes_from_that_sender_and_raises_when_unreadable(self):
+        self.append(self.folded("own-1", 990, sender="watcher", to=self.SESSION, text="one", via=None),
+                    self.folded("own-2", 991, sender="watcher", text="two", via=None),
+                    self.folded("sib-1", 992, sender="watcher", to=self.SESSION, text="theirs"),
+                    self.folded("other", 993, sender=self.SENDER, text="not mine", via=None))
+        said = self.berth.said("watcher")
+        self.assertEqual([(n["cid"], n["to"], n["text"]) for n in said],
+                         [("own-1", self.SESSION, "one"), ("own-2", None, "two")])
+        # Reading is not hearing: the addressee's inbox still holds the note.
+        self.assertEqual([n["cid"] for n in self.berth.inbox(self.SESSION, mark=False)],
+                         ["own-1", "sib-1"])
+        self.flow.unlink()
+        with self.assertRaises(OSError):
+            self.berth.said("watcher")
+
     def test_inbox_lines_is_empty_when_channel_store_is_missing(self):
         self.flow.unlink()
         self.assertEqual(self.berth.inbox_lines(self.SESSION), "")
