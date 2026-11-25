@@ -563,21 +563,83 @@ export function deviceRoot(root, spawn = spawnSync) {
   return dirname(common);
 }
 
-/** Admitted sibling verdict rows from the native device-channel read. Any failure is a miss. */
-export function siblingVerdicts(project, key, { root, env = process.env, spawn = spawnSync }) {
-  const device = deviceRoot(root, spawn);
+const DEFAULT_SIBLING_READ_TIMEOUT_MS = 5_000;
+const MAX_SIBLING_READ_RETRY_TIMEOUT_MS = 30_000;
+
+function siblingReadTimeout(env) {
+  const configured = Number(env.GATE_SIBLING_READ_TIMEOUT_MS);
+  return Number.isFinite(configured) && configured > 0
+    ? Math.round(configured)
+    : DEFAULT_SIBLING_READ_TIMEOUT_MS;
+}
+
+function seconds(timeoutMs) {
+  return `${timeoutMs / 1_000} s`;
+}
+
+function shortLine(value, fallback) {
+  const line = String(value ?? '').trim().split(/\r?\n/, 1)[0].trim() || fallback;
+  return line.length > 240 ? `${line.slice(0, 237)}...` : line;
+}
+
+function siblingReadFailure(kind, detail) {
+  return { candidates: [], error: { kind, detail }, why: `sibling read failed: ${detail}` };
+}
+
+function readSiblingVerdicts(project, key, { device, env, spawn, timeout }) {
   try {
     // A device read: sibling verdicts are read by the device's head epr, not the session's pin.
     const r = spawn(deviceEpr({ env }), [
       'peer', 'verdicts', '--project', project.name, '--closure', key, '--json', '--root', device,
-    ], { cwd: device, encoding: 'utf8', timeout: 5_000 });
-    if (r.status !== 0) return { candidates: [], error: 'epr peer verdicts failed' };
-    const rows = JSON.parse(r.stdout);
-    if (!Array.isArray(rows)) return { candidates: [], error: 'epr peer verdicts: not an array' };
+    ], { cwd: device, encoding: 'utf8', timeout });
+    if (r?.error?.code === 'ETIMEDOUT' || (r?.status === null && r?.signal)) {
+      return siblingReadFailure('timeout', `timeout after ${seconds(timeout)}`);
+    }
+    if (!r || typeof r !== 'object') return siblingReadFailure('spawn', 'spawn returned no result');
+    if (r.error) return siblingReadFailure('spawn', shortLine(r.error.message ?? r.error.code ?? r.error, 'spawn error'));
+    if (r.status !== 0) {
+      const code = r.status ?? 'unknown';
+      const stderr = shortLine(r.stderr, '');
+      return siblingReadFailure('exit', `exit ${code}${stderr ? `: ${stderr}` : ''}`);
+    }
+    let rows;
+    try {
+      rows = JSON.parse(r.stdout);
+    } catch (error) {
+      return siblingReadFailure('parse', shortLine(error?.message, 'invalid JSON'));
+    }
+    if (!Array.isArray(rows)) return siblingReadFailure('parse', 'not an array');
     return { candidates: rows.map(row => ({ source: 'sibling', ...row })) };
-  } catch {
-    return { candidates: [], error: 'epr peer verdicts unavailable' };
+  } catch (error) {
+    return siblingReadFailure('spawn', shortLine(error?.message ?? error, 'spawn error'));
   }
+}
+
+/** Admitted sibling verdict rows from the native device-channel read. Any failure is a miss. */
+export function siblingVerdicts(project, key, { root, env = process.env, spawn = spawnSync }) {
+  const device = deviceRoot(root, spawn);
+  const timeout = siblingReadTimeout(env);
+  const options = { device, env, spawn };
+  const first = readSiblingVerdicts(project, key, { ...options, timeout });
+  if (first.error?.kind !== 'timeout') return first;
+
+  const retryTimeout = Math.min(timeout * 4, MAX_SIBLING_READ_RETRY_TIMEOUT_MS);
+  const retry = readSiblingVerdicts(project, key, { ...options, timeout: retryTimeout });
+  if (!retry.error) {
+    return { ...retry, retried: true, firstAttempt: first.why };
+  }
+  if (retry.error.kind === 'timeout') {
+    const detail = `timeout after ${seconds(retryTimeout)} (first attempt timed out after ${seconds(timeout)})`;
+    return {
+      candidates: [],
+      error: { kind: 'timeout', detail },
+      why: `sibling read failed: timeout after ${seconds(timeout)}; retry timed out after ${seconds(retryTimeout)}`,
+    };
+  }
+  return {
+    ...retry,
+    why: `${first.why}; retry ${retry.why.replace(/^sibling read failed: /, '')}`,
+  };
 }
 
 /**
