@@ -535,6 +535,22 @@ function gitDirs(root) {
   return gitDir && commonDir ? { gitDir, commonDir } : null;
 }
 
+/** The stable lock sits beside the slot, so deleting the slot cannot replace the locked inode. */
+export function slotGateLockPath(slot) {
+  return slot ? `${slot}.gate.lock` : '';
+}
+
+function cargoSlotPath(cargo, targetDir, root, env) {
+  if (targetDir) return targetDir;
+  if (!cargo.workspace) return '';
+  const result = spawnSync('bash', [
+    '-c',
+    'source "$1/genesis/agentic/bin/pool-lib.sh" && slot_path "$(detect_family "$1")" "$2" "$3"',
+    '_', root, cargo.workspace, cargo.profile || 'dev',
+  ], { cwd: root, encoding: 'utf8', env });
+  return result.status === 0 ? String(result.stdout || '').trim() : '';
+}
+
 // Findings belong to this device's shared ledger, while recipes and measures
 // still come from the checkout being gated. Non-git fixtures remain local.
 export function architectureLedgerPath(root, git = gitDirs) {
@@ -580,7 +596,11 @@ export const GATE_SLOT_BUSY_EXIT = 73;
  * command directly, as an injected spawn in a fixture does.
  */
 function gateSpawn(project, command, argv, options, { spawn, env, tap }) {
-  if (!tap || env.GATE_TAP === 'off') return { result: spawn(command, argv, options), tapped: null };
+  // A cargo-slot holder is owned by the tap even when live failure tapping is disabled. Bypassing
+  // it would run the recipe without the lock. Injected-spawn fixtures (`tap: false`) remain direct.
+  if (!tap || (env.GATE_TAP === 'off' && !options.env?.GATE_SLOT_LOCK_PATH)) {
+    return { result: spawn(command, argv, options), tapped: null };
+  }
   const live = env.GATE_LIVE_RUN ? ['--run', env.GATE_LIVE_RUN] : [];
   const result = spawn(process.execPath, [TAP, '--project', project.name, '--dir', project.dir, ...live, '--', command, ...argv],
     { ...options, stdio: ['inherit', 'inherit', 'inherit', 'pipe'] });
@@ -1067,6 +1087,21 @@ export function runProject(project, printOnly, namesOnly, {
 } = {}) {
   const cargo = project.run.cargo || {};
   const targetDir = worktreeTargetDir(cargo.targetDir || '', root);
+  const slotDir = cargoSlotPath(cargo, targetDir, root, env);
+  const slotLock = slotGateLockPath(slotDir);
+  const gateRunEnv = (slotWaitPath = null) => {
+    const child = gateChildEnv(project, env, root);
+    if (slotLock) {
+      child.GATE_SLOT_LOCK_PATH = slotLock;
+      child.GATE_SLOT_HOLDER_PATH = resolve(slotDir, '.gate.holder');
+    } else {
+      delete child.GATE_SLOT_LOCK_PATH;
+      delete child.GATE_SLOT_HOLDER_PATH;
+    }
+    if (slotWaitPath) child.GATE_SLOT_WAIT_RESULT = slotWaitPath;
+    else delete child.GATE_SLOT_WAIT_RESULT;
+    return child;
+  };
   const args = [
     root,
     project.name,
@@ -1084,9 +1119,9 @@ export function runProject(project, printOnly, namesOnly, {
     try {
       const dir = mkdtempSync(join(realpathSync(tmpdir()), 'gate-slot-wait-'));
       const path = join(dir, 'result.tsv');
-      return { argv: [...args, path], dir, path };
+      return { argv: [...args, path, slotLock], dir, path };
     } catch {
-      return { argv: args, dir: null, path: null };
+      return { argv: [...args, '', slotLock], dir: null, path: null };
     }
   };
   const collectSlotWait = attempt => {
@@ -1233,11 +1268,13 @@ export function runProject(project, printOnly, namesOnly, {
     reading.key = `none: alternate recipe ${recipe} has no gate closure key`;
     write(`\n[gate] ${project.name} (${project.dir}) — recipe ${recipe}\n`);
     const slotAttempt = newSlotWaitAttempt();
-    const status = spawn('bash', [resolve(root, 'genesis/orchestrator/run-local-gate.sh'), ...slotAttempt.argv], {
+    const recipeEnv = gateRunEnv(slotAttempt.path);
+    const ran = gateSpawn(project, 'bash', [resolve(root, 'genesis/orchestrator/run-local-gate.sh'), ...slotAttempt.argv], {
       cwd: root,
       stdio: 'inherit',
-      env: gateChildEnv(project, env, root),
-    }).status ?? 1;
+      env: recipeEnv,
+    }, { spawn, env, tap });
+    const status = ran.result.status ?? 1;
     const slotWait = collectSlotWait(slotAttempt);
     if (status === GATE_SLOT_BUSY_EXIT) return slotBusyGate(slotWait);
     emitSlotWaitReading(slotWait, 'ran');
@@ -1288,7 +1325,7 @@ export function runProject(project, printOnly, namesOnly, {
     costDecision = costLineAndDefer(project, { rows, subjectFallback, env });
     write(`${costDecision.line}\n`);
   }
-  const childEnv = gateChildEnv(project, env, root);
+  const childEnv = gateRunEnv();
   let started = clock();
   const cycleEnv = { ...env, ...cargoEnvOf(childEnv) };
   const cycleDeps = {
@@ -1622,6 +1659,8 @@ export function runProject(project, printOnly, namesOnly, {
     try { writeFileSync(childEnv.GATE_STEP_TIMES, ''); } catch { /* telemetry */ }
   };
   const slotAttempt = newSlotWaitAttempt();
+  if (slotAttempt.path) childEnv.GATE_SLOT_WAIT_RESULT = slotAttempt.path;
+  else delete childEnv.GATE_SLOT_WAIT_RESULT;
   let task = null;
   if (taskOn) {
     task = prepareTask(project, {

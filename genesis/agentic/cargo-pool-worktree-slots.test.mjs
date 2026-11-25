@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
@@ -78,7 +78,7 @@ function fixture(t) {
     });
     return gateWorktreeTargetDir()(base, checkout, dirs);
   };
-  return { repo, worktrees, pool, a, b, run, key, gateTarget };
+  return { repo, worktrees, pool, a, b, env, run, key, gateTarget };
 }
 
 test('two cd linked worktrees get distinct key slots and the main checkout stays unsuffixed', (t) => {
@@ -137,7 +137,7 @@ test('steward preserves process-owned and gate-locked orphan slots and removes o
     stdio: 'ignore',
   });
   const ready = join(f.pool, 'gate-lock-ready');
-  const locker = spawn('flock', ['-x', join(gateLocked, '.gate.lock'), 'sh', '-c',
+  const locker = spawn('flock', ['-x', `${gateLocked}.gate.lock`, 'sh', '-c',
     'touch "$1"; sleep 30', '_', ready], { stdio: 'ignore' });
   t.after(() => {
     for (const child of [sleeper, locker]) if (child.exitCode === null) child.kill('SIGKILL');
@@ -151,10 +151,49 @@ test('steward preserves process-owned and gate-locked orphan slots and removes o
   assert.equal(spawnSync('test', ['-d', processOwned]).status, 0,
     'a live CARGO_TARGET_DIR process keeps its orphan slot');
   assert.equal(spawnSync('test', ['-d', gateLocked]).status, 0,
-    'a held .gate.lock keeps its orphan slot');
+    'a held stable gate lock keeps its orphan slot');
   assert.notEqual(spawnSync('test', ['-e', idle]).status, 0, 'a truly idle orphan is reclaimed');
   for (const slot of [processOwned, gateLocked]) {
     assert.match(result.stdout, new RegExp(`stale-worktree-slot\\s+left-busy\\s+${escapeRegExp(slot)}`));
   }
   assert.match(result.stdout, new RegExp(`stale-worktree-slot\\s+removed\\s+${escapeRegExp(idle)}`));
+});
+
+test('steward holds the slot gate lock until orphan deletion finishes', async (t) => {
+  const f = fixture(t);
+  const gone = f.key(f.b).slot_dev;
+  mkdirSync(gone, { recursive: true });
+  writeFileSync(join(gone, 'large-fixture'), 'bytes');
+  git(f.repo, 'worktree', 'remove', f.b);
+
+  const bin = join(f.pool, 'bin');
+  const ready = join(f.pool, 'rm-ready');
+  const release = join(f.pool, 'rm-release');
+  mkdirSync(bin, { recursive: true });
+  const rm = join(bin, 'rm');
+  writeFileSync(rm, `#!/usr/bin/env bash
+set -euo pipefail
+if [[ " $* " == *" $RECLAIM_TARGET "* ]]; then
+  : > "$RECLAIM_READY"
+  while [[ ! -e "$RECLAIM_RELEASE" ]]; do sleep 0.01; done
+fi
+exec /bin/rm "$@"
+`);
+  chmodSync(rm, 0o755);
+  const child = spawn(cargoPool, ['steward'], {
+    cwd: f.repo,
+    env: { ...f.env, PATH: `${bin}:${process.env.PATH}`, RECLAIM_TARGET: gone,
+      RECLAIM_READY: ready, RECLAIM_RELEASE: release },
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  t.after(() => { if (child.exitCode === null) child.kill('SIGKILL'); });
+  const deadline = Date.now() + 3000;
+  while (!existsSync(ready) && Date.now() < deadline) await delay(10);
+  assert.ok(existsSync(ready), 'reclaim never entered its delete');
+  assert.notEqual(spawnSync('flock', ['-n', `${gone}.gate.lock`, 'true']).status, 0,
+    'a gate cannot acquire the slot while reclaim is deleting it');
+  writeFileSync(release, 'release\n');
+  const status = await new Promise(resolve => child.once('close', resolve));
+  assert.equal(status, 0);
+  assert.equal(existsSync(gone), false, 'reclaim completes after releasing the fixture');
 });
