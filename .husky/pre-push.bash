@@ -2587,7 +2587,22 @@ GATE_SECONDS_SUM=0
 # ── Carry: offered
 
 NOT_RUN=""
+SLOT_NOT_RUN=""
+SLOT_NOT_RUN_HOLDER=""
 STOP_REASON=""
+gate_slot_not_run_holder() {
+  local project="$1"
+  [ -n "${GATE_LIVE_RUN:-}" ] || { echo "holder details unavailable"; return; }
+  node -e '
+const fs = require("node:fs");
+const [path, project] = process.argv.slice(1);
+try {
+  const events = fs.readFileSync(path, "utf8").split("\n").filter(Boolean).map(JSON.parse);
+  const found = events.findLast(event => event.kind === "not-run" && event.project === project);
+  process.stdout.write(found?.holder || "holder details unavailable");
+} catch { process.stdout.write("holder details unavailable"); }
+' "$GATE_LIVE_RUN" "$project"
+}
 # shellcheck disable=SC2206 # GATE_INLINE is a word list of manifest keys
 PROJECT_LIST=($GATE_INLINE)
 for PROJECT in $GATE_INLINE; do
@@ -2614,6 +2629,17 @@ for PROJECT in $GATE_INLINE; do
   PROJECT_END=$(date +%s)
   PROJECT_ELAPSED=$((PROJECT_END - PROJECT_START))
   GATE_SECONDS_SUM=$((GATE_SECONDS_SUM + PROJECT_ELAPSED))
+
+  if [ "$GATE_EXIT" -eq 73 ]; then
+    SLOT_NOT_RUN="$PROJECT"
+    SLOT_NOT_RUN_HOLDER="$(gate_slot_not_run_holder "$PROJECT")"
+    echo "$PROJECT: NOT RUN: slot held by $SLOT_NOT_RUN_HOLDER (${PROJECT_ELAPSED}s waited; no evidence recorded)"
+    NOT_RUN="$NOT_RUN $PROJECT"
+    STOP_REASON="$PROJECT slot held by $SLOT_NOT_RUN_HOLDER"
+    RESULTS="$RESULTS  $PROJECT: NOT RUN (${PROJECT_ELAPSED}s waited)\n"
+    echo ""
+    continue
+  fi
 
   # A gate ended by `gate-live.mjs stop --now` (its tap ended the gate's process group; gate-runner
   # recorded nothing for it) is STOPPED, not FAILED, and still refuses the push; nothing after it starts.
@@ -2688,7 +2714,9 @@ TOTAL_ELAPSED=$((TOTAL_END - TOTAL_START))
 if [ -n "$GATE_CARRY_USED" ]; then
   echo "[pre-push] carry: the overlap saved $((GATE_SECONDS_SUM - TOTAL_ELAPSED))s (gates ${GATE_SECONDS_SUM}s, wall ${TOTAL_ELAPSED}s)"
 fi
-if [ -n "$NOT_RUN" ]; then
+if [ -n "$SLOT_NOT_RUN" ]; then
+  echo "[pre-push] NOT RUN: slot held by $SLOT_NOT_RUN_HOLDER; not run:$NOT_RUN"
+elif [ -n "$NOT_RUN" ]; then
   echo "[pre-push] stopped: $STOP_REASON; not run:$NOT_RUN"
   FAILED="$FAILED${FAILED:+ }stopped"
 elif gate_stop_requested; then
@@ -2702,6 +2730,21 @@ FAILED="$FAILED$PREGATE_FAILED"
 
 # Trim leading space from FAILED
 FAILED=$(echo "$FAILED" | sed 's/^ //')
+
+if [ -n "$SLOT_NOT_RUN" ]; then
+  if [ -n "$GATE_LIVE_RUN" ]; then
+    node genesis/orchestrator/gate-live.mjs close --run "$GATE_LIVE_RUN" --outcome interrupted \
+      --deferred-from-log >/dev/null 2>&1 || true
+  fi
+  echo "============================================"
+  echo "  PRE-PUSH GATE: NOT RUN (${TOTAL_ELAPSED}s)"
+  echo "============================================"
+  echo "  Slot held by: $SLOT_NOT_RUN_HOLDER"
+  echo ""
+  echo "  Retry after the current holder releases the shared Cargo slot."
+  echo "============================================"
+  exit 1
+fi
 
 # The run describes the gate loop; later steps (cargo-deny, landing) can still refuse the push. A
 # failed loop closes now; a passed one stays open for stops until stop_point closes it gates-passed.

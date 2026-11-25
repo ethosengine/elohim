@@ -2,13 +2,15 @@ import assert from 'node:assert/strict';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
+import { setTimeout as delay } from 'node:timers/promises';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 const repoRoot = fileURLToPath(new URL('../..', import.meta.url));
 const cargoPool = join(repoRoot, 'genesis/agentic/bin/cargo-pool');
 const gateRunner = join(repoRoot, 'genesis/orchestrator/gate-runner.mjs');
+const escapeRegExp = value => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 function gateWorktreeTargetDir() {
   const source = readFileSync(gateRunner, 'utf8');
@@ -119,4 +121,40 @@ test('steward dry-run marks a gone worktree slot reclaimable without deleting it
   assert.match(result.stdout, new RegExp(gone.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   assert.doesNotMatch(result.stdout, new RegExp(`${live.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}.*reclaimable`));
   assert.equal(spawnSync('test', ['-d', gone]).status, 0, 'dry-run must preserve the slot');
+});
+
+test('steward preserves process-owned and gate-locked orphan slots and removes only the idle orphan', async (t) => {
+  const f = fixture(t);
+  const key = f.key(f.b);
+  const processOwned = key.slot_dev;
+  const gateLocked = key.slot_release;
+  const idle = key.slot_release.replace(/release-wt-/, 'lsp-wt-');
+  for (const slot of [processOwned, gateLocked, idle]) mkdirSync(slot, { recursive: true });
+  git(f.repo, 'worktree', 'remove', f.b);
+
+  const sleeper = spawn('sleep', ['30'], {
+    env: { ...process.env, CARGO_TARGET_DIR: processOwned },
+    stdio: 'ignore',
+  });
+  const ready = join(f.pool, 'gate-lock-ready');
+  const locker = spawn('flock', ['-x', join(gateLocked, '.gate.lock'), 'sh', '-c',
+    'touch "$1"; sleep 30', '_', ready], { stdio: 'ignore' });
+  t.after(() => {
+    for (const child of [sleeper, locker]) if (child.exitCode === null) child.kill('SIGKILL');
+  });
+  const deadline = Date.now() + 3000;
+  while (spawnSync('test', ['-e', ready]).status !== 0 && Date.now() < deadline) await delay(10);
+  assert.equal(spawnSync('test', ['-e', ready]).status, 0, 'the fixture lock was not acquired');
+
+  const result = f.run(f.repo, 'steward');
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(spawnSync('test', ['-d', processOwned]).status, 0,
+    'a live CARGO_TARGET_DIR process keeps its orphan slot');
+  assert.equal(spawnSync('test', ['-d', gateLocked]).status, 0,
+    'a held .gate.lock keeps its orphan slot');
+  assert.notEqual(spawnSync('test', ['-e', idle]).status, 0, 'a truly idle orphan is reclaimed');
+  for (const slot of [processOwned, gateLocked]) {
+    assert.match(result.stdout, new RegExp(`stale-worktree-slot\\s+left-busy\\s+${escapeRegExp(slot)}`));
+  }
+  assert.match(result.stdout, new RegExp(`stale-worktree-slot\\s+removed\\s+${escapeRegExp(idle)}`));
 });

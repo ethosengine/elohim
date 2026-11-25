@@ -1,4 +1,5 @@
 import { gateEvidence, gateKeyMaterial, gateKeyMaterials, recordEvidence } from './gate-evidence.mjs';
+import { openRun, readRun } from './gate-live.mjs';
 import { after, describe, test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import { chmodSync, existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -793,7 +794,8 @@ describe('gate step reading collector', () => {
     ]);
   });
 
-  function timedCrateRun({ budgetMs, cargoAdvanceNs, rustcAdvanceNs = 0n, recipeAdvanceNs = 0n, injectReads = true }) {
+  function timedCrateRun({ budgetMs, cargoAdvanceNs, rustcAdvanceNs = 0n, recipeAdvanceNs = 0n,
+    slotWaitSeconds = null, injectReads = true }) {
     const root = mkdtempSync(resolve(tmpdir(), 'crate-shadow-budget-'));
     const rows = resolve(root, 'rows.jsonl');
     const changed = resolve(root, 'changed.txt');
@@ -834,6 +836,7 @@ describe('gate step reading collector', () => {
       if (command === 'bash' && String(args[0]).endsWith('/rust-style.sh')) return { status: 0 };
       if (command === 'bash' && String(args[0]).endsWith('/run-local-gate.sh')) {
         writeFileSync(options.env.GATE_STEP_TIMES, 'fmt\t0\t1795500000\t1795500002\n');
+        if (slotWaitSeconds !== null) writeFileSync(args.at(-1), `${slotWaitSeconds}\tproject=incumbent pid=42\n`);
         now += recipeAdvanceNs;
         return { status: 7, stdout: '', stderr: '' };
       }
@@ -863,6 +866,28 @@ describe('gate step reading collector', () => {
       assert.ok(cycle, 'recordCycle writes its native observation');
       assert.equal(cycle.args[cycle.args.indexOf('--value') + 1], '0');
       assert.equal(result.readScans, 1, 'selection and crate context share the member read-set cache');
+    } finally {
+      rmSync(result.root, { recursive: true, force: true });
+    }
+  });
+
+  test('slot wait is its own reading and is excluded from cycle and gate seconds', () => {
+    const result = timedCrateRun({
+      budgetMs: 60_000,
+      cargoAdvanceNs: 0n,
+      recipeAdvanceNs: 5_000_000_000n,
+      slotWaitSeconds: 2,
+    });
+    try {
+      assert.equal(result.status, 7);
+      const cycle = result.calls.find(call =>
+        call.command === 'fixture-epr' && call.args.includes('gate-cycle-seconds@1'));
+      assert.equal(cycle.args[cycle.args.indexOf('--value') + 1], '3');
+      const main = result.readings.find(row => row.step === 'eprfs');
+      assert.deepEqual({ seconds: main.value, waited: main.waited_seconds }, { seconds: 3, waited: 2 });
+      const wait = result.readings.find(row => row.step === 'eprfs:slot-wait');
+      assert.deepEqual({ seconds: wait.value, status: wait.status, outcome: wait.outcome },
+        { seconds: 2, status: 'none', outcome: 'ran' });
     } finally {
       rmSync(result.root, { recursive: true, force: true });
     }
@@ -2037,6 +2062,11 @@ test('--recipe runs another recipe of one project in its gate slot, never throug
     assert.equal(refused.status, 2, `${bad.join(' ')} must refuse`);
     assert.doesNotMatch(refused.stdout, /RAN/);
   }
+
+  writeFileSync(resolve(root, 'genesis/orchestrator/run-local-gate.sh'), 'exit 73\n');
+  const busy = cli('--recipe', '_tool-deliver');
+  assert.equal(busy.status, GATE_SLOT_BUSY_EXIT, busy.stdout + busy.stderr);
+  assert.match(busy.stdout, /NOT RUN: slot held by holder details unavailable/);
 });
 
 test('a red run keeps its non-zero status when its same-device green note is kept', t => {
@@ -2070,21 +2100,71 @@ test('a red run keeps its non-zero status when its same-device green note is kep
   assert.doesNotMatch(output, /evidence: recorded/);
 });
 
-test('a cargo slot timeout records no evidence, verdict, cycle row, or gate reading', t => {
+test('recorded evidence duration excludes a simulated cargo slot wait', t => {
+  const root = mkdtempSync(resolve(tmpdir(), 'gate-slot-wait-duration-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const bin = resolve(root, 'brit');
+  writeFileSync(bin, '', { mode: 0o755 });
+  const project = { name: 'fixture', dir: 'fixture', steps: ['build'], manifestPath: 'build-manifest.json',
+    run: { kind: 'just', recipe: 'gate', cargo: { targetDir: resolve(root, 'slot'), rustflags: '' } } };
+  const agentId = 'ab'.repeat(32);
+  const readings = [];
+  const calls = [];
+  let key;
+  let now = 0n;
+  const spawn = (command, args) => {
+    calls.push({ command, args });
+    const ok = stdout => ({ status: 0, stdout, stderr: '' });
+    if (command === 'bash' && String(args[0]).endsWith('/rust-style.sh')) return ok('');
+    if (command === 'bash' && String(args[0]).endsWith('/run-local-gate.sh')) {
+      writeFileSync(args.at(-1), '2\tproject=incumbent pid=42\n');
+      now += 5_000_000_000n;
+      return ok('');
+    }
+    if (args[0] === 'rev-parse') return ok('a'.repeat(40));
+    if (args[0] === 'show') return ok(JSON.stringify({ steps: { build: { inputs: { sources: ['fixture/**'] } } } }));
+    if (args[0] === 'status' || args[0] === 'ls-tree') return ok('');
+    if (args[1] === 'fingerprint') return ok(JSON.stringify({ fingerprints: [{ step: 'build', fingerprint: 'fp' }] }));
+    if (args[3] === 'find') { key = args[args.indexOf('--inputs-hash') + 1]; return ok('[]'); }
+    if (args[3] === 'get') return ok('[]');
+    if (args[2] === 'signer') return ok(JSON.stringify({ agentId }));
+    if (args[3] === 'put') return ok(`bafyrei${'a'.repeat(52)}`);
+    return { status: 0, stdout: '', stderr: '' };
+  };
+  const status = runProject(project, false, false, {
+    root, spawn, clock: () => now, readingCollector: readings,
+    env: { PATH: '', BRIT_BIN: bin, BRIT_BUILD_REF_BIN: bin, EPR_BIN: 'fixture-epr',
+      GATE_READING_RUN_ID: 'slot-wait-duration', GATE_TASK: 'off', GATE_EVIDENCE: 'off',
+      GATE_INPUTS: 'off', GATE_RECIPE_KEY: 'off' },
+    write: () => {}, warn: () => {},
+  });
+  assert.equal(status, 0);
+  const put = calls.find(call => call.args[3] === 'put');
+  assert.equal(put.args[put.args.indexOf('--duration-ms') + 1], '3000');
+  assert.equal(readings.find(row => row.step === 'fixture').value, 3);
+  assert.equal(readings.find(row => row.step === 'fixture:slot-wait').value, 2);
+});
+
+test('a cargo slot timeout records only its not-run slot-wait reading and live event', t => {
   const root = mkdtempSync(resolve(tmpdir(), 'gate-slot-busy-'));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const bin = resolve(root, 'brit');
   writeFileSync(bin, '', { mode: 0o755 });
   const project = { name: 'fixture', dir: 'fixture', steps: ['build'],
-    manifestPath: 'build-manifest.json', run: { kind: 'just', recipe: 'gate' } };
+    manifestPath: 'build-manifest.json', run: {
+      kind: 'just', recipe: 'gate', cargo: { targetDir: resolve(root, 'slot'), rustflags: '' },
+    } };
   const agentId = 'ab'.repeat(32);
   const calls = [];
   const readings = [];
+  const live = openRun({ root, sha: 'a'.repeat(40), target: 'just gate', session: 'test' });
   let key, puts = 0, output = '';
   const spawn = (command, args) => {
     calls.push({ command, args });
     const ok = stdout => ({ status: 0, stdout, stderr: '' });
+    if (command === 'bash' && String(args[0]).endsWith('/rust-style.sh')) return ok('');
     if (command === 'bash' && String(args[0]).endsWith('/run-local-gate.sh')) {
+      writeFileSync(args.at(-1), '0.5\tproject=incumbent pid=42\n');
       return { status: GATE_SLOT_BUSY_EXIT, stdout: '', stderr: '' };
     }
     if (args[0] === 'rev-parse') return ok('a'.repeat(40));
@@ -2099,16 +2179,21 @@ test('a cargo slot timeout records no evidence, verdict, cycle row, or gate read
   };
   const status = runProject(project, false, false, { root, spawn, readingCollector: readings,
     env: { PATH: '', BRIT_BIN: bin, BRIT_BUILD_REF_BIN: bin, EPR_BIN: 'fixture-epr',
-      GATE_TASK: 'off', GATE_EVIDENCE: 'off', GATE_INPUTS: 'off', GATE_RECIPE_KEY: 'off' },
+      GATE_LIVE_RUN: live.path, GATE_TASK: 'off', GATE_EVIDENCE: 'off', GATE_INPUTS: 'off', GATE_RECIPE_KEY: 'off' },
     write: line => { output += line; }, warn: line => { output += line; } });
 
   assert.equal(status, GATE_SLOT_BUSY_EXIT);
   assert.equal(puts, 0, 'no closure evidence is written');
-  assert.equal(readings.length, 0, 'a did-not-run gate has no reading outcome');
+  assert.deepEqual(readings.map(row => [row.step, row.status, row.outcome, row.value]), [
+    ['fixture:slot-wait', 'none', 'skipped', 0.5],
+  ]);
   assert.equal(calls.some(call => call.args.includes('gate-verdict@1')), false);
   assert.equal(calls.some(call => call.args.includes('gate-cycle-seconds@1')), false);
-  assert.match(output, /^\[gate\] fixture slot busy: did not run \(unanswered\); no evidence, verdict, or cycle recorded$/m);
+  assert.match(output, /^\[gate\] fixture NOT RUN: slot held by project=incumbent pid=42; no evidence, verdict, or cycle recorded$/m);
   assert.doesNotMatch(output, /evidence: recorded/);
+  const notRun = readRun(live.path).events.find(event => event.kind === 'not-run');
+  assert.deepEqual({ project: notRun.project, holder: notRun.holder, waited: notRun.waited_seconds },
+    { project: 'fixture', holder: 'project=incumbent pid=42', waited: 0.5 });
 });
 
 test('ark CLI and workspace lock are eprfs gate-owned inputs, not pipeline dispatch sources', () => {

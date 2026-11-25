@@ -606,6 +606,23 @@ function oneLine(value) {
   return String(value ?? '').replace(/[\r\n]+/g, ' ').trim();
 }
 
+function slotWaitResult(path) {
+  if (!path) return { measured: false, seconds: 0, holder: 'holder details unavailable' };
+  try {
+    const line = readFileSync(path, 'utf8').split('\n')[0];
+    const at = line.indexOf('\t');
+    const seconds = Number(at < 0 ? line : line.slice(0, at));
+    if (!Number.isFinite(seconds) || seconds < 0) throw new Error('invalid slot wait seconds');
+    return {
+      measured: true,
+      seconds,
+      holder: oneLine(at < 0 ? '' : line.slice(at + 1)) || 'holder details unavailable',
+    };
+  } catch {
+    return { measured: false, seconds: 0, holder: 'holder details unavailable' };
+  }
+}
+
 class ShadowBudgetExhausted extends Error {
   constructor(budgetMs, phase) {
     super(`budget ${budgetMs} ms exhausted in ${phase}`);
@@ -1062,6 +1079,28 @@ export function runProject(project, printOnly, namesOnly, {
     Object.hasOwn(cargo, 'rustflags') ? cargo.rustflags : '__inherit__',
   ];
 
+  const newSlotWaitAttempt = () => {
+    if (!cargo.workspace && !targetDir) return { argv: args, dir: null, path: null };
+    try {
+      const dir = mkdtempSync(join(realpathSync(tmpdir()), 'gate-slot-wait-'));
+      const path = join(dir, 'result.tsv');
+      return { argv: [...args, path], dir, path };
+    } catch {
+      return { argv: args, dir: null, path: null };
+    }
+  };
+  const collectSlotWait = attempt => {
+    const result = slotWaitResult(attempt.path);
+    if (attempt.dir) {
+      try { rmSync(attempt.dir, { recursive: true, force: true }); } catch { /* telemetry */ }
+    }
+    return result;
+  };
+  const clearSlotWait = attempt => {
+    if (!attempt.path) return;
+    try { writeFileSync(attempt.path, ''); } catch { /* telemetry */ }
+  };
+
   if (namesOnly) {
     write(`${project.name}\n`);
     return 0;
@@ -1140,9 +1179,30 @@ export function runProject(project, printOnly, namesOnly, {
     });
     return GATE_STOPPED_EXIT;
   };
-  const slotBusyGate = () => {
+  const emitSlotWaitReading = (slotWait, outcome) => {
+    reading.waitedSeconds = slotWait.seconds;
+    if (!slotWait.measured) return;
+    emitGateReading({
+      ...reading,
+      step: `${project.name}:slot-wait`,
+      parent: project.name,
+      key: 'none: cargo slot admission is not closure evidence',
+      keyChanged: 'unknown',
+      outcome,
+      status: 'none',
+      synthesized: false,
+      seconds: slotWait.seconds,
+      endedAt: rfc3339(wallClock()),
+    }, { env, collector: readingCollector });
+  };
+  const slotBusyGate = (slotWait = { measured: false, seconds: 0, holder: 'holder details unavailable' }) => {
     readingComplete = true;
-    write(`[gate] ${project.name} slot busy: did not run (unanswered); no evidence, verdict, or cycle recorded\n`);
+    emitSlotWaitReading(slotWait, 'skipped');
+    write(`[gate] ${project.name} NOT RUN: slot held by ${slotWait.holder}; no evidence, verdict, or cycle recorded\n`);
+    liveEvent(env, {
+      kind: 'not-run', project: project.name, reason: 'slot-held', resource: 'cargo-slot',
+      holder: slotWait.holder, waited_seconds: slotWait.seconds,
+    });
     return GATE_SLOT_BUSY_EXIT;
   };
   const complete = (status, outcome, seconds = null) => {
@@ -1150,7 +1210,7 @@ export function runProject(project, printOnly, namesOnly, {
       readingComplete = true;
       const elapsed = Number(clock() - readingStarted) / 1e9;
       const executing = seconds === null
-        ? Math.max(0, elapsed - finiteSeconds(reading.leaseWaitedSeconds))
+        ? Math.max(0, elapsed - finiteSeconds(reading.leaseWaitedSeconds) - finiteSeconds(reading.waitedSeconds))
         : seconds;
       emitGateReading({
         ...reading,
@@ -1172,12 +1232,15 @@ export function runProject(project, printOnly, namesOnly, {
     }
     reading.key = `none: alternate recipe ${recipe} has no gate closure key`;
     write(`\n[gate] ${project.name} (${project.dir}) — recipe ${recipe}\n`);
-    const status = spawn('bash', [resolve(root, 'genesis/orchestrator/run-local-gate.sh'), ...args], {
+    const slotAttempt = newSlotWaitAttempt();
+    const status = spawn('bash', [resolve(root, 'genesis/orchestrator/run-local-gate.sh'), ...slotAttempt.argv], {
       cwd: root,
       stdio: 'inherit',
       env: gateChildEnv(project, env, root),
     }).status ?? 1;
-    if (status === GATE_SLOT_BUSY_EXIT) return slotBusyGate();
+    const slotWait = collectSlotWait(slotAttempt);
+    if (status === GATE_SLOT_BUSY_EXIT) return slotBusyGate(slotWait);
+    emitSlotWaitReading(slotWait, 'ran');
     return complete(status, 'ran');
   }
 
@@ -1558,10 +1621,11 @@ export function runProject(project, printOnly, namesOnly, {
     if (!stepTimesDir) return;
     try { writeFileSync(childEnv.GATE_STEP_TIMES, ''); } catch { /* telemetry */ }
   };
+  const slotAttempt = newSlotWaitAttempt();
   let task = null;
   if (taskOn) {
     task = prepareTask(project, {
-      root, env, childEnv, args, evidence, spawn, device: selfId,
+      root, env, childEnv, args: slotAttempt.argv, evidence, spawn, device: selfId,
       // gate-runner made the reuse decision; the Task is asked to run, never to reuse.
       reuse: { mode: null, enabled: false, selfId: null, dirty: evidence.dirty ?? null, commit: gateCommit },
     });
@@ -1576,7 +1640,7 @@ export function runProject(project, printOnly, namesOnly, {
       write(`gate-task: not passed to the Task child (braces are ark template syntax): ${task.dropped.join(' ')}\n`);
     }
   }
-  const direct = () => gateSpawn(project, 'bash', [resolve(root, 'genesis/orchestrator/run-local-gate.sh'), ...args], {
+  const direct = () => gateSpawn(project, 'bash', [resolve(root, 'genesis/orchestrator/run-local-gate.sh'), ...slotAttempt.argv], {
     cwd: root,
     stdio: 'inherit',
     env: childEnv,
@@ -1605,6 +1669,7 @@ export function runProject(project, printOnly, namesOnly, {
         suiteResult = null;
         resultDir = newResultDir();
         clearStepTimes(); // the second attempt's steps alone are the run's steps
+        clearSlotWait(slotAttempt);
         ran = direct();
       }
     } else {
@@ -1614,21 +1679,26 @@ export function runProject(project, printOnly, namesOnly, {
   } finally {
     if (resultDir) rmSync(resultDir, { recursive: true, force: true });
   }
+  const slotWait = collectSlotWait(slotAttempt);
   const stepTimes = readStepTimes();
   if (stepTimesDir) {
     try { rmSync(stepTimesDir, { recursive: true, force: true }); } catch { /* telemetry */ }
   }
   const { result, tapped } = ran;
   if (tapped?.stopped) return stoppedGate(tapped.stopped);
-  if (result.status === GATE_SLOT_BUSY_EXIT) return slotBusyGate();
+  if (result.status === GATE_SLOT_BUSY_EXIT) return slotBusyGate(slotWait);
+  emitSlotWaitReading(slotWait, 'ran');
   const cost = tapped ? Object.fromEntries(COST_FIELDS.map(k => [k, tapped[k] ?? null])) : undefined;
   const derivation = task ? { ...task.derivation, hit: answer.answered?.hit === true } : undefined;
   if (answer?.answered?.hit) {
     write(`[gate] ${project.name} reused: derivation hit (method ${derivation.method}, input ${derivation.input})\n`);
     const seconds = Number(clock() - started) / 1e9;
-    recordCycle(project, seconds, 0, { ...cycleEnv, GATE_RUN_KIND: 'reused' }, cycleDeps);
+    const executionSeconds = Math.max(0, seconds
+      - finiteSeconds(reading.leaseWaitedSeconds)
+      - finiteSeconds(reading.waitedSeconds));
+    recordCycle(project, executionSeconds, 0, { ...cycleEnv, GATE_RUN_KIND: 'reused' }, cycleDeps);
     liveEvent(env, { kind: 'gate-verdict', project: project.name, verdict: { exit: 0, seconds: 0, reused: true }, derivation, status: 'Answered' });
-    const completed = complete(0, 'reused', Math.max(0, seconds - finiteSeconds(reading.leaseWaitedSeconds)));
+    const completed = complete(0, 'reused', executionSeconds);
     runReadShadow('reused', 'green');
     return completed;
   }
@@ -1658,6 +1728,9 @@ export function runProject(project, printOnly, namesOnly, {
     : { status: result.status ?? 1, record: true };
   const status = outcome.status;
   const seconds = Number(clock() - started) / 1e9;
+  const executionSeconds = Math.max(0, seconds
+    - finiteSeconds(reading.leaseWaitedSeconds)
+    - finiteSeconds(reading.waitedSeconds));
   let evidenceCid = null;
   // The verdict is recorded against the closure — red too; a known-red closure is information.
   // An interrupted Task has no verdict, so nothing is recorded for it. A suite's named half is
@@ -1674,7 +1747,7 @@ export function runProject(project, printOnly, namesOnly, {
   if (evidence.key && evidence.buildRefBin && !answer?.unanswered && suiteCheck.record) {
     const put = recordEvidence(project, evidence.key, {
       success: status === 0,
-      seconds,
+      seconds: executionSeconds,
       cost,
       commit: gateCommit,
       buildRefBin: evidence.buildRefBin,
@@ -1694,7 +1767,7 @@ export function runProject(project, printOnly, namesOnly, {
     if (put.status === 0 && !put.keptGreen) {
       evidenceCid = String(put.stdout || '').trim().split('\n').pop() || null;
       emitGateVerdict(project, evidence.key, {
-        success: status === 0, seconds, commit: gateCommit, put, root, env, spawn, warn,
+        success: status === 0, seconds: executionSeconds, commit: gateCommit, put, root, env, spawn, warn,
       });
     }
   }
@@ -1702,16 +1775,16 @@ export function runProject(project, printOnly, namesOnly, {
   // The ceiling, the reviewer and its charter are declared in measures.yaml.
   // Untapped output is unavailable, not evidence that no tests ran.
   const signals = { ...(tapped?.signals || {}), signal: result.signal, firstRedSeconds: tapped?.firstRedSeconds ?? undefined, cost };
-  recordCycle(project, seconds, status, cycleEnv, cycleDeps, signals);
+  recordCycle(project, executionSeconds, status, cycleEnv, cycleDeps, signals);
   liveEvent(env, { kind: 'gate-verdict', project: project.name, verdict: {
-    exit: status, seconds: Math.round(seconds), failure_class: classifyFailure(status, signals) ?? null,
+    exit: status, seconds: Math.round(executionSeconds), failure_class: classifyFailure(status, signals) ?? null,
     failures: tapped?.failures ?? null, overflow: tapped?.overflow || undefined, evidence: evidenceCid || undefined,
   }, ...(task ? {
     derivation,
     status: answer.unanswered ? 'Unanswered' : 'Answered',
     ...(answer.unanswered ? { unanswered: answer.unanswered } : {}),
   } : {}) });
-  const completed = complete(status, 'ran', Math.max(0, seconds - finiteSeconds(reading.leaseWaitedSeconds)));
+  const completed = complete(status, 'ran', executionSeconds);
   runReadShadow('ran', status === 0 ? 'green' : 'red');
   return completed;
 }
@@ -1811,8 +1884,13 @@ if (isMain) {
   if (orderIndex >= 0 && args[orderIndex + 1] === 'cost') projects = orderByCost(projects);
   if (namesOnly || printOnly || recipe) {
     let failed = 0;
-    for (const project of projects) failed |= runProject(project, printOnly, namesOnly, { recipe });
-    process.exit(failed ? 1 : 0);
+    let refused = false;
+    for (const project of projects) {
+      const status = runProject(project, printOnly, namesOnly, { recipe });
+      if (status === GATE_SLOT_BUSY_EXIT) refused = true;
+      failed |= status;
+    }
+    process.exit(refused ? GATE_SLOT_BUSY_EXIT : (failed ? 1 : 0));
   }
 
   // A standalone `just gate` opens its own live run so its reds reach the session the way a
@@ -1890,5 +1968,7 @@ if (isMain) {
     closeRun(ownRun, refused ? 'interrupted' : (failed ? 'failed' : 'passed'));
     for (const line of formatHarvest(harvest({ root: ROOT, last: 10 }))) process.stdout.write(`${line}\n`);
   }
-  process.exit(failed ? 1 : 0);
+  // Let Node drain stdout/stderr before ending. The recipe's inherited stdout is unbuffered, while
+  // the runner's own NOT RUN / gate heading can otherwise be lost when capture uses a pipe.
+  process.exit(refused ? GATE_SLOT_BUSY_EXIT : (failed ? 1 : 0));
 }

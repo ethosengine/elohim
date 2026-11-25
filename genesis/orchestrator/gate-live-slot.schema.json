@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://elohim.host/schemas/orchestrator/gate-live-slot.schema.json",
+  "title": "gate-live cargo-slot events",
+  "description": "A gate waiting for its shared Cargo slot, or ending without a verdict because the bounded wait expired. These are neither failures nor gate verdicts. This addendum stays beside gate-live-schema.test.mjs because the v1 schema directory is an Edge build source; it is merged with the v1 file and the other orchestrator-local addenda at the next deliberate Edge roll.",
+  "oneOf": [
+    { "$ref": "#/$defs/wait" },
+    { "$ref": "#/$defs/notRun" }
+  ],
+  "$defs": {
+    "envelope": {
+      "type": "object",
+      "properties": {
+        "v": { "$ref": "https://elohim.host/schemas/v1/gate-live-event.schema.json#/properties/v" },
+        "run": { "$ref": "https://elohim.host/schemas/v1/gate-live-event.schema.json#/properties/run" },
+        "seq": { "$ref": "https://elohim.host/schemas/v1/gate-live-event.schema.json#/properties/seq" },
+        "at": { "$ref": "https://elohim.host/schemas/v1/gate-live-event.schema.json#/properties/at" },
+        "project": { "$ref": "https://elohim.host/schemas/v1/gate-live-event.schema.json#/$defs/name" },
+        "resource": { "const": "cargo-slot" },
+        "holder": { "type": "string", "minLength": 1, "maxLength": 1024 }
+      }
+    },
+    "wait": {
+      "allOf": [
+        { "$ref": "#/$defs/envelope" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["v", "run", "seq", "at", "kind", "project", "resource", "holder"],
+          "properties": {
+            "v": true, "run": true, "seq": true, "at": true, "project": true,
+            "resource": true, "holder": true,
+            "kind": { "const": "wait" }
+          }
+        }
+      ]
+    },
+    "notRun": {
+      "allOf": [
+        { "$ref": "#/$defs/envelope" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["v", "run", "seq", "at", "kind", "project", "reason", "resource", "holder", "waited_seconds"],
+          "properties": {
+            "v": true, "run": true, "seq": true, "at": true, "project": true,
+            "resource": true, "holder": true,
+            "kind": { "const": "not-run" },
+            "reason": { "const": "slot-held" },
+            "waited_seconds": { "type": "number", "minimum": 0 }
+          }
+        }
+      ]
+    }
+  }
+}
