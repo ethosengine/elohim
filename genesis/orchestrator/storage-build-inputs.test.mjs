@@ -23,6 +23,7 @@ import { spawnSync } from 'node:child_process';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync, mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { walkGraph } from './graph-walker.mjs';
+import { CONTINUATION, COPY_LINE, FROM_FLAG, VALUED_FLAG, dockerfileStages } from './dockerfile-copies.mjs';
 import { dirname, join, normalize, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -45,18 +46,20 @@ function pathDepClosure(crateDir, seen = new Set()) {
   return seen;
 }
 
-/** Build-context sources for the runtime image; sdk-check is an independent CI target. */
-function dockerCopySources({ includeSdkCheck = false } = {}) {
-  const text = readFileSync(join(root, STORAGE, 'Dockerfile'), 'utf8');
+const storageDockerfile = () => readFileSync(join(root, STORAGE, 'Dockerfile'), 'utf8');
+
+/**
+ * Build-context sources for the runtime image; sdk-check is an independent CI target. Parsed by
+ * dockerfile-copies.mjs, the rule closure-input-digest.sh applies (indented or lowercase COPY,
+ * continuations, valued flags; a --from copy is no context source).
+ */
+function dockerCopySources({ includeSdkCheck = false, text = storageDockerfile() } = {}) {
   const sources = new Set();
-  let sdkCheck = false;
-  for (const line of text.split('\n')) {
-    if (/^FROM\s/i.test(line)) sdkCheck = /\sAS\s+sdk-check\s*$/i.test(line);
-    if (sdkCheck && !includeSdkCheck) continue;
-    const m = line.match(/^COPY\s+(?!--from)(.+)$/);
-    if (!m) continue;
-    const parts = m[1].trim().split(/\s+/).filter(p => !p.startsWith('--'));
-    parts.slice(0, -1).forEach(p => sources.add(normalize(p).replace(/\/$/, '')));
+  for (const stage of dockerfileStages(text)) {
+    if (stage.name === 'sdk-check' && !includeSdkCheck) continue;
+    for (const copy of stage.copies) {
+      for (const p of copy.sources ?? []) sources.add(normalize(p).replace(/\/$/, ''));
+    }
   }
   return sources;
 }
@@ -109,25 +112,38 @@ test('SDK validation helpers stay in the isolated check stage, outside runtime d
 });
 
 /** stage name -> { parent, sdk: [[source, dest]] } for every build-context COPY of elohim/sdk. */
-function sdkCopiesByStage() {
-  const text = readFileSync(join(root, STORAGE, 'Dockerfile'), 'utf8').replace(/\\\r?\n/g, ' ');
+function sdkCopiesByStage(text = storageDockerfile()) {
   const stages = new Map();
-  let current = null;
-  for (const line of text.split('\n')) {
-    const from = line.match(/^FROM\s+(\S+)(?:\s+AS\s+(\S+))?/i);
-    if (from) {
-      current = from[2] ?? `stage${stages.size}`;
-      stages.set(current, { parent: from[1], sdk: [] });
-      continue;
+  for (const stage of dockerfileStages(text)) {
+    const sdk = [];
+    for (const copy of stage.copies) {
+      for (const src of copy.sources ?? []) {
+        if (src === 'elohim/sdk' || src.startsWith('elohim/sdk/')) sdk.push([src.replace(/\/$/, ''), copy.dest.replace(/\/$/, '')]);
+      }
     }
-    const m = current && line.match(/^COPY\s+(?!--from)(.+)$/i);
-    if (!m) continue;
-    const parts = m[1].trim().split(/\s+/).filter(p => !p.startsWith('--'));
-    for (const src of parts.slice(0, -1)) {
-      if (src === 'elohim/sdk' || src.startsWith('elohim/sdk/')) stages.get(current).sdk.push([src.replace(/\/$/, ''), parts.at(-1).replace(/\/$/, '')]);
-    }
+    stages.set(stage.name, { parent: stage.parent, sdk });
   }
   return stages;
+}
+
+/** Every way the storage Dockerfile's elohim/sdk COPYs disagree with cargo-build-storage's sources. */
+function sdkDrift(text = storageDockerfile()) {
+  const declared = manifestSources().filter(g => g.startsWith('elohim/sdk/'));
+  const stages = sdkCopiesByStage(text);
+  const spell = ([src]) => (/\.[a-z]+$/.test(src.split('/').at(-1)) ? src : `${src}/**`);
+  const drift = [];
+  for (const stage of ['check', 'builder']) {
+    const chain = sdkCopyChain(stages, stage);
+    for (const [src, dest] of chain) {
+      if (dest !== src.replace(/^elohim\//, '/')) drift.push(`${stage}: ${src} lands at ${dest}, not the same path under /sdk`);
+    }
+    const copied = [...new Set(chain.map(spell))].sort();
+    if (JSON.stringify(copied) !== JSON.stringify([...declared].sort())) {
+      drift.push(`${stage}: copies [${copied.filter(c => !declared.includes(c)).join(', ')}] undeclared, `
+        + `declares [${declared.filter(d => !copied.includes(d)).join(', ')}] uncopied`);
+    }
+  }
+  return drift;
 }
 
 /** The elohim/sdk COPY sources reaching `stage` through its FROM chain, as manifest-glob spellings. */
@@ -147,16 +163,39 @@ function sdkCopyChain(stages, stage) {
 test('the storage image copies exactly the elohim/sdk subtrees cargo-build-storage declares', () => {
   const declared = manifestSources().filter(g => g.startsWith('elohim/sdk/'));
   assert.ok(!declared.includes('elohim/sdk/**'), 'elohim/sdk/** is back: name the subtrees the build reads');
-  const stages = sdkCopiesByStage();
-  const spell = ([src]) => (/\.[a-z]+$/.test(src.split('/').at(-1)) ? src : `${src}/**`);
-  for (const stage of ['check', 'builder']) {
-    const chain = sdkCopyChain(stages, stage);
-    for (const [src, dest] of chain) {
-      assert.equal(dest, src.replace(/^elohim\//, '/'), `${stage}: ${src} must land at the same path under /sdk`);
-    }
-    assert.deepEqual([...new Set(chain.map(spell))].sort(), [...declared].sort(),
-      `${stage}: the Dockerfile's elohim/sdk COPYs and cargo-build-storage's elohim/sdk sources differ`);
+  assert.deepEqual(sdkDrift(), [], "the Dockerfile's elohim/sdk COPYs and cargo-build-storage's elohim/sdk sources differ");
+});
+
+// The digest script is a node heredoc that cannot import dockerfile-copies.mjs; hold the two to one rule.
+test('dockerfile-copies.mjs reads COPY with the same regexes closure-input-digest.sh uses', () => {
+  const digest = readFileSync(join(root, 'scripts/ci/closure-input-digest.sh'), 'utf8');
+  for (const [name, re] of Object.entries({ CONTINUATION, COPY_LINE, FROM_FLAG, VALUED_FLAG })) {
+    assert.ok(digest.includes(`/${re.source}/`), `${name} /${re.source}/ is not the digest's rule`);
   }
+});
+
+// Review of ci/edge-sdk-narrow (2026-11-25): each spelling below is a valid Docker COPY the digest
+// keys, and each was invisible to a column-zero, uppercase-only parser, so unequal lists passed.
+for (const [name, line] of [
+  ['an indented COPY', '    COPY elohim/sdk/schemas/v1/agent /sdk/schemas/v1/agent'],
+  ['a lowercase copy', 'copy elohim/sdk/schemas/v1/agent /sdk/schemas/v1/agent'],
+  ['an indented, flagged COPY', '  COPY --chown=1000:1000 --chmod=644 elohim/sdk/schemas/v1/agent /sdk/schemas/v1/agent'],
+  ['a continued COPY', 'COPY \\\n    elohim/sdk/schemas/v1/agent \\\n    /sdk/schemas/v1/agent'],
+]) {
+  test(`${name} of an undeclared sdk subtree is a drift and an unwatched source`, () => {
+    const text = storageDockerfile().replace(/^FROM deps AS builder\n/m, m => `${m}${line}\n`);
+    assert.notEqual(text, storageDockerfile(), 'the builder stage was not found');
+    assert.ok(sdkDrift(text).some(d => d.startsWith('builder:') && d.includes('elohim/sdk/schemas/v1/agent/**')), sdkDrift(text).join('; '));
+    const unwatched = [...dockerCopySources({ text })].filter(src => !covered(src, manifestSources()));
+    assert.deepEqual(unwatched, ['elohim/sdk/schemas/v1/agent']);
+  });
+}
+
+test('a --from stage copy of an sdk path is no context source and no drift', () => {
+  const text = storageDockerfile().replace(/^FROM deps AS builder\n/m,
+    m => `${m}  COPY --link --from=check /sdk/schemas/v1/agent /sdk/schemas/v1/agent\n`);
+  assert.deepEqual(sdkDrift(text), []);
+  assert.deepEqual([...dockerCopySources({ text })].sort(), [...dockerCopySources()].sort());
 });
 
 test('an agent script, test, adapter or package fixture under elohim-agent selects no storage input', () => {
@@ -190,8 +229,9 @@ test('an agent script, test, adapter or package fixture under elohim-agent selec
 // elohim-epr-index at ../epr-index — COPY'd, never re-rooted, invisible to the native gates).
 test("every direct path dep of storage is re-rooted by the Dockerfile's sed rewrites", () => {
   const cargo = readFileSync(join(root, STORAGE, 'Cargo.toml'), 'utf8');
-  const docker = readFileSync(join(root, STORAGE, 'Dockerfile'), 'utf8');
-  const copyDests = [...docker.matchAll(/^COPY\s+(?!--from)\S+\s+(\/\S+?)\/?$/gm)].map(m => m[1]);
+  const docker = storageDockerfile();
+  const copyDests = dockerfileStages(docker).flatMap(s => s.copies)
+    .filter(c => c.sources?.length === 1 && c.dest.startsWith('/')).map(c => c.dest.replace(/\/$/, ''));
   const unrooted = [...cargo.matchAll(/\bpath\s*=\s*"(\.\.\/[^"]+)"/g)]
     .map(m => m[1])
     .filter(rel => existsSync(join(root, STORAGE, rel, 'Cargo.toml')))
