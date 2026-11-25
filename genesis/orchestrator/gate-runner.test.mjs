@@ -148,7 +148,7 @@ test('read-shadow on and off keep the same verdict, run decision, and evidence-s
         PATH: '', BRIT_BIN: brit, BRIT_BUILD_REF_BIN: buildRef, GATE_TASK: 'off',
         GATE_EVIDENCE: 'off', GATE_INPUTS: 'off', GATE_RECIPE_KEY: 'off',
         GATE_READ_SHADOW: mode, GATE_READING_RUN_ID: `shadow-${mode}`,
-        ...(budget === null ? {} : { GATE_CRATE_SHADOW_BUDGET_MS: budget }),
+        ...(budget === null ? {} : { GATE_READ_SHADOW_BUDGET_MS: budget }),
       },
       inputsPolicy: { cls: { britArgs: [] } },
       spawn,
