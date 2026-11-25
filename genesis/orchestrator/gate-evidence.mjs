@@ -49,6 +49,24 @@ export function attestationRef(project) {
 const BUILD_REF_ENV = ['BRIT_BUILD_REF_BIN', 'BRIT_BUILD_REF'];
 const stderrWarn = line => process.stderr.write(line);
 
+/** Trusted process environment for carry-only Cargo/rustc evaluation outside a candidate tree. */
+export function carryExecutionEnv(env, cargoEnv, cargoHome) {
+  const fenced = { ...env, ...cargoEnv, CARGO_HOME: cargoHome };
+  if (typeof cargoEnv?.RUSTUP_TOOLCHAIN === 'string' && cargoEnv.RUSTUP_TOOLCHAIN) {
+    fenced.RUSTUP_TOOLCHAIN = cargoEnv.RUSTUP_TOOLCHAIN;
+  } else {
+    delete fenced.RUSTUP_TOOLCHAIN;
+  }
+  for (const key of ['RUSTC', 'RUSTC_WRAPPER', 'RUSTC_WORKSPACE_WRAPPER',
+    'CARGO_BUILD_RUSTC', 'CARGO_BUILD_RUSTC_WRAPPER']) {
+    delete fenced[key];
+  }
+  for (const key of Object.keys(fenced)) {
+    if (/^CARGO_TARGET_.*_RUNNER$/.test(key)) delete fenced[key];
+  }
+  return fenced;
+}
+
 /** A withheld gate has no reusable verdict writer; its policy row is the user-facing reason. */
 export function gateReuseWithheldReason(project, root) {
   try {
@@ -304,10 +322,13 @@ function gitlinksAt(root, commit, sources, spawn) {
   }).sort((a, b) => a.path.localeCompare(b.path));
 }
 
-function rustcHash(project, root, env, cargoEnv, spawn) {
+function rustcHash(project, root, env, cargoEnv, spawn, execution = null) {
   try {
+    const options = execution
+      ? { cwd: execution.cwd, encoding: 'utf8', env: execution.env }
+      : { cwd: resolve(root, project.dir), encoding: 'utf8', env: { ...env, ...cargoEnv } };
     const r = spawn('rustc', ['-vV'], {
-      cwd: resolve(root, project.dir), encoding: 'utf8', env: { ...env, ...cargoEnv },
+      ...options,
     });
     return r.status === 0 ? createHash('sha256').update(r.stdout).digest('hex') : null;
   } catch {
@@ -681,6 +702,7 @@ export function gateKeyMaterials(project, {
   env = process.env, root, commit, cargoEnv, spawn = spawnSync, inputs = null,
   variants = [{ name: 'real', variant: {} }], boundedSuite = false,
   britBin = resolveBin('brit', ['BRIT_BIN'], env), clock = defaultClock, shared = {}, suiteCheck = null,
+  execution = null,
 } = {}) {
   const started = clock();
   const timing = {
@@ -708,8 +730,16 @@ export function gateKeyMaterials(project, {
   if (project.run?.kind === 'attested') return unavailable('unavailable (attested project, no local recipe)');
   if (!britBin) return unavailable('unavailable (brit not on BRIT_BIN/BRIT_BUILD_REF_BIN or PATH)');
   const common = timed('fingerprintingMs', () => {
+    // A carry reads an untrusted candidate checkout. Its native evaluator still needs the
+    // candidate's Git objects, but every non-Git child runs from the trusted execution fence.
+    // Ordinary gates omit `execution` and retain their historical cwd and environment.
+    const nativeRun = execution
+      ? (bin, args, options) => spawn(bin, args, bin === 'git'
+        ? options
+        : { ...options, cwd: execution.cwd, env: execution.env })
+      : spawn;
     const native = usesNativeClosure(project)
-      ? nativeGateState(project, { root, env, run: spawn, toolchain: cargoEnv?.RUSTUP_TOOLCHAIN, commit }) : undefined;
+      ? nativeGateState(project, { root, env, run: nativeRun, toolchain: cargoEnv?.RUSTUP_TOOLCHAIN, commit }) : undefined;
     if (native?.miss) return { error: `unavailable (${native.miss})`, dirty: true };
     const fp = stepFingerprints(project, commit, { britBin, root, spawn, inputs: inputs?.cls ?? LEGACY_ALL });
     if (fp.error) return { error: noKeyLine(fp.error, project, root) };
@@ -728,9 +758,12 @@ export function gateKeyMaterials(project, {
     const tree = gitRead(root, ['rev-parse', `${commit}^{tree}`], spawn)?.trim() || null;
     if (!tree) return { error: `unavailable (read tree absent at ${String(commit).slice(0, 9)})` };
     shared.rustc ||= new Map();
-    const rustcCacheKey = JSON.stringify([resolve(root), project.dir, cargoEnv || {}, env.RUSTUP_TOOLCHAIN || null]);
+    const rustcCacheParts = [resolve(root), project.dir, cargoEnv || {}, env.RUSTUP_TOOLCHAIN || null];
+    const rustcCacheKey = JSON.stringify(execution
+      ? [...rustcCacheParts, execution.cwd, execution.env]
+      : rustcCacheParts);
     if (!shared.rustc.has(rustcCacheKey)) {
-      shared.rustc.set(rustcCacheKey, rustcHash(project, root, env, cargoEnv, spawn));
+      shared.rustc.set(rustcCacheKey, rustcHash(project, root, env, cargoEnv, spawn, execution));
     }
     return {
       nativeKey: native?.key, fp, blob, recipe, runner, compilerTools, dirTree, sources, tree,
@@ -853,14 +886,14 @@ export function gateKeyMaterial(project, options = {}) {
  * Resolve the closure and look for evidence. Returns `{ key, rows, line }` on a resolved
  * closure (rows may be empty) or `{ line }` alone when the closure is unavailable.
  */
-export function gateEvidence(project, { env = process.env, root, commit, cargoEnv, spawn = spawnSync, now = Date.now(), warn = stderrWarn, inputs = null } = {}) {
+export function gateEvidence(project, { env = process.env, root, commit, cargoEnv, spawn = spawnSync, now = Date.now(), warn = stderrWarn, inputs = null, execution = null } = {}) {
   if (project.run?.kind === 'attested') return { line: 'unavailable (attested project, no local recipe)' };
   const britBin = resolveBin('brit', ['BRIT_BIN'], env);
   const buildRefBin = resolveBin('brit-build-ref', BUILD_REF_ENV, env);
   if (!britBin || !buildRefBin) {
     return { line: `unavailable (${!britBin ? 'brit' : 'brit-build-ref'} not on BRIT_BIN/BRIT_BUILD_REF_BIN or PATH)` };
   }
-  const closure = gateKeyMaterial(project, { env, root, commit, cargoEnv, spawn, inputs, britBin });
+  const closure = gateKeyMaterial(project, { env, root, commit, cargoEnv, spawn, inputs, britBin, execution });
   if (!closure.key) return { line: closure.line, ...(closure.dirty === true ? { dirty: true } : {}) };
   const { key, material, fingerprints, nativeKey, sources, recipePath, reads, scope, suite } = closure;
   const found = findEvidence(project, key, { buildRefBin, root, spawn, warn });
