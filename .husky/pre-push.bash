@@ -360,24 +360,26 @@ trap 'exit 129' HUP
 HOOK_ON_EXIT="$HOOK_ON_EXIT gate_step_reading"
 
 # ── Read-shadow push ledger ─────────────────────────────────────
-# One append-only read-shadow budget ledger belongs to this push. Every gate-runner child inherits
-# the same path; an unavailable scratch path is left unreadable so runners fail closed and skip the
-# telemetry shadow instead of silently restoring one budget per process.
-GATE_READ_SHADOW_SCRATCH=$(mktemp -d 2>/dev/null || true)
-if [ -n "$GATE_READ_SHADOW_SCRATCH" ]; then
-  GATE_READ_SHADOW_LEDGER="$GATE_READ_SHADOW_SCRATCH/spent-ms"
-  : >"$GATE_READ_SHADOW_LEDGER" 2>/dev/null || true
-else
-  GATE_READ_SHADOW_LEDGER="$HOOK_WORK_TREE/.gate-read-shadow-ledger-unavailable-$BASHPID"
-fi
-gate_remove_read_shadow_ledger() {
-  [ -z "$GATE_READ_SHADOW_SCRATCH" ] || {
-    rm -f -- "$GATE_READ_SHADOW_LEDGER"
-    rmdir -- "$GATE_READ_SHADOW_SCRATCH" 2>/dev/null || true
+# One append-only read-shadow budget ledger belongs to this push when the shadow is on. Every
+# gate-runner child inherits the same path; an unavailable scratch path is left unreadable so
+# runners fail closed instead of silently restoring one budget per process.
+if [ "${GATE_READ_SHADOW:-on}" != "off" ]; then
+  GATE_READ_SHADOW_SCRATCH=$(mktemp -d 2>/dev/null || true)
+  if [ -n "$GATE_READ_SHADOW_SCRATCH" ]; then
+    GATE_READ_SHADOW_LEDGER="$GATE_READ_SHADOW_SCRATCH/spent-ms"
+    : >"$GATE_READ_SHADOW_LEDGER" 2>/dev/null || true
+  else
+    GATE_READ_SHADOW_LEDGER="$HOOK_WORK_TREE/.gate-read-shadow-ledger-unavailable-$BASHPID"
+  fi
+  gate_remove_read_shadow_ledger() {
+    [ -z "$GATE_READ_SHADOW_SCRATCH" ] || {
+      rm -f -- "$GATE_READ_SHADOW_LEDGER"
+      rmdir -- "$GATE_READ_SHADOW_SCRATCH" 2>/dev/null || true
+    }
   }
-}
-HOOK_ON_EXIT="$HOOK_ON_EXIT gate_remove_read_shadow_ledger"
-export GATE_READ_SHADOW_LEDGER
+  HOOK_ON_EXIT="$HOOK_ON_EXIT gate_remove_read_shadow_ledger"
+  export GATE_READ_SHADOW_LEDGER
+fi
 # ── Read-shadow push ledger end ─────────────────────────────────
 
 BERTH_BIN="$HOOK_WORK_TREE/genesis/agentic/bin/berth"
