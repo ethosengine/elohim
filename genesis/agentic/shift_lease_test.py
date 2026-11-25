@@ -528,7 +528,7 @@ class ReadinessCapacity(unittest.TestCase):
         # berth imports _lib.session at startup (resolved from the repo root it runs in).
         scripts_lib = self.root / '.claude/scripts/_lib'
         scripts_lib.mkdir(parents=True)
-        for name in ('__init__.py', 'session.py'):
+        for name in ('__init__.py', 'session.py', 'deadline.py'):
             shutil.copy2(ROOT / '.claude/scripts/_lib' / name, scripts_lib / name)
         policy = agentic / 'pool-policy.json'
         state.atomic(policy, {'berth': {'resources': {'cargo': 2, 'mesh': 1, 'disk-heavy': 1}}})
@@ -698,6 +698,7 @@ class NativeHostSession(unittest.TestCase):
             fixture_berth.unlink()
             shutil.copy2(BERTH, fixture_berth)
             for source in ['.claude/scripts/_lib/__init__.py', '.claude/scripts/_lib/session.py',
+                           '.claude/scripts/_lib/deadline.py',
                            '.claude/scripts/_lib/epr_client.py', '.claude/hooks/_observation.py',
                            '.claude/epr-meta/measures.yaml', 'genesis/agentic/pool-policy.json',
                            'genesis/agentic/shift_lease.py', 'genesis/agentic/shift_state.py',
