@@ -3125,3 +3125,47 @@ Not cured:
   path. Every gate now runs in its own session; no recipe is known to need a controlling
   terminal, and none was tested for it.
 - No second device has run it. Under the standing rule a gate change is not met until one has.
+
+## Row 96 — first install of epr on a third device from a sibling's artifact, and three things it showed
+
+Reported by the ThinkPad session, 2026-11-25; not re-run on shem. The laptop (95% full disk, no
+cargo pool) fetched epr and bin-launch from shem over the peer runtime (101 and 9 chunks),
+ingested them with `--source-commit 4498b9394f16687a53ec05589c915ba726f4fa68`, got the release
+CID shem's gate published (`bafyreif47wpi6iakdxocxkaitbial4iwe6ndo5geyukytraukq2xict43y`), landed
+it (`"ring":"landed"`, `"treeClean":true`, `landedAt 2026-11-25T12:34:52Z`), restarted its peer
+daemon, and the serve log read `payload store … (blob-store-v1)`. It then folded both siblings.
+It removed about 8.6 GB of local builds afterwards.
+
+Not cured:
+- `just status device` on that laptop still reads `degraded peer daemon: running bafkr4igtg4… ;
+  current bafyreif47w… — restart epr peer serve to follow current` after a correct restart. It
+  compares the running binary's output CID with the head's release CID. On a device that built
+  its own epr the line reads ok; on a device that fetched it, it can never clear.
+- `just status device` has no payload-store line, so the format a daemon opened is read from its
+  serve log.
+- ethosengine's and shem's builds of the same epr sources (c27114cb9 and 4498b9394) have
+  different output CIDs. Two producers cannot agree on one output by rebuilding.
+- A release still does not state the payload formats it opens. The cure is written on
+  ethosengine and not landed; until it is, a device with a `blob-store-v1` store that follows a
+  release built before 4498b9394 lands an epr that refuses its store.
+
+## Row 97 — a gate verdict is dated by an unrelated checkout's head
+
+Read by ethosengine, 2026-11-25 (`elohim/eprfs/epr-cli/src/flow/note.rs:24`; not re-read on
+shem). `epr flow note` dates every note by the author date of the HEAD commit at its `--root`,
+under the ruled choice that dates are history-derived and never the wall clock. Since verdicts
+are written from the device's main checkout, a `gate-verdict@1` carries the date of whatever
+commit that checkout sits on: unrelated to the commit judged and to the run. A verdict recorded
+on ethosengine on 2026-11-25 at about 05:19Z read `2026-11-24T20:56:01Z` on shem. Freshness
+windows, a carry's valid-for and "newest green" read that field. Not cured; an evidence note of
+every reader and what each needs (an order, or a wall-clock age) is asked of ethosengine before
+any change.
+
+## Row 98 — brit's quieter capture notice will fail epr's qualification probe
+
+Reported by the ThinkPad session from brit sprint 5 item 7, 2026-11-25; the probe was read on
+shem. `elohim/eprfs/epr-cli/src/feedback/qualify.rs` runs brit twice in one session
+(`recorder-success`, then `recorder-refusal`) and requires `feedback capture gap` on stderr both
+times. Item 7 prints that notice once per session. When the sprint's release moves the brit pin,
+the second check fails with "Recorder failure was not visible." Not cured: the probe must change
+before the pin moves, in the same landing or an earlier one.
