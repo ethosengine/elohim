@@ -58,6 +58,28 @@ class PoolDisciplineTest(unittest.TestCase):
         self.assertNotIn('SessionStart', text)
         self.assertNotIn('Slot map', text)
 
+    def test_slot_for_suffixes_only_a_linked_worktree(self):
+        completed = lambda value: mock.Mock(returncode=0, stdout=value + '\n')
+        with mock.patch.object(guard, 'family_for', return_value='cd'), \
+                mock.patch.object(guard, 'worktree_root', return_value='/repo/.worktrees/wt-a'), \
+                mock.patch.object(guard.subprocess, 'run', side_effect=[
+                    completed('/repo/.git/worktrees/wt-a'), completed('/repo/.git')
+                ]):
+            self.assertEqual(
+                guard.slot_for('elohim/eprfs', '/repo/.worktrees/wt-a', False),
+                f'{guard.POOL_ROOT}/family/cd/elohim__eprfs/dev-wt-wt-a',
+            )
+
+        with mock.patch.object(guard, 'family_for', return_value='dev'), \
+                mock.patch.object(guard, 'worktree_root', return_value='/repo'), \
+                mock.patch.object(guard.subprocess, 'run', side_effect=[
+                    completed('/repo/.git'), completed('/repo/.git')
+                ]):
+            self.assertEqual(
+                guard.slot_for('elohim/eprfs', '/repo', False),
+                f'{guard.POOL_ROOT}/family/dev/elohim__eprfs/dev',
+            )
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -165,6 +165,36 @@ slot_path() {
   echo "$POOL_ROOT/family/$family/$flat/$profile"
 }
 
+# Gate-runner's linked-worktree rule, shared by manual cargo and agent tools:
+# the main checkout keeps the base slot, while a linked worktree appends
+# `-wt-<basename(root)>`. Comparing the absolute git-dir and common-dir is the
+# same predicate used by worktreeTargetDir in genesis/orchestrator/gate-runner.mjs.
+worktree_is_linked() {
+  local wt="$1" git_dir common_dir
+  git_dir="$(git -C "$wt" rev-parse --path-format=absolute --git-dir 2>/dev/null)" || return 1
+  common_dir="$(git -C "$wt" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)" || return 1
+  [ -n "$git_dir" ] && [ -n "$common_dir" ] && [ "$git_dir" != "$common_dir" ]
+}
+
+worktree_slot_path() {
+  local family="$1" ws_rel="$2" profile="${3:-dev}" wt="$4" base
+  base="$(slot_path "$family" "$ws_rel" "$profile")" || return 1
+  if worktree_is_linked "$wt"; then
+    printf '%s-wt-%s\n' "$base" "$(basename "$wt")"
+  else
+    printf '%s\n' "$base"
+  fi
+}
+
+worktree_slot_rule() {
+  local wt="$1"
+  if worktree_is_linked "$wt"; then
+    printf 'linked-worktree suffix=-wt-%s\n' "$(basename "$wt")"
+  else
+    printf 'main-checkout suffix=none\n'
+  fi
+}
+
 # Native cargo workspaces in this repo whose target/ should land in the pool.
 # WASM/DNA workspaces are excluded by design (hc dna pack canonicalizes
 # ./target — moving it breaks the build).
@@ -273,11 +303,55 @@ steward_worktree() {
 # Walk every worktree in $POOL_WORKTREES_DIR and steward.
 steward_all_worktrees() {
   local dry_run="${1:-0}"
-  [ -d "$POOL_WORKTREES_DIR" ] || return 0
   local wt
-  for wt in "$POOL_WORKTREES_DIR"/*; do
-    [ -d "$wt" ] || continue
-    steward_worktree "$wt" "$dry_run"
+  if [ -d "$POOL_WORKTREES_DIR" ]; then
+    for wt in "$POOL_WORKTREES_DIR"/*; do
+      [ -d "$wt" ] || continue
+      steward_worktree "$wt" "$dry_run"
+    done
+  fi
+  steward_gone_worktree_slots "$dry_run"
+}
+
+# A suffixed pool profile belongs to the linked worktree named after `-wt-`.
+# Once no registered worktree has that basename, the slot is reclaimable. A
+# live cargo lock or executable still wins: stale registration never proves
+# that a running build is safe to interrupt.
+steward_gone_worktree_slots() {
+  local dry_run="${1:-0}" live_names="" path name fam slot action
+  live_names="$(git -C "$POOL_PARENT_REPO" worktree list --porcelain 2>/dev/null \
+    | sed -n 's/^worktree //p' \
+    | while IFS= read -r path; do basename "$path"; done)" || return 0
+  for fam in $(list_families); do
+    while IFS= read -r slot; do
+      case "${slot##*/}" in
+        dev-wt-*) name="${slot##*/dev-wt-}" ;;
+        release-wt-*) name="${slot##*/release-wt-}" ;;
+        lsp-wt-*) name="${slot##*/lsp-wt-}" ;;
+        *) continue ;;
+      esac
+      [ -n "$name" ] || continue
+      if printf '%s\n' "$live_names" | grep -Fxq -- "$name"; then
+        continue
+      fi
+      if [ -L "$slot" ]; then
+        printf '%s\t%s\t%s\t%s\n' "stale-worktree-slot" "left-linked" "$slot" "$name"
+        continue
+      fi
+      if slot_pinned "$slot"; then
+        printf '%s\t%s\t%s\t%s\n' "stale-worktree-slot" "left-pinned" "$slot" "$name"
+        continue
+      fi
+      if slot_in_use "$slot"; then
+        printf '%s\t%s\t%s\t%s\n' "stale-worktree-slot" "left-busy" "$slot" "$name"
+        continue
+      fi
+      action=reclaimable
+      if [ "$dry_run" != "1" ]; then
+        if rm -rf -- "$slot"; then action=removed; else action=left; fi
+      fi
+      printf '%s\t%s\t%s\t%s\n' "stale-worktree-slot" "$action" "$slot" "$name"
+    done < <(list_slots_for_family "$fam")
   done
 }
 
@@ -829,7 +903,9 @@ record_all_slot_watermarks() {
   local fam slot
   for fam in $(list_families); do
     while IFS= read -r slot; do
-      case "$slot" in */dev|*/release) record_slot_watermark "$slot" ;; esac
+      case "$slot" in
+        */dev|*/release|*/dev-wt-*|*/release-wt-*) record_slot_watermark "$slot" ;;
+      esac
     done < <(list_slots_for_family "$fam")
   done
 }
@@ -849,7 +925,7 @@ estimate_slot_cost_gb() {
   local total=0 ws slot bytes
   for ws in "${NATIVE_WORKSPACES[@]}"; do
     [ -d "$wt/$ws" ] || continue
-    slot="$(slot_path "$family" "$ws" dev)"
+    slot="$(worktree_slot_path "$family" "$ws" dev "$wt")"
     bytes=0
     if [ -d "$slot" ]; then
       bytes="$(read_slot_watermark "$slot")"
@@ -878,13 +954,14 @@ cross_family_watermark() {
   local flat; flat="$(flatten_path "$ws")"
   local fr="$POOL_ROOT/family"
   [ -d "$fr" ] || { echo 0; return; }
-  local best=0 wm
+  local best=0 wm slot
   local fam
   for fam in $(list_families); do
-    local slot="$fr/$fam/$flat/dev"
-    [ -d "$slot" ] || continue
-    wm="$(read_slot_watermark "$slot")"
-    if [ "${wm:-0}" -gt "$best" ]; then best="$wm"; fi
+    for slot in "$fr/$fam/$flat"/dev "$fr/$fam/$flat"/dev-wt-*; do
+      [ -d "$slot" ] || continue
+      wm="$(read_slot_watermark "$slot")"
+      if [ "${wm:-0}" -gt "$best" ]; then best="$wm"; fi
+    done
   done
   echo "$best"
 }
@@ -1689,7 +1766,7 @@ trim_family_to_gb() {
   done < <(
     # order: release profile slots oldest-first, then the rest oldest-first
     for s in $(list_slots_for_family "$fam"); do
-      printf '%s\t%s\t%s\n' "$(case "$s" in */release) echo 0 ;; *) echo 1 ;; esac)" "$(slot_age_epoch "$s")" "$s"
+      printf '%s\t%s\t%s\n' "$(case "$s" in */release|*/release-wt-*) echo 0 ;; *) echo 1 ;; esac)" "$(slot_age_epoch "$s")" "$s"
     done | sort -t"$(printf '\t')" -k1,1n -k2,2n | cut -f3
   )
   if [ "${size:-0}" -gt "$cap_b" ]; then
@@ -1718,7 +1795,7 @@ pick_lru_slot() {
       [ -L "$slot" ] && continue
       if slot_pinned "$slot" || slot_in_use "$slot"; then continue; fi
       t="$(slot_age_epoch "$slot")"
-      case "$slot" in */release) t=$((t - 2592000)) ;; esac
+      case "$slot" in */release|*/release-wt-*) t=$((t - 2592000)) ;; esac
       if [ "${t:-0}" -lt "$best_t" ]; then best_t="$t"; best="$slot"; fi
     done < <(list_slots_for_family "$fam")
   done
