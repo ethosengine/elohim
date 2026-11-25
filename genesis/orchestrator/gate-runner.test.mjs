@@ -17,12 +17,14 @@ import {
   gateReadingRow,
   oracleMode,
   projectsForChanges,
+  readShadowPushBudget,
   readShadowComparison,
   runProject,
   selectGateProjects,
   worktreeTargetDir,
   parseStepTimes,
 } from './gate-runner.mjs';
+import { suiteInventory } from './suite-inventory.mjs';
 
 function readShadowKeyFixture(t, changed) {
   const root = mkdtempSync(resolve(tmpdir(), 'read-shadow-key-'));
@@ -50,14 +52,16 @@ function readShadowKeyFixture(t, changed) {
   put('crates/dependency/src/lib.rs', 'pub fn dependency() {}\n');
   put('crates/dependency/tests/read.rs', `fn schema(name: &str) {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-      .join(format!("fixtures/{name}.json"));
+      .join(format!("../../sdk/schemas/v1/views/{name}.schema.json"));
     let _ = std::fs::read_to_string(path);
   }
 `);
+  if (changed !== 'absent') put('sdk/schemas/v1/views/example.schema.json', '{"version":1}\n');
   git('add', '.');
   git('commit', '-qm', 'base');
   const base = git('rev-parse', 'HEAD');
   if (changed === 'test') put('crates/dependency/tests/read.rs', `${readFileSync(resolve(root, 'crates/dependency/tests/read.rs'), 'utf8')}\n// edit\n`);
+  else if (changed === 'format') put('sdk/schemas/v1/views/example.schema.json', '{"version":2}\n');
   else put('crates/dependency/src/lib.rs', 'pub fn dependency() -> u8 { 1 }\n');
   git('add', '.');
   git('commit', '-qm', changed);
@@ -84,8 +88,33 @@ test('read-shadow: a dependency test-only change moves real and leaves fix 1 unc
   const evidence = gateKeyMaterial(fixture.project, { ...options, commit: fixture.commit });
   assert.ok(evidence.key, evidence.line);
   const shadow = readShadowComparison(fixture.project, evidence, options);
-  assert.match(shadow.line, /read-shadow: real moved; fix 1 unchanged;/);
-  assert.equal(shadow.rows.find(row => row.name === 'fix1').keyChanged, 'no');
+  assert.match(shadow.line, /read-shadow: real moved; fix 1 would have held IF fix 1 were sound;/);
+  assert.equal(shadow.rows.find(row => row.name === 'fix1').keyChanged,
+    'would have held IF fix 1 were sound');
+});
+
+test('read-shadow fix 2 key moves with its resolved directory contents', t => {
+  const fixture = readShadowKeyFixture(t, 'format');
+  const options = { ...fixture, env: {}, cargoEnv: {}, britBin: 'brit', variant: { resolveFormatJoin: true } };
+  const before = gateKeyMaterial(fixture.project, { ...options, commit: fixture.base });
+  const after = gateKeyMaterial(fixture.project, { ...options, commit: fixture.commit });
+  assert.ok(before.key, before.line);
+  assert.ok(after.key, after.line);
+  assert.notEqual(after.key, before.key);
+  assert.equal(JSON.parse(after.material).reads.scope, 'paths');
+  assert.ok(JSON.parse(after.material).reads.oids.some(row => row.path === 'sdk/schemas/v1/views'));
+});
+
+test('read-shadow fix 2 falls an absent resolved path back to the whole crate', t => {
+  const fixture = readShadowKeyFixture(t, 'absent');
+  const options = { ...fixture, env: {}, cargoEnv: {}, britBin: 'brit', variant: { resolveFormatJoin: true } };
+  const before = gateKeyMaterial(fixture.project, { ...options, commit: fixture.base });
+  const after = gateKeyMaterial(fixture.project, { ...options, commit: fixture.commit });
+  assert.ok(before.key, before.line);
+  assert.ok(after.key, after.line);
+  assert.notEqual(after.key, before.key, 'a mutation anywhere in the fallback crate moves the key');
+  assert.ok(JSON.parse(after.material).reads.oids.some(row => row.path === 'crates/dependency'));
+  assert.ok(!JSON.parse(after.material).reads.oids.some(row => row.oid === null));
 });
 
 test('read-shadow: a used dependency module moves real and fix 1, so no line is produced', t => {
@@ -116,10 +145,11 @@ test('read-shadow on and off keep the same verdict, run decision, and evidence-s
   };
   const current = 'a'.repeat(40);
   const base = 'b'.repeat(40);
-  const run = (mode, budget = null) => {
+  const run = (mode, budget = null, shadowError = null) => {
     const calls = [];
     const rows = [];
     let output = '';
+    let clockNs = 0n;
     const spawn = (command, args) => {
       calls.push({ command, args });
       const ok = stdout => ({ status: 0, stdout, stderr: '' });
@@ -139,7 +169,7 @@ test('read-shadow on and off keep the same verdict, run decision, and evidence-s
       if (command === 'git' && args[0] === 'rev-parse' && args.includes('--verify')) return ok(`${current}\n`);
       if (command === 'git' && args[0] === 'rev-parse') return ok('blob1\n');
       if (command === 'rustc') return ok('rustc fixture');
-      if (command === 'bash') return ok('');
+      if (command === 'bash') { clockNs += 5_000_000_000n; return ok(''); }
       return ok('');
     };
     const status = runProject(project, false, false, {
@@ -156,10 +186,15 @@ test('read-shadow on and off keep the same verdict, run decision, and evidence-s
       write: text => { output += text; },
       warn: text => { output += text; },
       readingCollector: rows,
-      readShadowOf: () => ({
-        line: '[gate] fixture read-shadow: real moved; fix 1 unchanged; fix 2 moved; both unchanged — a narrowed read is sound only while eprfs runs and blocks on the same push; decides nothing',
-        rows: ['fix1', 'fix2', 'both'].map((name, index) => ({ name, key: `shadow-${index}`, keyChanged: index === 1 ? 'yes' : 'no' })),
-      }),
+      clock: () => clockNs,
+      readShadowOf: () => {
+        if (shadowError) throw new Error(shadowError);
+        clockNs += 7_000_000_000n;
+        return {
+          line: '[gate] fixture read-shadow: real moved; fix 1 would have held IF fix 1 were sound; fix 2 moved; both would have held IF fixes 1 and 2 were sound — decides nothing',
+          rows: ['fix1', 'fix2', 'both'].map((name, index) => ({ name, key: `shadow-${index}`, keyChanged: index === 1 ? 'moved' : 'would have held' })),
+        };
+      },
     });
     return { status, calls, rows, output };
   };
@@ -171,18 +206,144 @@ test('read-shadow on and off keep the same verdict, run decision, and evidence-s
   assert.equal(on.status, off.status);
   assert.equal(gateRuns(on), gateRuns(off));
   assert.deepEqual(evidenceCalls(on), evidenceCalls(off));
+  assert.deepEqual(on.calls.filter(call => call.command === buildRef).map(call => call.args),
+    off.calls.filter(call => call.command === buildRef).map(call => call.args),
+    'the recorded evidence duration is byte-identical');
+  assert.deepEqual(on.calls.filter(call => call.command === 'epr').map(call => call.args),
+    off.calls.filter(call => call.command === 'epr').map(call => call.args),
+    'the cycle observation receives identical seconds');
+  assert.equal(on.rows.find(row => row.step === 'fixture').value,
+    off.rows.find(row => row.step === 'fixture').value,
+    'the recorded gate reading excludes post-record shadow time');
   assert.equal(on.rows.length, off.rows.length + 3);
   assert.deepEqual(on.rows.filter(row => row.parent === 'fixture').map(row => row.step), [
     'fixture:read-shadow:fix1', 'fixture:read-shadow:fix2', 'fixture:read-shadow:both',
   ]);
   assert.ok(on.rows.filter(row => row.parent === 'fixture')
     .every(row => row.outcome === 'ran' && row.status === 'green' && row.value === 0));
-  assert.match(on.output, /read-shadow: real moved; fix 1 unchanged;/);
+  assert.match(on.output, /read-shadow: real moved; fix 1 would have held IF fix 1 were sound;/);
   assert.doesNotMatch(off.output, /read-shadow/);
   const dropped = run('on', '0');
   assert.equal(dropped.status, off.status);
   assert.equal(dropped.rows.filter(row => row.parent === 'fixture').length, 0);
-  assert.equal(dropped.output.match(/read-shadow: dropped \([^\n]+\)/g)?.length, 1);
+  assert.equal(dropped.output.match(/read-shadow: skipped for budget \([^\n]+\)/g)?.length, 1);
+  const mismatch = run('on', null, 'real variant differs from the gate evidence key');
+  assert.equal(mismatch.rows.filter(row => row.parent === 'fixture').length, 0,
+    'a canonical material mismatch writes no shadow row');
+  assert.match(mismatch.output, /read-shadow: dropped \(real variant differs from the gate evidence key\)/);
+});
+
+test('read-shadow keeps its in-process budget without a ledger and shares a ledger across runner invocations', t => {
+  const root = mkdtempSync(resolve(tmpdir(), 'read-shadow-push-budget-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  mkdirSync(resolve(root, 'fixture'), { recursive: true });
+  mkdirSync(resolve(root, 'genesis/orchestrator'), { recursive: true });
+  writeFileSync(resolve(root, 'fixture/justfile'), 'gate:\n    true\n');
+  writeFileSync(resolve(root, 'genesis/orchestrator/run-local-gate.sh'), '#!/bin/sh\nexit 0\n');
+  writeFileSync(resolve(root, 'build-manifest.json'), JSON.stringify({ steps: {
+    build: { inputs: { sources: ['fixture/**'] } },
+  } }));
+  const brit = resolve(root, 'brit');
+  const buildRef = resolve(root, 'brit-build-ref');
+  writeFileSync(brit, '', { mode: 0o755 });
+  writeFileSync(buildRef, '', { mode: 0o755 });
+  const current = 'c'.repeat(40);
+  const base = 'd'.repeat(40);
+  let clockNs = 0n;
+  const calls = [];
+  const spawn = (command, args) => {
+    calls.push({ command, args });
+    const ok = stdout => ({ status: 0, stdout, stderr: '' });
+    if (command === brit && args[1] === 'fingerprint') {
+      return ok(JSON.stringify({ fingerprints: [{ step: 'build', fingerprint: 'fixed' }] }));
+    }
+    if (command === buildRef && args[3] === 'find') return ok('[]');
+    if (command === buildRef && args[3] === 'get') return ok('');
+    if (command === buildRef && args[3] === 'put') return { status: 1, stdout: '', stderr: 'fixture refuses writes' };
+    if (command === 'git' && args[0] === 'merge-base') return ok(`${base}\n`);
+    if (command === 'git' && args[0] === 'diff') return ok('fixture/test.rs\0');
+    if (command === 'git' && args[0] === 'show') {
+      return ok(JSON.stringify({ steps: { build: { inputs: { sources: ['fixture/**'] } } } }));
+    }
+    if (command === 'git' && args[0] === 'ls-tree' && args.includes('--full-tree')) {
+      clockNs += 6_000_000n;
+      return ok('');
+    }
+    if (command === 'git' && args[0] === 'ls-tree') return ok('');
+    if (command === 'git' && args[0] === 'status') return ok('');
+    if (command === 'git' && args[0] === 'rev-parse' && args.includes('--verify')) return ok(`${current}\n`);
+    if (command === 'git' && args[0] === 'rev-parse') return ok('blob1\n');
+    if (command === 'git' && args[0] === 'config') return ok('');
+    if (command === 'rustc') return ok('rustc fixture');
+    return ok('');
+  };
+  const env = {
+    PATH: '', BRIT_BIN: brit, BRIT_BUILD_REF_BIN: buildRef, GATE_TASK: 'off',
+    GATE_EVIDENCE: 'off', GATE_INPUTS: 'off', GATE_RECIPE_KEY: 'off',
+    GATE_READ_SHADOW: 'on', GATE_READ_SHADOW_BUDGET_MS: '10',
+  };
+  const budget = readShadowPushBudget(env, () => clockNs);
+  const run = (name, readBudget = budget) => {
+    const rows = [];
+    let output = '';
+    const project = {
+      name, dir: 'fixture', manifestPath: 'build-manifest.json', steps: ['build'],
+      run: { kind: 'just', recipe: 'gate' },
+    };
+    const status = runProject(project, false, false, {
+      root, env: { ...env, GATE_READING_RUN_ID: name }, inputsPolicy: { cls: { britArgs: [] } },
+      spawn, tap: false, clock: () => clockNs, readShadowBudget: readBudget,
+      write: text => { output += text; }, warn: text => { output += text; }, readingCollector: rows,
+      readShadowOf: (_project, _evidence, options) => {
+        suiteInventory({ root, commit: current, listText: '{"groups":[]}', env: {}, spawn: options.spawn });
+        return {
+          line: `[gate] ${name} read-shadow: fix 1 would have held IF fix 1 were sound — decides nothing`,
+          rows: [{ name: 'fix1', key: `${name}-fix1`, keyChanged: 'would have held IF fix 1 were sound' }],
+        };
+      },
+    });
+    return { status, rows, output };
+  };
+  const first = run('first');
+  const second = run('second');
+  assert.equal(first.status, 0);
+  assert.equal(second.status, 0);
+  assert.equal(first.rows.filter(row => row.parent === 'first').length, 1);
+  assert.equal(second.rows.filter(row => row.parent === 'second').length, 0);
+  assert.match(second.output, /second read-shadow: skipped for budget \(budget 10 ms exhausted in read-shadow\)/);
+  assert.equal(calls.filter(call => call.command === 'git' && call.args.includes('--full-tree')).length, 2,
+    'the suite inventory git runs use and exhaust the shared bounded spawn');
+
+  const ledger = resolve(root, 'read-shadow-ledger');
+  writeFileSync(ledger, '');
+  clockNs = 0n;
+  calls.length = 0;
+  const ledgerEnv = { ...env, GATE_READ_SHADOW_BUDGET_MS: '5', GATE_READ_SHADOW_LEDGER: ledger };
+  const ledgerFirst = run('ledger-first', readShadowPushBudget(ledgerEnv, () => clockNs));
+  const firstRows = readFileSync(ledger, 'utf8').trim().split('\n');
+  const ledgerSecond = run('ledger-second', readShadowPushBudget(ledgerEnv, () => clockNs));
+  assert.equal(ledgerFirst.status, 0);
+  assert.equal(ledgerSecond.status, 0);
+  assert.equal(firstRows.length, 1);
+  assert.match(firstRows[0], /^[0-9]+$/);
+  assert.ok(Number(firstRows[0]) >= 5, 'the first runner records the budget it spent');
+  assert.match(ledgerFirst.output,
+    /ledger-first read-shadow: skipped for budget \(budget 5 ms exhausted in read-shadow\)/);
+  assert.equal(ledgerFirst.rows.filter(row => row.parent === 'ledger-first').length, 0);
+  assert.equal(ledgerSecond.rows.filter(row => row.parent === 'ledger-second').length, 0);
+  assert.match(ledgerSecond.output,
+    /ledger-second read-shadow: skipped for budget \(budget 5 ms exhausted in read-shadow\)/);
+  assert.deepEqual(readFileSync(ledger, 'utf8').trim().split('\n'), firstRows,
+    'a runner skipped by the shared budget writes no ledger row');
+
+  writeFileSync(ledger, 'not-an-integer\n');
+  const malformed = run('malformed-ledger', readShadowPushBudget(ledgerEnv, () => clockNs));
+  assert.equal(malformed.status, 0);
+  assert.equal(malformed.rows.filter(row => row.parent === 'malformed-ledger').length, 0);
+  assert.match(malformed.output,
+    /malformed-ledger read-shadow: skipped for budget \(budget 5 ms exhausted in read-shadow\)/);
+  assert.equal(readFileSync(ledger, 'utf8'), 'not-an-integer\n',
+    'a malformed ledger is fail-closed and receives no row');
 });
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');

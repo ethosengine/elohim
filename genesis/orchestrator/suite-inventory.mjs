@@ -64,8 +64,8 @@ export function gitEnv({ execPath = process.execPath } = {}) {
   };
 }
 
-export function git(args, { cwd, env = gitEnv(), input, encoding = 'utf8' }) {
-  const result = spawnSync('git', args, {
+export function git(args, { cwd, env = gitEnv(), input, encoding = 'utf8', spawn = spawnSync }) {
+  const result = spawn('git', args, {
     cwd, env, input, maxBuffer: 256 * 1024 * 1024, ...(encoding === 'buffer' ? {} : { encoding }),
   });
   if (result.error || result.status !== 0) {
@@ -95,8 +95,8 @@ export function viewMatcher(text, listPath = SUITE_LIST) {
 }
 
 /** `[{ mode, type, oid, path }]` for every entry of `commit` in the repository at `cwd`. */
-function treeEntries(cwd, commit, env) {
-  return git(['ls-tree', '-r', '-z', '--full-tree', commit], { cwd, env }).split('\0').filter(Boolean).map(entry => {
+function treeEntries(cwd, commit, env, spawn = spawnSync) {
+  return git(['ls-tree', '-r', '-z', '--full-tree', commit], { cwd, env, spawn }).split('\0').filter(Boolean).map(entry => {
     const tab = entry.indexOf('\t');
     const [mode, type, oid] = entry.slice(0, tab).split(' ');
     return { mode, type, oid, path: entry.slice(tab + 1) };
@@ -108,9 +108,9 @@ function treeEntries(cwd, commit, env) {
  * files, so the view takes nothing from them (their pin is still keyed). From `commit`'s copy of
  * the file, or the working tree's when `file` is given. No file, or none readable, is the empty set.
  */
-export function updateNoneSubmodules({ root, commit, file, env = gitEnv() }) {
+export function updateNoneSubmodules({ root, commit, file, env = gitEnv(), spawn = spawnSync }) {
   const source = file ? ['--file', file] : ['--blob', `${commit}:.gitmodules`];
-  const r = spawnSync('git', ['config', '-z', ...source, '--get-regexp', '^submodule\\..*\\.(path|update)$'], { cwd: root, env, encoding: 'utf8' });
+  const r = spawn('git', ['config', '-z', ...source, '--get-regexp', '^submodule\\..*\\.(path|update)$'], { cwd: root, env, encoding: 'utf8' });
   if (r.status !== 0) return new Set();
   const path = new Map(), update = new Map();
   for (const record of String(r.stdout).split('\0').filter(Boolean)) {
@@ -123,14 +123,14 @@ export function updateNoneSubmodules({ root, commit, file, env = gitEnv() }) {
 }
 
 /** A git dir that holds `oid`: the submodule's checkout, then this checkout's module store, then the common dir's. */
-function moduleStore(root, path, oid, env) {
+function moduleStore(root, path, oid, env, spawn = spawnSync) {
   const candidates = [];
   if (existsSync(join(root, path, '.git'))) candidates.push(join(root, path));
-  candidates.push(git(['rev-parse', '--path-format=absolute', '--git-path', `modules/${path}`], { cwd: root, env }).trim());
-  candidates.push(join(git(['rev-parse', '--path-format=absolute', '--git-common-dir'], { cwd: root, env }).trim(), 'modules', path));
+  candidates.push(git(['rev-parse', '--path-format=absolute', '--git-path', `modules/${path}`], { cwd: root, env, spawn }).trim());
+  candidates.push(join(git(['rev-parse', '--path-format=absolute', '--git-common-dir'], { cwd: root, env, spawn }).trim(), 'modules', path));
   for (const dir of candidates) {
     if (!existsSync(dir)) continue;
-    if (spawnSync('git', ['cat-file', '-e', `${oid}^{commit}`], { cwd: dir, env }).status === 0) return dir;
+    if (spawn('git', ['cat-file', '-e', `${oid}^{commit}`], { cwd: dir, env }).status === 0) return dir;
   }
   return null;
 }
@@ -167,19 +167,19 @@ export function blobAt(root, commit, path, env = gitEnv()) {
  * every entry's path, mode, type and object id and every pin with its entries; it leaves the commit
  * out, so a commit that changes nothing the view holds keeps it.
  */
-export function suiteInventory({ root, commit, listText, env = gitEnv() }) {
+export function suiteInventory({ root, commit, listText, env = gitEnv(), spawn = spawnSync }) {
   const matcher = viewMatcher(listText);
-  const all = treeEntries(root, commit, env).filter(e => matcher.has(e.path));
+  const all = treeEntries(root, commit, env, spawn).filter(e => matcher.has(e.path));
   const entries = all.filter(e => e.type === 'blob');
-  const none = updateNoneSubmodules({ root, commit, env });
+  const none = updateNoneSubmodules({ root, commit, env, spawn });
   const pins = all.filter(e => e.type === 'commit').map(link => {
     // update = none: the pin is keyed, nothing is taken from the submodule, here or on any device.
     if (none.has(link.path)) return { path: link.path, oid: link.oid, store: null, entries: [] };
-    const store = moduleStore(root, link.path, link.oid, env);
+    const store = moduleStore(root, link.path, link.oid, env, spawn);
     if (!store) {
       throw new Error(`suite-run: submodule ${link.path} at ${link.oid} is in no object store here; run: git submodule update --init ${link.path}`);
     }
-    const inner = treeEntries(store, link.oid, env).filter(e => e.type === 'blob' && matcher.inside(e.path));
+    const inner = treeEntries(store, link.oid, env, spawn).filter(e => e.type === 'blob' && matcher.inside(e.path));
     return { path: link.path, oid: link.oid, store, entries: inner };
   });
   const row = e => [e.path, e.mode, e.type, e.oid];

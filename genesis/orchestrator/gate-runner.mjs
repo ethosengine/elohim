@@ -328,12 +328,20 @@ const READ_SHADOW_VARIANTS = Object.freeze([
   { name: 'both', label: 'both', variant: { excludeDependencyTests: true, resolveFormatJoin: true } },
 ]);
 
-/** Compare closure movement under the two proposed read-set fixes. This returns telemetry only. */
+/**
+ * Compare closure movement under the two proposed read-set fixes. This returns telemetry only.
+ * Neither fix may decide a gate until the proof covers: dependency tests/** support reached through
+ * #[path], format! joins with variable suffixes, absent resolved paths, and eprfs actually running
+ * and blocking on the same push whose closure the shadow compares.
+ */
 export function readShadowComparison(project, evidence, {
   root, base, commit, env, cargoEnv, spawn, inputs = null,
 } = {}) {
   const results = READ_SHADOW_VARIANTS.map(entry => {
-    const options = { root, env, cargoEnv, spawn, inputs, britBin: evidence.britBin, variant: entry.variant };
+    const options = {
+      root, env, cargoEnv, spawn, inputs, britBin: evidence.britBin, variant: entry.variant,
+      boundedSuite: true,
+    };
     const before = gateKeyMaterial(project, { ...options, commit: base });
     const after = gateKeyMaterial(project, { ...options, commit });
     if (!before.key || !after.key) {
@@ -344,10 +352,21 @@ export function readShadowComparison(project, evidence, {
   const real = results[0];
   if (real.key !== evidence.key) throw new Error('real variant differs from the gate evidence key');
   if (!results.slice(1).some(result => result.moved !== real.moved)) return null;
-  const movement = results.map(result => `${result.label} ${result.moved ? 'moved' : 'unchanged'}`).join('; ');
+  const movement = results.map(result => {
+    if (result.moved) return `${result.label} moved`;
+    if (result.name === 'real') return 'real held';
+    const proof = result.name === 'both' ? 'fixes 1 and 2 were sound' : `${result.label} were sound`;
+    return `${result.label} would have held IF ${proof}`;
+  }).join('; ');
   return {
-    line: `[gate] ${project.name} read-shadow: ${movement} — a narrowed read is sound only while eprfs runs and blocks on the same push; decides nothing`,
-    rows: results.slice(1).map(result => ({ name: result.name, key: result.key, keyChanged: result.moved ? 'yes' : 'no' })),
+    line: `[gate] ${project.name} read-shadow: ${movement} — decides nothing; enablement requires proof for #[path]-included tests/** support, format! joins with variable suffixes, absent paths, and eprfs running and blocking on this same push`,
+    rows: results.slice(1).map(result => ({
+      name: result.name,
+      key: result.key,
+      keyChanged: result.moved
+        ? 'moved'
+        : `would have held IF ${result.name === 'both' ? 'fixes 1 and 2 were sound' : `${result.label} were sound`}`,
+    })),
   };
 }
 
@@ -555,14 +574,19 @@ class ShadowBudgetExhausted extends Error {
   }
 }
 
-function crateShadowBudget(env, clock) {
-  const declared = String(env.GATE_CRATE_SHADOW_BUDGET_MS ?? '').trim();
+function shadowBudgetMs(value) {
+  const declared = String(value ?? '').trim();
   const configured = declared ? Number(declared) : Number.NaN;
-  const budgetMs = Number.isFinite(configured) && configured >= 0 ? Math.floor(configured) : 15_000;
+  return Number.isFinite(configured) && configured >= 0 ? Math.floor(configured) : 15_000;
+}
+
+function crateShadowBudget(env, clock, initialSpent = 0) {
+  const declared = String(env.GATE_CRATE_SHADOW_BUDGET_MS ?? '').trim();
+  const budgetMs = shadowBudgetMs(declared);
   // The budget is spent only inside the shadow's own spans (`span`): discovery before the recipe
   // and the crate keys after it. The recipe between them never counts, so a long gate keeps its
   // crate rows; only shadow work beyond the budget drops them.
-  let spent = 0;
+  let spent = initialSpent;
   let spanStart = null;
   let depth = 0;
   let exhausted = null;
@@ -602,6 +626,42 @@ function crateShadowBudget(env, clock) {
   };
 }
 
+function readShadowLedgerSpent(path, budgetMs) {
+  try {
+    const text = readFileSync(path, 'utf8');
+    if (text === '') return 0;
+    const body = text.endsWith('\n') ? text.slice(0, -1) : text;
+    const rows = body.split('\n');
+    if (rows.some(row => !/^(0|[1-9][0-9]*)$/.test(row))) return budgetMs;
+    const spent = rows.reduce((sum, row) => sum + Number(row), 0);
+    return Number.isSafeInteger(spent) ? spent : budgetMs;
+  } catch {
+    return budgetMs;
+  }
+}
+
+/** One read-shadow budget shared by this process, and by a hook push when its ledger is set. */
+export function readShadowPushBudget(env, clock) {
+  const budgetMs = shadowBudgetMs(env.GATE_READ_SHADOW_BUDGET_MS);
+  const hasLedger = Object.hasOwn(env, 'GATE_READ_SHADOW_LEDGER');
+  const ledger = hasLedger ? String(env.GATE_READ_SHADOW_LEDGER) : null;
+  const budget = crateShadowBudget(
+    { GATE_CRATE_SHADOW_BUDGET_MS: budgetMs }, clock,
+    hasLedger ? readShadowLedgerSpent(ledger, budgetMs) : 0,
+  );
+  return {
+    ...budget,
+    recordSpent(spentMs) {
+      if (!hasLedger) return;
+      const row = Math.max(0, Math.ceil(spentMs));
+      try {
+        // Node's `a` flag opens with O_APPEND: concurrent runner rows cannot overwrite each other.
+        appendFileSync(ledger, `${row}\n`, { encoding: 'utf8', flag: 'a' });
+      } catch { /* telemetry never changes a gate verdict */ }
+    },
+  };
+}
+
 function dropCrateShadow(project, error, state, write) {
   if (state.dropped) return;
   state.dropped = true;
@@ -611,7 +671,11 @@ function dropCrateShadow(project, error, state, write) {
 function dropReadShadow(project, error, state, write) {
   if (state.dropped) return;
   state.dropped = true;
-  write(`[gate] ${project} read-shadow: dropped (${oneLine(error?.message || error)})\n`);
+  if (error instanceof ShadowBudgetExhausted) {
+    write(`[gate] ${project} read-shadow: skipped for budget (${oneLine(error.message)})\n`);
+  } else {
+    write(`[gate] ${project} read-shadow: dropped (${oneLine(error?.message || error)})\n`);
+  }
 }
 
 function rfc3339(value) {
@@ -903,7 +967,7 @@ export function runProject(project, printOnly, namesOnly, {
   write = text => process.stdout.write(text), warn = text => process.stderr.write(text),
   readsOf, recipe = null, tap = spawn === spawnSync, clock = () => process.hrtime.bigint(),
   wallClock = () => new Date(), inputsPolicy = null, readingCollector = invocationGateReadings,
-  readShadowOf = readShadowComparison,
+  readShadowOf = readShadowComparison, readShadowBudget = null,
 } = {}) {
   const cargo = project.run.cargo || {};
   const targetDir = worktreeTargetDir(cargo.targetDir || '', root);
@@ -944,6 +1008,8 @@ export function runProject(project, printOnly, namesOnly, {
     startedAt: rfc3339(wallClock()),
   };
   let readShadow = null;
+  let sharedReadShadowBudget = readShadowBudget;
+  let runReadShadow = () => {};
   let readShadowRowsEmitted = false;
   const emitReadShadowRows = (outcome, status) => {
     if (!readShadow || readShadowRowsEmitted) return;
@@ -1236,41 +1302,54 @@ export function runProject(project, printOnly, namesOnly, {
   Object.assign(reading, keyReading(evidence));
   const inputsClass = inputs?.cls ?? LEGACY_ALL;
   write(`[gate] ${project.name} evidence: ${evidence.line}\n`);
-  // GATE_READ_SHADOW (default on): compare this gate's canonical closure at the integration base
-  // and gated commit under two proposed audit fixes. It reads the same key material but neither the
-  // reuse decision nor the evidence store reads these results. It has its own budget
-  // (GATE_READ_SHADOW_BUDGET_MS, default 15000), so it never spends the crate shadow's, and its
-  // elapsed time is removed from the gate duration.
+  // GATE_READ_SHADOW (default on): after this gate's seconds, evidence and cycle are recorded,
+  // compare its canonical closure at the integration base and gated commit under two proposed
+  // audit fixes. One GATE_READ_SHADOW_BUDGET_MS budget (default 15000) belongs to the hook push
+  // when its ledger is set, otherwise to this runner invocation; every subprocess, including suite
+  // inventory recomputation, receives the remaining bound. The comparison decides nothing. Neither
+  // fix may decide until proof covers
+  // #[path]-included dependency tests/** support, format! joins with variable suffixes, absent
+  // paths, and eprfs running and blocking on this same push.
   if (env.GATE_READ_SHADOW !== 'off' && evidence.key && evidence.material) {
     let scopeKnown = false;
     try { scopeKnown = ['paths', 'tree'].includes(JSON.parse(evidence.material).reads?.scope); } catch { /* no shadow */ }
     if (scopeKnown) {
-      const readShadowStarted = clock();
-      const readShadowState = { dropped: false };
-      const readShadowBudget = crateShadowBudget(
-        { GATE_CRATE_SHADOW_BUDGET_MS: env.GATE_READ_SHADOW_BUDGET_MS }, clock);
-      readShadowBudget.begin();
-      try {
-        const bounded = (command, args, options) => readShadowBudget.spawn(
-          spawn, 'read-shadow', command, args, options,
-        );
-        const { base } = touchedProcessSteps(project, { root, gateCommit, spawn: bounded });
-        if (base) {
-          readShadowBudget.check('read-shadow');
-          readShadow = readShadowOf(project, evidence, {
-            root, base, commit: gateCommit, env: childEnv, cargoEnv: cargoEnvOf(childEnv),
-            spawn: bounded, inputs,
-          });
-          readShadowBudget.check('read-shadow');
-          if (readShadow) write(`${readShadow.line}\n`);
+      runReadShadow = (outcome, status) => {
+        const readShadowState = { dropped: false };
+        sharedReadShadowBudget ||= readShadowPushBudget(env, clock);
+        let shadowStarted = false;
+        let spentBefore = 0;
+        try {
+          sharedReadShadowBudget.check('read-shadow');
+          spentBefore = sharedReadShadowBudget.spentMs();
+          sharedReadShadowBudget.begin();
+          shadowStarted = true;
+          const bounded = (command, args, options) => sharedReadShadowBudget.spawn(
+            spawn, 'read-shadow', command, args, options,
+          );
+          const { base } = touchedProcessSteps(project, { root, gateCommit, spawn: bounded });
+          if (base) {
+            sharedReadShadowBudget.check('read-shadow');
+            readShadow = readShadowOf(project, evidence, {
+              root, base, commit: gateCommit, env: childEnv, cargoEnv: cargoEnvOf(childEnv),
+              spawn: bounded, inputs,
+            });
+            sharedReadShadowBudget.check('read-shadow');
+            if (readShadow) {
+              write(`${readShadow.line}\n`);
+              emitReadShadowRows(outcome, status);
+            }
+          }
+        } catch (error) {
+          dropReadShadow(project.name, error, readShadowState, write);
+          readShadow = null;
+        } finally {
+          if (shadowStarted) {
+            sharedReadShadowBudget.end();
+            sharedReadShadowBudget.recordSpent(sharedReadShadowBudget.spentMs() - spentBefore);
+          }
         }
-      } catch (error) {
-        dropReadShadow(project.name, error, readShadowState, write);
-        readShadow = null;
-      } finally {
-        readShadowBudget.end();
-      }
-      started += clock() - readShadowStarted;
+      };
     }
   }
   // Shadow only (gate-recipe-key.mjs): whether a justfile edit since the integration base left this
@@ -1344,12 +1423,13 @@ export function runProject(project, printOnly, namesOnly, {
       : ageOf(row.attestation.builtAt);
     write(`[gate] ${project.name} reused: green ${when} at ${String(row.commit).slice(0, 9)} (${signer})\n`);
     const seconds = Number(clock() - started) / 1e9;
-    emitReadShadowRows('reused', 'green');
     recordCycle(project, seconds, 0, {
       ...cycleEnv, GATE_RUN_KIND: sibling ? 'sibling-reused' : 'reused',
     }, cycleDeps);
     liveEvent(env, { kind: 'gate-verdict', project: project.name, verdict: { exit: 0, seconds: 0, reused: true } });
-    return complete(0, 'reused');
+    const completed = complete(0, 'reused', Math.max(0, seconds - finiteSeconds(reading.leaseWaitedSeconds)));
+    runReadShadow('reused', 'green');
+    return completed;
   }
   if (env.GATE_EVIDENCE === 'reuse') write(`[gate] ${project.name} not reused: ${decision.why}\n`);
   // A suite's named half is handed what its key expects (the gated sha and the inventory, package
@@ -1458,10 +1538,11 @@ export function runProject(project, printOnly, namesOnly, {
   if (answer?.answered?.hit) {
     write(`[gate] ${project.name} reused: derivation hit (method ${derivation.method}, input ${derivation.input})\n`);
     const seconds = Number(clock() - started) / 1e9;
-    emitReadShadowRows('reused', 'green');
     recordCycle(project, seconds, 0, { ...cycleEnv, GATE_RUN_KIND: 'reused' }, cycleDeps);
     liveEvent(env, { kind: 'gate-verdict', project: project.name, verdict: { exit: 0, seconds: 0, reused: true }, derivation, status: 'Answered' });
-    return complete(0, 'reused');
+    const completed = complete(0, 'reused', Math.max(0, seconds - finiteSeconds(reading.leaseWaitedSeconds)));
+    runReadShadow('reused', 'green');
+    return completed;
   }
   const crateShadowStarted = clock();
   shadowBudget.begin();
@@ -1488,7 +1569,6 @@ export function runProject(project, printOnly, namesOnly, {
       gateSha: gateCommit, headAfter: revParse('HEAD'), dirtyAfter: dirtyAfterRun(root, gateCommit) })
     : { status: result.status ?? 1, record: true };
   const status = outcome.status;
-  emitReadShadowRows('ran', status === 0 ? 'green' : 'red');
   const seconds = Number(clock() - started) / 1e9;
   let evidenceCid = null;
   // The verdict is recorded against the closure — red too; a known-red closure is information.
@@ -1543,7 +1623,9 @@ export function runProject(project, printOnly, namesOnly, {
     status: answer.unanswered ? 'Unanswered' : 'Answered',
     ...(answer.unanswered ? { unanswered: answer.unanswered } : {}),
   } : {}) });
-  return complete(status, 'ran', Math.max(0, seconds - finiteSeconds(reading.leaseWaitedSeconds)));
+  const completed = complete(status, 'ran', Math.max(0, seconds - finiteSeconds(reading.leaseWaitedSeconds)));
+  runReadShadow('ran', status === 0 ? 'green' : 'red');
+  return completed;
 }
 
 // The per-project cargo cap travels as one serialized variable; the jobs count
@@ -1583,7 +1665,7 @@ function usage() {
   console.error('  env: GATE_ORACLE=rakia|shadow|path (default rakia; without a brit binary every mode is path-only) · BRIT_BIN · GATE_ROOT (fixture repository root)');
   console.error('  env: GATE_RECIPE_KEY=shadow|off (default shadow): a root-just gate prints whether a justfile edit since the integration base left its recipe closure unchanged; it changes no key, reuse decision or record');
   console.error('  env: GATE_INPUTS=shadow|off (default shadow; no on yet): prints, once per push, the borrowed steps whose own buildProcess alone selects them, and per gate when, since the integration base, its step fingerprints moved under all and are unchanged under sources; it changes no selection, key, reuse decision or record');
-  console.error('  env: GATE_READ_SHADOW=off (default on): compares closure movement under two read-audit fixes; it changes no selection, key, reuse decision, evidence record or exit status');
+  console.error('  env: GATE_READ_SHADOW=off (default on) · GATE_READ_SHADOW_BUDGET_MS (default 15000 once per push with GATE_READ_SHADOW_LEDGER, otherwise per invocation): after recorded timing, compares closure movement under two read-audit fixes; it decides nothing, and enablement requires proof for #[path]-included tests/** support, format! joins with variable suffixes, absent paths, and eprfs running and blocking on the same push');
   console.error('  env: GATE_READING=off (default on): suppress collection and the one bounded `epr flow reading append` call; the shadow reading never changes selection, reuse, keys or exit status');
   console.error('  env: GATE_CARRY=off|shadow|on (default shadow, read by gate-carry.mjs under pre-push): carry one long one-build-job cargo gate on this device\'s second cargo seat beside the loop when `berth room cargo` admits it; shadow prints what would be carried and why and changes nothing');
 }
@@ -1677,6 +1759,9 @@ if (isMain) {
   }
   const notRun = [];
   const ordered = orderByCost(projects);
+  // Every gate in this process draws from one telemetry budget; a spent budget starts no later
+  // shadow subprocess and yields one skip line per remaining eligible gate.
+  const readShadowBudget = readShadowPushBudget(process.env, () => process.hrtime.bigint());
   if (failed && process.env.GATE_LIVE_RUN) await outlook(process.env.GATE_LIVE_RUN, ordered.map(p => p.name), { root: ROOT });
   for (const [index, project] of ordered.entries()) {
     if (!stopping && process.env.GATE_LIVE_RUN && stopRequested(process.env.GATE_LIVE_RUN)) {
@@ -1689,7 +1774,7 @@ if (isMain) {
     if (ownRun || process.env.GATE_PREFLIGHT_DONE !== '1') {
       process.env.GATE_REMAINING = ordered.slice(index + 1).map(p => p.name).join(' ');
     }
-    const status = runProject(project, false, false, {});
+    const status = runProject(project, false, false, { readShadowBudget });
     failed |= status;
     if (status !== 0 && process.env.GATE_LIVE_RUN) {
       await outlook(process.env.GATE_LIVE_RUN, ordered.slice(index + 1).map(p => p.name), { root: ROOT });

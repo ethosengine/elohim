@@ -256,6 +256,11 @@ function formatJoinDirectory(ts, start, end) {
   if (typeof template !== 'string') return null;
   const dynamic = template.indexOf('{');
   if (dynamic < 0) return null;
+  // The dynamic value may choose a filename in the literal directory, but it must not choose a
+  // descendant (or climb back out of one). Such a suffix cannot be represented by one directory
+  // key, so leave the read at the crate fallback instead.
+  const dynamicSuffix = template.slice(dynamic);
+  if (dynamicSuffix.includes('/') || dynamicSuffix.includes('\\') || dynamicSuffix.includes('..')) return null;
   const prefix = template.slice(0, dynamic);
   if (!prefix) return null;
   if (prefix.endsWith('/')) return prefix.replace(/\/+$/, '');
@@ -300,7 +305,8 @@ function pathExpression(ts, start, crate, constants, bindings, helpers = new Map
         const candidate = !result.dynamic && resolve(result.path, formatDir);
         const rel = candidate && variant.root
           ? relative(variant.root, candidate).split('\\').join('/') : null;
-        if (candidate && (!rel || (rel !== '..' && !rel.startsWith('../')))) result.path = candidate;
+        if (candidate && (!rel || (rel !== '..' && !rel.startsWith('../')))
+            && (!variant.pathExists || variant.pathExists(candidate))) result.path = candidate;
         result.prefix = true;
       } else if (!str) result.prefix = true;
       else if (!result.dynamic) {
@@ -334,6 +340,19 @@ function nearestCrate(root, file, readFile) {
     catch (error) { if (error.code !== 'ENOENT' && error.code !== 'ENOTDIR') throw error; }
     if (dir === root || dirname(dir) === dir) return null;
   }
+}
+
+/** Literal modules a Rust source includes with `#[path = "..."]`. */
+function pathIncludedModules(text) {
+  const { ts } = tokens(text);
+  const paths = [];
+  for (let i = 0; i < ts.length - 5; i++) {
+    if (ts[i].text !== '#' || ts[i + 1].text !== '[' || ts[i + 1].close !== i + 5) continue;
+    if (ts[i + 2].text === 'path' && ts[i + 3].text === '=' && typeof ts[i + 4].value === 'string') {
+      paths.push(ts[i + 4].value);
+    }
+  }
+  return paths;
 }
 
 function auditFile(root, file, text, crate, projectName = null, variant = {}) {
@@ -484,7 +503,27 @@ function auditFile(root, file, text, crate, projectName = null, variant = {}) {
 export function scan({ root, sources, project = null, readFile = readFileSync, listFiles = repositoryFiles, variant = {} }) {
   root = resolve(root);
   const found = new Map();
-  for (const file of [...new Set(listFiles(root))].sort()) {
+  const files = [...new Set(listFiles(root))].sort();
+  const pathExists = target => {
+    const rel = relative(root, target).split('\\').join('/');
+    return rel !== '..' && !rel.startsWith('../')
+      && files.some(file => file === rel || file.startsWith(`${rel}/`));
+  };
+  const includedDependencyTests = new Set();
+  if (variant.excludeDependencyTests && project) {
+    for (const file of files) {
+      if (!file.endsWith('.rs') || !sources.some(glob => globCovers(glob, file))) continue;
+      const crate = nearestCrate(root, file, readFile);
+      if (!crate) continue;
+      const inCrate = relative(crate, resolve(root, file)).split('\\').join('/');
+      if (inCrate.startsWith('tests/')) continue;
+      for (const path of pathIncludedModules(readFile(resolve(root, file), 'utf8'))) {
+        const included = relative(root, resolve(dirname(resolve(root, file)), path)).split('\\').join('/');
+        if (included !== '..' && !included.startsWith('../')) includedDependencyTests.add(included);
+      }
+    }
+  }
+  for (const file of files) {
     if (!file.endsWith('.rs') || !sources.some(glob => globCovers(glob, file))) continue;
     const crate = nearestCrate(root, file, readFile);
     if (variant.excludeDependencyTests && project && crate) {
@@ -492,10 +531,10 @@ export function scan({ root, sources, project = null, readFile = readFileSync, l
       const fromProject = relative(projectDir, crate).split('\\').join('/');
       const crateInProject = fromProject === '' || (fromProject !== '..' && !fromProject.startsWith('../'));
       const inCrate = relative(crate, resolve(root, file)).split('\\').join('/');
-      if (!crateInProject && inCrate.startsWith('tests/')) continue;
+      if (!crateInProject && inCrate.startsWith('tests/') && !includedDependencyTests.has(file)) continue;
     }
     const rows = auditFile(root, file, readFile(resolve(root, file), 'utf8'), crate, project?.name ?? null,
-      { ...variant, root });
+      { ...variant, root, pathExists });
     for (const row of rows) found.set(JSON.stringify(row), row);
   }
   return [...found.values()];
