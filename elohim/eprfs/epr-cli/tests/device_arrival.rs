@@ -4,6 +4,7 @@ use std::{
     fs,
     path::Path,
     process::{Command, Output},
+    time::{Duration, Instant},
 };
 
 fn epr(base: &Path, args: &[&str]) -> Output {
@@ -414,6 +415,48 @@ fn would_timeout_is_reported_without_changing_status_exit() {
         &["device", "status", "--would", "HEAD", "--target", "HEAD~1"],
         &[("EPR_WOULD_TIMEOUT_MS", "100")],
     );
+    assert_eq!(forecast.status.code(), ordinary.status.code());
+    assert!(String::from_utf8_lossy(&forecast.stdout)
+        .contains("timed out after 10s while running gate selection"));
+}
+
+#[test]
+fn would_input_stall_is_reported_within_deadline_without_changing_status_exit() {
+    let temp = fixture();
+    let base = temp.path();
+    first_device(base);
+    let orchestrator = base.join("repo/genesis/orchestrator");
+    install_push_changed_files(base);
+    fs::write(
+        orchestrator.join("gate-runner.mjs"),
+        "console.log('too-late');\n",
+    )
+    .unwrap();
+    fs::write(base.join("repo/changed.txt"), "selected\n").unwrap();
+    fixture_git(
+        base,
+        &[
+            "add",
+            "genesis/orchestrator/gate-runner.mjs",
+            "genesis/orchestrator/push-changed-files.sh",
+            "changed.txt",
+        ],
+    );
+    fixture_git(
+        base,
+        &["commit", "-q", "-m", "fixture stalled selection input"],
+    );
+    let ordinary = epr(base, &["device", "status"]);
+    let started = Instant::now();
+    let forecast = epr_with_env(
+        base,
+        &["device", "status", "--would", "HEAD", "--target", "HEAD~1"],
+        &[
+            ("EPR_WOULD_TIMEOUT_MS", "100"),
+            ("EPR_WOULD_STALL_INPUT", "1"),
+        ],
+    );
+    assert!(started.elapsed() < Duration::from_secs(2));
     assert_eq!(forecast.status.code(), ordinary.status.code());
     assert!(String::from_utf8_lossy(&forecast.stdout)
         .contains("timed out after 10s while running gate selection"));

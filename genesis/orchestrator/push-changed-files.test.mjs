@@ -61,12 +61,12 @@ function fixture() {
   return { repo, base };
 }
 
-function oldRange(repo, destination, tip) {
+function oldRange(repo, destination, tip, remoteRef = REMOTE_REF) {
   const wrapper = `
 REMOTE_SHA=$1
 LOCAL_SHA=$2
+REMOTE_REF=$3
 ZERO_SHA=${ZERO_SHA}
-REMOTE_REF=${REMOTE_REF}
 GATE_NARROW_BASE=ok
 CHANGE_UNREADABLE=""
 NEW_CHANGED=""
@@ -74,7 +74,7 @@ ${OLD_BLOCK}
 printf '%s' "$NEW_CHANGED"
 printf '%s\\0%s' "$GATE_NARROW_BASE" "$CHANGE_UNREADABLE" >&2
 `;
-  const result = spawnSync('bash', ['-c', wrapper, 'old-range', destination, tip], {
+  const result = spawnSync('bash', ['-c', wrapper, 'old-range', destination, tip, remoteRef], {
     cwd: repo,
     encoding: 'buffer',
   });
@@ -83,14 +83,30 @@ printf '%s\\0%s' "$GATE_NARROW_BASE" "$CHANGE_UNREADABLE" >&2
   return { paths: result.stdout.toString(), gateNarrowBase, changeUnreadable };
 }
 
-function sharedRange(repo, destination, tip) {
+function sharedRange(repo, destination, tip, remoteRef = REMOTE_REF) {
   const result = spawnSync('bash', [SCRIPT, destination, tip], {
     cwd: repo,
     encoding: 'utf8',
   });
   const gateNarrowBase = result.status === 0 ? 'ok' : 'none';
-  const changeUnreadable = result.status === 4 ? ` ${REMOTE_REF}` : '';
+  const changeUnreadable = result.status === 4 ? ` ${remoteRef}` : '';
   return { paths: result.stdout.replace(/\n$/, ''), gateNarrowBase, changeUnreadable, status: result.status };
+}
+
+function pushAccumulation(repo, refs, range) {
+  let changed = '';
+  let gateNarrowBase = 'ok';
+  let changeUnreadable = '';
+  let calls = 0;
+  for (const { localSha, remoteRef, remoteSha } of refs) {
+    if (localSha === ZERO_SHA) continue;
+    calls += 1;
+    const result = range(repo, remoteSha, localSha, remoteRef);
+    if (result.gateNarrowBase === 'none') gateNarrowBase = 'none';
+    changeUnreadable += result.changeUnreadable;
+    if (result.paths) changed = `${changed}\n${result.paths}`;
+  }
+  return { changed, gateNarrowBase, changeUnreadable, calls };
 }
 
 function assertParity(repo, destination, tip, expectedStatus) {
@@ -135,4 +151,44 @@ test('unreadable_ranges_match_the_former_empty_refusal_effects', () => {
   const { repo } = fixture();
   git(repo, 'update-ref', '-d', 'refs/remotes/origin/dev');
   assertParity(repo, 'missing-destination', 'missing-tip', 4);
+});
+
+test('two_refs_accumulate_the_same_changed_path_union_as_the_former_hook_block', () => {
+  const { repo, base } = fixture();
+  const first = commit(repo, 'first ref', { 'first.txt': 'first\n' });
+  const second = commit(repo, 'second ref', { 'second.txt': 'second\n' });
+  const refs = [
+    { localSha: first, remoteRef: 'refs/heads/first', remoteSha: base },
+    { localSha: second, remoteRef: 'refs/heads/second', remoteSha: first },
+  ];
+  const former = pushAccumulation(repo, refs, oldRange);
+  const shared = pushAccumulation(repo, refs, sharedRange);
+  assert.deepEqual(shared, former);
+  assert.equal(shared.changed, '\nfirst.txt\nsecond.txt');
+  assert.equal(shared.calls, 2);
+});
+
+test('tag_push_matches_the_former_hook_accumulation', () => {
+  const { repo, base } = fixture();
+  const tip = commit(repo, 'tagged tip', { 'tagged.txt': 'tagged\n' });
+  const refs = [{ localSha: tip, remoteRef: 'refs/tags/v1', remoteSha: base }];
+  const former = pushAccumulation(repo, refs, oldRange);
+  const shared = pushAccumulation(repo, refs, sharedRange);
+  assert.deepEqual(shared, former);
+  assert.equal(shared.changed, '\ntagged.txt');
+  assert.equal(shared.calls, 1);
+});
+
+test('delete_push_skips_the_range_script_and_leaves_accumulation_unchanged', () => {
+  const { repo, base } = fixture();
+  const refs = [{ localSha: ZERO_SHA, remoteRef: 'refs/heads/deleted', remoteSha: base }];
+  const former = pushAccumulation(repo, refs, oldRange);
+  const shared = pushAccumulation(repo, refs, sharedRange);
+  assert.deepEqual(shared, former);
+  assert.deepEqual(shared, {
+    changed: '',
+    gateNarrowBase: 'ok',
+    changeUnreadable: '',
+    calls: 0,
+  });
 });
