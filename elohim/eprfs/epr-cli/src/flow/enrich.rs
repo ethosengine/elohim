@@ -3,6 +3,13 @@
 //! The enriched verdict remains immutable. This writer names its exact event CID, copies the
 //! project, closure and commit from that event, and appends a separate `Cite`. In shadow the new
 //! measure is read by nothing and is absent from the peer crossing allow-list.
+//!
+//! What the record is not. It is unsigned and stays on this device, so it carries no authority: a
+//! reader may count it, never obey it. Its outcome and method are the caller's assertion; this verb
+//! checks only that the verdict it names exists in the fold and has the gate-verdict shape, not that
+//! the caller re-executed anything. It lives in the flow sidecar (`.eprfs/status/flows.jsonl`), and
+//! its only bound there is content deduplication: the same (verdict, kind, outcome, method, run)
+//! from this device is written once.
 
 use std::collections::BTreeMap;
 use std::path::Path;
