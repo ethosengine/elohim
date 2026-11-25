@@ -3072,3 +3072,24 @@ Not known: the cause, and why only one side's restart heals it. Proposed by the 
 session, not built: a watch that fires when the newest head from a sibling is older than N
 minutes while that sibling is seen exchanging with a third device. Ethosengine has such a watch
 for its own exchange (`genesis/local-dev/peer/daemon-liveness.sh`); shem and the laptop do not.
+
+## Row 94 — the Edge storage step watches all of `elohim/sdk/**`, so an agent hook test selects a fleet roll
+
+Observed on shem, 2026-11-25. A landing that changed a hook, its package projection, two
+documents and one test file, `elohim/sdk/domains/elohim-agent/scripts/brit-first.test.py`, was
+refused by the preflight's `fleet-roll` check: "CI would select an Edge build and its deploy step
+for this push to dev: elohim-edge stale steps cargo-build-storage, build-edge-image,
+deploy-manifests". The cause is one line: `elohim/holochain/build-manifest.json` lists
+`elohim/sdk/**` among the sources of the `cargo-build-storage` step. The same path is in the
+`elohim-storage` gate's read set, so the push also ran the storage gate on the lander (about an
+hour) for a closure that never landed, because a stop request does not interrupt a gate that has
+started.
+
+What was done: the test cases moved to `.claude/hooks/tests/test_brit_first_forms.py` and the
+sdk file went back to dev's bytes. No `[edge:roll]` was added.
+
+Not cured: the source list. Nothing has measured which paths under `elohim/sdk/` the storage
+build reads (schemas and generated types are likely; agent scripts and package fixtures are
+not). Narrowing it edits the Edge manifest, which is itself an Edge input, so it belongs with the
+next deliberate roll. A stop request that cannot interrupt a running gate is a second cost here
+and has no row of its own yet.
