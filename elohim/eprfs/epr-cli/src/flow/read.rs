@@ -22,6 +22,7 @@
 //! need to see it.
 
 use std::cmp::Ordering;
+use std::path::Path;
 
 use chrono::DateTime;
 use cid::Cid;
@@ -42,6 +43,26 @@ use super::note::{
 pub enum OccurredAtKey {
     Parsed(DateTime<chrono::FixedOffset>),
     Raw(String),
+}
+
+/// The shared history key for note and ledger readers.
+///
+/// A gate verdict whose judged commit cannot be resolved is deliberately after every dated row;
+/// its checkout-HEAD `occurred_at` is legacy transport data, not the verdict's history date.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub enum HistoryOrderKey {
+    Dated(OccurredAtKey),
+    GateDateUnknown,
+}
+
+impl HistoryOrderKey {
+    pub fn dated(occurred_at: &str) -> Self {
+        Self::Dated(OccurredAtKey::parse(occurred_at))
+    }
+
+    pub fn date_unknown(&self) -> bool {
+        matches!(self, Self::GateDateUnknown)
+    }
 }
 
 impl OccurredAtKey {
@@ -166,6 +187,10 @@ pub struct NoteView {
     pub verdict: Option<String>,
     pub steward: Option<String>,
     pub occurred_at: String,
+    /// The verdict's `env:commit` did not resolve in the repository, so its legacy checkout date
+    /// was not used as history. Omitted for every ordinarily dated note.
+    #[serde(skip_serializing_if = "is_false")]
+    pub date_unknown: bool,
     /// The commitment this note was recorded ON, when it has been rolled up onto a different
     /// atom's screen. `None` for a note on the atom itself. Omitted rather than null so an
     /// un-rolled note's payload is byte-identical to the one emitted before this field existed.
@@ -195,7 +220,8 @@ pub struct NoteSource {
 /// The unit test is the selector, not the verb alone: `Cite` is a general reference verb, and
 /// a future citing leg with a different unit must not appear in a note render.
 pub fn notes_on(records: &[(Cid, FlowRecord)], resource_cid: &Cid, limit: usize) -> Vec<NoteView> {
-    notes_across(
+    collect_notes(
+        None,
         records,
         &[NoteSource {
             resource: *resource_cid,
@@ -208,11 +234,21 @@ pub fn notes_on(records: &[(Cid, FlowRecord)], resource_cid: &Cid, limit: usize)
 /// The notes standing on ANY of several addresses, newest first across the merged set,
 /// truncated to `limit`. Each note carries the `via` marker of the source it was found at.
 pub fn notes_across(
+    root: &Path,
     records: &[(Cid, FlowRecord)],
     sources: &[NoteSource],
     limit: usize,
 ) -> Vec<NoteView> {
-    let mut matched: Vec<(OccurredAtKey, usize, NoteView)> = Vec::new();
+    collect_notes(Some(root), records, sources, limit)
+}
+
+fn collect_notes(
+    root: Option<&Path>,
+    records: &[(Cid, FlowRecord)],
+    sources: &[NoteSource],
+    limit: usize,
+) -> Vec<NoteView> {
+    let mut matched: Vec<(HistoryOrderKey, usize, NoteView)> = Vec::new();
     for (index, (cid, record)) in records.iter().enumerate() {
         let FlowRecord::Event(event) = record else {
             continue;
@@ -228,16 +264,25 @@ pub fn notes_across(
         };
         let mut view = note_view(cid, event);
         view.via.clone_from(&source.via);
-        matched.push((OccurredAtKey::parse(&event.occurred_at), index, view));
+        let order = root
+            .map(|root| note_history_order(root, &view))
+            .unwrap_or_else(|| HistoryOrderKey::dated(&event.occurred_at));
+        view.date_unknown = order.date_unknown();
+        matched.push((order, index, view));
     }
-    // Ascending by (history time, append order), then reversed: newest first with the
-    // LAST-appended note of an exact timestamp tie leading, which is the order a session authored
-    // them in. For gate-verdict@1, occurred_at is the judged commit's author date; the separate
-    // env:observedAt slot is display/freshness data and deliberately does not participate here.
-    matched.sort_by(|a, b| a.0.cmp(&b.0).then_with(|| a.1.cmp(&b.1)));
+    // Dated rows are newest first with last append winning exact ties. Unknown verdict dates stay
+    // after every dated row (also newest append first), so they cannot consume the bounded window
+    // ahead of a verdict whose judged commit is known.
+    matched.sort_by(|a, b| match (&a.0, &b.0) {
+        (HistoryOrderKey::Dated(a_time), HistoryOrderKey::Dated(b_time)) => {
+            b_time.cmp(a_time).then_with(|| b.1.cmp(&a.1))
+        }
+        (HistoryOrderKey::Dated(_), HistoryOrderKey::GateDateUnknown) => Ordering::Less,
+        (HistoryOrderKey::GateDateUnknown, HistoryOrderKey::Dated(_)) => Ordering::Greater,
+        (HistoryOrderKey::GateDateUnknown, HistoryOrderKey::GateDateUnknown) => b.1.cmp(&a.1),
+    });
     matched
         .into_iter()
-        .rev()
         .take(limit)
         .map(|(_, _, view)| view)
         .collect()
@@ -267,6 +312,7 @@ pub fn note_view(cid: &Cid, event: &elohim_epr_rea::FlowEvent) -> NoteView {
         verdict: None,
         steward: None,
         occurred_at: event.occurred_at.clone(),
+        date_unknown: false,
         via: None,
         extra: Vec::new(),
     };
@@ -286,18 +332,45 @@ pub fn note_view(cid: &Cid, event: &elohim_epr_rea::FlowEvent) -> NoteView {
     view
 }
 
+fn is_false(value: &bool) -> bool {
+    !*value
+}
+
+fn is_gate_verdict(view: &NoteView) -> bool {
+    view.reason.as_deref() == Some("verdict")
+        && view
+            .extra
+            .iter()
+            .any(|slot| slot == "measure:gate-verdict@1")
+}
+
+/// A note's history order. Gate verdicts use the judged commit's author date on both legacy and
+/// current records; an unresolvable commit is explicitly unknown rather than inheriting HEAD.
+pub fn note_history_order(root: &Path, view: &NoteView) -> HistoryOrderKey {
+    if !is_gate_verdict(view) {
+        return HistoryOrderKey::dated(&view.occurred_at);
+    }
+    let mut commits = view
+        .extra
+        .iter()
+        .filter_map(|slot| slot.strip_prefix("env:commit="));
+    let commit = commits.next();
+    if commits.next().is_none() {
+        if let Some(occurred_at) = commit.and_then(|commit| super::commit_author_date(root, commit))
+        {
+            return HistoryOrderKey::dated(&occurred_at);
+        }
+    }
+    HistoryOrderKey::GateDateUnknown
+}
+
 /// A gate verdict's run observation time.
 ///
 /// The outer option distinguishes a gate verdict from every other note. The inner option is
 /// absent for a legacy gate verdict (or a malformed duplicate slot), which readers render as
 /// unknown rather than falling back to the verdict's historical `occurred_at`.
 pub fn gate_verdict_observed_at(view: &NoteView) -> Option<Option<&str>> {
-    if view.reason.as_deref() != Some("verdict")
-        || !view
-            .extra
-            .iter()
-            .any(|slot| slot == "measure:gate-verdict@1")
-    {
+    if !is_gate_verdict(view) {
         return None;
     }
     let mut values = view

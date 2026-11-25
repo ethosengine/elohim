@@ -108,6 +108,11 @@ recipes:
     );
     write(
         root,
+        ".claude/epr-meta/measures.yaml",
+        "measures:\n  - id: gate-verdict\n    version: 1\n    unit: verdicts\n    status: active\n    default-authority: observation\n",
+    );
+    write(
+        root,
         FEATURE,
         "Feature: Chapter five — node loss\n  @concern:resiliency\n  Scenario: data survives\n    Given a node dies\n    Then the data survives\n",
     );
@@ -195,6 +200,70 @@ fn dated_by_an_unresolvable_commit_refuses_on_one_line_and_appends_nothing() {
     assert_eq!(stderr.lines().count(), 1, "{stderr}");
     assert!(stderr.contains("does not resolve to a commit"), "{stderr}");
     assert_eq!(sidecar_lines(root), before, "nothing appended");
+}
+
+#[test]
+fn dated_by_must_match_the_structured_observations_commit() {
+    let dir = projected();
+    let root = dir.path();
+    let judged = git_stdout(root, &["rev-parse", "HEAD"]);
+    write(root, "new-head.txt", "a later checkout head\n");
+    commit_at(root, "later head", "2037-04-05T06:07:08Z");
+    let other = git_stdout(root, &["rev-parse", "HEAD"]);
+
+    let matching = epr_note(
+        root,
+        &[
+            "--kind",
+            "observation",
+            "--measure",
+            "gate-verdict@1",
+            "--subject",
+            ".",
+            "--value",
+            "1",
+            "--reason",
+            "verdict",
+            "--env",
+            &format!("commit={judged}"),
+            "--dated-by",
+            &judged[..9],
+        ],
+    );
+    assert!(
+        matching.status.success(),
+        "{}",
+        String::from_utf8_lossy(&matching.stderr)
+    );
+    let after_matching = sidecar_lines(root);
+
+    let mismatching = epr_note(
+        root,
+        &[
+            "--kind",
+            "observation",
+            "--measure",
+            "gate-verdict@1",
+            "--subject",
+            ".",
+            "--value",
+            "1",
+            "--reason",
+            "verdict",
+            "--env",
+            &format!("commit={judged}"),
+            "--dated-by",
+            &other,
+        ],
+    );
+    assert!(!mismatching.status.success());
+    let stderr = String::from_utf8_lossy(&mismatching.stderr);
+    assert_eq!(stderr.lines().count(), 1, "{stderr}");
+    assert!(
+        stderr.contains("must name the same commit as env:commit"),
+        "{stderr}"
+    );
+    assert_eq!(sidecar_lines(root), after_matching, "nothing appended");
 }
 
 fn note_events(root: &Path) -> Vec<elohim_epr_rea::FlowEvent> {
