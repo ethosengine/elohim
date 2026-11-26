@@ -483,6 +483,35 @@ def _peer_age(ms):
     return f"{secs}s" if secs < 120 else (f"{secs // 60}m" if secs < 7200 else f"{secs // 3600}h")
 
 
+def _lease_wait_detail(waiting, now_ms):
+    """Say what one sibling head must prove before this device's claim is confirmed."""
+    if not isinstance(waiting, dict):
+        return None
+    device = waiting.get("device", "another device")
+    needs = waiting.get("needsSeq")
+    if needs is None:
+        return (f"{device}: no own head has carried the claim yet "
+                "(waiting on the next announce)")
+    acked = waiting.get("ackedSeq")
+    acknowledgement = (f"it acknowledges {acked}" if acked is not None
+                       else "has not acknowledged yet")
+    head_seq = waiting.get("headSeq")
+    processed_at = waiting.get("processedAt")
+    if head_seq is None:
+        head = "no head held here"
+    elif processed_at is None:
+        head = f"its head seq {head_seq} has no processing time"
+    else:
+        age_s = max(0, (int(now_ms) - int(processed_at)) // 1000)
+        head = f"its head seq {head_seq} processed {age_s}s ago"
+    return f"{device} to acknowledge our seq {needs} ({acknowledgement}; {head})"
+
+
+def _with_lease_wait(line, waiting, now_ms):
+    detail = _lease_wait_detail(waiting, now_ms)
+    return f"{line} — {detail}" if detail else line
+
+
 def steward_reason(verdict, now_ms, fence_after_s=None):
     """The one reason line a refused steward claim prints, from its `epr peer leases` verdict:
     `held by <device>/<session> since <time>` or `unconfirmed: <device> last seen <age> ago`. The a2o
@@ -494,18 +523,26 @@ def steward_reason(verdict, now_ms, fence_after_s=None):
     # A pending verdict names who it waits on, not a device: the re-read right after an override
     # row is written is pending until the view folds that row.
     if verdict.get("verdict") == "pending":
-        waiting = (verdict.get("waiting_on") or ["another device"])[0]
-        return f"unconfirmed: {waiting} has not acknowledged yet"
+        waiting_on = verdict.get("waiting_on") or ["another device"]
+        line = f"unconfirmed: {waiting_on[0]} has not acknowledged yet"
+        evidence = {row.get("device"): row for row in (verdict.get("waiting") or [])
+                    if isinstance(row, dict)}
+        details = [_lease_wait_detail(evidence.get(device), now_ms) for device in waiting_on]
+        details = [detail for detail in details if detail]
+        return f"{line} — {' | '.join(details)}" if details else line
     if verdict.get("fenced"):
         window = f" within {fence_after_s}s" if fence_after_s is not None else " recently"
         return f"self-demoted: no head from {verdict['device']}{window}"
     if verdict.get("override_at") is not None:
-        return (f"unconfirmed: {verdict['device']} — override effective at "
+        line = (f"unconfirmed: {verdict['device']} — override effective at "
                 f"{_rfc3339(verdict['override_at'])}")
+        return _with_lease_wait(line, verdict.get("waiting"), now_ms)
     seen = verdict.get("last_seen")
     if seen is None:
-        return f"unconfirmed: {verdict['device']} never seen"
-    return f"unconfirmed: {verdict['device']} last seen {_peer_age(now_ms - seen)} ago"
+        line = f"unconfirmed: {verdict['device']} never seen"
+    else:
+        line = f"unconfirmed: {verdict['device']} last seen {_peer_age(now_ms - seen)} ago"
+    return _with_lease_wait(line, verdict.get("waiting"), now_ms)
 
 
 

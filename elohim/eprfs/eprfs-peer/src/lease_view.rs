@@ -454,6 +454,9 @@ pub enum LeaseVerdict {
     Pending {
         session: String,
         waiting_on: Vec<String>,
+        /// What this device's last folded head from each waiting device proves.
+        #[serde(skip_serializing_if = "Vec::is_empty")]
+        waiting: Vec<LeaseWait>,
     },
     /// This device's `session` claimed it and `device` did not acknowledge within the wait.
     /// `last_seen` is when this device last folded a head from it (its clock, unix ms).
@@ -465,6 +468,10 @@ pub enum LeaseVerdict {
         fenced: bool,
         /// When an offline override becomes eligible, unix milliseconds.
         override_at: Option<u64>,
+        /// What this device's last folded head from the unconfirmed device proves. A fenced
+        /// holder is waiting for freshness rather than acknowledgement and carries no row.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        waiting: Option<LeaseWait>,
     },
     /// A peer acknowledged the carrying head but explicitly refused this claim CID.
     RefusedBy { session: String, device: String },
@@ -477,6 +484,24 @@ pub enum LeaseVerdict {
         #[serde(rename = "override")]
         overriding: bool,
     },
+}
+
+/// What one waiting device's last locally held head says about this device's claim.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct LeaseWait {
+    pub device: String,
+    /// The first own head that carried the claim.
+    #[serde(rename = "needsSeq", skip_serializing_if = "Option::is_none")]
+    pub needs_seq: Option<u64>,
+    /// The highest head of ours this device's held head acknowledges.
+    #[serde(rename = "ackedSeq", skip_serializing_if = "Option::is_none")]
+    pub acked_seq: Option<u64>,
+    /// The sequence of this device's held head.
+    #[serde(rename = "headSeq", skip_serializing_if = "Option::is_none")]
+    pub head_seq: Option<u64>,
+    /// When this device finished processing that held head, unix milliseconds.
+    #[serde(rename = "processedAt", skip_serializing_if = "Option::is_none")]
+    pub processed_at: Option<u64>,
 }
 
 /// How many of a lease's claim and renews the holder fence considers: the newest acknowledged
@@ -900,6 +925,16 @@ fn own_verdict(
     now: u64,
     settlement: Settlement,
 ) -> LeaseVerdict {
+    let wait_for = |device: &str| {
+        let head = heads.devices.get(device);
+        LeaseWait {
+            device: device.to_string(),
+            needs_seq: carried.claim,
+            acked_seq: head.and_then(|head| head.folded.get(me)).copied(),
+            head_seq: head.map(|head| head.seq),
+            processed_at: head.map(|head| head.folded_at),
+        }
+    };
     let claim_cid = lease.claim_cid.to_string();
     if let Some(device) = others.iter().find(|device| {
         heads
@@ -923,12 +958,14 @@ fn own_verdict(
             .get(**device)
             .is_some_and(|head| head.nack.overflowed())
     }) {
+        let wait = wait_for(device);
         return LeaseVerdict::Unconfirmed {
             session: lease.session,
             last_seen: heads.devices.get(*device).map(|head| head.folded_at),
             device: (*device).to_string(),
             fenced: false,
             override_at: None,
+            waiting: Some(wait),
         };
     }
     let override_at = lease.overrode.as_ref().and_then(|silent| {
@@ -946,26 +983,30 @@ fn own_verdict(
     let override_effective = override_at.is_some_and(|at| now >= at);
     if let Some(silent) = lease.overrode.clone() {
         if !override_effective {
+            let wait = wait_for(&silent);
             return LeaseVerdict::Unconfirmed {
                 session: lease.session,
                 last_seen: heads.devices.get(&silent).map(|head| head.folded_at),
-                device: silent,
+                device: silent.clone(),
                 fenced: false,
                 override_at,
+                waiting: Some(wait),
             };
         }
     }
-    let waiting_on: Vec<String> = others
+    let waiting: Vec<LeaseWait> = others
         .iter()
         .filter(|device| lease.overrode.as_deref() != Some(**device) || !override_effective)
-        .filter(|device| {
-            let head = heads.devices.get(**device);
-            let acked = head.and_then(|head| head.folded.get(me));
-            !matches!((carried.claim, acked), (Some(seq), Some(&acked)) if acked >= seq)
+        .filter_map(|device| {
+            let wait = wait_for(device);
+            (!matches!(
+                (wait.needs_seq, wait.acked_seq),
+                (Some(seq), Some(acked)) if acked >= seq
+            ))
+            .then_some(wait)
         })
-        .map(|device| (*device).to_string())
         .collect();
-    let Some(silent) = waiting_on.first().cloned() else {
+    let Some(silent) = waiting.first().cloned() else {
         let fence_after_s = lease
             .ttl_s
             .map(|ttl| ttl.saturating_sub(settlement.fence_margin_s));
@@ -1003,6 +1044,7 @@ fn own_verdict(
                 device: (*device).to_string(),
                 fenced: true,
                 override_at: None,
+                waiting: None,
             },
             None => LeaseVerdict::Effective {
                 session: lease.session,
@@ -1015,15 +1057,17 @@ fn own_verdict(
     if now < deadline {
         LeaseVerdict::Pending {
             session: lease.session,
-            waiting_on,
+            waiting_on: waiting.iter().map(|wait| wait.device.clone()).collect(),
+            waiting,
         }
     } else {
         LeaseVerdict::Unconfirmed {
             session: lease.session,
-            last_seen: heads.devices.get(&silent).map(|head| head.folded_at),
-            device: silent,
+            last_seen: silent.processed_at,
+            device: silent.device.clone(),
             fenced: false,
             override_at: None,
+            waiting: Some(silent),
         }
     }
 }
