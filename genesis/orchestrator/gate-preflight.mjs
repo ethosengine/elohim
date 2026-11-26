@@ -13,13 +13,13 @@
 // The fresh-worktree checklist this replaces lived in agent memory and was re-learned on
 // 2026-10-15, -17, -19, -22, -27, -31 and 11-01. Habit `careless-reds-cost-seconds`.
 
-import { attestedSubmodules } from './attested-list.mjs';
+import { attestedSubmodules, LIST_PATH } from './attested-list.mjs';
 import { accessSync, constants, existsSync, readFileSync, readdirSync, realpathSync, statSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { loadGateRegistry } from './pipeline-registry.mjs';
+import { loadGateRegistry, loadPipelineRegistry } from './pipeline-registry.mjs';
 import { SUITE_READ_LISTS, UNAUDITED_RECIPE_PROJECTS, globCovers, readSet, suiteReadSet } from './gate-input-audit.mjs';
 import { declaredPinStores } from './suite-inventory.mjs';
 import { dirtyPaths } from './gate-evidence.mjs';
@@ -100,20 +100,75 @@ function underApp(project) {
   return project.dir === 'app' || project.dir.startsWith('app/') || project.dir.startsWith('doorway/doorway-app');
 }
 
-export function checkSubmodules({ root, spawn = spawnSync }) {
+/**
+ * Whether a selected project's own manifest reads `module`: a step source or buildProcess file at
+ * or under it. An unreadable manifest answers the wider way: it does.
+ */
+export function manifestNames(module, project, { root, read = readFileSync }) {
+  try {
+    const manifest = JSON.parse(String(read(resolve(root, project.manifestPath), 'utf8')));
+    return Object.values(manifest.steps || {}).some(step =>
+      [...(step?.inputs?.sources || []), ...(step?.inputs?.buildProcess || [])]
+        .some(source => source === module || source.startsWith(`${module}/`)));
+  } catch { return true; }
+}
+
+/**
+ * Why this work needs the attested submodule `module`, or null when its own changed paths and
+ * selected projects make it irrelevant (a documents-only or script-only change on a device that
+ * holds no copy of brit, rakia or sophia). Every answer that cannot be computed is a reason: no
+ * change list, no selection, an unreadable manifest, a dependency no loaded manifest declares
+ * (the absent submodule may be what declares it). The orchestrator gates load every manifest and
+ * read every declared pin, so either of them needs all of them.
+ */
+export function attestedNeed(module, { root, projects, changed, read = readFileSync, pipelines = loadPipelineRegistry }) {
+  if (!Array.isArray(changed)) return 'no change list to judge it by';
+  if (!Array.isArray(projects)) return 'the selection is unavailable';
+  const touched = changed.find(path => path === module || path.startsWith(`${module}/`) || path === '.gitmodules' || path === LIST_PATH);
+  if (touched) return `the change touches ${touched}`;
+  let known;
+  try { known = pipelines(root); } catch { return 'the build manifests could not be read'; }
+  for (const project of projects) {
+    if (project.name === 'orchestrator' || project.name === 'orchestrator-tree') return `${project.name} is selected and loads every attested manifest`;
+    if (project.run?.kind === 'attested') return `the attested project ${project.name} is selected`;
+    if (project.dir === module || project.dir?.startsWith(`${module}/`)) return `${project.name} lives in it`;
+    if (!project.manifestPath) return `${project.name} has no manifest to read`;
+    if (manifestNames(module, project, { root, read })) return `${project.name}'s manifest reads it (or cannot be read)`;
+    let manifest;
+    try { manifest = JSON.parse(String(read(resolve(root, project.manifestPath), 'utf8'))); }
+    catch { return `${project.manifestPath} cannot be read`; }
+    const wanted = [...(Array.isArray(manifest.dependsOn) ? manifest.dependsOn : []),
+      ...Object.values(manifest.steps || {}).flatMap(step => (step?.depends || []).map(dep => String(dep).split(':')[0]))];
+    const unknown = wanted.find(name => !known.has(name));
+    if (unknown) return `${project.name} depends on ${unknown}, which no checked-out manifest declares`;
+  }
+  return null;
+}
+
+/**
+ * With `projects` and `changed` (prep, and the hook's own preflight), an uninitialised attested
+ * submodule is required only when attestedNeed gives a reason; the rest are named as skipped.
+ * With neither (`just gate`, which has no change list), every one is required, as before.
+ */
+export function checkSubmodules({ root, spawn = spawnSync, projects = null, changed = null, need = attestedNeed }) {
   const r = spawn('git', ['-C', root, 'submodule', 'status', '--', ...ATTESTED_SUBMODULES], { encoding: 'utf8' });
   if (r.status !== 0) return row('submodules', 'WARN', 'git submodule status failed', 'git submodule status');
-  const missing = String(r.stdout).split('\n').filter(line => line.startsWith('-')).map(line => line.trim().split(/\s+/)[1]);
+  const absent = String(r.stdout).split('\n').filter(line => line.startsWith('-')).map(line => line.trim().split(/\s+/)[1]);
+  const reasons = new Map(absent.map(module => [module, need(module, { root, projects, changed })]));
+  const missing = absent.filter(module => reasons.get(module));
+  const skipped = absent.filter(module => !reasons.get(module));
   if (missing.length) {
-    return { ...row('submodules', 'REFUSED', `not checked out: ${missing.join(' ')} — their attested gate projects vanish and the orchestrator registry tests fail`,
-      viaPrep(root, `git submodule update --init ${missing.join(' ')}`)), missing };
+    const because = projects && changed ? ` (${missing.map(module => `${module}: ${reasons.get(module)}`).join('; ')})` : '';
+    return { ...row('submodules', 'REFUSED', `not checked out: ${missing.join(' ')} — their attested gate projects vanish and the orchestrator registry tests fail${because}`,
+      viaPrep(root, `git submodule update --init ${missing.join(' ')}`)), missing, skipped };
   }
   const moved = String(r.stdout).split('\n').filter(line => line.startsWith('+')).map(line => line.trim().split(/\s+/)[1]);
   if (moved.length) {
-    return row('submodules', 'WARN', `checked-out commit differs from the pin: ${moved.join(' ')} — gates test bytes the push does not carry`,
-      `git submodule update ${moved.join(' ')}   (or commit the pin you mean)`);
+    return { ...row('submodules', 'WARN', `checked-out commit differs from the pin: ${moved.join(' ')} — gates test bytes the push does not carry`,
+      `git submodule update ${moved.join(' ')}   (or commit the pin you mean)`), skipped };
   }
-  return row('submodules', 'ok');
+  return { ...row('submodules', 'ok', skipped.length
+    ? `not checked out and not required: ${skipped.join(' ')} — no changed path or selected project needs them` : ''), skipped };
 }
 
 /**
@@ -545,9 +600,12 @@ export function runPreflight({ root = ROOT, projects, env = process.env, spawn =
     for (const r of rows) onRow(r);
     return rows;
   };
+  // The change list is trusted to skip a check only when the hook read the push's own range
+  // (GATE_NARROW_BASE=none marks a fallback range) or a caller handed it in; otherwise every check runs.
+  const exact = env.GATE_NARROW_BASE === 'none' ? null : changed;
   return [
     ...timed(() => checkEprBin({ env })),
-    ...timed(() => checkSubmodules({ root, spawn })),
+    ...timed(() => checkSubmodules({ root, spawn, projects: exact === null ? null : projects, changed: exact })),
     ...timed(() => checkSubmodulePins({ root, projects })),
     ...timed(() => checkTmpdir({ projects, env })),
     ...timed(() => checkNodeModules({ root, projects })),

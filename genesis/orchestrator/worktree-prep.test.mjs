@@ -5,7 +5,7 @@ import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync 
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { currentChanges, mainCheckout, neededSubmodule, prep, submoduleCommand } from './worktree-prep.mjs';
-import { ATTESTED_SUBMODULES, runPreflight, WORKSPACE_INSTALL } from './gate-preflight.mjs';
+import { ATTESTED_SUBMODULES, attestedNeed, checkSubmodules, runPreflight, WORKSPACE_INSTALL } from './gate-preflight.mjs';
 
 const ok = stdout => ({ status: 0, stdout: stdout || '' });
 const put = (root, file, value = '') => {
@@ -321,7 +321,7 @@ test('declared submodules: prep initializes one whose pin is in no store and ski
   ];
   assert.equal(prep(f.options), 0, f.logs.join('\n'));
   const clones = f.calls.filter(([cmd, arg]) => cmd === 'git' && arg === '-c').map(call => call.at(-1));
-  assert.deepEqual(clones, [...ATTESTED_SUBMODULES, 'elohim/holochain-conductor'], 'the attested three as before, then the absent declared one');
+  assert.deepEqual(clones, ['elohim/holochain-conductor'], 'the absent declared one; no selected project needs an attested one');
   assert.match(f.logs.join('\n'), /elohim\/holochain-conductor: pin aaaaaaaaaaaa is in no object store here/);
 });
 
@@ -352,7 +352,7 @@ test('not needed and held by no local checkout: one line, no clone, no fetch, in
   const out = f.logs.join('\n');
   assert.match(out, new RegExp(`\\[prep\\] ${CHE}: not needed for this worktree and not present locally; left uninitialised`));
   assert.match(out, new RegExp(`\\[prep\\] ${COND}: not needed for this worktree and not present locally; left uninitialised`));
-  assert.deepEqual(cloned(f), [...ATTESTED_SUBMODULES]);
+  assert.deepEqual(cloned(f), [], 'and no attested submodule either: nothing selected needs one');
   assert.ok(f.calls.some(([cmd, arg]) => cmd === 'pnpm' && arg === 'install'), 'pnpm install ran');
   assert.ok(f.calls.some(([cmd]) => cmd === 'test'), 'hook check ran');
   assert.ok(!f.calls.some(call => call.includes('fetch')), 'nothing fetched');
@@ -368,7 +368,7 @@ test('needed (a selected project names it) and held by no local checkout: REFUSE
 test('not needed but available locally is initialised as today', t => {
   const f = neededFixture(t, { selected: [], heldBy: { [CHE]: true, [COND]: true } });
   assert.equal(prep(f.options), 0, f.logs.join('\n'));
-  assert.deepEqual(cloned(f), [...ATTESTED_SUBMODULES, CHE, COND]);
+  assert.deepEqual(cloned(f), [CHE, COND]);
   assert.doesNotMatch(f.logs.join('\n'), /left uninitialised/);
 });
 
@@ -388,4 +388,92 @@ test('the pre-push hook and prep read one attested list file', () => {
   assert.match(hook, /attested-list\.mjs/);
   assert.doesNotMatch(hook, /submodule status -- elohim\/brit/);
   assert.deepEqual(ATTESTED_SUBMODULES, ['elohim/brit', 'elohim/rakia', 'sophia']);
+});
+
+// Thin-device station 1 (backlog row 106): prep asks which attested submodules this work needs.
+const SKIPPED = /\[preflight\] ok submodules \(not checked out and not required: elohim\/brit elohim\/rakia sophia/;
+
+test('station 1: no selected project needs an attested submodule: none is cloned, the skip is named, prep is clear', t => {
+  const f = fixture(t, { projects: [] });
+  f.options.select = () => [];
+  assert.equal(prep(f.options), 0, f.logs.join('\n'));
+  assert.deepEqual(cloned(f), []);
+  assert.match(f.logs[0], SKIPPED, 'said before anything else');
+  assert.ok(f.logs.filter(line => SKIPPED.test(line)).length >= 2, 'and again by the final preflight, which no longer refuses');
+  assert.match(f.logs.at(-2), /preflight clear/);
+});
+
+test('station 1: a selected project that is not the orchestrator and reads no submodule skips them too', t => {
+  const f = fixture(t);
+  put(f.root, 'm/build-manifest.json', JSON.stringify({ pipeline: 'p', steps: { s: { inputs: { sources: ['genesis/docs/**'] } } } }));
+  f.options.select = () => [{ name: 'eprfs-live-corpus', dir: '.', manifestPath: 'm/build-manifest.json', run: { kind: 'root-just' } }];
+  f.options.preflight = () => [];
+  assert.equal(prep(f.options), 0, f.logs.join('\n'));
+  assert.deepEqual(cloned(f), []);
+});
+
+test('station 1: the orchestrator selected requires all three, as before', t => {
+  const f = fixture(t);
+  f.options.select = () => [{ name: 'orchestrator', dir: 'genesis/orchestrator', manifestPath: 'genesis/orchestrator/build-manifest.json', run: { kind: 'just' } }];
+  f.options.preflight = () => [];
+  assert.equal(prep(f.options), 0, f.logs.join('\n'));
+  assert.deepEqual(cloned(f), [...ATTESTED_SUBMODULES]);
+  assert.match(f.logs[0], /REFUSED submodules: not checked out: elohim\/brit elohim\/rakia sophia/);
+});
+
+test('station 1: a selection that cannot be computed requires all three', t => {
+  const f = fixture(t);
+  let asked = 0;
+  f.options.select = () => { asked += 1; if (asked === 1) throw new Error('registry unreadable'); return []; };
+  f.options.preflight = () => [];
+  assert.equal(prep(f.options), 0, f.logs.join('\n'));
+  assert.deepEqual(cloned(f), [...ATTESTED_SUBMODULES]);
+  assert.equal(asked, 2, 'read again once the submodule manifests exist');
+});
+
+test('station 1: a moved pin requires that submodule and no other', t => {
+  const f = fixture(t, { git: args => (args[0] === 'diff' || args[0] === 'ls-files' ? ok('sophia\0genesis/docs/a.md\0') : null) });
+  f.options.select = () => [];
+  f.options.preflight = () => [];
+  assert.equal(prep(f.options), 0, f.logs.join('\n'));
+  assert.deepEqual(cloned(f), ['sophia']);
+  assert.match(f.logs[0], /REFUSED submodules: not checked out: sophia .*sophia: the change touches sophia/);
+});
+
+test('station 1: attestedNeed gives a reason whenever the answer cannot be computed, and null only for irrelevant work', () => {
+  const manifest = { pipeline: 'elohim', dependsOn: ['elohim-sophia'], steps: { build: { depends: ['elohim-sophia:build-sophia-umd'], inputs: { sources: ['app/**'] } } } };
+  const read = () => JSON.stringify(manifest);
+  const none = () => new Map([['elohim', {}]]);
+  const both = () => new Map([['elohim', {}], ['elohim-sophia', {}]]);
+  const app = { name: 'elohim-app', dir: 'app/elohim-app', manifestPath: 'app/elohim-app/build-manifest.json', run: { kind: 'just' } };
+  const ask = (module, projects, changed, pipelines = both, reader = read) => attestedNeed(module, { root: '/x', projects, changed, read: reader, pipelines });
+  assert.equal(ask('sophia', [], ['genesis/docs/a.md']), null);
+  assert.equal(ask('sophia', [app], ['app/elohim-app/src/main.ts']), null, 'its dependencies are all declared by manifests that are here');
+  assert.match(ask('sophia', [app], ['app/elohim-app/src/main.ts'], none), /depends on elohim-sophia, which no checked-out manifest declares/);
+  assert.match(ask('elohim/brit', [app], ['app/x.ts'], none), /depends on elohim-sophia/, 'which absent submodule declares it is unknown: each is needed');
+  assert.match(ask('sophia', null, ['a.md']), /selection is unavailable/);
+  assert.match(ask('sophia', [], null), /no change list/);
+  for (const path of ['sophia', 'sophia/package.json', '.gitmodules', 'genesis/orchestrator/attested-submodules.txt']) {
+    assert.match(ask('sophia', [], [path]), /the change touches/, path);
+  }
+  assert.equal(ask('elohim/brit', [], ['sophia']), null, 'another submodule\'s pin does not need this one');
+  assert.match(ask('sophia', [{ ...app, name: 'orchestrator' }], ['x']), /orchestrator is selected/);
+  assert.match(ask('sophia', [{ ...app, name: 'orchestrator-tree' }], ['x']), /orchestrator-tree is selected/);
+  assert.match(ask('sophia', [{ ...app, run: { kind: 'attested' } }], ['x']), /attested project/);
+  assert.match(ask('sophia', [{ ...app, dir: 'sophia/packages/x' }], ['x']), /lives in it/);
+  assert.match(ask('sophia', [app], ['x'], both, () => { throw new Error('ENOENT'); }), /cannot be read/);
+  assert.match(ask('sophia', [app], ['x'], () => { throw new Error('bad manifest'); }), /build manifests could not be read/);
+  assert.match(ask('elohim/rakia', [app], ['x'], both, () => JSON.stringify({ steps: { v: { inputs: { sources: ['a'], buildProcess: ['elohim/rakia/schemas/scripts/validate.mjs'] } } } })), /manifest reads it/);
+});
+
+test('station 1: without a selection and a change list (just gate) every absent attested submodule still refuses', () => {
+  const spawn = () => ({ status: 0, stdout: '-abc elohim/brit\n-abc elohim/rakia\n-abc sophia\n' });
+  const all = checkSubmodules({ root: '/x', spawn });
+  assert.equal(all.level, 'REFUSED');
+  assert.deepEqual(all.missing, ['elohim/brit', 'elohim/rakia', 'sophia']);
+  assert.equal(checkSubmodules({ root: '/x', spawn, projects: [], changed: null }).level, 'REFUSED');
+  assert.equal(checkSubmodules({ root: '/x', spawn, projects: null, changed: ['a.md'] }).level, 'REFUSED');
+  const thin = checkSubmodules({ root: '/x', spawn, projects: [], changed: ['a.md'], need: () => null });
+  assert.equal(thin.level, 'ok');
+  assert.deepEqual(thin.skipped, ['elohim/brit', 'elohim/rakia', 'sophia']);
 });

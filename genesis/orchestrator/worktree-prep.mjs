@@ -6,7 +6,7 @@ import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { projectsForChanges } from './gate-runner.mjs';
 import { declaredPinStores } from './suite-inventory.mjs';
-import { ATTESTED_SUBMODULES, checkSubmodules, DIST_CHECKS, formatRow, runPreflight, WORKSPACE_INSTALL } from './gate-preflight.mjs';
+import { ATTESTED_SUBMODULES, checkSubmodules, DIST_CHECKS, formatRow, manifestNames, runPreflight, WORKSPACE_INSTALL } from './gate-preflight.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
@@ -108,13 +108,7 @@ export function pinSource(module, pin, { candidates, spawn = spawnSync, exists =
 export function neededSubmodule(module, projects, { read = readFileSync, root = ROOT } = {}) {
   if (ATTESTED_SUBMODULES.includes(module) || !projects) return true;
   if (projects.some(project => project.name === 'orchestrator')) return true;
-  return projects.some(project => {
-    try {
-      const manifest = JSON.parse(String(read(resolve(root, project.manifestPath), 'utf8')));
-      return Object.values(manifest.steps || {}).some(step =>
-        (step?.inputs?.sources || []).some(source => source === module || source.startsWith(`${module}/`)));
-    } catch { return true; } // an unreadable manifest answers the wider way: needed
-  });
+  return projects.some(project => manifestNames(module, project, { read, root }));
 }
 
 function noSource(module, pin, candidates) {
@@ -139,7 +133,18 @@ export function prep({ root = ROOT, spawn = spawnSync, exists = existsSync,
   const refused = []; // moved submodules prep would not touch (E8 #2): prep exits 1 naming each
   try {
     const main = mainCheckout({ root, spawn });
-    const modules = checkSubmodules({ root, spawn });
+    // Thin-device station 1: an absent attested submodule is brought in only when this worktree's
+    // own changes need it (gate-preflight attestedNeed). The selection is read before any checkout,
+    // from the manifests that are here; when it or the change list cannot be read, all are required.
+    let early = null;
+    let modules = checkSubmodules({ root, spawn });
+    if (modules.missing?.length) {
+      let before = null;
+      try { before = currentChanges({ root, spawn }); early = select(root, before); } catch { early = null; before = null; }
+      modules = checkSubmodules({ root, spawn, projects: early, changed: before });
+      // A checkout adds manifests to the registry: the selection is read again once they exist.
+      if (modules.missing?.length) early = null;
+    }
     log(formatRow(modules));
     if (modules.level === 'WARN' && !modules.why.includes('differs from the pin')) {
       throw new Error('cannot inspect submodules; refusing an incomplete gate registry');
@@ -170,8 +175,7 @@ export function prep({ root = ROOT, spawn = spawnSync, exists = existsSync,
     // clone what is there). The attested three are handled above and by the moved-pin step below.
     // Selection is read here only to learn which declared submodules the work needs; it is
     // computed once and the later log line reuses it. A failure leaves every one needed.
-    let early = null;
-    try { early = select(root, currentChanges({ root, spawn })); } catch { early = null; }
+    if (!early) { try { early = select(root, currentChanges({ root, spawn })); } catch { early = null; } }
     for (const { path: module, oid, store } of declaredPins({ root })) {
       if (store || ATTESTED_SUBMODULES.includes(module)) continue;
       if (!neededSubmodule(module, early, { root })) {
