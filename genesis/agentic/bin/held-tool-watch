@@ -1108,6 +1108,14 @@ def _release_carry(head, repo, commitment, runner):
     return False, last
 
 
+def _claim_commitment(output):
+    try:
+        commitment = json.loads(output)["commitment"]
+    except (ValueError, KeyError, TypeError):
+        return None
+    return commitment if isinstance(commitment, str) and _CID.match(commitment) else None
+
+
 def _capacity_refusal(repo, pool, runner):
     ram = os.path.join(repo, "genesis", "agentic", "bin", "ram-guard")
     code, out, err = runner([ram, "status", "--brief"], timeout=30, cwd=repo)
@@ -1387,10 +1395,22 @@ def _cmd_carry_locked(args, repo, status_dir, runner, gate_runner):
             if code != 0:
                 say(carry_line(miss, f"claim failed: {_one_line(err) or f'exit {code}'}; no claim to release"))
                 return 1
-            try:
-                commitment = json.loads(claim_out)["commitment"]
-            except (ValueError, KeyError, TypeError):
-                say(carry_line(miss, "claim returned no commitment; gate not started"))
+            commitment = _claim_commitment(claim_out)
+            if not commitment:
+                replay_code, replay_out, replay_err = runner(claim, timeout=30, cwd=repo)
+                commitment = _claim_commitment(replay_out) if replay_code == 0 else None
+                if commitment:
+                    released, release_why = _release_carry(head, repo, commitment, runner)
+                    detail = ("replayed claim released" if released else
+                              f"claim release failed after retry: {release_why}")
+                else:
+                    replay_why = (_one_line(replay_err or replay_out)
+                                  or (f"exit {replay_code}" if replay_code else "no commitment"))
+                    detail = f"claim replay could not recover commitment: {replay_why}"
+                commitment = None
+                reason = f"claim returned no commitment; {detail}; gate not started"
+                decline_once(status_dir, repo, miss, reason, runner)
+                say(carry_line(miss, reason))
                 return 1
             capacity = _capacity_refusal(repo, pool, runner)
             if capacity:
