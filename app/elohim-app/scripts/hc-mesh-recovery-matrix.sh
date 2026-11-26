@@ -6,6 +6,12 @@
 #   MESH_RECOVERY_SCENARIOS=homo-dual,split-libp2p-iroh \
 #   hc-mesh-recovery-matrix.sh
 #
+# MESH_RECOVERY_DRAW=<path> runs a draw chosen by another seat instead of the
+# cycle: `#` comments (one must be `# chosen_by: <actor>`), then one run per
+# line, tab-separated: scenario, shape (warm|cold), recovering slot (0|1).
+# Each drawn record carries chosen_by, run_by (MESH_RECOVERY_RUN_BY, or
+# `unmeasured`) and draw_sha256. A draw whose chooser is the runner is refused.
+#
 # A scenario whose `expect` is no-shared-transport PASSES when recovery FAILS
 # with P0..P2 all 0 (nothing crossed) — the honest red the spec demands.
 set -u
@@ -15,12 +21,22 @@ LIB="${MESH_RECOVERY_LIBRARY:-$SCRIPT_DIR/mesh-recovery-scenarios.tsv}"
 RUNS="${MESH_RECOVERY_RUNS:-3}"
 IFS=',' read -ra SHAPES <<< "${MESH_RECOVERY_SHAPES:-warm,cold}"
 ONLY="${MESH_RECOVERY_SCENARIOS:-}"
+DRAW="${MESH_RECOVERY_DRAW:-}"
+DRAW_ROWS=""
+DRAW_CHOSEN_BY=""
+DRAW_SHA=""
+RUN_BY="${MESH_RECOVERY_RUN_BY:-unmeasured}"
 # Probe port base for matrix_live_shape's own health checks (mirrors
 # hc-mesh.sh's http_port() 8090+i scheme); overridable so tests can point the
 # probe at guaranteed-closed ports without touching the real mesh scheme.
 MESH_RECOVERY_PROBE_BASE="${MESH_RECOVERY_PROBE_BASE:-8090}"
 
 matrix_scenarios() {
+  # Draw mode: each line is "<library row>\t<shape>\t<slot>\t<draw-line-no>".
+  if [ -n "$DRAW" ]; then
+    [ -n "$DRAW_ROWS" ] && printf '%s\n' "$DRAW_ROWS"
+    return 0
+  fi
   awk -F '\t' -v only="$ONLY" '
     BEGIN {
       count = split(only, selected, ",")
@@ -29,6 +45,48 @@ matrix_scenarios() {
     /^[[:space:]]*#/ || /^[[:space:]]*$/ { next }
     only == "" || ($1 in wanted)
   ' "$LIB"
+}
+
+matrix_load_draw() { # validates $DRAW; sets DRAW_ROWS/DRAW_CHOSEN_BY/DRAW_SHA; rc 2 + reason on refusal
+  if [ -n "$ONLY" ]; then
+    echo "MESH_RECOVERY_DRAW and MESH_RECOVERY_SCENARIOS are exclusive: a draw names its own runs" >&2; return 2
+  fi
+  if [ ! -r "$DRAW" ] || [ ! -f "$DRAW" ]; then
+    echo "recovery draw is not readable: $DRAW" >&2; return 2
+  fi
+  DRAW_CHOSEN_BY="$(sed -n 's/^#[[:space:]]*chosen_by:[[:space:]]*//p' "$DRAW" | head -1 | sed 's/[[:space:]]*$//')"
+  if [ -z "$DRAW_CHOSEN_BY" ]; then
+    echo "recovery draw names no chooser: add '# chosen_by: <actor>' to $DRAW" >&2; return 2
+  fi
+  if [ -n "${MESH_RECOVERY_RUN_BY:-}" ] && [ "$MESH_RECOVERY_RUN_BY" = "$DRAW_CHOSEN_BY" ]; then
+    echo "recovery draw was chosen by the runner ($DRAW_CHOSEN_BY): a draw made by the runner is not a draw" >&2; return 2
+  fi
+  DRAW_SHA="$(sha256sum "$DRAW" | cut -d' ' -f1)"
+  local line scen dshape dslot extra row n=0 out=""
+  while IFS= read -r line || [ -n "$line" ]; do
+    case "$line" in \#*|'') continue ;; esac
+    [ -z "${line//[[:space:]]/}" ] && continue
+    n=$((n + 1))
+    IFS=$'\t' read -r scen dshape dslot extra <<< "$line"
+    if [ -n "${extra:-}" ] || [ -z "${dslot:-}" ]; then
+      echo "recovery draw line $n is not scenario<TAB>shape<TAB>slot: '$line'" >&2; return 2
+    fi
+    case "$dshape" in warm|cold) ;; *) echo "recovery draw line $n: invalid shape '$dshape' (expected warm or cold)" >&2; return 2 ;; esac
+    case "$dslot" in 0|1) ;; *) echo "recovery draw line $n: invalid recovering slot '$dslot' (expected 0 or 1)" >&2; return 2 ;; esac
+    row="$(awk -F '\t' -v s="$scen" '/^[[:space:]]*#/ { next } $1 == s { print; exit }' "$LIB")"
+    if [ -z "$row" ]; then
+      echo "recovery draw line $n: scenario '$scen' is not in the library $LIB" >&2; return 2
+    fi
+    out+="${out:+$'\n'}$row"$'\t'"$dshape"$'\t'"$dslot"$'\t'"$n"
+  done < "$DRAW"
+  if [ "$n" -eq 0 ]; then
+    echo "recovery draw has no run lines: $DRAW" >&2; return 2
+  fi
+  DRAW_ROWS="$out"
+}
+
+matrix_run_list() { # runs of the current scenario: 1..RUNS, or the draw line number
+  if [ -n "$DRAW" ]; then echo "$DRAW_RUN"; else seq 1 "$RUNS"; fi
 }
 
 matrix_recovering_index() { # <run-number>; run 1 -> slot 1, run 2 -> slot 0, …
@@ -170,7 +228,7 @@ matrix_mark_remaining_fail() { # <name> <from-shape> <from-run> — appends
   for sh in "${SHAPES[@]}"; do
     [ "$sh" = "$from_shape" ] && started=1
     [ "$started" -eq 1 ] || continue
-    for rn in $(seq 1 "$RUNS"); do
+    for rn in $(matrix_run_list); do
       if [ "$sh" = "$from_shape" ] && [ "$rn" -lt "$from_run" ]; then continue; fi
       rows+=("$nm"$'\t'"$sh"$'\t'"$rn"$'\t'"-"$'\t'"-"$'\t'"-"$'\t'"survivor-unhealthy"$'\t'"FAIL(survivor-unhealthy)")
     done
@@ -272,6 +330,10 @@ for matrix_shape in "${SHAPES[@]}"; do
     *) echo "invalid recovery shape '$matrix_shape' (expected warm or cold)" >&2; exit 2 ;;
   esac
 done
+if [ -n "$DRAW" ]; then
+  matrix_load_draw || exit 2
+  echo "matrix: draw $DRAW (sha256 $DRAW_SHA) chosen_by=$DRAW_CHOSEN_BY run_by=$RUN_BY"
+fi
 scenario_count="$(matrix_scenarios | wc -l)"
 if [ "$scenario_count" -eq 0 ]; then
   echo "no recovery scenarios matched MESH_RECOVERY_SCENARIOS='$ONLY'" >&2
@@ -355,14 +417,15 @@ matrix_reshape_fail_rows() { # <name> — append FAIL(reshape) rows for every
   local name="$1"
   local fr_shape fr_run
   for fr_shape in "${SHAPES[@]}"; do
-    for fr_run in $(seq 1 "$RUNS"); do
+    for fr_run in $(matrix_run_list); do
       rows+=("$name"$'\t'"$fr_shape"$'\t'"$fr_run"$'\t'"-"$'\t'"-"$'\t'"-"$'\t'"reshape"$'\t'"FAIL(reshape)")
     done
   done
 }
 
-while IFS=$'\t' read -r name peers doorways t_surv t_rec expect; do
+while IFS=$'\t' read -r name peers doorways t_surv t_rec expect draw_shape draw_slot DRAW_RUN; do
   [ -n "$name" ] || continue
+  if [ -n "$DRAW" ]; then SHAPES=("$draw_shape"); fi
   case "$doorways" in 0|1) ;; *) echo "invalid doorways value for $name: $doorways" >&2; rc=1; continue ;; esac
   case "$expect" in recover|no-shared-transport) ;; *) echo "invalid expectation for $name: $expect" >&2; rc=1; continue ;; esac
 
@@ -406,10 +469,12 @@ while IFS=$'\t' read -r name peers doorways t_surv t_rec expect; do
   fi
 
   for shape in "${SHAPES[@]}"; do
-    for run in $(seq 1 "$RUNS"); do
+    for run in $(matrix_run_list); do
       # Two peers alternate roles. In fanout scenarios the last peer always
       # recovers and every preceding peer survives.
-      if [ "${#PEERS[@]}" -eq 2 ]; then
+      if [ -n "$DRAW" ]; then
+        ri="$draw_slot"
+      elif [ "${#PEERS[@]}" -eq 2 ]; then
         ri="$(matrix_recovering_index "$run")"
       else
         ri=$(( ${#PEERS[@]} - 1 ))
@@ -479,8 +544,11 @@ while IFS=$'\t' read -r name peers doorways t_surv t_rec expect; do
       timeline="${RECOVERY_TIMELINE:-$(cd "$SCRIPT_DIR/../../.." && pwd)/genesis/a2o/reports/recovery/recovery-timeline.jsonl}"  # durable home (see hc-mesh-recovery.sh)
       before_lines=0
       [ -f "$timeline" ] && before_lines="$(wc -l < "$timeline")"
-      "$SCRIPT_DIR/hc-mesh-recovery.sh" "$shape" "$rec" \
-        --label "scenario=$name" --label "shape=$shape" --label "run=$run" --label "expect=$expect"
+      run_labels=(--label "scenario=$name" --label "shape=$shape" --label "run=$run")
+      if [ -n "$DRAW" ]; then
+        run_labels+=(--label "chosen_by=$DRAW_CHOSEN_BY" --label "run_by=$RUN_BY" --label "draw_sha256=$DRAW_SHA")
+      fi
+      "$SCRIPT_DIR/hc-mesh-recovery.sh" "$shape" "$rec" "${run_labels[@]}"
       got=$?
 
       if [ "$got" -eq 6 ]; then

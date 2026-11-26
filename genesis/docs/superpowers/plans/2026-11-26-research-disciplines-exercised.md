@@ -228,10 +228,11 @@ until the flight's verdict note stands and its landing is verified on `dev`.
 - [x] F2 said: the reviewer line in the `valueflow-reviewer` package, and the root "warn-only" sentence fixed through its package
 - [x] F2 checked: the two tests pass, run directly
 - [ ] F2 exercised as planned: a session start on ethosengine shows the saga line with its age (owed until its main checkout follows `dev`; exercised meanwhile by a read-only run against that checkout's reports)
-- [ ] F2 landed on `dev` and verified there
-- [ ] F3 built: the recovery matrix takes a draw, `expect` leaves the run's arguments, and the record carries `chosen_by` and the draw hash
-- [ ] F3 said: the receipt rule in the `hc-dev-orchestrator` package
-- [ ] F3 exercised and checked: one drawn run of three scenarios whose record shows a chooser other than the runner
+- [x] F3 built: the recovery matrix takes a draw, `expect` leaves the run's arguments, and the record carries `chosen_by` and the draw hash
+- [x] F3 said: the receipt rule in the `hc-dev-orchestrator` package
+- [x] F3 checked: the draw test passes, run directly
+- [ ] F3 exercised: one drawn run of three scenarios whose record shows a chooser other than the runner (owed; offered to shem)
+- [ ] F2 and F3 landed on `dev` and verified there
 - [ ] F4 said: the proposed section appended to the placement design, the `source-priority` skill, and `stop:` in the dispatch lines
 - [ ] F4 exercised and checked: one arrival read as step 2's dry run, recorded as a verdict note and a habit delta
 

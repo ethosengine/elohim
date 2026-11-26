@@ -206,8 +206,9 @@ PY
 # matrix_live_shape: an explicit override bypasses probing entirely (tests use it).
 (
   set +e
-  MESH_RECOVERY_LIVE_SHAPE="matthew,jessica/1" RECOVERY_MATRIX_SOURCE_ONLY=1 \
-    source "$here/../hc-mesh-recovery-matrix.sh"
+  # export: a prefix on `source` does not outlive the source command.
+  export MESH_RECOVERY_LIVE_SHAPE="matthew,jessica/1"
+  RECOVERY_MATRIX_SOURCE_ONLY=1 source "$here/../hc-mesh-recovery-matrix.sh"
   out="$(matrix_live_shape)"; rc=$?
   t "matrix_live_shape honors MESH_RECOVERY_LIVE_SHAPE override (rc=$rc): '$out'" \
     '[ "$rc" -eq 0 ] && [ "$out" = "matthew,jessica/1" ]'

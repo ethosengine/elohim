@@ -241,7 +241,13 @@ their pacing environment into new npm aliases.
 library across `MESH_RECOVERY_SHAPES` and `MESH_RECOVERY_RUNS`, alternates the
 two-peer recovering slot, and reshapes only when peers/doorways change. Narrow
 a run with `MESH_RECOVERY_SCENARIOS`; opt into per-run local quiesce records
-with `MESH_RECOVERY_QUIESCE=1`. It composes the per-peer transport interface
+with `MESH_RECOVERY_QUIESCE=1`. A recovery receipt offered as evidence for a
+dataplane change is drawn by a seat other than the change's author:
+`MESH_RECOVERY_DRAW=<file>` runs exactly the lines of a draw file (a
+`# chosen_by: <actor>` comment, then `scenario<TAB>warm|cold<TAB>slot` per run),
+is refused together with `MESH_RECOVERY_SCENARIOS` or when `chosen_by` equals
+`MESH_RECOVERY_RUN_BY`, and writes `chosen_by`, `run_by` and `draw_sha256` on
+every record. A run narrowed by its own author is a rehearsal, not a receipt. It composes the per-peer transport interface
 (`MESH_PEER_TRANSPORTS` in `hc-mesh.sh`) with the single-peer recovery
 primitive (`hc-mesh-recovery.sh`). Drive one scenario/run directly with
 `just mesh recovery <warm|cold> <peer> [--label k=v]` before reaching for the
