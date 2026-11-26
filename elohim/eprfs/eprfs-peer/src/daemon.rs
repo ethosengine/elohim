@@ -1961,6 +1961,7 @@ impl Run {
                 let failed = result.is_err();
                 match result {
                     Ok(unindexed) => {
+                        self.indexed_once = true;
                         for error in unindexed {
                             self.log(&error.to_string());
                         }
@@ -2030,7 +2031,6 @@ impl Run {
         // The stamp describes a flow state that was actually read. A failed read remains due even
         // when the log does not move again.
         self.index_stamp = now;
-        self.indexed_once = true;
         self.index_retry_at = None;
         self.index_retry_stamp = None;
         self.index_retry_failed = false;

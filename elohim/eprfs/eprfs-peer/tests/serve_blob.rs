@@ -2058,6 +2058,63 @@ async fn custody_index_tracks_outputs_and_serves_oldest_record_on_demand() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn first_rebuild_distinguishes_index_warming_from_established_absence() {
+    let h = household();
+    let mut a = holder(&h).await;
+    let put = put_with(
+        a.payload.as_ref(),
+        &mut a.flow,
+        granted_variant("warming"),
+        Bytes::from_static(b"held before the first rebuild"),
+        true,
+        &context(),
+    )
+    .await;
+    let artifact = output(&put);
+    let request = TierRequest::Record {
+        artifact: artifact.clone(),
+        manifest: put.manifest_cid.clone(),
+        key: None,
+        cid: None,
+    };
+    let b = client(&h.key_b).await;
+
+    assert_eq!(
+        call(&b, &a.addr, request.clone()).await,
+        typed(
+            &artifact,
+            ReachReason::IndexWarming,
+            Some(&format!("manifest:{}", put.manifest_cid))
+        )
+    );
+
+    assert!(a.reindex().await.is_empty());
+    served_bytes(call(&b, &a.addr, request).await, &put.manifest_cid);
+    let absent = BlobCid::compute_bytes(b"a manifest never held here");
+    assert_eq!(
+        call(
+            &b,
+            &a.addr,
+            TierRequest::Record {
+                artifact: artifact.clone(),
+                manifest: absent.clone(),
+                key: None,
+                cid: None,
+            }
+        )
+        .await,
+        typed(
+            &artifact,
+            ReachReason::NoRecord,
+            Some(&format!("manifest:{absent}"))
+        )
+    );
+
+    b.close().await;
+    a.router.shutdown().await.unwrap();
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn on_demand_record_cache_is_bounded_and_evicted_records_are_revalidated() {
     let h = household();
     let mut a = holder(&h).await;

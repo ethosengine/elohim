@@ -36,7 +36,7 @@
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
 use std::path::Path;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, RwLock};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
@@ -388,6 +388,8 @@ pub struct BlobMount {
     /// This device's did:key: the only custodian whose custody Produce events are indexed.
     custodian: String,
     index: RwLock<ArtifactIndex>,
+    /// True only after the daemon has completed its first artifact-index rebuild.
+    indexed_once: AtomicBool,
     served: mpsc::Sender<ServedDraw>,
     sessions: Mutex<HashMap<(String, BlobCid), Session>>,
     /// Per requester, the refusals recorded in its current window.
@@ -416,6 +418,7 @@ impl BlobMount {
                 store,
                 custodian: custodian.into(),
                 index: RwLock::new(ArtifactIndex::default()),
+                indexed_once: AtomicBool::new(false),
                 served,
                 sessions: Mutex::new(HashMap::new()),
                 refused: Mutex::new(HashMap::new()),
@@ -449,6 +452,16 @@ impl BlobMount {
     /// The payload store this mount serves from.
     pub fn store(&self) -> &Arc<dyn EprfsStorage> {
         &self.store
+    }
+
+    /// Mark the first artifact-index rebuild complete. This transition is monotonic for the
+    /// lifetime of the mount: later misses are established absence, even if a later rebuild fails.
+    fn mark_indexed(&self) {
+        self.indexed_once.store(true, Ordering::Release);
+    }
+
+    fn indexed_once(&self) -> bool {
+        self.indexed_once.load(Ordering::Acquire)
     }
 
     /// Try to index `designated`, recording a failure with its retry state.
@@ -681,6 +694,7 @@ impl BlobMount {
                 unindexed.push(error);
             }
         }
+        self.mark_indexed();
         unindexed
     }
 
@@ -985,6 +999,7 @@ fn refusal_reason(refusal: &ReachRefusal) -> String {
         None => match refusal.reason {
             ReachReason::OutsideStanding => "outside-standing",
             ReachReason::NoRecord => "no-record",
+            ReachReason::IndexWarming => "index-warming",
             ReachReason::NotUnderRoot => "not-under-root",
             ReachReason::IdentityRequired => "identity-required",
             ReachReason::AuthorizerUnavailable => "authorizer-unavailable",
@@ -1065,9 +1080,14 @@ pub(crate) async fn answer(
     let record_bound = matches!(request, TierRequest::Record { .. });
     // What this request shape is answered for a record this device does not hold.
     let absent = match request {
-        TierRequest::Record { manifest, .. } => {
-            ReachRefusal::new(ReachReason::NoRecord, Some(format!("manifest:{manifest}")))
-        }
+        TierRequest::Record { manifest, .. } => ReachRefusal::new(
+            if mount.is_some_and(|mount| !mount.indexed_once()) {
+                ReachReason::IndexWarming
+            } else {
+                ReachReason::NoRecord
+            },
+            Some(format!("manifest:{manifest}")),
+        ),
         _ => ReachRefusal::new(ReachReason::OutsideStanding, None),
     };
     let selected = match (mount, request) {
