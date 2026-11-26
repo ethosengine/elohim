@@ -240,6 +240,24 @@ pub struct Provenance {
     /// UTC ingest timestamp (display and retention only, never ordering authority).
     pub ingested_at: String,
 }
+/// Producer-supplied build derivation keys, explicitly outside the release identity.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+struct DerivationKeysAnnotation {
+    /// Keys by release binary name.
+    keys: BTreeMap<String, String>,
+    /// Always false: neither the keys nor this annotation contribute to `rcid`.
+    covered_by_rcid: bool,
+    /// The component that observed and supplied the keys.
+    source: String,
+}
+/// Non-authoritative release metadata that no admission decision reads.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+struct ReleaseAnnotations {
+    /// Derivation keys observed by the producer after the release bytes were built.
+    derivation_keys: DerivationKeysAnnotation,
+}
 /// An immutable content identity and appendable private provenance.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -265,6 +283,9 @@ pub struct Release {
     /// Attestation verdicts keyed by repo, SHA and check (serialized tuple key).
     #[serde(default)]
     pub attestations: BTreeMap<String, Value>,
+    /// Labelled metadata outside `rcid`; absent from non-producer ingest paths.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    annotations: Option<ReleaseAnnotations>,
     /// Additional prior provenance and refusal records retained during migration.
     #[serde(flatten)]
     pub extra: Map<String, Value>,
