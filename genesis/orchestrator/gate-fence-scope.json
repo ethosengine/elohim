@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "judge": {
+    "importRoots": [
+      "genesis/orchestrator/gate-runner.mjs",
+      "genesis/orchestrator/gate-evidence.mjs"
+    ],
+    "exact": [
+      "genesis/orchestrator/gate-fence-scope.json",
+      "genesis/agentic/pool-policy.json",
+      ".claude/epr-meta/measures.yaml",
+      "elohim/eprfs/eprfs-peer/src/admission.rs",
+      "elohim/eprfs/eprfs-peer/src/allow.rs",
+      "elohim/eprfs/eprfs-peer/src/channel.rs",
+      "elohim/eprfs/eprfs-peer/src/daemon.rs",
+      "elohim/eprfs/eprfs-peer/src/fold.rs",
+      "elohim/eprfs/eprfs-peer/src/head.rs",
+      "elohim/eprfs/epr-cli/src/peer.rs"
+    ]
+  },
+  "keyed": {
+    "exact": [
+      "genesis/orchestrator/cargo-lint.mjs",
+      "genesis/orchestrator/gate-steps.sh",
+      "genesis/agentic/bin/pool-lib.sh"
+    ]
+  },
+  "substrate": {
+    "prefixes": [
+      "elohim/eprfs/eprfs-peer/"
+    ],
+    "exact": [
+      "elohim/eprfs/epr-cli/src/peer.rs"
+    ]
+  }
+}
