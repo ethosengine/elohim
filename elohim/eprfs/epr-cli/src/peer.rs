@@ -1101,6 +1101,11 @@ struct DeviceStatus {
     root: Option<String>,
     /// Seconds since this device folded the head (this device's clock).
     age_s: Option<u64>,
+    probe_ok: Option<bool>,
+    probe_unsupported: Option<bool>,
+    probe_age_s: Option<u64>,
+    resubscriptions: u64,
+    connection_resets: u64,
     events_folded: u64,
     /// The highest seq of this device's own heads that device has acknowledged folding.
     acked: Option<u64>,
@@ -1382,6 +1387,7 @@ fn status(options: &Options) -> PeerResult<ExitCode> {
     let device = Device::open(&options.root, options.handle.as_deref())?;
     let admission = device.admission()?;
     let table = HeadTable::load(&device.peer_dir)?;
+    let recovery = eprfs_peer::PeerRecoveryStatus::load(&device.peer_dir);
     let did = device.key.did_key();
     let now = unix_ms();
     let coverage_store = table
@@ -1401,12 +1407,26 @@ fn status(options: &Options) -> PeerResult<ExitCode> {
             continue;
         }
         let head = table.devices.get(member);
+        let recovered = recovery.devices.get(member);
         devices.push(DeviceStatus {
             device: member.to_string(),
             node_id: node.to_string(),
             seq: head.map(|h| h.seq),
             root: head.map(|h| h.root.to_string()),
-            age_s: head.map(|h| now.saturating_sub(h.folded_at) / 1000),
+            age_s: recovered
+                .and_then(|state| state.last_head_at)
+                .map(|at| now.saturating_sub(at) / 1000)
+                .or_else(|| head.map(|h| now.saturating_sub(h.folded_at) / 1000)),
+            probe_ok: recovered.and_then(|state| state.last_probe.map(|probe| probe.ok)),
+            probe_unsupported: recovered
+                .and_then(|state| state.last_probe.map(|probe| probe.unsupported)),
+            probe_age_s: recovered.and_then(|state| {
+                state
+                    .last_probe
+                    .map(|probe| now.saturating_sub(probe.at) / 1000)
+            }),
+            resubscriptions: recovered.map_or(0, |state| state.resubscriptions),
+            connection_resets: recovered.map_or(0, |state| state.connection_resets),
             events_folded: head.map_or(0, |h| h.events_folded),
             acked: head.and_then(|h| h.folded.get(&did).copied()),
             coverage: head.map(|head| {
@@ -1565,6 +1585,24 @@ fn render(outcome: &StatusOutcome) {
             ),
             _ => println!("device  {}  no head folded yet", short(&device.device)),
         }
+        let probe = match (
+            device.probe_ok,
+            device.probe_unsupported,
+            device.probe_age_s,
+        ) {
+            (Some(true), Some(true), Some(age)) => {
+                format!("unsupported (older peer) {age}s ago")
+            }
+            (Some(true), _, Some(age)) => format!("ok {age}s ago"),
+            (Some(false), _, Some(age)) => format!("fail {age}s ago"),
+            _ => "none".to_string(),
+        };
+        println!(
+            "{}: probe {probe}  resubscribes {}  resets {}",
+            short(&device.device),
+            device.resubscriptions,
+            device.connection_resets
+        );
         if let Some(line) = fold_coverage_line(device) {
             println!("{line}");
         }
@@ -3171,6 +3209,11 @@ mod status_contract {
                 seq: Some(1),
                 root: None,
                 age_s: None,
+                probe_ok: None,
+                probe_unsupported: None,
+                probe_age_s: None,
+                resubscriptions: 0,
+                connection_resets: 0,
                 events_folded: 0,
                 acked: None,
                 coverage: None,

@@ -5,15 +5,18 @@
 mod support;
 
 use std::path::Path;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, RwLock};
 use std::time::{Duration, Instant};
 
 use elohim_epr_rea::{ParticipantRow, SidecarRoster};
 use eprfs_peer::{
-    via_device, CrossingAllowList, HeadTable, PeerConfig, PeerDaemon, PeerKey, Rules,
-    INDEX_RETRY_FIRST,
+    via_device, ChannelHead, ChannelStore, CrossingAllowList, HeadTable, PeerConfig, PeerDaemon,
+    PeerKey, PeerRecoveryStatus, Rules, TierLimits, TierProtocol, INDEX_RETRY_FIRST, TIER_ALPN,
 };
 use futures_lite::StreamExt;
+use iroh::endpoint::{Connection, VarInt};
+use iroh::protocol::{AcceptError, ProtocolHandler, Router};
+use serde::Deserialize;
 use support::{
     berth_event, binding, contest, device, endpoint_row, event_with, genesis, policy, verifier,
     Checkout, Device, HANDLE,
@@ -104,6 +107,555 @@ async fn eventually(what: &str, mut check: impl FnMut() -> bool) {
 
 fn load_key(dir: &Path) -> PeerKey {
     PeerKey::load_or_generate(dir).expect("key")
+}
+
+#[derive(Debug, Clone)]
+struct MuteGossip;
+
+impl ProtocolHandler for MuteGossip {
+    async fn accept(&self, _connection: Connection) -> Result<(), AcceptError> {
+        std::future::pending().await
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+enum OlderTierRequest {
+    Read,
+}
+
+#[derive(Debug, Clone)]
+struct OlderTier;
+
+impl ProtocolHandler for OlderTier {
+    async fn accept(&self, connection: Connection) -> Result<(), AcceptError> {
+        while let Ok((mut send, mut recv)) = connection.accept_bi().await {
+            let mut header = [0; 4];
+            if recv.read_exact(&mut header).await.is_err() {
+                continue;
+            }
+            let mut body = vec![0; u32::from_be_bytes(header) as usize];
+            if recv.read_exact(&mut body).await.is_err() {
+                continue;
+            }
+            match serde_ipld_dagcbor::from_slice::<OlderTierRequest>(&body) {
+                Ok(OlderTierRequest::Read) => {}
+                Err(_) => {
+                    let code = VarInt::from_u32(1);
+                    let _ = recv.stop(code);
+                    let _ = send.reset(code);
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+struct ProbePeer {
+    head: Arc<RwLock<Option<ChannelHead>>>,
+    router: Router,
+    addr: iroh::NodeAddr,
+}
+
+async fn probe_peer(
+    me: &Device,
+    other: &Device,
+    key: PeerKey,
+    rows: &[ParticipantRow],
+    head: ChannelHead,
+    store: Arc<ChannelStore>,
+) -> ProbePeer {
+    let admission = Arc::new(RwLock::new(eprfs_peer::Admission::from_roster(
+        rows,
+        &me.did,
+        &*verifier(&[me, other]),
+    )));
+    let served = Arc::new(RwLock::new(Some(head)));
+    let endpoint = eprfs_peer::bind(
+        &key,
+        None,
+        vec![TIER_ALPN.to_vec(), iroh_gossip::ALPN.to_vec()],
+    )
+    .await
+    .expect("probe peer binds");
+    let addr = support::loopback(&endpoint);
+    let tier = TierProtocol::new(
+        eprfs_peer::channel_tier_id(),
+        store,
+        admission,
+        TierLimits::default(),
+    )
+    .expect("tier")
+    .with_head(served.clone());
+    let router = Router::builder(endpoint)
+        .accept(TIER_ALPN, tier)
+        .accept(iroh_gossip::ALPN, MuteGossip)
+        .spawn();
+    ProbePeer {
+        head: served,
+        router,
+        addr,
+    }
+}
+
+async fn older_probe_peer(key: &PeerKey) -> (Router, iroh::NodeAddr) {
+    let endpoint = eprfs_peer::bind(
+        key,
+        None,
+        vec![TIER_ALPN.to_vec(), iroh_gossip::ALPN.to_vec()],
+    )
+    .await
+    .expect("older probe peer binds");
+    let addr = support::loopback(&endpoint);
+    let router = Router::builder(endpoint)
+        .accept(TIER_ALPN, OlderTier)
+        .accept(iroh_gossip::ALPN, MuteGossip)
+        .spawn();
+    (router, addr)
+}
+
+async fn advance_recovery_clock(daemon: &PeerDaemon, clock: &Arc<Mutex<Instant>>, by: Duration) {
+    let before = daemon.ticks();
+    *clock.lock().expect("clock") += by;
+    eventually("the recovery clock reaches another daemon tick", || {
+        daemon.ticks() > before
+    })
+    .await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn mute_receiver_reachable_tier_probes_resubscribes_and_folds_probe_head() {
+    let a = device("DeviceA", 1);
+    let b = device("DeviceB", 2);
+    let (key_dir_a, key_dir_b) = (tempfile::tempdir().unwrap(), tempfile::tempdir().unwrap());
+    let (key_a, key_b) = (load_key(key_dir_a.path()), load_key(key_dir_b.path()));
+    let rows = vec![
+        genesis(&a),
+        binding(&a, &b),
+        endpoint_row(&a, &a, &key_a),
+        endpoint_row(&a, &b, &key_b),
+    ];
+    let side_a = Side::new(&rows);
+    let b_checkout = Checkout::new();
+    b_checkout.append(berth_event("claim", "mute-probe", "sb", "1.0"));
+    let allow = CrossingAllowList::from_policy(&policy()).expect("policy");
+    let tree = eprfs_peer::project_channel(&b_checkout.store(), &allow).expect("B projects");
+    let root = tree.root().clone();
+    let store = Arc::new(ChannelStore::default());
+    store.install(&tree);
+    let head = ChannelHead::sign(
+        b.did.clone(),
+        root.clone(),
+        1,
+        1,
+        Default::default(),
+        &b.signer(),
+    )
+    .expect("B signs");
+    let peer = probe_peer(&a, &b, key_b, &rows, head, store).await;
+    let start = Instant::now();
+    let clock = Arc::new(Mutex::new(start));
+    let clock_for_daemon = clock.clone();
+    let daemon = PeerDaemon::start_with_clock(
+        config(
+            &a,
+            &a.did,
+            key_a,
+            &side_a,
+            &[&a, &b],
+            vec![peer.addr.clone()],
+            local(free_port()),
+        ),
+        Arc::new(move || *clock_for_daemon.lock().expect("clock")),
+    )
+    .await
+    .expect("A starts");
+
+    for _ in 0..4 {
+        advance_recovery_clock(&daemon, &clock, Duration::from_secs(30)).await;
+    }
+    eventually("the probe head is folded", || {
+        side_a
+            .table()
+            .devices
+            .get(&b.did)
+            .is_some_and(|folded| folded.seq == 1 && folded.root == root)
+    })
+    .await;
+    eventually("the muted topic is resubscribed once", || {
+        let status = PeerRecoveryStatus::load(side_a.state.path());
+        status.resubscriptions == 1
+            && status.devices.get(&b.did).is_some_and(|device| {
+                device.last_probe.is_some_and(|probe| probe.ok)
+                    && device.resubscriptions == 1
+                    && device.rejoins_since_head == 0
+            })
+    })
+    .await;
+
+    daemon.shutdown().await;
+    peer.router.shutdown().await.expect("probe peer stops");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn forged_and_rolled_back_probe_heads_use_gossip_admission_and_are_counted() {
+    let a = device("DeviceA", 1);
+    let b = device("DeviceB", 2);
+    let (key_dir_a, key_dir_b) = (tempfile::tempdir().unwrap(), tempfile::tempdir().unwrap());
+    let (key_a, key_b) = (load_key(key_dir_a.path()), load_key(key_dir_b.path()));
+    let rows = vec![
+        genesis(&a),
+        binding(&a, &b),
+        endpoint_row(&a, &a, &key_a),
+        endpoint_row(&a, &b, &key_b),
+    ];
+    let side_a = Side::new(&rows);
+    let b_checkout = Checkout::new();
+    b_checkout.append(berth_event("claim", "probe-admission", "sb", "1.0"));
+    let allow = CrossingAllowList::from_policy(&policy()).expect("policy");
+    let tree = eprfs_peer::project_channel(&b_checkout.store(), &allow).expect("B projects");
+    let root = tree.root().clone();
+    let store = Arc::new(ChannelStore::default());
+    store.install(&tree);
+    let forged = ChannelHead::sign(
+        b.did.clone(),
+        root.clone(),
+        4,
+        4,
+        Default::default(),
+        &a.signer(),
+    )
+    .expect("another key can produce a forged frame");
+    let peer = probe_peer(&a, &b, key_b, &rows, forged, store).await;
+    let start = Instant::now();
+    let clock = Arc::new(Mutex::new(start));
+    let clock_for_daemon = clock.clone();
+    let daemon = PeerDaemon::start_with_clock(
+        config(
+            &a,
+            &a.did,
+            key_a,
+            &side_a,
+            &[&a, &b],
+            vec![peer.addr.clone()],
+            local(free_port()),
+        ),
+        Arc::new(move || *clock_for_daemon.lock().expect("clock")),
+    )
+    .await
+    .expect("A starts");
+    for _ in 0..4 {
+        advance_recovery_clock(&daemon, &clock, Duration::from_secs(30)).await;
+    }
+    eventually("the forged probe head is counted", || {
+        side_a.table().dropped.forged == 1 && side_a.table().devices.is_empty()
+    })
+    .await;
+
+    let valid = ChannelHead::sign(
+        b.did.clone(),
+        root.clone(),
+        5,
+        5,
+        Default::default(),
+        &b.signer(),
+    )
+    .expect("B signs");
+    *peer.head.write().expect("probe head") = Some(valid);
+    advance_recovery_clock(&daemon, &clock, Duration::from_secs(30)).await;
+    eventually("the valid probe head is folded", || {
+        side_a
+            .table()
+            .devices
+            .get(&b.did)
+            .is_some_and(|head| head.seq == 5)
+    })
+    .await;
+
+    let rollback = ChannelHead::sign(b.did.clone(), root, 3, 3, Default::default(), &b.signer())
+        .expect("B signs an older head");
+    *peer.head.write().expect("probe head") = Some(rollback);
+    for by in [90, 30, 30, 30] {
+        advance_recovery_clock(&daemon, &clock, Duration::from_secs(by)).await;
+    }
+    eventually("the rollback probe head is counted", || {
+        let table = side_a.table();
+        table.dropped.rollback == 1 && table.devices.get(&b.did).is_some_and(|head| head.seq == 5)
+    })
+    .await;
+
+    daemon.shutdown().await;
+    peer.router.shutdown().await.expect("probe peer stops");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn older_peer_head_refusal_is_reachable_unsupported_without_connection_reset() {
+    let a = device("DeviceA", 1);
+    let b = device("DeviceB", 2);
+    let (key_dir_a, key_dir_b) = (tempfile::tempdir().unwrap(), tempfile::tempdir().unwrap());
+    let (key_a, key_b) = (load_key(key_dir_a.path()), load_key(key_dir_b.path()));
+    let rows = vec![
+        genesis(&a),
+        binding(&a, &b),
+        endpoint_row(&a, &a, &key_a),
+        endpoint_row(&a, &b, &key_b),
+    ];
+    let side_a = Side::new(&rows);
+    let (router, addr) = older_probe_peer(&key_b).await;
+    let logs = Arc::new(Mutex::new(Vec::<String>::new()));
+    let captured = logs.clone();
+    let mut cfg = config(
+        &a,
+        &a.did,
+        key_a,
+        &side_a,
+        &[&a, &b],
+        vec![addr],
+        local(free_port()),
+    );
+    cfg.log = Arc::new(move |line| captured.lock().expect("logs").push(line.to_string()));
+    let start = Instant::now();
+    let clock = Arc::new(Mutex::new(start));
+    let clock_for_daemon = clock.clone();
+    let daemon = PeerDaemon::start_with_clock(
+        cfg,
+        Arc::new(move || *clock_for_daemon.lock().expect("clock")),
+    )
+    .await
+    .expect("A starts");
+
+    for _ in 0..4 {
+        advance_recovery_clock(&daemon, &clock, Duration::from_secs(30)).await;
+    }
+    eventually(
+        "the older peer is recorded as reachable unsupported",
+        || {
+            let recovery = PeerRecoveryStatus::load(side_a.state.path());
+            recovery.resubscriptions == 1
+                && recovery.devices.get(&b.did).is_some_and(|state| {
+                    state
+                        .last_probe
+                        .is_some_and(|probe| probe.ok && probe.unsupported)
+                        && state.resubscriptions == 1
+                        && state.connection_resets == 0
+                })
+        },
+    )
+    .await;
+    assert!(logs
+        .lock()
+        .expect("logs")
+        .iter()
+        .any(|line| line.contains("probe unsupported (older peer)")));
+    assert!(!side_a.table().devices.contains_key(&b.did));
+
+    daemon.shutdown().await;
+    router.shutdown().await.expect("older peer stops");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn unreachable_tier_resets_and_redials_with_capped_backoff_without_resubscribe_storm() {
+    let a = device("DeviceA", 1);
+    let b = device("DeviceB", 2);
+    let (key_dir_a, key_dir_b) = (tempfile::tempdir().unwrap(), tempfile::tempdir().unwrap());
+    let (key_a, key_b) = (load_key(key_dir_a.path()), load_key(key_dir_b.path()));
+    let rows = vec![
+        genesis(&a),
+        binding(&a, &b),
+        endpoint_row(&a, &a, &key_a),
+        endpoint_row(&a, &b, &key_b),
+    ];
+    let side_a = Side::new(&rows);
+    let absent = iroh::NodeAddr::new(key_b.node_id())
+        .with_direct_addresses([std::net::SocketAddr::V4(local(free_port()))]);
+    let logs = Arc::new(Mutex::new(Vec::<String>::new()));
+    let captured = logs.clone();
+    let mut cfg = config(
+        &a,
+        &a.did,
+        key_a,
+        &side_a,
+        &[&a, &b],
+        vec![absent],
+        local(free_port()),
+    );
+    cfg.log = Arc::new(move |line| captured.lock().expect("logs").push(line.to_string()));
+    let start = Instant::now();
+    let clock = Arc::new(Mutex::new(start));
+    let clock_for_daemon = clock.clone();
+    let daemon = PeerDaemon::start_with_clock(
+        cfg,
+        Arc::new(move || *clock_for_daemon.lock().expect("clock")),
+    )
+    .await
+    .expect("A starts");
+    for _ in 0..4 {
+        advance_recovery_clock(&daemon, &clock, Duration::from_secs(30)).await;
+    }
+    eventually("the first unreachable probe resets the path", || {
+        PeerRecoveryStatus::load(side_a.state.path())
+            .devices
+            .get(&b.did)
+            .is_some_and(|state| {
+                state.connection_resets == 1 && state.last_probe.is_some_and(|probe| !probe.ok)
+            })
+    })
+    .await;
+
+    for delay in [90, 180, 360, 720, 900] {
+        advance_recovery_clock(&daemon, &clock, Duration::from_secs(delay)).await;
+    }
+    eventually("the capped reset is recorded", || {
+        PeerRecoveryStatus::load(side_a.state.path())
+            .devices
+            .get(&b.did)
+            .is_some_and(|state| state.connection_resets == 6)
+    })
+    .await;
+    assert_eq!(
+        logs.lock()
+            .expect("logs")
+            .iter()
+            .filter(|line| line.contains("tier probe failed"))
+            .count(),
+        5,
+        "one line for each changed backoff, none for the repeated 15 minute cap"
+    );
+    assert_eq!(
+        PeerRecoveryStatus::load(side_a.state.path()).resubscriptions,
+        0
+    );
+
+    daemon.shutdown().await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn topic_wide_silence_resubscribes_once_per_ten_minutes_when_probe_is_live() {
+    let a = device("DeviceA", 1);
+    let b = device("DeviceB", 2);
+    let (key_dir_a, key_dir_b) = (tempfile::tempdir().unwrap(), tempfile::tempdir().unwrap());
+    let (key_a, key_b) = (load_key(key_dir_a.path()), load_key(key_dir_b.path()));
+    let rows = vec![
+        genesis(&a),
+        binding(&a, &b),
+        endpoint_row(&a, &a, &key_a),
+        endpoint_row(&a, &b, &key_b),
+    ];
+    let side_a = Side::new(&rows);
+    let b_checkout = Checkout::new();
+    let allow = CrossingAllowList::from_policy(&policy()).expect("policy");
+    let tree = eprfs_peer::project_channel(&b_checkout.store(), &allow).expect("B projects");
+    let store = Arc::new(ChannelStore::default());
+    store.install(&tree);
+    let head = ChannelHead::sign(
+        b.did.clone(),
+        tree.root().clone(),
+        1,
+        1,
+        Default::default(),
+        &b.signer(),
+    )
+    .expect("B signs");
+    let peer = probe_peer(&a, &b, key_b, &rows, head, store).await;
+    let start = Instant::now();
+    let clock = Arc::new(Mutex::new(start));
+    let clock_for_daemon = clock.clone();
+    let daemon = PeerDaemon::start_with_clock(
+        config(
+            &a,
+            &a.did,
+            key_a,
+            &side_a,
+            &[&a, &b],
+            vec![peer.addr.clone()],
+            local(free_port()),
+        ),
+        Arc::new(move || *clock_for_daemon.lock().expect("clock")),
+    )
+    .await
+    .expect("A starts");
+
+    advance_recovery_clock(&daemon, &clock, Duration::from_secs(600)).await;
+    advance_recovery_clock(&daemon, &clock, Duration::from_secs(1)).await;
+    eventually("one silence resubscribe completes", || {
+        PeerRecoveryStatus::load(side_a.state.path()).resubscriptions == 1
+    })
+    .await;
+    advance_recovery_clock(&daemon, &clock, Duration::from_secs(599)).await;
+    assert_eq!(
+        PeerRecoveryStatus::load(side_a.state.path()).resubscriptions,
+        1
+    );
+    advance_recovery_clock(&daemon, &clock, Duration::from_secs(1)).await;
+    advance_recovery_clock(&daemon, &clock, Duration::from_secs(1)).await;
+    eventually("the next window permits one more resubscribe", || {
+        PeerRecoveryStatus::load(side_a.state.path()).resubscriptions == 2
+    })
+    .await;
+
+    daemon.shutdown().await;
+    peer.router.shutdown().await.expect("probe peer stops");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn healthy_exchange_never_probes_resubscribes_or_resets() {
+    let a = device("DeviceA", 1);
+    let b = device("DeviceB", 2);
+    let (key_dir_a, key_dir_b) = (tempfile::tempdir().unwrap(), tempfile::tempdir().unwrap());
+    let (key_a, key_b) = (load_key(key_dir_a.path()), load_key(key_dir_b.path()));
+    let (id_a, id_b) = (key_a.node_id(), key_b.node_id());
+    let rows = vec![
+        genesis(&a),
+        binding(&a, &b),
+        endpoint_row(&a, &a, &key_a),
+        endpoint_row(&a, &b, &key_b),
+    ];
+    let (side_a, side_b) = (Side::new(&rows), Side::new(&rows));
+    side_a
+        .checkout
+        .append(berth_event("claim", "healthy-a", "sa", "1.0"));
+    side_b
+        .checkout
+        .append(berth_event("claim", "healthy-b", "sb", "1.0"));
+    let (port_a, port_b) = (free_port(), free_port());
+    let daemon_a = PeerDaemon::start(config(
+        &a,
+        &a.did,
+        key_a,
+        &side_a,
+        &[&a, &b],
+        vec![iroh::NodeAddr::new(id_b)
+            .with_direct_addresses([std::net::SocketAddr::V4(local(port_b))])],
+        local(port_a),
+    ))
+    .await
+    .expect("A starts");
+    let daemon_b = PeerDaemon::start(config(
+        &b,
+        &a.did,
+        key_b,
+        &side_b,
+        &[&a, &b],
+        vec![iroh::NodeAddr::new(id_a)
+            .with_direct_addresses([std::net::SocketAddr::V4(local(port_a))])],
+        local(port_b),
+    ))
+    .await
+    .expect("B starts");
+    eventually("both healthy heads fold", || {
+        side_a.table().devices.contains_key(&b.did) && side_b.table().devices.contains_key(&a.did)
+    })
+    .await;
+    for (side, other) in [(&side_a, &b), (&side_b, &a)] {
+        let recovery = PeerRecoveryStatus::load(side.state.path());
+        assert_eq!(recovery.resubscriptions, 0);
+        let device = recovery.devices.get(&other.did).expect("other device");
+        assert!(device.last_probe.is_none());
+        assert_eq!(device.connection_resets, 0);
+    }
+
+    daemon_a.shutdown().await;
+    daemon_b.shutdown().await;
 }
 
 #[tokio::test(flavor = "multi_thread")]

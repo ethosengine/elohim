@@ -89,11 +89,12 @@ pub use channel::{
     channel_tier_id, project_channel, project_channel_with_nacks, ChannelStore, ChannelTree,
     CHANNEL_EVENTS, CHANNEL_NACKS, RETAINED_ROOTS,
 };
-pub use connections::{ConnectionBook, NOT_ADMITTED};
+pub use connections::{ConnectionBook, NOT_ADMITTED, RECOVERY_RESET};
 pub use daemon::{
-    FoldStats, PeerConfig, PeerDaemon, ProjectionRetry, RetryBackoff, FOLD_DEADLINE,
-    PROJECTION_RETRY_FIRST, PROJECTION_RETRY_MAX, REJOIN_RETRY_FIRST, REJOIN_RETRY_MAX,
-    STREAM_RETRY_FIRST, STREAM_RETRY_MAX, TICK,
+    DeviceRecoveryStatus, FoldStats, PeerConfig, PeerDaemon, PeerRecoveryStatus, ProbeStatus,
+    ProjectionRetry, RetryBackoff, FOLD_DEADLINE, PROJECTION_RETRY_FIRST, PROJECTION_RETRY_MAX,
+    RECOVERY_STATUS_FILE, REJOIN_RETRY_FIRST, REJOIN_RETRY_MAX, STREAM_RETRY_FIRST,
+    STREAM_RETRY_MAX, TICK,
 };
 pub use endpoint::{bind, bind_on, peer_from_arg, relay_from_env, relay_from_value, RELAY_ENV};
 pub use error::PeerError;
