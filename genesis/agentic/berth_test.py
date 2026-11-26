@@ -51,7 +51,7 @@ _miss_patch = mock.patch.object(_NS["_SilenceWatch"], "_miss_lines", side_effect
 # The presence reading reads the main checkout's stasis journals and gate-live runs: never this
 # workspace's from a test. PresenceReading points the seam at its own temporary directories.
 _NO_RECORDS = {"stasis": "/nonexistent-berth-test/stasis", "gate_live": "/nonexistent-berth-test/gate-live",
-               "watch_pass": "/nonexistent-berth-test/last-pass", "bin_store": "/nonexistent-berth-test/bin-store"}
+               "bin_store": "/nonexistent-berth-test/bin-store"}
 _presence_patch = mock.patch.dict(_sibling_scanner.__globals__, {"presence_sources": lambda: dict(_NO_RECORDS)})
 
 
@@ -528,7 +528,7 @@ class StatusJson(unittest.TestCase):
                                        "evidence": "recent-record"}}],
             "siblings": [{"device": "did:key:sibling", "session": "remote", "runtime": "codex",
                           "task": "repair", "writes": ["src/**"], "seenS": 10,
-                          "presence": {"state": "unknown", "since": None, "ageS": 10, "evidence": "held-note",
+                          "presence": {"state": "unknown", "since": None, "ageS": 10, "evidence": "no-held-note",
                                        "why": "no pending call announced; working or idle does not cross devices"}}],
             "devices": [{"device": "did:key:sibling", "headAgeS": 10, "silent": False,
                          "unacked": {"reason": "never", "gap": None}}],
@@ -4354,7 +4354,8 @@ class PresenceReading(unittest.TestCase):
         self.b = Berth(str(self.root / "berth"), now=lambda: self.now, policy_path=MISSING_POLICY)
         self.b.pid_alive = lambda pid: True
         self.sources = {"stasis": str(self.root / "stasis"), "gate_live": str(self.root / "gate-live"),
-                        "watch_pass": str(self.root / "last-pass.txt"), "bin_store": str(self.root / "bin-store")}
+                        "watch_pass": str(self.root / "last-pass.txt"),  # read by 32d350c86, by nothing now
+                        "bin_store": str(self.root / "bin-store")}
         self.g = render_status.__globals__
         for patch in (mock.patch.dict(self.g, {"presence_sources": lambda: dict(self.sources),
                                                 "_guard_state": lambda _: None,
@@ -4510,18 +4511,63 @@ class PresenceReading(unittest.TestCase):
         self.note("resumed", agent="sub1", tool="Edit", since_age=800)
         self.assertEqual(self.reading()["state"], "idle")
 
-    def test_an_observation_the_watcher_stopped_renewing_is_cleared_or_unknown_never_waiting(self):
+    def test_an_unrenewed_observation_reads_unknown_since_and_only_a_result_clears_it(self):
+        # B3: a pass that skips a session (read budget spent, transcript outside its window, a failed
+        # observe) renews nothing and resolves nothing, so it must never turn a wait into working/idle.
         self.event("turn-ended", 2000)
-        seq = self.event("tool-pending-observed", 600, agent="sub1", tool="Edit", pendingSince=self.stamp(800),
+        seq = self.event("tool-pending-observed", 300, tool="Edit", pendingSince=self.stamp(420),
                          source={"observer": "watcher:held-tool"})
-        self.incidents(seq)  # the fold never closes a subagent's observed call
-        r = self.reading()   # no pass of the watcher is on record since: not known either way
-        self.assertEqual((r["state"], r["ageS"]), ("unknown", 600))
-        self.assertEqual(self.line(), "    presence: unknown since 10m (a pending call was last observed then and "
-                                      "this device's watcher has not passed since)")
-        Path(self.sources["watch_pass"]).write_text("pass")  # it passed again, now, and renewed nothing
-        self.assertEqual(self.reading()["state"], "idle")
+        self.incidents(seq)
+        Path(self.root / "last-pass.txt").write_text("a later pass that skipped this session")
+        self.moor(writes_observed_at=self.now - 5)  # even a fresh mooring record of the session
+        r = self.reading()
+        self.assertEqual((r["state"], r["ageS"]), ("unknown", 300))
+        self.assertEqual(self.line(), "    presence: unknown since 5m (a pending call was last observed then; "
+                                      "no renewal and no result is on record)")
+        self.note("open", tool="Edit", since_age=420)
+        self.assertEqual(self.reading()["state"], "unknown")
+        self.note("resumed", tool="Edit", since_age=420)  # the watcher read the result
+        self.assertEqual(self.reading()["state"], "working")
         self.assertEqual(self.calls(), [])
+
+    def test_the_sessions_own_later_turn_end_clears_an_unrenewed_observation(self):
+        self.event("tool-pending-observed", 300, tool="Edit", pendingSince=self.stamp(420),
+                   source={"observer": "watcher:held-tool"})
+        self.assertEqual(self.reading()["state"], "unknown")
+        self.event("turn-ended", 100)
+        self.assertEqual(self.reading()["state"], "idle")
+
+    def test_no_pending_call_on_record_starts_no_process_at_all(self):
+        # B2: the bin store is resolved only once a candidate exists, inside the read deadline.
+        self.event("steward-ping", 500)
+        self.event("turn-ended", 400)
+        self.sources["bin_store"] = None
+        self.b.epr_bin = lambda: None
+        started = []
+
+        def refuse(argv, *a, **k):
+            started.append(argv)
+            raise OSError("no process may start")
+        with mock.patch("subprocess.run", side_effect=refuse), mock.patch("subprocess.Popen", side_effect=refuse):
+            self.assertEqual(self.reading()["state"], "idle")
+            self.assertIn("presence: idle since", render_status(self.b))
+        self.assertEqual(started, [])
+
+    def test_the_bin_store_is_resolved_inside_the_read_deadline_once_a_call_is_pending(self):
+        self.event("steward-ping", 700)
+        self.event("permission-requested", 600, tool="Bash")
+        self.sources["bin_store"] = None
+        self.b.epr_bin = lambda: None
+        seen = []
+
+        def run_command(argv, timeout=60):
+            seen.append((argv[:3], timeout))
+            raise subprocess.TimeoutExpired(argv, timeout)
+        with mock.patch.dict(_NS["_held_watch"](), {"run_command": run_command}):
+            r = self.reading()
+        self.assertEqual(seen[0][0], ["epr", "bin", "resolve"])
+        self.assertLessEqual(seen[0][1], _NS["PRESENCE_READ_S"])
+        self.assertEqual((r["state"], r["why"]), ("unknown", "session's epr pin could not be determined (no bin-store)"))
 
     # ---- idle, stale
     def test_a_turn_end_with_nothing_newer_reads_idle_since_it(self):
@@ -4590,23 +4636,41 @@ class PresenceReading(unittest.TestCase):
 
     def test_a_siblings_waiting_comes_from_a_heard_held_note_and_clears_on_its_resumed_note(self):
         r, rows = self.sibling(self.sibling_view())
-        self.assertEqual((r["state"], r["evidence"]), ("unknown", "held-note"))
+        self.assertEqual((r["state"], r["evidence"]), ("unknown", "no-held-note"))
         self.assertIn("working or idle does not cross devices", r["why"])
-        since = self.note("open", device=self.SIB, session="remote", tool="Bash", since_age=25200)
+        since = self.note("open", device=self.SIB, session="remote", tool="Bash", since_age=25200, at_age=240)
         self.note("open", device="did:key:z6Other", session="remote", tool="Write")  # another device's word about it
         r, rows = self.sibling(self.sibling_view())
         self.assertEqual((r["state"], r["since"], r["tool"], r["evidence"]), ("waiting", since, "Bash", "held-note"))
         with mock.patch.dict(self.g, {"sibling_moorings": lambda *a, **k: rows}):
             lines = _NS["_other_devices_lines"](self.b, self.sibling_view(), None)
         [line] = [l for l in lines if "presence:" in l]
-        self.assertTrue(line.startswith(f"        presence: waiting on a person since {since}: a Bash call has been "
-                                        "pending since then and no result is recorded (announced by its device's "
-                                        "watcher; newest record here "), line)
+        self.assertEqual(line, f"        presence: waiting on a person since {since}: a Bash call has been "
+                               "pending since then and no result is recorded (announced by its device's "
+                               "watcher 4m ago, not renewed since; whether that watcher still runs does not "
+                               "cross devices)")
+        self.assertEqual(r["ageS"], 240)  # the note's age, not the head's 12 s
         self.note("resumed", device=self.SIB, session="remote", tool="Bash", since_age=25200)
         self.assertEqual(self.sibling(self.sibling_view())[0]["state"], "unknown")
 
+    def test_a_siblings_old_unrenewed_held_note_reads_unknown_since_it_was_said(self):
+        # B1: the sibling's watcher dies, its call then completes, no `resumed` is ever said, and its
+        # device's head keeps folding fresh from its other sessions.
+        since = self.note("open", device=self.SIB, session="remote", tool="Bash", since_age=25200, at_age=25000)
+        r, _ = self.sibling(self.sibling_view(head_age=30))
+        self.assertEqual((r["state"], r["ageS"], r["since"], r.get("tool")), ("unknown", 25000, None, None))
+        line = _NS["presence_line"](r)
+        self.assertEqual(line, f"presence: unknown since 6h56 (its device's watcher announced a call pending since "
+                               f"{since} then; it has not been renewed or cleared, and whether that watcher still "
+                               "runs does not cross devices)")
+        self.assertNotIn("waiting", line)
+
+    def test_a_sibling_clock_running_ahead_gives_age_zero_not_a_negative_age(self):
+        r, _ = self.sibling(self.sibling_view(head_age=-40))
+        self.assertEqual((r["state"], r["ageS"]), ("unknown", 0))
+
     def test_a_sibling_on_a_silent_device_reads_unknown_since_its_last_head(self):
-        self.note("open", device=self.SIB, session="remote", tool="Bash", since_age=25200)
+        self.note("open", device=self.SIB, session="remote", tool="Bash", since_age=25200, at_age=60)
         r, _ = self.sibling(self.sibling_view(head_age=600))
         self.assertEqual((r["state"], r["ageS"], r["evidence"]), ("unknown", 600, "device-head"))
         self.assertEqual(_NS["presence_line"](r), "presence: unknown since 10m (its device's last head folded here "
@@ -4629,6 +4693,17 @@ class PresenceReading(unittest.TestCase):
         self.assertEqual((r["state"], r.get("tool")), ("waiting", None))
         self.assertIn("a tool call has been pending", _NS["presence_line"](r))
         self.assertNotIn("passwd", json.dumps(r) + _NS["presence_line"](r))
+        for name, shown in (("Bash", "Bash"), ("mcp__jenkins__getBuild", "mcp__jenkins__getBuild"),
+                            ("RunThisNow", None), ("mcp__x__" + "y" * 60, None), ("rm", None)):
+            self.assertEqual(_NS["_tool_name"](name), shown)
+
+    def test_one_status_reads_the_note_cache_once(self):
+        real, reads = _NS["held_notes"], []
+        with mock.patch.dict(self.g, {"held_notes": lambda b: reads.append(1) or real(b),
+                                      "_steward_view": lambda b: ({"standing": "device", "others": {}}, None),
+                                      "_ack_observations": lambda b: {}}):
+            render_status(self.b)
+        self.assertEqual(len(reads), 1)
 
     # ---- existing output
     def test_status_of_a_store_with_no_sessions_is_unchanged(self):
