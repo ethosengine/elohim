@@ -207,7 +207,9 @@ class PaydownTests(unittest.TestCase):
     def test_pre_push_wiring_is_before_rust_build(self):
         source = (ROOT / ".husky/pre-push.bash").read_text()
         self.assertIn('dependabot-paydown.py" --base "$STYLE_BASE" --head "$LOCAL_SHA"', source)
-        self.assertLess(source.index('dependabot-paydown.py'), source.index('if ! bash "$(git rev-parse --show-toplevel)/genesis/orchestrator/rust-style.sh"'))
+        # The rust-style step is invoked as `bash … rust-style.sh" --base … || STYLE_RC=$?` (it was
+        # `if ! bash … rust-style.sh"` when this test was written); the order is what is pinned.
+        self.assertLess(source.index('dependabot-paydown.py'), source.index('genesis/orchestrator/rust-style.sh" --base "$STYLE_BASE" --head "$LOCAL_SHA"'))
 
 
 class VersionTests(unittest.TestCase):
