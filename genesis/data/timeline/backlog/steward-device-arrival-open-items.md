@@ -3250,3 +3250,58 @@ Recorded by shem session 96b46344 while attaching the governed-space design to t
 The governed-space design (`genesis/docs/superpowers/specs/2026-11-26-governed-space-share-boundary-collective-memory-design.md`) lets one device's memory tending be accepted by its siblings. Its acceptance rule begins with "the signer is another admitted device" (station GS-2 of `genesis/docs/superpowers/plans/2026-11-26-governed-space-collective-memory-plan.md`). A device whose checkout does not yet carry a sibling's roster row would refuse that sibling's tending for the same reason it admits nobody here, so that station inherits this gap and carries no station of its own for it.
 
 The design also names a case this row does not cover. For a space held by a collective, the list of members cannot stay in a tracked file at all, because who is a member must not be readable from outside the collective (the design's section 12a, missing node 6). Reading the roster from a published ref, which is this row's candidate cure, does not meet that: a collective's roster and affiliations would have to be held inside its own space.
+
+## Row 110 — the orchestrator's own result went unread for two days, and a fleet roll built nothing
+
+From 2026-11-24 to 2026-11-26 `elohim-orchestrator/dev` had no successful build (#2434 was the last).
+`elohim-eprfs/dev` failed on one test in every run: `flow::sense::tests::direct_observation_uses_the_declared_native_writer`
+demanded `CARGO_TARGET_DIR`, which a device gate names and the pipeline's nextest run does not. Every device gate was green.
+Because the orchestrator never succeeded, its trusted Rust-style baseline stayed at #2434. Once that commit was more than
+200 commits behind, it fell outside the job's shallow clone, `rust-style-ci.sh` refused with "trusted baseline object
+missing", and the orchestrator stopped before dispatching anything (#2474 to #2477). The roll landed at `0f23d2d49` was not
+built until `1812e398c` cured both (the fixture falls back to its own binary's directory; the script fetches full history
+when the baseline is outside the clone). #2479 and #2480 were the first green builds.
+
+Owed: the landing job prints `elohim-orchestrator/dev`'s result for the pushed commit, and what it dispatched, as its last
+line, so a landing cannot be reported done without it. Until then the read is the integrator's last step by hand.
+Jenkins' log readers time out on a running build; its stage view (`…/<build>/wfapi/describe`) answers.
+
+## Row 111 — the early head acknowledgement was dropped: it let two devices hold one lease
+
+A lane proposed counting a sibling's acknowledgement of a lease claim as soon as its head passed the fold verdict, before
+that head's content was folded (ref `self/ethosengine-early-ack`, `034b486cf`, withdrawn, kept on the forge as the record).
+An independent read found an honest race. A claims; B claims before folding A's claim; B then folds A's claim and announces a
+head that acknowledges it, whose content holds B's own earlier claim; A counts the acknowledgement, sees no rival because it
+has not folded B's content, reads Effective and lands; A's fold completes and B's claim precedes A's. The rule was safe only
+because the acknowledgement and the content it covers arrive in one fold. A head signs device, root, seq, at and folded, and
+events sit flat in the channel tree, so no head can prove "nothing unfolded here concerns the lease"; proving it needs a
+head-format change. Two tests on dev (`efaed7e67`, eprfs-peer `tests/lease_view.rs`) pin the folded-only rule and name the
+race.
+
+## Row 112 — a doorway restart can outlast the server-rendered landing's adoption window
+
+Edge #1930 rebuilt and restarted the doorway. Its validation build #1931 passed fleet quiesce and the dht-fetch smoke and
+then failed `verify-projected-head.sh`: after 393 of 400 seconds the alpha doorway's renderer still served the previous
+landing head (the refresh nudge returned 401, which the script treats as non-gating). The same script passed by hand three
+minutes later, and the validate-only build #1932 passed every line. Not established: whether 400 seconds is too short for
+a cold doorway, or the adoption is slower than it should be; and whether the 401 is new. Any roll that rebuilds the doorway
+will meet this again.
+
+## Row 113 — the managed launcher adopts itself at every arrival, and a clean release gains a dirty source
+
+`install_launcher` calls `adopt_plain`, which ingests each plain executable it finds at the launcher's destination as
+`adopted-from-path`, source commit unknown, tree not clean. One of those files is the managed launcher itself. When the
+store already held those bytes, the ingest appended that row to a release built clean at a known commit and overwrote the
+record's `provenance.ingestedAt`. Seen on shem and ethosengine on 2026-11-26. Nothing decides on a release's sources today;
+the lanes that record closure keys and later draw by closure will read these records. Fix in review:
+`self/ethosengine-adopt-held` (held bytes add no source and leave the record untouched; the managed launcher is not adopted).
+Records that already carry the row are left as they are.
+
+## Row 114 — `epr peer serve` says "serving" before it can answer for what it holds
+
+`PeerDaemon::start` returns with an empty artifact index and the CLI prints the serving line; the first index rebuild is a
+background task. Until it finishes, a request for a release the device holds is answered `NoRecord`, which also means "not
+held". Under load the gap passed five seconds. A device that does not build and follows in that window is told the release
+is absent. In progress: a distinct "index warming" answer that follow treats as ask-again inside its existing bound. Not
+taken: moving the serving line to after the first rebuild. `just mesh wait`, the device supervisor and the session hooks
+wait on that line with their own timeouts, and each must be read before it moves.
