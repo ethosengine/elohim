@@ -472,7 +472,7 @@ export function checkReadSets({ root, projects, registry, changed = null, read =
 export function checkCargoDeny({ root, projects, spawn = spawnSync, changed = null, read = readFileSync }) {
   if (!projects.length) return null;
   if (Array.isArray(changed) && cargoInputChange(changed, { root, read, extra: DENY_INPUT }) === null) {
-    return row('cargo-deny-bans', 'ok', 'not run: the push changes no deny.toml, Cargo.toml, Cargo.lock, rust-toolchain file, .cargo config, toolchain pin or submodule pin');
+    return row('cargo-deny-bans', 'ok', 'not run: the push changes no deny.toml, Cargo.toml, Cargo.lock, rust-toolchain file, .cargo config, toolchain pin, build manifest or submodule pin');
   }
   const which = spawn('bash', ['-c', 'command -v cargo-deny'], { encoding: 'utf8' });
   if (which.status !== 0) {
@@ -505,13 +505,14 @@ const LOCK_STALE = /lock file .*needs to be updated|--locked was passed/i;
 
 const POOL_POLICY = 'genesis/agentic/pool-policy.json';
 const DENY_INPUT = /(^|\/)deny\.toml$/;
-const CARGO_INPUT = /(^|\/)(Cargo\.toml|Cargo\.lock|rust-toolchain(\.toml)?)$|(^|\/)\.cargo\//;
+const CARGO_INPUT = /(^|\/)(Cargo\.toml|Cargo\.lock|rust-toolchain(\.toml)?|build-manifest\.json)$|(^|\/)\.cargo\//;
 
 /**
  * The first changed path that can move what a Cargo.lock must hold or which cargo resolves it: a
  * Cargo.toml, a Cargo.lock, a rust-toolchain file, anything under a `.cargo/` directory, the
- * pool policy (it pins RUSTUP_TOOLCHAIN), .gitmodules, or a submodule's gitlink (a path
- * dependency may live in one). Null when the list holds none. An unreadable .gitmodules counts
+ * pool policy (it pins RUSTUP_TOOLCHAIN), a build-manifest.json (a gate project's own
+ * `run.cargo.env` may pin RUSTUP_TOOLCHAIN, and the new bytes alone cannot say one was not removed),
+ * .gitmodules, or a submodule's gitlink (a path dependency may live in one). Null when the list holds none. An unreadable .gitmodules counts
  * as a change, and a caller with no change list never asks.
  */
 export function cargoInputChange(changed, { root, read = readFileSync, extra = null } = {}) {
@@ -541,7 +542,7 @@ export function checkCargoLocks({ root, projects, spawn = spawnSync, env = proce
   // Thin-device station 2: a push that changes no cargo input cannot have made a lock lag, and the
   // check would ask this device for cargo, a toolchain and a registry cache it may not hold.
   if (Array.isArray(changed) && cargoInputChange(changed, { root, read }) === null) {
-    return row('cargo-lock', 'ok', `not run for ${[...workspaces].sort().join(' ')}: the push changes no Cargo.toml, Cargo.lock, rust-toolchain file, .cargo config, toolchain pin or submodule pin`);
+    return row('cargo-lock', 'ok', `not run for ${[...workspaces].sort().join(' ')}: the push changes no Cargo.toml, Cargo.lock, rust-toolchain file, .cargo config, toolchain pin, build manifest or submodule pin`);
   }
   // The pin lives only in pool-policy; with no readable pin, cargo resolves its own default.
   let toolchain;
