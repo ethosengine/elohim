@@ -1,10 +1,13 @@
 import { describe, test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
 import { runEnrichSample } from './enrich-sample.mjs';
+import { gateEvidence } from './gate-evidence.mjs';
+import { loadGateRegistry } from './pipeline-registry.mjs';
 
 const COMMIT = '0123456789abcdef0123456789abcdef01234567';
 const VERDICT = `bafyrei${'a'.repeat(52)}`;
@@ -21,6 +24,7 @@ function fixture(t, {
   dirty = '',
   pnpmStatus = 0,
   gateTimeout = false,
+  gateThrows = false,
 } = {}) {
   const root = mkdtempSync(resolve(tmpdir(), 'enrich-sample-'));
   t.after(() => rmSync(root, { recursive: true, force: true }));
@@ -31,6 +35,7 @@ function fixture(t, {
     calls.push(call);
     if (command === 'pgrep') return { status: 1 };
     if (command === 'just') {
+      if (gateThrows) throw new TypeError('gate exploded\nwith a second line');
       now += 4_500;
       if (gateTimeout) return { status: null, error: { code: 'ETIMEDOUT', message: 'timed out' } };
       if (gateReports) {
@@ -125,7 +130,6 @@ describe('detached enrichment sample', () => {
     ['closure drift', { actualClosure: 'closure-b' }, 'closure differs: verdict closure-a, execution closure-b'],
     ['dirty checkout', { dirty: ' M tracked-file\n' }, 'dirty tree after execution'],
     ['unrecordable execution', { actualRecordable: false }, 'working tree was dirty or unreadable before execution'],
-    ['skipped execution', { gateReports: false }, 'gate did not report a completed execution'],
     ['setup failure', { pnpmStatus: 7 }, 'pnpm install failed (7)'],
   ]) {
     test(`${name} records not-comparable with its one-line reason`, async t => {
@@ -138,6 +142,134 @@ describe('detached enrichment sample', () => {
       assert.equal(call.args[call.args.indexOf('--reason') + 1], reason);
     });
   }
+
+  test('an unexpected exception is recorded with its kind and one-line message', async t => {
+    const sample = fixture(t, { gateThrows: true });
+    const result = await sample.run();
+    assert.equal(result.outcome, 'not-comparable');
+    assert.equal(result.reason, 'unexpected TypeError: gate exploded with a second line');
+    const call = enrichCall(sample.calls);
+    assert.equal(call.args[call.args.indexOf('--outcome') + 1], 'not-comparable');
+    assert.equal(call.args[call.args.indexOf('--reason') + 1], result.reason);
+  });
+
+  test('a missing gate result is recorded as an unexpected error, not an ordinary refusal', async t => {
+    const sample = fixture(t, { gateReports: false });
+    const result = await sample.run();
+    assert.equal(result.outcome, 'not-comparable');
+    assert.match(result.reason,
+      /^unexpected Error: gate did not report a completed execution \(Error: ENOENT:/);
+    const call = enrichCall(sample.calls);
+    assert.equal(call.args[call.args.indexOf('--reason') + 1], result.reason);
+  });
+
+  test('a sampled reused green is comparable through the real gate runner and stub recipe', async t => {
+    const root = mkdtempSync(resolve(tmpdir(), 'enrich-sample-e2e-'));
+    t.after(() => rmSync(root, { recursive: true, force: true }));
+    const put = (path, text, options = {}) => {
+      const absolute = resolve(root, path);
+      mkdirSync(resolve(absolute, '..'), { recursive: true });
+      writeFileSync(absolute, text, options);
+    };
+    const git = (...args) => {
+      const result = spawnSync('git', [
+        '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.test', ...args,
+      ], { cwd: root, encoding: 'utf8' });
+      assert.equal(result.status, 0, result.stderr);
+      return result.stdout.trim();
+    };
+    const gateRunner = resolve(import.meta.dirname, 'gate-runner.mjs');
+    put('justfile', `gate target:
+    @GATE_ROOT="{{justfile_directory()}}" node ${JSON.stringify(gateRunner)} --target "{{target}}"
+
+_fixture-gate:
+    @true
+`);
+    put('build-manifest.json', `${JSON.stringify({
+      manifestVersion: '1.0',
+      pipeline: 'fixture-pipeline',
+      steps: { build: { inputs: { sources: ['fixture.txt'], buildProcess: [] } } },
+      gate: { projects: { fixture: {
+        dir: '.', steps: ['build'],
+        run: { kind: 'root-just', recipe: '_fixture-gate' },
+      } } },
+    }, null, 2)}\n`);
+    put('fixture.txt', 'fixture input\n');
+    put('genesis/orchestrator/gate-runner.mjs', readFileSync(gateRunner, 'utf8'));
+    put('genesis/orchestrator/run-local-gate.sh',
+      readFileSync(resolve(import.meta.dirname, 'run-local-gate.sh'), 'utf8'));
+    put('bin/brit', `#!/bin/sh
+printf '%s\n' '{"fingerprints":[{"step":"build","fingerprint":"fixture-fingerprint"}]}'
+`, { mode: 0o755 });
+    put('bin/brit-build-ref', '#!/bin/sh\nprintf \'%s\\n\' \'[]\'\n', { mode: 0o755 });
+    git('init', '-q');
+    git('add', '.');
+    git('commit', '-qm', 'fixture');
+    const commit = git('rev-parse', 'HEAD');
+    const gateEnv = {
+      ...process.env,
+      BRIT_BIN: resolve(root, 'bin/brit'),
+      BRIT_BUILD_REF_BIN: resolve(root, 'bin/brit-build-ref'),
+      GATE_RECORD: 'off',
+      GATE_EVIDENCE: 'off',
+      GATE_TASK: 'off',
+      GATE_READING: 'off',
+      GATE_PREFLIGHT: 'off',
+      GATE_READ_SHADOW: 'off',
+      GATE_GRADE: 'off',
+      GATE_INPUTS: 'off',
+      GATE_RECIPE_KEY: 'off',
+      GATE_ORACLE: 'path',
+      GATE_TAP: 'off',
+    };
+    const project = loadGateRegistry(root).get('fixture');
+    const evidence = gateEvidence(project, {
+      env: gateEnv, root, commit, cargoEnv: {}, spawn: spawnSync, warn: () => {},
+    });
+    assert.ok(evidence.key, evidence.line);
+    assert.equal(evidence.dirty, false, evidence.line);
+
+    mkdirSync(resolve(root, '.worktrees'), { recursive: true });
+    const reusedGreen = { verdict: VERDICT, outcome: 'green', closure: evidence.key };
+    const eprCalls = [];
+    const spawn = (command, args, options = {}) => {
+      if (command === 'fixture-epr') {
+        eprCalls.push(args);
+        if (args.includes('--resolve-only')) {
+          return { status: 0, stdout: JSON.stringify({
+            verdict: reusedGreen.verdict,
+            project: 'fixture',
+            closure: reusedGreen.closure,
+            commit,
+            device: 'did:key:fixture',
+          }) };
+        }
+        return { status: 0 };
+      }
+      if (command === 'pgrep') return { status: 1 };
+      if (command === 'pnpm') return { status: 0 };
+      if (command === 'git' && args.includes('submodule')) return { status: 0 };
+      return spawnSync(command, args, options);
+    };
+    const sampled = await runEnrichSample({
+      project: 'fixture', commit, closure: reusedGreen.closure, root,
+    }, { env: { ...gateEnv, EPR_BIN: 'fixture-epr' }, spawn });
+
+    assert.equal(sampled.outcome, reusedGreen.outcome,
+      `${sampled.reason}\n${readFileSync(sampled.logPath, 'utf8')}`);
+    assert.equal(sampled.reason, null);
+    const sampledResult = resolve(sampled.logPath, '../gate-result.json');
+    assert.equal(existsSync(sampledResult), true, 'the sampled gate wrote gate-result.json');
+    const executed = JSON.parse(readFileSync(sampledResult, 'utf8'));
+    assert.equal(executed.closure, reusedGreen.closure);
+    assert.equal(executed.status, 0);
+    assert.equal(executed.recordable, true);
+    const enrichment = eprCalls.find(args => !args.includes('--resolve-only'));
+    assert.ok(enrichment, 'the comparable enrichment is recorded');
+    assert.equal(enrichment[enrichment.indexOf('--verdict') + 1], reusedGreen.verdict);
+    assert.equal(enrichment[enrichment.indexOf('--outcome') + 1], reusedGreen.outcome);
+    assert.ok(!enrichment.includes('--reason'));
+  });
 
   test('one deadline kills the gate and records not-comparable(timeout)', async t => {
     const sample = fixture(t, { gateTimeout: true });
