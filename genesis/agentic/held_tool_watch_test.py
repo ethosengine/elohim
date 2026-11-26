@@ -477,7 +477,17 @@ class CarryFixture(Fixture, NoStateDir):
         self.calls.append(dict(argv=argv, timeout=timeout, cwd=str(cwd) if cwd else None,
                                env=dict(env) if env is not None else None))
         if argv[:2] == [str(self.head), "peer"]:
-            return 0, json.dumps({"device": "did:key:z6MkLOCAL", "misses": self.misses}), ""
+            # As the real CLI answers (epr-cli peer.rs render_intents): under --json, --misses
+            # prints only the misses list; without it, the whole output, device and misses among
+            # its keys. A carry that asked with --misses would see no device and take nothing.
+            if "--misses" in argv:
+                return 0, json.dumps(self.misses), ""
+            return 0, json.dumps({
+                "advisory": [], "device": "did:key:z6MkLOCAL", "error": None, "intents": [],
+                "maxSkewS": 120, "misses": self.misses, "now": int(self.now or 0),
+                "settledMisses": [], "siblingsRead": 1, "siblingsWhy": None,
+                "standing": "device", "store": None, "unjoined": [],
+            }), ""
         if "claim" in argv and "cargo" in argv:
             return (0 if self.room.get("verdict") == "admit" else 3), json.dumps(self.room), ""
         if "room" in argv and "cargo" in argv:
@@ -649,6 +659,16 @@ class CarryTest(CarryFixture):
         code, lines = self.run_carry(state="off")
         self.assertEqual((code, lines), (0, ["carry off; last: no carry pass recorded"]))
         self.assertFalse(Path(self.root, W["CARRY_ON_FILE"]).exists())
+
+    def test_carry_asks_for_the_full_intents_output_never_the_misses_list(self):
+        # Under --json, `epr peer intents --misses` prints only the misses list (epr-cli peer.rs
+        # render_intents): no device, so a carry that asked with it could never see a miss.
+        self.run_carry()
+        intents = [c["argv"] for c in self.calls if c["argv"][1:3] == ["peer", "intents"]]
+        self.assertEqual(len(intents), 1)
+        self.assertIn("--json", intents[0])
+        self.assertNotIn("--misses", intents[0])
+        self.assertEqual(len(self.claims()), 1, "the miss is seen and claimed")
 
     def test_uses_device_head_exact_sha_and_ignores_own_device_misses(self):
         own = self.miss(announcer="did:key:z6MkLOCAL", project="own")
@@ -1342,5 +1362,41 @@ class BerthStatusTest(NoStateDir):
             self.assertNotIn("held", text)
 
 
+REAL_INTENTS = HERE / "fixtures/peer-intents-json.real.json"
+
+
+class RealIntentsShapeTest(unittest.TestCase):
+    """Carry reads the shape the real CLI prints, captured from `epr peer intents --json`."""
+
+    def test_the_captured_full_output_yields_the_announced_miss_and_skips_unannounced_rows(self):
+        data = json.loads(REAL_INTENTS.read_text())
+        self.assertIsInstance(data, dict)
+        self.assertIn("device", data)
+        self.assertIn("misses", data)
+        before = min(m["waitUntil"] for m in data["misses"] if m.get("announcer")) - 1
+        rows = W["_eligible_misses"](data, before)
+        self.assertEqual([(r["project"], r["commit"]) for r in rows],
+                         [("eprfs-live-corpus", "d12c22740c46766d8a5e4b68ce86e406b74244c2")])
+
+    def test_the_misses_only_list_is_what_hid_every_miss(self):
+        data = json.loads(REAL_INTENTS.read_text())
+        before = min(m["waitUntil"] for m in data["misses"] if m.get("announcer")) - 1
+        self.assertEqual(W["_eligible_misses"](data["misses"], before), [])
+
+    def test_a_built_epr_prints_device_and_misses_under_intents_json(self):
+        epr = os.environ.get("EPR_BIN")
+        if not epr or not os.access(epr, os.X_OK):
+            self.skipTest("no EPR_BIN to run; the captured fixture stands in")
+        code, out, err = W["run_command"]([epr, "peer", "intents", "--json", "--root",
+                                           W["main_checkout"](W["REPO_ROOT"])], timeout=60)
+        if code != 0:
+            self.skipTest(f"epr peer intents exited {code} here: {' '.join(err.split())[:120]}")
+        data = json.loads(out)
+        self.assertIsInstance(data, dict)
+        self.assertIn("device", data)
+        self.assertIsInstance(data.get("misses"), list)
+
+
 if __name__ == "__main__":
     unittest.main()
+
