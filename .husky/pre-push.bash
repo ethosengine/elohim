@@ -227,18 +227,41 @@ fi
 READING_STATUS=0
 { [ -z "$MISSING_SUBMODULES" ] && [ -z "$ATTESTED_REFUSAL" ]; } || READING_STATUS=1
 READING_ENDED_AT=$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)
-gate_step_reading "$READING_STATUS" submodules ran \
+# Absent ones are judged by attested_decide, once the push's change list and selection exist; the
+# leg's reading is written there. Every other outcome is written and refused here, as before.
+ATTESTED_ABSENT=$MISSING_SUBMODULES
+ATTESTED_STARTED_S=$READING_STARTED_S; ATTESTED_STARTED_AT=$READING_STARTED_AT
+[ -n "$ATTESTED_ABSENT" ] || gate_step_reading "$READING_STATUS" submodules ran \
   "$((SECONDS - READING_STARTED_S))" "$READING_STARTED_AT" "$READING_ENDED_AT"
 if [ -n "$ATTESTED_REFUSAL" ]; then
   echo "[pre-push] REFUSED: $ATTESTED_REFUSAL" >&2
   gate_step_reading
   exit 1
 fi
-if [ -n "$MISSING_SUBMODULES" ]; then
-  echo "[pre-push] REFUSED: not checked out: $MISSING_SUBMODULES. Run: git submodule update --init $MISSING_SUBMODULES" >&2
+# An absent attested submodule refuses the push unless the push's own changed paths and selected
+# projects make it irrelevant (gate-preflight.mjs attestedNeed, the question prep asks). The change
+# list (GATE_CHANGED_FILES, GATE_NARROW_BASE) and the selection ($PROJECTS) are computed below this
+# block, so the decision is made where they exist: after project selection, and before any earlier
+# pass (hook_pass), where the hook runs no project and the selection is empty. The CLI prints the
+# required ones on stdout and exits 3, or exits 0 with none and says on stderr which were not
+# required. Any other exit, or an exit 0 that names one, is no decision: all are required.
+attested_decide() {
+  [ -n "$ATTESTED_ABSENT" ] || return 0
+  local need rc absent=$ATTESTED_ABSENT
+  # shellcheck disable=SC2086 # word lists of submodule paths and manifest keys
+  need=$(node "${HOOK_WORK_TREE:-.}/genesis/orchestrator/gate-preflight.mjs" --attested-need $absent --projects $PROJECTS); rc=$?
+  need=$(printf '%s' "$need" | xargs)
+  ATTESTED_ABSENT=""
+  if [ "$rc" -eq 0 ] && [ -z "$need" ]; then
+    gate_step_reading 0 submodules ran "$((SECONDS - ATTESTED_STARTED_S))" "$ATTESTED_STARTED_AT" "$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)"
+    return 0
+  fi
+  { [ "$rc" -eq 3 ] && [ -n "$need" ]; } || need=$absent
+  gate_step_reading 1 submodules ran "$((SECONDS - ATTESTED_STARTED_S))" "$ATTESTED_STARTED_AT" "$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)"
+  echo "[pre-push] REFUSED: not checked out: $need. Run: git submodule update --init $need" >&2
   gate_step_reading
   exit 1
-fi
+}
 # ── Attested submodules present ─────────────────────────────────
 
 # Detects projects and executes typed gate recipes from build-manifest.json.
@@ -1342,6 +1365,7 @@ handover_finish() {
 }
 
 hook_pass() {
+  attested_decide
   [ -z "$PUSH_IS_HANDOVER" ] || handover_finish
   [ -n "$BERTH_TARGETS" ] || { stop_point; exit 0; }
   local line local_sha remote_ref remote_sha target rc
@@ -2199,6 +2223,7 @@ fi
 # No grep fallback: build manifests are the sole positive gate detector.
 # Trim leading space
 PROJECTS=$(echo "$PROJECTS" | sed 's/^ //')
+attested_decide
 
 # ── Preflight (seconds) ──────────────────────────────────────────
 # The careless misses that have each cost a long gate run: an uninitialised submodule, an

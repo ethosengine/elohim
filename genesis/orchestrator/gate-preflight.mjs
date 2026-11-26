@@ -732,6 +732,29 @@ export function main(argv, env = process.env) {
     // EPR_BIN on 3 alone, so a crash (1) or a missing node (127) never unsets it.
     return r.level === 'REFUSED' ? 3 : 0;
   }
+  if (argv.includes('--attested-need')) {
+    // The pre-push hook's question about the attested submodules it found absent (named after the
+    // flag): which does this push need? The required ones on stdout, exit 3; none, exit 0 and one
+    // line on stderr naming what was not required. The change list is the hook's GATE_CHANGED_FILES;
+    // a missing or unreadable one, GATE_NARROW_BASE=none, or a project name the registry does not
+    // hold is no answer, and attestedNeed then requires every one.
+    const from = argv.indexOf('--attested-need');
+    const at = argv.indexOf('--projects');
+    const absent = argv.slice(from + 1, at > from ? at : undefined).filter(a => !a.startsWith('--'));
+    const wanted = at >= 0 ? argv.slice(at + 1).filter(a => !a.startsWith('--')) : null;
+    const registry = loadGateRegistry(ROOT);
+    const projects = wanted && wanted.every(name => registry.has(name)) ? wanted.map(name => registry.get(name)) : null;
+    const changed = env.GATE_NARROW_BASE === 'none' ? null : changedFromEnv(env);
+    const reasons = absent.map(module => [module, attestedNeed(module, { root: ROOT, projects, changed })]);
+    const required = reasons.filter(([, why]) => why);
+    if (!required.length) {
+      process.stderr.write(`[pre-push] attested submodules not checked out and not required by this push: ${absent.join(' ')} — no changed path or selected project needs them\n`);
+      return 0;
+    }
+    process.stderr.write(`[pre-push] attested submodules required: ${required.map(([module, why]) => `${module}: ${why}`).join('; ')}\n`);
+    process.stdout.write(`${required.map(([module]) => module).join('\n')}\n`);
+    return 3;
+  }
   if (argv.includes('--on-red')) {
     process.stdout.write(`${onRedPolicy().mode}\n`);
     return 0;
