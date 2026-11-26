@@ -283,6 +283,39 @@ test('a Cargo.toml renamed away in the push still runs cargo-lock and cargo-deny
   assert.deepEqual(run(bare), ['ok cargo-deny-bans (not run)', 'ok cargo-lock (not run)']);
 });
 
+// Laptop, 2026-11-26: a first hand-over is a NEW ref, which was no list for the cargo checks, so a
+// documents-only push still asked for cargo-deny and a registry download.
+test('a first hand-over to a new ref skips the cargo checks by its branch since origin/dev, and runs them when that cannot be read', (t) => {
+  const repo = ({ first = 'genesis/docs/a.md', dev = true, unrelated = false } = {}) => {
+    const root = cargoTree(t);
+    put(root, '.gitmodules', '');
+    const git = (...args) => {
+      const r = spawnSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@example.invalid', ...args], { cwd: root, encoding: 'utf8' });
+      assert.equal(r.status, 0, r.stderr);
+      return r.stdout.trim();
+    };
+    git('init', '-q', '-b', 'main'); git('add', '-A'); git('commit', '-q', '-m', 'base');
+    if (dev) git('update-ref', 'refs/remotes/origin/dev', 'HEAD');
+    if (unrelated) { git('checkout', '-q', '--orphan', 'other'); git('rm', '-rqf', '--cached', '.'); }
+    put(root, first, 'first\n'); git('add', '-A'); git('commit', '-q', '-m', 'first');
+    put(root, 'genesis/docs/b.md', 'second\n'); git('add', '-A'); git('commit', '-q', '-m', 'second');
+    return { root, tip: git('rev-parse', 'HEAD') };
+  };
+  const rows = ({ root, tip }) => {
+    const spawn = (cmd, args, opts) => (cmd === 'git' ? spawnSync(cmd, args, opts) : { status: cmd === 'cargo' ? 0 : 1, stdout: '', stderr: '' });
+    const env = { TMPDIR: '/preflight-fixture-tmp', GATE_NARROW_BASE: 'none', GATE_PUSH_REFS: `refs/heads/self/thin-x ${tip} ${'0'.repeat(40)}` };
+    // The hook's list for a new ref names what the tip's diff shows; here only the tip's own path.
+    return runPreflight({ root, projects: [pa], env, spawn, registry: new Map(), changed: ['genesis/docs/b.md'], hostTriple: 'x', fleet: { root, spawn }, docCut: { root, spawn } })
+      .filter(r => /^cargo-(lock|deny)/.test(r.check)).map(r => `${r.level} ${r.check}${r.why.startsWith('not run') ? ' (not run)' : ''}`);
+  };
+  const ran = ['WARN cargo-deny-bans', 'ok cargo-lock:ws'];
+  assert.deepEqual(rows(repo()), ['ok cargo-deny-bans (not run)', 'ok cargo-lock (not run)']);
+  assert.deepEqual(rows(repo({ first: 'ws/b/Cargo.toml' })), ran, 'a Cargo.toml in the branch\'s first commit');
+  assert.deepEqual(rows(repo({ first: 'deny.toml' })), ['WARN cargo-deny-bans', 'ok cargo-lock (not run)'], 'a deny.toml there runs the deny check alone');
+  assert.deepEqual(rows(repo({ dev: false })), ran, 'no origin/dev');
+  assert.deepEqual(rows(repo({ unrelated: true })), ran, 'no merge base');
+});
+
 test('rows stream as each check completes', (t) => {
   const root = scratch(t);
   const seen = [];

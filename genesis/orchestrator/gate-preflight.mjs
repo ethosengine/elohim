@@ -711,10 +711,12 @@ export function runPreflight({ root = ROOT, projects, env = process.env, spawn =
   };
   // The change list is trusted to skip a check only when the hook read the push's own range
   // (GATE_NARROW_BASE=none marks a fallback range) or a caller handed it in; otherwise every check
-  // runs. Under a push the list is the hook's plus each ref's range read without rename detection.
-  // The attested-submodule question alone also reads a new ref's branch (decisionChanges).
-  const exact = env.GATE_NARROW_BASE === 'none' ? null : decisionChanges(changed, { env, root, spawn });
+  // runs. Under a push the list is the hook's plus each ref's range read without rename detection,
+  // and a new ref (a first hand-over) is read as its branch since <remote>/dev (decisionChanges):
+  // the hook marks a new ref GATE_NARROW_BASE=none for the gate's narrowing, which these skips do
+  // not use. The same list answers the attested-submodule question and the two cargo checks.
   const attested = decisionChanges(changed, { env, root, spawn, newRefs: true });
+  const exact = attested;
   return [
     ...timed(() => checkEprBin({ env })),
     ...timed(() => checkSubmodules({ root, spawn, projects: attested === null ? null : projects, changed: attested })),
@@ -772,8 +774,9 @@ export function docCutRows(env, options = {}, guard = docCutGuard, loadError = d
  * too (the hook's shared GATE_CHANGED_FILES names only the new one). A destination tip this clone
  * does not hold is no list. A NEW ref (destination all-zero: a thin client's first hand-over to
  * self/<x>) is no list either, except with `newRefs`, used for the attested-submodule question
- * alone: then its range is merge-base(<remote>/dev, pushed tip)..tip, the whole branch, and still
- * no list when <remote>/dev does not resolve or shares no history with the tip.
+ * and the cargo-lock and cargo-deny skips (never for selection or a gate key): then its range is
+ * merge-base(<remote>/dev, pushed tip)..tip, the whole branch, and still no list when
+ * <remote>/dev does not resolve or shares no history with the tip.
  */
 export function decisionChanges(listed, { env = process.env, root = ROOT, spawn = spawnSync, newRefs = false } = {}) {
   if (!Array.isArray(listed)) return null;
