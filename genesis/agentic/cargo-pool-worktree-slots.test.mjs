@@ -81,7 +81,7 @@ function fixture(t) {
   return { repo, worktrees, pool, a, b, env, run, key, gateTarget };
 }
 
-test('two cd linked worktrees get distinct key slots and the main checkout stays unsuffixed', (t) => {
+test('two cd linked worktrees get distinct key slots and the main checkout stays unsuffixed', { timeout: 60_000 }, (t) => {
   const f = fixture(t);
   const main = f.key(f.repo);
   const a = f.key(f.a);
@@ -98,7 +98,7 @@ test('two cd linked worktrees get distinct key slots and the main checkout stays
   assert.match(status.stdout, /Slot rule:\s+linked-worktree suffix=-wt-wt-a/);
 });
 
-test('cargo-pool key and gate-runner compute the same linked-worktree slot', (t) => {
+test('cargo-pool key and gate-runner compute the same linked-worktree slot', { timeout: 60_000 }, (t) => {
   const f = fixture(t);
   const key = f.key(f.a);
   const base = join(f.pool, 'family/cd/elohim__eprfs/dev');
@@ -107,7 +107,7 @@ test('cargo-pool key and gate-runner compute the same linked-worktree slot', (t)
     f.gateTarget(join(f.pool, 'family/cd/elohim__eprfs/release'), f.a));
 });
 
-test('steward dry-run marks a gone worktree slot reclaimable without deleting it', (t) => {
+test('steward dry-run marks a gone worktree slot reclaimable without deleting it', { timeout: 60_000 }, (t) => {
   const f = fixture(t);
   const live = f.key(f.a).slot_dev;
   const gone = f.key(f.b).slot_dev;
@@ -123,7 +123,7 @@ test('steward dry-run marks a gone worktree slot reclaimable without deleting it
   assert.equal(spawnSync('test', ['-d', gone]).status, 0, 'dry-run must preserve the slot');
 });
 
-test('steward preserves process-owned and gate-locked orphan slots and removes only the idle orphan', async (t) => {
+test('steward preserves process-owned and gate-locked orphan slots and removes only the idle orphan', { timeout: 60_000 }, async (t) => {
   const f = fixture(t);
   const key = f.key(f.b);
   const processOwned = key.slot_dev;
@@ -159,7 +159,7 @@ test('steward preserves process-owned and gate-locked orphan slots and removes o
   assert.match(result.stdout, new RegExp(`stale-worktree-slot\\s+removed\\s+${escapeRegExp(idle)}`));
 });
 
-test('steward holds the slot gate lock until orphan deletion finishes', async (t) => {
+test('steward holds the slot gate lock until orphan deletion finishes', { timeout: 60_000 }, async (t) => {
   const f = fixture(t);
   const gone = f.key(f.b).slot_dev;
   mkdirSync(gone, { recursive: true });
