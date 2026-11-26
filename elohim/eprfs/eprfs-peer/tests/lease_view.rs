@@ -13,7 +13,7 @@ use elohim_epr_rea::{atom_cid, FlowEvent, FlowRecord};
 use eprfs_core::BlobCid;
 use eprfs_peer::{
     other_devices, steward_lease_view, Admission, DeviceHead, FoldCoverage, FoldCoverageState,
-    HeadTable, LeaseStore, LeaseVerdict, NackLeaf, OwnAnnounce, PeerError, Settlement,
+    HeadTable, LeaseStore, LeaseVerdict, LeaseWait, NackLeaf, OwnAnnounce, PeerError, Settlement,
     StewardScope, VIA_SLOT,
 };
 use support::{
@@ -384,6 +384,13 @@ fn an_unacknowledged_claim_is_pending_then_unconfirmed_naming_the_device() {
         Some(LeaseVerdict::Pending {
             session: "claude-1".into(),
             waiting_on: vec![h.b.did.clone()],
+            waiting: vec![LeaseWait {
+                device: h.b.did.clone(),
+                needs_seq: Some(3),
+                acked_seq: Some(2),
+                head_seq: Some(9),
+                processed_at: Some(last_seen),
+            }],
         })
     );
     assert_eq!(
@@ -394,6 +401,13 @@ fn an_unacknowledged_claim_is_pending_then_unconfirmed_naming_the_device() {
             last_seen: Some(last_seen),
             fenced: false,
             override_at: None,
+            waiting: Some(LeaseWait {
+                device: h.b.did.clone(),
+                needs_seq: Some(3),
+                acked_seq: Some(2),
+                head_seq: Some(9),
+                processed_at: Some(last_seen),
+            }),
         })
     );
 
@@ -407,6 +421,48 @@ fn an_unacknowledged_claim_is_pending_then_unconfirmed_naming_the_device() {
             last_seen: None,
             fenced: false,
             override_at: None,
+            waiting: Some(LeaseWait {
+                device: h.b.did.clone(),
+                needs_seq: Some(3),
+                acked_seq: None,
+                head_seq: None,
+                processed_at: None,
+            }),
+        })
+    );
+}
+
+#[test]
+fn pending_wait_evidence_is_additive_camel_case_and_omits_unknown_sequences() {
+    let h = household();
+    let s = store(vec![own(claim("claude-1", T0))]);
+    let processed_at = ms(T0) + 900;
+    let heads = table(&h.a.did, &[], &s, &[(&h.b.did, 7, processed_at)]);
+    let pending =
+        verdict(&h.a.did, &s, &heads, &h.admission(), ms(T0) + 1000).expect("pending lease");
+    let json = serde_json::to_value(pending).expect("lease JSON");
+    assert_eq!(json["waiting_on"], serde_json::json!([h.b.did.clone()]));
+    assert_eq!(json["waiting"][0]["device"], h.b.did);
+    assert!(json["waiting"][0].get("needsSeq").is_none());
+    assert_eq!(json["waiting"][0]["ackedSeq"], 7);
+    assert_eq!(json["waiting"][0]["headSeq"], 9);
+    assert_eq!(json["waiting"][0]["processedAt"], processed_at);
+}
+
+#[test]
+fn effective_and_held_by_json_remain_unchanged() {
+    assert_eq!(
+        serde_json::to_value(effective("claude-1")).expect("effective JSON"),
+        serde_json::json!({"verdict": "effective", "session": "claude-1"})
+    );
+    assert_eq!(
+        serde_json::to_value(held("did:key:sibling", "claude-1", T0, false)).expect("held JSON"),
+        serde_json::json!({
+            "verdict": "held_by",
+            "device": "did:key:sibling",
+            "session": "claude-1",
+            "since": ms(T0),
+            "override": false
         })
     );
 }
@@ -1665,6 +1721,13 @@ fn override_waits_ttl_plus_skew_plus_margin() {
             last_seen: Some(last_seen),
             fenced: false,
             override_at: Some(last_seen + 120_000),
+            waiting: Some(LeaseWait {
+                device: h.a.did.clone(),
+                needs_seq: Some(4),
+                acked_seq: Some(1),
+                head_seq: Some(9),
+                processed_at: Some(last_seen),
+            }),
         })
     );
     assert_eq!(

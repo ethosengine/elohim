@@ -1656,17 +1656,33 @@ def held_by_a(override=False):
             "override": override}
 
 
-def unconfirmed_a(session="codex-1", last_seen=NOW_MS - 180_000, fenced=False, override_at=None):
-    return {"verdict": "unconfirmed", "session": session, "device": DEVICE_A,
-            "last_seen": last_seen, "fenced": fenced, "override_at": override_at}
+def unconfirmed_a(session="codex-1", last_seen=NOW_MS - 180_000, fenced=False,
+                  override_at=None, waiting=None):
+    verdict = {"verdict": "unconfirmed", "session": session, "device": DEVICE_A,
+               "last_seen": last_seen, "fenced": fenced, "override_at": override_at}
+    if waiting is not None:
+        verdict["waiting"] = waiting
+    return verdict
 
 
 def refused_by_a(session="codex-1"):
     return {"verdict": "refused_by", "session": session, "device": DEVICE_A}
 
 
-def pending(session="codex-1"):
-    return {"verdict": "pending", "session": session, "waiting_on": [DEVICE_A]}
+def pending(session="codex-1", waiting=None):
+    verdict = {"verdict": "pending", "session": session, "waiting_on": [DEVICE_A]}
+    if waiting is not None:
+        verdict["waiting"] = [waiting]
+    return verdict
+
+
+def lease_wait(needs_seq=3, acked_seq=2, head_seq=9, processed_at=NOW_MS - 5_000):
+    waiting = {"device": DEVICE_A, "headSeq": head_seq, "processedAt": processed_at}
+    if needs_seq is not None:
+        waiting["needsSeq"] = needs_seq
+    if acked_seq is not None:
+        waiting["ackedSeq"] = acked_seq
+    return waiting
 
 
 def effective(session="codex-1"):
@@ -3215,6 +3231,25 @@ class StewardClaimTest(unittest.TestCase):
         for age_ms, text in ages:
             self.assertEqual(fmt(unconfirmed_a(last_seen=NOW_MS - age_ms), NOW_MS),
                              f"unconfirmed: {DEVICE_A} last seen {text} ago")
+
+    def test_steward_reason_appends_lease_wait_evidence_without_replacing_old_phrases(self):
+        fmt = _NS["steward_reason"]
+        evidence = lease_wait()
+        detail = (f"{DEVICE_A} to acknowledge our seq 3 (it acknowledges 2; "
+                  "its head seq 9 processed 5s ago)")
+        self.assertEqual(
+            fmt(pending(waiting=evidence), NOW_MS),
+            f"unconfirmed: {DEVICE_A} has not acknowledged yet — {detail}",
+        )
+        self.assertEqual(
+            fmt(unconfirmed_a(waiting=evidence), NOW_MS),
+            f"unconfirmed: {DEVICE_A} last seen 3m ago — {detail}",
+        )
+        no_announce = lease_wait(needs_seq=None)
+        reason = fmt(pending(waiting=no_announce), NOW_MS)
+        self.assertIn(f"unconfirmed: {DEVICE_A} has not acknowledged yet", reason)
+        self.assertIn("no own head has carried the claim yet (waiting on the next announce)",
+                      reason)
 
     def test_steward_claim_held_names_holder(self):
         self.views(view(dev_integration=held_by_a()))

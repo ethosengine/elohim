@@ -131,7 +131,7 @@ pub use iroh::{NodeAddr, NodeId};
 pub use key::PeerKey;
 pub use lease_view::{
     lease_events, other_devices, steward_lease_view, FoldCoverageState, LeaseEvent, LeaseKind,
-    LeaseStore, LeaseVerdict, OtherDevice, Resource, BERTH_EVENTS_MEASURE,
+    LeaseStore, LeaseVerdict, LeaseWait, OtherDevice, Resource, BERTH_EVENTS_MEASURE,
 };
 pub use local_blob::{
     put_local_blob, put_local_blob_with, read_local_blob, stream_local_blob,

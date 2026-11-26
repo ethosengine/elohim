@@ -1804,44 +1804,179 @@ fn leases(options: &Options) -> PeerResult<ExitCode> {
         println!("no live lease on a steward-scoped resource");
     }
     for (resource, verdict) in &view {
-        let line = match verdict {
-            LeaseVerdict::Effective { session } => format!("effective, held by {session} here"),
-            LeaseVerdict::Pending {
-                session,
-                waiting_on,
-            } => format!(
+        println!("{resource:<18} {}", lease_line(verdict, now));
+    }
+    Ok(ExitCode::SUCCESS)
+}
+
+fn wait_detail(
+    device: &str,
+    needs_seq: Option<u64>,
+    acked_seq: Option<u64>,
+    head_seq: Option<u64>,
+    processed_at: Option<u64>,
+    now: u64,
+) -> String {
+    let device = short(device);
+    let Some(needs_seq) = needs_seq else {
+        return format!(
+            "{device}: no own head has carried the claim yet (waiting on the next announce)"
+        );
+    };
+    let acknowledged = acked_seq.map_or_else(
+        || "has not acknowledged yet".to_string(),
+        |acked| format!("it acknowledges {acked}"),
+    );
+    let head = match (head_seq, processed_at) {
+        (Some(seq), Some(processed_at)) => format!(
+            "its head seq {seq} processed {}s ago",
+            now.saturating_sub(processed_at) / 1000
+        ),
+        (Some(seq), None) => format!("its head seq {seq} has no processing time"),
+        (None, _) => "no head held here".to_string(),
+    };
+    format!("{device} to acknowledge our seq {needs_seq} ({acknowledged}; {head})")
+}
+
+fn lease_line(verdict: &LeaseVerdict, now: u64) -> String {
+    match verdict {
+        LeaseVerdict::Effective { session } => format!("effective, held by {session} here"),
+        LeaseVerdict::Pending {
+            session,
+            waiting_on,
+            waiting,
+        } => {
+            let line = format!(
                 "pending for {session} here, waiting on {}",
                 waiting_on
                     .iter()
                     .map(|device| short(device))
                     .collect::<Vec<_>>()
                     .join(", ")
-            ),
-            // berth formats the refusal line and its age; this line only names the device.
-            LeaseVerdict::Unconfirmed {
-                session, device, ..
-            } => format!("unconfirmed for {session} here: {}", short(device)),
-            LeaseVerdict::RefusedBy { session, device } => {
-                format!("refused for {session} here by {}", short(device))
+            );
+            let detail = waiting
+                .iter()
+                .map(|wait| {
+                    wait_detail(
+                        &wait.device,
+                        wait.needs_seq,
+                        wait.acked_seq,
+                        wait.head_seq,
+                        wait.processed_at,
+                        now,
+                    )
+                })
+                .collect::<Vec<_>>()
+                .join("; ");
+            if detail.is_empty() {
+                line
+            } else {
+                format!("{line} — {detail}")
             }
-            LeaseVerdict::HeldBy {
-                device,
-                session,
-                overriding,
-                ..
-            } => format!(
-                "held by {}/{session}{}",
-                short(device),
-                if *overriding {
-                    " (an override of this device's silence)"
-                } else {
-                    ""
-                }
-            ),
-        };
-        println!("{resource:<18} {line}");
+        }
+        // berth formats the refusal line and its age; this line only names the device.
+        LeaseVerdict::Unconfirmed {
+            session,
+            device,
+            fenced,
+            waiting,
+            ..
+        } => {
+            let line = format!("unconfirmed for {session} here: {}", short(device));
+            if *fenced {
+                line
+            } else if let Some(wait) = waiting {
+                format!(
+                    "{line} — {}",
+                    wait_detail(
+                        &wait.device,
+                        wait.needs_seq,
+                        wait.acked_seq,
+                        wait.head_seq,
+                        wait.processed_at,
+                        now
+                    )
+                )
+            } else {
+                line
+            }
+        }
+        LeaseVerdict::RefusedBy { session, device } => {
+            format!("refused for {session} here by {}", short(device))
+        }
+        LeaseVerdict::HeldBy {
+            device,
+            session,
+            overriding,
+            ..
+        } => format!(
+            "held by {}/{session}{}",
+            short(device),
+            if *overriding {
+                " (an override of this device's silence)"
+            } else {
+                ""
+            }
+        ),
     }
-    Ok(ExitCode::SUCCESS)
+}
+
+#[cfg(test)]
+mod lease_line_tests {
+    use super::*;
+    use eprfs_peer::LeaseWait;
+
+    fn waiting(needs_seq: Option<u64>) -> LeaseWait {
+        LeaseWait {
+            device: "sibling".into(),
+            needs_seq,
+            acked_seq: Some(4),
+            head_seq: Some(11),
+            processed_at: Some(1_000),
+        }
+    }
+
+    #[test]
+    fn pending_and_unconfirmed_lines_append_what_the_sibling_must_acknowledge() {
+        let pending = LeaseVerdict::Pending {
+            session: "codex-1".into(),
+            waiting_on: vec!["sibling".into()],
+            waiting: vec![waiting(Some(7))],
+        };
+        assert_eq!(
+            lease_line(&pending, 6_000),
+            "pending for codex-1 here, waiting on sibling — sibling to acknowledge our seq 7 \
+             (it acknowledges 4; its head seq 11 processed 5s ago)"
+        );
+
+        let unconfirmed = LeaseVerdict::Unconfirmed {
+            session: "codex-1".into(),
+            device: "sibling".into(),
+            last_seen: Some(1_000),
+            fenced: false,
+            override_at: None,
+            waiting: Some(waiting(Some(7))),
+        };
+        assert_eq!(
+            lease_line(&unconfirmed, 6_000),
+            "unconfirmed for codex-1 here: sibling — sibling to acknowledge our seq 7 \
+             (it acknowledges 4; its head seq 11 processed 5s ago)"
+        );
+    }
+
+    #[test]
+    fn a_wait_without_a_carrying_head_names_the_next_announce() {
+        let pending = LeaseVerdict::Pending {
+            session: "codex-1".into(),
+            waiting_on: vec!["sibling".into()],
+            waiting: vec![waiting(None)],
+        };
+        assert_eq!(
+            lease_line(&pending, 6_000),
+            "pending for codex-1 here, waiting on sibling — sibling: no own head has carried the \
+             claim yet (waiting on the next announce)"
+        );
+    }
 }
 
 /// One completed gate verdict folded from an admitted sibling device.
