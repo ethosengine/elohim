@@ -24,7 +24,7 @@ run *args:
 
 # Run tests
 test:
-    cargo test
+    cargo test --no-fail-fast
 
 # Type-check without building
 check:

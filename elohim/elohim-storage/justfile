@@ -33,7 +33,7 @@ build-dev:
 
 # Run tests (jobs_flag: -j1 under RAM-guard pressure, see above)
 test:
-    cargo test {{jobs_flag}}
+    cargo test --no-fail-fast {{jobs_flag}}
 
 # Build with iroh parallel stack enabled (libp2p still default)
 # See genesis/docs/superpowers/plans/2026-05-07-iroh-parallel-stack.md

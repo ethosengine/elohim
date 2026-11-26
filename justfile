@@ -680,23 +680,23 @@ _gate-elements-codegen:
 _gate-elohim-compute:
     cd elohim/elohim-compute && bash "{{justfile_directory()}}/genesis/orchestrator/gate-steps.sh" fmt -- cargo fmt --check \
       ::: lint -- node "{{justfile_directory()}}/genesis/orchestrator/cargo-lint.mjs" -- -D warnings \
-      ::: test -- cargo test
+      ::: test -- cargo test --no-fail-fast
 
 _gate-elohim-epr:
     cd elohim && bash "{{justfile_directory()}}/genesis/orchestrator/gate-steps.sh" fmt -- cargo fmt --check \
       ::: lint -- node "{{justfile_directory()}}/genesis/orchestrator/cargo-lint.mjs" -p elohim-epr -p elohim-epr-rea -p elohim-epr-index -- -D warnings \
-      ::: test -- cargo test -p elohim-epr -p elohim-epr-rea -p elohim-epr-index --all-targets
+      ::: test -- cargo test --no-fail-fast -p elohim-epr -p elohim-epr-rea -p elohim-epr-index --all-targets
 
 _gate-elohim-live-session:
     cd elohim && bash "{{justfile_directory()}}/genesis/orchestrator/gate-steps.sh" fmt -- cargo fmt --check -p elohim-live-session \
       ::: lint -- node "{{justfile_directory()}}/genesis/orchestrator/cargo-lint.mjs" -p elohim-live-session --all-targets -- -D warnings \
-      ::: test -- cargo test -p elohim-live-session --all-targets
+      ::: test -- cargo test --no-fail-fast -p elohim-live-session --all-targets
 
 _gate-elohim-ark:
     cd elohim && bash "{{justfile_directory()}}/genesis/orchestrator/gate-steps.sh" fmt -- cargo fmt --check -p elohim-ark-core -p elohim-ark-supervisor -p elohim-ark \
       ::: lint -- node "{{justfile_directory()}}/genesis/orchestrator/cargo-lint.mjs" -p elohim-ark-core -p elohim-ark-supervisor -p elohim-ark -- -D warnings \
-      ::: test -- cargo test -p elohim-ark-core -p elohim-ark-supervisor -p elohim-ark --all-targets \
-      ::: test-doc -- cargo test -p elohim-ark-core --doc
+      ::: test -- cargo test --no-fail-fast -p elohim-ark-core -p elohim-ark-supervisor -p elohim-ark --all-targets \
+      ::: test-doc -- cargo test --no-fail-fast -p elohim-ark-core --doc
 
 # Private sensor, consultation and delivery contracts; no live model calls.
 _gate-dialogue-stasis:
@@ -729,6 +729,9 @@ _gate-epr-ts:
 # The ingest's build after the tests stays: `cargo test` runs with the published blob-store
 # feature and uplifts its test-profile epr over `debug/epr`; that second build, a fresh no-op
 # (well under a second), puts back the bytes the ingest delivers.
+# The test step passes `--no-fail-fast`: it runs every test binary and reports all failures in one run
+# (2026-11-26: an integration stack failed this gate three times, on three different tests, 15 to 20
+# minutes each, because cargo test stops after the first failing binary).
 _gate-eprfs:
     @before="$("$CARGO_TARGET_DIR/debug/epr" bin --tool epr source-state 2>/dev/null || "${EPR_BIN:-epr}" bin --tool epr source-state 2>/dev/null || echo none)"; \
       tested_head="$(git rev-parse HEAD)"; \
@@ -741,8 +744,8 @@ _gate-eprfs:
         ::: lint -- node "{{justfile_directory()}}/genesis/orchestrator/cargo-lint.mjs" "$@" --all-targets -- -D warnings \
         ::: bins -- cargo build -p elohim-epr-cli --bin epr -p elohim-device-runtime --bin bin-launch --features elohim-epr-cli/blob-store \
         ::: ark -- cargo build --manifest-path ../Cargo.toml -p elohim-ark --bin ark \
-        ::: test -- cargo test "$@" --features elohim-epr-cli/blob-store -- --skip live_corpus_ \
-        ::: nofeature -- cargo test -p elohim-epr-cli --features peer --lib -- no_blob_store_build_) || exit $?; \
+        ::: test -- cargo test --no-fail-fast "$@" --features elohim-epr-cli/blob-store -- --skip live_corpus_ \
+        ::: nofeature -- cargo test --no-fail-fast -p elohim-epr-cli --features peer --lib -- no_blob_store_build_) || exit $?; \
       EPRFS_SOURCE_BEFORE="$before" EPRFS_TESTED_HEAD="$tested_head" just _eprfs-ingest-around build
 
 # The eprfs live-corpus legs (backlog steward-device-arrival-open-items row 7): the `live_corpus_*`
@@ -799,7 +802,7 @@ _eprfs-ingest-around mode:
       if [[ "{{mode}}" == test ]]; then \
         set -- --workspace; \
         if [ -n "${GATE_CARGO_PACKAGES:-}" ]; then set --; for package in $GATE_CARGO_PACKAGES; do set -- "$@" -p "$package"; done; fi; \
-        (cd elohim/eprfs && cargo test "$@" --features elohim-epr-cli/blob-store) || exit $?; \
+        (cd elohim/eprfs && cargo test --no-fail-fast "$@" --features elohim-epr-cli/blob-store) || exit $?; \
       fi; \
       (cd elohim/eprfs && cargo build -p elohim-epr-cli --bin epr -p elohim-device-runtime --bin bin-launch --features elohim-epr-cli/blob-store) || exit $?; \
       after="$("$CARGO_TARGET_DIR/debug/epr" bin --tool epr source-state 2>/dev/null || echo none)"; \
@@ -854,7 +857,7 @@ _gate-memory-ceremony:
 _gate-seam-contracts:
     cd crates/seam-contracts && bash "{{justfile_directory()}}/genesis/orchestrator/gate-steps.sh" fmt -- cargo fmt --check \
       ::: lint -- node "{{justfile_directory()}}/genesis/orchestrator/cargo-lint.mjs" --all-features -- -D warnings \
-      ::: test -- cargo test --all-features \
+      ::: test -- cargo test --no-fail-fast --all-features \
       ::: build-wasm -- env -u RUSTUP_TOOLCHAIN cargo build --target wasm32-unknown-unknown --no-default-features
 
 # The addressing kernel links into the DNA zomes and browser builds: the wasm build is part
@@ -864,7 +867,7 @@ _gate-seam-contracts:
 _gate-elohim-address:
     cd crates/elohim-address && bash "{{justfile_directory()}}/genesis/orchestrator/gate-steps.sh" fmt -- cargo fmt --check \
       ::: lint -- node "{{justfile_directory()}}/genesis/orchestrator/cargo-lint.mjs" --all-features --all-targets -- -D warnings \
-      ::: test -- cargo test --all-features \
+      ::: test -- cargo test --no-fail-fast --all-features \
       ::: test-release -- cargo test --release --test parse_never_panics \
       ::: build-wasm -- env -u RUSTUP_TOOLCHAIN cargo build --target wasm32-unknown-unknown --no-default-features
 
@@ -873,17 +876,17 @@ _gate-elohim-address:
 _gate-elohim-storage-client:
     cd crates/elohim-storage-client && bash "{{justfile_directory()}}/genesis/orchestrator/gate-steps.sh" fmt -- cargo fmt --check \
       ::: lint -- node "{{justfile_directory()}}/genesis/orchestrator/cargo-lint.mjs" --all-targets -- -D warnings \
-      ::: test -- cargo test
+      ::: test -- cargo test --no-fail-fast
 
 _gate-consent-grant:
     cd crates/consent-grant && bash "{{justfile_directory()}}/genesis/orchestrator/gate-steps.sh" fmt -- cargo fmt --check \
       ::: lint -- node "{{justfile_directory()}}/genesis/orchestrator/cargo-lint.mjs" --all-targets -- -D warnings \
-      ::: test -- cargo test
+      ::: test -- cargo test --no-fail-fast
 
 _gate-hc-dbtool:
     cd elohim/holochain/tools/hc-dbtool && bash "{{justfile_directory()}}/genesis/orchestrator/gate-steps.sh" fmt -- cargo fmt --check \
       ::: lint -- node "{{justfile_directory()}}/genesis/orchestrator/cargo-lint.mjs" --all-targets -- -D warnings \
-      ::: test -- cargo test
+      ::: test -- cargo test --no-fail-fast
 
 _gate-epr-storage:
     cd elohim/elohim-storage && cargo build && cargo test --test schema_contract && cargo test --test schema_contract_diesel_epr
