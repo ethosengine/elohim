@@ -52,11 +52,6 @@ const stderrWarn = line => process.stderr.write(line);
 /** Trusted process environment for carry-only Cargo/rustc evaluation outside a candidate tree. */
 export function carryExecutionEnv(env, cargoEnv, cargoHome) {
   const fenced = { ...env, ...cargoEnv, CARGO_HOME: cargoHome };
-  if (typeof cargoEnv?.RUSTUP_TOOLCHAIN === 'string' && cargoEnv.RUSTUP_TOOLCHAIN) {
-    fenced.RUSTUP_TOOLCHAIN = cargoEnv.RUSTUP_TOOLCHAIN;
-  } else {
-    delete fenced.RUSTUP_TOOLCHAIN;
-  }
   for (const key of ['RUSTC', 'RUSTC_WRAPPER', 'RUSTC_WORKSPACE_WRAPPER',
     'CARGO_BUILD_RUSTC', 'CARGO_BUILD_RUSTC_WRAPPER']) {
     delete fenced[key];
