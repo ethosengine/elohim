@@ -67,6 +67,30 @@ export interface PeerCliStatus {
   channel: {
     projection_failures: number;
     fold_failures: number;
+    /**
+     * Fold failures caused by this device's transport, timeout, unanswered request, or local I/O. Optional for output from older CLIs.
+     */
+    foldFailuresOurs?: number;
+    /**
+     * Fold failures caused by sender content that failed verification. Optional for output from older CLIs.
+     */
+    foldFailuresInvalid?: number;
+    /**
+     * The latest fold failure, cleared when that same device later folds successfully. Optional for output from older CLIs.
+     */
+    lastFoldFailure?: null | {
+      device: string;
+      seq: number;
+      /**
+       * Unix milliseconds on the receiving device when the failure was recorded.
+       */
+      at: number;
+      class: 'ours' | 'invalid';
+      /**
+       * Bounded, one-line Display form of the typed fold error.
+       */
+      reason: string;
+    };
     oversized_events: number;
     over_budget_folds: number;
     refused_strangers: number;

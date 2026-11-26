@@ -62,7 +62,7 @@ use crate::fold::{fold_root_planned, FoldLimits, FoldPlan, FoldReader, FoldRepor
 use crate::gate::SharedAdmission;
 use crate::gossip::GatedGossip;
 use crate::head::{ChannelHead, HeadSigner};
-use crate::head_table::{FoldCoverage, HeadTable, StorePlace};
+use crate::head_table::{FoldCoverage, FoldFailureClass, HeadTable, StorePlace};
 use crate::key::PeerKey;
 use crate::local_blob::LocalBlobContext;
 use crate::rules::{Rules, RulesDigest, RulesState};
@@ -2596,6 +2596,7 @@ impl Run {
         }
         match result {
             Ok(report) => {
+                fold_succeeded(self.channel.counters_mut(), &head.device);
                 self.stats
                     .store_parses
                     .fetch_add(report.store_parses, Ordering::Relaxed);
@@ -2675,7 +2676,13 @@ impl Run {
             }
             Err(e) => {
                 self.held.remove(&head.device);
-                self.channel.counters_mut().fold_failures += 1;
+                record_fold_failure(
+                    self.channel.counters_mut(),
+                    &head.device,
+                    head.seq,
+                    unix_ms(),
+                    &e,
+                );
                 self.log(&format!(
                     "fold of {} seq {} failed, retried on its next head: {e}",
                     head.device, head.seq
@@ -2693,6 +2700,31 @@ impl Run {
         }
         self.save()
     }
+}
+
+fn record_fold_failure(
+    counters: &mut crate::head_table::ChannelCounters,
+    device: &str,
+    seq: u64,
+    at: u64,
+    error: &PeerError,
+) {
+    let class = if matches!(
+        error,
+        PeerError::FoldIntegrity { .. }
+            | PeerError::TierLeafIntegrity { .. }
+            | PeerError::TierFrame { .. }
+            | PeerError::TierFrameTooLarge { .. }
+    ) {
+        FoldFailureClass::Invalid
+    } else {
+        FoldFailureClass::Ours
+    };
+    counters.record_fold_failure(device, seq, at, class, &error.to_string());
+}
+
+fn fold_succeeded(counters: &mut crate::head_table::ChannelCounters, device: &str) {
+    counters.clear_fold_failure(device);
 }
 
 /// Every node id a `PeerEndpoint` row of `chain_root`'s lineage names (64 lowercase hex), admitted
@@ -2713,6 +2745,66 @@ fn roster_named_nodes(rows: &[ParticipantRow], chain_root: &str) -> Vec<String> 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn unreachable_fold_failure_records_ours_with_its_reason() {
+        let mut counters = crate::head_table::ChannelCounters::default();
+        let error = PeerError::FoldUnanswered {
+            what: "root bafyfixture (timed out connecting)".into(),
+        };
+
+        record_fold_failure(&mut counters, "did:key:laptop", 7, 12_000, &error);
+
+        assert_eq!(counters.fold_failures, 1);
+        assert_eq!(counters.fold_failures_ours, 1);
+        assert_eq!(counters.fold_failures_invalid, 0);
+        let failure = counters.last_fold_failure_parts().expect("last failure");
+        assert_eq!(failure.0, "did:key:laptop");
+        assert_eq!(failure.1, 7);
+        assert_eq!(failure.2, 12_000);
+        assert_eq!(failure.3, "ours");
+        assert_eq!(failure.4, error.to_string());
+    }
+
+    #[test]
+    fn integrity_fold_failure_records_invalid_and_bounds_one_line_reason() {
+        let mut counters = crate::head_table::ChannelCounters::default();
+        let error = PeerError::FoldIntegrity {
+            reason: format!("sender content\n{}", "x".repeat(500)),
+        };
+
+        record_fold_failure(&mut counters, "did:key:sender", 8, 13_000, &error);
+
+        assert_eq!(counters.fold_failures, 1);
+        assert_eq!(counters.fold_failures_ours, 0);
+        assert_eq!(counters.fold_failures_invalid, 1);
+        let failure = counters.last_fold_failure_parts().expect("last failure");
+        assert_eq!(failure.3, "invalid");
+        assert!(!failure.4.contains('\n'));
+        assert!(
+            failure.4.len() <= crate::head_table::MAX_FOLD_FAILURE_REASON_BYTES,
+            "{} bytes",
+            failure.4.len()
+        );
+    }
+
+    #[test]
+    fn successful_fold_clears_only_its_last_failure_and_keeps_totals() {
+        let mut counters = crate::head_table::ChannelCounters::default();
+        let error = PeerError::FoldUnanswered {
+            what: "root bafyfixture".into(),
+        };
+        record_fold_failure(&mut counters, "did:key:laptop", 7, 12_000, &error);
+
+        fold_succeeded(&mut counters, "did:key:another-device");
+        assert!(counters.last_fold_failure_parts().is_some());
+        fold_succeeded(&mut counters, "did:key:laptop");
+
+        assert!(counters.last_fold_failure_parts().is_none());
+        assert_eq!(counters.fold_failures, 1);
+        assert_eq!(counters.fold_failures_ours, 1);
+        assert_eq!(counters.fold_failures_invalid, 0);
+    }
 
     #[test]
     fn unchanged_index_without_a_manifest_retry_never_becomes_due() {

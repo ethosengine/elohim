@@ -409,6 +409,42 @@ fn grouped_crossing_drops_without_bounded_history_fields_still_load() {
 }
 
 #[test]
+fn old_head_table_channel_without_fold_failure_fields_still_loads() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    std::fs::write(
+        dir.path().join(HeadTable::FILE_NAME),
+        r#"{
+          "version": 1,
+          "own": null,
+          "devices": {},
+          "dropped": {
+            "unadmitted": 0,
+            "forged": 0,
+            "rollback": 0,
+            "replayed": 0,
+            "malformed": 0
+          },
+          "channel": {
+            "projection_failures": 0,
+            "last_projection_error": null,
+            "fold_failures": 3,
+            "oversized_events": 0,
+            "over_budget_folds": 0,
+            "refused_connections": {},
+            "refused_strangers": 0
+          }
+        }"#,
+    )
+    .expect("write old head table");
+
+    let table = HeadTable::load(dir.path()).expect("old channel shape loads");
+    assert_eq!(table.channel.fold_failures, 3);
+    assert_eq!(table.channel.fold_failures_ours, 0);
+    assert_eq!(table.channel.fold_failures_invalid, 0);
+    assert!(table.channel.last_fold_failure_parts().is_none());
+}
+
+#[test]
 fn old_ungrouped_crossing_drops_load_as_unknown_history() {
     let dir = tempfile::tempdir().expect("tempdir");
     std::fs::write(
