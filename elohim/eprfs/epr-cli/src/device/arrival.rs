@@ -616,14 +616,6 @@ fn exchange_check(
         ),
         None => "HEARD unknown".to_string(),
     };
-    let heads: Vec<(&String, &eprfs_peer::DeviceHead)> = siblings
-        .iter()
-        .filter_map(|sibling| table.devices.get(sibling).map(|head| (sibling, head)))
-        .collect();
-    let acking = heads
-        .iter()
-        .filter_map(|(sibling, head)| head.folded.get(did).map(|seq| (sibling, head, seq)))
-        .max_by_key(|(sibling, head, _)| (heard_at(sibling).unwrap_or(0), head.folded_at));
     let latest_mature_root_seq = table.own_log.iter().rev().find_map(|root| {
         age_s(root.at)
             .filter(|age_s| *age_s >= freshness_s)
@@ -631,78 +623,69 @@ fn exchange_check(
     });
     // Legacy tables can have an empty `own_log`. With no dated root to require, any
     // acknowledgement passes the sequence gate.
-    if let Some((sibling, head, &acked_seq)) = acking {
+    let mut fresh = Vec::new();
+    let mut stale = Vec::new();
+    for sibling in siblings {
         let short = actor::short_did(sibling);
+        let Some(head) = table.devices.get(sibling) else {
+            stale.push(format!(
+                "{short} has no verified head folded here ({}, FOLDED unknown; folded-from \
+                 direction absent)",
+                heard_age(sibling)
+            ));
+            continue;
+        };
         let Some(fold_age_s) = age_s(head.folded_at) else {
-            return Check::new(
-                SIBLING_CHECK,
-                State::Degraded,
-                format!(
-                    "{short} has {}, FOLDED timestamp is in this device's future, so the \
-                     acknowledgement carrier's age is invalid",
-                    heard_age(sibling)
-                ),
-                Some(
-                    "keep epr peer serve running on every admitted device until fresh heads and \
-                     acknowledgements cross in both directions"
-                        .into(),
-                ),
-            );
+            stale.push(format!(
+                "{short} has {}, FOLDED timestamp is in this device's future, so liveness \
+                 cannot be judged",
+                heard_age(sibling)
+            ));
+            continue;
         };
         let recorded_heard_at = heard_at(sibling);
         let heard_age_s = recorded_heard_at.and_then(age_s);
-        let (carrier_age_s, ages) = match (recorded_heard_at, heard_age_s) {
-            (Some(_), Some(heard_age_s)) => (
-                Some(heard_age_s),
-                format!("HEARD {heard_age_s}s ago, FOLDED {fold_age_s}s ago"),
-            ),
-            (Some(_), None) => (
-                None,
-                format!("HEARD timestamp is in this device's future, FOLDED {fold_age_s}s ago"),
-            ),
-            (None, _) => (
-                Some(fold_age_s),
-                format!("HEARD unknown, FOLDED {fold_age_s}s ago"),
-            ),
+        let ages = match (recorded_heard_at, heard_age_s) {
+            (Some(_), Some(heard_age_s)) => {
+                format!("HEARD {heard_age_s}s ago, FOLDED {fold_age_s}s ago")
+            }
+            (Some(_), None) => {
+                stale.push(format!(
+                    "{short} HEARD timestamp is in this device's future, FOLDED {fold_age_s}s \
+                     ago, so liveness cannot be judged"
+                ));
+                continue;
+            }
+            (None, _) => format!("HEARD unknown, FOLDED {fold_age_s}s ago"),
         };
-        let carrier_is_fresh = carrier_age_s.is_some_and(|age_s| age_s < freshness_s);
+        // HEARD is recovery evidence and FOLDED is head evidence. Either fresh observation
+        // proves the exchange is live; healthy HEARD snapshots are intentionally flushed less
+        // often than channel freshness.
+        let liveness_age_s = heard_age_s.map_or(fold_age_s, |heard| heard.min(fold_age_s));
+        let liveness_is_fresh = liveness_age_s < freshness_s;
+        let Some(&acked_seq) = head.folded.get(did) else {
+            stale.push(format!(
+                "{short} {ages}; acknowledges none of this device's heads (acknowledgement \
+                 direction absent)"
+            ));
+            continue;
+        };
         let unacknowledged_root_seq =
             latest_mature_root_seq.filter(|root_seq| acked_seq < *root_seq);
-        if carrier_is_fresh && unacknowledged_root_seq.is_none() {
-            let carrier_age_s = carrier_age_s.expect("a fresh carrier has a known age");
-            return Check::new(
-                SIBLING_CHECK,
-                State::Ok,
-                format!(
-                    "{short} folded-from head seq {} is {fold_age_s}s old; liveness is judged by \
-                     {ages}; it acknowledges this device to seq {acked_seq}, carried \
-                     {carrier_age_s}s ago; both directions are within \
-                     freshness_s={freshness_s}s",
-                    head.seq
-                ),
-                None,
-            );
+        if liveness_is_fresh && unacknowledged_root_seq.is_none() {
+            fresh.push(format!(
+                "{short} folded-from head seq {}; {ages}; it acknowledges this device to seq \
+                 {acked_seq}, carried {liveness_age_s}s ago",
+                head.seq
+            ));
+            continue;
         }
         let mut directions = Vec::new();
-        match (recorded_heard_at, carrier_age_s) {
-            (Some(_), Some(carrier_age_s)) if !carrier_is_fresh => {
-                directions.push(format!(
-                    "HEARD is {carrier_age_s}s old, FOLDED {fold_age_s}s ago"
-                ));
-                directions.push(format!(
-                    "acknowledgement of this device's head was carried {carrier_age_s}s ago"
-                ));
-            }
-            (Some(_), None) => directions.push(ages),
-            (None, Some(carrier_age_s)) if !carrier_is_fresh => {
-                directions.push(format!(
-                    "HEARD unknown, so folded-from head is {fold_age_s}s old"
-                ));
-                directions.push(format!(
-                    "acknowledgement of this device's head was carried {carrier_age_s}s ago"
-                ));
-            }
-            _ => directions.push(ages),
+        if !liveness_is_fresh {
+            directions.push(format!(
+                "{ages}; newer liveness age is {liveness_age_s}s and acknowledgement of this \
+                 device's head was carried {liveness_age_s}s ago"
+            ));
         }
         if let Some(root_seq) = unacknowledged_root_seq {
             directions.push(format!(
@@ -710,64 +693,32 @@ fn exchange_check(
                  root at seq {root_seq}"
             ));
         }
-        return Check::new(
+        stale.push(format!(
+            "{short} {} (freshness_s={freshness_s}s)",
+            directions.join(" and ")
+        ));
+    }
+    if stale.is_empty() {
+        Check::new(
+            SIBLING_CHECK,
+            State::Ok,
+            format!(
+                "{}; both directions are within freshness_s={freshness_s}s",
+                fresh.join("; ")
+            ),
+            None,
+        )
+    } else {
+        Check::new(
             SIBLING_CHECK,
             State::Degraded,
-            format!(
-                "{short} {} (freshness_s={freshness_s}s)",
-                directions.join(" and ")
-            ),
+            stale.join("; "),
             Some(
                 "keep epr peer serve running on every admitted device until fresh heads and \
                  acknowledgements cross in both directions"
                     .into(),
             ),
-        );
-    }
-
-    let named = siblings
-        .iter()
-        .map(|sibling| actor::short_did(sibling))
-        .collect::<Vec<_>>()
-        .join(", ");
-    match heads
-        .iter()
-        .max_by_key(|(sibling, head)| (heard_at(sibling).unwrap_or(0), head.folded_at))
-    {
-        None => Check::new(
-            SIBLING_CHECK,
-            State::Degraded,
-            format!(
-                "the roster lists {named}, but no verified head from a sibling has been folded \
-                 here: HEARD unknown, FOLDED unknown, so nothing has been exchanged"
-            ),
-            Some(format!(
-                "keep epr peer serve running here and on {named}; epr peer status shows each \
-                 head as it folds"
-            )),
-        ),
-        Some((sibling, head)) => {
-            let heard = heard_age(sibling);
-            let folded = age_s(head.folded_at).map_or_else(
-                || "FOLDED timestamp is in this device's future".to_string(),
-                |age_s| format!("FOLDED {age_s}s ago"),
-            );
-            Check::new(
-                SIBLING_CHECK,
-                State::Degraded,
-                format!(
-                    "{} has a verified head here (seq {}, last {heard}, {folded}), but \
-                     acknowledges none of this device's heads (acknowledgement direction absent)",
-                    actor::short_did(sibling),
-                    head.seq
-                ),
-                Some(format!(
-                    "keep epr peer serve running here until {} folds this device's head; epr peer \
-                 status shows its acknowledgement",
-                    actor::short_did(sibling)
-                )),
-            )
-        }
+        )
     }
 }
 
@@ -1459,11 +1410,7 @@ fn peer_daemon_check(root: &Path) -> Check {
     use super::supervise::RestartNote;
     let mut check = peer_daemon_line();
     match super::supervise::restart_note(root) {
-        Some(RestartNote::Ready(suffix)) => {
-            if let Some(rest) = check.detail.strip_prefix("serving at current") {
-                check.detail = format!("serving at current{suffix}{rest}");
-            }
-        }
+        Some(RestartNote::Ready(suffix)) => add_ready_restart_note(&mut check, &suffix),
         // A restart that did not come up keeps the line degraded until the supervisor reads
         // every child ready again (row 35, F1).
         Some(RestartNote::Degraded { note, cure }) => {
@@ -1477,6 +1424,14 @@ fn peer_daemon_check(root: &Path) -> Check {
         None => {}
     }
     check
+}
+
+fn add_ready_restart_note(check: &mut Check, suffix: &str) {
+    if let Some(rest) = check.detail.strip_prefix("serving at current") {
+        check.detail = format!("serving at current{suffix}{rest}");
+    } else if check.detail.starts_with("running release-record CID(s)") {
+        check.detail.push_str(suffix);
+    }
 }
 
 fn peer_daemon_line() -> Check {
@@ -2160,6 +2115,26 @@ mod tests {
     use super::*;
     use serde_json::json;
     use std::os::unix::fs::PermissionsExt;
+
+    #[test]
+    fn ready_restart_receipt_is_kept_on_a_stale_release_line() {
+        let mut check = Check::new(
+            "peer daemon",
+            State::Degraded,
+            "running release-record CID(s) old; current release-record CID current",
+            Some("restart epr peer serve to follow current".into()),
+        );
+        add_ready_restart_note(
+            &mut check,
+            " (restarted by bin-follow at 2026-11-26T00:00:00Z in 2 s)",
+        );
+        assert!(
+            check
+                .detail
+                .ends_with("(restarted by bin-follow at 2026-11-26T00:00:00Z in 2 s)"),
+            "{check}"
+        );
+    }
 
     fn write_rules_policy(path: &Path, kinds: &[&str]) -> eprfs_peer::RulesDigest {
         fs::create_dir_all(path.parent().unwrap()).unwrap();
@@ -3163,14 +3138,154 @@ mod tests {
             1_000_000,
         );
         assert_eq!(check.state, State::Degraded, "{check}");
-        assert!(
-            check.detail.contains("folded-from head is 91s old"),
-            "{check}"
-        );
+        assert!(check.detail.contains("FOLDED 91s ago"), "{check}");
         assert!(
             check
                 .detail
                 .contains("acknowledgement of this device's head was carried 91s ago"),
+            "{check}"
+        );
+    }
+
+    #[cfg(feature = "peer")]
+    #[test]
+    fn every_sibling_must_be_live_both_ways() {
+        const NOW_MS: u64 = 1_000_000;
+        let ours = "did:key:z6MkThisDevice000000000000000000000";
+        let healthy = "did:key:z6MkHealthySibling00000000000000000".to_owned();
+        let stalled = "did:key:z6MkStalledSibling00000000000000000".to_owned();
+        let mut table = exchange_table(ours, &healthy, 5, 7);
+        let mut stalled_head = table.devices[&healthy].clone();
+        stalled_head.folded_at = NOW_MS - 120_000;
+        table.devices.insert(stalled.clone(), stalled_head);
+        let siblings = vec![healthy.clone(), stalled.clone()];
+
+        let degraded = exchange_check(
+            &siblings,
+            ours,
+            Ok(Some(table.clone())),
+            Ok(Default::default()),
+            Some(90),
+            NOW_MS,
+        );
+        assert_eq!(degraded.state, State::Degraded, "{degraded}");
+        assert!(
+            degraded.detail.contains(&actor::short_did(&stalled)),
+            "{degraded}"
+        );
+        assert!(
+            !degraded.detail.contains(&actor::short_did(&healthy)),
+            "a degraded aggregate names only stale siblings: {degraded}"
+        );
+
+        table
+            .devices
+            .get_mut(&stalled)
+            .expect("stalled sibling")
+            .folded_at = NOW_MS - 5_000;
+        let healthy_check = exchange_check(
+            &siblings,
+            ours,
+            Ok(Some(table)),
+            Ok(Default::default()),
+            Some(90),
+            NOW_MS,
+        );
+        assert_eq!(healthy_check.state, State::Ok, "{healthy_check}");
+        assert!(
+            healthy_check.detail.contains(&actor::short_did(&healthy)),
+            "{healthy_check}"
+        );
+        assert!(
+            healthy_check.detail.contains(&actor::short_did(&stalled)),
+            "{healthy_check}"
+        );
+    }
+
+    #[cfg(feature = "peer")]
+    #[test]
+    fn a_sibling_without_a_head_is_named_beside_a_healthy_sibling() {
+        const NOW_MS: u64 = 1_000_000;
+        let ours = "did:key:z6MkThisDevice000000000000000000000";
+        let healthy = "did:key:z6MkHealthySibling00000000000000000".to_owned();
+        let missing = "did:key:z6MkMissingSibling00000000000000000".to_owned();
+        let check = exchange_check(
+            &[healthy.clone(), missing.clone()],
+            ours,
+            Ok(Some(exchange_table(ours, &healthy, 5, 7))),
+            Ok(Default::default()),
+            Some(90),
+            NOW_MS,
+        );
+        assert_eq!(check.state, State::Degraded, "{check}");
+        assert!(
+            check.detail.contains(&actor::short_did(&missing)),
+            "{check}"
+        );
+        assert!(
+            check.detail.contains("no verified head folded here"),
+            "{check}"
+        );
+        assert!(
+            !check.detail.contains(&actor::short_did(&healthy)),
+            "a degraded aggregate names only stale siblings: {check}"
+        );
+    }
+
+    #[cfg(feature = "peer")]
+    #[test]
+    fn fresh_folded_keeps_exchange_live_across_the_heard_flush_window() {
+        const NOW_MS: u64 = 1_000_000;
+        let ours = "did:key:z6MkThisDevice000000000000000000000";
+        let sibling = "did:key:z6MkSiblingDevice0000000000000000000".to_owned();
+        let mut recovery = eprfs_peer::PeerRecoveryStatus::default();
+        recovery.devices.insert(
+            sibling.clone(),
+            eprfs_peer::DeviceRecoveryStatus {
+                last_heard_at: Some(NOW_MS - 500_000),
+                ..Default::default()
+            },
+        );
+        let check = exchange_check(
+            std::slice::from_ref(&sibling),
+            ours,
+            Ok(Some(exchange_table(ours, &sibling, 5, 7))),
+            Ok(recovery),
+            Some(90),
+            NOW_MS,
+        );
+        assert_eq!(check.state, State::Ok, "{check}");
+        assert!(check.detail.contains("HEARD 500s ago"), "{check}");
+        assert!(check.detail.contains("FOLDED 5s ago"), "{check}");
+    }
+
+    #[cfg(feature = "peer")]
+    #[test]
+    fn stale_exchange_names_the_newer_of_heard_and_folded_ages() {
+        const NOW_MS: u64 = 1_000_000;
+        let ours = "did:key:z6MkThisDevice000000000000000000000";
+        let sibling = "did:key:z6MkSiblingDevice0000000000000000000".to_owned();
+        let mut recovery = eprfs_peer::PeerRecoveryStatus::default();
+        recovery.devices.insert(
+            sibling.clone(),
+            eprfs_peer::DeviceRecoveryStatus {
+                last_heard_at: Some(NOW_MS - 500_000),
+                ..Default::default()
+            },
+        );
+        let check = exchange_check(
+            std::slice::from_ref(&sibling),
+            ours,
+            Ok(Some(exchange_table(ours, &sibling, 120, 7))),
+            Ok(recovery),
+            Some(90),
+            NOW_MS,
+        );
+        assert_eq!(check.state, State::Degraded, "{check}");
+        assert!(check.detail.contains("HEARD 500s ago"), "{check}");
+        assert!(check.detail.contains("FOLDED 120s ago"), "{check}");
+        assert!(
+            check.detail.contains("newer liveness age is 120s"),
             "{check}"
         );
     }
@@ -3235,7 +3350,7 @@ mod tests {
         );
         assert_eq!(check.state, State::Ok, "{check}");
         assert!(check.detail.contains("both directions"), "{check}");
-        assert!(check.detail.contains("12s old"), "{check}");
+        assert!(check.detail.contains("FOLDED 12s ago"), "{check}");
     }
 
     #[cfg(feature = "peer")]
@@ -3321,10 +3436,7 @@ mod tests {
             10_000_000,
         );
         assert_eq!(check.state, State::Degraded, "{check}");
-        let age = check
-            .detail
-            .find("folded-from head is 8667s old")
-            .expect("carrier age");
+        let age = check.detail.find("FOLDED 8667s ago").expect("carrier age");
         let sequence = check
             .detail
             .find("only to seq 6, before its latest announced root at seq 7")

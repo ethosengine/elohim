@@ -1099,6 +1099,8 @@ struct DeviceStatus {
     node_id: String,
     seq: Option<u64>,
     root: Option<String>,
+    /// Seconds since this device folded the head (legacy field retained for older consumers).
+    age_s: Option<u64>,
     /// Seconds since any verified head was heard, including a replay (this device's clock).
     heard_age_s: Option<u64>,
     /// Seconds since a head folded new records (this device's clock).
@@ -1415,6 +1417,7 @@ fn status(options: &Options) -> PeerResult<ExitCode> {
             node_id: node.to_string(),
             seq: head.map(|h| h.seq),
             root: head.map(|h| h.root.to_string()),
+            age_s: head.map(|h| now.saturating_sub(h.folded_at) / 1000),
             heard_age_s: recovered
                 .and_then(|state| state.last_heard_at)
                 .map(|at| now.saturating_sub(at) / 1000),
@@ -3221,6 +3224,7 @@ mod status_contract {
                 node_id: "node".into(),
                 seq: Some(1),
                 root: None,
+                age_s: None,
                 heard_age_s: None,
                 folded_age_s: None,
                 probe_ok: None,
@@ -3304,13 +3308,31 @@ mod status_contract {
                 .remove("detail");
             assert!(!validator.is_valid(&bad), "{why} names its detail");
         }
-        // Output from a CLI that predates follow outcomes still validates.
+        // Output from a CLI that predates follow outcomes and the richer per-peer recovery
+        // fields still validates.
         let mut older = value;
         older
             .as_object_mut()
             .expect("status")
             .remove("followOutcomes");
-        assert!(validator.is_valid(&older), "followOutcomes is optional");
+        let older_device = older["devices"][0]
+            .as_object_mut()
+            .expect("older device row");
+        for field in [
+            "heardAgeS",
+            "foldedAgeS",
+            "probeOk",
+            "probeUnsupported",
+            "probeAgeS",
+            "resubscriptions",
+            "connectionResets",
+        ] {
+            older_device.remove(field);
+        }
+        assert!(
+            validator.is_valid(&older),
+            "followOutcomes and richer recovery fields are optional"
+        );
     }
 
     fn follow_outcome_fixtures() -> Vec<super::follow_status::ToolFollow> {
