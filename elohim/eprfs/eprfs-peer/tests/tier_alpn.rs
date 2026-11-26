@@ -14,9 +14,9 @@ use eprfs_core::{
     TreeEntry, TreeEntryKind, TreeLimits, TreeNode, TreePath, View,
 };
 use eprfs_peer::{
-    bind, tier_call, tier_request, Admission, PeerError, PeerKey, SharedAdmission, TierAnswer,
-    TierLimits, TierProtocol, TierRequest, MAX_ANSWER_FRAME_BYTES, MAX_REQUEST_FRAME_BYTES,
-    TIER_ALPN,
+    bind, tier_call, tier_request, Admission, ChannelHead, PeerError, PeerKey, SharedAdmission,
+    TierAnswer, TierLimits, TierProtocol, TierRequest, MAX_ANSWER_FRAME_BYTES,
+    MAX_REQUEST_FRAME_BYTES, TIER_ALPN,
 };
 use eprfs_serve::testing::CountingTier;
 use iroh::endpoint::{Connection, RecvStream, SendStream};
@@ -379,6 +379,51 @@ async fn admitted_device_reads_and_diffs_a_root() {
     assert_ne!(s.first, s.second);
 
     b.close().await;
+    server.router.shutdown().await.expect("shutdown");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn head_probe_serves_only_the_admitted_requester_the_exact_gossip_head() {
+    let h = household();
+    let served = tier_id(&h.a);
+    let s = store(&served);
+    let admission = Arc::new(RwLock::new(Admission::from_roster(
+        &h.rows, &h.a.did, &h.verify,
+    )));
+    let device = h.a.did.clone();
+    let signer = move |message: &[u8]| proof::sign(&h.a.key, message);
+    let head = ChannelHead::sign(device, s.new.clone(), 7, 42, Default::default(), &signer)
+        .expect("signed head");
+    let gossip_wire = head.to_wire().expect("canonical gossip head");
+    let protocol = TierProtocol::new(served, s.tier.clone(), admission, TierLimits::default())
+        .expect("protocol")
+        .with_head(Arc::new(RwLock::new(Some(head))));
+    let server = mount(&h.key_a, protocol.clone()).await.with(protocol);
+    let admitted = client(&h.key_b).await;
+    let (_stranger_dir, stranger_key) = peer_key();
+    let stranger = client(&stranger_key).await;
+
+    let answer = call(&admitted, &server.addr, TierRequest::Head).await;
+    assert_eq!(
+        answer,
+        TierAnswer::Head {
+            head: Some(Bytes::from(gossip_wire))
+        },
+        "the probe returns exactly the signed bytes gossip carries"
+    );
+    assert_eq!(
+        call(&stranger, &server.addr, TierRequest::Head).await,
+        TierAnswer::Head { head: None },
+        "an unadmitted requester gets the uniform empty answer"
+    );
+    let calls = s.tier.calls();
+    assert!(
+        calls.batches.is_empty() && calls.fetch_blob == 0,
+        "a head probe serves no store data: {calls:?}"
+    );
+
+    admitted.close().await;
+    stranger.close().await;
     server.router.shutdown().await.expect("shutdown");
 }
 
