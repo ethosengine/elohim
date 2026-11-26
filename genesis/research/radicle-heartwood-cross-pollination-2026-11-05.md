@@ -13,11 +13,11 @@ cites:
 takes:
   - "T1 | arch-native-dev-plane-backlog#9"
   - "T2 | arch-native-dev-plane-backlog#10"
-  - "T4 | arch-dataplane-borrows-backlog#23"
+  - "T4 | released: not taken, by ruling: a clean break to a signed v2 envelope; held unknown epochs and schemes keep the mechanism for the next crossing (this note, Verdict status after re-genesis 1)"
   - "T6 | brit-daily-driver-handoff-2026-10-27#6"
   - "T8 | arch-dataplane-borrows-backlog#23"
-  - "T3 | owed: arch-native-dev-plane-backlog has no row for the lineage- and parent-bound publication envelope (searched it for R12 and publication envelope, and the backlog for the same)"
-  - "T5 | owed: no row or file carries inventory as an expiring hint with relay dedupe after authentication (arch-dataplane-borrows-backlog rows 23 and 24 are holder binding and fetch budgets)"
+  - "T3 | owed: the signature-envelope half is done (this note, Verdict status after re-genesis 1); the lineage-root and parent-binding half has no row (arch-native-dev-plane-backlog searched for R12 and publication envelope)"
+  - "T5 | file: elohim/elohim-storage/src/p2p/inventory_gossip.rs"
   - "T7 | owed: arch-native-dev-plane-backlog has no row for typed divergence with a named election (searched it for divergen and election)"
 ---
 

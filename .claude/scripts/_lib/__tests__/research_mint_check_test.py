@@ -105,6 +105,32 @@ class HomeForms(unittest.TestCase):
         self.assertEqual(tree.run("--strict")[0], 1)
         self.assertEqual(tree.run()[0], 0)
 
+    def test_file_must_stay_inside_the_repository(self):
+        tree = Tree({"a.md": note("note-a", ["T1 | file: ../outside.md", "T2 | file: /etc/hostname", "T3 | file: docs/x.md"])})
+        r = rmc.scan(tree.root)
+        self.assertEqual(r["takes_failing"], 2)
+        self.assertTrue(all("stay inside" in f["problem"] for f in r["failures"]))
+
+    def test_row_must_name_the_note_as_a_whole_slug(self):
+        tree = Tree({"a.md": note("note", ["T1 | cl#12"])})  # row 12 names "note-a", a longer slug
+        r = rmc.scan(tree.root)
+        self.assertEqual(r["takes_failing"], 1)
+        self.assertIn("does not name note id", r["failures"][0]["problem"])
+
+    def test_row_number_carried_by_two_table_rows_is_ambiguous(self):
+        tree = Tree({"a.md": note("note-a", ["T1 | cl#12"])})
+        b = tree.root / "genesis/data/timeline/backlog/cl.md"
+        b.write_text(b.read_text() + "\n| # | Other table |\n|---|---|\n| 12 | a second row twelve, note-a |\n")
+        r = rmc.scan(tree.root)
+        self.assertEqual(r["takes_failing"], 1)
+        self.assertIn("ambiguous", r["failures"][0]["problem"])
+
+    def test_entry_continued_on_a_second_line_fails(self):
+        text = '---\nid: note-a\ntakes:\n  - "T1 | released: a reason that\n    runs on"\ncites:\n  - "x"\n---\n\nbody\n'
+        tree = Tree({"a.md": text})
+        r = rmc.scan(tree.root)
+        self.assertTrue(any(f["take"] == "(shape)" for f in r["failures"]))
+
     def test_malformed(self):
         self.assertFail("T2 no separator", "malformed")
         self.assertFail("T2 | somewhere vague", "malformed home")

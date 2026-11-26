@@ -138,9 +138,10 @@ every note), ran against a fresh worktree at the F0 tip. Four rounds, eight agen
   as a `--kind failed-approach` note on the plan. In flight a fourth home was added, `owed:`,
   when three Radicle takes turned out to have no row anywhere: the approved three forms
   left only "undeclared" for them, which is a silent drop. The plan says so under F1.
-- **Declared.** Eight notes, 66 takes: 23 on a backlog row that names the note, 18 on a file,
-  3 released with the note's own reason, 22 owed (hypha-dao 6, memorilla 6,
-  hypha-distributed-press 5, radicle 3, freenet 2). Rows 14 to 17 of
+- **Declared.** Eight notes, 66 takes: 22 on a backlog row that names the note, 19 on a file,
+  4 released with the note's own reason, 21 owed (hypha-dao 6, memorilla 6,
+  hypha-distributed-press 5, radicle 2, freenet 2). These are the counts after the judge's
+  correction below; the first count had 22 owed. Rows 14 to 17 of
   `agentic-harness-borrows-backlog` did not name the survey they came from; they do now.
 - **Not declared.** 46 notes, reported by the check as unmeasured; ten of them have no
   frontmatter, and two that have it carry no `id` (hypha-distributed-press, whose five takes
@@ -158,7 +159,7 @@ every note), ran against a fresh worktree at the F0 tip. Four rounds, eight agen
   (`.epr-meta/elohim/projections/`, which the write-set clause covers in its words, "with
   their projections", and not in a glob).
 - **Checked.** Habit `research-takes-have-a-home`, born red. Its strict run exits 1 on
-  exactly the 22 owed takes; the approved plan's "a strict run exits 0" was replaced, and the
+  exactly the 21 owed takes; the approved plan's "a strict run exits 0" was replaced, and the
   plan says why.
 - **Memorilla.** A correction note is recorded on the note: its Outputs describe a mint pass
   and an index entry that are not in the tree. Its index entry was moved under the Discovery
