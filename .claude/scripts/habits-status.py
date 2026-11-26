@@ -486,6 +486,9 @@ def load_reports() -> list:
             "profile": doc.get("profile") if isinstance(doc.get("profile"), str) else "?",
             "byConcern": by if isinstance(by, dict) else {},
             "scenarios": scenarios if isinstance(scenarios, dict) else {},
+            # The commit the run tested; None when the report does not say (readers print
+            # that as unmeasured, never as "current").
+            "gitCommit": doc.get("gitCommit") if isinstance(doc.get("gitCommit"), str) else None,
         })
     _floor = datetime.min.replace(tzinfo=timezone.utc)
     out.sort(key=lambda r: (r["when"] is not None, r["when"] or _floor), reverse=True)
