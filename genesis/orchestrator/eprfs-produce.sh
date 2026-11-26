@@ -6,12 +6,13 @@
 #   eprfs-produce.sh <tested-head> <tree-clean> <ingest-json>
 #
 # Called by the root justfile's `_eprfs-ingest-around` in the same shell environment its
-# `cargo build` ran in, right after the ingest. For each of epr and bin-launch: `epr artifact
-# describe` (the bin-build view as sources, the environment recorded as it is, the declared target
-# from pool-policy.json declared_targets when one names this host and workspace), `epr artifact key`,
-# then `epr artifact put --release <ingested release> --release-bin <bin> --cross` of the gate's
-# own bytes in $CARGO_TARGET_DIR/debug. No second build: the method records the environment the
-# gate's build ran under, and `put` re-checks that this process's environment is that record.
+# `cargo build` ran in, after the baseline ingest has established the release identity. For each
+# of epr and bin-launch it runs `epr artifact describe` and `epr artifact key` against this tested
+# checkout, then re-ingests the identical bytes with those keys labelled as producer annotations
+# outside rcid. Only then does it run `epr artifact put --release <ingested release> --release-bin
+# <bin> --cross` on the gate's own bytes in $CARGO_TARGET_DIR/debug. No second build: the method
+# records the environment the gate's build ran under, and `put` re-checks that this process's
+# environment is that record.
 # Under a declared target the build is replayed once with --message-format=json (a no-op over its
 # fresh units) and put is handed those messages as --build-messages, the evidence of the C level.
 #
@@ -191,6 +192,34 @@ for bin in "${bins[@]}"; do
 $(cat "$out/key-$bin.err")")"
   input[$bin]="$(tail -n 1 <<<"$said")"
 done
+
+# These keys describe the tested checkout and therefore must be attached by the producer that
+# read that checkout, before either Produce is written. Re-ingest copies and verifies the same
+# built bytes; the equality check pins the invariant that annotations do not change rcid.
+key_pairs=()
+for bin in "${bins[@]}"; do
+  key_pairs+=("$bin" "${input[$bin]}")
+done
+derivation_keys="$(python3 -c 'import json, sys
+print(json.dumps(dict(zip(sys.argv[1::2], sys.argv[2::2])), separators=(",", ":")))' "${key_pairs[@]}")" \
+  || skip "producer derivation keys could not be encoded"
+gate_run="$(json_field "$ingest_json" 'd.get("gateRun")')"
+provenance=(--source-commit "$tested_head" --tree-clean "$tree_clean" --repo "$repo")
+[[ -n "$gate_run" ]] && provenance+=(--gate-run "$gate_run")
+# The annotation is a recorded fact the put does not depend on: a refused or mismatched annotated
+# ingest leaves the release unannotated, says so, and the put goes ahead as it did before keys.
+if annotated="$("$epr" bin --tool epr ingest "$target/debug/epr" "${provenance[@]}" \
+  --derivation-keys "$derivation_keys" 2>"$out/annotated-ingest.err")"; then
+  annotated_release="$(json_field "$annotated" 'd.get("cid") or d.get("rcid")')"
+  if [[ "$annotated_release" == "$release" ]]; then
+    ingest_json="$annotated"
+  else
+    echo "[gate] epr producer: derivation keys not recorded (annotated ingest made ${annotated_release:-no release}, not $release)"
+  fi
+else
+  echo "[gate] epr producer: derivation keys not recorded (annotated ingest refused: $(reason_of "$annotated
+$(cat "$out/annotated-ingest.err")"))"
+fi
 
 declare -A output
 for bin in "${bins[@]}"; do

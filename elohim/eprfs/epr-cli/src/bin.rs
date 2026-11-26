@@ -228,7 +228,7 @@ fn execute_with(args: &[String], restart: bool, warn_role: bool) -> Result<Strin
         }
         match arg.as_str() {
             "--repair"|"--json"|"--revert"|"--rebase-lineage"|"--current"|"--pin"|"--provisional"=>{ flags.insert(arg.as_str()); },
-            "--tool"|"--registry"|"--store"|"--repo"|"--source-commit"|"--gate-run"|"--tree-clean"|"--commit"|"--expect"|"--reason"|"--invoked"|"--cid"|"--closure"|"--launcher"|"--destination"=>{ options.insert(arg.as_str(),iter.next().ok_or_else(|| argument(format!("{arg} needs a value")))?.as_str()); },
+            "--tool"|"--registry"|"--store"|"--repo"|"--source-commit"|"--gate-run"|"--tree-clean"|"--commit"|"--expect"|"--reason"|"--invoked"|"--cid"|"--closure"|"--launcher"|"--destination"|"--derivation-keys"=>{ options.insert(arg.as_str(),iter.next().ok_or_else(|| argument(format!("{arg} needs a value")))?.as_str()); },
             "--help"|"-h"=>return Ok("epr bin <ingest|land|pin|resolve|status|gc|bootstrap|follow|shadows|source-state|launch|install-launcher|migrate> --tool <name> [--registry PATH] [--store PATH] [--json]; land requires --expect <cid|none> [--revert | --rebase-lineage --reason <text>]".into()),
             _ if arg.starts_with('-')=>return Err(argument(format!("unknown flag {arg}"))),
             _=>positional.push(arg.as_str()),
@@ -296,7 +296,23 @@ fn execute_with(args: &[String], restart: bool, warn_role: bool) -> Result<Strin
                 closure: closure.is_some(),
                 payload_formats: None,
             };
-            let release = if closure.is_some() {
+            let derivation_keys = options
+                .get("--derivation-keys")
+                .map(|raw| {
+                    serde_json::from_str::<BTreeMap<String, String>>(raw)
+                        .map_err(|error| argument(format!("--derivation-keys expects a JSON object of binary names to keys: {error}")))
+                })
+                .transpose()?;
+            if closure.is_some() && derivation_keys.is_some() {
+                return Err(argument(
+                    "--derivation-keys is producer metadata and cannot annotate a supplied closure",
+                ));
+            }
+            let release = if let Some(keys) = derivation_keys {
+                store.ingest_with_derivation_keys(source, &ingest_options, keys, |stored| {
+                    held_payload_formats(tool, stored)
+                })
+            } else if closure.is_some() {
                 store.ingest(source, &ingest_options)
             } else {
                 store.ingest_with_payload_formats(source, &ingest_options, |stored| {
@@ -2272,6 +2288,20 @@ mod tests {
         };
         assert_eq!(drawn["release"], release);
         assert_eq!(drawn["gateRun"], "sibling:did:key:z6MkSibling");
+        let record: Value = serde_json::from_slice(
+            &std::fs::read(
+                tmp.path()
+                    .join("store/epr")
+                    .join(&release)
+                    .join("record.json"),
+            )
+            .unwrap(),
+        )
+        .unwrap();
+        assert!(
+            record.get("annotations").is_none(),
+            "a sibling draw does not infer producer keys"
+        );
         // The predicate `follow` and `bootstrap` land by without building.
         assert!(store.holds_verified_for(&commit));
         assert!(
