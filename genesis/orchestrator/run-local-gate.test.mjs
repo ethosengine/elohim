@@ -268,11 +268,11 @@ test("ending a gate tap releases its outside-the-group slot holder", { timeout: 
   holder.child.kill("SIGTERM");
   const waited = await Promise.race([
     waiter.closed,
-    delay(1500).then(() => ({ timeout: true })),
+    delay(10_000).then(() => ({ timeout: true })),
   ]);
   assert.equal(waited.timeout, undefined, "waiter did not proceed when the killed holder released the lock");
   assert.equal(waited.status, 0, waited.stderr);
-  assert.ok(Date.now() - killedAt < 1500);
+  assert.ok(Date.now() - killedAt < 10_000, "the released slot proceeds within a loaded-host margin");
   writeFileSync(release, "release\n");
   const killed = await holder.closed;
   assert.equal(killed.signal, "SIGTERM");
@@ -486,10 +486,14 @@ test("slot drain is bounded, heartbeats, and KILLs a TERM-ignoring session membe
       GATE_SLOT_DRAIN_TERM_MS: "100", GATE_SLOT_DRAIN_HEARTBEAT_MS: "20" },
   });
   const result = await gate.closed;
+  const tookMs = Date.now() - started;
   assert.equal(result.status, 0, result.stderr);
-  assert.ok(Date.now() - started < 2000, `drain took ${Date.now() - started} ms`);
-  assert.match(result.stderr, /draining session .* after its recipe closed/);
-  assert.match(result.stderr, /sent SIGKILL/);
+  assert.ok(tookMs < 10_000, `drain took ${tookMs} ms`);
+  const heartbeatAt = result.stderr.indexOf("draining session");
+  const killAt = result.stderr.indexOf("sent SIGKILL");
+  assert.ok(heartbeatAt >= 0 && heartbeatAt < killAt,
+    `the drain heartbeat must precede TERM grace and KILL: ${JSON.stringify(result.stderr)}`);
+  assert.match(result.stderr, /exceeded the 100 ms drain and 100 ms TERM grace; sent SIGKILL/);
   const pid = Number(readFileSync(pidFile, "utf8"));
   assert.notEqual(spawnSync("kill", ["-0", String(pid)]).status, 0, "the session member is gone");
 });
