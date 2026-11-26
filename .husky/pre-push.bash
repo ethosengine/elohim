@@ -821,6 +821,14 @@ phase_l_agent_override_wait() {
           fi
           return 0
         fi
+        # The renew path's rule: "renewed here, but ..." (exit 1, the record written, its fold late)
+        # still holds the lease. The read-only check already read effective for this session.
+        if [ "$rc" -eq 1 ] && [[ "$PHASE_L_OUT" == "dev-integration: renewed here, but "* ]]; then
+          phase_l_agent_say berth "$PHASE_L_OUT"
+          phase_l_agent_say say "[pre-push] Phase L: the claim is effective and its confirming renew was written; proceeding"
+          PHASE_L_RENEWED_AT=$(date +%s)
+          return 0
+        fi
         phase_l_agent_overridden || return "$rc"
         phase_l_agent_token
       elif [ "$rc" -eq 3 ]; then

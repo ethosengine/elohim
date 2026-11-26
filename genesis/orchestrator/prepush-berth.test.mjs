@@ -67,7 +67,7 @@ case "$1" in
   if [ "$check" -eq 1 ]; then
    case "$m" in
     W|D) f="$here/override-at"; at=$(cat "$f"); if [ "$(date +%s%3N)" -lt "$at" ]; then echo "$2: WAITING — unconfirmed: sibling — override on the record" >&2; exit 1; fi; echo "$2: effective for \${ELOHIM_SESSION_ID:-claude-9}"; exit 0;;
-    P) echo "$2: effective for \${ELOHIM_SESSION_ID:-claude-9}"; exit 0;;
+    P|V) echo "$2: effective for \${ELOHIM_SESSION_ID:-claude-9}"; exit 0;;
     Q) echo "$2: WAITING — unconfirmed: sibling — override on the record" >&2; exit 1;;
     X) echo "the steward lease view did not answer" >&2; exit 1;;
     H) echo "$2: REFUSED — held by did:key:z6MkDeviceA/claude-1 since 2026-10-23T15:28:09Z" >&2; exit 3;;
@@ -84,6 +84,9 @@ case "$1" in
    W|D)
     f="$here/override-at"; [ -f "$f" ] || printf %s "$(( $(date +%s%3N) + \${STUB_OVERRIDE_IN_MS:-1500} ))" > "$f"; at=$(cat "$f")
     if [ "$(date +%s%3N)" -lt "$at" ]; then extra=""; [ "$m" != D ] || extra=" (this device's peer daemon is not running: start it with epr peer serve)"; echo "$2: REFUSED — unconfirmed: sibling$extra — override on the record" >&2; echo "  override_at_ms=$at claimed_at=1001.125" >&2; exit 3; fi;;
+   V)
+    if [ "$n" -eq 1 ]; then at="$(( $(date +%s%3N) + 60000 ))"; echo "$2: REFUSED — unconfirmed: sibling — override on the record" >&2; echo "  override_at_ms=$at claimed_at=1001.125" >&2; exit 3; fi
+    echo "$2: renewed here, but the renew record did not reach this device's channel store" >&2; exit 1;;
    P|Q|X|H)
     if [ "$n" -eq 1 ]; then at="$(( $(date +%s%3N) + 60000 ))"; echo "$2: REFUSED — unconfirmed: sibling — override on the record" >&2; echo "  override_at_ms=$at claimed_at=1001.125" >&2; exit 3; fi
     [ "$m" != Q ] || { echo "$2: REFUSED — unconfirmed: sibling" >&2; exit 3; }
@@ -383,6 +386,18 @@ test("an_effective_claim_ends_the_override_wait_on_the_short_poll", async (t) =>
     /Phase L: the claim became effective \d+s into the override wait; proceeding \(override not needed\)/,
   );
   await pollCalls(fx, (c) => !!release(c));
+});
+test("a_confirming_claim_renewed_with_a_late_fold_proceeds_as_the_renew_path_does", (t) => {
+  const r = runBlock(fixture(t), {
+    env: {
+      BERTH_MODES: '{"dev-integration":"V"}',
+      BERTH_OVERRIDE_POLL_S: "1",
+      BERTH_PREPUSH_OVERRIDE_MAX_S: "8",
+    },
+  });
+  assert.equal(r.status, 0, r.out);
+  assert.match(r.out, /Phase L: the claim is effective and its confirming renew was written; proceeding/);
+  assert.match(r.out, /renewed here, but the renew record did not reach/);
 });
 test("override_polls_are_read_only_while_unconfirmed_or_unreadable", (t) => {
   for (const mode of ["Q", "X"]) {
