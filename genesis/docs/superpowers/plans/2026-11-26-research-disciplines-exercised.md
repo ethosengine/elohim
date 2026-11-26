@@ -6,7 +6,7 @@ class: process-meta
 date: 2026-11-26
 steward: human:matthew
 author: "Claude (session cfde00a4, Fable 5.2), at the steward's direction; three read-only explorers and one independent challenger; plan approved by the steward 2026-11-26"
-serves: [dataplane-convergence, agents-arrive-briefed]
+serves: [dataplane-convergence, agents-arrive-briefed, research-takes-have-a-home]
 tags: [research, absorption, disciplines, evidence-age, failure-seat, mint-pass, arrival-brief, sprint]
 cites:
   - genesis/research/apollo-sp287-what-made-apollo-a-success-cross-pollination-2026-11-26.md
@@ -124,12 +124,18 @@ plan may serve a red habit that is not active, as the 2026-11-22 plan does.
   anomaly found in flight closes as a claimed commitment with a date, or as "understood, no
   action" with its two facts (the failure's history, and the redundant path or why none is
   needed).
+- **Amended in flight (2026-11-26).** The approved form had three homes. A fourth was added
+  while exercising it: `owed: <what is missing>`, for a take the note still means that has no
+  home in the tree. Without it a stranded take could only be left undeclared, which is the
+  silent drop this flight exists to stop. An owed take always counts as failing, so the
+  habit's check is red on exactly the stranded takes, and "a strict run exits 0" below is
+  no longer this flight's finish line: the finish line is that the red is the true count.
 - **Build.** `.claude/scripts/research-mint-check.py`, with a test in
   `.claude/scripts/_lib/__tests__/`. It verifies declared takes only: the row exists and
   names the note's slug, or the file exists, or a reason is given. A note with no `takes:`
   is counted as undeclared and printed as unmeasured, not as passing. `--strict` exits
-  non-zero on a declared take with no home, or when the undeclared count rises above its
-  best observed. Pattern to copy: the script check of
+  non-zero on a declared take that is owed or broken, or when `--max-undeclared N` is given
+  and exceeded (the habit's check line carries N, lowered as notes declare). Pattern to copy: the script check of
   `genesis/orchestrator/.epr-meta/security-alerts-close-in-flight.habit.md`.
 - **Exercised.** `takes:` is written for the notes whose lessons this sprint touches: the
   three T-numbered notes (SP-287, ngit, Radicle; current tables only, not a superseded
@@ -137,6 +143,11 @@ plan may serve a red habit that is not active, as the 2026-11-22 plan does.
   4/6/10, Compass N9, Hypha lifts 4/6). Each of the 28 practice-shaped rows gets one
   disposition written into the row: exercised in a flight, claimed with an owner and a date,
   or released with a reason. The 180 build rows are not touched.
+  *As done:* eight notes declare 66 takes (23 on a row, 18 on a file, 3 released, 22 owed).
+  The search-discovery note was left undeclared: it has no `id` and no verdict section, and
+  whether its "proposed, not yet folded" list is its take list is its author's to say. The
+  inventory's 28 lines named 29 rows, and all 29 carry a disposition; twelve of them are
+  held for one gathered read at the sprint's close.
 - **Checked.** New habit `genesis/research/.epr-meta/research-takes-have-a-home.habit.md`,
   born red, `checks:` the script, `retire-when:` the mint pass is mechanical. A level check
   does not fit `dev-system-equilibrium`, whose invariant is a rate; a research-take stock
@@ -207,11 +218,12 @@ until the flight's verdict note stands and its landing is verified on `dev`.
 
 - [x] F0 said and exercised: the SP-287 note at v1.4 and rows 13, 16, 17 and 24 corrected against the code
 - [x] F0 checked: `eprfs-live-corpus` green on the flight commit, and an approving verdict from a seat that did not do the work
-- [ ] F0 landed on `dev` and verified there
-- [ ] F1 said: the `takes:` form named in `genesis/research/.epr-meta`, and the closing rule in the `valueflow-authoring` package
-- [ ] F1 built: `.claude/scripts/research-mint-check.py` with its test
-- [ ] F1 exercised: `takes:` declared in the touched notes, and each of the 28 practice rows carries a disposition
-- [ ] F1 checked: habit `research-takes-have-a-home` born red with the script as its check, and a strict run exits 0
+- [x] F0 landed on `dev` and verified there
+- [x] F1 said: the `takes:` form named in `genesis/research/.epr-meta`, and the closing rule in the `valueflow-authoring` package
+- [x] F1 built: `.claude/scripts/research-mint-check.py` with its test
+- [x] F1 exercised: `takes:` declared in eight notes, and each of the 29 practice rows carries a disposition
+- [x] F1 checked: habit `research-takes-have-a-home` born red with the script as its check; its strict run is red on exactly the 22 owed takes
+- [ ] F1 landed on `dev` and verified there
 - [ ] F2 built: the saga headline prints its report, age and commits since, and a recovery record carries its commit and binary identity
 - [ ] F2 said: the reviewer line in the `valueflow-reviewer` package, and the root "warn-only" sentence fixed through its package
 - [ ] F2 exercised and checked: a session start shows the saga line with its age, and the two tests pass
@@ -259,8 +271,9 @@ rows; a viable-system fixture (`measure-family-borrows-backlog` row 41).
 
 ## Verification
 
-- `python3 .claude/scripts/research-mint-check.py --strict` exits 0; 28 of 28 practice rows
-  carry a disposition; the undeclared-note count is printed and recorded as best observed.
+- `python3 .claude/scripts/research-mint-check.py` runs and its failing takes are exactly the
+  owed ones (22 at the habit's birth); 29 of 29 practice rows carry a disposition; the
+  undeclared-note count (46) stands in the habit's check line.
 - The session-start saga line names its report, age and commits since; the newest recovery
   record carries the commit, `chosen_by` and the draw hash.
 - The named tests pass when run directly; `just gate eprfs-live-corpus` for every
