@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { closureVerdict, inventory, main, summaryLine } from './handover-record.mjs';
+import { channelFreshness, closureVerdict, crossingLine, crossingReport, inventory, main, summaryLine } from './handover-record.mjs';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
@@ -104,10 +104,21 @@ test('closureVerdict includes an admitted sibling green for the computed closure
   assert.equal(got.green, true);
 });
 
+/** `epr peer status --json`, as a healthy exchange prints it: both siblings folded seconds ago and acknowledge our sequence. */
+const FRESH = {
+  ownSeq: 95826,
+  devices: [
+    { device: 'did:key:z6MkLaptop', seq: 24455, ageS: 7, eventsFolded: 31, acked: 95826 },
+    { device: 'did:key:z6MkRoot', seq: 92711, ageS: 7, eventsFolded: 3501, acked: 95825 },
+  ],
+};
+const CURE = 'restart this device\'s peer daemon (dry run first: genesis/agentic/bin/peer-liveness), then read `epr peer status`';
+
 function postingRun({
   verdicts = [], projects = ['green', 'miss-a', 'miss-b'], message = `subject\n\nChange-Id: ${CHANGE}\n`,
   env = {}, lookup = name => ({ closure: `${name.charCodeAt(0).toString(16)}`.repeat(64).slice(0, 64), row: null }),
   eprStatus = 0, p90 = name => ({ 'miss-a': 901, 'miss-b': 77 }[name] ?? null), commonDir = null,
+  peerStatus = { status: 0, stdout: JSON.stringify(FRESH), stderr: '' },
 } = {}) {
   const calls = [];
   const written = [];
@@ -121,6 +132,10 @@ function postingRun({
     }
     if (bin === 'git' && args[0] === 'rev-parse') return { status: 0, stdout: `${TREE}\n`, stderr: '' };
     if (bin === '/stub/epr' && eprStatus !== 0) return { status: eprStatus, stdout: '', stderr: 'native write failed\n' };
+    if (bin === '/stub/epr' && args[0] === 'peer') {
+      if (peerStatus instanceof Error) throw peerStatus;
+      return peerStatus;
+    }
     if (bin === '/stub/epr' && args.includes('--change')) {
       return { status: 0, stdout: JSON.stringify({ mode: 'raise', intent: INTENT }), stderr: '' };
     }
@@ -154,7 +169,7 @@ test('a green and two selected misses raise one intent and post exactly the miss
   });
   assert.equal(r.code, 0);
   assert.equal(r.written.length, 1, 'the inventory is durable before misses are posted');
-  const epr = r.calls.filter(([bin]) => bin === '/stub/epr').map(([, args]) => args);
+  const epr = r.calls.filter(([bin, args]) => bin === '/stub/epr' && args[0] === 'flow').map(([, args]) => args);
   assert.equal(epr.length, 2);
   assert.deepEqual(epr[0].slice(0, 3), ['flow', 'intend', '--change']);
   assert.equal(epr[0].includes('--raise'), false);
@@ -216,7 +231,7 @@ test('a hand-over from a worktree writes its intent and misses to the device cha
   const r = postingRun({ commonDir: '/main/.git' });
   assert.equal(r.code, 0);
   const epr = r.calls.filter(([bin]) => bin === '/stub/epr').map(([, args]) => args);
-  assert.equal(epr.length, 2);
+  assert.equal(epr.length, 3, 'the raise, the misses and one status read');
   for (const args of epr) assert.equal(args[args.indexOf('--root') + 1], '/main');
 });
 
@@ -256,4 +271,77 @@ test('a selected project without a closure is named and left out', () => {
   assert.deepEqual(r.stderr, [
     '[pre-push] hand-over: closure key unavailable; used head lookup fallback: unknown (key unavailable; no verdict at head; left out of misses)',
   ]);
+});
+
+// Row 105 (2026-11-25): "posted" was a local write, and nothing said the exchange had stalled.
+
+test('a fresh sibling that acknowledges this device adds no line, and status is read once', () => {
+  const r = postingRun();
+  assert.equal(r.code, 0);
+  assert.equal(r.stdout.length, 2, r.stdout.join('\n'));
+  assert.deepEqual(r.stderr, []);
+  const reads = r.calls.filter(([bin, args]) => bin === '/stub/epr' && args[0] === 'peer');
+  assert.deepEqual(reads.map(([, args]) => args), [['peer', 'status', '--root', '/repo', '--json']]);
+});
+
+test('no sibling folded within the policy freshness: one line says the misses have not crossed', () => {
+  const stalled = { ownSeq: 95826, devices: [
+    { device: 'did:key:z6MkLaptop', ageS: 8540, acked: 95540 },
+    { device: 'did:key:z6MkRoot', ageS: 8667, acked: 95540 },
+  ] };
+  const r = postingRun({ peerStatus: { status: 0, stdout: JSON.stringify(stalled), stderr: '' } });
+  assert.equal(r.code, 0, 'a report, never a refusal');
+  assert.equal(r.stdout.length, 3);
+  assert.match(r.stdout[1], /hand-over: posted 3 misses/);
+  assert.equal(r.stdout[2],
+    `[pre-push] hand-over: posted locally; no sibling has acknowledged this device since 8540 s ago (freshness 90 s): the misses have not crossed; ${CURE}`);
+});
+
+test('a fresh sibling acknowledging an older sequence than the one written is the same one line', () => {
+  const behind = { ownSeq: 95826, devices: [
+    { device: 'did:key:z6MkLaptop', ageS: 12, acked: 95700 },
+    { device: 'did:key:z6MkRoot', ageS: 4000, acked: 95826 },
+  ] };
+  assert.equal(crossingLine(behind, { freshnessS: 90 }),
+    `hand-over: posted locally; no sibling has acknowledged this device past seq 95700 (this device is at seq 95826): the misses have not crossed; ${CURE}`);
+  assert.equal(crossingLine({ ...behind, devices: [{ ageS: 12, acked: 95825 }] }, { freshnessS: 90 }), null,
+    'one sequence behind is the acknowledgement in flight');
+  assert.equal(crossingLine({ ...behind, devices: [{ ageS: 91, acked: 95826 }] }, { freshnessS: 90 })?.includes('since 91 s ago'), true,
+    'an acknowledgement is as old as the head that carried it');
+});
+
+test('an unreadable status is its own line, never silence and never a refusal', () => {
+  for (const peerStatus of [
+    { status: 3, stdout: '', stderr: 'epr peer: this device is on no participant roster\n' },
+    { status: 0, stdout: 'not json', stderr: '' },
+    Object.assign(new Error('spawnSync /stub/epr ETIMEDOUT'), { code: 'ETIMEDOUT' }),
+  ]) {
+    const r = postingRun({ peerStatus });
+    assert.equal(r.code, 0);
+    assert.equal(r.stdout.length, 3, r.stdout.join('\n'));
+    assert.match(r.stdout[2], /^\[pre-push\] hand-over: posted locally; `epr peer status` could not be read within 5 s \(.+\): whether the misses crossed is not known; read `epr peer status`$/);
+    assert.deepEqual(r.stderr, []);
+  }
+  assert.match(crossingLine({ devices: [] }), /gave no sequence or device list/);
+  assert.match(crossingLine({ ownSeq: 4, devices: [] }), /no admitted sibling: nothing else reads the misses/);
+});
+
+test('the status read is bounded by HANDOVER_CROSSING_TIMEOUT_S (default 5 s) and HANDOVER_CROSSING=off skips it', () => {
+  const timeouts = [];
+  const spawn = (_bin, _args, options) => { timeouts.push(options.timeout); return { status: 0, stdout: JSON.stringify(FRESH), stderr: '' }; };
+  assert.equal(crossingReport({ epr: 'epr', store: '/s', root: '/s', env: {}, spawn }), null);
+  assert.equal(crossingReport({ epr: 'epr', store: '/s', root: '/s', env: { HANDOVER_CROSSING_TIMEOUT_S: '2' }, spawn }), null);
+  assert.equal(crossingReport({ epr: 'epr', store: '/s', root: '/s', env: { HANDOVER_CROSSING: 'off' }, spawn }), null);
+  assert.deepEqual(timeouts, [5000, 2000]);
+});
+
+test('freshness is the policy the daemon loaded (berth.channel.freshness_s), 90 s when unreadable', () => {
+  const read = path => {
+    if (path === '/device/genesis/agentic/pool-policy.json') return JSON.stringify({ berth: { channel: { freshness_s: 45 } } });
+    throw new Error('ENOENT');
+  };
+  assert.equal(channelFreshness({ rules: { policy: '/device/genesis/agentic/pool-policy.json' } }, '/other', read), 45);
+  assert.equal(channelFreshness({}, '/device', read), 45);
+  assert.equal(channelFreshness({}, '/nowhere', read), 90);
+  assert.equal(channelFreshness({}, REPO), 90, 'the committed policy');
 });

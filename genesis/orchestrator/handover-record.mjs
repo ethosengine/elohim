@@ -16,6 +16,11 @@
 // `deviceRoot`), beside the gate-live run logs: <device>/.eprfs/status/handover/handovers.jsonl.
 // A failed write exits non-zero, and the hook refuses the push.
 //
+// "Posted" is a local write. After posting, `epr peer status` is read once (bounded,
+// HANDOVER_CROSSING_TIMEOUT_S, default 5 s) and one line is printed when no admitted sibling shows
+// the write can have crossed (crossingLine). It reports only: it never refuses and changes no exit.
+// HANDOVER_CROSSING=off skips the read.
+//
 //   printf '%s\n' "<push lines>" | node genesis/orchestrator/handover-record.mjs --root <checkout>
 //
 // Exit: 0 recorded (or nothing to record: deletions only), 1 the record was not written,
@@ -23,7 +28,7 @@
 
 import { spawnSync } from 'node:child_process';
 import { closeSync, fstatSync, fsyncSync, ftruncateSync, mkdirSync, openSync, readFileSync, writeSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { costOf, isHandoverBranch, readCycleUnion } from './gate-cost.mjs';
 import { changeClass } from './gate-change-class.mjs';
@@ -161,6 +166,69 @@ function run(spawn, bin, args, root, timeout = 30_000) {
   return String(result.stdout || '');
 }
 
+/** `berth.channel.freshness_s` of the policy the peer daemon loaded, else the checkout's; 90 when unreadable (berth's default). */
+export function channelFreshness(status, store, read = readFileSync) {
+  const named = status?.rules?.policy;
+  const path = typeof named === 'string' && isAbsolute(named) ? named : join(store, 'genesis/agentic/pool-policy.json');
+  try {
+    const value = Number(JSON.parse(read(path, 'utf8')).berth.channel.freshness_s);
+    if (Number.isFinite(value) && value > 0) return value;
+  } catch { /* the default below */ }
+  return 90;
+}
+
+export const CROSSING_CURE = 'restart this device\'s peer daemon (dry run first: genesis/agentic/bin/peer-liveness), then read `epr peer status`';
+
+/**
+ * What one `epr peer status --json` reading says about a record this device has just written:
+ * null when an admitted sibling is fresh (its head folded within `freshnessS`) and acknowledges
+ * this device's sequence to within `lagSeqs`; otherwise the one line. A sibling's acknowledgement
+ * arrives with its head, so a head older than `freshnessS` is an acknowledgement at least that old.
+ * `lagSeqs` (default 1) is the acknowledgement in flight: a healthy exchange was measured one
+ * sequence behind for a few seconds in each ~30 s round (2026-11-26, 2 of 14 reads).
+ */
+export function crossingLine(status, { freshnessS = 90, lagSeqs = 1 } = {}) {
+  const own = Number(status?.ownSeq);
+  const devices = Array.isArray(status?.devices) ? status.devices : null;
+  if (!devices || !Number.isFinite(own)) {
+    return 'hand-over: posted locally; `epr peer status` gave no sequence or device list: whether the misses crossed is not known; read `epr peer status`';
+  }
+  if (devices.length === 0) {
+    return 'hand-over: posted locally; this device has no admitted sibling: nothing else reads the misses; bind a sibling (`just status device`)';
+  }
+  const fresh = devices.filter(d => Number.isFinite(Number(d?.ageS)) && d.ageS !== null && Number(d.ageS) <= freshnessS);
+  if (fresh.some(d => Number(d.acked) >= own - lagSeqs)) return null;
+  if (fresh.length === 0) {
+    const ages = devices.map(d => (d?.ageS === null || d?.ageS === undefined ? NaN : Number(d.ageS))).filter(Number.isFinite);
+    const since = ages.length ? `${Math.min(...ages)} s ago` : 'this daemon started (no sibling head folded)';
+    return `hand-over: posted locally; no sibling has acknowledged this device since ${since} (freshness ${freshnessS} s): the misses have not crossed; ${CROSSING_CURE}`;
+  }
+  const best = Math.max(...fresh.map(d => (Number.isFinite(Number(d.acked)) ? Number(d.acked) : -1)));
+  return `hand-over: posted locally; no sibling has acknowledged this device past seq ${best < 0 ? 'none' : best} (this device is at seq ${own}): the misses have not crossed; ${CROSSING_CURE}`;
+}
+
+/**
+ * Read `epr peer status` once through `epr` and return {@link crossingLine}'s line, or null when
+ * a sibling is fresh. An unreadable status is its own line. Never throws.
+ */
+export function crossingReport({ epr, store, root, env = process.env, spawn = spawnSync, read = readFileSync }) {
+  if (env.HANDOVER_CROSSING === 'off') return null;
+  const asked = Number(env.HANDOVER_CROSSING_TIMEOUT_S ?? 5);
+  const timeoutS = Number.isFinite(asked) && asked > 0 ? asked : 5;
+  let status;
+  try {
+    status = JSON.parse(run(spawn, epr, ['peer', 'status', '--root', store, '--json'], root, timeoutS * 1000));
+  } catch (error) {
+    const why = String(error?.message || error).split('\n')[0];
+    return `hand-over: posted locally; \`epr peer status\` could not be read within ${timeoutS} s (${why}): whether the misses crossed is not known; read \`epr peer status\``;
+  }
+  try {
+    return crossingLine(status, { freshnessS: channelFreshness(status, store, read) });
+  } catch (error) {
+    return `hand-over: posted locally; \`epr peer status\` could not be judged (${String(error?.message || error).split('\n')[0]}): whether the misses crossed is not known; read \`epr peer status\``;
+  }
+}
+
 /**
  * Raise the landing intent and append its open gate misses. The inventory has already been made
  * durable when this runs; every thrown error is rendered by main as one advisory line.
@@ -169,6 +237,7 @@ export function postMisses(record, projects, {
   root, env = process.env, spawn = spawnSync, now = () => new Date(), err = () => {},
   lookup = registryLookup({ root, env, spawn }), p90 = registryP90({ root }),
   classify = changeClass, resolveBinary = resolveBin, resolveDevice = deviceEprResolution,
+  crossing = crossingReport,
 } = {}) {
   if (env.HANDOVER_MISSES === 'off' || projects.length === 0) return null;
 
@@ -250,7 +319,13 @@ export function postMisses(record, projects, {
   }
   missArgs.push('--wait-until', String(waitUntil), '--root', store, '--json');
   run(spawn, epr, missArgs, root);
-  return `hand-over: posted ${misses.length} misses on intent ${raised.intent.slice(0, 12)}: ${misses.map(m => m.project).join(', ')}`;
+  const posted = `hand-over: posted ${misses.length} misses on intent ${raised.intent.slice(0, 12)}: ${misses.map(m => m.project).join(', ')}`;
+  // "Posted" is this device's own store. One bounded read says whether a sibling can have it.
+  let crossed = null;
+  try { crossed = crossing({ epr, store, root, env, spawn }); } catch (error) {
+    crossed = `hand-over: posted locally; the crossing read failed (${String(error?.message || error).split('\n')[0]}): whether the misses crossed is not known; read \`epr peer status\``;
+  }
+  return crossed ? `${posted}\n[pre-push] ${crossed}` : posted;
 }
 
 /**
@@ -401,7 +476,7 @@ export function main(argv, {
         root, env, spawn, now, err, lookup: lookupFactory({ root, env, spawn }),
         p90: p90Factory({ root }), classify, resolveBinary,
       });
-      if (line) out(line);
+      if (line) for (const each of line.split('\n')) out(each);
     } catch (error) {
       err(`[pre-push] hand-over: misses not posted: ${String(error?.message || error).split('\n')[0]}`);
     }
