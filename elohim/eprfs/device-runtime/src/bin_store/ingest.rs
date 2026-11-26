@@ -206,7 +206,6 @@ impl Store {
             {
                 release.sources.push(release.provenance.clone());
             }
-            release.provenance.ingested_at = provenance.ingested_at.clone();
             // The same bytes from the same source and run refresh their row; a retrying
             // bootstrap must not grow the record once per attempt.
             match release.sources.iter_mut().find(|row| {

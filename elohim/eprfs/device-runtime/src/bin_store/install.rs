@@ -6,7 +6,9 @@ use super::{
 use serde_json::{json, Value};
 use std::{
     collections::BTreeMap,
-    fs,
+    fs::{self, OpenOptions},
+    io::{Error, ErrorKind, Write},
+    os::unix::fs::OpenOptionsExt,
     path::{Path, PathBuf},
 };
 
@@ -325,6 +327,20 @@ impl Store {
                         0o444,
                     )?;
                 }
+                let cid = self.release_cid(&sums)?;
+                if self.record(&cid).is_some() {
+                    append_adoption(
+                        &self.artifact(&cid)?.join("adoptions.jsonl"),
+                        &json!({
+                            "at": files::now(),
+                            "path": path,
+                            "session": crate::session::resolve().session,
+                            "tool": &self.tool,
+                        }),
+                    )?;
+                    adopted.insert(name.clone(), self.artifact(&cid)?.join(target));
+                    continue;
+                }
                 let release = match self.ingest(
                     &stage,
                     &IngestOptions {
@@ -358,6 +374,33 @@ impl Store {
         let _ = fs::remove_dir_all(stage);
         result
     }
+}
+
+/// Append one complete adoption line while the caller holds the installation lock. One write
+/// keeps concurrent readers from observing interleaved JSON; fsync makes a successful adoption
+/// durable before the launcher replaces the adopted path.
+fn append_adoption(path: &Path, event: &Value) -> Result<()> {
+    let existed = path.exists();
+    let mut line = serde_json::to_vec(event)?;
+    line.push(b'\n');
+    let mut file = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .mode(0o600)
+        .custom_flags(libc::O_NOFOLLOW)
+        .open(path)?;
+    if file.write(&line)? != line.len() {
+        return Err(Error::new(
+            ErrorKind::WriteZero,
+            "adoption event was not appended as one complete line",
+        )
+        .into());
+    }
+    file.sync_all()?;
+    if !existed {
+        files::sync_parent(path)?;
+    }
+    Ok(())
 }
 
 fn build_output(path: &Path) -> bool {
