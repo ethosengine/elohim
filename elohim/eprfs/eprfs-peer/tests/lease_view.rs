@@ -405,18 +405,22 @@ fn a_concurrent_claim_inside_a_heard_but_unfolded_head_never_makes_ours_effectiv
     assert_eq!(channel.table().devices[&h.b.did].seq, 9);
     // Concurrent-claim race: B's heard head acknowledges A while its root still hides B's
     // earlier claim. An early ack would turn this Pending assertion red by making A Effective.
-    assert_eq!(
-        verdict(
-            &h.a.did,
-            &before_fold,
-            channel.table(),
-            &admission,
-            ms(T0) + 1000,
+    let pending = verdict(
+        &h.a.did,
+        &before_fold,
+        channel.table(),
+        &admission,
+        ms(T0) + 1000,
+    );
+    assert!(
+        matches!(
+            &pending,
+            Some(LeaseVerdict::Pending { session, waiting_on, waiting })
+                if session == "claude-1"
+                    && *waiting_on == vec![h.b.did.clone()]
+                    && waiting.iter().any(|wait| wait.device == h.b.did)
         ),
-        Some(LeaseVerdict::Pending {
-            session: "claude-1".into(),
-            waiting_on: vec![h.b.did.clone()],
-        })
+        "{pending:?}"
     );
 
     channel.folded(
