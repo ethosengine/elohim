@@ -641,6 +641,18 @@ phase_l_agent_claim() {
     --note "pre-push to${BERTH_TARGETS} for $PHASE_L_FOR" 2>&1)
 }
 
+# Read this session's steward verdict without touching its mooring, lease or crossing ledger. Exit
+# 0 means effective for this session, 1 means not yet effective/unreadable, and 3 is terminal.
+phase_l_agent_check() {
+  local b
+  b=$(phase_l_agent_bound "${PHASE_L_READ_S:-30}") || {
+    PHASE_L_OUT="dev-integration: WAITING — the landing agent's deadline has passed"
+    return 124
+  }
+  PHASE_L_OUT=$(timeout -k "$PHASE_L_KILL_S" "$b" "$BERTH_BIN" claim dev-integration --check \
+    --session "$ELOHIM_SESSION_ID" --class verify --ttl "$BERTH_TTL_S" 2>&1)
+}
+
 # The hard deadline, enforced from outside: TERM the agent when it is passed (its trap then releases
 # once), and KILL it PHASE_L_GRACE_S (100) later. Restarted with the new deadline at the hand-over.
 phase_l_agent_watchdog() { # agent pid, deadline (unix s)
@@ -754,8 +766,9 @@ phase_l_agent_listen() {
   return 0
 }
 
-# berth refused the claim with an override on the record: wait until it takes effect, renewing,
-# then re-claim (R-K). 0 = held, 2 = the parent asked or went away, else berth's refusal.
+# berth refused the claim with an override on the record: observe it read-only until it is effective,
+# then renew once to confirm (R-K). The ordinary ttl/3 renewal remains. 0 = held, 2 = the parent
+# asked or went away, else berth's refusal.
 phase_l_agent_override_wait() {
   local start now until_s deadline next poll_at poll_s min_poll ms="" rc step
   start=$(date +%s)
@@ -781,21 +794,9 @@ phase_l_agent_override_wait() {
   poll_at=$((start + poll_s))
   while :; do
     now=$(date +%s)
-    if [ "$now" -ge "$until_s" ]; then
-      if [ $((now + PHASE_L_CW + 1)) -gt "$deadline" ]; then
-        PHASE_L_OUT="[pre-push] REFUSED: the override did not take effect within $((now - start))s (one silent sibling is covered; two are not). Nothing was pushed."
-        return 3
-      fi
-      phase_l_agent_claim_patient
-      rc=$?
-      if [ "$rc" -eq 0 ]; then
-        phase_l_agent_token
-        return 0
-      fi
-      phase_l_agent_overridden || return "$rc"
-      phase_l_agent_token
-      until_s=$((now + 2))
-      continue
+    if [ "$now" -ge "$deadline" ]; then
+      PHASE_L_OUT="[pre-push] REFUSED: the override did not take effect within $((now - start))s (one silent sibling is covered; two are not). Nothing was pushed."
+      return 3
     fi
     if [ "$now" -ge "$next" ]; then
       phase_l_agent_renew || return 3
@@ -808,18 +809,27 @@ phase_l_agent_override_wait() {
       continue
     fi
     if [ "$now" -ge "$poll_at" ]; then
-      phase_l_agent_claim_patient
+      phase_l_agent_check
       rc=$?
       if [ "$rc" -eq 0 ]; then
+        phase_l_agent_claim_patient
+        rc=$?
+        if [ "$rc" -eq 0 ]; then
+          phase_l_agent_token
+          if [ "$(date +%s)" -lt "$until_s" ]; then
+            phase_l_agent_say say "[pre-push] Phase L: the claim became effective $(( $(date +%s) - start ))s into the override wait; proceeding (override not needed)"
+          fi
+          return 0
+        fi
+        phase_l_agent_overridden || return "$rc"
         phase_l_agent_token
-        phase_l_agent_say say "[pre-push] Phase L: the claim became effective $(( $(date +%s) - start ))s into the override wait; proceeding (override not needed)"
-        return 0
+      elif [ "$rc" -eq 3 ]; then
+        return 3
       fi
-      phase_l_agent_overridden && phase_l_agent_token
       poll_at=$(($(date +%s) + poll_s))
       continue
     fi
-    step=$((until_s - now))
+    step=$((deadline - now))
     [ "$step" -le $((next - now)) ] || step=$((next - now))
     [ "$step" -le $((poll_at - now)) ] || step=$((poll_at - now))
     [ "$step" -le 5 ] || step=5

@@ -3080,6 +3080,39 @@ class StewardClaimTest(unittest.TestCase):
         self.assertRegex(lines[0], r"^dev-integration: claimed by codex-1 .* claimed_at=")
         self.assertTrue(lines[1].startswith("  override on the record — unconfirmed:"), lines)
 
+    def test_delayed_effective_at_override_keeps_override_and_later_renew_writes_no_second(self):
+        override_at = NOW_MS + 120_000
+        at_override = view(dev_integration=effective())
+        at_override["now"] = override_at
+        at_override["dev-integration"]["override_at"] = override_at
+        self.views(view(), view(dev_integration=unconfirmed_a()), at_override)
+
+        ok, _, reason, _ = self.claim(offline_ok=True, ttl_s=600)
+        self.assertTrue(ok, reason)
+        generation = self.berth.who("dev-integration")["claimed_at"]
+        override = self.rows("override")[-1]
+        self.assertNotIn("superseded", _NS["_fmt_ledger"](override))
+        self.assertIsNotNone(self.berth._override_row("dev-integration", "codex-1", generation))
+
+        waiting = view(dev_integration=unconfirmed_a(override_at=override_at))
+        self.views(waiting, waiting)
+        ok, lease, renew_reason, _ = self.claim(offline_ok=True, ttl_s=600)
+        self.assertFalse(ok)
+        self.assertIsNone(lease)
+        self.assertTrue(renew_reason.endswith("— override on the record"), renew_reason)
+        self.assertEqual(len(self.rows("override")), 1)
+
+    def test_delayed_effective_before_override_still_supersedes_it(self):
+        override_at = NOW_MS + 120_000
+        before_override = view(dev_integration=effective())
+        before_override["dev-integration"]["override_at"] = override_at
+        self.views(view(), view(dev_integration=unconfirmed_a()), before_override)
+
+        ok, _, reason, _ = self.claim(offline_ok=True, ttl_s=600)
+        self.assertTrue(ok, reason)
+        override = self.rows("override")[-1]
+        self.assertIn("superseded by effective renew", _NS["_fmt_ledger"](override))
+
     def test_offline_ok_wait_names_override_at_and_the_generation(self):
         override_at = NOW_MS + 120_000
         self.views(view(), view(dev_integration=unconfirmed_a()),
@@ -3249,6 +3282,30 @@ class StewardClaimTest(unittest.TestCase):
         self.assertEqual(self.rows("claim"), [])
         self.assertEqual(self.rows("override"), [])
         self.assertEqual(len(self.calls()), 2)
+
+    def test_claim_check_polls_are_read_only_and_terminal_refusals_keep_claim_shape(self):
+        baseline = self.rows()
+        waiting = view(dev_integration=unconfirmed_a(override_at=NOW_MS + 120_000))
+        self.views(waiting, waiting, waiting)
+        for _ in range(3):
+            result = self.run_cli("claim", "dev-integration", "--session", "codex-1", "--check")
+            self.assertEqual(result.returncode, 1, result.stderr)
+            self.assertIn("dev-integration: WAITING — unconfirmed:", result.stderr)
+        self.assertEqual(self.rows(), baseline, "read-only polls append no berth records")
+
+        self.views(view(dev_integration=effective()))
+        effective_result = self.run_cli(
+            "claim", "dev-integration", "--session", "codex-1", "--check")
+        self.assertEqual(effective_result.returncode, 0, effective_result.stderr)
+        self.assertEqual(effective_result.stdout.strip(), "dev-integration: effective for codex-1")
+
+        self.views(view(dev_integration=held_by_a()))
+        refused = self.run_cli("claim", "dev-integration", "--session", "codex-1", "--check")
+        self.assertEqual(refused.returncode, 3, refused.stderr)
+        self.assertEqual(refused.stderr.strip(),
+                         f"dev-integration: REFUSED — held by {DEVICE_A}/claude-1 since "
+                         "2026-10-23T15:28:09Z")
+        self.assertEqual(self.rows(), baseline)
 
     def test_a_lease_already_folded_refuses_a_claim_whose_clock_runs_behind_it_writing_nothing(self):
         # A's claim (stamped by A's clock at SINCE_MS) is folded here; this device's clock runs 20
