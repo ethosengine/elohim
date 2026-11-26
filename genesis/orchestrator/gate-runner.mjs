@@ -1520,6 +1520,12 @@ export function runProject(project, printOnly, namesOnly, {
   const decision = decideReuse(project, evidence, reuseContext, {
     root, env, spawn, ...(gradeOn ? { observe: read => { observedSiblings = read; } } : {}),
   });
+  // The reason a reuse was declined, said the moment it is decided and under the evidence line's
+  // own name, so a reader of `evidence: miss` finds the why beside it (arrival backlog row 101).
+  // The decision above is untouched, and the `not reused:` line where the gate starts is kept.
+  if (env.GATE_EVIDENCE === 'reuse' && !decision.reuse) {
+    write(`[gate] ${project.name} evidence: not reused: ${decision.why}\n`);
+  }
   // GATE_GRADE=shadow (default; `off` adds no read, spawn or write; there is no `on`): after this
   // gate's seconds, evidence and cycle are recorded, say what evidence this device holds for the
   // closure and how it would read under the PROPOSED graded table (gate-grade.mjs). It draws on the
