@@ -299,16 +299,28 @@ def load_report():
         # load_reports() falls back to the file mtime when `generatedAt` is unparseable; the
         # headline must say so rather than print an mtime as the report's age, so the raw
         # value is re-read from the report itself.
+        # The date and the commit are taken from ONE read of the file, and only when that
+        # read is the same run load_reports() ranked: a report rewritten between the two
+        # reads must not lend one run's date to another run's id.
         raw_generated = None
+        raw_commit = None
+        read_note = None
         try:
             raw_doc = json.loads(Path(newest.get("path")).read_text(encoding="utf-8"))
-            raw_generated = raw_doc.get("generatedAt") if isinstance(raw_doc, dict) else None
-        except Exception:
-            raw_generated = None
+            if not isinstance(raw_doc, dict):
+                read_note = "report is not an object"
+            elif isinstance(raw_doc.get("runId"), str) and raw_doc.get("runId") != newest.get("runId"):
+                read_note = "report changed while it was being read"
+            else:
+                raw_generated = raw_doc.get("generatedAt")
+                raw_commit = raw_doc.get("gitCommit") if isinstance(raw_doc.get("gitCommit"), str) else None
+        except Exception as exc:
+            read_note = f"report could not be re-read ({type(exc).__name__})"
         return {
             "runId": newest.get("runId"),
             "generatedAt": raw_generated,
-            "gitCommit": newest.get("gitCommit"),
+            "gitCommit": raw_commit,
+            "readNote": read_note,
             "profile": newest.get("profile"),
             "path": str(newest.get("path")),
             "summary": {"byConcern": newest.get("byConcern") or {},
@@ -429,6 +441,12 @@ def report_provenance(report, now=None) -> str:
     run_id = report.get("runId")
     parts = [f"report {run_id}" if run_id else "report unmeasured (no runId)"]
 
+    note = report.get("readNote")
+    if note:
+        parts.append(f"age unmeasured ({note})")
+        parts.append(f"commits since unmeasured ({note})")
+        return ", ".join(parts)
+
     raw = report.get("generatedAt")
     when = None
     if isinstance(raw, str) and raw:
@@ -442,7 +460,11 @@ def report_provenance(report, now=None) -> str:
             parts.append(f"age unmeasured (generatedAt unparseable: {raw!r})")
     else:
         parts.append("age unmeasured (no generatedAt)")
-    if when is not None:
+    if when is not None and when > now:
+        # habits-status's _age calls a future time "just now"; a report dated ahead of this
+        # clock is not fresh, it is unreadable as an age.
+        parts.append(f"age unmeasured (generatedAt {raw} is ahead of this clock)")
+    elif when is not None:
         try:
             age = _habits_age()(when, now)
             parts.append(age[:-4] + " old" if age.endswith(" ago") else age)
@@ -457,11 +479,16 @@ def report_provenance(report, now=None) -> str:
             if _git("cat-file", "-e", f"{commit}^{{commit}}").returncode != 0:
                 parts.append(f"commits since unmeasured ({commit[:9]} not in this checkout's "
                              "object store; shallow clone?)")
+            elif _git("merge-base", "--is-ancestor", commit, "HEAD").returncode != 0:
+                # Without this, rev-list would count commits on an unrelated line of history
+                # and print them as "since".
+                parts.append(f"commits since unmeasured ({commit[:9]} is not an ancestor of "
+                             "this checkout's HEAD)")
             else:
                 r = _git("rev-list", "--count", f"{commit}..HEAD")
                 n = r.stdout.strip()
                 if r.returncode == 0 and n.isdigit():
-                    parts.append(f"{n} commits since (all paths)")
+                    parts.append(f"{n} commits since, to this checkout's HEAD (all paths)")
                 else:
                     parts.append("commits since unmeasured (rev-list failed)")
         except Exception as exc:

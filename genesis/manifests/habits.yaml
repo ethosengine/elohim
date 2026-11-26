@@ -113,9 +113,9 @@ habits:
       - "a2o @concern:household-follows-head (genesis/a2o/features/devflow/epr-follows-its-head.feature — Act I host, the binary class of this invariant: a device that missed a landing heals at its next session, a session keeps its pinned CID, a failed health check or a dirty build never becomes the head, and moving back is a revert. Spec genesis/docs/superpowers/specs/2026-10-23-household-follows-latest-design.md, slices 1–2 = epr plus brit following its attested gitlink pin on one workspace)"
       - "a2o @device-declared-target (genesis/a2o/features/devflow/device-declared-target.feature, @concern:dataplane-convergence) — offline private declaration, projection replay, pinned-session notice and committed-base recovery; slice M"
     evidence: >
-      DELTA 2026-11-26b (RED preserved; flight F3 of sprint 2026-11-26-research-disciplines, ethosengine; script and tests only, no household run): the recovery matrix accepts a draw made by another seat (`MESH_RECOVERY_DRAW`), refuses one made by its own runner when the runner names itself, and writes `chosen_by`, `run_by` and `draw_sha256` on each record; the `expect` label no longer travels into a run. `hc-mesh-recovery-draw.test.sh` (15 checks) passes, run directly. No drawn run has been made: that exercise is owed and is offered to shem. A check of `hc-mesh-recovery.test.sh` that was failing on dev is fixed (the test's fault).
-    evidence-fingerprint: sha256:60e6c4cf7faba130
-    evidence-bytes: 284703
+      DELTA 2026-11-26b (RED preserved; flight F3 of sprint 2026-11-26-research-disciplines, ethosengine; script and tests only, no household run): the recovery matrix accepts a draw that names another seat (`MESH_RECOVERY_DRAW`; who made it is as sure as the channel it came by), refuses one that names its own runner when the runner names itself, and writes `chosen_by`, `run_by` and `draw_sha256` on each record; the `expect` label no longer travels into a run. `hc-mesh-recovery-draw.test.sh` (15 checks) passes, run directly. No drawn run has been made: that exercise is owed and is offered to shem. A check of `hc-mesh-recovery.test.sh` that was failing on dev is fixed (the test's fault).
+    evidence-fingerprint: sha256:b68757fa2b5080bb
+    evidence-bytes: 284759
     evidence-entries: 186
     guard: >
       Regression risk = the fleet-safety invariants in sync/projector.rs
