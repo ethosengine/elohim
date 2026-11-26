@@ -21,7 +21,7 @@
 //! built with (artifact-store design §1.2–§1.3).
 
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 use std::time::Duration;
 
 use bytes::Bytes;
@@ -41,6 +41,7 @@ use tokio::task::JoinSet;
 use crate::blob_mount::{self, Answered, BlobMount};
 use crate::error::PeerError;
 use crate::gate::{ServeScope, SharedAdmission, StewardDevicesGate, WholeStoreScope};
+use crate::head::ChannelHead;
 
 /// The ALPN a device's tier answers on.
 pub const TIER_ALPN: &[u8] = b"/elohim/eprfs-tier/1.0.0";
@@ -99,6 +100,29 @@ pub(crate) fn is_busy(error: &PeerError) -> bool {
     )
 }
 
+/// Whether a tier exchange reached an open stream that the peer then refused or closed.
+///
+/// This deliberately excludes connection loss: callers may use a peer reset or an answer-less
+/// FIN as evidence that the peer is reachable even when it does not understand the request.
+pub(crate) fn is_peer_stream_refusal(error: &PeerError) -> bool {
+    let PeerError::TierStream(source) = error else {
+        return false;
+    };
+    matches!(
+        source.downcast_ref::<iroh::endpoint::ReadExactError>(),
+        Some(iroh::endpoint::ReadExactError::FinishedEarly(_))
+            | Some(iroh::endpoint::ReadExactError::ReadError(
+                iroh::endpoint::ReadError::Reset(_) | iroh::endpoint::ReadError::ClosedStream
+            ))
+    ) || matches!(
+        source.downcast_ref::<iroh::endpoint::ReadError>(),
+        Some(iroh::endpoint::ReadError::Reset(_) | iroh::endpoint::ReadError::ClosedStream)
+    ) || matches!(
+        source.downcast_ref::<iroh::endpoint::WriteError>(),
+        Some(iroh::endpoint::WriteError::Stopped(_) | iroh::endpoint::WriteError::ClosedStream)
+    )
+}
+
 /// How a [`TierProtocol`] bounds its work. `Clone` shares the two in-flight pools: every protocol
 /// cloned from one set of limits draws on the same bounds.
 #[derive(Debug, Clone)]
@@ -142,6 +166,9 @@ impl Default for TierLimits {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case", rename_all_fields = "camelCase")]
 pub enum TierRequest {
+    /// The device's latest persisted signed channel head. Used only as a cheap liveness probe;
+    /// the caller must apply the same signature, admission and ordering checks as gossip.
+    Head,
     /// [`TierEndpoint::serve_read`]: one file or symlink and its bytes.
     Read { root: BlobCid, path: TreePath },
     /// [`TierEndpoint::serve_list`]: one directory's entries.
@@ -172,6 +199,11 @@ pub enum TierRequest {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case", rename_all_fields = "camelCase")]
 pub enum TierAnswer {
+    /// The latest signed head's canonical wire bytes. `None` is deliberately identical for an
+    /// unadmitted requester and a device that has not announced yet.
+    Head {
+        head: Option<Bytes>,
+    },
     Read(ReadLeaf),
     List(DirListing),
     Diff(Vec<TreeChange>),
@@ -292,6 +324,7 @@ struct Inner {
     mount: Option<Arc<BlobMount>>,
     limits: TierLimits,
     counters: TierCounters,
+    head: Arc<RwLock<Option<ChannelHead>>>,
 }
 
 impl std::fmt::Debug for TierProtocol {
@@ -352,8 +385,17 @@ impl TierProtocol {
                 mount,
                 limits,
                 counters: TierCounters::default(),
+                head: Arc::new(RwLock::new(None)),
             }),
         })
+    }
+
+    /// Serve the daemon's latest persisted signed head through [`TierRequest::Head`].
+    pub fn with_head(mut self, head: Arc<RwLock<Option<ChannelHead>>>) -> TierProtocol {
+        Arc::get_mut(&mut self.inner)
+            .expect("a newly built tier protocol has one owner")
+            .head = head;
+        self
     }
 
     /// Record accepted connections in `book`, so a reload that drops a device can close what it
@@ -509,6 +551,17 @@ impl Inner {
         let opts = BatchOptions::default();
         let endpoint = &self.endpoint;
         match request {
+            TierRequest::Head => {
+                let head = who.agent().is_some().then(|| {
+                    self.head
+                        .read()
+                        .ok()
+                        .and_then(|head| head.as_ref().and_then(|head| head.to_wire().ok()))
+                });
+                TierAnswer::Head {
+                    head: head.flatten().map(Bytes::from),
+                }
+            }
             TierRequest::Read { root, path } => TierAnswer::from_tree(
                 endpoint.serve_read(who, &root, &path, &opts).await,
                 TierAnswer::Read,
@@ -646,6 +699,7 @@ fn check_answer(
     tree: &TreeLimits,
 ) -> Result<(), PeerError> {
     let (cid, consistent) = match (req, answer) {
+        (TierRequest::Head, TierAnswer::Head { .. }) => return Ok(()),
         (TierRequest::Read { path, .. }, TierAnswer::Read(leaf)) => (
             &leaf.cid,
             leaf.path == *path && leaf.cid.verifies(&leaf.bytes),

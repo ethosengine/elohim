@@ -48,6 +48,9 @@ struct TestChannel {
 impl TestChannel {
     fn answer(&self, request: &TierRequest) -> TierAnswer {
         match request {
+            TierRequest::Head => TierAnswer::Failed {
+                reason: "this fold fixture serves roots, not daemon heads".into(),
+            },
             TierRequest::List { path, .. } => self
                 .listings
                 .get(&path.to_string())
