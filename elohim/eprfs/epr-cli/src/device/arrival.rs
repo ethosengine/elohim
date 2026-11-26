@@ -1687,7 +1687,9 @@ fn peer_daemon_version_check(evidence: Option<String>) -> Check {
                     "peer daemon",
                     State::Ok,
                     format!(
-                        "running and current release-record CIDs are {}{evidence}",
+                        // "serving at current" leads, so a ready restart's receipt lands right
+                        // after it (peer_daemon_check, row 35); the release CIDs follow.
+                        "serving at current; running and current release-record CIDs are {}{evidence}",
                         head.as_deref().unwrap_or("absent")
                     ),
                     None,
