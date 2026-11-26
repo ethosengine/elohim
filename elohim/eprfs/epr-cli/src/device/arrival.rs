@@ -566,7 +566,13 @@ fn exchange_check(
         );
     };
     let age_s = |at: u64| (at <= now_ms).then(|| now_ms.saturating_sub(at) / 1000);
-    let latest_root_seq = table.own_log.last().map(|head| head.seq);
+    let latest_mature_root_seq = table.own_log.iter().rev().find_map(|root| {
+        age_s(root.at)
+            .filter(|age_s| *age_s >= freshness_s)
+            .map(|_| root.seq)
+    });
+    // Legacy tables can have an empty `own_log`. With no dated root to require, any
+    // acknowledgement passes the sequence gate.
     let mut fresh = Vec::new();
     let mut stale = Vec::new();
     for sibling in siblings {
@@ -590,20 +596,15 @@ fn exchange_check(
             ));
             continue;
         };
-        if let Some(root_seq) = latest_root_seq.filter(|root_seq| acked_seq < *root_seq) {
-            stale.push(format!(
-                "{short} acknowledges this device only to seq {acked_seq}, before its latest \
-                 announced root at seq {root_seq}"
-            ));
-            continue;
-        }
         // The sibling head is the carrier of its acknowledgement. Its local receipt time is the
         // age of both directions; the acknowledged seq establishes only that our latest root
         // crossed, since periodic re-announces do not add entries to `own_log`.
         let ack_age_s = fold_age_s;
         let fold_is_fresh = fold_age_s < freshness_s;
         let ack_is_fresh = ack_age_s < freshness_s;
-        if fold_is_fresh && ack_is_fresh {
+        let unacknowledged_root_seq =
+            latest_mature_root_seq.filter(|root_seq| acked_seq < *root_seq);
+        if fold_is_fresh && ack_is_fresh && unacknowledged_root_seq.is_none() {
             fresh.push(format!(
                 "{short} folded-from head seq {} is {fold_age_s}s old and acknowledges this \
                  device to seq {acked_seq}, carried {ack_age_s}s ago",
@@ -618,6 +619,12 @@ fn exchange_check(
         if !ack_is_fresh {
             directions.push(format!(
                 "acknowledgement of this device's head was carried {ack_age_s}s ago"
+            ));
+        }
+        if let Some(root_seq) = unacknowledged_root_seq {
+            directions.push(format!(
+                "acknowledges this device only to seq {acked_seq}, before its latest announced \
+                 root at seq {root_seq}"
             ));
         }
         stale.push(format!(
@@ -2733,6 +2740,18 @@ mod tests {
         fold_age_s: u64,
         acked_seq: u64,
     ) -> eprfs_peer::HeadTable {
+        exchange_table_with_root(ours, sibling, fold_age_s, acked_seq, 1, 600)
+    }
+
+    #[cfg(feature = "peer")]
+    fn exchange_table_with_root(
+        ours: &str,
+        sibling: &str,
+        fold_age_s: u64,
+        acked_seq: u64,
+        root_seq: u64,
+        root_age_s: u64,
+    ) -> eprfs_peer::HeadTable {
         const NOW_MS: u64 = 1_000_000;
         let root = eprfs_core::BlobCid::compute_bytes(b"own root");
         let own = eprfs_peer::ChannelHead {
@@ -2757,9 +2776,9 @@ mod tests {
             // The root last changed ten minutes ago. Re-announces advanced `own.seq` without
             // adding log rows, so an acknowledgement one round behind is still current.
             own_log: vec![eprfs_peer::OwnAnnounce {
-                seq: 1,
+                seq: root_seq,
                 root,
-                at: NOW_MS - 600_000,
+                at: NOW_MS.saturating_sub(root_age_s.saturating_mul(1000)),
                 events: 1,
                 last: Some("event-cid".into()),
             }],
@@ -2914,6 +2933,75 @@ mod tests {
                 .contains("only to seq 0, before its latest announced root at seq 1"),
             "{check}"
         );
+    }
+
+    #[cfg(feature = "peer")]
+    #[test]
+    fn recent_root_does_not_require_the_next_acknowledgement_round() {
+        let ours = "did:key:z6MkThisDevice000000000000000000000";
+        let sibling = "did:key:z6MkSiblingDevice0000000000000000000".to_owned();
+        let check = exchange_check(
+            std::slice::from_ref(&sibling),
+            ours,
+            Ok(Some(exchange_table_with_root(ours, &sibling, 12, 6, 7, 5))),
+            Some(90),
+            1_000_000,
+        );
+        assert_eq!(check.state, State::Ok, "{check}");
+        assert!(check.detail.contains("seq 6, carried 12s ago"), "{check}");
+    }
+
+    #[cfg(feature = "peer")]
+    #[test]
+    fn mature_root_requires_acknowledgement_of_its_sequence() {
+        let ours = "did:key:z6MkThisDevice000000000000000000000";
+        let sibling = "did:key:z6MkSiblingDevice0000000000000000000".to_owned();
+        let check = exchange_check(
+            std::slice::from_ref(&sibling),
+            ours,
+            Ok(Some(exchange_table_with_root(
+                ours, &sibling, 12, 6, 7, 200,
+            ))),
+            Some(90),
+            1_000_000,
+        );
+        assert_eq!(check.state, State::Degraded, "{check}");
+        assert!(
+            check
+                .detail
+                .contains("only to seq 6, before its latest announced root at seq 7"),
+            "{check}"
+        );
+    }
+
+    #[cfg(feature = "peer")]
+    #[test]
+    fn stalled_carrier_names_its_age_before_the_sequence_lag() {
+        let ours = "did:key:z6MkThisDevice000000000000000000000";
+        let sibling = "did:key:z6MkSiblingDevice0000000000000000000".to_owned();
+        let mut table = exchange_table_with_root(ours, &sibling, 12, 6, 7, 200);
+        table
+            .devices
+            .get_mut(&sibling)
+            .expect("sibling head")
+            .folded_at = 10_000_000 - 8_667_000;
+        let check = exchange_check(
+            std::slice::from_ref(&sibling),
+            ours,
+            Ok(Some(table)),
+            Some(90),
+            10_000_000,
+        );
+        assert_eq!(check.state, State::Degraded, "{check}");
+        let age = check
+            .detail
+            .find("folded-from head is 8667s old")
+            .expect("carrier age");
+        let sequence = check
+            .detail
+            .find("only to seq 6, before its latest announced root at seq 7")
+            .expect("sequence lag");
+        assert!(age < sequence, "{check}");
     }
     #[cfg(feature = "peer")]
     #[test]
