@@ -1,8 +1,8 @@
 ---
 title: "What Made Apollo a Success? — NASA SP-287 read for the pilot's brief, the simulacra and the flight sequence"
 id: apollo-sp287-what-made-apollo-a-success-cross-pollination-2026-11-26
-status: Draft (v1.3, single author, steward-directed on composition, the control room, coordination cost and councils; one challenge pass applied to v1)
-version: 1.3
+status: Draft (v1.4, single author, steward-directed on composition, the control room, coordination cost and councils; one challenge pass applied to v1; claims about our own code re-read for v1.4)
+version: 1.4
 date: 2026-11-26
 cites:
   - "elohim-protocol-manifesto | the canon's destination: Part VII's eight conditions, Part IX's causal order and the conclusion's refusal of a single arrival, which section 4 reads Apollo's landing against | sha256:21e5057f62b72ed3 | path: genesis/docs/content/elohim-protocol/manifesto.md"
@@ -38,11 +38,13 @@ maintenance backlog together. The thing to design is the composition: what is se
 position, in what priority, and what is left out.
 
 **(2) Apollo's simulators ran the real flight software, exercised the people and the rules, and
-had their failures chosen by somebody else.** Our household mesh runs the real binaries and has a
-better staleness check than Apollo had. The other two properties are missing. Nothing we have
-exercises an agent, and nobody but the party under test injects a fault. The mesh and its fault
-harnesses are run by hand; only the in-process models and vectors sit in a gate. The saga reads
-green from flow state alone, and the newest mesh report is 39 days old.
+had their failures chosen by somebody else.** Our household mesh runs the real binaries and checks by
+arithmetic that they are the current build. The other two properties are missing. One harness
+runs agents with a judge of another tier, for recall only; none sends an agent to a place and
+injects a failure. Nobody but the party under test chooses a fault. The mesh and its fault
+harnesses are run by hand and no gate project covers them, though since 2026-11-24 a serving
+change cannot reach `dev` without a household receipt on its own source. The saga headline reads
+green from flow state and names neither its report nor that report's age, which is 39 days.
 
 **(3) Apollo's landing was a proof, and the adoption came later and elsewhere.** The canon is
 right to refuse a flag day for adoption. It still names crossings that a simulator cannot fully
@@ -398,9 +400,12 @@ different ruling before and after a commitment point, and Table 7-I is a matrix 
 against decision points (§1.5). Nobody carried the whole rulebook. Position on the timeline is one
 case of what the steward asks for, which is position in the graph ✎. An EPR has more
 neighbourhood than a directory does: what it cites and supersedes, who stewards it, its reach, the
-commitments open on it, the habit it serves. `epr flow context` already takes a content address as
-its subject as well as a path ✅ (`usage: epr flow context <path|cid>`), so the read is closer to
-graph-shaped than its name suggests. I have not tested it against a node or an agent as subject.
+commitments open on it, the habit it serves. `epr flow context` takes a content address as its
+subject as well as a path ✅ (`usage: epr flow context <path|cid>`), with two limits found on a
+later read of `flow/context.rs`: the CID must be one that a record in the local sidecar already
+mints or names, and for a bare CID the seals, habit, gate and governance sections are skipped.
+The read is graph-shaped in its signature and path-shaped in what it can say. I have not tested
+it against a node or an agent as subject.
 
 **C2. Rank, then cut.** Controllers defined the data they needed "parameter by parameter,
 assigning a priority to each", and only then was software written to show it (SP p. 46) ✅. A
@@ -415,7 +420,9 @@ who work there. Our root file holds both tiers. The habit's own move ledger meas
 KB of root instructions reviewed, about 11.3 KB is to keep at the root (HAB, delta 2026-11-23b)
 ✅. So roughly five-sixths of the root file is content the ledger would move out to where it
 applies. Not all of that is rule (the first cut was a block of command forms), and the same delta
-keeps command-triggered rules at the root until something else can enforce them.
+keeps command-triggered rules at the root until something else can enforce them. (On 2026-11-26
+`CLAUDE.md` measures 66,172 bytes and `AGENTS.md` 71,146, the second over Codex's 65,536-byte
+read limit.)
 
 **C4. One format, kept for a decade.** Condition, ruling, notes with reasons (SP p. 47) ✅. Our
 `.epr-meta` rule is `when`, class and parameters, `why`, `retire-when`. The match is close, and
@@ -580,13 +587,23 @@ keeping the mesh's *shape* faithful to the fleet's, and nothing checks that ◐:
 the fleet found (S-4) were all differences of shape, the first being that the mesh ran one
 transport where the fleet ran two.
 
-**S-2. The mesh and its fault harnesses are run by hand, and the readings age.** No gate runs the
-mesh, the recovery matrix or the chaos drills ◐; only the in-process models and the
-cross-language vectors sit in a gate. The saga headline reads "11/12 green", and `saga-status.py --full`
-shows why: each chapter is green because its flow state is `fulfilled`, while the report column
-reads `absent` for all twelve, and the newest mesh report is run `20261018T154413Z`, 39 days old
-✅. The habit register says so itself: 42 habits and 60 declared concerns are without a witness,
-and several habits read `status: green` with `last_measured: never` ✅. Apollo's rule was that a
+**S-2. The mesh and its fault harnesses are run by hand, and some readings do not say their
+age.** No gate project runs the mesh, the recovery matrix or the chaos drills ◐; only the
+in-process models and the cross-language vectors sit in a gate. One push-time check does reach
+the mesh's evidence: since 2026-11-24 a push to `dev` or `main` that changes serving paths is
+refused unless a household report witnessed the same source identity, and a dataplane-only
+change still only warns ✅ (`genesis/orchestrator/scripts/t2-receipt.sh`). The saga headline
+reads "11/12 green", and `saga-status.py --full` shows why: each chapter is green because its
+flow state is `fulfilled`. The newest mesh report is run `20261018T154413Z`, 39 days old ✅, and
+the headline prints neither the run nor its age. (The report column read `absent` for all twelve
+when I ran it from a worktree. Reports are untracked and live in the main checkout, so that
+reading described where I stood.) Readings differ in what they say about age: the habit register
+prints `last_measured` and marks evidence older than 14 days `STALE`, and a locally reused gate
+green prints its age; the saga headline, the recovery timeline and a green reused from a sibling
+device do not ✅. The household report records its commit and per-binary source identity; a
+recovery record carries neither ✅. The habit register says the rest itself: 42 habits and 60
+declared concerns are without a witness, and several habits read `status: green` with
+`last_measured: never` ✅. Apollo's rule was that a
 change voids prior test experience (§1.3). A simulator reading has an age, and the question is how
 many relevant changes have landed since.
 
@@ -603,10 +620,13 @@ measured: three regimes the mesh could not model were found on the fleet "at ~45
 two of the three are still unmodelled (`mesh-fixture-fidelity-regimes`) ✅. Apollo spent about 30
 percent of its simulation time on the mathematical model before the crew simulators joined.
 
-**S-5. No simulator exercises an agent.** This is the largest gap against the steward's first
-question. Every agent-facing check tests an output contract or uses an agent as the instrument ◐.
-A search for an evaluation harness in the skills, agents, `genesis/agentic` and the specs found
-none ◐ (an absence by grep, which is weaker than a reading). The one planned is in HAB: an arrival reader that launches "a real subagent, a `claude -p`
+**S-5. No simulator sends an agent to a place and injects a failure.** This is the largest gap
+against the steward's first question. Every agent-facing check but one tests an output contract
+or uses an agent as the instrument ◐. The exception is `.claude/workflows/recall-standing-reader.js`,
+which spawns a real sampler agent for each question and reader tier and has a different tier
+judge it, for recall journeys only ✅. My first search covered the skills, agents,
+`genesis/agentic` and the specs and missed `.claude/workflows/`; it was an absence by grep and
+was marked as weaker than a reading, and it was wrong. The one planned for arrival is in HAB: an arrival reader that launches "a real subagent, a `claude -p`
 step and a `codex exec` step… at a target with a one-line task", captures what each received, and
 has the five questions "judged by a different tier". It is marked "NOT BUILT YET" ✅.
 
@@ -847,24 +867,28 @@ of them needs a new register.
 
 **An anomaly is a commitment.** Arabian's problem list is a row per problem with the action, the
 responsible engineer and the anticipated closure date (§1.4). That is a commitment with a
-provider and a due date. Our findings ledgers lack both: the 179 rows of
-`.claude/data/ci-findings.jsonl` carry a fingerprint, class, job, status, a first-seen timestamp
-and build numbers, and no owner and no date by which to close ✅; no other ledger has them
-either, and of 809 backlog files one has an owner ◐.
+provider and a due date. Our CI findings ledger lacks both: the rows of
+`.claude/data/ci-findings.jsonl` (179 when first read, 203 later the same day) carry a
+fingerprint, class, job, status, a first-seen timestamp and build numbers, and no owner and no
+date by which to close ✅. No other ledger has an owner either; `architecture-findings.jsonl`
+does record a closing time, and of 809 backlog files one has an owner ◐.
 Closure is by disappearance: a CI finding closes after it is absent from three builds ◐. That is
 Simpkinson's "explained failure", closed by not recurring. SessionStart reported five known
 findings "recurred (flake evidence)" ✅.
 
-Two things are missing, and both fit the existing flow verbs. The first is an owner and a date,
-which `claim` supplies. The second is a disposition that says a finding was understood and needs
+Two things are missing. The first is an owner and a date. `claim` supplies the owner (its
+provider) and a start date; it sets no date by which, and it needs an intent or a path, which a
+finding has only once triage has given it a backlog file ✅ (`flow/claim.rs`). The second is a
+disposition that says a finding was understood and needs
 no action: Apollo's "random failure", admitted only with a failure history and a redundant path
 named (§1.4). Today only the deprecations ledger has anything like it ◐.
 
 **The flight an anomaly must precede depends on the anomaly.** Apollo closed everything before
 the next flight because every flight carried a crew. We land on the integration branch many times
 a day. The transferable rule is by class: a finding blocks the kind of crossing it endangers. The
-warn-only receipt leg on dataplane changes is already this shape ✅ (root `CLAUDE.md`, "T2
-receipt").
+receipt leg at push time is already this shape ✅: it refuses a serving change at `dev` and
+`main`, and warns on a dataplane-only one (`t2-receipt.sh`; root `CLAUDE.md` still calls the
+whole leg warn-only, which is stale).
 
 **Readiness is a resource, and rehearsal produces it.** Tindall's confession (§1.8) describes
 work whose product was never visibly used. In a flow that recognises only fulfilled commitments
@@ -1084,6 +1108,19 @@ Second, agents working together are councils in small, and where each voice come
 inform how a decision is made (new study item S9). Quotations added for these were checked
 against the source text and the manifesto by the author, outside the challenge pass.
 
+v1.4, same day, after three read-only explorers re-read our own code for the sprint that follows
+this note (`genesis/docs/superpowers/plans/2026-11-26-research-disciplines-exercised.md`). They
+found the note too strong in six places, all about us and none about Apollo. The push-time
+receipt is not warn-only: it refuses a serving change at `dev` and `main` (§3.3 S-2, §6). Some
+readings already say their age; the saga headline, the recovery timeline and sibling reuse do not
+(S-2). The report column read `absent` because I stood in a worktree (S-2). `claim` records an
+owner and a start date, no date by which (§6). One harness already runs agents under a judge of
+another tier, for recall (opening, T7). `epr flow context` takes only a CID the local sidecar
+knows (§2.2). The opening still said the mesh's staleness check was better than Apollo's, which
+v1.1 had withdrawn in §3; it now says what the check does. Rows 13, 16 and 17 of
+`agentic-harness-borrows-backlog` and row 24 of `arch-dataplane-refactor-backlog` carry the same
+corrections.
+
 ## Outputs
 
 - Source text: `genesis/research/nasa-sp287-what-made-apollo-a-success-1971.txt`.
@@ -1093,7 +1130,9 @@ against the source text and the manifesto by the author, outside the challenge p
   `arch-dataplane-refactor-backlog` row 24 (T5 and T6), with a dated method note appended to
   `mesh-fixture-fidelity-regimes`. `CLUSTERS.md` rows groomed to match. Not minted: S1 to S7, the
   LEAVE items and W1 stay in §8; open questions 1 to 6 stay in §9.
-- Side finding, recorded here and not acted on: the [Memorilla note](epr:memorilla-claude-dreaming-cross-pollination-2026-11-18)
+- Side finding: the [Memorilla note](epr:memorilla-claude-dreaming-cross-pollination-2026-11-18)
   says its mint pass added items 28 to 31 to `agentic-context-tooling-consolidation-queue` and
-  rows to three other clusters. In this checkout that queue ends at item 27 and no backlog file
-  mentions Memorilla ✅ (grep, 2026-11-26). Either that pass landed elsewhere or it was lost.
+  rows to three other clusters. That queue ends at item 27 and no backlog file mentions Memorilla
+  ✅ (grep, 2026-11-26, both checkouts on ethosengine and `origin/dev`). The note itself was
+  untracked; the steward had it committed on 2026-11-26, and its six takes are given homes or
+  stated releases in flight F1 of the sprint that follows this note.
