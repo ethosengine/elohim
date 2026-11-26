@@ -111,6 +111,34 @@ test('cargo-deny keeps its old scope: any selection, cargo or not', () => {
   assert.ok(calls.some(call => call.includes('deny --manifest-path elohim/Cargo.toml check bans')));
 });
 
+// Thin-device station 3 (backlog row 106): no cargo input in the push, no cargo-deny asked for.
+test('cargo-deny: a push that changes no cargo input or deny.toml probes nothing and says so; any such path runs it', (t) => {
+  const root = scratch(t);
+  put(root, '.gitmodules', '[submodule "sophia"]\n\tpath = sophia\n');
+  const calls = [];
+  const absent = (cmd, args) => { calls.push([cmd, ...args].join(' ')); return { status: 1, stdout: '', stderr: '' }; };
+  const thin = checkCargoDeny({ root, projects: [app], spawn: absent, changed: ['genesis/docs/a.md', 'genesis/orchestrator/x.mjs'] });
+  assert.equal(thin.level, 'ok');
+  assert.match(thin.why, /^not run: the push changes no deny\.toml, Cargo\.toml, Cargo\.lock/);
+  assert.deepEqual(calls, [], 'not even the `command -v cargo-deny` probe');
+  for (const path of ['deny.toml', 'elohim/deny.toml', 'elohim/eprfs/Cargo.toml', 'elohim/Cargo.lock', 'rust-toolchain.toml', '.cargo/config.toml', 'genesis/agentic/pool-policy.json', 'sophia', '.gitmodules']) {
+    const warn = checkCargoDeny({ root, projects: [app], spawn: absent, changed: ['a.md', path] });
+    assert.equal(warn.level, 'WARN', path);
+    assert.match(warn.cure, /cargo install --locked cargo-deny/);
+  }
+  assert.equal(checkCargoDeny({ root, projects: [app], spawn: absent, changed: null }).level, 'WARN', 'no change list: as before');
+  assert.equal(checkCargoDeny({ root, projects: [app], spawn: absent }).level, 'WARN');
+  const present = (cmd) => ({ status: cmd === 'bash' ? 0 : 1, stdout: '', stderr: 'error: banned crate' });
+  assert.equal(checkCargoDeny({ root, projects: [app], spawn: present, changed: ['elohim/eprfs/Cargo.toml'] }).level, 'REFUSED', 'a violation still refuses');
+  rmSync(join(root, '.gitmodules'));
+  assert.equal(checkCargoDeny({ root, projects: [app], spawn: absent, changed: ['a.md'] }).level, 'WARN', 'unreadable .gitmodules: the check runs');
+  const none = env => runPreflight({ root, projects: [app], env: { TMPDIR: '/preflight-fixture-tmp', ...env }, spawn: absent, registry: new Map(), changed: ['a.md'], hostTriple: 'x' })
+    .find(r => r.check === 'cargo-deny-bans').level;
+  put(root, '.gitmodules', '');
+  assert.equal(none({}), 'ok');
+  assert.equal(none({ GATE_NARROW_BASE: 'none' }), 'WARN', 'a fallback range is no change list');
+});
+
 function cargoTree(t) {
   const root = scratch(t);
   put(root, 'ws/Cargo.toml', '[workspace]\nmembers = ["a", "b"]\n');
