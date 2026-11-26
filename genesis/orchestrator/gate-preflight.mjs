@@ -13,7 +13,7 @@
 // The fresh-worktree checklist this replaces lived in agent memory and was re-learned on
 // 2026-10-15, -17, -19, -22, -27, -31 and 11-01. Habit `careless-reds-cost-seconds`.
 
-import { attestedSubmodules, LIST_PATH } from './attested-list.mjs';
+import { attestedSubmodules, LIST_PATH, modulePaths } from './attested-list.mjs';
 import { accessSync, constants, existsSync, readFileSync, readdirSync, realpathSync, statSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
@@ -452,13 +452,33 @@ function cargoWorkspaceOf(root, dir) {
 
 const LOCK_STALE = /lock file .*needs to be updated|--locked was passed/i;
 
+const POOL_POLICY = 'genesis/agentic/pool-policy.json';
+const CARGO_INPUT = /(^|\/)(Cargo\.toml|Cargo\.lock|rust-toolchain(\.toml)?)$|(^|\/)\.cargo\//;
+
+/**
+ * The first changed path that can move what a Cargo.lock must hold or which cargo resolves it: a
+ * Cargo.toml, a Cargo.lock, a rust-toolchain file, anything under a `.cargo/` directory, the
+ * pool policy (it pins RUSTUP_TOOLCHAIN), .gitmodules, or a submodule's gitlink (a path
+ * dependency may live in one). Null when the list holds none. An unreadable .gitmodules counts
+ * as a change, and a caller with no change list never asks.
+ */
+export function cargoInputChange(changed, { root, read = readFileSync, extra = null } = {}) {
+  let modules;
+  try { modules = modulePaths(read(join(root, '.gitmodules'), 'utf8')); }
+  catch { return '.gitmodules (unreadable)'; }
+  return changed.find(path => CARGO_INPUT.test(path) || path === POOL_POLICY || path === '.gitmodules'
+    || modules.has(path) || (extra ? extra.test(path) : false)) ?? null;
+}
+
 /**
  * A manifest edit that outran its Cargo.lock passes the local gate (its cargo rewrites the lock)
  * and fails the first `--locked` CI build; on 2026-11-07 it surfaced only as a dirty tree after a
  * 65-minute eprfs gate. `cargo metadata --locked --offline` resolves without writing, in seconds.
  * Only the lock-update refusal is a red; a crate missing from the offline cache is a WARN.
+ * With a change list that holds no cargo input (cargoInputChange) the check does not run and one
+ * `ok` row says so; with no change list (`just gate`) it runs as before.
  */
-export function checkCargoLocks({ root, projects, spawn = spawnSync, env = process.env }) {
+export function checkCargoLocks({ root, projects, spawn = spawnSync, env = process.env, changed = null, read = readFileSync }) {
   const workspaces = new Set();
   for (const p of projects) {
     if (!p.run?.cargo || !p.dir || p.dir.startsWith('elohim/holochain/dna')) continue;
@@ -466,6 +486,11 @@ export function checkCargoLocks({ root, projects, spawn = spawnSync, env = proce
     if (ws && !ws.startsWith('elohim/holochain/dna')) workspaces.add(ws);
   }
   if (!workspaces.size) return null;
+  // Thin-device station 2: a push that changes no cargo input cannot have made a lock lag, and the
+  // check would ask this device for cargo, a toolchain and a registry cache it may not hold.
+  if (Array.isArray(changed) && cargoInputChange(changed, { root, read }) === null) {
+    return row('cargo-lock', 'ok', `not run for ${[...workspaces].sort().join(' ')}: the push changes no Cargo.toml, Cargo.lock, rust-toolchain file, .cargo config, toolchain pin or submodule pin`);
+  }
   // The pin lives only in pool-policy; with no readable pin, cargo resolves its own default.
   let toolchain;
   try { toolchain = JSON.parse(readFileSync(join(root, 'genesis/agentic/pool-policy.json'), 'utf8')).cargo_env_overrides?.['*']?.RUSTUP_TOOLCHAIN; }
@@ -612,7 +637,7 @@ export function runPreflight({ root = ROOT, projects, env = process.env, spawn =
     ...DIST_CHECKS.flatMap(check => timed(() => check({ root, projects }))),
     ...timed(() => checkArk({ projects, env })),
     ...timed(() => checkCargoDeny({ root, projects, spawn })),
-    ...timed(() => checkCargoLocks({ root, projects, spawn, env })),
+    ...timed(() => checkCargoLocks({ root, projects, spawn, env, changed: exact })),
     ...timed(() => checkCBaselineOffer({ root, projects, env, spawn, hostTriple })),
     ...timed(() => checkReadSets({ root, projects, registry, changed, read })),
     ...timed(() => checkEvidenceRecordable({ root, projects, env, reuse, read })),
