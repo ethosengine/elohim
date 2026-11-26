@@ -560,22 +560,13 @@ fn exchange_check(
         return Check::new(
             SIBLING_CHECK,
             State::Unknown,
-            "berth.channel.freshness_s is unreadable from the peer's loaded pool policy; no \
+            "berth.channel.freshness_s is unreadable from the checkout's pool policy; no \
              freshness is guessed",
-            Some("restore the peer's loaded pool policy and restart epr peer serve".into()),
+            Some("restore the checkout's pool policy".into()),
         );
     };
     let age_s = |at: u64| (at <= now_ms).then(|| now_ms.saturating_sub(at) / 1000);
-    let acknowledged_at = |seq: u64| {
-        table
-            .own
-            .iter()
-            .map(|head| (head.seq, head.at))
-            .chain(table.own_log.iter().map(|head| (head.seq, head.at)))
-            .filter(|(own_seq, _)| *own_seq <= seq)
-            .max_by_key(|(own_seq, _)| *own_seq)
-            .map(|(_, at)| at)
-    };
+    let latest_root_seq = table.own_log.last().map(|head| head.seq);
     let mut fresh = Vec::new();
     let mut stale = Vec::new();
     for sibling in siblings {
@@ -599,19 +590,23 @@ fn exchange_check(
             ));
             continue;
         };
-        let Some(ack_age_s) = acknowledged_at(acked_seq).and_then(age_s) else {
+        if let Some(root_seq) = latest_root_seq.filter(|root_seq| acked_seq < *root_seq) {
             stale.push(format!(
-                "{short} acknowledges this device to seq {acked_seq}, but that local head's age \
-                 is unavailable"
+                "{short} acknowledges this device only to seq {acked_seq}, before its latest \
+                 announced root at seq {root_seq}"
             ));
             continue;
-        };
+        }
+        // The sibling head is the carrier of its acknowledgement. Its local receipt time is the
+        // age of both directions; the acknowledged seq establishes only that our latest root
+        // crossed, since periodic re-announces do not add entries to `own_log`.
+        let ack_age_s = fold_age_s;
         let fold_is_fresh = fold_age_s < freshness_s;
         let ack_is_fresh = ack_age_s < freshness_s;
         if fold_is_fresh && ack_is_fresh {
             fresh.push(format!(
                 "{short} folded-from head seq {} is {fold_age_s}s old and acknowledges this \
-                 device to seq {acked_seq}, a head {ack_age_s}s old",
+                 device to seq {acked_seq}, carried {ack_age_s}s ago",
                 head.seq
             ));
             continue;
@@ -622,7 +617,7 @@ fn exchange_check(
         }
         if !ack_is_fresh {
             directions.push(format!(
-                "acknowledgement of this device's head is {ack_age_s}s old"
+                "acknowledgement of this device's head was carried {ack_age_s}s ago"
             ));
         }
         stale.push(format!(
@@ -2736,14 +2731,15 @@ mod tests {
         ours: &str,
         sibling: &str,
         fold_age_s: u64,
-        ack_age_s: u64,
+        acked_seq: u64,
     ) -> eprfs_peer::HeadTable {
         const NOW_MS: u64 = 1_000_000;
+        let root = eprfs_core::BlobCid::compute_bytes(b"own root");
         let own = eprfs_peer::ChannelHead {
             device: ours.to_owned(),
-            root: eprfs_core::BlobCid::compute_bytes(b"own root"),
+            root: root.clone(),
             seq: 7,
-            at: NOW_MS.saturating_sub(ack_age_s.saturating_mul(1000)),
+            at: NOW_MS,
             folded: std::collections::BTreeMap::new(),
             signature: String::new(),
         };
@@ -2751,13 +2747,22 @@ mod tests {
             seq: 4,
             root: eprfs_core::BlobCid::compute_bytes(b"sibling root"),
             at: NOW_MS,
-            folded: std::collections::BTreeMap::from([(ours.to_owned(), own.seq)]),
+            folded: std::collections::BTreeMap::from([(ours.to_owned(), acked_seq)]),
             folded_at: NOW_MS.saturating_sub(fold_age_s.saturating_mul(1000)),
             events_folded: 0,
             nack: Default::default(),
         };
         eprfs_peer::HeadTable {
             own: Some(own),
+            // The root last changed ten minutes ago. Re-announces advanced `own.seq` without
+            // adding log rows, so an acknowledgement one round behind is still current.
+            own_log: vec![eprfs_peer::OwnAnnounce {
+                seq: 1,
+                root,
+                at: NOW_MS - 600_000,
+                events: 1,
+                last: Some("event-cid".into()),
+            }],
             devices: std::collections::BTreeMap::from([(sibling.to_owned(), sibling_head)]),
             ..Default::default()
         }
@@ -2770,6 +2775,26 @@ mod tests {
         assert_eq!(
             exchange_check(&[], ours, Ok(None), Some(90), 1_000_000).to_string(),
             "degraded sibling exchange: this device has no sibling in the roster"
+        );
+    }
+
+    #[cfg(feature = "peer")]
+    #[test]
+    fn sibling_exchange_names_checkout_as_missing_freshness_source() {
+        let ours = "did:key:z6MkThisDevice000000000000000000000";
+        let sibling = "did:key:z6MkSiblingDevice0000000000000000000".to_owned();
+        let check = exchange_check(
+            std::slice::from_ref(&sibling),
+            ours,
+            Ok(Some(exchange_table(ours, &sibling, 12, 7))),
+            None,
+            1_000_000,
+        );
+        assert_eq!(check.state, State::Unknown, "{check}");
+        assert!(check.detail.contains("checkout's pool policy"), "{check}");
+        assert_eq!(
+            check.cure.as_deref(),
+            Some("restore the checkout's pool policy")
         );
     }
 
@@ -2813,13 +2838,13 @@ mod tests {
 
     #[cfg(feature = "peer")]
     #[test]
-    fn sibling_exchange_degrades_when_folded_from_head_is_stale_but_ack_is_fresh() {
+    fn sibling_exchange_degrades_when_acknowledgement_carrier_is_stale() {
         let ours = "did:key:z6MkThisDevice000000000000000000000";
         let sibling = "did:key:z6MkSiblingDevice0000000000000000000".to_owned();
         let check = exchange_check(
             std::slice::from_ref(&sibling),
             ours,
-            Ok(Some(exchange_table(ours, &sibling, 91, 12))),
+            Ok(Some(exchange_table(ours, &sibling, 91, 7))),
             Some(90),
             1_000_000,
         );
@@ -2828,29 +2853,29 @@ mod tests {
             check.detail.contains("folded-from head is 91s old"),
             "{check}"
         );
-        assert!(!check.detail.contains("acknowledgement of"), "{check}");
+        assert!(
+            check
+                .detail
+                .contains("acknowledgement of this device's head was carried 91s ago"),
+            "{check}"
+        );
     }
 
     #[cfg(feature = "peer")]
     #[test]
-    fn sibling_exchange_degrades_when_ack_is_stale_but_fold_is_fresh() {
+    fn idle_root_with_ack_one_round_behind_is_exchanging() {
         let ours = "did:key:z6MkThisDevice000000000000000000000";
         let sibling = "did:key:z6MkSiblingDevice0000000000000000000".to_owned();
         let check = exchange_check(
             std::slice::from_ref(&sibling),
             ours,
-            Ok(Some(exchange_table(ours, &sibling, 12, 91))),
+            Ok(Some(exchange_table(ours, &sibling, 12, 6))),
             Some(90),
             1_000_000,
         );
-        assert_eq!(check.state, State::Degraded, "{check}");
-        assert!(
-            check
-                .detail
-                .contains("acknowledgement of this device's head is 91s old"),
-            "{check}"
-        );
-        assert!(!check.detail.contains("folded-from head is"), "{check}");
+        assert_eq!(check.state, State::Ok, "{check}");
+        assert!(check.detail.contains("seq 6, carried 12s ago"), "{check}");
+        assert!(!check.detail.contains("600s old"), "{check}");
     }
 
     #[cfg(feature = "peer")]
@@ -2861,14 +2886,34 @@ mod tests {
         let check = exchange_check(
             std::slice::from_ref(&sibling),
             ours,
-            Ok(Some(exchange_table(ours, &sibling, 12, 34))),
+            Ok(Some(exchange_table(ours, &sibling, 12, 7))),
             Some(90),
             1_000_000,
         );
         assert_eq!(check.state, State::Ok, "{check}");
         assert!(check.detail.contains("both directions"), "{check}");
         assert!(check.detail.contains("12s old"), "{check}");
-        assert!(check.detail.contains("34s old"), "{check}");
+    }
+
+    #[cfg(feature = "peer")]
+    #[test]
+    fn sibling_exchange_requires_acknowledgement_of_latest_root() {
+        let ours = "did:key:z6MkThisDevice000000000000000000000";
+        let sibling = "did:key:z6MkSiblingDevice0000000000000000000".to_owned();
+        let check = exchange_check(
+            std::slice::from_ref(&sibling),
+            ours,
+            Ok(Some(exchange_table(ours, &sibling, 12, 0))),
+            Some(90),
+            1_000_000,
+        );
+        assert_eq!(check.state, State::Degraded, "{check}");
+        assert!(
+            check
+                .detail
+                .contains("only to seq 0, before its latest announced root at seq 1"),
+            "{check}"
+        );
     }
     #[cfg(feature = "peer")]
     #[test]
