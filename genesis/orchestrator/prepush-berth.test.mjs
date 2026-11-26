@@ -61,7 +61,18 @@ case "$1" in
  claim)
   [ ! -f "$here/hang" ] || { trap '' TERM; sleep 300; }
   [ ! -f "$here/refuse" ] || { echo "$2: REFUSED — held by did:key:z6MkOther/claude-2" >&2; exit 3; }
-  n=$(grep -c "|claim $2 " "$here/calls.log" 2>/dev/null || true); m=$(mode "$2"); token=1001.125
+  check=0; [[ " $* " != *" --check "* ]] || check=1
+  if [ "$check" -eq 0 ]; then echo "$2" >> "$here/claim-records.log"; fi
+  n=$(grep -c "^$2$" "$here/claim-records.log" 2>/dev/null || true); m=$(mode "$2"); token=1001.125
+  if [ "$check" -eq 1 ]; then
+   case "$m" in
+    W|D) f="$here/override-at"; at=$(cat "$f"); if [ "$(date +%s%3N)" -lt "$at" ]; then echo "$2: WAITING — unconfirmed: sibling — override on the record" >&2; exit 1; fi; echo "$2: effective for \${ELOHIM_SESSION_ID:-claude-9}"; exit 0;;
+    P) echo "$2: effective for \${ELOHIM_SESSION_ID:-claude-9}"; exit 0;;
+    Q) echo "$2: WAITING — unconfirmed: sibling — override on the record" >&2; exit 1;;
+    X) echo "the steward lease view did not answer" >&2; exit 1;;
+    H) echo "$2: REFUSED — held by did:key:z6MkDeviceA/claude-1 since 2026-10-23T15:28:09Z" >&2; exit 3;;
+   esac
+  fi
   [ "$m" != N ] || [ "$n" -lt 2 ] || token=1009.500
   case "$m" in
    3) echo "$2: REFUSED — held by did:key:z6MkDeviceA/claude-1" >&2; exit 3;;
@@ -73,10 +84,11 @@ case "$1" in
    W|D)
     f="$here/override-at"; [ -f "$f" ] || printf %s "$(( $(date +%s%3N) + \${STUB_OVERRIDE_IN_MS:-1500} ))" > "$f"; at=$(cat "$f")
     if [ "$(date +%s%3N)" -lt "$at" ]; then extra=""; [ "$m" != D ] || extra=" (this device's peer daemon is not running: start it with epr peer serve)"; echo "$2: REFUSED — unconfirmed: sibling$extra — override on the record" >&2; echo "  override_at_ms=$at claimed_at=1001.125" >&2; exit 3; fi;;
-   P|Q|X)
+   P|Q|X|H)
     if [ "$n" -eq 1 ]; then at="$(( $(date +%s%3N) + 60000 ))"; echo "$2: REFUSED — unconfirmed: sibling — override on the record" >&2; echo "  override_at_ms=$at claimed_at=1001.125" >&2; exit 3; fi
     [ "$m" != Q ] || { echo "$2: REFUSED — unconfirmed: sibling" >&2; exit 3; }
-    [ "$m" != X ] || { echo "the steward lease view did not answer" >&2; exit 1; };;
+    [ "$m" != X ] || { echo "the steward lease view did not answer" >&2; exit 1; }
+    [ "$m" != H ] || { echo "$2: REFUSED — held by did:key:z6MkDeviceA/claude-1" >&2; exit 3; };;
   esac
   [ "$n" -gt 1 ] || [ "$m" = R ] && verb=renewed || verb=claimed
   echo "$2: $verb by \${ELOHIM_SESSION_ID:-claude-9} claimed_at=$token";;
@@ -135,6 +147,10 @@ function calls(fx) {
     : [];
 }
 const argv = (l) => l.split("|")[1];
+const claimChecks = (c) =>
+  c.filter((l) => argv(l).startsWith("claim dev-integration ") && argv(l).includes(" --check "));
+const claimWrites = (c) =>
+  c.filter((l) => argv(l).startsWith("claim dev-integration ") && !argv(l).includes(" --check "));
 const field = (l, k) =>
   l
     .split("|")
@@ -368,7 +384,7 @@ test("an_effective_claim_ends_the_override_wait_on_the_short_poll", async (t) =>
   );
   await pollCalls(fx, (c) => !!release(c));
 });
-test("unconfirmed_and_error_override_polls_do_not_proceed_early", (t) => {
+test("override_polls_are_read_only_while_unconfirmed_or_unreadable", (t) => {
   for (const mode of ["Q", "X"]) {
     const r = runBlock(fixture(t), {
       env: {
@@ -379,8 +395,22 @@ test("unconfirmed_and_error_override_polls_do_not_proceed_early", (t) => {
     });
     assert.equal(r.status, 1, `${mode}: ${r.out}`);
     assert.doesNotMatch(r.out, /proceeding \(override not needed\)/);
-    assert.ok(r.calls.filter((l) => argv(l).startsWith("claim ")).length >= 3, r.out);
+    assert.ok(claimChecks(r.calls).length >= 2, r.out);
+    assert.equal(claimWrites(r.calls).length, 1, r.calls.join("\n"));
   }
+});
+test("a_terminal_refusal_from_an_override_poll_stops_with_berths_reason", (t) => {
+  const r = runBlock(fixture(t), {
+    env: {
+      BERTH_MODES: '{"dev-integration":"H"}',
+      BERTH_OVERRIDE_POLL_S: "1",
+      BERTH_PREPUSH_OVERRIDE_MAX_S: "8",
+    },
+  });
+  assert.equal(r.status, 1, r.out);
+  assert.match(r.out, /dev-integration: REFUSED — held by did:key:z6MkDeviceA\/claude-1 since /);
+  assert.equal(claimChecks(r.calls).length, 1, r.calls.join("\n"));
+  assert.equal(claimWrites(r.calls).length, 1, r.calls.join("\n"));
 });
 test("the_override_wait_is_bounded", async (t) => {
   const fx = fixture(t),

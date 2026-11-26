@@ -38,6 +38,9 @@ Commands:
   berth touch   --session S [--pid N]                              liveness heartbeat (hooks call it)
   berth claim   RESOURCE --session S [--class verify|measure|mesh] [--ttl SECONDS] [--note TEXT]
                 [--closure KEY] [--offline-ok]                      take one unit; exit 3 if held or refused
+  berth claim   RESOURCE --session S --check                        read-only steward verdict: exit 0 effective
+                                                                   for S, 1 not yet effective/unreadable,
+                                                                   3 terminal refusal; writes no berth record
   berth release RESOURCE --session S [--expected-claimed-at T] [--force]
                                                                    --force gives back whoever holds it
   berth owner-check RESOURCE [--action A] [--force]                exit 3 while another live session
@@ -2144,6 +2147,37 @@ class Berth:
         seen = view.get("seen") if isinstance(view.get("seen"), dict) else {}
         return True, seen, "renewing" if mine else False, None
 
+    def claim_check(self, resource, session):
+        """Read only where a steward claim stands for `session`.
+
+        Returns (True, reason) only for this session's effective verdict, (False, reason) for a
+        terminal refusal, and (None, reason) while it is not effective or the view is unreadable.
+        Unlike a claim/renew this writes no lease, liveness, refusal or crossing record.
+        """
+        if not self.steward_scoped(resource):
+            raise BerthUsage("--check is only for a steward-scoped resource")
+        view, err = self.peer_leases()
+        if err:
+            return None, err
+        standing = view.get("standing")
+        if standing == "revoked":
+            return False, f"revoked: {view.get('why')}"
+        if standing != "device":
+            return None, f"the steward lease view names no standing (`{standing}`)"
+        verdict = view.get(resource)
+        if not isinstance(verdict, dict):
+            return None, (f"this device's lease on {resource} is not in its channel store "
+                          "(the dev-berth-events@1 fold did not land)")
+        kind = verdict.get("verdict")
+        holder = verdict.get("session")
+        if kind == "effective" and holder == session:
+            return True, "effective"
+        if kind in ("held_by", "refused_by"):
+            return False, steward_reason(verdict, self._view_now(view))
+        if holder != session:
+            return False, f"held by {holder} on this device"
+        return None, steward_reason(verdict, self._view_now(view))
+
     def _mark_effective(self, resource, session, effective=True, override_row=None,
                         supersede_override=False):
         with self._locked():
@@ -2257,8 +2291,11 @@ class Berth:
                 elif (isinstance(delayed_verdict, dict)
                       and delayed_verdict.get("verdict") == "effective"
                       and delayed_verdict.get("session") == session):
+                    delayed_override_at = delayed_verdict.get("override_at")
+                    supersede = bool(isinstance(delayed_override_at, (int, float))
+                                     and self._view_now(delayed) < delayed_override_at)
                     self._mark_effective(resource, session, override_row=override_written,
-                                         supersede_override=True)
+                                         supersede_override=supersede)
                     return True, lease, f"claimed; override on the record — {reason}"
                 elif (isinstance(delayed_verdict, dict)
                       and delayed_verdict.get("verdict") in ("held_by", "refused_by")):
@@ -3881,7 +3918,8 @@ def _main(argv):
     if cmd == "status" and "--json" in argv:
         print(json.dumps(status_json(Berth(read_only=True), no_peer="--no-peer" in argv)))
         return 0
-    b = Berth(read_only=True) if cmd in ("verify-released", "holds", "impact") else Berth()
+    claim_check = cmd == "claim" and "--check" in argv
+    b = Berth(read_only=True) if cmd in ("verify-released", "holds", "impact") or claim_check else Berth()
     session = _opt(argv, "--session")
     source = "flag" if session else None
     if cmd == "verify-released":
@@ -3953,7 +3991,7 @@ def _main(argv):
         # Parsed and class-checked BEFORE the session is resolved: a class this berth does not run
         # is refused (exit 3) whether or not the caller can name itself.
         usage = ("usage: berth claim RESOURCE --session S [--class verify|measure|mesh] [--ttl SECONDS] [--note TEXT] "
-                 "[--closure KEY] [--offline-ok]")
+                 "[--closure KEY] [--offline-ok] [--check]")
         ttl = _opt(argv, "--ttl")
         note = _opt(argv, "--note")
         klass = _opt(argv, "--class") or DEFAULT_CLASS
@@ -3962,7 +4000,7 @@ def _main(argv):
             print(usage, file=sys.stderr)
             return 2
         offline_ok = "--offline-ok" in argv
-        argv = [a for a in argv if a != "--offline-ok"]
+        argv = [a for a in argv if a not in ("--offline-ok", "--check")]
         if not argv:
             print(usage, file=sys.stderr)
             return 2
@@ -3981,7 +4019,7 @@ def _main(argv):
         if reason:
             print(f"{res}: REFUSED — {reason}", file=sys.stderr)
             return 3
-        claim_args = (res, note, ttl_s, klass, override, offline_ok, closure)
+        claim_args = (res, note, ttl_s, klass, override, offline_ok, closure, claim_check)
 
     if cmd == "owner-check":
         if not argv:
@@ -4160,7 +4198,15 @@ def _main(argv):
             print(f"{res}: released here, but {why} — the other devices still see it held", file=sys.stderr)
         return 1 if failed else 0
     if cmd == "claim":
-        res, note, ttl_s, klass, override, offline_ok, closure = claim_args
+        res, note, ttl_s, klass, override, offline_ok, closure, check = claim_args
+        if check:
+            state, reason = b.claim_check(res, session)
+            if state is True:
+                print(f"{res}: effective for {session}")
+                return 0
+            label = "REFUSED" if state is False else "WAITING"
+            print(f"{res}: {label} — {reason}", file=sys.stderr)
+            return 3 if state is False else 1
         # The envelope's store binding is checked first (a foreign store is never read), then
         # corrupt state refuses before any touch/moor write.
         with envelope_guard(session, b.dir):
