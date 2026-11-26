@@ -712,6 +712,67 @@ _gate-agentic-shift:
     # The cargo-pool library every session hook sources (backlog row 6), with family_busy (row 13).
     python3 -m unittest genesis.agentic.pool_preflight_test genesis.agentic.pool_family_test genesis.agentic.pool_artifact_hashes_test genesis.agentic.lsp_attach_test genesis.agentic.lsp_flycheck_test
 
+# Agent-authored Python utilities and hooks. Every file reports even after an earlier red.
+_gate-agentic-tools:
+    #!/usr/bin/env bash
+    set -uo pipefail
+    result=0
+    epr_bin="$(node genesis/orchestrator/device-epr.mjs)" || epr_bin=""
+    if [[ -n "$epr_bin" && -x "$epr_bin" ]]; then
+      export EPR_BIN="$epr_bin"
+    else
+      printf '%s\n' '[agentic-tools] FAIL genesis/agentic/session_envelope_test.py (UNMEASURED — device head epr is unavailable)'
+      result=1
+    fi
+    run_test() {
+      local test_file="$1"
+      shift
+      if "$@"; then
+        printf '[agentic-tools] PASS %s\n' "$test_file"
+      else
+        local status=$?
+        printf '[agentic-tools] FAIL %s (exit %s)\n' "$test_file" "$status"
+        result=1
+      fi
+    }
+    hook_tests=(
+      .claude/hooks/tests/test_berth_note_inject.py
+      .claude/hooks/tests/test_berth_writes_observe.py
+      .claude/hooks/tests/test_blind_reader_review.py
+      .claude/hooks/tests/test_brit_first_forms.py
+      .claude/hooks/tests/test_cargo_disk_guard_pool.py
+      .claude/hooks/tests/test_cargo_disk_guard_seats.py
+      .claude/hooks/tests/test_cargo_disk_guard_yield.py
+      .claude/hooks/tests/test_gate_live_inject.py
+      .claude/hooks/tests/test_held_tool_ensure.py
+      .claude/hooks/tests/test_hook_budgets.py
+      .claude/hooks/tests/test_load_project_context.py
+      .claude/hooks/tests/test_lsp_edit_event.py
+      .claude/hooks/tests/test_sensor_scan_budget.py
+      .claude/hooks/tests/test_sibling_miss_inject.py
+    )
+    for test_file in "${hook_tests[@]}"; do
+      run_test "$test_file" python3 -m unittest discover -s .claude/hooks/tests -p "${test_file##*/}"
+    done
+    agentic_tests=(
+      genesis/agentic/bin-head-notice_test.py
+      genesis/agentic/dup_census_test.py
+      genesis/agentic/held_tool_watch_test.py
+      genesis/agentic/lsp_null_test.py
+      genesis/agentic/peer_liveness_test.py
+      genesis/agentic/ram_guard_session_test.py
+    )
+    for test_file in "${agentic_tests[@]}"; do
+      run_test "$test_file" python3 -m unittest "$test_file"
+    done
+    run_test .claude/hooks/tests/test_io_guard.py python3 -m unittest discover -s .claude/hooks/tests -p test_io_guard.py
+    run_test .claude/hooks/tests/test_ram_guard.py python3 .claude/hooks/tests/test_ram_guard.py
+    run_test .claude/hooks/tests/test_sensitive_file_protection.py python3 -m unittest discover -s .claude/hooks/tests -p test_sensitive_file_protection.py
+    if [[ -n "${EPR_BIN:-}" ]]; then
+      run_test genesis/agentic/session_envelope_test.py python3 genesis/agentic/session_envelope_test.py --parallel --jobs "${AGENTIC_TOOLS_JOBS:-4}"
+    fi
+    exit "$result"
+
 # `pnpm build` first: @elohim/epr ships no dist/ in the tree, so a consumer's
 # import fails at module resolution rather than at type-check. Testing a package
 # that cannot be imported proves the tests, not the package.

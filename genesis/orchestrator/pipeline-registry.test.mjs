@@ -135,6 +135,9 @@ describe('pipeline-registry', () => {
     assert.ok(gates.size >= 23, `expected ≥23 gates, got ${gates.size}`);
     assert.strictEqual(gates.get('doorway').dir, 'doorway/doorway-service');
     assert.strictEqual(gates.get('doorway').run.kind, 'just');
+    assert.deepStrictEqual(gates.get('agentic-tools').run, {
+      kind: 'root-just', recipe: '_gate-agentic-tools',
+    });
   });
 });
 

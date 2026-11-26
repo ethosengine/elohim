@@ -13,8 +13,42 @@ import tempfile
 import unittest
 
 REPO = Path(__file__).resolve().parents[2]
-BINARY = Path(os.environ.get('EPR_BIN', '/var/tmp/eprfs-a2-target/debug/epr')).resolve()
+
+
+def resolve_device_epr(run=subprocess.run, env=os.environ):
+    """Resolve the device head; case workers may use the parent's stripped copy of that head."""
+    resolver = REPO / 'genesis/orchestrator/device-epr.mjs'
+    try:
+        result = run(['node', str(resolver), '--json'], cwd=REPO, capture_output=True,
+                     text=True, timeout=10, check=False)
+        payload = json.loads(result.stdout) if result.returncode == 0 else {}
+        binary = Path(payload.get('command', '')).resolve()
+        if payload.get('source') != 'head' or not binary.is_file() or not os.access(binary, os.X_OK):
+            raise ValueError(payload.get('why') or 'device head did not resolve to an executable')
+        case_binary = env.get('SESSION_ENVELOPE_CASE_EPR')
+        if case_binary:
+            candidate = Path(case_binary).resolve()
+            if not candidate.is_file() or not os.access(candidate, os.X_OK):
+                raise ValueError('the device-head-derived case executable is unavailable')
+            return candidate
+        return binary
+    except (OSError, ValueError, json.JSONDecodeError, subprocess.SubprocessError) as error:
+        raise RuntimeError(f'UNMEASURED: device head epr is unavailable ({error})') from error
+
+
+BINARY = resolve_device_epr()
 RUNTIMES = {'claude': ('claude-code', 4101), 'codex': ('codex', 4102)}
+
+
+class DeviceEprResolutionTest(unittest.TestCase):
+    def test_path_fallback_is_unmeasured(self):
+        result = subprocess.CompletedProcess(
+            args=[], returncode=0,
+            stdout=json.dumps({'command': '/bin/false', 'source': 'path', 'why': 'no device head'}),
+            stderr='',
+        )
+        with self.assertRaisesRegex(RuntimeError, 'UNMEASURED.*no device head'):
+            resolve_device_epr(run=lambda *_args, **_kwargs: result, env={})
 
 
 def write(path, text):
@@ -1299,7 +1333,8 @@ def run_parallel(jobs, exclude, case_timeout):
     else:
         print('session_envelope_test: strip unavailable; the cases run the unstripped epr',
               file=sys.stderr, flush=True)
-    os.environ['EPR_BIN'] = str(binary)  # case processes inherit it; BINARY is read from it
+    # A case still resolves the device head before accepting this per-run stripped derivative.
+    os.environ['SESSION_ENVELOPE_CASE_EPR'] = str(binary)
     batches = ([i for i in ids if i not in SERIAL_TAIL], jobs), ([i for i in ids if i in SERIAL_TAIL], 1)
     failed, reported, interrupted = [], set(), None
 
