@@ -515,7 +515,9 @@ process.exit(73);
   assert.doesNotMatch(r.stdout + r.stderr, /FAILED/);
 });
 
-test("a gate stopped from outside records no verdict and still refuses the push", (t) => {
+// The runner is stubbed here: this proves the hook refuses a non-zero runner that reports an
+// outside stop. The real runner's outside-signal verdict handling is covered in gate-stop.test.mjs.
+test("a stubbed non-zero runner reporting an outside stop still makes the hook refuse the push", (t) => {
   const dir = fixture(t);
   writeFileSync(join(dir, "genesis/orchestrator/gate-runner.mjs"), `
 import { spawnSync } from "node:child_process";
