@@ -1,7 +1,7 @@
 ---
 id: brit-feedback-operation-2026-11-11
 title: Brit feedback reaches daily operation and the next sprint
-status: In Progress
+status: in-flight  # source uncommitted in shared tree per plan body
 date: 2026-11-11
 serves: private-feedback-loop
 steward: human:matthew

@@ -1,7 +1,7 @@
 ---
 title: Licence tiers — primitives share alike, services protect the commons, everything else is a gift
 id: licence-tiers-decision
-status: Decided
+status: approved  # ruled 2026-11-06; graduation-trigger (counsel confirmation, first pinned release) unmet
 class: governance
 serves: licence-tiers-declared
 date: 2026-11-06

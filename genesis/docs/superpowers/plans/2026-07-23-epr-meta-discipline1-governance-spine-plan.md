@@ -4,6 +4,7 @@ id: epr-meta-discipline1-governance-spine-plan
 status: claimed-not-verified
 verification_note: "landed (c67b8c2e3). 2026-09-24: Python legs green — test_governance_parity.py 52 assertions, test_escalation_ladder.py 6; the Rust parity leg (T2) was not re-run"
 landed_commit: c67b8c2e3
+verified_by: "python3 .claude/scripts/_lib/__tests__/test_governance_parity.py EXIT=0 (80 assertions, 18/18 corpus vectors exercised, 0 skipped; vector ask-fires-refer asserts decision=='refer', winning_class=='ask', refer.reason, witnessed) and python3 .claude/scripts/_lib/__tests__/test_escalation_ladder.py EXIT=0 (6 assertions), at dev dc2829b49, 2026-11-26. Python legs only; the Rust parity leg (T2) not re-run (cargo)"
 class: protocol-canonical
 created: 2026-07-23
 domain: D2

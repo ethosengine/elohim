@@ -2,6 +2,7 @@
 id: placement-seam-check-report
 title: Adversarial seam check of the placement-contract interfaces — reviser's report
 status: DONE_WITH_CONCERNS
+verified_by: "doc-only claims checked 2026-11-26: `epr flow cites verify` on specs/2026-10-20-placement-contract-interfaces-design.md returns all cites content-addressed + resolvable; the spec and its reconciliation section (line 3339) exist on dev; 5e7612aa7 is on origin/dev (read 2026-11-26)"
 class: architecture
 gap: plans__2026-10-20-placement-contract-architecture-plan#4
 actor: agent:implementer@claude-opus-5-5

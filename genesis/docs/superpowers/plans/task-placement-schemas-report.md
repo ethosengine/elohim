@@ -2,6 +2,7 @@
 id: placement-schemas-report
 title: "S1-S5 report: the SDK schemas (tree view, needs block, placement intents, parameter set)"
 status: DONE_WITH_CONCERNS
+verified_by: "signed gate:schema-validate and gate:schema-codegen attestations success=true at 293da5672 (dev, contains 5e7612aa7, builtAt 2026-11-15); the codegen-freshness follow-ons the report names are in 5e7612aa7 (read 2026-11-26 via brit notes)"
 class: architecture
 gap: plans__2026-10-20-placement-contract-architecture-plan#10
 actor: agent:implementer@claude-opus-5-5

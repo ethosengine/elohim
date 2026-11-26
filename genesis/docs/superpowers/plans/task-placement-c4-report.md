@@ -2,6 +2,7 @@
 id: placement-c4-report
 title: "C4 — eprfs: slice-1 renames, the tier, reach and view interfaces, eprfs-serve, eprfs-ts and the eprfs seam governance (E4)"
 status: DONE_WITH_CONCERNS
+verified_by: "elohim-eprfs/dev #217 SUCCESS at c4bea4ded (contains 5e7612aa7; eprfs-core derive/walk/level_walk tests PASS in its nextest log) and signed gate:eprfs attestation success=true at ff65a9e0c (builtAt 2026-11-25) (read 2026-11-26 via Jenkins and brit notes)"
 class: architecture
 gap: plans__2026-10-20-placement-contract-architecture-plan#27
 actor: agent:implementer@codex

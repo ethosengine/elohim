@@ -2,6 +2,7 @@
 id: placement-c5-report
 title: "C5 report — elohim-storage adapters: the ranking shim, the blob-store tier, the root reach gate and rail R-P8"
 status: DONE_WITH_CONCERNS
+verified_by: "signed gate:elohim-storage attestation success=true at 22b97392d (dev, contains 5e7612aa7, builtAt 2026-11-25; also 7d44849c6 and 0c3b6bf4d) (read 2026-11-26 via brit notes refs/notes/brit/build/gate%3Aelohim-storage)"
 class: architecture
 gap: plans__2026-10-20-placement-contract-architecture-plan#28
 actor: agent:implementer@codex

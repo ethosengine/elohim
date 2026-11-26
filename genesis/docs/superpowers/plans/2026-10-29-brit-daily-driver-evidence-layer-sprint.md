@@ -1,7 +1,7 @@
 ---
 id: brit-daily-driver-evidence-layer-sprint
 title: "Sprint: brit daily-driver — opens the monorepo, every claim fails closed"
-status: in-progress
+status: in-flight  # brit pin b52a1007 holds the trust-lane commits; G3-G9 not shown on the pin
 class: architecture
 serves: [brit-native-daily-driver, push-delivers-within-budget, push-gate-pays-once]
 steward: human:matthew

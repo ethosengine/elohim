@@ -2,6 +2,7 @@
 title: "Closure Posture — what silence means, declared per axis"
 id: closure-posture-axis-card-plan
 status: Landed
+verified_by: "pnpm run schema:test EXIT=0 at dev dc2829b49 on 2026-11-26: the registries leg passes (closure accepts open/closed, rejects partial; epistemic and reach axis cards conform; half or missing closure posture rejected). Log genesis/local-dev/memory-stasis-2026-11-26-schema-test.log. No gate runs schema:test, so this was a direct run on the steward device."
 class: protocol-canonical
 created: 2026-07-24
 domain: D2

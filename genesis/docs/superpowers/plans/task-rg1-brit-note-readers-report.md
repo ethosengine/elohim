@@ -1,7 +1,7 @@
 ---
 title: "Re-genesis 1 follow-on: ark brit_index and gate-evidence read the epoch-2 note format"
 id: task-rg1-brit-note-readers-report
-status: landed-on-branch
+status: landed  # readers re-landed on dev as d6d33fdb4 (d0a790265 itself is not on dev)
 landed_commit: "d0a790265 on regenesis/brit-note-readers (local, unpushed; base 89d4a22ff)"
 verified_by:
   - "Reviewer (agent:rust-architect@claude-opus-5-5): a REAL brit.validate@2 note minted by brit-build-ref built from brit c3b3d8af074e (fixtures/brit-validation-attestation-epoch2.json) verifies locally with brit off the path; `npx tsx --test genesis/a2o/scripts/__tests__/household-attestation.test.ts` 42 pass 0 fail EXIT=0; `node --test genesis/orchestrator/serving-receipt.test.mjs` 38 pass 0 fail EXIT=0. See the Reviewer section."

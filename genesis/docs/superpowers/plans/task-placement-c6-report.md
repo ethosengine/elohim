@@ -2,6 +2,7 @@
 id: placement-c6-report
 title: "C6 — TypeScript: verifyAddress, HttpTier and placement status, the service worker's CacheTier"
 status: DONE_WITH_CONCERNS
+verified_by: "signed gate:epr-ts, gate:storage-client-ts success=true at ac4df62d7 and gate:elohim-app success=true at 0c3b6bf4d, all dev commits containing 5e7612aa7 (read 2026-11-26 via brit notes refs/notes/brit/build/gate*)"
 class: architecture
 gap: plans__2026-10-20-placement-contract-architecture-plan#29
 actor: agent:implementer@codex

@@ -3,6 +3,7 @@ title: "Dogfood .epr-meta Native Governance + Certify Claude→Elohim-Native Tra
 id: epr-meta-native-capability-dogfood-and-graph
 tier: spec
 status: claimed-not-verified
+verified_by: "2026-11-26, live run of node elohim/sdk/domains/elohim-agent/scripts/package-projections.mjs verify exits 0, 2460 passed (clears the 2026-09-24 four stale-projection failures); steward device own signed gate:eprfs attestation success:true at de1d22eababc (2026-10-27), a descendant of 8f322dfdf (range aefa1b2cf..8f322dfdf, ancestors of origin/dev). Not re-run: Python cascade/parity and ci_trigger suites, pre-push drift gate. Own-device evidence only."
 verification_note: "landed (aefa1b2cf..8f322dfdf). 2026-09-24 package-projections.mjs verify: 2075 pass, 4 FAIL — stale runtime projections of CLAUDE.md and the hc-dev-orchestrator skill, both edited directly in 33b604518 instead of through their packages"
 landed_commit: 8f322dfdf  # range aefa1b2cf..8f322dfdf per §Implemented
 created: 2026-07-10

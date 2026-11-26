@@ -2,6 +2,7 @@
 title: "Third-party gate closure — the consumer's verdict surface, declared"
 id: third-party-gate-closure-plan
 status: Landed
+verified_by: "pnpm run schema:test EXIT=0 at dev dc2829b49 on 2026-11-26: modular manifest $refs resolve with no phantom $ref errors; an event-handling gate without closure is rejected; an inert gate may omit it; a closure outside the vocabulary is rejected; lamad manifest non-regression passes. Log genesis/local-dev/memory-stasis-2026-11-26-schema-test.log. No gate runs schema:test, so this was a direct run on the steward device."
 class: protocol-canonical
 created: 2026-07-24
 domain: D2

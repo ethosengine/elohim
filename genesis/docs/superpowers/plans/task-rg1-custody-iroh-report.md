@@ -2,8 +2,8 @@
 title: "Re-genesis 1 R1 report: custody announcements carry an authenticated author over iroh"
 id: task-rg1-custody-iroh-report
 status: claimed-not-verified
-landed_commit: "afadfb5c9 + 33bf2b742 (ruling follow-up) on regenesis/integrate (local, unpushed)"
-verified_by:
+landed_commit: "afadfb5c9 + 33bf2b742 (ruling follow-up) on regenesis/integrate, both on origin/dev (checked 2026-11-26); status stays claimed-not-verified until a household T2 receipt shows custody received > 0"
+verified_by: "signed gate:elohim-storage attestation success=true at 22b97392d (dev; contains afadfb5c9 and 33bf2b742; builtAt 2026-11-25) (read 2026-11-26 via brit notes refs/notes/brit/build/gate%3Aelohim-storage)"
 actor: agent:rust-architect@claude-opus-5-5
 cites: []
 concerns:

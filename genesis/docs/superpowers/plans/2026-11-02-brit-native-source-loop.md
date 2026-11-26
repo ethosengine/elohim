@@ -1,7 +1,7 @@
 ---
 id: brit-native-source-loop-2026-11-02
 title: Brit's first native source-to-execution loop
-status: Planned
+status: proposed  # no landing commit; graduation-trigger unmet
 date: 2026-11-02
 serves: brit-native-daily-driver
 steward: human:matthew

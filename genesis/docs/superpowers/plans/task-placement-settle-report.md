@@ -2,6 +2,7 @@
 id: placement-settle-report
 title: Settling the placement-contract spec — report
 status: DONE_WITH_CONCERNS
+verified_by: "doc-only claims checked 2026-11-26: specs/2026-10-20-what-every-app-inherits-placement-contract-design.md exists on dev with the settled live-channel row ('chosen only for slice 1') and the 'Reads only what it holds' bullet, and `epr flow cites verify` on it returns all cites content-addressed + resolvable; 5e7612aa7 is on origin/dev (read 2026-11-26)"
 class: architecture
 gap: plans__2026-10-20-placement-contract-architecture-plan#1
 actor: agent:implementer@claude-opus-5-5

@@ -2,6 +2,7 @@
 id: placement-c2-report
 title: "C2 report — elohim-compute's runtime split, then elohim/placement/core"
 status: DONE_WITH_CONCERNS
+verified_by: "signed gate:elohim-placement attestation success=true at a85090fd4 and gate:elohim-compute success=true at 5535405d4, both dev commits containing 5e7612aa7 (read 2026-11-26 via brit notes refs/notes/brit/build/gate*); elohim-eprfs/dev #217 SUCCESS compiled placement-core under clippy"
 class: architecture
 gap: plans__2026-10-20-placement-contract-architecture-plan#25
 actor: agent:implementer@claude-opus-5-5

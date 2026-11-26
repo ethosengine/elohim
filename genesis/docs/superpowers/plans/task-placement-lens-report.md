@@ -2,6 +2,7 @@
 id: placement-lens-report
 title: Applying the three design-lens findings to the placement-contract spec
 status: DONE_WITH_CONCERNS
+verified_by: "doc-only claims checked 2026-11-26: `epr flow cites verify` on specs/2026-10-20-what-every-app-inherits-placement-contract-design.md returns all cites content-addressed + resolvable and the 'Reads only what it holds' bullet (F2) is present at line 390; 5e7612aa7 is on origin/dev (read 2026-11-26)"
 class: architecture
 gap: plans__2026-10-20-placement-contract-architecture-plan#23
 actor: agent:implementer@claude-opus-5-5

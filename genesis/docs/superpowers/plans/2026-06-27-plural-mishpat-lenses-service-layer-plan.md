@@ -2,6 +2,7 @@
 title: "Plural Mishpat Lenses over an EPR — service-layer vertical slice (DNA teeth → DAO → service → route)"
 id: plural-mishpat-lenses-service-layer-plan
 status: claimed-not-verified   # S1–S8 code landed + gate-green locally (7ff99ebcd); S9 live render is the open verification gap — see "Decomposition status" below
+verified_by: "PARTIAL 2026-11-26: S1-S8 storage legs only. Steward device own signed gate:elohim-storage attestation success:true at bd7b1094a60a (2026-10-26), a descendant of 7ff99ebcd on origin/dev (mishpat_commitment_facing.rs and elohim-facings lens_affinity.rs present). NOT covered: S1 sweettest on a 1-conductor stack and S9 live render on household-nodes, the plan own open gap; the checked FIXED boxes are not evidence. Status stays claimed-not-verified."
 class: protocol-canonical
 domain: D7
 sprint: vision-deferred   # D7 collective-governance ranks below the household seed; this is the read+write vertical proof, not a scheduled sprint
@@ -21,7 +22,7 @@ cites:
   - elohim/elohim-storage/src/api/mod.rs
   - elohim/elohim-storage/src/api/resilience.rs
   - elohim/elohim-storage/src/views_convert/lamad.rs
-  - elohim/elohim-views/src/lens.rs
+  - crates/elohim-views/src/lens.rs
   - elohim/elohim-facings/src/folds/lens_affinity.rs
   - elohim/elohim-facings/src/folds/lens_contention.rs
   - elohim/elohim-facings/src/folds/lens_selector.rs

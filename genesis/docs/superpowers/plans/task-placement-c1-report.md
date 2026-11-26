@@ -2,6 +2,7 @@
 id: placement-c1-report
 title: "C1 report — seam-contracts: the ruling-7 unanswered type, status channel and probe reading"
 status: DONE_WITH_CONCERNS
+verified_by: "just gate seam-contracts EXIT=0 at dev dc2829b49 (contains 5e7612aa7): fmt, lint -D warnings, 158+6+6 tests and 18 doctests pass, wasm build ok; run 2026-11-26 on the steward device, log genesis/local-dev/memory-stasis-2026-11-26-gate-seam-contracts-2.log (submodule checkouts brit/rakia differed from pin, outside this crate)"
 class: architecture
 gap: plans__2026-10-20-placement-contract-architecture-plan#24
 actor: agent:implementer@codex

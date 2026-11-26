@@ -2,6 +2,7 @@
 title: Auth Wire-Contract Completion — schema-contract the doorway auth shapes, migrate the Angular consumers
 id: auth-wire-contract-completion-plan
 status: landed
+verified_by: "signed gate:doorway success=true at ac4df62d7, gate:elohim-app success=true at 0c3b6bf4d, gate:schema-validate and gate:schema-codegen success=true at 293da5672, all dev commits containing the plan's landing commits 09becf281, df41f874d, 9dd0a286e, f5a8d86a7 (read 2026-11-26 via brit notes)"
 class: protocol-canonical
 domain: D8
 sprint: unranked — born 2026-06-10; sequenced AFTER sdk-core-entrypoints-plan (identity package churn). Operational wire-contract only — no storage, no DHT.

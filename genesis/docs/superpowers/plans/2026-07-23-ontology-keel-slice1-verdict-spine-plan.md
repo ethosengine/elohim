@@ -2,6 +2,7 @@
 title: "Ontology Keel Slice 1 — the verdict spine, the epistemic axis, and peer review as value flow"
 id: ontology-keel-slice1-verdict-spine-plan
 status: claimed-not-verified
+verified_by: "2026-11-26, steward device own signed gate attestations (brit notes) success:true: gate:elohim-epr (covers elohim/epr verdict.rs 4 tests and elohim/epr-rea epistemic.rs 8 tests) at d5603787853d (2026-10-26) and gate:elohim-storage (reach_earning.rs From<ReachVerdict> and schema_contract verdict_view_matches_schema) at bd7b1094a60a (2026-10-26), both descendants of landing 713562975 on origin/dev; gate:schema-validate success:true at 6f4fc96a4964 (2026-11-01). Not covered: Tasks 1 and 5 JSON-schema negative tests (schema:test is run by no gate) and the epistemic-standing.feature a2o scenario (@wip). Own-device attestation only."
 verification_note: "landed (713562975; verdict.rs, epistemic.rs, decision schema, epistemic-standing.feature on disk); crate tests not re-run in the 2026-09-24 triage (host busy with another build)"
 landed_commit: 713562975
 class: protocol-canonical

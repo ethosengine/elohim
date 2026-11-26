@@ -4,7 +4,7 @@ id: map
 tier: architecture
 status: Living document
 created: 2026-06-02
-last-verified: 2026-10-28
+last-verified: 2026-11-26
 maintainers: Matthew Dowell + Opus 4.8
 realizes:
   - genesis/docs/content/elohim-protocol/value_scanner/epic.md (the household living core — the default reading path)

@@ -2,6 +2,7 @@
 title: Jenkins Seed Bearer-Gate — Stage A authorization for CI seeding (closes perimeter hole #2)
 id: jenkins-seed-bearer-gate-plan
 status: landed
+verified_by: "PARTIAL 2026-11-26: steward device own signed gate:doorway attestation success:true at ed14395017dc (2026-10-25), a descendant of landing 396779747 (http_permission.rs bearer-gate unit tests incl. fail-closed cases; seed.rs); elohim-genesis/dev #1793 (668a11d2, UNSTABLE for unrelated a2o failures) log shows seeder doorway-client-auth.test.ts bearer tests passing (Authorization Bearer attached, 401/403 actionable errors, dev-mode no-bearer path). NOT observed: the in-pipeline jenkins-ci self-provisioning and bearer-authenticated /admin/seed stage in a live seed run (log has no jenkins-ci or provision lines; seeding in #1793 ran against alpha storage directly)."
 class: protocol-canonical
 domain: D8
 sprint: unranked — born 2026-06-11; Stage A of the CI-substrate-authorization ladder

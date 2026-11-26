@@ -1,7 +1,8 @@
 ---
 title: "Reach Reconciliation Slice 1 — canonical enum consolidation + drift test"
 id: reach-vocab-slice1-canonical-enum-plan
-status: claimed-not-verified
+status: landed
+verified_by: "signed gate:elohim-storage attestation success=true at 22b97392d (dev; contains bc5dcc454; tests/api/reach_vocabulary_contract.rs present; builtAt 2026-11-25) and gate:elohim-epr success=true at a85090fd4 (read 2026-11-26 via brit notes)"
 verification_note: "landed (bc5dcc454); graduation-trigger asks for the drift test green in CI — not re-run in the 2026-09-24 triage"
 landed_commit: bc5dcc454  # drift test now tests/api/reach_vocabulary_contract.rs (grouped in b88503495)
 class: substrate

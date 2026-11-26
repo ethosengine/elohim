@@ -2,6 +2,7 @@
 id: graphos-look
 status: landed
 landed: 2026-06-11
+verified_by: "cd genesis/a2o && pnpm exec tsx --test scripts/__tests__/graphos-cli.test.ts scripts/__tests__/graphos-stories.test.ts EXIT=0, 33 pass / 0 fail (the test files are node:test, not vitest; the vitest form finds no tests); pnpm graphos list --base https://storybook.elohim.host EXIT=0 listing 522 lines; at dev dc2829b49, 2026-11-26. Proves the library and CLI parse/list; sheet and story rendering (Playwright) not re-run; the plan's unchecked task boxes are not proven by this"
 ---
 
 # graphos-look Implementation Plan

@@ -6,7 +6,7 @@ contentFormat: "markdown"
 title: "The vision × readiness sprint roadmap (the maintained prioritization home)"
 slug: "vision-readiness-sprint-roadmap"
 written: "2026-06-02"
-regenerated: "2026-09-09"
+regenerated: "2026-11-26"
 author: "cartographer"
 status: "active"
 target_window: "open-ended"
@@ -80,6 +80,24 @@ No new global ranking is inferred from that recall.
   These are authored gap states, not independent assertions or accepted outcomes.
 - Declared markdown scope is 41 in scope and zero BLOCKED-BY-ENV. This is a declaration read,
   not a live runtime probe. `local-conductor` and `owned-substrate` are unavailable.
+
+## Currency re-stamp 2026-11-26 (bounded; ranking inherited)
+
+A bounded currency pass under the regeneration contract (step 5). Only the ledger counts and the
+scope line were re-read; the vision axis was not re-mined and §1's order and readiness labels are
+still the inherited 2026-09-09 judgments, not newly verified.
+
+- Ledger now (`epr flow report placement --ledger`): 5,789 OPEN / 590 CLAIMED / 2 BLOCKED across
+  293 documents with items (614 scanned). The 2026-09-09 counts below (4,430 / 672 / 232 docs) are
+  superseded; these are authored gap states, not accepted outcomes. Scope: aligned.
+- Plan and timeline surfaces since the last stamp include, by commit subject: the research-disciplines
+  sprint (F1 to F4 landed and verified, three stations open), the gate-reuse work (no-fingerprint
+  gates sorted by cause; change-detection harvest stations), the governed-space design and its
+  memory-tended-once habit (declared unwired), bounded recall reaching authority, and the
+  slug-leftovers sprint with its NameBinding design gate. None of these re-ranks §1 here.
+- §4 (the doorway continuity investigation) was not re-checked for completion in this pass.
+
+---
 
 ## The ledger in one breath (read 2026-09-09)
 

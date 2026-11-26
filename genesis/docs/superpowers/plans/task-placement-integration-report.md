@@ -2,6 +2,7 @@
 id: placement-integration-report
 title: Placement interfaces — Codex recovery and integration evidence
 status: DONE_WITH_CONCERNS
+verified_by: "Every gate in its table holds green evidence on dev commits containing 5e7612aa7, read 2026-11-26: signed attestations for eprfs, elohim-placement, elohim-compute, elohim-ark, elohim-storage, elohim-epr, doorway, epr-ts, eprfs-ts, storage-client-ts, elohim-app, k8s-bridge, schema-validate and schema-codegen, plus elohim-eprfs/dev #217 SUCCESS. seam-contracts and constants-sync were run at dc2829b49 with EXIT=0 (logs genesis/local-dev/memory-stasis-2026-11-26-gate-*.log). All of this is the steward device's own evidence; the seat's self-receipt table was not counted."
 class: architecture
 gap: plans__2026-10-20-placement-contract-architecture-plan#22
 actor: agent:implementer@codex

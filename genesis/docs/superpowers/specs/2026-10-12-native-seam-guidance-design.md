@@ -1,6 +1,7 @@
 ---
 id: native-seam-guidance
-status: Implemented
+status: landed  # native seam evaluator on dev (5213c277b, opt-in 499727ff5); live activation per harness claimed separately
+verified_by: "signed gate:eprfs attestation success=true at 053f39078 (on origin/dev; contains 5213c277b and 499727ff5), read 2026-11-26 via brit notes. This is the steward device's own attestation. It covers the evaluator only; live harness activation is claimed separately, as the status comment says."
 class: design
 context-tier: warm
 steward: governance-plane-single-evaluator

@@ -2,6 +2,7 @@
 id: placement-interfaces-report
 title: The composed interfaces of the placement contract — report
 status: DONE_WITH_CONCERNS
+verified_by: "doc-only claims checked 2026-11-26: specs/2026-10-20-placement-contract-interfaces-design.md exists on dev, carries the section 'Interface implementation reconciliation (2026-10-21)' (line 3339), and `epr flow cites verify` on it returns all cites content-addressed + resolvable; commit 5e7612aa7 is on origin/dev (read 2026-11-26)"
 class: architecture
 gap: plans__2026-10-20-placement-contract-architecture-plan#3
 actor: agent:architect@claude-opus-5-5

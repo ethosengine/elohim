@@ -2,6 +2,7 @@
 id: placement-eprfs-slice1-e1-report
 title: eprfs slice 1, E1 — View and the view-scoped walk over any EprfsStorage
 status: DONE_WITH_CONCERNS
+verified_by: "elohim-eprfs/dev #217 SUCCESS at c4bea4ded (contains 5e7612aa7; eprfs-core derive/walk/level_walk tests PASS in its nextest log) and signed gate:eprfs attestation success=true at ff65a9e0c (builtAt 2026-11-25) (read 2026-11-26)"
 class: architecture
 gap: plans__2026-10-20-placement-contract-architecture-plan#5
 actor: agent:implementer@claude-opus-5-5
