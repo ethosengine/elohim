@@ -3303,5 +3303,13 @@ Records that already carry the row are left as they are.
 background task. Until it finishes, a request for a release the device holds is answered `NoRecord`, which also means "not
 held". Under load the gap passed five seconds. A device that does not build and follows in that window is told the release
 is absent. In progress: a distinct "index warming" answer that follow treats as ask-again inside its existing bound. Not
-taken: moving the serving line to after the first rebuild. `just mesh wait`, the device supervisor and the session hooks
-wait on that line with their own timeouts, and each must be read before it moves.
+taken: moving the serving line to after the first rebuild.
+
+Correction, 2026-11-26 (the integrator's own): the first form of this row said `just mesh wait`, the device supervisor and
+the session hooks wait on that line. Only one of the three was read. What a search of dev at `0b369e541` shows: the line is
+`SERVING_LINE` ("epr peer: serving", `elohim/eprfs/epr-cli/src/peer.rs:61`, printed at `:1075`); tests read it
+(`epr-cli/tests/peer.rs:1016` and others); the steward-space design names it as the peer daemon's readiness probe under the
+device ark (`genesis/docs/superpowers/specs/2026-10-27-steward-space-landing-plane-design.md:203`), and the supervisor
+honours a declared stdout-line probe with its own patience (`epr-cli/src/device/supervise.rs:1556`), so a device that
+declares the daemon that way waits on the line. `just mesh wait` concerns the household mesh, not this daemon, and no session
+hook was found reading the line. Before the line moves, read each device's declared readiness for its peer daemon.
