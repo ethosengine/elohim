@@ -38,6 +38,6 @@ Two readings agree when they give the same answer **from different sources or at
 
 ## What to do with the loser
 
-Record the correction on the surface that was stale, with the exact stale claim and the evidence: `epr flow note --on <surface> --kind correction --reason '…'`. From a worktree pass `--root <main checkout>`, so the note is written where it outlives the worktree, and `--as agent:<role>@<model>`, so it names its actor (a worktree's flow store holds no actor claim for the session). If no pairing above covers the disagreement, state both readings with source and age, and put the pairing to the steward as a ruling to be made.
+Record the correction on the surface that was stale, with the exact stale claim and the evidence: `epr flow note --on <surface> --kind correction --reason '…'`. From a worktree pass `--root <main checkout>`, so the note is written where it outlives the worktree, and `--as agent:<role>@<model> --session <id>`, so it names its actor and pins that session's registered claim (a worktree's flow store holds no actor claim for the session, and a typed `--as` alone names a provider without pinning a claim). If no pairing above covers the disagreement, state both readings with source and age, and put the pairing to the steward as a ruling to be made.
 
 This page is a skill because the root instructions are over their size budget; it moves there when a root cut makes room (plan `2026-11-22-agents-arrive-briefed`, step 5).
