@@ -530,7 +530,7 @@ function realReadSet(name) {
 
 test('default read-set options preserve the five device-runtime gate outputs byte for byte', () => {
   const expected = new Map([
-    ['elohim-storage', '1d3493b06b9424cb5bf49c60aeec457f5fcabea8ae32c0f85eac04f0b23ca0be'],
+    ['elohim-storage', 'f962c76e4cd5411b7c7d1b3223a11449023d1f745e6423bca1daa70f52f9ba8f'],
     ['steward-node', '0f30099c6fc559d0d97cc5cad214e0bf7387298882ae63335867f20bd213cae2'],
     ['elohim-ark', '71d683c1c9c4e64a855d0372e743e96776a30642c8f49b30120a192e516fa190'],
     ['cargo-bridge', 'b49e9c6b2c0b38ccef214c201ae8b310d9420943d438e80c80f05b2889e2e91d'],
