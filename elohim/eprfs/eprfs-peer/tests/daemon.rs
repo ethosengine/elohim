@@ -11,7 +11,8 @@ use std::time::{Duration, Instant};
 use elohim_epr_rea::{ParticipantRow, SidecarRoster};
 use eprfs_peer::{
     via_device, ChannelHead, ChannelStore, CrossingAllowList, HeadTable, PeerConfig, PeerDaemon,
-    PeerKey, PeerRecoveryStatus, Rules, TierLimits, TierProtocol, INDEX_RETRY_FIRST, TIER_ALPN,
+    PeerKey, PeerRecoveryStatus, Rules, TierLimits, TierProtocol, INDEX_RETRY_FIRST,
+    STREAM_RETRY_FIRST, TIER_ALPN,
 };
 use futures_lite::StreamExt;
 use iroh::endpoint::{Connection, VarInt};
@@ -283,7 +284,7 @@ async fn mute_receiver_reachable_tier_probes_resubscribes_and_folds_probe_head()
     })
     .await;
     eventually("the muted topic is resubscribed once", || {
-        let status = PeerRecoveryStatus::load(side_a.state.path());
+        let status = daemon.recovery_status();
         status.resubscriptions == 1
             && status.devices.get(&b.did).is_some_and(|device| {
                 device.last_probe.is_some_and(|probe| probe.ok)
@@ -362,7 +363,7 @@ async fn forged_and_rolled_back_probe_heads_use_gossip_admission_and_are_counted
     )
     .expect("B signs");
     *peer.head.write().expect("probe head") = Some(valid);
-    advance_recovery_clock(&daemon, &clock, Duration::from_secs(30)).await;
+    advance_recovery_clock(&daemon, &clock, Duration::from_secs(90)).await;
     eventually("the valid probe head is folded", || {
         side_a
             .table()
@@ -389,7 +390,7 @@ async fn forged_and_rolled_back_probe_heads_use_gossip_admission_and_are_counted
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn older_peer_head_refusal_is_reachable_unsupported_without_connection_reset() {
+async fn older_peer_head_refusal_is_unsupported_and_takes_the_outbound_reset_backoff() {
     let a = device("DeviceA", 1);
     let b = device("DeviceB", 2);
     let (key_dir_a, key_dir_b) = (tempfile::tempdir().unwrap(), tempfile::tempdir().unwrap());
@@ -430,14 +431,14 @@ async fn older_peer_head_refusal_is_reachable_unsupported_without_connection_res
     eventually(
         "the older peer is recorded as reachable unsupported",
         || {
-            let recovery = PeerRecoveryStatus::load(side_a.state.path());
-            recovery.resubscriptions == 1
+            let recovery = daemon.recovery_status();
+            recovery.resubscriptions == 0
                 && recovery.devices.get(&b.did).is_some_and(|state| {
                     state
                         .last_probe
                         .is_some_and(|probe| probe.ok && probe.unsupported)
-                        && state.resubscriptions == 1
-                        && state.connection_resets == 0
+                        && state.resubscriptions == 0
+                        && state.connection_resets == 1
                 })
         },
     )
@@ -448,6 +449,26 @@ async fn older_peer_head_refusal_is_reachable_unsupported_without_connection_res
         .iter()
         .any(|line| line.contains("probe unsupported (older peer)")));
     assert!(!side_a.table().devices.contains_key(&b.did));
+    advance_recovery_clock(&daemon, &clock, Duration::from_secs(89)).await;
+    assert_eq!(
+        logs.lock()
+            .expect("logs")
+            .iter()
+            .filter(|line| line.contains("probe unsupported (older peer)"))
+            .count(),
+        1,
+        "the unsupported peer observes the first reset backoff"
+    );
+    advance_recovery_clock(&daemon, &clock, Duration::from_secs(30)).await;
+    eventually("the unsupported peer reaches the next reset rung", || {
+        logs.lock()
+            .expect("logs")
+            .iter()
+            .filter(|line| line.contains("probe unsupported (older peer)"))
+            .count()
+            == 2
+    })
+    .await;
 
     daemon.shutdown().await;
     router.shutdown().await.expect("older peer stops");
@@ -493,7 +514,8 @@ async fn unreachable_tier_resets_and_redials_with_capped_backoff_without_resubsc
         advance_recovery_clock(&daemon, &clock, Duration::from_secs(30)).await;
     }
     eventually("the first unreachable probe resets the path", || {
-        PeerRecoveryStatus::load(side_a.state.path())
+        daemon
+            .recovery_status()
             .devices
             .get(&b.did)
             .is_some_and(|state| {
@@ -506,7 +528,8 @@ async fn unreachable_tier_resets_and_redials_with_capped_backoff_without_resubsc
         advance_recovery_clock(&daemon, &clock, Duration::from_secs(delay)).await;
     }
     eventually("the capped reset is recorded", || {
-        PeerRecoveryStatus::load(side_a.state.path())
+        daemon
+            .recovery_status()
             .devices
             .get(&b.did)
             .is_some_and(|state| state.connection_resets == 6)
@@ -521,10 +544,7 @@ async fn unreachable_tier_resets_and_redials_with_capped_backoff_without_resubsc
         5,
         "one line for each changed backoff, none for the repeated 15 minute cap"
     );
-    assert_eq!(
-        PeerRecoveryStatus::load(side_a.state.path()).resubscriptions,
-        0
-    );
+    assert_eq!(daemon.recovery_status().resubscriptions, 0);
 
     daemon.shutdown().await;
 }
@@ -598,7 +618,82 @@ async fn topic_wide_silence_resubscribes_once_per_ten_minutes_when_probe_is_live
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn healthy_exchange_never_probes_resubscribes_or_resets() {
+async fn lag_after_a_rung_resubscribe_reopens_after_stream_retry_not_silence_window() {
+    let a = device("DeviceA", 1);
+    let b = device("DeviceB", 2);
+    let (key_dir_a, key_dir_b) = (tempfile::tempdir().unwrap(), tempfile::tempdir().unwrap());
+    let (key_a, key_b) = (load_key(key_dir_a.path()), load_key(key_dir_b.path()));
+    let rows = vec![
+        genesis(&a),
+        binding(&a, &b),
+        endpoint_row(&a, &a, &key_a),
+        endpoint_row(&a, &b, &key_b),
+    ];
+    let side_a = Side::new(&rows);
+    let b_checkout = Checkout::new();
+    let allow = CrossingAllowList::from_policy(&policy()).expect("policy");
+    let tree = eprfs_peer::project_channel(&b_checkout.store(), &allow).expect("B projects");
+    let store = Arc::new(ChannelStore::default());
+    store.install(&tree);
+    let head = ChannelHead::sign(
+        b.did.clone(),
+        tree.root().clone(),
+        1,
+        1,
+        Default::default(),
+        &b.signer(),
+    )
+    .expect("B signs");
+    let peer = probe_peer(&a, &b, key_b, &rows, head, store).await;
+    let start = Instant::now();
+    let clock = Arc::new(Mutex::new(start));
+    let clock_for_daemon = clock.clone();
+    let daemon = PeerDaemon::start_with_clock(
+        config(
+            &a,
+            &a.did,
+            key_a,
+            &side_a,
+            &[&a, &b],
+            vec![peer.addr.clone()],
+            local(free_port()),
+        ),
+        Arc::new(move || *clock_for_daemon.lock().expect("clock")),
+    )
+    .await
+    .expect("A starts");
+
+    advance_recovery_clock(&daemon, &clock, Duration::from_secs(600)).await;
+    advance_recovery_clock(&daemon, &clock, Duration::from_secs(1)).await;
+    eventually("the rung resubscribe completes", || {
+        PeerRecoveryStatus::load(side_a.state.path()).resubscriptions == 1
+    })
+    .await;
+
+    daemon.lag_gossip_stream();
+    advance_recovery_clock(&daemon, &clock, Duration::ZERO).await;
+    assert_eq!(
+        PeerRecoveryStatus::load(side_a.state.path()).resubscriptions,
+        1,
+        "stream retry has not elapsed"
+    );
+    advance_recovery_clock(&daemon, &clock, STREAM_RETRY_FIRST).await;
+    assert_eq!(
+        daemon.resubscriptions(),
+        2,
+        "the lagged stream reopens at the first stream retry"
+    );
+    daemon.shutdown().await;
+    let recovery = PeerRecoveryStatus::load(side_a.state.path());
+    assert_eq!(
+        recovery.resubscriptions, 2,
+        "the exit flush records the stream-failure resubscribe before S"
+    );
+    peer.router.shutdown().await.expect("probe peer stops");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn healthy_exchange_never_recovers_and_writes_status_at_most_once_per_silence_window() {
     let a = device("DeviceA", 1);
     let b = device("DeviceB", 2);
     let (key_dir_a, key_dir_b) = (tempfile::tempdir().unwrap(), tempfile::tempdir().unwrap());
@@ -618,28 +713,38 @@ async fn healthy_exchange_never_probes_resubscribes_or_resets() {
         .checkout
         .append(berth_event("claim", "healthy-b", "sb", "1.0"));
     let (port_a, port_b) = (free_port(), free_port());
-    let daemon_a = PeerDaemon::start(config(
-        &a,
-        &a.did,
-        key_a,
-        &side_a,
-        &[&a, &b],
-        vec![iroh::NodeAddr::new(id_b)
-            .with_direct_addresses([std::net::SocketAddr::V4(local(port_b))])],
-        local(port_a),
-    ))
+    let start = Instant::now();
+    let clock = Arc::new(Mutex::new(start));
+    let clock_for_a = clock.clone();
+    let daemon_a = PeerDaemon::start_with_clock(
+        config(
+            &a,
+            &a.did,
+            key_a,
+            &side_a,
+            &[&a, &b],
+            vec![iroh::NodeAddr::new(id_b)
+                .with_direct_addresses([std::net::SocketAddr::V4(local(port_b))])],
+            local(port_a),
+        ),
+        Arc::new(move || *clock_for_a.lock().expect("clock")),
+    )
     .await
     .expect("A starts");
-    let daemon_b = PeerDaemon::start(config(
-        &b,
-        &a.did,
-        key_b,
-        &side_b,
-        &[&a, &b],
-        vec![iroh::NodeAddr::new(id_a)
-            .with_direct_addresses([std::net::SocketAddr::V4(local(port_a))])],
-        local(port_b),
-    ))
+    let clock_for_b = clock.clone();
+    let daemon_b = PeerDaemon::start_with_clock(
+        config(
+            &b,
+            &a.did,
+            key_b,
+            &side_b,
+            &[&a, &b],
+            vec![iroh::NodeAddr::new(id_a)
+                .with_direct_addresses([std::net::SocketAddr::V4(local(port_a))])],
+            local(port_b),
+        ),
+        Arc::new(move || *clock_for_b.lock().expect("clock")),
+    )
     .await
     .expect("B starts");
     eventually("both healthy heads fold", || {
@@ -653,6 +758,41 @@ async fn healthy_exchange_never_probes_resubscribes_or_resets() {
         assert!(device.last_probe.is_none());
         assert_eq!(device.connection_resets, 0);
     }
+
+    eventually("A writes its first healthy recovery snapshot", || {
+        daemon_a.recovery_saves() >= 1
+    })
+    .await;
+    let baseline_saves = daemon_a.recovery_saves();
+    let mut previous_seq = side_a.table().devices[&b.did].seq;
+    for index in 0..3 {
+        side_b.checkout.append(berth_event(
+            "claim",
+            &format!("healthy-b-{index}"),
+            "sb",
+            "1.0",
+        ));
+        advance_recovery_clock(&daemon_a, &clock, Duration::from_secs(30)).await;
+        eventually("A hears and folds B's next healthy head", || {
+            side_a
+                .table()
+                .devices
+                .get(&b.did)
+                .is_some_and(|head| head.seq > previous_seq)
+        })
+        .await;
+        previous_seq = side_a.table().devices[&b.did].seq;
+        assert_eq!(
+            daemon_a.recovery_saves(),
+            baseline_saves,
+            "healthy HEARD updates stay in memory inside S"
+        );
+    }
+    advance_recovery_clock(&daemon_a, &clock, Duration::from_secs(510)).await;
+    assert!(
+        daemon_a.recovery_saves() <= baseline_saves + 1,
+        "recovery.json is written at most once per S"
+    );
 
     daemon_a.shutdown().await;
     daemon_b.shutdown().await;
