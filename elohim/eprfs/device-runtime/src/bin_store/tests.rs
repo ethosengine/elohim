@@ -382,6 +382,13 @@ fn age(f: &Fixture, r: &Release, at: &str) {
     r.provenance.ingested_at = at.into();
     f.store.save(&r).unwrap();
 }
+fn adoption_events(f: &Fixture, cid: &str) -> Vec<Value> {
+    fs::read_to_string(f.store.root.join(cid).join("adoptions.jsonl"))
+        .unwrap()
+        .lines()
+        .map(|line| serde_json::from_str(line).unwrap())
+        .collect()
+}
 #[test]
 fn test_session_key_uses_nearest_claude_ancestor_and_starttime() {
     let t = tempfile::tempdir().unwrap();
@@ -1172,13 +1179,14 @@ fn lineage_rebase_keeps_dirty_unverified_and_commit_mismatch_refusals() {
     unverified.land(&unverified_current).unwrap();
     unverified.state.lock().unwrap().head = "b".repeat(40);
     let unverified_candidate = unverified.release("unverified-candidate");
-    fs::write(
-        unverified
+    atomic_bytes(
+        &unverified
             .store
             .root
             .join(&unverified_candidate.cid)
             .join("epr"),
         b"tampered",
+        0o555,
     )
     .unwrap();
     assert_eq!(
@@ -1499,6 +1507,24 @@ fn test_reingest_preserves_primary_provenance_and_appends_sources() {
     assert_eq!(b.provenance.source_commit, a.provenance.source_commit);
     assert_eq!(b.sources.len(), 2);
     f.land(&b).unwrap();
+}
+#[test]
+fn reingesting_an_existing_release_keeps_its_first_ingested_at() {
+    let f = Fixture::new("epr");
+    let first = f.release("same-release");
+    let mut stored = f.store.record(&first.cid).unwrap();
+    stored.provenance.ingested_at = "2026-11-25T18:44:00Z".into();
+    f.store.save(&stored).unwrap();
+    f.state.lock().unwrap().head = "b".repeat(40);
+
+    let reingested = f.release("same-release");
+
+    assert_eq!(reingested.cid, first.cid);
+    assert_eq!(reingested.provenance.ingested_at, "2026-11-25T18:44:00Z");
+    assert!(reingested.sources.iter().any(|source| {
+        source.source_commit == "b".repeat(40)
+            && source.ingested_at != reingested.provenance.ingested_at
+    }));
 }
 #[test]
 fn test_retried_ingest_and_refusal_refresh_their_rows_instead_of_growing() {
@@ -1895,6 +1921,139 @@ fn test_guard_keeps_a_hand_installed_binary_and_repoints_stale_shadows() {
     let r = f.store.record(&cid).unwrap();
     assert!(!r.provenance.tree_clean);
     assert_eq!(r.provenance.gate_run.as_deref(), Some("adopted-from-path"));
+}
+#[test]
+fn adopting_held_bytes_leaves_record_identical_and_appends_one_event() {
+    let f = Fixture::new("epr");
+    let held = f.release("held-adoption");
+    f.head(&held);
+    let record = f.store.root.join(&held.cid).join("record.json");
+    let before = fs::read(&record).unwrap();
+    atomic_bytes(
+        &f.path("cargo-bin/epr"),
+        &fs::read(f.store.root.join(&held.cid).join("epr")).unwrap(),
+        0o755,
+    )
+    .unwrap();
+
+    f.install().unwrap();
+
+    assert_eq!(fs::read(record).unwrap(), before);
+    let events = adoption_events(&f, &held.cid);
+    assert_eq!(events.len(), 1);
+    assert_eq!(events[0]["path"], json!(f.path("cargo-bin/epr")));
+    assert_eq!(
+        events[0]["session"],
+        json!(crate::session::resolve().session)
+    );
+    assert_eq!(events[0]["tool"], "epr");
+    assert!(events[0]["at"].as_str().is_some());
+}
+#[test]
+fn adopting_held_bytes_twice_appends_two_events_without_a_source() {
+    let f = Fixture::new("epr");
+    let held = f.release("held-twice");
+    f.head(&held);
+    let artifact = f.store.root.join(&held.cid);
+    let record = artifact.join("record.json");
+    let before = fs::read(&record).unwrap();
+    for _ in 0..2 {
+        atomic_bytes(
+            &f.path("cargo-bin/epr"),
+            &fs::read(artifact.join("epr")).unwrap(),
+            0o755,
+        )
+        .unwrap();
+        f.install().unwrap();
+    }
+
+    assert_eq!(fs::read(record).unwrap(), before);
+    assert_eq!(adoption_events(&f, &held.cid).len(), 2);
+    assert!(!f
+        .store
+        .record(&held.cid)
+        .unwrap()
+        .sources
+        .iter()
+        .any(|source| source.gate_run.as_deref() == Some("adopted-from-path")));
+}
+#[test]
+fn adopting_unheld_bytes_ingests_an_adopted_from_path_source() {
+    let f = Fixture::new("epr");
+    let current = f.release("current-before-adoption");
+    f.head(&current);
+    atomic_bytes(&f.path("cargo-bin/epr"), b"unheld executable", 0o755).unwrap();
+    let cid = file_cid(&f.path("cargo-bin/epr")).unwrap();
+
+    f.install().unwrap();
+
+    let adopted = f.store.record(&cid).unwrap();
+    assert_eq!(
+        adopted.provenance.gate_run.as_deref(),
+        Some("adopted-from-path")
+    );
+    assert_eq!(adopted.sources.len(), 1);
+    assert_eq!(
+        adopted.sources[0].gate_run.as_deref(),
+        Some("adopted-from-path")
+    );
+    assert!(!adopted.provenance.tree_clean);
+    assert!(!f.store.root.join(cid).join("adoptions.jsonl").exists());
+}
+#[test]
+fn adopting_held_record_with_an_adopted_source_never_rewrites_it() {
+    let f = Fixture::new("epr");
+    let held = f.release("held-with-adopted-source");
+    f.head(&held);
+    let mut record = f.store.record(&held.cid).unwrap();
+    record.sources.push(Provenance {
+        source_commit: "unknown".into(),
+        tree_clean: false,
+        gate_run: Some("adopted-from-path".into()),
+        ingested_at: "2026-11-25T18:44:00Z".into(),
+    });
+    f.store.save(&record).unwrap();
+    let record_path = f.store.root.join(&held.cid).join("record.json");
+    let before = fs::read(&record_path).unwrap();
+    atomic_bytes(
+        &f.path("cargo-bin/epr"),
+        &fs::read(f.store.root.join(&held.cid).join("epr")).unwrap(),
+        0o755,
+    )
+    .unwrap();
+
+    f.install().unwrap();
+
+    assert_eq!(fs::read(record_path).unwrap(), before);
+    assert_eq!(adoption_events(&f, &held.cid).len(), 1);
+}
+#[test]
+fn install_launcher_with_held_launcher_bytes_never_rewrites_record() {
+    let mut f = Fixture::new("epr");
+    f.store.config.bins.push("bin-launch".into());
+    let held = f.release("held-launcher");
+    f.head(&held);
+    let artifact = f.store.root.join(&held.cid);
+    let record = artifact.join("record.json");
+    let before = fs::read(&record).unwrap();
+    let launcher = fs::read(artifact.join("bin-launch")).unwrap();
+    atomic_bytes(&f.path("native"), &launcher, 0o755).unwrap();
+    atomic_bytes(&f.path("bin/bin-launch"), &launcher, 0o755).unwrap();
+    crate::manifest_store::write_registry(&f.path("bin/bin-tools.json"), &f.registry).unwrap();
+
+    f.store
+        .install_launcher(
+            &f.path("native"),
+            &f.path("cargo-bin"),
+            &f.registry,
+            f.tmp.path(),
+        )
+        .unwrap();
+
+    assert_eq!(fs::read(record).unwrap(), before);
+    let events = adoption_events(&f, &held.cid);
+    assert_eq!(events.len(), 1);
+    assert_eq!(events[0]["path"], json!(f.path("bin/bin-launch")));
 }
 #[test]
 fn test_guard_preserves_distinct_plain_alias_bytes_as_separate_candidates() {
