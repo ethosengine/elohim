@@ -250,7 +250,8 @@ attested_decide() {
   local need rc absent=$ATTESTED_ABSENT
   # shellcheck disable=SC2086 # word lists of submodule paths and manifest keys
   need=$(node "${HOOK_WORK_TREE:-.}/genesis/orchestrator/gate-preflight.mjs" --attested-need $absent --projects $PROJECTS); rc=$?
-  need=$(printf '%s' "$need" | xargs)
+  # Not xargs: an unmatched quote in the output would empty it, and an empty answer is a pass.
+  need=$(printf '%s' "$need" | tr -s '[:space:]' ' '); need=${need# }; need=${need% }
   ATTESTED_ABSENT=""
   if [ "$rc" -eq 0 ] && [ -z "$need" ]; then
     gate_step_reading 0 submodules ran "$((SECONDS - ATTESTED_STARTED_S))" "$ATTESTED_STARTED_AT" "$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)"
