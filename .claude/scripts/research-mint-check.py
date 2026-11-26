@@ -94,8 +94,11 @@ def check_take(root: Path, note_id: str, entry: str) -> tuple[str, str | None]:
         rel_path = Path(rel)
         if rel_path.is_absolute() or ".." in rel_path.parts:
             return take_id, f"file path must be repository-relative and stay inside it: {rel}"
-        if not (root / rel_path).exists():
+        target = root / rel_path
+        if not target.exists():
             return take_id, f"file not found: {rel}"
+        if not target.resolve().is_relative_to(root.resolve()):
+            return take_id, f"file path must be repository-relative and stay inside it: {rel} (a link that leaves the repository)"
         return take_id, None
     m = _ROW_HOME.match(home)
     if not m:

@@ -44,7 +44,7 @@ by something that runs.
 | Flight | Discipline | State | Hand-over ref | On dev as |
 |---|---|---|---|---|
 | F0 | Correct the record, open the sprint | done: judged, landed 2026-11-26 03:43Z, verified on `origin/dev` file by file | `self/ethosengine-disciplines-f0` | `6187dff08`, `ab78d3ad0`, `baeb32247` |
-| F1 | Nothing is dropped silently | said, exercised and checked; verdict and landing pending | `self/ethosengine-disciplines-f1` (carries the cleanup pass's two commits) | |
+| F1 | Nothing is dropped silently | said, exercised, checked and judged (changes-requested, fixed, approved); handed over | `self/ethosengine-disciplines-f1` (carries the cleanup pass's two commits) | |
 | F2 | Evidence carries its age | not started | | |
 | F3 | Another seat chooses the failure | not started | | |
 | F4 | The brief carries position and a stop condition | not started | | |
@@ -169,6 +169,28 @@ every note), ran against a fresh worktree at the F0 tip. Four rounds, eight agen
   orchestrating session. The declarations were made by a Sonnet seat in two passes, with the
   check as its acceptance test, and re-run by the orchestrating session. The dispositions
   are the orchestrating session's.
+- **Verdict: changes-requested, then approved.** The judge was an Opus seat on ethosengine,
+  dispatched and briefed by the implementing session (a different tier and a separate
+  context; the same lab and steward). First pass: it ran the check and its test, opened
+  every row home and each distinct file home, checked the three ngit releases against the
+  note, and searched for homes the owed takes might have. It found two Radicle declarations
+  wrong (T5 declared owed though the note's later status table marks it done; T4 declared on
+  a row though ruled not taken), four holes in the check (a `file:` home could leave the
+  repository, a row could match a longer slug, a row number could match a second table, an
+  entry continued onto a second line was silently cut), and that a plain run with failures
+  exits 0. All were fixed in commit `e6d51181a`. Second pass, on that commit: approved, after
+  checking all eight Radicle declarations against the status table and trying again to pass a
+  wrong declaration. It did not check the 22 tests one by one, the habit atom's diff, or the
+  journal's counts, and on its first pass it sampled the owed takes (the six Memorilla ones
+  and Radicle T3 and T7 were checked by the implementing session, not by it).
+- **After the verdict, not re-judged.** One of the judge's two closing notes was fixed: a
+  link inside the repository that points outside it no longer passes as a `file:` home (one
+  more test, 23 in all). The other stands as a known limit: `takes:` written as a flow list
+  on one line fails, and is counted as one take.
+- **Where the notes live.** The verdict and the failed-approach note are in the flight
+  worktree's flow store, for the reason given under F0; this record is the durable copy.
+- **Gate.** `just gate eprfs-live-corpus` was run on ethosengine on the flight's last
+  content commit; its result is in the hand-over note to the integrator.
 - **Brit gaps met.** `brit rebase` refuses with "shallow repositories require Git"; `brit mv`
   is a bridge to git; cherry-pick is absent. Each fallback was stated where it was used.
 

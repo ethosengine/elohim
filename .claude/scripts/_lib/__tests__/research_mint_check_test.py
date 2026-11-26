@@ -111,6 +111,18 @@ class HomeForms(unittest.TestCase):
         self.assertEqual(r["takes_failing"], 2)
         self.assertTrue(all("stay inside" in f["problem"] for f in r["failures"]))
 
+    def test_file_link_that_leaves_the_repository_fails(self):
+        tree = Tree({"a.md": note("note-a", ["T1 | file: docs/link.md"])})
+        outside = tempfile.NamedTemporaryFile(delete=False)
+        outside.close()
+        os.symlink(outside.name, tree.root / "docs/link.md")
+        try:
+            r = rmc.scan(tree.root)
+        finally:
+            os.unlink(outside.name)
+        self.assertEqual(r["takes_failing"], 1)
+        self.assertIn("leaves the repository", r["failures"][0]["problem"])
+
     def test_row_must_name_the_note_as_a_whole_slug(self):
         tree = Tree({"a.md": note("note", ["T1 | cl#12"])})  # row 12 names "note-a", a longer slug
         r = rmc.scan(tree.root)
