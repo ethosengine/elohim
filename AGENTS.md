@@ -155,12 +155,23 @@ including submodules and worktrees. This is an operator-requested experiment in 
 an agent's habitual Git usage. Start with `brit <command> --help` when syntax is unfamiliar;
 Brit has its own CLI, so do not mechanically substitute its name into Git commands.
 For an initial inspection, use `brit status --no-write` and `brit log`.
-Verbs agents most often fell back for that brit 0.3.4 already has: a file at a ref (`brit show <rev>:<path>`),
-`rev-parse`, `ls-remote`, `submodule update --init`, `rebase`, `commit -m|-F`, `log <A..B>`, `branch delete`,
-`config set`, `worktree add|remove`, `merge-base --is-ancestor`, and `-C <dir>` for another checkout. Absent in
-0.3.4, so a stated fallback is expected: stash, reset, cherry-pick, notes, grep, update-index. The `brit-first`
-hook names the exact form when it refuses; its `BRIT_TABLE` (`.claude/hooks/brit-first.py`) is the full table,
-read from the installed brit's help, with the version it was read from.
+Verbs agents most often fell back for that brit 0.3.5 has: a file at a ref (`brit show <rev>:<path>`),
+`rev-parse`, `ls-remote`, `submodule update --init`, `rebase`, `commit -m|-F` (and `--amend`), `log <A..B>`,
+`log -S <string>`, `branch delete`, `config set`, `worktree add|remove`, `merge-base --is-ancestor`, and `-C <dir>`
+for another checkout. New in 0.3.5, each narrower than Git's verb: `cherry-pick <commit>` (one commit per call),
+`merge --ff-only <ref>` (the ref is required), `grep <rev> -- <pattern>` (blobs in a revision, never the working
+tree), `notes [--ref <ref>] show [object]` (reading only; `refs/notes/*` move as a refspec on `brit fetch` and
+`brit push`), and `add --gitlink <full commit> <submodule path>` (stages a pin without a checked-out submodule,
+the one `update-index` use it replaces). `pull --ff-only <remote> <branch>` takes both arguments and recovers with
+`--status`, `--continue` or `--abort`. Absent in 0.3.5, so a stated fallback is expected: stash, reset, writing or
+listing notes, a cherry-pick range or its `--continue`, a merge that is not a fast-forward, a working-tree grep,
+every other `update-index` form, a path restored from a commit other than HEAD, `submodule status`, Git's
+`ls-tree` and `ls-files -s` output (`brit tree entries` and `brit index entries` print their own), and
+`config get` (`brit config show <filter>` prints the matching entries). The `brit-first` hook names the exact form
+when it refuses; its `BRIT_TABLE` (`.claude/hooks/brit-first.py`) is the full table, read from the installed
+brit's help, with the version it was read from. A session started before the device's pin moved still runs brit
+0.3.4 until it restarts: on a refusal the hook asks the brit on PATH for its version and answers from the 0.3.4
+rows when that is what the session holds, and when it cannot read the version it says the form is 0.3.5's.
 
 Before invoking Git directly, state `Git fallback: <operation> — <specific missing Brit
 capability or observed failure>` in commentary. A remembered Git spelling, unfamiliarity
