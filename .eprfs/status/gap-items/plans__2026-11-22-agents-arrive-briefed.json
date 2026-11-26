@@ -1,0 +1,116 @@
+{
+ "doc": "genesis/docs/superpowers/plans/2026-11-22-agents-arrive-briefed.md",
+ "slug": "plans__2026-11-22-agents-arrive-briefed",
+ "method": "agent-decomposed",
+ "count": 15,
+ "items": [
+  {
+   "text": "Step 1 Slice 0: narrow seam/rust-style/pool-preflight/ram-guard hook noise, each with a test in .claude/hooks/__tests__/",
+   "line": 234,
+   "state": "OPEN",
+   "id": "plans__2026-11-22-agents-arrive-briefed#1",
+   "cites": "genesis/docs/superpowers/plans/2026-11-22-agents-arrive-briefed.md#L234"
+  },
+  {
+   "text": "Step 1: context meter (queue item 13) emitted once by load-project-context.py with a measures.yaml row and ceiling; close item 13",
+   "line": 242,
+   "state": "OPEN",
+   "id": "plans__2026-11-22-agents-arrive-briefed#2",
+   "cites": "genesis/docs/superpowers/plans/2026-11-22-agents-arrive-briefed.md#L242"
+  },
+  {
+   "text": "Step 2: agent-arrives-briefed.feature with @concern: agents-arrive-briefed scenarios",
+   "line": 248,
+   "state": "CLAIMED",
+   "id": "plans__2026-11-22-agents-arrive-briefed#3",
+   "cites": "genesis/docs/superpowers/plans/2026-11-22-agents-arrive-briefed.md#L248",
+   "evidence": "genesis/a2o/features/devflow/agent-arrives-briefed.feature exists"
+  },
+  {
+   "text": "Step 2: habit atom agents-arrive-briefed.habit.md (red, checks, retire-when), re-projected",
+   "line": 255,
+   "state": "CLAIMED",
+   "id": "plans__2026-11-22-agents-arrive-briefed#4",
+   "cites": "genesis/docs/superpowers/plans/2026-11-22-agents-arrive-briefed.md#L255",
+   "evidence": "genesis/agentic/.epr-meta/agents-arrive-briefed.habit.md exists"
+  },
+  {
+   "text": "Step 2: arrival mode in recall-standing-reader.js launching subagent/claude -p/codex exec and judging the five questions with a different tier",
+   "line": 259,
+   "state": "OPEN",
+   "id": "plans__2026-11-22-agents-arrive-briefed#5",
+   "cites": "genesis/docs/superpowers/plans/2026-11-22-agents-arrive-briefed.md#L259"
+  },
+  {
+   "text": "Step 3: router (five questions, done table, correction rule, memory-saving rule) landed in elohim-root-gospel package",
+   "line": 266,
+   "state": "CLAIMED",
+   "id": "plans__2026-11-22-agents-arrive-briefed#6",
+   "cites": "genesis/docs/superpowers/plans/2026-11-22-agents-arrive-briefed.md#L266",
+   "evidence": "root CLAUDE.md carries 'Start here: five questions', 'When you are corrected', 'What to save as memory'"
+  },
+  {
+   "text": "Step 3: widen pre-push projection regex for CLAUDE/AGENTS.md, planted docs, .claude/commands/, .claude/hooks/",
+   "line": 273,
+   "state": "OPEN",
+   "id": "plans__2026-11-22-agents-arrive-briefed#7",
+   "cites": "genesis/docs/superpowers/plans/2026-11-22-agents-arrive-briefed.md#L273"
+  },
+  {
+   "text": "Step 4: native placement read (L1-L6 per 2026-11-23 placement-read-and-notes-store design), guide-stars as upwardChain",
+   "line": 276,
+   "state": "OPEN",
+   "id": "plans__2026-11-22-agents-arrive-briefed#8",
+   "cites": "genesis/docs/superpowers/plans/2026-11-22-agents-arrive-briefed.md#L276"
+  },
+  {
+   "text": "Step 4 precondition 1: notes gathered by subject label so a correction outlives an edit of its subject",
+   "line": 291,
+   "state": "OPEN",
+   "id": "plans__2026-11-22-agents-arrive-briefed#9",
+   "cites": "genesis/docs/superpowers/plans/2026-11-22-agents-arrive-briefed.md#L291"
+  },
+  {
+   "text": "Step 4 precondition 2: one flow notes store per repository per device (resolve via common git dir)",
+   "line": 299,
+   "state": "OPEN",
+   "id": "plans__2026-11-22-agents-arrive-briefed#10",
+   "cites": "genesis/docs/superpowers/plans/2026-11-22-agents-arrive-briefed.md#L299"
+  },
+  {
+   "text": "Step 4: placement resolves one gate and one covering habit or says it cannot (GATE ambiguous today)",
+   "line": 306,
+   "state": "OPEN",
+   "id": "plans__2026-11-22-agents-arrive-briefed#11",
+   "cites": "genesis/docs/superpowers/plans/2026-11-22-agents-arrive-briefed.md#L306"
+  },
+  {
+   "text": "Step 4: one contract commit re-pinning recall-contract.json guiding_context/lens_table and recall-questions.json in_scope_of",
+   "line": 309,
+   "state": "OPEN",
+   "id": "plans__2026-11-22-agents-arrive-briefed#12",
+   "cites": "genesis/docs/superpowers/plans/2026-11-22-agents-arrive-briefed.md#L309"
+  },
+  {
+   "text": "Step 5: cut root instructions per the 144-row move ledger, one landing per section, plus root size check at pre-push",
+   "line": 328,
+   "state": "OPEN",
+   "id": "plans__2026-11-22-agents-arrive-briefed#13",
+   "cites": "genesis/docs/superpowers/plans/2026-11-22-agents-arrive-briefed.md#L328"
+  },
+  {
+   "text": "Step 6: package memory-ceremony skill for three runtimes with two rings and a graduate-steering phase",
+   "line": 367,
+   "state": "OPEN",
+   "id": "plans__2026-11-22-agents-arrive-briefed#14",
+   "cites": "genesis/docs/superpowers/plans/2026-11-22-agents-arrive-briefed.md#L367"
+  },
+  {
+   "text": "Step 7: the sweep (private rings shem+ethosengine, collective ring, nested instruction files, hook census, loop agents)",
+   "line": 384,
+   "state": "OPEN",
+   "id": "plans__2026-11-22-agents-arrive-briefed#15",
+   "cites": "genesis/docs/superpowers/plans/2026-11-22-agents-arrive-briefed.md#L384"
+  }
+ ]
+}

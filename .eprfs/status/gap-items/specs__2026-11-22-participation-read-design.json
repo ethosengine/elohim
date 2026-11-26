@@ -1,0 +1,65 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-11-22-participation-read-design.md",
+ "slug": "specs__2026-11-22-participation-read-design",
+ "method": "agent-decomposed",
+ "count": 8,
+ "items": [
+  {
+   "text": "Cut 1 local composition: native participation reader in epr-cli, directory scope, snapshot reads, unknowns",
+   "line": 325,
+   "state": "CLAIMED",
+   "id": "specs__2026-11-22-participation-read-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-11-22-participation-read-design.md#L325",
+   "evidence": "elohim/eprfs/epr-cli/src/flow/participate.rs exists; verify against P14-P16 fixtures"
+  },
+  {
+   "text": "Cut 2 sibling context: carry freshness, graph provenance and upstream lines through berth follow and gate-impact.mjs",
+   "line": 331,
+   "state": "OPEN",
+   "id": "specs__2026-11-22-participation-read-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-11-22-participation-read-design.md#L331"
+  },
+  {
+   "text": "Cut 3 carry reconciliation: join recorded costs, grants and outcomes via gate-carry.mjs with absent carriers explicit",
+   "line": 335,
+   "state": "OPEN",
+   "id": "specs__2026-11-22-participation-read-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-11-22-participation-read-design.md#L335"
+  },
+  {
+   "text": "Validation protocol: native readers and fakes over absent stores, expired sibling declarations, missing grants, plural roles; assert zero writes and no hidden counts",
+   "line": 342,
+   "state": "OPEN",
+   "id": "specs__2026-11-22-participation-read-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-11-22-participation-read-design.md#L342"
+  },
+  {
+   "text": "Composition must not initialize absent stores (store.rs:210 opener creates directories)",
+   "line": 344,
+   "state": "OPEN",
+   "id": "specs__2026-11-22-participation-read-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-11-22-participation-read-design.md#L344"
+  },
+  {
+   "text": "Open: human-presence authority, classification, retention and permitted readers (steward ruling)",
+   "line": 377,
+   "state": "OPEN",
+   "id": "specs__2026-11-22-participation-read-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-11-22-participation-read-design.md#L377"
+  },
+  {
+   "text": "Open: reconcile P11 with dialogue-stasis per-incident notification (arrival backlog row 58; steward rules)",
+   "line": 383,
+   "state": "OPEN",
+   "id": "specs__2026-11-22-participation-read-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-11-22-participation-read-design.md#L383"
+  },
+  {
+   "text": "Open: read the declared person-reach measures (dialogue-blocked-seconds) so P12/P13 have a reading",
+   "line": 385,
+   "state": "OPEN",
+   "id": "specs__2026-11-22-participation-read-design#8",
+   "cites": "genesis/docs/superpowers/specs/2026-11-22-participation-read-design.md#L385"
+  }
+ ]
+}
