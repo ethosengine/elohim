@@ -67,6 +67,7 @@ impl From<&ItemAbsence> for ItemAbsenceLabel {
 pub enum ReachReasonLabel {
     OutsideStanding,
     NoRecord,
+    IndexWarming,
     NotUnderRoot,
     IdentityRequired,
     AuthorizerUnavailable,
@@ -76,6 +77,7 @@ impl ReasonLabel for ReachReasonLabel {
     const ALL: &'static [Self] = &[
         Self::OutsideStanding,
         Self::NoRecord,
+        Self::IndexWarming,
         Self::NotUnderRoot,
         Self::IdentityRequired,
         Self::AuthorizerUnavailable,
@@ -85,6 +87,7 @@ impl ReasonLabel for ReachReasonLabel {
         match self {
             Self::OutsideStanding => "outside-standing",
             Self::NoRecord => "no-record",
+            Self::IndexWarming => "index-warming",
             Self::NotUnderRoot => "not-under-root",
             Self::IdentityRequired => "identity-required",
             Self::AuthorizerUnavailable => "authorizer-unavailable",
@@ -97,6 +100,7 @@ impl From<&ReachReason> for ReachReasonLabel {
         match reason {
             ReachReason::OutsideStanding => Self::OutsideStanding,
             ReachReason::NoRecord => Self::NoRecord,
+            ReachReason::IndexWarming => Self::IndexWarming,
             ReachReason::NotUnderRoot => Self::NotUnderRoot,
             ReachReason::IdentityRequired => Self::IdentityRequired,
             ReachReason::AuthorizerUnavailable => Self::AuthorizerUnavailable,
@@ -207,6 +211,7 @@ mod tests {
         for (reason, label) in [
             (ReachReason::OutsideStanding, "outside-standing"),
             (ReachReason::NoRecord, "no-record"),
+            (ReachReason::IndexWarming, "index-warming"),
             (ReachReason::NotUnderRoot, "not-under-root"),
             (ReachReason::IdentityRequired, "identity-required"),
             (ReachReason::AuthorizerUnavailable, "authorizer-unavailable"),

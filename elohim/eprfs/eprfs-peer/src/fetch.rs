@@ -180,6 +180,8 @@ pub struct FetchedArtifact {
 pub enum FetchGap {
     /// No admitted sibling has recorded a build for this key.
     NoRecord,
+    /// The sibling has not completed its first artifact-index rebuild yet.
+    IndexWarming,
     /// No expected output, own output or strict plurality resolves the differing outputs.
     Mismatch { outputs: Vec<BlobCid> },
     /// The explicitly requested output has no holder for this key.
@@ -222,6 +224,7 @@ impl FetchGap {
     pub fn kind(&self) -> &'static str {
         match self {
             FetchGap::NoRecord => "no-record",
+            FetchGap::IndexWarming => "index-warming",
             FetchGap::Mismatch { .. } => "mismatch",
             FetchGap::ExpectedOutputUnavailable { .. } => "expected-output-unavailable",
             FetchGap::LocalOnlyCustody { .. } => "local-only-custody",
@@ -246,6 +249,7 @@ impl fmt::Display for FetchGap {
             FetchGap::NoRecord => f.write_str(
                 "no admitted sibling device has recorded a build for this key; build here",
             ),
+            FetchGap::IndexWarming => f.write_str("the sibling is still indexing"),
             FetchGap::Mismatch { outputs } => write!(
                 f,
                 "admitted siblings recorded {} different outputs for this key ({}); no \
@@ -392,6 +396,20 @@ fn refusal_text(why: &ItemAbsence) -> String {
         },
         ItemAbsence::NotHeld { .. } => "not held there".into(),
         other => format!("{other:?}"),
+    }
+}
+
+fn refusal_gap(device: &str, why: &ItemAbsence) -> FetchGap {
+    match why {
+        ItemAbsence::Refused { refusal, .. }
+            if refusal.reason == eprfs_core::ReachReason::IndexWarming =>
+        {
+            FetchGap::IndexWarming
+        }
+        _ => FetchGap::Refused {
+            device: device.to_owned(),
+            refusal: refusal_text(why),
+        },
     }
 }
 
@@ -550,139 +568,160 @@ async fn accept_manifest(
         progress,
     } = *bounds;
     let mut last = FetchGap::NoRecord;
-    for (index, holder) in holders.iter().enumerate() {
-        let relay = relay_only(&holder.addr);
-        let bound = request_bound(relay, u64::from(budget.manifest_cap), budget, deadline);
-        let dialled = dial(endpoint, &holder.addr, bound).await;
-        if matches!(dialled, Err(DialFailed::Elapsed { by_deadline: true })) {
-            return Err(FetchGap::DeadlineExceeded {
-                fetched: 0,
-                total: 0,
-            });
+    let mut candidates: Vec<usize> = (0..holders.len()).collect();
+    let mut retried_warming = false;
+    loop {
+        if retried_warming && Instant::now() >= deadline {
+            return Err(FetchGap::IndexWarming);
         }
-        let Ok(connection) = dialled else {
-            // Unreachable is a route gap; only a reached relay too slow for a frame is the
-            // transport's.
-            unreachable.insert(index);
-            last = FetchGap::NoRoute {
-                device: holder.device.clone(),
-            };
-            continue;
-        };
-        let request = TierRequest::Record {
-            artifact: output.clone(),
-            manifest: holder.manifest.clone(),
-            key: key
-                .map(crate::key_cid)
-                .transpose()
-                .map_err(|e| FetchGap::ManifestRejected {
-                    reason: e.to_string(),
-                })?,
-            cid: None,
-        };
-        let received = AtomicU64::new(0);
-        let bound = request_bound(relay, u64::from(budget.manifest_cap), budget, deadline);
-        let answer = tokio::time::timeout(
-            bound.wait,
-            tier_request_counted(&connection, &request, budget.manifest_cap, &received),
-        )
-        .await;
-        let rejected = |reason: String| FetchGap::ManifestRejected { reason };
-        let gap = match answer {
-            Ok(Ok(TierAnswer::Blob { cid, bytes })) if !cid.verifies(&bytes) => rejected(format!(
-                "{} served bytes that do not hash to {cid}",
-                holder.device
-            )),
-            Ok(Ok(TierAnswer::Blob { cid, bytes })) => {
-                if cid != holder.manifest {
-                    rejected(format!(
-                        "{} served manifest {cid}; its crossed record names {}",
-                        holder.device, holder.manifest
-                    ))
+        let mut warming = Vec::new();
+        for &index in &candidates {
+            let holder = &holders[index];
+            let relay = relay_only(&holder.addr);
+            let bound = request_bound(relay, u64::from(budget.manifest_cap), budget, deadline);
+            let dialled = dial(endpoint, &holder.addr, bound).await;
+            if matches!(dialled, Err(DialFailed::Elapsed { by_deadline: true })) {
+                return Err(if retried_warming {
+                    FetchGap::IndexWarming
                 } else {
-                    match decode_manifest(&cid, &bytes).await {
-                        Err(reason) => rejected(format!("{cid}: {reason}")),
-                        Ok(manifest) if key.is_some_and(|key| manifest.record.key != *key) => {
-                            rejected(format!(
+                    FetchGap::DeadlineExceeded {
+                        fetched: 0,
+                        total: 0,
+                    }
+                });
+            }
+            let Ok(connection) = dialled else {
+                // Unreachable is a route gap; only a reached relay too slow for a frame is the
+                // transport's.
+                unreachable.insert(index);
+                last = FetchGap::NoRoute {
+                    device: holder.device.clone(),
+                };
+                continue;
+            };
+            let request = TierRequest::Record {
+                artifact: output.clone(),
+                manifest: holder.manifest.clone(),
+                key: key.map(crate::key_cid).transpose().map_err(|e| {
+                    FetchGap::ManifestRejected {
+                        reason: e.to_string(),
+                    }
+                })?,
+                cid: None,
+            };
+            let received = AtomicU64::new(0);
+            let bound = request_bound(relay, u64::from(budget.manifest_cap), budget, deadline);
+            let answer = tokio::time::timeout(
+                bound.wait,
+                tier_request_counted(&connection, &request, budget.manifest_cap, &received),
+            )
+            .await;
+            let rejected = |reason: String| FetchGap::ManifestRejected { reason };
+            let gap = match answer {
+                Ok(Ok(TierAnswer::Blob { cid, bytes })) if !cid.verifies(&bytes) => rejected(
+                    format!("{} served bytes that do not hash to {cid}", holder.device),
+                ),
+                Ok(Ok(TierAnswer::Blob { cid, bytes })) => {
+                    if cid != holder.manifest {
+                        rejected(format!(
+                            "{} served manifest {cid}; its crossed record names {}",
+                            holder.device, holder.manifest
+                        ))
+                    } else {
+                        match decode_manifest(&cid, &bytes).await {
+                            Err(reason) => rejected(format!("{cid}: {reason}")),
+                            Ok(manifest) if key.is_some_and(|key| manifest.record.key != *key) => {
+                                rejected(format!(
                             "{cid} is keyed for another closure (method {}, input {}), not the \
                              one computed here",
                             manifest.record.key.method,
                             manifest.record.key.input.cid()
                         ))
-                        }
-                        Ok(manifest) if manifest.record.output != *output => rejected(format!(
-                            "{cid} names output {}, not {output}",
-                            manifest.record.output
-                        )),
-                        Ok(manifest) => {
-                            let method = if key.is_none() {
-                                match fetch_method(&connection, &cid, &manifest, bounds, relay)
-                                    .await
-                                {
-                                    Ok(bytes) => Some(bytes),
-                                    Err(reason) => {
-                                        connection.close(VarInt::from_u32(0), b"");
-                                        last = rejected(reason);
-                                        unreachable.insert(index);
-                                        continue;
+                            }
+                            Ok(manifest) if manifest.record.output != *output => rejected(format!(
+                                "{cid} names output {}, not {output}",
+                                manifest.record.output
+                            )),
+                            Ok(manifest) => {
+                                let method = if key.is_none() {
+                                    match fetch_method(&connection, &cid, &manifest, bounds, relay)
+                                        .await
+                                    {
+                                        Ok(bytes) => Some(bytes),
+                                        Err(reason) => {
+                                            connection.close(VarInt::from_u32(0), b"");
+                                            last = rejected(reason);
+                                            unreachable.insert(index);
+                                            continue;
+                                        }
                                     }
-                                }
-                            } else {
-                                None
-                            };
-                            return Ok(Accepted {
-                                method,
-                                holder: index,
-                                connection,
-                                cid,
-                                bytes,
-                                manifest,
-                            });
+                                } else {
+                                    None
+                                };
+                                return Ok(Accepted {
+                                    method,
+                                    holder: index,
+                                    connection,
+                                    cid,
+                                    bytes,
+                                    manifest,
+                                });
+                            }
                         }
                     }
                 }
+                Ok(Ok(TierAnswer::Unanswered { why, .. })) => refusal_gap(&holder.device, &why.why),
+                Ok(Ok(TierAnswer::Failed { reason })) => FetchGap::Refused {
+                    device: holder.device.clone(),
+                    refusal: reason,
+                },
+                Ok(Ok(_)) => FetchGap::Refused {
+                    device: holder.device.clone(),
+                    refusal: "answered another kind than a manifest".into(),
+                },
+                Ok(Err(PeerError::TierFrameTooLarge { len, cap })) => {
+                    FetchGap::ManifestTooLarge { len, cap }
+                }
+                Err(_) if bound.by_deadline => {
+                    return Err(if retried_warming {
+                        FetchGap::IndexWarming
+                    } else {
+                        FetchGap::DeadlineExceeded {
+                            fetched: 0,
+                            total: 0,
+                        }
+                    })
+                }
+                Ok(Err(error)) => manifest_request_failed(
+                    relay,
+                    &holder.device,
+                    &ManifestRequestFailure::Error(error.to_string()),
+                ),
+                Err(_) => manifest_request_failed(
+                    relay,
+                    &holder.device,
+                    &ManifestRequestFailure::Elapsed(bound.wait),
+                ),
+            };
+            // Whatever arrived for a manifest that was not accepted was moved for nothing.
+            progress
+                .wasted
+                .fetch_add(received.load(Ordering::Relaxed), Ordering::Relaxed);
+            connection.close(VarInt::from_u32(0), b"");
+            if gap == FetchGap::IndexWarming {
+                warming.push(index);
+            } else {
+                unreachable.insert(index);
+                last = gap;
             }
-            Ok(Ok(TierAnswer::Unanswered { why, .. })) => FetchGap::Refused {
-                device: holder.device.clone(),
-                refusal: refusal_text(&why.why),
-            },
-            Ok(Ok(TierAnswer::Failed { reason })) => FetchGap::Refused {
-                device: holder.device.clone(),
-                refusal: reason,
-            },
-            Ok(Ok(_)) => FetchGap::Refused {
-                device: holder.device.clone(),
-                refusal: "answered another kind than a manifest".into(),
-            },
-            Ok(Err(PeerError::TierFrameTooLarge { len, cap })) => {
-                FetchGap::ManifestTooLarge { len, cap }
-            }
-            Err(_) if bound.by_deadline => {
-                return Err(FetchGap::DeadlineExceeded {
-                    fetched: 0,
-                    total: 0,
-                })
-            }
-            Ok(Err(error)) => manifest_request_failed(
-                relay,
-                &holder.device,
-                &ManifestRequestFailure::Error(error.to_string()),
-            ),
-            Err(_) => manifest_request_failed(
-                relay,
-                &holder.device,
-                &ManifestRequestFailure::Elapsed(bound.wait),
-            ),
-        };
-        // Whatever arrived for a manifest that was not accepted was moved for nothing.
-        progress
-            .wasted
-            .fetch_add(received.load(Ordering::Relaxed), Ordering::Relaxed);
-        connection.close(VarInt::from_u32(0), b"");
-        unreachable.insert(index);
-        last = gap;
+        }
+        if warming.is_empty() {
+            return Err(last);
+        }
+        candidates = warming;
+        retried_warming = true;
+        tokio::task::yield_now().await;
     }
-    Err(last)
 }
 
 // A method is an existing member of an admitted artifact, served under that artifact's grant.
@@ -1942,6 +1981,73 @@ pub(crate) fn admitted_holders(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The `ReachReason` decoder at base ac4df62d7, copied as a fixture so this test keeps proving
+    /// what an older follower does with a newer refusal.
+    #[derive(Debug, serde::Deserialize)]
+    #[serde(rename_all = "kebab-case")]
+    enum OldReachReason {
+        OutsideStanding,
+        NoRecord,
+        NotUnderRoot,
+        IdentityRequired,
+        AuthorizerUnavailable,
+    }
+
+    #[derive(Debug, serde::Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct OldReachRefusal {
+        reason: OldReachReason,
+        needs_standing: Option<String>,
+    }
+
+    #[test]
+    fn old_decoder_reads_index_warming_as_an_unknown_answer_fetch_gap() {
+        let _old_variants = [
+            OldReachReason::OutsideStanding,
+            OldReachReason::NoRecord,
+            OldReachReason::NotUnderRoot,
+            OldReachReason::IdentityRequired,
+            OldReachReason::AuthorizerUnavailable,
+        ];
+        let known = eprfs_core::ReachRefusal::new(eprfs_core::ReachReason::NoRecord, None);
+        let known = serde_ipld_dagcbor::to_vec(&known).expect("old refusal encodes");
+        let known = serde_ipld_dagcbor::from_slice::<OldReachRefusal>(&known)
+            .expect("the fixture is the base decoder");
+        assert!(matches!(known.reason, OldReachReason::NoRecord));
+        assert_eq!(known.needs_standing, None);
+
+        let refusal = eprfs_core::ReachRefusal::new(
+            eprfs_core::ReachReason::IndexWarming,
+            Some("manifest:bafkfixture".into()),
+        );
+        let bytes = serde_ipld_dagcbor::to_vec(&refusal).expect("new refusal encodes");
+        let error = serde_ipld_dagcbor::from_slice::<OldReachRefusal>(&bytes)
+            .expect_err("the old enum fails closed on the unknown answer kind");
+        let gap = manifest_request_failed(
+            false,
+            "did:key:older-follower",
+            &ManifestRequestFailure::Error(error.to_string()),
+        );
+
+        assert_eq!(
+            gap,
+            FetchGap::NoRoute {
+                device: "did:key:older-follower".into()
+            }
+        );
+    }
+
+    #[test]
+    fn index_warming_gap_wire_and_lines_name_it() {
+        let gap = FetchGap::IndexWarming;
+        assert_eq!(
+            serde_json::to_string(&gap).unwrap(),
+            r#"{"gap":"index-warming"}"#
+        );
+        assert_eq!(gap.kind(), "index-warming");
+        assert_eq!(gap.to_string(), "the sibling is still indexing");
+    }
 
     #[test]
     fn a_destination_outside_the_install_roots_names_the_serve_argument_that_admits_it() {

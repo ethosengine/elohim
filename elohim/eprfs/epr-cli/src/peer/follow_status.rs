@@ -304,6 +304,25 @@ mod tests {
     }
 
     #[test]
+    fn follow_status_names_index_warming() {
+        let mut warming = record(FollowOutcome::Refused);
+        warming.kind = Some("index-warming".into());
+        warming.reason = Some("the sibling is still indexing".into());
+
+        let lines = follow_lines(&[ToolFollow::Recorded {
+            tool: "epr".into(),
+            record: warming,
+        }]);
+
+        assert!(
+            lines[0].ends_with("— index-warming: the sibling is still indexing"),
+            "{}",
+            lines[0]
+        );
+        assert!(!lines[0].contains("no record"), "{}", lines[0]);
+    }
+
+    #[test]
     fn follow_status_renders_one_line_per_state() {
         let pending = record(FollowOutcome::Pending);
         let mut landed_late = record(FollowOutcome::Landed);

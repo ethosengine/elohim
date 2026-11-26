@@ -15,7 +15,6 @@ use serde_json::json;
 use std::{
     fs,
     io::{BufRead, BufReader},
-    net::UdpSocket,
     os::unix::fs::{symlink, PermissionsExt},
     path::{Path, PathBuf},
     process::{Child, Command, Output, Stdio},
@@ -221,7 +220,10 @@ fn text(output: &Output) -> String {
     )
 }
 
-struct Serving(Child);
+struct Serving {
+    child: Child,
+    bound_socket: String,
+}
 
 impl Serving {
     fn start(mut command: Command) -> Self {
@@ -241,26 +243,37 @@ impl Serving {
             .recv_timeout(Duration::from_secs(10))
             .expect("peer serve announces readiness within 10 seconds")
             .expect("peer serve readiness line is readable");
+        if line.is_empty() {
+            let output = child.wait_with_output().expect("failed serve can be read");
+            panic!("peer serve exited before readiness: {}", text(&output));
+        }
         assert!(
             line.starts_with(elohim_epr_cli::peer::SERVING_LINE),
             "peer serve readiness line: {line:?}"
         );
-        Self(child)
+        let bound_socket = line
+            .split_once(" on ")
+            .and_then(|(_, rest)| rest.split_once(" for ").map(|(sockets, _)| sockets))
+            .and_then(|sockets| sockets.split(',').next())
+            .expect("SERVING_LINE carries the bound socket")
+            .trim()
+            .to_string();
+        Self {
+            child,
+            bound_socket,
+        }
+    }
+
+    fn bound_socket(&self) -> &str {
+        &self.bound_socket
     }
 }
 
 impl Drop for Serving {
     fn drop(&mut self) {
-        let _ = self.0.kill();
-        let _ = self.0.wait();
+        let _ = self.child.kill();
+        let _ = self.child.wait();
     }
-}
-
-fn free_port() -> u16 {
-    UdpSocket::bind("127.0.0.1:0")
-        .and_then(|socket| socket.local_addr())
-        .map(|address| address.port())
-        .unwrap()
 }
 
 fn device_command(
@@ -641,7 +654,6 @@ fn declared_non_builder_draws_an_absent_sibling_release_without_cargo() {
     .unwrap();
     assert_eq!(folded.appended, 2);
 
-    let sibling_port = free_port();
     let mut sibling_serve = device_command(
         &sibling_key_file,
         &sibling_config,
@@ -657,10 +669,9 @@ fn declared_non_builder_draws_an_absent_sibling_release_without_cargo() {
         "--policy",
         policy.to_str().unwrap(),
         "--listen",
-        &format!("127.0.0.1:{sibling_port}"),
+        "127.0.0.1:0",
     ]);
-    let _sibling_serve = Serving::start(sibling_serve);
-    let reader_port = free_port();
+    let sibling_serve = Serving::start(sibling_serve);
     let mut reader_serve = device_command(
         &reader_key_file,
         &reader_config,
@@ -676,9 +687,9 @@ fn declared_non_builder_draws_an_absent_sibling_release_without_cargo() {
         "--policy",
         policy.to_str().unwrap(),
         "--listen",
-        &format!("127.0.0.1:{reader_port}"),
+        "127.0.0.1:0",
         "--peer",
-        &format!("{sibling_node}@127.0.0.1:{sibling_port}"),
+        &format!("{sibling_node}@{}", sibling_serve.bound_socket()),
     ]);
     let _reader_serve = Serving::start(reader_serve);
 

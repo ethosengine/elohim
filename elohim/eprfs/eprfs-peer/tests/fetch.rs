@@ -19,7 +19,7 @@ use elohim_epr::profile::ByteProfile;
 use elohim_epr_rea::{atom_cid, AgentRef, FlowEvent, FlowStore, MemoryFlowStore, ReaVerb};
 use eprfs_core::{
     BlobCid, BlobPresence, DerivationBasis, DerivationKey, DerivationRecord, EprfsStorage,
-    KeyInput, MethodDescriptor, Witness,
+    ItemAbsence, KeyInput, MethodDescriptor, ReachReason, ReachRefusal, TreePath, Witness,
 };
 use eprfs_peer::{
     bind, channel_tier_id, fetch_artifact, install_fetched, key_cid, open_payload_store,
@@ -280,6 +280,10 @@ impl RealHolder {
 
 #[derive(Debug, Clone, Default)]
 struct Faults {
+    /// The first this many manifest asks answer that the artifact index is still warming.
+    manifest_warming: usize,
+    /// Every manifest ask answers established absence.
+    manifest_no_record: bool,
     /// Every chunk answer waits this long first.
     delay_chunks: Option<Duration>,
     /// This chunk is answered with other bytes under its CID.
@@ -296,6 +300,7 @@ struct Scripted {
     asked: Arc<Mutex<Vec<TierRequest>>>,
     connections: Arc<AtomicUsize>,
     answered: Arc<AtomicUsize>,
+    manifest_answered: Arc<AtomicUsize>,
 }
 
 impl std::fmt::Debug for Scripted {
@@ -332,9 +337,31 @@ impl Scripted {
         self.asked.lock().expect("asked").push(request.clone());
         let answer = match &request {
             TierRequest::Manifest { .. } | TierRequest::Record { cid: None, .. } => {
-                TierAnswer::Blob {
-                    cid: self.manifest.0.clone(),
-                    bytes: self.manifest.1.clone(),
+                let answered = self.manifest_answered.fetch_add(1, Ordering::SeqCst);
+                let reason = if answered < self.faults.manifest_warming {
+                    Some(ReachReason::IndexWarming)
+                } else if self.faults.manifest_no_record {
+                    Some(ReachReason::NoRecord)
+                } else {
+                    None
+                };
+                if let Some(reason) = reason {
+                    TierAnswer::Unanswered {
+                        cid: self.manifest.0.clone(),
+                        path: TreePath::root(),
+                        why: ItemAbsence::refused(
+                            &channel_tier_id(),
+                            ReachRefusal::new(
+                                reason,
+                                Some(format!("manifest:{}", self.manifest.0)),
+                            ),
+                        ),
+                    }
+                } else {
+                    TierAnswer::Blob {
+                        cid: self.manifest.0.clone(),
+                        bytes: self.manifest.1.clone(),
+                    }
                 }
             }
             TierRequest::Blob { cid, .. } | TierRequest::Record { cid: Some(cid), .. } => {
@@ -460,6 +487,7 @@ async fn scripted(held: &Held, faults: Faults) -> Running {
         asked: Arc::default(),
         connections: Arc::default(),
         answered: Arc::default(),
+        manifest_answered: Arc::default(),
     };
     let endpoint = bind(&key, None, vec![TIER_ALPN.to_vec()])
         .await
@@ -499,6 +527,105 @@ async fn within<T>(what: &str, future: impl std::future::Future<Output = T>) -> 
 // ---------------------------------------------------------------------------
 // tests
 // ---------------------------------------------------------------------------
+
+#[tokio::test(flavor = "multi_thread")]
+async fn index_warming_retries_within_the_existing_fetch_deadline_and_draws() {
+    let t = three();
+    let key = key_for("warming-then-ready");
+    let held = held_artifact(&key, artifact_bytes(9, 1024)).await;
+    let server = scripted(
+        &held,
+        Faults {
+            manifest_warming: 2,
+            ..Faults::default()
+        },
+    )
+    .await;
+    let endpoint = fetcher(&t.key_c).await;
+    let (_dir, store) = payload();
+
+    fetch_artifact(
+        &endpoint,
+        store.as_ref(),
+        &key,
+        &held.manifest.record.output,
+        &[server.holder(&t.a.did, &held.manifest_cid)],
+        &budget(),
+    )
+    .await
+    .expect("the same holder becomes ready inside the existing bound");
+
+    assert_eq!(server.tier.manifest_asks(), 3);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn no_record_is_not_retried() {
+    let t = three();
+    let key = key_for("established-absence");
+    let held = held_artifact(&key, artifact_bytes(10, 1024)).await;
+    let server = scripted(
+        &held,
+        Faults {
+            manifest_no_record: true,
+            ..Faults::default()
+        },
+    )
+    .await;
+    let endpoint = fetcher(&t.key_c).await;
+    let (_dir, store) = payload();
+
+    let gap = fetch_artifact(
+        &endpoint,
+        store.as_ref(),
+        &key,
+        &held.manifest.record.output,
+        &[server.holder(&t.a.did, &held.manifest_cid)],
+        &budget(),
+    )
+    .await
+    .expect_err("established absence remains a refusal");
+
+    assert!(matches!(gap, FetchGap::Refused { .. }), "{gap:?}");
+    assert_eq!(server.tier.manifest_asks(), 1);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn index_warming_that_outlasts_the_existing_bound_refuses_by_name() {
+    let t = three();
+    let key = key_for("warming-past-bound");
+    let held = held_artifact(&key, artifact_bytes(11, 1024)).await;
+    let server = scripted(
+        &held,
+        Faults {
+            manifest_warming: usize::MAX,
+            ..Faults::default()
+        },
+    )
+    .await;
+    let endpoint = fetcher(&t.key_c).await;
+    let (_dir, store) = payload();
+    let budget = FetchBudget {
+        stall: Duration::from_secs(1),
+        total: Duration::from_millis(30),
+        ..FetchBudget::default()
+    };
+
+    let gap = fetch_artifact(
+        &endpoint,
+        store.as_ref(),
+        &key,
+        &held.manifest.record.output,
+        &[server.holder(&t.a.did, &held.manifest_cid)],
+        &budget,
+    )
+    .await
+    .expect_err("warming cannot extend the fetch deadline");
+
+    assert_eq!(gap, FetchGap::IndexWarming);
+    assert_eq!(gap.kind(), "index-warming");
+    assert_eq!(gap.to_string(), "the sibling is still indexing");
+    assert!(server.tier.manifest_asks() > 1);
+}
 
 #[tokio::test(flavor = "multi_thread")]
 async fn a_sibling_fetches_the_closure_from_one_holder_and_records_use_against_the_holders_produce()

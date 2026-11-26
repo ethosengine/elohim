@@ -81,6 +81,9 @@ impl ReachRefusal {
 pub enum ReachReason {
     OutsideStanding,
     NoRecord,
+    /// The serving daemon has not completed its first artifact-index rebuild, so absence is not
+    /// established yet.
+    IndexWarming,
     NotUnderRoot,
     IdentityRequired,
     AuthorizerUnavailable,
