@@ -95,6 +95,8 @@ struct State {
     distances: BTreeMap<String, u64>,
     /// `cargo build` runs out of its bound, as `SystemRunner` reports it.
     build_timeout: bool,
+    /// `cargo build` writes the epr release fixture and succeeds.
+    build_success: bool,
 }
 struct Fake {
     state: Arc<Mutex<State>>,
@@ -169,14 +171,29 @@ impl Runner for Fake {
                 } else {
                     success = false;
                 }
-            } else if c.args[0] == "build" && s.build_timeout {
-                return Err(Refusal::new(
-                    "command-timeout",
-                    format!(
-                        "cargo exceeded {}ms including pipe drain",
-                        c.timeout.as_millis()
-                    ),
-                ));
+            } else if c.args[0] == "build" {
+                if s.build_timeout {
+                    return Err(Refusal::new(
+                        "command-timeout",
+                        format!(
+                            "cargo exceeded {}ms including pipe drain",
+                            c.timeout.as_millis()
+                        ),
+                    ));
+                }
+                if s.build_success {
+                    let debug = self.root.join("target/debug");
+                    fs::create_dir_all(&debug)?;
+                    for bin in ["epr", "bin-launch"] {
+                        atomic_bytes(
+                            &debug.join(bin),
+                            format!("#!/bin/sh\n# built {bin}\n").as_bytes(),
+                            0o755,
+                        )?;
+                    }
+                } else {
+                    success = false;
+                }
             } else {
                 success = false;
             }
@@ -3001,6 +3018,7 @@ fn f2_closure_requires_and_preserves_its_own_provenance() {
     );
     atomic_json(&f.path("closure/release.json"), &r).unwrap();
     let imported = f.store.ingest(&f.path("closure"), &options).unwrap();
+    assert!(imported.annotations.is_none());
     assert!(imported.source(&f.commit()).is_none());
     assert!(imported.source(&old).is_some());
     assert_eq!(f.land(&imported).unwrap_err().kind, "commit-mismatch");
@@ -3945,6 +3963,160 @@ fn release_cid_of_names_what_ingest_records_without_writing_anything() {
         "binary-unusable",
         "a missing bin is refused, never hashed as absent"
     );
+}
+
+#[test]
+fn producer_derivation_keys_are_uncovered_and_do_not_change_release_cid() {
+    let f = Fixture::new("epr");
+    let mut registry = f.registry.clone();
+    registry.tools.get_mut("epr").unwrap()["bins"] = json!(["epr", "bin-launch"]);
+    let store = Store::new(f.path("producer-store"), "epr", &registry)
+        .unwrap()
+        .with_runner(Arc::new(Fake {
+            root: f.tmp.path().into(),
+            state: f.state.clone(),
+            tool: "epr".into(),
+        }));
+    let source = f.path("producer-release");
+    fs::create_dir_all(&source).unwrap();
+    for bin in ["epr", "bin-launch"] {
+        atomic_bytes(
+            &source.join(bin),
+            format!("#!/bin/sh\n# {bin}\n").as_bytes(),
+            0o755,
+        )
+        .unwrap();
+    }
+    let options = IngestOptions {
+        source_commit: Some(f.commit()),
+        tree_clean: Some(true),
+        gate_run: Some("producer-test".into()),
+        ..Default::default()
+    };
+    let ordinary = store.ingest(&source.join("epr"), &options).unwrap();
+    assert!(serde_json::to_value(&ordinary)
+        .unwrap()
+        .get("annotations")
+        .is_none());
+    let keys = BTreeMap::from([
+        ("bin-launch".into(), "bafkr-derivation-launch".into()),
+        ("epr".into(), "bafkr-derivation-epr".into()),
+    ]);
+    let annotated = store
+        .ingest_with_derivation_keys(&source.join("epr"), &options, keys, |_| Ok(None))
+        .unwrap();
+    assert_eq!(annotated.rcid, ordinary.rcid);
+    assert_eq!(annotated.cid, ordinary.cid);
+    let value = serde_json::to_value(&annotated).unwrap();
+    assert_eq!(
+        value["annotations"]["derivationKeys"],
+        json!({
+            "keys": {
+                "bin-launch": "bafkr-derivation-launch",
+                "epr": "bafkr-derivation-epr"
+            },
+            "coveredByRcid": false,
+            "source": "producer"
+        })
+    );
+    let stored: Value =
+        read_json(&store.artifact(&annotated.cid).unwrap().join("record.json")).unwrap();
+    assert_eq!(stored["annotations"], value["annotations"]);
+}
+
+#[test]
+fn old_release_record_without_annotations_round_trips_unchanged() {
+    let old = json!({
+        "cid": "bafkr-old",
+        "rcid": "bafkr-old",
+        "tool": "epr",
+        "bins": {"epr": "bafkr-old"},
+        "version": "fixture",
+        "sourceCommit": "a".repeat(40),
+        "treeClean": true,
+        "gateRun": "fixture",
+        "ingestedAt": "2026-11-26T00:00:00Z",
+        "sources": [],
+        "ring": "dev-context",
+        "attestations": {}
+    });
+    let release: Release = serde_json::from_value(old.clone()).unwrap();
+    assert!(release.annotations.is_none());
+    assert_eq!(serde_json::to_value(release).unwrap(), old);
+}
+
+#[test]
+fn local_build_release_records_no_derivation_annotations() {
+    let f = Fixture::new("epr");
+    f.state.lock().unwrap().build_success = true;
+    let mut attempts = Vec::new();
+    let release = f
+        .store
+        .build_release(
+            f.tmp.path(),
+            &f.commit(),
+            "build-test",
+            &mut attempts,
+            &|_| None,
+        )
+        .unwrap();
+    assert!(release.annotations.is_none());
+}
+
+#[test]
+fn older_epr_reads_and_verifies_release_with_uncovered_derivation_keys() {
+    const OLD_EPR: &str = "/projects/.claude-config/tools/bin-store/epr/bafyreicogwrk7rngfo6en67qy5vzvaik4on3fb3bih3fnz56s7xtdqcagq/epr";
+    if !Path::new(OLD_EPR).is_file() {
+        eprintln!("compat skipped: older epr is not installed at {OLD_EPR}");
+        return;
+    }
+    let f = Fixture::new("epr");
+    let source = f.path("compat-epr");
+    atomic_bytes(&source, b"#!/bin/sh\n# compat epr\n", 0o755).unwrap();
+    let release = f
+        .store
+        .ingest_with_derivation_keys(
+            &source,
+            &IngestOptions {
+                source_commit: Some(f.commit()),
+                tree_clean: Some(true),
+                gate_run: Some("compat-test".into()),
+                ..Default::default()
+            },
+            BTreeMap::from([("epr".into(), "bafkr-compat-input".into())]),
+            |_| Ok(None),
+        )
+        .unwrap();
+    f.head(&release);
+    let registry = f.path("compat-registry.json");
+    atomic_json(&registry, &f.registry).unwrap();
+    let output = std::process::Command::new(OLD_EPR)
+        .args([
+            "bin",
+            "--tool",
+            "epr",
+            "status",
+            "--registry",
+            registry.to_str().unwrap(),
+            "--store",
+            f.store.root().to_str().unwrap(),
+            "--json",
+        ])
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    eprintln!(
+        "compat command: {OLD_EPR} bin --tool epr status --registry {} --store {} --json\n{stdout}",
+        registry.display(),
+        f.store.root().display()
+    );
+    let status: Value = serde_json::from_str(&stdout).unwrap();
+    assert_eq!(status["verifiedCurrent"], true);
 }
 
 #[path = "tests_retained.rs"]
