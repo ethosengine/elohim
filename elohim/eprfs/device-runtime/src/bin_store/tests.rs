@@ -397,6 +397,9 @@ fn proc_entry(root: &Path, pid: u32, parent: u32, comm: &str, start: u64) {
 fn age(f: &Fixture, r: &Release, at: &str) {
     let mut r = r.clone();
     r.provenance.ingested_at = at.into();
+    for source in &mut r.sources {
+        source.ingested_at = at.into();
+    }
     f.store.save(&r).unwrap();
 }
 fn adoption_events(f: &Fixture, cid: &str) -> Vec<Value> {
@@ -1543,6 +1546,34 @@ fn reingesting_an_existing_release_keeps_its_first_ingested_at() {
             && source.ingested_at != reingested.provenance.ingested_at
     }));
 }
+
+#[test]
+fn declared_selection_prefers_identical_bytes_reingested_after_a_newer_build() {
+    use ark_core::declaration::{Follow, FollowMode};
+
+    let f = Fixture::new("epr");
+    let reingested = f.release("reingested-candidate");
+    let newer_build = f.release("different-newer-candidate");
+    age(&f, &reingested, "2026-01-01T00:00:00Z");
+    age(&f, &newer_build, "2026-11-25T00:00:00Z");
+
+    let refreshed = f.release("reingested-candidate");
+    let result = f
+        .store
+        .follow_declared(
+            f.tmp.path(),
+            None,
+            &Follow {
+                channel: "bin:epr".into(),
+                mode: FollowMode::Observe,
+                pin: None,
+            },
+        )
+        .unwrap();
+
+    assert_eq!(refreshed.cid, reingested.cid);
+    assert_eq!(result["observed"], reingested.cid);
+}
 #[test]
 fn test_retried_ingest_and_refusal_refresh_their_rows_instead_of_growing() {
     let f = Fixture::new("epr");
@@ -1736,6 +1767,23 @@ fn test_gc_keeps_an_old_artifact_used_within_fourteen_days() {
         f.store.gc(&f.path("proc"), Some(at)).unwrap()["removed"],
         json!([])
     );
+}
+
+#[test]
+fn gc_keeps_a_release_whose_identical_bytes_were_just_reingested() {
+    let f = Fixture::new("epr");
+    let release = f.release("reingested-before-gc");
+    age(&f, &release, "2026-01-01T00:00:00Z");
+
+    let refreshed = f.release("reingested-before-gc");
+    let result = f.store.gc(&f.path("proc"), Some(now_seconds())).unwrap();
+
+    assert_eq!(refreshed.cid, release.cid);
+    assert_eq!(result["removed"], json!([]));
+    assert!(result["kept"]
+        .as_array()
+        .unwrap()
+        .contains(&json!(release.cid)));
 }
 #[test]
 fn test_exec_pin_lock_timeout_falls_back_to_current_with_one_warning() {
@@ -1943,7 +1991,8 @@ fn test_guard_keeps_a_hand_installed_binary_and_repoints_stale_shadows() {
 fn adopting_held_bytes_leaves_record_identical_and_appends_one_event() {
     let f = Fixture::new("epr");
     let held = f.release("held-adoption");
-    f.head(&held);
+    let current = f.release("current-during-adoption");
+    f.head(&current);
     let record = f.store.root.join(&held.cid).join("record.json");
     let before = fs::read(&record).unwrap();
     atomic_bytes(
@@ -1967,10 +2016,11 @@ fn adopting_held_bytes_leaves_record_identical_and_appends_one_event() {
     assert!(events[0]["at"].as_str().is_some());
 }
 #[test]
-fn adopting_held_bytes_twice_appends_two_events_without_a_source() {
+fn adopting_the_same_held_path_and_cid_twice_appends_one_event_without_a_source() {
     let f = Fixture::new("epr");
     let held = f.release("held-twice");
-    f.head(&held);
+    let current = f.release("current-during-repeat-adoption");
+    f.head(&current);
     let artifact = f.store.root.join(&held.cid);
     let record = artifact.join("record.json");
     let before = fs::read(&record).unwrap();
@@ -1985,7 +2035,7 @@ fn adopting_held_bytes_twice_appends_two_events_without_a_source() {
     }
 
     assert_eq!(fs::read(record).unwrap(), before);
-    assert_eq!(adoption_events(&f, &held.cid).len(), 2);
+    assert_eq!(adoption_events(&f, &held.cid).len(), 1);
     assert!(!f
         .store
         .record(&held.cid)
@@ -2021,7 +2071,8 @@ fn adopting_unheld_bytes_ingests_an_adopted_from_path_source() {
 fn adopting_held_record_with_an_adopted_source_never_rewrites_it() {
     let f = Fixture::new("epr");
     let held = f.release("held-with-adopted-source");
-    f.head(&held);
+    let current = f.release("current-with-held-adopted-source");
+    f.head(&current);
     let mut record = f.store.record(&held.cid).unwrap();
     record.sources.push(Provenance {
         source_commit: "unknown".into(),
@@ -2068,10 +2119,179 @@ fn install_launcher_with_held_launcher_bytes_never_rewrites_record() {
         .unwrap();
 
     assert_eq!(fs::read(record).unwrap(), before);
-    let events = adoption_events(&f, &held.cid);
-    assert_eq!(events.len(), 1);
-    assert_eq!(events[0]["path"], json!(f.path("bin/bin-launch")));
+    assert!(!artifact.join("adoptions.jsonl").exists());
 }
+
+#[test]
+fn repeated_arrivals_skip_plain_files_equal_to_the_current_release() {
+    let f = Fixture::new("epr");
+    let current = f.release("current-arrival-bytes");
+    f.head(&current);
+    let bytes = fs::read(f.store.root.join(&current.cid).join("epr")).unwrap();
+
+    for _ in 0..3 {
+        atomic_bytes(&f.path("cargo-bin/epr"), &bytes, 0o755).unwrap();
+        let result = f.install().unwrap();
+        assert!(result["adopted"].as_object().unwrap().is_empty());
+    }
+
+    assert!(!f
+        .store
+        .root
+        .join(&current.cid)
+        .join("adoptions.jsonl")
+        .exists());
+}
+
+#[test]
+fn adoption_log_failure_warns_and_does_not_fail_launcher_installation() {
+    let f = Fixture::new("epr");
+    let held = f.release("held-with-unwritable-log");
+    let current = f.release("current-with-unwritable-log");
+    f.head(&current);
+    atomic_bytes(
+        &f.path("cargo-bin/epr"),
+        &fs::read(f.store.root.join(&held.cid).join("epr")).unwrap(),
+        0o755,
+    )
+    .unwrap();
+    let events = f.store.root.join(&held.cid).join("adoptions.jsonl");
+    symlink("missing-adoption-target", &events).unwrap();
+
+    let result = f.install().unwrap();
+
+    assert_eq!(
+        result["adopted"]["epr"],
+        json!(f.store.root.join(&held.cid).join("epr"))
+    );
+    assert!(events.is_symlink());
+}
+
+#[test]
+fn adoption_event_does_not_make_an_old_release_recent_for_gc() {
+    let f = Fixture::new("epr");
+    let held = f.release("old-held-adoption");
+    let current = f.release("current-for-old-adoption");
+    age(&f, &held, "2026-01-01T00:00:00Z");
+    f.head(&current);
+    atomic_bytes(
+        &f.path("cargo-bin/epr"),
+        &fs::read(f.store.root.join(&held.cid).join("epr")).unwrap(),
+        0o755,
+    )
+    .unwrap();
+    f.install().unwrap();
+    assert_eq!(adoption_events(&f, &held.cid).len(), 1);
+
+    let result = f.store.gc(&f.path("proc"), Some(now_seconds())).unwrap();
+
+    assert!(result["removed"]
+        .as_array()
+        .unwrap()
+        .contains(&json!(held.cid)));
+}
+
+#[test]
+fn adopting_a_held_but_tampered_release_repairs_bytes_without_moving_first_ingest() {
+    let f = Fixture::new("epr");
+    let held = f.release("held-before-tamper");
+    let current = f.release("current-while-repairing-held");
+    f.head(&current);
+    let first_ingest = held.provenance.ingested_at.clone();
+    let original = fs::read(f.path("held-before-tamper/epr")).unwrap();
+    atomic_bytes(
+        &f.store.root.join(&held.cid).join("epr"),
+        b"tampered",
+        0o755,
+    )
+    .unwrap();
+    atomic_bytes(&f.path("cargo-bin/epr"), &original, 0o755).unwrap();
+
+    f.install().unwrap();
+
+    assert_eq!(
+        fs::read(f.store.root.join(&held.cid).join("epr")).unwrap(),
+        original
+    );
+    let repaired = f.store.record(&held.cid).unwrap();
+    assert_eq!(repaired.provenance.ingested_at, first_ingest);
+    assert!(repaired
+        .sources
+        .iter()
+        .any(|source| source.gate_run.as_deref() == Some("adopted-from-path")));
+    assert!(!f
+        .store
+        .root
+        .join(&held.cid)
+        .join("adoptions.jsonl")
+        .exists());
+}
+
+#[test]
+fn concurrent_ingest_finishes_before_adoption_decides_held_provenance() {
+    use std::sync::mpsc;
+
+    let f = Fixture::new("epr");
+    let source = f.path("concurrent-ingest");
+    fs::create_dir_all(&source).unwrap();
+    atomic_bytes(&source.join("epr"), b"concurrent release", 0o755).unwrap();
+    let adopted_path = f.path("plain/epr");
+    let (entered_tx, entered_rx) = mpsc::channel();
+    let (continue_tx, continue_rx) = mpsc::channel();
+    let (started_tx, started_rx) = mpsc::channel();
+
+    let (normal, adopted) = std::thread::scope(|scope| {
+        let normal_store = f.store.clone();
+        let normal_source = source.clone();
+        let normal = scope.spawn(move || {
+            normal_store.ingest_with_payload_formats(
+                &normal_source,
+                &IngestOptions {
+                    source_commit: Some("a".repeat(40)),
+                    tree_clean: Some(true),
+                    gate_run: Some("normal-ingest".into()),
+                    ..Default::default()
+                },
+                |_| {
+                    entered_tx.send(()).unwrap();
+                    continue_rx.recv().unwrap();
+                    Ok(None)
+                },
+            )
+        });
+        entered_rx.recv().unwrap();
+        let adoption_store = f.store.clone();
+        let adoption_source = source.clone();
+        let adopted = scope.spawn(move || {
+            started_tx.send(()).unwrap();
+            adoption_store.ingest_adoption(
+                &adoption_source,
+                &IngestOptions {
+                    source_commit: Some("unknown".into()),
+                    tree_clean: Some(false),
+                    gate_run: Some("adopted-from-path".into()),
+                    ..Default::default()
+                },
+                &adopted_path,
+            )
+        });
+        started_rx.recv().unwrap();
+        continue_tx.send(()).unwrap();
+        (
+            normal.join().unwrap().unwrap(),
+            adopted.join().unwrap().unwrap(),
+        )
+    });
+
+    assert_eq!(normal.cid, adopted.cid);
+    let record = f.store.record(&normal.cid).unwrap();
+    assert!(!record
+        .sources
+        .iter()
+        .any(|source| source.gate_run.as_deref() == Some("adopted-from-path")));
+    assert_eq!(adoption_events(&f, &normal.cid).len(), 1);
+}
+
 #[test]
 fn test_guard_preserves_distinct_plain_alias_bytes_as_separate_candidates() {
     let f = Fixture::new("brit");
