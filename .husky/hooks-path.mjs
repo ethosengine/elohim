@@ -18,11 +18,18 @@
 // main checkout has checked out, and the gate inputs are the worktree's. That version skew is
 // expected — the hook on dev governs pushes to dev.
 //
+// When the main checkout's pre-push.bash differs from this worktree's (the main checkout sits on an
+// older branch: the laptop, 2026-11-25, backlog row 106), a second line says so and prints the push
+// form that runs this worktree's own hook for that one push. The setting itself is not moved:
+// core.hooksPath lives in the config every checkout shares, so pointing it at one worktree would
+// change which hook every other worktree and the main checkout run, and removing that worktree
+// would leave a hooks directory that does not exist, which Git treats as no hook at all.
+//
 // Idempotent. A no-op under HUSKY=0 (the same switch husky honours), outside a git checkout, and
 // when the common dir is not a `.git` directory (a separate git dir or a submodule), whose parent
 // is not the checkout.
 import { execFileSync } from 'node:child_process';
-import { accessSync, constants, cpSync, statSync } from 'node:fs';
+import { accessSync, constants, cpSync, readFileSync, statSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 
 function git(args, cwd) {
@@ -46,6 +53,25 @@ const GOVERNED_HOOKS = ['pre-push', 'pre-commit', 'pre-merge-commit', 'prepare-c
 function shimsReady(dir) {
   return GOVERNED_HOOKS.every((hook) => usable(join(dir, hook), constants.R_OK | constants.X_OK)) &&
     usable(join(dir, 'h'));
+}
+
+/**
+ * One line when a plain push from the linked worktree `top` would run a pre-push.bash that differs
+ * from the worktree's own; '' when they agree, when `top` is the main checkout, or when either
+ * file cannot be read (the entrypoint check has already refused a missing main one).
+ */
+function skewNote(top, hooks) {
+  const own = join(top, '.husky');
+  if (resolve(own) === resolve(hooks)) return '';
+  let differs;
+  try { differs = !readFileSync(join(hooks, 'pre-push.bash')).equals(readFileSync(join(own, 'pre-push.bash'))); }
+  catch { return ''; }
+  if (!differs) return '';
+  const said = `NOTE: ${join(hooks, 'pre-push.bash')} differs from this worktree's, and a plain push from here runs the main checkout's`;
+  if (!shimsReady(join(own, '_'))) {
+    return `${said}; this worktree has no complete ${join(own, '_')} to run its own from: run pnpm install here first`;
+  }
+  return `${said}; to run this worktree's own hook: brit -c core.hooksPath=${join(own, '_')} push origin HEAD:<ref>`;
 }
 
 function main(cwd) {
@@ -78,13 +104,15 @@ function main(cwd) {
   } catch {
     current = '';
   }
-  if (current === target) return `core.hooksPath already ${target}`;
+  const note = skewNote(top, hooks);
+  const lines = said => (note ? [said, note] : [said]);
+  if (current === target) return lines(`core.hooksPath already ${target}`);
   execFileSync('git', ['config', 'core.hooksPath', target], { cwd, stdio: 'ignore' });
-  return `core.hooksPath ${current || '(unset)'} -> ${target}`;
+  return lines(`core.hooksPath ${current || '(unset)'} -> ${target}`);
 }
 
 try {
-  console.log(`[hooks-path] ${main(process.cwd())}`);
+  for (const line of [].concat(main(process.cwd()))) console.log(`[hooks-path] ${line}`);
 } catch (error) {
   console.error(`[hooks-path] REFUSED: ${error.stderr?.toString().trim() || error.message}`);
   process.exitCode = 1;
