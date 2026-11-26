@@ -508,8 +508,10 @@ def _lease_wait_detail(waiting, now_ms):
 
 
 def _with_lease_wait(line, waiting, now_ms):
+    # The first line stays byte-identical (the a2o steps and the hook match it exactly); what the
+    # lease waits for goes on a second, indented line under it.
     detail = _lease_wait_detail(waiting, now_ms)
-    return f"{line} — {detail}" if detail else line
+    return f"{line}\n  waiting: {detail}" if detail else line
 
 
 def steward_reason(verdict, now_ms, fence_after_s=None):
@@ -529,7 +531,7 @@ def steward_reason(verdict, now_ms, fence_after_s=None):
                     if isinstance(row, dict)}
         details = [_lease_wait_detail(evidence.get(device), now_ms) for device in waiting_on]
         details = [detail for detail in details if detail]
-        return f"{line} — {' | '.join(details)}" if details else line
+        return f"{line}\n  waiting: {' | '.join(details)}" if details else line
     if verdict.get("fenced"):
         window = f" within {fence_after_s}s" if fence_after_s is not None else " recently"
         return f"self-demoted: no head from {verdict['device']}{window}"
