@@ -635,3 +635,71 @@ main's, so a correction folded after its closure stays open with a `REVALIDATE` 
 refused by default), and gate-cost `costOf` (last 10 or 20 rows by append order) may read old rows as
 recent for one push. Old binaries keep writing worktree logs until replaced; the write-time fold
 catches them, and nothing is deleted.
+
+## 8. Proposed amendment from the SP-287 survey (2026-11-26; not ruled)
+
+Proposed by flight F4 of plan `2026-11-26-research-disciplines-exercised`, from the survey
+`genesis/research/apollo-sp287-what-made-apollo-a-success-cross-pollination-2026-11-26.md`
+(§2.2, rules C1 to C6; §2.3; study items S8 and S9). Nothing in sections 1 to 7 is changed by
+this section. It states what would change in §2.4 and in the landing rows if the steward rules
+for it; until he does, the landings stand as written. The author of this section did not write
+the design and has not built against it.
+
+**P1. The subject is an address, of which a path is one case.** §2.4's surface takes
+`--target <path>`. The steward's direction of 2026-11-26 is that a brief composes "from the
+position in the world", and that the position may be a node, an agent or any EPR an agent is
+invoked from. Proposed: `--target` takes a path, a content address the device's store knows, or
+an `epr:` id. For a subject that is not a path, a part that cannot be resolved prints
+`unmeasured: <reason>` as every other missing part does. Today `epr flow context <cid>` accepts
+only a CID that a local record already mints or names, and for a bare CID it skips the seals,
+habit, gate and governance sections with a scope note (`flow/context.rs`, `resolve_target`); the
+placement read should say unmeasured line by line where that read skips sections.
+
+**P2. A fifth part, kept under every size limit: the stop.** §2.4 has four parts (goal and rung, guide-stars,
+authority, where to look). Apollo's crew carried enough to end safely with no ground contact.
+Proposed: a part named *Stop*, composed from the dispatch or commitment: the conditions on which
+the seat stops and reports, and the state it must leave. It prints
+`unmeasured: no stop condition is recorded for this task` when none is, and that line is itself
+the finding. Under a size limit every other part is cut before it.
+
+**P3. Rank against the declared ceiling, and say what was cut.** The habit declares a
+session-open ceiling (95,000 bytes soft, 100,000 hard) and the design shapes output by level
+(`lens_table`). Proposed: within a level, lines are composed in a stated order (stop; goal and
+rung; authority; guide-stars; where to look) against a share of that ceiling, and a brief that
+drops lines ends with one line saying how many and where they can be read. A line is one of
+three kinds: delivered, reachable by an address the brief prints, or withheld; the kind is
+visible.
+
+**P4. Arrival conditions are selected by the act, inside this read.** `epr device arrive` reads a
+list of conditions and a session is shown every one of them at start, whatever it came to do.
+Proposed: each condition declares which kinds of act depend on it (read, edit, run a gate,
+land, run the mesh, roll the fleet); the placement read selects the conditions the seat's act
+needs and prints a count of the rest with the command that lists them. The declaration is a
+field on `Check` in `elohim/eprfs/epr-cli/src/device/arrival.rs`. No hook filters conditions:
+"native composes; hooks only render" holds. A condition nobody's act selects still needs a seat
+that repairs it between tasks; this section names that need and does not design the seat.
+
+**P5. Study, no row: a control room is this read taken from a seat.** We decline a central
+control room and keep the room: any EPR should be able to compose one for the agent or human
+who sits there. `--as <seat>` on an address already composes a brief for a seat at a position.
+What the seat may invoke from there, and what it shows of other seats at the same position, is
+not designed here.
+
+**P6. Study, no row: a judging seat's brief carries where the other voices come from.** Agents
+working together are councils in small. A seat that judges should be handed, with the artifact,
+the provenance of the seats that produced it: model, lab, device, and what each read. The
+verdict notes of sprint `2026-11-26-research-disciplines` record this by hand; the gate
+evidence's `independence` field is the same idea for machines.
+
+**What would change in §3 if this is ruled.**
+
+| Row | Change |
+|---|---|
+| L3 | `--target` accepts an address (P1); the *Stop* part (P2); composition order, the share of the ceiling and the closing "cut" line (P3). Scenario 1 gains a subject that is not a path and a task with no recorded stop condition |
+| L4 | The SubagentStart and compaction renders carry the *Stop* part unchanged; arrival conditions are rendered as selected by the act (P4), which needs the `Check` field first |
+| L5 | Commitment rungs supply the *Stop* part's conditions where a commitment records them |
+| L1, L2, L6 | No change |
+
+**Not proposed.** No second path to the brief: no `epr device status --for <act>` and no
+filtering in `device-arrive.sh`. A due date on `claim` is not part of this section; it waits
+for a reader (backlog `agentic-harness-borrows-backlog` row 16).

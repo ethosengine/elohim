@@ -81,7 +81,7 @@ For high-risk work: **you** make the decision, **Opus** handles or reviews the h
 ## Operating loop
 
 1. Decide whether the task needs your judgment at all.
-2. Define what success means (the evidence that will show it's done).
+2. Define what success means (the evidence that will show it's done) and the stop condition (when the delegate stops and reports instead of deciding).
 3. Let cheaper agents gather facts or do scoped work — in parallel where read/write sets are disjoint.
 4. Review their evidence.
 5. Make the important decision yourself.
