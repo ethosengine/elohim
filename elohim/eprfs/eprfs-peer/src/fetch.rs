@@ -1406,10 +1406,22 @@ impl InstallScope {
         if under_root || in_mesh_bin {
             Ok(resolved.join(name))
         } else {
+            let held = if self.roots.is_empty() {
+                "none".to_owned()
+            } else {
+                self.roots
+                    .iter()
+                    .map(|root| root.display().to_string())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            };
             Err(format!(
-                "{} is outside this daemon's install roots (a mesh-bin directory under the cargo \
-                 pool, or an --install-root given at serve start)",
-                dest.display()
+                "{} is outside this daemon's install roots (held: {held}; also a mesh-bin \
+                 directory under the cargo pool); to admit it, restart the daemon with `epr peer \
+                 serve --install-root {}` (or EPR_INSTALL_ROOTS={})",
+                dest.display(),
+                resolved.display(),
+                resolved.display()
             ))
         }
     }
@@ -1930,6 +1942,36 @@ pub(crate) fn admitted_holders(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_destination_outside_the_install_roots_names_the_serve_argument_that_admits_it() {
+        let held = tempfile::tempdir().unwrap();
+        let elsewhere = tempfile::tempdir().unwrap();
+        let scope = InstallScope {
+            roots: vec![held.path().to_path_buf()],
+            mesh_bin_pool: None,
+        };
+        let dest = elsewhere.path().join("epr");
+        let refused = scope.admits(&dest).unwrap_err();
+        let dir = elsewhere.path().canonicalize().unwrap();
+        assert!(
+            refused.contains(&format!("held: {}", held.path().display())),
+            "{refused}"
+        );
+        assert!(
+            refused.contains(&format!("epr peer serve --install-root {}", dir.display())),
+            "{refused}"
+        );
+        assert!(
+            refused.contains(&format!("EPR_INSTALL_ROOTS={}", dir.display())),
+            "{refused}"
+        );
+        assert!(InstallScope::default()
+            .admits(&dest)
+            .unwrap_err()
+            .contains("held: none"));
+        assert!(scope.admits(&held.path().join("epr")).is_ok());
+    }
 
     #[test]
     fn a_relay_manifest_error_keeps_its_kind_and_carries_the_holders_error() {
