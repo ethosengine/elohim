@@ -566,10 +566,15 @@ mod tests {
                 .duration_since(UNIX_EPOCH)
                 .unwrap()
                 .as_nanos();
+            // The tests of this module run as threads of one process, so the
+            // process id and the clock alone can name one directory twice.
+            static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+            let serial = NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             let root = std::env::temp_dir().join(format!(
-                "elohim-agent-adapter-{}-{}",
+                "elohim-agent-adapter-{}-{}-{}",
                 std::process::id(),
-                nanos
+                nanos,
+                serial
             ));
             fs::create_dir_all(&root).unwrap();
             Self { root }
