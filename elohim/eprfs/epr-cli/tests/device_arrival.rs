@@ -512,13 +512,15 @@ fn detached_arrival_closes_parent_pipes_and_returns_summary() {
 
 #[test]
 #[cfg(feature = "peer")] // the live daemon holds `peer::ServeLock`
-fn peer_daemon_status_compares_live_lease_with_current() {
+fn peer_daemon_status_compares_release_record_cids_not_binary_blob_cids() {
     use std::os::unix::{fs::symlink, fs::PermissionsExt};
     let temp = fixture();
     let base = temp.path();
     let store = base.join("store/epr");
     let current = eprfs_core::BlobCid::compute_bytes(b"current").to_string();
     let older = eprfs_core::BlobCid::compute_bytes(b"older").to_string();
+    let current_blob = eprfs_core::BlobCid::compute_bytes(b"current binary blob").to_string();
+    let older_blob = eprfs_core::BlobCid::compute_bytes(b"older binary blob").to_string();
     fs::create_dir_all(store.join(&current)).unwrap();
     fs::create_dir_all(store.join("sessions")).unwrap();
     let executable = store.join(&current).join("epr");
@@ -538,34 +540,48 @@ fn peer_daemon_status_compares_live_lease_with_current() {
     )
     .unwrap();
     let lease = store.join("sessions/daemon-fixture");
-    let write = |cid: &str, start: u64| {
+    let write = |release_cid: &str, blob_cid: &str, start: u64| {
         fs::write(
             &lease,
-            json!({"cid":cid,"runningCid":cid,"session":"daemon-fixture",
+            json!({"cid":release_cid,"runningCid":blob_cid,"session":"daemon-fixture",
             "pinnedAt":"2026-10-24T00:00:00Z","ownerPid":pid,"ownerStartTime":start.to_string()})
             .to_string(),
         )
         .unwrap();
     };
-    write(&older, start);
+    write(&older, &older_blob, start);
     // A live daemon holds its serve lock; liveness is the lock, never a recorded pid.
     let _serving = elohim_epr_cli::peer::ServeLock::acquire(&base.join("config/epr/peer")).unwrap();
     let (_, rows) = checks(base);
     let peer = rows.iter().find(|r| r["name"] == "peer daemon").unwrap();
     assert_eq!(peer["state"], "degraded");
+    assert!(peer["detail"]
+        .as_str()
+        .unwrap()
+        .contains("release-record CID"));
     assert!(peer["cure"].as_str().unwrap().contains("restart"));
-    let peer_state = |base: &Path| {
+    let peer = |base: &Path| {
         checks(base)
             .1
             .into_iter()
             .find(|r| r["name"] == "peer daemon")
-            .unwrap()["state"]
-            .clone()
+            .unwrap()
     };
-    write(&current, start);
-    assert_eq!(peer_state(base), "ok");
-    write(&older, start + 1);
-    assert_eq!(peer_state(base), "ok");
+    write(&current, &current_blob, start);
+    let current_peer = peer(base);
+    assert_eq!(current_peer["state"], "ok");
+    assert!(current_peer["detail"]
+        .as_str()
+        .unwrap()
+        .contains("running and current release-record CIDs"));
+    write(&older, &current_blob, start);
+    assert_eq!(
+        peer(base)["state"],
+        "degraded",
+        "a current binary-blob CID cannot make an older release-record CID current"
+    );
+    write(&older, &older_blob, start + 1);
+    assert_eq!(peer(base)["state"], "ok");
 }
 
 /// Plain git in the fixture repository, as its owner (no assumed foreign ownership).
