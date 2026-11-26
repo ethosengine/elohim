@@ -41,6 +41,10 @@ function fixture(t, { current = HEAD, sessionSays = 'pin', launcher = true } = {
   const release = (cid, which, ingestedAt) => {
     const path = join(store, 'epr', cid, 'epr');
     script(path, [
+      'if [ "$1 $2 $3" = "flow note --help" ]; then',
+      '  echo "Usage: epr flow note [OPTIONS] --dated-by <COMMIT>"',
+      '  exit 0',
+      'fi',
       `echo "${which} $*" >> "${log}"`,
       'case "$*" in',
       '  "peer leases"*) echo \'{"standing":"device","device":"did:key:zFixture"}\' ;;',
