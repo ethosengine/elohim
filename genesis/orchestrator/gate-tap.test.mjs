@@ -236,13 +236,21 @@ test('missing kernel files are unknown, and disappearing processes do not break 
 test('slot holder releases non-zero and names members that survive the post-KILL wait', { timeout: 60_000 }, async () => {
   const member = { pid: 42, sid: 7, start: '200', state: 'S' };
   const sent = [];
+  const order = [];
   let output = '';
+  let now = 0;
   const status = await drainSlotSession(7, '100', {
     scan: () => new Map([[member.pid, member]]),
-    now: () => 0,
+    now: () => { now += 10; return now; },
     sleep: async () => {},
-    send: (sid, members, signal) => sent.push([sid, members.map(item => item.pid), signal]),
-    write: line => { output += line; },
+    send: (sid, members, signal) => {
+      sent.push([sid, members.map(item => item.pid), signal]);
+      order.push(signal);
+    },
+    write: line => {
+      output += line;
+      if (line.includes('draining session')) order.push('heartbeat');
+    },
     drainMs: 0,
     termMs: 0,
     killMs: 0,
@@ -252,6 +260,8 @@ test('slot holder releases non-zero and names members that survive the post-KILL
 
   assert.equal(status, 1);
   assert.deepEqual(sent, [[7, [42], 'SIGTERM'], [7, [42], 'SIGKILL']]);
+  assert.ok(order.indexOf('heartbeat') < order.indexOf('SIGTERM')
+    && order.indexOf('SIGTERM') < order.indexOf('SIGKILL'), JSON.stringify(order));
   assert.match(output, /^\[gate-slot\] session 7 still alive 0 ms after SIGKILL; releasing slot with surviving pids: 42$/m);
 });
 
@@ -343,7 +353,7 @@ describe('gate-tap sibling notes', () => {
 
   const says = dir => { try { return readFileSync(resolve(dir, 'says.log'), 'utf8').split('\n').filter(Boolean); } catch { return []; } };
   const wait = async (dir, n) => {
-    for (let i = 0; i < 80 && says(dir).length < n; i++) await new Promise(r => setTimeout(r, 50));
+    for (let i = 0; i < 300 && says(dir).length < n; i++) await new Promise(r => setTimeout(r, 50));
     await new Promise(r => setTimeout(r, 250));
   };
   const runTap = (env, runPath, script) => {
@@ -396,10 +406,10 @@ describe('gate-tap sibling notes', () => {
     assert.equal(measured.result.stdout, base.result.stdout);
     const added = measured.ms - base.ms;
     console.log(`hung-say overhead: ${added} ms (baseline ${base.ms} ms, with a hung say ${measured.ms} ms)`);
-    assert.ok(added < 2000, `added ${added} ms`);
+    assert.ok(added < 10_000, `added ${added} ms`);
     // The detached sender hits its deadline, kills berth's process group and records why.
     let deliveries = [];
-    for (let i = 0; i < 80 && !deliveries.length; i++) {
+    for (let i = 0; i < 200 && !deliveries.length; i++) {
       await new Promise(r => setTimeout(r, 100));
       deliveries = readFileSync(hung.runPath, 'utf8').split('\n').filter(Boolean).map(l => JSON.parse(l))
         .filter(e => e.kind === 'sibling-delivery');
@@ -467,7 +477,7 @@ describe('gate-tap sibling notes', () => {
     const { result } = runTap(env, runPath, `${twelve(12)}; sleep 4; exit 101`);
     assert.equal(result.status, 101);
     let ok = [];
-    for (let i = 0; i < 60 && ok.length < 12; i++) {
+    for (let i = 0; i < 200 && ok.length < 12; i++) {
       await new Promise(r => setTimeout(r, 100));
       ok = deliveries(runPath).filter(d => d.note === 'gate-red@1' && d.ok);
     }

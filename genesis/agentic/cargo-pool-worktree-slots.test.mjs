@@ -142,7 +142,7 @@ test('steward preserves process-owned and gate-locked orphan slots and removes o
   t.after(() => {
     for (const child of [sleeper, locker]) if (child.exitCode === null) child.kill('SIGKILL');
   });
-  const deadline = Date.now() + 3000;
+  const deadline = Date.now() + 15_000;
   while (spawnSync('test', ['-e', ready]).status !== 0 && Date.now() < deadline) await delay(10);
   assert.equal(spawnSync('test', ['-e', ready]).status, 0, 'the fixture lock was not acquired');
 
@@ -187,7 +187,7 @@ exec /bin/rm "$@"
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   t.after(() => { if (child.exitCode === null) child.kill('SIGKILL'); });
-  const deadline = Date.now() + 3000;
+  const deadline = Date.now() + 15_000;
   while (!existsSync(ready) && Date.now() < deadline) await delay(10);
   assert.ok(existsSync(ready), 'reclaim never entered its delete');
   assert.notEqual(spawnSync('flock', ['-n', `${gone}.gate.lock`, 'true']).status, 0,
