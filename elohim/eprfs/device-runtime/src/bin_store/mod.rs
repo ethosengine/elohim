@@ -68,7 +68,7 @@ pub enum FollowBuild {
     Builder,
     /// Refuse at the local-build boundary, after every usable release path has been tried.
     NotBuilder {
-        /// The readable role label, or `unknown` when no valid role could be read.
+        /// The readable, current non-builder role label.
         role: String,
         /// The sibling device(s) that answered with offers, or a generic builder source.
         draw_from: String,
@@ -87,11 +87,6 @@ impl FollowBuild {
             role: role.into(),
             draw_from: draw_from.into(),
         }
-    }
-
-    /// Missing, expired, or unreadable role state fails closed.
-    pub fn unknown(draw_from: impl Into<String>) -> Self {
-        Self::not_builder("unknown", draw_from)
     }
 }
 
