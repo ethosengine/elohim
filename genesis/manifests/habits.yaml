@@ -2817,9 +2817,9 @@ habits:
       - "python3 .claude/scripts/research-mint-check.py --strict --max-undeclared 46 (exit 0 = no declared take is owed or broken and no more than 46 notes are undeclared; 46 is the count of 2026-11-26 and is lowered as notes declare)"
       - "python3 .claude/scripts/_lib/__tests__/research_mint_check_test.py"
     evidence: >
-      DELTA 2026-11-26b (RED preserved; the flight's judge, a seat that did not do the work): two Radicle declarations were wrong, because the declarer read the note's take table and not its later status table. T5 was declared owed though the note marks it done; it now points at its code. T4 was declared on a row though the note records it as not taken, by ruling; it is now released with that ruling. Counts after the fix: 22 on a row, 19 on a file, 4 released, 21 owed (hypha-dao 6, memorilla 6, hypha-distributed-press 5, radicle 2, freenet 2). The check was hardened on the judge's reading: a `file:` home must stay inside the repository, a row must name the note as a whole slug, a row number carried by two table rows is ambiguous, and an entry that runs onto a second line fails. The unit test passes (22 tests).
-    evidence-fingerprint: sha256:97beb1fa97ac1f54
-    evidence-bytes: 1572
+      DELTA 2026-11-26b (RED preserved; the flight's judge, a seat that did not do the work): two Radicle declarations were wrong, because the declarer read the note's take table and not its later status table. T5 was declared owed though the note marks it done; it now points at its code. T4 was declared on a row though the note records it as not taken, by ruling; it is now released with that ruling. Counts after the fix: 22 on a row, 19 on a file, 4 released, 21 owed (hypha-dao 6, memorilla 6, hypha-distributed-press 5, radicle 2, freenet 2). The check was hardened on the judge's reading: a `file:` home must stay inside the repository, a row must name the note as a whole slug, a row number carried by two table rows is ambiguous, and an entry that runs onto a second line fails. The unit test passes (22 tests; 23 after one more hardening, a link that leaves the repository, made after the verdict).
+    evidence-fingerprint: sha256:31a61acc1f1fc6c7
+    evidence-bytes: 1660
     evidence-entries: 2
     guard: >
       The check verifies what a note declares and does not read prose for takes, so
