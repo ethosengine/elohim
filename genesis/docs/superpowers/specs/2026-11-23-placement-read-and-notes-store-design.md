@@ -655,8 +655,8 @@ only a CID that a local record already mints or names, and for a bare CID it ski
 habit, gate and governance sections with a scope note (`flow/context.rs`, `resolve_target`); the
 placement read should say unmeasured line by line where that read skips sections.
 
-**P2. A fifth part, kept under every size limit: the stop.** §2.4 has four parts (goal and rung, guide-stars,
-authority, where to look). Apollo's crew carried enough to end safely with no ground contact.
+**P2. A further part, kept under every size limit: the stop.** §2.4 has four parts (goal and rung, guide-stars,
+authority, where to look) and, for the scaffold `locate-and-hand-one-command`, a fifth, *Course*. Apollo's crew carried enough to end safely with no ground contact.
 Proposed: a part named *Stop*, composed from the dispatch or commitment: the conditions on which
 the seat stops and reports, and the state it must leave. It prints
 `unmeasured: no stop condition is recorded for this task` when none is, and that line is itself
@@ -665,7 +665,7 @@ the finding. Under a size limit every other part is cut before it.
 **P3. Rank against the declared ceiling, and say what was cut.** The habit declares a
 session-open ceiling (95,000 bytes soft, 100,000 hard) and the design shapes output by level
 (`lens_table`). Proposed: within a level, lines are composed in a stated order (stop; goal and
-rung; authority; guide-stars; where to look) against a share of that ceiling, and a brief that
+rung; course, where the scaffold has one; authority; guide-stars; where to look) against a share of that ceiling, and a brief that
 drops lines ends with one line saying how many and where they can be read. A line is one of
 three kinds: delivered, reachable by an address the brief prints, or withheld; the kind is
 visible.
