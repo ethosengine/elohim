@@ -14,7 +14,9 @@ The same silent stall was seen on 2026-11-05 (arrival backlog row 105). Nothing 
       The same reading, then at most one restart of this device's peer daemon, one JSON line in
       <root>/genesis/a2o/reports/recovery/peer-liveness.jsonl, and a re-read of the status that
       says whether a stale head moved. Exit 0 when a head moved, 4 when it restarted and none did,
-      3 when it found a stall and did not act (the line says why), 1 when it could not read.
+      3 when it found a stall and did not act (the line says why), 5 when the daemon could not be
+      started again as it runs (its executable, working directory or output directory is gone:
+      checked BEFORE any signal, so nothing is stopped), 1 when it could not read.
 
 What it can observe, and what it cannot. Every record this device holds of a sibling (its head, its
 acknowledgement, its berth moorings) arrives over the one exchange that has stalled, so nothing
@@ -218,19 +220,27 @@ def decide(status, daemons, rows, now, stale_after_s=STALE_AFTER_S, interval_s=I
     if uptime is not None and uptime < stale_after_s:
         return {"act": False, "stale": stale, "daemon": daemon,
                 "why": f"{said}; this daemon (pid {daemon['pid']}) has been up {int(uptime)} s, under the bound: not yet"}
-    restarts = [r for r in rows if r.get("outcome") in ("moved", "not-moved") and isinstance(r.get("at"), (int, float))]
+    # Every attempt counts toward the interval, a SIGTERM the daemon ignored included: it was signalled.
+    restarts = [r for r in rows if r.get("outcome") in ("moved", "not-moved", "not-restarted")
+                and isinstance(r.get("at"), (int, float))]
     if restarts:
         last = restarts[-1]
         since = now - last["at"]
         if since < interval_s:
+            did = "a restart was attempted and failed" if last.get("outcome") == "not-restarted" else "this daemon was restarted"
             return {"act": False, "stale": stale, "daemon": daemon,
-                    "why": f"{said}; this daemon was restarted {int(since)} s ago (at most one per {int(interval_s)} s)"}
+                    "why": f"{said}; {did} {int(since)} s ago (at most one per {int(interval_s)} s)"}
         if last.get("outcome") == "not-moved":
             tried = {(s.get("device"), s.get("seq")) for s in last.get("stale") or []}
             if all((s["device"], s["seq"]) in tried for s in stale):
                 return {"act": False, "stale": stale, "daemon": daemon,
                         "why": f"{said}; a restart {int(since)} s ago moved no head and none has moved since: "
                                "the sibling is likely off or stalled on its side (wake it, or restart its daemon)"}
+    blocked = respawnable(daemon) if "env" in daemon else None
+    if blocked:
+        return {"act": False, "unsafe": True, "stale": stale, "daemon": daemon,
+                "why": f"{said}; this daemon (pid {daemon['pid']}) could not be started again: {blocked}; "
+                       "nothing signalled (start a daemon from the current head by hand)"}
     return {"act": True, "stale": stale, "daemon": daemon,
             "why": f"{said}; would restart this device's peer daemon (pid {daemon['pid']}) as it runs"}
 
@@ -242,12 +252,30 @@ def alive(proc, pid, ticks):
         return False
 
 
+def respawnable(captured):
+    """None when the captured daemon could be started again as it ran, else the one reason it could not."""
+    exe = captured["argv"][0]
+    if not (os.path.isfile(exe) and os.access(exe, os.X_OK)):
+        return f"its executable {exe} is gone or not executable (the bin-store head moved under it)"
+    cwd = captured.get("cwd")
+    if not cwd or not os.path.isdir(cwd):
+        return f"its working directory {cwd or '(unreadable)'} is not a directory"
+    for target in {captured.get("stdout"), captured.get("stderr")} - {None}:
+        where = os.path.dirname(target)
+        if not (os.path.isdir(where) and os.access(where, os.W_OK)):
+            return f"its output directory {where} is not writable"
+    return None
+
+
 def restart(proc, captured, term_wait_s=TERM_WAIT_S, kill=os.kill, spawn=subprocess.Popen,
             sleep=time.sleep, clock=time.monotonic):
     """Stop the captured daemon by pid and start it again as it ran. {pid} or {error}."""
     pid = captured["pid"]
     if not alive(proc, pid, captured["ticks"]):
         return {"error": f"pid {pid} is no longer the daemon that was read; nothing signalled"}
+    blocked = respawnable(captured)
+    if blocked:
+        return {"error": f"pid {pid} could not be started again: {blocked}; nothing signalled", "unsafe": True}
     kill(pid, signal.SIGTERM)
     deadline = clock() + term_wait_s
     while alive(proc, pid, captured["ticks"]):
@@ -324,6 +352,8 @@ def main(argv=None, *, out=None, proc="/proc", now=time.time, status_of=None, ki
         say(f"[peer-liveness] the process table could not be read ({str(error).splitlines()[0]}); nothing done")
         return 1
     at = now()
+    if captured:
+        daemons = [captured]
     plan = decide(status, daemons, read_log(log), at, args.stale_after_s, args.interval_s,
                   uptime=(at - captured["started"]) if captured else None)
     if plan.get("well"):
@@ -342,7 +372,7 @@ def main(argv=None, *, out=None, proc="/proc", now=time.time, status_of=None, ki
                 relays = captured["env"].get("EPR_PEER_RELAYS", "(unset)")
                 say(f"[peer-liveness]   argv: {' '.join(captured['argv'])}")
                 say(f"[peer-liveness]   cwd {captured['cwd']}  EPR_PEER_RELAYS={relays}  output {captured['stdout'] or '(discarded)'}")
-        return 3
+        return 5 if plan.get("unsafe") else 3
 
     # --apply, and the reading says act. One apply at a time, and the log is re-read under the lock.
     log.parent.mkdir(parents=True, exist_ok=True)
@@ -356,7 +386,7 @@ def main(argv=None, *, out=None, proc="/proc", now=time.time, status_of=None, ki
                        uptime=at - captured["started"])
         if not again["act"]:
             say(f"[peer-liveness] {again['why']}")
-            return 3
+            return 5 if again.get("unsafe") else 3
         say(f"[peer-liveness] {plan['why'].replace('would restart', 'restarting')}")
         result = restart(proc, captured, args.term_wait_s, kill=kill, spawn=spawn, sleep=sleep, clock=clock)
         row = {"at": at, "atIso": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(at)), "stale": plan["stale"],
@@ -365,6 +395,8 @@ def main(argv=None, *, out=None, proc="/proc", now=time.time, status_of=None, ki
         if "error" in result:
             row.update(outcome="not-restarted", error=result["error"])
             say(f"[peer-liveness] {result['error']}")
+            if result.get("unsafe"):
+                code = 5
         else:
             row["newPid"] = result["pid"]
             heads = []

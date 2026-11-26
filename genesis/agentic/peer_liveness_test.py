@@ -41,6 +41,10 @@ class Fixture(unittest.TestCase):
         self.proc = base / "proc"
         self.proc.mkdir()
         (self.proc / "stat").write_text(f"cpu 1 2 3\nbtime {BTIME}\n")
+        self.exe = base / "store" / "epr"
+        self.exe.parent.mkdir()
+        self.exe.write_text("#!/bin/sh\n")
+        self.exe.chmod(0o755)
         self.serve_log = base / "serve.log"
         self.serve_log.write_text("earlier line\n")
         self.lines = []
@@ -64,7 +68,7 @@ class Fixture(unittest.TestCase):
         return entry
 
     def daemon(self, pid=PID, **kw):
-        return self.process(pid, ["/store/epr/bafyhead/epr", "peer", "serve", "--root", str(self.root),
+        return self.process(pid, [str(self.exe), "peer", "serve", "--root", str(self.root),
                                   "--handle", "matthew", "--listen", "0.0.0.0:7777"], **kw)
 
     def kill(self, pid, sig):
@@ -114,7 +118,7 @@ class PeerLiveness(Fixture):
         self.assertEqual(self.lines, [
             "[peer-liveness] no head folded within 900 s from did:key:z6MkgHju…xMbu (8540 s); would restart this device's "
             f"peer daemon (pid {PID}) as it runs (dry run: --apply does it)",
-            f"[peer-liveness]   argv: /store/epr/bafyhead/epr peer serve --root {self.root} --handle matthew --listen 0.0.0.0:7777",
+            f"[peer-liveness]   argv: {self.exe} peer serve --root {self.root} --handle matthew --listen 0.0.0.0:7777",
             f"[peer-liveness]   cwd {self.root}  EPR_PEER_RELAYS=https://relay.example  output {self.serve_log}",
         ])
         self.assertEqual((self.signals, self.spawned, self.log_rows()), ([], [], []))
@@ -128,7 +132,7 @@ class PeerLiveness(Fixture):
         self.assertEqual(self.signals, [(PID, signal.SIGTERM)], "one signal, to the numeric pid, never SIGKILL")
         self.assertEqual(len(self.spawned), 1)
         child = self.spawned[0]
-        self.assertEqual(child["argv"], ["/store/epr/bafyhead/epr", "peer", "serve", "--root", str(self.root),
+        self.assertEqual(child["argv"], [str(self.exe), "peer", "serve", "--root", str(self.root),
                                          "--handle", "matthew", "--listen", "0.0.0.0:7777"])
         self.assertEqual(child["env"], {"EPR_PEER_RELAYS": "https://relay.example", "XDG_DATA_HOME": "/nix/xdg/data", "HOME": "/h"},
                          "the daemon's own environment, not the caller's")
@@ -222,6 +226,47 @@ class PeerLiveness(Fixture):
             return type("R", (), {"returncode": 0, "stdout": json.dumps(status()), "stderr": ""})()
         self.assertEqual(P["read_status"]("/head/epr", "/device", run=run)["ownSeq"], 95826)
         self.assertEqual(seen, {"argv": ["/head/epr", "peer", "status", "--root", "/device", "--json"], "timeout": 5})
+
+    def test_a_daemon_that_could_not_be_started_again_is_never_signalled(self):
+        """The bin-store head moves under a running daemon: stopping it would leave no daemon."""
+        cases = []
+        self.daemon()
+        self.exe.unlink()
+        cases.append(r"its executable .*/store/epr is gone or not executable")
+        for expect in list(cases) + ["cwd", "output"]:
+            if expect == "cwd":
+                self.exe.write_text("#!/bin/sh\n"); self.exe.chmod(0o755)
+                os.unlink(self.proc / str(PID) / "cwd")
+                os.symlink(str(self.root) + "/gone (deleted)", self.proc / str(PID) / "cwd")
+                expect = r"its working directory .*gone \(deleted\) is not a directory"
+            elif expect == "output":
+                os.unlink(self.proc / str(PID) / "cwd"); os.symlink(str(self.root), self.proc / str(PID) / "cwd")
+                for fd in ("1", "2"):
+                    os.unlink(self.proc / str(PID) / "fd" / fd)
+                    os.symlink("/nonexistent-dir/serve.log", self.proc / str(PID) / "fd" / fd)
+                expect = r"its output directory /nonexistent-dir is not writable"
+            for flags in ((), ("--apply",)):
+                self.lines.clear()
+                self.assertEqual(self.run_main(*flags, statuses=[status(laptop_age=8540)]), 5)
+                self.assertEqual(len(self.lines), 1)
+                self.assertRegex(self.lines[0], r"could not be started again: " + expect + r".*; nothing signalled")
+        self.assertEqual((self.signals, self.spawned, self.log_rows()), ([], [], []))
+        self.assertTrue((self.proc / str(PID)).exists())
+        # The last check stands again inside restart(), after the plan and just before the signal.
+        captured = P["capture"](str(self.proc), P["find_daemons"](str(self.proc), self.root)[0])
+        result = P["restart"](str(self.proc), captured, kill=self.kill, spawn=self.spawn, sleep=self.sleep, clock=lambda: self.mono[0])
+        self.assertTrue(result.get("unsafe"))
+        self.assertEqual(self.signals, [])
+
+    def test_an_ignored_sigterm_counts_toward_the_interval(self):
+        self.daemon()
+        self.kill = lambda pid, sig: self.signals.append((pid, sig))
+        self.assertEqual(self.run_main("--apply", statuses=[status(laptop_age=8540)]), 3)
+        self.lines.clear()
+        self.assertEqual(self.run_main("--apply", statuses=[status(laptop_age=8540)]), 3)
+        self.assertEqual(self.signals, [(PID, signal.SIGTERM)], "no second SIGTERM inside the interval")
+        self.assertRegex(self.lines[0], r"a restart was attempted and failed 0 s ago \(at most one per 3600 s\)$")
+        self.assertEqual(len(self.log_rows()), 1)
 
 
 if __name__ == "__main__":

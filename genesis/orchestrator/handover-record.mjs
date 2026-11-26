@@ -188,7 +188,8 @@ export const CROSSING_CURE = 'restart this device\'s peer daemon (dry run first:
  * sequence behind for a few seconds in each ~30 s round (2026-11-26, 2 of 14 reads).
  */
 export function crossingLine(status, { freshnessS = 90, lagSeqs = 1 } = {}) {
-  const own = Number(status?.ownSeq);
+  // Number(null) is 0: an own sequence that is not a number was not read, and is never "behind nobody".
+  const own = typeof status?.ownSeq === 'number' ? status.ownSeq : NaN;
   const devices = Array.isArray(status?.devices) ? status.devices : null;
   if (!devices || !Number.isFinite(own)) {
     return 'hand-over: posted locally; `epr peer status` gave no sequence or device list: whether the misses crossed is not known; read `epr peer status`';
