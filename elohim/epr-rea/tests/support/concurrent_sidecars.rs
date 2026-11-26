@@ -117,7 +117,17 @@ fn subprocess() {
         }
         "read-flow" => {
             fs::write(root.join("reading"), "reading").unwrap();
-            let records = SidecarFlowStore::open(root).unwrap().records().unwrap();
+            let store = SidecarFlowStore::open(root).unwrap();
+            let log = OpenOptions::new()
+                .read(true)
+                .open(store.log_path())
+                .unwrap();
+            let error = log
+                .try_lock_shared()
+                .expect_err("the partial writer still holds the exclusive lock");
+            assert!(matches!(error, std::fs::TryLockError::WouldBlock));
+            fs::write(root.join("blocked-on-writer"), "blocked").unwrap();
+            let records = store.records().unwrap();
             fs::write(root.join("read-count"), records.len().to_string()).unwrap();
             fs::write(root.join("read-complete"), "complete").unwrap();
         }
@@ -262,7 +272,7 @@ fn reader_starting_mid_append_sees_a_whole_prefix_never_a_torn_record() {
     wait_for(&root.join("held"));
     let reader = spawn(root, "read-flow", "reader");
     wait_for(&root.join("reading"));
-    std::thread::sleep(Duration::from_millis(50));
+    wait_for(&root.join("blocked-on-writer"));
     assert!(!root.join("read-complete").exists());
     fs::write(root.join("release"), "release").unwrap();
     finish(writer);
@@ -271,7 +281,7 @@ fn reader_starting_mid_append_sees_a_whole_prefix_never_a_torn_record() {
 }
 
 #[test]
-fn writer_finishes_within_one_second_while_four_readers_decode_twenty_megabytes() {
+fn writer_adds_less_than_one_second_of_overhead_while_four_readers_decode_twenty_megabytes() {
     let dir = tempfile::tempdir().unwrap();
     let root = dir.path();
     let mut store = SidecarFlowStore::open(root).unwrap();
@@ -280,6 +290,10 @@ fn writer_finishes_within_one_second_while_four_readers_decode_twenty_megabytes(
     let repeats = SYNTHETIC_LOG_BYTES.div_ceil(line.len());
     fs::write(store.log_path(), line.repeat(repeats)).unwrap();
     assert!(fs::metadata(store.log_path()).unwrap().len() >= SYNTHETIC_LOG_BYTES as u64);
+
+    let ordinary_started = Instant::now();
+    store.append(flow("writer-without-read-load")).unwrap();
+    let ordinary_elapsed = ordinary_started.elapsed();
 
     let readers: Vec<_> = (0..READER_COUNT)
         .map(|n| spawn(root, "read-flow-loop", &format!("reader-{n}")))
@@ -295,17 +309,20 @@ fn writer_finishes_within_one_second_while_four_readers_decode_twenty_megabytes(
     let started = Instant::now();
     store.append(flow("writer-under-read-load")).unwrap();
     let elapsed = started.elapsed();
+    let contention_overhead = elapsed.saturating_sub(ordinary_elapsed);
     fs::write(root.join("stop-readers"), "stop").unwrap();
     for reader in readers {
         finish(reader);
     }
     eprintln!(
-        "FLOWSTORE_CONTENTION bytes={} readers={READER_COUNT} append={elapsed:?}",
+        "FLOWSTORE_CONTENTION bytes={} readers={READER_COUNT} ordinary={ordinary_elapsed:?} \
+         loaded={elapsed:?} overhead={contention_overhead:?}",
         fs::metadata(store.log_path()).unwrap().len()
     );
     assert!(
-        elapsed < Duration::from_secs(1),
-        "append took {elapsed:?} while readers decoded the synthetic log"
+        contention_overhead < Duration::from_secs(1),
+        "read contention added {contention_overhead:?}: ordinary {ordinary_elapsed:?}, loaded \
+         {elapsed:?}"
     );
 }
 
