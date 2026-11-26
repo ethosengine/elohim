@@ -717,14 +717,16 @@ _gate-agentic-tools:
     #!/usr/bin/env bash
     set -uo pipefail
     result=0
-    if [[ -z "${EPR_BIN:-}" ]]; then
-      epr_bin="$(node genesis/orchestrator/device-epr.mjs)" || epr_bin=""
-      if [[ -n "$epr_bin" && -x "$epr_bin" ]]; then
-        export EPR_BIN="$epr_bin"
-      else
-        printf '%s\n' '[agentic-tools] FAIL genesis/agentic/session_envelope_test.py (UNMEASURED — device head epr is unavailable)'
-        result=1
-      fi
+    # The recipe always tests the device head: an EPR_BIN inherited from a developer's shell is not a
+    # caller's choice (it may name a release that is not the head). Only a direct caller of a test file
+    # (epr-cli tests/session_envelope.rs, the a2o steps, bootstrap_projection) passes a candidate.
+    epr_bin="$(node genesis/orchestrator/device-epr.mjs)" || epr_bin=""
+    if [[ -n "$epr_bin" && -x "$epr_bin" ]]; then
+      export EPR_BIN="$epr_bin"
+    else
+      unset EPR_BIN
+      printf '%s\n' '[agentic-tools] FAIL genesis/agentic/session_envelope_test.py (UNMEASURED — device head epr is unavailable)'
+      result=1
     fi
     run_test() {
       local test_file="$1"

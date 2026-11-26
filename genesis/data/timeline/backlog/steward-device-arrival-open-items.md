@@ -3338,3 +3338,15 @@ For elohim-storage and steward/node the guard named `cargo update -p rustls-webp
 ## Row 118 — a fresh worktree's prep leaves the storage-client dist unbuilt, and only the push preflight says so
 
 `just dev prep` in a fresh worktree reported `preflight clear` while `elohim/sdk/storage-client-ts/dist/index.js` was absent; the push preflight then refused with `storage-client-dist: … absent — type-aware lint and the a2o lane read it`. Cure: prep builds that dist, or names it at prep time as the push will.
+
+## Row 119 — a recipe-only edit to agentic-tools selects no gate
+
+The agentic-tools gate project declares `buildProcess: []`, so an edit to its justfile recipe alone selects nothing and runs no gate. (Before the narrowing, `buildProcess: ["justfile"]` selected it on every justfile change.) Cure: declare the recipe's own lines as an input the way other projects declare theirs, so a change to the recipe selects the gate and nothing else does.
+
+## Row 120 — `.claude/hooks/__tests__/` is owned by no gate
+
+Fifteen test files under `.claude/hooks/__tests__/` (bootstrap_projection_test.py among them) are selected by no gate project, and the agentic-tools orphan test does not scan that directory. bootstrap_projection_test.py already fails on dev (3 failures, 3 errors, 2026-11-26), unnoticed for the same reason the carry stub was. Cure: give the directory an owner, after deciding what to do with the files that fail today.
+
+## Row 121 — the agentic Python orphan test can no longer fail for the directories it checks
+
+Since agentic-tools owns its test files by glob, every `*_test.py` / `test_*.py` under genesis/agentic, genesis/agentic/bin and .claude/hooks/tests has an owner by construction, so the orphan test in gate-input-audit.test.mjs cannot fail there. It protects only if it points at the directories NOT yet covered (for example `.claude/hooks/__tests__/`, row 120, and any other directory holding Python tests). Cure: scan every directory that holds Python tests, and require an owner for each file found.
