@@ -636,11 +636,13 @@ export function runPreflight({ root = ROOT, projects, env = process.env, spawn =
     return rows;
   };
   // The change list is trusted to skip a check only when the hook read the push's own range
-  // (GATE_NARROW_BASE=none marks a fallback range) or a caller handed it in; otherwise every check runs.
+  // (GATE_NARROW_BASE=none marks a fallback range) or a caller handed it in; otherwise every check
+  // runs. The attested-submodule question alone also reads a new ref's branch (decisionChanges).
   const exact = env.GATE_NARROW_BASE === 'none' ? null : changed;
+  const attested = decisionChanges(changed, { env, root, spawn, newRefs: true });
   return [
     ...timed(() => checkEprBin({ env })),
-    ...timed(() => checkSubmodules({ root, spawn, projects: exact === null ? null : projects, changed: exact })),
+    ...timed(() => checkSubmodules({ root, spawn, projects: attested === null ? null : projects, changed: attested })),
     ...timed(() => checkSubmodulePins({ root, projects })),
     ...timed(() => checkTmpdir({ projects, env })),
     ...timed(() => checkNodeModules({ root, projects })),
@@ -684,6 +686,40 @@ export function docCutRows(env, options = {}, guard = docCutGuard, loadError = d
   return row('doc-cut', deploys ? 'REFUSED' : 'WARN',
     `the doc-cut check could not load: ${String(loadError?.message || loadError).split('\n')[0]}`,
     'node genesis/orchestrator/doc-cut-guard.mjs names the load error; fix it and push again');
+}
+
+/**
+ * The change list a check may be skipped by, or null when there is none it can trust.
+ *
+ * Outside a push (prep, `just gate`: no GATE_PUSH_REFS) it is `listed` as handed in, and null under
+ * GATE_NARROW_BASE=none. Under a push each ref's own range is read again from git objects and
+ * added to `listed`, with rename detection off, so a file renamed away is named under its old path
+ * too (the hook's shared GATE_CHANGED_FILES names only the new one). A destination tip this clone
+ * does not hold is no list. A NEW ref (destination all-zero: a thin client's first hand-over to
+ * self/<x>) is no list either, except with `newRefs`, used for the attested-submodule question
+ * alone: then its range is merge-base(<remote>/dev, pushed tip)..tip, the whole branch, and still
+ * no list when <remote>/dev does not resolve or shares no history with the tip.
+ */
+export function decisionChanges(listed, { env = process.env, root = ROOT, spawn = spawnSync, newRefs = false } = {}) {
+  if (!Array.isArray(listed)) return null;
+  const refs = String(env.GATE_PUSH_REFS ?? '').split('\n').map(line => line.trim().split(/\s+/)).filter(fields => fields.length === 3);
+  if (!refs.length) return env.GATE_NARROW_BASE === 'none' ? null : listed;
+  const git = args => {
+    const r = spawn('git', ['-C', root, ...args], { encoding: 'utf8' });
+    return r.status === 0 ? String(r.stdout ?? '') : null;
+  };
+  const paths = new Set(listed);
+  for (const [, local, remote] of refs) {
+    let base = remote;
+    if (/^0+$/.test(remote)) {
+      base = newRefs ? git(['merge-base', `refs/remotes/${env.GATE_PUSH_REMOTE || 'origin'}/dev`, local])?.trim() : null;
+    } else if (git(['cat-file', '-e', `${remote}^{commit}`]) === null) base = null;
+    if (!base) return null;
+    const out = git(['diff', '--name-only', '-z', '--no-renames', '--ignore-submodules=none', '--no-relative', '--no-ext-diff', base, local]);
+    if (out === null) return null;
+    for (const path of out.split('\0').filter(Boolean)) paths.add(path);
+  }
+  return [...paths];
 }
 
 /** pre-push exports the push range's file list; `just gate` has none and audits everything. */
@@ -736,15 +772,15 @@ export function main(argv, env = process.env) {
     // The pre-push hook's question about the attested submodules it found absent (named after the
     // flag): which does this push need? The required ones on stdout, exit 3; none, exit 0 and one
     // line on stderr naming what was not required. The change list is the hook's GATE_CHANGED_FILES;
-    // a missing or unreadable one, GATE_NARROW_BASE=none, or a project name the registry does not
-    // hold is no answer, and attestedNeed then requires every one.
+    // a missing or unreadable one, a range decisionChanges cannot read, or a project name the
+    // registry does not hold is no answer, and attestedNeed then requires every one.
     const from = argv.indexOf('--attested-need');
     const at = argv.indexOf('--projects');
     const absent = argv.slice(from + 1, at > from ? at : undefined).filter(a => !a.startsWith('--'));
     const wanted = at >= 0 ? argv.slice(at + 1).filter(a => !a.startsWith('--')) : null;
     const registry = loadGateRegistry(ROOT);
     const projects = wanted && wanted.every(name => registry.has(name)) ? wanted.map(name => registry.get(name)) : null;
-    const changed = env.GATE_NARROW_BASE === 'none' ? null : changedFromEnv(env);
+    const changed = decisionChanges(changedFromEnv(env), { env, root: ROOT, newRefs: true });
     const reasons = absent.map(module => [module, attestedNeed(module, { root: ROOT, projects, changed })]);
     const required = reasons.filter(([, why]) => why);
     if (!required.length) {

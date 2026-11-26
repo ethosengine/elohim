@@ -162,3 +162,60 @@ test("station 5: a device that holds every attested submodule is asked nothing a
   assert.deepEqual(r.out, ["decided rc=0 absent=[]"], "no reading from here: the block wrote it");
   assert.match(HOOK, /\[ -n "\$ATTESTED_ABSENT" \] \|\| gate_step_reading "\$READING_STATUS" submodules ran \\\n/);
 });
+
+// Review of 42faf6aaa (a): a thin client's FIRST hand-over is a new ref (destination all-zero), which
+// the hook marks GATE_NARROW_BASE=none. For this question alone its range is the branch since its
+// merge base with origin/dev. A scratch repository stands for the pushing checkout (GATE_ROOT).
+import { decisionChanges } from "./gate-preflight.mjs";
+
+function branchRepo(t, { firstCommit = ["genesis/docs/a.md"], dev = true, unrelated = false } = {}) {
+  const dir = mkdtempSync(join(tmpdir(), "prepush-newref-"));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const git = (...args) => {
+    const r = spawnSync("git", ["-c", "user.name=t", "-c", "user.email=t@example.invalid", ...args], { cwd: dir, encoding: "utf8" });
+    assert.equal(r.status, 0, r.stderr);
+    return r.stdout.trim();
+  };
+  const commit = (files, message) => {
+    for (const file of files) { spawnSync("mkdir", ["-p", join(dir, file, "..")]); writeFileSync(join(dir, file), `${message}\n`); }
+    git("add", "-A"); git("commit", "-q", "-m", message);
+    return git("rev-parse", "HEAD");
+  };
+  git("init", "-q", "-b", "main");
+  const base = commit(["README.md"], "base");
+  if (dev) git("update-ref", "refs/remotes/origin/dev", base);
+  if (unrelated) { git("checkout", "-q", "--orphan", "other"); git("rm", "-rqf", "."); }
+  commit(firstCommit, "first");
+  const tip = commit(["genesis/docs/b.md"], "second");
+  return { dir, tip, env: { GATE_ROOT: dir, GATE_NARROW_BASE: "none", GATE_PUSH_REFS: `refs/heads/self/thin-x ${tip} ${"0".repeat(40)}` } };
+}
+
+test("review (a): a first hand-over to a new self/ branch is judged by its branch since origin/dev, and passes when that gives no reason", (t) => {
+  const repo = branchRepo(t);
+  assert.deepEqual(decisionChanges(["genesis/docs/b.md"], { env: repo.env, root: repo.dir, newRefs: true }).sort(), ["genesis/docs/a.md", "genesis/docs/b.md"]);
+  assert.equal(decisionChanges(["genesis/docs/b.md"], { env: repo.env, root: repo.dir }), null, "every other check keeps treating a new ref as no list");
+  const r = decide(t, { changed: ["genesis/docs/a.md", "genesis/docs/b.md"], env: repo.env });
+  assert.equal(r.status, 0, r.err.join("\n"));
+  assert.match(r.err[0], /not checked out and not required by this push: elohim\/brit elohim\/rakia sophia/);
+});
+
+test("review (a): the new branch's earlier commits count, and no origin/dev or no shared history requires every one", (t) => {
+  // The pin move is in the FIRST commit; the hook's list here names only the tip's path.
+  const moved = branchRepo(t, { firstCommit: ["sophia"] });
+  const pin = decide(t, { changed: ["genesis/docs/b.md"], env: moved.env });
+  assert.equal(pin.status, 1);
+  assert.match(pin.err[0], /required: sophia: the change touches sophia/);
+  assert.equal(pin.err.at(-1), REFUSED("sophia"));
+  for (const [what, repo] of [["no origin/dev", branchRepo(t, { dev: false })], ["no merge base", branchRepo(t, { unrelated: true })]]) {
+    assert.equal(decisionChanges(["genesis/docs/b.md"], { env: repo.env, root: repo.dir, newRefs: true }), null, what);
+    const r = decide(t, { changed: ["genesis/docs/a.md", "genesis/docs/b.md"], env: repo.env });
+    assert.equal(r.status, 1, what);
+    assert.match(r.err[0], /no change list to judge it by/, what);
+    assert.equal(r.err.at(-1), REFUSED(ALL), what);
+  }
+  // A destination tip this clone does not hold is no list either.
+  const repo = branchRepo(t);
+  const gone = { ...repo.env, GATE_NARROW_BASE: "ok", GATE_PUSH_REFS: `refs/heads/dev ${repo.tip} ${"1".repeat(40)}` };
+  assert.equal(decisionChanges(["a.md"], { env: gone, root: repo.dir, newRefs: true }), null);
+  assert.equal(decide(t, { env: gone }).err.at(-1), REFUSED(ALL));
+});
