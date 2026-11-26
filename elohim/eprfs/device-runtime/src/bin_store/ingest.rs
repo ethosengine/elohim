@@ -118,7 +118,15 @@ impl Store {
         let clean = options
             .tree_clean
             .unwrap_or_else(|| state.as_ref().is_some_and(|s| s["clean"] == true));
+        #[cfg(test)]
+        if let Some(observer) = &self.before_ingest_lock {
+            observer();
+        }
         let _lock = files::Lock::acquire(&self.root, files::MUTATION_WAIT)?;
+        #[cfg(test)]
+        if let Some(observer) = &self.after_ingest_lock {
+            observer();
+        }
         self.require_migrated()?;
         let stage = files::temporary(&self.root.join("staging"));
         fs::create_dir(&stage)?;
@@ -183,7 +191,14 @@ impl Store {
             if artifact_verified {
                 if let (Some(adopted_path), Some(release)) = (adoption, held.as_ref()) {
                     let events = artifact.join("adoptions.jsonl");
-                    if let Err(error) = append_adoption(&events, adopted_path, &self.tool) {
+                    if let Err(error) = append_adoption_event(
+                        &events,
+                        "adoption",
+                        adopted_path,
+                        &release.cid,
+                        &self.tool,
+                        &self.now(),
+                    ) {
                         eprintln!(
                             "warning: could not append adoption event to {}: {}; continuing launcher installation",
                             events.display(),
@@ -212,6 +227,27 @@ impl Store {
                     0o444,
                 )?;
             }
+            if let (Some(adopted_path), Some(release)) = (adoption, held.as_ref()) {
+                // The path supplied bytes that repaired custody, but the CID proves they are the
+                // release already established by its earlier clean ingest. Keep that provenance
+                // unchanged and record the repair as an event instead of inventing a new source.
+                let events = artifact.join("adoptions.jsonl");
+                if let Err(error) = append_adoption_event(
+                    &events,
+                    "repair",
+                    adopted_path,
+                    &release.cid,
+                    &self.tool,
+                    &self.now(),
+                ) {
+                    eprintln!(
+                        "warning: could not append repair event to {}: {}; continuing launcher installation",
+                        events.display(),
+                        error
+                    );
+                }
+                return Ok(release.clone());
+            }
             let probed_payload_formats = if options.payload_formats.is_none() {
                 self.config
                     .bins
@@ -224,7 +260,7 @@ impl Store {
                 source_commit: commit,
                 tree_clean: clean,
                 gate_run: options.gate_run.clone(),
-                ingested_at: files::now(),
+                ingested_at: self.now(),
             };
             let mut release = held.unwrap_or_else(|| Release {
                 cid: cid.clone(),
@@ -291,6 +327,7 @@ impl Store {
                     Value::String(format!("failed: {reason}")),
                 );
             }
+            release.record_last_ingested_at();
             self.save(&release)?;
             Ok(release)
         })();
@@ -543,20 +580,32 @@ impl Store {
 
 /// Append at most one event for an adopted path beneath this release CID. The caller holds the
 /// store lock, so checking and appending form one decision with held-release verification.
-fn append_adoption(events: &Path, adopted_path: &Path, tool: &str) -> Result<()> {
+fn append_adoption_event(
+    events: &Path,
+    kind: &str,
+    adopted_path: &Path,
+    cid: &str,
+    tool: &str,
+    at: &str,
+) -> Result<()> {
     if fs::read_to_string(events).is_ok_and(|contents| {
         contents.lines().any(|line| {
             serde_json::from_str::<Value>(line)
                 .ok()
-                .is_some_and(|event| event["path"] == json!(adopted_path))
+                .is_some_and(|event| {
+                    event["path"] == json!(adopted_path)
+                        && event["kind"].as_str().unwrap_or("adoption") == kind
+                })
         })
     }) {
         return Ok(());
     }
     let existed = events.exists();
     let mut line = serde_json::to_vec(&json!({
-        "at": files::now(),
+        "kind": kind,
+        "at": at,
         "path": adopted_path,
+        "cid": cid,
         "session": crate::session::resolve().session,
         "tool": tool,
     }))?;

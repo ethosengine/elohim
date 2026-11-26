@@ -775,9 +775,9 @@ test('epr-bin: current path, symlink and same store cid are ok', t => {
   assert.equal(checkEprBin({ env: { ...env, EPR_BIN: copy } }).level, 'ok');
 });
 
-const release = (root, cid, ingestedAt) => {
+const release = (root, cid, ingestedAt, record = {}) => {
   put(root, `store/epr/${cid}/epr`);
-  put(root, `store/epr/${cid}/record.json`, JSON.stringify({ cid, ingestedAt }));
+  put(root, `store/epr/${cid}/record.json`, JSON.stringify({ cid, ingestedAt, ...record }));
   return join(root, 'store/epr', cid, 'epr');
 };
 
@@ -811,6 +811,37 @@ test('epr-bin: a candidate outside the store, a newer release, or an undated one
     assert.match(r.why, /is a candidate, not this device's head epr/);
     assert.match(r.why, /it is left set/);
   }
+});
+
+test('epr-bin: lastIngestedAt is canonical even when source rows would order differently', t => {
+  const { root, env } = eprFixture(t);
+  put(root, 'store/epr/bafyreicurrent/record.json', JSON.stringify({
+    cid: 'bafyreicurrent', ingestedAt: '2026-11-01T00:00:00Z',
+    lastIngestedAt: '2026-11-26T00:00:00Z',
+  }));
+  const candidate = release(root, 'bafyreicandidate', '2026-11-25T00:00:00Z', {
+    lastIngestedAt: '2026-11-25T00:00:00Z',
+    sources: [{ ingestedAt: '2026-11-27T00:00:00Z' }],
+  });
+
+  assert.equal(checkEprBin({ env: { ...env, EPR_BIN: candidate } }).level, 'REFUSED');
+});
+
+test('epr-bin: old records fall back to the newest first-ingest or source timestamp', t => {
+  const { root, env } = eprFixture(t);
+  put(root, 'store/epr/bafyreicurrent/record.json', JSON.stringify({
+    cid: 'bafyreicurrent', ingestedAt: '2026-11-01T00:00:00Z',
+    sources: [{ ingestedAt: '2026-11-25T00:00:00Z' }],
+  }));
+  const candidate = release(root, 'bafyreicandidate', '2026-11-20T00:00:00Z', {
+    sources: [{ ingestedAt: '2026-11-26T00:00:00Z' }],
+  });
+  assert.equal(checkEprBin({ env: { ...env, EPR_BIN: candidate } }).level, 'WARN');
+
+  release(root, 'bafyreicandidate', '2026-11-20T00:00:00Z', {
+    sources: [{ ingestedAt: '2026-11-24T00:00:00Z' }],
+  });
+  assert.equal(checkEprBin({ env: { ...env, EPR_BIN: candidate } }).level, 'REFUSED');
 });
 
 test('epr-bin: unreadable current warns, including a malformed authoritative head', t => {

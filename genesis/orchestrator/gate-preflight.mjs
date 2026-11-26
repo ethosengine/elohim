@@ -341,9 +341,16 @@ export function checkEprBin({ env = process.env } = {}) {
   // reads EPR_BIN as its candidate): it is named, never refused or unset.
   const ingested = cid => {
     try {
-      const at = JSON.parse(readFileSync(join(dirname(dirname(current)), cid, 'record.json'), 'utf8')).ingestedAt;
-      const ms = Date.parse(at);
-      return Number.isFinite(ms) ? ms : null;
+      const record = JSON.parse(readFileSync(join(dirname(dirname(current)), cid, 'record.json'), 'utf8'));
+      const recorded = Date.parse(record.lastIngestedAt);
+      if (Number.isFinite(recorded)) return recorded;
+      // Records written before lastIngestedAt fall back exactly as Rust does: the newest
+      // observation among the first ingest and every appended source row.
+      const observed = [record.ingestedAt, ...(Array.isArray(record.sources)
+        ? record.sources.map(source => source?.ingestedAt) : [])]
+        .map(at => Date.parse(at))
+        .filter(Number.isFinite);
+      return observed.length ? Math.max(...observed) : null;
     } catch { return null; }
   };
   const inheritedAt = storeCid(inherited) ? ingested(storeCid(inherited)) : null;
