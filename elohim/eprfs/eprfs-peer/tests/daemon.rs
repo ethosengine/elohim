@@ -524,17 +524,25 @@ async fn unreachable_tier_resets_and_redials_with_capped_backoff_without_resubsc
     })
     .await;
 
-    for delay in [90, 180, 360, 720, 900] {
+    // Each step waits for its own reset before the clock moves again: a probe to an absent node
+    // takes real time, and on a loaded host it can still be in flight when the next advance would
+    // pass its due time, so advancing ahead of it schedules the backoff from the later clock and
+    // skips a reset. The ladder itself is time-injected; only the test's pacing was not.
+    for (step, delay) in [90, 180, 360, 720, 900].into_iter().enumerate() {
         advance_recovery_clock(&daemon, &clock, Duration::from_secs(delay)).await;
+        let expected = 2 + step as u64;
+        eventually(
+            &format!("reset {expected} after a {delay}s backoff"),
+            || {
+                daemon
+                    .recovery_status()
+                    .devices
+                    .get(&b.did)
+                    .is_some_and(|state| state.connection_resets == expected)
+            },
+        )
+        .await;
     }
-    eventually("the capped reset is recorded", || {
-        daemon
-            .recovery_status()
-            .devices
-            .get(&b.did)
-            .is_some_and(|state| state.connection_resets == 6)
-    })
-    .await;
     assert_eq!(
         logs.lock()
             .expect("logs")
