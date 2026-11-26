@@ -186,7 +186,7 @@ The dedupe guard. Before designing anything in this space, find the row; if it i
 | household / holon as a kind | none in Rust | commons-holonic stewardship cluster | household = smallest Collective EPR | ⚠ decision |
 | behavior-learned ranking | refused | search epic | refused again, with SuperLocalMemory's evidence | ✅ (by refusal) |
 | model provisioning per device (added 2026-10-10) | the model manifest's `resolve` list (`$EPR_EMBED_MODEL_DIR`, `$XDG_CACHE_HOME/elohim/embed-models/…` on the PVC, the chroma cache last) + `genesis/agentic/bin/embed-model-provision`; read by `just status device` | lvi arrival spec `elohim/lvi/docs/specs/2026-10-10-workspace-arrival-as-declared-device.md` | the pin is the authority, the bytes are re-fetchable; a device's fold must never depend on a visitor's cache | ◐ provisioned by script, not yet by the Berth |
-| contribution acts across devices (added 2026-10-10) | contributions git-tracked; their acts in `.eprfs/status/flows.jsonl`, per device — a second device reads every shared contribution as unattributed | lvi arrival spec §6.3 | none; named as the record-without-witness seam | ⚠ |
+| contribution acts across devices (added 2026-10-10) | contributions git-tracked; their acts in `.eprfs/status/flows.jsonl`, per device — a second device reads every shared contribution as unattributed | lvi arrival spec §6.3 | none here; (2026-11-26) the governed-space design names a cure, the acts graduate into the steward's space, claimable as station GS-1 of `governed-space-collective-memory-plan`; not built | ⚠ |
 
 ---
 
