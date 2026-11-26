@@ -55,7 +55,7 @@ const DECIDE = fnText("attested_decide");
 const ALL = "elohim/brit elohim/rakia sophia";
 const REFUSED = (need) => `[pre-push] REFUSED: not checked out: ${need}. Run: git submodule update --init ${need}`;
 
-function decide(t, { changed = ["genesis/docs/a.md"], absent = ALL, projects = "", env = {}, stub = "" } = {}) {
+function decide(t, { changed = ["genesis/docs/a.md"], absent = ALL, moved = "", projects = "", env = {}, stub = "" } = {}) {
   const dir = mkdtempSync(join(tmpdir(), "prepush-attested-"));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   const list = join(dir, "changed");
@@ -63,6 +63,7 @@ function decide(t, { changed = ["genesis/docs/a.md"], absent = ALL, projects = "
   const r = spawnSync("bash", ["-c", [
     "set -o pipefail",
     `HOOK_WORK_TREE=${JSON.stringify(ROOT)}; SECONDS=0`,
+    `ATTESTED_MOVED=${JSON.stringify(moved)}`,
     `ATTESTED_ABSENT=${JSON.stringify(absent)}; ATTESTED_STARTED_S=0; ATTESTED_STARTED_AT=t0; PROJECTS=${JSON.stringify(projects)}`,
     'gate_step_reading() { echo "reading:$*"; }',
     stub,
@@ -79,7 +80,7 @@ test("station 5 (a): a push whose changes give no reason passes with one line na
   for (const projects of ["", "eprfs-live-corpus"]) {
     const r = decide(t, { projects });
     assert.equal(r.status, 0, r.err.join("\n"));
-    assert.deepEqual(r.err, [`[pre-push] attested submodules not checked out and not required by this push: ${ALL} — no changed path or selected project needs them`]);
+    assert.deepEqual(r.err, [`[pre-push] attested submodules absent or off their pin, and not required by this push: ${ALL} — no changed path or selected project needs them`]);
     assert.match(r.out[0], /^reading:0 submodules ran /, "the leg's reading is a green run");
     assert.equal(r.out.at(-1), "decided rc=0 absent=[]", "decided once");
   }
@@ -150,7 +151,7 @@ test("station 5 (e): a hand-over and a landing get the same answer, and every pa
   }
   assert.doesNotMatch(DECIDE, /HANDOVER|GATE_PUSH|BERTH/);
   // hook_pass is the one way out for an early pass, a hand-over and a landing: it asks before either.
-  assert.match(fnText("hook_pass"), /^hook_pass\(\) \{\n  attested_decide\n  \[ -z "\$PUSH_IS_HANDOVER" \] \|\| handover_finish\n/);
+  assert.match(fnText("hook_pass"), /^hook_pass\(\) \{\n  attested_decide\n  attested_pins_gated\n  \[ -z "\$PUSH_IS_HANDOVER" \] \|\| handover_finish\n/);
   // And once the selection exists, before the preflight and every project gate.
   const selected = HOOK.indexOf("PROJECTS=$(echo \"$PROJECTS\" | sed 's/^ //')\nattested_decide\n");
   assert.ok(selected > 0 && selected < HOOK.indexOf("# ── Preflight (seconds)"));
@@ -169,7 +170,7 @@ test("station 5: a device that holds every attested submodule is asked nothing a
 // Review of 42faf6aaa (a): a thin client's FIRST hand-over is a new ref (destination all-zero), which
 // the hook marks GATE_NARROW_BASE=none. For this question alone its range is the branch since its
 // merge base with origin/dev. A scratch repository stands for the pushing checkout (GATE_ROOT).
-import { decisionChanges } from "./gate-preflight.mjs";
+import { decisionChanges, pinMoveRefusals } from "./gate-preflight.mjs";
 
 function branchRepo(t, { firstCommit = ["genesis/docs/a.md"], dev = true, unrelated = false } = {}) {
   const dir = mkdtempSync(join(tmpdir(), "prepush-newref-"));
@@ -199,7 +200,7 @@ test("review (a): a first hand-over to a new self/ branch is judged by its branc
   assert.equal(decisionChanges(["genesis/docs/b.md"], { env: repo.env, root: repo.dir }), null, "every other check keeps treating a new ref as no list");
   const r = decide(t, { changed: ["genesis/docs/a.md", "genesis/docs/b.md"], env: repo.env });
   assert.equal(r.status, 0, r.err.join("\n"));
-  assert.match(r.err[0], /not checked out and not required by this push: elohim\/brit elohim\/rakia sophia/);
+  assert.match(r.err[0], /absent or off their pin, and not required by this push: elohim\/brit elohim\/rakia sophia/);
 });
 
 test("review (a): the new branch's earlier commits count, and no origin/dev or no shared history requires every one", (t) => {
@@ -227,4 +228,108 @@ test("review (c): the required names are read by collapsing whitespace, whatever
   const r = decide(t, { stub: "node() { printf 'sophia\\n  elohim/rakia \\n'; return 3; }" });
   assert.equal(r.err.at(-1), REFUSED("sophia elohim/rakia"));
   assert.doesNotMatch(DECIDE, /\| xargs/);
+});
+
+// 2026-11-26 01:29Z: a push moving only the elohim/brit gitlink landed on dev in 23 s with no gate.
+// brit was checked out (`+c2f8193105`), at a commit older than the manifest that declares its
+// attested project; nothing was absent, the oracle could not build its graph, path-only selected
+// nothing. Three closures, each fail closed.
+const STALE = "c2f8193105aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+const PIN = spawnSync("git", ["-C", ROOT, "ls-tree", "HEAD", "--", "elohim/brit"], { encoding: "utf8" }).stdout.split(/\s+/)[2];
+
+test("incident (1): a submodule checked out off its gitlink is found, and judged like an absent one", (t) => {
+  const r = spawnSync("bash", ["-c", [
+    `git() { printf '%s\\n' '+${STALE} elohim/brit (heads/x)' ' 9db775b3eca070ae89509251b0563b9e4d6518b1 elohim/rakia (heads/main)' 'U1111111111111111111111111111111111111111 sophia'; }`,
+    fnText("attested_submodules_moved"), "attested_submodules_moved",
+  ].join("\n")], { encoding: "utf8" });
+  assert.deepEqual(r.stdout.split("\n").filter(Boolean), [`elohim/brit ${STALE}`, "sophia 1111111111111111111111111111111111111111"]);
+  assert.match(HOOK, /ATTESTED_MOVED=\$\(attested_submodules_moved "\$\{ATTESTED_LIST\[@\]\}"\)\nATTESTED_ABSENT=\$\(printf '%s %s' "\$MISSING_SUBMODULES"/);
+
+  // The exact case: brit present at a stale commit, a pin-only change, nothing selected.
+  const stale = decide(t, { absent: "elohim/brit", moved: `elohim/brit ${STALE}`, changed: ["elohim/brit"] });
+  assert.equal(stale.status, 1);
+  assert.deepEqual(stale.err, [
+    "[pre-push] attested submodules required: elohim/brit: the change touches elohim/brit",
+    `[pre-push] REFUSED: elohim/brit is checked out at c2f8193105aa, not at its pin ${PIN.slice(0, 12)}: its gate would be read from a manifest and bytes the push does not carry. Run: just dev prep, or git submodule update --init elohim/brit`,
+  ]);
+  // Moved and absent together: one line each kind.
+  const both = decide(t, { absent: "sophia elohim/brit", moved: `elohim/brit ${STALE}`, projects: "orchestrator" });
+  assert.match(both.err[1], /^\[pre-push\] REFUSED: elohim\/brit is checked out at c2f8193105aa, not at its pin /);
+  assert.equal(both.err[2], REFUSED("sophia"));
+  // Someone working inside brit who pushes documents is not stopped, and is told.
+  const docs = decide(t, { absent: "elohim/brit", moved: `elohim/brit ${STALE}` });
+  assert.equal(docs.status, 0);
+  assert.deepEqual(docs.err, ["[pre-push] attested submodules absent or off their pin, and not required by this push: elohim/brit — no changed path or selected project needs them"]);
+});
+
+const MODULES = new Set(["elohim/brit", "elohim/rakia", "sophia", "elohim/holochain-conductor"]);
+const BRIT = { name: "brit", dir: "elohim/brit", run: { kind: "attested" } };
+const pins = (over) => pinMoveRefusals({
+  changed: ["elohim/brit"], selected: [], registry: new Map(), modules: MODULES, attested: ["elohim/brit", "elohim/rakia", "sophia"],
+  targets: "refs/heads/dev", oracle: () => "unresolved dependency: step 'elohim-edge:build-edge-image' depends on 'elohim-brit:brit-ci' which does not exist", ...over,
+});
+
+test("incident (2) and (3): a pin move needs its attested gate in the selection, and on dev or main the oracle", () => {
+  assert.deepEqual(pins({}), [
+    "elohim/brit: its pin moves and no attested gate project is registered for it here (absent, or checked out at a commit older than the manifest that declares it) — the pin move would land ungated",
+    "a push to dev or main that moves a pin (elohim/brit) is selected by the graph oracle or not at all, and the oracle is unavailable (unresolved dependency: step 'elohim-edge:build-edge-image' depends on 'elohim-brit:brit-ci' which does not exist) — path-only selection is not accepted for it",
+  ]);
+  const registry = new Map([["brit", BRIT], ["elohim-app", { name: "elohim-app", dir: "app/elohim-app", run: { kind: "just" } }]]);
+  // A correctly prepared worktree, the same change: the attested gate is selected and the push goes on.
+  assert.deepEqual(pins({ registry, selected: ["brit"], oracle: () => null }), []);
+  assert.deepEqual(pins({ registry, selected: ["elohim-app"], oracle: () => null }),
+    ["elohim/brit: its pin moves and the selection does not contain its attested gate brit — the pin move would land ungated"]);
+  // (3) alone: selected by path, but the oracle that adds the pin's consumers was unavailable.
+  assert.match(pins({ registry, selected: ["brit"] })[0], /^a push to dev or main that moves a pin \(elohim\/brit\) .* path-only selection is not accepted for it$/);
+  assert.equal(pins({ registry, selected: ["brit"], targets: "refs/heads/main refs/heads/self/x" }).length, 1);
+  // A hand-over is held to (2), not (3): its dev landing is where the oracle is demanded.
+  assert.deepEqual(pins({ registry, selected: ["brit"], targets: "refs/heads/self/thin-x" }), []);
+  assert.equal(pins({ targets: "refs/heads/self/thin-x" }).length, 1);
+  // Any gitlink counts for (3); only attested ones have a gate to demand for (2).
+  assert.equal(pins({ changed: ["elohim/holochain-conductor"] }).length, 1);
+  assert.deepEqual(pins({ changed: ["elohim/holochain-conductor"], oracle: () => null }), []);
+  // No pin change: nothing is asked, not even the oracle.
+  assert.deepEqual(pins({ changed: ["genesis/docs/a.md", "elohim/brit/README.md"], oracle: () => { throw new Error("must not be asked"); } }), []);
+  assert.deepEqual(pins({ changed: null }), ["the change list could not be read, so a submodule pin move cannot be ruled out"]);
+});
+
+function gated(t, { changed = ["genesis/docs/a.md"], stub = "", env = {}, projects = "", twice = false } = {}) {
+  const dir = mkdtempSync(join(tmpdir(), "prepush-pins-"));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const list = join(dir, "changed");
+  if (changed) writeFileSync(list, `${changed.join("\n")}\n`);
+  const r = spawnSync("bash", ["-c", [
+    `HOOK_WORK_TREE=${JSON.stringify(ROOT)}; PROJECTS=${JSON.stringify(projects)}; ATTESTED_PINS_JUDGED=""`,
+    'gate_step_reading() { :; }', stub, fnText("attested_pins_gated"),
+    `attested_pins_gated${twice ? "; attested_pins_gated" : ""}; echo "went on rc=$?"`,
+  ].join("\n")], { cwd: ROOT, encoding: "utf8", timeout: 120000, env: { PATH: process.env.PATH, HOME: process.env.HOME, GATE_CHANGED_FILES: list, GATE_NARROW_BASE: "ok", GATE_PUSH_TARGETS: "refs/heads/dev", ...env } });
+  return { status: r.status, out: r.stdout.split("\n").filter(Boolean), err: r.stderr.split("\n").filter(Boolean) };
+}
+const LOUD = "node() { echo 'node ran' >&2; return 0; }";
+const LAST = "[pre-push] REFUSED: a submodule pin move in this push is not gated (above). Run: just dev prep, then push again";
+
+test("incident: the hook asks the pin-move question only for a push that moves a pin, once, and any failure of it refuses", (t) => {
+  // All submodules at their pins and no pin change: no node, no output, the push goes on.
+  assert.deepEqual(gated(t, { stub: LOUD }), { status: 0, out: ["went on rc=0"], err: [] });
+  assert.deepEqual(gated(t, { changed: ["elohim/brit/README.md", "sophia.Jenkinsfile"], stub: LOUD }).err, []);
+  // A pin move asks; yes goes on, once.
+  assert.deepEqual(gated(t, { changed: ["a.md", "elohim/brit"], stub: LOUD, twice: true }), { status: 0, out: ["went on rc=0"], err: ["node ran"] });
+  assert.deepEqual(gated(t, { changed: ["elohim/holochain-conductor"], stub: LOUD }).err, ["node ran"]);
+  for (const [what, stub] of [["a refusal", "node() { echo '[pre-push] why' >&2; return 3; }"], ["a crash", "node() { return 1; }"], ["node cannot start", "node() { return 127; }"]]) {
+    const r = gated(t, { changed: ["elohim/brit"], stub });
+    assert.equal(r.status, 1, what);
+    assert.equal(r.err.at(-1), LAST, what);
+    assert.deepEqual(r.out, [], what);
+  }
+  // A change list that cannot be compared is asked about, never assumed clean.
+  assert.deepEqual(gated(t, { env: { GATE_CHANGED_FILES: "/nonexistent/changed" }, stub: LOUD }).err, ["node ran"]);
+  // The real question, this checkout: a brit pin move to dev with nothing selected does not go on.
+  const real = gated(t, { changed: ["elohim/brit"] });
+  assert.equal(real.status, 1, real.err.join("\n"));
+  assert.match(real.err[0], /^\[pre-push\] elohim\/brit: its pin moves and .* — the pin move would land ungated$/);
+  assert.equal(real.err.at(-1), LAST);
+  assert.equal(gated(t, { changed: null, env: { GATE_CHANGED_FILES: "/nonexistent/changed" } }).status, 1, "no list, real CLI: refused");
+  // Asked where the selection exists and at every pass, as attested_decide is.
+  assert.match(fnText("hook_pass"), /^hook_pass\(\) \{\n  attested_decide\n  attested_pins_gated\n/);
+  assert.ok(HOOK.includes("PROJECTS=$(echo \"$PROJECTS\" | sed 's/^ //')\nattested_decide\nattested_pins_gated\n"));
 });

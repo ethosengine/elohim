@@ -211,6 +211,12 @@ attested_submodules_missing() {
   }
   printf '%s\n' "$out" | awk '/^-/ { print $2 }'
 }
+# "<path> <commit>" for each one checked out at another commit than its gitlink (`+`) or conflicted
+# (`U`): its manifest and bytes are not the pin's, so it is judged like an absent one (2026-11-26: a
+# brit checkout older than the manifest that declares brit's gate let a pin move land ungated).
+attested_submodules_moved() {
+  git submodule status -- "$@" 2>/dev/null | awk '/^[+U]/ { print $2, substr($1, 2) }'
+}
 READING_STARTED_S=$SECONDS
 READING_STARTED_AT=$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)
 ATTESTED_LIST_OUT=$(attested_submodules_list); ATTESTED_LIST_RC=$?
@@ -229,7 +235,10 @@ READING_STATUS=0
 READING_ENDED_AT=$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)
 # Absent ones are judged by attested_decide, once the push's change list and selection exist; the
 # leg's reading is written there. Every other outcome is written and refused here, as before.
-ATTESTED_ABSENT=$MISSING_SUBMODULES
+ATTESTED_MOVED=""
+[ -n "$ATTESTED_REFUSAL" ] || ATTESTED_MOVED=$(attested_submodules_moved "${ATTESTED_LIST[@]}")
+ATTESTED_ABSENT=$(printf '%s %s' "$MISSING_SUBMODULES" "$(printf '%s\n' "$ATTESTED_MOVED" | awk 'NF { print $1 }')" | tr -s '[:space:]' ' ')
+ATTESTED_ABSENT=${ATTESTED_ABSENT# }; ATTESTED_ABSENT=${ATTESTED_ABSENT% }
 ATTESTED_STARTED_S=$READING_STARTED_S; ATTESTED_STARTED_AT=$READING_STARTED_AT
 [ -n "$ATTESTED_ABSENT" ] || gate_step_reading "$READING_STATUS" submodules ran \
   "$((SECONDS - READING_STARTED_S))" "$READING_STARTED_AT" "$READING_ENDED_AT"
@@ -247,7 +256,7 @@ fi
 # required. Any other exit, or an exit 0 that names one, is no decision: all are required.
 attested_decide() {
   [ -n "$ATTESTED_ABSENT" ] || return 0
-  local need rc absent=$ATTESTED_ABSENT
+  local need rc absent=$ATTESTED_ABSENT path at pin gone=""
   # shellcheck disable=SC2086 # word lists of submodule paths and manifest keys
   need=$(node "${HOOK_WORK_TREE:-.}/genesis/orchestrator/gate-preflight.mjs" --attested-need $absent --projects $PROJECTS); rc=$?
   # Not xargs: an unmatched quote in the output would empty it, and an empty answer is a pass.
@@ -259,7 +268,36 @@ attested_decide() {
   fi
   { [ "$rc" -eq 3 ] && [ -n "$need" ]; } || need=$absent
   gate_step_reading 1 submodules ran "$((SECONDS - ATTESTED_STARTED_S))" "$ATTESTED_STARTED_AT" "$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)"
-  echo "[pre-push] REFUSED: not checked out: $need. Run: git submodule update --init $need" >&2
+  for path in $need; do
+    at=$(printf '%s\n' "$ATTESTED_MOVED" | awk -v p="$path" '$1 == p { print $2 }')
+    if [ -z "$at" ]; then gone="$gone $path"; continue; fi
+    pin=$(git ls-tree "${LAST_LOCAL_SHA:-HEAD}" -- "$path" 2>/dev/null | awk '{ print $3 }')
+    echo "[pre-push] REFUSED: $path is checked out at ${at:0:12}, not at its pin ${pin:0:12}: its gate would be read from a manifest and bytes the push does not carry. Run: just dev prep, or git submodule update --init $path" >&2
+  done
+  gone=${gone# }
+  [ -z "$gone" ] || echo "[pre-push] REFUSED: not checked out: $gone. Run: git submodule update --init $gone" >&2
+  gate_step_reading
+  exit 1
+}
+# A push that moves a submodule pin is judged once more, whatever is checked out (2026-11-26: a
+# brit pin move landed on dev in 23 s with no gate). gate-preflight.mjs --pin-moves refuses, one line
+# each, when the selection lacks the moved pin's attested gate project, or when the push names dev
+# or main and the graph oracle was unavailable, so the selection was path-only. Asked only when the
+# change list names a path of .gitmodules, or cannot be compared with it; any failure of the
+# question is a refusal. Run once, where the selection exists (as attested_decide).
+ATTESTED_PINS_JUDGED=""
+attested_pins_gated() {
+  [ -z "$ATTESTED_PINS_JUDGED" ] || return 0
+  ATTESTED_PINS_JUDGED=1
+  [ -e "${HOOK_WORK_TREE:-.}/.gitmodules" ] || return 0
+  local paths
+  if [ -r "${GATE_CHANGED_FILES-}" ] &&
+     paths=$(git config --file "${HOOK_WORK_TREE:-.}/.gitmodules" --get-regexp '^submodule\..*\.path$' 2>/dev/null | awk '{ print $2 }') && [ -n "$paths" ]; then
+    grep -Fxq -f <(printf '%s\n' "$paths") "$GATE_CHANGED_FILES" || return 0
+  fi
+  # shellcheck disable=SC2086 # a word list of manifest keys
+  node "${HOOK_WORK_TREE:-.}/genesis/orchestrator/gate-preflight.mjs" --pin-moves --projects $PROJECTS && return 0
+  echo "[pre-push] REFUSED: a submodule pin move in this push is not gated (above). Run: just dev prep, then push again" >&2
   gate_step_reading
   exit 1
 }
@@ -1367,6 +1405,7 @@ handover_finish() {
 
 hook_pass() {
   attested_decide
+  attested_pins_gated
   [ -z "$PUSH_IS_HANDOVER" ] || handover_finish
   [ -n "$BERTH_TARGETS" ] || { stop_point; exit 0; }
   local line local_sha remote_ref remote_sha target rc
@@ -2225,6 +2264,7 @@ fi
 # Trim leading space
 PROJECTS=$(echo "$PROJECTS" | sed 's/^ //')
 attested_decide
+attested_pins_gated
 
 # ── Preflight (seconds) ──────────────────────────────────────────
 # The careless misses that have each cost a long gate run: an uninitialised submodule, an

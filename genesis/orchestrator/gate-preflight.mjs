@@ -28,7 +28,7 @@ import { dirtyPaths } from './gate-evidence.mjs';
 import { appendEvent } from './gate-live.mjs';
 import { applicableTargets, checkCBaseline, hostTripleOf, readDeclaredTargets } from './c-baseline.mjs';
 // gate-runner imports this module too; the cycle is safe because neither calls the other while loading.
-import { gateChildEnv } from './gate-runner.mjs';
+import { gateChildEnv, projectsForChanges } from './gate-runner.mjs';
 // Loaded so that a module that fails to load still gives a row, not a stack trace (fleetRollRows).
 let fleetGuard = null;
 let fleetGuardError = null;
@@ -185,6 +185,34 @@ export function attestedNeed(module, { root, projects, changed, read = readFileS
     if (unknown) return `${project.name} depends on ${unknown}, which no checked-out manifest declares`;
   }
   return null;
+}
+
+/**
+ * Why a push that moves a submodule pin may not go on, one line each; empty when it may.
+ * Independent of what is checked out (2026-11-26: a brit pin move landed on dev with no gate, the
+ * brit checkout being older than the manifest that declares brit's attested project).
+ *  - No change list: a pin move cannot be ruled out.
+ *  - A moved pin of an attested submodule whose attested gate project (registry: `run.kind`
+ *    attested, `dir` the submodule path) is not in the selection, or is not registered here at all.
+ *  - A push to dev or main that moves any pin while the graph oracle is unavailable: a path-only
+ *    selection drops the pin's consumers, and is not accepted for it. `oracle()` returns the
+ *    reason it is unavailable, or null.
+ */
+export function pinMoveRefusals({ changed, selected, registry, modules, attested = ATTESTED_SUBMODULES, targets = '', oracle }) {
+  if (!Array.isArray(changed)) return ['the change list could not be read, so a submodule pin move cannot be ruled out'];
+  const moved = changed.filter(path => modules.has(path));
+  if (!moved.length) return [];
+  const lines = [];
+  for (const path of moved.filter(m => attested.includes(m))) {
+    const project = [...registry.values()].find(p => p.run?.kind === 'attested' && p.dir === path);
+    if (!project) lines.push(`${path}: its pin moves and no attested gate project is registered for it here (absent, or checked out at a commit older than the manifest that declares it) — the pin move would land ungated`);
+    else if (!selected.includes(project.name)) lines.push(`${path}: its pin moves and the selection does not contain its attested gate ${project.name} — the pin move would land ungated`);
+  }
+  if (/(^|\s)refs\/heads\/(dev|main)(\s|$)/.test(String(targets))) {
+    const why = oracle();
+    if (why) lines.push(`a push to dev or main that moves a pin (${moved.join(' ')}) is selected by the graph oracle or not at all, and the oracle is unavailable (${why}) — path-only selection is not accepted for it`);
+  }
+  return lines;
 }
 
 /**
@@ -828,12 +856,35 @@ export function main(argv, env = process.env) {
     const reasons = absent.map(module => [module, attestedNeed(module, { root: ROOT, projects, changed })]);
     const required = reasons.filter(([, why]) => why);
     if (!required.length) {
-      process.stderr.write(`[pre-push] attested submodules not checked out and not required by this push: ${absent.join(' ')} — no changed path or selected project needs them\n`);
+      process.stderr.write(`[pre-push] attested submodules absent or off their pin, and not required by this push: ${absent.join(' ')} — no changed path or selected project needs them\n`);
       return 0;
     }
     process.stderr.write(`[pre-push] attested submodules required: ${required.map(([module, why]) => `${module}: ${why}`).join('; ')}\n`);
     process.stdout.write(`${required.map(([module]) => module).join('\n')}\n`);
     return 3;
+  }
+  if (argv.includes('--pin-moves')) {
+    // The hook's question for a push that moves a submodule pin (pinMoveRefusals). Exit 0 when it
+    // may go on; exit 3 with one `[pre-push]` line per reason on stderr. The oracle is asked here
+    // again, for its availability alone; the selection judged is the hook's own (--projects).
+    const at = argv.indexOf('--projects');
+    const selected = at >= 0 ? argv.slice(at + 1).filter(a => !a.startsWith('--')) : [];
+    const changed = decisionChanges(changedFromEnv(env), { env, root: ROOT, newRefs: true });
+    let lines;
+    try {
+      lines = pinMoveRefusals({
+        changed, selected, registry: loadGateRegistry(ROOT),
+        modules: modulePaths(readFileSync(join(ROOT, '.gitmodules'), 'utf8')), targets: env.GATE_PUSH_TARGETS,
+        oracle: () => {
+          let unavailable = 'the oracle gave no answer';
+          projectsForChanges(ROOT, changed, { env, log: () => {}, inputsLog: () => {}, announce: false,
+            onOracle: (available, reason) => { unavailable = available ? null : (reason || 'GATE_ORACLE=path'); } });
+          return unavailable;
+        },
+      });
+    } catch (error) { lines = [`the pin-move question could not be answered: ${String(error?.message || error).split('\n')[0]}`]; }
+    for (const line of lines) process.stderr.write(`[pre-push] ${line}\n`);
+    return lines.length ? 3 : 0;
   }
   if (argv.includes('--on-red')) {
     process.stdout.write(`${onRedPolicy().mode}\n`);
