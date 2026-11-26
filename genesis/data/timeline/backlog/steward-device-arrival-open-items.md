@@ -3319,3 +3319,22 @@ device ark (`genesis/docs/superpowers/specs/2026-10-27-steward-space-landing-pla
 honours a declared stdout-line probe with its own patience (`epr-cli/src/device/supervise.rs:1556`), so a device that
 declares the daemon that way waits on the line. `just mesh wait` concerns the household mesh, not this daemon, and no session
 hook was found reading the line. Before the line moves, read each device's declared readiness for its peer daemon.
+
+## Row 115 — security alerts no lock-only update can pay down, with their real cures
+
+The roll bundle of 2026-11-26 moved eprfs-core's entry in every lock that path-depends on it, and each moved lock pays down one patchable alert (`.claude/scripts/_lib/dependabot_paydown.py`). Three alerts could not be paid in line, because the crate that requires them pins an older line:
+
+- `elohim/eprfs`: hickory-resolver (fixed in 0.26.2), hickory-proto (0.26.1) and lru (0.16.3) all ride iroh 0.92 (`hickory-resolver = "^0.25"`, `hickory-proto = "^0.25"`, `lru = "^0.13"`). Real cure: an iroh upgrade to a release on hickory 0.26. That lock paid nothing in the bundle.
+- `elohim/elohim-storage` and `steward/node`: rustls-webpki 0.101.7 is pulled by libp2p-tls 0.5.0 and cannot reach 0.103 by `cargo update`. Real cure: a libp2p upgrade to a libp2p-tls on rustls-webpki 0.103. Both locks paid down in line with serde_with 3.21.0 instead.
+
+## Row 116 — the paydown guard names a cure older than what is already resolved
+
+For elohim-storage and steward/node the guard named `cargo update -p rustls-webpki --precise 0.103.13`, while both locks already resolve rustls-webpki 0.103.16; the open alert sits on the other copy, 0.101.7. The guard clusters alerts by package name, not by resolved copy, so its top cure can be a downgrade of the copy that is already fixed, and `cargo update` refuses it as ambiguous. Cure: cluster by (package, resolved version) and name a cure per copy, saying when no in-line cure exists.
+
+## Row 117 — in warn mode the paydown guard prints REFUSED for a line that refuses nothing
+
+`SECURITY_PAYDOWN` defaults to warn (`.husky/pre-push.bash` ~:1784) and only `strict` makes the leg bind, yet each line reads `REFUSED <lock>: … no paydown`. On 2026-11-26 the push of the roll bundle was refused by a different row (`[preflight] REFUSED storage-client-dist`), and those lines led two sessions to diagnose the paydown guard for about twenty minutes. Cure: print WARN unless strict, and keep REFUSED for a line that refuses.
+
+## Row 118 — a fresh worktree's prep leaves the storage-client dist unbuilt, and only the push preflight says so
+
+`just dev prep` in a fresh worktree reported `preflight clear` while `elohim/sdk/storage-client-ts/dist/index.js` was absent; the push preflight then refused with `storage-client-dist: … absent — type-aware lint and the a2o lane read it`. Cure: prep builds that dist, or names it at prep time as the push will.
