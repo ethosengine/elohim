@@ -1016,6 +1016,39 @@ async function settle(root, count, ms = 4000) {
 
 const sayBody = (line) => JSON.parse(line.slice(line.indexOf('{')));
 
+test('a delivery after close cannot close the run again or send its final again', async (t) => {
+  const root = fixture(t);
+  const env = siblingEnv(root, stubBerth(root, { notes: [subNote({})] }));
+  const { path } = openRun({
+    root,
+    sha: SHA,
+    target: 'dev',
+    session: 'gate-session',
+    ref: 'refs/heads/dev',
+  });
+  const close = () => spawnSync(process.execPath,
+    [SCRIPT, 'close', '--run', path, '--outcome', 'failed'],
+    { cwd: root, encoding: 'utf8', timeout: 8000, env });
+
+  const first = close();
+  assert.equal(first.status, 0, first.stderr);
+  assert.equal((await settle(root, 1)).length, 1, 'the first close sends one gate-final');
+  assert.equal(readRun(path).events.filter((event) => event.kind === 'sibling-delivery'
+    && event.note === 'gate-final@1').length, 1);
+
+  const second = close();
+  assert.equal(second.status, 0, second.stderr);
+  assert.equal(second.stdout, '');
+  assert.equal(second.stderr, '');
+  assert.equal((await settle(root, 2, 500)).length, 1, 'the second close sends nothing');
+
+  const events = readRun(path).events;
+  assert.equal(events.filter((event) => event.kind === 'run-close').length, 1);
+  assert.equal(events.find((event) => event.kind === 'run-close').outcome, 'failed');
+  assert.equal(events.filter((event) => event.kind === 'sibling-delivery'
+    && event.note === 'gate-final@1').length, 1);
+});
+
 test('subscribe sends one broadcast berth note that records the subscription', (t) => {
   const root = fixture(t);
   const bin = stubBerth(root);

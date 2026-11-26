@@ -1436,7 +1436,19 @@ gate_live_close_on_exit() {
     0) outcome="${GATE_LOOP_OUTCOME:-passed}" ;;
     129 | 130 | 143) outcome=interrupted ;;
   esac
-  node genesis/orchestrator/gate-live.mjs close --run "$GATE_LIVE_RUN" --outcome "$outcome" --deferred-from-log >/dev/null 2>&1
+  local close_error_file="${TMPDIR:-/tmp}/gate-live-close-$BASHPID.stderr"
+  local close_stderr="" close_status=0
+  node genesis/orchestrator/gate-live.mjs close --run "$GATE_LIVE_RUN" --outcome "$outcome" --deferred-from-log >/dev/null 2>"$close_error_file" || close_status=$?
+  if [ "$close_status" -ne 0 ]; then
+    sleep 1
+    close_status=0
+    node genesis/orchestrator/gate-live.mjs close --run "$GATE_LIVE_RUN" --outcome "$outcome" --deferred-from-log >/dev/null 2>"$close_error_file" || close_status=$?
+    if [ "$close_status" -ne 0 ]; then
+      IFS= read -r close_stderr < "$close_error_file" || close_stderr=""
+      printf '[pre-push] gate-live: run %s was not closed (%s): %s\n' "$GATE_LIVE_RUN" "$outcome" "$close_stderr" >&2
+    fi
+  fi
+  rm -f -- "$close_error_file"
   # The integrator's harvest: recurring and late cheap reds across this device's recent runs.
   [ "$outcome" = interrupted ] || node genesis/orchestrator/gate-live.mjs harvest --last 10 2>/dev/null
   return 0

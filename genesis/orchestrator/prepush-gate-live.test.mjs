@@ -56,6 +56,25 @@ function fixture(t, { brokenCli = false } = {}) {
   return dir;
 }
 
+function stubClose(dir, failures) {
+  const orch = join(dir, "genesis/orchestrator");
+  copyFileSync(join(orch, "gate-live.mjs"), join(orch, "gate-live-real.mjs"));
+  writeFileSync(join(orch, "gate-live.mjs"), [
+    "import { existsSync, readFileSync, writeFileSync } from 'node:fs';",
+    "import { spawnSync } from 'node:child_process';",
+    "const callsFile = new URL('./close-calls', import.meta.url);",
+    "if (process.argv[2] === 'close') {",
+    "  const calls = (existsSync(callsFile) ? Number(readFileSync(callsFile, 'utf8')) : 0) + 1;",
+    "  writeFileSync(callsFile, String(calls));",
+    `  if (calls <= ${failures}) { console.error(\`close attempt \${calls} failed\\nlast detail\`); process.exit(7); }`,
+    "}",
+    "const r = spawnSync(process.execPath, [new URL('./gate-live-real.mjs', import.meta.url).pathname, ...process.argv.slice(2)], { stdio: 'inherit' });",
+    "process.exit(r.status ?? 1);",
+  ].join("\n"));
+}
+
+const closeCalls = (dir) => Number(readFileSync(join(dir, "genesis/orchestrator/close-calls"), "utf8"));
+
 const env = () => ({
   ...cleanEnv,
   EPR_BIN: "/nonexistent/epr",
@@ -212,6 +231,45 @@ for (const [label, code, outcome] of [["exit_0_closes_passed", 0, "passed"], ["e
     assert.ok(r.stdout.includes("[harvest]"), `the close prints the integrator's harvest: ${r.stdout}`);
   });
 }
+
+test("live_run_close_succeeds_first_time_without_new_output", (t) => {
+  const dir = fixture(t);
+  stubClose(dir, 0);
+  const r = spawnSync("bash", ["-c", script(`HOOK_WORK_TREE='${dir}'`, PRELUDE, OPEN_BLOCK, "exit 0")],
+    { cwd: dir, env: env(), encoding: "utf8", timeout: 15000 });
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.equal(closeCalls(dir), 1);
+  assert.doesNotMatch(r.stderr, /\[pre-push\] gate-live: run .* was not closed/);
+  assert.equal(eventsOf(runsOf(dir)[0]).at(-1).kind, "run-close");
+});
+
+test("live_run_close_retries_once_then_succeeds_without_warning", (t) => {
+  const dir = fixture(t);
+  stubClose(dir, 1);
+  const r = spawnSync("bash", ["-c", script(`HOOK_WORK_TREE='${dir}'`, PRELUDE, OPEN_BLOCK, "exit 1")],
+    { cwd: dir, env: env(), encoding: "utf8", timeout: 15000 });
+  assert.equal(r.status, 1, r.stdout + r.stderr);
+  assert.equal(closeCalls(dir), 2);
+  assert.doesNotMatch(r.stderr, /\[pre-push\] gate-live: run .* was not closed/);
+  const last = eventsOf(runsOf(dir)[0]).at(-1);
+  assert.equal(last.kind, "run-close");
+  assert.equal(last.outcome, "failed");
+});
+
+test("live_run_close_warns_once_after_two_failures_without_changing_hook_exit", (t) => {
+  const dir = fixture(t);
+  stubClose(dir, 2);
+  const r = spawnSync("bash", ["-c", script(`HOOK_WORK_TREE='${dir}'`, PRELUDE, OPEN_BLOCK, "exit 23")],
+    { cwd: dir, env: env(), encoding: "utf8", timeout: 15000 });
+  assert.equal(r.status, 23, r.stdout + r.stderr);
+  assert.equal(closeCalls(dir), 2);
+  const run = runsOf(dir)[0];
+  const warnings = r.stderr.split("\n").filter((line) => line.startsWith("[pre-push] gate-live: run "));
+  assert.deepEqual(warnings, [
+    `[pre-push] gate-live: run ${run} was not closed (failed): close attempt 2 failed`,
+  ]);
+  assert.notEqual(eventsOf(run).at(-1).kind, "run-close");
+});
 
 test("a pre-gate red is live at once, the push continues, and an early pass still refuses", (t) => {
   const dir = fixture(t);
