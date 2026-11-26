@@ -5,14 +5,32 @@ use super::{
     PAYLOAD_FORMATS_PROBE_FIELD,
 };
 use eprfs_core::{BlobCid, ByteCid};
-use serde_json::Value;
-use std::{collections::BTreeMap, fs, path::Path};
+use serde_json::{json, Value};
+use std::{
+    collections::BTreeMap,
+    fs::{self, OpenOptions},
+    io::{Error, ErrorKind, Write},
+    os::unix::fs::OpenOptionsExt,
+    path::Path,
+};
 
 impl Store {
     /// Copy to private staging, verify those exact bytes, then atomically publish a candidate.
     /// Ingest never moves current, even if the candidate passed a gate.
     pub fn ingest(&self, source: &Path, options: &IngestOptions) -> Result<Release> {
-        self.ingest_with_payload_formats(source, options, |_| Ok(None))
+        self.ingest_with_payload_formats_and_adoption(source, options, None, |_| Ok(None))
+    }
+
+    /// Adopt a plain installed path through ingest's locked held-or-repair decision.
+    pub(super) fn ingest_adoption(
+        &self,
+        source: &Path,
+        options: &IngestOptions,
+        adopted_path: &Path,
+    ) -> Result<Release> {
+        self.ingest_with_payload_formats_and_adoption(source, options, Some(adopted_path), |_| {
+            Ok(None)
+        })
     }
 
     /// Ingest, then derive a payload-format statement from the primary executable held beneath
@@ -22,6 +40,16 @@ impl Store {
         &self,
         source: &Path,
         options: &IngestOptions,
+        probe: impl FnOnce(&Path) -> std::result::Result<Option<String>, String>,
+    ) -> Result<Release> {
+        self.ingest_with_payload_formats_and_adoption(source, options, None, probe)
+    }
+
+    fn ingest_with_payload_formats_and_adoption(
+        &self,
+        source: &Path,
+        options: &IngestOptions,
+        adoption: Option<&Path>,
         probe: impl FnOnce(&Path) -> std::result::Result<Option<String>, String>,
     ) -> Result<Release> {
         // Closure provenance travels with the bytes; caller overrides never relabel it.
@@ -146,6 +174,25 @@ impl Store {
             let cid = self.release_cid(&sums)?;
             let version = self.identity(&stage, &cid, &commit)?;
             let artifact = self.artifact(&cid)?;
+            let held = self.record(&cid);
+            let artifact_verified = artifact.exists()
+                && sums.iter().all(|(name, sum)| {
+                    files::executable(&artifact.join(name))
+                        && files::file_cid(&artifact.join(name)).ok().as_ref() == Some(sum)
+                });
+            if artifact_verified {
+                if let (Some(adopted_path), Some(release)) = (adoption, held.as_ref()) {
+                    let events = artifact.join("adoptions.jsonl");
+                    if let Err(error) = append_adoption(&events, adopted_path, &self.tool) {
+                        eprintln!(
+                            "warning: could not append adoption event to {}: {}; continuing launcher installation",
+                            events.display(),
+                            error
+                        );
+                    }
+                    return Ok(release.clone());
+                }
+            }
             if artifact.exists() {
                 for name in sums.keys() {
                     if !files::executable(&artifact.join(name))
@@ -179,7 +226,7 @@ impl Store {
                 gate_run: options.gate_run.clone(),
                 ingested_at: files::now(),
             };
-            let mut release = self.record(&cid).unwrap_or_else(|| Release {
+            let mut release = held.unwrap_or_else(|| Release {
                 cid: cid.clone(),
                 rcid: cid.clone(),
                 tool: self.tool.clone(),
@@ -492,4 +539,44 @@ impl Store {
         self.artifact(cid)
             .is_ok_and(|dir| files::executable(&dir.join(bin)))
     }
+}
+
+/// Append at most one event for an adopted path beneath this release CID. The caller holds the
+/// store lock, so checking and appending form one decision with held-release verification.
+fn append_adoption(events: &Path, adopted_path: &Path, tool: &str) -> Result<()> {
+    if fs::read_to_string(events).is_ok_and(|contents| {
+        contents.lines().any(|line| {
+            serde_json::from_str::<Value>(line)
+                .ok()
+                .is_some_and(|event| event["path"] == json!(adopted_path))
+        })
+    }) {
+        return Ok(());
+    }
+    let existed = events.exists();
+    let mut line = serde_json::to_vec(&json!({
+        "at": files::now(),
+        "path": adopted_path,
+        "session": crate::session::resolve().session,
+        "tool": tool,
+    }))?;
+    line.push(b'\n');
+    let mut file = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .mode(0o600)
+        .custom_flags(libc::O_NOFOLLOW)
+        .open(events)?;
+    if file.write(&line)? != line.len() {
+        return Err(Error::new(
+            ErrorKind::WriteZero,
+            "adoption event was not appended as one complete line",
+        )
+        .into());
+    }
+    file.sync_all()?;
+    if !existed {
+        files::sync_parent(events)?;
+    }
+    Ok(())
 }

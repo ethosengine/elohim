@@ -237,7 +237,7 @@ pub struct Provenance {
     pub tree_clean: bool,
     /// Gate or adoption run that supplied the bytes.
     pub gate_run: Option<String>,
-    /// UTC ingest timestamp (display and retention only, never ordering authority).
+    /// UTC ingest timestamp used for display, candidate recency, and retention.
     pub ingested_at: String,
 }
 /// An immutable content identity and appendable private provenance.
@@ -276,6 +276,15 @@ impl Release {
             .rev()
             .find(|p| p.source_commit == commit)
             .or_else(|| (self.provenance.source_commit == commit).then_some(&self.provenance))
+    }
+
+    /// Latest actual ingest of these bytes; adoption events are held outside the release record.
+    pub(crate) fn last_ingested_at(&self) -> &str {
+        std::iter::once(&self.provenance)
+            .chain(&self.sources)
+            .map(|source| source.ingested_at.as_str())
+            .max()
+            .unwrap_or(self.provenance.ingested_at.as_str())
     }
 }
 /// A session pin or daemon lease. Owner identity is PID plus start time, never PID alone.
@@ -461,7 +470,11 @@ impl Store {
             .filter(|p| !p.is_symlink())
             .filter_map(|p| p.file_name()?.to_str().and_then(|cid| self.record(cid)))
             .collect();
-        records.sort_by(|a, b| b.provenance.ingested_at.cmp(&a.provenance.ingested_at));
+        records.sort_by(|a, b| {
+            b.last_ingested_at()
+                .cmp(a.last_ingested_at())
+                .then_with(|| a.cid.cmp(&b.cid))
+        });
         records
     }
     pub(crate) fn save(&self, release: &Release) -> Result<()> {
