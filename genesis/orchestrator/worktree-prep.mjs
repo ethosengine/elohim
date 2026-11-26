@@ -33,11 +33,13 @@ export function currentChangeList({ root, spawn = spawnSync, base = 'origin/dev'
   if (ref.error || ref.status === null) throw new Error(`cannot inspect ${base}: ${ref.error?.message || ref.signal}`);
   const exact = ref.status === 0;
   const committed = exact
-    ? capture(root, ['diff', '--name-only', '-z', capture(root, ['merge-base', 'HEAD', base], spawn).trim(), 'HEAD'], spawn)
+    ? capture(root, ['diff', '--name-only', '--no-renames', '-z', capture(root, ['merge-base', 'HEAD', base], spawn).trim(), 'HEAD'], spawn)
     : capture(root, ['diff-tree', '--root', '--no-commit-id', '--name-only', '-r', '-z', 'HEAD'], spawn);
   const paths = [committed,
-    capture(root, ['diff', '--name-only', '-z'], spawn),
-    capture(root, ['diff', '--cached', '--name-only', '-z'], spawn),
+    // --no-renames: a file renamed away is listed under its old name too, so a Cargo.toml or a
+    // deny.toml moved aside still counts as a change to it.
+    capture(root, ['diff', '--name-only', '--no-renames', '-z'], spawn),
+    capture(root, ['diff', '--cached', '--name-only', '--no-renames', '-z'], spawn),
     capture(root, ['ls-files', '--others', '--exclude-standard', '-z'], spawn),
   ];
   return { paths: [...new Set(paths.flatMap(value => value.split('\0').filter(Boolean)))].sort(), exact };

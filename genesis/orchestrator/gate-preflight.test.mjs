@@ -8,7 +8,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
   checkElementDists, checkEvidenceRecordable, checkNodeModules, checkReadSets, checkSophiaUmd,
-  main, cargoInputChange, checkEprBin, checkArk, checkCargoDeny, checkCargoLocks, checkCBaselineOffer, checkStorageClientDist, checkWorkspaceDists, checkSubmodules, checkTmpdir, emitLive, NAMED_READ_SET_PROJECTS, PREFLIGHT_READ_SET_PROJECTS, onRedPolicy,
+  main, cargoInputChange, decisionChanges, checkEprBin, checkArk, checkCargoDeny, checkCargoLocks, checkCBaselineOffer, checkStorageClientDist, checkWorkspaceDists, checkSubmodules, checkTmpdir, emitLive, NAMED_READ_SET_PROJECTS, PREFLIGHT_READ_SET_PROJECTS, onRedPolicy,
   fleetRollRows, docCutRows, runPreflight, checkSubmodulePins,
 } from './gate-preflight.mjs';
 import { orderByCost } from './gate-runner.mjs';
@@ -246,6 +246,39 @@ test('cargo-locks: under runPreflight a fallback range (GATE_NARROW_BASE=none) i
   assert.ok(!asked.includes('cargo metadata'));
   assert.deepEqual(run({ GATE_NARROW_BASE: 'none' }), ['cargo-lock:ws']);
   assert.ok(asked.includes('cargo metadata'));
+});
+
+// Review of 42faf6aaa (d): the hook's shared list is read with rename detection, so a Cargo.toml
+// renamed away appears only under its new name. The checks read the range again without it.
+test('a Cargo.toml renamed away in the push still runs cargo-lock and cargo-deny', (t) => {
+  const root = cargoTree(t);
+  put(root, '.gitmodules', '');
+  const git = (...args) => {
+    const r = spawnSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@example.invalid', '-c', 'diff.renames=true', ...args], { cwd: root, encoding: 'utf8' });
+    assert.equal(r.status, 0, r.stderr);
+    return r.stdout.trim();
+  };
+  git('init', '-q', '-b', 'main'); git('add', '-A'); git('commit', '-q', '-m', 'base');
+  const base = git('rev-parse', 'HEAD');
+  git('mv', 'ws/b/Cargo.toml', 'ws/b/Cargo.toml.aside'); git('commit', '-q', '-m', 'rename');
+  const tip = git('rev-parse', 'HEAD');
+  const shared = git('diff', '--name-only', base, tip).split('\n'); // as the hook computes GATE_CHANGED_FILES
+  assert.deepEqual(shared, ['ws/b/Cargo.toml.aside'], 'the shared list names only the new path');
+  const env = { TMPDIR: '/preflight-fixture-tmp', GATE_NARROW_BASE: 'ok', GATE_PUSH_REFS: `refs/heads/dev ${tip} ${base}` };
+  assert.deepEqual(decisionChanges(shared, { env, root }).sort(), ['ws/b/Cargo.toml', 'ws/b/Cargo.toml.aside']);
+  const asked = [];
+  const spawn = (cmd, args, opts) => {
+    if (cmd === 'git') return spawnSync(cmd, args, opts);
+    asked.push(`${cmd} ${args[0]}`);
+    return { status: cmd === 'cargo' ? 0 : 1, stdout: '', stderr: '' };
+  };
+  const run = e => runPreflight({ root, projects: [pa], env: e, spawn, registry: new Map(), changed: shared, hostTriple: 'x', fleet: { root, spawn }, docCut: { root, spawn } })
+    .filter(r => /^cargo-(lock|deny)/.test(r.check)).map(r => `${r.level} ${r.check}${r.why.startsWith('not run') ? ' (not run)' : ''}`);
+  assert.deepEqual(run(env), ['WARN cargo-deny-bans', 'ok cargo-lock:ws']);
+  assert.ok(asked.includes('cargo metadata'));
+  // The same list with no pushed range to read again is what skipped them before.
+  const { GATE_PUSH_REFS: _refs, ...bare } = env;
+  assert.deepEqual(run(bare), ['ok cargo-deny-bans (not run)', 'ok cargo-lock (not run)']);
 });
 
 test('rows stream as each check completes', (t) => {
