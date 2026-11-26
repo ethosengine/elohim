@@ -2291,6 +2291,10 @@ class Berth:
                 elif (isinstance(delayed_verdict, dict)
                       and delayed_verdict.get("verdict") == "effective"
                       and delayed_verdict.get("session") == session):
+                    # epr's LeaseVerdict::Effective carries only `session` (lease_view.rs:309), so this
+                    # read never has override_at and never supersedes: the right outcome, since an
+                    # effective read here may be the override taking effect. The early exit comes from
+                    # the hook's read-only poll and the 'device is back' withdrawal, not from here.
                     delayed_override_at = delayed_verdict.get("override_at")
                     supersede = bool(isinstance(delayed_override_at, (int, float))
                                      and self._view_now(delayed) < delayed_override_at)
