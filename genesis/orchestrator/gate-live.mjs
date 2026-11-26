@@ -303,7 +303,7 @@ export function closeRun(path, outcome, {
   try {
     if (!OUTCOMES.has(outcome)) return null;
     const events = parseEvents(readFileSync(path, 'utf8'));
-    if (events.at(-1)?.kind === 'run-close') return undefined;
+    if (events.some((event) => event.kind === 'run-close')) return undefined;
     if (deferredFromLog) {
       deferred = events.filter((event) =>
         event.kind === 'gate-verdict' && event.verdict?.deferred === true).length;
@@ -345,9 +345,7 @@ export function stoppedAnswer(stopped) {
 
 export function readRun(path, { staleMs = STALE_MS, now = () => new Date() } = {}) {
   const events = parseEvents(readFileSync(path, 'utf8'));
-  const closed = [...events]
-    .reverse()
-    .find((event) => event.kind === 'run-close' && OUTCOMES.has(event.outcome));
+  const closed = events.find((event) => event.kind === 'run-close' && OUTCOMES.has(event.outcome));
 
   if (closed) return { events, outcome: closed.outcome };
 
@@ -1206,7 +1204,7 @@ export async function emitRed(path, event, { continuing, env = process.env } = {
 /** The gate-final@1 body for a closed run, from what its log already holds. */
 function finalBody(path, { did, ref }) {
   const { events, open } = runFacts(path);
-  const close = events.findLast((e) => e.kind === 'run-close');
+  const close = events.find((e) => e.kind === 'run-close' && OUTCOMES.has(e.outcome));
   const verdicts = events.filter((e) => e.kind === 'gate-verdict' && e.verdict && typeof e.verdict === 'object');
   const reds = [];
   const seen = new Set();
