@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { decideReuse } from './gate-runner.mjs';
+import { decideReuse, pushRange } from './gate-runner.mjs';
 import {
   FENCE_SCOPE_TABLE,
   classifyFencePath,
@@ -98,6 +98,32 @@ test('an absent destination table holds the fence and says so', () => {
   });
   assert.equal(fenceScopeLine(project, reading),
     '[gate] fixture fence-scope (shadow): table absent at destination; the fence holds');
+});
+
+test('a changed-path diff that fails is unavailable, not empty, and the shadow refuses on it', () => {
+  // pushRange's merge base answers, its diff fails: the range says unavailable rather than "no files".
+  const failedDiff = (_command, args) => (args[0] === 'merge-base'
+    ? { status: 0, stdout: 'base\n' }
+    : { status: 128, stdout: '', stderr: 'fatal: bad object' });
+  const range = pushRange({ root: '/fixture-failed-diff', gateCommit: 'head', spawn: failedDiff });
+  assert.deepEqual(range, { base: 'base', files: [], unavailable: true });
+
+  resetFenceScopeCache();
+  const table = JSON.stringify({
+    version: 1,
+    judge: { importRoots: [], exact: [FENCE_SCOPE_TABLE] },
+    keyed: { exact: [] },
+    substrate: { prefixes: [], exact: [] },
+  });
+  const spawn = (_command, args) => (args[1] === `origin/dev:${FENCE_SCOPE_TABLE}`
+    ? { status: 0, stdout: table } : { status: 128, stdout: '' });
+  const reading = fenceScopeShadow({
+    project, key, range, candidates: [green], root: '/fixture-unavailable-range', env: {}, spawn,
+  });
+  assert.equal(reading.answer, 'would-refuse');
+  assert.equal(reading.reason, 'range-unavailable');
+  assert.equal(fenceScopeLine(project, reading),
+    '[gate] fixture fence-scope (shadow): would refuse: governance range unavailable; the fence holds');
 });
 
 test('GATE_FENCE_SCOPE=off adds no spawn, reader resolution or result', () => {
