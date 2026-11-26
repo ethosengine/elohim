@@ -1,5 +1,6 @@
 //! Device-private executable custody. Ingest owns bytes; land owns the committed head.
 //! Status is a projection, never an authority. CLI parsing lives in the consuming binary.
+mod annotate;
 mod feedback_health;
 pub(crate) mod files;
 mod follow_record;

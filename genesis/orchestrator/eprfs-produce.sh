@@ -8,8 +8,8 @@
 # Called by the root justfile's `_eprfs-ingest-around` in the same shell environment its
 # `cargo build` ran in, after the baseline ingest has established the release identity. For each
 # of epr and bin-launch it runs `epr artifact describe` and `epr artifact key` against this tested
-# checkout, then re-ingests the identical bytes with those keys labelled as producer annotations
-# outside rcid. Only then does it run `epr artifact put --release <ingested release> --release-bin
+# checkout, then annotates that already-held release in place with those keys labelled as producer
+# annotations outside rcid. Only then does it run `epr artifact put --release <ingested release> --release-bin
 # <bin> --cross` on the gate's own bytes in $CARGO_TARGET_DIR/debug. No second build: the method
 # records the environment the gate's build ran under, and `put` re-checks that this process's
 # environment is that record.
@@ -91,14 +91,17 @@ host_triple="$(rustc -vV 2>/dev/null | sed -n 's/^host: //p')"
 # The C level, in this same environment the build ran in. A missing checker withholds too: an
 # offer whose C level nobody read is the one that trapped on shem.
 check="${EPRFS_C_BASELINE_CHECK:-$here/c-baseline.mjs}"
+out="$target/producer"
+mkdir -p "$out" || skip "$out cannot be created"
 # An override decides what gates an offer, so the gate log names it, before the check runs.
 [[ -n "${EPRFS_C_BASELINE_CHECK:-}" ]] \
   && echo "[gate] epr producer C baseline check overridden: EPRFS_C_BASELINE_CHECK=$check (not $here/c-baseline.mjs)"
 [[ -f "$check" ]] || withhold "the C baseline check $check is not there"
 # The finding is the checker's stdout alone; its stderr (a node warning, a trace) goes to the gate
 # log as it is, never into the withheld reason.
-said="$(node "$check" --triple "$host_triple")"
+said="$(node "$check" --triple "$host_triple" 2>"$out/c-baseline.err")"
 status=$?
+cat "$out/c-baseline.err" >&2
 if ((status != 0)); then
   finding="$(reason_of "$said")"
   withhold "${finding:-the C baseline check exited $status}"
@@ -155,8 +158,6 @@ while IFS= read -r name; do
   esac
 done < <(compgen -e | LC_ALL=C sort)
 
-out="$target/producer"
-mkdir -p "$out" || skip "$out cannot be created"
 for bin in "${bins[@]}"; do
   [[ -f "$target/debug/$bin" && -f "$target/debug/$bin.d" ]] \
     || skip "$target/debug/$bin or its dep-info was not built"
@@ -179,6 +180,13 @@ if ((${#declared[@]})); then
   evidence=(--build-messages "$messages")
 fi
 
+annotate_release=true
+head_before_keys="$(git -C "$repo" rev-parse HEAD 2>/dev/null)" || head_before_keys=""
+if [[ -z "$head_before_keys" || "$head_before_keys" != "$tested_head" ]]; then
+  echo "[gate] epr producer: derivation keys not recorded (HEAD ${head_before_keys:0:12} is not the tested head ${tested_head:0:12} before key computation)"
+  annotate_release=false
+fi
+
 declare -A input
 for bin in "${bins[@]}"; do
   method="$out/method-$bin.json"
@@ -194,31 +202,24 @@ $(cat "$out/key-$bin.err")")"
 done
 
 # These keys describe the tested checkout and therefore must be attached by the producer that
-# read that checkout, before either Produce is written. Re-ingest copies and verifies the same
-# built bytes; the equality check pins the invariant that annotations do not change rcid.
+# read that checkout, before either Produce is written. Annotation mutates only the already-held
+# release record; it cannot create another release or provenance row.
 key_pairs=()
 for bin in "${bins[@]}"; do
   key_pairs+=("$bin" "${input[$bin]}")
 done
 derivation_keys="$(python3 -c 'import json, sys
-print(json.dumps(dict(zip(sys.argv[1::2], sys.argv[2::2])), separators=(",", ":")))' "${key_pairs[@]}")" \
-  || skip "producer derivation keys could not be encoded"
-gate_run="$(json_field "$ingest_json" 'd.get("gateRun")')"
-provenance=(--source-commit "$tested_head" --tree-clean "$tree_clean" --repo "$repo")
-[[ -n "$gate_run" ]] && provenance+=(--gate-run "$gate_run")
-# The annotation is a recorded fact the put does not depend on: a refused or mismatched annotated
-# ingest leaves the release unannotated, says so, and the put goes ahead as it did before keys.
-if annotated="$("$epr" bin --tool epr ingest "$target/debug/epr" "${provenance[@]}" \
-  --derivation-keys "$derivation_keys" 2>"$out/annotated-ingest.err")"; then
-  annotated_release="$(json_field "$annotated" 'd.get("cid") or d.get("rcid")')"
-  if [[ "$annotated_release" == "$release" ]]; then
-    ingest_json="$annotated"
-  else
-    echo "[gate] epr producer: derivation keys not recorded (annotated ingest made ${annotated_release:-no release}, not $release)"
-  fi
-else
-  echo "[gate] epr producer: derivation keys not recorded (annotated ingest refused: $(reason_of "$annotated
-$(cat "$out/annotated-ingest.err")"))"
+print(json.dumps(dict(zip(sys.argv[1::2], sys.argv[2::2])), separators=(",", ":")))' "${key_pairs[@]}")" || {
+  echo "[gate] epr producer: derivation keys not recorded (the keys could not be encoded)"
+  annotate_release=false
+}
+# The annotation is a recorded fact the put does not depend on: a refusal leaves the release
+# unannotated, says so once, and the put goes ahead as it did before keys.
+if [[ "$annotate_release" == true ]] && ! annotated="$("$epr" bin --tool epr annotate \
+  --release "$release" --derivation-keys "$derivation_keys" --expect-head "$tested_head" \
+  --repo "$repo" 2>"$out/annotate.err")"; then
+  echo "[gate] epr producer: derivation keys not recorded (annotate refused: $(reason_of "$annotated
+$(cat "$out/annotate.err")"))"
 fi
 
 declare -A output
