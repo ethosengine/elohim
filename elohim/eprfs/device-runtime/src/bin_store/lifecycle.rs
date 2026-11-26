@@ -103,7 +103,7 @@ impl Store {
                 .ok()
                 .and_then(|m| m.modified().ok())
                 .and_then(|t| t.duration_since(UNIX_EPOCH).ok());
-            if files::parse_time(&record.provenance.ingested_at).is_some_and(recent)
+            if files::parse_time(record.last_ingested_at()).is_some_and(recent)
                 || used.is_some_and(|d| recent(d.as_secs()))
             {
                 keep.insert(record.cid.clone());
@@ -256,6 +256,8 @@ impl Store {
             },
         )
     }
+    /// Prefer an explicit pin, then the most recently ingested matching release. Reingests count
+    /// through source-row timestamps, adoption events do not count, and equal times tie by CID.
     fn prepare_declared(
         &self,
         repo: &Path,

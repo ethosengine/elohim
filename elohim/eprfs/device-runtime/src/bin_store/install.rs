@@ -6,9 +6,7 @@ use super::{
 use serde_json::{json, Value};
 use std::{
     collections::BTreeMap,
-    fs::{self, OpenOptions},
-    io::{Error, ErrorKind, Write},
-    os::unix::fs::OpenOptionsExt,
+    fs,
     path::{Path, PathBuf},
 };
 
@@ -261,13 +259,18 @@ impl Store {
         destination: &Path,
         repo: &Path,
     ) -> Result<(BTreeMap<String, PathBuf>, BTreeMap<PathBuf, PathBuf>)> {
-        let plain: BTreeMap<_, _> = self
+        let managed_launcher = self
+            .root
+            .parent()
+            .ok_or_else(|| Refusal::new("path-invalid", "store has no parent"))?
+            .join("bin/bin-launch");
+        let mut plain: BTreeMap<_, _> = self
             .config
             .bins
             .iter()
             .chain(self.config.aliases.keys())
             .map(|name| (name.clone(), destination.join(name)))
-            .filter(|(_, p)| p.is_file() && !p.is_symlink())
+            .filter(|(_, path)| path != &managed_launcher && path.is_file() && !path.is_symlink())
             .collect();
         let mut adopted = BTreeMap::new();
         let mut retired = BTreeMap::new();
@@ -280,6 +283,16 @@ impl Store {
             .parent()
             .ok_or_else(|| Refusal::new("head-absent", "current directory missing"))?
             .to_owned();
+        plain.retain(|name, path| {
+            let target = self.config.aliases.get(name).unwrap_or(name);
+            !matches!(
+                (files::file_cid(path), files::file_cid(&current.join(target))),
+                (Ok(observed), Ok(held)) if observed == held
+            )
+        });
+        if plain.is_empty() {
+            return Ok((adopted, retired));
+        }
         let stage = files::temporary(&self.root.join("adopt"));
         fs::create_dir_all(&stage)?;
         let result = (|| {
@@ -327,21 +340,7 @@ impl Store {
                         0o444,
                     )?;
                 }
-                let cid = self.release_cid(&sums)?;
-                if self.record(&cid).is_some() {
-                    append_adoption(
-                        &self.artifact(&cid)?.join("adoptions.jsonl"),
-                        &json!({
-                            "at": files::now(),
-                            "path": path,
-                            "session": crate::session::resolve().session,
-                            "tool": &self.tool,
-                        }),
-                    )?;
-                    adopted.insert(name.clone(), self.artifact(&cid)?.join(target));
-                    continue;
-                }
-                let release = match self.ingest(
+                let release = match self.ingest_adoption(
                     &stage,
                     &IngestOptions {
                         repo: Some(repo.into()),
@@ -351,6 +350,7 @@ impl Store {
                         closure: false,
                         ..Default::default()
                     },
+                    path,
                 ) {
                     Ok(release) => release,
                     Err(error) if error.kind == "identity-mismatch" && self.tool == "epr" => {
@@ -374,33 +374,6 @@ impl Store {
         let _ = fs::remove_dir_all(stage);
         result
     }
-}
-
-/// Append one complete adoption line while the caller holds the installation lock. One write
-/// keeps concurrent readers from observing interleaved JSON; fsync makes a successful adoption
-/// durable before the launcher replaces the adopted path.
-fn append_adoption(path: &Path, event: &Value) -> Result<()> {
-    let existed = path.exists();
-    let mut line = serde_json::to_vec(event)?;
-    line.push(b'\n');
-    let mut file = OpenOptions::new()
-        .create(true)
-        .append(true)
-        .mode(0o600)
-        .custom_flags(libc::O_NOFOLLOW)
-        .open(path)?;
-    if file.write(&line)? != line.len() {
-        return Err(Error::new(
-            ErrorKind::WriteZero,
-            "adoption event was not appended as one complete line",
-        )
-        .into());
-    }
-    file.sync_all()?;
-    if !existed {
-        files::sync_parent(path)?;
-    }
-    Ok(())
 }
 
 fn build_output(path: &Path) -> bool {
