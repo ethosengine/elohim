@@ -17,10 +17,22 @@ function capture(root, args, spawn) {
 }
 
 /** Match just gate's branch range plus staged, unstaged and untracked paths. No fetch. */
-export function currentChanges({ root, spawn = spawnSync, base = 'origin/dev' }) {
+export function currentChanges(options) {
+  return currentChangeList(options).paths;
+}
+
+/**
+ * The same paths, and whether they are the whole of this worktree's change. When `base` does not
+ * resolve the committed part is the tip commit alone: enough to select by, as before, but a pin
+ * move or a Cargo.toml in an earlier commit of the branch is not in it. `exact: false` says so,
+ * and a caller that skips a check by the list must then treat it as no list (the hook's
+ * GATE_NARROW_BASE=none).
+ */
+export function currentChangeList({ root, spawn = spawnSync, base = 'origin/dev' }) {
   const ref = spawn('git', ['rev-parse', '--verify', base], { cwd: root, encoding: 'utf8' });
   if (ref.error || ref.status === null) throw new Error(`cannot inspect ${base}: ${ref.error?.message || ref.signal}`);
-  const committed = ref.status === 0
+  const exact = ref.status === 0;
+  const committed = exact
     ? capture(root, ['diff', '--name-only', '-z', capture(root, ['merge-base', 'HEAD', base], spawn).trim(), 'HEAD'], spawn)
     : capture(root, ['diff-tree', '--root', '--no-commit-id', '--name-only', '-r', '-z', 'HEAD'], spawn);
   const paths = [committed,
@@ -28,7 +40,7 @@ export function currentChanges({ root, spawn = spawnSync, base = 'origin/dev' })
     capture(root, ['diff', '--cached', '--name-only', '-z'], spawn),
     capture(root, ['ls-files', '--others', '--exclude-standard', '-z'], spawn),
   ];
-  return [...new Set(paths.flatMap(value => value.split('\0').filter(Boolean)))].sort();
+  return { paths: [...new Set(paths.flatMap(value => value.split('\0').filter(Boolean)))].sort(), exact };
 }
 
 /** A linked checkout shares the main checkout's .git directory, not its worktree git dir. */
@@ -140,7 +152,11 @@ export function prep({ root = ROOT, spawn = spawnSync, exists = existsSync,
     let modules = checkSubmodules({ root, spawn });
     if (modules.missing?.length) {
       let before = null;
-      try { before = currentChanges({ root, spawn }); early = select(root, before); } catch { early = null; before = null; }
+      try {
+        const list = currentChangeList({ root, spawn });
+        early = select(root, list.paths);
+        before = list.exact ? list.paths : null; // a tip-only list requires every one
+      } catch { early = null; before = null; }
       modules = checkSubmodules({ root, spawn, projects: early, changed: before });
       // A checkout adds manifests to the registry: the selection is read again once they exist.
       if (modules.missing?.length) early = null;
@@ -231,7 +247,8 @@ export function prep({ root = ROOT, spawn = spawnSync, exists = existsSync,
     execute(WORKSPACE_INSTALL);
 
     // Load the registry only after the submodules exist: they own attested manifests.
-    const changed = currentChanges({ root, spawn });
+    const list = currentChangeList({ root, spawn });
+    const changed = list.paths;
     const projects = early ?? select(root, changed);
     log(`[prep] selected projects: ${projects.map(project => project.name).join(' ') || '(none)'}`);
     for (const check of distChecks) {
@@ -243,7 +260,8 @@ export function prep({ root = ROOT, spawn = spawnSync, exists = existsSync,
         for (const command of result.commands) execute(command);
       }
     }
-    const rows = preflight({ root, projects, changed, spawn, onRow: result => log(formatRow(result)) });
+    if (!list.exact) log('[prep] origin/dev does not resolve here, so only the tip commit\'s paths are known: no check is skipped by the change list');
+    const rows = preflight({ root, projects, changed: list.exact ? changed : null, spawn, onRow: result => log(formatRow(result)) });
     failed = rows.some(result => result.level === 'REFUSED');
     log(`[prep] preflight ${failed ? 'REFUSED' : 'clear'}${rows.some(result => result.level === 'WARN') ? ' (warnings above)' : ''}`);
   } catch (error) {
