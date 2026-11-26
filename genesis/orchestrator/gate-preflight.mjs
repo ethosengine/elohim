@@ -342,15 +342,7 @@ export function checkEprBin({ env = process.env } = {}) {
   const ingested = cid => {
     try {
       const record = JSON.parse(readFileSync(join(dirname(dirname(current)), cid, 'record.json'), 'utf8'));
-      const recorded = Date.parse(record.lastIngestedAt);
-      if (Number.isFinite(recorded)) return recorded;
-      // Records written before lastIngestedAt fall back exactly as Rust does: the newest
-      // observation among the first ingest and every appended source row.
-      const observed = [record.ingestedAt, ...(Array.isArray(record.sources)
-        ? record.sources.map(source => source?.ingestedAt) : [])]
-        .map(at => Date.parse(at))
-        .filter(Number.isFinite);
-      return observed.length ? Math.max(...observed) : null;
+      return releaseLastIngestedAt(record);
     } catch { return null; }
   };
   const inheritedAt = storeCid(inherited) ? ingested(storeCid(inherited)) : null;
@@ -365,6 +357,15 @@ export function checkEprBin({ env = process.env } = {}) {
   return row('epr-bin', env.GATE_ALLOW_EPR_BIN === '1' ? 'WARN' : 'REFUSED',
     `inherited EPR_BIN=${env.EPR_BIN} is a release this device's store ingested before its head; device current epr=${current} — gates key on a native evaluator; an older one makes evidence unavailable, so nothing is reused; a new Claude session unsets it at start (device-arrive)`,
     'unset EPR_BIN');
+}
+
+/** Derive release recency from the original provenance and every appended source row. */
+export function releaseLastIngestedAt(record) {
+  const observed = [record?.ingestedAt, ...(Array.isArray(record?.sources)
+    ? record.sources.map(source => source?.ingestedAt) : [])]
+    .map(at => Date.parse(at))
+    .filter(Number.isFinite);
+  return observed.length ? Math.max(...observed) : null;
 }
 
 export function checkNodeModules({ root, projects }) {

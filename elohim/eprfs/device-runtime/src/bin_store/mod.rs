@@ -93,7 +93,6 @@ impl FollowBuild {
 
 const PAYLOAD_FORMATS_FIELD: &str = "payloadFormats";
 const PAYLOAD_FORMATS_PROBE_FIELD: &str = "payloadFormatsProbe";
-const LAST_INGESTED_AT_FIELD: &str = "lastIngestedAt";
 const LEGACY_PAYLOAD_FORMAT: &str = "directory-v1";
 const PAYLOAD_FORMAT_ORDER: [&str; 2] = ["blob-store-v1", LEGACY_PAYLOAD_FORMAT];
 
@@ -270,8 +269,7 @@ pub struct Provenance {
     pub tree_clean: bool,
     /// Gate or adoption run that supplied the bytes.
     pub gate_run: Option<String>,
-    /// UTC timestamp of this source observation, used for display and as the fallback from
-    /// records that predate `lastIngestedAt`.
+    /// UTC timestamp of this source observation, used for display and recency ordering.
     pub ingested_at: String,
 }
 /// Producer-supplied build derivation keys, explicitly outside the release identity.
@@ -333,28 +331,14 @@ impl Release {
             .or_else(|| (self.provenance.source_commit == commit).then_some(&self.provenance))
     }
 
-    fn latest_source_ingested_at(&self) -> &str {
+    /// Latest actual ingest of these bytes, derived from every source observation.
+    /// Adoption and repair events are held outside the release record and never count.
+    pub(crate) fn last_ingested_at(&self) -> &str {
         std::iter::once(&self.provenance)
             .chain(&self.sources)
             .map(|source| source.ingested_at.as_str())
             .max()
             .unwrap_or(self.provenance.ingested_at.as_str())
-    }
-
-    /// Latest actual ingest of these bytes. New records carry the value explicitly so non-Rust
-    /// readers use the same order; old records fall back to their newest source observation.
-    /// Adoption and repair events are held outside the release record and never count.
-    pub(crate) fn last_ingested_at(&self) -> &str {
-        self.extra
-            .get(LAST_INGESTED_AT_FIELD)
-            .and_then(Value::as_str)
-            .unwrap_or_else(|| self.latest_source_ingested_at())
-    }
-
-    fn record_last_ingested_at(&mut self) {
-        let latest = self.latest_source_ingested_at().to_owned();
-        self.extra
-            .insert(LAST_INGESTED_AT_FIELD.into(), Value::String(latest));
     }
 }
 /// A session pin or daemon lease. Owner identity is PID plus start time, never PID alone.
@@ -581,7 +565,7 @@ impl Store {
     }
     pub(crate) fn save(&self, release: &Release) -> Result<()> {
         let mut stored = release.clone();
-        stored.record_last_ingested_at();
+        stored.extra.remove("lastIngestedAt");
         files::atomic_json(&self.artifact(&release.cid)?.join("record.json"), &stored)
     }
     pub(crate) fn release_cid(&self, sums: &BTreeMap<String, String>) -> Result<String> {

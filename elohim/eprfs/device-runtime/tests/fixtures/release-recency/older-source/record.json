@@ -1,0 +1,20 @@
+{
+  "cid": "bafyreioldersource",
+  "rcid": "bafyreioldersource",
+  "tool": "epr",
+  "bins": {},
+  "version": null,
+  "sourceCommit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "treeClean": true,
+  "gateRun": null,
+  "ingestedAt": "2026-11-25T00:00:00Z",
+  "sources": [
+    {
+      "sourceCommit": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "treeClean": true,
+      "gateRun": "reingest",
+      "ingestedAt": "2026-11-21T00:00:00Z"
+    }
+  ],
+  "ring": "dev-context"
+}
