@@ -3184,3 +3184,61 @@ The "Temporary landing exception" (dev landings made with `git push` instead of 
 Evidence: four dev landings were made with brit 0.3.4 and no git. c1035eebc ran its hook in about 65 s. 40418e53b and d6bf967da followed (d6bf967da about 8 min), and a3632f54 took 1543 s (about 26 min) for hook and push, with the eprfs gate run in the hook. `.git/landing/settle.log` reads `landed … tool=brit … released=ok` for the last three; the first read did-not-land because the landing agent then looked only for a git ancestor, which 40418e53b fixed. The brit team's CI and these landings confirm on 0.3.4 that the `-c core.hooksPath=<worktree>/.husky/_` form runs the worktree's own hook; that the environment (`GATE_EVIDENCE` and the rest) reaches the hook and its output streams; that HEAD is resolved once before the hook and that commit is what is sent, so a commit made during the hook does not go out in that push (a later separate push is not prevented); and that brit connects for the transfer after the hook returns.
 
 Not proven: a hook that runs a full hour (the longest so far is 26 minutes), and a missing hooks directory under brit on this repository. The brit team's journey test says brit refuses with nothing sent there; it was not re-run here, so the `test -x <worktree>/.husky/_/pre-push` precaution stays.
+
+## Row 100 — a latent red on dev for about four hours
+
+On 2026-11-25, 97d92014e (16:46Z) made `.claude/scripts/_lib/session.py` and `epr_client.py` import `_lib/deadline.py`. Two fixtures in `genesis/agentic/shift_lease_test.py` copy a subset of `_lib` and did not copy it. The agentic-shift gate was not selected by that landing. It went red (5 failures, 2 errors) on the next two landings that selected it. Fixed in 668a11d22.
+
+Open: a landing that adds an import to a shared helper is not checked against fixtures that stage a subset of that helper's directory.
+
+## Row 101 — reuse measured on one landing
+
+On 2026-11-25 the refusal half's candidate was pushed twice. First push: 6623 s, refused only by row 100's red. Re-push of the same content plus one test file: 1648 s. steward-node took 1211 s then 43 s; eprfs 1271 s then 44 s; elohim-storage 47 s (its own earlier verdict, which had cost 7134 s on a loaded device) then 53 s. Gates keyed on the whole tree ran both times (orchestrator-tree 522 s then 201 s).
+
+A sibling's eprfs verdict for the same closure did not stand in, correctly: the landing changes `elohim/eprfs/epr-cli/src/peer.rs`, which is in `SIBLING_REUSE_GOVERNANCE_PATHS`, and the log said so (`[gate] eprfs not reused: governance-class change: …`). The integrator misread the log and reported that a declined reuse prints no reason; that was wrong.
+
+Open: the reason prints thousands of lines after the `evidence: miss` line; put it beside it.
+
+## Row 102 — shared cargo slot collisions
+
+On 2026-11-25 four agent lanes on branches named `agentic/*` shared one target slot (`slot_path(family, workspace, profile)`). Three lost their orchestrator-tree verdicts to "file vanished" / "failed to write … invoked.timestamp".
+
+Cure in progress: an exclusive slot lock (ethosengine, pool-slot lane), reviewed five rounds and accepted at v6 with three stated limits: a forged token; a holder's failure after survivors outlive KILL is not propagated; a holder killed after verification leaves the recipe unlocked. It is not landed: shem's gate on it found that `runtime-config-render.test.mjs:438` calls `run-local-gate.sh` directly without the lock. v7 pending.
+
+## Row 103 — a run can be closed twice, and a failed close is silent
+
+`closeRun` (`genesis/orchestrator/gate-live.mjs:306`) treats a run as closed only when its last line is `run-close`. A sibling-delivery line after a close lets the exit trap append a second `run-close` and send a second `gate-final`; `readRun` takes the first close, `finalBody` the last. `gate_live_close_on_exit` (`.husky/pre-push.bash`) discards the close's output and status.
+
+Found while diagnosing a test that failed twice inside the gate and never outside it. The mechanism was reproduced only by forcing a delay, and why the gate failed only that one test is not explained. With ethosengine.
+
+## Row 104 — the device-head resolver looked only at ~/.local/bin/epr
+
+The laptop's launcher is `~/.cargo/bin/epr`, so its landed head (4498b9394) was read as absent and its first thin hand-over (f7fcd7b27) posted no misses, with one line. Every resolver test set `BIN_STORE`, so the launcher lookup had no test. Fixed in 12fd5cc16 (three tests). Found and traced by the ThinkPad session.
+
+## Row 105 — "posted" is not "crossed", and a stalled exchange prints ok
+
+After 12fd5cc16 the laptop's hook said `hand-over: posted 1 misses`, and nothing reached shem. Shem had last folded the laptop's head 8540 s earlier (SILENT printed about 21:15Z on 2026-11-25), while the laptop's own `just status device` printed `ok sibling exchange` with nothing folded for 8667 s. Both daemons were up, on the relay, with no error. Restarting shem's daemon alone healed it within 20 s (about 23:55Z). The same silent stall was seen on 2026-11-05.
+
+Open: the sibling-exchange line reads acknowledgement, not head age in both directions; a hand-over does not learn that its misses did not cross; shem has no liveness watchdog (ethosengine has `genesis/local-dev/peer/daemon-liveness.sh`).
+
+Not proven: the laptop's status line says its daemon runs `bafkr4igtg4…` against current `bafyreif47…`, which may be two identifiers of one build.
+
+## Row 106 — thin-client stations after the first two thin landings
+
+The laptop's two thin landings took 6 s for the worktree, 13 s for prep and 18 s for the push, about 670 MB, nothing built. Open, in order:
+- Prep still requires every attested submodule when no project is selected (hidden on the laptop by local checkouts).
+- Preflight's cargo-lock check runs `cargo metadata --locked` and tried the network on a docs-only push.
+- A cargo-deny cure ran on a push with no Cargo change.
+- Prep's hooks-path step points a worktree at the main checkout's hook, which on the laptop is an older branch.
+- The pre-push reading leg uses the session's pinned epr and drops readings when the pin lacks `flow reading` (the head has it).
+- `[gate] inputs: --inputs unavailable` on brit 0.3.0, waiting on the brit pin.
+
+## Row 107 — unused capacity
+
+For about four hours on 2026-11-25 shem ran every cargo gate serially while ethosengine had 0 of 3 Codex seats and 0 of 2 cargo seats in use and the laptop had readers free; Jenkins had no work from 16:46Z to 21:04Z. The steward asked twice before the integrator asked the other devices. Three reviews queued behind shem came back from the laptop in minutes.
+
+Practice from here: ask each device its capacity when the landing lane blocks; reviews go to a device that did not write the change; a gate-only pull request (`[edge:gate-only]`, live on dev: `genesis/orchestrator/Jenkinsfile:944`) is available for native candidates.
+
+## Row 108 — hook budget overruns under load
+
+PreToolUse hooks timed out several times on 2026-11-25 (for example brit-first at 2 s and dialogue-stasis-sense at 3 s, each over by under a second) while shem's load was 13 to 25. Once the load was an agent's 30 busy loops run for 19 minutes as an experiment.

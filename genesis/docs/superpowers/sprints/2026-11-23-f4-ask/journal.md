@@ -509,3 +509,32 @@ The one-home plan, in five lines (the main session's reading, from `governance-p
 5. The watcher and the command-shape hook reworked against the target before they land.
 
 Station F4-ask stays unticked in the peers plan: the Verify was run and three clauses were not met.
+
+## 25 Nov, late, to 26 Nov 00:00Z
+
+Landings on dev, all through brit, each `landed … tool=brit … released=ok`:
+- 668a11d22 at 21:04Z: the refusal half (a release states the payload formats its bytes open and every landing path checks them before the head is published), with an `[edge:roll]` commit, plus the shift-fixture fix.
+- e44b8f31b at 22:53Z: watch-loop cost fix, sensor scan budget, style leg without a toolchain, prep that skips unneeded submodules, device acts through the device head epr, grade shadow, a test fix.
+- 158cdbe75 at 23:06Z: the laptop's first thin landing, carried by shem.
+- 12fd5cc16 at 23:31Z: device-epr finds the head beside the launcher on PATH.
+- 294716a1f at 23:42Z: the laptop's second thin landing, carried.
+
+The roll: Jenkins elohim-edge/dev #1928 SUCCESS (hApp OK, push OK, deploy OK); validation left to sibling run #1929 SUCCESS. The validation lines were not read.
+
+Findings, in the arrival backlog (`steward-device-arrival-open-items`):
+- Row 100: a latent red on dev for about four hours.
+- Row 101: reuse measured on one landing.
+- Row 102: shared cargo slot collisions.
+- Row 103: a run can be closed twice, and a failed close is silent.
+- Row 104: the device-head resolver looked only at `~/.local/bin/epr`.
+- Row 105: "posted" is not "crossed", and a stalled exchange prints ok.
+- Row 106: thin-client stations after the first two thin landings.
+- Row 107: unused capacity.
+- Row 108: hook budget overruns under load.
+
+In flight at midnight:
+- pool-slot v7 (ethosengine).
+- candidate-2: flow store v3 e96b3380c, capacity line v3 28671f751, pack-slot check fix 741da841a; to be gated on shem only because they trip the governance paths.
+- accepted and waiting: verdict dating 0a906cf0a, reader coverage (lane L) df151e2e5, sibling-read 1b4e5aa61.
+- in review on the laptop: carry lane 893a5a7c5 and enrichment sampler 01a956779.
+- brit 0.3.5 publish in CI, pin not moved.
