@@ -200,6 +200,27 @@ plan may serve a red habit that is not active, as the 2026-11-22 plan does.
 - **Checked.** `epr flow cites verify` on the amended design; the arrival read recorded as a
   `--kind verdict` note and a delta in `genesis/agentic/.epr-meta/agents-arrive-briefed.habit.md`.
 
+## Stations
+
+One line per rung of each flight. A box is ticked on evidence, and a ticked box is a claim
+until the flight's verdict note stands and its landing is verified on `dev`.
+
+- [x] F0 said and exercised: the SP-287 note at v1.4 and rows 13, 16, 17 and 24 corrected against the code
+- [x] F0 checked: `eprfs-live-corpus` green on the flight commit, and an approving verdict from a seat that did not do the work
+- [ ] F0 landed on `dev` and verified there
+- [ ] F1 said: the `takes:` form named in `genesis/research/.epr-meta`, and the closing rule in the `valueflow-authoring` package
+- [ ] F1 built: `.claude/scripts/research-mint-check.py` with its test
+- [ ] F1 exercised: `takes:` declared in the touched notes, and each of the 28 practice rows carries a disposition
+- [ ] F1 checked: habit `research-takes-have-a-home` born red with the script as its check, and a strict run exits 0
+- [ ] F2 built: the saga headline prints its report, age and commits since, and a recovery record carries its commit and binary identity
+- [ ] F2 said: the reviewer line in the `valueflow-reviewer` package, and the root "warn-only" sentence fixed through its package
+- [ ] F2 exercised and checked: a session start shows the saga line with its age, and the two tests pass
+- [ ] F3 built: the recovery matrix takes a draw, `expect` leaves the run's arguments, and the record carries `chosen_by` and the draw hash
+- [ ] F3 said: the receipt rule in the `hc-dev-orchestrator` package
+- [ ] F3 exercised and checked: one drawn run of three scenarios whose record shows a chooser other than the runner
+- [ ] F4 said: the proposed section appended to the placement design, the `source-priority` skill, and `stop:` in the dispatch lines
+- [ ] F4 exercised and checked: one arrival read as step 2's dry run, recorded as a verdict note and a habit delta
+
 ## How the work is run
 
 - One worktree under `/projects/elohim/.worktrees/`, `brit` for repository operations,
