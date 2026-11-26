@@ -28,6 +28,7 @@ import {
   worktreeTargetDir,
   parseStepTimes,
 } from './gate-runner.mjs';
+import { FENCE_SCOPE_TABLE } from './gate-fence-scope.mjs';
 import { suiteInventory } from './suite-inventory.mjs';
 
 function readShadowKeyFixture(t, changed) {
@@ -2423,7 +2424,7 @@ function gradeFixture(t) {
   const sibling = 'did:key:z6MkpZRhMwSiblingDeviceKeyOfTheSteward0001';
   const outputCid = [0x12, 0x20, ...Array(32).fill(7)];
   const run = ({
-    grade = 'shadow', evidence = 'off', budget = null, changed = ['fixture/test.rs'],
+    grade = 'shadow', fence = 'off', evidence = 'off', budget = null, changed = ['fixture/test.rs'],
     local = [], siblings = [], ci = null, flowLog = '', flowError = null, gateExit = 0, modes = {},
   } = {}) => {
     const calls = [];
@@ -2461,8 +2462,25 @@ function gradeFixture(t) {
         return ok(changed.map(path => `:${(modes[path] || ['100644', '100644']).join(' ')} ${'1'.repeat(40)} ${'2'.repeat(40)} M\0${path}\0`).join(''));
       }
       if (command === 'git' && args[0] === 'diff' && args.includes('-z')) return ok(changed.map(path => `${path}\0`).join(''));
+      if (command === 'git' && args[0] === 'diff' && args.includes('--name-only')) {
+        const governance = changed.filter(path => path.startsWith('genesis/orchestrator/gate-'));
+        return ok(governance.length ? `${governance.join('\n')}\n` : '');
+      }
       if (command === 'git' && args[0] === 'diff') return ok('');
       if (command === 'git' && args[0] === 'show') {
+        if (args[1] === `origin/dev:${FENCE_SCOPE_TABLE}`) {
+          clockNs += 2_000_000_000n;
+          return ok(JSON.stringify({
+            version: 1,
+            judge: { importRoots: ['genesis/orchestrator/fixture-judge.mjs'], exact: [FENCE_SCOPE_TABLE] },
+            keyed: { exact: [] },
+            substrate: { prefixes: ['elohim/eprfs/eprfs-peer/'], exact: [] },
+          }));
+        }
+        if (args[1] === 'origin/dev:genesis/orchestrator/fixture-judge.mjs') {
+          clockNs += 2_000_000_000n;
+          return ok('export const fixtureJudge = true;\n');
+        }
         return ok(JSON.stringify({ steps: { build: { inputs: { sources: ['fixture/**'] } } } }));
       }
       if (command === 'git' && args[0] === 'ls-tree') return ok('');
@@ -2479,7 +2497,7 @@ function gradeFixture(t) {
       env: {
         PATH: '', BRIT_BIN: brit, BRIT_BUILD_REF_BIN: buildRef, GATE_TASK: 'off',
         GATE_EVIDENCE: evidence, GATE_INPUTS: 'off', GATE_RECIPE_KEY: 'off', GATE_READ_SHADOW: 'off',
-        GATE_GRADE: grade, GATE_READING_RUN_ID: 'grade-fixture',
+        GATE_GRADE: grade, GATE_FENCE_SCOPE: fence, GATE_READING_RUN_ID: 'grade-fixture',
         ...(budget === null ? {} : { GATE_READ_SHADOW_BUDGET_MS: budget }),
       },
       inputsPolicy: { cls: { britArgs: [] } },
@@ -2496,6 +2514,8 @@ function gradeFixture(t) {
     const ranAt = calls.findIndex(call => call.command === 'bash');
     const lateFinds = new Set(ranAt < 0 ? [] : calls.slice(ranAt).filter(call => call.command === buildRef && call.args[3] === 'find').map(call => call.args));
     const gradeBuildRef = args => args[2] === 'signer' || lateFinds.has(args) || (args[3] === 'get' && String(args[args.indexOf('--step') + 1]).startsWith('ci:'));
+    const put = of(buildRef).find(args => args[3] === 'put');
+    const cycle = of('epr').find(args => args.includes('gate-cycle-seconds@1'));
     return {
       status, calls, rows, output, logReads,
       // What the gate itself hands the evidence store and the cycle recorder.
@@ -2508,13 +2528,41 @@ function gradeFixture(t) {
       ],
       eprPeerReads: of('epr').filter(args => args[0] === 'peer').length,
       gateRuns: of('bash').length,
+      reused: /\[gate\] fixture reused:/.test(output),
+      evidenceSeconds: put?.[put.indexOf('--duration-ms') + 1] ?? null,
+      cycleSeconds: cycle?.[cycle.indexOf('--value') + 1] ?? null,
       gateSeconds: rows.find(row => row.step === 'fixture')?.value,
+      fenceRows: rows.filter(row => String(row.step).startsWith('fixture:fence-scope:')),
+      fenceLines: output.split('\n').filter(line => / fence-scope \(shadow\)/.test(line)),
       gradeRows: rows.filter(row => String(row.step).startsWith('fixture:grade:')),
       gradeLines: output.split('\n').filter(line => / grade \(shadow/.test(line)),
     };
   };
   return { run, self, sibling, root };
 }
+
+test('fence-scope shadow and off preserve runProject exit, reuse and recorded seconds', t => {
+  const { run } = gradeFixture(t);
+  const scene = {
+    grade: 'off', evidence: 'reuse', siblings: [{ success: true }],
+    changed: ['genesis/orchestrator/gate-future-reader.mjs'],
+  };
+  const shadow = run({ ...scene, fence: 'shadow' });
+  const off = run({ ...scene, fence: 'off' });
+
+  assert.equal(shadow.status, off.status, 'exit status');
+  assert.equal(shadow.reused, off.reused, 'reuse result');
+  assert.equal(shadow.gateRuns, off.gateRuns, 'whether the recipe ran');
+  assert.equal(shadow.evidenceSeconds, off.evidenceSeconds, 'evidence row seconds');
+  assert.equal(shadow.cycleSeconds, off.cycleSeconds, 'cycle row seconds');
+  assert.equal(shadow.gateSeconds, off.gateSeconds, 'gate reading seconds');
+  assert.equal(shadow.reused, false, 'the governance change makes the candidate run, not reuse');
+  assert.equal(shadow.gateRuns, 1);
+  assert.deepEqual(shadow.fenceRows.map(row => [row.outcome, row.status]), [['ran', 'green']]);
+  assert.match(shadow.fenceLines[0], /would refuse: J path genesis\/orchestrator\/gate-future-reader\.mjs/);
+  assert.deepEqual(off.fenceRows, []);
+  assert.deepEqual(off.fenceLines, []);
+});
 
 test('grade shadow: on, off, failing and over budget keep the same decision, evidence arguments, cycle arguments, exit and recorded seconds', t => {
   const { run } = gradeFixture(t);
