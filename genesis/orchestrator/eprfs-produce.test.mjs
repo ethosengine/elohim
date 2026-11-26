@@ -33,7 +33,7 @@ const policyWith = (target, triple = HOST_TRIPLE) => ({
 
 // A stub epr, also the bytes the stub cargo "builds" into debug/epr. Logs its argv as one JSON
 // line. STUB_DIRTY reads the source closure dirty; STUB_PUT_REFUSE refuses every put;
-// STUB_ANNOTATE_REFUSE refuses the ingest that carries --derivation-keys.
+// STUB_ANNOTATE_REFUSE refuses the in-place annotation.
 const STUB_EPR = `#!/usr/bin/env node
 const { appendFileSync, writeFileSync } = require('node:fs');
 const args = process.argv.slice(2);
@@ -42,8 +42,10 @@ const value = flag => args[args.indexOf(flag) + 1];
 if (args[0] === 'bin' && args[3] === 'source-state') {
   console.log(JSON.stringify({ clean: !process.env.STUB_DIRTY }));
 } else if (args[0] === 'bin' && args[3] === 'ingest') {
-  if (process.env.STUB_ANNOTATE_REFUSE && args.includes('--derivation-keys')) {
-    console.error('refused: unknown option --derivation-keys');
+  console.log(JSON.stringify({ cid: ${JSON.stringify(RELEASE)}, bins: ${JSON.stringify(OUTPUTS)} }));
+} else if (args[0] === 'bin' && args[3] === 'annotate') {
+  if (process.env.STUB_ANNOTATE_REFUSE) {
+    console.error('REFUSED source-head-moved: repository HEAD moved');
     process.exit(2);
   }
   console.log(JSON.stringify({ cid: ${JSON.stringify(RELEASE)}, bins: ${JSON.stringify(OUTPUTS)} }));
@@ -76,12 +78,18 @@ console.log('release: 1.100.0');
 // A stub cargo: logs argv; `build` writes each named --bin (the stub epr for epr) and its dep-info.
 const STUB_CARGO = `#!/usr/bin/env node
 const { appendFileSync, copyFileSync, chmodSync, mkdirSync, writeFileSync } = require('node:fs');
+const { spawnSync } = require('node:child_process');
 const args = process.argv.slice(2);
 appendFileSync(process.env.STUB_LOG, JSON.stringify(['cargo', ...args]) + '\\n');
 if (process.env.STUB_CARGO_FAIL) process.exit(101);
 if (args[0] === 'build' && args.includes('--message-format=json')) {
   // The producer's replay: fresh units, one compiler-artifact line per bin, nothing rebuilt.
   if (process.env.STUB_REPLAY_FAIL) { console.error('error: could not compile'); process.exit(101); }
+  if (process.env.STUB_MOVE_HEAD_BEFORE_KEYS) {
+    const moved = spawnSync('git', ['-C', process.cwd(), '-c', 'user.name=t', '-c', 'user.email=t@t',
+      '-c', 'commit.gpgsign=false', 'commit', '--allow-empty', '-qm', 'moved-before-keys', '--no-verify']);
+    if (moved.status !== 0) { console.error(moved.stderr?.toString() || 'could not move HEAD'); process.exit(102); }
+  }
   const debug = process.env.CARGO_TARGET_DIR + '/debug';
   args.forEach((arg, i) => {
     if (arg !== '--bin') return;
@@ -185,20 +193,21 @@ const skipped = (out) => out.split("\n").filter((l) => l.startsWith("[gate] epr 
 function assertOffered(f, r, target = null) {
   assert.equal(r.status, 0, r.stderr);
   const initialIngest = verb(r.calls, "epr", "bin", "--tool", "epr", "ingest");
-  const annotatedIngest = r.calls.findIndex((c) => c[1] === "bin" && c[4] === "ingest" && c.includes("--derivation-keys"));
+  const annotate = r.calls.findIndex((c) => c[1] === "bin" && c[4] === "annotate");
   assert.ok(initialIngest >= 0, "the gate establishes the release first");
-  assert.ok(annotatedIngest > initialIngest, "the producer re-ingests with its keys");
-  const annotation = JSON.parse(flag(r.calls[annotatedIngest], "--derivation-keys"));
+  assert.ok(annotate > initialIngest, "the producer annotates the held release with its keys");
+  const annotation = JSON.parse(flag(r.calls[annotate], "--derivation-keys"));
   assert.deepEqual(annotation, INPUTS, "the producer passes the two keys it computed");
-  assert.equal(flag(r.calls[annotatedIngest], "--repo"), f.repo, "the annotation keys name this tested checkout");
-  assert.equal(flag(r.calls[annotatedIngest], "--source-commit"), f.head);
+  assert.equal(flag(r.calls[annotate], "--repo"), f.repo, "the annotation keys name this tested checkout");
+  assert.equal(flag(r.calls[annotate], "--release"), RELEASE, "the baseline release is annotated in place");
+  assert.equal(flag(r.calls[annotate], "--expect-head"), f.head);
   for (const bin of ["epr", "bin-launch"]) {
     const describe = r.calls.findIndex((c) => c[1] === "artifact" && c[2] === "describe" && flag(c, "--bin") === bin);
     const key = r.calls.findIndex((c) => c[1] === "artifact" && c[2] === "key"
       && flag(c, "--method") === join(f.target, `producer/method-${bin}.json`));
     const put = r.calls.findIndex((c) => c[1] === "artifact" && c[2] === "put" && flag(c, "--release-bin") === bin);
-    assert.ok(initialIngest < describe && describe < key && key < annotatedIngest && annotatedIngest < put,
-      `${bin}: baseline ingest -> describe -> key -> annotated ingest -> put:\n${r.calls.map((c) => c.join(" ")).join("\n")}`);
+    assert.ok(initialIngest < describe && describe < key && key < annotate && annotate < put,
+      `${bin}: baseline ingest -> describe -> key -> annotate -> put:\n${r.calls.map((c) => c.join(" ")).join("\n")}`);
     const d = r.calls[describe];
     assert.equal(flag(d, "--sources"), SOURCES);
     assert.equal(flag(d, "--project"), "eprfs");
@@ -250,7 +259,7 @@ function assertOffered(f, r, target = null) {
     const [build] = builds.filter((c) => !replay(c));
     assert.deepEqual(replays[0].filter((a) => a !== "--message-format=json"), build, "the replay is the ingest build");
     const at = r.calls.indexOf(replays[0]);
-    assert.ok(at > initialIngest && at < annotatedIngest && puts.every((p) => r.calls.indexOf(p) > at));
+    assert.ok(at > initialIngest && at < annotate && puts.every((p) => r.calls.indexOf(p) > at));
     for (const p of puts) assert.equal(flag(p, "--build-messages"), join(f.target, "producer/build-messages.json"));
     const lines = readFileSync(join(f.target, "producer/build-messages.json"), "utf8").trim().split("\n").map((l) => JSON.parse(l));
     assert.deepEqual(lines.filter((m) => m.reason === "compiler-artifact").map((m) => m.target.name), ["epr", "bin-launch"]);
@@ -297,9 +306,23 @@ test("a_refused_annotation_records_no_keys_and_the_put_still_runs", (t) => {
   const f = fixture(t);
   const r = run(f, "build", { STUB_ANNOTATE_REFUSE: "1" });
   assert.equal(r.status, 0, r.stderr);
-  assert.match(r.stdout, /\[gate\] epr producer: derivation keys not recorded \(annotated ingest refused/);
+  assert.match(r.stdout, /\[gate\] epr producer: derivation keys not recorded \(annotate refused/);
   assert.deepEqual(skipped(r.stdout).filter((l) => l.includes("skipped")), [], "the put is not skipped");
   assert.match(r.stdout, /\[gate\] epr producer put: release /, "the put reports its release");
+  for (const bin of ["epr", "bin-launch"]) {
+    assert.ok(r.calls.some((c) => c[1] === "artifact" && c[2] === "put" && flag(c, "--release-bin") === bin),
+      `${bin} is still put`);
+  }
+});
+
+test("a_head_move_before_key_computation_records_no_annotation_and_still_puts_both_bins", (t) => {
+  const f = fixture(t, { policy: policyWith(FIXTURE_TARGET) });
+  const r = run(f, "build", { ...C_LEVEL, STUB_MOVE_HEAD_BEFORE_KEYS: "1" });
+  assert.equal(r.status, 0, r.stderr);
+  const notices = r.stdout.split("\n").filter((line) => line.includes("derivation keys not recorded"));
+  assert.equal(notices.length, 1, r.stdout);
+  assert.match(notices[0], /is not the tested head .* before key computation/);
+  assert.ok(!r.calls.some((c) => c[1] === "bin" && c[4] === "annotate"), "no annotation is attempted");
   for (const bin of ["epr", "bin-launch"]) {
     assert.ok(r.calls.some((c) => c[1] === "artifact" && c[2] === "put" && flag(c, "--release-bin") === bin),
       `${bin} is still put`);

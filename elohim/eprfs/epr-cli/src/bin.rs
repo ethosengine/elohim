@@ -159,6 +159,23 @@ fn payload_formats_trace(
     ))
 }
 
+fn label_status_derivation_keys_unverified(status: &mut Value) {
+    let Some(candidates) = status.get_mut("candidates").and_then(Value::as_array_mut) else {
+        return;
+    };
+    for candidate in candidates {
+        let Some(annotations) = candidate
+            .get_mut("annotations")
+            .and_then(Value::as_object_mut)
+        else {
+            continue;
+        };
+        if let Some(keys) = annotations.remove("derivationKeys") {
+            annotations.insert("derivationKeysUnverified".into(), keys);
+        }
+    }
+}
+
 fn land_transition(
     flags: &BTreeSet<&str>,
     options: &BTreeMap<&str, &str>,
@@ -228,8 +245,8 @@ fn execute_with(args: &[String], restart: bool, warn_role: bool) -> Result<Strin
         }
         match arg.as_str() {
             "--repair"|"--json"|"--revert"|"--rebase-lineage"|"--current"|"--pin"|"--provisional"=>{ flags.insert(arg.as_str()); },
-            "--tool"|"--registry"|"--store"|"--repo"|"--source-commit"|"--gate-run"|"--tree-clean"|"--commit"|"--expect"|"--reason"|"--invoked"|"--cid"|"--closure"|"--launcher"|"--destination"|"--derivation-keys"=>{ options.insert(arg.as_str(),iter.next().ok_or_else(|| argument(format!("{arg} needs a value")))?.as_str()); },
-            "--help"|"-h"=>return Ok("epr bin <ingest|land|pin|resolve|status|gc|bootstrap|follow|shadows|source-state|launch|install-launcher|migrate> --tool <name> [--registry PATH] [--store PATH] [--json]; land requires --expect <cid|none> [--revert | --rebase-lineage --reason <text>]".into()),
+            "--tool"|"--registry"|"--store"|"--repo"|"--source-commit"|"--gate-run"|"--tree-clean"|"--commit"|"--expect"|"--expect-head"|"--reason"|"--invoked"|"--cid"|"--release"|"--closure"|"--launcher"|"--destination"|"--derivation-keys"=>{ options.insert(arg.as_str(),iter.next().ok_or_else(|| argument(format!("{arg} needs a value")))?.as_str()); },
+            "--help"|"-h"=>return Ok("epr bin <ingest|annotate|land|pin|resolve|status|gc|bootstrap|follow|shadows|source-state|launch|install-launcher|migrate> --tool <name> [--registry PATH] [--store PATH] [--json]; annotate requires --release <cid> --derivation-keys <json> --expect-head <commit> --repo <repo>; land requires --expect <cid|none> [--revert | --rebase-lineage --reason <text>]".into()),
             _ if arg.starts_with('-')=>return Err(argument(format!("unknown flag {arg}"))),
             _=>positional.push(arg.as_str()),
         }
@@ -277,6 +294,11 @@ fn execute_with(args: &[String], restart: bool, warn_role: bool) -> Result<Strin
     let closure = options.get("--closure").map(Path::new);
     let value: Value = match verb {
         "ingest" => {
+            if options.contains_key("--derivation-keys") {
+                return Err(argument(
+                    "--derivation-keys is only valid with bin annotate",
+                ));
+            }
             let source = closure
                 .or_else(|| positional.get(1).map(Path::new))
                 .ok_or_else(|| argument("ingest requires binary or --closure PATH"))?;
@@ -296,23 +318,7 @@ fn execute_with(args: &[String], restart: bool, warn_role: bool) -> Result<Strin
                 closure: closure.is_some(),
                 payload_formats: None,
             };
-            let derivation_keys = options
-                .get("--derivation-keys")
-                .map(|raw| {
-                    serde_json::from_str::<BTreeMap<String, String>>(raw)
-                        .map_err(|error| argument(format!("--derivation-keys expects a JSON object of binary names to keys: {error}")))
-                })
-                .transpose()?;
-            if closure.is_some() && derivation_keys.is_some() {
-                return Err(argument(
-                    "--derivation-keys is producer metadata and cannot annotate a supplied closure",
-                ));
-            }
-            let release = if let Some(keys) = derivation_keys {
-                store.ingest_with_derivation_keys(source, &ingest_options, keys, |stored| {
-                    held_payload_formats(tool, stored)
-                })
-            } else if closure.is_some() {
+            let release = if closure.is_some() {
                 store.ingest(source, &ingest_options)
             } else {
                 store.ingest_with_payload_formats(source, &ingest_options, |stored| {
@@ -320,6 +326,28 @@ fn execute_with(args: &[String], restart: bool, warn_role: bool) -> Result<Strin
                 })
             }?;
             json!(release)
+        }
+        "annotate" => {
+            let release = options
+                .get("--release")
+                .ok_or_else(|| argument("annotate requires --release <cid>"))?;
+            let expected_head = options
+                .get("--expect-head")
+                .ok_or_else(|| argument("annotate requires --expect-head <commit>"))?;
+            let repo = options
+                .get("--repo")
+                .ok_or_else(|| argument("annotate requires --repo <repo>"))?;
+            let keys = serde_json::from_str::<BTreeMap<String, String>>(
+                options
+                    .get("--derivation-keys")
+                    .ok_or_else(|| argument("annotate requires --derivation-keys <json>"))?,
+            )
+            .map_err(|error| {
+                argument(format!(
+                    "--derivation-keys expects a JSON object of binary names to keys: {error}"
+                ))
+            })?;
+            json!(store.annotate_derivation_keys(release, keys, expected_head, Path::new(repo))?)
         }
         "land" => {
             let expected = options
@@ -408,7 +436,9 @@ fn execute_with(args: &[String], restart: bool, warn_role: bool) -> Result<Strin
                         .unwrap_or_else(|| "none".into())
                 ));
             }
-            json!(status)
+            let mut value = json!(status);
+            label_status_derivation_keys_unverified(&mut value);
+            value
         }
         "gc" => store.gc(&session::proc_root(), None)?,
         "shadows" => json!(store.shadows(&std::env::var("PATH").unwrap_or_default())),
@@ -1526,6 +1556,58 @@ mod tests {
 
     fn options(values: &[(&'static str, &'static str)]) -> BTreeMap<&'static str, &'static str> {
         values.iter().copied().collect()
+    }
+
+    #[test]
+    fn status_labels_candidate_derivation_keys_unverified() {
+        let annotation = json!({
+            "keys": {"epr": "bafkr-input"},
+            "coveredByRcid": false,
+            "source": "producer"
+        });
+        let mut status = json!({
+            "candidates": [{"annotations": {"derivationKeys": annotation.clone()}}]
+        });
+        label_status_derivation_keys_unverified(&mut status);
+        assert!(status["candidates"][0]["annotations"]
+            .get("derivationKeys")
+            .is_none());
+        assert_eq!(
+            status["candidates"][0]["annotations"]["derivationKeysUnverified"],
+            annotation
+        );
+    }
+
+    #[test]
+    fn ingest_rejects_derivation_keys() {
+        let tmp = tempfile::tempdir().unwrap();
+        let registry = tmp.path().join("bin-tools.json");
+        std::fs::write(
+            &registry,
+            json!({
+                "version": 1,
+                "tools": {"epr": {"bins": ["epr"], "aliases": {}}}
+            })
+            .to_string(),
+        )
+        .unwrap();
+        let store = tmp.path().join("store");
+        let args = [
+            "ingest",
+            "/unused/epr",
+            "--tool",
+            "epr",
+            "--registry",
+            registry.to_str().unwrap(),
+            "--store",
+            store.to_str().unwrap(),
+            "--derivation-keys",
+            r#"{"epr":"bafkr-input"}"#,
+        ]
+        .map(str::to_owned);
+        let error = execute(&args).unwrap_err();
+        assert_eq!(error.kind, "arguments");
+        assert!(error.detail.contains("only valid with bin annotate"));
     }
 
     #[test]

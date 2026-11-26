@@ -1,8 +1,8 @@
 use super::{
     files, parse_payload_formats,
     source::{copy_executable, CommandSpec},
-    DerivationKeysAnnotation, IngestOptions, Provenance, Refusal, Release, ReleaseAnnotations,
-    Result, Store, PAYLOAD_FORMATS_FIELD, PAYLOAD_FORMATS_PROBE_FIELD,
+    IngestOptions, Provenance, Refusal, Release, Result, Store, PAYLOAD_FORMATS_FIELD,
+    PAYLOAD_FORMATS_PROBE_FIELD,
 };
 use eprfs_core::{BlobCid, ByteCid};
 use serde_json::Value;
@@ -12,7 +12,7 @@ impl Store {
     /// Copy to private staging, verify those exact bytes, then atomically publish a candidate.
     /// Ingest never moves current, even if the candidate passed a gate.
     pub fn ingest(&self, source: &Path, options: &IngestOptions) -> Result<Release> {
-        self.ingest_inner(source, options, None, |_| Ok(None))
+        self.ingest_inner(source, options, |_| Ok(None))
     }
 
     /// Ingest, then derive a payload-format statement from the primary executable held beneath
@@ -24,25 +24,13 @@ impl Store {
         options: &IngestOptions,
         probe: impl FnOnce(&Path) -> std::result::Result<Option<String>, String>,
     ) -> Result<Release> {
-        self.ingest_inner(source, options, None, probe)
-    }
-
-    /// Ingest producer bytes with their explicitly non-`rcid` derivation keys.
-    pub fn ingest_with_derivation_keys(
-        &self,
-        source: &Path,
-        options: &IngestOptions,
-        derivation_keys: BTreeMap<String, String>,
-        probe: impl FnOnce(&Path) -> std::result::Result<Option<String>, String>,
-    ) -> Result<Release> {
-        self.ingest_inner(source, options, Some(derivation_keys), probe)
+        self.ingest_inner(source, options, probe)
     }
 
     fn ingest_inner(
         &self,
         source: &Path,
         options: &IngestOptions,
-        derivation_keys: Option<BTreeMap<String, String>>,
         probe: impl FnOnce(&Path) -> std::result::Result<Option<String>, String>,
     ) -> Result<Release> {
         // Closure provenance travels with the bytes; caller overrides never relabel it.
@@ -266,23 +254,6 @@ impl Store {
                     PAYLOAD_FORMATS_PROBE_FIELD.into(),
                     Value::String(format!("failed: {reason}")),
                 );
-            }
-            if let Some(keys) = derivation_keys {
-                let exact_bins = keys.len() == self.config.bins.len()
-                    && self.config.bins.iter().all(|name| keys.contains_key(name));
-                if !exact_bins || keys.values().any(|key| key.trim().is_empty()) {
-                    return Err(Refusal::new(
-                        "derivation-keys-invalid",
-                        "producer derivation keys require one non-empty key for every release binary",
-                    ));
-                }
-                release.annotations = Some(ReleaseAnnotations {
-                    derivation_keys: DerivationKeysAnnotation {
-                        keys,
-                        covered_by_rcid: false,
-                        source: "producer".into(),
-                    },
-                });
             }
             self.save(&release)?;
             Ok(release)
