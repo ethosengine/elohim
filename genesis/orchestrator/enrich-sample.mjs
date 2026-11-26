@@ -63,6 +63,20 @@ class SampleDeadline extends Error {
   }
 }
 
+class SampleNotComparable extends Error {
+  constructor(message) {
+    super(message);
+    this.name = 'SampleNotComparable';
+  }
+}
+
+function errorKindAndLine(error) {
+  const kind = String(error?.name || error?.constructor?.name || typeof error)
+    .replace(/[\r\n]+/g, ' ').trim() || 'unknown';
+  const message = String(error?.message ?? error).replace(/[\r\n]+/g, ' ').trim() || 'no message';
+  return `${kind}: ${message}`;
+}
+
 export async function runEnrichSample(options, {
   env = process.env,
   spawn = spawnSync,
@@ -118,7 +132,7 @@ export async function runEnrichSample(options, {
   };
   const requireSuccess = (result, label) => {
     if (timedOut(result)) throw new SampleDeadline();
-    if (result?.status !== 0) throw new Error(`${label} failed (${statusOf(result)})`);
+    if (result?.status !== 0) throw new SampleNotComparable(`${label} failed (${statusOf(result)})`);
   };
   const removeOwned = path => {
     if (!path.startsWith(`${join(root, '.worktrees', SAMPLE_PREFIX)}`)
@@ -171,9 +185,9 @@ export async function runEnrichSample(options, {
     });
     requireSuccess(resolved, 'verdict lookup');
     try { named = JSON.parse(String(resolved.stdout || '')); }
-    catch { throw new Error('verdict lookup returned invalid JSON'); }
+    catch { throw new SampleNotComparable('verdict lookup returned invalid JSON'); }
     if (named.project !== project || named.closure !== closure || named.commit !== commit || !named.verdict) {
-      throw new Error('verdict lookup did not name the requested project, closure, and commit');
+      throw new SampleNotComparable('verdict lookup did not name the requested project, closure, and commit');
     }
     line(`named verdict=${named.verdict} closure=${named.closure}`);
 
@@ -228,29 +242,31 @@ export async function runEnrichSample(options, {
     });
     gateSeconds = secondsText(clock() - gateStarted);
     if (timedOut(gate)) throw new SampleDeadline();
-    if (gate?.signal) throw new Error(`killed: ${gate.signal}`);
+    if (gate?.signal) throw new SampleNotComparable(`killed: ${gate.signal}`);
     if (gate?.status === null || gate?.status === undefined) {
-      throw new Error(`gate setup failed (${statusOf(gate)})`);
+      throw new SampleNotComparable(`gate setup failed (${statusOf(gate)})`);
     }
 
     let actual;
     try { actual = JSON.parse(readFileSync(resultPath, 'utf8')); }
-    catch { throw new Error('gate did not report a completed execution'); }
-    if (actual.executed !== true) throw new Error(actual.reason || 'gate was skipped');
+    catch (error) {
+      throw new Error(`gate did not report a completed execution (${errorKindAndLine(error)})`);
+    }
+    if (actual.executed !== true) throw new SampleNotComparable(actual.reason || 'gate was skipped');
     if (actual.project !== project || actual.commit !== commit) {
-      throw new Error('gate executed a different project or commit');
+      throw new SampleNotComparable('gate executed a different project or commit');
     }
     if (actual.closure !== closure) {
-      throw new Error(`closure differs: verdict ${closure}, execution ${actual.closure || 'unavailable'}`);
+      throw new SampleNotComparable(`closure differs: verdict ${closure}, execution ${actual.closure || 'unavailable'}`);
     }
-    if (actual.signal) throw new Error(`killed: ${actual.signal}`);
-    if (actual.recordable !== true) throw new Error(actual.reason || 'execution was not recordable');
+    if (actual.signal) throw new SampleNotComparable(`killed: ${actual.signal}`);
+    if (actual.recordable !== true) throw new SampleNotComparable(actual.reason || 'execution was not recordable');
 
     const dirty = run('git', ['-C', samplePath, 'status', '--porcelain', '--untracked-files=normal'], {
       stdio: ['ignore', 'pipe', log], encoding: 'utf8',
     });
     requireSuccess(dirty, 'post-run worktree check');
-    if (String(dirty.stdout || '').trim()) throw new Error('dirty tree after execution');
+    if (String(dirty.stdout || '').trim()) throw new SampleNotComparable('dirty tree after execution');
 
     outcome = actual.status === 0 && gate.status === 0 ? 'green' : 'red';
     reason = null;
@@ -258,7 +274,9 @@ export async function runEnrichSample(options, {
     outcome = 'not-comparable';
     reason = error instanceof SampleDeadline
       ? 'timeout'
-      : oneLine(error?.message || error, 'sample failure');
+      : error instanceof SampleNotComparable
+        ? oneLine(error.message, 'sample failure')
+        : `unexpected ${errorKindAndLine(error)}`;
     line(`sample stopped: ${reason}`);
   }
 
