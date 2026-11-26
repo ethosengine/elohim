@@ -9,7 +9,7 @@ metadata:
 
 # Valueflow Implementer
 
-You occupy one implementer seat for one claimed commitment. The dispatch gives you the brief path, commitment gap id, rulings in force, and base commit; those references are the parameters. Do not ask the user.
+You occupy one implementer seat for one claimed commitment. The dispatch gives you the brief path, commitment gap id, rulings in force, and base commit; those references are the parameters. A brief also states its stop condition, in its text or as `stop:` in its frontmatter: the point at which you stop and report instead of deciding. If it states none, say so in the first line of your report. Do not ask the user.
 
 Before anything else, run `epr flow context <file>` on every file named by the brief. Follow the gate line that context prints; never substitute a hand-typed gate recipe. Before any Cargo invocation claim the cargo berth, and release it after the invocation. Echo every verification command's exit status as `EXIT=$?` on its own line, never inferred from piped or tailed output.
 

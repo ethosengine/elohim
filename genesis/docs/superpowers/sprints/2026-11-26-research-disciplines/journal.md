@@ -45,9 +45,9 @@ by something that runs.
 |---|---|---|---|---|
 | F0 | Correct the record, open the sprint | done: judged, landed 2026-11-26 03:43Z, verified on `origin/dev` file by file | `self/ethosengine-disciplines-f0` | `6187dff08`, `ab78d3ad0`, `baeb32247` |
 | F1 | Nothing is dropped silently | said, exercised, checked and judged (changes-requested, fixed, approved); handed over | `self/ethosengine-disciplines-f1` (carries the cleanup pass's two commits) | |
-| F2 | Evidence carries its age | built, said and checked; exercised against the main checkout's reports; verdict pending | travels with F3's script change as one carry | |
-| F3 | Another seat chooses the failure | built, said and checked; **exercise owed** (no drawn run yet); verdict pending | travels with F2 as one carry | |
-| F4 | The brief carries position and a stop condition | not started | | |
+| F2 | Evidence carries its age | built, said, checked and judged (changes-requested, fixed, approved); its planned exercise owed | `self/ethosengine-disciplines-f2f3f4`, one carry with F3 and F4 | |
+| F3 | Another seat chooses the failure | built, said, checked and judged (approved); **exercise owed** (no drawn run yet), so not done | same carry | |
+| F4 | The brief carries position and a stop condition | said (one part proposed, not ruled), exercised and checked; verdict pending | same carry | |
 
 ## F0 record
 
@@ -240,8 +240,15 @@ every note), ran against a fresh worktree at the F0 tip. Four rounds, eight agen
   unmeasured; commits were counted against a report commit that need not be an ancestor of
   this checkout's HEAD, and are now unmeasured unless it is; and the date and commit were
   taken from two reads of the file and are now taken from one (9 tests).
-- **A limit that stands.** The binary identity is what the installer recorded. A process
-  started before a reinstall would be recorded under the new key.
+- **Verdict, second pass: approved** (commit `7028bb0cf`). The judge re-read the four changed
+  files, checked the receipt sentence against the script again and ran the two tests. It did
+  not read the test file's diff, `AGENTS.md` or the plan's stations.
+- **Limits that stand.** The binary identity is what the installer recorded; a process
+  started before a reinstall would be recorded under the new key. The receipt sentence names
+  `dev` and `main` only: a push of a serving path to any other ref passes with one line
+  naming the receipt still owed, and the sentence does not say so. A report file with no
+  `runId` of its own, rewritten between the two reads, could still lend one run's date to
+  another; the guard compares run ids and such a file has none.
 - **A worktree that was never prepared reds one harness test.** The second worktree, made for
   the cleanup pass, has no submodules checked out, and `seam_matrix_test.py` fails its live
   check there. F2 was finished in the prepared worktree for that reason.
@@ -276,7 +283,7 @@ every note), ran against a fresh worktree at the F0 tip. Four rounds, eight agen
   its runner, this flight is not done.
 - **Seats.** Built by an Opus seat from a brief; its three tests re-run by the orchestrating
   session, which wrote the said-rung edit.
-- **Verdict: approved, with two things to say plainly.** The same judge approved F3. It found
+- **Verdict: approved on both passes, with two things to say plainly.** The same judge approved F3. It found
   that `chosen_by` is text the draw file supplies: a runner can write another seat's name and
   the matrix will record it. The matrix establishes who a draw names, not who made it; a
   draw is as trustworthy as the channel it arrived by, and signing it is not built. It also
@@ -286,6 +293,47 @@ every note), ran against a fresh worktree at the F0 tip. Four rounds, eight agen
   scenarios will run and in what order, as Apollo's simulation group withheld the failure and
   not the rulebook. The test's check that no expectation is printed before a run is weak
   (it filters whole classes of line); the script was read and does not print it.
+
+## F4 record
+
+- **Said, proposed.** Section 8 of the placement design
+  (`specs/2026-11-23-placement-read-and-notes-store-design.md`) is appended and marked not
+  ruled. It proposes six things and names the rows that would change: the subject is an
+  address, of which a path is one case; a fifth part, the stop, kept under every size limit;
+  ranking against the declared ceiling with a closing line for what was cut; arrival
+  conditions selected by the act, inside the read and not by a hook; and two study items, a
+  control room as this same read taken from a seat, and a judging seat handed the provenance
+  of the other voices. Its author did not write that design and has built nothing against it.
+- **Said, in force.** A `source-priority` skill, projected to the three runtimes: ten
+  pairings of sources with the one to believe, each citing the text that already states it
+  (each citation checked by search before it was written), one pairing named as having no
+  rule (a local gate against CI), what "agree" means, and what to do with the loser. It is a
+  skill because `AGENTS.md` is over Codex's limit; it says it moves to the root when a cut
+  makes room. The `orchestrate` and `valueflow-implementer` skills now ask a dispatch for its
+  stop condition.
+- **Exercised, the dispatch.** Every dispatch of this sprint from F1 on carried a goal, a
+  target and checkout, a rung and a stop condition; the F0 judge's brief had them without the
+  heading. From F1 on that is eight seats and four follow-ups.
+- **Exercised, one arrival read.** The dry run that step 2 of the 2026-11-22 plan names: one
+  tier, by hand, not the arrival mode its habit waits for. Method: the dispatch text kept at
+  `genesis/local-dev/research-disciplines/arrival-read-2026-11-26-prompt.md` on ethosengine,
+  sha256 `7e41b4bc3c4b203f2f0b1918435323f5e4d932df384b2113fe7dca81b66af722`. A Sonnet seat
+  was sent to `genesis/research/README.md` with a one-line task and the five questions; an
+  Opus seat ran the reads itself and judged. **2 of 5 answered correctly from what was
+  handed**: what it was for, from the dispatch, and who decides, from the SubagentStart
+  covenant line. Two were partly right. "Why is it this way" was unanswered: the reader
+  named the read that answers it and did not run it, taking "read-only" to forbid it. Handed
+  and unused, measured from the reader's transcript as serialized record sizes and not
+  tokens: instructions 89,767 bytes, the skill listing 35,314, deferred tools 18,436, against
+  a dispatch of 1,275. What the judge says a brief for that position needed: three lines of
+  `epr flow context`, the directory's purpose in one sentence, the link convention.
+- **What that read is and is not.** One reader, one task, one tier, one judge. The reader's
+  list of what it was handed is its own account; the byte sizes are measured. It is a
+  baseline for the brief, not a result about briefs.
+- **Checked.** `epr flow cites verify` passes on the amended design. The arrival read is
+  recorded as a verdict note on the habit atom (`changes-requested`, since the brief as
+  delivered answered two of five) and as a delta in
+  `genesis/agentic/.epr-meta/agents-arrive-briefed.habit.md`. Red preserved.
 
 ## Stop conditions, every flight
 

@@ -233,8 +233,10 @@ until the flight's verdict note stands and its landing is verified on `dev`.
 - [x] F3 checked: the draw test passes, run directly
 - [ ] F3 exercised: one drawn run of three scenarios whose record shows a chooser other than the runner (owed; offered to shem)
 - [ ] F2 and F3 landed on `dev` and verified there
-- [ ] F4 said: the proposed section appended to the placement design, the `source-priority` skill, and `stop:` in the dispatch lines
-- [ ] F4 exercised and checked: one arrival read as step 2's dry run, recorded as a verdict note and a habit delta
+- [x] F4 said: the proposed section appended to the placement design, the `source-priority` skill, and `stop:` in the dispatch lines
+- [x] F4 exercised and checked: one arrival read as step 2's dry run (2 of 5), recorded as a verdict note and a habit delta
+- [ ] F4's proposed section ruled on by the steward
+- [ ] F4 landed on `dev` and verified there
 
 ## How the work is run
 
