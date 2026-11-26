@@ -21,6 +21,10 @@ use crate::admission::{node_id_hex, Admission};
 /// with: a stranger's at once, an admitted device's when a reload drops it.
 pub const NOT_ADMITTED: u32 = 1;
 
+/// The QUIC application code used when the recovery ladder discards a stale path to an admitted
+/// device. Unlike [`NOT_ADMITTED`], this is a transport refresh, not an admission ruling.
+pub const RECOVERY_RESET: u32 = 2;
+
 /// Open connections by node id, and refusals counted per node id. `Clone` shares the book.
 #[derive(Debug, Clone, Default)]
 pub struct ConnectionBook {
@@ -93,6 +97,23 @@ impl ConnectionBook {
                     book.count(&node);
                     closed += 1;
                 }
+            }
+        }
+        closed
+    }
+
+    /// Close every tracked open connection to `node`, so its next dial negotiates a fresh path.
+    /// Returns how many live connections were closed. The node remains admitted and no refusal is
+    /// counted: this is recovery evidence, not an admission failure.
+    pub fn reset(&self, node: NodeId) -> usize {
+        let Ok(mut book) = self.inner.lock() else {
+            return 0;
+        };
+        let mut closed = 0;
+        for connection in book.open.remove(&node).unwrap_or_default() {
+            if connection.close_reason().is_none() {
+                connection.close(VarInt::from_u32(RECOVERY_RESET), b"peer recovery");
+                closed += 1;
             }
         }
         closed

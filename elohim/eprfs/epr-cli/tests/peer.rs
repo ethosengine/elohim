@@ -22,7 +22,8 @@ use elohim_epr_rea::{
 };
 use eprfs_peer::{
     fold_events, project_channel, via_device, ChannelEvent, CrossingAllowList, DeviceHead,
-    FoldCoverage, HeadTable, PeerConfig, PeerDaemon, PeerKey, Rules, RulesState, StorePlace,
+    DeviceRecoveryStatus, FoldCoverage, HeadTable, PeerConfig, PeerDaemon, PeerKey,
+    PeerRecoveryStatus, ProbeStatus, Rules, RulesState, StorePlace, RECOVERY_STATUS_FILE,
 };
 use tempfile::TempDir;
 
@@ -361,6 +362,27 @@ async fn flow_fold_folds_a_devices_channel_root_once_and_status_reads_it() {
     table.record_crossing_drop("rules-old-b", "device-b", "measure", "kind", 20);
     table.record_crossing_drop("rules-old-c", "device-c", "measure", "kind", 30);
     table.save(&a.peer_dir()).unwrap();
+    let mut recovery = PeerRecoveryStatus::default();
+    recovery.devices.insert(
+        b_did.clone(),
+        DeviceRecoveryStatus {
+            last_head_at: Some(2_000),
+            rejoins_since_head: 3,
+            neighbor_up_after_last_join: false,
+            last_probe: Some(ProbeStatus {
+                ok: true,
+                unsupported: true,
+                at: 3_000,
+            }),
+            resubscriptions: 2,
+            connection_resets: 1,
+        },
+    );
+    std::fs::write(
+        a.peer_dir().join(RECOVERY_STATUS_FILE),
+        serde_json::to_vec_pretty(&recovery).unwrap(),
+    )
+    .unwrap();
     let status = a.epr(&["peer", "status", "--root", a.root(), "--json"]);
     assert!(
         status.status.success(),
@@ -373,6 +395,10 @@ async fn flow_fold_folds_a_devices_channel_root_once_and_status_reads_it() {
     assert_eq!(devices[0]["device"], b_did);
     assert_eq!(devices[0]["seq"], 4);
     assert_eq!(devices[0]["eventsFolded"], 1);
+    assert_eq!(devices[0]["probeOk"], true);
+    assert_eq!(devices[0]["probeUnsupported"], true);
+    assert_eq!(devices[0]["resubscriptions"], 2);
+    assert_eq!(devices[0]["connectionResets"], 1);
     // Refused connections, by the device the roster names for the node id; strangers in a total.
     assert_eq!(
         json["refusedConnections"],
@@ -396,6 +422,8 @@ async fn flow_fold_folds_a_devices_channel_root_once_and_status_reads_it() {
     let text = String::from_utf8_lossy(&text.stdout).to_string();
     assert!(text.contains("artifact gate since"), "{text}");
     assert!(text.contains("head seq 4"), "{text}");
+    assert!(text.contains("probe unsupported (older peer)"), "{text}");
+    assert!(text.contains("resubscribes 2  resets 1"), "{text}");
     assert!(
         text.contains("fold coverage unavailable; sibling events use legacy unbounded replay"),
         "{text}"
