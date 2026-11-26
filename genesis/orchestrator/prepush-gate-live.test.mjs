@@ -515,6 +515,30 @@ process.exit(73);
   assert.doesNotMatch(r.stdout + r.stderr, /FAILED/);
 });
 
+test("a gate stopped from outside records no verdict and still refuses the push", (t) => {
+  const dir = fixture(t);
+  writeFileSync(join(dir, "genesis/orchestrator/gate-runner.mjs"), `
+import { spawnSync } from "node:child_process";
+const project = process.argv.at(-1);
+const event = { kind: "gate-stopped", project, by: null, requests: [], signal: "SIGTERM", evidence: "none" };
+const recorded = spawnSync(process.execPath, ["genesis/orchestrator/gate-live.mjs", "event", "--run", process.env.GATE_LIVE_RUN, "--json", JSON.stringify(event)], { stdio: "inherit" });
+process.exit(recorded.status === 0 ? 1 : recorded.status ?? 1);
+`);
+  const r = spawnSync("bash", ["-c", script(
+    `HOOK_WORK_TREE='${dir}'`, PRELUDE, OPEN_BLOCK,
+    'FAILED=""', 'PREGATE_FAILED=""', 'PROJECTS="fixture"', 'GATE_INLINE="fixture"',
+    'GATE_CARRIED=""', 'GATE_CARRY_USED=""', 'GATE_ON_RED_MODE=continue',
+    'INDEX=0', 'RESULTS=""', 'TOTAL_START=$(date +%s)',
+    'gate_stop_requested() { return 1; }', 'gate_carry_red() { return 1; }',
+    'honour_stop() { :; }', GATE_LOOP,
+  )], { cwd: dir, env: env(), encoding: "utf8", timeout: 15000 });
+  assert.equal(r.status, 1, r.stdout + r.stderr);
+  assert.match(r.stdout, /fixture: STOPPED on request .*no evidence recorded/);
+  assert.match(r.stdout, /PRE-PUSH GATE: FAILED/);
+  assert.doesNotMatch(r.stdout, /fixture: PASSED/);
+  assertClosedOnce(dir, "interrupted", r);
+});
+
 // The fleet-roll block: it hands each pushed ref over as "<remote ref> <pushed sha> <destination
 // sha>" with the hook's remote and a mark file, runs `--fleet-roll` before the hook's early
 // passes, records exit 3 as a pre-gate red, and records a node that could not run as a red only

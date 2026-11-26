@@ -591,6 +591,7 @@ async function main() {
   // signal delivered only to the detached recipe tree (OOM / RAM-guard shed), which never reaches
   // this process and therefore keeps the recipe's resulting verdict.
   let outsideSignal = null;
+  let outsideSignalAt = null;
   let held = [];
   // The first red's outlook is written to the run log before its sibling note is sent, so the
   // detached sender reads it there; the tap waits for that write only (bounded, below).
@@ -629,7 +630,10 @@ async function main() {
   const slotInterrupt = { signal: null };
   const earlySignals = [];
   const forward = signal => () => {
-    outsideSignal ??= signal;
+    if (!outsideSignal) {
+      outsideSignal = signal;
+      outsideSignalAt = performance.now();
+    }
     if (signalGate) signalGate(signal);
     else { slotInterrupt.signal ??= signal; earlySignals.push(signal); }
   };
@@ -763,11 +767,20 @@ async function main() {
     if (stopProbe) clearInterval(stopProbe);
     const cost = sampler.sample();
     let stopped;
-    if (outsideSignal) {
+    const verdictPredatesOutsideSignal = outsideSignal && Number.isInteger(code)
+      && Number.isFinite(exitAt) && Number.isFinite(outsideSignalAt) && exitAt < outsideSignalAt;
+    if (outsideSignal && !verdictPredatesOutsideSignal) {
       stopped = { by: null, signal: outsideSignal, outside: true };
       stopping = null;
       held = [];
       process.stderr.write(`[gate-tap] ${project}: stopped from outside (${outsideSignal}); no verdict is recorded for it\n`);
+    } else if (outsideSignal) {
+      const arrived = outsideSignal;
+      outsideSignal = null;
+      const keep = held;
+      held = [];
+      for (const event of keep) deliver(event);
+      process.stderr.write(`[gate-tap] ${project}: an outside ${arrived} arrived after the recipe exited with code ${code}; its verdict stands\n`);
     } else if (stopping) {
       const asked = stopping;
       const ended = await asked.ended;
