@@ -601,15 +601,22 @@ test('REAL every gate keeps declared sources, recipes and audited reads disjoint
   assert.deepEqual(failures, [], 'remove a real input from GATE_EXHAUST; never silently ignore it');
 });
 
+test('agentic Python test names include prefix and suffix conventions', () => {
+  const isPythonTest = name => /^(?:test_.*|.*_test)\.py$/.test(name);
+  for (const name of ['test_future.py', 'future_test.py']) assert.equal(isPythonTest(name), true, name);
+  for (const name of ['future.py', 'future.test.py', 'test_future.mjs']) assert.equal(isPythonTest(name), false, name);
+});
+
 test('every agentic Python test has a gate-project source owner', () => {
   const repo = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
+  const isPythonTest = name => /^(?:test_.*|.*_test)\.py$/.test(name);
   const tests = [
     ...readdirSync(resolve(repo, 'genesis/agentic'))
-      .filter(name => name.endsWith('_test.py')).map(name => `genesis/agentic/${name}`),
+      .filter(isPythonTest).map(name => `genesis/agentic/${name}`),
     ...readdirSync(resolve(repo, 'genesis/agentic/bin'))
-      .filter(name => name.endsWith('_test.py')).map(name => `genesis/agentic/bin/${name}`),
+      .filter(isPythonTest).map(name => `genesis/agentic/bin/${name}`),
     ...readdirSync(resolve(repo, '.claude/hooks/tests'))
-      .filter(name => /^test_.*\.py$/.test(name)).map(name => `.claude/hooks/tests/${name}`),
+      .filter(isPythonTest).map(name => `.claude/hooks/tests/${name}`),
   ].sort();
   const owners = [...loadGateRegistry(repo).values()].map(project => {
     const manifest = JSON.parse(readFileSync(resolve(repo, project.manifestPath), 'utf8'));

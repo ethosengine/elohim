@@ -717,60 +717,81 @@ _gate-agentic-tools:
     #!/usr/bin/env bash
     set -uo pipefail
     result=0
-    epr_bin="$(node genesis/orchestrator/device-epr.mjs)" || epr_bin=""
-    if [[ -n "$epr_bin" && -x "$epr_bin" ]]; then
-      export EPR_BIN="$epr_bin"
-    else
-      printf '%s\n' '[agentic-tools] FAIL genesis/agentic/session_envelope_test.py (UNMEASURED — device head epr is unavailable)'
-      result=1
+    if [[ -z "${EPR_BIN:-}" ]]; then
+      epr_bin="$(node genesis/orchestrator/device-epr.mjs)" || epr_bin=""
+      if [[ -n "$epr_bin" && -x "$epr_bin" ]]; then
+        export EPR_BIN="$epr_bin"
+      else
+        printf '%s\n' '[agentic-tools] FAIL genesis/agentic/session_envelope_test.py (UNMEASURED — device head epr is unavailable)'
+        result=1
+      fi
     fi
     run_test() {
       local test_file="$1"
       shift
-      if "$@"; then
+      local output status count
+      output="$("$@" 2>&1)"
+      status=$?
+      printf '%s\n' "$output"
+      count="$(TEST_FILE="$test_file" TEST_OUTPUT="$output" python3 -c '
+    import os, re
+    path = os.environ["TEST_FILE"]
+    text = os.environ["TEST_OUTPUT"]
+    unittest_counts = re.findall(r"^Ran ([0-9]+) tests?", text, re.MULTILINE)
+    session_counts = re.findall(r"^session_envelope_test: ([0-9]+) cases", text, re.MULTILINE)
+    direct_count = len(re.findall(r"^ok\s", text, re.MULTILINE))
+    if path == "genesis/agentic/session_envelope_test.py":
+        print(session_counts[-1] if session_counts else 0)
+    elif path == ".claude/hooks/tests/test_ram_guard.py":
+        print(direct_count)
+    else:
+        print(unittest_counts[-1] if unittest_counts else 0)
+    ')"
+      printf '[agentic-tools] COLLECT %s (%s tests)\n' "$test_file" "$count"
+      if [[ "$status" -eq 0 && "$count" =~ ^[0-9]+$ && "$count" -gt 0 ]]; then
         printf '[agentic-tools] PASS %s\n' "$test_file"
+      elif [[ "$status" -eq 0 ]]; then
+        printf '[agentic-tools] FAIL %s (collected zero tests)\n' "$test_file"
+        result=1
       else
-        local status=$?
-        printf '[agentic-tools] FAIL %s (exit %s)\n' "$test_file" "$status"
+        printf '[agentic-tools] FAIL %s (exit %s; collected %s tests)\n' "$test_file" "$status" "${count:-unknown}"
         result=1
       fi
     }
-    hook_tests=(
-      .claude/hooks/tests/test_berth_note_inject.py
-      .claude/hooks/tests/test_berth_writes_observe.py
-      .claude/hooks/tests/test_blind_reader_review.py
-      .claude/hooks/tests/test_brit_first_forms.py
-      .claude/hooks/tests/test_cargo_disk_guard_pool.py
-      .claude/hooks/tests/test_cargo_disk_guard_seats.py
-      .claude/hooks/tests/test_cargo_disk_guard_yield.py
-      .claude/hooks/tests/test_gate_live_inject.py
-      .claude/hooks/tests/test_held_tool_ensure.py
-      .claude/hooks/tests/test_hook_budgets.py
-      .claude/hooks/tests/test_load_project_context.py
-      .claude/hooks/tests/test_lsp_edit_event.py
-      .claude/hooks/tests/test_sensor_scan_budget.py
-      .claude/hooks/tests/test_sibling_miss_inject.py
-    )
-    for test_file in "${hook_tests[@]}"; do
-      run_test "$test_file" python3 -m unittest discover -s .claude/hooks/tests -p "${test_file##*/}"
+    skip_reason() {
+      case "$1" in
+        .claude/hooks/tests/test_dialogue_stasis_sense.py) printf '%s' 'owned and run by dialogue-stasis' ;;
+        genesis/agentic/stasis_audit_test.py|genesis/agentic/stasis_control_test.py|genesis/agentic/stasis_coordinator_test.py|genesis/agentic/stasis_keeper_test.py|genesis/agentic/stasis_no_allow_test.py|genesis/agentic/stasis_policy_test.py|genesis/agentic/stasis_probe_test.py|genesis/agentic/stasis_runtime_test.py) printf '%s' 'owned and run by dialogue-stasis' ;;
+        genesis/agentic/berth_test.py|genesis/agentic/lsp_attach_test.py|genesis/agentic/lsp_flycheck_test.py|genesis/agentic/pool_artifact_hashes_test.py|genesis/agentic/pool_family_test.py|genesis/agentic/pool_preflight_test.py|genesis/agentic/shift_attribution_test.py|genesis/agentic/shift_evidence_test.py|genesis/agentic/shift_gate_observer_test.py|genesis/agentic/shift_initialization_test.py|genesis/agentic/shift_inputs_test.py|genesis/agentic/shift_lease_test.py|genesis/agentic/shift_process_test.py|genesis/agentic/shift_readiness_test.py|genesis/agentic/shift_reconcile_test.py|genesis/agentic/shift_repair_test.py|genesis/agentic/shift_submodule_test.py|genesis/agentic/shift_test.py) printf '%s' 'owned and run by agentic-shift' ;;
+        *) return 1 ;;
+      esac
+    }
+    mapfile -t test_files < <(python3 -c '
+    import glob, json, os
+    with open("genesis/orchestrator/build-manifest.json", encoding="utf-8") as source:
+        patterns = json.load(source)["gate"]["projects"]["agentic-tools"]["inputs"]["sources"]
+    files = {path for pattern in patterns for path in glob.glob(pattern, recursive=True)
+             if path.endswith(".py") and (os.path.basename(path).startswith("test_")
+                                          or os.path.basename(path).endswith("_test.py"))}
+    print("\n".join(sorted(files)))
+    ')
+    for test_file in "${test_files[@]}"; do
+      if reason="$(skip_reason "$test_file")"; then
+        printf '[agentic-tools] SKIP %s (%s)\n' "$test_file" "$reason"
+        continue
+      fi
+      test_dir="${test_file%/*}"
+      test_name="${test_file##*/}"
+      if [[ "$test_file" == genesis/agentic/session_envelope_test.py ]]; then
+        run_test "$test_file" python3 "$test_file" --parallel --jobs "${AGENTIC_TOOLS_JOBS:-4}"
+      elif [[ "$test_file" == .claude/hooks/tests/test_ram_guard.py ]]; then
+        run_test "$test_file" python3 "$test_file"
+      elif [[ "$test_file" == .claude/hooks/tests/* ]]; then
+        run_test "$test_file" python3 -m unittest discover -s "$test_dir" -p "$test_name"
+      else
+        run_test "$test_file" python3 -m unittest "$test_file"
+      fi
     done
-    agentic_tests=(
-      genesis/agentic/bin-head-notice_test.py
-      genesis/agentic/dup_census_test.py
-      genesis/agentic/held_tool_watch_test.py
-      genesis/agentic/lsp_null_test.py
-      genesis/agentic/peer_liveness_test.py
-      genesis/agentic/ram_guard_session_test.py
-    )
-    for test_file in "${agentic_tests[@]}"; do
-      run_test "$test_file" python3 -m unittest "$test_file"
-    done
-    run_test .claude/hooks/tests/test_io_guard.py python3 -m unittest discover -s .claude/hooks/tests -p test_io_guard.py
-    run_test .claude/hooks/tests/test_ram_guard.py python3 .claude/hooks/tests/test_ram_guard.py
-    run_test .claude/hooks/tests/test_sensitive_file_protection.py python3 -m unittest discover -s .claude/hooks/tests -p test_sensitive_file_protection.py
-    if [[ -n "${EPR_BIN:-}" ]]; then
-      run_test genesis/agentic/session_envelope_test.py python3 genesis/agentic/session_envelope_test.py --parallel --jobs "${AGENTIC_TOOLS_JOBS:-4}"
-    fi
     exit "$result"
 
 # `pnpm build` first: @elohim/epr ships no dist/ in the tree, so a consumer's

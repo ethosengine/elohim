@@ -15,40 +15,35 @@ import unittest
 REPO = Path(__file__).resolve().parents[2]
 
 
-def resolve_device_epr(run=subprocess.run, env=os.environ):
-    """Resolve the device head; case workers may use the parent's stripped copy of that head."""
-    resolver = REPO / 'genesis/orchestrator/device-epr.mjs'
+def resolve_caller_epr(env=os.environ):
+    """Use the executable selected by the caller; selecting a device head belongs to recipes."""
     try:
-        result = run(['node', str(resolver), '--json'], cwd=REPO, capture_output=True,
-                     text=True, timeout=10, check=False)
-        payload = json.loads(result.stdout) if result.returncode == 0 else {}
-        binary = Path(payload.get('command', '')).resolve()
-        if payload.get('source') != 'head' or not binary.is_file() or not os.access(binary, os.X_OK):
-            raise ValueError(payload.get('why') or 'device head did not resolve to an executable')
-        case_binary = env.get('SESSION_ENVELOPE_CASE_EPR')
-        if case_binary:
-            candidate = Path(case_binary).resolve()
-            if not candidate.is_file() or not os.access(candidate, os.X_OK):
-                raise ValueError('the device-head-derived case executable is unavailable')
-            return candidate
+        selected = env.get('EPR_BIN')
+        if not selected:
+            raise ValueError('EPR_BIN was not supplied by the caller')
+        binary = Path(selected).resolve()
+        if not binary.is_file() or not os.access(binary, os.X_OK):
+            raise ValueError(f'EPR_BIN is not an executable file: {selected}')
         return binary
-    except (OSError, ValueError, json.JSONDecodeError, subprocess.SubprocessError) as error:
-        raise RuntimeError(f'UNMEASURED: device head epr is unavailable ({error})') from error
+    except (OSError, ValueError) as error:
+        raise RuntimeError(f'UNMEASURED: caller-selected epr is unavailable ({error})') from error
 
 
-BINARY = resolve_device_epr()
+BINARY = resolve_caller_epr()
 RUNTIMES = {'claude': ('claude-code', 4101), 'codex': ('codex', 4102)}
 
 
-class DeviceEprResolutionTest(unittest.TestCase):
-    def test_path_fallback_is_unmeasured(self):
-        result = subprocess.CompletedProcess(
-            args=[], returncode=0,
-            stdout=json.dumps({'command': '/bin/false', 'source': 'path', 'why': 'no device head'}),
-            stderr='',
-        )
-        with self.assertRaisesRegex(RuntimeError, 'UNMEASURED.*no device head'):
-            resolve_device_epr(run=lambda *_args, **_kwargs: result, env={})
+class CallerEprResolutionTest(unittest.TestCase):
+    def test_explicit_epr_bin_wins(self):
+        with tempfile.TemporaryDirectory(prefix='caller-epr-') as base:
+            selected = Path(base) / 'epr'
+            selected.write_text('#!/bin/sh\nexit 0\n')
+            selected.chmod(0o755)
+            self.assertEqual(resolve_caller_epr(env={'EPR_BIN': str(selected)}), selected)
+
+    def test_missing_epr_bin_is_unmeasured(self):
+        with self.assertRaisesRegex(RuntimeError, 'UNMEASURED.*EPR_BIN was not supplied'):
+            resolve_caller_epr(env={})
 
 
 def write(path, text):
@@ -80,6 +75,7 @@ class Fixture:
                 'EPR_BIN': str(self.base / 'hook-bin/epr'), 'EPR_BIN_TOOLS': str(self.base / 'registry.json'),
                 'EPR_UNDER_TEST': '1', 'EPR_AGENT_RUNTIMES': str(REPO / 'genesis/agentic/agent-runtimes.json'),
                 'BIN_STORE': str(self.base / 'stores'), 'EPR_PROC_ROOT': str(self.base / 'proc'),
+                'HOME': str(self.base / 'home'), 'XDG_DATA_HOME': str(self.base / 'data-home'),
                 'XDG_CONFIG_HOME': str(self.base / 'config-home'),
                 'CLAUDE_PROJECT_DIR': str(self.root), 'CLAUDE_CONFIG_DIR': str(self.base / 'config'),
                 'BERTH_DIR': str(self.base / 'berth'), 'BERTH_UNDER_TEST': '1',
@@ -1333,8 +1329,8 @@ def run_parallel(jobs, exclude, case_timeout):
     else:
         print('session_envelope_test: strip unavailable; the cases run the unstripped epr',
               file=sys.stderr, flush=True)
-    # A case still resolves the device head before accepting this per-run stripped derivative.
-    os.environ['SESSION_ENVELOPE_CASE_EPR'] = str(binary)
+    # Child cases inherit the caller-selected executable, or this per-run stripped derivative.
+    os.environ['EPR_BIN'] = str(binary)
     batches = ([i for i in ids if i not in SERIAL_TAIL], jobs), ([i for i in ids if i in SERIAL_TAIL], 1)
     failed, reported, interrupted = [], set(), None
 
