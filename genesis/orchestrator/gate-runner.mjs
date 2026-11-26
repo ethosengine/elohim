@@ -1750,6 +1750,7 @@ export function runProject(project, printOnly, namesOnly, {
   // what it would have done. It receives only the observer copy decideReuse already exposes. The
   // paid verdict is added to its child gate-reading row only after this gate finishes.
   let fenceScopeReading = null;
+  const fenceScopeStarted = clock();
   if (fenceScopeOn && observedSiblings?.candidates?.length) {
     const state = { dropped: false };
     let began = false;
@@ -1786,15 +1787,21 @@ export function runProject(project, printOnly, namesOnly, {
       }
     }
   }
+  started += clock() - fenceScopeStarted;
+  const fenceScopeRecordState = { dropped: false };
   const recordFenceScope = (outcome, status) => {
     if (!fenceScopeReading) return;
     const { result, endedAt, seconds } = fenceScopeReading;
-    emitGateReading({
-      ...reading, step: fenceScopeStep(project.name, result), parent: project.name,
-      key: evidence.key, keyChanged: 'unknown', outcome, status, synthesized: false,
-      waitedSeconds: 0, leaseWaitedSeconds: 0, seconds,
-      startedAt: new Date(new Date(endedAt).getTime() - seconds * 1000), endedAt,
-    }, { env, collector: readingCollector });
+    try {
+      emitGateReading({
+        ...reading, step: fenceScopeStep(project.name, result), parent: project.name,
+        key: evidence.key, keyChanged: 'unknown', outcome, status, synthesized: false,
+        waitedSeconds: 0, leaseWaitedSeconds: 0, seconds,
+        startedAt: new Date(new Date(endedAt).getTime() - seconds * 1000), endedAt,
+      }, { env, collector: readingCollector });
+    } catch (error) {
+      dropFenceScope(project.name, error, fenceScopeRecordState, write);
+    }
   };
   // GATE_GRADE=shadow (default; `off` adds no read, spawn or write; there is no `on`): after this
   // gate's seconds, evidence and cycle are recorded, say what evidence this device holds for the

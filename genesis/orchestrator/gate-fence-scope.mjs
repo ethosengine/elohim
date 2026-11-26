@@ -2,6 +2,13 @@
 // candidate, changes a decision, or changes a closure key. Its classification and the judge's
 // transitive JS import closure are read from the destination tip, so candidate bytes cannot bless
 // themselves. The first landing therefore holds: its destination has no table yet.
+//
+// Before ON:
+// - the classifier and table run from the destination or an admitted installed binary, never the candidate module;
+// - the destination is the push's actual remote ref, not local origin/dev;
+// - classify actor.rs (channel_standing, revocation), the epr-rea SidecarFlowStore shape, the native key derivation, eprfs-peer key.rs, rules.rs, steward_scope.rs and head_table.rs, and the hook, the justfile recipes and push-changed-files.sh;
+// - a commit field on the ledger row, and rows on the stopped, slot-busy and exception paths;
+// - a test of a candidate that edits the table or the module.
 
 import { posix } from 'node:path';
 import { deviceEprResolution } from './device-epr.mjs';
@@ -113,7 +120,7 @@ export function classifyFencePath(path, { table, imports = new Set() }) {
   if (table.keyed.exact.includes(path)) return 'K';
   if (table.substrate.exact.includes(path)
       || table.substrate.prefixes.some(prefix => path.startsWith(prefix))) return 'S';
-  return null;
+  return 'J';
 }
 
 const matchingGreen = (candidate, project, key) => candidate?.source === 'sibling'

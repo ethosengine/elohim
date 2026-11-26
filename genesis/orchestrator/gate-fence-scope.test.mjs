@@ -33,6 +33,17 @@ test('classifies a plain peer substrate file as S and compiler input cargo-lint 
   assert.equal(classifyFencePath('genesis/orchestrator/cargo-lint.mjs', destination), 'K');
 });
 
+test('an unclassified changed path is J and refuses with that path named', () => {
+  const path = 'docs/unclassified-fence-input.txt';
+  assert.equal(classifyFencePath(path, destination), 'J');
+  const reading = evaluateFenceScope({
+    project, key, paths: [path], candidates: [green], destination, readerAdmitted: true,
+  });
+  assert.deepEqual(reading, { answer: 'would-refuse', paths: [path], reason: 'judge' });
+  assert.equal(fenceScopeLine(project, reading),
+    `[gate] fixture fence-scope (shadow): would refuse: J path ${path}`);
+});
+
 test('an S change becomes a J refusal unless the reader is an admitted store release', () => {
   const scene = {
     project, key, paths: ['elohim/eprfs/eprfs-peer/src/fetch.rs'], candidates: [green], destination,
