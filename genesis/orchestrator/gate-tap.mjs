@@ -767,7 +767,7 @@ async function main() {
     if (stopProbe) clearInterval(stopProbe);
     const cost = sampler.sample();
     let stopped;
-    const verdictPredatesOutsideSignal = outsideSignal && Number.isInteger(code)
+    const verdictPredatesOutsideSignal = outsideSignal
       && Number.isFinite(exitAt) && Number.isFinite(outsideSignalAt) && exitAt < outsideSignalAt;
     if (outsideSignal && !verdictPredatesOutsideSignal) {
       stopped = { by: null, signal: outsideSignal, outside: true };
@@ -780,7 +780,8 @@ async function main() {
       const keep = held;
       held = [];
       for (const event of keep) deliver(event);
-      process.stderr.write(`[gate-tap] ${project}: an outside ${arrived} arrived after the recipe exited with code ${code}; its verdict stands\n`);
+      const ending = signal ? `died of ${signal}` : `exited with code ${code}`;
+      process.stderr.write(`[gate-tap] ${project}: an outside ${arrived} arrived after the recipe ${ending}; its verdict stands\n`);
     } else if (stopping) {
       const asked = stopping;
       const ended = await asked.ended;
