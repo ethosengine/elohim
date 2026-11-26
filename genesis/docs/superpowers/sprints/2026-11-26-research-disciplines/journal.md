@@ -46,7 +46,7 @@ by something that runs.
 | F0 | Correct the record, open the sprint | done: judged, landed 2026-11-26 03:43Z, verified on `origin/dev` file by file | `self/ethosengine-disciplines-f0` | `6187dff08`, `ab78d3ad0`, `baeb32247` |
 | F1 | Nothing is dropped silently | said, exercised, checked and judged (changes-requested, fixed, approved); handed over | `self/ethosengine-disciplines-f1` (carries the cleanup pass's two commits) | |
 | F2 | Evidence carries its age | built, said and checked; exercised against the main checkout's reports; verdict pending | travels with F3's script change as one carry | |
-| F3 | Another seat chooses the failure | not started | | |
+| F3 | Another seat chooses the failure | built, said and checked; **exercise owed** (no drawn run yet); verdict pending | travels with F2 as one carry | |
 | F4 | The brief carries position and a stop condition | not started | | |
 
 ## F0 record
@@ -230,6 +230,37 @@ every note), ran against a fresh worktree at the F0 tip. Four rounds, eight agen
   the cleanup pass, has no submodules checked out, and `seam_matrix_test.py` fails its live
   check there. F2 was finished in the prepared worktree for that reason.
 
+## F3 record
+
+- **Built.** `MESH_RECOVERY_DRAW=<file>` makes the recovery matrix run exactly the lines of a
+  draw file, in its order, in place of its own cycle. The file names who chose
+  (`# chosen_by:`), then one run per line: scenario, shape, recovering slot. It is refused,
+  before the mesh is probed, when it is combined with `MESH_RECOVERY_SCENARIOS`, when a
+  scenario, shape or slot is not valid, when `chosen_by` is missing, and when `chosen_by`
+  equals `MESH_RECOVERY_RUN_BY`. Every record of a drawn run carries `chosen_by`, `run_by`
+  and `draw_sha256`. The `expect` label no longer travels into any run; nothing read it.
+- **A limit of the refusal.** The matrix can only refuse a self-made draw when the runner
+  names itself. With `MESH_RECOVERY_RUN_BY` unset the record says `run_by: unmeasured`, and
+  whether the chooser differed from the runner is then a question for whoever reads the
+  record, not something the script established.
+- **The failing check that was already on `dev`** (`matrix_live_shape honors
+  MESH_RECOVERY_LIVE_SHAPE override`) was a fault in the test: it set the variable in front
+  of `source`, where it does not outlive the `source`. Two lines; the function was right.
+- **Said.** The `hc-dev-orchestrator` skill names the draw form and the rule: a recovery
+  receipt offered for a dataplane change is drawn by a seat other than the change's author,
+  and a run narrowed by its own author is a rehearsal.
+- **Checked.** `hc-mesh-recovery-draw.test.sh` (15 checks, the whole matrix against stubs, no
+  mesh), `hc-mesh-recovery.test.sh` (31) and `hc-mesh-recovery-record.test.sh` (8), run
+  directly, all pass. The `elohim-app` gate that a change to these scripts selects was not
+  run here and does not run them.
+- **Exercise owed.** No drawn run has been made. It is a measure-class run; this device is a
+  dev berth with another session building on it, and its main checkout does not hold the
+  script. The run is offered to shem once the script is on `dev`, with the draw made by an
+  isolated agent seat as the steward ruled. Until a record exists with a chooser other than
+  its runner, this flight is not done.
+- **Seats.** Built by an Opus seat from a brief; its three tests re-run by the orchestrating
+  session, which wrote the said-rung edit.
+
 ## Stop conditions, every flight
 
 Stop and report when: a gate reds twice on one cause; a write is needed outside the covenant
@@ -256,3 +287,4 @@ failure's history and the redundant path.
 | 11 | 2026-11-26 | Twelve research notes cannot declare takes as they stand: ten have no frontmatter and two have no `id` | Owner: the gathered read. The check counts all of them as unmeasured meanwhile |
 | 12 | 2026-11-26 | F1's hand-over was refused before the gates: `dependabot_paydown_test.py` pins the text `if ! bash … rust-style.sh"` in `.husky/pre-push.bash`, and that line had changed form on `dev` (present at `a9f896596`, gone by `510a7223c`). The harness leg runs only for a push that touches `.claude/scripts`, so docs-only landings never met it | Closed the same day in its own commit: the test now pins the current form of the same step. Its intent holds (the paydown step at line 1714 still precedes the rust-style step at line 1729). History: first seen here; `dev` carried it for every push selecting that leg. Told to the integrator |
 | 13 | 2026-11-26 | Row 85, written in F0, said no gate project covers the mesh recovery scripts and implied their tests and the status scripts' tests run nowhere. A change to the mesh scripts does select the `elohim-app` gate (which does not run their tests), and the status scripts' tests do run in a pre-push leg | Closed the same day: row 85 is narrowed to what is uncovered. The first wording came from an explorer's grep of the manifests, taken without running `epr flow context` on the files |
+| 14 | 2026-11-26 | One check of `hc-mesh-recovery.test.sh` failed on `dev` and nothing reported it (the gate a change to these scripts selects does not run them) | Closed the same day in F3: the test set a variable in front of `source`, where it does not persist; fixed in the test. That nothing runs these tests stays open as row 85 |
