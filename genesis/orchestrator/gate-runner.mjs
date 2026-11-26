@@ -2,7 +2,7 @@
 // One local gate path for humans and pre-push. Detection and execution both
 // come from build-manifest.json; no project-name command switch lives here.
 
-import { appendFileSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from 'fs';
+import { appendFileSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { spawn as spawnProcess, spawnSync } from 'child_process';
 import { createHash } from 'crypto';
@@ -687,10 +687,8 @@ function slotWaitResult(path) {
 function writeSampleResult(env, row) {
   const path = oneLine(env.GATE_SAMPLE_RESULT);
   if (!path) return;
-  try {
-    mkdirSync(dirname(path), { recursive: true });
-    writeFileSync(path, `${JSON.stringify({ v: 1, ...row })}\n`, { mode: 0o600 });
-  } catch { /* a missing scratch result becomes not-comparable in the sampler */ }
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, `${JSON.stringify({ v: 1, ...row })}\n`, { mode: 0o600 });
 }
 
 class ShadowBudgetExhausted extends Error {
