@@ -1,0 +1,399 @@
+#!/usr/bin/env python3
+"""
+peer-liveness — a watchdog for THIS device's peer daemon (`epr peer serve`). Dry run by default.
+
+On 2026-11-25 this device folded no head from a sibling for 8540 s while both peer daemons were up,
+on the relay and printing no error; restarting this device's daemon alone healed it within 20 s.
+The same silent stall was seen on 2026-11-05 (arrival backlog row 105). Nothing restarted it.
+
+  peer-liveness [--root DIR] [--stale-after-s 900] [--interval-s 3600] [--json] [--verbose]
+      Read `epr peer status --json` once (through the device's head epr, device-epr.mjs; bounded,
+      --status-timeout-s, default 5). Silent and exit 0 when every admitted sibling's head was
+      folded within --stale-after-s. Otherwise print what it would do and exit 3.
+  peer-liveness --apply [same flags] [--term-wait-s 10] [--settle-s 60]
+      The same reading, then at most one restart of this device's peer daemon, one JSON line in
+      <root>/genesis/a2o/reports/recovery/peer-liveness.jsonl, and a re-read of the status that
+      says whether a stale head moved. Exit 0 when a head moved, 4 when it restarted and none did,
+      3 when it found a stall and did not act (the line says why), 1 when it could not read.
+
+What it can observe, and what it cannot. Every record this device holds of a sibling (its head, its
+acknowledgement, its berth moorings) arrives over the one exchange that has stalled, so nothing
+here shows a sibling alive "some other way": a sibling asleep or switched off reads the same as a
+stalled exchange. The watchdog therefore acts on head age alone, and is bounded instead:
+
+  - never before this device's daemon has itself been up --stale-after-s (default 900 s);
+  - at most one restart per --interval-s (default 3600 s), read from the log;
+  - at most one restart per stall: after a restart that moved no head, a sibling whose head
+    sequence is still the one that restart saw is not a reason to restart again. A sibling that is
+    simply off costs one restart, once, until its head moves.
+
+The restart is this daemon exactly as it runs: argv from /proc/<pid>/cmdline, the environment from
+/proc/<pid>/environ (so EPR_PEER_RELAYS and the XDG paths that hold the device key are the
+daemon's own, never the caller's), its working directory, and its stdout and stderr appended to the
+file they already go to. The daemon is found in the process table as the one process of this user
+whose argv is `<…/epr> peer serve … --root <root>`; none, or more than one, is said and nothing is
+done. It is stopped by numeric pid with SIGTERM after its start time is read again (a reused pid is
+never signalled), and never with SIGKILL: a daemon that has not exited within --term-wait-s
+(default 10 s) is left alone and said. A dry run sends no signal, starts nothing and writes no file.
+
+Time bounds (seconds): status read 5; SIGTERM wait 10; settle 60 (status re-read every 5).
+A dry run is bounded by the one status read; an apply by their sum, 80 s with defaults.
+
+Nothing calls this: no hook, no timer, no SessionStart. A person or a later, ruled wiring does.
+"""
+import argparse
+import fcntl
+import json
+import os
+import signal
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+STALE_AFTER_S = 900
+INTERVAL_S = 3600
+STATUS_TIMEOUT_S = 5
+TERM_WAIT_S = 10
+SETTLE_S = 60
+SETTLE_POLL_S = 5
+LOG_RELATIVE = "genesis/a2o/reports/recovery/peer-liveness.jsonl"
+
+
+def short(did):
+    did = str(did or "")
+    return did if len(did) <= 24 else f"{did[:16]}…{did[-4:]}"
+
+
+def device_root(script=None):
+    """The device checkout (the main one, never a linked worktree): where the daemon serves."""
+    here = Path(script or __file__).resolve().parent
+    try:
+        out = subprocess.run(["git", "-C", str(here), "rev-parse", "--path-format=absolute", "--git-common-dir"],
+                             capture_output=True, text=True, timeout=10)
+        if out.returncode == 0 and out.stdout.strip():
+            return Path(out.stdout.strip()).parent
+    except (OSError, subprocess.SubprocessError):
+        pass
+    return here.parents[2]
+
+
+def head_epr(root, env=None):
+    """The device's head epr through the one resolver; 'epr' when it prints none."""
+    resolver = Path(root) / "genesis/orchestrator/device-epr.mjs"
+    try:
+        out = subprocess.run(["node", str(resolver)], capture_output=True, text=True, timeout=10, env=env)
+        if out.returncode == 0 and out.stdout.strip():
+            return out.stdout.strip().splitlines()[0]
+    except (OSError, subprocess.SubprocessError):
+        pass
+    return "epr"
+
+
+def read_status(epr, root, timeout_s=STATUS_TIMEOUT_S, run=subprocess.run):
+    """`epr peer status --json`, or raise RuntimeError with one line."""
+    try:
+        out = run([epr, "peer", "status", "--root", str(root), "--json"],
+                  capture_output=True, text=True, timeout=timeout_s, cwd=str(root))
+    except subprocess.TimeoutExpired:
+        raise RuntimeError(f"no answer within {timeout_s} s")
+    except OSError as error:
+        raise RuntimeError(str(error).splitlines()[0])
+    if out.returncode != 0:
+        lines = (out.stderr or "").strip().splitlines()
+        raise RuntimeError(lines[-1] if lines else f"exit {out.returncode}")
+    try:
+        status = json.loads(out.stdout)
+    except ValueError:
+        raise RuntimeError("the status is not JSON")
+    if not isinstance(status, dict) or not isinstance(status.get("devices"), list):
+        raise RuntimeError("the status names no device list")
+    return status
+
+
+def stale_siblings(status, stale_after_s):
+    """Siblings whose head is older than the bound, or was never folded: [{device, seq, ageS}]."""
+    stale = []
+    for row in status.get("devices") or []:
+        age = row.get("ageS")
+        if age is None or not isinstance(age, (int, float)) or age > stale_after_s:
+            stale.append({"device": row.get("device"), "seq": row.get("seq"), "ageS": age})
+    return stale
+
+
+def boot_time(proc):
+    for line in (Path(proc) / "stat").read_text().splitlines():
+        if line.startswith("btime "):
+            return int(line.split()[1])
+    raise RuntimeError("no btime in the process table")
+
+
+def start_ticks(proc, pid):
+    """Field 22 of /proc/<pid>/stat: the start time in clock ticks. The comm field may hold spaces."""
+    text = (Path(proc) / str(pid) / "stat").read_text()
+    return int(text[text.rindex(")") + 2:].split()[19])
+
+
+def find_daemons(proc, root, uid=None):
+    """Every process of this user whose argv is `<…/epr> peer serve … --root <root>`."""
+    uid = os.getuid() if uid is None else uid
+    want = os.path.realpath(str(root))
+    found = []
+    for entry in sorted(Path(proc).iterdir(), key=lambda p: p.name):
+        if not entry.name.isdigit():
+            continue
+        try:
+            if entry.stat().st_uid != uid:
+                continue
+            argv = [a.decode("utf-8", "surrogateescape") for a in (entry / "cmdline").read_bytes().split(b"\0")]
+        except OSError:
+            continue
+        while argv and argv[-1] == "":
+            argv.pop()
+        if len(argv) < 3 or os.path.basename(argv[0]) != "epr" or argv[1:3] != ["peer", "serve"]:
+            continue
+        served = None
+        for i, arg in enumerate(argv):
+            if arg == "--root" and i + 1 < len(argv):
+                served = argv[i + 1]
+        try:
+            cwd = os.readlink(entry / "cwd")
+        except OSError:
+            cwd = None
+        if os.path.realpath(served if served is not None else (cwd or "")) != want:
+            continue
+        found.append({"pid": int(entry.name), "argv": argv, "cwd": cwd})
+    return found
+
+
+def capture(proc, daemon):
+    """What a restart needs, read from the running process: environment, start time, output file."""
+    base = Path(proc) / str(daemon["pid"])
+    env = {}
+    for item in (base / "environ").read_bytes().split(b"\0"):
+        if b"=" in item:
+            key, value = item.split(b"=", 1)
+            env[key.decode("utf-8", "surrogateescape")] = value.decode("utf-8", "surrogateescape")
+    outputs = []
+    for fd in ("1", "2"):
+        try:
+            target = os.readlink(base / "fd" / fd)
+        except OSError:
+            target = None
+        outputs.append(target if target and target.startswith("/") and not target.startswith("/dev/")
+                       and not target.endswith(" (deleted)") else None)
+    ticks = start_ticks(proc, daemon["pid"])
+    started = boot_time(proc) + ticks / os.sysconf("SC_CLK_TCK")
+    return {**daemon, "env": env, "ticks": ticks, "started": started, "stdout": outputs[0], "stderr": outputs[1]}
+
+
+def read_log(log):
+    rows = []
+    try:
+        for line in Path(log).read_text().splitlines():
+            try:
+                row = json.loads(line)
+            except ValueError:
+                continue
+            if isinstance(row, dict):
+                rows.append(row)
+    except OSError:
+        pass
+    return rows
+
+
+def decide(status, daemons, rows, now, stale_after_s=STALE_AFTER_S, interval_s=INTERVAL_S, uptime=None):
+    """What to do, with no effect: {act: bool, why: str, stale: [...], daemon}."""
+    stale = stale_siblings(status, stale_after_s)
+    if not stale:
+        return {"act": False, "well": True, "stale": [], "why": "every admitted sibling's head is within the bound"}
+    names = ", ".join(
+        f"{short(s['device'])} ({'never folded' if s['ageS'] is None else str(int(s['ageS'])) + ' s'})" for s in stale)
+    said = f"no head folded within {int(stale_after_s)} s from {names}"
+    if len(daemons) != 1:
+        which = "no peer daemon of this user serves this root" if not daemons else \
+            f"{len(daemons)} peer daemons serve this root (pids {', '.join(str(d['pid']) for d in daemons)})"
+        return {"act": False, "stale": stale, "why": f"{said}; {which}: nothing to restart safely"}
+    daemon = daemons[0]
+    if uptime is not None and uptime < stale_after_s:
+        return {"act": False, "stale": stale, "daemon": daemon,
+                "why": f"{said}; this daemon (pid {daemon['pid']}) has been up {int(uptime)} s, under the bound: not yet"}
+    restarts = [r for r in rows if r.get("outcome") in ("moved", "not-moved") and isinstance(r.get("at"), (int, float))]
+    if restarts:
+        last = restarts[-1]
+        since = now - last["at"]
+        if since < interval_s:
+            return {"act": False, "stale": stale, "daemon": daemon,
+                    "why": f"{said}; this daemon was restarted {int(since)} s ago (at most one per {int(interval_s)} s)"}
+        if last.get("outcome") == "not-moved":
+            tried = {(s.get("device"), s.get("seq")) for s in last.get("stale") or []}
+            if all((s["device"], s["seq"]) in tried for s in stale):
+                return {"act": False, "stale": stale, "daemon": daemon,
+                        "why": f"{said}; a restart {int(since)} s ago moved no head and none has moved since: "
+                               "the sibling is likely off or stalled on its side (wake it, or restart its daemon)"}
+    return {"act": True, "stale": stale, "daemon": daemon,
+            "why": f"{said}; would restart this device's peer daemon (pid {daemon['pid']}) as it runs"}
+
+
+def alive(proc, pid, ticks):
+    try:
+        return start_ticks(proc, pid) == ticks
+    except (OSError, ValueError):
+        return False
+
+
+def restart(proc, captured, term_wait_s=TERM_WAIT_S, kill=os.kill, spawn=subprocess.Popen,
+            sleep=time.sleep, clock=time.monotonic):
+    """Stop the captured daemon by pid and start it again as it ran. {pid} or {error}."""
+    pid = captured["pid"]
+    if not alive(proc, pid, captured["ticks"]):
+        return {"error": f"pid {pid} is no longer the daemon that was read; nothing signalled"}
+    kill(pid, signal.SIGTERM)
+    deadline = clock() + term_wait_s
+    while alive(proc, pid, captured["ticks"]):
+        if clock() >= deadline:
+            return {"error": f"pid {pid} did not exit within {term_wait_s} s of SIGTERM; left running, nothing started"}
+        sleep(0.2)
+    opened = []
+    try:
+        out = err = subprocess.DEVNULL
+        if captured["stdout"]:
+            out = open(captured["stdout"], "ab")
+            opened.append(out)
+        if captured["stderr"] and captured["stderr"] == captured["stdout"]:
+            err = out
+        elif captured["stderr"]:
+            err = open(captured["stderr"], "ab")
+            opened.append(err)
+        child = spawn(captured["argv"], cwd=captured["cwd"] or None, env=captured["env"], stdin=subprocess.DEVNULL,
+                      stdout=out, stderr=err, start_new_session=True, close_fds=True)
+    except OSError as error:
+        return {"error": f"stopped pid {pid} and could not start it again: {str(error).splitlines()[0]}; "
+                         f"start it by hand: {' '.join(captured['argv'])}"}
+    finally:
+        for handle in opened:
+            handle.close()
+    return {"pid": child.pid}
+
+
+def moved(before, after):
+    """Stale siblings whose head sequence advanced, or whose head is now younger than it was."""
+    now = {row.get("device"): row for row in (after or {}).get("devices") or []}
+    out = []
+    for s in before:
+        row = now.get(s["device"])
+        if not row:
+            continue
+        seq_up = isinstance(row.get("seq"), (int, float)) and isinstance(s["seq"], (int, float)) and row["seq"] > s["seq"]
+        younger = isinstance(row.get("ageS"), (int, float)) and (s["ageS"] is None or row["ageS"] < s["ageS"])
+        if seq_up or younger:
+            out.append(s["device"])
+    return out
+
+
+def main(argv=None, *, out=None, proc="/proc", now=time.time, status_of=None, kill=os.kill,
+         spawn=subprocess.Popen, sleep=time.sleep, clock=time.monotonic):
+    parser = argparse.ArgumentParser(prog="peer-liveness", description="Watch this device's peer daemon; dry run by default.")
+    parser.add_argument("--apply", action="store_true")
+    parser.add_argument("--root")
+    parser.add_argument("--epr")
+    parser.add_argument("--stale-after-s", type=float, default=STALE_AFTER_S)
+    parser.add_argument("--interval-s", type=float, default=INTERVAL_S)
+    parser.add_argument("--status-timeout-s", type=float, default=STATUS_TIMEOUT_S)
+    parser.add_argument("--term-wait-s", type=float, default=TERM_WAIT_S)
+    parser.add_argument("--settle-s", type=float, default=SETTLE_S)
+    parser.add_argument("--json", action="store_true")
+    parser.add_argument("--verbose", action="store_true")
+    args = parser.parse_args(argv)
+    say = out or (lambda line: print(line, flush=True))
+    root = Path(args.root) if args.root else device_root()
+    log = root / LOG_RELATIVE
+    if status_of is None:
+        epr = args.epr or head_epr(root)
+        status_of = lambda: read_status(epr, root, args.status_timeout_s)  # noqa: E731
+
+    try:
+        status = status_of()
+    except RuntimeError as error:
+        say(f"[peer-liveness] `epr peer status` could not be read ({error}): the exchange is not known; nothing done")
+        return 1
+    try:
+        daemons = find_daemons(proc, root)
+        captured = capture(proc, daemons[0]) if len(daemons) == 1 else None
+    except (OSError, ValueError, RuntimeError) as error:
+        say(f"[peer-liveness] the process table could not be read ({str(error).splitlines()[0]}); nothing done")
+        return 1
+    at = now()
+    plan = decide(status, daemons, read_log(log), at, args.stale_after_s, args.interval_s,
+                  uptime=(at - captured["started"]) if captured else None)
+    if plan.get("well"):
+        if args.json:
+            say(json.dumps({"well": True, "act": False, "stale": []}))
+        elif args.verbose:
+            say(f"[peer-liveness] ok: {plan['why']} ({int(args.stale_after_s)} s)")
+        return 0
+    if not plan["act"] or not args.apply:
+        if args.json:
+            say(json.dumps({"well": False, "act": plan["act"], "applied": False, "why": plan["why"], "stale": plan["stale"]}))
+        else:
+            tail = " (dry run: --apply does it)" if plan["act"] else ""
+            say(f"[peer-liveness] {plan['why']}{tail}")
+            if plan["act"]:
+                relays = captured["env"].get("EPR_PEER_RELAYS", "(unset)")
+                say(f"[peer-liveness]   argv: {' '.join(captured['argv'])}")
+                say(f"[peer-liveness]   cwd {captured['cwd']}  EPR_PEER_RELAYS={relays}  output {captured['stdout'] or '(discarded)'}")
+        return 3
+
+    # --apply, and the reading says act. One apply at a time, and the log is re-read under the lock.
+    log.parent.mkdir(parents=True, exist_ok=True)
+    with open(log, "a+") as handle:
+        try:
+            fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError:
+            say("[peer-liveness] another peer-liveness --apply holds the log; nothing done")
+            return 3
+        again = decide(status, daemons, read_log(log), now(), args.stale_after_s, args.interval_s,
+                       uptime=at - captured["started"])
+        if not again["act"]:
+            say(f"[peer-liveness] {again['why']}")
+            return 3
+        say(f"[peer-liveness] {plan['why'].replace('would restart', 'restarting')}")
+        result = restart(proc, captured, args.term_wait_s, kill=kill, spawn=spawn, sleep=sleep, clock=clock)
+        row = {"at": at, "atIso": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(at)), "stale": plan["stale"],
+               "oldPid": captured["pid"], "argv": captured["argv"]}
+        code = 3
+        if "error" in result:
+            row.update(outcome="not-restarted", error=result["error"])
+            say(f"[peer-liveness] {result['error']}")
+        else:
+            row["newPid"] = result["pid"]
+            heads = []
+            after = None
+            deadline = clock() + args.settle_s
+            while True:
+                sleep(min(SETTLE_POLL_S, max(0.0, deadline - clock())))
+                try:
+                    after = status_of()
+                    heads = moved(plan["stale"], after)
+                except RuntimeError:
+                    after = None
+                if heads or clock() >= deadline:
+                    break
+            row.update(outcome="moved" if heads else "not-moved", moved=heads,
+                       after=[{"device": d.get("device"), "seq": d.get("seq"), "ageS": d.get("ageS")}
+                              for d in (after or {}).get("devices") or []])
+            if heads:
+                code = 0
+                say(f"[peer-liveness] restarted as pid {result['pid']}; head moved for {', '.join(short(d) for d in heads)}")
+            else:
+                code = 4
+                say(f"[peer-liveness] restarted as pid {result['pid']}; no stale head moved within {int(args.settle_s)} s: "
+                    "the sibling is likely off or stalled on its side; this stall is not retried until a head moves")
+        handle.write(json.dumps(row, sort_keys=True) + "\n")
+        handle.flush()
+        os.fsync(handle.fileno())
+        return code
+
+
+if __name__ == "__main__":
+    sys.exit(main())
