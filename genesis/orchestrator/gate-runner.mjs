@@ -309,7 +309,11 @@ export function pushRange({ root, gateCommit, spawn = spawnSync }) {
       if (base === gateCommit) { range = { base, files: [] }; break; }
       const diff = spawn('git', ['diff', '--name-only', '--no-renames', '-z', base, gateCommit], { cwd: root, encoding: 'utf8' });
       if (diff?.error?.code === 'EBUDGET') { refused = true; break; }
-      range = { base, files: diff?.status === 0 ? String(diff.stdout || '').split('\0').filter(Boolean) : [] };
+      // A diff that failed is not an empty diff: `unavailable` says so for a reader that must fail
+      // closed (the fence-scope shadow); the other shadows keep reading an empty list as before.
+      range = diff?.status === 0
+        ? { base, files: String(diff.stdout || '').split('\0').filter(Boolean) }
+        : { base, files: [], unavailable: true };
       break;
     }
     if (refused) return null;

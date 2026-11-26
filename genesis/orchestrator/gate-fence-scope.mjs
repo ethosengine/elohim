@@ -187,7 +187,7 @@ export function fenceScopeShadow({
 }) {
   if (fenceScopeMode(env) === 'off' || !Array.isArray(candidates) || candidates.length === 0) return null;
   const destination = readDestinationFenceScope({ root, spawn });
-  if (destination.state === 'read' && !range?.base) {
+  if (destination.state === 'read' && (!range?.base || range?.unavailable)) {
     return {
       answer: 'would-refuse', paths: ['<governance-range-unavailable>'],
       reason: 'range-unavailable',
