@@ -15,9 +15,9 @@ relatedNodeIds:
   - "habit:dataplane-convergence"
   - "habit:reach-enforced-everywhere"
 cites:
-  - genesis/docs/superpowers/sprints/2026-10-01-campaign-1.4-closing-definition.md
-  - genesis/docs/superpowers/specs/2026-09-30-claim-backed-credentials-and-contextual-authority-design.md
-  - genesis/docs/superpowers/specs/2026-09-08-peer-executed-stage-design.md
+  - "campaign-1-4-closing-definition-20261001 | 2026-10-01-campaign-1.4-closing-definition | sha256:98caccfd5df208af | path: genesis/docs/superpowers/sprints/2026-10-01-campaign-1.4-closing-definition.md"
+  - "claim-backed-credentials-and-contextual-authority-design | Claim-backed credentials and contextual authority | sha256:c16fffbadbe818e9 | path: genesis/docs/superpowers/specs/2026-09-30-claim-backed-credentials-and-contextual-authority-design.md"
+  - "peer-executed-stage-design | The first Jenkins stage executed by a peer | sha256:41d3536b4a97b0f8 | path: genesis/docs/superpowers/specs/2026-09-08-peer-executed-stage-design.md"
   - genesis/data/timeline/backlog/reach-delivery-subsystem-solutioning-bootstrap.md
 tags: [seed, design-session-input, devspace, peer-channel, jobs, collective-memory, reach, device-binding, trustful-self]
 ---
@@ -307,3 +307,20 @@ coordination like this one can run on the mesh alone.
   siblings "no head folded yet"; laptop daemon `epr peer serve --root /home/matthew/git/elohim
   --handle matthew`.
 - ethosengine's report of its daemon root and roster (4 rows, branch `memory/ceremony-2026-11-20`).
+
+## The steward's direction, 2026-11-26: the collective-memory half has a design and a plan
+
+Recorded by shem session 96b46344. His words, in the order he gave them:
+
+> "yeah I think git first was a concession."
+
+> "I would think memory acts and tending attestations might not \"cross\" but I'd imagine they'd graduate to climb the reach ladder agreements to cover more, as appropriate."
+
+> "note that even bytes on a hosted drive are governed space, it's just a really low bar of governance... the governed space we're talking about 1st is a p2p-hosted drive in essence, an epr-meta layer shared between three or more stewarded devices.."
+
+What this settles and what it does not:
+
+- Open question 5 recorded that he declined a git coordination branch, with no reason. His first remark above gives the reason for memory at least: git as the carrier was a concession and not necessarily the destination.
+- Open questions 1 and 4, for memory only, now have a design, `genesis/docs/superpowers/specs/2026-11-26-governed-space-share-boundary-collective-memory-design.md`, and claimable stations, `genesis/docs/superpowers/plans/2026-11-26-governed-space-collective-memory-plan.md`. The design's answers are working postures and are not his rulings.
+- The 2026-10-26 section says the "conversation, jobs and collective-memory half serves no declared habit yet and waits for one". For memory that is no longer so: habit `memory-tended-once` was declared on this date, unwired and inactive, and the plan's other stations serve habits that already existed.
+- Conversation and jobs are untouched by this, and this entry's "Close when" is unchanged.

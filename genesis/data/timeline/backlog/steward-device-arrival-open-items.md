@@ -3242,3 +3242,11 @@ Practice from here: ask each device its capacity when the landing lane blocks; r
 ## Row 108 — hook budget overruns under load
 
 PreToolUse hooks timed out several times on 2026-11-25 (for example brit-first at 2 s and dialogue-stasis-sense at 3 s, each over by under a second) while shem's load was 13 to 25. Once the load was an agent's 30 busy loops run for 19 minutes as an experiment.
+
+## Row 77, delta 4 (2026-11-26): a second design depends on this cure, and a collective's case goes further than it
+
+Recorded by shem session 96b46344 while attaching the governed-space design to the epic. Nothing about this row's state changes: it is open.
+
+The governed-space design (`genesis/docs/superpowers/specs/2026-11-26-governed-space-share-boundary-collective-memory-design.md`) lets one device's memory tending be accepted by its siblings. Its acceptance rule begins with "the signer is another admitted device" (station GS-2 of `genesis/docs/superpowers/plans/2026-11-26-governed-space-collective-memory-plan.md`). A device whose checkout does not yet carry a sibling's roster row would refuse that sibling's tending for the same reason it admits nobody here, so that station inherits this gap and carries no station of its own for it.
+
+The design also names a case this row does not cover. For a space held by a collective, the list of members cannot stay in a tracked file at all, because who is a member must not be readable from outside the collective (the design's section 12a, missing node 6). Reading the roster from a published ref, which is this row's candidate cure, does not meet that: a collective's roster and affiliations would have to be held inside its own space.
