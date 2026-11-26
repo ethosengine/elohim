@@ -22,6 +22,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
+import { runProject } from "./gate-runner.mjs";
 import { requireEpr } from "./runtime-declaration-render.mjs";
 
 const EPR_BIN = requireEpr();
@@ -438,7 +439,8 @@ test("renderer refuses an unnamed EPR_BIN even when epr is on PATH", async () =>
 test("orchestrator gate supplies its declared native epr instead of a PATH launcher", async () => {
   const { chmodSync, rmSync } = await import("node:fs");
   const { fileURLToPath } = await import("node:url");
-  const run = JSON.parse(read("genesis/orchestrator/build-manifest.json")).gate.projects["orchestrator-tree"].run;
+  const project = JSON.parse(read("genesis/orchestrator/build-manifest.json")).gate.projects["orchestrator-tree"];
+  const run = project.run;
   assert.equal(run.cargo.workspace, "elohim/eprfs");
   assert.equal(run.cargo.rustflags, "");
   const scratch = mkdtempSync(join(tmpdir(), "orchestrator-epr-"));
@@ -456,9 +458,10 @@ test("orchestrator gate supplies its declared native epr instead of a PATH launc
     const env = { ...process.env, PATH: `${scratch}:${process.env.PATH}`, EPR_BIN: "",
       GATE_CARGO_ENV: "{}", CARGO_TARGET_POOL_ROOT: join(scratch, "pool"), POOL_PARENT_REPO: fileURLToPath(ROOT),
       M_METADATA_DIR: join(scratch, "metadata-dir"), M_BUILD_ARGS: join(scratch, "build"), M_SELECTED_EPR: join(scratch, "selected") };
-    execFileSync("bash", [fileURLToPath(new URL("run-local-gate.sh", import.meta.url)),
-      fileURLToPath(ROOT), "orchestrator-tree", "genesis/orchestrator", run.kind, "test-suite-tree",
-      run.cargo.workspace, "", "dev", run.cargo.rustflags], { env });
+    const invoke = () => runProject({ name: "orchestrator-tree", dir: "genesis/orchestrator", ...project }, false, false, {
+      root: fileURLToPath(ROOT), env, recipe: "test-suite-tree",
+    });
+    assert.equal(invoke(), 0);
     const selected = readFileSync(env.M_SELECTED_EPR, "utf8").trim();
     assert.ok(selected.startsWith(env.CARGO_TARGET_POOL_ROOT + "/"));
     assert.ok(selected.endsWith("/elohim__eprfs/dev/debug/epr"));
@@ -466,9 +469,7 @@ test("orchestrator gate supplies its declared native epr instead of a PATH launc
     assert.match(readFileSync(env.M_BUILD_ARGS, "utf8"), /build .*--locked -p elohim-epr-cli --bin epr/);
     env.EPR_BIN = "/explicit/lane/epr";
     rmSync(env.M_BUILD_ARGS);
-    execFileSync("bash", [fileURLToPath(new URL("run-local-gate.sh", import.meta.url)),
-      fileURLToPath(ROOT), "orchestrator-tree", "genesis/orchestrator", run.kind, "test-suite-tree",
-      run.cargo.workspace, "", "dev", run.cargo.rustflags], { env });
+    assert.equal(invoke(), 0);
     assert.equal(readFileSync(env.M_SELECTED_EPR, "utf8").trim(), env.EPR_BIN);
     assert.ok(!readdirSync(scratch).includes("build"), "explicit lane does not rebuild");
   } finally {
