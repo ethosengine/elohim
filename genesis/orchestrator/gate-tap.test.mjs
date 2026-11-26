@@ -52,7 +52,7 @@ function tap(t, script, { run = true } = {}) {
 }
 
 describe('gate-tap', () => {
-  test('forwards bytes unchanged and keeps the exit status as the verdict', t => {
+  test('forwards bytes unchanged and keeps the exit status as the verdict', { timeout: 60_000 }, t => {
     const script = `cat <<'EOF'\n${CARGO_RED}\nEOF\necho "warning: on stderr" >&2\nexit 101`;
     const { result, events, summary } = tap(t, script);
     assert.equal(result.status, 101);
@@ -65,13 +65,13 @@ describe('gate-tap', () => {
     assert.equal(summary.signals.testOutput, true);
   });
 
-  test('a green exit stays green whatever the output looked like', t => {
+  test('a green exit stays green whatever the output looked like', { timeout: 60_000 }, t => {
     const { result, summary } = tap(t, 'echo "test looks_bad ... FAILED"; exit 0');
     assert.equal(result.status, 0);
     assert.equal(summary.failures, 1);
   });
 
-  test('a red exit with nothing recognized stays red', t => {
+  test('a red exit with nothing recognized stays red', { timeout: 60_000 }, t => {
     const { result, events, summary } = tap(t, 'echo "something odd"; exit 3');
     assert.equal(result.status, 3);
     assert.equal(events.length, 0);
@@ -79,24 +79,24 @@ describe('gate-tap', () => {
     assert.equal(summary.firstRedSeconds, null);
   });
 
-  test('runs with no live run open and still reports on fd 3', t => {
+  test('runs with no live run open and still reports on fd 3', { timeout: 60_000 }, t => {
     const { result, summary } = tap(t, 'echo "test x ... FAILED"; exit 1', { run: false });
     assert.equal(result.status, 1);
     assert.equal(summary.failures, 1);
   });
 
-  test('carries a signal death through', t => {
+  test('carries a signal death through', { timeout: 60_000 }, t => {
     const { result } = tap(t, 'kill -TERM $$');
     assert.equal(result.signal, 'SIGTERM');
   });
 
-  test('refuses a missing command with usage', () => {
+  test('refuses a missing command with usage', { timeout: 60_000 }, () => {
     const result = spawnSync(process.execPath, [TAP, '--project', 'x'], { encoding: 'utf8' });
     assert.equal(result.status, 2);
     assert.match(result.stderr, /usage: gate-tap/);
   });
 
-  test('splits lines across chunk boundaries and keeps a trailing partial', () => {
+  test('splits lines across chunk boundaries and keeps a trailing partial', { timeout: 60_000 }, () => {
     const lines = [];
     const split = lineSplitter(line => lines.push(line));
     split.write(Buffer.from('test a ... FA'));
@@ -107,13 +107,13 @@ describe('gate-tap', () => {
     assert.deepEqual(lines, ['test a ... FAILED', 'second', 'thi', 'rd']);
   });
 
-  test('keeps colour only for a terminal, and never over a declared value', () => {
+  test('keeps colour only for a terminal, and never over a declared value', { timeout: 60_000 }, () => {
     assert.deepEqual(tapChildEnv({ A: '1' }, false), { A: '1' });
     assert.equal(tapChildEnv({}, true).CARGO_TERM_COLOR, 'always');
     assert.equal(tapChildEnv({ CARGO_TERM_COLOR: 'never' }, true).CARGO_TERM_COLOR, 'never');
   });
 
-  test('caps an unterminated line at 64 KiB and drops its tail through the next newline', () => {
+  test('caps an unterminated line at 64 KiB and drops its tail through the next newline', { timeout: 60_000 }, () => {
     const lines = [];
     const split = lineSplitter(line => lines.push(line));
     const prefix = 'x'.repeat(64 * 1024);
@@ -127,7 +127,7 @@ describe('gate-tap', () => {
     assert.deepEqual(lines, [prefix, 'next', 'partial']);
   });
 
-  test('caps partials in bytes across UTF-8 chunks and resets dropping at end', () => {
+  test('caps partials in bytes across UTF-8 chunks and resets dropping at end', { timeout: 60_000 }, () => {
     const lines = [];
     const split = lineSplitter(line => lines.push(line));
     const prefix = 'é'.repeat(32 * 1024);
@@ -141,7 +141,7 @@ describe('gate-tap', () => {
     assert.deepEqual(lines, [prefix, 'fresh']);
   });
 
-  test('truncates only the recognizer input while forwarding oversized lines unchanged', t => {
+  test('truncates only the recognizer input while forwarding oversized lines unchanged', { timeout: 60_000 }, t => {
     const { result, events } = tap(t,
       `node -e 'const line = "not ok 1 - " + "x".repeat(70000) + "\\n"; process.stdout.write(line); process.stderr.write(line);'`);
     const line = 'not ok 1 - ' + 'x'.repeat(70000) + '\n';
@@ -172,7 +172,7 @@ describe('gate-tap attribution', () => {
     return { root, run, edit };
   }
 
-  test('a failure in a file this session edited is labelled mine; another session\'s is other', t => {
+  test('a failure in a file this session edited is labelled mine; another session\'s is other', { timeout: 60_000 }, t => {
     const { root, run, edit } = journal(t);
     writeFileSync(resolve(root, '.eprfs/status/lsp/edits.jsonl'), `${edit('me', resolve(root, 'crate/src/head.rs'))}\n`);
     const label = attributor({ run, dir: 'crate', root });
@@ -182,7 +182,7 @@ describe('gate-tap attribution', () => {
     assert.deepEqual(attributor({ run, dir: 'crate', root })(failure).failure.attribution, { label: 'other', sessions: ['peer'] });
   });
 
-  test('a locus that resolves nowhere, or a run with no run-open, passes through unlabelled', t => {
+  test('a locus that resolves nowhere, or a run with no run-open, passes through unlabelled', { timeout: 60_000 }, t => {
     const { root, run } = journal(t);
     const failure = { kind: 'failure', project: 'p', failure: { class: 'test', locus: { file: 'src/missing.rs' } } };
     assert.equal(attributor({ run, dir: 'crate', root })(failure).failure.attribution, undefined);
@@ -194,7 +194,7 @@ describe('gate-tap attribution', () => {
 });
 
 
-test('cost samples sum only descendants, retain peaks and take cgroup counter deltas after exit', () => {
+test('cost samples sum only descendants, retain peaks and take cgroup counter deltas after exit', { timeout: 60_000 }, () => {
   const files = new Map([
     ['/proc/20/cgroup', '0::/gate\n'],
     ['/proc/20/status', 'PPid:\t1\nVmRSS:\t10 kB\n'],
@@ -224,7 +224,7 @@ test('cost samples sum only descendants, retain peaks and take cgroup counter de
   assert.equal(sampler.sample().io_full_pct_max, 4.25);
 });
 
-test('missing kernel files are unknown, and disappearing processes do not break the tap', () => {
+test('missing kernel files are unknown, and disappearing processes do not break the tap', { timeout: 60_000 }, () => {
   const sampler = createCostSampler(7, {
     readFile: () => { throw new Error('unavailable'); },
     listDir: () => { throw new Error('unavailable'); },
@@ -233,7 +233,7 @@ test('missing kernel files are unknown, and disappearing processes do not break 
     memory_high_events: null, io_full_pct_max: null });
 });
 
-test('slot holder releases non-zero and names members that survive the post-KILL wait', async () => {
+test('slot holder releases non-zero and names members that survive the post-KILL wait', { timeout: 60_000 }, async () => {
   const member = { pid: 42, sid: 7, start: '200', state: 'S' };
   const sent = [];
   let output = '';
@@ -255,7 +255,7 @@ test('slot holder releases non-zero and names members that survive the post-KILL
   assert.match(output, /^\[gate-slot\] session 7 still alive 0 ms after SIGKILL; releasing slot with surviving pids: 42$/m);
 });
 
-test('slot holder observes its leader before accepting an empty session', async () => {
+test('slot holder observes its leader before accepting an empty session', { timeout: 60_000 }, async () => {
   const leader = { pid: 7, sid: 7, start: '100', state: 'S' };
   const scans = [new Map(), new Map([[leader.pid, leader]]), new Map()];
   let sleeps = 0;
@@ -270,7 +270,7 @@ test('slot holder observes its leader before accepting an empty session', async 
   assert.equal(scans.length, 0);
 });
 
-test('slot holder releases without signalling when the sid belongs to a new leader start', async () => {
+test('slot holder releases without signalling when the sid belongs to a new leader start', { timeout: 60_000 }, async () => {
   const reused = { pid: 7, sid: 7, start: '101', state: 'S' };
   const member = { pid: 42, sid: 7, start: '200', state: 'S' };
   const sent = [];
@@ -287,7 +287,7 @@ test('slot holder releases without signalling when the sid belongs to a new lead
   assert.equal(output, '');
 });
 
-test('slot holder signals nothing when a reused sid has a zombie leader and a live member', async () => {
+test('slot holder signals nothing when a reused sid has a zombie leader and a live member', { timeout: 60_000 }, async () => {
   const zombie = { pid: 7, sid: 7, start: '101', state: 'Z' };
   const member = { pid: 42, sid: 7, start: '200', state: 'S' };
   const sent = [];
@@ -305,7 +305,7 @@ test('slot holder signals nothing when a reused sid has a zombie leader and a li
   assert.equal(output, '');
 });
 
-test('fd 3 carries all five cost axes beside the failure signals', t => {
+test('fd 3 carries all five cost axes beside the failure signals', { timeout: 60_000 }, t => {
   const { summary, result } = tap(t, 'sleep 0.05');
   assert.equal(result.status, 0);
   for (const key of ['cpu_s', 'throttled_s', 'rss_peak_bytes', 'memory_high_events', 'io_full_pct_max']) {
@@ -353,7 +353,7 @@ describe('gate-tap sibling notes', () => {
     return { result, ms: Date.now() - started };
   };
 
-  test('three reds then close send exactly the first red and the final, facts only', async t => {
+  test('three reds then close send exactly the first red and the final, facts only', { timeout: 60_000 }, async t => {
     const { dir, runPath, env } = setup(t);
     const { result } = runTap(env, runPath, THREE_RED);
     assert.equal(result.status, 101);
@@ -375,7 +375,7 @@ describe('gate-tap sibling notes', () => {
     for (const line of sent) assert.match(line, /^say --session gate-session --to shem \{/);
   });
 
-  test('a berth that fails or is missing never changes the gate status or its output', t => {
+  test('a berth that fails or is missing never changes the gate status or its output', { timeout: 60_000 }, t => {
     for (const options of [{ exit: 1 }, { withBerth: false }]) {
       const { runPath, env } = setup(t, options);
       const { result } = runTap(env, runPath, THREE_RED);
@@ -384,7 +384,7 @@ describe('gate-tap sibling notes', () => {
     }
   });
 
-  test('a hung berth say leaves the gate fast and its status intact, and the sender is reaped and named', async t => {
+  test('a hung berth say leaves the gate fast and its status intact, and the sender is reaped and named', { timeout: 60_000 }, async t => {
     const baseline = setup(t, { notes: [] });
     const off = { ...baseline.env, GATE_LIVE_SIBLING: 'off' };
     const base = runTap(off, baseline.runPath, THREE_RED);
@@ -412,7 +412,7 @@ describe('gate-tap sibling notes', () => {
     assert.deepEqual(says(hung.dir), [], 'the hung say never wrote');
   });
 
-  test('a gate that exits red with no recognized failure line still sends one red (DoD-4 receipt)', async t => {
+  test('a gate that exits red with no recognized failure line still sends one red (DoD-4 receipt)', { timeout: 60_000 }, async t => {
     const { dir, runPath, env } = setup(t);
     // A Gherkin parse error prints nothing the recognizer knows; just names the failed recipe.
     const script = "echo '(6:1): expected: #EOF, got Feature: a second feature'; echo 'error: Recipe `_gate-x` failed on line 3 with exit code 1' >&2; exit 1";
@@ -431,7 +431,7 @@ describe('gate-tap sibling notes', () => {
 
   // E12 L1: eprfs-produce.sh withheld its offer on a green gate. The agent hears a notice; nothing
   // reads it as a red: no failure event, no outlook, no first-red time, no sibling red, a zero final.
-  test('a green gate that withheld its offer reports zero reds, no outlook and no first red, and the follower shows the notice', async t => {
+  test('a green gate that withheld its offer reports zero reds, no outlook and no first red, and the follower shows the notice', { timeout: 60_000 }, async t => {
     const { dir, runPath, env } = setup(t);
     const text = 'epr producer put withheld (CFLAGS is set; gate remains green)';
     const { result } = runTap(env, runPath, `echo 'test result: ok. 3 passed; 0 failed'; echo '[gate] ${text}'; exit 0`);
@@ -462,7 +462,7 @@ describe('gate-tap sibling notes', () => {
   const deliveries = runPath => readFileSync(runPath, 'utf8').split('\n').filter(Boolean).map(l => JSON.parse(l))
     .filter(e => e.kind === 'sibling-delivery');
 
-  test('E5 #4: twelve reds for an every subscriber all reach it while the tap lives (no total cap)', async t => {
+  test('E5 #4: twelve reds for an every subscriber all reach it while the tap lives (no total cap)', { timeout: 60_000 }, async t => {
     const { runPath, env } = setup(t, { notes: [EVERY] });
     const { result } = runTap(env, runPath, `${twelve(12)}; sleep 4; exit 101`);
     assert.equal(result.status, 101);
@@ -474,7 +474,7 @@ describe('gate-tap sibling notes', () => {
     assert.equal(ok.length, 12, JSON.stringify(deliveries(runPath)));
   });
 
-  test('E5 #4: reds still queued when the tap exits are named, not dropped in silence', async t => {
+  test('E5 #4: reds still queued when the tap exits are named, not dropped in silence', { timeout: 60_000 }, async t => {
     const { runPath, env } = setup(t, { notes: [EVERY], saySleepS: 3 });
     const { result } = runTap(env, runPath, `${twelve(12)}; exit 101`);
     assert.equal(result.status, 101);

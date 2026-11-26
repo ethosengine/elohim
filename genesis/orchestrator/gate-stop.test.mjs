@@ -77,7 +77,7 @@ function startTap(run, script, env = {}) {
 }
 
 describe('stop --now ends the running gate', () => {
-  test('TERM ends the leader, its child and its grandchild within the grace', async t => {
+  test('TERM ends the leader, its child and its grandchild within the grace', { timeout: 60_000 }, async t => {
     const dir = scratch(t, 'gate-stop-term-');
     const { path: run } = openRun({ root: dir, sha: 'a'.repeat(40), target: 'test' });
     const { done } = startTap(run, fakeGate(dir));
@@ -99,7 +99,7 @@ describe('stop --now ends the running gate', () => {
     assert.equal(readRun(run).events.filter(event => event.kind === 'failure').length, 0);
   });
 
-  test('a grandchild that ignores TERM is KILLed once the grace is over', async t => {
+  test('a grandchild that ignores TERM is KILLed once the grace is over', { timeout: 60_000 }, async t => {
     const dir = scratch(t, 'gate-stop-kill-');
     const { path: run } = openRun({ root: dir, sha: 'b'.repeat(40), target: 'test' });
     const { done } = startTap(run, fakeGate(dir, { stubborn: true }), { GATE_STOP_GRACE_MS: '600' });
@@ -112,7 +112,7 @@ describe('stop --now ends the running gate', () => {
     assert.equal(result.summary.stopped.signal, 'SIGKILL');
   });
 
-  test('a TERM-ignoring gate keeps its cargo slot until the stopped group is gone', async t => {
+  test('a TERM-ignoring gate keeps its cargo slot until the stopped group is gone', { timeout: 60_000 }, async t => {
     const dir = scratch(t, 'gate-stop-slot-lock-');
     const { path: run } = openRun({ root: dir, sha: 'd'.repeat(40), target: 'test' });
     const lock = resolve(dir, 'slot.gate.lock');
@@ -145,7 +145,7 @@ describe('stop --now ends the running gate', () => {
     assert.ok(existsSync(entered), 'the second gate enters after the first group is gone');
   });
 
-  test('a plain stop leaves the running gate to finish', async t => {
+  test('a plain stop leaves the running gate to finish', { timeout: 60_000 }, async t => {
     const dir = scratch(t, 'gate-stop-plain-');
     const { path: run } = openRun({ root: dir, sha: 'c'.repeat(40), target: 'test' });
     const { done } = startTap(run, fakeGate(dir, { seconds: 1 }));
@@ -158,7 +158,7 @@ describe('stop --now ends the running gate', () => {
 });
 
 describe('only the gate is ever signalled', () => {
-  test('a recorded pid in another process group is not signalled', async t => {
+  test('a recorded pid in another process group is not signalled', { timeout: 60_000 }, async t => {
     // A foreign process in its own session and group, recorded as if it were known: it is not in
     // the gate's session and descends from nothing of the gate's, so it is never a target.
     const foreign = spawn('sleep', ['30'], { detached: true, stdio: 'ignore' });
@@ -183,7 +183,7 @@ describe('only the gate is ever signalled', () => {
     assert.equal(alive(foreign.pid), true, 'the foreign process still runs');
   });
 
-  test('a leader whose pid was reused (another start time) gives no custody and no signal', async t => {
+  test('a leader whose pid was reused (another start time) gives no custody and no signal', { timeout: 60_000 }, async t => {
     const stranger = spawn('sleep', ['30'], { detached: true, stdio: 'ignore' });
     t.after(() => { try { process.kill(stranger.pid, 'SIGKILL'); } catch { /* gone */ } });
     await waitFor(() => readStat(stranger.pid));
@@ -197,7 +197,7 @@ describe('only the gate is ever signalled', () => {
     assert.equal(alive(stranger.pid), true);
   });
 
-  test('the grace is bounded', () => {
+  test('the grace is bounded', { timeout: 60_000 }, () => {
     assert.equal(stopGraceMs({}), 10_000);
     assert.equal(stopGraceMs({ GATE_STOP_GRACE_MS: '250' }), 250);
     assert.equal(stopGraceMs({ GATE_STOP_GRACE_MS: '999999' }), 60_000);
@@ -254,7 +254,7 @@ function stopperFor(run, pids, { immediate, marker = 'grandchild', afterMs = 0 }
 }
 
 describe('a stopped gate records no evidence', () => {
-  test('stop --now: no put, no verdict note, no cycle observation, no reading; the close is the stopped line', async t => {
+  test('stop --now: no put, no verdict note, no cycle observation, no reading; the close is the stopped line', { timeout: 60_000 }, async t => {
     const fx = evidenceFixture(t, 'gate-stop-evidence-', { seconds: 300 });
     const stopper = stopperFor(fx.run, fx.pids, { immediate: true });
     t.after(() => stopper.kill());
@@ -295,7 +295,7 @@ describe('a stopped gate records no evidence', () => {
     assert.equal(cli.status, 0, 'the hook reads the gate as stopped');
   });
 
-  test('a plain stop waits for the running gate, whose verdict is recorded as before', async t => {
+  test('a plain stop waits for the running gate, whose verdict is recorded as before', { timeout: 60_000 }, async t => {
     const fx = evidenceFixture(t, 'gate-stop-plain-evidence-', { seconds: 1 });
     const stopper = stopperFor(fx.run, fx.pids, { immediate: false });
     t.after(() => stopper.kill());
@@ -343,7 +343,7 @@ describe('a verdict the gate reached on its own survives a stop', () => {
 });
 
 describe('the stop is decided from the leader\'s own exit', () => {
-  test('a gate that exits 1 from its own TERM handler keeps its red', async t => {
+  test('a gate that exits 1 from its own TERM handler keeps its red', { timeout: 60_000 }, async t => {
     const fx = evidenceFixture(t, 'gate-stop-race-trap-', { recipe: pids => [
       '#!/usr/bin/env bash',
       "trap 'exit 1' TERM",
@@ -364,7 +364,7 @@ describe('the stop is decided from the leader\'s own exit', () => {
     assert.equal(events.filter(event => event.kind === 'gate-verdict').at(-1).verdict.exit, 1);
   });
 
-  test('endTree on a leader that already exited sends the leader nothing', async () => {
+  test('endTree on a leader that already exited sends the leader nothing', { timeout: 60_000 }, async () => {
     const gone = spawn('sleep', ['0.1'], { detached: true, stdio: 'ignore' });
     await waitFor(() => readStat(gone.pid));
     const recorded = readStat(gone.pid);
@@ -375,7 +375,7 @@ describe('the stop is decided from the leader\'s own exit', () => {
     assert.deepEqual(sent.filter(([pid]) => pid === recorded.pid), [], 'never the leader pid');
   });
 
-  test('stoppedBy matches the signal sent to the leader, and only when it came before the exit', () => {
+  test('stoppedBy matches the signal sent to the leader, and only when it came before the exit', { timeout: 60_000 }, () => {
     const term = [{ signal: 'SIGTERM', at: 10 }];
     assert.equal(stoppedBy({ code: null, signal: 'SIGTERM', exitAt: 11 }, term), 'SIGTERM');
     assert.equal(stoppedBy({ code: 143, signal: null, exitAt: 11 }, term), 'SIGTERM', 'just reports a TERM death as 143');
@@ -433,11 +433,11 @@ describe('runner matrix: a verdict is withheld only for a leader the stop itself
       assert.equal(stoppedEvents.length, cell.evidence ? 0 : 1);
     });
   }
-  test('the matrix has fifteen cells', () => assert.equal(MATRIX.length, 15));
+  test('the matrix has fifteen cells', { timeout: 60_000 }, () => assert.equal(MATRIX.length, 15));
 });
 
 describe('an escaped child does not hang the run', () => {
-  test('a green whose output was cut after its exit is recorded, and says its output was cut', async t => {
+  test('a green whose output was cut after its exit is recorded, and says its output was cut', { timeout: 60_000 }, async t => {
     const fx = evidenceFixture(t, 'gate-stop-cut-', { recipe: pids => [
       '#!/usr/bin/env bash',
       `( setsid bash -c 'echo $$ > "${pids}/escaped"; exec sleep 30' & )`,
@@ -456,7 +456,7 @@ describe('an escaped child does not hang the run', () => {
     assert.match(output, /its output was cut after the recipe exited .*the verdict is the recipe's own exit/);
   });
 
-  test('the leader ended on its own and a stray holds its output: the verdict stands and the wait is bounded', async t => {
+  test('the leader ended on its own and a stray holds its output: the verdict stands and the wait is bounded', { timeout: 60_000 }, async t => {
     const dir = scratch(t, 'gate-stop-stray-');
     const script = resolve(dir, 'gate.sh');
     writeFileSync(script, [
@@ -483,7 +483,7 @@ describe('an escaped child does not hang the run', () => {
     assert.equal(alive(escaped), true, 'never signalled');
   });
 
-  test('a double-forked holder of the output is named, and the tap stops waiting for it', async t => {
+  test('a double-forked holder of the output is named, and the tap stops waiting for it', { timeout: 60_000 }, async t => {
     const dir = scratch(t, 'gate-stop-escaped-');
     const script = resolve(dir, 'gate.sh');
     writeFileSync(script, [
@@ -511,7 +511,7 @@ describe('an escaped child does not hang the run', () => {
 });
 
 describe('Ctrl-C still reaches the detached gate', () => {
-  test('SIGINT to the tap ends the gate group, and no stop is reported', async t => {
+  test('SIGINT to the tap ends the gate group, and no stop is reported', { timeout: 60_000 }, async t => {
     const dir = scratch(t, 'gate-stop-int-');
     const script = resolve(dir, 'gate.sh');
     // Foreground generations, as a recipe runs cargo: SIGINT reaches each through the group.
@@ -533,7 +533,7 @@ describe('Ctrl-C still reaches the detached gate', () => {
     assert.equal(result.summary?.stopped, undefined);
   });
 
-  test('SIGINT at the gate\'s first line, before the tap has settled, still ends the gate', async t => {
+  test('SIGINT at the gate\'s first line, before the tap has settled, still ends the gate', { timeout: 60_000 }, async t => {
     // The tap used to install its signal handlers after spawning (and after a full /proc scan for
     // its cost sampler): an interrupt in that window killed the tap and orphaned the detached gate.
     for (let round = 0; round < 5; round += 1) {
@@ -570,7 +570,7 @@ async function requestOf(run) {
 }
 
 describe('the stop CLI', () => {
-  test('a stop for a push run that already passed says the push is proceeding, and exits 1', t => {
+  test('a stop for a push run that already passed says the push is proceeding, and exits 1', { timeout: 60_000 }, t => {
     const root = scratch(t, 'gate-stop-passed-');
     const { path: run } = openRun({ root, sha: 'e'.repeat(40), target: 'refs/heads/dev' });
     closeRun(run, 'gates-passed');
@@ -581,7 +581,7 @@ describe('the stop CLI', () => {
     assert.equal(readFileSync(run, 'utf8'), before, 'nothing appended');
   });
 
-  test('a stop against a run that looks abandoned stops nothing, says why, and exits 1', t => {
+  test('a stop against a run that looks abandoned stops nothing, says why, and exits 1', { timeout: 60_000 }, t => {
     const root = scratch(t, 'gate-stop-abandoned-');
     const { path: run } = openRun({ root, sha: '6'.repeat(40), target: 'refs/heads/dev' });
     const old = new Date(Date.now() - 7 * 3600 * 1000);
@@ -593,7 +593,7 @@ describe('the stop CLI', () => {
     assert.equal(readFileSync(run, 'utf8'), before, 'nothing appended');
   });
 
-  test('a stop for a run that already ended is a no-op with a clear line', t => {
+  test('a stop for a run that already ended is a no-op with a clear line', { timeout: 60_000 }, t => {
     const root = scratch(t, 'gate-stop-ended-');
     const { path: run } = openRun({ root, sha: 'f'.repeat(40), target: 'test' });
     closeRun(run, 'failed');
@@ -606,7 +606,7 @@ describe('the stop CLI', () => {
     assert.equal(readFileSync(run, 'utf8'), before, 'nothing was appended to the closed run');
   });
 
-  test('a stop the run never answers is unconfirmed: exit 2, and the push may be proceeding', t => {
+  test('a stop the run never answers is unconfirmed: exit 2, and the push may be proceeding', { timeout: 60_000 }, t => {
     const root = scratch(t, 'gate-stop-idle-');
     const { path: run } = openRun({ root, sha: '1'.repeat(40), target: 'test' });
     const result = spawnSync(process.execPath, [LIVE, 'stop', '--now', '--wait', '1', '--run', run],
@@ -619,7 +619,7 @@ describe('the stop CLI', () => {
     assert.match(formatEvent(request), /stop requested now by session-cli — a gate still running is ended and records no verdict; .* the push is refused/);
   });
 
-  test('stop --now on a running gate exits 0 only once the run\'s stopped close exists', async t => {
+  test('stop --now on a running gate exits 0 only once the run\'s stopped close exists', { timeout: 60_000 }, async t => {
     const fx = evidenceFixture(t, 'gate-stop-cli-now-', { seconds: 300 });
     const exitFile = resolve(fx.pids, 'cli-exit');
     const cli = spawn('bash', ['-c', `until [ -f "${resolve(fx.pids, 'grandchild')}" ]; do sleep 0.05; done; `
@@ -638,7 +638,7 @@ describe('the stop CLI', () => {
     assert.match(readFileSync(resolve(fx.pids, 'cli-out'), 'utf8'), /fixture stopped by this request \(SIGTERM\); no verdict recorded; the run closed interrupted and the push is refused/);
   });
 
-  test('a stop that ties the stop-point mark is after it, through the real stop verb', async t => {
+  test('a stop that ties the stop-point mark is after it, through the real stop verb', { timeout: 60_000 }, async t => {
     const root = scratch(t, 'gate-stop-tie-');
     const { path: run } = openRun({ root, sha: '5'.repeat(40), target: 'refs/heads/dev' });
     const cli = startCli(run, ['--wait', '5']);
@@ -651,7 +651,7 @@ describe('the stop CLI', () => {
     assert.equal(stopRequested(run), false, 'the hook\'s reader does not count it either');
   });
 
-  test('stop A pending, the mark, then stop B: A is confirmed by the record naming it, B is told another request stopped the run', async t => {
+  test('stop A pending, the mark, then stop B: A is confirmed by the record naming it, B is told another request stopped the run', { timeout: 60_000 }, async t => {
     const root = scratch(t, 'gate-stop-ab-');
     const { path: run } = openRun({ root, sha: '7'.repeat(40), target: 'refs/heads/dev' });
     const a = startCli(run, ['--wait', '10']);
@@ -671,7 +671,7 @@ describe('the stop CLI', () => {
     assert.match(resultB.out, /this run has passed its last stop point; it was already stopped by another request/);
   });
 
-  test('a stopped record that names another request never confirms this one', async t => {
+  test('a stopped record that names another request never confirms this one', { timeout: 60_000 }, async t => {
     const root = scratch(t, 'gate-stop-other-');
     const { path: run } = openRun({ root, sha: '8'.repeat(40), target: 'refs/heads/dev' });
     appendEvent(run, { kind: 'stop-honoured', where: 'between-gates', requests: ['ffffffffffffffff'] });

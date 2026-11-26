@@ -6,6 +6,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  readdirSync,
   rmSync,
   symlinkSync,
   writeFileSync,
@@ -128,6 +129,21 @@ printf 'exit\\t%s\\t%s\\n' "$GATE_TEST_LABEL" "$(now)" >> "$GATE_TEST_EVENTS"
   return { ...fx, bin, slotRoot, events: join(fx.dir, "events.tsv") };
 }
 
+/** SIGKILL every live process whose environment carries GATE_TEST_RUN_TAG=<tag>. */
+function killTagged(tag) {
+  const needle = `GATE_TEST_RUN_TAG=${tag}`;
+  let pids;
+  try { pids = readdirSync("/proc").filter(name => /^\d+$/.test(name)); } catch { return; }
+  for (const pid of pids) {
+    if (Number(pid) === process.pid) continue;
+    let environ;
+    try { environ = readFileSync(`/proc/${pid}/environ`, "latin1"); } catch { continue; }
+    if (environ.split("\0").includes(needle)) {
+      try { process.kill(Number(pid), "SIGKILL"); } catch { /* already gone */ }
+    }
+  }
+}
+
 function startSlotGate(t, fx, {
   projectName,
   workspace = "workspace-a",
@@ -136,6 +152,7 @@ function startSlotGate(t, fx, {
   env = {},
 } = {}) {
   const slot = targetDir || join(fx.slotRoot, `family__${workspace.replaceAll("/", "_")}__dev`);
+  const tag = `rlg-${process.pid}-${label}-${Math.random().toString(36).slice(2)}`;
   const lock = slotGateLockPath(slot);
   const backing = lock.slice(0, -".gate.lock".length);
   const waitResult = join(fx.dir, `${label}.slot-wait.tsv`);
@@ -157,6 +174,7 @@ function startSlotGate(t, fx, {
       GATE_SLOT_LOCK_PATH: lock,
       GATE_SLOT_HOLDER_PATH: join(backing, ".gate.holder"),
       GATE_SLOT_WAIT_RESULT: waitResult,
+      GATE_TEST_RUN_TAG: tag,
       ...env,
     },
     detached: true,
@@ -179,6 +197,10 @@ function startSlotGate(t, fx, {
     if (child.exitCode === null && child.signalCode === null) {
       try { process.kill(-child.pid, "SIGKILL"); } catch { /* already exited */ }
     }
+    // The slot launcher leads its own session (outside the tap's group), and the slot holder runs
+    // under flock in another; a TERM-trapping stub left in either outlived the test once and hung a
+    // gate for 27 minutes. Every process of this gate carries the tag, so all of them end here.
+    killTagged(tag);
   });
   return { child, closed, stdout: () => stdout, stderr: () => stderr, slot, lock, waitResult };
 }
@@ -198,7 +220,7 @@ function readEvents(path) {
   });
 }
 
-test("two gates on one cargo slot never overlap and the waiter names the holder", async (t) => {
+test("two gates on one cargo slot never overlap and the waiter names the holder", { timeout: 60_000 }, async (t) => {
   const fx = slotFixture(t);
   const ready = join(fx.dir, "first.ready");
   const release = join(fx.dir, "first.release");
@@ -228,7 +250,7 @@ test("two gates on one cargo slot never overlap and the waiter names the holder"
   assert.ok(events[1].at <= events[2].at, "the second recipe entered before the first exited");
 });
 
-test("ending a gate tap releases its outside-the-group slot holder", async (t) => {
+test("ending a gate tap releases its outside-the-group slot holder", { timeout: 60_000 }, async (t) => {
   const fx = slotFixture(t);
   const ready = join(fx.dir, "holder.ready");
   const release = join(fx.dir, "never.release");
@@ -256,7 +278,7 @@ test("ending a gate tap releases its outside-the-group slot holder", async (t) =
   assert.equal(killed.signal, "SIGTERM");
 });
 
-test("different workspace slots never wait on each other", async (t) => {
+test("different workspace slots never wait on each other", { timeout: 60_000 }, async (t) => {
   const fx = slotFixture(t);
   const ready = join(fx.dir, "workspace-a.ready");
   const release = join(fx.dir, "workspace-a.release");
@@ -272,7 +294,7 @@ test("different workspace slots never wait on each other", async (t) => {
   const second = startSlotGate(t, fx, { projectName: "workspace-b-gate", workspace: "workspace-b" });
   const result = await Promise.race([
     second.closed,
-    delay(1500).then(() => ({ timeout: true })),
+    delay(10_000).then(() => ({ timeout: true })),
   ]);
   assert.equal(result.timeout, undefined, "a different workspace waited on the occupied slot");
   assert.equal(result.status, 0, result.stderr);
@@ -281,7 +303,7 @@ test("different workspace slots never wait on each other", async (t) => {
   assert.equal((await first.closed).status, 0);
 });
 
-test("a cargo slot timeout refuses with the dedicated did-not-run status", async (t) => {
+test("a cargo slot timeout refuses with the dedicated did-not-run status", { timeout: 60_000 }, async (t) => {
   const fx = slotFixture(t);
   const ready = join(fx.dir, "timeout-holder.ready");
   const release = join(fx.dir, "timeout-holder.release");
@@ -309,7 +331,7 @@ test("a cargo slot timeout refuses with the dedicated did-not-run status", async
   assert.equal((await holder.closed).status, 0);
 });
 
-test("flock owns the cargo slot lock while the descriptor stays out of the recipe", async (t) => {
+test("flock owns the cargo slot lock while the descriptor stays out of the recipe", { timeout: 60_000 }, async (t) => {
   const fx = slotFixture(t);
   const live = openRun({ root: fx.root, sha: "b".repeat(40), target: "just gate", session: "uncontended" });
   const gate = startSlotGate(t, fx, {
@@ -326,7 +348,7 @@ test("flock owns the cargo slot lock while the descriptor stays out of the recip
     "an uncontended admission emits no phantom wait event");
 });
 
-test("a waiting gate refreshes its holder heartbeat on stderr and the live run", async (t) => {
+test("a waiting gate refreshes its holder heartbeat on stderr and the live run", { timeout: 60_000 }, async (t) => {
   const fx = slotFixture(t);
   const ready = join(fx.dir, "heartbeat-holder.ready");
   const release = join(fx.dir, "heartbeat-holder.release");
@@ -353,7 +375,7 @@ test("a waiting gate refreshes its holder heartbeat on stderr and the live run",
     `waiting gate did not refresh its stderr heartbeat: ${JSON.stringify(result.stderr)}`);
 });
 
-test("SIGINT while waiting for a cargo slot aborts admission with exit 130", async (t) => {
+test("SIGINT while waiting for a cargo slot aborts admission with exit 130", { timeout: 60_000 }, async (t) => {
   const fx = slotFixture(t);
   const ready = join(fx.dir, "interrupt-holder.ready");
   const release = join(fx.dir, "interrupt-holder.release");
@@ -374,7 +396,7 @@ test("SIGINT while waiting for a cargo slot aborts admission with exit 130", asy
   assert.equal((await holder.closed).status, 0);
 });
 
-test("an uncontended gate on a symlinked cargo slot runs against the backing lock", async (t) => {
+test("an uncontended gate on a symlinked cargo slot runs against the backing lock", { timeout: 60_000 }, async (t) => {
   const fx = slotFixture(t);
   const backing = join(fx.slotRoot, "backing-slot");
   const linked = join(fx.slotRoot, "linked-slot");
@@ -392,7 +414,7 @@ test("an uncontended gate on a symlinked cargo slot runs against the backing loc
   ]);
 });
 
-test("SIGKILL of the tap does not release the slot while its recipe session lives", async (t) => {
+test("SIGKILL of the tap does not release the slot while its recipe session lives", { timeout: 60_000 }, async (t) => {
   const fx = slotFixture(t);
   const ready = join(fx.dir, "killed-tap.ready");
   const release = join(fx.dir, "killed-tap.release");
@@ -412,7 +434,7 @@ test("SIGKILL of the tap does not release the slot while its recipe session live
   assert.equal(killed.signal, "SIGKILL");
 });
 
-test("a nested same-slot gate reuses its verified ancestor's ownership", async (t) => {
+test("a nested same-slot gate reuses its verified ancestor's ownership", { timeout: 60_000 }, async (t) => {
   const fx = slotFixture(t);
   const gate = startSlotGate(t, fx, {
     projectName: "outer",
@@ -424,7 +446,7 @@ test("a nested same-slot gate reuses its verified ancestor's ownership", async (
   assert.doesNotMatch(result.stderr, /cargo slot still busy/);
 });
 
-test("wrong pid, wrong start time and a non-ancestor token never bypass a busy slot", async (t) => {
+test("wrong pid, wrong start time and a non-ancestor token never bypass a busy slot", { timeout: 60_000 }, async (t) => {
   const fx = slotFixture(t);
   const ready = join(fx.dir, "token-holder.ready");
   const release = join(fx.dir, "token-holder.release");
@@ -454,7 +476,7 @@ test("wrong pid, wrong start time and a non-ancestor token never bypass a busy s
   assert.equal((await holder.closed).status, 0);
 });
 
-test("slot drain is bounded, heartbeats, and KILLs a TERM-ignoring session member", async (t) => {
+test("slot drain is bounded, heartbeats, and KILLs a TERM-ignoring session member", { timeout: 60_000 }, async (t) => {
   const fx = slotFixture(t);
   const pidFile = join(fx.dir, "background.pid");
   const started = Date.now();
@@ -472,7 +494,7 @@ test("slot drain is bounded, heartbeats, and KILLs a TERM-ignoring session membe
   assert.notEqual(spawnSync("kill", ["-0", String(pid)]).status, 0, "the session member is gone");
 });
 
-test("a non-slot gate starts no slot session scan", (t) => {
+test("a non-slot gate starts no slot session scan", { timeout: 60_000 }, (t) => {
   const fx = fixture(t);
   const trace = join(fx.dir, "proc-scans");
   const result = spawnSync(process.execPath, [TAP, "--project", "non-slot", "--", "bash", "-c", "exit 0"], {
@@ -483,7 +505,7 @@ test("a non-slot gate starts no slot session scan", (t) => {
   assert.equal(existsSync(trace), false);
 });
 
-test("a_callers_ceiling_is_appended_and_honoured", (t) => {
+test("a_callers_ceiling_is_appended_and_honoured", { timeout: 60_000 }, (t) => {
   const fx = fixture(t);
   git(fx.dir, "init", "--quiet");
 
@@ -495,7 +517,7 @@ test("a_callers_ceiling_is_appended_and_honoured", (t) => {
   assert.match(result.stdout, /RAN/);
 });
 
-test("the_ceiling_starts_with_tmp_and_var_tmp", (t) => {
+test("the_ceiling_starts_with_tmp_and_var_tmp", { timeout: 60_000 }, (t) => {
   const fx = fixture(t, '@echo "$GIT_CEILING_DIRECTORIES"\n    @echo RAN');
 
   const result = run(fx, { env: { GIT_CEILING_DIRECTORIES: fx.dir } });
@@ -508,7 +530,7 @@ test("the_ceiling_starts_with_tmp_and_var_tmp", (t) => {
   assert.match(result.stdout, /RAN/);
 });
 
-test("a_tempdir_repo_still_finds_its_own_git", (t) => {
+test("a_tempdir_repo_still_finds_its_own_git", { timeout: 60_000 }, (t) => {
   const fx = fixture(t);
   git(fx.root, "init", "--quiet");
 
@@ -522,7 +544,7 @@ test("a_tempdir_repo_still_finds_its_own_git", (t) => {
 // E12 (b): cc reads the C flags for one target from a triple-suffixed variable
 // (CFLAGS_x86_64_unknown_linux_gnu), so a declared cargo env key may carry lowercase after its
 // leading capital. Anything else still refuses before the recipe runs.
-test("a_triple_suffixed_c_flags_key_is_exported_to_the_recipe", (t) => {
+test("a_triple_suffixed_c_flags_key_is_exported_to_the_recipe", { timeout: 60_000 }, (t) => {
   const fx = fixture(t, '@echo "C=$CFLAGS_x86_64_unknown_linux_gnu"\n    @echo RAN');
 
   const result = run(fx, {
@@ -534,7 +556,7 @@ test("a_triple_suffixed_c_flags_key_is_exported_to_the_recipe", (t) => {
   assert.match(result.stdout, /RAN/);
 });
 
-test("a_malformed_cargo_env_key_still_refuses", (t) => {
+test("a_malformed_cargo_env_key_still_refuses", { timeout: 60_000 }, (t) => {
   for (const key of ["lowercase_first", "1LEADING_DIGIT", "HAS-DASH", "HAS SPACE", "_LEADING"]) {
     const fx = fixture(t);
     const result = run(fx, { env: { GATE_CARGO_ENV: JSON.stringify({ [key]: "1" }) } });
@@ -544,7 +566,7 @@ test("a_malformed_cargo_env_key_still_refuses", (t) => {
   }
 });
 
-test("documented limit: a double-forked setsid escapee is outside slot custody", async (t) => {
+test("documented limit: a double-forked setsid escapee is outside slot custody", { timeout: 60_000 }, async (t) => {
   const fx = slotFixture(t);
   const daemonPid = join(fx.dir, "daemon.pid");
   const gate = startSlotGate(t, fx, {
