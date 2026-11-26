@@ -21,7 +21,7 @@
 //! The iroh key lives at `$XDG_CONFIG_HOME/epr/peer/iroh.key` (mode 0600). Neither it nor the
 //! device key is ever printed, logged or copied: the device key is reached only as a signer.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 use std::net::SocketAddrV4;
 use std::path::{Path, PathBuf};
@@ -1135,7 +1135,7 @@ struct StatusOutcome {
     /// Events this receiver refused because its loaded crossing list did not admit them.
     #[serde(skip_serializing_if = "CrossingDropStatus::is_empty")]
     crossing_drops: CrossingDropStatus,
-    channel: eprfs_peer::ChannelCounters,
+    channel: ChannelStatus,
     /// Connections this device's daemon refused, per node id, with the device the roster names
     /// for it (a contested device's old endpoint row still names it); `None` for a stranger.
     refused_connections: Vec<RefusedConnections>,
@@ -1152,6 +1152,59 @@ struct StatusOutcome {
     /// The last `epr bin follow` attempt per registered tool, from each store's private
     /// `follow.json`; `state` names never-attempted, interrupted and corrupt records apart.
     follow_outcomes: Vec<follow_status::ToolFollow>,
+}
+
+#[derive(Debug, Default, Serialize)]
+struct ChannelStatus {
+    projection_failures: u64,
+    last_projection_error: Option<String>,
+    fold_failures: u64,
+    #[serde(rename = "foldFailuresOurs")]
+    fold_failures_ours: u64,
+    #[serde(rename = "foldFailuresInvalid")]
+    fold_failures_invalid: u64,
+    #[serde(rename = "lastFoldFailure")]
+    last_fold_failure: Option<FoldFailureStatus>,
+    oversized_events: u64,
+    over_budget_folds: u64,
+    refused_connections: BTreeMap<String, u64>,
+    refused_strangers: u64,
+}
+
+#[derive(Debug, Serialize)]
+struct FoldFailureStatus {
+    device: String,
+    seq: u64,
+    at: u64,
+    class: String,
+    reason: String,
+}
+
+impl From<&eprfs_peer::ChannelCounters> for ChannelStatus {
+    fn from(counters: &eprfs_peer::ChannelCounters) -> Self {
+        let last_fold_failure =
+            counters
+                .last_fold_failure_parts()
+                .map(|(device, seq, at, class, reason)| FoldFailureStatus {
+                    device: device.to_string(),
+                    seq,
+                    at,
+                    class: class.to_string(),
+                    reason: reason.to_string(),
+                });
+        Self {
+            projection_failures: counters.projection_failures,
+            last_projection_error: counters.last_projection_error.clone(),
+            fold_failures: counters.fold_failures,
+            fold_failures_ours: counters.fold_failures_ours,
+            fold_failures_invalid: counters.fold_failures_invalid,
+            last_fold_failure,
+            oversized_events: counters.oversized_events,
+            over_budget_folds: counters.over_budget_folds,
+            refused_connections: counters.refused_connections.clone(),
+            refused_strangers: counters.refused_strangers,
+        }
+    }
 }
 
 const MAX_CURRENT_CROSSING_DROP_ROWS: usize = 5;
@@ -1495,6 +1548,7 @@ fn status(options: &Options) -> PeerResult<ExitCode> {
         });
     let follow_outcomes = follow_status::follow_outcomes(&crate::bin::daemon_proc_root());
     let crossing_drops = crossing_drop_status(&table);
+    let channel = ChannelStatus::from(&table.channel);
     let outcome = StatusOutcome {
         follow_outcomes,
         artifact_gate,
@@ -1512,7 +1566,7 @@ fn status(options: &Options) -> PeerResult<ExitCode> {
         devices,
         dropped: table.dropped,
         crossing_drops,
-        channel: table.channel,
+        channel,
         refused_connections,
     };
     if options.json {
@@ -1659,12 +1713,40 @@ fn render(outcome: &StatusOutcome) {
             c.projection_failures
         );
     }
-    if c.fold_failures + c.oversized_events + c.over_budget_folds > 0 {
-        println!(
-            "folds  failed {}  oversized events {}  over budget {}",
-            c.fold_failures, c.oversized_events, c.over_budget_folds
-        );
+    if let Some(line) = folds_line(c, unix_ms()) {
+        println!("{line}");
     }
+}
+
+fn folds_line(counters: &ChannelStatus, now_ms: u64) -> Option<String> {
+    if counters.fold_failures + counters.oversized_events + counters.over_budget_folds == 0 {
+        return None;
+    }
+    let failure = counters.last_fold_failure.as_ref().map_or_else(
+        || {
+            format!(
+                " (ours {}, invalid {})",
+                counters.fold_failures_ours, counters.fold_failures_invalid
+            )
+        },
+        |failure| {
+            let age_s = now_ms.saturating_sub(failure.at) / 1_000;
+            format!(
+                " (ours {}, invalid {}; last: {} seq {}, {}s ago, {}: {})",
+                counters.fold_failures_ours,
+                counters.fold_failures_invalid,
+                short(&failure.device),
+                failure.seq,
+                age_s,
+                failure.class,
+                failure.reason
+            )
+        },
+    );
+    Some(format!(
+        "folds  failed {}{}  oversized events {}  over budget {}",
+        counters.fold_failures, failure, counters.oversized_events, counters.over_budget_folds
+    ))
 }
 
 fn fold_coverage_line(device: &DeviceStatus) -> Option<String> {
@@ -3081,6 +3163,106 @@ mod status_contract {
             loaded_at: 1,
             pending: None,
         }
+    }
+
+    #[test]
+    fn unreachable_fold_status_line_names_reason_class_and_recorded_age() {
+        use super::*;
+        let device = "did:key:z6MkLaptopDevice1234567890";
+        let counters: eprfs_peer::ChannelCounters = serde_json::from_value(serde_json::json!({
+            "projection_failures": 0,
+            "last_projection_error": null,
+            "fold_failures": 2,
+            "fold_failures_ours": 1,
+            "fold_failures_invalid": 1,
+            "last_fold_failure": {
+                "device": device,
+                "seq": 9,
+                "at": 12_000,
+                "class": "ours",
+                "reason": "the peer's tier did not answer for root bafyfixture"
+            },
+            "oversized_events": 3,
+            "over_budget_folds": 4,
+            "refused_connections": {},
+            "refused_strangers": 0
+        }))
+        .expect("persisted counters");
+
+        assert_eq!(
+            folds_line(&ChannelStatus::from(&counters), 17_000).as_deref(),
+            Some(
+                format!(
+                    "folds  failed 2 (ours 1, invalid 1; last: {} seq 9, 5s ago, ours: the \
+                     peer's tier did not answer for root bafyfixture)  oversized events 3  over \
+                     budget 4",
+                    short(device)
+                )
+                .as_str()
+            )
+        );
+    }
+
+    #[test]
+    fn peer_status_contract_accepts_fold_failure_fields_and_older_output() {
+        let schema: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../sdk/schemas/v1/views/peer-cli-status.schema.json"
+        ))
+        .expect("status schema");
+        let validator = jsonschema::validator_for(&schema).expect("valid schema");
+        let current = serde_json::json!({
+            "cliCid": null,
+            "daemonCids": [],
+            "daemonDiffers": false,
+            "handle": "fixture",
+            "chainRoot": "fixture",
+            "device": "did:key:fixture",
+            "nodeId": null,
+            "ownSeq": null,
+            "rules": null,
+            "devices": [],
+            "dropped": {
+                "unadmitted": 0,
+                "forged": 0,
+                "rollback": 0,
+                "replayed": 0,
+                "malformed": 0
+            },
+            "channel": {
+                "projection_failures": 0,
+                "last_projection_error": null,
+                "fold_failures": 1,
+                "foldFailuresOurs": 1,
+                "foldFailuresInvalid": 0,
+                "lastFoldFailure": {
+                    "device": "did:key:sender",
+                    "seq": 7,
+                    "at": 12_000,
+                    "class": "ours",
+                    "reason": "the peer's tier did not answer for the signed root"
+                },
+                "oversized_events": 0,
+                "over_budget_folds": 0,
+                "refused_connections": {},
+                "refused_strangers": 0
+            },
+            "refusedConnections": [],
+            "refusedStrangers": 0,
+            "withheldCrossings": [],
+            "artifactGate": null
+        });
+        validator
+            .validate(&current)
+            .expect("current output with fold failure fields validates");
+
+        let mut older = current;
+        let channel = older["channel"].as_object_mut().expect("channel");
+        for field in ["foldFailuresOurs", "foldFailuresInvalid", "lastFoldFailure"] {
+            channel.remove(field);
+        }
+        validator
+            .validate(&older)
+            .expect("older output without fold failure fields validates");
     }
 
     #[test]

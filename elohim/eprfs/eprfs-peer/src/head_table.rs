@@ -26,6 +26,7 @@
 //!   },
 //!   "evicted_totals": { "<author-did>": { "count", "last_seen" } },
 //!   "channel": { "projection_failures", "last_projection_error", "fold_failures",
+//!                "fold_failures_ours", "fold_failures_invalid", "last_fold_failure",
 //!                "oversized_events", "over_budget_folds" }
 //! }
 //! ```
@@ -77,6 +78,10 @@ pub const MAX_CROSSING_DROP_RULE_GROUPS: usize = 3;
 
 /// The most distinct device/measure/kind refusal rows persisted for one rules digest.
 pub const MAX_CROSSING_DROP_ROWS_PER_RULE_GROUP: usize = 32;
+
+/// The most bytes persisted from one fold error's display. Enough for diagnosis without letting
+/// a remote error make the device-private head table grow without bound.
+pub const MAX_FOLD_FAILURE_REASON_BYTES: usize = 320;
 
 /// One nack leaf as it crosses at `channel/nacks/<author>`.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -178,6 +183,15 @@ pub struct ChannelCounters {
     /// Folds that failed (unreachable, unanswered, or a tree that does not hold its events at
     /// their CIDs); each is retried on the device's next head.
     pub fold_failures: u64,
+    /// Fold failures caused by this device's transport, timeout, unanswered request, or local I/O.
+    #[serde(default)]
+    pub fold_failures_ours: u64,
+    /// Fold failures caused by content from the sender that did not verify.
+    #[serde(default)]
+    pub fold_failures_invalid: u64,
+    /// The latest fold failure, cleared when a later fold of that same device completes.
+    #[serde(default)]
+    last_fold_failure: Option<LastFoldFailure>,
     /// Events refused for exceeding the per-event cap.
     pub oversized_events: u64,
     /// Folds stopped at their byte budget.
@@ -189,6 +203,99 @@ pub struct ChannelCounters {
     /// Connections refused from node ids the roster does not name, in one total.
     #[serde(default)]
     pub refused_strangers: u64,
+}
+
+/// Which side of the fold boundary caused a failure.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub(crate) enum FoldFailureClass {
+    /// This device's transport, timeout, unanswered request, or local I/O failed.
+    Ours,
+    /// The sender supplied content that failed verification.
+    Invalid,
+}
+
+impl FoldFailureClass {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Ours => "ours",
+            Self::Invalid => "invalid",
+        }
+    }
+}
+
+/// The latest failed fold, retained only until that same device next folds successfully.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+struct LastFoldFailure {
+    device: String,
+    seq: u64,
+    /// This device's clock when the failure was recorded, unix milliseconds.
+    at: u64,
+    reason: String,
+    class: FoldFailureClass,
+}
+
+impl ChannelCounters {
+    pub(crate) fn record_fold_failure(
+        &mut self,
+        device: &str,
+        seq: u64,
+        at: u64,
+        class: FoldFailureClass,
+        reason: &str,
+    ) {
+        self.fold_failures = self.fold_failures.saturating_add(1);
+        match class {
+            FoldFailureClass::Ours => {
+                self.fold_failures_ours = self.fold_failures_ours.saturating_add(1);
+            }
+            FoldFailureClass::Invalid => {
+                self.fold_failures_invalid = self.fold_failures_invalid.saturating_add(1);
+            }
+        }
+        self.last_fold_failure = Some(LastFoldFailure {
+            device: device.to_string(),
+            seq,
+            at,
+            reason: bounded_one_line(reason, MAX_FOLD_FAILURE_REASON_BYTES),
+            class,
+        });
+    }
+
+    pub(crate) fn clear_fold_failure(&mut self, device: &str) {
+        if self
+            .last_fold_failure
+            .as_ref()
+            .is_some_and(|failure| failure.device == device)
+        {
+            self.last_fold_failure = None;
+        }
+    }
+
+    /// The latest failure's device, sequence, time, class, and bounded one-line reason.
+    pub fn last_fold_failure_parts(&self) -> Option<(&str, u64, u64, &'static str, &str)> {
+        self.last_fold_failure.as_ref().map(|failure| {
+            (
+                failure.device.as_str(),
+                failure.seq,
+                failure.at,
+                failure.class.as_str(),
+                failure.reason.as_str(),
+            )
+        })
+    }
+}
+
+fn bounded_one_line(reason: &str, cap: usize) -> String {
+    let one_line = reason.split_whitespace().collect::<Vec<_>>().join(" ");
+    if one_line.len() <= cap {
+        return one_line;
+    }
+    let mut end = cap.saturating_sub('…'.len_utf8());
+    while !one_line.is_char_boundary(end) {
+        end = end.saturating_sub(1);
+    }
+    format!("{}…", &one_line[..end])
 }
 
 impl Default for HeadTable {
