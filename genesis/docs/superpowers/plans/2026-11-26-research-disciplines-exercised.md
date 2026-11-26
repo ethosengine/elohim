@@ -223,7 +223,7 @@ until the flight's verdict note stands and its landing is verified on `dev`.
 - [x] F1 built: `.claude/scripts/research-mint-check.py` with its test
 - [x] F1 exercised: `takes:` declared in eight notes, and each of the 29 practice rows carries a disposition
 - [x] F1 checked: habit `research-takes-have-a-home` born red with the script as its check; its strict run is red on exactly the 21 owed takes
-- [ ] F1 landed on `dev` and verified there
+- [x] F1 landed on `dev` and verified there
 - [x] F2 built: the saga headline prints its report, age and commits since, and a recovery record carries its commit and binary identity
 - [x] F2 said: the reviewer line in the `valueflow-reviewer` package, and the root "warn-only" sentence fixed through its package
 - [x] F2 checked: the two tests pass, run directly

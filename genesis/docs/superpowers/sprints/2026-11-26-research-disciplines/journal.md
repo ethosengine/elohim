@@ -44,7 +44,7 @@ by something that runs.
 | Flight | Discipline | State | Hand-over ref | On dev as |
 |---|---|---|---|---|
 | F0 | Correct the record, open the sprint | done: judged, landed 2026-11-26 03:43Z, verified on `origin/dev` file by file | `self/ethosengine-disciplines-f0` | `6187dff08`, `ab78d3ad0`, `baeb32247` |
-| F1 | Nothing is dropped silently | said, exercised, checked and judged (changes-requested, fixed, approved); handed over | `self/ethosengine-disciplines-f1` (carries the cleanup pass's two commits) | |
+| F1 | Nothing is dropped silently | done as far as this sprint takes it: judged, landed 2026-11-26 04:43Z after an independent read on shem, verified on `origin/dev` (32 of its 33 files byte-identical; the habit register re-projected there) | `self/ethosengine-disciplines-f1` (carried the cleanup pass's two commits) | tip `198a4901b` |
 | F2 | Evidence carries its age | built, said, checked and judged (changes-requested, fixed, approved); its planned exercise owed | `self/ethosengine-disciplines-f2f3f4`, one carry with F3 and F4 | |
 | F3 | Another seat chooses the failure | built, said, checked and judged (approved); **exercise owed** (no drawn run yet), so not done | same carry | |
 | F4 | The brief carries position and a stop condition | said (one part proposed, not ruled), exercised, checked and judged (changes-requested, fixed, approved) | same carry | |
@@ -193,7 +193,10 @@ every note), ran against a fresh worktree at the F0 tip. Four rounds, eight agen
 - **Gate.** `just gate eprfs-live-corpus` was run on ethosengine on the flight's last
   content commit; its result is in the hand-over note to the integrator.
 - **Brit gaps met.** `brit rebase` refuses with "shallow repositories require Git"; `brit mv`
-  is a bridge to git; cherry-pick is absent. Each fallback was stated where it was used.
+  is a bridge to git; cherry-pick is absent in the 0.3.4 this session holds. Each fallback was
+  stated where it was used, with one slip: a script that verified F1's landing called `git`
+  directly for a name list and blob ids, unstated, where `brit rev-parse` and `brit show`
+  would have served for the ids.
 
 ## F2 record
 
@@ -360,13 +363,19 @@ after F0 is finished in the plan's own sense, and each says why:
 
 | Flight | Said | Exercised | Checked | Still owed |
 |---|---|---|---|---|
-| F1 | yes | yes: 8 notes, 66 takes, 29 rows | yes: habit red on 21 owed takes | its landing (handed over; an independent read on shem first) |
+| F1 | yes | yes: 8 notes, 66 takes, 29 rows | yes: habit red on 21 owed takes | nothing; landed and verified. The habit stays red until the owed takes have homes |
 | F2 | yes | by a read-only run only | yes: tests run directly | the planned exercise (a session start on ethosengine), and its landing |
 | F3 | yes | **no** | the build only | one drawn run whose record shows a chooser other than its runner; its landing |
 | F4 | yes; one part proposed | yes: every dispatch; one arrival read, 2 of 5 | yes | the steward's ruling on section 8; its landing |
 
 The gate `eprfs-live-corpus` passed on ethosengine on the commit that carries F2, F3 and F4
-(`a1dee8022`); the commit after it changes this journal only. A change to the mesh scripts
+(`a1dee8022`); the commit after it changes this journal only. Those seven commits were then
+replayed onto `dev` at `fa308b6c5`, because `dev` had since changed the root instructions and
+the habit register, which this stack also changes. Neither was merged: the register was
+re-projected at each step, and this stack's one root sentence was re-applied to `dev`'s newer
+text and re-projected. Of the 59 files the stack changed, 53 are byte-identical before and
+after the replay; the six that differ are those two generated surfaces. The gate was run
+again on the replayed tip; its result is in the hand-over note. A change to the mesh scripts
 selects the `elohim-app` gate, which was not run here.
 
 ## For the steward, in one read
