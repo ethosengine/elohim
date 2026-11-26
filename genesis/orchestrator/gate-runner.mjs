@@ -1319,11 +1319,20 @@ export function runProject(project, printOnly, namesOnly, {
   // which closes the run interrupted. The exit status is non-zero, so the push is refused.
   const stoppedGate = (stopped, step = null) => {
     readingComplete = true;
-    const by = stopped.by || 'a caller with no session';
-    // "No verdict" is the claim, and no more: scratch the gate already wrote (step times, a slot's
-    // build products) and a producer put it already made (eprfs-produce.sh) are not undone.
-    write(`[gate] ${project.name}${step ? ` (${step})` : ''} stopped on request by ${by}: its process group was ended `
-      + `(${stopped.signal || 'nothing left to signal'}); no verdict recorded (what it already wrote or put is not undone)\n`);
+    if (stopped.outside) {
+      // This begins only once gate-tap is running. A signal during the runner's synchronous setup
+      // remains uncovered; a supervisor at the CLI boundary could cover that window, as a possible
+      // follow-up for the integrator to rule on.
+      const number = { SIGHUP: 1, SIGINT: 2, SIGTERM: 15 }[stopped.signal];
+      write(`[gate] ${project.name}${step ? ` (${step})` : ''}: stopped from outside `
+        + `(${number ? `signal ${number}` : stopped.signal || 'signal unknown'}); no verdict recorded\n`);
+    } else {
+      const by = stopped.by || 'a caller with no session';
+      // "No verdict" is the claim, and no more: scratch the gate already wrote (step times, a slot's
+      // build products) and a producer put it already made (eprfs-produce.sh) are not undone.
+      write(`[gate] ${project.name}${step ? ` (${step})` : ''} stopped on request by ${by}: its process group was ended `
+        + `(${stopped.signal || 'nothing left to signal'}); no verdict recorded (what it already wrote or put is not undone)\n`);
+    }
     if (stopped.escaped) {
       write(`[gate] ${project.name}: a process outside the gate's tree may still be running: `
         + `${stopped.escaped.length ? stopped.escaped.map(h => `pid ${h.pid}${h.cmd ? ` (${h.cmd})` : ''}`).join(', ') : 'none found carrying its environment'}\n`);
