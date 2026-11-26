@@ -117,6 +117,9 @@ test("station 5 (c): no decision is a refusal of every absent one, in the line t
     ["node could not start", { stub: "node() { return 127; }" }],
     ["an older gate-preflight that ran its checks instead", { stub: "node() { echo '[preflight] ok epr-bin'; return 0; }" }],
     ["exit 3 naming nothing", { stub: "node() { return 3; }" }],
+    // Review (c): xargs emptied these, and an empty answer with exit 0 passed.
+    ["exit 0 with an unmatched quote in its output", { stub: "node() { echo \"it's broken\"; return 0; }" }],
+    ["exit 0 with an unmatched double quote", { stub: "node() { echo 'say \"what'; return 0; }" }],
   ];
   for (const [what, options] of closed) {
     const r = decide(t, options);
@@ -218,4 +221,10 @@ test("review (a): the new branch's earlier commits count, and no origin/dev or n
   const gone = { ...repo.env, GATE_NARROW_BASE: "ok", GATE_PUSH_REFS: `refs/heads/dev ${repo.tip} ${"1".repeat(40)}` };
   assert.equal(decisionChanges(["a.md"], { env: gone, root: repo.dir, newRefs: true }), null);
   assert.equal(decide(t, { env: gone }).err.at(-1), REFUSED(ALL));
+});
+
+test("review (c): the required names are read by collapsing whitespace, whatever else the lines hold", (t) => {
+  const r = decide(t, { stub: "node() { printf 'sophia\\n  elohim/rakia \\n'; return 3; }" });
+  assert.equal(r.err.at(-1), REFUSED("sophia elohim/rakia"));
+  assert.doesNotMatch(DECIDE, /\| xargs/);
 });
