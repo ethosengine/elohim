@@ -243,6 +243,32 @@ PY
 # conductor log can never silently drop the whole JSONL line: both receipt
 # values tolerate "null"/empty instead of raising inside float(...).
 recovery_write_record() { # <path> <shape> <peer> <survivor> <t_surv> <t_rec> <recovered 0|1> <elapsed_s> <polls> <failing_csv> <labels_json> <rr> <rs> <receipt_scope_rec> <receipt_scope_surv> <zome_verdict>
+  # Source identity (F2): the commit these scripts ran from, whether its tracked tree was
+  # dirty, and the storage binary's derivation key as its install recorded it
+  # (.derivation-elohim-storage.json beside $STORAGE_BIN, which hc-mesh.sh sets when main
+  # sources it). The key is the recorded one, not re-derived here; absent -> "unmeasured".
+  local src_commit src_dirty bin_id="" bin_why="" bin_rec
+  src_commit="$(git -C "$REPO_ROOT" rev-parse HEAD 2>/dev/null)" || src_commit=""
+  if [ -z "$src_commit" ]; then
+    src_dirty=""
+  elif [ -n "$(git -C "$REPO_ROOT" status --porcelain --untracked-files=no 2>/dev/null)" ]; then
+    src_dirty=1
+  else
+    src_dirty=0
+  fi
+  if [ -z "${STORAGE_BIN:-}" ]; then
+    bin_why="STORAGE_BIN unset (hc-mesh.sh not sourced)"
+  else
+    bin_rec="$(dirname "$STORAGE_BIN")/.derivation-elohim-storage.json"
+    if [ ! -f "$bin_rec" ]; then
+      bin_why="no derivation record at $bin_rec"
+    else
+      bin_id="$(python3 -c 'import json,sys;k=json.load(open(sys.argv[1])).get("key");print(k if isinstance(k,str) and k else "")' "$bin_rec" 2>/dev/null)" || bin_id=""
+      [ -n "$bin_id" ] || bin_why="derivation record at $bin_rec has no key"
+    fi
+  fi
+  RECOVERY_SRC_COMMIT="$src_commit" RECOVERY_SRC_DIRTY="$src_dirty" \
+  RECOVERY_BIN_ID="$bin_id" RECOVERY_BIN_WHY="$bin_why" \
   python3 - "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8" "$9" "${10}" "${11}" "${12}" "${13}" "${14}" "${15}" "${16}" <<'PY'
 import json, sys, datetime, os
 p, shape, peer, surv, ts, tr, rec, el, polls, failing, labels, rr, rs, rscope_rec, rscope_surv, zome = sys.argv[1:17]
@@ -262,6 +288,18 @@ record = {
     "conductor_receipt_scope": {"recovering": rscope_rec or "unknown", "survivor": rscope_surv or "unknown"},
     "zome_path": zome or "unknown",
 }
+src_commit = os.environ.get("RECOVERY_SRC_COMMIT", "")
+src_dirty = os.environ.get("RECOVERY_SRC_DIRTY", "")
+record["source_commit"] = src_commit or "unmeasured"
+record["source_dirty"] = {"1": True, "0": False}.get(src_dirty, "unmeasured")
+if not src_commit:
+    record["source_unmeasured_reason"] = "git rev-parse HEAD failed at REPO_ROOT"
+bin_id = os.environ.get("RECOVERY_BIN_ID", "")
+record["binary_identity"] = bin_id or "unmeasured"
+if bin_id:
+    record["binary_identity_kind"] = "storage derivation key (recorded at install)"
+else:
+    record["binary_identity_reason"] = os.environ.get("RECOVERY_BIN_WHY", "") or "unknown"
 # One open/write, not two separate appends: two calls each do their own
 # open()/close() against the same path, so a concurrent recovery run's
 # append (this loop is meant to run per-peer, potentially overlapping other

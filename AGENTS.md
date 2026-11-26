@@ -244,9 +244,10 @@ Seed content with the `seed-workflow` skill (`just seed validate` is the only no
 
 Recovery / quiesce evidence is durable: `just mesh recovery …` and `just mesh quiesce` write under
 `genesis/a2o/reports/recovery/` (gitignored, persistent). The canonical Dowell household fixture’s runtime state persists under `genesis/local-dev/household-dowell`; a one-time stopped-state migration leaves `/tmp/elohim-local-mesh` as a compatibility symlink.
-Pre-push carries a warn-only **T2 receipt** leg: a dataplane change (`elohim-storage/src/{p2p,sync,reconcile,p2p_iroh}`,
-`doorway-service/src`) with no household sprint-report newer than it prints `NO-T2-RECEIPT` naming `just test mesh`
-(`T2_RECEIPT=strict` refuses) — the evidence ladder's ascend-only rule at push time.
+Pre-push carries a **receipt** leg, the evidence ladder's ascend-only rule (`genesis/orchestrator/scripts/t2-receipt.sh`): a serving
+change pushed to `dev` or `main` with no household report on its source is refused (`NO-SERVING-RECEIPT`); a dataplane-only change
+(`elohim-storage/src/{p2p,sync,reconcile,p2p_iroh}`, `doorway-service/src`) with no newer sprint-report only warns
+(`NO-T2-RECEIPT` naming `just test mesh`; `T2_RECEIPT=strict` refuses).
 
 `build-manifest.json gate.projects` owns local gate detection and typed
 execution. Both `just gate` and pre-push use

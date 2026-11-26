@@ -289,14 +289,26 @@ def load_report():
             return _load_legacy_slot()
         mod = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(mod)
+        # Read the same root this script reads (equal in a normal run; lets a caller that
+        # re-points ROOT read another checkout's reports read-only).
+        mod.REPORTS_DIR = ROOT / "genesis" / "a2o" / "reports"
         reports = mod.load_reports()
         if not reports:
             return _load_legacy_slot()
         newest = reports[0]
-        when = newest.get("when")
+        # load_reports() falls back to the file mtime when `generatedAt` is unparseable; the
+        # headline must say so rather than print an mtime as the report's age, so the raw
+        # value is re-read from the report itself.
+        raw_generated = None
+        try:
+            raw_doc = json.loads(Path(newest.get("path")).read_text(encoding="utf-8"))
+            raw_generated = raw_doc.get("generatedAt") if isinstance(raw_doc, dict) else None
+        except Exception:
+            raw_generated = None
         return {
             "runId": newest.get("runId"),
-            "generatedAt": when.isoformat().replace("+00:00", "Z") if when else None,
+            "generatedAt": raw_generated,
+            "gitCommit": newest.get("gitCommit"),
             "profile": newest.get("profile"),
             "path": str(newest.get("path")),
             "summary": {"byConcern": newest.get("byConcern") or {},
@@ -394,6 +406,69 @@ def assemble():
 # Render
 # ---------------------------------------------------------------------------
 
+def _habits_age():
+    """habits-status.py's `_age` helper, loaded the way load_report() loads load_reports()."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(
+        "_habits_status_for_saga_age", SCRIPT.parent / "habits-status.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod._age
+
+
+def _git(*args):
+    import subprocess
+    return subprocess.run(["git", "-C", str(ROOT), *args], capture_output=True, text=True, timeout=10)
+
+
+def report_provenance(report, now=None) -> str:
+    """`report <runId>, <age> old, <n> commits since (all paths)`; each part that cannot be
+    read says `unmeasured (<reason>)` — never a zero, never silence."""
+    from datetime import datetime, timezone
+    now = now or datetime.now(timezone.utc)
+    run_id = report.get("runId")
+    parts = [f"report {run_id}" if run_id else "report unmeasured (no runId)"]
+
+    raw = report.get("generatedAt")
+    when = None
+    if isinstance(raw, str) and raw:
+        try:
+            when = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+            if when.tzinfo is None:
+                when = when.replace(tzinfo=timezone.utc)
+        except ValueError:
+            when = None
+        if when is None:
+            parts.append(f"age unmeasured (generatedAt unparseable: {raw!r})")
+    else:
+        parts.append("age unmeasured (no generatedAt)")
+    if when is not None:
+        try:
+            age = _habits_age()(when, now)
+            parts.append(age[:-4] + " old" if age.endswith(" ago") else age)
+        except Exception as exc:
+            parts.append(f"age unmeasured (age helper unavailable: {type(exc).__name__})")
+
+    commit = report.get("gitCommit")
+    if not isinstance(commit, str) or not commit:
+        parts.append("commits since unmeasured (no gitCommit in report)")
+    else:
+        try:
+            if _git("cat-file", "-e", f"{commit}^{{commit}}").returncode != 0:
+                parts.append(f"commits since unmeasured ({commit[:9]} not in this checkout's "
+                             "object store; shallow clone?)")
+            else:
+                r = _git("rev-list", "--count", f"{commit}..HEAD")
+                n = r.stdout.strip()
+                if r.returncode == 0 and n.isdigit():
+                    parts.append(f"{n} commits since (all paths)")
+                else:
+                    parts.append("commits since unmeasured (rev-list failed)")
+        except Exception as exc:
+            parts.append(f"commits since unmeasured (git unavailable: {type(exc).__name__})")
+    return ", ".join(parts)
+
+
 def headline(rows, report, flows_present) -> str:
     if not rows:
         return ""
@@ -426,6 +501,8 @@ def headline(rows, report, flows_present) -> str:
         line += " · " + " · ".join(extras)
     if not report:
         line += " · (no report)"
+    else:
+        line += " · " + report_provenance(report)
     return line
 
 
