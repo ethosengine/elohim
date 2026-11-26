@@ -249,6 +249,7 @@ test('pre-push preserves unfiltered files across refs and removes the file throu
     const result = spawnSync('bash', ['-c', `
       ${handlers}
       ZERO_SHA=0000000000000000000000000000000000000000
+      HOOK_WORK_TREE=$2
       PUSH_LINES=("refs/heads/one local refs/heads/one base" "refs/heads/two local refs/heads/two $1")
       git() {
         case "$1" in
@@ -258,11 +259,19 @@ test('pre-push preserves unfiltered files across refs and removes the file throu
             printf '%s\\n' .claude/test-fixture.json ws/leaf/src/lib.rs ;;
         esac
       }
-      bash() { return 0; } # The style gate is outside this input-handoff test.
+      export -f git
+      bash() {
+        # Exercise the extracted hook's real range script; only the unrelated style gate is stubbed.
+        if [ "$1" = "$HOOK_WORK_TREE/genesis/orchestrator/push-changed-files.sh" ]; then
+          command bash "$@"
+        else
+          return 0
+        fi
+      }
       ${detection}
       printf '%s\\n' "$GATE_NARROW_BASE" "$GATE_CHANGED_FILES"
       cat "$GATE_CHANGED_FILES"
-    `, 'pre-push-fixture', remote], { encoding: 'utf8' });
+    `, 'pre-push-fixture', remote, ROOT], { encoding: 'utf8' });
     assert.equal(result.status, 0, result.stderr);
     const [base, file, ...files] = result.stdout.split('\n');
     assert.equal(base, remote === 'base' ? 'ok' : 'none');
