@@ -75,10 +75,18 @@ pre_rows="${out%%scenario	shape	run*}"
 t "no expected outcome printed before the runs finish" \
   '! grep -qE "recover|no-shared-transport|expect" <<< "$(grep -v "^matrix: draw\|survivor health\|corpus reference\|live shape" <<< "$pre_rows" | grep -v "^===")"'
 
-# 2. run_by is the word unmeasured when the runner is not named.
-reset; run_matrix MESH_RECOVERY_DRAW="$tmp/draw.txt"
-t "run_by=unmeasured when MESH_RECOVERY_RUN_BY is unset" \
-  '[ "$mrc" -eq 0 ] && [ "$(python3 -c "import json;print({json.loads(l)[\"labels\"][\"run_by\"] for l in open(\"$tmp/timeline.jsonl\")})")" = "{'"'"'unmeasured'"'"'}" ]'
+# 2. In a fanout scenario (more than two peers) the last peer recovers, drawn or not:
+#    the line's slot chooses only between the two peers of a two-peer scenario.
+cat > "$tmp/lib-fan.tsv" <<'LIB'
+# scenario	peers	doorways	survivor	recovering	expect
+fan-3	matthew,jessica,james	0	dual	dual	recover
+LIB
+printf '# chosen_by: agent:drawer\nfan-3\tcold\t0\n' > "$tmp/fan.txt"
+reset; run_matrix MESH_RECOVERY_LIBRARY="$tmp/lib-fan.tsv" MESH_RECOVERY_LIVE_SHAPE="matthew,jessica,james/0" \
+  MESH_RECOVERY_DRAW="$tmp/fan.txt" MESH_RECOVERY_RUN_BY=agent:runner
+fan_peer="$(python3 -c 'import json,sys; print(",".join(json.loads(l)["peer"] for l in open(sys.argv[1])))' "$tmp/timeline.jsonl" 2>/dev/null)"
+t "a drawn fanout run recovers the last peer, whatever its slot says (rc=$mrc, peer=$fan_peer)" \
+  '[ "$mrc" -eq 0 ] && [ "$fan_peer" = "james" ]'
 
 # 3. Refusals: exit 2, a reason, and no run.
 refuse() { # <label> <expected-reason-substring> <env...>
@@ -99,6 +107,7 @@ refuse "an invalid slot" "invalid recovering slot" MESH_RECOVERY_DRAW="$tmp/slot
 printf '# a draw\nhomo-a\twarm\t0\n' > "$tmp/nochooser.txt"
 refuse "a draw with no chooser" "chosen_by" MESH_RECOVERY_DRAW="$tmp/nochooser.txt"
 refuse "a draw chosen by the runner" "not a draw" MESH_RECOVERY_DRAW="$tmp/draw.txt" MESH_RECOVERY_RUN_BY=agent:drawer
+refuse "a drawn run whose runner is not named" "runner is not named" MESH_RECOVERY_DRAW="$tmp/draw.txt"
 
 # 4. Without a draw the cycle runs as before, minus the expect label.
 reset; run_matrix MESH_RECOVERY_RUNS=2 MESH_RECOVERY_SHAPES=warm

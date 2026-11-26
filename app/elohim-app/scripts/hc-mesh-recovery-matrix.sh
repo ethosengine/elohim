@@ -9,8 +9,11 @@
 # MESH_RECOVERY_DRAW=<path> runs a draw chosen by another seat instead of the
 # cycle: `#` comments (one must be `# chosen_by: <actor>`), then one run per
 # line, tab-separated: scenario, shape (warm|cold), recovering slot (0|1).
-# Each drawn record carries chosen_by, run_by (MESH_RECOVERY_RUN_BY, or
-# `unmeasured`) and draw_sha256. A draw whose chooser is the runner is refused.
+# The slot chooses between the two peers of a two-peer scenario. In a fanout
+# scenario (more than two peers) the last peer recovers, as in the cycle, and
+# the line's slot does not choose. Each drawn record carries chosen_by, run_by
+# and draw_sha256. A drawn run must name its runner (MESH_RECOVERY_RUN_BY), and
+# a draw whose chooser is that runner is refused.
 #
 # A scenario whose `expect` is no-shared-transport PASSES when recovery FAILS
 # with P0..P2 all 0 (nothing crossed) — the honest red the spec demands.
@@ -94,6 +97,9 @@ matrix_load_draw() { # validates $DRAW; sets DRAW_ROWS/DRAW_CHOSEN_BY/DRAW_SHA; 
   fi
   if [ "$n" -eq 0 ]; then
     echo "recovery draw has no run lines: $DRAW" >&2; return 2
+  fi
+  if [ -z "${MESH_RECOVERY_RUN_BY:-}" ]; then
+    echo "recovery draw: the runner is not named. Set MESH_RECOVERY_RUN_BY=<actor>, so the receipt names who ran it" >&2; return 2
   fi
   DRAW_ROWS="$out"
 }
@@ -483,9 +489,10 @@ while IFS=$'\t' read -r name peers doorways t_surv t_rec expect draw_shape draw_
 
   for shape in "${SHAPES[@]}"; do
     for run in $(matrix_run_list); do
-      # Two peers alternate roles. In fanout scenarios the last peer always
-      # recovers and every preceding peer survives.
-      if [ -n "$DRAW" ]; then
+      # Two peers alternate roles, or take the draw's slot. In fanout scenarios
+      # the last peer always recovers and every preceding peer survives, drawn
+      # or not: that is the only fanout shape the matrix has ever run.
+      if [ -n "$DRAW" ] && [ "${#PEERS[@]}" -eq 2 ]; then
         ri="$draw_slot"
       elif [ "${#PEERS[@]}" -eq 2 ]; then
         ri="$(matrix_recovering_index "$run")"

@@ -265,10 +265,16 @@ every note), ran against a fresh worktree at the F0 tip. Four rounds, eight agen
   scenario, shape or slot is not valid, when `chosen_by` is missing, and when `chosen_by`
   equals `MESH_RECOVERY_RUN_BY`. Every record of a drawn run carries `chosen_by`, `run_by`
   and `draw_sha256`. The `expect` label no longer travels into any run; nothing read it.
-- **A limit of the refusal.** The matrix can only refuse a self-made draw when the runner
-  names itself. With `MESH_RECOVERY_RUN_BY` unset the record says `run_by: unmeasured`, and
-  whether the chooser differed from the runner is then a question for whoever reads the
-  record, not something the script established.
+- **A limit of the refusal, then closed.** As first built the matrix could only refuse a
+  self-made draw when the runner named itself; with `MESH_RECOVERY_RUN_BY` unset it recorded
+  `run_by: unmeasured` and ran. On shem's independent read (follow-up a) a drawn run now
+  refuses unless its runner is named, so every drawn record names both seats. What stays
+  true: `chosen_by` is text the draw file supplies.
+- **Fanout keeps its own rule.** As first built a draw's slot picked the recovering peer even
+  in a fanout scenario, where the cycle always recovers the last peer and no other shape has
+  ever been run. On shem's read (follow-up b) the slot now chooses only between the two peers
+  of a two-peer scenario; in fanout the last peer recovers, drawn or not. The draw already
+  announced for the owed run has one fanout line whose slot therefore does not choose.
 - **The failing check that was already on `dev`** (`matrix_live_shape honors
   MESH_RECOVERY_LIVE_SHAPE override`) was a fault in the test: it set the variable in front
   of `source`, where it does not outlive the `source`. Two lines; the function was right.
@@ -426,7 +432,7 @@ failure's history and the redundant path.
 | 4 | 2026-11-26 | The ethosengine main checkout is more than 41 commits behind `origin/dev`, holds three local commits that duplicate landed ones, and has two stranded autostash entries | Owner: the steward, told in the session report of 2026-11-26. Outside this sprint's write set |
 | 5 | 2026-11-26 | A `PostToolUse:Edit` hook timed out once during the research session | Owner: the steward, told the same day. Not investigated; outside this sprint's write set |
 | 6 | 2026-11-26 | The plan's F0 step "`epr flow project <plan>`" cannot be done as written: the installed `epr` takes no path there, and a hand-written gap-items file sits outside the sprint's write set | Understood, no action in F0. History: first occurrence; the `/plan` command's text is stale and a correction note is recorded on its package. Redundant path: this journal's flight table and the habit deltas carry the sprint's state. Closed 2026-11-26: the coverage read counts a plan as captured when it yields checkbox stations, so the plan gained a Stations section (commit `0a84d2bff`) and left the un-captured list |
-| 7 | 2026-11-26 | The F0 verdict note, written from the flight worktree without `--root`, recorded `human:matthew` as its actor: the worktree's flow sidecar holds no actor claim for the session, and the note took the participant | Closed the same day: correction `bafyreic65f6s4n…x3pe` names the mis-attributed note, and the verdict is restated with its actor named and closes that correction. The first note cannot be withdrawn (notes are append-only). Practice kept for this sprint: every note written from a worktree passes `--as`. The cause is the per-checkout sidecar, already owned by landing L2 of the placement design |
+| 7 | 2026-11-26 | The F0 verdict note, written from the flight worktree without `--root`, recorded `human:matthew` as its actor: the worktree's flow sidecar holds no actor claim for the session, and the note took the participant | Closed the same day: correction `bafyreic65f6s4n…x3pe` names the mis-attributed note, and the verdict is restated with its actor named and closes that correction. The first note cannot be withdrawn (notes are append-only). Practice kept for this sprint: every note written from a worktree passes `--as` and `--session` (a typed `--as` alone names a provider without pinning a registered claim; shem's read, follow-up c). The cause is the per-checkout sidecar, already owned by landing L2 of the placement design |
 | 8 | 2026-11-26 | The cleanup workflow dispatches only the largest pressure class and says "from /projects/elohim" in every prompt: it ranked one class twice, wrote the ranking nowhere, never reached two smaller classes, and as written would have edited a stale shared checkout | Correction note recorded on `.claude/workflows/memory-stasis-loop.js`. Owner of the fix: the gathered read (the workflow is outside this sprint's write set) |
 | 9 | 2026-11-26 | The `cleanup:` gate still reads 384 against 120 after the pass | Owner: the steward. The reset is his to record or withhold; the count lives in a checkout this sprint did not touch |
 | 10 | 2026-11-26 | A cherry-pick refused over a staged rename left its sequence pending; a later `--continue` treated the next commit as the first pick's result and skipped that pick | Closed the same day: seen by checking the result (the plan had no stations), repaired by picking the skipped commit alone. Understood, no further action. History: first occurrence. Redundant path: the result was read before anything was pushed |
