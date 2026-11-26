@@ -335,12 +335,12 @@ test('openRun prunes to the newest N files by name, ignoring unrelated entries',
   );
 });
 
-test('openRun preserves active runs outside keep until their mtime is stale', (t) => {
+test('openRun preserves active runs but prunes a closed run with a later delivery', (t) => {
   const root = fixture(t);
   const active = open(root);
   const reopened = open(root);
   closeRun(reopened.path, 'passed', { now });
-  appendEvent(reopened.path, { kind: 'gate-verdict' }, { now });
+  appendEvent(reopened.path, { kind: 'sibling-delivery', ok: true }, { now });
   const stale = open(root);
   const closed = open(root);
   closeRun(closed.path, 'passed', { now });
@@ -357,7 +357,7 @@ test('openRun preserves active runs outside keep until their mtime is stale', (t
   });
   assert.equal(existsSync(newest.path), true);
   assert.equal(existsSync(active.path), true);
-  assert.equal(existsSync(reopened.path), true);
+  assert.equal(existsSync(reopened.path), false);
   assert.equal(existsSync(stale.path), false);
   assert.equal(existsSync(closed.path), false);
 });
@@ -510,6 +510,16 @@ test('closeRun is idempotent and preserves the first closing outcome', (t) => {
   );
 });
 
+test('closeRun ignores a run-close outcome that readers do not accept', (t) => {
+  const root = fixture(t);
+  const { path } = open(root);
+  appendEvent(path, { kind: 'run-close', outcome: 'success' }, { now });
+
+  assert.equal(readRun(path).outcome, 'running');
+  assert.equal(closeRun(path, 'passed', { now }).outcome, 'passed');
+  assert.equal(readRun(path).outcome, 'passed');
+});
+
 test('readRun distinguishes fresh, stale, and explicitly closed runs', (t) => {
   const root = fixture(t);
   const { path } = open(root);
@@ -646,11 +656,12 @@ for (const selector of [{ session: 'waiting-session' }, { latest: true }]) {
   });
 }
 
-test('follow by session skips the previous push and waits for the next run', async (t) => {
+test('follow by session skips the previous push when delivery follows its close', async (t) => {
   const root = fixture(t);
   const previous = open(root, { session: 'pusher' });
   appendEvent(previous.path, { kind: 'gate-verdict', project: 'old', verdict: { exit: 1, seconds: 9 } });
   closeRun(previous.path, 'failed');
+  appendEvent(previous.path, { kind: 'sibling-delivery', ok: true });
   const past = new Date(Date.now() - 60_000);
   utimesSync(previous.path, past, past);
   const lines = [];
@@ -944,14 +955,13 @@ test('CLI open, event, show, and close preserve excerpts and support seq selecti
   assert.equal(readRun(path).outcome, 'failed');
 });
 
-test('CLI open, event, and close fail open with one stderr line on IO errors', (t) => {
+test('CLI open and event fail open with one stderr line on IO errors', (t) => {
   const root = fixture(t);
   writeFileSync(join(root, '.eprfs'), 'blocks the log directory', 'utf8');
   const missing = join(root, 'missing', 'run.jsonl');
   const cases = [
     ['open', '--sha', SHA, '--target', 'dev', '--session', 'cli'],
     ['event', '--run', missing, '--json', '{"kind":"failure"}'],
-    ['close', '--run', missing, '--outcome', 'failed'],
   ];
 
   for (const args of cases) {
@@ -960,6 +970,16 @@ test('CLI open, event, and close fail open with one stderr line on IO errors', (
     assert.equal(result.stdout, '');
     assert.match(result.stderr, /^\[gate-live\] [^\r\n]+\n$/);
   }
+});
+
+test('CLI close reports an IO error with a non-zero exit', (t) => {
+  const root = fixture(t);
+  const missing = join(root, 'missing', 'run.jsonl');
+  const result = cli(root, ['close', '--run', missing, '--outcome', 'failed']);
+
+  assert.equal(result.status, 1);
+  assert.equal(result.stdout, '');
+  assert.match(result.stderr, /^\[gate-live\] [^\r\n]+\n$/);
 });
 
 test('CLI follow maps outcomes to exit codes', (t) => {
@@ -1623,6 +1643,7 @@ test('notice: a green run with a withheld offer counts no red in harvest, the fi
     assert.equal(await live.emitRed(path, notice, { env }), 0, 'a notice is never a gate-red@1');
     clock += 30 * 60 * 1000;
     closeRun(path, 'passed', { now: tick });
+    appendEvent(path, { kind: 'sibling-delivery', ok: true }, { now: tick });
     paths.push(path);
   }
   const result = live.harvest({ root, last: 10 });
