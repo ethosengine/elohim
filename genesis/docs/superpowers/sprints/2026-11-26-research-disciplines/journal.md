@@ -41,7 +41,7 @@ by something that runs.
 
 | Flight | Discipline | State | Hand-over ref | On dev as |
 |---|---|---|---|---|
-| F0 | Correct the record, open the sprint | written; gate and verdict pending | `self/ethosengine-disciplines-f0` | |
+| F0 | Correct the record, open the sprint | judged (changes-requested, fixed); handed over | `self/ethosengine-disciplines-f0` | |
 | F1 | Nothing is dropped silently | not started | | |
 | F2 | Evidence carries its age | not started | | |
 | F3 | Another seat chooses the failure | not started | | |
@@ -60,8 +60,17 @@ by something that runs.
   (the viable-system code has no fixture) and `arch-workspace-discipline-backlog` row 85 (no
   gate project covers the saga and habit status scripts or the mesh recovery scripts).
 - **Research Index.** An entry for the Memorilla note, and the table "What more than one pass
-  reached". The table's citations were compiled by an explorer and are the first thing the F0
-  judge checks.
+  reached". The table's citations were compiled by an explorer and not re-read by the author,
+  so they were the first thing the F0 judge was asked to check.
+- **Verdict: changes-requested, then fixed.** The judge (an Opus seat on ethosengine that read
+  the diff, the cited code and every cited take and row, and did not read the whole note or
+  this journal) found every code correction true and the table wrong in five cells: two Nostr
+  Compass citations swapped, one Unified Attestation study item called a take, and three
+  Radicle citations that supported their lesson only by interpretation. The author re-read
+  those sources and corrected the table in the next commit on the same ref: N6 moved to lesson
+  5 and Compass left lesson 2, the study item is named as one, Radicle T8 and T7 were removed,
+  and Radicle T1 and ngit T2 name the clause that supports the lesson. No lesson fell below
+  two passes. Implemented by the orchestrating session (Fable 5.2, ethosengine).
 - **Two notes committed** that had existed only as untracked files in the ethosengine main
   checkout: Memorilla (2026-11-18) and Gesell (2026-10-29), unchanged.
 
@@ -83,3 +92,4 @@ failure's history and the redundant path.
 | 3 | 2026-11-26 | A gate verdict run on ethosengine for a handed-over commit did not stand in on shem: the integrator picked the commit onto a newer tip, which changed the closure, and shem ran the gate itself (262 s) | Understood, no action. History: one of three hand-overs that day; the first was reused (69 s). Redundant path: the integrator's own gate run, which is what happened. Practice kept: rebase onto the fetched `origin/dev` tip immediately before the gate run |
 | 4 | 2026-11-26 | The ethosengine main checkout is more than 41 commits behind `origin/dev`, holds three local commits that duplicate landed ones, and has two stranded autostash entries | Owner: the steward, told in the session report of 2026-11-26. Outside this sprint's write set |
 | 5 | 2026-11-26 | A `PostToolUse:Edit` hook timed out once during the research session | Owner: the steward, told the same day. Not investigated; outside this sprint's write set |
+| 6 | 2026-11-26 | The plan's F0 step "`epr flow project <plan>`" cannot be done as written: the installed `epr` takes no path there, and a hand-written gap-items file sits outside the sprint's write set | Understood, no action in F0. History: first occurrence; the `/plan` command's text is stale and a correction note is recorded on its package. Redundant path: this journal's flight table and the habit deltas carry the sprint's state. The plan is therefore absent from the placement ledger, which is put to the steward with the cleanup pass |
