@@ -1184,6 +1184,11 @@ class Berth:
                 continue
             if isinstance(ev, dict):
                 out.append(ev)
+        superseded = {ev.get("supersedes_override"): ev.get("dseq") for ev in out
+                      if ev.get("kind") == "renew" and ev.get("supersedes_override") is not None}
+        for ev in out:
+            if ev.get("kind") == "override" and ev.get("dseq") in superseded:
+                ev["superseded_by"] = superseded[ev["dseq"]]
         return out[-n:] if n else out
 
     # ------------------------------------------------------------ observation
@@ -1562,7 +1567,8 @@ class Berth:
         end = cur.get("since", start) + ttl if ttl is not None else now
         return round(max(0, min(end, now) - start))
 
-    def _renew(self, lease, ttl_s, note, seat, klass=None, session_source=None, closure=None):
+    def _renew(self, lease, ttl_s, note, seat, klass=None, session_source=None, closure=None,
+               supersedes_override=None):
         """Reset `since` (never `claimed_at`). Without an explicit ttl the hold stops at the class's
         max_ttl_s counted from claimed_at; an explicit ttl is itself capped. Returns a refusal
         reason, or None when renewed."""
@@ -1596,9 +1602,12 @@ class Berth:
             lease["seat"] = seat
         if closure is not None:
             lease["closure"] = closure
+        supersession = ({"supersedes_override": supersedes_override}
+                        if supersedes_override is not None else {})
         self.record("renew", resource=lease.get("resource"), session=lease.get("holder"), ttl_s=ttl,
                     claimed_at=claimed, seat=seat, note=note, session_source=session_source,
-                    closure=lease.get("closure"), **_lease_times(lease), **{"class": lease_class})
+                    closure=lease.get("closure"), **supersession, **_lease_times(lease),
+                    **{"class": lease_class})
         return None
 
     def _new_lease(self, resource, session, note, ttl_s, klass, seat, closure=None):
@@ -2135,19 +2144,38 @@ class Berth:
         seen = view.get("seen") if isinstance(view.get("seen"), dict) else {}
         return True, seen, "renewing" if mine else False, None
 
-    def _mark_effective(self, resource, session, effective=True):
+    def _mark_effective(self, resource, session, effective=True, override_row=None,
+                        supersede_override=False):
         with self._locked():
             leases = self.leases()
             for lease in [leases.get(resource)] + leases.get(resource + "/slots", []):
                 if isinstance(lease, dict) and lease.get("holder") == session:
                     lease["effective"] = effective
+                    if override_row:
+                        if supersede_override:
+                            self._renew(lease, lease.get("ttl_s"), None, lease.get("seat"),
+                                        supersedes_override=override_row.get("dseq"))
+                            lease["override_state"] = "superseded"
+                        else:
+                            lease["override_state"] = "needed"
+            self._write_leases(leases)
+
+    def _mark_override_wait(self, resource, session, claimed_at, override_at_ms):
+        if not isinstance(override_at_ms, (int, float)):
+            return
+        with self._locked():
+            leases = self.leases()
+            for lease in [leases.get(resource)] + leases.get(resource + "/slots", []):
+                if (isinstance(lease, dict) and lease.get("holder") == session
+                        and lease.get("claimed_at") == claimed_at):
+                    lease["override_at_ms"] = override_at_ms
             self._write_leases(leases)
 
     def _override_row(self, resource, session, claimed_at):
         return next((row for row in reversed(self.ledger(0))
                      if row.get("kind") == "override" and row.get("resource") == resource
                      and row.get("session") == session and row.get("claimed_at") == claimed_at
-                     and row.get("overrode")), None)
+                     and row.get("overrode") and row.get("superseded_by") is None), None)
 
     def _has_offline_override(self, resource, session, claimed_at):
         return self._override_row(resource, session, claimed_at) is not None
@@ -2172,6 +2200,7 @@ class Berth:
                 continue
             break
         held = False
+        override_written = None
         if err:
             reason = err
         elif kind is None:
@@ -2182,7 +2211,12 @@ class Berth:
         elif verdict.get("session") != session:
             reason, held = f"held by {verdict.get('session')} on this device", True
         elif kind == "effective":
-            self._mark_effective(resource, session)
+            override_row = self._override_row(resource, session, lease.get("claimed_at"))
+            override_at = lease.get("override_at_ms")
+            supersede = bool(override_row and isinstance(override_at, (int, float))
+                             and self._view_now(view) < override_at)
+            self._mark_effective(resource, session, override_row=override_row,
+                                 supersede_override=supersede)
             return True, lease, "renewed" if renewal else "claimed"
         elif kind == "unconfirmed":
             fence_after_s = None
@@ -2192,10 +2226,11 @@ class Berth:
             reason = steward_reason(verdict, self._view_now(view), fence_after_s)
             override_row = self._override_row(resource, session, lease.get("claimed_at"))
             if offline_ok and not verdict.get("fenced") and not override_row:
-                self.record("override", resource=resource, session=session, holder=session,
-                            claimed_at=lease.get("claimed_at"), overrode=verdict.get("device"),
-                            last_seen=verdict.get("last_seen"), reason=f"--offline-ok over {reason}",
-                            **{"class": lease.get("class")})
+                override_written = self.record(
+                    "override", resource=resource, session=session, holder=session,
+                    claimed_at=lease.get("claimed_at"), overrode=verdict.get("device"),
+                    last_seen=verdict.get("last_seen"), reason=f"--offline-ok over {reason}",
+                    **{"class": lease.get("class")})
                 failed = self.take_fold_failures(resource)
                 if failed:
                     self._release(resource, session, reason=f"steward: {failed[0]}",
@@ -2222,7 +2257,8 @@ class Berth:
                 elif (isinstance(delayed_verdict, dict)
                       and delayed_verdict.get("verdict") == "effective"
                       and delayed_verdict.get("session") == session):
-                    self._mark_effective(resource, session)
+                    self._mark_effective(resource, session, override_row=override_written,
+                                         supersede_override=True)
                     return True, lease, f"claimed; override on the record — {reason}"
                 elif (isinstance(delayed_verdict, dict)
                       and delayed_verdict.get("verdict") in ("held_by", "refused_by")):
@@ -2238,6 +2274,8 @@ class Berth:
                                            if isinstance(delayed_verdict, dict) else None),
                         "claimed_at": lease.get("claimed_at"),
                     }
+                    self._mark_override_wait(resource, session, lease.get("claimed_at"),
+                                             self.override_wait["override_at_ms"])
                 reason = f"{reason} — override on the record"
                 if (view or {}).get("serving") is False:
                     reason = f"{reason}\n{DAEMON_DOWN_LINE}"
@@ -2707,9 +2745,11 @@ def _lease_description(lease, now):
     terms = ", ".join(x for x in (lease.get("class"),
                                  f"ttl {_age(lease['ttl_s'])}" if lease.get("ttl_s") else None,
                                  f"last renewed {_age(now - times['last_renewed_at'])} ago", expiry) if x)
+    override = ({"superseded": " — override superseded (claim became effective before it was needed)",
+                 "needed": " — override on the record"}.get(lease.get("override_state"), ""))
     return (f"held by {lease['holder']} for {_age(now - lease.get('claimed_at', lease['since']))} ({terms})"
             + (f" closure={lease['closure']}" if lease.get("closure") else "")
-            + (f" — {lease['note']}" if lease.get("note") else ""))
+            + (f" — {lease['note']}" if lease.get("note") else "") + override)
 
 
 def _guard_state(name):
@@ -3721,6 +3761,10 @@ def _fmt_ledger(ev):
         extra += f" held {_age(ev['held_s'])}" if ev.get("held_s") is not None else ""
         extra += f" seat={ev['seat']}" if ev.get("seat") else ""
         extra += f" — {ev['reason']}" if k == "override" and ev.get("reason") else ""
+        extra += (f" — superseded by effective renew #{ev['superseded_by']}"
+                  if k == "override" and ev.get("superseded_by") is not None else "")
+        extra += (f" — supersedes override #{ev['supersedes_override']}"
+                  if k == "renew" and ev.get("supersedes_override") is not None else "")
         extra += f" — {ev['note']}" if ev.get("note") else ""
         return f"{t} {k:<7} {ev.get('resource')} by {ev.get('session') or ev.get('holder')}{extra}"
     if k == "moor":

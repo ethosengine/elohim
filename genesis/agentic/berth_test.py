@@ -3126,18 +3126,53 @@ class StewardClaimTest(unittest.TestCase):
         self.assertEqual(self.berth.override_wait,
                          {"override_at_ms": override_at, "claimed_at": generation})
 
+    def test_effective_before_override_at_supersedes_the_override_in_status_and_ledger(self):
+        override_at = NOW_MS + 120_000
+        self.views(view(), view(dev_integration=unconfirmed_a()),
+                   view(dev_integration=unconfirmed_a(override_at=override_at)))
+        self.assertFalse(self.claim(offline_ok=True, ttl_s=600)[0])
+        generation = self.berth.who("dev-integration")["claimed_at"]
+
+        self.views(view(dev_integration=effective()), view(dev_integration=effective()))
+        ok, _, reason, _ = self.claim(offline_ok=True, ttl_s=600)
+        self.assertTrue(ok, reason)
+        self.assertIn("override superseded (claim became effective before it was needed)",
+                      render_status(self.berth))
+        override = self.rows("override")[-1]
+        self.assertIn("superseded by effective renew", _NS["_fmt_ledger"](override))
+        self.assertIsNone(self.berth._override_row("dev-integration", "codex-1", generation))
+
     def test_a_reclaim_at_override_at_is_effective_and_keeps_the_generation(self):
         override_at = NOW_MS + 120_000
         self.views(view(), view(dev_integration=unconfirmed_a()),
                    view(dev_integration=unconfirmed_a(override_at=override_at)))
         self.assertFalse(self.claim(offline_ok=True, ttl_s=60)[0])
         generation = self.berth.who("dev-integration")["claimed_at"]
-        self.views(view(dev_integration=effective()), view(dev_integration=effective()))
+        at_override = view(dev_integration=effective())
+        at_override["now"] = override_at
+        self.views(at_override, at_override)
         ok, lease, reason, _ = self.claim(offline_ok=True, ttl_s=60)
         self.assertTrue(ok, reason)
         self.assertEqual(reason, "renewed")
         self.assertEqual(lease["claimed_at"], generation)
         self.assertEqual(self.berth.who("dev-integration")["claimed_at"], generation)
+
+    def test_effective_at_override_at_still_reads_as_an_override(self):
+        override_at = NOW_MS + 120_000
+        self.views(view(), view(dev_integration=unconfirmed_a()),
+                   view(dev_integration=unconfirmed_a(override_at=override_at)))
+        self.assertFalse(self.claim(offline_ok=True, ttl_s=600)[0])
+        generation = self.berth.who("dev-integration")["claimed_at"]
+
+        at_override = view(dev_integration=effective())
+        at_override["now"] = override_at
+        self.views(at_override, at_override)
+        ok, _, reason, _ = self.claim(offline_ok=True, ttl_s=600)
+        self.assertTrue(ok, reason)
+        self.assertIn("override on the record", render_status(self.berth))
+        override = self.rows("override")[-1]
+        self.assertNotIn("superseded", _NS["_fmt_ledger"](override))
+        self.assertIsNotNone(self.berth._override_row("dev-integration", "codex-1", generation))
 
     def test_a_returning_sibling_withdraws_the_override_and_claims_on_acknowledgement(self):
         override_at = NOW_MS + 120_000

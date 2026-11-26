@@ -73,6 +73,10 @@ case "$1" in
    W|D)
     f="$here/override-at"; [ -f "$f" ] || printf %s "$(( $(date +%s%3N) + \${STUB_OVERRIDE_IN_MS:-1500} ))" > "$f"; at=$(cat "$f")
     if [ "$(date +%s%3N)" -lt "$at" ]; then extra=""; [ "$m" != D ] || extra=" (this device's peer daemon is not running: start it with epr peer serve)"; echo "$2: REFUSED — unconfirmed: sibling$extra — override on the record" >&2; echo "  override_at_ms=$at claimed_at=1001.125" >&2; exit 3; fi;;
+   P|Q|X)
+    if [ "$n" -eq 1 ]; then at="$(( $(date +%s%3N) + 60000 ))"; echo "$2: REFUSED — unconfirmed: sibling — override on the record" >&2; echo "  override_at_ms=$at claimed_at=1001.125" >&2; exit 3; fi
+    [ "$m" != Q ] || { echo "$2: REFUSED — unconfirmed: sibling" >&2; exit 3; }
+    [ "$m" != X ] || { echo "the steward lease view did not answer" >&2; exit 1; };;
   esac
   [ "$n" -gt 1 ] || [ "$m" = R ] && verb=renewed || verb=claimed
   echo "$2: $verb by \${ELOHIM_SESSION_ID:-claude-9} claimed_at=$token";;
@@ -343,7 +347,40 @@ test("prepush_waits_for_the_override_then_lands", async (t) => {
     r.out,
   );
   assert.ok(r.calls.filter((l) => argv(l).startsWith("claim ")).length >= 2);
+  assert.doesNotMatch(r.out, /proceeding \(override not needed\)/);
   await pollCalls(fx, (c) => !!release(c));
+});
+test("an_effective_claim_ends_the_override_wait_on_the_short_poll", async (t) => {
+  const fx = fixture(t),
+    started = Date.now(),
+    r = runBlock(fx, {
+      env: {
+        BERTH_MODES: '{"dev-integration":"P"}',
+        BERTH_OVERRIDE_POLL_S: "1",
+        BERTH_PREPUSH_OVERRIDE_MAX_S: "8",
+      },
+    });
+  assert.equal(r.status, 0, r.out);
+  assert.ok(Date.now() - started < 5000, r.out);
+  assert.match(
+    r.out,
+    /Phase L: the claim became effective \d+s into the override wait; proceeding \(override not needed\)/,
+  );
+  await pollCalls(fx, (c) => !!release(c));
+});
+test("unconfirmed_and_error_override_polls_do_not_proceed_early", (t) => {
+  for (const mode of ["Q", "X"]) {
+    const r = runBlock(fixture(t), {
+      env: {
+        BERTH_MODES: `{"dev-integration":"${mode}"}`,
+        BERTH_OVERRIDE_POLL_S: "1",
+        BERTH_PREPUSH_OVERRIDE_MAX_S: "2",
+      },
+    });
+    assert.equal(r.status, 1, `${mode}: ${r.out}`);
+    assert.doesNotMatch(r.out, /proceeding \(override not needed\)/);
+    assert.ok(r.calls.filter((l) => argv(l).startsWith("claim ")).length >= 3, r.out);
+  }
 });
 test("the_override_wait_is_bounded", async (t) => {
   const fx = fixture(t),
@@ -351,11 +388,13 @@ test("the_override_wait_is_bounded", async (t) => {
       env: {
         BERTH_MODES: '{"dev-integration":"W"}',
         STUB_OVERRIDE_IN_MS: "60000",
+        BERTH_OVERRIDE_POLL_S: "1",
         BERTH_PREPUSH_OVERRIDE_MAX_S: "2",
       },
     });
   assert.equal(r.status, 1, r.out);
   assert.match(r.out, /one silent sibling/);
+  assert.doesNotMatch(r.out, /proceeding \(override not needed\)/);
   const c = await pollCalls(fx, (x) => !!release(x));
   assert.match(argv(release(c)), /1001\.125$/);
 });
