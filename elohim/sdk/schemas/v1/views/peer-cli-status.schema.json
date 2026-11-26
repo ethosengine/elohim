@@ -166,13 +166,7 @@
           "nodeId",
           "seq",
           "root",
-          "heardAgeS",
-          "foldedAgeS",
-          "probeOk",
-          "probeUnsupported",
-          "probeAgeS",
-          "resubscriptions",
-          "connectionResets",
+          "ageS",
           "eventsFolded",
           "acked"
         ],
@@ -195,6 +189,13 @@
               "string",
               "null"
             ]
+          },
+          "ageS": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
           },
           "heardAgeS": {
             "description": "Seconds on this device's clock since any verified head was heard from the peer, including a replay; null when no verified head has been heard (one provenance).",

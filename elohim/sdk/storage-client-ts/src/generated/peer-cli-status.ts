@@ -25,34 +25,35 @@ export interface PeerCliStatus {
     nodeId: string;
     seq: number | null;
     root: string | null;
+    ageS: number | null;
     /**
      * Seconds on this device's clock since any verified head was heard from the peer, including a replay; null when no verified head has been heard (one provenance).
      */
-    heardAgeS: number | null;
+    heardAgeS?: number | null;
     /**
      * Seconds on this device's clock since a head from the peer folded new records; null when no head has folded records (one provenance).
      */
-    foldedAgeS: number | null;
+    foldedAgeS?: number | null;
     /**
      * Whether the most recent recovery probe reached the peer; null when no recovery probe has been recorded (one provenance).
      */
-    probeOk: boolean | null;
+    probeOk?: boolean | null;
     /**
      * Whether the most recent recovery probe found a peer that does not support probing; null when no recovery probe has been recorded (one provenance).
      */
-    probeUnsupported: boolean | null;
+    probeUnsupported?: boolean | null;
     /**
      * Seconds on this device's clock since the most recent recovery probe; null when no recovery probe has been recorded (one provenance).
      */
-    probeAgeS: number | null;
+    probeAgeS?: number | null;
     /**
      * Number of recovery resubscriptions attempted for this peer since the daemon started.
      */
-    resubscriptions: number;
+    resubscriptions?: number;
     /**
      * Number of recovery connection resets attempted for this peer since the daemon started.
      */
-    connectionResets: number;
+    connectionResets?: number;
     eventsFolded: number;
     acked: number | null;
   }[];
