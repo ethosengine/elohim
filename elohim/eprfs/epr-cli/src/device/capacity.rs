@@ -370,6 +370,26 @@ fn validate_build_role(record: &BuildRoleRecord) -> Result<(), String> {
     Ok(())
 }
 
+/// The role `epr bin follow` acts on, read from the same record, with the same validation, that
+/// `epr device status` reports. `None` is unknown: unparseable, invalid, or a builder whose `until`
+/// has passed. A follow treats unknown as not a builder, so an unreadable role never builds.
+pub(crate) fn follow_build_role(bytes: &[u8]) -> Option<BuildRole> {
+    let record: BuildRoleRecord = serde_json::from_slice(bytes).ok()?;
+    validate_build_role(&record).ok()?;
+    match (record.role, record.until.as_deref()) {
+        (BuildRole::Builder, Some(until)) => chrono::DateTime::parse_from_rfc3339(until)
+            .ok()
+            .filter(|until| *until > chrono::Utc::now())
+            .map(|_| BuildRole::Builder),
+        (role, _) => Some(role),
+    }
+}
+
+/// The local build-role file's path under the device config directory.
+pub(crate) fn build_role_path(config_dir: &Path) -> PathBuf {
+    config_dir.join(BUILD_ROLE_FILE)
+}
+
 fn read_build_role(config_dir: &Path) -> Result<Option<BuildRoleRecord>, String> {
     let path = config_dir.join(BUILD_ROLE_FILE);
     let bytes = match fs::read(&path) {
