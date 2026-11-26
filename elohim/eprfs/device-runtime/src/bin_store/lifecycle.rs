@@ -3,7 +3,7 @@ use super::{
     follow_record::{FollowOutcome, Noted},
     landing::{Expect, Transition},
     source::{self, CommandSpec},
-    IngestOptions, Pin, Refusal, Release, Result, Status, Store,
+    FollowBuild, IngestOptions, Pin, Refusal, Release, Result, Status, Store,
 };
 use crate::session::{self, SessionIdentity};
 use serde_json::{json, Value};
@@ -21,6 +21,13 @@ struct PrepareOptions<'a> {
     expect: Expect,
     /// A follow attempt's slot for the release it stages, filled before landing is tried.
     candidate: Option<&'a RefCell<Option<String>>>,
+    build: &'a FollowBuild,
+}
+
+struct AdoptOptions<'a> {
+    expect: Expect,
+    candidate: Option<&'a RefCell<Option<String>>>,
+    build: &'a FollowBuild,
 }
 
 /// The bound on one brit build attempt. One that runs out is reported as such, with how to
@@ -210,8 +217,11 @@ impl Store {
             commit,
             closure,
             "bootstrap",
-            Expect::Prior(expected),
-            None,
+            AdoptOptions {
+                expect: Expect::Prior(expected),
+                candidate: None,
+                build: &FollowBuild::Builder,
+            },
         )
     }
     fn adopt(
@@ -220,8 +230,7 @@ impl Store {
         commit: &str,
         closure: Option<&Path>,
         gate: &str,
-        expect: Expect,
-        candidate: Option<&RefCell<Option<String>>>,
+        options: AdoptOptions<'_>,
     ) -> Result<Release> {
         self.prepare_declared(
             repo,
@@ -231,8 +240,9 @@ impl Store {
             PrepareOptions {
                 mode: ark_core::declaration::FollowMode::Apply,
                 pin: None,
-                expect,
-                candidate,
+                expect: options.expect,
+                candidate: options.candidate,
+                build: options.build,
             },
         )
     }
@@ -304,6 +314,16 @@ impl Store {
                 format!("{detail}; {}", attempts.join("; ")),
             ));
         }
+        if let FollowBuild::NotBuilder { role, draw_from } = options.build {
+            return Err(Refusal::new(
+                "not-a-builder",
+                format!(
+                    "no release for {commit}; this device does not build (build-role {role}); \
+                     draw it from {draw_from} once it holds one: epr bin follow --repo {}",
+                    repo.display()
+                ),
+            ));
+        }
         // A host with no build target says so, rather than folding it into the build attempts.
         if let Err(e) = self.build_target_with(repo, &files::env) {
             return Err(Refusal::new(
@@ -366,9 +386,22 @@ impl Store {
         closure: Option<&Path>,
         follow: &ark_core::declaration::Follow,
     ) -> Result<Value> {
+        self.follow_declared_for_build(repo, closure, follow, &FollowBuild::Builder)
+    }
+
+    /// Follow the declaration with the device's explicit local-build role. Stored, supplied and
+    /// sibling-drawn releases retain their existing admission path; only the compile fallback is
+    /// role-gated.
+    pub fn follow_declared_for_build(
+        &self,
+        repo: &Path,
+        closure: Option<&Path>,
+        follow: &ark_core::declaration::Follow,
+        build: &FollowBuild,
+    ) -> Result<Value> {
         self.recorded_follow(repo, follow.mode.label(), |noted| {
             if follow.mode.applies() && follow.pin.is_none() {
-                return self.follow_unrecorded(repo, closure, noted);
+                return self.follow_unrecorded(repo, closure, noted, build);
             }
             let expected = self.committed_current();
             let state = self.source_state(repo)?;
@@ -389,6 +422,7 @@ impl Store {
                     pin: follow.pin.as_deref(),
                     expect: Expect::Prior(expected),
                     candidate: Some(&noted.candidate),
+                    build,
                 },
             )?;
             Ok(json!({"followed":follow.mode.applies(), "observed":record.cid, "mode":follow.mode}))
@@ -642,7 +676,7 @@ impl Store {
     /// leaves its outcome in the store's `follow.json` (see `last_follow`).
     pub fn follow(&self, repo: &Path, closure: Option<&Path>) -> Result<Value> {
         self.recorded_follow(repo, "apply", |noted| {
-            self.follow_unrecorded(repo, closure, noted)
+            self.follow_unrecorded(repo, closure, noted, &FollowBuild::Builder)
         })
     }
     fn follow_unrecorded(
@@ -650,6 +684,7 @@ impl Store {
         repo: &Path,
         closure: Option<&Path>,
         noted: &mut Noted,
+        build: &FollowBuild,
     ) -> Result<Value> {
         use FollowOutcome::{Refused, Unchanged};
         let landed: Value =
@@ -728,8 +763,11 @@ impl Store {
             commit,
             closure,
             "follow",
-            Expect::Prior(expected),
-            Some(&noted.candidate),
+            AdoptOptions {
+                expect: Expect::Prior(expected),
+                candidate: Some(&noted.candidate),
+                build,
+            },
         )?;
         let mut value = serde_json::to_value(record)?;
         value["followed"] = json!(true);

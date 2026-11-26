@@ -59,6 +59,42 @@ impl From<serde_json::Error> for Refusal {
 }
 pub(crate) type Result<T> = std::result::Result<T, Refusal>;
 
+/// Whether a declared follow may fall back to compiling after stored and supplied releases have
+/// been exhausted. The CLI derives this from this device's local build-role record and names the
+/// sibling custody source a non-builder should use instead.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum FollowBuild {
+    /// Preserve the existing local-build fallback.
+    Builder,
+    /// Refuse at the local-build boundary, after every usable release path has been tried.
+    NotBuilder {
+        /// The readable role label, or `unknown` when no valid role could be read.
+        role: String,
+        /// The sibling device(s) that answered with offers, or a generic builder source.
+        draw_from: String,
+    },
+}
+
+impl FollowBuild {
+    /// A declared, current builder role.
+    pub fn builder() -> Self {
+        Self::Builder
+    }
+
+    /// A readable non-builder role such as `carrier` or `neither`.
+    pub fn not_builder(role: impl Into<String>, draw_from: impl Into<String>) -> Self {
+        Self::NotBuilder {
+            role: role.into(),
+            draw_from: draw_from.into(),
+        }
+    }
+
+    /// Missing, expired, or unreadable role state fails closed.
+    pub fn unknown(draw_from: impl Into<String>) -> Self {
+        Self::not_builder("unknown", draw_from)
+    }
+}
+
 const PAYLOAD_FORMATS_FIELD: &str = "payloadFormats";
 const PAYLOAD_FORMATS_PROBE_FIELD: &str = "payloadFormatsProbe";
 const LEGACY_PAYLOAD_FORMAT: &str = "directory-v1";

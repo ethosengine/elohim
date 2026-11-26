@@ -30,6 +30,7 @@
 mod arrival;
 mod arrival_work;
 mod capacity;
+pub(crate) use capacity::{build_role_path, follow_build_role, BuildRole};
 pub(crate) mod declaration;
 mod layout;
 pub(crate) mod supervise;

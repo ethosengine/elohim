@@ -3455,6 +3455,120 @@ fn compatible_held_candidate_still_lands_through_declared_follow() {
     assert_eq!(f.store.head("current"), Some(candidate.cid));
 }
 
+fn apply_follow() -> ark_core::declaration::Follow {
+    ark_core::declaration::Follow {
+        channel: "bin:epr".into(),
+        mode: ark_core::declaration::FollowMode::Apply,
+        pin: None,
+    }
+}
+
+fn follow_fixture_without_release() -> Fixture {
+    let f = Fixture::new("epr");
+    let old = f.release("follow-build-role-old");
+    f.land(&old).unwrap();
+    f.state.lock().unwrap().head = "b".repeat(40);
+    f
+}
+
+fn cargo_build_calls(f: &Fixture) -> usize {
+    f.state
+        .lock()
+        .unwrap()
+        .calls
+        .iter()
+        .filter(|call| {
+            call.program == "cargo" && call.args.first().is_some_and(|arg| arg == "build")
+        })
+        .count()
+}
+
+#[test]
+fn non_builder_with_no_release_refuses_and_never_calls_cargo() {
+    let f = follow_fixture_without_release();
+    let commit = f.commit();
+    let refusal = f
+        .store
+        .follow_declared_for_build(
+            f.tmp.path(),
+            None,
+            &apply_follow(),
+            &FollowBuild::not_builder("carrier", "did:key:z6MkBuilder"),
+        )
+        .unwrap_err();
+
+    assert_eq!(refusal.kind, "not-a-builder");
+    assert_eq!(
+        refusal.detail,
+        format!(
+            "no release for {commit}; this device does not build (build-role carrier); draw it \
+             from did:key:z6MkBuilder once it holds one: epr bin follow --repo {}",
+            f.tmp.path().display()
+        )
+    );
+    assert_eq!(cargo_build_calls(&f), 0);
+}
+
+#[test]
+fn unknown_build_role_refuses_closed_and_never_calls_cargo() {
+    let f = follow_fixture_without_release();
+    let commit = f.commit();
+    let refusal = f
+        .store
+        .follow_declared_for_build(
+            f.tmp.path(),
+            None,
+            &apply_follow(),
+            &FollowBuild::unknown("a builder device"),
+        )
+        .unwrap_err();
+
+    assert_eq!(refusal.kind, "not-a-builder");
+    assert_eq!(
+        refusal.detail,
+        format!(
+            "no release for {commit}; this device does not build (build-role unknown); draw it \
+             from a builder device once it holds one: epr bin follow --repo {}",
+            f.tmp.path().display()
+        )
+    );
+    assert_eq!(cargo_build_calls(&f), 0);
+}
+
+#[test]
+fn builder_with_no_release_keeps_the_local_build_fallback() {
+    let f = follow_fixture_without_release();
+    let refusal = f
+        .store
+        .follow_declared_for_build(f.tmp.path(), None, &apply_follow(), &FollowBuild::builder())
+        .unwrap_err();
+
+    assert_eq!(refusal.kind, "bootstrap-unavailable");
+    assert!(
+        cargo_build_calls(&f) > 0,
+        "the builder still reaches build_release"
+    );
+}
+
+#[test]
+fn non_builder_with_a_drawn_release_uses_it_without_calling_cargo() {
+    let f = follow_fixture_without_release();
+    // The CLI draw has already verified and ingested the sibling's release before lifecycle runs.
+    let candidate = f.release("drawn-release");
+
+    f.store
+        .follow_declared_for_build(
+            f.tmp.path(),
+            None,
+            &apply_follow(),
+            &FollowBuild::not_builder("neither", "did:key:z6MkBuilder"),
+        )
+        .unwrap();
+
+    assert_eq!(f.store.head("current"), Some(candidate.cid));
+    assert_eq!(cargo_build_calls(&f), 0);
+}
+
 #[test]
 fn following_a_paired_declaration_upgrades_same_commit_legacy_custody() {
     use ark_core::declaration::{Follow, FollowMode};
