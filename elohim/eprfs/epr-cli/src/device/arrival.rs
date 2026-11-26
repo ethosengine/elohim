@@ -2894,6 +2894,7 @@ mod tests {
             folded_at: NOW_MS.saturating_sub(fold_age_s.saturating_mul(1000)),
             events_folded: 0,
             nack: Default::default(),
+            coverage: None,
         };
         eprfs_peer::HeadTable {
             own: Some(own),
