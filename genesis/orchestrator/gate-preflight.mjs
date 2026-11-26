@@ -20,6 +20,8 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadGateRegistry, loadPipelineRegistry } from './pipeline-registry.mjs';
+import { projectsFromStale, staleSteps } from './graph-walker.mjs';
+import { loadManifests, resolveStep } from './manifest-utils.mjs';
 import { SUITE_READ_LISTS, UNAUDITED_RECIPE_PROJECTS, globCovers, readSet, suiteReadSet } from './gate-input-audit.mjs';
 import { declaredPinStores } from './suite-inventory.mjs';
 import { dirtyPaths } from './gate-evidence.mjs';
@@ -114,21 +116,61 @@ export function manifestNames(module, project, { root, read = readFileSync }) {
 }
 
 /**
+ * Inputs an attested submodule's own manifest declares OUTSIDE its path. Each such manifest names
+ * its gitlink, paths under it, and nothing else, with this exception: sophia's step lists the
+ * superproject's `sophia.Jenkinsfile` as its buildProcess file. A change to one of these selects
+ * the attested project, and with the submodule absent its manifest is not here to say so.
+ * worktree-prep.test.mjs holds every checked-out attested manifest to this table.
+ */
+export const ATTESTED_OUTSIDE_INPUTS = Object.freeze({ sophia: ['sophia.Jenkinsfile'] });
+
+/**
+ * The gate projects one hop downstream of the change, read from the manifests that are checked
+ * out: every project owning a step that `depends` on a step the changed paths make stale. The
+ * path-only selection the gate falls back to when `brit build affected` is unavailable (it is,
+ * whenever a submodule manifest another step depends on is absent) does not propagate through
+ * dependencies (graph-walker.mjs walkGraph, phase 3+4); the oracle adds exactly this hop
+ * (gate-oracle.mjs: `upstream` of a directly stale step). The attested question is asked of these
+ * too, so a dependent the fallback dropped is still judged. It selects and keys nothing.
+ */
+export function oneHopDependents(root, changed) {
+  const manifests = loadManifests(root);
+  const direct = staleSteps(manifests, changed);
+  const widened = new Map(direct);
+  for (const { content } of manifests) {
+    for (const [name, step] of Object.entries(content.steps || {})) {
+      const upstream = (step.depends || []).map(dep => resolveStep(dep, content.pipeline)).find(dep => direct.has(dep));
+      const qualified = `${content.pipeline}:${name}`;
+      if (upstream && !widened.has(qualified)) widened.set(qualified, [`upstream: ${upstream}`]);
+    }
+  }
+  const registry = loadGateRegistry(root);
+  return projectsFromStale(manifests, widened, changed).map(project => registry.get(project.name) ?? { name: project.name, dir: project.dir });
+}
+
+/**
  * Why this work needs the attested submodule `module`, or null when its own changed paths and
  * selected projects make it irrelevant (a documents-only or script-only change on a device that
  * holds no copy of brit, rakia or sophia). Every answer that cannot be computed is a reason: no
  * change list, no selection, an unreadable manifest, a dependency no loaded manifest declares
  * (the absent submodule may be what declares it). The orchestrator gates load every manifest and
- * read every declared pin, so either of them needs all of them.
+ * read every declared pin, so either of them needs all of them. The projects judged are the
+ * selected ones and their one-hop dependents (oneHopDependents).
  */
-export function attestedNeed(module, { root, projects, changed, read = readFileSync, pipelines = loadPipelineRegistry }) {
+export function attestedNeed(module, { root, projects, changed, read = readFileSync, pipelines = loadPipelineRegistry, dependents = oneHopDependents }) {
   if (!Array.isArray(changed)) return 'no change list to judge it by';
   if (!Array.isArray(projects)) return 'the selection is unavailable';
-  const touched = changed.find(path => path === module || path.startsWith(`${module}/`) || path === '.gitmodules' || path === LIST_PATH);
+  const touched = changed.find(path => path === module || path.startsWith(`${module}/`) || path === '.gitmodules' || path === LIST_PATH
+    || (ATTESTED_OUTSIDE_INPUTS[module] || []).includes(path));
   if (touched) return `the change touches ${touched}`;
   let known;
   try { known = pipelines(root); } catch { return 'the build manifests could not be read'; }
-  for (const project of projects) {
+  let judged;
+  try {
+    const named = new Set(projects.map(project => project.name));
+    judged = [...projects, ...dependents(root, changed).filter(project => !named.has(project.name))];
+  } catch { return 'the dependents of the change could not be read'; }
+  for (const project of judged) {
     if (project.name === 'orchestrator' || project.name === 'orchestrator-tree') return `${project.name} is selected and loads every attested manifest`;
     if (project.run?.kind === 'attested') return `the attested project ${project.name} is selected`;
     if (project.dir === module || project.dir?.startsWith(`${module}/`)) return `${project.name} lives in it`;
