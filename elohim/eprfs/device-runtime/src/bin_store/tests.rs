@@ -3211,6 +3211,45 @@ fn land_refuses_a_held_incompatible_payload_format_and_keeps_the_installed_head(
 }
 
 #[test]
+fn failed_payload_format_probe_is_recorded_and_refuses_land_with_its_reason() {
+    let mut f = Fixture::new("epr");
+    let path = f.path("probe-failed-candidate");
+    fs::write(&path, "probe-failed-candidate").unwrap();
+    fs::set_permissions(&path, fs::Permissions::from_mode(0o755)).unwrap();
+    let candidate = f
+        .store
+        .ingest_with_payload_formats(
+            &path,
+            &IngestOptions {
+                source_commit: Some(f.commit()),
+                tree_clean: Some(true),
+                gate_run: Some("payload-format-probe-failure-test".into()),
+                ..Default::default()
+            },
+            |_| Err("Text file busy (os error 26)".into()),
+        )
+        .unwrap();
+    assert_eq!(
+        candidate.extra[PAYLOAD_FORMATS_PROBE_FIELD],
+        "failed: Text file busy (os error 26)"
+    );
+    assert!(candidate.extra.get(PAYLOAD_FORMATS_FIELD).is_none());
+    f.store = f
+        .store
+        .clone()
+        .with_payload_store_format(Some("directory-v1"));
+
+    let refusal = f.land(&candidate).unwrap_err();
+
+    assert_eq!(refusal.kind, "payload-format-probe-failed");
+    assert_eq!(
+        refusal.detail,
+        "payload formats are unknown: failed: Text file busy (os error 26); this device's payload store is directory-v1"
+    );
+    assert_eq!(f.store.head("current"), None);
+}
+
+#[test]
 fn revert_admits_a_previously_landed_statementless_release_with_a_note() {
     let mut f = Fixture::new("epr");
     let old = f.release("previously-landed-unstated");

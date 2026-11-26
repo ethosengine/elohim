@@ -1,6 +1,6 @@
 //! Thin command adapter for the device-runtime library.
 use elohim_device_runtime::{
-    bin_store::{self, IngestOptions, PeerServing, Refusal, Registry, Store, Transition},
+    bin_store::{self, IngestOptions, PeerServing, Refusal, Registry, Release, Store, Transition},
     manifest_store::ManifestStore,
     session,
 };
@@ -60,13 +60,13 @@ pub(crate) fn payload_store_configured(store: Store, _tool: &str) -> Result<Stor
 }
 
 #[cfg(feature = "peer")]
-fn held_payload_formats(tool: &str, stored: &Path) -> Option<String> {
+fn held_payload_formats(tool: &str, stored: &Path) -> Result<Option<String>, String> {
     if tool != "epr" {
-        return None;
+        return Ok(None);
     }
-    let bytes = std::fs::read(stored).ok()?;
+    let bytes = std::fs::read(stored)
+        .map_err(|error| format!("cannot read held epr at {}: {error}", stored.display()))?;
     crate::payload::PayloadFormat::probe_supported_bytes(&bytes)
-        .ok()
         .map(|formats| {
             formats
                 .into_iter()
@@ -74,11 +74,27 @@ fn held_payload_formats(tool: &str, stored: &Path) -> Option<String> {
                 .collect::<Vec<_>>()
                 .join(",")
         })
+        .map(Some)
 }
 
 #[cfg(not(feature = "peer"))]
-fn held_payload_formats(_tool: &str, _stored: &Path) -> Option<String> {
-    None
+fn held_payload_formats(_tool: &str, _stored: &Path) -> Result<Option<String>, String> {
+    Ok(None)
+}
+
+fn payload_formats_trace(
+    tool: &str,
+    release: &Release,
+    store_format: Option<&str>,
+) -> Option<String> {
+    if tool != "epr" {
+        return None;
+    }
+    let statement = release.extra.get("payloadFormats")?.as_str()?;
+    let store_format = store_format?;
+    Some(format!(
+        "payload formats: {statement} ok (store: {store_format})"
+    ))
 }
 
 fn land_transition(
@@ -241,15 +257,20 @@ fn execute_with(args: &[String], restart: bool) -> Result<String, Refusal> {
             // Only a forward landing restarts the device; a revert or a lineage rebase never.
             let restarts = restart && transition == Transition::Forward;
             let before = current_cid(&store);
-            let mut value = json!(store.land_expected(
+            let release = store.land_expected(
                 cid,
                 options
                     .get("--commit")
                     .ok_or_else(|| argument("land requires --commit"))?,
                 &repo,
                 transition,
-                (expected != "none").then_some(expected)
-            )?);
+                (expected != "none").then_some(expected),
+            )?;
+            if let Some(trace) = payload_formats_trace(tool, &release, store.payload_store_format())
+            {
+                eprintln!("{trace}");
+            }
+            let mut value = json!(release);
             if restarts {
                 with_restart(
                     &mut value,
@@ -1333,6 +1354,31 @@ mod tests {
             Transition::RebaseLineage {
                 reason: "history was rewritten".into()
             }
+        );
+    }
+
+    #[test]
+    fn successful_land_payload_format_trace_names_statement_and_store() {
+        let release: Release = serde_json::from_value(json!({
+            "cid": "bafk-release",
+            "rcid": "bafk-release",
+            "tool": "epr",
+            "bins": {},
+            "version": "fixture",
+            "sourceCommit": "a".repeat(40),
+            "treeClean": true,
+            "gateRun": "fixture",
+            "ingestedAt": "2026-11-26T00:00:00Z",
+            "sources": [],
+            "ring": "landed",
+            "attestations": {},
+            "payloadFormats": "blob-store-v1,directory-v1"
+        }))
+        .unwrap();
+
+        assert_eq!(
+            payload_formats_trace("epr", &release, Some("blob-store-v1")).as_deref(),
+            Some("payload formats: blob-store-v1,directory-v1 ok (store: blob-store-v1)")
         );
     }
 

@@ -1,6 +1,6 @@
 use super::{
     files, parse_payload_formats, source::CommandSpec, Refusal, Release, Result, Store,
-    PAYLOAD_FORMATS_FIELD,
+    PAYLOAD_FORMATS_FIELD, PAYLOAD_FORMATS_PROBE_FIELD,
 };
 use serde_json::{json, Value};
 use std::{path::Path, time::Duration};
@@ -159,6 +159,28 @@ impl Store {
         release: &mut Release,
         transition: &Transition,
     ) -> Result<()> {
+        if self.tool == "epr" && !release.extra.contains_key(PAYLOAD_FORMATS_FIELD) {
+            match release.extra.get(PAYLOAD_FORMATS_PROBE_FIELD) {
+                Some(Value::String(failure)) => {
+                    return Err(Refusal::new(
+                        "payload-format-probe-failed",
+                        format!(
+                        "payload formats are unknown: {failure}; this device's payload store is {}",
+                        self.payload_store_format
+                            .as_deref()
+                            .unwrap_or("not initialized")
+                    ),
+                    ))
+                }
+                Some(_) => {
+                    return Err(Refusal::new(
+                        "payload-format-statement-invalid",
+                        "release states a non-text payload-format probe result",
+                    ))
+                }
+                None => {}
+            }
+        }
         let Some(device_format) = self
             .payload_store_format
             .as_deref()

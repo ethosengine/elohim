@@ -60,6 +60,7 @@ impl From<serde_json::Error> for Refusal {
 pub(crate) type Result<T> = std::result::Result<T, Refusal>;
 
 const PAYLOAD_FORMATS_FIELD: &str = "payloadFormats";
+const PAYLOAD_FORMATS_PROBE_FIELD: &str = "payloadFormatsProbe";
 const LEGACY_PAYLOAD_FORMAT: &str = "directory-v1";
 const PAYLOAD_FORMAT_ORDER: [&str; 2] = ["blob-store-v1", LEGACY_PAYLOAD_FORMAT];
 
@@ -396,6 +397,10 @@ impl Store {
     pub fn with_payload_store_format(mut self, format: Option<&str>) -> Self {
         self.payload_store_format = format.map(str::to_owned);
         self
+    }
+    /// The existing payload-store marker used to judge an epr landing, when one exists.
+    pub fn payload_store_format(&self) -> Option<&str> {
+        self.payload_store_format.as_deref()
     }
     /// Name a running stored executable by its verified release; standalone candidates
     /// keep their raw byte CID. Path binding prevents equal bytes elsewhere claiming custody.
