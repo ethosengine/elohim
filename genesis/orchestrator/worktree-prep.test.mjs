@@ -5,7 +5,7 @@ import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync 
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { currentChangeList, currentChanges, mainCheckout, neededSubmodule, prep, submoduleCommand } from './worktree-prep.mjs';
-import { ATTESTED_OUTSIDE_INPUTS, ATTESTED_SUBMODULES, attestedNeed, checkSubmodules, oneHopDependents, runPreflight, WORKSPACE_INSTALL } from './gate-preflight.mjs';
+import { ATTESTED_OUTSIDE_INPUTS, ATTESTED_SUBMODULES, attestedNeed, checkSubmodules, checkTmpdir, oneHopDependents, runPreflight, tmpdirRepository, WORKSPACE_INSTALL } from './gate-preflight.mjs';
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
@@ -60,7 +60,7 @@ function fixture(t, { hook = true, fail, projects, ineffectiveBuild = false, git
     return ok();
   };
   const options = {
-    root, spawn, exists: () => true, log: line => logs.push(line),
+    root, spawn, exists: () => true, tmp: () => null, log: line => logs.push(line),
     select: (selectedRoot, changed) => {
       assert.equal(selectedRoot, root);
       assert.deepEqual(changed, ['app/elohim-app/src/main.ts']);
@@ -574,4 +574,42 @@ test('review (d): prep reads its change list without rename detection, so a Carg
   git('update-ref', 'refs/remotes/origin/dev', 'HEAD');
   git('mv', 'ws/Cargo.toml', 'ws/Cargo.toml.aside'); git('commit', '-q', '-m', 'rename');
   assert.deepEqual(currentChangeList({ root }), { paths: ['ws/Cargo.toml', 'ws/Cargo.toml.aside'], exact: true });
+});
+
+// Backlog row 106: an empty /tmp/.git (the Codex workspace-write sandbox leaves one in its writable
+// roots) makes the preflight refuse a push. prep says it first, and never removes it.
+test('prep says first that TMPDIR is inside a repository, names an empty placeholder as one, and removes nothing', t => {
+  const tmp = mkdtempSync(join(tmpdir(), 'prep-tmpdir-'));
+  t.after(() => rmSync(tmp, { recursive: true, force: true }));
+  mkdirSync(join(tmp, '.git'));
+  mkdirSync(join(tmp, 'scratch'));
+  const env = { TMPDIR: join(tmp, 'scratch') };
+  const found = tmpdirRepository({ env });
+  assert.equal(found.dir, tmp);
+  assert.equal(found.placeholder, `${tmp}/.git is an empty placeholder (no HEAD, no objects), the kind the Codex workspace-write sandbox leaves in its writable roots`);
+
+  const f = fixture(t, { projects: [] });
+  f.options.select = () => [];
+  f.options.tmp = () => tmpdirRepository({ env });
+  assert.equal(prep(f.options), 0, f.logs.join('\n'));
+  assert.equal(f.logs[0], `[prep] WARN TMPDIR ${tmp}/scratch is inside the git repository at ${tmp} — every fixture repository a test creates there resolves that outer repository; a push that selects any gate is refused for it. `
+    + `${tmp}/.git is an empty placeholder (no HEAD, no objects), the kind the Codex workspace-write sandbox leaves in its writable roots. `
+    + `Cure: export TMPDIR=<a directory outside any repository>, or remove a stray ${tmp}/.git (prep does not remove it)`);
+  assert.ok(existsSync(join(tmp, '.git')), 'still there');
+  // The preflight's own row says the same, with the placeholder named.
+  const red = checkTmpdir({ projects: [{ name: 'eprfs' }], env });
+  assert.equal(red.level, 'REFUSED');
+  assert.match(red.why, /is inside the git repository at .* — .*\.git is an empty placeholder \(no HEAD, no objects\)/);
+
+  // A real repository there is named as a repository, not as a placeholder.
+  writeFileSync(join(tmp, '.git/HEAD'), 'ref: refs/heads/main\n');
+  mkdirSync(join(tmp, '.git/objects'));
+  assert.equal(tmpdirRepository({ env }).placeholder, null);
+  assert.doesNotMatch(checkTmpdir({ projects: [{ name: 'eprfs' }], env }).why, /placeholder/);
+  // And outside any repository nothing is said.
+  assert.equal(tmpdirRepository({ env, exists: () => false }), null);
+  const quiet = fixture(t, { projects: [] });
+  quiet.options.select = () => [];
+  assert.equal(prep(quiet.options), 0);
+  assert.ok(!quiet.logs.some(line => line.includes('TMPDIR')));
 });

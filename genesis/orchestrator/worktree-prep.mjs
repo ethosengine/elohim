@@ -6,7 +6,7 @@ import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { projectsForChanges } from './gate-runner.mjs';
 import { declaredPinStores } from './suite-inventory.mjs';
-import { ATTESTED_SUBMODULES, checkSubmodules, DIST_CHECKS, formatRow, manifestNames, runPreflight, WORKSPACE_INSTALL } from './gate-preflight.mjs';
+import { ATTESTED_SUBMODULES, checkSubmodules, DIST_CHECKS, formatRow, manifestNames, runPreflight, tmpdirRepository, WORKSPACE_INSTALL } from './gate-preflight.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
@@ -133,7 +133,7 @@ function noSource(module, pin, candidates) {
 
 export function prep({ root = ROOT, spawn = spawnSync, exists = existsSync,
   select = projectsForChanges, preflight = runPreflight, declaredPins = declaredPinStores,
-  distChecks = DIST_CHECKS, log = console.log } = {}) {
+  distChecks = DIST_CHECKS, tmp = tmpdirRepository, log = console.log } = {}) {
   const attempt = ([command, ...args]) => {
     log(`[prep] ${[command, ...args].join(' ')}`);
     const result = spawn(command, args, { cwd: root, stdio: 'inherit' });
@@ -145,6 +145,12 @@ export function prep({ root = ROOT, spawn = spawnSync, exists = existsSync,
   };
   let failed = false;
   const refused = []; // moved submodules prep would not touch (E8 #2): prep exits 1 naming each
+  // Said first, and whatever is selected: the preflight refuses a push for this only once a gate is
+  // selected, and a device should learn it before then. prep removes nothing.
+  try {
+    const inside = tmp();
+    if (inside) log(`[prep] WARN ${inside.why}; a push that selects any gate is refused for it.${inside.placeholder ? ` ${inside.placeholder}.` : ''} Cure: ${inside.cure} (prep does not remove it)`);
+  } catch { /* the preflight's own row still says it */ }
   try {
     const main = mainCheckout({ root, spawn });
     // Thin-device station 1: an absent attested submodule is brought in only when this worktree's

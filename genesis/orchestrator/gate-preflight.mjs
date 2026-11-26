@@ -270,14 +270,36 @@ export function checkSubmodulePins({ root, projects, env, pins = declaredPinStor
  */
 export function checkTmpdir({ projects, env = process.env, exists = existsSync }) {
   if (!projects.length) return null;
+  const found = tmpdirRepository({ env, exists });
+  if (!found) return row('tmpdir', 'ok');
+  return row('tmpdir', 'REFUSED', `${found.why}${found.placeholder ? ` — ${found.placeholder}` : ''}`, found.cure);
+}
+
+/**
+ * The git repository TMPDIR sits inside, or null: `{ tmp, dir, why, cure, placeholder }`. prep says
+ * it before a push does (worktree-prep.mjs). `placeholder` is set when that `.git` is a directory
+ * holding neither a HEAD nor an objects directory: not a repository anyone made, but the empty
+ * one the Codex workspace-write sandbox leaves in its writable roots (seen on all three devices).
+ * Nothing here removes it.
+ */
+export function tmpdirRepository({ env = process.env, exists = existsSync } = {}) {
   const tmp = resolve(env.TMPDIR || tmpdir());
   for (let dir = tmp; ; dir = dirname(dir)) {
-    if (exists(join(dir, '.git'))) {
-      return row('tmpdir', 'REFUSED',
-        `TMPDIR ${tmp} is inside the git repository at ${dir} — every fixture repository a test creates there resolves that outer repository`,
-        `export TMPDIR=<a directory outside any repository>, or remove a stray ${join(dir, '.git')}`);
+    const git = join(dir, '.git');
+    if (exists(git)) {
+      let placeholder = null;
+      try {
+        if (statSync(git).isDirectory() && !existsSync(join(git, 'HEAD')) && !existsSync(join(git, 'objects'))) {
+          placeholder = `${git} is an empty placeholder (no HEAD, no objects), the kind the Codex workspace-write sandbox leaves in its writable roots`;
+        }
+      } catch { /* not readable: say only what is known */ }
+      return {
+        tmp, dir, placeholder,
+        why: `TMPDIR ${tmp} is inside the git repository at ${dir} — every fixture repository a test creates there resolves that outer repository`,
+        cure: `export TMPDIR=<a directory outside any repository>, or remove a stray ${git}`,
+      };
     }
-    if (dirname(dir) === dir) return row('tmpdir', 'ok');
+    if (dirname(dir) === dir) return null;
   }
 }
 
