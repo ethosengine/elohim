@@ -558,3 +558,20 @@ test('review (b): an attested manifest declares its gitlink, paths under it, the
     }
   }
 });
+
+test('review (d): prep reads its change list without rename detection, so a Cargo.toml renamed away is still named', t => {
+  const calls = [];
+  currentChangeList({ root: '/repo', spawn: (_cmd, args) => { calls.push(args); return ok(args[0] === 'merge-base' ? 'base\n' : ''); } });
+  const diffs = calls.filter(args => args[0] === 'diff');
+  assert.equal(diffs.length, 3, 'committed, unstaged, staged');
+  for (const args of diffs) assert.ok(args.includes('--no-renames'), args.join(' '));
+  // And in a real repository, with rename detection configured on.
+  const root = mkdtempSync(join(tmpdir(), 'prep-rename-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const git = (...args) => assert.equal(spawnSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@example.invalid', ...args], { cwd: root }).status, 0, args.join(' '));
+  put(root, 'ws/Cargo.toml', '[workspace]\nmembers = []\n# a manifest long enough to be detected as a rename\n');
+  git('init', '-q', '-b', 'main'); git('config', 'diff.renames', 'true'); git('add', '-A'); git('commit', '-q', '-m', 'base');
+  git('update-ref', 'refs/remotes/origin/dev', 'HEAD');
+  git('mv', 'ws/Cargo.toml', 'ws/Cargo.toml.aside'); git('commit', '-q', '-m', 'rename');
+  assert.deepEqual(currentChangeList({ root }), { paths: ['ws/Cargo.toml', 'ws/Cargo.toml.aside'], exact: true });
+});

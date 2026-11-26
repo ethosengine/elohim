@@ -679,8 +679,9 @@ export function runPreflight({ root = ROOT, projects, env = process.env, spawn =
   };
   // The change list is trusted to skip a check only when the hook read the push's own range
   // (GATE_NARROW_BASE=none marks a fallback range) or a caller handed it in; otherwise every check
-  // runs. The attested-submodule question alone also reads a new ref's branch (decisionChanges).
-  const exact = env.GATE_NARROW_BASE === 'none' ? null : changed;
+  // runs. Under a push the list is the hook's plus each ref's range read without rename detection.
+  // The attested-submodule question alone also reads a new ref's branch (decisionChanges).
+  const exact = env.GATE_NARROW_BASE === 'none' ? null : decisionChanges(changed, { env, root, spawn });
   const attested = decisionChanges(changed, { env, root, spawn, newRefs: true });
   return [
     ...timed(() => checkEprBin({ env })),
