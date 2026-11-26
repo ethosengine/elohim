@@ -371,17 +371,23 @@ fn validate_build_role(record: &BuildRoleRecord) -> Result<(), String> {
 }
 
 /// The role `epr bin follow` acts on, read from the same record, with the same validation, that
-/// `epr device status` reports. `None` is unknown: unparseable, invalid, or a builder whose `until`
-/// has passed. A follow treats unknown as not a builder, so an unreadable role never builds.
-pub(crate) fn follow_build_role(bytes: &[u8]) -> Option<BuildRole> {
-    let record: BuildRoleRecord = serde_json::from_slice(bytes).ok()?;
-    validate_build_role(&record).ok()?;
+/// `epr device status` reports. The error is the warning fragment for state that cannot currently
+/// declare a role; callers preserve the historical build fallback in that case.
+pub(crate) fn follow_build_role(bytes: &[u8]) -> Result<BuildRole, String> {
+    let record: BuildRoleRecord =
+        serde_json::from_slice(bytes).map_err(|error| format!("unreadable: {error}"))?;
+    validate_build_role(&record).map_err(|error| format!("unreadable: {error}"))?;
     match (record.role, record.until.as_deref()) {
-        (BuildRole::Builder, Some(until)) => chrono::DateTime::parse_from_rfc3339(until)
-            .ok()
-            .filter(|until| *until > chrono::Utc::now())
-            .map(|_| BuildRole::Builder),
-        (role, _) => Some(role),
+        (BuildRole::Builder, Some(until)) => {
+            let current = chrono::DateTime::parse_from_rfc3339(until)
+                .map_err(|error| format!("unreadable: {error}"))?;
+            if current <= chrono::Utc::now() {
+                Err(format!("builder expired {until}"))
+            } else {
+                Ok(BuildRole::Builder)
+            }
+        }
+        (role, _) => Ok(role),
     }
 }
 

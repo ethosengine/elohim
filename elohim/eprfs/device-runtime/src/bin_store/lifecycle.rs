@@ -150,6 +150,16 @@ impl Store {
     }
     /// Seed a store locally before attempting builds or downloads. A verified current needs no network.
     pub fn bootstrap(&self, repo: &Path, closure: Option<&Path>) -> Result<Release> {
+        self.bootstrap_for_build(repo, closure, &FollowBuild::Builder)
+    }
+
+    /// Seed a store while honoring this device's declared local-build role.
+    pub fn bootstrap_for_build(
+        &self,
+        repo: &Path,
+        closure: Option<&Path>,
+        build: &FollowBuild,
+    ) -> Result<Release> {
         self.repair_heads()?;
         let expected = self.committed_current();
         if let Some(cid) = expected
@@ -220,7 +230,7 @@ impl Store {
             AdoptOptions {
                 expect: Expect::Prior(expected),
                 candidate: None,
-                build: &FollowBuild::Builder,
+                build,
             },
         )
     }
@@ -274,7 +284,17 @@ impl Store {
                 return self.finish_declared(record, commit, repo, &options);
             }
         }
-        let mut attempts=vec!["verified current unavailable (epr bin status --tool <tool> --json)".to_owned(),"no verified stored candidate for wanted commit (epr bin status --tool <tool> --commit <sha> --json)".into()];
+        let mut attempts = vec![
+            format!(
+                "verified current unavailable (epr bin status --tool {} --json)",
+                self.tool
+            ),
+            format!(
+                "no verified stored candidate for wanted commit (epr bin status --tool {} \
+                 --commit {commit} --json)",
+                self.tool
+            ),
+        ];
         if let Some(closure) = closure {
             match self.ingest(
                 closure,
@@ -315,12 +335,21 @@ impl Store {
             ));
         }
         if let FollowBuild::NotBuilder { role, draw_from } = options.build {
+            let sibling = if draw_from.starts_with("no sibling path for ") {
+                draw_from.to_string()
+            } else {
+                format!("draw it from {draw_from} once it holds one")
+            };
             return Err(Refusal::new(
                 "not-a-builder",
                 format!(
                     "no release for {commit}; this device does not build (build-role {role}); \
-                     draw it from {draw_from} once it holds one: epr bin follow --repo {}",
-                    repo.display()
+                     attempts: {}; {sibling}; declare this device a builder: epr device \
+                     build-role builder --until <RFC3339>; retry: epr bin follow --tool {} \
+                     --repo {}",
+                    attempts.join("; "),
+                    self.tool,
+                    repo.display(),
                 ),
             ));
         }

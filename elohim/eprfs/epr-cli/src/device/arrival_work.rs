@@ -30,6 +30,7 @@ fn each_tool(root: &Path, long: bool) -> Result<()> {
         })?;
     let skipped = std::env::var("BIN_STORE_SKIP_TOOLS").unwrap_or_default();
     let mut moved = Vec::new();
+    let mut build_role = None;
     for tool in registry
         .tools
         .keys()
@@ -42,6 +43,11 @@ fn each_tool(root: &Path, long: bool) -> Result<()> {
         else {
             continue;
         };
+        let build_role = build_role.get_or_insert_with(|| {
+            let role = crate::bin::local_build_role();
+            role.warn_if_unknown();
+            role
+        });
         let current = || {
             Store::from_environment(tool, &registry)
                 .and_then(|store| store.current_artifact())
@@ -61,7 +67,9 @@ fn each_tool(root: &Path, long: bool) -> Result<()> {
             });
             if follow.mode == ark_core::declaration::FollowMode::Observe {
                 if long {
-                    store.follow_declared(root, None, follow)?;
+                    let source = crate::bin::sibling::fallback_source(tool);
+                    let build = build_role.follow_build(&source);
+                    store.follow_declared_for_build(root, None, follow, &build)?;
                 }
                 return Ok(());
             }
@@ -74,7 +82,9 @@ fn each_tool(root: &Path, long: bool) -> Result<()> {
             }
             if follow.pin.is_some() {
                 if long {
-                    store.follow_declared(root, None, follow)?;
+                    let source = crate::bin::sibling::fallback_source(tool);
+                    let build = build_role.follow_build(&source);
+                    store.follow_declared_for_build(root, None, follow, &build)?;
                 }
                 // A pinned apply/canary must install the launcher from the matching landed
                 // release; bootstrap would be an unconstrained adoption before that check.
