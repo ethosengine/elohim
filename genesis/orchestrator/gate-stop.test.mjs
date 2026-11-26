@@ -274,7 +274,7 @@ function evidenceFixture(t, prefix, { seconds, recipe = null }) {
   return { root, pids, run, project, calls, spawnFake, env };
 }
 
-function outsideSignalFixture(t) {
+function outsideSignalFixture(t, { recipe = null } = {}) {
   const scratchDir = scratch(t, 'gate-outside-signal-');
   const root = resolve(scratchDir, 'repo');
   const ready = resolve(scratchDir, 'ready');
@@ -290,7 +290,7 @@ function outsideSignalFixture(t) {
     gate: { projects: { fixture: { dir: 'fixture', steps: ['build'], run: { kind: 'root-just', recipe: '_gate-fixture' } } } },
   }));
   writeFileSync(resolve(root, 'justfile'), '_gate-fixture:\n    true\n');
-  writeFileSync(resolve(root, 'genesis/orchestrator/run-local-gate.sh'), [
+  writeFileSync(resolve(root, 'genesis/orchestrator/run-local-gate.sh'), recipe ? recipe({ scratchDir, ready }) : [
     '#!/usr/bin/env bash',
     'printf ready > "$OUTSIDE_READY"',
     'exec sleep 300',
@@ -341,7 +341,7 @@ else if (at('signer') >= 0) fs.writeFileSync(1, JSON.stringify({ agentId: 'ab'.r
     OUTSIDE_CALLS: calls,
     OUTSIDE_EPR_CALLS: eprCalls,
   };
-  return { root, ready, calls, eprCalls, env };
+  return { root, scratchDir, ready, calls, eprCalls, env };
 }
 
 // The stop comes from another process, as the integrator's does: runProject blocks this one.
@@ -395,6 +395,48 @@ describe('a stopped gate records no evidence', () => {
     })), [{ project: 'fixture', by: null, signal: 'SIGTERM', evidence: 'none' }]);
     assert.equal(events.at(-1).kind, 'run-close');
     assert.equal(events.at(-1).outcome, 'interrupted');
+  });
+
+  test('outside TERM after a failed leader exit keeps the red verdict and evidence', { timeout: 60_000 }, async t => {
+    const fx = outsideSignalFixture(t, { recipe: ({ scratchDir }) => [
+      '#!/usr/bin/env bash',
+      `echo $$ > "${scratchDir}/leader"`,
+      'sleep 2 &',
+      `echo $! > "${scratchDir}/leaked"`,
+      'echo "test late_failure ... FAILED"',
+      'printf ready > "$OUTSIDE_READY"',
+      'exit 1',
+    ].join('\n') });
+    const cli = resolve(HERE, 'gate-runner.mjs');
+    const stdoutCapture = outputCapture('gate-outside-late-stdout-');
+    const stderrCapture = outputCapture('gate-outside-late-stderr-');
+    const child = spawn(process.execPath, [cli, '--target', 'fixture'], {
+      cwd: fx.root,
+      env: fx.env,
+      stdio: ['ignore', stdoutCapture.fd, stderrCapture.fd],
+    });
+    stdoutCapture.close();
+    stderrCapture.close();
+    t.after(() => { try { child.kill('SIGTERM'); } catch { /* gone */ } });
+    assert.ok(await waitFor(() => existsSync(fx.ready)), 'the fixture gate did not reach its failure');
+    const leader = readPid(resolve(fx.scratchDir, 'leader'));
+    assert.ok(await waitFor(() => !alive(leader)), 'the recipe leader did not exit before the outside signal');
+    const tap = [...snapshot().values()].find(stat => stat.ppid === child.pid);
+    assert.ok(tap, 'the runner had no gate-tap child while the leaked child held stdout open');
+    process.kill(tap.pid, 'SIGTERM');
+    const result = await new Promise(resolveDone => child.once('close', (code, signal) => resolveDone({ code, signal })));
+    const stdout = stdoutCapture.read();
+    const stderr = stderrCapture.read();
+
+    assert.deepEqual(result, { code: 1, signal: null }, stderr);
+    assert.match(stdout, /evidence: recorded/);
+    assert.doesNotMatch(stdout + stderr, /stopped from outside .*no verdict/);
+    assert.match(readFileSync(fx.calls, 'utf8'), /build put/, 'the failed closure evidence is recorded');
+    const runPath = /live failures: .* --run (.+)\n/.exec(stdout)?.[1];
+    assert.ok(runPath, stdout);
+    const events = readRun(runPath).events;
+    assert.equal(events.filter(event => event.kind === 'gate-stopped').length, 0);
+    assert.equal(events.filter(event => event.kind === 'gate-verdict').at(-1).verdict.exit, 1);
   });
 
   test('TERM delivered only to the recipe leader keeps the red verdict and evidence', { timeout: 60_000 }, t => {
