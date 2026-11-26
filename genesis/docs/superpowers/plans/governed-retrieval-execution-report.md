@@ -3,6 +3,7 @@ id: governed-retrieval-execution-report
 gap: plans__2026-09-09-governed-retrieval-execution#1
 actor: agent:orchestrator@gpt-6
 status: landed
+parent: genesis/docs/superpowers/plans/2026-09-09-governed-retrieval-execution.md
 landed_commit: c51471be5
 verified_by: "independent technical approval bafyreie2hbil4qyuyhbmfzq7pv7v63ofajo5kf7xsjdruwuymehfm7s3zi; 29 adversarial recall tests + 1919 package checks PASS (see §Verification)"
 concerns: "was: DONE_WITH_CONCERNS — known limits in the closing paragraph (owner-changeable budgets, bypassable local accounting)"

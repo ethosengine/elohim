@@ -2,6 +2,7 @@
 title: Reach-Floor Foundation — Implementation Plan (slice 1 of 3)
 id: reach-floor-foundation-plan
 status: Draft
+spec: genesis/docs/superpowers/specs/2026-06-10-deterministic-reach-archetype-floor-design.md
 class: protocol-canonical
 domain: D6
 implements: genesis/docs/superpowers/specs/2026-06-10-deterministic-reach-archetype-floor-design.md

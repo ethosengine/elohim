@@ -2,6 +2,7 @@
 title: Custody Blob Canonical Artifact Address
 id: custody-blob-canonical-artifact-address-design
 status: claimed-not-verified
+related: genesis/data/timeline/backlog/2026-07-30-blobhash-serverblobhash-duality-canonical-join-key.md
 verified_by: "2026-11-26, steward device own signed gate attestations (brit notes refs/notes/brit/build/gate:elohim-storage) success:true at dev commits bd7b1094a60a (2026-10-26) and d44a9b8f2f6a (2026-10-26), both descendants of landing 6103694f9 (ancestor of origin/dev); native tests present in capacity_pledge_author.rs and rea_commitment_service.rs; genesis gate (gate:genesis, seeder tests) success:true at 6d79c37b7873 (2026-11-01). Not covered: live conductor-anchored custody commitment, saga ch9 on a mesh. Own-device attestation only, no CI cite."
 verification_note: "code landed (6103694f9); the elohim-storage gate was not re-run in the 2026-09-24 triage (host busy with another build)"
 landed_commit: 6103694f9

@@ -1,6 +1,7 @@
 ---
 id: task-as-h-report
 status: landed
+parent: genesis/docs/superpowers/sprints/2026-11-07-artifact-store/briefs/H-hardening.md
 cites: []
 landed_commit: 1b76c2327
 verified_by: "red-team third read + L3 combined gate evidence/gate-L3-storage.log; household chaos 3/3, blob-durability lane, epr-app-deliverability 7/7; L3 landing evidence/push-L3.log"

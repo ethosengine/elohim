@@ -2,6 +2,7 @@
 title: "Change detection read as one thing — where it runs, where it is missing, and the reuse still to harvest"
 id: change-detection-one-reading-design
 status: draft
+related: genesis/docs/superpowers/specs/2026-11-24-verdict-is-an-attestation-on-an-artifact-design.md
 class: process-meta
 date: 2026-11-23
 context-tier: disclosed

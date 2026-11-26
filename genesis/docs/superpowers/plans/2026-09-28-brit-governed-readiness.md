@@ -2,6 +2,7 @@
 title: Brit governed readiness and native developer entry
 id: brit-governed-readiness
 status: active
+related: genesis/docs/superpowers/sprints/task-brit-readiness-3-brief.md
 class: devflow
 serves: dev-system-equilibrium
 date: 2026-09-28

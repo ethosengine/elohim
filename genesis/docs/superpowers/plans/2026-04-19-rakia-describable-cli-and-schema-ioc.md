@@ -2,6 +2,7 @@
 title: "Rakia Describable via CLI + Schema-as-IoC Implementation Plan"
 id: rakia-describable-cli-and-schema-ioc
 status: landed
+spec: genesis/docs/superpowers/specs/2026-04-19-rakia-describable-cli-and-schema-ioc.md
 landed_commit: c4a1f21
 landed_in: elohim/rakia
 triage_note: "rakia schemas/v1 (build-manifest, build-plan) + describable brit/rakia CLI, elohim/rakia submodule 2026-04-19"

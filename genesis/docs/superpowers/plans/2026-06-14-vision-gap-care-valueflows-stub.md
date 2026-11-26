@@ -2,6 +2,7 @@
 title: "O2 — Native Observed-Care → REA Valueflow Emitter (vision-gap stub)"
 id: vision-gap-care-valueflows-stub
 status: proposal
+related: genesis/docs/superpowers/specs/2026-06-14-elohim-substrate-passes/VISION-DESIGN-felt-spine-2026-06-14.md
 triage_note: "vision-gap stub (was: GREENLIGHT-TO-EXPAND); awaiting an operator expand/decline"
 triaged: 2026-09-24
 kind: vision-gap-stub

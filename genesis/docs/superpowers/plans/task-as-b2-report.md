@@ -1,6 +1,7 @@
 ---
 id: task-as-b2-report
 status: landed
+parent: genesis/docs/superpowers/sprints/2026-11-07-artifact-store/briefs/B2-seeder-deferred-retry.md
 landed_commit: 3b266e41d
 verified_by: "orchestrator (Claude Opus 5.5): diff review + call-path trace + vitest 3/3 new, 742/742 suite EXIT=0 (evidence/b2-seeder-vitest.txt)"
 cites: []

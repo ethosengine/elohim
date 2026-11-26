@@ -2,6 +2,7 @@
 id: rg1-app-report
 title: "Re-genesis 1, T7 — the address crossing on the SPA: byte CIDs only, apps-v4, lamad BLAKE3 verification"
 status: landed
+parent: genesis/docs/superpowers/sprints/2026-11-05-regenesis-1/STATE.md
 landed_commit: b71acbc42
 landed_on_dev: "dev 9f9fef877..e85eeeee5 (L2)"
 verified_by: "orchestrator 184beb01 (claude-fable-5-1), post-L2 verification pass 2026-11-06 on the integrated tree 29a62b5c0/428752cb7 — genesis/docs/superpowers/sprints/2026-11-05-regenesis-1/logs/push-L2c-1.log elohim-app GREEN 142 s + elohim-storybook GREEN; verify-gate-elohim-library.log, verify-gate-elements-codegen-2.log (after the loader.spec fix-up 428752cb7), verify-gate-epr-app-package.log (every EXIT=0; summary verify-pass-summary.log). Hook gates on the L2c push attempt (push-L2c-1.log): gherkin-prepush-lint, genesis, elohim-ark, genesis-a2o, elohim-storybook, elohim-app, rust-style all GREEN."

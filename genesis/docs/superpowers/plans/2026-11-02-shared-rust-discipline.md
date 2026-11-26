@@ -2,6 +2,7 @@
 id: shared-rust-discipline
 title: Shared Rust discipline through independent governed spaces
 status: Active
+related: genesis/docs/superpowers/sprints/task-srd-1-report.md
 class: implementation
 serves: rust-style
 created: 2026-11-02

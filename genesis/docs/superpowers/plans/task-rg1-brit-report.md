@@ -2,6 +2,7 @@
 title: "Re-genesis 1 T4 report: brit — envelope note format @2, typed HELD, byte CIDs through elohim-address"
 id: task-rg1-brit-report
 status: claimed-not-verified
+parent: genesis/docs/superpowers/sprints/2026-11-05-regenesis-1/STATE.md
 landed_commit: "brit e7cd82686 + c94b66ad7 + c3b3d8af0 + 10d18eacc (cargo-machete ignore for serde_bytes; brit CI Tests-pass check green on run-ci/signature-envelope) on brit branch regenesis/signature-envelope (local, unpushed; base 1c6ae5568 = brit-cli 0.1.12)"
 verified_by:
 actor: agent:brit-implementer@claude-opus-5-5

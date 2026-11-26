@@ -2,6 +2,7 @@
 title: "Re-genesis 1 T6 report: doorway on the byte profile"
 id: task-rg1-doorway-report
 status: landed
+parent: genesis/docs/superpowers/sprints/2026-11-05-regenesis-1/STATE.md
 landed_commit: "regenesis/doorway on regenesis/storage bc0edbd64: f02fce8d5 (doorway-service + doorway-client), 3ed8d4984 (report + live /blob tests), 6a6679917 (clippy fix)"
 landed_on_dev: "dev 9f9fef877..e85eeeee5 (L2)"
 verified_by: "orchestrator 184beb01 (claude-fable-5-1), post-L2 verification pass 2026-11-06 on the integrated tree 29a62b5c0/428752cb7 — genesis/docs/superpowers/sprints/2026-11-05-regenesis-1/logs/verify-gate-doorway.log (331 s), verify-gate-doorway-app.log (every EXIT=0; summary verify-pass-summary.log). Hook gates on the L2c push attempt (push-L2c-1.log): gherkin-prepush-lint, genesis, elohim-ark, genesis-a2o, elohim-storybook, elohim-app, rust-style all GREEN."

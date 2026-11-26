@@ -2,6 +2,7 @@
 id: task-as-b1-report
 cites: []
 status: landed
+parent: genesis/docs/superpowers/sprints/2026-11-07-artifact-store/briefs/B1-notes-reach-gate.md
 landed_commit: 3b266e41d
 verified_by: "orchestrator (Claude Opus 5.5): diff read + `just gate orchestrator` EXIT=0 at dc0a8b2f4 with EPR_BIN at bafyreif5zxb6… (evidence/gate-B1-orchestrator.log, 2026-11-07T23:23Z); the real notes push and the gospel change follow at landing"
 concerns: gate orchestrator red in this worktree for environmental reasons (see body)

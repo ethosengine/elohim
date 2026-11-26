@@ -3,6 +3,7 @@ title: "Wisdom Layer — Stakes→Mechanism Selector (floor-meets-ceiling judgme
 id: wisdom-layer-stakes-mechanism-selector-design
 date: 2026-06-09
 status: design
+related: genesis/docs/superpowers/specs/2026-06-09-wisdom-layer-floor-ceiling-judgment-culminating-design.md
 cluster: wisdom (culminating)
 predecessors:
   - 2026-06-09-per-substrate-limitarian-governor-design.md
