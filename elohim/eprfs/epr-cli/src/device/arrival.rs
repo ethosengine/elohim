@@ -649,12 +649,10 @@ fn exchange_check(
             (Some(_), Some(heard_age_s)) => {
                 format!("HEARD {heard_age_s}s ago, FOLDED {fold_age_s}s ago")
             }
+            // A HEARD in this device's future (after a backward clock step) is shown, never
+            // counted: the folded-from direction is judged by FOLDED alone.
             (Some(_), None) => {
-                stale.push(format!(
-                    "{short} HEARD timestamp is in this device's future, FOLDED {fold_age_s}s \
-                     ago, so liveness cannot be judged"
-                ));
-                continue;
+                format!("HEARD timestamp is in this device's future, FOLDED {fold_age_s}s ago")
             }
             (None, _) => format!("HEARD unknown, FOLDED {fold_age_s}s ago"),
         };
@@ -689,7 +687,7 @@ fn exchange_check(
         }
         if let Some(root_seq) = unacknowledged_root_seq {
             directions.push(format!(
-                "acknowledges this device only to seq {acked_seq}, before its latest announced \
+                "acknowledges this device only to seq {acked_seq}, before its latest mature \
                  root at seq {root_seq}"
             ));
         }
@@ -703,7 +701,8 @@ fn exchange_check(
             SIBLING_CHECK,
             State::Ok,
             format!(
-                "{}; both directions are within freshness_s={freshness_s}s",
+                "{}; every folded-from head is within freshness_s={freshness_s}s and every \
+                 acknowledgement covers this device's latest mature root",
                 fresh.join("; ")
             ),
             None,
@@ -3294,6 +3293,39 @@ mod tests {
 
     #[cfg(feature = "peer")]
     #[test]
+    fn a_future_heard_is_shown_and_a_fresh_fold_still_reads_ok() {
+        const NOW_MS: u64 = 1_000_000;
+        let ours = "did:key:z6MkThisDevice000000000000000000000";
+        let sibling = "did:key:z6MkSiblingDevice0000000000000000000".to_owned();
+        let mut recovery = eprfs_peer::PeerRecoveryStatus::default();
+        recovery.devices.insert(
+            sibling.clone(),
+            eprfs_peer::DeviceRecoveryStatus {
+                // After a backward clock step: HEARD is ahead of this device's clock.
+                last_heard_at: Some(NOW_MS + 60_000),
+                ..Default::default()
+            },
+        );
+        let check = exchange_check(
+            std::slice::from_ref(&sibling),
+            ours,
+            Ok(Some(exchange_table(ours, &sibling, 5, 7))),
+            Ok(recovery),
+            Some(90),
+            NOW_MS,
+        );
+        assert_eq!(check.state, State::Ok, "{check}");
+        assert!(
+            check
+                .detail
+                .contains("HEARD timestamp is in this device's future"),
+            "{check}"
+        );
+        assert!(check.detail.contains("FOLDED 5s ago"), "{check}");
+    }
+
+    #[cfg(feature = "peer")]
+    #[test]
     fn fresh_heard_does_not_stand_in_for_a_head_that_is_not_folding() {
         const NOW_MS: u64 = 1_000_000;
         let ours = "did:key:z6MkThisDevice000000000000000000000";
@@ -3353,7 +3385,12 @@ mod tests {
             1_000_000,
         );
         assert_eq!(check.state, State::Ok, "{check}");
-        assert!(check.detail.contains("both directions"), "{check}");
+        assert!(
+            check
+                .detail
+                .contains("every acknowledgement covers this device's latest mature root"),
+            "{check}"
+        );
         assert!(check.detail.contains("FOLDED 12s ago"), "{check}");
     }
 
@@ -3374,7 +3411,7 @@ mod tests {
         assert!(
             check
                 .detail
-                .contains("only to seq 0, before its latest announced root at seq 1"),
+                .contains("only to seq 0, before its latest mature root at seq 1"),
             "{check}"
         );
     }
@@ -3415,7 +3452,7 @@ mod tests {
         assert!(
             check
                 .detail
-                .contains("only to seq 6, before its latest announced root at seq 7"),
+                .contains("only to seq 6, before its latest mature root at seq 7"),
             "{check}"
         );
     }
@@ -3443,7 +3480,7 @@ mod tests {
         let age = check.detail.find("FOLDED 8667s ago").expect("carrier age");
         let sequence = check
             .detail
-            .find("only to seq 6, before its latest announced root at seq 7")
+            .find("only to seq 6, before its latest mature root at seq 7")
             .expect("sequence lag");
         assert!(age < sequence, "{check}");
     }
