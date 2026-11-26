@@ -584,6 +584,67 @@ fn peer_daemon_status_compares_release_record_cids_not_binary_blob_cids() {
     assert_eq!(peer(base)["state"], "ok");
 }
 
+#[test]
+#[cfg(feature = "peer")]
+fn explicit_epr_bin_inside_store_reads_peer_daemon_current() {
+    use elohim_device_runtime::bin_store::{IngestOptions, Registry, Store};
+    use std::os::unix::{fs::symlink, fs::PermissionsExt};
+
+    let temp = fixture();
+    let base = temp.path();
+    let store_root = base.join("store/epr");
+    let registry: Registry = serde_json::from_value(json!({
+        "version": 1,
+        "tools": {"epr": {"bins": ["epr"], "candidateEnv": {"epr": ["EPR_BIN"]}}}
+    }))
+    .unwrap();
+    let store = Store::new(&store_root, "epr", &registry).unwrap();
+    let source = base.join("candidate");
+    fs::create_dir(&source).unwrap();
+    let source_epr = source.join("epr");
+    fs::copy(env!("CARGO_BIN_EXE_epr"), &source_epr).unwrap();
+    fs::set_permissions(&source_epr, fs::Permissions::from_mode(0o755)).unwrap();
+    let release = store
+        .ingest(
+            &source,
+            &IngestOptions {
+                source_commit: Some("a".repeat(40)),
+                tree_clean: Some(true),
+                gate_run: Some("device-arrival-test".into()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+    symlink(&release.cid, store_root.join("current")).unwrap();
+    fs::write(
+        store_root.join("current.json"),
+        json!({"cid": release.cid, "commit": "a".repeat(40)}).to_string(),
+    )
+    .unwrap();
+
+    let pid = 42;
+    let start = 77;
+    fs::create_dir_all(base.join("proc/42")).unwrap();
+    let mut fields = vec!["0".to_owned(); 20];
+    fields[0] = "S".into();
+    fields[1] = "1".into();
+    fields[19] = start.to_string();
+    fs::write(
+        base.join("proc/42/stat"),
+        format!("42 (epr) {}", fields.join(" ")),
+    )
+    .unwrap();
+    let executable = store_root.join(&release.cid).join("epr");
+    store
+        .record_running_daemon(&executable, pid, &base.join("proc"), Some(&executable))
+        .unwrap();
+
+    let _serving = elohim_epr_cli::peer::ServeLock::acquire(&base.join("config/epr/peer")).unwrap();
+    let peer = line(base, "peer daemon");
+    assert_eq!(peer["state"], "ok", "{peer}");
+    assert!(peer["detail"].as_str().unwrap().contains(&release.cid));
+}
+
 /// Plain git in the fixture repository, as its owner (no assumed foreign ownership).
 fn fixture_git(base: &Path, args: &[&str]) {
     let output = Command::new("git")
