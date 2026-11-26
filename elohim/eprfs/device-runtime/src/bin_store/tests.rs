@@ -1545,17 +1545,99 @@ fn reingesting_an_existing_release_keeps_its_first_ingested_at() {
         source.source_commit == "b".repeat(40)
             && source.ingested_at != reingested.provenance.ingested_at
     }));
+    assert_eq!(
+        reingested.extra[LAST_INGESTED_AT_FIELD],
+        json!(reingested.last_ingested_at())
+    );
+}
+
+#[test]
+fn saved_last_ingested_at_is_visible_to_pre_field_readers_as_extra() {
+    #[derive(serde::Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct PreFieldRelease {
+        ingested_at: String,
+        #[serde(flatten)]
+        extra: serde_json::Map<String, Value>,
+    }
+
+    let mut f = Fixture::new("epr");
+    f.store = f.store.clone().with_now("2026-11-26T08:00:00Z");
+    let release = f.release("pre-field-reader");
+    let bytes = fs::read(f.store.root.join(&release.cid).join("record.json")).unwrap();
+    let old: PreFieldRelease = serde_json::from_slice(&bytes).unwrap();
+
+    assert_eq!(old.ingested_at, "2026-11-26T08:00:00Z");
+    assert_eq!(
+        old.extra[LAST_INGESTED_AT_FIELD],
+        json!("2026-11-26T08:00:00Z")
+    );
+}
+
+#[test]
+fn gate_preflight_recency_matches_store_order_after_real_reingest() {
+    let mut f = Fixture::new("epr");
+    let runner = f.store.runner.clone();
+    f.store = Store::new(f.path("device-store/epr"), "epr", &f.registry)
+        .unwrap()
+        .with_runner(runner);
+    f.store = f.store.clone().with_now("2026-11-20T00:00:00Z");
+    let reingested = f.release("script-reingested");
+    f.store = f.store.clone().with_now("2026-11-21T00:00:00Z");
+    let other = f.release("script-other");
+    f.store = f.store.clone().with_now("2026-11-22T00:00:00Z");
+    let refreshed = f.release("script-reingested");
+
+    let ordered = f.store.records();
+    assert_eq!(ordered[0].cid, refreshed.cid);
+    assert_eq!(ordered[1].cid, other.cid);
+    assert_eq!(refreshed.cid, reingested.cid);
+
+    let script = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../genesis/orchestrator/gate-preflight.mjs");
+    let run = |head: &Release, inherited: &Release| {
+        f.head(head);
+        std::process::Command::new("node")
+            .arg(&script)
+            .arg("--epr-bin")
+            .env("EPR_STORE", f.store.root())
+            .env(
+                "EPR_BIN",
+                f.store.artifact(&inherited.cid).unwrap().join("epr"),
+            )
+            .env("GATE_ALLOW_EPR_BIN", "0")
+            .output()
+            .unwrap()
+    };
+
+    let newer = run(&other, &refreshed);
+    assert!(
+        newer.status.success(),
+        "{}",
+        String::from_utf8_lossy(&newer.stdout)
+    );
+    assert!(String::from_utf8_lossy(&newer.stdout).contains("WARN epr-bin"));
+    let older = run(&refreshed, &other);
+    assert_eq!(
+        older.status.code(),
+        Some(3),
+        "stdout={} stderr={}",
+        String::from_utf8_lossy(&older.stdout),
+        String::from_utf8_lossy(&older.stderr)
+    );
+    assert!(String::from_utf8_lossy(&older.stdout).contains("REFUSED epr-bin"));
 }
 
 #[test]
 fn declared_selection_prefers_identical_bytes_reingested_after_a_newer_build() {
     use ark_core::declaration::{Follow, FollowMode};
 
-    let f = Fixture::new("epr");
+    let mut f = Fixture::new("epr");
     let reingested = f.release("reingested-candidate");
     let newer_build = f.release("different-newer-candidate");
     age(&f, &reingested, "2026-01-01T00:00:00Z");
     age(&f, &newer_build, "2026-11-25T00:00:00Z");
+    f.store = f.store.clone().with_now("2026-11-26T00:00:00Z");
 
     let refreshed = f.release("reingested-candidate");
     let result = f
@@ -1771,12 +1853,13 @@ fn test_gc_keeps_an_old_artifact_used_within_fourteen_days() {
 
 #[test]
 fn gc_keeps_a_release_whose_identical_bytes_were_just_reingested() {
-    let f = Fixture::new("epr");
+    let mut f = Fixture::new("epr");
     let release = f.release("reingested-before-gc");
     age(&f, &release, "2026-01-01T00:00:00Z");
+    f.store = f.store.clone().with_now("2026-11-26T00:00:00Z");
 
     let refreshed = f.release("reingested-before-gc");
-    let result = f.store.gc(&f.path("proc"), Some(now_seconds())).unwrap();
+    let result = f.store.gc(&f.path("proc"), None).unwrap();
 
     assert_eq!(refreshed.cid, release.cid);
     assert_eq!(result["removed"], json!([]));
@@ -2007,7 +2090,9 @@ fn adopting_held_bytes_leaves_record_identical_and_appends_one_event() {
     assert_eq!(fs::read(record).unwrap(), before);
     let events = adoption_events(&f, &held.cid);
     assert_eq!(events.len(), 1);
+    assert_eq!(events[0]["kind"], "adoption");
     assert_eq!(events[0]["path"], json!(f.path("cargo-bin/epr")));
+    assert_eq!(events[0]["cid"], held.cid);
     assert_eq!(
         events[0]["session"],
         json!(crate::session::resolve().session)
@@ -2169,10 +2254,11 @@ fn adoption_log_failure_warns_and_does_not_fail_launcher_installation() {
 
 #[test]
 fn adoption_event_does_not_make_an_old_release_recent_for_gc() {
-    let f = Fixture::new("epr");
+    let mut f = Fixture::new("epr");
     let held = f.release("old-held-adoption");
     let current = f.release("current-for-old-adoption");
     age(&f, &held, "2026-01-01T00:00:00Z");
+    f.store = f.store.clone().with_now("2026-11-26T00:00:00Z");
     f.head(&current);
     atomic_bytes(
         &f.path("cargo-bin/epr"),
@@ -2183,7 +2269,7 @@ fn adoption_event_does_not_make_an_old_release_recent_for_gc() {
     f.install().unwrap();
     assert_eq!(adoption_events(&f, &held.cid).len(), 1);
 
-    let result = f.store.gc(&f.path("proc"), Some(now_seconds())).unwrap();
+    let result = f.store.gc(&f.path("proc"), None).unwrap();
 
     assert!(result["removed"]
         .as_array()
@@ -2192,7 +2278,7 @@ fn adoption_event_does_not_make_an_old_release_recent_for_gc() {
 }
 
 #[test]
-fn adopting_a_held_but_tampered_release_repairs_bytes_without_moving_first_ingest() {
+fn adopting_a_held_but_tampered_release_records_repair_without_changing_provenance() {
     let f = Fixture::new("epr");
     let held = f.release("held-before-tamper");
     let current = f.release("current-while-repairing-held");
@@ -2215,20 +2301,19 @@ fn adopting_a_held_but_tampered_release_repairs_bytes_without_moving_first_inges
     );
     let repaired = f.store.record(&held.cid).unwrap();
     assert_eq!(repaired.provenance.ingested_at, first_ingest);
-    assert!(repaired
+    assert!(!repaired
         .sources
         .iter()
         .any(|source| source.gate_run.as_deref() == Some("adopted-from-path")));
-    assert!(!f
-        .store
-        .root
-        .join(&held.cid)
-        .join("adoptions.jsonl")
-        .exists());
+    let events = adoption_events(&f, &held.cid);
+    assert_eq!(events.len(), 1);
+    assert_eq!(events[0]["kind"], "repair");
+    assert_eq!(events[0]["path"], json!(f.path("cargo-bin/epr")));
+    assert_eq!(events[0]["cid"], held.cid);
 }
 
 #[test]
-fn concurrent_ingest_finishes_before_adoption_decides_held_provenance() {
+fn concurrent_adoption_waits_on_ingest_lock_before_deciding_held_provenance() {
     use std::sync::mpsc;
 
     let f = Fixture::new("epr");
@@ -2238,7 +2323,8 @@ fn concurrent_ingest_finishes_before_adoption_decides_held_provenance() {
     let adopted_path = f.path("plain/epr");
     let (entered_tx, entered_rx) = mpsc::channel();
     let (continue_tx, continue_rx) = mpsc::channel();
-    let (started_tx, started_rx) = mpsc::channel();
+    let (attempting_tx, attempting_rx) = mpsc::channel();
+    let (acquired_tx, acquired_rx) = mpsc::channel();
 
     let (normal, adopted) = std::thread::scope(|scope| {
         let normal_store = f.store.clone();
@@ -2260,10 +2346,12 @@ fn concurrent_ingest_finishes_before_adoption_decides_held_provenance() {
             )
         });
         entered_rx.recv().unwrap();
-        let adoption_store = f.store.clone();
+        let adoption_store = f.store.clone().with_ingest_lock_observers(
+            Arc::new(move || attempting_tx.send(()).unwrap()),
+            Arc::new(move || acquired_tx.send(()).unwrap()),
+        );
         let adoption_source = source.clone();
         let adopted = scope.spawn(move || {
-            started_tx.send(()).unwrap();
             adoption_store.ingest_adoption(
                 &adoption_source,
                 &IngestOptions {
@@ -2275,8 +2363,13 @@ fn concurrent_ingest_finishes_before_adoption_decides_held_provenance() {
                 &adopted_path,
             )
         });
-        started_rx.recv().unwrap();
+        attempting_rx.recv().unwrap();
+        assert!(
+            acquired_rx.recv_timeout(Duration::from_millis(50)).is_err(),
+            "adoption must not acquire while normal ingest holds the store lock"
+        );
         continue_tx.send(()).unwrap();
+        acquired_rx.recv_timeout(Duration::from_secs(1)).unwrap();
         (
             normal.join().unwrap().unwrap(),
             adopted.join().unwrap().unwrap(),
