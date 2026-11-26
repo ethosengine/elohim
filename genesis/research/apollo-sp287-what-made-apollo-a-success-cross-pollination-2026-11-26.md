@@ -1,8 +1,8 @@
 ---
 title: "What Made Apollo a Success? — NASA SP-287 read for the pilot's brief, the simulacra and the flight sequence"
 id: apollo-sp287-what-made-apollo-a-success-cross-pollination-2026-11-26
-status: Draft (v1.1, single author, steward-directed on the composition reading, one challenge pass applied)
-version: 1
+status: Draft (v1.2, single author, steward-directed on composition and on the control room, one challenge pass applied to v1)
+version: 1.2
 date: 2026-11-26
 cites:
   - "elohim-protocol-manifesto | the canon's destination: Part VII's eight conditions, Part IX's causal order and the conclusion's refusal of a single arrival, which section 4 reads Apollo's landing against | sha256:21e5057f62b72ed3 | path: genesis/docs/content/elohim-protocol/manifesto.md"
@@ -786,9 +786,13 @@ refereed by policy. Low found that a body set up to control change had become th
 by fast-forward with no review, and review by more than the author happens only on the way to
 main ◐. We have the change discipline, which is the gate, and no forum.
 
-**Apollo centralised System 3, and we decline that** (§7). The recursion is the part that
-transfers: every seat that acts has behind it a seat with more data and more time than it has.
-For a household that is its own elohim and then its community, which is the subsidiarity the
+**Apollo centralised one authority and kept many rooms.** We decline the centre and keep the room
+(§7). What was single in Houston was the Flight Director's authority and the trajectory
+computation. The rooms were plural, and each was composed for a perspective: the front room, a
+support room per system, the evaluation room, the contractors' plants (SP pp. 44, 53) ✅. That is
+Beer's recursion in operation, since a viable system has all five functions at every level. So
+every seat that acts has a room of its own to act from, and behind it a seat with more data and
+more time. For a household that is its own elohim and then its community, which is the subsidiarity the
 constitution already encodes.
 
 On plentiful intelligence. The steward's observation is that NASA had capable people in
@@ -855,12 +859,37 @@ could only approximate with a board, and it is worth saying to anyone who knows 
 
 ## 7. Where Apollo does not transfer
 
-**A control room.** Flight control was centralised as soon as data lines allowed it (SP p. 44) ✅.
-Trajectory determination could not be done on board, and Tindall says plainly what that cost:
-"much more complicated that [than] if the whole job could be done on board the spacecraft without
-external assistance" (SP p. 60) ✅. The protocol is built for a household working alone with
-nobody else present. The development system has a legitimate centre for now, the steward's own
-workshop; G4 says it must not stay one.
+**A central control room, though not the room.** Version 1.1 of this note declined "a control
+room". The steward corrected that ✎: "it's just [we] refuse a CENTRAL control room.. but any epr
+should be able to compose a control room.. sort of on the spot. Because the agent or human that
+sits there... basically should be able to invoke the control from that perspective."
+
+The source supports the correction. Flight control was centralised in Houston only once data
+lines allowed it. Before that, teams at the remote tracking stations had "handled certain
+operational responsibilities delegated to them somewhat independently of the main control
+center" (SP p. 44) ✅. The room went where the data could be brought. In a content-addressed
+graph the data is at the position, so the same reasoning puts the room there. Controllers also
+composed their own rooms: they defined the data they needed "parameter by parameter" and "worked
+out the best formats for their real-time displays" (SP pp. 11, 46) ✅. And the furthest seat of
+all composed one on the spot. On the lunar surface "the two-man crew performs the functions of
+the entire launch complex and blockhouse crew at Cape Kennedy" (SP p. 35) ✅.
+
+What we decline is what Tindall himself counted as a cost: a seat that cannot act without a
+distant one. Trajectory determination could not be done on board, which made the job "much more
+complicated that [than] if the whole job could be done on board the spacecraft without external
+assistance" (SP p. 60) ✅. The protocol is built for a household working alone with nobody else
+present, so no position may depend on a room elsewhere for what it can do itself. The development
+system has a centre for now, the steward's own workshop; G4 says it must not stay one.
+
+A room composed at an EPR is the counterpart of the brief composed there (§2.2). The brief is what
+the position hands whoever arrives. The room is what they can see and invoke from where they sit.
+We hold a seed of the seeing half ◐. `epr flow context <dir> --participate` already answers, for
+a position, what is open there, whom each item serves, the sitter's standing, what taking an item
+would record, and whether there is capacity ✅ (run on `genesis/research`, 2026-11-26). The
+steward's earlier direction that an EPR's chrome signals governance, redress and owed response ✎
+is the same room seen by a person. Neither yet lets the sitter invoke control. What a composed
+room shows, what it lets its sitter do, and on whose authority are design questions this note
+does not answer (S8).
 
 **"Any change is undesirable."** True for a flight article frozen for one mission. A living
 commons changes continuously, and the manifesto's sixth principle is that memory grows where
@@ -922,10 +951,12 @@ later history. Its numbers are the authors' own.
 | S5 | Qualification of skills and brief templates, apart from acceptance of each run (§3.4) | Depends on T7 |
 | S6 | A procedure freeze by class of crossing, so the rules agents fly by do not change by preference during one (§1.3) | No evidence yet that it bites |
 | S7 | A forum on the integration branch where a change's cross-cutting effects are judged by more than its author (§5) | Conflicts with the no-PR landing; needs the earned-reach ladder's answer |
+| S8 | A control room composes at any EPR, on the spot, for the agent or human who sits there ✎: what they can see and what they can invoke from that position (§7). The counterpart of T2 | The steward's direction of 2026-11-26. Needs a design pass and the p2p design gate: what a room shows, what control it grants, and on whose authority. Seeds: the `--participate` read, EPR chrome, and the `operator-runtime-surface` habit, which is red ◐ |
 
 **LEAVE**
 
-- L1. A central control room for the protocol (§7).
+- L1. A *central* control room: a seat that cannot act without a distant one (§7). The room
+  itself is kept; see S8.
 - L2. "Any change is undesirable" as a premise (§7).
 - L3. Tier upon tier of contingency procedure. Tindall's bound applies to us first: more evidence
   on an artifact costs nothing once paid, and more modes in a pilot's head cost reliability.
@@ -1011,6 +1042,12 @@ re-read:
   paragraph on plentiful intelligence now carries its pages and is marked as the author's reading
   (§5). The modelled-world rung is held in pieces, not absent (§3.4). The count of epics without a
   path is reconciled against all nine (§4.2).
+
+v1.2, same day, on the steward's correction after reading the note. Version 1.1 declined "a
+control room". What is declined is a central one. A room composes at any EPR for whoever sits
+there, and the source itself shows rooms composed per perspective and one composed on the lunar
+surface (§5, §7, L1, new study item S8). The three passages quoted for this were checked against
+the source text by the author; they were not part of the challenge pass.
 
 ## Outputs
 
