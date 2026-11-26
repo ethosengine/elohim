@@ -8,13 +8,14 @@
 mod support;
 
 use std::collections::BTreeMap;
+use std::time::Instant;
 
 use elohim_epr_rea::{atom_cid, FlowEvent, FlowRecord};
 use eprfs_core::BlobCid;
 use eprfs_peer::{
-    other_devices, steward_lease_view, Admission, DeviceHead, FoldCoverage, FoldCoverageState,
-    HeadTable, LeaseStore, LeaseVerdict, LeaseWait, NackLeaf, OwnAnnounce, PeerError, Settlement,
-    StewardScope, VIA_SLOT,
+    other_devices, steward_lease_view, Admission, Channel, ChannelHead, DeviceHead, FoldCoverage,
+    FoldCoverageState, HeadTable, HeadVerdict, LeaseStore, LeaseVerdict, LeaseWait, NackLeaf,
+    OwnAnnounce, PeerError, Settlement, StewardScope, VIA_SLOT,
 };
 use support::{
     binding, contest, device, endpoint_row, event_with, genesis, household, peer_key, verifier,
@@ -369,6 +370,144 @@ fn a_nacked_claim_is_refused_and_an_overflowed_nack_is_unconfirmed() {
         ),
         Some(LeaseVerdict::Unconfirmed { ref device, .. }) if device == &h.b.did
     ));
+}
+
+#[test]
+fn a_concurrent_claim_inside_a_heard_but_unfolded_head_never_makes_ours_effective() {
+    let h = household();
+    let admission = h.admission();
+    let a_claim = claim("claude-1", T0 + 10.0);
+    let before_fold = store(vec![own(a_claim.clone())]);
+    let heads = table(
+        &h.a.did,
+        &[(2, 0), (3, 1)],
+        &before_fold,
+        &[(&h.b.did, 2, ms(T0) + 500)],
+    );
+    let mut channel = Channel::new(h.a.did.clone(), heads);
+    let b_claim = claim("codex-1", T0);
+    let mut folded = BTreeMap::new();
+    folded.insert(h.a.did.clone(), 3);
+    let heard = ChannelHead::sign(
+        h.b.did.clone(),
+        BlobCid::compute(b"B root containing its earlier concurrent claim"),
+        10,
+        ms(T0) + 900,
+        folded,
+        &h.b.signer(),
+    )
+    .expect("B signs its newer head");
+
+    assert_eq!(
+        channel.judge(&heard, &admission, &*h.verify),
+        HeadVerdict::Fold
+    );
+    assert_eq!(channel.table().devices[&h.b.did].seq, 9);
+    // Concurrent-claim race: B's heard head acknowledges A while its root still hides B's
+    // earlier claim. An early ack would turn this Pending assertion red by making A Effective.
+    assert_eq!(
+        verdict(
+            &h.a.did,
+            &before_fold,
+            channel.table(),
+            &admission,
+            ms(T0) + 1000,
+        ),
+        Some(LeaseVerdict::Pending {
+            session: "claude-1".into(),
+            waiting_on: vec![h.b.did.clone()],
+        })
+    );
+
+    channel.folded(
+        &heard,
+        1,
+        None,
+        NackLeaf::default(),
+        ms(T0) + 1100,
+        Instant::now(),
+    );
+    let after_fold = store(vec![own(a_claim), from(&h.b.did, b_claim)]);
+    assert_eq!(
+        verdict(
+            &h.a.did,
+            &after_fold,
+            channel.table(),
+            &admission,
+            ms(T0) + 1200,
+        ),
+        Some(held(&h.b.did, "codex-1", T0, false))
+    );
+}
+
+#[test]
+fn a_nack_inside_a_heard_but_unfolded_head_applies_only_after_the_fold() {
+    let h = household();
+    let admission = h.admission();
+    let claims = store(vec![own(claim("claude-1", T0))]);
+    let claim_cid = claims.events[0].to_string();
+    let heads = table(
+        &h.a.did,
+        &[(2, 0), (3, 1)],
+        &claims,
+        &[(&h.b.did, 2, ms(T0) + 500)],
+    );
+    let mut channel = Channel::new(h.a.did.clone(), heads);
+    let mut folded = BTreeMap::new();
+    folded.insert(h.a.did.clone(), 3);
+    let heard = ChannelHead::sign(
+        h.b.did.clone(),
+        BlobCid::compute(b"B root containing A's nack"),
+        10,
+        ms(T0) + 900,
+        folded,
+        &h.b.signer(),
+    )
+    .expect("B signs its newer head");
+
+    assert_eq!(
+        channel.judge(&heard, &admission, &*h.verify),
+        HeadVerdict::Fold
+    );
+    assert_eq!(channel.table().devices[&h.b.did].seq, 9);
+    // In-flight-nack race: B's heard head acknowledges A while its root still hides the nack.
+    // An early ack would turn this Pending assertion red by making A Effective without the nack.
+    assert!(matches!(
+        verdict(
+            &h.a.did,
+            &claims,
+            channel.table(),
+            &admission,
+            ms(T0) + 1000,
+        ),
+        Some(LeaseVerdict::Pending { .. })
+    ));
+
+    channel.folded(
+        &heard,
+        0,
+        None,
+        NackLeaf {
+            refused: vec![claim_cid],
+            quarantined: vec![],
+            refused_total: 1,
+        },
+        ms(T0) + 1100,
+        Instant::now(),
+    );
+    assert_eq!(
+        verdict(
+            &h.a.did,
+            &claims,
+            channel.table(),
+            &admission,
+            ms(T0) + 1200,
+        ),
+        Some(LeaseVerdict::RefusedBy {
+            session: "claude-1".into(),
+            device: h.b.did.clone(),
+        })
+    );
 }
 
 #[test]
