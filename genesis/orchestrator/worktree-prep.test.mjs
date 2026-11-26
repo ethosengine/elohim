@@ -5,7 +5,9 @@ import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync 
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { currentChangeList, currentChanges, mainCheckout, neededSubmodule, prep, submoduleCommand } from './worktree-prep.mjs';
-import { ATTESTED_SUBMODULES, attestedNeed, checkSubmodules, runPreflight, WORKSPACE_INSTALL } from './gate-preflight.mjs';
+import { ATTESTED_OUTSIDE_INPUTS, ATTESTED_SUBMODULES, attestedNeed, checkSubmodules, oneHopDependents, runPreflight, WORKSPACE_INSTALL } from './gate-preflight.mjs';
+import { existsSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
 const ok = stdout => ({ status: 0, stdout: stdout || '' });
 const put = (root, file, value = '') => {
@@ -405,7 +407,7 @@ test('station 1: no selected project needs an attested submodule: none is cloned
 
 test('station 1: a selected project that is not the orchestrator and reads no submodule skips them too', t => {
   const f = fixture(t);
-  put(f.root, 'm/build-manifest.json', JSON.stringify({ pipeline: 'p', steps: { s: { inputs: { sources: ['genesis/docs/**'] } } } }));
+  put(f.root, 'm/build-manifest.json', JSON.stringify({ pipeline: 'p', steps: { s: { depends: [], inputs: { sources: ['genesis/docs/**'] } } } }));
   f.options.select = () => [{ name: 'eprfs-live-corpus', dir: '.', manifestPath: 'm/build-manifest.json', run: { kind: 'root-just' } }];
   f.options.preflight = () => [];
   assert.equal(prep(f.options), 0, f.logs.join('\n'));
@@ -446,7 +448,7 @@ test('station 1: attestedNeed gives a reason whenever the answer cannot be compu
   const none = () => new Map([['elohim', {}]]);
   const both = () => new Map([['elohim', {}], ['elohim-sophia', {}]]);
   const app = { name: 'elohim-app', dir: 'app/elohim-app', manifestPath: 'app/elohim-app/build-manifest.json', run: { kind: 'just' } };
-  const ask = (module, projects, changed, pipelines = both, reader = read) => attestedNeed(module, { root: '/x', projects, changed, read: reader, pipelines });
+  const ask = (module, projects, changed, pipelines = both, reader = read, dependents = () => []) => attestedNeed(module, { root: '/x', projects, changed, read: reader, pipelines, dependents });
   assert.equal(ask('sophia', [], ['genesis/docs/a.md']), null);
   assert.equal(ask('sophia', [app], ['app/elohim-app/src/main.ts']), null, 'its dependencies are all declared by manifests that are here');
   assert.match(ask('sophia', [app], ['app/elohim-app/src/main.ts'], none), /depends on elohim-sophia, which no checked-out manifest declares/);
@@ -495,7 +497,7 @@ test('a change list read without its base is not exact: every attested submodule
   put(f.root, 'ws/Cargo.toml', '[workspace]\nmembers = ["a"]\n');
   put(f.root, 'ws/Cargo.lock', '');
   put(f.root, 'ws/a/Cargo.toml', '[package]\nname = "a"\n');
-  put(f.root, 'm/build-manifest.json', JSON.stringify({ pipeline: 'p', steps: { s: { inputs: { sources: ['genesis/docs/**'] } } } }));
+  put(f.root, 'm/build-manifest.json', JSON.stringify({ pipeline: 'p', steps: { s: { depends: [], inputs: { sources: ['genesis/docs/**'] } } } }));
   f.options.select = () => [{ name: 'a', dir: 'ws/a', manifestPath: 'm/build-manifest.json', run: { kind: 'just', cargo: {} } }];
   const inner = f.options.spawn;
   const cargo = [];
@@ -509,4 +511,50 @@ test('a change list read without its base is not exact: every attested submodule
   assert.match(out, /\[preflight\] ok cargo-lock:ws/);
   assert.match(out, /\[preflight\] WARN cargo-deny-bans: cargo-deny is not installed/, 'cargo-deny was asked for, not skipped');
   assert.doesNotMatch(out, /\(not run/);
+});
+
+// Review of 42faf6aaa (b): the path-only fallback drops one-hop dependents; the attested question
+// judges them anyway, from the manifests that are checked out.
+test('review (b): a dependent one hop downstream of the change is judged though the selection never named it', t => {
+  const root = mkdtempSync(join(tmpdir(), 'one-hop-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  put(root, 'lib/build-manifest.json', JSON.stringify({ pipeline: 'lib', steps: { build: { depends: [], inputs: { sources: ['lib/**'] } } },
+    gate: { projects: { lib: { dir: 'lib', steps: ['build'], run: { kind: 'just' } } } } }));
+  put(root, 'app/build-manifest.json', JSON.stringify({ pipeline: 'app', dependsOn: ['lib', 'elohim-sophia'],
+    steps: { bundle: { depends: ['lib:build', 'elohim-sophia:build-sophia-umd'], inputs: { sources: ['app/**'] } }, lint: { depends: ['bundle'], inputs: { sources: ['app/**'] } } },
+    gate: { projects: { app: { dir: 'app', steps: ['bundle'], run: { kind: 'just' } }, 'app-lint': { dir: 'app', steps: ['lint'], run: { kind: 'just' } } } } }));
+  put(root, 'docs/build-manifest.json', JSON.stringify({ pipeline: 'docs', steps: { read: { depends: [], inputs: { sources: ['docs/**'] } } },
+    gate: { projects: { docs: { dir: 'docs', steps: ['read'], run: { kind: 'just' } } } } }));
+  spawnSync('git', ['init', '-q'], { cwd: root });
+  spawnSync('git', ['add', '-A'], { cwd: root });
+  assert.deepEqual(oneHopDependents(root, ['lib/src/a.ts']).map(p => p.name).sort(), ['app', 'lib'], 'one hop: app-lint is two away');
+  assert.deepEqual(oneHopDependents(root, ['docs/a.md']).map(p => p.name), ['docs']);
+  const lib = { name: 'lib', dir: 'lib', manifestPath: 'lib/build-manifest.json', run: { kind: 'just' } };
+  // Path-only selected lib alone; app, one hop down, depends on a pipeline no checked-out manifest declares.
+  assert.match(attestedNeed('sophia', { root, projects: [lib], changed: ['lib/src/a.ts'] }), /app depends on elohim-sophia, which no checked-out manifest declares/);
+  assert.equal(attestedNeed('sophia', { root, projects: [lib], changed: ['lib/src/a.ts'], dependents: () => [] }), null, 'without the hop it was missed');
+  assert.equal(attestedNeed('sophia', { root, projects: [{ ...lib, name: 'docs', manifestPath: 'docs/build-manifest.json' }], changed: ['docs/a.md'] }), null, 'a change with no dependent still passes');
+  assert.match(attestedNeed('sophia', { root, projects: [], changed: ['a.md'], dependents: () => { throw new Error('bad manifest'); } }), /dependents of the change could not be read/);
+});
+
+test('review (b): an attested manifest declares its gitlink, paths under it, the listed outside inputs, and no dependency', () => {
+  // With the submodule absent its manifest cannot be read, so the rule is held wherever it is present.
+  const ROOT = fileURLToPath(new URL('../../', import.meta.url));
+  assert.match(attestedNeed('sophia', { root: '/x', projects: [], changed: ['sophia.Jenkinsfile'], pipelines: () => new Map(), dependents: () => [] }), /the change touches sophia\.Jenkinsfile/);
+  assert.equal(attestedNeed('elohim/brit', { root: '/x', projects: [], changed: ['sophia.Jenkinsfile'], pipelines: () => new Map(), dependents: () => [] }), null);
+  for (const module of ATTESTED_SUBMODULES) {
+    const path = join(ROOT, module, 'build-manifest.json');
+    if (!existsSync(path)) continue;
+    const manifest = JSON.parse(readFileSync(path, 'utf8'));
+    assert.deepEqual(manifest.dependsOn || [], [], `${module}: dependsOn`);
+    for (const [name, step] of Object.entries(manifest.steps || {})) {
+      assert.deepEqual(step.depends || [], [], `${module}:${name} depends on nothing`);
+      for (const input of [...(step.inputs?.sources || []), ...(step.inputs?.buildProcess || []).map(ref => ref.split('@')[0])]) {
+        assert.ok(input === module || input.startsWith(`${module}/`) || (ATTESTED_OUTSIDE_INPUTS[module] || []).includes(input), `${module}:${name} reads ${input}, outside its path and not in ATTESTED_OUTSIDE_INPUTS`);
+      }
+    }
+    for (const [name, project] of Object.entries(manifest.gate?.projects || {})) {
+      assert.equal(project.inputs, undefined, `${module} project ${name} declares no inputs of its own`);
+    }
+  }
 });
