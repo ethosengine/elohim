@@ -330,6 +330,21 @@ every note), ran against a fresh worktree at the F0 tip. Four rounds, eight agen
 - **What that read is and is not.** One reader, one task, one tier, one judge. The reader's
   list of what it was handed is its own account; the byte sizes are measured. It is a
   baseline for the brief, not a result about briefs.
+- **Verdict, first pass: changes-requested, nothing false.** The judge (an Opus seat on
+  ethosengine, dispatched and briefed by the implementing session) confirmed the design's diff
+  only appends, checked section 8 against sections 2.4 and 3 and against the code it
+  describes, opened the source of every pairing in the new skill, and matched the arrival
+  read's method hash and its numbers across the journal, the habit and the plan. Three things
+  to fix: the skill told an agent writing a correction from a worktree to pass `--as`, where
+  the root says `--root`; both are needed, one for where the note is kept and one for whose it
+  is, and the skill now says both. One pairing (manifest against pool policy) was stated more
+  broadly than its source, which is about per-project cargo caps only. And section 8 said the
+  read has four parts, where it has a conditional fifth (*Course*), which the proposed order
+  now places. Three smaller notes were taken: a citation pointed at the journal for a figure
+  that is in the plan, a pairing about peer notes was an inference and is now worded as what
+  the root says, and "the first line of your report" is "of your report's body". It did not
+  search `genesis/orchestrator/scripts` for a rule on a local gate against CI, so that pairing
+  is "unruled as far as the root instructions say".
 - **Checked.** `epr flow cites verify` passes on the amended design. The arrival read is
   recorded as a verdict note on the habit atom (`changes-requested`, since the brief as
   delivered answered two of five) and as a delta in
