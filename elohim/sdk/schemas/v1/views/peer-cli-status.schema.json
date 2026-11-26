@@ -313,6 +313,42 @@
           "type": "integer",
           "minimum": 0
         },
+        "foldFailuresOurs": {
+          "description": "Fold failures caused by this device's transport, timeout, unanswered request, or local I/O. Optional for output from older CLIs.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "foldFailuresInvalid": {
+          "description": "Fold failures caused by sender content that failed verification. Optional for output from older CLIs.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "lastFoldFailure": {
+          "description": "The latest fold failure, cleared when that same device later folds successfully. Optional for output from older CLIs.",
+          "oneOf": [
+            { "type": "null" },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["device", "seq", "at", "class", "reason"],
+              "properties": {
+                "device": { "type": "string" },
+                "seq": { "type": "integer", "minimum": 0 },
+                "at": {
+                  "description": "Unix milliseconds on the receiving device when the failure was recorded.",
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "class": { "enum": ["ours", "invalid"] },
+                "reason": {
+                  "description": "Bounded, one-line Display form of the typed fold error.",
+                  "type": "string",
+                  "maxLength": 320
+                }
+              }
+            }
+          ]
+        },
         "oversized_events": {
           "type": "integer",
           "minimum": 0

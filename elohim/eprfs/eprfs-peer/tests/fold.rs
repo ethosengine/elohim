@@ -2082,6 +2082,20 @@ async fn a_self_consistent_tree_other_than_the_signed_root_is_refused_and_the_he
         !table.devices.contains_key(&h.b.did),
         "a failed fold leaves the peer head unrecorded"
     );
+    assert_eq!(table.channel.fold_failures_ours, 0);
+    assert_eq!(table.channel.fold_failures_invalid, 1);
+    let failure = table
+        .channel
+        .last_fold_failure_parts()
+        .expect("integrity failure is retained for status");
+    assert_eq!(
+        (failure.0, failure.1, failure.3),
+        (h.b.did.as_str(), 1, "invalid")
+    );
+    assert!(
+        !failure.4.is_empty(),
+        "the typed error keeps its Display reason"
+    );
 
     daemon.shutdown().await;
     mounted.router.shutdown().await.expect("shutdown");
