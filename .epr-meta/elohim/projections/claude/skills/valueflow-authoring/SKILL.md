@@ -66,5 +66,6 @@ Every `task-*-brief.md` carries `gap: <gap-id>` and `actor: agent:<role>@<model>
 
 - Do not restate constants from the brief, plan, rulings, or repository governance in a dispatch prompt. Pass their addresses and let the seat read them.
 - Do not write rulings only as prose in a progress file or report. The ruling note is the record; prose is a projection.
+- Do not leave an anomaly met in flight in a report's prose. It closes one of two ways: as a claimed commitment with an owner and a date, or as a ruling note that says it is understood and needs no action and gives its two facts, the failure's history and the redundant path (or why none is needed).
 - Do not exceed the WIP fence to make dispatch easier.
 - Do not invent a parameter ABI around the prompt shape.

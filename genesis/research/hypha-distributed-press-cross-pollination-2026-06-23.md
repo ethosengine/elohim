@@ -2,6 +2,12 @@
 title: Hypha / Distributed Press / Hypercore Cross-Pollination
 status: Capture
 date: 2026-06-23
+takes:
+  - "L1 | owed: no backlog row, plan or spec carries it (searched for FEP-1042 and distributed press); the note lists the FEP-1042 spec stub as not yet authored"
+  - "L2 | owed: no backlog row, plan or spec carries it (searched for FEP-1042 and distributed press); the note lists the FEP-1042 spec stub as not yet authored"
+  - "L3 | owed: no backlog row, plan or spec carries it (searched for FEP-1042 and distributed press); the note lists the FEP-1042 spec stub as not yet authored"
+  - "L4 | owed: no backlog row, plan or spec carries it (searched for FEP-1042 and distributed press); the note lists the FEP-1042 spec stub as not yet authored"
+  - "L5 | owed: no backlog row, plan or spec carries it (searched for FEP-1042 and distributed press); the note lists the FEP-1042 spec stub as not yet authored"
 ---
 
 # Hypha · Distributed Press · Hypercore Cross-Pollination — June 2026

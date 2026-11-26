@@ -11,6 +11,14 @@ cites:
   - "evidence-ladder-push-left | the T0 to T4 tiers that already name in-process and local-stack simulacra and treat a banking run as an economic event, the ladder section 3 finds no scenario climbing | sha256:c8bdfe8ba6c28790 | path: genesis/docs/superpowers/specs/2026-08-10-evidence-ladder-push-left-design.md"
   - genesis/research/elohim-as-viable-system-2026-06-04.md
   - genesis/research/context-engineering-primary-sources-cross-pollination-2026-08-13.md
+takes:
+  - "T1 | agentic-harness-borrows-backlog#14"
+  - "T2 | agentic-harness-borrows-backlog#13"
+  - "T3 | agentic-harness-borrows-backlog#15"
+  - "T4 | agentic-harness-borrows-backlog#16"
+  - "T5 | arch-dataplane-refactor-backlog#24"
+  - "T6 | arch-dataplane-refactor-backlog#24"
+  - "T7 | agentic-harness-borrows-backlog#17"
 ---
 
 # What Made Apollo a Success? — November 2026

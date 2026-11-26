@@ -10,6 +10,15 @@ cites:
   - "artifact-store-sprint-2026-11-07 | the sprint 2 hub whose landed and branch-only work the After sprint 2 section reports | sha256:4b76fac9f23efae3 | path: genesis/docs/superpowers/sprints/2026-11-07-artifact-store/plan.md"
   - "native-dev-plane-one-derivation-earned-reach-design | the design whose derivation key, one store per device and reach rulings the store follows | sha256:024a89c3dba2699f | path: genesis/docs/superpowers/specs/2026-11-04-native-dev-plane-one-derivation-earned-reach-design.md"
   - "native-dev-tooling-over-peers-plan | the plan §7.3-7.4 that sorted this survey's lessons into tracks | sha256:a894a6f45fc92215 | path: genesis/docs/superpowers/plans/2026-10-29-native-dev-tooling-over-peers-plan.md"
+takes:
+  - "T1 | arch-native-dev-plane-backlog#9"
+  - "T2 | arch-native-dev-plane-backlog#10"
+  - "T4 | arch-dataplane-borrows-backlog#23"
+  - "T6 | brit-daily-driver-handoff-2026-10-27#6"
+  - "T8 | arch-dataplane-borrows-backlog#23"
+  - "T3 | owed: arch-native-dev-plane-backlog has no row for the lineage- and parent-bound publication envelope (searched it for R12 and publication envelope, and the backlog for the same)"
+  - "T5 | owed: no row or file carries inventory as an expiring hint with relay dedupe after authentication (arch-dataplane-borrows-backlog rows 23 and 24 are holder binding and fetch budgets)"
+  - "T7 | owed: arch-native-dev-plane-backlog has no row for typed divergence with a named election (searched it for divergen and election)"
 ---
 
 # Radicle / Heartwood Cross-Pollination — November 2026
