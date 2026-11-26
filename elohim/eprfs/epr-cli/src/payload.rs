@@ -147,8 +147,25 @@ impl PayloadFormat {
         bytes: &[u8],
         deadline: std::time::Duration,
     ) -> Result<Vec<Self>, String> {
-        use std::io::Write;
-        use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt, PermissionsExt};
+        Self::probe_supported_bytes_with_deadline_using(
+            bytes,
+            deadline,
+            |command, output_limit, seconds| {
+                crate::flow::memory::recall::bounded_command(command, output_limit, seconds, None)
+            },
+        )
+    }
+
+    fn probe_supported_bytes_with_deadline_using(
+        bytes: &[u8],
+        deadline: std::time::Duration,
+        mut run: impl FnMut(
+            std::process::Command,
+            usize,
+            f64,
+        ) -> std::io::Result<crate::flow::memory::recall::ProcessOutcome>,
+    ) -> Result<Vec<Self>, String> {
+        use std::os::unix::fs::{DirBuilderExt, PermissionsExt};
 
         const OUTPUT_LIMIT: usize = 64 * 1024;
         let private = tempfile::Builder::new()
@@ -169,34 +186,48 @@ impl PayloadFormat {
         let environment = make_dir("environment")?;
         let cwd = make_dir("cwd")?;
         let binary = private.path().join("epr");
-        let mut file = std::fs::OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .mode(0o700)
-            .open(&binary)
+        write_probe_executable(&binary, bytes)
             .map_err(|error| format!("cannot create private epr probe: {error}"))?;
-        file.write_all(bytes)
-            .map_err(|error| format!("cannot write private epr probe: {error}"))?;
-        file.sync_all()
-            .map_err(|error| format!("cannot sync private epr probe: {error}"))?;
-        drop(file);
 
-        let mut command = std::process::Command::new(&binary);
-        command
-            .args(["payload", "formats", "--json"])
-            .current_dir(&cwd)
-            .env_clear()
-            .env("HOME", &environment)
-            .env("XDG_CONFIG_HOME", &environment)
-            .env("XDG_CACHE_HOME", &environment)
-            .env("XDG_DATA_HOME", &environment);
-        let output = crate::flow::memory::recall::bounded_command(
-            command,
-            OUTPUT_LIMIT,
-            deadline.as_secs_f64(),
-            None,
-        )
-        .map_err(|error| format!("cannot run private epr probe: {error}"))?;
+        const BACKOFFS: [std::time::Duration; 4] = [
+            std::time::Duration::from_millis(10),
+            std::time::Duration::from_millis(20),
+            std::time::Duration::from_millis(40),
+            std::time::Duration::from_millis(80),
+        ];
+        let started = std::time::Instant::now();
+        let mut attempt = 0;
+        let output = loop {
+            let remaining = deadline.saturating_sub(started.elapsed());
+            if remaining.is_zero() {
+                return Err(format!(
+                    "cannot run private epr probe: executable remained busy for {attempt} attempts"
+                ));
+            }
+            let mut command = std::process::Command::new(&binary);
+            command
+                .args(["payload", "formats", "--json"])
+                .current_dir(&cwd)
+                .env_clear()
+                .env("HOME", &environment)
+                .env("XDG_CONFIG_HOME", &environment)
+                .env("XDG_CACHE_HOME", &environment)
+                .env("XDG_DATA_HOME", &environment);
+            attempt += 1;
+            match run(command, OUTPUT_LIMIT, remaining.as_secs_f64()) {
+                Ok(output) => break output,
+                Err(error)
+                    if error.raw_os_error() == Some(libc::ETXTBSY) && attempt <= BACKOFFS.len() =>
+                {
+                    std::thread::sleep(BACKOFFS[attempt - 1].min(remaining));
+                }
+                Err(error) => {
+                    return Err(format!(
+                        "cannot run private epr probe after {attempt} attempt(s): {error}"
+                    ))
+                }
+            }
+        };
         if let Some(error) = output.error {
             return Err(format!(
                 "private epr probe did not answer payload formats within {}s: {error}",
@@ -237,6 +268,76 @@ impl PayloadFormat {
 impl fmt::Display for PayloadFormat {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(self.marker())
+    }
+}
+
+/// Create the executable in a short-lived writer process, not in this multithreaded parent.
+/// A sibling fork of the parent therefore cannot inherit a writable descriptor for the inode
+/// that will be executed. The writer exits, and `waitpid` observes that exit, before the probe.
+fn write_probe_executable(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
+    use std::ffi::CString;
+    use std::os::unix::ffi::OsStrExt;
+
+    let path = CString::new(path.as_os_str().as_bytes()).map_err(|_| {
+        std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "private probe path contains NUL",
+        )
+    })?;
+    // SAFETY: the child performs only async-signal-safe syscalls before `_exit`; it does not
+    // allocate, unwind, or touch Rust synchronization inherited from the multithreaded parent.
+    let pid = unsafe { libc::fork() };
+    if pid < 0 {
+        return Err(std::io::Error::last_os_error());
+    }
+    if pid == 0 {
+        // SAFETY: `path` is a live NUL-terminated string, and every operation before `_exit` is
+        // an async-signal-safe syscall over child-owned descriptors and the inherited byte slice.
+        unsafe {
+            let fd = libc::open(
+                path.as_ptr(),
+                libc::O_WRONLY | libc::O_CREAT | libc::O_EXCL | libc::O_CLOEXEC,
+                0o700,
+            );
+            if fd < 0 || libc::fchmod(fd, 0o700) != 0 {
+                libc::_exit(120);
+            }
+            let mut written = 0;
+            while written < bytes.len() {
+                let count =
+                    libc::write(fd, bytes[written..].as_ptr().cast(), bytes.len() - written);
+                if count <= 0 {
+                    libc::_exit(121);
+                }
+                written += count as usize;
+            }
+            if libc::fsync(fd) != 0 || libc::close(fd) != 0 {
+                libc::_exit(122);
+            }
+            libc::_exit(0);
+        }
+    }
+
+    let mut status = 0;
+    loop {
+        // SAFETY: `pid` is the one child created above and `status` is writable for this call.
+        let waited = unsafe { libc::waitpid(pid, &mut status, 0) };
+        if waited == pid {
+            break;
+        }
+        if waited < 0 {
+            let error = std::io::Error::last_os_error();
+            if error.kind() != std::io::ErrorKind::Interrupted {
+                return Err(error);
+            }
+        }
+    }
+    if libc::WIFEXITED(status) && libc::WEXITSTATUS(status) == 0 {
+        Ok(())
+    } else {
+        Err(std::io::Error::other(format!(
+            "private probe writer failed with wait status {status}"
+        )))
     }
 }
 
@@ -605,6 +706,26 @@ mod tests {
             PayloadFormat::probe_supported_bytes(&held).unwrap(),
             vec![PayloadFormat::DirectoryV1]
         );
+    }
+
+    #[test]
+    fn payload_format_probe_retries_executable_file_busy_then_succeeds() {
+        let mut attempts = 0;
+        let probed = PayloadFormat::probe_supported_bytes_with_deadline_using(
+            &script("printf '[\"directory-v1\"]'"),
+            std::time::Duration::from_secs(2),
+            |command, output_limit, seconds| {
+                attempts += 1;
+                if attempts == 1 {
+                    return Err(std::io::Error::from_raw_os_error(libc::ETXTBSY));
+                }
+                crate::flow::memory::recall::bounded_command(command, output_limit, seconds, None)
+            },
+        )
+        .unwrap();
+
+        assert_eq!(attempts, 2);
+        assert_eq!(probed, vec![PayloadFormat::DirectoryV1]);
     }
 
     #[test]

@@ -2,6 +2,7 @@ use super::{
     files, parse_payload_formats,
     source::{copy_executable, CommandSpec},
     IngestOptions, Provenance, Refusal, Release, Result, Store, PAYLOAD_FORMATS_FIELD,
+    PAYLOAD_FORMATS_PROBE_FIELD,
 };
 use eprfs_core::{BlobCid, ByteCid};
 use serde_json::Value;
@@ -11,7 +12,7 @@ impl Store {
     /// Copy to private staging, verify those exact bytes, then atomically publish a candidate.
     /// Ingest never moves current, even if the candidate passed a gate.
     pub fn ingest(&self, source: &Path, options: &IngestOptions) -> Result<Release> {
-        self.ingest_with_payload_formats(source, options, |_| None)
+        self.ingest_with_payload_formats(source, options, |_| Ok(None))
     }
 
     /// Ingest, then derive a payload-format statement from the primary executable held beneath
@@ -21,7 +22,7 @@ impl Store {
         &self,
         source: &Path,
         options: &IngestOptions,
-        probe: impl FnOnce(&Path) -> Option<String>,
+        probe: impl FnOnce(&Path) -> std::result::Result<Option<String>, String>,
     ) -> Result<Release> {
         // Closure provenance travels with the bytes; caller overrides never relabel it.
         let closure_options;
@@ -168,9 +169,9 @@ impl Store {
                 self.config
                     .bins
                     .first()
-                    .and_then(|name| probe(&artifact.join(name)))
+                    .map_or(Ok(None), |name| probe(&artifact.join(name)))
             } else {
-                None
+                Ok(None)
             };
             let provenance = Provenance {
                 source_commit: commit,
@@ -212,11 +213,11 @@ impl Store {
             ) {
                 release.ring = "dev-context".into();
             }
-            if let Some(statement) = options
+            let statement = options
                 .payload_formats
                 .as_deref()
-                .or(probed_payload_formats.as_deref())
-            {
+                .or_else(|| probed_payload_formats.as_ref().ok()?.as_deref());
+            if let Some(statement) = statement {
                 parse_payload_formats(Some(statement))
                     .map_err(|detail| Refusal::new("payload-format-statement-invalid", detail))?;
                 if let Some(held) = release
@@ -236,6 +237,12 @@ impl Store {
                 release.extra.insert(
                     PAYLOAD_FORMATS_FIELD.into(),
                     Value::String(statement.to_owned()),
+                );
+                release.extra.remove(PAYLOAD_FORMATS_PROBE_FIELD);
+            } else if let Err(reason) = probed_payload_formats {
+                release.extra.insert(
+                    PAYLOAD_FORMATS_PROBE_FIELD.into(),
+                    Value::String(format!("failed: {reason}")),
                 );
             }
             self.save(&release)?;
