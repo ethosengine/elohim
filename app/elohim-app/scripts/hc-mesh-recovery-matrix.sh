@@ -54,31 +54,44 @@ matrix_load_draw() { # validates $DRAW; sets DRAW_ROWS/DRAW_CHOSEN_BY/DRAW_SHA; 
   if [ ! -r "$DRAW" ] || [ ! -f "$DRAW" ]; then
     echo "recovery draw is not readable: $DRAW" >&2; return 2
   fi
-  DRAW_CHOSEN_BY="$(sed -n 's/^#[[:space:]]*chosen_by:[[:space:]]*//p' "$DRAW" | head -1 | sed 's/[[:space:]]*$//')"
+  # One copy is read, hashed and parsed: a draw file edited while this function runs cannot
+  # yield rows that differ from the bytes the recorded hash names.
+  local draw_copy
+  draw_copy="$(mktemp)" || { echo "recovery draw: no temporary file for a stable copy" >&2; return 2; }
+  if ! cat "$DRAW" > "$draw_copy"; then
+    rm -f "$draw_copy"; echo "recovery draw is not readable: $DRAW" >&2; return 2
+  fi
+  DRAW_CHOSEN_BY="$(sed -n 's/^#[[:space:]]*chosen_by:[[:space:]]*//p' "$draw_copy" | head -1 | sed 's/[[:space:]]*$//')"
   if [ -z "$DRAW_CHOSEN_BY" ]; then
+    rm -f "$draw_copy"
     echo "recovery draw names no chooser: add '# chosen_by: <actor>' to $DRAW" >&2; return 2
   fi
   if [ -n "${MESH_RECOVERY_RUN_BY:-}" ] && [ "$MESH_RECOVERY_RUN_BY" = "$DRAW_CHOSEN_BY" ]; then
+    rm -f "$draw_copy"
     echo "recovery draw was chosen by the runner ($DRAW_CHOSEN_BY): a draw made by the runner is not a draw" >&2; return 2
   fi
-  DRAW_SHA="$(sha256sum "$DRAW" | cut -d' ' -f1)"
-  local line scen dshape dslot extra row n=0 out=""
+  DRAW_SHA="$(sha256sum "$draw_copy" | cut -d' ' -f1)"
+  local line scen dshape dslot extra row n=0 out="" bad=""
   while IFS= read -r line || [ -n "$line" ]; do
     case "$line" in \#*|'') continue ;; esac
     [ -z "${line//[[:space:]]/}" ] && continue
     n=$((n + 1))
     IFS=$'\t' read -r scen dshape dslot extra <<< "$line"
     if [ -n "${extra:-}" ] || [ -z "${dslot:-}" ]; then
-      echo "recovery draw line $n is not scenario<TAB>shape<TAB>slot: '$line'" >&2; return 2
+      bad="recovery draw line $n is not scenario<TAB>shape<TAB>slot: '$line'"; break
     fi
-    case "$dshape" in warm|cold) ;; *) echo "recovery draw line $n: invalid shape '$dshape' (expected warm or cold)" >&2; return 2 ;; esac
-    case "$dslot" in 0|1) ;; *) echo "recovery draw line $n: invalid recovering slot '$dslot' (expected 0 or 1)" >&2; return 2 ;; esac
+    case "$dshape" in warm|cold) ;; *) bad="recovery draw line $n: invalid shape '$dshape' (expected warm or cold)"; break ;; esac
+    case "$dslot" in 0|1) ;; *) bad="recovery draw line $n: invalid recovering slot '$dslot' (expected 0 or 1)"; break ;; esac
     row="$(awk -F '\t' -v s="$scen" '/^[[:space:]]*#/ { next } $1 == s { print; exit }' "$LIB")"
     if [ -z "$row" ]; then
-      echo "recovery draw line $n: scenario '$scen' is not in the library $LIB" >&2; return 2
+      bad="recovery draw line $n: scenario '$scen' is not in the library $LIB"; break
     fi
     out+="${out:+$'\n'}$row"$'\t'"$dshape"$'\t'"$dslot"$'\t'"$n"
-  done < "$DRAW"
+  done < "$draw_copy"
+  rm -f "$draw_copy"
+  if [ -n "$bad" ]; then
+    echo "$bad" >&2; return 2
+  fi
   if [ "$n" -eq 0 ]; then
     echo "recovery draw has no run lines: $DRAW" >&2; return 2
   fi

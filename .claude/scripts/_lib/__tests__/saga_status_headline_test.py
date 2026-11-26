@@ -44,11 +44,11 @@ class Headline(unittest.TestCase):
     def test_full_provenance(self):
         rep = {"runId": "R1", "generatedAt": "2026-10-18T15:47:23.398Z", "gitCommit": self.first}
         now = datetime(2026, 11, 26, 16, 0, tzinfo=timezone.utc)
-        self.assertEqual(saga.report_provenance(rep, now), "report R1, 39d old, 2 commits since (all paths)")
+        self.assertEqual(saga.report_provenance(rep, now), "report R1, 39d old, 2 commits since, to this checkout's HEAD (all paths)")
         line = saga.headline(rows(), rep, False)
         self.assertTrue(line.startswith("SAGA resiliency: 0/1 green · frontier: ch01 first (red)"), line)
         self.assertIn(" · report R1, ", line)
-        self.assertIn("2 commits since (all paths)", line)
+        self.assertIn("2 commits since, to this checkout's HEAD (all paths)", line)
 
     def test_no_report_kept(self):
         self.assertTrue(saga.headline(rows(), None, False).endswith(" · (no report)"))
@@ -67,6 +67,29 @@ class Headline(unittest.TestCase):
         self.assertIn("age unmeasured (generatedAt unparseable: 'yesterday')", out)
         out = saga.report_provenance({"runId": "R", "gitCommit": self.first})
         self.assertIn("age unmeasured (no generatedAt)", out)
+
+    def test_future_date_is_unmeasured_not_fresh(self):
+        now = datetime(2026, 11, 26, 16, 0, tzinfo=timezone.utc)
+        out = saga.report_provenance({"runId": "R", "generatedAt": "2026-12-01T00:00:00Z", "gitCommit": self.first}, now)
+        self.assertIn("age unmeasured (generatedAt 2026-12-01T00:00:00Z is ahead of this clock)", out)
+        self.assertNotIn("just now", out)
+
+    def test_commit_off_this_history_is_unmeasured(self):
+        repo = saga.ROOT
+        home = vcs(repo, "symbolic-ref", "--short", "HEAD")
+        vcs(repo, "checkout", "-q", "--orphan", "other")
+        vcs(repo, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "--allow-empty", "-m", "elsewhere")
+        elsewhere = vcs(repo, "rev-parse", "HEAD")
+        vcs(repo, "checkout", "-q", home)
+        out = saga.report_provenance({"runId": "R", "generatedAt": "2026-11-01T00:00:00Z", "gitCommit": elsewhere})
+        self.assertIn("is not an ancestor of this checkout's HEAD", out)
+        self.assertNotIn("commits since,", out)
+
+    def test_report_changed_between_reads_is_unmeasured(self):
+        out = saga.report_provenance({"runId": "R", "generatedAt": None, "gitCommit": None,
+                                      "readNote": "report changed while it was being read"})
+        self.assertEqual(out, "report R, age unmeasured (report changed while it was being read), "
+                              "commits since unmeasured (report changed while it was being read)")
 
     def test_load_report_keeps_git_commit_and_raw_date(self):
         reports = Path(self.tmp.name) / "genesis" / "a2o" / "reports"

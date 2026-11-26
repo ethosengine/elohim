@@ -599,8 +599,8 @@ transport where the fleet ran two.
 age.** No gate project runs the mesh, the recovery matrix or the chaos drills ◐; only the
 in-process models and the cross-language vectors sit in a gate. One push-time check does reach
 the mesh's evidence: since 2026-11-24 a push to `dev` or `main` that changes serving paths is
-refused unless a household report witnessed the same source identity, and a dataplane-only
-change still only warns ✅ (`genesis/orchestrator/scripts/t2-receipt.sh`). The saga headline
+refused unless a household report witnessed the same source identity, and a change to a
+dataplane path outside the serving set still only warns ✅ (`genesis/orchestrator/scripts/t2-receipt.sh`). The saga headline
 reads "11/12 green", and `saga-status.py --full` shows why: each chapter is green because its
 flow state is `fulfilled`. The newest mesh report is run `20261018T154413Z`, 39 days old ✅, and
 the headline prints neither the run nor its age. (The report column read `absent` for all twelve
@@ -895,7 +895,7 @@ named (§1.4). Today only the deprecations ledger has anything like it ◐.
 the next flight because every flight carried a crew. We land on the integration branch many times
 a day. The transferable rule is by class: a finding blocks the kind of crossing it endangers. The
 receipt leg at push time is already this shape ✅: it refuses a serving change at `dev` and
-`main`, and warns on a dataplane-only one (`t2-receipt.sh`; root `CLAUDE.md` still calls the
+`main`, and warns on a dataplane path outside the serving set (`t2-receipt.sh`; root `CLAUDE.md` still calls the
 whole leg warn-only, which is stale).
 
 **Readiness is a resource, and rehearsal produces it.** Tindall's confession (§1.8) describes

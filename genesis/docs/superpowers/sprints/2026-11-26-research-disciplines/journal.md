@@ -226,6 +226,22 @@ every note), ran against a fresh worktree at the F0 tip. Four rounds, eight agen
   gate, which was not run here and does not run that script's tests (row 85, narrowed).
 - **Seats.** Built by an Opus seat from a brief; read, re-run and committed by the
   orchestrating session, which also wrote the two said-rung edits.
+- **Verdict, first pass: changes-requested.** The judge (an Opus seat on ethosengine,
+  dispatched and briefed by the implementing session) read the diffs, the receipt script and
+  the hook, and ran the five tests. Its blocking finding was the orchestrating session's own
+  sentence: the root instructions, as corrected, said a dataplane-only change to
+  `elohim-storage/src/{p2p,sync,reconcile,p2p_iroh}` or `doorway-service/src` only warns. Most
+  of those paths are also in the script's serving set and are refused at `dev` and `main`. One
+  false sentence had been replaced with another, by enumerating paths from the stale sentence
+  and not from the script. The sentence now points at the script's two path sets
+  (`SERVING_RE`, `DATAPLANE_RE`) and says only that a dataplane path outside the serving set
+  warns; rows 16 and 24 and the SP-287 note carry the same wording. Three further findings on
+  the saga line were fixed: a report dated ahead of the clock read as "just now" and now reads
+  unmeasured; commits were counted against a report commit that need not be an ancestor of
+  this checkout's HEAD, and are now unmeasured unless it is; and the date and commit were
+  taken from two reads of the file and are now taken from one (9 tests).
+- **A limit that stands.** The binary identity is what the installer recorded. A process
+  started before a reinstall would be recorded under the new key.
 - **A worktree that was never prepared reds one harness test.** The second worktree, made for
   the cleanup pass, has no submodules checked out, and `seam_matrix_test.py` fails its live
   check there. F2 was finished in the prepared worktree for that reason.
@@ -260,6 +276,16 @@ every note), ran against a fresh worktree at the F0 tip. Four rounds, eight agen
   its runner, this flight is not done.
 - **Seats.** Built by an Opus seat from a brief; its three tests re-run by the orchestrating
   session, which wrote the said-rung edit.
+- **Verdict: approved, with two things to say plainly.** The same judge approved F3. It found
+  that `chosen_by` is text the draw file supplies: a runner can write another seat's name and
+  the matrix will record it. The matrix establishes who a draw names, not who made it; a
+  draw is as trustworthy as the channel it arrived by, and signing it is not built. It also
+  found the draw file was hashed and then re-opened to be parsed; it is now copied once, and
+  that copy is hashed and parsed. And it noted what the draw does not hide: the library's
+  `expect` column is a tracked file any runner can read. What a draw withholds is which
+  scenarios will run and in what order, as Apollo's simulation group withheld the failure and
+  not the rulebook. The test's check that no expectation is printed before a run is weak
+  (it filters whole classes of line); the script was read and does not print it.
 
 ## Stop conditions, every flight
 
@@ -274,7 +300,7 @@ failure's history and the redundant path.
 
 | # | Seen | Anomaly | Disposition |
 |---|---|---|---|
-| 1 | 2026-11-26 | Root `CLAUDE.md` calls the push-time receipt "warn-only"; since 2026-11-24 it refuses a serving change at `dev` and `main` | Closed 2026-11-26 in F2: the sentence is corrected in the root package and re-projected (the correction note of F0 stands as its record) |
+| 1 | 2026-11-26 | Root `CLAUDE.md` calls the push-time receipt "warn-only"; since 2026-11-24 it refuses a serving change at `dev` and `main` | Closed 2026-11-26 in F2, at the second attempt: the first correction enumerated paths and was itself wrong (the F2 judge's finding); the sentence now points at the script's two path sets. Re-projected from the root package |
 | 2 | 2026-11-26 | No gate project covers `saga-status.py`, `habits-status.py` or `hc-mesh-recovery*.sh` | Owner: this sprint, row 85. Closed or released with a reason by the sprint's close |
 | 3 | 2026-11-26 | A gate verdict run on ethosengine for a handed-over commit did not stand in on shem: the integrator picked the commit onto a newer tip, which changed the closure, and shem ran the gate itself (262 s) | Understood, no action. History: one of three hand-overs that day; the first was reused (69 s). Redundant path: the integrator's own gate run, which is what happened. Practice kept: rebase onto the fetched `origin/dev` tip immediately before the gate run |
 | 4 | 2026-11-26 | The ethosengine main checkout is more than 41 commits behind `origin/dev`, holds three local commits that duplicate landed ones, and has two stranded autostash entries | Owner: the steward, told in the session report of 2026-11-26. Outside this sprint's write set |
