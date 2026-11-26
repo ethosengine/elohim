@@ -93,6 +93,7 @@ impl FollowBuild {
 
 const PAYLOAD_FORMATS_FIELD: &str = "payloadFormats";
 const PAYLOAD_FORMATS_PROBE_FIELD: &str = "payloadFormatsProbe";
+const LAST_INGESTED_AT_FIELD: &str = "lastIngestedAt";
 const LEGACY_PAYLOAD_FORMAT: &str = "directory-v1";
 const PAYLOAD_FORMAT_ORDER: [&str; 2] = ["blob-store-v1", LEGACY_PAYLOAD_FORMAT];
 
@@ -269,7 +270,8 @@ pub struct Provenance {
     pub tree_clean: bool,
     /// Gate or adoption run that supplied the bytes.
     pub gate_run: Option<String>,
-    /// UTC ingest timestamp used for display, candidate recency, and retention.
+    /// UTC timestamp of this source observation, used for display and as the fallback from
+    /// records that predate `lastIngestedAt`.
     pub ingested_at: String,
 }
 /// Producer-supplied build derivation keys, explicitly outside the release identity.
@@ -331,13 +333,28 @@ impl Release {
             .or_else(|| (self.provenance.source_commit == commit).then_some(&self.provenance))
     }
 
-    /// Latest actual ingest of these bytes; adoption events are held outside the release record.
-    pub(crate) fn last_ingested_at(&self) -> &str {
+    fn latest_source_ingested_at(&self) -> &str {
         std::iter::once(&self.provenance)
             .chain(&self.sources)
             .map(|source| source.ingested_at.as_str())
             .max()
             .unwrap_or(self.provenance.ingested_at.as_str())
+    }
+
+    /// Latest actual ingest of these bytes. New records carry the value explicitly so non-Rust
+    /// readers use the same order; old records fall back to their newest source observation.
+    /// Adoption and repair events are held outside the release record and never count.
+    pub(crate) fn last_ingested_at(&self) -> &str {
+        self.extra
+            .get(LAST_INGESTED_AT_FIELD)
+            .and_then(Value::as_str)
+            .unwrap_or_else(|| self.latest_source_ingested_at())
+    }
+
+    fn record_last_ingested_at(&mut self) {
+        let latest = self.latest_source_ingested_at().to_owned();
+        self.extra
+            .insert(LAST_INGESTED_AT_FIELD.into(), Value::String(latest));
     }
 }
 /// A session pin or daemon lease. Owner identity is PID plus start time, never PID alone.
@@ -420,6 +437,11 @@ pub struct Store {
     runner: Arc<dyn Runner>,
     peer_serving: PeerServing,
     payload_store_format: Option<String>,
+    now: Arc<dyn Fn() -> String + Send + Sync>,
+    #[cfg(test)]
+    before_ingest_lock: Option<Arc<dyn Fn() + Send + Sync>>,
+    #[cfg(test)]
+    after_ingest_lock: Option<Arc<dyn Fn() + Send + Sync>>,
 }
 impl Store {
     /// Open a store description without mutating it.
@@ -432,6 +454,11 @@ impl Store {
             runner: Arc::new(SystemRunner),
             peer_serving: PeerServing::default(),
             payload_store_format: None,
+            now: Arc::new(files::now),
+            #[cfg(test)]
+            before_ingest_lock: None,
+            #[cfg(test)]
+            after_ingest_lock: None,
         })
     }
     /// Select TOOL_STORE, else `<bin_store>/tool` from the device layout
@@ -459,6 +486,28 @@ impl Store {
     pub fn with_payload_store_format(mut self, format: Option<&str>) -> Self {
         self.payload_store_format = format.map(str::to_owned);
         self
+    }
+    #[cfg(test)]
+    fn with_now(mut self, now: &str) -> Self {
+        let now = now.to_owned();
+        self.now = Arc::new(move || now.clone());
+        self
+    }
+    #[cfg(test)]
+    fn with_ingest_lock_observers(
+        mut self,
+        before: Arc<dyn Fn() + Send + Sync>,
+        after: Arc<dyn Fn() + Send + Sync>,
+    ) -> Self {
+        self.before_ingest_lock = Some(before);
+        self.after_ingest_lock = Some(after);
+        self
+    }
+    pub(crate) fn now(&self) -> String {
+        (self.now)()
+    }
+    pub(crate) fn now_seconds(&self) -> u64 {
+        files::parse_time(&self.now()).unwrap_or_else(files::now_seconds)
     }
     /// The existing payload-store marker used to judge an epr landing, when one exists.
     pub fn payload_store_format(&self) -> Option<&str> {
@@ -531,7 +580,9 @@ impl Store {
         records
     }
     pub(crate) fn save(&self, release: &Release) -> Result<()> {
-        files::atomic_json(&self.artifact(&release.cid)?.join("record.json"), release)
+        let mut stored = release.clone();
+        stored.record_last_ingested_at();
+        files::atomic_json(&self.artifact(&release.cid)?.join("record.json"), &stored)
     }
     pub(crate) fn release_cid(&self, sums: &BTreeMap<String, String>) -> Result<String> {
         if sums.len() == 1 {

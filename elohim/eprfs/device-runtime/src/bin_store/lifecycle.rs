@@ -86,7 +86,7 @@ impl Store {
     }
     /// Keep current, previous, every live owner, and fourteen days of ingest/use history.
     pub fn gc(&self, proc_root: &Path, at: Option<u64>) -> Result<Value> {
-        let at = at.unwrap_or_else(files::now_seconds);
+        let at = at.unwrap_or_else(|| self.now_seconds());
         let _lock = files::Lock::acquire(&self.root, files::MUTATION_WAIT)?;
         self.require_migrated()?;
         let mut keep: BTreeSet<_> = [self.head("current"), self.head("previous")]
