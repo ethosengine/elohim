@@ -45,7 +45,7 @@ by something that runs.
 |---|---|---|---|---|
 | F0 | Correct the record, open the sprint | done: judged, landed 2026-11-26 03:43Z, verified on `origin/dev` file by file | `self/ethosengine-disciplines-f0` | `6187dff08`, `ab78d3ad0`, `baeb32247` |
 | F1 | Nothing is dropped silently | said, exercised, checked and judged (changes-requested, fixed, approved); handed over | `self/ethosengine-disciplines-f1` (carries the cleanup pass's two commits) | |
-| F2 | Evidence carries its age | not started | | |
+| F2 | Evidence carries its age | built, said and checked; exercised against the main checkout's reports; verdict pending | travels with F3's script change as one carry | |
 | F3 | Another seat chooses the failure | not started | | |
 | F4 | The brief carries position and a stop condition | not started | | |
 
@@ -132,7 +132,8 @@ every note), ran against a fresh worktree at the F0 tip. Four rounds, eight agen
 
 - **Built.** `.claude/scripts/research-mint-check.py` and its test, 18 cases, run directly
   (`python3 .claude/scripts/_lib/__tests__/research_mint_check_test.py`, exit 0). No gate
-  project covers the script (row 85), so no gate is reported as passed for it.
+  project covers the script (row 85), so no gate is reported as passed for it. Its test does
+  run in the pre-push harness leg, which is how anomaly 12 was met.
 - **The design changed twice, and both are on the record.** The first design guessed takes
   from prose and was abandoned before any code, on the challenger's reading; it is recorded
   as a `--kind failed-approach` note on the plan. In flight a fourth home was added, `owed:`,
@@ -194,6 +195,41 @@ every note), ran against a fresh worktree at the F0 tip. Four rounds, eight agen
 - **Brit gaps met.** `brit rebase` refuses with "shallow repositories require Git"; `brit mv`
   is a bridge to git; cherry-pick is absent. Each fallback was stated where it was used.
 
+## F2 record
+
+- **Built.** The session-start saga line names its report, that report's age and the commits
+  since its `gitCommit`, labelled as counting all paths. Run read-only against the main
+  checkout's reports it prints `report 20261018T154413Z-e42c7f45, 38d old, 1940 commits since
+  (all paths)`, reproduced by the orchestrating session, where it printed "11/12 green"
+  alone. (The research note said 39 days; the tool floors 38 and a half.) A recovery record
+  carries `source_commit`, `source_dirty` and `binary_identity`. Every part that cannot be read
+  is written `unmeasured` with its reason.
+- **What the binary identity is, and is not.** It is the storage derivation key as the
+  install recorded it beside the binary. It is not re-derived at the moment of the run, as
+  `preflight_binary_freshness` does; the record's `binary_identity_kind` says so.
+- **Not built, as planned.** A count filtered to the dataplane closure (it waits for one
+  shared source of the path set), and an age on a green reused from a sibling device (that
+  row carries no clock reading by design).
+- **Said.** The `valueflow-reviewer` skill treats a green cited without its source and its
+  age as an Important finding. The root instructions no longer call the push-time receipt
+  warn-only: edited in the root package after `berth impact` showed no session near it and a
+  note to the integrator, re-projected to `CLAUDE.md` and `AGENTS.md`. The true sentence is
+  127 bytes longer than the stale one, on a root file already over its budget; the cut that
+  pays for it belongs to step 5 of the 2026-11-22 plan. This closes anomaly 1.
+- **Exercised.** By the run above. The plan's own exercise, the next session start on this
+  device showing the line, is owed until the ethosengine main checkout follows `dev`
+  (anomaly 4): the session-start hook reads the script in that checkout.
+- **Checked.** `saga_status_headline_test.py` (6 cases) and
+  `hc-mesh-recovery-record.test.sh` (8 checks), run directly; every harness test under
+  `.claude/scripts/_lib/__tests__/` and the session-start hook's own test, run by hand in the
+  prepared worktree, all pass. A change to the recovery script selects the `elohim-app`
+  gate, which was not run here and does not run that script's tests (row 85, narrowed).
+- **Seats.** Built by an Opus seat from a brief; read, re-run and committed by the
+  orchestrating session, which also wrote the two said-rung edits.
+- **A worktree that was never prepared reds one harness test.** The second worktree, made for
+  the cleanup pass, has no submodules checked out, and `seam_matrix_test.py` fails its live
+  check there. F2 was finished in the prepared worktree for that reason.
+
 ## Stop conditions, every flight
 
 Stop and report when: a gate reds twice on one cause; a write is needed outside the covenant
@@ -207,7 +243,7 @@ failure's history and the redundant path.
 
 | # | Seen | Anomaly | Disposition |
 |---|---|---|---|
-| 1 | 2026-11-26 | Root `CLAUDE.md` calls the push-time receipt "warn-only"; since 2026-11-24 it refuses a serving change at `dev` and `main` | Owner: this sprint. Correction note recorded in F0; the sentence is fixed in F2 through the root package |
+| 1 | 2026-11-26 | Root `CLAUDE.md` calls the push-time receipt "warn-only"; since 2026-11-24 it refuses a serving change at `dev` and `main` | Closed 2026-11-26 in F2: the sentence is corrected in the root package and re-projected (the correction note of F0 stands as its record) |
 | 2 | 2026-11-26 | No gate project covers `saga-status.py`, `habits-status.py` or `hc-mesh-recovery*.sh` | Owner: this sprint, row 85. Closed or released with a reason by the sprint's close |
 | 3 | 2026-11-26 | A gate verdict run on ethosengine for a handed-over commit did not stand in on shem: the integrator picked the commit onto a newer tip, which changed the closure, and shem ran the gate itself (262 s) | Understood, no action. History: one of three hand-overs that day; the first was reused (69 s). Redundant path: the integrator's own gate run, which is what happened. Practice kept: rebase onto the fetched `origin/dev` tip immediately before the gate run |
 | 4 | 2026-11-26 | The ethosengine main checkout is more than 41 commits behind `origin/dev`, holds three local commits that duplicate landed ones, and has two stranded autostash entries | Owner: the steward, told in the session report of 2026-11-26. Outside this sprint's write set |
@@ -219,3 +255,4 @@ failure's history and the redundant path.
 | 10 | 2026-11-26 | A cherry-pick refused over a staged rename left its sequence pending; a later `--continue` treated the next commit as the first pick's result and skipped that pick | Closed the same day: seen by checking the result (the plan had no stations), repaired by picking the skipped commit alone. Understood, no further action. History: first occurrence. Redundant path: the result was read before anything was pushed |
 | 11 | 2026-11-26 | Twelve research notes cannot declare takes as they stand: ten have no frontmatter and two have no `id` | Owner: the gathered read. The check counts all of them as unmeasured meanwhile |
 | 12 | 2026-11-26 | F1's hand-over was refused before the gates: `dependabot_paydown_test.py` pins the text `if ! bash … rust-style.sh"` in `.husky/pre-push.bash`, and that line had changed form on `dev` (present at `a9f896596`, gone by `510a7223c`). The harness leg runs only for a push that touches `.claude/scripts`, so docs-only landings never met it | Closed the same day in its own commit: the test now pins the current form of the same step. Its intent holds (the paydown step at line 1714 still precedes the rust-style step at line 1729). History: first seen here; `dev` carried it for every push selecting that leg. Told to the integrator |
+| 13 | 2026-11-26 | Row 85, written in F0, said no gate project covers the mesh recovery scripts and implied their tests and the status scripts' tests run nowhere. A change to the mesh scripts does select the `elohim-app` gate (which does not run their tests), and the status scripts' tests do run in a pre-push leg | Closed the same day: row 85 is narrowed to what is uncovered. The first wording came from an explorer's grep of the manifests, taken without running `epr flow context` on the files |

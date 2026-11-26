@@ -224,9 +224,11 @@ until the flight's verdict note stands and its landing is verified on `dev`.
 - [x] F1 exercised: `takes:` declared in eight notes, and each of the 29 practice rows carries a disposition
 - [x] F1 checked: habit `research-takes-have-a-home` born red with the script as its check; its strict run is red on exactly the 21 owed takes
 - [ ] F1 landed on `dev` and verified there
-- [ ] F2 built: the saga headline prints its report, age and commits since, and a recovery record carries its commit and binary identity
-- [ ] F2 said: the reviewer line in the `valueflow-reviewer` package, and the root "warn-only" sentence fixed through its package
-- [ ] F2 exercised and checked: a session start shows the saga line with its age, and the two tests pass
+- [x] F2 built: the saga headline prints its report, age and commits since, and a recovery record carries its commit and binary identity
+- [x] F2 said: the reviewer line in the `valueflow-reviewer` package, and the root "warn-only" sentence fixed through its package
+- [x] F2 checked: the two tests pass, run directly
+- [ ] F2 exercised as planned: a session start on ethosengine shows the saga line with its age (owed until its main checkout follows `dev`; exercised meanwhile by a read-only run against that checkout's reports)
+- [ ] F2 landed on `dev` and verified there
 - [ ] F3 built: the recovery matrix takes a draw, `expect` leaves the run's arguments, and the record carries `chosen_by` and the draw hash
 - [ ] F3 said: the receipt rule in the `hc-dev-orchestrator` package
 - [ ] F3 exercised and checked: one drawn run of three scenarios whose record shows a chooser other than the runner

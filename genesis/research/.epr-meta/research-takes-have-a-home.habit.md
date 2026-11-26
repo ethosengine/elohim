@@ -16,8 +16,10 @@ guard: >
   a note can under-declare; the reader of its mint pass is the guard for that.
   Greening this habit by rewriting an owed take as released without the note's
   own reason is the over-claim the invariant names. No gate project covers the
-  script (backlog arch-workspace-discipline row 85), so a green here is a run
-  someone made, with its date.
+  script (backlog arch-workspace-discipline row 85). Its test runs in the
+  pre-push harness leg for a push that touches `.claude/scripts`; the strict
+  run itself is run by nobody on a schedule, so a green here is a run someone
+  made, with its date.
 refs:
   - "rule: genesis/research/.epr-meta/manifest.md, mint-pass-at-close (this check is the drain that rule's retire-when waits for)"
   - "plan: genesis/docs/superpowers/plans/2026-11-26-research-disciplines-exercised.md, flight F1"
