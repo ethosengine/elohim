@@ -332,11 +332,9 @@ impl Store {
             .and_then(|p| p.canonicalize().ok())
             .zip(executable.canonicalize().ok())
             .is_some_and(|(candidate, actual)| candidate == actual);
-        let cid = if explicit {
-            files::file_cid(executable)?
-        } else {
-            self.executable_cid(executable)?
-        };
+        // An explicit candidate inside this verified store still has the release-record identity
+        // of its parent artifact. A standalone candidate falls back to its raw byte CID.
+        let cid = self.executable_cid(executable)?;
         let _lock = files::Lock::acquire(&self.root, files::EXEC_WAIT)?;
         self.require_migrated()?;
         let source = if explicit {
