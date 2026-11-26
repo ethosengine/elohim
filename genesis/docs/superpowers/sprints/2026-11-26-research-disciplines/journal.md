@@ -47,7 +47,7 @@ by something that runs.
 | F1 | Nothing is dropped silently | said, exercised, checked and judged (changes-requested, fixed, approved); handed over | `self/ethosengine-disciplines-f1` (carries the cleanup pass's two commits) | |
 | F2 | Evidence carries its age | built, said, checked and judged (changes-requested, fixed, approved); its planned exercise owed | `self/ethosengine-disciplines-f2f3f4`, one carry with F3 and F4 | |
 | F3 | Another seat chooses the failure | built, said, checked and judged (approved); **exercise owed** (no drawn run yet), so not done | same carry | |
-| F4 | The brief carries position and a stop condition | said (one part proposed, not ruled), exercised and checked; verdict pending | same carry | |
+| F4 | The brief carries position and a stop condition | said (one part proposed, not ruled), exercised, checked and judged (changes-requested, fixed, approved) | same carry | |
 
 ## F0 record
 
@@ -345,10 +345,58 @@ every note), ran against a fresh worktree at the F0 tip. Four rounds, eight agen
   the root says, and "the first line of your report" is "of your report's body". It did not
   search `genesis/orchestrator/scripts` for a rule on a local gate against CI, so that pairing
   is "unruled as far as the root instructions say".
+- **Verdict, second pass: approved** (commit `a1dee8022`). It checked the six fixes and did
+  not read the journal's added lines. The verdict is on whether section 8 and the skill say
+  what their sources say; whether to adopt section 8 is the steward's.
 - **Checked.** `epr flow cites verify` passes on the amended design. The arrival read is
   recorded as a verdict note on the habit atom (`changes-requested`, since the brief as
   delivered answered two of five) and as a delta in
   `genesis/agentic/.epr-meta/agents-arrive-briefed.habit.md`. Red preserved.
+
+## Where the sprint stands (2026-11-26, end of the first session)
+
+Four lessons have a rule where the act happens and a check that runs. None of the four flights
+after F0 is finished in the plan's own sense, and each says why:
+
+| Flight | Said | Exercised | Checked | Still owed |
+|---|---|---|---|---|
+| F1 | yes | yes: 8 notes, 66 takes, 29 rows | yes: habit red on 21 owed takes | its landing (handed over; an independent read on shem first) |
+| F2 | yes | by a read-only run only | yes: tests run directly | the planned exercise (a session start on ethosengine), and its landing |
+| F3 | yes | **no** | the build only | one drawn run whose record shows a chooser other than its runner; its landing |
+| F4 | yes; one part proposed | yes: every dispatch; one arrival read, 2 of 5 | yes | the steward's ruling on section 8; its landing |
+
+The gate `eprfs-live-corpus` passed on ethosengine on the commit that carries F2, F3 and F4
+(`a1dee8022`); the commit after it changes this journal only. A change to the mesh scripts
+selects the `elohim-app` gate, which was not run here.
+
+## For the steward, in one read
+
+Held for one decision each, gathered here so they are asked once:
+
+1. **The cleanup counter** reads 384 against 120 after a pass that changed two files. Reset
+   it, or leave it until the ethosengine main checkout follows `dev` (anomalies 4 and 9).
+2. **Section 8 of the placement design**: adopt, amend or decline.
+3. **The F3 drawn run**: who runs it and where. It is a measure-class run; shem is the
+   natural place once the script is on `dev`.
+4. **21 owed takes in five notes** (hypha-dao 6, memorilla 6, hypha-distributed-press 5,
+   radicle 2, freenet 2): mint a row for each, or release it with the note's reason.
+5. **Twelve practice rows not exercised** (harness 4, 9, 12; design-legibility 1, 4, 5, 7, 8;
+   workspace-discipline 43, 58; measure-family 27; dataplane-borrows 8), and the unexercised
+   halves of harness 7, 11 and 17, workspace-discipline 44, measure-family 28 and
+   commons-holonic 54: next sprint, hold, or release.
+6. **Twelve notes that cannot declare takes** as they stand (ten without frontmatter, two
+   without an `id`).
+7. **What the cleanup pass left**: 38 claimed-only documents (ranked above), 6 documents
+   without a status, 19 memory entries without a cite, and the workflow's two limits
+   (anomaly 8).
+8. **One unruled pairing**: a local gate's verdict against CI's for the same closure.
+9. **Row 85**: nothing runs the mesh scripts' shell tests, and the status scripts have no
+   gate project.
+10. **Row 41**, the lead for the next sprint: the viable-system code has no fixture. A
+    decision or a release by 2026-12-10.
+11. **Outside this sprint's write set**: the ethosengine main checkout behind `dev`
+    (anomaly 4), which blocks F2's planned exercise and the memory ring sweep; and a hook
+    that timed out once (anomaly 5).
 
 ## Stop conditions, every flight
 
