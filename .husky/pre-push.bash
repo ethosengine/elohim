@@ -694,11 +694,13 @@ phase_l_agent_overridden() {
 # One renew. 0 = still held (a new generation is recorded), 1 = refused outright.
 phase_l_agent_renew() {
   local rc
+  PHASE_L_RENEW_EFFECTIVE=""
   phase_l_agent_claim_patient
   rc=$?
   if [ "$rc" -eq 0 ]; then
     phase_l_agent_token
     PHASE_L_RENEWED_AT=$(date +%s)
+    PHASE_L_RENEW_EFFECTIVE=1
     return 0
   fi
   if { [ "$rc" -eq 3 ] && phase_l_agent_overridden; } ||
@@ -740,7 +742,7 @@ phase_l_agent_listen() {
 # berth refused the claim with an override on the record: wait until it takes effect, renewing,
 # then re-claim (R-K). 0 = held, 2 = the parent asked or went away, else berth's refusal.
 phase_l_agent_override_wait() {
-  local start now until_s deadline next ms="" rc step
+  local start now until_s deadline next poll_at poll_s min_poll ms="" rc step
   start=$(date +%s)
   [[ "$PHASE_L_OUT" =~ override_at_ms=([0-9]+) ]] && ms="${BASH_REMATCH[1]}"
   phase_l_agent_token
@@ -756,6 +758,12 @@ phase_l_agent_override_wait() {
     phase_l_agent_say say "[pre-push] Phase L: this device's peer daemon is down — run: epr peer serve"
   fi
   next=$((start + PHASE_L_INTERVAL))
+  poll_s=${BERTH_OVERRIDE_POLL_S:-10}
+  [[ "$poll_s" =~ ^[0-9]+$ ]] || poll_s=10
+  min_poll=$PHASE_L_CW
+  [ "$min_poll" -ge 1 ] || min_poll=1
+  [ "$poll_s" -ge "$min_poll" ] || poll_s=$min_poll
+  poll_at=$((start + poll_s))
   while :; do
     now=$(date +%s)
     if [ "$now" -ge "$until_s" ]; then
@@ -774,14 +782,34 @@ phase_l_agent_override_wait() {
       until_s=$((now + 2))
       continue
     fi
+    if [ "$now" -ge "$next" ]; then
+      phase_l_agent_renew || return 3
+      if [ "$PHASE_L_RENEW_EFFECTIVE" = 1 ]; then
+        phase_l_agent_say say "[pre-push] Phase L: the claim became effective $(( $(date +%s) - start ))s into the override wait; proceeding (override not needed)"
+        return 0
+      fi
+      next=$(($(date +%s) + PHASE_L_INTERVAL))
+      poll_at=$(($(date +%s) + poll_s))
+      continue
+    fi
+    if [ "$now" -ge "$poll_at" ]; then
+      phase_l_agent_claim_patient
+      rc=$?
+      if [ "$rc" -eq 0 ]; then
+        phase_l_agent_token
+        phase_l_agent_say say "[pre-push] Phase L: the claim became effective $(( $(date +%s) - start ))s into the override wait; proceeding (override not needed)"
+        return 0
+      fi
+      phase_l_agent_overridden && phase_l_agent_token
+      poll_at=$(($(date +%s) + poll_s))
+      continue
+    fi
     step=$((until_s - now))
+    [ "$step" -le $((next - now)) ] || step=$((next - now))
+    [ "$step" -le $((poll_at - now)) ] || step=$((poll_at - now))
     [ "$step" -le 5 ] || step=5
     phase_l_agent_listen "$step"
     [ $? -eq 2 ] && return 2
-    if [ "$(date +%s)" -ge "$next" ]; then
-      phase_l_agent_renew || return 3
-      next=$(($(date +%s) + PHASE_L_INTERVAL))
-    fi
   done
 }
 
