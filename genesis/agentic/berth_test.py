@@ -3300,19 +3300,25 @@ class StewardClaimTest(unittest.TestCase):
             self.assertEqual(fmt(unconfirmed_a(last_seen=NOW_MS - age_ms), NOW_MS),
                              f"unconfirmed: {DEVICE_A} last seen {text} ago")
 
-    def test_steward_reason_appends_lease_wait_evidence_without_replacing_old_phrases(self):
+    def test_steward_reason_keeps_its_first_line_and_puts_the_wait_on_a_second(self):
+        # The first line is byte-identical to the form the a2o steps and the hook match exactly
+        # (devices-share-one-berth.steps.ts asserts it); the wait detail is a second, indented line.
         fmt = _NS["steward_reason"]
         evidence = lease_wait()
         detail = (f"{DEVICE_A} to acknowledge our seq 3 (it acknowledges 2; "
                   "its head seq 9 processed 5s ago)")
+        pending_reason = fmt(pending(waiting=evidence), NOW_MS)
         self.assertEqual(
-            fmt(pending(waiting=evidence), NOW_MS),
-            f"unconfirmed: {DEVICE_A} has not acknowledged yet — {detail}",
+            pending_reason.split("\n"),
+            [f"unconfirmed: {DEVICE_A} has not acknowledged yet", f"  waiting: {detail}"],
         )
+        unconfirmed_reason = fmt(unconfirmed_a(waiting=evidence), NOW_MS)
         self.assertEqual(
-            fmt(unconfirmed_a(waiting=evidence), NOW_MS),
-            f"unconfirmed: {DEVICE_A} last seen 3m ago — {detail}",
+            unconfirmed_reason.split("\n"),
+            [f"unconfirmed: {DEVICE_A} last seen 3m ago", f"  waiting: {detail}"],
         )
+        # Without wait evidence the line is exactly the old one-line form.
+        self.assertEqual(fmt(unconfirmed_a(), NOW_MS), f"unconfirmed: {DEVICE_A} last seen 3m ago")
         no_announce = lease_wait(needs_seq=None)
         reason = fmt(pending(waiting=no_announce), NOW_MS)
         self.assertIn(f"unconfirmed: {DEVICE_A} has not acknowledged yet", reason)
