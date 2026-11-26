@@ -172,7 +172,10 @@ export function attestedNeed(module, { root, projects, changed, read = readFileS
   } catch { return 'the dependents of the change could not be read'; }
   for (const project of judged) {
     if (project.name === 'orchestrator' || project.name === 'orchestrator-tree') return `${project.name} is selected and loads every attested manifest`;
-    if (project.run?.kind === 'attested') return `the attested project ${project.name} is selected`;
+    // An attested project needs the submodule it lives in (the next line), not the others; one
+    // that lives in no attested submodule is not understood, and needs every one.
+    const home = ATTESTED_SUBMODULES.find(path => project.dir === path || project.dir?.startsWith(`${path}/`));
+    if (project.run?.kind === 'attested' && !home) return `the attested project ${project.name} is selected`;
     if (project.dir === module || project.dir?.startsWith(`${module}/`)) return `${project.name} lives in it`;
     if (!project.manifestPath) return `${project.name} has no manifest to read`;
     if (manifestNames(module, project, { root, read })) return `${project.name}'s manifest reads it (or cannot be read)`;

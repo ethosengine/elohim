@@ -122,7 +122,7 @@
       {"file": "doc-cut-guard.test.mjs", "reads": []},
       {"file": "fleet-roll-guard.test.mjs", "tree": "its real-manifest tests run git ls-tree and cat-file on this repository's HEAD (evaluatePaths at sha HEAD); in the view there is no repository, so 2 of its 50 tests fail there"},
       {"file": "prepush-ra-strays.test.mjs", "reads": [".husky/pre-push.bash"]},
-      {"file": "prepush-submodules.test.mjs", "reads": [".husky/pre-push.bash"]},
+      {"file": "prepush-submodules.test.mjs", "reads": [".gitmodules", ".husky/pre-push.bash"]},
       {"file": "attested-list.test.mjs", "reads": [".husky/pre-push.bash"]},
       {"file": "gate-task.test.mjs", "reads": []},
       {"file": "gate-change-id.test.mjs", "reads": []},

@@ -43,7 +43,7 @@ test("a_modified_or_conflicted_checkout_is_present", () => {
 
 // Thin-device station 5 (backlog row 106): the hook asks attestedNeed, as prep does, with the
 // push's own change list and selection. The real hook function, the real CLI, this checkout.
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 
 const fnText = (name) => {
@@ -55,9 +55,37 @@ const DECIDE = fnText("attested_decide");
 const ALL = "elohim/brit elohim/rakia sophia";
 const REFUSED = (need) => `[pre-push] REFUSED: not checked out: ${need}. Run: git submodule update --init ${need}`;
 
-function decide(t, { changed = ["genesis/docs/a.md"], absent = ALL, moved = "", projects = "", env = {}, stub = "" } = {}) {
+// What the CLI reads is a fixture root (GATE_ROOT), never this checkout: the answer must not depend
+// on which submodules the device running the test holds. `thin` has no submodule manifest; `full`
+// adds the three attested ones, shaped as the real ones are.
+const step = (sources, depends = []) => ({ depends, inputs: { sources } });
+const justIn = (dir, steps) => ({ dir, steps, run: { kind: "just" } });
+const attestedIn = (dir, steps) => ({ dir, steps, run: { kind: "attested" } });
+function fixtureRoot(t, { full = false } = {}) {
+  const root = mkdtempSync(join(tmpdir(), "prepush-root-"));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const manifest = (path, content) => { mkdirSync(join(root, path), { recursive: true }); writeFileSync(join(root, path, "build-manifest.json"), JSON.stringify(content)); };
+  writeFileSync(join(root, ".gitmodules"), ["elohim/brit", "elohim/rakia", "sophia", "elohim/holochain-conductor"].map((p) => `[submodule "${p}"]\n\tpath = ${p}\n`).join(""));
+  manifest("genesis/orchestrator", { pipeline: "elohim-orchestrator", dependsOn: [], steps: { lint: step(["genesis/orchestrator/**"]) },
+    gate: { projects: { orchestrator: justIn("genesis/orchestrator", ["lint"]), "orchestrator-tree": justIn("genesis/orchestrator", ["lint"]), "address-profile-lint": justIn(".", ["lint"]) } } });
+  manifest("elohim/eprfs", { pipeline: "elohim-eprfs", dependsOn: [], steps: { "rust-build-test": step(["elohim/eprfs/**"]) },
+    gate: { projects: { "eprfs-live-corpus": { dir: "elohim/eprfs", steps: [], inputs: { sources: ["genesis/docs/**"] }, run: { kind: "root-just" } } } } });
+  manifest("elohim/holochain", { pipeline: "elohim-edge", dependsOn: [], steps: { "build-edge-image": step(["elohim/elohim-storage/**", "elohim/rakia/schemas/**"], ["elohim-brit:brit-ci"]) },
+    gate: { projects: { "elohim-storage": justIn("elohim/elohim-storage", ["build-edge-image"]) } } });
+  manifest("app/elohim-app", { pipeline: "elohim", dependsOn: ["elohim-sophia"], steps: { "build-angular": step(["app/**"], ["elohim-sophia:build-sophia-umd"]) },
+    gate: { projects: { "elohim-app": justIn("app/elohim-app", ["build-angular"]) } } });
+  if (full) {
+    manifest("sophia", { pipeline: "elohim-sophia", dependsOn: [], steps: { "build-sophia-umd": { depends: [], inputs: { sources: ["sophia", "sophia/**"], buildProcess: ["sophia.Jenkinsfile"] } } }, gate: { projects: { sophia: attestedIn("sophia", ["build-sophia-umd"]) } } });
+    manifest("elohim/brit", { pipeline: "elohim-brit", dependsOn: [], steps: { "brit-ci": step(["elohim/brit", "elohim/brit/**"]) }, gate: { projects: { brit: attestedIn("elohim/brit", ["brit-ci"]) } } });
+    manifest("elohim/rakia", { pipeline: "elohim-rakia", dependsOn: [], steps: { "rakia-ci": step(["elohim/rakia", "elohim/rakia/**"]) }, gate: { projects: { rakia: attestedIn("elohim/rakia", ["rakia-ci"]) } } });
+  }
+  return root;
+}
+
+function decide(t, { changed = ["genesis/docs/a.md"], absent = ALL, moved = "", projects = "", env = {}, stub = "", full = false, cwd = ROOT } = {}) {
   const dir = mkdtempSync(join(tmpdir(), "prepush-attested-"));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
+  env = { GATE_ROOT: fixtureRoot(t, { full }), ...env };
   const list = join(dir, "changed");
   if (changed) writeFileSync(list, `${changed.join("\n")}\n`);
   const r = spawnSync("bash", ["-c", [
@@ -70,7 +98,7 @@ function decide(t, { changed = ["genesis/docs/a.md"], absent = ALL, moved = "", 
     DECIDE,
     "attested_decide; echo \"decided rc=$? absent=[$ATTESTED_ABSENT]\"",
   ].join("\n")], {
-    cwd: ROOT, encoding: "utf8", timeout: 60000,
+    cwd, encoding: "utf8", timeout: 60000,
     env: { PATH: process.env.PATH, HOME: process.env.HOME, ...(changed ? { GATE_CHANGED_FILES: list } : {}), GATE_NARROW_BASE: "ok", ...env },
   });
   return { status: r.status, out: r.stdout.split("\n").filter(Boolean), err: r.stderr.split("\n").filter(Boolean) };
@@ -95,9 +123,19 @@ test("station 5 (b): every reason prep honours refuses here, naming only the sub
     [{ changed: [".gitmodules"] }, ALL, /the change touches \.gitmodules/],
     [{ changed: ["genesis/orchestrator/attested-submodules.txt"] }, ALL, /the change touches genesis\/orchestrator\/attested-submodules\.txt/],
     [{ projects: "elohim-storage", absent: "elohim/rakia" }, "elohim/rakia", /elohim\/rakia: elohim-storage's manifest reads it/],
+    [{ projects: "elohim-app" }, ALL, /elohim-app depends on elohim-sophia, which no checked-out manifest declares/],
+    // The same questions where the submodule manifests ARE checked out (the orchestrator gate's own
+    // view, 2026-11-26): a sophia pin move selects the attested sophia project and elohim-app one
+    // hop down, and that is no reason to require brit or rakia.
+    [{ full: true, changed: ["genesis/docs/a.md", "sophia"] }, "sophia", /^\[pre-push\] attested submodules required: sophia: the change touches sophia$/],
+    [{ full: true, changed: ["sophia.Jenkinsfile"] }, "sophia", /sophia: the change touches sophia\.Jenkinsfile$/],
+    [{ full: true, projects: "sophia elohim-app", changed: ["app/a.ts"], absent: "elohim/brit elohim/rakia" }, null, null],
+    // A brit pin move there: elohim-storage is one hop down (its step depends on brit-ci) and its manifest reads rakia.
+    [{ full: true, changed: ["elohim/brit"] }, "elohim/brit elohim/rakia", /elohim\/brit: the change touches elohim\/brit; elohim\/rakia: elohim-storage's manifest reads it/],
   ];
   for (const [options, need, why] of cases) {
     const r = decide(t, options);
+    if (need === null) { assert.equal(r.status, 0, `${JSON.stringify(options)}: ${r.err.join(" | ")}`); continue; }
     assert.equal(r.status, 1, JSON.stringify(options));
     assert.match(r.err[0], /^\[pre-push\] attested submodules required: /);
     assert.match(r.err[0], why);
@@ -235,7 +273,18 @@ test("review (c): the required names are read by collapsing whitespace, whatever
 // attested project; nothing was absent, the oracle could not build its graph, path-only selected
 // nothing. Three closures, each fail closed.
 const STALE = "c2f8193105aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-const PIN = spawnSync("git", ["-C", ROOT, "ls-tree", "HEAD", "--", "elohim/brit"], { encoding: "utf8" }).stdout.split(/\s+/)[2];
+const PIN = "b52a100700bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+// A repository whose HEAD pins elohim/brit at PIN: what the hook's `git ls-tree` reads in the pushing checkout.
+function pinnedRepo(t) {
+  const dir = mkdtempSync(join(tmpdir(), "prepush-pinned-"));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  for (const args of [["init", "-q", "-b", "main"], ["update-index", "--add", "--cacheinfo", `160000,${PIN},elohim/brit`],
+    ["-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-q", "-m", "pin"]]) {
+    const r = spawnSync("git", args, { cwd: dir, encoding: "utf8" });
+    assert.equal(r.status, 0, r.stderr);
+  }
+  return dir;
+}
 
 test("incident (1): a submodule checked out off its gitlink is found, and judged like an absent one", (t) => {
   const r = spawnSync("bash", ["-c", [
@@ -246,14 +295,15 @@ test("incident (1): a submodule checked out off its gitlink is found, and judged
   assert.match(HOOK, /ATTESTED_MOVED=\$\(attested_submodules_moved "\$\{ATTESTED_LIST\[@\]\}"\)\nATTESTED_ABSENT=\$\(printf '%s %s' "\$MISSING_SUBMODULES"/);
 
   // The exact case: brit present at a stale commit, a pin-only change, nothing selected.
-  const stale = decide(t, { absent: "elohim/brit", moved: `elohim/brit ${STALE}`, changed: ["elohim/brit"] });
+  const cwd = pinnedRepo(t);
+  const stale = decide(t, { cwd, absent: "elohim/brit", moved: `elohim/brit ${STALE}`, changed: ["elohim/brit"] });
   assert.equal(stale.status, 1);
   assert.deepEqual(stale.err, [
     "[pre-push] attested submodules required: elohim/brit: the change touches elohim/brit",
     `[pre-push] REFUSED: elohim/brit is checked out at c2f8193105aa, not at its pin ${PIN.slice(0, 12)}: its gate would be read from a manifest and bytes the push does not carry. Run: just dev prep, or git submodule update --init elohim/brit`,
   ]);
   // Moved and absent together: one line each kind.
-  const both = decide(t, { absent: "sophia elohim/brit", moved: `elohim/brit ${STALE}`, projects: "orchestrator" });
+  const both = decide(t, { cwd, absent: "sophia elohim/brit", moved: `elohim/brit ${STALE}`, projects: "orchestrator" });
   assert.match(both.err[1], /^\[pre-push\] REFUSED: elohim\/brit is checked out at c2f8193105aa, not at its pin /);
   assert.equal(both.err[2], REFUSED("sophia"));
   // Someone working inside brit who pushes documents is not stopped, and is told.
@@ -293,9 +343,10 @@ test("incident (2) and (3): a pin move needs its attested gate in the selection,
   assert.deepEqual(pins({ changed: null }), ["the change list could not be read, so a submodule pin move cannot be ruled out"]);
 });
 
-function gated(t, { changed = ["genesis/docs/a.md"], stub = "", env = {}, projects = "", twice = false } = {}) {
+function gated(t, { changed = ["genesis/docs/a.md"], stub = "", env = {}, projects = "", twice = false, full = false } = {}) {
   const dir = mkdtempSync(join(tmpdir(), "prepush-pins-"));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
+  env = { GATE_ROOT: fixtureRoot(t, { full }), ...env };
   const list = join(dir, "changed");
   if (changed) writeFileSync(list, `${changed.join("\n")}\n`);
   const r = spawnSync("bash", ["-c", [
@@ -326,8 +377,13 @@ test("incident: the hook asks the pin-move question only for a push that moves a
   // The real question, this checkout: a brit pin move to dev with nothing selected does not go on.
   const real = gated(t, { changed: ["elohim/brit"] });
   assert.equal(real.status, 1, real.err.join("\n"));
-  assert.match(real.err[0], /^\[pre-push\] elohim\/brit: its pin moves and .* — the pin move would land ungated$/);
+  assert.match(real.err[0], /^\[pre-push\] elohim\/brit: its pin moves and no attested gate project is registered for it here .* — the pin move would land ungated$/);
   assert.equal(real.err.at(-1), LAST);
+  // Where brit's manifest is checked out: not selected refuses; selected, a hand-over goes on.
+  const handover = { GATE_PUSH_TARGETS: "refs/heads/self/thin-x" };
+  assert.deepEqual(gated(t, { full: true, changed: ["elohim/brit"], env: handover }).err,
+    ["[pre-push] elohim/brit: its pin moves and the selection does not contain its attested gate brit — the pin move would land ungated", LAST]);
+  assert.deepEqual(gated(t, { full: true, changed: ["elohim/brit"], env: handover, projects: "brit elohim-storage" }), { status: 0, out: ["went on rc=0"], err: [] });
   assert.equal(gated(t, { changed: null, env: { GATE_CHANGED_FILES: "/nonexistent/changed" } }).status, 1, "no list, real CLI: refused");
   // Asked where the selection exists and at every pass, as attested_decide is.
   assert.match(fnText("hook_pass"), /^hook_pass\(\) \{\n  attested_decide\n  attested_pins_gated\n/);
