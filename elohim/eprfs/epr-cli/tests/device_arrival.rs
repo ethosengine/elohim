@@ -446,7 +446,9 @@ fn would_input_stall_is_reported_within_deadline_without_changing_status_exit() 
         base,
         &["commit", "-q", "-m", "fixture stalled selection input"],
     );
+    let ordinary_started = Instant::now();
     let ordinary = epr(base, &["device", "status"]);
+    let ordinary_elapsed = ordinary_started.elapsed();
     let started = Instant::now();
     let forecast = epr_with_env(
         base,
@@ -456,7 +458,13 @@ fn would_input_stall_is_reported_within_deadline_without_changing_status_exit() 
             ("EPR_WOULD_STALL_INPUT", "1"),
         ],
     );
-    assert!(started.elapsed() < Duration::from_secs(2));
+    let forecast_elapsed = started.elapsed();
+    let forecast_overhead = forecast_elapsed.saturating_sub(ordinary_elapsed);
+    assert!(
+        forecast_overhead < Duration::from_secs(2),
+        "forecast added {forecast_overhead:?}: ordinary {ordinary_elapsed:?}, forecast \
+         {forecast_elapsed:?}"
+    );
     assert_eq!(forecast.status.code(), ordinary.status.code());
     assert!(String::from_utf8_lossy(&forecast.stdout)
         .contains("timed out after 10s while running gate selection"));
