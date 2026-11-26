@@ -8,7 +8,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
   checkElementDists, checkEvidenceRecordable, checkNodeModules, checkReadSets, checkSophiaUmd,
-  main, checkEprBin, checkArk, checkCargoDeny, checkCargoLocks, checkCBaselineOffer, checkStorageClientDist, checkWorkspaceDists, checkSubmodules, checkTmpdir, emitLive, NAMED_READ_SET_PROJECTS, PREFLIGHT_READ_SET_PROJECTS, onRedPolicy,
+  main, cargoInputChange, checkEprBin, checkArk, checkCargoDeny, checkCargoLocks, checkCBaselineOffer, checkStorageClientDist, checkWorkspaceDists, checkSubmodules, checkTmpdir, emitLive, NAMED_READ_SET_PROJECTS, PREFLIGHT_READ_SET_PROJECTS, onRedPolicy,
   fleetRollRows, docCutRows, runPreflight, checkSubmodulePins,
 } from './gate-preflight.mjs';
 import { orderByCost } from './gate-runner.mjs';
@@ -172,6 +172,52 @@ test('cargo-locks: a non-cargo project, and a DNA workspace, are not checked', (
   const dna = { name: 'dna', dir: 'elohim/holochain/dna', run: { kind: 'just', cargo: {} } };
   const spawn = () => { throw new Error('cargo must not run'); };
   assert.equal(checkCargoLocks({ root, projects: [app, dna], spawn }), null);
+});
+
+// Thin-device station 2 (backlog row 106): no cargo input in the push, no cargo asked for.
+test('cargo-locks: a push that changes no cargo input runs no cargo and says so in one ok row', (t) => {
+  const root = cargoTree(t);
+  put(root, '.gitmodules', '[submodule "elohim/brit"]\n\tpath = elohim/brit\n');
+  const spawn = () => { throw new Error('cargo must not run'); };
+  const r = checkCargoLocks({ root, projects: [pa, pb], spawn, changed: ['genesis/docs/a.md', 'genesis/orchestrator/x.mjs', 'ws/a/src/lib.rs'] });
+  assert.equal(r.level, 'ok');
+  assert.equal(r.check, 'cargo-lock');
+  assert.match(r.why, /^not run for ws: the push changes no Cargo\.toml, Cargo\.lock, rust-toolchain file/);
+  assert.equal(checkCargoLocks({ root, projects: [app], spawn, changed: ['a.md'] }), null, 'no cargo project: still no row');
+});
+
+test('cargo-locks: any cargo input in the push, no change list, or an unreadable .gitmodules runs the check as before', (t) => {
+  const root = cargoTree(t);
+  put(root, '.gitmodules', '[submodule "elohim/brit"]\n\tpath = elohim/brit\n');
+  for (const path of ['ws/a/Cargo.toml', 'ws/Cargo.lock', 'Cargo.toml', 'elohim/epr/rust-toolchain.toml', 'rust-toolchain',
+    '.cargo/config.toml', 'elohim/x/.cargo/config', 'genesis/agentic/pool-policy.json', '.gitmodules', 'elohim/brit']) {
+    let ran = 0;
+    const [r] = checkCargoLocks({ root, projects: [pa], spawn: () => { ran += 1; return { status: 101, stderr: STALE }; }, changed: ['a.md', path] });
+    assert.equal(ran, 1, path);
+    assert.equal(r.level, 'REFUSED', path);
+  }
+  let ran = 0;
+  const spawn = () => { ran += 1; return { status: 0 }; };
+  checkCargoLocks({ root, projects: [pa], spawn, changed: null });
+  checkCargoLocks({ root, projects: [pa], spawn });
+  assert.equal(ran, 2, 'no change list: the check runs');
+  rmSync(join(root, '.gitmodules'));
+  checkCargoLocks({ root, projects: [pa], spawn, changed: ['a.md'] });
+  assert.equal(ran, 3, 'the submodule paths cannot be read: the check runs');
+  assert.equal(cargoInputChange(['a.md'], { root }), '.gitmodules (unreadable)');
+});
+
+test('cargo-locks: under runPreflight a fallback range (GATE_NARROW_BASE=none) is no change list', (t) => {
+  const root = cargoTree(t);
+  put(root, '.gitmodules', '');
+  const asked = [];
+  const spawn = (cmd, args) => { asked.push(`${cmd} ${args[0]}`); return { status: 0, stdout: '' }; };
+  const run = env => runPreflight({ root, projects: [pa], env: { TMPDIR: '/preflight-fixture-tmp', ...env }, spawn, registry: new Map(), changed: ['genesis/docs/a.md'], hostTriple: 'x' })
+    .filter(r => r.check.startsWith('cargo-lock')).map(r => r.check);
+  assert.deepEqual(run({}), ['cargo-lock']);
+  assert.ok(!asked.includes('cargo metadata'));
+  assert.deepEqual(run({ GATE_NARROW_BASE: 'none' }), ['cargo-lock:ws']);
+  assert.ok(asked.includes('cargo metadata'));
 });
 
 test('rows stream as each check completes', (t) => {
