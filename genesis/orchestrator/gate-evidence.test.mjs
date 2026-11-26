@@ -255,6 +255,11 @@ test('carry-only native evaluation ignores candidate Cargo/rustup config and pre
   writeFileSync(wrapper, `#!/bin/sh\nprintf ran > ${JSON.stringify(marker)}\nexec rustc "$@"\n`);
   chmodSync(wrapper, 0o755);
   const evaluator = join(root, 'fake-epr');
+  const fixtureBin = join(root, 'bin');
+  const fixtureCargoMarker = join(root, 'fixture-cargo-ran');
+  mkdirSync(fixtureBin);
+  writeFileSync(join(fixtureBin, 'cargo'), `#!/bin/sh\nprintf ran > ${JSON.stringify(fixtureCargoMarker)}\n`);
+  chmodSync(join(fixtureBin, 'cargo'), 0o755);
   const sourceState = JSON.stringify({
     head: 'blob1', clean: true, status: '', closure: [{ path: 'elohim/eprfs', tree: 'blob1' }],
     closureCid: `bafkr4i${'a'.repeat(52)}`,
@@ -269,7 +274,7 @@ test('carry-only native evaluation ignores candidate Cargo/rustup config and pre
   const cargoHome = process.env.CARGO_HOME || join(process.env.HOME, '.cargo');
   const env = {
     EPR_BIN: evaluator, BRIT_BIN: join(root, 'brit'), BRIT_BUILD_REF_BIN: join(root, 'brit-build-ref'),
-    PATH: process.env.PATH || '', RUSTUP_TOOLCHAIN: toolchain, CARGO_HOME: cargoHome, RUSTFLAGS: '',
+    PATH: fixtureBin, RUSTUP_TOOLCHAIN: toolchain, CARGO_HOME: cargoHome, RUSTFLAGS: '',
   };
   const cargoEnv = { RUSTUP_TOOLCHAIN: toolchain };
   const simulated = fakeSpawn([
@@ -285,6 +290,7 @@ test('carry-only native evaluation ignores candidate Cargo/rustup config and pre
     : simulated.spawn(bin, args, options));
   const honest = gateEvidence(nativeProject, { env, root, commit: 'HEAD', cargoEnv, spawn });
   assert.match(honest.key, /^[0-9a-f]{64}$/, honest.line);
+  assert.equal(existsSync(fixtureCargoMarker), true, 'the evaluator used the fixture cargo');
 
   writeFileSync(join(root, '.cargo/config.toml'),
     `[build]\nrustc-wrapper = ${JSON.stringify(wrapper)}\n`);
