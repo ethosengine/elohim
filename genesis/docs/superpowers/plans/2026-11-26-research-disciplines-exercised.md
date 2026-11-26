@@ -143,7 +143,7 @@ plan may serve a red habit that is not active, as the 2026-11-22 plan does.
   4/6/10, Compass N9, Hypha lifts 4/6). Each of the 28 practice-shaped rows gets one
   disposition written into the row: exercised in a flight, claimed with an owner and a date,
   or released with a reason. The 180 build rows are not touched.
-  *As done:* eight notes declare 66 takes (23 on a row, 18 on a file, 3 released, 22 owed).
+  *As done:* eight notes declare 66 takes (22 on a row, 19 on a file, 4 released, 21 owed).
   The search-discovery note was left undeclared: it has no `id` and no verdict section, and
   whether its "proposed, not yet folded" list is its take list is its author's to say. The
   inventory's 28 lines named 29 rows, and all 29 carry a disposition; twelve of them are
@@ -222,7 +222,7 @@ until the flight's verdict note stands and its landing is verified on `dev`.
 - [x] F1 said: the `takes:` form named in `genesis/research/.epr-meta`, and the closing rule in the `valueflow-authoring` package
 - [x] F1 built: `.claude/scripts/research-mint-check.py` with its test
 - [x] F1 exercised: `takes:` declared in eight notes, and each of the 29 practice rows carries a disposition
-- [x] F1 checked: habit `research-takes-have-a-home` born red with the script as its check; its strict run is red on exactly the 22 owed takes
+- [x] F1 checked: habit `research-takes-have-a-home` born red with the script as its check; its strict run is red on exactly the 21 owed takes
 - [ ] F1 landed on `dev` and verified there
 - [ ] F2 built: the saga headline prints its report, age and commits since, and a recovery record carries its commit and binary identity
 - [ ] F2 said: the reviewer line in the `valueflow-reviewer` package, and the root "warn-only" sentence fixed through its package
@@ -272,7 +272,7 @@ rows; a viable-system fixture (`measure-family-borrows-backlog` row 41).
 ## Verification
 
 - `python3 .claude/scripts/research-mint-check.py` runs and its failing takes are exactly the
-  owed ones (22 at the habit's birth); 29 of 29 practice rows carry a disposition; the
+  owed ones (21 when the flight closed); 29 of 29 practice rows carry a disposition; the
   undeclared-note count (46) stands in the habit's check line.
 - The session-start saga line names its report, age and commits since; the newest recovery
   record carries the commit, `chosen_by` and the draw hash.

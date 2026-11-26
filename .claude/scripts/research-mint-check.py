@@ -36,14 +36,40 @@ BACKLOG = Path("genesis/data/timeline/backlog")
 _ROW_HOME = re.compile(r"^([A-Za-z0-9][A-Za-z0-9._-]*)#(\d+(?:\s*,\s*\d+)*)$")
 
 
-def _row_text(backlog_text: str, row: str) -> str | None:
+def _rows_numbered(backlog_text: str, row: str) -> list[str]:
+    """Every table line whose first cell is this number. More than one is ambiguous."""
+    found = []
     for line in backlog_text.splitlines():
         s = line.strip()
         if not s.startswith("|"):
             continue
         cells = s.strip("|").split("|")
         if cells and cells[0].strip() == row:
-            return s
+            found.append(s)
+    return found
+
+
+def _names(line: str, note_id: str) -> bool:
+    """The row names this note: its id as a whole slug, not as part of a longer one."""
+    if not note_id:
+        return False
+    pattern = r"(?<![A-Za-z0-9_-])" + re.escape(note_id) + r"(?![A-Za-z0-9_-])"
+    return re.search(pattern, line) is not None
+
+
+def _shape_problem(raw_block: str) -> str | None:
+    """A `takes:` entry must sit on one line; the shared parser drops what follows it."""
+    lines = raw_block.splitlines()
+    for i, line in enumerate(lines):
+        if not re.match(r"^takes:\s*$", line):
+            continue
+        for follow in lines[i + 1:]:
+            if not follow.strip():
+                continue
+            if not follow[:1].isspace():
+                break  # the next top-level key
+            if not follow.lstrip().startswith("- "):
+                return "a takes: entry continues onto a second line; write each take on one line"
     return None
 
 
@@ -65,7 +91,10 @@ def check_take(root: Path, note_id: str, entry: str) -> tuple[str, str | None]:
         rel = home[len("file:"):].strip()
         if not rel:
             return take_id, "file: with no path"
-        if not (root / rel).exists():
+        rel_path = Path(rel)
+        if rel_path.is_absolute() or ".." in rel_path.parts:
+            return take_id, f"file path must be repository-relative and stay inside it: {rel}"
+        if not (root / rel_path).exists():
             return take_id, f"file not found: {rel}"
         return take_id, None
     m = _ROW_HOME.match(home)
@@ -77,10 +106,12 @@ def check_take(root: Path, note_id: str, entry: str) -> tuple[str, str | None]:
         return take_id, f"backlog cluster not found: {BACKLOG / (slug + '.md')}"
     text = bfile.read_text(encoding="utf-8", errors="replace")
     for row in rows:
-        line = _row_text(text, row)
-        if line is None:
+        found = _rows_numbered(text, row)
+        if not found:
             return take_id, f"row {row} not found in {slug}"
-        if not note_id or note_id not in line:
+        if len(found) > 1:
+            return take_id, f"row {row} is ambiguous in {slug}: {len(found)} table rows carry that number"
+        if not _names(found[0], note_id):
             return take_id, f"row {row} of {slug} does not name note id {note_id!r}"
     return take_id, None
 
@@ -118,6 +149,10 @@ def scan(root: Path) -> dict:
             takes = [] if takes == "[]" else [takes]
         note_id = fm.get("id")
         seen: set[str] = set()
+        shape = _shape_problem(fm.raw_block)
+        if shape:
+            out["takes_failing"] += 1
+            out["failures"].append({"note": rel, "take": "(shape)", "problem": shape})
         for entry in takes:
             out["takes_checked"] += 1
             tid, problem = check_take(root, note_id, entry)
@@ -153,6 +188,8 @@ def main(argv: list[str] | None = None) -> int:
         print(f"research-mint-check: notes scanned {r['notes_scanned']}, declared {r['declared']}, "
               f"undeclared {r['undeclared']} (unmeasured), takes checked {r['takes_checked']}, "
               f"takes failing {r['takes_failing']}")
+    if r["takes_failing"] and not args.strict and not args.json:
+        print("research-mint-check: failing takes are listed above; this plain run exits 0, --strict exits 1")
     if args.strict and (r["takes_failing"] or over):
         return 1
     return 0
