@@ -131,6 +131,14 @@ test('missing_destination_falls_back_to_origin_dev_merge_base', () => {
   assertParity(repo, 'destination-this-clone-lacks', tip, 3);
 });
 
+// A malformed pre-push line (three fields) leaves the destination empty. The former block's direct
+// diff on an empty name failed and fell to the merge-base range: the ordinary path, never unreadable.
+test('empty_destination_reads_the_merge_base_range_as_the_former_hook_block_did', () => {
+  const { repo } = fixture();
+  const tip = commit(repo, 'tip', { 'malformed.txt': 'malformed\n' });
+  assertParity(repo, '', tip, 3);
+});
+
 test('new_ref_uses_origin_dev_merge_base', () => {
   const { repo } = fixture();
   const tip = commit(repo, 'tip', { 'new-ref.txt': 'new\n' });
