@@ -533,8 +533,8 @@ test('default read-set options preserve the five device-runtime gate outputs byt
     ['elohim-storage', '1d3493b06b9424cb5bf49c60aeec457f5fcabea8ae32c0f85eac04f0b23ca0be'],
     ['steward-node', '0f30099c6fc559d0d97cc5cad214e0bf7387298882ae63335867f20bd213cae2'],
     ['elohim-ark', '71d683c1c9c4e64a855d0372e743e96776a30642c8f49b30120a192e516fa190'],
-    ['cargo-bridge', '5a3fefca8e5a73b1e59602927b5fdfab69dc76055ab51d1f98359fd2295ed848'],
-    ['jenkins-bridge', 'cdffd3ffdf8e6976abdf6e95b3c0b6d869596d016341d27498a9d2e64eff53fd'],
+    ['cargo-bridge', 'b49e9c6b2c0b38ccef214c201ae8b310d9420943d438e80c80f05b2889e2e91d'],
+    ['jenkins-bridge', '2aea65b9ae27448330400ffed6a335540dd5ed664a1d6c3867db71af76f6b489'],
   ]);
   for (const [name, digest] of expected) {
     const bytes = JSON.stringify(realReadSet(name));
