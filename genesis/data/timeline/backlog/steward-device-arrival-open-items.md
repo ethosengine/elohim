@@ -3251,6 +3251,12 @@ The governed-space design (`genesis/docs/superpowers/specs/2026-11-26-governed-s
 
 The design also names a case this row does not cover. For a space held by a collective, the list of members cannot stay in a tracked file at all, because who is a member must not be readable from outside the collective (the design's section 12a, missing node 6). Reading the roster from a published ref, which is this row's candidate cure, does not meet that: a collective's roster and affiliations would have to be held inside its own space.
 
+## Row 109 — the native bootstrap script builds epr without reading the build role
+
+Since 2026-11-26 the Rust follow paths of `epr bin follow` (the CLI follow and bootstrap, and arrival's maintain, observe and pinned follows) refuse to build on a device that declares itself a carrier or neither in `build-role.json`. One path still builds regardless: `genesis/agentic/native-epr-bootstrap.mjs` runs `cargo build` directly (line 74) and never reads the role. It is reached three ways: the launcher's self-heal (`device-runtime/src/bin_store/launch.rs` ~:468, through `queue_bootstrap` ~:512), `.claude/hooks/device-arrive.sh` line 26 when `epr bin status` fails, and `epr_client.py` ~:289. So a device with no head epr and cargo on PATH still builds, whatever its declared role.
+
+Owed: gate that script on the same role. It is its own lane, and starts with a note, because epr may be absent exactly when the script runs, so the note must say who reads `build-role.json` then (the script itself, from the same file and with the same validation as `epr-cli/src/device/capacity.rs`, or something else) and what it prints when it refuses.
+
 ## Row 110 — the orchestrator's own result went unread for two days, and a fleet roll built nothing
 
 From 2026-11-24 to 2026-11-26 `elohim-orchestrator/dev` had no successful build (#2434 was the last).
