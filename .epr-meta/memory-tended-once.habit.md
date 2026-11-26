@@ -17,3 +17,4 @@ retire-when: >
   is restated for spaces in general, under a habit that names no one kind of content.
 ---
 DELTA 2026-11-26: declared unwired and inactive on the steward's choice of this date (session 96b46344). No evidence yet: the tending attestation, the closure it is keyed on and the shared pressure count are not built. Today a memory ceremony is run separately on each of the steward's three devices.
+DELTA 2026-11-26b: status stays unwired. On this device only, session 0a0687e8 tended placement pressure from 63 to 36 (6594c3aa8): 21 CLAIMED-ONLY docs cleared on gate attestations, CI #217 and direct runs; index fold lag 109 to 0. It recorded no tending attestation, so the steward's other two devices have nothing to accept and would tend again. That is the gap this habit names. The stasis composite stays at 0.844 because `traceability` is 0 by construction: no doc carries `traces:` yet.
