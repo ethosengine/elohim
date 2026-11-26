@@ -1395,6 +1395,15 @@ test('a governance-class change refuses a sibling verdict and runs the gate', as
     root, env: { ...env, GATE_EVIDENCE: 'reuse' }, spawn, write: line => lines.push(line), warn: () => {},
   }), 0);
   assert.match(lines.join(''), /not reused: governance-class change: genesis\/orchestrator\/gate-runner\.mjs/);
+  // Row 101: the why is said under the evidence line's name before anything else runs, and the
+  // later line is kept. Nothing but this gate's own shadow lines may stand between the two.
+  const text = lines.join('').split('\n');
+  const evidenceAt = text.findIndex(line => /^\[gate\] elohim-storage evidence: (?!not reused)/.test(line));
+  const whyAt = text.findIndex(line => /^\[gate\] elohim-storage evidence: not reused: governance-class change: genesis\/orchestrator\/gate-runner\.mjs/.test(line));
+  const laterAt = text.findIndex(line => /^\[gate\] elohim-storage not reused: governance-class change/.test(line));
+  assert.ok(evidenceAt >= 0 && whyAt > evidenceAt && laterAt > whyAt, text.join('\n'));
+  assert.deepEqual(text.slice(evidenceAt + 1, whyAt).filter(line => !/^\[gate\] elohim-storage (recipe-key|carry)/.test(line)), [], text.join('\n'));
+  assert.equal(calls.findIndex(c => c.bin === 'bash') >= 0, true);
   assert.equal(calls.filter(c => c.bin === 'bash').length, 1);
 });
 

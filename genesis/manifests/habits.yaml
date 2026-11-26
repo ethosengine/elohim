@@ -2695,10 +2695,10 @@ habits:
       - "node --test genesis/orchestrator/suite-list.test.mjs (the orchestrator suite list holds every test file once; the named half's view holds what its key hashes and its environment is constructed)"
       - "a2o genesis/a2o/features/devflow/native-gate-evidence.feature reuse rule (this workspace's own green stands in; a red or an unadmitted signer never does)"
     evidence: >
-      DELTA 2026-11-25b (GREEN preserved; Attest-grade shadow corrected after independent review): the line no longer calls this device's own green independent (it prints `own:` apart), counts a roster-admitted sibling row as a signature-unchecked claim that never reaches sufficiency (signature-checked independent executions read 0 until a reader checks a sibling's signature), classes every path that selects, runs, keys, records or enforces a gate as governance (SIBLING_REUSE_GOVERNANCE_PATHS plus gate-grade.mjs GRADE_GOVERNANCE) with git modes read so a gitlink is governance and a symlink undetermined, and answers `unexamined: <what>` (row kind `na`) on the library and serving rows. The reading row is `<project>:grade:<class>:n<checked>c<claims>:<yes|no|na>`. Not built, named in the module header: the shadow budget is accounting, not a hard bound. Evidence: gate-grade.test.mjs and the `grade shadow:` tests in gate-runner.test.mjs, run directly.
-    evidence-fingerprint: sha256:a420434e78fd2adf
-    evidence-bytes: 43513
-    evidence-entries: 46
+      DELTA 2026-11-26 (no status change; a declined reuse says why beside the evidence line): `gate-runner.mjs` now writes `[gate] <project> evidence: not reused: <why>` the moment the reuse decision is made, under the evidence line's own name, and keeps the `[gate] <project> not reused: <why>` line where the gate starts; on 2026-11-25 an integrator read `evidence: miss` and reported that a declined sibling reuse printed no reason, because the reason stood far below it in a log shared with other gates (arrival backlog row 101). The decision, its order, the key and the exit status are unchanged. Evidence: `node --test genesis/orchestrator/gate-evidence.test.mjs`, 97 of 97 (96 of 97 before); no gate was run on this change.
+    evidence-fingerprint: sha256:bb2ff9629e77af8a
+    evidence-bytes: 44240
+    evidence-entries: 47
     guard: >
       Regression risks: (1) reusing on a key that omits something the recipe reads — the recipe
       body, the project tree, a submodule pin, a repo file a test include_str!s; the input audit
