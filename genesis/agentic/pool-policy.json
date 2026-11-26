@@ -96,6 +96,7 @@
       "elohim-placement", "schema-dna", "epr-ts", "genesis", "eprfs-live-corpus",
       "rust-style-checker", "orchestrator-tree"],
     "withheld": {
+      "agentic-tools": "a new gate held out of reuse until its cost and reds have been seen on a few pushes (ruled 2026-11-26)",
       "elohim-app": "the lint-a11y recipe reads the moving origin/dev baseline, which the step fingerprint cannot see",
       "elohim-library": "the TypeScript build chain resolves workspace packages and root dependency state outside lint-library inputs",
       "elements-codegen": "no step fingerprint: gate-only inputs, so no closure key can be computed",

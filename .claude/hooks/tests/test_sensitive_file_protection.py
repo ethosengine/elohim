@@ -6,6 +6,7 @@ import json
 import re
 import subprocess
 import sys
+import unittest
 from pathlib import Path
 
 HOOK = Path(__file__).resolve().parents[1] / "sensitive-file-protection.py"
@@ -26,7 +27,7 @@ def run(path: str, content: str) -> dict:
     return json.loads(result.stdout)["hookSpecificOutput"] if result.stdout.strip() else {}
 
 
-def main() -> int:
+def run_cases() -> int:
     cases = [
         (
             "stasis policy only advises",
@@ -205,5 +206,10 @@ def main() -> int:
     return 0
 
 
+class SensitiveFileProtectionTest(unittest.TestCase):
+    def test_boundary_cases(self):
+        self.assertEqual(run_cases(), 0)
+
+
 if __name__ == "__main__":
-    raise SystemExit(main())
+    unittest.main()
