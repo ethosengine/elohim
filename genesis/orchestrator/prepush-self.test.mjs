@@ -67,6 +67,10 @@ function fixture(t, { hook = readFileSync(HOOK_PATH, "utf8") } = {}) {
   mkdirSync(join(dir, ".husky"), { recursive: true });
   writeFileSync(join(dir, ".husky/pre-push.bash"), hook);
   mkdirSync(join(dir, "genesis/orchestrator"), { recursive: true });
+  // The hook reads each pushed ref's range through this script; the real one, so a malformed line is
+  // read exactly as the hook reads it (push-changed-files.test.mjs holds its own parity proofs).
+  writeFileSync(join(dir, "genesis/orchestrator/push-changed-files.sh"),
+    readFileSync(join(ROOT, "genesis/orchestrator/push-changed-files.sh"), "utf8"));
   // The attested-list resolver has its own tests (attested-list.test.mjs); this fixture has no
   // submodules, so its stand-in resolver names a tracked plain file, which git reports as no missing submodule.
   writeFileSync(join(dir, "genesis/orchestrator/attested-list.mjs"), 'process.stdout.write("src/y.txt\\n");\n');
