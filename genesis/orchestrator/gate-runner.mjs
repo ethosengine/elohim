@@ -33,7 +33,7 @@ import { affectedPackages, loadMetadata, metadataToolchain } from './cargo-affec
 import { isReadPattern, SUITE_READ_LISTS, readSet } from './gate-input-audit.mjs';
 import { crateKeys, EPRFS_RECIPE_STEP_COVERAGE } from './crate-keys.mjs';
 import { appendEvent, closeRun, formatHarvest, harvest, liveStopIds, openRun, outlook, resolveSession, stopRequested } from './gate-live.mjs';
-import { emitLive, formatRow, onRedPolicy, runPreflight } from './gate-preflight.mjs';
+import { emitLive, formatRow, oneHopDependents, onRedPolicy, runPreflight } from './gate-preflight.mjs';
 import { prepareTask, readTaskStatus, taskAnswer, taskEnabled } from './gate-task.mjs';
 import { SUITE_EXPECT_ENV, SUITE_RESULT_ENV, dirtyAfterRun, encodeExpectation, readResult, suiteDecision } from './suite-inventory.mjs';
 
@@ -142,6 +142,14 @@ export function projectsForChanges(root, changedFiles, opts = {}) {
       // Said in both modes: in shadow mode an absent binary would otherwise mean the
       // flip evidence silently never arrives.
       log(`[gate] brit build affected unavailable (${reason}) — path-only selection`);
+      // The path walk does not follow dependencies. Name the projects one hop downstream that it
+      // therefore lacks, so whoever carries or lands this change knows; nothing is added to the
+      // selection, and a walk that cannot be made says nothing more.
+      try {
+        const lacking = (opts.dependents || oneHopDependents)(root, files).map(project => project.name)
+          .filter(name => !chosen.some(project => project.name === name));
+        if (lacking.length) log(`[gate] path-only selection may be missing ${lacking.join(' ')}: one hop downstream of the change, selected only by the graph oracle — not selected here`);
+      } catch { /* the fallback line above stands alone */ }
     } else {
       const byOracle = projectsFromStale(manifests, selected.stale, files);
       if (mode === 'rakia') {

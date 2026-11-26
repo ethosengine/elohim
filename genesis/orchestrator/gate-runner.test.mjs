@@ -1771,7 +1771,27 @@ describe('selection oracle — shadow, rakia, path', () => {
     const names = projectsForChanges(MANIFESTS, ['sophia'], { oracle: 'rakia', ask: noOracle, log: l => lines.push(l) }).map(p => p.name);
     assert.ok(names.includes('sophia'));
     assert.ok(!names.includes('elohim-app'));
-    assert.deepEqual(lines, ['[gate] brit build affected unavailable (no reason reported) — path-only selection']);
+    // Backlog row 106: the fallback also names what it may be missing, one hop down, and adds none of it.
+    assert.deepEqual(lines, [
+      '[gate] brit build affected unavailable (no reason reported) — path-only selection',
+      '[gate] path-only selection may be missing elohim-app: one hop downstream of the change, selected only by the graph oracle — not selected here',
+    ]);
+  });
+
+  test('the fallback names nothing when no project is one hop down, or when the walk cannot be made; with the oracle it is never asked', () => {
+    const fallback = ['[gate] brit build affected unavailable (no reason reported) — path-only selection'];
+    for (const dependents of [() => [], () => [{ name: 'sophia' }], () => { throw new Error('bad manifest'); }]) {
+      const lines = [];
+      projectsForChanges(MANIFESTS, ['sophia'], { oracle: 'rakia', ask: noOracle, dependents, log: l => lines.push(l) });
+      assert.deepEqual(lines, fallback);
+    }
+    const lines = [];
+    const names = projectsForChanges(MANIFESTS, ['sophia'], { oracle: 'rakia', ask: noOracle, dependents: () => [{ name: 'x' }, { name: 'y' }], log: l => lines.push(l) }).map(p => p.name);
+    assert.equal(lines[1], '[gate] path-only selection may be missing x y: one hop downstream of the change, selected only by the graph oracle — not selected here');
+    assert.ok(!names.includes('x'), 'named, never selected');
+    const withOracle = [];
+    projectsForChanges(MANIFESTS, ['sophia'], { oracle: 'path', dependents: () => { throw new Error('must not be asked'); }, log: l => withOracle.push(l) });
+    assert.deepEqual(withOracle, []);
   });
 
   test('a gitlink path and files beneath it select the component once, reasons merged', () => {
@@ -1887,18 +1907,18 @@ describe('the hook parses stdout as project names — diagnostics never ride on 
   });
   test('shadow mode without a binary also says so, so the flip evidence cannot silently never arrive', () => {
     const lines = [];
-    projectsForChanges(MANIFESTS, ['sophia'], { oracle: 'shadow', ask: () => null, log: l => lines.push(l) });
+    projectsForChanges(MANIFESTS, ['sophia'], { oracle: 'shadow', ask: () => null, dependents: () => [], log: l => lines.push(l) });
     assert.deepEqual(lines, ['[gate] brit build affected unavailable (no reason reported) — path-only selection']);
   });
   test('the real resolution path prints the oracle reason in the path-only line', () => {
     const lines = [];
-    projectsForChanges(MANIFESTS, ['sophia'], { oracle: 'rakia', env: { BRIT_BIN: '/nonexistent/brit', PATH: '' }, log: l => lines.push(l) });
+    projectsForChanges(MANIFESTS, ['sophia'], { oracle: 'rakia', env: { BRIT_BIN: '/nonexistent/brit', PATH: '' }, dependents: () => [], log: l => lines.push(l) });
     assert.deepEqual(lines, ['[gate] brit build affected unavailable (no brit executable (BRIT_BIN or PATH)) — path-only selection']);
   });
   test('a failing brit build affected prints its stderr in the path-only line', () => {
     const lines = [];
     const spawn = () => ({ status: 3, stdout: '', stderr: 'bad repo\n' });
-    projectsForChanges(MANIFESTS, ['sophia'], { oracle: 'rakia', env: { BRIT_BIN: process.execPath }, spawn, log: l => lines.push(l) });
+    projectsForChanges(MANIFESTS, ['sophia'], { oracle: 'rakia', env: { BRIT_BIN: process.execPath }, spawn, dependents: () => [], log: l => lines.push(l) });
     assert.deepEqual(lines, ['[gate] brit build affected unavailable (brit build affected exited 3: bad repo) — path-only selection']);
   });
   test('--list names the attestation for attested projects instead of an undefined recipe', () => {
