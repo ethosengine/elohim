@@ -26,6 +26,10 @@ const STALE_MS = 6 * 60 * 60 * 1000;
 const OUTCOMES = new Set(['passed', 'gates-passed', 'failed', 'interrupted']);
 const nextSeq = new Map();
 
+function isRunClose(event) {
+  return event.kind === 'run-close' && OUTCOMES.has(event.outcome);
+}
+
 function sessionFilename(session) {
   return String(session).replace(/[^A-Za-z0-9._-]/g, '_');
 }
@@ -196,7 +200,7 @@ export function openRun({
       const oldPath = join(runs, name);
       const events = parseEvents(readFileSync(oldPath, 'utf8'));
       if (
-        events.at(-1)?.kind !== 'run-close'
+        !events.some(isRunClose)
         && new Date(at).getTime() - statSync(oldPath).mtimeMs <= STALE_MS
       ) continue;
       unlinkSync(oldPath);
@@ -303,7 +307,7 @@ export function closeRun(path, outcome, {
   try {
     if (!OUTCOMES.has(outcome)) return null;
     const events = parseEvents(readFileSync(path, 'utf8'));
-    if (events.some((event) => event.kind === 'run-close')) return undefined;
+    if (events.some(isRunClose)) return undefined;
     if (deferredFromLog) {
       deferred = events.filter((event) =>
         event.kind === 'gate-verdict' && event.verdict?.deferred === true).length;
@@ -345,7 +349,7 @@ export function stoppedAnswer(stopped) {
 
 export function readRun(path, { staleMs = STALE_MS, now = () => new Date() } = {}) {
   const events = parseEvents(readFileSync(path, 'utf8'));
-  const closed = events.find((event) => event.kind === 'run-close' && OUTCOMES.has(event.outcome));
+  const closed = events.find(isRunClose);
 
   if (closed) return { events, outcome: closed.outcome };
 
@@ -505,7 +509,7 @@ export async function follow({
         for (const event of state.events.slice(seen)) {
           const line = formatEvent(event);
           if (line !== null) write(line);
-          if (event.kind === 'run-close' && OUTCOMES.has(event.outcome)) {
+          if (isRunClose(event)) {
             return event.outcome;
           }
         }
@@ -571,7 +575,7 @@ export function unseen({ root = process.cwd(), session, reader = 'main' } = {}) 
 function closedBefore(path, instant) {
   try {
     const { events } = readRun(path);
-    return events.at(-1)?.kind === 'run-close' && statSync(path).mtimeMs < instant;
+    return events.some(isRunClose) && statSync(path).mtimeMs < instant;
   } catch {
     return false;
   }
@@ -689,7 +693,7 @@ export async function awaitStopAnswer(path, requested, { timeoutMs, now = false,
     const boundary = events.find((event) => event.kind === 'stop-boundary');
     const mine = events.find((event) => STOPPED_RECORDS.has(event.kind) && names(event, requested.id));
     const other = events.find((event) => STOPPED_RECORDS.has(event.kind));
-    const close = events.find((event) => event.kind === 'run-close');
+    const close = events.find(isRunClose);
     if (mine && (!now || close)) return { state: 'confirmed', record: mine, close: close ?? null };
     if (!mine && (close || !stopCounts(requested, boundary))) {
       if (other) return { state: 'already-stopped', outcome: close?.outcome ?? null };
@@ -755,7 +759,7 @@ export function harvest({ root = process.cwd(), last = 10 } = {}) {
     let events;
     try { events = parseEvents(readFileSync(join(runsDir, name), 'utf8')); } catch { continue; }
     const open = events.find((event) => event.kind === 'run-open');
-    const close = events.findLast((event) => event.kind === 'run-close');
+    const close = events.findLast(isRunClose);
     if (!open || !close) continue;
     const t0 = Date.parse(open.at);
     const at = (event) => (Date.parse(event.at) - t0) / 1000;
@@ -1204,7 +1208,7 @@ export async function emitRed(path, event, { continuing, env = process.env } = {
 /** The gate-final@1 body for a closed run, from what its log already holds. */
 function finalBody(path, { did, ref }) {
   const { events, open } = runFacts(path);
-  const close = events.find((e) => e.kind === 'run-close' && OUTCOMES.has(e.outcome));
+  const close = events.find(isRunClose);
   const verdicts = events.filter((e) => e.kind === 'gate-verdict' && e.verdict && typeof e.verdict === 'object');
   const reds = [];
   const seen = new Set();
@@ -1262,7 +1266,7 @@ function spawnWorker(args, path, onExit = () => {}) {
 function reconcileUnclosed(previous) {
   try {
     const events = parseEvents(readFileSync(previous, 'utf8'));
-    if (events.some((e) => e.kind === 'run-close')) return;
+    if (events.some(isRunClose)) return;
     // E5 #6: a run that did any work is reconciled, not only one whose red already reached someone:
     // a subscriber may hear only finals. The worker sends nothing when no subscription matches.
     if (!events.some((e) => e.kind === 'gate-verdict' || e.kind === 'failure' || e.kind === 'gate-start')) return;
@@ -1728,7 +1732,7 @@ async function main(argv) {
         if (!path || !isFile(path)) throw new Error('no running gate run to stop');
         const { events: before, outcome: state } = readRun(path);
         const pushRun = before.find((event) => event.kind === 'run-open')?.candidate?.target !== 'just gate';
-        const closed = before.find((event) => event.kind === 'run-close');
+        const closed = before.find(isRunClose);
         const otherStopped = before.some((event) => STOPPED_RECORDS.has(event.kind));
         // Exit 0 means "this request stopped this run": with no request made, never.
         if (closed) {
@@ -1816,7 +1820,7 @@ async function main(argv) {
   } catch (error) {
     const message = String(error?.message ?? error).replace(/[\r\n]+/g, ' ');
     process.stderr.write(`[gate-live] ${message}\n`);
-    if (['open', 'event', 'close', 'unseen', 'red', 'harvest', 'outlook', 'emit-final'].includes(verb)) return 0;
+    if (['open', 'event', 'unseen', 'red', 'harvest', 'outlook', 'emit-final'].includes(verb)) return 0;
     return verb === 'follow' ? 3 : 1;
   }
 }

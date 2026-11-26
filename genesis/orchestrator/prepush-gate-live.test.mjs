@@ -6,7 +6,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync,
+  chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync,
+  writeFileSync,
 } from "node:fs";
 import { constants } from "node:fs";
 import { open } from "node:fs/promises";
@@ -270,6 +271,32 @@ test("live_run_close_warns_once_after_two_failures_without_changing_hook_exit", 
     `[pre-push] gate-live: run ${run} was not closed (failed): close attempt 2 failed`,
   ]);
   assert.notEqual(eventsOf(run).at(-1).kind, "run-close");
+});
+
+test("live_run_real_cli_retries_an_unwritable_close_then_warns_without_changing_hook_exit", (t) => {
+  const dir = fixture(t);
+  const bin = join(dir, "bin");
+  mkdirSync(bin);
+  const node = join(bin, "node");
+  writeFileSync(node, [
+    "#!/bin/bash",
+    `if [ \"$2\" = close ]; then printf 'close\\n' >> '${join(dir, "close-calls")}'; fi`,
+    `exec '${process.execPath}' \"$@\"`,
+  ].join("\n"));
+  chmodSync(node, 0o755);
+  const r = spawnSync("bash", ["-c", script(`HOOK_WORK_TREE='${dir}'`, PRELUDE, OPEN_BLOCK,
+    'GATE_LIVE_RUN=/proc/version', "exit 23")], {
+    cwd: dir,
+    env: { ...env(), PATH: `${bin}:${process.env.PATH}` },
+    encoding: "utf8",
+    timeout: 15000,
+  });
+
+  assert.equal(r.status, 23, r.stdout + r.stderr);
+  assert.equal(readFileSync(join(dir, "close-calls"), "utf8"), "close\nclose\n");
+  const warnings = r.stderr.split("\n").filter((line) => line.startsWith("[pre-push] gate-live: run "));
+  assert.equal(warnings.length, 1, r.stderr);
+  assert.match(warnings[0], /was not closed \(failed\): \[gate-live\] could not close /);
 });
 
 test("a pre-gate red is live at once, the push continues, and an early pass still refuses", (t) => {
