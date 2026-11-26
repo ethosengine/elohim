@@ -427,7 +427,7 @@ async fn flow_fold_folds_a_devices_channel_root_once_and_status_reads_it() {
     assert!(text.contains("HEARD "), "{text}");
     assert!(text.contains("FOLDED "), "{text}");
     assert!(text.contains("probe unsupported (older peer)"), "{text}");
-    assert!(text.contains("resubscribes 2  resets 1"), "{text}");
+    assert!(text.contains("resubscribes 2  reset attempts 1"), "{text}");
     assert!(
         text.contains("fold coverage unavailable; sibling events use legacy unbounded replay"),
         "{text}"

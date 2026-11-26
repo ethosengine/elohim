@@ -1603,7 +1603,7 @@ fn render(outcome: &StatusOutcome) {
             _ => "none".to_string(),
         };
         println!(
-            "{}: probe {probe}  resubscribes {}  resets {}",
+            "{}: probe {probe}  resubscribes {}  reset attempts {}",
             short(&device.device),
             device.resubscriptions,
             device.connection_resets
