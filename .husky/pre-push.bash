@@ -140,6 +140,21 @@ gate_step_reading() {
     else
       reading_emit_status=127
     fi
+    # Readings are the session's own act and stay on its epr. A session older than `flow reading`
+    # has no such verb (exit 2, "unknown flow subcommand reading"): then, and only then, this
+    # device's landed head is tried once (device-epr.mjs) and one line says which epr wrote them.
+    if [ "$reading_emit_status" -eq 2 ] && [[ "$reading_emit_err" == *unknown*subcommand* ]]; then
+      local reading_head="" reading_head_err="" reading_head_status
+      reading_head=$(node "${HOOK_WORK_TREE:-.}/genesis/orchestrator/device-epr.mjs" 2>/dev/null) || reading_head=""
+      if [ -n "$reading_head" ] && [ "$reading_head" != "$reading_epr" ]; then
+        reading_head_err=$(timeout -k 1s 5s "$reading_head" flow reading append --from "$GATE_READING_ROWS" --root "$HOOK_WORK_TREE" 2>&1 >/dev/null)
+        reading_head_status=$?
+        if [ "$reading_head_status" -eq 0 ]; then
+          echo "[gate-reading] pre-push readings written by this device's head epr ($reading_head): the session's $reading_epr has no \`flow reading\`" >&2
+          reading_epr=$reading_head reading_emit_status=0
+        fi
+      fi
+    fi
     if [ "$reading_emit_status" -ne 0 ]; then
       reading_emit_err=${reading_emit_err%%$'\n'*}
       echo "[gate-reading] pre-push readings dropped (exit $reading_emit_status${reading_emit_err:+: $reading_emit_err})" >&2

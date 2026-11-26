@@ -3,6 +3,7 @@ import { strict as assert } from 'node:assert';
 import {
   chmodSync,
   existsSync,
+  mkdirSync,
   mkdtempSync,
   readFileSync,
   rmSync,
@@ -248,4 +249,64 @@ exit 41
   assert.equal(result.status, 41);
   assert.equal(result.stdout, '');
   assert.equal(result.stderr, '');
+});
+
+// Backlog row 106: a session started before `flow reading` existed keeps an epr without the verb.
+function oldSession(fx, { head = 0 } = {}) {
+  writeFileSync(fx.epr, `#!/usr/bin/env bash
+printf 'session %s\\n' "$*" >>"$CAPTURE"
+echo 'error: unknown flow subcommand reading' >&2
+exit 2
+`);
+  chmodSync(fx.epr, 0o755);
+  const store = join(fx.dir, 'store');
+  mkdirSync(join(store, 'current'), { recursive: true });
+  const headEpr = join(store, 'current/epr');
+  writeFileSync(headEpr, `#!/usr/bin/env bash
+printf 'head %s\\n' "$*" >>"$CAPTURE"
+if [ "$2" = report ]; then echo 'crate shadow from the head'; exit 0; fi
+${head === 0 ? '' : "echo 'error: unknown flow subcommand reading' >&2"}
+exit ${head}
+`);
+  chmodSync(headEpr, 0o755);
+  return { store, headEpr };
+}
+const TWO_LEGS = `
+GATE_READING_SEEN=""
+GATE_READING_LEGS=$'first\\tnone\\tfirst reason'
+gate_step_reading 0 first ran 1 2026-11-24T12:00:00.000Z 2026-11-24T12:00:01.000Z
+gate_step_reading
+`;
+
+test('a session epr without `flow reading` hands the readings to the device head once, and one line says which wrote them', () => {
+  const fx = fixture();
+  const { store, headEpr } = oldSession(fx);
+  const result = run(fx, TWO_LEGS, { EPR_STORE: store });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stderr, `[gate-reading] pre-push readings written by this device's head epr (${headEpr}): the session's ${fx.epr} has no \`flow reading\`\n`);
+  assert.equal(result.stdout, 'crate shadow from the head\n', 'the report comes from the epr that wrote');
+  const calls = readFileSync(fx.capture, 'utf8').trim().split('\n').map(line => line.split(' ').slice(0, 4).join(' '));
+  assert.deepEqual(calls, ['session flow reading append', 'head flow reading append', 'head flow report reading']);
+});
+
+test('when neither epr has the verb, or no head can be read, the one drop line is the session\'s, as before', () => {
+  const DROP = '[gate-reading] pre-push readings dropped (exit 2: error: unknown flow subcommand reading)\n';
+  const neither = fixture();
+  const { store } = oldSession(neither, { head: 2 });
+  assert.equal(run(neither, TWO_LEGS, { EPR_STORE: store }).stderr, DROP);
+  assert.equal(readFileSync(neither.capture, 'utf8').trim().split('\n').length, 2, 'each tried once');
+  const noHead = fixture();
+  oldSession(noHead);
+  assert.equal(run(noHead, TWO_LEGS, { EPR_STORE: join(noHead.dir, 'no-such-store') }).stderr, DROP);
+  assert.equal(readFileSync(noHead.capture, 'utf8').trim().split('\n').length, 1, 'the session alone');
+});
+
+test('a session epr that has the verb is never routed through the head, whatever it answers', () => {
+  for (const exit of [0, 3]) {
+    const fx = fixture(exit);
+    const { store } = oldSession({ ...fx, epr: join(fx.dir, 'unused') });
+    const result = run(fx, TWO_LEGS, { EPR_STORE: store });
+    assert.doesNotMatch(result.stderr, /head epr/);
+    assert.ok(!readFileSync(fx.capture, 'utf8').includes('head '), `exit ${exit}`);
+  }
 });
