@@ -107,8 +107,13 @@ const ran = (fx, which, text) => fx.log().filter(line => line.startsWith(`${whic
 test('a hand-over raises its intent and posts its misses through the head, not the pin', t => {
   resetDeviceEprCache();
   const fx = fixture(t);
-  const line = handOver(fx);
+  const [line, crossing, ...rest] = handOver(fx).split('\n');
   assert.match(line, /^hand-over: posted 1 misses on intent bafyintent: orchestrator$/);
+  // The crossing read is a device act too; the fixture's epr prints no status, which is one line.
+  assert.match(crossing, /^\[pre-push\] hand-over: posted locally; `epr peer status` could not be read within 5 s /);
+  assert.deepEqual(rest, []);
+  assert.equal(ran(fx, 'head', 'peer status').length, 1);
+  assert.equal(ran(fx, 'pin', 'peer status').length, 0);
   assert.equal(ran(fx, 'head', 'flow intend --change').length, 1);
   assert.equal(ran(fx, 'head', 'flow intend --misses bafyintent').length, 1);
   assert.equal(ran(fx, 'pin', 'flow intend').length, 0);
