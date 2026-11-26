@@ -2645,6 +2645,9 @@ impl Run {
                         ));
                     }
                 } else if report.quarantine_blocks {
+                    // Invalid content is the sender's refusal, so its pre-fold acknowledgement
+                    // loses standing. Incomplete folds caused by our deadline or limits do not.
+                    self.channel.withdraw_early_acknowledgement(&head.device);
                     self.log(&format!(
                         "folded {} seq {} in part ({} appended, {} quarantined); held at the \
                          prior head until that device's daemon reads nacks",
@@ -2674,6 +2677,10 @@ impl Run {
                 }
             }
             Err(e) => {
+                // A signed acknowledgement speaks about our records and survives failures on our
+                // side (I/O, timeout, transport). Only content that proves this head invalid can
+                // retract it, returning lease confirmation to the last folded head.
+                reconcile_failed_fold(&mut self.channel, &head.device, &e);
                 self.held.remove(&head.device);
                 self.channel.counters_mut().fold_failures += 1;
                 self.log(&format!(
@@ -2695,6 +2702,22 @@ impl Run {
     }
 }
 
+fn invalidates_head(error: &PeerError) -> bool {
+    matches!(
+        error,
+        PeerError::FoldIntegrity { .. }
+            | PeerError::TierLeafIntegrity { .. }
+            | PeerError::TierFrame { .. }
+            | PeerError::TierFrameTooLarge { .. }
+    )
+}
+
+fn reconcile_failed_fold(channel: &mut Channel, device: &str, error: &PeerError) {
+    if invalidates_head(error) {
+        channel.withdraw_early_acknowledgement(device);
+    }
+}
+
 /// Every node id a `PeerEndpoint` row of `chain_root`'s lineage names (64 lowercase hex), admitted
 /// or not: the node ids whose refused connections are counted one by one. Bounded by the roster.
 fn roster_named_nodes(rows: &[ParticipantRow], chain_root: &str) -> Vec<String> {
@@ -2713,6 +2736,34 @@ fn roster_named_nodes(rows: &[ParticipantRow], chain_root: &str) -> Vec<String> 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn io_and_timeout_fold_failures_keep_early_acks_but_invalid_content_withdraws_them() {
+        let device = "did:key:zSibling";
+        let mut table = HeadTable::default();
+        table
+            .early_acked
+            .entry(device.to_string())
+            .or_default()
+            .insert("did:key:zMe".to_string(), 7);
+        let mut channel = Channel::new("did:key:zMe".to_string(), table);
+
+        let io = PeerError::TierStream(Box::new(std::io::Error::other("link failed")));
+        reconcile_failed_fold(&mut channel, device, &io);
+        assert_eq!(channel.table().early_acked[device]["did:key:zMe"], 7);
+
+        let timeout = PeerError::FoldUnanswered {
+            what: "root timed out".to_string(),
+        };
+        reconcile_failed_fold(&mut channel, device, &timeout);
+        assert_eq!(channel.table().early_acked[device]["did:key:zMe"], 7);
+
+        let invalid = PeerError::FoldIntegrity {
+            reason: "leaf does not match its signed root".to_string(),
+        };
+        reconcile_failed_fold(&mut channel, device, &invalid);
+        assert!(!channel.table().early_acked.contains_key(device));
+    }
 
     #[test]
     fn unchanged_index_without_a_manifest_retry_never_becomes_due() {

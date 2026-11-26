@@ -181,6 +181,9 @@ impl Channel {
                 _ => HeadVerdict::Fold,
             }
         };
+        if verdict == HeadVerdict::Fold {
+            self.early_acknowledged(head);
+        }
         if matches!(
             verdict,
             HeadVerdict::Fold | HeadVerdict::Rollback | HeadVerdict::Replayed
@@ -196,6 +199,27 @@ impl Channel {
             HeadVerdict::Fold | HeadVerdict::Own => {}
         }
         verdict
+    }
+
+    /// Record the signed acknowledgement vector of a head that passed admission, signature and
+    /// folded-seq ordering. Content-address checks remain the fold's work; this state cannot move
+    /// that ordering and is withdrawn if the fold later proves the signed root invalid.
+    fn early_acknowledged(&mut self, head: &ChannelHead) {
+        let Some(&acked) = head.folded.get(&self.device) else {
+            return;
+        };
+        let early = self
+            .table
+            .early_acked
+            .entry(head.device.clone())
+            .or_default();
+        let held = early.entry(self.device.clone()).or_default();
+        *held = (*held).max(acked);
+    }
+
+    /// Withdraw acknowledgements learned from `device` before its content was verified.
+    pub(crate) fn withdraw_early_acknowledgement(&mut self, device: &str) {
+        self.table.early_acked.remove(device);
     }
 
     /// A verified head from another device acknowledges this device up to `folded[me]`. When that
@@ -269,11 +293,15 @@ impl Channel {
             .table
             .devices
             .keys()
+            .chain(self.table.early_acked.keys())
             .filter(|device| !admitted(device))
             .cloned()
+            .collect::<std::collections::BTreeSet<_>>()
+            .into_iter()
             .collect();
         for device in &forgotten {
             self.table.devices.remove(device);
+            self.table.early_acked.remove(device);
         }
         forgotten
     }

@@ -30,6 +30,26 @@ fn head_of(h: &Household, from_b: bool, seq: u64, root_label: &str) -> ChannelHe
     .expect("signs")
 }
 
+fn acknowledging_head(
+    h: &Household,
+    from_b: bool,
+    seq: u64,
+    root_label: &str,
+    acknowledged: u64,
+) -> ChannelHead {
+    let dev = if from_b { &h.b } else { &h.a };
+    let other = if from_b { &h.a } else { &h.b };
+    ChannelHead::sign(
+        dev.did.clone(),
+        root(root_label),
+        seq,
+        1_000 + seq,
+        BTreeMap::from([(other.did.clone(), acknowledged)]),
+        &dev.signer(),
+    )
+    .expect("signs")
+}
+
 #[test]
 fn head_signature_verifies_against_device_did() {
     let h = household();
@@ -128,6 +148,10 @@ fn forged_head_dropped_and_counted() {
     assert_eq!(table.dropped.forged, 2);
     assert_eq!(table.dropped.unadmitted, 1);
     assert!(table.devices.is_empty(), "nothing was folded");
+    assert!(
+        table.early_acked.is_empty(),
+        "nothing was acknowledged early"
+    );
     assert_eq!(channel.last_folded(&h.b.did), None);
 
     // A genuine head is still folded after the forgeries.
@@ -136,6 +160,42 @@ fn forged_head_dropped_and_counted() {
         channel.judge(&genuine, &admission, &*h.verify),
         HeadVerdict::Fold
     );
+}
+
+#[test]
+fn only_verified_admitted_forward_heads_raise_an_early_ack_and_it_never_falls() {
+    let h = household();
+    let admission = h.admission();
+    let mut channel = Channel::new(h.a.did.clone(), HeadTable::default());
+
+    let five = acknowledging_head(&h, true, 5, "r5", 7);
+    assert_eq!(
+        channel.judge(&five, &admission, &*h.verify),
+        HeadVerdict::Fold
+    );
+    assert_eq!(channel.table().early_acked[&h.b.did][&h.a.did], 7);
+
+    // A lower head is still forward relative to the last content fold while five is in flight;
+    // its smaller acknowledgement cannot lower the value learned from five.
+    let four = acknowledging_head(&h, true, 4, "r4", 3);
+    assert_eq!(
+        channel.judge(&four, &admission, &*h.verify),
+        HeadVerdict::Fold
+    );
+    assert_eq!(channel.table().early_acked[&h.b.did][&h.a.did], 7);
+
+    channel.folded(&five, 0, None, Default::default(), 2_000, Instant::now());
+    let rollback = acknowledging_head(&h, true, 4, "r4", 99);
+    assert_eq!(
+        channel.judge(&rollback, &admission, &*h.verify),
+        HeadVerdict::Rollback
+    );
+    let replay = acknowledging_head(&h, true, 5, "r5", 99);
+    assert_eq!(
+        channel.judge(&replay, &admission, &*h.verify),
+        HeadVerdict::Replayed
+    );
+    assert_eq!(channel.table().early_acked[&h.b.did][&h.a.did], 7);
 }
 
 #[test]
@@ -636,4 +696,17 @@ fn each_new_root_is_logged_with_the_events_it_covers_and_reannounces_are_not() {
         HeadTable::load(dir.path()).expect("loads").own_log,
         channel.table().own_log
     );
+}
+
+#[test]
+fn a_head_table_written_before_early_acked_existed_still_loads() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    std::fs::write(
+        dir.path().join(HeadTable::FILE_NAME),
+        r#"{"version":1,"own":null,"devices":{},"dropped":{"unadmitted":0,"forged":0,"rollback":0,"replayed":0,"malformed":0}}"#,
+    )
+    .expect("old table");
+
+    let loaded = HeadTable::load(dir.path()).expect("old table loads");
+    assert!(loaded.early_acked.is_empty());
 }

@@ -14,6 +14,7 @@
 //!   "devices": {
 //!     "<did>": { "seq", "root", "at", "folded": {"<did>": seq}, "folded_at", "events_folded", "nack" }
 //!   },
+//!   "early_acked": { "<announcing-did>": { "<acknowledged-did>": seq } },
 //!   "nacks": { "<author-did>": { "refused", "quarantined" } },
 //!   "dropped": { "unadmitted", "forged", "rollback", "replayed", "malformed" },
 //!   "crossing_drop_groups": {
@@ -48,6 +49,10 @@
 //! head. It names the complete fold's flow-log prefix: a sender event whose JSONL line starts below
 //! `log_offset` is covered. Older epr builds ignore this unknown head-table field; no new flow
 //! record or field is written to `flows.jsonl`.
+//! `early_acked` is deliberately separate from `devices`: a verified, admitted, forward head can
+//! acknowledge this device before its content fold finishes, but cannot advance rollback order,
+//! root, coverage, freshness, nacks, or the acknowledgement this device sends back. Its values
+//! rise monotonically unless that announcing head's content is later refused as invalid.
 //! `dropped` counts heads refused: from a device not admitted, failing their signature, with a
 //! lower `seq` than the last folded (rollback), the same `seq` again (replay), or not decoding.
 
@@ -143,6 +148,9 @@ pub struct HeadTable {
     pub rules: Option<RulesState>,
     /// The last head folded from each other device, by did:key.
     pub devices: BTreeMap<String, DeviceHead>,
+    /// Acknowledgement vectors accepted from verified forward heads before their content fold.
+    #[serde(default)]
+    pub early_acked: BTreeMap<String, BTreeMap<String, u64>>,
     /// CIDs this device refused from each author, projected into this device's channel tree.
     #[serde(default)]
     pub nacks: BTreeMap<String, NackState>,
@@ -200,6 +208,7 @@ impl Default for HeadTable {
             store: None,
             rules: None,
             devices: BTreeMap::new(),
+            early_acked: BTreeMap::new(),
             nacks: BTreeMap::new(),
             dropped: DroppedHeads::default(),
             crossing_drop_groups: BTreeMap::new(),

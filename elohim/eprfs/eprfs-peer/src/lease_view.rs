@@ -959,9 +959,8 @@ fn own_verdict(
         .iter()
         .filter(|device| lease.overrode.as_deref() != Some(**device) || !override_effective)
         .filter(|device| {
-            let head = heads.devices.get(**device);
-            let acked = head.and_then(|head| head.folded.get(me));
-            !matches!((carried.claim, acked), (Some(seq), Some(&acked)) if acked >= seq)
+            let acked = acknowledged_by(heads, device, me);
+            !matches!((carried.claim, acked), (Some(seq), Some(acked)) if acked >= seq)
         })
         .map(|device| (*device).to_string())
         .collect();
@@ -981,7 +980,7 @@ fn own_verdict(
             });
             // The newest claim or renew this device has acknowledged is what binds it, so a renew
             // still in flight rides on the last acknowledged one until that one leaves the window.
-            let acked = head.folded.get(me).copied();
+            let acked = acknowledged_by(heads, device, me);
             let anchor = carried
                 .extensions
                 .iter()
@@ -1026,4 +1025,22 @@ fn own_verdict(
             override_at: None,
         }
     }
+}
+
+/// The highest acknowledgement a sibling supplied in either its last content-verified head or a
+/// newer verified head whose content fold is still in flight.
+fn acknowledged_by(heads: &HeadTable, device: &str, me: &str) -> Option<u64> {
+    heads
+        .devices
+        .get(device)
+        .and_then(|head| head.folded.get(me))
+        .into_iter()
+        .chain(
+            heads
+                .early_acked
+                .get(device)
+                .and_then(|acked| acked.get(me)),
+        )
+        .copied()
+        .max()
 }

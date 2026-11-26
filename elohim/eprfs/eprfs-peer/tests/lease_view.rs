@@ -412,6 +412,30 @@ fn an_unacknowledged_claim_is_pending_then_unconfirmed_naming_the_device() {
 }
 
 #[test]
+fn an_in_flight_head_ack_is_effective_and_invalid_withdrawal_makes_the_lease_pending_again() {
+    let h = household();
+    let s = store(vec![own(claim("claude-1", T0))]);
+    let mut heads = table(&h.a.did, &[(3, 1)], &s, &[(&h.b.did, 2, ms(T0) + 500)]);
+    heads
+        .early_acked
+        .entry(h.b.did.clone())
+        .or_default()
+        .insert(h.a.did.clone(), 3);
+
+    assert_eq!(
+        verdict(&h.a.did, &s, &heads, &h.admission(), ms(T0) + 1_000),
+        Some(effective("claude-1")),
+        "the signed acknowledgement is usable before B's content fold returns"
+    );
+
+    heads.early_acked.remove(&h.b.did);
+    assert!(matches!(
+        verdict(&h.a.did, &s, &heads, &h.admission(), ms(T0) + 1_000),
+        Some(LeaseVerdict::Pending { waiting_on, .. }) if waiting_on == vec![h.b.did.clone()]
+    ));
+}
+
+#[test]
 fn an_ack_of_a_head_projected_before_the_claim_reached_the_store_does_not_confirm_it() {
     let h = household();
     // Head 3 was announced after the claim's stamp, but projected from a store that held only one

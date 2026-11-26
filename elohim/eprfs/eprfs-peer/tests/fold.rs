@@ -3,7 +3,7 @@
 
 mod support;
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -2054,7 +2054,7 @@ async fn a_self_consistent_tree_other_than_the_signed_root_is_refused_and_the_he
         signed_root,
         1,
         1,
-        Default::default(),
+        BTreeMap::from([(h.a.did.clone(), 7)]),
         &h.b.signer(),
     )
     .expect("head signs");
@@ -2081,6 +2081,10 @@ async fn a_self_consistent_tree_other_than_the_signed_root_is_refused_and_the_he
     assert!(
         !table.devices.contains_key(&h.b.did),
         "a failed fold leaves the peer head unrecorded"
+    );
+    assert!(
+        !table.early_acked.contains_key(&h.b.did),
+        "content outside the signed root withdraws its early acknowledgement"
     );
 
     daemon.shutdown().await;
