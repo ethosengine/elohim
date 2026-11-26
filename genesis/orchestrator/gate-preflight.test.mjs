@@ -6,10 +6,11 @@ import assert from 'node:assert/strict';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
   checkElementDists, checkEvidenceRecordable, checkNodeModules, checkReadSets, checkSophiaUmd,
   main, cargoInputChange, decisionChanges, checkEprBin, checkArk, checkCargoDeny, checkCargoLocks, checkCBaselineOffer, checkStorageClientDist, checkWorkspaceDists, checkSubmodules, checkTmpdir, emitLive, NAMED_READ_SET_PROJECTS, PREFLIGHT_READ_SET_PROJECTS, onRedPolicy,
-  fleetRollRows, docCutRows, runPreflight, checkSubmodulePins,
+  fleetRollRows, docCutRows, runPreflight, checkSubmodulePins, releaseLastIngestedAt,
 } from './gate-preflight.mjs';
 import { orderByCost } from './gate-runner.mjs';
 import { appendEvent, closeRun, formatEvent, formatHarvest, harvest, openRun, outlook } from './gate-live.mjs';
@@ -813,21 +814,7 @@ test('epr-bin: a candidate outside the store, a newer release, or an undated one
   }
 });
 
-test('epr-bin: lastIngestedAt is canonical even when source rows would order differently', t => {
-  const { root, env } = eprFixture(t);
-  put(root, 'store/epr/bafyreicurrent/record.json', JSON.stringify({
-    cid: 'bafyreicurrent', ingestedAt: '2026-11-01T00:00:00Z',
-    lastIngestedAt: '2026-11-26T00:00:00Z',
-  }));
-  const candidate = release(root, 'bafyreicandidate', '2026-11-25T00:00:00Z', {
-    lastIngestedAt: '2026-11-25T00:00:00Z',
-    sources: [{ ingestedAt: '2026-11-27T00:00:00Z' }],
-  });
-
-  assert.equal(checkEprBin({ env: { ...env, EPR_BIN: candidate } }).level, 'REFUSED');
-});
-
-test('epr-bin: old records fall back to the newest first-ingest or source timestamp', t => {
+test('epr-bin: release recency derives from the newest first-ingest or source timestamp', t => {
   const { root, env } = eprFixture(t);
   put(root, 'store/epr/bafyreicurrent/record.json', JSON.stringify({
     cid: 'bafyreicurrent', ingestedAt: '2026-11-01T00:00:00Z',
@@ -842,6 +829,22 @@ test('epr-bin: old records fall back to the newest first-ingest or source timest
     sources: [{ ingestedAt: '2026-11-24T00:00:00Z' }],
   });
   assert.equal(checkEprBin({ env: { ...env, EPR_BIN: candidate } }).level, 'REFUSED');
+});
+
+test('epr-bin: shared release-recency fixtures match Rust answers and CID tie order', () => {
+  const root = fileURLToPath(new URL(
+    '../../elohim/eprfs/device-runtime/tests/fixtures/release-recency/', import.meta.url,
+  ));
+  const expected = JSON.parse(readFileSync(join(root, 'expected.json'), 'utf8'));
+  const records = expected.cases.map(expectedCase => {
+    const record = JSON.parse(readFileSync(join(root, expectedCase.name, 'record.json'), 'utf8'));
+    const actual = releaseLastIngestedAt(record);
+    assert.equal(actual, Date.parse(expectedCase.lastIngestedAt), expectedCase.name);
+    return { name: expectedCase.name, record, actual };
+  });
+  records.sort((left, right) => right.actual - left.actual
+    || left.record.cid.localeCompare(right.record.cid));
+  assert.deepEqual(records.map(({ name }) => name), expected.order);
 });
 
 test('epr-bin: unreadable current warns, including a malformed authoritative head', t => {

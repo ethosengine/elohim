@@ -12,6 +12,7 @@ import { createHash } from 'node:crypto';
 import {
   appendFileSync,
   chmodSync,
+  cpSync,
   copyFileSync,
   existsSync,
   mkdirSync,
@@ -57,6 +58,7 @@ interface FollowFixture {
   sessionEnv?: NodeJS.ProcessEnv;
   launchedCid?: string;
   last?: Invocation;
+  gcWithoutLease?: Invocation;
   daemon?: ChildProcess;
   deviceEnv?: NodeJS.ProcessEnv;
   bootstrapEnv?: NodeJS.ProcessEnv;
@@ -1000,6 +1002,9 @@ When(
       const path = join(state.store, cid, 'record.json');
       const record = object(JSON.parse(readFileSync(path, 'utf8')));
       record.ingestedAt = '2000-01-01T00:00:00Z';
+      if (Array.isArray(record.sources)) {
+        for (const source of record.sources) object(source).ingestedAt = '2000-01-01T00:00:00Z';
+      }
       writeFileSync(path, JSON.stringify(record));
       rmSync(join(state.store, cid, '.used'), { force: true });
     }
@@ -1009,6 +1014,11 @@ When(
 When('garbage collection runs while the peer daemon lives', function () {
   const state = fixture(this);
   state.last = storeOk(state, ['gc']);
+  const withoutLease = join(state.base, 'store-without-daemon-lease');
+  cpSync(state.store, withoutLease, { recursive: true });
+  rmSync(join(withoutLease, 'sessions'), { recursive: true, force: true });
+  mkdirSync(join(withoutLease, 'sessions'), { recursive: true });
+  state.gcWithoutLease = storeOk({ ...state, store: withoutLease }, ['gc']);
 });
 
 Then("build B remains in the store, held by the daemon's lease", function () {
@@ -1017,6 +1027,12 @@ Then("build B remains in the store, held by the daemon's lease", function () {
   assert.ok(Array.isArray(result.kept));
   assert.ok(result.kept.includes(state.cidB));
   assert.ok(existsSync(join(state.store, String(state.cidB), 'epr')));
+  const withoutLease = object(JSON.parse(state.gcWithoutLease?.stdout ?? '{}'));
+  assert.ok(Array.isArray(withoutLease.removed));
+  assert.ok(
+    withoutLease.removed.includes(state.cidB),
+    'build B would not be collected after removing the daemon lease'
+  );
   // The lease is the reason it was kept: a live daemon's record still names build B.
   const leases = readdirSync(join(state.store, 'sessions')).filter(name =>
     name.startsWith('daemon-')
