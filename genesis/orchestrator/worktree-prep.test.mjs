@@ -4,7 +4,7 @@ import { spawnSync } from 'node:child_process';
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { currentChanges, mainCheckout, neededSubmodule, prep, submoduleCommand } from './worktree-prep.mjs';
+import { currentChangeList, currentChanges, mainCheckout, neededSubmodule, prep, submoduleCommand } from './worktree-prep.mjs';
 import { ATTESTED_SUBMODULES, attestedNeed, checkSubmodules, runPreflight, WORKSPACE_INSTALL } from './gate-preflight.mjs';
 
 const ok = stdout => ({ status: 0, stdout: stdout || '' });
@@ -476,4 +476,37 @@ test('station 1: without a selection and a change list (just gate) every absent 
   const thin = checkSubmodules({ root: '/x', spawn, projects: [], changed: ['a.md'], need: () => null });
   assert.equal(thin.level, 'ok');
   assert.deepEqual(thin.skipped, ['elohim/brit', 'elohim/rakia', 'sophia']);
+});
+
+// Review of 42faf6aaa, blocking: without origin/dev the committed part of the list is the tip commit
+// alone. A two-commit branch whose FIRST commit moved the brit pin and a Cargo.toml shows neither.
+test('a change list read without its base is not exact: every attested submodule is required and both cargo checks run', t => {
+  const tipOnly = args => {
+    if (args[0] === 'rev-parse' && args.includes('--verify')) return { status: 1, stdout: '', stderr: 'fatal: Needed a single revision' };
+    if (args[0] === 'diff-tree') return ok('genesis/docs/a.md\0'); // HEAD alone; HEAD~1 moved elohim/brit and ws/Cargo.toml
+    if (args[0] === 'diff' || args[0] === 'ls-files') return ok('');
+    return null;
+  };
+  assert.deepEqual(currentChangeList({ root: '/x', spawn: (cmd, args) => tipOnly(args) || ok('') }), { paths: ['genesis/docs/a.md'], exact: false });
+  assert.equal(currentChangeList({ root: '/x', spawn: () => ok('a.md\0') }).exact, true);
+
+  const f = fixture(t, { git: tipOnly });
+  put(f.root, '.gitmodules', '[submodule "elohim/brit"]\n\tpath = elohim/brit\n');
+  put(f.root, 'ws/Cargo.toml', '[workspace]\nmembers = ["a"]\n');
+  put(f.root, 'ws/Cargo.lock', '');
+  put(f.root, 'ws/a/Cargo.toml', '[package]\nname = "a"\n');
+  put(f.root, 'm/build-manifest.json', JSON.stringify({ pipeline: 'p', steps: { s: { inputs: { sources: ['genesis/docs/**'] } } } }));
+  f.options.select = () => [{ name: 'a', dir: 'ws/a', manifestPath: 'm/build-manifest.json', run: { kind: 'just', cargo: {} } }];
+  const inner = f.options.spawn;
+  const cargo = [];
+  f.options.spawn = (command, args, options) => (command === 'cargo' ? (cargo.push(args[0]), { status: 0, stderr: '' }) : inner(command, args, options));
+  assert.equal(prep(f.options), 0, f.logs.join('\n'));
+  const out = f.logs.join('\n');
+  assert.deepEqual(cloned(f), [...ATTESTED_SUBMODULES], 'the pin move in the first commit cannot be ruled out');
+  assert.match(f.logs[0], /REFUSED submodules: not checked out: elohim\/brit elohim\/rakia sophia/);
+  assert.match(out, /\[prep\] origin\/dev does not resolve here, so only the tip commit's paths are known: no check is skipped by the change list/);
+  assert.deepEqual(cargo, ['metadata'], 'cargo-lock ran');
+  assert.match(out, /\[preflight\] ok cargo-lock:ws/);
+  assert.match(out, /\[preflight\] WARN cargo-deny-bans: cargo-deny is not installed/, 'cargo-deny was asked for, not skipped');
+  assert.doesNotMatch(out, /\(not run/);
 });
