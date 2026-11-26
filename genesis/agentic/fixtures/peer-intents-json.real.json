@@ -1,0 +1,95 @@
+{
+ "advisory": [],
+ "device": "did:key:z6MkpZRhMwWJpv7HeZyArTUkbnG6DUyukQp18MxUs2fHVMZB",
+ "error": null,
+ "intents": [
+  {
+   "announcer": "did:key:z6MkpZRhMwWJpv7HeZyArTUkbnG6DUyukQp18MxUs2fHVMZB",
+   "base": "179814d6badb6ab5d3d317df03ba4ca9c247f410",
+   "chainLen": 0,
+   "change": "I0ef2fa55a5868d49e48a817199ab2276ab628137",
+   "class": "governance",
+   "closures": {
+    "address-profile-lint": "9f03ad71d7a9e03f0b3928887307d7c256eca5a6f8bdbf85dc41cdbffc39d89e",
+    "eprfs-live-corpus": "83b2d6f57e57fb40ecf7e489182423d5cacbb380bc9d313de809045da3cdac35",
+    "genesis": "e06ac70f1f00f40e5d86ab4f86b537c4ab2eda254d01772a478b42bd329ec0bc",
+    "genesis-a2o": "4df2d7b04ea0c0f6ccb7fe27ed3741683a49766ec67601623f37b7b10f7dee69",
+    "gherkin-prepush-lint": "0cf3ddbf5260908d0df06a7b9fd11a9f64e98890d9ae74f4fc4dce574fa96f2d",
+    "orchestrator": "0fc2705cc7f8ba594ca9cb3cb09ec1fce1ab842e821ed60f3c4251a45a61fab6",
+    "orchestrator-tree": "241eeb5d320738cd38213174be5c86870287d578e808baa5f793fd9ea00d9f38"
+   },
+   "device": "did:key:z6MkpZRhMwWJpv7HeZyArTUkbnG6DUyukQp18MxUs2fHVMZB",
+   "deviceFoldedAt": null,
+   "dseq": 1,
+   "intent": "bafyreidhvpkg7x4ybc3mt2uwjthsntqkddqlk7dz23elnotpm7iz7njnfa",
+   "moved": null,
+   "own": true,
+   "predictedBase": "dev",
+   "raisedAt": 1795413466556,
+   "regatedS": null,
+   "session": "d6cfb7e1-ee3c-4e45-bfb2-ae04ec4b50a3",
+   "settled": [],
+   "state": "live",
+   "storeIndex": 27825,
+   "supersedes": null,
+   "tree": "4996c3ad6d3de47ab7d1af7a7a0d55effb8c7e65",
+   "verified": false,
+   "verifiedAt": null
+  }
+ ],
+ "maxSkewS": 30,
+ "misses": [
+  {
+   "announcer": "did:key:z6Mkm5deEA87WrC3PDDGjkZwnWhUGhwHS43UinXhy5N6bowj",
+   "at": "1795717574.798",
+   "carriedBy": [],
+   "change": "I471fd621feaa718e1ba93b57088cf7bb4cfd41a3",
+   "closure": "2950639aadb13e64606ceea9e572e39f9eb904f0fcbddd08a90569aaae4e2691",
+   "commit": "d12c22740c46766d8a5e4b68ce86e406b74244c2",
+   "event": "bafyreiazn2v6vkgkbnsbgw5e23qklb7ydgwf5ndeyy3r7tr3rlqhdswbe4",
+   "gitRef": "refs/heads/self/shem-f4ask-verify-20261126",
+   "intent": "bafyreig62svk3syzde6qqtc2opcxhj4ex5xonvgm5ldlxkeah3xt624pzi",
+   "p90S": 98,
+   "project": "eprfs-live-corpus",
+   "waitUntil": 1795721174
+  },
+  {
+   "announcer": null,
+   "at": "1795714915.294",
+   "carriedBy": [],
+   "change": "I6d8b82d3a650000cc64de169af5bf32f33413487",
+   "closure": "a2b66c24ce91c83c2719c65764f8f6a631bde16addfd15fbb3953218d40b1e5d",
+   "commit": "a48acde96244db4b753bc62e7e3ecb68ebe7b8da",
+   "event": "bafyreiedj2t6kxalwshdypodivjdu4uaf5q54zyv2urlu676l5y7b46nrq",
+   "gitRef": "refs/heads/self/ethosengine-adopt-held",
+   "intent": "bafyreid43iir4t2rgsb3gkm3etqyjk4lldsgrcudz42hzouiskwgp66u3u",
+   "p90S": 8,
+   "project": "address-profile-lint",
+   "waitUntil": 1795718515
+  }
+ ],
+ "now": 1795717810222,
+ "settledMisses": [
+  {
+   "by": "waitUntil",
+   "miss": {
+    "announcer": null,
+    "at": "1795663684.749",
+    "change": "I368625d7b2894646303930090a820e72ec3892d8",
+    "closure": "d57882b0d31d308e11c6c03885813a7698a0862a2e18fe2fbcb146447ab85c52",
+    "commit": "189b1f00bf53cdac1872a4b6c5ae76a22a4ec45b",
+    "event": "bafyreid7gmjp3yvlgdodjxa4tg7wbudb7oaiv7nn6ywbnbbdx33qls6p3a",
+    "gitRef": "refs/heads/self/ethosengine-disciplines-f0",
+    "intent": "bafyreia4iawttb5jf4afo5j7t3l2volqkvam2uveio3libyo3hrg7fykva",
+    "p90S": 446,
+    "project": "eprfs-live-corpus",
+    "waitUntil": 1795667284
+   }
+  }
+ ],
+ "siblingsRead": true,
+ "siblingsWhy": null,
+ "standing": "device",
+ "store": "/projects/elohim",
+ "unjoined": 0
+}

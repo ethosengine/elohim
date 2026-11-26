@@ -1274,8 +1274,9 @@ def _cmd_carry_locked(args, repo, status_dir, runner, gate_runner):
         say(f"held-tool-watch carry: no device-head epr — {why}")
         return 1
     try:
-        data = _json_call(runner, [head, "peer", "intents", "--misses", "--json", "--root", repo],
-                          cwd=repo)
+        # The full output, not `--misses`: under --json, --misses prints only the misses list
+        # (epr-cli peer.rs render_intents), and carry also needs `device` to skip its own misses.
+        data = _json_call(runner, [head, "peer", "intents", "--json", "--root", repo], cwd=repo)
         now = time.time() if args.now is None else args.now
         misses = _eligible_misses(data, now)
         if not misses:
