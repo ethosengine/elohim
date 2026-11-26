@@ -29,7 +29,14 @@ def resolve_caller_epr(env=os.environ):
         raise RuntimeError(f'UNMEASURED: caller-selected epr is unavailable ({error})') from error
 
 
-BINARY = resolve_caller_epr()
+# Chosen when this file's own tests run, never at import: shift_lease_test imports this module for its
+# Fixture and patches BINARY itself, and an import must not raise for a caller that set no EPR_BIN.
+BINARY = None
+
+
+def setUpModule():
+    global BINARY
+    BINARY = resolve_caller_epr()
 RUNTIMES = {'claude': ('claude-code', 4101), 'codex': ('codex', 4102)}
 
 
@@ -1373,6 +1380,8 @@ def run_parallel(jobs, exclude, case_timeout):
 
 
 if __name__ == '__main__':
+    # Run as a program (--stage and --parallel bypass unittest's setUpModule): choose the caller's epr now.
+    setUpModule()
     if '--stage' in sys.argv:
         p=argparse.ArgumentParser();p.add_argument('--stage');p.add_argument('--base');a=p.parse_args()
         getattr(Fixture(a.base),a.stage)()
