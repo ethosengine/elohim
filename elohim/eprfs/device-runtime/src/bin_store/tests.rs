@@ -1555,7 +1555,6 @@ fn saved_release_does_not_store_derived_or_legacy_last_ingested_at() {
     assert!(record.get("lastIngestedAt").is_none());
 }
 
-// gate-reads(eprfs): elohim/eprfs/device-runtime/tests/fixtures/release-recency
 #[test]
 fn shared_release_recency_fixtures_match_expected_times_and_cid_tie_order() {
     #[derive(serde::Deserialize)]
@@ -1571,34 +1570,32 @@ fn shared_release_recency_fixtures_match_expected_times_and_cid_tie_order() {
     }
 
     let fixture_path = ["tests", "fixtures", "release-recency"].join(std::path::MAIN_SEPARATOR_STR);
+    // gate-reads(eprfs): elohim/eprfs/device-runtime/tests/fixtures/release-recency
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join(fixture_path);
     let expected: Expected = files::read_json(&root.join("expected.json")).unwrap();
-    let mut records = expected
-        .cases
-        .into_iter()
-        .map(|case| {
-            let record: Release = files::read_json(&root.join(&case.name).join("record.json"))
-                .unwrap_or_else(|| panic!("missing recency fixture {}", case.name));
-            assert_eq!(
-                record.last_ingested_at(),
-                case.last_ingested_at,
-                "{}",
-                case.name
-            );
-            (case.name, record)
-        })
-        .collect::<Vec<_>>();
-    records.sort_by(|(_, left), (_, right)| {
-        right
-            .last_ingested_at()
-            .cmp(left.last_ingested_at())
-            .then_with(|| left.cid.cmp(&right.cid))
-    });
+    let f = Fixture::new("epr");
+    let mut names_by_cid = BTreeMap::new();
+    for case in expected.cases {
+        let source = root.join(&case.name).join("record.json");
+        let record: Release = files::read_json(&source)
+            .unwrap_or_else(|| panic!("missing recency fixture {}", case.name));
+        assert_eq!(
+            record.last_ingested_at(),
+            case.last_ingested_at,
+            "{}",
+            case.name
+        );
+        let artifact = f.store.root.join(&record.cid);
+        fs::create_dir_all(&artifact).unwrap();
+        fs::copy(source, artifact.join("record.json")).unwrap();
+        names_by_cid.insert(record.cid, case.name);
+    }
 
     assert_eq!(
-        records
+        f.store
+            .records()
             .into_iter()
-            .map(|(name, _)| name)
+            .map(|record| names_by_cid.remove(&record.cid).unwrap())
             .collect::<Vec<_>>(),
         expected.order
     );
