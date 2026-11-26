@@ -27,6 +27,11 @@ distills:
   - .claude/shifts/2026-10-23T15-20-integration-shakeout
   - .claude/shifts/2026-10-25T03-00-land-gate-evidence-reuse
   - .claude/shifts/2026-10-27T03-00-overnight-integration-pass
+  # appended 2026-11-26 (stasis round 1): four journals the first pass missed
+  - .claude/shifts/2026-10-24T-land-workspaces-cooperate-green
+  - .claude/shifts/2026-10-26T04-35-land-slice-m-household-receipt
+  - .claude/shifts/2026-10-27T03-10-devices-converse
+  - .claude/shifts/2026-10-29T03-55-closure-keyed-edge-build
 # Bidirectional: the canonical surface this record points back to (and which points here).
 canonical:
   - genesis/docs/shifts/JOURNAL-TEMPLATE.md     # where every "Observed anti-patterns" table is born
@@ -129,3 +134,12 @@ CI-green (`include_str!` target absent from the image stage; backlog
 | 10-27 overnight integration pass | trains 2–4 landed; two ports deferred | `local-view-delivery-deferred-steward-closure-conflict`, `chrome-trust-edge-deferred-egress-census-site` |
 
 A seventeenth file, `2026-10-29-continuation.md`, was empty and carried nothing.
+
+### Appended 2026-11-26: four journals the first pass missed
+
+| Shift | Outcome | Lesson (one line) |
+|---|---|---|
+| 10-24 land workspaces-cooperate green | DONE at #2138 + #2140 | A partial worktree install and absent sophia/rakia submodules read as eleven code reds; prepare the tree first (memory `integration-push-from-fresh-worktree`). |
+| 10-26 land slice M household receipt | slice M on dev as ddee90f30; gate reuse went live | A 401 "credential drift" meant the apex fixture human (adam) was never cast; the receipt ran on a separate household fixture with adam joined rather than recasting the canonical one. |
+| 10-27 devices converse | first device-to-device code handoff over berth | **Split-generation stranding**: a release declaring a new bin (`bin-launch`) projected before the follow that carried it stranded every release under the old launcher's `verified()`; `epr device arrive` cannot self-cure — bootstrap must use `admissible()` (fix carried by shem as 9d5e27da2). A fold watcher keyed on action filtered `say` rows as cites. |
+| 10-29 closure-keyed edge build | stalled on an unsheddable workload; closed 11-01 | **An empty `[build:edge]` commit measures nothing**: the graph-walker derives run class from changed steps, an empty changeset derives `verify`, and edge runs verify as validate-only; waves coalesce per branch head. |
