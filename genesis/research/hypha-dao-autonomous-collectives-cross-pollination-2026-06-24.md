@@ -3,6 +3,14 @@ title: Hypha DAO — Autonomous Entity & Collective Designs Cross-Pollination
 id: hypha-dao-autonomous-collectives-cross-pollination-2026-06-24
 status: Capture
 date: 2026-06-24
+takes:
+  - "L1 | owed: no backlog row, plan or spec names this note, and the Home it proposes does not mention it"
+  - "L2 | owed: no backlog row, plan or spec names this note, and the Home it proposes does not mention it"
+  - "L3 | owed: no backlog row, plan or spec names this note, and the Home it proposes does not mention it"
+  - "L4 | owed: the note lists the proposal-lifecycle and dissent-window design as not authored, and no row or file exists (searched backlog, specs, plans)"
+  - "L5 | owed: no backlog row, plan or spec names this note, and the Home it proposes does not mention it"
+  - "L6 | file: elohim/elohim-token/research/hypha-dao-governance-token-prior-art.md"
+  - "L7 | owed: no backlog row, plan or spec names this note, and the Home it proposes does not mention it"
 ---
 
 # Hypha DAO Cross-Pollination — June 2026

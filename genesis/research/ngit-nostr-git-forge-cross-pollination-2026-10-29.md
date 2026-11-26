@@ -5,6 +5,18 @@ status: Reviewed
 date: 2026-10-29
 revised: 2026-10-29 (challenge pass wf_2a270487-6c2; design panel wf_f9cfa72a-80c)
 sovereignty-frame: bounded
+takes:
+  - "T0 | file: genesis/docs/superpowers/plans/2026-10-29-brit-daily-driver-evidence-layer-sprint.md"
+  - "T1 | file: genesis/docs/superpowers/specs/2026-10-29-closure-keyed-landing-plane-design.md"
+  - "T2 | commons-holonic-stewardship-backlog#52"
+  - "T4 | file: genesis/docs/superpowers/specs/2026-10-29-closure-keyed-landing-plane-design.md"
+  - "T5 | file: genesis/docs/superpowers/plans/2026-10-29-brit-daily-driver-evidence-layer-sprint.md"
+  - "T7 | file: genesis/docs/superpowers/plans/2026-10-29-brit-daily-driver-evidence-layer-sprint.md"
+  - "T10 | file: genesis/docs/superpowers/plans/2026-10-29-brit-daily-driver-evidence-layer-sprint.md"
+  - "T3 | file: genesis/docs/superpowers/specs/2026-10-29-closure-keyed-landing-plane-design.md"
+  - "T6 | released: moved to Hold as H6 (was T6): we do not have the trust shape it serves, and our trajectory is to avoid creating it; revisit if a carried job must publish or a second principal's executor appears"
+  - "T8 | released: moved to Hold as H7 (was T8): ngit's euc is announcer-declared, not derivable from one repo's bytes; waits for fork governance"
+  - "T9 | released: moved to Hold as H8 (was T9): a read-only OCI gateway; take only ncontainer's publishing order; revisit at plan row 5 (artifact custody)"
 ---
 
 # ngit Cross-Pollination — October 2026

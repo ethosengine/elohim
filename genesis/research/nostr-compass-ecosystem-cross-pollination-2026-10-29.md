@@ -4,6 +4,19 @@ id: nostr-compass-ecosystem-cross-pollination-2026-10-29
 status: Capture
 date: 2026-10-29
 sovereignty-frame: bounded
+takes:
+  - "T1 | agentic-harness-borrows-backlog#11"
+  - "T2 | file: genesis/data/timeline/backlog/blob-forward-confirmation-status-only-no-body-check.md"
+  - "T3 | agentic-harness-borrows-backlog#11"
+  - "N1 | arch-dataplane-borrows-backlog#21"
+  - "N2 | arch-dataplane-borrows-backlog#22"
+  - "N3 | arch-authority-in-integrity-backlog#19"
+  - "N4 | arch-authority-in-integrity-backlog#20"
+  - "N5 | agentic-harness-borrows-backlog#12"
+  - "N6 | agentic-harness-borrows-backlog#12"
+  - "N7 | file: genesis/data/timeline/backlog/security-html5-app-iframe-same-origin-reads-session-token.md"
+  - "N8 | arch-workspace-discipline-backlog#58"
+  - "N9 | commons-holonic-stewardship-backlog#51"
 ---
 
 # Nostr Compass Cross-Pollination — October 2026

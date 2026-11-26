@@ -9,6 +9,13 @@ cites:
   - "elohim-protocol-manifesto | principle 6 (living memory) and Witnessed Humanity, the source of the attunement limit this note reads both systems against | sha256:21e5057f62b72ed3 | path: genesis/docs/content/elohim-protocol/manifesto.md"
   - "private-thought-governed-fruit | the ruling that thoughts are private and never enter a notarized plane | sha256:2945eb608257be1e | path: genesis/docs/architecture/private-thought-governed-fruit.md"
   - "memory-lifecycle-design | the consolidation-event section and the unbuilt proposal-only /dream that verdicts T1 and T2 take up | sha256:6a3557a18e2ceb09 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-10-memory-lifecycle-design.md"
+takes:
+  - "T1 | owed: the mint this note's Outputs describes is not in the tree: agentic-context-tooling-consolidation-queue ends at item 27, not 31"
+  - "T2 | owed: the mint this note's Outputs describes is not in the tree: agentic-context-tooling-consolidation-queue ends at item 27, not 31"
+  - "T3 | owed: the mint this note's Outputs describes is not in the tree: agentic-context-tooling-consolidation-queue ends at item 27, not 31"
+  - "T4 | owed: native-peer-dev-channel-and-collective-memory-seed has no row or text naming this note, so the mint the Outputs describes is not in the tree"
+  - "T5 | owed: the mint this note's Outputs describes is not in the tree: agentic-context-tooling-consolidation-queue ends at item 27, not 31; the Outputs also say T5 stays a steward settings change, not minted"
+  - "T6 | owed: the mint this note's Outputs describes is not in the tree: agentic-context-tooling-consolidation-queue ends at item 27, not 31"
 ---
 
 # Memorilla and Claude's Dreaming — November 2026

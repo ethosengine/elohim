@@ -3,6 +3,17 @@ title: "Freenet — Peer Confrontation: same problem, different bet"
 id: freenet-peer-confrontation-2026-07-27
 status: Capture
 date: 2026-07-27
+takes:
+  - "T1 | file: genesis/docs/superpowers/plans/2026-07-27-freenet-lift-and-shift-plan.md"
+  - "T2 | file: genesis/docs/superpowers/plans/2026-07-27-freenet-lift-and-shift-plan.md"
+  - "T3 | file: genesis/docs/superpowers/plans/2026-07-27-freenet-lift-and-shift-plan.md"
+  - "T4 | file: genesis/docs/superpowers/plans/2026-07-27-freenet-lift-and-shift-plan.md"
+  - "T5 | file: genesis/docs/superpowers/plans/2026-07-27-freenet-lift-and-shift-plan.md"
+  - "T6 | file: genesis/docs/superpowers/plans/2026-07-27-freenet-lift-and-shift-plan.md"
+  - "T7 | owed: no plan, spec or backlog row carries the build-time lineage guard (searched the lift-and-shift plan for lineage guard and freenet-migrate)"
+  - "T8 | owed: no plan, spec or backlog row carries deterministic seeded simulation (searched the lift-and-shift plan for simulat)"
+  - "T9 | file: genesis/docs/superpowers/plans/2026-07-27-freenet-lift-and-shift-plan.md"
+  - "T10 | file: genesis/docs/superpowers/plans/2026-07-27-freenet-lift-and-shift-plan.md"
 ---
 
 # Freenet — Peer Confrontation

@@ -2803,3 +2803,35 @@ habits:
       landing intents, verdicts and change-class acceptance are served by brit-native integrate over the
       dataplane in a collective space (S2), so this repo-local queue adds no information; or it retires
       together with push-delivers-within-budget.
+
+  - id: research-takes-have-a-home
+    declared: genesis/research/.epr-meta/research-takes-have-a-home.habit.md
+    invariant: >
+      Every take a research note declares has a home that can be checked: a backlog
+      row that names the note, a file that exists, or a stated release. A take the
+      note still means and that has no home is declared as owed, and counted. A note
+      that declares nothing is unmeasured; it is not read as a note with no takes.
+    status: red
+    active: false
+    checks:
+      - "python3 .claude/scripts/research-mint-check.py --strict --max-undeclared 46 (exit 0 = no declared take is owed or broken and no more than 46 notes are undeclared; 46 is the count of 2026-11-26 and is lowered as notes declare)"
+      - "python3 .claude/scripts/_lib/__tests__/research_mint_check_test.py"
+    evidence: >
+      DELTA 2026-11-26 (BORN red; flight F1 of sprint 2026-11-26-research-disciplines, on ethosengine at dev baeb32247 plus the flight's changes): `python3 .claude/scripts/research-mint-check.py` reads 54 notes, 8 declared, 46 undeclared and reported as unmeasured (10 of them have no frontmatter). The 8 declare 66 takes: 23 on a backlog row that names the note, 18 on a file, 3 released with the note's reason, and 22 owed in five notes (hypha-dao 6, memorilla 6, hypha-distributed-press 5, radicle 3, freenet 2). The strict run exits 1 on those 22. Four rows of agentic-harness-borrows-backlog (14 to 17) did not name the survey they came from and now do. The unit test passes (18 tests). Red until the owed takes are given a home or released by their notes.
+    evidence-fingerprint: sha256:591bdad3dd8913af
+    evidence-bytes: 755
+    evidence-entries: 1
+    guard: >
+      The check verifies what a note declares and does not read prose for takes, so
+      a note can under-declare; the reader of its mint pass is the guard for that.
+      Greening this habit by rewriting an owed take as released without the note's
+      own reason is the over-claim the invariant names. No gate project covers the
+      script (backlog arch-workspace-discipline row 85), so a green here is a run
+      someone made, with its date.
+    refs:
+      - "rule: genesis/research/.epr-meta/manifest.md, mint-pass-at-close (this check is the drain that rule's retire-when waits for)"
+      - "plan: genesis/docs/superpowers/plans/2026-11-26-research-disciplines-exercised.md, flight F1"
+      - "lesson: genesis/research/README.md, What more than one pass reached, row 4 (nothing is dropped silently)"
+    retire-when: >
+      when the mint pass is mechanical: a survey's verdicts are folded into cluster
+      rows by tooling at its close, so a take cannot be written without its home.

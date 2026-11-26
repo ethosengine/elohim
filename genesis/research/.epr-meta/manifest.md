@@ -28,6 +28,12 @@ rules:
       of standalone backlog entries. Takes not worth a cluster row die honestly in the survey's
       prose. The survey's Outputs section then points at the clusters it fed. This is the first hop
       of the provenance chain (research → cluster row → spec → code + scenario → chronicle).
+      From 2026-11-26 a survey also DECLARES its takes in frontmatter, one string per take,
+      `takes: ["<id> | <home>"]`, where a home is a cluster row (`<cluster>#<row>`, and the row
+      names the survey's id), an existing file (`file: <path>`), a stated release
+      (`released: <reason>`), or `owed: <what is missing>` for a take that has no home yet.
+      `python3 .claude/scripts/research-mint-check.py` verifies what is declared and counts a
+      survey that declares nothing as unmeasured (habit `research-takes-have-a-home`).
     retire-when: >
       when the mint pass is MECHANICAL — a survey's graded verdicts folded into cluster rows by
       tooling at close, so the provenance chain is walked rather than remembered. Until then this
