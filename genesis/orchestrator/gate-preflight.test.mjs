@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 import {
   checkElementDists, checkEvidenceRecordable, checkNodeModules, checkReadSets, checkSophiaUmd,
   main, cargoInputChange, decisionChanges, checkEprBin, checkArk, checkCargoDeny, checkCargoLocks, checkCBaselineOffer, checkStorageClientDist, checkWorkspaceDists, checkSubmodules, checkTmpdir, emitLive, NAMED_READ_SET_PROJECTS, PREFLIGHT_READ_SET_PROJECTS, onRedPolicy,
-  fleetRollRows, docCutRows, runPreflight, checkSubmodulePins, releaseLastIngestedAt,
+  fleetRollRows, docCutRows, runPreflight, checkSubmodulePins,
 } from './gate-preflight.mjs';
 import { orderByCost } from './gate-runner.mjs';
 import { appendEvent, closeRun, formatEvent, formatHarvest, harvest, openRun, outlook } from './gate-live.mjs';
@@ -831,20 +831,37 @@ test('epr-bin: release recency derives from the newest first-ingest or source ti
   assert.equal(checkEprBin({ env: { ...env, EPR_BIN: candidate } }).level, 'REFUSED');
 });
 
-test('epr-bin: shared release-recency fixtures match Rust answers and CID tie order', () => {
-  const root = fileURLToPath(new URL(
+test('epr-bin: shared release-recency fixtures drive the store head comparison', t => {
+  const fixtureRoot = fileURLToPath(new URL(
     '../../elohim/eprfs/device-runtime/tests/fixtures/release-recency/', import.meta.url,
   ));
-  const expected = JSON.parse(readFileSync(join(root, 'expected.json'), 'utf8'));
-  const records = expected.cases.map(expectedCase => {
-    const record = JSON.parse(readFileSync(join(root, expectedCase.name, 'record.json'), 'utf8'));
-    const actual = releaseLastIngestedAt(record);
-    assert.equal(actual, Date.parse(expectedCase.lastIngestedAt), expectedCase.name);
-    return { name: expectedCase.name, record, actual };
-  });
-  records.sort((left, right) => right.actual - left.actual
-    || left.record.cid.localeCompare(right.record.cid));
-  assert.deepEqual(records.map(({ name }) => name), expected.order);
+  const expected = JSON.parse(readFileSync(join(fixtureRoot, 'expected.json'), 'utf8'));
+  const root = scratch(t);
+  const store = join(root, 'store/epr');
+  const records = new Map(expected.cases.map(expectedCase => {
+    const text = readFileSync(join(fixtureRoot, expectedCase.name, 'record.json'), 'utf8');
+    const record = JSON.parse(text);
+    put(root, `store/epr/${record.cid}/epr`);
+    put(root, `store/epr/${record.cid}/record.json`, text);
+    return [expectedCase.name, { ...expectedCase, cid: record.cid }];
+  }));
+
+  for (const currentName of expected.order) {
+    const current = records.get(currentName);
+    put(root, 'store/epr/current.json', JSON.stringify({ cid: current.cid }));
+    for (const candidateName of expected.order) {
+      const candidate = records.get(candidateName);
+      const level = checkEprBin({
+        env: { EPR_STORE: store, EPR_BIN: join(store, candidate.cid, 'epr') },
+      }).level;
+      const expectedLevel = candidate.cid === current.cid
+        ? 'ok'
+        : Date.parse(candidate.lastIngestedAt) < Date.parse(current.lastIngestedAt)
+          ? 'REFUSED'
+          : 'WARN';
+      assert.equal(level, expectedLevel, `${candidateName} relative to ${currentName}`);
+    }
+  }
 });
 
 test('epr-bin: unreadable current warns, including a malformed authoritative head', t => {
