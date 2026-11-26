@@ -1,0 +1,21 @@
+{
+  "cid": "bafyreihj34ldtpwnqdxj5vuc35nfcglqzi62l3cmxefcnbb6gpdwwivpe4",
+  "rcid": "bafyreihj34ldtpwnqdxj5vuc35nfcglqzi62l3cmxefcnbb6gpdwwivpe4",
+  "tool": "epr",
+  "bins": {},
+  "version": null,
+  "sourceCommit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "treeClean": true,
+  "gateRun": null,
+  "ingestedAt": "2026-11-19T00:00:00Z",
+  "sources": [
+    {
+      "sourceCommit": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "treeClean": true,
+      "gateRun": "reingest",
+      "ingestedAt": "2026-11-22T00:00:00Z"
+    }
+  ],
+  "ring": "dev-context",
+  "lastIngestedAt": "2099-01-01T00:00:00Z"
+}
