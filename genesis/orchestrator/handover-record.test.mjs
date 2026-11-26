@@ -323,6 +323,10 @@ test('an unreadable status is its own line, never silence and never a refusal', 
     assert.deepEqual(r.stderr, []);
   }
   assert.match(crossingLine({ devices: [] }), /gave no sequence or device list/);
+  for (const ownSeq of [null, undefined, '95826', NaN]) {
+    assert.match(String(crossingLine({ ownSeq, devices: FRESH.devices })), /gave no sequence or device list: whether the misses crossed is not known/,
+      `an own sequence of ${ownSeq} with a fresh sibling is not silence`);
+  }
   assert.match(crossingLine({ ownSeq: 4, devices: [] }), /no admitted sibling: nothing else reads the misses/);
 });
 
