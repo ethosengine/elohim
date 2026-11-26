@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, readdirSync } from 'fs';
-import { dirname, resolve } from 'path';
+import { dirname, matchesGlob, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import { SUITE_READ_LISTS, UNAUDITED_RECIPE_PROJECTS, auditProject, declarationScopes, declarationsIn, exhaustInputs, globCovers, isReadPattern, readCovers, readSet, repositoryFiles, suiteReadSet } from './gate-input-audit.mjs';
 import { GATE_EXHAUST } from './gate-evidence.mjs';
@@ -599,6 +599,29 @@ test('REAL every gate keeps declared sources, recipes and audited reads disjoint
     if (conflicts.length) failures.push({ project: project.name, conflicts });
   }
   assert.deepEqual(failures, [], 'remove a real input from GATE_EXHAUST; never silently ignore it');
+});
+
+test('every agentic Python test has a gate-project source owner', () => {
+  const repo = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
+  const tests = [
+    ...readdirSync(resolve(repo, 'genesis/agentic'))
+      .filter(name => name.endsWith('_test.py')).map(name => `genesis/agentic/${name}`),
+    ...readdirSync(resolve(repo, 'genesis/agentic/bin'))
+      .filter(name => name.endsWith('_test.py')).map(name => `genesis/agentic/bin/${name}`),
+    ...readdirSync(resolve(repo, '.claude/hooks/tests'))
+      .filter(name => /^test_.*\.py$/.test(name)).map(name => `.claude/hooks/tests/${name}`),
+  ].sort();
+  const owners = [...loadGateRegistry(repo).values()].map(project => {
+    const manifest = JSON.parse(readFileSync(resolve(repo, project.manifestPath), 'utf8'));
+    return {
+      sources: [...(project.inputs?.sources || []),
+        ...project.steps.flatMap(step => manifest.steps[step]?.inputs?.sources || [])],
+    };
+  });
+  const unowned = tests.filter(file => !owners.some(project =>
+    project.sources.some(source => matchesGlob(file, source))));
+  assert.deepEqual(unowned, [],
+    'add each new agentic Python test to one gate project inputs.sources and run it in that gate recipe');
 });
 
 // One list with the preflight that runs this same assertion before the gates (gate-preflight.mjs).

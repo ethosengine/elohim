@@ -13,8 +13,8 @@ queued; a stale holder is taken over on the record).
 import importlib.machinery
 import importlib.util
 import os
-import sys
 import tempfile
+import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -83,12 +83,12 @@ def test_write_sensor_rate_over_window():
     assert abs(s.rate(130.0) - (70 / 30)) < 1e-6
 
 
-def test_psi_parser(tmp_path=None):
-    d = tmp_path or Path(tempfile.mkdtemp())
-    p = d / "io"
-    p.write_text("some avg10=1.00 avg60=44.50 avg300=3.00 total=1\nfull avg10=21.25 avg60=2.00 avg300=1.00 total=1\n")
-    psi = io.WriteSensor.read_psi(str(p))
-    assert psi["full_avg10"] == 21.25 and psi["some_avg60"] == 44.5
+def test_psi_parser():
+    with tempfile.TemporaryDirectory() as directory:
+        p = Path(directory) / "io"
+        p.write_text("some avg10=1.00 avg60=44.50 avg300=3.00 total=1\nfull avg10=21.25 avg60=2.00 avg300=1.00 total=1\n")
+        psi = io.WriteSensor.read_psi(str(p))
+        assert psi["full_avg10"] == 21.25 and psi["some_avg60"] == 44.5
 
 
 def test_wbytes_is_max_over_devices_not_sum():
@@ -165,14 +165,14 @@ def test_mooring_carries_the_commitment_shape():
         assert ev["kind"] == "moor" and ev["provider"] == "human@example"
 
 
+def load_tests(_loader, _tests, _pattern):
+    """Enroll the pure-function checks in unittest instead of reporting zero tests."""
+    suite = unittest.TestSuite()
+    for name, function in sorted(globals().items()):
+        if name.startswith("test_") and callable(function):
+            suite.addTest(unittest.FunctionTestCase(function, description=name))
+    return suite
+
+
 if __name__ == "__main__":
-    failed = 0
-    for name, fn in sorted(globals().items()):
-        if name.startswith("test_") and callable(fn):
-            try:
-                fn()
-                print(f"ok   {name}")
-            except Exception as e:  # noqa: BLE001
-                failed += 1
-                print(f"FAIL {name}: {e!r}")
-    sys.exit(1 if failed else 0)
+    unittest.main()
