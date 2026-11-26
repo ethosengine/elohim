@@ -43,3 +43,13 @@ runtime. These three regimes are that simulacra's first scenario families.
 Regime 3 is now household-mintable. Regimes 1 and 2 remain independent work;
 this staging result does not change their state or claim the corresponding
 fleet confirmations.
+
+**Method note, 2026-11-26.** The Apollo SP-287 survey
+(`genesis/research/apollo-sp287-what-made-apollo-a-success-cross-pollination-2026-11-26.md`,
+§3) reads this item's simulacra network against the seven properties that made
+Apollo's simulators work. The mesh already has two of them. The two it lacks, a
+seat that chooses the failure and a reading that carries its age, are minted as
+row 24 of `arch-dataplane-refactor-backlog`. The survey also records, as study
+items and not yet as work, a cheaper rung beneath the mesh (the real regulator
+against a modelled world, in fast time) and one scenario climbing every rung of
+the evidence ladder. Regimes 1 and 2 above are unchanged by this note.
