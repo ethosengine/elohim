@@ -1,8 +1,8 @@
 ---
 title: "What Made Apollo a Success? — NASA SP-287 read for the pilot's brief, the simulacra and the flight sequence"
 id: apollo-sp287-what-made-apollo-a-success-cross-pollination-2026-11-26
-status: Draft (v1.2, single author, steward-directed on composition and on the control room, one challenge pass applied to v1)
-version: 1.2
+status: Draft (v1.3, single author, steward-directed on composition, the control room, coordination cost and councils; one challenge pass applied to v1)
+version: 1.3
 date: 2026-11-26
 cites:
   - "elohim-protocol-manifesto | the canon's destination: Part VII's eight conditions, Part IX's causal order and the conclusion's refusal of a single arrival, which section 4 reads Apollo's landing against | sha256:21e5057f62b72ed3 | path: genesis/docs/content/elohim-protocol/manifesto.md"
@@ -813,6 +813,31 @@ requisite variety has become affordable at every endpoint. The same claim covers
 Rehearsal, closeout and rule-writing at household scale are plausible only because the labour is
 now cheap. The harness is where that claim is first tested.
 
+**Coordination is the thing being bought ✎.** An earlier draft of this section, and the author in
+conversation, cautioned that more seats cost coordination. The steward corrected that: "we're
+assuming that agentic AI, which is absorbing the variety is also collapsing that cost to machine
+speed. That's exactly what the elohim protocol is buying us.. coordination, whatever shape that
+takes that helps us achieve the best decision.. embedded in the system itself." Apollo paid for
+shared understanding in "big meetings, little meetings, hundreds of meetings", and Tindall could
+"offer no acceptable solution" to the communication problem beyond them (SP pp. 66–67) ✅. The
+protocol's bet is that this is the cost that falls when the coordinating is done by agents inside
+the system. The manifesto says the same of judgment, carried "at machine speed so that harmful
+dynamics can be met faster than human coordination alone can manage" (M, Part IX) ✅.
+
+Tindall's bound has two halves, and the bet removes one. The half that falls is the waste of
+resources. The other half, "confusion or the incomprehensible" (SP p. 61) ✅, was never a cost of
+coordinating. It is a property of what arrives at one seat, and composition from position (§2) is
+the answer to it. So the bound belongs on the cockpit and not on the council: many seats may
+confer, and each must still be handed little.
+
+This session saw a small instance. A sibling device advertised gate runs it lacked ("run it… or
+leave it") ✅. A verdict produced on this device was admitted there as `independence: sibling`,
+and the integrator reported the landing took 69 seconds where the gate alone takes about seven
+minutes ◐ (the landing was verified; the timing is the integrator's report).
+
+What machine speed does not buy is independence ◐. Voices spawned from one context with one brief
+are one voice, however quickly they confer. That is the subject of S9.
+
 ---
 
 ## 6. In the grammar of valueflows
@@ -952,14 +977,16 @@ later history. Its numbers are the authors' own.
 | S6 | A procedure freeze by class of crossing, so the rules agents fly by do not change by preference during one (§1.3) | No evidence yet that it bites |
 | S7 | A forum on the integration branch where a change's cross-cutting effects are judged by more than its author (§5) | Conflicts with the no-PR landing; needs the earned-reach ladder's answer |
 | S8 | A control room composes at any EPR, on the spot, for the agent or human who sits there ✎: what they can see and what they can invoke from that position (§7). The counterpart of T2 | The steward's direction of 2026-11-26. Needs a design pass and the p2p design gate: what a room shows, what control it grants, and on whose authority. Seeds: the `--participate` read, EPR chrome, and the `operator-runtime-surface` habit, which is red ◐ |
+| S9 | A council composes from the provenance of its seats ✎: who confers on a decision is chosen by where each voice comes from (device, model, role, what it was handed, whether it did the work), and the decision method reads independence instead of counting voices (§5) | The steward's thought of 2026-11-26: agents working together are "little elohim councils in micro", and "the diversity of those agents in where they're coming from.. could inform how the decisions get made". Apollo composed its boards by stake (SP pp. 6, 46) and its backup guidance by a different design (SP p. 19). Seed: gate evidence already carries `independence: sibling`. Needs design: which axes of provenance count for which decisions, and how a council closes |
 
 **LEAVE**
 
 - L1. A *central* control room: a seat that cannot act without a distant one (§7). The room
   itself is kept; see S8.
 - L2. "Any change is undesirable" as a premise (§7).
-- L3. Tier upon tier of contingency procedure. Tindall's bound applies to us first: more evidence
-  on an artifact costs nothing once paid, and more modes in a pilot's head cost reliability.
+- L3. Tier upon tier of contingency procedure. Tindall's bound applies to what one seat must
+  hold: more evidence on an artifact costs nothing once paid, and more modes in a pilot's head
+  cost reliability. It is not a bound on how many seats coordinate (§5).
 - L4. A new anomaly register. T4 uses the flow verbs we have.
 
 **WATCH**
@@ -1048,6 +1075,14 @@ control room". What is declined is a central one. A room composes at any EPR for
 there, and the source itself shows rooms composed per perspective and one composed on the lunar
 surface (§5, §7, L1, new study item S8). The three passages quoted for this were checked against
 the source text by the author; they were not part of the challenge pass.
+
+v1.3, same day, on two further points from the steward. First, coordination cost: the note's
+caution that more seats cost coordination carried a constant in from human organisations. The
+protocol's bet is that agents inside the system collapse that cost to machine speed, so Tindall's
+bound is restated as a bound on what one seat must hold and not on how many confer (§5, L3).
+Second, agents working together are councils in small, and where each voice comes from should
+inform how a decision is made (new study item S9). Quotations added for these were checked
+against the source text and the manifesto by the author, outside the challenge pass.
 
 ## Outputs
 
