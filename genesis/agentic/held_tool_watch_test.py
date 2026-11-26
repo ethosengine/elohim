@@ -447,6 +447,7 @@ class CarryFixture(Fixture, NoStateDir):
         self.gate_verdict = True
         self.capacity = {"ram": "ok", "room": "admit", "pool": "ok"}
         self.release_failures = 0
+        self.claim_replies = []
         self.make_slot = False
         self.commitment = "bafyreiaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         self.misses = [self.miss()]
@@ -507,6 +508,8 @@ class CarryFixture(Fixture, NoStateDir):
             if "--release-carry" in argv and self.release_failures:
                 self.release_failures -= 1
                 return 7, "", "release refused"
+            if "--carry" in argv and self.claim_replies:
+                return self.claim_replies.pop(0)
             return 0, json.dumps({"commitment": self.commitment}), ""
         if "worktree" in argv and "remove" in argv:
             import shutil
@@ -733,6 +736,22 @@ class CarryTest(CarryFixture):
         self.assertEqual(code, 1)
         self.assertIn("emitted no gate verdict", lines[-1])
         self.assertEqual(len(self.releases()), 2)
+
+    def test_unparseable_successful_claim_is_replayed_released_and_declined_once(self):
+        self.claim_replies = [
+            (0, "not json", ""),
+            (0, json.dumps({"commitment": self.commitment}), ""),
+        ]
+        self.release_failures = 1
+        code, lines = self.run_carry()
+        self.assertEqual(code, 1)
+        self.assertEqual(len(self.claims()), 2)
+        self.assertEqual(len(self.releases()), 2)
+        self.assertEqual(self.gates(), [])
+        self.assertEqual(len(lines), 1)
+        self.assertIn("claim returned no commitment; replayed claim released; gate not started", lines[0])
+        declines = [call for call in self.calls if "say" in call["argv"]]
+        self.assertEqual(len(declines), 1)
 
     def test_capacity_is_rechecked_immediately_before_gate_and_each_refusal_declines(self):
         for axis, refused in (("ram", "hard"), ("room", "refuse"), ("pool", "hard")):

@@ -310,6 +310,16 @@ test('carry-only native evaluation ignores candidate Cargo/rustup config and pre
   }
 });
 
+test('carry execution keeps a process-pinned toolchain when the project has no cargo env', () => {
+  const executionEnv = carryExecutionEnv({
+    RUSTUP_TOOLCHAIN: '1.100.0',
+    RUSTC: '/candidate/rustc',
+  }, undefined, '/device/cargo');
+  assert.equal(executionEnv.RUSTUP_TOOLCHAIN, '1.100.0');
+  assert.equal(executionEnv.CARGO_HOME, '/device/cargo');
+  assert.equal(Object.hasOwn(executionEnv, 'RUSTC'), false);
+});
+
 test('a dirty working tree under the project is named on the line and blocks the record', () => {
   const dir = mkdtempSync(join(tmpdir(), 'gate-evidence-'));
   try {
@@ -2251,7 +2261,8 @@ test('E11: orchestrator keys on its suite list, orchestrator-tree on the whole t
   const root = mkdtempSync(join(tmpdir(), 'gate-evidence-suite-'));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const cleanEnv = { ...process.env };
-  for (const key of ['GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_PREFIX', 'GIT_COMMON_DIR', 'GATE_COMMIT']) delete cleanEnv[key];
+  for (const key of ['GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_PREFIX', 'GIT_COMMON_DIR',
+    'GATE_COMMIT', 'RUSTUP_TOOLCHAIN']) delete cleanEnv[key];
   Object.assign(cleanEnv, {
     GIT_CEILING_DIRECTORIES: dirname(root), GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: '/dev/null', HOME: root,
     GIT_AUTHOR_NAME: 'Test Author', GIT_AUTHOR_EMAIL: 'author@example.test',
@@ -2306,13 +2317,20 @@ test('E11: orchestrator keys on its suite list, orchestrator-tree on the whole t
   writeFileSync(buildRef, '#!/bin/sh\nprintf "[]"\n');
   chmodSync(brit, 0o755);
   chmodSync(buildRef, 0o755);
-  const env = { ...cleanEnv, BRIT_BIN: brit, BRIT_BUILD_REF_BIN: buildRef, PATH: cleanEnv.PATH || '' };
-  const isoSpawn = (cmd, args, opts) => spawnSync(cmd, args, { ...opts, env: { ...cleanEnv, ...(opts?.env || {}) } });
+  const env = {
+    ...cleanEnv, BRIT_BIN: brit, BRIT_BUILD_REF_BIN: buildRef, PATH: cleanEnv.PATH || '',
+    RUSTUP_TOOLCHAIN: '1.100.0',
+  };
+  const isoSpawn = (cmd, args, opts) => cmd === 'rustc'
+    ? { status: 0, stdout: `rustc ${opts?.env?.RUSTUP_TOOLCHAIN || 'unpinned'}\n`, stderr: '' }
+    : spawnSync(cmd, args, { ...opts, env: { ...cleanEnv, ...(opts?.env || {}) } });
   const gateProject = (name, recipe) => ({
     name, dir: 'genesis/orchestrator', manifestPath: 'genesis/orchestrator/build-manifest.json', steps: ['s'],
     run: { kind: 'just', recipe },
   });
-  const at = (gp, rev) => gateEvidence(gp, { root, commit: rev, env, spawn: isoSpawn });
+  const at = (gp, rev, execution = null) => gateEvidence(gp, {
+    root, commit: rev, env, spawn: isoSpawn, ...(execution ? { execution } : {}),
+  });
   const named = revs.map(rev => at(gateProject('orchestrator', 'gate'), rev));
   const tree = revs.map(rev => at(gateProject('orchestrator-tree', 'gate-tree'), rev));
   const [base, docs, habit, rust, data, outside, relisted, moded] = named;
@@ -2320,6 +2338,11 @@ test('E11: orchestrator keys on its suite list, orchestrator-tree on the whole t
   // shared/data.json, and the named test outside the project dir.
   assert.match(base.line, /closure scope paths \(6 reads\)/, base.line);
   assert.match(tree[0].line, /closure scope tree/, tree[0].line);
+  const executionEnv = carryExecutionEnv(env, undefined, root);
+  assert.equal(executionEnv.RUSTUP_TOOLCHAIN, '1.100.0');
+  const fenced = at(gateProject('orchestrator', 'gate'), revs[0], { cwd: root, env: executionEnv });
+  assert.equal(fenced.key, base.key,
+    'the carry fence keeps the honest orchestrator key when the project has no cargo env');
   assert.equal(docs.key, base.key, 'a documentation commit keeps the named suite closure');
   assert.equal(habit.key, docs.key, 'a habit DELTA under the project dir keeps it');
   assert.equal(rust.key, habit.key, 'a step source the list does not name keeps it');
