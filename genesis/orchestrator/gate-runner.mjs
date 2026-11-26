@@ -27,6 +27,9 @@ import { landerWait } from './gate-carry-claim.mjs';
 import { deviceEpr } from './device-epr.mjs';
 import { recipeKeyShadow } from './gate-recipe-key.mjs';
 import { enrichmentsIn, gradeLine, gradeMode, gradeOf, gradeStep, rawModes } from './gate-grade.mjs';
+import {
+  fenceScopeLine, fenceScopeMode, fenceScopeShadow, fenceScopeStep,
+} from './gate-fence-scope.mjs';
 import { readBuildNote } from './scripts/brit-attest.mjs';
 import { CLAIMED_EXIT_CODE, runAttested } from './gate-attest.mjs';
 import { affectedPackages, loadMetadata, metadataToolchain } from './cargo-affected.mjs';
@@ -769,14 +772,15 @@ function readShadowLedgerSpent(path, budgetMs, readFile = readFileSync) {
 }
 
 /**
- * One budget for the shadows that run after a gate is recorded (the read-shadow and GATE_GRADE),
- * shared by this process, and by a hook push when its ledger is set. With both knobs off there is
- * no budget and no ledger I/O.
+ * One budget for the observational shadows beside or after a gate (fence-scope, read-shadow and
+ * GATE_GRADE), shared by this process and by a hook push when its ledger is set. With all three
+ * knobs off there is no budget and no ledger I/O.
  */
 export function readShadowPushBudget(env, clock, {
   readFile = readFileSync, appendFile = appendFileSync, removeFile = rmSync,
 } = {}) {
-  if (env.GATE_READ_SHADOW === 'off' && gradeMode(env) === 'off') return null;
+  if (env.GATE_READ_SHADOW === 'off' && gradeMode(env) === 'off'
+      && fenceScopeMode(env) === 'off') return null;
   const budgetMs = shadowBudgetMs(env.GATE_READ_SHADOW_BUDGET_MS);
   const hasLedger = Object.hasOwn(env, 'GATE_READ_SHADOW_LEDGER');
   const ledger = hasLedger ? String(env.GATE_READ_SHADOW_LEDGER) : null;
@@ -843,6 +847,16 @@ function dropGrade(project, error, state, write) {
     write(`[gate] ${project} grade (shadow): skipped for budget (${oneLine(error.message)})\n`);
   } else {
     write(`[gate] ${project} grade (shadow): dropped (${oneLine(error?.message || error)})\n`);
+  }
+}
+
+function dropFenceScope(project, error, state, write) {
+  if (state.dropped) return;
+  state.dropped = true;
+  if (error instanceof ShadowBudgetExhausted) {
+    write(`[gate] ${project} fence-scope (shadow): skipped for budget (${oneLine(error.message)})\n`);
+  } else {
+    write(`[gate] ${project} fence-scope (shadow): dropped (${oneLine(error?.message || error)})\n`);
   }
 }
 
@@ -1719,9 +1733,11 @@ export function runProject(project, printOnly, namesOnly, {
   reading.leaseWaitedSeconds = carry.waitedS;
   // One admission decision for both run modes (decideReuse); ark is then asked only to run.
   const gradeOn = gradeMode(env) !== 'off' && Boolean(evidence.key);
+  const fenceScopeOn = fenceScopeMode(env) !== 'off' && Boolean(evidence.key);
   let observedSiblings = null;
   const decision = decideReuse(project, evidence, reuseContext, {
-    root, env, spawn, ...(gradeOn ? { observe: read => { observedSiblings = read; } } : {}),
+    root, env, spawn, ...((gradeOn || fenceScopeOn)
+      ? { observe: read => { observedSiblings = read; } } : {}),
   });
   // The reason a reuse was declined, said the moment it is decided and under the evidence line's
   // own name, so a reader of `evidence: miss` finds the why beside it (arrival backlog row 101).
@@ -1729,6 +1745,57 @@ export function runProject(project, printOnly, namesOnly, {
   if (env.GATE_EVIDENCE === 'reuse' && !decision.reuse) {
     write(`[gate] ${project.name} evidence: not reused: ${decision.why}\n`);
   }
+  // GATE_FENCE_SCOPE=shadow (default; `off` adds no read, spawn or write; there is no `on`):
+  // beside the already-made reuse decision, classify the destination tip's J/K/S fence and say
+  // what it would have done. It receives only the observer copy decideReuse already exposes. The
+  // paid verdict is added to its child gate-reading row only after this gate finishes.
+  let fenceScopeReading = null;
+  if (fenceScopeOn && observedSiblings?.candidates?.length) {
+    const state = { dropped: false };
+    let began = false;
+    let spentBefore = 0;
+    try {
+      sharedReadShadowBudget ||= readShadowPushBudget(env, clock);
+      sharedReadShadowBudget.check('fence-scope');
+      spentBefore = sharedReadShadowBudget.spentMs();
+      sharedReadShadowBudget.begin();
+      began = true;
+      const bounded = (command, args, options) =>
+        sharedReadShadowBudget.spawn(spawn, 'fence-scope', command, args, options);
+      const range = pushRange({ root, gateCommit, spawn: bounded });
+      sharedReadShadowBudget.check('fence-scope');
+      const result = fenceScopeShadow({
+        project: project.name, key: evidence.key, range,
+        candidates: observedSiblings.candidates, root, env, spawn: bounded,
+      });
+      sharedReadShadowBudget.check('fence-scope');
+      if (result) {
+        write(`${fenceScopeLine(project.name, result)}\n`);
+        const endedAt = wallClock();
+        const seconds = Math.max(0, (sharedReadShadowBudget.spentMs() - spentBefore) / 1000);
+        fenceScopeReading = { result, endedAt, seconds };
+      }
+    } catch (error) {
+      dropFenceScope(project.name, error, state, write);
+    } finally {
+      if (began) {
+        try {
+          sharedReadShadowBudget.end();
+          sharedReadShadowBudget.recordSpent(sharedReadShadowBudget.spentMs() - spentBefore);
+        } catch { /* a shadow is never a red */ }
+      }
+    }
+  }
+  const recordFenceScope = (outcome, status) => {
+    if (!fenceScopeReading) return;
+    const { result, endedAt, seconds } = fenceScopeReading;
+    emitGateReading({
+      ...reading, step: fenceScopeStep(project.name, result), parent: project.name,
+      key: evidence.key, keyChanged: 'unknown', outcome, status, synthesized: false,
+      waitedSeconds: 0, leaseWaitedSeconds: 0, seconds,
+      startedAt: new Date(new Date(endedAt).getTime() - seconds * 1000), endedAt,
+    }, { env, collector: readingCollector });
+  };
   // GATE_GRADE=shadow (default; `off` adds no read, spawn or write; there is no `on`): after this
   // gate's seconds, evidence and cycle are recorded, say what evidence this device holds for the
   // closure and how it would read under the PROPOSED graded table (gate-grade.mjs). It draws on the
@@ -1856,6 +1923,7 @@ export function runProject(project, printOnly, namesOnly, {
     liveEvent(env, { kind: 'gate-verdict', project: project.name, verdict: { exit: 0, seconds: 0, reused: true } });
     const completed = complete(0, 'reused', Math.max(0, seconds - finiteSeconds(reading.leaseWaitedSeconds)));
     runReadShadow('reused', 'green');
+    recordFenceScope('reused', 'green');
     runGrade('reused', 'green', sibling ? 'reuse sibling' : 'reuse own');
     // Sampling begins only after the reuse verdict, cycle observation and reading are complete.
     // In particular, detached process creation is outside every recorded gate timer.
@@ -1986,6 +2054,7 @@ export function runProject(project, printOnly, namesOnly, {
     liveEvent(env, { kind: 'gate-verdict', project: project.name, verdict: { exit: 0, seconds: 0, reused: true }, derivation, status: 'Answered' });
     const completed = complete(0, 'reused', executionSeconds);
     runReadShadow('reused', 'green');
+    recordFenceScope('reused', 'green');
     runGrade('reused', 'green', 'reuse derivation');
     return completed;
   }
@@ -2086,6 +2155,7 @@ export function runProject(project, printOnly, namesOnly, {
   } : {}) });
   const completed = complete(status, 'ran', executionSeconds);
   runReadShadow('ran', status === 0 ? 'green' : 'red');
+  recordFenceScope('ran', status === 0 ? 'green' : 'red');
   runGrade('ran', status === 0 ? 'green' : 'red', `ran ${status === 0 ? 'green' : 'red'}`);
   return completed;
 }

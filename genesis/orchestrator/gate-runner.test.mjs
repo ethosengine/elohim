@@ -442,7 +442,8 @@ test('read-shadow knob off performs no ledger I/O', () => {
   let ledgerReads = 0;
   let ledgerWrites = 0;
   const off = readShadowPushBudget({
-    GATE_READ_SHADOW: 'off', GATE_GRADE: 'off', GATE_READ_SHADOW_LEDGER: 'fixture',
+    GATE_READ_SHADOW: 'off', GATE_GRADE: 'off', GATE_FENCE_SCOPE: 'off',
+    GATE_READ_SHADOW_LEDGER: 'fixture',
   }, () => 0n, {
     readFile: () => { ledgerReads++; return ''; },
     appendFile: () => { ledgerWrites++; },
@@ -2586,9 +2587,12 @@ test('grade shadow: knob off adds no read, spawn or write', t => {
   assert.equal(off.calls.length, on.calls.length - on.gradeSpawns.length - on.calls.filter(call =>
     call.command === 'git' && (call.args[0] === 'merge-base' || (call.args[0] === 'diff' && call.args.includes('-z')) || call.args.includes('--git-common-dir'))).length,
   'every call the knob adds is accounted for: off makes none of them');
-  // With both post-record shadows off there is no budget object and so no ledger I/O at all.
+  // With all three observational shadows off there is no budget object and no ledger I/O at all.
   let ledgerIo = 0;
-  assert.equal(readShadowPushBudget({ GATE_READ_SHADOW: 'off', GATE_GRADE: 'off', GATE_READ_SHADOW_LEDGER: 'fixture' }, () => 0n, {
+  assert.equal(readShadowPushBudget({
+    GATE_READ_SHADOW: 'off', GATE_GRADE: 'off', GATE_FENCE_SCOPE: 'off',
+    GATE_READ_SHADOW_LEDGER: 'fixture',
+  }, () => 0n, {
     readFile: () => { ledgerIo++; return ''; }, appendFile: () => { ledgerIo++; }, removeFile: () => { ledgerIo++; },
   }), null);
   assert.equal(ledgerIo, 0);
