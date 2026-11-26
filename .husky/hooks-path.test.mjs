@@ -116,6 +116,43 @@ test('from a linked worktree, core.hooksPath becomes the main checkout absolute 
   assert.equal(git(main, 'config', '--get', 'core.hooksPath'), want);
 });
 
+// Thin-device station 4 (backlog row 106): the main checkout may sit on an older branch.
+test('a main checkout whose pre-push.bash differs is named with the push form for this worktree, and the shared setting is not moved', (t) => {
+  const { main, worktree } = scratch(t);
+  const mainHook = readFileSync(join(main, '.husky/pre-push.bash'), 'utf8');
+  installShims(worktree);
+  writeFileSync(join(worktree, '.husky/pre-push.bash'), mainHook);
+  const same = runScript(worktree);
+  assert.equal(same.status, 0, same.stderr);
+  assert.doesNotMatch(same.stdout, /NOTE/, 'identical hooks: one line, as before');
+  assert.equal(same.stdout.trim().split('\n').length, 1);
+
+  writeFileSync(join(worktree, '.husky/pre-push.bash'), `${mainHook}# newer\n`);
+  const r = runScript(worktree);
+  assert.equal(r.status, 0, r.stderr);
+  const lines = r.stdout.trim().split('\n');
+  assert.equal(lines.length, 2, r.stdout);
+  assert.equal(lines[1], `[hooks-path] NOTE: ${join(main, '.husky/pre-push.bash')} differs from this worktree's, and a plain push from here runs the main checkout's; `
+    + `to run this worktree's own hook: brit -c core.hooksPath=${join(worktree, '.husky/_')} push origin HEAD:<ref>`);
+  // Every checkout still reads the main checkout's hook; nothing was repointed.
+  assert.equal(git(main, 'config', '--get', 'core.hooksPath'), join(main, '.husky/_'));
+  assert.equal(git(worktree, 'config', '--get', 'core.hooksPath'), join(main, '.husky/_'));
+  // The printed override is what Git honours for one command.
+  writeFileSync(join(worktree, '.husky/pre-push'), '#!/bin/sh\necho "worktree hook ran" >&2\nexit 29\n', { mode: 0o755 });
+  const own = spawnSync('git', ['-c', `core.hooksPath=${join(worktree, '.husky/_')}`, 'hook', 'run', 'pre-push'], { cwd: worktree, env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+  assert.equal(own.status, 29, own.stderr);
+  const plain = spawnSync('git', ['hook', 'run', 'pre-push'], { cwd: worktree, env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+  assert.equal(plain.status, 23, 'a plain push still runs the main checkout hook');
+
+  // Without this worktree's own shims the override would name a directory with no hook: say so instead.
+  rmSync(join(worktree, '.husky/_'), { recursive: true });
+  const bare = runScript(worktree);
+  assert.match(bare.stdout, /NOTE: .* differs .*run pnpm install here first/);
+  assert.doesNotMatch(bare.stdout, /brit -c core\.hooksPath/);
+  // From the main checkout itself there is nothing to compare.
+  assert.doesNotMatch(runScript(main).stdout, /NOTE/);
+});
+
 test('from the main checkout too, and a missing shim dir is installed from this checkout', (t) => {
   const { main, worktree } = scratch(t);
   rmSync(join(main, '.husky/_'), { recursive: true, force: true });
